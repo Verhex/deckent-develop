@@ -11,7 +11,17 @@ export const HOST_PRE_DISPATCH_SETTLEMENT_VERSION = 1 as const;
 export type HostPreDispatchReasonCode =
   | 'PROVIDER_ADAPTER_UNAVAILABLE'
   | 'FORCED_SKILL_UNAVAILABLE'
+  | 'ATTRIBUTION_BASELINE_CAPTURE_FAILED'
+  | 'COORDINATOR_CRASHED_BEFORE_DOCKER_PREPARE'
   | 'LEGACY_HOST_PRE_DISPATCH_REJECTION';
+
+export interface DockerRecoveryAttemptAuthority {
+  readonly schemaVersion: 1;
+  readonly taskId: string;
+  readonly backend: 'docker';
+  readonly projectRootSha256: string;
+  readonly attemptId: string;
+}
 
 function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
@@ -91,6 +101,49 @@ export function createHostPreDispatchNoGoResult(
       model: task.model,
     },
   };
+}
+
+/**
+ * Project a host-settled Docker attempt that never reached PREPARED into the
+ * canonical zero-work pre-dispatch contract. The caller must first establish
+ * the durable settlement/closure authority; this helper only validates the
+ * exact recovery payload and binds it to that immutable attempt identity.
+ *
+ * Generic return shape preserves legacy recovery payloads without pretending
+ * they were worker-authored TaskResultV1 records.
+ */
+export function projectDockerRecoveryPreDispatchSettlement<T>(
+  value: T,
+  authority: DockerRecoveryAttemptAuthority,
+): T {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+  const result = value as Record<string, unknown>;
+  const isExactZeroWorkRecovery = result.taskId === authority.taskId
+    && result.workerId === `docker-recovery-${authority.taskId}`
+    && Array.isArray(result.filesChanged)
+    && result.filesChanged.length === 0
+    && result.linesAdded === 0
+    && result.linesRemoved === 0
+    && result.testsPassed === false
+    && result.selfAssessment === 'NO_GO'
+    && result.notes === `DECKENT_E091:coordinator-crashed-before-docker-prepare:${authority.attemptId}`;
+  if (!isExactZeroWorkRecovery) return value;
+
+  const detail = canonicalJson({
+    domain: 'deckent.docker-recovery-pre-dispatch.v1',
+    authority,
+  });
+  const digest = sha256(detail);
+  return {
+    ...result,
+    preDispatchSettlement: {
+      version: HOST_PRE_DISPATCH_SETTLEMENT_VERSION,
+      state: 'NOT_DISPATCHED',
+      attemptId: `host-pre-dispatch:${authority.taskId}:${digest.slice(0, 32)}`,
+      reasonCode: 'COORDINATOR_CRASHED_BEFORE_DOCKER_PREPARE',
+      evidenceRef: `host-pre-dispatch-settlement:sha256:${digest}`,
+    },
+  } as T;
 }
 
 function explicitSettlementIsValid(

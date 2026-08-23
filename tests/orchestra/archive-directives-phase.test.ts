@@ -13,6 +13,10 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+const publishSprintArchiveArtifactMock = vi.hoisted(() => vi.fn(
+  (_root: string, _sprintId: string, _source: string, target: string) => ({ path: target }),
+));
+
 vi.mock('node:fs', () => ({
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
@@ -23,6 +27,7 @@ vi.mock('node:fs', () => ({
   statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
   appendFileSync: vi.fn(),
   unlinkSync: vi.fn(),
+  renameSync: vi.fn(),
   rmdirSync: vi.fn(),
   promises: {
     readFile: vi.fn(async () => ''),
@@ -66,6 +71,14 @@ vi.mock('../../src/core/model-registry.js', () => ({
   },
 }));
 
+vi.mock('../../src/core/sprint-archive.js', () => ({
+  archiveTaskArtifacts: vi.fn(),
+  isSprintOwnedTaskArtifact: vi.fn().mockReturnValue(false),
+  publishSprintArchiveArtifact: publishSprintArchiveArtifactMock,
+  resolveSprintArchiveDir: vi.fn((root: string, sprintId: string) =>
+    `${root}/.deckent/archive/sprints/${sprintId}`),
+}));
+
 vi.mock('../../src/orchestra/result-collector.js', () => ({
   buildResultsMap: vi.fn().mockReturnValue(new Map()),
 }));
@@ -86,12 +99,11 @@ vi.mock('../../src/core/ci-learning.js', () => ({
   writeCiLearnings: vi.fn(),
 }));
 
-import { existsSync, mkdirSync, copyFileSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, copyFileSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
 import { archiveDirectives, emergencyRestoreDirectives } from '../../src/orchestra/sprint-docs-updater.js';
 import { debugLog } from '../../src/core/utils.js';
 
 const mockExistsSync = existsSync as ReturnType<typeof vi.fn>;
-const mockMkdirSync = mkdirSync as ReturnType<typeof vi.fn>;
 const mockCopyFileSync = copyFileSync as ReturnType<typeof vi.fn>;
 const mockWriteFileSync = writeFileSync as ReturnType<typeof vi.fn>;
 const mockReadFileSync = readFileSync as ReturnType<typeof vi.fn>;
@@ -147,16 +159,11 @@ describe('archiveDirectives — phase guard (Sprint 146 T-008)', () => {
     // Sprint 168 C0a-4: legacy placeholder-overwrite opt-in (BUG-CC default preserve)
     archiveDirectives('/project', 'sprint-145', 'CLEANUP', { autoArchive: true });
 
-    // Should create archive dir
-    expect(mockMkdirSync).toHaveBeenCalledWith(
-      expect.stringContaining('.brain/archive'),
-      { recursive: true },
-    );
-
-    // Should copy DIRECTIVES.md to archive
-    expect(mockCopyFileSync).toHaveBeenCalledWith(
+    expect(publishSprintArchiveArtifactMock).toHaveBeenCalledWith(
+      '/project',
+      'sprint-145',
       expect.stringContaining('DIRECTIVES.md'),
-      expect.stringContaining('DIRECTIVES-sprint-145.md'),
+      'docs/DIRECTIVES.md',
     );
 
     // Should write placeholder

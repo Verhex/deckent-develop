@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync, unlinkSync } from 'node:fs';
 import { join, basename } from 'node:path';
+import { createHash } from 'node:crypto';
 import { archivePromptFiles } from '../../orchestra/spawn-backend-docker.js';
 import { cleanTasksArchive } from '../../orchestra/sprint-docs-updater.js';
 import { runRetention } from '../../core/sprint-file-retention.js';
@@ -8,7 +9,7 @@ import type { Command } from 'commander';
 import type { Task, Sprint } from '../../core/types.js';
 import { SprintStatus, SprintPhase, TaskStatus } from '../../core/types.js';
 import {
-  TASKS_DIR, LOCKS_DIR, BRAIN_DIR, ARCHIVE_DIR, MEMORY_DB_FILE,
+  TASKS_DIR, LOCKS_DIR, BRAIN_DIR, MEMORY_DB_FILE,
   TMUX_SESSION_NAME, PROJECT_CONFIG_PATH,
 } from '../../core/constants.js';
 import { MemoryStore } from '../../core/memory-store.js';
@@ -31,6 +32,134 @@ import {
 } from '../../core/sprint-terminal-publication-status.js';
 import { publishCanonicalRunStatusReadModel } from '../../core/run-status-read-model.js';
 import { DeckentError } from '../../core/errors.js';
+import { archiveTaskArtifacts } from '../../core/sprint-archive.js';
+import {
+  applyRuntimeHygiene,
+  planRuntimeHygiene,
+  readRuntimeHygieneReceipt,
+  type RuntimeHygieneApplyResult,
+  type RuntimeHygieneFamily,
+  type RuntimeHygienePlan,
+} from '../../core/runtime-hygiene.js';
+
+const RUNTIME_HYGIENE_FAMILIES = [
+  'recent-work', 'jobs', 'evaluations', 'run-flows', 'logs',
+] as const satisfies readonly RuntimeHygieneFamily[];
+
+interface RuntimeHygieneCleanupOptions {
+  readonly history?: boolean;
+  readonly apply?: boolean;
+  readonly planDigest?: string;
+  readonly json?: boolean;
+  readonly dryRun?: boolean;
+}
+
+interface RuntimeHygieneProjection {
+  readonly version: 1;
+  readonly operation: 'runtime-hygiene';
+  readonly mode: 'plan' | 'apply' | 'hold';
+  readonly planDigest?: string;
+  readonly reasonCode?: string;
+  readonly inventory?: { readonly families: number; readonly count: number; readonly bytes: number };
+  readonly candidates?: { readonly count: number; readonly bytes: number };
+  readonly counters?: RuntimeHygienePlan['counters'];
+  readonly receipt?: {
+    readonly state: RuntimeHygieneApplyResult['receiptState'];
+    readonly status: RuntimeHygieneApplyResult['receipt']['status'];
+  };
+  readonly outcomes?: readonly {
+    readonly family: RuntimeHygieneFamily;
+    readonly attempted: number;
+    readonly retired: number;
+    readonly retiredBytes: number;
+    readonly failures: number;
+  }[];
+}
+
+function sumRuntimeHygieneCounters(
+  plan: RuntimeHygienePlan,
+  field: 'inventoryCount' | 'inventoryBytes' | 'candidateCount' | 'candidateBytes',
+): number {
+  return RUNTIME_HYGIENE_FAMILIES.reduce((sum, family) => sum + plan.counters[family][field], 0);
+}
+
+/** Public, path-free machine projection for the CLI JSON surface. */
+export function projectRuntimeHygienePlan(plan: RuntimeHygienePlan): RuntimeHygieneProjection {
+  return {
+    version: 1, operation: 'runtime-hygiene', mode: 'plan', planDigest: plan.planDigest,
+    inventory: {
+      families: RUNTIME_HYGIENE_FAMILIES.length,
+      count: sumRuntimeHygieneCounters(plan, 'inventoryCount'),
+      bytes: sumRuntimeHygieneCounters(plan, 'inventoryBytes'),
+    },
+    candidates: {
+      count: sumRuntimeHygieneCounters(plan, 'candidateCount'),
+      bytes: sumRuntimeHygieneCounters(plan, 'candidateBytes'),
+    },
+    counters: plan.counters,
+  };
+}
+
+/** Public, path-free projection of durable apply evidence. */
+export function projectRuntimeHygieneApply(
+  plan: Pick<RuntimeHygienePlan, 'planDigest'>,
+  result: RuntimeHygieneApplyResult,
+): RuntimeHygieneProjection {
+  return {
+    version: 1, operation: 'runtime-hygiene', mode: 'apply', planDigest: plan.planDigest,
+    counters: result.receipt.counters,
+    receipt: { state: result.receiptState, status: result.receipt.status },
+    outcomes: result.receipt.outcomes.map(outcome => ({
+      family: outcome.family,
+      attempted: outcome.attempted,
+      retired: outcome.retired,
+      retiredBytes: outcome.retiredBytes,
+      failures: outcome.failures.length,
+    })),
+  };
+}
+
+function runtimeHygieneReason(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.match(/(?:^|\b)(RUNTIME_HYGIENE_[A-Z_]+)/u)?.[1] ?? 'RUNTIME_HYGIENE_FAILED';
+}
+
+function printRuntimeHygieneProjection(projection: RuntimeHygieneProjection): void {
+  process.stdout.write(`${JSON.stringify(projection)}\n`);
+}
+
+function renderRuntimeHygienePlan(plan: RuntimeHygienePlan, lang: string): void {
+  print(getMessage('runtime_hygiene.inventory', lang, {
+    families: String(RUNTIME_HYGIENE_FAMILIES.length),
+    count: String(sumRuntimeHygieneCounters(plan, 'inventoryCount')),
+    bytes: String(sumRuntimeHygieneCounters(plan, 'inventoryBytes')),
+  }));
+  print(getMessage('runtime_hygiene.plan', lang, {
+    count: String(sumRuntimeHygieneCounters(plan, 'candidateCount')),
+    bytes: String(sumRuntimeHygieneCounters(plan, 'candidateBytes')),
+  }));
+  print(`Plan digest: ${plan.planDigest}`);
+}
+
+function renderRuntimeHygieneApply(result: RuntimeHygieneApplyResult, lang: string): void {
+  for (const outcome of result.receipt.outcomes) {
+    print(getMessage('runtime_hygiene.retire', lang, {
+      family: outcome.family,
+      count: String(outcome.retired),
+      bytes: String(outcome.retiredBytes),
+    }));
+  }
+  print(getMessage('runtime_hygiene.receipt', lang, {
+    receiptState: result.receiptState,
+    status: result.receipt.status,
+  }));
+  print(getMessage('runtime_hygiene.summary', lang, {
+    families: String(result.receipt.outcomes.length),
+    attempted: String(result.receipt.outcomes.reduce((sum, item) => sum + item.attempted, 0)),
+    retired: String(result.receipt.outcomes.reduce((sum, item) => sum + item.retired, 0)),
+    failures: String(result.receipt.outcomes.reduce((sum, item) => sum + item.failures.length, 0)),
+  }));
+}
 
 export function cleanupAuthorityHoldReason(
   authority: CanonicalRunStatus,
@@ -87,8 +216,17 @@ function getProjectSessionName(root: string): string {
 export function archiveLogFileWithVerify(liveLogPath: string, archiveDir: string, content: Buffer): boolean {
   try {
     mkdirSync(archiveDir, { recursive: true });
-    const archivePath = join(archiveDir, basename(liveLogPath));
-    writeFileSync(archivePath, content);
+    let archivePath = join(archiveDir, basename(liveLogPath));
+    if (existsSync(archivePath)) {
+      const existing = readFileSync(archivePath) as Buffer;
+      if (existing.equals(content)) return true;
+      const digest = createHash('sha256').update(content).digest('hex').slice(0, 16);
+      const conflictsDir = join(archiveDir, 'conflicts');
+      mkdirSync(conflictsDir, { recursive: true });
+      archivePath = join(conflictsDir, `${basename(liveLogPath)}.${digest}`);
+      if (existsSync(archivePath)) return (readFileSync(archivePath) as Buffer).equals(content);
+    }
+    writeFileSync(archivePath, content, { flag: 'wx' });
     const archived = readFileSync(archivePath) as Buffer;
     return archived.equals(content);
   } catch {
@@ -121,8 +259,12 @@ export function registerCleanup(program: Command): void {
     .description(getMessage('cli.cleanup.desc', getLanguage(undefined)))
     .option('--decay', 'Force run memory decay (compress .brain/ files)')
     .option('--dry-run', 'Preview what would be deleted without actually deleting')
+    .option('--history', 'Plan bounded runtime-history hygiene (dry-run by default)')
+    .option('--apply', 'Apply a runtime-history hygiene plan')
+    .option('--plan-digest <digest>', 'Exact runtime-history plan digest required by --apply')
+    .option('--json', 'Emit one path-free runtime-history JSON projection')
     .option('--sprint <id>', getMessage('cleanup.sprint_option', registerLang))
-    .action((opts: { decay?: boolean; dryRun?: boolean; sprint?: string }) => {
+    .action((opts: RuntimeHygieneCleanupOptions & { decay?: boolean; sprint?: string }) => {
       const root = resolveProjectRoot();
       const lang = getLangFromConfig(root);
       const tasksDir = join(root, TASKS_DIR);
@@ -133,6 +275,84 @@ export function registerCleanup(program: Command): void {
           sprintId: requestedSprintId,
           reason: 'invalid-sprint-id',
         })));
+        process.exitCode = 1;
+        return;
+      }
+      if (opts.history) {
+        const hold = (reasonCode: string): void => {
+          if (opts.json) {
+            printRuntimeHygieneProjection({
+              version: 1, operation: 'runtime-hygiene', mode: 'hold', reasonCode,
+            });
+          } else {
+            printError(new Error(getMessage('runtime_hygiene.hold', lang, { reasonCode })));
+          }
+          process.exitCode = 1;
+        };
+
+        if (opts.apply && opts.dryRun) { hold('APPLY_DRY_RUN_CONFLICT'); return; }
+        if (!opts.apply && opts.planDigest !== undefined) { hold('PLAN_DIGEST_REQUIRES_APPLY'); return; }
+        if (opts.apply && !opts.planDigest?.trim()) { hold('PLAN_DIGEST_REQUIRED'); return; }
+
+        try {
+          if (opts.apply) {
+            const authorityHold = cleanupAuthorityHoldReason(
+              authority,
+              projectTerminalPublicationStatus(root, authority),
+            );
+            if (authorityHold) {
+              hold(`AUTHORITY_${authorityHold.toUpperCase().replace(/-/gu, '_')}`);
+              return;
+            }
+            const requestedDigest = opts.planDigest!.trim();
+            const existing = readRuntimeHygieneReceipt(root, requestedDigest);
+            if (existing) {
+              if (opts.json) {
+                printRuntimeHygieneProjection(projectRuntimeHygieneApply(
+                  { planDigest: requestedDigest },
+                  existing,
+                ));
+              } else {
+                renderRuntimeHygieneApply(existing, lang);
+              }
+              if (existing.receipt.status === 'partial') process.exitCode = 1;
+              return;
+            }
+          }
+          const selectedSprints = requestedSprintId
+            ? [requestedSprintId]
+            : authority.sprintId && !authority.active ? [authority.sprintId] : [];
+          const currentSprints = authority.active && authority.sprintId ? [authority.sprintId] : [];
+          // Retention is day-granular; pin the clock so a preview digest can be
+          // supplied unchanged to a same-day exact-CAS apply invocation.
+          const now = new Date();
+          now.setUTCHours(0, 0, 0, 0);
+          const plan = planRuntimeHygiene(root, {
+            sprintIds: selectedSprints,
+            currentSprintIds: currentSprints,
+            now,
+          });
+
+          if (!opts.apply) {
+            if (opts.json) printRuntimeHygieneProjection(projectRuntimeHygienePlan(plan));
+            else renderRuntimeHygienePlan(plan, lang);
+            return;
+          }
+          if (opts.planDigest!.trim() !== plan.planDigest) { hold('PLAN_DIGEST_MISMATCH'); return; }
+          const result = applyRuntimeHygiene(plan);
+          if (opts.json) printRuntimeHygieneProjection(projectRuntimeHygieneApply(plan, result));
+          else renderRuntimeHygieneApply(result, lang);
+          if (result.receipt.status === 'partial') process.exitCode = 1;
+        } catch (error) {
+          hold(runtimeHygieneReason(error));
+        }
+        return;
+      }
+      // Runtime-hygiene mutation switches are never aliases for the legacy,
+      // destructive cleanup path. Require the explicit surface selector.
+      if (opts.apply || opts.planDigest !== undefined || opts.json) {
+        const reasonCode = 'HISTORY_SELECTOR_REQUIRED';
+        printError(new Error(getMessage('runtime_hygiene.hold', lang, { reasonCode })));
         process.exitCode = 1;
         return;
       }
@@ -184,17 +404,17 @@ export function registerCleanup(program: Command): void {
           )
           : [];
 
-        print('[dry-run] Would archive:');
-        for (const f of promptFiles) print(`  prompt → archive: ${f}`);
-        print('[dry-run] Would delete:');
-        for (const f of taskFiles) print(`  task: ${f}`);
-        for (const f of lockFiles) print(`  lock: ${f}`);
-        print(`  ${taskFiles.length} task file(s) (includes .log, .timeout artifacts)`);
-        print(`  ${lockFiles.length} lock file(s)`);
-        print(`  ${promptFiles.length} prompt file(s) → archived to .tasks/archive/`);
-        print('  tmux session: deckent-orchestra');
-        print('  .tasks/archive/ retention policy will be applied');
-        print('\nRun without --dry-run to execute.');
+        print(getMessage('cleanup.dry_run.archive_header', lang));
+        for (const file of promptFiles) print(getMessage('cleanup.dry_run.prompt', lang, { file }));
+        print(getMessage('cleanup.dry_run.delete_header', lang));
+        for (const file of taskFiles) print(getMessage('cleanup.dry_run.task', lang, { file }));
+        for (const file of lockFiles) print(getMessage('cleanup.dry_run.lock', lang, { file }));
+        print(getMessage('cleanup.dry_run.task_count', lang, { count: String(taskFiles.length) }));
+        print(getMessage('cleanup.dry_run.lock_count', lang, { count: String(lockFiles.length) }));
+        print(getMessage('cleanup.dry_run.prompt_count', lang, { count: String(promptFiles.length) }));
+        print(getMessage('cleanup.dry_run.tmux', lang));
+        print(getMessage('cleanup.dry_run.reconcile', lang));
+        print(getMessage('cleanup.dry_run.execute', lang));
         return;
       }
 
@@ -308,20 +528,18 @@ export function registerCleanup(program: Command): void {
         // §2.4 — Archive every owned task artifact with byte verification
         // before live deletion. An archive failure restores that exact file;
         // foreign-run evidence never enters this run's archive.
-        const taskArchiveDir = join(root, BRAIN_DIR, ARCHIVE_DIR, 'sprints', `${archiveSprintId}-tasks`);
         const archiveFailures: string[] = [];
         if (targetSprintId && existsSync(tasksDir)) {
           const archivalSuffix = /\.(?:json|plan|hb|result|paused|log|timeout|partial-result)$/u;
-          for (const artifactName of (readdirSync(tasksDir) as string[]).filter(
+          const ownedArtifacts = (readdirSync(tasksDir) as string[]).filter(
             name => ownsTaskArtifact(name) && archivalSuffix.test(name),
-          )) {
-            const liveArtifactPath = join(tasksDir, artifactName);
-            try {
-              const content = readFileSync(liveArtifactPath) as Buffer;
-              const ok = archiveLogFileWithVerify(liveArtifactPath, taskArchiveDir, content);
-              if (!ok) archiveFailures.push(artifactName);
-            } catch { archiveFailures.push(artifactName); }
-          }
+          );
+          const settlement = archiveTaskArtifacts(root, archiveSprintId, {
+            archive: ownedArtifacts,
+            preserve: [],
+            sweepResidue: false,
+          });
+          archiveFailures.push(...settlement.failures);
         }
         if (archiveFailures.length > 0) {
           throw new DeckentError('E_CLEANUP_ARCHIVE_HOLD', getMessage('cleanup.archive_hold', lang, {
@@ -335,8 +553,7 @@ export function registerCleanup(program: Command): void {
         // lifecycle projections. Immutable job/receipt/forensic archives stay.
         if (sprintId) cleanupSprintMetadata(root, sprintId);
 
-        // E) Archive .prompt-* files to .tasks/archive/sprint-{id}/ before deleting
-        // Prompt files persist during sprint for analysis — archived on cleanup with retention policy
+        // E) Archive .prompt-* files into the canonical sprint namespace.
         const archiveResult = archivePromptFiles(
           tasksDir,
           archiveSprintId,
@@ -344,16 +561,19 @@ export function registerCleanup(program: Command): void {
           taskIdPrefix ?? undefined,
         );
         if (archiveResult.archived > 0) {
-          print(`Archived ${archiveResult.archived} prompt file(s) → .tasks/archive/${archiveSprintId}/`);
-        }
-        if (archiveResult.cleaned > 0) {
-          print(`Removed ${archiveResult.cleaned} prompt file(s) from old archive (retention: ${promptArchiveRetention} sprints)`);
+          print(getMessage('cleanup.prompts_archived', lang, {
+            count: String(archiveResult.archived),
+            sprintId: archiveSprintId,
+          }));
         }
 
-        // F) Apply .tasks/archive/ retention policy — remove sprint archive dirs beyond retention limit
+        // F) Reconcile legacy `.tasks/archive/` staging; immutable evidence is
+        // never deleted by this compatibility pass.
         const tasksArchiveCleaned = cleanTasksArchive(root, promptArchiveRetention);
         if (tasksArchiveCleaned > 0) {
-          print(`Removed ${tasksArchiveCleaned} old .tasks/archive/ dir(s) (retention: ${promptArchiveRetention} sprints)`);
+          print(getMessage('cleanup.legacy_archives_consolidated', lang, {
+            count: String(tasksArchiveCleaned),
+          }));
         }
 
         // G) Sprint file retention — clean counters, migrate forensic, enforce keep_last_n + size_cap
@@ -377,7 +597,12 @@ export function registerCleanup(program: Command): void {
           if (retResult.archived.length > 0) {
             print(`Archived ${retResult.archived.length} sprint file(s) (retention: keep_last_n=${retentionConfig.keep_last_n ?? 10})`);
           }
-        } catch { /* best-effort, non-blocking */ }
+        } catch (error) {
+          // Retention may already have published immutable bytes. Hiding a
+          // manifest reconciliation failure would leave canonical evidence
+          // untracked, so the cleanup command must stop with the typed cause.
+          throw error;
+        }
 
         // C) Kill only this project's tmux session — not a hardcoded global name
         const sessionName = getProjectSessionName(root);

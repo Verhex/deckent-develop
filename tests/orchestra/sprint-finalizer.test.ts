@@ -438,9 +438,19 @@ function settledFixture(sprint: Sprint): {
   evaluations: Map<string, TaskEvaluation>;
   results: TaskResult[];
 } {
+  const tasksDir = join(PROJECT_ROOT, '.tasks');
+  mkdirSync(tasksDir, { recursive: true });
   const evaluations = new Map<string, TaskEvaluation>();
   const results: TaskResult[] = [];
   for (const task of sprint.tasks) {
+    // The finalizer's terminal receipt is CAS-fenced against durable task
+    // authority. Integration fixtures must therefore persist the task bytes
+    // they claim to settle instead of relying on the in-memory Sprint alone.
+    writeFileSync(
+      join(tasksDir, `task-${task.id}.json`),
+      `${JSON.stringify(task, null, 2)}\n`,
+      { mode: 0o600 },
+    );
     const attemptId = `attempt-${task.id}`;
     evaluations.set(task.id, TaskEvaluation.DONE);
     results.push({
@@ -495,10 +505,9 @@ describe('sprint-finalizer — finalizeSprint gate.json integration', () => {
     expect(readFileSync(reportPath, 'utf8')).toContain('Wave Timeline');
   });
 
-  it('finalizeSprint completes normally when gate.json write fails (fail-safe)', async () => {
-    // Async writeFile failure is non-fatal by contract: gate/load-report writes are
-    // fail-safe. Spy on the REAL fs.promises object (sync atomic publication ring is
-    // untouched, so terminal evidence still settles).
+  it('holds when fresh gate authority cannot be persisted', async () => {
+    // The gate JSON view is best-effort only after a fresh authoritative gate has
+    // been persisted. A global write failure at that authority boundary is a HOLD.
     const writeSpy = vi.spyOn(nodeFsMod.promises, 'writeFile')
       .mockRejectedValue(new Error('ENOSPC: no space left'));
     try {
@@ -506,10 +515,9 @@ describe('sprint-finalizer — finalizeSprint gate.json integration', () => {
     const sprint = makeSprint('sprint-137');
     const { evaluations, results } = settledFixture(sprint);
 
-    // finalizeSprint must not throw — gate write failure is non-fatal
     await expect(
       finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true }),
-    ).resolves.toBeDefined();
+    ).rejects.toThrow(/FINALIZER_GATE_EVALUATION_HOLD/);
     } finally { writeSpy.mockRestore(); }
   });
 });
@@ -649,7 +657,7 @@ describe('sprint-finalizer — archiveDirectives called in finalizeSprint', () =
     expect(mockArchive).not.toHaveBeenCalled();
   });
 
-  it('finalizeSprint continues when archiveDirectives throws (fail-safe)', async () => {
+  it('holds when canonical DIRECTIVES archival fails', async () => {
     const { archiveDirectives } = await import('../../src/orchestra/sprint-reporter.js');
     const mockArchive = vi.mocked(archiveDirectives);
     mockArchive.mockImplementationOnce(() => { throw new Error('EACCES: permission denied'); });
@@ -657,10 +665,9 @@ describe('sprint-finalizer — archiveDirectives called in finalizeSprint', () =
     const sprint = makeSprint('sprint-138');
     const { evaluations, results } = settledFixture(sprint);
 
-    // Must not throw — archiveDirectives failure is non-fatal
     await expect(
       finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true }),
-    ).resolves.toBeDefined();
+    ).rejects.toThrow(/SPRINT_ARCHIVE_DIRECTIVES_FAILED/);
   });
 });
 
@@ -728,17 +735,16 @@ describe('sprint-finalizer — Layer 4 runtime wire fix (Sprint 138)', () => {
     expect(readFileSync(reportPath, 'utf8')).toContain('Wave Timeline');
   });
 
-  it('finalizeSprint completes even when both gate and load-report write fail (fail-safe)', async () => {
+  it('holds when the fresh gate cannot persist before report publication', async () => {
     const wSpy = vi.spyOn(nodeFsMod.promises, 'writeFile').mockRejectedValue(new Error('ENOSPC'));
     const mSpy = vi.spyOn(nodeFsMod.promises, 'mkdir').mockRejectedValue(new Error('ENOSPC'));
     try {
       const sprint = makeSprint('sprint-138');
       const { evaluations, results } = settledFixture(sprint);
 
-      // finalizeSprint must NOT throw — async gate/report writes are non-fatal
-      const metrics = await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
-      expect(metrics).toBeDefined();
-      expect(metrics.totalTasks).toBe(1);
+      await expect(
+        finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true }),
+      ).rejects.toThrow(/FINALIZER_GATE_EVALUATION_HOLD/);
     } finally {
       wSpy.mockRestore();
       mSpy.mockRestore();
@@ -970,7 +976,9 @@ describe('sprint-finalizer — Brain event hooks (Sprint 139 Task 042)', () => {
     const sprint = makeSprint('sprint-139');
     const { evaluations, results } = settledFixture(sprint);
 
-    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+    await expect(
+      finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true }),
+    ).rejects.toThrow(/FINALIZER_GATE_EVALUATION_HOLD/);
 
     // The gate.json write failed, so GATE_COMPUTED inside that try block was not reached
     const gateComputedCalls = vi.mocked(eventStreamMod.writeEvent).mock.calls.filter(
@@ -1208,13 +1216,7 @@ describe('sprint-finalizer — post-finalize hooks (Sprint 143 Task 10)', () => 
 
   it('metrics passed to hooks match calculated sprint metrics', async () => {
     const sprint = makeSprint('sprint-143');
-    sprint.tasks = [
-      { id: '143-001', title: 'Task 1', description: '', model: 'opus', effort: 'normal', priority: 'CRITICAL', reason: '', scope: { directories: ['src/'], filesRead: [], filesWrite: [] }, dependencies: [], goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' }, status: 'DONE' },
-    ] as Sprint['tasks'];
-    const evaluations = new Map<string, TaskEvaluation>([
-      ['143-001', TaskEvaluation.DONE],
-    ]);
-    const { results } = settledFixture(sprint);
+    const { evaluations, results } = settledFixture(sprint);
 
     await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 

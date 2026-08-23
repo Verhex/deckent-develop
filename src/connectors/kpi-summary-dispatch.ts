@@ -8,7 +8,7 @@
 //
 // The only prod adapter-construction path, `buildConnectorNotificationAdapter`
 // (connector-bootstrap.ts), neither accepts nor forwards `ConnectorNotifyOptions`,
-// and that module is off-limits. Both building blocks it composes —
+// Both building blocks it composes —
 // `buildConnectorTargets` and `makeConnectorNotificationAdapter` — are exported, so
 // this module re-composes them in a thin opts-forwarding wrapper instead. Wiring
 // happens at the three clean caller-sites (start / autonomous / sprint-runner-entry),
@@ -82,7 +82,7 @@ export function buildSprintKpiSummaryFn(root: string, lang: string): SprintKpiSu
  * (notably `kpiSummaryFn`) to the underlying adapter.
  *
  * This mirrors `buildConnectorNotificationAdapter` (connector-bootstrap.ts) but adds the
- * opts-forwarding that function lacks and cannot gain (it is off-limits). Behaviour is
+ * opts-forwarding that function lacks. Behaviour is
  * byte-for-byte identical when no connectors are configured: `buildConnectorTargets`
  * returns an empty list → this returns `null`, so the default (no-notify) path is
  * unchanged and the `kpiSummaryFn` is never invoked.

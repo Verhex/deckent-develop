@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getNextSprintId, updateLastSprintId, parseDebtTable, generateDebtTable } from '../../src/core/utils.js';
+import { getNextSprintId, updateLastSprintId, parseSprintOrdinal, parseDebtTable, generateDebtTable } from '../../src/core/utils.js';
 import { DebtPriority } from '../../src/core/types.js';
 import type { DebtItem } from '../../src/core/types.js';
 
@@ -140,6 +140,19 @@ describe('getNextSprintId', () => {
     expect(getNextSprintId('/project')).toBe('sprint-513');
   });
 
+  it('ignores legacy epoch job identities while retaining the ordinal archive floor', () => {
+    mockExistsSync.mockImplementation(
+      (p: any) => String(p).endsWith('archive/sprints') || String(p).endsWith('config.json'),
+    );
+    mockReaddirSync.mockReturnValue([
+      'sprint-622',
+      'sprint-1780659451558',
+    ] as any);
+    mockReadFileSync.mockReturnValue(JSON.stringify({ last_sprint_id: 'sprint-1780659451558' }));
+
+    expect(getNextSprintId('/project')).toBe('sprint-623');
+  });
+
   it('does not advance past an approved-but-not-started task projection', () => {
     mockExistsSync.mockImplementation((p: any) => String(p).endsWith('.tasks'));
     mockReaddirSync.mockReturnValue(['task-490-001.json'] as any);
@@ -212,6 +225,25 @@ describe('getNextSprintId', () => {
     mockReadFileSync.mockReturnValue(JSON.stringify({ last_sprint_id: 'not-a-sprint' }));
     expect(getNextSprintId('/project')).toBe('sprint-001');
   });
+
+  it('classifies epoch-millisecond legacy IDs separately from ordinals', () => {
+    expect(parseSprintOrdinal('sprint-622')).toBe(622);
+    expect(parseSprintOrdinal('sprint-1780659451558')).toBeNull();
+  });
+
+  it('does not impose a digit-count cap on large ordinal installations', () => {
+    mockConfigOnly();
+    mockReadFileSync.mockReturnValue(JSON.stringify({ last_sprint_id: 'sprint-32503680000001' }));
+
+    expect(getNextSprintId('/project')).toBe('sprint-32503680000002');
+  });
+
+  it('requires a complete ordinal identity in config', () => {
+    mockConfigOnly();
+    mockReadFileSync.mockReturnValue(JSON.stringify({ last_sprint_id: 'sprint-622.md' }));
+
+    expect(getNextSprintId('/project')).toBe('sprint-001');
+  });
 });
 
 // ─── updateLastSprintId tests ──────────────────────────────────────
@@ -254,6 +286,33 @@ describe('updateLastSprintId', () => {
     expect(written.language).toBe('tr');
   });
 
+  it('does not let a legacy detached-job identity poison the ordinal config floor', () => {
+    mockExistsSync.mockReturnValue(true);
+    mockReadFileSync.mockReturnValue(JSON.stringify({ last_sprint_id: 'sprint-622' }));
+
+    updateLastSprintId('/project', 'sprint-1780659451558');
+
+    expect(mockWriteFileSync).not.toHaveBeenCalled();
+  });
+
+  it('does not overwrite the config floor with a lower ordinal', () => {
+    mockExistsSync.mockReturnValue(true);
+    mockReadFileSync.mockReturnValue(JSON.stringify({ last_sprint_id: 'sprint-622', mode: 'performance' }));
+
+    updateLastSprintId('/project', 'sprint-621');
+
+    expect(mockWriteFileSync).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed ordinal writes instead of silently persisting them', () => {
+    mockExistsSync.mockReturnValue(true);
+    mockReadFileSync.mockReturnValue(JSON.stringify({ last_sprint_id: 'sprint-622' }));
+
+    updateLastSprintId('/project', 'sprint-623.md');
+
+    expect(mockWriteFileSync).not.toHaveBeenCalled();
+  });
+
   it('handles write errors gracefully (no throw)', () => {
     mockExistsSync.mockReturnValue(false);
     mockWriteFileSync.mockImplementation(() => { throw new Error('EACCES'); });
@@ -266,6 +325,7 @@ describe('updateLastSprintId', () => {
     mockReadFileSync.mockReturnValue('NOT VALID JSON');
     // Should not throw — creates fresh config
     expect(() => updateLastSprintId('/project', 'sprint-001')).not.toThrow();
+    expect(mockWriteFileSync).not.toHaveBeenCalled();
   });
 });
 

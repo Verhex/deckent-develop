@@ -97,13 +97,29 @@ function buildActionButtons(actions: Notification['actions']): InlineButton[][] 
 
 /** Resolve `undefined` after `ms` so a hanging send never blocks the caller. */
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T | undefined> {
-  return Promise.race([
-    p,
-    new Promise<undefined>((resolve) => {
-      const timer = setTimeout(() => resolve(undefined), ms);
-      if (typeof timer.unref === 'function') timer.unref();
-    }),
-  ]);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<undefined>((resolve) => {
+    timer = setTimeout(() => resolve(undefined), ms);
+    if (typeof timer.unref === 'function') timer.unref();
+  });
+  return Promise.race([p, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
+function makeCloseTargets(targets: readonly ConnectorTarget[]): () => Promise<void> {
+  let closePromise: Promise<void> | null = null;
+  return () => {
+    closePromise ??= Promise.allSettled(
+      targets.map((target) => target.connector.stop()),
+    ).then((results) => {
+      const errors = results
+        .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+        .map((result) => result.reason as unknown);
+      if (errors.length > 0) throw new AggregateError(errors, 'Connector stop failed');
+    });
+    return closePromise;
+  };
 }
 
 /**
@@ -147,14 +163,17 @@ export function makeConnectorNotificationAdapter(
   opts: ConnectorNotifyOptions = {},
 ): NotificationAdapter {
   const timeoutMs = opts.timeoutMs ?? 5000;
+  const close = makeCloseTargets(targets);
+  let closed = false;
   return {
     name: 'connector-broadcast',
 
     isAvailable(): boolean {
-      return targets.length > 0;
+      return !closed && targets.length > 0;
     },
 
     async send(notification: Notification): Promise<void> {
+      if (closed) return;
       // Rich-approval bot: actions that carry a callbackData become inline buttons,
       // attached to the LAST part so they render once, under the final message.
       // Button-incapable connectors ignore `buttons` and keep the cliCommand text.
@@ -211,6 +230,11 @@ export function makeConnectorNotificationAdapter(
           debugLog('connector-notify-adapter:kpi-summary', err);
         }
       }
+    },
+
+    close(): Promise<void> {
+      closed = true;
+      return close();
     },
   };
 }

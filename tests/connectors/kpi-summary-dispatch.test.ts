@@ -166,4 +166,22 @@ describe('buildConnectorAdapterWithKpiSummary', () => {
 
     expect(tg.sent.some((m) => m.text.includes('📊'))).toBe(false);
   });
+
+  it('closes earlier started connectors when a later connector fails to start', async () => {
+    const tg = fakeConnector('telegram');
+    const stop = vi.spyOn(tg, 'stop');
+    const dc = fakeConnector('discord');
+    dc.start = async () => { throw new Error('start failed'); };
+    const config = {
+      telegram: { enabled: true, token: 'tg', chat_id: 'T' },
+      discord: { enabled: true, token: 'dc', chat_id: 'D' },
+    } satisfies DeckentConfig['notify_connectors'];
+
+    const adapter = await buildConnectorAdapterWithKpiSummary(config, {}, {
+      makeConnector: (id) => id === 'telegram' ? tg : dc,
+    });
+
+    expect(adapter).toBeNull();
+    expect(stop).toHaveBeenCalledTimes(1);
+  });
 });

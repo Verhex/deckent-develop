@@ -14,6 +14,7 @@ import {
   writeTaskResultSettlementClosureAtomic,
 } from '../../src/core/task-result-settlement.js';
 import { readAuthoritativeTaskResult } from '../../src/orchestra/task-result-authority.js';
+import { projectAttributedTaskWork } from '../../src/core/sprint-work-attribution.js';
 
 const roots: string[] = [];
 const originalDeckentHome = process.env.DECKENT_HOME;
@@ -82,6 +83,63 @@ describe('task result authority', () => {
       state: 'settled',
       result: hostResult,
       settlementRef: ref,
+    });
+  });
+
+  it('projects a closed crash-before-prepare recovery as host-owned zero-work evidence', () => {
+    const { root, tasksDir } = fixture();
+    const taskId = 'recovered-before-prepare';
+    const ref = createTaskResultSettlementRef(root, taskId);
+    const recoveryResult = {
+      taskId,
+      workerId: `docker-recovery-${taskId}`,
+      filesChanged: [],
+      linesAdded: 0,
+      linesRemoved: 0,
+      testsPassed: false,
+      selfAssessment: 'NO_GO',
+      notes: `DECKENT_E091:coordinator-crashed-before-docker-prepare:${ref.attemptId}`,
+      exitCode: null,
+      tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0 },
+    };
+    writeRaw(tasksDir, taskId, recoveryResult);
+    writeTaskResultSettlementAttemptAtomic(ref);
+    claimTaskResultSettlementAttemptAtomic(ref);
+    writeTaskResultSettlementAtomic(createTaskResultSettlement({
+      ref,
+      exitCode: null,
+      result: recoveryResult,
+    }));
+    writeTaskResultSettlementClosureAtomic(ref, {
+      containerDisposition: 'not-dispatched',
+      locksReleased: true,
+    });
+
+    const authority = readAuthoritativeTaskResult<typeof recoveryResult & {
+      preDispatchSettlement?: {
+        attemptId: string;
+        reasonCode: string;
+        evidenceRef: string;
+      };
+    }>(root, taskId);
+    expect(authority).toMatchObject({
+      state: 'settled',
+      settlementRef: ref,
+      result: {
+        preDispatchSettlement: {
+          reasonCode: 'COORDINATOR_CRASHED_BEFORE_DOCKER_PREPARE',
+        },
+      },
+    });
+    expect(authority.result?.preDispatchSettlement?.attemptId)
+      .toMatch(new RegExp(`^host-pre-dispatch:${taskId}:`));
+    expect(authority.result?.preDispatchSettlement?.evidenceRef)
+      .toMatch(/^host-pre-dispatch-settlement:sha256:[a-f0-9]{64}$/u);
+    expect(projectAttributedTaskWork(authority.result as never)).toMatchObject({
+      state: 'VERIFIED',
+      filesChanged: [],
+      linesAdded: 0,
+      linesRemoved: 0,
     });
   });
 

@@ -28,6 +28,8 @@ import type { ParsedDirectiveTask } from './task-builder.js';
 export interface DirectiveBuildTask {
   title: string;
   desc: string;
+  /** Exact read-only files. Never widened into files/directories write authority. */
+  reads?: string[];
   files: string[];
   scope: string[];
   deps: string[];
@@ -90,7 +92,7 @@ export interface ExtractedStructuredGoNogo extends ExtractedGoNogo {
 // refusal (fail-closed, never silent corruption); escaping them is a separate slice.
 
 const RESERVED_LABEL_RE =
-  /^\s*-?\s*(?:Model|Effort|Provider|Agent|Skills|Dependencies|Priority|Auth|Backend|ModelEffort|Test|Smoke|Files?|Dosya|Scope|Kapsam)\s*:/i;
+  /^\s*-?\s*(?:Model|Effort|Provider|Agent|Skills|Dependencies|Priority|Auth|Backend|ModelEffort|Test|Smoke|Files?|Reads?|Oku|Okuma|Dosya|Scope|Kapsam)\s*:/i;
 const TASK_HEADING_RE = /^##\s+(?:G[öo]rev|Task)\s+\d+[^:]*:/m;
 const SECTION_HEADING_RE = /^\s*###\s+(?:Description|goNogo)\b/im;
 
@@ -239,6 +241,7 @@ function validateTask(task: DirectiveBuildTask): void {
   }
 
   assertNoDelimiterCollision('files', task.files, ',');
+  if (task.reads) assertNoDelimiterCollision('reads', task.reads, ',');
   assertNoDelimiterCollision('scope', task.scope, ',');
   assertNoDelimiterCollision('deps', task.deps, ',');
   if (task.skills) assertNoDelimiterCollision('skills', task.skills, ',');
@@ -256,6 +259,7 @@ function buildTaskBlock(task: DirectiveBuildTask, seq: number): string[] {
     lines.push(`- Skills: ${task.skills.length > 0 ? task.skills.join(', ') : 'none'}`);
   }
   lines.push(`- Files: ${task.files.join(', ')}`);
+  if (task.reads && task.reads.length > 0) lines.push(`- Reads: ${task.reads.join(', ')}`);
   if (task.meta && Object.keys(task.meta).length > 0) {
     // U1-G2: metadata as a dedicated line — readers keep it OUT of content flows.
     const metaStr = Object.entries(task.meta)
@@ -426,6 +430,7 @@ export function reconstructBuildTask(parsed: ParsedDirectiveTask): DirectiveBuil
   return {
     title: parsed.title,
     desc: extractDescBody(parsed.description),
+    ...(parsed.scope.filesRead.length > 0 ? { reads: [...parsed.scope.filesRead] } : {}),
     files: [...parsed.scope.filesWrite],
     scope: [...parsed.scope.directories],
     deps: parsed.dependencies ?? [],

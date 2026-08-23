@@ -65,6 +65,8 @@ export interface NotificationAdapter {
   readonly name: string;
   isAvailable(): boolean;
   send(notification: Notification): Promise<void>;
+  /** Release resources owned by this adapter. Implementations must be idempotent. */
+  close?(): Promise<void>;
 }
 
 // ─── Throttle State ──────────────────────────────────────────────
@@ -81,6 +83,10 @@ export class NotifyDispatcher {
   private queue: Notification[] = [];
   private throttle: ThrottleState;
   private processing = false;
+  private flushTimer: ReturnType<typeof setTimeout> | null = null;
+  private state: 'open' | 'closing' | 'closed' = 'open';
+  private inFlight = new Set<Promise<number>>();
+  private closePromise: Promise<void> | null = null;
 
   constructor(minIntervalMs = 1000) {
     this.throttle = {
@@ -93,6 +99,7 @@ export class NotifyDispatcher {
    * Register an adapter for notification delivery.
    */
   addAdapter(adapter: NotificationAdapter): void {
+    if (this.state !== 'open') return;
     this.adapters.push(adapter);
   }
 
@@ -100,6 +107,7 @@ export class NotifyDispatcher {
    * Remove all registered adapters.
    */
   clearAdapters(): void {
+    if (this.state !== 'open') return;
     this.adapters = [];
   }
 
@@ -116,6 +124,7 @@ export class NotifyDispatcher {
    * Returns the number of adapters that successfully delivered.
    */
   async dispatch(notification: Notification): Promise<number> {
+    if (this.state !== 'open') return 0;
     if (notification.priority === 'critical') {
       return this.sendNow(notification);
     }
@@ -139,6 +148,19 @@ export class NotifyDispatcher {
    * Fail-safe: individual adapter errors are caught and logged.
    */
   async sendNow(notification: Notification): Promise<number> {
+    if (this.state !== 'open') return 0;
+    return this.startDelivery(notification);
+  }
+
+  /** Admit one delivery and retain it so close() can await terminal teardown. */
+  private startDelivery(notification: Notification): Promise<number> {
+    const delivery = this.deliver(notification);
+    this.inFlight.add(delivery);
+    void delivery.finally(() => this.inFlight.delete(delivery));
+    return delivery;
+  }
+
+  private async deliver(notification: Notification): Promise<number> {
     this.throttle.lastSent = Date.now();
     let delivered = 0;
 
@@ -163,9 +185,10 @@ export class NotifyDispatcher {
    * Flush queued notifications (oldest first, one per flush).
    */
   async flush(): Promise<number> {
+    if (this.state !== 'open') return 0;
     const next = this.queue.shift();
     if (!next) return 0;
-    return this.sendNow(next);
+    return this.startDelivery(next);
   }
 
   /**
@@ -176,15 +199,55 @@ export class NotifyDispatcher {
   }
 
   /**
+   * Permanently close the dispatcher and every adapter it owns.
+   *
+   * Closing is async and idempotent. It rejects new work, cancels the throttle
+   * timer, waits for admitted delivery, drains the queued notifications FIFO,
+   * and only then closes each adapter exactly once.
+   */
+  close(): Promise<void> {
+    if (this.closePromise) return this.closePromise;
+    this.state = 'closing';
+    this.processing = false;
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer);
+      this.flushTimer = null;
+    }
+    this.closePromise = (async () => {
+      await Promise.allSettled([...this.inFlight]);
+
+      while (this.queue.length > 0) {
+        const next = this.queue.shift();
+        if (next) await this.startDelivery(next);
+      }
+
+      const adapters = this.adapters;
+      const results = await Promise.allSettled(
+        adapters.map((adapter) => adapter.close?.()),
+      );
+      this.adapters = [];
+      this.state = 'closed';
+      const errors = results
+        .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+        .map((result) => result.reason as unknown);
+      if (errors.length > 0) throw new AggregateError(errors, 'Notification adapter close failed');
+    })();
+    return this.closePromise;
+  }
+
+  /**
    * Schedule a flush after delay. Non-blocking.
    */
   private scheduleFlush(delayMs: number): void {
-    if (this.processing) return;
+    if (this.state !== 'open' || this.processing) return;
     this.processing = true;
-    setTimeout(async () => {
+    this.flushTimer = setTimeout(async () => {
+      this.flushTimer = null;
       this.processing = false;
       await this.flush();
+      if (this.queue.length > 0) this.scheduleFlush(this.throttle.minInterval);
     }, delayMs);
+    if (typeof this.flushTimer.unref === 'function') this.flushTimer.unref();
   }
 }
 

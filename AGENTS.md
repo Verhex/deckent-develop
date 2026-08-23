@@ -18,10 +18,10 @@ PR_REQUIRED=false
 MERGE_QUEUE_REQUIRED=false
 REMOTE_CI_MODE=ADVISORY
 LOCAL_VERIFICATION_MODE=REQUIRED
-EXECUTION_AUTHORITY=FABLE
+EXECUTION_AUTHORITY=CODEX
 ANALYSIS_AUTHORITY=CODEX
 OWNER_AUTHORITY=ALPEREN
-DECISION_REF=owner-live-2026-08-20-dogfood-on-canary-587
+DECISION_REF=owner-live-2026-08-23-repo-hygiene-complete-dogfood-on
 <!-- DECKENT-DEV-CONTROL:END -->
 
 > Yukarıdaki blok aktif repo-development mode değerlerinin TEK persisted projection'ıdır
@@ -142,7 +142,11 @@ projection'ıdır. Ürün kullanıcı belleği bundan ayrıdır ve `.brain/memor
 - **İş-takip SSOT** = `docs/MASTER-PLAN.md` (tek canonical ledger; sayı generated
   projection'dan okunur, metinde hardcode edilmez) + pinned `MEMORY.md`. Eski plan:
   `docs/archive/MASTER-PLAN-archived-2026-07-26.md`.
-- **🧭 Aktif Yön (2026-06-29 pivot — Hermes-vs-Deckent analiz turu):** terminal = ana yönetim+kullanım yüzeyi (tool-driven, derin, **full-control + yormayan**; iş CLI değil terminalden, CLI/MCP opsiyonel) · dashboard = yalnız izleme. **P0:** training-trace WIRE · runtime-wide ApprovalBroker (çok-ortam canlı onay) · Hermes-rol-model tool + progressive disclosure · global-install+proje-scope · DIRECTIVES 0-kırılganlık. **Koru (yeniden-yazma YOK):** deterministik 8-faz eval-backed orchestration · kapalı outcome→routing→promotion öğrenme · governance-by-construction. Detay: `.analysis/hermes-vs-deckent-direction-decisions.md` + memory `project_hermes_deckent_direction_2026_06`.
+- **🧭 Aktif Yön:** ürün kimliği `.deckent/workspace/IDENTITY.md`; Terminal ve Desktop
+  primary control/operator surfaces, Dashboard yalnız observability projection'dır.
+  API/CLI/MCP/autonomous/process/connectors aynı application-service authority'nin
+  adapterlarıdır. Yön ve gerekçe `docs/en/vision.md` + `docs/tr/vision.md`; iş SSOT'u
+  `docs/MASTER-PLAN.md`.
 - **CLOSURE-OS-LEDGER-AUTHORITY.** Closure disposition / sidecar-ledger mutation yalnız authenticated batch authority + append-only gate (`scripts/lint-closure-dispositions.mjs`) + projection settlement üzerinden yapılır; elle MASTER/ledger sınıflandırması veya sahte receipt YASAK. Phase-4 foundation + owner-verified public genesis trust anchor main'de (PR #127, commit `88637d5d6`; private signer key repo DIŞINDA owner custody — dokunma/okuma/loglama yasak); Phase-5 writer/signer CANLI — ilk authenticated batch (`dba89c03…`, 2 event) append edildi, 8101+7140 settlement'ı bu batch'e bağlıdır (2026-08-17). Ayrıntı: `docs/governance/closure-os-sidecar-ledger.md`.
 </operating_rules>
 

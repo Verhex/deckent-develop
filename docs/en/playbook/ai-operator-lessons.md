@@ -397,10 +397,52 @@ test, (3) run the adjacent legacy battery for every changed public contract, and
 write `LOCAL_VERIFIED` to MASTER only after this root consumer gate is green. Report
 task-scope green and root-wiring green as separate evidence classes.
 
+
+## 28. Stale MASTER counts are hypotheses — measure SQLite and Git before choosing migration
+
+**Mistake:** A migration was planned from a stale MASTER count without first proving
+what database bytes were actually present. That can replay a mutation over a database
+which already has the target shape but lacks its adoption receipt.
+
+**Correct usage:** Before planning, measure the SQLite header, integrity result, live
+schema/schema version, and relevant row counts; then compare them with the exact Git
+preimage for the expected v1 state. If the measured database is still v1, plan a
+migration. If it is already mutated but no durable receipt exists, do not migrate it
+again: use the adoption prepare/proof flow against the measured preimage and current
+state. If the authorities disagree or are incomplete, stop on HOLD. MASTER prose and
+counts are discovery hints, not mutation authority; HOLD is not a seal.
+
+## 29. Acceptance belongs at the task's execution boundary
+
+**Evidence (sprint-1780659451557):** The archived manifest records
+`terminalOutcome: ABORTED`; the recovery directive records 7/20 tasks complete and 13
+unresolved because an implementation task's mandatory test was owned by a blocked
+future task. The retained terminal and recovery evidence are the authority; recovery
+does not rewrite the predecessor as complete.
+
+**Rule:** A mandatory task-local test must already exist at that task's execution
+boundary or be co-owned by the task. A future dependent cannot supply its
+predecessor's acceptance evidence. Model the DAG so the implementation and its exact
+test are one node, or make the implementation depend on an earlier node that creates
+the test. Never point acceptance forward to a dependent node.
+
+**Recovery:** If the required test is absent, report the task's typed failure and let
+the run settle `ABORTED` with unresolved descendants preserved. Replan by moving the
+test into the implementation node or into a completed prerequisite, then execute a
+new recovery lineage against the retained evidence. This is a dependency-boundary
+defect, not blame assigned to a worker, provider, or later task.
+
 ---
 
 ## Changelog (update after every sprint experience)
 
+- **2026-08-22 — dependency-local acceptance recovery**: Lesson 29 added (mandatory
+  task-local tests must exist at execution or be co-owned; forward acceptance edges
+  settle as typed `ABORTED` and recover through a corrected DAG without rewriting the
+  predecessor).
+- **2026-08-22 — provider-observation migration verification**: Lesson 28 added
+  (measure SQLite header/schema/rows and the Git preimage before choosing migration;
+  distinguish already-mutated-but-unreceipted adoption; HOLD is not a seal).
 - **2026-08-22 — Sprint 622 root landing review**: Lesson 27 added (dogfood
   `COMPLETE` is an orchestration terminal, not production landing proof; root
   import/call-site, producer-consumer, and adjacent legacy batteries are a separate gate).

@@ -10,6 +10,7 @@ const mockBuildPreplannedResumeSprint = vi.fn();
 const mockFinalizeSprint = vi.fn();
 const mockPublishFinalSprintAuthority = vi.fn();
 const mockPublishTestModeSprintTerminalReceipt = vi.fn();
+const mockLoadFinalizerAttemptTasks = vi.fn();
 const mockResolveSprintTerminalHandoff = vi.fn();
 const mockCommitSprintTerminalHandoff = vi.fn();
 const mockRunCleanupPhase = vi.fn();
@@ -21,6 +22,7 @@ vi.mock('../../src/orchestra/sprint-checkpoint.js', () => ({
 
 vi.mock('../../src/orchestra/sprint-finalizer.js', () => ({
   finalizeSprint: (...args: unknown[]) => mockFinalizeSprint(...args),
+  loadFinalizerAttemptTasks: (...args: unknown[]) => mockLoadFinalizerAttemptTasks(...args),
   publishFinalSprintAuthority: (...args: unknown[]) => mockPublishFinalSprintAuthority(...args),
   publishTestModeSprintTerminalReceipt: (...args: unknown[]) => mockPublishTestModeSprintTerminalReceipt(...args),
 }));
@@ -123,6 +125,7 @@ describe('completed-checkpoint recovery event path', () => {
         notes: 'persisted evaluation',
       },
     });
+    mockLoadFinalizerAttemptTasks.mockImplementation((_root: string, sprint: { tasks: unknown[] }) => sprint.tasks);
     mockFinalizeSprint.mockResolvedValue(metrics);
     mockResolveSprintTerminalHandoff.mockReturnValue(authorizedHandoff);
     mockRunCleanupPhase.mockResolvedValue(null);
@@ -183,6 +186,55 @@ describe('completed-checkpoint recovery event path', () => {
     expect(events.map(event => event.sequence)).toEqual([1, 2, 3, 4, 5, 6]);
     expect(reconstructState(root, checkpoint.sprintId).phaseChanges.at(-1)?.phase)
       .toBe(SprintPhase.COMPLETE);
+  });
+
+  it('reuses dynamic fix-task evidence discovered by the canonical finalizer loader', async () => {
+    const root = makeRoot();
+    const fixTask = { id: '901-001-fix', sprintId: 'sprint-901' };
+    mockLoadFinalizerAttemptTasks.mockReturnValue([
+      { id: '901-001', sprintId: 'sprint-901' },
+      fixTask,
+    ]);
+    mockReadAuthoritativeTaskResult.mockImplementation((_root: string, taskId: string) => ({
+      state: 'AUTHORITATIVE',
+      result: {
+        taskId,
+        workerId: `w-${taskId}`,
+        filesChanged: [],
+        linesAdded: 0,
+        linesRemoved: 0,
+        testsPassed: taskId.endsWith('-fix'),
+        coverage: 100,
+        selfAssessment: taskId.endsWith('-fix') ? TaskEvaluation.DONE : TaskEvaluation.NO_GO,
+        brainEvaluation: taskId.endsWith('-fix') ? TaskEvaluation.DONE : TaskEvaluation.NO_GO,
+        notes: 'persisted lineage evaluation',
+      },
+    }));
+
+    await terminalizeCompletedCheckpointRun(
+      root,
+      checkpoint,
+      { auth_mode: 'subscription', language: 'en' } as never,
+    );
+
+    expect(mockFinalizeSprint).toHaveBeenCalledWith(
+      root,
+      expect.any(Object),
+      new Map([
+        ['901-001', TaskEvaluation.NO_GO],
+        ['901-001-fix', TaskEvaluation.DONE],
+      ]),
+      expect.arrayContaining([
+        expect.objectContaining({ taskId: '901-001' }),
+        expect.objectContaining({ taskId: '901-001-fix' }),
+      ]),
+      expect.objectContaining({ lifecycleContext: 'completed-checkpoint-recovery' }),
+    );
+    expect(readEvents(root, checkpoint.sprintId)[1]?.payload).toMatchObject({
+      taskCount: 2,
+      resultCount: 2,
+      evaluationCount: 2,
+    });
   });
 
   it('records the legacy safe-retention decision explicitly', async () => {

@@ -103,6 +103,15 @@ function makeSettledTask(taskId: string): Sprint['tasks'][number] {
   } as unknown as Sprint['tasks'][number];
 }
 
+function seedTaskAuthorities(root: string, sprint: Sprint): void {
+  for (const task of sprint.tasks) {
+    writeFileSync(
+      join(root, '.tasks', `task-${task.id}.json`),
+      JSON.stringify({ ...task, sprintId: sprint.id }, null, 2),
+    );
+  }
+}
+
 const FINALIZE_OPTS = {
   skipDecay: true,
   skipHooks: true,
@@ -139,7 +148,8 @@ function schedShadowPath(root: string, filename: string): string {
 }
 
 function schedShadowArchivePath(root: string, filename: string): string {
-  return join(root, '.deckent', 'archive', 'scheduler-shadow', filename);
+  const sprintId = filename.replace(/\.jsonl$/u, '');
+  return join(root, '.deckent', 'archive', 'sprints', sprintId, 'scheduler', filename);
 }
 
 // ─── (1) Default retention — real finalizeSprint() call ──────────────────────
@@ -151,19 +161,20 @@ describe('scheduler-shadow retention — real finalizeSprint() integration', () 
   afterEach(() => cleanupTmpProject(tmpDir));
 
   it('archives a stale journal and keeps a fresh one during a real finalizeSprint() call (default 14d)', async () => {
-    seedJournal(tmpDir, 'sprint-old.jsonl', 20);
-    seedJournal(tmpDir, 'sprint-new.jsonl', 0);
+    seedJournal(tmpDir, 'sprint-8990.jsonl', 20);
+    seedJournal(tmpDir, 'sprint-8999.jsonl', 0);
 
     const sprint = makeSprint('sprint-9001', 9001);
     sprint.tasks = [makeSettledTask('9001-001')];
+    seedTaskAuthorities(tmpDir, sprint);
     const evaluations = new Map<string, TaskEvaluation>([['9001-001', TaskEvaluation.DONE]]);
 
     await finalizeSprint(tmpDir, sprint, evaluations, [makeResult('9001-001')], FINALIZE_OPTS);
 
-    expect(existsSync(schedShadowPath(tmpDir, 'sprint-old.jsonl'))).toBe(false);
-    expect(existsSync(schedShadowArchivePath(tmpDir, 'sprint-old.jsonl'))).toBe(true);
-    expect(existsSync(schedShadowPath(tmpDir, 'sprint-new.jsonl'))).toBe(true);
-    expect(existsSync(schedShadowArchivePath(tmpDir, 'sprint-new.jsonl'))).toBe(false);
+    expect(existsSync(schedShadowPath(tmpDir, 'sprint-8990.jsonl'))).toBe(false);
+    expect(existsSync(schedShadowArchivePath(tmpDir, 'sprint-8990.jsonl'))).toBe(true);
+    expect(existsSync(schedShadowPath(tmpDir, 'sprint-8999.jsonl'))).toBe(true);
+    expect(existsSync(schedShadowArchivePath(tmpDir, 'sprint-8999.jsonl'))).toBe(false);
   }, 30_000);
 });
 
@@ -181,20 +192,21 @@ describe('scheduler-shadow retention — config override via real finalizeSprint
       JSON.stringify({ scheduler_shadow_retention: { retention_days: 7 } }, null, 2),
     );
 
-    seedJournal(tmpDir, 'sprint-old.jsonl', 20);
-    seedJournal(tmpDir, 'sprint-new.jsonl', 0);
-    seedJournal(tmpDir, 'sprint-mid.jsonl', 10); // > default keep, but > 7d override → archive
+    seedJournal(tmpDir, 'sprint-8980.jsonl', 20);
+    seedJournal(tmpDir, 'sprint-8999.jsonl', 0);
+    seedJournal(tmpDir, 'sprint-8990.jsonl', 10); // > default keep, but > 7d override → archive
 
     const sprint = makeSprint('sprint-9002', 9002);
     sprint.tasks = [makeSettledTask('9002-001')];
+    seedTaskAuthorities(tmpDir, sprint);
     const evaluations = new Map<string, TaskEvaluation>([['9002-001', TaskEvaluation.DONE]]);
 
     await finalizeSprint(tmpDir, sprint, evaluations, [makeResult('9002-001')], FINALIZE_OPTS);
 
-    expect(existsSync(schedShadowArchivePath(tmpDir, 'sprint-old.jsonl'))).toBe(true);
-    expect(existsSync(schedShadowArchivePath(tmpDir, 'sprint-mid.jsonl'))).toBe(true);
-    expect(existsSync(schedShadowPath(tmpDir, 'sprint-mid.jsonl'))).toBe(false);
-    expect(existsSync(schedShadowPath(tmpDir, 'sprint-new.jsonl'))).toBe(true);
+    expect(existsSync(schedShadowArchivePath(tmpDir, 'sprint-8980.jsonl'))).toBe(true);
+    expect(existsSync(schedShadowArchivePath(tmpDir, 'sprint-8990.jsonl'))).toBe(true);
+    expect(existsSync(schedShadowPath(tmpDir, 'sprint-8990.jsonl'))).toBe(false);
+    expect(existsSync(schedShadowPath(tmpDir, 'sprint-8999.jsonl'))).toBe(true);
   }, 30_000);
 });
 
@@ -207,8 +219,8 @@ describe('scheduler-shadow retention — finalizeSprint side-effect-free integra
   afterEach(() => cleanupTmpProject(tmpDir));
 
   it('SprintMetrics return value, Step 13 job summary, orphan-task archive, and stale-handoff prune all still run alongside Step 12f', async () => {
-    seedJournal(tmpDir, 'sprint-old.jsonl', 20);
-    seedJournal(tmpDir, 'sprint-new.jsonl', 0);
+    seedJournal(tmpDir, 'sprint-8990.jsonl', 20);
+    seedJournal(tmpDir, 'sprint-8999.jsonl', 0);
 
     // Orphan task file for Step 12b (archiveOrphanTasks) — task-<sprintNum>-*.result
     const orphanTaskFile = join(tmpDir, '.tasks', 'task-9003-001.result');
@@ -228,6 +240,7 @@ describe('scheduler-shadow retention — finalizeSprint side-effect-free integra
       { id: '9003-001', title: 'Task 1', description: '', model: 'sonnet', effort: 'normal', priority: 'HIGH', reason: '', scope: { directories: ['src/'], filesRead: [], filesWrite: [] }, dependencies: [], goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' }, status: 'DONE' },
       { id: '9003-002', title: 'Task 2', description: '', model: 'sonnet', effort: 'normal', priority: 'HIGH', reason: '', scope: { directories: ['src/'], filesRead: [], filesWrite: [] }, dependencies: [], goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' }, status: 'DONE' },
     ] as Sprint['tasks'];
+    seedTaskAuthorities(tmpDir, sprint);
 
     const evaluations = new Map<string, TaskEvaluation>([
       ['9003-001', TaskEvaluation.DONE],
@@ -238,8 +251,8 @@ describe('scheduler-shadow retention — finalizeSprint side-effect-free integra
     const metrics = await finalizeSprint(tmpDir, sprint, evaluations, results, FINALIZE_OPTS);
 
     // ── Step 12f (this task's chain) still archives the stale journal ──
-    expect(existsSync(schedShadowArchivePath(tmpDir, 'sprint-old.jsonl'))).toBe(true);
-    expect(existsSync(schedShadowPath(tmpDir, 'sprint-new.jsonl'))).toBe(true);
+    expect(existsSync(schedShadowArchivePath(tmpDir, 'sprint-8990.jsonl'))).toBe(true);
+    expect(existsSync(schedShadowPath(tmpDir, 'sprint-8999.jsonl'))).toBe(true);
 
     // ── Return value (SprintMetrics) unaffected ──
     expect(metrics.totalTasks).toBe(2);
@@ -256,7 +269,9 @@ describe('scheduler-shadow retention — finalizeSprint side-effect-free integra
 
     // ── Step 12b: orphan task file physically archived ──
     expect(existsSync(orphanTaskFile)).toBe(false);
-    const archivedOrphanPath = join(tmpDir, '.brain', 'archive', 'sprints', 'sprint-9003-tasks', 'task-9003-001.result');
+    const archivedOrphanPath = join(
+      tmpDir, '.deckent', 'archive', 'sprints', 'sprint-9003', 'tasks', 'task-9003-001.result',
+    );
     expect(existsSync(archivedOrphanPath)).toBe(true);
 
     // ── Step 12e: stale handoff (endpoints outside this sprint) pruned ──

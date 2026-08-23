@@ -10,7 +10,7 @@
 // per-target error-isolated. Delivery to a real platform is user-verified; these
 // tests prove the wiring + the fail-safe.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { makeConnectorNotificationAdapter } from '../../src/connectors/connector-notify-adapter.js';
 import type { ConnectorId, IMessageConnector, OutgoingMessage } from '../../src/connectors/types.js';
 import type { Notification } from '../../src/core/notification-dispatcher.js';
@@ -161,6 +161,44 @@ describe('ConnectorNotificationAdapter (BOT-001)', () => {
     const adapter = makeConnectorNotificationAdapter([{ connector: hang, chatId: 'x' }], { timeoutMs: 40 });
     // Resolves via the timeout rather than hanging the sprint's awaited notify().
     await expect(adapter.send(notif('critical'))).resolves.toBeUndefined();
+  });
+
+  it('close stops every connector exactly once and makes later sends a no-op', async () => {
+    const tg = fakeConnector('telegram');
+    const dc = fakeConnector('discord');
+    const tgStop = vi.spyOn(tg, 'stop');
+    const dcStop = vi.spyOn(dc, 'stop');
+    const adapter = makeConnectorNotificationAdapter([
+      { connector: tg, chatId: 'x' },
+      { connector: dc, chatId: 'y' },
+    ]);
+
+    await Promise.all([adapter.close!(), adapter.close!()]);
+    await adapter.send(notif());
+
+    expect(tgStop).toHaveBeenCalledTimes(1);
+    expect(dcStop).toHaveBeenCalledTimes(1);
+    expect(tg.sent).toHaveLength(0);
+    expect(dc.sent).toHaveLength(0);
+    expect(adapter.isAvailable()).toBe(false);
+  });
+
+  it('close attempts every stop and propagates shutdown failure', async () => {
+    const bad = fakeConnector('telegram');
+    bad.stop = vi.fn(async () => { throw new Error('stop failed'); });
+    const good = fakeConnector('discord');
+    const goodStop = vi.spyOn(good, 'stop');
+    const adapter = makeConnectorNotificationAdapter([
+      { connector: bad, chatId: 'x' },
+      { connector: good, chatId: 'y' },
+    ]);
+
+    await expect(adapter.close!()).rejects.toThrow('Connector stop failed');
+    expect(bad.stop).toHaveBeenCalledTimes(1);
+    expect(goodStop).toHaveBeenCalledTimes(1);
+    await expect(adapter.close!()).rejects.toThrow('Connector stop failed');
+    expect(bad.stop).toHaveBeenCalledTimes(1);
+    expect(goodStop).toHaveBeenCalledTimes(1);
   });
 
   // BOT-LEN — a notification longer than Telegram's 4096-char cap is SPLIT into

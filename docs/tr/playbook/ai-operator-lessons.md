@@ -378,10 +378,28 @@ calistir, (3) degisen public contractin komsu legacy bataryasini kos, (4) ancak 
 root consumer gate'i yesilse MASTER'a `LOCAL_VERIFIED` yaz. Task-scope yesili ile
 root-wiring yesilini raporda ayri adlandir.
 
+
+## 28. Bayat MASTER sayıları hipotezdir — migrasyon seçmeden önce SQLite ve Git'i ölç
+
+**Hata:** Önce gerçekte hangi veritabanı baytlarının bulunduğu kanıtlanmadan, bayat
+bir MASTER sayısına göre migrasyon planlandı. Bu, hedef biçime zaten gelmiş fakat
+adoption receipt'i eksik bir veritabanında mutation'ı yeniden oynatabilir.
+
+**Doğru kullanım:** Planlamadan önce SQLite header'ını, integrity sonucunu, canlı
+schema/schema version'ı ve ilgili row sayılarını ölç; sonra beklenen v1 durumunun exact
+Git preimage'ıyla karşılaştır. Ölçülen veritabanı hâlâ v1 ise migrasyon planla. Zaten
+mutate edilmiş fakat durable receipt yoksa tekrar migrate etme: ölçülmüş preimage ve
+current state'e karşı adoption prepare/proof akışını kullan. Authority'ler uyuşmuyor
+veya eksikse HOLD'da dur. MASTER metni ve sayıları yalnız discovery ipucudur, mutation
+authority'si değildir; HOLD mühür değildir.
+
 ---
 
 ## Değişiklik günlüğü (her sprint deneyiminden sonra güncelle)
 
+- **2026-08-22 — provider-observation migrasyon doğrulaması**: Ders 28 eklendi
+  (migrasyon seçmeden önce SQLite header/schema/row ve Git preimage ölçümü; zaten
+  mutate edilmiş fakat receipt'siz adoption ayrımı; HOLD mühür değildir).
 - **2026-08-22 — Sprint-622 root landing denetimi**: Ders 27 eklendi (dogfood
   `COMPLETE` orchestration terminalidir, production landing kaniti degildir; root
   import/call-site, producer-consumer ve adjacent legacy bataryasi ayri gate'tir).

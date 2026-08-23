@@ -92,6 +92,7 @@ function resolveLineageRoot(task: Task, tasksById: ReadonlyMap<string, Task>): s
 function computeCollisionBlockingState(
   tasks: readonly Task[],
   satisfyingIds: ReadonlySet<string>,
+  collectedIds: ReadonlySet<string>,
 ): CollisionBlockingState {
   const graph = buildDependencyGraph(tasks as Task[], true);
   const blocked = new Set<string>();
@@ -111,7 +112,14 @@ function computeCollisionBlockingState(
       if (blockingTask && resolveLineageRoot(t, tasksById) === resolveLineageRoot(blockingTask, tasksById)) {
         continue;
       }
-      if (!satisfyingIds.has(dep)) {
+      // A collision edge is a temporal writer-serialization barrier, not a
+      // success dependency. Once the predecessor attempt has been collected,
+      // it no longer owns a live dispatch slot and must not hold every later
+      // writer behind its DONE/NO_GO outcome. Authored dependencies are
+      // handled above and still require `satisfyingIds`, so a collected NO_GO
+      // can release an unrelated colliding writer without releasing a real
+      // dependant.
+      if (!satisfyingIds.has(dep) && !collectedIds.has(dep)) {
         blocked.add(t.id);
         blockingIds.set(t.id, dep);
         break;
@@ -141,6 +149,7 @@ export function captureShadowSchedulerSnapshot(input: CaptureShadowSchedulerSnap
   const collisionBlockingState = computeCollisionBlockingState(
     input.sprint.tasks,
     effectiveDependencyState.satisfyingIds,
+    input.collectedIds,
   );
 
   return {

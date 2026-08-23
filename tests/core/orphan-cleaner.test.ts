@@ -108,7 +108,7 @@ describe('postFinalizeCleanup', () => {
   beforeEach(() => { testRoot = createTestRoot(); });
   afterEach(() => { rmSync(testRoot, { recursive: true, force: true }); });
 
-  it('should archive DONE task files to .tasks/archive/sprint-NNN/', () => {
+  it('should archive DONE task files to the canonical sprint task namespace', () => {
     writeTaskJson(testRoot, 'task-144-001', 'DONE');
     writeTaskHb(testRoot, 'task-144-001');
     writeTaskResult(testRoot, 'task-144-001');
@@ -118,7 +118,7 @@ describe('postFinalizeCleanup', () => {
     expect(report.archivedFiles.length).toBe(3);
     expect(report.preservedFiles.length).toBe(0);
 
-    const archiveDir = join(testRoot, '.tasks', 'archive', 'sprint-144');
+    const archiveDir = join(testRoot, '.deckent', 'archive', 'sprints', 'sprint-144', 'tasks');
     expect(existsSync(join(archiveDir, 'task-144-001.json'))).toBe(true);
     expect(existsSync(join(archiveDir, 'task-144-001.hb'))).toBe(true);
     expect(existsSync(join(archiveDir, 'task-144-001.result'))).toBe(true);
@@ -182,9 +182,10 @@ describe('postFinalizeCleanup', () => {
     expect(report.archivedFiles).toContain('task-144-004.json');
     expect(existsSync(join(
       testRoot,
-      '.tasks',
-      'archive',
+      '.deckent',
+      'archive', 'sprints',
       'sprint-144',
+      'tasks',
       'task-144-004.json',
     ))).toBe(true);
   });
@@ -209,9 +210,10 @@ describe('postFinalizeCleanup', () => {
     expect(report.archivedFiles).toContain('task-144-004.json');
     expect(existsSync(join(
       testRoot,
-      '.tasks',
-      'archive',
+      '.deckent',
+      'archive', 'sprints',
       'sprint-144',
+      'tasks',
       'task-144-004.json',
     ))).toBe(true);
   });
@@ -370,7 +372,7 @@ describe('preflightOrphanCleanup', () => {
     expect(report.cleanedSprintIds).toContain('sprint-143');
 
     // Sprint 143 files archived
-    const archiveDir = join(testRoot, '.tasks', 'archive', 'sprint-143');
+    const archiveDir = join(testRoot, '.deckent', 'archive', 'sprints', 'sprint-143', 'tasks');
     expect(existsSync(join(archiveDir, 'task-143-001.json'))).toBe(true);
 
     // Sprint 144 files preserved

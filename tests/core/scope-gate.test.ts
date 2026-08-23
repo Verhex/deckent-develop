@@ -20,6 +20,23 @@ function task(id: string, filesWrite: string[], filesRead: string[] = []): Scope
 }
 
 describe('evaluateScopeGate', () => {
+  it('rejects a tracked directory in filesWrite even with acknowledgeScopePaths', () => {
+    const res = evaluateScopeGate({
+      tasks: [task('t-dir', ['docs/governance/closure-projections/bundles'])],
+      trackedFiles: [
+        ...TRACKED,
+        'docs/governance/closure-projections/bundles/abc/closure-health.json',
+      ],
+      acknowledgeScopePaths: true,
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.reason).toBe('DIRECTORY_IN_FILES_WRITE');
+    expect(res.suspects).toHaveLength(1);
+    expect(res.suspects[0]?.structuralError).toBe('directory-in-files-write');
+    expect(res.message).toContain('--force-scope cannot override');
+  });
+
   it('blocks the exact born-573/518 wrong-directory write with a did-you-mean suggestion', () => {
     const res = evaluateScopeGate({
       tasks: [

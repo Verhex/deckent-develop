@@ -9,6 +9,16 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+const publishSprintArchiveArtifactMock = vi.hoisted(() => vi.fn(
+  (_root: string, _sprintId: string, _source: string, target: string) => ({
+    path: target,
+    bytes: 1,
+    sha256: 'a'.repeat(64),
+    state: 'published',
+    sourceRetired: false,
+  }),
+));
+
 vi.mock('node:fs', () => ({
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
@@ -19,6 +29,7 @@ vi.mock('node:fs', () => ({
   statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
   appendFileSync: vi.fn(),
   unlinkSync: vi.fn(),
+  renameSync: vi.fn(),
   // Sprint 139 async I/O migration: sprint-finalizer and other modules use
   // `import { promises as fsPromises } from 'node:fs'`. Bind async impls via
   // `vi.fn(async () => ...)` so vi.clearAllMocks preserves them.
@@ -63,6 +74,14 @@ vi.mock('../../src/core/model-registry.js', () => ({
   },
 }));
 
+vi.mock('../../src/core/sprint-archive.js', () => ({
+  archiveTaskArtifacts: vi.fn(),
+  isSprintOwnedTaskArtifact: vi.fn().mockReturnValue(false),
+  publishSprintArchiveArtifact: publishSprintArchiveArtifactMock,
+  resolveSprintArchiveDir: vi.fn((root: string, sprintId: string) =>
+    `${root}/.deckent/archive/sprints/${sprintId}`),
+}));
+
 vi.mock('../../src/orchestra/result-collector.js', () => ({
   buildResultsMap: vi.fn().mockReturnValue(new Map()),
 }));
@@ -83,12 +102,11 @@ vi.mock('../../src/core/ci-learning.js', () => ({
   writeCiLearnings: vi.fn(),
 }));
 
-import { existsSync, mkdirSync, copyFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { archiveDirectives } from '../../src/orchestra/sprint-reporter.js';
 
 const mockExistsSync = existsSync as ReturnType<typeof vi.fn>;
 const mockMkdirSync = mkdirSync as ReturnType<typeof vi.fn>;
-const mockCopyFileSync = copyFileSync as ReturnType<typeof vi.fn>;
 const mockWriteFileSync = writeFileSync as ReturnType<typeof vi.fn>;
 
 describe('archiveDirectives', () => {
@@ -103,16 +121,13 @@ describe('archiveDirectives', () => {
     // Sprint 168 C0a-4: legacy placeholder-overwrite behavior is now opt-in (BUG-CC fix)
     archiveDirectives('/project', 'sprint-133', 'COMPLETE', { autoArchive: true });
 
-    // Should create archive dir
-    expect(mockMkdirSync).toHaveBeenCalledWith(
-      expect.stringContaining('.brain/archive'),
-      { recursive: true },
-    );
-
-    // Should copy DIRECTIVES.md to archive
-    expect(mockCopyFileSync).toHaveBeenCalledWith(
+    // The central authority owns directory creation, digest verification and
+    // conflict preservation.
+    expect(publishSprintArchiveArtifactMock).toHaveBeenCalledWith(
+      '/project',
+      'sprint-133',
       expect.stringContaining('DIRECTIVES.md'),
-      expect.stringContaining('DIRECTIVES-sprint-133.md'),
+      'docs/DIRECTIVES.md',
     );
 
     // Should write placeholder
@@ -134,7 +149,7 @@ describe('archiveDirectives', () => {
     // Placeholder should reference next sprint
     expect(content).toContain('Sprint 51');
     // Should reference the archive file
-    expect(content).toContain('DIRECTIVES-sprint-050.md');
+    expect(content).toContain('.deckent/archive/sprints/sprint-050/docs/DIRECTIVES.md');
     // Should reference RETRO.md and MEMORY.md
     expect(content).toContain('RETRO.md');
     expect(content).toContain('MEMORY.md');
@@ -147,26 +162,24 @@ describe('archiveDirectives', () => {
 
     archiveDirectives('/project', 'sprint-100');
 
-    // Should NOT copy or write anything
-    expect(mockCopyFileSync).not.toHaveBeenCalled();
+    // Should NOT publish or write anything
+    expect(publishSprintArchiveArtifactMock).not.toHaveBeenCalled();
     expect(mockWriteFileSync).not.toHaveBeenCalled();
     expect(mockMkdirSync).not.toHaveBeenCalled();
   });
 
-  it('should create .brain/archive/ directory if it does not exist', () => {
-    // DIRECTIVES.md exists, archive dir will be created by mkdirSync recursive
+  it('should delegate canonical sprint docs publication to the archive authority', () => {
     mockExistsSync.mockReturnValue(true);
 
     // Sprint 168 C0a-4: legacy placeholder-overwrite opt-in (BUG-CC default preserve)
     archiveDirectives('/project', 'sprint-010', 'COMPLETE', { autoArchive: true });
 
-    expect(mockMkdirSync).toHaveBeenCalledWith(
-      expect.stringContaining('.brain/archive'),
-      { recursive: true },
+    expect(publishSprintArchiveArtifactMock).toHaveBeenCalledWith(
+      '/project',
+      'sprint-010',
+      expect.stringContaining('DIRECTIVES.md'),
+      'docs/DIRECTIVES.md',
     );
-
-    // Verify the copy still happens after mkdir
-    expect(mockCopyFileSync).toHaveBeenCalled();
     expect(mockWriteFileSync).toHaveBeenCalled();
   });
 

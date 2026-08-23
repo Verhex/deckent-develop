@@ -22,6 +22,7 @@ function makeIntent(): DirectiveBuildIntent {
         desc:
           'Deterministic builder that turns structured intent into canonical DIRECTIVES.md text.\n' +
           'Round-trip guarantee: parseStructuredDirectives reads the output back losslessly.',
+        reads: ['docs/MASTER-PLAN.md'],
         files: ['src/orchestra/directives-builder.ts', 'tests/orchestra/directives-builder.test.ts'],
         scope: ['src/orchestra/', 'src/core/', 'tests/orchestra/', 'docs/adr/'],
         deps: [],

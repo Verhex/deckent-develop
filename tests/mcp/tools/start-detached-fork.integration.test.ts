@@ -174,7 +174,7 @@ async function getStartTool(): Promise<{ config: unknown; handler: ToolHandler }
 
 /**
  * Find IPC directories created under .deckent/ during a handler call.
- * IPC dirs follow the pattern: `sprint-<timestamp>-ipc`
+ * IPC dirs follow the pattern: `job-<timestamp>-<uuid>-ipc`
  */
 function findIpcDirs(root: string): string[] {
   const deckentDir = join(root, '.deckent');
@@ -216,7 +216,7 @@ describe('MCP deckent_start — detached fork + IPC integration', () => {
 
     const ipcDirs = findIpcDirs(testRoot);
     expect(ipcDirs.length).toBe(1);
-    expect(ipcDirs[0]).toMatch(/sprint-\d+-ipc$/);
+    expect(ipcDirs[0]).toMatch(/job-\d{13}-[0-9a-f-]+-ipc$/);
   });
 
   // ── IPC Config Schema ──────────────────────────────────────────
@@ -232,10 +232,30 @@ describe('MCP deckent_start — detached fork + IPC integration', () => {
     const config = JSON.parse(readFileSync(configPath, 'utf-8')) as SprintRunnerConfig;
     expect(config).toHaveProperty('projectRoot');
     expect(config).toHaveProperty('jobId');
+    expect(config).toHaveProperty('startedAt');
     expect(config).toHaveProperty('autoApprove');
     expect(typeof config.projectRoot).toBe('string');
     expect(typeof config.jobId).toBe('string');
+    expect(typeof config.startedAt).toBe('string');
+    expect(Number.isFinite(Date.parse(config.startedAt!))).toBe(true);
     expect(typeof config.autoApprove).toBe('boolean');
+  });
+
+  it('preserves the exact parent admission time in the detached child config', async () => {
+    const { writeJobState } = await import('../../../src/mcp/tools/job-runner.js');
+    const tool = await getStartTool();
+    await tool.handler({});
+
+    const runningState = vi.mocked(writeJobState).mock.calls[0]?.[1] as
+      | { jobId: string; startedAt: string }
+      | undefined;
+    expect(runningState).toBeDefined();
+
+    const config = JSON.parse(
+      readFileSync(join(testRoot, '.deckent', `${runningState!.jobId}-ipc`, 'config.json'), 'utf-8'),
+    ) as SprintRunnerConfig;
+    expect(config.jobId).toBe(runningState!.jobId);
+    expect(config.startedAt).toBe(runningState!.startedAt);
   });
 
   it('config.json autoApprove defaults to false (Sprint 189 T-009 — CLI parity)', async () => {
@@ -319,7 +339,7 @@ describe('MCP deckent_start — detached fork + IPC integration', () => {
     const [_runnerPath, args] = mockFork.mock.calls[0]! as [string, string[]];
     // The IPC dir is passed as the first (and only) positional arg
     expect(args).toHaveLength(1);
-    expect(args[0]).toMatch(/sprint-\d+-ipc$/);
+    expect(args[0]).toMatch(/job-\d{13}-[0-9a-f-]+-ipc$/);
   });
 
   it('fork() runner path points to sprint-runner-entry.js', async () => {
@@ -335,10 +355,7 @@ describe('MCP deckent_start — detached fork + IPC integration', () => {
   it('concurrent starts produce unique IPC directories', async () => {
     const tool = await getStartTool();
 
-    // Introduce small delay to ensure different Date.now() timestamps
     const result1 = await tool.handler({});
-    // Force a distinct timestamp
-    await new Promise(resolve => setTimeout(resolve, 5));
     const result2 = await tool.handler({});
 
     const parsed1 = JSON.parse(result1.content[0]!.text) as { jobId: string };
@@ -380,7 +397,7 @@ describe('MCP deckent_start — detached fork + IPC integration', () => {
 
     expect(parsed.success).toBe(true);
     expect(parsed.status).toBe('RUNNING');
-    expect(parsed.jobId).toMatch(/^sprint-\d+$/);
+    expect(parsed.jobId).toMatch(/^job-\d{13}-[0-9a-f-]+$/);
     expect(result.isError).toBeUndefined();
   });
 });

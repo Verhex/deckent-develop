@@ -4,10 +4,12 @@ import { TASKS_DIR } from '../core/constants.js';
 import {
   readLatestTaskResultSettlementRef,
   readClosedTaskResultSettlement,
+  readTaskResultSettlementClosure,
   readTaskVerificationIsolationHoldReceipt,
   type TaskVerificationIsolationHoldReceiptV1,
   type TaskResultSettlementRefV1,
 } from '../core/task-result-settlement.js';
+import { projectDockerRecoveryPreDispatchSettlement } from '../core/pre-dispatch-settlement.js';
 import { createExecutionAuthorityError } from '../core/errors.js';
 import { readJsonSafe } from '../core/utils.js';
 import {
@@ -67,8 +69,12 @@ export function readAuthoritativeTaskResult<T>(
         `${error instanceof Error ? error.message : String(error)}`,
       );
     }
+    const closure = settlement ? readTaskResultSettlementClosure(settlementRef) : null;
+    const result = settlement && closure?.containerDisposition === 'not-dispatched'
+      ? projectDockerRecoveryPreDispatchSettlement(settlement.result, settlementRef)
+      : settlement?.result;
     return settlement
-      ? { state: 'settled', result: settlement.result as T, settlementRef, rawResultPath }
+      ? { state: 'settled', result: result as T, settlementRef, rawResultPath }
       : { state: 'pending-settlement', result: null, settlementRef, rawResultPath };
   }
 

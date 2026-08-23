@@ -546,7 +546,7 @@ Güncel delivery durumu §11.1'dedir.
 - **Yapılmayan (açık):** priority-mutation uygulaması (0 değişiklik), key revocation,
   rotation depth>1.
 
-| DELIVERED (Phase-4, buildless — sevk edildi) | NOT-YET-WIRED (Phase-5 — YAZILMADI) |
+| HISTORICAL DELIVERED (Phase-4, buildless — o tarihte sevk edildi) | HISTORICAL NOT-YET-WIRED (Phase-5 — o tarihte yazılmamıştı) |
 |---|---|
 | Gate/validator `scripts/lint-closure-dispositions.mjs` (SOLE validator) | Genesis provisioning **TOOL + procedure sevk edildi** (`scripts/closure-ledger/genesis-anchor.mjs`, `closure-genesis-provisioning.md`, ayrı genesis PR — SOLE validator'ı reuse eder, private key üretmez/commit etmez); **kalan:** owner'ın ceremony'yi koşup public anchor+fingerprint'i commit+verify+merge etmesi |
 | Canonical encoder + digest `scripts/closure-ledger/canonical.mjs` (v1 freeze) | ed25519 **SIGNER** + owner **private key custody** (karar anında imza üreten; hiçbir şey bu dalda gerçek imza üretmez) |
@@ -594,7 +594,10 @@ honest çıktısıdır — asla bir başarı/kapanış değildir.
 
 ---
 
-*Not: Bu doküman bir governance/reference spec'idir. Phase-5 (signer, ApprovalBroker
-writer, gerçek receipt/event, MASTER mutation, genesis provisioning) **yazılmadan**
-hiçbir gerçek closure/approval/receipt üretilmemiştir; defter bugün boştur ve gate
-"nothing to validate (OK)" raporlar.*
+*Güncel not (2026-08-17): Bu doküman bir governance/reference spec'idir. Phase-5
+canlıdır: ledger boş değildir (2 authenticated event); owner-signed receipt, immutable
+batch snapshot ve dört-view projection commit'lidir. Phase-4 tablosu yalnız historical
+delivery sınırını korur ve güncel durumu geçersiz kılmaz. Açık kalan işler MASTER
+priority mutation (0 değişiklik), key revocation ve rotation depth>1'dir; bunların
+hiçbiri mevcut receipt/batch/ledger/projection kanıtını ya da “HOLD ≠ closure”
+kuralını genişletmez.*

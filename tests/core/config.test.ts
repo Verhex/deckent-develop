@@ -13,6 +13,8 @@ import {
   resolveDefaultModel,
   VALID_PROVIDERS,
   clearConfigCache,
+  DEFAULT_RUNTIME_ARTIFACT_RETENTION_CONFIG,
+  RUNTIME_ARTIFACT_RETENTION_LIMITS,
 } from '../../src/core/config.js';
 import type { SystemProfile, PlanMode } from '../../src/core/types.js';
 import type { ProviderLimitsConfig } from '../../src/core/config-types.js';
@@ -99,6 +101,18 @@ describe('getDefaultConfig', () => {
     a.mode = 'pro_plan';
     expect(b.mode).toBe(DEFAULT_MODE);
   });
+
+  it('ships disabled, bounded runtime artifact retention defaults', () => {
+    const policy = getDefaultConfig().runtime_artifact_retention;
+    expect(policy).toEqual(DEFAULT_RUNTIME_ARTIFACT_RETENTION_CONFIG);
+    expect(policy?.enabled).toBe(false);
+    expect(policy?.apply_on_finalize).toBe(false);
+    for (const family of Object.values(policy.families)) {
+      expect(family.max_age_days).toBeLessThanOrEqual(RUNTIME_ARTIFACT_RETENTION_LIMITS.max_age_days);
+      expect(family.max_count).toBeLessThanOrEqual(RUNTIME_ARTIFACT_RETENTION_LIMITS.max_count);
+      expect(family.max_size_mb).toBeLessThanOrEqual(RUNTIME_ARTIFACT_RETENTION_LIMITS.max_size_mb);
+    }
+  });
 });
 
 describe('getDefaultModes', () => {
@@ -160,6 +174,29 @@ describe('loadConfig', () => {
     const config = await loadConfig('/test/project');
     expect(config.language).toBe('tr');
     expect(config.mode).toBe('balanced');
+  });
+
+  it('deep-merges a project runtime artifact retention override and preserves defaults', async () => {
+    mockedExistsSync.mockImplementation((p) => String(p).includes('.deckent'));
+    mockedReadFile.mockResolvedValue(JSON.stringify({
+      runtime_artifact_retention: {
+        enabled: true,
+        apply_on_finalize: true,
+        archive_path: '.deckent/archive/custom-runtime/',
+        families: { runtime: { max_count: 25 } },
+      },
+    }));
+
+    const config = await loadConfig('/test/project');
+    expect(config.runtime_artifact_retention).toEqual({
+      enabled: true,
+      apply_on_finalize: true,
+      archive_path: '.deckent/archive/custom-runtime/',
+      families: {
+        runtime: { max_age_days: 30, max_count: 25, max_size_mb: 1_024 },
+        recent: { max_age_days: 14, max_count: 500, max_size_mb: 512 },
+      },
+    });
   });
 
   it('preserves the canonical frozen provider-limit authority envelope after interpolation', async () => {

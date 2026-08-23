@@ -67,7 +67,11 @@ Auto-memory lazy yüklenir (topic dosyaları yalnız okunca gelir); bu yüzden g
 - **Disk-verify ground truth** — Brain sentetik NO_GO'ya güvenme; `git diff --stat`/`git ls-files` ile doğrula.
 - **haiku yalnız doc** — kod/tsx'e route etme.
 - **İş-takip SSOT** = `docs/MASTER-PLAN.md` (tek pillar-tablo, 209 madde, Durum+Tarih sütunlu) + memory `work_tracking_ledger`; aktif öncelikler MEMORY.md tepesinde pinned. Eski plan: `docs/archive/MASTER-PLAN-archived-2026-06-29.md`.
-- **🧭 Aktif Yön (2026-06-29 pivot — Hermes-vs-Deckent analiz turu):** terminal = ana yönetim+kullanım yüzeyi (tool-driven, derin, **full-control + yormayan**; iş CLI değil terminalden, CLI/MCP opsiyonel) · dashboard = yalnız izleme. **P0:** training-trace WIRE · runtime-wide ApprovalBroker (çok-ortam canlı onay) · Hermes-rol-model tool + progressive disclosure · global-install+proje-scope · DIRECTIVES 0-kırılganlık. **Koru (yeniden-yazma YOK):** deterministik 8-faz eval-backed orchestration · kapalı outcome→routing→promotion öğrenme · governance-by-construction. Detay: `.analysis/hermes-vs-deckent-direction-decisions.md` + memory `project_hermes_deckent_direction_2026_06`.
+- **🧭 Aktif Yön:** ürün kimliği `.deckent/workspace/IDENTITY.md`; Terminal ve Desktop
+  primary control/operator surfaces, Dashboard yalnız observability projection'dır.
+  API/CLI/MCP/autonomous/process/connectors aynı application-service authority'nin
+  adapterlarıdır. Yön ve gerekçe `docs/en/vision.md` + `docs/tr/vision.md`; iş SSOT'u
+  `docs/MASTER-PLAN.md`.
 </operating_rules>
 
 <rules>

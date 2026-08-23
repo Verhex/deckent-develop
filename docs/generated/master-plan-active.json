@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "bc668686ee47ebba48d46a23d535cd39d34ddd04a6d84898cf8644798ac04d35"
+    "value": "904ad7aa77ed3fee080831dc2e108715d53698a2e112d43410c987e48a19c2e9"
   },
   "summary": {
     "total": 521,
@@ -565,9 +565,9 @@
       "program": "TRUTH",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-11",
+      "updated": "2026-08-22",
       "definitionDigest": "4171048871ae812f8f1a1440c6193f2370d477bc0d688777a1ae8dc1519d7da2",
-      "progressDigest": "ea71e4ca38f228b88d8966ea7cac4b5af80608c3ae7f2b3f181b3bb392df4b62",
+      "progressDigest": "0fb4bdddf8e7c30422e7227a617eb2c29e3cea1dbdbfbff8e4e4571403c8c858",
       "terminalClosureDigest": null
     },
     {
@@ -829,9 +829,9 @@
       "program": "TRUTH",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-03",
+      "updated": "2026-08-22",
       "definitionDigest": "c1b29d46382ed5792e70d1736b574c0805ce3a2207963578f1c8aeb0acc65982",
-      "progressDigest": "296aff3a7e44de56da3b2f90a78ec35674c11f13b76b0c2d80b20c04d3b1b0a6",
+      "progressDigest": "e23bf94c1999877f7b50f6e59f2c310aa3a66c77e41a6b2ee04cb72ada980915",
       "terminalClosureDigest": null
     },
     {
@@ -1643,9 +1643,9 @@
       "program": "PAEP",
       "priority": "P0",
       "state": "BLOCKED",
-      "updated": "2026-07-26",
+      "updated": "2026-08-23",
       "definitionDigest": "324fdeb2dd6ad32794b73d5a43af6d64b7d840041366641ff47fd237916c3888",
-      "progressDigest": "fe20fedcc7c5a6be6eecd4db84755675563ff9c17664a696f66c0eeff831ac5f",
+      "progressDigest": "f157c10ddd9510789fd38c36d2ccabefcca55fd29b54be32789e453609a5e4a8",
       "terminalClosureDigest": null
     },
     {
@@ -3161,9 +3161,9 @@
       "program": "KERNEL",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-15",
+      "updated": "2026-08-22",
       "definitionDigest": "0253183b7f17b549605fc1b9b224a1543410d852205209e0f69643a554bd60e0",
-      "progressDigest": "966b638938960c884dc7673ebe32f488216b35f005231fb8b20ece50b4a54a44",
+      "progressDigest": "3b9c9afa4df3b940ea8bfd83b5ab387ab3d12db2c18ba92962f2149ebf4200b1",
       "terminalClosureDigest": null
     },
     {
@@ -3205,9 +3205,9 @@
       "program": "ASSURANCE",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-01",
+      "updated": "2026-08-22",
       "definitionDigest": "e12c2ac83a7ad957d5148e5fd48e176eb66abfe6bf3c5169b452f0e93d48294a",
-      "progressDigest": "28b1b78ed8a36f5c557e4706b203c0b70fbcd5055b2421aa0f79c5720e206cc7",
+      "progressDigest": "6f3ad4f61cd9b8bcb3e63648a98462b0d8651e827dabcc423478c14282868081",
       "terminalClosureDigest": null
     },
     {
@@ -4800,9 +4800,9 @@
       "program": "TRUTH",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-18",
+      "updated": "2026-08-22",
       "definitionDigest": "a3d700becca28d0c1e7c9c41519dbf6a852dcea2f8ae943c9d3dc18f41ff850f",
-      "progressDigest": "6e28059ad928d4c8e582c7698725a9473d2fba2997d5a45fb8c8a2529fc9fadf",
+      "progressDigest": "61c6ec2fec474fd33358e254396a03a868bc7f5178ed73e2e8bc66c0d0e3ecbb",
       "terminalClosureDigest": null
     },
     {
@@ -9169,8 +9169,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Versioned manifest/schema registry every archived artifactı tenant/project/run identity, producer, retention class, digest and restore target ile binds; restore hem `recently-works` hem cold archiveı path-safe, hash-verified, no-clobber ve crash-recoverable okur; usage/lineage canonical `.brain/archive` authoritysini tüketir; terminal receipt canonical-location migrationı fallback ile monotonic kalır; confidentiality, legal hold, failure injection ve Linux/macOS/Windows-native/WSL proofs pass",
-      "evidence": "2026-08-10 disk/code truth: 311 tar+sha pair checksum/gzip/path-safe olsa da `restoreFromSnapshot` yalnız `recently-works` okuduğundan cold archive restore dokümanı fiilen yanlış; `usage --lineage` `.deckent/archive` altında mevcut olmayan direct task JSON/result arıyor, gerçek task authority `.brain/archive/sprints/*-tasks`; 448 JSON içinde sprint-168 sonucu invalid; archive 0755/0644; iki ignored analysis corpusunda 662 doküman topology disposition bekliyor. 2026-08-11 recovery-snapshot RCA: repo-local path için production producer/reader/restore ingressi yok; product `restoreFromSnapshot` yalnız `.deckent/recently-works/<sprint>-pre-archive.*` basename formatını tüketiyor ve iki manuel repo-local formatla uyumsuz. Dört kayıtlı digest eşleşti, iki tar gzip/path/link güvenlik taramasından geçti ve main-dirty artifactı exact base üzerinde izole restore edildi; buna rağmen sprint tar'ındaki yalnız 6/60 entry canonical arşivde exact duplicate kanıtlandı, kalan legacy kapsam için silme güvenli değil. Repo-local ve host-global recovery yollarındaki format/authority ayrışmasının exact closure'ı RECOVERY-SNAPSHOT-AUTHORITY-001 childındadır 2026-08-11 recently-works proof: on warm pre-archive tar+sha çiftinin checksum ve path/link taraması temiz; buna rağmen external `tar` başarısızlığı archiveı fail-closed durdurmuyor, same-sprint snapshot generation taşımıyor ve restore cold archiveı okumuyor. Sprint-520 task archive+event+snapshot taşıdığı halde terminal receipt/gate yok; outcome uydurulmadan HOLD. Closure RECENT-WORKS-ARTIFACT-AUTHORITY-001 ve SPRINT-EVENT-STREAM-AUTHORITY-001 ile bağlandı.",
-      "updated": "2026-08-11"
+      "evidence": "2026-08-10 disk/code truth: 311 tar+sha pair checksum/gzip/path-safe olsa da `restoreFromSnapshot` yalnız `recently-works` okuduğundan cold archive restore dokümanı fiilen yanlış; `usage --lineage` `.deckent/archive` altında mevcut olmayan direct task JSON/result arıyor, gerçek task authority `.brain/archive/sprints/*-tasks`; 448 JSON içinde sprint-168 sonucu invalid; archive 0755/0644; iki ignored analysis corpusunda 662 doküman topology disposition bekliyor. 2026-08-11 recovery-snapshot RCA: repo-local path için production producer/reader/restore ingressi yok; product `restoreFromSnapshot` yalnız `.deckent/recently-works/<sprint>-pre-archive.*` basename formatını tüketiyor ve iki manuel repo-local formatla uyumsuz. Dört kayıtlı digest eşleşti, iki tar gzip/path/link güvenlik taramasından geçti ve main-dirty artifactı exact base üzerinde izole restore edildi; buna rağmen sprint tar'ındaki yalnız 6/60 entry canonical arşivde exact duplicate kanıtlandı, kalan legacy kapsam için silme güvenli değil. Repo-local ve host-global recovery yollarındaki format/authority ayrışmasının exact closure'ı RECOVERY-SNAPSHOT-AUTHORITY-001 childındadır 2026-08-11 recently-works proof: on warm pre-archive tar+sha çiftinin checksum ve path/link taraması temiz; buna rağmen external `tar` başarısızlığı archiveı fail-closed durdurmuyor, same-sprint snapshot generation taşımıyor ve restore cold archiveı okumuyor. Sprint-520 task archive+event+snapshot taşıdığı halde terminal receipt/gate yok; outcome uydurulmadan HOLD. Closure RECENT-WORKS-ARTIFACT-AUTHORITY-001 ve SPRINT-EVENT-STREAM-AUTHORITY-001 ile bağlandı. 2026-08-22 canonical sprint-archive dilimi: raw authority `.deckent/archive/sprints/<sprint-id>/` altinda tekillesti; legacy dual-read, non-clobber conflict preservation, manifest/integrity verify, Brain semantic index ve finalizer fail-closed wiring landed. Copy-only live reconcile 653 sprintte 27,169 artifact ve 664,365,957 byte icin 0 failure; verify 653/653 green, 4 sprint-619 conflict varyanti kayipsiz korundu, ikinci apply published=0 ve Memory DB byte-stable. Parent OPEN kalir: restore, legal-hold, ACL/confidentiality ve native-platform closure tamamlanmadi. Kanit: `docs/evidence/STATE-ARCHIVE-RESTORE-001-canonical-sprint-archive-2026-08-22.md`.",
+      "updated": "2026-08-22"
     },
     {
       "order": 306,
@@ -9889,8 +9889,8 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Canlı DB `user_version=2`, `run_id`/`retired` kolonları ve indexler mevcut; 53 legacy interval korunur ve legacy-unowned kalır (sahiplik uydurulmaz); yeni gözlem run-bound yazılır; backup + before/after şema hash + read/write smoke kanıtı kayıtlı",
-      "evidence": "Açılış: Alperen 2026-08-03 onayı (EK-3 crosswalk, soru-cevap kaydı). Sahipsiz kalemler: F-022 · OQ-07 · CODE-DOC-DIFF DB-01 · aday-4 · PAZARTESI P12. Mevcut durum: source şeması v2'yi taşıyor ve üretim `runId` binding'i canlı (spawn-backend-docker.ts observation.runId ↔ input.binding.runId), fakat canlı disk hâlâ `user_version=1` ve 53 legacy interval sahipsiz — `RECOVERY-BORN-490-PROVIDER-OBSERVATION-001` evidence'ında P12 olarak asılıydı, kendi Work ID'si yoktu. Migration aktif-dirty authority üstünde mutation olduğu için owner-controlled entrypoint ister (analiz turları bilinçli read-only kaldı)",
-      "updated": "2026-08-03"
+      "evidence": "2026-08-22 final technical cut: compiled inspect + digest-bound apply + ayrı-process replay 43 legacy + 946 run-owned = 989 satırı doğruladı. Receipt `sha256:5b4c3e75abb9d43a5f5e3d8490592100fbfbf761165ac5d53037f2bc0a8eb847`, `databaseMutation=none`; source/target/WAL/SHM digest'leri değişmedi. Sprint-1558 `COMPLETE`, 294 artifact / 13.046.491 byte, zero conflict/missing/mismatch/untracked. Predecessor sprint-1557 `ABORTED` korunur. Different-provider XVerify `HOLD / NO SEAL`; owner Closure pending olduğundan Work 480 `OPEN` kalır ve manual settlement yapılmaz. Historical 53 ve timestamped 976 değerleri yalnız eski bounded kesitlerdir. `proof=docs/evidence/PROVIDER-OBS-MIGRATION-001-result-2026-08-22.md`",
+      "updated": "2026-08-22"
     },
     {
       "order": 490,
@@ -12277,8 +12277,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "P02-631–656 complete; zero-worker-exposure and rollback live-proven",
-      "evidence": "PAEP spec; legacy 630",
-      "updated": "2026-07-26"
+      "evidence": "MASTER P02 ledger; legacy 630",
+      "updated": "2026-08-23"
     },
     {
       "order": 2010,
@@ -17936,8 +17936,8 @@
         "GR-2026-08-11-CAMPAIGN-DONE-01"
       ],
       "acceptance": "COMPLETE and cleanup reconcile every interval owned by the exact run/attempt generation; foreign or historical intervals remain forensic but do not impose an admission HOLD on an unrelated IDLE/current run; reconciliation is idempotent and tenant/provider-principal fenced",
-      "evidence": "Sprint-490 COMPLETE and subsequent exact cleanup correctly projected currentAttained=0, but canonical read-model revisions 51 and 52 retained four open intervals outside the exact current task set as `unresolved-provider-observation`. The evidence is truthful; ownership/retirement policy is incomplete. Negative scope: never erase provider history or infer closure from USD=0; 2026-08-03 (PAZARTESI P6 + P12): provider-observation v2 run-binding wiring-closure KAPANDI (4 → 0 ZodError). Kök neden üretim değil test tarafıydı: v2 şeması her gözlemi sahibi olan run'a bağlıyor ve üretim bunu zaten taşıyor (spawn-backend-docker.ts:3484 observation.runId ↔ input.binding.runId karşılaştırması); bayat olan fixture'lardı. runId değerleri uydurulmadı, semantikten türetildi. P12 AÇIK: live DB hâlâ user_version=1 ve 53 legacy interval taşıyor; v1→v2 migration owner-controlled adoption proof'u bekliyor ; `receipt=GR-2026-08-11-CAMPAIGN-DONE-01`; `proof=interval-retirement-8of8-idempotent-fenced`; 2026-08-11 statü-mutabakat turu: DONE-adayıydı, validator kuralı gereği OPEN tutuldu (DependsOn PROVIDER-HOLD-001 henuz DONE degil); işin kendisi landed+doğrulanmış, kapanış koşul sağlanınca; 2026-08-14 [CLOSURE-CLASSIFICATION-FOUNDATION] §10-adım-3 bağlama: Closure OS transition brief'inin source/dist + provider-observation residual'ı yeni root açılmadan bu satıra bağlandı; canlı DB v1→v2 migration faseti dedicated successor PROVIDER-OBS-MIGRATION-001 (Work 480) altında izlenir; STATUS değişmedi (OPEN, P12 forensic-open); durable kanıt: merge 7232615322 tag'sız 0.100.0 rebaseline + Fable→Sol xverify CONFIRMED cross-verify-verdict:sha256:3543790980fdb345e65d065b011c877ecf728d53d4acab2d6bc7ef6d3426cf20; 2026-08-15 [CLOSURE-OS-FOUNDATION-COMMIT] Phase-4 sidecar disposition foundation COMPLETE (mekanizma + kanıt-kapalı; ürün wiring DEĞİL): buildless append-only hash-chained decision-ledger gate (scripts/lint-closure-dispositions.mjs, lint:gates'e bağlı) + Closure canonical v1 encoder/digest (canonical.mjs) + reviewed-parent root-of-trust (merge-base origin/main; genesis → typed HOLD TRUST_ANCHOR_BOOTSTRAP_UNRESOLVED, in-repo self-sign yok) + immutable per-batch MASTER+proposal snapshot bundle (canonical-payload integrity master-plan-integrity.mjs ile; tamper → AUTHORITY_SNAPSHOT_INTEGRITY_MISMATCH) + ed25519 offline attestation VERIFIER (signer değil) + transactional four-view projection bundle (project.mjs; tek atomik current.json pointer swap) + ApprovalBroker requestId/claimRef identity pin (approval-identity.mjs ≡ approvalIdSchema). Kanıt: gate self-check 127/127 (rowRef SSOT drift-guard dahil), projector 22/22, governance 9/9 normal+PATH-stripped, approval-parity 3/3, lint:gates+tsc yeşil, ledger EMPTY (nothing-to-validate OK). Extended spec: docs/governance/closure-os-sidecar-ledger.md. STATUS DEĞİŞMEDİ (OPEN, P1); HOLD ≠ closure. Phase-5 KURULMADI ve bu satırın dependency'si açık kalır: genesis public trust-anchor provisioning (owner fingerprint), ed25519 SIGNER + private-key custody, gerçek ApprovalBroker writer, gerçek receipt/ledger-event, MASTER state/priority mutation, provider çağrısı. Sıra: foundation PR merge → ayrı genesis trust-anchor PR → Phase-5 writer → exact dry-run digest → tek authenticated owner approval → append + atomic projections",
-      "updated": "2026-08-15"
+      "evidence": "Sprint-490 COMPLETE and subsequent exact cleanup correctly projected currentAttained=0, but canonical read-model revisions 51 and 52 retained four open intervals outside the exact current task set as `unresolved-provider-observation`. The evidence is truthful; ownership/retirement policy is incomplete. Negative scope: never erase provider history or infer closure from USD=0; 2026-08-03 (PAZARTESI P6 + P12): provider-observation v2 run-binding wiring-closure KAPANDI (4 → 0 ZodError). Kök neden üretim değil test tarafıydı: v2 şeması her gözlemi sahibi olan run'a bağlıyor ve üretim bunu zaten taşıyor (spawn-backend-docker.ts:3484 observation.runId ↔ input.binding.runId karşılaştırması); bayat olan fixture'lardı. runId değerleri uydurulmadı, semantikten türetildi. P12 AÇIK: live DB hâlâ user_version=1 ve 53 legacy interval taşıyor; v1→v2 migration owner-controlled adoption proof'u bekliyor ; `receipt=GR-2026-08-11-CAMPAIGN-DONE-01`; `proof=interval-retirement-8of8-idempotent-fenced`; 2026-08-11 statü-mutabakat turu: DONE-adayıydı, validator kuralı gereği OPEN tutuldu (DependsOn PROVIDER-HOLD-001 henuz DONE degil); işin kendisi landed+doğrulanmış, kapanış koşul sağlanınca; 2026-08-14 [CLOSURE-CLASSIFICATION-FOUNDATION] §10-adım-3 bağlama: Closure OS transition brief'inin source/dist + provider-observation residual'ı yeni root açılmadan bu satıra bağlandı; canlı DB v1→v2 migration faseti dedicated successor PROVIDER-OBS-MIGRATION-001 (Work 480) altında izlenir; STATUS değişmedi (OPEN, P12 forensic-open); durable kanıt: merge 7232615322 tag'sız 0.100.0 rebaseline + Fable→Sol xverify CONFIRMED cross-verify-verdict:sha256:3543790980fdb345e65d065b011c877ecf728d53d4acab2d6bc7ef6d3426cf20; 2026-08-15 [CLOSURE-OS-FOUNDATION-COMMIT] Phase-4 sidecar disposition foundation COMPLETE (mekanizma + kanıt-kapalı; ürün wiring DEĞİL): buildless append-only hash-chained decision-ledger gate (scripts/lint-closure-dispositions.mjs, lint:gates'e bağlı) + Closure canonical v1 encoder/digest (canonical.mjs) + reviewed-parent root-of-trust (merge-base origin/main; genesis → typed HOLD TRUST_ANCHOR_BOOTSTRAP_UNRESOLVED, in-repo self-sign yok) + immutable per-batch MASTER+proposal snapshot bundle (canonical-payload integrity master-plan-integrity.mjs ile; tamper → AUTHORITY_SNAPSHOT_INTEGRITY_MISMATCH) + ed25519 offline attestation VERIFIER (signer değil) + transactional four-view projection bundle (project.mjs; tek atomik current.json pointer swap) + ApprovalBroker requestId/claimRef identity pin (approval-identity.mjs ≡ approvalIdSchema). Kanıt: gate self-check 127/127 (rowRef SSOT drift-guard dahil), projector 22/22, governance 9/9 normal+PATH-stripped, approval-parity 3/3, lint:gates+tsc yeşil, ledger EMPTY (nothing-to-validate OK). Extended spec: docs/governance/closure-os-sidecar-ledger.md. STATUS DEĞİŞMEDİ (OPEN, P1); HOLD ≠ closure. Phase-5 KURULMADI ve bu satırın dependency'si açık kalır: genesis public trust-anchor provisioning (owner fingerprint), ed25519 SIGNER + private-key custody, gerçek ApprovalBroker writer, gerçek receipt/ledger-event, MASTER state/priority mutation, provider çağrısı. Sıra: foundation PR merge → ayrı genesis trust-anchor PR → Phase-5 writer → exact dry-run digest → tek authenticated owner approval → append + atomic projections 2026-08-22 truth-sync: 53 yalnız 2026-08-03 ölçümüdür. Exact-owned retirement scoped-green; historical/foreign disposition ve dependency settlement açık. Implicit migration adoption sayılmaz. Work 480 live receipt'i ve Work 3300 reconnect identity gelmeden parent `OPEN`. `proof=docs/evidence/PROVIDER-OBS-MIGRATION-001-result-2026-08-22.md`",
+      "updated": "2026-08-22"
     },
     {
       "order": 3298,
@@ -18069,8 +18069,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "With no active run, build completes, documented host reconnect/restart is applied and one machine-readable digest proves the invoked CLI binary corresponds to the settled source; mismatch blocks every following dogfood replay",
-      "evidence": "EK-3 open replay basamak; deliberately post-settlement and separate from implementation workers because active-sprint build is forbidden and stale `dist/` previously generated false recovery evidence",
-      "updated": "2026-08-01"
+      "evidence": "EK-3 open replay basamak; deliberately post-settlement and separate from implementation workers because active-sprint build is forbidden and stale `dist/` previously generated false recovery evidence 2026-08-22 truth-sync: sprint-local source/dist same-generation gate implementation landing'ini destekler; post-sprint owner reconnect/restart, invoked live binary digest veya adoption receipt'i değildir. Work 480/3296 kapanmaz; status `OPEN`. `proof=docs/evidence/PROVIDER-OBS-MIGRATION-001-result-2026-08-22.md`",
+      "updated": "2026-08-22"
     },
     {
       "order": 3301,
@@ -23376,8 +23376,8 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Closure projection'ları (level-lane.json, active.json, closure-health.json, owner-proposal) güncel MASTER'a regen + drift gate yeşil; CLOSURE-OS-PRODUCT-TRANSITION-BRIEF.md §'Phase-5 kurulmadı' ve sidecar-spec'in 'projection yok / ledger boş' kalıntıları canlı duruma truth-sync edilir (MASTER 3296 evidence supersede işaretli); 'approval yalnız CLI' iddiası kapsamlanır: bugün effective config'te api_decide kapalı olduğundan fiilen CLI-only, code-wide invariant DEĞİL (flag-gated fresh-OIDC HTTP decision endpoint'i mevcut) — doküman ifadesi bu gerçeğe çekilir; hiçbir ledger/run state mutation yok, yalnız projection+doc",
-      "evidence": "Codex denetim hükmü (2026-08-18): mekanizma zinciri COMPLETE (Phase-4→genesis→Phase-5 writer/signer, ilk batch canlı-gate OK, 8101+7140 DONE), brief roadmap'i OPEN — kalanlar: §10 adım-4 owner disposition + P0/P1/P2 re-triage TURU (classificationCoverage 0; OWNER KARARI gerekir, bu satır yalnız truth-sync yapar), §10 adım-3 residual (MASTER 1015/786 OPEN), STATE-PRUNE/DOCS-ARCHIVE/REPO-CLEANUP-APPLY blocked, RELEASE-001 blocked, 7-gün Closure Health + P50/P80 ETA yok; xverify yeni kapanışları 7081'e bağlı",
-      "updated": "2026-08-18"
+      "evidence": "Codex denetim hükmü (2026-08-18): mekanizma zinciri COMPLETE (Phase-4→genesis→Phase-5 writer/signer, ilk batch canlı-gate OK, 8101+7140 DONE), brief roadmap'i OPEN — kalanlar: §10 adım-4 owner disposition + P0/P1/P2 re-triage TURU (classificationCoverage 0; OWNER KARARI gerekir, bu satır yalnız truth-sync yapar), §10 adım-3 residual (MASTER 1015/786 OPEN), STATE-PRUNE/DOCS-ARCHIVE/REPO-CLEANUP-APPLY blocked, RELEASE-001 blocked, 7-gün Closure Health + P50/P80 ETA yok; xverify yeni kapanışları 7081'e bağlı 2026-08-22 read-only parity ölçümü: canonical Work 7084 satırı `OPEN/P1`, bağımlılık `—`; active projection aynı kimliği ve alanları taşıyor. Projection özeti `521 total / 456 active / 65 terminal`; lint parity yeşil. Stale-fact hükmü: outcome içindeki “projection drift” kapanacak işin definition metnidir, current drift iddiası değildir; mevcut MASTER active projectionları in-sync, hiçbir closure ledger/run state veya manual settlement yapılmadı.",
+      "updated": "2026-08-22"
     },
     {
       "order": 7085,
@@ -26831,6 +26831,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "9c1f9493d090fca8c937ee81e719bb14a728de2e395496b5c296f2cb150dfeae"
+    "value": "8e458fc3d51214393a9f50aabd03a8b606ca91ad7538cea7feb3287b5136c71b"
   }
 }

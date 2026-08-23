@@ -59,13 +59,13 @@ describe('spawnDetachedDeckent — detached-start.ts', () => {
     expect(result.pid).toBe(4242);
   });
 
-  it('returns a log path under <projectRoot>/.deckent/recently-works/<cmd>-<timestamp>.log, and the file exists on disk', () => {
+  it('returns a log path under the owned detached runtime-log namespace', () => {
     const { handle } = fakeChild(99);
     const spawnFn = vi.fn().mockReturnValue(handle) as unknown as DetachedSpawnFn;
 
     const result = spawnDetachedDeckent(['start'], { projectRoot, spawnFn });
 
-    expect(result.logPath).toMatch(/[/\\]\.deckent[/\\]recently-works[/\\]start-\d+\.log$/);
+    expect(result.logPath).toMatch(/[/\\]\.deckent[/\\]runtime[/\\]logs[/\\]detached[/\\]start-\d+\.log$/);
     expect(result.logPath.startsWith(projectRoot)).toBe(true);
     expect(existsSync(result.logPath)).toBe(true);
   });
@@ -76,7 +76,7 @@ describe('spawnDetachedDeckent — detached-start.ts', () => {
 
     const result = spawnDetachedDeckent(['weird cmd/../name'], { projectRoot, spawnFn });
 
-    expect(result.logPath).toMatch(/recently-works[/\\]weird_cmd_+name-\d+\.log$/);
+    expect(result.logPath).toMatch(/runtime[/\\]logs[/\\]detached[/\\]weird_cmd_+name-\d+\.log$/);
   });
 
   it('returns pid: null when the child handle reports no pid', () => {
@@ -160,7 +160,7 @@ describe('buildFlowStartSpawn — argv contract + interactive live-trace (583/N5
       'start', '--flow-id', 'flow-xyz', '--revision', '3', '--plan-digest', 'digest-abc',
       '--exact-attempt-id', 'attempt-1',
       '--exact-owner-nonce', 'owner-1',
-      '--exact-log-ref', expect.stringMatching(/recently-works[/\\]start-flow-xyz-\d+\.log$/),
+      '--exact-log-ref', expect.stringMatching(/runtime[/\\]logs[/\\]detached[/\\]start-flow-xyz-\d+\.log$/),
     ]);
     // Flow-start IS the human seal — every spawn built here streams live.
     expect(options.env[LIVE_TRACE_ENV]).toBe('1');

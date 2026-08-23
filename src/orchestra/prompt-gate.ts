@@ -356,6 +356,7 @@ function lintSatisfiability(task: Task, trackedFiles: readonly string[], lang: s
     description,
     goCriteria,
     proofCommands: extractProofCommands(goCriteria, description),
+    filesRead: task.scope?.filesRead ?? [],
     filesWrite: task.scope?.filesWrite ?? [],
     directories: task.scope?.directories ?? [],
     trackedFiles,

@@ -2,7 +2,7 @@
  * Tests for scope-satisfiability lint (G1b) — Sprint 399, Task 399-004.
  *
  * Covers:
- * (1) Rule MENTIONED_NOT_WRITABLE — 1a (goCriteria, unconditional BLOCK) and
+ * (1) Rule MENTIONED_NOT_WRITABLE — 1a (goCriteria mutation contract) and
  *     1b (description, verb-adjacent WARN + negation-guard), including the
  *     root-file OR-clause and the directories escape.
  * (2) Rule PROOF_PATH_MISSING — BLOCK when a proof-command path resolves to
@@ -51,7 +51,7 @@ function findingsOf(code: SatisfiabilityFinding['code'], findings: Satisfiabilit
   return findings.filter(f => f.code === code);
 }
 
-// ─── Rule 1a: MENTIONED_NOT_WRITABLE (goCriteria, unconditional) ──────
+// ─── Rule 1a: MENTIONED_NOT_WRITABLE (goCriteria authority) ───────────
 
 describe('lintScopeSatisfiability — rule 1a (goCriteria)', () => {
   it('BLOCKs a goCriteria-mentioned path outside filesWrite/directories', () => {
@@ -83,6 +83,29 @@ describe('lintScopeSatisfiability — rule 1a (goCriteria)', () => {
       filesWrite: ['src/foo/bar.ts'],
     });
     expect(lintScopeSatisfiability(input)).toEqual([]);
+  });
+
+  it('does not BLOCK a read-only goCriteria assertion with exact filesRead authority', () => {
+    const input = base({
+      goCriteria: 'tests/core/archive.test.ts passes without changing the fixture.',
+      proofCommands: ['npx vitest run tests/core/archive.test.ts'],
+      filesRead: ['tests/core/archive.test.ts'],
+    });
+    expect(lintScopeSatisfiability(input)).toEqual([]);
+  });
+
+  it('still BLOCKs mutation language when the path has read-only authority', () => {
+    const input = base({
+      goCriteria: 'Update src/core/archive.ts with the new writer.',
+      filesRead: ['src/core/archive.ts'],
+    });
+    expect(lintScopeSatisfiability(input)).toEqual([
+      expect.objectContaining({
+        severity: 'BLOCK',
+        code: 'MENTIONED_NOT_WRITABLE',
+        path: 'src/core/archive.ts',
+      }),
+    ]);
   });
 
   it('root-file OR-clause: a bare root filename mention resolves via trackedFiles', () => {

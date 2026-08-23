@@ -603,6 +603,42 @@ describe('Docker coordinator restart reconciliation', () => {
     });
   });
 
+  it('closes multiple unprepared attempts without overwriting the first raw recovery result', async () => {
+    const taskId = 'restart-multiple-unprepared';
+    const { root, tasks, ref: firstRef } = fixture(taskId);
+    const secondRef = createTaskResultSettlementRefForAttempt(root, taskId, randomUUID());
+    writeTaskResultSettlementAttemptAtomic(secondRef, '2099-01-01T00:00:00.000Z');
+
+    const report = await new DockerSpawnBackend(root).reconcilePendingAttempts();
+    const rawResult = readFileSync(join(tasks, `task-${taskId}.result`), 'utf-8');
+    const firstSettlement = readTaskResultSettlement(firstRef);
+    const secondSettlement = readTaskResultSettlement(secondRef);
+
+    expect(report.closedNotDispatched).toEqual([taskId, taskId]);
+    expect(firstSettlement?.result).toMatchObject({
+      notes: `DECKENT_E091:coordinator-crashed-before-docker-prepare:${firstRef.attemptId}`,
+    });
+    expect(secondSettlement?.result).toMatchObject({
+      notes: `DECKENT_E091:coordinator-crashed-before-docker-prepare:${secondRef.attemptId}`,
+    });
+    expect(readTaskResultSettlementClosure(firstRef)).toMatchObject({
+      containerDisposition: 'not-dispatched',
+    });
+    expect(readTaskResultSettlementClosure(secondRef)).toMatchObject({
+      containerDisposition: 'not-dispatched',
+    });
+    expect(JSON.parse(rawResult)).toEqual(firstSettlement?.result);
+
+    expect(await new DockerSpawnBackend(root).reconcilePendingAttempts()).toEqual({
+      adopted: [],
+      closedNotDispatched: [],
+      closedAbsentAfterExit: [],
+      retiredLanded: [],
+      resumedContinuations: [],
+    });
+    expect(readFileSync(join(tasks, `task-${taskId}.result`), 'utf-8')).toBe(rawResult);
+  });
+
   it('contains a prepared attempt as NO_GO when the exact container is proven absent and its result is missing', async () => {
     const taskId = 'restart-prepared-absent';
     const { root, tasks, ref } = fixture(taskId);
@@ -649,10 +685,10 @@ describe('Docker coordinator restart reconciliation', () => {
     expect(settlement?.result).toMatchObject({
       taskId,
       selfAssessment: 'NO_GO',
-      markerType: 'RECOVERY_RESULT_UNAVAILABLE',
+      markerType: 'RECOVERY_RESULT_INVALID',
       recovery: {
         attemptId: ref.attemptId,
-        resultArtifactState: 'malformed',
+        resultArtifactState: 'corrupt',
       },
     });
     const forensic = JSON.parse(readFileSync(
@@ -662,7 +698,7 @@ describe('Docker coordinator restart reconciliation', () => {
     expect(forensic).toMatchObject({
       taskId,
       attemptId: ref.attemptId,
-      artifactState: 'malformed',
+      artifactState: 'corrupt',
       rawBytes: Buffer.byteLength(malformed),
       truncated: false,
     });

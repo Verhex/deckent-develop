@@ -5,7 +5,7 @@
 // ─── Node Builtins ─────────────────────────────────────────────────
 import {
   readFileSync, writeFileSync, existsSync,
-  mkdirSync, readdirSync, renameSync, unlinkSync, rmdirSync, statSync,
+  mkdirSync, readdirSync, renameSync, unlinkSync,
   openSync, closeSync, fsyncSync,
 } from 'node:fs';
 import { promises as fsPromises } from 'node:fs';
@@ -241,11 +241,35 @@ export function writeCatalogStatsTerminalOutcomes(
 import {
   BRAIN_DIR, JOBS_DIR, DASHBOARD_FILE, RECENT_WORKS_DIR, TASKS_DIR,
   SPRINT_ACTIVE_FILE, SPRINT_PAUSE_STATE_FILE,
-  ARCHIVE_DIR, ARCHIVE_SPRINTS_SUBDIR, PROJECT_CONFIG_PATH,
 } from '../core/constants.js';
+
+import {
+  archiveTaskArtifacts,
+  reconcileSprintArchive,
+  resolveTaskArtifactReadDirs,
+  verifySprintArchive,
+} from '../core/sprint-archive.js';
+import type { TaskArtifactArchivePlan } from '../core/sprint-archive.js';
+export {
+  archiveTaskArtifacts,
+  resolveTaskArtifactArchiveDir,
+  TASK_ARTIFACT_PRESERVED_SUBDIR,
+  TASK_ARTIFACT_PRESERVATION_MARKER_FILE,
+  TASK_ARTIFACT_PRESERVATION_MARKER_KIND,
+} from '../core/sprint-archive.js';
+export type {
+  TaskArtifactArchivePlan,
+  TaskArtifactArchiveResult,
+  TaskArtifactPreservationMarker,
+} from '../core/sprint-archive.js';
 
 import { cleanupCounters, runRetention } from '../core/sprint-file-retention.js';
 import { archiveStaleSchedulerShadowJournals } from '../core/scheduler-shadow-retention.js';
+import {
+  reconcileRuntimeHygiene,
+  type RuntimeHygieneApplyResult,
+  type RuntimeHygieneFamilyOutcome,
+} from '../core/runtime-hygiene.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
 import { updateLastSprintId, debugLog, readJsonSafe } from '../core/utils.js';
@@ -254,6 +278,7 @@ import { updateLastSprintId, debugLog, readJsonSafe } from '../core/utils.js';
 // orchestra → core import: ADR-D-004 C2 allowed direction.
 import { canonicalProjectRoot, settleRunPolicyResultEvidence } from '../core/task-result-settlement.js';
 import {
+  PROVIDER_EXECUTION_OBSERVATION_DATABASE_PATH,
   ProviderExecutionObservationStore,
   type ProviderExecutionGenerationReconciliation,
   type ProviderExecutionIntervalRetirementReason,
@@ -472,6 +497,74 @@ export interface FinalizeSprintOptions {
    * recovery-specific events can continue the original monotonic stream.
    */
   lifecycleContext?: 'live-execution' | 'completed-checkpoint-recovery';
+}
+
+export type FinalizerRuntimeHygieneResult =
+  | { readonly state: 'skipped'; readonly reason: 'disabled' | 'not-configured' | 'not-terminal' }
+  | { readonly state: 'applied'; readonly evidence: RuntimeHygieneApplyResult };
+
+/** Typed, durable evidence that optional finalize-time hygiene did not complete. */
+export class FinalizerRuntimeHygieneHoldError extends Error {
+  readonly code = 'RUNTIME_HYGIENE_FINALIZER_HOLD' as const;
+
+  constructor(
+    readonly reasonCode: 'RUNTIME_HYGIENE_EXECUTION_FAILED' | 'RUNTIME_HYGIENE_PARTIAL',
+    readonly evidence?: {
+      readonly receiptPath: string;
+      readonly outcomes: readonly RuntimeHygieneFamilyOutcome[];
+    },
+    options?: ErrorOptions,
+  ) {
+    super(`${reasonCode}${evidence ? `:${evidence.receiptPath}` : ''}`, options);
+    this.name = 'FinalizerRuntimeHygieneHoldError';
+  }
+}
+
+/** Apply resolved opt-in hygiene only at the verified terminal boundary. */
+export function runConfiguredRuntimeHygieneAfterFinalize(
+  projectRoot: string,
+  sprintId: string,
+  config: ResolvedConfig | undefined,
+  terminal: { readonly receiptCleanupEligible: boolean; readonly archiveVerified: boolean },
+): FinalizerRuntimeHygieneResult {
+  const policy = config?.runtime_artifact_retention;
+  if (policy === undefined) return { state: 'skipped', reason: 'not-configured' };
+  if (!policy.enabled || !policy.apply_on_finalize) return { state: 'skipped', reason: 'disabled' };
+  if (!terminal.receiptCleanupEligible || !terminal.archiveVerified) {
+    return { state: 'skipped', reason: 'not-terminal' };
+  }
+
+  const archiveRoot = policy.archive_path.replace(/[\\/]+$/u, '');
+  const runtimeBounds = policy.families['runtime'];
+  try {
+    const result = reconcileRuntimeHygiene(projectRoot, {
+      apply: true,
+      sprintIds: [sprintId],
+      currentSprintIds: [],
+      ...(runtimeBounds ? { jobBounds: runtimeBounds } : {}),
+      flow: {
+        ...(runtimeBounds ? { staleAfterMs: runtimeBounds.max_age_days * 24 * 60 * 60 * 1_000 } : {}),
+        archiveRoot: `${archiveRoot}/run-flows`,
+      },
+      logs: {
+        ...(runtimeBounds ? { maxAgeDays: runtimeBounds.max_age_days } : {}),
+        archiveRoot: `${archiveRoot}/logs`,
+      },
+      receiptRoot: `${archiveRoot}/receipts`,
+    }) as RuntimeHygieneApplyResult;
+    if (result.receipt.status === 'partial') {
+      throw new FinalizerRuntimeHygieneHoldError('RUNTIME_HYGIENE_PARTIAL', {
+        receiptPath: result.receiptPath,
+        outcomes: result.receipt.outcomes,
+      });
+    }
+    return { state: 'applied', evidence: result };
+  } catch (error) {
+    if (error instanceof FinalizerRuntimeHygieneHoldError) throw error;
+    throw new FinalizerRuntimeHygieneHoldError('RUNTIME_HYGIENE_EXECUTION_FAILED', undefined, {
+      cause: error,
+    });
+  }
 }
 
 export function shouldEmitStandardLifecycleEvents(
@@ -1528,19 +1621,47 @@ function isTaskTerminalProjection(value: unknown): value is TaskTerminalProjecti
 /** Persist CAS-fenced terminal task read models before publishing a sprint receipt. */
 export function persistFinalizerTaskTerminalProjections(input: {
   readonly projectRoot: string;
+  readonly sprintId: string;
   readonly truth: FinalizerTerminalTruth;
   readonly coordinatorGeneration: number;
   readonly terminalOutcome: SprintTerminalOutcome;
 }): void {
   const tasksDir = join(input.projectRoot, TASKS_DIR);
+  const locateTaskProjection = (taskId: string): string => {
+    const fileName = `task-${taskId}.json`;
+    const roots = [tasksDir, ...resolveTaskArtifactReadDirs(input.projectRoot, input.sprintId)];
+    for (const root of roots) {
+      const pending = [root];
+      while (pending.length > 0) {
+        const current = pending.pop()!;
+        let entries;
+        try { entries = readdirSync(current, { withFileTypes: true }); } catch { continue; }
+        for (const entry of entries) {
+          const path = join(current, entry.name);
+          if (entry.isDirectory()) {
+            pending.push(path);
+          } else if (entry.isFile() && entry.name === fileName) {
+            return path;
+          }
+        }
+      }
+    }
+    // Preserve the historical fail-closed ENOENT/CAS signal when no durable
+    // task authority exists anywhere. The finalizer must never synthesize a
+    // projection from its in-memory Sprint argument alone.
+    return join(tasksDir, fileName);
+  };
   const targets = [...input.truth.terminalEvidence.logicalTasks]
     .sort((left, right) => left.logicalTaskId.localeCompare(right.logicalTaskId))
-    .flatMap(logicalTask => logicalTask.attempts.map(identity => ({
-      logicalTask,
-      identity,
-      path: join(tasksDir, `task-${identity.taskId}.json`),
-      lockPath: join(tasksDir, `task-${identity.taskId}.terminal-projection.lock`),
-    }))).sort((left, right) => left.path.localeCompare(right.path));
+    .flatMap(logicalTask => logicalTask.attempts.map(identity => {
+      const path = locateTaskProjection(identity.taskId);
+      return {
+        logicalTask,
+        identity,
+        path,
+        lockPath: join(dirname(path), `task-${identity.taskId}.terminal-projection.lock`),
+      };
+    })).sort((left, right) => left.path.localeCompare(right.path));
   const locks: Array<{ readonly path: string; readonly fd: number }> = [];
 
   try {
@@ -1621,8 +1742,8 @@ export function persistFinalizerTaskTerminalProjections(input: {
       }
       renameSync(tempPath, target.path);
     }
-    if (targets.length > 0) {
-      const dirFd = openSync(tasksDir, 'r');
+    for (const directory of new Set(targets.map(target => dirname(target.path)))) {
+      const dirFd = openSync(directory, 'r');
       try { fsyncSync(dirFd); } finally { closeSync(dirFd); }
     }
   } finally {
@@ -1700,7 +1821,7 @@ export function reconcileSettledProviderExecutionObservations(input: {
   readonly dbPath?: string;
 }): ProviderExecutionGenerationReconciliation | null {
   const dbPath = input.dbPath
-    ?? join(input.projectRoot, '.deckent', 'provider-execution-observations.db');
+    ?? join(input.projectRoot, PROVIDER_EXECUTION_OBSERVATION_DATABASE_PATH);
   if (!existsSync(dbPath)) return null;
   const attempts = input.attempts.filter(
     attempt => attempt.taskId.trim() !== '' && attempt.attemptId.trim() !== '',
@@ -1729,21 +1850,49 @@ export function loadFinalizerAttemptTasks(
   // attempt-task discovery on fresh installs (PROD-SPRINT-PREFIX-PAD-001).
   const sprintIdSegment = sprint.id.replace(/^sprint-/, '');
   const prefix = `task-${sprintIdSegment}-`;
-  if (!existsSync(tasksDir)) return [...byId.values()];
-  try {
-    for (const file of readdirSync(tasksDir)) {
-      if (!file.startsWith(prefix) || !file.endsWith('.json')) continue;
-      const candidate = readJsonSafe<Task>(join(tasksDir, file));
-      if (
-        !candidate
-        || typeof candidate.id !== 'string'
-        || !candidate.id.startsWith(`${sprintIdSegment}-`)
-        || (candidate.sprintId !== undefined && candidate.sprintId !== sprint.id)
-      ) continue;
-      byId.set(candidate.id, candidate);
+
+  // Live projection has precedence; every canonical/legacy archive root is a
+  // fallback. This closes the recovery ordering hole where task artifacts were
+  // settled before force-finalize rebuilt whole-run truth.
+  const roots = [
+    ...(existsSync(tasksDir) ? [tasksDir] : []),
+    ...resolveTaskArtifactReadDirs(projectRoot, sprint.id),
+  ];
+  const seenPaths = new Set<string>();
+  const diskTaskIds = new Set<string>();
+  for (const root of roots) {
+    const pending = [root];
+    while (pending.length > 0) {
+      const current = pending.pop()!;
+      let entries;
+      try { entries = readdirSync(current, { withFileTypes: true }); } catch (error) {
+        debugLog('loadFinalizerAttemptTasks:read', error);
+        continue;
+      }
+      for (const entry of entries) {
+        const path = join(current, entry.name);
+        if (entry.isDirectory()) {
+          pending.push(path);
+          continue;
+        }
+        if (!entry.isFile() || !entry.name.startsWith(prefix) || !entry.name.endsWith('.json')) continue;
+        if (seenPaths.has(path)) continue;
+        seenPaths.add(path);
+        const candidate = readJsonSafe<Task>(path);
+        if (
+          !candidate
+          || typeof candidate.id !== 'string'
+          || !candidate.id.startsWith(`${sprintIdSegment}-`)
+          || (candidate.sprintId !== undefined && candidate.sprintId !== sprint.id)
+        ) continue;
+        // The first root wins, so live state cannot be overwritten by an older
+        // legacy archive projection.
+        if (!diskTaskIds.has(candidate.id)) {
+          byId.set(candidate.id, candidate);
+          diskTaskIds.add(candidate.id);
+        }
+      }
     }
-  } catch (error) {
-    debugLog('loadFinalizerAttemptTasks', error);
   }
   return [...byId.values()].sort((left, right) => left.id.localeCompare(right.id));
 }
@@ -2205,6 +2354,7 @@ function publishFencedTerminalReceipt(
   // durability failure propagates as a typed HOLD before receipt bytes exist.
   persistFinalizerTaskTerminalProjections({
     projectRoot: input.projectRoot,
+    sprintId: input.sprint.id,
     truth: input.truth,
     coordinatorGeneration,
     terminalOutcome,
@@ -2371,6 +2521,45 @@ export function forceAbortSprint(
       ? { coordinatorGeneration: opts.coordinatorGeneration }
       : {}),
   });
+
+  // ABORTED is terminal containment, not permission to discard unresolved
+  // evidence. Preserve a rollback snapshot, settle terminal artifacts and hold
+  // non-terminal artifacts under `tasks/preserved/`, then publish a complete
+  // hash manifest plus the Brain archive index. Retrospective/promotion remain
+  // deliberately out of this path; only evidence preservation is closed here.
+  createPreArchiveSnapshot(projectRoot, sprint.id);
+  const tasksDir = join(projectRoot, TASKS_DIR);
+  const segment = sprint.id.replace(/^sprint-/u, '');
+  let archivePlan: TaskArtifactArchivePlan = { archive: [], preserve: [] };
+  if (existsSync(tasksDir)) {
+    const prefix = `task-${segment}-`;
+    const sprintFiles = readdirSync(tasksDir).filter(name => name.startsWith(prefix));
+    const classified = classifyTaskFiles(tasksDir, prefix, sprintFiles);
+    archivePlan = { archive: classified.archivable, preserve: classified.preserved };
+  }
+  const artifactSettlement = archiveTaskArtifacts(projectRoot, sprint.id, archivePlan);
+  if (artifactSettlement.failures.length > 0) {
+    throw new FinalizerTerminalEvidenceError(
+      `SPRINT_ARCHIVE_TASK_SETTLEMENT_FAILED:${artifactSettlement.failures.join('|')}`,
+    );
+  }
+  const archiveReconciliation = reconcileSprintArchive(projectRoot, sprint.id, {
+    apply: true,
+    retireLegacySources: true,
+    indexMemory: true,
+  });
+  if (archiveReconciliation.failures.length > 0) {
+    throw new FinalizerTerminalEvidenceError(
+      `SPRINT_ARCHIVE_RECONCILE_FAILED:${archiveReconciliation.failures.join('|')}`,
+    );
+  }
+  const archiveVerification = verifySprintArchive(projectRoot, sprint.id);
+  if (!archiveVerification.ok) {
+    throw new FinalizerTerminalEvidenceError(
+      `SPRINT_ARCHIVE_VERIFY_FAILED:missing=${archiveVerification.missing.length}:`
+      + `mismatched=${archiveVerification.mismatched.length}:untracked=${archiveVerification.untracked.length}`,
+    );
+  }
   publishAbortedSprintAuthority(projectRoot, sprint, truth.logicalMetrics);
   // Sprint log projection (row 3298): publishAbortedSprintAuthority just set
   // sprint.status = ABORTED and sprint.completedAt — genuinely terminal, so
@@ -2884,300 +3073,8 @@ export function buildSprintCompletionRecord(
 }
 
 
-// ═══ Canonical Task-Artifact Archive Authority (row 3314) ═════════
-// Measured on row 3314 (three manual moves in one night): normal settlement
-// archived task artifacts under the brain archive, the recover path archived
-// under a DIFFERENT tasks-local directory and left non-terminal files loose in
-// the tasks root, and hidden worker shell scripts were left behind by both. The
-// owner hand-consolidated sprints 507/509/510/511 into the brain archive.
-//
-// This section is the SINGLE archive authority. Every lifecycle path that moves
-// task artifacts (finalize, force-abort, recover, cleanup) resolves its
-// destination through resolveTaskArtifactArchiveDir() and mutates through
-// archiveTaskArtifacts(). No second resolver exists: the destination comes from
-// the `sprint_file_retention` config family when the project sets
-// `archive_path`, otherwise from the existing brain-archive constants — never
-// from a fresh path literal.
-//
-// Archive means MOVE. Nothing here deletes an artifact, nothing unlinks a
-// source before its copy is byte-verified at the destination, and nothing
-// clobbers an existing destination file.
-
-/** Subdirectory (inside the canonical destination) that holds non-terminal artifacts. */
-export const TASK_ARTIFACT_PRESERVED_SUBDIR = 'preserved';
-
-/** Typed marker file written alongside preserved (non-terminal) artifacts. */
-export const TASK_ARTIFACT_PRESERVATION_MARKER_FILE = 'preservation-marker.json';
-
-/** Marker discriminator — consumers match on this `kind`, never on the filename. */
-export const TASK_ARTIFACT_PRESERVATION_MARKER_KIND = 'deckent.task-artifact-preservation';
-
-/** Tasks-local archive directory that predates the single authority (recover/cleanup wrote here). */
-const LEGACY_TASK_ARCHIVE_SUBDIR = 'archive';
-
-/**
- * Dot-prefixed worker artifacts that no path swept before — the residue class
- * row 3314 caught (hidden worker shell scripts alongside `.prompt-*` files).
- */
-const WORKER_RESIDUE_PATTERNS: readonly RegExp[] = [
-  /^\.prompt-/u,
-  /^\.worker-/u,
-  /^\.[^.].*\.(?:sh|bash|zsh|cmd|bat|ps1)$/u,
-];
-
-/** Typed marker recorded next to non-terminal artifacts held inside the canonical destination. */
-export interface TaskArtifactPreservationMarker {
-  readonly kind: typeof TASK_ARTIFACT_PRESERVATION_MARKER_KIND;
-  readonly version: 1;
-  readonly sprintId: string;
-  /** Why these artifacts were held rather than settled — classification is the caller's, not ours. */
-  readonly reason: 'non-terminal';
-  /** Project-relative directory the entries were lifted from, for restoration. */
-  readonly restorePath: string;
-  readonly entries: readonly string[];
-  readonly recordedAt: string;
-}
-
-/**
- * Classification supplied by the CALLING lifecycle path. This authority owns the
- * destination, never the classification — what counts as non-terminal stays with
- * `classifyTaskFiles` (finalize) / `classifySprintTaskFiles` (recover).
- */
-export interface TaskArtifactArchivePlan {
-  /** Artifact filenames (relative to `.tasks/`) the caller classified terminal. */
-  readonly archive: readonly string[];
-  /** Artifact filenames (relative to `.tasks/`) the caller classified non-terminal. */
-  readonly preserve: readonly string[];
-}
-
-export interface TaskArtifactArchiveResult {
-  /** The one canonical destination every path shares. */
-  readonly destination: string;
-  /** Where non-terminal artifacts are held — inside `destination`, never in the tasks root. */
-  readonly preservedDestination: string;
-  readonly archived: string[];
-  readonly preserved: string[];
-  /** Files lifted out of the legacy tasks-local archive into the canonical destination. */
-  readonly consolidated: string[];
-  /** Leftovers (hidden worker scripts, unmatched sprint artifacts) swept to the destination. */
-  readonly residueSwept: string[];
-  /** Artifacts that could not be moved — left in place, never deleted. */
-  readonly failures: string[];
-}
-
-/**
- * Read `sprint_file_retention.archive_path` from the project config. Returns
- * null when the family is absent so the caller falls back to the established
- * brain-archive constants instead of inventing a path.
- */
-function readConfiguredSprintArchiveBase(projectRoot: string): string | null {
-  try {
-    const cfgPath = join(projectRoot, PROJECT_CONFIG_PATH);
-    if (!existsSync(cfgPath)) return null;
-    const raw = JSON.parse(readFileSync(cfgPath, 'utf-8')) as {
-      sprint_file_retention?: { archive_path?: unknown };
-    } | null;
-    const configured = raw?.sprint_file_retention?.archive_path;
-    return typeof configured === 'string' && configured.trim().length > 0
-      ? configured.trim()
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * THE resolver. Every archive/preserve path for task artifacts asks this and
- * nothing else for its destination.
- */
-export function resolveTaskArtifactArchiveDir(projectRoot: string, sprintId: string): string {
-  const base = readConfiguredSprintArchiveBase(projectRoot)
-    ?? join(BRAIN_DIR, ARCHIVE_DIR, ARCHIVE_SPRINTS_SUBDIR);
-  return join(projectRoot, base, `${sprintId}-tasks`);
-}
-
-/** Pick a destination filename that never clobbers existing archived evidence. */
-function nonClobberingDest(destDir: string, name: string): string {
-  let candidate = join(destDir, name);
-  let n = 1;
-  while (existsSync(candidate)) {
-    candidate = join(destDir, `${name}.dup-${n}`);
-    n += 1;
-  }
-  return candidate;
-}
-
-/**
- * Move one artifact. Rename first; on cross-device/busy rename fall back to
- * copy + byte-verify + unlink. A source is never unlinked without a verified
- * copy at the destination, so a failure leaves the artifact in place.
- */
-function moveTaskArtifact(srcPath: string, destPath: string): boolean {
-  try {
-    mkdirSync(dirname(destPath), { recursive: true });
-  } catch {
-    return false;
-  }
-  try {
-    renameSync(srcPath, destPath);
-    return true;
-  } catch {
-    try {
-      const content = readFileSync(srcPath) as Buffer;
-      writeFileSync(destPath, content);
-      const written = readFileSync(destPath) as Buffer;
-      if (!written.equals(content)) return false;
-      unlinkSync(srcPath);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-}
-
-/** Numeric sprint number used to recognise this sprint's leftovers in the tasks root. */
-function sprintArtifactPrefix(sprintId: string): string | null {
-  const m = sprintId.match(/(\d+)/u);
-  return m?.[1] ? `task-${m[1]}-` : null;
-}
-
-function isWorkerResidue(name: string): boolean {
-  return WORKER_RESIDUE_PATTERNS.some(re => re.test(name));
-}
-
-/**
- * The single mutation entrypoint. Settles a sprint's task artifacts into the
- * canonical destination and guarantees the tasks root holds no residue for that
- * sprint afterwards:
- *
- *  1. terminal artifacts (caller's classification) → `destination`
- *  2. non-terminal artifacts → `destination/preserved/` + typed marker
- *  3. any legacy `.tasks/archive/<sprintId>` content → `destination`
- *  4. residue sweep: sprint-prefixed leftovers + hidden worker artifacts → `destination`
- */
-export function archiveTaskArtifacts(
-  projectRoot: string,
-  sprintId: string,
-  plan: TaskArtifactArchivePlan = { archive: [], preserve: [] },
-): TaskArtifactArchiveResult {
-  const destination = resolveTaskArtifactArchiveDir(projectRoot, sprintId);
-  const preservedDestination = join(destination, TASK_ARTIFACT_PRESERVED_SUBDIR);
-  const result: TaskArtifactArchiveResult = {
-    destination,
-    preservedDestination,
-    archived: [],
-    preserved: [],
-    consolidated: [],
-    residueSwept: [],
-    failures: [],
-  };
-
-  const tasksDir = join(projectRoot, TASKS_DIR);
-  if (!existsSync(tasksDir)) return result;
-
-  // Preservation wins over archival when a caller lists a name in both.
-  const preserveSet = new Set(plan.preserve);
-
-  // 1. Terminal artifacts.
-  for (const name of plan.archive) {
-    if (preserveSet.has(name)) continue;
-    const src = join(tasksDir, name);
-    if (!existsSync(src)) continue;
-    if (moveTaskArtifact(src, nonClobberingDest(destination, name))) {
-      result.archived.push(name);
-    } else {
-      result.failures.push(name);
-    }
-  }
-
-  // 2. Non-terminal artifacts — still preserved, but INSIDE the canonical
-  //    location rather than loose in the tasks root.
-  for (const name of preserveSet) {
-    const src = join(tasksDir, name);
-    if (!existsSync(src)) continue;
-    if (moveTaskArtifact(src, nonClobberingDest(preservedDestination, name))) {
-      result.preserved.push(name);
-    } else {
-      result.failures.push(name);
-    }
-  }
-  if (result.preserved.length > 0) {
-    const marker: TaskArtifactPreservationMarker = {
-      kind: TASK_ARTIFACT_PRESERVATION_MARKER_KIND,
-      version: 1,
-      sprintId,
-      reason: 'non-terminal',
-      restorePath: TASKS_DIR,
-      entries: [...result.preserved].sort(),
-      recordedAt: new Date().toISOString(),
-    };
-    try {
-      mkdirSync(preservedDestination, { recursive: true });
-      writeFileSync(
-        join(preservedDestination, TASK_ARTIFACT_PRESERVATION_MARKER_FILE),
-        `${JSON.stringify(marker, null, 2)}\n`,
-        'utf-8',
-      );
-    } catch (e) {
-      debugLog('archiveTaskArtifacts:marker', e);
-    }
-  }
-
-  // 3. Consolidate the legacy tasks-local archive for this sprint — the exact
-  //    manual move row 3314 recorded for sprints 507/509/510/511.
-  const legacyDir = join(tasksDir, LEGACY_TASK_ARCHIVE_SUBDIR, sprintId);
-  if (existsSync(legacyDir)) {
-    let legacyEntries: string[] = [];
-    try {
-      legacyEntries = readdirSync(legacyDir) as string[];
-    } catch (e) {
-      debugLog('archiveTaskArtifacts:legacyRead', e);
-    }
-    for (const name of legacyEntries) {
-      const src = join(legacyDir, name);
-      try {
-        if (statSync(src).isDirectory()) continue;
-      } catch {
-        continue;
-      }
-      if (moveTaskArtifact(src, nonClobberingDest(destination, name))) {
-        result.consolidated.push(name);
-      } else {
-        result.failures.push(name);
-      }
-    }
-    try {
-      if ((readdirSync(legacyDir) as string[]).length === 0) rmdirSync(legacyDir);
-    } catch { /* leave a non-empty legacy dir alone — never remove evidence */ }
-  }
-
-  // 4. Residue sweep — whatever the classification never named still belongs to
-  //    this sprint's archive, not to the tasks root.
-  const prefix = sprintArtifactPrefix(sprintId);
-  let rootEntries: string[] = [];
-  try {
-    rootEntries = readdirSync(tasksDir) as string[];
-  } catch (e) {
-    debugLog('archiveTaskArtifacts:residueRead', e);
-  }
-  for (const name of rootEntries) {
-    const belongsToSprint = prefix !== null && name.startsWith(prefix);
-    if (!belongsToSprint && !isWorkerResidue(name)) continue;
-    const src = join(tasksDir, name);
-    try {
-      if (!statSync(src).isFile()) continue;
-    } catch {
-      continue;
-    }
-    if (moveTaskArtifact(src, nonClobberingDest(destination, name))) {
-      result.residueSwept.push(name);
-    } else {
-      result.failures.push(name);
-    }
-  }
-
-  return result;
-}
+// Task archive authority lives in core/sprint-archive.ts so normal finalize,
+// recovery, cleanup and read-side consumers share one dependency-safe contract.
 
 // ═══ Finalize Sprint ══════════════════════════════════════════════
 
@@ -4079,7 +3976,12 @@ export async function finalizeSprint(
     const rawCfg = opts?.config as Record<string, unknown> | undefined;
     const autoArchive = rawCfg?.['auto_archive_directives'] ?? false;
     archiveDirectives(projectRoot, sprint.id, 'CLEANUP', { autoArchive: autoArchive === true });
-  } catch (e) { debugLog('finalizeSprint:archiveDirectives', e); }
+  } catch (e) {
+    debugLog('finalizeSprint:archiveDirectives', e);
+    throw new FinalizerTerminalEvidenceError(
+      `SPRINT_ARCHIVE_DIRECTIVES_FAILED:${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
 
   // 12b. Settle task artifacts into the canonical archive destination
   // (resolveTaskArtifactArchiveDir — the single authority, row 3314). Guard:
@@ -4114,17 +4016,28 @@ export async function finalizeSprint(
     // non-terminal artifacts, legacy tasks-local archives and hidden worker
     // artifacts all land under the same resolved directory.
     const settlement = archiveTaskArtifacts(projectRoot, sprint.id, plan);
+    if (settlement.failures.length > 0) {
+      throw new FinalizerTerminalEvidenceError(
+        `SPRINT_ARCHIVE_TASK_SETTLEMENT_FAILED:${settlement.failures.join('|')}`,
+      );
+    }
     debugLog('finalizeSprint:archiveTaskArtifacts',
       `Archived ${settlement.archived.length} → ${settlement.destination} `
       + `(preserved=${settlement.preserved.length}, consolidated=${settlement.consolidated.length}, `
       + `residue=${settlement.residueSwept.length}, failures=${settlement.failures.length})`);
-  } catch (e) { debugLog('finalizeSprint:archiveTaskArtifacts', e); }
+  } catch (e) {
+    debugLog('finalizeSprint:archiveTaskArtifacts', e);
+    if (e instanceof FinalizerTerminalEvidenceError) throw e;
+    throw new FinalizerTerminalEvidenceError(
+      `SPRINT_ARCHIVE_TASK_SETTLEMENT_FAILED:${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
 
-  // 12c. Apply .tasks/archive/ retention policy — remove archives beyond retention limit
+  // 12c. Consolidate legacy `.tasks/archive/` staging into canonical archives.
   debugLog('finalizeSprint:breadcrumb', 'Step 12c (cleanTasksArchive) — entering');
   try {
     const removed = cleanTasksArchive(projectRoot);
-    debugLog('finalizeSprint:cleanTasksArchive', `Removed ${removed} old .tasks/archive/ dirs`);
+    debugLog('finalizeSprint:cleanTasksArchive', `Consolidated ${removed} legacy .tasks/archive/ dirs`);
   } catch (e) { debugLog('finalizeSprint:cleanTasksArchive', e); }
 
   // 12d. Sprint file retention — clean counters, migrate forensic files, enforce keep_last_n + size_cap
@@ -4147,8 +4060,13 @@ export async function finalizeSprint(
       { deferCounterCleanup: true },
     );
     debugLog('finalizeSprint:sprintFileRetention',
-      `Retention complete: archived=${retentionResult.archived.length}, countersDeleted=${retentionResult.countersDeleted.length}, forensicMoved=${retentionResult.forensicMoved.length}, bytesFreed=${retentionResult.bytesFreed}`);
-  } catch (e) { debugLog('finalizeSprint:sprintFileRetention', e); }
+      `Retention complete: archived=${retentionResult.archived.length}, countersDeleted=${retentionResult.countersDeleted.length}, forensicMoved=${retentionResult.forensicMoved.length}, reconciled=${retentionResult.reconciledSprintIds.length}, bytesFreed=${retentionResult.bytesFreed}`);
+  } catch (e) {
+    debugLog('finalizeSprint:sprintFileRetention', e);
+    throw new FinalizerTerminalEvidenceError(
+      `SPRINT_ARCHIVE_RETENTION_FAILED:${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
 
   // 12e. Prune stale cross-sprint handoff files (B-HANDOFF-PRUNE — Sprint 331 331-006).
   // `.tasks/handoffs/` is an append-only registry that grows without bound across
@@ -4335,40 +4253,6 @@ export async function finalizeSprint(
       skipIdentityRegen: opts?.skipIdentityRegen,
     });
 
-    // Sprint 227 task 227-002 — guarded export.
-    // Runs AFTER runPostFinalizeHooks so post-Step-3 ADR inserts are
-    // reflected in the rendered .md files. Caller can still opt out via
-    // opts.skipMemoryExport (preserves prior semantics).
-    if (!opts?.skipMemoryExport) {
-      try {
-        const dbPath = join(projectRoot, BRAIN_DIR, MEMORY_DB_FILE);
-        if (existsSync(dbPath)) {
-          const exportsDir = join(projectRoot, BRAIN_DIR, 'exports');
-          const store = new MemoryStore(dbPath);
-          try {
-            const guarded = writeGuardedExports(store, exportsDir);
-            debugLog('finalizeSprint:writeGuardedExports',
-              `written=${guarded.written.length} skipped=${guarded.skipped.length} ` +
-              `warnings=${guarded.warnings.length}`);
-            for (const w of guarded.warnings) {
-              debugLog('finalizeSprint:writeGuardedExports:warn', w);
-            }
-            // Reflect the guarded run onto postFinalizeResult.memoryExport so
-            // downstream consumers see a non-null result (the caller-visible
-            // contract did not change).
-            postFinalizeResult.memoryExport = {
-              success: guarded.warnings.length === 0,
-              filesWritten: guarded.written,
-              errors: guarded.warnings,
-            };
-          } finally {
-            store.close();
-          }
-        }
-      } catch (e) {
-        debugLog('finalizeSprint:writeGuardedExports', `guarded export failed: ${e}`);
-      }
-    }
     debugLog('finalizeSprint:postFinalizeHooks',
       `memExport=${postFinalizeResult.memoryExport?.filesWritten.length ?? 'skipped'} ` +
       `identity=${postFinalizeResult.identityRegen?.reason ?? 'skipped'} ` +
@@ -4390,6 +4274,80 @@ export async function finalizeSprint(
       CHANNELS.SPRINT_PHASE_CHANGE,
       { fromPhase: 'RETRO', toPhase: 'CLEANUP', sprintId: sprint.id, timestamp: new Date().toISOString() },
     );
+  }
+
+  // 14b. Materialize and verify the whole-sprint evidence manifest only after
+  // post-finalize writers and the final lifecycle event have settled. Earlier
+  // publication captured a pre-CLEANUP event stream and made the archive look
+  // complete while late outputs remained scattered.
+  debugLog('finalizeSprint:breadcrumb', 'Step 14b (sprintArchiveManifest) — entering');
+  const archiveReconciliation = reconcileSprintArchive(projectRoot, sprint.id, {
+    apply: true,
+    retireLegacySources: true,
+    indexMemory: true,
+  });
+  if (archiveReconciliation.failures.length > 0) {
+    throw new FinalizerTerminalEvidenceError(
+      `SPRINT_ARCHIVE_RECONCILE_FAILED:${archiveReconciliation.failures.join('|')}`,
+    );
+  }
+  const archiveVerification = verifySprintArchive(projectRoot, sprint.id);
+  if (!archiveVerification.ok) {
+    throw new FinalizerTerminalEvidenceError(
+      `SPRINT_ARCHIVE_VERIFY_FAILED:missing=${archiveVerification.missing.length}:`
+      + `mismatched=${archiveVerification.mismatched.length}:untracked=${archiveVerification.untracked.length}`,
+    );
+  }
+  debugLog(
+    'finalizeSprint:sprintArchiveManifest',
+    `Verified ${archiveVerification.checked} artifacts at ${archiveReconciliation.manifestPath}`,
+  );
+
+  // Optional bounded hygiene runs only after receipt eligibility and archive
+  // verification. Its failure is terminal typed HOLD evidence, never fail-soft.
+  debugLog('finalizeSprint:breadcrumb', 'Step 14c (runtimeHygiene) — entering');
+  const runtimeHygiene = runConfiguredRuntimeHygieneAfterFinalize(
+    projectRoot,
+    sprint.id,
+    opts?.config,
+    { receiptCleanupEligible: receiptAllowsArchive, archiveVerified: archiveVerification.ok },
+  );
+  debugLog(
+    'finalizeSprint:runtimeHygiene',
+    runtimeHygiene.state === 'applied'
+      ? `Receipt ${runtimeHygiene.evidence.receiptState} at ${runtimeHygiene.evidence.receiptPath}`
+      : `Skipped: ${runtimeHygiene.reason}`,
+  );
+
+  // Sprint 227 guarded exports run after the archive index is committed, so
+  // summary.md observes the same searchable manifest reference. Raw evidence
+  // remains in `.deckent`; Brain receives only the compact semantic index.
+  if (!opts?.skipMemoryExport) {
+    try {
+      const dbPath = join(projectRoot, BRAIN_DIR, MEMORY_DB_FILE);
+      if (existsSync(dbPath)) {
+        const exportsDir = join(projectRoot, BRAIN_DIR, 'exports');
+        const store = new MemoryStore(dbPath);
+        try {
+          const guarded = writeGuardedExports(store, exportsDir);
+          debugLog('finalizeSprint:writeGuardedExports',
+            `written=${guarded.written.length} skipped=${guarded.skipped.length} ` +
+            `warnings=${guarded.warnings.length}`);
+          for (const warning of guarded.warnings) {
+            debugLog('finalizeSprint:writeGuardedExports:warn', warning);
+          }
+          if (postFinalizeResult) postFinalizeResult.memoryExport = {
+            success: guarded.warnings.length === 0,
+            filesWritten: guarded.written,
+            errors: guarded.warnings,
+          };
+        } finally {
+          store.close();
+        }
+      }
+    } catch (e) {
+      debugLog('finalizeSprint:writeGuardedExports', `guarded export failed: ${e}`);
+    }
   }
 
   if (!opts?.deferTerminalAuthority) {

@@ -220,12 +220,19 @@ mcpOnly.sort((a, b) => a.tool.localeCompare(b.tool));
 const BASELINE_PATH = join(__dirname, 'cli-mcp-parity-baseline.json');
 
 if (process.argv.includes('--update-baseline')) {
+  const existing = existsSync(BASELINE_PATH)
+    ? JSON.parse(readFileSync(BASELINE_PATH, 'utf8'))
+    : {};
   const baseline = {
     _comment:
       'Accepted CLI↔MCP parity gaps. lint-cli-mcp-parity.mjs fails only on gaps NOT listed here. Regenerate: node scripts/lint-cli-mcp-parity.mjs --update-baseline',
     cliOnly: cliOnly.map((x) => x.cmd),
     mcpOnly: mcpOnly.map((x) => x.tool),
     descriptionKeyGaps,
+    // Authority intent is hand-authored policy, not a discovered gap. Preserve
+    // it during mechanical baseline refreshes so --update-baseline cannot erase
+    // the reason an operator-only mutation surface exists.
+    intentionalCliAuthority: existing.intentionalCliAuthority ?? {},
   };
   writeFileSync(BASELINE_PATH, JSON.stringify(baseline, null, 2) + '\n');
   console.log(
@@ -235,11 +242,12 @@ if (process.argv.includes('--update-baseline')) {
   process.exit(0);
 }
 
-let baseline = { cliOnly: [], mcpOnly: [], descriptionKeyGaps: [] };
+let baseline = { cliOnly: [], mcpOnly: [], descriptionKeyGaps: [], intentionalCliAuthority: {} };
 if (existsSync(BASELINE_PATH)) {
   baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'));
   // Older baseline files predate 559-005 and won't carry this field.
   baseline.descriptionKeyGaps ??= [];
+  baseline.intentionalCliAuthority ??= {};
 } else {
   console.error(`✗ baseline missing: ${BASELINE_PATH} — run with --update-baseline first`);
   process.exit(1);
@@ -252,6 +260,31 @@ const staleMcp = baseline.mcpOnly.filter((name) => !mcpOnly.some((x) => x.tool =
 
 const newDescriptionKeyGaps = descriptionKeyGaps.filter((g) => !baseline.descriptionKeyGaps.includes(g));
 const staleDescriptionKeyGaps = baseline.descriptionKeyGaps.filter((g) => !descriptionKeyGaps.includes(g));
+
+// Operator-only mutation intent is stronger than an ordinary accepted gap:
+// it must remain a real CLI-only command, carry the catalogued risk/capability,
+// and must fail (rather than merely warn as stale) if an MCP counterpart appears.
+const authorityIntentErrors = [];
+const registryContent = readFileSync(join(root, 'src', 'core', 'command-registry.ts'), 'utf8');
+for (const [name, intent] of Object.entries(baseline.intentionalCliAuthority)) {
+  if (!baseline.cliOnly.includes(name) || !cliCommands.has(name) || findMcpForCli(name)) {
+    authorityIntentErrors.push(`${name}: must remain a registered, baselined CLI-only command`);
+  }
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const catalogEntry = new RegExp(
+    `entry\\('${escapedName}',\\s*'[^']+',\\s*'([^']+)',\\s*'([^']+)',\\s*\\[([^\\]]*)\\]`,
+    'u',
+  ).exec(registryContent);
+  if (!catalogEntry || catalogEntry[1] !== intent.risk
+    || catalogEntry[2] !== 'providers' || catalogEntry[3].replace(/\s/gu, '') !== "'cli'") {
+    authorityIntentErrors.push(`${name}: registry must catalog ${intent.risk}/providers/CLI-only authority`);
+  }
+  if (intent.capability !== 'provider-observation-migration'
+    || intent.mcpPolicy !== 'forbidden'
+    || JSON.stringify(intent.operations) !== JSON.stringify(['prepare', 'decide', 'apply'])) {
+    authorityIntentErrors.push(`${name}: prepare/decide/apply MCP prohibition intent drifted`);
+  }
+}
 
 // ── 5. Report ─────────────────────────────────────────────────────────────────
 
@@ -276,7 +309,7 @@ console.log(
 console.log('');
 console.log(line);
 
-if (newCliOnly.length === 0 && newMcpOnly.length === 0 && newDescriptionKeyGaps.length === 0) {
+if (newCliOnly.length === 0 && newMcpOnly.length === 0 && newDescriptionKeyGaps.length === 0 && authorityIntentErrors.length === 0) {
   console.log('  ✓ No NEW parity gaps beyond the accepted baseline.');
 } else {
   if (newCliOnly.length > 0) {
@@ -307,6 +340,11 @@ if (newCliOnly.length === 0 && newMcpOnly.length === 0 && newDescriptionKeyGaps.
     console.log('  fix the key drift in src/mcp/tools/description-catalog.ts, or if');
     console.log('  intentional, accept it below.');
   }
+  if (authorityIntentErrors.length > 0) {
+    console.log(`  ✗ CLI authority intent violation — ${authorityIntentErrors.length} item(s):`);
+    for (const error of authorityIntentErrors) console.log(`    ${error}`);
+    console.log('');
+  }
   console.log('  Add the missing counterpart, or if the gap is intentional,');
   console.log('  accept it: node scripts/lint-cli-mcp-parity.mjs --update-baseline');
 }
@@ -323,4 +361,5 @@ console.log('');
 console.log(line);
 console.log('');
 
-process.exit(newCliOnly.length > 0 || newMcpOnly.length > 0 || newDescriptionKeyGaps.length > 0 ? 1 : 0);
+process.exit(newCliOnly.length > 0 || newMcpOnly.length > 0
+  || newDescriptionKeyGaps.length > 0 || authorityIntentErrors.length > 0 ? 1 : 0);

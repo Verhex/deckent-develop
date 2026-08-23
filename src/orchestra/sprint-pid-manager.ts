@@ -9,7 +9,10 @@ import {
 } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { DECKENT_DIR, BRAIN_DIR } from '../core/constants.js';
+import { DECKENT_DIR } from '../core/constants.js';
+import {
+  publishSprintArchiveArtifact,
+} from '../core/sprint-archive.js';
 import { ErrorRegistry } from '../core/errors.js';
 import { isPidAlive } from '../core/pid-liveness.js';
 import {
@@ -483,22 +486,26 @@ export function detectOrphan(root: string, sprintId: string): OrphanInfo | null 
 // ─── Archive Helper ───────────────────────────────────────────────
 
 /**
- * Archive orphaned sprint artifacts to .brain/archive/.
+ * Archive orphaned sprint artifacts inside the canonical sprint namespace.
  * Moves PID file, snapshot, and sprint state to the archive directory.
  */
 export function archiveOrphan(root: string, orphan: OrphanInfo): void {
-  const archiveDir = join(root, BRAIN_DIR, 'archive', 'sprints');
-  mkdirSync(archiveDir, { recursive: true });
-
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const prefix = `${orphan.sprintId}_${timestamp}`;
+  const settle = (source: string, target: string): void => {
+    publishSprintArchiveArtifact(
+      root,
+      orphan.sprintId,
+      source,
+      join('orphan-authority', target),
+      { retireSource: true },
+    );
+  };
 
   // Move PID file
   try {
     if (existsSync(orphan.pidFilePath)) {
-      const content = readFileSync(orphan.pidFilePath, 'utf-8');
-      writeFileSync(join(archiveDir, `${prefix}.pid`), content, 'utf-8');
-      unlinkSync(orphan.pidFilePath);
+      settle(orphan.pidFilePath, `${prefix}.pid`);
     }
   } catch { /* non-fatal */ }
 
@@ -506,9 +513,7 @@ export function archiveOrphan(root: string, orphan: OrphanInfo): void {
   if (orphan.snapshotPath) {
     try {
       if (existsSync(orphan.snapshotPath)) {
-        const content = readFileSync(orphan.snapshotPath, 'utf-8');
-        writeFileSync(join(archiveDir, `${prefix}.snapshot.json`), content, 'utf-8');
-        unlinkSync(orphan.snapshotPath);
+        settle(orphan.snapshotPath, `${prefix}.snapshot.json`);
       }
     } catch { /* non-fatal */ }
   }
@@ -517,9 +522,7 @@ export function archiveOrphan(root: string, orphan: OrphanInfo): void {
   const sprintStatePath = join(root, DECKENT_DIR, 'sprint-state.json');
   try {
     if (existsSync(sprintStatePath)) {
-      const content = readFileSync(sprintStatePath, 'utf-8');
-      writeFileSync(join(archiveDir, `${prefix}.sprint-state.json`), content, 'utf-8');
-      unlinkSync(sprintStatePath);
+      settle(sprintStatePath, `${prefix}.sprint-state.json`);
     }
   } catch { /* non-fatal */ }
 }

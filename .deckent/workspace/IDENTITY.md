@@ -16,14 +16,14 @@ Runtime: Node.js >=24.0.0
 Platform: macOS, Linux, Windows (native), WSL2
 Direction (2026-06-29 pivot): Tool-driven, progressive-disclosure, full-control + düşük bilişsel yüklü Terminal ana kullanım/yönetim yüzeyi; Desktop aynı authority'nin native operator yüzeyi; Dashboard yalnız observability projection.
 Moat: Deterministik eval-backed orchestration · governance-by-construction · outcome→evidence→routing→promotion→training-trace kapalı öğrenme döngüsü
-SSOT: `docs/MASTER-PLAN.md` · core-memory: `.deckent/docs/core-memory/MEMORY.md` · yön gerekçesi: `.analysis/hermes-vs-deckent-direction-decisions.md`
+SSOT: `docs/MASTER-PLAN.md` · core-memory: `.deckent/docs/core-memory/MEMORY.md` · yön gerekçesi: `docs/en/vision.md` (TR: `docs/tr/vision.md`)
 <!-- AUTOGEN:START id="identity-tests" -->
-Tests: 36,580 descriptors (parsed from tests/**/*.test.ts(x))
+Tests: 36,741 descriptors (parsed from tests/**/*.test.ts(x))
 Dashboard Tests: 96 descriptors (parsed from src/dashboard/src/**/*.test.tsx)
 Coverage: N/A
 <!-- AUTOGEN:END id="identity-tests" -->
 <!-- AUTOGEN:START id="identity-summary" -->
-CLI Commands: 78+
+CLI Commands: 80+
 MCP: 51 tools, 8 resources
 Agents: 21 built-in
 Skills: 30 built-in
@@ -37,7 +37,7 @@ Core Capabilities: Deterministik lifecycle orchestration; durable execution/reco
 | Version | 0.100.0 |
 | MCP Tools | 51 |
 | MCP Resources | 8 |
-| CLI Commands | 78+ |
+| CLI Commands | 80+ |
 | Dashboard Pages | 20 |
 | Agents | 21 built-in |
 | Skills | 30 built-in |

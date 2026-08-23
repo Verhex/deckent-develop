@@ -23,7 +23,6 @@ import {
   CLAUDE_RULES_DIR,
   WORKSPACE_DIR,
   PLUGINS_DIR,
-  I18N_DIR,
   DASHBOARD_FILE,
   DIRECTIVES_FILE,
   AGENTS_FILE,
@@ -177,7 +176,6 @@ export function createDirectories(root: string): void {
   ensureDir(join(root, LOCKS_DIR));
   ensureDir(join(root, CLAUDE_RULES_DIR));
   ensureDir(join(root, PLUGINS_DIR));
-  ensureDir(join(root, I18N_DIR));
 }
 
 export function clearStaleCaches(root: string): void {
@@ -525,27 +523,6 @@ export function writeBrainFiles(
   try {
     seedDocsConfig(root);
   } catch { /* non-fatal */ }
-}
-
-export function writeI18nFiles(root: string): void {
-  const enMessages = {
-    sprint_started: 'Sprint {id} started with {count} tasks',
-    sprint_complete: 'Sprint {id} complete',
-    task_done: 'Task {id}: DONE',
-    task_nogo: 'Task {id}: NO_GO',
-    plan_approved: 'Plan approved',
-    plan_rejected: 'Plan rejected',
-  };
-  const trMessages = {
-    sprint_started: 'Sprint {id} baslatildi, {count} gorev',
-    sprint_complete: 'Sprint {id} tamamlandi',
-    task_done: 'Gorev {id}: TAMAMLANDI',
-    task_nogo: 'Gorev {id}: BASARISIZ',
-    plan_approved: 'Plan onaylandi',
-    plan_rejected: 'Plan reddedildi',
-  };
-  writeIfNotExists(join(root, I18N_DIR, 'en.json'), JSON.stringify(enMessages, null, 2) + '\n');
-  writeIfNotExists(join(root, I18N_DIR, 'tr.json'), JSON.stringify(trMessages, null, 2) + '\n');
 }
 
 export function updateGitignore(root: string): void {

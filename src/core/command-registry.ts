@@ -115,6 +115,7 @@ export const COMMAND_REGISTRY: readonly CommandRegistryEntry[] = [
   entry('connect', 'Core', 'Oku', 'core', ['cli']),     // diagnostic wizard, no mutation
   entry('do', 'Run', 'Çalıştır', 'orchestra', ['cli', 'repl']), // golden-flow; default dry-run, --run executes. 'repl': 452-002 /do slash (RunFlow chain via app.tsx)
   entry('archive-debt', 'Core', 'Oku', 'orchestra', ['cli']),
+  entry('archive', 'Core', 'Değiştir', 'core', ['cli']),
   entry('dashboard', 'Core', 'Oku', 'monitor', ['cli']),
   entry('sync', 'Core', 'Değiştir', 'orchestra', ['cli', 'mcp', 'repl'], ['deckent_sync']),
   entry('agent', 'Core', 'Değiştir', 'core', ['cli', 'mcp', 'repl'], ['deckent_agent_list', 'deckent_agent_manage']),
@@ -134,6 +135,9 @@ export const COMMAND_REGISTRY: readonly CommandRegistryEntry[] = [
   entry('limits', 'Core', 'Oku', 'core', ['cli']),          // 361-002 subscription limit-probe
   entry('openrouter-probe', 'Core', 'Oku', 'core', ['cli']), // 366-003 canlı-probe (key'siz dürüst-unavailable)
   entry('provider-authority', 'Enterprise', 'Değiştir', 'providers', ['cli']),
+  // Migration prepare/decision/apply authority stays operator-only: MCP must
+  // not gain a provider-observation mutation tool implicitly through parity.
+  entry('provider-observations', 'Enterprise', 'Değiştir', 'providers', ['cli']),
   entry('execution-authority', 'Enterprise', 'Değiştir', 'core', ['cli', 'mcp'], ['deckent_execution_authority']), // mount-adopt: yerel execution-lock authority mutasyonu
   // approvals: CLI `list` + `decide --allow/--deny` mutates approval-admission state ('Değiştir');
   // the folded MCP tool `deckent_approvals` is a READ-ONLY pending inbox only — deciding stays

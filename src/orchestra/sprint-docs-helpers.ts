@@ -94,12 +94,12 @@ export function buildSprintLogLines(
 /**
  * Build the placeholder DIRECTIVES.md content for the next sprint.
  * @param archivedSprintId - The sprint that was just completed
- * @param archiveFileName - The filename of the archived DIRECTIVES
+ * @param archiveReference - Project-relative path of the archived DIRECTIVES
  * @param nextNum - The next sprint number (or '???' if unknown)
  */
 export function buildDirectivesPlaceholder(
   archivedSprintId: string,
-  archiveFileName: string,
+  archiveReference: string,
   nextNum: number | string,
 ): string {
   return [
@@ -108,7 +108,7 @@ export function buildDirectivesPlaceholder(
     `> Önceki sprint (${archivedSprintId}) tamamlandı. Bu dosya yeni sprint hedefleri için hazırdır.`,
     '',
     `## Referanslar`,
-    `- Arşiv: .brain/archive/${archiveFileName}`,
+    `- Arşiv: ${archiveReference}`,
     `- Retro: .brain/RETRO.md`,
     `- Bellek: .brain/MEMORY.md`,
     '',

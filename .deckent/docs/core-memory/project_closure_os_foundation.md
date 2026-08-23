@@ -1,57 +1,64 @@
-# Closure OS Sidecar Ledger — Foundation Kararı (2026-08-15)
+# Closure OS Sidecar Ledger — Foundation’dan İlk Settlement’a (2026-08-22)
 
-**Tip:** project / kalıcı-durum (law değil; genişletme değil, referans-karar).
+**Tip:** project / kalıcı-durum (law veya iş kuyruğu değil; tarihsel ve semantik referans).
 
-Phase-4 **foundation COMPLETE** — bir **mekanizma + governance foundation** kapanışıdır, **ürün
-wiring değildir** ve **canlı ledger mutation'ı yoktur** (ledger boş; gate `nothing to validate (OK)`).
-Sidecar decision-ledger, MASTER'dan ayrı bir **Level×Lane + admission + priority-karar** authority'sidir;
-projections yalnız-okuma türevdir ve truth kaynağı değildir.
+Bu kayıt üç ayrı truth'u karıştırmaz: foundation'ın kurulması, ürün zincirinin kanıtlanması ve
+owner/product seviyesinde hâlâ **OPEN** olan residual'lar. Projection'lar yalnız-okuma türevdir;
+closure veya canlı disk kanıtının yerine geçmez.
 
-## Sabitlenen kararlar
-- **Root-of-trust = reviewed-parent** (merge-base `origin/main`): bir key **kendi eklendiği PR'da
-  kendini yetkilendiremez**; rotation ancak parent-key'in ed25519-imzaladığı rotation receipt'iyle;
-  genesis/çözülemez git → typed HOLD `TRUST_ANCHOR_BOOTSTRAP_UNRESOLVED` (in-repo self-sign yok).
-- **Historical batch** = immutable snapshot bundle; imzalı digest'ler **arşivlenen byte'lardan**
-  yeniden hesaplanır (current MASTER'dan DEĞİL); payload tamper → `AUTHORITY_SNAPSHOT_INTEGRITY_MISMATCH`.
-- **Append-only hash chain** + **transactional four-view projection** (tek atomik `current.json` swap).
-- **HOLD ≠ closure** — typed HOLD asla başarı/kapanış değildir.
-- Mutation yalnız **authenticated batch authority + append-only gate + projection settlement** ile;
-  elle MASTER/ledger sınıflandırması veya **sahte receipt YASAK**.
+## Dated history
 
-## Genesis provisioning TOOL sevk edildi (2026-08-16 — ayrı genesis PR)
-`scripts/closure-ledger/genesis-anchor.mjs` + [`docs/governance/closure-genesis-provisioning.md`](../../../docs/governance/closure-genesis-provisioning.md):
-buildless ceremony/verify aracı, **SOLE validator** `parseTrustAnchorsDoc`'u reuse eder (ikinci şema
-authority'si icat etmez). Fingerprint = `sha256`(**SPKI DER**), deterministik/recomputable. **İki mod
-(Codex security re-audit sonrası):** `--adopt-public-key` (CANONICAL — hardware/KMS/keychain public key'i
-alır, private'e dokunmaz) ve `--generate` (software-key bootstrap; plaintext PKCS8 repo-DIŞI, POSIX 0600
-enforce+verify; **Windows'ta typed HOLD**). **Fail-closed:** private/anchors/fingerprint hedefleri önce
-absent preflight; private key **O_EXCL** (overwrite/symlink-follow yok) + mode-verify; partial failure yalnız
-bu-koşum-dosyaları rollback; private key hiçbir stream'de. Araç repo'ya **private key YAZMAZ**
-(in-repo/symlink-into-repo reddi), yalnız public anchor + fingerprint manifest emit eder. **Bu PR'da gerçek
-anchor commit YOK** — anchor'ı owner ceremony provision eder; authority yalnız owner-verified
-**reviewed-parent merge**'den gelir. Stable reasonCode'lar (`GENESIS_*`) + negatif forgery seti tool
-`--self-check` (21/21) + `tests/governance/closure-genesis-anchor.test.ts` (13/13)'te. Canonical owner
-identity: keyId=`closure-owner-genesis-v1`, tenantId=`main`, projectId=`deckent`. tenantId/projectId'in
-**canonical producer'ı YOK** → owner ceremony input'u; Phase-5 writer'ın approval subject'i birebir eşleşmeli.
-**Round-2 security re-audit (2026-08-16):** (A) `createPublicKey` private PEM'den public türetiyor → adopt artık
-PRIVATE KEY envelope'ını createPublicKey'den ÖNCE reddeder (`GENESIS_PRIVATE_KEY_INPUT_FORBIDDEN`) — "no private
-material" envelope-guard ile KANITLI. (B) **SOLE validator** (`parseTrustAnchorsDoc` + `resolveTrustAnchors`,
-`lint-closure-dispositions.mjs`) artık anchor.publicKeyPem VE rotation.newPublicKeyPem için tek `ed25519PublicPemProblem`
-helper'ıyla: tam bir SPKI PUBLIC KEY bloğu + private-envelope YASAK (`TRUST_ANCHOR_PRIVATE_KEY_FORBIDDEN`) + ed25519
-type (`TRUST_ANCHOR_BAD_KEY_TYPE`) zorunlu — P-256/RSA/private anchor artık trusted-set'e giremez; parent-imzası bile
-non-ed25519 rotation'ı launder edemez (key-type önce). Gate self-check 131/131, genesis tool self-check 23/23,
-genesis vitest 18/18. İkinci validator icat edilmedi (helper gate içinde reuse).
+### Phase-4 foundation — 2026-08-15
 
-## Phase-5 (KURULMADI — kod olarak yok)
-ed25519 **SIGNER** + owner private-key custody · gerçek **ApprovalBroker writer** · gerçek
-**receipt/ledger-event** · **MASTER state/priority mutation** · provider çağrısı · **owner ceremony ile
-gerçek genesis anchor commit** (tool hazır; anchor henüz yok).
+Phase-4 **COMPLETE** bir mekanizma ve governance foundation kapanışıdır. Sidecar decision-ledger,
+MASTER'dan ayrı Level×Lane, admission ve priority-karar yüzeyini; append-only chain'i; immutable
+historical batch snapshot'ını; typed HOLD semantiğini ve atomik four-view projection üretimini
+sabitledi. Bu tarih ürün wiring'i veya gerçek bir batch settlement'ı değildi.
 
-## Sıra (güncelleme 2026-08-17)
-foundation PR ✅ → genesis trust-anchor PR #127 ✅ **MERGED** (owner ceremony koşuldu;
-owner-verified public anchor + fingerprint main'de — commit `88637d5d6`) → **Paket B
-(`RUN-POLICY-DELIVERY-001`, aktif sıradaki product closure)** → Phase-5 writer →
-exact dry-run digest → **tek authenticated owner approval** → ledger append + atomic projections.
+Kaynaklar: [sidecar-ledger spec](../../../docs/governance/closure-os-sidecar-ledger.md) ·
+[transition brief §14](../../../CLOSURE-OS-PRODUCT-TRANSITION-BRIEF.md).
 
-Extended spec: [`docs/governance/closure-os-sidecar-ledger.md`](../../../docs/governance/closure-os-sidecar-ledger.md) ·
-Transition brief §14: [`CLOSURE-OS-PRODUCT-TRANSITION-BRIEF.md`](../../../CLOSURE-OS-PRODUCT-TRANSITION-BRIEF.md).
+### Genesis — 2026-08-16/17
+
+Buildless genesis ceremony/verify aracı 2026-08-16'da sevk edildi. Owner-verified public anchor ve
+fingerprint, ayrı genesis PR #127 ile main'e 2026-08-17'de girdi (`88637d5d6`). Böylece Phase-4'ün
+bootstrap residual'ı kapandı; tool teslimi ile gerçek anchor'ın reviewed history'ye girmesi aynı olay
+olarak yazılmaz.
+
+Kaynaklar: [genesis provisioning](../../../docs/governance/closure-genesis-provisioning.md) ·
+[sidecar-ledger spec](../../../docs/governance/closure-os-sidecar-ledger.md).
+
+### Phase-5 ve ilk authenticated batch — 2026-08-22
+
+Önceki “Phase-5 KURULMADI” durumu artık tarihsel kaldı. Dependency kapanışlarından sonra Phase-5
+writer yolu ve ilk batch uçtan uca çalıştırıldı; kaynak değişikliklerinin disk anchor'ı `dba89c03`.
+İlk batch'in anlamı bütün Closure OS ürününün bittiği değil, gerçek writer→receipt/event→append→
+projection zincirinin ilk kez settled olduğudur. Phase-4 foundation ile bu product proof aynı closure
+olarak geriye dönük birleştirilmez.
+
+Kaynaklar: [transition brief](../../../CLOSURE-OS-PRODUCT-TRANSITION-BRIEF.md) ·
+[MASTER tracking SSOT](../../../docs/MASTER-PLAN.md) · disk commit `dba89c03`.
+
+## Settlement ve projection truth
+
+- İlk batch settlement'ı terminaldir; HOLD, dry-run veya yalnız projection sonucu closure sayılmaz.
+- `8101` ve `7140` settlement/projection kanıt ailesi birlikte okunur: durable settlement asıl
+  kanıttır; projection onun yeniden üretilebilir read-model görünümüdür.
+- Projection drift veya stale görünüm, settled history'yi yeniden yazmaz. Canlı durum iddiası için
+  projection tek başına yeterli değildir; disk artefact'ı ve durable receipt birlikte doğrulanır.
+- Bu kayıt tracking SSOT değildir. Satır durumu ve owner-admitted residual için canonical kaynak
+  [docs/MASTER-PLAN.md](../../../docs/MASTER-PLAN.md)'dir.
+
+## Şimdi OPEN olan truth
+
+- **Owner residual — OPEN:** İlk batch proof'u sonraki batch'ler için sınırsız veya kalıcı owner
+  kabulü değildir. Yeni scope veya destructive/external sınırında yeni owner kararı gerekir.
+- **Product residual — OPEN:** İlk settled batch, Closure OS ürün ailesinin bütün consumer,
+  operational hardening ve rollout işlerini otomatik kapatmaz. Yalnız MASTER'da owner-admitted
+  satırlar yürütülebilir product işi sayılır.
+- **Projection residual — OPEN olduğu ölçüde:** `8101`/`7140` görünüm farkları settlement truth'tan
+  ayrı izlenir; read-model parity tamamlanmadan “tüm projection'lar current” iddiası kurulmaz.
+
+Bu OPEN maddeler yeni backlog icat etmez; yalnız ilk batch settlement'ından çıkarılamayacak sonuçların
+sınırını kaydeder. Güncel kabul ve kapanış verdict'i için her zaman
+[MASTER tracking SSOT](../../../docs/MASTER-PLAN.md) okunur.

@@ -483,8 +483,50 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // measured 10k case remained below ten seconds and no live repo task,
   // memory or runtime authority entered test ownership. Prior: 9040 runtime
   // hygiene follow-up (14818).
-  count: 14946,
-  digest: '737f51a44de8369fd190444860ee1bd1d4920c7413955c309eeb2bfa81957a12',
+  // 2026-08-22 (canonical sprint archive handoff): +3 — the new archive
+  // reconciliation suite uses only suite-owned tmpdir/SQLite fixtures to pin
+  // lossless retirement, hash-addressed conflicts, Brain semantic indexing,
+  // tamper detection and read-only dry-run behavior. The wider archive/finalizer
+  // battery passed with zero live-repository authority writes. Prior: 7092
+  // RECOVERY-TRUTH (14946).
+  // 2026-08-22 archive ownership hardening: count unchanged; digest-only update
+  // after the hermetic fixtures began pinning exact sprint ownership and the
+  // canonical DIRECTIVES reference instead of the retired Brain raw path.
+  // 2026-08-22 (completed-checkpoint dynamic FIX evidence recovery): same
+  // 14949 count, digest only — the existing terminalizer suite now pins the
+  // canonical finalizer loader's dynamically discovered FIX-task evidence.
+  // 2026-08-22 (crash-before-prepare terminal identity recovery): same count,
+  // digest only — task-result authority now projects a closed host recovery
+  // settlement as deterministic zero-work pre-dispatch evidence.
+  // 2026-08-22 (PROVIDER-OBS-MIGRATION-001): +21 — the migration, adoption,
+  // approval and real-process CLI proof suites plus adjacent legacy-store and
+  // connector partial-start cases add only suite-owned tmpdir/SQLite lifecycle,
+  // tamper and symlink effects. The source-derived registry reported zero
+  // confirmed violations; no live repo database, task or owner authority entered
+  // test ownership. Notification drain tests are injected-timer/adapter based.
+  // 2026-08-22 (provider-observation canonical-path closure): +2 — suite-owned
+  // tmpdir SQLite fixtures now prove the real CLI default selects the canonical
+  // `.db` authority without WAL/SHM/migration writes, and pin text-source NUL
+  // hygiene. Source-derived scanning still reports zero confirmed violations.
+  // 2026-08-22 (durable provider-adoption closure): +50 — the receipt-store,
+  // adversarial and real compiled-process suites add only suite-owned tmpdir /
+  // SQLite fixtures, create-only private receipt files, bounded child-process
+  // restart/replay and finalizer durable-task fixtures. Host-policy coverage
+  // pins owner-controlled 0755 `.deckent`, rejects group-writable 0775, and
+  // keeps every receipt descendant 0700/0600. The 24-file scoped battery passed
+  // 315 tests (4 intentional skips); no live repo authority path is admitted.
+  // 2026-08-23 (sprint identity recovery): +2 — the existing tmpdir-backed
+  // sequence tests now pin legacy epoch-ID exclusion and reject a timestamp
+  // identity at the config-write boundary. Both sites use mocked fs effects;
+  // no live `.deckent`, `.tasks` or Brain authority is mutated by the suite.
+  // 2026-08-23 (runtime hygiene + repository cleanup landing): +93 — archive,
+  // retention, provider-adoption and runtime-hygiene suites use suite-owned
+  // tmpdir/SQLite fixtures and bounded compiled-process smoke paths. The
+  // source-derived scan measured zero confirmed live-authority violations;
+  // removal of the unwired `.deckent/i18n` fixture also retires its legacy
+  // live-read exception instead of grandfathering it.
+  count: 15117,
+  digest: 'aa8184eced6186c1b0e0a503158c5a7a68b779926ea009269453887a3e50b036',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -853,8 +895,43 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // modules moved content to consume those authorities. Root proof: 200 pass,
   // 2 skip scoped; 253 adjacent; tsc and real compiled CLI green. Prior: 9040
   // acceptance authority-restart closure (1281).
-  count: 1288,
-  digest: '7397e78f64aa738d5e46ce26436405da1cab4fd313da8f52e936c1f45a34780f',
+  // 2026-08-22 (canonical sprint archive handoff): +2 — the canonical
+  // src/core/sprint-archive.ts authority and its operator-only archive CLI
+  // surface enter the inventory. Existing finalizer, recovery, retention,
+  // auditor, SDK, MCP read-side and task-reader modules now consume this single
+  // dual-read/new-write authority. Prior: 7092 RECOVERY-TRUTH (1288).
+  // 2026-08-22 archive ownership hardening: count unchanged; digest-only update
+  // for the central non-clobber publisher, exact ownership filter and fail-
+  // closed finalizer wiring in the same two inventoried modules.
+  // 2026-08-22 completed-checkpoint recovery: count unchanged; digest-only
+  // update after terminal evidence collection began consuming the canonical
+  // finalizer attempt-task loader, including dynamic FIX attempts.
+  // 2026-08-22 crash-before-prepare terminal identity recovery: count
+  // unchanged; digest-only update for the shared pre-dispatch projection,
+  // Docker recovery writer and authoritative result reader wiring.
+  // 2026-08-22 (PROVIDER-OBS-MIGRATION-001): +4 — canonical migration,
+  // adoption, approval-bridge and CLI composition modules enter inventory.
+  // Existing observation store/status and notification composition modules move
+  // content only; the digest binds their fail-closed and lifecycle wiring.
+  // 2026-08-22 canonical-path closure: count unchanged; digest-only update after
+  // the store exported one `.db` path authority and every production reader,
+  // finalizer and CLI default consumed it. No new production module was added.
+  // 2026-08-22 durable provider-adoption closure: +1 — the content-addressed
+  // src/core/provider-execution-observation-adoption-receipt-store.ts enters
+  // inventory. The adoption CLI consumes its no-replace/fsync/fresh-read chain;
+  // the final host-policy correction changes only the shared-control-directory
+  // trust boundary and keeps the scoped receipt store private.
+  // 2026-08-23 (sprint identity recovery): +1 — the provider-neutral
+  // execution-job identity module separates detached job IDs from sprint
+  // ordinals while preserving legacy timestamp ordering during migration.
+  // 2026-08-23 (runtime hygiene + canonical archive landing): +8 — the
+  // maintenance archive, recent-work, run-flow, artifact classifier,
+  // evaluation, job, log and unified hygiene authorities enter the production
+  // inventory through their hermetic suites. Existing finalizer/CLI wiring
+  // moves content only; the measured registry contains zero confirmed
+  // violations.
+  count: 1304,
+  digest: '4617e0568b4901c6887b051830848876e4e759685b783c4677272caa6f9e229e',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
@@ -888,13 +965,11 @@ export const ALLOWLIST = [
   'tests/orchestra/spawn-backend-docker.test.ts',
   'tests/scripts/lint-test-hermeticity.test.ts',
   'tests/docs/api-md-no-stale-refs.test.ts',
-  'tests/cli/helpers/i18n-coverage.test.ts',
   'tests/core/debt-002.test.ts',
   'tests/core/features-manifest.test.ts',
 ];
 
 export const LEGACY_READ_MIGRATION_BASELINE = Object.freeze([
-  'tests/cli/helpers/i18n-coverage.test.ts:9e5e256d837d13b50688ad12b091703d1744e583107d5afd15d0c2355a3e3ed1',
   'tests/core/debt-002.test.ts:3ad99766549f71dd4975c5136f314bab6305062af608a53de6d31fd180049a33',
   'tests/core/features-manifest.test.ts:b7b9c3987127fea3ad886be3903adc86e3252966c997c0b1d0e52d11bac065ac',
   'tests/core/nervous-enabled-integration.test.ts:2a6ad86be5a4e6cade1a7b07c8866d28c3bbde48f0b9207c8acc62aa8871f8ce',

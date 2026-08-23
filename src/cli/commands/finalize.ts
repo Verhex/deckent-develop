@@ -1,5 +1,5 @@
 import { readdirSync, existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import type { Command } from 'commander';
 import type { Sprint, Task, TaskResult } from '../../core/types.js';
 import {
@@ -30,6 +30,7 @@ import {
   runSprintRecoveryOperation,
 } from '../../orchestra/sprint-recovery-operation.js';
 import { DeckentError } from '../../core/errors.js';
+import { resolveTaskArtifactReadDirs } from '../../core/sprint-archive.js';
 
 /**
  * Project the task record a surviving `.result` proves must have existed, for
@@ -106,6 +107,22 @@ export function buildSprintFromTasks(root: string, sprintFilter?: string, option
     }
   };
 
+  const listFilesRecursively = (dir: string): string[] => {
+    const files: string[] = [];
+    const pending = [dir];
+    while (pending.length > 0) {
+      const current = pending.pop()!;
+      let entries;
+      try { entries = readdirSync(current, { withFileTypes: true }); } catch { continue; }
+      for (const entry of entries) {
+        const path = join(current, entry.name);
+        if (entry.isDirectory()) pending.push(path);
+        else if (entry.isFile()) files.push(path);
+      }
+    }
+    return files.sort();
+  };
+
   const tasksDirExists = existsSync(tasksDir);
   // Without a .tasks/ dir AND without an explicit --sprint filter there is no
   // way to locate the per-sprint archive dir either — nothing to finalize.
@@ -132,20 +149,21 @@ export function buildSprintFromTasks(root: string, sprintFilter?: string, option
   // Determine sprint ID: use filter if provided, else derive from tasks
   const sprintId = sprintFilter ?? tasks[0]?.sprintId ?? 'sprint-unknown';
 
-  // Merge archived task JSONs (.tasks/ wins on id collision)
-  // W7: yeni-düzen önce, eski düz-yerleşim fallback.
-  const archiveNewDir = join(root, BRAIN_DIR, 'archive', 'sprints', `${sprintId}-tasks`);
-  const archiveTasksDir = existsSync(archiveNewDir) ? archiveNewDir : join(root, BRAIN_DIR, 'archive', `${sprintId}-tasks`);
-  const archiveDirExists = sprintId !== 'sprint-unknown' && existsSync(archiveTasksDir);
-  if (archiveDirExists) {
-    const archivedTaskFiles = readdirSync(archiveTasksDir).filter(f => /^task-[\w-]{1,100}\.json$/u.test(f));
-    for (const file of archivedTaskFiles) {
-      const task = readCanonicalTaskArtifact(archiveTasksDir, file);
+  // Merge canonical + legacy archived task JSONs (.tasks/ wins on id collision).
+  // Canonical reads come first; migration roots remain dual-readable until
+  // their verified disposition is complete.
+  const archiveTaskDirs = sprintId === 'sprint-unknown'
+    ? []
+    : [...resolveTaskArtifactReadDirs(root, sprintId)];
+  const archivedFiles = archiveTaskDirs.flatMap(listFilesRecursively);
+  for (const path of archivedFiles) {
+    const file = basename(path);
+    if (!/^task-[\w-]{1,100}\.json$/u.test(file)) continue;
+    const task = readCanonicalTaskArtifact(dirname(path), file);
       if (task && !seenTaskIds.has(task.id) && (!sprintFilter || task.sprintId === sprintFilter)) {
         tasks.push(task);
         seenTaskIds.add(task.id);
       }
-    }
   }
 
   // Read all result files (.tasks/ first, then archive — deduped by taskId)
@@ -160,15 +178,14 @@ export function buildSprintFromTasks(root: string, sprintFilter?: string, option
       }
     }
   }
-  if (archiveDirExists) {
-    const archivedResultFiles = readdirSync(archiveTasksDir).filter(f => f.startsWith('task-') && f.endsWith('.result'));
-    for (const file of archivedResultFiles) {
-      const result = normalizeTaskResultShape(readJsonSafe<TaskResult>(join(archiveTasksDir, file)));
+  for (const path of archivedFiles) {
+      const file = basename(path);
+      if (!file.startsWith('task-') || !file.endsWith('.result')) continue;
+      const result = normalizeTaskResultShape(readJsonSafe<TaskResult>(path));
       if (result && seenTaskIds.has(result.taskId) && !seenResultIds.has(result.taskId)) {
         results.push(result);
         seenResultIds.add(result.taskId);
       }
-    }
   }
 
   // Force-only evidence recovery (row 3162). A sprint whose task projection was
@@ -183,15 +200,14 @@ export function buildSprintFromTasks(root: string, sprintFilter?: string, option
   if (options.recoverOrphanResults && sprintId !== 'sprint-unknown') {
     const sprintSegment = sprintId.replace(/^sprint-/u, '');
     const resultPrefix = `task-${sprintSegment}-`;
-    const recoveryDirs = [
-      ...(tasksDirExists ? [tasksDir] : []),
-      ...(archiveDirExists ? [archiveTasksDir] : []),
+    const recoveryFiles = [
+      ...(tasksDirExists ? listFilesRecursively(tasksDir) : []),
+      ...archivedFiles,
     ];
-    for (const dir of recoveryDirs) {
-      const orphanFiles = readdirSync(dir)
-        .filter(f => f.startsWith(resultPrefix) && f.endsWith('.result'));
-      for (const file of orphanFiles) {
-        const result = normalizeTaskResultShape(readJsonSafe<TaskResult>(join(dir, file)));
+    for (const path of recoveryFiles) {
+        const file = basename(path);
+        if (!file.startsWith(resultPrefix) || !file.endsWith('.result')) continue;
+        const result = normalizeTaskResultShape(readJsonSafe<TaskResult>(path));
         if (!result || typeof result.taskId !== 'string') continue;
         if (!result.taskId.startsWith(`${sprintSegment}-`)) continue;
         if (seenTaskIds.has(result.taskId)) continue;
@@ -199,7 +215,6 @@ export function buildSprintFromTasks(root: string, sprintFilter?: string, option
         seenTaskIds.add(result.taskId);
         results.push(result);
         seenResultIds.add(result.taskId);
-      }
     }
   }
 
@@ -532,6 +547,7 @@ export function registerFinalize(program: Command): void {
           noGo: String(metrics.noGoTasks),
         }));
       } catch (error) {
+        debugLog('finalize:terminalSettlement', error);
         printError(error);
         process.exitCode = 1;
       }

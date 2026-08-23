@@ -21,10 +21,11 @@
 // (dual-read). Telemetry lives in a SEPARATE top-level `telemetry` sidecar that
 // the ShareGPT projection never reads, so it can never reach the training set.
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { LogEvent, LogEventType } from './log-event.js';
 import { redactSensitive } from './redact-sensitive.js';
+import { resolveTaskArtifactReadDirs } from './sprint-archive.js';
 
 /** Current sprint-worker trace record format. Absent/`1` ⇒ legacy v1 record. */
 export const TRACE_SCHEMA_VERSION = 2;
@@ -117,7 +118,7 @@ export function splitWorkerPrompt(text: string): WorkerPrompt {
 /**
  * Locate + read + split the worker's real prompt for `taskId` from the `.tasks`
  * archive. The compiled prompt is written to `.tasks/.prompt-<taskId>-<hash>.txt`
- * live and moved to `.tasks/archive/sprint-<id>/` at sprint-end
+ * live and moved to the canonical sprint task archive at sprint-end
  * (spawn-backend-docker.ts archivePromptFiles / tmux.ts writePromptFile), so
  * both locations are searched.
  *
@@ -148,28 +149,36 @@ export function loadWorkerPromptMeta(
 }
 
 /** Deterministic pick of the `.prompt-<taskId>-*.txt` file (live dir first, then
- *  each `archive/<sprint>/` dir), honoring the fix/original preference. Within a
+ *  canonical/legacy read roots), honoring the fix/original preference. Within a
  *  category the lexicographically-first match wins (hashes are random but the
  *  choice is stable across runs). */
 function locateWorkerPromptFile(tasksDir: string, taskId: string, preferFix: boolean): string | undefined {
-  const searchDirs: string[] = [tasksDir];
-  const archiveRoot = join(tasksDir, 'archive');
-  if (existsSync(archiveRoot)) {
-    for (const entry of safeReaddir(archiveRoot)) {
-      searchDirs.push(join(archiveRoot, entry));
-    }
+  const sprintSegment = taskId.match(/^(\d+)-/u)?.[1];
+  const searchRoots: string[] = [tasksDir];
+  if (sprintSegment) {
+    searchRoots.push(...resolveTaskArtifactReadDirs(dirname(tasksDir), `sprint-${sprintSegment}`));
   }
 
   const prefix = `.prompt-${taskId}-`;
-  for (const dir of searchDirs) {
-    const matches = safeReaddir(dir)
-      .filter((f) => f.startsWith(prefix) && f.endsWith('.txt'))
-      .sort();
+  for (const root of searchRoots) {
+    const directories = [root];
+    const matches: string[] = [];
+    while (directories.length > 0) {
+      const dir = directories.pop()!;
+      for (const entry of safeReaddir(dir)) {
+        const path = join(dir, entry);
+        try {
+          if (statSync(path).isDirectory()) directories.push(path);
+          else if (entry.startsWith(prefix) && entry.endsWith('.txt')) matches.push(path);
+        } catch { /* raced archive publication; try the next entry */ }
+      }
+    }
+    matches.sort();
     if (matches.length === 0) continue;
-    const isFix = (f: string): boolean => f.endsWith('-fix.txt');
-    const preferred = matches.filter((f) => isFix(f) === preferFix);
+    const isFix = (path: string): boolean => path.endsWith('-fix.txt');
+    const preferred = matches.filter(path => isFix(path) === preferFix);
     const chosen = (preferred.length > 0 ? preferred : matches)[0];
-    if (chosen !== undefined) return join(dir, chosen);
+    if (chosen !== undefined) return chosen;
   }
   return undefined;
 }

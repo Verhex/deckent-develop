@@ -57,49 +57,41 @@
 | adr-g-041 | Deckent Core ve Verhex Enterprise Modüler Ürün Mimarisi | accepted |
 
 ## Recent Learnings
-- **Sprint sprint-622 Learnings** (sprint-622): ## Sprint sprint-622 Learnings
-- Immutable evaluation receipt restart replay pin: GO_WITH_TECH_DEBT — Receipt replay ...
-- **Sprint sprint-619 Learnings** (sprint-619): ## Sprint sprint-619 Learnings
+- **Sprint sprint-1780659451558 Learnings** (sprint-1780659451558): ## Sprint sprint-1780659451558 Learnings
+- POMR02-STORE-SCALE 10k lookup and concurrent publication proof: GO_WITH_TE...
+- **Sprint sprint-1780659451557 Learnings** (sprint-1780659451557): ## Sprint sprint-1780659451557 Learnings
+- POM01-DISK-INVENTORY Exact adoption authority inventory: GO_WITH_TECH_DEBT...
+- **Sprint sprint-1780659451556 Learnings** (sprint-1780659451556): ## Sprint sprint-1780659451556 Learnings
 
 ## Gains
-- 619-001 — Durable LLM authority binding and restart verifier — Declared ta...
-- **Sprint sprint-613 Learnings** (sprint-613): ## Sprint sprint-613 Learnings
+- 1780659451556-001 — R01-LINK-REPAIR Closure gate source-referenc...
+- **Sprint sprint-1780659451549 Learnings** (sprint-1780659451549): ## Sprint sprint-1780659451549 Learnings
 
 ## Gains
-- 613-001 — Hermetic provider-probe broker clock — Injected the fixture muta...
-- **Sprint sprint-612 Learnings** (sprint-612): ## Sprint sprint-612 Learnings
+- 1780659451549-001 — Canonical CLI consumer and text-source byte ...
+- **Sprint sprint-1780659451548 Learnings** (sprint-1780659451548): ## Sprint sprint-1780659451548 Learnings
+- Canonical provider-observation path authority: GO_WITH_TECH_DEBT — Exporte...
+- **Sprint sprint-1780659451547 Learnings** (sprint-1780659451547): ## Sprint sprint-1780659451547 Learnings
 
 ## Gains
-- 612-001 — Canonical bounded probe risk envelope — Exact declared Vitest co...
-- **Sprint sprint-611 Learnings** (sprint-611): ## Sprint sprint-611 Learnings
+- 1780659451547-001 — Compiled adoption and closure evidence — Rec...
+- **Sprint sprint-1780659451546 Learnings** (sprint-1780659451546): ## Sprint sprint-1780659451546 Learnings
 
 ## Gains
-- 611-001 — Wave-level verification placement — npx tsc --noEmit passed.
-- 6...
-- **Sprint sprint-606 Learnings** (sprint-606): ## Sprint sprint-606 Learnings
+- 1780659451546-001 — Graceful terminal-notification drain — Canon...
+- **Sprint sprint-1780659451545 Learnings** (sprint-1780659451545): ## Sprint sprint-1780659451545 Learnings
 
 ## Gains
-- 606-001 — Claude Docker evidence-source ve authoring composition tasarimi ...
-- **Sprint sprint-605 Learnings** (sprint-605): ## Sprint sprint-605 Learnings
-
-## Gains
-- 605-001 — D4 blueprint canonical-path ve closure-DAG düzeltmesi — Updated ...
-- **Sprint sprint-604 Learnings** (sprint-604): ## Sprint sprint-604 Learnings
-
-## Gains
-- 604-001 — D4 olculmus lifecycle blueprint ve closure matrisi — Appended a ...
-- **Sprint sprint-603 Learnings** (sprint-603): ## Sprint sprint-603 Learnings
-
-## Gains
-- 603-001 — VS Code decide istemci-ucu (T11) — npx tsc --noEmit passed.
-- 60...
-- **Sprint sprint-602 Learnings** (sprint-602): ## Sprint sprint-602 Learnings
-
-## Gains
-- 602-001 — bot-sürecinde relay + kanal-karar zinciri (T7) — npx tsc --noEmi...
+- 1780659451545-001 — Adoption schema and duplicate-identity autho...
+- **Sprint sprint-1780659451544 Learnings** (sprint-1780659451544): ## Sprint sprint-1780659451544 Learnings
+- Migration authority proof: GO_WITH_TECH_DEBT — Declared verification passe...
+- **Sprint sprint-1780659451539 Learnings** (sprint-1780659451539): ## Sprint sprint-1780659451539 Learnings
+- Sidecar spec inventory: NO_GO — The authorized target .analysis/closure-os...
 
 ## Active Technical Debt
-_No active technical debt._
+- [HIGH] Tech debt from 1780659451558-013: The compiled dist/cli/entry.js must be rebuilt
+- [HIGH] Tech debt from 1780659451558-018: The required node scripts/lint-master-plan.mjs
+- [CRITICAL] Tech debt from 1780659451542-015-fix: Registered the single provider-observation
 
 ## Active Patterns
 - Violation pattern: stale_heartbeat (×47 sprints)
@@ -107,4 +99,4 @@ _No active technical debt._
 - Violation pattern: doc_sync_ground_truth_mismatch (×12 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 2165 | Generated: 2026-08-22_
+_Total entries: 2895 | Generated: 2026-08-22_

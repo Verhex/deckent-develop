@@ -72,7 +72,7 @@ Toplam: 51
 <!-- DECKENT:CONTRACT:END id="tools" -->
 
 ## CLI Commands
-<!-- DECKENT:CONTRACT id="tools" schema="1" sha256="b752d771fc74303f621c7cabc0425a71b80c44223f9032c79ae7fa264b5e3873" -->
+<!-- DECKENT:CONTRACT id="tools" schema="1" sha256="232a8fc392b65edde983fa00f93d740b4bfbd9d72d3ec1a69b7b7c7e32a60061" -->
 Bu tablo kayıtlı cross-surface command tree üzerinden üretilir; helper module dosya adları dışlanır.
 
 | Komut | Kategori | Risk | Yüzeyler |
@@ -80,6 +80,7 @@ Bu tablo kayıtlı cross-surface command tree üzerinden üretilir; helper modul
 | `deckent agent` | Core | Değiştir | cli, mcp, repl |
 | `deckent analyze` | Core | Oku | cli, mcp, repl |
 | `deckent approvals` | Enterprise | Değiştir | cli, mcp |
+| `deckent archive` | Core | Değiştir | cli |
 | `deckent archive-debt` | Core | Oku | cli |
 | `deckent attach` | Run | Çalıştır | cli |
 | `deckent audit` | Core | Çalıştır | cli, mcp, repl |
@@ -130,6 +131,7 @@ Bu tablo kayıtlı cross-surface command tree üzerinden üretilir; helper modul
 | `deckent plugin` | Core | Değiştir | cli |
 | `deckent process` | Enterprise | Çalıştır | cli, mcp |
 | `deckent provider-authority` | Enterprise | Değiştir | cli |
+| `deckent provider-observations` | Enterprise | Değiştir | cli |
 | `deckent rbac` | Enterprise | Değiştir | cli |
 | `deckent recall` | Memory | Oku | cli, mcp, repl |
 | `deckent recover` | Danger | Değiştir | cli, mcp, repl |
@@ -156,5 +158,5 @@ Bu tablo kayıtlı cross-surface command tree üzerinden üretilir; helper modul
 | `deckent watch` | Run | Oku | cli, mcp |
 | `deckent xverify` | Core | Oku | cli, mcp |
 
-Toplam: 78
+Toplam: 80
 <!-- DECKENT:CONTRACT:END id="tools" -->

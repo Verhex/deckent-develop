@@ -173,6 +173,15 @@ function containsLemma(sentence: string, lemmas: string[]): boolean {
   return lemmas.some(lemma => lower.includes(lemma));
 }
 
+/** Mutation-language detector for the filesRead-only goCriteria exception.
+ * English terms are token/stem bounded so ordinary nouns such as "fixture"
+ * cannot accidentally match "fix"; Turkish terms retain suffix-friendly
+ * matching. */
+function impliesWriteMutation(sentence: string): boolean {
+  const english = /\b(?:fix(?:es|ed|ing)?|update(?:s|d|ing)?|writ(?:e|es|ten|ing)|creat(?:e|es|ed|ing)|add(?:s|ed|ing)?|chang(?:e|es|ed|ing)|modif(?:y|ies|ied|ying)|remov(?:e|es|ed|ing)|delet(?:e|es|ed|ing)|refactor(?:s|ed|ing)?|implement(?:s|ed|ing)?)\b/i;
+  return english.test(sentence) || containsLemma(sentence, ['pinle', 'güncelle', 'yaz', 'oluştur', 'ekle', 'taşı', 'düzelt']);
+}
+
 // ─── Write-authority resolution ────────────────────────────────────
 
 function normalizeDir(dir: string): string {
@@ -221,13 +230,26 @@ function lintMentionedNotWritable(input: SatisfiabilityInput): SatisfiabilityFin
   const inRunSpan = (start: number, end: number): boolean =>
     runSpans.some(s => start >= s.start && end <= s.end);
 
-  // (1a) goCriteria — unconditional, high-precision: goCriteria is the contract.
+  // (1a) goCriteria — high-precision: goCriteria is the contract. An exact
+  // filesRead grant is also author intent: a read-only assertion/proof may name
+  // that path without pretending it is writable. Mutation language still
+  // requires filesWrite/directories and therefore remains BLOCK.
   const goMasked = maskPathSpans(input.goCriteria);
   for (const mention of extractMentions(input.goCriteria)) {
     if (mention.kind === 'bare' && !isRootTrackedFile(mention.token, input.trackedFiles)) continue;
     const writable =
       input.filesWrite.includes(mention.token) || isCoveredByDirectories(mention.token, input.directories);
     if (writable) continue;
+    const sentence = sentenceAround(input.goCriteria, goMasked, mention.start, mention.end);
+    if ((input.filesRead ?? []).includes(mention.token)) {
+      const exactProofTarget = (input.proofCommands ?? []).some(command =>
+        extractMentions(command).some(candidate => candidate.token === mention.token));
+      if (exactProofTarget
+        || !impliesWriteMutation(sentence)
+        || containsLemma(sentence, NEGATION_LEMMAS)) {
+        continue;
+      }
+    }
     if (inRunSpan(mention.start, mention.end) && input.trackedFiles.includes(mention.token)) {
       // Tracked run-target. Silent for the dominant legitimate pattern (a regression
       // proof runs an UNCHANGED tracked test — the fixture-012 class). But when the
@@ -235,7 +257,6 @@ function lintMentionedNotWritable(input: SatisfiabilityInput): SatisfiabilityFin
       // genişlet"), the task likely must EXTEND the file it cannot write — the
       // 397-007 single-mention-in-backtick window (advisor, sprint-399 BEFORE-done):
       // surface a WARN instead of staying silent. Negation still suppresses.
-      const sentence = sentenceAround(input.goCriteria, goMasked, mention.start, mention.end);
       if (containsLemma(sentence, POSITIVE_VERB_LEMMAS) && !containsLemma(sentence, NEGATION_LEMMAS)) {
         const key = `WARN-RUN:${mention.token}`;
         if (!seen.has(key)) {
@@ -342,16 +363,17 @@ function lintProofPathMissing(input: SatisfiabilityInput): SatisfiabilityFinding
     // intentionally left unresolved rather than fuzzy-globbed — no finding either way.
     for (const { token } of findSpans(PRIMARY_PATH_RE, command)) {
       const tracked = input.trackedFiles.includes(token);
+      const readable = (input.filesRead ?? []).includes(token);
       const writable = input.filesWrite.includes(token);
       const covered = isCoveredByDirectories(token, input.directories);
-      if (tracked || writable || covered) continue;
+      if (tracked || readable || writable || covered) continue;
       if (seen.has(token)) continue;
       seen.add(token);
       findings.push({
         severity: 'BLOCK',
         code: 'PROOF_PATH_MISSING',
         path: token,
-        message: `proof command references "${token}" but it is not tracked, writable, or under a scoped directory`,
+        message: `proof command references "${token}" but it is not tracked, readable, writable, or under a scoped directory`,
       });
     }
   }

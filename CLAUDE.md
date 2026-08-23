@@ -12,10 +12,10 @@ PR_REQUIRED=false
 MERGE_QUEUE_REQUIRED=false
 REMOTE_CI_MODE=ADVISORY
 LOCAL_VERIFICATION_MODE=REQUIRED
-EXECUTION_AUTHORITY=FABLE
+EXECUTION_AUTHORITY=CODEX
 ANALYSIS_AUTHORITY=CODEX
 OWNER_AUTHORITY=ALPEREN
-DECISION_REF=owner-live-2026-08-20-dogfood-on-canary-587
+DECISION_REF=owner-live-2026-08-23-repo-hygiene-complete-dogfood-on
 <!-- DECKENT-DEV-CONTROL:END -->
 
 > Yukarıdaki blok aktif repo-development mode değerlerinin TEK persisted projection'ıdır

@@ -14,6 +14,164 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint1780659451558] - 2026-08-22
+
+### Added
+
+- POMR01-STORE-CLOSURE Receipt store implementation plus executable proof
+- POMR03-CLI-CLOSURE Real adopt producer→durable store→fresh-read
+- POMR04-I18N-CLOSURE EN/TR receipt surface and parity
+- POMR05-CLI-NEGATIVE CLI restart, replay and zero-write regressions
+- POMR07-SNAPSHOT-REGRESSION Immutable SQLite boundary audit
+- POMR08-STORE-RESTART Fresh-process and privacy assurance
+- POMR10-INVENTORY-TRUTH Predecessor and current authority inventory
+- POMR12-WIRING-AUDIT Production closure map
+- POMR14-ARCHIVE-INVARIANT Normal-finalizer proof contract
+- POMR15-RESULT-EVIDENCE Work 480 result superseding cut
+
+### Changed
+
+- POMR02-STORE-SCALE 10k lookup and concurrent publication proof (completed with tech debt)
+- POMR06-ADVERSARIAL Receipt forgery and project-boundary proof (completed with tech debt)
+- POMR11-CONTRACT-TRUTH Receipt contract implementation synchronization (completed with tech debt)
+- POMR13-CURRENT-MEASUREMENT Aggregate live re-measurement (completed with tech debt)
+- POMR18-MASTER-TRUTH Work 480 acceptance correction (completed with tech debt)
+
+### Fixed
+
+- Fix: POMR09-REAL-BINARY-E2E Compiled command lifecycle fixture
+- Fix: Fix: Fix: Fix: POMR20-FINAL-CONSISTENCY Ordered package report
+
+
+_Tasks: 20 total, 20 done, 5 tech debt, 0 no-go_
+
+## [sprint1780659451557] - 2026-08-22
+
+### Added
+
+- POM02-RECEIPT-CONTRACT Durable adoption receipt contract
+- POM03-IMMUTABLE-READ Side-effect-free SQLite snapshot reader
+- POM10-I18N-PROOF Message parity regression
+
+### Changed
+
+- POM01-DISK-INVENTORY Exact adoption authority inventory (completed with tech debt)
+- POM04-IMMUTABLE-READ-PROOF Snapshot/WAL/concurrency regression proof (completed with tech debt)
+- POM09-I18N Adoption receipt user messages (completed with tech debt)
+
+### Fixed
+
+- Fix: Fix: Fix: Fix: POM05-RECEIPT-STORE Content-addressed durable receipt authority
+
+
+_Tasks: 20 total, 7 done, 3 tech debt, 0 no-go_
+
+## [sprint1780659451556] - 2026-08-22
+
+### Added
+
+- R01-LINK-REPAIR Closure gate source-reference repair
+- R02-PROJECTION-EVIDENCE Current MASTER projection measurement
+- R03-BRIEF-REPAIR Transition brief current-truth correction
+- R04-RESULT-REPAIR Work 7084 bounded result synchronization
+- R05-VERIFICATION-REPAIR Verification record synchronization
+- R06-FINAL-CONSISTENCY Ordered repair proof
+
+
+_Tasks: 6 total, 6 done, 0 tech debt, 0 no-go_
+
+## [sprint1780659451549] - 2026-08-22
+
+### Added
+
+- Canonical CLI consumer and text-source byte hygiene
+
+
+_Tasks: 1 total, 1 done, 0 tech debt, 0 no-go_
+
+## [sprint1780659451548] - 2026-08-22
+
+### Added
+
+- CLI default-path parity and real handler regression
+
+### Changed
+
+- Canonical provider-observation path authority (completed with tech debt)
+
+
+_Tasks: 2 total, 2 done, 1 tech debt, 0 no-go_
+
+## [sprint1780659451547] - 2026-08-22
+
+### Added
+
+- Compiled adoption and closure evidence
+
+
+_Tasks: 1 total, 1 done, 0 tech debt, 0 no-go_
+
+## [sprint1780659451546] - 2026-08-22
+
+### Added
+
+- Graceful terminal-notification drain
+
+### Fixed
+
+- Fix-lineage evidence
+
+
+_Tasks: 2 total, 2 done, 0 tech debt, 0 no-go_
+
+## [sprint1780659451545] - 2026-08-22
+
+### Added
+
+- Adoption schema and duplicate-identity authority
+- Disposable notification lifecycle contract
+- Finite CLI and detached-runner teardown wiring
+- Autonomous notification teardown wiring
+- Terminal closure evidence reconciliation
+
+
+_Tasks: 5 total, 5 done, 0 tech debt, 0 no-go_
+
+## [sprint1780659451544] - 2026-08-22
+
+### Added
+
+- Core compile and canonicalization closure
+- Adoption verifier proof
+- Exact CLI wiring and real-process proof
+
+### Changed
+
+- Migration authority proof (completed with tech debt)
+- Critical ApprovalBroker bridge proof (completed with tech debt)
+- Continuation evidence reconciliation (completed with tech debt)
+
+
+_Tasks: 6 total, 6 done, 3 tech debt, 0 no-go_
+
+## [sprint1780659451539] - 2026-08-22
+
+### Added
+
+- Outcome capsule
+- Live phase-chain inventory
+- Projection drift inventory
+- Transition brief inventory
+- Approval capability-policy inventory
+- Core-memory inventory
+- Product residual inventory
+- Health and ETA readiness
+- Row 3296 supersession inventory
+- Transition brief update
+
+
+_Tasks: 20 total, 17 done, 0 tech debt, 0 no-go_
+
 ## [sprint622] - 2026-08-22
 
 ### Added

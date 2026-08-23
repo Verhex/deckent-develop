@@ -186,8 +186,9 @@ describe('DECKENT.md — number truth', () => {
     expect(content).toContain('run, eskiden "sprint"');
   });
 
-  it('no longer inlines the internal pivot-note strategy block (moved to .analysis/)', () => {
-    expect(content).not.toContain('Aktif Yön (2026-06-29 pivot');
-    expect(content).toContain('.analysis/hermes-vs-deckent-direction-decisions.md');
+  it('points product direction to the tracked canonical vision instead of an ignored analysis note', () => {
+    expect(content).not.toContain('.analysis/');
+    expect(content).toContain('docs/en/vision.md');
+    expect(content).toContain('docs/tr/vision.md');
   });
 });

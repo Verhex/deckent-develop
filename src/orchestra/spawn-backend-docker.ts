@@ -5,7 +5,7 @@
 
 import { spawnSync, spawn as nodeSpawn } from 'node:child_process';
 import type { SpawnOptionsWithoutStdio } from 'node:child_process';
-import { writeFileSync, readFileSync, mkdirSync, existsSync, unlinkSync, openSync, fsyncSync, closeSync, readdirSync, renameSync, rmdirSync, chmodSync, statSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync, existsSync, unlinkSync, openSync, fsyncSync, closeSync, readdirSync, renameSync, chmodSync, statSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
 import { homedir, tmpdir, totalmem } from 'node:os';
@@ -35,6 +35,7 @@ import { createCursorAdapter } from '../providers/cursor.js';
 import { createGeminiAdapter } from '../providers/gemini.js';
 import { buildSuggestedImageCmd } from '../core/worker-image-check.js';
 import { LOCKS_DIR, TASKS_DIR } from '../core/constants.js';
+import { archiveTaskArtifacts } from '../core/sprint-archive.js';
 import {
   crossVerifyEvidenceBrokerDirectory,
   crossVerifyEvidenceReceiptRef,
@@ -80,6 +81,7 @@ import {
   dockerContainerNameForTask,
   assertTaskResultSettlementRef,
   listPendingTaskResultSettlementAttempts,
+  parseTaskResultSettlementAttempt,
   readTaskProviderTerminalBillingReceipt,
   readTaskResultSettlementExecutionBudgetAuthority,
   readTaskResultSettlementExecutionContract,
@@ -112,6 +114,7 @@ import {
   type TaskProviderTerminalUsageSourceV1,
   type TaskResultSettlementRefV1,
 } from '../core/task-result-settlement.js';
+import { projectDockerRecoveryPreDispatchSettlement } from '../core/pre-dispatch-settlement.js';
 import { normalizeTaskResultShape } from '../core/task-result-schema.js';
 import {
   listRetiredExecutionLandings,
@@ -921,6 +924,78 @@ export function persistDockerTaskResultSettlement(
   return true;
 }
 
+/**
+ * A task-level result is shared by every attempt for that logical task. A
+ * coordinator crash can leave more than one unprepared attempt behind before
+ * the first recovery pass runs. Once the first attempt is recovered, later
+ * attempts must preserve that raw result while receiving their own immutable
+ * attempt settlement. Only Deckent's exact, content-addressed zero-work
+ * recovery projection is eligible; a worker-authored or malformed result still
+ * fails closed.
+ */
+function isCanonicalPriorUnpreparedRecoveryResult(
+  value: unknown,
+  currentRef: TaskResultSettlementRefV1,
+): value is Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  const notes = record['notes'];
+  const prefix = 'DECKENT_E091:coordinator-crashed-before-docker-prepare:';
+  if (
+    record['taskId'] !== currentRef.taskId
+    || record['workerId'] !== `docker-recovery-${currentRef.taskId}`
+    || !Array.isArray(record['filesChanged'])
+    || record['filesChanged'].length !== 0
+    || record['linesAdded'] !== 0
+    || record['linesRemoved'] !== 0
+    || record['testsPassed'] !== false
+    || record['selfAssessment'] !== 'NO_GO'
+    || typeof notes !== 'string'
+    || !notes.startsWith(prefix)
+  ) return false;
+
+  const priorAttemptId = notes.slice(prefix.length);
+  if (!/^[0-9a-f-]{36}$/iu.test(priorAttemptId) || priorAttemptId === currentRef.attemptId) {
+    return false;
+  }
+  const priorRef: TaskResultSettlementRefV1 = {
+    schemaVersion: currentRef.schemaVersion,
+    taskId: currentRef.taskId,
+    backend: currentRef.backend,
+    projectRootSha256: currentRef.projectRootSha256,
+    attemptId: priorAttemptId,
+  };
+  const authorities: TaskResultSettlementRefV1[] = [priorRef];
+  try {
+    const priorAttempt = parseTaskResultSettlementAttempt(JSON.parse(
+      readFileSync(taskResultSettlementAttemptPath(priorRef), 'utf-8'),
+    ) as unknown);
+    if (priorAttempt) authorities.push(priorAttempt);
+  } catch { /* an exact v1 authority below can still validate */ }
+
+  const { preDispatchSettlement: _ignored, ...baseResult } = record;
+  return authorities.some(authority => {
+    const projected = projectDockerRecoveryPreDispatchSettlement(
+      baseResult,
+      authority,
+    ) as Record<string, unknown>;
+    return canonicalJson(projected['preDispatchSettlement'])
+      === canonicalJson(record['preDispatchSettlement']);
+  });
+}
+
+function exactDockerRecoveryAuthority(
+  ref: TaskResultSettlementRefV1,
+): TaskResultSettlementRefV1 {
+  return {
+    schemaVersion: ref.schemaVersion,
+    taskId: ref.taskId,
+    backend: ref.backend,
+    projectRootSha256: ref.projectRootSha256,
+    attemptId: ref.attemptId,
+  };
+}
+
 const MAX_RECOVERY_FORENSIC_BYTES = 1024 * 1024;
 
 function isValidDockerWorkerResult(
@@ -946,12 +1021,12 @@ function isValidDockerWorkerResult(
   return true;
 }
 
-function persistDockerCorruptResultRecovery(input: {
+function buildDockerCorruptResultRecovery(input: {
   readonly ref: TaskResultSettlementRefV1;
   readonly raw: Buffer;
   readonly exitCode: number | null;
   readonly model: string;
-}): void {
+}): { readonly capturedAt: string; readonly result: Record<string, unknown> } {
   const rawSha256 = createHash('sha256').update(input.raw).digest('hex');
   const captured = input.raw.subarray(0, MAX_RECOVERY_FORENSIC_BYTES);
   const forensicPath = join(dirname(taskResultSettlementPath(input.ref)), 'invalid-worker-result.json');
@@ -985,7 +1060,7 @@ function persistDockerCorruptResultRecovery(input: {
   }
   const provider = modelRegistry.get(input.model)?.provider ?? 'unknown';
   const evidenceRef = `invalid-worker-result:sha256:${rawSha256}`;
-  const result = {
+  const result: Record<string, unknown> = {
     taskId: input.ref.taskId,
     workerId: `docker-recovery-${input.ref.taskId}`,
     filesChanged: [],
@@ -1005,11 +1080,21 @@ function persistDockerCorruptResultRecovery(input: {
     notes: `Host rejected an invalid Docker worker result and contained the attempt as NO_GO; container exit ${input.exitCode ?? 'unknown'} is not success authority. attemptId=${input.ref.attemptId}. evidence=${evidenceRef}.`,
     tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, provider, model: input.model },
   };
+  return { capturedAt, result };
+}
+
+function persistDockerCorruptResultRecovery(input: {
+  readonly ref: TaskResultSettlementRefV1;
+  readonly raw: Buffer;
+  readonly exitCode: number | null;
+  readonly model: string;
+}): void {
+  const recovery = buildDockerCorruptResultRecovery(input);
   writeTaskResultSettlementAtomic(createTaskResultSettlement({
     ref: input.ref,
     exitCode: input.exitCode,
-    result,
-    settledAt: capturedAt,
+    result: recovery.result,
+    settledAt: recovery.capturedAt,
   }));
 }
 
@@ -5048,12 +5133,20 @@ export class DockerSpawnBackend implements SpawnBackend {
       if (!prepared) {
         const resultPath = join(tasksDir, `task-${attempt.taskId}.result`);
         if (existsSync(resultPath)) {
-          throw new SpawnBackendError(
-            `DECKENT_E091:unprepared-attempt-has-worker-result:${attempt.taskId}/${attempt.attemptId}`,
-            this.name,
-          );
+          let existingResult: unknown;
+          try {
+            existingResult = JSON.parse(readFileSync(resultPath, 'utf-8')) as unknown;
+          } catch {
+            existingResult = null;
+          }
+          if (!isCanonicalPriorUnpreparedRecoveryResult(existingResult, attempt)) {
+            throw new SpawnBackendError(
+              `DECKENT_E091:unprepared-attempt-has-worker-result:${attempt.taskId}/${attempt.attemptId}`,
+              this.name,
+            );
+          }
         }
-        atomicWriteFileSync(resultPath, `${JSON.stringify({
+        const recoveryResult = projectDockerRecoveryPreDispatchSettlement({
           taskId: attempt.taskId,
           workerId: `docker-recovery-${attempt.taskId}`,
           filesChanged: [],
@@ -5064,8 +5157,17 @@ export class DockerSpawnBackend implements SpawnBackend {
           notes: `DECKENT_E091:coordinator-crashed-before-docker-prepare:${attempt.attemptId}`,
           exitCode: null,
           tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0 },
-        }, null, 2)}\n`);
-        this.settleRecoveredAttempt(attempt, tasksDir, null, 'not-dispatched');
+        }, exactDockerRecoveryAuthority(attempt));
+        if (!existsSync(resultPath)) {
+          atomicWriteFileSync(resultPath, `${JSON.stringify(recoveryResult, null, 2)}\n`);
+        }
+        this.settleRecoveredAttempt(
+          attempt,
+          tasksDir,
+          null,
+          'not-dispatched',
+          recoveryResult,
+        );
         report.closedNotDispatched.push(attempt.taskId);
         continue;
       }
@@ -5245,14 +5347,23 @@ export class DockerSpawnBackend implements SpawnBackend {
     tasksDir: string,
     exitCode: number | null,
     disposition: 'not-dispatched' | 'absent-after-exit',
+    recoveryResult?: Record<string, unknown>,
   ): void {
     if (!readTaskResultSettlement(ref)) {
-      const persisted = persistDockerTaskResultSettlement(this.projectDir, tasksDir, ref, exitCode);
-      if (!persisted) {
-        throw new SpawnBackendError(
-          `DECKENT_E091:recovery-result-missing:${ref.taskId}/${ref.attemptId}`,
-          this.name,
-        );
+      if (recoveryResult) {
+        writeTaskResultSettlementAtomic(createTaskResultSettlement({
+          ref,
+          exitCode,
+          result: recoveryResult,
+        }));
+      } else {
+        const persisted = persistDockerTaskResultSettlement(this.projectDir, tasksDir, ref, exitCode);
+        if (!persisted) {
+          throw new SpawnBackendError(
+            `DECKENT_E091:recovery-result-missing:${ref.taskId}/${ref.attemptId}`,
+            this.name,
+          );
+        }
       }
     }
     releaseAllSpawnLocks(this.projectDir, ref.taskId);
@@ -7474,16 +7585,40 @@ export class DockerSpawnBackend implements SpawnBackend {
       // traps — the container's EXIT trap never runs. The host-side monitor must
       // write the fallback .result so Brain's result-collector doesn't wait forever.
       const timeoutPath = join(tasksDir, `task-${taskId}.timeout`);
-      // Sprint 149: Partial write detection — .result exists but corrupt JSON
-      // This catches cases where container was SIGKILL'd mid-write
-      if (existsSync(resultPath) && exitCode !== 0) {
+      // Partial/invalid write detection is independent of process exit status.
+      // A provider can exit 0 after writing malformed JSON (for example an
+      // unescaped newline in notes); treating exit 0 as syntax authority leaves
+      // work-attribution stuck on an unreadable result forever. Preserve the raw
+      // bytes in the exact-attempt forensic journal, then project a host-authored
+      // NO_GO result before attribution and terminal settlement.
+      if (existsSync(resultPath)) {
+        let invalidRaw: Buffer | undefined;
         try {
-          const raw = readFileSync(resultPath, 'utf-8');
-          JSON.parse(raw); // Just validate — if corrupt, overwrite below
+          invalidRaw = readFileSync(resultPath);
+          const parsed = JSON.parse(invalidRaw.toString('utf-8')) as unknown;
+          if (settlementRef && !isValidDockerWorkerResult(parsed, settlementRef)) {
+            throw new SyntaxError('worker result failed schema or attempt identity validation');
+          }
         } catch {
-          debugLog('docker-backend:partial-write', `taskId=${taskId} .result exists but corrupt JSON — overwriting with NO_GO`);
-          try { unlinkSync(resultPath); } catch { /* ok */ }
-          // Fall through to the fallback writer below
+          debugLog('docker-backend:partial-write', `taskId=${taskId} .result exists but is corrupt JSON/schema — containing as NO_GO`);
+          if (!invalidRaw) {
+            // A non-file path or unreadable artifact is not safely replaceable.
+            // Preserve container/claim/locks for typed recovery.
+            return;
+          }
+          if (settlementRef) {
+            const recovery = buildDockerCorruptResultRecovery({
+              ref: settlementRef,
+              raw: invalidRaw,
+              exitCode,
+              model,
+            });
+            atomicWriteFileSync(resultPath, `${JSON.stringify(recovery.result, null, 2)}\n`);
+          } else {
+            try { unlinkSync(resultPath); } catch { /* ok */ }
+            // Without an exact attempt reference the generic fallback below is
+            // the only honest projection available.
+          }
         }
       }
 
@@ -8071,7 +8206,8 @@ export function isDockerAvailable(): boolean {
 // ─── Prompt File Archive ───────────────────────────────────────────────────
 
 /**
- * Archive .prompt-*.txt AND .worker-*.sh tmpfiles from .tasks/ into .tasks/archive/sprint-{sprintId}/.
+ * Archive .prompt-*.txt AND .worker-*.sh tmpfiles into the canonical
+ * `<archive_path>/<sprintId>/tasks/` evidence namespace.
  *
  * Called during sprint finalize/cleanup — tmpfiles persist during the sprint
  * for analysis, then are moved to the archive directory on completion.
@@ -8087,74 +8223,23 @@ export function isDockerAvailable(): boolean {
 export function archivePromptFiles(
   tasksDir: string,
   sprintId: string,
-  retentionSprints = 5,
+  _retentionSprints = 5,
   taskIdPrefix?: string,
 ): { archived: number; cleaned: number } {
-  let archived = 0;
-  let cleaned = 0;
-
-  if (!existsSync(tasksDir)) return { archived, cleaned };
-
-  // Create archive directory for this sprint
-  const archiveDir = join(tasksDir, 'archive', sprintId);
-  mkdirSync(archiveDir, { recursive: true });
-
-  // Move all .prompt-*.txt AND .worker-*.sh tmpfiles to archive
+  if (!existsSync(tasksDir)) return { archived: 0, cleaned: 0 };
+  const segment = sprintId.replace(/^sprint-/u, '');
+  const prefix = taskIdPrefix ?? `${segment}-`;
+  let candidates: string[] = [];
   try {
-    const files = readdirSync(tasksDir) as string[];
-    for (const f of files) {
-      const isPromptFile = f.startsWith('.prompt-') && f.endsWith('.txt');
-      const isWorkerScript = f.startsWith('.worker-') && f.endsWith('.sh');
-      const belongsToSprint = taskIdPrefix === undefined
-        || f.startsWith(`.prompt-${taskIdPrefix}`)
-        || f.startsWith(`.worker-${taskIdPrefix}`);
-      if ((isPromptFile || isWorkerScript) && belongsToSprint) {
-        const src = join(tasksDir, f);
-        const dst = join(archiveDir, f);
-        try {
-          renameSync(src, dst);
-          archived++;
-        } catch { /* skip files that can't be moved */ }
-      }
-    }
-  } catch { /* ok — tasksDir may be empty */ }
-
-  // F0.3: drain the mid-sprint orphan staging bucket (.tasks/archive/_orphaned/,
-  // populated by ClaudeAdapter.archiveOrphanPromptFile when a prompt is cleaned
-  // before sprint-end) into this sprint's archive dir, so those prompts inherit
-  // the same retention instead of accumulating unbounded in staging.
-  const orphanStaging = join(tasksDir, 'archive', '_orphaned');
-  if (taskIdPrefix === undefined && existsSync(orphanStaging)) {
-    try {
-      for (const f of readdirSync(orphanStaging) as string[]) {
-        try { renameSync(join(orphanStaging, f), join(archiveDir, f)); archived++; }
-        catch { /* skip files that can't be moved */ }
-      }
-    } catch { /* ok */ }
-  }
-
-  // Apply retention policy: remove old sprint archives beyond retentionSprints
-  if (retentionSprints > 0) {
-    const archiveRoot = join(tasksDir, 'archive');
-    try {
-      const sprintDirs = (readdirSync(archiveRoot) as string[])
-        .filter(d => d.startsWith('sprint-'))
-        .sort(); // alphabetical sort = chronological for sprint-NNN format
-      const toRemove = sprintDirs.slice(0, Math.max(0, sprintDirs.length - retentionSprints));
-      for (const dir of toRemove) {
-        const dirPath = join(archiveRoot, dir);
-        try {
-          // Remove all files in the old archive sprint dir
-          const oldFiles = readdirSync(dirPath) as string[];
-          for (const f of oldFiles) {
-            try { unlinkSync(join(dirPath, f)); cleaned++; } catch { /* ok */ }
-          }
-          // Remove the now-empty directory
-          rmdirSync(dirPath);
-        } catch { /* ok */ }
-      }
-    } catch { /* archive root may not exist yet */ }
-  }
-
-  return { archived, cleaned };
+    candidates = (readdirSync(tasksDir) as string[]).filter(file => (
+      (file.startsWith(`.prompt-${prefix}`) && file.endsWith('.txt'))
+      || (file.startsWith(`.worker-${prefix}`) && file.endsWith('.sh'))
+    ));
+  } catch { /* the caller receives an honest zero */ }
+  const result = archiveTaskArtifacts(dirname(tasksDir), sprintId, {
+    archive: candidates,
+    preserve: [],
+    sweepResidue: false,
+  });
+  return { archived: result.archived.length + result.consolidated.length, cleaned: 0 };
 }

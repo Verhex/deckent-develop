@@ -10,7 +10,7 @@
 
 import {
   existsSync, readdirSync, readFileSync, statSync,
-  mkdirSync, copyFileSync, unlinkSync, rmSync,
+  rmSync,
 } from 'node:fs';
 import { promises as fsPromises } from 'node:fs';
 import { join } from 'node:path';
@@ -21,6 +21,7 @@ import { isPidAlive } from './pid-liveness.js';
 import { openTaskSettlementProjection } from './task-settlement-authority.js';
 import { resolveTenant } from './tenant-context.js';
 import { debugLog } from './utils.js';
+import { archiveTaskArtifacts } from './sprint-archive.js';
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -341,24 +342,18 @@ export function postFinalizeCleanup(
     debugLog('orphan-cleaner:postFinalize', `Archiving terminal task ${taskId}`);
   }
 
-  // Archive terminal task files (if any)
-  if (cls.archiveGroups.size > 0) {
-    const archiveDir = join(projectRoot, TASKS_DIR, 'archive', sprintId);
-    for (const files of cls.archiveGroups.values()) {
-      mkdirSync(archiveDir, { recursive: true });
-      for (const file of files) {
-        try {
-          const src = join(tasksDir, file);
-          const dest = join(archiveDir, file);
-          copyFileSync(src, dest);
-          unlinkSync(src);
-          report.archivedFiles.push(file);
-        } catch (e) {
-          debugLog('orphan-cleaner:postFinalize', `Failed to archive ${file}: ${e}`);
-        }
-      }
-    }
-  }
+  const settlement = archiveTaskArtifacts(projectRoot, sprintId, {
+    archive: cls.archivedFiles,
+    preserve: [],
+    // An ambiguous/active task remains live and resumable. Exact-sprint
+    // residue is swept only when every classified task is terminal.
+    sweepResidue: cls.preservedFiles.length === 0,
+  });
+  report.archivedFiles.push(
+    ...settlement.archived,
+    ...settlement.consolidated,
+    ...settlement.residueSwept,
+  );
 
   // Normal finalization keeps its historical stale-lock cleanup. A targeted
   // recovery command passes `cleanStaleLocks:false`: a sprint-scoped action
@@ -476,22 +471,14 @@ export function preflightOrphanCleanup(
       options,
     );
     if (!classification || classification.archivedFiles.length === 0) continue;
-    const archiveDir = join(projectRoot, TASKS_DIR, 'archive', `sprint-${sprintNum}`);
-    mkdirSync(archiveDir, { recursive: true });
+    const settlement = archiveTaskArtifacts(projectRoot, `sprint-${sprintNum}`, {
+      archive: classification.archivedFiles,
+      preserve: [],
+      sweepResidue: false,
+    });
+    report.archivedFiles.push(...settlement.archived, ...settlement.consolidated);
 
-    for (const file of classification.archivedFiles) {
-      try {
-        const src = join(tasksDir, file);
-        const dest = join(archiveDir, file);
-        copyFileSync(src, dest);
-        unlinkSync(src);
-        report.archivedFiles.push(file);
-      } catch (e) {
-        debugLog('orphan-cleaner:preflight', `Failed to archive ${file}: ${e}`);
-      }
-    }
-
-    if (classification.archivedFiles.length > 0) {
+    if (settlement.archived.length + settlement.consolidated.length > 0) {
       report.cleanedSprintIds.push(`sprint-${sprintNum}`);
     }
   }

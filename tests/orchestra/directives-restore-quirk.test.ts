@@ -170,7 +170,7 @@ describe('DIRECTIVES-RESTORE-QUIRK — sprint-378 root-cause repro', () => {
 
       archiveDirectives(root, 'sprint-378', 'CLEANUP');
 
-      const archivePath = join(root, '.brain', 'archive', 'directives', 'DIRECTIVES-sprint-378.md');
+      const archivePath = join(root, '.deckent', 'archive', 'sprints', 'sprint-378', 'docs', 'DIRECTIVES.md');
       expect(existsSync(archivePath)).toBe(true);
       const archived = readFileSync(archivePath, 'utf-8');
 
@@ -200,7 +200,7 @@ describe('DIRECTIVES-RESTORE-QUIRK — sprint-378 root-cause repro', () => {
 
       archiveDirectives(root, 'sprint-378', 'CLEANUP');
 
-      const archivePath = join(root, '.brain', 'archive', 'directives', 'DIRECTIVES-sprint-378.md');
+      const archivePath = join(root, '.deckent', 'archive', 'sprints', 'sprint-378', 'docs', 'DIRECTIVES.md');
       const archived = readFileSync(archivePath, 'utf-8');
       expect(archived).toBe(SPRINT_378_CONTENT);
       // Default preserve (ADR-046/Sprint 168 C0a-4): working copy stays intact too.

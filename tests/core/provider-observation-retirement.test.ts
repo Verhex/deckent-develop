@@ -4,7 +4,7 @@
 // `unresolved-provider-observation` holds against an unrelated IDLE or next
 // run; foreign and historical intervals must stay open, untouched and harmless.
 import { createHash } from 'node:crypto';
-import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -12,6 +12,7 @@ import Database from 'better-sqlite3';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+  PROVIDER_EXECUTION_OBSERVATION_DATABASE_PATH,
   PROVIDER_EXECUTION_OBSERVATION_STORE_SCHEMA_VERSION,
   ProviderExecutionObservationStore,
 } from '../../src/core/provider-execution-observation-store.js';
@@ -220,6 +221,43 @@ describe('provider execution observation generation retirement', () => {
     }
   });
 
+  it('opens legacy v1 evidence read-only without migration or inferred ownership', () => {
+    const root = fixtureRoot();
+    const dbPath = join(root, 'observations-v1.db');
+    const legacyStart = startObservation({
+      executionId: 'legacy-v1',
+      taskId: 'task-legacy',
+      attemptId: 'attempt-legacy',
+    });
+    const raw = new Database(dbPath);
+    raw.exec(`CREATE TABLE provider_execution_intervals (
+      execution_id TEXT PRIMARY KEY, task_id TEXT NOT NULL, attempt_id TEXT NOT NULL,
+      principal_digest TEXT NOT NULL, fence TEXT NOT NULL, start_json TEXT NOT NULL,
+      end_json TEXT, start_sequence INTEGER NOT NULL, end_sequence INTEGER
+    );
+    CREATE TABLE provider_execution_contradictions (
+      contradiction_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      principal_digest TEXT NOT NULL, payload_json TEXT NOT NULL
+    );
+    PRAGMA user_version = 1;`);
+    raw.prepare('INSERT INTO provider_execution_intervals VALUES (?, ?, ?, ?, ?, ?, NULL, ?, NULL)')
+      .run('legacy-v1', 'task-legacy', 'attempt-legacy', 'principal-a', 'fence-1', JSON.stringify(legacyStart), 1);
+    raw.close();
+    const before = readFileSync(dbPath);
+
+    const reader = new ProviderExecutionObservationStore(root, { dbPath, readOnly: true });
+    expect(reader.listIntervals('principal-a')).toMatchObject([{
+      executionId: 'legacy-v1', runId: null, ownership: 'legacy-unowned', retired: false,
+    }]);
+    expect(reader.listOpenIntervalsForScope({
+      runId: 'run-a', attemptId: 'attempt-legacy',
+      providerPrincipalDigest: 'principal-a', fence: 'fence-1',
+    })).toEqual([]);
+    reader.close();
+
+    expect(readFileSync(dbPath)).toEqual(before);
+  });
+
   it('honors the provider fence and rejects an untyped or unowned generation', () => {
     const root = fixtureRoot();
     const dbPath = join(root, 'observations.db');
@@ -268,6 +306,23 @@ describe('finalizer settlement reconciliation seam', () => {
       attempts: SETTLING_ATTEMPTS,
       reason: 'run-generation-settled',
     })).toBeNull();
+  });
+
+  it('uses the canonical observation database for default settlement', () => {
+    const root = fixtureRoot();
+    const store = new ProviderExecutionObservationStore(root);
+    openInterval(store, {
+      executionId: 'owned-canonical',
+      runId: resolveProviderExecutionObservationRunId(root),
+    });
+    store.close();
+
+    expect(readFileSync(join(root, PROVIDER_EXECUTION_OBSERVATION_DATABASE_PATH))).toBeInstanceOf(Buffer);
+    expect(reconcileSettledProviderExecutionObservations({
+      projectRoot: root,
+      attempts: [{ taskId: 'task-1', attemptId: 'attempt-1' }],
+      reason: 'run-generation-settled',
+    })?.retired.map(interval => interval.executionId)).toEqual(['owned-canonical']);
   });
 
   it('settles a run with open intervals and stays a no-op on re-finalize', () => {

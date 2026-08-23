@@ -946,6 +946,16 @@ export function resolveDependencyRef(
   if (!trimmed) return undefined;
   if (DEPENDENCY_REF_RESERVED.has(trimmed.toUpperCase())) return undefined;
 
+  // Canonical task ids are not limited to the historical `NNN-NNN` plan-slot
+  // shape. Timestamp-backed sprint ids (for example `1780659451555-017`) are
+  // already persisted by the structured-plan normalizer before SPAWN, where
+  // the shared planner normalizer runs a second, idempotence-oriented pass.
+  // Resolve an exact sibling id before applying legacy shape heuristics;
+  // otherwise that second pass treats a valid canonical id as a title label
+  // and silently drops the authored dependency at the execution boundary.
+  const exactTask = tasks.find(t => t.id === trimmed);
+  if (exactTask) return exactTask.id;
+
   // Index-form refs ("0" / "Task 3") count only authored directive tasks:
   // auto-injected debt-fix prepends are invisible to the DIRECTIVES author,
   // so they must be invisible to the author's numbering too.
@@ -970,8 +980,7 @@ export function resolveDependencyRef(
   }
 
   if (PLAN_SLOT_ID_RE.test(trimmed)) {
-    const exact = tasks.find(t => t.id === trimmed);
-    return exact?.id;
+    return undefined;
   }
 
   const titleMatch = tasks.find(t => titleHasRefToken(t.title, trimmed));
@@ -1416,7 +1425,22 @@ function isPhantomTailToken(token: string, line: string, extracted: readonly str
  */
 export function extractScopeFromDirective(line: string): TaskScope {
   const directories: string[] = [];
+  const filesRead: string[] = [];
   const filesWrite: string[] = [];
+
+  // Structured DIRECTIVES previously had no way to express read-only
+  // authority: every explicit path was parsed through Files:/Scope: and
+  // therefore became writable. `Reads:` is a disjoint exact-file channel.
+  // Return immediately after parsing so the legacy path scavenger below can
+  // never reclassify a read grant as filesWrite.
+  const readsLabelMatch = line.match(/(?:^|\n)\s*-?\s*(?:Reads?|Oku|Okuma)\s*:\s*(.+)/im);
+  if (readsLabelMatch?.[1]) {
+    for (const raw of readsLabelMatch[1].split(',')) {
+      const path = raw.trim();
+      if (path && !filesRead.includes(path)) filesRead.push(path);
+    }
+    return { directories, filesRead, filesWrite };
+  }
 
   // BUG-25: Explicit Files:/Dosya: and Scope:/Kapsam: label parsing (highest priority)
   const filesLabelMatch = line.match(/(?:^|\n)\s*-?\s*(?:Files?|Dosya)\s*:\s*(.+)/im);
@@ -1543,7 +1567,7 @@ export function extractScopeFromDirective(line: string): TaskScope {
     f => !(BARE_TOKEN_BLOCKLIST as readonly string[]).includes(f),
   );
 
-  return { directories, filesRead: [], filesWrite: sanitizedFilesWrite };
+  return { directories, filesRead, filesWrite: sanitizedFilesWrite };
 }
 
 /**
@@ -1704,13 +1728,13 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
       // Skip the title line — it may contain code snippets that look like paths
       if (l === titleLine) continue;
       // Use masked line for directive detection to skip code block content.
-      if (/^\s*-?\s*(?:Dosya|Files?|Kapsam|Scope)\s*:/i.test(ml)) { scopeLines.push(l); continue; }
+      if (/^\s*-?\s*(?:Dosya|Files?|Reads?|Oku|Okuma|Kapsam|Scope)\s*:/i.test(ml)) { scopeLines.push(l); continue; }
     }
     const scope = scopeLines.reduce<TaskScope>((acc, scopeLine) => {
       const extracted = extractScopeFromDirective(scopeLine);
       return {
         directories: [...acc.directories, ...extracted.directories.filter(d => !acc.directories.includes(d))],
-        filesRead: [],
+        filesRead: [...acc.filesRead, ...extracted.filesRead.filter(f => !acc.filesRead.includes(f))],
         filesWrite: [...acc.filesWrite, ...extracted.filesWrite.filter(f => !acc.filesWrite.includes(f))],
       };
     }, { directories: [], filesRead: [], filesWrite: [] });
@@ -1868,7 +1892,7 @@ export function parseBulletOrNumberedTasks(content: string): ParsedDirectiveTask
         while (j < lines.length) {
           const subLine = lines[j]!;
           // Continue collecting if indented or starts with special chars
-          if (/^\s+/.test(subLine) || /^[\s]*[-*]\s+(?:Model|Effort|Provider|Scope|Files|Test):/.test(subLine)) {
+          if (/^\s+/.test(subLine) || /^[\s]*[-*]\s+(?:Model|Effort|Provider|Scope|Files|Reads?|Oku|Okuma|Test):/.test(subLine)) {
             subLines.push(subLine);
             j++;
           } else {
@@ -1887,13 +1911,13 @@ export function parseBulletOrNumberedTasks(content: string): ParsedDirectiveTask
         for (let ali = 0; ali < allLines.length; ali++) {
           const al = allLines[ali]!;
           const aml = allMaskedLines[ali] ?? al;
-          if (/^\s*-?\s*(?:Dosya|Files?|Kapsam|Scope)\s*:/i.test(aml)) { scopeLines.push(al); continue; }
+          if (/^\s*-?\s*(?:Dosya|Files?|Reads?|Oku|Okuma|Kapsam|Scope)\s*:/i.test(aml)) { scopeLines.push(al); continue; }
         }
         const scope = scopeLines.reduce<TaskScope>((acc, scopeLine) => {
           const extracted = extractScopeFromDirective(scopeLine);
           return {
             directories: [...acc.directories, ...extracted.directories.filter(d => !acc.directories.includes(d))],
-            filesRead: [],
+            filesRead: [...acc.filesRead, ...extracted.filesRead.filter(f => !acc.filesRead.includes(f))],
             filesWrite: [...acc.filesWrite, ...extracted.filesWrite.filter(f => !acc.filesWrite.includes(f))],
           };
         }, { directories: [], filesRead: [], filesWrite: [] });

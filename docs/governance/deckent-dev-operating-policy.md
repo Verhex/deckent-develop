@@ -5,7 +5,10 @@ DOGFOOD_MODE=OFF + Paket A→B sırası · Paket B ürün-kodu çerçevesi · la
 amendment aynı gün: `DECISION_REF=owner-live-2026-08-17-direct-main` — direct-main çalışma,
 PR/merge-queue optional, remote CI advisory; DOGFOOD ON-dönüşü Alperen 2026-08-20:
 `DECISION_REF=owner-live-2026-08-20-dogfood-on-canary-587` — sprint-587 canary 2/2 DONE
-terminal settlement kanıtıyla açık owner ON kararı).
+terminal settlement kanıtıyla açık owner ON kararı; geçici repository-hygiene OFF kararı
+Alperen 2026-08-23: `DECISION_REF=owner-live-2026-08-23-repo-hygiene-dogfood-off` — cleanup
+süresince sprint/run/task/settlement state'i oluşturulmaz veya mutate edilmez; cleanup kapanışı
+sonrası açık ON dönüşü: `DECISION_REF=owner-live-2026-08-23-repo-hygiene-complete-dogfood-on`).
 **Aktif mode değerleri:** YALNIZ `AGENTS.md`/`CLAUDE.md` başındaki machine-readable
 `DECKENT-DEV-CONTROL` bloğundadır (tek persisted projection; gate doğrular). Bu doküman mode
 değerini PROSE olarak taşımaz; çelişki durumunda canlı Alperen kararı → control block kazanır.
@@ -57,11 +60,9 @@ kararıdır. **Yalnız Alperen değiştirir**; agent öneri sunabilir, mutation 
   production-wiring closure, hermetic test ve real-binary proof kuralları AYNEN geçerlidir;
   kapanış Git commit/PR/CI kanıtıyla olur. OFF ≠ düşük kalite; yalnız execution controller
   Deckent değildir.
-- **Güncel karar:** control block'ta (`DECISION_REF=owner-live-2026-08-20-dogfood-on-canary-587`).
-  **ON-dönüş koşulu:** Paket B DONE — runPolicyAuthority task-carried wiring + Codex/Fable/Qwen
-  policy-digest parity hermetic testi + tek no-op dogfood canary'nin terminal settlement'ı;
-  canary öncesi `CANARY_READY` raporu verilir ve Alperen'in açık ON kararı beklenir (tek owner
-  gate). Phase-5 writer için mode kararı Alperen'indir.
+- **Güncel karar:** control block'ta
+  (`DECISION_REF=owner-live-2026-08-23-repo-hygiene-complete-dogfood-on`). Repository-hygiene
+  turu kapandı; Alperen'in açık canlı kararıyla mode yeniden `ON` oldu.
 
 ## 3. Bir anda TEK aktif product outcome (amendment 2026-08-17)
 

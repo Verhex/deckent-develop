@@ -15,10 +15,29 @@ vi.mock('../../src/core/constants.js', () => ({
   JOBS_DIR: '.deckent/jobs',
 }));
 
-import { writeJobState, readJobState, readLatestJobState } from '../../src/mcp/tools/job-runner.js';
+import { createJobId, writeJobState, readJobState, readLatestJobState } from '../../src/mcp/tools/job-runner.js';
 import type { JobState } from '../../src/mcp/tools/job-runner.js';
 
 describe('job-runner', () => {
+  it('creates collision-resistant job identities outside the sprint namespace', () => {
+    expect(createJobId(() => 1780659451558, () => '11111111-1111-4111-8111-111111111111'))
+      .toBe('job-1780659451558-11111111-1111-4111-8111-111111111111');
+  });
+
+  it('does not collide when multiple jobs are admitted in the same millisecond', () => {
+    const first = createJobId(
+      () => 1780659451558,
+      () => '11111111-1111-4111-8111-111111111111',
+    );
+    const second = createJobId(
+      () => 1780659451558,
+      () => '22222222-2222-4222-8222-222222222222',
+    );
+
+    expect(first).not.toBe(second);
+    expect(first.startsWith('sprint-')).toBe(false);
+    expect(second.startsWith('sprint-')).toBe(false);
+  });
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -112,21 +131,46 @@ describe('job-runner', () => {
   });
 
   describe('readLatestJobState', () => {
-    it('returns latest job by filename sort', () => {
+    it('returns latest job across current and legacy timestamp namespaces', () => {
       const state: JobState = {
-        jobId: 'sprint-2000000000',
+        jobId: 'job-1780659451559-11111111-1111-4111-8111-111111111111',
         status: 'RUNNING',
         startedAt: '2026-03-18T10:00:00Z',
       };
 
       vi.mocked(existsSync).mockReturnValue(true);
       vi.mocked(readdirSync).mockReturnValue(
-        ['sprint-1000000000.json', 'sprint-2000000000.json'] as unknown as ReturnType<typeof readdirSync>,
+        [
+          'sprint-1780659451558.json',
+          'job-1780659451559-11111111-1111-4111-8111-111111111111.json',
+        ] as unknown as ReturnType<typeof readdirSync>,
       );
       vi.mocked(readFileSync).mockReturnValue(JSON.stringify(state));
 
       const result = readLatestJobState('/tmp/project');
       expect(result).toEqual(state);
+    });
+
+    it('returns a newer legacy job when it follows a current job', () => {
+      const state: JobState = {
+        jobId: 'sprint-1780659451560',
+        status: 'COMPLETE',
+        startedAt: '2026-03-18T10:00:00Z',
+      };
+
+      vi.mocked(existsSync).mockReturnValue(true);
+      vi.mocked(readdirSync).mockReturnValue(
+        [
+          'job-1780659451559-11111111-1111-4111-8111-111111111111.json',
+          'sprint-1780659451560.json',
+        ] as unknown as ReturnType<typeof readdirSync>,
+      );
+      vi.mocked(readFileSync).mockReturnValue(JSON.stringify(state));
+
+      expect(readLatestJobState('/tmp/project')).toEqual(state);
+      expect(vi.mocked(readFileSync).mock.calls[0]?.[0]).toEqual(
+        expect.stringContaining('sprint-1780659451560.json'),
+      );
     });
 
     it('returns null when jobs dir does not exist', () => {

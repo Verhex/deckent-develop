@@ -9,7 +9,7 @@ import type { Sprint, ResolvedConfig } from '../../../src/core/types.js';
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
 // Stub fork + filesystem writes so registerStartTool does not create real
-// .deckent/sprint-<timestamp>-ipc/ directories in the project root during tests.
+// .deckent/job-<timestamp>-<uuid>-ipc/ directories in the project root during tests.
 // Pre-fix this test leaked ~10 orphan IPC dirs per run (cumulatively 435+).
 vi.mock('node:child_process', async () => {
   const actual = await vi.importActual<typeof import('node:child_process')>('node:child_process');
@@ -218,12 +218,12 @@ describe('registerStartTool', () => {
   // ── Background Job Creation ──────────────────────────────────────────────
 
   describe('background job creation', () => {
-    it('returns immediately with jobId matching sprint-<timestamp> format', async () => {
+    it('returns immediately with a job-scoped timestamp and UUID identity', async () => {
       const tool = await getStartTool();
       const result = await tool.handler({ autoApprove: false });
       const parsed = JSON.parse(result.content[0]!.text);
 
-      expect(parsed.jobId).toMatch(/^sprint-\d+$/);
+      expect(parsed.jobId).toMatch(/^job-\d{13}-[0-9a-f-]+$/);
     });
 
     it('returns status RUNNING immediately without waiting for sprint', async () => {

@@ -1,4 +1,5 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
@@ -6,6 +7,8 @@ import Database from 'better-sqlite3';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+  PROVIDER_EXECUTION_OBSERVATION_DATABASE_PATH,
+  PROVIDER_EXECUTION_OBSERVATION_STORE_SCHEMA_VERSION,
   ProviderExecutionObservationStore,
   ProviderExecutionObservationStoreError,
 } from '../../src/core/provider-execution-observation-store.js';
@@ -46,6 +49,31 @@ function end(overrides: Partial<ProviderExecutionObservationInput> = {}): Provid
 }
 
 describe('ProviderExecutionObservationStore', () => {
+  it('keeps the ownership delimiter as an escaped NUL in ordinary UTF-8 source text', () => {
+    const sourceBytes = readFileSync(join(
+      process.cwd(),
+      'src/core/provider-execution-observation-store.ts',
+    ));
+    const sourceText = sourceBytes.toString('utf8');
+
+    expect(Buffer.from(sourceText, 'utf8')).toEqual(sourceBytes);
+    expect(sourceBytes.includes(0)).toBe(false);
+    expect(sourceText).toContain('return `${taskId}\\0${attemptId}`;');
+  });
+
+  it('exports and uses one canonical project-relative database path by default', () => {
+    const root = mkdtempSync(join(tmpdir(), 'deckent-provider-observation-default-'));
+    roots.push(root);
+
+    expect(PROVIDER_EXECUTION_OBSERVATION_DATABASE_PATH).toBe(
+      join('.deckent', 'provider-execution-observations.db'),
+    );
+    const store = new ProviderExecutionObservationStore(root);
+    store.close();
+
+    expect(readFileSync(join(root, PROVIDER_EXECUTION_OBSERVATION_DATABASE_PATH))).toBeInstanceOf(Buffer);
+  });
+
   it('persists exact-principal start/end intervals across restart', () => {
     const { store, dbPath } = fixture();
     expect(store.put({ source: 'provider-runtime', observation: start() }).accepted).toBe(true);
@@ -146,7 +174,7 @@ describe('ProviderExecutionObservationStore', () => {
     store.close();
   });
 
-  it('migrates v1 rows without assigning run ownership and preserves them in read-only mode', () => {
+  it('keeps v1 reads byte-stable, requires explicit migration for writes, and preserves legacy ownership', () => {
     const root = mkdtempSync(join(tmpdir(), 'deckent-provider-observation-legacy-'));
     roots.push(root);
     const dbPath = join(root, 'observations.db');
@@ -157,14 +185,68 @@ describe('ProviderExecutionObservationStore', () => {
     db.prepare('INSERT INTO provider_execution_intervals VALUES (?, ?, ?, ?, ?, ?, NULL, ?, NULL)').run('legacy-exec', 'task-491-008', 'attempt-legacy', 'principal-a', 'fence-legacy', JSON.stringify(legacyStart), 1);
     db.close();
 
+    const digest = () => createHash('sha256').update(readFileSync(dbPath)).digest('hex');
+    const bytesBeforeRead = readFileSync(dbPath);
+    const digestBeforeRead = digest();
+
     const reader = new ProviderExecutionObservationStore('.', { dbPath, readOnly: true });
-    expect(reader.listIntervals('principal-a')).toMatchObject([{ executionId: 'legacy-exec', runId: null, ownership: 'legacy-unowned' }]);
+    expect(reader.listIntervals('principal-a')).toMatchObject([{
+      executionId: 'legacy-exec', runId: null, ownership: 'legacy-unowned', retired: false,
+    }]);
     expect(reader.listOpenIntervalsForScope({ runId: 'task-491-008', attemptId: 'attempt-legacy', providerPrincipalDigest: 'principal-a', fence: 'fence-legacy' })).toEqual([]);
     reader.close();
 
+    expect(readFileSync(dbPath)).toEqual(bytesBeforeRead);
+    expect(digest()).toBe(digestBeforeRead);
+    expect(() => new ProviderExecutionObservationStore('.', { dbPath })).toThrowError(
+      expect.objectContaining({ code: 'MIGRATION_REQUIRED' }),
+    );
+    expect(readFileSync(dbPath)).toEqual(bytesBeforeRead);
+    expect(digest()).toBe(digestBeforeRead);
+
+    const migrator = new Database(dbPath);
+    migrator.transaction(() => {
+      migrator.exec(`ALTER TABLE provider_execution_intervals ADD COLUMN run_id TEXT;
+        ALTER TABLE provider_execution_intervals ADD COLUMN retired INTEGER NOT NULL DEFAULT 0;
+        CREATE INDEX idx_provider_execution_run_scope
+          ON provider_execution_intervals
+            (run_id, attempt_id, principal_digest, fence, retired, start_sequence, execution_id);
+        PRAGMA user_version = ${PROVIDER_EXECUTION_OBSERVATION_STORE_SCHEMA_VERSION};`);
+    })();
+    migrator.close();
+
     const migrated = new ProviderExecutionObservationStore('.', { dbPath });
-    expect(migrated.listIntervals('principal-a')).toMatchObject([{ executionId: 'legacy-exec', runId: null, ownership: 'legacy-unowned' }]);
+    expect(migrated.listIntervals('principal-a')).toMatchObject([{
+      executionId: 'legacy-exec', runId: null, ownership: 'legacy-unowned', retired: false,
+    }]);
     expect(migrated.retireOpenIntervalsForScope({ runId: 'run-1', attemptId: 'attempt-legacy', providerPrincipalDigest: 'principal-a', fence: 'fence-legacy' })).toBe(0);
+    expect(migrated.put({
+      source: 'provider-runtime',
+      observation: start({ executionId: 'post-migration', providerPrincipalDigest: 'principal-b' }),
+    })).toMatchObject({ accepted: true });
+    expect(migrated.listIntervals('principal-b')).toMatchObject([{
+      executionId: 'post-migration', runId: 'run-1', ownership: 'run-owned', retired: false,
+    }]);
     migrated.close();
+
+    const restarted = new ProviderExecutionObservationStore('.', { dbPath });
+    expect(restarted.listIntervals('principal-a')).toMatchObject([{
+      executionId: 'legacy-exec', runId: null, ownership: 'legacy-unowned', retired: false,
+    }]);
+    expect(restarted.listIntervals('principal-b')).toHaveLength(1);
+    restarted.close();
+  });
+
+  it('rejects an unsupported future schema without weakening schema mismatch admission', () => {
+    const root = mkdtempSync(join(tmpdir(), 'deckent-provider-observation-future-'));
+    roots.push(root);
+    const dbPath = join(root, 'observations.db');
+    const db = new Database(dbPath);
+    db.pragma(`user_version = ${PROVIDER_EXECUTION_OBSERVATION_STORE_SCHEMA_VERSION + 1}`);
+    db.close();
+
+    expect(() => new ProviderExecutionObservationStore('.', { dbPath })).toThrowError(
+      expect.objectContaining({ code: 'SCHEMA_MISMATCH' }),
+    );
   });
 });

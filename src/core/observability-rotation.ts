@@ -1,15 +1,17 @@
 // ═══ Observability Rotation ════════════════════════════════════════
 // Size-based and sprint-based metrics file rotation.
-// Archives to .deckent/archive/metrics/metrics-<sprintId>.jsonl.gz
+// Archives to .deckent/archive/sprints/<sprintId>/metrics/
 // Sprint 150 — Task 030
 
 import {
   existsSync, readFileSync, writeFileSync, mkdirSync,
-  statSync, readdirSync, unlinkSync,
+  statSync, readdirSync, unlinkSync, linkSync,
 } from 'node:fs';
 import { join } from 'node:path';
 import { gzipSync, gunzipSync } from 'node:zlib';
+import { createHash, randomUUID } from 'node:crypto';
 import { debugLog } from './utils.js';
+import { discoverSprintArchiveIds, resolveSprintArchiveDir } from './sprint-archive.js';
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -42,7 +44,7 @@ export const DEFAULT_ROTATION_CONFIG: ObservabilityRotationConfig = {
 
 const METRICS_FILENAME = 'metrics.jsonl';
 const DECKENT_DIR = '.deckent';
-const ARCHIVE_DIR = 'archive/metrics';
+const LEGACY_ARCHIVE_DIR = 'archive/metrics';
 
 // ─── Core Functions ──────────────────────────────────────────────
 
@@ -58,8 +60,6 @@ export function rotateMetricsFile(
 ): RotationResult {
   const opts = { ...DEFAULT_ROTATION_CONFIG, ...config };
   const metricsPath = join(root, DECKENT_DIR, METRICS_FILENAME);
-  const archiveBase = join(root, DECKENT_DIR, ARCHIVE_DIR);
-  const archivePath = join(archiveBase, `metrics-${sprintId}.jsonl.gz`);
 
   if (!existsSync(metricsPath)) {
     return { rotated: false, pruned: [] };
@@ -73,9 +73,24 @@ export function rotateMetricsFile(
   // Read, compress, write archive
   const content = readFileSync(metricsPath);
   const gzipped = gzipSync(content);
+  const digest = createHash('sha256').update(gzipped).digest('hex');
+  const archiveBase = join(resolveSprintArchiveDir(root, sprintId), 'metrics');
+  const archivePath = join(archiveBase, `metrics-${digest.slice(0, 16)}.jsonl.gz`);
 
   mkdirSync(archiveBase, { recursive: true });
-  writeFileSync(archivePath, gzipped);
+  if (!existsSync(archivePath)) {
+    const temporary = join(archiveBase, `.metrics-${process.pid}-${randomUUID()}.tmp`);
+    try {
+      writeFileSync(temporary, gzipped, { flag: 'wx' });
+      if (!readFileSync(temporary).equals(gzipped)) throw new Error('METRICS_ARCHIVE_VERIFY_FAILED');
+      try { linkSync(temporary, archivePath); } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      }
+    } finally {
+      try { unlinkSync(temporary); } catch { /* no temporary remained */ }
+    }
+  }
+  if (!readFileSync(archivePath).equals(gzipped)) throw new Error('METRICS_ARCHIVE_CONFLICT');
 
   // Truncate original
   writeFileSync(metricsPath, '', 'utf-8');
@@ -118,28 +133,14 @@ export function shouldRotate(
  * Returns list of pruned file paths.
  */
 export function enforceKeepLastN(root: string, keepLastN: number): string[] {
-  const archiveBase = join(root, DECKENT_DIR, ARCHIVE_DIR);
-  if (!existsSync(archiveBase)) return [];
-
-  const files = readdirSync(archiveBase)
-    .filter(f => f.startsWith('metrics-') && f.endsWith('.jsonl.gz'))
-    .sort(); // lexicographic sort = chronological for sprint-NNN naming
-
-  const pruned: string[] = [];
-  if (files.length > keepLastN) {
-    const toRemove = files.slice(0, files.length - keepLastN);
-    for (const file of toRemove) {
-      const fullPath = join(archiveBase, file);
-      try {
-        unlinkSync(fullPath);
-        pruned.push(fullPath);
-      } catch (e) {
-        debugLog('observability-rotation:prune', `Failed to remove ${fullPath}: ${e}`);
-      }
-    }
+  const count = listArchives(root).length;
+  if (count > keepLastN) {
+    debugLog(
+      'observability-rotation:retention',
+      `Preserved ${count} immutable metric archives; sprint archive lifecycle owns retention (legacy keepLastN=${keepLastN})`,
+    );
   }
-
-  return pruned;
+  return [];
 }
 
 /**
@@ -160,11 +161,19 @@ export function readArchivedMetrics(archivePath: string): string {
  * Returns sorted list of archive file paths (oldest first).
  */
 export function listArchives(root: string): string[] {
-  const archiveBase = join(root, DECKENT_DIR, ARCHIVE_DIR);
-  if (!existsSync(archiveBase)) return [];
-
-  return readdirSync(archiveBase)
-    .filter(f => f.startsWith('metrics-') && f.endsWith('.jsonl.gz'))
-    .sort()
-    .map(f => join(archiveBase, f));
+  const archives: string[] = [];
+  const legacyBase = join(root, DECKENT_DIR, LEGACY_ARCHIVE_DIR);
+  if (existsSync(legacyBase)) {
+    archives.push(...readdirSync(legacyBase)
+      .filter(file => file.startsWith('metrics-') && file.endsWith('.jsonl.gz'))
+      .map(file => join(legacyBase, file)));
+  }
+  for (const sprintId of discoverSprintArchiveIds(root)) {
+    const metricsDir = join(resolveSprintArchiveDir(root, sprintId), 'metrics');
+    if (!existsSync(metricsDir)) continue;
+    archives.push(...readdirSync(metricsDir)
+      .filter(file => file.startsWith('metrics-') && file.endsWith('.jsonl.gz'))
+      .map(file => join(metricsDir, file)));
+  }
+  return [...new Set(archives)].sort();
 }

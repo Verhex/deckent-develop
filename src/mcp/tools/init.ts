@@ -5,7 +5,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { PlanMode } from '../../core/types.js';
 import {
   DECKENT_DIR, BRAIN_DIR, TASKS_DIR, LOCKS_DIR, CLAUDE_RULES_DIR,
-  WORKSPACE_DIR, PLUGINS_DIR, I18N_DIR, DASHBOARD_FILE, DIRECTIVES_FILE,
+  WORKSPACE_DIR, PLUGINS_DIR, DASHBOARD_FILE, DIRECTIVES_FILE,
   AGENTS_FILE, CLAUDE_FILE, DECKENT_FILE,
 } from '../../core/constants.js';
 import { regenerateRules } from '../../core/rule-generator.js';
@@ -81,7 +81,6 @@ export function registerInitTool(server: McpServer): void {
         join(root, LOCKS_DIR),
         join(root, CLAUDE_RULES_DIR),
         join(root, PLUGINS_DIR),
-        join(root, I18N_DIR),
       ];
       for (const dir of dirs) {
         ensureDir(dir);
@@ -184,26 +183,6 @@ Lint: tsc --noEmit
       try {
         seedDocsConfig(root);
       } catch { /* non-fatal */ }
-
-      // i18n
-      const enMessages = {
-        sprint_started: 'Sprint {id} started with {count} tasks',
-        sprint_complete: 'Sprint {id} complete',
-        task_done: 'Task {id}: DONE',
-        task_nogo: 'Task {id}: NO_GO',
-        plan_approved: 'Plan approved',
-        plan_rejected: 'Plan rejected',
-      };
-      const trMessages = {
-        sprint_started: 'Sprint {id} baslatildi, {count} gorev',
-        sprint_complete: 'Sprint {id} tamamlandi',
-        task_done: 'Gorev {id}: TAMAMLANDI',
-        task_nogo: 'Gorev {id}: BASARISIZ',
-        plan_approved: 'Plan onaylandi',
-        plan_rejected: 'Plan reddedildi',
-      };
-      writeIfNotExists(join(root, I18N_DIR, 'en.json'), JSON.stringify(enMessages, null, 2) + '\n');
-      writeIfNotExists(join(root, I18N_DIR, 'tr.json'), JSON.stringify(trMessages, null, 2) + '\n');
 
       // .gitignore (no longer adds .deckent/ — it should be tracked)
       appendToGitignore(root, [

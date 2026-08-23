@@ -7,6 +7,7 @@ import { loadConfig } from '../../core/config.js';
 import { getNextSprintId } from '../../core/utils.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { mcpToolDescription } from './description-catalog.js';
+import { resolveTaskArtifactReadDirs } from '../../core/sprint-archive.js';
 
 interface TaskResultData {
   taskId?: string;
@@ -25,43 +26,38 @@ interface TaskData {
 
 function loadTaskResults(root: string, sprintId: string): Array<{ task: TaskData; result: TaskResultData | null }> {
   const tasksDir = join(root, TASKS_DIR);
-  if (!existsSync(tasksDir)) return [];
-
-  // Look in active tasks first, then fall back to archive
-  let taskDir = tasksDir;
-  let entries = readdirSync(tasksDir).filter(
-    (f) => f.startsWith('task-') && f.endsWith('.json'),
-  );
-
-  // If no active tasks, check archive directory
-  if (entries.length === 0) {
-    const archiveDir = join(tasksDir, 'archive');
-    if (existsSync(archiveDir)) {
-      entries = readdirSync(archiveDir).filter(
-        (f) => f.startsWith('task-') && f.endsWith('.json'),
-      );
-      taskDir = archiveDir;
-    }
-  }
-
+  const roots = [tasksDir, ...resolveTaskArtifactReadDirs(root, sprintId)];
   const results: Array<{ task: TaskData; result: TaskResultData | null }> = [];
-
-  for (const entry of entries) {
-    try {
-      const task = JSON.parse(readFileSync(join(taskDir, entry), 'utf-8')) as TaskData;
-      if (task.sprintId && task.sprintId !== sprintId) continue;
-
-      const resultPath = join(taskDir, entry.replace('.json', '.result'));
-      let result: TaskResultData | null = null;
-      if (existsSync(resultPath)) {
-        result = JSON.parse(readFileSync(resultPath, 'utf-8')) as TaskResultData;
+  const seenTaskIds = new Set<string>();
+  for (const searchRoot of roots) {
+    const directories = [searchRoot];
+    while (directories.length > 0) {
+      const taskDir = directories.pop()!;
+      let entries;
+      try { entries = readdirSync(taskDir, { withFileTypes: true }); } catch { continue; }
+      for (const entry of entries) {
+        const path = join(taskDir, entry.name);
+        if (entry.isDirectory()) {
+          directories.push(path);
+          continue;
+        }
+        if (!entry.isFile() || !entry.name.startsWith('task-') || !entry.name.endsWith('.json')) continue;
+        try {
+          const task = JSON.parse(readFileSync(path, 'utf-8')) as TaskData;
+          if (!task.id || seenTaskIds.has(task.id) || (task.sprintId && task.sprintId !== sprintId)) continue;
+          const resultPath = join(taskDir, entry.name.replace('.json', '.result'));
+          let result: TaskResultData | null = null;
+          if (existsSync(resultPath)) {
+            result = JSON.parse(readFileSync(resultPath, 'utf-8')) as TaskResultData;
+          }
+          results.push({ task, result });
+          seenTaskIds.add(task.id);
+        } catch {
+          // skip malformed
+        }
       }
-      results.push({ task, result });
-    } catch {
-      // skip malformed
     }
   }
-
   return results;
 }
 

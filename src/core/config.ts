@@ -49,6 +49,8 @@ import type {
   SystemProfile,
   TerminalConfig,
   TimeoutConfig,
+  RuntimeArtifactFamilyRetentionConfig,
+  RuntimeArtifactRetentionConfig,
 } from './types.js';
 import {
   ALL_PROVIDER_NAMES,
@@ -643,6 +645,55 @@ export function deepMerge<T>(base: T, override: Partial<T>): T {
 
   return result;
 }
+
+/** Safe, explicit runtime-artifact retention defaults; no cleanup runs by default. */
+export const DEFAULT_RUNTIME_ARTIFACT_RETENTION_CONFIG: Readonly<RuntimeArtifactRetentionConfig> = Object.freeze({
+  enabled: false,
+  apply_on_finalize: false,
+  archive_path: '.deckent/archive/runtime-artifacts/',
+  families: Object.freeze({
+    runtime: Object.freeze({ max_age_days: 30, max_count: 1_000, max_size_mb: 1_024 }),
+    recent: Object.freeze({ max_age_days: 14, max_count: 500, max_size_mb: 512 }),
+  }),
+});
+
+function resolveRuntimeArtifactRetention(config: DeckentConfig): RuntimeArtifactRetentionConfig {
+  const defaults = structuredClone(DEFAULT_RUNTIME_ARTIFACT_RETENTION_CONFIG);
+  const authored = config.runtime_artifact_retention;
+  const families: Record<string, RuntimeArtifactFamilyRetentionConfig> = { ...defaults.families };
+  for (const [familyName, override] of Object.entries(authored?.families ?? {})) {
+    const fallback = defaults.families[familyName];
+    const maxAgeDays = override.max_age_days ?? fallback?.max_age_days;
+    const maxCount = override.max_count ?? fallback?.max_count;
+    const maxSizeMb = override.max_size_mb ?? fallback?.max_size_mb;
+    if (maxAgeDays === undefined || maxCount === undefined || maxSizeMb === undefined) {
+      throw new ConfigValidationError([
+        `runtime_artifact_retention.families.${familyName} must define all bounds`,
+      ]);
+    }
+    families[familyName] = {
+      max_age_days: maxAgeDays,
+      max_count: maxCount,
+      max_size_mb: maxSizeMb,
+    };
+  }
+  return {
+    enabled: authored?.enabled ?? defaults.enabled,
+    apply_on_finalize: authored?.apply_on_finalize ?? defaults.apply_on_finalize,
+    archive_path: authored?.archive_path ?? defaults.archive_path,
+    families,
+  };
+}
+
+/**
+ * Public validation ceilings for runtime-artifact retention authoring.
+ * Keeping these next to the defaults makes every accepted bound inspectable.
+ */
+export const RUNTIME_ARTIFACT_RETENTION_LIMITS = Object.freeze({
+  max_age_days: 3_650,
+  max_count: 1_000_000,
+  max_size_mb: 1_048_576,
+});
 
 /**
  * Validate a complete DeckentConfig object against all known rules.
@@ -1318,6 +1369,69 @@ export function validateConfig(config: DeckentConfig): string[] {
     }
   }
 
+  // Runtime artifact retention is fail-closed: every family must carry all
+  // three finite positive bounds and each bound has a hard upper ceiling.
+  if (config.runtime_artifact_retention !== undefined) {
+    const policy = config.runtime_artifact_retention;
+    if (typeof policy !== 'object' || policy === null || Array.isArray(policy)) {
+      errors.push('runtime_artifact_retention must be an object');
+    } else {
+      const allowedPolicyFields = new Set(['enabled', 'apply_on_finalize', 'archive_path', 'families']);
+      for (const field of Object.keys(policy)) {
+        if (!allowedPolicyFields.has(field)) {
+          errors.push(`runtime_artifact_retention.${field} is not a recognized field`);
+        }
+      }
+      if (typeof policy.enabled !== 'boolean') {
+        errors.push('runtime_artifact_retention.enabled must be a boolean');
+      }
+      if (typeof policy.apply_on_finalize !== 'boolean') {
+        errors.push('runtime_artifact_retention.apply_on_finalize must be a boolean');
+      }
+      if (typeof policy.archive_path !== 'string'
+        || policy.archive_path.trim().length === 0
+        || policy.archive_path.startsWith('/')
+        || policy.archive_path.startsWith('\\\\')
+        || /^[A-Za-z]:[\\/]/u.test(policy.archive_path)
+        || policy.archive_path.split(/[\\/]+/u).includes('..')) {
+        errors.push('runtime_artifact_retention.archive_path must be a safe project-relative path');
+      }
+      if (typeof policy.families !== 'object' || policy.families === null
+        || Array.isArray(policy.families) || Object.keys(policy.families).length === 0) {
+        errors.push('runtime_artifact_retention.families must be a non-empty object');
+      } else {
+        for (const [familyName, family] of Object.entries(policy.families)) {
+          if (familyName.trim().length === 0
+            || familyName === '.'
+            || familyName === '..'
+            || familyName.includes('/')
+            || familyName.includes('\\')) {
+            errors.push('runtime_artifact_retention family names must be safe non-empty path segments');
+            continue;
+          }
+          if (typeof family !== 'object' || family === null || Array.isArray(family)) {
+            errors.push(`runtime_artifact_retention.families.${familyName} must be an object`);
+            continue;
+          }
+          const boundFields = ['max_age_days', 'max_count', 'max_size_mb'] as const;
+          const allowedBoundFields = new Set<string>(boundFields);
+          for (const field of Object.keys(family)) {
+            if (!allowedBoundFields.has(field)) {
+              errors.push(`runtime_artifact_retention.families.${familyName}.${field} is not a recognized bound`);
+            }
+          }
+          for (const field of boundFields) {
+            const value = family[field];
+            if (typeof value !== 'number' || !Number.isInteger(value)
+              || value < 1 || value > RUNTIME_ARTIFACT_RETENTION_LIMITS[field]) {
+              errors.push(`runtime_artifact_retention.families.${familyName}.${field} must be an integer between 1 and ${RUNTIME_ARTIFACT_RETENTION_LIMITS[field]}`);
+            }
+          }
+        }
+      }
+    }
+  }
+
   // ─── Gate config validation (Sprint 325) ───────────────────────────
   if (config.gate !== undefined) {
     const g = config.gate;
@@ -1906,6 +2020,7 @@ export function createDefaultConfig(): DeckentConfig {
       retention_days: 14,
       archive_path: '.deckent/archive/scheduler-shadow/',
     },
+    runtime_artifact_retention: structuredClone(DEFAULT_RUNTIME_ARTIFACT_RETENTION_CONFIG),
     // Runtime Style
     deckent_style: 'sprint',
     // Terminal (Sprint 175 — embedded web terminal)
@@ -2307,6 +2422,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     autonomous: config.autonomous,
     // Resource Monitor — passed through from project config (opt-in, absent = disabled)
     resource_monitor: config.resource_monitor,
+    runtime_artifact_retention: resolveRuntimeArtifactRetention(config),
     // Worker Comms — passed through (opt-in, absent = disabled)
     worker_comms: config.worker_comms,
     // Cost Guard — passed through (opt-in, absent = disabled)
@@ -3179,6 +3295,7 @@ export function mergeConfigs(
       : structuredClone(DEFAULT_TERMINAL_CONFIG),
     // Resource Monitor — passed through (opt-in, absent = disabled)
     resource_monitor: config.resource_monitor,
+    runtime_artifact_retention: resolveRuntimeArtifactRetention(config),
     // Worker Comms — passed through (opt-in, absent = disabled)
     worker_comms: config.worker_comms,
     // Cost Guard — passed through (opt-in, absent = disabled)

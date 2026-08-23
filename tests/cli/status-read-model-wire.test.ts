@@ -38,6 +38,7 @@ describe('CLI canonical status read-model wire', () => {
       expect(status.providerConcurrency).toEqual([
         expect.objectContaining({ currentAttained: 0, unresolvedOpenIntervals: 1 }),
       ]);
+      expect(JSON.stringify(status)).not.toContain('unresolved-provider-observation');
       expect(fallback).not.toHaveBeenCalled();
     } finally {
       rmSync(root, { recursive: true, force: true });

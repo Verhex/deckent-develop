@@ -306,8 +306,9 @@ export async function buildConnectorTargets(
       continue;
     }
 
+    let connector: IMessageConnector | null = null;
     try {
-      const connector = deps.makeConnector ? deps.makeConnector(id) : await loadConnector(id);
+      connector = deps.makeConnector ? deps.makeConnector(id) : await loadConnector(id);
       if (!connector) continue;
       const startOutbound = connector.startOutbound?.bind(connector) ?? connector.start.bind(connector);
       await startOutbound({ enabled: true, token: cfg.token });
@@ -317,6 +318,14 @@ export async function buildConnectorTargets(
         `[connector-bootstrap] ${id} start failed — skipping: ` +
           `${err instanceof Error ? err.message : String(err)}`,
       );
+      // Construction is atomic: a later failure must not orphan connectors that
+      // were already started during this attempt.
+      const constructed = connector ? [connector] : [];
+      await Promise.allSettled([
+        ...targets.map((target) => target.connector.stop()),
+        ...constructed.map((candidate) => candidate.stop()),
+      ]);
+      return [];
     }
   }
   return targets;

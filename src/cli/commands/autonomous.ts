@@ -1345,8 +1345,9 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
   );
 
   const controller = new AbortController();
-  const sigintHandler = (): void => controller.abort();
-  process.on('SIGINT', sigintHandler);
+  const signalHandler = (): void => controller.abort();
+  process.on('SIGINT', signalHandler);
+  process.on('SIGTERM', signalHandler);
 
   const intervalMs = opts.intervalMs !== undefined
     ? Math.max(0, parseInt(opts.intervalMs, 10) || 0)
@@ -1367,11 +1368,15 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
     resolvedConfig.notify_connectors,
     { kpiSummaryFn: buildSprintKpiSummaryFn(root, lang) },
   );
-  bootstrapNotifyDispatcher({
+  // This command owns the dispatcher for exactly the lifetime of this loop.
+  // Keep the returned handle so every exit path awaits the dispatcher's one
+  // canonical, idempotent close (including connector sockets and timers).
+  const notifyDispatcher = bootstrapNotifyDispatcher({
     projectRoot: root,
     extraAdapters: connectorAdapter ? [connectorAdapter] : [],
     webhook: resolveWebhookBootstrapOption(resolvedConfig),
   });
+  try {
   const onTick = makeTickReporter(lang);
 
   // Surface the immediate work queue, not just scheduled flows: an empty/all-done backlog
@@ -1399,7 +1404,6 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
     }, ms));
 
   const loopConfig: AutonomousRuntimeConfig = {};
-  try {
     const summary = await runAutonomousLoop(loopConfig, deps, {
       intervalMs,
       maxIterations,
@@ -1412,19 +1416,24 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
       reason: summary.reason,
     }));
   } finally {
-    process.off('SIGINT', sigintHandler);
-    for (const source of reactiveSources) source.stop();
-    // Ensure the observer releases any timers/watchers it started so the
-    // process (and tests) can exit cleanly.
-    reactiveObserver?.stop?.();
-    // N1: tear down the nervous system (observer watchers + executor timers +
-    // heartbeat) so the process exits cleanly.
-    nervousHandle?.dispose();
-    // AUT-6: the loop has ended (no task is in-flight here), so sweep stray
-    // per-run artifacts (task-run-*.{hb,result,json,prompt,worker,log}, _*.pid)
-    // that the execute-dispatcher leaves behind — keeps .tasks/ from accumulating
-    // run files across autonomous sessions. Best-effort; never throws.
-    cleanupAutonomousArtifacts(root);
+    try {
+      process.off('SIGINT', signalHandler);
+      process.off('SIGTERM', signalHandler);
+      for (const source of reactiveSources) source.stop();
+      // Ensure the observer releases any timers/watchers it started so the
+      // process (and tests) can exit cleanly.
+      reactiveObserver?.stop?.();
+      // N1: tear down the nervous system (observer watchers + executor timers +
+      // heartbeat) so the process exits cleanly.
+      nervousHandle?.dispose();
+      // AUT-6: the loop has ended (no task is in-flight here), so sweep stray
+      // per-run artifacts (task-run-*.{hb,result,json,prompt,worker,log}, _*.pid)
+      // that the execute-dispatcher leaves behind — keeps .tasks/ from accumulating
+      // run files across autonomous sessions. Best-effort; never throws.
+      cleanupAutonomousArtifacts(root);
+    } finally {
+      await notifyDispatcher.close();
+    }
   }
   } finally {
     if (approvalAuthority?.state === 'ready') approvalAuthority.runtime.close();

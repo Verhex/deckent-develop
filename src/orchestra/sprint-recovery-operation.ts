@@ -18,6 +18,11 @@ import { decideExecutionRecovery } from '../core/execution-recovery.js';
 import { previewFinalizeCleanup } from '../core/orphan-cleaner.js';
 import { readCanonicalRunStatus } from '../core/run-status-authority.js';
 import {
+  resolveTaskArtifactArchiveDir,
+  TASK_ARTIFACT_PRESERVED_SUBDIR,
+  writeTaskArtifactPreservationMarker,
+} from '../core/sprint-archive.js';
+import {
   RECOVERY_ARTIFACT_POLICY_VERSION,
   evaluateForceArchive,
   type ForceArchiveManifestV1,
@@ -183,18 +188,23 @@ function checkpointPolicyDisposition(
 function taskArchiveManifests(
   root: string,
   sprintId: string,
-  files: readonly string[],
+  classification: { readonly archivedFiles: readonly string[]; readonly preservedFiles: readonly string[] },
   identity: SprintRecoverySettlementIdentity,
 ): ForceArchiveManifestV1[] {
+  const preserved = new Set(classification.preservedFiles);
+  const files = [...classification.archivedFiles, ...classification.preservedFiles];
   return files.map(file => {
     const source = join(root, '.tasks', file);
+    const taskArchive = resolveTaskArtifactArchiveDir(root, sprintId);
     const decision = evaluateForceArchive({
       artifact: {
         policyVersion: RECOVERY_ARTIFACT_POLICY_VERSION,
         artifactClass: 'task-residue', source, digest: fileDigest(source),
         owner: { taskId: identity.taskId, attemptId: identity.attemptId, fence: identity.fenceToken },
       },
-      destination: join(root, '.tasks', 'archive', sprintId, file),
+      destination: preserved.has(file)
+        ? join(taskArchive, TASK_ARTIFACT_PRESERVED_SUBDIR, file)
+        : join(taskArchive, file),
       requestedBy: 'sprint-recovery-operation',
     });
     if (!decision.allowed) {
@@ -462,7 +472,7 @@ export async function runSprintRecoveryOperation(
   const authorityBeforeMutation = readCanonicalRunStatus(root, { sprintIdHint: sprintId });
   const checkpointDisposition = checkpointPolicyDisposition(root, sprintId, identity);
   const preview = previewFinalizeCleanup(root, sprintId);
-  const archiveManifests = taskArchiveManifests(root, sprintId, preview.archivedFiles, identity);
+  const archiveManifests = taskArchiveManifests(root, sprintId, preview, identity);
   const report: SprintRecoveryReport = {
     identity,
     audit: { overallGate: 'SKIPPED' },
@@ -542,15 +552,17 @@ export async function runSprintRecoveryOperation(
     }
   }
 
-  report.taskFilesArchived = applyForceArchiveManifests(archiveManifests);
+  const settledTaskFiles = applyForceArchiveManifests(archiveManifests);
+  report.taskFilesArchived = preview.archivedFiles.length;
   report.taskFilesPreserved = preview.preservedFiles.length;
-  if (report.taskFilesArchived !== preview.archivedFiles.length) {
+  if (settledTaskFiles !== preview.archivedFiles.length + preview.preservedFiles.length) {
     throw new SprintRecoveryOperationError('ARCHIVE_INCOMPLETE', {
       sprintId,
-      expected: String(preview.archivedFiles.length),
-      actual: String(report.taskFilesArchived),
+      expected: String(preview.archivedFiles.length + preview.preservedFiles.length),
+      actual: String(settledTaskFiles),
     });
   }
+  writeTaskArtifactPreservationMarker(root, sprintId, preview.preservedFiles);
 
   if (snapshotOk || report.taskFilesArchived === 0) {
     const adapter = createSprintRecoveryAdapter(opts.platform ?? platformDefault(), {

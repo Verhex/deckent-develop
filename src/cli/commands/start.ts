@@ -413,6 +413,7 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
       let sandboxState: SandboxState | null = null;
       let lang = 'en';
       let approvalAuthority: ReturnType<typeof bootstrapApprovalAuthority> | undefined;
+      let notifyDispatcher: ReturnType<typeof bootstrapNotifyDispatcher> | undefined;
 
       try {
         const config = authorityConfig ?? await loadConfig(root);
@@ -599,7 +600,7 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
           let sprintResult;
           try {
             const bootstrap = await bootstrapProviders(config);
-            bootstrapNotifyDispatcher({
+            notifyDispatcher = bootstrapNotifyDispatcher({
               projectRoot: root,
               webhook: resolveWebhookBootstrapOption(config),
             });
@@ -932,7 +933,7 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
           config.notify_connectors,
           { kpiSummaryFn: buildSprintKpiSummaryFn(root, lang) },
         );
-        bootstrapNotifyDispatcher({
+        notifyDispatcher = bootstrapNotifyDispatcher({
           projectRoot: root,
           extraAdapters: connectorAdapter ? [connectorAdapter] : [],
           webhook: resolveWebhookBootstrapOption(config),
@@ -1249,6 +1250,7 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
         // printed message. Keep it unconditional for both branches above.
         process.exitCode = 1;
       } finally {
+        await notifyDispatcher?.close();
         if (approvalAuthority?.state === 'ready') approvalAuthority.runtime.close();
         // Always clean up temp DIRECTIVES.md (moved from try/catch to finally)
         if (zeroConfigResult) cleanupZeroConfig(zeroConfigResult);

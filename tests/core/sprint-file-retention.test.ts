@@ -5,7 +5,7 @@
  *  1. keep_last_n retention trigger
  *  2. Archive path correctness
  *  3. Size cap enforcement
- *  4. Forensic .md migration to .brain/archive/audits/
+ *  4. Forensic .md migration to the canonical sprint archive
  *  5. Counter (-seq, -checkpoint-seq) cleanup
  *  6. runRetention combined pipeline
  */
@@ -26,6 +26,10 @@ import {
   groupBySprintId,
   DEFAULT_RETENTION_CONFIG,
 } from '../../src/core/sprint-file-retention.js';
+import {
+  reconcileSprintArchive,
+  verifySprintArchive,
+} from '../../src/core/sprint-archive.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -82,6 +86,16 @@ describe('listSprintFiles + groupBySprintId', () => {
     expect(grouped['sprint-101']).toHaveLength(1);
   });
 
+  it('does not let legacy epoch job ids occupy the ordinal sprint window', () => {
+    seedSprintFile(tmpDir, 'sprint-623-events.jsonl');
+    seedSprintFile(tmpDir, 'sprint-624-events.jsonl');
+    seedSprintFile(tmpDir, 'sprint-1780659451558-events.jsonl');
+
+    const grouped = groupBySprintId(listSprintFiles(tmpDir));
+
+    expect(Object.keys(grouped).sort()).toEqual(['sprint-623', 'sprint-624']);
+  });
+
   it('returns empty when .deckent/ absent', () => {
     const emptyDir = join(tmpdir(), `deckent-empty-${Date.now()}`);
     expect(listSprintFiles(emptyDir)).toEqual([]);
@@ -128,7 +142,7 @@ describe('enforceRetention — keep_last_n', () => {
     expect(result.kept.sort()).toEqual(['sprint-100', 'sprint-101']);
   });
 
-  it('strips sprint-id prefix in archive filenames', () => {
+  it('preserves the canonical sprint-prefixed run filename', () => {
     for (const n of [100, 101]) {
       seedSprintFile(tmpDir, `sprint-${n}-events.jsonl`);
     }
@@ -136,7 +150,34 @@ describe('enforceRetention — keep_last_n', () => {
     enforceRetention(tmpDir, { keep_last_n: 1, size_cap_mb: 500, archive_path: '.deckent/archive/sprints/' });
 
     const archiveDir = join(tmpDir, '.deckent', 'archive', 'sprints', 'sprint-100');
-    expect(readdirSync(archiveDir)).toContain('events.jsonl');
+    expect(readdirSync(archiveDir)).toContain('sprint-100-events.jsonl');
+    expect(verifySprintArchive(tmpDir, 'sprint-100').ok).toBe(true);
+  });
+
+  it('refreshes a pre-existing historical manifest after retention publishes new evidence', () => {
+    const archiveDir = join(tmpDir, '.deckent', 'archive', 'sprints', 'sprint-100');
+    mkdirSync(archiveDir, { recursive: true });
+    writeFileSync(join(archiveDir, 'job.json'), '{"prior":true}');
+    reconcileSprintArchive(tmpDir, 'sprint-100', { apply: true, indexMemory: false });
+    expect(verifySprintArchive(tmpDir, 'sprint-100').ok).toBe(true);
+
+    seedSprintFile(tmpDir, 'sprint-100-events.jsonl', '{"late":true}');
+    seedSprintFile(tmpDir, 'sprint-101-events.jsonl', '{"current":true}');
+
+    const result = enforceRetention(tmpDir, {
+      keep_last_n: 1,
+      size_cap_mb: 500,
+      archive_path: '.deckent/archive/sprints/',
+    });
+
+    expect(result.reconciledSprintIds).toEqual(['sprint-100']);
+    expect(verifySprintArchive(tmpDir, 'sprint-100')).toMatchObject({
+      ok: true,
+      missing: [],
+      mismatched: [],
+      untracked: [],
+      manifestDigestValid: true,
+    });
   });
 });
 
@@ -204,7 +245,7 @@ describe('migrateForensicFiles', () => {
   beforeEach(() => { tmpDir = createTmpProject('forensic'); });
   afterEach(() => cleanupTmpProject(tmpDir));
 
-  it('moves forensic .md files to .brain/archive/audits/sprint-NNN/', () => {
+  it('moves forensic .md files to the canonical sprint audit namespace', () => {
     seedSprintFile(tmpDir, 'sprint-140-layer3-scorecard.md', '# Scorecard');
     seedSprintFile(tmpDir, 'sprint-140-verifier-log.md', '# Verifier');
     seedSprintFile(tmpDir, 'sprint-140-events.jsonl', '{}');  // not forensic
@@ -212,8 +253,8 @@ describe('migrateForensicFiles', () => {
     const moved = migrateForensicFiles(tmpDir);
 
     expect(moved.length).toBe(2);
-    expect(existsSync(join(tmpDir, '.brain', 'archive', 'audits', 'sprint-140', 'layer3-scorecard.md'))).toBe(true);
-    expect(existsSync(join(tmpDir, '.brain', 'archive', 'audits', 'sprint-140', 'verifier-log.md'))).toBe(true);
+    expect(existsSync(join(tmpDir, '.deckent', 'archive', 'sprints', 'sprint-140', 'audits', 'forensic', 'layer3-scorecard.md'))).toBe(true);
+    expect(existsSync(join(tmpDir, '.deckent', 'archive', 'sprints', 'sprint-140', 'audits', 'forensic', 'verifier-log.md'))).toBe(true);
 
     // Source removed
     expect(existsSync(join(tmpDir, '.deckent', 'recently-works', 'sprint-140-layer3-scorecard.md'))).toBe(false);

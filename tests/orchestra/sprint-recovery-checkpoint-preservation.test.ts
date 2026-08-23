@@ -70,12 +70,15 @@ describe('force recovery checkpoint preservation', () => {
       approval: { approvalRef: 'test:force', idempotencyKey: 'exact', identity },
     });
     expect(report.taskFilesArchived).toBe(1);
-    expect(report.artifactPolicy.archiveManifests).toHaveLength(1);
-    expect(report.artifactPolicy.archiveManifests[0]).toMatchObject({
+    expect(report.artifactPolicy.archiveManifests).toHaveLength(2);
+    const residueManifest = report.artifactPolicy.archiveManifests.find(
+      manifest => manifest.source === residuePath,
+    );
+    expect(residueManifest).toMatchObject({
       artifactClass: 'task-residue', operation: 'force-archive',
       restoreSemantics: 'restore-to-source-if-owner-current',
     });
-    const destination = report.artifactPolicy.archiveManifests[0]!.destination;
+    const destination = residueManifest!.destination;
     expect(readFileSync(destination, 'utf8')).toBe(residueBytes);
     expect(() => readFileSync(residuePath)).toThrow();
     expect(readFileSync(checkpointPath)).toBeTruthy();

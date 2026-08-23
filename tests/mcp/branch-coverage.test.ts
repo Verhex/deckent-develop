@@ -36,7 +36,7 @@ vi.mock('../../src/core/memory-store.js', () => ({
 }));
 
 // fork() must be stubbed to prevent registerStartTool from spawning real
-// detached children + leaking .deckent/sprint-<timestamp>-ipc/ orphan dirs.
+// detached children + leaking .deckent/job-<timestamp>-<uuid>-ipc/ orphan dirs.
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
   fork: vi.fn(() => ({

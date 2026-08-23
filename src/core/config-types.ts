@@ -1499,6 +1499,8 @@ export interface DeckentConfig {
   sprint_file_retention?: Partial<SprintFileRetentionConfig>;
   /** Retention policy for scheduler-shadow JSONL files (age-based archive). */
   scheduler_shadow_retention?: Partial<SchedulerShadowRetentionConfig>;
+  /** Bounded policy for runtime/recent artifact families. Safe default is disabled. */
+  runtime_artifact_retention?: RuntimeArtifactRetentionConfigInput;
 
   // ─── Nervous System ─────────────────────────────────────────────────
   /** Proactive meta-orchestrator nervous system configuration (Sprint 147+) */
@@ -1939,6 +1941,34 @@ export interface SchedulerShadowRetentionConfig {
   archive_path: string;
 }
 
+/** Bounds applied independently to one owned runtime artifact family. */
+export interface RuntimeArtifactFamilyRetentionConfig {
+  /** Maximum artifact age before archival. */
+  max_age_days: number;
+  /** Maximum number of artifacts retained in the live family. */
+  max_count: number;
+  /** Maximum aggregate live-family size in MiB. */
+  max_size_mb: number;
+}
+
+/** Config-resolved runtime artifact retention authority. */
+export interface RuntimeArtifactRetentionConfig {
+  /** Enables policy evaluation. Default false preserves existing configs. */
+  enabled: boolean;
+  /** Applies the policy during sprint finalization. Default false. */
+  apply_on_finalize: boolean;
+  /** Archive destination relative to the project root. */
+  archive_path: string;
+  /** Explicit bounds keyed by owned artifact-family name. */
+  families: Record<string, RuntimeArtifactFamilyRetentionConfig>;
+}
+
+/** Authoring shape; layered config may override any subset of resolved policy. */
+export type RuntimeArtifactRetentionConfigInput =
+  Partial<Omit<RuntimeArtifactRetentionConfig, 'families'>> & {
+    families?: Record<string, Partial<RuntimeArtifactFamilyRetentionConfig>>;
+  };
+
 export interface ResolvedConfig {
   mode: PlanMode;
   activeModeConfig: PlanModeConfig;
@@ -2161,6 +2191,8 @@ export interface ResolvedConfig {
   worker_output_contract?: DeckentConfig['worker_output_contract'];
   /** Resource monitor configuration (passed through from DeckentConfig). Default-disabled. */
   resource_monitor?: ResourceMonitorConfig;
+  /** Fully resolved runtime artifact retention policy. */
+  runtime_artifact_retention: RuntimeArtifactRetentionConfig;
   /** Cross-provider adversarial verification configuration (passed through from DeckentConfig). Default-disabled. */
   cross_verify?: CrossVerifyConfig;
   /** Worker-to-worker communication configuration (passed through from DeckentConfig). Default-disabled. */

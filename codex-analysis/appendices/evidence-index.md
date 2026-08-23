@@ -6,8 +6,7 @@
 |---|---|
 | `AGENTS.md` | Immutable Laws, operating rules, precedence, quality bar |
 | `.deckent/workspace/IDENTITY.md` | Product identity, Trinity, surfaces, environments |
-| `docs/en/vision.md` | Nihai ürün, canonical lifecycle, audiences, falsifiers |
-| `.analysis/hermes-vs-deckent-direction-decisions.md` | Terminal/Approval/Training/Tool/Onboarding pivot |
+| `docs/en/vision.md` | Canonical yön ve gerekçe, ürün, lifecycle, audiences, falsifiers |
 | `docs/MASTER-PLAN.md` | Canonical work ledger contract |
 | `docs/generated/master-plan-active.json` | Deterministic ledger snapshot |
 | `PAZARTESI.md` | En güncel fakat non-canonical bridge/evidence/owner sequence |

@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import Database from 'better-sqlite3';
@@ -12,6 +12,11 @@ import {
 } from './provider-execution-observation.js';
 
 export const PROVIDER_EXECUTION_OBSERVATION_STORE_SCHEMA_VERSION = 2 as const;
+/** Canonical project-relative path for durable provider execution observations. */
+export const PROVIDER_EXECUTION_OBSERVATION_DATABASE_PATH = join(
+  '.deckent',
+  'provider-execution-observations.db',
+);
 
 const positiveInteger = z.number().int().positive();
 const storeInputSchema = z.object({
@@ -109,7 +114,7 @@ export interface ProviderExecutionObservationWriteResult {
 
 export class ProviderExecutionObservationStoreError extends Error {
   constructor(
-    readonly code: 'INVALID_SOURCE' | 'OPEN_RETENTION_EXCEEDED' | 'SCHEMA_MISMATCH',
+    readonly code: 'INVALID_SOURCE' | 'OPEN_RETENTION_EXCEEDED' | 'SCHEMA_MISMATCH' | 'MIGRATION_REQUIRED',
     message: string,
   ) {
     super(message);
@@ -157,15 +162,25 @@ export class ProviderExecutionObservationStore {
 
   constructor(projectRoot: string, options: ProviderExecutionObservationStoreOptions = {}) {
     this.retention = resolveRetention(options.retention);
-    const dbPath = options.dbPath ?? join(projectRoot, '.deckent', 'provider-execution-observations.db');
+    const dbPath = options.dbPath ?? join(projectRoot, PROVIDER_EXECUTION_OBSERVATION_DATABASE_PATH);
+    if (!options.readOnly && existsSync(dbPath)) {
+      const probe = new Database(dbPath, { readonly: true, fileMustExist: true });
+      try {
+        const version = probe.pragma('user_version', { simple: true }) as number;
+        if (version === 1) {
+          throw new ProviderExecutionObservationStoreError(
+            'MIGRATION_REQUIRED',
+            'Provider execution observation schema requires an explicit validated migration',
+          );
+        }
+      } finally {
+        probe.close();
+      }
+    }
     if (!options.readOnly) mkdirSync(dirname(dbPath), { recursive: true });
     this.db = new Database(dbPath, options.readOnly
       ? { readonly: true, fileMustExist: true }
       : undefined);
-    if (!options.readOnly) {
-      this.db.pragma('journal_mode = WAL');
-      this.db.pragma('synchronous = FULL');
-    }
     const version = this.db.pragma('user_version', { simple: true }) as number;
     if (version !== 0 && version !== 1 && version !== PROVIDER_EXECUTION_OBSERVATION_STORE_SCHEMA_VERSION) {
       this.db.close();
@@ -176,6 +191,15 @@ export class ProviderExecutionObservationStore {
     }
     this.legacyReadSchema = options.readOnly === true && version === 1;
     if (options.readOnly) return;
+    if (version === 1) {
+      this.db.close();
+      throw new ProviderExecutionObservationStoreError(
+        'MIGRATION_REQUIRED',
+        'Provider execution observation schema requires an explicit validated migration',
+      );
+    }
+    this.db.pragma('journal_mode = WAL');
+    this.db.pragma('synchronous = FULL');
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS provider_execution_intervals (
         execution_id TEXT PRIMARY KEY,
@@ -198,10 +222,6 @@ export class ProviderExecutionObservationStore {
         payload_json TEXT NOT NULL
       );
     `);
-    if (version === 1) {
-      this.db.exec('ALTER TABLE provider_execution_intervals ADD COLUMN run_id TEXT;');
-      this.db.exec('ALTER TABLE provider_execution_intervals ADD COLUMN retired INTEGER NOT NULL DEFAULT 0;');
-    }
     this.db.exec(`CREATE INDEX IF NOT EXISTS idx_provider_execution_run_scope
       ON provider_execution_intervals (run_id, attempt_id, principal_digest, fence, retired, start_sequence, execution_id);`);
     this.db.pragma(`user_version = ${PROVIDER_EXECUTION_OBSERVATION_STORE_SCHEMA_VERSION}`);
@@ -449,7 +469,7 @@ function assertScope(scope: ProviderExecutionObservationScope): void {
 }
 
 function ownershipKey(taskId: string, attemptId: string): string {
-  return `${taskId} ${attemptId}`;
+  return `${taskId}\0${attemptId}`;
 }
 
 function assertGenerationScope(scope: ProviderExecutionGenerationScope): void {

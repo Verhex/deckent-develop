@@ -6,6 +6,7 @@ import {
   ARCHIVE_SPRINTS_SUBDIR,
   BRAIN_DIR,
   DEBT_TABLE_HEADER,
+  DECKENT_DIR,
   DECKENT_FILE,
   ERRORS_FILE,
   ERRORS_MAX_LINES,
@@ -128,10 +129,42 @@ export async function readJsonSafeAsync<T>(filePath: string): Promise<T | null> 
  * Config remains a floor when other evidence is removed.
  * If no sources available, returns "sprint-001".
  */
+const LEGACY_EPOCH_SPRINT_MIN_MS = Date.UTC(2000, 0, 1);
+const LEGACY_EPOCH_SPRINT_MAX_MS = Date.UTC(3000, 0, 1);
+
+/**
+ * Parse an ordinal sprint identity without confusing legacy Date.now()-based
+ * detached-job identities with the repository's monotonic sprint sequence.
+ *
+ * Historical `sprint-17…` records remain valid archive evidence; they are only
+ * excluded from sequence allocation. The bounded epoch range is semantic (real
+ * millisecond timestamps), rather than a digit-count shortcut that would cap a
+ * future large installation's ordinal namespace.
+ */
+export function parseSprintOrdinal(value: unknown): number | null {
+  let candidate: number;
+  if (typeof value === 'number') {
+    candidate = value;
+  } else if (typeof value === 'string') {
+    const match = value.match(/^sprint-(\d+)$/);
+    if (!match?.[1]) return null;
+    candidate = Number(match[1]);
+  } else {
+    return null;
+  }
+
+  if (!Number.isSafeInteger(candidate) || candidate < 0) return null;
+  if (candidate >= LEGACY_EPOCH_SPRINT_MIN_MS && candidate < LEGACY_EPOCH_SPRINT_MAX_MS) {
+    return null;
+  }
+  return candidate;
+}
+
 export function getNextSprintId(projectRoot: string): string {
   const evidenceDirectories = [
     join(projectRoot, BRAIN_DIR, SPRINTS_DIR),
     join(projectRoot, BRAIN_DIR, ARCHIVE_DIR, ARCHIVE_SPRINTS_SUBDIR),
+    join(projectRoot, DECKENT_DIR, ARCHIVE_DIR, ARCHIVE_SPRINTS_SUBDIR),
     join(projectRoot, RECENT_WORKS_DIR),
   ];
   let maxFromFiles = 0;
@@ -141,8 +174,8 @@ export function getNextSprintId(projectRoot: string): string {
       const match = file.match(/^sprint-(\d+)(?:\D|$)/)
         ?? file.match(/^task-(\d+)-/);
       if (match?.[1]) {
-        const num = parseInt(match[1], 10);
-        if (num > maxFromFiles) maxFromFiles = num;
+        const ordinal = parseSprintOrdinal(`sprint-${match[1]}`);
+        if (ordinal !== null && ordinal > maxFromFiles) maxFromFiles = ordinal;
       }
     }
   }
@@ -153,12 +186,8 @@ export function getNextSprintId(projectRoot: string): string {
   const config = readJsonSafe<Record<string, unknown>>(configPath);
   if (config) {
     const lastId = config.last_sprint_id;
-    if (typeof lastId === 'string') {
-      const m = lastId.match(/^sprint-(\d+)$/);
-      if (m?.[1]) maxFromConfig = parseInt(m[1], 10);
-    } else if (typeof lastId === 'number') {
-      maxFromConfig = lastId;
-    }
+    const ordinal = parseSprintOrdinal(lastId);
+    if (ordinal !== null) maxFromConfig = ordinal;
   }
 
   // Take the max of both sources — never go backward
@@ -173,6 +202,10 @@ export function getNextSprintId(projectRoot: string): string {
 export function updateLastSprintId(projectRoot: string, sprintId: string): void {
   const configPath = join(projectRoot, PROJECT_CONFIG_PATH);
   try {
+    if (parseSprintOrdinal(sprintId) === null || !/^sprint-\d+$/.test(sprintId)) {
+      debugLog('updateLastSprintId', `refusing non-ordinal sprint identity: ${sprintId}`);
+      return;
+    }
     // Read existing config — use empty object ONLY if file doesn't exist yet
     // If file exists but is corrupted/unreadable, skip update to preserve whatever is there
     let config: Record<string, unknown>;
@@ -185,6 +218,12 @@ export function updateLastSprintId(projectRoot: string, sprintId: string): void 
       config = parsed;
     } else {
       config = {};
+    }
+    const currentOrdinal = parseSprintOrdinal(config.last_sprint_id);
+    const nextOrdinal = parseSprintOrdinal(sprintId);
+    if (nextOrdinal === null || (currentOrdinal !== null && nextOrdinal < currentOrdinal)) {
+      debugLog('updateLastSprintId', `refusing regressive sprint identity: ${sprintId}`);
+      return;
     }
     config.last_sprint_id = sprintId;
     writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');

@@ -166,12 +166,12 @@ describe('cleanupCounters', () => {
 // ─── migrateForensicFiles ─────────────────────────────────────────────
 
 describe('migrateForensicFiles', () => {
-  it('should move forensic files to .brain/archive/audits/sprint-NNN/', () => {
+  it('should move forensic files to the canonical sprint audit namespace', () => {
     createForensicFiles(testRoot, 'sprint-138');
     const moved = migrateForensicFiles(testRoot);
     expect(moved.length).toBe(2);
-    expect(existsSync(join(testRoot, '.brain', 'archive', 'audits', 'sprint-138', 'layer3-scorecard.md'))).toBe(true);
-    expect(existsSync(join(testRoot, '.brain', 'archive', 'audits', 'sprint-138', 'verifier-log.md'))).toBe(true);
+    expect(existsSync(join(testRoot, '.deckent', 'archive', 'sprints', 'sprint-138', 'audits', 'forensic', 'layer3-scorecard.md'))).toBe(true);
+    expect(existsSync(join(testRoot, '.deckent', 'archive', 'sprints', 'sprint-138', 'audits', 'forensic', 'verifier-log.md'))).toBe(true);
     // Source removed
     expect(existsSync(join(testRoot, '.deckent', 'recently-works', 'sprint-138-layer3-scorecard.md'))).toBe(false);
   });
@@ -202,11 +202,11 @@ describe('enforceRetention', () => {
     expect(existsSync(join(testRoot, '.deckent', 'archive', 'sprints', 'sprint-130'))).toBe(true);
     expect(existsSync(join(testRoot, '.deckent', 'archive', 'sprints', 'sprint-131'))).toBe(true);
 
-    // Archived files have clean names (prefix stripped)
+    // Archived run files retain the canonical recently-works filename.
     const archiveDir = join(testRoot, '.deckent', 'archive', 'sprints', 'sprint-130');
     const archivedFiles = readdirSync(archiveDir);
-    expect(archivedFiles.some(f => f === 'events.jsonl')).toBe(true);
-    expect(archivedFiles.some(f => f === 'gate.json')).toBe(true);
+    expect(archivedFiles.some(f => f === 'sprint-130-events.jsonl')).toBe(true);
+    expect(archivedFiles.some(f => f === 'sprint-130-gate.json')).toBe(true);
 
     // Source files removed
     expect(existsSync(join(testRoot, '.deckent', 'recently-works', 'sprint-130-events.jsonl'))).toBe(false);
@@ -264,7 +264,7 @@ describe('enforceRetention', () => {
     const archiveDir = join(testRoot, '.deckent', 'archive', 'sprints', 'sprint-130');
     if (existsSync(archiveDir)) {
       const files = readdirSync(archiveDir);
-      expect(files.some(f => f === 'gate.json')).toBe(true);
+      expect(files.some(f => f === 'sprint-130-gate.json')).toBe(true);
     }
   });
 });
@@ -329,8 +329,8 @@ describe('edge cases', () => {
     const archiveDir = join(testRoot, '.deckent', 'archive', 'sprints', 'sprint-130');
     if (existsSync(archiveDir)) {
       const files = readdirSync(archiveDir);
-      expect(files.some(f => f === 'pre-archive.tar.gz')).toBe(true);
-      expect(files.some(f => f === 'pre-archive.sha256')).toBe(true);
+      expect(files.some(f => f === 'sprint-130-pre-archive.tar.gz')).toBe(true);
+      expect(files.some(f => f === 'sprint-130-pre-archive.sha256')).toBe(true);
     }
   });
 

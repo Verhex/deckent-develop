@@ -30,7 +30,7 @@ import {
   settleRecoveredTaskArtifacts,
   recoveredTaskArtifactDestination,
 } from '../../src/cli/commands/recover-helpers.js';
-import { BRAIN_DIR, TASKS_DIR } from '../../src/core/constants.js';
+import { TASKS_DIR } from '../../src/core/constants.js';
 
 // ─── Fixture ─────────────────────────────────────────────────────────
 
@@ -108,9 +108,9 @@ afterEach(() => {
 // ─── Resolver: one destination, config-derived ───────────────────────
 
 describe('resolveTaskArtifactArchiveDir — the single destination authority', () => {
-  it('defaults to the established brain archive, not a fresh literal', () => {
+  it('defaults to the canonical deckent sprint namespace', () => {
     expect(resolveTaskArtifactArchiveDir(root, SPRINT_ID))
-      .toBe(join(root, BRAIN_DIR, 'archive', 'sprints', `${SPRINT_ID}-tasks`));
+      .toBe(join(root, '.deckent', 'archive', 'sprints', SPRINT_ID, 'tasks'));
   });
 
   it('resolves from the sprint_file_retention config family when archive_path is set', () => {
@@ -119,14 +119,14 @@ describe('resolveTaskArtifactArchiveDir — the single destination authority', (
     }));
 
     expect(resolveTaskArtifactArchiveDir(root, SPRINT_ID))
-      .toBe(join(root, '.deckent', 'archive', 'sprints', `${SPRINT_ID}-tasks`));
+      .toBe(join(root, '.deckent', 'archive', 'sprints', SPRINT_ID, 'tasks'));
   });
 
   it('ignores a blank/absent archive_path instead of resolving to the project root', () => {
     write('.deckent/config.json', JSON.stringify({ sprint_file_retention: { archive_path: '   ' } }));
 
     expect(resolveTaskArtifactArchiveDir(root, SPRINT_ID))
-      .toBe(join(root, BRAIN_DIR, 'archive', 'sprints', `${SPRINT_ID}-tasks`));
+      .toBe(join(root, '.deckent', 'archive', 'sprints', SPRINT_ID, 'tasks'));
   });
 
   it('is the same destination the recover path reports — no second resolver', () => {
@@ -273,12 +273,14 @@ describe('settleRecoveredTaskArtifacts — recover path shares the single destin
 
     const archived = readdirSync(result.destination);
     expect(archived).toContain('task-903-001.result');
-    expect(archived).toContain('task-903-001.result.dup-1');
+    expect(archived).toContain('conflicts');
 
-    const contents = archived
-      .filter(n => n.startsWith('task-903-001.result'))
-      .map(n => readFileSync(join(result.destination, n), 'utf-8'))
-      .sort();
+    const contents = [
+      readFileSync(join(result.destination, 'task-903-001.result'), 'utf-8'),
+      ...readdirSync(join(result.destination, 'conflicts'))
+        .filter(name => name.startsWith('task-903-001.result.'))
+        .map(name => readFileSync(join(result.destination, 'conflicts', name), 'utf-8')),
+    ].sort();
     expect(contents).toEqual([JSON.stringify({ taskId: '903-001' }), 'legacy-copy'].sort());
   });
 });
@@ -304,7 +306,7 @@ describe('single-destination invariant', () => {
 
     expect(recoverDestination).toBe(settleDestination);
     expect(settleDestination)
-      .toBe(join(root, '.deckent', 'archive', 'sprints', `${SPRINT_ID}-tasks`));
+      .toBe(join(root, '.deckent', 'archive', 'sprints', SPRINT_ID, 'tasks'));
     expect(tasksRootFiles()).toEqual(['task-777-009.json']);
   });
 });

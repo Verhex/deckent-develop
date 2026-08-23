@@ -7,25 +7,31 @@
  *  1. keep_last_n: keep the N most-recent sprints, archive older ones
  *  2. size_cap_mb: if total sprint file size exceeds cap, archive oldest first
  *  3. Counter cleanup: -seq and -checkpoint-seq files are deleted on sprint DONE
- *  4. Forensic files: -layer3-scorecard.md etc. moved to .brain/archive/audits/sprint-NNN/
+ *  4. Forensic files: -layer3-scorecard.md etc. moved into the canonical sprint archive
  *
  * @module sprint-file-retention
  * @since Sprint 150
  */
 
 import {
-  existsSync, readdirSync, statSync, renameSync, mkdirSync, unlinkSync,
-  readFileSync, writeFileSync,
+  existsSync, readdirSync, statSync, unlinkSync,
 } from 'node:fs';
 import { join } from 'node:path';
 import { RECENT_WORKS_DIR } from './constants.js';
 import type { SprintFileRetentionConfig } from './config-types.js';
+import {
+  publishSprintArchiveArtifact,
+  reconcileSprintArchive,
+  resolveSprintArchiveDir,
+  verifySprintArchive,
+} from './sprint-archive.js';
+import { parseSprintOrdinal } from './utils.js';
 
 /**
  * Directory scanned for sprint-prefixed machine artifacts. Sprint-NNN-*.jsonl /
  * -seq / -gate.json / -pre-archive.* now live under `.deckent/recently-works/`
  * (purpose-folder de-scatter). The archive TARGET (`archive_path`) and forensic
- * TARGET (`.brain/archive/audits/`) are unchanged.
+ * TARGET is the canonical sprint namespace.
  */
 function sprintArtifactsDir(root: string): string {
   return join(root, RECENT_WORKS_DIR);
@@ -48,6 +54,8 @@ const SPRINT_FILE_PATTERNS = [
   /-checkpoint\.json$/,
   /-checkpoint-seq$/,
   /-gate\.json$/,
+  /-gate-authority\.json$/,
+  /-terminal-receipt\.json$/,
   /-pre-archive\.tar\.gz$/,
   /-pre-archive\.sha256$/,
   /-panic-[^/]*\.json$/,
@@ -59,7 +67,7 @@ const COUNTER_PATTERNS = [
   /-checkpoint-seq$/,
 ] as const;
 
-/** Forensic/human-generated files that should move to .brain/archive/audits/ */
+/** Forensic/human-generated files that should move into the canonical sprint archive. */
 const FORENSIC_PATTERNS = [
   /-layer3-scorecard\.md$/,
   /-verifier-log\.md$/,
@@ -76,10 +84,40 @@ export interface RetentionResult {
   kept: string[];
   /** Counter files deleted */
   countersDeleted: string[];
-  /** Forensic files moved to .brain/archive/audits/ */
+  /** Forensic files moved into the canonical sprint archive. */
   forensicMoved: string[];
   /** Total bytes freed */
   bytesFreed: number;
+  /** Canonical manifests refreshed and integrity-verified in this pass. */
+  reconciledSprintIds: string[];
+}
+
+function reconcileTouchedSprintArchives(root: string, sprintIds: Iterable<string>): string[] {
+  const reconciled: string[] = [];
+  for (const sprintId of [...new Set(sprintIds)].sort(
+    (left, right) => sprintNumber(left) - sprintNumber(right),
+  )) {
+    const report = reconcileSprintArchive(root, sprintId, {
+      apply: true,
+      retireLegacySources: true,
+      indexMemory: true,
+    });
+    if (report.failures.length > 0) {
+      throw new Error(
+        `SPRINT_RETENTION_RECONCILE_FAILED:${sprintId}:${report.failures.join('|')}`,
+      );
+    }
+    const verification = verifySprintArchive(root, sprintId);
+    if (!verification.ok) {
+      throw new Error(
+        `SPRINT_RETENTION_VERIFY_FAILED:${sprintId}:missing=${verification.missing.length}:`
+        + `mismatched=${verification.mismatched.length}:untracked=${verification.untracked.length}:`
+        + `manifestDigestValid=${verification.manifestDigestValid}`,
+      );
+    }
+    reconciled.push(sprintId);
+  }
+  return reconciled;
 }
 
 // ─── Sprint ID Extraction ─────────────────────────────────────────────
@@ -144,7 +182,10 @@ export function groupBySprintId(files: string[]): Record<string, string[]> {
   const groups: Record<string, string[]> = {};
   for (const f of files) {
     const id = extractSprintId(f);
-    if (!id) continue;
+    // Historical detached jobs used Date.now() as `sprint-<id>`. They remain
+    // valid archive evidence, but they are not ordinal sprints and must never
+    // occupy the keep_last_n window for real sprint history.
+    if (!id || parseSprintOrdinal(id) === null) continue;
     if (!groups[id]) groups[id] = [];
     groups[id].push(f);
   }
@@ -188,39 +229,37 @@ export function cleanupCounters(root: string, sprintId: string): string[] {
 // ─── Forensic File Migration ──────────────────────────────────────────
 
 /**
- * Move forensic/human-generated sprint files to .brain/archive/audits/sprint-NNN/.
+ * Move forensic/human-generated sprint files to the canonical sprint audit namespace.
  * Owner decision (Alperen, 2026-08-12): docs/ is PRODUCT documentation only —
  * forensic sprint evidence belongs with the other sprint archives under
- * .brain/archive/, never under docs/audits (that directory must not exist).
+ * the sprint archive, never under product documentation.
  */
 export function migrateForensicFiles(root: string): string[] {
   const forensicFiles = listForensicFiles(root);
   const moved: string[] = [];
+  const touchedSprintIds = new Set<string>();
 
   for (const f of forensicFiles) {
     const sprintId = extractSprintId(f);
     if (!sprintId) continue;
 
-    const targetDir = join(root, '.brain', 'archive', 'audits', sprintId);
-    mkdirSync(targetDir, { recursive: true });
-
     const srcPath = join(sprintArtifactsDir(root), f);
     // Strip sprint prefix for cleaner filenames in audit dir
     const cleanName = f.replace(`${sprintId}-`, '');
-    const dstPath = join(targetDir, cleanName);
 
     try {
-      renameSync(srcPath, dstPath);
-      moved.push(dstPath);
-    } catch {
-      // Cross-device? Fall back to copy+delete
-      try {
-        writeFileSync(dstPath, readFileSync(srcPath));
-        unlinkSync(srcPath);
-        moved.push(dstPath);
-      } catch { /* best-effort */ }
-    }
+      const publication = publishSprintArchiveArtifact(
+        root,
+        sprintId,
+        srcPath,
+        join('audits', 'forensic', cleanName),
+        { retireSource: true },
+      );
+      moved.push(join(resolveSprintArchiveDir(root, sprintId), publication.path));
+      touchedSprintIds.add(sprintId);
+    } catch { /* best-effort; source remains */ }
   }
+  reconcileTouchedSprintArchives(root, touchedSprintIds);
   return moved;
 }
 
@@ -251,6 +290,7 @@ export function enforceRetention(
     countersDeleted: [],
     forensicMoved: [],
     bytesFreed: 0,
+    reconciledSprintIds: [],
   };
 
   // Step 1: List all sprint machine files (excluding forensic — handled separately)
@@ -295,35 +335,34 @@ export function enforceRetention(
   const deckentDir = sprintArtifactsDir(root);
 
   for (const sprintId of archiveSet) {
-    const archiveDir = join(root, resolved.archive_path, sprintId);
-    mkdirSync(archiveDir, { recursive: true });
-
     const sprintFiles = grouped[sprintId] ?? [];
     for (const f of sprintFiles) {
       const srcPath = join(deckentDir, f);
       if (!existsSync(srcPath)) continue;
 
-      // Strip sprint-id prefix for cleaner archive names
-      const cleanName = f.replace(`${sprintId}-`, '');
-      const dstPath = join(archiveDir, cleanName);
-
       try {
         const fileSize = statSync(srcPath).size;
-        renameSync(srcPath, dstPath);
-        result.archived.push(dstPath);
+        const publication = publishSprintArchiveArtifact(
+          root,
+          sprintId,
+          srcPath,
+          // Preserve the canonical recently-works filename. The whole-sprint
+          // reconciler uses this exact relative path, so retention deduplicates
+          // its snapshot instead of creating a second, prefix-stripped copy.
+          f,
+          { retireSource: true },
+        );
+        result.archived.push(join(resolveSprintArchiveDir(root, sprintId), publication.path));
         result.bytesFreed += fileSize;
-      } catch {
-        // Cross-device rename fallback
-        try {
-          const fileSize = statSync(srcPath).size;
-          writeFileSync(dstPath, readFileSync(srcPath));
-          unlinkSync(srcPath);
-          result.archived.push(dstPath);
-          result.bytesFreed += fileSize;
-        } catch { /* best-effort */ }
-      }
+      } catch { /* best-effort; source remains */ }
     }
   }
+
+  // Retention can write historical sprint archives while the normal finalizer
+  // later reconciles only the sprint that just completed. Refresh every
+  // touched historical manifest here so no successful retention publication
+  // can become untracked canonical evidence.
+  result.reconciledSprintIds = reconcileTouchedSprintArchives(root, archiveSet);
 
   // Compute kept list
   result.kept = sprintIds.filter(id => !archiveSet.has(id));
@@ -336,7 +375,7 @@ export function enforceRetention(
 /**
  * Run full retention pipeline:
  * 1. Clean counters for the completed sprint
- * 2. Migrate forensic files to .brain/archive/audits/
+ * 2. Migrate forensic files into the canonical sprint archive
  * 3. Enforce retention policy (keep_last_n + size_cap)
  */
 export function runRetention(
@@ -351,6 +390,7 @@ export function runRetention(
     countersDeleted: [],
     forensicMoved: [],
     bytesFreed: 0,
+    reconciledSprintIds: [],
   };
 
   // 1. Clean counters for completed sprint
@@ -366,6 +406,13 @@ export function runRetention(
   result.archived = retention.archived;
   result.kept = retention.kept;
   result.bytesFreed = retention.bytesFreed;
+  const forensicSprintIds = result.forensicMoved
+    .map(path => path.match(/(?:^|[\\/])(sprint-\d+)(?:[\\/]|$)/u)?.[1])
+    .filter((sprintId): sprintId is string => sprintId !== undefined);
+  result.reconciledSprintIds = [...new Set([
+    ...forensicSprintIds,
+    ...retention.reconciledSprintIds,
+  ])].sort((left, right) => sprintNumber(left) - sprintNumber(right));
 
   return result;
 }

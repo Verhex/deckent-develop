@@ -522,7 +522,7 @@ describe('deckent_start — approved-snapshot branch (born-673b)', () => {
       expect(result.isError).toBeUndefined();
       expect(parsed.success).toBe(true);
       expect(parsed.status).toBe('RUNNING');
-      expect(parsed.jobId).toMatch(/^sprint-\d+$/);
+      expect(parsed.jobId).toMatch(/^job-\d{13}-[0-9a-f-]+$/);
 
       expect(vi.mocked(fork)).toHaveBeenCalledTimes(1);
       expect(vi.mocked(loadApprovedSnapshot)).not.toHaveBeenCalled();

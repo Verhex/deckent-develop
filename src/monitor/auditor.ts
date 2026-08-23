@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync, existsSync, writeFileSync, unlinkSync, statSync, mkdirSync, renameSync } from 'node:fs';
 import { readFile, stat, writeFile } from 'node:fs/promises';
-import { join, normalize } from 'node:path';
+import { basename, join, normalize } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { AgentStatus, AlertLevel, SprintPhase, SprintStatus, TaskStatus } from '../core/types.js';
 import type {
@@ -18,8 +18,8 @@ import {
   LOCKS_DIR,
   BRAIN_DIR,
   DASHBOARD_FILE,
-  ARCHIVE_DIR,
 } from '../core/constants.js';
+import { archiveTaskArtifacts } from '../core/sprint-archive.js';
 
 import { readJsonSafe, debugLog } from '../core/utils.js';
 import { metric } from '../core/observability.js';
@@ -2637,7 +2637,7 @@ export function detectOrphans(
  * Clean up orphan HB files.
  *
  * For each orphan task:
- * 1. Moves the .hb file to `.brain/archive/sprint-NNN-orphan-hb/`
+ * 1. Moves the .hb file to the canonical sprint task evidence archive
  * 2. Releases any file locks held by the orphan worker (via clearOrphanLocks)
  * 3. Emits `AUDITOR→BRAIN:ORPHAN_HB_DETECTED` event to the event stream
  *
@@ -2663,28 +2663,34 @@ export function cleanupOrphanHBs(
     return { archived: [], locksReleased: [], orphanCount: 0 };
   }
 
-  // Prepare archive directory: .brain/archive/{sprintId}-orphan-hb/
-  const archiveDir = join(projectRoot, BRAIN_DIR, ARCHIVE_DIR, 'sprints', `${sprintId}-orphan-hb`);
-  try {
-    mkdirSync(archiveDir, { recursive: true });
-  } catch {
-    // If archive dir cannot be created, we still attempt lock cleanup and event emit
-  }
-
   const archived: string[] = [];
 
-  // 1. Archive each orphan HB file
-  for (const hbPath of orphanHBPaths) {
-    try {
-      const fileName = hbPath.split('/').pop() ?? hbPath.split('\\').pop() ?? hbPath;
-      const dest = join(archiveDir, fileName);
-      renameSync(hbPath, dest);
-      archived.push(hbPath);
-      debugLog('auditor:cleanupOrphanHBs', `Archived orphan HB: ${hbPath} → ${dest}`);
-    } catch {
-      // Non-fatal: log and continue
-      debugLog('auditor:cleanupOrphanHBs', `Failed to archive orphan HB: ${hbPath}`);
+  // 1. Archive each orphan HB through the digest-verified destination authority.
+  const orphanGroups = new Map<string, string[]>();
+  for (const path of orphanHBPaths) {
+    const name = basename(path);
+    const segment = /^task-(\d+)-/u.exec(name)?.[1];
+    if (!segment) {
+      debugLog('auditor:cleanupOrphanHBs', `Unowned orphan HB retained: ${path}`);
+      continue;
     }
+    const ownerSprintId = `sprint-${segment}`;
+    const names = orphanGroups.get(ownerSprintId) ?? [];
+    names.push(name);
+    orphanGroups.set(ownerSprintId, names);
+  }
+  const archivedNames = new Set<string>();
+  for (const [ownerSprintId, names] of orphanGroups) {
+    const settlement = archiveTaskArtifacts(projectRoot, ownerSprintId, {
+      archive: names,
+      preserve: [],
+      sweepResidue: false,
+    });
+    for (const name of settlement.archived) archivedNames.add(name);
+  }
+  for (const hbPath of orphanHBPaths) {
+    if (archivedNames.has(basename(hbPath))) archived.push(hbPath);
+    else debugLog('auditor:cleanupOrphanHBs', `Failed to archive orphan HB: ${hbPath}`);
   }
 
   // 2. Build set of active worker IDs from active task HB files (post-cleanup)

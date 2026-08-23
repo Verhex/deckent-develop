@@ -43,6 +43,8 @@ export interface ScopePathVerdict {
   suggestion?: string;
   /** Short human-readable reason for the classification. */
   reason: string;
+  /** Structural scope errors cannot be made safe by acknowledging a likely typo. */
+  structuralError?: 'directory-in-files-write';
 }
 
 export interface ScopeGateInput {
@@ -117,7 +119,7 @@ export interface ScopeGatePass {
 
 export interface ScopeGateBlocked {
   ok: false;
-  reason: 'SCOPE_GATE_SUSPECT';
+  reason: 'SCOPE_GATE_SUSPECT' | 'DIRECTORY_IN_FILES_WRITE';
   /** The WRITE-path suspects that triggered the block (post-resolution, see `resolveSuggestions`). */
   suspects: ScopePathVerdict[];
   verdicts: ScopePathVerdict[];
@@ -390,6 +392,17 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
     taskPaths: readonly string[],
     declaredDirs: readonly string[] = [],
   ): ScopePathVerdict => {
+    const normalizedPath = path.replace(/^\.\//u, '').replace(/\/+$/u, '');
+    if (role === 'write' && trackedDirs.has(normalizedPath)) {
+      return {
+        taskId,
+        path,
+        role,
+        classification: 'suspect',
+        structuralError: 'directory-in-files-write',
+        reason: getMessage('scope_gate.reason.directory_in_files_write', lang),
+      };
+    }
     if (tracked.has(path) || (role === 'read' && plannedWrites.has(path))) {
       return { taskId, path, role, classification: 'confirmed', reason: getMessage('scope_gate.reason.confirmed', lang) };
     }
@@ -522,6 +535,9 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
   }
 
   const writeSuspects = verdicts.filter(v => v.role === 'write' && v.classification === 'suspect');
+  const structuralWriteErrors = writeSuspects.filter(
+    verdict => verdict.structuralError === 'directory-in-files-write',
+  );
   const advisories = verdicts.filter(
     v => v.classification === 'new-plausible' || (v.classification === 'suspect' && v.role === 'read'),
   );
@@ -563,6 +579,32 @@ export function evaluateScopeGate(input: ScopeGateInput): ScopeGateResult {
     // else: 2+ same-basename candidates — left unresolved (rule c).
   }
   const resolutions = [...resolutionByVerdict.values()];
+
+  // A directory is broader authority than one exact file and Git cannot create
+  // a blob baseline for it. `--force-scope` acknowledges plausible new FILES;
+  // it must never reinterpret a directory token as file authority. Keep this
+  // structural rejection non-overridable and before the generic suspect branch.
+  if (structuralWriteErrors.length > 0) {
+    const shown = structuralWriteErrors.slice(0, MAX_LISTED_SUSPECTS);
+    const list = shown.map(error => `  • [${error.taskId}] ${error.path} (${error.reason})`).join('\n');
+    const more = structuralWriteErrors.length > shown.length
+      ? `\n  ${getMessage('scope_gate.message.more_suspects', lang, {
+          count: String(structuralWriteErrors.length - shown.length),
+        })}`
+      : '';
+    return {
+      ok: false,
+      reason: 'DIRECTORY_IN_FILES_WRITE',
+      suspects: structuralWriteErrors,
+      verdicts,
+      resolutions,
+      message:
+        `${getMessage('scope_gate.message.directory_in_files_write_header', lang, {
+          count: String(structuralWriteErrors.length),
+        })}\n${list}${more}\n`
+        + getMessage('scope_gate.message.directory_in_files_write_footer', lang),
+    };
+  }
 
   const blockingWriteSuspects = resolveSuggestions
     ? writeSuspects.filter(s => !resolutionByVerdict.has(s))

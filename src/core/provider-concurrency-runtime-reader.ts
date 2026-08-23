@@ -5,7 +5,10 @@ import {
   projectProviderConcurrencyRuntime,
   type ProviderConcurrencyRuntimeProjection,
 } from './provider-limit-admission.js';
-import { ProviderExecutionObservationStore } from './provider-execution-observation-store.js';
+import {
+  PROVIDER_EXECUTION_OBSERVATION_DATABASE_PATH,
+  ProviderExecutionObservationStore,
+} from './provider-execution-observation-store.js';
 
 /**
  * Read the attained provider concurrency surface without creating authority.
@@ -24,7 +27,7 @@ export function readProviderConcurrencyRuntime(
     readonly currentAttemptIdsByTaskId?: ReadonlyMap<string, ReadonlySet<string>>;
   } = {},
 ): readonly ProviderConcurrencyRuntimeProjection[] {
-  const dbPath = join(projectRoot, '.deckent', 'provider-execution-observations.db');
+  const dbPath = join(projectRoot, PROVIDER_EXECUTION_OBSERVATION_DATABASE_PATH);
   if (!existsSync(dbPath)) return [];
 
   const store = new ProviderExecutionObservationStore(projectRoot, {

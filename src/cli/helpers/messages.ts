@@ -3,6 +3,43 @@
 type MessageMap = Record<string, Record<string, string>>;
 
 const MESSAGES: MessageMap = {
+  // ─── runtime hygiene operator vocabulary (RH14-I18N) ────────────────
+  // Only bounded aggregate fields cross this presentation boundary. In
+  // particular, paths, authority identities, digests, and secrets are never
+  // interpolation inputs for these operator-facing messages.
+  'runtime_hygiene.inventory': {
+    en: 'Inventory complete: {count} owned artifact(s), {bytes} bytes across {families} family/families.',
+    tr: 'Envanter tamamlandı: {families} ailede {count} sahipli artifact, {bytes} bayt.',
+  },
+  'runtime_hygiene.plan': {
+    en: 'Retention plan ready: {count} candidate(s), {bytes} bytes. Nothing was changed.',
+    tr: 'Saklama planı hazır: {count} aday, {bytes} bayt. Hiçbir şey değiştirilmedi.',
+  },
+  'runtime_hygiene.preserve': {
+    en: 'PRESERVE: {count} artifact(s) remain active for {family}.',
+    tr: 'KORU: {family} için {count} artifact etkin kalıyor.',
+  },
+  'runtime_hygiene.archive': {
+    en: 'ARCHIVE: {count} artifact(s), {bytes} bytes, were durably archived for {family}.',
+    tr: 'ARŞİVLE: {family} için {count} artifact, {bytes} bayt, kalıcı olarak arşivlendi.',
+  },
+  'runtime_hygiene.retire': {
+    en: 'RETIRE: {count} verified artifact(s), {bytes} bytes, were retired for {family}.',
+    tr: 'EMEKLİ ET: {family} için doğrulanmış {count} artifact, {bytes} bayt, emekli edildi.',
+  },
+  'runtime_hygiene.hold': {
+    en: 'HOLD ({reasonCode}): no artifact was changed; existing runtime evidence was preserved.',
+    tr: 'HOLD ({reasonCode}): hiçbir artifact değiştirilmedi; mevcut runtime kanıtı korundu.',
+  },
+  'runtime_hygiene.receipt': {
+    en: 'Durable receipt {receiptState}: hygiene status is {status}.',
+    tr: 'Kalıcı makbuz {receiptState}: hygiene durumu {status}.',
+  },
+  'runtime_hygiene.summary': {
+    en: 'Runtime hygiene summary: {families} family/families, {attempted} attempted, {retired} retired, {failures} failure(s).',
+    tr: 'Runtime hygiene özeti: {families} aile, {attempted} deneme, {retired} emekli, {failures} hata.',
+  },
+
   // COMPLETE phase
   'hint.COMPLETE': {
     tr: 'Sprint tamamlandı! `deckent retro` ile retrospektif okuyun',
@@ -847,6 +884,62 @@ const MESSAGES: MessageMap = {
     en: 'Refused ({reasonCode}): {detail}. No provider-limit authority was changed.',
     tr: 'Reddedildi ({reasonCode}): {detail}. Hiçbir provider-limit authority değiştirilmedi.',
   },
+
+  // ─── provider-observation schema migration ───────────────────────────────
+  // Migration mechanics return typed facts only. This CLI-owned catalog is the
+  // sole place where those facts become operator-facing prose.
+  'provider_observation.migration.inspect': {
+    en: 'Provider observation migration inspection: source={sourcePath}, schema={schemaVersion}, action={action}.',
+    tr: 'Provider observation migration incelemesi: kaynak={sourcePath}, şema={schemaVersion}, işlem={action}.',
+  },
+  'provider_observation.migration.dry_run': {
+    en: 'Dry-run: provider observations would be migrated to schema v2; nothing was written.',
+    tr: 'Dry-run: provider observation kayıtları şema v2’ye taşınacaktı; hiçbir şey yazılmadı.',
+  },
+  'provider_observation.migration.pending_approval': {
+    en: 'Migration is pending approval {approvalId}; no provider observation state was changed.',
+    tr: 'Migration {approvalId} onayını bekliyor; hiçbir provider observation durumu değiştirilmedi.',
+  },
+  'provider_observation.migration.backup': {
+    en: 'Backup created at {backupPath} before provider observation migration.',
+    tr: 'Provider observation migration öncesinde {backupPath} konumunda yedek oluşturuldu.',
+  },
+  'provider_observation.migration.migrated': {
+    en: 'Migrated {count} provider observation record(s) to schema v2.',
+    tr: '{count} provider observation kaydı şema v2’ye taşındı.',
+  },
+  'provider_observation.migration.adopted': {
+    en: 'Adopted existing schema-v2 provider observations at {path}.',
+    tr: '{path} konumundaki mevcut şema-v2 provider observation kayıtları benimsendi.',
+  },
+  'provider_observation.adoption.receipt_persisted': {
+    en: 'Adoption receipt {receiptId} persisted.',
+    tr: 'Adoption receipt {receiptId} kalıcılaştırıldı.',
+  },
+  'provider_observation.adoption.replay_verified': {
+    en: 'Adoption receipt {receiptId} replay verified.',
+    tr: 'Adoption receipt {receiptId} replay doğrulandı.',
+  },
+  'provider_observation.adoption.hold': {
+    en: 'ADOPTION_HOLD ({reasonCode}): {detail}. No receipt was persisted and existing provider observations were preserved.',
+    tr: 'ADOPTION_HOLD ({reasonCode}): {detail}. Receipt kalıcılaştırılmadı ve mevcut provider observation kayıtları korundu.',
+  },
+  'provider_observation.migration.already_v2': {
+    en: 'Provider observations already use schema v2; no migration was required.',
+    tr: 'Provider observation kayıtları zaten şema v2 kullanıyor; migration gerekmedi.',
+  },
+  'provider_observation.migration.hold': {
+    en: 'HOLD ({reasonCode}): {detail}. Existing provider observations were preserved.',
+    tr: 'HOLD ({reasonCode}): {detail}. Mevcut provider observation kayıtları korundu.',
+  },
+  'provider_observation.migration.error': {
+    en: 'Provider observation migration failed ({errorCode}): {detail}.',
+    tr: 'Provider observation migration başarısız oldu ({errorCode}): {detail}.',
+  },
+  'provider_observation.migration.forensic_counts': {
+    en: 'Forensic summary: inspected={inspected}, eligible={eligible}, migrated={migrated}, adopted={adopted}, held={held}, rejected={rejected}.',
+    tr: 'Forensic özet: incelenen={inspected}, uygun={eligible}, taşınan={migrated}, benimsenen={adopted}, bekletilen={held}, reddedilen={rejected}.',
+  },
   'doctor.provider_limit_authority_name': {
     en: 'Provider limit authority',
     tr: 'Provider limit authority',
@@ -1579,6 +1672,37 @@ const MESSAGES: MessageMap = {
   'cleanup.archive_hold': {
     en: 'Cleanup held: {count} owned task artifact(s) could not be archived and byte-verified ({files}). Live evidence was retained.',
     tr: 'Cleanup beklemeye alındı: {count} owned task artifaktı arşivlenip byte-verify edilemedi ({files}). Live kanıt korundu.',
+  },
+  'cleanup.dry_run.archive_header': { en: '[dry-run] Would archive:', tr: '[dry-run] Arşivlenecekler:' },
+  'cleanup.dry_run.prompt': { en: '  prompt → archive: {file}', tr: '  prompt → arşiv: {file}' },
+  'cleanup.dry_run.delete_header': { en: '[dry-run] Would delete:', tr: '[dry-run] Silinecekler:' },
+  'cleanup.dry_run.task': { en: '  task: {file}', tr: '  task: {file}' },
+  'cleanup.dry_run.lock': { en: '  lock: {file}', tr: '  lock: {file}' },
+  'cleanup.dry_run.task_count': {
+    en: '  {count} task file(s) (includes .log and .timeout artifacts)',
+    tr: '  {count} task dosyası (.log ve .timeout artifaktları dahil)',
+  },
+  'cleanup.dry_run.lock_count': { en: '  {count} lock file(s)', tr: '  {count} lock dosyası' },
+  'cleanup.dry_run.prompt_count': {
+    en: '  {count} prompt file(s) → canonical sprint archive',
+    tr: '  {count} prompt dosyası → canonical sprint arşivi',
+  },
+  'cleanup.dry_run.tmux': { en: '  tmux session: deckent-orchestra', tr: '  tmux session: deckent-orchestra' },
+  'cleanup.dry_run.reconcile': {
+    en: '  Legacy task archives will be reconciled into the canonical namespace',
+    tr: '  Legacy task arşivleri canonical namespace içine uzlaştırılacak',
+  },
+  'cleanup.dry_run.execute': {
+    en: '\nRun without --dry-run to execute.',
+    tr: '\nUygulamak için --dry-run olmadan çalıştırın.',
+  },
+  'cleanup.prompts_archived': {
+    en: 'Archived {count} prompt file(s) → canonical archive for {sprintId}',
+    tr: '{count} prompt dosyası arşivlendi → {sprintId} canonical arşivi',
+  },
+  'cleanup.legacy_archives_consolidated': {
+    en: 'Consolidated {count} legacy task archive entries into canonical sprint archives',
+    tr: '{count} legacy task arşiv dizini canonical sprint arşivlerine birleştirildi',
   },
   'lifecycle.execution_lock_bind_failed': {
     en: 'Project leadership could not be bound to execution {sprintId}.',
@@ -6996,6 +7120,64 @@ const MESSAGES: MessageMap = {
     en: 'Report tech-debt status (DB-first; resolved debt is auto-managed in memory.db)',
     tr: 'Teknik borç durumunu raporlayın (DB-first; çözülen borç memory.db içinde otomatik yönetilir)',
   },
+  'cmdCatalog.archive.summary': {
+    en: 'Inspect, reconcile, and verify canonical sprint archives',
+    tr: 'Canonical sprint arşivlerini inceleyin, uzlaştırın ve doğrulayın',
+  },
+  'archive.description': {
+    en: 'Inspect, reconcile, and verify canonical sprint evidence archives',
+    tr: 'Canonical sprint kanıt arşivlerini inceleyin, uzlaştırın ve doğrulayın',
+  },
+  'archive.inspect.description': {
+    en: 'Build a read-only inventory without changing archive state',
+    tr: 'Arşiv durumunu değiştirmeden salt-okunur envanter oluşturun',
+  },
+  'archive.reconcile.description': {
+    en: 'Reconcile scattered evidence into canonical sprint archives (dry-run by default)',
+    tr: 'Dağınık kanıtları canonical sprint arşivlerinde uzlaştırın (varsayılan dry-run)',
+  },
+  'archive.verify.description': {
+    en: 'Verify manifest coverage and every archived artifact digest',
+    tr: 'Manifest kapsamını ve arşivlenen her artifact digest’ini doğrulayın',
+  },
+  'archive.option.sprint': { en: 'Select one sprint ID', tr: 'Tek bir sprint ID seçin' },
+  'archive.option.all': { en: 'Select every discovered sprint', tr: 'Bulunan tüm sprintleri seçin' },
+  'archive.option.json': { en: 'Output stable JSON', tr: 'Kararlı JSON çıktısı üretin' },
+  'archive.option.apply': { en: 'Apply the reconciliation plan', tr: 'Uzlaştırma planını uygulayın' },
+  'archive.option.retire_legacy': {
+    en: 'Retire verified legacy copies after canonical publication',
+    tr: 'Canonical yayın sonrası doğrulanmış legacy kopyaları emekliye ayırın',
+  },
+  'archive.mode.apply': { en: 'apply', tr: 'uygula' },
+  'archive.mode.dry_run': { en: 'dry-run', tr: 'dry-run' },
+  'archive.report': {
+    en: '{sprintId} [{mode}] artifacts={artifacts} bytes={bytes} published={published} deduplicated={deduplicated} retired={retired} conflicts={conflicts} failures={failures}',
+    tr: '{sprintId} [{mode}] artifact={artifacts} byte={bytes} yayınlanan={published} tekilleştirilen={deduplicated} emekli={retired} çakışma={conflicts} hata={failures}',
+  },
+  'archive.verify.ok': {
+    en: '{sprintId} archive verified ({checked} artifacts)',
+    tr: '{sprintId} arşivi doğrulandı ({checked} artifact)',
+  },
+  'archive.verify.failed': {
+    en: '{sprintId} archive verification failed: missing={missing}, mismatched={mismatched}, untracked={untracked}',
+    tr: '{sprintId} arşiv doğrulaması başarısız: eksik={missing}, uyuşmayan={mismatched}, izlenmeyen={untracked}',
+  },
+  'archive.error.selection_required': {
+    en: 'Select exactly one of --sprint <id> or --all.',
+    tr: '--sprint <id> veya --all seçeneklerinden tam olarak birini seçin.',
+  },
+  'archive.error.selection_conflict': {
+    en: '--sprint and --all cannot be combined.',
+    tr: '--sprint ve --all birlikte kullanılamaz.',
+  },
+  'archive.error.retire_requires_apply': {
+    en: '--retire-legacy requires --apply.',
+    tr: '--retire-legacy için --apply gerekir.',
+  },
+  'archive.error.reconcile_failed': {
+    en: 'Archive reconciliation failed: {error}',
+    tr: 'Arşiv uzlaştırması başarısız: {error}',
+  },
   'cli.attach.desc': {
     en: 'Attach to the tmux orchestra session',
     tr: 'tmux orchestra oturumuna bağlanın',
@@ -7991,6 +8173,10 @@ const MESSAGES: MessageMap = {
     en: 'no such file and its directory \'{parent}\' is not in the repo',
     tr: 'böyle bir dosya yok ve \'{parent}\' dizini repoda değil',
   },
+  'scope_gate.reason.directory_in_files_write': {
+    en: 'this path is a tracked directory, but filesWrite accepts exact file paths only',
+    tr: 'bu yol takip edilen bir dizin; ancak filesWrite yalnız exact dosya yollarını kabul eder',
+  },
   'scope_gate.resolution.drop_duplicate': {
     en: 'duplicate of \'{suggestion}\', already planned as a write in the same task',
     tr: '\'{suggestion}\' ile aynı; aynı görevde zaten yazma olarak planlanmış',
@@ -8014,6 +8200,14 @@ const MESSAGES: MessageMap = {
   'scope_gate.message.footer': {
     en: 'If these are intentional new files, override with acknowledgeScopePaths=true (MCP) / --force-scope (CLI). If a path should be an existing file, fix the DIRECTIVES scope before spawning.',
     tr: 'Bunlar kasıtlı yeni dosyalarsa, acknowledgeScopePaths=true (MCP) / --force-scope (CLI) ile geçersiz kılın. Bir yol mevcut bir dosya olmalıysa, spawn etmeden önce DIRECTIVES scope\'unu düzeltin.',
+  },
+  'scope_gate.message.directory_in_files_write_header': {
+    en: 'Scope gate: {count} filesWrite path(s) resolve to directories and cannot enter dispatch:',
+    tr: 'Scope gate: {count} filesWrite yolu dizine çözümleniyor ve dispatch aşamasına giremez:',
+  },
+  'scope_gate.message.directory_in_files_write_footer': {
+    en: 'Move each directory to scope.directories or replace it with exact file paths. --force-scope cannot override this structural error.',
+    tr: 'Her dizini scope.directories alanına taşıyın veya exact dosya yollarıyla değiştirin. --force-scope bu yapısal hatayı geçersiz kılamaz.',
   },
   'scope_gate.notice.greenfield': {
     en: 'Scope gate: greenfield repo (no tracked directories) — {count} write path(s) could not be validated against tracked files; proceeding advisory-only (born-584).',

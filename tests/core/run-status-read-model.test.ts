@@ -3,7 +3,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { ProviderExecutionObservationStore } from '../../src/core/provider-execution-observation-store.js';
+import {
+  PROVIDER_EXECUTION_OBSERVATION_DATABASE_PATH,
+  ProviderExecutionObservationStore,
+} from '../../src/core/provider-execution-observation-store.js';
 import {
   buildCanonicalRunStatusReadModel,
   publishCanonicalRunStatusReadModel,
@@ -109,10 +112,11 @@ describe('canonical run status read model', () => {
     expect(unchanged).toBe(first);
   });
 
-  it('persists IDLE with retired open observations as forensic HOLD, not current concurrency', () => {
+  it('keeps IDLE historical observations forensic without carrying a run HOLD', () => {
     const root = mkdtempSync(join(tmpdir(), 'deckent-run-status-model-'));
     try {
       putOpenObservation(root, '488-002');
+      expect(readFileSync(join(root, PROVIDER_EXECUTION_OBSERVATION_DATABASE_PATH))).toBeInstanceOf(Buffer);
       const model = publishCanonicalRunStatusReadModel(root, {
         authority: authority(),
         publishedAt: '2026-08-01T01:00:00.000Z',
@@ -126,10 +130,62 @@ describe('canonical run status read model', () => {
           observationScope: 'exact-task-set',
         }),
       ]);
-      expect(model.holds).toContainEqual(expect.objectContaining({
+      expect(model.holds).not.toContainEqual(expect.objectContaining({
         reasonCode: 'unresolved-provider-observation',
       }));
       expect(readCanonicalRunStatusReadModel(root)).toEqual(model);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    {
+      label: 'COMPLETE',
+      status: authority({
+        lifecycle: 'COMPLETE', sprintId: 'sprint-900', phase: 'COMPLETE', status: 'COMPLETE',
+      }),
+      currentTask: null,
+    },
+    {
+      label: 'the next ACTIVE run',
+      status: authority({
+        lifecycle: 'ACTIVE', active: true, sprintId: 'sprint-901', phase: 'EXECUTE',
+        status: 'RUNNING', coordinator: 'alive',
+      }),
+      currentTask: task('901-001', { sprintId: 'sprint-901' }),
+    },
+  ])('keeps foreign history visible but non-blocking for $label', ({ status, currentTask }) => {
+    const root = mkdtempSync(join(tmpdir(), 'deckent-run-status-model-'));
+    try {
+      putOpenObservation(root, '488-002');
+      if (currentTask !== null) {
+        mkdirSync(join(root, '.tasks'), { recursive: true });
+        mkdirSync(join(root, '.deckent'), { recursive: true });
+        writeFileSync(join(root, '.tasks', `task-${currentTask.id}.json`), JSON.stringify(currentTask));
+        writeFileSync(join(root, '.deckent', 'sprint-state.json'), JSON.stringify({
+          sprintId: currentTask.sprintId,
+          taskIds: [currentTask.id],
+          phase: 'EXECUTE',
+          status: 'RUNNING',
+        }));
+      }
+
+      const model = publishCanonicalRunStatusReadModel(root, {
+        authority: status,
+        publishedAt: '2026-08-01T01:00:00.000Z',
+      });
+
+      expect(model.providerConcurrency).toEqual([
+        expect.objectContaining({
+          currentAttained: 0,
+          peakAttained: 0,
+          unresolvedOpenIntervals: 1,
+        }),
+      ]);
+      expect(model.holds).not.toContainEqual(expect.objectContaining({
+        reasonCode: 'unresolved-provider-observation',
+      }));
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -161,6 +217,12 @@ describe('canonical run status read model', () => {
         peakAttained: 0,
         unresolvedOpenIntervals: 2,
       });
+      // The exact current task remains an anomaly even though foreign history
+      // is only forensic. Status must not suppress the owned interval with the
+      // historical one.
+      expect(model.holds).toContainEqual(expect.objectContaining({
+        reasonCode: 'unresolved-provider-observation',
+      }));
 
       const path = join(root, '.deckent', 'runtime', 'run-status-read-model.json');
       const tampered = JSON.parse(readFileSync(path, 'utf-8')) as Record<string, unknown>;

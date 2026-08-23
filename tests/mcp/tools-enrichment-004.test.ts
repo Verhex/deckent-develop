@@ -86,7 +86,7 @@ vi.mock('node:fs', () => ({
 }));
 
 // fork() must be stubbed to prevent registerStartTool from spawning real
-// detached children + leaking .deckent/sprint-<timestamp>-ipc/ orphan dirs.
+// detached children + leaking .deckent/job-<timestamp>-<uuid>-ipc/ orphan dirs.
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
   fork: vi.fn(() => ({
@@ -589,7 +589,7 @@ describe('MCP Enrichment 004 — start', () => {
     const data = parsed.data ?? parsed;
 
     expect(data.success).toBe(true);
-    expect(data.jobId).toMatch(/^sprint-\d+$/);
+    expect(data.jobId).toMatch(/^job-\d{13}-[0-9a-f-]+$/);
     expect(data.status).toBe('RUNNING');
     expect(data.message).toContain('background');
     expect(data._enriched).toBeDefined();

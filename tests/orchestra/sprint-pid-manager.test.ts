@@ -303,29 +303,29 @@ describe('sprint-pid-manager', () => {
     });
   });
 
-  // ── Test 8: archiveOrphan moves files to .brain/archive/ ───────
+  // ── Test 8: archiveOrphan moves files to the canonical archive ──
 
   describe('archiveOrphan', () => {
-    it('should move orphan artifacts to .brain/archive/', () => {
+    it('should move orphan artifacts to the canonical sprint namespace', () => {
       const pidDir = join(tmpRoot, '.deckent', 'pids');
       mkdirSync(pidDir, { recursive: true });
 
       const deadPid = 99999999;
-      const pidPath = join(pidDir, 'sprint-archive.pid');
-      const snapPath = join(pidDir, 'sprint-archive.snapshot.json');
+      const pidPath = join(pidDir, 'sprint-999.pid');
+      const snapPath = join(pidDir, 'sprint-999.snapshot.json');
 
-      writeFileSync(pidPath, JSON.stringify({ pid: deadPid, sprintId: 'sprint-archive' }), 'utf-8');
-      writeFileSync(snapPath, JSON.stringify({ sprintId: 'sprint-archive', pid: deadPid }), 'utf-8');
+      writeFileSync(pidPath, JSON.stringify({ pid: deadPid, sprintId: 'sprint-999' }), 'utf-8');
+      writeFileSync(snapPath, JSON.stringify({ sprintId: 'sprint-999', pid: deadPid }), 'utf-8');
 
       // Also create a sprint-state.json
       writeFileSync(
         join(tmpRoot, '.deckent', 'sprint-state.json'),
-        JSON.stringify({ sprintId: 'sprint-archive', phase: 'EXECUTE' }),
+        JSON.stringify({ sprintId: 'sprint-999', phase: 'EXECUTE' }),
         'utf-8',
       );
 
       const orphan: OrphanInfo = {
-        sprintId: 'sprint-archive',
+        sprintId: 'sprint-999',
         pid: deadPid,
         pidFilePath: pidPath,
         snapshotPath: snapPath,
@@ -340,13 +340,14 @@ describe('sprint-pid-manager', () => {
       expect(existsSync(snapPath)).toBe(false);
       expect(existsSync(join(tmpRoot, '.deckent', 'sprint-state.json'))).toBe(false);
 
-      // Archive directory should have files (archiveOrphan writes under .brain/archive/sprints/)
-      const archiveDir = join(tmpRoot, '.brain', 'archive', 'sprints');
+      const archiveDir = join(
+        tmpRoot, '.deckent', 'archive', 'sprints', 'sprint-999', 'orphan-authority',
+      );
       expect(existsSync(archiveDir)).toBe(true);
       const archiveFiles = readdirSync(archiveDir);
       expect(archiveFiles.length).toBeGreaterThanOrEqual(2);
-      expect(archiveFiles.some(f => f.includes('sprint-archive') && f.endsWith('.pid'))).toBe(true);
-      expect(archiveFiles.some(f => f.includes('sprint-archive') && f.includes('.snapshot.json'))).toBe(true);
+      expect(archiveFiles.some(f => f.includes('sprint-999') && f.endsWith('.pid'))).toBe(true);
+      expect(archiveFiles.some(f => f.includes('sprint-999') && f.includes('.snapshot.json'))).toBe(true);
     });
   });
 

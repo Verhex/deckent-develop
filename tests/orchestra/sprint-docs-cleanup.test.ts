@@ -30,7 +30,7 @@ describe('archiveOrphanTasks — extended extension support', () => {
   beforeEach(() => {
     root = makeTempDir();
     mkdirSync(join(root, '.tasks'), { recursive: true });
-    mkdirSync(join(root, '.brain', 'archive'), { recursive: true });
+    mkdirSync(join(root, '.deckent', 'archive'), { recursive: true });
   });
 
   afterEach(() => {
@@ -44,7 +44,7 @@ describe('archiveOrphanTasks — extended extension support', () => {
     const count = archiveOrphanTasks(root, 'sprint-139');
 
     expect(count).toBe(2);
-    const archiveDir = join(root, '.brain', 'archive', 'sprints', 'sprint-139-tasks');
+    const archiveDir = join(root, '.deckent', 'archive', 'sprints', 'sprint-139', 'tasks');
     expect(existsSync(join(archiveDir, 'task-139-001.log'))).toBe(true);
     expect(existsSync(join(archiveDir, 'task-139-001.json'))).toBe(true);
     // Originals should be removed
@@ -59,19 +59,21 @@ describe('archiveOrphanTasks — extended extension support', () => {
     const count = archiveOrphanTasks(root, 'sprint-139');
 
     expect(count).toBe(2);
-    const archiveDir = join(root, '.brain', 'archive', 'sprints', 'sprint-139-tasks');
+    const archiveDir = join(root, '.deckent', 'archive', 'sprints', 'sprint-139', 'tasks');
     expect(existsSync(join(archiveDir, 'task-139-002.timeout'))).toBe(true);
   });
 
   it('archives .prompt-* files alongside task files', () => {
     writeFileSync(join(root, '.tasks', 'task-139-003.json'), '{}');
-    writeFileSync(join(root, '.tasks', '.prompt-abc123.txt'), 'prompt content');
+    writeFileSync(join(root, '.tasks', '.prompt-139-003-abc123.txt'), 'prompt content');
+    writeFileSync(join(root, '.tasks', '.prompt-abc123.txt'), 'unowned prompt');
 
     const count = archiveOrphanTasks(root, 'sprint-139');
 
     expect(count).toBe(2);
-    const archiveDir = join(root, '.brain', 'archive', 'sprints', 'sprint-139-tasks');
-    expect(existsSync(join(archiveDir, '.prompt-abc123.txt'))).toBe(true);
+    const archiveDir = join(root, '.deckent', 'archive', 'sprints', 'sprint-139', 'tasks');
+    expect(existsSync(join(archiveDir, '.prompt-139-003-abc123.txt'))).toBe(true);
+    expect(existsSync(join(root, '.tasks', '.prompt-abc123.txt'))).toBe(true);
   });
 
   it('does not archive files from a different sprint', () => {

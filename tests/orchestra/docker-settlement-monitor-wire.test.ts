@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import type { ChildProcess } from 'node:child_process';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -30,6 +30,7 @@ import {
   readTaskResultSettlement,
   readTaskResultSettlementClosure,
   readTaskResultSettlementLandedRetirement,
+  taskResultSettlementPath,
   taskResultSettlementActiveClaimDigest,
   writeTaskResultSettlementAttemptAtomic,
   writeTaskResultSettlementDispatchAtomic,
@@ -430,6 +431,57 @@ describe('Docker monitor settlement authority wiring', () => {
     expect(readTaskResultSettlement(ref)).toMatchObject({ exitCode: 0 });
     expect(backend.list()).not.toContain(taskId);
     expect(mockSpawnSync).not.toHaveBeenCalledWith('docker', expect.arrayContaining(['-f']), expect.anything());
+  });
+
+  it('contains an exit-0 malformed worker result as forensic-backed NO_GO instead of hanging', async () => {
+    const taskId = 'monitor-exit-zero-malformed-result';
+    const { root, tasks, ref, containerId } = fixture(taskId);
+    const malformed = `{"taskId":"${taskId}","selfAssessment":"DONE","notes":"line one\nline two"}`;
+    writeFileSync(join(tasks, `task-${taskId}.result`), malformed, 'utf-8');
+    const { waitChild } = installChildRouter();
+    mockSpawnSync.mockImplementation((command, args) => {
+      expect(command).toBe('docker');
+      expect(args).toEqual(['rm', containerId]);
+      return spawnResult(0);
+    });
+
+    const backend = new DockerSpawnBackend(root);
+    registerAuthority(backend, taskId, containerId, root, tasks, ref);
+    (backend as unknown as MonitorHarness).monitorContainer(
+      taskId,
+      containerId,
+      tasks,
+      'claude-fable-5',
+      root,
+      null,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      ref,
+    );
+    waitChild.stdout.write('0\n');
+    waitChild.emit('close', 0, null);
+
+    await vi.waitFor(() => expect(readTaskResultSettlementClosure(ref)).not.toBeNull());
+    expect(readTaskResultSettlement(ref)).toMatchObject({
+      exitCode: 0,
+      result: {
+        taskId,
+        selfAssessment: 'NO_GO',
+        markerType: 'RECOVERY_RESULT_INVALID',
+        workAttribution: { state: 'VERIFIED' },
+      },
+    });
+    expect(JSON.parse(readFileSync(join(tasks, `task-${taskId}.result`), 'utf-8')))
+      .toMatchObject({ selfAssessment: 'NO_GO', markerType: 'RECOVERY_RESULT_INVALID' });
+    const forensic = JSON.parse(readFileSync(
+      join(dirname(taskResultSettlementPath(ref)), 'invalid-worker-result.json'),
+      'utf-8',
+    ));
+    expect(Buffer.from(forensic.rawBase64, 'base64').toString('utf-8')).toBe(malformed);
+    expect(backend.list()).not.toContain(taskId);
   });
 
   it('persists terminal provider billing from the live follower before removal and settlement', async () => {

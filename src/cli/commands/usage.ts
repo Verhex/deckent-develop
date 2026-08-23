@@ -16,7 +16,7 @@
  * CLI usage lineage projection — 486-010
  */
 
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import type { Command } from 'commander';
 import { print } from '../helpers/output.js';
@@ -29,7 +29,10 @@ import type { UsageRecord, LedgerOpts, LedgerPrices } from '../../core/limit-led
 import { summarizeSprint, buildTranscriptTaskMap, evaluateCacheGate } from '../../core/limit-ledger-report.js';
 import type { SprintUsageSummary, CacheGateReport } from '../../core/limit-ledger-report.js';
 import { buildLedgerPrices } from '../../core/cost-config-loader.js';
-import { DEFAULT_RETENTION_CONFIG } from '../../core/sprint-file-retention.js';
+import {
+  discoverSprintArchiveIds,
+  resolveTaskArtifactReadDirs,
+} from '../../core/sprint-archive.js';
 import { aggregateLineageUsageAuthority } from '../../core/lineage-usage-authority.js';
 import type {
   LineageUsageAuthorityInput,
@@ -231,45 +234,51 @@ function defaultReadArchivedLineageInput(
   root: string,
   sprintTaskIdPrefix?: string,
 ): LineageUsageAuthorityInput {
-  const archiveRoot = join(root, DEFAULT_RETENTION_CONFIG.archive_path);
   const tasks: LineageUsageAuthorityTask[] = [];
   const attempts: LineageUsageAttempt[] = [];
-  if (!existsSync(archiveRoot)) return { tasks, attempts };
-
-  let sprintDirs: string[];
-  try {
-    sprintDirs = readdirSync(archiveRoot, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => entry.name);
-  } catch {
-    return { tasks, attempts };
-  }
-
-  for (const sprintDir of sprintDirs) {
-    const dirPath = join(archiveRoot, sprintDir);
-    let entries: string[];
-    try {
-      entries = readdirSync(dirPath);
-    } catch {
-      continue;
+  const listFiles = (directory: string): string[] => {
+    const files: string[] = [];
+    const pending = [directory];
+    while (pending.length > 0) {
+      const current = pending.pop()!;
+      let entries;
+      try { entries = readdirSync(current, { withFileTypes: true }); } catch { continue; }
+      for (const entry of entries) {
+        const path = join(current, entry.name);
+        if (entry.isDirectory()) pending.push(path);
+        else if (entry.isFile()) files.push(path);
+      }
     }
-    const entrySet = new Set(entries);
+    return files;
+  };
+  const seenTaskIds = new Set<string>();
+  for (const sprintId of discoverSprintArchiveIds(root)) {
+    const files = resolveTaskArtifactReadDirs(root, sprintId).flatMap(listFiles);
+    const resultByTaskId = new Map<string, Record<string, unknown>>();
+    for (const path of files) {
+      const filename = basename(path);
+      if (!filename.startsWith('task-') || (!filename.endsWith('.result') && !filename.endsWith('.result.json'))) continue;
+      const result = readJsonRecordSafe(path);
+      if (typeof result?.['taskId'] === 'string' && !resultByTaskId.has(result['taskId'])) {
+        resultByTaskId.set(result['taskId'], result);
+      }
+    }
 
-    for (const filename of entries) {
+    for (const path of files) {
+      const filename = basename(path);
       const match = ARCHIVED_TASK_FILE.exec(filename);
       if (!match) continue;
       const taskId = match[1]!;
       if (sprintTaskIdPrefix && !taskId.startsWith(sprintTaskIdPrefix)) continue;
+      if (seenTaskIds.has(taskId)) continue;
 
-      const taskRecord = readJsonRecordSafe(join(dirPath, filename));
+      const taskRecord = readJsonRecordSafe(path);
       if (!taskRecord || taskRecord['id'] !== taskId) continue;
+      seenTaskIds.add(taskId);
       const fixForTaskId = typeof taskRecord['fixForTaskId'] === 'string'
         ? taskRecord['fixForTaskId'] as string
         : undefined;
-
-      const resultFilename = [`task-${taskId}.result`, `task-${taskId}.result.json`]
-        .find((candidate) => entrySet.has(candidate));
-      const resultRecord = resultFilename ? readJsonRecordSafe(join(dirPath, resultFilename)) : null;
+      const resultRecord = resultByTaskId.get(taskId) ?? null;
 
       const billingMode = (resultRecord?.['cost'] as Record<string, unknown> | undefined)?.['billingMode'];
       tasks.push({ id: taskId, billingAuthority: deriveTaskBillingAuthority([billingMode]) });

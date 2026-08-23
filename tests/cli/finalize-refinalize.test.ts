@@ -42,6 +42,14 @@ vi.mock('node:child_process', () => ({
   spawn: vi.fn(),
 }));
 
+// Snapshot command execution is covered by task-restoration tests. This file
+// mocks spawnSync globally for the finalizer audit, so a real tarball cannot be
+// produced here; keep the archive settlement focused on task/manifest truth.
+vi.mock('../../src/orchestra/task-restoration.js', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  createPreArchiveSnapshot: vi.fn().mockReturnValue(null),
+}));
+
 // Code-verify reconciliation must not shell out / read git state.
 vi.mock('../../src/monitor/auditor.js', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -165,6 +173,12 @@ function writeTaskFixture(dir: string, task: Task): void {
 function writeResultFixture(dir: string, result: TaskResult): void {
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, `task-${result.taskId}.result`), JSON.stringify(result, null, 2), 'utf-8');
+}
+
+function seedFinalizerDiskEvidence(tasks: readonly Task[], results: readonly TaskResult[]): void {
+  const tasksDir = join(root, '.tasks');
+  for (const task of tasks) writeTaskFixture(tasksDir, task);
+  for (const result of results) writeResultFixture(tasksDir, result);
 }
 
 function archiveDir(root: string, sprintId = SPRINT_ID): string {
@@ -402,6 +416,7 @@ describe('finalizeSprint — double-finalize stats idempotency (FINALIZE-RECOUNT
       ['900-002', TaskEvaluation.DONE],
     ]);
     const results = [makeResult('900-001'), makeResult('900-002')];
+    seedFinalizerDiskEvidence(tasks, results);
 
     // First finalize — the same agent serving BOTH tasks must count both
     // uses (pre-scan must not skip mid-run stamps).
@@ -436,6 +451,7 @@ describe('finalizeSprint — double-finalize stats idempotency (FINALIZE-RECOUNT
       ['900-002', TaskEvaluation.DONE],
     ]);
     const results = [makeResult('900-001'), makeResult('900-002')];
+    seedFinalizerDiskEvidence(tasks, results);
     const v2Opts = { ...finalizeOpts, config: { routing_engine: 'v2' } as unknown as ResolvedConfig };
 
     await finalizeSprint(root, makeSprint(tasks), evaluations, results, v2Opts);
@@ -466,6 +482,7 @@ describe('finalizeSprint — double-finalize stats idempotency (FINALIZE-RECOUNT
     const tasks = [makeTask('900-001')];
     const evaluations = new Map<string, TaskEvaluation>([['900-001', TaskEvaluation.DONE]]);
     const results = [makeResult('900-001')];
+    seedFinalizerDiskEvidence(tasks, results);
     const jobPath = join(root, '.deckent', 'runtime', 'jobs', `${SPRINT_ID}.json`);
 
     // startedAt known → real duration string, never 'unknown'

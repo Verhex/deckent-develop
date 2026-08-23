@@ -40,6 +40,8 @@ export interface CrashContext {
 export interface SprintRunnerConfig {
   projectRoot: string;
   jobId: string;
+  /** Exact parent-side admission time, preserved across the detached fork. */
+  startedAt?: string;
   autoApprove: boolean;
   /** Dimension B: bypass the pre-spawn scope gate (CLI --force-scope parity). */
   acknowledgeScopePaths?: boolean;
@@ -487,7 +489,7 @@ export function _resetCrashHandlersForTesting(): void {
 
 // ─── Runner Main (only runs when executed directly) ──────────────
 
-async function main(): Promise<void> {
+export async function runSprintRunnerMain(): Promise<void> {
   // row 3311, exit path #3: a startup abort happens before the IPC config (and
   // therefore projectRoot) is known, so the record lands under the cwd — the
   // same convention the CLI crash handler uses.
@@ -527,7 +529,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const { projectRoot, jobId, autoApprove, acknowledgeScopePaths, acknowledgePromptGate, sandboxMode, timeoutMs } = runnerConfig;
+  const { projectRoot, jobId, startedAt, autoApprove, acknowledgeScopePaths, acknowledgePromptGate, sandboxMode, timeoutMs } = runnerConfig;
 
   // ADR-043: Install crash handlers AS EARLY AS POSSIBLE after IPC
   // config is known. Anything thrown after this point lands in error.json
@@ -552,6 +554,7 @@ async function main(): Promise<void> {
   });
 
   let approvalAuthority: ApprovalAuthorityBootstrapResult | undefined;
+  let notifyDispatcher: ReturnType<typeof bootstrapNotifyDispatcher> | undefined;
   try {
     // Dynamic imports — these pull in the full sprint machinery
     const { loadConfig } = await import('../core/config.js');
@@ -585,7 +588,7 @@ async function main(): Promise<void> {
       config.notify_connectors,
       { kpiSummaryFn: buildSprintKpiSummaryFn(projectRoot, config.language) },
     );
-    bootstrapNotifyDispatcher({
+    notifyDispatcher = bootstrapNotifyDispatcher({
       projectRoot,
       extraAdapters: connectorAdapter ? [connectorAdapter] : [],
       webhook: resolveWebhookBootstrapOption(config),
@@ -640,7 +643,7 @@ async function main(): Promise<void> {
     writeJobState(projectRoot, {
       jobId,
       status: 'COMPLETE',
-      startedAt: runnerConfig.jobId.replace('sprint-', ''),
+      startedAt: startedAt ?? new Date().toISOString(),
       completedAt: new Date().toISOString(),
       sprintId: sprint.id,
       tasks,
@@ -670,7 +673,7 @@ async function main(): Promise<void> {
       writeJobState(projectRoot, {
         jobId,
         status: 'FAILED',
-        startedAt: new Date().toISOString(),
+        startedAt: startedAt ?? new Date().toISOString(),
         completedAt: new Date().toISOString(),
         error: message,
       });
@@ -701,6 +704,7 @@ async function main(): Promise<void> {
 
     process.exitCode = 1;
   } finally {
+    await notifyDispatcher?.close();
     if (approvalAuthority?.state === 'ready') approvalAuthority.runtime.close();
   }
 }
@@ -724,7 +728,7 @@ async function main(): Promise<void> {
 const isEntryPoint = process.argv[1]?.endsWith('sprint-runner-entry.js') ||
                      process.argv[1]?.endsWith('sprint-runner-entry.ts');
 if (isEntryPoint) {
-  main().catch((err) => {
+  runSprintRunnerMain().catch((err) => {
     // row 3311, exit path #8: this last-resort catch used to leave only a
     // stderr line. The record is written before the exit so the death is typed
     // even when main() failed outside every inner handler.

@@ -20,7 +20,7 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { removeNervousPending } from '../../core/pending-approvals.js';
-import { BRAIN_DIR, ARCHIVE_DIR, ARCHIVE_SPRINTS_SUBDIR } from '../../core/constants.js';
+import { resolveTaskArtifactArchiveDir } from '../../core/sprint-archive.js';
 import {
   acceptPanicGuard,
   listPendingPanicEvents,
@@ -235,7 +235,7 @@ export async function handleNervousReject(
 // reverse for those action ids. Cross-referencing that allowlist against
 // ACTION_REGISTRY's `reversible:true` flags leaves exactly one action that is
 // BOTH self-executed AND reversible: `ORPHAN_TASK_ARCHIVE` (moves
-// `.tasks/task-<n>-*` files into `.brain/archive/sprints/<sprintId>-tasks/`,
+// `.tasks/task-<n>-*` files into the canonical sprint task archive,
 // see orchestra/sprint-docs-updater.ts `archiveOrphanTasks`).
 //
 // `runNervousCompensatingAction` performs a REAL, disk-verifiable reversal
@@ -282,7 +282,7 @@ function reverseOrphanTaskArchive(record: ExecutionRecord, root: string, lang: s
     };
   }
 
-  const archiveDir = join(root, BRAIN_DIR, ARCHIVE_DIR, ARCHIVE_SPRINTS_SUBDIR, `${sprintId}-tasks`);
+  const archiveDir = resolveTaskArtifactArchiveDir(root, sprintId);
   if (!existsSync(archiveDir)) {
     return {
       applied: false,

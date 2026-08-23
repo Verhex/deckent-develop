@@ -64,13 +64,13 @@ describe('archivePromptFiles (.worker-*.sh extension)', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('archives BOTH .prompt-*.txt AND .worker-*.sh into .tasks/archive/sprint-{id}/', () => {
+  it('archives BOTH .prompt-*.txt AND .worker-*.sh into the canonical sprint archive', () => {
     const { promptFile, workerScript } = seedTmpfiles(tasksDir);
 
     const result = archivePromptFiles(tasksDir, 'sprint-156');
 
     expect(result.archived).toBe(2);
-    const archiveDir = join(tasksDir, 'archive', 'sprint-156');
+    const archiveDir = join(root, '.deckent', 'archive', 'sprints', 'sprint-156', 'tasks');
     expect(existsSync(join(archiveDir, promptFile))).toBe(true);
     expect(existsSync(join(archiveDir, workerScript))).toBe(true);
     // Source files must be moved (not copied)
@@ -84,7 +84,7 @@ describe('archivePromptFiles (.worker-*.sh extension)', () => {
     const result = archivePromptFiles(tasksDir, 'sprint-156');
 
     expect(result.archived).toBe(1);
-    expect(existsSync(join(tasksDir, 'archive', 'sprint-156', '.worker-156-002.sh'))).toBe(true);
+    expect(existsSync(join(root, '.deckent', 'archive', 'sprints', 'sprint-156', 'tasks', '.worker-156-002.sh'))).toBe(true);
   });
 
   it('archives only .prompt-*.txt when no worker scripts exist', () => {
@@ -93,7 +93,7 @@ describe('archivePromptFiles (.worker-*.sh extension)', () => {
     const result = archivePromptFiles(tasksDir, 'sprint-156');
 
     expect(result.archived).toBe(1);
-    expect(existsSync(join(tasksDir, 'archive', 'sprint-156', '.prompt-156-003-aaa.txt'))).toBe(true);
+    expect(existsSync(join(root, '.deckent', 'archive', 'sprints', 'sprint-156', 'tasks', '.prompt-156-003-aaa.txt'))).toBe(true);
   });
 
   it('does NOT archive unrelated files (e.g. .worker- without .sh suffix)', () => {
@@ -115,9 +115,10 @@ describe('archivePromptFiles (.worker-*.sh extension)', () => {
 
     expect(result.archived).toBe(1);
     expect(existsSync(join(
-      tasksDir,
-      'archive',
+      root,
+      '.deckent', 'archive', 'sprints',
       'sprint-156',
+      'tasks',
       '.prompt-156-001-owned.txt',
     ))).toBe(true);
     expect(existsSync(join(tasksDir, '.prompt-xv-independent.txt'))).toBe(true);
@@ -139,13 +140,13 @@ describe('cleanup() — tmpfile gating by cleanupPhase', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it("sprint-end (default): archives .prompt-*.txt and .worker-*.sh to .tasks/archive/sprint-{id}/", () => {
+  it("sprint-end (default): archives .prompt-*.txt and .worker-*.sh to the canonical sprint archive", () => {
     const { promptFile, workerScript } = seedTmpfiles(tasksDir);
     const sprint = makeSprint('sprint-156');
 
     cleanup(root, sprint);
 
-    const archiveDir = join(tasksDir, 'archive', 'sprint-156');
+    const archiveDir = join(root, '.deckent', 'archive', 'sprints', 'sprint-156', 'tasks');
     expect(existsSync(join(archiveDir, promptFile))).toBe(true);
     expect(existsSync(join(archiveDir, workerScript))).toBe(true);
     expect(existsSync(join(tasksDir, promptFile))).toBe(false);
@@ -158,8 +159,8 @@ describe('cleanup() — tmpfile gating by cleanupPhase', () => {
 
     cleanup(root, sprint, undefined, 'sprint-end');
 
-    expect(existsSync(join(tasksDir, 'archive', 'sprint-156', promptFile))).toBe(true);
-    expect(existsSync(join(tasksDir, 'archive', 'sprint-156', workerScript))).toBe(true);
+    expect(existsSync(join(root, '.deckent', 'archive', 'sprints', 'sprint-156', 'tasks', promptFile))).toBe(true);
+    expect(existsSync(join(root, '.deckent', 'archive', 'sprints', 'sprint-156', 'tasks', workerScript))).toBe(true);
   });
 
   it("spawn-fail: PRESERVES tmpfiles in-place (NOT archived, NOT deleted)", () => {
@@ -172,7 +173,7 @@ describe('cleanup() — tmpfile gating by cleanupPhase', () => {
     expect(existsSync(join(tasksDir, promptFile))).toBe(true);
     expect(existsSync(join(tasksDir, workerScript))).toBe(true);
     // No archive dir created for this sprint
-    const archiveDir = join(tasksDir, 'archive', 'sprint-156');
+    const archiveDir = join(root, '.deckent', 'archive', 'sprints', 'sprint-156', 'tasks');
     expect(existsSync(archiveDir)).toBe(false);
   });
 });
@@ -219,7 +220,7 @@ describe('Mid-sprint tmpfile preservation contract', () => {
     );
     expect(postCleanupTmpfiles.length).toBe(0);
 
-    const archived = readdirSync(join(tasksDir, 'archive', 'sprint-156'));
+    const archived = readdirSync(join(root, '.deckent', 'archive', 'sprints', 'sprint-156', 'tasks'));
     expect(archived.sort()).toEqual([
       '.prompt-156-001-abcdef.txt',
       '.prompt-156-002-xyz.txt',
@@ -232,7 +233,8 @@ describe('Mid-sprint tmpfile preservation contract', () => {
 // ═══ F0.3: orphan-prompt preservation (training-trace) ══════════════════════
 // Mid-sprint cleanup (kill()/health-check) must ARCHIVE orphan prompts, not
 // delete them — the (prompt → result) pair is the training-trace unit. Prompts
-// are staged in .tasks/archive/_orphaned/ and drained into the sprint archive.
+// task-bound prompts are written directly into the canonical sprint archive;
+// legacy `_orphaned` staging is still reconciled at sprint end.
 
 describe('F0.3 archiveOrphanPromptFile — preserves instead of deleting', () => {
   let root: string;
@@ -244,7 +246,7 @@ describe('F0.3 archiveOrphanPromptFile — preserves instead of deleting', () =>
   });
   afterEach(() => { rmSync(root, { recursive: true, force: true }); });
 
-  it('moves an orphan prompt into .tasks/archive/_orphaned/ (not unlinked)', () => {
+  it('moves a task-bound orphan prompt directly into the canonical sprint archive', () => {
     const promptFile = '.prompt-156-009-deadbeef.txt';
     writeFileSync(join(tasksDir, promptFile), 'PROMPT CONTENT', 'utf-8');
 
@@ -252,8 +254,10 @@ describe('F0.3 archiveOrphanPromptFile — preserves instead of deleting', () =>
 
     // Source removed from the active dir…
     expect(existsSync(join(tasksDir, promptFile))).toBe(false);
-    // …but preserved in the orphan staging bucket (not destroyed).
-    expect(existsSync(join(tasksDir, 'archive', '_orphaned', promptFile))).toBe(true);
+    // …but preserved in the canonical archive (not destroyed).
+    expect(existsSync(join(
+      root, '.deckent', 'archive', 'sprints', 'sprint-156', 'tasks', promptFile,
+    ))).toBe(true);
   });
 
   it('sprint-end archivePromptFiles drains _orphaned/ into the sprint archive', () => {
@@ -267,12 +271,12 @@ describe('F0.3 archiveOrphanPromptFile — preserves instead of deleting', () =>
 
     const result = archivePromptFiles(tasksDir, 'sprint-156');
 
-    const archiveDir = join(tasksDir, 'archive', 'sprint-156');
+    const archiveDir = join(root, '.deckent', 'archive', 'sprints', 'sprint-156', 'tasks');
     // Both the live prompt AND the drained staged prompt land in the sprint archive.
     expect(existsSync(join(archiveDir, live))).toBe(true);
     expect(existsSync(join(archiveDir, staged))).toBe(true);
     // Staging bucket is emptied.
-    expect(readdirSync(join(tasksDir, 'archive', '_orphaned')).length).toBe(0);
+    expect(existsSync(join(tasksDir, 'archive', '_orphaned'))).toBe(false);
     expect(result.archived).toBe(2);
   });
 });

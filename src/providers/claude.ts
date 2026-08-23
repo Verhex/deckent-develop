@@ -178,7 +178,7 @@ export class ClaudeAdapter implements ProviderAdapter {
    * prompt files.
    *
    * F0.3 (training-trace preservation): orphan prompts are ARCHIVED (moved to
-   * `.tasks/archive/_orphaned/`), NOT deleted — the (prompt → result) pair is the
+   * the canonical sprint archive, NOT deleted — the (prompt → result) pair is the
    * training-trace unit, and unlinking the prompt here (before the sprint-end
    * archivePromptFiles() runs) previously destroyed the prompt half systematically.
    * Archiving also makes the selective-filter below fail SAFE: if a still-running

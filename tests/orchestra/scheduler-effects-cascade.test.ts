@@ -79,6 +79,7 @@ import {
 } from '../../src/orchestra/scheduler-effects.js';
 import type { SchedulerDecisionExecutionDeps } from '../../src/orchestra/scheduler-effects.js';
 import type { SchedulerDecision, SchedulerEffect } from '../../src/orchestra/scheduler-reducer.js';
+import { DeckentError } from '../../src/core/errors.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -354,6 +355,53 @@ describe('executeSchedulerDecision — SpawnTask/KillWorker regression (must sta
     expect(task.status).toBe(TaskStatus.EXECUTING);
     const persisted = JSON.parse(readFileSync(join(root, '.tasks', 'task-800-060.json'), 'utf-8'));
     expect(persisted.status).toBe(TaskStatus.EXECUTING);
+  });
+
+  it('settles a deterministic attribution admission failure once instead of retrying forever', async () => {
+    const task = makeTask('800-061');
+    const taskMap = new Map([[task.id, task]]);
+    const backend = makeMockBackend();
+    backend.spawn = vi.fn(() => {
+      throw new DeckentError(
+        'E_ATTRIBUTION_BASELINE_CAPTURE_FAILED',
+        'attribution-baseline-capture-failed:docs/evidence',
+      );
+    });
+    const decision = makeDecision([{ kind: 'SpawnTask', taskId: task.id, reason: 'queue-drain' }]);
+
+    const first = await executeSchedulerDecision(decision, baseDeps(root, taskMap, { backend }));
+    const resultPath = join(root, '.tasks', `task-${task.id}.result`);
+    const firstBytes = readFileSync(resultPath, 'utf-8');
+    const result = JSON.parse(firstBytes);
+
+    expect(task.status).toBe(TaskStatus.NO_GO);
+    expect(first.spawnSkips).toEqual(expect.arrayContaining([
+      expect.objectContaining({ taskId: task.id, reasonCode: 'spawn-admission-settled' }),
+    ]));
+    expect(result.preDispatchSettlement).toMatchObject({
+      state: 'NOT_DISPATCHED',
+      reasonCode: 'ATTRIBUTION_BASELINE_CAPTURE_FAILED',
+    });
+    expect(result.tokenUsage).toMatchObject({ inputTokens: 0, outputTokens: 0 });
+
+    await executeSchedulerDecision(decision, baseDeps(root, taskMap, { backend }));
+    expect(readFileSync(resultPath, 'utf-8')).toBe(firstBytes);
+  });
+
+  it('keeps an unclassified spawn exception retryable and does not forge a settlement', async () => {
+    const task = makeTask('800-062');
+    const taskMap = new Map([[task.id, task]]);
+    const backend = makeMockBackend();
+    backend.spawn = vi.fn(() => { throw new Error('transient transport reset'); });
+    const decision = makeDecision([{ kind: 'SpawnTask', taskId: task.id, reason: 'queue-drain' }]);
+
+    const result = await executeSchedulerDecision(decision, baseDeps(root, taskMap, { backend }));
+
+    expect(task.status).toBe(TaskStatus.PENDING);
+    expect(existsSync(join(root, '.tasks', `task-${task.id}.result`))).toBe(false);
+    expect(result.spawnSkips).toEqual(expect.arrayContaining([
+      expect.objectContaining({ taskId: task.id, reasonCode: 'spawn-threw' }),
+    ]));
   });
 
   it('kills a worker via the injected killWorker dep for a KillWorker effect', async () => {

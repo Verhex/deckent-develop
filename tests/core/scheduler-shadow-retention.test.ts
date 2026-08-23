@@ -61,7 +61,9 @@ describe('archiveStaleSchedulerShadowJournals — age threshold', () => {
     expect(result.kept).toEqual([]);
     expect(result.bytesFreed).toBeGreaterThan(0);
     expect(existsSync(join(tmpDir, '.deckent', 'runtime', 'scheduler-shadow', 'sprint-424.jsonl'))).toBe(false);
-    expect(existsSync(join(tmpDir, '.deckent', 'archive', 'scheduler-shadow', 'sprint-424.jsonl'))).toBe(true);
+    expect(existsSync(join(
+      tmpDir, '.deckent', 'archive', 'sprints', 'sprint-424', 'scheduler', 'sprint-424.jsonl',
+    ))).toBe(true);
   });
 
   it('(b) keeps a journal newer than retention_days (5 days, default 14)', () => {

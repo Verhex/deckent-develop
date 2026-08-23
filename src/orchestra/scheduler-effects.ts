@@ -37,6 +37,7 @@ import { TaskStatus } from '../core/types.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { resolveLiveTraceEnabled } from '../core/config.js';
 import { debugLog } from '../core/utils.js';
+import { DeckentError } from '../core/errors.js';
 import {
   assertExecutionLandingSupport,
   assertLiveUsageBudgetSupport,
@@ -273,6 +274,8 @@ export type SchedulerSpawnSkipReasonCode =
   | 'routing-lineage-missing'
   /** The spawn attempt threw; the id was rolled back out of the assigned set. */
   | 'spawn-threw'
+  /** A deterministic pre-dispatch admission failure was durably settled; no retry is valid. */
+  | 'spawn-admission-settled'
   /** A SpawnTask effect named an id the live task map does not contain. */
   | 'task-not-found'
   /** Returned in a wave's overflow queue and never handed to a later dispatcher. */
@@ -964,6 +967,36 @@ function persistCascadeSkipResultAtomic(projectRoot: string, result: TaskResult)
   renameSync(tmpPath, filePath);
 }
 
+function settleNonRetryableSpawnAdmission(
+  projectRoot: string,
+  task: Task,
+  error: unknown,
+): string | null {
+  if (!(error instanceof DeckentError) || error.code !== 'E_ATTRIBUTION_BASELINE_CAPTURE_FAILED') {
+    return null;
+  }
+  const detail = `${error.code}:${error.message}`;
+  const resultPath = cascadeSkipResultPath(projectRoot, task.id);
+  try {
+    if (!existsSync(resultPath)) {
+      persistCascadeSkipResultAtomic(
+        projectRoot,
+        createHostPreDispatchNoGoResult(
+          task,
+          'ATTRIBUTION_BASELINE_CAPTURE_FAILED',
+          detail,
+        ),
+      );
+    }
+  } catch (persistError) {
+    debugLog('executeSchedulerDecision:spawnAdmission:persist', persistError);
+    return null;
+  }
+  task.status = TaskStatus.NO_GO;
+  persistTask(projectRoot, task);
+  return detail;
+}
+
 /**
  * Execute a `SchedulerDecision`'s effects, IN ORDER, through the canonical
  * single executor (`executeSpawnTask` for SpawnTask). Never throws — a single
@@ -1074,6 +1107,15 @@ export async function executeSchedulerDecision(
     } catch (e) {
       debugLog('executeSchedulerDecision:spawn', e);
       deps.assignedTaskIds.delete(effect.taskId);
+      const settledAdmission = settleNonRetryableSpawnAdmission(deps.projectRoot, task, e);
+      if (settledAdmission !== null) {
+        spawnSkips.push(describeSpawnSkip(
+          task,
+          'spawn-admission-settled',
+          `non-retryable pre-dispatch admission failure settled as zero-work NO_GO: ${settledAdmission}`,
+        ));
+        continue;
+      }
       spawnSkips.push(describeSpawnSkip(
         task,
         'spawn-threw',

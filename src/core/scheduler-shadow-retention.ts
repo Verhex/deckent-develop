@@ -16,11 +16,14 @@
  */
 
 import {
-  existsSync, readdirSync, statSync, renameSync, mkdirSync, unlinkSync,
-  readFileSync, writeFileSync,
+  existsSync, readdirSync, statSync,
 } from 'node:fs';
 import { join } from 'node:path';
 import type { SchedulerShadowRetentionConfig } from './config-types.js';
+import {
+  publishSprintArchiveArtifact,
+  resolveSprintArchiveDir,
+} from './sprint-archive.js';
 
 /**
  * Directory scanned for scheduler-shadow JSONL journals. Redefined here
@@ -81,8 +84,6 @@ export function archiveStaleSchedulerShadowJournals(
 
   const journals = entries.filter(f => f.endsWith('.jsonl'));
   const retentionMs = resolved.retention_days * 24 * 60 * 60 * 1000;
-  const archiveDir = join(root, resolved.archive_path);
-
   for (const filename of journals) {
     const srcPath = join(shadowDir, filename);
 
@@ -103,17 +104,25 @@ export function archiveStaleSchedulerShadowJournals(
       continue;
     }
 
-    const dstPath = join(archiveDir, filename);
+    const sprintMatch = /^(sprint-\d+)\.jsonl$/u.exec(filename);
     try {
-      mkdirSync(archiveDir, { recursive: true });
-      try {
-        renameSync(srcPath, dstPath);
-      } catch {
-        // Cross-device rename fallback
-        writeFileSync(dstPath, readFileSync(srcPath));
-        unlinkSync(srcPath);
+      let destination: string;
+      if (sprintMatch?.[1]) {
+        const publication = publishSprintArchiveArtifact(
+          root,
+          sprintMatch[1],
+          srcPath,
+          join('scheduler', filename),
+          { retireSource: true },
+        );
+        destination = join(resolveSprintArchiveDir(root, sprintMatch[1]), publication.path);
+      } else {
+        // Non-sprint journals have no canonical ownership identity and remain
+        // in place until an owner-specific migration can name one.
+        result.kept.push(filename);
+        continue;
       }
-      result.archived.push(dstPath);
+      result.archived.push(destination);
       result.bytesFreed += fileSize;
     } catch {
       // best-effort — leave file in place, do not crash

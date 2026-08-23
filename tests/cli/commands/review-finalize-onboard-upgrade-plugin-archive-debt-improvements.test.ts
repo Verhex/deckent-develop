@@ -39,16 +39,9 @@ vi.mock('../../../src/cli/helpers/process.js', () => ({
   resolveProjectRoot: vi.fn().mockReturnValue('/mock/root'),
 }));
 
-vi.mock('../../../src/core/constants.js', () => ({
-  RUNTIME_DIR: '.deckent/runtime',  // sprint-429 (429-011) tool-inventory yolu modül-yüklemede okur
-  BRAIN_DIR: '.brain',
-  TASKS_DIR: '.tasks',
-  DECKENT_DIR: '.deckent',
-  SETTINGS_DIR: '.deckent/settings',  // born-630 allowscope-zinciri modül-yüklemede okur
+vi.mock('../../../src/core/constants.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/core/constants.js')>()),
   DECKENT_VERSION: '1.0.0',
-  DEBT_FILE: 'DEBT.md',
-  ARCHIVE_DIR: 'archive',
-  DEBT_TABLE_HEADER: '| ID | Description | Task | Sprint | Priority | Open | Resolved | Fixed In | Created |',
 }));
 
 vi.mock('../../../src/core/system-profile.js', () => ({
@@ -250,7 +243,9 @@ describe('B: Finalize --sprint Flag', () => {
     vi.mocked(existsSync).mockImplementation((p: unknown) => {
       const s = String(p);
       if (s.includes('.brain')) return false;
-      return s.includes('.tasks');
+      // This fixture has only the live task root; do not accidentally claim
+      // that every nested legacy/canonical archive candidate also exists.
+      return s === '/mock/root/.tasks';
     });
     vi.mocked(readdirSync).mockImplementation((p: unknown) => {
       if (String(p).includes('.tasks')) return ['task-001.json', 'task-002.json'] as unknown as ReturnType<typeof readdirSync>;

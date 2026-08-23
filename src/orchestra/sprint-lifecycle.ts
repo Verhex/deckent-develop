@@ -339,7 +339,7 @@ function sweepOrphanHeartbeats(tasksDir: string, previousSprintId: string): void
  * Indicates which lifecycle event triggered a cleanup() invocation.
  *
  * - `sprint-end`: Normal sprint completion or CLI-driven cleanup. Tmpfiles
- *   (.prompt-*.txt, .worker-*.sh) are archived to .tasks/archive/sprint-{id}/.
+ *   (.prompt-*.txt, .worker-*.sh) are archived to the canonical sprint namespace.
  * - `spawn-fail`: Cleanup invoked from runSpawnPhase retry-failure path. The
  *   sprint did not reach its execution lifecycle, so tmpfiles are preserved
  *   in-place for post-mortem debugging — they are NOT archived or deleted.
@@ -467,7 +467,7 @@ export function cleanup(
   }
 
   // Sprint 156 Task 4: Tmpfile handling is gated by cleanupPhase.
-  // sprint-end → archive .prompt-*.txt and .worker-*.sh into .tasks/archive/sprint-{id}/.
+  // sprint-end → archive .prompt-*.txt and .worker-*.sh into the canonical sprint namespace.
   // spawn-fail → preserve tmpfiles in-place (post-mortem debugging value).
   // Previously (pre-Sprint 156) cleanup() unconditionally deleted these files, which
   // (a) destroyed forensic evidence on spawn-fail and (b) raced ahead of CLI cleanup's

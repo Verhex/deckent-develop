@@ -37,7 +37,7 @@ function sprint(tasks: Task[]): Sprint {
   } as Sprint;
 }
 
-function decide(tasks: Task[], slotBudget: number) {
+function decide(tasks: Task[], slotBudget: number, collectedIds = new Set<string>()) {
   const snapshot = captureShadowSchedulerSnapshot({
     trigger: { kind: 'watcher', sequence: 1 },
     strategy: 'continuous',
@@ -48,7 +48,7 @@ function decide(tasks: Task[], slotBudget: number) {
     sprint: sprint(tasks),
     remainingQueue: [],
     assignedTaskIds: new Set(tasks.filter(t => t.status === TaskStatus.EXECUTING).map(t => t.id)),
-    collectedIds: new Set(),
+    collectedIds,
     completedTaskIds: [],
   });
   return reduceSchedulerTick(snapshot);
@@ -99,5 +99,35 @@ describe('scheduler collision reorder production wire', () => {
       reason: 'pending-slot-fill',
     });
     expect(decision.dispositions.get(competitor.id)).toBe('spawn');
+  });
+
+  it('releases only a synthetic collision after a NO_GO predecessor is collected', () => {
+    const failedWriter = task('487-030', 'src/shared.ts', { status: TaskStatus.NO_GO });
+    const collisionOnly = task('487-031', 'src/shared.ts');
+    const realDependant = task('487-032', 'src/independent.ts', {
+      dependencies: [failedWriter.id],
+    });
+
+    const decision = decide(
+      [failedWriter, collisionOnly, realDependant],
+      2,
+      new Set([failedWriter.id]),
+    );
+
+    expect(decision.orderedEffects).toContainEqual({
+      kind: 'SpawnTask',
+      taskId: collisionOnly.id,
+      reason: 'pending-slot-fill',
+    });
+    expect(decision.orderedEffects).toContainEqual({
+      kind: 'CascadeSkip',
+      taskId: realDependant.id,
+      failedDependencyId: failedWriter.id,
+      idempotencyKey: `cascade-skip:${realDependant.id}:${failedWriter.id}`,
+    });
+    expect(decision.orderedEffects).not.toContainEqual(expect.objectContaining({
+      kind: 'SpawnTask',
+      taskId: realDependant.id,
+    }));
   });
 });

@@ -1,22 +1,22 @@
 // ═══ Recover — Task-Artifact Settlement Helpers (row 3314) ════════
 // The recover path used to archive task artifacts into a tasks-local directory
-// (`.tasks/archive/<sprintId>`) while normal settlement archived into the brain
+// (`.tasks/archive/<sprintId>`) while normal settlement used another legacy
 // archive, and it left non-terminal artifacts loose in the tasks root. Row 3314
 // measured three manual consolidation moves in one night because of that split.
 //
 // This module is the recover path's consumer of the SINGLE archive authority in
-// `orchestra/sprint-finalizer.ts`. It deliberately contains no path literal, no
+// `core/sprint-archive.ts`. It deliberately contains no path literal, no
 // classification and no second resolver: it forwards the recovery report's own
 // terminal/non-terminal classification into `archiveTaskArtifacts`, which owns
 // the destination, the typed preservation marker and the zero-residue sweep.
 //
-// Layering: cli → orchestra is the allowed direction (ADR-D-004 C3).
+// Layering: cli → core is the canonical adapter direction (ADR-D-004).
 
 import {
   archiveTaskArtifacts,
   resolveTaskArtifactArchiveDir,
   type TaskArtifactArchiveResult,
-} from '../../orchestra/sprint-finalizer.js';
+} from '../../core/sprint-archive.js';
 
 /**
  * Classification produced by the recovery path (`postFinalizeCleanup` /

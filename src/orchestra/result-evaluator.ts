@@ -9,7 +9,8 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 
 import { isAbsolute, join, posix, resolve } from 'node:path';
 import type { Task, TaskResult, EvaluationRubric, RubricScore, EvaluationResult, NoGoCategory } from '../core/types.js';
 import { TaskEvaluation } from '../core/types.js';
-import { BRAIN_DIR, SPRINTS_DIR, TASKS_DIR, ARCHIVE_DIR } from '../core/constants.js';
+import { BRAIN_DIR, SPRINTS_DIR, TASKS_DIR } from '../core/constants.js';
+import { discoverSprintArchiveIds, resolveTaskArtifactReadDirs } from '../core/sprint-archive.js';
 import { debugLog } from '../core/utils.js';
 import { coerceNotesToString } from '../core/task-result-schema.js';
 import {
@@ -3206,12 +3207,22 @@ export function classifyHonestyViolation(
  */
 export function archivedResultExists(projectRoot: string, taskId: string): boolean {
   try {
-    // W7: yeni-düzen archive/sprints/ önce, eski düz-yerleşim fallback (geriye-uyum).
-    for (const base of [join(projectRoot, BRAIN_DIR, ARCHIVE_DIR, 'sprints'), join(projectRoot, BRAIN_DIR, ARCHIVE_DIR)]) {
-      if (!existsSync(base)) continue;
-      for (const dir of readdirSync(base)) {
-        if (!dir.endsWith('-tasks')) continue;
-        if (existsSync(join(base, dir, `task-${taskId}.result`))) return true;
+    const sprintSegment = taskId.match(/^(\d+)-/u)?.[1];
+    const sprintIds = sprintSegment
+      ? [`sprint-${sprintSegment}`]
+      : discoverSprintArchiveIds(projectRoot);
+    const expected = `task-${taskId}.result`;
+    for (const sprintId of sprintIds) {
+      for (const base of resolveTaskArtifactReadDirs(projectRoot, sprintId)) {
+        const pending = [base];
+        while (pending.length > 0) {
+          const current = pending.pop()!;
+          for (const entry of readdirSync(current, { withFileTypes: true })) {
+            const path = join(current, entry.name);
+            if (entry.isDirectory()) pending.push(path);
+            else if (entry.isFile() && entry.name === expected) return true;
+          }
+        }
       }
     }
     return false;

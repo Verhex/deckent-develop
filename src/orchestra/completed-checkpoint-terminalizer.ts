@@ -14,6 +14,7 @@ import {
 } from './sprint-checkpoint.js';
 import {
   finalizeSprint,
+  loadFinalizerAttemptTasks,
   publishFinalSprintAuthority,
   publishTestModeSprintTerminalReceipt,
 } from './sprint-finalizer.js';
@@ -50,10 +51,11 @@ function emitRecoveryEvent(
 function completedCheckpointEvidence(
   projectRoot: string,
   sprint: Sprint,
-): { results: TaskResult[]; evaluations: Map<string, TaskEvaluation> } {
+): { results: TaskResult[]; evaluations: Map<string, TaskEvaluation>; taskCount: number } {
   const results: TaskResult[] = [];
   const evaluations = new Map<string, TaskEvaluation>();
-  for (const task of sprint.tasks) {
+  const attemptTasks = loadFinalizerAttemptTasks(projectRoot, sprint);
+  for (const task of attemptTasks) {
     const authority = readAuthoritativeTaskResult<TaskResult>(projectRoot, task.id);
     const result = normalizeTaskResultShape(authority.result);
     if (!result) throw new DeckentError('E_TERMINALIZATION_RESULT_AUTHORITY_MISSING', `TERMINALIZATION_RESULT_AUTHORITY_MISSING:${task.id}:${authority.state}`);
@@ -71,7 +73,7 @@ function completedCheckpointEvidence(
     results.push(result);
     evaluations.set(task.id, recorded as TaskEvaluation);
   }
-  return { results, evaluations };
+  return { results, evaluations, taskCount: attemptTasks.length };
 }
 
 function testTerminalMetrics(
@@ -136,14 +138,14 @@ export async function terminalizeCompletedCheckpointRun(
     sprint.skipCleanup = checkpoint.skipCleanup ?? true;
 
     stage = 'evidence';
-    const { results, evaluations } = completedCheckpointEvidence(projectRoot, sprint);
+    const { results, evaluations, taskCount } = completedCheckpointEvidence(projectRoot, sprint);
     emitRecoveryEvent(
       projectRoot,
       sprint.id,
       CHANNELS.RECOVERY_EVIDENCE_REUSED,
       {
         source: 'persisted-task-result-and-brain-evaluation',
-        taskCount: sprint.tasks.length,
+        taskCount,
         resultCount: results.length,
         evaluationCount: evaluations.size,
         evaluatorRerun: false,

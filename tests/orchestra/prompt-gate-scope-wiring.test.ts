@@ -123,6 +123,26 @@ describe('SAN-1 wiring — render keeps tracked root files (397-011/012 failure 
 });
 
 describe('G1b wiring — satisfiability findings surface through evaluatePromptGate', () => {
+  it('passes task.scope.filesRead into the read-satisfiability gate', () => {
+    const t = task({
+      id: 't-read-authority',
+      description: 'Read src/core/provider-catalog.ts before writing the bounded evidence note.',
+      scope: {
+        directories: [],
+        filesRead: ['src/core/provider-catalog.ts'],
+        filesWrite: ['docs/evidence/provider-catalog-note.md'],
+      },
+    });
+    const res = evaluatePromptGate({
+      tasks: [t],
+      agentPool: EMPTY_POOL,
+      trackedFiles: ['src/core/provider-catalog.ts', 'docs/evidence/provider-catalog-note.md'],
+    });
+    expect(res.findings.filter(f =>
+      f.lint === 'scope-satisfiability' && f.message.includes('MENTIONED_NOT_READABLE'),
+    )).toEqual([]);
+  });
+
   it('flags a goCriteria-mentioned path missing from the write authority as BLOCK', () => {
     const t = task({
       id: 't-g1b',

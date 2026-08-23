@@ -151,14 +151,6 @@ describe('registerInitTool', () => {
       expect(String(deckentWrite![1])).toContain('awesome-project');
     });
 
-    it('writes i18n files for en and tr', async () => {
-      const tool = await getInitTool();
-      await tool.handler({ projectName: 'proj', mode: 'performance', language: 'en' });
-      const writeCalls = vi.mocked(writeFileSync).mock.calls.map((c) => String(c[0]));
-      expect(writeCalls.some((p) => p.includes('en.json'))).toBe(true);
-      expect(writeCalls.some((p) => p.includes('tr.json'))).toBe(true);
-    });
-
     it('calls ensureDeckentImport for AGENTS.md and CLAUDE.md', async () => {
       const tool = await getInitTool();
       await tool.handler({ projectName: 'proj', mode: 'performance', language: 'en' });

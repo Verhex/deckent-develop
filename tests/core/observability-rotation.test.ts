@@ -71,7 +71,10 @@ describe('rotateMetricsFile()', () => {
     const result = rotateMetricsFile(TEST_ROOT, 'sprint-150');
 
     expect(result.rotated).toBe(true);
-    expect(result.archivePath).toContain('metrics-sprint-150.jsonl.gz');
+    expect(result.archivePath).toContain(join(
+      '.deckent', 'archive', 'sprints', 'sprint-150', 'metrics', 'metrics-',
+    ));
+    expect(result.archivePath).toMatch(/metrics-[0-9a-f]{16}\.jsonl\.gz$/u);
     expect(result.originalSizeBytes).toBeGreaterThan(0);
     expect(result.archivedSizeBytes).toBeGreaterThan(0);
 
@@ -104,7 +107,7 @@ describe('rotateMetricsFile()', () => {
     ].join('\n') + '\n';
     writeFileSync(METRICS_PATH, originalContent, 'utf-8');
 
-    const result = rotateMetricsFile(TEST_ROOT, 'sprint-rt');
+    const result = rotateMetricsFile(TEST_ROOT, 'sprint-151');
 
     const recovered = readArchivedMetrics(result.archivePath!);
     expect(recovered).toBe(originalContent);
@@ -114,7 +117,7 @@ describe('rotateMetricsFile()', () => {
 // ═══ keepLastN Enforcement ══════════════════════════════════════
 
 describe('enforceKeepLastN()', () => {
-  it('should prune oldest archives when exceeding limit', () => {
+  it('preserves immutable archives when the legacy hot-cache limit is exceeded', () => {
     mkdirSync(ARCHIVE_DIR, { recursive: true });
 
     // Create 5 archive files
@@ -123,17 +126,13 @@ describe('enforceKeepLastN()', () => {
       writeFileSync(join(ARCHIVE_DIR, name), gzipSync('test'));
     }
 
-    // Keep only 3
     const pruned = enforceKeepLastN(TEST_ROOT, 3);
 
-    expect(pruned).toHaveLength(2);
-    // sprint-001 and sprint-002 should be removed
-    expect(pruned[0]).toContain('sprint-001');
-    expect(pruned[1]).toContain('sprint-002');
-
-    // Remaining files
+    expect(pruned).toEqual([]);
     const remaining = readdirSync(ARCHIVE_DIR);
-    expect(remaining).toHaveLength(3);
+    expect(remaining).toHaveLength(5);
+    expect(remaining).toContain('metrics-sprint-001.jsonl.gz');
+    expect(remaining).toContain('metrics-sprint-002.jsonl.gz');
     expect(remaining).toContain('metrics-sprint-003.jsonl.gz');
     expect(remaining).toContain('metrics-sprint-004.jsonl.gz');
     expect(remaining).toContain('metrics-sprint-005.jsonl.gz');
@@ -285,7 +284,7 @@ describe('Retro-compatibility', () => {
     writeMetricsLines(legacyLines);
 
     // Rotation should still work
-    const result = rotateMetricsFile(TEST_ROOT, 'legacy-archive');
+    const result = rotateMetricsFile(TEST_ROOT, 'sprint-152');
     expect(result.rotated).toBe(true);
 
     // Archived content should be recoverable

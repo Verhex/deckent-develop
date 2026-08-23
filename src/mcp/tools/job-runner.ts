@@ -1,6 +1,8 @@
 import { writeFileSync, readFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { JOBS_DIR, TASKS_DIR } from '../../core/constants.js';
+import { executionJobTimestamp } from '../../core/execution-job-identity.js';
+export { createExecutionJobId as createJobId } from '../../core/execution-job-identity.js';
 
 export interface TaskSummary {
   taskId: string;
@@ -88,8 +90,10 @@ export function readLatestJobState(projectRoot: string): JobState | null {
   try {
     const jobFiles = readdirSync(jobsDir)
       .filter(f => f.endsWith('.json'))
-      .sort()
-      .reverse();
+      .sort((left, right) => {
+        const byTimestamp = executionJobTimestamp(right) - executionJobTimestamp(left);
+        return byTimestamp !== 0 ? byTimestamp : right.localeCompare(left);
+      });
     if (jobFiles.length === 0) return null;
     const jobId = (jobFiles[0] ?? '').replace('.json', '');
     return readJobState(projectRoot, jobId);

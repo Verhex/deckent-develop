@@ -1318,18 +1318,18 @@ describe('Docker Backend Parity — Orphan HB Cleanup', () => {
   beforeEach(() => { root = makeTmpRoot(); });
   afterEach(() => { fs.rmSync(root, { recursive: true, force: true }); });
 
-  it('T12a: cleanupOrphanHBs archives orphan HB files to brain/archive/', () => {
+  it('T12a: cleanupOrphanHBs archives orphan HB files to the canonical sprint archive', () => {
     // Arrange
     const brainDir = path.join(root, '.brain');
     const archiveBase = path.join(brainDir, 'archive');
     fs.mkdirSync(brainDir, { recursive: true });
     fs.mkdirSync(archiveBase, { recursive: true });
-    writeHBFile(root, 'orphan-001', { workerId: 'docker-orphan-001', taskId: 'orphan-001', status: 'EXECUTING' });
-    const originalHbPath = path.join(root, TASKS_DIR, 'task-orphan-001.hb');
+    writeHBFile(root, '991-001', { workerId: 'docker-orphan-001', taskId: '991-001', status: 'EXECUTING' });
+    const originalHbPath = path.join(root, TASKS_DIR, 'task-991-001.hb');
     expect(fs.existsSync(originalHbPath)).toBe(true);
 
     // Act
-    const cleanup = cleanupOrphanHBs(root, 'sprint-test', new Set());
+    const cleanup = cleanupOrphanHBs(root, 'sprint-991', new Set());
 
     // Assert — HB must be removed from .tasks/ and archived
     expect(cleanup.orphanCount).toBeGreaterThan(0);
@@ -1343,7 +1343,7 @@ describe('Docker Backend Parity — Orphan HB Cleanup', () => {
     fs.mkdirSync(path.join(brainDir, 'archive'), { recursive: true });
 
     // Act
-    const cleanup = cleanupOrphanHBs(root, 'sprint-clean', new Set());
+    const cleanup = cleanupOrphanHBs(root, 'sprint-992', new Set());
 
     // Assert
     expect(cleanup.orphanCount).toBe(0);
@@ -1354,15 +1354,15 @@ describe('Docker Backend Parity — Orphan HB Cleanup', () => {
     // Arrange
     const brainDir = path.join(root, '.brain');
     fs.mkdirSync(path.join(brainDir, 'archive'), { recursive: true });
-    writeTaskJson(root, 'active-task');
-    writeHBFile(root, 'active-task', { workerId: 'docker-active-task', taskId: 'active-task', status: 'EXECUTING' });
-    writeHBFile(root, 'orphan-task', { workerId: 'docker-orphan-task', taskId: 'orphan-task', status: 'EXECUTING' });
+    writeTaskJson(root, '993-001');
+    writeHBFile(root, '993-001', { workerId: 'docker-active-task', taskId: '993-001', status: 'EXECUTING' });
+    writeHBFile(root, '993-002', { workerId: 'docker-orphan-task', taskId: '993-002', status: 'EXECUTING' });
 
     // Act — active-task has a JSON file, orphan-task does not
-    const cleanup = cleanupOrphanHBs(root, 'sprint-preserve');
+    const cleanup = cleanupOrphanHBs(root, 'sprint-993');
 
     // Assert — active task HB preserved
-    expect(fs.existsSync(path.join(root, TASKS_DIR, 'task-active-task.hb'))).toBe(true);
+    expect(fs.existsSync(path.join(root, TASKS_DIR, 'task-993-001.hb'))).toBe(true);
     expect(cleanup.orphanCount).toBe(1);
   });
 });
@@ -1728,7 +1728,7 @@ describe('Docker Backend — Prompt Persistence + Archive', () => {
   });
 
   // T24: archivePromptFiles moves .prompt-* to archive directory
-  it('T24: archivePromptFiles() moves prompt files to .tasks/archive/sprint-NNN/', () => {
+  it('T24: archivePromptFiles() moves prompt files to the canonical sprint archive', () => {
     // Arrange — create some .prompt-* files
     const tasksDir = path.join(root, TASKS_DIR);
     const promptFiles = [
@@ -1745,7 +1745,7 @@ describe('Docker Backend — Prompt Persistence + Archive', () => {
 
     // Assert — files moved to archive
     expect(result.archived).toBe(3);
-    const archiveDir = path.join(tasksDir, 'archive', 'sprint-139');
+    const archiveDir = path.join(root, '.deckent', 'archive', 'sprints', 'sprint-139', 'tasks');
     expect(fs.existsSync(archiveDir)).toBe(true);
     for (const f of promptFiles) {
       expect(fs.existsSync(path.join(archiveDir, f))).toBe(true);
@@ -1753,8 +1753,8 @@ describe('Docker Backend — Prompt Persistence + Archive', () => {
     }
   });
 
-  // T25: archivePromptFiles applies retention policy
-  it('T25: archivePromptFiles() removes old sprint archives beyond retention limit', () => {
+  // T25: immutable evidence is never deleted by prompt-only retention.
+  it('T25: archivePromptFiles() does not delete prior immutable sprint archives', () => {
     // Arrange — create archive dirs for sprints 100-104 (5 sprints)
     const tasksDir = path.join(root, TASKS_DIR);
     const archiveRoot = path.join(tasksDir, 'archive');
@@ -1764,13 +1764,14 @@ describe('Docker Backend — Prompt Persistence + Archive', () => {
       fs.writeFileSync(path.join(dir, `.prompt-test-${i}.txt`), `old prompt ${i}`, 'utf-8');
     }
 
-    // Act — archive sprint-105 with retention=5 (should remove sprint-100)
-    archivePromptFiles(tasksDir, 'sprint-105', 5);
+    const result = archivePromptFiles(tasksDir, 'sprint-105', 5);
 
-    // Assert — sprint-100 removed, sprints 101-105 kept
-    expect(fs.existsSync(path.join(archiveRoot, 'sprint-100'))).toBe(false);
+    // Legacy staging is reconciled by the canonical archive authority; this
+    // prompt writer itself never destroys historical evidence.
+    expect(result.cleaned).toBe(0);
+    expect(fs.existsSync(path.join(archiveRoot, 'sprint-100'))).toBe(true);
     expect(fs.existsSync(path.join(archiveRoot, 'sprint-101'))).toBe(true);
-    expect(fs.existsSync(path.join(archiveRoot, 'sprint-105'))).toBe(true);
+    expect(fs.existsSync(path.join(archiveRoot, 'sprint-104'))).toBe(true);
   });
 
   // T26: archivePromptFiles handles empty tasksDir gracefully

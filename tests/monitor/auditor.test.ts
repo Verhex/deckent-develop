@@ -44,6 +44,8 @@ import { AlertLevel, TaskStatus } from '../../src/core/types.js';
 import type { Task, TaskScope, DashboardState, Heartbeat, LockInfo } from '../../src/core/types.js';
 import { AUDITOR_SCAN_INTERVAL_MS, PATTERNS_MAX_LINES } from '../../src/core/constants.js';
 
+const archiveTaskArtifactsMock = vi.hoisted(() => vi.fn());
+
 vi.mock('node:fs', () => ({
   readFileSync: vi.fn(),
   readdirSync: vi.fn(),
@@ -83,6 +85,10 @@ const mockAuditorMemStore = {
 };
 vi.mock('../../src/core/memory-store.js', () => ({
   MemoryStore: vi.fn().mockImplementation(() => mockAuditorMemStore),
+}));
+
+vi.mock('../../src/core/sprint-archive.js', () => ({
+  archiveTaskArtifacts: archiveTaskArtifactsMock,
 }));
 
 import { readFileSync, readdirSync, existsSync, writeFileSync, unlinkSync, statSync, mkdirSync, renameSync } from 'node:fs';
@@ -2312,6 +2318,9 @@ describe('cleanupOrphanHBs', () => {
   beforeEach(() => {
     mockedMkdirSync.mockReturnValue(undefined as never);
     mockedRenameSync.mockReturnValue(undefined as never);
+    archiveTaskArtifactsMock.mockImplementation((_root, _sprintId, plan) => ({
+      archived: [...plan.archive], failures: [],
+    }));
   });
 
   it('returns zero counts when no orphans exist', () => {
@@ -2326,13 +2335,13 @@ describe('cleanupOrphanHBs', () => {
     expect(mockedRenameSync).not.toHaveBeenCalled();
   });
 
-  it('archives orphan HB files to .brain/archive/{sprintId}-orphan-hb/', () => {
+  it('archives orphan HB files through the canonical sprint archive authority', () => {
     mockedExistsSync.mockReturnValue(true);
     mockedReaddirSync.mockImplementation((dir: unknown) => {
       const d = String(dir);
       if (d.includes('.locks')) return [] as never;    // no locks
       // .tasks dir scan (for orphan detect and active worker IDs)
-      return ['task-001.hb', 'task-orphan.hb'] as never;
+      return ['task-139-001.hb', 'task-139-002.hb'] as never;
     });
 
     // readFileSync for active worker HB after archive (remaining HBs)
@@ -2340,19 +2349,15 @@ describe('cleanupOrphanHBs', () => {
       JSON.stringify({ workerId: 'w-001' }) as never,
     );
 
-    const result = cleanupOrphanHBs('/project', 'sprint-139', new Set(['001']));
+    const result = cleanupOrphanHBs('/project', 'sprint-139', new Set(['139-001']));
 
     expect(result.orphanCount).toBe(1);
     expect(result.archived).toHaveLength(1);
-    expect(result.archived[0]).toContain('task-orphan.hb');
+    expect(result.archived[0]).toContain('task-139-002.hb');
 
-    // mkdirSync called for archive dir
-    expect(mockedMkdirSync).toHaveBeenCalledWith(
-      expect.stringContaining('sprint-139-orphan-hb'),
-      expect.objectContaining({ recursive: true }),
-    );
-    // renameSync called to move file
-    expect(mockedRenameSync).toHaveBeenCalledTimes(1);
+    expect(archiveTaskArtifactsMock).toHaveBeenCalledWith('/project', 'sprint-139', {
+      archive: ['task-139-002.hb'], preserve: [], sweepResidue: false,
+    });
   });
 
   it('continues processing other orphans when one rename fails', () => {
@@ -2360,18 +2365,17 @@ describe('cleanupOrphanHBs', () => {
     mockedReaddirSync.mockImplementation((dir: unknown) => {
       const d = String(dir);
       if (d.includes('.locks')) return [] as never;
-      return ['task-001.hb', 'task-orphanA.hb', 'task-orphanB.hb'] as never;
+      return ['task-139-001.hb', 'task-139-002.hb', 'task-139-003.hb'] as never;
     });
     mockedReadFileSync.mockReturnValue(
       JSON.stringify({ workerId: 'w-001' }) as never,
     );
 
-    // First rename fails, second succeeds
-    mockedRenameSync
-      .mockImplementationOnce(() => { throw new Error('ENOENT'); })
-      .mockReturnValueOnce(undefined as never);
+    archiveTaskArtifactsMock.mockReturnValue({
+      archived: ['task-139-003.hb'], failures: ['task-139-002.hb'],
+    });
 
-    const result = cleanupOrphanHBs('/project', 'sprint-139', new Set(['001']));
+    const result = cleanupOrphanHBs('/project', 'sprint-139', new Set(['139-001']));
 
     // orphanCount = 2 detected; archived = 1 (one failed)
     expect(result.orphanCount).toBe(2);
@@ -2390,7 +2394,7 @@ describe('cleanupOrphanHBs', () => {
         return ['src__orphan-worker__file.ts.lock'] as never;
       }
       if (d.includes('.tasks')) {
-        return ['task-001.hb', 'task-orphan.hb'] as never;
+        return ['task-139-001.hb', 'task-139-002.hb'] as never;
       }
       return [] as never;
     });
@@ -2409,7 +2413,7 @@ describe('cleanupOrphanHBs', () => {
       return JSON.stringify({ workerId: 'w-001' }) as never;
     });
 
-    const result = cleanupOrphanHBs('/project', 'sprint-139', new Set(['001']));
+    const result = cleanupOrphanHBs('/project', 'sprint-139', new Set(['139-001']));
 
     // Lock for w-orphan should be released (not in active set)
     expect(result.locksReleased).toHaveLength(1);

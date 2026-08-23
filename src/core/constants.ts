@@ -17,11 +17,12 @@ export const CONTRACTS_DIR = '.contracts' as const;
 export const CLAUDE_RULES_DIR = join('.claude', 'rules');
 export const WORKSPACE_DIR = join(DECKENT_DIR, 'workspace');
 export const PLUGINS_DIR = join(DECKENT_DIR, 'plugins');
-export const I18N_DIR = join(DECKENT_DIR, 'i18n');
 // ─── Purpose-folder roots (de-scatter: settings = config-like JSON,
 //     runtime = ephemeral per-run state, nervous = nervous-system files) ──
 export const SETTINGS_DIR = join(DECKENT_DIR, 'settings');
 export const RUNTIME_DIR = join(DECKENT_DIR, 'runtime');
+/** Detached CLI stdout/stderr logs. Runtime retention owns this namespace. */
+export const DETACHED_LOGS_DIR = join(RUNTIME_DIR, 'logs', 'detached');
 export const RUN_STATUS_READ_MODEL_FILE = join(RUNTIME_DIR, 'run-status-read-model.json');
 export const JOBS_DIR = join(RUNTIME_DIR, 'jobs');
 export const DECISIONS_LOG_DIR = join(RUNTIME_DIR, 'decisions');

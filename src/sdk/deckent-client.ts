@@ -15,9 +15,10 @@
 // added startSprintDetached/getSprintResults/getRetro.
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { getCurrentSprintId } from '../core/event-stream.js';
-import { TASKS_DIR, DASHBOARD_FILE, BRAIN_DIR, ARCHIVE_DIR, MEMORY_DB_FILE } from '../core/constants.js';
+import { TASKS_DIR, DASHBOARD_FILE, BRAIN_DIR, MEMORY_DB_FILE } from '../core/constants.js';
+import { resolveTaskArtifactReadDirs } from '../core/sprint-archive.js';
 import type { Task, TaskResult } from '../core/task-types.js';
 import type { DashboardState } from '../core/monitoring-types.js';
 import { MemoryStore } from '../core/memory-store.js';
@@ -173,7 +174,7 @@ function tallyTaskCounts(tasks: readonly Task[]): Record<string, number> {
 }
 
 // ─── getSprintResults() disk reader ─────────────────────────────────────
-// Shared by both the live `.tasks/` dir and the post-finalize `.brain/archive/`
+// Shared by both the live `.tasks/` dir and the canonical/legacy archives.
 // copy — same `task-<prefix>-*.json` / `.result` file-name convention in both
 // locations (archiveOrphanTasks moves files verbatim, it doesn't rename them).
 
@@ -181,18 +182,23 @@ function readTaskAndResultFiles(dir: string, prefix: string): { tasks: Task[]; r
   const empty = { tasks: [], results: [] };
   if (!existsSync(dir)) return empty;
 
-  let entries: string[];
-  try {
-    entries = readdirSync(dir);
-  } catch {
-    return empty;
-  }
-
   const tasks: Task[] = [];
   const results: TaskResult[] = [];
-  for (const entry of entries) {
+  const files: string[] = [];
+  const pending = [dir];
+  while (pending.length > 0) {
+    const current = pending.pop()!;
+    try {
+      for (const entry of readdirSync(current, { withFileTypes: true })) {
+        const full = join(current, entry.name);
+        if (entry.isDirectory()) pending.push(full);
+        else if (entry.isFile()) files.push(full);
+      }
+    } catch { /* unreadable branch is not fatal to the SDK read model */ }
+  }
+  for (const full of files.sort()) {
+    const entry = basename(full);
     if (!entry.startsWith(prefix)) continue;
-    const full = join(dir, entry);
     if (entry.endsWith('.json')) {
       try {
         tasks.push(JSON.parse(readFileSync(full, 'utf-8')) as Task);
@@ -280,13 +286,19 @@ class DeckentClientImpl implements DeckentClient {
       return { sprintId, tasks: live.tasks, results: live.results, source: 'live' };
     }
 
-    // W7: yeni-düzen önce, eski düz-yerleşim fallback (geriye-uyum).
-    const archiveNew = join(this.projectRoot, BRAIN_DIR, ARCHIVE_DIR, 'sprints', `${sprintId}-tasks`);
-    const archiveDir = existsSync(archiveNew) ? archiveNew : join(this.projectRoot, BRAIN_DIR, ARCHIVE_DIR, `${sprintId}-tasks`);
-    const archived = readTaskAndResultFiles(archiveDir, prefix);
-    if (archived.tasks.length > 0 || archived.results.length > 0) {
-      return { sprintId, tasks: archived.tasks, results: archived.results, source: 'archive' };
+    const taskById = new Map<string, Task>();
+    const resultById = new Map<string, TaskResult>();
+    for (const archiveDir of resolveTaskArtifactReadDirs(this.projectRoot, sprintId)) {
+      const archived = readTaskAndResultFiles(archiveDir, prefix);
+      for (const task of archived.tasks) if (!taskById.has(task.id)) taskById.set(task.id, task);
+      for (const result of archived.results) if (!resultById.has(result.taskId)) resultById.set(result.taskId, result);
     }
+    if (taskById.size > 0 || resultById.size > 0) return {
+      sprintId,
+      tasks: [...taskById.values()],
+      results: [...resultById.values()],
+      source: 'archive',
+    };
 
     return { sprintId, tasks: [], results: [], source: 'none' };
   }

@@ -1,5 +1,123 @@
 # Sprint Learnings (auto-generated)
 
+## Sprint sprint-1780659451558 Learnings
+- Sprint sprint-1780659451558 Learnings: ## Sprint sprint-1780659451558 Learnings
+- POMR02-STORE-SCALE 10k lookup and concurrent publication proof: GO_WITH_TECH_DEBT — Added deterministic IPC-barrier concurrent identical publication coverage proving one created and one existing-identical
+- POMR06-ADVERSARIAL Receipt forgery and project-boundary proof: GO_WITH_TECH_DEBT — Added real parser and filesystem-store adversarial proof for tampered digests, swapped references, foreign-project repla
+- POMR09-REAL-BINARY-E2E Compiled command lifecycle fixture: NO_GO — Implemented a real compiled-entry subprocess fixture covering inspect → adopt dry-run → apply → fresh-process replay, in
+- POMR11-CONTRACT-TRUTH Receipt contract implementation synchronization: GO_WITH_TECH_DEBT — Updated the contract from future-only language to an implemented-versus-pending account grounded in the production store
+- POMR13-CURRENT-MEASUREMENT Aggregate live re-measurement: GO_WITH_TECH_DEBT — Created and read back the timestamped, provenance-bound aggregate measurement. Read-only measurements establish v1=43 ro
+- POMR18-MASTER-TRUTH Work 480 acceptance correction: GO_WITH_TECH_DEBT — Updated only Work 480 acceptance/evidence semantics with exact retained-v1-preimage lineage and durable receipt criteria
+- POMR20-FINAL-CONSISTENCY Ordered package report: NO_GO — Wrote and read back the final-consistency report; it preserves OPEN/ACTIVE/ABORTED and exact ordered Brain gates.
+Critic
+- Fix: POMR20-FINAL-CONSISTENCY Ordered package report: NO_GO — Critical Definition-of-Done item remains unticked: the supplied prior readback explicitly reports artifacts 03–11 and 15
+- Fix: Fix: Fix: POMR20-FINAL-CONSISTENCY Ordered package report: NO_GO — Read back the final-consistency report and confirmed that it accounts for all twenty ordered positions, preserves the se
+- Fix: Fix: POMR20-FINAL-CONSISTENCY Ordered package report: NO_GO — Reconciled all twenty ordered positions individually, corrected time-bounded count semantics, and recorded the seven exa
+
+## Gains
+- 1780659451558-001 — POMR01-STORE-CLOSURE Receipt store implementation plus executable proof — Declared verification passed: npx vitest run tests/core/provider-execution-observation-adoption-r...
+- 1780659451558-003 — POMR03-CLI-CLOSURE Real adopt producer→durable store→fresh-read — Registered production provider-observations adopt --apply now performs producer → durable publica...
+- 1780659451558-004 — POMR04-I18N-CLOSURE EN/TR receipt surface and parity — Direct EN/TR catalog membership is asserted so English fallback cannot hide a Turkish gap.
+- 1780659451558-005 — POMR05-CLI-NEGATIVE CLI restart, replay and zero-write regressions — Added hermetic child-process lifecycle regressions covering dry-run zero-write, apply creation, c...
+- 1780659451558-007 — POMR07-SNAPSHOT-REGRESSION Immutable SQLite boundary audit — Created real SQLite regression coverage proving archived/live database bytes and metadata remain ...
+- 1780659451558-008 — POMR08-STORE-RESTART Fresh-process and privacy assurance — Added a genuine separate-process re-import proof that performs a fresh exact-ID read under the cu...
+- 1780659451558-010 — POMR10-INVENTORY-TRUTH Predecessor and current authority inventory — Inventory is disk-backed: it distinguishes the retained 43-row v1 preimage from stale 53-row pros...
+- 1780659451558-012 — POMR12-WIRING-AUDIT Production closure map — Created the production closure map with exact producer, durable store, exact/fresh reader, compil...
+- …and 7 more delivered
+
+## Sprint sprint-1780659451557 Learnings
+- Sprint sprint-1780659451557 Learnings: ## Sprint sprint-1780659451557 Learnings
+- POM01-DISK-INVENTORY Exact adoption authority inventory: GO_WITH_TECH_DEBT — Created the disk inventory with the production caller chain, persisted artifact counts, stale 53-row versus current 43-r
+- POM04-IMMUTABLE-READ-PROOF Snapshot/WAL/concurrency regression proof: GO_WITH_TECH_DEBT — Added hermetic real-SQLite regression proof for immutable snapshot reads: pre-existing WAL/SHM preservation, non-empty W
+- POM05-RECEIPT-STORE Content-addressed durable receipt authority: NO_GO — Implemented the canonical immutable receipt-store module with strict canonical parsing, content-addressed identity, auth
+- POM09-I18N Adoption receipt user messages: GO_WITH_TECH_DEBT — Added EN/TR messages for persisted adoption receipts ({receiptId}, {receiptPath}), verified receipt replay ({receiptId},
+- Fix: Fix: Fix: POM05-RECEIPT-STORE Content-addressed durable receipt authority: NO_GO — Bug: create-only publication verification did not prove that the final entry was the inode whose bytes and metadata had
+- Fix: Fix: POM05-RECEIPT-STORE Content-addressed durable receipt authority: NO_GO — Bug: durable read/fresh verification had TOCTOU gaps: final receipt bytes were not surrounded by stable metadata checks,
+- Fix: POM05-RECEIPT-STORE Content-addressed durable receipt authority: NO_GO — Bug: the original attempt was rejected because its task-authoritative regression test could not run.
+Root cause: tests/c
+
+## Gains
+- 1780659451557-002 — POM02-RECEIPT-CONTRACT Durable adoption receipt contract — Created an implementable, strict v1 durable adoption receipt contract with project-relative refer...
+- 1780659451557-003 — POM03-IMMUTABLE-READ Side-effect-free SQLite snapshot reader — Implemented bounded private snapshot inspection: source databases are never passed to SQLite, mai...
+- 1780659451557-010 — POM10-I18N-PROOF Message parity regression — Pinned the three provider-observation adoption receipt/replay/HOLD keys through direct catalog-la...
+- 1780659451557-005-fix-fix-fix-fix — Fix: Fix: Fix: Fix: POM05-RECEIPT-STORE Content-addressed durable receipt authority — Bug: prior receipt publication did not retain enough inode identity evidence across create-only p...
+
+## Sprint sprint-1780659451556 Learnings
+- Sprint sprint-1780659451556 Learnings: ## Sprint sprint-1780659451556 Learnings
+
+## Gains
+- 1780659451556-001 — R01-LINK-REPAIR Closure gate source-reference repair — Replaced exactly three broken line-range fragments with stable references to scripts/lint-closure...
+- 1780659451556-002 — R02-PROJECTION-EVIDENCE Current MASTER projection measurement — Created a read-only current-cut evidence note with exact canonical/projection counts, digest pari...
+- 1780659451556-003 — R03-BRIEF-REPAIR Transition brief current-truth correction — Updated the 2026-08-22 current-truth addendum to record canonical/generated projection parity and...
+- 1780659451556-004 — R04-RESULT-REPAIR Work 7084 bounded result synchronization — Appended a 2026-08-22 repair cut recording current 521/456/65 projection parity, sprint 1555 as e...
+- 1780659451556-005 — R05-VERIFICATION-REPAIR Verification record synchronization — Created the dated verification repair that supersedes only sprint 1555 task-level projection/link...
+- 1780659451556-006 — R06-FINAL-CONSISTENCY Ordered repair proof — Recorded the exact five-task timestamp-backed dependency barrier, current 521/456/65/187 projecti...
+
+## Sprint sprint-1780659451549 Learnings
+- Sprint sprint-1780659451549 Learnings: ## Sprint sprint-1780659451549 Learnings
+
+## Gains
+- 1780659451549-001 — Canonical CLI consumer and text-source byte hygiene — Declared targeted Vitest battery passed (3 files, 43 tests).
+
+## Sprint sprint-1780659451548 Learnings
+- Sprint sprint-1780659451548 Learnings: ## Sprint sprint-1780659451548 Learnings
+- Canonical provider-observation path authority: GO_WITH_TECH_DEBT — Exported PROVIDER_EXECUTION_OBSERVATION_DATABASE_PATH as the single project-relative .db authority and routed the produc
+
+## Gains
+- 1780659451548-002 — CLI default-path parity and real handler regression — Default inspect, migrate, and adopt now resolve the canonical .deckent/provider-execution-observa...
+
+## Sprint sprint-1780659451547 Learnings
+- Sprint sprint-1780659451547 Learnings: ## Sprint sprint-1780659451547 Learnings
+
+## Gains
+- 1780659451547-001 — Compiled adoption and closure evidence — Recorded disk-backed compiled build/restart, read-only inspect/dry-run, exact v1→v2 adoption matc...
+
+## Sprint sprint-1780659451546 Learnings
+- Sprint sprint-1780659451546 Learnings: ## Sprint sprint-1780659451546 Learnings
+
+## Gains
+- 1780659451546-001 — Graceful terminal-notification drain — Canonical open/closing/closed lifecycle now rejects new work, cancels and unrefs the scheduled ti...
+- 1780659451546-002 — Fix-lineage evidence — Recorded sprint 1545 as scoped-green while explicitly carrying the later Brain finding and source...
+
+## Sprint sprint-1780659451545 Learnings
+- Sprint sprint-1780659451545 Learnings: ## Sprint sprint-1780659451545 Learnings
+
+## Gains
+- 1780659451545-001 — Adoption schema and duplicate-identity authority — Exact table_info authority now rejects duplicate-capable execution identity schemas and every non...
+- 1780659451545-002 — Disposable notification lifecycle contract — Targeted Vitest verification passed: 3 files, 36 tests.
+- 1780659451545-003 — Finite CLI and detached-runner teardown wiring — Both finite composition roots retain the exact dispatcher returned by bootstrap and await its can...
+- 1780659451545-004 — Autonomous notification teardown wiring — Autonomous notification ownership is explicit: connectors and the dispatcher are constructed once...
+- 1780659451545-005 — Terminal closure evidence reconciliation — Recorded both immutable prior sprint receipts, including the visible ABORTED 15/20 lineage and th...
+
+## Sprint sprint-1780659451544 Learnings
+- Sprint sprint-1780659451544 Learnings: ## Sprint sprint-1780659451544 Learnings
+- Migration authority proof: GO_WITH_TECH_DEBT — Declared verification passed: npx vitest run tests/core/provider-execution-observation-migration.test.ts (6/6 tests).
+Ev
+- Critical ApprovalBroker bridge proof: GO_WITH_TECH_DEBT — Added a hermetic bridge integration proof for pending→interactive authenticated allow→fresh apply authority, with a spy
+- Continuation evidence reconciliation: GO_WITH_TECH_DEBT — Recorded the disk-backed first-pass ABORTED 15/20 and sprint-1780659451544 continuation lineage without rewriting histor
+
+## Gains
+- 1780659451544-001 — Core compile and canonicalization closure — Exact canonical projections now preserve array/object narrowing without broad assertions, API ren...
+- 1780659451544-003 — Adoption verifier proof — Added evidence-complete adoption proof coverage for exact 43-row legacy preservation plus contrad...
+- 1780659451544-005 — Exact CLI wiring and real-process proof — Declared verification passed: 2 files, 25 tests.
+
+## Sprint sprint-1780659451539 Learnings
+- Sprint sprint-1780659451539 Learnings: ## Sprint sprint-1780659451539 Learnings
+- Sidecar spec inventory: NO_GO — The authorized target .analysis/closure-os-7084/05-sidecar-inventory.md is missing, and its parent .analysis/closure-os-
+- MASTER evidence supersession: NO_GO — Explicit dated supersession history was added for rows 7084 and 3296 while preserving every protected canonical row fiel
+- Projection regeneration: NO_GO — DECKENT_E091:coordinator-crashed-before-docker-prepare:cf3737f7-fe98-46a8-b403-088e40cfa5f4
+
+## Gains
+- 1780659451539-001 — Outcome capsule — Created the row 7084 outcome capsule with DOGFOOD_MODE=ON, owner decision reference, pinned base ...
+- 1780659451539-002 — Live phase-chain inventory — Created the intended new scoped inventory path after confirming the closure-os-7084 directory and...
+- 1780659451539-003 — Projection drift inventory — Documented the projection authority boundary, reproducible read-only drift commands, exact counts...
+- 1780659451539-004 — Transition brief inventory — Created the exact transition-brief inventory sections for Phase-5, ledger/projection, approval, d...
+- 1780659451539-006 — Approval capability-policy inventory — Fiili CLI-only durum ile flag/policy-gated product capability ayrımı source, docs, effective conf...
+- 1780659451539-007 — Core-memory inventory — Created the exact-scope core-memory inventory.
+- 1780659451539-008 — Product residual inventory — Created a source-backed residual crosswalk against existing MASTER identities/dependencies; no ne...
+- 1780659451539-009 — Health and ETA readiness — Created a source-backed Closure Health and ETA readiness assessment.
+- …and 9 more delivered
+
 ## Sprint sprint-622 Learnings
 - Sprint sprint-622 Learnings: ## Sprint sprint-622 Learnings
 - Immutable evaluation receipt restart replay pin: GO_WITH_TECH_DEBT — Receipt replay is idempotent: an existing exact-attempt receipt is consumed as verdict authority without evaluation or r

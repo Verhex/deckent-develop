@@ -16,6 +16,7 @@ import { cleanOrphanIpcDirs } from '../../core/orphan-cleaner.js';
 import { debugLog } from '../../core/utils.js';
 import type { SprintSizeRecommendation } from '../../core/types.js';
 import { writeJobState } from './job-runner.js';
+import { createExecutionJobId } from '../../core/execution-job-identity.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { formatStartResponse, formatErrorResponse, wrapResponse } from '../helpers/format.js';
 import { isSprintLocked } from '../../core/multi-ide.js';
@@ -571,7 +572,7 @@ export function registerStartTool(
           };
         }
 
-        const jobId = `sprint-${Date.now()}`;
+        const jobId = createExecutionJobId();
         const startedAt = new Date().toISOString();
 
         writeJobState(root, { jobId, status: 'RUNNING', startedAt });
@@ -591,6 +592,7 @@ export function registerStartTool(
         const runnerConfig: SprintRunnerConfig & { acknowledgePromptGate?: boolean } = {
           projectRoot: root,
           jobId,
+          startedAt,
           // Sprint 189 T-009: honor caller-supplied autoApprove (default false
           // for CLI parity). Previously hardcoded to true which bypassed the
           // schema default and made the surface param dead-letter.

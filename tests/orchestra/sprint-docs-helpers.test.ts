@@ -257,18 +257,18 @@ describe('buildDirectivesPlaceholder', () => {
   it('includes previous sprint reference', () => {
     const content = buildDirectivesPlaceholder(
       'sprint-042',
-      'DIRECTIVES-sprint-042.md',
+      '.deckent/archive/sprints/sprint-042/docs/DIRECTIVES.md',
       43,
     );
 
     expect(content).toContain('sprint-042');
-    expect(content).toContain('DIRECTIVES-sprint-042.md');
+    expect(content).toContain('.deckent/archive/sprints/sprint-042/docs/DIRECTIVES.md');
   });
 
   it('includes correct next sprint number', () => {
     const content = buildDirectivesPlaceholder(
       'sprint-010',
-      'DIRECTIVES-sprint-010.md',
+      '.deckent/archive/sprints/sprint-010/docs/DIRECTIVES.md',
       11,
     );
 
@@ -278,7 +278,7 @@ describe('buildDirectivesPlaceholder', () => {
   it('handles string sprint number', () => {
     const content = buildDirectivesPlaceholder(
       'sprint-100',
-      'DIRECTIVES-sprint-100.md',
+      '.deckent/archive/sprints/sprint-100/docs/DIRECTIVES.md',
       '101',
     );
 
@@ -288,12 +288,12 @@ describe('buildDirectivesPlaceholder', () => {
   it('includes reference sections', () => {
     const content = buildDirectivesPlaceholder(
       'sprint-005',
-      'DIRECTIVES-sprint-005.md',
+      '.deckent/archive/sprints/sprint-005/docs/DIRECTIVES.md',
       6,
     );
 
     expect(content).toContain('## Referanslar');
-    expect(content).toContain('.brain/archive/');
+    expect(content).toContain('.deckent/archive/sprints/sprint-005/docs/DIRECTIVES.md');
     expect(content).toContain('.brain/RETRO.md');
     expect(content).toContain('.brain/MEMORY.md');
   });
@@ -301,7 +301,7 @@ describe('buildDirectivesPlaceholder', () => {
   it('includes template task structure', () => {
     const content = buildDirectivesPlaceholder(
       'sprint-001',
-      'DIRECTIVES-sprint-001.md',
+      '.deckent/archive/sprints/sprint-001/docs/DIRECTIVES.md',
       2,
     );
 
@@ -315,7 +315,7 @@ describe('buildDirectivesPlaceholder', () => {
   it('uses "???" for unknown next sprint number', () => {
     const content = buildDirectivesPlaceholder(
       'sprint-099',
-      'DIRECTIVES-sprint-099.md',
+      '.deckent/archive/sprints/sprint-099/docs/DIRECTIVES.md',
       '???',
     );
 

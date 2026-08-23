@@ -197,6 +197,21 @@ describe('extractScopeFromDirective', () => {
     expect(scope.filesRead).toEqual([]);
   });
 
+  it('parses Reads as exact read-only authority without leaking into write scope', () => {
+    const scope = extractScopeFromDirective(
+      'Reads: src/core/utils.ts, docs/MASTER-PLAN.md, .deckent/provider-execution-observations.db',
+    );
+    expect(scope).toEqual({
+      directories: [],
+      filesRead: [
+        'src/core/utils.ts',
+        'docs/MASTER-PLAN.md',
+        '.deckent/provider-execution-observations.db',
+      ],
+      filesWrite: [],
+    });
+  });
+
   it('adds root-level DECKENT.md to filesWrite without adding docs/ directory', () => {
     const scope = extractScopeFromDirective('Files: DECKENT.md, src/core/config.ts');
     expect(scope.filesWrite).toContain('DECKENT.md');
@@ -225,6 +240,17 @@ describe('extractScopeFromDirective', () => {
 // ─── parseStructuredDirectives ─────────────────────────────────────────────
 
 describe('parseStructuredDirectives', () => {
+  it('keeps Reads and Files in disjoint authority channels', () => {
+    const [task] = parseStructuredDirectives(`
+## Task 1: Read/write split
+- Reads: src/core/config.ts, docs/MASTER-PLAN.md
+- Files: docs/evidence/read-write-split.md
+Implement: inspect inputs and write the evidence note.
+`);
+    expect(task?.scope.filesRead).toEqual(['src/core/config.ts', 'docs/MASTER-PLAN.md']);
+    expect(task?.scope.filesWrite).toEqual(['docs/evidence/read-write-split.md']);
+  });
+
   it('returns empty array when no structured sections', () => {
     const result = parseStructuredDirectives('# Just a heading\nSome content');
     expect(result).toEqual([]);

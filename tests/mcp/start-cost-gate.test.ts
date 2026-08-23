@@ -363,7 +363,7 @@ describe('deckent_start — cost gate (Sprint 189 T-008)', () => {
 
       expect(result.isError).toBeUndefined();
       expect(parsed.success).toBe(true);
-      expect(parsed.jobId).toMatch(/^sprint-\d+$/);
+      expect(parsed.jobId).toMatch(/^job-\d{13}-[0-9a-f-]+$/);
       expect(parsed.status).toBe('RUNNING');
     });
   });

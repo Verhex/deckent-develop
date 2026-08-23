@@ -158,6 +158,38 @@ Depends via 0-based index "0".
     expect(tasks[1]!.dependencies).toEqual([firstId]);
   });
 
+  it('keeps timestamp-backed canonical ids across a second normalization pass', () => {
+    const tasks = buildStructuredTasks(TITLE_PREFIX_FIXTURE, 'sprint-1780659451555');
+
+    normalizeStructuredTaskDependencies(tasks);
+    const firstPass = [...tasks[1]!.dependencies];
+    normalizeStructuredTaskDependencies(tasks);
+
+    expect(firstPass).toEqual(['1780659451555-001']);
+    expect(tasks[1]!.dependencies).toEqual(firstPass);
+  });
+
+  it('preserves a timestamp-id high-fan-in barrier during idempotent normalization', () => {
+    const tasks = buildStructuredTasks(TITLE_PREFIX_FIXTURE, 'sprint-1780659451555');
+    const barrier = createTask({
+      title: 'T17-BRIEF-INTEGRATION',
+      description: 'Integrate every predecessor.',
+      model: 'claude-sonnet-5',
+      effort: 'normal',
+      priority: 'NORMAL',
+      reason: 'test fixture',
+      scope: { directories: [], filesRead: [], filesWrite: ['brief.md'] },
+      dependencies: tasks.map(task => task.id),
+      goNogo: { goCriteria: 'n/a', noGoCriteria: 'n/a', techDebtAcceptable: '' },
+      sprintId: 'sprint-1780659451555',
+    }, 3);
+    tasks.push(barrier);
+
+    normalizeStructuredTaskDependencies(tasks);
+
+    expect(barrier.dependencies).toEqual(['1780659451555-001', '1780659451555-002']);
+  });
+
   it('leaves tasks with no dependencies untouched', () => {
     const tasks = buildStructuredTasks(TITLE_PREFIX_FIXTURE);
     expect(tasks[0]!.dependencies).toEqual([]);

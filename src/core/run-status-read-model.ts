@@ -24,6 +24,10 @@ import {
   type LogicalProgressStatus,
 } from './logical-progress-projection.js';
 import { readProviderConcurrencyRuntime } from './provider-concurrency-runtime-reader.js';
+import {
+  PROVIDER_EXECUTION_OBSERVATION_DATABASE_PATH,
+  ProviderExecutionObservationStore,
+} from './provider-execution-observation-store.js';
 import type { ProviderConcurrencyRuntimeProjection } from './provider-limit-admission.js';
 import { readCanonicalRunStatus, type CanonicalRunStatus } from './run-status-authority.js';
 import { projectTerminalPublicationStatus } from './sprint-terminal-publication-status.js';
@@ -250,20 +254,48 @@ function readRunGeneration(projectRoot: string, authority: CanonicalRunStatus): 
 }
 
 function projectionHolds(
+  projectRoot: string,
   authority: CanonicalRunStatus,
   providerConcurrency: readonly ProviderConcurrencyRuntimeProjection[],
+  currentTaskIds: ReadonlySet<string>,
+  currentAttemptIdsByTaskId: ReadonlyMap<string, ReadonlySet<string>>,
 ): RunStatusReadModelHold[] {
   const holds: RunStatusReadModelHold[] = authority.conflicts.map(conflict => ({
     reasonCode: 'authority-conflict',
     evidenceRef: `run-status-conflict:${conflict.surface}:${conflict.sprintId ?? 'none'}`,
     detail: conflict.value,
   }));
+  if (!authority.sprintId) return holds;
+
+  const databasePath = join(projectRoot, PROVIDER_EXECUTION_OBSERVATION_DATABASE_PATH);
+  if (!existsSync(databasePath)) return holds;
+  const store = new ProviderExecutionObservationStore(projectRoot, {
+    dbPath: databasePath,
+    readOnly: true,
+  });
+  const anomalousOpenIntervalsByPrincipal = new Map<string, number>();
+  try {
+    for (const provider of providerConcurrency) {
+      const count = store.listIntervals(provider.providerPrincipalDigest).filter(interval => {
+        if (interval.end !== null || interval.retired) return false;
+        if (interval.ownership !== 'run-owned' || interval.runId !== authority.sprintId) return false;
+        if (!currentTaskIds.has(interval.taskId)) return true;
+        return !(currentAttemptIdsByTaskId.get(interval.taskId)?.has(interval.attemptId) ?? false);
+      }).length;
+      if (count > 0) anomalousOpenIntervalsByPrincipal.set(provider.providerPrincipalDigest, count);
+    }
+  } finally {
+    store.close();
+  }
   for (const provider of providerConcurrency) {
-    if (provider.unresolvedOpenIntervals === 0) continue;
+    const anomalousOpenIntervals = anomalousOpenIntervalsByPrincipal.get(
+      provider.providerPrincipalDigest,
+    ) ?? 0;
+    if (anomalousOpenIntervals === 0) continue;
     holds.push({
       reasonCode: 'unresolved-provider-observation',
       evidenceRef: `provider-principal:${provider.providerPrincipalDigest}`,
-      detail: `${provider.unresolvedOpenIntervals} open observation(s) are outside the exact current run task set`,
+      detail: `${anomalousOpenIntervals} open observation(s) owned by the current run are outside its exact task/attempt set`,
     });
   }
   return holds;
@@ -373,7 +405,16 @@ export function publishCanonicalRunStatusReadModel(
     providerConcurrency,
     terminalPublication,
     runGeneration: readRunGeneration(projectRoot, authority),
-    holds: [...loaded.holds, ...projectionHolds(authority, providerConcurrency)],
+    holds: [
+      ...loaded.holds,
+      ...projectionHolds(
+        projectRoot,
+        authority,
+        providerConcurrency,
+        currentTaskIds,
+        currentAttemptIdsByTaskId,
+      ),
+    ],
     previous,
     publishedAt: options.publishedAt ?? new Date().toISOString(),
   });

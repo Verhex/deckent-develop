@@ -300,7 +300,7 @@ describe('deckent_start — fire-and-forget lifecycle (Sprint 191 T-006)', () =>
       const tool = await getStartTool();
       const result = await tool.handler({});
       const parsed = JSON.parse(result.content[0]!.text) as { jobId?: string; status?: string };
-      expect(parsed.jobId).toMatch(/^sprint-\d+$/);
+      expect(parsed.jobId).toMatch(/^job-\d{13}-[0-9a-f-]+$/);
       expect(parsed.status).toBe('RUNNING');
     });
   });
@@ -348,7 +348,7 @@ describe('deckent_start — fire-and-forget lifecycle (Sprint 191 T-006)', () =>
         jobId?: string;
         autoApprove?: boolean;
       };
-      expect(ipcBody.jobId).toMatch(/^sprint-\d+$/);
+      expect(ipcBody.jobId).toMatch(/^job-\d{13}-[0-9a-f-]+$/);
       expect(ipcBody.projectRoot).toBeTruthy();
       expect(typeof ipcBody.autoApprove).toBe('boolean');
     });
@@ -369,7 +369,7 @@ describe('deckent_start — fire-and-forget lifecycle (Sprint 191 T-006)', () =>
       };
       // Written before fork — no child PID in IPC config
       expect(ipcBody.childPid).toBeUndefined();
-      expect(ipcBody.jobId).toMatch(/^sprint-\d+$/);
+      expect(ipcBody.jobId).toMatch(/^job-\d{13}-[0-9a-f-]+$/);
     });
   });
 

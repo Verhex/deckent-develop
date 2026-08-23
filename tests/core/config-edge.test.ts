@@ -353,6 +353,22 @@ describe('loadConfig', () => {
     expect(config.auto_docs).toBeDefined();
     expect(config.auto_docs?.tier1).toBe(true);
   });
+
+  it.each([
+    ['zero age', { families: { runtime: { max_age_days: 0 } } }],
+    ['unbounded count', { families: { runtime: { max_count: 1_000_001 } } }],
+    ['non-finite size', { families: { runtime: { max_size_mb: 'Infinity' } } }],
+    ['unsafe archive path', { archive_path: '../outside' }],
+    ['invalid enable control', { enabled: 'yes' }],
+    ['invalid finalize control', { apply_on_finalize: 1 }],
+    ['unknown policy field', { delete_immediately: true }],
+    ['unknown family bound', { families: { runtime: { max_bytes: 1 } } }],
+    ['unsafe dot family', { families: { '.': { max_age_days: 1, max_count: 1, max_size_mb: 1 } } }],
+  ])('rejects invalid runtime artifact retention fail-closed: %s', async (_label, override) => {
+    const projectConfigPath = join(tmpDir, '.deckent', 'config.json');
+    writeFileSync(projectConfigPath, JSON.stringify({ runtime_artifact_retention: override }));
+    await expect(loadConfig(tmpDir, { force: true })).rejects.toThrow(ConfigValidationError);
+  });
 });
 
 // ─── validatePartialConfig ────────────────────────────────────────────────────

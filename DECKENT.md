@@ -4,9 +4,9 @@
 Canonical ürün kimliği ve execution-authority tanımı: `.deckent/workspace/IDENTITY.md`.
 `@file` import çözmeyen host'lar bu dosyayı doğrudan açıp okur.
 
-> **Aktif yön kararları taşındı** — bu iç-pivot notu artık `.analysis/hermes-vs-deckent-direction-decisions.md`
-> içinde tutuluyor (CLAUDE.md operating_rules'ta da özetlenir); DECKENT.md yalnız mekanik/işlevsel
-> referans kalır, tekrar-eden iç-strateji notu barındırmaz.
+> **Ürün yönü:** canonical kimlik `.deckent/workspace/IDENTITY.md`; yön ve gerekçesi
+> `docs/en/vision.md` ile `docs/tr/vision.md`; yürütülecek işler `docs/MASTER-PLAN.md`
+> tarafından yönetilir. DECKENT.md yalnız mekanik/işlevsel referanstır.
 
 ## Rules
 - Canonical authority chain Goal → Mission → Flow → Run → WorkItem → Attempt → Operation'dır; Brain bu authority'yi supervise eder, worker kendi scope veya authority'sini genişletemez
@@ -328,10 +328,15 @@ PLAN → SPAWN → EXECUTE → EVALUATE → FIX → RETRO → DECAY → COMPLETE
 
 ### approvals ve xverify kullanıcı akışı
 
-**approvals — runtime onay isteklerinin yönetimi:**
-- `deckent approvals list` → bekleyen (pending) onay isteklerini listeler (read-only).
-- `deckent approvals decide <requestId> --allow|--deny [--reason <text>]` → kararı verir; bu mutation
-  YALNIZ CLI'da, interactive live-auth arkasında yapılır.
+**approvals — ürün capability'si ve mevcut repo policy'si:**
+- Ürün transport contractı CLI-only değildir. HTTP/RPC karar capability'si `api_decide`,
+  policy değerlendirmesi ve fresh OIDC doğrulaması birlikte başarılı olduğunda kullanılabilir.
+  Canonical transport/runtime ayrıntıları için
+  [API surface reference](docs/en/reference/api-surface.md) belgesine bakın.
+- Bu repodaki mevcut operator policy'si approval mutation'ını CLI ile sınırlar:
+  `deckent approvals decide <requestId> --allow|--deny [--reason <text>]` yalnız interactive
+  live-auth arkasında karar verir. Bu, ürünün HTTP/RPC capability'sinin olmadığı anlamına gelmez.
+- `deckent approvals list` bekleyen (pending) onay isteklerini listeler (read-only).
 - MCP `deckent_approvals` yalnız **read-only pending inbox**'tur (canonical `ApprovalBroker` →
   `list('pending')`); MCP üzerinden allow/deny/decide/self-approval YOKTUR.
 

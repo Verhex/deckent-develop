@@ -8,7 +8,7 @@
 // point as a fully detached child instead: own process group (separate PGID,
 // mirrors the detached-worker pattern in providers/subprocess.ts), unref'd so
 // the parent never waits on it, stdout+stderr redirected straight to a log
-// file under `.deckent/recently-works/`. Returns immediately with the child's
+// file under `.deckent/runtime/logs/detached/`. Returns immediately with the child's
 // pid and the log path — never awaits completion.
 //
 // fd-based stdio (not 'pipe' + `.on('data')`) is deliberate: a piped stream
@@ -25,7 +25,7 @@ import { spawn } from 'node:child_process';
 import { openSync, closeSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { RECENT_WORKS_DIR } from '../../core/constants.js';
+import { DETACHED_LOGS_DIR } from '../../core/constants.js';
 import { LIVE_TRACE_ENV } from '../../core/config.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -53,7 +53,7 @@ export type DetachedSpawnFn = (
 ) => DetachedChildHandle;
 
 export interface SpawnDetachedOptions {
-  /** Project root — resolves `.deckent/recently-works/` and the child's cwd. Defaults to process.cwd(). */
+  /** Project root — resolves the detached runtime-log namespace and the child's cwd. Defaults to process.cwd(). */
   projectRoot?: string;
   /** Inject a fake spawn for hermetic tests; omit for the real node:child_process spawn. */
   spawnFn?: DetachedSpawnFn;
@@ -120,7 +120,7 @@ function defaultSpawnFn(
  * process group (`detached: true` → separate PGID on POSIX) + `windowsHide`
  * (no visible console window on native Windows), unref'd so the parent can
  * exit independently, stdout+stderr redirected to
- * `.deckent/recently-works/<argv[0]>-<timestamp>.log`. Returns immediately
+ * `.deckent/runtime/logs/detached/<argv[0]>-<timestamp>.log`. Returns immediately
  * with the child's pid and the log path; never awaits completion.
  */
 export function spawnDetachedDeckent(
@@ -128,14 +128,14 @@ export function spawnDetachedDeckent(
   opts: SpawnDetachedOptions = {},
 ): DetachedSpawnResult {
   const projectRoot = opts.projectRoot ?? process.cwd();
-  const recentWorksDir = join(projectRoot, RECENT_WORKS_DIR);
-  mkdirSync(recentWorksDir, { recursive: true });
+  const detachedLogsDir = join(projectRoot, DETACHED_LOGS_DIR);
+  mkdirSync(detachedLogsDir, { recursive: true });
 
   const cmdLabel = (argv[0] ?? 'cmd').replace(/[^a-zA-Z0-9_-]/g, '_');
   // flowId (when supplied) is folded into the log filename so a durable job
   // is findable by its correlator, not just by pid — see SpawnDetachedOptions.flowId.
   const flowIdSegment = opts.flowId ? `${opts.flowId.replace(/[^a-zA-Z0-9_-]/g, '_')}-` : '';
-  const logPath = join(recentWorksDir, `${cmdLabel}-${flowIdSegment}${Date.now()}.log`);
+  const logPath = join(detachedLogsDir, `${cmdLabel}-${flowIdSegment}${Date.now()}.log`);
   const logFd = openSync(logPath, 'a');
   const childArgv = opts.exactStart
     ? [

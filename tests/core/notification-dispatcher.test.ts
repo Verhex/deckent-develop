@@ -152,6 +152,91 @@ describe('NotifyDispatcher', () => {
     const count = await dispatcher.flush();
     expect(count).toBe(0);
   });
+
+  it('close shares one promise, drains queued work once, then rejects post-close delivery', async () => {
+    const stop = vi.fn(async () => {});
+    const adapter = {
+      ...makeAdapter(),
+      close: vi.fn(async () => {
+        expect(adapter.calls.map((notification) => notification.title)).toEqual(['first', 'queued']);
+        await stop();
+      }),
+    };
+    dispatcher.addAdapter(adapter);
+    await dispatcher.dispatch(makeNotification({ title: 'first' }));
+    await dispatcher.dispatch(makeNotification({ title: 'queued' }));
+
+    const firstClose = dispatcher.close();
+    const secondClose = dispatcher.close();
+    expect(secondClose).toBe(firstClose);
+    dispatcher.clearAdapters();
+    await firstClose;
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(adapter.close).toHaveBeenCalledTimes(1);
+    expect(adapter.calls.map((notification) => notification.title)).toEqual(['first', 'queued']);
+    expect(dispatcher.queueLength).toBe(0);
+    await expect(dispatcher.dispatch(makeNotification({ title: 'late' }))).resolves.toBe(0);
+    expect(adapter.calls).toHaveLength(2);
+  });
+
+  it('drains every queued notification FIFO without duplicate timer delivery', async () => {
+    const adapter = makeAdapter();
+    dispatcher.addAdapter(adapter);
+    await dispatcher.dispatch(makeNotification({ title: 'first' }));
+    await dispatcher.dispatch(makeNotification({ title: 'second' }));
+    await dispatcher.dispatch(makeNotification({ title: 'third' }));
+
+    const closing = dispatcher.close();
+    await closing;
+    await vi.advanceTimersByTimeAsync(3000);
+
+    expect(adapter.calls.map((notification) => notification.title)).toEqual([
+      'first', 'second', 'third',
+    ]);
+    expect(dispatcher.queueLength).toBe(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('waits for an already-admitted delivery before draining and closing', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const events: string[] = [];
+    const adapter: NotificationAdapter = {
+      name: 'ordered',
+      isAvailable: () => true,
+      send: async (notification) => {
+        events.push(`send:${notification.title}`);
+        if (notification.title === 'first') await gate;
+      },
+      close: async () => { events.push('close'); },
+    };
+    dispatcher.addAdapter(adapter);
+
+    const first = dispatcher.dispatch(makeNotification({ title: 'first' }));
+    await Promise.resolve();
+    const second = dispatcher.dispatch(makeNotification({ title: 'second' }));
+    const closing = dispatcher.close();
+    expect(events).toEqual(['send:first']);
+    release();
+
+    await Promise.all([first, second, closing]);
+    expect(events).toEqual(['send:first', 'send:second', 'close']);
+  });
+
+  it('close attempts every adapter and preserves close failure authority', async () => {
+    const failClose = vi.fn(async () => { throw new Error('close failed'); });
+    const goodClose = vi.fn(async () => {});
+    dispatcher.addAdapter({ ...makeAdapter(), close: failClose });
+    dispatcher.addAdapter({ ...makeAdapter(), close: goodClose });
+
+    await expect(dispatcher.close()).rejects.toThrow('Notification adapter close failed');
+    expect(failClose).toHaveBeenCalledTimes(1);
+    expect(goodClose).toHaveBeenCalledTimes(1);
+    await expect(dispatcher.close()).rejects.toThrow('Notification adapter close failed');
+    expect(failClose).toHaveBeenCalledTimes(1);
+  });
 });
 
 // ─── createNotification Tests ────────────────────────────────────

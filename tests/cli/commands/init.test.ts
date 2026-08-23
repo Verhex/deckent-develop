@@ -320,13 +320,6 @@ describe('init command (isolated)', () => {
       );
     });
 
-    it('creates .deckent/i18n directory', async () => {
-      await runCommand(['init', '--auto']);
-      expect(mkdirSync).toHaveBeenCalledWith(
-        expect.stringContaining('i18n'),
-        expect.objectContaining({ recursive: true }),
-      );
-    });
   });
 
   // ─── File generation ───────────────────────────────────────────────
@@ -373,25 +366,6 @@ describe('init command (isolated)', () => {
       expect(directivesCall).toBeDefined();
     });
 
-    it('writes i18n/en.json file', async () => {
-      vi.mocked(existsSync).mockReturnValue(false);
-      await runCommand(['init', '--auto']);
-      const writeCalls = vi.mocked(writeFileSync).mock.calls;
-      const enCall = writeCalls.find(c => String(c[0]).includes('en.json'));
-      expect(enCall).toBeDefined();
-      const content = JSON.parse(String(enCall![1]));
-      expect(content).toHaveProperty('sprint_started');
-    });
-
-    it('writes i18n/tr.json file', async () => {
-      vi.mocked(existsSync).mockReturnValue(false);
-      await runCommand(['init', '--auto']);
-      const writeCalls = vi.mocked(writeFileSync).mock.calls;
-      const trCall = writeCalls.find(c => String(c[0]).includes('tr.json'));
-      expect(trCall).toBeDefined();
-      const content = JSON.parse(String(trCall![1]));
-      expect(content).toHaveProperty('sprint_started');
-    });
 
     it('TOOLS.md reads scripts from package.json when it exists', async () => {
       vi.mocked(existsSync).mockReturnValue(false);

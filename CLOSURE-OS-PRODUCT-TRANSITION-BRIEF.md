@@ -364,7 +364,7 @@ Sol çapraz-analizi + owner onayıyla bağlanan sıra (önceki taslak sıranın 
 |---:|---|---|
 | 1 | `COMPLETE` | 13/13 terminal receipt + tarball digest doğrulandı; legacy code-only `GATE_FAILURE` owner kararıyla ürün settlement hükmü değildir |
 | 2 | `COMPLETE` (2026-08-14 uzlaştırma) | Fable→Sol tier düzeltmesi (`gpt-5.6-sol → premium_plus`) uygulandı ve gerçek cross-provider dispatch CONFIRMED/ALLOW verdi: author `claude/claude-fable-5` → verifier `codex/gpt-5.6-sol`, `typed-host-adjudicated`, usage 60787, receipt `cross-verify-verdict:sha256:3543790980fdb345e65d065b011c877ecf728d53d4acab2d6bc7ef6d3426cf20` (PR #123 §12.2, 2026-08-13). Önceki `TYPED_HOLD_ACCEPTED` artık geçerli değil |
-| 3 | `PARTIAL (bound)` | Source/dist identity uzlaştı ve binary warning kayboldu; unresolved provider-observation residual **yeni root açmadan** mevcut MASTER satırı `RECOVERY-BORN-490-PROVIDER-OBSERVATION-001` (OPEN; P12: live DB `user_version=1`, v1→v2 migration owner-controlled adoption proof bekliyor) altında forensic-open kalır |
+| 3 | `PARTIAL (bound)` | Sprint-local source/dist identity kanıtı vardır; post-sprint live reconnect/adoption receipt'i yoktur. `user_version=1` ve 53 legacy interval yalnız 2026-08-03 ölçümüdür. Work 3296/480/3300 ve parent `OPEN` kalır. |
 
 ## 11. Karar kaydı
 
@@ -419,7 +419,7 @@ Kalan açık maddeler (2026-08-14 uzlaştırması — [CLOSURE-CLASSIFICATION-FO
 
 - ✅ **KAPANDI (PR #124, merge `7232615322`, 2026-08-14):** `release.yml`'in otomatik `npm-publish` adımı + `Create GitHub Release` adımı kaldırıldı; workflow yalnız build/validate/attestation. Least-privilege (`contents: read`, `id-token` yok); publish owner-manual (`npm publish --access public --ignore-scripts`, `--provenance` yok — local publish'te desteklenmez). Çifte-authority çatışması kapandı. `0.100.0` **tag'sız** rebaseline (git tag / GitHub Release / npm publish YOK) main'e indi.
 - ✅ **KAPANDI — §10 adım-2 COMPLETE (PR #123 §12.2, 2026-08-13):** Codex reachability evidence-source + Fable→Sol canlı xverify uygulandı. Gerçek cross-provider dispatch (author `claude/claude-fable-5` → verifier `codex/gpt-5.6-sol`) host verdict **CONFIRMED / ALLOW**, assurance `typed-host-adjudicated`, provider-reported usage **60787** token, durable receipt `cross-verify-verdict:sha256:3543790980fdb345e65d065b011c877ecf728d53d4acab2d6bc7ef6d3426cf20`; `gpt-5.6-sol → premium_plus` registry amendment uygulandı; owner-bounded subscription adjudication (maxTokens 100000, maxWallClockSeconds 300, maxVerificationsPerSprint 1). "Source değişikliği ve yeni smoke henüz uygulanmadı" ifadesi artık geçersizdir.
-- 🔗 **§10 adım-3 residual bağlandı (yeni root YOK):** source/dist identity + historical provider-observation HOLD'ları mevcut MASTER satırı **`RECOVERY-BORN-490-PROVIDER-OBSERVATION-001`** (OPEN, P12: live DB `user_version=1`, v1→v2 migration owner-controlled adoption proof bekliyor) altında forensic-open kalır. Yeni satır/root açılmaz; kapanış o satırın owner-koordinasyonlu build/reconnect adoption proof'una bağlıdır.
+- 🔗 **§10 adım-3 residual bağlandı (yeni root YOK):** 2026-08-03 `user_version=1` + 53 ölçümü tarihsel baselinedır, current-live sayı değildir. Work 3296 historical dispositionı, Work 480 guarded migration/live adoptionı, Work 3300 source/dist reconnect identityyi taşır. Implicit DB-open migration owner intent/backup/target identity yerine geçmez; üçü `OPEN`.
 
 ### 12.1 Sidecar karar-defteri kontratı — revizyon 2 (owner-approved, 2026-08-12)
 
@@ -462,14 +462,14 @@ Kapanış hükümleri:
    `execution_budget` authority'sindeki amaç-profilden gelir. Subscription/free/local çalışmada USD
    authority üretilmez; metered API çalışmada owner-authored USD ceiling ayrıca bağlanır. Hardcoded
    probe bütçesi, ikinci budget authority veya `maxTokens` alanından kanıtsız türetme yoktur.
-3. **Freshness/replay:** stable-forever scope-digest ve her yarışmacının bağımsız rastgele
+2. **Freshness/replay:** stable-forever scope-digest ve her yarışmacının bağımsız rastgele
    `attemptRevision` üretmesi yasaktır. Hazırlık exact-scope latest-evidence sorgusuyla taze kanıtı
    yeniden kullanır; stale/absent durumda `scopeDigest + freshnessEpoch` ortak invocation identity'si
    üretir. Aynı epoch'taki eşzamanlı süreçler aynı receipt declaration üzerinde first-writer-wins
    singleflight olur; takipçiler bounded bekleyip exact-scope evidence'ı yeniden okur. Negatif kanıtın
    TTL/cooldown'u dolmadan yeni epoch açılamaz; süre dolunca immutable yeni kayıt üretilir. Bounded
    retry/backoff ve typed cooldown kanıtı taşır; eski receipt veya truth satırı yeniden yazılmaz.
-4. **Docker transport:** reachability source ham `docker run`/raw argv yolu kuramaz.
+3. **Docker transport:** reachability source ham `docker run`/raw argv yolu kuramaz.
    Provider-neutral bounded probe seam'i canonical `DockerSpawnBackend` image identity, credential
    mount/env scrub, network policy, prompt feed, timeout/output ceiling, termination ve containment
    builder'larını kullanır. Probe network davranışı exact provider dispatch'in effective backend
@@ -478,16 +478,16 @@ Kapanış hükümleri:
    provider-native observation üretir; `reachable/liveProven`
    terfisini canonical core yapar. Unsupported platform/backend dürüst typed sonuçtur; dört-platform
    adapter matrisi tasarım ve hermetik testte baştan tanımlanır.
-5. **Tier:** `gpt-5.6-sol → premium_plus`; `gpt-5.5`, Codex premium için explicit preferred;
+4. **Tier:** `gpt-5.6-sol → premium_plus`; `gpt-5.5`, Codex premium için explicit preferred;
    Sol, Codex premium_plus için explicit preferred olur. `gpt-5.6` alias ve `gpt-5.6-sol` pricing
    satırları `premium_plus` ile hizalanır; registry↔pricing invariant testi vacuous-green olamaz.
    `CONFIG_MIGRATION_TIER_OVERRIDES` tablosuna Sol istisnası eklenmez; Sol tier'ını doğrudan okuyan
    beklentiler güncellenir. Etki dosyası sayısı metinde sabitlenmez; machine-generated impacted
    manifest ve host geniş regression gate ground truth'tur.
-6. **Balanced mode:** bu pakette config/preset değişikliği yapılmaz. `gpt-5.5` owner activation
+5. **Balanced mode:** bu pakette config/preset değişikliği yapılmaz. `gpt-5.5` owner activation
    store'da kapalı, balanced dormant ve `max_tier` enforcement'ı eksiktir; bulgu
    `MODEL-ACTIVATION-001` altında disposition'a gider.
-7. **Terminal proof:** gerçek Fable→Sol provider dispatch, terminal verdict, invocation/usage ve
+6. **Terminal proof:** gerçek Fable→Sol provider dispatch, terminal verdict, invocation/usage ve
    settlement receipt zinciri olmadan kapanış yoktur. Typed HOLD tanıdır fakat success değildir;
    exact authority eksikliğiyle run resumable `NO_GO/HOLD` kalır. Test claim'i deterministik seçilir.
 
@@ -599,24 +599,151 @@ Kanıt: gate self-check **127/127**, projector **22/22**, governance **9/9** (no
 approval-parity **3/3**, `lint:gates`+`tsc` yeşil. Mekanizma yalnız self-check/fixture + boş-ledger
 yeşil gate ile kanıtlıdır — **gerçek veri akmadı**.
 
-### 14.3 Phase-5 (HENÜZ KURULMADI — dürüst kayıt)
+### 14.3 Phase-5 ilk güvenli dikey dilim — COMPLETE (2026-08-17)
 
-Aşağıdakiler **kod olarak yoktur**; bu foundation onları YALNIZCA **doğrular/bekler**:
+Phase-4 foundation'ın tarihsel kapsamı değişmez: o teslimat yalnız buildless verifier, immutable
+snapshot ve transactional projection mekanizmasını kurmuştu. Sonraki **Phase-5 ilk güvenli dikey
+dilim** ise artık **COMPLETE**'tir:
 
-- genesis public trust-anchor provisioning (owner fingerprint / signed Git authority);
-- ed25519 **SIGNER** + owner private-key custody (repo'da hiçbir private key yok);
-- gerçek **ApprovalBroker writer** (subject/claim submit yolu);
-- gerçek **receipt / ledger event**;
-- **MASTER state/priority mutation**;
-- herhangi bir **provider çağrısı**.
+- genesis public trust-anchor owner ceremony'si tamamlandı; public anchor reviewed parent'ta,
+  private key owner custody'de ve repo dışındadır;
+- `phase5-dry-run.mjs`, `phase5-writer.mjs` ve `phase5-sign.mjs` sevk edildi;
+- ilk batch tek **authenticated** owner kararı ve ed25519 attestation ile yazıldı
+  (`requestId=aprcdb-dba89c0355ac0654f52a24e68e669329`);
+- iki gerçek ledger event'i append edildi; immutable batch snapshot/receipt commit'lendi ve atomik
+  dört-view projection üretildi;
+- event seq1 `DEV-OPERATING-CONTRACT-001` (Work 8101), seq2
+  `RUN-POLICY-DELIVERY-001` (Work 7140) satırlarını receipt-backed DONE'a taşıdı.
 
-### 14.4 HOLD ≠ closure ve exact sonraki sıra
+Bu, ilk güvenli dikey dilimin kapanışıdır; **ürün rollout'u OPEN** kalır. MASTER priority mutation
+hâlâ 0 değişikliktir; key revocation, rotation depth>1, geniş sınıflandırma/re-triage ve ürün
+yüzeylerinin tamamı bu kapanışın dışındadır. Provider çağrısı bu ledger batch'inin kabul kanıtı
+değildir.
 
-Bir typed **HOLD asla başarı/kapanış değildir** (§12.2 ile aynı ilke). Zorunlu sıra:
+### 14.4 HOLD ≠ closure; approval kapsamı ve ordered residual'lar
 
-1. Bu **foundation PR**'ı manifest-kontrollü merge.
-2. **Ayrı genesis trust-anchor PR**'ı — public-key fingerprint'ini owner doğrular; ayrı olması şart
-   (reviewed-parent kuralı: key kendi eklendiği PR'da kendini yetkilendiremez).
-3. **Phase-5 writer** (ApprovalBroker subject/claim + immutable batch bundle + signer/key custody).
-4. **Exact dry-run batch digest** → owner'a **tek authenticated approval** → **ledger append** →
-   **atomic projections**.
+Bir typed **HOLD asla başarı/kapanış değildir** (§12.2 ile aynı ilke). Güncel approval gerçeği:
+
+- İlk batch'in kararı `deckent approvals decide` üzerinden interactive live-auth ile verildi.
+- Effective config'te `api_decide=false`; bu nedenle mevcut deployment fiilen CLI-only'dir.
+- Bu durum code-wide bir invariant değildir: fresh **OIDC** doğrulaması ve MAC authority'si isteyen,
+  flag-gated HTTP decision endpoint'i kodda vardır. `api_decide` açılmadığı için **HTTP enabled**
+  veya rollout tamamlandı iddiası yapılmaz.
+
+Kalan iş sırası, yeni root açmadan canonical MASTER authority'sinde şöyledir:
+
+1. `RECOVERY-BORN-490-BUILD-DIGEST-GATE-001` (Work 3300, **OPEN**) — sprint-local
+   same-generation gate geçti; post-sprint owner reconnect/restart ve invoked live binary digest bekler.
+2. `RECOVERY-BORN-490-PROVIDER-OBSERVATION-001` (Work 3296, **OPEN**) — exact-owned
+   retirement scoped-green; historical/foreign kayıtlar silinmez, sahiplik tahmin edilmez.
+3. `PROVIDER-OBS-MIGRATION-001` (Work 480, **OPEN**) — guarded migration yolu vardır.
+   `user_version=1` + 53 yalnız 2026-08-03 ölçümüdür. Implicit migration adoption değildir;
+   live approval, backup, before/after ölçüm, smoke ve receipt gerekir.
+4. §10 adım-4 owner disposition + P0/P1/P2 re-triage; ardından yedi günlük Closure Health verisi
+   ve P50/P80 ETA. Bunlar tamamlanmadan product roadmap **OPEN** kalır.
+
+## 15. Current-truth addendum — 2026-08-22
+
+Bu ek, yukarıdaki tarihsel kesitleri yeniden yazmadan 2026-08-22 disk ve ürün gerçeğini kaydeder.
+Ölçüm çatışmasında bu bölümün aşağıdaki **ölçüm kapsamı içindeki** değerleri önceki provider,
+archive ve source/dist snapshot'larını supersede eder. §14.2'deki Phase-4 mekanizma kapanışı ile
+§14.3'teki Phase-5 ilk canlı dilim kapanışı tarihsel ve kapsam-sınırlı kayıtlar olarak aynen kalır;
+ikisi de ürün-geneli rollout veya roadmap kapanışı değildir. MASTER iş kimliği/state authority'si,
+sidecar karar authority'si ve projection'ların read-only niteliği değişmez.
+
+### 15.1 Supersede edilen ölçümler ve güncel sınır
+
+| Alan | 2026-08-22 current truth | Yetki ve kapsam sınırı |
+|---|---|---|
+| MASTER / projection parity | Canonical MASTER ile regenerated Markdown/JSON projection'lar **521 total, 456 active, 65 terminal** ve normalized-source digest düzeyinde parity'dedir; deterministic check yeşildir. Work 7084 ve Work 480 `OPEN`, `P1`, dependency alanı boş kalır. Önceki checked-in projection'ların stale olduğu sprint-1555 gözlemi tarihsel kesit olarak geçerlidir; current repository state değildir. | `docs/MASTER-PLAN.md` canonical'dır; generated projection'lar read-only türevdir. Regeneration settlement, owner disposition veya state/priority/dependency değişikliği yapmamıştır. |
+| Canonical sprint archive | **673 manifest**, **29.982 manifest artifact kaydı / 29.980 doğrulanan file**, **782.197.590 payload byte**, 25 manifest conflict kaydı ve 27 fiziksel conflict artifact; missing, mismatch, untracked ve invalid-manifest-digest sayıları sıfırdır. | Bu doğrulanmış lossless all-history cut eski archive sayımlarını supersede eder. Restore, legal-hold, ACL/permission ve native-platform residual'larını ya da yeni destructive authority'yi kapatmaz. |
+| Beş hedef sprint | `sprint-611` ve `sprint-622` `COMPLETE`; `sprint-619`, `sprint-620`, `sprint-621` `ABORTED`. Beş canonical manifest de PASS; Sprint 611'de Sprint 610'a ait path/source yoktur. | Outcome tarihçesi korunur; archive doğrulaması ownership uydurmaz veya payload silmez. |
+| Provider-observation adoption | Teknik adoption proof **COMPLETE**: final compiled binary schema-v2 canonical DB'de 989 interval doğruladı; 43/43 retained legacy v1 satırı exact eşleşir, 946 ek satır run-owned'dır. Digest-bound apply create-only receipt `sha256:5b4c3e75…b847` yayımladı; ayrı process replay aynı receipt'i buldu ve `databaseMutation=none` kaldı. | Bu, Work 480'i kapatmaz. Work 480 canonical settlement boundary'sinde `OPEN` kalır; receipt migration replay veya owner disposition authority'si değildir. |
+| Provider source/dist | Final `build:all` sonrasında invoked `dist` ile source aynı binary identity'dedir ve aynı canonical default'u kullanır: `.deckent/provider-execution-observations.db`. Bot documented stop/build/start akışıyla PID `2600909` üzerinde yeniden bağlandı. | Eski `.sqlite`, v1 veya stale-dist varsayımları current default değildir. Build/adoption proof owner Closure veya release authority'si değildir. |
+| Provider interval inventory | Canonical DB final adoption cut'ında **989** retained interval taşır; mevcut status projection 20 opaque principal ve 6 principal üzerinde 19 unresolved non-retired open interval göstermeyi sürdürür. | Envanter settlement değildir. Foreign/historical kayıt silinmez; sessizlik, yaş veya bu sayı retirement authority üretmez. |
+| Classification | Current active backlog classification coverage **0/456 (%0)**. Projection aggregate'ındaki 3 classification yalnız settled satırlardadır; `3/456`, yuvarlanmış `%1`, aktif coverage değildir. Born projection boştur ve MASTER priority mutation hâlâ sıfırdır. | 456 aktif satırın Level × Lane, priority ve admission kararları owner-only'dir; bu ek bunları sınıflandırmaz. |
+| Closure Health / ETA | Yalnız tek, tarihsiz current projection vardır; yedi bağımsız günlük seri yoktur. Mature Burn, Born Rate, Verified Closure Throughput ve P50/P80 ETA için kanıt **INSUFFICIENT_EVIDENCE**'dır. | Eksik günler backfill edilmez; owner ve worker kapasitesi birleştirilmez; ETA veya rollout tarihi yayımlanmaz. |
+| Release readiness | `0.100.0` tagless version/changelog rebaseline'dır; published release veya GA değildir. `RELEASE-001` `BLOCKED`; platform, packaging/docs, 72-hour soak, signed artifact/SBOM/provenance/rollback ve fresh owner publish authority kanıtları kapanmamıştır. | Tag, GitHub Release, npm publish veya dist-tag değişimi için **NO-GO**. Provider source/dist parity ve sprint archive release artifact proof'u değildir. |
+| Product surfaces | Üç Run Inspector package slice'ı live read-only foundation olarak landed'dır; umbrella `RUN-INSPECTOR-001` ve product outcome `OPEN`, surface parity/cutover ile `NATIVE-DEV-001` dogfood kapanmamıştır. | Package testi veya endpoint landing'i Desktop↔Terminal same-run continuity, protected control, broad parity ya da primary dogfood promotion değildir. |
+| Gate redesign | Work 9040 enforce canary bir `LOCAL_VERIFIED` implementation slice'ıdır; global default `observe` kalır. `EVALUATION-001`, `GOAL-ACCEPTANCE-001`, `KERNEL-SETTLEMENT-001` ve `SPRINT-HONESTY-001` `OPEN`; formal different-provider seal `unavailable/HOLD`'dur. | Canary global default-ON kararı değildir; Sprint 619'un `ABORTED` sonucu korunur ve owner promotion kararı gerekir. |
+| Enterprise governance | Priority mutation depth 0; key revocation yok; rotation depth >1 yok; tenant/project signature binding var fakat geniş Enterprise tenant separation kanıtlanmadı. Work 7084 `OPEN/P1` kalır. | Additive Enterprise tek Core kernel/authority zincirini kullanır; owner disposition, trust mutation, ikinci authority veya hidden license gate bu ekten türetilemez. |
+
+### 15.2 Değişmeyen kapanış sınırları
+
+- Phase 4, verifier/projection foundation olarak `COMPLETE` kalır; o kesitte ledger boştu ve canlı
+  karar akışı yoktu.
+- Phase 5'in ilk güvenli vertical slice'ı `COMPLETE` kalır. İlk batch iki event'tir; sidecar'daki
+  üçüncü event daha sonraki batch'tir ve ilk-slice claim'ini genişletmez.
+- Effective approval deployment için kanıt CLI-only'dir (`api_decide=false`). Flag-gated HTTP
+  endpoint'in kodda bulunması HTTP enablement veya geniş rollout kanıtı değildir.
+- Typed `HOLD` closure değildir. Read-only audit, teknik implementation/adoption proof'u, archive
+  verification'ı veya provider invocation owner admission, priority değişimi ya da MASTER state
+  promotion'ı yapmaz.
+- Release readiness `NO-GO`, product surface foundation dışındaki outcome'lar `OPEN`, gate redesign
+  `LOCAL_VERIFIED`/parent'lar `OPEN` ve enterprise mutation/implementation `HOLD` sınırındadır.
+  Bunların hiçbiri `COMPLETE`, rollout, publish veya owner promotion iddiasına çevrilmez.
+
+### 15.3 Exact ordered residuals
+
+Aşağıdaki sıra kapanış iddiası değil, mevcut dependency ve authority sınırlarının fail-closed
+uygulama sırasıdır. Bir adımın teknik kanıtı sonraki adıma otomatik admission vermez.
+
+Regenerated projection parity'si bu current cut'ta tamamlanmıştır; sprint-1555'teki stale
+projection gözlemi tarihsel kanıt olarak korunur. Aşağıdaki açık residual sırası parity sonrasından
+başlar:
+
+1. **Work 3300 canonical dispositionını hazırla.**
+   Post-sprint build, invoked binary identity ve documented bot reconnect teknik kanıtı mevcuttur;
+   MASTER state değişikliği yalnız canonical Closure authority ile yapılır.
+2. **Work 3296 sahiplik sınırını kapat.**
+   `RECOVERY-BORN-490-PROVIDER-OBSERVATION-001` yalnız exact-owned retirement yapabilir;
+   historical/foreign ve dört legacy-unowned açık interval korunur, sahiplik tahmin edilmez.
+3. **Work 480'i canonical olarak settle et.** Live receipt ve post-finalizer archive proof complete olsa da
+   `PROVIDER-OBS-MIGRATION-001` MASTER/append-only Closure boundary'sinde `OPEN`'dır. Mevcut
+   v1-preimage↔v2 lineage, no-mutation adoption receipt'i ve gerekli owner-bound settlement
+   kanıtları exact batch'e bağlanmadan status promotion yapma.
+4. **Owner disposition batch'ini tamamla.** 456 aktif satır için owner, per-row Level × Lane,
+   admission disposition ve gerekliyse parent outcome seçer; priority için explicit değişiklik
+   listesi veya zero-change onayı verir. Paket şu anda `PREPARED / NOT ADMITTED` kalır. İmzalı
+   exact-batch receipt yoksa ledger, MASTER ve projection mutation yoktur.
+5. **Yedi gerçek günlük Closure Health serisini topla.** Tarihli, provenance-bearing günlük
+   gözlemlerle mature cohort, born/admission, verified closure ve owner/worker kapasite havuzlarını
+   ayrı tut. Ancak frozen scope ve owner-approved availability ile P50/P80 bandı hesaplanabilir;
+   öncesinde ETA yoktur.
+6. **Destructive cleanup prerequisites'lerini sırayla kapat.**
+   `STATE-RETENTION-001` + cold-archive/restore authority → `STATE-PRUNE-001`;
+   `DOCS-TOPOLOGY-001` → `DOCS-ARCHIVE-001`;
+   `REPO-CLEANUP-001` → `REPO-CLEANUP-APPLY-001`.
+   Her apply için güncel exact manifest, recoverability proof, no-active-sprint koşulu (uygunsa)
+   ve unchanged manifest'e bağlı fresh `G3` receipt gerekir; archive cut tek başına silme yetkisi
+   değildir.
+7. **Repository migration'ı dependency sırasıyla yürüt.** Logical ownership/import ratchet →
+   cleanup inventory → docs topology + repo-local memory authority → approved cleanup apply →
+   contract/kernel/application/surface/adapter ve behavior gates → consumer-by-consumer
+   behavior-neutral Core extraction → fresh `G2/G5` rebaseline/remote authority → public Core
+   cutover → additive Enterprise split → Core-only ve Core+Enterprise assurance. Mevcut
+   `REPO-MIGRATION-001` `OPEN` ve execution `HOLD` kalır; expired tarih, filesystem move veya
+   repository split authority'si değildir.
+8. **Gate-redesign parent residual'larını kapat.** Capability-floor'u karşılayan fresh
+   different-provider receipt'i olmadan `unavailable/HOLD` korunur. Sprint 619 stale
+   gate/projection recovery, Goal acceptance propagation, kernel exactly-once settlement/finalizer
+   order ve sprint denominator/cross-platform/scale proof'u kapanır; global default-ON yalnız exact
+   owner kararıyla promote edilir.
+9. **Product-surface promotion kanıtını kapat.** Versioned full execution graph ve evidence
+    coverage'ı tamamla; Desktop ve Terminal'i aynı durable run/conversation identity'sinde
+    reconnect/readback ile kanıtla; capability parity matrix ve Golden Workflow'u real process'lerde
+    kapat. Ancak bundan sonra beş günlük primary-development `NATIVE-DEV-001` dogfood yapılır;
+    mevcut fallback erken kaldırılmaz.
+10. **Enterprise governance'i ayrı admitted slices ile sertleştir.** Exact owner-bound priority
+    mutation, append-only key revocation, bounded multi-hop rotation ve tenant isolation/lifecycle
+    proof'u ayrı ayrı kapanır. Core tam ve bağımsız kalır; Enterprise published Core portları
+    üzerinden additive olur, ikinci kernel/policy/evidence authority veya Core execution içinde
+    hidden entitlement üretmez.
+11. **Release candidate'ı en son admit et.** Declared-platform real-binary matrix, reproducible
+    packages ve current docs, 72-hour soak/zero blocker, signed artifacts + SBOM/provenance,
+    install/upgrade/rollback ve supply-chain proof'u kapanmadan tag/publish yoktur. Bütün teknik
+    kapılar geçtikten sonra exact candidate ve remote action'a bağlı fresh `G2/G5` owner publish
+    kararı gerekir; `0.100.0` o zamana dek yalnız rebaseline'dır.
+
+Bu sıranın sonuna ulaşılması dahi otomatik ürün kapanışı değildir: her canonical outcome kendi
+acceptance evidence, owner authority ve settlement receipt'iyle kapanır.

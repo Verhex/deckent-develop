@@ -1,14 +1,14 @@
 // ─── Sprint Docs Updater ─────────────────────────────────────────
 // Extracted from sprint-reporter.ts — managed-docs, project identity, sprint log, debt, archive
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, copyFileSync, unlinkSync, rmdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
-import { join } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { TaskEvaluation } from '../core/types.js';
 import type {
   TaskResult, Sprint, SprintMetrics, ResolvedConfig, SprintResult,
 } from '../core/types.js';
 import {
-  BRAIN_DIR, SPRINTS_DIR, ARCHIVE_DIR, ARCHIVE_SPRINTS_SUBDIR, ARCHIVE_DIRECTIVES_SUBDIR, SPRINT_LOG_MAX_LINES,
+  BRAIN_DIR, SPRINTS_DIR, ARCHIVE_DIR, SPRINT_LOG_MAX_LINES,
   DECISIONS_FILE, DIRECTIVES_FILE,
 } from '../core/constants.js';
 import { runAllUpdaters } from './doc-updaters/registry.js';
@@ -19,10 +19,17 @@ import { runManagedDocUpdates } from './managed-docs/managed-doc-runner.js';
 import { resolveDebt } from './debt-manager.js';
 import { getDebtItems } from '../core/debt-store.js';
 import { debugLog } from '../core/utils.js';
+import { DEFAULT_RUNTIME_ARTIFACT_RETENTION_CONFIG } from '../core/config.js';
 import { modelRegistry } from '../core/model-registry.js';
 import type { RegistryProviderName } from '../core/model-registry.js';
 import { getDefaultProviderName } from './sprint-utils.js';
 import { extractSprintNumber } from './sprint-metrics.js';
+import {
+  archiveTaskArtifacts,
+  isSprintOwnedTaskArtifact,
+  publishSprintArchiveArtifact,
+  resolveSprintArchiveDir,
+} from '../core/sprint-archive.js';
 import {
   buildSprintLogLines,
   buildDirectivesPlaceholder,
@@ -103,6 +110,7 @@ export function updateProjectDocs(projectRoot: string, sprintResult: SprintResul
     adaptive_config: { min_samples: 3, no_go_threshold: 0.3, coverage_lookback: 3 },
     sprint_timeout_minutes: 0,
     deckent_style: 'sprint' as const,
+    runtime_artifact_retention: structuredClone(DEFAULT_RUNTIME_ARTIFACT_RETENTION_CONFIG),
     terminal: {
       enabled: true,
       bind: '127.0.0.1',
@@ -354,18 +362,18 @@ export interface ArchiveDirectivesOptions {
 }
 
 /**
- * Archive the current DIRECTIVES.md to .brain/archive/.
+ * Archive the current DIRECTIVES.md to the canonical sprint archive.
  *
- * Always copies DIRECTIVES.md → .brain/archive/DIRECTIVES-sprint-NNN.md (audit trail).
+ * Always copies DIRECTIVES.md into the canonical sprint archive (audit trail).
  * The working DIRECTIVES.md is PRESERVED by default; opt-in placeholder
  * overwrite via `{ autoArchive: true }` (legacy behavior).
  *
  * Called by finalizeSprint() Step 12 after RETRO is written.
  *
- * - Always: copies DIRECTIVES.md → .brain/archive/DIRECTIVES-sprint-NNN.md
+ * - Always: copies DIRECTIVES.md → `<archive_path>/<sprintId>/docs/DIRECTIVES.md`
  * - Default (Sprint 168 C0a-4 Option B): PRESERVES the working DIRECTIVES.md
  * - Opt-in via `{ autoArchive: true }`: writes next-sprint placeholder (legacy)
- * - Creates .brain/archive/ if it doesn't exist
+ * - Creates the canonical sprint docs directory if it doesn't exist
  * - No-ops gracefully if DIRECTIVES.md doesn't exist
  * - Phase guard: only executes during CLEANUP or COMPLETE phase (Sprint 146 bug fix)
  *
@@ -386,26 +394,27 @@ export function archiveDirectives(
     return;
   }
   const directivesPath = join(projectRoot, DIRECTIVES_FILE);
-  const archiveDir = join(projectRoot, BRAIN_DIR, ARCHIVE_DIR, ARCHIVE_DIRECTIVES_SUBDIR);
 
   if (!existsSync(directivesPath)) {
     debugLog('archiveDirectives', `${DIRECTIVES_FILE} not found — skipping`);
     return;
   }
 
-  mkdirSync(archiveDir, { recursive: true });
-
-  const archiveFileName = `DIRECTIVES-${sprintId}.md`;
-  const archivePath = join(archiveDir, archiveFileName);
-  // Always archive copy (audit trail)
-  copyFileSync(directivesPath, archivePath);
+  const publication = publishSprintArchiveArtifact(
+    projectRoot,
+    sprintId,
+    directivesPath,
+    'docs/DIRECTIVES.md',
+  );
+  const archivePath = join(resolveSprintArchiveDir(projectRoot, sprintId), publication.path);
 
   // Sprint 168 C0a-4 BUG-CC fix: default PRESERVE working DIRECTIVES.md.
   // Opt-in legacy placeholder-overwrite behavior via { autoArchive: true }.
   if (options.autoArchive === true) {
     const currentNum = extractSprintNumber(sprintId);
     const nextNum = currentNum !== null ? currentNum + 1 : '???';
-    writeFileSync(directivesPath, buildDirectivesPlaceholder(sprintId, archiveFileName, nextNum));
+    const archiveReference = relative(projectRoot, archivePath).split(sep).join('/');
+    writeFileSync(directivesPath, buildDirectivesPlaceholder(sprintId, archiveReference, nextNum));
     debugLog(
       'archiveDirectives',
       `Archived ${DIRECTIVES_FILE} → ${archivePath} (autoArchive=true → placeholder written)`,
@@ -519,7 +528,7 @@ export function emergencyRestoreDirectives(projectRoot: string, sprintId: string
 const ORPHAN_TASK_EXTENSIONS = /\.(json|plan|hb|result|paused|log|timeout|verify-delta\.json)$/;
 
 /**
- * Archive orphan task files from `.tasks/` to `.brain/archive/sprint-NNN-tasks/`.
+ * Archive orphan task files from `.tasks/` to the canonical sprint task namespace.
  * Collects all task-NNN-* files (*.json, *.hb, *.result, *.plan, *.log, *.timeout,
  * *.verify-delta.json) belonging to the given sprint and moves them to the archive
  * directory. Also archives `.tasks/.prompt-*` files for the sprint.
@@ -554,8 +563,12 @@ export function archiveOrphanTasks(projectRoot: string, sprintId: string): numbe
       // `.json` suffix as a task artifact destroys exact landing diagnostics.
       && !f.endsWith('.landing-proposal.json'),
   );
-  // Also archive .prompt-* files for this sprint
-  const promptFiles = allFiles.filter(f => f.startsWith('.prompt-'));
+  // Hidden worker artifacts are exact-sprint owned; foreign prompts/scripts
+  // must never leak into this sprint's archive.
+  const promptFiles = allFiles.filter(f =>
+    (f.startsWith('.prompt-') || f.startsWith('.worker-'))
+    && isSprintOwnedTaskArtifact(f, sprintId),
+  );
   const filesToArchive = [...taskFiles, ...promptFiles];
 
   if (filesToArchive.length === 0) {
@@ -563,30 +576,19 @@ export function archiveOrphanTasks(projectRoot: string, sprintId: string): numbe
     return 0;
   }
 
-  const archiveDir = join(projectRoot, BRAIN_DIR, ARCHIVE_DIR, ARCHIVE_SPRINTS_SUBDIR, `${sprintId}-tasks`);
-  mkdirSync(archiveDir, { recursive: true });
-
-  let count = 0;
-  for (const file of filesToArchive) {
-    try {
-      const src = join(tasksDir, file);
-      const dest = join(archiveDir, file);
-      copyFileSync(src, dest);
-      // Remove original after successful copy
-      unlinkSync(src);
-      count++;
-    } catch (e) {
-      debugLog('archiveOrphanTasks', `Failed to archive ${file}: ${e}`);
-    }
-  }
-
-  debugLog('archiveOrphanTasks', `Archived ${count} task files to ${archiveDir}`);
+  const result = archiveTaskArtifacts(projectRoot, sprintId, {
+    archive: filesToArchive,
+    preserve: [],
+  });
+  const count = result.archived.length + result.residueSwept.length + result.consolidated.length;
+  debugLog('archiveOrphanTasks',
+    `Archived ${count} task files to ${result.destination} (failures=${result.failures.length})`);
   return count;
 }
 
 /**
- * Clean old sprint archives from `.tasks/archive/` based on a retention policy.
- * Archives older than `retentionCount` sprints are deleted to prevent unbounded growth.
+ * Retire old `.tasks/archive/` staging directories into the canonical sprint
+ * archive. Retention never deletes the last evidence copy.
  *
  * @param projectRoot - Project root directory
  * @param retentionCount - Number of most-recent sprint archives to keep (default: 5)
@@ -610,25 +612,17 @@ export function cleanTasksArchive(projectRoot: string, retentionCount = 5): numb
   let removed = 0;
   for (const dir of toRemove) {
     try {
-      const dirPath = join(archiveDir, dir.name);
-      // Remove all files inside before removing the directory
-      const files = readdirSync(dirPath);
-      for (const file of files) {
-        try { unlinkSync(join(dirPath, file)); } catch { /* skip */ }
-      }
-      // Use rmdirSync (no recursive needed — files already removed above)
-      // If there are nested dirs, fall through silently
-      try {
-        rmdirSync(dirPath);
-      } catch {
-        // Best-effort: non-empty dirs (nested) are left as-is
-      }
-      removed++;
+      const settlement = archiveTaskArtifacts(projectRoot, `sprint-${dir.num}`, {
+        archive: [],
+        preserve: [],
+      });
+      if (settlement.failures.length === 0 && !existsSync(join(archiveDir, dir.name))) removed++;
     } catch (e) {
-      debugLog('cleanTasksArchive', `Failed to remove ${dir.name}: ${e}`);
+      debugLog('cleanTasksArchive', `Failed to consolidate ${dir.name}: ${e}`);
     }
   }
 
-  debugLog('cleanTasksArchive', `Removed ${removed} old archive dirs (retention: ${retentionCount})`);
+  debugLog('cleanTasksArchive',
+    `Consolidated ${removed} old staging archive dirs (retention window: ${retentionCount})`);
   return removed;
 }

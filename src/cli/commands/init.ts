@@ -81,7 +81,6 @@ import {
   writeRuleFiles,
   writeDirectivesFile,
   writeBrainFiles,
-  writeI18nFiles,
   updateGitignore,
   writeProviderConfig,
   ALL_ENV_NAMES,
@@ -509,10 +508,6 @@ export function registerInit(program: Command): void {
         // 10. Brain files
         currentStep = 'write-brain-files';
         writeBrainFiles(root, projectName, language, stackResult, detectedAnalysis);
-
-        // 10d. i18n
-        currentStep = 'write-i18n-files';
-        writeI18nFiles(root);
 
         // 11. .gitignore
         currentStep = 'update-gitignore';

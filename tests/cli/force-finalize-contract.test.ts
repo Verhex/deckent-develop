@@ -221,7 +221,7 @@ describe('force-finalize contract — every result present', () => {
     expect(settlement.terminalTruth.logicalEvaluations.size).toBe(0);
   });
 
-  it('never deletes the task evidence it settled from', () => {
+  it('preserves settled task evidence in the canonical archive', () => {
     const sprintId = 'sprint-901';
     const root = makeRoot(sprintId);
     writeTask(root, task('901-001', sprintId, TaskStatus.NO_GO));
@@ -229,8 +229,16 @@ describe('force-finalize contract — every result present', () => {
 
     forceFinalize(root, sprintId);
 
-    expect(existsSync(join(root, '.tasks', 'task-901-001.json'))).toBe(true);
-    expect(existsSync(join(root, '.tasks', 'task-901-001.result'))).toBe(true);
+    expect(existsSync(join(root, '.tasks', 'task-901-001.json'))).toBe(false);
+    expect(existsSync(join(root, '.tasks', 'task-901-001.result'))).toBe(false);
+    expect(existsSync(join(
+      root,
+      '.deckent/archive/sprints/sprint-901/tasks/task-901-001.json',
+    ))).toBe(true);
+    expect(existsSync(join(
+      root,
+      '.deckent/archive/sprints/sprint-901/tasks/task-901-001.result',
+    ))).toBe(true);
   });
 });
 
