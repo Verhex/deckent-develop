@@ -4,6 +4,30 @@
 **Mode:** read-only aggregate inspection
 **Scope:** retained v1 preimage, live v2 database, and compiled CLI identity
 
+## Fresh compiled-consumer completion
+
+**Observed:** 2026-08-23T16:27:33Z
+
+The compiled production entrypoint was rerun from the current checkout with the exact declared
+command:
+
+```text
+node dist/cli/entry.js provider-observations inspect --json
+```
+
+It exited `0` and returned this aggregate inspection:
+
+```json
+{"inspection":{"databaseBytes":2138112,"rowCount":1017,"rowLineageDigest":"9847e5dbc46e4ebf14ae407ff9ce1bd832463e38fd1d472a6e7476615c8bc4dc","schemaDigest":"9a63aa956cb566ab9ba3340092258ee7ee8744ba956d94ea75598743b494a273","sourceSchemaVersion":2,"state":"current","targetSchemaVersion":2},"mode":"inspect","operation":"migration"}
+```
+
+The compiled entry identity remains
+`sha256:190d0a7a1a08afd75e12b93e808026c9ae4b75db94d8b4968b51d3061639a1cc`.
+At the observation instant, the live database main-file identity was
+`sha256:a21819c002608168e87cff51fc8c63ee766d5200b7592e9b11885e41d626f21f`.
+This fresh result closes only the stale compiled-consumer residual recorded below. It does not
+settle provider-concurrency open intervals, prove migration equivalence, or authorize Closure.
+
 ## Measurement
 
 | Artifact | SQLite user version | Schema objects (tables / indexes) | Aggregate rows (intervals / contradictions / total) | Pages × bytes | Integrity |

@@ -89,8 +89,6 @@
 - Sidecar spec inventory: NO_GO — The authorized target .analysis/closure-os...
 
 ## Active Technical Debt
-- [HIGH] Tech debt from 1780659451558-013: The compiled dist/cli/entry.js must be rebuilt
-- [HIGH] Tech debt from 1780659451558-018: The required node scripts/lint-master-plan.mjs
 - [CRITICAL] Tech debt from 1780659451542-015-fix: Registered the single provider-observation
 
 ## Active Patterns
@@ -99,4 +97,4 @@
 - Violation pattern: doc_sync_ground_truth_mismatch (×12 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 2895 | Generated: 2026-08-22_
+_Total entries: 2899 | Generated: 2026-08-23_

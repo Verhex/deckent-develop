@@ -525,8 +525,12 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // source-derived scan measured zero confirmed live-authority violations;
   // removal of the unwired `.deckent/i18n` fixture also retires its legacy
   // live-read exception instead of grandfathering it.
+  // 2026-08-23 (retired-plan identity floor recovery): count unchanged;
+  // digest-only update after the existing run-flow decision suite began
+  // pinning that an approved but unstarted exact plan consumes its ordinal
+  // identity when durably retired. The proof remains suite-owned tmpdir state.
   count: 15117,
-  digest: 'aa8184eced6186c1b0e0a503158c5a7a68b779926ea009269453887a3e50b036',
+  digest: '2f36f0b3390d771b2e8f1941193b5168032c3cfdb249d9a2a45b6823da3fde99',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -930,8 +934,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // inventory through their hermetic suites. Existing finalizer/CLI wiring
   // moves content only; the measured registry contains zero confirmed
   // violations.
+  // 2026-08-23 (retired-plan identity floor recovery): count unchanged;
+  // digest-only update for shared run-flow coordinator retirement wiring to
+  // the existing canonical config-floor authority. No module was added.
   count: 1304,
-  digest: '4617e0568b4901c6887b051830848876e4e759685b783c4677272caa6f9e229e',
+  digest: '58de4868317a0bc076ab5ce1a6e4f044bdba8d657297b0240d093f0203da919d',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

@@ -40,6 +40,7 @@ import {
   EXECUTION_PLAN_DIGEST_VERSION,
   type ExecutionPlanDigestContext,
 } from '../../src/core/execution-plan-digest.js';
+import { getNextSprintId } from '../../src/core/utils.js';
 
 const ACTOR = { id: 'decision-service-test' } as const;
 
@@ -226,6 +227,21 @@ describe('run-flow-decision-service — shared decide/start (SURF-6)', () => {
     expect(context.state).toBe('CANCELLED');
     const events = readFlowEvents(root, flowId);
     expect(events.at(-1)?.type).toBe('APPROVAL_REJECTED');
+  });
+
+  it('retiring an approved unstarted plan consumes its sprint identity', () => {
+    const flowId = generateFlowId('retire-approved-identity');
+    appendProposalToCompletionChain({ root, flowId, through: 'PREVIEW_READY' });
+    const sprint = { ...testSprint('sprint-626'), number: 626 };
+    savePlannedSprint(root, flowId, { revision: 1, sprint });
+    decideRunFlow(root, flowId, { decision: 'approve', actor: ACTOR });
+
+    expect(getNextSprintId(root)).toBe('sprint-001');
+
+    const retired = getRunFlowCoordinator(root).abortFlow({ flowId });
+
+    expect(retired.context.state).toBe('CANCELLED');
+    expect(getNextSprintId(root)).toBe('sprint-627');
   });
 
   it('start spawns exactly once, remains STARTING until child admission, and refuses an active re-start', () => {

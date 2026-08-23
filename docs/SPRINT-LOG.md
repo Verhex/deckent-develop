@@ -15507,3 +15507,30 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 625-020: RH20-LOCAL-CLOSURE Ordered verification and live-apply readiness (PAUSED)
 
 ---
+## Sprint 627 — sprint-627
+
+**Status:** ABORTED
+**Date:** 2026-08-23
+**Duration:** 1009s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 4 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 1009479ms |
+
+### Tasks
+
+- 627-001-fix: Fix: Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Residual gap (worker-typed): The compiled dist/cli/entry.js mus… (PAUSED)
+- 627-001: Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Residual gap (worker-typed): The compiled dist/cli/entry.js mus… (NO_GO)
+- 627-002: Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Residual gap (worker-typed): The required node scripts/lint-mas… (DONE)
+- 627-003: FAC01-ARCHIVE Canonical archive wiring and integrity contract (DONE)
+- 627-004: FAC02-BRAIN Brain archive index, summary and idempotency contract (DONE)
+- 627-005: FAC03-NEGATIVE-SPACE Legacy raw-write and residue negative-space contract (DONE)
+
+---

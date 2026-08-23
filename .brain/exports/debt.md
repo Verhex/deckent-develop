@@ -4,8 +4,6 @@
 
 | ID | Title | Priority | Sprint | Status |
 |----|-------|----------|--------|--------|
-| debt-1780659451558-013 | Tech debt from 1780659451558-013: The compiled dist/cli/entry.js must be rebuilt | high | sprint-1780659451558 | active |
-| debt-1780659451558-018 | Tech debt from 1780659451558-018: The required node scripts/lint-master-plan.mjs | high | sprint-1780659451558 | active |
 | debt-1780659451542-015-fix | Tech debt from 1780659451542-015-fix: Registered the single provider-observation | critical | sprint-1780659451542 | active |
 
 ## Resolved Technical Debt
@@ -15,6 +13,8 @@
 | debt-1780659451558-002 | Tech debt from 1780659451558-002: Added deterministic IPC-barrier concurrent ide | normal | sprint-1780659451558 | resolved |
 | debt-1780659451558-006 | Tech debt from 1780659451558-006: Added real parser and filesystem-store adversa | normal | sprint-1780659451558 | resolved |
 | debt-1780659451558-011 | Tech debt from 1780659451558-011: Updated the contract from future-only language | normal | sprint-1780659451558 | resolved |
+| debt-1780659451558-013 | Tech debt from 1780659451558-013: The compiled dist/cli/entry.js must be rebuilt | critical | sprint-1780659451558 | resolved |
+| debt-1780659451558-018 | Tech debt from 1780659451558-018: The required node scripts/lint-master-plan.mjs | critical | sprint-1780659451558 | resolved |
 | debt-1780659451557-001 | Tech debt from 1780659451557-001: The exact declared compiled CLI inspection rem | normal | sprint-1780659451557 | resolved |
 | debt-1780659451557-009 | Tech debt from 1780659451557-009: Added EN/TR messages for persisted adoption re | normal | sprint-1780659451557 | resolved |
 | debt-1780659451557-004 | Tech debt from 1780659451557-004: Added hermetic real-SQLite regression proof fo | normal | sprint-1780659451557 | resolved |
@@ -36,6 +36,8 @@
 | debt-1780659451542-018 | Tech debt from 1780659451542-018: Declared verification passed: 3 files, 16 test | normal | sprint-1780659451542 | resolved |
 | debt-1780659451542-020 | Tech debt from 1780659451542-020: Evidence record cites bounded persisted source | normal | sprint-1780659451542 | resolved |
 | debt-1780659451542-019 | Tech debt from 1780659451542-019: npm run lint:master-plan reports docs/generate | normal | sprint-1780659451542 | resolved |
+| debt-625-006 | Tech debt from 625-006: Implemented immutable project-relative SHA-256 storage w | normal | sprint-625 | resolved |
+| debt-625-008 | Tech debt from 625-008: Implemented bounded plan/apply reconciliation for direct | normal | sprint-625 | resolved |
 | debt-622-003 | Tech debt from 622-003: Receipt replay is idempotent: an existing exact-attempt  | normal | sprint-622 | resolved |
 | debt-622-005 | Tech debt from 622-005: Task-14 recovery-artifact policy is now the production p | normal | sprint-622 | resolved |
 | debt-621-008 | Tech debt from 621-008: Implemented an immutable, replay-stable terminal reducer | normal | sprint-621 | resolved |

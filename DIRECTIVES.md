@@ -1,236 +1,53 @@
-# DIRECTIVES — RUNTIME-HYGIENE-001 / SPRINT-623
+# DIRECTIVES — FINALIZER-ACCEPTANCE-CANARY MULTI-TASK WAVE
 
 ## Outcome
 
-Restore canonical ordinal sprint allocation after legacy detached-job identities polluted the
-archive namespace, then implement and prove a lossless, policy-driven hygiene pipeline for
-`.deckent/recently-works/` and `.deckent/runtime/`. The pipeline reconciles raw evidence into
-canonical archives, preserves byte conflicts, refuses live/ambiguous authority, publishes a
-durable cleanup receipt, and retires only independently verified source copies. XVerify is owner-
-deferred until 2026-08-24 20:00 Europe/Istanbul; this sprint may become LOCAL_VERIFIED but cannot
-claim final DONE/Closure before that boundary.
+Normal dogfood finalizer zincirini üç bağımsız acceptance faceti ve planner admissionını bloke eden iki fresh-stale critical debt revalidation taskı ile paralel çalıştır. Bu wave tek product outcome taşır: canonical archive finalizer acceptance. Worker faceti yalnız bounded evidence document üretir. Terminal settlement sonrasında host gerçek run arşivini, manifest ve hash integrity durumunu, Brain archive index ve summary refresh durumunu, idempotent reconcile sonucunu ve legacy raw-write negative space durumunu bağımsız doğrular.
+
+Runtime hygiene formal different-provider XVerify 2026-08-24 20:00 Europe/Istanbul sonrasına ertelenmiştir. Bu run formal runtime-hygiene DONE, Closure veya release iddiası üretmez.
 
 ## Invariants
 
-- Never delete or mutate `.brain/memory.db`, provider auth, credentials, runtime tokens, live
-  SQLite/WAL/SHM authorities, active/resumable runs, unresolved approvals, or foreign task state.
-- Do not use `rm .tasks/*`, kill a live sprint, run repository-global TypeScript inside a worker,
-  commit, push, mutate Closure dispositions, or invoke XVerify in this sprint.
-- Historical epoch-shaped sprint IDs remain immutable evidence. They are excluded only from
-  ordinal allocation. Next canonical identity is `sprint-623`; detached work uses `job-*`.
-- Every retired byte is exact-digest duplicated by canonical authority or published to a content-
-  addressed archive first. Conflicts are preserved; ambiguity is typed HOLD.
-- Read/plan/dry-run is zero-write. Apply is no-active-run guarded, first-writer-wins, restart-safe,
-  idempotent, tenant/project scoped, cross-platform, and emits one bounded durable receipt.
-- Each observed runtime family resolves to preserve, archive-then-retire, duplicate-retire,
-  ephemeral-retire, or HOLD. Unknown never defaults to delete.
+- Üç canary task bağımsızdır, dependency taşımaz ve exact ayrı evidence file yazar.
+- Product source, tests, config, auth ve provider state canary taskları tarafından değiştirilmez.
+- Planner tarafından canonical biçimde injected stale-debt revalidation taskları yalnız kendi inherited exact scope sınırında fresh disk truth ölçer. Green truth varsa no-op settlement üretir; yeni unrelated implementation yapmaz.
+- Aktif run sırasında build, provider auth mutation ve XVerify çağrısı yapılmaz.
+- .brain/memory.db silinmez veya taşınmaz. .tasks içeriği rm ile temizlenmez.
+- Finding başka outcome kapsamındaysa result notes içinde RELATED_BUT_NONBLOCKING olarak raporlanır.
 
-## Task 1: RH01-ID-INVENTORY Sprint identity root-cause evidence
+## Task 1: FAC01-ARCHIVE Canonical archive wiring and integrity contract
 
-Files: docs/evidence/runtime-hygiene-2026-08-23/01-sprint-identity-inventory.md
-Reads: src/core/utils.ts, src/mcp/tools/start.ts, .deckent/config.json
-Implement: Record the disk-proven 622 ordinal floor, legacy epoch family, polluted config, detached
-job namespace collision, recovery scope and exact preserved history. No runtime mutation.
-Test: `git diff --check -- docs/evidence/runtime-hygiene-2026-08-23/01-sprint-identity-inventory.md`
-GO: Evidence distinguishes sprint, run and job identities and names the causal producer/consumer.
-NO_GO: Timestamp history is rewritten, deleted, or represented as a canonical ordinal.
+Files: docs/evidence/finalizer-acceptance-canary-2026-08-23/01-archive-wiring.md
+Reads: docs/evidence/STATE-ARCHIVE-RESTORE-001-canonical-sprint-archive-2026-08-22.md, src/core/sprint-archive.ts, src/orchestra/sprint-finalizer.ts, src/cli/commands/archive.ts
+Implement: Fresh source truth ile canonical raw archive producer to consumer to finalizer to CLI verification zincirini incele. Exact source references, manifest family and digest invariants, targeted archive verify acceptance, terminal-outcome honesty and archive failure false-COMPLETE guardını bounded evidence document olarak kaydet. Kod veya başka doküman değiştirme.
+Test: git diff --check -- docs/evidence/finalizer-acceptance-canary-2026-08-23/01-archive-wiring.md
+GO: Evidence document exact production wiring zincirini ve post-terminal live checks listesini source-backed taşır; yalnız exact file değişir; build, XVerify ve auth mutation yok.
+NO_GO: Wiring uydurulur, başka file değişir, legacy path yazılır veya formal DONE ya da Closure iddia edilir.
 
-## Task 2: RH02-ORDINAL-AUTHORITY Ordinal allocation regression closure
+## Task 2: FAC02-BRAIN Brain archive index, summary and idempotency contract
 
-Files: src/core/utils.ts, tests/core/utils-sprint-id.test.ts
-Reads: .deckent/archive/sprints/, .deckent/config.json
-Implement: Review semantic legacy-epoch exclusion, strict ordinal config writes, archive/config floor
-merging and large-installation safety. Preserve every historical directory.
-Test: `npx vitest run tests/core/utils-sprint-id.test.ts tests/core/utils-debug.test.ts tests/core/readjson-migration.test.ts`
-GO: A polluted timestamp archive plus sprint-622 deterministically allocates sprint-623.
-NO_GO: Digit-count cap, backward reuse, timestamp deletion, silent invalid config write.
+Files: docs/evidence/finalizer-acceptance-canary-2026-08-23/02-brain-index-summary.md
+Reads: docs/evidence/STATE-ARCHIVE-RESTORE-001-canonical-sprint-archive-2026-08-22.md, src/core/sprint-archive.ts, src/orchestra/sprint-finalizer.ts, src/core/memory-store.ts
+Implement: Fresh source truth ile compact archive index producer, Memory DB upsert identity, guarded summary export ordering ve second reconcile idempotency contractını incele. Post-terminal host proof için searchable archive row, raw-payload exclusion, summary refresh ve zero-publish plus unchanged Memory DB digest acceptanceını bounded evidence document olarak kaydet. Kod veya başka doküman değiştirme.
+Test: git diff --check -- docs/evidence/finalizer-acceptance-canary-2026-08-23/02-brain-index-summary.md
+GO: Evidence document Brain index and summary chain ile idempotency acceptanceını exact source references ile taşır; yalnız exact file değişir; build, XVerify ve auth mutation yok.
+NO_GO: Raw task payloadın Brain rowunda olması kabul edilir, ordering uydurulur, başka file değişir veya formal DONE ya da Closure iddia edilir.
 
-## Task 3: RH03-JOB-NAMESPACE Detached job identity separation
+## Task 3: FAC03-NEGATIVE-SPACE Legacy raw-write and residue negative-space contract
 
-Dependencies: RH02-ORDINAL-AUTHORITY
-Files: src/core/execution-job-identity.ts, src/mcp/tools/job-runner.ts, src/mcp/tools/start.ts, src/orchestra/sprint-runner-entry.ts, tests/mcp/job-runner.test.ts, tests/mcp/tools/start-detached-fork.integration.test.ts
-Implement: Complete `job-<timestamp>-<uuid>` wiring, mixed legacy/current latest-job ordering,
-exact startedAt fork lineage and collision proof. Job IDs never enter sprint allocation.
-Test: `npx vitest run tests/mcp/job-runner.test.ts tests/mcp/tools/start-detached-fork.integration.test.ts tests/mcp/start-lifecycle.test.ts tests/mcp/tools/start.test.ts`
-GO: Real handler creates unique job namespace and child preserves parent admission time.
-NO_GO: `sprint-${Date.now()}` remains reachable or new IDs break mixed-history readers.
+Files: docs/evidence/finalizer-acceptance-canary-2026-08-23/03-legacy-negative-space.md
+Reads: docs/evidence/STATE-ARCHIVE-RESTORE-001-canonical-sprint-archive-2026-08-22.md, src/core/sprint-archive.ts, src/core/sprint-file-retention.ts, src/orchestra/sprint-finalizer.ts
+Implement: Fresh source truth ile live task retirement, conflict preservation, canonical-only publication ve legacy archive negative-space contractını incele. Host baseline comparisonı için live .tasks residue, .brain/archive task pathleri, .tasks/archive, recently-works ve canonical archive root acceptanceını bounded evidence document olarak kaydet. Kod veya başka doküman değiştirme.
+Test: git diff --check -- docs/evidence/finalizer-acceptance-canary-2026-08-23/03-legacy-negative-space.md
+GO: Evidence document cleanup safety, conflict preservation ve legacy no-new-raw-write acceptanceını source-backed taşır; yalnız exact file değişir; build, XVerify ve auth mutation yok.
+NO_GO: rm cleanup önerilir, conflict kaybı kabul edilir, başka file değişir, legacy path yazılır veya formal DONE ya da Closure iddia edilir.
 
-## Task 4: RH04-CONTRACT Runtime hygiene policy contract
+## Host post-terminal acceptance
 
-Dependencies: RH01-ID-INVENTORY
-Files: docs/evidence/runtime-hygiene-2026-08-23/02-runtime-hygiene-contract.md
-Reads: src/core/constants.ts, src/core/sprint-archive.ts, src/cli/commands/cleanup.ts
-Implement: Define family ownership, live-authority guards, retention dimensions, archive targets,
-conflict semantics, dry-run/apply behavior, receipts and platform adapter guarantees.
-Test: `git diff --check -- docs/evidence/runtime-hygiene-2026-08-23/02-runtime-hygiene-contract.md`
-GO: Every observed top-level runtime/recent family has one explicit disposition and authority.
-NO_GO: Unknown or credential/database family can fall through to deletion.
-
-## Task 5: RH05-CONFIG Config-resolved retention policy
-
-Dependencies: RH04-CONTRACT
-Files: src/core/config-types.ts, src/core/config.ts, tests/core/config.test.ts, tests/core/config-edge.test.ts
-Implement: Add validated `runtime_artifact_retention` policy with bounded per-family age/count/size,
-archive path, enabled/apply-on-finalize controls and safe defaults. Preserve old configs.
-Test: `npx vitest run tests/core/config.test.ts tests/core/config-edge.test.ts`
-GO: Defaults and project overrides survive loadConfig; invalid values reject fail-closed.
-NO_GO: Hidden constants, unbounded values, default deletion, or declared-but-unwired config.
-
-## Task 6: RH06-MAINTENANCE-ARCHIVE Generic content-addressed archive authority
-
-Dependencies: RH04-CONTRACT
-Files: src/core/maintenance-archive.ts, tests/core/maintenance-archive.test.ts
-Implement: Create project-relative content-addressed storage for non-sprint operational evidence
-with mode-safe publication, manifest digest, source lineage, conflict preservation, exact replay,
-fresh-read verification and no mutable latest pointer.
-Test: `npx vitest run tests/core/maintenance-archive.test.ts`
-GO: Concurrent identical publish deduplicates; differing bytes coexist; restart verifies manifest.
-NO_GO: Overwrite, path escape, symlink follow, absolute path leak, or unverified source retirement.
-
-## Task 7: RH07-CLASSIFIER Fail-closed artifact classification
-
-Dependencies: RH04-CONTRACT
-Files: src/core/runtime-artifact-classifier.ts, tests/core/runtime-artifact-classifier.test.ts
-Implement: Classify every inventoried recently-works/runtime family into preserve, archive-then-
-retire, duplicate-retire, ephemeral-retire or HOLD using content/owner/liveness evidence.
-Test: `npx vitest run tests/core/runtime-artifact-classifier.test.ts`
-GO: DB/WAL/SHM/token/current status/unknown inputs preserve or HOLD; no catch-all delete.
-NO_GO: Filename-only unsafe deletion, secret inspection/output, or missing tenant/project boundary.
-
-## Task 8: RH08-RECENTLY-WORKS Lossless recent-work retirement planner
-
-Dependencies: RH06-MAINTENANCE-ARCHIVE, RH07-CLASSIFIER
-Files: src/core/recent-work-retention.ts, tests/core/recent-work-retention.test.ts
-Implement: Plan/apply sprint-owned reconcile, exact canonical duplicate retirement, phase5 staging
-dedup and sprint-479 recovery-not-dispatched archival. Nested/unknown content HOLDs.
-Test: `npx vitest run tests/core/recent-work-retention.test.ts tests/core/sprint-archive.test.ts`
-GO: Named live examples retire only after digest/manifest proof; conflicts remain byte-preserved.
-NO_GO: Deletion before publish, sprint-610/611 ownership confusion, or directory-wide rm.
-
-## Task 9: RH09-JOBS Terminal job retention
-
-Dependencies: RH05-CONFIG, RH06-MAINTENANCE-ARCHIVE, RH07-CLASSIFIER
-Files: src/core/runtime-job-retention.ts, tests/core/runtime-job-retention.test.ts
-Implement: Retain active/recent job views; archive terminal/stale-dead records by real sprint or
-generic job identity; support legacy/current namespaces and preserve resumable continuity.
-Test: `npx vitest run tests/core/runtime-job-retention.test.ts tests/mcp/job-runner.test.ts`
-GO: Terminal old records archive then retire; RUNNING with live/unknown ownership never deletes.
-NO_GO: Status string alone authorizes deletion or latest-job/session reader loses continuity.
-
-## Task 10: RH10-EVALUATIONS Evaluation audit retention
-
-Dependencies: RH05-CONFIG, RH07-CLASSIFIER
-Files: src/core/runtime-evaluation-retention.ts, tests/core/runtime-evaluation-retention.test.ts
-Implement: Reconcile sprint-owned evaluation trees into canonical manifests, keep current window,
-preserve malformed/conflicting attempts and retire only manifest-verified duplicates.
-Test: `npx vitest run tests/core/runtime-evaluation-retention.test.ts tests/core/sprint-archive.test.ts`
-GO: Nested evaluation artifacts retire losslessly with family counts/digests intact.
-NO_GO: Recursive delete before archive verify or cross-sprint ownership leakage.
-
-## Task 11: RH11-RUN-FLOWS Run-flow journal retention
-
-Dependencies: RH05-CONFIG, RH06-MAINTENANCE-ARCHIVE, RH07-CLASSIFIER
-Files: src/core/run-flow-retention.ts, tests/core/run-flow-retention.test.ts
-Implement: Fresh-read flow journals; preserve proposed/approved/running/resumable authority; archive
-terminal and liveness-proven stale-dead flows with revision/digest lineage and idempotent retirement.
-Test: `npx vitest run tests/core/run-flow-retention.test.ts tests/core/run-flow-store.test.ts`
-GO: Terminal flow history survives canonical archive while live/ambiguous flows remain untouched.
-NO_GO: Age/status-only delete, lost revision, split-brain latest pointer, or malformed fail-open.
-
-## Task 12: RH12-LOGS One-off log and transient residue policy
-
-Dependencies: RH05-CONFIG, RH06-MAINTENANCE-ARCHIVE, RH07-CLASSIFIER
-Files: src/core/runtime-log-retention.ts, tests/core/runtime-log-retention.test.ts
-Implement: Handle named start logs, bot logs, prompt-lint/resource JSONL and temp residues. Empty
-expired logs may retire with receipt; non-empty logs rotate/archive; current writers preserve.
-Test: `npx vitest run tests/core/runtime-log-retention.test.ts tests/core/observability-rotation.test.ts`
-GO: Four named zero-byte start logs retire only in apply; live logs/databases/tokens survive.
-NO_GO: Truncating active writer, deleting credential/state, or read-mode mutation.
-
-## Task 13: RH13-ORCHESTRATOR Unified plan/apply and durable receipt
-
-Dependencies: RH08-RECENTLY-WORKS, RH09-JOBS, RH10-EVALUATIONS, RH11-RUN-FLOWS, RH12-LOGS
-Files: src/core/runtime-hygiene.ts, tests/core/runtime-hygiene.test.ts
-Implement: Compose inventory→plan→fresh authority check→archive/verify→retire→receipt. Add bounded
-work, per-family counters/bytes, deterministic plan digest, FWW receipt and restart idempotency.
-Test: `npx vitest run tests/core/runtime-hygiene.test.ts`
-GO: 10k synthetic inventory bounded; second apply is byte-stable; injected fault loses none.
-NO_GO: Partial success hidden, missing receipt, unbounded scan, or current-run mutation.
-
-## Task 14: RH14-I18N Complete EN/TR operator vocabulary
-
-Dependencies: RH13-ORCHESTRATOR
-Files: src/cli/helpers/messages.ts, tests/cli/runtime-hygiene-messages.test.ts
-Reads: src/core/runtime-hygiene.ts
-Implement: Add EN/TR keys for inventory, plan, preserve, archive, retire, HOLD, receipt and summary;
-keep core string-free and placeholder parity exact.
-Test: `npx vitest run tests/cli/runtime-hygiene-messages.test.ts`
-GO: Every user-visible state resolves directly in both locales with safe placeholders.
-NO_GO: Hardcoded CLI prose, fallback-hidden gap, raw path/identity/secret placeholder.
-
-## Task 15: RH15-CLI Production cleanup surface wiring
-
-Dependencies: RH13-ORCHESTRATOR, RH14-I18N
-Files: src/cli/commands/cleanup.ts, tests/cli/runtime-hygiene-cleanup.test.ts
-Reads: dist/cli/entry.js
-Implement: Add explicit history/runtime hygiene options with dry-run default, separate apply flag,
-JSON projection, exact plan-digest CAS and no-active authority guard. Preserve legacy cleanup.
-Test: `npx vitest run tests/cli/runtime-hygiene-cleanup.test.ts tests/cli/cleanup-log-archive.test.ts`
-Smoke: `node dist/cli/entry.js cleanup --history --dry-run --json` emits one plan and writes zero bytes.
-GO: Registered CLI calls canonical service; apply requires matching digest and terminal authority.
-NO_GO: Default destructive behavior, MCP mutation, source-only wiring, or legacy regression.
-
-## Task 16: RH16-FINALIZER Automatic bounded hygiene wiring
-
-Dependencies: RH05-CONFIG, RH13-ORCHESTRATOR
-Files: src/orchestra/sprint-finalizer.ts, tests/orchestra/runtime-hygiene-finalizer.test.ts
-Implement: After terminal receipt/archive verification, optionally run bounded hygiene from resolved
-config. Never run while active, never mask finalizer failure, and surface typed hygiene HOLD evidence.
-Test: `npx vitest run tests/orchestra/runtime-hygiene-finalizer.test.ts tests/orchestra/sprint-finalizer.test.ts`
-GO: Future finalizers retain configured windows and never write legacy raw archive paths.
-NO_GO: Pre-terminal cleanup, hidden failure, default-on destructive behavior, or config drop.
-
-## Task 17: RH17-ADVERSARIAL Filesystem and liveness assurance
-
-Dependencies: RH13-ORCHESTRATOR
-Files: tests/core/runtime-hygiene-adversarial.test.ts
-Reads: src/core/runtime-hygiene.ts, src/core/maintenance-archive.ts
-Implement: Test symlink/hardlink escape, path swap, concurrent writer, malformed JSON, permission
-fault, plan tamper, archive conflict, PID recycle, foreign tenant and interrupted apply.
-Test: `npx vitest run tests/core/runtime-hygiene-adversarial.test.ts`
-GO: Every ambiguity HOLDs with original bytes intact and no out-of-root access.
-NO_GO: TOCTOU delete, cross-tenant discovery, overwrite, mock-only filesystem proof.
-
-## Task 18: RH18-REAL-BINARY Compiled dry-run/apply/restart lifecycle
-
-Dependencies: RH15-CLI, RH17-ADVERSARIAL
-Files: tests/cli/runtime-hygiene.integration.test.ts
-Reads: dist/cli/entry.js
-Implement: In tmpdir, execute real compiled CLI inventory→dry-run→apply→fresh-process replay with
-duplicate, conflict, active, DB/token and named staging fixtures. Assert exact tree before/after.
-Test: `npx vitest run tests/cli/runtime-hygiene.integration.test.ts --pool=threads`
-GO: Compiled binary proves lossless retirement and zero-write reads across process restart.
-NO_GO: Source-only runner, synthesized receipt, live project mutation, or skipped compiled proof.
-
-## Task 19: RH19-OPERATOR-DOC Product/operator documentation
-
-Dependencies: RH15-CLI, RH16-FINALIZER
-Files: docs/en/reference/runtime-hygiene.md, docs/tr/reference/runtime-hygiene.md
-Reads: docs/evidence/runtime-hygiene-2026-08-23/02-runtime-hygiene-contract.md
-Implement: Document family lifecycle, defaults, dry-run/apply, receipts, recovery, Windows/macOS/Linux
-semantics and explicit preserved authorities in EN/TR parity.
-Test: `npm run lint:link`
-GO: Operators can predict exactly what is kept, archived, retired or held.
-NO_GO: Undocumented destructive default, unsupported platform claim, locale drift.
-
-## Task 20: RH20-LOCAL-CLOSURE Ordered verification and live-apply readiness
-
-Dependencies: RH01-ID-INVENTORY, RH02-ORDINAL-AUTHORITY, RH03-JOB-NAMESPACE, RH18-REAL-BINARY, RH19-OPERATOR-DOC
-Files: docs/evidence/runtime-hygiene-2026-08-23/20-local-closure.md
-Reads: docs/evidence/runtime-hygiene-2026-08-23/01-sprint-identity-inventory.md, docs/evidence/runtime-hygiene-2026-08-23/02-runtime-hygiene-contract.md
-Implement: Reconcile code/config/CLI/finalizer/tests and record exact Brain gates: wave tsc, scoped
-battery, build/restart, live dry-run, owner-authorized apply, post-apply archive verify, disk delta and
-scheduled 2026-08-24 20:00 different-provider XVerify HOLD.
-Test: `git diff --check -- docs/evidence/runtime-hygiene-2026-08-23/20-local-closure.md`
-GO: Package is honestly LOCAL_VERIFIED-ready with no unsupported DONE or hidden owner action.
-NO_GO: Premature XVerify/Closure claim, missing live-apply checklist, or lost artifact.
+- Live .tasks rootunda settled sprint-owned task, result, log, prompt veya worker residue kalmaz.
+- Canonical .deckent/archive/sprints allocated-id manifest gerçek terminal outcome ve family counts taşır.
+- Targeted deckent archive verify sonucu ok true, missing, mismatched ve untracked boş, manifestDigestValid true olur.
+- Compact archive allocated-id Brain rowu ve refreshed summary or index searchable olur; raw payload Brain rowuna kopyalanmaz.
+- İkinci reconcile zero-publish olur ve Memory DB digestini değiştirmez.
+- Legacy .brain/archive task pathleri, .tasks/archive ve recently-works baseline count and digest değerleri değişmez.
+- Archive or finalizer failure false COMPLETE yerine typed terminal-evidence failure üretir.

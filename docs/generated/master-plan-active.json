@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "904ad7aa77ed3fee080831dc2e108715d53698a2e112d43410c987e48a19c2e9"
+    "value": "3df2cfc88d206430cb86ca81d7155a80f2aba74efe1891bbdb3509efa2545c51"
   },
   "summary": {
     "total": 521,
@@ -2204,9 +2204,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-28",
+      "updated": "2026-08-23",
       "definitionDigest": "60b3a13655a25995824df224f775f4ccf477279e4bafaf9a92189e66dd63e0f2",
-      "progressDigest": "ba5057d49dbb684c4b7da43f8e01fa7b9eb3ac60ed4a327a8d5426a04c9fd50d",
+      "progressDigest": "6abd49966624d75e3971294aa1abaf0e99c2473b150302527c09c3ecfd1e500d",
       "terminalClosureDigest": null
     },
     {
@@ -14641,8 +14641,8 @@
         "GR-2026-07-28-RUNFLOW-START-ACTOR-01"
       ],
       "acceptance": "`do`, run, API, terminal and Desktop consume one service; legacy stores migrated",
-      "evidence": "`receipt=GR-2026-07-28-RUNFLOW-EXACT-01`; `receipt=GR-2026-07-28-RUNFLOW-ADOPTION-01`; `receipt=GR-2026-07-28-RUNFLOW-START-ACTOR-01`; one canonical service generates and approves the same exact `Sprint+revision+planDigest+source/topology/scope lineage` and drives durable start-attempt CAS across CLI, MCP, API, Terminal, Autonomous and Process; execution digest V4 closes the structured-criteria authority gap; owner `Alperen` approved canonical sprint-461 flow `adoption-3b945d6a1400dc3687a55b68f036b0e4` at revision 1 with plan `dfa5882f793082a045ce623a49db09c1209560e8576b17c5ede3b5297fa1f596`, legacy projection `0e6e6b941d29bfb88c404984572f7a19048705b54b31a8c0f2c35fbff4ca2cb7` and canonical projection `a1989eb1876285500688f2cd78dfbbab970b1e103a8f77a6650a72c64317c6a6`; the first real built-CLI start stopped before provider dispatch, start-attempt publication or task migration on an approval-actor mismatch, leaving the four approval events, task byte-set `495410164414c24fe3c765dedab0e87c4db48e0ee6e0b267bf2dea1dc454b6a8`, 0/24 structured items and empty attempts unchanged; the CLI adapter now preserves `approvedSnapshot.approvedBy`, matching Terminal semantics, with 63/63 focused proof and fresh Fable 5 CONFIRMED evidence in `.analysis/xverify/xv-manual-20260728-runs-start-actor-fable5.md`; live truth remains open until the repaired exact start executes this approved record, provider authority admits its heterogeneous workers, default non-exact start retires and Desktop/cancel/recovery/every-environment/scale proof completes",
-      "updated": "2026-07-28"
+      "evidence": "`receipt=GR-2026-07-28-RUNFLOW-EXACT-01`; `receipt=GR-2026-07-28-RUNFLOW-ADOPTION-01`; `receipt=GR-2026-07-28-RUNFLOW-START-ACTOR-01`; one canonical service generates and approves the same exact `Sprint+revision+planDigest+source/topology/scope lineage` and drives durable start-attempt CAS across CLI, MCP, API, Terminal, Autonomous and Process; execution digest V4 closes the structured-criteria authority gap; owner `Alperen` approved canonical sprint-461 flow `adoption-3b945d6a1400dc3687a55b68f036b0e4` at revision 1 with plan `dfa5882f793082a045ce623a49db09c1209560e8576b17c5ede3b5297fa1f596`, legacy projection `0e6e6b941d29bfb88c404984572f7a19048705b54b31a8c0f2c35fbff4ca2cb7` and canonical projection `a1989eb1876285500688f2cd78dfbbab970b1e103a8f77a6650a72c64317c6a6`; the first real built-CLI start stopped before provider dispatch, start-attempt publication or task migration on an approval-actor mismatch, leaving the four approval events, task byte-set `495410164414c24fe3c765dedab0e87c4db48e0ee6e0b267bf2dea1dc454b6a8`, 0/24 structured items and empty attempts unchanged; the CLI adapter now preserves `approvedSnapshot.approvedBy`, matching Terminal semantics, with 63/63 focused proof and fresh Fable 5 CONFIRMED evidence in `.analysis/xverify/xv-manual-20260728-runs-start-actor-fable5.md`; live truth remains open until the repaired exact start executes this approved record, provider authority admits its heterogeneous workers, default non-exact start retires and Desktop/cancel/recovery/every-environment/scale proof completes. **2026-08-23 sprint-627 live finding (owner-admitted; implementation yok):** gerçek run `plan --structured` + `runs <flow> --start` ile başladı; flag-on `do --run` ve `runs --start` kod-truth'ta aynı `startRunFlow` exact-start service'ine converge ettiği için FIX'in başlamaması ingress farkı değildir. `injectCriticalDebtTasks()` origin `directories` değerini `filesRead` içine directory olarak yansıttı; `resolveFixRepairAuthority()` exact-file contractı bunu `invalid_inherited_path` saydı, `handleEvaluation()` fix'i doğarken `PAUSED` yazdı ve `selectPendingFixTasks()` yalnız `PENDING` seçtiği için worker hiç spawn edilmedi. Checkpoint `remainingQueue=[]` + paused fix taşıdı; resume terminalizer ise olmayan result authority'yi `TERMINALIZATION_RESULT_AUTHORITY_MISSING` ile HOLD etti. Canonical closure taskı producer scope-normalization → repair-authority admission → FIX dispatch → checkpoint/recovery terminalization zincirini tüm ingress'lerde tek semantics'e bağlamalı; directory read-context ya typed directory authority olarak korunmalı ya injection'da exact tracked files'e deterministik normalize edilmeli, sessiz genişletme/fallback yapılmamalı.",
+      "updated": "2026-08-23"
     },
     {
       "order": 3131,
@@ -26831,6 +26831,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "8e458fc3d51214393a9f50aabd03a8b606ca91ad7538cea7feb3287b5136c71b"
+    "value": "e2a800c3320a16a3895a6e214fe321f4ec8bee565a8a4b23f788c4115654439b"
   }
 }

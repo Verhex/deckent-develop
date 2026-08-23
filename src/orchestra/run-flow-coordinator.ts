@@ -89,6 +89,7 @@ import {
   loadRunHandle,
   RunFlowStoreError,
 } from '../core/run-flow-store.js';
+import { updateLastSprintId } from '../core/utils.js';
 
 // ═══ Typed error taxonomy ══════════════════════════════════════════════════
 
@@ -742,13 +743,28 @@ export function createRunFlowCoordinator(deps: RunFlowCoordinatorDeps): RunFlowC
 
     abortFlow(cmd) {
       const { flowId, reason, supersededBy, commandId } = cmd;
-      return runCommand(flowId, commandId, () => [
+      const before = ensureFlowLoaded(flowId).context;
+      const retiredSprintId = before.state === 'APPROVED'
+        ? loadApprovedSnapshot(root, flowId)?.sprint.id
+        : undefined;
+      const result = runCommand(flowId, commandId, () => [
         buildEvent(flowId, commandId, {
           type: 'FLOW_ABORTED',
           ...(reason !== undefined ? { reason } : {}),
           ...(supersededBy !== undefined ? { supersededBy } : {}),
         }),
       ]);
+      // An approved exact plan may already have published immutable task
+      // compatibility artifacts. Once the operator retires that plan, its
+      // sprint identity is consumed even though no worker started; otherwise
+      // the allocator reuses the same task ids and the next plan correctly
+      // fails closed on TASK_ARTIFACT_CONTENT_CONFLICT. Keep live approved
+      // plans reusable (the existing allocator contract), but advance the
+      // canonical config floor after durable CANCELLED settlement.
+      if (result.context.state === 'CANCELLED' && retiredSprintId !== undefined) {
+        updateLastSprintId(root, retiredSprintId);
+      }
+      return result;
     },
 
     getFlow(flowId) {
