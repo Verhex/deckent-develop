@@ -6,35 +6,28 @@
  * verification, and every unlink is digest-bound. Unknown/foreign entries and
  * conflicting attempts remain at their source.
  */
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import {
   closeSync,
   constants,
   existsSync,
-  fsyncSync,
   lstatSync,
-  mkdirSync,
   openSync,
   readFileSync,
   readdirSync,
   readSync,
-  renameSync,
   statSync,
   unlinkSync,
-  writeFileSync,
 } from 'node:fs';
-import { basename, dirname, join, relative, resolve, sep } from 'node:path';
+import { basename, join, relative, resolve, sep } from 'node:path';
 
 import {
   SPRINT_ARCHIVE_MANIFEST_FILE,
-  SPRINT_ARCHIVE_MANIFEST_KIND,
-  SPRINT_ARCHIVE_MANIFEST_VERSION,
   publishSprintArchiveArtifact,
+  reconcileSprintArchive,
   resolveSprintArchiveDir,
   verifySprintArchive,
-  type SprintArchiveArtifactFamily,
   type SprintArchiveManifest,
-  type SprintArchiveManifestArtifact,
 } from './sprint-archive.js';
 
 export const RUNTIME_EVALUATION_RETENTION_VERSION = 1 as const;
@@ -206,90 +199,13 @@ export function planRuntimeEvaluationRetention(
   };
 }
 
-function familyFor(path: string): SprintArchiveArtifactFamily {
-  const first = portable(path).split('/')[0];
-  if (first === 'tasks' || first === 'evaluations' || first === 'metrics'
-    || first === 'scheduler' || first === 'heartbeat' || first === 'docs' || first === 'audits') return first;
-  return 'run';
-}
-
-function writeAtomic(path: string, value: unknown): void {
-  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
-  const temporary = join(dirname(path), `.${basename(path)}.${process.pid}.${randomUUID()}.tmp`);
-  let descriptor: number | undefined;
-  try {
-    descriptor = openSync(temporary, 'wx', 0o600);
-    writeFileSync(descriptor, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
-    fsyncSync(descriptor);
-    closeSync(descriptor);
-    descriptor = undefined;
-    renameSync(temporary, path);
-    const directoryDescriptor = openSync(dirname(path), 'r');
-    try { fsyncSync(directoryDescriptor); } finally { closeSync(directoryDescriptor); }
-  } finally {
-    if (descriptor !== undefined) closeSync(descriptor);
-    try { unlinkSync(temporary); } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-    }
-  }
-}
-
-/** Refresh the canonical manifest without consulting the unsafe live tree. */
-function refreshManifest(root: string, sprintId: string, prior: SprintArchiveManifest | null): SprintArchiveManifest {
+function archiveCarriesTerminalSealOrApplication(root: string, sprintId: string): boolean {
   const archiveDir = resolveSprintArchiveDir(root, sprintId);
-  const manifestPath = join(archiveDir, SPRINT_ARCHIVE_MANIFEST_FILE);
-  const priorByPath = new Map((prior?.artifacts ?? []).map(artifact => [artifact.path, artifact]));
-  const artifacts: SprintArchiveManifestArtifact[] = listEntries(archiveDir)
-    .filter(entry => entry.regular && resolve(entry.path) !== resolve(manifestPath))
-    .map(entry => {
-      const file = identity(entry.path);
-      const previous = priorByPath.get(entry.relativePath);
-      return {
-        path: entry.relativePath,
-        family: familyFor(entry.relativePath),
-        ...file,
-        sources: previous && previous.sha256 === file.sha256
-          ? previous.sources
-          : [entry.relativePath],
-      };
-    });
-  const counts: Record<SprintArchiveArtifactFamily, number> = {
-    run: 0, tasks: 0, evaluations: 0, metrics: 0, scheduler: 0,
-    heartbeat: 0, docs: 0, audits: 0, unknown: 0,
-  };
-  for (const artifact of artifacts) counts[artifact.family] += 1;
-  const groups = new Map<string, Set<string>>();
-  for (const artifact of artifacts) {
-    const match = /^(.*\/)?conflicts\/(.+)\.[0-9a-f]{16}$/u.exec(artifact.path);
-    const logical = match ? `${match[1] ?? ''}${match[2] ?? ''}` : artifact.path;
-    const variants = groups.get(logical) ?? new Set<string>();
-    variants.add(artifact.path);
-    groups.set(logical, variants);
-  }
-  const conflicts = [...groups.entries()].filter(([, variants]) => variants.size > 1)
-    .map(([path, variants]) => ({ path, variants: [...variants].sort() }))
-    .sort((left, right) => left.path.localeCompare(right.path));
-  const payload: Omit<SprintArchiveManifest, 'contentDigest'> = {
-    kind: SPRINT_ARCHIVE_MANIFEST_KIND,
-    schemaVersion: SPRINT_ARCHIVE_MANIFEST_VERSION,
-    sprintId,
-    terminalOutcome: prior?.terminalOutcome ?? null,
-    artifactCount: artifacts.length,
-    totalBytes: artifacts.reduce((total, artifact) => total + artifact.bytes, 0),
-    familyCounts: counts,
-    artifacts,
-    conflicts,
-    memoryReferences: prior?.memoryReferences ?? [],
-  };
-  const manifest = {
-    ...payload,
-    contentDigest: createHash('sha256').update(JSON.stringify(payload)).digest('hex'),
-  };
-  writeAtomic(manifestPath, manifest);
-  return manifest;
+  return existsSync(join(archiveDir, 'terminal-seal-receipt.json'))
+    || existsSync(join(archiveDir, 'terminal-seal-application.json'));
 }
 
-/** Publish, manifest, verify, then retire only exact digest-bound duplicates. */
+/** Publish, reconcile, verify, then retire only exact digest-bound duplicates. */
 export function applyRuntimeEvaluationRetention(
   plan: RuntimeEvaluationRetentionPlan,
 ): RuntimeEvaluationRetentionResult {
@@ -303,40 +219,52 @@ export function applyRuntimeEvaluationRetention(
   const retired: string[] = [];
   const conflictSources = new Set<string>();
   const prior = readVerifiedManifest(root, plan.sprintId);
+  const terminalArchive = archiveCarriesTerminalSealOrApplication(root, plan.sprintId);
 
-  for (const candidate of plan.reconcile) {
-    const expected = join(evaluationRoot, candidate.relativePath);
-    if (resolve(root, candidate.source) !== resolve(expected)) {
-      failures.push(`${candidate.source}:SOURCE_IDENTITY_INVALID`);
-      continue;
-    }
-    try {
-      const fresh = identity(expected);
-      if (fresh.bytes !== candidate.bytes || fresh.sha256 !== candidate.sha256) {
-        failures.push(`${candidate.source}:SOURCE_CHANGED`);
+  if (terminalArchive && plan.reconcile.length > 0) {
+    failures.push(`${plan.sprintId}:TERMINAL_ARCHIVE_SEALED`);
+  } else {
+    for (const candidate of plan.reconcile) {
+      const expected = join(evaluationRoot, candidate.relativePath);
+      if (resolve(root, candidate.source) !== resolve(expected)) {
+        failures.push(`${candidate.source}:SOURCE_IDENTITY_INVALID`);
         continue;
       }
-      const publication = publishSprintArchiveArtifact(
-        root,
-        plan.sprintId,
-        expected,
-        `evaluations/${candidate.relativePath}`,
-      );
-      published.push(publication.path);
-      if (publication.state === 'conflict') conflictSources.add(candidate.source);
-    } catch (error) {
-      failures.push(`${candidate.source}:${error instanceof Error ? error.message : String(error)}`);
+      try {
+        const fresh = identity(expected);
+        if (fresh.bytes !== candidate.bytes || fresh.sha256 !== candidate.sha256) {
+          failures.push(`${candidate.source}:SOURCE_CHANGED`);
+          continue;
+        }
+        const publication = publishSprintArchiveArtifact(
+          root,
+          plan.sprintId,
+          expected,
+          `evaluations/${candidate.relativePath}`,
+        );
+        published.push(publication.path);
+        if (publication.state === 'conflict') conflictSources.add(candidate.source);
+      } catch (error) {
+        failures.push(`${candidate.source}:${error instanceof Error ? error.message : String(error)}`);
+      }
     }
   }
 
   let manifest: SprintArchiveManifest | null = prior;
-  if (failures.length === 0 && plan.reconcile.length > 0) {
-    try { manifest = refreshManifest(root, plan.sprintId, prior); }
-    catch (error) { failures.push(`${plan.sprintId}:${error instanceof Error ? error.message : String(error)}`); }
+  if (!terminalArchive && failures.length === 0 && plan.reconcile.length > 0) {
+    try {
+      const reconciliation = reconcileSprintArchive(root, plan.sprintId, { apply: true });
+      manifest = reconciliation.manifest;
+      failures.push(...reconciliation.failures.map(failure => `${plan.sprintId}:${failure}`));
+    } catch (error) {
+      failures.push(`${plan.sprintId}:${error instanceof Error ? error.message : String(error)}`);
+    }
   }
-  const archiveVerified = failures.length === 0 && verifySprintArchive(root, plan.sprintId).ok;
-  const candidates = [...plan.retire, ...plan.reconcile];
-  if (archiveVerified && manifest) {
+  const archiveVerified = verifySprintArchive(root, plan.sprintId).ok;
+  const candidates = terminalArchive ? plan.retire : [...plan.retire, ...plan.reconcile];
+  const canRetire = archiveVerified && manifest !== null
+    && (failures.length === 0 || (terminalArchive && failures.length === 1));
+  if (canRetire) {
     for (const candidate of candidates) {
       if (conflictSources.has(candidate.source)) continue;
       const expected = join(evaluationRoot, candidate.relativePath);

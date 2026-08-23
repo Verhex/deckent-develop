@@ -28,8 +28,9 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
-  mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync,
+  mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, statSync,
 } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -105,6 +106,7 @@ import { Command } from 'commander';
 import { TaskEvaluation, SprintStatus, SprintPhase } from '../../src/core/types.js';
 import type { Sprint, Task, TaskResult, ResolvedConfig } from '../../src/core/types.js';
 import { createAgentDefinition } from '../../src/core/agent-types.js';
+import { MemoryStore } from '../../src/core/memory-store.js';
 import { buildSprintFromTasks, registerFinalize } from '../../src/cli/commands/finalize.js';
 import { finalizeSprint, persistFinalSprintState } from '../../src/orchestra/sprint-finalizer.js';
 
@@ -175,14 +177,23 @@ function writeResultFixture(dir: string, result: TaskResult): void {
   writeFileSync(join(dir, `task-${result.taskId}.result`), JSON.stringify(result, null, 2), 'utf-8');
 }
 
-function seedFinalizerDiskEvidence(tasks: readonly Task[], results: readonly TaskResult[]): void {
-  const tasksDir = join(root, '.tasks');
+function seedBrainAuthority(projectRoot: string): void {
+  mkdirSync(join(projectRoot, '.brain'), { recursive: true });
+  new MemoryStore(join(projectRoot, '.brain', 'memory.db')).close();
+}
+
+function seedFinalizerDiskEvidence(
+  tasks: readonly Task[],
+  results: readonly TaskResult[],
+  projectRoot = root,
+): void {
+  const tasksDir = join(projectRoot, '.tasks');
   for (const task of tasks) writeTaskFixture(tasksDir, task);
   for (const result of results) writeResultFixture(tasksDir, result);
 }
 
 function archiveDir(root: string, sprintId = SPRINT_ID): string {
-  return join(root, '.brain', 'archive', `${sprintId}-tasks`);
+  return join(root, '.deckent', 'archive', 'sprints', sprintId, 'tasks');
 }
 
 function seedAgent(root: string, id: string): string {
@@ -214,6 +225,60 @@ function readJson<T>(p: string): T {
   return JSON.parse(readFileSync(p, 'utf-8')) as T;
 }
 
+interface AuthorityFileSnapshot {
+  readonly exists: boolean;
+  readonly size: number | null;
+  readonly mtimeMs: number | null;
+  readonly ctimeMs: number | null;
+  readonly sha256: string | null;
+}
+
+function snapshotAuthorityFile(path: string): AuthorityFileSnapshot {
+  if (!existsSync(path)) {
+    return { exists: false, size: null, mtimeMs: null, ctimeMs: null, sha256: null };
+  }
+  const metadata = statSync(path);
+  const bytes = readFileSync(path);
+  return {
+    exists: true,
+    size: metadata.size,
+    mtimeMs: metadata.mtimeMs,
+    ctimeMs: metadata.ctimeMs,
+    sha256: createHash('sha256').update(bytes).digest('hex'),
+  };
+}
+
+function terminalAuthoritySnapshot(projectRoot: string, sprintId = SPRINT_ID): Record<string, AuthorityFileSnapshot> {
+  const dbPath = join(projectRoot, '.brain', 'memory.db');
+  const sprintArchiveDir = join(projectRoot, '.deckent', 'archive', 'sprints', sprintId);
+  return Object.fromEntries([
+    dbPath,
+    `${dbPath}-wal`,
+    `${dbPath}-shm`,
+    join(projectRoot, '.brain', 'exports', 'summary.md'),
+    join(projectRoot, '.deckent', 'recently-works', `${sprintId}-events.jsonl`),
+    join(sprintArchiveDir, `${sprintId}-events.jsonl`),
+    join(sprintArchiveDir, 'manifest.json'),
+    join(sprintArchiveDir, 'terminal-seal-receipt.json'),
+    join(sprintArchiveDir, 'terminal-seal-application.json'),
+    join(projectRoot, '.deckent', 'runtime', 'jobs', `${sprintId}.json`),
+  ].map(path => [path, snapshotAuthorityFile(path)]));
+}
+
+function retentionConfig(maxCount = 37): ResolvedConfig {
+  return {
+    runtime_artifact_retention: {
+      enabled: false,
+      apply_on_finalize: false,
+      archive_path: '.deckent/archive/configured-runtime/',
+      families: {
+        runtime: { max_age_days: 9, max_count: maxCount, max_size_mb: 41 },
+        recent: { max_age_days: 4, max_count: 17, max_size_mb: 19 },
+      },
+    },
+  } as ResolvedConfig;
+}
+
 // born-605 (405-003): finalizer stats artık gitignored sidecar'a yazar
 // (.deckent/stats/catalog-stats.json) — manifest'ler dokunulmaz. Disk-okuyan
 // bu E2E, kaynağı sidecar'a çevirir (görülen değerler birebir aynı).
@@ -241,7 +306,6 @@ function makeSprint(tasks: Task[], overrides: Partial<Sprint> = {}): Sprint {
 const finalizeOpts = {
   skipDecay: true,
   skipHooks: true,
-  skipMemoryExport: true,
   skipIdentityRegen: true,
   onRuleRegen: async (): Promise<void> => { /* no-op */ },
 };
@@ -262,6 +326,7 @@ let root: string;
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'deckent-268-002-'));
   currentRoot = root;
+  seedBrainAuthority(root);
 });
 
 afterEach(() => {
@@ -491,14 +556,174 @@ describe('finalizeSprint — double-finalize stats idempotency (FINALIZE-RECOUNT
     expect(withStart.metrics.duration).not.toBe('unknown');
     expect(withStart.metrics.durationMs).toBeGreaterThan(0);
 
+    // A different immutable run identity owns the unrecoverable-start variant.
+    // Reusing sprint-900 after its terminal seal would be request drift, not a
+    // duration-format test.
+    const noStartRoot = join(root, 'duration-no-start');
+    const noStartSprintId = 'sprint-902';
+    const noStartTasks = [makeTask('902-001', { sprintId: noStartSprintId })];
+    const noStartEvaluations = new Map<string, TaskEvaluation>([
+      ['902-001', TaskEvaluation.DONE],
+    ]);
+    const noStartResults = [makeResult('902-001')];
+    seedBrainAuthority(noStartRoot);
+    seedFinalizerDiskEvidence(noStartTasks, noStartResults, noStartRoot);
+
     // startedAt unrecoverable → honest 'unknown' (sprint-267 wrote 0ms)
     await finalizeSprint(
-      root,
-      makeSprint(tasks, { startedAt: undefined, completedAt: undefined }),
-      evaluations, results, finalizeOpts,
+      noStartRoot,
+      makeSprint(noStartTasks, {
+        id: noStartSprintId,
+        number: 902,
+        startedAt: undefined,
+        completedAt: undefined,
+      }),
+      noStartEvaluations, noStartResults, finalizeOpts,
     );
-    const withoutStart = readJson<{ metrics: { duration: string } }>(jobPath);
+    const withoutStart = readJson<{ metrics: { duration: string } }>(join(
+      noStartRoot,
+      '.deckent',
+      'runtime',
+      'jobs',
+      `${noStartSprintId}.json`,
+    ));
     expect(withoutStart.metrics.duration).toBe('unknown');
+  });
+});
+
+describe('finalizeSprint — immutable terminal-seal replay boundary', () => {
+  function completeFixture(): {
+    tasks: Task[];
+    evaluations: Map<string, TaskEvaluation>;
+    results: TaskResult[];
+  } {
+    const tasks = [makeTask('900-001')];
+    const evaluations = new Map<string, TaskEvaluation>([['900-001', TaskEvaluation.DONE]]);
+    const results = [makeResult('900-001')];
+    seedFinalizerDiskEvidence(tasks, results);
+    return { tasks, evaluations, results };
+  }
+
+  it('applied exact replay is byte- and metadata-read-only with a live unrelated Brain WAL', async () => {
+    const { tasks, evaluations, results } = completeFixture();
+    await finalizeSprint(root, makeSprint(tasks), evaluations, results, finalizeOpts);
+
+    const dbPath = join(root, '.brain', 'memory.db');
+    const liveStore = new MemoryStore(dbPath);
+    try {
+      liveStore.insert({
+        id: 'unrelated-live-wal-entry',
+        type: 'memory',
+        title: 'Unrelated concurrent Brain authority',
+        content: 'Must remain outside the sealed sprint archive projection.',
+      });
+      expect(statSync(`${dbPath}-wal`).size).toBeGreaterThan(0);
+      expect(statSync(`${dbPath}-shm`).size).toBeGreaterThan(0);
+      const before = terminalAuthoritySnapshot(root);
+
+      await finalizeSprint(root, makeSprint(tasks), evaluations, results, finalizeOpts);
+
+      expect(terminalAuthoritySnapshot(root)).toEqual(before);
+      expect(liveStore.getById('unrelated-live-wal-entry')).not.toBeNull();
+    } finally {
+      liveStore.close();
+    }
+  });
+
+  it('identity, logical digest, and post-seal policy drift HOLD before any authority write', async () => {
+    const { tasks, evaluations, results } = completeFixture();
+    const config = retentionConfig();
+    await finalizeSprint(root, makeSprint(tasks), evaluations, results, { ...finalizeOpts, config });
+    const sealed = terminalAuthoritySnapshot(root);
+
+    await expect(finalizeSprint(
+      root,
+      makeSprint(tasks),
+      evaluations,
+      results,
+      { ...finalizeOpts, config, flowId: 'different-run-identity' },
+    )).rejects.toThrow('SPRINT_ARCHIVE_EXISTING_SEAL_IDENTITY_MISMATCH');
+    expect(terminalAuthoritySnapshot(root)).toEqual(sealed);
+
+    const driftedEvaluations = new Map<string, TaskEvaluation>([
+      ['900-001', TaskEvaluation.GO_WITH_TECH_DEBT],
+    ]);
+    await expect(finalizeSprint(
+      root,
+      makeSprint(tasks),
+      driftedEvaluations,
+      results,
+      { ...finalizeOpts, config },
+    )).rejects.toThrow('SPRINT_ARCHIVE_EXISTING_SEAL_IDENTITY_MISMATCH');
+    expect(terminalAuthoritySnapshot(root)).toEqual(sealed);
+
+    await expect(finalizeSprint(
+      root,
+      makeSprint(tasks),
+      evaluations,
+      results,
+      { ...finalizeOpts, config: retentionConfig(38) },
+    )).rejects.toThrow('SPRINT_ARCHIVE_EXISTING_SEAL_IDENTITY_MISMATCH');
+    expect(terminalAuthoritySnapshot(root)).toEqual(sealed);
+  });
+
+  it('resumes staged and seal-only receipts without appending terminal events', async () => {
+    const { tasks, evaluations, results } = completeFixture();
+    await finalizeSprint(root, makeSprint(tasks), evaluations, results, finalizeOpts);
+    const sprintArchiveDir = join(root, '.deckent', 'archive', 'sprints', SPRINT_ID);
+    const applicationPath = join(sprintArchiveDir, 'terminal-seal-application.json');
+    const hotJournalPath = join(root, '.deckent', 'recently-works', `${SPRINT_ID}-events.jsonl`);
+    const archivedJournalPath = join(sprintArchiveDir, `${SPRINT_ID}-events.jsonl`);
+    const applied = readJson<{
+      kind: 'deckent.sprint-archive-terminal-application';
+      version: 1;
+      sprintId: string;
+      sealReceiptSha256: string;
+    }>(applicationPath);
+    const hotJournal = readFileSync(hotJournalPath);
+    const archivedJournal = readFileSync(archivedJournalPath);
+
+    writeFileSync(applicationPath, `${JSON.stringify({
+      kind: applied.kind,
+      version: applied.version,
+      sprintId: applied.sprintId,
+      state: 'staged',
+      sealReceiptSha256: applied.sealReceiptSha256,
+    }, null, 2)}\n`, 'utf-8');
+    await finalizeSprint(root, makeSprint(tasks), evaluations, results, finalizeOpts);
+    expect(readJson<{ state: string }>(applicationPath).state).toBe('applied');
+    expect(readFileSync(hotJournalPath)).toEqual(hotJournal);
+    expect(readFileSync(archivedJournalPath)).toEqual(archivedJournal);
+
+    rmSync(applicationPath);
+    await finalizeSprint(root, makeSprint(tasks), evaluations, results, finalizeOpts);
+    expect(readJson<{ state: string }>(applicationPath).state).toBe('applied');
+    expect(readFileSync(hotJournalPath)).toEqual(hotJournal);
+    expect(readFileSync(archivedJournalPath)).toEqual(archivedJournal);
+  });
+
+  it('deferTerminalAuthority remains on the live lifecycle path', async () => {
+    const { tasks, evaluations, results } = completeFixture();
+    await finalizeSprint(root, makeSprint(tasks), evaluations, results, {
+      ...finalizeOpts,
+      deferTerminalAuthority: true,
+    });
+
+    const journal = readFileSync(
+      join(root, '.deckent', 'recently-works', `${SPRINT_ID}-events.jsonl`),
+      'utf-8',
+    );
+    expect(journal).toContain('SPRINT_PHASE_CHANGE');
+    expect(journal).toContain('"fromPhase":"EXECUTE"');
+    expect(journal).toContain('"toPhase":"EVALUATE"');
+    expect(existsSync(join(
+      root,
+      '.deckent',
+      'archive',
+      'sprints',
+      SPRINT_ID,
+      'terminal-seal-receipt.json',
+    ))).toBe(false);
   });
 });
 

@@ -9,7 +9,7 @@
 //   6. source override propagates to event.source
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -65,7 +65,7 @@ describe('PROGRESS channel + emitProgress (Sprint 280 PLANOBS-001)', () => {
   it('emitProgress writes an event with channel=PROGRESS and correct payload shape', () => {
     writeSprint(testRoot, 'sprint-280');
 
-    const ev = emitProgress({ root: testRoot, phase: 'EXECUTE', pct: 50, detail: 'half done' });
+    const ev = emitProgress({ root: testRoot, sprintId: 'sprint-280', phase: 'EXECUTE', pct: 50, detail: 'half done' });
 
     expect(ev).not.toBeNull();
     expect(ev!.channel).toBe(CHANNELS.PROGRESS);
@@ -80,7 +80,7 @@ describe('PROGRESS channel + emitProgress (Sprint 280 PLANOBS-001)', () => {
   it('pct is optional — omitting it leaves pct undefined in payload (not an error)', () => {
     writeSprint(testRoot, 'sprint-280');
 
-    const ev = emitProgress({ root: testRoot, phase: 'SPAWN' });
+    const ev = emitProgress({ root: testRoot, sprintId: 'sprint-280', phase: 'SPAWN' });
 
     expect(ev).not.toBeNull();
     const payload = ev!.payload as { phase: string; pct?: number };
@@ -88,19 +88,20 @@ describe('PROGRESS channel + emitProgress (Sprint 280 PLANOBS-001)', () => {
     expect(payload.pct).toBeUndefined();
   });
 
-  it('emitProgress is fail-safe — returns null when sprint-state.json is absent (no throw)', () => {
-    // testRoot exists but sprint-state.json does NOT exist → getCurrentSprintId returns null
-    let result: ReturnType<typeof emitProgress> | undefined;
-    expect(() => {
-      result = emitProgress({ root: testRoot, phase: 'PLAN' });
-    }).not.toThrow();
-    expect(result).toBeNull();
+  it('writes only to the explicit target even when current state names another sprint', () => {
+    writeSprint(testRoot, 'sprint-stale');
+    const ev = emitProgress({ root: testRoot, sprintId: 'sprint-owned', phase: 'PLAN' });
+
+    expect(ev).not.toBeNull();
+    expect(readEvents(testRoot, 'sprint-owned')).toHaveLength(1);
+    expect(readEvents(testRoot, 'sprint-stale')).toHaveLength(0);
+    expect(existsSync(join(testRoot, '.deckent', 'recently-works', 'sprint-stale-seq'))).toBe(false);
   });
 
   it('source is NOT present in payload — only in event.source', () => {
     writeSprint(testRoot, 'sprint-280');
 
-    const ev = emitProgress({ root: testRoot, phase: 'PRE_VITEST', source: 'worker' });
+    const ev = emitProgress({ root: testRoot, sprintId: 'sprint-280', phase: 'PRE_VITEST', source: 'worker' });
 
     expect(ev).not.toBeNull();
     // source should be on the event, not the payload
@@ -112,17 +113,17 @@ describe('PROGRESS channel + emitProgress (Sprint 280 PLANOBS-001)', () => {
   it('source override propagates to event.source; defaults to "brain"', () => {
     writeSprint(testRoot, 'sprint-280');
 
-    const defaultEv = emitProgress({ root: testRoot, phase: 'EXECUTE' });
+    const defaultEv = emitProgress({ root: testRoot, sprintId: 'sprint-280', phase: 'EXECUTE' });
     expect(defaultEv!.source).toBe('brain');
 
-    const overrideEv = emitProgress({ root: testRoot, phase: 'EXECUTE', source: 'auditor' });
+    const overrideEv = emitProgress({ root: testRoot, sprintId: 'sprint-280', phase: 'EXECUTE', source: 'auditor' });
     expect(overrideEv!.source).toBe('auditor');
   });
 
   it('emitProgress event is readable back via readEvents', () => {
     writeSprint(testRoot, 'sprint-280');
 
-    emitProgress({ root: testRoot, phase: 'EXECUTE', pct: 75, detail: 'almost' });
+    emitProgress({ root: testRoot, sprintId: 'sprint-280', phase: 'EXECUTE', pct: 75, detail: 'almost' });
 
     const events = readEvents(testRoot, 'sprint-280', { channel: CHANNELS.PROGRESS });
     expect(events).toHaveLength(1);
@@ -139,7 +140,7 @@ describe('PROGRESS channel + emitProgress (Sprint 280 PLANOBS-001)', () => {
     writeFileSync(join(badRoot, '.deckent', 'sprint-state.json'), 'NOT JSON');
 
     expect(() => {
-      emitProgress({ root: badRoot, phase: 'EXECUTE' });
+      emitProgress({ root: badRoot, sprintId: 'sprint-280', phase: 'EXECUTE' });
     }).not.toThrow();
 
     rmSync(badRoot, { recursive: true, force: true });

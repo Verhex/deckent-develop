@@ -25,18 +25,22 @@ import {
   fsyncSync,
   linkSync,
   lstatSync,
+  mkdtempSync,
   mkdirSync,
   openSync,
   readFileSync,
   readdirSync,
   readSync,
+  realpathSync,
   renameSync,
   rmdirSync,
   statSync,
   unlinkSync,
   writeFileSync,
+  type Stats,
 } from 'node:fs';
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { tmpdir } from 'node:os';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep, win32 } from 'node:path';
 
 import {
   ARCHIVE_DIR,
@@ -47,7 +51,10 @@ import {
   PROJECT_CONFIG_PATH,
   TASKS_DIR,
 } from './constants.js';
+import { canonicalJson } from './audit-writer.js';
+import { writeGuardedExports } from './memory-export.js';
 import { MemoryStore } from './memory-store.js';
+import type { SprintTerminalReceiptV1 } from './sprint-terminal-publication.js';
 import { debugLog } from './utils.js';
 
 export const SPRINT_ARCHIVE_MANIFEST_KIND = 'deckent.sprint-archive-manifest';
@@ -62,6 +69,8 @@ const DEFAULT_ARCHIVE_BASE = join(DECKENT_DIR, ARCHIVE_DIR, ARCHIVE_SPRINTS_SUBD
 const LEGACY_TASK_ARCHIVE_SUBDIR = 'archive';
 const HASH_BUFFER_BYTES = 1024 * 1024;
 const SPRINT_ID_PATTERN = /^sprint-(\d+)$/u;
+const TERMINAL_SEAL_RECEIPT_FILE = 'terminal-seal-receipt.json';
+const TERMINAL_SEAL_APPLICATION_FILE = 'terminal-seal-application.json';
 
 export type SprintArchiveArtifactFamily =
   | 'run'
@@ -170,6 +179,22 @@ export interface SprintArchiveArtifactPublication {
   readonly sha256: string;
   readonly state: 'published' | 'deduplicated' | 'conflict';
   readonly sourceRetired: boolean;
+}
+
+/** Stable failure codes for callers that must fail closed before archive mutation. */
+export type SprintArchivePublicationErrorCode =
+  | 'ARCHIVE_UNSAFE_NAMESPACE'
+  | 'ARCHIVE_UNSAFE_DESTINATION_PATH'
+  | 'ARCHIVE_TERMINAL_PUBLICATION_REJECTED';
+
+export class SprintArchivePublicationError extends Error {
+  readonly code: SprintArchivePublicationErrorCode;
+
+  constructor(code: SprintArchivePublicationErrorCode, path: string) {
+    super(`${code}:${path}`);
+    this.name = 'SprintArchivePublicationError';
+    this.code = code;
+  }
 }
 
 interface ArchiveCandidate {
@@ -294,6 +319,68 @@ function conflictDestination(destination: string, sha256: string): string {
   return join(dirname(destination), 'conflicts', `${basename(destination)}.${sha256.slice(0, 16)}`);
 }
 
+/**
+ * Check every currently-existing component before mkdir/copy can touch the
+ * archive. `lstat` deliberately rejects both symlinks and Windows junctions.
+ */
+function assertArchivePublicationDestinationSafe(
+  projectRoot: string,
+  destination: string,
+): void {
+  const root = resolve(projectRoot);
+  const target = resolve(destination);
+  const projected = relative(root, target);
+  if (projected === '' || projected === '..' || projected.startsWith(`..${sep}`) || isAbsolute(projected)) {
+    throw new SprintArchivePublicationError('ARCHIVE_UNSAFE_DESTINATION_PATH', destination);
+  }
+  const segments = projected.split(sep);
+  let current = root;
+  for (let index = 0; index < segments.length; index += 1) {
+    current = join(current, segments[index]!);
+    try {
+      const metadata = lstatSync(current);
+      if (metadata.isSymbolicLink() || (index < segments.length - 1 && !metadata.isDirectory())) {
+        throw new SprintArchivePublicationError('ARCHIVE_UNSAFE_DESTINATION_PATH', current);
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+      throw error;
+    }
+  }
+}
+
+function terminalSidecarExists(archiveDir: string): boolean {
+  for (const filename of [TERMINAL_SEAL_RECEIPT_FILE, TERMINAL_SEAL_APPLICATION_FILE]) {
+    try {
+      lstatSync(join(archiveDir, filename));
+      return true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return true;
+    }
+  }
+  return false;
+}
+
+function identicalFileIdentity(
+  left: { readonly bytes: number; readonly sha256: string },
+  right: { readonly bytes: number; readonly sha256: string },
+): boolean {
+  return left.bytes === right.bytes && left.sha256 === right.sha256;
+}
+
+function retireExactPublishedSource(source: string, destination: string): boolean {
+  if (resolve(source) === resolve(destination)) return false;
+  // Re-read both identities immediately before unlinking; an old comparison is
+  // not proof that the source still names the archived bytes.
+  const destinationIdentity = fileIdentity(destination);
+  const sourceIdentity = fileIdentity(source);
+  if (!identicalFileIdentity(destinationIdentity, sourceIdentity)) {
+    throw new Error(`ARCHIVE_RETIREMENT_DIGEST_MISMATCH:${source}`);
+  }
+  unlinkSync(source);
+  return true;
+}
+
 function publishVerifiedCopy(source: string, requestedDestination: string): {
   destination: string;
   state: 'published' | 'deduplicated' | 'conflict';
@@ -368,18 +455,33 @@ export function publishSprintArchiveArtifact(
     || !destination.startsWith(`${resolve(archiveDir)}${sep}`)
   ) throw new Error(`INVALID_ARCHIVE_TARGET:${targetRelative}`);
 
-  const publication = publishVerifiedCopy(source, destination);
-  let sourceRetired = false;
-  if (options.retireSource === true && resolve(source) !== resolve(publication.destination)) {
-    const destinationIdentity = fileIdentity(publication.destination);
-    const sourceIdentity = fileIdentity(source);
-    if (
-      destinationIdentity.bytes !== sourceIdentity.bytes
-      || destinationIdentity.sha256 !== sourceIdentity.sha256
-    ) throw new Error(`ARCHIVE_RETIREMENT_DIGEST_MISMATCH:${source}`);
-    unlinkSync(source);
-    sourceRetired = true;
+  if (!isSprintArchiveNamespaceSafe(projectRoot, sprintId)) {
+    throw new SprintArchivePublicationError('ARCHIVE_UNSAFE_NAMESPACE', archiveDir);
   }
+  assertArchivePublicationDestinationSafe(projectRoot, destination);
+
+  if (terminalSidecarExists(archiveDir)) {
+    const sourceIdentity = fileIdentity(source);
+    let destinationIdentity: { bytes: number; sha256: string };
+    try {
+      destinationIdentity = fileIdentity(destination);
+    } catch {
+      throw new SprintArchivePublicationError('ARCHIVE_TERMINAL_PUBLICATION_REJECTED', destination);
+    }
+    if (!identicalFileIdentity(destinationIdentity, sourceIdentity)) {
+      throw new SprintArchivePublicationError('ARCHIVE_TERMINAL_PUBLICATION_REJECTED', destination);
+    }
+    return {
+      path: relative(archiveDir, destination).split(sep).join('/'),
+      ...destinationIdentity,
+      state: 'deduplicated',
+      sourceRetired: options.retireSource === true && retireExactPublishedSource(source, destination),
+    };
+  }
+
+  const publication = publishVerifiedCopy(source, destination);
+  const sourceRetired = options.retireSource === true
+    && retireExactPublishedSource(source, publication.destination);
   return {
     path: relative(archiveDir, publication.destination).split(sep).join('/'),
     ...publication.identity,
@@ -597,8 +699,12 @@ function terminalOutcomeFromReceipt(projectRoot: string, sprintId: string, archi
   ];
   for (const path of candidates) {
     try {
-      const parsed = JSON.parse(readFileSync(path, 'utf-8')) as { terminalOutcome?: unknown };
-      if (typeof parsed.terminalOutcome === 'string') return parsed.terminalOutcome;
+      const parsed = JSON.parse(readFileSync(path, 'utf-8')) as {
+        terminalOutcome?: unknown;
+        receipt?: { terminalOutcome?: unknown };
+      };
+      const outcome = parsed.receipt?.terminalOutcome ?? parsed.terminalOutcome;
+      if (typeof outcome === 'string') return outcome;
     } catch { /* try next authority */ }
   }
   return null;
@@ -630,6 +736,44 @@ function collectHeartbeatCandidates(
         continue;
       }
       addDirectoryCandidates(candidates, projectRoot, attemptRoot, join(item.target, entry.name), 'heartbeat', false);
+    }
+  }
+}
+
+function isSprintTaskEndpoint(taskId: unknown, sprintId: string): taskId is string {
+  if (typeof taskId !== 'string') return false;
+  const number = sprintNumber(sprintId);
+  return new RegExp(`^(?:task-)?${number}-[A-Za-z0-9][A-Za-z0-9._-]*$`, 'u').test(taskId);
+}
+
+/** Handoff filenames are not authority; endpoints and terminal status are. */
+function collectSettledHandoffCandidates(
+  candidates: ArchiveCandidate[],
+  projectRoot: string,
+  sprintId: string,
+): void {
+  const handoffDir = join(projectRoot, TASKS_DIR, 'handoffs');
+  let entries;
+  try { entries = readdirSync(handoffDir, { withFileTypes: true }); } catch { return; }
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith('.json')) continue;
+    const source = join(handoffDir, entry.name);
+    try {
+      const metadata = lstatSync(source);
+      if (!metadata.isFile() || metadata.isSymbolicLink()) continue;
+      const value = JSON.parse(readFileSync(source, 'utf8')) as Record<string, unknown>;
+      if (!isSprintTaskEndpoint(value.fromTaskId, sprintId)
+          || !isSprintTaskEndpoint(value.toTaskId, sprintId)
+          || (value.status !== 'ready' && value.status !== 'failed')
+          || value.id !== `${value.fromTaskId}-to-${value.toTaskId}`) continue;
+      candidates.push({
+        source,
+        targetRelative: join(SPRINT_ARCHIVE_TASKS_SUBDIR, 'handoffs', entry.name),
+        family: 'tasks',
+        retireLegacy: true,
+      });
+    } catch {
+      // Malformed handoffs are live protocol authority, never archive input.
     }
   }
 }
@@ -773,6 +917,7 @@ function collectArchiveCandidates(projectRoot: string, sprintId: string): Archiv
     retireLegacy: false,
   });
   collectHeartbeatCandidates(candidates, projectRoot, sprintId);
+  collectSettledHandoffCandidates(candidates, projectRoot, sprintId);
 
   // Existing canonical evidence is included during manifest construction, not
   // copied back onto itself.
@@ -874,8 +1019,8 @@ function upsertMemoryArchiveIndex(
   manifest: SprintArchiveManifest,
   archiveDir: string,
 ): void {
-  const dbPath = join(projectRoot, BRAIN_DIR, MEMORY_DB_FILE);
-  if (!existsSync(dbPath)) return;
+  const dbPath = safeBrainDatabasePath(projectRoot);
+  if (!dbPath) return;
   const store = new MemoryStore(dbPath);
   try {
     const familySummary = Object.entries(manifest.familyCounts)
@@ -1023,7 +1168,12 @@ export function reconcileSprintArchive(
   // discovered legacy candidates. Earlier code returned an empty manifest for
   // a fully reconciled archive because it enumerated canonical files only in
   // apply mode.
-  const artifactFiles = listFilesRecursively(archiveDir).filter(path => path !== manifestPath);
+  // The application receipt binds the final manifest digest and therefore is
+  // an integrity sidecar, not a manifest member (including it would create a
+  // self-referential digest). Its own digest is bound by terminal verification.
+  const terminalApplicationPath = join(archiveDir, TERMINAL_SEAL_APPLICATION_FILE);
+  const artifactFiles = listFilesRecursively(archiveDir)
+    .filter(path => path !== manifestPath && path !== terminalApplicationPath);
   const plannedOnly = apply ? [] : published;
   const artifactsByPath = new Map<string, SprintArchiveManifestArtifact>();
   for (const path of artifactFiles) {
@@ -1126,6 +1276,1152 @@ function readManifest(path: string): SprintArchiveManifest | null {
   }
 }
 
+export interface SprintArchiveTerminalEventIdentity {
+  readonly sequence: number;
+  readonly digest: string;
+}
+
+export interface SprintArchiveTerminalSealRequest {
+  readonly receipt: SprintTerminalReceiptV1;
+  readonly finalEvent: SprintArchiveTerminalEventIdentity;
+  /** Must resolve to the one canonical hot journal for this sprint. */
+  readonly hotJournalPath?: string;
+  /** Null means that no archived journal is expected to exist. */
+  readonly expectedArchivedPreimageSha256: string | null;
+  readonly expectedHotJournalSha256: string;
+  readonly operatorReason: string;
+  /** Operator repair requests require compact Brain + guarded export adoption. */
+  readonly adoptBrain?: boolean;
+  /** Canonical digest of the outer lifecycle events requested by the ingress. */
+  readonly terminalEventsProjectionSha256?: string | null;
+  /** Canonical digest of the post-seal policy admitted by the outer ingress. */
+  readonly postSealPolicySha256?: string | null;
+}
+
+export type SprintArchiveTerminalSealHoldReason =
+  | 'missing_terminal_marker'
+  | 'terminal_identity_mismatch'
+  | 'invalid_final_event'
+  | 'invalid_hot_journal_path'
+  | 'invalid_archive_path'
+  | 'invalid_operator_reason'
+  | 'invalid_expected_digest'
+  | 'preimage_mismatch'
+  | 'sequence_counter_mismatch'
+  | 'append_race'
+  | 'non_prefix_divergence'
+  | 'manifest_conflict'
+  | 'archive_tampered'
+  | 'untracked_artifact'
+  | 'seal_locked'
+  | 'seal_write_failed'
+  | 'brain_adoption_failed'
+  | 'application_not_applied';
+
+export interface SprintArchiveTerminalSealReceipt {
+  readonly kind: 'deckent.sprint-archive-terminal-seal';
+  readonly version: 1;
+  readonly sprintId: string;
+  readonly runId: string;
+  readonly coordinatorGeneration: number;
+  readonly terminalOutcome: string;
+  readonly logicalSettlementDigest: string;
+  readonly priorAuthorityVersion: number;
+  readonly authorityVersion: number;
+  readonly terminalReceipt: SprintTerminalReceiptV1;
+  readonly finalEvent: SprintArchiveTerminalEventIdentity;
+  readonly canonicalHotJournalPath: string;
+  readonly expectedArchivedPreimageSha256: string | null;
+  readonly hotJournalSha256: string;
+  readonly archivedJournalSha256: string;
+  readonly operatorReason: string;
+  readonly operatorReasonSha256: string;
+  readonly brainAdoptionRequired: boolean;
+  readonly terminalEventsProjectionSha256: string | null;
+  readonly postSealPolicySha256: string | null;
+  readonly repairedHistoryPath: string | null;
+  readonly repairedHistorySha256: string | null;
+  readonly sequenceCounterValue: number;
+  readonly sequenceCounterSha256: string;
+  readonly expectedArchivedSequencePreimageSha256: string | null;
+  readonly repairedSequenceHistoryPath: string | null;
+  readonly repairedSequenceHistorySha256: string | null;
+  readonly originalDisposition: 'sealed' | 'repaired';
+}
+
+export interface SprintArchiveTerminalApplicationReceipt {
+  readonly kind: 'deckent.sprint-archive-terminal-application';
+  readonly version: 1;
+  readonly sprintId: string;
+  readonly state: 'staged' | 'applied';
+  readonly sealReceiptSha256: string;
+  readonly manifestDigest?: string;
+  readonly brainAdopted?: boolean;
+  readonly brainIndexSha256?: string | null;
+  readonly guardedSummarySha256?: string | null;
+}
+
+export interface SprintArchiveTerminalSealResult {
+  readonly disposition: 'sealed' | 'repaired' | 'idempotent' | 'hold';
+  readonly terminalComplete: boolean;
+  readonly reasonCode?: SprintArchiveTerminalSealHoldReason;
+  readonly receipt?: SprintArchiveTerminalSealReceipt;
+  readonly applicationReceipt?: SprintArchiveTerminalApplicationReceipt;
+  /**
+   * Exact verification produced inside the same terminal commit.
+   *
+   * This is output-only authority: callers cannot inject it through the seal
+   * request.  The first writer therefore hands its already-validated Brain
+   * projection to the outer finalizer without forcing an immediate detached
+   * SQLite/WAL re-open.  Later public/replay verification remains independent.
+   */
+  readonly verification?: SprintArchiveTerminalVerificationReport;
+}
+
+export interface SprintArchiveTerminalVerificationReport {
+  readonly sprintId: string;
+  readonly ok: boolean;
+  readonly reasonCodes: readonly SprintArchiveTerminalSealHoldReason[];
+  readonly manifestDigest: string | null;
+  readonly sealReceiptSha256: string | null;
+  readonly brainIndexSha256: string | null;
+  readonly guardedSummarySha256: string | null;
+}
+
+const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/u;
+const OPERATOR_REASON_CONTROL_PATTERN = /[\u0000-\u001f\u007f]/u;
+
+function sha256(value: string | Buffer): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function isTerminalReceipt(value: unknown): value is SprintTerminalReceiptV1 {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Partial<SprintTerminalReceiptV1>;
+  return record.version === 1
+    && typeof record.sprintId === 'string' && record.sprintId.length > 0
+    && typeof record.runId === 'string' && record.runId.length > 0
+    && Number.isSafeInteger(record.coordinatorGeneration) && (record.coordinatorGeneration ?? 0) > 0
+    && (record.terminalOutcome === 'COMPLETE' || record.terminalOutcome === 'ABORTED')
+    && typeof record.logicalSettlementDigest === 'string'
+    && SHA256_HEX_PATTERN.test(record.logicalSettlementDigest)
+    && Number.isSafeInteger(record.priorAuthorityVersion) && (record.priorAuthorityVersion ?? -1) >= 0
+    && Number.isSafeInteger(record.authorityVersion) && (record.authorityVersion ?? -1) >= 0;
+}
+
+function exactReceiptEquals(value: unknown, receipt: SprintTerminalReceiptV1): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const wrapper = value as Record<string, unknown>;
+  const record = wrapper.receipt && typeof wrapper.receipt === 'object' && !Array.isArray(wrapper.receipt)
+    ? wrapper.receipt as Record<string, unknown>
+    : wrapper;
+  return record.version === receipt.version
+    && record.sprintId === receipt.sprintId
+    && record.runId === receipt.runId
+    && record.coordinatorGeneration === receipt.coordinatorGeneration
+    && record.terminalOutcome === receipt.terminalOutcome
+    && record.logicalSettlementDigest === receipt.logicalSettlementDigest
+    && record.priorAuthorityVersion === receipt.priorAuthorityVersion
+    && record.authorityVersion === receipt.authorityVersion;
+}
+
+function readJournalSnapshot(path: string): {
+  readonly bytes: Buffer;
+  readonly sequence: number;
+  readonly digest: string;
+} | null {
+  try {
+    const metadata = lstatSync(path);
+    if (!metadata.isFile() || metadata.isSymbolicLink()) return null;
+    const bytes = readFileSync(path);
+    const lines = bytes.toString('utf8').split(/\r?\n/u).filter(line => line !== '');
+    const finalLine = lines.at(-1);
+    if (!finalLine) return null;
+    const parsed = JSON.parse(finalLine) as { sequence?: unknown };
+    if (!Number.isSafeInteger(parsed.sequence) || (parsed.sequence as number) < 1) return null;
+    return { bytes, sequence: parsed.sequence as number, digest: sha256(finalLine) };
+  } catch {
+    return null;
+  }
+}
+
+function readSequenceSnapshot(path: string): { readonly bytes: Buffer; readonly value: number; readonly digest: string } | null {
+  try {
+    const metadata = lstatSync(path);
+    if (!metadata.isFile() || metadata.isSymbolicLink()) return null;
+    const bytes = readFileSync(path);
+    const raw = bytes.toString('utf8');
+    if (!/^(?:0|[1-9]\d*)$/u.test(raw)) return null;
+    const value = Number(raw);
+    if (!Number.isSafeInteger(value) || value < 0) return null;
+    return { bytes, value, digest: sha256(bytes) };
+  } catch {
+    return null;
+  }
+}
+
+/** Retire only the exact counter bound by an applied terminal seal. */
+function retireHotSequenceCounter(
+  projectRoot: string,
+  sprintId: string,
+  expected: Pick<SprintArchiveTerminalSealReceipt, 'sequenceCounterValue' | 'sequenceCounterSha256'>,
+): boolean {
+  const path = join(projectRoot, DECKENT_DIR, 'recently-works', `${sprintId}-seq`);
+  if (!existsSync(path)) return true;
+  const before = readSequenceSnapshot(path);
+  if (!before || before.value !== expected.sequenceCounterValue
+      || before.digest !== expected.sequenceCounterSha256) return false;
+  const confirmed = readSequenceSnapshot(path);
+  if (!confirmed || !confirmed.bytes.equals(before.bytes)
+      || confirmed.value !== expected.sequenceCounterValue
+      || confirmed.digest !== expected.sequenceCounterSha256) return false;
+  try {
+    unlinkSync(path);
+  } catch {
+    return false;
+  }
+  return !existsSync(path);
+}
+
+/** Pure path adapter used by native authority and win32 regression tests. */
+export function isSprintArchivePathContained(
+  root: string,
+  candidate: string,
+  flavor: 'native' | 'win32' = 'native',
+): boolean {
+  const pathApi = flavor === 'win32' ? win32 : { resolve, relative, isAbsolute };
+  const projected = pathApi.relative(pathApi.resolve(root), pathApi.resolve(candidate));
+  return projected !== '' && projected !== '..'
+    && !projected.startsWith(`..${flavor === 'win32' ? '\\' : sep}`)
+    && !pathApi.isAbsolute(projected);
+}
+
+/** Reject symlink/junction redirection in every existing namespace component below the project root. */
+function isArchiveNamespaceLinkFree(projectRoot: string, candidate: string): boolean {
+  const root = resolve(projectRoot);
+  const target = resolve(candidate);
+  const projected = relative(root, target);
+  if (projected === '' || projected === '..' || projected.startsWith(`..${sep}`) || isAbsolute(projected)) {
+    return false;
+  }
+  let current = root;
+  for (const segment of projected.split(sep)) {
+    current = join(current, segment);
+    try {
+      if (lstatSync(current).isSymbolicLink()) return false;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return true;
+      return false;
+    }
+  }
+  return true;
+}
+
+/** Public fail-closed namespace predicate shared by outer lifecycle replay admission. */
+export function isSprintArchiveNamespaceSafe(projectRoot: string, sprintId: string): boolean {
+  const archiveDir = resolveSprintArchiveDir(projectRoot, sprintId);
+  if (!isArchiveNamespaceLinkFree(projectRoot, archiveDir)) return false;
+  try {
+    return lstatSync(archiveDir).isDirectory();
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'ENOENT';
+  }
+}
+
+function canonicalHotJournalPath(projectRoot: string, sprintId: string, supplied?: string): string | null {
+  const canonical = resolve(projectRoot, DECKENT_DIR, 'recently-works', `${sprintId}-events.jsonl`);
+  if (supplied !== undefined && resolve(supplied) !== canonical) return null;
+  try {
+    if (!isArchiveNamespaceLinkFree(projectRoot, canonical)) return null;
+    const rootReal = realpathSync(resolve(projectRoot));
+    const hotReal = realpathSync(canonical);
+    const metadata = lstatSync(canonical);
+    if (!metadata.isFile() || metadata.isSymbolicLink()
+        || !isSprintArchivePathContained(rootReal, hotReal)) return null;
+  } catch {
+    return null;
+  }
+  return canonical;
+}
+
+function terminalMarker(projectRoot: string, sprintId: string): unknown | null {
+  const path = join(projectRoot, DECKENT_DIR, 'recently-works', `${sprintId}-terminal-receipt.json`);
+  try {
+    const metadata = lstatSync(path);
+    if (!metadata.isFile() || metadata.isSymbolicLink()) return null;
+    return JSON.parse(readFileSync(path, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function sealReceiptDigest(receipt: SprintArchiveTerminalSealReceipt): string {
+  return sha256(canonicalJson(receipt));
+}
+
+function deterministicHistoryPath(sprintId: string, digest: string): string {
+  return `journal-history/${sprintId}-events.jsonl.${digest}`;
+}
+
+function deterministicSequenceHistoryPath(sprintId: string, digest: string): string {
+  return `sequence-history/${sprintId}-seq.${digest}`;
+}
+
+function exactSealReceipt(value: unknown, expected: SprintArchiveTerminalSealReceipt): boolean {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    && canonicalJson(value) === canonicalJson(expected);
+}
+
+function readJson(path: string): unknown | null {
+  try { return JSON.parse(readFileSync(path, 'utf8')); } catch { return null; }
+}
+
+function sealHold(
+  reasonCode: SprintArchiveTerminalSealHoldReason,
+  receipt?: SprintArchiveTerminalSealReceipt,
+  applicationReceipt?: SprintArchiveTerminalApplicationReceipt,
+): SprintArchiveTerminalSealResult {
+  return {
+    disposition: 'hold',
+    terminalComplete: false,
+    reasonCode,
+    ...(receipt ? { receipt } : {}),
+    ...(applicationReceipt ? { applicationReceipt } : {}),
+  };
+}
+
+/**
+ * Load a SQLite authority as a detached, process-owned snapshot.
+ *
+ * Opening a WAL-mode database with SQLite's file-backed `readonly` option can
+ * still create or touch `-shm`.  Terminal verification must be observational,
+ * so it never gives SQLite the authority path.  Exact source DB/WAL bytes are
+ * copied under a process-owned temp directory after a before/after stat CAS;
+ * SQLite may create SHM only beside that detached copy.  Concurrent snapshot
+ * drift is rejected fail-closed and no authority bytes are written.
+ */
+interface ImmutableSqliteSnapshot {
+  readonly directory: string;
+  readonly databasePath: string;
+}
+
+function sameFileSnapshot(
+  before: Stats,
+  after: Stats,
+): boolean {
+  return before.dev === after.dev && before.ino === after.ino && before.size === after.size
+    && before.mtimeMs === after.mtimeMs && before.ctimeMs === after.ctimeMs;
+}
+
+function removeImmutableSqliteSnapshot(directory: string): void {
+  try {
+    for (const entry of readdirSync(directory)) {
+      try { unlinkSync(join(directory, entry)); } catch { /* bounded process-owned residue */ }
+    }
+    rmdirSync(directory);
+  } catch { /* process temp cleanup is best-effort */ }
+}
+
+function immutableSqliteSnapshot(path: string): ImmutableSqliteSnapshot | null {
+  const walPath = `${path}-wal`;
+  let directory: string | null = null;
+  try {
+    const linkMetadata = lstatSync(path);
+    if (!linkMetadata.isFile() || linkMetadata.isSymbolicLink()) return null;
+    const databaseBefore = statSync(path);
+    const walPresent = existsSync(walPath);
+    const walBefore = walPresent ? statSync(walPath) : null;
+    if (walPresent && (!lstatSync(walPath).isFile() || lstatSync(walPath).isSymbolicLink())) return null;
+    const databaseBytes = readFileSync(path);
+    const walBytes = walPresent ? readFileSync(walPath) : null;
+    const databaseConfirmation = readFileSync(path);
+    const walConfirmation = walPresent ? readFileSync(walPath) : null;
+    const databaseAfter = statSync(path);
+    const walStillPresent = existsSync(walPath);
+    const walAfter = walStillPresent ? statSync(walPath) : null;
+    if (!databaseBytes.equals(databaseConfirmation)
+        || walBytes !== null && (walConfirmation === null || !walBytes.equals(walConfirmation))
+        || !sameFileSnapshot(databaseBefore, databaseAfter) || walPresent !== walStillPresent
+        || walBefore !== null && (walAfter === null || !sameFileSnapshot(walBefore, walAfter))) return null;
+    if (databaseBytes.length < 100
+        || databaseBytes.subarray(0, 16).toString('binary') !== 'SQLite format 3\0') return null;
+    if (walBytes !== null && walBytes.length > 0) {
+      if (walBytes.length < 32) return null;
+      const magic = walBytes.readUInt32BE(0);
+      const declaredPageSize = walBytes.readUInt32BE(8);
+      const pageSize = declaredPageSize === 1 ? 65_536 : declaredPageSize;
+      if ((magic !== 0x377f0682 && magic !== 0x377f0683)
+          || pageSize < 512 || pageSize > 65_536 || (pageSize & (pageSize - 1)) !== 0
+          || (walBytes.length - 32) % (pageSize + 24) !== 0) return null;
+    }
+
+    directory = mkdtempSync(join(tmpdir(), 'deckent-brain-projection-'));
+    const databasePath = join(directory, MEMORY_DB_FILE);
+    writeFileSync(databasePath, databaseBytes, { mode: 0o600 });
+    if (walBytes !== null && walBytes.length > 0) {
+      writeFileSync(`${databasePath}-wal`, walBytes, { mode: 0o600 });
+    }
+    return { directory, databasePath };
+  } catch {
+    if (directory !== null) removeImmutableSqliteSnapshot(directory);
+    return null;
+  }
+}
+
+interface BrainArchiveProjectionEntry {
+  readonly id: string;
+  readonly type: string;
+  readonly content: string;
+  readonly summary: string | null;
+  readonly metadata: string;
+}
+
+/**
+ * Brain adoption may never escape the repo-local `.brain` namespace through
+ * a symlink or junction. Resolve the project root once so a workspace entered
+ * through a symlink remains valid, while the namespace and DB leaf themselves
+ * must be ordinary directory/file entries under that canonical root.
+ */
+function safeBrainDatabasePath(projectRoot: string): string | null {
+  const brainDir = join(projectRoot, BRAIN_DIR);
+  const dbPath = join(brainDir, MEMORY_DB_FILE);
+  try {
+    const brainMetadata = lstatSync(brainDir);
+    const databaseMetadata = lstatSync(dbPath);
+    if (!brainMetadata.isDirectory() || brainMetadata.isSymbolicLink()
+        || !databaseMetadata.isFile() || databaseMetadata.isSymbolicLink()) return null;
+    const canonicalRoot = realpathSync(projectRoot);
+    const canonicalBrain = realpathSync(brainDir);
+    const canonicalDatabase = realpathSync(dbPath);
+    if (canonicalBrain !== join(canonicalRoot, BRAIN_DIR)
+        || dirname(canonicalDatabase) !== canonicalBrain
+        || basename(canonicalDatabase) !== MEMORY_DB_FILE) return null;
+    return dbPath;
+  } catch {
+    return null;
+  }
+}
+
+function readBrainProjectionEntry(
+  dbPath: string,
+  sprintId: string,
+): BrainArchiveProjectionEntry | null {
+  const snapshot = immutableSqliteSnapshot(dbPath);
+  if (!snapshot) return null;
+  let db: Database.Database | null = null;
+  try {
+    db = new Database(snapshot.databasePath, { readonly: true, fileMustExist: true });
+    return db.prepare(`
+      SELECT id, type, content, summary, metadata
+      FROM entries
+      WHERE id = ? AND deleted_at IS NULL
+    `).get(`archive-${sprintId}`) as BrainArchiveProjectionEntry | undefined ?? null;
+  } catch {
+    return null;
+  } finally {
+    try { db?.close(); } finally { removeImmutableSqliteSnapshot(snapshot.directory); }
+  }
+}
+
+const TRUSTED_BRAIN_PROJECTION = Symbol('trusted-brain-projection');
+
+interface TrustedBrainProjection {
+  readonly [TRUSTED_BRAIN_PROJECTION]: true;
+  readonly sprintId: string;
+  readonly manifestDigest: string;
+  readonly brainIndexSha256: string;
+  readonly guardedSummarySha256: string;
+}
+
+function brainAdoptionProjection(
+  projectRoot: string,
+  sprintId: string,
+  manifestDigest: string,
+  refresh: boolean,
+): TrustedBrainProjection | null {
+  const dbPath = safeBrainDatabasePath(projectRoot);
+  if (!dbPath) return null;
+  let entry: BrainArchiveProjectionEntry | null = null;
+  if (refresh) {
+    const store = new MemoryStore(dbPath);
+    try {
+      const adopted = store.getById(`archive-${sprintId}`);
+      if (!adopted) return null;
+      const guarded = writeGuardedExports(store, join(projectRoot, BRAIN_DIR, 'exports'));
+      if (guarded.warnings.length > 0 || !guarded.written.includes('summary.md')) return null;
+      // This is the writer-owned refresh path: use the exact row read from the
+      // same MemoryStore transaction boundary that rendered the guarded
+      // exports. Reopening a detached WAL snapshot immediately after closing
+      // the writer can fail during SQLite's own checkpoint transition even
+      // though the durable row/export are already correct. Read-only terminal
+      // verification below still uses the immutable detached snapshot.
+      entry = {
+        id: adopted.id,
+        type: adopted.type,
+        content: adopted.content,
+        summary: adopted.summary,
+        metadata: adopted.metadata,
+      };
+    } finally {
+      store.close();
+    }
+  } else {
+    entry = readBrainProjectionEntry(dbPath, sprintId);
+  }
+  if (!entry) return null;
+  let metadata: Record<string, unknown>;
+  try { metadata = JSON.parse(entry.metadata) as Record<string, unknown>; } catch { return null; }
+  if (metadata.manifestDigest !== `sha256:${manifestDigest}`) return null;
+  const summaryPath = join(projectRoot, BRAIN_DIR, 'exports', 'summary.md');
+  if (!existsSync(summaryPath)) return null;
+  return {
+    [TRUSTED_BRAIN_PROJECTION]: true,
+    sprintId,
+    manifestDigest,
+    brainIndexSha256: sha256(canonicalJson({
+      id: entry.id,
+      type: entry.type,
+      content: entry.content,
+      summary: entry.summary,
+      metadata: entry.metadata,
+    })),
+    guardedSummarySha256: hashFile(summaryPath),
+  };
+}
+
+function validateRepairedHistory(
+  archiveDir: string,
+  receipt: SprintArchiveTerminalSealReceipt,
+): boolean {
+  if (receipt.expectedArchivedPreimageSha256 === null) {
+    return receipt.repairedHistoryPath === null && receipt.repairedHistorySha256 === null;
+  }
+  if (receipt.expectedArchivedPreimageSha256 === receipt.hotJournalSha256) {
+    return receipt.repairedHistoryPath === null && receipt.repairedHistorySha256 === null;
+  }
+  const expectedRelative = deterministicHistoryPath(receipt.sprintId, receipt.expectedArchivedPreimageSha256);
+  if (receipt.repairedHistoryPath !== expectedRelative
+      || receipt.repairedHistorySha256 !== receipt.expectedArchivedPreimageSha256) return false;
+  const history = resolve(archiveDir, receipt.repairedHistoryPath);
+  return isSprintArchivePathContained(archiveDir, history) && hashFile(history) === receipt.repairedHistorySha256;
+}
+
+function validateRepairedSequenceHistory(
+  archiveDir: string,
+  receipt: SprintArchiveTerminalSealReceipt,
+): boolean {
+  const expected = receipt.expectedArchivedSequencePreimageSha256;
+  if (expected === null || expected === receipt.sequenceCounterSha256) {
+    return receipt.repairedSequenceHistoryPath === null
+      && receipt.repairedSequenceHistorySha256 === null;
+  }
+  const expectedRelative = deterministicSequenceHistoryPath(receipt.sprintId, expected);
+  if (receipt.repairedSequenceHistoryPath !== expectedRelative
+      || receipt.repairedSequenceHistorySha256 !== expected) return false;
+  const history = resolve(archiveDir, receipt.repairedSequenceHistoryPath);
+  return isSprintArchivePathContained(archiveDir, history) && hashFile(history) === expected;
+}
+
+/** Read-only terminal-complete verification; never reconciles or refreshes Brain. */
+function verifySprintArchiveTerminalWithProjection(
+  projectRoot: string,
+  sprintId: string,
+  hotJournalPath: string | undefined,
+  trustedBrainProjection?: TrustedBrainProjection,
+): SprintArchiveTerminalVerificationReport {
+  assertSprintId(sprintId);
+  if (!isSprintArchiveNamespaceSafe(projectRoot, sprintId)) {
+    return {
+      sprintId,
+      ok: false,
+      reasonCodes: ['invalid_archive_path'],
+      manifestDigest: null,
+      sealReceiptSha256: null,
+      brainIndexSha256: null,
+      guardedSummarySha256: null,
+    };
+  }
+  const reasons: SprintArchiveTerminalSealHoldReason[] = [];
+  const archiveDir = resolveSprintArchiveDir(projectRoot, sprintId);
+  const hot = canonicalHotJournalPath(projectRoot, sprintId, hotJournalPath);
+  if (!hot) reasons.push('invalid_hot_journal_path');
+  const sealValue = readJson(join(archiveDir, TERMINAL_SEAL_RECEIPT_FILE));
+  const applicationValue = readJson(join(archiveDir, TERMINAL_SEAL_APPLICATION_FILE));
+  const seal = sealValue as Partial<SprintArchiveTerminalSealReceipt> | null;
+  const application = applicationValue as Partial<SprintArchiveTerminalApplicationReceipt> | null;
+  const sealStructurallyValid = seal?.kind === 'deckent.sprint-archive-terminal-seal'
+    && seal.version === 1 && seal.sprintId === sprintId && isTerminalReceipt(seal.terminalReceipt)
+    && typeof seal.operatorReason === 'string' && seal.operatorReason.trim() === seal.operatorReason
+    && seal.operatorReason.length > 0 && !OPERATOR_REASON_CONTROL_PATTERN.test(seal.operatorReason)
+    && typeof seal.operatorReasonSha256 === 'string' && seal.operatorReasonSha256 === sha256(seal.operatorReason)
+    && typeof seal.priorAuthorityVersion === 'number'
+    && seal.priorAuthorityVersion === seal.terminalReceipt.priorAuthorityVersion
+    && seal.runId === seal.terminalReceipt.runId
+    && seal.coordinatorGeneration === seal.terminalReceipt.coordinatorGeneration
+    && seal.terminalOutcome === seal.terminalReceipt.terminalOutcome
+    && seal.logicalSettlementDigest === seal.terminalReceipt.logicalSettlementDigest
+    && seal.authorityVersion === seal.terminalReceipt.authorityVersion
+    && typeof seal.brainAdoptionRequired === 'boolean'
+    && (seal.terminalEventsProjectionSha256 === null
+      || (typeof seal.terminalEventsProjectionSha256 === 'string'
+        && SHA256_HEX_PATTERN.test(seal.terminalEventsProjectionSha256)))
+    && (seal.postSealPolicySha256 === null
+      || (typeof seal.postSealPolicySha256 === 'string'
+        && SHA256_HEX_PATTERN.test(seal.postSealPolicySha256)));
+  if (!sealStructurallyValid) reasons.push('terminal_identity_mismatch');
+  const typedSeal = sealStructurallyValid ? seal as SprintArchiveTerminalSealReceipt : null;
+  const sealSha = typedSeal ? sealReceiptDigest(typedSeal) : null;
+  const applicationStructurallyValid = typedSeal !== null
+    && application?.kind === 'deckent.sprint-archive-terminal-application'
+    && application.version === 1 && application.sprintId === sprintId
+    && application.state === 'applied' && application.sealReceiptSha256 === sealSha
+    && typeof application.manifestDigest === 'string'
+    && application.brainAdopted === typedSeal.brainAdoptionRequired
+    && (typedSeal.brainAdoptionRequired
+      ? typeof application.brainIndexSha256 === 'string'
+        && SHA256_HEX_PATTERN.test(application.brainIndexSha256)
+        && typeof application.guardedSummarySha256 === 'string'
+        && SHA256_HEX_PATTERN.test(application.guardedSummarySha256)
+      : application.brainIndexSha256 === null && application.guardedSummarySha256 === null);
+  if (!applicationStructurallyValid) reasons.push('application_not_applied');
+  if (typedSeal?.brainAdoptionRequired === true && application?.brainAdopted !== true) {
+    reasons.push('brain_adoption_failed');
+  }
+  const typedApplication = applicationStructurallyValid
+    ? application as SprintArchiveTerminalApplicationReceipt
+    : null;
+
+  if (typedSeal) {
+    const marker = terminalMarker(projectRoot, sprintId);
+    if (!marker || !exactReceiptEquals(marker, typedSeal.terminalReceipt)
+        || typedSeal.priorAuthorityVersion !== typedSeal.terminalReceipt.priorAuthorityVersion
+        || typedSeal.runId !== typedSeal.terminalReceipt.runId
+        || typedSeal.authorityVersion !== typedSeal.terminalReceipt.authorityVersion) {
+      reasons.push('terminal_identity_mismatch');
+    }
+    const hotSnapshot = hot ? readJournalSnapshot(hot) : null;
+    const canonicalJournal = join(archiveDir, `${sprintId}-events.jsonl`);
+    const archivedSnapshot = readJournalSnapshot(canonicalJournal);
+    if (!hotSnapshot || !archivedSnapshot
+        || !hotSnapshot.bytes.equals(archivedSnapshot.bytes)
+        || sha256(hotSnapshot.bytes) !== typedSeal.hotJournalSha256
+        || sha256(archivedSnapshot.bytes) !== typedSeal.archivedJournalSha256
+        || hotSnapshot.sequence !== typedSeal.finalEvent.sequence
+        || hotSnapshot.digest !== typedSeal.finalEvent.digest) reasons.push('append_race');
+    try {
+      if (!validateRepairedHistory(archiveDir, typedSeal)) reasons.push('preimage_mismatch');
+    } catch {
+      reasons.push('preimage_mismatch');
+    }
+    const hotSequencePath = join(projectRoot, DECKENT_DIR, 'recently-works', `${sprintId}-seq`);
+    const archivedSequence = readSequenceSnapshot(join(archiveDir, `${sprintId}-seq`));
+    const hotSequenceRetired = !existsSync(hotSequencePath);
+    if (!archivedSequence
+        || archivedSequence.value !== typedSeal.finalEvent.sequence
+        || archivedSequence.digest !== typedSeal.sequenceCounterSha256
+        || !hotSequenceRetired) {
+      reasons.push('sequence_counter_mismatch');
+    }
+    try {
+      if (!validateRepairedSequenceHistory(archiveDir, typedSeal)) reasons.push('sequence_counter_mismatch');
+    } catch {
+      reasons.push('sequence_counter_mismatch');
+    }
+  }
+
+  const verified = verifySprintArchive(projectRoot, sprintId);
+  const manifest = readManifest(join(archiveDir, SPRINT_ARCHIVE_MANIFEST_FILE));
+  if (!verified.ok || !manifest) reasons.push(verified.untracked.length > 0 ? 'untracked_artifact' : 'archive_tampered');
+  if (typedApplication && manifest?.contentDigest !== typedApplication.manifestDigest) reasons.push('archive_tampered');
+
+  let brainIndexSha256: string | null = null;
+  let guardedSummarySha256: string | null = null;
+  if (typedApplication?.brainAdopted === true && manifest) {
+    const projection = trustedBrainProjection?.[TRUSTED_BRAIN_PROJECTION] === true
+        && trustedBrainProjection.sprintId === sprintId
+        && trustedBrainProjection.manifestDigest === manifest.contentDigest
+      ? trustedBrainProjection
+      : brainAdoptionProjection(projectRoot, sprintId, manifest.contentDigest, false);
+    if (!projection
+        || projection.brainIndexSha256 !== typedApplication.brainIndexSha256
+        || projection.guardedSummarySha256 !== typedApplication.guardedSummarySha256) {
+      reasons.push('brain_adoption_failed');
+    } else {
+      brainIndexSha256 = projection.brainIndexSha256;
+      guardedSummarySha256 = projection.guardedSummarySha256;
+    }
+  }
+  return {
+    sprintId,
+    ok: reasons.length === 0,
+    reasonCodes: [...new Set(reasons)],
+    manifestDigest: manifest?.contentDigest ?? null,
+    sealReceiptSha256: sealSha,
+    brainIndexSha256,
+    guardedSummarySha256,
+  };
+}
+
+/**
+ * Public verification always observes Brain through a fresh detached immutable
+ * DB/WAL snapshot. The writer-owned projection used during the first commit is
+ * intentionally unavailable through this API.
+ */
+export function verifySprintArchiveTerminal(
+  projectRoot: string,
+  sprintId: string,
+  hotJournalPath?: string,
+): SprintArchiveTerminalVerificationReport {
+  return verifySprintArchiveTerminalWithProjection(projectRoot, sprintId, hotJournalPath);
+}
+
+/**
+ * Terminal-only authority. Every repair is exact-preimage CAS-bound and first
+ * publishes a durable staged application receipt. A later failure can leave
+ * repaired bytes, but can never be reported terminal-complete until the
+ * manifest, compact Brain index, and guarded summary are bound by `applied`.
+ */
+export function sealSprintArchiveTerminal(
+  projectRoot: string,
+  sprintId: string,
+  request: SprintArchiveTerminalSealRequest,
+): SprintArchiveTerminalSealResult {
+  assertSprintId(sprintId);
+  const { receipt, finalEvent } = request;
+  if (typeof request.operatorReason !== 'string') return sealHold('invalid_operator_reason');
+  const reason = request.operatorReason.trim();
+  if (reason.length === 0 || reason !== request.operatorReason
+      || reason.length > 2048 || OPERATOR_REASON_CONTROL_PATTERN.test(reason)) {
+    return sealHold('invalid_operator_reason');
+  }
+  if (!SHA256_HEX_PATTERN.test(request.expectedHotJournalSha256)
+      || (request.expectedArchivedPreimageSha256 !== null
+        && !SHA256_HEX_PATTERN.test(request.expectedArchivedPreimageSha256))
+      || (request.terminalEventsProjectionSha256 !== undefined
+        && request.terminalEventsProjectionSha256 !== null
+        && !SHA256_HEX_PATTERN.test(request.terminalEventsProjectionSha256))
+      || (request.postSealPolicySha256 !== undefined
+        && request.postSealPolicySha256 !== null
+        && !SHA256_HEX_PATTERN.test(request.postSealPolicySha256))) {
+    return sealHold('invalid_expected_digest');
+  }
+  if (!isTerminalReceipt(receipt) || receipt.sprintId !== sprintId || !Number.isSafeInteger(finalEvent.sequence)
+      || finalEvent.sequence < 1 || !SHA256_HEX_PATTERN.test(finalEvent.digest)) {
+    return sealHold('terminal_identity_mismatch');
+  }
+  const hotJournal = canonicalHotJournalPath(projectRoot, sprintId, request.hotJournalPath);
+  if (!hotJournal) return sealHold('invalid_hot_journal_path');
+  const marker = terminalMarker(projectRoot, sprintId);
+  if (!marker) return sealHold('missing_terminal_marker');
+  if (!exactReceiptEquals(marker, receipt)) return sealHold('terminal_identity_mismatch');
+  if (request.adoptBrain === true && !safeBrainDatabasePath(projectRoot)) {
+    return sealHold('brain_adoption_failed');
+  }
+
+  const archiveDir = resolveSprintArchiveDir(projectRoot, sprintId);
+  if (!isSprintArchiveNamespaceSafe(projectRoot, sprintId)) return sealHold('invalid_archive_path');
+  try { mkdirSync(archiveDir, { recursive: true, mode: 0o700 }); } catch {
+    return sealHold('invalid_archive_path');
+  }
+  try {
+    if (!isArchiveNamespaceLinkFree(projectRoot, archiveDir)
+        || !lstatSync(archiveDir).isDirectory()) return sealHold('invalid_archive_path');
+  } catch {
+    return sealHold('invalid_archive_path');
+  }
+  const lockDir = join(projectRoot, DECKENT_DIR, 'runtime', 'archive-seal-locks');
+  mkdirSync(lockDir, { recursive: true, mode: 0o700 });
+  const lockPath = join(lockDir, `${sprintId}.lock`);
+  let lockDescriptor: number;
+  try { lockDescriptor = openSync(lockPath, 'wx', 0o600); } catch { return sealHold('seal_locked'); }
+  try {
+    const first = readJournalSnapshot(hotJournal);
+    if (!first) return sealHold('invalid_final_event');
+    if (first.sequence !== finalEvent.sequence || first.digest !== finalEvent.digest) {
+      return sealHold('terminal_identity_mismatch');
+    }
+    if (sha256(first.bytes) !== request.expectedHotJournalSha256) return sealHold('preimage_mismatch');
+    const second = readJournalSnapshot(hotJournal);
+    if (!second || !first.bytes.equals(second.bytes)) return sealHold('append_race');
+
+    const canonicalJournal = join(archiveDir, `${sprintId}-events.jsonl`);
+    const archivedSequencePath = join(archiveDir, `${sprintId}-seq`);
+    const sealPath = join(archiveDir, TERMINAL_SEAL_RECEIPT_FILE);
+    const applicationPath = join(archiveDir, TERMINAL_SEAL_APPLICATION_FILE);
+    const priorSeal = readJson(sealPath);
+    const priorSealRecord = priorSeal && typeof priorSeal === 'object' && !Array.isArray(priorSeal)
+      ? priorSeal as Partial<SprintArchiveTerminalSealReceipt>
+      : null;
+    const priorApplicationValue = readJson(applicationPath);
+    const priorApplicationRecord = priorApplicationValue && typeof priorApplicationValue === 'object'
+      && !Array.isArray(priorApplicationValue)
+      ? priorApplicationValue as Partial<SprintArchiveTerminalApplicationReceipt>
+      : null;
+    if (existsSync(sealPath) && !priorSealRecord
+        || existsSync(applicationPath) && !priorApplicationRecord) {
+      return sealHold('terminal_identity_mismatch');
+    }
+
+    const priorSealMatchesRequest = priorSealRecord?.kind === 'deckent.sprint-archive-terminal-seal'
+      && priorSealRecord.version === 1
+      && priorSealRecord.sprintId === sprintId
+      && exactReceiptEquals(priorSealRecord.terminalReceipt, receipt)
+      && priorSealRecord.finalEvent?.sequence === finalEvent.sequence
+      && priorSealRecord.finalEvent.digest === finalEvent.digest
+      && priorSealRecord.canonicalHotJournalPath === relativePortable(projectRoot, hotJournal)
+      && priorSealRecord.expectedArchivedPreimageSha256 === request.expectedArchivedPreimageSha256
+      && priorSealRecord.hotJournalSha256 === request.expectedHotJournalSha256
+      && priorSealRecord.archivedJournalSha256 === request.expectedHotJournalSha256
+      && priorSealRecord.operatorReason === reason
+      && priorSealRecord.brainAdoptionRequired === (request.adoptBrain === true)
+      && priorSealRecord.terminalEventsProjectionSha256
+        === (request.terminalEventsProjectionSha256 ?? null)
+      && priorSealRecord.postSealPolicySha256
+        === (request.postSealPolicySha256 ?? null);
+    if (priorSealRecord && !priorSealMatchesRequest) return sealHold('terminal_identity_mismatch');
+    const typedPriorSeal = priorSealMatchesRequest
+      ? priorSealRecord as SprintArchiveTerminalSealReceipt
+      : null;
+    const priorSealSha = typedPriorSeal ? sealReceiptDigest(typedPriorSeal) : null;
+    if (priorApplicationRecord && (!typedPriorSeal
+        || priorApplicationRecord.kind !== 'deckent.sprint-archive-terminal-application'
+        || priorApplicationRecord.version !== 1
+        || priorApplicationRecord.sprintId !== sprintId
+        || (priorApplicationRecord.state !== 'staged' && priorApplicationRecord.state !== 'applied')
+        || priorApplicationRecord.sealReceiptSha256 !== priorSealSha)) {
+      return sealHold('terminal_identity_mismatch');
+    }
+
+    // An applied seal owns the immutable sequence counter after hot retirement.
+    // Validate the complete caller projection before any counter read, reconcile,
+    // or write, then use the fresh terminal verifier as the idempotency gate.
+    if (priorApplicationRecord?.state === 'applied') {
+      if (!typedPriorSeal) return sealHold('terminal_identity_mismatch');
+      const typedSeal = typedPriorSeal;
+      const typedApplication = priorApplicationRecord as SprintArchiveTerminalApplicationReceipt;
+      if (!retireHotSequenceCounter(projectRoot, sprintId, typedSeal)) {
+        return sealHold('sequence_counter_mismatch', typedSeal, typedApplication);
+      }
+      const verified = verifySprintArchiveTerminal(projectRoot, sprintId, hotJournal);
+      return verified.ok
+        ? { disposition: 'idempotent', terminalComplete: true, receipt: typedSeal,
+          applicationReceipt: typedApplication, verification: verified }
+        : sealHold(verified.reasonCodes[0] ?? 'application_not_applied', typedSeal, typedApplication);
+    }
+
+    const hotSequencePath = join(projectRoot, DECKENT_DIR, 'recently-works', `${sprintId}-seq`);
+    const hotSequence = readSequenceSnapshot(hotSequencePath);
+    const archivedSequenceBefore = readSequenceSnapshot(archivedSequencePath);
+    // Cleanup retires the hot counter only after a terminal seal is durable.
+    // A staged/seal-only replay therefore resumes from the immutable archived
+    // counter, but only when that snapshot is exactly bound by the prior seal.
+    const sequenceSnapshot = hotSequence ?? (typedPriorSeal
+      && archivedSequenceBefore?.value === typedPriorSeal.sequenceCounterValue
+      && archivedSequenceBefore.digest === typedPriorSeal.sequenceCounterSha256
+      ? archivedSequenceBefore
+      : null);
+    if (!sequenceSnapshot || sequenceSnapshot.value !== finalEvent.sequence) {
+      return sealHold('sequence_counter_mismatch');
+    }
+
+    const expectedPreimage = request.expectedArchivedPreimageSha256;
+    const isRepair = expectedPreimage !== null && expectedPreimage !== request.expectedHotJournalSha256;
+    const repairedHistoryPath = isRepair ? deterministicHistoryPath(sprintId, expectedPreimage) : null;
+    const priorSequencePreimage = priorSealRecord?.expectedArchivedSequencePreimageSha256;
+    const expectedSequencePreimage = priorSealRecord
+      ? (priorSequencePreimage === null || (typeof priorSequencePreimage === 'string'
+          && SHA256_HEX_PATTERN.test(priorSequencePreimage)) ? priorSequencePreimage : undefined)
+      : archivedSequenceBefore?.digest ?? null;
+    if (expectedSequencePreimage === undefined) return sealHold('terminal_identity_mismatch');
+    const isSequenceRepair = expectedSequencePreimage !== null
+      && expectedSequencePreimage !== sequenceSnapshot.digest;
+    const repairedSequenceHistoryPath = isSequenceRepair
+      ? deterministicSequenceHistoryPath(sprintId, expectedSequencePreimage)
+      : null;
+    const sealReceipt: SprintArchiveTerminalSealReceipt = {
+      kind: 'deckent.sprint-archive-terminal-seal',
+      version: 1,
+      sprintId,
+      runId: receipt.runId,
+      coordinatorGeneration: receipt.coordinatorGeneration,
+      terminalOutcome: receipt.terminalOutcome,
+      logicalSettlementDigest: receipt.logicalSettlementDigest,
+      priorAuthorityVersion: receipt.priorAuthorityVersion,
+      authorityVersion: receipt.authorityVersion,
+      terminalReceipt: { ...receipt },
+      finalEvent: { ...finalEvent },
+      canonicalHotJournalPath: relativePortable(projectRoot, hotJournal),
+      expectedArchivedPreimageSha256: expectedPreimage,
+      hotJournalSha256: request.expectedHotJournalSha256,
+      archivedJournalSha256: request.expectedHotJournalSha256,
+      operatorReason: reason,
+      operatorReasonSha256: sha256(reason),
+      brainAdoptionRequired: request.adoptBrain === true,
+      terminalEventsProjectionSha256: request.terminalEventsProjectionSha256 ?? null,
+      postSealPolicySha256: request.postSealPolicySha256 ?? null,
+      repairedHistoryPath,
+      repairedHistorySha256: isRepair ? expectedPreimage : null,
+      sequenceCounterValue: finalEvent.sequence,
+      sequenceCounterSha256: sequenceSnapshot.digest,
+      expectedArchivedSequencePreimageSha256: expectedSequencePreimage,
+      repairedSequenceHistoryPath,
+      repairedSequenceHistorySha256: isSequenceRepair ? expectedSequencePreimage : null,
+      originalDisposition: isRepair ? 'repaired' : 'sealed',
+    };
+    const sealSha = sealReceiptDigest(sealReceipt);
+    const staged: SprintArchiveTerminalApplicationReceipt = {
+      kind: 'deckent.sprint-archive-terminal-application',
+      version: 1,
+      sprintId,
+      state: 'staged',
+      sealReceiptSha256: sealSha,
+    };
+    if (priorSeal && !exactSealReceipt(priorSeal, sealReceipt)) return sealHold('terminal_identity_mismatch');
+    if (priorApplicationRecord && canonicalJson(priorApplicationRecord) !== canonicalJson(staged)) {
+      return sealHold('terminal_identity_mismatch');
+    }
+
+    // Fail closed before publishing the durable stage when the supplied
+    // journal is not an exact strict-prefix repair (or a valid staged replay).
+    const preStageJournal = readJournalSnapshot(canonicalJournal);
+    if (isRepair) {
+      if (preStageJournal && sha256(preStageJournal.bytes) === expectedPreimage) {
+        if (!first.bytes.subarray(0, preStageJournal.bytes.length).equals(preStageJournal.bytes)) {
+          return sealHold('non_prefix_divergence');
+        }
+      } else if (!priorSeal || !preStageJournal || !preStageJournal.bytes.equals(first.bytes)) {
+        return sealHold('preimage_mismatch');
+      }
+    } else if (expectedPreimage === null) {
+      if (preStageJournal && (!priorSeal || !preStageJournal.bytes.equals(first.bytes))) {
+        return sealHold('preimage_mismatch');
+      }
+    } else if (!preStageJournal || sha256(preStageJournal.bytes) !== expectedPreimage
+        || !preStageJournal.bytes.equals(first.bytes)) {
+      return sealHold('preimage_mismatch');
+    }
+
+    if (isSequenceRepair) {
+      if (archivedSequenceBefore?.digest === expectedSequencePreimage) {
+        if (archivedSequenceBefore.value > finalEvent.sequence) return sealHold('sequence_counter_mismatch');
+      } else if (!priorSeal || archivedSequenceBefore?.digest !== sequenceSnapshot.digest) {
+        return sealHold('sequence_counter_mismatch');
+      }
+    } else if (expectedSequencePreimage === null) {
+      if (archivedSequenceBefore && (!priorSeal || archivedSequenceBefore.digest !== sequenceSnapshot.digest)) {
+        return sealHold('sequence_counter_mismatch');
+      }
+    } else if (archivedSequenceBefore?.digest !== sequenceSnapshot.digest) {
+      return sealHold('sequence_counter_mismatch');
+    }
+
+    const manifestPath = join(archiveDir, SPRINT_ARCHIVE_MANIFEST_FILE);
+    if (!priorSeal && existsSync(manifestPath)) {
+      const verified = verifySprintArchive(projectRoot, sprintId);
+      if (verified.missing.length || verified.mismatched.length || !verified.manifestDigestValid) {
+        return sealHold('archive_tampered');
+      }
+      if (verified.untracked.length) return sealHold('untracked_artifact');
+      if ((readManifest(manifestPath)?.conflicts.length ?? 1) > 0) return sealHold('manifest_conflict');
+    } else if (!priorSeal && listFilesRecursively(archiveDir).some(path => {
+      const exact = resolve(path);
+      return exact !== resolve(canonicalJournal) && exact !== resolve(archivedSequencePath);
+    })) {
+      return sealHold('untracked_artifact');
+    }
+
+    try {
+      if (!priorSeal) writeJsonAtomic(sealPath, sealReceipt);
+      if (!priorApplicationRecord) writeJsonAtomic(applicationPath, staged);
+    } catch {
+      return sealHold('seal_write_failed', sealReceipt, staged);
+    }
+
+    const canonicalSnapshot = readJournalSnapshot(canonicalJournal);
+    if (isRepair) {
+      const historyPath = resolve(archiveDir, repairedHistoryPath!);
+      if (!isSprintArchivePathContained(archiveDir, historyPath)) {
+        return sealHold('preimage_mismatch', sealReceipt, staged);
+      }
+      if (canonicalSnapshot && sha256(canonicalSnapshot.bytes) === expectedPreimage) {
+        if (!first.bytes.subarray(0, canonicalSnapshot.bytes.length).equals(canonicalSnapshot.bytes)) {
+          return sealHold('non_prefix_divergence', sealReceipt, staged);
+        }
+        const history = publishVerifiedCopy(canonicalJournal, historyPath);
+        if (history.identity.sha256 !== expectedPreimage || hashFile(history.destination) !== expectedPreimage) {
+          return sealHold('preimage_mismatch', sealReceipt, staged);
+        }
+        const casSnapshot = readJournalSnapshot(canonicalJournal);
+        if (!casSnapshot || sha256(casSnapshot.bytes) !== expectedPreimage) {
+          return sealHold('preimage_mismatch', sealReceipt, staged);
+        }
+        try { writeFileAtomic(canonicalJournal, first.bytes); } catch {
+          return sealHold('seal_write_failed', sealReceipt, staged);
+        }
+      } else if (!canonicalSnapshot || !canonicalSnapshot.bytes.equals(first.bytes)) {
+        return sealHold('preimage_mismatch', sealReceipt, staged);
+      }
+      try {
+        if (!validateRepairedHistory(archiveDir, sealReceipt)) {
+          return sealHold('preimage_mismatch', sealReceipt, staged);
+        }
+      } catch {
+        return sealHold('preimage_mismatch', sealReceipt, staged);
+      }
+    } else if (expectedPreimage === null) {
+      if (canonicalSnapshot && !canonicalSnapshot.bytes.equals(first.bytes)) {
+        return sealHold('preimage_mismatch', sealReceipt, staged);
+      }
+      if (!canonicalSnapshot) {
+        try { writeFileAtomic(canonicalJournal, first.bytes); } catch {
+          return sealHold('seal_write_failed', sealReceipt, staged);
+        }
+      }
+    } else if (!canonicalSnapshot || sha256(canonicalSnapshot.bytes) !== expectedPreimage
+        || !canonicalSnapshot.bytes.equals(first.bytes)) {
+      return sealHold('preimage_mismatch', sealReceipt, staged);
+    }
+
+    const archivedSequence = readSequenceSnapshot(archivedSequencePath);
+    if (isSequenceRepair) {
+      const historyPath = resolve(archiveDir, repairedSequenceHistoryPath!);
+      if (!isSprintArchivePathContained(archiveDir, historyPath)) {
+        return sealHold('sequence_counter_mismatch', sealReceipt, staged);
+      }
+      if (archivedSequence?.digest === expectedSequencePreimage) {
+        const history = publishVerifiedCopy(archivedSequencePath, historyPath);
+        if (history.identity.sha256 !== expectedSequencePreimage
+            || hashFile(history.destination) !== expectedSequencePreimage) {
+          return sealHold('sequence_counter_mismatch', sealReceipt, staged);
+        }
+        const casSequence = readSequenceSnapshot(archivedSequencePath);
+        if (casSequence?.digest !== expectedSequencePreimage) {
+          return sealHold('sequence_counter_mismatch', sealReceipt, staged);
+        }
+        try { writeFileAtomic(archivedSequencePath, sequenceSnapshot.bytes); } catch {
+          return sealHold('seal_write_failed', sealReceipt, staged);
+        }
+      } else if (archivedSequence?.digest !== sequenceSnapshot.digest) {
+        return sealHold('sequence_counter_mismatch', sealReceipt, staged);
+      }
+      try {
+        if (!validateRepairedSequenceHistory(archiveDir, sealReceipt)) {
+          return sealHold('sequence_counter_mismatch', sealReceipt, staged);
+        }
+      } catch {
+        return sealHold('sequence_counter_mismatch', sealReceipt, staged);
+      }
+    } else if (expectedSequencePreimage === null) {
+      if (!archivedSequence) {
+        try { writeFileAtomic(archivedSequencePath, sequenceSnapshot.bytes); } catch {
+          return sealHold('seal_write_failed', sealReceipt, staged);
+        }
+      } else if (archivedSequence.digest !== sequenceSnapshot.digest) {
+        return sealHold('sequence_counter_mismatch', sealReceipt, staged);
+      }
+    } else if (archivedSequence?.digest !== sequenceSnapshot.digest) {
+      return sealHold('sequence_counter_mismatch', sealReceipt, staged);
+    }
+
+    const third = readJournalSnapshot(hotJournal);
+    const archived = readJournalSnapshot(canonicalJournal);
+    const finalHotSequence = readSequenceSnapshot(hotSequencePath);
+    const finalArchivedSequence = readSequenceSnapshot(archivedSequencePath);
+    if (!third || !archived || !third.bytes.equals(first.bytes) || !archived.bytes.equals(first.bytes)
+        || !finalArchivedSequence
+        || finalArchivedSequence.value !== finalEvent.sequence
+        || finalArchivedSequence.digest !== sequenceSnapshot.digest
+        || (finalHotSequence !== null
+          && (finalHotSequence.value !== finalEvent.sequence
+            || finalHotSequence.digest !== finalArchivedSequence.digest))
+        || (finalHotSequence === null && !typedPriorSeal)) {
+      return sealHold('append_race', sealReceipt, staged);
+    }
+
+    const reconciled = reconcileSprintArchive(projectRoot, sprintId, {
+      apply: true,
+      retireLegacySources: true,
+      indexMemory: request.adoptBrain === true,
+    });
+    if (reconciled.failures.length || reconciled.manifest.conflicts.length) {
+      return sealHold('manifest_conflict', sealReceipt, staged);
+    }
+    const archiveVerification = verifySprintArchive(projectRoot, sprintId);
+    if (!archiveVerification.ok) {
+      return sealHold(archiveVerification.untracked.length ? 'untracked_artifact' : 'archive_tampered',
+        sealReceipt, staged);
+    }
+
+    const brain = request.adoptBrain === true
+      ? brainAdoptionProjection(projectRoot, sprintId, reconciled.manifest.contentDigest, true)
+      : null;
+    if (request.adoptBrain === true && !brain) {
+      return sealHold('brain_adoption_failed', sealReceipt, staged);
+    }
+    const applied: SprintArchiveTerminalApplicationReceipt = {
+      ...staged,
+      state: 'applied',
+      manifestDigest: reconciled.manifest.contentDigest,
+      brainAdopted: request.adoptBrain === true,
+      brainIndexSha256: brain?.brainIndexSha256 ?? null,
+      guardedSummarySha256: brain?.guardedSummarySha256 ?? null,
+    };
+    try { writeJsonAtomic(applicationPath, applied); } catch {
+      return sealHold('seal_write_failed', sealReceipt, staged);
+    }
+    if (!retireHotSequenceCounter(projectRoot, sprintId, sealReceipt)) {
+      return sealHold('sequence_counter_mismatch', sealReceipt, applied);
+    }
+    const terminalVerification = verifySprintArchiveTerminalWithProjection(
+      projectRoot,
+      sprintId,
+      hotJournal,
+      brain ?? undefined,
+    );
+    if (!terminalVerification.ok) {
+      return sealHold(terminalVerification.reasonCodes[0] ?? 'application_not_applied', sealReceipt, applied);
+    }
+    return {
+      disposition: priorSeal ? 'idempotent' : sealReceipt.originalDisposition,
+      terminalComplete: true,
+      receipt: sealReceipt,
+      applicationReceipt: applied,
+      verification: terminalVerification,
+    };
+  } finally {
+    closeSync(lockDescriptor);
+    try { unlinkSync(lockPath); } catch { /* a stale lock is safer than deleting a foreign lock */ }
+  }
+}
+
+function writeFileAtomic(path: string, bytes: Buffer): void {
+  const directory = dirname(path);
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  const temporary = join(directory, `.${basename(path)}.${process.pid}.${randomUUID()}.tmp`);
+  let descriptor: number | undefined;
+  try {
+    descriptor = openSync(temporary, 'wx', 0o600);
+    writeFileSync(descriptor, bytes);
+    fsyncSync(descriptor);
+    closeSync(descriptor);
+    descriptor = undefined;
+    renameSync(temporary, path);
+    const directoryDescriptor = openSync(directory, 'r');
+    try {
+      fsyncSync(directoryDescriptor);
+    } finally {
+      closeSync(directoryDescriptor);
+    }
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
+    try {
+      unlinkSync(temporary);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+  }
+}
+
 export function verifySprintArchive(projectRoot: string, sprintId: string): SprintArchiveVerificationReport {
   assertSprintId(sprintId);
   const archiveDir = resolveSprintArchiveDir(projectRoot, sprintId);
@@ -1157,7 +2453,7 @@ export function verifySprintArchive(projectRoot: string, sprintId: string): Spri
   }
   const tracked = new Set(manifest.artifacts.map(artifact => artifact.path));
   const untracked = listFilesRecursively(archiveDir)
-    .filter(path => path !== manifestPath)
+    .filter(path => path !== manifestPath && path !== join(archiveDir, TERMINAL_SEAL_APPLICATION_FILE))
     .map(path => relative(archiveDir, path).split(sep).join('/'))
     .filter(path => !tracked.has(path));
   const { contentDigest: _digest, ...payload } = manifest;

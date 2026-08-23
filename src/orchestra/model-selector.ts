@@ -5,6 +5,7 @@ import { getModelTier } from '../core/types.js';
 import { getEquivalentModel, isModelAvailable, isModelExecutable, getModelForProviderTier } from '../core/model-equivalence.js';
 import type { ModelTier } from '../core/model-equivalence.js';
 import { enforceModelTierGuard } from '../core/model-tier-guard.js';
+import { modelRegistry } from '../core/model-registry.js';
 import { DeckentError } from '../core/errors.js';
 import { debugLog } from '../core/utils.js';
 import { getDefaultProviderName } from './sprint-utils.js';
@@ -18,6 +19,27 @@ const TIER_RANK: Record<ModelTier, number> = {
   premium: 2,
   premium_plus: 3,
 };
+
+/** Resolve the configured stronger default for the one sparse-tier auto-selection case. */
+function resolveConfiguredStrongerDefault(
+  provider: ProviderName,
+  tier: ModelTier,
+  config: ResolvedConfig,
+): ModelType | undefined {
+  const strategy = config.model_strategy;
+  if (tier !== 'premium' || strategy?.auto_upgrade !== true) return undefined;
+
+  const preferred = modelRegistry.get(config.activeModeConfig.default_model);
+  if (
+    preferred?.provider !== provider
+    || preferred.status !== 'ga'
+    || !isModelExecutable(preferred.id, provider)
+    || !modelRegistry.isAtLeastTier(preferred.id, tier)
+    || modelRegistry.compareTiers(preferred.tier, strategy.max_tier) > 0
+  ) return undefined;
+
+  return preferred.id;
+}
 
 /**
  * Resolve a tier name to a concrete model (exact registered API ID) for the
@@ -33,7 +55,8 @@ function resolveTierToModel(tier: ModelTier, config: ResolvedConfig): ModelType 
     config.worker_provider
     ?? config.brain_provider
     ?? getDefaultProviderName();
-  const model = getModelForProviderTier(provider, tier);
+  const model = getModelForProviderTier(provider, tier)
+    ?? resolveConfiguredStrongerDefault(provider, tier, config);
   if (!model) {
     throw new DeckentError(
       'E_NO_EQUIVALENT_MODEL',

@@ -534,8 +534,12 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // tmpdir project/host fixture and fails before Docker/provider dispatch when
   // the canonical task lacks its owner grant. No live repo config or runtime
   // authority is read or mutated.
-  count: 15118,
-  digest: 'cf5f3260dc195f9bbe82797db19abc980a2a35ee0dc7912d276026f01a7bfe04',
+  // 2026-08-23 terminal archive seal: suite-owned journal/seq/Brain fixtures,
+  // including retired-counter replay and detached live-WAL projection reads.
+  // 2026-08-24 sprint-635 acceptance: same-commit outer-finalizer projection
+  // regression plus protected-root debt scope fixtures.
+  count: 15789,
+  digest: '7a225f8a95bb2b915d3b8bab497cdae68ab089793c5871daef99fa52294426e0',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -946,8 +950,15 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // final-only-usage resolver enters inventory; manual spawn, initial
   // scheduler and retry/FIX/continuation consumers now fail closed over the
   // exact task-stamped grant before provider work.
-  count: 1305,
-  digest: '898f6ffbf5b73058eccd4d571370420cd25bf2b616bd6eba496593d019b57526',
+  // 2026-08-23 (ADR-D-007 pre-plan recovery): count unchanged; digest-only
+  // update after model selection began accepting an owner-active
+  // premium_plus model as the stronger substitute when an explicit-active
+  // provider has no selectable exact-premium model. Inactive exact-tier
+  // identities remain non-executable and no provider/model policy is mutated.
+  // 2026-08-23 terminal archive seal: writer ratchet enters the test graph;
+  // live-WAL/replay hardening changes already-inventoried production modules.
+  count: 1306,
+  digest: '25c6e1c63572e9270195452ed4512347f132cb2f378dc605f7a8a2f4ca3bcc83',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

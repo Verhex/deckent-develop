@@ -3,12 +3,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { CHANNELS, readEvents, reconstructState } from '../../src/core/event-stream.js';
+import { CHANNELS, readEvents, reconstructState, writeEvent } from '../../src/core/event-stream.js';
 import { SprintPhase, SprintStatus, TaskEvaluation } from '../../src/core/types.js';
 
 const mockBuildPreplannedResumeSprint = vi.fn();
 const mockFinalizeSprint = vi.fn();
 const mockPublishFinalSprintAuthority = vi.fn();
+const mockPublishOutermostSprintTerminalArchive = vi.fn();
 const mockPublishTestModeSprintTerminalReceipt = vi.fn();
 const mockLoadFinalizerAttemptTasks = vi.fn();
 const mockResolveSprintTerminalHandoff = vi.fn();
@@ -24,7 +25,13 @@ vi.mock('../../src/orchestra/sprint-finalizer.js', () => ({
   finalizeSprint: (...args: unknown[]) => mockFinalizeSprint(...args),
   loadFinalizerAttemptTasks: (...args: unknown[]) => mockLoadFinalizerAttemptTasks(...args),
   publishFinalSprintAuthority: (...args: unknown[]) => mockPublishFinalSprintAuthority(...args),
+  publishOutermostSprintTerminalArchive: (...args: unknown[]) => mockPublishOutermostSprintTerminalArchive(...args),
   publishTestModeSprintTerminalReceipt: (...args: unknown[]) => mockPublishTestModeSprintTerminalReceipt(...args),
+  SprintTerminalArchivePublicationError: class SprintTerminalArchivePublicationError extends Error {
+    constructor(message: string, readonly archiveSealed: boolean) {
+      super(message);
+    }
+  },
 }));
 
 vi.mock('../../src/orchestra/sprint-controller.js', () => ({
@@ -41,6 +48,7 @@ vi.mock('../../src/orchestra/task-result-authority.js', () => ({
 }));
 
 import { terminalizeCompletedCheckpointRun } from '../../src/orchestra/completed-checkpoint-terminalizer.js';
+import { SprintTerminalArchivePublicationError } from '../../src/orchestra/sprint-finalizer.js';
 
 const roots: string[] = [];
 
@@ -130,6 +138,22 @@ describe('completed-checkpoint recovery event path', () => {
     mockResolveSprintTerminalHandoff.mockReturnValue(authorizedHandoff);
     mockRunCleanupPhase.mockResolvedValue(null);
     mockCommitSprintTerminalHandoff.mockReturnValue(authorizedHandoff);
+    mockPublishOutermostSprintTerminalArchive.mockImplementation((input: {
+      projectRoot: string;
+      sprintId: string;
+      terminalEvents: Array<{ channel: string; payload: Record<string, unknown>; target?: string }>;
+    }) => {
+      for (const event of input.terminalEvents) {
+        writeEvent(
+          input.projectRoot,
+          input.sprintId,
+          'brain',
+          event.target ?? '*',
+          event.channel,
+          event.payload,
+        );
+      }
+    });
   });
 
   afterEach(() => {
@@ -186,6 +210,14 @@ describe('completed-checkpoint recovery event path', () => {
     expect(events.map(event => event.sequence)).toEqual([1, 2, 3, 4, 5, 6]);
     expect(reconstructState(root, checkpoint.sprintId).phaseChanges.at(-1)?.phase)
       .toBe(SprintPhase.COMPLETE);
+    expect(mockPublishOutermostSprintTerminalArchive).toHaveBeenCalledWith(expect.objectContaining({
+      sprintId: checkpoint.sprintId,
+      receipt: authorizedHandoff.receipt,
+      terminalEvents: [
+        expect.objectContaining({ channel: CHANNELS.SPRINT_PHASE_CHANGE }),
+        expect.objectContaining({ channel: CHANNELS.RECOVERY_TERMINALIZATION_COMPLETED }),
+      ],
+    }));
   });
 
   it('reuses dynamic fix-task evidence discovered by the canonical finalizer loader', async () => {
@@ -282,6 +314,7 @@ describe('completed-checkpoint recovery event path', () => {
     });
     expect(mockRunCleanupPhase).not.toHaveBeenCalled();
     expect(mockPublishFinalSprintAuthority).not.toHaveBeenCalled();
+    expect(mockPublishOutermostSprintTerminalArchive).not.toHaveBeenCalled();
   });
 
   it('never terminalizes a checkpoint task whose result authority is absent', async () => {
@@ -303,5 +336,25 @@ describe('completed-checkpoint recovery event path', () => {
       channel: CHANNELS.RECOVERY_TERMINALIZATION_HELD,
       payload: { stage: 'evidence' },
     });
+  });
+
+  it('does not append recovery HOLD evidence after an immutable staged seal exists', async () => {
+    const root = makeRoot();
+    mockPublishOutermostSprintTerminalArchive.mockImplementation(() => {
+      throw new SprintTerminalArchivePublicationError('APPLICATION_NOT_APPLIED', true);
+    });
+
+    await expect(terminalizeCompletedCheckpointRun(
+      root,
+      checkpoint,
+      { auth_mode: 'subscription', language: 'en' } as never,
+    )).rejects.toThrow('APPLICATION_NOT_APPLIED');
+
+    expect(readEvents(root, checkpoint.sprintId).map(event => event.channel)).toEqual([
+      CHANNELS.RECOVERY_TERMINALIZATION_STARTED,
+      CHANNELS.RECOVERY_EVIDENCE_REUSED,
+      CHANNELS.RECOVERY_RECEIPT_AUTHORIZED,
+      CHANNELS.RECOVERY_CLEANUP_SETTLED,
+    ]);
   });
 });

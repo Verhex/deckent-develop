@@ -7144,6 +7144,47 @@ const MESSAGES: MessageMap = {
     en: 'Verify manifest coverage and every archived artifact digest',
     tr: 'Manifest kapsamını ve arşivlenen her artifact digest’ini doğrulayın',
   },
+  'archive.terminal.inspect.description': {
+    en: 'Inspect canonical hot/archive journal parity without changing state',
+    tr: 'Durumu değiştirmeden canonical hot/archive journal eşliğini inceleyin',
+  },
+  'archive.terminal.verify.description': {
+    en: 'Verify terminal receipt, archive integrity, and Brain adoption without changing state',
+    tr: 'Durumu değiştirmeden terminal receipt, arşiv bütünlüğü ve Brain adoption doğrulayın',
+  },
+  'archive.terminal.repair.description': {
+    en: 'Repair one proven strict-prefix terminal journal with receipt-bound authority',
+    tr: 'Kanıtlanmış tek strict-prefix terminal journal’ı receipt-bound authority ile onarın',
+  },
+  'archive.option.exact_sprint': { en: 'Select exactly one sprint ID', tr: 'Tam olarak bir sprint ID seçin' },
+  'archive.option.hot_journal': { en: 'Use this exact hot journal path', tr: 'Bu tam hot journal yolunu kullanın' },
+  'archive.option.receipt': { en: 'Use this exact terminal receipt identity', tr: 'Bu tam terminal receipt kimliğini kullanın' },
+  'archive.option.final_sequence': { en: 'Require this final event sequence', tr: 'Bu final event sequence değerini zorunlu tutun' },
+  'archive.option.final_digest': { en: 'Require this final event SHA-256', tr: 'Bu final event SHA-256 değerini zorunlu tutun' },
+  'archive.option.expected_archive_digest': { en: 'Require this archived preimage SHA-256', tr: 'Bu arşivlenmiş preimage SHA-256 değerini zorunlu tutun' },
+  'archive.option.expected_hot_digest': { en: 'Require this hot journal SHA-256', tr: 'Bu hot journal SHA-256 değerini zorunlu tutun' },
+  'archive.option.reason': { en: 'Record the operator repair reason', tr: 'Operatör onarım nedenini kaydedin' },
+  'archive.value.missing': { en: 'missing', tr: 'eksik' },
+  'archive.value.none': { en: 'none', tr: 'yok' },
+  'archive.terminal.relation.identical': { en: 'byte-identical', tr: 'byte-identical' },
+  'archive.terminal.relation.strict_prefix': { en: 'strict-prefix', tr: 'strict-prefix' },
+  'archive.terminal.relation.unproven': { en: 'unproven', tr: 'kanıtlanmamış' },
+  'archive.terminal.inspect_report': {
+    en: '{sprintId} terminal parity: archive={archivedDigest}, hot={hotDigest}, relation={relation}',
+    tr: '{sprintId} terminal eşliği: arşiv={archivedDigest}, hot={hotDigest}, ilişki={relation}',
+  },
+  'archive.terminal.repair_ok': {
+    en: '{sprintId} terminal repair {disposition}: journal={digest}, manifest={manifestDigest}, Brain-index={brainIndexDigest}, guarded-summary={guardedSummaryDigest}',
+    tr: '{sprintId} terminal onarımı {disposition}: journal={digest}, manifest={manifestDigest}, Brain-index={brainIndexDigest}, guarded-summary={guardedSummaryDigest}',
+  },
+  'archive.terminal.verify_ok': {
+    en: '{sprintId} terminal archive verified: manifest={manifestDigest}',
+    tr: '{sprintId} terminal arşivi doğrulandı: manifest={manifestDigest}',
+  },
+  'archive.terminal.verify_failed': {
+    en: '{sprintId} terminal archive verification failed: {reasons}',
+    tr: '{sprintId} terminal arşiv doğrulaması başarısız: {reasons}',
+  },
   'archive.option.sprint': { en: 'Select one sprint ID', tr: 'Tek bir sprint ID seçin' },
   'archive.option.all': { en: 'Select every discovered sprint', tr: 'Bulunan tüm sprintleri seçin' },
   'archive.option.json': { en: 'Output stable JSON', tr: 'Kararlı JSON çıktısı üretin' },
@@ -7181,6 +7222,10 @@ const MESSAGES: MessageMap = {
   'archive.error.reconcile_failed': {
     en: 'Archive reconciliation failed: {error}',
     tr: 'Arşiv uzlaştırması başarısız: {error}',
+  },
+  'archive.error.terminal_failed': {
+    en: 'Terminal archive operation failed ({code}). Check the JSON failure envelope for mutation, seal, application, and verification state.',
+    tr: 'Terminal arşiv işlemi başarısız oldu ({code}). Mutation, seal, application ve verification state için JSON failure envelope’u kontrol edin.',
   },
   'cli.attach.desc': {
     en: 'Attach to the tmux orchestra session',

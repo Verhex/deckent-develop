@@ -1835,7 +1835,7 @@ export async function waitForResults(
 
       lastSpawnAttempt = Date.now();
       // PLANOBS-001 emit-site: SPAWN — fail-safe, never throws
-      emitProgress({ root: projectRoot, phase: 'SPAWN', detail: nextTask.id });
+      emitProgress({ root: projectRoot, sprintId: sprint.id, phase: 'SPAWN', detail: nextTask.id });
       return true;
     } catch (err) {
       if (isProviderExecutionIngressHoldError(err)) {
@@ -2516,6 +2516,7 @@ export async function waitForResults(
         // PLANOBS-001 emit-site: EXECUTE progress — fail-safe, never throws
         emitProgress({
           root: projectRoot,
+          sprintId: sprint.id,
           phase: 'EXECUTE',
           pct: taskIds.size > 0 ? Math.round((collected.size / taskIds.size) * 100) : 0,
           detail: `${collected.size}/${taskIds.size}`,

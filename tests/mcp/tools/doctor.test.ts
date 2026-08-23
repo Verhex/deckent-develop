@@ -20,6 +20,7 @@ vi.mock('node:fs', () => ({
   mkdirSync: vi.fn(),
   readdirSync: vi.fn(),
   unlinkSync: vi.fn(),
+  renameSync: vi.fn(),
 }));
 
 vi.mock('node:child_process', () => ({

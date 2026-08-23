@@ -81,6 +81,11 @@ function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
 }
 
 const scope: TaskScope = { directories: ['src/core/'], filesRead: [], filesWrite: [] };
+const complexScope: TaskScope = {
+  directories: ['src/core/', 'src/orchestra/'],
+  filesRead: [],
+  filesWrite: ['src/core/example.ts', 'src/orchestra/example.ts'],
+};
 
 describe('BUILTIN registry carries the owner tier ladder (fail-fast precondition)', () => {
   it('gpt-5.6 family + gpt-5.5 exist with the owner-reviewed tiers', () => {
@@ -167,6 +172,81 @@ describe('forceModel HOLD — explicit inactive override is a typed MODEL_INACTI
     modelRegistry.setActivationPolicy(ownerCodexPolicy());
     const result = resolveTaskModel('t', 'd', scope, makeConfig(), undefined, 'gpt-5.6-terra', undefined, 'codex');
     expect(result).toBe('gpt-5.6-terra');
+  });
+});
+
+describe('auto-selection — an active stronger tier may satisfy a missing exact tier', () => {
+  it('resolves a premium task to active premium_plus sol without resurrecting inactive gpt-5.5', () => {
+    modelRegistry.setActivationPolicy(ownerCodexPolicy());
+
+    const result = resolveTaskModel(
+      'Architect migration refactor',
+      'Cross-cutting refactor across the terminal archive authority',
+      complexScope,
+      makeConfig({
+        model_strategy: {
+          brain_tier: 'premium',
+          worker_tier: 'premium',
+          min_tier: 'economy',
+          max_tier: 'premium_plus',
+          auto_upgrade: true,
+          auto_downgrade: false,
+        },
+        activeModeConfig: {
+          max_workers: 4,
+          brain_model: 'claude-fable-5',
+          default_model: 'gpt-5.6-sol',
+          haiku_allowed: false,
+        },
+      }),
+      undefined,
+      undefined,
+      undefined,
+      'codex',
+    );
+
+    expect(result).toBe('gpt-5.6-sol');
+    expect(result).not.toBe(CODEX_INACTIVE_PREMIUM);
+    expect(modelRegistry.isAtLeastTier(result, 'premium')).toBe(true);
+  });
+
+  it.each([
+    {
+      name: 'auto-upgrade is disabled',
+      strategy: {
+        brain_tier: 'standard', worker_tier: 'standard', min_tier: 'economy',
+        max_tier: 'premium_plus', auto_upgrade: false, auto_downgrade: true,
+      } as const,
+    },
+    {
+      name: 'the configured ceiling excludes premium_plus',
+      strategy: {
+        brain_tier: 'standard', worker_tier: 'premium', min_tier: 'economy',
+        max_tier: 'premium', auto_upgrade: true, auto_downgrade: true,
+      } as const,
+    },
+  ])('holds instead of exceeding policy when $name', ({ strategy }) => {
+    modelRegistry.setActivationPolicy(ownerCodexPolicy());
+    const config = makeConfig({
+      model_strategy: strategy,
+      activeModeConfig: {
+        max_workers: 4,
+        brain_model: 'claude-fable-5',
+        default_model: 'gpt-5.6-sol',
+        haiku_allowed: false,
+      },
+    });
+
+    expect(() => resolveTaskModel(
+      'Architect migration refactor',
+      'Cross-cutting refactor across the terminal archive authority',
+      complexScope,
+      config,
+      undefined,
+      undefined,
+      undefined,
+      'codex',
+    )).toThrow("No premium-tier model registered for provider 'codex'");
   });
 });
 

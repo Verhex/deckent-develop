@@ -7,7 +7,7 @@ import {
   applyRuntimeEvaluationRetention,
   planRuntimeEvaluationRetention,
 } from '../../src/core/runtime-evaluation-retention.js';
-import { resolveSprintArchiveDir, verifySprintArchive } from '../../src/core/sprint-archive.js';
+import { reconcileSprintArchive, resolveSprintArchiveDir, verifySprintArchive } from '../../src/core/sprint-archive.js';
 
 let root: string;
 const sprintId = 'sprint-625';
@@ -113,8 +113,37 @@ describe('runtime evaluation audit retention', () => {
     expect(result.failures).toEqual([]);
     expect(existsSync(restored)).toBe(false);
     expect(existsSync(foreign)).toBe(true);
-    const manifestText = readFileSync(join(resolveSprintArchiveDir(root, sprintId), 'manifest.json'), 'utf8');
-    expect(manifestText).not.toContain('626-001-attempt-1.json');
+    expect(planRuntimeEvaluationRetention(root, sprintId).hold)
+      .toContainEqual(expect.objectContaining({ relativePath: '626-001-attempt-1.json', reason: 'foreign-sprint' }));
+  });
+
+  it('holds pending evaluation publication without mutating a terminal application archive', () => {
+    write('.deckent/archive/sprints/sprint-625/existing.json', 'canonical');
+    reconcileSprintArchive(root, sprintId, { apply: true, indexMemory: false });
+    const archive = resolveSprintArchiveDir(root, sprintId);
+    const before = readFileSync(join(archive, 'manifest.json'), 'utf8');
+    write('.deckent/archive/sprints/sprint-625/terminal-seal-application.json', '{"state":"applied"}');
+    const source = write('.deckent/runtime/evaluations/sprint-625/625-004-attempt-1.json', 'pending');
+
+    const result = applyRuntimeEvaluationRetention(planRuntimeEvaluationRetention(root, sprintId));
+
+    expect(result.failures).toContain('sprint-625:TERMINAL_ARCHIVE_SEALED');
+    expect(result.published).toEqual([]);
+    expect(result.retired).toEqual([]);
+    expect(existsSync(source)).toBe(true);
+    expect(existsSync(join(archive, 'evaluations/625-004-attempt-1.json'))).toBe(false);
+    expect(readFileSync(join(archive, 'manifest.json'), 'utf8')).toBe(before);
+  });
+
+  it('keeps the terminal application receipt outside canonical manifest artifacts', () => {
+    write('.deckent/archive/sprints/sprint-625/evaluations/625-005-attempt-1.json', 'canonical');
+    write('.deckent/archive/sprints/sprint-625/terminal-seal-application.json', '{"state":"staged"}');
+
+    const report = reconcileSprintArchive(root, sprintId, { apply: true, indexMemory: false });
+
+    expect(report.manifest.artifacts.map(artifact => artifact.path))
+      .toEqual(['evaluations/625-005-attempt-1.json']);
+    expect(verifySprintArchive(root, sprintId)).toMatchObject({ ok: true, checked: 1 });
   });
 
   it('keeps changed source bytes when a plan becomes stale', () => {

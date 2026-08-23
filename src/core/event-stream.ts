@@ -682,20 +682,22 @@ export function _getDependencyBlockedStateForTest(): Map<string, Map<string, str
 // ─── Sprint 280 PLANOBS-001: emitProgress helper ─────────────────────
 
 /**
- * Emit a PROGRESS event to the active sprint's event stream.
+ * Emit a PROGRESS event to the producer-owned sprint's event stream.
  *
  * Thin wrapper over writeEvent — fail-safe (never throws).
  * Emit-sites (result-collector, plugin-hooks) are wired by Task 5.
  *
  * @param opts.root    - Project root; defaults to process.cwd()
+ * @param opts.sprintId - Explicit run identity owned by the producer
  * @param opts.phase   - Sprint/task phase label (e.g. 'EXECUTE', 'SPAWN', 'PLAN')
  * @param opts.pct     - Completion percentage 0–100 (optional)
  * @param opts.detail  - Human-readable detail string (optional)
  * @param opts.source  - Event source component; defaults to 'brain'
- * @returns The written DeckentEvent, or null if sprint not found / write failed
+ * @returns The written DeckentEvent, or null if the write failed
  */
 export function emitProgress(opts: {
   root?: string;
+  sprintId: string;
   phase: string;
   pct?: number;
   detail?: string;
@@ -703,12 +705,10 @@ export function emitProgress(opts: {
 }): DeckentEvent | null {
   try {
     const projectRoot = opts.root ?? process.cwd();
-    const sprintId = getCurrentSprintId(projectRoot);
-    if (!sprintId) return null;
     const source = (opts.source ?? 'brain') as DeckentEvent['source'];
     return writeEvent(
       projectRoot,
-      sprintId,
+      opts.sprintId,
       source,
       '*',
       CHANNELS.PROGRESS,

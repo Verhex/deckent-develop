@@ -64,6 +64,14 @@ function result(verdict: 'DONE' | 'NO_GO'): TaskResult {
   };
 }
 
+function persistTaskAuthority(root: string, sprintTask: Task): void {
+  mkdirSync(join(root, '.tasks'), { recursive: true });
+  writeFileSync(
+    join(root, '.tasks', `task-${sprintTask.id}.json`),
+    `${JSON.stringify(sprintTask, null, 2)}\n`,
+  );
+}
+
 afterEach(() => {
   for (const root of temporaryRoots.splice(0)) {
     rmSync(root, { recursive: true, force: true });
@@ -92,6 +100,7 @@ describe('fenced sprint terminal receipt archive boundary', () => {
       tasks: [sprintTask],
     } as Parameters<typeof publishFencedSprintTerminalReceipt>[0]['sprint'];
     const root = projectRoot();
+    persistTaskAuthority(root, sprintTask);
 
     const first = publishFencedSprintTerminalReceipt({
       projectRoot: root,
@@ -153,8 +162,10 @@ describe('fenced sprint terminal receipt archive boundary', () => {
     // whose lineages did not complete can no longer be PUBLISHED as COMPLETE
     // at all — the old behavior (publish + record BLOCKED eligibility) is
     // superseded by the typed refusal; force-abort is the closure path.
+    const root = projectRoot();
+    persistTaskAuthority(root, sprintTask);
     expect(() => publishFencedSprintTerminalReceipt({
-      projectRoot: projectRoot(),
+      projectRoot: root,
       sprint: { id: 'sprint-487', number: 487, tasks: [sprintTask] } as Parameters<
         typeof publishFencedSprintTerminalReceipt
       >[0]['sprint'],
@@ -169,9 +180,11 @@ describe('fenced sprint terminal receipt archive boundary', () => {
       number: 487,
       tasks: [sprintTask],
     } as Parameters<typeof publishFencedSprintTerminalReceipt>[0]['sprint'];
+    const root = projectRoot();
+    persistTaskAuthority(root, sprintTask);
 
     const settlement = publishTestModeSprintTerminalReceipt(
-      projectRoot(),
+      root,
       sprint,
       new Map([['487-002', TaskEvaluation.DONE]]),
       [result('DONE')],
@@ -207,6 +220,7 @@ describe('fenced sprint terminal receipt archive boundary', () => {
       startedAt: '2026-07-31T00:00:00.000Z',
     } as Parameters<typeof runRetroPhase>[1];
     const root = projectRoot();
+    persistTaskAuthority(root, sprintTask);
 
     const outcome = await runRetroPhase(
       root,
@@ -321,5 +335,29 @@ describe('fenced sprint terminal receipt archive boundary', () => {
     expect(guardIndex).toBeGreaterThan(publishIndex);
     expect(archiveIndex).toBeGreaterThan(guardIndex);
     expect(retiredOrphanIndex).toBe(-1);
+  });
+
+  it('publishes terminal lifecycle authority before the single outer archive seal and only then projects EventBus completion', () => {
+    const controller = readFileSync(
+      new URL('../../src/orchestra/sprint-controller.ts', import.meta.url),
+      'utf-8',
+    );
+    const terminalTail = controller.slice(controller.indexOf(
+      'const terminalPublication = commitSprintTerminalHandoff(terminalHandoff);',
+    ));
+    const authorityIndex = terminalTail.indexOf('publishFinalSprintAuthority(');
+    const archivePublisherIndex = terminalTail.indexOf('publishOutermostSprintTerminalArchive({');
+    const phaseProjectionIndex = terminalTail.indexOf(
+      'emitPhaseChange(SprintPhase.DECAY, SprintPhase.COMPLETE, sprint.id);',
+    );
+    const completedProjectionIndex = terminalTail.indexOf(
+      "emitSprintEvent('SPRINT_COMPLETED', { sprintId: sprint.id });",
+    );
+
+    expect(authorityIndex).toBeGreaterThan(0);
+    expect(archivePublisherIndex).toBeGreaterThan(authorityIndex);
+    expect(phaseProjectionIndex).toBeGreaterThan(archivePublisherIndex);
+    expect(completedProjectionIndex).toBeGreaterThan(phaseProjectionIndex);
+    expect(terminalTail.match(/publishOutermostSprintTerminalArchive\(\{/gu)).toHaveLength(1);
   });
 });

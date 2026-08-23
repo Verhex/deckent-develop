@@ -272,35 +272,28 @@ describe('planner-fail: timeout → notify', () => {
   });
 });
 
-// ─── Test 3: planner-start → emitProgress called ──────────────────
+// ─── Test 3: preview isolation ────────────────────────────────────
 
 describe('planner-start: emitProgress', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('emitProgress is called with phase PLAN at the start of planSprint', async () => {
+  it('dry-run preview does not emit raw PLAN progress', async () => {
     await planSprint(ROOT, makeConfig(), makeContext('Task A'), recommendation, {
       mode: 'structured',
       dryRun: true,
     });
 
-    expect(mockedEmitProgress).toHaveBeenCalledWith(
-      expect.objectContaining({ phase: 'PLAN' }),
-    );
+    expect(mockedEmitProgress).not.toHaveBeenCalled();
   });
 
-  it('emitProgress is called before any task processing', async () => {
-    const calls: string[] = [];
-    mockedEmitProgress.mockImplementation((opts) => {
-      calls.push(`emitProgress:${opts.phase}`);
-      return null;
-    });
+  it('dry-run AI fallback also does not emit raw PLAN progress', async () => {
     mockedCallPlanner.mockReturnValue({ ok: false, reason: 'parse_failed', message: 'fail' });
 
     await planSprint(ROOT, makeConfig(), makeContext(), recommendation, { mode: 'auto', dryRun: true });
 
-    expect(calls[0]).toBe('emitProgress:PLAN');
+    expect(mockedEmitProgress).not.toHaveBeenCalled();
   });
 });
 

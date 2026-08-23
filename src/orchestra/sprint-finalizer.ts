@@ -245,11 +245,21 @@ import {
 
 import {
   archiveTaskArtifacts,
+  isSprintArchiveNamespaceSafe,
   reconcileSprintArchive,
+  resolveSprintArchiveDir,
   resolveTaskArtifactReadDirs,
+  sealSprintArchiveTerminal,
   verifySprintArchive,
+  verifySprintArchiveTerminal,
 } from '../core/sprint-archive.js';
-import type { TaskArtifactArchivePlan } from '../core/sprint-archive.js';
+import type {
+  SprintArchiveTerminalApplicationReceipt,
+  SprintArchiveTerminalSealReceipt,
+  SprintArchiveTerminalSealResult,
+  SprintArchiveTerminalVerificationReport,
+  TaskArtifactArchivePlan,
+} from '../core/sprint-archive.js';
 export {
   archiveTaskArtifacts,
   resolveTaskArtifactArchiveDir,
@@ -397,7 +407,7 @@ import { runDecay, auditBrainBudget } from './debt-manager.js';
 import { runDocTrackingSync } from '../core/doc-tracking/sync.js';
 
 // ─── Observability ────────────────────────────────────────────────
-import { generateLoadReport, initObservability } from '../core/observability.js';
+import { initObservability } from '../core/observability.js';
 import { rotateMetricsFile } from '../core/observability-rotation.js';
 import type { ObservabilityRotationConfig } from '../core/observability-rotation.js';
 
@@ -424,8 +434,6 @@ import type { PostFinalizeHookResult } from '../core/identity-generator.js';
 // while the DB still held 75 ADRs. We bypass runMemoryExport and call the
 // guarded writer here instead — it refuses to overwrite when the render
 // collapses to the "no entries" marker while the DB has entries.
-import { writeGuardedExports } from '../core/memory-export.js';
-import { MemoryStore } from '../core/memory-store.js';
 import { MEMORY_DB_FILE } from '../core/constants.js';
 
 // ─── Task Restoration / Auto-Archive Guard (Sprint 143 Task 13) ───
@@ -1575,6 +1583,451 @@ export interface TestModeSprintTerminalSettlement {
   readonly terminalTruth: FinalizerTerminalTruth;
 }
 
+export const SPRINT_TERMINAL_COMPLETED_CHANNEL = 'BRAIN→*:SPRINT_TERMINAL_COMPLETED';
+export const SPRINT_TERMINAL_ABORTED_CHANNEL = 'BRAIN→*:SPRINT_TERMINAL_ABORTED';
+
+export interface SprintTerminalDurableEvent {
+  readonly channel: string;
+  readonly payload: Readonly<Record<string, unknown>>;
+  readonly target?: string;
+}
+
+export interface OutermostSprintTerminalArchivePublication {
+  readonly seal: SprintArchiveTerminalSealResult;
+  readonly verification: SprintArchiveTerminalVerificationReport;
+  readonly finalEvent: {
+    readonly sequence: number;
+    readonly digest: string;
+  };
+}
+
+function matchesSameCommitTerminalVerification(
+  sprintId: string,
+  seal: SprintArchiveTerminalSealResult,
+  verification: SprintArchiveTerminalVerificationReport | undefined,
+): boolean {
+  const application = seal.applicationReceipt;
+  return seal.terminalComplete
+    && application?.state === 'applied'
+    && verification?.ok === true
+    && verification.sprintId === sprintId
+    && verification.manifestDigest === application.manifestDigest
+    && verification.sealReceiptSha256 === application.sealReceiptSha256
+    && verification.brainIndexSha256 === (application.brainIndexSha256 ?? null)
+    && verification.guardedSummarySha256 === (application.guardedSummarySha256 ?? null);
+}
+
+/**
+ * Identifies whether the canonical terminal seal was already committed before
+ * a later projection failed. Recovery callers use this bit to avoid appending
+ * a HOLD event to an immutable, sealed journal.
+ */
+export class SprintTerminalArchivePublicationError extends FinalizerTerminalEvidenceError {
+  constructor(
+    reasonCode: string,
+    readonly archiveSealed: boolean,
+    options?: ErrorOptions,
+  ) {
+    super(reasonCode);
+    this.name = 'SprintTerminalArchivePublicationError';
+    if (options?.cause !== undefined) this.cause = options.cause;
+  }
+}
+
+function persistedReceiptMatches(
+  projectRoot: string,
+  sprintId: string,
+  expected: SprintTerminalReceiptV1,
+): boolean {
+  const artifact = readJsonSafe<Record<string, unknown>>(
+    join(projectRoot, RECENT_WORKS_DIR, `${sprintId}-terminal-receipt.json`),
+  );
+  if (!artifact) return false;
+  const candidate = artifact.receipt && typeof artifact.receipt === 'object' && !Array.isArray(artifact.receipt)
+    ? artifact.receipt as Record<string, unknown>
+    : artifact;
+  return receiptRecordMatches(candidate, expected);
+}
+
+function receiptRecordMatches(
+  candidate: Record<string, unknown>,
+  expected: SprintTerminalReceiptV1,
+): boolean {
+  return candidate.version === expected.version
+    && candidate.sprintId === expected.sprintId
+    && candidate.runId === expected.runId
+    && candidate.coordinatorGeneration === expected.coordinatorGeneration
+    && candidate.terminalOutcome === expected.terminalOutcome
+    && candidate.logicalSettlementDigest === expected.logicalSettlementDigest
+    && candidate.priorAuthorityVersion === expected.priorAuthorityVersion
+    && candidate.authorityVersion === expected.authorityVersion;
+}
+
+function terminalEventsProjectionDigest(events: readonly SprintTerminalDurableEvent[]): string {
+  return createHash('sha256').update(canonicalJson(events.map(event => ({
+    channel: event.channel,
+    target: event.target ?? '*',
+    payload: event.payload,
+  })))).digest('hex');
+}
+
+function postSealPolicyDigest(config: ResolvedConfig | undefined): string | null {
+  const policy = config?.runtime_artifact_retention;
+  return policy === undefined
+    ? null
+    : createHash('sha256').update(canonicalJson(policy)).digest('hex');
+}
+
+function manualFinalizeTerminalEvents(
+  receipt: SprintTerminalReceiptV1,
+): readonly SprintTerminalDurableEvent[] {
+  return [
+    {
+      channel: CHANNELS.SPRINT_PHASE_CHANGE,
+      payload: {
+        fromPhase: SprintPhase.DECAY,
+        toPhase: SprintPhase.COMPLETE,
+        sprintId: receipt.sprintId,
+        transitionKind: 'manual-finalize',
+      },
+    },
+    {
+      channel: SPRINT_TERMINAL_COMPLETED_CHANNEL,
+      payload: {
+        sprintId: receipt.sprintId,
+        status: SprintStatus.COMPLETE,
+        phase: SprintPhase.COMPLETE,
+        terminalOutcome: 'COMPLETE',
+        runId: receipt.runId,
+        coordinatorGeneration: receipt.coordinatorGeneration,
+        authorityVersion: receipt.authorityVersion,
+      },
+    },
+  ];
+}
+
+/**
+ * A published terminal seal is the replay boundary for manual finalization.
+ * Re-entering the full finalizer would append pre-terminal events and mutate
+ * already-bound projections before the outer publisher can inspect the seal.
+ * Validate the current logical input against the immutable receipt, resume or
+ * replay the outer seal, and let the caller return its freshly computed metrics.
+ */
+function replaySettledManualFinalizeIfPresent(input: {
+  readonly projectRoot: string;
+  readonly sprintId: string;
+  readonly logicalSettlementDigest: string;
+  readonly opts?: FinalizeSprintOptions;
+}): boolean {
+  if (input.opts?.deferTerminalAuthority) return false;
+  const archiveDir = resolveSprintArchiveDir(input.projectRoot, input.sprintId);
+  const sealPath = join(archiveDir, 'terminal-seal-receipt.json');
+  const applicationPath = join(archiveDir, 'terminal-seal-application.json');
+  const sealExists = existsSync(sealPath);
+  const applicationExists = existsSync(applicationPath);
+  if (!sealExists && !applicationExists) return false;
+  const seal = readJsonSafe<SprintArchiveTerminalSealReceipt>(sealPath);
+  const application = readJsonSafe<SprintArchiveTerminalApplicationReceipt>(applicationPath);
+  const expectedRunId = input.opts?.flowId ?? input.sprintId;
+  const expectedGeneration = input.opts?.coordinatorGeneration ?? 1;
+  if (!seal
+      || seal.sprintId !== input.sprintId
+      || seal.terminalOutcome !== 'COMPLETE'
+      || seal.logicalSettlementDigest !== input.logicalSettlementDigest
+      || seal.terminalReceipt.runId !== expectedRunId
+      || seal.terminalReceipt.coordinatorGeneration !== expectedGeneration
+      || seal.postSealPolicySha256 !== postSealPolicyDigest(input.opts?.config)) {
+    throw new FinalizerTerminalEvidenceError('SPRINT_ARCHIVE_EXISTING_SEAL_IDENTITY_MISMATCH');
+  }
+  const terminalEvents = manualFinalizeTerminalEvents(seal.terminalReceipt);
+  if (application?.state === 'applied') {
+    const replay = replayExistingTerminalSeal({
+      projectRoot: input.projectRoot,
+      sprintId: input.sprintId,
+      receipt: seal.terminalReceipt,
+      terminalEvents,
+      config: input.opts?.config,
+    });
+    if (!replay) {
+      throw new FinalizerTerminalEvidenceError('SPRINT_ARCHIVE_EXISTING_SEAL_IDENTITY_MISMATCH');
+    }
+    return true;
+  }
+  publishOutermostSprintTerminalArchive({
+    projectRoot: input.projectRoot,
+    sprintId: input.sprintId,
+    receipt: seal.terminalReceipt,
+    terminalEvents,
+    config: input.opts?.config,
+    skipMemoryExport: input.opts?.skipMemoryExport,
+  });
+  return true;
+}
+
+/** Replay or resume an existing seal before any reconcile or journal append. */
+function replayExistingTerminalSeal(input: {
+  readonly projectRoot: string;
+  readonly sprintId: string;
+  readonly receipt: SprintTerminalReceiptV1;
+  readonly terminalEvents: readonly SprintTerminalDurableEvent[];
+  readonly config?: ResolvedConfig;
+}): OutermostSprintTerminalArchivePublication | null {
+  const archiveDir = resolveSprintArchiveDir(input.projectRoot, input.sprintId);
+  const sealPath = join(archiveDir, 'terminal-seal-receipt.json');
+  const applicationPath = join(archiveDir, 'terminal-seal-application.json');
+  const sealExists = existsSync(sealPath);
+  const applicationExists = existsSync(applicationPath);
+  if (!sealExists && !applicationExists) return null;
+  if (!isSprintArchiveNamespaceSafe(input.projectRoot, input.sprintId)) {
+    throw new FinalizerTerminalEvidenceError('SPRINT_ARCHIVE_NAMESPACE_UNSAFE');
+  }
+  const seal = readJsonSafe<SprintArchiveTerminalSealReceipt>(
+    sealPath,
+  );
+  const application = readJsonSafe<SprintArchiveTerminalApplicationReceipt>(
+    applicationPath,
+  );
+  if (!seal
+      || !receiptRecordMatches(seal.terminalReceipt as unknown as Record<string, unknown>, input.receipt)
+      || seal.sprintId !== input.sprintId) {
+    throw new FinalizerTerminalEvidenceError('SPRINT_ARCHIVE_EXISTING_SEAL_IDENTITY_MISMATCH');
+  }
+  const expectedProjection = terminalEventsProjectionDigest(input.terminalEvents);
+  if (seal.terminalEventsProjectionSha256 !== expectedProjection) {
+    throw new FinalizerTerminalEvidenceError('SPRINT_ARCHIVE_TERMINAL_EVENTS_PROJECTION_MISMATCH');
+  }
+  const expectedPostSealPolicy = postSealPolicyDigest(input.config);
+  if (seal.postSealPolicySha256 !== expectedPostSealPolicy) {
+    throw new FinalizerTerminalEvidenceError('SPRINT_ARCHIVE_POST_SEAL_POLICY_MISMATCH');
+  }
+
+  const hotJournalPath = join(
+    input.projectRoot,
+    RECENT_WORKS_DIR,
+    `${input.sprintId}-events.jsonl`,
+  );
+  if (application?.state === 'applied') {
+    const verification = verifySprintArchiveTerminal(
+      input.projectRoot,
+      input.sprintId,
+      hotJournalPath,
+    );
+    if (!verification.ok) {
+      throw new FinalizerTerminalEvidenceError(
+        `SPRINT_ARCHIVE_EXISTING_SEAL_VERIFY_HOLD:${verification.reasonCodes.join('|')}`,
+      );
+    }
+    return {
+      seal: {
+        disposition: 'idempotent',
+        terminalComplete: true,
+        receipt: seal,
+        applicationReceipt: application,
+      },
+      verification,
+      finalEvent: seal.finalEvent,
+    };
+  }
+  if (application && application.state !== 'staged') {
+    throw new FinalizerTerminalEvidenceError('SPRINT_ARCHIVE_EXISTING_APPLICATION_INVALID');
+  }
+
+  const resumed = sealSprintArchiveTerminal(input.projectRoot, input.sprintId, {
+    receipt: input.receipt,
+    finalEvent: seal.finalEvent,
+    hotJournalPath,
+    expectedArchivedPreimageSha256: seal.expectedArchivedPreimageSha256,
+    expectedHotJournalSha256: seal.hotJournalSha256,
+    operatorReason: seal.operatorReason,
+    adoptBrain: seal.brainAdoptionRequired,
+    terminalEventsProjectionSha256: expectedProjection,
+    postSealPolicySha256: expectedPostSealPolicy,
+  });
+  if (!resumed.terminalComplete || !resumed.receipt || resumed.applicationReceipt?.state !== 'applied') {
+    throw new FinalizerTerminalEvidenceError(
+      `SPRINT_ARCHIVE_EXISTING_SEAL_RESUME_HOLD:${resumed.reasonCode ?? 'unknown'}`,
+    );
+  }
+  const verification = resumed.verification;
+  if (!verification
+      || !matchesSameCommitTerminalVerification(input.sprintId, resumed, verification)) {
+    throw new FinalizerTerminalEvidenceError(
+      `SPRINT_ARCHIVE_EXISTING_SEAL_VERIFY_HOLD:${verification?.reasonCodes.join('|') ?? 'missing_same_commit_verification'}`,
+    );
+  }
+  return {
+    seal: resumed,
+    verification,
+    finalEvent: resumed.receipt.finalEvent,
+  };
+}
+
+function completeOutermostPostSeal(input: {
+  readonly projectRoot: string;
+  readonly sprintId: string;
+  readonly config?: ResolvedConfig;
+}, publication: OutermostSprintTerminalArchivePublication): OutermostSprintTerminalArchivePublication {
+  const runtimeHygiene = runConfiguredRuntimeHygieneAfterFinalize(
+    input.projectRoot,
+    input.sprintId,
+    input.config,
+    { receiptCleanupEligible: true, archiveVerified: true },
+  );
+  debugLog(
+    'publishOutermostSprintTerminalArchive:runtimeHygiene',
+    runtimeHygiene.state === 'applied'
+      ? `Receipt ${runtimeHygiene.evidence.receiptState} at ${runtimeHygiene.evidence.receiptPath}`
+      : `Skipped: ${runtimeHygiene.reason}`,
+  );
+  cleanupCounters(input.projectRoot, input.sprintId);
+  return publication;
+}
+
+/**
+ * The sole outer lifecycle publisher for terminal archive evidence.
+ *
+ * Every ingress first finishes its lifecycle authority and cleanup work, then
+ * delegates here. This function snapshots all pre-terminal artifacts, appends
+ * the final durable lifecycle marker(s), seals that exact journal tail, refreshes
+ * the Brain archive projection, verifies the resulting manifest and retires the
+ * sequence counter. No caller may write raw sprint evidence after it returns.
+ */
+export function publishOutermostSprintTerminalArchive(input: {
+  readonly projectRoot: string;
+  readonly sprintId: string;
+  readonly receipt: SprintTerminalReceiptV1;
+  readonly terminalEvents: readonly SprintTerminalDurableEvent[];
+  readonly config?: ResolvedConfig;
+  readonly skipMemoryExport?: boolean;
+}): OutermostSprintTerminalArchivePublication {
+  let archiveSealed = false;
+  try {
+    if (input.terminalEvents.length === 0) {
+      throw new FinalizerTerminalEvidenceError('SPRINT_ARCHIVE_TERMINAL_EVENT_REQUIRED');
+    }
+    if (!persistedReceiptMatches(input.projectRoot, input.sprintId, input.receipt)) {
+      throw new FinalizerTerminalEvidenceError('SPRINT_ARCHIVE_TERMINAL_RECEIPT_MISMATCH');
+    }
+    if (!isSprintArchiveNamespaceSafe(input.projectRoot, input.sprintId)) {
+      throw new FinalizerTerminalEvidenceError('SPRINT_ARCHIVE_NAMESPACE_UNSAFE');
+    }
+    const archiveDir = resolveSprintArchiveDir(input.projectRoot, input.sprintId);
+    archiveSealed = existsSync(join(archiveDir, 'terminal-seal-receipt.json'))
+      || existsSync(join(archiveDir, 'terminal-seal-application.json'));
+    const replay = replayExistingTerminalSeal(input);
+    if (replay) {
+      return replay.seal.disposition === 'idempotent'
+        ? replay
+        : completeOutermostPostSeal(input, replay);
+    }
+
+    // Materialize every already-settled artifact before the final journal
+    // append. The core seal then repairs only the strict journal prefix and
+    // commits the exact terminal snapshot without accepting divergent history.
+    const prepared = reconcileSprintArchive(input.projectRoot, input.sprintId, {
+      apply: true,
+      retireLegacySources: true,
+      indexMemory: false,
+    });
+    if (prepared.failures.length > 0) {
+      throw new FinalizerTerminalEvidenceError(
+        `SPRINT_ARCHIVE_RECONCILE_FAILED:${prepared.failures.join('|')}`,
+      );
+    }
+    if (prepared.manifest.conflicts.length > 0) {
+      throw new FinalizerTerminalEvidenceError(
+        `SPRINT_ARCHIVE_RECONCILE_CONFLICT:${prepared.manifest.conflicts.length}`,
+      );
+    }
+    const preparedVerification = verifySprintArchive(input.projectRoot, input.sprintId);
+    if (!preparedVerification.ok) {
+      throw new FinalizerTerminalEvidenceError(
+        `SPRINT_ARCHIVE_VERIFY_FAILED:missing=${preparedVerification.missing.length}:`
+        + `mismatched=${preparedVerification.mismatched.length}:untracked=${preparedVerification.untracked.length}`,
+      );
+    }
+    const canonicalJournalPath = join(prepared.archiveDir, `${input.sprintId}-events.jsonl`);
+    const expectedArchivedPreimageSha256 = existsSync(canonicalJournalPath)
+      ? createHash('sha256').update(readFileSync(canonicalJournalPath)).digest('hex')
+      : null;
+
+    let finalEvent: ReturnType<typeof writeEvent> = null;
+    for (const terminalEvent of input.terminalEvents) {
+      finalEvent = writeEvent(
+        input.projectRoot,
+        input.sprintId,
+        'brain',
+        terminalEvent.target ?? '*',
+        terminalEvent.channel,
+        terminalEvent.payload,
+      );
+      if (finalEvent === null) {
+        throw new FinalizerTerminalEvidenceError(
+          `SPRINT_ARCHIVE_TERMINAL_EVENT_WRITE_FAILED:${terminalEvent.channel}`,
+        );
+      }
+    }
+    if (finalEvent === null) {
+      throw new FinalizerTerminalEvidenceError('SPRINT_ARCHIVE_TERMINAL_EVENT_WRITE_FAILED');
+    }
+
+    const finalEventIdentity = {
+      sequence: finalEvent.sequence,
+      digest: createHash('sha256').update(JSON.stringify(finalEvent)).digest('hex'),
+    };
+    const hotJournalPath = join(
+      input.projectRoot,
+      RECENT_WORKS_DIR,
+      `${input.sprintId}-events.jsonl`,
+    );
+    const expectedHotJournalSha256 = createHash('sha256')
+      .update(readFileSync(hotJournalPath))
+      .digest('hex');
+    const seal = sealSprintArchiveTerminal(input.projectRoot, input.sprintId, {
+      receipt: input.receipt,
+      finalEvent: finalEventIdentity,
+      hotJournalPath,
+      expectedArchivedPreimageSha256,
+      expectedHotJournalSha256,
+      operatorReason: `deckent outer lifecycle terminal publication: ${input.receipt.terminalOutcome}`,
+      adoptBrain: input.skipMemoryExport !== true,
+      terminalEventsProjectionSha256: terminalEventsProjectionDigest(input.terminalEvents),
+      postSealPolicySha256: postSealPolicyDigest(input.config),
+    });
+    // A staged seal receipt is already immutable authority even when its
+    // application remains HOLD. Callers must not append a recovery event over
+    // that exact final-event identity; retry proceeds through the core repair.
+    archiveSealed = seal.receipt !== undefined;
+    if (!seal.terminalComplete) {
+      throw new FinalizerTerminalEvidenceError(
+        `SPRINT_ARCHIVE_TERMINAL_SEAL_HOLD:${seal.reasonCode ?? 'unknown'}`,
+      );
+    }
+    archiveSealed = true;
+
+    // The core application receipt binds manifest + optional Brain index and
+    // guarded summary digests. Consume the exact verification produced inside
+    // that same commit; an immediate detached DB/WAL re-open can observe a
+    // checkpoint transition and falsely report brain_adoption_failed. Public
+    // and later replay verification remain independent through the path above.
+    const verification = seal.verification;
+    if (!verification
+        || !matchesSameCommitTerminalVerification(input.sprintId, seal, verification)) {
+      throw new FinalizerTerminalEvidenceError(
+        `SPRINT_ARCHIVE_TERMINAL_VERIFY_FAILED:${verification?.reasonCodes.join('|') ?? 'missing_same_commit_verification'}`,
+      );
+    }
+
+    return completeOutermostPostSeal(input, { seal, verification, finalEvent: finalEventIdentity });
+  } catch (error) {
+    if (error instanceof SprintTerminalArchivePublicationError) throw error;
+    const reason = error instanceof FinalizerTerminalEvidenceError
+      ? error.reasonCode
+      : `SPRINT_ARCHIVE_TERMINAL_PUBLICATION_FAILED:${error instanceof Error ? error.message : String(error)}`;
+    throw new SprintTerminalArchivePublicationError(reason, archiveSealed, { cause: error });
+  }
+}
+
 /** RCPT-1: receipt detail bound — enough for any real fix cascade while
  *  keeping the artifact small; the full list stays in terminal evidence. */
 const RECEIPT_EXCLUSION_DETAIL_LIMIT = 20;
@@ -2543,23 +2996,6 @@ export function forceAbortSprint(
       `SPRINT_ARCHIVE_TASK_SETTLEMENT_FAILED:${artifactSettlement.failures.join('|')}`,
     );
   }
-  const archiveReconciliation = reconcileSprintArchive(projectRoot, sprint.id, {
-    apply: true,
-    retireLegacySources: true,
-    indexMemory: true,
-  });
-  if (archiveReconciliation.failures.length > 0) {
-    throw new FinalizerTerminalEvidenceError(
-      `SPRINT_ARCHIVE_RECONCILE_FAILED:${archiveReconciliation.failures.join('|')}`,
-    );
-  }
-  const archiveVerification = verifySprintArchive(projectRoot, sprint.id);
-  if (!archiveVerification.ok) {
-    throw new FinalizerTerminalEvidenceError(
-      `SPRINT_ARCHIVE_VERIFY_FAILED:missing=${archiveVerification.missing.length}:`
-      + `mismatched=${archiveVerification.mismatched.length}:untracked=${archiveVerification.untracked.length}`,
-    );
-  }
   publishAbortedSprintAuthority(projectRoot, sprint, truth.logicalMetrics);
   // Sprint log projection (row 3298): publishAbortedSprintAuthority just set
   // sprint.status = ABORTED and sprint.completedAt — genuinely terminal, so
@@ -2588,6 +3024,24 @@ export function forceAbortSprint(
       'ABORTED',
     );
   } catch (e) { debugLog('forceAbortSprint:sprintLogProjection', e); }
+
+  publishOutermostSprintTerminalArchive({
+    projectRoot,
+    sprintId: sprint.id,
+    receipt: receiptPublication.receipt,
+    terminalEvents: [{
+      channel: SPRINT_TERMINAL_ABORTED_CHANNEL,
+      payload: {
+        sprintId: sprint.id,
+        status: SprintStatus.ABORTED,
+        phase: sprint.phase,
+        terminalOutcome: 'ABORTED',
+        runId: receiptPublication.receipt.runId,
+        coordinatorGeneration: receiptPublication.receipt.coordinatorGeneration,
+        authorityVersion: receiptPublication.receipt.authorityVersion,
+      },
+    }],
+  });
   return { outcome: 'ABORTED', receiptPublication, terminalTruth: truth };
 }
 
@@ -3110,48 +3564,29 @@ export async function finalizeSprint(
   results: TaskResult[],
   opts?: FinalizeSprintOptions,
 ): Promise<SprintMetrics> {
-  // Ensure observability is initialized (idempotent — safe to call multiple times)
-  initObservability(projectRoot);
-
-  // ─── SPRINT_PHASE_CHANGE: EXECUTE → EVALUATE ────────────────────
-  // Brain broadcasts faz geçişini event stream'e yazar.
-  // Tüm consumer'lar (auditor, dashboard, CLI) bu event'i okuyarak
-  // sprint'in EVALUATE fazına girdiğini anlar (ADR-035 broadcast kanalı).
   const sprintIdForEvents = getCurrentSprintId(projectRoot) ?? sprint.id;
   const emitStandardLifecycleEvents = shouldEmitStandardLifecycleEvents(opts);
-  if (emitStandardLifecycleEvents) {
-    writeEvent(
-      projectRoot, sprintIdForEvents, 'brain', '*',
-      CHANNELS.SPRINT_PHASE_CHANGE,
-      { fromPhase: 'EXECUTE', toPhase: 'EVALUATE', sprintId: sprint.id, timestamp: new Date().toISOString() },
-    );
+  const archiveDir = resolveSprintArchiveDir(projectRoot, sprint.id);
+  const manualReplayCandidate = opts?.deferTerminalAuthority !== true
+    && (existsSync(join(archiveDir, 'terminal-seal-receipt.json'))
+      || existsSync(join(archiveDir, 'terminal-seal-application.json')));
+
+  // Preserve the live first-finalize event order. A sealed replay takes the
+  // read-only branch below before observability, lifecycle, debt or Brain APIs
+  // receive an opportunity to mutate authority files.
+  if (!manualReplayCandidate) {
+    initObservability(projectRoot);
+    if (emitStandardLifecycleEvents) {
+      writeEvent(
+        projectRoot, sprintIdForEvents, 'brain', '*',
+        CHANNELS.SPRINT_PHASE_CHANGE,
+        { fromPhase: 'EXECUTE', toPhase: 'EVALUATE', sprintId: sprint.id, timestamp: new Date().toISOString() },
+      );
+    }
   }
 
   // Build O(1) lookup index from results array — eliminates O(n²) linear scans
   const resultsMap = buildResultsMap(results);
-
-  // 0. Legacy ambient code observation (diagnostic-only).
-  // Shared-worktree git state is not exact-attempt verdict authority. Preserve
-  // this probe temporarily for forensic visibility, but it may never mutate an
-  // evaluation or synthesize a worker result at the finalizer boundary.
-  const codeVerifiedTasks: string[] = [];
-  for (const [taskId, evaluation] of evaluations) {
-    if (evaluation !== TaskEvaluation.NO_GO) continue;
-    try {
-      const verifyResult = await tryCodeVerifiedDone(taskId, projectRoot);
-      if (verifyResult.triggered && verifyResult.verified) {
-        debugLog(
-          'finalizeSprint:ambientCodeObservation',
-          `task=${taskId} observedFiles=${verifyResult.verifiedFiles.length}; verdict unchanged`,
-        );
-      }
-    } catch (e) {
-      debugLog('finalizeSprint:codeReconcile', `Reconciliation failed for ${taskId}: ${e}`);
-    }
-  }
-  if (codeVerifiedTasks.length > 0) {
-    debugLog('finalizeSprint:codeReconcile', `${codeVerifiedTasks.length} tasks reconciled: ${codeVerifiedTasks.join(', ')}`);
-  }
 
   // One canonical terminal projection owns every finalizer denominator. Exact
   // attempts remain on terminalTruth for evidence/usage, while downstream
@@ -3189,6 +3624,44 @@ export async function finalizeSprint(
   const logicalResultsMap = buildResultsMap(logicalResults);
   const logicalSprint: Sprint = { ...sprint, tasks: logicalTasks };
   const logicalEvaluations = new Map(terminalTruth.logicalEvaluations);
+
+  if (manualReplayCandidate) {
+    const replayMetrics: SprintMetrics = {
+      ...calculateMetrics(logicalSprint, logicalEvaluations, logicalResults),
+      ...terminalTruth.logicalMetrics,
+    };
+    if (replaySettledManualFinalizeIfPresent({
+      projectRoot,
+      sprintId: sprint.id,
+      logicalSettlementDigest: terminalTruth.logicalSettlementDigest,
+      opts,
+    })) {
+      sprint.metrics = replayMetrics;
+      return replayMetrics;
+    }
+    throw new FinalizerTerminalEvidenceError('SPRINT_ARCHIVE_EXISTING_SEAL_IDENTITY_MISMATCH');
+  }
+
+  // 0. Legacy ambient code observation (diagnostic-only). It deliberately runs
+  // after the immutable replay branch so sealed re-entry remains observational.
+  const codeVerifiedTasks: string[] = [];
+  for (const [taskId, evaluation] of evaluations) {
+    if (evaluation !== TaskEvaluation.NO_GO) continue;
+    try {
+      const verifyResult = await tryCodeVerifiedDone(taskId, projectRoot);
+      if (verifyResult.triggered && verifyResult.verified) {
+        debugLog(
+          'finalizeSprint:ambientCodeObservation',
+          `task=${taskId} observedFiles=${verifyResult.verifiedFiles.length}; verdict unchanged`,
+        );
+      }
+    } catch (e) {
+      debugLog('finalizeSprint:codeReconcile', `Reconciliation failed for ${taskId}: ${e}`);
+    }
+  }
+  if (codeVerifiedTasks.length > 0) {
+    debugLog('finalizeSprint:codeReconcile', `${codeVerifiedTasks.length} tasks reconciled: ${codeVerifiedTasks.join(', ')}`);
+  }
 
   // 1. Calculate metrics — tech debt is read DB-first (Task #4d).
   const freshDebt = getDebtItems(projectRoot);
@@ -3840,28 +4313,6 @@ export async function finalizeSprint(
   } catch (e) { debugLog('finalizeSprint:techDebtGate', e); }
   debugLog('finalizeSprint:breadcrumb', 'Step 10b2 (techDebtGate) — done');
 
-  // 10c. Generate load-test-report.md from metrics.jsonl (Sprint 135 N6 — Task 5)
-  debugLog('finalizeSprint:breadcrumb', 'Step 10c (loadReport) — entering');
-  try {
-    const reportDir = join(projectRoot, 'docs', 'audits', sprint.id);
-    await fsPromises.mkdir(reportDir, { recursive: true });
-    const reportPath = join(reportDir, 'load-test-report.md');
-    const report = await generateLoadReport(projectRoot);
-    await fsPromises.writeFile(reportPath, report);
-    debugLog('finalizeSprint:loadReport', `Load test report written to ${reportPath}`);
-
-    // ─── LOAD_REPORT_WRITTEN event (ADR-035 — AUDITOR→BRAIN:LOAD_REPORT_WRITTEN) ─
-    // Emitted after the report is successfully written to disk so consumers
-    // know the file is ready to read without polling.
-    writeEvent(
-      projectRoot, sprintIdForEvents, 'auditor', 'brain',
-      CHANNELS.LOAD_REPORT_WRITTEN,
-      { sprintId: sprint.id, reportPath, timestamp: new Date().toISOString() },
-    );
-  } catch (e) { debugLog('finalizeSprint:loadReport', `WARNING: load_report_generation_failed: ${e}`); }
-
-  debugLog('finalizeSprint:breadcrumb', 'Step 10c (loadReport) — done');
-
   // 10c2. Rotate metrics file (Sprint 150 T-030)
   debugLog('finalizeSprint:breadcrumb', 'Step 10c2 (metricsRotation) — entering');
   try {
@@ -4247,8 +4698,8 @@ export async function finalizeSprint(
       },
       onRuleRegen: resolvedOnRuleRegen,
       // Sprint 227 task 227-002: always skip the unsafe runMemoryExport.
-      // We do the export ourselves via writeGuardedExports below so the
-      // sanity guard runs on every finalize cycle, not just opted-in callers.
+      // The outer terminal seal performs the guarded Brain adoption and binds
+      // its digest in the applied archive-side application receipt.
       skipMemoryExport: true,
       skipIdentityRegen: opts?.skipIdentityRegen,
     });
@@ -4276,91 +4727,16 @@ export async function finalizeSprint(
     );
   }
 
-  // 14b. Materialize and verify the whole-sprint evidence manifest only after
-  // post-finalize writers and the final lifecycle event have settled. Earlier
-  // publication captured a pre-CLEANUP event stream and made the archive look
-  // complete while late outputs remained scattered.
-  debugLog('finalizeSprint:breadcrumb', 'Step 14b (sprintArchiveManifest) — entering');
-  const archiveReconciliation = reconcileSprintArchive(projectRoot, sprint.id, {
-    apply: true,
-    retireLegacySources: true,
-    indexMemory: true,
-  });
-  if (archiveReconciliation.failures.length > 0) {
-    throw new FinalizerTerminalEvidenceError(
-      `SPRINT_ARCHIVE_RECONCILE_FAILED:${archiveReconciliation.failures.join('|')}`,
-    );
-  }
-  const archiveVerification = verifySprintArchive(projectRoot, sprint.id);
-  if (!archiveVerification.ok) {
-    throw new FinalizerTerminalEvidenceError(
-      `SPRINT_ARCHIVE_VERIFY_FAILED:missing=${archiveVerification.missing.length}:`
-      + `mismatched=${archiveVerification.mismatched.length}:untracked=${archiveVerification.untracked.length}`,
-    );
-  }
-  debugLog(
-    'finalizeSprint:sprintArchiveManifest',
-    `Verified ${archiveVerification.checked} artifacts at ${archiveReconciliation.manifestPath}`,
-  );
-
-  // Optional bounded hygiene runs only after receipt eligibility and archive
-  // verification. Its failure is terminal typed HOLD evidence, never fail-soft.
-  debugLog('finalizeSprint:breadcrumb', 'Step 14c (runtimeHygiene) — entering');
-  const runtimeHygiene = runConfiguredRuntimeHygieneAfterFinalize(
-    projectRoot,
-    sprint.id,
-    opts?.config,
-    { receiptCleanupEligible: receiptAllowsArchive, archiveVerified: archiveVerification.ok },
-  );
-  debugLog(
-    'finalizeSprint:runtimeHygiene',
-    runtimeHygiene.state === 'applied'
-      ? `Receipt ${runtimeHygiene.evidence.receiptState} at ${runtimeHygiene.evidence.receiptPath}`
-      : `Skipped: ${runtimeHygiene.reason}`,
-  );
-
-  // Sprint 227 guarded exports run after the archive index is committed, so
-  // summary.md observes the same searchable manifest reference. Raw evidence
-  // remains in `.deckent`; Brain receives only the compact semantic index.
-  if (!opts?.skipMemoryExport) {
-    try {
-      const dbPath = join(projectRoot, BRAIN_DIR, MEMORY_DB_FILE);
-      if (existsSync(dbPath)) {
-        const exportsDir = join(projectRoot, BRAIN_DIR, 'exports');
-        const store = new MemoryStore(dbPath);
-        try {
-          const guarded = writeGuardedExports(store, exportsDir);
-          debugLog('finalizeSprint:writeGuardedExports',
-            `written=${guarded.written.length} skipped=${guarded.skipped.length} ` +
-            `warnings=${guarded.warnings.length}`);
-          for (const warning of guarded.warnings) {
-            debugLog('finalizeSprint:writeGuardedExports:warn', warning);
-          }
-          if (postFinalizeResult) postFinalizeResult.memoryExport = {
-            success: guarded.warnings.length === 0,
-            filesWritten: guarded.written,
-            errors: guarded.warnings,
-          };
-        } finally {
-          store.close();
-        }
-      }
-    } catch (e) {
-      debugLog('finalizeSprint:writeGuardedExports', `guarded export failed: ${e}`);
-    }
-  }
-
   if (!opts?.deferTerminalAuthority) {
     publishFinalSprintAuthority(projectRoot, sprint, metrics, opts?.config?.language ?? 'en', logicalEvaluations);
-  }
-
-  // Counter cleanup must be the final filesystem action after the terminal
-  // event. Deleting `<sprint>-seq` during retention and then emitting
-  // RETRO→CLEANUP recreated the sequence at 1, breaking monotonicity.
-  if (emitStandardLifecycleEvents) {
-    try {
-      cleanupCounters(projectRoot, sprint.id);
-    } catch (e) { debugLog('finalizeSprint:cleanupCountersFinal', e); }
+    publishOutermostSprintTerminalArchive({
+      projectRoot,
+      sprintId: sprint.id,
+      receipt: terminalReceiptPublication.receipt,
+      config: opts?.config,
+      skipMemoryExport: opts?.skipMemoryExport,
+      terminalEvents: manualFinalizeTerminalEvents(terminalReceiptPublication.receipt),
+    });
   }
 
   return metrics;

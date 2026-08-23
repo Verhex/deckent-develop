@@ -16,6 +16,7 @@ vi.mock('node:fs', () => ({
   mkdirSync: vi.fn(),
   rmSync: vi.fn(),
   unlinkSync: vi.fn(),
+  renameSync: vi.fn(),
   chmodSync: vi.fn(),
   watch: vi.fn().mockReturnValue({ on: vi.fn(), close: vi.fn() }),
   cpSync: vi.fn(),

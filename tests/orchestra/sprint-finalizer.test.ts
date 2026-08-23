@@ -10,7 +10,7 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import { TaskEvaluation, SprintPhase, SprintStatus, TaskStatus } from '../../src/core/types.js';
 import type { Sprint, TaskResult } from '../../src/core/types.js';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -68,24 +68,27 @@ vi.mock('../../src/orchestra/sprint-reporter.js', () => ({
 // Mock MemoryStore for triple-link tests (dynamic import in finalizeSprint)
 const mockInsertRelation = vi.fn();
 const mockMemStoreClose = vi.fn();
-vi.mock('../../src/core/memory-store.js', () => ({
-  MemoryStore: vi.fn().mockImplementation(() => ({
-    insertRelation: mockInsertRelation,
-    close: mockMemStoreClose,
-    insert: vi.fn(),
-    upsert: vi.fn(),
-    getById: vi.fn(),
-    getByType: vi.fn().mockReturnValue([]),
-    countByType: vi.fn().mockReturnValue(new Map()),
-    totalCount: vi.fn().mockReturnValue(0),
-    getSchemaVersion: vi.fn().mockReturnValue(1),
-    getRawDb: vi.fn(),
-    getRelationsFrom: vi.fn().mockReturnValue([]),
-    getRelationsTo: vi.fn().mockReturnValue([]),
-    getRelations: vi.fn().mockReturnValue([]),
-    countRelations: vi.fn().mockReturnValue(0),
-  })),
-}));
+vi.mock('../../src/core/memory-store.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/memory-store.js')>();
+  return {
+    ...actual,
+    MemoryStore: vi.fn().mockImplementation((...args: ConstructorParameters<typeof actual.MemoryStore>) => {
+      const store = new actual.MemoryStore(...args);
+      const close = store.close.bind(store);
+      store.close = () => {
+        mockMemStoreClose();
+        close();
+      };
+      // Triple-link behavior stays directly observable without manufacturing
+      // foreign-key fixture rows. Every archive/index/export method remains the
+      // real MemoryStore implementation and therefore materializes Brain truth.
+      store.insertRelation = ((...relationArgs: unknown[]) => {
+        mockInsertRelation(...relationArgs);
+      }) as typeof store.insertRelation;
+      return store;
+    }),
+  };
+});
 
 vi.mock('../../src/orchestra/result-evaluator.js', () => ({
   GO_WITH_GATE_FAILURE: 'GO_WITH_GATE_FAILURE',
@@ -188,34 +191,20 @@ vi.mock('../../src/core/identity-generator.js', () => ({
 }));
 
 // ─── Event Stream Mock (Sprint 139 Task 042 — Brain event hooks) ──
-vi.mock('../../src/orchestra/event-stream.js', () => ({
-  writeEvent: vi.fn().mockReturnValue(null),
-  getCurrentSprintId: vi.fn().mockReturnValue('sprint-139'),
-  readSequence: vi.fn().mockReturnValue(0),
-  CHANNELS: {
-    TASK_ASSIGN: 'BRAIN→WORKER:TASK_ASSIGN',
-    HEARTBEAT: 'WORKER→BRAIN:HEARTBEAT',
-    RESULT: 'WORKER→BRAIN:RESULT',
-    QUESTION: 'WORKER→BRAIN:QUESTION',
-    ANSWER: 'BRAIN→WORKER:ANSWER',
-    CODE_VERIFY_REQUEST: 'WORKER→AUDITOR:CODE_VERIFY_REQUEST',
-    VERIFICATION_RESULT: 'AUDITOR→BRAIN:VERIFICATION_RESULT',
-    SCOPE_COLLISION_DETECTED: 'AUDITOR→BRAIN:SCOPE_COLLISION_DETECTED',
-    ADR_VIOLATION: 'AUDITOR→BRAIN:ADR_VIOLATION',
-    GATE_COMPUTED: 'AUDITOR→BRAIN:GATE_COMPUTED',
-    LOAD_REPORT_WRITTEN: 'AUDITOR→BRAIN:LOAD_REPORT_WRITTEN',
-    METRIC_EMITTED: 'BRAIN→*:METRIC_EMITTED',
-    FIX_REQUEST: 'BRAIN→WORKER:FIX_REQUEST',
-    SPRINT_PHASE_CHANGE: 'BRAIN→*:SPRINT_PHASE_CHANGE',
-    NOTIFY: 'DECKENT→USER:NOTIFY',
-    ORPHAN_HB_DETECTED: 'AUDITOR→BRAIN:ORPHAN_HB_DETECTED',
-    AUTHORITY_VIOLATION: 'AUDITOR→BRAIN:AUTHORITY_VIOLATION',
-  },
-}));
+vi.mock('../../src/orchestra/event-stream.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/orchestra/event-stream.js')>();
+  return {
+    ...actual,
+    writeEvent: vi.fn(actual.writeEvent),
+    getCurrentSprintId: vi.fn().mockReturnValue('sprint-139'),
+  };
+});
 
 import * as nodeFsMod from 'node:fs';
 import * as observabilityMod from '../../src/core/observability.js';
 import * as eventStreamMod from '../../src/orchestra/event-stream.js';
+import { writeEvent as writeCanonicalEvent } from '../../src/core/event-stream.js';
+import { MemoryStore } from '../../src/core/memory-store.js';
 
 import {
   runHonestyCheck,
@@ -230,6 +219,11 @@ import { GO_WITH_GATE_FAILURE } from '../../src/orchestra/result-evaluator.js';
 import { runDecay as mockRunDecay, auditBrainBudget as mockAuditBrainBudget } from '../../src/orchestra/debt-manager.js';
 import { tryCodeVerifiedDone, writeCodeVerifiedResult } from '../../src/monitor/auditor.js';
 import { buildResultsMap } from '../../src/orchestra/result-collector.js';
+
+beforeEach(() => {
+  vi.mocked(eventStreamMod.writeEvent).mockReset();
+  vi.mocked(eventStreamMod.writeEvent).mockImplementation(writeCanonicalEvent);
+});
 
 describe('sprint-finalizer — hook stubs', () => {
   describe('runHonestyCheck', () => {
@@ -317,8 +311,8 @@ describe('sprint-finalizer — hook stubs', () => {
   });
 });
 
-describe('sprint-finalizer — load-test-report.md wiring', () => {
-  it('finalize → generateLoadReport is called and returns a report with wave timeline section', async () => {
+describe('sprint-finalizer — on-demand load-report formatter', () => {
+  it('generateLoadReport returns a report with a wave timeline section', async () => {
     const mockGenerate = vi.mocked(observabilityMod.generateLoadReport);
     mockGenerate.mockResolvedValueOnce(
       '# Sprint Load Test Report\n\n## Wave Timeline\n\nNo wave data recorded.\n\n## Percentile Distribution (p50/p95/p99)\n',
@@ -329,19 +323,17 @@ describe('sprint-finalizer — load-test-report.md wiring', () => {
     expect(mockGenerate).toHaveBeenCalledWith(PROJECT_ROOT);
   });
 
-  it('generateLoadReport throws → sprint continues (error should not propagate)', async () => {
+  it('generateLoadReport errors propagate to its on-demand caller', async () => {
     const mockGenerate = vi.mocked(observabilityMod.generateLoadReport);
     // Simulate a throw from generateLoadReport
     mockGenerate.mockRejectedValueOnce(new Error('Disk full'));
 
-    // The function should reject when called directly — finalizeSprint catches this
     await expect(observabilityMod.generateLoadReport(PROJECT_ROOT)).rejects.toThrow('Disk full');
 
-    // Verify the mock was called (sprint continues because finalizeSprint wraps in try/catch)
     expect(mockGenerate).toHaveBeenCalled();
   });
 
-  it('generateLoadReport returns minimal report when no metrics data available', async () => {
+  it('generateLoadReport returns a minimal report when no metrics data is available', async () => {
     const mockGenerate = vi.mocked(observabilityMod.generateLoadReport);
     mockGenerate.mockResolvedValueOnce('# Load Report\n\nNo metrics data found.\n');
 
@@ -350,11 +342,6 @@ describe('sprint-finalizer — load-test-report.md wiring', () => {
     expect(result).toContain('No metrics data found');
   });
 
-  // RETIRED (FAZ4A-S2): the old "fsPromises.mkdir and writeFile are called with the
-  // correct report path" case simulated production inside the test and then asserted its
-  // own mock calls — a tautology from the fs-mock era that verified nothing about the
-  // finalizer. The real contract (report lands on disk at the canonical path) is pinned
-  // by "load-test-report.md is written under docs/audits/<sprintId>/" against real files.
 });
 
 describe('sprint-finalizer — gate.json wiring', () => {
@@ -438,6 +425,13 @@ function settledFixture(sprint: Sprint): {
   evaluations: Map<string, TaskEvaluation>;
   results: TaskResult[];
 } {
+  // Finalizer archive settlement adopts a compact Brain index by default.
+  // Materialize a genuine SQLite authority so reconcile/upsert/export/verify
+  // exercise the same producer→consumer chain as production.
+  try {
+    mkdirSync(join(PROJECT_ROOT, '.brain'), { recursive: true });
+    new MemoryStore(join(PROJECT_ROOT, '.brain', 'memory.db')).close();
+  } catch { /* tests that intentionally make .brain unavailable opt out below */ }
   const tasksDir = join(PROJECT_ROOT, '.tasks');
   mkdirSync(tasksDir, { recursive: true });
   const evaluations = new Map<string, TaskEvaluation>();
@@ -492,17 +486,16 @@ describe('sprint-finalizer — finalizeSprint gate.json integration', () => {
     expect(['PASS', 'GATE_FAILURE']).toContain(parsed.overallGate);
   });
 
-  it('finalizeSprint writes load-test-report.md under docs/audits/<sprintId>/', async () => {
-    vi.mocked(observabilityMod.generateLoadReport).mockResolvedValueOnce('# Load Report\n\n## Wave Timeline\n\nNo data.\n');
-
+  it('finalizeSprint does not write a product-doc load report', async () => {
+    vi.mocked(observabilityMod.generateLoadReport).mockClear();
     const sprint = makeSprint('sprint-137');
     const { evaluations, results } = settledFixture(sprint);
 
     await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
 
-    // REAL disk truth: report directory created and report written.
     const reportPath = join(PROJECT_ROOT, 'docs', 'audits', 'sprint-137', 'load-test-report.md');
-    expect(readFileSync(reportPath, 'utf8')).toContain('Wave Timeline');
+    expect(existsSync(reportPath)).toBe(false);
+    expect(observabilityMod.generateLoadReport).not.toHaveBeenCalled();
   });
 
   it('holds when fresh gate authority cannot be persisted', async () => {
@@ -721,21 +714,7 @@ describe('sprint-finalizer — Layer 4 runtime wire fix (Sprint 138)', () => {
     spawnSyncMock.mockReturnValue({ status: 0, stdout: '', stderr: '', pid: 0, signal: null, output: [] });
   });
 
-  it('load-test-report.md is written under docs/audits/<sprintId>/', async () => {
-    vi.mocked(observabilityMod.generateLoadReport).mockResolvedValueOnce(
-      '# Sprint Load Test Report\n\n## Wave Timeline\n\nNo wave data recorded.\n',
-    );
-
-    const sprint = makeSprint('sprint-138');
-    const { evaluations, results } = settledFixture(sprint);
-
-    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
-
-    const reportPath = join(PROJECT_ROOT, 'docs', 'audits', 'sprint-138', 'load-test-report.md');
-    expect(readFileSync(reportPath, 'utf8')).toContain('Wave Timeline');
-  });
-
-  it('holds when the fresh gate cannot persist before report publication', async () => {
+  it('holds when the fresh gate cannot persist', async () => {
     const wSpy = vi.spyOn(nodeFsMod.promises, 'writeFile').mockRejectedValue(new Error('ENOSPC'));
     const mSpy = vi.spyOn(nodeFsMod.promises, 'mkdir').mockRejectedValue(new Error('ENOSPC'));
     try {
@@ -779,7 +758,6 @@ describe('sprint-finalizer — Layer 4 runtime wire fix (Sprint 138)', () => {
 //   SPRINT_PHASE_CHANGE (EXECUTE→EVALUATE, EVALUATE→RETRO, RETRO→CLEANUP)
 //   METRIC_EMITTED (sprint.summary after metrics calculation)
 //   GATE_COMPUTED (after gate.json is written)
-//   LOAD_REPORT_WRITTEN (after load-test-report.md is written)
 
 describe('sprint-finalizer — Brain event hooks (Sprint 139 Task 042)', () => {
   beforeEach(() => {
@@ -988,33 +966,7 @@ describe('sprint-finalizer — Brain event hooks (Sprint 139 Task 042)', () => {
     } finally { eaccesSpy.mockRestore(); }
   });
 
-  // ─── LOAD_REPORT_WRITTEN ─────────────────────────────────────────
-
-  it('emits LOAD_REPORT_WRITTEN after load-test-report.md is written', async () => {
-    const sprint = makeSprint('sprint-139');
-    const { evaluations, results } = settledFixture(sprint);
-    vi.mocked(observabilityMod.generateLoadReport).mockResolvedValueOnce('# Load Report\n\n## Wave Timeline\n\nNo data.\n');
-
-    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
-
-    const loadReportCalls = vi.mocked(eventStreamMod.writeEvent).mock.calls.filter(
-      call => call[4] === 'AUDITOR→BRAIN:LOAD_REPORT_WRITTEN',
-    );
-    expect(loadReportCalls.length).toBeGreaterThanOrEqual(1);
-
-    const call = loadReportCalls[0];
-    expect(call[2]).toBe('auditor');
-    expect(call[3]).toBe('brain');
-
-    const payload = call[5] as { sprintId: string; reportPath: string };
-    expect(payload.sprintId).toBe('sprint-139');
-    expect(payload.reportPath).toContain('load-test-report.md');
-    expect(payload.reportPath).toContain('sprint-139');
-  });
-
-  it('LOAD_REPORT_WRITTEN is NOT emitted when generateLoadReport fails', async () => {
-    vi.mocked(observabilityMod.generateLoadReport).mockRejectedValueOnce(new Error('Disk full'));
-
+  it('does not emit LOAD_REPORT_WRITTEN during finalization', async () => {
     const sprint = makeSprint('sprint-139');
     const { evaluations, results } = settledFixture(sprint);
 
@@ -1023,21 +975,23 @@ describe('sprint-finalizer — Brain event hooks (Sprint 139 Task 042)', () => {
     const loadReportCalls = vi.mocked(eventStreamMod.writeEvent).mock.calls.filter(
       call => call[4] === 'AUDITOR→BRAIN:LOAD_REPORT_WRITTEN',
     );
-    // generateLoadReport threw, so the event was not emitted
-    expect(loadReportCalls.length).toBe(0);
+    expect(loadReportCalls).toHaveLength(0);
   });
 
-  // ─── Fail-safe: writeEvent returning null does NOT crash finalizeSprint ──
+  // ─── Fail-safe: a non-terminal event write may fail without hiding terminal authority ──
 
-  it('writeEvent returning null (I/O failure) does not crash finalizeSprint (fail-safe)', async () => {
+  it('a non-terminal writeEvent I/O failure does not crash finalizeSprint (fail-safe)', async () => {
     // Real writeEvent never throws — it swallows errors and returns null.
-    // Simulate the fail-safe path by having the mock always return null.
-    vi.mocked(eventStreamMod.writeEvent).mockReturnValue(null);
+    // Only the first lifecycle observation is optional. The outer terminal
+    // archive events remain canonical authority and must materialize on disk.
+    vi.mocked(eventStreamMod.writeEvent)
+      .mockReturnValueOnce(null)
+      .mockImplementation(writeCanonicalEvent);
 
     const sprint = makeSprint('sprint-139');
     const { evaluations, results } = settledFixture(sprint);
 
-    // Should resolve despite all writeEvent calls returning null
+    // Should resolve despite the non-terminal observation failure.
     const metrics = await finalizeSprint(
       PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true },
     );
@@ -1101,7 +1055,11 @@ describe('sprint-finalizer — triple-link relations (Task 143-007)', () => {
     const sprint = makeSprint('sprint-143');
     const { evaluations, results } = settledFixture(sprint);
 
-    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, {
+      skipDecay: true,
+      skipHooks: true,
+      skipMemoryExport: true,
+    });
 
     expect(mockInsertRelation).not.toHaveBeenCalled();
   });
@@ -1198,7 +1156,7 @@ describe('sprint-finalizer — post-finalize hooks (Sprint 143 Task 10)', () => 
     vi.mocked(eventStreamMod.writeEvent).mockImplementation((...args: unknown[]) => {
       const payload = args[5] as { toPhase?: string } | undefined;
       if (payload && payload.toPhase === 'CLEANUP') callOrder.push('retroCleanupEvent');
-      return null;
+      return writeCanonicalEvent(...args as Parameters<typeof writeCanonicalEvent>);
     });
 
     const sprint = makeSprint('sprint-143');
@@ -1210,8 +1168,6 @@ describe('sprint-finalizer — post-finalize hooks (Sprint 143 Task 10)', () => 
     // (redefining node:fs exports is impossible against the real module — by design).
     expect(callOrder.indexOf('postFinalizeHooks')).toBeGreaterThanOrEqual(0);
     expect(callOrder.indexOf('retroCleanupEvent')).toBeGreaterThan(callOrder.indexOf('postFinalizeHooks'));
-    vi.mocked(eventStreamMod.writeEvent).mockReset();
-    vi.mocked(eventStreamMod.writeEvent).mockReturnValue(null);
   });
 
   it('metrics passed to hooks match calculated sprint metrics', async () => {

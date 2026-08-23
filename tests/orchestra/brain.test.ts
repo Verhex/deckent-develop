@@ -197,6 +197,9 @@ vi.mock('../../src/core/provider.js', () => ({
 
 const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
 const actualFsp = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+const actualMemoryStoreModule = await vi.importActual<
+  typeof import('../../src/core/memory-store.js')
+>('../../src/core/memory-store.js');
 import {
   readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, statSync,
   appendFileSync, renameSync, promises as fsPromisesNs,
@@ -211,6 +214,7 @@ import { resetDashboard, updateDashboard, detectDeadlocks, startScanLoop, writeS
 import { getNextSprintId } from '../../src/core/utils.js';
 import { updateTaskStatus, releaseAllLocks } from '../../src/agents/worker.js';
 import { callBrainPlanner } from '../../src/orchestra/planner.js';
+import { MemoryStore } from '../../src/core/memory-store.js';
 
 const mockedCallBrainPlanner = vi.mocked(callBrainPlanner);
 const mockedReadFileSync = vi.mocked(readFileSync);
@@ -238,6 +242,7 @@ const mockedFspStat = vi.mocked(fspStat);
 const mockedFspWriteFile = vi.mocked(fspWriteFile);
 const mockedAppendFileSync = vi.mocked(appendFileSync);
 const mockedRenameSync = vi.mocked(renameSync);
+const mockedMemoryStore = vi.mocked(MemoryStore);
 
 // ─── Real-filesystem passthrough (FAZ4A-S5, sprint-controller.test.ts pattern) ──
 // runSprint's PLAN phase (a) opens the provider-execution-observation SQLite
@@ -272,6 +277,8 @@ function useRealFileSystem(): void {
   mockedFspStat.mockImplementation(actualFsp.stat as never);
   vi.mocked(fspAccess).mockImplementation(actualFsp.access as never);
   vi.mocked(fspUnlink).mockImplementation(actualFsp.unlink as never);
+  mockedMemoryStore.mockImplementation(((dbPath: string, opts?: { strictTenantIsolation?: boolean }) =>
+    new actualMemoryStoreModule.MemoryStore(dbPath, opts)) as never);
 }
 
 import {
@@ -429,6 +436,18 @@ function setupRealSprint(opts: {
   // scope-gate classifies legacy-fallback scopes as new-plausible instead of
   // suspect; every other git subcommand keeps empty stdout.
   mockedSpawnSync.mockImplementation((_command, args) => {
+    if (_command === 'tar' && Array.isArray(args)) {
+      const outputIndex = args.indexOf('-czf') + 1;
+      const snapshotPath = outputIndex > 0 ? args[outputIndex] : undefined;
+      if (typeof snapshotPath === 'string') {
+        // The process mock cannot execute tar, but terminal archive settlement
+        // now consumes and hashes its output. Materialize deterministic bytes
+        // so this fixture models the successful command result it returns.
+        actualFs.mkdirSync(join(snapshotPath, '..'), { recursive: true });
+        actualFs.writeFileSync(snapshotPath, `brain.test snapshot ${attemptNonce}\n`, 'utf8');
+      }
+      return spawnOk;
+    }
     const isLsFiles = Array.isArray(args) && args[0] === 'ls-files';
     return {
       status: 0, stdout: isLsFiles ? 'src/index.ts\n' : '', stderr: '', pid: 1, signal: null, output: [],
@@ -464,6 +483,7 @@ beforeEach(() => {
   // Reset async fs mocks (node:fs/promises) — stat defaults to ENOENT (file not found)
   mockedFspStat.mockRejectedValue(new Error('ENOENT'));
   mockedFspWriteFile.mockResolvedValue(undefined);
+  mockedMemoryStore.mockImplementation(() => mockMemoryStore as never);
   // FAZ4A-S5: useRealFileSystem() passthroughs persist across vi.clearAllMocks
   // (which clears call history only, not implementations) — restore every
   // remaining fs mock to its historical no-op default so the pure-function
@@ -1148,6 +1168,7 @@ describe('waitForResults', () => {
       if (String(path).includes('001-001.result')) return JSON.stringify(makeResult());
       throw new Error('not found');
     });
+    mockedExistsSync.mockImplementation(path => String(path).includes('001-001.result'));
 
     const results = await waitForResults(ROOT, sprint, 1);
     expect(results).toHaveLength(1);
@@ -1867,11 +1888,11 @@ describe('runSprint', () => {
 
   it('recovers from RETRO/DECAY errors', async () => {
     setupRealSprint();
-    // Fail ONLY `.brain/` writes (retro/sprint-log/decay targets): the
-    // canonical run-status publication ring (.deckent/…) must stay real or
-    // the sprint would honestly HOLD long before RETRO.
+    // Fail only the legacy sprint-log projection. Terminal archive adoption
+    // now refreshes guarded `.brain/exports`, which is required authority and
+    // must remain real even while the recoverable RETRO projection fails.
     mockedWriteFileSync.mockImplementation(((path: unknown, ...rest: unknown[]) => {
-      if (String(path).includes('.brain')) throw new Error('write fail');
+      if (String(path).includes(join('.brain', 'sprints'))) throw new Error('write fail');
       return (actualFs.writeFileSync as (...a: unknown[]) => void)(path, ...rest);
     }) as never);
 

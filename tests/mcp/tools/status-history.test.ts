@@ -44,6 +44,7 @@ vi.mock('node:fs', () => ({
   readdirSync: vi.fn(),
   writeFileSync: vi.fn(),
   mkdirSync: vi.fn(),
+  renameSync: vi.fn(),
 }));
 
 vi.mock('../../../src/mcp/tools/job-runner.js', () => ({

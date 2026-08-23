@@ -77,6 +77,22 @@ describe('PCOMP-W1: scope block has a single write authority', () => {
     expect(warnings.some(warning => warning.startsWith('Rejected read path:'))).toBe(true);
   });
 
+  it('renders a protected root target as exact read-only while withholding write authority', () => {
+    const out = buildScopeBlock({
+      directories: ['scripts/'],
+      filesRead: ['package.json'],
+      filesWrite: ['package.json', 'scripts/lint-sprint-archive-writers.mjs'],
+    }, [], true, ['package.json', 'scripts/lint-sprint-archive-writers.mjs']);
+    const readBlock = out.slice(
+      out.indexOf('Exact read-only project files:'),
+      out.indexOf('WRITE authority (canonical'),
+    );
+    const writeBlock = out.slice(out.indexOf('WRITE authority (canonical'));
+    expect(readBlock).toContain('  - package.json');
+    expect(writeBlock).not.toContain('  - package.json');
+    expect(writeBlock).toContain('  - scripts/lint-sprint-archive-writers.mjs');
+  });
+
   it('keeps the directory-fallback wording when no filesWrite list exists (PQ-4 F5)', () => {
     const out = buildScopeBlock({ directories: ['src/x/'], filesRead: [], filesWrite: [] }, [], false);
     expect(out).toContain('You may ONLY modify files in these directories');

@@ -61,6 +61,8 @@ vi.mock('../../src/agents/worker.js', () => ({
 // ─── Real imports ────────────────────────────────────────────────────
 
 import { planSprint, readContext } from '../../src/orchestra/brain.js';
+import { CHANNELS, readEvents } from '../../src/core/event-stream.js';
+import { getNextSprintId } from '../../src/core/utils.js';
 
 // ─── Test Setup ──────────────────────────────────────────────────────
 
@@ -314,5 +316,47 @@ Third task
     const sprint = await planSprint(root, config, context, makeRecommendation(), { mode: 'structured' });
 
     expect(sprint.planningMode).toBe('structured');
+  });
+
+  it('writes live PLAN progress to the canonical allocated sprint only', async () => {
+    const root = join(tempDir, 'project-live-ownership');
+    mkdirSync(root, { recursive: true });
+    setupProject(root, `# DIRECTIVES\n\n## Görev 1: Owned plan\n- Kapsam: src/\n### Açıklama\nPlan it\n### Test\n- pass\n`);
+    const staleId = 'sprint-627';
+    const recentWorks = join(root, '.deckent', 'recently-works');
+    mkdirSync(recentWorks, { recursive: true });
+    const staleJournal = join(recentWorks, `${staleId}-events.jsonl`);
+    const staleBytes = '{"sealed":"terminal"}\n';
+    writeFileSync(staleJournal, staleBytes, 'utf-8');
+    writeFileSync(join(recentWorks, `${staleId}-seq`), '41', 'utf-8');
+    writeFileSync(join(root, '.deckent', 'sprint-state.json'), JSON.stringify({ sprintId: staleId }), 'utf-8');
+    const expectedId = getNextSprintId(root);
+
+    const sprint = await planSprint(root, makeConfig(root), makeContext(root), makeRecommendation(), { mode: 'structured' });
+
+    expect(sprint.id).toBe(expectedId);
+    expect(readFileSync(staleJournal, 'utf-8')).toBe(staleBytes);
+    expect(readFileSync(join(recentWorks, `${staleId}-seq`), 'utf-8')).toBe('41');
+    const events = readEvents(root, expectedId, { channel: CHANNELS.PROGRESS });
+    expect(events).toHaveLength(1);
+    expect(events[0]!.payload).toMatchObject({ phase: 'PLAN' });
+  });
+
+  it('dry-run leaves no raw journal/sequence and does not advance the allocator', async () => {
+    const root = join(tempDir, 'project-preview-isolation');
+    mkdirSync(root, { recursive: true });
+    setupProject(root, `# DIRECTIVES\n\n## Görev 1: Preview\n- Kapsam: src/\n### Açıklama\nPreview it\n### Test\n- pass\n`);
+    const before = getNextSprintId(root);
+
+    const preview = await planSprint(root, makeConfig(root), makeContext(root), makeRecommendation(), {
+      mode: 'structured',
+      dryRun: true,
+    });
+
+    expect(preview.id).toBe(before);
+    expect(getNextSprintId(root)).toBe(before);
+    expect(existsSync(join(root, '.deckent', 'recently-works', `${before}-events.jsonl`))).toBe(false);
+    expect(existsSync(join(root, '.deckent', 'recently-works', `${before}-seq`))).toBe(false);
+    expect(readdirSync(join(root, TASKS_DIR)).filter(name => name.startsWith('task-'))).toHaveLength(0);
   });
 });

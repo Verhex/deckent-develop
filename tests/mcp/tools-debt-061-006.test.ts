@@ -14,6 +14,7 @@ vi.mock('node:fs', () => ({
   mkdirSync: vi.fn(),
   readdirSync: vi.fn(),
   unlinkSync: vi.fn(),
+  renameSync: vi.fn(),
 }));
 
 vi.mock('../../src/core/config.js', () => ({

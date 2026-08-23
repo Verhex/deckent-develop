@@ -59,14 +59,46 @@ describe('Sprint 179 W1-1 — injectCriticalDebtTasks', () => {
     // without a BOUNDARY_VIOLATION.
     expect(fix.scope.directories).toEqual(['src/orchestra/', 'tests/orchestra/']);
     expect(fix.scope.filesWrite).toEqual(['src/orchestra/event-stream.ts']);
-    // filesRead defaults to the same directories so the worker can read what
-    // it must write to (otherwise scope check would block legitimate edits).
-    expect(fix.scope.filesRead).toEqual(['src/orchestra/']);
+    // Directories are already navigation context; exact reads mirror targets.
+    expect(fix.scope.filesRead).toEqual(['src/orchestra/event-stream.ts']);
     expect(fix.priority).toBe('CRITICAL');
     expect(fix.isPriorityFix).toBe(true);
     expect(fix.fixForTaskId).toBe('178-001');
     expect(result.skipped).toEqual([]);
     expect(result.nextSeq).toBe(2);
+  });
+
+  it('keeps a protected root target observable without granting worker write authority', () => {
+    const debt: DebtItem[] = [
+      makeDebt({
+        id: 'DEBT-PROTECTED-ROOT',
+        description: 'package.json lint:gates must contain the archive writer ratchet',
+        originScope: {
+          directories: ['scripts/'],
+          filesWrite: ['package.json', 'scripts/lint-sprint-archive-writers.mjs'],
+        },
+      }),
+    ];
+
+    const result = injectCriticalDebtTasks(debt, SPRINT_ID, MODEL, 1, TaskStatus.PENDING);
+    const fix = result.tasks[0]!;
+    expect(fix.scope.filesRead).toEqual([
+      'package.json',
+      'scripts/lint-sprint-archive-writers.mjs',
+    ]);
+
+    const { prompt } = buildTaskPrompt(fix, {
+      effort: 'high',
+      trackedFiles: ['package.json', 'scripts/lint-sprint-archive-writers.mjs'],
+    });
+    const readBlock = prompt.slice(
+      prompt.indexOf('Exact read-only project files:'),
+      prompt.indexOf('WRITE authority (canonical'),
+    );
+    const writeBlock = prompt.slice(prompt.indexOf('WRITE authority (canonical'));
+    expect(readBlock).toContain('  - package.json');
+    expect(writeBlock).not.toContain('  - package.json');
+    expect(writeBlock).toContain('  - scripts/lint-sprint-archive-writers.mjs');
   });
 
   it('(b) skip: class=verified-no-result debt produces no fix task', () => {

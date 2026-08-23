@@ -4,14 +4,16 @@
 // Sprint 150 — Task 030
 
 import {
-  existsSync, readFileSync, writeFileSync, mkdirSync,
-  statSync, readdirSync, unlinkSync, linkSync,
+  existsSync, readFileSync, writeFileSync,
+  statSync, readdirSync, unlinkSync,
 } from 'node:fs';
 import { join } from 'node:path';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { createHash, randomUUID } from 'node:crypto';
 import { debugLog } from './utils.js';
-import { discoverSprintArchiveIds, resolveSprintArchiveDir } from './sprint-archive.js';
+import {
+  discoverSprintArchiveIds, publishSprintArchiveArtifact, resolveSprintArchiveDir,
+} from './sprint-archive.js';
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -70,29 +72,35 @@ export function rotateMetricsFile(
     return { rotated: false, pruned: [] };
   }
 
-  // Read, compress, write archive
+  // Stage deterministic gzip bytes outside the immutable archive namespace. The
+  // canonical publisher is the only archive writer and proves its destination
+  // before the hot source is retired below.
   const content = readFileSync(metricsPath);
   const gzipped = gzipSync(content);
   const digest = createHash('sha256').update(gzipped).digest('hex');
-  const archiveBase = join(resolveSprintArchiveDir(root, sprintId), 'metrics');
-  const archivePath = join(archiveBase, `metrics-${digest.slice(0, 16)}.jsonl.gz`);
+  const targetRelative = `metrics/metrics-${digest.slice(0, 16)}.jsonl.gz`;
+  const archivePath = join(resolveSprintArchiveDir(root, sprintId), targetRelative);
+  const stagingPath = join(
+    root,
+    DECKENT_DIR,
+    `.metrics-rotation-${process.pid}-${randomUUID()}.tmp`,
+  );
 
-  mkdirSync(archiveBase, { recursive: true });
-  if (!existsSync(archivePath)) {
-    const temporary = join(archiveBase, `.metrics-${process.pid}-${randomUUID()}.tmp`);
-    try {
-      writeFileSync(temporary, gzipped, { flag: 'wx' });
-      if (!readFileSync(temporary).equals(gzipped)) throw new Error('METRICS_ARCHIVE_VERIFY_FAILED');
-      try { linkSync(temporary, archivePath); } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-      }
-    } finally {
-      try { unlinkSync(temporary); } catch { /* no temporary remained */ }
-    }
+  try {
+    writeFileSync(stagingPath, gzipped, { flag: 'wx', mode: 0o600 });
+    const publication = publishSprintArchiveArtifact(root, sprintId, stagingPath, targetRelative);
+    if (
+      publication.path !== targetRelative
+      || publication.bytes !== gzipped.length
+      || publication.sha256 !== digest
+      || !readFileSync(archivePath).equals(gzipped)
+    ) throw new Error('METRICS_ARCHIVE_VERIFY_FAILED');
+  } finally {
+    // This is process-owned staging, never an archive artifact.
+    try { unlinkSync(stagingPath); } catch { /* staging was never created or already removed */ }
   }
-  if (!readFileSync(archivePath).equals(gzipped)) throw new Error('METRICS_ARCHIVE_CONFLICT');
 
-  // Truncate original
+  // Publication and exact destination proof succeeded; only now retire hot bytes.
   writeFileSync(metricsPath, '', 'utf-8');
 
   // Enforce keepLastN
@@ -108,6 +116,7 @@ export function rotateMetricsFile(
     pruned,
   };
 }
+
 
 /**
  * Check if the metrics file exceeds the size threshold.

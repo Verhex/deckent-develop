@@ -16,7 +16,9 @@ import {
   finalizeSprint,
   loadFinalizerAttemptTasks,
   publishFinalSprintAuthority,
+  publishOutermostSprintTerminalArchive,
   publishTestModeSprintTerminalReceipt,
+  SprintTerminalArchivePublicationError,
 } from './sprint-finalizer.js';
 import {
   commitSprintTerminalHandoff,
@@ -231,42 +233,52 @@ export async function terminalizeCompletedCheckpointRun(
     publishFinalSprintAuthority(projectRoot, sprint, metrics, config.language ?? 'en');
     sprint.status = SprintStatus.COMPLETE;
     sprint.phase = SprintPhase.COMPLETE;
-    emitRecoveryEvent(
+    publishOutermostSprintTerminalArchive({
       projectRoot,
-      sprint.id,
-      CHANNELS.SPRINT_PHASE_CHANGE,
-      {
-        fromPhase: checkpoint.brainPhase,
-        toPhase: SprintPhase.COMPLETE,
-        transitionKind: 'completed-checkpoint-terminalization',
-        replayedPhases: [],
-      },
-    );
-    emitRecoveryEvent(
-      projectRoot,
-      sprint.id,
-      CHANNELS.RECOVERY_TERMINALIZATION_COMPLETED,
-      {
-        status: SprintStatus.COMPLETE,
-        phase: SprintPhase.COMPLETE,
-        handoffKey: publication.handoffKey,
-        dispatchCount: 0,
-      },
-    );
+      sprintId: sprint.id,
+      receipt: publication.receipt,
+      config,
+      terminalEvents: [
+        {
+          channel: CHANNELS.SPRINT_PHASE_CHANGE,
+          payload: {
+            recoveryKind: 'completed-checkpoint-terminalization',
+            sprintId: sprint.id,
+            fromPhase: checkpoint.brainPhase,
+            toPhase: SprintPhase.COMPLETE,
+            transitionKind: 'completed-checkpoint-terminalization',
+            replayedPhases: [],
+          },
+        },
+        {
+          channel: CHANNELS.RECOVERY_TERMINALIZATION_COMPLETED,
+          payload: {
+            recoveryKind: 'completed-checkpoint-terminalization',
+            sprintId: sprint.id,
+            status: SprintStatus.COMPLETE,
+            phase: SprintPhase.COMPLETE,
+            handoffKey: publication.handoffKey,
+            dispatchCount: 0,
+          },
+        },
+      ],
+    });
     return sprint;
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    emitRecoveryEvent(
-      projectRoot,
-      checkpoint.sprintId,
-      CHANNELS.RECOVERY_TERMINALIZATION_HELD,
-      {
-        stage,
-        reason,
-        resumable: true,
-        recoveryCommand: `deckent recover ${checkpoint.sprintId} --resume`,
-      },
-    );
+    if (!(error instanceof SprintTerminalArchivePublicationError && error.archiveSealed)) {
+      emitRecoveryEvent(
+        projectRoot,
+        checkpoint.sprintId,
+        CHANNELS.RECOVERY_TERMINALIZATION_HELD,
+        {
+          stage,
+          reason,
+          resumable: true,
+          recoveryCommand: `deckent recover ${checkpoint.sprintId} --resume`,
+        },
+      );
+    }
     throw error;
   }
 }

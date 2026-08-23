@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { join } from 'node:path';
 import {
   mkdirSync, existsSync, readFileSync, writeFileSync,
-  rmSync, readdirSync,
+  rmSync, readdirSync, symlinkSync,
 } from 'node:fs';
 import { gzipSync, gunzipSync } from 'node:zlib';
 
@@ -14,6 +14,7 @@ import {
   listArchives,
   DEFAULT_ROTATION_CONFIG,
 } from '../../src/core/observability-rotation.js';
+import { SprintArchivePublicationError } from '../../src/core/sprint-archive.js';
 
 import {
   initObservability,
@@ -44,6 +45,20 @@ function createSampleMetric(name: string, value: number, sprintId?: string): str
     entry.tags = { sprintId };
   }
   return JSON.stringify(entry);
+}
+
+function expectPublicationError(
+  action: () => void,
+  code: SprintArchivePublicationError['code'],
+): void {
+  try {
+    action();
+  } catch (error) {
+    expect(error).toBeInstanceOf(SprintArchivePublicationError);
+    expect((error as SprintArchivePublicationError).code).toBe(code);
+    return;
+  }
+  throw new Error('Expected SprintArchivePublicationError');
 }
 
 beforeEach(() => {
@@ -111,6 +126,43 @@ describe('rotateMetricsFile()', () => {
 
     const recovered = readArchivedMetrics(result.archivePath!);
     expect(recovered).toBe(originalContent);
+  });
+
+  it('rejects redirected metrics namespaces without mutating hot metrics', () => {
+    const originalContent = `${createSampleMetric('namespace.safe', 1)}\n`;
+    writeFileSync(METRICS_PATH, originalContent, 'utf-8');
+    const archiveDir = join(TEST_ROOT, '.deckent', 'archive', 'sprints', 'sprint-153');
+    const namespace = join(archiveDir, 'metrics');
+    const outside = join(TEST_ROOT, 'outside');
+    mkdirSync(archiveDir, { recursive: true });
+    mkdirSync(outside, { recursive: true });
+    symlinkSync(outside, namespace, process.platform === 'win32' ? 'junction' : 'dir');
+
+    expectPublicationError(
+      () => rotateMetricsFile(TEST_ROOT, 'sprint-153'),
+      'ARCHIVE_UNSAFE_DESTINATION_PATH',
+    );
+    expect(readFileSync(METRICS_PATH, 'utf-8')).toBe(originalContent);
+    expect(readdirSync(outside)).toEqual([]);
+    expect(readdirSync(join(TEST_ROOT, '.deckent')).filter(name => name.startsWith('.metrics-rotation-')))
+      .toEqual([]);
+  });
+
+  it('does not mutate a terminal-sealed archive or hot metrics', () => {
+    const originalContent = `${createSampleMetric('sealed.safe', 1)}\n`;
+    writeFileSync(METRICS_PATH, originalContent, 'utf-8');
+    const archiveDir = join(TEST_ROOT, '.deckent', 'archive', 'sprints', 'sprint-154');
+    mkdirSync(archiveDir, { recursive: true });
+    writeFileSync(join(archiveDir, 'terminal-seal-application.json'), '{"state":"applied"}', 'utf-8');
+
+    expectPublicationError(
+      () => rotateMetricsFile(TEST_ROOT, 'sprint-154'),
+      'ARCHIVE_TERMINAL_PUBLICATION_REJECTED',
+    );
+    expect(readFileSync(METRICS_PATH, 'utf-8')).toBe(originalContent);
+    expect(readdirSync(archiveDir)).toEqual(['terminal-seal-application.json']);
+    expect(readdirSync(join(TEST_ROOT, '.deckent')).filter(name => name.startsWith('.metrics-rotation-')))
+      .toEqual([]);
   });
 });
 

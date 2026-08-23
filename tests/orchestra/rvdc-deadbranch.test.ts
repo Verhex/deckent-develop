@@ -35,6 +35,14 @@ vi.mock('node:child_process', () => ({
   spawn: vi.fn(),
 }));
 
+// The subprocess mock above cannot materialize a real tarball. Snapshot
+// behavior has its own integration coverage; keep this routing test on the
+// canonical task/archive settlement without inventing a successful archive.
+vi.mock('../../src/orchestra/task-restoration.js', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  createPreArchiveSnapshot: vi.fn().mockReturnValue(null),
+}));
+
 vi.mock('../../src/monitor/auditor.js', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   tryCodeVerifiedDone: vi.fn().mockResolvedValue({ triggered: false, verified: false }),
@@ -70,6 +78,7 @@ vi.mock('../../src/orchestra/sprint-reporter.js', async (importOriginal) => ({
 import { TaskEvaluation, SprintStatus, SprintPhase } from '../../src/core/types.js';
 import type { Sprint, Task, TaskResult, ResolvedConfig } from '../../src/core/types.js';
 import { createAgentDefinition } from '../../src/core/agent-types.js';
+import { MemoryStore } from '../../src/core/memory-store.js';
 import { finalizeSprint } from '../../src/orchestra/sprint-finalizer.js';
 
 // Same real better-sqlite3/fs pipeline as finalize-refinalize.test.ts — slow
@@ -158,10 +167,24 @@ function readJson<T>(p: string): T {
   return JSON.parse(readFileSync(p, 'utf-8')) as T;
 }
 
+function seedFinalizerDiskEvidence(
+  root: string,
+  tasks: readonly Task[],
+  results: readonly TaskResult[],
+): void {
+  const tasksDir = join(root, '.tasks');
+  mkdirSync(tasksDir, { recursive: true });
+  for (const task of tasks) {
+    writeFileSync(join(tasksDir, `task-${task.id}.json`), JSON.stringify(task, null, 2), 'utf-8');
+  }
+  for (const result of results) {
+    writeFileSync(join(tasksDir, `task-${result.taskId}.result`), JSON.stringify(result, null, 2), 'utf-8');
+  }
+}
+
 const finalizeOpts = {
   skipDecay: true,
   skipHooks: true,
-  skipMemoryExport: true,
   skipIdentityRegen: true,
   onRuleRegen: async (): Promise<void> => { /* no-op */ },
 };
@@ -172,6 +195,8 @@ let root: string;
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'deckent-rvdc-'));
+  mkdirSync(join(root, '.brain'), { recursive: true });
+  new MemoryStore(join(root, '.brain', 'memory.db')).close();
 });
 
 afterEach(() => {
@@ -185,6 +210,7 @@ describe('sprint-finalizer — ROUTE-V1-DEADBRANCH-COLLAPSE (351-010)', () => {
     const tasks = [makeTask('901-001')];
     const evaluations = new Map<string, TaskEvaluation>([['901-001', TaskEvaluation.DONE]]);
     const results = [makeResult('901-001')];
+    seedFinalizerDiskEvidence(root, tasks, results);
     // 'v1' has not been a config-valid value since ROUTE-V1-PURGE, but
     // finalizeSprint reads opts.config.routing_engine via a raw cast and
     // pre-collapse would have routed this into the legacy direct-write
@@ -209,6 +235,7 @@ describe('sprint-finalizer — ROUTE-V1-DEADBRANCH-COLLAPSE (351-010)', () => {
       ['901-002', TaskEvaluation.GO_WITH_TECH_DEBT],
     ]);
     const results = [makeResult('901-001'), makeResult('901-002')];
+    seedFinalizerDiskEvidence(root, tasks, results);
 
     await finalizeSprint(root, makeSprint(tasks), evaluations, results, finalizeOpts);
 

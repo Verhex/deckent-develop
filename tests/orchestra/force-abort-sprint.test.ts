@@ -10,9 +10,15 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { readEvents } from '../../src/core/event-stream.js';
+import { MemoryStore } from '../../src/core/memory-store.js';
+import { verifySprintArchive } from '../../src/core/sprint-archive.js';
 import { SprintPhase, SprintStatus, TaskStatus } from '../../src/core/types.js';
 import type { Sprint, Task } from '../../src/core/types.js';
-import { forceAbortSprint } from '../../src/orchestra/sprint-finalizer.js';
+import {
+  forceAbortSprint,
+  SPRINT_TERMINAL_ABORTED_CHANNEL,
+} from '../../src/orchestra/sprint-finalizer.js';
 
 const roots: string[] = [];
 
@@ -21,6 +27,9 @@ function fixture(): { root: string; sprint: Sprint; task: Task } {
   roots.push(root);
   mkdirSync(join(root, '.deckent'), { recursive: true });
   mkdirSync(join(root, '.tasks'), { recursive: true });
+  mkdirSync(join(root, '.brain'), { recursive: true });
+  const memory = new MemoryStore(join(root, '.brain', 'memory.db'));
+  memory.close();
   const task: Task = {
     id: '488-003',
     title: 'Unresolved dependency producer',
@@ -114,6 +123,38 @@ describe('forceAbortSprint', () => {
       terminalAuthority: { sprintId: 'sprint-488', outcome: 'ABORTED' },
     });
     expect(existsSync(join(root, '.deckent', 'pause-state.json'))).toBe(false);
-    expect(existsSync(join(root, '.tasks', `task-${task.id}.json`))).toBe(true);
+    expect(existsSync(join(root, '.tasks', `task-${task.id}.json`))).toBe(false);
+    expect(existsSync(join(
+      root,
+      '.deckent',
+      'archive',
+      'sprints',
+      sprint.id,
+      'tasks',
+      `task-${task.id}.json`,
+    ))).toBe(true);
+    expect(readEvents(root, sprint.id).at(-1)?.channel).toBe(SPRINT_TERMINAL_ABORTED_CHANNEL);
+    expect(existsSync(join(
+      root,
+      '.deckent',
+      'archive',
+      'sprints',
+      sprint.id,
+      'terminal-seal-receipt.json',
+    ))).toBe(true);
+    expect(verifySprintArchive(root, sprint.id).ok).toBe(true);
+    expect(existsSync(join(root, '.deckent', 'recently-works', `${sprint.id}-seq`))).toBe(false);
+    expect(existsSync(join(root, '.tasks', 'archive', sprint.id))).toBe(false);
+
+    const hotJournalPath = join(root, '.deckent', 'recently-works', `${sprint.id}-events.jsonl`);
+    const journalAfterFirstSeal = readFileSync(hotJournalPath, 'utf-8');
+    const replay = forceAbortSprint(root, sprint, new Map(), [], {
+      defaultAuthMode: 'subscription',
+      runId: sprint.id,
+      coordinatorGeneration: 4,
+    });
+    expect(replay.receiptPublication.receipt).toEqual(settlement.receiptPublication.receipt);
+    expect(readFileSync(hotJournalPath, 'utf-8')).toBe(journalAfterFirstSeal);
+    expect(readEvents(root, sprint.id)).toHaveLength(1);
   });
 });

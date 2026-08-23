@@ -60,7 +60,7 @@ describe('emitProgress EXECUTE phase (PLANOBS-001 emit-site)', () => {
   });
 
   it('writes EXECUTE event with channel=PROGRESS and pct payload', () => {
-    const ev = emitProgress({ root: testRoot, phase: 'EXECUTE', pct: 60, detail: '3/5' });
+    const ev = emitProgress({ root: testRoot, sprintId: 'sprint-280', phase: 'EXECUTE', pct: 60, detail: '3/5' });
 
     expect(ev).not.toBeNull();
     expect(ev!.channel).toBe(CHANNELS.PROGRESS);
@@ -71,7 +71,7 @@ describe('emitProgress EXECUTE phase (PLANOBS-001 emit-site)', () => {
   });
 
   it('EXECUTE event is readable back via readEvents', () => {
-    emitProgress({ root: testRoot, phase: 'EXECUTE', pct: 100, detail: '5/5' });
+    emitProgress({ root: testRoot, sprintId: 'sprint-280', phase: 'EXECUTE', pct: 100, detail: '5/5' });
 
     const events = readEvents(testRoot, 'sprint-280', { channel: CHANNELS.PROGRESS });
     const execEvents = events.filter(e => (e.payload as { phase: string }).phase === 'EXECUTE');
@@ -94,7 +94,7 @@ describe('emitProgress SPAWN phase (PLANOBS-001 emit-site)', () => {
   });
 
   it('writes SPAWN event with channel=PROGRESS and task id in detail', () => {
-    const ev = emitProgress({ root: testRoot, phase: 'SPAWN', detail: '280-001' });
+    const ev = emitProgress({ root: testRoot, sprintId: 'sprint-280', phase: 'SPAWN', detail: '280-001' });
 
     expect(ev).not.toBeNull();
     expect(ev!.channel).toBe(CHANNELS.PROGRESS);
@@ -104,7 +104,7 @@ describe('emitProgress SPAWN phase (PLANOBS-001 emit-site)', () => {
   });
 
   it('SPAWN pct is optional — omitting it leaves pct undefined', () => {
-    const ev = emitProgress({ root: testRoot, phase: 'SPAWN' });
+    const ev = emitProgress({ root: testRoot, sprintId: 'sprint-280', phase: 'SPAWN' });
     expect(ev).not.toBeNull();
     const payload = ev!.payload as { phase: string; pct?: number };
     expect(payload.pct).toBeUndefined();
@@ -129,7 +129,7 @@ describe('emitProgress PRE_VITEST phase label', () => {
   });
 
   it('writes PRE_VITEST event with channel=PROGRESS', () => {
-    const ev = emitProgress({ root: testRoot, phase: 'PRE_VITEST', detail: 'before' });
+    const ev = emitProgress({ root: testRoot, sprintId: 'sprint-280', phase: 'PRE_VITEST', detail: 'before' });
 
     expect(ev).not.toBeNull();
     expect(ev!.channel).toBe(CHANNELS.PROGRESS);
@@ -138,8 +138,8 @@ describe('emitProgress PRE_VITEST phase label', () => {
   });
 
   it('PRE_VITEST before/after pair both write to event stream', () => {
-    emitProgress({ root: testRoot, phase: 'PRE_VITEST', detail: 'before' });
-    emitProgress({ root: testRoot, phase: 'PRE_VITEST', pct: 100, detail: 'after' });
+    emitProgress({ root: testRoot, sprintId: 'sprint-280', phase: 'PRE_VITEST', detail: 'before' });
+    emitProgress({ root: testRoot, sprintId: 'sprint-280', phase: 'PRE_VITEST', pct: 100, detail: 'after' });
 
     const events = readEvents(testRoot, 'sprint-280', { channel: CHANNELS.PROGRESS });
     const preVitestEvents = events.filter(e => (e.payload as { phase: string }).phase === 'PRE_VITEST');
@@ -154,26 +154,25 @@ describe('emitProgress fail-safe (emit-hata sprint-düşürmez)', () => {
 
   beforeEach(() => {
     testRoot = makeTestRoot();
-    // No sprint-state.json — emitProgress must return null without throwing
+    // No sprint-state.json — explicit ownership must not need global current state.
   });
 
   afterEach(() => {
     try { rmSync(testRoot, { recursive: true, force: true }); } catch { /* cleanup best-effort */ }
   });
 
-  it('returns null without throwing when sprint-state.json is missing', () => {
+  it('writes without throwing when sprint-state.json is missing', () => {
     let result: ReturnType<typeof emitProgress> | undefined;
     expect(() => {
-      result = emitProgress({ root: testRoot, phase: 'EXECUTE', pct: 50 });
+      result = emitProgress({ root: testRoot, sprintId: 'sprint-280', phase: 'EXECUTE', pct: 50 });
     }).not.toThrow();
-    expect(result).toBeNull();
+    expect(result).not.toBeNull();
+    expect(readEvents(testRoot, 'sprint-280')).toHaveLength(1);
   });
 
-  it('returns null without throwing when sprint-state.json is malformed JSON', () => {
+  it('writes without throwing when sprint-state.json is malformed JSON', () => {
     writeFileSync(join(testRoot, '.deckent', 'sprint-state.json'), 'NOT-JSON', 'utf-8');
-    expect(() => {
-      emitProgress({ root: testRoot, phase: 'SPAWN', detail: '001' });
-    }).not.toThrow();
+    expect(emitProgress({ root: testRoot, sprintId: 'sprint-280', phase: 'SPAWN', detail: '001' })).not.toBeNull();
   });
 });
 
@@ -197,7 +196,7 @@ describe('pct (percentage) calculation for EXECUTE emit', () => {
     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
     expect(pct).toBe(0);
 
-    const ev = emitProgress({ root: testRoot, phase: 'EXECUTE', pct, detail: `${done}/${total}` });
+    const ev = emitProgress({ root: testRoot, sprintId: 'sprint-280', phase: 'EXECUTE', pct, detail: `${done}/${total}` });
     expect((ev!.payload as { pct: number }).pct).toBe(0);
   });
 
@@ -207,7 +206,7 @@ describe('pct (percentage) calculation for EXECUTE emit', () => {
     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
     expect(pct).toBe(60);
 
-    const ev = emitProgress({ root: testRoot, phase: 'EXECUTE', pct, detail: `${done}/${total}` });
+    const ev = emitProgress({ root: testRoot, sprintId: 'sprint-280', phase: 'EXECUTE', pct, detail: `${done}/${total}` });
     expect((ev!.payload as { pct: number }).pct).toBe(60);
   });
 
@@ -217,7 +216,7 @@ describe('pct (percentage) calculation for EXECUTE emit', () => {
     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
     expect(pct).toBe(100);
 
-    const ev = emitProgress({ root: testRoot, phase: 'EXECUTE', pct, detail: `${done}/${total}` });
+    const ev = emitProgress({ root: testRoot, sprintId: 'sprint-280', phase: 'EXECUTE', pct, detail: `${done}/${total}` });
     expect((ev!.payload as { pct: number }).pct).toBe(100);
   });
 
@@ -425,6 +424,10 @@ describe('SPAWN emit fires during spawnIfNotAssigned (wiring test)', () => {
       (call: unknown[]) => (call[0] as { phase: string })?.phase === 'SPAWN',
     );
     expect(spawnCalls.length).toBeGreaterThanOrEqual(1);
-    expect((spawnCalls[0]![0] as { phase: string; detail: string }).detail).toBe('queue-001');
+    expect(spawnCalls[0]![0]).toMatchObject({
+      sprintId: 'sprint-280',
+      phase: 'SPAWN',
+      detail: 'queue-001',
+    });
   });
 });

@@ -99,7 +99,11 @@ import type {
   PlanPhaseResult, RetroPhaseFailure,
   OuterStagedSettlementBarrier,
 } from './sprint-phases.js';
-import { publishFinalSprintAuthority } from './sprint-finalizer.js';
+import {
+  publishFinalSprintAuthority,
+  publishOutermostSprintTerminalArchive,
+  SPRINT_TERMINAL_COMPLETED_CHANNEL,
+} from './sprint-finalizer.js';
 import {
   evaluateFixCircuitBreaker,
   projectNotDispatchedSettlements,
@@ -3115,6 +3119,36 @@ export async function runSprint(
   publishFinalSprintAuthority(
     projectRoot, sprint, terminalPublication.metrics, config.language ?? 'en',
   );
+
+  publishOutermostSprintTerminalArchive({
+    projectRoot,
+    sprintId: sprint.id,
+    receipt: terminalPublication.receipt,
+    config,
+    terminalEvents: [
+      {
+        channel: CHANNELS.SPRINT_PHASE_CHANGE,
+        payload: {
+          fromPhase: SprintPhase.DECAY,
+          toPhase: SprintPhase.COMPLETE,
+          sprintId: sprint.id,
+          transitionKind: 'normal-run',
+        },
+      },
+      {
+        channel: SPRINT_TERMINAL_COMPLETED_CHANNEL,
+        payload: {
+          sprintId: sprint.id,
+          status: SprintStatus.COMPLETE,
+          phase: SprintPhase.COMPLETE,
+          terminalOutcome: 'COMPLETE',
+          runId: terminalPublication.receipt.runId,
+          coordinatorGeneration: terminalPublication.receipt.coordinatorGeneration,
+          authorityVersion: terminalPublication.receipt.authorityVersion,
+        },
+      },
+    ],
+  });
 
   // Nervous System: DECAY→COMPLETE (the CLEANUP maintenance above is
   // non-phase and is not itself an emitted phase transition).

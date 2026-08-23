@@ -709,6 +709,16 @@
       "notes": "Sprint-523 task 8. Derives the digest from the S5 snapshot; a second hash mechanism in this script is itself a violation (pinned by its test)."
     },
     {
+      "file": "scripts/lint-sprint-archive-writers.mjs",
+      "class": "gate",
+      "owner": "canonical-sprint-archive-authority",
+      "npmScript": "lint:gates member (unaliased)",
+      "input": "production src/** JS/JSX/MJS/CJS/TS/TSX filesystem mutations, provenance-resolved node:fs bindings, and exact symbol authority annotations",
+      "output": "exit 0 when canonical/legacy sprint archive writes and retirements remain authority-contained / 1 with typed source locations on violation",
+      "expiry": "none — permanent canonical sprint archive writer ratchet",
+      "notes": "CAF07 static authority gate; tracks canonical resolver/constants/property/wrapper data flow, fails closed on unresolved archive-derived targets, and admits only exact top-level publication/verified-retirement owners. Wired directly into lint:gates."
+    },
+    {
       "file": "scripts/lint-test-hermeticity.mjs",
       "class": "gate",
       "owner": "test-hermeticity-registry",

@@ -31,7 +31,7 @@ function projectRoot(): string {
   return root;
 }
 
-function task(id: string): Task {
+function task(id: string, sprintId: string): Task {
   return {
     id,
     title: 'Controller terminal handoff',
@@ -46,7 +46,7 @@ function task(id: string): Task {
     dependencies: [],
     goNogo: { goCriteria: 'handoff', noGoCriteria: 'early complete', techDebtAcceptable: 'none' },
     status: 'DONE',
-    sprintId: 'sprint-487',
+    sprintId,
     assignedWorker: `w-${id}`,
     createdAt: '2026-07-31T00:00:00.000Z',
   } as Task;
@@ -82,8 +82,11 @@ function publishReceipt(options: {
   readonly runId?: string;
   readonly coordinatorGeneration?: number;
 }): string {
-  const taskId = `${options.sprintId}-001`;
-  const sprintTask = task(taskId);
+  const taskId = `${options.sprintId.replace(/^sprint-/u, '')}-001`;
+  const sprintTask = task(taskId, options.sprintId);
+  const tasksDir = join(options.root, '.tasks');
+  mkdirSync(tasksDir, { recursive: true });
+  writeFileSync(join(tasksDir, `task-${taskId}.json`), JSON.stringify(sprintTask), 'utf-8');
   const truth = buildFinalizerTerminalTruth({
     tasks: [sprintTask],
     evaluations: new Map([[taskId, options.verdict === 'DONE' ? TaskEvaluation.DONE : TaskEvaluation.NO_GO]]),

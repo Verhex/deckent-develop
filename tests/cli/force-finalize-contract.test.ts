@@ -26,6 +26,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { TaskEvaluation, TaskStatus } from '../../src/core/types.js';
 import type { Task, TaskResult } from '../../src/core/types.js';
+import { MemoryStore } from '../../src/core/memory-store.js';
 import {
   buildFinalizeSprintProjection,
   buildSprintFromTasks,
@@ -41,6 +42,8 @@ function makeRoot(sprintId: string): string {
   roots.push(root);
   mkdirSync(join(root, '.tasks'), { recursive: true });
   mkdirSync(join(root, '.deckent'), { recursive: true });
+  mkdirSync(join(root, '.brain'), { recursive: true });
+  new MemoryStore(join(root, '.brain', 'memory.db')).close();
   writeFileSync(join(root, '.deckent', 'sprint-state.json'), JSON.stringify({
     sprintId,
     phase: 'EXECUTE',
@@ -272,7 +275,7 @@ describe('force-finalize contract — results missing', () => {
 });
 
 describe('force-finalize contract — lost task projection', () => {
-  it('still reaches a truthful terminal state from the surviving result evidence', () => {
+  it('fails closed when only unbound result evidence survives', () => {
     const sprintId = 'sprint-903';
     const root = makeRoot(sprintId);
     // The task JSONs are gone (crash / partial archive); only results survive.
@@ -283,45 +286,27 @@ describe('force-finalize contract — lost task projection', () => {
     // run may only ever count planned work.
     expect(buildSprintFromTasks(root, sprintId).tasks).toHaveLength(0);
 
-    const { tasks, settlement } = forceFinalize(root, sprintId);
-
-    expect(tasks.map(t => t.id).sort()).toEqual(['903-001', '903-002']);
-    expect(settlement.outcome).toBe('ABORTED');
-    expect(settlement.terminalTruth.logicalMetrics).toMatchObject({
-      totalTasks: 2,
-      completedTasks: 1,
-      noGoTasks: 1,
-    });
-    assertNoUnresolvedPromotion(settlement, ['903-001']);
-    expect(readReceipt(root, sprintId)).toMatchObject({
-      terminalOutcome: 'ABORTED',
-      receipt: { sprintId, terminalOutcome: 'ABORTED' },
-    });
-    expect(readSprintState(root)).toMatchObject({ sprintId, status: 'ABORTED' });
-    expect(headingCount(readSprintLog(root), 903, sprintId)).toBe(1);
-    // The recovered records are evidence projections, not invented plan work.
-    const recovered = tasks.find(t => t.id === '903-002');
-    expect(recovered).toMatchObject({ description: '', reason: '', dependencies: [] });
-    expect(recovered?.scope).toEqual({ directories: [], filesRead: [], filesWrite: [] });
+    expect(() => forceFinalize(root, sprintId)).toThrow(
+      'TASK_TERMINAL_PROJECTION_READ_HOLD:903-001',
+    );
+    expect(readSprintState(root)).toMatchObject({ sprintId, status: 'ACTIVE' });
+    expect(existsSync(join(
+      root,
+      '.deckent/archive/sprints/sprint-903/terminal-seal-application.json',
+    ))).toBe(false);
   });
 
-  it('recovers a partially lost projection without double-counting surviving tasks', () => {
+  it('fails closed when a partially lost projection cannot bind every result', () => {
     const sprintId = 'sprint-904';
     const root = makeRoot(sprintId);
     writeTask(root, task('904-001', sprintId, TaskStatus.DONE));
     writeResult(root, result('904-001', 'DONE'));
     writeResult(root, result('904-002', 'NO_GO')); // task JSON lost
 
-    const { tasks, settlement } = forceFinalize(root, sprintId);
-
-    expect(tasks.map(t => t.id).sort()).toEqual(['904-001', '904-002']);
-    expect(tasks.find(t => t.id === '904-001')?.title).toBe('task 904-001');
-    assertNoUnresolvedPromotion(settlement, ['904-001']);
-    expect(settlement.terminalTruth.logicalMetrics).toMatchObject({
-      totalTasks: 2,
-      completedTasks: 1,
-      noGoTasks: 1,
-    });
+    expect(() => forceFinalize(root, sprintId)).toThrow(
+      'TASK_TERMINAL_PROJECTION_READ_HOLD:904-002',
+    );
+    expect(readSprintState(root)).toMatchObject({ sprintId, status: 'ACTIVE' });
   });
 
   it('reports nothing to settle when no evidence of any kind survives', () => {

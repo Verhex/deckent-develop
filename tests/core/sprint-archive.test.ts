@@ -259,6 +259,37 @@ describe('canonical sprint archive reconciliation', () => {
       .toBe('second');
   });
 
+  it('archives only settled handoffs with two parsed current-sprint endpoints', () => {
+    const settledContent = JSON.stringify({
+      id: '621-001-to-621-002', fromTaskId: '621-001', toTaskId: '621-002',
+      artifacts: ['src/a.ts'], status: 'ready', createdAt: '2026-08-23T00:00:00.000Z',
+    });
+    const settled = write('.tasks/handoffs/621-001-to-621-002.json', settledContent);
+    const pending = write('.tasks/handoffs/621-002-to-621-003.json', JSON.stringify({
+      id: '621-002-to-621-003', fromTaskId: '621-002', toTaskId: '621-003',
+      artifacts: ['src/b.ts'], status: 'pending', createdAt: '2026-08-23T00:00:00.000Z',
+    }));
+    const foreign = write('.tasks/handoffs/621-003-to-620-001.json', JSON.stringify({
+      id: '621-003-to-620-001', fromTaskId: '621-003', toTaskId: '620-001',
+      artifacts: ['src/c.ts'], status: 'ready', createdAt: '2026-08-23T00:00:00.000Z',
+    }));
+    const malformed = write('.tasks/handoffs/looks-current.json', '{not json');
+
+    const report = reconcileSprintArchive(root, SPRINT_ID, {
+      apply: true, retireLegacySources: true, indexMemory: false,
+    });
+    const archived = join(resolveSprintArchiveDir(root, SPRINT_ID), 'tasks', 'handoffs',
+      '621-001-to-621-002.json');
+
+    expect(report.failures).toEqual([]);
+    expect(readFileSync(archived, 'utf8')).toBe(settledContent);
+    expect(existsSync(settled)).toBe(false);
+    expect(existsSync(pending)).toBe(true);
+    expect(existsSync(foreign)).toBe(true);
+    expect(existsSync(malformed)).toBe(true);
+    expect(verifySprintArchive(root, SPRINT_ID).ok).toBe(true);
+  });
+
   it('never adopts sprint-610 residue found inside sprint-611 legacy staging', () => {
     const owned = write('.tasks/archive/sprint-611/task-611-001.result', 'owned');
     const foreign = write('.tasks/archive/sprint-611/task-610-999.result', 'foreign');

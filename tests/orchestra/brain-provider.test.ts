@@ -46,6 +46,29 @@ vi.mock('node:fs', () => ({
   },
 }));
 
+vi.mock('../../src/core/sprint-archive.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/sprint-archive.js')>();
+  return {
+    ...actual,
+    archiveTaskArtifacts: vi.fn((
+      projectRoot: string,
+      sprintId: string,
+      plan: { archive: readonly string[]; preserve: readonly string[]; sweepResidue?: boolean },
+    ) => {
+      const destination = `${projectRoot}/.deckent/archive/sprints/${sprintId}/tasks`;
+      return {
+        destination,
+        preservedDestination: `${destination}/preserved`,
+        archived: [...plan.archive],
+        preserved: [],
+        consolidated: [],
+        residueSwept: [],
+        failures: [],
+      };
+    }),
+  };
+});
+
 vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
 }));
@@ -276,12 +299,13 @@ vi.mock('../../src/orchestra/coverage-validator.js', async (importOriginal) => {
 
 // ─── Imports after mocks ──────────────────────────────────────────
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, renameSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { ensureSession, spawnWorker, killWorker, listWorkers } from '../../src/orchestra/tmux.js';
 import { updateDashboard, detectDeadlocks } from '../../src/monitor/auditor.js';
 import { getNextSprintId } from '../../src/core/utils.js';
 import { providerRegistry } from '../../src/core/provider.js';
+import { archiveTaskArtifacts } from '../../src/core/sprint-archive.js';
 
 import {
   spawnWorkers,
@@ -573,9 +597,10 @@ describe('cleanup with SpawnBackend', () => {
     expect(killWorker).toHaveBeenCalledWith('001-001');
   });
 
-  it('archives .tasks/.prompt-*.txt hidden tmpfiles into archive/sprint-{id}/', () => {
-    // Sprint 156 Task 4: prompt files are archived (renameSync) instead of unlinked
-    // so they retain post-mortem forensic value. Production filter requires `.txt`.
+  it('archives .tasks/.prompt-*.txt hidden tmpfiles into the canonical sprint namespace', () => {
+    // Prompt evidence is now delegated to the canonical archive authority,
+    // which publishes verified bytes under .deckent/archive/sprints/<id>/tasks.
+    // Production filtering still requires `.txt`.
     // FAZ4A-S5 sprint-ownership contract: cleanup() calls
     // archivePromptFiles(tasksDir, sprint.id, 5, '<padded-id-segment>-') — only
     // tmpfiles whose taskId belongs to THIS sprint (`.prompt-{paddedSegment}-…`)
@@ -594,15 +619,13 @@ describe('cleanup with SpawnBackend', () => {
 
     cleanup(ROOT, sprint);
 
-    // Both sprint-owned .prompt-*.txt files should be renamed (archived), not deleted.
-    expect(renameSync).toHaveBeenCalledWith(
-      expect.stringContaining('.prompt-001-001-abc123.txt'),
-      expect.stringContaining('archive'),
-    );
-    expect(renameSync).toHaveBeenCalledWith(
-      expect.stringContaining('.prompt-001-002-def456.txt'),
-      expect.stringContaining('archive'),
-    );
+    expect(archiveTaskArtifacts).toHaveBeenCalledWith(ROOT, 'sprint-001', {
+      archive: ['.prompt-001-001-abc123.txt', '.prompt-001-002-def456.txt'],
+      preserve: [],
+      sweepResidue: false,
+    });
+    expect(vi.mocked(archiveTaskArtifacts).mock.results[0]?.value.destination)
+      .toBe('/project/.deckent/archive/sprints/sprint-001/tasks');
   });
 
   it('does NOT archive another run\'s prompt files (sprint-ownership filter)', () => {
@@ -617,9 +640,11 @@ describe('cleanup with SpawnBackend', () => {
 
     cleanup(ROOT, sprint);
 
-    const archived = vi.mocked(renameSync).mock.calls.map(c => String(c[0]));
-    expect(archived.some(p => p.includes('.prompt-001-001-mine.txt'))).toBe(true);
-    expect(archived.some(p => p.includes('.prompt-999-001-other.txt'))).toBe(false);
+    expect(archiveTaskArtifacts).toHaveBeenCalledWith(ROOT, 'sprint-001', {
+      archive: ['.prompt-001-001-mine.txt'],
+      preserve: [],
+      sweepResidue: false,
+    });
   });
 
   it('does not archive non-prompt hidden files', () => {
@@ -645,13 +670,11 @@ describe('cleanup with SpawnBackend', () => {
 
     cleanup(ROOT, sprint);
 
-    // Only .prompt-xyz.txt should be archived, not .gitkeep or .dashboard
-    const archivedPaths = vi.mocked(renameSync).mock.calls.map(c => c[0] as string);
-    const archivedPrompt = archivedPaths.filter(p => p.includes('.prompt-'));
-    const archivedOthers = archivedPaths.filter(p => p.includes('.gitkeep') || p.includes('.dashboard'));
-
-    expect(archivedPrompt).toHaveLength(1);
-    expect(archivedOthers).toHaveLength(0);
+    expect(archiveTaskArtifacts).toHaveBeenCalledWith(ROOT, 'sprint-001', {
+      archive: ['.prompt-001-001-xyz.txt'],
+      preserve: [],
+      sweepResidue: false,
+    });
   });
 
   it('handles cleanup errors gracefully (does not throw)', () => {

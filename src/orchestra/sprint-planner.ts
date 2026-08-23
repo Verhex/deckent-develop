@@ -293,7 +293,10 @@ export async function planSprint(
   // G-series plan-time prompt-gate result (persona/decision-space); computed after
   // routing inside the pool try-block, attached to the returned Sprint below.
   let promptGate: PromptGateResult | undefined;
-  emitProgress({ phase: 'PLAN', root: projectRoot });
+  // A preview is not a run: it must leave no raw event/sequence allocator evidence.
+  if (!options?.dryRun) {
+    emitProgress({ phase: 'PLAN', root: projectRoot, sprintId });
+  }
   const plannerTaskModelPolicy = createPlannerTaskModelPolicy(
     recommendation.modelConstraint ?? config.activeModeConfig.default_model,
     config.worker_provider,
@@ -1388,9 +1391,11 @@ export function injectCriticalDebtTasks(
     const scope: TaskScope = hasOriginScope
       ? {
           directories: [...item.originScope!.directories],
-          filesRead: item.originScope!.filesWrite.length > 0
-            ? [...item.originScope!.directories]
-            : [],
+          // Directories already provide navigation context. Exact read scope
+          // must instead carry the original targets themselves so a debt worker
+          // can observe an already-satisfied protected/root-file residual even
+          // when the prompt sanitizer correctly withholds WRITE authority.
+          filesRead: [...item.originScope!.filesWrite],
           filesWrite: [...item.originScope!.filesWrite],
         }
       : legacyFallbackScope();
