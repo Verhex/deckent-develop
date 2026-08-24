@@ -1,5 +1,6 @@
 import type { TaskResult } from './task-types.js';
 import { resolveHostPreDispatchSettlement } from './pre-dispatch-settlement.js';
+import { normalizeChangedPaths } from './task-result-schema.js';
 
 export type SprintWorkAttributionState = 'VERIFIED' | 'HOLD' | 'UNAVAILABLE';
 
@@ -53,13 +54,23 @@ export function projectAttributedTaskWork(
       linesRemoved: 0,
     };
   }
+  // FILESCHANGED-SHAPE, attribution edition (live sprint-661/667): canonical
+  // FileChange OBJECTS flowed into the attribution projection unnormalized, so
+  // terminal-evidence's validText check held EVERY verified attempt and the
+  // success-path COMPLETE publication was structurally impossible. Canonical
+  // results also carry totalLinesAdded/Removed, not the legacy linesAdded.
+  const canonical = result as { totalLinesAdded?: unknown; totalLinesRemoved?: unknown };
+  const added = Number.isFinite(canonical.totalLinesAdded) ? canonical.totalLinesAdded as number
+    : Number.isFinite(result.linesAdded) ? result.linesAdded : 0;
+  const removed = Number.isFinite(canonical.totalLinesRemoved) ? canonical.totalLinesRemoved as number
+    : Number.isFinite(result.linesRemoved) ? result.linesRemoved : 0;
   return {
     state: 'VERIFIED',
     attemptId: attribution.attemptId,
     reasonCode: null,
-    filesChanged: [...new Set((result.filesChanged ?? []).filter(Boolean))],
-    linesAdded: Number.isFinite(result.linesAdded) ? Math.max(0, result.linesAdded) : 0,
-    linesRemoved: Number.isFinite(result.linesRemoved) ? Math.max(0, result.linesRemoved) : 0,
+    filesChanged: [...new Set(normalizeChangedPaths(result.filesChanged))],
+    linesAdded: Math.max(0, added),
+    linesRemoved: Math.max(0, removed),
   };
 }
 

@@ -41,7 +41,20 @@
   kanalına (content-addressed `.worker-core-<digest>.md`) BİR kez enjekte edilir — biter gider.
   Uygulama yeri: skill-pool compose + prompt-god-template skill-birleştirme + worker-core builder;
   sprint-664 terminal olduktan sonraki İLK iş.
-- SIRADAKİ (sıra bağlayıcı): (1) sprint-662 DIRECTIVES'i — event-authority/heartbeat-UI +
+- ✅ TAMAM (2026-08-25 ~04:45): **7094 ikiz-run A/B İLK GERÇEK ÖLÇÜM** — sprint-667
+  (bayraklar OFF) vs sprint-668 (ON), bayt-aynı bench-workload, ikisi de COMPLETE:
+  toplam-token 202.837→119.276 (**−41,2%**; cache-read −49,3%, output −9,1%, input +4,4%).
+  Formal PROMOTE-kernel dürüst-HOLD: (a) arşiv manifest-yarışı — terminal-yayın anında
+  prompt-delivery receipt'i canlı-kaynaktan yeniden-hash'leniyor, kopya eski-baytta kalıyor
+  (668'de 1 mismatched; force-finalize'lardaki mismatched-ailesinin kökü BU) → SONRAKİ-FIX;
+  (b) subscription-kolunda provider-USD yapısal-yok. Yan-zaferler: 659'dan beri İLK
+  COMPLETE-terminal ×2; success-yolu finalizer'ının gerçek-kökü bulundu-kapandı
+  (attribution-projeksiyonu FileChange-objeleri + totalLines alanları — ailenin 11. üyesi);
+  finalizer-hold artık suçlu-listeli tanı basıyor; dedup canlı-kanıt (668-prompt'unda 0
+  `Karpathy Notes`, 36,8→32,2KB). Bench 3-case (her ikiz kendi sıralı-case'ini ekledi).
+  12. aile-üyesi (`f.includes`, rubric-yolu) evaluation-fault-recovery'ce tolere edildi → küçük-fix sırada.
+- SIRADAKİ (sıra bağlayıcı): (1) arşiv manifest-yarışı fix'i + `f.includes` normalizasyonu;
+  (2) sprint-662 DIRECTIVES'i — event-authority/heartbeat-UI +
   Nervous→Telegram delivery-bridge + result-ingress tekilleştirme residual'ları, 8-worker dogfood
   DAG'ı olarak; (2) 7094 gerçek A/B cohort koşusu (ölçüm-hattı artık açık) → owner-karar raporu;
   (3) D5 retirement dilimi; (4) MASTER satır-senkronu (4056 D4 + 7091/7092 evidence güncellemesi);

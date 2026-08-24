@@ -2837,15 +2837,36 @@ function publishFencedTerminalReceipt(
   terminalOutcome: SprintTerminalOutcome,
   requireSettledAttempts: boolean,
 ): FinalizerTerminalReceiptPublication {
-  const exactAttemptsSettled = input.truth.terminalEvidence.logicalTasks.every(
-    logicalTask => logicalTask.state === 'COMPLETED' || logicalTask.state === 'FAILED',
-  )
-    && input.truth.terminalEvidence.activeOrUnsettledAttempts.length === 0
-    && input.truth.terminalEvidence.partialResults.length === 0
-    && input.truth.terminalEvidence.holds.length === 0;
+  const evidence = input.truth.terminalEvidence;
+  const unsettledLogical = evidence.logicalTasks.filter(
+    logicalTask => logicalTask.state !== 'COMPLETED' && logicalTask.state !== 'FAILED',
+  );
+  const exactAttemptsSettled = unsettledLogical.length === 0
+    && evidence.activeOrUnsettledAttempts.length === 0
+    && evidence.partialResults.length === 0
+    && evidence.holds.length === 0;
   if (requireSettledAttempts && !exactAttemptsSettled) {
+    // Name WHICH settled-condition failed and its first offender — the bare
+    // TERMINAL_EVIDENCE_HOLD code hid the cause across two live runs
+    // (sprint-661 and sprint-667) and made the success-path finalizer
+    // undiagnosable from operator logs.
+    const offenders: string[] = [];
+    if (unsettledLogical.length > 0) {
+      offenders.push(`logical=${unsettledLogical.length}:${unsettledLogical[0]!.logicalTaskId}:${unsettledLogical[0]!.state}`);
+    }
+    if (evidence.activeOrUnsettledAttempts.length > 0) {
+      const first = evidence.activeOrUnsettledAttempts[0]!;
+      offenders.push(`unsettled=${evidence.activeOrUnsettledAttempts.length}:${JSON.stringify(first).slice(0, 160)}`);
+    }
+    if (evidence.partialResults.length > 0) {
+      offenders.push(`partial=${evidence.partialResults.length}:${JSON.stringify(evidence.partialResults[0]).slice(0, 120)}`);
+    }
+    if (evidence.holds.length > 0) {
+      const firstHold = evidence.holds[0]!;
+      offenders.push(`holds=${evidence.holds.length}:${JSON.stringify(firstHold).slice(0, 200)}`);
+    }
     throw new FinalizerTerminalEvidenceError(
-      `TERMINAL_EVIDENCE_${input.truth.terminalEvidence.cleanupEligibility.state}`,
+      `TERMINAL_EVIDENCE_${evidence.cleanupEligibility.state}[${offenders.join(' | ')}]`,
     );
   }
   const recentWorksDir = join(input.projectRoot, RECENT_WORKS_DIR);
