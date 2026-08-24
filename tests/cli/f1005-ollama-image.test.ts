@@ -41,6 +41,14 @@ describe('F1-005 — ollama added to worker image', () => {
     expect(content).toContain('if [ "$INSTALL_OLLAMA" = "true" ]');
   });
 
+  it('worker image provides the extraction dependency required by Ollama', () => {
+    const content = readFileSync(
+      join(PROJECT_ROOT, 'assets', 'Dockerfile.worker'),
+      'utf-8',
+    );
+    expect(content).toMatch(/apt-get install[\s\S]*\bzstd\b/u);
+  });
+
   it('existing INSTALL_CODEX and INSTALL_GEMINI patterns still present', () => {
     const content = readFileSync(
       join(PROJECT_ROOT, 'assets', 'Dockerfile.worker'),
