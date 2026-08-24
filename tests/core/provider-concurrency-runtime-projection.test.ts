@@ -187,4 +187,44 @@ describe('provider concurrency runtime projection', () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it('keeps retired open rows as forensic history without projecting them as active concurrency', () => {
+    const root = mkdtempSync(join(tmpdir(), 'deckent-provider-concurrency-retired-'));
+    try {
+      const store = new ProviderExecutionObservationStore(root);
+      const retired = interval('retired', '2026-07-31T12:00:00.000Z', null);
+      const live = interval('live', '2026-07-31T12:01:00.000Z', null);
+      store.put({ source: 'provider-runtime', observation: retired.start });
+      store.put({ source: 'provider-runtime', observation: live.start });
+      expect(store.retireExactOpenIntervals([{
+        executionId: retired.executionId,
+        runId: retired.runId!,
+        taskId: retired.taskId,
+        attemptId: retired.attemptId,
+        providerPrincipalDigest: retired.providerPrincipalDigest,
+        fence: retired.fence,
+      }])).toBe(1);
+      store.close();
+
+      expect(readProviderConcurrencyRuntime(root, {
+        currentTaskIds: new Set<string>(),
+        currentAttemptIdsByTaskId: new Map(),
+      })).toEqual([
+        expect.objectContaining({
+          currentAttained: 0,
+          peakAttained: 0,
+          unresolvedOpenIntervals: 1,
+          observationScope: 'exact-task-set',
+        }),
+      ]);
+
+      const forensic = new ProviderExecutionObservationStore(root, { readOnly: true });
+      expect(forensic.listIntervals(PRINCIPAL)).toEqual(expect.arrayContaining([
+        expect.objectContaining({ executionId: 'retired', retired: true, end: null }),
+      ]));
+      forensic.close();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

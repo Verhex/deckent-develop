@@ -2292,6 +2292,29 @@ export function reconcileSettledProviderExecutionObservations(input: {
   }
 }
 
+/** Reconcile only the terminal truth's exact owned attempts, or fail the terminal boundary closed. */
+function retireTerminalProviderExecutionObservations(
+  projectRoot: string,
+  terminalTruth: FinalizerTerminalTruth,
+  source: 'finalizeSprint' | 'forceAbortSprint',
+): void {
+  try {
+    const reconciliation = reconcileSettledProviderExecutionObservations({
+      projectRoot,
+      attempts: terminalTruth.attempts.map(attempt => attempt.identity),
+      reason: 'run-generation-settled',
+    });
+    debugLog(`${source}:providerObservationRetirement`, reconciliation === null
+      ? 'No provider execution observation authority — nothing to reconcile'
+      : `Retired ${reconciliation.retired.length} owned interval(s) `
+        + `(reason=${reconciliation.reason}, foreignOpen=${reconciliation.foreignOpenIntervals})`);
+  } catch (e) {
+    throw new FinalizerTerminalEvidenceError(
+      `PROVIDER_EXECUTION_OBSERVATION_RETIREMENT_FAILED:${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+}
+
 export function loadFinalizerAttemptTasks(
   projectRoot: string,
   sprint: Sprint,
@@ -2974,6 +2997,10 @@ export function forceAbortSprint(
       ? { coordinatorGeneration: opts.coordinatorGeneration }
       : {}),
   });
+
+  // The receipt fences ABORTED truth before this exact-attempt retirement.
+  // Any authority failure is terminal: do not archive evidence or publish state.
+  retireTerminalProviderExecutionObservations(projectRoot, truth, 'forceAbortSprint');
 
   // ABORTED is terminal containment, not permission to discard unresolved
   // evidence. Preserve a rollback snapshot, settle terminal artifacts and hold
@@ -4400,17 +4427,7 @@ export async function finalizeSprint(
   // intervals stay open, forensic, and harmless to the next run. Idempotent, so
   // a re-finalize retires nothing further.
   debugLog('finalizeSprint:breadcrumb', 'Step 12a (providerObservationRetirement) — entering');
-  try {
-    const reconciliation = reconcileSettledProviderExecutionObservations({
-      projectRoot,
-      attempts: terminalTruth.attempts.map(attempt => attempt.identity),
-      reason: 'run-generation-settled',
-    });
-    debugLog('finalizeSprint:providerObservationRetirement', reconciliation === null
-      ? 'No provider execution observation authority — nothing to reconcile'
-      : `Retired ${reconciliation.retired.length} owned interval(s) `
-        + `(reason=${reconciliation.reason}, foreignOpen=${reconciliation.foreignOpenIntervals})`);
-  } catch (e) { debugLog('finalizeSprint:providerObservationRetirement', e); }
+  retireTerminalProviderExecutionObservations(projectRoot, terminalTruth, 'finalizeSprint');
 
   // 12. Archive DIRECTIVES.md — always archive copy; PRESERVE working DIRECTIVES.md by default.
   //

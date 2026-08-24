@@ -219,6 +219,32 @@ function exactCoordinatorSettled(
   >> = {},
 ): Extract<CrossVerifyInvocationCoordinatorResult, { state: 'settled' }> {
   const attemptId = '11111111-1111-4111-8111-111111111111';
+  const terminalSettlementRef = createTaskResultSettlementRefForAttempt(
+    root,
+    '276-001-xverify',
+    attemptId,
+  );
+  writeTaskResultSettlementAttemptAtomic(terminalSettlementRef);
+  claimTaskResultSettlementAttemptAtomic(terminalSettlementRef);
+  writeTaskResultSettlementAtomic(createTaskResultSettlement({
+    ref: terminalSettlementRef,
+    exitCode: 0,
+    result: {
+      taskId: terminalSettlementRef.taskId,
+      workerId: 'w-276-001-xverify',
+      filesChanged: [],
+      linesAdded: 0,
+      linesRemoved: 0,
+      testsPassed: true,
+      coverage: 100,
+      selfAssessment: 'DONE',
+      notes: 'exact coordinator terminal fixture',
+    },
+  }));
+  writeTaskResultSettlementClosureAtomic(terminalSettlementRef, {
+    containerDisposition: 'stopped-removed',
+    locksReleased: true,
+  });
   return {
     state: 'settled',
     output,
@@ -248,11 +274,7 @@ function exactCoordinatorSettled(
     executionContractEvidenceRef: 'xverify-contract:mandatory-xverify',
     outputArtifactRef: 'task-result-output:mandatory-xverify',
     hostObservationEvidenceRef: 'xverify-host-observation:mandatory-xverify',
-    terminalSettlementRef: createTaskResultSettlementRefForAttempt(
-      root,
-      '276-001-xverify',
-      attemptId,
-    ),
+    terminalSettlementRef,
     calledProvider: 'codex',
     calledModel: 'gpt-5.6-sol',
     ...overrides,
@@ -273,7 +295,18 @@ function mandatoryComposition(
   const launcher = vi.fn();
   const composition: MandatoryCrossVerifyInvocationComposition = {
     coordinator: { execute },
-    input: {} as MandatoryCrossVerifyInvocationComposition['input'],
+    input: {
+      executionContract: {
+        verifierTaskId: '276-001-xverify',
+        attemptId: '11111111-1111-4111-8111-111111111111',
+        provider: 'codex',
+      },
+      projection: {
+        invocationReceipt: {
+          receipt: { invocationId: 'invocation-mandatory-xverify' },
+        },
+      },
+    } as MandatoryCrossVerifyInvocationComposition['input'],
     launcher: launcher as MandatoryCrossVerifyInvocationComposition['launcher'],
   };
   return { composition, execute, launcher };

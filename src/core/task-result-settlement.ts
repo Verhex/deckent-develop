@@ -2197,6 +2197,20 @@ export function readTaskResultSettlement(
   }
 }
 
+/** Exact immutable settlement receipt digest for consumers that bind a preimage. */
+export function taskResultSettlementDigest(settlement: TaskResultSettlementV1): string {
+  const parsed = parseTaskResultSettlement(settlement);
+  if (!parsed) throw createExecutionAuthorityError('Invalid Docker result settlement receipt digest input');
+  return sha256(JSON.stringify(parsed));
+}
+
+/** Exact immutable closure receipt digest for consumers that bind a preimage. */
+export function taskResultSettlementClosureDigest(closure: TaskResultSettlementClosureV1): string {
+  const parsed = parseTaskResultSettlementClosure(closure);
+  if (!parsed) throw createExecutionAuthorityError('Invalid Docker result settlement closure digest input');
+  return sha256(JSON.stringify(parsed));
+}
+
 /**
  * Read a terminal product result only after the host-owned lifecycle closure
  * proves that container disposition and lock release completed for the exact

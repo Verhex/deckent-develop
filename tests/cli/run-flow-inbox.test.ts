@@ -41,6 +41,7 @@ import { getMessage } from '../../src/cli/helpers/messages.js';
 import { collectAddressableInboxRows, resolveDecideTarget, runDecide } from '../../src/cli/commands/runs.js';
 import { getRunFlowCoordinator, _resetRunFlowCoordinatorsForTests } from '../../src/orchestra/run-flow-coordinator-registry.js';
 import { saveApprovedSnapshot, saveRunHandle } from '../../src/core/run-flow-store.js';
+import { openTaskSettlementProjection } from '../../src/core/task-settlement-authority.js';
 import type { RunProposal, PlanPreview } from '../../src/core/run-flow-contract.js';
 
 function proposal(flowId: string, intent: string, revision = 1): RunProposal {
@@ -357,16 +358,39 @@ describe('runs explicit retirement (505-001)', () => {
 
   it('retires an approved, unstarted flow through the existing abort command', () => {
     const flowId = 'approved-to-retire';
+    const task = {
+      id: '626-001', title: 'Retire exact task', description: 'Retire exact task',
+      model: 'gpt-5.6-sol', effort: 'normal', priority: 'NORMAL', reason: 'test',
+      scope: { directories: [], filesRead: [], filesWrite: [] }, dependencies: [],
+      goNogo: { goCriteria: 'pass', noGoCriteria: 'fail', techDebtAcceptable: '' },
+      status: 'PENDING', sprintId: 'sprint-626', provider: 'codex',
+      createdAt: '2026-08-24T12:00:00.000Z',
+    } as const;
     proposedFlow(root, flowId, 'retire me');
     getRunFlowCoordinator(root).grantApproval({
       flowId, revision: 1, planDigest: 'd-1', approvedBy: { id: 'approver' },
     });
+    saveApprovedSnapshot(root, {
+      flowId, revision: 1, planDigest: 'd-1',
+      approvedBy: { id: 'approver' }, approvedAt: '2026-08-24T12:00:01.000Z',
+      proposal: proposal(flowId, 'retire me'),
+      sprint: {
+        id: 'sprint-626', number: 626, status: 'PLANNING', phase: 'PLAN',
+        tasks: [task], workers: [],
+      } as never,
+    });
+    mkdirSync(join(root, '.tasks'), { recursive: true });
+    writeFileSync(join(root, '.tasks', 'task-626-001.json'), JSON.stringify(task, null, 2));
 
     runDecide(root, flowId, { retire: true }, 'en', DEFAULT_INBOX_LABELS);
 
     expect(getRunFlowCoordinator(root).getFlow(flowId)).toMatchObject({
       state: 'CANCELLED', cancelReason: 'aborted',
     });
+    const projection = openTaskSettlementProjection(root);
+    expect(projection.projectTaskExecutionState('626-001', 'PENDING', 'local'))
+      .toMatchObject({ effectiveStatus: 'NOT_DISPATCHED', reasonCode: 'projected' });
+    projection.close();
   });
 
   it('keeps rejection for an awaiting-approval flow and refuses a terminal retirement', () => {

@@ -940,6 +940,46 @@ const MESSAGES: MessageMap = {
     en: 'Forensic summary: inspected={inspected}, eligible={eligible}, migrated={migrated}, adopted={adopted}, held={held}, rejected={rejected}.',
     tr: 'Forensic özet: incelenen={inspected}, uygun={eligible}, taşınan={migrated}, benimsenen={adopted}, bekletilen={held}, reddedilen={rejected}.',
   },
+  'provider_observation.reconciliation.run_id': {
+    en: 'Optional run ID filter; repeat to narrow the reconciliation batch.',
+    tr: 'İsteğe bağlı run kimliği filtresi; uzlaştırma batch’ini daraltmak için tekrarlayın.',
+  },
+  'provider_observation.reconciliation.inspect': {
+    en: 'Reconciliation inspection: {activeOpenCount} active open provider observation(s).',
+    tr: 'Uzlaştırma incelemesi: {activeOpenCount} etkin açık provider observation kaydı.',
+  },
+  'provider_observation.reconciliation.dry_run': {
+    en: 'Dry-run batch plan: {runCount} run(s), {candidateCount} candidate(s), {holdCount} HOLD; nothing was changed.',
+    tr: 'Dry-run batch planı: {runCount} run, {candidateCount} aday, {holdCount} HOLD; hiçbir şey değiştirilmedi.',
+  },
+  'provider_observation.reconciliation.pending_approval': {
+    en: 'Reconciliation batch is pending Deckent approval {approvalId}; no provider observation was changed.',
+    tr: 'Uzlaştırma batch’i Deckent onayı {approvalId} bekliyor; hiçbir provider observation değiştirilmedi.',
+  },
+  'provider_observation.reconciliation.applied': {
+    en: 'Reconciliation batch applied; approval-bound receipt {receiptId} was verified.',
+    tr: 'Uzlaştırma batch’i uygulandı; onaya bağlı makbuz {receiptId} doğrulandı.',
+  },
+  'provider_observation.reconciliation.replay_verified': {
+    en: 'Reconciliation approval-bound receipt {receiptId} replay verified.',
+    tr: 'Uzlaştırma onaya bağlı makbuzu {receiptId} yeniden oynatma için doğrulandı.',
+  },
+  'provider_observation.reconciliation.apply': {
+    en: 'Apply only after an exact plan digest and Deckent approval ID are supplied.',
+    tr: 'Yalnızca tam plan özeti ve Deckent onay kimliği verildiğinde uygula.',
+  },
+  'provider_observation.reconciliation.plan_digest': {
+    en: 'Exact SHA-256 digest of the inspected reconciliation plan.',
+    tr: 'İncelenen uzlaştırma planının tam SHA-256 özeti.',
+  },
+  'provider_observation.reconciliation.approval_id': {
+    en: 'Deckent approval ID for this exact reconciliation plan.',
+    tr: 'Bu tam uzlaştırma planının Deckent onay kimliği.',
+  },
+  'provider_observation.reconciliation.hold': {
+    en: 'RECONCILIATION_HOLD ({reasonCode}): no provider observation was changed.',
+    tr: 'UZLAŞTIRMA_BEKLET ({reasonCode}): hiçbir provider observation değiştirilmedi.',
+  },
   'doctor.provider_limit_authority_name': {
     en: 'Provider limit authority',
     tr: 'Provider limit authority',

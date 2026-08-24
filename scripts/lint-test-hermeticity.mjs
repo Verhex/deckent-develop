@@ -538,8 +538,26 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // including retired-counter replay and detached live-WAL projection reads.
   // 2026-08-24 sprint-635 acceptance: same-commit outer-finalizer projection
   // regression plus protected-root debt scope fixtures.
-  count: 15789,
-  digest: '7a225f8a95bb2b915d3b8bab497cdae68ab089793c5871daef99fa52294426e0',
+  // 2026-08-24 provider-observation reconciliation: +25 — planning, approval,
+  // receipt, CLI and fan-in suites use only suite-owned tmpdir/SQLite stores,
+  // live-auth test doubles and bounded durable files. The source-derived scan
+  // reports zero violations; no repository task, Brain or owner state is test-
+  // owned. The digest also binds the all-vs-filtered TOCTOU and forged-capability
+  // landing regressions.
+  // 2026-08-24 retired-flow settlement + bot readiness: +5 suite-owned task
+  // projection/receipt fixture writes pin exact NOT_DISPATCHED fan-out and
+  // start→ownership-record readiness. All roots remain disposable tmpdirs;
+  // the source-derived scan measured zero confirmed live-authority violations.
+  // The terminal-only reconciliation composition regression remains in the
+  // same tmpdir/mock inventory; count unchanged, digest binds the no-OIDC pin.
+  // Root landing verification: +4 real scratch filesystem/MemoryStore fixture
+  // boundaries replace module-global DB/process doubles in finalizer/debt
+  // integration. Every root remains tmpdir-owned and is removed after the
+  // suite; the compiled runtime-hygiene fixture likewise uses a valid scratch
+  // Brain DB instead of counterfeit bytes. Production authority is never
+  // opened or mutated by these tests.
+  count: 15823,
+  digest: 'a759a136848df13ea96bab804865151bda7fd4579af72113b0c873757bab867f',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -957,8 +975,20 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // identities remain non-executable and no provider/model policy is mutated.
   // 2026-08-23 terminal archive seal: writer ratchet enters the test graph;
   // live-WAL/replay hardening changes already-inventoried production modules.
-  count: 1306,
-  digest: '25c6e1c63572e9270195452ed4512347f132cb2f378dc605f7a8a2f4ca3bcc83',
+  // 2026-08-24 provider-observation reconciliation: +3 — deterministic batch
+  // planning, live-approval capability and content-addressed receipt modules
+  // enter inventory. Existing store, settlement, finalizer, XVerify and CLI
+  // consumers move content to close the producer→consumer→entrypoint chain.
+  // 2026-08-24 retired-flow settlement + bot readiness: count unchanged;
+  // digest binds shared retire application-service wiring and the daemon's
+  // ownership-record readiness fence before STARTED is surfaced.
+  // Terminal reconciliation now opens the shared approval runtime directly;
+  // API OIDC remains adapter-specific and is not a CLI admission dependency.
+  // Root landing verification binds retired-row exclusion in the canonical
+  // concurrency reader and replay-time status projection repair; the governed
+  // production inventory count is unchanged.
+  count: 1309,
+  digest: '835da79162beb9c2c768973e950466746c275eb4544218ae5b08153638665411',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

@@ -112,6 +112,15 @@ export interface ProviderExecutionObservationWriteResult {
   readonly contradiction: ProviderExecutionObservationHold | null;
 }
 
+export interface ProviderExecutionExactOpenInterval {
+  readonly executionId: string;
+  readonly runId: string;
+  readonly taskId: string;
+  readonly attemptId: string;
+  readonly providerPrincipalDigest: string;
+  readonly fence: string;
+}
+
 export class ProviderExecutionObservationStoreError extends Error {
   constructor(
     readonly code: 'INVALID_SOURCE' | 'OPEN_RETENTION_EXCEEDED' | 'SCHEMA_MISMATCH' | 'MIGRATION_REQUIRED',
@@ -285,6 +294,50 @@ export class ProviderExecutionObservationStore {
       WHERE principal_digest = ? ORDER BY contradiction_id
     `).all(providerPrincipalDigest) as ContradictionRow[];
     return rows.map(row => JSON.parse(row.payload_json) as ProviderExecutionObservationHold);
+  }
+
+  /** Enumerate active intervals globally with a hard discovery bound. */
+  listActiveOpenIntervals(limit = 1_000): StoredProviderExecutionInterval[] {
+    assertLimit(limit);
+    if (this.legacyReadSchema) return [];
+    const rows = this.db.prepare(`
+      SELECT execution_id, task_id, attempt_id, principal_digest, fence, run_id, retired, start_json, end_json
+      FROM provider_execution_intervals
+      WHERE end_json IS NULL AND retired = 0
+      ORDER BY start_sequence, execution_id LIMIT ?
+    `).all(limit + 1) as ExecutionRow[];
+    if (rows.length > limit) throw new ProviderExecutionObservationStoreError(
+      'OPEN_RETENTION_EXCEEDED', 'Active provider execution discovery bound exceeded',
+    );
+    return rows.map(row => toStoredInterval(row));
+  }
+
+  /** Retire a prevalidated exact set atomically; no wider scope is inferred. */
+  retireExactOpenIntervals(intervals: readonly ProviderExecutionExactOpenInterval[]): number {
+    if (this.legacyReadSchema || intervals.length === 0) return 0;
+    for (const interval of intervals) assertExactOpenInterval(interval);
+    return this.db.transaction(() => {
+      const verify = this.db.prepare(`
+        SELECT 1 FROM provider_execution_intervals
+        WHERE execution_id = ? AND run_id = ? AND task_id = ? AND attempt_id = ?
+          AND principal_digest = ? AND fence = ? AND end_json IS NULL AND retired = 0
+      `);
+      for (const interval of intervals) {
+        if (!verify.get(interval.executionId, interval.runId, interval.taskId, interval.attemptId,
+          interval.providerPrincipalDigest, interval.fence)) {
+          throw new ProviderExecutionObservationStoreError('SCHEMA_MISMATCH', 'Exact open interval preimage no longer matches');
+        }
+      }
+      const retire = this.db.prepare(`
+        UPDATE provider_execution_intervals SET retired = 1
+        WHERE execution_id = ? AND run_id = ? AND task_id = ? AND attempt_id = ?
+          AND principal_digest = ? AND fence = ? AND end_json IS NULL AND retired = 0
+      `);
+      return intervals.reduce((count, interval) => count + retire.run(
+        interval.executionId, interval.runId, interval.taskId, interval.attemptId,
+        interval.providerPrincipalDigest, interval.fence,
+      ).changes, 0);
+    })();
   }
 
   /** Returns only active intervals owned by one exact run/attempt/principal/fence tuple. */
@@ -465,6 +518,12 @@ export class ProviderExecutionObservationStore {
 function assertScope(scope: ProviderExecutionObservationScope): void {
   for (const [name, value] of Object.entries(scope)) {
     if (value.trim() === '') throw new TypeError(`${name} must be non-empty`);
+  }
+}
+
+function assertExactOpenInterval(interval: ProviderExecutionExactOpenInterval): void {
+  for (const [name, value] of Object.entries(interval)) {
+    if (typeof value !== 'string' || value.trim() === '') throw new TypeError(`${name} must be non-empty`);
   }
 }
 

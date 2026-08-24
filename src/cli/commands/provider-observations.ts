@@ -5,7 +5,9 @@ import type { Command } from 'commander';
 import { ApprovalBroker } from '../../core/approval-broker.js';
 import { ApprovalStore } from '../../core/approval-store.js';
 import { bootstrapApprovalAuthority } from '../../core/approval-authority-bootstrap.js';
+import { openApprovalAuthorityRuntime } from '../../core/approval-authority-runtime.js';
 import { loadConfig } from '../../core/config.js';
+import type { ResolvedConfig } from '../../core/config-types.js';
 import {
   inspectProviderExecutionObservationMigration, planProviderExecutionObservationMigration,
   safeProviderExecutionObservationProjectPath,
@@ -29,7 +31,27 @@ import {
   readProviderExecutionObservationAdoptionReceipt,
   type ProviderExecutionObservationAdoptionDurableReceipt,
 } from '../../core/provider-execution-observation-adoption-receipt-store.js';
+import {
+  inventoryProviderExecutionObservationReconciliation,
+  planProviderExecutionObservationReconciliation,
+  type ProviderExecutionObservationReconciliationApplyResult,
+  type ProviderExecutionObservationReconciliationInventory,
+  type ProviderExecutionObservationReconciliationPlan,
+} from '../../core/provider-execution-observation-reconciliation.js';
+import {
+  ProviderExecutionObservationReconciliationApprovalAuthority,
+  ProviderExecutionObservationReconciliationApprovalError,
+  assertProviderExecutionObservationReconciliationReplayApproval,
+} from '../../core/provider-execution-observation-reconciliation-approval.js';
+import {
+  ProviderExecutionObservationReconciliationReceiptStoreError,
+  discoverProviderExecutionObservationReconciliationReceipts,
+  publishProviderExecutionObservationReconciliationReceipt,
+  readProviderExecutionObservationReconciliationReceipt,
+  type ProviderExecutionObservationReconciliationDurableReceipt,
+} from '../../core/provider-execution-observation-reconciliation-receipt-store.js';
 import { PROVIDER_EXECUTION_OBSERVATION_DATABASE_PATH } from '../../core/provider-execution-observation-store.js';
+import { publishCanonicalRunStatusReadModel } from '../../core/run-status-read-model.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
@@ -43,6 +65,10 @@ interface MigrationOptions extends CommonOptions {
 }
 interface AdoptionOptions extends CommonOptions {
   readonly apply?: boolean; readonly planDigest?: string; readonly preimage?: string;
+}
+interface ReconciliationOptions extends CommonOptions {
+  readonly apply?: boolean; readonly approvalId?: string; readonly planDigest?: string;
+  readonly runId?: readonly string[];
 }
 
 export interface ProviderObservationMigrationProjection {
@@ -61,11 +87,21 @@ export interface ProviderObservationAdoptionProjection {
   readonly receipt?: ProviderExecutionObservationAdoptionDurableReceipt;
   readonly projectRelativeReceiptPath?: string;
 }
+export interface ProviderObservationReconciliationProjection {
+  readonly operation: 'reconcile';
+  readonly mode: 'inspect' | 'dry-run' | 'pending-approval' | 'applied' | 'replay';
+  readonly inspection: ProviderExecutionObservationReconciliationInventory;
+  readonly plan?: ProviderExecutionObservationReconciliationPlan;
+  readonly approval?: { readonly approvalId: string };
+  readonly result?: ProviderExecutionObservationReconciliationApplyResult;
+  readonly receipt?: ProviderExecutionObservationReconciliationDurableReceipt;
+}
 export interface ProviderObservationsCommandDeps {
   readonly resolveProjectRootFn?: () => string;
   readonly inspect?: (root: string, options: CommonOptions) => Promise<ProviderObservationMigrationProjection>;
   readonly migrate?: (root: string, options: MigrationOptions) => Promise<ProviderObservationMigrationProjection>;
   readonly adopt?: (root: string, options: AdoptionOptions) => Promise<ProviderObservationAdoptionProjection>;
+  readonly reconcile?: (root: string, options: ReconciliationOptions) => Promise<ProviderObservationReconciliationProjection>;
 }
 type JsonValue = null | boolean | number | string | readonly JsonValue[]
   | { readonly [key: string]: JsonValue };
@@ -214,9 +250,139 @@ async function defaultAdoption(
   };
 }
 
+function reconciliationPlan(projectRoot: string, database: string | undefined, runIds?: readonly string[]): {
+  inspection: ProviderExecutionObservationReconciliationInventory;
+  plan: ProviderExecutionObservationReconciliationPlan;
+} {
+  const path = providerObservationProjectPath(projectRoot, database);
+  const inspection = inventoryProviderExecutionObservationReconciliation({
+    projectRoot, relativeDatabasePath: path.relativeDatabasePath,
+  });
+  return { inspection, plan: planProviderExecutionObservationReconciliation({
+    inventory: inspection, runIds,
+  }) };
+}
+
+function reconciliationApprovalExpiry(existing: unknown, now: () => Date): string {
+  const subject = existing && typeof existing === 'object'
+    ? (existing as { details?: { subject?: { expiresAt?: unknown } } }).details?.subject : undefined;
+  return typeof subject?.expiresAt === 'string' && Number.isFinite(Date.parse(subject.expiresAt))
+    ? subject.expiresAt : new Date(now().getTime() + 600_000).toISOString();
+}
+
+/**
+ * Reconciliation's approval request is owned by the runtime broker and the
+ * interactive terminal ingress. API OIDC composition is deliberately absent:
+ * it is required only by OIDC-authenticated adapter paths, never by this local
+ * terminal request/decision chain.
+ */
+export function openReconciliationApprovalRuntime(
+  projectRoot: string,
+  config: ResolvedConfig,
+) {
+  const authority = config.approval?.authority;
+  if (authority?.enabled !== true) throw new Error('APPROVAL_AUTHORITY_REQUIRED');
+  return openApprovalAuthorityRuntime({
+    projectRoot,
+    tenantId: authority.tenant_id,
+  });
+}
+
+async function defaultReconciliation(
+  projectRoot: string, options: ReconciliationOptions,
+): Promise<ProviderObservationReconciliationProjection> {
+  const path = providerObservationProjectPath(projectRoot, options.database);
+  const inspection = inventoryProviderExecutionObservationReconciliation({
+    projectRoot, relativeDatabasePath: path.relativeDatabasePath,
+  });
+  if (!options.apply) {
+    const { plan } = reconciliationPlan(projectRoot, options.database, options.runId);
+    return { operation: 'reconcile', mode: 'dry-run', inspection, plan };
+  }
+  if (!options.planDigest || !HEX_256.test(options.planDigest)) throw new Error('PLAN_DIGEST_MISMATCH');
+  const config = await loadConfig(projectRoot);
+  const authorityConfig = config.approval?.authority;
+  if (authorityConfig?.enabled !== true) throw new Error('APPROVAL_AUTHORITY_REQUIRED');
+  const receiptContext = { projectRoot, tenantId: authorityConfig.tenant_id, environmentId: 'local-cli' };
+  let existingReceipt: ProviderExecutionObservationReconciliationDurableReceipt | undefined;
+  try {
+    existingReceipt = discoverProviderExecutionObservationReconciliationReceipts(receiptContext)
+      .find(receipt => receipt.planDigest === `sha256:${options.planDigest}`);
+  } catch (error) {
+    if (!(error instanceof ProviderExecutionObservationReconciliationReceiptStoreError)
+      || error.code !== 'RECEIPT_NOT_FOUND') throw error;
+  }
+  // Reconciliation is submitted and later decided through the local-terminal
+  // live-auth channel. OIDC is an API/enterprise authenticator, not an
+  // admission prerequisite for this CLI-only request path; requiring the API
+  // bootstrap here made a correctly configured terminal authority unreachable.
+  const opened = openReconciliationApprovalRuntime(projectRoot, config);
+  if (opened.state !== 'ready') {
+    throw new Error('APPROVAL_AUTHORITY_HOLD:' + opened.reasonCode);
+  }
+  try {
+    const existing = options.approvalId ? opened.service.broker.getRequest(options.approvalId) : null;
+    if (existingReceipt) {
+      if (!options.approvalId) throw new ProviderExecutionObservationReconciliationApprovalError('REQUEST_NOT_FOUND', 'Replay requires its approval ID');
+      const decision = opened.service.broker.getDecision(options.approvalId);
+      assertProviderExecutionObservationReconciliationReplayApproval({
+        request: existing, decision, approvalId: options.approvalId,
+        planDigest: options.planDigest, claim: existingReceipt.approvalClaim,
+      });
+      const receipt = readProviderExecutionObservationReconciliationReceipt({
+        ...receiptContext, receiptId: existingReceipt.receiptId, expectedPlanDigest: options.planDigest, fresh: true,
+      });
+      // Reconciliation mutates the observation authority outside the sprint
+      // lifecycle publisher. Replay is also a repair ingress: always republish
+      // so a prior post-mutation publication failure cannot leave CLI/API/MCP
+      // consumers pinned to the pre-reconciliation read model.
+      publishCanonicalRunStatusReadModel(projectRoot);
+      return { operation: 'reconcile', mode: 'replay', inspection, receipt };
+    }
+    const { plan } = reconciliationPlan(projectRoot, options.database, options.runId);
+    exactDigest(plan.planDigest, options.planDigest);
+    const now = (): Date => new Date();
+    const reconciliation = new ProviderExecutionObservationReconciliationApprovalAuthority(
+      projectRoot, opened.service.broker, opened.service.decisionAuthority, { now },
+    );
+    const requestedBy = 'cli-provider-observations';
+    const expiresAt = reconciliationApprovalExpiry(existing, now);
+    if (!options.approvalId) {
+      const request = reconciliation.submit({
+        plan, tenantId: authorityConfig.tenant_id, requestedBy, approverUserId: userInfo().username,
+        generation: plan.planDigest, expiresAt,
+        requester: { role: 'brain', instanceId: 'cli-provider-observations:' + process.pid },
+      });
+      return {
+        operation: 'reconcile', mode: 'pending-approval', inspection, plan,
+        approval: { approvalId: request.id },
+      };
+    }
+    const result = reconciliation.apply({
+      requestId: options.approvalId, plan, tenantId: authorityConfig.tenant_id, requestedBy,
+      generation: plan.planDigest, expiresAt,
+    });
+    if (result.state === 'hold') {
+      throw new ProviderExecutionObservationReconciliationApprovalError(
+        'DECISION_UNTRUSTED', `Reconciliation approval is unavailable: ${result.reasonCode}`,
+      );
+    }
+    const published = publishProviderExecutionObservationReconciliationReceipt({
+      ...receiptContext, plan, result, verifiedAt: now().toISOString(),
+    });
+    const receipt = readProviderExecutionObservationReconciliationReceipt({
+      ...receiptContext, receiptId: published.receipt.receiptId, expectedPlanDigest: plan.planDigest, fresh: true,
+    });
+    publishCanonicalRunStatusReadModel(projectRoot);
+    return { operation: 'reconcile', mode: result.state === 'replayed' ? 'replay' : 'applied', inspection, plan, result, receipt };
+  } finally {
+    opened.service.close();
+  }
+}
+
 /** Canonical redacted output: project-relative paths, aggregates and digests only. */
 export function providerObservationJson(
-  value: ProviderObservationMigrationProjection | ProviderObservationAdoptionProjection,
+  value: ProviderObservationMigrationProjection | ProviderObservationAdoptionProjection | ProviderObservationReconciliationProjection,
   projectRoot: string,
 ): string {
   const base: Record<string, JsonValue> = { mode: value.mode, operation: value.operation };
@@ -242,7 +408,7 @@ export function providerObservationJson(
           receiptPath: relative(projectRoot, value.result.receiptPath),
           rowCount: value.result.receipt.rowCount, state: value.result.state,
         };
-  } else {
+  } else if (value.operation === 'adoption') {
     base.inspection = {
       adoptedLegacyRowCount: value.inspection.adoptedLegacyRowCount,
       extraRunOwnedRowCount: value.inspection.extraRunOwnedRows.length,
@@ -270,12 +436,37 @@ export function providerObservationJson(
       targetProjectRelativePath: value.receipt.target.projectRelativePath,
       totalRowCount: value.receipt.target.totalRowCount,
     };
+  } else {
+    base.inspection = {
+      activeOpenCount: value.inspection.activeOpenCount,
+      databaseLineageDigest: value.inspection.databaseLineage.rowLineageDigest,
+      databaseSchemaDigest: value.inspection.databaseLineage.schemaDigest,
+    };
+    if (value.plan) base.plan = {
+      candidateCount: value.plan.candidates.length,
+      holdCount: value.plan.activeOpenCount - value.plan.candidates.length,
+      planDigest: value.plan.planDigest,
+      runCount: value.plan.runIds.length,
+    };
+    if (value.approval) base.approval = value.approval;
+    if (value.result) base.result = {
+      afterActiveOpenCount: value.result.afterActiveOpenCount,
+      beforeActiveOpenCount: value.result.beforeActiveOpenCount,
+      retiredCount: value.result.retiredCount,
+    };
+    if (value.receipt) base.receipt = {
+      afterActiveOpenCount: value.receipt.after.activeOpenCount,
+      beforeActiveOpenCount: value.receipt.before.activeOpenCount,
+      planDigest: value.receipt.planDigest,
+      receiptId: value.receipt.receiptId,
+      retiredCount: value.receipt.retiredCount,
+    };
   }
   return canonical(base);
 }
 
 async function render(
-  operation: 'inspect' | 'migration' | 'adoption', options: MigrationOptions & AdoptionOptions,
+  operation: 'inspect' | 'migration' | 'adoption' | 'reconcile', options: MigrationOptions & AdoptionOptions & ReconciliationOptions,
   deps: ProviderObservationsCommandDeps,
 ): Promise<void> {
   const projectRoot = resolve((deps.resolveProjectRootFn ?? resolveProjectRoot)());
@@ -285,11 +476,36 @@ async function render(
       ? await (deps.inspect ?? defaultInspect)(projectRoot, options)
       : operation === 'migration'
         ? await (deps.migrate ?? defaultMigration)(projectRoot, options)
-        : await (deps.adopt ?? defaultAdoption)(projectRoot, options);
+        : operation === 'adoption'
+          ? await (deps.adopt ?? defaultAdoption)(projectRoot, options)
+          : await (deps.reconcile ?? defaultReconciliation)(projectRoot, options);
     if (options.json) { print(providerObservationJson(result, projectRoot)); return; }
     if (result.mode === 'pending-approval' && result.operation === 'migration' && result.approval) {
       print(getMessage('provider_observation.migration.pending_approval', language, {
         approvalId: result.approval.request.id,
+      }));
+    } else if (result.operation === 'reconcile' && result.mode === 'inspect') {
+      print(getMessage('provider_observation.reconciliation.inspect', language, {
+        activeOpenCount: String(result.inspection.activeOpenCount),
+      }));
+    } else if (result.operation === 'reconcile' && result.mode === 'dry-run' && result.plan) {
+      print(getMessage('provider_observation.reconciliation.dry_run', language, {
+        candidateCount: String(result.plan.candidates.length),
+        holdCount: String(result.plan.activeOpenCount - result.plan.candidates.length),
+        runCount: String(result.plan.runIds.length),
+      }));
+      print(JSON.stringify({ planDigest: result.plan.planDigest }));
+    } else if (result.operation === 'reconcile' && result.mode === 'pending-approval' && result.approval) {
+      print(getMessage('provider_observation.reconciliation.pending_approval', language, {
+        approvalId: result.approval.approvalId,
+      }));
+    } else if (result.operation === 'reconcile' && result.mode === 'applied' && result.receipt) {
+      print(getMessage('provider_observation.reconciliation.applied', language, {
+        receiptId: result.receipt.receiptId,
+      }));
+    } else if (result.operation === 'reconcile' && result.mode === 'replay' && result.receipt) {
+      print(getMessage('provider_observation.reconciliation.replay_verified', language, {
+        receiptId: result.receipt.receiptId,
       }));
     } else if (result.mode === 'dry-run') {
       print(getMessage('provider_observation.migration.dry_run', language));
@@ -311,23 +527,33 @@ async function render(
     } else print(getMessage('provider_observation.migration.already_v2', language));
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    const code = error instanceof Error && 'code' in error
+    const errorCode = error instanceof Error && 'code' in error
       ? String((error as Error & { code: unknown }).code) : detail.split(':', 1)[0]!;
+    const code = operation === 'reconcile' && !(error instanceof Error && 'code' in error)
+      ? (['PLAN_DIGEST_MISMATCH', 'APPROVAL_AUTHORITY_REQUIRED']
+        .includes(errorCode) || errorCode.startsWith('APPROVAL_AUTHORITY_HOLD')
+        ? errorCode : 'RECONCILIATION_FAILED')
+      : errorCode;
     const adoptionHold = operation === 'adoption'
       && (error instanceof ProviderExecutionObservationAdoptionReceiptStoreError
         || error instanceof ProviderExecutionObservationAdoptionError);
+    const reconciliationHold = operation === 'reconcile';
     // Machine output is deliberately locale-independent and excludes exception
     // text: filesystem/database errors may contain an absolute path or identity.
     if (options.json) {
       print(adoptionHold
         ? canonical({ detail: code, mode: 'hold', operation, reasonCode: code })
-        : canonical({ code, mode: 'error', operation }));
+        : reconciliationHold
+          ? canonical({ mode: 'hold', operation, reasonCode: code })
+          : canonical({ code, mode: 'error', operation }));
       process.exitCode = 1;
       return;
     }
     printError(new Error(adoptionHold
       ? getMessage('provider_observation.adoption.hold', language, { reasonCode: code, detail: code })
-      : getMessage('provider_observation.migration.error', language, { errorCode: code, detail })));
+      : reconciliationHold
+        ? getMessage('provider_observation.reconciliation.hold', language, { reasonCode: code })
+        : getMessage('provider_observation.migration.error', language, { errorCode: code, detail })));
     process.exitCode = 1;
   }
 }
@@ -361,4 +587,11 @@ export function registerProviderObservations(
     .option('--apply', getMessage('provider_observation.migration.adopted', language, { path: '-' }))
     .option('--plan-digest <digest>', getMessage('provider_observation.migration.dry_run', language))
     .action((options: AdoptionOptions) => render('adoption', options, deps));
+  common(parent.command('reconcile'))
+    .option('--run-id <id>', getMessage('provider_observation.reconciliation.run_id', language),
+      (value: string, previous: string[] = []) => [...previous, value])
+    .option('--apply', getMessage('provider_observation.reconciliation.apply', language))
+    .option('--plan-digest <digest>', getMessage('provider_observation.reconciliation.plan_digest', language))
+    .option('--approval-id <id>', getMessage('provider_observation.reconciliation.approval_id', language))
+    .action((options: ReconciliationOptions) => render('reconcile', options, deps));
 }

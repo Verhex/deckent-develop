@@ -33,6 +33,11 @@ const BOT_PID_SCHEMA_VERSION = 1 as const;
 const MAX_BOT_PID_BYTES = 4_096;
 const SHA256_RE = /^[a-f0-9]{64}$/u;
 const START_TOKEN_RE = /^s\d+$/u;
+const BOT_READY_POLL_INTERVAL_MS = 25;
+const BOT_READY_MAX_ATTEMPTS = 400;
+const BOT_READY_WAITER = new Int32Array(
+  new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT),
+);
 
 interface BotPidRecord {
   readonly schemaVersion: typeof BOT_PID_SCHEMA_VERSION;
@@ -467,6 +472,48 @@ export type StartBotResult =
 export interface StartBotDaemonOptions extends BotPidRuntimeDeps {
   /** Inject the detached spawn for tests; returns the child pid or null. */
   readonly spawnFn?: (root: string) => number | null;
+  /** Readiness authority seam. Production polls the ownership-bound pid record. */
+  readonly readinessInspect?: (root: string) => BotPidInspection;
+  /** Hermetic wait seam; production uses a bounded non-busy blocking wait. */
+  readonly readinessWait?: (milliseconds: number) => void;
+  readonly readinessMaxAttempts?: number;
+}
+
+function waitForBotReadiness(
+  root: string,
+  pid: number,
+  opts: StartBotDaemonOptions,
+): StartBotResult {
+  const inspect = opts.readinessInspect ?? ((candidateRoot: string) =>
+    inspectBotPid(candidateRoot, opts));
+  const isAlive = opts.isAlive ?? isPidAlive;
+  const wait = opts.readinessWait ?? ((milliseconds: number) => {
+    Atomics.wait(BOT_READY_WAITER, 0, 0, milliseconds);
+  });
+  const attempts = opts.readinessMaxAttempts ?? BOT_READY_MAX_ATTEMPTS;
+  if (!Number.isSafeInteger(attempts) || attempts <= 0 || attempts > 10_000) {
+    return { status: 'spawn-failed' };
+  }
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const inspection = inspect(root);
+    if (inspection.status === 'running') {
+      return inspection.pid === pid
+        ? { status: 'started', pid }
+        : {
+            status: 'ownership-unknown',
+            pid: inspection.pid,
+            reason: 'concurrent-owner',
+          };
+    }
+    if (inspection.status === 'ownership-unknown') return inspection;
+    if (!isAlive(pid)) return { status: 'spawn-failed' };
+    if (attempt + 1 < attempts) wait(BOT_READY_POLL_INTERVAL_MS);
+  }
+  return {
+    status: 'ownership-unknown',
+    pid,
+    reason: 'readiness-timeout',
+  };
 }
 
 /** Start the listener only when prior ownership is absent, never ambiguous. */
@@ -483,7 +530,10 @@ export function startBotDaemon(
   const spawnFn = opts.spawnFn ?? defaultDetachedSpawn;
   const pid = spawnFn(root);
   if (pid == null) return { status: 'spawn-failed' };
-  return { status: 'started', pid };
+  // A child PID is only process-birth evidence. Do not report "started" until
+  // the listener itself publishes the ownership-bound pid record that
+  // `status` and `stop` consume. This closes start→immediate-status races.
+  return waitForBotReadiness(root, pid, opts);
 }
 
 /** Resolve dist/cli/entry.js relative to this compiled module. */

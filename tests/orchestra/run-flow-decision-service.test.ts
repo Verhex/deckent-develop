@@ -14,6 +14,8 @@
 // assigns every sequence; no spawnSync anywhere.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   createHarnessRoot,
   cleanupHarnessRoot,
@@ -22,6 +24,7 @@ import {
 } from './run-flow-coordinator-harness.js';
 import {
   decideRunFlow,
+  retireRunFlow,
   startRunFlow,
   RunFlowDecisionError,
 } from '../../src/orchestra/run-flow-decision-service.js';
@@ -35,6 +38,7 @@ import {
 import type { Sprint } from '../../src/core/types.js';
 import { SprintPhase, SprintStatus } from '../../src/core/sprint-types.js';
 import { TaskStatus } from '../../src/core/task-types.js';
+import { openTaskSettlementProjection } from '../../src/core/task-settlement-authority.js';
 import {
   computeExecutionPlanDigestV4,
   EXECUTION_PLAN_DIGEST_VERSION,
@@ -53,6 +57,32 @@ function testSprint(id = 'sprint-decision-test'): Sprint {
     tasks: [],
     workers: [],
   };
+}
+
+function retirementTask(id: string, sprintId: string) {
+  return {
+    id,
+    title: `Retire ${id}`,
+    description: `Retire ${id}`,
+    model: 'gpt-5.6-sol',
+    effort: 'normal' as const,
+    priority: 'NORMAL' as const,
+    reason: 'test',
+    scope: { directories: [], filesRead: [], filesWrite: [] },
+    dependencies: [],
+    goNogo: { goCriteria: 'pass', noGoCriteria: 'fail', techDebtAcceptable: '' },
+    status: TaskStatus.PENDING,
+    sprintId,
+    provider: 'codex' as const,
+    createdAt: '2026-08-24T12:00:00.000Z',
+  };
+}
+
+function writeRetirementTasks(root: string, tasks: readonly ReturnType<typeof retirementTask>[]): void {
+  mkdirSync(join(root, '.tasks'), { recursive: true });
+  for (const task of tasks) {
+    writeFileSync(join(root, '.tasks', `task-${task.id}.json`), JSON.stringify(task, null, 2));
+  }
 }
 
 describe('run-flow-decision-service — shared decide/start (SURF-6)', () => {
@@ -229,19 +259,66 @@ describe('run-flow-decision-service — shared decide/start (SURF-6)', () => {
     expect(events.at(-1)?.type).toBe('APPROVAL_REJECTED');
   });
 
-  it('retiring an approved unstarted plan consumes its sprint identity', () => {
+  it('retires the exact approved task set, projects NOT_DISPATCHED, and replays without duplicates', () => {
     const flowId = generateFlowId('retire-approved-identity');
-    appendProposalToCompletionChain({ root, flowId, through: 'PREVIEW_READY' });
-    const sprint = { ...testSprint('sprint-626'), number: 626 };
-    savePlannedSprint(root, flowId, { revision: 1, sprint });
+    const chain = appendProposalToCompletionChain({ root, flowId, through: 'PREVIEW_READY' });
+    const tasks = [
+      retirementTask('626-001', 'sprint-626'),
+      retirementTask('626-002', 'sprint-626'),
+    ];
+    const sprint = { ...testSprint('sprint-626'), number: 626, tasks };
+    savePlannedSprint(root, flowId, {
+      revision: 1,
+      sprint,
+      proposal: chain.proposal,
+    });
     decideRunFlow(root, flowId, { decision: 'approve', actor: ACTOR });
+    writeRetirementTasks(root, tasks);
 
     expect(getNextSprintId(root)).toBe('sprint-001');
 
-    const retired = getRunFlowCoordinator(root).abortFlow({ flowId });
+    const retired = retireRunFlow(root, flowId);
 
-    expect(retired.context.state).toBe('CANCELLED');
+    expect(retired).toMatchObject({
+      context: { state: 'CANCELLED', cancelReason: 'aborted' },
+      flowTransitionApplied: true,
+    });
+    expect(retired.taskReceiptRefs).toHaveLength(2);
     expect(getNextSprintId(root)).toBe('sprint-627');
+    const projection = openTaskSettlementProjection(root);
+    for (const task of tasks) {
+      expect(projection.projectTaskExecutionState(task.id, 'PENDING', 'local')).toMatchObject({
+        effectiveStatus: 'NOT_DISPATCHED',
+        reasonCode: 'projected',
+      });
+    }
+    projection.close();
+
+    const replay = retireRunFlow(root, flowId);
+    expect(replay.flowTransitionApplied).toBe(false);
+    expect(replay.taskReceiptRefs).toEqual(retired.taskReceiptRefs);
+    expect(readFlowEvents(root, flowId).filter(event => event.type === 'FLOW_ABORTED'))
+      .toHaveLength(1);
+  });
+
+  it('refuses a drifted task projection before changing an approved flow', () => {
+    const flowId = generateFlowId('retire-drifted-task');
+    const chain = appendProposalToCompletionChain({ root, flowId, through: 'PREVIEW_READY' });
+    const task = retirementTask('627-001', 'sprint-627');
+    const sprint = { ...testSprint('sprint-627'), number: 627, tasks: [task] };
+    savePlannedSprint(root, flowId, {
+      revision: 1,
+      sprint,
+      proposal: chain.proposal,
+    });
+    decideRunFlow(root, flowId, { decision: 'approve', actor: ACTOR });
+    writeRetirementTasks(root, [{ ...task, title: 'drifted' }]);
+
+    expect(() => retireRunFlow(root, flowId)).toThrowError(
+      expect.objectContaining({ code: 'RETIRE_TASK_SNAPSHOT_MISMATCH' }),
+    );
+    expect(getRunFlowCoordinator(root).getFlow(flowId).state).toBe('APPROVED');
+    expect(readFlowEvents(root, flowId).map(event => event.type)).not.toContain('FLOW_ABORTED');
   });
 
   it('start spawns exactly once, remains STARTING until child admission, and refuses an active re-start', () => {

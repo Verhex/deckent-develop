@@ -116,6 +116,10 @@ import {
   type XVerifyTaskDispatchOutcome,
   type XVerifyTaskSettlementReceipt,
 } from '../core/xverify-task-settlement.js';
+import {
+  PROVIDER_EXECUTION_OBSERVATION_DATABASE_PATH,
+  ProviderExecutionObservationStore,
+} from '../core/provider-execution-observation-store.js';
 
 // ─── Public types ────────────────────────────────────────────────────────────
 
@@ -242,6 +246,8 @@ export interface SpawnVerifierInput {
   dockerTimeout?: number;
   /** Reports host execution truth without conflating it with semantic verifier output. */
   onExecutionEvidence?: (evidence: CrossVerifyExecutionEvidence) => void;
+  /** Reports whether canonical provider-observation retirement held after settlement. */
+  onProviderObservationRetirement?: (retirement: CrossVerifyProviderObservationRetirement) => void;
 }
 
 /**
@@ -410,6 +416,56 @@ function sameXverifySettlementIdentity(
  * terminal receipt. A restart reads the already committed receipt back instead
  * of reducing the same invocation a second time.
  */
+/** Result of reconciling one settled verifier attempt's provider interval. */
+export type CrossVerifyProviderObservationRetirement =
+  | { readonly state: 'retired'; readonly retired: number }
+  | { readonly state: 'not-observed' }
+  | { readonly state: 'hold'; readonly reasonCode: string };
+
+/**
+ * Retire only the provider-execution interval bound to an exact, closed verifier
+ * settlement. The observation store owns matching and idempotency; this runner
+ * supplies no inferred completion from logs or provider prose.
+ */
+export function retireSettledCrossVerifyProviderObservation(input: {
+  readonly projectRoot: string;
+  readonly settlementRef: TaskResultSettlementRefV1;
+}): CrossVerifyProviderObservationRetirement {
+  let settlementClosed: boolean;
+  try {
+    settlementClosed = Boolean(readClosedTaskResultSettlement(input.settlementRef));
+  } catch (error) {
+    debugLog('cross-verify:provider-observation-settlement-read-hold', String(error));
+    return { state: 'hold', reasonCode: 'xverify-provider-observation-settlement-read-failed' };
+  }
+  if (!settlementClosed) {
+    return { state: 'hold', reasonCode: 'xverify-provider-observation-settlement-not-closed' };
+  }
+
+  try {
+    const dbPath = join(input.projectRoot, PROVIDER_EXECUTION_OBSERVATION_DATABASE_PATH);
+    // Settlement must not manufacture an authority store merely to retire from it.
+    if (!existsSync(dbPath)) return { state: 'not-observed' };
+    const store = new ProviderExecutionObservationStore(input.projectRoot, { dbPath });
+    try {
+      const reconciliation = store.reconcileGenerationRetirement({
+        runId: input.settlementRef.projectRootSha256,
+        attempts: [{
+          taskId: input.settlementRef.taskId,
+          attemptId: input.settlementRef.attemptId,
+        }],
+        reason: 'run-generation-settled',
+      });
+      return { state: 'retired', retired: reconciliation.retired.length };
+    } finally {
+      store.close();
+    }
+  } catch (error) {
+    debugLog('cross-verify:provider-observation-retirement-hold', String(error));
+    return { state: 'hold', reasonCode: 'xverify-provider-observation-retirement-failed' };
+  }
+}
+
 export function persistCrossVerifyTaskSettlement(input: {
   readonly projectRoot: string;
   readonly taskId: string;
@@ -1114,6 +1170,11 @@ async function defaultSpawnVerifier(input: SpawnVerifierInput): Promise<string> 
       terminalRef,
     );
     if (settledOutcome) {
+      const retirement = retireSettledCrossVerifyProviderObservation({
+        projectRoot: input.projectRoot,
+        settlementRef: settledOutcome.settlementRef,
+      });
+      input.onProviderObservationRetirement?.(retirement);
       input.onExecutionEvidence?.(settledOutcome.execution);
       const terminal = parseRefuteVerdict(settledOutcome.output).verdict;
       settleCrossVerifyTwinProjection(input.projectRoot, verifierTaskId, terminal);
@@ -1395,6 +1456,23 @@ export async function runCrossVerify(
         return skip(reason, 'unavailable', evidencePersisted, verificationRequired);
       }
       const verifierProvider = coordinated.calledProvider as ProviderName;
+      dispatchedVerifier = verifierProvider;
+      dispatchedVerifierModel = coordinated.calledModel;
+      const retirement = retireSettledCrossVerifyProviderObservation({
+        projectRoot,
+        settlementRef: coordinated.terminalSettlementRef,
+      });
+      if (retirement.state === 'hold') {
+        const reason = `verifier-provider-observation-retirement-hold:${retirement.reasonCode}`;
+        const evidencePersisted = writeEvidenceToResult(projectRoot, task.id, {
+          outcome: 'unavailable',
+          verifier: verifierProvider,
+          verifierModel: coordinated.calledModel,
+          reason,
+          invocationReceiptRef: coordinated.invocationReceiptRef,
+        });
+        return skip(reason, 'unavailable', evidencePersisted, true);
+      }
       const transportReceipt = {
         taskId: mandatory.input.executionContract.verifierTaskId,
         invocationId: coordinated.invocationReceiptRef.invocationId,
@@ -1906,6 +1984,7 @@ export async function runCrossVerify(
 
     let output: string;
     let executionEvidence: CrossVerifyExecutionEvidence | undefined;
+    let providerObservationRetirement: CrossVerifyProviderObservationRetirement | undefined;
     const dispatchStartedAt = Date.now();
     try {
       opts.onVerifierDispatch?.({
@@ -1946,6 +2025,9 @@ export async function runCrossVerify(
         dockerTimeout: config.docker_timeout,
         onExecutionEvidence: evidence => {
           executionEvidence = evidence;
+        },
+        onProviderObservationRetirement: retirement => {
+          providerObservationRetirement = retirement;
         },
       });
     } catch (e) {
@@ -1988,6 +2070,15 @@ export async function runCrossVerify(
         ...(invocationReceiptRef ? { invocationReceiptRef } : {}),
       });
       return skip('spawn-error', 'unavailable', evidencePersisted, verificationRequired);
+    }
+
+    if (providerObservationRetirement?.state === 'hold') {
+      const reason = `verifier-provider-observation-retirement-hold:${providerObservationRetirement.reasonCode}`;
+      const evidencePersisted = writeEvidenceToResult(projectRoot, task.id, {
+        outcome: 'unavailable', verifier: verifierProvider, verifierModel, reason,
+        ...(invocationReceiptRef ? { invocationReceiptRef } : {}),
+      });
+      return skip(reason, 'unavailable', evidencePersisted, true);
     }
 
     const providerVerdict = parseRefuteVerdict(output);

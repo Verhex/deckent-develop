@@ -37,16 +37,22 @@ export function readProviderConcurrencyRuntime(
   try {
     return Object.freeze(store.listProviderPrincipalDigests().map(providerPrincipalDigest => {
       const allIntervals = store.listIntervals(providerPrincipalDigest);
+      // Retirement is an explicit terminal settlement for an observation whose
+      // provider end event can no longer arrive. The row remains immutable
+      // forensic history, but it is no longer an active capacity observation.
+      // Including it here would make reconciliation durable in the store while
+      // every status surface continued to report the pre-reconciliation count.
+      const activeIntervals = allIntervals.filter(interval => !interval.retired);
       const isCurrent = (interval: typeof allIntervals[number]): boolean => {
         if (options.currentTaskIds === undefined) return true;
         if (!options.currentTaskIds.has(interval.taskId)) return false;
         const exactAttempts = options.currentAttemptIdsByTaskId?.get(interval.taskId);
         return exactAttempts === undefined ? true : exactAttempts.has(interval.attemptId);
       };
-      const intervals = allIntervals.filter(isCurrent);
+      const intervals = activeIntervals.filter(isCurrent);
       const unresolvedOpenIntervals = options.currentTaskIds === undefined
         ? 0
-        : allIntervals.filter(interval => interval.end === null && !isCurrent(interval)).length;
+        : activeIntervals.filter(interval => interval.end === null && !isCurrent(interval)).length;
       return projectProviderConcurrencyRuntime({
         providerPrincipalDigest,
         capability: null,

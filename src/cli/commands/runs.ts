@@ -19,7 +19,11 @@ import type { InboxLabels, InboxDecisionVerb, InboxRow } from '../repl/run-flow-
 import { scanJobRecords } from '../repl/run-completion-watch.js';
 import { sweepStaleRuns } from '../../orchestra/run-flow-death-sweep.js';
 import type { StaleRunSweepReport } from '../../orchestra/run-flow-death-sweep.js';
-import { decideRunFlow, startRunFlow } from '../../orchestra/run-flow-decision-service.js';
+import {
+  decideRunFlow,
+  retireRunFlow,
+  startRunFlow,
+} from '../../orchestra/run-flow-decision-service.js';
 import { computeRunDiff } from '../../orchestra/run-diff-service.js';
 import { buildRunCommitProposal, gitWorkflowAdd, gitWorkflowCommit } from '../../orchestra/git-workflow-service.js';
 import { isRowTerminal } from '../repl/run-flow-inbox.js';
@@ -177,10 +181,10 @@ export function runDecide(root: string, flowId: string, flags: DecideFlags, lang
       ? getMessage('runs.decide.rejected_reason', lang, { reason: flags.reason })
       : getMessage('runs.decide.rejected', lang));
   } else if (flags.retire) {
-    // `reject` remains the approval-stage decision. Retirement is the explicit
-    // operator action for an already-approved flow and reuses the coordinator's
-    // terminal-safe abort command rather than changing the state machine.
-    getRunFlowCoordinator(root).abortFlow({ flowId });
+    // `reject` remains the approval-stage decision. The shared application
+    // service owns both terminal flow state and exact NOT_DISPATCHED task
+    // settlement, so every adapter converges on the same replay-safe authority.
+    retireRunFlow(root, flowId);
   }
 
   if (flags.start && !flags.reject) {

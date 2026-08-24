@@ -16,6 +16,7 @@ import { join, relative, resolve } from 'node:path';
 import { describe, expect, it, onTestFinished } from 'vitest';
 import { appendFlowEvents } from '../../src/core/run-flow-store.js';
 import type { RunFlowEvent } from '../../src/core/run-flow-contract.js';
+import { MemoryStore } from '../../src/core/memory-store.js';
 
 const ENTRY = resolve('dist/cli/entry.js');
 
@@ -164,7 +165,9 @@ describe('runtime hygiene — real compiled binary lifecycle', () => {
     write(root, '.deckent/runtime/telegram-bot.log', 'deduplicated-bot-log\n');
     write(root, '.deckent/runtime/discord-bot.log', 'deduplicated-bot-log\n');
     write(root, '.deckent/runtime/slack-bot.log', 'fresh-bot-log-must-stay\n');
-    write(root, '.brain/memory.db', 'database-bytes-must-stay\n');
+    mkdirSync(join(root, '.brain'), { recursive: true });
+    const memory = new MemoryStore(join(root, '.brain', 'memory.db'));
+    memory.close();
     write(root, '.deckent/auth/token.json', 'token-bytes-must-stay\n');
     write(root, '.deckent/archive/runtime-hygiene/staging/named-interrupted/item', 'staging-must-stay\n');
 

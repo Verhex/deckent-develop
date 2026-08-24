@@ -21,8 +21,8 @@ import { DEBT_TABLE_HEADER } from '../../src/core/constants.js';
 // that verifies its own writes; a mocked fs cannot carry that round-trip
 // (RunStatusReadModelError PERSIST_FAILED). Same root cause + fix as
 // FAZ4A-S2/S3 (finalize-sprint / sprint-finalizer / pause-resume). Every
-// assertion in this file targets the mocked MemoryStore (upsert calls) or
-// the returned Sprint object — no fs call-recording is asserted anywhere,
+// assertion in this file targets the real scratch MemoryStore or the returned
+// Sprint object — no fs call-recording is asserted anywhere,
 // so FULL removal (not the hybrid useRealFileSystem passthrough) applies.
 // Each test gets a real scratch project root under tmpdir.
 
@@ -225,22 +225,6 @@ vi.mock('../../src/agents/worker-ipc.js', () => ({
 }));
 
 // ── MemoryStore mock for DB-first code paths ─────────────────────
-const mockMemStore = {
-  getById: vi.fn().mockReturnValue(null),
-  getByType: vi.fn().mockReturnValue([]),
-  insert: vi.fn().mockImplementation((input) => ({ ...input, metadata: JSON.stringify(input.metadata ?? {}), tag_text: (input.tags ?? []).join(' '), status: input.status ?? 'active', priority: input.priority ?? 'normal', sprint_id: input.sprint_id ?? null, sprint_num: input.sprint_num ?? 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null })),
-  upsert: vi.fn().mockImplementation((input) => ({ ...input, metadata: JSON.stringify(input.metadata ?? {}), tag_text: (input.tags ?? []).join(' '), status: input.status ?? 'active', priority: input.priority ?? 'normal' })),
-  softDelete: vi.fn(), totalCount: vi.fn().mockReturnValue(0), countByType: vi.fn(),
-  decay: vi.fn(), close: vi.fn(), getRawDb: vi.fn(),
-  getRelationsFrom: vi.fn().mockReturnValue([]), getRelationsTo: vi.fn().mockReturnValue([]),
-  getTagsForEntry: vi.fn().mockReturnValue([]), getByTags: vi.fn().mockReturnValue([]),
-  getHistory: vi.fn().mockReturnValue([]), restore: vi.fn(), getSchemaVersion: vi.fn().mockReturnValue(1),
-};
-vi.mock('../../src/core/memory-store.js', () => ({
-  MemoryStore: vi.fn().mockImplementation(() => mockMemStore),
-}));
-
-
 import {
   mkdtempSync, rmSync, mkdirSync, writeFileSync,
 } from 'node:fs';
@@ -249,6 +233,10 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { runSprint } from '../../src/orchestra/brain.js';
 import { SpawnBackendFactory } from '../../src/orchestra/spawn-backend.js';
+
+const actualMemoryStore = await vi.importActual<typeof import('../../src/core/memory-store.js')>(
+  '../../src/core/memory-store.js',
+);
 
 const mockedSpawnSync = vi.mocked(spawnSync);
 
@@ -272,10 +260,13 @@ function freshProjectRoot(): string {
   PROJECT_ROOT = mkdtempSync(join(tmpdir(), 'deckent-rsd-'));
   mkdirSync(join(PROJECT_ROOT, '.tasks'), { recursive: true });
   mkdirSync(join(PROJECT_ROOT, '.deckent', 'pids'), { recursive: true });
-  // memory.db must EXIST so debt-manager's getMemoryStore() opens the (mocked)
-  // MemoryStore — the DB-first path all upsert assertions in this file target.
+  // Debt-manager and the archive finalizer share the real scratch SQLite
+  // projection, matching the production producer→consumer chain.
   mkdirSync(join(PROJECT_ROOT, '.brain'), { recursive: true });
-  writeFileSync(join(PROJECT_ROOT, '.brain', 'memory.db'), '', 'utf-8');
+  const archiveIndex = new actualMemoryStore.MemoryStore(
+    join(PROJECT_ROOT, '.brain', 'memory.db'),
+  );
+  archiveIndex.close();
   return PROJECT_ROOT;
 }
 
@@ -362,28 +353,34 @@ function makeTaskResult(opts: {
   });
 }
 
-/** Seed mockMemStore.getById so resolveDebt can find debt entries */
+/** Seed the real scratch MemoryStore so resolveDebt can find debt entries. */
 function seedDebtStore(items: Array<Partial<DebtItem>>): void {
-  const entries = items.map(d => ({
-    id: d.id ?? EXPECTED_DEBT_ID,
-    type: 'debt' as const,
-    title: d.description ?? 'Test debt',
-    content: '',
-    source: 'brain',
-    summary: null,
-    status: d.resolved ? 'resolved' : 'active',
-    priority: (d.priority ?? 'NORMAL').toLowerCase(),
-    sprint_id: d.originSprintId ?? 'sprint-000',
-    sprint_num: 0,
-    tag_text: '',
-    metadata: JSON.stringify({ originTaskId: d.originTaskId ?? '', originSprintId: d.originSprintId ?? 'sprint-000', sprintsOpen: d.sprintsOpen ?? 0, resolvedInSprintId: d.resolvedInSprintId, class: d.class }),
-    created_at: d.createdAt ?? '2026-03-17T00:00:00.000Z',
-    updated_at: new Date().toISOString(),
-    deleted_at: null,
-  }));
-
-  mockMemStore.getById.mockImplementation((id: string) => entries.find(e => e.id === id) ?? null);
-  mockMemStore.getByType.mockImplementation((type: string) => type === 'debt' ? entries.filter(e => e.status !== 'resolved') : []);
+  const store = new actualMemoryStore.MemoryStore(join(PROJECT_ROOT, '.brain', 'memory.db'));
+  try {
+    for (const d of items) {
+      store.upsert({
+        id: d.id ?? EXPECTED_DEBT_ID,
+        type: 'debt',
+        title: d.description ?? 'Test debt',
+        content: '',
+        source: 'brain',
+        status: d.resolved ? 'resolved' : 'active',
+        priority: (d.priority ?? 'NORMAL').toLowerCase(),
+        sprint_id: d.originSprintId ?? 'sprint-000',
+        sprint_num: 0,
+        metadata: {
+          originTaskId: d.originTaskId ?? '',
+          originSprintId: d.originSprintId ?? 'sprint-000',
+          sprintsOpen: d.sprintsOpen ?? 0,
+          resolvedInSprintId: d.resolvedInSprintId,
+          class: d.class,
+          originScope: d.originScope,
+        },
+      }, 'runsprint-debt-test-seed');
+    }
+  } finally {
+    store.close();
+  }
 }
 
 /**
@@ -392,7 +389,7 @@ function seedDebtStore(items: Array<Partial<DebtItem>>): void {
  * @param resultJsonByTask  - map of taskId → result JSON, pre-written as real
  *                            `.tasks/task-<id>.result` files (missing = timeout path)
  * @param directives        - DIRECTIVES.md content (drives how many tasks planSprint creates)
- * @param debtItems         - debt items to seed in the mock MemoryStore
+ * @param debtItems         - debt items to seed in the real scratch MemoryStore
  */
 function setupProject(
   debtTableContent: string,
@@ -400,17 +397,21 @@ function setupProject(
   directives = 'Build the system',
   debtItems?: Array<Partial<DebtItem>>,
 ): void {
-  // Seed the DB mock with debt entries
+  // Seed the scratch DB with debt entries.
   if (debtItems) {
     seedDebtStore(debtItems);
   }
   // git commands in readContext + the pre-spawn scope-gate's `git ls-files`
   // call (sprint-controller.ts) both go through this mock. `git ls-files`
-  // must report a tracked src/ path so evaluateScopeGate's directory check
-  // classifies legacy-fallback scopes (filesWrite: ['src/']) as
-  // new-plausible instead of suspect; every other git subcommand keeps the
-  // original empty-stdout behavior.
-  mockedSpawnSync.mockImplementation((_command, args) => {
+  // reports the exact production-like file carried by critical-debt
+  // originScope; every other git subcommand keeps the empty-stdout behavior.
+  mockedSpawnSync.mockImplementation((command, args) => {
+    // The mocked process boundary must honor tar's successful side effect;
+    // otherwise the canonical finalizer correctly HOLDs on a missing snapshot.
+    if (command === 'tar' && Array.isArray(args) && args[0] === '-czf'
+      && typeof args[1] === 'string') {
+      writeFileSync(args[1], `runsprint-debt-pre-archive-${attemptNonce}\n`, 'utf-8');
+    }
     const isLsFiles = Array.isArray(args) && args[0] === 'ls-files';
     return {
       status: 0, stdout: isLsFiles ? 'src/index.ts\n' : '', stderr: '', pid: 1, signal: null, output: [],
@@ -427,14 +428,21 @@ function setupProject(
   }
 }
 
-/** Returns true if mockMemStore.upsert was called with status='resolved' and matching sprintId */
+function readDebt(id = EXPECTED_DEBT_ID) {
+  const store = new actualMemoryStore.MemoryStore(join(PROJECT_ROOT, '.brain', 'memory.db'));
+  try {
+    return store.getById(id);
+  } finally {
+    store.close();
+  }
+}
+
+/** Returns true if the durable debt row is resolved by the matching sprint. */
 function debtWasResolved(sprintId = EXPECTED_SPRINT_ID): boolean {
-  return mockMemStore.upsert.mock.calls.some((args: unknown[]) => {
-    const input = args[0] as Record<string, unknown>;
-    return input.status === 'resolved' &&
-      typeof input.metadata === 'object' && input.metadata !== null &&
-      (input.metadata as Record<string, unknown>).resolvedInSprintId === sprintId;
-  });
+  const row = readDebt();
+  if (row?.status !== 'resolved') return false;
+  const metadata = JSON.parse(row.metadata) as Record<string, unknown>;
+  return metadata.resolvedInSprintId === sprintId;
 }
 
 // ─── Tests ──────────────────────────────────────────────────────────
@@ -484,14 +492,9 @@ describe('runSprint Phase 4 — debt resolution integration', () => {
 
     await runSprint(PROJECT_ROOT, makeConfig());
 
-    // Verify upsert was called with correct resolved status and sprintId
-    const upsertCalls = mockMemStore.upsert.mock.calls;
-    const resolvedCall = upsertCalls.find((args: unknown[]) => {
-      const input = args[0] as Record<string, unknown>;
-      return input.id === EXPECTED_DEBT_ID && input.status === 'resolved';
-    });
-    expect(resolvedCall).toBeDefined();
-    const meta = (resolvedCall![0] as Record<string, unknown>).metadata as Record<string, unknown>;
+    const resolved = readDebt();
+    expect(resolved?.status).toBe('resolved');
+    const meta = JSON.parse(resolved!.metadata) as Record<string, unknown>;
     expect(meta.resolvedInSprintId).toBe(EXPECTED_SPRINT_ID);
   });
 
@@ -522,12 +525,7 @@ describe('runSprint Phase 4 — debt resolution integration', () => {
 
     await runSprint(PROJECT_ROOT, makeConfig());
 
-    const upsertCalls = mockMemStore.upsert.mock.calls;
-    const resolvedCall = upsertCalls.find((args: unknown[]) => {
-      const input = args[0] as Record<string, unknown>;
-      return input.status === 'resolved';
-    });
-    expect(resolvedCall).toBeDefined();
+    expect(readDebt()?.status).toBe('resolved');
   });
 
   // ── isPriorityFix + DONE ─────────────────────────────────────────
@@ -541,6 +539,7 @@ describe('runSprint Phase 4 — debt resolution integration', () => {
       originTaskId,
       priority: DebtPriority.CRITICAL,
       resolved: false,
+      originScope: { directories: ['src/'], filesWrite: ['src/index.ts'] },
     }];
     const debtTable = makeDebtTable(debtItems);
 
@@ -553,13 +552,7 @@ describe('runSprint Phase 4 — debt resolution integration', () => {
 
     await runSprint(PROJECT_ROOT, makeConfig());
 
-    // resolveDebt should have been called for 'debt-999-001'
-    const upsertCalls = mockMemStore.upsert.mock.calls;
-    const fixDebtResolved = upsertCalls.find((args: unknown[]) => {
-      const input = args[0] as Record<string, unknown>;
-      return input.id === fixDebtId && input.status === 'resolved';
-    });
-    expect(fixDebtResolved).toBeDefined();
+    expect(readDebt(fixDebtId)?.status).toBe('resolved');
   });
 
   // ── PLAN: verified-no-result debt is resolved, not re-injected (365-001) ──
@@ -575,7 +568,13 @@ describe('runSprint Phase 4 — debt resolution integration', () => {
     // settle (TERMINAL_EVIDENCE_HOLD) — production truth, stale fixture.
     const vnrDebtId = 'debt-vnr-001';
     const debtItems = [
-      { id: 'debt-998-001', originTaskId: '998-001', priority: DebtPriority.CRITICAL, resolved: false },
+      {
+        id: 'debt-998-001',
+        originTaskId: '998-001',
+        priority: DebtPriority.CRITICAL,
+        resolved: false,
+        originScope: { directories: ['src/'], filesWrite: ['src/index.ts'] },
+      },
       { id: vnrDebtId, originTaskId: 'vnr-001', priority: DebtPriority.CRITICAL, resolved: false, class: 'verified-no-result' as const },
     ];
     const results = new Map([[
@@ -587,11 +586,7 @@ describe('runSprint Phase 4 — debt resolution integration', () => {
 
     await runSprint(PROJECT_ROOT, makeConfig());
 
-    const vnrResolved = mockMemStore.upsert.mock.calls.some((args: unknown[]) => {
-      const input = args[0] as Record<string, unknown>;
-      return input.id === vnrDebtId && input.status === 'resolved';
-    });
-    expect(vnrResolved).toBe(true);
+    expect(readDebt(vnrDebtId)?.status).toBe('resolved');
   });
 
   // ── NO_GO evaluation — debt must NOT be resolved ─────────────────
@@ -624,12 +619,7 @@ describe('runSprint Phase 4 — debt resolution integration', () => {
 
     await runSprint(PROJECT_ROOT, makeConfig());
 
-    // None of the upsert calls should mark our debt as resolved
-    const hasResolvedWrite = mockMemStore.upsert.mock.calls.some((args: unknown[]) => {
-      const input = args[0] as Record<string, unknown>;
-      return input.id === EXPECTED_DEBT_ID && input.status === 'resolved';
-    });
-    expect(hasResolvedWrite).toBe(false);
+    expect(readDebt()?.status).toBe('active');
   });
 
   // ── Timeout (missing result) — debt must NOT be resolved ─────────
@@ -669,14 +659,9 @@ describe('runSprint Phase 4 — debt resolution integration', () => {
 
     const sprint = await runSprint(PROJECT_ROOT, makeConfig());
 
-    // The resolvedInSprintId in the upsert metadata must match the actual sprint
-    const upsertCalls = mockMemStore.upsert.mock.calls;
-    const resolvedCall = upsertCalls.find((args: unknown[]) => {
-      const input = args[0] as Record<string, unknown>;
-      return input.id === EXPECTED_DEBT_ID && input.status === 'resolved';
-    });
-    expect(resolvedCall).toBeDefined();
-    const meta = (resolvedCall![0] as Record<string, unknown>).metadata as Record<string, unknown>;
+    const resolved = readDebt();
+    expect(resolved?.status).toBe('resolved');
+    const meta = JSON.parse(resolved!.metadata) as Record<string, unknown>;
     expect(meta.resolvedInSprintId).toBe(sprint.id);
   });
 
@@ -727,19 +712,7 @@ describe('runSprint Phase 4 — debt resolution integration', () => {
 
     await runSprint(PROJECT_ROOT, makeConfig());
 
-    // Only EXPECTED_DEBT_ID should be resolved, not debt-other-001
-    const upsertCalls = mockMemStore.upsert.mock.calls;
-    const resolvedCall = upsertCalls.find((args: unknown[]) => {
-      const input = args[0] as Record<string, unknown>;
-      return input.id === EXPECTED_DEBT_ID && input.status === 'resolved';
-    });
-    expect(resolvedCall).toBeDefined();
-
-    // debt-other-001 should NOT have been resolved
-    const otherResolved = upsertCalls.find((args: unknown[]) => {
-      const input = args[0] as Record<string, unknown>;
-      return input.id === 'debt-other-001' && input.status === 'resolved';
-    });
-    expect(otherResolved).toBeUndefined();
+    expect(readDebt()?.status).toBe('resolved');
+    expect(readDebt('debt-other-001')?.status).toBe('active');
   });
 });

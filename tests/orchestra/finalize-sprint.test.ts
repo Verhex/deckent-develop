@@ -26,7 +26,15 @@ import type { Task, Sprint, SprintMetrics, TaskResult, ResolvedConfig } from '..
 vi.mock('node:child_process', () => ({
   // Real fs, mocked processes: git/tsc probes must not escape the sandbox. A bare
   // vi.fn() would return undefined and crash callers reading `.status`.
-  spawnSync: vi.fn(() => ({ status: 0, stdout: '', stderr: '' })),
+  spawnSync: vi.fn((command: string, args?: readonly string[]) => {
+    // A successful tar process has an observable output artifact. Preserve
+    // that boundary in the mock so the finalizer can hash and archive the
+    // rollback snapshot it was told succeeded.
+    if (command === 'tar' && args?.[0] === '-czf' && args[1]) {
+      writeFileSync(args[1], 'finalize-sprint-pre-archive\n', 'utf-8');
+    }
+    return { status: 0, stdout: '', stderr: '' };
+  }),
 }));
 
 vi.mock('../../src/orchestra/tmux.js', () => ({
@@ -154,6 +162,7 @@ vi.mock('../../src/orchestra/sprint-reporter.js', () => ({
     crossAssignments: 0, contextLinesUsed: 0,
   }),
   updateProjectDocs: vi.fn(),
+  archiveDirectives: vi.fn(),
 }));
 
 vi.mock('../../src/orchestra/coverage-validator.js', () => ({
@@ -252,7 +261,7 @@ vi.mock('../../src/agents/worker-ipc.js', () => {
 
 // ─── Imports (after mocks) ───────────────────────────────────────────
 
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { finalizeSprint } from '../../src/orchestra/sprint-controller.js';
@@ -261,6 +270,7 @@ import { writeRetrospective, writeSprintLog, calculateMetrics, updateProjectDocs
 import { runDecay } from '../../src/orchestra/debt-manager.js';
 import { updateLastSprintId } from '../../src/core/utils.js';
 import { runHooks } from '../../src/core/plugin-hooks.js';
+import { MemoryStore } from '../../src/core/memory-store.js';
 
 // ─── Test Helpers ────────────────────────────────────────────────────
 
@@ -269,6 +279,9 @@ let PROJECT_ROOT = '';
 const freshProjectRoot = (): string => {
   if (PROJECT_ROOT) rmSync(PROJECT_ROOT, { recursive: true, force: true });
   PROJECT_ROOT = mkdtempSync(join(tmpdir(), 'deckent-finalize-'));
+  mkdirSync(join(PROJECT_ROOT, '.brain'), { recursive: true });
+  const store = new MemoryStore(join(PROJECT_ROOT, '.brain', 'memory.db'));
+  store.close();
   return PROJECT_ROOT;
 };
 afterAll(() => {
@@ -320,6 +333,19 @@ function createTestResult(taskId: string, passed: boolean = true, coverage: numb
 }
 
 function createTestSprint(tasks: Task[]): Sprint {
+  // Terminal publication is a disk-authority CAS: the finalizer must update
+  // an existing canonical task projection, never synthesize one from its
+  // in-memory Sprint argument. Materialize the same producer output a real
+  // planner/run would have written before finalization.
+  const tasksDir = join(PROJECT_ROOT, '.tasks');
+  mkdirSync(tasksDir, { recursive: true });
+  for (const task of tasks) {
+    writeFileSync(
+      join(tasksDir, `task-${task.id}.json`),
+      `${JSON.stringify(task, null, 2)}\n`,
+      'utf-8',
+    );
+  }
   return {
     id: 'sprint-042',
     number: 42,
@@ -608,9 +634,10 @@ describe('finalizeSprint', () => {
 
     expect(metrics1).toBeDefined();
     expect(metrics2).toBeDefined();
-    // Both should have been called twice (idempotent = safe to call twice)
-    expect(vi.mocked(writeSprintLog)).toHaveBeenCalledTimes(2);
-    expect(vi.mocked(updateLastSprintId)).toHaveBeenCalledTimes(2);
+    // The durable terminal seal makes replay safe and exact-once: the second
+    // call returns the settled metrics without repeating outer side effects.
+    expect(vi.mocked(writeSprintLog)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(updateLastSprintId)).toHaveBeenCalledTimes(1);
   });
 
   it('refuses plain finalize while a logical task is NO_GO (fail-closed, was: mixed evaluations)', async () => {
@@ -662,6 +689,12 @@ describe('finalizeSprint', () => {
 });
 
 describe('FinalizeSprintOptions type', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(calculateMetrics).mockReturnValue({ ...defaultMetrics });
+    freshProjectRoot();
+  });
+
   it('should accept empty options object', async () => {
     const tasks = [createTestTask('042-001')];
     const sprint = createTestSprint(tasks);

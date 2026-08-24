@@ -181,8 +181,44 @@ describe('startBotDaemon', () => {
   it('not running → spawns detached and reports started', () => {
     const root = tmp();
     try {
-      const res = startBotDaemon(root, { spawnFn: () => 9988 });
+      const res = startBotDaemon(root, {
+        spawnFn: () => 9988,
+        readinessInspect: () => ({ status: 'running', pid: 9988 }),
+      });
       expect(res).toEqual({ status: 'started', pid: 9988 });
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it('reports started only after the listener publishes its ownership record', () => {
+    const root = tmp();
+    const readinessWait = vi.fn();
+    const inspections = [
+      { status: 'not-running' as const, reason: 'absent' as const },
+      { status: 'not-running' as const, reason: 'absent' as const },
+      { status: 'running' as const, pid: 9988 },
+    ];
+    try {
+      const res = startBotDaemon(root, {
+        spawnFn: () => 9988,
+        isAlive: () => true,
+        readinessInspect: () => inspections.shift()!,
+        readinessWait,
+        readinessMaxAttempts: 3,
+      });
+      expect(res).toEqual({ status: 'started', pid: 9988 });
+      expect(readinessWait).toHaveBeenCalledTimes(2);
+      expect(readinessWait).toHaveBeenNthCalledWith(1, 25);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it('never reports started when the spawned listener dies before readiness', () => {
+    const root = tmp();
+    try {
+      expect(startBotDaemon(root, {
+        spawnFn: () => 9988,
+        isAlive: () => false,
+        readinessInspect: () => ({ status: 'not-running', reason: 'absent' }),
+      })).toEqual({ status: 'spawn-failed' });
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 

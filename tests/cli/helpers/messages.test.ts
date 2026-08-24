@@ -57,6 +57,22 @@ const KNOWN_KEYS = [
 // ─── getMessage ───────────────────────────────────────────────────────────────
 
 describe('getMessage', () => {
+  describe('provider observation reconciliation messages', () => {
+    it('localizes batch reconciliation, approval, receipt, and HOLD wording in English and Turkish', () => {
+      expect(getMessage('provider_observation.reconciliation.dry_run', 'en', {
+        runCount: '2', candidateCount: '3', holdCount: '1',
+      })).toContain('2 run(s), 3 candidate(s), 1 HOLD');
+      expect(getMessage('provider_observation.reconciliation.dry_run', 'tr', {
+        runCount: '2', candidateCount: '3', holdCount: '1',
+      })).toContain('2 run, 3 aday, 1 HOLD');
+      expect(getMessage('provider_observation.reconciliation.pending_approval', 'en', { approvalId: 'apr-1' })).toContain('apr-1');
+      expect(getMessage('provider_observation.reconciliation.applied', 'tr', { receiptId: 'receipt-1' })).toContain('receipt-1');
+      expect(getMessage('provider_observation.reconciliation.replay_verified', 'en', { receiptId: 'receipt-1' })).toContain('receipt-1');
+      expect(getMessage('provider_observation.reconciliation.hold', 'tr', { reasonCode: 'REQUEST_NOT_FOUND' }))
+        .toContain('UZLAŞTIRMA_BEKLET');
+    });
+  });
+
   describe('key lookup', () => {
     it('renders an opaque invocation receipt reference in both languages', () => {
       const vars = { invocationId: 'inv-1', tenantId: 'tenant-a', projectId: 'project-a' };

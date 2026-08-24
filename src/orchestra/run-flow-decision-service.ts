@@ -23,10 +23,17 @@
 // a foreign process (CLI) the daemon picks the appended events up via the
 // SURF-5 freshness probe and re-publishes them onto open streams.
 
+import { createHash } from 'node:crypto';
+import { lstatSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { getRunFlowCoordinator } from './run-flow-coordinator-registry.js';
 import {
   loadApprovedSnapshot,
+  loadLatestStartAttempt,
   loadPlannedSprint,
+  loadRunHandle,
+  readFlowEvents,
   saveApprovedSnapshot,
   type StoredApprovedSnapshot,
 } from '../core/run-flow-store.js';
@@ -37,7 +44,17 @@ import type {
 } from '../core/run-flow-contract.js';
 import { canonicalJson } from '../core/audit-writer.js';
 import type { ActorContext } from '../core/work-model.js';
+import { TASKS_DIR } from '../core/constants.js';
+import { InvocationReceiptStore } from '../core/invocation-receipt-store.js';
+import {
+  INVOCATION_RECEIPT_SCHEMA_VERSION,
+  type InvocationEvent,
+  type InvocationReceipt,
+  type InvocationReceiptRef,
+} from '../core/invocation-receipt.js';
+import { getProviderForModel, TaskStatus, type Task } from '../core/task-types.js';
 import type { Sprint } from '../core/types.js';
+import { validateTaskId } from '../core/validators.js';
 import {
   computeExecutionPlanDigestByVersion,
 } from '../core/execution-plan-digest.js';
@@ -58,7 +75,11 @@ export type RunFlowDecisionRefusalCode =
   | 'PLANNED_SPRINT_DIGEST_MISMATCH'
   | 'TOPOLOGY_BLOCKED'
   | 'ADOPTION_AUTHORITY_MISMATCH'
-  | 'NOT_APPROVED';
+  | 'NOT_APPROVED'
+  | 'RETIRE_NOT_APPROVED'
+  | 'RETIRE_ALREADY_STARTED'
+  | 'RETIRE_SNAPSHOT_MISSING'
+  | 'RETIRE_TASK_SNAPSHOT_MISMATCH';
 
 /** A refusal that is a state-of-the-world fact, not a transition bug —
  *  API adapters answer 409, the CLI prints the message and exits non-zero. */
@@ -204,7 +225,292 @@ export function decideRunFlow(
   return result.context;
 }
 
-// ─── start (APPROVED → detached run) ─────────────────────────────────────────
+// ─── retire (APPROVED → CANCELLED + exact task settlement) ───────────
+
+interface RetireTaskSnapshot {
+  readonly task: Task;
+  readonly path: string;
+  readonly content: Buffer;
+  readonly contentDigest: string;
+}
+
+export interface RetireRunFlowResult {
+  readonly context: RunFlowContext;
+  readonly taskReceiptRefs: readonly InvocationReceiptRef[];
+  /** True only when this call appended FLOW_ABORTED; false on an exact replay. */
+  readonly flowTransitionApplied: boolean;
+}
+
+function sha256(value: string | Uint8Array): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function stableId(domain: string, value: unknown): string {
+  return `${domain}:${sha256(canonicalJson(value))}`;
+}
+
+function taskSnapshotMatches(path: string, expected: Buffer): boolean {
+  try {
+    const stat = lstatSync(path);
+    return stat.isFile()
+      && !stat.isSymbolicLink()
+      && readFileSync(path).equals(expected);
+  } catch {
+    return false;
+  }
+}
+
+function retireTaskSnapshotError(): RunFlowDecisionError {
+  return new RunFlowDecisionError(
+    'RETIRE_TASK_SNAPSHOT_MISMATCH',
+    'run-flow: RETIRE_TASK_SNAPSHOT_MISMATCH',
+  );
+}
+
+function loadRetireTaskSnapshots(
+  projectRoot: string,
+  snapshot: StoredApprovedSnapshot,
+): readonly RetireTaskSnapshot[] {
+  const seen = new Set<string>();
+  return Object.freeze(snapshot.sprint.tasks.map((task): RetireTaskSnapshot => {
+    try {
+      validateTaskId(task.id);
+    } catch {
+      throw retireTaskSnapshotError();
+    }
+    if (seen.has(task.id)) throw retireTaskSnapshotError();
+    seen.add(task.id);
+    const path = join(projectRoot, TASKS_DIR, `task-${task.id}.json`);
+    let stat: ReturnType<typeof lstatSync>;
+    let content: Buffer;
+    let parsed: unknown;
+    try {
+      stat = lstatSync(path);
+      if (!stat.isFile() || stat.isSymbolicLink()) throw new TypeError('not a regular file');
+      content = readFileSync(path);
+      parsed = JSON.parse(content.toString('utf8'));
+    } catch {
+      throw retireTaskSnapshotError();
+    }
+    if (
+      task.status !== TaskStatus.PENDING
+      || canonicalJson(parsed) !== canonicalJson(task)
+      || typeof task.createdAt !== 'string'
+      || !Number.isFinite(Date.parse(task.createdAt))
+    ) {
+      throw retireTaskSnapshotError();
+    }
+    return Object.freeze({
+      task,
+      path,
+      content,
+      contentDigest: sha256(content),
+    });
+  }));
+}
+
+function taskProvider(task: Task): string | null {
+  if (task.provider) return task.provider;
+  try {
+    return getProviderForModel(task.model);
+  } catch {
+    return null;
+  }
+}
+
+function retirementReceipt(
+  flowId: string,
+  snapshot: StoredApprovedSnapshot,
+  taskSnapshot: RetireTaskSnapshot,
+  scope: { readonly tenantId: string; readonly projectId: string },
+  retiredAt: string,
+): { readonly receipt: InvocationReceipt; readonly events: readonly InvocationEvent[] } {
+  const task = taskSnapshot.task;
+  const invocationId = stableId('run-flow-retirement', {
+    schemaVersion: 1,
+    flowId,
+    revision: snapshot.revision,
+    planDigest: snapshot.planDigest,
+    sprintId: snapshot.sprint.id,
+    taskId: task.id,
+    tenantId: scope.tenantId,
+    projectId: scope.projectId,
+  });
+  const provider = taskProvider(task);
+  const selection = {
+    provider,
+    model: task.model,
+    source: 'config' as const,
+    reasonCode: 'none' as const,
+  };
+  const evidenceRefs = Object.freeze([
+    `run-flow-retirement:${flowId}:revision:${snapshot.revision}`,
+    `run-plan:${snapshot.planDigest}`,
+    `task-snapshot:sha256:${taskSnapshot.contentDigest}`,
+  ].sort());
+  const receipt: InvocationReceipt = {
+    schemaVersion: INVOCATION_RECEIPT_SCHEMA_VERSION,
+    invocationId,
+    idempotencyKey: invocationId,
+    tenantId: scope.tenantId,
+    projectId: scope.projectId,
+    runId: snapshot.sprint.id,
+    taskId: task.id,
+    callId: `run-flow-retirement:${flowId}:${task.id}`,
+    role: 'worker',
+    purpose: 'worker-execution',
+    configured: selection,
+    requested: selection,
+    resolved: selection,
+    called: {
+      provider: null,
+      model: null,
+      source: 'none',
+      reasonCode: 'execution_admission_rejected',
+    },
+    backend: { transport: 'local-runtime', executionBackend: 'unknown' },
+    auth: { mode: 'unknown', accountRefHash: null },
+    fallbackChain: [],
+    reachability: { state: 'unknown', evidenceRef: null },
+    limits: { state: 'unknown', evidenceRefs: [] },
+    createdAt: retiredAt,
+  };
+  const rejectedEvent: InvocationEvent = {
+    eventId: stableId('run-flow-retirement-dispatch-rejected', {
+      invocationId,
+      retiredAt,
+      evidenceRefs,
+    }),
+    type: 'dispatch_rejected',
+    occurredAt: retiredAt,
+    payload: {
+      reasonCode: 'execution_admission_rejected',
+      evidenceRefs,
+    },
+  };
+  const settledEvent: InvocationEvent = {
+    eventId: stableId('run-flow-retirement-consumer-settled', {
+      invocationId,
+      retiredAt,
+      evidenceRefs,
+    }),
+    type: 'consumer_settled',
+    occurredAt: retiredAt,
+    payload: {
+      outcome: 'accepted',
+      reasonCode: 'execution_admission_rejected',
+      taskDisposition: 'not_dispatched',
+      evidenceRefs,
+    },
+  };
+  return { receipt, events: Object.freeze([rejectedEvent, settledEvent]) };
+}
+
+/**
+ * Retire one exact approved plan without leaving raw PENDING task projections
+ * behind. The coordinator owns the flow transition; the invocation ledger owns
+ * each task's deterministic NOT_DISPATCHED terminal truth. Per-task writes are
+ * replay-safe, so a process failure after a partial batch is repaired by the
+ * same command without inventing a second execution owner.
+ */
+export function retireRunFlow(projectRoot: string, flowId: string): RetireRunFlowResult {
+  const coordinator = getRunFlowCoordinator(projectRoot);
+  const existing = coordinator.getFlow(flowId);
+  const replay = existing.state === 'CANCELLED' && existing.cancelReason === 'aborted';
+  if (existing.state !== 'APPROVED' && !replay) {
+    throw new RunFlowDecisionError('RETIRE_NOT_APPROVED', 'run-flow: RETIRE_NOT_APPROVED');
+  }
+  const snapshot = loadApprovedSnapshot(projectRoot, flowId);
+  if (!snapshot) {
+    throw new RunFlowDecisionError('RETIRE_SNAPSHOT_MISSING', 'run-flow: RETIRE_SNAPSHOT_MISSING');
+  }
+  if (
+    snapshot.flowId !== flowId
+    || (
+      existing.approvedSnapshot !== undefined
+      && (
+        existing.approvedSnapshot.revision !== snapshot.revision
+        || existing.approvedSnapshot.planDigest !== snapshot.planDigest
+      )
+    )
+  ) {
+    throw new RunFlowDecisionError('RETIRE_SNAPSHOT_MISSING', 'run-flow: RETIRE_SNAPSHOT_MISSING');
+  }
+
+  const events = readFlowEvents(projectRoot, flowId);
+  if (
+    existing.handle !== undefined
+    || loadRunHandle(projectRoot, flowId) !== undefined
+    || loadLatestStartAttempt(projectRoot, flowId) !== undefined
+    || events.some(event => event.type === 'START_REQUESTED' || event.type === 'RUN_STARTED')
+  ) {
+    throw new RunFlowDecisionError('RETIRE_ALREADY_STARTED', 'run-flow: RETIRE_ALREADY_STARTED');
+  }
+  // Validate every exact task byte before the terminal flow transition. A
+  // malformed/moved projection therefore leaves an APPROVED flow untouched.
+  const taskSnapshots = loadRetireTaskSnapshots(projectRoot, snapshot);
+  const result = replay
+    ? { applied: false as const, context: existing }
+    : coordinator.abortFlow({
+        flowId,
+        commandId: `retire-${flowId}-r${snapshot.revision}`,
+      });
+  if (
+    result.context.state !== 'CANCELLED'
+    || result.context.cancelReason !== 'aborted'
+    || typeof result.context.updatedAt !== 'string'
+    || !Number.isFinite(Date.parse(result.context.updatedAt))
+  ) {
+    throw new RunFlowDecisionError('RETIRE_NOT_APPROVED', 'run-flow: RETIRE_NOT_APPROVED');
+  }
+  const retiredAt = result.context.updatedAt;
+
+  const store = new InvocationReceiptStore(projectRoot);
+  try {
+    const tenantId = snapshot.proposal?.tenant ?? existing.proposal?.tenant ?? 'local';
+    const taskReceiptRefs = taskSnapshots.map(taskSnapshot => {
+      const authority = retirementReceipt(
+        flowId,
+        snapshot,
+        taskSnapshot,
+        { tenantId, projectId: store.projectId },
+        retiredAt,
+      );
+      const persisted = store.writeAtomic({
+        receipt: authority.receipt,
+        requireSynchronousPrecondition: () => taskSnapshotMatches(
+          taskSnapshot.path,
+          taskSnapshot.content,
+        ),
+        requireTaskReceiptAbsence: {
+          tenantId,
+          projectId: store.projectId,
+          taskId: taskSnapshot.task.id,
+          purpose: 'worker-execution',
+        },
+        events: authority.events,
+      });
+      if (
+        persisted.view.taskDisposition !== 'not_dispatched'
+        || persisted.view.events.length !== 2
+        || persisted.view.events[0]?.type !== 'dispatch_rejected'
+        || persisted.view.events[1]?.type !== 'consumer_settled'
+      ) {
+        throw retireTaskSnapshotError();
+      }
+      return persisted.declaration.ref;
+    });
+    return {
+      context: result.context,
+      taskReceiptRefs: Object.freeze(taskReceiptRefs),
+      flowTransitionApplied: result.applied,
+    };
+  } finally {
+    store.close();
+  }
+}
+
+// ─── start (APPROVED → detached run) ────────────────────────────────
 
 export interface StartRunFlowOptions {
   /** Start-command principal and idempotency authority. */

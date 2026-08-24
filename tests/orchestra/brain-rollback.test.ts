@@ -246,21 +246,6 @@ vi.mock('../../src/agents/worker-ipc.js', () => ({
 }));
 
 // ── MemoryStore mock for DB-first code paths ─────────────────────
-const mockMemStore = {
-  getById: vi.fn().mockReturnValue(null),
-  getByType: vi.fn().mockReturnValue([]),
-  insert: vi.fn().mockImplementation((input) => ({ ...input, metadata: JSON.stringify(input.metadata ?? {}), tag_text: (input.tags ?? []).join(' '), status: input.status ?? 'active', priority: input.priority ?? 'normal', sprint_id: input.sprint_id ?? null, sprint_num: input.sprint_num ?? 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null })),
-  upsert: vi.fn().mockImplementation((input) => ({ ...input, metadata: JSON.stringify(input.metadata ?? {}), tag_text: (input.tags ?? []).join(' '), status: input.status ?? 'active', priority: input.priority ?? 'normal' })),
-  softDelete: vi.fn(), totalCount: vi.fn().mockReturnValue(0), countByType: vi.fn(),
-  decay: vi.fn(), close: vi.fn(), getRawDb: vi.fn(),
-  getRelationsFrom: vi.fn().mockReturnValue([]), getRelationsTo: vi.fn().mockReturnValue([]),
-  getTagsForEntry: vi.fn().mockReturnValue([]), getByTags: vi.fn().mockReturnValue([]),
-  getHistory: vi.fn().mockReturnValue([]), restore: vi.fn(), getSchemaVersion: vi.fn().mockReturnValue(1),
-};
-vi.mock('../../src/core/memory-store.js', () => ({
-  MemoryStore: vi.fn().mockImplementation(() => mockMemStore),
-}));
-
 // ─── Imports (after mocks) ───────────────────────────────────────────
 import {
   mkdtempSync, rmSync, mkdirSync, writeFileSync,
@@ -280,6 +265,9 @@ import {
 // would be a fixture-local reimplementation.
 const actualRollback = await vi.importActual<typeof import('../../src/orchestra/rollback.js')>(
   '../../src/orchestra/rollback.js',
+);
+const actualMemoryStore = await vi.importActual<typeof import('../../src/core/memory-store.js')>(
+  '../../src/core/memory-store.js',
 );
 
 const mockedSpawnSync = vi.mocked(spawnSync);
@@ -303,7 +291,10 @@ function freshProjectRoot(): string {
   mkdirSync(join(PROJECT_ROOT, '.tasks'), { recursive: true });
   mkdirSync(join(PROJECT_ROOT, '.deckent', 'pids'), { recursive: true });
   mkdirSync(join(PROJECT_ROOT, '.brain'), { recursive: true });
-  writeFileSync(join(PROJECT_ROOT, '.brain', 'memory.db'), '', 'utf-8');
+  const archiveIndex = new actualMemoryStore.MemoryStore(
+    join(PROJECT_ROOT, '.brain', 'memory.db'),
+  );
+  archiveIndex.close();
   return PROJECT_ROOT;
 }
 
@@ -383,7 +374,14 @@ function setupProject(
   // call both go through this mock. `git ls-files` must report a tracked
   // src/ path so evaluateScopeGate classifies legacy-fallback scopes
   // (filesWrite: ['src/']) as new-plausible instead of suspect.
-  mockedSpawnSync.mockImplementation((_command, args) => {
+  mockedSpawnSync.mockImplementation((command, args) => {
+    // The production finalizer invokes tar for its rollback-safe pre-archive
+    // artifact. This suite mocks child processes, so the tar success fixture
+    // must also materialize the output it claims to have produced.
+    if (command === 'tar' && Array.isArray(args) && args[0] === '-czf'
+      && typeof args[1] === 'string') {
+      writeFileSync(args[1], `brain-rollback-pre-archive-${attemptNonce}\n`, 'utf-8');
+    }
     const isLsFiles = Array.isArray(args) && args[0] === 'ls-files';
     return {
       status: 0, stdout: isLsFiles ? 'src/index.ts\n' : '', stderr: '', pid: 1, signal: null, output: [],
