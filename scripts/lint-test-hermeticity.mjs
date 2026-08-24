@@ -1123,8 +1123,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-24 sprint-661 manual ADR-D-007 closure: +2 — worker-activity
   // heartbeat v1 authority (core) and the extracted layer-clean canonical
   // result-ingress module (ADR-G-041 SCC fix). Scan remains violation-free.
+  // 2026-08-24 read-path purity fix: count unchanged, digest moved — the
+  // EXPIRE-SWEEP read hook was retired from pending-approvals (status/bot
+  // polls no longer write expiry decisions; settlement is driver-owned).
   count: 1321,
-  digest: '36ab30600375a15f83388674ee01c504137bb9e591e9775d1384c4cfe7812f3b',
+  digest: '2764d1bea4da7cb3859626fde123b988221ccd3b64f725499736d5380f4d31b6',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

@@ -483,10 +483,20 @@ export function parseCrossVerifyAdjudicationOutputV2(
     : [];
   if (lines.length !== 2
     || !lines[0]!.startsWith(CROSS_VERIFY_ADJUDICATION_RESPONSE_PREFIX)) {
+    // A verdict-only reply (the docker framer's single-line arm) is the one
+    // provider-compliance failure operators keep hitting; name it precisely
+    // instead of the generic framing error (live Sol-verifier evidence
+    // 2026-08-24, receipts d22a59ad… / 34ddfca1…). Still verdict-unclear:
+    // an evidence-free VERDICT line never gains adjudication authority.
+    const verdictOnly = lines.length === 1
+      && !lines[0]!.startsWith(CROSS_VERIFY_ADJUDICATION_RESPONSE_PREFIX)
+      && /^VERDICT:\s*(?:CONFIRMED|REFUTED|UNCLEAR)\s+/iu.test(lines[0]!);
     return {
       response: null,
       providerDeclaredVerdict: 'unclear',
-      error: 'xverify-v2-output-framing-invalid',
+      error: verdictOnly
+        ? 'xverify-v2-response-json-line-missing'
+        : 'xverify-v2-output-framing-invalid',
     };
   }
   if (parsedTerminal.verdict === 'unclear'

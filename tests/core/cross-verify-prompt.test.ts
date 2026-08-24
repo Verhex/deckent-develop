@@ -532,6 +532,15 @@ describe('cross-verify-prompt · typed adjudication v2', () => {
       providerDeclaredVerdict: 'unclear',
       error: 'xverify-v2-output-ceiling-exceeded',
     });
+    // Verdict-only reply (docker framer single-line arm, live Sol evidence
+    // 2026-08-24): named precisely, never granted verdict authority.
+    expect(parseCrossVerifyAdjudicationOutputV2(
+      'VERDICT: CONFIRMED evidence-free single line',
+    )).toMatchObject({
+      response: null,
+      providerDeclaredVerdict: 'unclear',
+      error: 'xverify-v2-response-json-line-missing',
+    });
   });
 });
 

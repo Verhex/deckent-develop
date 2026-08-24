@@ -719,6 +719,33 @@
       "notes": "CAF07 static authority gate; tracks canonical resolver/constants/property/wrapper data flow, fails closed on unresolved archive-derived targets, and admits only exact top-level publication/verified-retirement owners. Wired directly into lint:gates."
     },
     {
+      "file": "scripts/lint-acceptance-confirmation-authority.mjs",
+      "class": "gate",
+      "owner": "acceptance-confirmation-authority",
+      "npmScript": "lint:gates member (unaliased)",
+      "input": "production src/** acceptance-confirmation read/settle call sites and their authority annotations",
+      "output": "exit 0 when confirmation discovery stays side-effect-free and settlement stays driver/service-owned; exit 2 on violation",
+      "notes": "Sprint-661 closure follow-up 2026-08-24: gate was authored in 4a77f5704 but never registered; registration closes the UNWIRED gap (owner finding HIGH-1)."
+    },
+    {
+      "file": "scripts/lint-approval-lifecycle-authority.mjs",
+      "class": "gate",
+      "owner": "approval-lifecycle-authority",
+      "npmScript": "lint:gates member (unaliased)",
+      "input": "production src/** approval lifecycle policy/SLA/CAS writer call sites",
+      "output": "exit 0 when lifecycle mutations flow through the D4 policy chain only; exit 2 on violation",
+      "notes": "Sprint-661 closure follow-up 2026-08-24: gate was authored in e9bc6c83a but never registered; registration closes the UNWIRED gap (owner finding HIGH-1)."
+    },
+    {
+      "file": "scripts/lint-recovery-truth-authority.mjs",
+      "class": "gate",
+      "owner": "recovery-truth-authority",
+      "npmScript": "lint:gates member (unaliased)",
+      "input": "production src/** recovery artifact/finalizer/status authority call sites",
+      "output": "exit 0 when recovery truth writes stay inside the RECOVERY-TRUTH-001 authority modules; exit 2 on violation",
+      "notes": "Sprint-661 closure follow-up 2026-08-24: gate was authored in eaba99b31 but never registered; registration closes the UNWIRED gap (owner finding HIGH-1)."
+    },
+    {
       "file": "scripts/lint-test-hermeticity.mjs",
       "class": "gate",
       "owner": "test-hermeticity-registry",

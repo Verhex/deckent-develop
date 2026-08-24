@@ -119,7 +119,10 @@ function readRuntime(projectRoot: string, now: Date): PendingApproval[] {
   const storeDir = join(projectRoot, DECKENT_DIR, 'approvals');
   if (!existsSync(storeDir)) return [];
   const store = new ApprovalStore(projectRoot, { storeDir, clock: () => now });
-  store.sweepExpired(now);
+  // Discovery is a projection: expiry settlement belongs to the scheduled
+  // driver / broker decide paths (d598007ae principle, D4 expiry-driver).
+  // `scanStoreDir` already excludes overdue rows from `pending` at read time,
+  // so status/bot polls must never write decision files or unlink records.
   return store.load().pending.map(({ request, lifecycle }) => ({
     kind: 'runtime' as const,
     id: request.id,
@@ -135,20 +138,16 @@ function readRuntime(projectRoot: string, now: Date): PendingApproval[] {
   }));
 }
 
-// ─── Runtime-wide sweep hook (EXPIRE-SWEEP wiring) ───────────────────────────
-// `readPendingApprovals` is the acknowledged single source of truth every
-// pending-approval surface (`deckent status`, `status --follow`, the dashboard,
-// MCP) reads through — so it is the natural attach point for Task-1's
-// `ApprovalStore.sweepExpired()` disk sweep, even though that sweep targets a
-// SEPARATE store (`.deckent/approvals`, the runtime-wide ApprovalBroker/
-// ApprovalStore, ADR-G-020) from this hub's own nervous/autonomous files. The
-// sweep never filters or reshapes THIS function's return value — no CLI command
-// exists today to accept/reject a runtime-wide entry from this hub's parked
-// list (`deckent nervous accept` resolves against the nervous IPC queue only),
-// so fabricating a merged entry here would show an operator a command that does
-// nothing. The sweep is a fail-soft side effect that keeps the runtime store's
-// OTHER consumers (dashboard `/api/approvals`, the relay, the bot-poll watcher)
-// honest by writing overdue closures on every status/pending read.
+// ─── Runtime-wide sweep (RETIRED from the read path, 2026-08-24) ─────────────
+// EXPIRE-SWEEP originally attached `ApprovalStore.sweepExpired()` to this read
+// hub, so every `deckent status` / bot inbox poll WROTE expiry decisions and
+// could unlink records. That contradicts the d598007ae principle ("expiry
+// settlement belongs to the scheduled driver / authenticated settlement
+// service") and the D4 expiry-driver, and it let a read surface mutate
+// approval state. Discovery is now a pure projection (`scanStoreDir` hides
+// overdue rows at read time); durable expiry closure is written only by the
+// scheduled driver and broker decide/transition paths. The helper below stays
+// exported for the driver and for fail-soft tests — the READ path never calls it.
 
 /** Narrow sweep-only surface this hook depends on — satisfied structurally by a
  *  real `ApprovalStore` or a test fake that throws to prove fail-soft. */
@@ -192,7 +191,6 @@ export function sweepRuntimeApprovals(
  */
 export function readPendingApprovals(projectRoot: string): PendingApproval[] {
   const now = new Date();
-  sweepRuntimeApprovals(projectRoot);
   return [
     ...readNervous(projectRoot),
     ...readAutonomous(projectRoot),
