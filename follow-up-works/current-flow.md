@@ -53,7 +53,16 @@
   finalizer-hold artık suçlu-listeli tanı basıyor; dedup canlı-kanıt (668-prompt'unda 0
   `Karpathy Notes`, 36,8→32,2KB). Bench 3-case (her ikiz kendi sıralı-case'ini ekledi).
   12. aile-üyesi (`f.includes`, rubric-yolu) evaluation-fault-recovery'ce tolere edildi → küçük-fix sırada.
-- SIRADAKİ (sıra bağlayıcı): (1) arşiv manifest-yarışı fix'i + `f.includes` normalizasyonu;
+- ✅ KISMEN-TAMAM (2026-08-25 ~05:30): `f.includes` normalizasyonu (aile 12/12 — evaluator×3
+  + rubric-registry) VE arşiv-yarışının yarısı: core-pair süpürmesi artık ARŞİVLENMİŞ
+  receipt'leri de tarar (self-healing reconcile) — 668 arşivi `verify ok:true`ya kendi
+  kanonik-aracıyla onarıldı. KALAN-YARI (sonraki-fix, tek-nokta): finalizer terminal-yayın
+  SIRALAMASI — reconcile→receipt→SEAL zinciri; şu an retention-pass'ı receipt'i mühürden
+  sonra manifest'e sokuyor ve mühür eski-digest'te kalıyor (668'de `unsealed-archive:
+  terminal_identity_mismatch`); mühür ancak finalizer'ın canlı-bağlamıyla yeniden türetilir,
+  elle mühür-yazımı YASAK (sahte-receipt sınıfı). Formal 7094-kernel bu tek-fix'e bağlı;
+  ölçüm-verisi mühürlü terminal-receipt'lerden zaten teslim (−41,2%).
+- SIRADAKİ (sıra bağlayıcı): (1) finalizer seal-sıralaması fix'i (üstteki kalan-yarı);
   (2) sprint-662 DIRECTIVES'i — event-authority/heartbeat-UI +
   Nervous→Telegram delivery-bridge + result-ingress tekilleştirme residual'ları, 8-worker dogfood
   DAG'ı olarak; (2) 7094 gerçek A/B cohort koşusu (ölçüm-hattı artık açık) → owner-karar raporu;

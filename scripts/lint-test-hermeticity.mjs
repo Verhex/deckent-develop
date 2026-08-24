@@ -639,7 +639,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-25 coordinator string-shape recovery: +2 — canonical FileChange
   // regression pin (quality-assessor) and worker-authored 664 suites.
   count: 16093,
-  digest: '2d8b68edc6ab9b3439f4e11342507f16c49cb6f10ed017d6ca4651ca0404898b',
+  digest: '1c9011bfe087fd87862abdbd3624f99d47e0a53b5453f804b3da421398763824',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1139,7 +1139,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-24 HIGH-5 + 7091 fold: count unchanged, digest moved — bot-daemon
   // token-proven legacy stop path and cursor image build-arg fold.
   count: 1323,
-  digest: '9234c7ab74aa63d3587e3c13a3b8fdd08e65a0fb82ea06bf7d7a1f30cecd1496',
+  digest: '7282fccd4b86bb135668d57edbad5b1330f2c6567ff8e93a936472d5c05a68fe',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

@@ -360,9 +360,9 @@ export async function evaluateResult(result: TaskResult, task: Task, vitestJsonO
   // Worker self-assessment is just a HINT, not the final decision
 
   // Check: did worker write new test files?
-  const hasNewTests = result.filesChanged?.some(f =>
+  const hasNewTests = normalizeChangedPaths(result.filesChanged).some(f =>
     f.includes('.test.') || f.includes('.spec.')
-  ) ?? false;
+  );
 
   // Step 3a: Validate task-specific goNogo criteria from DIRECTIVES
   // If goCriteria contains specific verification patterns, validate notes match
@@ -853,7 +853,7 @@ function hasTestClaimEvidence(result: TaskResult, task: Task): boolean {
           && reportedCommands.every(command => declaredCommands.includes(command))))
     ) return true;
   }
-  if (result.filesChanged?.some(f => f.includes('.test.') || f.includes('.spec.'))) return true;
+  if (normalizeChangedPaths(result.filesChanged).some(f => f.includes('.test.') || f.includes('.spec.'))) return true;
   if (typeof result.coverage === 'number' && result.coverage > 0) return true;
   const notes = coerceNotesToString(result.notes);
   return /\b\d+\s*\/\s*\d+\b|vitest|jest|pytest|go test|cargo test|npx tsc|tsc --noEmit|exit(ed)?\s+0|tests?\s+(all\s+)?(pass(ed)?|green)/i.test(notes);
@@ -910,9 +910,9 @@ export function scoreCorrectness(result: TaskResult, task?: Task): RubricScore {
 
 /** Score test coverage based on coverage metric and presence of new test files */
 export function scoreTestCoverage(result: TaskResult): RubricScore {
-  const hasNewTests = result.filesChanged?.some(f =>
+  const hasNewTests = normalizeChangedPaths(result.filesChanged).some(f =>
     f.includes('.test.') || f.includes('.spec.')
-  ) ?? false;
+  );
 
   // Bash unavailable with zero coverage → neutral score (not penalized)
   if (isBashUnavailable(result) && result.coverage === 0) {

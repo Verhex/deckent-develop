@@ -919,6 +919,47 @@ function collectArchiveCandidates(projectRoot: string, sprintId: string): Archiv
     }
   }
 
+  // Self-healing sweep (live sprint-668 defect, 2026-08-25): the retention/
+  // cleanup pass archives delivery receipts and retires their live copies
+  // BEFORE this sweep ever sees them, so the referenced worker-core pair was
+  // never manifested and terminal verification stayed permanently mismatched.
+  // Reconcile describes canonical truth, so archived receipts are swept too;
+  // core bytes still come only from the immutable live core artifact.
+  {
+    const archivedTasksDir = join(
+      resolveSprintArchiveDir(projectRoot, sprintId), 'tasks',
+    );
+    let archivedEntries: string[] = [];
+    try { archivedEntries = readdirSync(archivedTasksDir); } catch { /* absent */ }
+    for (const name of archivedEntries.filter(entry => entry.endsWith('.prompt-delivery.json'))) {
+      const receiptPath = join(archivedTasksDir, name);
+      try {
+        const binding = archivedPromptRuntimeBinding(
+          JSON.parse(readFileSync(receiptPath, 'utf8')) as unknown,
+          name,
+          sprintId,
+        );
+        if (!binding) continue;
+        const coreName = `.worker-core-${binding.coreSha256}.md`;
+        const canonicalCoreSource = join(resolve(projectRoot, TASKS_DIR), coreName);
+        const coreSource = resolve(projectRoot, binding.coreArtifactPath);
+        if (basename(binding.coreArtifactPath) !== coreName
+          || coreSource !== canonicalCoreSource
+          || !existsSync(coreSource)) continue;
+        const identity = fileIdentity(coreSource);
+        if (identity.sha256 !== binding.coreSha256 || identity.bytes !== binding.coreBytes) continue;
+        if (!candidates.some(candidate => candidate.targetRelative === join(taskTarget, 'worker-cores', coreName))) {
+          candidates.push({
+            source: coreSource,
+            targetRelative: join(taskTarget, 'worker-cores', coreName),
+            family: 'tasks',
+            retireLegacy: false,
+          });
+        }
+      } catch { /* malformed archived receipt grants no core authority */ }
+    }
+  }
+
   const recentWorks = join(projectRoot, DECKENT_DIR, 'recently-works');
   if (existsSync(recentWorks)) {
     let entries: string[] = [];

@@ -373,7 +373,7 @@ export function coverageOptional(task: Task, result?: { filesChanged?: string[];
     // still fails validateResultSchema separately, so this never masks a sloppy
     // result; a wrong "nothing changed" claim is the Auditor's git-diff domain.
     if (Array.isArray(result.filesChanged) && result.filesChanged.length === 0) return true;
-    const wroteTests = result.filesChanged?.some(f => f.includes('.test.') || f.includes('.spec.')) ?? false;
+    const wroteTests = normalizeChangedPaths(result.filesChanged).some(f => f.includes('.test.') || f.includes('.spec.'));
     if (wroteTests) return true;
     // WM-7: deckent's coverage scoring is vitest/v8-only. For a non-JS/TS code
     // task (Go / Python / C++ / Rust / …), `coverage:null` is a MEASUREMENT GAP
