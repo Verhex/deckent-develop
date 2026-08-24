@@ -19,6 +19,14 @@
   `259c6472f` HIGH-3/4 (canary-arşiv lineage onarımı + config-owned thresholds) ·
   `06f201ae3` HIGH-5 + 7091 cursor build-arg fold. Formal mühürler: D4 discovery-purity
   `cfeaae18…` CONFIRMED, runtime-hygiene `094c1634…` CONFIRMED. Denetim-bulgu paketi 5/5 kapalı.
+- TAMAM-EK (2026-08-25 gece, epoch-3 devam): `4c735a5be` koordinatör string-shape
+  recovery R1 + 664-hasadı (worker-core provenance, nervous same-store accept) ·
+  `23d0ad731` **normalizeChangedPaths tek-projeksiyon** (10 tüketici tek normalizer'a
+  bağlandı — relPath.replace/file.startsWith ailesi KÖKten kapandı) + 665-hasadı
+  (host-primary consumer'lar + 8-suite mutabakatı, durable notification-delivery core)
+  + 3 straggler-fix; nervous+monitor+connectors süpürmesi **906/906 yeşil** (661-rewrite
+  sonrası 15-kırmızıydı). 663/664/665 dürüst-ABORTED arşivde; false-NO_GO damgası
+  koordinatör-çökme kaskadıydı, kök kapandı.
 - SIRADAKİ-ACİL (owner 2026-08-25): **skill-prompt tekrar-tekilleştirme** — her skill'in sonuna
   eklenen `## Karpathy Notes` bloğu worker-prompt'una 3 kez enjekte ediliyor (ölçüldü:
   `.tasks/.prompt-664-00{1,2,3}-*.txt` her birinde 3 kopya, satır ~67/~127/~214, ~36KB prompt).
