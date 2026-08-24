@@ -24,7 +24,7 @@ import { print } from '../helpers/output.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
 import { formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
-import { loadConfig } from '../../core/config.js';
+import { loadConfig, DEFAULT_PROMPT_CONFIG } from '../../core/config.js';
 import { parseTranscriptUsage, limitCost, resolveModelPrice } from '../../core/limit-ledger.js';
 import type { UsageRecord, LedgerOpts, LedgerPrices } from '../../core/limit-ledger.js';
 import { summarizeSprint, buildTranscriptTaskMap, evaluateCacheGate } from '../../core/limit-ledger-report.js';
@@ -313,8 +313,22 @@ function lineageLabel(key: string, lang: string, vars?: Record<string, string>):
   return getMessage(`usage.lineage_${key}`, lang, vars);
 }
 
-const DEFAULT_CANARY_THRESHOLDS = Object.freeze({ minimumQualityPassRate: 1, maximumQualityPassRateRegression: 0,
-  maximumCostPerLineageIncreaseRatio: 0, minimumCacheHitRatio: 0, maximumCacheHitRatioRegression: 0 });
+// PROMOTE/REJECT policy is config-owned (prompt.canary_thresholds, KANUN 10);
+// the strict defaults live in core/config.ts as the single source — on any
+// config-load failure this resolver falls back to those same defaults, never
+// to caller literals.
+async function resolveCanaryThresholds(root: string): Promise<PromptCostCanaryPlan['thresholds']> {
+  const cfg = await loadConfig(root).catch(() => null);
+  const configured = cfg?.prompt?.canary_thresholds;
+  const defaults = DEFAULT_PROMPT_CONFIG.canary_thresholds;
+  return {
+    minimumQualityPassRate: configured?.minimumQualityPassRate ?? defaults.minimumQualityPassRate!,
+    maximumQualityPassRateRegression: configured?.maximumQualityPassRateRegression ?? defaults.maximumQualityPassRateRegression!,
+    maximumCostPerLineageIncreaseRatio: configured?.maximumCostPerLineageIncreaseRatio ?? defaults.maximumCostPerLineageIncreaseRatio!,
+    minimumCacheHitRatio: configured?.minimumCacheHitRatio ?? defaults.minimumCacheHitRatio!,
+    maximumCacheHitRatioRegression: configured?.maximumCacheHitRatioRegression ?? defaults.maximumCacheHitRatioRegression!,
+  };
+}
 
 export type UsageCanaryReasonCode = PromptCostCanaryDecision['reasonCodes'][number]
   | 'archive_evidence_rejected' | 'provider_reported_usd_unavailable'
@@ -409,7 +423,7 @@ async function runUsageCanary(options: UsageCommandOptions, deps: UsageDeps, roo
       const featureId = featureComparisonId(baselineFeature, candidateFeature);
       const kernel = (deps.canaryCompareFn ?? comparePromptCostCanary)({ version: 1,
         baseline: { identity: cohortIdentity(baselineSamples, baselineSprint, featureId), samples: baselineSamples.map(kernelSample) },
-        candidate: { identity: cohortIdentity(candidateSamples, candidateSprint, featureId), samples: candidateSamples.map(kernelSample) }, thresholds: DEFAULT_CANARY_THRESHOLDS });
+        candidate: { identity: cohortIdentity(candidateSamples, candidateSprint, featureId), samples: candidateSamples.map(kernelSample) }, thresholds: await resolveCanaryThresholds(root) });
       projection = { schema: 'deckent.usage-canary', version: 1, baselineSprint, candidateSprint,
         decision: { disposition: kernel.disposition, reasonCodes: kernel.reasonCodes, planDigest: kernel.planDigest, kernelDecisionDigest: kernel.decisionDigest },
         measuredHitRatio: { denominator: 'inputTokens+cacheReadTokens+cacheCreationTokens', baseline: kernel.baseline.cacheHitRatio, candidate: kernel.candidate.cacheHitRatio, delta: kernel.deltas.cacheHitRatio },

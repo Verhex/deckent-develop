@@ -1765,6 +1765,18 @@ export interface PromptConfig {
    */
   codex_suppress_project_doc?: boolean;
   /**
+   * Usage prompt-cost canary PROMOTE/REJECT thresholds (KANUN 10: flow values
+   * are config-owned — the CLI caller must not hardcode policy). Every field
+   * is a ratio in [0,1] except maximumCostPerLineageIncreaseRatio (>= 0).
+   */
+  canary_thresholds?: {
+    minimumQualityPassRate?: number;
+    maximumQualityPassRateRegression?: number;
+    maximumCostPerLineageIncreaseRatio?: number;
+    minimumCacheHitRatio?: number;
+    maximumCacheHitRatioRegression?: number;
+  };
+  /**
    * 593-001 F2c catalog mount mask (default: **false** — behavior stays
    * byte-identical until the flag is explicitly turned on).
    *

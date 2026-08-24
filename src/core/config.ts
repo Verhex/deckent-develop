@@ -309,6 +309,16 @@ export const DEFAULT_PROMPT_CONFIG: Required<PromptConfig> = {
   // 593-001 F2c: catalog mount mask OFF by default — flag-gated, so worker
   // `docker run` argv stays byte-identical until it is explicitly enabled.
   catalog_mount_mask: false,
+  // Usage prompt-cost canary PROMOTE/REJECT policy (KANUN 10: flow values live
+  // in config, not in the CLI caller). The defaults are the strictest bar:
+  // full quality parity, zero cost/cache regression tolerated.
+  canary_thresholds: {
+    minimumQualityPassRate: 1,
+    maximumQualityPassRateRegression: 0,
+    maximumCostPerLineageIncreaseRatio: 0,
+    minimumCacheHitRatio: 0,
+    maximumCacheHitRatioRegression: 0,
+  },
   // 593-002: task-class profile SSOT (`resolveTaskPromptProfile`). The default IS
   // the set of literals the three former inline predicates carried, so resolving
   // through config changes NO classification — only where the values live.

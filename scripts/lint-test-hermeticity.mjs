@@ -631,8 +631,11 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // heartbeat v1, execution-write-scope-policy and host-primary stale-worker
   // suites (9 new descriptors + reworked result/heartbeat fixtures), all
   // suite-owned in-memory shapes; scan reports zero confirmed violations.
-  count: 16083,
-  digest: 'b905eaa8138a8ffda1450e37d55253b97743dd92bde69b6e0ef72acde5723315',
+  // 2026-08-24 HIGH-3/4 closure: +7 — hostTerminalProjection passthrough,
+  // legacy-evaluation resolution, depth-2 fix-chain and config-owned canary
+  // threshold regressions; all suite-owned in-memory/tmpdir fixtures.
+  count: 16090,
+  digest: '2c201975467b2fa1b2a092810b41ce9701d8e1b80259f1bd8681674a98a67ec1',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1126,8 +1129,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-24 read-path purity fix: count unchanged, digest moved — the
   // EXPIRE-SWEEP read hook was retired from pending-approvals (status/bot
   // polls no longer write expiry decisions; settlement is driver-owned).
+  // 2026-08-24 HIGH-3/4 closure: count unchanged, digest moved — canary
+  // archive reader (legacy-evaluation resolution, fix-chain walk), config-owned
+  // canary thresholds and result-schema hostTerminalProjection passthrough.
   count: 1321,
-  digest: '2764d1bea4da7cb3859626fde123b988221ccd3b64f725499736d5380f4d31b6',
+  digest: 'faefe9ea164807a372635ec784066cb83ee1fff93cad5e0924c3963df813ead3',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

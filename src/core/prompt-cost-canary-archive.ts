@@ -115,6 +115,8 @@ interface ProviderBillingArtifact {
 interface ResultArtifact {
   readonly taskId: string;
   readonly attemptId: string;
+  /** Result's own attempt ordinal when present — the legacy-evaluation join key. */
+  readonly attemptNum: number | null;
   readonly provider: string;
   readonly model: string;
   readonly tokenSource: string;
@@ -243,6 +245,7 @@ function parseResult(value: unknown, pathTaskId: string): ResultArtifact | null 
   return {
     taskId: pathTaskId,
     attemptId,
+    attemptNum: safeInteger(item['attempt']),
     provider,
     model,
     tokenSource,
@@ -262,21 +265,37 @@ function normalizeVerdict(value: unknown): PromptCostCanaryCohortSample['verdict
     : null;
 }
 
-function parseEvaluation(value: unknown): EvaluationArtifact | null {
+function parseEvaluation(value: unknown): EvaluationArtifact | PendingEvaluationArtifact | null {
   const item = record(value);
   if (!item || typeof item['taskId'] !== 'string') return null;
   const attemptId = item['attemptId'];
   const verdict = normalizeVerdict(item['verdict'] ?? item['decision'] ?? item['evaluationDecision']);
   const quality = item['quality'] ?? item['totalScore'];
-  if (typeof attemptId !== 'string' || attemptId.length === 0
-      || !verdict || typeof quality !== 'number' || !Number.isFinite(quality)
+  if (!verdict || typeof quality !== 'number' || !Number.isFinite(quality)
       || quality < 0 || quality > 100) return null;
-  return {
-    taskId: item['taskId'],
-    attemptId,
-    verdict,
-    quality,
-  };
+  if (typeof attemptId === 'string' && attemptId.length > 0) {
+    return { taskId: item['taskId'], attemptId, verdict, quality };
+  }
+  // Evaluation audit records never carried the exact attempt UUID (live gap
+  // 2026-08-24: 2759/2759 archived evaluations lack it). Their (taskId,
+  // attemptNum) identity is still exact — resolve the UUID through the
+  // task's own result artifact after the scan instead of rejecting history.
+  const attemptNum = safeInteger(item['attemptNum']);
+  if (attemptNum === null || attemptNum < 1) return null;
+  return { taskId: item['taskId'], attemptNum, verdict, quality };
+}
+
+interface PendingEvaluationArtifact {
+  readonly taskId: string;
+  readonly attemptNum: number;
+  readonly verdict: PromptCostCanaryCohortSample['verdict'];
+  readonly quality: number;
+}
+
+function isPendingEvaluation(
+  value: EvaluationArtifact | PendingEvaluationArtifact,
+): value is PendingEvaluationArtifact {
+  return !('attemptId' in value);
 }
 
 function parseAttempt(value: unknown): LineageUsageAttempt | null {
@@ -432,6 +451,7 @@ function readSprint(
   const results = new Map<string, ResultArtifact>();
   const resultsByAttemptId = new Map<string, ResultArtifact>();
   const evaluationsByAttemptId = new Map<string, EvaluationArtifact>();
+  const pendingEvaluations: PendingEvaluationArtifact[] = [];
   let sealedTerminalReceipt: JsonRecord | null = null;
   let terminalArtifact: TerminalArtifact | null = null;
   const exactTerminalPath = `${sprintId}-terminal-receipt.json`;
@@ -507,16 +527,54 @@ function readSprint(
         if (!parsed || !isSprintOwnedTaskArtifact(`task-${parsed.taskId}.json`, sprintId)) {
           throw new Error('invalid evaluation or task identity');
         }
-        if (evaluationsByAttemptId.has(parsed.attemptId)) {
-          throw new Error('duplicate evaluation exact attempt identity');
+        if (isPendingEvaluation(parsed)) {
+          pendingEvaluations.push(parsed);
+        } else {
+          if (evaluationsByAttemptId.has(parsed.attemptId)) {
+            throw new Error('duplicate evaluation exact attempt identity');
+          }
+          evaluationsByAttemptId.set(parsed.attemptId, parsed);
         }
-        evaluationsByAttemptId.set(parsed.attemptId, parsed);
       }
     } catch (error) {
       rejections.push(reject('invalid-artifact', error instanceof Error ? error.message : String(error), {
         sprintId, path: artifact.path,
       }));
     }
+  }
+
+  // Resolve legacy (taskId, attemptNum) evaluations to their exact attempt
+  // UUID through the task's own result artifact. A result whose ordinal is
+  // present must agree; a missing ordinal accepts attempt 1 only.
+  for (const pending of pendingEvaluations) {
+    const result = results.get(pending.taskId);
+    if (!result) {
+      rejections.push(reject('incomplete-lineage', 'legacy evaluation has no result artifact to resolve its exact attempt', {
+        sprintId, taskId: pending.taskId,
+      }));
+      continue;
+    }
+    const ordinalAgrees = result.attemptNum !== null
+      ? result.attemptNum === pending.attemptNum
+      : pending.attemptNum === 1;
+    if (!ordinalAgrees) {
+      rejections.push(reject('mixed-authority', 'legacy evaluation ordinal disagrees with its result attempt', {
+        sprintId, taskId: pending.taskId,
+      }));
+      continue;
+    }
+    if (evaluationsByAttemptId.has(result.attemptId)) {
+      rejections.push(reject('duplicate-artifact', 'duplicate evaluation exact attempt identity', {
+        sprintId, taskId: pending.taskId,
+      }));
+      continue;
+    }
+    evaluationsByAttemptId.set(result.attemptId, {
+      taskId: pending.taskId,
+      attemptId: result.attemptId,
+      verdict: pending.verdict,
+      quality: pending.quality,
+    });
   }
 
   if (!terminalArtifact || !sealedTerminalReceipt
@@ -575,8 +633,18 @@ function readSprint(
         continue;
       }
       const isRootAttempt = task.taskId === rootTask.taskId && task.fixForTaskId === null;
-      const isDirectFixAttempt = task.fixForTaskId === rootTask.taskId;
-      if ((isRootAttempt === isDirectFixAttempt)
+      // Walk the full fix chain: with the default bounded FIX budget a lineage
+      // legitimately contains X-fix-fix attempts, which a direct-parent-only
+      // check would reject (live sprint-661 case: 006/008 depth-2 fixes).
+      let chainCursor: TaskArtifact | undefined = task;
+      const chainSeen = new Set<string>();
+      while (chainCursor && chainCursor.fixForTaskId !== null && !chainSeen.has(chainCursor.taskId)) {
+        chainSeen.add(chainCursor.taskId);
+        chainCursor = tasks.get(chainCursor.fixForTaskId);
+      }
+      const isFixChainAttempt = task.fixForTaskId !== null
+        && chainCursor !== undefined && chainCursor.taskId === rootTask.taskId;
+      if ((isRootAttempt === isFixChainAttempt)
           || task.authority.authorityDigest !== rootTask.authority.authorityDigest
           || result.taskId !== attempt.taskId
           || evaluation.taskId !== attempt.taskId

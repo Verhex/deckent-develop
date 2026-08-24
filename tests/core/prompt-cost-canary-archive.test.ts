@@ -35,6 +35,7 @@ function fixture(sprintId: string, attempts: readonly Attempt[] = [], options: {
   readonly sidecars?: boolean;
   readonly duplicateResult?: boolean;
   readonly evaluationAttemptId?: string;
+  readonly legacyEvaluations?: boolean;
   readonly conflicts?: readonly unknown[];
 } = {}): string {
   const root = roots[0] ?? mkdtempSync(join(tmpdir(), 'canary-archive-'));
@@ -73,10 +74,16 @@ function fixture(sprintId: string, attempts: readonly Attempt[] = [], options: {
     };
     files[`tasks/task-${attempt.taskId}.json`] = task;
     files[`tasks/task-${attempt.taskId}.result`] = result;
-    files[`evaluations/arbitrary-${index}.json`] = {
-      taskId: attempt.taskId, sprintId, attemptId: options.evaluationAttemptId ?? attempt.attemptId,
-      decision: attempt.verdict ?? 'DONE', totalScore: attempt.quality ?? 91,
-    };
+    files[`evaluations/arbitrary-${index}.json`] = options.legacyEvaluations
+      ? {
+        // Real evaluation-audit shape: no exact attempt UUID, ordinal only.
+        taskId: attempt.taskId, sprintId, attemptNum: 1,
+        decision: attempt.verdict ?? 'DONE', totalScore: attempt.quality ?? 91,
+      }
+      : {
+        taskId: attempt.taskId, sprintId, attemptId: options.evaluationAttemptId ?? attempt.attemptId,
+        decision: attempt.verdict ?? 'DONE', totalScore: attempt.quality ?? 91,
+      };
     return {
       id: attempt.attemptId, taskId: attempt.taskId, logicalRootTaskId: rootTaskId,
       ...(attempt.fixForTaskId ? { fixForTaskId: attempt.fixForTaskId } : {}),
@@ -126,6 +133,35 @@ describe('canonical prompt-cost canary archive cohort', () => {
     if (!value.ok) return;
     expect(value.samples[0]).toMatchObject({ taskId: '702-001-fix-fix', attemptId: 'fix-done', attempt: 2, verdict: 'DONE', quality: 97, tokenUsage: { inputTokens: 30, outputTokens: 5, cacheReadTokens: 9, cacheCreationTokens: 3, totalTokens: 47 }, providerReportedUsd: { available: true, usd: 0.2, source: 'provider-envelope' } });
     expect(value.samples[0]?.billingSource.pricingSource).toBe('reference-catalog');
+  });
+
+  it('resolves legacy attemptNum-only evaluations through the result attempt identity', () => {
+    // Live gap 2026-08-24: 2759/2759 archived evaluation-audit records carry
+    // attemptNum but no attempt UUID; the cohort reader must not reject history.
+    const root = fixture('sprint-705', [], { legacyEvaluations: true });
+    fixture('sprint-706', [], { legacyEvaluations: true });
+    const value = readPromptCostCanaryArchiveCohort({ projectRoot: root, sprintIds: ['sprint-705', 'sprint-706'] });
+    expect(value.ok).toBe(true);
+    if (!value.ok) return;
+    expect(value.samples.some(sample => sample.sprintId === 'sprint-705'
+      && sample.attemptId === 'attempt-sprint-705' && sample.verdict === 'DONE')).toBe(true);
+  });
+
+  it('accepts a bounded depth-2 fix chain (root → fix → fix-fix) in one lineage', () => {
+    // Live sprint-661 case: 006/008 produced X-fix-fix attempts under the
+    // default bounded FIX budget; a direct-parent-only check rejected them.
+    const rootTaskId = '707-001';
+    const root = fixture('sprint-707', [
+      { taskId: rootTaskId, attemptId: 'root-no-go', verdict: 'NO_GO', quality: 10, usage: [10, 2, 4, 1], providerUsd: 0.05 },
+      { taskId: `${rootTaskId}-fix`, fixForTaskId: rootTaskId, attemptId: 'fix-no-go', verdict: 'NO_GO', quality: 20, usage: [5, 1, 2, 1], providerUsd: 0.05 },
+      { taskId: `${rootTaskId}-fix-fix`, fixForTaskId: `${rootTaskId}-fix`, attemptId: 'fix-fix-done', verdict: 'DONE', quality: 95, usage: [8, 2, 3, 1], providerUsd: 0.06 },
+    ]);
+    fixture('sprint-708');
+    const value = readPromptCostCanaryArchiveCohort({ projectRoot: root, sprintIds: ['sprint-707', 'sprint-708'] });
+    expect(value.ok).toBe(true);
+    if (!value.ok) return;
+    expect(value.samples.some(sample => sample.taskId === '707-001-fix-fix'
+      && sample.attemptId === 'fix-fix-done' && sample.verdict === 'DONE' && sample.quality === 95)).toBe(true);
   });
 
   it('rejects duplicate canonical results, mismatched exact evaluation identity, and conflicted manifests', () => {
