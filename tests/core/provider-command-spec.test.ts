@@ -122,7 +122,7 @@ describe('buildProviderCommand', () => {
     expect(PROVIDER_COMMAND_SPECS.claude.oauthHomeDir).toBe('.claude');
     expect(PROVIDER_COMMAND_SPECS.codex.oauthHomeDir).toBe('.codex');
     expect(PROVIDER_COMMAND_SPECS.gemini.oauthHomeDir).toBe('.gemini');
-    expect(PROVIDER_COMMAND_SPECS.cursor.oauthHomeDir).toBeNull();
+    expect(PROVIDER_COMMAND_SPECS.cursor.oauthHomeDir).toBe('.config/cursor');
   });
 
   // F1-RE (Sprint 252): model reasoning-effort appended when resolved + supported.

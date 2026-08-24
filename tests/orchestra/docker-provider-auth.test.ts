@@ -84,6 +84,7 @@ import { readFileSync } from 'node:fs';
 import {
   buildProviderAuthIsolation,
   DockerSpawnBackend,
+  resolveCursorHostCredentialRoot,
 } from '../../src/orchestra/spawn-backend-docker.js';
 import type { ModelType } from '../../src/core/types.js';
 import {
@@ -209,6 +210,43 @@ describe('DockerSpawnBackend: provider-aware auth mount (Sprint 203 T-002)', () 
     const argv = buildProviderAuthIsolation('/home/test', 'gemini', '.gemini', false).mountArgs;
     expect(hasVolumeMount(argv, '.claude')).toBe(false);
     expect(hasVolumeMount(argv, '.gemini/gemini-credentials.json')).toBe(true);
+  });
+
+  it.each([
+    ['linux', '/home/test', { XDG_CONFIG_HOME: '/xdg/config' }, '/xdg/config/cursor'],
+    ['darwin', '/Users/test', { XDG_CONFIG_HOME: '/custom/config' }, '/custom/config/cursor'],
+    ['win32', 'C:\\Users\\test', { APPDATA: 'D:\\Roaming' }, 'D:\\Roaming\\cursor'],
+  ] as const)('resolves the %s Cursor host credential root from platform authority', (platform, home, env, expected) => {
+    expect(resolveCursorHostCredentialRoot(home, platform, env)).toBe(expected);
+  });
+
+  it.each([
+    ['linux', '/home/test', { XDG_CONFIG_HOME: 'relative/config' }, '/home/test/.config/cursor'],
+    ['darwin', '/Users/test', { XDG_CONFIG_HOME: '/unsafe,config' }, '/Users/test/.config/cursor'],
+    ['win32', 'C:\\Users\\test', { APPDATA: 'relative\\Roaming' }, 'C:\\Users\\test\\.config\\cursor'],
+  ] as const)('ignores unsafe or relative %s Cursor env input and uses the documented home fallback', (platform, home, env, expected) => {
+    expect(resolveCursorHostCredentialRoot(home, platform, env)).toBe(expected);
+  });
+
+  it('mounts only Cursor auth.json from the resolved host root into its private Linux destination', () => {
+    const auth = buildProviderAuthIsolation('/home/test', 'cursor', '.config/cursor', false, () => true, {
+      hostCredentialRoot: '/xdg/config/cursor',
+    });
+    expect(auth.mountArgs).toEqual([
+      '--mount',
+      'type=bind,src=/xdg/config/cursor/auth.json,dst=/run/deckent-auth-cursor-auth.json,readonly',
+    ]);
+    expect(auth.bootstrapLines).toContain('cp "/run/deckent-auth-cursor-auth.json" "$HOME/.config/cursor/auth.json" || exit 78');
+    expect(auth.mountArgs.some(arg => arg.includes('src=/xdg/config/cursor,dst='))).toBe(false);
+  });
+
+  it('fails closed when Cursor auth.json is absent and preserves API-only no-mount behavior', () => {
+    const missing = buildProviderAuthIsolation('/home/test', 'cursor', '.config/cursor', false, () => false, {
+      hostCredentialRoot: '/home/test/.config/cursor',
+    });
+    expect(missing.missingRequiredFiles).toEqual(['auth.json']);
+    expect(missing.mountArgs).toEqual([]);
+    expect(buildProviderAuthIsolation('/home/test', 'cursor', '.config/cursor', true).mountArgs).toEqual([]);
   });
 
   it('mounts only the Claude credential for claude-haiku-4-5-20251001', () => {

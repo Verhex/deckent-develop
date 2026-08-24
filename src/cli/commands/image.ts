@@ -38,6 +38,8 @@ export interface ImageBuildOptions {
   withGemini?: boolean;
   /** Install Ollama CLI in the image (INSTALL_OLLAMA=true build-arg). */
   withOllama?: boolean;
+  /** Install Cursor CLI in the image (INSTALL_CURSOR=true build-arg). */
+  withCursor?: boolean;
   /** Image tag to build. CLI `--tag`. Falls back to {@link image} then {@link DEFAULT_WORKER_IMAGE}. */
   tag?: string;
   /**
@@ -112,12 +114,13 @@ function buildDockerBuildArgs(
   dockerfilePath: string,
   context: string,
   tag: string,
-  opts: Pick<ImageBuildOptions, 'withCodex' | 'withGemini' | 'withOllama'>,
+  opts: Pick<ImageBuildOptions, 'withCodex' | 'withGemini' | 'withOllama' | 'withCursor'>,
 ): string[] {
   const args = ['build', '-f', dockerfilePath];
   if (opts.withCodex) args.push('--build-arg', 'INSTALL_CODEX=true');
   if (opts.withGemini) args.push('--build-arg', 'INSTALL_GEMINI=true');
   if (opts.withOllama) args.push('--build-arg', 'INSTALL_OLLAMA=true');
+  if (opts.withCursor) args.push('--build-arg', 'INSTALL_CURSOR=true');
   args.push('-t', tag, context);
   return args;
 }
@@ -153,39 +156,38 @@ export async function handleImageBuild(
   const planStr = `docker ${args.join(' ')}`;
 
   if (opts.dryRun) {
-    // TODO(phase2): add dedicated i18n keys (image.dry_run_dockerfile / image.dry_run_tag).
-    // The build-plan line reuses the existing doctor.image_build_hint key ('Build: {cmd}').
-    print(`Dockerfile: ${dockerfilePath}${exists ? '' : ' (NOT FOUND)'}`);
-    print(getMessage('doctor.image_build_hint', lang, { cmd: planStr }));
-    print(`Image tag: ${tag}`);
+    print(getMessage('image.dry_run_dockerfile', lang, {
+      path: dockerfilePath,
+      status: exists ? '' : getMessage('image.dry_run_not_found', lang),
+    }));
+    print(getMessage('image.dry_run_build', lang, { cmd: planStr }));
+    print(getMessage('image.dry_run_tag', lang, { tag }));
     return 0;
   }
 
   if (!exists) {
     // Honest-fail: do NOT spawn a build that docker would reject with an opaque
     // "unable to prepare context" error. Surface the concrete expected path.
-    // TODO(phase2): add i18n key image.dockerfile_missing.
     printError(
       new Error(
-        `Packaged Dockerfile.worker not found at ${dockerfilePath}. ` +
-          `Reinstall deckent (the Dockerfile ships in the npm package) or report this packaging error.`,
+        getMessage('image.dockerfile_missing', lang, { path: dockerfilePath }),
       ),
     );
     return 1;
   }
 
-  print(getMessage('doctor.image_fix_running', lang, { cmd: planStr }));
+  print(getMessage('image.build_running', lang, { cmd: planStr }));
 
-  const code = await runBuild(args, spawnImpl);
+  const code = await runBuild(args, lang, spawnImpl);
 
   if (code === 0) {
-    print(getMessage('doctor.image_fix_done', lang));
+    print(getMessage('image.build_done', lang));
   } else if (code === DOCKER_UNAVAILABLE) {
     // The actionable "docker unavailable" message was already printed in runBuild.
     // Normalise to a clean non-zero exit for callers (init/upgrade fold + CLI).
     return 1;
   } else {
-    print(getMessage('doctor.image_fix_failed', lang, { code: String(code) }));
+    print(getMessage('image.build_failed', lang, { code: String(code) }));
   }
 
   return code;
@@ -199,7 +201,7 @@ export async function handleImageBuild(
  * vector). Resolves the process exit code, or {@link DOCKER_UNAVAILABLE} when the
  * docker binary itself could not be launched (honest-fail, message printed).
  */
-function runBuild(args: string[], spawnImpl?: SpawnImpl): Promise<number> {
+function runBuild(args: string[], lang: string, spawnImpl?: SpawnImpl): Promise<number> {
   const spawn: SpawnImpl = spawnImpl ?? ((c, a, o) => nodeSpawn(c, a, o));
   return new Promise((resolve) => {
     let settled = false;
@@ -214,13 +216,11 @@ function runBuild(args: string[], spawnImpl?: SpawnImpl): Promise<number> {
     child.on('error', (err: Error) => {
       // Honest-fail: never a silent success. Distinguish "docker not installed"
       // (ENOENT) from other launch failures so the message is actionable.
-      // TODO(phase2): add i18n key image.docker_unavailable.
       const isMissing = (err as NodeJS.ErrnoException).code === 'ENOENT';
       const detail = isMissing
-        ? 'docker command not found — install Docker and ensure it is on PATH, ' +
-          'or switch spawn_backend to "subprocess".'
-        : `could not launch docker: ${err.message}`;
-      printError(new Error(`deckent image build: ${detail}`));
+        ? getMessage('image.docker_unavailable', lang)
+        : getMessage('image.docker_launch_failed', lang, { error: err.message });
+      printError(new Error(getMessage('image.build_launch_error', lang, { detail })));
       finish(DOCKER_UNAVAILABLE);
     });
     child.on('close', (code) => finish(code ?? -1));
@@ -237,13 +237,14 @@ export function registerImage(program: Command): void {
   cmd
     .command('build')
     .description(getMessage('cli.image.build.desc', getLanguage(undefined)))
-    .option('--tag <tag>', `Docker image tag to build (default: ${DEFAULT_WORKER_IMAGE})`)
-    .option('--dry-run', 'Print the resolved Dockerfile path + build plan without building (no docker spawn)')
-    .option('--with-codex', 'Install Codex CLI (INSTALL_CODEX=true build-arg)')
-    .option('--with-gemini', 'Install Gemini CLI (INSTALL_GEMINI=true build-arg)')
-    .option('--with-ollama', 'Install Ollama CLI (INSTALL_OLLAMA=true build-arg)')
-    .option('--image <tag>', 'Deprecated alias for --tag')
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--tag <tag>', getMessage('cli.image.build.opt_tag', getLanguage(undefined), { default: DEFAULT_WORKER_IMAGE }))
+    .option('--dry-run', getMessage('cli.image.build.opt_dry_run', getLanguage(undefined)))
+    .option('--with-codex', getMessage('cli.image.build.opt_with_codex', getLanguage(undefined)))
+    .option('--with-gemini', getMessage('cli.image.build.opt_with_gemini', getLanguage(undefined)))
+    .option('--with-ollama', getMessage('cli.image.build.opt_with_ollama', getLanguage(undefined)))
+    .option('--with-cursor', getMessage('cli.image.build.opt_with_cursor', getLanguage(undefined)))
+    .option('--image <tag>', getMessage('cli.image.build.opt_image', getLanguage(undefined)))
+    .option('--lang <code>', getMessage('cli.image.build.opt_lang', getLanguage(undefined)))
     .action(async (opts: ImageBuildOptions) => {
       try {
         const code = await handleImageBuild(opts);

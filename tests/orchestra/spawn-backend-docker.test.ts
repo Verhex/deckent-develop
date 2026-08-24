@@ -76,7 +76,7 @@ vi.mock('../../src/orchestra/execution-landing-coordinator.js', async (importAct
 }));
 
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import {
   DockerSpawnBackend,
   DEFAULT_WORKER_MEMORY_LIMIT,
@@ -95,6 +95,7 @@ import {
 
 const mockSpawnSync = vi.mocked(spawnSync);
 const mockReadFileSync = vi.mocked(readFileSync);
+const mockWriteFileSync = vi.mocked(writeFileSync);
 const TEST_EXECUTION_OPTIONS = TEST_DOCKER_EXECUTION_OPTIONS;
 
 // The full node:fs mock cannot carry the WorkerHeartbeatAuthorityStore
@@ -702,7 +703,17 @@ describe('DockerSpawnBackend: provider-aware command + isolated OAuth credential
 describe('A23: host-side claude auth health-check (Sprint 194 W-AUTH wire)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockReadFileSync.mockImplementation((path) => budgetedDockerTaskJson(path));
+    mockReadFileSync.mockImplementation((path, options) => {
+      const writtenResult = String(path).endsWith('/task-t-a23-authfail.result')
+        ? [...mockWriteFileSync.mock.calls].reverse().find(call =>
+            String(call[1]).includes('AUTH_FAILED') && String(call[1]).includes('t-a23-authfail'))
+        : undefined;
+      const contents = writtenResult ? String(writtenResult[1]) : budgetedDockerTaskJson(path);
+      // Settlement intentionally reads worker results without an encoding so it
+      // can hash/capture the original bytes. Mirror node:fs's overload instead
+      // of returning a string for that raw-buffer read.
+      return options === undefined ? Buffer.from(contents) : contents;
+    });
     capturedDockerRunArgs.length = 0;
     // Router: docker healthy, but `claude --version` FAILS (auth lost).
     mockSpawnSync.mockImplementation((cmd, args) => {

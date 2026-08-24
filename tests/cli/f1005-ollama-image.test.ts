@@ -51,4 +51,36 @@ describe('F1-005 — ollama added to worker image', () => {
     expect(content).toContain('if [ "$INSTALL_CODEX" = "true" ]');
     expect(content).toContain('if [ "$INSTALL_GEMINI" = "true" ]');
   });
+
+  it('Cursor support does not replace or alter the adjacent Ollama gate', () => {
+    const content = readFileSync(
+      join(PROJECT_ROOT, 'src/cli/commands/image.ts'),
+      'utf-8',
+    );
+    expect(content).toContain("'INSTALL_OLLAMA=true'");
+    expect(content).toContain("'INSTALL_CURSOR=true'");
+  });
+});
+
+describe('CURSOR-PROVIDER-001 — Cursor added to the worker image', () => {
+  const dockerfile = () => readFileSync(
+    join(PROJECT_ROOT, 'assets', 'Dockerfile.worker'),
+    'utf-8',
+  );
+
+  it('declares and consumes the default-off INSTALL_CURSOR build argument', () => {
+    const content = dockerfile();
+    expect(content).toContain('ARG INSTALL_CURSOR=false');
+    expect(content).toContain('if [ "$INSTALL_CURSOR" = "true" ]');
+    expect(content).toContain('https://cursor.com/install');
+  });
+
+  it('installs Cursor into a non-root-readable prefix and verifies the binary', () => {
+    const content = dockerfile();
+    expect(content).toContain('HOME=/opt/cursor-agent bash');
+    expect(content).toContain('/usr/local/bin/cursor-agent');
+    expect(content).toContain('chmod -R a+rX /opt/cursor-agent/.local');
+    expect(content).toContain('cursor-agent --version');
+    expect(content).not.toContain('HOME=/root');
+  });
 });

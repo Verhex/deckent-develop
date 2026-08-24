@@ -60,9 +60,10 @@ export interface ProviderCommandSpec {
    */
   promptFeed: 'stdin' | 'inline' | 'argument';
   /**
-   * Host OAuth/session dir (relative to HOME) to mount into the container so the
-   * CLI can authenticate (claude `.claude`, codex `.codex`, gemini `.gemini`),
-   * or null for providers with no host session dir.
+   * Task-private container OAuth/session destination relative to HOME. For the
+   * legacy providers this also names the default host-relative source; providers
+   * with platform config authority (Cursor) resolve the host source separately.
+   * Null means the provider has no file-backed session directory.
    */
   oauthHomeDir: string | null;
   /**
@@ -174,8 +175,10 @@ export const PROVIDER_COMMAND_SPECS: Readonly<Record<string, ProviderCommandSpec
     availableToolsFlag: null,
     isolatedContextArgs: [],
     promptFeed: 'argument',
-    // The CLI contract proves session auth but not its on-disk home directory.
-    oauthHomeDir: null,
+    // Containers run the Linux CLI, whose file credential store is rooted here.
+    // The host source is platform-specific and is resolved independently by the
+    // Docker backend; never use this destination to infer a host mount source.
+    oauthHomeDir: '.config/cursor',
     reasoningEffortArgs: null,
     excludeDynamicPromptSectionsFlag: null,
     liveUsage: 'final-only',

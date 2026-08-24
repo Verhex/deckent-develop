@@ -560,8 +560,11 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // pre-cutover assertions now pin the canonical read-only terminal projection
   // and legacy human-command routing contract. No fixture root or effect class
   // changed; the dedicated time-drift regression remains tmpdir-owned.
+  // 2026-08-24 Cursor production wiring: count unchanged, digest only — the
+  // Docker probe now exercises the logical-provider auth bridge and the fan-in
+  // suite uses async-disposable tmpdirs. No new unresolved effect is admitted.
   count: 15823,
-  digest: '8fd3db93169f80db161bd9b2a956b5c3111bd63e28ac2af029968f3965dec223',
+  digest: '216a921e4801442796e9a0dd6df4e5267a677bcd7b44cdcfdbab4ac4342bd0fe',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -995,8 +998,13 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // CLI now consumes the existing side-effect-free projection instead of the
   // expiry-settling store API. No new production module or effect entered the
   // graph.
+  // 2026-08-24 Cursor production wiring: count unchanged; digest binds image
+  // CLI/i18n, canonical catalog enrichment, and logical-provider Docker auth
+  // consumer wiring. No new production module entered the inventory.
+  // Root consumer repair keeps the count unchanged and bounds unsupported
+  // remote-catalog diagnostics to one deterministic aggregate warning.
   count: 1309,
-  digest: '6a52cba56111047d07263a51c64dd48d9fcca823796473efe71a13f29bffa64b',
+  digest: '59c9a39bacf828c82c87c2ee2915c0a7115d98490a9bbd48c0c17065330386fd',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

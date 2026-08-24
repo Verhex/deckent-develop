@@ -1,120 +1,50 @@
-# DIRECTIVES — FINAL-ONLY USAGE CONTAINMENT PARITY
+# CURSOR-PROVIDER-001: Production Image, Catalog, and Isolated Auth Closure
 
 ## Goal
+Close the remaining Cursor production wiring for MASTER outcome 7091 without creating reports or docs/evidence: make the production image build surface install Cursor, keep canonical Cursor models visible when the remote catalog omits them, and bridge the host Cursor session into Docker through a credential-only cross-platform auth authority. Root operator owns post-terminal build, image, real-binary, auth, and different-provider XVerify proof.
 
-Manual `deckent spawn --force` ile normal sprint executor arasındaki final-only usage
-containment authority farkını kapat. Tek product outcome budur. Provider live-usage
-capability, immutable task budget policy ve owner-authored final-only grant tek shared
-resolver üzerinden kesişmeli; manual, initial sprint, retry, FIX ve continuation yolları
-surface-local fallback veya ikinci grant üretmeden aynı kararı tüketmelidir.
+## Execution contract
+- DOGFOOD_MODE=ON. Allocate the run ID only through canonical allocator authority.
+- Four-task dependency DAG: Tasks 1, 2, and 3 execute concurrently; Task 4 is the production fan-in and depends on Tasks 1 through 3.
+- No docs/evidence, MASTER, follow-up, ADR, changelog, provider login/auth mutation, execution-authority, Brain-memory, generated projection, or live database mutation by workers.
+- Preserve every unrelated dirty file. Never delete `.brain/memory.db` or clean `.tasks` manually.
+- No `npm run build`, `npm run build:all`, Docker image build, provider login, or full suite during the active run. Hermetic scoped Vitest and `npx tsc --noEmit` are allowed.
+- Production wiring must close producer -> consumer -> CLI/runtime entrypoint -> policy/config. Test-only imports are not completion.
+- All user-facing CLI strings use `getMessage(key, lang)` with English and Turkish entries. No new hardcoded visible text.
+- Provider/model/worker selection and concurrency are resolved only from effective config, registry, auth, reachability, limits, dependency DAG, and collision policy. Do not encode provider or model choice in task output.
+- Cursor auth must expose only the exact credential file, never the complete host config directory. Honor XDG config authority, native Windows APPDATA authority, and honest fallback semantics without platform-specific silent behavior.
+- Task-local acceptance is scoped source verification. The root operator performs the mandatory fresh-dist and real production image proof only after the run is terminal, because builds are forbidden while the run is active.
 
-Aktif run sırasında build, provider auth mutation ve XVerify çalıştırma. `.brain/memory.db`
-silinmez veya taşınmaz; `.tasks` içeriği `rm` ile temizlenmez. Başka outcome'a ait finding
-yalnız `RELATED_BUT_NONBLOCKING` olarak raporlanır.
+## Task 1: Cursor production image CLI and complete image-command i18n
+- Files: src/cli/commands/image.ts, src/cli/helpers/messages.ts, tests/cli/image-build.test.ts, tests/cli/f1005-ollama-image.test.ts, tests/cli/helpers/messages.test.ts
+- Scope: src/cli/, tests/cli/
+- Type: feature
+- Goal: Add `withCursor` to the typed image build options, emit the exact `INSTALL_CURSOR=true` Docker build argument, and expose `deckent image build --with-cursor`. Migrate every user-visible string touched or already emitted by the image command, including option descriptions, dry-run lines, missing Dockerfile guidance, and Docker-launch errors, into existing `getMessage` English/Turkish authority. Preserve cwd-independent packaged Dockerfile resolution, shell-free argument vectors, existing provider flags, deprecated `--image`, and honest non-zero failures. Tests must prove the Cursor argument, complete EN/TR message coverage, spaces in paths, no Docker spawn on dry-run/missing Dockerfile, and adjacent Ollama behavior. Do not build an image during the run.
 
-## Task 1: FO01 ingress wiring inventory
-- Files: docs/evidence/final-only-usage-containment-parity-2026-08-23/01-ingress-inventory.md
-- Reads: src/cli/commands/spawn.ts, src/orchestra/sprint-spawner.ts, src/orchestra/scheduler-effects.ts, src/orchestra/cross-verify-runner.ts, src/orchestra/task-mode-runner.ts
-- Dependencies: none
-- Priority: HIGH
-- Test: git diff --check -- docs/evidence/final-only-usage-containment-parity-2026-08-23/01-ingress-inventory.md
-### Description
-Manual spawn, initial sprint scheduler, scheduler retry/FIX/continuation, task mode ve XVerify
-producer-to-consumer-to-backend zincirlerini fresh source references ile ölç. Her ingress'in
-provider route seçimi, live-usage admission, grant forwarding, dispatch boundary ve terminal
-settlement davranışını tablo halinde kaydet. Kod veya başka dosya değiştirme.
-### goNogo
-- goCriteria: Exact production references ile tüm execution ingressleri ve manual-vs-sprint divergence noktası kaydedilir; yalnız declared evidence file değişir
-- nogo: Tahmini wiring yazılır; başka file değiştirilir; formal closure veya runtime-hygiene DONE iddia edilir
+## Task 2: Canonical Cursor catalog visibility
+- Files: src/core/model-catalog.ts, tests/core/model-catalog.test.ts, tests/core/model-catalog-bootstrap.test.ts, tests/core/catalog-apiid-merge.test.ts, tests/core/catalog-merge-id.test.ts
+- Scope: src/core/, tests/core/
+- Type: fix
+- Goal: Make every successful remote or cached catalog result retain canonical registry definitions that the external catalog omits, including all four Cursor models, while letting fresh external definitions override matching canonical API identities where their evidence is authoritative. Preserve deterministic order, provider/api-id identity, cache source metadata, warnings, offline fallback, bootstrap behavior, and no duplicate logical model. Tests cover remote omission of Cursor, cached omission, matching override, deterministic order, and registry bootstrap. Do not hardcode Cursor as a one-off CLI special case.
 
-## Task 2: FO02 policy and provenance inventory
-- Files: docs/evidence/final-only-usage-containment-parity-2026-08-23/02-policy-provenance.md
-- Reads: src/core/execution-budget-policy.ts, src/core/execution-plan-digest.ts, src/core/task-types.ts, src/orchestra/spawn-backend-docker.ts, src/core/task-execution-settlement.ts
-- Dependencies: none
-- Priority: HIGH
-- Test: git diff --check -- docs/evidence/final-only-usage-containment-parity-2026-08-23/02-policy-provenance.md
-### Description
-Final-only authorization'ın provider live-usage capability, immutable task budget snapshot,
-policy digest, role, tenant, run, task, attempt, deadline ve wall-clock binding zincirini ölç.
-Replay, expiry, missing grant, provider mismatch, backend mismatch ve stale task projection
-negative-space'ini exact source references ile kaydet. Kod veya başka dosya değiştirme.
-### goNogo
-- goCriteria: Authority inputs and fail-closed negative space exact production references ile kaydedilir; yalnız declared evidence file değişir
-- nogo: Yeni authority uydurulur; replay veya expiry sessiz kabul edilir; başka file değiştirilir
+## Task 3: Cross-platform Cursor Docker auth isolation
+- Files: src/core/provider-command-spec.ts, src/orchestra/spawn-backend-docker.ts, tests/core/provider-command-spec.test.ts, tests/orchestra/spawn-backend-docker.test.ts, tests/orchestra/docker-provider-auth.test.ts, tests/orchestra/docker-auth-precedence.test.ts, tests/orchestra/spawn-backend-docker-probe.test.ts, tests/providers/docker-bounded-reachability-evidence.test.ts
+- Scope: src/core/, src/orchestra/, tests/core/, tests/orchestra/, tests/providers/
+- Type: feature
+- Goal: Encode Cursor's container auth destination and add `auth.json` to the provider credential allowlist. Resolve the host credential root from XDG_CONFIG_HOME on Unix-like/WSL hosts, APPDATA on native Windows, and the documented home fallback, using explicit sanitized path authority rather than mounting the complete host config tree. Thread the resolved host source independently from the task-private container destination through both the credential broker and direct isolation path. Preserve file-only mounts, permission hardening, refresh broker locking, missing-required-file fail-closed behavior, API-only behavior, and every existing Claude/Codex/Gemini path. Tests cover Linux, macOS, native Windows, WSL/XDG override, unsafe or relative env input, required-file absence, probe use, and no full-directory mount.
 
-## Task 3: FO03 conformance matrix inventory
-- Files: docs/evidence/final-only-usage-containment-parity-2026-08-23/03-conformance-matrix.md
-- Reads: tests/orchestra/docker-final-only-containment.test.ts, tests/orchestra/spawn-spawner-wire.test.ts, tests/orchestra/scheduler-spawn-executor.test.ts, tests/cli/spawn-lifecycle.test.ts, tests/cli/commands/multi-provider-spawn-kill-run.test.ts, tests/cli/spawn-settlement-attempt.test.ts
-- Dependencies: none
-- Priority: HIGH
-- Test: git diff --check -- docs/evidence/final-only-usage-containment-parity-2026-08-23/03-conformance-matrix.md
-### Description
-Mevcut final-only ve manual-spawn test coverage'ını normal completion, hang, child process,
-missing-final usage, missing grant, replay, crash, stale result ve exactly-once settlement
-eksenlerinde say. Covered ve missing hücreleri test isimleriyle kaydet; implementation önerisini
-yalnız measured gap ile sınırla. Kod veya başka dosya değiştirme.
-### goNogo
-- goCriteria: Test matrix gerçek test isimleri ve measured covered-missing counts taşır; yalnız declared evidence file değişir
-- nogo: Çalışmayan test varmış gibi gösterilir; başka file değiştirilir; mock-only proof COMPLETE sayılır
+## Task 4: Cursor production wiring fan-in
+- Files: tests/integration/cursor-production-wiring.integration.test.ts
+- Scope: tests/integration/
+- Dependencies: Task 1, Task 2, Task 3
+- Type: test
+- Goal: Add one integration battery that imports and exercises the actual production modules across the three seams: image build argument generation through the CLI handler, canonical-plus-remote catalog resolution exposing all Cursor model identities, and Cursor credential-only Docker auth preparation with the correct task-private destination. Assert that no full config/home directory is mounted, no provider auth file is mutated, existing provider behavior remains available, and the named Cursor verifier model resolves through the real registry/catalog chain. Run this test plus the exact adjacent scoped batteries and `npx tsc --noEmit`; do not modify production code or build dist/image during the run.
 
-## Task 4: FO04 shared containment authority resolver
-- Files: src/core/final-only-usage-containment.ts, tests/core/final-only-usage-containment.test.ts
-- Reads: docs/evidence/final-only-usage-containment-parity-2026-08-23/01-ingress-inventory.md, docs/evidence/final-only-usage-containment-parity-2026-08-23/02-policy-provenance.md, src/core/execution-budget-policy.ts, src/core/provider-command-spec.ts, src/orchestra/spawn-backend.ts
-- Dependencies: Task 1, Task 2
-- Priority: CRITICAL
-- Test: npx vitest run tests/core/final-only-usage-containment.test.ts
-### Description
-Provider live-usage mode, resolved executor capability, immutable execution budget ve task-stamped
-owner authorization kesişimini tek pure shared resolver'da üret. Resolver only-if-exact semantics,
-typed reason code ve fail-closed negative-space taşısın; grant üretmesin veya genişletmesin.
-Cross-platform `auto` backend sonucu caller tarafından resolved executor olarak verilmelidir.
-### goNogo
-- goCriteria: Shared resolver final-only plus live ceiling plus eligible executor plus exact authorization kesişiminde grant döndürür; missing or mismatch cases typed fail-closed olur; scoped unit tests green
-- nogo: Resolver owner grant üretir; backend tahmin eder; non-final-only provider'a containment verir; expiry or mismatch kabul eder; scoped tests fail
-
-## Task 5: FO05 manual spawn production consumer
-- Files: src/cli/commands/spawn.ts, tests/cli/spawn-lifecycle.test.ts
-- Reads: docs/evidence/final-only-usage-containment-parity-2026-08-23/01-ingress-inventory.md, docs/evidence/final-only-usage-containment-parity-2026-08-23/02-policy-provenance.md, src/core/final-only-usage-containment.ts, src/orchestra/spawn-backend-docker.ts
-- Dependencies: Task 4
-- Priority: CRITICAL
-- Test: npx vitest run tests/cli/spawn-lifecycle.test.ts
-### Description
-Manual `registerSpawn` task snapshotındaki final-only authorization'ı shared resolver inputuna
-taşısın. `spawnWorkerMultiProvider` gerçek configured backend'i resolve ettikten sonra containment
-kararını versin; geçerli Docker containment varken host-adapter short-circuit etmesin. Dispatch
-boundary receipt backend spawn'dan önce, terminal settlement exact attempttan ve stale result guard
-korunarak çalışsın. Missing grant veya uygun olmayan executor provider work öncesi fail-closed olsun.
-### goNogo
-- goCriteria: Manual force spawn valid final-only taskı shared resolver ile Docker containment'a yollar ve exact grant backend optionına ulaşır; missing grant and non-Docker paths provider work öncesi fail-closed; scoped tests green
-- nogo: Surface-local grant üretilir; host-adapter bypass sürer; wall-clock cap düşer; dispatch receipt veya stale-result guard zayıflar; scoped tests fail
-
-## Task 6: FO06 sprint and continuation consumer parity
-- Files: src/orchestra/sprint-spawner.ts, src/orchestra/scheduler-effects.ts, tests/orchestra/spawn-spawner-wire.test.ts, tests/orchestra/scheduler-spawn-executor.test.ts
-- Reads: docs/evidence/final-only-usage-containment-parity-2026-08-23/01-ingress-inventory.md, docs/evidence/final-only-usage-containment-parity-2026-08-23/02-policy-provenance.md, src/core/final-only-usage-containment.ts
-- Dependencies: Task 4
-- Priority: CRITICAL
-- Test: npx vitest run tests/orchestra/spawn-spawner-wire.test.ts tests/orchestra/scheduler-spawn-executor.test.ts
-### Description
-Initial sprint spawner ile scheduler retry/FIX/continuation executor'ındaki duplicate final-only
-kararlarını shared resolver consumerlarına çevir. Her iki yol provider, resolved backend, immutable
-budget ve task authorization'ın aynı kesişimini kullansın. Existing dispatch, approval, timeout,
-settlement ve provider-unavailable semantics değişmesin; ikinci grant veya fallback oluşmasın.
-### goNogo
-- goCriteria: Initial and continuation paths shared resolver kullanır ve identical valid plus missing-grant outcomes üretir; existing routing and settlement tests green
-- nogo: Consumerlardan biri local predicate tutar; FIX or retry farklı grant semantics alır; approval or settlement ordering değişir; scoped tests fail
-
-## Task 7: FO07 adversarial parity fan-in proof
-- Files: tests/cli/spawn-final-only-parity.test.ts, docs/evidence/final-only-usage-containment-parity-2026-08-23/04-adversarial-proof-plan.md
-- Reads: docs/evidence/final-only-usage-containment-parity-2026-08-23/03-conformance-matrix.md, src/core/final-only-usage-containment.ts, src/cli/commands/spawn.ts, src/orchestra/sprint-spawner.ts, src/orchestra/scheduler-effects.ts, src/orchestra/spawn-backend-docker.ts
-- Dependencies: Task 3, Task 5, Task 6
-- Priority: HIGH
-- Test: npx vitest run tests/cli/spawn-final-only-parity.test.ts
-### Description
-Manual ve sprint ingresslerini aynı immutable task projectionıyla conformance-test et. Valid grant,
-missing grant, final-only mismatch, non-Docker executor, `auto` platform resolution, stale result,
-replay ve exactly-once dispatch/settlement vakalarını hermetic test et. Hang, child process, crash ve
-missing-final gerçek-process kanıtlarının mevcut Docker suite ile bağlantısını evidence planında
-kaydet; gerçek binary canary'yi post-terminal host adımı olarak bırak.
-### goNogo
-- goCriteria: Hermetic parity battery manual and sprint authority kararlarının eşitliğini ve adversarial fail-closed vakaları kanıtlar; proof plan remaining real-binary checks'i authority requirements ile tanımlar; scoped suite green
-- nogo: Mock result real-process proof diye sunulur; replay accepted olur; process-tree negative space kaybolur; başka file değiştirilir; scoped suite fail
+## Outcome acceptance
+- The run is terminal with every exact implementation lineage settled; terminal state alone is not production closure.
+- Post-terminal fresh `npm run build:all` exposes `deckent image build --with-cursor` from dist and the active bot/runtime is restarted on the fresh binary.
+- A production `deckent-worker:latest` build with Cursor enabled contains a runnable `cursor-agent` at the expected version and preserves existing provider CLIs.
+- A fresh container reaches the real host Cursor session only through the isolated credential bridge; no host provider directory is mounted.
+- `deckent models list --provider cursor` exposes the four canonical Cursor models even when the external catalog omits them.
+- A real different-provider Cursor XVerify attempt uses the configured Cursor model, records the provider call and provider-reported usage, and produces a terminal durable receipt; any provider limit or unavailable evidence remains typed HOLD and does not become DONE.
+- Scoped tests, TypeScript, image-command i18n gates, real-binary proof, and canonical archive/finalizer integrity are green before landing.

@@ -28,6 +28,7 @@ RUN npm i -g @anthropic-ai/claude-code
 #   docker build --build-arg INSTALL_CODEX=true ...
 #   docker build --build-arg INSTALL_GEMINI=true ...
 #   docker build --build-arg INSTALL_OLLAMA=true ...
+#   docker build --build-arg INSTALL_CURSOR=true ...
 # Manual uncomment alternative (without build args):
 # RUN npm i -g @openai/codex
 # RUN npm i -g @google/gemini-cli
@@ -35,9 +36,25 @@ RUN npm i -g @anthropic-ai/claude-code
 ARG INSTALL_CODEX=false
 ARG INSTALL_GEMINI=false
 ARG INSTALL_OLLAMA=false
+ARG INSTALL_CURSOR=false
 RUN if [ "$INSTALL_CODEX" = "true" ]; then npm i -g @openai/codex; fi
 RUN if [ "$INSTALL_GEMINI" = "true" ]; then npm i -g @google/gemini-cli; fi
 RUN if [ "$INSTALL_OLLAMA" = "true" ]; then curl -fsSL https://ollama.ai/install.sh | sh; fi
+# Cursor's official installer is HOME-scoped. Install into a shared, read-only
+# prefix instead of /root so DockerSpawnBackend's host UID/GID can execute the
+# CLI, then expose both official binary names on the system PATH. Download and
+# execution are separate so an HTTP failure cannot be hidden by a successful
+# empty shell pipeline.
+RUN if [ "$INSTALL_CURSOR" = "true" ]; then \
+      mkdir -p /opt/cursor-agent && \
+      curl -fsSL https://cursor.com/install --output /tmp/cursor-agent-install.sh && \
+      HOME=/opt/cursor-agent bash /tmp/cursor-agent-install.sh && \
+      rm -f /tmp/cursor-agent-install.sh && \
+      chmod -R a+rX /opt/cursor-agent/.local && \
+      ln -s /opt/cursor-agent/.local/bin/cursor-agent /usr/local/bin/cursor-agent && \
+      ln -s /opt/cursor-agent/.local/bin/agent /usr/local/bin/agent && \
+      cursor-agent --version; \
+    fi
 
 # Create writable home directory for non-root execution
 # spawn-backend-docker.ts uses --tmpfs /tmp/deckent-home, but this ensures

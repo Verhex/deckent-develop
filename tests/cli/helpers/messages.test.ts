@@ -463,6 +463,68 @@ describe('doctor command messages', () => {
   });
 });
 
+// ─── image command messages ──────────────────────────────────────────────────
+
+describe('image command messages', () => {
+  const keys = [
+    'cli.image.desc',
+    'cli.image.build.desc',
+    'cli.image.build.opt_tag',
+    'cli.image.build.opt_dry_run',
+    'cli.image.build.opt_with_codex',
+    'cli.image.build.opt_with_gemini',
+    'cli.image.build.opt_with_ollama',
+    'cli.image.build.opt_with_cursor',
+    'cli.image.build.opt_image',
+    'cli.image.build.opt_lang',
+    'image.dry_run_dockerfile',
+    'image.dry_run_not_found',
+    'image.dry_run_build',
+    'image.dry_run_tag',
+    'image.dockerfile_missing',
+    'image.build_running',
+    'image.build_done',
+    'image.build_failed',
+    'image.docker_unavailable',
+    'image.docker_launch_failed',
+    'image.build_launch_error',
+  ];
+
+  it('provides distinct English and Turkish authority for every image-command string', () => {
+    const vars = {
+      default: 'deckent-worker:latest',
+      path: '/tmp/package with spaces/assets/Dockerfile.worker',
+      status: ' (NOT FOUND)',
+      cmd: 'docker build -f file',
+      tag: 'worker:test',
+      code: '7',
+      error: 'boom',
+      detail: 'detail',
+    };
+    for (const key of keys) {
+      const en = getMessage(key, 'en', vars);
+      const tr = getMessage(key, 'tr', vars);
+      expect(en).not.toBe(key);
+      expect(tr).not.toBe(key);
+      if (!['image.dry_run_dockerfile', 'image.build_launch_error'].includes(key)) {
+        expect(en).not.toBe(tr);
+      }
+    }
+  });
+
+  it('interpolates Cursor, path, command, tag, and failure details in both languages', () => {
+    for (const lang of ['en', 'tr'] as const) {
+      expect(getMessage('cli.image.build.opt_with_cursor', lang)).toContain('INSTALL_CURSOR=true');
+      expect(getMessage('image.dry_run_dockerfile', lang, { path: '/a path/Dockerfile.worker', status: '' }))
+        .toContain('/a path/Dockerfile.worker');
+      expect(getMessage('image.dry_run_build', lang, { cmd: 'docker build' })).toContain('docker build');
+      expect(getMessage('image.dry_run_tag', lang, { tag: 'worker:test' })).toContain('worker:test');
+      expect(getMessage('image.build_failed', lang, { code: '9' })).toContain('9');
+      expect(getMessage('image.docker_launch_failed', lang, { error: 'boom' })).toContain('boom');
+    }
+  });
+});
+
 // ─── status extended messages ─────────────────────────────────────────────────
 
 describe('status extended messages', () => {

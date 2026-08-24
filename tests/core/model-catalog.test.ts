@@ -21,6 +21,7 @@ import {
 import {
   BUILTIN_MODELS,
   CANONICAL_MODELS,
+  CURSOR_MODELS,
   ModelRegistry,
   type ModelDefinition,
 } from '../../src/core/model-registry.js';
@@ -108,6 +109,7 @@ describe('model-catalog: provider/tier/status normalization', () => {
   it('maps anthropic/openai/google aliases to canonical providers', () => {
     expect(normalizeProvider('Anthropic')).toBe('claude');
     expect(normalizeProvider('openai')).toBe('codex');
+    expect(normalizeProvider('cursor')).toBe('cursor');
     expect(normalizeProvider('google')).toBe('gemini');
     expect(normalizeProvider('ollama')).toBe('ollama');
     expect(normalizeProvider('unknown-vendor')).toBeNull();
@@ -304,7 +306,7 @@ describe('loadCatalog: fresh fetch → cache write', () => {
       fetchImpl: mock.impl,
     });
     expect(result.source).toBe('remote');
-    expect(result.models.length).toBe(3);
+    expect(result.models.length).toBe(CANONICAL_MODELS.length + 3);
     expect(mock.calls).toBe(1);
 
     const cached = JSON.parse(await fs.readFile(cachePath(), 'utf-8'));
@@ -332,7 +334,93 @@ describe('loadCatalog: warm cache hit', () => {
 
     expect(result.source).toBe('cache');
     expect(mock.calls).toBe(0);
-    expect(result.models.length).toBe(3);
+    expect(result.models.length).toBe(CANONICAL_MODELS.length + 3);
+  });
+});
+
+describe('loadCatalog: canonical enrichment', () => {
+  it('retains all Cursor definitions when a successful remote catalog omits them', async () => {
+    const result = await loadCatalog({
+      cachePath: cachePath(),
+      fetchImpl: makeMockFetch(fakeCatalogResponse()).impl,
+    });
+
+    expect(result.source).toBe('remote');
+    expect(result.models.filter(model => model.provider === 'cursor').map(model => model.id))
+      .toEqual(CURSOR_MODELS.map(model => model.id));
+  });
+
+  it('retains all Cursor definitions when a successful cached catalog omits them', async () => {
+    const fetchedAt = Date.now() - 1_000;
+    await fs.writeFile(cachePath(), JSON.stringify({
+      fetchedAt,
+      url: 'https://example.test/api',
+      payload: fakeCatalogResponse(),
+    }));
+
+    const result = await loadCatalog({ cachePath: cachePath(), offline: true });
+
+    expect(result).toMatchObject({ source: 'cache', fetchedAt });
+    expect(result.models.filter(model => model.provider === 'cursor').map(model => model.id))
+      .toEqual(CURSOR_MODELS.map(model => model.id));
+  });
+
+  it('lets a fresh external definition override a matching canonical identity in stable order', async () => {
+    const target = CANONICAL_MODELS[0]!;
+    const payload: RemoteCatalogResponse = {
+      version: 'override',
+      models: [{
+        id: target.apiId,
+        apiId: target.apiId,
+        provider: target.provider,
+        tier: target.tier,
+        contextWindow: target.contextWindow + 1,
+        costPerMillion: { input: 123, output: 456 },
+      }],
+    };
+
+    const first = await loadCatalog({
+      cachePath: cachePath(),
+      fetchImpl: makeMockFetch(payload).impl,
+    });
+    const second = await loadCatalog({ cachePath: cachePath(), offline: true });
+
+    expect(first.models.map(model => `${model.provider}:${model.apiId}`))
+      .toEqual(second.models.map(model => `${model.provider}:${model.apiId}`));
+    expect(first.models).toHaveLength(CANONICAL_MODELS.length);
+    expect(first.models[0]).toMatchObject({
+      id: target.apiId,
+      apiId: target.apiId,
+      provider: target.provider,
+      contextWindow: target.contextWindow + 1,
+      costPerMillion: { input: 123, output: 456 },
+    });
+    expect(new Set(first.models.map(model => `${model.provider}:${model.apiId}`)).size)
+      .toBe(first.models.length);
+  });
+
+  it('aggregates unsupported remote rows into one deterministic bounded warning', async () => {
+    const payload: RemoteCatalogResponse = {
+      version: 'unsupported-providers',
+      models: Array.from({ length: 25 }, (_, index) => ({
+        id: `unsupported-${index}`,
+        provider: `vendor-${String(index).padStart(2, '0')}`,
+      })),
+    };
+
+    const result = await loadCatalog({
+      cachePath: cachePath(),
+      fetchImpl: makeMockFetch(payload).impl,
+    });
+    const skipped = result.warnings.filter(warning => warning.startsWith('skipped-models:'));
+
+    expect(skipped).toEqual([
+      'skipped-models: count=25 providers='
+      + 'vendor-00:1,vendor-01:1,vendor-02:1,vendor-03:1,vendor-04:1,'
+      + 'vendor-05:1,vendor-06:1,vendor-07:1,vendor-08:1,vendor-09:1,+15',
+    ]);
+    expect(skipped[0]!.length).toBeLessThan(256);
+    expect(result.models).toHaveLength(CANONICAL_MODELS.length);
   });
 });
 

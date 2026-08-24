@@ -91,6 +91,15 @@ describe('mergeApiIdOverrides — apiId-aware matching', () => {
     expect(haiku5!.tier).toBe('economy');
   });
 
+  it('keeps equal apiIds from different providers as distinct logical models', () => {
+    const existing = [makeModel('shared-id', 'shared-id', { provider: 'claude' })];
+    const remote = [makeModel('shared-id', 'shared-id', { provider: 'codex' })];
+
+    const result = mergeApiIdOverrides(existing, remote);
+
+    expect(result.map(model => model.provider)).toEqual(['claude', 'codex']);
+  });
+
   it('is idempotent — second pass produces equal result', () => {
     const existing = [makeModel('claude-opus-4-8', 'claude-opus-4-8')];
     const remote = [

@@ -16,7 +16,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
-import { handleImageBuild } from '../../src/cli/commands/image.js';
+import { Command } from 'commander';
+import { handleImageBuild, registerImage } from '../../src/cli/commands/image.js';
 import { DEFAULT_WORKER_IMAGE } from '../../src/core/worker-image-check.js';
 import type { SpawnImpl, SpawnedProcessLike } from '../../src/core/worker-image-check.js';
 
@@ -158,6 +159,20 @@ describe('handleImageBuild — --dry-run', () => {
     expect(out).toContain(root);
     expect(out).not.toContain(`${process.cwd()}/Dockerfile.worker`);
   });
+
+  it('preserves spaces in Dockerfile and context paths without spawning a shell', async () => {
+    const parent = mkdtempSync(join(tmpdir(), 'img build parent-'));
+    roots.push(parent);
+    const root = join(parent, 'package with spaces');
+    mkdirSync(join(root, 'assets'), { recursive: true });
+    writeFileSync(join(root, 'assets', 'Dockerfile.worker'), 'FROM node:24-trixie-slim\n');
+    const rec = emptyRecord();
+
+    await handleImageBuild({ root }, closeSpawn(0, rec));
+
+    expect(rec.calls[0]!.args).toContain(join(root, 'assets', 'Dockerfile.worker'));
+    expect(rec.calls[0]!.args.at(-1)).toBe(join(root, 'assets'));
+  });
 });
 
 // ─── Tests: real build via the injected seam ──────────────────────────────────────
@@ -239,12 +254,12 @@ describe('handleImageBuild — real build (injected seam)', () => {
 // ─── Tests: provider build-args ───────────────────────────────────────────────────
 
 describe('handleImageBuild — provider build-args', () => {
-  it('--with-codex / --with-gemini / --with-ollama add their INSTALL_* build-args', async () => {
+  it('--with-codex / --with-gemini / --with-ollama / --with-cursor add exact INSTALL_* build-args', async () => {
     const root = rootWithDockerfile();
     const rec = emptyRecord();
 
     await handleImageBuild(
-      { withCodex: true, withGemini: true, withOllama: true, root },
+      { withCodex: true, withGemini: true, withOllama: true, withCursor: true, root },
       closeSpawn(0, rec),
     );
 
@@ -252,6 +267,8 @@ describe('handleImageBuild — provider build-args', () => {
     expect(joined).toContain('INSTALL_CODEX=true');
     expect(joined).toContain('INSTALL_GEMINI=true');
     expect(joined).toContain('INSTALL_OLLAMA=true');
+    expect(joined).toContain('INSTALL_CURSOR=true');
+    expect(rec.calls[0]!.args).toContain('INSTALL_CURSOR=true');
   });
 
   it('no provider flags → no INSTALL_* build-args', async () => {
@@ -264,6 +281,19 @@ describe('handleImageBuild — provider build-args', () => {
     expect(joined).not.toContain('INSTALL_CODEX');
     expect(joined).not.toContain('INSTALL_GEMINI');
     expect(joined).not.toContain('INSTALL_OLLAMA');
+    expect(joined).not.toContain('INSTALL_CURSOR');
+  });
+});
+
+describe('registerImage — production CLI surface', () => {
+  it('exposes --with-cursor on deckent image build', () => {
+    const program = new Command();
+    program.exitOverride();
+    registerImage(program);
+
+    const build = program.commands.find((command) => command.name() === 'image')
+      ?.commands.find((command) => command.name() === 'build');
+    expect(build?.options.some((option) => option.long === '--with-cursor')).toBe(true);
   });
 });
 
@@ -317,5 +347,17 @@ describe('handleImageBuild — honest-fail when the packaged Dockerfile is missi
     const out = stdout.join('');
     expect(out).toContain(join(root, 'assets', 'Dockerfile.worker'));
     expect(out).toContain('NOT FOUND');
+  });
+
+  it('Turkish missing-Dockerfile guidance is localized and never spawns docker', async () => {
+    const root = rootWithoutDockerfile();
+    const rec = emptyRecord();
+
+    const code = await handleImageBuild({ root, lang: 'tr' }, closeSpawn(0, rec));
+
+    expect(code).toBe(1);
+    expect(rec.calls).toHaveLength(0);
+    expect(stderr.join('')).toContain('bulunamadı');
+    expect(stderr.join('')).toContain(root);
   });
 });

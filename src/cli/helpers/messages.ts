@@ -7555,6 +7555,82 @@ const MESSAGES: MessageMap = {
     en: 'Build the deckent-worker Docker image from the packaged Dockerfile.worker',
     tr: 'deckent-worker Docker imajını paketlenmiş Dockerfile.worker\'dan derleyin',
   },
+  'cli.image.build.opt_tag': {
+    en: 'Docker image tag to build (default: {default})',
+    tr: 'Derlenecek Docker imajı etiketi (varsayılan: {default})',
+  },
+  'cli.image.build.opt_dry_run': {
+    en: 'Print the resolved Dockerfile path + build plan without building (no docker spawn)',
+    tr: 'Derleme yapmadan çözümlenen Dockerfile yolunu ve derleme planını yazdır (docker başlatılmaz)',
+  },
+  'cli.image.build.opt_with_codex': {
+    en: 'Install Codex CLI (INSTALL_CODEX=true build-arg)',
+    tr: 'Codex CLI\'ı yükle (INSTALL_CODEX=true derleme argümanı)',
+  },
+  'cli.image.build.opt_with_gemini': {
+    en: 'Install Gemini CLI (INSTALL_GEMINI=true build-arg)',
+    tr: 'Gemini CLI\'ı yükle (INSTALL_GEMINI=true derleme argümanı)',
+  },
+  'cli.image.build.opt_with_ollama': {
+    en: 'Install Ollama CLI (INSTALL_OLLAMA=true build-arg)',
+    tr: 'Ollama CLI\'ı yükle (INSTALL_OLLAMA=true derleme argümanı)',
+  },
+  'cli.image.build.opt_with_cursor': {
+    en: 'Install Cursor CLI (INSTALL_CURSOR=true build-arg)',
+    tr: 'Cursor CLI\'ı yükle (INSTALL_CURSOR=true derleme argümanı)',
+  },
+  'cli.image.build.opt_image': {
+    en: 'Deprecated alias for --tag',
+    tr: '--tag için kullanımdan kaldırılmış takma ad',
+  },
+  'cli.image.build.opt_lang': {
+    en: 'Language override (en|tr)',
+    tr: 'Dil geçersiz kılma değeri (en|tr)',
+  },
+  'image.dry_run_dockerfile': {
+    en: 'Dockerfile: {path}{status}',
+    tr: 'Dockerfile: {path}{status}',
+  },
+  'image.dry_run_not_found': {
+    en: ' (NOT FOUND)',
+    tr: ' (BULUNAMADI)',
+  },
+  'image.dry_run_build': {
+    en: 'Build: {cmd}',
+    tr: 'Derleme: {cmd}',
+  },
+  'image.dry_run_tag': {
+    en: 'Image tag: {tag}',
+    tr: 'İmaj etiketi: {tag}',
+  },
+  'image.dockerfile_missing': {
+    en: 'Packaged Dockerfile.worker not found at {path}. Reinstall deckent (the Dockerfile ships in the npm package) or report this packaging error.',
+    tr: 'Paketlenmiş Dockerfile.worker {path} konumunda bulunamadı. deckent paketini yeniden yükleyin (Dockerfile npm paketiyle gelir) veya bu paketleme hatasını bildirin.',
+  },
+  'image.build_running': {
+    en: 'Building worker image: {cmd}',
+    tr: 'Worker imajı derleniyor: {cmd}',
+  },
+  'image.build_done': {
+    en: 'Worker image built successfully.',
+    tr: 'Worker imajı başarıyla derlendi.',
+  },
+  'image.build_failed': {
+    en: 'Worker image build failed (exit {code}). See the build output above.',
+    tr: 'Worker imaj derlemesi başarısız (çıkış {code}). Yukarıdaki derleme çıktısına bakın.',
+  },
+  'image.docker_unavailable': {
+    en: 'docker command not found — install Docker and ensure it is on PATH, or switch spawn_backend to "subprocess".',
+    tr: 'docker komutu bulunamadı — Docker\'ı yükleyip PATH üzerinde olduğundan emin olun veya spawn_backend değerini "subprocess" olarak değiştirin.',
+  },
+  'image.docker_launch_failed': {
+    en: 'could not launch docker: {error}',
+    tr: 'docker başlatılamadı: {error}',
+  },
+  'image.build_launch_error': {
+    en: 'deckent image build: {detail}',
+    tr: 'deckent image build: {detail}',
+  },
   'cli.init.desc': {
     en: 'Initialize a new Deckent project',
     tr: 'Yeni bir Deckent projesi başlatın',

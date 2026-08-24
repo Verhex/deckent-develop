@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { RemoteCatalogResponse } from '../../src/core/model-catalog.js';
+import { CURSOR_MODELS } from '../../src/core/model-registry.js';
 
 // ─── Test helpers ──────────────────────────────────────────────────────────
 
@@ -24,6 +25,7 @@ function fakeCatalogResponse(id = 'test-model-01'): RemoteCatalogResponse {
         tier: 'standard',
         status: 'ga',
         contextWindow: 200_000,
+        costPerMillion: { input: 1, output: 2 },
         capabilities: { streaming: true, toolUse: true, vision: false, codeExecution: false, reasoning: false },
       },
     ],
@@ -72,6 +74,8 @@ describe('bootstrapFromCatalog', () => {
     expect(registry.mergeFromCatalog).toHaveBeenCalledOnce();
     const calledWith = (registry.mergeFromCatalog as ReturnType<typeof vi.fn>).mock.calls[0][0] as unknown[];
     expect(calledWith.length).toBeGreaterThan(0);
+    expect(calledWith.filter((model: { provider?: string }) => model.provider === 'cursor'))
+      .toHaveLength(CURSOR_MODELS.length);
   });
 
   it('(b) fetch fail + warm cache → mergeFromCatalog called with cached models', async () => {

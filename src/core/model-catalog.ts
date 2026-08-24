@@ -125,6 +125,7 @@ const PROVIDER_ALIASES: Record<string, string> = {
   // Canonical
   claude: 'claude',
   codex: 'codex',
+  cursor: 'cursor',
   gemini: 'gemini',
   ollama: 'ollama',
   // Anthropic flavors
@@ -508,20 +509,37 @@ function mapCatalogToDefinitions(
   warnings: string[],
 ): ModelDefinition[] {
   const defs: ModelDefinition[] = [];
+  const skippedProviders = new Map<string, number>();
   for (const remote of catalog.models) {
     const mapped = mapRemoteEntry(remote);
     if (mapped) {
       defs.push(mapped);
     } else {
-      warnings.push(`skipped-model: ${remote.id ?? '<no-id>'} (provider=${remote.provider})`);
+      const provider = typeof remote.provider === 'string' && remote.provider.trim().length > 0
+        ? remote.provider.trim()
+        : '<unknown>';
+      skippedProviders.set(provider, (skippedProviders.get(provider) ?? 0) + 1);
     }
   }
-  // If catalog returned zero usable entries, merge bundled as a safety net.
+  if (skippedProviders.size > 0) {
+    const entries = [...skippedProviders.entries()].sort(([left], [right]) => left.localeCompare(right));
+    const skippedCount = entries.reduce((total, [, count]) => total + count, 0);
+    const visible = entries.slice(0, 10).map(([provider, count]) => `${provider}:${count}`);
+    const hiddenCount = Math.max(0, entries.length - visible.length);
+    warnings.push(
+      `skipped-models: count=${skippedCount} providers=${visible.join(',')}`
+      + (hiddenCount > 0 ? `,+${hiddenCount}` : ''),
+    );
+  }
   if (defs.length === 0) {
     warnings.push('catalog-empty: merged bundled fallback');
-    return getBundledCatalog();
   }
-  return defs;
+
+  // External catalogs are enrichment sources, not replacements for Deckent's
+  // canonical registry. Keep canonical order stable, refresh matching
+  // provider/API identities from authoritative mapped rows, then append new
+  // external identities in their source order.
+  return mergeApiIdOverrides(getBundledCatalog(), defs);
 }
 
 // ─── Bootstrap Helper ──────────────────────────────────────────────────────
@@ -549,8 +567,9 @@ interface BootstrapOptions {
  * Merge remote catalog into existing (bundled) model definitions — apiId-aware.
  *
  * Remote and bundled definitions share one identity contract: `id===apiId`.
- * Exact API ids are the merge key, so a remote row can refresh pricing and
- * capabilities without preserving or minting a Deckent-side alias.
+ * Provider plus exact API id is the logical merge key, so a remote row can
+ * refresh pricing and capabilities without collapsing equal ids owned by
+ * different providers.
  *
  * Unmatched remote entries are appended as new entries so that upstream-only
  * models reach the registry only after map-time pricing validation
@@ -560,8 +579,10 @@ export function mergeApiIdOverrides(
   existing: ModelDefinition[],
   remote: ModelDefinition[],
 ): ModelDefinition[] {
-  const merged = new Map(existing.map(model => [model.apiId, model]));
-  for (const model of remote) merged.set(model.apiId, model);
+  const identity = (model: ModelDefinition): string =>
+    `${model.provider}\u0000${model.apiId}`;
+  const merged = new Map(existing.map(model => [identity(model), model]));
+  for (const model of remote) merged.set(identity(model), model);
   return [...merged.values()];
 }
 

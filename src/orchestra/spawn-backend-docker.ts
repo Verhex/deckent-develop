@@ -6,7 +6,7 @@
 import { spawnSync, spawn as nodeSpawn } from 'node:child_process';
 import type { SpawnOptionsWithoutStdio } from 'node:child_process';
 import { writeFileSync, readFileSync, mkdirSync, existsSync, unlinkSync, openSync, fsyncSync, closeSync, readdirSync, renameSync, chmodSync, statSync } from 'node:fs';
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, join, posix, relative, resolve, sep, win32 } from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
 import { homedir, tmpdir, totalmem } from 'node:os';
 import type { ModelType } from '../core/types.js';
@@ -501,6 +501,7 @@ const PROVIDER_AUTH_FILES: Readonly<Record<string, readonly { file: string; requ
     { file: 'gemini-credentials.json', required: true },
     { file: 'google_accounts.json', required: false },
   ],
+  cursor: [{ file: 'auth.json', required: true }],
 };
 
 export interface ProviderAuthIsolation {
@@ -520,6 +521,49 @@ export interface ProviderAuthIsolationOptions {
   credentialSources?: Readonly<Record<string, string>>;
   /** Shared host lock file serializing refresh-capable provider sessions. */
   lockPath?: string;
+  /** Exact sanitized host directory containing the allowlisted credential files. */
+  hostCredentialRoot?: string | null;
+}
+
+function safeHostConfigRoot(value: string | undefined, platform: NodeJS.Platform): string | null {
+  if (!value || /[,\u0000\r\n]/u.test(value)) return null;
+  const pathApi = platform === 'win32' ? win32 : posix;
+  return pathApi.isAbsolute(value) ? pathApi.normalize(value) : null;
+}
+
+function joinHostCredentialPath(root: string, file: string): string {
+  return /^(?:[a-zA-Z]:[\\/]|\\\\)/u.test(root) ? win32.join(root, file) : join(root, file);
+}
+
+/**
+ * Resolve Cursor's host credential directory without granting the container
+ * access to the surrounding host configuration tree. Cursor's container-side
+ * destination remains `$HOME/.config/cursor`; this authority is source-only.
+ */
+export function resolveCursorHostCredentialRoot(
+  home: string,
+  platform: NodeJS.Platform,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): string | null {
+  const pathApi = platform === 'win32' ? win32 : posix;
+  const override = platform === 'win32' ? env.APPDATA : env.XDG_CONFIG_HOME;
+  const safeOverride = safeHostConfigRoot(override, platform);
+  if (safeOverride) return pathApi.join(safeOverride, 'cursor');
+  const safeHome = safeHostConfigRoot(home, platform);
+  return safeHome ? pathApi.join(safeHome, '.config', 'cursor') : null;
+}
+
+function resolveProviderHostCredentialRoot(
+  home: string,
+  provider: string,
+  oauthHomeDir: string | undefined,
+  platform: NodeJS.Platform,
+): string | null {
+  if (!oauthHomeDir) return null;
+  if (provider === 'cursor') {
+    return resolveCursorHostCredentialRoot(home, platform);
+  }
+  return join(home, oauthHomeDir);
 }
 
 export interface GeminiAuthSelectionBootstrap {
@@ -1836,7 +1880,14 @@ export function buildProviderAuthIsolation(
   }
   for (const entry of PROVIDER_AUTH_FILES[provider] ?? []) {
     const { file } = entry;
-    const hostPath = join(home, oauthHomeDir, file);
+    const hostRoot = Object.prototype.hasOwnProperty.call(options, 'hostCredentialRoot')
+      ? options.hostCredentialRoot
+      : join(home, oauthHomeDir);
+    if (!hostRoot) {
+      if (entry.required) missingRequiredFiles.push(file);
+      continue;
+    }
+    const hostPath = joinHostCredentialPath(hostRoot, file);
     const credentialSource = options.credentialSources?.[file] ?? hostPath;
     if (!options.credentialSources?.[file] && !fileExists(credentialSource)) {
       if (entry.required) missingRequiredFiles.push(file);
@@ -1904,11 +1955,10 @@ export function buildProviderAuthIsolation(
  */
 function prepareProviderAuthBroker(
   projectDir: string,
-  home: string,
   provider: string,
-  oauthHomeDir: string | undefined,
+  hostCredentialRoot: string | null,
 ): ProviderAuthIsolationOptions {
-  if (!oauthHomeDir) return {};
+  if (!hostCredentialRoot) return { hostCredentialRoot: null };
   const projectKey = createHash('sha256').update(resolve(projectDir)).digest('hex').slice(0, 24);
   const brokerDir = join(tmpdir(), 'deckent-provider-auth', projectKey, provider);
   mkdirSync(brokerDir, { recursive: true, mode: 0o700 });
@@ -1916,7 +1966,7 @@ function prepareProviderAuthBroker(
 
   const credentialSources: Record<string, string> = {};
   for (const entry of PROVIDER_AUTH_FILES[provider] ?? []) {
-    const hostPath = join(home, oauthHomeDir, entry.file);
+    const hostPath = joinHostCredentialPath(hostCredentialRoot, entry.file);
     if (!existsSync(hostPath)) continue;
     const safeName = entry.file.replace(/[^a-zA-Z0-9._-]/g, '_');
     const brokerPath = join(brokerDir, safeName);
@@ -1934,7 +1984,7 @@ function prepareProviderAuthBroker(
   const lockPath = join(brokerDir, 'refresh.lock');
   if (!existsSync(lockPath)) writeFileSync(lockPath, '', { mode: 0o600 });
   chmodSync(lockPath, 0o600);
-  return { credentialSources, lockPath };
+  return { credentialSources, lockPath, hostCredentialRoot };
 }
 
 /**
@@ -4779,15 +4829,20 @@ export class DockerSpawnBackend implements SpawnBackend {
       return transportError('backend_unsupported', false);
     }
     const home = this.homeDir;
+    const hostCredentialRoot = resolveProviderHostCredentialRoot(
+      home,
+      provider,
+      spec.oauthHomeDir ?? undefined,
+      this.platform,
+    );
     const authBroker = prepareProviderAuthBroker(
       this.projectDir,
-      home,
-      spec.binary,
-      spec.oauthHomeDir ?? undefined,
+      provider,
+      hostCredentialRoot,
     );
     const auth = buildProviderAuthIsolation(
       home,
-      spec.binary,
+      provider,
       spec.oauthHomeDir ?? undefined,
       false,
       existsSync,
@@ -6178,7 +6233,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     // Run as host user to avoid root — Claude CLI blocks --dangerously-skip-permissions as root
     const uid = process.getuid?.() ?? 1000;
     const gid = process.getgid?.() ?? 1000;
-    const home = homedir();
+    const home = this.homeDir;
 
     // Container HOME: use /tmp/deckent-home to avoid missing host HOME directory
     // Host HOME (e.g. /home/alperen) doesn't exist in container filesystem.
@@ -6214,13 +6269,17 @@ export class DockerSpawnBackend implements SpawnBackend {
       ? {}
       : prepareProviderAuthBroker(
           dir,
-          home,
-          providerBinary,
-          spec.oauthHomeDir ?? undefined,
+          provider,
+          resolveProviderHostCredentialRoot(
+            home,
+            provider,
+            spec.oauthHomeDir ?? undefined,
+            this.platform,
+          ),
         );
     const providerAuth = buildProviderAuthIsolation(
       home,
-      providerBinary,
+      provider,
       // `ProviderCommandSpec.oauthHomeDir` is `string | null` (null = provider has
       // no host OAuth home to isolate — true for key-only providers); the helper
       // takes `string | undefined`. Both spell "nothing to mount", so normalize.

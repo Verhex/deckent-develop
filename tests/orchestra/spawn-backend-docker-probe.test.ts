@@ -37,10 +37,30 @@ async function requestFor(backend: DockerSpawnBackend): Promise<BoundedReachabil
   };
 }
 
+async function cursorRequestFor(backend: DockerSpawnBackend): Promise<BoundedReachabilityProbeRequest> {
+  const runtime = await backend.inspectExactCrossVerifyRuntime('cursor', 'cursor-grok-4.6-high');
+  if (runtime.state !== 'ready') throw new Error('Cursor test runtime must be ready');
+  return {
+    provider: 'cursor',
+    model: 'cursor-grok-4.6-high',
+    executionProfileRef: runtime.executionProfileRef as BoundedReachabilityProbeRequest['executionProfileRef'],
+    promptBytes: new TextEncoder().encode('cursor probe'),
+    timeoutMs: 37,
+    maxOutputTokens: 19,
+  };
+}
+
 function authenticatedHome(dir: string): string {
   const home = join(dir, 'home');
   mkdirSync(join(home, '.claude'), { recursive: true });
   writeFileSync(join(home, '.claude', '.credentials.json'), '{}');
+  return home;
+}
+
+function cursorAuthenticatedHome(dir: string): string {
+  const home = join(dir, 'cursor-home');
+  mkdirSync(join(home, '.config', 'cursor'), { recursive: true });
+  writeFileSync(join(home, '.config', 'cursor', 'auth.json'), '{}');
   return home;
 }
 
@@ -73,6 +93,31 @@ describe('DockerSpawnBackend bounded reachability probe', () => {
     // without it the CLI exits "no prompt" and the probe misreads a dead
     // container for an unreachable backend (bulgu #10, measured live).
     expect(received?.args).toContain('-i');
+  });
+
+  it('uses logical Cursor provider authority to mount auth.json for the real probe entrypoint', async () => {
+    const dir = root();
+    let received: Parameters<DockerReachabilityProbeCommandRunner>[0] | undefined;
+    const backend = new DockerSpawnBackend(dir, {
+      homeDir: cursorAuthenticatedHome(dir),
+      platform: 'linux',
+      crossVerifyRuntimeCommandRunner: async (_command, args) => args[0] === 'image'
+        ? { status: 0, stdout: `sha256:${'c'.repeat(64)}\n`, stderr: '' }
+        : { status: 0, stdout: '/usr/local/bin/cursor-agent\n', stderr: '' },
+      reachabilityProbeCommandRunner: async input => {
+        received = input;
+        return { status: 0, stdout: 'ok', stderr: '' };
+      },
+    });
+
+    await expect(backend.invokeBoundedReachabilityProbe(await cursorRequestFor(backend)))
+      .resolves.toMatchObject({ outcome: 'completed' });
+
+    const args = received?.args ?? [];
+    expect(args.some(arg => arg.includes('/cursor/auth.json,dst=/run/deckent-auth-cursor-auth.json')))
+      .toBe(true);
+    expect(args.join(' ')).not.toContain('src=' + join(dir, 'cursor-home', '.config', 'cursor') + ',dst=');
+    expect(args.join(' ')).toContain('cursor-agent');
   });
 
   it('classifies a dead Docker daemon as backend-unreachable', async () => {
