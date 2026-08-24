@@ -2,11 +2,22 @@
 
 > İş SSOT'u `docs/MASTER-PLAN.md`'dir. Bu dosya yalnız kısa vadeli yürütme sırasını taşır;
 > closure authority veya yeni work identity üretmez. Tüketilen ayrıntı burada biriktirilmez.
+> Aktif Codex→Codex devir authority'si: `ah-2026-08-24-codex-new-session`, epoch 2,
+> `RECOVERY_COMMITTED`, receipt `sha256:db58fbcfa6d71a79d6667dd1b571068a5642ef8aece4330bb0b975159a4f9234`.
 
 ## Canlı truth
 
 - `DOGFOOD_MODE=ON`, `WORKSPACE_MODE=MAIN`, `DELIVERY_MODE=DIRECT_MAIN`.
-- Aktif worker yok. Fresh compiled runtime'da `sprint-657` iki paralel ilk-wave taskı + bağımlı
+- Aktif worker yok. `sprint-659` iki paralel ilk-wave acceptance taskı + bağımlı fan-in taskıyla
+  terminal `COMPLETE` (3/3 logical DONE). API ve MCP unknown/forged approval ID ingressleri gerçek
+  compiled binary üzerinden typed `APR_UNKNOWN_REQUEST` ile fail-closed; karar dosyası oluşmadı ve
+  redler durable audit'e yazıldı. Scoped birleşik batarya 50/50, full lint ve `build:all` yeşil.
+  Canonical archive verify 52 artifact için temiz; terminal/manifest digestleri doğrulandı.
+  `sprint-658` aynı DAG'ın ilk koşusuydu: MCP test mock'undaki eksik `renameSync` yüzünden FIX
+  write-authority kazanamadı, resume fan-in result authority'sini bulamadı ve run owner-authorized
+  finalization ile dürüstçe `ABORTED` kapandı. Bounded ADR-D-007 recovery yalnız test mock'unu
+  düzeltti; yeniden dogfood `sprint-659` ile kanıtlandı.
+- Fresh compiled runtime'da `sprint-657` iki paralel ilk-wave taskı + bağımlı
   fan-in taskıyla terminal `COMPLETE` (3/3 logical DONE). Current prompt-delivery receipt,
   typed verification commandı, agent/skill attribution ve finalizer consumer zinciri üç taskta da
   canlı görüldü. Canonical archive 52 artifact/438,838 byte; manifest verify ve terminal-verify
@@ -23,7 +34,7 @@
 - Root `.tasks` altındaki 63 `task-xv*` artifact hash-korumalı biçimde
   `.tasks/archive/xverify-settled-2026-08-24/` staging archive'ına taşındı; root eşleşme sıfır,
   `rm` kullanılmadı. Product canonical one-shot task archive surface'i henüz yok.
-- Bot daemon fresh compiled dist ile PID `1289426` olarak çalışıyor. Pending approval yok.
+- Bot daemon fresh compiled dist ile PID `1317315` olarak çalışıyor. Pending approval yok.
 - `.result` geçişi production-wired: worker claim'i ile host authority ayrıldı; exact
   `testVerification`, criterion-polarity/evidence, prompt compile-plan ID, current delivery
   attribution ve git-derived work attribution canonical result/finalizer consumerlarına ulaşıyor.
@@ -77,15 +88,15 @@
 
 ## Done-ready sayacı
 
-- 8/20 — canonical terminal archive/finalizer acceptance + provider-observation reconciliation +
+- 9/20 — canonical terminal archive/finalizer acceptance + provider-observation reconciliation +
   source/dist/provider runtime adoption + 7094 production measurement authority + Work 1055
   XVerify production wiring + response-budget authority + settlement projection parity + current
-  prompt-delivery/structured-result authority.
+  prompt-delivery/structured-result authority + API/MCP unknown-ID approval ingress acceptance.
 
 ## Sıradaki yürütme sırası
 
-1. Prompt-delivery/result authority paketini full scoped gates + fresh dist/real-binary proof sonrası
-   land et; agent/skill kataloglarının 300/1000-scale ve all-surface residuallarını açık tut.
+1. `APPROVAL-INGRESS-UNKNOWN-ID-001` disk truth/SSOT diffini landing ritüeliyle commit et; push yalnız
+   owner yeniden isterse. Parent `APPROVAL-001` broker residuallarını OPEN tut.
 2. Archive replay hardening'i `LOCAL_VERIFIED/LIVE_PROVEN` tut; formal XVerify'ın iki
    `UNCLEAR/HOLD` sonucu yeni evidence veya farklı-provider authority olmadan retry edilmez.
 3. `2026-08-24 20:00 Europe/Istanbul` sonrasında runtime hygiene different-provider XVerify.
@@ -108,6 +119,14 @@
   owner admission olmadan archive outcome'una alınmaz.
 - Formal XVerify host adjudicator, atomic targeted claim'de dahi inaccurate missing-evidence map
   üretti; owner-admitted ayrı execution-surface işidir, kör retry yapılmaz.
+- Sprint-658 FIX gerçekten üretildi fakat read-only acceptance taskından inherited boş
+  `filesWrite` ile gerekli test-fixture repair'ini yapamadı; ardından fan-in result authority'si
+  üretilemedi ve resume terminalizer `TERMINALIZATION_RESULT_AUTHORITY_MISSING` verdi. Bu bulgu
+  mevcut `RUNFLOW-001` repair-authority/checkpoint-finalization kapsamındadır.
+- Sprint-659 coordinator, terminal receipt sonrası arşiv manifestini yayımlamadan canlı kaldı;
+  owner-authorized force-finalize containment'ı tamamladı fakat
+  `SPRINT_ARCHIVE_EXISTING_SEAL_IDENTITY_MISMATCH` raporladı. Canonical archive sonunda temizdir;
+  finalizer idempotency/cleanup bulgusu mevcut runflow/recovery kapsamına aittir.
 
 ## Sabit yürütme contractı
 

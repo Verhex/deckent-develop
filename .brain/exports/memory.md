@@ -118,6 +118,14 @@ Ev
 - 1780659451539-009 — Health and ETA readiness — Created a source-backed Closure Health and ETA readiness assessment.
 - …and 9 more delivered
 
+## Sprint sprint-659 Learnings
+- Sprint sprint-659 Learnings: ## Sprint sprint-659 Learnings
+
+## Gains
+- 659-001 — Core gate and API ingress acceptance — Read-only acceptance completed.
+- 659-002 — MCP ingress and registry acceptance — Read-only acceptance completed.
+- 659-003 — Canonical pending producer-to-consumer fan-in acceptance — Read-only acceptance completed.
+
 ## Sprint sprint-657 Learnings
 - Sprint sprint-657 Learnings: ## Sprint sprint-657 Learnings
 - Docker settlement and finalizer attribution acceptance: GO_WITH_TECH_DEBT — Read-only acceptance completed within the exact authorized scope. The initial scoped git diff was non-clean due to pre-e

@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "outcomeId": "APPROVAL-INGRESS-UNKNOWN-ID-001",
+  "role": "supervisor",
+  "baseSha": "6cc1835e93bd2a579c735e9cc30b4a2c3d99ea54",
+  "headSha": "d2a4472314771d3d9a08bcb1f13659591840cf9e",
+  "branch": "main",
+  "policyDigest": "sha256:c4c96a971833ee892174b7d361e08c7f0eb53c629873381235deaa573594d863",
+  "scopeDigest": "sha256:3e2a46841efae370bcfc700705d2948c06569e004fa4ed5e172f74cb5ee55b79",
+  "filesChanged": [],
+  "verification": [],
+  "findings": [],
+  "openActions": [
+    "Independently reconcile AGENTS/policy/git/runtime/approval/build/SSOT against this receipt",
+    "Land the verified APPROVAL-INGRESS-UNKNOWN-ID-001 diff after scoped diff review; do not push unless owner asks",
+    "After 20:00 Europe/Istanbul run runtime-hygiene different-provider XVerify, then D4 closure/D5 retirement",
+    "Continue only dependency-ready MASTER work through multi-task dogfood; carry FIX authority/finalizer and TaskResultV1 cutover findings in their existing rows"
+  ],
+  "recommendedNextAction": "Read and verify the handoff receipt, then inspect the scoped dirty diff for APPROVAL-INGRESS-UNKNOWN-ID-001 before any mutation",
+  "authorityHandoff": {
+    "protocolVersion": 1,
+    "handoffId": "ah-2026-08-24-codex-new-session",
+    "sequence": 1,
+    "transition": "PREPARED",
+    "transitionActor": "transferor",
+    "currentAuthorityEpoch": 1,
+    "proposedAuthorityEpoch": 2,
+    "previousReceiptDigest": null,
+    "from": {
+      "hostId": "codex-cli",
+      "providerId": "codex",
+      "modelApiId": "gpt-5.6-sol",
+      "role": "supervisor",
+      "principalDigest": "sha256:1d1549ebd7282b91e0c19f892a1d68c3092d2c2f7fc05d3096b405c151d47bca",
+      "sessionDigest": "sha256:28088afd8b40fc09ada955057fb4688486edaa97d76b48f155b2b761a734cb76"
+    },
+    "to": {
+      "hostId": "codex-cli",
+      "providerId": "codex",
+      "modelApiId": "gpt-5.6-sol",
+      "role": "supervisor",
+      "principalDigest": "sha256:1d1549ebd7282b91e0c19f892a1d68c3092d2c2f7fc05d3096b405c151d47bca",
+      "sessionDigest": "sha256:9f1650745a7793fcb72680d980097fb7765484ff496c4301acca2e5c7eee7cbd"
+    },
+    "trigger": {
+      "reasonCode": "CONTEXT_EXHAUSTION",
+      "authorityRef": "owner-live-2026-08-24-codex-new-session-urgent-handoff"
+    },
+    "authorityScope": {
+      "goalId": "n/a",
+      "missionId": "n/a",
+      "flowId": "n/a",
+      "runId": "n/a",
+      "roles": [
+        "supervisor"
+      ],
+      "includes": [
+        "APPROVAL-INGRESS-UNKNOWN-ID-001 landing; current-flow ordered continuation; owner-admitted MASTER work only"
+      ],
+      "excludes": [
+        "owner-only signer custody; unadmitted findings; unrelated user docs and workspace history"
+      ]
+    },
+    "evidenceSnapshot": {
+      "observedAt": "2026-08-24T15:42:26.629Z",
+      "repoStateRef": "git:d2a4472314771d3d9a08bcb1f13659591840cf9e:dirty=17",
+      "runtimeStateRef": "sprint-659 COMPLETE 3/3; no active run; bot pid 1317315",
+      "approvalStateRef": "no pending approval @ 2026-08-24T18:40:17+03:00",
+      "verificationStateRef": "sprint-659 scoped 50/50; full lint; build:all; real compiled API+MCP proof; archive+terminal verify",
+      "buildStateRef": "build:all@d2a4472314771d3d9a08bcb1f13659591840cf9e; bot pid 1317315",
+      "ssotStateRef": "docs/MASTER-PLAN.md + follow-up-works/current-flow.md"
+    }
+  },
+  "receiptDigest": "sha256:60b0924a3715f59847cc33d75b376635d33d5a620b6015b8fe5a3be4b1e3ddeb"
+}

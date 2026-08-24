@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "6b704a63a402c30cbc1c33912121e65a6a4552d74b42f6e4ddefc32a47cf057c"
+    "value": "7fd8181e41d2f2a607c9ff1feb4b76d87a02c726daea71799b3c8f7a26f261d7"
   },
   "summary": {
     "total": 521,
@@ -3634,9 +3634,9 @@
       "program": "AUTHORITY",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-08",
+      "updated": "2026-08-24",
       "definitionDigest": "47995548a67a5d0109cc1a6ccbf61173d100e77e97fe5997ecda1d0873b21481",
-      "progressDigest": "327542be18a2e3c22dfb1bfe81d5c83efb37b5a9c2aa3097ffde491b3a98da66",
+      "progressDigest": "196295dbcaf6604daac88cbda460eca909eba83a0ed1c59a56556fa35fa5bcbf",
       "terminalClosureDigest": null
     },
     {
@@ -3667,9 +3667,9 @@
       "program": "AUTHORITY",
       "priority": "P0",
       "state": "VERIFY",
-      "updated": "2026-08-08",
+      "updated": "2026-08-24",
       "definitionDigest": "9f1889561d84a710a34806cc3eaaab84a54f9817a594ad749c948c9fb04a7494",
-      "progressDigest": "840e57b8cdd02c7d54c614842d68af881e0a4afffd9fa654cca33ae0dabc1792",
+      "progressDigest": "8718eb979cf00b3801e1139141b4fc23a6f35bd1ac51ab02985ec02905afb380",
       "terminalClosureDigest": null
     },
     {
@@ -19081,8 +19081,8 @@
         "GR-2026-08-08-APPROVAL-T1-SUPP-01"
       ],
       "acceptance": "CLI, terminal, Desktop, API, connectors, Worker and Nervous share CAS, expiry, relay and audit",
-      "evidence": "2026-07-27 code-truth: v2 request actor eksikliğinde park; v1 adapter unknown ID decision yazabiliyor ve API/MCP ingress bunu validate etmiyor; DO gate/revision semantics yüzeyler arasında drift; `receipt=GR-2026-08-08-APPROVAL-T1-01`; `receipt=GR-2026-08-08-APPROVAL-T1-SUPP-01`; T1 SETTLEMENT 2026-08-08: forgeable-approval kapandı — autonomous approval-adapter accept/reject unknown-ID guard'ı fail-closed (taze disk pending.json artı in-memory pending'de yoksa karar YAZILMAZ, typed APR_UNKNOWN_REQUEST fırlar, red durable audit'e writeAuditEvent ile yazılır), API ingress tipli 403, MCP ingress tipli fail; guard tek noktada (adapter) olduğundan iki yüzey birlikte kapanır, fail-closed güvenli çünkü geçerli hiçbir akış unknown-ID decision üretmez. advisor-hardening: guard okuma-yolunu load-bearing yaptığından park==read zorunlu oldu — yedi ingress'in pendingPath kopyası tek canonical autonomousPendingPath resolver'a (core constants leaf modül, NERVOUS_PENDING_FILE kardeşi) indirildi, park-read producer-consumer pin eklendi, hermeticity baseline digest-only tazelendi; `proof=approval-t1-guard-plus-typed-403-plus-parkread-pin-97-green`; 13 dosya 3-core-artı-10-supp-hardening. T1 dilimi kaydedildi ama satır OPEN kalır (runtime-wide ApprovalBroker G2-design + 7-yüzey kapsamı bu API+MCP diliminde kapanmaz; tek receipt her mutation gate'i kapatmadığından governance VERIFY'ı bloklar). AÇIK typed-residual: decision-overwrite still-pending (accept sonra reject last-writer-wins) onaylı scope dışı; CLI gate projectRoot'suz kurulur, CLI reddi audit yazmaz (API+MCP onaylı yüzeydi); refusal recentAudit dashboard'da görünmez (audit-chain'de durable ama status yüzeyi autonomous-events.jsonl ayrı dosyayı okur); real-binary Tier-1 smoke koşulmadı (startTestServer gerçek in-process HTTP pipeline'ı çalıştırır ama dist binary değil); connectors/nervous yüzeyleri, v2 request-actor, DO gate/revision drift, tam broker birleştirme CAPABILITY-001 bağımlı — API+MCP ingress dilimi VERIFY-able child APPROVAL-INGRESS-UNKNOWN-ID-001 (4053) olarak carve edildi",
-      "updated": "2026-08-08"
+      "evidence": "2026-07-27 code-truth: v2 request actor eksikliğinde park; v1 adapter unknown ID decision yazabiliyor ve API/MCP ingress bunu validate etmiyor; DO gate/revision semantics yüzeyler arasında drift; `receipt=GR-2026-08-08-APPROVAL-T1-01`; `receipt=GR-2026-08-08-APPROVAL-T1-SUPP-01`; T1 SETTLEMENT 2026-08-08: forgeable-approval kapandı — autonomous approval-adapter accept/reject unknown-ID guard'ı fail-closed (taze disk pending.json artı in-memory pending'de yoksa karar YAZILMAZ, typed APR_UNKNOWN_REQUEST fırlar, red durable audit'e writeAuditEvent ile yazılır), API ingress tipli 403, MCP ingress tipli fail; guard tek noktada (adapter) olduğundan iki yüzey birlikte kapanır, fail-closed güvenli çünkü geçerli hiçbir akış unknown-ID decision üretmez. advisor-hardening: guard okuma-yolunu load-bearing yaptığından park==read zorunlu oldu — yedi ingress'in pendingPath kopyası tek canonical autonomousPendingPath resolver'a (core constants leaf modül, NERVOUS_PENDING_FILE kardeşi) indirildi, park-read producer-consumer pin eklendi, hermeticity baseline digest-only tazelendi; `proof=approval-t1-guard-plus-typed-403-plus-parkread-pin-97-green`; 13 dosya 3-core-artı-10-supp-hardening. T1 dilimi kaydedildi ama satır OPEN kalır (runtime-wide ApprovalBroker G2-design + 7-yüzey kapsamı bu API+MCP diliminde kapanmaz; tek receipt her mutation gate'i kapatmadığından governance VERIFY'ı bloklar). AÇIK typed-residual: decision-overwrite still-pending (accept sonra reject last-writer-wins) onaylı scope dışı; CLI gate projectRoot'suz kurulur, CLI reddi audit yazmaz (API+MCP onaylı yüzeydi); refusal recentAudit dashboard'da görünmez (audit-chain'de durable ama status yüzeyi autonomous-events.jsonl ayrı dosyayı okur); child 4053 API+MCP real-binary ingress proof'unu 2026-08-24'te kapattı; connectors/nervous yüzeyleri, v2 request-actor, DO gate/revision drift, tam broker birleştirme CAPABILITY-001 bağımlı — API+MCP ingress dilimi VERIFY-able child APPROVAL-INGRESS-UNKNOWN-ID-001 (4053) olarak carve edildi",
+      "updated": "2026-08-24"
     },
     {
       "order": 4052,
@@ -19145,8 +19145,8 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "An approval id absent from the durable pending queue is refused fail-closed at BOTH the API and MCP ingress — no decision is persisted, a typed APR_UNKNOWN_REQUEST is returned and the refusal is written to the durable audit trail; the loop park path and every read surface resolve one canonical pending-queue path",
-      "evidence": "`historical-authority=commit-b98c526b7;historical-gates=G1;proof=approval-t1-guard-typed403-parkread-pin-97-green`; APPROVAL-001'in API+MCP unknown-ID ingress dilimi burada VERIFY-able olarak carve edildi (owner 2026-08-08 kararı) — parent broker satırı G2-design + 7-yüzey kapsamıyla OPEN kalır, bu child yalnız G1 ingress'i kapsar. T1 dilimi PR 108 ile main'e girdi (merge commit b98c526b7 yukarıda pinlendi). Kapsam autonomous approval-adapter accept/reject fail-closed guard (taze disk pending.json artı in-memory yoksa karar YAZILMAZ, typed hata, red durable audit'e writeAuditEvent ile yazılır), API tipli 403, MCP tipli fail; advisor-hardening ile yedi ingress tek canonical autonomousPendingPath resolver'a indirildi ve park-read producer-consumer pin eklendi. `proof=approval-t1-97-tests-green-plus-lint-gates`. AÇIK typed-residual (bu G1 ingress diliminin dışında, parent OPEN'da izlenir): decision-overwrite still-pending, CLI reddi audit yazmaz, refusal recentAudit dashboard'da görünmez, real-binary Tier-1 smoke koşulmadı",
-      "updated": "2026-08-08"
+      "evidence": "`historical-authority=commit-b98c526b7;historical-gates=G1;proof=approval-t1-guard-typed403-parkread-pin-97-green`; APPROVAL-001'in API+MCP unknown-ID ingress dilimi burada VERIFY-able olarak carve edildi (owner 2026-08-08 kararı) — parent broker satırı G2-design + 7-yüzey kapsamıyla OPEN kalır, bu child yalnız G1 ingress'i kapsar. T1 dilimi PR 108 ile main'e girdi (merge commit b98c526b7 yukarıda pinlendi). Kapsam autonomous approval-adapter accept/reject fail-closed guard (taze disk pending.json artı in-memory yoksa karar YAZILMAZ, typed hata, red durable audit'e writeAuditEvent ile yazılır), API tipli 403, MCP tipli fail; advisor-hardening ile yedi ingress tek canonical autonomousPendingPath resolver'a indirildi ve park-read producer-consumer pin eklendi. `proof=approval-t1-97-tests-green-plus-lint-gates`. **LOCAL_VERIFIED + LIVE_PROVEN 2026-08-24:** canonical sprint-659 iki paralel acceptance taskı + fan-in ile 3/3 DONE ve terminal COMPLETE; API real compiled `serve` (control mutation policy explicit temp enablement) forged approve/reject çağrılarını HTTP 403 + typed `APR_UNKNOWN_REQUEST` ile reddetti, MCP real compiled stdio server iki tool çağrısını typed aynı kodla reddetti; iki yüzeyde decision dosyası oluşmadı ve durable `approval.unknown_request_rejected` audit kayıtları yazıldı. Birleşik scoped batarya 50/50, full lint ve `build:all` yeşil; canonical archive/terminal verify temiz (`manifestDigest=7c0fdf7edb20da0c1c0a766088d669cc4e3dda9cb61cc204f4f9519f6b370d76`). Child'ın real-binary residualı kapandı; decision-overwrite, CLI audit ve dashboard recentAudit parent `APPROVAL-001` kapsamındadır. Status Closure OS authenticated disposition beklediği için `VERIFY` korunur",
+      "updated": "2026-08-24"
     },
     {
       "order": 4054,
@@ -26831,6 +26831,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "7001cbcd48c4d1c365a3e65b8d8681d0b310474c6ecfae06e20983338b056294"
+    "value": "9c84ad6612b6e5417318e64b085f03a222812ef2957a05bca22deab3526f7431"
   }
 }

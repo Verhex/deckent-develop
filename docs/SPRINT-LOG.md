@@ -16323,3 +16323,52 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 657-003: Dependent and FIX shared-boundary fan-in acceptance (DONE)
 
 ---
+## Sprint 658 — sprint-658
+
+**Status:** ABORTED
+**Date:** 2026-08-24
+**Duration:** 232s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 1 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 231533ms |
+
+### Tasks
+
+- 658-001: Core gate and API ingress acceptance (DONE)
+- 658-002-fix: Fix: MCP ingress and registry acceptance (PAUSED)
+- 658-002: MCP ingress and registry acceptance (NO_GO)
+- 658-003: Canonical pending producer-to-consumer fan-in acceptance (PAUSED)
+
+---
+## Sprint 659 — sprint-659
+
+**Status:** COMPLETE
+**Date:** 2026-08-24
+**Duration:** 242s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 242304ms |
+
+### Tasks
+
+- 659-001: Core gate and API ingress acceptance (DONE)
+- 659-002: MCP ingress and registry acceptance (DONE)
+- 659-003: Canonical pending producer-to-consumer fan-in acceptance (DONE)
+
+---

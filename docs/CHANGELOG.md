@@ -14,6 +14,17 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint659] - 2026-08-24
+
+### Added
+
+- Core gate and API ingress acceptance
+- MCP ingress and registry acceptance
+- Canonical pending producer-to-consumer fan-in acceptance
+
+
+_Tasks: 3 total, 3 done, 0 tech debt, 0 no-go_
+
 ## [sprint657] - 2026-08-24
 
 ### Added
