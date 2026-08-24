@@ -79,6 +79,8 @@ export interface XVerifyTaskSettlementReceipt extends XVerifyTaskInvocationIdent
   readonly outcome: XVerifyTaskSettlementOutcome;
   readonly producerProvider: string;
   readonly verifierProvider: string;
+  /** Exact owner decision that admitted a below-tier author/verifier pair. */
+  readonly authorityEvidenceRef?: string;
   readonly evidenceRefs: readonly string[];
   readonly projection: XVerifyTaskProjection;
   readonly noReplay: XVerifyNoReplayDisposition;
@@ -88,6 +90,8 @@ export interface XVerifyTaskSettlementReceipt extends XVerifyTaskInvocationIdent
 export interface CreateXVerifyTaskSettlementInput extends XVerifyTaskInvocationIdentity {
   readonly producerProvider: string;
   readonly verifierProvider: string;
+  /** Exact owner decision that admitted a below-tier author/verifier pair. */
+  readonly authorityEvidenceRef?: string;
   readonly dispatchOutcome: XVerifyTaskDispatchOutcome;
 }
 
@@ -178,6 +182,9 @@ export function createXVerifyTaskSettlement(
   if (input.producerProvider === input.verifierProvider) {
     fail('same-provider self-settlement is forbidden');
   }
+  if (input.authorityEvidenceRef !== undefined) {
+    assertEvidenceRef('authorityEvidenceRef', input.authorityEvidenceRef);
+  }
 
   let outcome: XVerifyTaskSettlementOutcome;
   let evidenceRefs: readonly string[];
@@ -252,6 +259,9 @@ export function createXVerifyTaskSettlement(
     }
   }
 
+  const boundEvidenceRefs = input.authorityEvidenceRef === undefined
+    ? evidenceRefs
+    : [...evidenceRefs, input.authorityEvidenceRef];
   const body = {
     schemaVersion: XVERIFY_TASK_SETTLEMENT_SCHEMA_VERSION,
     state: 'settled' as const,
@@ -262,7 +272,10 @@ export function createXVerifyTaskSettlement(
     outcome,
     producerProvider: input.producerProvider,
     verifierProvider: input.verifierProvider,
-    evidenceRefs,
+    ...(input.authorityEvidenceRef !== undefined
+      ? { authorityEvidenceRef: input.authorityEvidenceRef }
+      : {}),
+    evidenceRefs: boundEvidenceRefs,
     projection,
   };
   const settlementDigest = digest(body);

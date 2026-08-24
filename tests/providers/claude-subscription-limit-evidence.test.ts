@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { CLAUDE_FABLE_API_ID } from '../../src/core/model-registry.js';
 import { ClaudeSubscriptionLimitEvidenceSource } from '../../src/providers/claude-subscription-limit-evidence.js';
 import {
   createProviderLimitResult,
@@ -20,7 +21,7 @@ function input(overrides: Partial<SourceInput> = {}): SourceInput {
     tenantId: 'tenant-test',
     projectId: 'project-test',
     provider: 'claude',
-    model: 'claude-fable-5',
+    model: CLAUDE_FABLE_API_ID,
     authMode: 'subscription',
     accountRefHash: ACCOUNT_REF,
     accountEvidence: {
@@ -95,7 +96,7 @@ describe('ClaudeSubscriptionLimitEvidenceSource', () => {
         {
           windowId: 'claude.week-fable',
           kind: 'custom',
-          model: null,
+          model: CLAUDE_FABLE_API_ID,
           consumed: 26,
           remaining: 74,
           limit: 100,
@@ -166,6 +167,39 @@ describe('ClaudeSubscriptionLimitEvidenceSource', () => {
       .not.toContain('claude.week-fable');
   });
 
+  it('requires only shared windows for exact Opus while retaining Fable evidence', async () => {
+    const probe = vi.fn(async () => ({
+      unavailable: false as const,
+      sessionPct: 22,
+      sessionResetAt: null,
+      weekAllPct: 44,
+      weekAllResetAt: null,
+      weekFablePct: 100,
+      raw: 'bounded fixture with a fully used Fable row',
+    }));
+    const source = new ClaudeSubscriptionLimitEvidenceSource({ probe, now: () => NOW });
+
+    const observation = await source.observe(input({ model: 'claude-opus-5' }));
+
+    expect(probe).toHaveBeenCalledOnce();
+    expect(observation).toMatchObject({
+      state: 'known',
+      requiredWindowIds: ['claude.session', 'claude.week-all'],
+    });
+    expect(observation.windows).toEqual(expect.arrayContaining([
+      expect.objectContaining({ windowId: 'claude.session', consumed: 22, remaining: 78, limit: 100 }),
+      expect.objectContaining({ windowId: 'claude.week-all', consumed: 44, remaining: 56, limit: 100 }),
+      expect.objectContaining({
+        windowId: 'claude.week-fable',
+        kind: 'custom',
+        model: CLAUDE_FABLE_API_ID,
+        consumed: 100,
+        remaining: 0,
+        limit: 100,
+      }),
+    ]));
+  });
+
   it('returns unavailable and never calls the probe for a near-match scope', async () => {
     const probe = vi.fn();
     const source = new ClaudeSubscriptionLimitEvidenceSource({
@@ -179,6 +213,7 @@ describe('ClaudeSubscriptionLimitEvidenceSource', () => {
       input({ accountEvidence: null }),
       input({ backend: { ...input().backend, transport: 'http' } }),
       input({ model: 'fable' }),
+      input({ model: 'opus' }),
     ];
 
     for (const scope of cases) {

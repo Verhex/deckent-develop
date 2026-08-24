@@ -17,6 +17,8 @@ import { createCrossVerifyContractError } from './errors.js';
 
 export const CROSS_VERIFY_ADJUDICATION_SCHEMA_VERSION = 2 as const;
 export const CROSS_VERIFY_ADJUDICATION_PROTOCOL = 'xverify-adjudication-v2' as const;
+/** Provider-authored explanation bound shared by the schema and prompt contract. */
+export const CROSS_VERIFY_ADJUDICATION_REASON_MAX_CHARS = 2_000;
 
 const MAX_ASSERTIONS = 64;
 const MAX_EVIDENCE_ENTRIES = 128;
@@ -112,7 +114,7 @@ const supportedOrContradictedResultSchema = z.object({
   citations: z.array(crossVerifyEvidenceCitationV2Schema)
     .min(1)
     .max(MAX_CITATIONS_PER_ASSERTION),
-  reason: boundedTextSchema(2_000),
+  reason: boundedTextSchema(CROSS_VERIFY_ADJUDICATION_REASON_MAX_CHARS),
 }).strict();
 
 const undecidableResultSchema = z.object({
@@ -123,7 +125,7 @@ const undecidableResultSchema = z.object({
   missingRequirementIds: z.array(identifierSchema)
     .min(1)
     .max(MAX_REQUIREMENTS_PER_ASSERTION),
-  reason: boundedTextSchema(2_000),
+  reason: boundedTextSchema(CROSS_VERIFY_ADJUDICATION_REASON_MAX_CHARS),
 }).strict();
 
 export const crossVerifyAssertionResultV2Schema = z.discriminatedUnion('status', [
@@ -200,6 +202,8 @@ export interface CrossVerifyHostAdjudicationV2 {
 export interface DeriveCrossVerifyAdjudicationV2Input {
   readonly contract: unknown;
   readonly response: unknown;
+  /** Host parser diagnostic retained when strict framing/schema parsing failed. */
+  readonly responseParseError?: string;
   readonly executionOutcome: CrossVerifyAdjudicationExecutionOutcome;
   /**
    * Parsed from the terminal `VERDICT:` token. It must agree with the
@@ -526,6 +530,14 @@ export function deriveCrossVerifyAdjudicationV2(
   }
 
   let response: Readonly<CrossVerifyAdjudicationResponseV2>;
+  if (input.responseParseError?.trim()) {
+    return failClosed(
+      providerDeclaredVerdict,
+      'response-invalid',
+      input.responseParseError,
+      contract,
+    );
+  }
   try {
     response = parseCrossVerifyAdjudicationResponseV2(input.response);
   } catch (error) {

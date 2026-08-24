@@ -37,13 +37,16 @@ export type {
   ParametricResolveOptions,
 } from './model-registry-types.js';
 
+/** Canonical provider API identity for Claude Fable quota and routing scope. */
+export const CLAUDE_FABLE_API_ID = 'claude-fable-5' as const;
+
 /**
  * Compatibility metadata for explicit config/active-work migration only.
  * Normal registry lookup never consumes this table and therefore never turns
  * an authored legacy alias into a different wire model silently.
  */
 export const LEGACY_MODEL_ALIASES = Object.freeze({
-  fable: 'claude-fable-5',
+  fable: CLAUDE_FABLE_API_ID,
   opus: 'claude-opus-4-8',
   sonnet: 'claude-sonnet-5',
   haiku: 'claude-haiku-4-5-20251001',
@@ -161,8 +164,8 @@ export const BUILTIN_MODELS: readonly ModelDefinition[] = [
     // Claude Fable 5 — Anthropic's most capable widely released model (GA 2026-06-09).
     // Free on Pro/Max/Team subscriptions through 2026-06-22; reverts to $10/$50 paid after.
     // 1M context (Opus 4.7 tokenizer), adaptive thinking always-on, no extended thinking.
-    id: 'claude-fable-5',
-    apiId: 'claude-fable-5',
+    id: CLAUDE_FABLE_API_ID,
+    apiId: CLAUDE_FABLE_API_ID,
     provider: 'claude',
     tier: 'premium_plus',
     contextWindow: 1_000_000,

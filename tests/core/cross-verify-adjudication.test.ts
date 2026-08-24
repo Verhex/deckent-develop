@@ -163,6 +163,47 @@ describe('CrossVerifyAdjudicationV2 contract', () => {
 });
 
 describe('CrossVerifyAdjudicationV2 host derivation', () => {
+  it('preserves the exact host parse rejection instead of reparsing null', () => {
+    const contract = createCrossVerifyAdjudicationContractV2(claim(), manifest());
+    const parseError = 'xverify v2 adjudication response rejected: '
+      + 'assertionResults.0.reason: max 2000 — byte-for-byte';
+    const decision = deriveCrossVerifyAdjudicationV2({
+      contract,
+      response: null,
+      responseParseError: parseError,
+      executionOutcome: 'completed',
+      providerDeclaredVerdict: 'confirmed',
+    });
+
+    expect(decision).toMatchObject({
+      verdict: 'unclear',
+      disposition: 'fail-closed',
+      reasonCode: 'response-invalid',
+      reason: parseError,
+      providerDeclaredVerdict: 'confirmed',
+      claimDigest: contract.claimDigest,
+      evidenceManifestDigest: contract.evidenceManifestDigest,
+    });
+  });
+
+  it('fails closed when a caller supplies both a parsed response and a parse error', () => {
+    const contract = createCrossVerifyAdjudicationContractV2(claim(), manifest());
+    const decision = deriveCrossVerifyAdjudicationV2({
+      contract,
+      response: supportedResponse(contract),
+      responseParseError: 'host parser reported an inconsistent response',
+      executionOutcome: 'completed',
+      providerDeclaredVerdict: 'confirmed',
+    });
+
+    expect(decision).toMatchObject({
+      verdict: 'unclear',
+      disposition: 'fail-closed',
+      reasonCode: 'response-invalid',
+      reason: 'host parser reported an inconsistent response',
+    });
+  });
+
   it('derives CONFIRMED only when every assertion has required host-bound evidence', () => {
     const contract = createCrossVerifyAdjudicationContractV2(claim(), manifest());
     const decision = deriveCrossVerifyAdjudicationV2({

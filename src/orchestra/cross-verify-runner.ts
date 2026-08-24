@@ -58,6 +58,7 @@ import {
   type VerifierEligibilityCandidate,
 } from '../core/cross-verify.js';
 import { getDefaultProviderName } from './sprint-utils.js';
+import { resolveXVerifyVerifierTierAuthority } from '../core/xverify-verifier-tier-authority.js';
 import { atomicWriteFileSync } from '../agents/worker-lifecycle.js';
 import { normalizeTaskResultShape } from '../core/task-result-schema.js';
 import {
@@ -90,8 +91,9 @@ import {
   type CrossVerifyAdjudicationContractV2,
   type CrossVerifyHostAdjudicationV2,
 } from '../core/cross-verify-adjudication.js';
-import type {
-  CrossVerifyVerdictReceiptEnvelopeV1,
+import {
+  crossVerifyVerdictReceiptRef,
+  type CrossVerifyVerdictReceiptEnvelopeV1,
 } from '../core/cross-verify-evidence-broker.js';
 import {
   findVerifierRefusal,
@@ -140,6 +142,8 @@ export interface CrossVerifyAdvisory {
   execution?: CrossVerifyExecutionEvidence;
   /** Exact authority evidence that admitted this verifier, when enforcement required it. */
   eligibility?: CrossVerifyEligibilityEvidence;
+  /** Exact owner decision that admitted a below-tier verifier pair. */
+  authorityEvidenceRef?: string;
   /** Immutable provider-call receipt whose lifecycle settled this verdict. */
   invocationReceiptRef?: InvocationReceiptRef;
   /** Host-only assurance carried by semantic protocol v2. */
@@ -475,6 +479,8 @@ export function persistCrossVerifyTaskSettlement(input: {
   readonly producerProvider: string;
   readonly verifierProvider: string;
   readonly dispatchOutcome: XVerifyTaskDispatchOutcome;
+  /** Exact owner decision that admitted a below-tier verifier pair. */
+  readonly authorityEvidenceRef?: string;
 }): Readonly<XVerifyTaskSettlementReceipt> {
   const receipt = createXVerifyTaskSettlement(input);
   const path = join(input.projectRoot, TASKS_DIR, `task-${input.taskId}.result`);
@@ -955,6 +961,28 @@ export function resolveVerifierTierFloorRefusal(
     + `verifier=${verifierModel}(${verifierTier}) < author=${authorModel}(${authorTier})`;
 }
 
+/**
+ * Preserve the ordinary tier floor unless the owner admitted this exact model
+ * pair. The decision is resolved at each identity boundary: an actual called
+ * model that drifts from an admitted requested pair cannot inherit its grant.
+ */
+function resolveVerifierTierFloorAdmission(
+  authorModel: string,
+  verifierModel: string,
+  config: ResolvedConfig | undefined,
+): { refusal: string | null; authorityEvidenceRef?: string } {
+  const refusal = resolveVerifierTierFloorRefusal(authorModel, verifierModel);
+  if (!refusal) return { refusal: null };
+  const authority = resolveXVerifyVerifierTierAuthority({
+    authority: config?.cross_verify?.verifier_tier_authority,
+    authorModel,
+    verifierModel,
+  });
+  return authority.admitted
+    ? { refusal: null, authorityEvidenceRef: authority.decisionRef }
+    : { refusal };
+}
+
 function resolveVerifierModel(
   taskModel: string,
   verifierProvider: ProviderName,
@@ -1289,6 +1317,7 @@ export async function runCrossVerify(
   let dispatchedVerifier: ProviderName | undefined;
   let dispatchedVerifierModel: string | undefined;
   let dispatchRejection: VerifierDispatchRejection | undefined;
+  let verifierTierAuthorityEvidenceRef: string | undefined;
 
   const skip = (
     reason: string,
@@ -1336,13 +1365,16 @@ export async function runCrossVerify(
     // branch spends anything. This is the point an explicit `--verifier-model`
     // would otherwise buy a below-tier judge outright.
     if (opts.verifierModel) {
-      const requestedRefusal = resolveVerifierTierFloorRefusal(authorModel, opts.verifierModel);
-      if (requestedRefusal) {
+      const requestedAdmission = resolveVerifierTierFloorAdmission(
+        authorModel, opts.verifierModel, config,
+      );
+      verifierTierAuthorityEvidenceRef = requestedAdmission.authorityEvidenceRef;
+      if (requestedAdmission.refusal) {
         const evidencePersisted = writeEvidenceToResult(projectRoot, task.id, {
           outcome: 'unavailable',
-          reason: requestedRefusal,
+          reason: requestedAdmission.refusal,
         });
-        return skip(requestedRefusal, 'unavailable', evidencePersisted, verificationRequired);
+        return skip(requestedAdmission.refusal, 'unavailable', evidencePersisted, verificationRequired);
       }
     }
 
@@ -1490,27 +1522,30 @@ export async function runCrossVerify(
       // Floor check #2 — the composition authority resolves the called model
       // itself, so the requested-model check above cannot speak for it. A
       // below-tier judge never gains verdict authority, whatever it returned.
-      const calledModelRefusal = resolveVerifierTierFloorRefusal(
-        authorModel,
-        coordinated.calledModel,
+      const calledModelAdmission = resolveVerifierTierFloorAdmission(
+        authorModel, coordinated.calledModel, config,
       );
-      if (calledModelRefusal) {
+      // The composition's called identity is authoritative; clear any request grant
+      // before downstream gates so a drifted model must earn its own exact decision.
+      verifierTierAuthorityEvidenceRef = calledModelAdmission.authorityEvidenceRef;
+      if (calledModelAdmission.refusal) {
         dispatchedVerifier = verifierProvider;
         dispatchedVerifierModel = coordinated.calledModel;
         const evidencePersisted = writeEvidenceToResult(projectRoot, task.id, {
           outcome: 'unavailable',
           verifier: verifierProvider,
           verifierModel: coordinated.calledModel,
-          reason: calledModelRefusal,
+          reason: calledModelAdmission.refusal,
           invocationReceiptRef: coordinated.invocationReceiptRef,
         });
-        return skip(calledModelRefusal, 'unavailable', evidencePersisted, verificationRequired);
+        return skip(calledModelAdmission.refusal, 'unavailable', evidencePersisted, verificationRequired);
       }
       if (mandatory.adjudication) {
         const parsed = parseCrossVerifyAdjudicationOutputV2(coordinated.output);
         const adjudication = deriveCrossVerifyAdjudicationV2({
           contract: mandatory.adjudication.contract,
           response: parsed.response,
+          responseParseError: parsed.error,
           executionOutcome: coordinated.execution.outcome,
           providerDeclaredVerdict: parsed.providerDeclaredVerdict,
         });
@@ -1529,6 +1564,13 @@ export async function runCrossVerify(
             adjudication,
             output: coordinated.output,
           });
+          if (!persisted.validatedReceipt) {
+            throw new Error('validated durable verdict receipt is missing');
+          }
+          const derivedReceiptRef = crossVerifyVerdictReceiptRef(persisted.validatedReceipt);
+          if (persisted.verdictReceiptRef !== derivedReceiptRef) {
+            throw new Error('durable verdict receipt reference does not match its validated receipt');
+          }
           adjudicationReceiptRef = persisted.verdictReceiptRef;
           validatedAdjudicationReceipt = persisted.validatedReceipt;
         } catch (error) {
@@ -1554,6 +1596,9 @@ export async function runCrossVerify(
           invocationReceiptRef: coordinated.invocationReceiptRef,
           assurance: 'typed-host-adjudicated',
           adjudicationReceiptRef,
+          ...(verifierTierAuthorityEvidenceRef
+            ? { authorityEvidenceRef: verifierTierAuthorityEvidenceRef }
+            : {}),
         };
         const requiredDisposition: CrossVerifyDisposition = refuted
           ? 'no-go'
@@ -1573,6 +1618,9 @@ export async function runCrossVerify(
           ...transportReceipt,
           producerProvider: task.provider ?? getDefaultProviderName(),
           verifierProvider,
+          ...(verifierTierAuthorityEvidenceRef
+            ? { authorityEvidenceRef: verifierTierAuthorityEvidenceRef }
+            : {}),
           dispatchOutcome: {
             kind: 'adjudicated',
             transportReceipt,
@@ -1629,6 +1677,9 @@ export async function runCrossVerify(
         reason: verdict.reason,
         execution: coordinated.execution,
         invocationReceiptRef: coordinated.invocationReceiptRef,
+        ...(verifierTierAuthorityEvidenceRef
+          ? { authorityEvidenceRef: verifierTierAuthorityEvidenceRef }
+          : {}),
       };
       const outcome = verdict.verdict;
       const evidencePersisted = writeEvidenceToResult(
@@ -1641,6 +1692,9 @@ export async function runCrossVerify(
         ...transportReceipt,
         producerProvider: task.provider ?? getDefaultProviderName(),
         verifierProvider,
+        ...(verifierTierAuthorityEvidenceRef
+          ? { authorityEvidenceRef: verifierTierAuthorityEvidenceRef }
+          : {}),
         dispatchOutcome: executionCompleted
           ? {
               kind: 'adjudicated',
@@ -1779,15 +1833,18 @@ export async function runCrossVerify(
     // Floor check #3 — the resolved identity on the string-spawn branch. This is
     // where `cross_verify.verifier_model` and `getEquivalent`'s one-tier-down
     // fallback land, neither of which passed through check #1.
-    const resolvedTierRefusal = resolveVerifierTierFloorRefusal(authorModel, verifierModel);
-    if (resolvedTierRefusal) {
+    const resolvedTierAdmission = resolveVerifierTierFloorAdmission(
+      authorModel, verifierModel, config,
+    );
+    verifierTierAuthorityEvidenceRef = resolvedTierAdmission.authorityEvidenceRef;
+    if (resolvedTierAdmission.refusal) {
       const evidencePersisted = writeEvidenceToResult(projectRoot, task.id, {
         outcome: 'unavailable',
         verifier: verifierProvider,
         verifierModel,
-        reason: resolvedTierRefusal,
+        reason: resolvedTierAdmission.refusal,
       });
-      return skip(resolvedTierRefusal, 'unavailable', evidencePersisted, verificationRequired);
+      return skip(resolvedTierAdmission.refusal, 'unavailable', evidencePersisted, verificationRequired);
     }
 
     // MASTER-PLAN 671(b) — do not pay twice for the same refusal. If THIS exact
@@ -2174,6 +2231,9 @@ export async function runCrossVerify(
       ...(executionEvidence ? { execution: executionEvidence } : {}),
       ...(eligibility ? { eligibility } : {}),
       ...(invocationReceiptRef ? { invocationReceiptRef } : {}),
+      ...(verifierTierAuthorityEvidenceRef
+        ? { authorityEvidenceRef: verifierTierAuthorityEvidenceRef }
+        : {}),
     };
     const outcome = verdict.verdict;
     const evidencePersisted = writeEvidenceToResult(projectRoot, task.id, { ...advisory, outcome });

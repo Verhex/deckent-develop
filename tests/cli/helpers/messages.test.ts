@@ -73,6 +73,23 @@ describe('getMessage', () => {
     });
   });
 
+  describe('xverify tier admission diagnostics', () => {
+    it('distinguishes normal admission from an owner-pair exception in English and Turkish', () => {
+      for (const [lang, verdictPhrase] of [
+        ['en', 'not a verifier verdict'],
+        ['tr', 'hakem kararı değildir'],
+      ] as const) {
+        const normal = getMessage('xverify.report.tier_admission.normal-tier-admitted', lang);
+        const exception = getMessage('xverify.report.tier_admission.owner-pair-admitted', lang);
+        const ref = getMessage('xverify.report.tier_decision_ref', lang, { decisionRef: 'owner-ref-opaque' });
+        expect(normal).toContain(verdictPhrase);
+        expect(exception).toContain(verdictPhrase);
+        expect(normal).not.toBe(exception);
+        expect(ref).toContain('owner-ref-opaque');
+      }
+    });
+  });
+
   describe('key lookup', () => {
     it('renders an opaque invocation receipt reference in both languages', () => {
       const vars = { invocationId: 'inv-1', tenantId: 'tenant-a', projectId: 'project-a' };

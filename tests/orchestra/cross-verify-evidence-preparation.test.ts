@@ -304,7 +304,7 @@ describe('prepareCrossVerifyCandidateEvidence', () => {
           getRequest: vi.fn((id: string) => ({
             version: 1, id, requester: { role: 'brain', instanceId: 'xverify' },
             summary: 'probe', details: { schemaVersion: 1, kind: 'provider-evidence-probe' },
-            scopeId: 'p', scope: 'network', risk: 'high', policy: 'require-approval',
+            scopeId: 'p', scope: 'network', risk: 'low', policy: 'require-approval',
             defaultAction: 'deny', tenantId: 'main', userId: 'alperen',
             createdAt: new Date(clock - 1000).toISOString(),
             expiresAt: new Date(clock + 600_000).toISOString(),

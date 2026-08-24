@@ -51,11 +51,15 @@ import type { VerifierEligibilityCandidate } from '../../src/core/cross-verify.j
 import { InvocationReceiptStore } from '../../src/core/invocation-receipt-store.js';
 import type { InvocationReceipt, InvocationReceiptLedger } from '../../src/core/invocation-receipt.js';
 import {
+  CROSS_VERIFY_ADJUDICATION_REASON_MAX_CHARS,
   CROSS_VERIFY_ADJUDICATION_PROTOCOL,
   CROSS_VERIFY_ADJUDICATION_SCHEMA_VERSION,
   createCrossVerifyAdjudicationContractV2,
 } from '../../src/core/cross-verify-adjudication.js';
-import { CROSS_VERIFY_ADJUDICATION_RESPONSE_PREFIX } from '../../src/core/cross-verify-prompt.js';
+import {
+  CROSS_VERIFY_ADJUDICATION_RESPONSE_PREFIX,
+  parseCrossVerifyAdjudicationOutputV2,
+} from '../../src/core/cross-verify-prompt.js';
 
 const defaultSpawnMocks = vi.hoisted(() => ({
   spawnWorkerMultiProvider: vi.fn(async () => ({ backend: 'docker', provider: 'claude' })),
@@ -1364,6 +1368,10 @@ describe('runCrossVerify — mandatory exact-coordinator enforcement', () => {
     const exact = mandatoryComposition(exactCoordinatorSettled(output));
     const persist = vi.fn(() => ({
       verdictReceiptRef: `cross-verify-verdict:sha256:${'a'.repeat(64)}`,
+      validatedReceipt: {
+        verdictReceiptSha256: 'a'.repeat(64),
+        receipt: {},
+      } as never,
     }));
 
     const res = await runCrossVerify(
@@ -1400,6 +1408,73 @@ describe('runCrossVerify — mandatory exact-coordinator enforcement', () => {
     });
   });
 
+  it('propagates an exact schema rejection through adjudication, result and report', async () => {
+    writeResultFile('276-001', makeResult());
+    const typed = typedAdjudicationFixture('supported');
+    const response = {
+      ...typed.response,
+      assertionResults: typed.response.assertionResults.map(result => ({
+        ...result,
+        reason: 'x'.repeat(CROSS_VERIFY_ADJUDICATION_REASON_MAX_CHARS + 1),
+      })),
+    };
+    const output = `${CROSS_VERIFY_ADJUDICATION_RESPONSE_PREFIX}${JSON.stringify(response)}\n`
+      + 'VERDICT: CONFIRMED provider completed the typed response';
+    const expectedParseError = parseCrossVerifyAdjudicationOutputV2(output).error;
+    expect(expectedParseError).toContain('assertionResults.0.reason');
+    const exact = mandatoryComposition(exactCoordinatorSettled(output));
+    const persist = vi.fn(() => ({
+      verdictReceiptRef: `cross-verify-verdict:sha256:${'c'.repeat(64)}`,
+      validatedReceipt: {
+        verdictReceiptSha256: 'c'.repeat(64),
+        receipt: {},
+      } as never,
+    }));
+
+    const res = await runCrossVerify(
+      root,
+      makeTask(),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true, enforce_refuted: true }),
+      {
+        mandatoryInvocation: {
+          ...exact.composition,
+          adjudication: { contract: typed.contract, persist },
+        },
+      },
+    );
+
+    expect(res).toMatchObject({
+      ran: true,
+      outcome: 'unclear',
+      disposition: 'hold',
+      blocked: true,
+      advisory: {
+        verdict: 'unclear',
+        reason: expectedParseError,
+        assurance: 'typed-host-adjudicated',
+      },
+    });
+    expect(persist.mock.calls[0]![0].adjudication).toMatchObject({
+      verdict: 'unclear',
+      disposition: 'fail-closed',
+      reasonCode: 'response-invalid',
+      reason: expectedParseError,
+    });
+    expect(readResultFile('276-001').crossVerify?.reason).toBe(expectedParseError);
+    const report = JSON.parse(readFileSync(
+      join(root, '.analysis/xverify/task-276-001-adjudication.json'),
+      'utf-8',
+    )) as Record<string, unknown>;
+    expect(report).toMatchObject({
+      schemaRejected: true,
+      schemaRejectionReason: expectedParseError,
+      rawProviderOutput: output,
+      rawProviderOutputTruncated: false,
+    });
+  });
+
   it('HOLDs when provider terminal CONFIRMED disagrees with typed host derivation', async () => {
     writeResultFile('276-001', makeResult());
     const typed = typedAdjudicationFixture('contradicted');
@@ -1408,6 +1483,10 @@ describe('runCrossVerify — mandatory exact-coordinator enforcement', () => {
     const exact = mandatoryComposition(exactCoordinatorSettled(output));
     const persist = vi.fn(() => ({
       verdictReceiptRef: `cross-verify-verdict:sha256:${'b'.repeat(64)}`,
+      validatedReceipt: {
+        verdictReceiptSha256: 'b'.repeat(64),
+        receipt: {},
+      } as never,
     }));
 
     const res = await runCrossVerify(

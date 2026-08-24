@@ -108,6 +108,21 @@ export interface ResourceMonitorConfig {
 }
 
 // ─── Cross Verify Config ─────────────────────────────────────────────
+/** One owner decision over one exact author/verifier model pair. */
+export interface XVerifyVerifierTierDecision {
+  author_model: string;
+  verifier_model: string;
+  decision: 'allow' | 'refuse';
+  /** Opaque, canonical reference to the immutable owner decision. */
+  decision_ref: string;
+}
+
+/** Versioned authority for the sole exception to the verifier capability-tier floor. */
+export interface XVerifyVerifierTierAuthority {
+  schema_version: 1;
+  decisions: XVerifyVerifierTierDecision[];
+}
+
 /** Cross-provider adversarial verification configuration (Sprint 276 XVER-1). Opt-in — absent block = disabled. */
 export interface CrossVerifyConfig {
   /** Enable cross-provider adversarial verification (required). */
@@ -158,6 +173,8 @@ export interface CrossVerifyConfig {
    * substitution.
    */
   verifier_model?: Record<string, string>;
+  /** Exact-pair owner decisions for verifier tier-floor admission. */
+  verifier_tier_authority?: XVerifyVerifierTierAuthority;
   /**
    * Owner-bounded allowance for the xverify verifier-adjudication dispatch to
    * proceed against a SUBSCRIPTION provider whose only limit windows are advisory

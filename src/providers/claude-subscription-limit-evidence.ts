@@ -10,6 +10,7 @@ import type {
   ProviderLimitSourceObservation,
 } from '../core/provider-evidence-producer.js';
 import type { ProviderLimitWindow } from '../core/provider-limit-truth.js';
+import { CLAUDE_FABLE_API_ID } from '../core/model-registry.js';
 import {
   assertCanonicalModelApiId,
   assertOpaqueEvidenceRef,
@@ -52,11 +53,12 @@ function percentWindow(
   kind: ProviderLimitWindow['kind'],
   consumed: number,
   reset: ResetTime | null,
+  model: string | null = null,
 ): ProviderLimitWindow {
   return {
     windowId,
     kind,
-    model: null,
+    model,
     unit: 'percent',
     consumed,
     remaining: 100 - consumed,
@@ -195,11 +197,14 @@ export class ClaudeSubscriptionLimitEvidenceSource implements ProviderLimitEvide
         'custom',
         result.weekFablePct,
         result.weekAllResetAt,
+        CLAUDE_FABLE_API_ID,
       ));
     }
     return {
       state: 'known',
-      requiredWindowIds: [SESSION_WINDOW_ID, WEEK_ALL_WINDOW_ID, WEEK_FABLE_WINDOW_ID],
+      requiredWindowIds: input.model === CLAUDE_FABLE_API_ID
+        ? [SESSION_WINDOW_ID, WEEK_ALL_WINDOW_ID, WEEK_FABLE_WINDOW_ID]
+        : [SESSION_WINDOW_ID, WEEK_ALL_WINDOW_ID],
       windows,
       source: {
         operatorApprovalRef: null,

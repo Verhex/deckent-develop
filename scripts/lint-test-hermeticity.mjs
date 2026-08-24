@@ -581,8 +581,19 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // tmpdirs; runtime identity digests are synthetic non-secret fixtures. The
   // prompt-cost archive-rejection assertion moves only callsite fingerprints.
   // The source-derived scan reports zero confirmed live-authority violations.
-  count: 15863,
-  digest: 'de934eb56f42b56f68e5e48f128cb5643885916cbb78a433e301b23f22858e95',
+  // 2026-08-24 XVERIFY-WIRE-001: +140 — exact-pair authority, hostile runner
+  // composition and compiled-CLI integration suites exercise only suite-owned
+  // tmpdir/config/task/receipt fixtures and bounded child processes. Existing
+  // settlement/config/message tests move tracked callsite fingerprints. The
+  // final causal rewrite adds seven tmpdir/store/settlement effects while
+  // replacing the disconnected synthetic invocation fixture with the real
+  // preparation → production-ingress → runner chain. The source-derived scan
+  // reports zero confirmed live-authority violations.
+  // The live Opus response-bound recovery adds pure parser/prompt bounds plus a
+  // suite-owned tmpdir runner propagation proof; it reuses inventoried effects,
+  // so the effect count remains unchanged while callsite fingerprints move.
+  count: 16003,
+  digest: '8a456bb3bf03010f9f8ef3dc4c564453316ecffa47dd3e067e0e4a905220170d',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1032,8 +1043,17 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // and the archive reader consumes terminal lineageUsage plus provider envelopes.
   // 2026-08-24 bot clean-guard schema-v2 closure: count unchanged; digest binds
   // the canonical v2 runtime-identity validation used by the build clean gate.
-  count: 1315,
-  digest: 'ca66cf812883230d3f0fd127d44d2edfc8040aaf5ca37ae6481800a53575acc9',
+  // 2026-08-24 XVERIFY-WIRE-001: +1 — the canonical exact author/verifier
+  // tier-authority module enters the governed inventory; config, runner,
+  // settlement and CLI consumers move existing production fingerprints.
+  // The final causal candidate-window integration rewrite changes only which
+  // already-inventoried production modules are reachable from that suite;
+  // inventory membership remains count-neutral.
+  // The live Opus response-bound recovery keeps membership count-neutral while
+  // binding prompt disclosure and parse-diagnostic propagation into the same
+  // already-inventoried adjudication/prompt/runner production chain.
+  count: 1316,
+  digest: '90fb24f871d3b3e2dcf25bc09cb9550a2974ff811d6c025e52e3a54ec59ee421',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

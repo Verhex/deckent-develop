@@ -48,6 +48,26 @@ function settle(dispatchOutcome: XVerifyTaskDispatchOutcome) {
 }
 
 describe('XVerify internal task settlement', () => {
+  it('cryptographically binds exact owner tier authority provenance', () => {
+    const withoutAuthority = settle(adjudicated('confirmed'));
+    const withAuthority = createXVerifyTaskSettlement({
+      ...base,
+      authorityEvidenceRef: 'owner-live-2026-08-24-opus5-xverify-accepted',
+      dispatchOutcome: adjudicated('confirmed'),
+    });
+
+    expect(withAuthority.authorityEvidenceRef)
+      .toBe('owner-live-2026-08-24-opus5-xverify-accepted');
+    expect(withAuthority.evidenceRefs)
+      .toContain('owner-live-2026-08-24-opus5-xverify-accepted');
+    expect(withAuthority.settlementDigest).not.toBe(withoutAuthority.settlementDigest);
+    expect(() => createXVerifyTaskSettlement({
+      ...base,
+      authorityEvidenceRef: ' ',
+      dispatchOutcome: adjudicated('confirmed'),
+    })).toThrow('authorityEvidenceRef is invalid');
+  });
+
   it.each([
     ['confirmed', 'DONE'],
     ['refuted', 'NO_GO'],

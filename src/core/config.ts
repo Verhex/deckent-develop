@@ -15,6 +15,7 @@ import { needsMigration, migrateConfig, removeDuplicateKeys } from './config-mig
 import { canonicalizeProviderConfigAliases } from './provider-config-canonicalizer.js';
 import { canonicalizeModelConfigAliases } from './model-config-canonicalizer.js';
 import { modelRegistry } from './model-registry.js';
+import { validateXVerifyVerifierTierAuthority } from './xverify-verifier-tier-authority.js';
 // 593-002: the task-class profile defaults live in the work-model kind-SSOT, next
 // to the other reverse helpers; config only RE-EXPORTS them as the resolved
 // `prompt.task_profiles` default (import is type-erased-safe: work-model imports
@@ -1312,6 +1313,11 @@ export function validateConfig(config: DeckentConfig): string[] {
           }
         }
       }
+    }
+    if (cv.verifier_tier_authority !== undefined) {
+      errors.push(...validateXVerifyVerifierTierAuthority(cv.verifier_tier_authority).map(
+        error => `cross_verify.verifier_tier_authority ${error}`,
+      ));
     }
   }
 

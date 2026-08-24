@@ -6,10 +6,10 @@
 ## Canlı truth
 
 - `DOGFOOD_MODE=ON`, `WORKSPACE_MODE=MAIN`, `DELIVERY_MODE=DIRECT_MAIN`.
-- Aktif run yok. Son outcome run'ı `sprint-642`: 5-task 7094 measurement-authority DAG'ı;
-  dört implementation lineage'ı settled, dar finalizer/FIX scope'u kapanamadığı için dürüst
-  `ABORTED`. Production fan-in post-terminal ADR-D-007 recovery seam'inde kapandı; run geçmişi
-  sahte `COMPLETE` edilmedi.
+- Aktif run yok. Son normal outcome run'ı `sprint-645`: beş-task paralel DAG terminal
+  `COMPLETE`. Finalizer re-entry ve `finalize --force` conflict'i bounded ADR-D-007 recovery
+  seam'inde kapandı; canonical terminal receipt generation 1, raw archive, manifest/hash/integrity
+  ve Brain archive projection zinciri doğrulandı.
 - Provider observation reconciliation canlı uygulandı: 19 active-open interval'ın exact
   run/attempt settlement sahibi olan 15'i digest-bound plan + interactive approval + immutable
   receipt ile `retired=true` oldu; dört `sprint-488` legacy-unowned interval forensic `HOLD`
@@ -18,7 +18,7 @@
 - Sprint-637'nin altı stale PENDING task artifact'ı canonical archive writer ile
   `.deckent/archive/sprints/sprint-637/tasks/` altına byte-identical taşındı; manifest/integrity
   6/6 yeşil, `.tasks` elle silinmedi.
-- Bot daemon fresh build sonrası PID `419599` ile çalışıyor. Pending approval yok.
+- Bot daemon fresh compiled dist ile PID `655230` olarak çalışıyor. Pending approval yok.
 - Source→dist→provider runtime adoption production-wired: immutable composite receipt provider
   receipt + current DB lineage + source/build/entrypoint digest + canlı PID/start token'ı bağlıyor;
   real dist dry-run→apply→fresh-process replay aynı receipt'i verdi, DB/WAL/SHM değişmedi.
@@ -36,18 +36,27 @@
 - 7094 measurement authority producer→archive reader→kernel→immutable receipt→i18n CLI zinciri
   LOCAL_VERIFIED. Formal Fable 5 koşusu provider call öncesi typed `limit_hold/unavailable` verdi;
   receipt yok, default flip yok. Outer 7094 gerçek comparable A/B cohortlarını beklediği için OPEN.
-- Status projection'da yalnız principal `c38a…` altında dört fresh unresolved provider interval
-  var; historical 19-interval settlement paketiyle karıştırılmadan ayrı reconcile edilecek.
+- Work 1055 XVerify production wiring functional olarak kapandı. Exact Sol→Opus owner-pair
+  authority, model-scoped limit policy ve parser→adjudication fail-closed zinciri gerçek
+  `claude-opus-5` call ile `CONFIRMED/allow` üretti; provider-reported usage/USD, terminal
+  settlement ve durable receipt
+  `cross-verify-verdict:sha256:299d10b3f9b636be07cfa38a2607b6bf6ed1defb3733838109595257ba5ffd87`
+  mevcut. MASTER satırı CM-04, PROVIDER-INGRESS-001 ve G1/G7 gate authority nedeniyle dürüstçe
+  `BLOCKED` kalır; receipt veya state uydurulmaz.
+- Status projection'daki dört unresolved provider interval fresh değildir: hepsi `sprint-488`
+  legacy-unowned forensic kayıttır. Exact owner/run authority bulunmadan retire edilmeyecek ve
+  yeni interval gibi sayılmayacak.
 
 ## Done-ready sayacı
 
-- 4/20 — canonical terminal archive/finalizer acceptance + provider-observation reconciliation +
-  source/dist/provider runtime adoption + 7094 production measurement authority.
+- 5/20 — canonical terminal archive/finalizer acceptance + provider-observation reconciliation +
+  source/dist/provider runtime adoption + 7094 production measurement authority + Work 1055
+  XVerify production wiring.
 
 ## Sıradaki yürütme sırası
 
-1. Principal `c38a…` altındaki dört fresh unresolved interval'ı exact run/attempt disk truth ile
-   reconcile et; historical sprint-488 forensic HOLD'larla birleştirme, kör apply etme.
+1. Dört `sprint-488` legacy-unowned interval için Work 3296→480 canonical ownership/settlement
+   authority'sini ölç; exact owner yoksa forensic HOLD'u koru, kör apply etme.
 2. Sıradaki multi-task dogfood run'ı 7094 plan-time authority'nin canlı canary'si yap; sonra aynı
    workload treatment cohort'u ile measuredHitRatio + provider-reported USD receipt'i üret.
 3. `2026-08-24 20:00 Europe/Istanbul` sonrasında runtime hygiene different-provider XVerify.

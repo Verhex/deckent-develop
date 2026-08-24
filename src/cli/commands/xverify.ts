@@ -34,10 +34,12 @@ import type {
   ResolvedConfig,
   CrossVerifyExecutionEvidence,
 } from '../../core/types.js';
+import type { XVerifyVerifierTierAuthority } from '../../core/config-types.js';
 import { TaskStatus, TaskEvaluation, ALL_PROVIDER_NAMES } from '../../core/types.js';
 import { loadConfig, readAuthMode, resolveDefaultModel } from '../../core/config.js';
 import { createGoNoGoCriterionItem } from '../../core/task-types.js';
 import { modelRegistry } from '../../core/model-registry.js';
+import { resolveXVerifyVerifierTierAuthority } from '../../core/xverify-verifier-tier-authority.js';
 import { registerOpenRouterModelFromCache, readFreeModelCache } from '../../core/openrouter-models.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
@@ -358,6 +360,10 @@ export interface XverifyResult {
   verifier: string | null;
   /** Exact canonical API id evidenced by the dispatched verifier advisory. */
   verifierModel: string | null;
+  /** Admission provenance is host/config authority, never a verifier verdict. */
+  tierAdmission: 'normal-tier-admitted' | 'owner-pair-admitted' | null;
+  /** Opaque owner decision reference, projected only for an admitted exact pair. */
+  tierDecisionRef: string | null;
   /**
    * Null when no verifier verdict exists (MASTER-PLAN 672). Previously this
    * defaulted to `'unclear'`, which asserts the verifier ran and could not
@@ -419,6 +425,44 @@ const VERIFIER_TIER_BELOW_AUTHOR_CODE = 'xverify_verifier_tier_below_author';
 const VERIFIER_TIER_FLOOR_UNRESOLVABLE_CODE = 'xverify_verifier_tier_floor_unresolvable';
 const TIER_BELOW_AUTHOR_RE =
   /^xverify_verifier_tier_below_author:verifier=(.+?)\(([a-z_]+)\) < author=(.+?)\(([a-z_]+)\)$/u;
+
+/**
+ * Projects the effective owner authority for the exact dispatched pair. This is
+ * presentation metadata, not a verifier finding and not a second admission
+ * path: the runner remains the dispatch/settlement authority.
+ */
+export function resolveTierAdmissionProjection(input: {
+  authority: XVerifyVerifierTierAuthority | undefined;
+  authorModel: string;
+  authorProvider: string;
+  verifierModel: string | null;
+  verifierProvider: string | null;
+}): { admission: 'normal-tier-admitted' | 'owner-pair-admitted' | null; decisionRef: string | null } {
+  if (!input.verifierModel || !input.verifierProvider || input.verifierProvider === input.authorProvider) {
+    return { admission: null, decisionRef: null };
+  }
+  const authorDefinition = modelRegistry.get(input.authorModel);
+  const verifierDefinition = modelRegistry.get(input.verifierModel);
+  if (!authorDefinition || !verifierDefinition
+    || verifierDefinition.provider !== input.verifierProvider
+    || authorDefinition.provider !== input.authorProvider) {
+    return { admission: null, decisionRef: null };
+  }
+  // An owner pair is an exception only when it admits a verifier below the
+  // normal tier floor. Equal-or-higher pairs remain normal tier admission even
+  // if an unrelated allow entry exists for that exact pair.
+  if (modelRegistry.compareTiers(verifierDefinition.tier, authorDefinition.tier) >= 0) {
+    return { admission: 'normal-tier-admitted', decisionRef: null };
+  }
+  const authority = resolveXVerifyVerifierTierAuthority({
+    authority: input.authority,
+    authorModel: input.authorModel,
+    verifierModel: input.verifierModel,
+  });
+  return authority.admitted
+    ? { admission: 'owner-pair-admitted', decisionRef: authority.decisionRef }
+    : { admission: null, decisionRef: null };
+}
 
 /** Renders a typed tier-floor refusal; `null` when this outcome is not one. */
 function localizeTierFloorRefusal(skippedReason: string | null, lang: string): string | null {
@@ -832,6 +876,13 @@ export async function runXverifyForResult(
   // UNCLEAR next to `outcome: unavailable` reads as verifier indecision — the
   // exact confusion MASTER-PLAN 671 removed from the machine-readable path.
   const verdict = outcome.advisory?.verdict ?? null;
+  const tierProjection = resolveTierAdmissionProjection({
+    authority: effectiveConfig.cross_verify?.verifier_tier_authority,
+    authorModel,
+    authorProvider: author,
+    verifierModel,
+    verifierProvider: verifier,
+  });
   const execution = outcome.advisory?.execution ?? null;
   // Empty evidence previously produced no next step — the operator only learned
   // something was wrong from a vague verdict. Never blocks dispatch (a claim can
@@ -886,6 +937,12 @@ export async function runXverifyForResult(
     `- ${getMessage('xverify.report.verifier_model', lang, {
       model: verifierModel ?? getMessage('xverify.report.none_dispatched', lang),
     })}`,
+    ...(tierProjection.admission
+      ? [`- ${getMessage(`xverify.report.tier_admission.${tierProjection.admission}`, lang)}`]
+      : []),
+    ...(tierProjection.decisionRef
+      ? [`- ${getMessage('xverify.report.tier_decision_ref', lang, { decisionRef: tierProjection.decisionRef })}`]
+      : []),
     `- **Verdict:** ${verdict ? verdict.toUpperCase() : getMessage('xverify.report.no_verdict', lang)}`,
     `- **Outcome:** ${outcome.outcome}${outcome.skippedReason ? ` (${outcome.skippedReason})` : ''}`,
     `- **Host disposition:** ${outcome.disposition.toUpperCase()}`,
@@ -917,6 +974,8 @@ export async function runXverifyForResult(
     authorModelConfidence,
     verifier,
     verifierModel,
+    tierAdmission: tierProjection.admission,
+    tierDecisionRef: tierProjection.decisionRef,
     verdict,
     outcome: outcome.outcome,
     disposition: outcome.disposition,

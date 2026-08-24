@@ -1895,4 +1895,34 @@ describe('validateConfig — cross_verify provider-name hardening (592-003)', ()
     config.cross_verify = { enabled: true, verifier_model: { claude: '' } };
     expect(() => validateConfig(config)).toThrow('cross_verify.verifier_model.claude must be a non-empty exact model API ID');
   });
+
+  it('validates exact-pair verifier tier authority carried by cross_verify', () => {
+    const config = getDefaultConfig();
+    config.cross_verify = { enabled: true, verifier_tier_authority: { schema_version: 1, decisions: [{
+      author_model: 'gpt-5.6-sol', verifier_model: 'claude-opus-5', decision: 'allow',
+      decision_ref: 'owner-live-2026-08-24-opus5-xverify-accepted',
+    }] } };
+    expect(() => validateConfig(config)).not.toThrow();
+  });
+
+  it('rejects malformed verifier tier authority during config validation', () => {
+    const config = getDefaultConfig();
+    config.cross_verify = { enabled: true, verifier_tier_authority: { schema_version: 1, decisions: [{
+      author_model: 'gpt-5.6-sol', verifier_model: 'gpt-5.6-terra', decision: 'allow', decision_ref: 'owner-decision-1',
+    }] } };
+    expect(() => validateConfig(config)).toThrow('author and verifier must use different providers');
+  });
+
+  it('rejects unknown verifier tier authority fields during config validation', () => {
+    const config = getDefaultConfig();
+    config.cross_verify = { enabled: true, verifier_tier_authority: {
+      schema_version: 1,
+      decisions: [{
+        author_model: 'gpt-5.6-sol', verifier_model: 'claude-opus-5', decision: 'allow',
+        decision_ref: 'owner-live-2026-08-24-opus5-xverify-accepted',
+      }],
+      default_decision: 'allow',
+    } as unknown as NonNullable<typeof config.cross_verify>['verifier_tier_authority'] };
+    expect(() => validateConfig(config)).toThrow('unknown field default_decision');
+  });
 });

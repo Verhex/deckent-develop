@@ -20,6 +20,8 @@ import {
 } from '../../src/core/provider-limit-truth.js';
 import { ProviderTruthStore } from '../../src/core/provider-truth-store.js';
 import { InvocationReceiptStore } from '../../src/core/invocation-receipt-store.js';
+import { CLAUDE_FABLE_API_ID } from '../../src/core/model-registry.js';
+import { ClaudeSubscriptionLimitEvidenceSource } from '../../src/providers/claude-subscription-limit-evidence.js';
 
 const T0 = new Date('2026-07-23T08:00:00.000Z');
 const T1 = '2026-07-23T08:01:00.000Z';
@@ -548,6 +550,188 @@ describe('ProviderEvidenceProducer', () => {
     const result = await fx.producer.refresh(request());
     expect(result).toMatchObject({ state: 'hold', reasonCode: 'limit_hold' });
     expect(exactProbe).not.toHaveBeenCalled();
+  });
+
+  it('uses real Claude model-scoped evidence to admit Opus but hold Fable at its exact limit', async () => {
+    const limitProbe = vi.fn(async () => ({
+      unavailable: false as const,
+      sessionPct: 22,
+      sessionResetAt: null,
+      weekAllPct: 44,
+      weekAllResetAt: null,
+      weekFablePct: 100,
+      raw: 'bounded Claude subscription fixture',
+    }));
+    const limitSource = new ClaudeSubscriptionLimitEvidenceSource({
+      probe: limitProbe,
+      now: () => T0,
+    });
+    const limitObserve = vi.fn(limitSource.observe.bind(limitSource));
+    const exactProbe = vi.fn(async input => ({
+      outcome: 'succeeded' as const,
+      calledProvider: input.provider,
+      calledModel: input.model,
+      providerRequestRefHash: 'c'.repeat(64),
+      latencyMs: 2,
+    }));
+    const fx = fixture({
+      limit: {
+        authorityRef: limitSource.authorityRef,
+        kind: limitSource.kind,
+        authority: limitSource.authority,
+        observe: limitObserve,
+      },
+      reachability: { ...sources().reachability, probe: exactProbe },
+    });
+
+    const unapprovedOpus = await fx.producer.refresh(request({
+      idempotencyKey: 'probe-refresh:claude-opus-unapproved-0001',
+      callId: 'provider-probe-call-claude-opus-unapproved-0001',
+      model: 'claude-opus-5',
+      approval: {
+        evidenceRef: null,
+        grantedAt: null,
+        expiresAt: null,
+      },
+    }));
+
+    expect(unapprovedOpus).toMatchObject({
+      state: 'hold',
+      reasonCode: 'probe_approval_required',
+      limit: {
+        state: 'unknown',
+        decision: 'hold',
+        requiredWindowIds: ['claude.session', 'claude.week-all'],
+        source: {
+          kind: 'provider-cli',
+          authority: 'advisory',
+          evidenceRef: expect.stringMatching(/^claude-limit-snapshot:[a-f0-9]{64}$/u),
+        },
+        evidenceRefs: expect.arrayContaining([
+          'account-evidence:test-0001',
+          'credential-generation:test-0001',
+          expect.stringMatching(/^claude-limit-model-scope:[a-f0-9]{64}$/u),
+        ]),
+      },
+      receiptRef: null,
+    });
+    expect(exactProbe).not.toHaveBeenCalled();
+
+    const opus = await fx.producer.refresh(request({
+      idempotencyKey: 'probe-refresh:claude-opus-approved-0002',
+      callId: 'provider-probe-call-claude-opus-approved-0002',
+      model: 'claude-opus-5',
+    }));
+
+    expect(limitSource).toMatchObject({ kind: 'provider-cli', authority: 'advisory' });
+    expect(opus).toMatchObject({
+      state: 'ready',
+      limit: {
+        state: 'unknown',
+        decision: 'hold',
+        source: {
+          kind: 'provider-cli',
+          authority: 'advisory',
+          evidenceRef: expect.stringMatching(/^claude-limit-snapshot:[a-f0-9]{64}$/u),
+        },
+        requiredWindowIds: ['claude.session', 'claude.week-all'],
+        evidenceRefs: expect.arrayContaining([
+          'account-evidence:test-0001',
+          'credential-generation:test-0001',
+          expect.stringMatching(/^claude-limit-model-scope:[a-f0-9]{64}$/u),
+        ]),
+      },
+      reachability: {
+        observed: {
+          requestedProvider: 'claude',
+          requestedModel: 'claude-opus-5',
+          calledProvider: 'claude',
+          calledModel: 'claude-opus-5',
+        },
+        evidenceRefs: expect.arrayContaining([limitSource.authorityRef]),
+      },
+    });
+    expect(exactProbe).toHaveBeenCalledWith(expect.objectContaining({
+      provider: 'claude',
+      model: 'claude-opus-5',
+      admission: expect.objectContaining({ limits: expect.objectContaining({ state: 'known', decision: 'allow' }) }),
+    }));
+
+    const fable = await fx.producer.refresh(request({
+      idempotencyKey: 'probe-refresh:claude-fable-0002',
+      callId: 'provider-probe-call-claude-fable-0002',
+      model: CLAUDE_FABLE_API_ID,
+    }));
+
+    expect(fable).toMatchObject({
+      state: 'hold',
+      reasonCode: 'limit_hold',
+      limit: {
+        state: 'unknown',
+        decision: 'hold',
+        requiredWindowIds: [
+          'claude.session',
+          'claude.week-all',
+          'claude.week-fable',
+        ],
+        source: {
+          kind: 'provider-cli',
+          authority: 'advisory',
+          evidenceRef: expect.stringMatching(/^claude-limit-snapshot:[a-f0-9]{64}$/u),
+        },
+        evidenceRefs: expect.arrayContaining([
+          'account-evidence:test-0001',
+          'credential-generation:test-0001',
+          expect.stringMatching(/^claude-limit-model-scope:[a-f0-9]{64}$/u),
+        ]),
+      },
+      receiptRef: null,
+    });
+    if (unapprovedOpus.state !== 'hold' || !unapprovedOpus.limit) {
+      throw new Error('expected unapproved Opus limit evidence');
+    }
+    if (opus.state !== 'ready' || fable.state !== 'hold' || !fable.limit) {
+      throw new Error('expected admitted Opus and held Fable evidence');
+    }
+    expect(opus.limit.source.evidenceRef).toBe(unapprovedOpus.limit.source.evidenceRef);
+    expect(fable.limit.source.evidenceRef).not.toBe(opus.limit.source.evidenceRef);
+    expect(limitProbe).toHaveBeenCalledTimes(3);
+    expect(limitObserve.mock.calls.map(([input]) => ({
+      provider: input.provider,
+      model: input.model,
+      authMode: input.authMode,
+      accountEvidence: input.accountEvidence,
+    }))).toEqual([
+      {
+        provider: 'claude',
+        model: 'claude-opus-5',
+        authMode: 'subscription',
+        accountEvidence: expect.objectContaining({
+          identityEvidenceRef: 'account-evidence:test-0001',
+          credentialGenerationRef: 'credential-generation:test-0001',
+        }),
+      },
+      {
+        provider: 'claude',
+        model: 'claude-opus-5',
+        authMode: 'subscription',
+        accountEvidence: expect.objectContaining({
+          identityEvidenceRef: 'account-evidence:test-0001',
+          credentialGenerationRef: 'credential-generation:test-0001',
+        }),
+      },
+      {
+        provider: 'claude',
+        model: CLAUDE_FABLE_API_ID,
+        authMode: 'subscription',
+        accountEvidence: expect.objectContaining({
+          identityEvidenceRef: 'account-evidence:test-0001',
+          credentialGenerationRef: 'credential-generation:test-0001',
+        }),
+      },
+    ]);
+    // The held Fable evidence cannot infer or substitute a model invocation.
+    expect(exactProbe).toHaveBeenCalledOnce();
   });
 
   it('runs the bounded probe above the ratio threshold only under explicit observe-only policy', async () => {

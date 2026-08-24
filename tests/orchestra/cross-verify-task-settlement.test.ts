@@ -28,6 +28,7 @@ describe('XVerify runner task settlement', () => {
         generation: 0,
         producerProvider: 'claude',
         verifierProvider: 'codex',
+        authorityEvidenceRef: 'owner-tier-authority:test-1',
         dispatchOutcome: {
           kind: 'adjudicated', transportReceipt,
           hostAdjudication: {
@@ -44,6 +45,8 @@ describe('XVerify runner task settlement', () => {
       expect(stored.status).toBe(status);
       expect(stored.xverifyTaskSettlement.settlementDigest).toBe(receipt.settlementDigest);
       expect(stored.xverifyTaskSettlement.invocationId).toBe('invocation-1');
+      expect(stored.xverifyTaskSettlement.authorityEvidenceRef).toBe('owner-tier-authority:test-1');
+      expect(stored.xverifyTaskSettlement.evidenceRefs).toContain('owner-tier-authority:test-1');
       expect(persistCrossVerifyTaskSettlement({
         projectRoot: root,
         taskId: transportReceipt.taskId,
@@ -52,6 +55,7 @@ describe('XVerify runner task settlement', () => {
         generation: 0,
         producerProvider: 'claude',
         verifierProvider: 'codex',
+        authorityEvidenceRef: 'owner-tier-authority:test-1',
         dispatchOutcome: {
           kind: 'adjudicated', transportReceipt,
           hostAdjudication: {

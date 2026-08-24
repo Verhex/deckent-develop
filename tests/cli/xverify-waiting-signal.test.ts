@@ -285,11 +285,12 @@ describe('xverify approval-phase timeout — --timeout bounds, never extends', (
 // ─── 3. `--json` stays machine-clean and backward compatible ────────────
 
 describe('xverify --json output', () => {
-  /** Field order pinned BEFORE this task — proof the change is additive only. */
+  /** Canonical machine payload order; `detail` remains the append-only tail. */
   const EXISTING_KEYS = [
     'id', 'author', 'authorModel', 'authorModelConfidence', 'verifier', 'verifierModel',
-    'verdict', 'outcome', 'disposition', 'blocked', 'skippedReason', 'reason', 'execution',
-    'assurance', 'adjudicationReceiptRef', 'remedy', 'rejection', 'report',
+    'tierAdmission', 'tierDecisionRef', 'verdict', 'outcome', 'disposition', 'blocked',
+    'skippedReason', 'reason', 'execution', 'assurance', 'adjudicationReceiptRef',
+    'settlementRef', 'remedy', 'rejection', 'report',
   ];
 
   it('emits exactly one parseable document on stdout while the waiting signal goes to stderr', async () => {

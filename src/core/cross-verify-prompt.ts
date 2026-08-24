@@ -13,6 +13,7 @@ import type { LogEvent } from './log-event.js';
 import type { ReachabilityOutcome } from './provider-truth.js';
 import { createCrossVerifyContractError } from './errors.js';
 import {
+  CROSS_VERIFY_ADJUDICATION_REASON_MAX_CHARS,
   canonicalCrossVerifyAdjudicationContractV2,
   parseCrossVerifyAdjudicationContractV2,
   parseCrossVerifyAdjudicationResponseV2,
@@ -419,7 +420,8 @@ object matching this contract:
 - protocol: "xverify-adjudication-v2"
 - claimDigest and evidenceManifestDigest: copied exactly from the immutable contract
 - assertionResults: one result per authored assertion, in authored order
-- each result: assertionId, status, citations, reason
+- each result: assertionId, status, citations, reason; reason must be non-empty, concise, and at
+  most ${CROSS_VERIFY_ADJUDICATION_REASON_MAX_CHARS} characters
 - each citation: { evidenceId, locator, evidenceSha256 } — evidenceSha256 is the
   matching evidence-manifest entry's content digest (its \`contentSha256\` value)
   copied verbatim; use the key name \`evidenceSha256\`

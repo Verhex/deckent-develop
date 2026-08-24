@@ -16,6 +16,7 @@ import {
   type RefuteVerdict,
 } from '../../src/core/cross-verify-prompt.js';
 import {
+  CROSS_VERIFY_ADJUDICATION_REASON_MAX_CHARS,
   CROSS_VERIFY_ADJUDICATION_PROTOCOL,
   CROSS_VERIFY_ADJUDICATION_SCHEMA_VERSION,
   createCrossVerifyAdjudicationContractV2,
@@ -296,6 +297,9 @@ describe('cross-verify-prompt · typed adjudication v2', () => {
     expect(built.prompt).toContain('no interpreter (python3/node/jq) is required');
     expect(built.prompt).toContain('at most ONE read-only evidence tool call');
     expect(built.prompt).toContain('no top-level verdict field');
+    expect(built.prompt).toContain(
+      `reason must be non-empty, concise, and at\n  most ${CROSS_VERIFY_ADJUDICATION_REASON_MAX_CHARS} characters`,
+    );
     // Representation consistency: the decoded filename strips the `sha256:` prefix
     // so the prompt path exactly equals the broker's on-disk bare-hex filename.
     const firstEntry = contract.evidenceManifest.entries[0];
@@ -355,6 +359,37 @@ describe('cross-verify-prompt · typed adjudication v2', () => {
     expect(parseCrossVerifyAdjudicationOutputV2(output)).toMatchObject({
       response,
       providerDeclaredVerdict: 'confirmed',
+    });
+  });
+
+  it('rejects an overlong assertion reason with the exact schema path', () => {
+    const contract = adjudicationContract();
+    const response = {
+      schemaVersion: CROSS_VERIFY_ADJUDICATION_SCHEMA_VERSION,
+      protocol: CROSS_VERIFY_ADJUDICATION_PROTOCOL,
+      claimDigest: contract.claimDigest,
+      evidenceManifestDigest: contract.evidenceManifestDigest,
+      assertionResults: [{
+        assertionId: 'A1',
+        status: 'supported',
+        citations: [{
+          evidenceId: 'E1',
+          locator: 'src/auth/middleware.ts#L10-L24',
+          evidenceSha256: `sha256:${'1'.repeat(64)}`,
+        }],
+        reason: 'x'.repeat(CROSS_VERIFY_ADJUDICATION_REASON_MAX_CHARS + 1),
+      }],
+    };
+    const parsed = parseCrossVerifyAdjudicationOutputV2(
+      `${CROSS_VERIFY_ADJUDICATION_RESPONSE_PREFIX}${JSON.stringify(response)}\n`
+        + 'VERDICT: CONFIRMED all authored assertions are supported',
+    );
+
+    expect(parsed).toEqual({
+      response: null,
+      providerDeclaredVerdict: 'confirmed',
+      error: 'xverify v2 adjudication response rejected: assertionResults.0.reason: '
+        + `String must contain at most ${CROSS_VERIFY_ADJUDICATION_REASON_MAX_CHARS} character(s)`,
     });
   });
 

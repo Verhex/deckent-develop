@@ -1306,6 +1306,18 @@ const MESSAGES: MessageMap = {
     en: '(none dispatched)',
     tr: '(çalıştırma yok)',
   },
+  'xverify.report.tier_admission.normal-tier-admitted': {
+    en: '**Tier admission:** normal tier admission (no owner-pair exception used; host/config policy, not a verifier verdict)',
+    tr: '**Tier kabulü:** normal tier kabulü (sahip-çifti istisnası kullanılmadı; host/config politikasıdır, hakem kararı değildir)',
+  },
+  'xverify.report.tier_admission.owner-pair-admitted': {
+    en: '**Tier admission:** owner-pair exception admitted (host/config policy; not a verifier verdict)',
+    tr: '**Tier kabulü:** sahip-çifti istisnasıyla kabul edildi (host/config politikasıdır; hakem kararı değildir)',
+  },
+  'xverify.report.tier_decision_ref': {
+    en: '**Owner decision reference:** {decisionRef} (opaque reference; not a verifier verdict)',
+    tr: '**Sahip karar referansı:** {decisionRef} (opak referans; hakem kararı değildir)',
+  },
   // A verifier that was never dispatched produced no verdict. An em dash says
   // that; UNCLEAR would claim the verifier ran and could not decide.
   'xverify.report.no_verdict': {
