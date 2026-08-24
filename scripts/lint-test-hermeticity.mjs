@@ -600,8 +600,11 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-24 Closure trust-anchor identity wiring: +1 — Phase-5 dry-run
   // rotation/conflict coverage writes only suite-owned tmpdir bundles and
   // trust-anchor fixtures. Scanner: zero confirmed live-authority violations.
-  count: 16010,
-  digest: 'c3316e7dab1e5ab62a7500b9a159d08deb1dab986ff1250d96e75b402f52647e',
+  // 2026-08-24 sprint-649 archive replay hardening: +8 — sequential Brain
+  // adoption, historical terminal replay and FIX-attempt archive fixtures use
+  // only suite-owned tmpdirs. Scanner: zero confirmed live-authority violations.
+  count: 16018,
+  digest: 'a24eb288974198e433d31fd47f882405156da8e06f929c61a4d841270eb8ff67',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1066,8 +1069,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-24 Closure identity closure: count unchanged; digest binds Phase-5
   // dry-run/claim/append to the canonical trust-anchor tenant/project scope
   // and removes the unwired generated-MASTER identity assumption.
+  // 2026-08-24 sprint-649 archive replay hardening: count unchanged; digest
+  // binds per-sprint guarded-summary adoption, exact FIX-attempt cohort lineage
+  // and replay-safe finalizer verification in existing production modules.
   count: 1318,
-  digest: 'a08a0c2243e2dc78abb34d3bef8eed951ef403a693393826a5a9c7321bf147f3',
+  digest: '70d96f738b8051c6e06f32147ba6a02aa73e376c2289a144072adeb4b8570903',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

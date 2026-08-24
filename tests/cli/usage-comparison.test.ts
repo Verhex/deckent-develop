@@ -74,6 +74,22 @@ describe('usage baseline/candidate canary', () => {
       decision: { disposition: 'PROMOTE', reasonCodes: ['thresholds_satisfied'] },
     });
   });
+  it('uses the terminally selected FIX lineage measurement without exposing its exact identity', async () => {
+    const fixedCandidate = {
+      ...sample('sprint-641', 20, 80, 1), taskId: '641-005-fix-fix',
+      attemptId: 'attempt-sprint-641-5-fix-done', attempt: 2, verdict: 'DONE' as const,
+    };
+    await runUsageCommand(
+      { baselineSprint: 'sprint-639', candidateSprint: 'sprint-641', json: true },
+      deps([sample('sprint-639', 60, 40, 2), fixedCandidate]),
+    );
+    expect(output()).toMatchObject({
+      decision: { disposition: 'PROMOTE', reasonCodes: ['thresholds_satisfied'] },
+      measuredHitRatio: { baseline: 0.4, candidate: 0.8 },
+      providerReportedUsd: { baseline: { exactUsd: 2 }, candidate: { exactUsd: 1 } },
+    });
+    expect(JSON.stringify(output())).not.toMatch(/641-005-fix-fix|attempt-sprint-641-5-fix-done/u);
+  });
   it('requires the dry-run digest for apply and publishes only an opaque receipt projection', async () => {
     const injected = deps([sample('sprint-639', 60, 40, 2), sample('sprint-641', 20, 80, 1)]);
     await runUsageCommand({ baselineSprint: 'sprint-639', candidateSprint: 'sprint-641', json: true }, injected);

@@ -6,9 +6,11 @@
 ## Canlı truth
 
 - `DOGFOOD_MODE=ON`, `WORKSPACE_MODE=MAIN`, `DELIVERY_MODE=DIRECT_MAIN`.
-- Aktif run yok. Son normal outcome run'ı `sprint-646`: dört-task paralel DAG terminal
-  `COMPLETE`. Canonical terminal receipt generation 1, raw archive, manifest/hash/integrity ve
-  Brain archive projection zinciri doğrulandı.
+- Aktif worker yok. `sprint-649` dört-task DAG terminal `COMPLETE`; archive replay ve FIX-attempt
+  measurement hardening'i 108 scoped test, full lint ve `build:all` ile yeşil. Fresh binary
+  `sprint-650/651` multi-task canary'leri unrelated task blocker'ları nedeniyle terminal `ABORTED`,
+  fakat her iki canonical terminal archive verify sonucu `ok=true`; sprint-651 Brain refresh
+  sonrasında sprint-650 replay'i de yeniden `ok=true`.
 - Provider observation reconciliation canlı uygulandı: 19 active-open interval'ın exact
   run/attempt settlement sahibi olan 15'i digest-bound plan + interactive approval + immutable
   receipt ile `retired=true` oldu; dört `sprint-488` legacy-unowned interval forensic `HOLD`
@@ -17,7 +19,10 @@
 - Sprint-637'nin altı stale PENDING task artifact'ı canonical archive writer ile
   `.deckent/archive/sprints/sprint-637/tasks/` altına byte-identical taşındı; manifest/integrity
   6/6 yeşil, `.tasks` elle silinmedi.
-- Bot daemon fresh compiled dist ile PID `745913` olarak çalışıyor. Pending approval yok.
+- Root `.tasks` altındaki 63 `task-xv*` artifact hash-korumalı biçimde
+  `.tasks/archive/xverify-settled-2026-08-24/` staging archive'ına taşındı; root eşleşme sıfır,
+  `rm` kullanılmadı. Product canonical one-shot task archive surface'i henüz yok.
+- Bot daemon fresh compiled dist ile PID `867485` olarak çalışıyor. Pending approval yok.
 - Source→dist→provider runtime adoption production-wired: immutable composite receipt provider
   receipt + current DB lineage + source/build/entrypoint digest + canlı PID/start token'ı bağlıyor;
   real dist dry-run→apply→fresh-process replay aynı receipt'i verdi, DB/WAL/SHM değişmedi.
@@ -54,6 +59,10 @@
 - Status projection'daki dört unresolved provider interval fresh değildir: hepsi `sprint-488`
   legacy-unowned forensic kayıttır. Exact owner/run authority bulunmadan retire edilmeyecek ve
   yeni interval gibi sayılmayacak.
+- Archive hardening için iki fresh Sol→Opus formal XVerify gerçek provider call, provider-reported
+  usage ve durable receipt üretti; host adjudicator ikisini de `inaccurate missing-evidence map`
+  gerekçesiyle `UNCLEAR/HOLD` kapattı. New evidence olmadan üçüncü retry yapılmaz; formal closure
+  20:00 Fable reset'i veya owner-admitted adjudicator fix'i bekler.
 
 ## Done-ready sayacı
 
@@ -63,12 +72,12 @@
 
 ## Sıradaki yürütme sırası
 
-1. Owner external key path'i sağlandığında Work 480 sign → append → closure gate → MASTER
+1. Archive replay hardening'i `LOCAL_VERIFIED/LIVE_PROVEN` tut; formal XVerify `HOLD` çözülmeden
+   sekizinci done-ready settlement/landing yapılmaz.
+2. `2026-08-24 20:00 Europe/Istanbul` sonrasında runtime hygiene different-provider XVerify.
+3. Aynı reset sonrasında D4 Approval Lifecycle formal XVerify/closure; ardından D5 retirement.
+4. Owner external key path'i sağlandığında Work 480 sign → append → closure gate → MASTER
    settlement zincirini tamamla; key'i arama/okuma/loglama.
-2. Sıradaki multi-task dogfood run'ı 7094 plan-time authority'nin canlı canary'si yap; sonra aynı
-   workload treatment cohort'u ile measuredHitRatio + provider-reported USD receipt'i üret.
-3. `2026-08-24 20:00 Europe/Istanbul` sonrasında runtime hygiene different-provider XVerify.
-4. Aynı reset sonrasında D4 Approval Lifecycle formal XVerify/closure; ardından D5 retirement.
 5. 7091 account/limit authority yalnız provider-native fresh truth açıldığında yeniden denenir.
 6. Closure OS owner disposition batches → yedi günlük
    health/ETA → cleanup/migration → release.
@@ -80,6 +89,11 @@
 - Effective `cleanup_delay_ms=180000`, normal run terminal publicationını task settlementından sonra
   yaklaşık üç dakika geciktiriyor. Sprint-635 correctness'i bozmadı; execution-surface latency işi
   owner admission olmadan bu outcome'a alınmaz.
+- Docker worker içindeki CLI fresh host build'e rağmen `DECKENT_BINARY_IDENTITY_HOLD
+  build-root-mismatch` verdi; host CLI fresh. Every-environment/path-adapter parity bulgusudur ve
+  owner admission olmadan archive outcome'una alınmaz.
+- Formal XVerify host adjudicator, atomic targeted claim'de dahi inaccurate missing-evidence map
+  üretti; owner-admitted ayrı execution-surface işidir, kör retry yapılmaz.
 
 ## Sabit yürütme contractı
 

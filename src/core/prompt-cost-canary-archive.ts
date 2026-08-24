@@ -132,7 +132,8 @@ interface ResultArtifact {
 
 interface EvaluationArtifact {
   readonly taskId: string;
-  readonly attemptId: string | null;
+  /** Evaluation identity is an exact execution attempt, never a filename ordinal. */
+  readonly attemptId: string;
   readonly verdict: PromptCostCanaryCohortSample['verdict'];
   readonly quality: number;
 }
@@ -143,8 +144,10 @@ interface TerminalArtifact {
 }
 
 const SPRINT_ID = /^sprint-(\d+)$/u;
-const TASK_PATH = /^tasks\/task-(.+)\.json$/u;
-const RESULT_PATH = /^tasks\/task-(.+)\.result(?:\.json)?$/u;
+// Canonical task names have no extension-like segments: landing/skill sidecars are
+// manifest members, but never task authority. Result matching remains separate.
+const TASK_PATH = /^tasks\/task-([^/.]+)\.json$/u;
+const RESULT_PATH = /^tasks\/task-([^/.]+)\.result(?:\.json)?$/u;
 const EVALUATION_PATH = /^evaluations\/(.+)\.json$/u;
 
 function record(value: unknown): JsonRecord | null {
@@ -265,12 +268,12 @@ function parseEvaluation(value: unknown): EvaluationArtifact | null {
   const attemptId = item['attemptId'];
   const verdict = normalizeVerdict(item['verdict'] ?? item['decision'] ?? item['evaluationDecision']);
   const quality = item['quality'] ?? item['totalScore'];
-  if ((attemptId !== undefined && (typeof attemptId !== 'string' || attemptId.length === 0))
+  if (typeof attemptId !== 'string' || attemptId.length === 0
       || !verdict || typeof quality !== 'number' || !Number.isFinite(quality)
       || quality < 0 || quality > 100) return null;
   return {
     taskId: item['taskId'],
-    attemptId: typeof attemptId === 'string' ? attemptId : null,
+    attemptId,
     verdict,
     quality,
   };
@@ -427,7 +430,8 @@ function readSprint(
   const archiveDir = resolveSprintArchiveDir(options.projectRoot, sprintId);
   const tasks = new Map<string, TaskArtifact>();
   const results = new Map<string, ResultArtifact>();
-  const evaluations = new Map<string, EvaluationArtifact>();
+  const resultsByAttemptId = new Map<string, ResultArtifact>();
+  const evaluationsByAttemptId = new Map<string, EvaluationArtifact>();
   let sealedTerminalReceipt: JsonRecord | null = null;
   let terminalArtifact: TerminalArtifact | null = null;
   const exactTerminalPath = `${sprintId}-terminal-receipt.json`;
@@ -497,13 +501,16 @@ function readSprint(
         if (seenAttemptIds.has(parsed.attemptId)) throw new Error('duplicate exact attempt identity');
         seenAttemptIds.add(parsed.attemptId);
         results.set(pathTaskId, parsed);
+        resultsByAttemptId.set(parsed.attemptId, parsed);
       } else {
         const parsed = parseEvaluation(value);
         if (!parsed || !isSprintOwnedTaskArtifact(`task-${parsed.taskId}.json`, sprintId)) {
           throw new Error('invalid evaluation or task identity');
         }
-        if (evaluations.has(parsed.taskId)) throw new Error('duplicate evaluation artifact');
-        evaluations.set(parsed.taskId, parsed);
+        if (evaluationsByAttemptId.has(parsed.attemptId)) {
+          throw new Error('duplicate evaluation exact attempt identity');
+        }
+        evaluationsByAttemptId.set(parsed.attemptId, parsed);
       }
     } catch (error) {
       rejections.push(reject('invalid-artifact', error instanceof Error ? error.message : String(error), {
@@ -558,20 +565,23 @@ function readSprint(
       }
       terminalAttemptIds.add(attempt.id);
       const task = tasks.get(attempt.taskId);
-      const result = results.get(attempt.taskId);
-      const evaluation = evaluations.get(attempt.taskId);
+      const result = resultsByAttemptId.get(attempt.id);
+      const evaluation = evaluationsByAttemptId.get(attempt.id);
       if (!task || !result || !evaluation) {
-        rejections.push(reject('incomplete-lineage', 'every terminal attempt requires task, result, and evaluation members', {
+        rejections.push(reject('incomplete-lineage', 'every terminal attempt requires task, result, and exact-attempt evaluation members', {
           sprintId, taskId: attempt.taskId,
         }));
         lineageInvalid = true;
         continue;
       }
-      if (task.authority.authorityDigest !== rootTask.authority.authorityDigest
-          || result.attemptId !== attempt.id
-          || evaluation.attemptId !== null && evaluation.attemptId !== attempt.id
+      const isRootAttempt = task.taskId === rootTask.taskId && task.fixForTaskId === null;
+      const isDirectFixAttempt = task.fixForTaskId === rootTask.taskId;
+      if ((isRootAttempt === isDirectFixAttempt)
+          || task.authority.authorityDigest !== rootTask.authority.authorityDigest
+          || result.taskId !== attempt.taskId
+          || evaluation.taskId !== attempt.taskId
           || !exactUsage(result, attempt)) {
-        rejections.push(reject('mixed-authority', 'task/result/evaluation/terminal usage identity does not agree', {
+        rejections.push(reject('mixed-authority', 'task/result/evaluation/terminal exact attempt or logical root contract does not agree', {
           sprintId, taskId: attempt.taskId,
         }));
         lineageInvalid = true;

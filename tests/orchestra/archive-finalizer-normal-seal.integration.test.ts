@@ -86,29 +86,33 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
+function terminalEventsFor(receipt: SprintTerminalReceiptV1) {
+  return [
+    {
+      channel: CHANNELS.SPRINT_PHASE_CHANGE,
+      payload: {
+        sprintId: receipt.sprintId,
+        fromPhase: 'DECAY',
+        toPhase: 'COMPLETE',
+        transitionKind: 'normal-run',
+      },
+    },
+    {
+      channel: SPRINT_TERMINAL_COMPLETED_CHANNEL,
+      payload: {
+        sprintId: receipt.sprintId,
+        status: 'COMPLETE',
+        phase: 'COMPLETE',
+        terminalOutcome: 'COMPLETE',
+      },
+    },
+  ];
+}
+
 describe('normal outermost archive finalizer seal', () => {
   it('seals the exact completed marker, refreshes Brain parity, and retires the journal counter', () => {
     const { root, receipt } = fixture();
-    const terminalEvents = [
-      {
-        channel: CHANNELS.SPRINT_PHASE_CHANGE,
-        payload: {
-          sprintId: receipt.sprintId,
-          fromPhase: 'DECAY',
-          toPhase: 'COMPLETE',
-          transitionKind: 'normal-run',
-        },
-      },
-      {
-        channel: SPRINT_TERMINAL_COMPLETED_CHANNEL,
-        payload: {
-          sprintId: receipt.sprintId,
-          status: 'COMPLETE',
-          phase: 'COMPLETE',
-          terminalOutcome: 'COMPLETE',
-        },
-      },
-    ];
+    const terminalEvents = terminalEventsFor(receipt);
     const handoffPath = join(root, '.tasks', 'handoffs', '905-001-to-905-002.json');
     mkdirSync(join(handoffPath, '..'), { recursive: true });
     writeFileSync(handoffPath, JSON.stringify({
@@ -208,5 +212,79 @@ describe('normal outermost archive finalizer seal', () => {
         : event),
     })).toThrow(SprintTerminalArchivePublicationError);
     expect(readFileSync(hotJournal)).toEqual(journalAfterSeal);
+  });
+
+
+  it('replays an older applied seal after a later Brain refresh and rejects conflict or tampering', () => {
+    const { root, receipt } = fixture();
+    const terminalEvents = terminalEventsFor(receipt);
+    publishOutermostSprintTerminalArchive({
+      projectRoot: root,
+      sprintId: receipt.sprintId,
+      receipt,
+      terminalEvents,
+    });
+    const archiveDir = join(root, '.deckent', 'archive', 'sprints', receipt.sprintId);
+    const hotJournal = join(root, '.deckent', 'recently-works', `${receipt.sprintId}-events.jsonl`);
+    const journalAfterSeal = readFileSync(hotJournal);
+    const firstSummary = readFileSync(join(root, '.brain', 'exports', 'summary.md'), 'utf8');
+
+    const laterReceipt: SprintTerminalReceiptV1 = {
+      ...receipt,
+      sprintId: 'sprint-906',
+      runId: 'run-906',
+      logicalSettlementDigest: 'b'.repeat(64),
+      priorAuthorityVersion: 1,
+      authorityVersion: 2,
+    };
+    writeFileSync(
+      join(root, '.deckent', 'recently-works', `${laterReceipt.sprintId}-terminal-receipt.json`),
+      `${JSON.stringify({ terminalOutcome: 'COMPLETE', receipt: laterReceipt }, null, 2)}\n`,
+    );
+    writeEvent(root, laterReceipt.sprintId, 'brain', '*', CHANNELS.SPRINT_PHASE_CHANGE, {
+      sprintId: laterReceipt.sprintId,
+      fromPhase: 'RETRO',
+      toPhase: 'CLEANUP',
+    });
+    publishOutermostSprintTerminalArchive({
+      projectRoot: root,
+      sprintId: laterReceipt.sprintId,
+      receipt: laterReceipt,
+      terminalEvents: terminalEventsFor(laterReceipt),
+    });
+    expect(readFileSync(join(root, '.brain', 'exports', 'summary.md'), 'utf8')).not.toBe(firstSummary);
+
+    expect(publishOutermostSprintTerminalArchive({
+      projectRoot: root,
+      sprintId: receipt.sprintId,
+      receipt,
+      terminalEvents,
+    }).seal).toMatchObject({ disposition: 'idempotent', terminalComplete: true });
+    expect(readFileSync(hotJournal)).toEqual(journalAfterSeal);
+
+    expect(() => publishOutermostSprintTerminalArchive({
+      projectRoot: root,
+      sprintId: receipt.sprintId,
+      receipt,
+      terminalEvents: terminalEvents.map((event, index) => index === 1
+        ? { ...event, payload: { ...event.payload, phase: 'ABORTED' } }
+        : event),
+    })).toThrow(SprintTerminalArchivePublicationError);
+
+    const store = new MemoryStore(join(root, '.brain', 'memory.db'));
+    try {
+      const entry = store.getById(`archive-${receipt.sprintId}`)!;
+      store.update(entry.id, { summary: 'tampered historic Brain projection' }, 'test-tamper');
+    } finally {
+      store.close();
+    }
+    expect(() => publishOutermostSprintTerminalArchive({
+      projectRoot: root,
+      sprintId: receipt.sprintId,
+      receipt,
+      terminalEvents,
+    })).toThrow(SprintTerminalArchivePublicationError);
+    expect(readFileSync(hotJournal)).toEqual(journalAfterSeal);
+    expect(readFileSync(join(archiveDir, 'terminal-seal-application.json'), 'utf8')).toContain('"state": "applied"');
   });
 });

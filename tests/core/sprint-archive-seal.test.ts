@@ -353,7 +353,10 @@ describe('typed terminal archive seal', () => {
     expect(result.applicationReceipt?.manifestDigest).toBe(verification.manifestDigest);
     expect(result.applicationReceipt?.brainIndexSha256).toBe(verification.brainIndexSha256);
     expect(result.applicationReceipt?.guardedSummarySha256).toBe(verification.guardedSummarySha256);
-    expect(JSON.parse(archiveEntry!.metadata)).toMatchObject({ manifestDigest: `sha256:${verification.manifestDigest}` });
+    expect(JSON.parse(archiveEntry!.metadata)).toMatchObject({
+      manifestDigest: `sha256:${verification.manifestDigest}`,
+      guardedSummarySha256: `sha256:${verification.guardedSummarySha256}`,
+    });
     expect(existsSync(join(root, '.brain', 'exports', 'summary.md'))).toBe(true);
     expect(verification.ok).toBe(true);
   });
@@ -394,7 +397,7 @@ describe('typed terminal archive seal', () => {
     }
   });
 
-  it('rejects later Brain row and guarded-summary drift, including applied-seal replay', () => {
+  it('replays an earlier adoption after a later canonical Brain refresh and rejects its row tampering', () => {
     persistMarker(true);
     createBrain();
     const content = journal();
@@ -405,20 +408,29 @@ describe('typed terminal archive seal', () => {
       disposition: 'sealed',
       terminalComplete: true,
     });
-    expect(verifySprintArchiveTerminal(root, sprintId, hot)).toMatchObject({
-      ok: true,
-      reasonCodes: [],
-    });
-
-    write('.brain/exports/summary.md', '# drifted guarded summary\n');
-    expect(verifySprintArchiveTerminal(root, sprintId, hot)).toMatchObject({
-      ok: false,
-      reasonCodes: expect.arrayContaining(['brain_adoption_failed']),
-    });
+    const firstSummary = readFileSync(join(root, '.brain', 'exports', 'summary.md'), 'utf8');
+    const laterSprintId = 'sprint-630';
+    const laterReceipt: SprintTerminalReceiptV1 = {
+      ...receipt, sprintId: laterSprintId, runId: 'run-630', priorAuthorityVersion: 9, authorityVersion: 10,
+    };
+    write(`.deckent/recently-works/${laterSprintId}-terminal-receipt.json`, JSON.stringify(laterReceipt));
+    const laterContent = journal([{ sequence: 1 }]);
+    const laterHot = write(`.deckent/recently-works/${laterSprintId}-events.jsonl`, laterContent);
+    write(`.deckent/recently-works/${laterSprintId}-seq`, '1');
+    const laterLine = laterContent.trim();
+    expect(sealSprintArchiveTerminal(root, laterSprintId, {
+      receipt: laterReceipt,
+      finalEvent: { sequence: 1, digest: digest(laterLine) },
+      hotJournalPath: laterHot,
+      expectedArchivedPreimageSha256: null,
+      expectedHotJournalSha256: digest(laterContent),
+      operatorReason: 'owner-authorized terminal archive repair',
+      adoptBrain: true,
+    })).toMatchObject({ terminalComplete: true });
+    expect(readFileSync(join(root, '.brain', 'exports', 'summary.md'), 'utf8')).not.toBe(firstSummary);
+    expect(verifySprintArchiveTerminal(root, sprintId, hot)).toMatchObject({ ok: true, reasonCodes: [] });
     expect(sealSprintArchiveTerminal(root, sprintId, authority)).toMatchObject({
-      disposition: 'hold',
-      terminalComplete: false,
-      reasonCode: 'brain_adoption_failed',
+      disposition: 'idempotent', terminalComplete: true,
     });
 
     const store = new MemoryStore(join(root, '.brain', 'memory.db'));

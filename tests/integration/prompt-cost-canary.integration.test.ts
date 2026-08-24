@@ -79,7 +79,10 @@ function canonicalResult(sprint: string, ordinal: number, overrides: Record<stri
   };
 }
 
-function writeCohort(sprint: string, mutate?: (result: Record<string, unknown>, ordinal: number) => void): void {
+function writeCohort(
+  sprint: string,
+  mutate?: (result: Record<string, unknown>, ordinal: number, taskId: string) => void,
+): void {
   const tasks = join(checkout, '.tasks');
   const evaluations = join(checkout, '.deckent', 'runtime', 'evaluations', sprint);
   const recentWorks = join(checkout, '.deckent', 'recently-works');
@@ -116,10 +119,13 @@ function writeCohort(sprint: string, mutate?: (result: Record<string, unknown>, 
       promptCostCanary,
     }), 'utf8');
     const result = canonicalResult(sprint, ordinal);
-    mutate?.(result, ordinal);
+    if (ordinal === 5) result.selfAssessment = 'NO_GO';
+    mutate?.(result, ordinal, taskId);
     writeFileSync(join(tasks, `task-${taskId}.result`), JSON.stringify(result), 'utf8');
+    writeFileSync(join(tasks, `task-${taskId}.landing.json`), JSON.stringify({ taskId, untrusted: true }), 'utf8');
+    writeFileSync(join(tasks, `task-${taskId}.skill.json`), JSON.stringify({ taskId, untrusted: true }), 'utf8');
     writeFileSync(join(evaluations, `${taskId}-attempt-1.json`), JSON.stringify({
-      taskId, sprintId: sprint, attemptNum: 1,
+      taskId, sprintId: sprint, attemptNum: 1, attemptId,
       decision: result.selfAssessment, totalScore: result.selfAssessment === 'NO_GO' ? 0 : 100,
     }), 'utf8');
     const tokenUsage = result.tokenUsage as Record<string, number>;
@@ -135,6 +141,46 @@ function writeCohort(sprint: string, mutate?: (result: Record<string, unknown>, 
         ? { invoicedCostUsd: providerBilling.providerReportedUsd }
         : {}),
     });
+    if (ordinal === 5) {
+      const fixTaskId = `${taskId}-fix-fix`;
+      const fixAttemptId = `${attemptId}-fix-done`;
+      const fixResult = canonicalResult(sprint, ordinal, {
+        taskId: fixTaskId,
+        workerId: `w-${sprint}-${ordinal}-fix`,
+        selfAssessment: 'DONE',
+        workAttribution: {
+          state: 'VERIFIED', attemptId: fixAttemptId, baselineRef: `baseline-${sprint}`,
+          scopeDigest: createHash('sha256').update(`${sprint}:${ordinal}:fix`).digest('hex'),
+        },
+        tokenUsage: {
+          inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0,
+          totalTokens: 0, source: 'provider-adapter',
+        },
+        providerBilling: {
+          source: 'provider-envelope', provider: 'codex', currency: 'USD', providerReportedUsd: 0,
+          modelUsage: { 'gpt-5.6-sol': { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, costUsd: 0 } },
+          capturedAt: '2026-08-24T00:00:00.000Z',
+        },
+        cost: { usd: 0, currency: 'USD', billingMode: 'api', pricingSource: 'reference-pricing', isLocal: false },
+      });
+      mutate?.(fixResult, ordinal, fixTaskId);
+      writeFileSync(join(tasks, `task-${fixTaskId}.json`), JSON.stringify({
+        id: fixTaskId, ...definition, fixForTaskId: taskId,
+        model: 'gpt-5.6-sol', effort: 'low', priority: 'NORMAL', reason: 'integration repair evidence',
+        status: 'DONE', sprintId: sprint, createdAt: '2026-08-24T00:00:00.000Z', promptCostCanary,
+      }), 'utf8');
+      writeFileSync(join(tasks, `task-${fixTaskId}.result`), JSON.stringify(fixResult), 'utf8');
+      writeFileSync(join(evaluations, `${fixTaskId}-attempt-2.json`), JSON.stringify({
+        taskId: fixTaskId, sprintId: sprint, attemptNum: 2, attemptId: fixAttemptId,
+        decision: fixResult.selfAssessment, totalScore: 100,
+      }), 'utf8');
+      usageTasks.push({ id: fixTaskId, billingAuthority: 'metered' });
+      usageAttempts.push({
+        id: fixAttemptId, taskId: fixTaskId, logicalRootTaskId: taskId,
+        inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0,
+        referenceCostUsd: 0, invoicedCostUsd: 0,
+      });
+    }
   }
   const receipt: SprintTerminalReceiptV1 = {
     version: 1, sprintId: sprint, runId: `run-${sprint}`, coordinatorGeneration: 1,
@@ -165,8 +211,8 @@ function writeCohort(sprint: string, mutate?: (result: Record<string, unknown>, 
 }
 
 function resetArchives(
-  baselineMutate?: (result: Record<string, unknown>, ordinal: number) => void,
-  candidateMutate?: (result: Record<string, unknown>, ordinal: number) => void,
+  baselineMutate?: (result: Record<string, unknown>, ordinal: number, taskId: string) => void,
+  candidateMutate?: (result: Record<string, unknown>, ordinal: number, taskId: string) => void,
 ): void {
   rmSync(join(checkout, '.deckent'), { recursive: true, force: true });
   writeCohort(BASELINE, baselineMutate);
@@ -232,7 +278,7 @@ describe('real production prompt-cost canary fan-in and hostile replay', () => {
     checkout = mkdtempSync(join(tmpdir(), 'deckent-prompt-cost-canary-'));
     cpSync(REPOSITORY, checkout, { recursive: true, filter: source => {
       const relative = source.slice(REPOSITORY.length).replace(/^\//u, '');
-      return !/^(?:node_modules|dist|\.brain|\.deckent|\.tasks)(?:\/|$)/u.test(relative);
+      return !/^(?:node_modules|dist|\.brain|\.deckent|\.tasks|\.git)(?:\/|$)/u.test(relative);
     } });
     symlinkSync(join(REPOSITORY, 'node_modules'), join(checkout, 'node_modules'), 'dir');
     await execFileAsync(process.execPath, [join(REPOSITORY, 'node_modules', 'typescript', 'bin', 'tsc'),
@@ -246,6 +292,21 @@ describe('real production prompt-cost canary fan-in and hostile replay', () => {
 
   it('fans in five real lineages, separates provider USD, and applies/replays one immutable receipt', async () => {
     resetArchives();
+    const cohort = readPromptCostCanaryArchiveCohort({ projectRoot: checkout, sprintIds: [BASELINE, CANDIDATE] });
+    expect(cohort.ok).toBe(true);
+    if (!cohort.ok) throw new Error(`CANARY_ARCHIVE_FIXTURE_REJECTED:${JSON.stringify(cohort.rejections)}`);
+    expect(cohort.samples).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        sprintId: CANDIDATE, taskId: '641-005-fix-fix', attemptId: 'attempt-sprint-641-5-fix-done',
+        attempt: 2, verdict: 'DONE', providerReportedUsd: { available: true, usd: 1, source: 'provider-envelope' },
+      }),
+    ]));
+    const candidateManifest = JSON.parse(readFileSync(join(archive(CANDIDATE), 'manifest.json'), 'utf8')) as {
+      artifacts: Array<{ path: string }>;
+    };
+    expect(candidateManifest.artifacts.map(artifact => artifact.path)).toEqual(expect.arrayContaining([
+      'tasks/task-641-005.landing.json', 'tasks/task-641-005.skill.json',
+    ]));
     const archiveBefore = treeDigest(join(checkout, '.deckent', 'archive'));
     const dryA = await compare(); const dryB = await compare();
     expect(dryA.run).toMatchObject({ code: 0, stderr: '' });
@@ -275,8 +336,8 @@ describe('real production prompt-cost canary fan-in and hostile replay', () => {
     resetArchives(undefined, result => { delete result.providerBilling; });
     expect((await compare()).value.decision).toEqual({ disposition: 'HOLD', reasonCodes: ['provider_reported_usd_unavailable'], planDigest: null, kernelDecisionDigest: null });
 
-    resetArchives(undefined, result => {
-      result.tokenUsage = { inputTokens: 0, outputTokens: 5, cacheReadTokens: 0, cacheCreationTokens: 0, totalTokens: 5, source: 'provider-adapter' };
+    resetArchives(undefined, (result, _ordinal, taskId) => {
+      if (!taskId.endsWith('-fix-fix')) result.tokenUsage = { inputTokens: 0, outputTokens: 5, cacheReadTokens: 0, cacheCreationTokens: 0, totalTokens: 5, source: 'provider-adapter' };
     });
     requireReadableArchive();
     const unmeasured = await compare();
@@ -295,7 +356,9 @@ describe('real production prompt-cost canary fan-in and hostile replay', () => {
     expect(mismatch.value.decision.disposition).toBe('HOLD');
     expect(mismatch.value.decision.reasonCodes).toContain('provider_mismatch');
 
-    resetArchives(undefined, (result, ordinal) => { if (ordinal === 5) result.selfAssessment = 'NO_GO'; });
+    resetArchives(undefined, (result, ordinal, taskId) => {
+      if (ordinal === 5 && taskId.endsWith('-fix-fix')) result.selfAssessment = 'NO_GO';
+    });
     const quality = await compare();
     expect(quality.value.decision.disposition).toBe('REJECT');
     expect(quality.value.decision.reasonCodes).toContain('quality_regression_exceeded');

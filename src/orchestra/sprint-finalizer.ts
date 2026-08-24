@@ -1607,14 +1607,12 @@ export interface OutermostSprintTerminalArchivePublication {
   };
 }
 
-function matchesSameCommitTerminalVerification(
+function matchesTerminalVerification(
   sprintId: string,
-  seal: SprintArchiveTerminalSealResult,
+  application: SprintArchiveTerminalApplicationReceipt | undefined,
   verification: SprintArchiveTerminalVerificationReport | undefined,
 ): boolean {
-  const application = seal.applicationReceipt;
-  return seal.terminalComplete
-    && application?.state === 'applied'
+  return application?.state === 'applied'
     && verification?.ok === true
     && verification.sprintId === sprintId
     && verification.manifestDigest === application.manifestDigest
@@ -1848,7 +1846,7 @@ function replayExistingTerminalSeal(input: {
       input.sprintId,
       hotJournalPath,
     );
-    if (!verification.ok) {
+    if (!matchesTerminalVerification(input.sprintId, application, verification)) {
       throw new FinalizerTerminalEvidenceError(
         `SPRINT_ARCHIVE_EXISTING_SEAL_VERIFY_HOLD:${verification.reasonCodes.join('|')}`,
       );
@@ -1886,7 +1884,7 @@ function replayExistingTerminalSeal(input: {
   }
   const verification = resumed.verification;
   if (!verification
-      || !matchesSameCommitTerminalVerification(input.sprintId, resumed, verification)) {
+      || !matchesTerminalVerification(input.sprintId, resumed.applicationReceipt, verification)) {
     throw new FinalizerTerminalEvidenceError(
       `SPRINT_ARCHIVE_EXISTING_SEAL_VERIFY_HOLD:${verification?.reasonCodes.join('|') ?? 'missing_same_commit_verification'}`,
     );
@@ -2048,7 +2046,7 @@ export function publishOutermostSprintTerminalArchive(input: {
     // and later replay verification remain independent through the path above.
     const verification = seal.verification;
     if (!verification
-        || !matchesSameCommitTerminalVerification(input.sprintId, seal, verification)) {
+        || !matchesTerminalVerification(input.sprintId, seal.applicationReceipt, verification)) {
       throw new FinalizerTerminalEvidenceError(
         `SPRINT_ARCHIVE_TERMINAL_VERIFY_FAILED:${verification?.reasonCodes.join('|') ?? 'missing_same_commit_verification'}`,
       );

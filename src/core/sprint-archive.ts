@@ -1038,7 +1038,8 @@ function upsertMemoryArchiveIndex(
     ].join('\n');
     const summary = `${manifest.artifactCount} artifacts; ${manifest.terminalOutcome ?? 'UNKNOWN'}`;
     const tags = ['sprint-archive', manifest.sprintId, manifest.terminalOutcome ?? 'unknown'];
-    const metadata = {
+    const existing = store.getById(id);
+    const metadata: Record<string, unknown> = {
       kind: SPRINT_ARCHIVE_MANIFEST_KIND,
       schemaVersion: SPRINT_ARCHIVE_MANIFEST_VERSION,
       manifestPath: relativePortable(projectRoot, join(archiveDir, SPRINT_ARCHIVE_MANIFEST_FILE)),
@@ -1046,7 +1047,14 @@ function upsertMemoryArchiveIndex(
       artifactCount: manifest.artifactCount,
       totalBytes: manifest.totalBytes,
     };
-    const existing = store.getById(id);
+    try {
+      const previous = existing ? JSON.parse(existing.metadata) as Record<string, unknown> : null;
+      if (previous && previous.manifestDigest === metadata.manifestDigest
+          && typeof previous.guardedSummarySha256 === 'string'
+          && SHA256_HEX_PATTERN.test(previous.guardedSummarySha256.slice('sha256:'.length))) {
+        metadata.guardedSummarySha256 = previous.guardedSummarySha256;
+      }
+    } catch { /* malformed historical metadata is replaced by the canonical index */ }
     if (
       existing?.type === 'sprint-archive'
       && existing.source === 'brain'
@@ -1730,6 +1738,7 @@ interface TrustedBrainProjection {
   readonly sprintId: string;
   readonly manifestDigest: string;
   readonly brainIndexSha256: string;
+  /** The guarded summary digest recorded in this sprint's archive-index row. */
   readonly guardedSummarySha256: string;
 }
 
@@ -1742,6 +1751,7 @@ function brainAdoptionProjection(
   const dbPath = safeBrainDatabasePath(projectRoot);
   if (!dbPath) return null;
   let entry: BrainArchiveProjectionEntry | null = null;
+  const summaryPath = join(projectRoot, BRAIN_DIR, 'exports', 'summary.md');
   if (refresh) {
     const store = new MemoryStore(dbPath);
     try {
@@ -1749,18 +1759,26 @@ function brainAdoptionProjection(
       if (!adopted) return null;
       const guarded = writeGuardedExports(store, join(projectRoot, BRAIN_DIR, 'exports'));
       if (guarded.warnings.length > 0 || !guarded.written.includes('summary.md')) return null;
-      // This is the writer-owned refresh path: use the exact row read from the
-      // same MemoryStore transaction boundary that rendered the guarded
-      // exports. Reopening a detached WAL snapshot immediately after closing
-      // the writer can fail during SQLite's own checkpoint transition even
-      // though the durable row/export are already correct. Read-only terminal
-      // verification below still uses the immutable detached snapshot.
+      const guardedSummarySha256 = hashFile(summaryPath);
+      if (!SHA256_HEX_PATTERN.test(guardedSummarySha256)) return null;
+      let metadata: Record<string, unknown>;
+      try { metadata = JSON.parse(adopted.metadata) as Record<string, unknown>; } catch { return null; }
+      if (metadata.manifestDigest !== `sha256:${manifestDigest}`) return null;
+      // Bind the exact guarded export rendered by this adoption to the archive
+      // row. The global summary is intentionally refreshed by later canonical
+      // adoptions, so replay validates this immutable per-sprint binding rather
+      // than requiring unrelated later summary bytes to remain unchanged.
+      store.update(adopted.id, {
+        metadata: JSON.stringify({ ...metadata, guardedSummarySha256: `sha256:${guardedSummarySha256}` }),
+      }, 'terminal-archive-seal');
+      const bound = store.getById(adopted.id);
+      if (!bound) return null;
       entry = {
-        id: adopted.id,
-        type: adopted.type,
-        content: adopted.content,
-        summary: adopted.summary,
-        metadata: adopted.metadata,
+        id: bound.id,
+        type: bound.type,
+        content: bound.content,
+        summary: bound.summary,
+        metadata: bound.metadata,
       };
     } finally {
       store.close();
@@ -1771,9 +1789,9 @@ function brainAdoptionProjection(
   if (!entry) return null;
   let metadata: Record<string, unknown>;
   try { metadata = JSON.parse(entry.metadata) as Record<string, unknown>; } catch { return null; }
-  if (metadata.manifestDigest !== `sha256:${manifestDigest}`) return null;
-  const summaryPath = join(projectRoot, BRAIN_DIR, 'exports', 'summary.md');
-  if (!existsSync(summaryPath)) return null;
+  if (metadata.manifestDigest !== `sha256:${manifestDigest}`
+      || typeof metadata.guardedSummarySha256 !== 'string'
+      || !SHA256_HEX_PATTERN.test(metadata.guardedSummarySha256.slice('sha256:'.length))) return null;
   return {
     [TRUSTED_BRAIN_PROJECTION]: true,
     sprintId,
@@ -1785,7 +1803,7 @@ function brainAdoptionProjection(
       summary: entry.summary,
       metadata: entry.metadata,
     })),
-    guardedSummarySha256: hashFile(summaryPath),
+    guardedSummarySha256: metadata.guardedSummarySha256.slice('sha256:'.length),
   };
 }
 
