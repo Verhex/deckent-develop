@@ -15,6 +15,11 @@
   interval'ı projekte ediyor.
 - Bot daemon build sonrası yeniden başlatıldı ve ownership-bound PID ile çalışıyor. Pending
   approval yok.
+- D4 Approval Lifecycle fresh closure recovery'si local olarak kapandı: `confirmations list`
+  expiry-settling store yerine side-effect-free projection tüketiyor; 70 dosya/330 test, full
+  lint, build ve real-binary byte-stability smoke yeşil. Formal Fable 5 XVerify provider call
+  öncesinde canonical `weekFablePct=100` nedeniyle typed `HOLD` verdi; reset
+  `2026-08-24 20:00 Europe/Istanbul`, mühür veya D4 `DONE` değildir.
 - Runtime hygiene formal different-provider XVerify, owner kararıyla
   `2026-08-24 20:00 Europe/Istanbul` sonrasındadır; bu saatten önce formal hygiene closure yok.
 
@@ -24,9 +29,9 @@
 
 ## Sıradaki yürütme sırası
 
-1. `2026-08-24 20:00 Europe/Istanbul` sonrasında runtime hygiene different-provider XVerify.
-2. D4 Approval Lifecycle formal XVerify/closure; ardından D5 retirement.
-3. 7091 Cursor production image + gerçek `--verifier cursor` smoke.
+1. Fable resetini beklerken 7091 Cursor production image + gerçek `--verifier cursor` smoke.
+2. `2026-08-24 20:00 Europe/Istanbul` sonrasında runtime hygiene different-provider XVerify.
+3. Aynı reset sonrasında D4 Approval Lifecycle formal XVerify/closure; ardından D5 retirement.
 4. 7094 prefix/F2c default-ON ölçümü: measuredHitRatio + provider-reported USD.
 5. Closure OS truth-sync → source/dist/provider adoption → owner disposition batches → yedi günlük
    health/ETA → cleanup/migration → release.

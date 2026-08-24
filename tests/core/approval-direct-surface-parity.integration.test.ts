@@ -116,7 +116,10 @@ describe('approval direct-surface late-decision parity', () => {
         'node', 'deckent', 'confirmations', 'decide', confirmation.id,
         '--confirm', '--reason', 'late allow',
       ]);
-      expect(process.exitCode).toBe(1);
+      // The legacy command is now a non-authoritative route to
+      // `deckent approvals decide`; successful routing is exit 0, while the
+      // late confirmation remains terminal and cannot be revived below.
+      expect(process.exitCode).toBe(0);
       const firstConfirmation = readConfirmation(
         confirmationRoot, confirmation.id, { lifecycle, clock: () => confirmationNow },
       );

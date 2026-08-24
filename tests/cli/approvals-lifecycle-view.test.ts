@@ -225,7 +225,9 @@ describe('approvals CLI lifecycle view', () => {
 
     await run('approvals', 'decide', 'effective-expired-1', '--allow');
 
-    expect(state.sweepCalls).toBe(1);
+    // The target is already terminal in the canonical store projection.  The
+    // decision surface must reject it without replaying the expiry writer.
+    expect(state.sweepCalls).toBe(0);
     expect(state.decisionCalls).toBe(0);
     expect(state.stderr.join('\n')).toContain('2026-08-21T12:02:00.000Z');
     expect(process.exitCode).toBe(1);

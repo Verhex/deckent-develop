@@ -3,7 +3,7 @@ import { Command } from 'commander';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
 import { print, printError } from '../helpers/output.js';
-import { listPendingConfirmations } from '../../core/confirmation-store.js';
+import { listPendingConfirmationsReadOnly } from '../../core/confirmation-store.js';
 import { loadConfig } from '../../core/config.js';
 import { resolveTenant } from '../../core/tenant-context.js';
 import { InvocationReceiptStore } from '../../core/invocation-receipt-store.js';
@@ -52,7 +52,11 @@ const EVIDENCE_UNAVAILABLE = 'exact-xverify-evidence-unavailable';
 const PROVIDER_NOT_SEPARATE = 'xverify-provider-separation-unproven';
 
 async function defaultReadModel(root: string): Promise<AcceptanceConfirmationReadModel> {
-  const pending = listPendingConfirmations(root).map(request => ({
+  // Listing and pre-adjudication discovery are projections: expiry settlement
+  // belongs to the scheduled driver / authenticated settlement service.  The
+  // read-only store view hides overdue rows without moving, quarantining, or
+  // rewriting their durable bytes.
+  const pending = listPendingConfirmationsReadOnly(root).map(request => ({
     confirmationId: request.id,
     adapter: request.adapter,
     kind: request.kind,

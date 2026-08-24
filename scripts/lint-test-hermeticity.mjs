@@ -556,8 +556,12 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // suite; the compiled runtime-hygiene fixture likewise uses a valid scratch
   // Brain DB instead of counterfeit bytes. Production authority is never
   // opened or mutated by these tests.
+  // 2026-08-24 D4 formal-closure recovery: same 15823 count, digest only — two
+  // pre-cutover assertions now pin the canonical read-only terminal projection
+  // and legacy human-command routing contract. No fixture root or effect class
+  // changed; the dedicated time-drift regression remains tmpdir-owned.
   count: 15823,
-  digest: 'a759a136848df13ea96bab804865151bda7fd4579af72113b0c873757bab867f',
+  digest: '8fd3db93169f80db161bd9b2a956b5c3111bd63e28ac2af029968f3965dec223',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -987,8 +991,12 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // Root landing verification binds retired-row exclusion in the canonical
   // concurrency reader and replay-time status projection repair; the governed
   // production inventory count is unchanged.
+  // 2026-08-24 D4 formal-closure recovery: count unchanged; the confirmations
+  // CLI now consumes the existing side-effect-free projection instead of the
+  // expiry-settling store API. No new production module or effect entered the
+  // graph.
   count: 1309,
-  digest: '835da79162beb9c2c768973e950466746c275eb4544218ae5b08153638665411',
+  digest: '6a52cba56111047d07263a51c64dd48d9fcca823796473efe71a13f29bffa64b',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
