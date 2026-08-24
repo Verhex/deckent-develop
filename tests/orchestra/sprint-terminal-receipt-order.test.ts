@@ -118,6 +118,12 @@ describe('fenced sprint terminal receipt archive boundary', () => {
       coordinatorGeneration: 7,
       now: () => '2026-07-31T12:01:00.000Z',
     });
+    const recoveryRetry = publishFencedSprintTerminalReceipt({
+      projectRoot: root,
+      sprint,
+      truth,
+      now: () => '2026-07-31T12:02:00.000Z',
+    });
     const artifact = JSON.parse(readFileSync(first.artifactPath, 'utf-8')) as {
       receipt: { logicalSettlementDigest: string; coordinatorGeneration: number; authorityVersion: number };
       terminalEvidence: { cleanupEligibility: { candidate: boolean } };
@@ -132,6 +138,7 @@ describe('fenced sprint terminal receipt archive boundary', () => {
     };
 
     expect(second.receipt).toEqual(first.receipt);
+    expect(recoveryRetry.receipt).toEqual(first.receipt);
     expect(artifact.receipt).toMatchObject({
       logicalSettlementDigest: truth.logicalSettlementDigest,
       coordinatorGeneration: 7,
@@ -311,7 +318,7 @@ describe('fenced sprint terminal receipt archive boundary', () => {
     );
     const finalizeSource = source.slice(source.indexOf('export async function finalizeSprint('));
     const publishIndex = finalizeSource.indexOf(
-      'terminalReceiptPublication = publishFencedSprintTerminalReceipt({',
+      'publishFencedSprintTerminalReceipt({',
     );
     const guardIndex = finalizeSource.indexOf('if (receiptAllowsArchive) {');
     const archiveIndex = finalizeSource.indexOf(

@@ -492,6 +492,12 @@ export interface FinalizeSprintOptions {
    */
   coordinatorGeneration?: number;
   /**
+   * Exact durable COMPLETE receipt adopted by an external recovery finalizer.
+   * The receipt is never regenerated or rewritten; it authorizes continuation
+   * from the post-receipt archive/seal boundary after a coordinator crash.
+   */
+  resumeTerminalReceipt?: SprintTerminalReceiptV1;
+  /**
    * The in-process Sprint controller still owns delayed cleanup. When true,
    * finalization prepares metrics/docs but leaves COMPLETE state, PID
    * retirement, dashboard and completion notification to the controller's
@@ -1663,6 +1669,36 @@ function receiptRecordMatches(
     && candidate.authorityVersion === expected.authorityVersion;
 }
 
+function resumePersistedTerminalReceipt(input: {
+  readonly projectRoot: string;
+  readonly sprintId: string;
+  readonly expected: SprintTerminalReceiptV1;
+  readonly terminalEvidence: SprintTerminalEvidence<TaskResult>;
+}): FinalizerTerminalReceiptPublication {
+  const artifactPath = join(
+    input.projectRoot,
+    RECENT_WORKS_DIR,
+    `${input.sprintId}-terminal-receipt.json`,
+  );
+  const persisted = readJsonSafe<PersistedSprintTerminalReceipt>(artifactPath);
+  if (!persisted
+      || persisted.terminalOutcome !== 'COMPLETE'
+      || !receiptRecordMatches(
+        persisted.receipt as unknown as Record<string, unknown>,
+        input.expected,
+      )
+      || persisted.terminalEvidence.cleanupEligibility.candidate !== true
+      || persisted.terminalEvidence.holds.length > 0
+      || input.terminalEvidence.cleanupEligibility.candidate !== true) {
+    throw new FinalizerTerminalEvidenceError('TERMINAL_RECEIPT_RESUME_AUTHORITY_HOLD');
+  }
+  return {
+    receipt: persisted.receipt,
+    terminalEvidence: input.terminalEvidence,
+    artifactPath,
+  };
+}
+
 function terminalEventsProjectionDigest(events: readonly SprintTerminalDurableEvent[]): string {
   return createHash('sha256').update(canonicalJson(events.map(event => ({
     channel: event.channel,
@@ -2808,8 +2844,18 @@ function publishFencedTerminalReceipt(
   mkdirSync(recentWorksDir, { recursive: true });
   const artifactPath = join(recentWorksDir, `${input.sprint.id}-terminal-receipt.json`);
   const existing = readJsonSafe<PersistedSprintTerminalReceipt>(artifactPath);
-  const runId = input.runId ?? input.sprint.id;
-  const coordinatorGeneration = input.coordinatorGeneration ?? 1;
+  // A recovery/finalize retry may enter without the original live Flow
+  // context. The persisted fenced authority is then the only canonical owner
+  // identity; defaulting to the sprint id/generation 1 manufactures a foreign
+  // publisher and makes an otherwise idempotent terminal retry impossible.
+  // Explicit caller identities still take precedence so a genuine mismatch
+  // remains a typed `foreign_ownership`/generation HOLD.
+  const runId = input.runId
+    ?? existing?.publicationState.runId
+    ?? input.sprint.id;
+  const coordinatorGeneration = input.coordinatorGeneration
+    ?? existing?.publicationState.coordinatorGeneration
+    ?? 1;
   const state = existing?.publicationState ?? createSprintTerminalPublicationState({
     version: SPRINT_TERMINAL_PUBLICATION_VERSION,
     sprintId: input.sprint.id,
@@ -4401,15 +4447,22 @@ export async function finalizeSprint(
   // partial, deferred, or otherwise held evidence leaves publication null.
   let terminalReceiptPublication: FinalizerTerminalReceiptPublication | null = null;
   try {
-    terminalReceiptPublication = publishFencedSprintTerminalReceipt({
-      projectRoot,
-      sprint,
-      truth: terminalTruth,
-      ...(opts?.flowId ? { runId: opts.flowId } : {}),
-      ...(opts?.coordinatorGeneration !== undefined
-        ? { coordinatorGeneration: opts.coordinatorGeneration }
-        : {}),
-    });
+    terminalReceiptPublication = opts?.resumeTerminalReceipt
+      ? resumePersistedTerminalReceipt({
+          projectRoot,
+          sprintId: sprint.id,
+          expected: opts.resumeTerminalReceipt,
+          terminalEvidence: terminalTruth.terminalEvidence,
+        })
+      : publishFencedSprintTerminalReceipt({
+          projectRoot,
+          sprint,
+          truth: terminalTruth,
+          ...(opts?.flowId ? { runId: opts.flowId } : {}),
+          ...(opts?.coordinatorGeneration !== undefined
+            ? { coordinatorGeneration: opts.coordinatorGeneration }
+            : {}),
+        });
     debugLog(
       'finalizeSprint:terminalReceipt',
       `Receipt published at ${terminalReceiptPublication.artifactPath}`,

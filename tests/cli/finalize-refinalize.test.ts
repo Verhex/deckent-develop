@@ -816,6 +816,40 @@ describe('finalize CLI — end-to-end force-finalize (ABORTED settlement, tmpdir
     return join(root, '.deckent', 'recently-works', `${SPRINT_ID}-terminal-receipt.json`);
   }
 
+  it('--force resumes an existing COMPLETE receipt with its exact flow identity instead of aborting it', async () => {
+    const tasks = [makeTask('900-001')];
+    const results = [makeResult('900-001')];
+    const evaluations = new Map<string, TaskEvaluation>([
+      ['900-001', TaskEvaluation.DONE],
+    ]);
+    seedFinalizerDiskEvidence(tasks, results);
+
+    await finalizeSprint(root, makeSprint(tasks), evaluations, results, {
+      ...finalizeOpts,
+      flowId: 'flow-900-live',
+      coordinatorGeneration: 7,
+      deferTerminalAuthority: true,
+    });
+    expect(readJson<{
+      terminalOutcome: string;
+      receipt: { runId: string; coordinatorGeneration: number };
+    }>(receiptPath())).toMatchObject({
+      terminalOutcome: 'COMPLETE',
+      receipt: { runId: 'flow-900-live', coordinatorGeneration: 7 },
+    });
+
+    await runFinalizeCli(['--sprint', SPRINT_ID, '--force', '--skip-decay', '--skip-hooks']);
+
+    expect(process.exitCode).toBeUndefined();
+    expect(readJson<{
+      terminalOutcome: string;
+      receipt: { runId: string; coordinatorGeneration: number };
+    }>(receiptPath())).toMatchObject({
+      terminalOutcome: 'COMPLETE',
+      receipt: { runId: 'flow-900-live', coordinatorGeneration: 7 },
+    });
+  });
+
   it('--force counts archived tasks in the fenced ABORTED receipt, preserves startedAt, stamps ABORTED state, clears pid', async () => {
     // Live .tasks/ task + archived task (sprint-267 "5/5 instead of 6/6")
     const tasksDir = join(root, '.tasks');

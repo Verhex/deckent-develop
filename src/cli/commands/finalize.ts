@@ -31,6 +31,7 @@ import {
 } from '../../orchestra/sprint-recovery-operation.js';
 import { DeckentError } from '../../core/errors.js';
 import { resolveTaskArtifactReadDirs } from '../../core/sprint-archive.js';
+import { readSprintTerminalReceiptSummary } from '../../core/sprint-terminal-publication-status.js';
 
 /**
  * Project the task record a surviving `.result` proves must have existed, for
@@ -509,6 +510,30 @@ export function registerFinalize(program: Command): void {
             },
             terminationPolicy,
           });
+          const priorTerminal = readSprintTerminalReceiptSummary(root, sprintId).receipt;
+          if (priorTerminal?.terminalOutcome === 'COMPLETE') {
+            const completedSprint = buildFinalizeSprintProjection(root, sprintId, tasks, false);
+            const { regenerateRules } = await import('../../core/rule-generator.js');
+            const metrics = await finalizeSprint(root, completedSprint, evaluations, results, {
+              skipDecay: opts.skipDecay,
+              skipHooks: opts.skipHooks,
+              config,
+              flowId: priorTerminal.runId,
+              coordinatorGeneration: priorTerminal.coordinatorGeneration,
+              resumeTerminalReceipt: priorTerminal,
+              onRuleRegen: async (projectRoot: string): Promise<void> => {
+                await regenerateRules(projectRoot);
+              },
+            });
+            print(getMessage('finalize.complete', lang, {
+              sprintId,
+              total: String(metrics.totalTasks),
+              done: String(metrics.completedTasks),
+              debt: String(metrics.techDebtTasks),
+              noGo: String(metrics.noGoTasks),
+            }));
+            return;
+          }
           const settlement = forceAbortSprint(root, sprint, evaluations, results, {
             defaultAuthMode: config.auth_mode,
             runId: sprintId,
