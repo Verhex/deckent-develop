@@ -98,6 +98,10 @@ export function assembleCanonicalIngressResult(
     ...(ingress['workAttribution'] ? { workAttribution: ingress['workAttribution'] } : {}),
     ...(ingress['workerWorkClaim'] ? { workerWorkClaim: ingress['workerWorkClaim'] } : {}),
     ...(ingress['promptDeliveryAttribution'] ? { promptDeliveryAttribution: ingress['promptDeliveryAttribution'] } : {}),
+    // Host-authored xverify terminal observation must survive the strict
+    // cutover — dropping it broke every cross-provider verifier run
+    // (framing-invalid regression 2026-08-24).
+    ...(ingress['hostTerminalProjection'] ? { hostTerminalProjection: ingress['hostTerminalProjection'] } : {}),
     tokenUsage: {
       inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens,
       totalTokens: nonnegativeInteger(usage['totalTokens'])

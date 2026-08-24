@@ -271,6 +271,30 @@ describe('assembleResult — validation', () => {
     expect(result.tests.outcome).toBe('PASSED');
   });
 
+  it('preserves the host-authored xverify terminal projection through strict settlement', () => {
+    // Live regression 2026-08-24: the cutover dropped this additive field and
+    // every cross-provider verifier run degraded to framing-invalid.
+    const result = assembleCanonicalIngressResult({
+      taskId: 'xv-1',
+      selfAssessment: 'DONE',
+      testsPassed: true,
+      filesChanged: [],
+      notes: 'Host-observed terminal xverify protocol completed.\nXVERIFY_RESPONSE_JSON: {}\nVERDICT: CONFIRMED ok',
+      hostTerminalProjection: {
+        version: 1,
+        protocol: 'xverify-v1',
+        observedBy: 'host',
+        sourceMarker: { type: 'EXIT_WITHOUT_RESULT', exitCode: 0 },
+      },
+    }, { taskId: 'xv-1', workerId: 'docker-xv-1', provider: 'claude', model: 'opus' });
+    expect(validateTaskResult(result).ok).toBe(true);
+    expect(result.hostTerminalProjection).toMatchObject({
+      version: 1,
+      protocol: 'xverify-v1',
+      observedBy: 'host',
+    });
+  });
+
   it('preserves digest-bound evaluator fields through strict canonical settlement', () => {
     const promptCompilePlanId = `prompt-compile-plan:sha256:${'a'.repeat(64)}`;
     const command = 'npx vitest run tests/orchestra/result-assembler.test.ts';

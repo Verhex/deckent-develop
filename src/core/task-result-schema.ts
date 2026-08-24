@@ -342,6 +342,17 @@ export const taskResultSchema = z.object({
   preDispatchSettlement: preDispatchSettlementSchema.optional(),
   promptDeliveryAttribution: promptDeliveryAttributionSchema.optional(),
   promptCompilePlanId: z.string().min(1).optional(),
+  /** Host-authored xverify terminal observation (spawn-backend-docker). The
+   *  strict cutover dropped this additive field and every cross-provider
+   *  verifier run degraded to framing-invalid (live regression 2026-08-24,
+   *  receipts c6d973d6… / d22a59ad… / 34ddfca1…) — same defect class as the
+   *  promptCompilePlanId/testVerification/techDebtCriterionIds drops. */
+  hostTerminalProjection: z.object({
+    version: z.literal(1),
+    protocol: z.string().min(1),
+    observedBy: z.literal('host'),
+    sourceMarker: z.record(z.string(), z.unknown()).optional(),
+  }).optional(),
 
   // resource accounting (orchestrator, provider-agnostic)
   tokenUsage: tokenUsageSchema,
