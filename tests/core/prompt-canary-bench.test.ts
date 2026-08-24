@@ -11,6 +11,6 @@ describe('prompt-canary bench workload (7094 twin-run surface)', () => {
   it('case ids are sequential from 1 with no gaps', () => {
     expect(BENCH_CASES.map(benchCase => benchCase.id))
       .toEqual(BENCH_CASES.map((_, index) => index + 1));
-    expect(BENCH_CASES.at(-1)?.id).toBe(3);
+    expect(BENCH_CASES.at(-1)?.id).toBe(4);
   });
 });

@@ -21,4 +21,5 @@ export const BENCH_CASES: readonly BenchCase[] = [
   { id: 1, input: 'deckent', expected: 'TNEKCED' },
   { id: 2, input: 'signal', expected: 'LANGIS' },
   { id: 3, input: 'orbit', expected: 'TIBRO' },
+  { id: 4, input: 'cobalt', expected: 'TLABOC' },
 ];

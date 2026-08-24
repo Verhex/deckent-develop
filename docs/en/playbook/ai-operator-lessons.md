@@ -564,3 +564,10 @@ not a reason to spend another provider attempt on the same prompt.
   the code rubric fails zero-diff as a correctness miss; the 661 futility machinery
   (`REPEATED_ZERO_DIFF_NO_GO → escalateReplan`) chose typed escalation over looping, and that
   behavior is the intended product.
+- **2026-08-25 — the seal-window lesson (sprint-667/668/669)**: The terminal summary print is
+  NOT the seal moment — the natural COMPLETE tail enters the outermost seal ~3-5 minutes later
+  (cleanup_delay + linger); never rule "no seal" before that window closes (an early verdict on
+  668 produced a wrong "early-exit" diagnosis; 669's breadcrumbs showed the truth). Second
+  lesson: instrument-and-reproduce before generalizing from one case — two permanent
+  breadcrumbs (controller terminal-tail + outermost enter/sealed) gave a definitive diagnosis
+  in a single run and stay in the product.

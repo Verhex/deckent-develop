@@ -14,6 +14,15 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint669] - 2026-08-24
+
+### Added
+
+- Append the next sequential bench case
+
+
+_Tasks: 1 total, 1 done, 0 tech debt, 0 no-go_
+
 ## [sprint668] - 2026-08-24
 
 ### Added

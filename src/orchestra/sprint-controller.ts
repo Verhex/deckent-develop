@@ -3104,6 +3104,7 @@ export async function runSprint(
   // interval, remove task/lock files); runs only under a published terminal
   // receipt, inline between the DECAY and COMPLETE transitions below.
   scanInterval = await runCleanupPhase(projectRoot, sprint, config, opts, scanInterval, spawnBackend);
+  debugLog('runSprint:terminalTail', `${sprint.id} cleanup done — claiming publication`);
 
   // Terminal handoff step 2: claim the single publication for this receipt.
   // A replay of the same fenced authority is a HOLD, not a second COMPLETE.
@@ -3116,10 +3117,12 @@ export async function runSprint(
     throw sprintTerminalHandoffHoldError(terminalPublication);
   }
 
+  debugLog('runSprint:terminalTail', `${sprint.id} publication claimed — final authority`);
   publishFinalSprintAuthority(
     projectRoot, sprint, terminalPublication.metrics, config.language ?? 'en',
   );
 
+  debugLog('runSprint:terminalTail', `${sprint.id} entering outermost archive publication`);
   publishOutermostSprintTerminalArchive({
     projectRoot,
     sprintId: sprint.id,

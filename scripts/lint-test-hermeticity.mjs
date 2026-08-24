@@ -1139,7 +1139,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-24 HIGH-5 + 7091 fold: count unchanged, digest moved — bot-daemon
   // token-proven legacy stop path and cursor image build-arg fold.
   count: 1323,
-  digest: '7282fccd4b86bb135668d57edbad5b1330f2c6567ff8e93a936472d5c05a68fe',
+  digest: 'd0b15222ef8521aad4a7cf1b132102aaa6ea3bcd077afbd2029868f177e18136',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

@@ -535,3 +535,9 @@ attempt harcama gerekçesi değil, host composition defect kanıtıdır.
   acceptance-türüyle işaretlenir** — aksi halde kod-rubriği zero-diff'i correctness diye
   kırar; 661-futility makinesi (`REPEATED_ZERO_DIFF_NO_GO → escalateReplan`) döngü yerine
   tipli-eskalasyon verdi ve bu davranış İSTENEN üründür.
+- **2026-08-25 — seal-penceresi dersi (sprint-667/668/669)**: Terminal-özet baskısı mühür-anı
+  DEĞİLDİR — doğal-COMPLETE kuyruğu cleanup_delay+linger ile ~3-5 dakika sonra outermost-seal'e
+  girer; pencere dolmadan "seal yok" yargısı verilmez (668'de erken-yargıyla yanlış
+  "erken-çıkış" teşhisi kondu; 669 breadcrumb'ları gerçeği gösterdi). İkinci ders: tek-vakadan
+  genelleme yapmadan önce enstrümante-et-ve-tekrar-üret — iki kalıcı-breadcrumb (controller
+  terminal-tail + outermost enter/sealed) bir koşuda kesin-teşhis verdi ve üründe kaldı.

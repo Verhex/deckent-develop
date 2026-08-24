@@ -1946,6 +1946,11 @@ export function publishOutermostSprintTerminalArchive(input: {
 }): OutermostSprintTerminalArchivePublication {
   let archiveSealed = false;
   try {
+    // Natural-path seal observability (2026-08-25): sprint-668 ended COMPLETE
+    // with no seal artifact and no error anywhere — entry/exit breadcrumbs make
+    // the outermost publication provable from .brain/ERRORS.md like the other
+    // finalize steps.
+    debugLog('publishOutermostSprintTerminalArchive:enter', `${input.sprintId} events=${input.terminalEvents.length}`);
     if (input.terminalEvents.length === 0) {
       throw new FinalizerTerminalEvidenceError('SPRINT_ARCHIVE_TERMINAL_EVENT_REQUIRED');
     }
@@ -2041,6 +2046,7 @@ export function publishOutermostSprintTerminalArchive(input: {
     // A staged seal receipt is already immutable authority even when its
     // application remains HOLD. Callers must not append a recovery event over
     // that exact final-event identity; retry proceeds through the core repair.
+    debugLog('publishOutermostSprintTerminalArchive:sealed', `${input.sprintId} receipt=${seal.receipt !== undefined} terminalComplete=${seal.terminalComplete}`);
     archiveSealed = seal.receipt !== undefined;
     if (!seal.terminalComplete) {
       throw new FinalizerTerminalEvidenceError(
