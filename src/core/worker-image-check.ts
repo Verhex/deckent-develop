@@ -157,6 +157,7 @@ export function buildSuggestedImageCmd(image: string, requiredProviders: string[
   const args = ['docker', 'build', '-f', 'Dockerfile.worker'];
   if (requiredProviders.includes('codex')) args.push('--build-arg', 'INSTALL_CODEX=true');
   if (requiredProviders.includes('gemini')) args.push('--build-arg', 'INSTALL_GEMINI=true');
+  if (requiredProviders.includes('cursor')) args.push('--build-arg', 'INSTALL_CURSOR=true');
   args.push('-t', image, '.');
   return args.join(' ');
 }

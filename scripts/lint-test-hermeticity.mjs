@@ -634,8 +634,10 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-24 HIGH-3/4 closure: +7 — hostTerminalProjection passthrough,
   // legacy-evaluation resolution, depth-2 fix-chain and config-owned canary
   // threshold regressions; all suite-owned in-memory/tmpdir fixtures.
+  // 2026-08-24 HIGH-5 + 7091 fold: count unchanged, digest moved — bot-daemon
+  // token-proven legacy stop pin reworked in place; suite-owned fixtures only.
   count: 16090,
-  digest: '2c201975467b2fa1b2a092810b41ce9701d8e1b80259f1bd8681674a98a67ec1',
+  digest: 'bd9c1bb57caf4973ec03284260d70b3c817fef2d9e9f08737250165567cab439',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1132,8 +1134,10 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-24 HIGH-3/4 closure: count unchanged, digest moved — canary
   // archive reader (legacy-evaluation resolution, fix-chain walk), config-owned
   // canary thresholds and result-schema hostTerminalProjection passthrough.
+  // 2026-08-24 HIGH-5 + 7091 fold: count unchanged, digest moved — bot-daemon
+  // token-proven legacy stop path and cursor image build-arg fold.
   count: 1321,
-  digest: 'faefe9ea164807a372635ec784066cb83ee1fff93cad5e0924c3963df813ead3',
+  digest: 'e1dc5f8d82f61c6f8362f88893b69da585daa8d3772332daebe9956fb787cd56',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

@@ -104,10 +104,19 @@ describe('bot pidfile lifecycle', () => {
       })).toEqual({
         status: 'ownership-unknown',
         pid: 4242,
-        reason: 'runtime-adoption-unavailable',
+        reason: 'token-proven-legacy-schema',
       });
       expect(JSON.parse(readFileSync(join(root, '.deckent', 'bot.pid'), 'utf8')))
         .toHaveProperty('schemaVersion', 1);
+      // HIGH-5 (2026-08-24): token equality is ownership proof for the STOP
+      // path — a pre-upgrade daemon must stay CLI-stoppable, not stranded.
+      const killed: Array<[number, string]> = [];
+      expect(stopBot(root, {
+        isAlive: () => true,
+        startToken: () => 's100',
+        kill: (pid, signal) => { killed.push([pid, String(signal)]); },
+      })).toEqual({ status: 'stopped', pid: 4242 });
+      expect(killed).toEqual([[4242, 'SIGTERM']]);
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 

@@ -80,7 +80,8 @@ export type BotPidInspection =
         | 'project-binding-mismatch'
         | 'start-token-unavailable'
         | 'legacy-identity-unavailable'
-        | 'runtime-adoption-unavailable';
+        | 'runtime-adoption-unavailable'
+        | 'token-proven-legacy-schema';
     };
 
 type LegacyIdentity = 'bot' | 'foreign' | 'unknown';
@@ -434,10 +435,14 @@ export function inspectBotPid(
     if (record.startToken && liveToken) {
       if (record.startToken === liveToken) {
         if (record.schemaVersion === LEGACY_BOT_PID_SCHEMA_VERSION) {
+          // Start-token equality on a live pid IS ownership proof; only the
+          // runtime-adoption identity is missing on the legacy schema. Name
+          // this precisely so stopBot can honor the proof — a pre-upgrade
+          // daemon must stay stoppable through the CLI (HIGH-5, 2026-08-24).
           return {
             status: 'ownership-unknown',
             pid: record.pid,
-            reason: 'runtime-adoption-unavailable',
+            reason: 'token-proven-legacy-schema',
           };
         }
         return {
@@ -542,13 +547,22 @@ export function stopBot(
 ): StopBotResult {
   const inspection = inspectBotPid(root, deps);
   if (inspection.status === 'not-running') return { status: 'not-running' };
-  if (inspection.status === 'ownership-unknown') return inspection;
+  let pid: number;
+  if (inspection.status === 'ownership-unknown') {
+    // Start-token equality on the legacy schema is ownership proof for the
+    // stop path (HIGH-5): a pre-upgrade daemon must stay CLI-stoppable.
+    if (inspection.reason !== 'token-proven-legacy-schema'
+      || inspection.pid === null) return inspection;
+    pid = inspection.pid;
+  } else {
+    pid = inspection.pid;
+  }
   try {
-    (deps.kill ?? process.kill)(inspection.pid, 'SIGTERM');
+    (deps.kill ?? process.kill)(pid, 'SIGTERM');
   } catch {
     return { status: 'not-running' };
   }
-  return { status: 'stopped', pid: inspection.pid };
+  return { status: 'stopped', pid };
 }
 
 export type StartBotResult =

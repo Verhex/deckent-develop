@@ -696,12 +696,13 @@ export async function maybeProvisionDockerImage(
   print(getMessage('doctor.image_not_ready', lang));
   print(`  ${getMessage('doctor.image_build_hint', lang)}`);
 
-  // Translate provider names → handleImageBuild flags (codex/gemini are opt-in build-args)
+  // Translate provider names → handleImageBuild flags (codex/gemini/cursor are opt-in build-args)
   const code = await handleImageBuild({
     image,
     lang: opts.lang,
     withCodex: requiredProviders.includes('codex'),
     withGemini: requiredProviders.includes('gemini'),
+    withCursor: requiredProviders.includes('cursor'),
   }, opts.spawnImpl);
   return code;
 }
