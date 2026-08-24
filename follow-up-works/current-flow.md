@@ -2,17 +2,28 @@
 
 > İş SSOT'u `docs/MASTER-PLAN.md`'dir. Bu dosya yalnız kısa vadeli yürütme sırasını taşır;
 > closure authority veya yeni work identity üretmez. Tüketilen ayrıntı burada biriktirilmez.
-> Son tamamlanmış devir authority'si: `ah-2026-08-24-codex-new-session`, epoch 2,
-> `RECOVERY_COMMITTED`, receipt `sha256:db58fbcfa6d71a79d6667dd1b571068a5642ef8aece4330bb0b975159a4f9234`.
-> Owner'ın `owner-live-2026-08-24-codex-authority-revoked-handoff-to-claude` talimatıyla
-> Codex→Claude sharp-cutover hedefi `ah-2026-08-24-codex-to-claude`, proposed epoch 3'tür;
-> exact transition/digest için versioned receipt dizini SSOT'tur. Claude bağımsız `VERIFIED` ve
-> explicit owner-authorized `RECOVERY_COMMITTED` olmadan mutation authority kazanmaz.
+> Son tamamlanmış devir authority'si: `ah-2026-08-24-codex-to-claude`, **epoch 3**,
+> `RECOVERY_COMMITTED` (transferee Claude), receipt
+> `sha256:09a1f774689ed4e785fa859dbd3f574406da02c87d2080c94d773c281a05117a`;
+> zincir PREPARED `af4752da…` → VERIFIED `e3b1fea2…` → RECOVERY_COMMITTED, authority-ref
+> `owner-live-2026-08-24-go-full-authority-claude-8workers`. Yürütme yetkisi CLAUDE'da.
 
 ## Canlı truth
 
 - `DOGFOOD_MODE=ON`, `WORKSPACE_MODE=MAIN`, `DELIVERY_MODE=DIRECT_MAIN`.
-- `DOGFOOD_HEALTH=DEGRADED`: `sprint-661` owner-authorized force-finalization ile terminal
+- `DOGFOOD_HEALTH=RECOVERED` (2026-08-24 gece, epoch-3): sprint-661 paketi + ADR-D-007 elle-kapanış
+  `e41b3acae` ile, HIGH-bulgu paketi (read-only pending discovery + 3 orphan gate kaydı + xverify
+  reason ayrımı) `e073da4e4` ile, `hostTerminalProjection` cutover-regresyon fix'i `b9c7b221b` ile
+  origin/main'e LANDED. Full lint 20-gate yeşil; `build:all` yeşil; documented bot stop/build/start;
+  fresh gerçek-binary `status`/`bot status`/`inspect` proof alındı — source↔dist mismatch KAPALI.
+  Formal XVerify boru-hattı onarıldı ve seri mühür üretiyor: D4 discovery-purity
+  `cross-verify-verdict:sha256:cfeaae188a83736857e829247eb23560dc06ef7732f12fa3fa4466a0a633e028`
+  (CONFIRMED, verifier claude-opus-5) ve runtime-hygiene
+  `cross-verify-verdict:sha256:094c1634d0c75f77704b3fbc36c7185151faeffd522c4938092e88c7ad7bd13b`
+  (CONFIRMED). Kök-neden: strict TaskResultV1 cutover'ın `hostTerminalProjection` alanını
+  düşürmesi (FIX-loop ile aynı defekt-sınıfı) + tam-dosya evidence'ın ~2KB'de kesilmesi — çözüm
+  bounded `--target` satır-dilimi disiplini. Tarihsel not: `sprint-661` owner-authorized
+  force-finalization ile terminal
   `ABORTED` kapandı. Canonical receipt içindeki `logicalProgress` 7 done/1 blocked/1 active derken
   `terminalEvidence` 6 completed ve archived top-level task JSON'ları 6 DONE/3 ABORTED gösteriyor;
   hiçbir unresolved lineage `COMPLETE` yapılmadı. Canonical terminal receipt generation 19,
@@ -98,13 +109,14 @@
   non-root UID/GID ile çalışıyor ve yalnız read-only `auth.json` taşıyan isolated login smoke'u
   yeşil. Outer 7091 DONE değildir: gerçek xverify canonical account authority stub'ında HOLD;
   provider-native quota surface olmadığı için limit policy uydurulmadı.
-- D4 Approval Lifecycle fresh closure recovery'si local olarak kapandı: `confirmations list`
-  expiry-settling store yerine side-effect-free projection tüketiyor; 70 dosya/330 test, full
-  lint, build ve real-binary byte-stability smoke yeşil. Formal Fable 5 XVerify provider call
-  öncesinde canonical `weekFablePct=100` nedeniyle typed `HOLD` verdi; reset
-  `2026-08-24 20:00 Europe/Istanbul`, mühür veya D4 `DONE` değildir.
-- Runtime hygiene formal different-provider XVerify, owner kararıyla
-  `2026-08-24 20:00 Europe/Istanbul` sonrasındadır; bu saatten önce formal hygiene closure yok.
+- D4 Approval Lifecycle discovery-purity artık İKİ katmanlı kapalı: `confirmations` VE
+  `pending-approvals` (status/bot inbox) read-yolları side-effect-free projection (EXPIRE-SWEEP
+  read-hook'u emekli, `e073da4e4`); üç orphan authority-gate `lint:gates`'e kayıtlı ve yeşil.
+  Formal mühür: CONFIRMED `cross-verify-verdict:sha256:cfeaae18…33e028` (verifier claude-opus-5,
+  2026-08-24 gece). Kalan: lifecycle `enabled` staged-rollout owner-kararı + D5 retirement.
+- Runtime hygiene formal different-provider XVerify CONFIRMED:
+  `cross-verify-verdict:sha256:094c1634…7bd13b` (661-arşiv-manifesti + hygiene-doc lifecycle +
+  gate-kaydı bounded-target kanıtıyla, 2026-08-24 gece).
 - 7094 measurement authority producer→archive reader→kernel→immutable receipt→i18n CLI zinciri
   LOCAL_VERIFIED. Formal Fable 5 koşusu provider call öncesi typed `limit_hold/unavailable` verdi;
   receipt yok, default flip yok. Outer 7094 gerçek comparable A/B cohortlarını beklediği için OPEN.
@@ -141,16 +153,12 @@
 
 ## Sıradaki yürütme sırası
 
-1. Claude, `ah-2026-08-24-codex-to-claude` PREPARED receipt'ini; branch/HEAD/origin, dirty-tree
-   grouping, Sprint-661 terminal receipt/archive, no-active-run ve provider/limit truth ile bağımsız
-   doğrular. `VERIFIED` receipt'ini yazar; owner'ın canlı yetki-devri talimatını exact
-   `authority-ref` ile `RECOVERY_COMMITTED` yapmadan mutation başlatmaz.
-2. Authority commit sonrası önce source↔dist kapanışı: full lint, `build:all`, documented bot
-   restart/reconnect, fresh compiled status/result/heartbeat/core/archive gerçek-binary proof.
-   Sprint-661 `ABORTED` kalır; worker sonuçları veya source tests nedeniyle elle COMPLETE yapılmaz.
-3. Sprint-661 dirty paketini shared-workspace dosyalarından bağımsız sınıflandır; scoped/full
-   verification green ise owner'ın landing talimatına göre commit/push öncesi branch-vv/HEAD/origin
-   ve exact diff'i yeniden doğrula. Codex bu paketi commit/push etmedi.
+1. ✅ TAMAM (2026-08-24): devir zinciri PREPARED→VERIFIED→RECOVERY_COMMITTED, epoch 3, Claude.
+2. ✅ TAMAM: source↔dist kapanışı — full lint (20 gate), `build:all`, bot stop/build/start,
+   fresh gerçek-binary proof. Sprint-661 `ABORTED` tarihi korunuyor.
+3. ✅ TAMAM: sprint-661 paketi sınıflandırılıp landed — `e41b3acae` + `e073da4e4` + `b9c7b221b`
+   (origin/main). Runtime-untracked `closure-staging/`+`logs/` bilinçli dışarıda (gitignore
+   owner-kararı bekliyor).
 4. Residual production closure'ı yeni outcome açmadan mevcut MASTER kapsamlarına işler:
    canonical host event SSOT→monotonic `.hb`/`.log`→Status/UI/Dashboard/Nervous; Nervous
    recommendation→local disposition→Telegram durable delivery; tek result ingress/schema/
@@ -162,8 +170,12 @@
    call + provider usage + closed settlement + durable receipt yoksa typed HOLD bırak.
 7. Archive replay hardening'i `LOCAL_VERIFIED/LIVE_PROVEN` tut; formal XVerify'ın iki
    `UNCLEAR/HOLD` sonucu yeni evidence veya farklı-provider authority olmadan retry edilmez.
-8. `2026-08-24 20:00 Europe/Istanbul` sonrasında runtime hygiene different-provider XVerify.
-9. Aynı reset sonrasında D4 Approval Lifecycle formal XVerify/closure; ardından D5 retirement.
+8. ✅ TAMAM: runtime-hygiene different-provider XVerify CONFIRMED —
+   `cross-verify-verdict:sha256:094c1634d0c75f77704b3fbc36c7185151faeffd522c4938092e88c7ad7bd13b`.
+9. KISMEN: D4 discovery-purity + gate-kaydı formal CONFIRMED —
+   `cross-verify-verdict:sha256:cfeaae188a83736857e829247eb23560dc06ef7732f12fa3fa4466a0a633e028`;
+   D4 outer closure için kalan: lifecycle `enabled` staged-rollout owner-kararı + D5 retirement
+   (hiç başlamadı).
 10. Owner external key path'i sağlandığında Work 480 sign → append → closure gate → MASTER
    settlement zincirini tamamla; key'i arama/okuma/loglama.
 11. 7091 account/limit authority yalnız provider-native fresh truth açıldığında yeniden denenir.
