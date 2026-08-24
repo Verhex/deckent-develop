@@ -16,6 +16,7 @@
  * CLI usage lineage projection — 486-010
  */
 
+import { createHash } from 'node:crypto';
 import { basename, join } from 'node:path';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import type { Command } from 'commander';
@@ -34,6 +35,17 @@ import {
   resolveTaskArtifactReadDirs,
 } from '../../core/sprint-archive.js';
 import { aggregateLineageUsageAuthority } from '../../core/lineage-usage-authority.js';
+import { comparePromptCostCanary, type PromptCostCanaryDecision, type PromptCostCanaryPlan, type PromptCostCanarySample } from '../../core/prompt-cost-canary.js';
+import { readPromptCostCanaryArchiveCohort, type PromptCostCanaryArchiveReadResult, type PromptCostCanaryCohortSample } from '../../core/prompt-cost-canary-archive.js';
+import {
+  discoverPromptCostCanaryReceipts,
+  promptCostCanaryDecisionDigest,
+  PromptCostCanaryReceiptStoreError,
+  publishPromptCostCanaryReceipt,
+  type PromptCostCanaryComparisonDecision,
+  type PromptCostCanaryReceipt,
+  type PublishPromptCostCanaryReceiptResult,
+} from '../../core/prompt-cost-canary-receipt-store.js';
 import type {
   LineageUsageAuthorityInput,
   LineageUsageAuthorityTask,
@@ -53,6 +65,11 @@ export interface UsageDeps {
     root: string,
     sprintTaskIdPrefix?: string,
   ) => LineageUsageAuthorityInput | Promise<LineageUsageAuthorityInput>;
+  canaryArchiveFn?: (input: { projectRoot: string; sprintIds: readonly [string, string] }) => PromptCostCanaryArchiveReadResult;
+  canaryCompareFn?: (plan: PromptCostCanaryPlan) => PromptCostCanaryDecision;
+  canaryPublishFn?: (input: { projectRoot: string; environmentId: string; tenantId: string; decision: PromptCostCanaryComparisonDecision; publishedAt: string }) => PublishPromptCostCanaryReceiptResult;
+  canaryDiscoverFn?: (input: { projectRoot: string; environmentId: string; tenantId: string }) => readonly PromptCostCanaryReceipt[];
+  nowFn?: () => string;
 }
 
 // ─── Build task map (session file → task ID) ─────────────────────────────────
@@ -292,34 +309,145 @@ function defaultReadArchivedLineageInput(
   return { tasks: Object.freeze(tasks), attempts: Object.freeze(attempts) };
 }
 
-// Local supplemental bilingual labels for the handful of NEW column headers
-// this projection needs. messages.ts is outside this task's write-scope
-// (usage.ts + its test file only) — this file's own convention runs every
-// visible string through getMessage, so this table exists to honor that
-// convention without touching an out-of-scope file. docImpact: fold these
-// into messages.ts under `usage.lineage_*` in a follow-up task, then delete
-// this table and call getMessage directly.
-const LINEAGE_LABELS: Record<string, { en: string; tr: string }> = {
-  header: { en: 'Lineage Usage (Archived)', tr: 'Soy Kullanımı (Arşivlenmiş)' },
-  col_attempts: { en: 'Attempts', tr: 'Denemeler' },
-  col_in: { en: 'In', tr: 'Giren' },
-  col_out: { en: 'Out', tr: 'Çıkan' },
-  col_cache_r: { en: 'CacheR', tr: 'ÖnbellekO' },
-  col_cache_c: { en: 'CacheC', tr: 'ÖnbellekY' },
-  col_ref_usd: { en: 'RefUSD', tr: 'RefUSD' },
-  col_billed: { en: 'Billed', tr: 'Faturalı' },
-  billed_unknown: { en: 'unknown', tr: 'bilinmiyor' },
-  denominator: {
-    en: '{logical} logical task(s) / {attempts} attempt(s)',
-    tr: '{logical} mantıksal görev / {attempts} deneme',
-  },
-};
-
 function lineageLabel(key: string, lang: string, vars?: Record<string, string>): string {
-  const entry = LINEAGE_LABELS[key];
-  const template = entry ? (lang === 'tr' ? entry.tr : entry.en) : key;
-  if (!vars) return template;
-  return template.replace(/\{(\w+)\}/g, (_, name: string) => vars[name] ?? `{${name}}`);
+  return getMessage(`usage.lineage_${key}`, lang, vars);
+}
+
+const DEFAULT_CANARY_THRESHOLDS = Object.freeze({ minimumQualityPassRate: 1, maximumQualityPassRateRegression: 0,
+  maximumCostPerLineageIncreaseRatio: 0, minimumCacheHitRatio: 0, maximumCacheHitRatioRegression: 0 });
+
+export type UsageCanaryReasonCode = PromptCostCanaryDecision['reasonCodes'][number]
+  | 'archive_evidence_rejected' | 'provider_reported_usd_unavailable'
+  | 'cache_measurement_unavailable';
+
+interface UsageCanaryProjection {
+  readonly schema: 'deckent.usage-canary'; readonly version: 1; readonly baselineSprint: string; readonly candidateSprint: string;
+  readonly decision: { readonly disposition: 'PROMOTE' | 'HOLD' | 'REJECT'; readonly reasonCodes: readonly UsageCanaryReasonCode[]; readonly planDigest: string | null; readonly kernelDecisionDigest: string | null };
+  readonly measuredHitRatio: { readonly denominator: 'inputTokens+cacheReadTokens+cacheCreationTokens'; readonly baseline: number | null; readonly candidate: number | null; readonly delta: number | null };
+  readonly providerReportedUsd: { readonly baseline: UsdProjection; readonly candidate: UsdProjection; readonly delta: number | null };
+  readonly qualityParity: { readonly baselinePassRate: number | null; readonly candidatePassRate: number | null; readonly delta: number | null };
+}
+interface UsdProjection { readonly available: boolean; readonly sampleCount: number; readonly availableSampleCount: number; readonly exactUsd: number | null }
+export interface UsageCanaryOutput extends UsageCanaryProjection {
+  readonly mode: 'dry-run' | 'applied'; readonly decisionDigest: string;
+  readonly receipt: null | { readonly state: 'created' | 'existing-identical'; readonly receiptId: string; readonly decisionDigest: string };
+}
+
+function cohortIdentity(
+  samples: readonly PromptCostCanaryCohortSample[],
+  sprintId: string,
+  featureComparisonId: string,
+) {
+  const unique = (values: readonly string[]) => [...new Set(values)].sort().join('+') || 'unavailable';
+  return { cohortId: sprintId, comparisonId: 'deckent-usage-canary-v1',
+    providerId: unique(samples.map(sample => sample.provider)), modelId: unique(samples.map(sample => sample.model)),
+    billingClass: unique(samples.map(sample => `${sample.billingSource.billingMode ?? 'unknown'}:${sample.billingSource.tokenSource}:${sample.billingSource.pricingSource}`)),
+    // The ordered A/B pair (not one side alone) is the comparison identity.
+    // This permits an intentional feature toggle while binding both exact
+    // plan-time snapshots into the kernel plan/decision digest.
+    featureId: featureComparisonId };
+}
+
+function homogeneousFeatureDigest(samples: readonly PromptCostCanaryCohortSample[]): string | null {
+  const values = [...new Set(samples.map(sample => sample.featureDigest))];
+  return values.length === 1 ? values[0]! : null;
+}
+
+function featureComparisonId(baseline: string, candidate: string): string {
+  return `sha256:${createHash('sha256').update(JSON.stringify([baseline, candidate]), 'utf8').digest('hex')}`;
+}
+
+function kernelSample(sample: PromptCostCanaryCohortSample): PromptCostCanarySample {
+  return { logicalLineageId: sample.logicalLineageId, inputTokens: sample.tokenUsage.inputTokens,
+    cacheReadTokens: sample.tokenUsage.cacheReadTokens, cacheCreationTokens: sample.tokenUsage.cacheCreationTokens,
+    outputTokens: sample.tokenUsage.outputTokens, providerReportedUsd: sample.providerReportedUsd.usd!,
+    ...(sample.durationMs === null ? {} : { durationMs: sample.durationMs }),
+    qualityVerdict: sample.verdict === 'NO_GO' ? 'FAIL' : 'PASS' };
+}
+
+function usdProjection(samples: readonly PromptCostCanaryCohortSample[]): UsdProjection {
+  const available = samples.filter(sample => sample.providerReportedUsd.available && sample.providerReportedUsd.usd !== null);
+  const complete = samples.length > 0 && available.length === samples.length;
+  return { available: complete, sampleCount: samples.length, availableSampleCount: available.length,
+    exactUsd: complete ? available.reduce((sum, sample) => sum + sample.providerReportedUsd.usd!, 0) : null };
+}
+
+function hasMeasuredCacheDenominator(samples: readonly PromptCostCanaryCohortSample[]): boolean {
+  return samples.length > 0 && samples.every(sample =>
+    sample.tokenUsage.inputTokens + sample.tokenUsage.cacheReadTokens
+      + sample.tokenUsage.cacheCreationTokens > 0);
+}
+
+function holdProjection(baselineSprint: string, candidateSprint: string, reasonCode: UsageCanaryReasonCode,
+  baselineSamples: readonly PromptCostCanaryCohortSample[] = [], candidateSamples: readonly PromptCostCanaryCohortSample[] = []): UsageCanaryProjection {
+  return { schema: 'deckent.usage-canary', version: 1, baselineSprint, candidateSprint,
+    decision: { disposition: 'HOLD', reasonCodes: [reasonCode], planDigest: null, kernelDecisionDigest: null },
+    measuredHitRatio: { denominator: 'inputTokens+cacheReadTokens+cacheCreationTokens', baseline: null, candidate: null, delta: null },
+    providerReportedUsd: { baseline: usdProjection(baselineSamples), candidate: usdProjection(candidateSamples), delta: null },
+    qualityParity: { baselinePassRate: null, candidatePassRate: null, delta: null } };
+}
+
+async function runUsageCanary(options: UsageCommandOptions, deps: UsageDeps, root: string, lang: string): Promise<void> {
+  const baselineSprint = options.baselineSprint!; const candidateSprint = options.candidateSprint!;
+  const archive = (deps.canaryArchiveFn ?? readPromptCostCanaryArchiveCohort)({ projectRoot: root, sprintIds: [baselineSprint, candidateSprint] });
+  let projection: UsageCanaryProjection;
+  if (!archive.ok) projection = holdProjection(baselineSprint, candidateSprint, 'archive_evidence_rejected');
+  else {
+    const baselineSamples = archive.samples.filter(sample => sample.sprintId === baselineSprint);
+    const candidateSamples = archive.samples.filter(sample => sample.sprintId === candidateSprint);
+    const baselineUsd = usdProjection(baselineSamples); const candidateUsd = usdProjection(candidateSamples);
+    const baselineFeature = homogeneousFeatureDigest(baselineSamples);
+    const candidateFeature = homogeneousFeatureDigest(candidateSamples);
+    if (!baselineUsd.available || !candidateUsd.available) projection = holdProjection(baselineSprint, candidateSprint, 'provider_reported_usd_unavailable', baselineSamples, candidateSamples);
+    else if (baselineFeature === null || candidateFeature === null) {
+      projection = holdProjection(baselineSprint, candidateSprint, 'feature_mismatch', baselineSamples, candidateSamples);
+    }
+    else if (!hasMeasuredCacheDenominator(baselineSamples) || !hasMeasuredCacheDenominator(candidateSamples)) {
+      projection = holdProjection(baselineSprint, candidateSprint, 'cache_measurement_unavailable', baselineSamples, candidateSamples);
+    }
+    else {
+      const featureId = featureComparisonId(baselineFeature, candidateFeature);
+      const kernel = (deps.canaryCompareFn ?? comparePromptCostCanary)({ version: 1,
+        baseline: { identity: cohortIdentity(baselineSamples, baselineSprint, featureId), samples: baselineSamples.map(kernelSample) },
+        candidate: { identity: cohortIdentity(candidateSamples, candidateSprint, featureId), samples: candidateSamples.map(kernelSample) }, thresholds: DEFAULT_CANARY_THRESHOLDS });
+      projection = { schema: 'deckent.usage-canary', version: 1, baselineSprint, candidateSprint,
+        decision: { disposition: kernel.disposition, reasonCodes: kernel.reasonCodes, planDigest: kernel.planDigest, kernelDecisionDigest: kernel.decisionDigest },
+        measuredHitRatio: { denominator: 'inputTokens+cacheReadTokens+cacheCreationTokens', baseline: kernel.baseline.cacheHitRatio, candidate: kernel.candidate.cacheHitRatio, delta: kernel.deltas.cacheHitRatio },
+        providerReportedUsd: { baseline: baselineUsd, candidate: candidateUsd, delta: kernel.deltas.providerReportedUsd },
+        qualityParity: { baselinePassRate: kernel.baseline.qualityPassRate, candidatePassRate: kernel.candidate.qualityPassRate, delta: kernel.deltas.qualityPassRate } };
+    }
+  }
+  const receiptDecision = projection as unknown as PromptCostCanaryComparisonDecision;
+  const decisionDigest = promptCostCanaryDecisionDigest(receiptDecision);
+  if (options.apply && options.decisionDigest !== decisionDigest) throw new Error(getMessage('usage.canary.apply_digest_mismatch', lang));
+  const receiptScope = { projectRoot: root, environmentId: options.environment ?? 'default', tenantId: options.tenant ?? 'default' };
+  let published: null | Pick<PublishPromptCostCanaryReceiptResult, 'state' | 'receipt'> = null;
+  if (options.apply) {
+    let existing: PromptCostCanaryReceipt | undefined;
+    // Injected publishers remain self-contained unless their test/adapter also
+    // injects discovery. Production first consults fresh durable bytes so a
+    // repeated apply of one digest is idempotent despite wall-clock drift.
+    if (!deps.canaryPublishFn || deps.canaryDiscoverFn) {
+      try {
+        existing = [...(deps.canaryDiscoverFn ?? discoverPromptCostCanaryReceipts)(receiptScope)]
+          .filter(receipt => receipt.decisionDigest === decisionDigest)
+          .sort((left, right) => left.publishedAt.localeCompare(right.publishedAt)
+            || left.receiptId.localeCompare(right.receiptId))[0];
+      } catch (error) {
+        if (!(error instanceof PromptCostCanaryReceiptStoreError) || error.code !== 'RECEIPT_NOT_FOUND') throw error;
+      }
+    }
+    published = existing
+      ? { state: 'existing-identical', receipt: existing }
+      : (deps.canaryPublishFn ?? publishPromptCostCanaryReceipt)({
+        ...receiptScope, decision: receiptDecision,
+        publishedAt: (deps.nowFn ?? (() => new Date().toISOString()))(),
+      });
+  }
+  const output: UsageCanaryOutput = { ...projection, mode: published ? 'applied' : 'dry-run', decisionDigest,
+    receipt: published ? { state: published.state, receiptId: published.receipt.receiptId, decisionDigest: published.receipt.decisionDigest } : null };
+  print(options.json ? JSON.stringify(output, null, 2) : getMessage('usage.canary.summary', lang,
+    { mode: output.mode, decision: output.decision.disposition, digest: output.decisionDigest }));
 }
 
 // ─── Run command ──────────────────────────────────────────────────────────────
@@ -330,6 +458,12 @@ export interface UsageCommandOptions {
   until?: string;
   json?: boolean;
   lineage?: boolean;
+  baselineSprint?: string;
+  candidateSprint?: string;
+  apply?: boolean;
+  decisionDigest?: string;
+  environment?: string;
+  tenant?: string;
 }
 
 export async function runUsageCommand(
@@ -340,6 +474,15 @@ export async function runUsageCommand(
   const configFn = deps.configFn ?? defaultConfigFn;
   const cfg = await configFn(root);
   const lang = getLanguage(cfg.language);
+  const hasBaseline = options.baselineSprint !== undefined;
+  const hasCandidate = options.candidateSprint !== undefined;
+  if (hasBaseline !== hasCandidate) throw new Error(getMessage('usage.canary.both_sprints_required', lang));
+  if (!hasBaseline && (options.decisionDigest || options.environment || options.tenant)) {
+    throw new Error(getMessage('usage.canary.scope_requires_comparison', lang));
+  }
+  if (hasBaseline && (options.sprint || options.since || options.until || options.lineage)) throw new Error(getMessage('usage.canary.mutually_exclusive', lang));
+  if (options.apply && !hasBaseline) throw new Error(getMessage('usage.canary.apply_requires_comparison', lang));
+  if (hasBaseline) { await runUsageCanary(options, deps, root, lang); return; }
 
   // ─── Lineage mode (--lineage) ──────────────────────────────────────
   // Archived task/result evidence only — never falls through to the
@@ -588,11 +731,17 @@ export function registerUsage(program: Command): void {
   program
     .command('usage')
     .description(getMessage('cli.usage.desc', getLanguage(undefined)))
-    .option('--sprint <N>', 'Show per-task breakdown for sprint N')
-    .option('--since <ISO>', 'Window start (ISO date, e.g. 2026-06-01)')
-    .option('--until <ISO>', 'Window end (ISO date, e.g. 2026-06-10)')
-    .option('--json', 'Output raw JSON')
-    .option('--lineage', 'Show archived lineage-aware usage authority (exact attempt totals, logical task denominators, typed unavailable billing evidence)')
+    .option('--sprint <N>', getMessage('usage.option.sprint', getLanguage(undefined)))
+    .option('--since <ISO>', getMessage('usage.option.since', getLanguage(undefined)))
+    .option('--until <ISO>', getMessage('usage.option.until', getLanguage(undefined)))
+    .option('--json', getMessage('usage.option.json', getLanguage(undefined)))
+    .option('--lineage', getMessage('usage.option.lineage', getLanguage(undefined)))
+    .option('--baseline-sprint <id>', getMessage('usage.option.baseline_sprint', getLanguage(undefined)))
+    .option('--candidate-sprint <id>', getMessage('usage.option.candidate_sprint', getLanguage(undefined)))
+    .option('--apply', getMessage('usage.option.apply', getLanguage(undefined)))
+    .option('--decision-digest <sha256>', getMessage('usage.option.decision_digest', getLanguage(undefined)))
+    .option('--environment <id>', getMessage('usage.option.environment', getLanguage(undefined)))
+    .option('--tenant <id>', getMessage('usage.option.tenant', getLanguage(undefined)))
     .action(async (opts) => {
       await runUsageCommand(opts);
     });

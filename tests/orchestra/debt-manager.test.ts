@@ -173,6 +173,21 @@ function makeDebtItem(overrides: Partial<DebtItem> = {}): DebtItem {
   };
 }
 
+const promptCostCanaryAuthority = {
+  version: 1 as const,
+  logicalLineageId: `prompt-cost-lineage:sha256:${'1'.repeat(64)}`,
+  workloadDigest: '1'.repeat(64),
+  featureDigest: '2'.repeat(64),
+  authorityDigest: '3'.repeat(64),
+  featureSnapshot: {
+    excludeDynamicSystemPromptSections: true,
+    workerCoreSystemPrompt: true,
+    codexCoreChannel: false,
+    codexSuppressProjectDoc: false,
+    catalogMountMask: false,
+  },
+};
+
 // ─── Shared reset ──────────────────────────────────────────────────
 function resetMocks() {
   vi.clearAllMocks();
@@ -318,7 +333,7 @@ describe('handleEvaluation', () => {
   });
 
   it('NO_GO: fix task has isPriorityFix=true and CRITICAL priority', () => {
-    const task = makeTask({ type: 'code-development' });
+    const task = makeTask({ type: 'code-development', promptCostCanary: promptCostCanaryAuthority });
     const result = makeTaskResult({ selfAssessment: 'NO_GO', notes: 'failed' });
     handleEvaluation('/root', task, TaskEvaluation.NO_GO, result);
     const writtenContent = JSON.parse(vi.mocked(writeFileSync).mock.calls[0]![1] as string);
@@ -327,6 +342,7 @@ describe('handleEvaluation', () => {
     expect(writtenContent.status).toBe(TaskStatus.PENDING);
     expect(writtenContent.fixForTaskId).toBe('task-001');
     expect(writtenContent.type).toBe('code-development');
+    expect(writtenContent.promptCostCanary).toEqual(promptCostCanaryAuthority);
   });
 
   it('NO_GO: does not release locks', () => {
@@ -400,6 +416,7 @@ describe('handleCrossDependencies', () => {
       id: 'task-001',
       dependencies: [],
       type: 'code-development',
+      promptCostCanary: promptCostCanaryAuthority,
     });
     const task2 = makeTask({ id: 'task-002', dependencies: ['task-001'] });
     const sprint: Sprint = {
@@ -416,6 +433,7 @@ describe('handleCrossDependencies', () => {
     expect(result[0]!.isPriorityFix).toBe(true);
     expect(result[0]!.priority).toBe('CRITICAL');
     expect(result[0]!.type).toBe('code-development');
+    expect(result[0]!.promptCostCanary).toEqual(promptCostCanaryAuthority);
   });
 
   it('does not create a concurrent cross-fix while the NO_GO task direct fix is pending', () => {

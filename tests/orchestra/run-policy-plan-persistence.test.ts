@@ -118,6 +118,11 @@ function makeConfig(projectRoot: string): ResolvedConfig {
     projectRoot,
     version: '0.1.0',
     brain_provider: 'claude',
+    prompt: {
+      codex_core_channel: true,
+      codex_suppress_project_doc: true,
+      catalog_mount_mask: true,
+    },
   } as unknown as ResolvedConfig;
 }
 
@@ -200,6 +205,18 @@ describe('correction-2 — run policy is stamped BEFORE first task-JSON persiste
         policyDigest: expected.policyDigest,
         constraints: [...expected.constraints],
       });
+      expect(diskTask.promptCostCanary).toMatchObject({
+        version: 1,
+        logicalLineageId: expect.stringMatching(/^prompt-cost-lineage:sha256:[a-f0-9]{64}$/u),
+        workloadDigest: expect.stringMatching(/^[a-f0-9]{64}$/u),
+        featureDigest: expect.stringMatching(/^[a-f0-9]{64}$/u),
+        authorityDigest: expect.stringMatching(/^[a-f0-9]{64}$/u),
+        featureSnapshot: {
+          codexCoreChannel: true,
+          codexSuppressProjectDoc: true,
+          catalogMountMask: true,
+        },
+      });
     }
   });
 
@@ -208,6 +225,7 @@ describe('correction-2 — run policy is stamped BEFORE first task-JSON persiste
     expect(sprint.tasks.length).toBeGreaterThan(0);
     for (const diskTask of readPersistedTasks()) {
       expect(diskTask.runPolicy).toBeUndefined();
+      expect(diskTask.promptCostCanary).toBeDefined();
     }
   });
 });

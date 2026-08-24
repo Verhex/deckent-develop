@@ -3936,14 +3936,19 @@ function inspectBotState(report, projectRoot, processProbe) {
 function validBotPidRecord(value) {
   if (!isRecord(value)) return false;
   const keys = Object.keys(value).sort();
-  if (canonicalJson(keys) !== canonicalJson([
+  const commonKeys = [
     'pid',
     'projectRootDigest',
     'recordedAt',
     'schemaVersion',
     'startToken',
-  ].sort())) return false;
-  return value.schemaVersion === 1
+  ];
+  const current = value.schemaVersion === 2;
+  const expectedKeys = current
+    ? [...commonKeys, 'runtimeIdentity'].sort()
+    : commonKeys.sort();
+  if (canonicalJson(keys) !== canonicalJson(expectedKeys)) return false;
+  return (value.schemaVersion === 1 || current)
     && Number.isSafeInteger(value.pid)
     && value.pid > 0
     && (value.startToken === null
@@ -3952,7 +3957,20 @@ function validBotPidRecord(value) {
     && /^[a-f0-9]{64}$/u.test(value.projectRootDigest)
     && typeof value.recordedAt === 'string'
     && Number.isFinite(Date.parse(value.recordedAt))
-    && new Date(value.recordedAt).toISOString() === value.recordedAt;
+    && new Date(value.recordedAt).toISOString() === value.recordedAt
+    && (!current || validBotRuntimeIdentity(value.runtimeIdentity));
+}
+
+function validBotRuntimeIdentity(value) {
+  if (!isRecord(value)) return false;
+  if (canonicalJson(Object.keys(value).sort()) !== canonicalJson([
+    'buildIdentityDigest',
+    'entrypointDigest',
+  ].sort())) return false;
+  return typeof value.entrypointDigest === 'string'
+    && /^[a-f0-9]{64}$/u.test(value.entrypointDigest)
+    && typeof value.buildIdentityDigest === 'string'
+    && /^[a-f0-9]{64}$/u.test(value.buildIdentityDigest);
 }
 
 function cleanProcessStartToken(pid) {

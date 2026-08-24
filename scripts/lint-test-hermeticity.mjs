@@ -568,8 +568,21 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // suite-owned tmpdir/SQLite stores, permission/symlink fault injection and
   // bounded child processes. The source-derived scan reports zero confirmed
   // live-authority violations; no repository runtime state is test-owned.
-  count: 15839,
-  digest: 'd3ec8ab4a2de71046ec42229488d3b2b1e0421f8ae14a42f28354654b7222f2e',
+  // 2026-08-24 prompt-cost canary authority: +13 — the archive reader,
+  // immutable receipt and real compiled-CLI fan-in suites add 9 core-fixture
+  // and 4 integration-fixture effects. Every path is rooted in a suite-owned
+  // mkdtemp checkout; production archive sealing, tamper/symlink refusal and
+  // no-replace receipt replay are exercised without repository-state writes.
+  // Plan-time task-authority and FIX-inheritance proofs move the unresolved
+  // callsite fingerprint without changing its measured count. The source-
+  // derived scan still reports zero confirmed live-authority violations.
+  // 2026-08-24 bot clean-guard schema-v2 closure: +11 unresolved static
+  // callsites exercise active/dead/malformed v2 PID records in suite-owned
+  // tmpdirs; runtime identity digests are synthetic non-secret fixtures. The
+  // prompt-cost archive-rejection assertion moves only callsite fingerprints.
+  // The source-derived scan reports zero confirmed live-authority violations.
+  count: 15863,
+  digest: 'de934eb56f42b56f68e5e48f128cb5643885916cbb78a433e301b23f22858e95',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1011,8 +1024,16 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-24 runtime-adoption closure: +2 — the canonical composite plan
   // contract and immutable no-replace/fsync receipt store enter production
   // inventory; CLI, build identity and bot ownership consumers move content.
-  count: 1311,
-  digest: '24d140077fa1a14a82b911e8c6af63ca8ad368a77e0e157291f0dce37f9e1941',
+  // 2026-08-24 prompt-cost canary authority: +3 — deterministic comparison
+  // kernel, canonical sealed-archive cohort reader and immutable scoped receipt
+  // store enter inventory; the existing usage CLI is their production ingress.
+  // Producer closure: +1 — stable cross-sprint task authority enters inventory;
+  // planSprint persists it before first write, FIX paths inherit it exactly,
+  // and the archive reader consumes terminal lineageUsage plus provider envelopes.
+  // 2026-08-24 bot clean-guard schema-v2 closure: count unchanged; digest binds
+  // the canonical v2 runtime-identity validation used by the build clean gate.
+  count: 1315,
+  digest: 'ca66cf812883230d3f0fd127d44d2edfc8040aaf5ca37ae6481800a53575acc9',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

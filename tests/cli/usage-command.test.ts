@@ -113,6 +113,10 @@ describe('usage command', () => {
     expect(opts).toContain('--since');
     expect(opts).toContain('--until');
     expect(opts).toContain('--json');
+    expect(opts).toContain('--baseline-sprint');
+    expect(opts).toContain('--candidate-sprint');
+    expect(opts).toContain('--apply');
+    expect(opts).toContain('--decision-digest');
   });
 
   // ─── Test 2: default table render (by model) ───────────────────────

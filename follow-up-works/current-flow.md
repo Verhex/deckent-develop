@@ -6,16 +6,19 @@
 ## Canlı truth
 
 - `DOGFOOD_MODE=ON`, `WORKSPACE_MODE=MAIN`, `DELIVERY_MODE=DIRECT_MAIN`.
-- Aktif run yok. Son outcome run'ı `sprint-641`: 5-task runtime-adoption DAG'ı active-run build
-  yasağını ihlal eden fan-in nedeniyle dürüst `ABORTED`; dört implementation lineage'ı settled,
-  finalizer generation/task-truth recovery'si ve post-terminal production fan-in root seam'de kapandı.
+- Aktif run yok. Son outcome run'ı `sprint-642`: 5-task 7094 measurement-authority DAG'ı;
+  dört implementation lineage'ı settled, dar finalizer/FIX scope'u kapanamadığı için dürüst
+  `ABORTED`. Production fan-in post-terminal ADR-D-007 recovery seam'inde kapandı; run geçmişi
+  sahte `COMPLETE` edilmedi.
 - Provider observation reconciliation canlı uygulandı: 19 active-open interval'ın exact
   run/attempt settlement sahibi olan 15'i digest-bound plan + interactive approval + immutable
   receipt ile `retired=true` oldu; dört `sprint-488` legacy-unowned interval forensic `HOLD`
   olarak korundu. Compiled replay aynı receipt'i döndürdü; canonical status yalnız bu dört aktif
   interval'ı projekte ediyor.
-- Bot daemon build sonrası yeniden başlatıldı ve ownership-bound PID ile çalışıyor. Pending
-  approval yok.
+- Sprint-637'nin altı stale PENDING task artifact'ı canonical archive writer ile
+  `.deckent/archive/sprints/sprint-637/tasks/` altına byte-identical taşındı; manifest/integrity
+  6/6 yeşil, `.tasks` elle silinmedi.
+- Bot daemon fresh build sonrası PID `419599` ile çalışıyor. Pending approval yok.
 - Source→dist→provider runtime adoption production-wired: immutable composite receipt provider
   receipt + current DB lineage + source/build/entrypoint digest + canlı PID/start token'ı bağlıyor;
   real dist dry-run→apply→fresh-process replay aynı receipt'i verdi, DB/WAL/SHM değişmedi.
@@ -30,19 +33,25 @@
   `2026-08-24 20:00 Europe/Istanbul`, mühür veya D4 `DONE` değildir.
 - Runtime hygiene formal different-provider XVerify, owner kararıyla
   `2026-08-24 20:00 Europe/Istanbul` sonrasındadır; bu saatten önce formal hygiene closure yok.
+- 7094 measurement authority producer→archive reader→kernel→immutable receipt→i18n CLI zinciri
+  LOCAL_VERIFIED. Formal Fable 5 koşusu provider call öncesi typed `limit_hold/unavailable` verdi;
+  receipt yok, default flip yok. Outer 7094 gerçek comparable A/B cohortlarını beklediği için OPEN.
+- Status projection'da yalnız principal `c38a…` altında dört fresh unresolved provider interval
+  var; historical 19-interval settlement paketiyle karıştırılmadan ayrı reconcile edilecek.
 
 ## Done-ready sayacı
 
-- 3/20 — canonical terminal archive/finalizer acceptance + provider-observation reconciliation +
-  source/dist/provider runtime adoption.
+- 4/20 — canonical terminal archive/finalizer acceptance + provider-observation reconciliation +
+  source/dist/provider runtime adoption + 7094 production measurement authority.
 
 ## Sıradaki yürütme sırası
 
-1. Sprint-641'den kalan dört exact-owned provider interval'ı digest-bound plan + interactive
-   approval + immutable reconciliation receipt ile kapat; legacy dört sprint-488 interval'ı koru.
-2. `2026-08-24 20:00 Europe/Istanbul` sonrasında runtime hygiene different-provider XVerify.
-3. Aynı reset sonrasında D4 Approval Lifecycle formal XVerify/closure; ardından D5 retirement.
-4. 7094 prefix/F2c default-ON ölçümü: measuredHitRatio + provider-reported USD.
+1. Principal `c38a…` altındaki dört fresh unresolved interval'ı exact run/attempt disk truth ile
+   reconcile et; historical sprint-488 forensic HOLD'larla birleştirme, kör apply etme.
+2. Sıradaki multi-task dogfood run'ı 7094 plan-time authority'nin canlı canary'si yap; sonra aynı
+   workload treatment cohort'u ile measuredHitRatio + provider-reported USD receipt'i üret.
+3. `2026-08-24 20:00 Europe/Istanbul` sonrasında runtime hygiene different-provider XVerify.
+4. Aynı reset sonrasında D4 Approval Lifecycle formal XVerify/closure; ardından D5 retirement.
 5. 7091 account/limit authority yalnız provider-native fresh truth açıldığında yeniden denenir.
 6. Closure OS owner disposition batches → yedi günlük
    health/ETA → cleanup/migration → release.

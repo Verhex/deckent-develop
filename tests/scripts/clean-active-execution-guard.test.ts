@@ -3240,6 +3240,42 @@ describe('clean active-execution admission', () => {
     expect(foreign.decision).toBe('ALLOW');
   });
 
+  it('consumes the current schema-v2 bot runtime identity and remains v1 read-compatible', () => {
+    const activeRoot = fixtureRoot();
+    const deadRoot = fixtureRoot();
+    const malformedRoot = fixtureRoot();
+    const currentRecord = (root: string) => ({
+      schemaVersion: 2,
+      pid: process.pid,
+      startToken: processStartToken(process.pid),
+      projectRootDigest: sha256(realpathSync.native(root)),
+      runtimeIdentity: {
+        entrypointDigest: 'a'.repeat(64),
+        buildIdentityDigest: 'b'.repeat(64),
+      },
+      recordedAt: '2026-07-27T00:00:00.000Z',
+    });
+    writeJson(join(activeRoot, '.deckent', 'bot.pid'), currentRecord(activeRoot));
+    writeJson(join(deadRoot, '.deckent', 'bot.pid'), currentRecord(deadRoot));
+    writeJson(join(malformedRoot, '.deckent', 'bot.pid'), {
+      ...currentRecord(malformedRoot),
+      runtimeIdentity: { entrypointDigest: 'not-a-digest' },
+    });
+
+    const active = inspectActiveExecutions(activeRoot, { processProbe: () => 'alive' });
+    const dead = inspectActiveExecutions(deadRoot, { processProbe: () => 'dead' });
+    const malformed = inspectActiveExecutions(malformedRoot, { processProbe: () => 'dead' });
+
+    expect(reasonCodes(active)).toContain('E_CLEAN_BOT_ACTIVE');
+    expect(dead).toMatchObject({ decision: 'ALLOW', reasons: [] });
+    expect(malformed.reasons).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: 'E_CLEAN_BOT_STATE_INVALID',
+        detailCode: 'INVALID_SHAPE',
+      }),
+    ]));
+  });
+
   it('classifies dead MCP launch anchors and unbound sprint markers as stale HOLDs', () => {
     const root = fixtureRoot();
     writeJson(join(root, '.deckent', 'sprint-active.json'), {

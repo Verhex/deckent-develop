@@ -24,6 +24,7 @@ import type {
   BoundedVerificationCommand,
   PostSettlementIngress,
 } from './post-settlement-verification.js';
+import type { PromptCostCanaryTaskAuthority } from './prompt-cost-canary-task-authority.js';
 
 // ─── Models ──────────────────────────────────────────────────────────
 
@@ -767,6 +768,8 @@ export interface Task {
    * policy source; an existing-but-empty source fails plan-time, never here.
    */
   runPolicy?: RunPolicyPlanAuthority;
+  /** Stable cross-sprint workload identity plus exact prompt-feature snapshot. */
+  promptCostCanary?: PromptCostCanaryTaskAuthority;
   /**
    * Digest-bound post-settlement promotion-proof declaration (488-014),
    * parsed from a `- PromotionProof:` directive line. Represented separately

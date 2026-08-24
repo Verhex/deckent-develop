@@ -38,6 +38,7 @@ import { MemoryStore } from '../core/memory-store.js';
 // ─── Core — utils ─────────────────────────────────────────────────
 import { getNextSprintId, readJsonSafe, debugLog } from '../core/utils.js';
 import { readAuthMode, resolveBrainPlanningMode } from '../core/config.js';
+import { createPromptCostCanaryTaskAuthority } from '../core/prompt-cost-canary-task-authority.js';
 import { estimateSprintCost } from '../core/cost-calculator.js';
 import { initCostConfig, loadCostConfig } from '../core/cost-config-loader.js';
 import {
@@ -1082,6 +1083,16 @@ export async function planSprint(
   const runPolicy = resolveRunPolicyFromDirectives(context.directives);
   if (runPolicy) {
     for (const stampTarget of tasks) stampTarget.runPolicy = runPolicy;
+  }
+
+  // 7094: stamp the stable cross-sprint workload identity and exact effective
+  // prompt-feature snapshot before the first task JSON write. FIX attempts copy
+  // this authority byte-for-byte; they never recompute it from mutable config.
+  for (const stampTarget of tasks) {
+    stampTarget.promptCostCanary = createPromptCostCanaryTaskAuthority(
+      stampTarget,
+      config.prompt,
+    );
   }
 
   // Write task files (skip in dry-run mode)
