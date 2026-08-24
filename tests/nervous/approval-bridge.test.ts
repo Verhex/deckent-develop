@@ -153,7 +153,11 @@ describe('NervousApprovalBridge.applyNervousDecision — real ApprovalBroker, do
         tenantId: 'local',
         userId: 'alperen',
         createdAt: CREATED_AT,
-        expiresAt: EXPIRES_AT,
+        // Idempotency is the subject here, not expiry: the D4 lifecycle store
+        // (e9bc6c83a) categorizes against the REAL clock, so a past expiresAt
+        // made the first decide land in the expired category and the test never
+        // exercised the double-decision path it was written for.
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
       };
       broker.submit(requestInput);
 

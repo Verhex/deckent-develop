@@ -20,6 +20,21 @@ import { getMessage } from '../cli/helpers/messages.js';
 import { isRiskyBotTool } from './bot-agentic.js';
 import { listBotActions } from './bot-action-store.js';
 import { readPendingApprovals } from '../core/pending-approvals.js';
+import {
+  deliverPendingOwnerNotifications,
+  type DeliveryOptions,
+  type DeliveryResult,
+  type OwnerNotificationTransport,
+} from './notification-delivery.js';
+
+/** One iteration of the bot poll loop's durable outbound-notification drain. */
+export async function pollOwnerNotifications(
+  root: string,
+  transport: OwnerNotificationTransport,
+  options: DeliveryOptions = {},
+): Promise<DeliveryResult> {
+  return deliverPendingOwnerNotifications(root, transport, options);
+}
 
 type BotCommandKind = 'help' | 'pending' | { readonly tool: string };
 

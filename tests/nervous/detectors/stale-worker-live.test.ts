@@ -143,11 +143,19 @@ describe('DetectorRegistry — Sprint 148 Live Activation', () => {
   it('should return results array from runAll without throwing', async () => {
     const registry = new DetectorRegistry(FULL_CONFIG);
 
-    // Stale worker olan bir context oluştur → StaleWorkerDetector sonuç üretmeli
+    // Yeni sözleşme (sprint-661 host-primary rewrite): respawn önerisi yalnız
+    // exact-attempt host authority'nin DEAD verdict'iyle doğar — activity/mtime
+    // yaşına bakılmaz. Fixture host-dead verdict taşır.
     const staleWorker = {
       id: 'w-148-001',
       taskId: '148-001',
       lastHeartbeat: new Date(BASE_NOW.getTime() - 300_000).toISOString(), // 5dk önce
+      liveness: {
+        state: 'dead' as const,
+        attemptId: 'attempt-148-001',
+        hostSequence: 1,
+        reason: 'host-observed process exit without result',
+      },
     };
 
     const ctx = makeCtx({

@@ -4,6 +4,7 @@
 // tryCodeVerifiedDone migrated to auditor.ts (Sprint 138) — re-exported here.
 // No side effects, no file writes — evaluation logic only.
 
+import { normalizeChangedPaths } from '../core/task-result-schema.js';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { isAbsolute, join, posix, resolve } from 'node:path';
@@ -590,7 +591,7 @@ const VERIFICATION_TASK_PATTERNS: readonly RegExp[] = [
  */
 export function isVerificationTask(task: Task, result: TaskResult): boolean {
   // No source-code changes (doc/audit reports in docs/ are OK)
-  const srcChanges = (result.filesChanged ?? []).some(f => isSourceCodeDir(f));
+  const srcChanges = normalizeChangedPaths(result.filesChanged).some(f => isSourceCodeDir(f));
   if (srcChanges) return false;
   if (!result.testsPassed) return false;
 
@@ -977,7 +978,13 @@ export function scoreScopeCompliance(result: TaskResult, task: Task): RubricScor
 
   let inScope = 0;
   let auxiliary = 0;
-  for (const file of changed) {
+  for (const entry of changed) {
+    // FILESCHANGED-SHAPE (live sprint-665): canonical FileChange objects reach
+    // scoring too; a bare .startsWith on the object killed EVALUATE (0/N).
+    const file = typeof entry === 'string'
+      ? entry
+      : String((entry as { path?: unknown } | null)?.path ?? '');
+    if (!file) continue;
     const inDir = dirs.some(d => file.startsWith(d));
     const inWrite = writeFiles.some(w => file === w);
     if (inDir || inWrite) {
@@ -2027,7 +2034,13 @@ export function enrichEvaluationWithCategory(
   const filesInScope: string[] = [];
   const filesOutOfScope: string[] = [];
 
-  for (const file of changed) {
+  for (const entry of changed) {
+    // FILESCHANGED-SHAPE (live sprint-665): normalize canonical FileChange
+    // objects before string ops — see scoreScopeCompliance.
+    const file = typeof entry === 'string'
+      ? entry
+      : String((entry as { path?: unknown } | null)?.path ?? '');
+    if (!file) continue;
     const inDir = dirs.some(d => file.startsWith(d));
     const inWrite = writeFiles.some(w => file === w);
     if (inDir || inWrite || isAuxiliaryFile(file)) {

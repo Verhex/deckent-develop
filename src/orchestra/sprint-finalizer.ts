@@ -3,6 +3,7 @@
 //   finalizeSprint(), applyAdaptiveThresholds(), hook stubs for Task 13/14/15
 
 // ─── Node Builtins ─────────────────────────────────────────────────
+import { normalizeChangedPaths } from '../core/task-result-schema.js';
 import {
   readFileSync, writeFileSync, existsSync,
   mkdirSync, readdirSync, renameSync, unlinkSync,
@@ -758,7 +759,7 @@ export function deriveScopedSelfAuditManifest(
     evidenceRefs.add(`task-scope:${task.id}`);
   }
   for (const result of results) {
-    for (const candidate of result.filesChanged ?? []) {
+    for (const candidate of normalizeChangedPaths(result.filesChanged)) {
       const normalized = normalizeScopedAuditPath(candidate);
       if (normalized) paths.add(normalized);
     }

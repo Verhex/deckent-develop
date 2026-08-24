@@ -129,6 +129,13 @@ export class NervousApprovalBridge {
         this.pendingCleanup?.remove(input.notificationId);
         return { applied: false, reason: 'already-decided' };
       }
+      // D4 expiry authority (e9bc6c83a) surfaces a re-decide on a request the
+      // sweep already settled as APR_EXPIRED — terminal like already-decided,
+      // so a duplicate accept/reject is swallowed and cleanup still runs.
+      if (err instanceof ApprovalBrokerError && err.code === 'APR_EXPIRED') {
+        this.pendingCleanup?.remove(input.notificationId);
+        return { applied: false, reason: 'already-decided' };
+      }
       throw err;
     }
   }

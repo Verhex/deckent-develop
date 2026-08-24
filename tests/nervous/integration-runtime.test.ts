@@ -54,6 +54,7 @@ import type {
   NervousSystemConfigV1,
   ObserverEvent,
 } from '../../src/core/nervous-types.js';
+import type { HostPrimaryLiveness } from '../../src/core/monitoring-types.js';
 
 // ─── Inline pipeline assembler (mirrors bootstrap.ts) ──────────────────────
 
@@ -173,7 +174,17 @@ describe('Nervous Integration Runtime — W3-3 full pipeline', () => {
       sprintId: 'sprint-180',
       currentPhase: 'EXECUTE',
       activeWorkers: [
-        { id: 'w-180-int', taskId: 'T-int', lastHeartbeat: STALE_HB },
+        {
+          id: 'w-180-int',
+          taskId: 'T-int',
+          lastHeartbeat: STALE_HB,
+          liveness: {
+            state: 'dead',
+            attemptId: 'attempt-int',
+            hostSequence: 3,
+            reason: 'host process exited',
+          } satisfies HostPrimaryLiveness,
+        },
       ],
       openDebtCount: 0,
       totalTasks: 3,

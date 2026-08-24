@@ -638,8 +638,8 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // token-proven legacy stop pin reworked in place; suite-owned fixtures only.
   // 2026-08-25 coordinator string-shape recovery: +2 — canonical FileChange
   // regression pin (quality-assessor) and worker-authored 664 suites.
-  count: 16092,
-  digest: '05adf0e0c01c7c1dba0c01f0a6ee53d089ff061081bc1ae3aa87a4fefc8e8af6',
+  count: 16093,
+  digest: '2d8b68edc6ab9b3439f4e11342507f16c49cb6f10ed017d6ca4651ca0404898b',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1138,8 +1138,8 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // canary thresholds and result-schema hostTerminalProjection passthrough.
   // 2026-08-24 HIGH-5 + 7091 fold: count unchanged, digest moved — bot-daemon
   // token-proven legacy stop path and cursor image build-arg fold.
-  count: 1321,
-  digest: 'f1be8455710c73cd05ea8e962754442b06331d7f889d4ceaca50482829d23ae1',
+  count: 1322,
+  digest: 'c2ebd998f18dd62b7d0326c656013f079c48f6785910c4a7537e5c9d08ac887f',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

@@ -81,6 +81,7 @@ import { getChannelRegistry } from './ipc-registry.js';
 // ─── Plugin Hooks ─────────────────────────────────────────────────
 import { clearHooks } from '../core/plugin-hooks.js';
 import { DeckentError } from '../core/errors.js';
+import { enqueueOwnerNotification } from '../connectors/notification-delivery.js';
 
 // ═══ Types ═════════════════════════════════════════════════════════
 
@@ -597,6 +598,17 @@ export async function waitForHumanApproval(
 
   const lang = detectLang(projectRoot);
 
+  // Persist before the live dispatcher: a stopped bot will drain this later.
+  enqueueOwnerNotification(projectRoot, {
+    id: `approval:${sprintId}:${phase}:${checkpoint.createdAt}`,
+    kind: 'approval-requested',
+    sprintId,
+    title: getMessage('checkpoint.notify_pending_title', lang, { phase }),
+    message: summary,
+    lang,
+    createdAt: checkpoint.createdAt,
+  });
+
   // DECKENT→USER:NOTIFY (Hot Fix H6) — human-checkpoint-required (critical, immediate)
   try {
     void notify(
@@ -812,6 +824,15 @@ export function pauseSprint(
   const summary = getMessage('pause.notification_summary', lang, {
     reason,
     command: pauseState.recoveryCommand,
+  });
+  enqueueOwnerNotification(projectRoot, {
+    id: `pause:${sprint.id}:${pauseState.pausedAt}`,
+    kind: 'paused',
+    sprintId: sprint.id,
+    title,
+    message: summary,
+    lang,
+    createdAt: pauseState.pausedAt,
   });
   try {
     void notify('human-checkpoint-required', sprint.id, title, summary, undefined, {

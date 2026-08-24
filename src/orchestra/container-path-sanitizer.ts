@@ -156,7 +156,13 @@ export function sanitizeHostFacingFiles(
 
   // De-dup while preserving the host-facing subset.
   const seen = new Set<string>();
-  for (const raw of changedFiles) {
+  for (const rawEntry of changedFiles) {
+    // FILESCHANGED-SHAPE (live sprint-664/665): canonical TaskResultV1 carries
+    // FileChange OBJECTS; this site received them as strings and the object
+    // hit isHostFacingFile's .replace, killing waitForResults for the run.
+    const raw = typeof rawEntry === 'string'
+      ? rawEntry
+      : String((rawEntry as { path?: unknown } | null)?.path ?? '');
     if (!raw || !isHostFacingFile(raw)) continue;
     const rel = raw.replace(/^\.\//, '').replace(/^\/workspace\//, '');
     if (seen.has(rel)) continue;

@@ -6,6 +6,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { StaleWorkerDetector } from '../../../src/nervous/detectors/stale-worker.js';
 import type { DetectorContext, SprintStateSnapshot, ObserverEvent } from '../../../src/core/nervous-types.js';
+import type { HostPrimaryLiveness } from '../../../src/core/monitoring-types.js';
 
 // ─── Test Helpers ─────────────────────────────────────────────────────────────
 
@@ -47,16 +48,27 @@ function makeCtx(
   };
 }
 
-function makeFreshWorker(id: string, taskId: string): SprintStateSnapshot['activeWorkers'][number] {
-  // Son heartbeat: 1 dakika önce (fresh)
-  const freshTime = new Date(BASE_NOW.getTime() - 60_000).toISOString();
-  return { id, taskId, lastHeartbeat: freshTime };
+function makeWorker(
+  id: string,
+  taskId: string,
+  state: 'alive' | 'dead',
+): SprintStateSnapshot['activeWorkers'][number] {
+  const liveness: HostPrimaryLiveness = {
+    state,
+    attemptId: `attempt-${taskId}`,
+    hostSequence: 1,
+    reason: `host reports ${state}`,
+  };
+  return { id, taskId, lastHeartbeat: BASE_NOW.toISOString(), liveness } as
+    SprintStateSnapshot['activeWorkers'][number];
 }
 
-function makeStaleWorker(id: string, taskId: string, staleMs = 700_000): SprintStateSnapshot['activeWorkers'][number] {
-  // Son heartbeat: staleMs önce (varsayılan 700s = stale > 600s/10dk threshold)
-  const staleTime = new Date(BASE_NOW.getTime() - staleMs).toISOString();
-  return { id, taskId, lastHeartbeat: staleTime };
+function makeFreshWorker(id: string, taskId: string): SprintStateSnapshot['activeWorkers'][number] {
+  return makeWorker(id, taskId, 'alive');
+}
+
+function makeStaleWorker(id: string, taskId: string): SprintStateSnapshot['activeWorkers'][number] {
+  return makeWorker(id, taskId, 'dead');
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────

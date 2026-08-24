@@ -18,6 +18,7 @@ import { DirectivesMidSprintProtection } from '../../src/nervous/detectors/direc
 import { Executor } from '../../src/nervous/executor.js';
 import type { CanAutoApplyFn, ActionHandler, NervousHistory } from '../../src/nervous/executor.js';
 import type { NervousNotification, NotificationAction, ExecutionRecord } from '../../src/core/nervous-types.js';
+import type { HostPrimaryLiveness } from '../../src/core/monitoring-types.js';
 import type { DetectorContext, SprintStateSnapshot, ObserverEvent } from '../../src/core/nervous-types.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -99,11 +100,17 @@ function makeStaleWorker(
   id: string,
   taskId: string,
   ageMs: number,
-): { id: string; taskId: string; lastHeartbeat: string } {
+): { id: string; taskId: string; lastHeartbeat: string; liveness: HostPrimaryLiveness } {
   return {
     id,
     taskId,
     lastHeartbeat: new Date(BASE_NOW.getTime() - ageMs).toISOString(),
+    liveness: {
+      state: 'dead',
+      attemptId: `attempt-${taskId}`,
+      hostSequence: Math.max(1, Math.floor(ageMs / 1000)),
+      reason: 'host process exited',
+    },
   };
 }
 

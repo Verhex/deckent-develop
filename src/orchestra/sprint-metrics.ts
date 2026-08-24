@@ -1,5 +1,6 @@
 // ─── Sprint Metrics ──────────────────────────────────────────────
 // Extracted from sprint-reporter.ts — metric calculation, aggregation, comparison, coverage
+import { normalizeChangedPaths } from '../core/task-result-schema.js';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { TaskEvaluation } from '../core/types.js';
@@ -352,7 +353,7 @@ export function countNewTestFiles(results?: TaskResult[]): number {
   if (!results) return 0;
   const testFiles = new Set<string>();
   for (const r of results) {
-    for (const f of r.filesChanged) {
+    for (const f of normalizeChangedPaths(r.filesChanged)) {
       if (f.match(/\.(test|spec)\.(ts|tsx|js|jsx)$/)) {
         testFiles.add(f);
       }

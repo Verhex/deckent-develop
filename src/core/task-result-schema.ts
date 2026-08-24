@@ -549,6 +549,28 @@ export interface FileChange {
   linesRemoved: number;
 }
 
+/**
+ * Normalize a result's `filesChanged` to plain path strings. Canonical
+ * TaskResultV1 carries FileChange OBJECTS while legacy results carried
+ * strings; consumers doing bare string ops on the entries killed EXECUTE/
+ * EVALUATE for whole runs (live sprint-661/664/665 TypeError family:
+ * "relPath.replace / file.startsWith is not a function"). Every filesChanged
+ * consumer MUST iterate this projection, never the raw list.
+ */
+export function normalizeChangedPaths(list: unknown): string[] {
+  if (!Array.isArray(list)) return [];
+  const out: string[] = [];
+  for (const entry of list) {
+    const path = typeof entry === 'string'
+      ? entry
+      : typeof (entry as { path?: unknown } | null)?.path === 'string'
+        ? (entry as { path: string }).path
+        : '';
+    if (path.length > 0) out.push(path);
+  }
+  return out;
+}
+
 /** Thrown when an assembled result fails canonical schema validation. */
 export class AssemblerError extends Error {
   constructor(

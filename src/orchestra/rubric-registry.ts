@@ -8,6 +8,7 @@
 // scope.filesWrite + scope.directories patterns determine type, not
 // description text. Worker prompt/title language never influences routing.
 
+import { normalizeChangedPaths } from '../core/task-result-schema.js';
 import type { Task, EvaluationRubric } from '../core/types.js';
 import {
   getRubricEvidenceApplicability,
@@ -379,7 +380,7 @@ export function coverageOptional(task: Task, result?: { filesChanged?: string[];
     // — deckent literally cannot measure it — NOT a quality failure. Signal: the
     // changed source files belong to a stack deckent can't measure coverage for.
     // Exempt → a C++ code task no longer false-NO_GOs on missing coverage.
-    const stack = inferStackFromFiles(result.filesChanged);
+    const stack = inferStackFromFiles(normalizeChangedPaths(result.filesChanged));
     if (stack !== 'generic' && !isCoverageMeasurable(stack)) return true;
   }
   // WM-7: same non-measurable-stack exemption when `result` is absent — the

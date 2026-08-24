@@ -5,6 +5,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { DetectorContext, ObserverEvent, SprintStateSnapshot } from '../../../src/core/nervous-types.js';
+import type { HostPrimaryLiveness } from '../../../src/core/monitoring-types.js';
 import { StaleWorkerDetector } from '../../../src/nervous/detectors/stale-worker.js';
 import { ScopeCollisionMonitor } from '../../../src/nervous/detectors/scope-collision.js';
 import { DirectivesMidSprintProtection } from '../../../src/nervous/detectors/directives-protection.js';
@@ -84,7 +85,13 @@ describe('Observer → Detector Integration', () => {
         event: makeObserverEvent({ source: 'cron', type: 'TICK' }),
         sprintState: makeSprintState({
           currentPhase: 'EXECUTE',
-          activeWorkers: [{ id: 'w-147-001', taskId: 'T-001', lastHeartbeat: staleHb }],
+          activeWorkers: [{
+            id: 'w-147-001', taskId: 'T-001', lastHeartbeat: staleHb,
+            liveness: {
+              state: 'dead', attemptId: 'attempt-1', hostSequence: 2,
+              reason: 'host process exited',
+            } satisfies HostPrimaryLiveness,
+          }],
         }),
         now,
       });
@@ -104,7 +111,13 @@ describe('Observer → Detector Integration', () => {
       const ctx = makeContext({
         event: makeObserverEvent({ source: 'cron', type: 'TICK' }),
         sprintState: makeSprintState({
-          activeWorkers: [{ id: 'w-147-001', taskId: 'T-001', lastHeartbeat: freshHb }],
+          activeWorkers: [{
+            id: 'w-147-001', taskId: 'T-001', lastHeartbeat: freshHb,
+            liveness: {
+              state: 'alive', attemptId: 'attempt-1', hostSequence: 1,
+              reason: 'host process running',
+            } satisfies HostPrimaryLiveness,
+          }],
         }),
         now,
       });

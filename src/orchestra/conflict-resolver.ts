@@ -37,7 +37,7 @@ export class ConflictResolver {
 
     // Build file -> workers map
     for (const result of results) {
-      for (const file of result.filesChanged) {
+      for (const file of normalizeChangedPaths(result.filesChanged)) {
         const workers = fileToWorkers.get(file) ?? [];
         workers.push(result.taskId);
         fileToWorkers.set(file, workers);
@@ -82,7 +82,7 @@ export class ConflictResolver {
         const a = results[i];
         const b = results[j];
         if (!a || !b) continue;
-        const overlap = a.filesChanged.filter(f => b.filesChanged.includes(f));
+        const overlap = normalizeChangedPaths(a.filesChanged).filter(f => normalizeChangedPaths(b.filesChanged).includes(f));
         if (overlap.length >= 2) {
           conflicts.push({
             type: 'scope_overlap',
@@ -152,6 +152,7 @@ export class ConflictResolver {
 // Detects file write collisions BEFORE tasks run, builds collision-aware waves.
 
 import type { Task } from '../core/types.js';
+import { normalizeChangedPaths } from '../core/task-result-schema.js';
 import type { ExecutionWave } from './parallel-pipeline.js';
 import { deriveExecutionTopology } from '../core/execution-topology.js';
 

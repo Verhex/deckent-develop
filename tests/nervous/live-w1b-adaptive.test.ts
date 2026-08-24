@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { computeAdaptiveThreshold, StaleWorkerDetector } from '../../src/nervous/detectors/stale-worker.js';
 import type { DetectorContext, SprintStateSnapshot, ObserverEvent } from '../../src/core/nervous-types.js';
+import type { HostPrimaryLiveness } from '../../src/core/monitoring-types.js';
 
 // ─── Test Helpers ─────────────────────────────────────────────────────────────
 
@@ -152,7 +153,13 @@ describe('StaleWorkerDetector — adaptive threshold integration', () => {
     const detector = new StaleWorkerDetector(BASE_THRESHOLD_MS);
     const ctx = makeCtx(projectRoot, {
       sprintState: makeSprintState({
-        activeWorkers: [{ id: 'w-ada-002', taskId, lastHeartbeat }],
+        activeWorkers: [{
+          id: 'w-ada-002', taskId, lastHeartbeat,
+          liveness: {
+            state: 'dead', attemptId: 'attempt-ada-002', hostSequence: 2,
+            reason: 'host process exited',
+          } satisfies HostPrimaryLiveness,
+        }],
       }),
     });
 
@@ -173,7 +180,13 @@ describe('StaleWorkerDetector — adaptive threshold integration', () => {
     const detector = new StaleWorkerDetector(BASE_THRESHOLD_MS);
     const ctx = makeCtx(projectRoot, {
       sprintState: makeSprintState({
-        activeWorkers: [{ id: 'w-ada-003', taskId: 'ada-003', lastHeartbeat }],
+        activeWorkers: [{
+          id: 'w-ada-003', taskId: 'ada-003', lastHeartbeat,
+          liveness: {
+            state: 'dead', attemptId: 'attempt-ada-003', hostSequence: 3,
+            reason: 'host process exited',
+          } satisfies HostPrimaryLiveness,
+        }],
       }),
     });
 

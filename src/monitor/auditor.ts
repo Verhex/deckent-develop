@@ -18,6 +18,7 @@ import {
   LOCKS_DIR,
   BRAIN_DIR,
   DASHBOARD_FILE,
+  RUNTIME_DIR,
 } from '../core/constants.js';
 import { archiveTaskArtifacts } from '../core/sprint-archive.js';
 
@@ -78,7 +79,7 @@ export interface HeartbeatAuthoritySnapshot {
 const HEARTBEAT_AUTHORITY_DIRECTORY = 'worker-heartbeat-authority';
 
 function heartbeatAuthorityRoot(projectRoot: string): string {
-  return join(projectRoot, TASKS_DIR, HEARTBEAT_AUTHORITY_DIRECTORY);
+  return join(projectRoot, RUNTIME_DIR, HEARTBEAT_AUTHORITY_DIRECTORY);
 }
 
 function isHeartbeatAuthorityIdentity(value: unknown): value is WorkerHeartbeatAuthorityIdentity {
@@ -124,7 +125,10 @@ function snapshotsForHeartbeat(
   hb: Heartbeat,
 ): HeartbeatAuthoritySnapshot[] {
   const attemptId = (hb as Heartbeat & { attemptId?: string }).attemptId;
-  if (!attemptId) return [];
+  // Legacy display heartbeats carry no attemptId; they still bind to the
+  // host authority by task so conflicting fenced snapshots become a HOLD
+  // instead of falling through to the mtime stale path (665-001 residue).
+  if (!attemptId) return snapshots.filter(snapshot => snapshot.identity.taskId === hb.taskId);
   return snapshots.filter(snapshot =>
     snapshot.identity.taskId === hb.taskId
     && snapshot.identity.attemptId === attemptId);

@@ -3,6 +3,7 @@
 // Note: mergeResults was removed — sprint-reporter.calculateMetrics() owns
 // that aggregation now.
 
+import { normalizeChangedPaths } from '../core/task-result-schema.js';
 export interface OverlapEntry {
   file: string;
   workers: string[];
@@ -23,7 +24,7 @@ export class ResultMerger {
     const fileToWorkers = new Map<string, string[]>();
 
     for (const result of results) {
-      for (const file of result.filesChanged) {
+      for (const file of normalizeChangedPaths(result.filesChanged)) {
         const workers = fileToWorkers.get(file) ?? [];
         workers.push(result.taskId);
         fileToWorkers.set(file, workers);

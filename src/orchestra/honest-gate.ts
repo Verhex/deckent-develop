@@ -16,6 +16,7 @@
 // All three return a typed DishonestyFinding the caller can use to
 // downgrade to NO_GO and emit the BRAIN→AUDITOR audit event.
 
+import { normalizeChangedPaths } from '../core/task-result-schema.js';
 import { spawnSync } from 'node:child_process';
 import type { TaskResult, TaskScope } from '../core/types.js';
 import { debugLog } from '../core/utils.js';
@@ -175,7 +176,7 @@ export function detectDishonestResult(
   const tolerance = clampTolerance(opts.tolerance ?? 0.5);
   const minLoc = opts.minLocThreshold ?? 20;
 
-  const filesChanged = (result.filesChanged ?? []).map(normalizePath);
+  const filesChanged = normalizeChangedPaths(result.filesChanged).map(normalizePath);
 
   // Sprint 195 195-001 — MISSING_RESULT_BUT_DISK_HAS_WORK rule.
   // When filesChanged is empty, the legacy fast-path returned "honest". That

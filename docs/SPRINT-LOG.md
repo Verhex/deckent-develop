@@ -16487,3 +16487,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 664-005: Read-only adversarial fan-in and sprint-661 replay (PENDING)
 
 ---
+## Sprint 665 — sprint-665
+
+**Status:** ABORTED
+**Date:** 2026-08-24
+**Duration:** 1070s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 2 |
+| Coverage | 0.0% |
+| Duration | 1070239ms |
+
+### Tasks
+
+- 665-001: Host-primary liveness consumers and legacy nervous suite reconciliation (EXECUTING)
+- 665-002: Durable owner notification delivery for run and approval events (EXECUTING)
+- 665-003: Read-only adversarial fan-in (PENDING)
+
+---
