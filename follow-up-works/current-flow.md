@@ -8,6 +8,23 @@
 > zincir PREPARED `af4752da…` → VERIFIED `e3b1fea2…` → RECOVERY_COMMITTED, authority-ref
 > `owner-live-2026-08-24-go-full-authority-claude-8workers`. Yürütme yetkisi CLAUDE'da.
 
+## ŞU AN — çalışma-imleci (Claude epoch-3, geçici iş-takibi)
+
+> Bağlam kaybında buradan devam: aşağıdaki TAMAM-listesi bu gecenin landed-kanıtı,
+> SIRADAKİ-listesi ise birebir yürütme sırasıdır.
+
+- TAMAM (2026-08-24 gece, hepsi origin/main): `e41b3acae` sprint-661 paketi ·
+  `e073da4e4` HIGH-1/2 (3 orphan gate + read-only pending discovery) · `b9c7b221b`
+  hostTerminalProjection xverify-regresyon fix'i · `c173f4b70` flow-senkron ·
+  `259c6472f` HIGH-3/4 (canary-arşiv lineage onarımı + config-owned thresholds) ·
+  `06f201ae3` HIGH-5 + 7091 cursor build-arg fold. Formal mühürler: D4 discovery-purity
+  `cfeaae18…` CONFIRMED, runtime-hygiene `094c1634…` CONFIRMED. Denetim-bulgu paketi 5/5 kapalı.
+- SIRADAKİ (sıra bağlayıcı): (1) sprint-662 DIRECTIVES'i — event-authority/heartbeat-UI +
+  Nervous→Telegram delivery-bridge + result-ingress tekilleştirme residual'ları, 8-worker dogfood
+  DAG'ı olarak; (2) 7094 gerçek A/B cohort koşusu (ölçüm-hattı artık açık) → owner-karar raporu;
+  (3) D5 retirement dilimi; (4) MASTER satır-senkronu (4056 D4 + 7091/7092 evidence güncellemesi);
+  (5) Work-480 imza + Slack/Teams secrets = OWNER-işi, beklemede.
+
 ## Canlı truth
 
 - `DOGFOOD_MODE=ON`, `WORKSPACE_MODE=MAIN`, `DELIVERY_MODE=DIRECT_MAIN`.
