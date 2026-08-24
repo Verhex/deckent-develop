@@ -62,7 +62,15 @@
   terminal_identity_mismatch`); mühür ancak finalizer'ın canlı-bağlamıyla yeniden türetilir,
   elle mühür-yazımı YASAK (sahte-receipt sınıfı). Formal 7094-kernel bu tek-fix'e bağlı;
   ölçüm-verisi mühürlü terminal-receipt'lerden zaten teslim (−41,2%).
-- SIRADAKİ (sıra bağlayıcı): (1) finalizer seal-sıralaması fix'i (üstteki kalan-yarı);
+- SIRADAKİ (sıra bağlayıcı): (1) **doğal-yol outermost-seal erken-çıkışı** — kesin-karakterize
+  (2026-08-25 ~05:50): recovery-yolu (:1879 resumePersistedTerminalReceipt) 667'yi DOĞRU
+  mühürledi (2 seal-dosyası); doğal-COMPLETE yolu ise `publishOutermostSprintTerminalArchive`'a
+  hiç ulaşmadan süreç-çıkışı yapıyor (668: cleanup 22:10:27.079 → publication-breadcrumb .100 →
+  activeResourcesAtExit .241; hiçbir SEAL/PublicationError logu yok — reconcile+seal saniyeler
+  sürer, 141ms'e sığmaz). Fix-noktası: sprint-controller runSprint kuyruğu,
+  commitSprintTerminalHandoff→publishFinalSprintAuthority→publishOutermost zincirinde
+  erken-return/await-kaçağı. 668'i mühürlemek için fix-sonrası tek `recover --resume`-benzeri
+  canonical yeniden-yayın yeter; elle mühür YASAK.
   (2) sprint-662 DIRECTIVES'i — event-authority/heartbeat-UI +
   Nervous→Telegram delivery-bridge + result-ingress tekilleştirme residual'ları, 8-worker dogfood
   DAG'ı olarak; (2) 7094 gerçek A/B cohort koşusu (ölçüm-hattı artık açık) → owner-karar raporu;
