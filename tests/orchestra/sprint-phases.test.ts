@@ -10,7 +10,7 @@ vi.mock('../../src/orchestra/result-evaluator.js', async (importOriginal) => {
 });
 
 import type { EvaluationResult, Task, TaskResult } from '../../src/core/types.js';
-import { TaskStatus } from '../../src/core/types.js';
+import { TaskEvaluation, TaskStatus } from '../../src/core/types.js';
 import {
   enforceRecoveryBornEvaluationHonesty,
   safeRubricReconcile,
@@ -209,5 +209,59 @@ describe('RECOVERY-BORN-483-EVALUATION-HONESTY-001', () => {
     expect(pausedTask.status).toBe(TaskStatus.PAUSED);
     expect(heldResult.workAttribution?.state).toBe('HOLD');
     expect(enforceRecoveryBornEvaluationHonesty(heldResult, promotedRubric).decision).toBe('NO_GO');
+  });
+});
+
+// ─── 652-004: FIX durable audit fan-in ───────────────────────────────────
+// The FIX task receipt is emitted by completeResultEvaluationAttempt. The
+// reconciliation projection below must use the same audit adapter as initial
+// evaluation so the root record retains applicability and normative fields.
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { evaluationAuditPath } from '../../src/orchestra/evaluation-audit-trail.js';
+import { recordFixEvaluationAudit } from '../../src/orchestra/sprint-phases.js';
+
+describe('652-004 FIX audit projection fan-in', () => {
+  it('projects a recovered doc root through the canonical audit adapter', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'deckent-fix-fanin-'));
+    try {
+      const original = task({
+        id: '652-004-root',
+        type: 'documentation',
+        scope: {
+          directories: ['docs/'], filesRead: [], filesWrite: ['docs/recovered.md'],
+        },
+      });
+      const fix = task({ id: '652-004-root-fix', fixForTaskId: original.id });
+      const rubric: EvaluationResult = {
+        decision: 'DONE', totalScore: 88, retryCount: 0,
+        rubricScores: [
+          { criterion: 'applicability:test_execution', score: 100, passed: true, reason: 'applicability=NOT_APPLICABLE' },
+          { criterion: 'applicability:coverage', score: 100, passed: true, reason: 'applicability=NOT_APPLICABLE' },
+        ],
+      };
+
+      recordFixEvaluationAudit(
+        root, 'sprint-652', fix, rubric, TaskEvaluation.DONE, true,
+        { rootTaskId: original.id, logicalAttempt: 2 }, original,
+      );
+
+      const record = JSON.parse(await readFile(
+        evaluationAuditPath(root, 'sprint-652', original.id, 2), 'utf-8',
+      )) as {
+        normativeVerdict: string;
+        acceptance?: { kind: string };
+        criterionScores: Array<{ name: string; reason: string }>;
+      };
+      expect(record.normativeVerdict).toBe('CONFIRMED');
+      expect(record.acceptance?.kind).toBe('documentation');
+      expect(record.criterionScores).toEqual(expect.arrayContaining([
+        expect.objectContaining({ name: 'applicability:test_execution', reason: 'applicability=NOT_APPLICABLE' }),
+        expect.objectContaining({ name: 'applicability:coverage', reason: 'applicability=NOT_APPLICABLE' }),
+      ]));
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });

@@ -58,7 +58,17 @@ describe('evaluateWithRubric() — Evaluator Consistency', () => {
 
     expect(evalResult.decision).toBe('DONE');
     expect(evalResult.totalScore).toBeGreaterThanOrEqual(DEFAULT_RUBRIC.passingScore);
-    expect(evalResult.rubricScores).toHaveLength(DEFAULT_RUBRIC.criteria.length);
+    expect(evalResult.rubricScores).toHaveLength(DEFAULT_RUBRIC.criteria.length + 2);
+    expect(evalResult.rubricScores).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        criterion: 'applicability:test_execution',
+        reason: 'applicability=REQUIRED',
+      }),
+      expect.objectContaining({
+        criterion: 'applicability:coverage',
+        reason: 'applicability=OPTIONAL',
+      }),
+    ]));
   });
 
   it('returns NO_GO when testsPassed=false and selfAssessment=NO_GO', () => {
@@ -106,7 +116,7 @@ describe('evaluateWithRubric() — Evaluator Consistency', () => {
     // Call without third argument — should use DEFAULT_RUBRIC
     const evalResult = evaluateWithRubric(result, task);
 
-    expect(evalResult.rubricScores).toHaveLength(DEFAULT_RUBRIC.criteria.length);
+    expect(evalResult.rubricScores).toHaveLength(DEFAULT_RUBRIC.criteria.length + 2);
     const criterionNames = evalResult.rubricScores.map(s => s.criterion);
     expect(criterionNames).toContain('correctness');
     expect(criterionNames).toContain('test_coverage');

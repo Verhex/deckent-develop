@@ -20,7 +20,10 @@ import type {
   TaskPriority,
   ProviderName,
   ModelType,
+  CriterionApplicability,
+  RubricEvidenceSignal,
 } from './task-types.js';
+import { CRITERION_APPLICABILITY } from './task-types.js';
 
 // ─── Canonical Types (spec §2) ──────────────────────────────────────────────
 
@@ -229,6 +232,10 @@ export function resolveRiskClass(
 /** Mirror of `rubric-registry.ts` TaskType (orchestra/). */
 export type RubricTaskType = 'audit' | 'document-write' | 'code-development';
 
+export type RubricEvidenceApplicability = Readonly<
+  Record<RubricEvidenceSignal, CriterionApplicability>
+>;
+
 /** Mirror of `task-router.ts` TaskType (orchestra/). */
 export type RouterTaskType = 'code' | 'test' | 'doc' | 'design' | 'unknown';
 
@@ -429,6 +436,36 @@ export function taskKindToRubric(kind: TaskKind): RubricTaskType {
     default:
       return 'code-development';
   }
+}
+
+const RUBRIC_EVIDENCE_APPLICABILITY: Readonly<
+  Record<RubricTaskType, RubricEvidenceApplicability>
+> = Object.freeze({
+  audit: Object.freeze({
+    test_execution: CRITERION_APPLICABILITY.NOT_APPLICABLE,
+    coverage: CRITERION_APPLICABILITY.NOT_APPLICABLE,
+  }),
+  'document-write': Object.freeze({
+    test_execution: CRITERION_APPLICABILITY.NOT_APPLICABLE,
+    coverage: CRITERION_APPLICABILITY.NOT_APPLICABLE,
+  }),
+  'code-development': Object.freeze({
+    test_execution: CRITERION_APPLICABILITY.REQUIRED,
+    coverage: CRITERION_APPLICABILITY.REQUIRED,
+  }),
+});
+
+/** Total frozen TaskKind matrix, derived through the canonical rubric adapter. */
+export const TASK_KIND_RUBRIC_EVIDENCE_APPLICABILITY: Readonly<
+  Record<TaskKind, RubricEvidenceApplicability>
+> = Object.freeze(Object.fromEntries(
+  TASK_KINDS.map(kind => [kind, RUBRIC_EVIDENCE_APPLICABILITY[taskKindToRubric(kind)]]),
+) as Record<TaskKind, RubricEvidenceApplicability>);
+
+export function getRubricEvidenceApplicability(
+  kind: TaskKind,
+): RubricEvidenceApplicability {
+  return TASK_KIND_RUBRIC_EVIDENCE_APPLICABILITY[kind];
 }
 
 /** Canonical `TaskKind` → adr-selector domain. */

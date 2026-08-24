@@ -9,7 +9,17 @@
 // description text. Worker prompt/title language never influences routing.
 
 import type { Task, EvaluationRubric } from '../core/types.js';
-import { taskKindToRubric, type RubricTaskType, type TaskKind } from '../core/work-model.js';
+import {
+  getRubricEvidenceApplicability,
+  taskKindToRubric,
+  type RubricTaskType,
+  type TaskKind,
+} from '../core/work-model.js';
+import {
+  CRITERION_APPLICABILITY,
+  type CriterionApplicability,
+  type RubricEvidenceSignal,
+} from '../core/task-types.js';
 import { inferStackFromFiles, isCoverageMeasurable } from '../core/coverage-adapters.js';
 
 /**
@@ -229,6 +239,21 @@ export function resolveCanonicalTaskKind(task: Task): TaskKind {
   return rubricType === 'document-write' ? 'documentation' : rubricType;
 }
 
+/** Resolve rubric evidence policy without re-classifying the task. */
+export function resolveRubricEvidenceApplicability(
+  task: Task,
+  signal: RubricEvidenceSignal,
+  result?: { filesChanged?: string[]; testsPassed?: boolean },
+): CriterionApplicability {
+  const declared = getRubricEvidenceApplicability(resolveCanonicalTaskKind(task))[signal];
+  if (
+    signal === 'coverage'
+    && declared === CRITERION_APPLICABILITY.REQUIRED
+    && coverageOptional(task, result)
+  ) return CRITERION_APPLICABILITY.OPTIONAL;
+  return declared;
+}
+
 export function getRubric(task: Task): EvaluationRubric {
   const rubricType = resolveRubricTaskType(task);
   const base = RUBRIC_REGISTRY[rubricType];
@@ -288,8 +313,18 @@ const COVERAGE_OPTIONAL_AGENTS = new Set([
   'refactorer-temp',
 ]);
 
-/** True when the owner/planner supplied an exact direct verification command. */
-export function hasDeclaredTestCommand(task: Pick<Task, 'description'>): boolean {
+/**
+ * True when the owner/planner supplied an exact direct verification command.
+ *
+ * `task.verification` is the canonical plan-time authority.  The description
+ * parser remains only as a compatibility adapter for durable tasks produced
+ * before typed verification existed.  When a typed block is present, even an
+ * explicitly empty one, stale prose must not regain authority.
+ */
+export function hasDeclaredTestCommand(task: Pick<Task, 'description' | 'verification'>): boolean {
+  if (task.verification !== undefined) {
+    return task.verification.commands.some(command => command.trim().length > 0);
+  }
   return /\*\*Test:\*\*\s*`[^`\r\n]+`/i.test(task.description ?? '');
 }
 
@@ -308,12 +343,13 @@ export function hasDeclaredTestCommand(task: Pick<Task, 'description'>): boolean
  * Sprint 169 169-001 (bug-fixer agent coverage:null cascade).
  */
 export function coverageOptional(task: Task, result?: { filesChanged?: string[]; testsPassed?: boolean }): boolean {
-  if (detectTaskType(task) !== 'code-development') return true;
-  // An owner-authored `**Test:** `command`` clause defines a direct proof
-  // contract that may not produce v8/istanbul coverage (standalone Node smoke,
-  // compiler invocation, CLI exit-path proof, etc.). Requiring a numeric
-  // JavaScript coverage percentage in addition would silently replace the
-  // task's declared acceptance authority with a different test system.
+  if (resolveRubricTaskType(task) !== 'code-development') return true;
+  // An owner-authored typed verification command (or its legacy prose
+  // projection) defines a direct proof contract that may not produce
+  // v8/istanbul coverage (standalone Node smoke, compiler invocation, CLI
+  // exit-path proof, etc.). Requiring a numeric JavaScript coverage percentage
+  // in addition would silently replace the task's declared acceptance
+  // authority with a different test system.
   if (hasDeclaredTestCommand(task)) return true;
   const agent = task.assignedAgent;
   if (agent && COVERAGE_OPTIONAL_AGENTS.has(agent)) return true;

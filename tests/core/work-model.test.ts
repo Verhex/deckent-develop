@@ -10,6 +10,9 @@ import {
   taskKindToIntent,
   resolveTaskPromptProfile,
   DEFAULT_TASK_PROFILES,
+  TASK_KINDS,
+  TASK_KIND_RUBRIC_EVIDENCE_APPLICABILITY,
+  getRubricEvidenceApplicability,
 } from '../../src/core/work-model.js';
 import type {
   TaskKind,
@@ -148,6 +151,28 @@ describe('work-model — reverse helpers produce valid subsystem values', () => 
     ];
     for (const kind of allKinds) {
       expect(valid.has(taskKindToRubric(kind))).toBe(true);
+    }
+  });
+});
+
+describe('work-model — rubric evidence applicability matrix', () => {
+  it('is total and deeply frozen for every canonical task kind', () => {
+    expect(Object.keys(TASK_KIND_RUBRIC_EVIDENCE_APPLICABILITY).sort())
+      .toEqual([...TASK_KINDS].sort());
+    expect(Object.isFrozen(TASK_KIND_RUBRIC_EVIDENCE_APPLICABILITY)).toBe(true);
+    for (const kind of TASK_KINDS) {
+      const row = getRubricEvidenceApplicability(kind);
+      expect(Object.isFrozen(row)).toBe(true);
+      expect(Object.keys(row).sort()).toEqual(['coverage', 'test_execution']);
+    }
+  });
+
+  it('derives each row through taskKindToRubric', () => {
+    for (const kind of TASK_KINDS) {
+      const expected = taskKindToRubric(kind) === 'code-development'
+        ? { test_execution: 'REQUIRED', coverage: 'REQUIRED' }
+        : { test_execution: 'NOT_APPLICABLE', coverage: 'NOT_APPLICABLE' };
+      expect(getRubricEvidenceApplicability(kind)).toEqual(expected);
     }
   });
 });

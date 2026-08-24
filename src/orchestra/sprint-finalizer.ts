@@ -30,6 +30,7 @@ import {
   projectSprintWorkAttribution,
 } from '../core/sprint-work-attribution.js';
 import { resolveHostPreDispatchSettlement } from '../core/pre-dispatch-settlement.js';
+import { resolvePromptDeliveryAttribution } from '../core/prompt-delivery-receipt.js';
 import {
   createTaskTerminalProjection,
   reduceTaskTerminalProjection,
@@ -107,6 +108,7 @@ export function parseCommsUsageFromResult(result: TaskResult): CatalogStatsComms
 }
 
 export function collectCatalogStatsTerminalOutcomes(
+  projectRoot: string,
   tasks: readonly Task[],
   evaluations: ReadonlyMap<string, TaskEvaluation>,
   results: ReadonlyMap<string, TaskResult>,
@@ -124,10 +126,17 @@ export function collectCatalogStatsTerminalOutcomes(
         && evaluation !== TaskEvaluation.NO_GO
       )
     ) continue;
+    const delivery = resolvePromptDeliveryAttribution({
+      projectRoot,
+      taskId: task.id,
+      requireCurrentReceipt: typeof task.promptCompilePlanId === 'string',
+      legacyAgentId: result.agentId ?? task.assignedAgent ?? null,
+      legacySkillIds: result.skillIds ?? task.assignedSkills,
+    });
     outcomes.push({
       taskId: task.id,
-      agentId: result.agentId ?? task.assignedAgent ?? null,
-      skillIds: result.skillIds ?? task.assignedSkills ?? [],
+      agentId: delivery.agentId,
+      skillIds: [...delivery.skillIds],
       evaluation,
       ...(typeof result.coverage === 'number' ? { coverage: result.coverage } : {}),
       commsUsage: parseCommsUsageFromResult(result),
@@ -3681,6 +3690,17 @@ export async function finalizeSprint(
   // its logical root id. This prevents original + FIX attempts from inflating
   // jobs, KPI measurements, coverage, or rich output.
   const attemptTasks = loadFinalizerAttemptTasks(projectRoot, sprint);
+  const deliveryByAttempt = new Map(attemptTasks.map(task => {
+    const result = resultsMap.get(task.id);
+    const delivery = resolvePromptDeliveryAttribution({
+      projectRoot,
+      taskId: task.id,
+      requireCurrentReceipt: typeof task.promptCompilePlanId === 'string',
+      legacyAgentId: result?.agentId ?? task.assignedAgent ?? null,
+      legacySkillIds: result?.skillIds ?? task.assignedSkills,
+    });
+    return [task.id, delivery] as const;
+  }));
   const terminalTruth = buildFinalizerTerminalTruth({
     tasks: attemptTasks,
     evaluations,
@@ -3709,6 +3729,12 @@ export async function finalizeSprint(
     return result ? [{ ...result, taskId: logicalTask.logicalTaskId }] : [];
   });
   const logicalResultsMap = buildResultsMap(logicalResults);
+  const logicalDelivery = new Map(terminalTruth.terminalEvidence.logicalTasks.flatMap(logicalTask => {
+    const resolvingTaskId = logicalTask.resolvingAttempt?.taskId
+      ?? logicalTask.attempts.at(-1)?.taskId;
+    const delivery = resolvingTaskId ? deliveryByAttempt.get(resolvingTaskId) : undefined;
+    return delivery ? [[logicalTask.logicalTaskId, delivery] as const] : [];
+  }));
   const logicalSprint: Sprint = { ...sprint, tasks: logicalTasks };
   const logicalEvaluations = new Map(terminalTruth.logicalEvaluations);
 
@@ -3839,11 +3865,12 @@ export async function finalizeSprint(
   debugLog('finalizeSprint:preRetro', `evaluations.size=${evaluations.size} keys=[${[...evaluations.keys()].join(',')}]`);
   let sprintLogPersisted = false;
   try {
-    // Build skillMap from tasks for Skill Performance table in RETRO.md
+    // Build skillMap from delivered prompt identities for Skill Performance.
     const skillMap = new Map<string, string[]>();
     for (const task of sprint.tasks) {
-      if (task.assignedSkills && task.assignedSkills.length > 0) {
-        skillMap.set(task.id, task.assignedSkills);
+      const delivered = deliveryByAttempt.get(task.id)?.skillIds ?? [];
+      if (delivered.length > 0) {
+        skillMap.set(task.id, [...delivered]);
       }
     }
     // Sprint 192 Task 192-005: opt into createIfMissing so the chronic
@@ -4079,7 +4106,7 @@ export async function finalizeSprint(
       debugLog('finalizeSprint:routing-outcomes',
         `Stats already recorded for ${sprint.id} — skipping re-record (idempotent re-finalize)`);
     } else {
-      const catalogOutcomes = collectCatalogStatsTerminalOutcomes(attemptTasks, evaluations, resultsMap);
+      const catalogOutcomes = collectCatalogStatsTerminalOutcomes(projectRoot, attemptTasks, evaluations, resultsMap);
       const catalogOutcomesByTask = new Map(catalogOutcomes.map(outcome => [outcome.taskId, outcome]));
       for (const task of attemptTasks) {
         const terminalOutcome = catalogOutcomesByTask.get(task.id);
@@ -4088,8 +4115,8 @@ export async function finalizeSprint(
         const taskResult = resultsMap.get(task.id);
         if (!taskResult) continue;
         // F5: record use against the agent's current prompt version (V2 path).
-        if (task.assignedAgent) {
-          promptVersionMgr.recordCurrentVersionUse(task.assignedAgent, evaluation);
+        if (terminalOutcome.agentId) {
+          promptVersionMgr.recordCurrentVersionUse(terminalOutcome.agentId, evaluation);
         }
 
         // Quality assessment — multi-dimensional scoring beyond GO/NO_GO
@@ -4117,7 +4144,7 @@ export async function finalizeSprint(
         // the workType×domain×agent cell ledger — PER-TASK DNA by contract
         // (the tasks[0] class cannot recur), ghost-gated at the source.
         const v3Meta = task.routingMeta;
-        if (v3Meta?.routingVersion === 'v3' && task.assignedAgent) {
+        if (v3Meta?.routingVersion === 'v3' && terminalOutcome.agentId) {
           try {
             const { recordOutcome: recordCell } = await import('../core/routing/learning-cells.js');
             const { producePositional } = await import('../core/routing/requirement-vector.js');
@@ -4130,7 +4157,7 @@ export async function finalizeSprint(
               sprintId: sprint.id,
               workType: (v3Meta.workType ?? 'build') as import('../core/routing/types.js').WorkType,
               domain: dominantDomain,
-              agentId: task.assignedAgent,
+              agentId: terminalOutcome.agentId,
               verdict: evaluation as unknown as 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO',
               quality: qualityScore ?? 50,
             });
@@ -4650,7 +4677,7 @@ export async function finalizeSprint(
     for (const task of logicalTasks) {
       const result = logicalResultsMap.get(task.id);
       if (!result || result.cascadeSkipped === true) continue;
-      const agent = task.assignedAgent ?? 'generic';
+      const agent = logicalDelivery.get(task.id)?.agentId ?? 'generic';
       agentBreakdown[agent] = (agentBreakdown[agent] ?? 0) + 1;
     }
     const agentParts = Object.entries(agentBreakdown).map(([a, c]) => `${a}(${c})`).join(', ');
@@ -4689,13 +4716,14 @@ export async function finalizeSprint(
     for (const [taskId, evaluation] of logicalEvaluations) {
       const taskResult = logicalResultsMap.get(taskId);
       const task = logicalTasks.find(t => t.id === taskId);
+      const delivery = logicalDelivery.get(taskId);
       const isTechDebt = evaluation === TaskEvaluation.GO_WITH_TECH_DEBT;
       const work = projectAttributedTaskWork(taskResult);
       richEvaluations[taskId] = {
         evaluation,
         title: task?.title ?? '',
-        agent: task?.assignedAgent ?? 'generic',
-        skills: task?.assignedSkills ?? [],
+        agent: delivery?.agentId ?? 'generic',
+        skills: [...(delivery?.skillIds ?? [])],
         reason: taskResult?.notes ?? '',
         filesChanged: [...work.filesChanged],
         linesAdded: work.linesAdded,

@@ -118,6 +118,170 @@ Ev
 - 1780659451539-009 — Health and ETA readiness — Created a source-backed Closure Health and ETA readiness assessment.
 - …and 9 more delivered
 
+## Sprint sprint-657 Learnings
+- Sprint sprint-657 Learnings: ## Sprint sprint-657 Learnings
+- Docker settlement and finalizer attribution acceptance: GO_WITH_TECH_DEBT — Read-only acceptance completed within the exact authorized scope. The initial scoped git diff was non-clean due to pre-e
+
+## Gains
+- 657-001 — Prompt receipt and result-contract acceptance — Executed exactly: VITEST_MAX_FORKS=2 npx vitest run tests/core/prompt-delivery-receipt.test.ts te...
+- 657-003 — Dependent and FIX shared-boundary fan-in acceptance — Read-only fan-in acceptance completed within the exact authorized scope.
+
+## Sprint sprint-653 Learnings
+- Sprint sprint-653 Learnings: ## Sprint sprint-653 Learnings
+- Single-source verification, scope and criterion compiler fan-in: GO_WITH_TECH_DEBT — 7/7 goCriteria satisfied. One immutable PromptCompilePlan and planId flow through buildWorkerPrompt -> buildTaskPromptSe
+
+## Gains
+- 653-001 — Typed PromptCompilePlan and applicability-aware result ingress — All 6/6 Definition-of-Done criteria verified.
+- 653-002 — Read-only role policy and ADR/scope authority repair — 8/8 goCriteria satisfied.
+- 653-004 — Prefix-default and production prompt authority canary — Implemented the production-default contiguous T0+T1 prefix and production buildWorkerPrompt autho...
+
+## Sprint sprint-652 Learnings
+- Sprint sprint-652 Learnings: ## Sprint sprint-652 Learnings
+
+## Gains
+- 652-001 — Declarative criterion applicability authority — Added a typed, frozen REQUIRED/OPTIONAL/NOT_APPLICABLE vocabulary and a total deeply frozen matri...
+- 652-002 — Normative verdict production-chain conformance — Exact gap fix: DECIDABLE_VERDICTS now derives from NORMATIVE_VERDICTS, keeping HOLD procedurally ...
+- 652-003 — Applicability-aware evaluator and durable reconstruction — Main evaluation and durable reconstruction now resolve the same canonical rubric and applicabilit...
+- 652-004 — Initial-attempt/FIX parity and production fan-in — FIX task receipts now remain owned by completeResultEvaluationAttempt; reconciled root receipts u...
+
+## Sprint sprint-649 Learnings
+- Sprint sprint-649 Learnings: ## Sprint sprint-649 Learnings
+- Read canonical sidecars and multi-attempt lineages without false rejection: GO_WITH_TECH_DEBT — Implemented narrow dotted-sidecar exclusion for canonical task paths, exact-attempt evaluation indexing, and root/FIX te
+
+## Gains
+- 649-001 — Make terminal Brain adoption replay temporally stable — Implemented temporal-stable per-sprint guarded-summary binding in archive-index metadata.
+- 649-003 — Preserve idempotent finalizer re-entry across later Brain refreshes — Unified same-call, staged-resume, and applied-replay consumers on the shared SprintArchiveTermina...
+- 649-004 — Prove sequential archives and FIX lineage through the real usage ingress — Added sequential production-finalizer archives in one Brain, manifest-bound landing/skill task si...
+
+## Sprint sprint-648 Learnings
+- Sprint sprint-648 Learnings: ## Sprint sprint-648 Learnings
+
+## Gains
+- 648-001 — Plan-time task authority verification — Observed src/core/prompt-cost-canary-task-authority.ts:46-73 normalizes text/paths and canonicali...
+- 648-002 — Catalog-mask production wiring verification — GO: No project files were modified.
+- 648-003 — Archive, kernel and receipt verification — Scoped inspection only; no project files changed.
+- 648-004 — CLI and end-to-end canary verification — Scoped inspection completed without project changes.
+
+## Sprint sprint-647 Learnings
+- Sprint sprint-647 Learnings: ## Sprint sprint-647 Learnings
+- CLI and end-to-end canary verification: GO_WITH_TECH_DEBT — Read .deckent/workspace/WORKER-GUIDE.md and all three exact scoped files. src/cli/commands/usage.ts imports archive disc
+
+## Gains
+- 647-001 — Plan-time task authority verification — GO evidence: src/core/prompt-cost-canary-task-authority.ts:46-73 normalizes text/paths, canonical...
+- 647-002 — Catalog-mask production wiring verification — Observed config producer: src/core/config.ts defines DEFAULT_PROMPT_CONFIG.catalog_mount_mask as ...
+- 647-003 — Archive, kernel and receipt verification — Scoped inspection found canonical archive reading restricts authority to verified terminally seal...
+
+## Sprint sprint-646 Learnings
+- Sprint sprint-646 Learnings: ## Sprint sprint-646 Learnings
+
+## Gains
+- 646-001 — Canonical response-budget authority — Implemented a dependency-free immutable response-limit SSOT (reason 8,192 chars; complete respons...
+- 646-002 — Prompt and parser adoption — Canonical complete-response ceiling is imported and re-exported by the prompt/parser while the co...
+- 646-003 — Durable receipt and bootstrap budget parity — Broker now re-exports the canonical derived raw-output byte cap for durable verdict receipt valid...
+- 646-004 — Production fan-in regression — Host rejected an invalid Docker worker result and contained the attempt as NO_GO; container exit ...
+
+## Sprint sprint-645 Learnings
+- Sprint sprint-645 Learnings: ## Sprint sprint-645 Learnings
+
+## Gains
+- 645-001 — Provider-source hostile model-window proof — Added hostile exact-Opus coverage that preserves a 100% Fable evidence row without requiring it, ...
+- 645-002 — Provider-evidence producer downstream admission proof — Host rejected an invalid Docker worker result and contained the attempt as NO_GO; container exit ...
+- 645-003 — XVerify preparation integration fan-in — Added scoped production-Claude evidence and provider-limit fan-in coverage.
+
+## Sprint sprint-641 Learnings
+- Sprint sprint-641 Learnings: ## Sprint sprint-641 Learnings
+- Real compiled producer-to-consumer fan-in: NO_GO — Created the scoped real compiled-CLI integration test and attempted the exact declared verification three times. All att
+- Fix: Fix: Real compiled producer-to-consumer fan-in: NO_GO — The exact declared command failed: npx vitest run tests/integration/provider-observation-runtime-adoption.integration.te
+- Fix: Real compiled producer-to-consumer fan-in: NO_GO — Declared verification failed repeatedly before either test could run. Exact evidence: npm run build:all, invoked by befo
+
+## Gains
+- 641-001 — Composite runtime-adoption contract and immutable store — Implemented a canonical, strictly validated provider-neutral v1 adoption plan binding the exact p...
+- 641-002 — Ownership-bound bot runtime build identity — Implemented schema-v2 bot pid authority with a module-load snapshot of SHA-256 digests for the ex...
+- 641-003 — Fresh dist build-identity read model — Added exported fresh runtime build-identity read model with exact checkout/dist provenance, typed...
+- 641-004 — Provider-observation runtime adoption CLI composition — Added provider-observations adopt-runtime with side-effect-free dry-run, explicit apply, exact ba...
+
+## Sprint sprint-639 Learnings
+- Sprint sprint-639 Learnings: ## Sprint sprint-639 Learnings
+
+## Gains
+- 639-001 — Cursor production image CLI and complete image-command i18n — Implemented typed withCursor support, exact INSTALL_CURSOR=true shell-free Docker argument emissi...
+- 639-002 — Canonical Cursor catalog visibility — TypeScript check passed: npx tsc --noEmit.
+- 639-003 — Cross-platform Cursor Docker auth isolation — Implementation satisfies the TypeScript feature requirements: Cursor uses the private container d...
+- 639-004 — Cursor production wiring fan-in — Added the authorized production fan-in battery covering the real image handler's exact Cursor and...
+
+## Sprint sprint-638 Learnings
+- Sprint sprint-638 Learnings: ## Sprint sprint-638 Learnings
+- Multi-run batch planning authority: GO_WITH_TECH_DEBT — Implemented deterministic default multi-run reconciliation planning with optional runIds filters, sorted unique candidat
+- XVerify retirement fail-closed hardening: GO_WITH_TECH_DEBT — Implemented typed HOLD for settlement-read failures and retained fail-closed HOLD for observation-store open/reconcile/c
+
+## Gains
+- 638-002 — Verified approval lineage — Implemented a verified apply-time approval claim binding canonical request digest, canonical deci...
+- 638-003 — Durable monotonic receipt — Bound the verified approval claim into content-addressed reconciliation receipts.
+- 638-004 — Canonical batch CLI UX and i18n — Implemented all-eligible dry-run batch reconciliation by default, repeatable --run-id filters, di...
+- 638-006 — Production fan-in — Implemented production fan-in coverage: one deterministic plan for 15 host-settled candidates acr...
+
+## Sprint sprint-636 Learnings
+- Sprint sprint-636 Learnings: ## Sprint sprint-636 Learnings
+- Future ABORTED sprint retirement wiring: GO_WITH_TECH_DEBT — Implemented one canonical exact-attempt retirement helper used by COMPLETE and forceAbortSprint. ABORTED retires only te
+
+## Gains
+- 636-001 — Core reconciliation plan and apply authority — Implemented bounded read-only active-interval inventory and deterministic exact candidate plannin...
+- 636-002 — Durable reconciliation receipt store (depends on Task 1) — Implemented content-addressed reconciliation receipts with opaque project/tenant/environment scop...
+- 636-003 — Authenticated approval bridge (depends on Task 1) — Implemented a reconciliation-specific ApprovalBroker adapter that binds project/tenant, exact pla...
+- 636-005 — Future XVerify retirement wiring — Implemented canonical provider-observation retirement only after an exact closed verifier settlem...
+- 636-006 — Canonical CLI reconciliation ingress (depends on Tasks 1, 2, 3) — Implemented canonical provider-observations reconcile ingress: inspect/dry-run defaults, exact di...
+- 636-007 — Production fan-in and regression proof (depends on Tasks 1, 2, 3, 4, 5, 6) — Added production fan-in integration coverage proving 15 exact host-settled run-owned candidates a...
+
+## Sprint sprint-635 Learnings
+- Sprint sprint-635 Learnings: ## Sprint sprint-635 Learnings
+
+## Gains
+- 635-001 — Verify terminal archive commit and replay invariants — No project files modified, as directed.
+- 635-002 — Verify both production finalizer entry paths — No project files modified, as directed.
+- 635-003 — Verify observability publication containment — Verified scoped implementation and tests without source changes.
+- 635-004 — Verify the production writer ratchet (depends on Tasks 1, 2, 3) — No project files modified: this verification-only task found the production archive-writer gate p...
+- 635-005 — Fan-in acceptance (depends on Tasks 1, 2, 3, 4) — Verification-only fan-in acceptance; no project files modified by this task.
+
+## Sprint sprint-634 Learnings
+- Sprint sprint-634 Learnings: ## Sprint sprint-634 Learnings
+
+## Gains
+- 634-001 — Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Residual gap (worker-typed): package.json lint:gates still need… — Debt resolved: current package.json lint:gates already invokes node scripts/lint-sprint-archive-w...
+- 634-002 — Verify terminal archive commit and replay invariants — Read-only verification completed; no source or test changes were required.
+- 634-003 — Verify both production finalizer entry paths — No project files modified, per task directive.
+- 634-004 — Verify observability publication containment — No source or test files modified, as directed.
+- 634-005 — Verify the production writer ratchet (depends on Fix debt and Tasks 1, 2, 3) — Verified exact disk truth: package.json lint:gates contains exactly one invocation of node script...
+- 634-006 — Fan-in acceptance (depends on Tasks 1, 2, 3, 4) — Read-only fan-in acceptance completed; no project files were modified.
+
+## Sprint sprint-632 Learnings
+- Sprint sprint-632 Learnings: ## Sprint sprint-632 Learnings
+
+## Gains
+- 632-001 — Fail-closed canonical artifact publisher — Implemented typed fail-closed publication errors; pre-mutation canonical namespace and destinatio...
+- 632-002 — Observability producer adopts canonical publisher — Mapped goal: rotation now writes deterministic gzip bytes only to a bounded .deckent staging file...
+- 632-003 — Retire the metrics raw-writer allowlist — Removed rotateMetricsFile from both canonical raw-writer and canonical-retirement allowlists.
+- 632-004 — Fan-in writer-authority acceptance (depends on Tasks 1, 2, 3) — Acceptance-only fan-in made no production changes.
+
+## Sprint sprint-631 Learnings
+- Sprint sprint-631 Learnings: ## Sprint sprint-631 Learnings
+- Truthful stable archive operator contract: GO_WITH_TECH_DEBT — Implemented a language-invariant terminal JSON failure envelope with typed code/reason, conservative mutation state, sea
+
+## Gains
+- 631-001 — Remove unconsumed product-doc load-report churn — Removed normal-finalization load report generation, product-doc persistence, and LOAD_REPORT_WRIT...
+- 631-002 — Seal-owned counter retirement and handoff settlement — Verified npx tsc --noEmit and the required four targeted test files: 34 tests passed.
+- 631-004 — Single manifest writer and computed-writer ratchet closure — Passed npx tsc --noEmit and npx vitest run tests/core/runtime-evaluation-retention.test.ts tests/...
+- 631-005 — Fan-in production acceptance (depends on Tasks 1, 2, 3, 4) — Fan-in acceptance only; no additional project mutation was necessary after the four settled depen...
+
+## Sprint sprint-630 Learnings
+- Sprint sprint-630 Learnings: ## Sprint sprint-630 Learnings
+
+## Gains
+- 630-001 — Core terminal seal and Brain adoption authority — No blocker found in the permitted source.
+- 630-002 — Terminal lifecycle ingress and outermost ordering — Unified normal completion, completed-checkpoint recovery, manual finalize, and force-abort throug...
+- 630-003 — Archive CLI and i18n production surface — Validated canonical terminal inspect/verify/repair paths, receipt parsing, exact initial/replay p...
+- 630-004 — Event ownership and archive-writer ratchet — Implementation evidence: emitProgress now requires producer-owned sprintId; planner suppresses dr...
+- 630-005 — Fan-in terminal acceptance battery — No current-source blocker found; no implementation was required.
+
 ## Sprint sprint-628 Learnings
 - Sprint sprint-628 Learnings: ## Sprint sprint-628 Learnings
 - FO01 ingress wiring inventory: NO_GO — Created the declared evidence file and `git diff --check -- docs/evidence/final-only-usage-containment-parity-2026-08-23

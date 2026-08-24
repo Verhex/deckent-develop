@@ -2,6 +2,12 @@
 // Extracted from brain.ts — task construction, scope extraction, directive parsing
 import { z } from 'zod';
 import { createHash } from 'node:crypto';
+import {
+  buildPromptDeliveryReceipt,
+  promptDeliveryReceiptPath,
+  readPromptDeliveryReceipt,
+  writePromptDeliveryReceipt,
+} from '../core/prompt-delivery-receipt.js';
 import { DeckentError } from '../core/errors.js';
 import { existsSync, readdirSync, readFileSync, appendFileSync, mkdirSync, writeFileSync, renameSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -13,8 +19,11 @@ import type {
   PostSettlementPlanProjection,
   PostSettlementPlatformCapability,
 } from '../core/types.js';
-import { createProductionWiringPlanEvidence } from '../core/task-types.js';
-import { createPostSettlementPlanProjection } from '../core/task-types.js';
+import {
+  createGoNoGoCriterionItem,
+  createPostSettlementPlanProjection,
+  createProductionWiringPlanEvidence,
+} from '../core/task-types.js';
 import type { PostSettlementIngress } from '../core/post-settlement-verification.js';
 import {
   POST_SETTLEMENT_MAX_ARG_BYTES,
@@ -77,7 +86,11 @@ export function logInjectionAudit(
   } catch (e) { debugLog('logInjectionAudit', e); }
 }
 import { readBaseline } from './baseline-tracker.js';
-import { buildTaskPrompt, hasTaskScopedTestDirective } from './prompt-god-template.js';
+import {
+  buildTaskPromptSegmented,
+  extractDeclaredTestCommands,
+  hasTaskScopedVerificationAuthority,
+} from './prompt-god-template.js';
 import { generateProjectContextSegment } from './temp-skill-generator.js';
 import { detectProjectStack } from '../core/stack-detector.js';
 import type {
@@ -357,6 +370,8 @@ export interface CreateTaskParams {
   scope: TaskScope;
   dependencies: string[];
   goNogo: GoNoGoCriteria;
+  /** Exact task-local verification commands captured by the planner/directive parser. */
+  verificationCommands?: readonly string[];
   sprintId: string;
   isPriorityFix?: boolean;
   fixForTaskId?: string;
@@ -1170,6 +1185,24 @@ function now(): string {
   return new Date().toISOString();
 }
 
+/** Producer-side migration for legacy display-only GO/NO-GO contracts. */
+function ensureStructuredGoNogo(goNogo: GoNoGoCriteria): GoNoGoCriteria {
+  if (goNogo.items?.length) return goNogo;
+  const items = [
+    ...(goNogo.goCriteria.trim() ? [createGoNoGoCriterionItem({
+      polarity: 'go',
+      statement: goNogo.goCriteria,
+      evidenceRequirements: [goNogo.goCriteria],
+    })] : []),
+    ...(goNogo.noGoCriteria.trim() ? [createGoNoGoCriterionItem({
+      polarity: 'no-go',
+      statement: goNogo.noGoCriteria,
+      evidenceRequirements: [goNogo.noGoCriteria],
+    })] : []),
+  ];
+  return { ...goNogo, items };
+}
+
 /**
  * Create a new Task object from the given parameters and sequence number.
  * Generates a unique task ID from the sprint ID and sequence (e.g., "037-001").
@@ -1206,6 +1239,9 @@ export function createTask(params: CreateTaskParams, sequence: number): Task & {
   // Sprint 260 BOUNDARY-TEST-PATTERN: auto-add mirrored tests/ dirs for code-development tasks
   // so workers adding a test alongside their fix stay in-scope without a BOUNDARY_VIOLATION.
   const normalizedScope = mirrorTestScope(params.scope, canonicalKind);
+  const verificationCommands = [...new Set((params.verificationCommands ?? [])
+    .map(command => command.replace(/\r\n?/g, '\n').trim())
+    .filter(Boolean))];
 
   return {
     id,
@@ -1217,7 +1253,10 @@ export function createTask(params: CreateTaskParams, sequence: number): Task & {
     reason: params.reason,
     scope: normalizedScope,
     dependencies: params.dependencies,
-    goNogo: params.goNogo,
+    goNogo: ensureStructuredGoNogo(params.goNogo),
+    verification: verificationCommands.length > 0
+      ? { version: 1, source: 'directive', commands: verificationCommands }
+      : undefined,
     status: params.initialStatus ?? TaskStatus.PENDING,
     type: canonicalKind,
     sprintId: params.sprintId,
@@ -2466,11 +2505,13 @@ export interface SkillDeliveryEvidence {
 /** A caller-supplied sink `buildWorkerPrompt` fills with the rendered skill ids. */
 export interface SkillDeliveryProbe {
   deliveredSkillIds: string[];
+  /** Digest identity carried through the production compile call chain. */
+  promptCompilePlanId?: string;
 }
 
-/** `.tasks/task-<id>.skill-delivery.json` — the delivery-proof sidecar path. */
+/** `.tasks/task-<id>.skill-delivery.json` — stable compatibility sidecar path. */
 export function skillDeliveryEvidencePath(projectRoot: string, taskId: string): string {
-  return join(projectRoot, TASKS_DIR, `task-${taskId}.skill-delivery.json`);
+  return promptDeliveryReceiptPath(projectRoot, taskId);
 }
 
 /** Delivery-proof record (9034): exactly which skill ids REACHED the worker
@@ -2502,6 +2543,12 @@ export function writeSkillDeliveryEvidence(
   projectRoot: string,
   evidence: SkillDeliveryEvidence,
 ): boolean {
+  // Spawn callers from the v1 compatibility era may still invoke this after
+  // buildWorkerPrompt. Never let that projection overwrite the canonical v2
+  // receipt that the prompt boundary already published.
+  if (readPromptDeliveryReceipt(projectRoot, evidence.taskId).state === 'AVAILABLE') {
+    return true;
+  }
   const target = skillDeliveryEvidencePath(projectRoot, evidence.taskId);
   const temp = `${target}.tmp`;
   try {
@@ -2525,6 +2572,19 @@ export function readSkillDeliveryEvidence(
   projectRoot: string,
   taskId: string,
 ): SkillDeliveryEvidence | null {
+  const current = readPromptDeliveryReceipt(projectRoot, taskId);
+  if (current.state === 'AVAILABLE') {
+    const receipt = current.receipt;
+    return {
+      version: 1,
+      taskId: receipt.taskId,
+      source: receipt.source,
+      deliveredSkillIds: [...receipt.deliveredSkillIds],
+      assignedSkillIds: [...receipt.assignedSkillIds],
+      forcedSkillIds: [...receipt.forcedSkillIds],
+      undeliveredForcedSkillIds: [...receipt.undeliveredForcedSkillIds],
+    };
+  }
   try {
     const target = skillDeliveryEvidencePath(projectRoot, taskId);
     if (!existsSync(target)) return null;
@@ -2552,17 +2612,19 @@ export function readSkillDeliveryEvidence(
  * @param task The task the worker will execute.
  * @param agentPrompt Optional agent PROMPT.md content.
  * @param skillPrompts Optional skill prompt blocks.
- * @param projectRoot Project root honored uniformly by every read in this function —
+ * @param projectRoot Explicit project root honored uniformly by every read in this function —
  *   `worker_comms` config + SharedMemory (Sprint 278 COMM-1 / 278-003), the ADR/
- *   `.brain/memory.db` load, the baseline-failure read, and `git ls-files`. Defaults
- *   to `process.cwd()` — the established spawn-path root.
+ *   `.brain/memory.db` load, the baseline-failure read, and `git ls-files`. Every
+ *   production dispatch passes this value and therefore publishes the durable
+ *   prompt-delivery receipt. An omitted value retains the established `process.cwd()`
+ *   read context for compile-only callers without mutating runtime state.
  * @returns The assembled worker prompt (also sets `task.estimatedTokens`).
  */
 export function buildWorkerPrompt(
   task: Task,
   agentPrompt?: string,
   skillPrompts?: Array<{ name: string; content: string }>,
-  projectRoot: string = process.cwd(),
+  projectRoot?: string,
   effectiveConfig?: Pick<ResolvedConfig, 'prompt'>,
   exactPlanAuthority?: {
     readonly flowId: string;
@@ -2572,6 +2634,22 @@ export function buildWorkerPrompt(
   },
   deliveryProbe?: SkillDeliveryProbe,
 ): string {
+  const publishDeliveryReceipt = projectRoot !== undefined;
+  projectRoot ??= process.cwd();
+  // Legacy task JSON may predate Task.verification and carry `Test:` only in
+  // description prose. Migrate exactly once at the production ingress; the
+  // compiler/renderer below consumes only the typed task field.
+  if (task.verification === undefined) {
+    const legacyCommands = extractDeclaredTestCommands(task);
+    if (legacyCommands.length > 0) {
+      task.verification = {
+        version: 1,
+        source: 'legacy-ingress',
+        commands: [...legacyCommands],
+      };
+    }
+  }
+  task.goNogo = ensureStructuredGoNogo(task.goNogo);
   const effort = resolveWorkerEffort(task);
 
   // 561-003 FORCE-EZME: the LAST boundary every spawn path crosses (sprint,
@@ -2659,7 +2737,7 @@ export function buildWorkerPrompt(
   // A task-local Test directive is the worker's complete verification authority.
   // Stack-resolved commands are wave-level orchestration inputs and must not leak
   // into that worker prompt or widen its proof obligation.
-  if (!hasTaskScopedTestDirective(task)) {
+  if (!hasTaskScopedVerificationAuthority(task)) {
     try {
       verifyCommands = resolveVerifyCommands(projectRoot);
     } catch (e) {
@@ -2800,16 +2878,36 @@ export function buildWorkerPrompt(
     coreExternalized: shouldExternalizeWorkerCore(task.provider, effectiveConfig?.prompt),
     exactExecutionAuthority,
   };
-  const artifact = buildTaskPrompt(task, ctx);
+  const artifact = buildTaskPromptSegmented(task, ctx);
 
   // Single accurate token estimate from the actual assembled prompt.
   task.estimatedTokens = artifact.metadata.estimatedTokens;
+  // Persisted with the EXECUTING task snapshot by every scheduler/spawn path.
+  // Result evaluation uses this exact value; workers never recompute it.
+  task.promptCompilePlanId = artifact.planId;
 
-  // 561-003 DELIVERY-PROOF: `artifact.metadata.skills` is emitted by
-  // `buildSkillBlock` while it writes the `--- <id> ---` blocks, so it is the
-  // rendered set itself — not a re-derivation of it. Handing that set back to
-  // the caller is what lets stat credit follow DELIVERY instead of assignment.
-  if (deliveryProbe) deliveryProbe.deliveredSkillIds = [...artifact.metadata.skills];
+  // Build and publish the authoritative receipt once, from this final segmented
+  // artifact. This is deliberately independent of the legacy caller probe.
+  const receipt = buildPromptDeliveryReceipt({
+    taskId: task.id,
+    prompt: artifact.prompt,
+    promptCompilePlanId: artifact.planId,
+    rolePolicyIdentity: artifact.compilePlan.rolePolicyIdentity,
+    assignedAgentId: task.assignedAgent,
+    assignedSkillIds: task.assignedSkills,
+    forcedSkillIds: task.forceSkills,
+    segments: artifact.segments,
+  });
+  if (publishDeliveryReceipt && !writePromptDeliveryReceipt(projectRoot, receipt)) {
+    throw new Error(`PROMPT_DELIVERY_RECEIPT_WRITE_HOLD:${task.id}`);
+  }
+
+  // Compatibility observer: its values are projected from the canonical receipt,
+  // never used to decide what was delivered or whether a receipt is written.
+  if (deliveryProbe) {
+    deliveryProbe.deliveredSkillIds = [...receipt.deliveredSkillIds];
+    deliveryProbe.promptCompilePlanId = artifact.planId;
+  }
 
   // PCOMP-6 D2 (MASTER-PLAN 573): spawn-time prompt-contract linter —
   // WARN-ONLY rollout (Alperen 2026-07-14: warn → ölçüm → fail-closed).

@@ -38,6 +38,8 @@ import type { RequirementVector } from '../../../src/core/routing/requirement-ve
 import { DEFAULT_ROUTING_V3_CONFIG } from '../../../src/core/routing/config.js';
 import { BUILTIN_DOMAINS } from '../../../src/core/routing/vocabulary-builtin.js';
 import type { RoutingDecisionV3, JournalEntryV3 } from '../../../src/core/routing/decision-types.js';
+import { deriveCanonicalSkillProfile } from '../../../src/core/skill-profile-derivation.js';
+import { createSkillDefinition } from '../../../src/core/skill-types.js';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -501,6 +503,32 @@ describe('routeTaskV3 — deterministic end-to-end', () => {
     // never the alphabetical tie-break winners.
     const decision = await routeTaskV3(BUILD_TASK, catalog, { config: CONFIG, requirement: req({}) });
     expect(decision.skillIds).toEqual([]);
+  });
+
+  it('skills: derived test authority is selected for a core plus tests task', async () => {
+    const testing = deriveCanonicalSkillProfile(createSkillDefinition({
+      id: 'testing-expert', name: 'Testing Expert', category: 'workflow', priority: 10,
+      description: 'Test pyramid, mocking strategies, coverage, and CI integration',
+      triggers: ['test', 'coverage', 'spec'],
+      stackDetection: { files: [], dependencies: ['vitest'], commands: [] },
+    }));
+    const generic = deriveCanonicalSkillProfile(createSkillDefinition({
+      id: 'generic-builder', name: 'Generic Builder', category: 'workflow', priority: 10,
+      description: 'Build components and tooling', triggers: ['build'],
+    }));
+    if (testing.status !== 'routable' || generic.status !== 'routable') {
+      throw new Error('test fixtures must derive');
+    }
+    const catalog: RouteCatalog = {
+      ...catalogOf(builder),
+      skills: [
+        { skillId: 'generic-builder', profile: generic.profile },
+        { skillId: 'testing-expert', profile: testing.profile },
+      ],
+    };
+
+    const decision = await routeTaskV3(BUILD_TASK, catalog, { config: CONFIG });
+    expect(decision.skillIds).toEqual(['testing-expert']);
   });
 
   it('skills: an explicit `*` domain declaration still attaches (owner-authored wildcard, 7094-F1c)', async () => {

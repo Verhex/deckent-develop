@@ -34,6 +34,7 @@ import { debugLog } from '../core/utils.js';
 import type { Task, TaskScope } from '../core/task-types.js';
 import type { TokenUsage } from '../core/token-usage.js';
 import { validateTaskResult, type TaskResultV1 } from '../core/task-result-schema.js';
+import { resolvePromptDeliveryAttribution } from '../core/prompt-delivery-receipt.js';
 import { getDefaultProviderName } from './sprint-utils.js';
 
 // ─── Input contract ──────────────────────────────────────────────────────────
@@ -203,6 +204,13 @@ export async function assembleResult(input: AssembleInput): Promise<TaskResultV1
     ws.tsc.clean === false && ws.selfAssessment === 'DONE'
       ? { flagged: true, violation: 'claimed-done-tsc-fail' }
       : { flagged: false, violation: null };
+  const promptDelivery = resolvePromptDeliveryAttribution({
+    projectRoot: input.projectRoot,
+    taskId: task.id,
+    requireCurrentReceipt: typeof task.promptCompilePlanId === 'string',
+    legacyAgentId: identity.agent ?? task.assignedAgent ?? null,
+    legacySkillIds: identity.skills ?? task.assignedSkills,
+  });
 
   // 4. Assemble the canonical shape (authoritative derived + worker subjective +
   //    null brain/auditor slots filled downstream). Defaults applied by the schema.
@@ -216,8 +224,8 @@ export async function assembleResult(input: AssembleInput): Promise<TaskResultV1
     provider: identity.provider ?? task.provider ?? getDefaultProviderName(),
     model: identity.model ?? task.forceModel ?? task.model,
     modelEffort: identity.modelEffort ?? task.modelEffort,
-    agent: identity.agent ?? task.assignedAgent ?? null,
-    skills: identity.skills ?? task.assignedSkills ?? [],
+    agent: promptDelivery.agentId,
+    skills: [...promptDelivery.skillIds],
     attempt: identity.attempt ?? 1,
     isPriorityFix: task.isPriorityFix ?? false,
     fixForTaskId: task.fixForTaskId ?? null,
@@ -234,6 +242,10 @@ export async function assembleResult(input: AssembleInput): Promise<TaskResultV1
     totalLinesRemoved,
     diskVerified: gitResult.ok,
     boundaryViolations,
+    promptDeliveryAttribution: {
+      state: promptDelivery.state,
+      ...(promptDelivery.state === 'HOLD' ? { reason: promptDelivery.reason } : {}),
+    },
 
     // resource accounting (orchestrator, provider-agnostic)
     tokenUsage: input.tokenUsage,

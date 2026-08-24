@@ -137,6 +137,40 @@ describe('FIX prompt enrichment — handleEvaluation NO_GO', () => {
     expect(payload.description).toContain('## Fix Guidance');
   });
 
+  it('carries the host schema failure into the next FIX instead of replaying implementation blindly', () => {
+    const task = makeTask();
+    const result = makeNoGoResult({
+      testsPassed: true,
+      filesChanged: ['src/scripts/guard.ts'],
+      linesAdded: 12,
+    }) as TaskResult & { brainEvaluationReason?: string };
+    result.brainEvaluationReason = 'schema-validation: criteriaEvidence:assessment-parity';
+    handleEvaluation('/root', task, TaskEvaluation.NO_GO, result);
+
+    const { payload } = readWrittenFixTask();
+    expect(payload.description).toContain('## Host Evaluation Authority');
+    expect(payload.description).toContain('criteriaEvidence:assessment-parity');
+    expect(payload.reason).toContain('brain=schema-validation');
+  });
+
+  it('inherits the exact typed verification authority including command prefixes', () => {
+    const task = makeTask({
+      verification: {
+        version: 1,
+        source: 'directive',
+        commands: [
+          'VITEST_MAX_FORKS=2 npx vitest run tests/orchestra/fix-task-enrichment.test.ts',
+        ],
+      },
+    });
+    handleEvaluation('/root', task, TaskEvaluation.NO_GO, makeNoGoResult());
+
+    const { payload } = readWrittenFixTask();
+    expect(payload.verification).toEqual(task.verification);
+    expect(payload.verification).not.toBe(task.verification);
+    expect(payload.verification.commands).not.toBe(task.verification?.commands);
+  });
+
   it('empty-description-fallback: when original description is empty the fix-task uses an explicit fallback marker (no crash)', () => {
     const task = makeTask({ description: '' });
     const result = makeNoGoResult();

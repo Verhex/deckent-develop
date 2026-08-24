@@ -377,6 +377,52 @@ describe('evaluateWithRubric — unevidenced test-claim ceiling (7097-B3)', () =
     expect(evaluation.decision).toBe('DONE');
   });
 
+  it('code task: typed PASSED execution matching declared command keeps DONE without prose heuristics', () => {
+    const command = 'VITEST_MAX_FORKS=2 npx vitest run tests/core/widget.test.ts';
+    const task = makeCodeTask();
+    task.verification = { version: 1, source: 'directive', commands: [command] };
+    const result = makeResult({
+      testsPassed: true,
+      testVerification: {
+        applicability: 'REQUIRED',
+        outcome: 'PASSED',
+        commands: [command, command],
+      },
+      coverage: 0,
+      filesChanged: ['src/core/widget.ts'],
+      notes: 'The declared operation completed successfully and the scoped source remained within its authorized boundary.',
+      selfAssessment: 'DONE',
+    });
+
+    const evaluation = evaluateWithRubric(result, task);
+
+    expect(evaluation.decision).toBe('DONE');
+    expect(evaluation.totalScore).toBe(100);
+  });
+
+  it('code task: typed PASSED execution with an undeclared command does not bypass the evidence ceiling', () => {
+    const task = makeCodeTask();
+    task.verification = {
+      version: 1,
+      source: 'directive',
+      commands: ['npx vitest run tests/core/widget.test.ts'],
+    };
+    const result = makeResult({
+      testsPassed: true,
+      testVerification: {
+        applicability: 'REQUIRED',
+        outcome: 'PASSED',
+        commands: ['npx vitest run tests/unrelated.test.ts'],
+      },
+      coverage: 0,
+      filesChanged: ['src/core/widget.ts'],
+      notes: 'The declared operation completed and the scoped source remained within its authorized boundary.',
+      selfAssessment: 'DONE',
+    });
+
+    expect(evaluateWithRubric(result, task).decision).toBe('GO_WITH_TECH_DEBT');
+  });
+
   it('code task: changed test file + measured coverage keep DONE (ceiling stays inert on evidence)', () => {
     // coverage 0 would independently drag the test_coverage criterion into
     // the DEBT band — that is rubric math, not the ceiling. A measured

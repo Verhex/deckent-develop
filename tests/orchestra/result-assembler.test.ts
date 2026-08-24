@@ -19,6 +19,11 @@ import {
   type FileChange,
 } from '../../src/orchestra/result-assembler.js';
 import { validateTaskResult } from '../../src/core/task-result-schema.js';
+import {
+  buildPromptDeliveryReceipt,
+  promptDeliveryReceiptPath,
+  writePromptDeliveryReceipt,
+} from '../../src/core/prompt-delivery-receipt.js';
 import type { TokenUsage } from '../../src/core/token-usage.js';
 import { TaskStatus } from '../../src/core/types.js';
 import type { Task, TaskScope } from '../../src/core/types.js';
@@ -280,6 +285,63 @@ describe('assembleResult — validation', () => {
     expect(result.brainEvaluation).toBeNull();
     expect(result.auditorValidation).toBeNull();
     expect(result.totalLinesAdded).toBe(2);
+  });
+});
+
+describe('assembleResult — prompt delivery identity authority', () => {
+  it('credits only identities rendered into a current receipt', async () => {
+    const root = makeTempDir('result-delivery-current');
+    try {
+      const planId = `prompt-compile-plan:sha256:${'a'.repeat(64)}`;
+      const receipt = buildPromptDeliveryReceipt({
+        taskId: 'task-1',
+        prompt: 'final prompt bytes',
+        promptCompilePlanId: planId,
+        rolePolicyIdentity: 'worker:delivered-agent',
+        assignedAgentId: 'claim-agent',
+        assignedSkillIds: ['claim-skill'],
+        segments: [
+          { kind: 'persona', content: '=== Agent: delivered-agent ===\npersona' },
+          { kind: 'skills', content: '=== Skills ===\n--- delivered-skill ---\nbody\n' },
+        ],
+      });
+      expect(writePromptDeliveryReceipt(root, receipt)).toBe(true);
+      const result = await assembleResult(baseInput({
+        projectRoot: root,
+        task: makeTask({ promptCompilePlanId: planId, assignedAgent: 'assigned-agent', assignedSkills: ['assigned-skill'] }),
+        identity: { workerId: 'w-1', provider: 'claude', model: 'opus', agent: 'claim-agent', skills: ['claim-skill'] },
+      }));
+      expect(result.agent).toBe('delivered-agent');
+      expect(result.skills).toEqual(['delivered-skill']);
+      expect(result.promptDeliveryAttribution).toEqual({ state: 'CURRENT' });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('gives no identity credit when a fresh current receipt is absent or malformed', async () => {
+    const root = makeTempDir('result-delivery-hold');
+    const planId = `prompt-compile-plan:sha256:${'b'.repeat(64)}`;
+    const input = baseInput({
+      projectRoot: root,
+      task: makeTask({ promptCompilePlanId: planId, assignedAgent: 'assigned-agent', assignedSkills: ['assigned-skill'] }),
+      identity: { workerId: 'w-1', provider: 'claude', model: 'opus', agent: 'claim-agent', skills: ['claim-skill'] },
+    });
+    try {
+      const missing = await assembleResult(input);
+      expect(missing.agent).toBeNull();
+      expect(missing.skills).toEqual([]);
+      expect(missing.promptDeliveryAttribution).toEqual({ state: 'HOLD', reason: 'missing' });
+
+      mkdirSync(join(root, '.tasks'), { recursive: true });
+      writeFileSync(promptDeliveryReceiptPath(root, 'task-1'), '{malformed', 'utf8');
+      const malformed = await assembleResult(input);
+      expect(malformed.agent).toBeNull();
+      expect(malformed.skills).toEqual([]);
+      expect(malformed.promptDeliveryAttribution).toEqual({ state: 'HOLD', reason: 'malformed' });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 

@@ -8,6 +8,9 @@ import {
   AUDIT_RUBRIC,
   DOC_WRITE_RUBRIC,
   CODE_RUBRIC,
+  resolveRubricTaskType,
+  resolveRubricEvidenceApplicability,
+  hasDeclaredTestCommand,
 } from '../../src/orchestra/rubric-registry.js';
 import { TaskStatus, type Task } from '../../src/core/types.js';
 
@@ -29,6 +32,38 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     ...overrides,
   };
 }
+
+describe('hasDeclaredTestCommand', () => {
+  it('uses typed verification as the canonical command authority', () => {
+    const task = makeTask({
+      description: 'Read-only acceptance without a legacy Test clause.',
+      verification: {
+        version: 1,
+        source: 'directive',
+        commands: ['VITEST_MAX_FORKS=2 npx vitest run tests/x.test.ts'],
+      },
+    });
+
+    expect(hasDeclaredTestCommand(task)).toBe(true);
+  });
+
+  it('does not let stale description prose override an explicitly empty typed block', () => {
+    const task = makeTask({
+      description: '**Test:** `npx vitest run tests/stale.test.ts`',
+      verification: { version: 1, source: 'directive', commands: [] },
+    });
+
+    expect(hasDeclaredTestCommand(task)).toBe(false);
+  });
+
+  it('keeps the legacy description adapter for tasks without typed verification', () => {
+    const task = makeTask({
+      description: '**Test:** `npx vitest run tests/legacy.test.ts`',
+    });
+
+    expect(hasDeclaredTestCommand(task)).toBe(true);
+  });
+});
 
 // ─── isAuditTask ────────────────────────────────────────────────────
 
@@ -409,5 +444,47 @@ describe('coverageOptional', () => {
       filesChanged: ['src/X.ts'],
       testsPassed: true,
     })).toBe(true);
+  });
+});
+
+describe('rubric evidence applicability', () => {
+  it.each([
+    ['documentation', 'document-write'],
+    ['audit', 'audit'],
+  ] as const)('uses canonical %s authority and makes false test claims N/A', (type, rubricType) => {
+    const task = makeTask({
+      type,
+      scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/X.ts'] },
+    });
+    expect(resolveRubricTaskType(task)).toBe(rubricType);
+    expect(resolveRubricEvidenceApplicability(task, 'test_execution', { testsPassed: false }))
+      .toBe('NOT_APPLICABLE');
+    expect(resolveRubricEvidenceApplicability(task, 'coverage')).toBe('NOT_APPLICABLE');
+  });
+
+  it('keeps a code test failure required', () => {
+    const task = makeTask({ type: 'code-development' });
+    expect(resolveRubricEvidenceApplicability(task, 'test_execution', { testsPassed: false }))
+      .toBe('REQUIRED');
+  });
+
+  it('marks non-measurable language coverage optional rather than N/A', () => {
+    const task = makeTask({
+      type: 'code-development',
+      scope: { directories: ['native/'], filesRead: [], filesWrite: ['native/main.cpp'] },
+    });
+    expect(resolveRubricEvidenceApplicability(task, 'coverage', {
+      filesChanged: ['native/main.cpp'], testsPassed: true,
+    })).toBe('OPTIONAL');
+  });
+
+  it('keeps measurable TypeScript coverage required', () => {
+    const task = makeTask({
+      type: 'code-development',
+      scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/X.ts'] },
+    });
+    expect(resolveRubricEvidenceApplicability(task, 'coverage', {
+      filesChanged: ['src/X.ts'], testsPassed: true,
+    })).toBe('REQUIRED');
   });
 });

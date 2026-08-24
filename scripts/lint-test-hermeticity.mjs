@@ -603,8 +603,29 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-24 sprint-649 archive replay hardening: +8 — sequential Brain
   // adoption, historical terminal replay and FIX-attempt archive fixtures use
   // only suite-owned tmpdirs. Scanner: zero confirmed live-authority violations.
-  count: 16018,
-  digest: 'a24eb288974198e433d31fd47f882405156da8e06f929c61a4d841270eb8ff67',
+  // 2026-08-24 sprint-652 evaluator applicability closure: +4 — the FIX
+  // production fan-in regression creates, reads and removes only its own
+  // async mkdtemp root. The evaluator-consistency pin now accounts for the
+  // two explicit applicability audit rows; no live repository authority is
+  // read or mutated by either suite.
+  // Root acceptance recovery keeps the count unchanged: recordFixEvaluationAudit
+  // restores its documented direct/recovery receipt while the live ingest path
+  // declares its already-written canonical receipt. The digest moves only with
+  // the existing sprint-phases production callsites; scanner violations remain 0.
+  // 2026-08-24 prompt compile authority P0: +2 — the production-chain canary's
+  // additional parse→Task→prompt case creates and retires only its suite-owned
+  // mkdtemp root. No live repository authority is read or mutated.
+  // 2026-08-24 prompt-delivery settlement closure: +25 — current/malformed
+  // receipt fixtures plus the real route→body resolver→prompt→Docker settlement
+  // chain operate only inside suite-owned mkdtemp projects. Compile-only prompt
+  // callers no longer attempt a live `.tasks` write; scanner violations remain 0.
+  // 2026-08-24 typed verification authority follow-through: count unchanged;
+  // digest binds the registry/evaluator regression that makes the canonical
+  // task.verification block authoritative while preserving the legacy prose
+  // adapter, plus authority-matched structured PASSED evidence consumption.
+  // The fixtures are pure in-memory task/result shapes.
+  count: 16049,
+  digest: 'dec6322745ea8c81f57a90066c283f6253f30021bfb717674bdd690788a2b7bf',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1072,8 +1093,24 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-24 sprint-649 archive replay hardening: count unchanged; digest
   // binds per-sprint guarded-summary adoption, exact FIX-attempt cohort lineage
   // and replay-safe finalizer verification in existing production modules.
-  count: 1318,
-  digest: '70d96f738b8051c6e06f32147ba6a02aa73e376c2289a144072adeb4b8570903',
+  // 2026-08-24 sprint-652 evaluator applicability closure: count unchanged;
+  // digest binds the frozen applicability matrix, canonical rubric/recovery
+  // resolver and initial/FIX durable audit fan-in in existing modules.
+  // Root acceptance recovery is count-neutral; the digest additionally binds
+  // the direct/recovery FIX audit contract without adding a production module.
+  // 2026-08-24 prompt compile authority P0: +1 — the immutable deterministic
+  // PromptCompilePlan IR enters production inventory; directive parsing,
+  // worker prompt ingress and evaluator consumers bind its digest and typed
+  // verification/criterion projections.
+  // 2026-08-24 prompt-delivery settlement closure: +1 — the versioned prompt
+  // delivery receipt authority is now a production module. The digest binds
+  // its route/spawn producer and Docker/finalizer/result consumers.
+  // 2026-08-24 typed verification authority follow-through: count unchanged;
+  // digest binds the canonical task.verification-first rubric consumer and
+  // its explicit legacy-description fallback in the existing registry, plus
+  // authority-matched structured execution evidence at the debt ceiling.
+  count: 1320,
+  digest: 'a896191dc2848445c71cfa89a8e0105f37aa74ac594aed7aa3cf254edb11e3b3',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

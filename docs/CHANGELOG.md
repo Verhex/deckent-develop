@@ -14,6 +14,254 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint657] - 2026-08-24
+
+### Added
+
+- Prompt receipt and result-contract acceptance
+
+### Changed
+
+- Docker settlement and finalizer attribution acceptance (completed with tech debt)
+
+### Fixed
+
+- Dependent and FIX shared-boundary fan-in acceptance
+
+
+_Tasks: 3 total, 3 done, 1 tech debt, 0 no-go_
+
+## [sprint653] - 2026-08-24
+
+### Added
+
+- Typed PromptCompilePlan and applicability-aware result ingress
+- Read-only role policy and ADR/scope authority repair
+
+### Changed
+
+- Single-source verification, scope and criterion compiler fan-in (completed with tech debt)
+
+### Fixed
+
+- Prefix-default and production prompt authority canary
+
+
+_Tasks: 4 total, 4 done, 1 tech debt, 0 no-go_
+
+## [sprint652] - 2026-08-24
+
+### Added
+
+- Declarative criterion applicability authority
+- Normative verdict production-chain conformance
+- Applicability-aware evaluator and durable reconstruction
+
+### Fixed
+
+- Initial-attempt/FIX parity and production fan-in
+
+
+_Tasks: 4 total, 4 done, 0 tech debt, 0 no-go_
+
+## [sprint649] - 2026-08-24
+
+### Added
+
+- Make terminal Brain adoption replay temporally stable
+- Preserve idempotent finalizer re-entry across later Brain refreshes
+
+### Changed
+
+- Read canonical sidecars and multi-attempt lineages without false rejection (completed with tech debt)
+
+### Fixed
+
+- Prove sequential archives and FIX lineage through the real usage ingress
+
+
+_Tasks: 4 total, 4 done, 1 tech debt, 0 no-go_
+
+## [sprint648] - 2026-08-24
+
+### Added
+
+- Plan-time task authority verification
+- Catalog-mask production wiring verification
+- Archive, kernel and receipt verification
+- CLI and end-to-end canary verification
+
+
+_Tasks: 4 total, 4 done, 0 tech debt, 0 no-go_
+
+## [sprint647] - 2026-08-24
+
+### Added
+
+- Plan-time task authority verification
+- Catalog-mask production wiring verification
+- Archive, kernel and receipt verification
+
+### Changed
+
+- CLI and end-to-end canary verification (completed with tech debt)
+
+
+_Tasks: 4 total, 4 done, 1 tech debt, 0 no-go_
+
+## [sprint646] - 2026-08-24
+
+### Added
+
+- Canonical response-budget authority
+- Prompt and parser adoption
+- Durable receipt and bootstrap budget parity
+- Production fan-in regression
+
+
+_Tasks: 4 total, 4 done, 0 tech debt, 0 no-go_
+
+## [sprint645] - 2026-08-24
+
+### Added
+
+- Provider-source hostile model-window proof
+- Provider-evidence producer downstream admission proof
+- XVerify preparation integration fan-in
+
+
+_Tasks: 3 total, 3 done, 0 tech debt, 0 no-go_
+
+## [sprint641] - 2026-08-24
+
+### Added
+
+- Composite runtime-adoption contract and immutable store
+- Ownership-bound bot runtime build identity
+- Fresh dist build-identity read model
+- Provider-observation runtime adoption CLI composition
+
+
+_Tasks: 5 total, 4 done, 0 tech debt, 1 no-go_
+
+## [sprint639] - 2026-08-24
+
+### Added
+
+- Cursor production image CLI and complete image-command i18n
+- Canonical Cursor catalog visibility
+- Cross-platform Cursor Docker auth isolation
+- Cursor production wiring fan-in
+
+
+_Tasks: 4 total, 4 done, 0 tech debt, 0 no-go_
+
+## [sprint638] - 2026-08-24
+
+### Added
+
+- Verified approval lineage
+- Durable monotonic receipt
+- Canonical batch CLI UX and i18n
+- Production fan-in
+
+### Changed
+
+- Multi-run batch planning authority (completed with tech debt)
+- XVerify retirement fail-closed hardening (completed with tech debt)
+
+
+_Tasks: 6 total, 6 done, 2 tech debt, 0 no-go_
+
+## [sprint636] - 2026-08-23
+
+### Added
+
+- Core reconciliation plan and apply authority
+- Durable reconciliation receipt store (depends on Task 1)
+- Authenticated approval bridge (depends on Task 1)
+- Future XVerify retirement wiring
+- Canonical CLI reconciliation ingress (depends on Tasks 1, 2, 3)
+- Production fan-in and regression proof (depends on Tasks 1, 2, 3, 4, 5, 6)
+
+### Changed
+
+- Future ABORTED sprint retirement wiring (completed with tech debt)
+
+
+_Tasks: 7 total, 7 done, 1 tech debt, 0 no-go_
+
+## [sprint635] - 2026-08-23
+
+### Added
+
+- Verify terminal archive commit and replay invariants
+- Verify both production finalizer entry paths
+- Verify observability publication containment
+- Verify the production writer ratchet (depends on Tasks 1, 2, 3)
+- Fan-in acceptance (depends on Tasks 1, 2, 3, 4)
+
+
+_Tasks: 5 total, 5 done, 0 tech debt, 0 no-go_
+
+## [sprint634] - 2026-08-23
+
+### Added
+
+- Verify terminal archive commit and replay invariants
+- Verify both production finalizer entry paths
+- Verify observability publication containment
+- Fan-in acceptance (depends on Tasks 1, 2, 3, 4)
+
+### Fixed
+
+- Fix debt: Task evaluated as GO_WITH_TECH_DEBT. Residual gap (worker-typed): package.json lint:gates still need…
+- Verify the production writer ratchet (depends on Fix debt and Tasks 1, 2, 3)
+
+
+_Tasks: 6 total, 6 done, 0 tech debt, 0 no-go_
+
+## [sprint632] - 2026-08-23
+
+### Added
+
+- Fail-closed canonical artifact publisher
+- Observability producer adopts canonical publisher
+- Retire the metrics raw-writer allowlist
+- Fan-in writer-authority acceptance (depends on Tasks 1, 2, 3)
+
+
+_Tasks: 4 total, 4 done, 0 tech debt, 0 no-go_
+
+## [sprint631] - 2026-08-23
+
+### Added
+
+- Remove unconsumed product-doc load-report churn
+- Seal-owned counter retirement and handoff settlement
+- Single manifest writer and computed-writer ratchet closure
+- Fan-in production acceptance (depends on Tasks 1, 2, 3, 4)
+
+### Changed
+
+- Truthful stable archive operator contract (completed with tech debt)
+
+
+_Tasks: 5 total, 5 done, 1 tech debt, 0 no-go_
+
+## [sprint630] - 2026-08-23
+
+### Added
+
+- Core terminal seal and Brain adoption authority
+- Terminal lifecycle ingress and outermost ordering
+- Archive CLI and i18n production surface
+- Event ownership and archive-writer ratchet
+- Fan-in terminal acceptance battery
+
+
+_Tasks: 5 total, 5 done, 0 tech debt, 0 no-go_
+
 ## [sprint628] - 2026-08-23
 
 

@@ -155,10 +155,8 @@ import { resolveAgentPrompt, resolveSkillPrompts } from './result-collector.js';
 import {
   buildWorkerPrompt,
   applySkillDirectiveAuthority,
-  buildSkillDeliveryEvidence,
-  writeSkillDeliveryEvidence,
-  type SkillDeliveryProbe,
 } from './task-builder.js';
+import { readPromptDeliveryReceipt } from '../core/prompt-delivery-receipt.js';
 import { hasSettlementReceipt } from './evaluation-audit-trail.js';
 
 // ─── Planner dependency normalization (323-031 wire) ──────────────
@@ -1104,12 +1102,6 @@ export async function spawnWorkers(
       }
     }
 
-    // 561-003 DELIVERY-PROOF: the probe is filled from the prompt's OWN skill
-    // block, so `deliveredSkillIds` is the set of ids whose SKILL.md content is
-    // really in the bytes handed to the worker — not the assignment it was
-    // derived from. Persisted next to the task's other lifecycle artifacts so
-    // outcome learning can credit delivery instead of assignment.
-    const skillDeliveryProbe: SkillDeliveryProbe = { deliveredSkillIds: [] };
     const prompt = buildWorkerPrompt(
       task,
       agentPrompt,
@@ -1117,10 +1109,14 @@ export async function spawnWorkers(
       projectRoot,
       config,
       spawnOpts?.exactPlanAuthority,
-      skillDeliveryProbe,
     );
-    const skillDelivery = buildSkillDeliveryEvidence(task, skillDeliveryProbe.deliveredSkillIds);
-    writeSkillDeliveryEvidence(projectRoot, skillDelivery);
+    // The shared prompt boundary is the sole producer for initial, dependent,
+    // FIX, respawn and manual paths. Initial dispatch reads that same receipt
+    // for event projection; it never publishes a scheduler-specific sidecar.
+    const promptDelivery = readPromptDeliveryReceipt(projectRoot, task.id);
+    if (promptDelivery.state !== 'AVAILABLE') {
+      throw new Error(`PROMPT_DELIVERY_RECEIPT_HOLD:${task.id}:${promptDelivery.reason}`);
+    }
     const model = task.model;
     // Row 4061: same authority, same formatter as every other backend. The
     // canonical deriver always returns at least `.tasks/`, so the historical
@@ -1154,7 +1150,7 @@ export async function spawnWorkers(
         // disk-fresh assignment can differ from the render (agent-named dedupe,
         // DNA filter, an unresolvable body), and an observer reading assignment
         // as delivery is exactly the phantom-credit gap this task closes.
-        skills: skillDelivery.deliveredSkillIds,
+        skills: [...promptDelivery.receipt.deliveredSkillIds],
         scope: {
           directories: freshTask.scope?.directories ?? task.scope?.directories ?? [],
           filesWrite: freshTask.scope?.filesWrite ?? task.scope?.filesWrite ?? [],

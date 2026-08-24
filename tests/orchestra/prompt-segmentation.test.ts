@@ -100,20 +100,20 @@ const SAMPLE: PromptSegment[] = [
 
 describe('classifyTier — T0/T1/T2 classification', () => {
   it('classifies the global worker-contract/verify/karpathy kinds as T0', () => {
-    for (const k of ['worker-contract', 'verify-steps', 'verify-precedence', 'karpathy']) {
+    for (const k of ['worker-contract', 'verify-precedence', 'karpathy']) {
       expect(classifyTier(k)).toBe('T0');
     }
   });
 
-  it('classifies the tenant-project persona/skills/ADR kinds as T1', () => {
-    for (const k of ['skills', 'persona', 'adr']) {
+  it('classifies tenant-project stable persona/skills/context/policy kinds as T1', () => {
+    for (const k of ['skills', 'persona', 'project-context', 'run-policy']) {
       expect(classifyTier(k)).toBe('T1');
     }
   });
 
   it('classifies the volatile task/scope/goNogo (and id-bearing) kinds as T2', () => {
     for (const k of [
-      'task', 'scope', 'goNogo', 'what-to-do', 'heartbeat',
+      'adr', 'verify-steps', 'task', 'scope', 'goNogo', 'what-to-do', 'heartbeat',
       'result-contract', 'deps', 'smoke', 'shared', 'handoff', 'comms',
     ]) {
       expect(classifyTier(k)).toBe('T2');
@@ -180,7 +180,7 @@ describe('prompt-protected-set — scope/goNogo/verify survive compilation diff-
     const bp = conditionalBoilerplate(task);
     const sources = {
       scope: buildScopeBlock(task.scope, [], bp.hostConfig),
-      goNogo: buildDodBlock(task.goNogo),
+      goNogo: buildDodBlock({ items: buildTaskPromptSegmented(task, ctx).compilePlan.criteria }),
       verifyPrecedence: buildVerifyPrecedenceNote(),
     };
 
@@ -232,16 +232,18 @@ describe('npm-advisory block — static T0, present in every compiled prompt', (
   });
 });
 
-// ─── (5) Leading-T0 reorder is flag-gated, default OFF ──────────────────────
+// ─── (5) Leading-T0+T1 prefix is the production default ─────────────────────
 
-describe('leading-T0 reorder — flag-gated, default OFF (determinism preserved)', () => {
-  it('the default constant is OFF', () => {
-    expect(DEFAULT_LEADING_T0_REORDER).toBe(false);
+describe('leading-T0 reorder — production default with an explicit legacy escape hatch', () => {
+  it('the default constant is ON', () => {
+    expect(DEFAULT_LEADING_T0_REORDER).toBe(true);
   });
 
-  it('default compilation preserves production order — Skills lead, not the worker-contract', () => {
-    const { prompt } = buildTaskPrompt(makeTask(), makeCtx());
-    expect(prompt.startsWith('=== Skills ===')).toBe(true);
+  it('default compilation leads with the worker contract and a contiguous T0+T1 prefix', () => {
+    const { prompt, segments } = buildTaskPromptSegmented(makeTask(), makeCtx());
+    expect(prompt.startsWith('You are a Deckent worker agent.')).toBe(true);
+    const prefix = computeStablePrefix(segments);
+    expect(prompt.startsWith(`${prefix}\n\n`)).toBe(true);
   });
 
   it('buildTaskPrompt is byte-identical to the default segmented assembly', () => {
@@ -250,21 +252,17 @@ describe('leading-T0 reorder — flag-gated, default OFF (determinism preserved)
     expect(buildTaskPrompt(task, ctx).prompt).toBe(buildTaskPromptSegmented(task, ctx).prompt);
   });
 
-  it('reorder ON leads with the global T0 worker-contract', () => {
-    const { prompt } = buildTaskPromptSegmented(makeTask(), makeCtx({ leadingT0Reorder: true }));
-    expect(prompt.startsWith('You are a Deckent worker agent.')).toBe(true);
-  });
-
-  it('reorder ON changes only segment ORDER, not the set of segment contents', () => {
-    const off = buildTaskPromptSegmented(makeTask(), makeCtx());
-    const on = buildTaskPromptSegmented(makeTask(), makeCtx({ leadingT0Reorder: true }));
-    expect(on.segments.map(s => s.content).sort()).toEqual(off.segments.map(s => s.content).sort());
-    expect(on.segments.map(s => s.kind)).not.toEqual(off.segments.map(s => s.kind));
-  });
-
   it('reorder ON still keeps Skills before Agent (within-tier order preserved)', () => {
     const { prompt } = buildTaskPromptSegmented(makeTask(), makeCtx({ leadingT0Reorder: true }));
     expect(prompt.indexOf('=== Skills ===')).toBeLessThan(prompt.indexOf('=== Agent:'));
+  });
+
+  it('never emits an invariant tier after the first task-specific segment', () => {
+    const { segments } = buildTaskPromptSegmented(makeTask(), makeCtx());
+    const firstTaskSpecific = segments.findIndex(segment => segment.tier === 'T2');
+    expect(firstTaskSpecific).toBeGreaterThan(-1);
+    expect(segments.slice(0, firstTaskSpecific).every(segment => segment.tier !== 'T2')).toBe(true);
+    expect(segments.slice(firstTaskSpecific).every(segment => segment.tier === 'T2')).toBe(true);
   });
 
   it('segmented build is idempotent (no Date/random leakage)', () => {

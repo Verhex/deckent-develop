@@ -8,10 +8,13 @@
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import type { ProductionWiringPlanEvidence, RunPolicyPlanAuthority, Task, TaskScope } from '../core/task-types.js';
+import { createPromptCompilePlan, type PromptCompilePlan, type ScopedVerificationCommand } from '../core/prompt-compile-plan.js';
 import {
   PRODUCTION_WIRING_EVIDENCE_VERSION,
+  createGoNoGoCriterionItem,
   createProductionWiringPlanEvidence,
 } from '../core/task-types.js';
+import type { GoNoGoCriterionItem } from '../core/task-types.js';
 import {
   resolveProductionWiringContract,
   type ProductionWiringContract,
@@ -72,6 +75,8 @@ export interface PromptArtifact {
  * varies. `prompt` is exactly `segments.map(s => s.content).join('\n\n')`.
  */
 export interface SegmentedPrompt {
+  compilePlan: PromptCompilePlan;
+  planId: string;
   prompt: string;
   segments: PromptSegment[];
   metadata: PromptArtifact['metadata'];
@@ -94,6 +99,8 @@ export interface SegmentedPrompt {
  * Callers construct this from their available data.
  */
 export interface SprintContext {
+  /** Precompiled authority; absent callers compile exactly once at this entrypoint. */
+  compilePlan?: PromptCompilePlan;
   /** Agent prompt content (full PROMPT.md text) */
   agentPrompt?: string;
   /** Agent ID assigned to this task */
@@ -246,13 +253,11 @@ export interface SprintContext {
   /**
    * Leading-T0 cache reorder (Sprint 330 330-019 — provider-agnostic prompt cache).
    *
-   * EXPERIMENTAL, default-OFF ({@link DEFAULT_LEADING_T0_REORDER}). When true the
+   * Production-default ON ({@link DEFAULT_LEADING_T0_REORDER}). The explicit
+   * `false` value is a compatibility escape hatch. When enabled, the
    * compiled prompt is reassembled so the global (T0) then project (T1) tiers lead
    * contiguously — maximising the byte-stable prefix a provider cache can share
-   * across tasks. When false/undefined the production assembly order (skills first,
-   * per the F1-TOK cache-prefix lesson) is preserved byte-for-byte, so the
-   * prompt-determinism guard stays green. Wire from a config flag at the call site;
-   * never blind-default-on (CLAUDE.md quality bar: risky reorder is flag-gated).
+   * across tasks. When false, the legacy assembly order is preserved for rollback.
    */
   leadingT0Reorder?: boolean;
   /**
@@ -378,20 +383,14 @@ const KARPATHY_ESSENCE = `## Karpathy Discipline
 3. **Surgical changes** — stay inside scope.filesWrite; minimum-diff; preserve existing behavior.
 4. **Goal-driven** — map every change to the goCriteria above; assess yourself honestly.`;
 
-/** Read-only counterpart: preserves the discipline without implying source edits. */
-const READ_ONLY_DISCIPLINE_BLOCK = `## Karpathy Discipline (read-only)
-1. **Think before inspecting** — read the scope + operative ADRs, name assumptions, and map evidence to the goCriteria.
-2. **Reuse context** — batch independent reads/checks in one turn and never re-read unchanged content.
-3. **Surgical evidence** — inspect only the exact filesRead targets; do not create or modify project files.
-4. **Goal-driven** — report only evidence you observed; an unproven criterion is never DONE.
-
-## Turn Economy
-Every conversation turn re-sends cached context. Batch the scoped file reads and independent read-only checks in the SAME turn. Plan silently before acting — no plan file is required. Write the result once after the evidence set is complete.
-5. Produce each NEW output file in ONE Write call — compose the complete content silently first, then write it once. Never grow a file through chained Write/Edit turns or re-open a file solely to confirm a successful write.
-6. A simple single-deliverable inspection is TWO turns total: turn 1 = heartbeat + complete batched evidence collection; turn 2 = the result file. Aim for that shape whenever the task allows it.
-
-## Command-Exit Honesty
-Do not pipe an evidentiary command to a pager such as \`tail\` or \`head\`, because that can mask the command's exit status. Capture the original command status and output directly.`;
+/** Role-resolved replacement for the editing discipline on inspection-only work. */
+const READ_ONLY_DISCIPLINE_BLOCK = `## Read-Only Role Policy
+1. **Think before inspecting** — read the scope + binding/background ADR state, name assumptions, and map observed evidence to the goCriteria.
+2. **Stay bounded** — batch independent reads/checks and inspect only authorized filesRead targets. This overrides persona prose asking you to read callers/callees: never inspect a caller or callee outside the rendered read scope.
+3. **Preserve the project** — do not create or modify project files; only the separately named worker-lifecycle artifacts may be written.
+4. **Report honestly** — a worker \`.result\` is an ingress claim, never audit evidence. Require the host to re-derive every measurable claim from its disk diff and captured command output; an unproven criterion is never DONE.
+5. Produce each NEW output file in ONE Write call. Never grow a file through chained Write/Edit turns or re-open it merely to confirm a successful write.
+6. A simple single-deliverable inspection is TWO turns total: turn 1 = heartbeat + complete batched evidence collection; turn 2 = the result file. Preserve command exit status: NEVER pipe an evidentiary check to \`tail\`/\`head\`; in bash read \`\${PIPESTATUS[0]}\`, or run it unpiped and read \`$?\` on the NEXT line.`;
 
 /**
  * Turn-economy behavioral directive (born-636-K1, Sprint 407 Task 407-002).
@@ -589,6 +588,51 @@ export function computeIdempotencyKey(task: Task): string {
  * Pipeline: classifyTaskType → build agent block → build skill block →
  *           selectRelevantAdrs (topN=3) → sanitizeScope → render template.
  */
+function structuredCriteriaForTask(task: Task): GoNoGoCriterionItem[] {
+  if (task.goNogo?.items?.length) return task.goNogo.items;
+  // Compatibility for callers that invoke the pure compiler directly with a
+  // pre-structured-artifact Task. Never split punctuation or infer boundaries:
+  // each legacy display field remains one opaque criterion. The production
+  // buildWorkerPrompt ingress migrates this shape before reaching the compiler.
+  return [
+    ...(task.goNogo?.goCriteria?.trim() ? [createGoNoGoCriterionItem({
+      polarity: 'go', statement: task.goNogo.goCriteria,
+      evidenceRequirements: [task.goNogo.goCriteria],
+    })] : []),
+    ...(task.goNogo?.noGoCriteria?.trim() ? [createGoNoGoCriterionItem({
+      polarity: 'no-go', statement: task.goNogo.noGoCriteria,
+      evidenceRequirements: [task.goNogo.noGoCriteria],
+    })] : []),
+  ];
+}
+
+/** Compile the sole immutable authority consumed by prompt rendering. */
+export function compileTaskPromptPlan(task: Task, ctx: SprintContext): PromptCompilePlan {
+  const overlap = task.scope.filesRead.filter(path => task.scope.filesWrite.includes(path));
+  if (overlap.length > 0) {
+    throw new TypeError(`PROMPT_COMPILE_HOLD:SCOPE_READ_WRITE_OVERLAP:${[...new Set(overlap)].sort().join(',')}`);
+  }
+  const declared = task.verification?.commands ?? [];
+  const verificationCommands: ScopedVerificationCommand[] = declared.map(command => ({
+    command, scope: resolveTargetedTestPaths(task, ctx.trackedFiles),
+  }));
+  if (verificationCommands.length === 0 && !hasTaskScopedVerificationAuthority(task) && ctx.verifyCommands) {
+    if (ctx.verifyCommands.check) verificationCommands.push({ command: ctx.verifyCommands.check, scope: [...task.scope.filesWrite] });
+    const paths = resolveTargetedTestPaths(task, ctx.trackedFiles);
+    if (ctx.verifyCommands.test && paths.length > 0) verificationCommands.push({
+      command: `${ctx.verifyCommands.test} ${paths.join(' ')}`, scope: paths,
+    });
+  }
+  return createPromptCompilePlan({
+    criteria: structuredCriteriaForTask(task),
+    verificationCommands,
+    testApplicability: resolveTaskPromptProfile(taskDocProfileSignals(task), ctx.taskProfiles) === 'doc-only'
+      ? 'NOT_APPLICABLE' : 'REQUIRED',
+    scope: task.scope,
+    rolePolicyIdentity: `worker:${ctx.agentId ?? task.assignedAgent ?? 'generic'}`,
+  });
+}
+
 export function buildTaskPrompt(task: Task, ctx: SprintContext): PromptArtifact {
   const { prompt, metadata } = buildTaskPromptSegmented(task, ctx);
   return { prompt, metadata };
@@ -606,6 +650,7 @@ export function buildTaskPrompt(task: Task, ctx: SprintContext): PromptArtifact 
  * stays byte-identical to its pre-330-019 output on the default path.
  */
 export function buildTaskPromptSegmented(task: Task, ctx: SprintContext): SegmentedPrompt {
+  const compilePlan = ctx.compilePlan ?? compileTaskPromptPlan(task, ctx);
   const effort = ctx.effort ?? 'medium';
   const agentId = ctx.agentId ?? task.assignedAgent ?? 'generic';
   const skillNames: string[] = [];
@@ -647,7 +692,11 @@ export function buildTaskPromptSegmented(task: Task, ctx: SprintContext): Segmen
   // ── 4. Scope Rules (sanitized) ──────────────────────────────────────
   // PROMPT-W1 (d): decide once which optional boilerplate this task needs.
   const boilerplate = conditionalBoilerplate(task);
-  const scopeBlock = buildScopeBlock(task.scope, scopeWarnings, boilerplate.hostConfig, ctx.trackedFiles);
+  const scopeBlock = buildScopeBlock({
+    directories: [...compilePlan.scope.directories],
+    filesRead: [...compilePlan.scope.filesRead],
+    filesWrite: [...compilePlan.scope.filesWrite],
+  }, scopeWarnings, boilerplate.hostConfig, ctx.trackedFiles);
 
   // ── 5. Dependencies Block ───────────────────────────────────────────
   const depsBlock = ctx.dependencyResults
@@ -693,6 +742,7 @@ export function buildTaskPromptSegmented(task: Task, ctx: SprintContext): Segmen
   // literal `${IDEMPOTENCY_KEY}` placeholder to the worker.
   const idempotencyKey = computeIdempotencyKey(task);
   const defaultOrder = renderSegments({
+    compilePlan,
     coreExternalized: ctx.coreExternalized === true,
     agentBlock,
     skillBlock,
@@ -722,9 +772,8 @@ export function buildTaskPromptSegmented(task: Task, ctx: SprintContext): Segmen
     taskProfiles: ctx.taskProfiles,
   });
 
-  // Leading-T0 reorder (default-OFF): regroup tiers (T0→T1→T2) for the longest
-  // shareable cache prefix. OFF → production order preserved byte-for-byte, so the
-  // prompt-determinism guard (skills-first block order) stays green.
+  // Leading-T0 reorder (production default ON): regroup tiers (T0→T1→T2) for the
+  // longest shareable cache prefix. Explicit false preserves the legacy order.
   const reorder = ctx.leadingT0Reorder ?? DEFAULT_LEADING_T0_REORDER;
   const segments = reorder ? reorderLeadingT0(defaultOrder) : defaultOrder;
   const prompt = segments.map(s => s.content).join(SEGMENT_SEPARATOR);
@@ -747,6 +796,8 @@ export function buildTaskPromptSegmented(task: Task, ctx: SprintContext): Segmen
   );
 
   return {
+    compilePlan,
+    planId: compilePlan.planId,
     prompt,
     segments,
     promptProfile,
@@ -921,14 +972,19 @@ function buildAdrBlock(
   // pointer instead of their full amendment-log body. Other task kinds (and
   // tasks with no `type`) keep the full render → backward-safe.
   const scopeGated = task.type === 'code-development';
-  // PCOMP-W4 (tiered injection): 'operative' render — only the GOVERNING ADR
-  // (explicit-ref) gets its full Decision body; scoring-selected ADRs render
-  // condensed (Active-constraint + Contract + pointer). Measured before the
-  // fix: ~40-50% of a worker prompt was non-governing ADR body (sprint-348-005).
-  const content = buildAdrPromptSection(filtered, 'full', allAdrs, 'operative', scopeGated);
+  // Binding/background is the complete enforcement vocabulary. Binding ADRs
+  // are always full-body; scoring-only background ADRs remain condensed.
+  const content = filtered.map(adr => {
+    if (adr.matchReasons.includes('explicit-ref')) {
+      return buildAdrPromptSection([adr], 'full', allAdrs, 'full', false);
+    }
+    return buildAdrPromptSection([adr], 'full', allAdrs, 'operative', scopeGated)
+      .replace('### Contract (binding)', '### Background contract')
+      .replace('[full text:', '[background — full text:');
+  }).filter(Boolean).join('\n\n');
   if (!content) return '';
 
-  return `=== Mandatory Architecture Rules (ADR) ===\nADRs rendered with a full body below are BINDING for THIS task: violating one requires a NO_GO result + an ADR amendment proposal. Entries marked "[background constraint — …]" are ADVISORY CONTEXT — surfaced for awareness, not a hard gate for this task; follow them where relevant and diverge only with a noted reason (not an automatic NO_GO).\n\n${content}\n`;
+  return `=== Mandatory Architecture Rules (ADR) ===\nA full-body ADR is BINDING for THIS task: violating it requires a NO_GO result + an ADR amendment proposal. A binding ADR must never be truncated; if its full body is unavailable, fail closed. An entry marked "[background …]" is BACKGROUND: use it as context, not as an enforcement gate. These are the only two ADR render and enforcement states.\n\n${content}\n`;
 }
 
 // ─── Smoke Note Builder (WP-16) ────────────────────────────────────────
@@ -1200,14 +1256,14 @@ export function buildScopeBlock(
 
   // LP-4 (2026-07-08 scope taxonomy): the WRITE authority names only project
   // artifacts, but the prompt also REQUIRES the worker to write its own
-  // `.tasks/task-<id>.{plan,hb,result}` (and a `.question` on escalation). Without
+  // `.tasks/task-<id>.hb`, `.result` (and a `.question` on escalation). Without
   // this exemption the "ONLY these files" line reads as self-contradictory — a
   // literal worker either skips its lifecycle files (result-missing → sprint stall)
   // or fears a scope violation. State the taxonomy split explicitly: protocol files
   // are lifecycle artifacts, always writable, and never counted as scope mutations
   // (the auditor already whitelists them — this makes the prompt match the audit).
   const tasksExemptionNote =
-    `\n\nSeparately, your worker-protocol files under \`.tasks/\` (your \`.hb\`, \`.result\`, and a \`.question\` if you escalate) are lifecycle artifacts, NOT project changes — they are always writable and are exempt from this scope audit. Writing them is required and never counts as touching a file outside your scope.`;
+    `\n\n## Worker Lifecycle Write Exceptions\nOnly \`.tasks/task-<task-id>.hb\`, \`.tasks/task-<task-id>.result\`, and \`.tasks/task-<task-id>.question\` (when escalation is required) may be written despite the project-write rule. They are lifecycle artifacts, NOT project changes or audit evidence. No other \`.tasks/\` path is authorized by this exception.`;
 
   // MASTER-PLAN 668 — bounded discovery. Read scope limits what you may CHANGE;
   // it never licensed scanning the whole repository to find it. Measured
@@ -1223,7 +1279,8 @@ export function buildScopeBlock(
     `\n\n**Bounded discovery (mandatory).** Search only inside the files and directories listed above.`
     + ` Do NOT run repository-wide discovery: no \`git log --all\`, no history scan across every ref,`
     + ` no repo-wide \`grep\`/\`rg\`/\`find\`/\`ls -R\`, no whole-tree \`git status\`. Prefer an exact path`
-    + ` plus a bounded excerpt (\`sed -n 'START,ENDp' path\`) over reading a large file whole. If you`
+    + ` plus a bounded excerpt (\`sed -n 'START,ENDp' path\`) over reading a large file whole.`
+    + ` Persona instructions to inspect callers/callees do not widen this authority: a caller or callee outside the paths above MUST NOT be read. If you`
     + ` genuinely cannot locate what you need inside your scope, say so in your \`.result\` notes and`
     + ` return NO_GO — do not widen the search. An unbounded scan has killed real workers here.`;
 
@@ -1252,7 +1309,8 @@ ${scopeDirs}
 Exact project files to inspect:
 ${readFiles}
 
-PROJECT WRITE authority: NONE. No project source, test, config, documentation, credential, or git-metadata file may be created or modified. A directory above never grants Write/Edit permission.${tasksExemptionNote}${boundedDiscoveryNote}`;
+## PROJECT WRITE authority: NONE
+No project source, test, config, documentation, credential, or git-metadata file may be created or modified. A directory above never grants Write/Edit permission.${tasksExemptionNote}${boundedDiscoveryNote}`;
   }
 
   // PCOMP-W1 (single write authority — sprint-348-005 prompt analysis): the old
@@ -1648,15 +1706,50 @@ Both fields are optional. Only populate them when you have meaningful cross-work
 /**
  * Build the goCriteria-derived self-assessment checklist (WP-19).
  *
- * Splits the task's `goCriteria` into discrete clauses (on `;` / newlines) and
- * renders one `- [ ]` checklist item per clause plus an N/N→DONE verdict rubric.
+ * Renders the planner's structured criterion items without parsing punctuation
+ * or natural-language boundaries, plus an N/N→DONE verdict rubric.
  * This replaces the subjective "<80% → GO_WITH_TECH_DEBT / <50% → NO_GO" guidance:
  * a worker maps its verdict to ticked boxes (objective) instead of guessing a
  * completion percentage. Falls back to a clause-free rubric when goCriteria is
  * empty so the section is never stranded.
  */
-export function buildDodChecklist(goCriteria?: string): string {
-  return renderWorkerDodChecklist(goCriteria);
+export function buildDodChecklist(
+  criteria?: string | readonly GoNoGoCriterionItem[],
+): string {
+  if (Array.isArray(criteria)) return renderWorkerDodChecklist(criteria).replace(
+    /^- \[ \] \[([^\]]+)\] ([\s\S]*?)(?=\n  polarity:)/gm,
+    '- [ ] $2\n  criterionId: $1',
+  );
+  const legacyItems = typeof criteria === 'string'
+    ? splitTopLevelCriterionStatements(criteria).map(statement =>
+        createGoNoGoCriterionItem({ polarity: 'go', statement }),
+      )
+    : [];
+  return renderWorkerDodChecklist(legacyItems).replace(
+    /^- \[ \] \[([^\]]+)\] ([\s\S]*?)(?=\n  polarity:)/gm,
+    '- [ ] $2\n  criterionId: $1',
+  );
+}
+
+function splitTopLevelCriterionStatements(value: string): string[] {
+  const statements: string[] = [];
+  let depth = 0;
+  let start = 0;
+  const push = (end: number): void => {
+    const statement = value.slice(start, end).trim();
+    if (statement) statements.push(statement);
+  };
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
+    if (character === '(') depth += 1;
+    else if (character === ')' && depth > 0) depth -= 1;
+    else if (depth === 0 && (character === ';' || character === '\n')) {
+      push(index);
+      start = index + 1;
+    }
+  }
+  push(value.length);
+  return statements;
 }
 
 export function buildExactExecutionAuthorityBlock(
@@ -1848,6 +1941,7 @@ ${PRODUCTION_WIRING_REPORTING_CONTRACT}`;
 // ─── Template Renderer ─────────────────────────────────────────────────
 
 interface RenderInput {
+  compilePlan: PromptCompilePlan;
   /** 7094-F3: core blocks externalized to --system-prompt-file — skip inline. */
   coreExternalized?: boolean;
   agentBlock: string;
@@ -2008,6 +2102,20 @@ export function buildDodBlock(goNogo?: { goCriteria?: string; noGoCriteria?: str
   return `\n## Definition of Done (goCriteria — your work is judged against this)\n${goNogo.goCriteria}${noGo}\n`;
 }
 
+function buildDodBlockFromCriteria(criteria: readonly Readonly<GoNoGoCriterionItem>[]): string {
+  const go = criteria.filter(item => item.polarity === 'go');
+  if (go.length === 0) return '';
+  const noGo = criteria.filter(item => item.polarity === 'no-go');
+  return `\n## Definition of Done (goCriteria — your work is judged against this)\n${go.map(item => `- [${item.id}] ${item.statement}`).join('\n')}${noGo.length > 0 ? `\nNO-GO if:\n${noGo.map(item => `- [${item.id}] ${item.statement}`).join('\n')}` : ''}\n`;
+}
+
+/** Remove free-form lines that could masquerade as compiled authority. */
+export function stripTaskBodyAuthorities(description: string): string {
+  return description.split(/\r?\n/)
+    .filter(line => !/^\s*(?:[-*]\s*)?(?:\*\*)?(?:Files?|Tests?):(?:\*\*)?(?:\s|$)/i.test(line))
+    .join('\n').trim();
+}
+
 /**
  * Reserved `### goNogo` sub-block heading (443-004 U4 goCriteria repeat-merge).
  *
@@ -2154,10 +2262,9 @@ export function buildTestCommandLine(
 }
 
 /**
- * Extract owner/planner-authored verification commands from explicit
- * `**Test:** `command`` clauses. These commands outrank stack-generic
- * tsc/vitest guidance: adding an unrelated runner changes the task contract and
- * can turn a valid standalone proof into a false NO_GO.
+ * Extract owner/planner-authored verification commands from legacy
+ * `**Test:** `command`` clauses. Retained for producer-side ingress migration
+ * only; prompt compilation consumes `Task.verification` and never reparses prose.
  */
 export function extractDeclaredTestCommands(task: Pick<Task, 'description'>): readonly string[] {
   const source = task.description ?? '';
@@ -2170,9 +2277,9 @@ export function extractDeclaredTestCommands(task: Pick<Task, 'description'>): re
   return Object.freeze(commands);
 }
 
-/** True when the task author supplied a task-local `Test:` proof surface. */
-export function hasTaskScopedTestDirective(task: Pick<Task, 'description'>): boolean {
-  return /^\s*(?:[-*]\s*)?(?:\*\*)?Test:(?:\*\*)?(?:\s|$)/im.test(task.description ?? '');
+/** True when the persisted task carries exact task-local verification authority. */
+export function hasTaskScopedVerificationAuthority(task: Pick<Task, 'verification'>): boolean {
+  return task.verification !== undefined;
 }
 
 /**
@@ -2213,7 +2320,7 @@ export function resolveTargetedTestPaths(
 }
 
 function renderSegments(input: RenderInput): PromptSegment[] {
-  const { coreExternalized, agentBlock, skillBlock, projectContextBlock, adrBlock, scopeBlock, depsBlock, sharedBlock, handoffBlock, commsInstructionBlock, executionAuthorityBlock, runPolicyBlock, productionWiringBlock, workerGuideContract, task, effort, modelTier, idempotencyKey, emitIdempotency, preExistingFailures, toolInventory, verifyCommands, toolAllowlist, targetedTestPaths, taskProfiles } = input;
+  const { compilePlan, coreExternalized, agentBlock, skillBlock, projectContextBlock, adrBlock, scopeBlock, depsBlock, sharedBlock, handoffBlock, commsInstructionBlock, executionAuthorityBlock, runPolicyBlock, productionWiringBlock, workerGuideContract, task, effort, modelTier, idempotencyKey, emitIdempotency, preExistingFailures, toolInventory, toolAllowlist, taskProfiles } = input;
 
   // Tier-tagged assembly (Sprint 330 330-019). Push order below IS the default
   // production order — `buildTaskPromptSegmented` joins these contents with
@@ -2224,6 +2331,8 @@ function renderSegments(input: RenderInput): PromptSegment[] {
   // 593-002: delegated to the canonical classifier (see {@link taskProfileSignals}).
   const isInspectionOnlyTask =
     resolveTaskPromptProfile(taskProfileSignals(task), taskProfiles) === 'inspection-only';
+  const isDocOnlyTask =
+    resolveTaskPromptProfile(taskDocProfileSignals(task), taskProfiles) === 'doc-only';
   // `kind` is widened to `PromptSegmentKind | string` (the same type PromptSegment.kind
   // already allows) so a task-specific, unregistered kind — e.g. TT555's volatile
   // 'env-probe' — can be emitted without editing the closed PromptSegmentKind registry
@@ -2232,6 +2341,22 @@ function renderSegments(input: RenderInput): PromptSegment[] {
   const push = (tier: PromptTier, kind: PromptSegmentKind | string, content: string): void => {
     segments.push({ tier, kind, content });
   };
+
+  // Stable cognitive/policy prefix: no task-variable segment may precede these.
+  const workerGuideAuthority = workerGuideContract?.state === 'VERIFIED'
+    ? `WORKER_GUIDE_CONTRACT: VERIFIED schema=${workerGuideContract.schemaVersion} sha256:${workerGuideContract.digest}. Read .deckent/workspace/WORKER-GUIDE.md as the digest-bound supporting contract.`
+    : workerGuideContract?.state === 'HOLD'
+      ? `WORKER_GUIDE_CONTRACT: HOLD (${workerGuideContract.reason}). Do not treat .deckent/workspace/WORKER-GUIDE.md as authority; follow the inline heartbeat, result, scope and Definition-of-Done contracts in this compiled prompt.`
+      : 'WORKER_GUIDE_CONTRACT: UNRESOLVED_BY_CALLER. The inline contracts in this compiled prompt remain authoritative.';
+  push('T0', 'worker-contract', `You are a Deckent worker agent.\n${workerGuideAuthority}`);
+  if (!coreExternalized) {
+    push('T0', 'karpathy', isInspectionOnlyTask
+      ? READ_ONLY_DISCIPLINE_BLOCK
+      : `${KARPATHY_ESSENCE}\n\n${buildTurnEconomyBlock(modelTier)}\n\n${PIPE_EXIT_BLOCK}\n\n${ARTIFACT_REUSE_BLOCK}`);
+  }
+  if (!isDocOnlyTask && !isInspectionOnlyTask && !coreExternalized) {
+    push('T0', 'npm-advisory', NPM_ADVISORY_BLOCK);
+  }
 
   // Conditionally emit non-empty sections only (skip filler empty headers).
   // Sprint 273 (F1-TOK fix #5): Skills FIRST, then Agent — skill blocks are
@@ -2243,7 +2368,7 @@ function renderSegments(input: RenderInput): PromptSegment[] {
   if (skillBlock) push('T1', 'skills', skillBlock);
   if (projectContextBlock) push('T1', 'project-context', projectContextBlock);
   if (agentBlock) push('T1', 'persona', agentBlock);
-  if (adrBlock) push('T1', 'adr', adrBlock);
+  if (adrBlock) push('T2', 'adr', adrBlock);
   // Run-wide policy (486-017): same digest-bound content for every task in this
   // run (original or FIX), so it shares the T1 (project/run-stable) tier with ADRs.
   if (runPolicyBlock) push('T1', 'run-policy', runPolicyBlock);
@@ -2256,7 +2381,7 @@ function renderSegments(input: RenderInput): PromptSegment[] {
   // as its own paragraph so markdown survives rendering.
   // PROMPT-W1 (d): the Idempotency Key section is only emitted when the task may
   // make external API calls (gated off for pure-refactor / no-API tasks).
-  const dodBlock = buildDodBlock(task.goNogo);
+  const dodBlock = buildDodBlockFromCriteria(compilePlan.criteria);
   const idempotencyBlock = emitIdempotency
     ? `\n## Idempotency Key\n${idempotencyKey}\nUse this key for external API calls (Idempotency-Key header) to make retries safe.`
     : '';
@@ -2264,18 +2389,13 @@ function renderSegments(input: RenderInput): PromptSegment[] {
   // interpolation — `dodBlock` above renders the SAME goCriteria/noGoCriteria text a
   // few lines below as the authoritative GO/NO-GO section, so keeping both would repeat
   // every unique criterion a 3rd time in this single segment.
-  const taskDescription = dedupeDescriptionGoNogoEcho(task.description, task.goNogo?.goCriteria);
+  const taskDescription = stripTaskBodyAuthorities(
+    dedupeDescriptionGoNogoEcho(task.description, task.goNogo?.goCriteria),
+  );
   // The global worker-contract preamble (T0) and the per-task body (T2) are split
   // at the existing blank-line boundary: joined with SEGMENT_SEPARATOR they are
   // byte-identical to the former single block, but the split lets the T0 contract
   // lead in the reordered cache layout without dragging the volatile task body.
-  const workerGuideAuthority = workerGuideContract?.state === 'VERIFIED'
-    ? `WORKER_GUIDE_CONTRACT: VERIFIED schema=${workerGuideContract.schemaVersion} sha256:${workerGuideContract.digest}. Read .deckent/workspace/WORKER-GUIDE.md as the digest-bound supporting contract.`
-    : workerGuideContract?.state === 'HOLD'
-      ? `WORKER_GUIDE_CONTRACT: HOLD (${workerGuideContract.reason}). Do not treat .deckent/workspace/WORKER-GUIDE.md as authority; follow the inline heartbeat, result, scope and Definition-of-Done contracts in this compiled prompt.`
-      : 'WORKER_GUIDE_CONTRACT: UNRESOLVED_BY_CALLER. The inline contracts in this compiled prompt remain authoritative.';
-  push('T0', 'worker-contract', `You are a Deckent worker agent.
-${workerGuideAuthority}`);
   push('T2', 'task', `## Your Task
 ${task.id}: ${task.title}
 
@@ -2316,7 +2436,7 @@ ${dodBlock}${idempotencyBlock}`);
   if (isInspectionOnlyTask) {
     push('T2', 'what-to-do', `## What To Do (inspection-only)
 1. Read the exact filesRead targets and task acceptance criteria before acting.
-2. Plan silently — no plan file is written (7094-F1d: the host never reads one).
+2. Plan silently in scratch reasoning before inspection.
 3. Batch independent read-only inspection commands. Do not create or modify any project file.
 4. Record evidence for each acceptance criterion, then write .tasks/task-${task.id}.result.`);
   } else {
@@ -2376,16 +2496,28 @@ ${dodBlock}${idempotencyBlock}`);
   // classifier. The scope signal is intentionally NOT passed here — see
   // {@link taskDocProfileSignals}: doc-vs-code and inspection-vs-writing are two
   // independent axes at this call site, and this one asks only the doc question.
-  const isDocOnlyTask =
-    resolveTaskPromptProfile(taskDocProfileSignals(task), taskProfiles) === 'doc-only';
   // PROMPT-W1 (b): a doc-only task verifies by reading its file back; every other
   // task verifies via targeted tests, which is also the mode whose guidance must
   // take precedence over a persona's conflicting full-suite test-mandate.
   const verificationMode: 'targeted' | 'doc' = isDocOnlyTask ? 'doc' : 'targeted';
-  const declaredTestCommands = extractDeclaredTestCommands(task);
-  const hasScopedTestDirective = hasTaskScopedTestDirective(task);
-  if (isInspectionOnlyTask) {
-    push('T0', 'verify-steps', `## VERIFY STEPS (inspection-only)
+  const declaredTestCommands = compilePlan.verification.commands.map(item => item.command);
+  const hasScopedTestDirective = hasTaskScopedVerificationAuthority(task);
+  if (isInspectionOnlyTask && hasScopedTestDirective && declaredTestCommands.length === 0) {
+    push('T2', 'verify-steps', `## SCOPED VERIFICATION HOLD (inspection-only)
+SCOPED_PROOF_HOLD: this inspection task declares a task-local verification surface, but no exact command was captured in the compiled authority. Do not infer a command from prose, substitute a repository-wide check, or claim DONE. Report the missing scoped proof in your result notes.`);
+  } else if (isInspectionOnlyTask && hasScopedTestDirective) {
+    const commandList = declaredTestCommands
+      .map((command, index) => `${index + 1}. \`${command}\``)
+      .join('\n');
+    push('T2', 'verify-steps', `## CRITICAL VERIFY STEPS (INSPECTION-ONLY TASK-DECLARED AUTHORITY)
+This task has no project write authority. Its typed verification authority is still executable and exact. Run every command below byte-for-byte; do not omit environment/resource prefixes, reorder arguments, or substitute an equivalent-looking command:
+${commandList}
+
+Only the commands above are authorized. Do not add a build, type check, full suite, package-manager mutation, or unrelated check. Record the exact executed command strings and their original exit codes in testVerification.commands.
+If every declared command passes and every GO criterion is MET while every NO-GO criterion is UNMET → selfAssessment = "DONE"
+If a command differs, cannot run, or fails → selfAssessment = "NO_GO" with exact evidence.`);
+  } else if (isInspectionOnlyTask) {
+    push('T2', 'verify-steps', `## VERIFY STEPS (inspection-only)
 This task has no project write authority. Do not run a build, type check, test suite, package-manager command, or other mutation-oriented verification unless the task's written acceptance criteria explicitly name that exact read-only command.
 1. Execute only the task-directed read-only checks needed to prove the Definition of Done.
 2. Cite observed command results and exact file/line evidence in the result notes.
@@ -2399,19 +2531,19 @@ This task has no project write authority. Do not run a build, type check, test s
     const declaredCheckBlock = declaredTestCommands.length > 0
       ? `\n3. Run your task-declared check(s) exactly as written — do not substitute a project-wide type check or test runner:\n${declaredTestCommands.map((command, index) => `   ${index + 1}. \`${command}\``).join('\n')}`
       : '';
-    push('T0', 'verify-steps', `## VERIFY STEPS (doc-only task — DO NOT run the test suite)
+    push('T2', 'verify-steps', `## VERIFY STEPS (doc-only task — DO NOT run the test suite)
 This is a Tier-0 documentation task: there is no source code to type-check or test. DO NOT run \`npm test\` / \`vitest\` / the project test suite, and DO NOT run a project-wide type check (\`tsc\`) — they are large, unrelated to your file, slow, and can race other in-flight workers' state without reflecting your own work.
 1. Read your file back from disk (the path in your scope) and confirm its content satisfies the goCriteria above.
 2. You MAY run a fast doc/markdown lint if one exists, but a passing test suite is NOT required and NOT expected.${declaredCheckBlock}
 Mark selfAssessment = "DONE" when the file exists (and any check above passes) and matches the goCriteria. Use "GO_WITH_TECH_DEBT" only if the content is genuinely partial; use "NO_GO" only if you could not create the file at all. Do NOT mark NO_GO because an unrelated test suite failed.`);
   } else if (hasScopedTestDirective && declaredTestCommands.length === 0) {
-    push('T0', 'verify-steps', `## SCOPED VERIFICATION HOLD
+    push('T2', 'verify-steps', `## SCOPED VERIFICATION HOLD
 SCOPED_PROOF_HOLD: this task declares a task-local Test proof surface, but no scoped command was captured. Do not substitute a repository-wide type check, build, or test command and do not claim DONE. Report the missing scoped proof in your result notes.`);
-  } else if (declaredTestCommands.length > 0) {
+  } else if (hasScopedTestDirective && declaredTestCommands.length > 0) {
     const commandList = declaredTestCommands
       .map((command, index) => `${index + 1}. \`${command}\``)
       .join('\n');
-    push('T0', 'verify-steps', `## CRITICAL VERIFY STEPS (TASK-DECLARED AUTHORITY)
+    push('T2', 'verify-steps', `## CRITICAL VERIFY STEPS (TASK-DECLARED AUTHORITY)
 This task declares its verification command(s) explicitly. Run exactly these commands:
 ${commandList}
 
@@ -2420,14 +2552,26 @@ If every declared command passes and every goCriteria checklist item is genuinel
 If a declared command cannot run or fails after repair attempts → selfAssessment = "NO_GO" with the exact evidence
 ${buildVerifyPrecedenceNote(verificationMode)}${buildBehaviorPrecedenceNote(task)}`);
   } else {
-    push('T0', 'verify-steps', `## CRITICAL VERIFY STEPS (DO NOT SKIP)
+    const checkCommand = compilePlan.verification.commands.find(item =>
+      !/(?:vitest|jest|pytest|test(?:\s|$))/i.test(item.command),
+    )?.command;
+    const testCommand = compilePlan.verification.commands.find(item =>
+      /(?:vitest|jest|pytest|test(?:\s|$))/i.test(item.command),
+    )?.command;
+    const checkLine = checkCommand
+      ? `Run: \`${checkCommand}\` — this project's compiled type-check command.`
+      : 'SCOPED_PROOF_HOLD: no task-local type-check command was compiled.';
+    const testLine = testCommand
+      ? `Run: \`${testCommand}\` — this exact task-local targeted test authority.`
+      : 'SCOPED_PROOF_HOLD: no exact task-local targeted test command was compiled; do not substitute an unscoped runner.';
+    push('T2', 'verify-steps', `## CRITICAL VERIFY STEPS (DO NOT SKIP)
 You MUST run the project's type check and TARGETED tests before marking your task as done.
 Check the project's TOOLS.md or package.json scripts to find the right commands.
 
 1. **Type check / static analysis** — fix ALL errors (max 3 attempts)
-   ${buildCheckCommandLine(verifyCommands)}
+   ${checkLine}
 2. **TARGETED test file(s) only** — run ONLY the test file(s) that cover the module(s) you changed (max 3 attempts)
-   ${buildTestCommandLine(verifyCommands, targetedTestPaths)}
+   ${testLine}
    ${buildPreExistingFailuresNote(preExistingFailures)}${buildExitPathTestHint(task)}
 
 If BOTH pass AND every goCriteria checklist item (Result & Self-Assessment section below) is genuinely satisfied → selfAssessment = "DONE"
@@ -2448,10 +2592,6 @@ ${buildVerifyPrecedenceNote(verificationMode)}${buildBehaviorPrecedenceNote(task
   // noise that dilutes the one constraint that matters (scope). Skip it for doc-only
   // tasks — the doc/code T0 prefix already diverges (verify-steps), so this adds no
   // new cache split. Every non-doc task keeps the full advisory verbatim.
-  if (!isDocOnlyTask && !isInspectionOnlyTask && !coreExternalized) {
-    push('T0', 'npm-advisory', NPM_ADVISORY_BLOCK);
-  }
-
   // Smoke note (WP-16) — Tier-1 Proof-of-Function context. Emitted next to the
   // VERIFY STEPS (its natural home) only when the task carries a Smoke: directive.
   const smokeNote = buildSmokeNote(task.smoke);
@@ -2477,15 +2617,19 @@ Create .tasks/task-${task.id}.hb ONCE, before ${isInspectionOnlyTask ? 'inspecti
   // separate "## Result File" and "## Honest Self-Assessment" sections so the
   // result/verdict instructions are stated once instead of 4×.
   push('T2', 'result-contract', `## Result & Self-Assessment
-Write .tasks/task-${task.id}.result with: taskId, workerId ("w-${task.id}"), filesChanged (string[]), linesAdded (integer), linesRemoved (integer), testsPassed (BOOLEAN), coverage (number; use 0 when not measured), selfAssessment ("DONE"|"GO_WITH_TECH_DEBT"|"NO_GO"), and notes. These are worker ingress claims, not the canonical settled result. The orchestrator derives top-level provider/model plus measurable file, line, token, cost, test and TypeScript evidence from host-authoritative sources and assembles the versioned canonical result. Workers do NOT estimate token usage and do not place provider/model inside tokenUsage. The optional tokenUsage object must be omitted unless an adapter supplied real values; when supplied, its usage-only fields are inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens, totalTokens, and source.
+Write .tasks/task-${task.id}.result with: taskId, workerId ("w-${task.id}"), promptCompilePlanId ("${compilePlan.planId}"), filesChanged (string[]), linesAdded (integer), linesRemoved (integer), testsPassed (BOOLEAN compatibility projection), testVerification, criteriaEvidence, coverage (number; use 0 when not measured), selfAssessment ("DONE"|"GO_WITH_TECH_DEBT"|"NO_GO"), techDebtCriterionIds, and notes. These are worker ingress claims, not the canonical settled result and never audit evidence. The orchestrator MUST independently re-derive measurable file/line claims from the host-observed disk diff and test/TypeScript claims from captured command output; worker \`.result\` notes cannot prove them. It also derives top-level provider/model plus token and cost evidence from host-authoritative sources and assembles the versioned canonical result. Workers do NOT estimate token usage and do not place provider/model inside tokenUsage. The optional tokenUsage object must be omitted unless an adapter supplied real values; when supplied, its usage-only fields are inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens, totalTokens, and source.
 Field shapes (strict — a wrong shape here breaks the orchestrator's result parser for the whole sprint):
 - \`notes\`: a SINGLE string, never an array or object. For multiple points, join them into ONE string using \`\\n\` newlines — do NOT write \`["point one", "point two"]\` or \`{"a": "..."}\`.
 - \`selfAssessment\`: exactly one of the three string literals \`"DONE"\`, \`"GO_WITH_TECH_DEBT"\`, \`"NO_GO"\` — never an array, never any other value.
 - \`residualDebt\`: REQUIRED whenever selfAssessment is \`"GO_WITH_TECH_DEBT"\` — ONE short paragraph naming ONLY what remains undone and where (file/area). Never restate what succeeded; the success evidence belongs in \`notes\`. Omit the field entirely for \`"DONE"\` and \`"NO_GO"\`.
 - \`filesChanged\`: an array of file-path strings, e.g. \`["src/foo.ts", "tests/foo.test.ts"]\`.
-- \`testsPassed\`: one boolean (\`true\` or \`false\`), never a command array.
+- \`promptCompilePlanId\`: exactly \`${compilePlan.planId}\`; never recompute or substitute it.
+- \`testVerification\`: \`{ "applicability": "${compilePlan.verification.applicability}", "outcome": "PASSED"|"FAILED"|"NOT_EXECUTED", "commands": string[] }\`. Commands are the exact commands actually executed; applicability is not a success verdict.
+- \`testsPassed\`: one boolean compatibility projection; true only when testVerification.outcome is "PASSED", never because verification is N/A.
+- \`criteriaEvidence\`: exactly one entry for every compiled criterion ID (GO and NO-GO): \`[{ "criterionId": string, "outcome": "MET"|"UNMET"|"UNVERIFIED", "evidence": string[] }]\`. Outcome reports whether the criterion STATEMENT is true. For DONE, every GO criterion must be MET and every NO-GO/forbidden criterion must be UNMET. Marking a NO-GO criterion MET means the forbidden condition occurred and blocks DONE. Use observed evidence, never repeat the criterion as its own proof.
+- \`techDebtCriterionIds\`: [] for DONE/NO_GO. For GO_WITH_TECH_DEBT it must contain every and only open compiled criterion ID; prose labels are invalid.
 - \`coverage\`: one finite number from 0 to 100; use \`0\` to mean "not measured", never omit the field.
-${isInspectionOnlyTask ? 'Assess against the single Definition of Done above and attach evidence for every clause; do not repeat or rewrite the criteria.' : buildDodChecklist(task.goNogo?.goCriteria)}
+${isInspectionOnlyTask ? 'Assess against the single Definition of Done above and attach evidence for every clause; do not repeat or rewrite the criteria.' : buildDodChecklist(compilePlan.criteria)}
 CRITICAL: never exit without writing the .result file — even on failure, write selfAssessment "NO_GO" with error details. A missing result file stalls the entire sprint.`);
 
   // Karpathy 4-discipline anchor + Turn Economy (born-636-K1) + Pipe-Exit Honesty
@@ -2498,12 +2642,6 @@ CRITICAL: never exit without writing the .result file — even on failure, write
   // out of this task's write scope, so these task-invariant cognitive-anchor blocks
   // share the segment instead. (PIPE_EXIT_BLOCK is separately ≤400-char pinned; the
   // Turn Economy ≤1200 footprint pin measures its own constant and is unaffected.)
-  if (!coreExternalized) {
-    push('T0', 'karpathy', isInspectionOnlyTask
-      ? READ_ONLY_DISCIPLINE_BLOCK
-      : `${KARPATHY_ESSENCE}\n\n${buildTurnEconomyBlock(modelTier)}\n\n${PIPE_EXIT_BLOCK}\n\n${ARTIFACT_REUSE_BLOCK}`);
-  }
-
   // Shared Context (Sprint 278 COMM-1 / 278-003) — appended LAST, after every
   // shared/structural section, so this per-spawn-variable block sits in the most
   // task-specific region and never splits the Skills→Agent→ADR cache prefix

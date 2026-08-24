@@ -644,7 +644,7 @@ function attachStructuredCriteria(
  */
 export function extractGoNogoCriteria(
   description: string,
-  testTarget?: string,
+  _testTarget?: string,
   // WM-7: optional kind×stack context. When supplied, the BASE criteria are
   // derived from the task kind + detected project stack. Stack commands remain
   // wave-verification inputs and are not copied into every task. When ABSENT, the
@@ -710,13 +710,11 @@ export function extractGoNogoCriteria(
   // ── WM-7 path: kind × stack aware base ──────────────────────────────────
   if (opts?.kind) {
     const base = deriveBaseCriteria(opts.kind, opts.stack ?? 'generic', opts.commands);
-    const scopedTestCriteria = testTarget?.trim();
-    const taskSpecificItems = scopedTestCriteria
-      ? [genericCriterionItem('go', scopedTestCriteria), ...specificItems]
-      : specificItems;
-    const withScopedTest = scopedTestCriteria
-      ? { ...base, goCriteria: `${base.goCriteria}; ${scopedTestCriteria}` }
-      : base;
+    // Test commands are execution authority, not acceptance prose. The caller
+    // persists `_testTarget` on Task.verification; never duplicate it into
+    // goCriteria where it would become an LLM-adjudicated criterion.
+    const taskSpecificItems = specificItems;
+    const withScopedTest = base;
     if (authored.go) {
       const authoredGo = appendBoundedCriterion(authored.go, withScopedTest.goCriteria);
       const authoredNoGo = authored.noGo ?? base.noGoCriteria;
@@ -749,7 +747,7 @@ export function extractGoNogoCriteria(
   }
 
   // ── Legacy path (no kind context): preserved verbatim ───────────────────
-  const baseCriteria = testTarget ? `${testTarget}; Tests pass` : 'Tests pass; tsc clean';
+  const baseCriteria = 'Tests pass; tsc clean';
 
   if (authored.go) {
     const authoredGo = appendBoundedCriterion(authored.go, baseCriteria);

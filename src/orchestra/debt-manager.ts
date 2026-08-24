@@ -868,6 +868,8 @@ export function handleEvaluation(
   if (!result.testsPassed) fixReasonParts.push('tests failed');
   if ((result.filesChanged?.length ?? 0) === 0) fixReasonParts.push('no files changed');
   if ((result.linesAdded ?? 0) === 0) fixReasonParts.push('zero lines added — worker may have crashed');
+  const brainEvaluationReason = (result as TaskResult & { brainEvaluationReason?: string }).brainEvaluationReason;
+  if (brainEvaluationReason) fixReasonParts.push(`brain=${brainEvaluationReason.slice(0, 800)}`);
   const enrichedReason = fixReasonParts.join('; ');
 
   // Sprint 210 Task 6 — FIX prompt enrichment ([[feedback_fix_prompt_quality]])
@@ -887,6 +889,9 @@ export function handleEvaluation(
   ];
   if (result.notes) {
     fixSections.push(`## Original Worker Notes\n${result.notes.slice(0, 500)}`);
+  }
+  if (brainEvaluationReason) {
+    fixSections.push(`## Host Evaluation Authority\n${brainEvaluationReason.slice(0, 1200)}`);
   }
   if (result.rubricScores) {
     const rs = result.rubricScores;
@@ -933,6 +938,17 @@ export function handleEvaluation(
     sprintId: task.sprintId,
     isPriorityFix: true,
     fixForTaskId: task.id,
+    // Verification authority is plan-time typed state, not prompt prose. A FIX
+    // must re-run the exact original commands (including env/resource prefixes)
+    // or it can settle under a silently weaker contract than the failed attempt.
+    ...(task.verification !== undefined
+      ? {
+          verification: {
+            ...task.verification,
+            commands: [...task.verification.commands],
+          },
+        }
+      : {}),
     // RUN-POLICY-DELIVERY-001: a FIX attempt inherits the parent's exact
     // digest-bound run policy — never re-resolved, never silently dropped.
     ...(task.runPolicy !== undefined ? { runPolicy: task.runPolicy } : {}),

@@ -6,11 +6,12 @@
 ## Canlı truth
 
 - `DOGFOOD_MODE=ON`, `WORKSPACE_MODE=MAIN`, `DELIVERY_MODE=DIRECT_MAIN`.
-- Aktif worker yok. `sprint-649` dört-task DAG terminal `COMPLETE`; archive replay ve FIX-attempt
-  measurement hardening'i 108 scoped test, full lint ve `build:all` ile yeşil. Fresh binary
-  `sprint-650/651` multi-task canary'leri unrelated task blocker'ları nedeniyle terminal `ABORTED`,
-  fakat her iki canonical terminal archive verify sonucu `ok=true`; sprint-651 Brain refresh
-  sonrasında sprint-650 replay'i de yeniden `ok=true`.
+- Aktif worker yok. Fresh compiled runtime'da `sprint-657` iki paralel ilk-wave taskı + bağımlı
+  fan-in taskıyla terminal `COMPLETE` (3/3 logical DONE). Current prompt-delivery receipt,
+  typed verification commandı, agent/skill attribution ve finalizer consumer zinciri üç taskta da
+  canlı görüldü. Canonical archive 52 artifact/438,838 byte; manifest verify ve terminal-verify
+  `ok=true`, Brain archive index/summary yenilendi, legacy `.tasks/archive`/`.brain/archive`
+  yollarına sprint-657 raw write yok.
 - Provider observation reconciliation canlı uygulandı: 19 active-open interval'ın exact
   run/attempt settlement sahibi olan 15'i digest-bound plan + interactive approval + immutable
   receipt ile `retired=true` oldu; dört `sprint-488` legacy-unowned interval forensic `HOLD`
@@ -22,7 +23,17 @@
 - Root `.tasks` altındaki 63 `task-xv*` artifact hash-korumalı biçimde
   `.tasks/archive/xverify-settled-2026-08-24/` staging archive'ına taşındı; root eşleşme sıfır,
   `rm` kullanılmadı. Product canonical one-shot task archive surface'i henüz yok.
-- Bot daemon fresh compiled dist ile PID `867485` olarak çalışıyor. Pending approval yok.
+- Bot daemon fresh compiled dist ile PID `1289426` olarak çalışıyor. Pending approval yok.
+- `.result` geçişi production-wired: worker claim'i ile host authority ayrıldı; exact
+  `testVerification`, criterion-polarity/evidence, prompt compile-plan ID, current delivery
+  attribution ve git-derived work attribution canonical result/finalizer consumerlarına ulaşıyor.
+  Sprint-657'nin yakaladığı typed command + coverage=0 yanlış debt sınıfı bounded ADR-D-007
+  recovery ile kapandı: evaluator typed `task.verification` authority-first, legacy prose yalnız
+  fallback; unevidenced-claim ceiling typed PASSED executionı yalnız declared commandla exact
+  eşleştiğinde kabul ediyor. Archived-shape regressionıyla 205/205 scoped test ve type-check yeşil.
+  Fresh dist replay `DONE/100`; scoped changed battery 35 dosya/1,121 test, full lint ve
+  `build:all` yeşil. Opus 5 owner-pair admission çözüldü fakat candidate-evidence producer provider
+  çağrısından önce `limit_hold` verdi; usage/verdict/receipt yok, formal XVerify dürüstçe HOLD.
 - Source→dist→provider runtime adoption production-wired: immutable composite receipt provider
   receipt + current DB lineage + source/build/entrypoint digest + canlı PID/start token'ı bağlıyor;
   real dist dry-run→apply→fresh-process replay aynı receipt'i verdi, DB/WAL/SHM değişmedi.
@@ -66,22 +77,25 @@
 
 ## Done-ready sayacı
 
-- 7/20 — canonical terminal archive/finalizer acceptance + provider-observation reconciliation +
+- 8/20 — canonical terminal archive/finalizer acceptance + provider-observation reconciliation +
   source/dist/provider runtime adoption + 7094 production measurement authority + Work 1055
-  XVerify production wiring + response-budget authority + settlement projection parity.
+  XVerify production wiring + response-budget authority + settlement projection parity + current
+  prompt-delivery/structured-result authority.
 
 ## Sıradaki yürütme sırası
 
-1. Archive replay hardening'i `LOCAL_VERIFIED/LIVE_PROVEN` tut; formal XVerify `HOLD` çözülmeden
-   sekizinci done-ready settlement/landing yapılmaz.
-2. `2026-08-24 20:00 Europe/Istanbul` sonrasında runtime hygiene different-provider XVerify.
-3. Aynı reset sonrasında D4 Approval Lifecycle formal XVerify/closure; ardından D5 retirement.
-4. Owner external key path'i sağlandığında Work 480 sign → append → closure gate → MASTER
+1. Prompt-delivery/result authority paketini full scoped gates + fresh dist/real-binary proof sonrası
+   land et; agent/skill kataloglarının 300/1000-scale ve all-surface residuallarını açık tut.
+2. Archive replay hardening'i `LOCAL_VERIFIED/LIVE_PROVEN` tut; formal XVerify'ın iki
+   `UNCLEAR/HOLD` sonucu yeni evidence veya farklı-provider authority olmadan retry edilmez.
+3. `2026-08-24 20:00 Europe/Istanbul` sonrasında runtime hygiene different-provider XVerify.
+4. Aynı reset sonrasında D4 Approval Lifecycle formal XVerify/closure; ardından D5 retirement.
+5. Owner external key path'i sağlandığında Work 480 sign → append → closure gate → MASTER
    settlement zincirini tamamla; key'i arama/okuma/loglama.
-5. 7091 account/limit authority yalnız provider-native fresh truth açıldığında yeniden denenir.
-6. Closure OS owner disposition batches → yedi günlük
+6. 7091 account/limit authority yalnız provider-native fresh truth açıldığında yeniden denenir.
+7. Closure OS owner disposition batches → yedi günlük
    health/ETA → cleanup/migration → release.
-7. Product surface ve `MODULAR-BOUNDARY-FREEZE-001`; fiziksel Core/Enterprise extraction yalnız
+8. Product surface ve `MODULAR-BOUNDARY-FREEZE-001`; fiziksel Core/Enterprise extraction yalnız
    dependency kapıları açıldıktan sonra.
 
 ## Ölçülmüş non-blocking finding

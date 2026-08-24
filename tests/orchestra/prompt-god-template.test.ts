@@ -7,7 +7,7 @@ import {
 } from '../../src/orchestra/prompt-god-template.js';
 import type { SprintContext } from '../../src/orchestra/prompt-god-template.js';
 import type { Task } from '../../src/core/task-types.js';
-import { TaskStatus } from '../../src/core/task-types.js';
+import { createGoNoGoCriterionItem, TaskStatus } from '../../src/core/task-types.js';
 import type { MemoryEntryV2 } from '../../src/core/memory-types.js';
 
 // ─── Test Helpers ──────────────────────────────────────────────────────
@@ -74,6 +74,19 @@ function makeCtx(overrides: Partial<SprintContext> = {}): SprintContext {
 // ─── Tests ─────────────────────────────────────────────────────────────
 
 describe('buildTaskPrompt', () => {
+  it('carries one immutable compile-plan digest and rejects overlapping scope authority', () => {
+    const task = makeTask({
+      description: '- Files: src/forged.ts\n- Test: `npx vitest run tests/x.test.ts`',
+      verification: { version: 1, source: 'directive', commands: ['npx vitest run tests/x.test.ts'] },
+    });
+    const compiled = buildTaskPromptSegmented(task, makeCtx());
+    expect(compiled.planId).toBe(compiled.compilePlan.planId);
+    expect(compiled.prompt).not.toContain('src/forged.ts');
+    expect(compiled.prompt).toContain('npx vitest run tests/x.test.ts');
+    expect(() => buildTaskPromptSegmented(makeTask({
+      scope: { directories: [], filesRead: ['src/core/config.ts'], filesWrite: ['src/core/config.ts'] },
+    }), makeCtx())).toThrow(/PROMPT_COMPILE_HOLD:SCOPE_READ_WRITE_OVERLAP/);
+  });
   it('adds stricter turn guidance only for the registry-resolved economy tier', () => {
     const economy = buildTaskPrompt(
       makeTask({ model: 'gpt-5.6-luna' }),
@@ -290,7 +303,8 @@ describe('buildTaskPrompt', () => {
     // dangling block where skills would have sat), and the rest of the template
     // (task body, scope rules) is intact.
     expect(prompt.length).toBeGreaterThan(0);
-    expect(prompt.startsWith('=== Agent: architect ===')).toBe(true);
+    expect(prompt.indexOf('=== Agent: architect ===')).toBeGreaterThan(0);
+    expect(prompt.indexOf('You are a Deckent worker agent')).toBeLessThan(prompt.indexOf('=== Agent: architect ==='));
     expect(prompt).toContain('## Scope Rules');
     expect(prompt).toContain('## Your Task');
   });
@@ -304,7 +318,8 @@ describe('buildTaskPrompt', () => {
     expect(prompt).not.toContain('=== Skills ===');
     expect(prompt).not.toMatch(/^--- .+ ---$/m);
     expect(metadata.skills).toEqual([]);
-    expect(prompt.startsWith('=== Agent: architect ===')).toBe(true);
+    expect(prompt.indexOf('=== Agent: architect ===')).toBeGreaterThan(0);
+    expect(prompt.indexOf('You are a Deckent worker agent')).toBeLessThan(prompt.indexOf('=== Agent: architect ==='));
   });
 
   // Test 8: Agent prompt is NOT truncated
@@ -526,20 +541,20 @@ describe('WP-14: live CI-baseline drives the pre-existing-failures note', () => 
   it('renders the live failure count and drops the stale ~67 hardcode', () => {
     const result = buildTaskPrompt(makeTask(), makeCtx({ preExistingFailures: 12 }));
     expect(result.prompt).toContain('12 pre-existing');
-    expect(result.prompt).not.toContain('67');
+    expect(result.prompt).not.toContain('~67 pre-existing');
     // The core guidance is preserved.
     expect(result.prompt).toContain('MUST NOT cause a NO_GO');
   });
 
   it('states a green baseline when zero pre-existing failures were measured', () => {
     const result = buildTaskPrompt(makeTask(), makeCtx({ preExistingFailures: 0 }));
-    expect(result.prompt).not.toContain('67');
+    expect(result.prompt).not.toContain('~67 pre-existing');
     expect(result.prompt.toLowerCase()).toMatch(/green at this sprint|0 pre-existing/);
   });
 
   it('emits no fabricated count when no baseline is available, but still warns', () => {
     const result = buildTaskPrompt(makeTask(), makeCtx({ preExistingFailures: undefined }));
-    expect(result.prompt).not.toContain('67');
+    expect(result.prompt).not.toContain('~67 pre-existing');
     expect(result.prompt).toMatch(/pre-existing unrelated failures/i);
   });
 });
@@ -602,12 +617,17 @@ describe('WP-18: heartbeat currentAction instruction', () => {
 // WP-19: the self-assessment must be a goCriteria-derived checklist (N/N → DONE),
 // not a subjective percentage.
 describe('WP-19: goCriteria-derived checklist rubric', () => {
-  it('renders one checklist item per goCriteria clause with an N/N→DONE rubric', () => {
+  it('renders one checklist item per structured criterion with an N/N→DONE rubric', () => {
+    const statements = ['tsc --noEmit clean', 'targeted tests pass', 'anti-IDOR returns 404'];
     const task = makeTask({
       goNogo: {
-        goCriteria: 'tsc --noEmit clean; targeted tests pass; anti-IDOR returns 404',
+        goCriteria: statements.join('; '),
         noGoCriteria: 'tests fail',
         techDebtAcceptable: 'minor',
+        items: [
+          ...statements.map(statement => createGoNoGoCriterionItem({ polarity: 'go', statement })),
+          createGoNoGoCriterionItem({ polarity: 'no-go', statement: 'tests fail' }),
+        ],
       },
     });
     const result = buildTaskPrompt(task, makeCtx());

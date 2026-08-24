@@ -5,7 +5,7 @@
 
 import { spawnSync, spawn as nodeSpawn } from 'node:child_process';
 import type { SpawnOptionsWithoutStdio } from 'node:child_process';
-import { writeFileSync, readFileSync, mkdirSync, existsSync, unlinkSync, openSync, fsyncSync, closeSync, readdirSync, renameSync, chmodSync, statSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync, existsSync, unlinkSync, openSync, fsyncSync, closeSync, readdirSync, renameSync, chmodSync, statSync, rmdirSync } from 'node:fs';
 import { dirname, isAbsolute, join, posix, relative, resolve, sep, win32 } from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
 import { homedir, tmpdir, totalmem } from 'node:os';
@@ -116,6 +116,7 @@ import {
 } from '../core/task-result-settlement.js';
 import { projectDockerRecoveryPreDispatchSettlement } from '../core/pre-dispatch-settlement.js';
 import { normalizeTaskResultShape } from '../core/task-result-schema.js';
+import { resolvePromptDeliveryAttribution } from '../core/prompt-delivery-receipt.js';
 import {
   listRetiredExecutionLandings,
   readExecutionLandingCheckpointByRef,
@@ -962,6 +963,33 @@ export function persistDockerTaskResultSettlement(
   const result = normalizeTaskResultShape(
     parsed as Record<string, unknown> & { notes?: unknown },
   ) as Record<string, unknown>;
+  let task: Task | null = null;
+  try {
+    const taskValue = JSON.parse(
+      readFileSync(join(tasksDir, `task-${ref.taskId}.json`), 'utf8'),
+    ) as Task;
+    if (taskValue.id === ref.taskId) task = taskValue;
+  } catch {
+    // Legacy/recovery attempts may no longer have a readable task projection.
+  }
+  const resultAgentId = typeof result.agentId === 'string' ? result.agentId : null;
+  const resultSkillIds = Array.isArray(result.skillIds)
+    ? result.skillIds.filter((value): value is string => typeof value === 'string')
+    : [];
+  const delivery = resolvePromptDeliveryAttribution({
+    projectRoot,
+    taskId: ref.taskId,
+    requireCurrentReceipt: typeof task?.promptCompilePlanId === 'string',
+    legacyAgentId: resultAgentId ?? task?.assignedAgent ?? null,
+    legacySkillIds: resultSkillIds.length > 0 ? resultSkillIds : task?.assignedSkills,
+  });
+  if (delivery.agentId === null) delete result.agentId;
+  else result.agentId = delivery.agentId;
+  result.skillIds = [...delivery.skillIds];
+  result.promptDeliveryAttribution = {
+    state: delivery.state,
+    ...(delivery.state === 'HOLD' ? { reason: delivery.reason } : {}),
+  };
   atomicWriteFileSync(resultPath, `${JSON.stringify(result, null, 2)}\n`);
   const settlement = createTaskResultSettlement({ ref, exitCode, result });
   writeTaskResultSettlementAtomic(settlement);
@@ -1749,6 +1777,15 @@ export interface DockerGitIsolation {
   envArgs: string[];
   hostCommonDir?: string;
   containerGitDir?: string;
+  /**
+   * Linked-worktree adapter materialized immediately before `docker run`.
+   * It replaces the host-absolute `.git` pointer with a container-native one
+   * without exporting process-global GIT_DIR/GIT_WORK_TREE variables.
+   */
+  adapter?: Readonly<{
+    hostPath: string;
+    content: string;
+  }>;
 }
 
 function readGitPointer(dotGitPath: string): string {
@@ -1799,20 +1836,79 @@ export function buildDockerGitIsolation(projectDir: string): DockerGitIsolation 
     ? `${CONTAINER_GIT_COMMON_DIR}/${containerRelativeGitDir}`
     : CONTAINER_GIT_COMMON_DIR;
 
+  // Never export GIT_DIR/GIT_COMMON_DIR/GIT_WORK_TREE to the provider
+  // process. Those variables are inherited by every child Git invocation and
+  // make `git init <tmpdir>` or a nested repository operate on Deckent's
+  // read-only metadata instead of its own target. Git's native repository
+  // discovery is the isolation boundary: a primary checkout can consume its
+  // mounted `.git` directory directly; a linked worktree receives an immutable
+  // container-native gitfile pointing into the read-only common-dir mount.
+  const adapter = linkedWorktree
+    ? (() => {
+        const identity = createHash('sha256')
+          .update(`${projectRoot}\0${hostGitDir}\0${containerGitDir}`)
+          .digest('hex');
+        return {
+          hostPath: join(tmpdir(), 'deckent-docker-git-adapters', identity, 'gitdir'),
+          content: `gitdir: ${containerGitDir}\n`,
+        } as const;
+      })()
+    : undefined;
+
   return {
     available: true,
-    mountArgs: [
-      '--mount', `type=bind,src=${dotGitPath},dst=${CONTAINER_WORKSPACE}/.git,readonly`,
-      '--mount', `type=bind,src=${hostCommonDir},dst=${CONTAINER_GIT_COMMON_DIR},readonly`,
-    ],
-    envArgs: [
-      '-e', `GIT_WORK_TREE=${CONTAINER_WORKSPACE}`,
-      '-e', `GIT_COMMON_DIR=${CONTAINER_GIT_COMMON_DIR}`,
-      '-e', `GIT_DIR=${containerGitDir}`,
-    ],
+    mountArgs: linkedWorktree
+      ? [
+          '--mount', `type=bind,src=${adapter!.hostPath},dst=${CONTAINER_WORKSPACE}/.git,readonly`,
+          '--mount', `type=bind,src=${hostCommonDir},dst=${CONTAINER_GIT_COMMON_DIR},readonly`,
+        ]
+      : [
+          '--mount', `type=bind,src=${dotGitPath},dst=${CONTAINER_WORKSPACE}/.git,readonly`,
+        ],
+    envArgs: [],
     hostCommonDir,
     containerGitDir,
+    ...(adapter ? { adapter } : {}),
   };
+}
+
+/** Materialize the immutable linked-worktree pointer only when a spawn is imminent. */
+export function materializeDockerGitIsolation(isolation: DockerGitIsolation): void {
+  const adapter = isolation.adapter;
+  if (!adapter) return;
+  const adapterDir = dirname(adapter.hostPath);
+  mkdirSync(adapterDir, { recursive: true, mode: 0o700 });
+  if (existsSync(adapter.hostPath)) {
+    const current = readFileSync(adapter.hostPath, 'utf-8');
+    if (current !== adapter.content) {
+      throw new Error(`Docker Git adapter identity conflict at ${adapter.hostPath}`);
+    }
+    return;
+  }
+  try {
+    writeFileSync(adapter.hostPath, adapter.content, { encoding: 'utf-8', mode: 0o600, flag: 'wx' });
+  } catch (error) {
+    // A concurrent worker for the same immutable worktree may win the first
+    // write. Equal bytes are safe to share; any other state fails closed.
+    if (!existsSync(adapter.hostPath) || readFileSync(adapter.hostPath, 'utf-8') !== adapter.content) {
+      throw error;
+    }
+  }
+}
+
+function cleanupDockerGitAdapter(adapterHostPath: string | undefined): void {
+  if (!adapterHostPath) return;
+  try {
+    if (existsSync(adapterHostPath)) unlinkSync(adapterHostPath);
+  } catch (error) {
+    debugLog('docker-backend:git-adapter-cleanup', error);
+    return;
+  }
+  try {
+    rmdirSync(dirname(adapterHostPath));
+  } catch {
+    // Concurrent attempts may still share or have recreated the directory.
+  }
 }
 
 /**
@@ -4628,6 +4724,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     projectDir: string;
     tasksDir: string;
     settlementRef?: TaskResultSettlementRefV1;
+    gitAdapterHostPath?: string;
   }>(); // taskId → effective execution context
 
   constructor(projectDir: string, opts?: DockerSpawnBackendConstructionOptions) {
@@ -5889,9 +5986,13 @@ export class DockerSpawnBackend implements SpawnBackend {
         gitIsolation,
         exactContext,
       );
+      if (!this.containers.has(taskId)) {
+        cleanupDockerGitAdapter(gitIsolation.adapter?.hostPath);
+      }
     } catch (err) {
       clearPending(taskId);
       try { releaseAllSpawnLocks(dir, taskId); } catch (e) { debugLog('docker-backend:spawn-lock-release', e); }
+      cleanupDockerGitAdapter(gitIsolation.adapter?.hostPath);
       throw err;
     }
   }
@@ -6438,6 +6539,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     // container could actually read the bind-mounted shim — still happens
     // well after this synchronous call returns.
     installGitGuard(gitGuardHostDir, CONTAINER_GIT_PATH);
+    materializeDockerGitIsolation(gitIsolation);
 
     const containerCmd = `sh ${CONTAINER_WORKSPACE}/${TASKS_DIR}/${scriptFileName}`;
 
@@ -6765,6 +6867,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       projectDir: dir,
       tasksDir,
       settlementRef: attemptRef,
+      ...(gitIsolation.adapter ? { gitAdapterHostPath: gitIsolation.adapter.hostPath } : {}),
     });
     debugLog(
       'docker-backend:spawn-ok',
@@ -7033,7 +7136,12 @@ export class DockerSpawnBackend implements SpawnBackend {
     spawnSync('sleep', [seconds], { timeout: ms + 2_000 });
   }
 
-  private resolveExecutionContext(taskId: string): { projectDir: string; tasksDir: string; containerId: string } {
+  private resolveExecutionContext(taskId: string): {
+    projectDir: string;
+    tasksDir: string;
+    containerId: string;
+    gitAdapterHostPath?: string;
+  } {
     const execution = this.containers.get(taskId);
     if (!execution) {
       throw new SpawnBackendError(
@@ -7046,6 +7154,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       projectDir,
       tasksDir: execution.tasksDir,
       containerId: execution.containerId,
+      ...(execution.gitAdapterHostPath ? { gitAdapterHostPath: execution.gitAdapterHostPath } : {}),
     };
   }
 
@@ -7063,7 +7172,7 @@ export class DockerSpawnBackend implements SpawnBackend {
    * the SIGTERM trap has already fsync'd .result to disk.
    */
   kill(taskId: string): void {
-    const { projectDir, tasksDir, containerId } = this.resolveExecutionContext(taskId);
+    const { projectDir, tasksDir, containerId, gitAdapterHostPath } = this.resolveExecutionContext(taskId);
     const grace = this.gracefulTimeoutSeconds;
     debugLog('docker-backend:kill', `taskId=${taskId} (graceful stop --time=${grace})`);
 
@@ -7103,6 +7212,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       if (released > 0) debugLog('docker-backend:spawn-lock', `taskId=${taskId} released ${released} spawn lock(s) on kill`);
     } catch (e) { debugLog('docker-backend:spawn-lock-release', e); }
 
+    cleanupDockerGitAdapter(gitAdapterHostPath);
     this.containers.delete(taskId);
   }
 
@@ -7390,6 +7500,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       liveness: 'not-alive',
       activeClaimFence,
     });
+    cleanupDockerGitAdapter(this.containers.get(input.taskId)?.gitAdapterHostPath);
     this.containers.delete(input.taskId);
     try {
       dispatchExecutionContinuation({
@@ -8187,7 +8298,10 @@ export class DockerSpawnBackend implements SpawnBackend {
         }
       }
 
-      if (lifecycleSettled) this.containers.delete(taskId);
+      if (lifecycleSettled) {
+        cleanupDockerGitAdapter(this.containers.get(taskId)?.gitAdapterHostPath);
+        this.containers.delete(taskId);
+      }
 
       // Sprint 156 Task 4: .prompt-*.txt AND .worker-*.sh tmpfiles persist until sprint cleanup.
       // Both are archived together by archivePromptFiles() during sprint cleanup phase.

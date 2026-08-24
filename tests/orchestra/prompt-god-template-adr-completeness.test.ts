@@ -145,4 +145,33 @@ describe('buildTaskPrompt — ADR completeness (F3, Sprint 182 PQ-2)', () => {
     // Combined ADR section alone is ~24K — entire prompt must exceed that.
     expect(result.prompt.length).toBeGreaterThanOrEqual(24000);
   });
+
+  it('never truncates an explicitly referenced binding ADR at operative markers', () => {
+    const content = [
+      'Before marker binding context.',
+      '<!-- worker-operative-start -->',
+      'Bounded worker slice.',
+      '<!-- worker-operative-end -->',
+      'After marker binding context.',
+    ].join('\n');
+    const result = buildTaskPrompt(
+      makeTask({ description: 'Implement ADR-001 as the binding rule.' }),
+      makeCtx({ allAdrs: [makeAdr('adr-001', 'Binding completeness', content)] }),
+    );
+    expect(result.prompt).toContain('Before marker binding context.');
+    expect(result.prompt).toContain('After marker binding context.');
+    expect(result.prompt).toContain('A binding ADR must never be truncated; if its full body is unavailable, fail closed.');
+  });
+
+  it('labels scoring-only condensed ADRs as background without a binding sub-signal', () => {
+    const content = '**Active constraint:** Keep core stable.\n\n## Contract\nBackground-only rule.\n\n## History\nLong history.';
+    const result = buildTaskPrompt(
+      makeTask({ description: 'core config change', type: 'code-development' }),
+      makeCtx({ allAdrs: [makeAdr('adr-777', 'Core config background', content)] }),
+    );
+    expect(result.prompt).toContain('[background constraint — full text:');
+    expect(result.prompt).toContain('### Background contract');
+    expect(result.prompt).not.toContain('### Contract (binding)');
+    expect(result.prompt).not.toContain('ADVISORY CONTEXT');
+  });
 });

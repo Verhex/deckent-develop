@@ -99,6 +99,17 @@ describe('born-670b (a): Pipe-Exit Honesty — no non-existent-tool reference', 
   it('replacement text stays reasonably compact (anti-bloat pin, mirrors the prior ≤400 discipline)', () => {
     expect(PIPE_EXIT_TEXT.length).toBeLessThanOrEqual(400);
   });
+
+  it('keeps both original-command status mechanisms in the role-resolved read-only policy', () => {
+    const task = makeTask({
+      type: 'audit',
+      scope: { directories: ['src/orchestra/'], filesRead: ['src/orchestra/prompt-god-template.ts'], filesWrite: [] },
+    });
+    const { prompt } = buildTaskPrompt(task, makeCtx());
+    expect(prompt).toContain('${PIPESTATUS[0]}');
+    expect(prompt).toContain('read `$?` on the NEXT line');
+    expect(prompt).not.toContain('## Pipe-Exit Honesty');
+  });
 });
 
 describe('born-670b (a): buildCheckCommandLine / buildTestCommandLine — pure helpers', () => {
@@ -136,25 +147,23 @@ describe('born-670b (a): buildCheckCommandLine / buildTestCommandLine — pure h
 });
 
 describe('born-670b (a): CRITICAL VERIFY STEPS injects concrete stack commands end-to-end', () => {
-  it('with verifyCommands resolved: prompt cites the exact check/test commands, not the generic list', () => {
+  it('with verifyCommands resolved: prompt cites only commands with an exact scoped target', () => {
     const { prompt } = buildTaskPrompt(
       makeTask({ type: 'code-development' }),
       makeCtx({ verifyCommands: { check: 'npx tsc --noEmit', test: 'npx vitest run' } }),
     );
     expect(prompt).toContain('CRITICAL VERIFY STEPS');
     expect(prompt).toContain('Run: `npx tsc --noEmit`');
-    expect(prompt).toContain('Run: `npx vitest run <path-to-the-test-file(s)-you-changed>`');
+    expect(prompt).toContain('SCOPED_PROOF_HOLD: no exact task-local targeted test command was compiled');
+    expect(prompt).not.toContain('<path-to-the-test-file(s)-you-changed>');
     expect(prompt).not.toContain('Examples: `tsc --noEmit` (TypeScript), `mypy` (Python)');
   });
 
-  it('without verifyCommands (default/legacy path): prompt is byte-identical to the pre-427-012 generic text', () => {
+  it('without verifyCommands: fails closed instead of inventing generic commands', () => {
     const { prompt } = buildTaskPrompt(makeTask({ type: 'code-development' }), makeCtx());
-    expect(prompt).toContain(
-      'Examples: `tsc --noEmit` (TypeScript), `mypy` (Python), `go vet ./...` (Go), `cargo check` (Rust)',
-    );
-    expect(prompt).toContain(
-      'Example: `npx vitest run tests/orchestra/my-module.test.ts` — do NOT run the Full test suite (`npx vitest run` without args).',
-    );
+    expect(prompt).toContain('SCOPED_PROOF_HOLD: no task-local type-check command was compiled');
+    expect(prompt).toContain('SCOPED_PROOF_HOLD: no exact task-local targeted test command was compiled');
+    expect(prompt).not.toContain('Examples: `tsc --noEmit`');
   });
 
   it('a doc-only task never renders CRITICAL VERIFY STEPS (verifyCommands irrelevant there)', () => {
@@ -190,10 +199,12 @@ describe('task-declared verification authority', () => {
     const { prompt } = buildTaskPrompt(
       makeTask({
         type: 'code-development',
-        description: [
-          'Create a standalone smoke example.',
-          '**Test:** `node --experimental-strip-types deneme/task-001/example.ts`',
-        ].join('\n'),
+        description: 'Create a standalone smoke example.',
+        verification: {
+          version: 1,
+          source: 'directive',
+          commands: ['node --experimental-strip-types deneme/task-001/example.ts'],
+        },
       }),
       makeCtx({ verifyCommands: { check: 'npx tsc --noEmit', test: 'npx vitest run' } }),
     );
@@ -204,5 +215,25 @@ describe('task-declared verification authority', () => {
     );
     expect(prompt).not.toContain('Run: `npx tsc --noEmit`');
     expect(prompt).not.toContain('npx vitest run <path-to-the-test-file(s)-you-changed>');
+  });
+
+  it('uses the same typed command authority for inspection-only tasks', () => {
+    const exactCommand = 'VITEST_MAX_FORKS=2 npx vitest run tests/orchestra/verify-commands-prompt.test.ts';
+    const { prompt } = buildTaskPrompt(
+      makeTask({
+        type: 'audit',
+        scope: {
+          directories: ['src/orchestra/'],
+          filesRead: ['src/orchestra/prompt-god-template.ts'],
+          filesWrite: [],
+        },
+        verification: { version: 1, source: 'directive', commands: [exactCommand] },
+      }),
+      makeCtx({ verifyCommands: { check: 'npx tsc --noEmit', test: 'npx vitest run' } }),
+    );
+
+    expect(prompt).toContain('INSPECTION-ONLY TASK-DECLARED AUTHORITY');
+    expect(prompt).toContain(`1. \`${exactCommand}\``);
+    expect(prompt).not.toContain('Run: `npx tsc --noEmit`');
   });
 });

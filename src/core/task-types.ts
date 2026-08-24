@@ -300,11 +300,37 @@ export enum TaskEvaluation {
 
 export type SelfAssessment = 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
 
+/** Whether an evidence signal participates in settlement for a task class. */
+export const CRITERION_APPLICABILITY = Object.freeze({
+  REQUIRED: 'REQUIRED',
+  OPTIONAL: 'OPTIONAL',
+  NOT_APPLICABLE: 'NOT_APPLICABLE',
+} as const);
+
+export type CriterionApplicability =
+  typeof CRITERION_APPLICABILITY[keyof typeof CRITERION_APPLICABILITY];
+
+/** Rubric evidence signals whose applicability varies by canonical task kind. */
+export type RubricEvidenceSignal = 'test_execution' | 'coverage';
+
 // ─── Task Scope (Blueprint 15) ──────────────────────────────────────
 export interface TaskScope {
   directories: string[];
   filesRead: string[];
   filesWrite: string[];
+}
+
+/**
+ * Planner-authored verification authority persisted with the task artifact.
+ *
+ * Commands are captured before prompt compilation. Renderers must never recover
+ * them from task prose: doing so would create a second, language-sensitive
+ * authority beside the canonical task JSON.
+ */
+export interface TaskVerificationAuthority {
+  readonly version: 1;
+  readonly source: 'directive' | 'planner' | 'legacy-ingress';
+  readonly commands: string[];
 }
 
 // ─── GO / NO-GO Criteria (Blueprint 8) ──────────────────────────────
@@ -655,6 +681,10 @@ export interface Task {
   scope: TaskScope;
   dependencies: string[];
   goNogo: GoNoGoCriteria;
+  /** Exact task-local verification authority; absent means policy-resolved verification. */
+  verification?: TaskVerificationAuthority;
+  /** Exact prompt compilation digest persisted at the pre-spawn boundary. */
+  promptCompilePlanId?: string;
   status: TaskStatus;
   /** Canonical work-model kind (WM-2a, optional/additive). Set at plan-time by future consumers. */
   type?: TaskKind;
@@ -1049,6 +1079,8 @@ export interface TaskResult {
   cascadeSkipped?: boolean;
   taskId: string;
   workerId: string;
+  /** Digest of the exact prompt authority the worker observed. */
+  promptCompilePlanId?: string;
   filesChanged: string[];
   linesAdded: number;
   linesRemoved: number;
@@ -1064,9 +1096,20 @@ export interface TaskResult {
   };
   /** Exact zero-work authority when dispatch was rejected before worker spawn. */
   preDispatchSettlement?: HostPreDispatchSettlement;
+  /** Compatibility projection of testVerification.outcome, never applicability authority. */
   testsPassed: boolean;
   /** Provider compatibility evidence: commands recovered from a legacy testsPassed string array. */
   testCommands?: string[];
+  /** Explicit applicability and actual execution outcome at worker ingress. */
+  testVerification?: {
+    applicability: CriterionApplicability;
+    outcome: 'PASSED' | 'FAILED' | 'NOT_EXECUTED';
+    commands: string[];
+  };
+  /** Explicit evidence for every structured criterion identity. */
+  criteriaEvidence?: Array<{ criterionId: string; outcome: 'MET' | 'UNMET' | 'UNVERIFIED'; evidence: string[] }>;
+  /** Exact criterion IDs left open by GO_WITH_TECH_DEBT. */
+  techDebtCriterionIds?: string[];
   coverage: number;
   selfAssessment: SelfAssessment;
   notes: string;
@@ -1083,6 +1126,11 @@ export interface TaskResult {
   agentId?: string;
   /** Skill IDs used during this task execution */
   skillIds?: string[];
+  /** Host projection of the prompt-delivery authority used for identity credit. */
+  promptDeliveryAttribution?: {
+    state: 'CURRENT' | 'LEGACY_RECEIPT' | 'LEGACY_FALLBACK' | 'HOLD';
+    reason?: 'missing' | 'malformed' | 'task-mismatch' | 'invalid-digest' | 'legacy-version';
+  };
   completedAt?: string;
   durationMs?: number;
   /** Worker feedback loop metrics (tsc/test verify retries) */

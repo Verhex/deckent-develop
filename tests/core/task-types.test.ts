@@ -1,10 +1,51 @@
 import { describe, expect, it } from 'vitest';
-import { PROVIDER_MODEL_MAP, TaskEvaluation, isCursorModel } from '../../src/core/task-types.js';
+import {
+  CRITERION_APPLICABILITY,
+  PROVIDER_MODEL_MAP,
+  TaskEvaluation,
+  isCursorModel,
+  createGoNoGoCriterionItem,
+} from '../../src/core/task-types.js';
+import { renderWorkerDodChecklist } from '../../src/core/worker-dod-contract.js';
 import { modelRegistry } from '../../src/core/model-registry.js';
 import {
   collectDeferredStats,
   buildDeferredSection,
 } from '../../src/orchestra/sprint-reporter.js';
+
+describe('criterion applicability vocabulary', () => {
+  it('is explicit and frozen', () => {
+    expect(CRITERION_APPLICABILITY).toEqual({
+      REQUIRED: 'REQUIRED',
+      OPTIONAL: 'OPTIONAL',
+      NOT_APPLICABLE: 'NOT_APPLICABLE',
+    });
+    expect(Object.isFrozen(CRITERION_APPLICABILITY)).toBe(true);
+  });
+});
+
+describe('structured worker checklist', () => {
+  it('renders criterion identities and evidence slots without splitting punctuation', () => {
+    const item = createGoNoGoCriterionItem({
+      polarity: 'go',
+      statement: 'Preserves commas, semicolons; and punctuation.',
+    });
+    const rendered = renderWorkerDodChecklist([item]);
+    expect(rendered).toContain(`[${item.id}] ${item.statement}`);
+    expect(rendered).toContain(`evidence: <explicit evidence for ${item.id}>`);
+    expect(rendered.match(/- \[ \]/g)).toHaveLength(1);
+  });
+
+  it('renders forbidden criteria with an explicit polarity-safe outcome', () => {
+    const forbidden = createGoNoGoCriterionItem({
+      polarity: 'no-go',
+      statement: 'Assignment is treated as delivery.',
+    });
+    const rendered = renderWorkerDodChecklist([forbidden]);
+    expect(rendered).toContain('forbidden condition; DONE expects outcome=UNMET');
+    expect(rendered).toContain('A NO-GO criterion marked MET means the forbidden condition occurred');
+  });
+});
 
 describe('Sprint 192 Task 192-010 — TaskEvaluation.DEFERRED + retro reporting', () => {
   it('reads Cursor models live from the registry', () => {

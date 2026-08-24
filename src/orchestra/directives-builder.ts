@@ -37,6 +37,8 @@ export interface DirectiveBuildTask {
   effort?: TaskEffort;
   /** undefined = auto-select (omit `Skills:` line); [] = explicitly none (`Skills: none`). */
   skills?: string[];
+  /** Exact task-local verification command; persisted as Task.verification. */
+  test?: string;
   goCriteria: string[];
   nogo: string[];
   /** Optional lossless machine-readable projection; display arrays stay unchanged. */
@@ -245,6 +247,13 @@ function validateTask(task: DirectiveBuildTask): void {
   assertNoDelimiterCollision('scope', task.scope, ',');
   assertNoDelimiterCollision('deps', task.deps, ',');
   if (task.skills) assertNoDelimiterCollision('skills', task.skills, ',');
+  if (task.test !== undefined) {
+    assertNonEmpty('test', task.test);
+    if (/\r|\n/.test(task.test)) {
+      throw new DeckentError('DECKENT_E074', 'directives-builder: "test" must be one physical command line');
+    }
+    assertSafeField('test', task.test);
+  }
   // goCriteria/nogo items are escaped instead of rejected — see escapeListItem above.
 }
 
@@ -260,6 +269,7 @@ function buildTaskBlock(task: DirectiveBuildTask, seq: number): string[] {
   }
   lines.push(`- Files: ${task.files.join(', ')}`);
   if (task.reads && task.reads.length > 0) lines.push(`- Reads: ${task.reads.join(', ')}`);
+  if (task.test) lines.push(`- Test: ${task.test}`);
   if (task.meta && Object.keys(task.meta).length > 0) {
     // U1-G2: metadata as a dedicated line — readers keep it OUT of content flows.
     const metaStr = Object.entries(task.meta)
@@ -437,6 +447,7 @@ export function reconstructBuildTask(parsed: ParsedDirectiveTask): DirectiveBuil
     model: parsed.forceModel,
     effort: parsed.forceEffort,
     skills: parsed.forceSkills,
+    ...(parsed.testTarget ? { test: parsed.testTarget } : {}),
     goCriteria,
     nogo,
     ...(encodedItems ? { criteriaItems: items } : {}),

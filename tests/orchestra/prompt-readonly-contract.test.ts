@@ -96,6 +96,20 @@ describe('inspection-only worker prompt contract', () => {
     expect(prompt).not.toContain('editing src/x.ts');
     expect(prompt).not.toContain('see the VERIFY STEPS section below');
     expect(prompt.match(/READONLY_ACCEPTANCE_MARKER/g)).toHaveLength(1);
+
+    expect(prompt.match(/## Read-Only Role Policy/g)).toHaveLength(1);
+    expect(prompt).not.toContain('## Karpathy Discipline (read-only)');
+    expect(prompt.match(/^\d+\./gm)?.map(line => line.split('.')[0])).toEqual(
+      expect.arrayContaining(['1', '2', '3', '4', '5', '6']),
+    );
+    expect(prompt).toContain('## PROJECT WRITE authority: NONE');
+    expect(prompt).toContain('## Worker Lifecycle Write Exceptions');
+    expect(prompt).toContain('Only `.tasks/task-<task-id>.hb`, `.tasks/task-<task-id>.result`, and `.tasks/task-<task-id>.question`');
+    expect(prompt).toContain('worker `.result` notes cannot prove them');
+    expect(prompt).toContain('host-observed disk diff');
+    expect(prompt).toContain('captured command output');
+    expect(prompt).toContain('caller or callee outside the paths above MUST NOT be read');
+    expect(prompt).not.toContain('no plan file is written');
   });
 
   it('preserves the ordinary code-task compiler path', () => {
@@ -109,6 +123,24 @@ describe('inspection-only worker prompt contract', () => {
     expect(prompt).toContain('## CRITICAL VERIFY STEPS');
     expect(prompt).toContain('Type check / static analysis');
     expect(prompt).toContain('## Dependency-Mutation Advisory');
+  });
+
+  it('renders typed inspection verification exactly, including environment prefixes', () => {
+    const task = makeInspectionTask();
+    const exactCommand = 'VITEST_MAX_FORKS=2 npx vitest run tests/orchestra/prompt-readonly-contract.test.ts';
+    task.verification = {
+      version: 1,
+      source: 'directive',
+      commands: [exactCommand],
+    };
+
+    const { prompt } = buildTaskPrompt(task, { effort: 'low' });
+
+    expect(prompt).toContain('CRITICAL VERIFY STEPS (INSPECTION-ONLY TASK-DECLARED AUTHORITY)');
+    expect(prompt.match(new RegExp(exactCommand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))).toHaveLength(1);
+    expect(prompt).toContain('do not omit environment/resource prefixes');
+    expect(prompt).not.toContain('## VERIFY STEPS (inspection-only)');
+    expect(prompt).not.toContain('Run: `npx tsc --noEmit`');
   });
 
   it('rejecting every authored read path never widens authority to the directories', () => {

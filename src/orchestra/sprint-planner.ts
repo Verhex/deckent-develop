@@ -718,6 +718,7 @@ export async function planSprint(
           stack: wm7StackKind,
           commands: wm7Commands,
         }),
+        verificationCommands: src.testTarget ? [src.testTarget] : undefined,
         sprintId,
         initialStatus,
         forceModel: src.forceModel,

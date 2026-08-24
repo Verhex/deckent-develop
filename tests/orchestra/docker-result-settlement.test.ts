@@ -3,6 +3,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { AgentPoolManager } from '../../src/core/agent-pool.js';
+import { createAgentDefinition } from '../../src/core/agent-types.js';
+import type { CapabilityVector, SkillProfile } from '../../src/core/routing/capability-vector.js';
+import { DEFAULT_ROUTING_V3_CONFIG } from '../../src/core/routing/config.js';
+import { SkillPoolManager } from '../../src/core/skill-pool.js';
+import { createSkillDefinition } from '../../src/core/skill-types.js';
+import type { Task, TaskResult } from '../../src/core/task-types.js';
+import { TaskEvaluation, TaskStatus } from '../../src/core/types.js';
+import { promptDeliveryReceiptPath } from '../../src/core/prompt-delivery-receipt.js';
+
 import {
   claimTaskResultSettlementAttemptAtomic,
   createTaskResultSettlementRef,
@@ -18,6 +28,9 @@ import {
   persistDockerTaskResultSettlement,
   reconcileDockerHostTerminalResultFile,
 } from '../../src/orchestra/spawn-backend-docker.js';
+import { collectCatalogStatsTerminalOutcomes } from '../../src/orchestra/sprint-finalizer.js';
+import { routeTasksV3ForPlan } from '../../src/orchestra/routing-plan-adapter.js';
+import { buildWorkerPrompt } from '../../src/orchestra/task-builder.js';
 
 const roots: string[] = [];
 const originalDeckentHome = process.env.DECKENT_HOME;
@@ -39,6 +52,143 @@ afterEach(() => {
 });
 
 describe('persistDockerTaskResultSettlement', () => {
+  it('carries real route→persona/skill body→receipt identities into settlement and finalizer attribution', async () => {
+    const { root, tasks } = fixture();
+    const taskId = 'docker-delivery-chain';
+    const agentId = 'delivery-agent';
+    const skillId = 'delivery-skill';
+    const capabilities: CapabilityVector = {
+      capabilitiesVersion: 3,
+      content: {
+        workTypes: [{ type: 'build', proficiency: 'primary' }],
+        expertise: ['prompt-delivery'],
+        personaSlices: ['implementation', 'default'],
+      },
+      positional: {
+        domains: [{ id: '*', proficiency: 'primary' }],
+        surfaces: [],
+        writeAuthority: true,
+        role: 'implementer',
+        deliverables: ['code-src'],
+      },
+      numerical: { costTier: 'standard', maxParallel: null },
+    };
+    const skillProfile: SkillProfile = {
+      profileVersion: 3,
+      workTypes: [{ type: 'build', proficiency: 'primary' }],
+      domains: [{ id: '*', proficiency: 'primary' }],
+      expertise: ['prompt-delivery'],
+      deliverables: ['code-src'],
+    };
+    const agent = createAgentDefinition({
+      id: agentId,
+      name: 'Delivery Agent',
+      source: 'user',
+      capabilities,
+    });
+    const skill = createSkillDefinition({
+      id: skillId,
+      name: 'Delivery Skill',
+      description: 'Canonical prompt delivery and settlement skill.',
+      profile: skillProfile,
+      manifestVersion: 2,
+      triggers: ['prompt-delivery'],
+    });
+    const task: Task = {
+      id: taskId,
+      title: 'Wire canonical prompt delivery settlement',
+      description: 'Implement the prompt delivery receipt consumer chain.',
+      model: agent.preferredModel,
+      effort: 'normal',
+      priority: 'NORMAL',
+      reason: 'production-chain-test',
+      scope: {
+        directories: ['src/core/'],
+        filesRead: [],
+        filesWrite: ['src/core/prompt-delivery-receipt.ts'],
+      },
+      dependencies: [],
+      goNogo: {
+        goCriteria: 'Canonical delivery identity reaches settlement.',
+        noGoCriteria: 'Worker claims override host delivery truth.',
+        techDebtAcceptable: 'none',
+      },
+      status: TaskStatus.PENDING,
+      sprintId: 'sprint-docker-delivery',
+      createdAt: '2026-08-24T00:00:00.000Z',
+    } as Task;
+
+    const agentDir = join(root, '.deckent', 'agents', agentId);
+    const skillDir = join(root, '.deckent', 'skills', skillId);
+    mkdirSync(agentDir, { recursive: true });
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(join(agentDir, 'PROMPT.md'), '# Delivery Agent\n\nCanonical persona bytes.\n', 'utf8');
+    writeFileSync(join(skillDir, 'SKILL.md'), '# Delivery Skill\n\nCanonical skill bytes.\n', 'utf8');
+    writeFileSync(join(skillDir, 'manifest.json'), `${JSON.stringify(skill, null, 2)}\n`, 'utf8');
+
+    const routed = await routeTasksV3ForPlan(
+      [task],
+      root,
+      { ...DEFAULT_ROUTING_V3_CONFIG, enabled: true },
+      {
+        journal: false,
+        pools: {
+          agents: new Map([[agentId, agent]]),
+          skills: new Map([[skillId, skill]]),
+        },
+      },
+    );
+    expect(routed.routed).toEqual([taskId]);
+    expect(task.assignedAgent).toBe(agentId);
+    expect(task.assignedSkills).toEqual([skillId]);
+
+    const persona = new AgentPoolManager(root).resolvePrompt(agentId);
+    const skillBody = new SkillPoolManager(root).resolveBody(skillId);
+    expect(persona.availability).toBe('prompt-file');
+    expect(skillBody.ok).toBe(true);
+    if (!skillBody.ok) return;
+    const prompt = buildWorkerPrompt(task, persona.content, [{
+      name: skillId,
+      content: skillBody.entrypoint.content,
+    }], root);
+    expect(prompt).toContain('Canonical persona bytes.');
+    expect(prompt).toContain('Canonical skill bytes.');
+    expect(task.promptCompilePlanId).toMatch(/^prompt-compile-plan:sha256:[a-f0-9]{64}$/);
+
+    writeFileSync(join(tasks, `task-${taskId}.json`), `${JSON.stringify(task, null, 2)}\n`, 'utf8');
+    writeFileSync(join(tasks, `task-${taskId}.result`), JSON.stringify({
+      taskId,
+      agentId: 'worker-claim-agent',
+      skillIds: ['worker-claim-skill'],
+      selfAssessment: 'DONE',
+      testsPassed: true,
+      notes: 'worker claim must not own attribution',
+    }), 'utf8');
+    const ref = createTaskResultSettlementRef(root, taskId);
+    writeTaskResultSettlementAttemptAtomic(ref);
+
+    expect(persistDockerTaskResultSettlement(root, tasks, ref, 0)).toBe(true);
+    const settlement = readTaskResultSettlement(ref);
+    expect(settlement?.result).toMatchObject({
+      agentId,
+      skillIds: [skillId],
+      promptDeliveryAttribution: { state: 'CURRENT' },
+    });
+    const canonicalResult = settlement?.result as TaskResult;
+    const outcomes = collectCatalogStatsTerminalOutcomes(
+      root,
+      [task],
+      new Map([[taskId, TaskEvaluation.DONE]]),
+      new Map([[taskId, canonicalResult]]),
+    );
+    expect(outcomes).toMatchObject([{
+      taskId,
+      agentId,
+      skillIds: [skillId],
+      evaluation: TaskEvaluation.DONE,
+    }]);
+  });
+
   it('embeds the final result under the exact project/task/attempt authority', () => {
     const { root, tasks } = fixture();
     const taskId = 'docker-a';
@@ -62,6 +212,34 @@ describe('persistDockerTaskResultSettlement', () => {
       selfAssessment: 'DONE',
     }), 'utf-8');
     expect(readTaskResultSettlement(ref)?.result).toMatchObject({ selfAssessment: 'NO_GO' });
+  });
+
+  it('denies agent and skill credit when a fresh task receipt is malformed', () => {
+    const { root, tasks } = fixture();
+    const taskId = 'docker-malformed-delivery';
+    const ref = createTaskResultSettlementRef(root, taskId);
+    writeTaskResultSettlementAttemptAtomic(ref);
+    writeFileSync(join(tasks, `task-${taskId}.json`), JSON.stringify({
+      id: taskId,
+      promptCompilePlanId: `prompt-compile-plan:sha256:${'a'.repeat(64)}`,
+      assignedAgent: 'assigned-agent',
+      assignedSkills: ['assigned-skill'],
+    }), 'utf8');
+    writeFileSync(promptDeliveryReceiptPath(root, taskId), '{malformed', 'utf8');
+    writeFileSync(join(tasks, `task-${taskId}.result`), JSON.stringify({
+      taskId,
+      agentId: 'worker-claim-agent',
+      skillIds: ['worker-claim-skill'],
+      selfAssessment: 'DONE',
+      testsPassed: true,
+    }), 'utf8');
+
+    expect(persistDockerTaskResultSettlement(root, tasks, ref, 0)).toBe(true);
+    expect(readTaskResultSettlement(ref)?.result).toMatchObject({
+      skillIds: [],
+      promptDeliveryAttribution: { state: 'HOLD', reason: 'malformed' },
+    });
+    expect(readTaskResultSettlement(ref)?.result).not.toHaveProperty('agentId');
   });
 
   it('does not invent authority for direct legacy backend calls and rejects cross-project refs', () => {

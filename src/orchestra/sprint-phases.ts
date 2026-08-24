@@ -159,6 +159,7 @@ import {
   readVerificationIsolationEvaluationAuthority,
 } from './task-result-authority.js';
 import { decideFixRepairAuthority } from './fix-repair-authority.js';
+import { resolvePromptDeliveryAttribution } from '../core/prompt-delivery-receipt.js';
 
 // ─── Overlap Detection (Sprint 324 — Task 324-004) ───────────────
 import { ResultMerger } from './result-merger.js';
@@ -893,6 +894,7 @@ export function writeTaskEvaluationAudit(
   rationaleOverride?: string,
   postRubricCauses?: readonly string[],
   acceptanceEnforcement?: AcceptanceEnforcementResult,
+  attemptNum = 1,
 ): void {
   try {
     const rubricScores = rubricResult?.rubricScores ?? [];
@@ -924,7 +926,7 @@ export function writeTaskEvaluationAudit(
       : normative === 'HOLD'
         ? undefined
         : resolveAcceptance(resolveCanonicalTaskKind(task), normative);
-    writeEvaluationAudit(projectRoot, sprintId, task.id, 1, {
+    writeEvaluationAudit(projectRoot, sprintId, task.id, attemptNum, {
       ruleSet: toAuditRuleSet(task),
       schemaValidation: auditSchema,
       criterionScores: auditCriteria,
@@ -1152,10 +1154,28 @@ export function completeResultEvaluationAttempt(input: {
   readonly fixPolicy?: { allowPriorityFixCreation?: boolean };
   readonly additionalCauses?: readonly string[];
 }): TaskEvaluation {
+  const requestedEvaluation = input.evaluation ?? input.prepared.evaluation;
+  if (requestedEvaluation === TaskEvaluation.NO_GO) {
+    const auditCriteria = toAuditCriterionScores(
+      input.task,
+      input.prepared.rubric.rubricScores,
+    );
+    const auditSchema = toAuditSchemaValidation(
+      input.task,
+      input.prepared.rubric.rubricScores,
+    );
+    const detailedReason = buildDecisionRationale(
+      toAuditDecision(requestedEvaluation),
+      input.prepared.rubric.totalScore,
+      auditCriteria,
+      auditSchema,
+    );
+    (input.result as TaskResult & { brainEvaluationReason?: string }).brainEvaluationReason = detailedReason;
+  }
   const evaluation = settleEvaluationWithRepairAuthority(
     input.projectRoot,
     input.task,
-    input.evaluation ?? input.prepared.evaluation,
+    requestedEvaluation,
     input.result,
     input.fixPolicy,
   );
@@ -2373,9 +2393,16 @@ export async function runEvaluatePhase(
             if (xvResult.validatedAdjudicationReceipt) {
               try {
                 const { OutcomeTracker } = await import('./outcome-tracker.js');
+                const delivery = resolvePromptDeliveryAttribution({
+                  projectRoot,
+                  taskId: task.id,
+                  requireCurrentReceipt: typeof task.promptCompilePlanId === 'string',
+                  legacyAgentId: result.agentId ?? task.assignedAgent ?? null,
+                  legacySkillIds: result.skillIds ?? task.assignedSkills,
+                });
                 new OutcomeTracker(projectRoot).recordValidatedCrossVerifyVerdict(
-                  result.agentId ?? task.assignedAgent ?? null,
-                  result.skillIds ?? task.assignedSkills ?? [],
+                  delivery.agentId,
+                  [...delivery.skillIds],
                   xvResult.validatedAdjudicationReceipt,
                 );
               } catch (e) {
@@ -2582,7 +2609,8 @@ export async function runEvaluatePhase(
           rubricResult.totalScore,
           gated,
           result,
-          runtimeBudgetAuthorityReason,
+          runtimeBudgetAuthorityReason
+            ?? (result as TaskResult & { brainEvaluationReason?: string }).brainEvaluationReason,
         );
 
         // Sprint 161 Task 2 (T-003): per-task forensic audit record.
@@ -3133,36 +3161,40 @@ export function recordFixEvaluationAudit(
     rootTaskId: string;
     logicalAttempt: number;
   },
+  originalTask?: Task,
+  fixReceiptAlreadyWritten = false,
 ): void {
   try {
-    const auditCriteria = toAuditCriterionScores(fixTask, fixRubricResult.rubricScores);
-    const auditSchema = toAuditSchemaValidation(fixTask, fixRubricResult.rubricScores);
-    const auditDecision = toAuditDecision(fixEval);
-    // 7097-B1 (fix-phase twin): when the settled verdict differs from the raw
-    // rubric decision, say so — the FIX ledger produced the same untraceable
-    // "N/N passed but NO_GO" records as EVALUATE (sprint-580 live case).
-    const fixCauseSuffix = fixRubricResult.decision !== auditDecision
-      ? ` | post-rubric: fix-phase-settle:${fixRubricResult.decision}→${auditDecision}`
-      : '';
-    const rationale = buildDecisionRationale(
-      auditDecision, fixRubricResult.totalScore, auditCriteria, auditSchema,
-    ) + fixCauseSuffix;
-    const payload = {
-      ruleSet: toAuditRuleSet(fixTask),
-      schemaValidation: auditSchema,
-      criterionScores: auditCriteria,
-      totalScore: fixRubricResult.totalScore,
-      decision: auditDecision,
-      decisionRationale: rationale,
-    };
-    writeEvaluationAudit(projectRoot, sprintId, fixTask.id, 1, payload);
-    if (originalReconciled && (lineage?.rootTaskId ?? fixTask.fixForTaskId)) {
-      writeEvaluationAudit(
+    // The live FIX ingest service emits the fix task's receipt before this
+    // projection step. Direct/recovery callers still rely on this helper's
+    // documented two-record contract, so emit the missing receipt only when
+    // the caller has not already done so. Both paths use the same canonical
+    // adapter; the live receipt therefore keeps its exact acceptance stamp.
+    if (!fixReceiptAlreadyWritten) {
+      writeTaskEvaluationAudit(
         projectRoot,
         sprintId,
-        lineage?.rootTaskId ?? fixTask.fixForTaskId!,
+        fixTask,
+        fixEval,
+        fixRubricResult,
+        undefined,
+        ['path:fix-attempt-projection'],
+      );
+    }
+
+    const rootTaskId = lineage?.rootTaskId ?? fixTask.fixForTaskId;
+    if (originalReconciled && rootTaskId) {
+      const rootTask = originalTask ?? { ...fixTask, id: rootTaskId };
+      writeTaskEvaluationAudit(
+        projectRoot,
+        sprintId,
+        rootTask,
+        fixEval,
+        fixRubricResult,
+        undefined,
+        ['path:fix-root-projection'],
+        undefined,
         lineage?.logicalAttempt ?? 2,
-        payload,
       );
     }
   } catch (e) { debugLog('recordFixEvaluationAudit', e); }
@@ -3719,6 +3751,7 @@ export async function runFixPhase(
           persistBrainVerdict(
             projectRoot, fixTask.id, fixEval, fixRubricResult.totalScore,
             { honest: true }, fixResult,
+            (fixResult as TaskResult & { brainEvaluationReason?: string }).brainEvaluationReason,
           );
           if (
             (fixEval === TaskEvaluation.DONE || fixEval === TaskEvaluation.GO_WITH_TECH_DEBT) &&
@@ -3785,6 +3818,8 @@ export async function runFixPhase(
                   logicalAttempt: fixAttempt + 1,
                 }
               : undefined,
+            ancestorIds.length > 0 ? tasksById.get(ancestorIds.at(-1)!) : undefined,
+            true,
           );
 
           // ─── Sprint 156 Task 003: Unblock dependents on fix DONE ────

@@ -16,6 +16,7 @@ import { join } from 'node:path';
 
 import { TASK_KINDS } from '../../src/core/work-model.js';
 import {
+  DECIDABLE_VERDICTS,
   DEFAULT_ACCEPTANCE_MATRIX,
   normalizeAcceptanceOverride,
   resolveAcceptance,
@@ -26,6 +27,11 @@ import { writeTaskEvaluationAudit } from '../../src/orchestra/sprint-phases.js';
 import { evaluationAuditPath } from '../../src/orchestra/evaluation-audit-trail.js';
 
 describe('acceptance matrix — default policy', () => {
+  it('derives the policy vocabulary from the canonical verdict authority, excluding HOLD', () => {
+    expect(DECIDABLE_VERDICTS).toEqual(['CONFIRMED', 'QUALIFIED', 'UNDECIDABLE', 'FAILED']);
+    expect(Object.isFrozen(DECIDABLE_VERDICTS)).toBe(true);
+  });
+
   it('covers every canonical kind with the base row; security is stricter', () => {
     for (const kind of TASK_KINDS) {
       const row = DEFAULT_ACCEPTANCE_MATRIX[kind];

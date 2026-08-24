@@ -28,7 +28,9 @@ import {
   coverageOptional,
   hasDeclaredTestCommand,
   resolveRubricTaskType,
+  resolveRubricEvidenceApplicability,
 } from './rubric-registry.js';
+import { CRITERION_APPLICABILITY } from '../core/task-types.js';
 import type { DiskVerifyResult } from './disk-verify.js';
 import { verifyDiskAgainstClaim } from './disk-verify.js';
 import { evaluateGoNogoCriteria, hasUnsalvageableContractFailure } from './criterion-evaluation.js';
@@ -670,6 +672,83 @@ export function validateResultSchema(result: TaskResult, task?: Task): ResultSch
     missingFields.push('filesChanged');
   }
 
+  // New prompt-authority tasks carry a digest persisted at the pre-spawn
+  // boundary. Enforce the worker-ingress projection only when that authority
+  // exists, so archived/legacy and pre-dispatch synthetic results remain
+  // readable without weakening new executions.
+  if (task?.promptCompilePlanId) {
+    if (result.promptCompilePlanId !== task.promptCompilePlanId) {
+      missingFields.push('promptCompilePlanId:exact-match');
+    }
+
+    const verification = result.testVerification;
+    const expectedApplicability = resolveRubricEvidenceApplicability(task, 'test_execution', result);
+    if (!verification
+      || verification.applicability !== expectedApplicability
+      || !['PASSED', 'FAILED', 'NOT_EXECUTED'].includes(verification.outcome)
+      || !Array.isArray(verification.commands)
+      || verification.commands.some(command => typeof command !== 'string')) {
+      missingFields.push('testVerification:typed');
+    }
+    if (verification && ['PASSED', 'FAILED', 'NOT_EXECUTED'].includes(verification.outcome)) {
+      if (result.testsPassed !== (verification.outcome === 'PASSED')) {
+        missingFields.push('testsPassed:testVerification-parity');
+      }
+      if (task.verification && Array.isArray(verification.commands)) {
+        const observed = [...new Set(verification.commands)].sort();
+        const expected = [...new Set(task.verification.commands)].sort();
+        if (observed.length !== expected.length || observed.some((command, index) => command !== expected[index])) {
+          missingFields.push('testVerification.commands:authority-mismatch');
+        }
+      }
+    }
+
+    const criterionItems = task.goNogo?.items ?? [];
+    const criterionIds = criterionItems.map(item => item.id).sort();
+    const evidence = result.criteriaEvidence;
+    const evidenceIds = Array.isArray(evidence)
+      ? evidence.map(item => item.criterionId).sort()
+      : [];
+    if (!Array.isArray(evidence)
+      || evidenceIds.length !== criterionIds.length
+      || evidenceIds.some((id, index) => id !== criterionIds[index])
+      || new Set(evidenceIds).size !== evidenceIds.length
+      || evidence.some(item => !['MET', 'UNMET', 'UNVERIFIED'].includes(item.outcome)
+        || !Array.isArray(item.evidence)
+        || item.evidence.some(ref => typeof ref !== 'string'))) {
+      missingFields.push('criteriaEvidence:exact-criterion-set');
+    }
+
+    const debtIds = result.techDebtCriterionIds;
+    const criterionIdSet = new Set(criterionIds);
+    if (!Array.isArray(debtIds)
+      || new Set(debtIds).size !== debtIds.length
+      || debtIds.some(id => !criterionIdSet.has(id))
+      || (result.selfAssessment === 'GO_WITH_TECH_DEBT' && debtIds.length === 0)
+      || (result.selfAssessment !== 'GO_WITH_TECH_DEBT' && debtIds.length !== 0)) {
+      missingFields.push('techDebtCriterionIds:assessment-parity');
+    }
+    if (Array.isArray(evidence) && Array.isArray(debtIds)
+      && evidenceIds.length === criterionIds.length
+      && new Set(evidenceIds).size === evidenceIds.length) {
+      const evidenceById = new Map(evidence.map(item => [item.criterionId, item]));
+      const openIds = criterionItems.filter((criterion) => {
+        const observed = evidenceById.get(criterion.id);
+        if (!observed || observed.evidence.length === 0) return true;
+        return criterion.polarity === 'go'
+          ? observed.outcome !== 'MET'
+          : observed.outcome !== 'UNMET';
+      }).map(item => item.id).sort();
+      const declaredDebt = [...debtIds].sort();
+      if ((result.selfAssessment === 'DONE' && openIds.length > 0)
+        || (result.selfAssessment === 'GO_WITH_TECH_DEBT'
+          && (openIds.length !== declaredDebt.length
+            || openIds.some((id, index) => id !== declaredDebt[index])))) {
+        missingFields.push('criteriaEvidence:assessment-parity');
+      }
+    }
+  }
+
   const valid = missingFields.length === 0;
   const reason = valid
     ? 'Result schema valid'
@@ -747,15 +826,32 @@ export { testsApplicableForTask as testsApplicableForTaskClass };
 
 /**
  * 7097-B3: does the result carry ANY evidence backing a `testsPassed: true`
- * claim? Three independent signals, any one suffices (deliberately generous
+ * claim? Four independent signals, any one suffices (deliberately generous
  * — the ceiling this feeds must only catch the bare, evidence-free claim,
  * never punish a worker who reported real runs tersely):
+ *  - a typed PASSED execution with non-empty commands; when the task declares
+ *    verification authority, every reported command must match it exactly;
  *  - a test file among filesChanged (the worker touched the test surface);
  *  - a measured coverage number > 0;
  *  - a test-run trace in notes (counts like "19/19", a runner name, or a
  *    "tests passed/green/exit 0" phrase adjacent to the run report).
  */
-function hasTestClaimEvidence(result: TaskResult): boolean {
+function hasTestClaimEvidence(result: TaskResult, task: Task): boolean {
+  const execution = result.testVerification;
+  if (
+    execution?.outcome === 'PASSED'
+    && execution.applicability !== CRITERION_APPLICABILITY.NOT_APPLICABLE
+    && execution.commands.length > 0
+  ) {
+    const reportedCommands = execution.commands.filter(command => command.length > 0);
+    const declaredCommands = task.verification?.commands.filter(command => command.length > 0);
+    if (
+      reportedCommands.length > 0
+      && (declaredCommands === undefined
+        || (declaredCommands.length > 0
+          && reportedCommands.every(command => declaredCommands.includes(command))))
+    ) return true;
+  }
   if (result.filesChanged?.some(f => f.includes('.test.') || f.includes('.spec.'))) return true;
   if (typeof result.coverage === 'number' && result.coverage > 0) return true;
   const notes = coerceNotesToString(result.notes);
@@ -1567,6 +1663,11 @@ function evaluateWithRubricCore(
   // Doc-only tasks no longer get graded against the code rubric, which was
   // producing false NO_GO when coverage was null.
   const baseRubric: EvaluationRubric = rubric ? DEFAULT_RUBRIC : getRubric(task);
+  // The evidence matrix is canonical even when a caller supplies presentation
+  // overrides for weights/thresholds.  It decides whether test evidence may
+  // participate; custom scoring must not turn an N/A signal into a penalty.
+  const testExecutionApplicability = resolveRubricEvidenceApplicability(task, 'test_execution', result);
+  const coverageApplicability = resolveRubricEvidenceApplicability(task, 'coverage', result);
   const merged: EvaluationRubric = {
     criteria: rubric?.criteria ?? baseRubric.criteria,
     passingScore: rubric?.passingScore ?? baseRubric.passingScore,
@@ -1588,7 +1689,10 @@ function evaluateWithRubricCore(
     scored.passed = scored.score >= criterion.threshold;
     rubricScores.push(scored);
 
-    if (criterion.name === 'test_coverage' && isCoverageStructurallyAbsent(result, task)) {
+    if (criterion.name === 'test_coverage' && (
+      coverageApplicability === CRITERION_APPLICABILITY.NOT_APPLICABLE
+      || (coverageApplicability === CRITERION_APPLICABILITY.OPTIONAL && isCoverageStructurallyAbsent(result, task))
+    )) {
       // Skip from weighted sum; reweight remaining criteria below.
       absentWeight += criterion.weight;
       continue;
@@ -1604,6 +1708,22 @@ function evaluateWithRubricCore(
   // back to the un-normalized 0 to preserve passingScore semantics).
   if (absentWeight > 0 && absentWeight < 1) {
     totalScore = totalScore / (1 - absentWeight);
+  }
+
+  // Persisted evaluation audits consume rubricScores.  Keep applicability as
+  // explicit, zero-weight rows so an honest doc/audit `testsPassed:false` or
+  // absent coverage is observable as N/A rather than looking like a failure.
+  if (!rubric) {
+    rubricScores.push(
+      {
+        criterion: 'applicability:test_execution', score: 100, passed: true,
+        reason: `applicability=${testExecutionApplicability}`,
+      },
+      {
+        criterion: 'applicability:coverage', score: 100, passed: true,
+        reason: `applicability=${coverageApplicability}`,
+      },
+    );
   }
 
   totalScore = Math.round(totalScore * 100) / 100;
@@ -1650,7 +1770,7 @@ function evaluateWithRubricCore(
     decision === 'DONE'
     && result.testsPassed === true
     && testsApplicableForTask(task)
-    && !hasTestClaimEvidence(result)
+    && !hasTestClaimEvidence(result, task)
   ) {
     decision = 'GO_WITH_TECH_DEBT';
   }
@@ -1955,11 +2075,8 @@ export function enrichEvaluationWithCategory(
 // from an ACTUAL scored zero, and threw away the worker's durable evidence
 // (testsPassed, selfAssessment, coverage, scope) entirely.
 //
-// Missing rubric evidence is UNKNOWN, not zero. This reconstructs a real
-// score from the always-computable durable criteria — the same
-// scoreCorrectness/scoreTestCoverage/scoreScopeCompliance/scoreDocumentation
-// scorers DEFAULT_RUBRIC uses, which read only `result` and `task.scope` and
-// never touch whatever rubric-registry/task-type lookup faulted — then
+// Missing rubric evidence is UNKNOWN, not zero. Reconstruction resolves the
+// same canonical rubric and applicability matrix as the main grader, then
 // applies the SAME concrete-failure vetoes evaluateWithRubric /
 // reconcileRubricNoGo already enforce (schema violation, worker self-NO_GO,
 // testsPassed=false, scope violation), so a genuine failure can never be
@@ -1995,81 +2112,107 @@ export function reconstructFromDurableEvidence(
     }
   };
 
-  const correctness = scoreOne('correctness', () => scoreCorrectness(result, task));
-  const coverage = scoreOne('test_coverage', () => scoreTestCoverage(result));
-  const scope = scoreOne('scope_compliance', () => scoreScopeCompliance(result, task));
-  const documentation = scoreOne('documentation', () => scoreDocumentation(result));
+  let rubric: EvaluationRubric;
+  let testExecutionApplicability: ReturnType<typeof resolveRubricEvidenceApplicability>;
+  let coverageApplicability: ReturnType<typeof resolveRubricEvidenceApplicability>;
+  try {
+    rubric = getRubric(task);
+    testExecutionApplicability = resolveRubricEvidenceApplicability(task, 'test_execution', result);
+    coverageApplicability = resolveRubricEvidenceApplicability(task, 'coverage', result);
+  } catch (e) {
+    const scope = scoreOne('scope_compliance', () => scoreScopeCompliance(result, task));
+    const testApplicability = (() => {
+      try { return resolveRubricEvidenceApplicability(task, 'test_execution', result); } catch { return null; }
+    })();
+    const veto = !schemaCheck.valid
+      ? `schema_violation:${schemaCheck.missingFields.join(',') || schemaCheck.reason}`
+      : result.selfAssessment === 'NO_GO'
+        ? 'worker_self_no_go'
+        : result.testsPassed === false && testApplicability === CRITERION_APPLICABILITY.REQUIRED
+          ? 'concrete_test_failed'
+          : !scope.passed ? 'concrete_scope_violation' : null;
+    const decision: 'GO_WITH_TECH_DEBT' | 'NO_GO' = veto ? 'NO_GO' : 'GO_WITH_TECH_DEBT';
+    const unavailableReason = `rubric authority unavailable: ${faultReason}; ${String(e)}`;
+    const evaluation: EvaluationResult = {
+      decision,
+      // -1 is an explicit unavailable sentinel, never a fabricated scored zero.
+      totalScore: -1,
+      rubricScores: [
+        scope,
+        { criterion: 'rubric_authority', score: -1, passed: false, reason: unavailableReason },
+        {
+          criterion: 'recovery_provenance', score: -1, passed: decision !== 'NO_GO',
+          reason: `worker claim=${String(result.selfAssessment)}; rubric availability=unavailable; veto=${veto ?? 'none'}; reconciliation=durable-evidence-reconstruction; final verdict=${decision}`,
+        },
+      ],
+      retryCount: 0,
+    };
+    return decision === 'NO_GO'
+      ? enrichEvaluationWithCategory(evaluation, result, task)
+      : gateRunPolicyParityVerdict(evaluation, task, result.runPolicyEvidence);
+  }
 
-  const weightOf = (name: string): number =>
-    DEFAULT_RUBRIC.criteria.find(c => c.name === name)?.weight ?? 0;
-  const totalScore = Math.round(
-    (correctness.score * weightOf('correctness') +
-      coverage.score * weightOf('test_coverage') +
-      scope.score * weightOf('scope_compliance') +
-      documentation.score * weightOf('documentation')) * 100,
-  ) / 100;
+  const rubricScores: RubricScore[] = [];
+  let totalScore = 0;
+  let excludedWeight = 0;
+  let allApplicableCriteriaPassed = true;
+  for (const criterion of rubric.criteria) {
+    const scored = scoreOne(criterion.name, () => scoreCriterion(criterion.name, result, task));
+    scored.passed = scored.score >= criterion.threshold;
+    rubricScores.push(scored);
+    const coverageExcluded = criterion.name === 'test_coverage' && (
+      coverageApplicability === CRITERION_APPLICABILITY.NOT_APPLICABLE
+      || (coverageApplicability === CRITERION_APPLICABILITY.OPTIONAL && isCoverageStructurallyAbsent(result, task))
+    );
+    if (coverageExcluded) {
+      excludedWeight += criterion.weight;
+      continue;
+    }
+    totalScore += scored.score * criterion.weight;
+    if (!scored.passed) allApplicableCriteriaPassed = false;
+  }
+  if (excludedWeight > 0 && excludedWeight < 1) totalScore /= 1 - excludedWeight;
+  totalScore = Math.round(totalScore * 100) / 100;
 
+  const scope = rubricScores.find(score => score.criterion === 'scope_compliance');
   let decision: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
   let veto: string | null = null;
-
   if (!schemaCheck.valid) {
     decision = 'NO_GO';
     veto = `schema_violation:${schemaCheck.missingFields.join(',') || schemaCheck.reason}`;
   } else if (result.selfAssessment === 'NO_GO') {
     decision = 'NO_GO';
     veto = 'worker_self_no_go';
-  } else if (result.testsPassed === false && testsApplicableForTask(task)) {
-    // Non-code classes (doc/audit) run no tests — an honest testsPassed:false
-    // there is not a concrete failure (sprint-573/574 honesty fix).
+  } else if (result.testsPassed === false && testExecutionApplicability === CRITERION_APPLICABILITY.REQUIRED) {
     decision = 'NO_GO';
     veto = 'concrete_test_failed';
-  } else if (!scope.passed) {
+  } else if (scope && !scope.passed) {
     decision = 'NO_GO';
     veto = 'concrete_scope_violation';
-  } else if (
-    totalScore >= DEFAULT_RUBRIC.passingScore &&
-    correctness.passed && coverage.passed && scope.passed && documentation.passed
-  ) {
-    // Sufficient durable acceptance evidence for a candidate DONE — every
-    // criterion individually clears its bar, not just the weighted total —
-    // still capped at the worker's own ceiling (EVAL-DEBT-CEILING parity: a
-    // GO_WITH_TECH_DEBT self-claim is never silently upgraded).
+  } else if (totalScore >= rubric.passingScore && allApplicableCriteriaPassed) {
     decision = result.selfAssessment === 'DONE' ? 'DONE' : 'GO_WITH_TECH_DEBT';
-  } else if (totalScore >= DEFAULT_RUBRIC.passingScore * 0.7) {
+  } else if (totalScore >= rubric.passingScore * 0.7) {
     decision = 'GO_WITH_TECH_DEBT';
   } else {
     decision = 'NO_GO';
     veto = 'durable_score_below_threshold';
   }
 
-  // Explicit decision provenance: worker claim, recovered evidence, rubric
-  // availability, veto, reconciliation path, and final verdict — all in one
-  // auditable record (persisted to the evaluation audit ledger by the
-  // existing writeTaskEvaluationAudit wire, so it survives a Brain restart).
-  const provenance: RubricScore = {
-    criterion: 'recovery_provenance',
-    score: totalScore,
-    passed: decision !== 'NO_GO',
-    reason:
-      `worker claim=${String(result.selfAssessment)}; ` +
-      `recovered evidence=testsPassed:${String(result.testsPassed)},coverage:${String(result.coverage)},` +
-      `filesChanged:${(result.filesChanged ?? []).length}; ` +
-      `rubric availability=unavailable (${faultReason}); ` +
-      `veto=${veto ?? 'none'}; ` +
-      `reconciliation=durable-evidence-reconstruction; ` +
-      `final verdict=${decision}`,
-  };
+  rubricScores.push(
+    { criterion: 'applicability:test_execution', score: 100, passed: true, reason: `applicability=${testExecutionApplicability}` },
+    { criterion: 'applicability:coverage', score: 100, passed: true, reason: `applicability=${coverageApplicability}` },
+    {
+      criterion: 'recovery_provenance', score: totalScore, passed: decision !== 'NO_GO',
+      reason:
+        `worker claim=${String(result.selfAssessment)}; ` +
+        `recovered evidence=testsPassed:${String(result.testsPassed)},coverage:${String(result.coverage)},` +
+        `filesChanged:${(result.filesChanged ?? []).length}; ` +
+        `rubric availability=available (recovery trigger: ${faultReason}); ` +
+        `veto=${veto ?? 'none'}; reconciliation=durable-evidence-reconstruction; final verdict=${decision}`,
+    },
+  );
 
-  const evaluation: EvaluationResult = {
-    decision,
-    totalScore,
-    rubricScores: [correctness, coverage, scope, documentation, provenance],
-    retryCount: 0,
-  };
-
-  // RUN-POLICY-DELIVERY-001 correction: a rubric-fault reconstruction is a
-  // terminal EvaluationResult producer — its DONE passes the same parity gate,
-  // so an evaluation fault can never become a policy bypass.
+  const evaluation: EvaluationResult = { decision, totalScore, rubricScores, retryCount: 0 };
   return decision === 'NO_GO'
     ? enrichEvaluationWithCategory(evaluation, result, task)
     : gateRunPolicyParityVerdict(evaluation, task, result.runPolicyEvidence);

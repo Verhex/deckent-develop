@@ -82,6 +82,8 @@ describe('task-result-schema (Worker Output Contract spine)', () => {
     // defaulted-downstream fields are populated so a fresh result validates pre-evaluation
     expect(value.goCriteria).toEqual([]);
     expect(value.skills).toEqual([]);
+    expect(value.tests.applicability).toBe('REQUIRED');
+    expect(value.tests.outcome).toBe('PASSED');
     expect(value.honestGate).toEqual({ flagged: false, violation: null });
     expect(value.brainEvaluation).toBeNull();
     expect(value.auditorValidation).toBeNull();
@@ -93,6 +95,16 @@ describe('task-result-schema (Worker Output Contract spine)', () => {
     // cost currency/isLocal defaults
     expect(value.cost.currency).toBe('USD');
     expect(value.cost.isLocal).toBe(false);
+  });
+
+  it('preserves explicit NOT_APPLICABLE and actual non-execution independently', () => {
+    const res = validateTaskResult({
+      ...validResult(),
+      tests: { passed: 0, failed: 0, total: 0, applicability: 'NOT_APPLICABLE', outcome: 'NOT_EXECUTED' },
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.value.tests).toMatchObject({ applicability: 'NOT_APPLICABLE', outcome: 'NOT_EXECUTED' });
   });
 
   it('defaults schemaVersion to 1.0 when omitted', () => {

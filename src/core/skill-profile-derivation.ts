@@ -6,8 +6,9 @@ import type {
   SkillProfileFieldProvenance,
   SkillProfileSourceField,
 } from './skill-types.js';
+import { BUILTIN_DOMAINS, WORK_TYPE_IDS } from './routing/vocabulary-builtin.js';
 
-export const SKILL_PROFILE_DERIVATION_VERSION = 1 as const;
+export const SKILL_PROFILE_DERIVATION_VERSION = 2 as const;
 
 type WorkType = WorkTypeEntry['type'];
 type Proficiency = WorkTypeEntry['proficiency'];
@@ -75,14 +76,31 @@ function deriveWorkTypes(skill: SkillDefinition, terms: readonly string[]): Work
 }
 
 function deriveDomains(skill: SkillDefinition): SkillProfile['domains'] {
-  const stackDomains = normalized([
+  // Only exact routing metadata is vocabulary authority. Generic manifest
+  // categories (domain/workflow/framework/tool) and prose are deliberately
+  // excluded: neither describes a feature domain.
+  const workTypeSignals = new Set<string>(WORK_TYPE_IDS);
+  const signals = new Set(normalized([
+    ...skill.triggers,
+    ...skill.stackDetection.files,
     ...skill.stackDetection.dependencies,
     ...skill.stackDetection.commands,
-  ]);
-  return [...new Set([skill.category, ...stackDomains])].map((id, index) => ({
+  ]).filter((signal) => !workTypeSignals.has(signal)));
+  const matched = BUILTIN_DOMAINS.filter((domain) =>
+    [domain.id, ...domain.aliases, ...domain.stackMarkers, ...domain.surfaces]
+      .some((signal) => signals.has(signal.toLowerCase())),
+  ).map((domain) => domain.id);
+
+  const domains: SkillProfile['domains'] = matched.map((id, index) => ({
     id,
     proficiency: index === 0 ? 'primary' : 'secondary',
   }));
+
+  // Language expertise is intentionally cross-cutting. Its wildcard is an
+  // explicit, narrow derivation policy and is always the lowest proficiency;
+  // no other generic category receives one.
+  if (skill.category === 'language') domains.push({ id: '*', proficiency: 'able' });
+  return domains;
 }
 
 function fieldProvenance(
@@ -96,7 +114,7 @@ function provenance(): SkillProfileFieldProvenance {
     derivationVersion: SKILL_PROFILE_DERIVATION_VERSION,
     fields: {
       workTypes: fieldProvenance(['category', 'triggers', 'stackDetection', 'composableWith', 'priority', 'description']),
-      domains: fieldProvenance(['category', 'stackDetection']),
+      domains: fieldProvenance(['triggers', 'stackDetection']),
       expertise: fieldProvenance(['category', 'triggers', 'stackDetection', 'composableWith', 'description']),
       deliverables: fieldProvenance(['category', 'triggers', 'stackDetection', 'composableWith', 'priority', 'description']),
     },
@@ -109,7 +127,8 @@ function provenance(): SkillProfileFieldProvenance {
  * routability authority.
  */
 export function deriveCanonicalSkillProfile(skill: SkillDefinition): SkillProfileDerivation {
-  if (skill.profile !== undefined && skill.profile !== null) {
+  const persistedGenerated = skill.profileProvenance?.origin === 'derived-profile';
+  if (skill.profile !== undefined && skill.profile !== null && !persistedGenerated) {
     const authored = validateSkillProfile(skill.profile);
     if (authored.ok) {
       return {

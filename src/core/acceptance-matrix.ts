@@ -21,7 +21,7 @@
 // a fake enablement).
 
 import { TASK_KINDS, type TaskKind } from './work-model.js';
-import type { NormativeVerdict } from './verdict-types.js';
+import { NORMATIVE_VERDICTS, type NormativeVerdict } from './verdict-types.js';
 
 /**
  * Confirmation adapter families (Evaluation Surface capability table).
@@ -32,12 +32,9 @@ export type ConfirmationAdapter = 'deterministic' | 'code' | 'llm' | 'human';
 /** Verdicts the acceptance policy may decide on. HOLD is type-excluded. */
 export type DecidableVerdict = Exclude<NormativeVerdict, 'HOLD'>;
 
-export const DECIDABLE_VERDICTS = Object.freeze([
-  'CONFIRMED',
-  'QUALIFIED',
-  'UNDECIDABLE',
-  'FAILED',
-] as const satisfies readonly DecidableVerdict[]);
+export const DECIDABLE_VERDICTS: readonly DecidableVerdict[] = Object.freeze(
+  NORMATIVE_VERDICTS.filter((verdict): verdict is DecidableVerdict => verdict !== 'HOLD'),
+);
 
 export type AcceptanceAction = 'ACCEPT' | 'ROUTE' | 'REJECT';
 

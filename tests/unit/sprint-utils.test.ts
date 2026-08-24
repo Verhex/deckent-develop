@@ -237,9 +237,10 @@ Fix the config module.
       ]);
     });
 
-    it('should include test target in base criteria', () => {
+    it('does not duplicate test execution authority into acceptance criteria', () => {
       const result = extractGoNogoCriteria('desc', 'tests/unit/foo.test.ts');
-      expect(result.goCriteria).toContain('tests/unit/foo.test.ts');
+      expect(result.goCriteria).not.toContain('tests/unit/foo.test.ts');
+      expect(result.items?.some(item => item.statement.includes('foo.test.ts'))).toBe(false);
     });
 
     // WP-13 (🔴): the proof-label prefix must be cleanly stripped. The previous

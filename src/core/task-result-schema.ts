@@ -12,7 +12,8 @@
 // optional/nullable/default so a freshly-assembled result still validates.
 
 import { z } from 'zod';
-import { WORK_ATTRIBUTION_REASON_CODES } from './task-types.js';
+import { CRITERION_APPLICABILITY, WORK_ATTRIBUTION_REASON_CODES } from './task-types.js';
+import { VERIFICATION_EXECUTION_OUTCOME, projectTestsPassed } from './prompt-compile-plan.js';
 
 /** Contract version stamped on every `TaskResultV1`. Bump on a breaking shape change. */
 export const TASK_RESULT_SCHEMA_VERSION = '1.0';
@@ -164,6 +165,11 @@ const preDispatchSettlementSchema = z.object({
   evidenceRef: z.string().min(1),
 });
 
+const promptDeliveryAttributionSchema = z.object({
+  state: z.enum(['CURRENT', 'LEGACY_RECEIPT', 'LEGACY_FALLBACK', 'HOLD']),
+  reason: z.enum(['missing', 'malformed', 'task-mismatch', 'invalid-digest', 'legacy-version']).optional(),
+});
+
 /** Provider-agnostic token accounting (§1.3). `source` records provenance honestly. */
 const tokenUsageSchema = z.object({
   inputTokens: z.number().int().nonnegative(),
@@ -220,7 +226,17 @@ const testsSchema = z.object({
   coverage: z.number().min(0).max(100).nullable().default(null),
   command: z.string().nullable().default(null),
   orchestratorVerified: z.boolean().default(false),
-});
+  applicability: z.enum(['REQUIRED', 'OPTIONAL', 'NOT_APPLICABLE'])
+    .default(CRITERION_APPLICABILITY.REQUIRED),
+  outcome: z.enum(['PASSED', 'FAILED', 'NOT_EXECUTED']).optional(),
+}).transform(tests => ({
+  ...tests,
+  outcome: tests.outcome ?? (tests.failed > 0
+    ? VERIFICATION_EXECUTION_OUTCOME.FAILED
+    : tests.total > 0
+      ? VERIFICATION_EXECUTION_OUTCOME.PASSED
+      : VERIFICATION_EXECUTION_OUTCOME.NOT_EXECUTED),
+}));
 
 /** Verification — TypeScript compile outcome. */
 const tscSchema = z.object({
@@ -298,6 +314,7 @@ export const taskResultSchema = z.object({
   boundaryViolations: z.array(boundaryViolationSchema).default([]),
   workAttribution: workAttributionSchema.optional(),
   preDispatchSettlement: preDispatchSettlementSchema.optional(),
+  promptDeliveryAttribution: promptDeliveryAttributionSchema.optional(),
 
   // resource accounting (orchestrator, provider-agnostic)
   tokenUsage: tokenUsageSchema,
@@ -444,19 +461,37 @@ export function normalizeTaskResultShape<T extends { notes?: unknown }>(result: 
   if (coerced !== record['notes']) {
     record['notes'] = coerced;
   }
-  if (
-    Array.isArray(record['testsPassed'])
-    && record['testsPassed'].every(command => typeof command === 'string')
-  ) {
-    record['testCommands'] = [...record['testsPassed']];
-    const assessment = record['selfAssessment'];
+  const explicit = record['testVerification'];
+  if (explicit !== null && typeof explicit === 'object') {
+    const verification = explicit as Record<string, unknown>;
+    const applicability = verification['applicability'];
+    const outcome = verification['outcome'];
+    const commands = verification['commands'];
     if (
-      assessment === 'DONE'
-      || assessment === 'GO_WITH_TECH_DEBT'
-      || assessment === 'NO_GO'
+      Object.values(CRITERION_APPLICABILITY).includes(applicability as never)
+      && Object.values(VERIFICATION_EXECUTION_OUTCOME).includes(outcome as never)
+      && Array.isArray(commands)
+      && commands.every(command => typeof command === 'string')
     ) {
-      record['testsPassed'] = assessment !== 'NO_GO';
+      record['testCommands'] = [...commands];
+      record['testsPassed'] = projectTestsPassed({ outcome: outcome as 'PASSED' | 'FAILED' | 'NOT_EXECUTED' });
+      return result;
     }
   }
+
+  const legacy = record['testsPassed'];
+  const commands = Array.isArray(legacy) && legacy.every(command => typeof command === 'string')
+    ? [...legacy]
+    : [];
+  const outcome = typeof legacy === 'boolean'
+    ? legacy ? VERIFICATION_EXECUTION_OUTCOME.PASSED : VERIFICATION_EXECUTION_OUTCOME.FAILED
+    : VERIFICATION_EXECUTION_OUTCOME.NOT_EXECUTED;
+  record['testVerification'] = {
+    applicability: CRITERION_APPLICABILITY.REQUIRED,
+    outcome,
+    commands,
+  };
+  record['testCommands'] = commands;
+  record['testsPassed'] = projectTestsPassed({ outcome });
   return result;
 }

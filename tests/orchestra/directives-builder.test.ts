@@ -29,6 +29,7 @@ function makeIntent(): DirectiveBuildIntent {
         model: 'claude-sonnet-5',
         effort: 'high',
         skills: ['typescript-expert'],
+        test: 'VITEST_MAX_FORKS=2 npx vitest run tests/orchestra/directives-builder.test.ts',
         goCriteria: ['round-trip build→parse→deep-equal holds', 'parser is never edited', '`tsc` temiz'],
         nogo: ['editing the parser', 'calling an LLM'],
       },

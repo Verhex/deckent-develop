@@ -20,6 +20,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -37,6 +38,7 @@ import {
 } from '../../src/orchestra/task-builder.js';
 import { routeSprintTasks, routeSprintTasksForExecution } from '../../src/orchestra/sprint-spawner.js';
 import { mergeForcePreservingSkillIds } from '../../src/orchestra/routing-plan-adapter.js';
+import { readPromptDeliveryReceipt } from '../../src/core/prompt-delivery-receipt.js';
 
 // ─── Fixtures ───────────────────────────────────────────────────────────────
 
@@ -345,6 +347,33 @@ describe('delivery evidence sidecar', () => {
 
   it('returns null when no proof was recorded — absence is not "nothing delivered"', () => {
     expect(readSkillDeliveryEvidence(root, 'never-spawned')).toBeNull();
+  });
+
+  it('buildWorkerPrompt publishes a current receipt without requiring a caller probe', () => {
+    const task = makeTask({ assignedAgent: 'implementer', assignedSkills: ['routed-skill'] });
+    const prompt = buildWorkerPrompt(task, '# persona', [{ name: 'routed-skill', content: ROUTED_BODY }], root);
+    const read = readPromptDeliveryReceipt(root, task.id);
+    expect(read.state).toBe('AVAILABLE');
+    if (read.state !== 'AVAILABLE') return;
+    expect(read.receipt.promptSha256).toBe(createHash('sha256').update(prompt, 'utf8').digest('hex'));
+    expect(read.receipt.promptCompilePlanId).toBe(task.promptCompilePlanId);
+    expect(read.receipt.rolePolicyIdentity).toBe('worker:implementer');
+    expect(read.receipt.deliveredSkillIds).toEqual(['routed-skill']);
+    expect(read.receipt.deliveredAgentId).toBe('implementer');
+    expect(read.receipt.personaSegmentSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(prompt).toContain(ROUTED_BODY);
+  });
+
+  it('legacy delivery projection cannot overwrite the canonical prompt receipt', () => {
+    const task = makeTask({ assignedAgent: 'implementer', assignedSkills: ['routed-skill'] });
+    buildWorkerPrompt(task, '# persona', [{ name: 'routed-skill', content: ROUTED_BODY }], root);
+
+    expect(writeSkillDeliveryEvidence(root, buildSkillDeliveryEvidence(task, []))).toBe(true);
+    const read = readPromptDeliveryReceipt(root, task.id);
+    expect(read.state).toBe('AVAILABLE');
+    if (read.state !== 'AVAILABLE') return;
+    expect(read.receipt.deliveredSkillIds).toEqual(['routed-skill']);
+    expect(read.receipt.promptCompilePlanId).toBe(task.promptCompilePlanId);
   });
 });
 

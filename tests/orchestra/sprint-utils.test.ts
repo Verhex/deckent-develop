@@ -62,7 +62,7 @@ describe('extractGoNogoCriteria — authored acceptance contracts', () => {
     expect(result.techDebtAcceptable).toHaveLength(2_000);
   });
 
-  it('adds an explicitly authored scoped Test only to that task acceptance contract', () => {
+  it('keeps explicitly authored Test execution authority out of acceptance criteria', () => {
     const scoped = extractGoNogoCriteria(
       'ordinary task description',
       'npx vitest run tests/core/criteria-deriver.test.ts',
@@ -70,8 +70,8 @@ describe('extractGoNogoCriteria — authored acceptance contracts', () => {
     );
     const unscoped = extractGoNogoCriteria('ordinary task description', undefined, context);
 
-    expect(scoped.goCriteria).toContain('npx vitest run tests/core/criteria-deriver.test.ts');
-    expect(scoped.items.some(item => item.statement.includes('criteria-deriver.test.ts'))).toBe(true);
+    expect(scoped.goCriteria).not.toContain('npx vitest run tests/core/criteria-deriver.test.ts');
+    expect(scoped.items.some(item => item.statement.includes('criteria-deriver.test.ts'))).toBe(false);
     expect(unscoped.goCriteria).not.toContain('vitest');
     expect(unscoped.items.some(item => item.statement.includes('vitest'))).toBe(false);
   });

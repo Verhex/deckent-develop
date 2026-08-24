@@ -69,6 +69,41 @@ function makeResult(overrides: Partial<TaskResult> = {}): TaskResult {
 // ═══ Tests ════════════════════════════════════════════════════════════
 
 describe('evaluateWithRubric — coverage:null renormalize (Sprint 227 227-001)', () => {
+  it('renormalizes coverage=0 for a typed direct verification command', () => {
+    const task = makeTask({
+      description: 'Read-only acceptance without a legacy Test clause.',
+      verification: {
+        version: 1,
+        source: 'directive',
+        commands: ['VITEST_MAX_FORKS=2 npx vitest run tests/orchestra/example.test.ts'],
+      },
+      scope: {
+        directories: ['src/orchestra/', 'tests/orchestra/'],
+        filesRead: ['src/orchestra/result-evaluator.ts', 'tests/orchestra/example.test.ts'],
+        filesWrite: [],
+      },
+    });
+    const result = makeResult({
+      filesChanged: [],
+      coverage: 0,
+      testVerification: {
+        applicability: 'REQUIRED',
+        outcome: 'PASSED',
+        commands: ['VITEST_MAX_FORKS=2 npx vitest run tests/orchestra/example.test.ts'],
+      },
+      notes: 'The declared operation completed successfully; coverage was not measured because the command did not authorize instrumentation.',
+    });
+
+    const evaluation = evaluateWithRubric(result, task);
+
+    expect(evaluation.totalScore).toBe(100);
+    expect(evaluation.decision).toBe('DONE');
+    expect(evaluation.rubricScores).toContainEqual(expect.objectContaining({
+      criterion: 'applicability:coverage',
+      reason: 'applicability=OPTIONAL',
+    }));
+  });
+
   it('coverage:null + all-good produces totalScore ≥ 90 (NOT 78.75) and decision DONE', () => {
     const task = makeTask();
     const result = makeResult({

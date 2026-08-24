@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { buildTaskPrompt } from '../../src/orchestra/prompt-god-template.js';
+import { buildTaskPrompt, buildTaskPromptSegmented } from '../../src/orchestra/prompt-god-template.js';
+import { computeStablePrefix } from '../../src/orchestra/prompt-segmentation.js';
 import type { SprintContext } from '../../src/orchestra/prompt-god-template.js';
 import type { Task } from '../../src/core/task-types.js';
 import { TaskStatus } from '../../src/core/task-types.js';
@@ -122,19 +123,32 @@ describe('prompt-determinism', () => {
     expect(buildTaskPrompt(task, ctx1).prompt).toBe(buildTaskPrompt(task, ctx2).prompt);
   });
 
-  // Test 4: Block order contract — Skills block BEFORE Agent block (Task 273-008 regression lock).
-  // If someone reverts the renderTemplate ordering, this test fails immediately.
-  it('Skills block appears before Agent block in rendered prompt', () => {
+  // Test 4: production cache-prefix contract — T0 leads, while T1 remains stable.
+  it('worker contract leads and Skills remains before Agent inside T1', () => {
     const task = makeTask();
     const ctx = makeCtx();
     const { prompt } = buildTaskPrompt(task, ctx);
 
     const skillsIdx = prompt.indexOf('=== Skills ===');
     const agentIdx = prompt.indexOf('=== Agent:');
+    const workerIdx = prompt.indexOf('You are a Deckent worker agent.');
 
+    expect(workerIdx).toBe(0);
     expect(skillsIdx).toBeGreaterThan(-1);
     expect(agentIdx).toBeGreaterThan(-1);
     expect(skillsIdx).toBeLessThan(agentIdx);
+  });
+
+  it('same-class tasks keep the exact leading prefix byte-identical', () => {
+    const ctx = makeCtx();
+    const first = buildTaskPromptSegmented(makeTask({ id: '273-101', title: 'First task' }), ctx);
+    const second = buildTaskPromptSegmented(makeTask({ id: '273-102', title: 'Second task' }), ctx);
+    const firstPrefix = computeStablePrefix(first.segments);
+    const secondPrefix = computeStablePrefix(second.segments);
+
+    expect(firstPrefix).toBe(secondPrefix);
+    expect(first.prompt.startsWith(`${firstPrefix}\n\n`)).toBe(true);
+    expect(second.prompt.startsWith(`${secondPrefix}\n\n`)).toBe(true);
   });
 
   // Test 5: No ISO-8601 timestamp in rendered prompt.

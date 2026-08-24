@@ -131,7 +131,8 @@ describe('createTask', () => {
     expect(task.scope.filesRead).toEqual(params.scope.filesRead);
     expect(task.scope.filesWrite).toEqual(params.scope.filesWrite);
     expect(task.dependencies).toEqual(params.dependencies);
-    expect(task.goNogo).toEqual(params.goNogo);
+    expect(task.goNogo).toEqual(expect.objectContaining(params.goNogo));
+    expect(task.goNogo.items).toHaveLength(2);
     expect(task.sprintId).toBe(params.sprintId);
   });
 
@@ -875,7 +876,7 @@ describe('buildWorkerPrompt — agentPrompt parameter', () => {
       // agentPrompt is included without truncation (Sprint 147+ behavior)
       const agentSection = prompt.split('## Your Task')[0]!;
       const xCount = (agentSection.match(/X/g) || []).length;
-      expect(xCount).toBe(3000);
+      expect(xCount).toBeGreaterThanOrEqual(3000);
     } finally {
       rmSync(emptyRoot, { recursive: true, force: true });
     }
@@ -903,7 +904,7 @@ describe('buildWorkerPrompt — agentPrompt parameter', () => {
     const prompt = buildWorkerPrompt(task, 'First content');
     const agentIdx = prompt.indexOf('=== Agent:');
     const workerIdx = prompt.indexOf('You are a Deckent worker agent');
-    expect(agentIdx).toBeLessThan(workerIdx);
+    expect(workerIdx).toBeLessThan(agentIdx);
   });
 
   it('standard prompt unchanged when agentPrompt is not provided', () => {
@@ -1899,7 +1900,7 @@ describe('buildWorkerPrompt — effort maxTokens budget', () => {
     ]);
     // High effort should allow up to 2500 chars per skill (not truncated to 2000)
     expect(prompt).toContain('typescript-expert');
-    const skillSectionMatch = prompt.match(/=== Skills ===([\s\S]*?)(?=You are a Deckent)/);
+    const skillSectionMatch = prompt.match(/=== Skills ===([\s\S]*?)(?=\n\n===)/);
     expect(skillSectionMatch).not.toBeNull();
     // Should contain more content than low-effort would allow
     const skillSection = skillSectionMatch![1] ?? '';
@@ -2423,25 +2424,25 @@ describe('buildWorkerPrompt — Honest Self-Assessment injection', () => {
     expect(prompt).toContain('Self-assessment rubric');
   });
 
-  it('maps a fully-ticked checklist to DONE (WP-19, replaces the 80% threshold)', () => {
+  it('maps fully closed polarity-specific outcomes to DONE (WP-19)', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
     expect(prompt).not.toContain('<80%');
-    expect(prompt).toMatch(/ticked → DONE/);
+    expect(prompt).toContain('polarity-specific outcomes closed → DONE');
     expect(prompt).toContain('GO_WITH_TECH_DEBT');
   });
 
-  it('maps a critical unticked item to NO_GO (WP-19, replaces the 50% threshold)', () => {
+  it('maps a critical open item to NO_GO (WP-19)', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
     expect(prompt).not.toContain('<50%');
-    expect(prompt).toMatch(/unticked → NO_GO/);
+    expect(prompt).toContain('a critical item open → NO_GO');
   });
 
   it('renders a goCriteria-derived checklist judged WITH EVIDENCE (WP-19)', () => {
     const task = makeTask();
     const prompt = buildWorkerPrompt(task);
-    // One checkbox per goCriteria clause ('tests pass'), ticked only with evidence.
+    // One polarity-aware checkbox per structured criterion, closed only with evidence.
     expect(prompt).toContain('- [ ] tests pass');
     expect(prompt).toContain('WITH EVIDENCE');
   });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TaskStatus } from '../../src/core/types.js';
+import { createGoNoGoCriterionItem, TaskStatus } from '../../src/core/types.js';
 import type { Task, TaskResult } from '../../src/core/types.js';
 import {
   validateResultSchema,
@@ -83,6 +83,75 @@ describe('validateResultSchema()', () => {
     const check = validateResultSchema(result);
     expect(check.valid).toBe(false);
     expect(check.missingFields).toContain('filesChanged');
+  });
+});
+
+describe('validateResultSchema() — prompt compile authority', () => {
+  const go = createGoNoGoCriterionItem({ polarity: 'go', statement: 'typed authority is wired' });
+  const noGo = createGoNoGoCriterionItem({ polarity: 'no-go', statement: 'authority digest mismatches' });
+  const promptCompilePlanId = `prompt-compile-plan:sha256:${'a'.repeat(64)}`;
+  const task = makeTask({
+    type: 'code-development',
+    promptCompilePlanId,
+    verification: { version: 1, source: 'directive', commands: ['npx vitest run tests/x.test.ts'] },
+    goNogo: {
+      goCriteria: go.statement,
+      noGoCriteria: noGo.statement,
+      techDebtAcceptable: 'none',
+      items: [go, noGo],
+    },
+  });
+
+  function authoritativeResult(overrides: Partial<TaskResult> = {}): TaskResult {
+    return makeResult({
+      promptCompilePlanId,
+      testVerification: {
+        applicability: 'REQUIRED',
+        outcome: 'PASSED',
+        commands: ['npx vitest run tests/x.test.ts'],
+      },
+      criteriaEvidence: [
+        { criterionId: go.id, outcome: 'MET', evidence: ['captured command exit=0'] },
+        { criterionId: noGo.id, outcome: 'UNMET', evidence: ['persisted digest matched'] },
+      ],
+      techDebtCriterionIds: [],
+      ...overrides,
+    });
+  }
+
+  it('accepts exact digest, applicability, commands and criterion identities', () => {
+    expect(validateResultSchema(authoritativeResult(), task)).toEqual({
+      valid: true,
+      missingFields: [],
+      reason: 'Result schema valid',
+    });
+  });
+
+  it('rejects a digest mismatch and testsPassed/applicability gaming', () => {
+    const check = validateResultSchema(authoritativeResult({
+      promptCompilePlanId: `${promptCompilePlanId}-wrong`,
+      testsPassed: true,
+      testVerification: {
+        applicability: 'NOT_APPLICABLE',
+        outcome: 'NOT_EXECUTED',
+        commands: [],
+      },
+    }), task);
+    expect(check.valid).toBe(false);
+    expect(check.missingFields).toContain('promptCompilePlanId:exact-match');
+    expect(check.missingFields).toContain('testVerification:typed');
+    expect(check.missingFields).toContain('testsPassed:testVerification-parity');
+  });
+
+  it('requires exact evidence IDs and explicit open IDs for tech debt', () => {
+    const check = validateResultSchema(authoritativeResult({
+      selfAssessment: 'GO_WITH_TECH_DEBT',
+      criteriaEvidence: [{ criterionId: go.id, outcome: 'UNVERIFIED', evidence: [] }],
+      techDebtCriterionIds: [],
+    }), task);
+    expect(check.valid).toBe(false);
+    expect(check.missingFields).toContain('criteriaEvidence:exact-criterion-set');
+    expect(check.missingFields).toContain('techDebtCriterionIds:assessment-parity');
   });
 });
 

@@ -664,7 +664,7 @@ describe('evaluateWithRubric', () => {
     const evaluation = evaluateWithRubric(result, task);
     expect(evaluation.decision).toBe('DONE');
     expect(evaluation.totalScore).toBeGreaterThanOrEqual(70);
-    expect(evaluation.rubricScores).toHaveLength(4);
+    expect(evaluation.rubricScores).toHaveLength(6); // four rubric criteria + two applicability audit rows
   });
 
   it('EVAL-DEBT-CEILING (born-459, 357-016 live case): honest worker GO_WITH_TECH_DEBT is never raised to DONE by a passing rubric score', () => {
@@ -1592,7 +1592,7 @@ describe('reconstructFromDurableEvidence (455-002 — recovered-result durable-e
     expect(provenance).toBeDefined();
     expect(provenance?.reason).toContain('worker claim=DONE');
     expect(provenance?.reason).toContain('recovered evidence=testsPassed:true');
-    expect(provenance?.reason).toContain('rubric availability=unavailable (getRubric threw: boom)');
+    expect(provenance?.reason).toContain('rubric availability=available (recovery trigger: getRubric threw: boom)');
     expect(provenance?.reason).toContain('veto=none');
     expect(provenance?.reason).toContain('reconciliation=durable-evidence-reconstruction');
     expect(provenance?.reason).toContain('final verdict=DONE');
@@ -1614,5 +1614,28 @@ describe('reconstructFromDurableEvidence (455-002 — recovered-result durable-e
       'rubric registry threw',
     );
     expect(evaluation.decision).toBe('GO_WITH_TECH_DEBT');
+  });
+
+  it('uses the canonical document rubric and records N/A test evidence during reconstruction', () => {
+    const task = codeTask({
+      type: 'documentation',
+      scope: {
+        directories: ['docs/guides/'], filesRead: [], filesWrite: ['docs/guides/recovery.md'],
+      },
+    });
+    const evaluation = reconstructFromDurableEvidence(codeResult({
+      filesChanged: ['docs/guides/recovery.md'],
+      testsPassed: false,
+      coverage: null as unknown as number,
+      notes: 'Wrote ~800 kelime recovery guide with clear headings, examples, and detailed verification notes for maintainers.',
+    }), task, 'primary evaluator fault');
+
+    expect(evaluation.decision).toBe('DONE');
+    expect(evaluation.rubricScores).toContainEqual(expect.objectContaining({
+      criterion: 'applicability:test_execution', reason: 'applicability=NOT_APPLICABLE',
+    }));
+    expect(evaluation.rubricScores).toContainEqual(expect.objectContaining({
+      criterion: 'applicability:coverage', reason: 'applicability=NOT_APPLICABLE',
+    }));
   });
 });

@@ -30,15 +30,17 @@ export type PromptTier = 'T0' | 'T1' | 'T2';
 export type PromptSegmentKind =
   // ── T0: global, no tenant/task variance ──
   | 'worker-contract'
-  | 'verify-steps'
   | 'verify-precedence'
   | 'npm-advisory'
   | 'karpathy'
   // ── T1: tenant-project, stable per task-class ──
   | 'skills'
   | 'persona'
-  | 'adr'
+  | 'project-context'
+  | 'run-policy'
   // ── T2: volatile per-task tail ──
+  | 'adr'
+  | 'verify-steps'
   | 'task'
   | 'what-to-do'
   | 'heartbeat'
@@ -71,13 +73,15 @@ export interface PromptSegment {
  */
 const TIER_BY_KIND: Readonly<Record<PromptSegmentKind, PromptTier>> = {
   'worker-contract': 'T0',
-  'verify-steps': 'T0',
   'verify-precedence': 'T0',
   'npm-advisory': 'T0',
   karpathy: 'T0',
   skills: 'T1',
   persona: 'T1',
-  adr: 'T1',
+  'project-context': 'T1',
+  'run-policy': 'T1',
+  adr: 'T2',
+  'verify-steps': 'T2',
   task: 'T2',
   'what-to-do': 'T2',
   heartbeat: 'T2',
@@ -111,8 +115,8 @@ const TIER_RANK: Readonly<Record<PromptTier, number>> = { T0: 0, T1: 1, T2: 2 };
 /** Separator used when concatenating segment contents (mirrors the compiler join). */
 export const SEGMENT_SEPARATOR = '\n\n';
 
-/** Default for the leading-T0 reorder feature — OFF (experimental, opt-in only). */
-export const DEFAULT_LEADING_T0_REORDER = false;
+/** Production default: assemble the complete cacheable T0+T1 prefix before T2. */
+export const DEFAULT_LEADING_T0_REORDER = true;
 
 /** Segments grouped by tier, original within-tier order preserved. */
 export interface TieredSegments {
@@ -142,7 +146,7 @@ export function segmentByTier(segments: readonly PromptSegment[]): TieredSegment
  * preserving the original within-tier order (stable). Pure — returns a new array,
  * never mutates the input.
  *
- * This is the assembly used when the (default-OFF) leading-T0 reorder flag is set:
+ * This is the production-default assembly (callers may explicitly disable it):
  * it groups the global + project prefix contiguously so a provider cache can share
  * the longest possible prefix across tasks. The default compiler order (skills
  * first, per the F1-TOK cache-prefix lesson) is left untouched when the flag is off.
@@ -167,8 +171,10 @@ export function reorderLeadingT0(segments: readonly PromptSegment[]): PromptSegm
  * so the returned string is exactly the prefix a reordered prompt would carry.
  */
 export function computeStablePrefix(segments: readonly PromptSegment[]): string {
-  const { T0, T1 } = segmentByTier(segments);
-  return [...T0, ...T1].map(s => s.content).join(SEGMENT_SEPARATOR);
+  const leading = reorderLeadingT0(segments);
+  const firstVolatile = leading.findIndex(segment => segment.tier === 'T2');
+  const prefix = firstVolatile === -1 ? leading : leading.slice(0, firstVolatile);
+  return prefix.map(segment => segment.content).join(SEGMENT_SEPARATOR);
 }
 
 // ─── Protected set ────────────────────────────────────────────────────────────

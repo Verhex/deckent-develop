@@ -120,9 +120,10 @@ ${BODY_SENTINEL} — long amendment history follows here with many revisions.`;
     expect(section).not.toContain('[full: .brain/memory.db adr-008]');
   });
 
-  it('wires via task.type: code-development condenses a non-scope ADR; no-type keeps it full', () => {
-    // adr-008 is explicitly referenced (force-included) and its content avoids
-    // every src/core scope keyword → no scope-path-match → eligible to condense.
+  it('keeps explicitly referenced ADRs full and binding regardless of task type', () => {
+    // Explicit references are execution authority, not scoring-only context.
+    // They therefore stay full-body even when their content has no scope-path
+    // keyword match; only non-explicit background ADRs may be condensed.
     const adr = makeAdr('adr-008', 'Brain Central Import', ADR_CONTENT, 'Brain one-way dependency rule.');
     const baseTask = makeTask({
       description: 'Implement the change described by ADR-008.',
@@ -132,12 +133,9 @@ ${BODY_SENTINEL} — long amendment history follows here with many revisions.`;
 
     const codeDev = buildTaskPrompt(makeTask({ ...baseTask, type: 'code-development' }), ctx);
     expect(codeDev.metadata.adrIds).toContain('adr-008');
-    expect(codeDev.prompt).toContain('[background constraint — full: .brain/memory.db adr-008]');
-    expect(codeDev.prompt).not.toContain(BODY_SENTINEL);
-    // G5 (enforcement-tier render): the ADR heading splits binding vs advisory-context,
-    // so a marked "[background constraint — …]" ADR is no longer framed as a hard NO_GO gate.
-    expect(codeDev.prompt).toContain('are BINDING for THIS task');
-    expect(codeDev.prompt).toContain('ADVISORY CONTEXT');
+    expect(codeDev.prompt).toContain(BODY_SENTINEL);
+    expect(codeDev.prompt).not.toContain('[background constraint — full: .brain/memory.db adr-008]');
+    expect(codeDev.prompt).toContain('is BINDING for THIS task');
 
     const noType = buildTaskPrompt(baseTask, ctx);
     expect(noType.metadata.adrIds).toContain('adr-008');
@@ -199,7 +197,7 @@ describe('PROMPT-W1 (c) — buildDodChecklist paren-aware parser', () => {
     expect(checklistItemCount(out)).toBe(2);
     expect(out).toContain('- [ ] Run tests (unit; e2e)');
     expect(out).toContain('- [ ] build green');
-    expect(out).toContain('all 2/2 ticked → DONE');
+    expect(out).toContain('all 2/2 polarity-specific outcomes closed → DONE');
   });
 
   it('preserves an internal newline inside parentheses (does not split it)', () => {

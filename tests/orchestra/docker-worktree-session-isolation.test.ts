@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   DockerSpawnBackend,
   buildDockerGitIsolation,
   buildProviderPrivateHomeBootstrap,
+  materializeDockerGitIsolation,
 } from '../../src/orchestra/spawn-backend-docker.js';
 
 const sandboxes: string[] = [];
@@ -33,13 +34,9 @@ describe('buildDockerGitIsolation', () => {
     expect(isolation.available).toBe(true);
     expect(isolation.mountArgs).toEqual([
       '--mount', `type=bind,src=${join(root, '.git')},dst=/workspace/.git,readonly`,
-      '--mount', `type=bind,src=${join(root, '.git')},dst=/run/deckent-git/common,readonly`,
     ]);
-    expect(isolation.envArgs).toEqual([
-      '-e', 'GIT_WORK_TREE=/workspace',
-      '-e', 'GIT_COMMON_DIR=/run/deckent-git/common',
-      '-e', 'GIT_DIR=/run/deckent-git/common',
-    ]);
+    expect(isolation.envArgs).toEqual([]);
+    expect(isolation.adapter).toBeUndefined();
   });
 
   it('maps a linked worktree to container-native Git paths', () => {
@@ -57,12 +54,19 @@ describe('buildDockerGitIsolation', () => {
     expect(isolation.hostCommonDir).toBe(commonGit);
     expect(isolation.containerGitDir).toBe('/run/deckent-git/common/worktrees/feature');
     expect(isolation.mountArgs).toContain(
-      `type=bind,src=${join(worktree, '.git')},dst=/workspace/.git,readonly`,
+      `type=bind,src=${isolation.adapter?.hostPath},dst=/workspace/.git,readonly`,
     );
     expect(isolation.mountArgs).toContain(
       `type=bind,src=${commonGit},dst=/run/deckent-git/common,readonly`,
     );
     expect(isolation.envArgs.join('\n')).not.toContain(base);
+    expect(isolation.envArgs).toEqual([]);
+    expect(isolation.adapter?.content).toBe(
+      'gitdir: /run/deckent-git/common/worktrees/feature\n',
+    );
+    materializeDockerGitIsolation(isolation);
+    sandboxes.push(dirname(isolation.adapter!.hostPath));
+    expect(readFileSync(isolation.adapter!.hostPath, 'utf-8')).toBe(isolation.adapter!.content);
   });
 
   it('preserves non-Git project support without synthetic metadata', () => {

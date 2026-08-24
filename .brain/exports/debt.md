@@ -36,6 +36,16 @@
 | debt-1780659451542-018 | Tech debt from 1780659451542-018: Declared verification passed: 3 files, 16 test | normal | sprint-1780659451542 | resolved |
 | debt-1780659451542-020 | Tech debt from 1780659451542-020: Evidence record cites bounded persisted source | normal | sprint-1780659451542 | resolved |
 | debt-1780659451542-019 | Tech debt from 1780659451542-019: npm run lint:master-plan reports docs/generate | normal | sprint-1780659451542 | resolved |
+| debt-657-002 | Tech debt from 657-002: Read-only acceptance completed within the exact authoriz | normal | sprint-657 | resolved |
+| debt-653-003 | Tech debt from 653-003: 7/7 goCriteria satisfied. One immutable PromptCompilePla | normal | sprint-653 | resolved |
+| debt-649-002 | Tech debt from 649-002: Project type checking remains blocked by three TS18047 s | normal | sprint-649 | resolved |
+| debt-647-004 | Tech debt from 647-004: Read .deckent/workspace/WORKER-GUIDE.md and all three ex | normal | sprint-647 | resolved |
+| debt-643-002 | Tech debt from 643-002: Wired validated exact-pair owner authority into requeste | normal | sprint-643 | resolved |
+| debt-638-005 | Tech debt from 638-005: Implemented typed HOLD for settlement-read failures and  | normal | sprint-638 | resolved |
+| debt-638-001 | Tech debt from 638-001: Implemented deterministic default multi-run reconciliati | normal | sprint-638 | resolved |
+| debt-636-004 | Tech debt from 636-004: Workspace type checking remains blocked by pre-existing  | normal | sprint-636 | resolved |
+| debt-631-003 | Tech debt from 631-003: Global TypeScript validation remains blocked by unused h | normal | sprint-631 | resolved |
+| debt-629-007 | Tech debt from 629-007: package.json lint:gates still needs to invoke scripts/li | critical | sprint-629 | resolved |
 | debt-625-006 | Tech debt from 625-006: Implemented immutable project-relative SHA-256 storage w | normal | sprint-625 | resolved |
 | debt-625-008 | Tech debt from 625-008: Implemented bounded plan/apply reconciliation for direct | normal | sprint-625 | resolved |
 | debt-622-003 | Tech debt from 622-003: Receipt replay is idempotent: an existing exact-attempt  | normal | sprint-622 | resolved |

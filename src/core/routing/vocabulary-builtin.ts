@@ -339,6 +339,24 @@ export const BUILTIN_DOMAINS: readonly DomainDef[] = [
     exclusiveRoles: [],
   },
   {
+    id: 'test/quality',
+    aliases: ['test', 'tests', 'testing', 'quality', 'qa', 'coverage', 'spec'],
+    pathPatterns: [
+      'tests/**',
+      'test/**',
+      '**/*.test.*',
+      '**/*.spec.*',
+      'vitest.config.*',
+      'jest.config.*',
+    ],
+    stackMarkers: ['vitest', 'jest', 'mocha', 'cypress', 'pytest'],
+    description:
+      'Cross-project test and quality work: test suites, specifications, coverage, fixtures, ' +
+      'and test-runner configuration used to verify product behavior.',
+    surfaces: [],
+    exclusiveRoles: [],
+  },
+  {
     id: 'agents-catalog',
     aliases: ['agent-catalog', 'personas', 'skills-catalog', 'ajan-kataloğu'],
     pathPatterns: [
@@ -379,7 +397,7 @@ export const BUILTIN_DOMAINS: readonly DomainDef[] = [
 // ─── Derived lookup surfaces ─────────────────────────────────────────
 /** The 8 work-type identifiers, in spec order. */
 export const WORK_TYPE_IDS: readonly WorkType[] = BUILTIN_WORK_TYPES.map((w) => w.type);
-/** The 14 builtin-base domain identifiers, in spec order. */
+/** The builtin-base domain identifiers, in registry order. */
 export const DOMAIN_IDS: readonly string[] = BUILTIN_DOMAINS.map((d) => d.id);
 
 const WORK_TYPE_SET: ReadonlySet<string> = new Set(WORK_TYPE_IDS);

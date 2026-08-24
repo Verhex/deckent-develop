@@ -63,6 +63,8 @@ export interface SkillDefinition {
   /** ROUTING-V3 skill matching profile (capability-vector.ts SkillProfile shape);
    *  optional — profile-less skills are simply not V3 candidates. */
   profile?: unknown;
+  /** Provenance for a persisted generated profile. Absence means the profile is authored. */
+  profileProvenance?: PersistedSkillProfileProvenance;
   id: string;
   name: string;
   version: string;
@@ -87,8 +89,15 @@ export interface SkillDefinition {
   activation?: ActivationConfig;
 }
 
+export interface PersistedSkillProfileProvenance {
+  origin: 'derived-profile';
+  derivationVersion: number;
+  persistedAt?: string;
+  authority?: string;
+}
+
 export interface SkillProfileFieldProvenance {
-  derivationVersion: 1;
+  derivationVersion: 2;
   fields: {
     workTypes: SkillProfileProvenanceNote;
     domains: SkillProfileProvenanceNote;

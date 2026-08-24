@@ -333,7 +333,15 @@ describe('handleEvaluation', () => {
   });
 
   it('NO_GO: fix task has isPriorityFix=true and CRITICAL priority', () => {
-    const task = makeTask({ type: 'code-development', promptCostCanary: promptCostCanaryAuthority });
+    const task = makeTask({
+      type: 'code-development',
+      promptCostCanary: promptCostCanaryAuthority,
+      verification: {
+        version: 1,
+        source: 'directive',
+        commands: ['VITEST_MAX_FORKS=2 npx vitest run tests/core/task-types.test.ts'],
+      },
+    });
     const result = makeTaskResult({ selfAssessment: 'NO_GO', notes: 'failed' });
     handleEvaluation('/root', task, TaskEvaluation.NO_GO, result);
     const writtenContent = JSON.parse(vi.mocked(writeFileSync).mock.calls[0]![1] as string);
@@ -343,6 +351,7 @@ describe('handleEvaluation', () => {
     expect(writtenContent.fixForTaskId).toBe('task-001');
     expect(writtenContent.type).toBe('code-development');
     expect(writtenContent.promptCostCanary).toEqual(promptCostCanaryAuthority);
+    expect(writtenContent.verification).toEqual(task.verification);
   });
 
   it('NO_GO: does not release locks', () => {

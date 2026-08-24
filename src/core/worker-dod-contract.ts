@@ -3,46 +3,33 @@
 // WORKER-GUIDE generation. Keeping it here prevents documentation from
 // re-introducing the retired percentage rubric.
 
-function splitTopLevelCriteria(goCriteria: string): string[] {
-  const items: string[] = [];
-  let buffer = '';
-  let depth = 0;
-  for (const char of goCriteria) {
-    if (char === '(' || char === '[' || char === '{') {
-      depth += 1;
-      buffer += char;
-    } else if (char === ')' || char === ']' || char === '}') {
-      if (depth > 0) depth -= 1;
-      buffer += char;
-    } else if ((char === ';' || char === '\n') && depth === 0) {
-      items.push(buffer);
-      buffer = '';
-    } else {
-      buffer += char;
-    }
-  }
-  if (buffer.length > 0) items.push(buffer);
-  return items;
-}
+import type { GoNoGoCriterionItem } from './task-types.js';
 
-export function renderWorkerDodChecklist(goCriteria?: string): string {
-  const items = splitTopLevelCriteria(goCriteria ?? '')
-    .map((item) => item.trim().replace(/^[-*]\s*/, ''))
-    .filter((item) => item.length > 0);
+export function renderWorkerDodChecklist(
+  criteria: readonly GoNoGoCriterionItem[] | string = [],
+): string {
+  // Legacy display text is accepted only for caller compatibility and never parsed.
+  const items = typeof criteria === 'string' ? [] : criteria;
 
   if (items.length === 0) {
-    return 'Assess yourself honestly against the goCriteria above. "Code written" ≠ "DONE": core criteria met with a minor gap → GO_WITH_TECH_DEBT (name the gap); a critical criterion unmet → NO_GO (explain).';
+    return 'Assess yourself honestly against structured goCriteria. Missing structured authority cannot be inferred from prose; report NO_GO when required evidence is unavailable.';
   }
 
-  const checklist = items.map((item) => `- [ ] ${item}`).join('\n');
+  const checklist = items.map(item => {
+    const disposition = item.polarity === 'go'
+      ? 'required condition; DONE expects outcome=MET'
+      : 'forbidden condition; DONE expects outcome=UNMET';
+    return `- [ ] [${item.id}] ${item.statement}\n  polarity: ${item.polarity}; ${disposition}\n  evidence: <explicit evidence for ${item.id}>`;
+  }).join('\n');
   const count = items.length;
-  return `Self-assessment rubric — "Code written" ≠ "DONE". Tick each Definition-of-Done item only when you verified it WITH EVIDENCE:
+  return `Self-assessment rubric — "Code written" ≠ "DONE". Tick each criterion only when its polarity-specific safe outcome is verified WITH EVIDENCE:
 ${checklist}
-Verdict: all ${count}/${count} ticked → DONE | core items ticked, a minor item open → GO_WITH_TECH_DEBT (name the open item) | a critical item unticked → NO_GO (explain which and why).`;
+Outcome semantics are statement truth, not success labels: GO + MET is closed; NO-GO + UNMET is closed. A NO-GO criterion marked MET means the forbidden condition occurred and BLOCKS DONE.
+Verdict: all ${count}/${count} polarity-specific outcomes closed → DONE | GO_WITH_TECH_DEBT requires exact open criterion IDs | a critical item open → NO_GO (explain which ID and why).`;
 }
 
 export const WORKER_DOD_POLICY_SUMMARY = Object.freeze({
   done: 'Every Definition-of-Done item is verified with evidence.',
-  techDebt: 'Core items are verified; each minor open item is named explicitly.',
+  techDebt: 'Core items are verified; exact structured criterion IDs name every open item.',
   noGo: 'At least one critical item is unverified; the exact blocker is named.',
 });

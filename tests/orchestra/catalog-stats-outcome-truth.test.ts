@@ -13,6 +13,11 @@ import { join } from 'node:path';
 import { TaskEvaluation } from '../../src/core/types.js';
 import type { Task, TaskResult } from '../../src/core/types.js';
 import {
+  buildPromptDeliveryReceipt,
+  promptDeliveryReceiptPath,
+  writePromptDeliveryReceipt,
+} from '../../src/core/prompt-delivery-receipt.js';
+import {
   collectCatalogStatsTerminalOutcomes,
   writeCatalogStatsTerminalOutcomes,
   parseCommsUsageFromResult,
@@ -70,11 +75,13 @@ afterEach(() => {
 
 describe('catalog stats terminal outcome truth', () => {
   it('collects V3 and FIX attempts once each and prefers carried result identities', () => {
+    const root = projectRoot();
     const v3 = task('545-001', {
       routingMeta: { routingVersion: 'v3', workType: 'build', confidence: 1, provenance: 'deterministic' },
     });
     const fix = task('545-001-fix-1', { fixForTaskId: v3.id });
     const outcomes = collectCatalogStatsTerminalOutcomes(
+      root,
       [v3, fix],
       new Map([
         [v3.id, TaskEvaluation.NO_GO],
@@ -91,6 +98,44 @@ describe('catalog stats terminal outcome truth', () => {
       { agentId: 'v3-agent', skillIds: ['v3-skill'], evaluation: TaskEvaluation.NO_GO },
       { agentId: 'fix-agent', skillIds: ['fix-skill'], evaluation: TaskEvaluation.DONE },
     ]);
+  });
+
+  it('credits current delivered identities and fails closed on malformed current receipts', () => {
+    const root = projectRoot();
+    const planId = `prompt-compile-plan:sha256:${'a'.repeat(64)}`;
+    const currentTask = task('654-current', {
+      promptCompilePlanId: planId,
+      assignedAgent: 'assigned-agent',
+      assignedSkills: ['assigned-skill'],
+    });
+    expect(writePromptDeliveryReceipt(root, buildPromptDeliveryReceipt({
+      taskId: currentTask.id,
+      prompt: 'prompt',
+      promptCompilePlanId: planId,
+      rolePolicyIdentity: 'worker:delivered-agent',
+      assignedAgentId: 'assigned-agent',
+      assignedSkillIds: ['assigned-skill'],
+      segments: [
+        { kind: 'persona', content: '=== Agent: delivered-agent ===\npersona' },
+        { kind: 'skills', content: '=== Skills ===\n--- delivered-skill ---\nbody\n' },
+      ],
+    }))).toBe(true);
+    const current = collectCatalogStatsTerminalOutcomes(
+      root,
+      [currentTask],
+      new Map([[currentTask.id, TaskEvaluation.DONE]]),
+      new Map([[currentTask.id, result(currentTask.id, { agentId: 'claim-agent', skillIds: ['claim-skill'] })]]),
+    );
+    expect(current).toMatchObject([{ agentId: 'delivered-agent', skillIds: ['delivered-skill'] }]);
+
+    writeFileSync(promptDeliveryReceiptPath(root, currentTask.id), '{malformed', 'utf8');
+    const malformed = collectCatalogStatsTerminalOutcomes(
+      root,
+      [currentTask],
+      new Map([[currentTask.id, TaskEvaluation.DONE]]),
+      new Map([[currentTask.id, result(currentTask.id, { agentId: 'claim-agent', skillIds: ['claim-skill'] })]]),
+    );
+    expect(malformed).toMatchObject([{ agentId: null, skillIds: [] }]);
   });
 
   it('counts every V3/FIX terminal attempt exactly once in the sidecar', () => {
@@ -229,6 +274,7 @@ describe('catalog stats terminal outcome truth', () => {
       } as unknown as TaskResult;
 
       const outcomes = collectCatalogStatsTerminalOutcomes(
+        projectRoot(),
         [v3],
         new Map([[v3.id, TaskEvaluation.DONE]]),
         new Map([[v3.id, withComms]]),
