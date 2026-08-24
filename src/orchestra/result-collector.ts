@@ -49,6 +49,7 @@ import {
   resolveSchedulerEngine,
 } from './scheduler-driver.js';
 import type { SchedulerSnapshot } from './scheduler-reducer.js';
+import type { SchedulerDriverTickResult } from './scheduler-driver.js';
 import { ApprovalBroker } from '../core/approval-broker.js';
 import type { BrainAnswer, WorkerQuestion, TokenUsage } from '../core/task-types.js';
 import { extractProviderBillingEvidence, reconcileProviderBilling } from '../core/provider-billing-evidence.js';
@@ -2231,7 +2232,9 @@ export async function waitForResults(
     await finalizeShadowSchedulerTick(projectRoot, sprint.id, snapshot, {
       assignedTaskIdsAfter: assignedTaskIds,
       collectedIdsAfter: collected,
-    }).catch(e => debugLog('waitForResults:shadowScheduler:finalize', e));
+      landedEffects: lastSchedulerTickResult?.landedEffects,
+      spawnSkipReasons: lastSchedulerTickResult?.spawnSkipReasons,
+    }, schedulerEngine).catch(e => debugLog('waitForResults:shadowScheduler:finalize', e));
   };
 
   // ─── SCHED5 (docs/analysis/scheduler-unify-design-2026-07-11.md, dilim-5) —
@@ -2242,6 +2245,7 @@ export async function waitForResults(
   // 'legacy' — see createSchedulerDriver's doc comment (scheduler-driver.ts)
   // for the exact zero-behavior-diff contract.
   const schedulerEngine = resolveSchedulerEngine(config?.scheduler);
+  let lastSchedulerTickResult: SchedulerDriverTickResult | undefined;
   const schedulerDriver = createSchedulerDriver(schedulerEngine, {
     sprint,
     config,
@@ -2294,7 +2298,7 @@ export async function waitForResults(
   // SCHED5: routed through the injected schedulerDriver — legacy engine runs
   // this exact sequence unchanged (runLegacyTick below); reducer engine
   // replaces it with one reduceSchedulerTick() decision + executeSchedulerDecision.
-  await schedulerDriver({
+  lastSchedulerTickResult = await schedulerDriver({
     trigger: 'initial',
     completedTaskIds: initiallyCollected,
     runLegacyTick: async () => {
@@ -2430,7 +2434,7 @@ export async function waitForResults(
           // ADR-064/Sprint 165/Sprint 272 sequence below unchanged; reducer
           // engine replaces it with one reduceSchedulerTick() decision
           // executed via executeSchedulerDecision.
-          await schedulerDriver({
+          lastSchedulerTickResult = await schedulerDriver({
             trigger: 'watcher',
             completedTaskIds: newlyCollected,
             runLegacyTick: async () => {

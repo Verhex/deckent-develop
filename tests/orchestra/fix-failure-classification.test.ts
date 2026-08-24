@@ -99,7 +99,9 @@ describe('classifyFixFailure', () => {
     expect(c.disposition).toBe('reviseScope');
     expect(c.code).toBe('BOUNDARY_VIOLATION');
     // Re-running the identical scope reproduces the identical violation.
-    expect(c.allowsFixTask).toBe(false);
+    expect(c.allowsFixTask).toBe(true);
+    expect(c.requiredAccess).toBe('access:write');
+    expect(c.repairTarget).toBe('current');
   });
 
   it('treats a host attribution HOLD with out-of-scope claims as a scope violation', () => {
@@ -217,5 +219,25 @@ describe('classifyFixFailure', () => {
       }),
     });
     expect(c.disposition).toBe('reviseScope');
+  });
+
+  it('routes typed upstream attribution repair with write authority', () => {
+    const c = classifyFixFailure({
+      result: makeResult(),
+      evidence: {
+        attribution: {
+          state: 'HOLD',
+          reasonCode: 'SCOPE_MISMATCH',
+          claimedOutsideScope: ['src/upstream.ts'],
+        },
+        dependencyLineage: { failedUpstreamTaskId: 'upstream-1' },
+      },
+    });
+    expect(c).toMatchObject({
+      disposition: 'reviseScope',
+      allowsFixTask: true,
+      requiredAccess: 'access:write',
+      repairTarget: 'upstream',
+    });
   });
 });

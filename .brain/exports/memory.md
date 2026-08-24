@@ -118,6 +118,14 @@ Ev
 - 1780659451539-009 — Health and ETA readiness — Created a source-backed Closure Health and ETA readiness assessment.
 - …and 9 more delivered
 
+## Sprint sprint-661 Learnings
+- Sprint sprint-661 Learnings: ## Sprint sprint-661 Learnings
+- Repair preserved modular layer gate implementation: GO_WITH_TECH_DEBT — Production registry now carries the generated exact baseline/topology and configured build ignore. Default graph check w
+
+## Gains
+- 661-001 — Canonical scope compiler and prompt admission — Canonical scope authority is centralized in src/core/execution-write-scope-policy.ts and consumed...
+- 661-002 — Scheduler admission settlement, quiescence and journal truth — Declared verification passed: 4 files, 34 tests.
+
 ## Sprint sprint-659 Learnings
 - Sprint sprint-659 Learnings: ## Sprint sprint-659 Learnings
 

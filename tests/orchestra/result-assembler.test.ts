@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os';
 
 import {
   assembleResult,
+  assembleCanonicalIngressResult,
   computeBoundaryViolations,
   makeStaticGitChangeProvider,
   createDefaultGitChangeProvider,
@@ -256,6 +257,56 @@ describe('assembleResult — honestGate conflict (§1.5)', () => {
 // ─── 3. Validation + error contract ────────────────────────────────────────────
 
 describe('assembleResult — validation', () => {
+  it('normalizes legacy ingress into strict canonical V1 once', () => {
+    const result = assembleCanonicalIngressResult({
+      taskId: 'task-1',
+      selfAssessment: 'DONE',
+      testsPassed: true,
+      filesChanged: ['src/orchestra/foo.ts'],
+      linesAdded: 2,
+      linesRemoved: 0,
+    }, { taskId: 'task-1', workerId: 'docker-task-1', provider: 'claude', model: 'opus' });
+    expect(validateTaskResult(result).ok).toBe(true);
+    expect(result).toMatchObject({ schemaVersion: '1.0', totalLinesAdded: 2 });
+    expect(result.tests.outcome).toBe('PASSED');
+  });
+
+  it('preserves digest-bound evaluator fields through strict canonical settlement', () => {
+    const promptCompilePlanId = `prompt-compile-plan:sha256:${'a'.repeat(64)}`;
+    const command = 'npx vitest run tests/orchestra/result-assembler.test.ts';
+    const result = assembleCanonicalIngressResult({
+      selfAssessment: 'DONE',
+      testsPassed: true,
+      testVerification: {
+        applicability: 'REQUIRED',
+        outcome: 'PASSED',
+        commands: [command],
+      },
+      criteriaEvidence: [{ criterionId: 'go-1', outcome: 'MET', evidence: ['test passed'] }],
+      techDebtCriterionIds: [],
+      promptCompilePlanId,
+      filesChanged: [],
+    }, {
+      taskId: 'task-1',
+      workerId: 'docker-task-1',
+      provider: 'codex',
+      model: 'gpt-test',
+      sprintId: 'sprint-661',
+      promptCompilePlanId,
+      verificationCommands: [command],
+      isPriorityFix: true,
+      fixForTaskId: 'task-0',
+    });
+
+    expect(result).toMatchObject({
+      promptCompilePlanId,
+      testVerification: { applicability: 'REQUIRED', outcome: 'PASSED', commands: [command] },
+      techDebtCriterionIds: [],
+      sprintId: 'sprint-661',
+      isPriorityFix: true,
+      fixForTaskId: 'task-0',
+    });
+  });
   it('throws AssemblerError when the assembled result is invalid', async () => {
     await expect(
       assembleResult(baseInput({ task: makeTask({ id: '' }) })),
@@ -285,6 +336,21 @@ describe('assembleResult — validation', () => {
     expect(result.brainEvaluation).toBeNull();
     expect(result.auditorValidation).toBeNull();
     expect(result.totalLinesAdded).toBe(2);
+  });
+
+  it('preserves a false worker claim separately without erasing host-measured work', async () => {
+    const result = await assembleResult(baseInput({
+      workerSubjective: {
+        ...baseInput().workerSubjective,
+        workClaim: { filesChanged: [], linesAdded: 0, linesRemoved: 0 },
+      },
+      gitProvider: makeStaticGitChangeProvider([
+        { path: 'src/orchestra/foo.ts', status: 'modified', linesAdded: 3, linesRemoved: 1 },
+      ]),
+    }));
+    expect(result.totalLinesAdded).toBe(3);
+    expect(result.filesChanged).toHaveLength(1);
+    expect(result.workerWorkClaim).toMatchObject({ mismatch: true, filesChanged: [] });
   });
 });
 

@@ -22,6 +22,16 @@ export enum AgentStatus {
   PAUSED = 'PAUSED',
 }
 
+/**
+ * Host-primary worker liveness verdict. Lives in core so layer-1 consumers
+ * (nervous detectors, monitors) can type against it without importing
+ * orchestra modules (ADR-G-041 layer boundary; nervous↔orchestra SCC edge ban).
+ */
+export type HostPrimaryLiveness =
+  | { readonly state: 'alive' | 'dead'; readonly attemptId: string; readonly hostSequence: number; readonly reason: string }
+  | { readonly state: 'unknown' | 'HOLD'; readonly attemptId: string; readonly hostSequence: number | null; readonly reason: string };
+
+/** @deprecated Legacy compatibility projection; not the v1 activity schema. */
 export interface Heartbeat {
   workerId: string;
   taskId: string;

@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -10,6 +10,7 @@ import {
   writeTaskResultSettlementAttemptAtomic,
 } from '../../src/core/task-result-settlement.js';
 import { WorkerHeartbeatAuthorityStore } from '../../src/core/worker-heartbeat-authority-store.js';
+import { parseWorkerActivityHeartbeat } from '../../src/core/worker-activity-heartbeat.js';
 import { observeDockerHeartbeatAuthority } from '../../src/orchestra/spawn-backend-docker.js';
 
 const roots: string[] = [];
@@ -65,5 +66,22 @@ describe('Docker heartbeat authority production wire', () => {
       liveness: 'not-alive',
     });
     expect(authority?.latest?.hostObservedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/u);
+
+    const projected = parseWorkerActivityHeartbeat(JSON.parse(readFileSync(
+      join(tasksDir, `task-${ref.taskId}.hb`),
+      'utf8',
+    )) as unknown);
+    expect(projected).toMatchObject({
+      state: 'VALID',
+      heartbeat: {
+        taskId: ref.taskId,
+        workerId: `docker-${ref.taskId}`,
+        attemptId: ref.attemptId,
+        backend: 'docker',
+        status: 'NO_GO',
+        currentAction: 'Host settled attempt: no-go',
+        observedAt: authority?.latest?.hostObservedAt,
+      },
+    });
   });
 });

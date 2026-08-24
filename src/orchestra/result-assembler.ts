@@ -33,9 +33,19 @@ import { join } from 'node:path';
 import { debugLog } from '../core/utils.js';
 import type { Task, TaskScope } from '../core/task-types.js';
 import type { TokenUsage } from '../core/token-usage.js';
-import { validateTaskResult, type TaskResultV1 } from '../core/task-result-schema.js';
+import {
+  validateTaskResult,
+  AssemblerError,
+  type TaskResultV1,
+  type FileChange,
+} from '../core/task-result-schema.js';
 import { resolvePromptDeliveryAttribution } from '../core/prompt-delivery-receipt.js';
 import { getDefaultProviderName } from './sprint-utils.js';
+
+// Compat re-exports — canonical ingress moved to result-ingress.ts (SCC fix);
+// shared shapes moved to core/task-result-schema.ts. Existing importers keep working.
+export { assembleCanonicalIngressResult, type CanonicalIngressAuthority } from './result-ingress.js';
+export { AssemblerError, type FileChange } from '../core/task-result-schema.js';
 
 // ─── Input contract ──────────────────────────────────────────────────────────
 
@@ -90,6 +100,18 @@ export interface WorkerSubjective {
   tsc: TscInput;
   handoffNotes?: string | null;
   sharedNotes?: SharedNoteInput[];
+  /** Optional ingress evidence retained independently from the host test projection. */
+  criteriaEvidence?: Array<{
+    criterionId: string;
+    outcome: 'MET' | 'UNMET' | 'UNVERIFIED';
+    evidence: string[];
+  }>;
+  /** Untrusted worker work claim, preserved only for mismatch diagnostics. */
+  workClaim?: {
+    filesChanged?: readonly string[];
+    linesAdded?: number | null;
+    linesRemoved?: number | null;
+  };
 }
 
 /**
@@ -130,13 +152,6 @@ export interface AssembleInput {
 
 // ─── Git change layer (authoritative, injectable) ────────────────────────────
 
-/** A git-derived per-file change (spec §1.2 `filesChanged[]` entry). */
-export interface FileChange {
-  path: string;
-  status: 'added' | 'modified' | 'deleted';
-  linesAdded: number;
-  linesRemoved: number;
-}
 
 /** Outcome of querying git for the working-tree changes. */
 export interface GitChangeResult {
@@ -153,17 +168,7 @@ export interface GitChangeProvider {
 
 // ─── Errors ──────────────────────────────────────────────────────────────────
 
-/** Thrown by {@link assembleResult} when the assembled result fails Zod validation. */
-export class AssemblerError extends Error {
-  constructor(
-    message: string,
-    public readonly missingFields: string[],
-    public readonly errors: string[],
-  ) {
-    super(message);
-    this.name = 'AssemblerError';
-  }
-}
+
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
@@ -195,6 +200,16 @@ export async function assembleResult(input: AssembleInput): Promise<TaskResultV1
   const totalLinesAdded = filesChanged.reduce((sum, f) => sum + f.linesAdded, 0);
   const totalLinesRemoved = filesChanged.reduce((sum, f) => sum + f.linesRemoved, 0);
   const boundaryViolations = computeBoundaryViolations(filesChanged, task.scope);
+  const claimedFiles = [...(ws.workClaim?.filesChanged ?? [])];
+  const measuredFiles = filesChanged.map(change => change.path);
+  const workerWorkClaim = ws.workClaim ? {
+    filesChanged: claimedFiles,
+    linesAdded: ws.workClaim.linesAdded ?? null,
+    linesRemoved: ws.workClaim.linesRemoved ?? null,
+    mismatch: JSON.stringify([...claimedFiles].sort()) !== JSON.stringify([...measuredFiles].sort())
+      || (ws.workClaim.linesAdded != null && ws.workClaim.linesAdded !== totalLinesAdded)
+      || (ws.workClaim.linesRemoved != null && ws.workClaim.linesRemoved !== totalLinesRemoved),
+  } : undefined;
 
   // 2. Timing → durationMs (completed − spawned). NaN-safe; clamp non-negative.
   const durationMs = diffMs(timing.spawnedAt, timing.completedAt);
@@ -242,6 +257,7 @@ export async function assembleResult(input: AssembleInput): Promise<TaskResultV1
     totalLinesRemoved,
     diskVerified: gitResult.ok,
     boundaryViolations,
+    ...(workerWorkClaim ? { workerWorkClaim } : {}),
     promptDeliveryAttribution: {
       state: promptDelivery.state,
       ...(promptDelivery.state === 'HOLD' ? { reason: promptDelivery.reason } : {}),
@@ -261,6 +277,7 @@ export async function assembleResult(input: AssembleInput): Promise<TaskResultV1
       orchestratorVerified: false,
     },
     tsc: { clean: ws.tsc.clean, errors: ws.tsc.errors },
+    criteriaEvidence: ws.criteriaEvidence ?? [],
 
     // assessment (worker + brain)
     selfAssessment: ws.selfAssessment,

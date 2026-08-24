@@ -1,10 +1,11 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdtempSync, writeFileSync, utimesSync, rmSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { StaleWorkerDetector } from '../../src/nervous/detectors/stale-worker.js';
 import { getSprintStateSnapshot } from '../../src/orchestra/sprint-state-tracker.js';
 import type { SprintStateSnapshot } from '../../src/core/nervous-types.js';
+import { WorkerHeartbeatAuthorityStore } from '../../src/core/worker-heartbeat-authority-store.js';
 
 // Bug-1: worker freshness must come from the .hb file mtime (host-set through the
 // docker bind-mount), NOT the in-file `timestamp` (written on the container's
@@ -49,15 +50,42 @@ describe('sprint-state-tracker — worker freshness uses .hb mtime (clock-skew-p
     return root;
   }
 
-  function writeHb(r: string, taskId: string, inFileTimestamp: string, mtimeEpochMs: number): void {
+  function writeHb(
+    r: string,
+    taskId: string,
+    observedAt: string,
+    liveness: 'alive' | 'not-alive' | 'unknown' = 'unknown',
+    verdict: 'pending' | 'done' | 'no-go' | 'hold' = 'pending',
+  ): void {
+    const attemptId = `attempt-${taskId}`;
     const p = join(r, '.tasks', `task-${taskId}.hb`);
     writeFileSync(
       p,
-      JSON.stringify({ workerId: `w-${taskId}`, taskId, timestamp: inFileTimestamp, status: 'EXECUTING' }),
+      JSON.stringify({
+        version: 1,
+        kind: 'worker-activity-heartbeat',
+        workerId: `w-${taskId}`,
+        taskId,
+        attemptId,
+        backend: 'docker',
+        observedAt,
+        status: 'EXECUTING',
+        currentAction: 'preserved activity',
+      }),
       'utf-8',
     );
-    const t = mtimeEpochMs / 1000;
-    utimesSync(p, t, t); // set both atime + mtime to the chosen instant
+    const identity = { runId: 'run', taskId, attemptId, workerId: `docker-${taskId}`, fence: 'fence' };
+    const store = new WorkerHeartbeatAuthorityStore(join(r, '.tasks', 'worker-heartbeat-authority'));
+    store.initialize(identity);
+    store.observe({
+      identity,
+      expectedHostSequence: 0,
+      hostProcessOutcome: liveness === 'alive'
+        ? { state: 'running', exitCode: null }
+        : { state: 'exited', exitCode: 1 },
+      workerTaskVerdict: verdict,
+      liveness,
+    });
   }
 
   function detect(snap: SprintStateSnapshot, now: number) {
@@ -68,26 +96,29 @@ describe('sprint-state-tracker — worker freshness uses .hb mtime (clock-skew-p
     } as never);
   }
 
-  it('FALSE-POSITIVE fixed: midnight in-file timestamp but FRESH mtime → lastHeartbeat fresh, detector NOT flagged', () => {
+  it('frozen activity with exact-attempt live host authority is not stale', () => {
     const r = setup(['290-001']);
     const now = 1_750_000_000_000; // fixed reference instant (ms)
     // in-file ts = midnight (container-clock skew ≈ 11h stale), but mtime = 3s ago (host fs)
-    writeHb(r, '290-001', '2026-06-18T00:00:00.000Z', now - 3_000);
+    writeHb(r, '290-001', '2024-01-01T00:00:00.000Z', 'alive');
 
     const snap = getSprintStateSnapshot(r);
     const w = snap.activeWorkers.find((x) => x.taskId === '290-001')!;
     expect(w).toBeDefined();
-    const ageMs = now - new Date(w.lastHeartbeat).getTime();
-    expect(ageMs).toBeLessThan(60_000); // fresh (from mtime), NOT ~11h (from the midnight in-file ts)
+    expect(w).toMatchObject({
+      attemptId: 'attempt-290-001',
+      currentAction: 'preserved activity',
+      liveness: { state: 'alive' },
+    });
 
     expect(detect(snap, now)).toBeNull();
   });
 
-  it('REAL staleness preserved: OLD mtime (11 min ago) → StaleWorkerDetector flags it', () => {
+  it('exact dead attempt produces a stale event', () => {
     const r = setup(['290-009']);
     const now = 1_750_000_000_000;
     // in-file ts looks fresh, but the actual host mtime is 11 min ago → genuinely hung
-    writeHb(r, '290-009', new Date(now).toISOString(), now - 11 * 60_000);
+    writeHb(r, '290-009', new Date(now).toISOString(), 'not-alive');
 
     const snap = getSprintStateSnapshot(r);
     const res = detect(snap, now);
@@ -106,7 +137,7 @@ describe('sprint-state-tracker — worker freshness uses .hb mtime (clock-skew-p
   it('residue heartbeat whose task no longer exists is not an active worker', () => {
     const r = setup(['290-011']);
     const now = 1_750_000_000_000;
-    writeHb(r, '290-011', new Date(now).toISOString(), now - 6 * 60 * 60 * 1000);
+    writeHb(r, '290-011', new Date(now).toISOString(), 'alive');
     // Cleanup removed the task JSON when the sprint settled; only the .hb lingers.
     rmSync(join(r, '.tasks', 'task-290-011.json'));
 
@@ -117,10 +148,24 @@ describe('sprint-state-tracker — worker freshness uses .hb mtime (clock-skew-p
   it('FINISHED-worker guard intact: .hb with sibling .result → not in activeWorkers', () => {
     const r = setup(['290-010']);
     const now = 1_750_000_000_000;
-    writeHb(r, '290-010', new Date(now).toISOString(), now - 3_000);
+    writeHb(r, '290-010', new Date(now).toISOString(), 'alive');
     writeFileSync(join(r, '.tasks', 'task-290-010.result'), '{"selfAssessment":"DONE"}', 'utf-8');
 
     const snap = getSprintStateSnapshot(r);
     expect(snap.activeWorkers.find((x) => x.taskId === '290-010')).toBeUndefined();
+  });
+
+  it('includes a dynamic FIX worker even when it was not in the initial taskIds', () => {
+    const r = setup(['290-001']);
+    writeFileSync(
+      join(r, '.tasks', 'task-290-001-fix.json'),
+      JSON.stringify({ id: '290-001-fix', title: 'dynamic repair', scope: {} }),
+      'utf8',
+    );
+    writeHb(r, '290-001-fix', '2026-08-24T12:00:00.000Z', 'alive');
+
+    expect(getSprintStateSnapshot(r).activeWorkers).toEqual(expect.arrayContaining([
+      expect.objectContaining({ taskId: '290-001-fix', liveness: expect.objectContaining({ state: 'alive' }) }),
+    ]));
   });
 });

@@ -9,13 +9,30 @@
 //   - .tasks/task-<id>.result       → completedTasks
 //   - .brain/memory.db              → openDebtCount (DB-first, Task #4d)
 
-import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { readSprintState } from './sprint-utils.js';
 import { getDebtItems } from '../core/debt-store.js';
 import type { SprintStateSnapshot } from '../core/nervous-types.js';
+import { parseWorkerActivityHeartbeat } from '../core/worker-activity-heartbeat.js';
+import { WorkerHeartbeatAuthorityStore } from '../core/worker-heartbeat-authority-store.js';
+import type { WorkerHeartbeatAuthorityState } from '../core/worker-heartbeat-authority.js';
+import type { HostPrimaryLiveness } from '../core/monitoring-types.js';
 
-type ActiveWorker = { id: string; taskId: string; lastHeartbeat: string };
+export type { HostPrimaryLiveness } from '../core/monitoring-types.js';
+
+export type TrackedActiveWorker = {
+  readonly id: string;
+  readonly taskId: string;
+  readonly attemptId: string;
+  readonly backend: 'docker' | 'tmux' | 'subprocess';
+  readonly status: string;
+  readonly currentAction: string;
+  readonly lastHeartbeat: string;
+  readonly liveness: HostPrimaryLiveness;
+};
+
+type ActiveWorker = TrackedActiveWorker;
 
 const TASKS_DIR = '.tasks';
 const VALID_PHASES = new Set([
@@ -80,11 +97,11 @@ function readActiveWorkers(tasksDir: string): ActiveWorker[] {
     // spurious WORKER_RESPAWN for a DONE worker (the false-positive root).
     try {
       const hbPath = join(tasksDir, file);
-      const raw = readFileSync(hbPath, 'utf-8');
-      const hb = JSON.parse(raw) as { workerId?: unknown; taskId?: unknown };
-      const workerId = typeof hb.workerId === 'string' ? hb.workerId : null;
-      const taskId = typeof hb.taskId === 'string' ? hb.taskId : null;
-      if (workerId === null || taskId === null) continue;
+      const raw: unknown = JSON.parse(readFileSync(hbPath, 'utf-8'));
+      const parsed = parseWorkerActivityHeartbeat(raw);
+      if (parsed.state !== 'VALID') continue;
+      const hb = parsed.heartbeat;
+      const { workerId, taskId } = hb;
       // Identity comes from the heartbeat's OWN taskId, never from its filename.
       // Measured 2026-08-10: a residue heartbeat named `500-003-fix-fix-fix.hb`
       // (no `task-` prefix, producer still unidentified) made the finished-worker
@@ -102,18 +119,76 @@ function readActiveWorkers(tasksDir: string): ActiveWorker[] {
       out.push({
         id: workerId,
         taskId,
-        // Bug-1: freshness from the host filesystem mtime (set on every write
-        // through the docker bind-mount) — clock-skew-proof. The worker's
-        // self-reported in-file `timestamp` is written on the container clock,
-        // which can be hours-skewed (observed: midnight) and falsely reads as
-        // stale, spamming StaleWorkerDetector → WORKER_RESPAWN for healthy workers.
-        lastHeartbeat: new Date(statSync(hbPath).mtimeMs).toISOString(),
+        attemptId: hb.attemptId,
+        backend: hb.backend,
+        status: hb.status,
+        currentAction: hb.currentAction,
+        // Activity time is retained for UI/identity projection only. It never
+        // participates in the liveness verdict below.
+        lastHeartbeat: hb.observedAt,
+        liveness: readExactAttemptLiveness(tasksDir, hb),
       });
     } catch {
       // malformed .hb / stat error — skip silently
     }
   }
   return out;
+}
+
+function readExactAttemptLiveness(
+  tasksDir: string,
+  hb: { taskId: string; workerId: string; attemptId: string },
+): HostPrimaryLiveness {
+  const root = join(tasksDir, 'worker-heartbeat-authority');
+  if (!existsSync(root)) {
+    return { state: 'unknown', attemptId: hb.attemptId, hostSequence: null, reason: 'host authority unavailable' };
+  }
+  let entries: string[];
+  try {
+    entries = readdirSync(root);
+  } catch {
+    return { state: 'unknown', attemptId: hb.attemptId, hostSequence: null, reason: 'host authority unreadable' };
+  }
+  const store = new WorkerHeartbeatAuthorityStore(root);
+  const matches: WorkerHeartbeatAuthorityState[] = [];
+  for (const entry of entries) {
+    try {
+      const record = JSON.parse(readFileSync(join(root, entry, 'identity.json'), 'utf8')) as {
+        identity?: WorkerHeartbeatAuthorityState['identity'];
+      };
+      const identity = record.identity;
+      if (!identity || identity.taskId !== hb.taskId || identity.attemptId !== hb.attemptId) continue;
+      const authority = store.read(identity);
+      if (authority) matches.push(authority);
+    } catch {
+      // An unreadable sibling attempt is not evidence that this attempt is dead.
+    }
+  }
+  if (matches.length !== 1) {
+    return {
+      state: matches.length > 1 ? 'HOLD' : 'unknown',
+      attemptId: hb.attemptId,
+      hostSequence: null,
+      reason: matches.length > 1 ? 'multiple exact-attempt authorities' : 'exact-attempt authority unavailable',
+    };
+  }
+  const authority = matches[0]!;
+  if (authority.holds.length > 0) {
+    return { state: 'HOLD', attemptId: hb.attemptId, hostSequence: authority.latest?.hostSequence ?? null, reason: 'authority contains HOLD' };
+  }
+  const latest = authority.latest;
+  if (!latest || latest.liveness === 'unknown') {
+    return { state: 'unknown', attemptId: hb.attemptId, hostSequence: latest?.hostSequence ?? null, reason: 'host liveness unavailable' };
+  }
+  if (latest.workerTaskVerdict === 'done') {
+    return { state: 'alive', attemptId: hb.attemptId, hostSequence: latest.hostSequence, reason: 'attempt settled done' };
+  }
+  return {
+    state: latest.liveness === 'alive' ? 'alive' : 'dead',
+    attemptId: hb.attemptId,
+    hostSequence: latest.hostSequence,
+    reason: `host process ${latest.hostProcessOutcome.state}`,
+  };
 }
 
 function countCompletedTasks(tasksDir: string): number {

@@ -624,8 +624,15 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // task.verification block authoritative while preserving the legacy prose
   // adapter, plus authority-matched structured PASSED evidence consumption.
   // The fixtures are pure in-memory task/result shapes.
-  count: 16049,
-  digest: 'dec6322745ea8c81f57a90066c283f6253f30021bfb717674bdd690788a2b7bf',
+  // 2026-08-24 sprint-661 execution-authority recovery: +2 — canonical scope
+  // admission and scheduler settlement regressions use only suite-owned
+  // fixtures. The source-derived scan reports zero confirmed violations.
+  // 2026-08-24 sprint-661 manual ADR-D-007 closure: +32 — worker-activity
+  // heartbeat v1, execution-write-scope-policy and host-primary stale-worker
+  // suites (9 new descriptors + reworked result/heartbeat fixtures), all
+  // suite-owned in-memory shapes; scan reports zero confirmed violations.
+  count: 16083,
+  digest: 'b905eaa8138a8ffda1450e37d55253b97743dd92bde69b6e0ef72acde5723315',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1109,8 +1116,15 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // digest binds the canonical task.verification-first rubric consumer and
   // its explicit legacy-description fallback in the existing registry, plus
   // authority-matched structured execution evidence at the debt ceiling.
-  count: 1320,
-  digest: 'a896191dc2848445c71cfa89a8e0105f37aa74ac594aed7aa3cf254edb11e3b3',
+  // 2026-08-24 sprint-661 execution-authority recovery: -1 production entry;
+  // the scope/scheduler contract moved existing modules without adding an
+  // unclassified runtime writer. Digest also binds collision relevance to the
+  // authored selector scope. The source-derived scan remains violation-free.
+  // 2026-08-24 sprint-661 manual ADR-D-007 closure: +2 — worker-activity
+  // heartbeat v1 authority (core) and the extracted layer-clean canonical
+  // result-ingress module (ADR-G-041 SCC fix). Scan remains violation-free.
+  count: 1321,
+  digest: '36ab30600375a15f83388674ee01c504137bb9e591e9775d1384c4cfe7812f3b',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

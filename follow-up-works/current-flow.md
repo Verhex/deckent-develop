@@ -2,12 +2,55 @@
 
 > İş SSOT'u `docs/MASTER-PLAN.md`'dir. Bu dosya yalnız kısa vadeli yürütme sırasını taşır;
 > closure authority veya yeni work identity üretmez. Tüketilen ayrıntı burada biriktirilmez.
-> Aktif Codex→Codex devir authority'si: `ah-2026-08-24-codex-new-session`, epoch 2,
+> Son tamamlanmış devir authority'si: `ah-2026-08-24-codex-new-session`, epoch 2,
 > `RECOVERY_COMMITTED`, receipt `sha256:db58fbcfa6d71a79d6667dd1b571068a5642ef8aece4330bb0b975159a4f9234`.
+> Owner'ın `owner-live-2026-08-24-codex-authority-revoked-handoff-to-claude` talimatıyla
+> Codex→Claude sharp-cutover hedefi `ah-2026-08-24-codex-to-claude`, proposed epoch 3'tür;
+> exact transition/digest için versioned receipt dizini SSOT'tur. Claude bağımsız `VERIFIED` ve
+> explicit owner-authorized `RECOVERY_COMMITTED` olmadan mutation authority kazanmaz.
 
 ## Canlı truth
 
 - `DOGFOOD_MODE=ON`, `WORKSPACE_MODE=MAIN`, `DELIVERY_MODE=DIRECT_MAIN`.
+- `DOGFOOD_HEALTH=DEGRADED`: `sprint-661` owner-authorized force-finalization ile terminal
+  `ABORTED` kapandı. Canonical receipt içindeki `logicalProgress` 7 done/1 blocked/1 active derken
+  `terminalEvidence` 6 completed ve archived top-level task JSON'ları 6 DONE/3 ABORTED gösteriyor;
+  hiçbir unresolved lineage `COMPLETE` yapılmadı. Canonical terminal receipt generation 19,
+  logical settlement digest
+  `346910bbe3308fff8c345d8e6ba9ce98ad192b22f9498f2e5d8612baa4acb248`, recovery state
+  `consistent`; aktif run/worker/coordinator ve pending approval yok.
+- Sprint-661 source paketi scope compiler/admission, canonical result attribution, heartbeat/status,
+  worker-core provenance/archive replay ve scheduler/finalizer zincirlerini değiştirdi. Owner'ın
+  bounded ADR-D-007 recovery talimatıyla result ingress ve host-terminal heartbeat wire'ı elle
+  kapatıldı; `tsc --noEmit`, 89/89 scoped regression ve dokuz-task fan-in 109/109 yeşil. Bu yalnız
+  `LOCAL_VERIFIED` source kanıtıdır: post-terminal full lint, `build:all`, fresh-process ve gerçek
+  binary proof yapılmadı; source↔dist mismatch açıktır ve bot PID `242187` eski dist'i çalıştırır.
+- Task 006 ve Task 008 FIX worker sonuçları gerçekte DONE ve exact testleri yeşildi. Strict
+  `TaskResultV1` schema additive `promptCompilePlanId`, `testVerification` ve
+  `techDebtCriterionIds` alanlarını taşımadığı için assembler bunları düşürdü; normalizer
+  `NOT_EXECUTED/[]` türetti ve Brain aynı işi `schema invalid/NO_GO` ile FIX→FIX-FIX loop'una soktu.
+  Source recovery bu üç alanı canonical schema/assembler/backend authority zincirine bağladı;
+  build ve real-binary adoption devralan authority'nin ilk closure işidir.
+- `.worker-core-*` result schema değil, content-addressed Markdown system-prompt artifactıdır.
+  Sprint-661 Task 008 full SHA-256 immutable core, exact task-attempt-provider/channel/argv receipt
+  ve archive replay ekledi; 37 test yeşil. Agent/skill injection canlıdır. Full dist/runtime proof
+  alınmadığı için production closure iddiası yapılmaz.
+- `.hb` defect'i kullanıcı yüzeyi blocker'ıdır: bitmiş Task 006'nın worker dosyası hâlâ legacy
+  dört-alanlı `EXECUTING` kaldı; host observation aynı attempt için terminal DONE truth'u taşıdı.
+  Source recovery host-terminal observation sonrası exact-attempt v1 `.hb` projectionı yazıyor,
+  fakat worker tool-activity anlık akışı, `.log` gecikmesi ve UI/Terminal/Dashboard tek read-model
+  closure'ı tamamlanmadı. Mtime/time-only freshness veya elle `seq=99` iki ayrı SSOT olamaz;
+  canonical append-only activity/event authority + monotonic projection zorunludur.
+- Nervous dormant değildi: event/metrics'ten `SPRINT_START operation=resume-paused-run`
+  recommendation üretti. Fakat recommendation yalnız dismiss edilebilirken `nervous accept`
+  farklı pending-notification store'unu okudu ve `not found` döndü; Telegram botu sprint/resume/FIX/
+  failure/approval olaylarının hiçbirini bildirmedi. Recommendation, approval ve notification
+  brokerları arasında production disposition/delivery bridge eksiktir.
+- Sprint-660 RCA gerçeği korunur: Task 003 pre-spawn read/write-overlap exception'ında bounded
+  settlement olmadan tekrarlandı; Task 004 resultı Brain tarafından okundu fakat glob write grant
+  attribution'da literal sayılarak false outside-scope üretildi. Sprint-661 bu kapsamı tüketti;
+  yeni outcome açılmaz, residuallar mevcut `RUNFLOW-001`, `EVALUATION-001`, scheduler,
+  prompt-authority, status/heartbeat ve notification MASTER satırlarında taşınır.
 - Aktif worker yok. `sprint-659` iki paralel ilk-wave acceptance taskı + bağımlı fan-in taskıyla
   terminal `COMPLETE` (3/3 logical DONE). API ve MCP unknown/forged approval ID ingressleri gerçek
   compiled binary üzerinden typed `APR_UNKNOWN_REQUEST` ile fail-closed; karar dosyası oluşmadı ve
@@ -34,8 +77,9 @@
 - Root `.tasks` altındaki 63 `task-xv*` artifact hash-korumalı biçimde
   `.tasks/archive/xverify-settled-2026-08-24/` staging archive'ına taşındı; root eşleşme sıfır,
   `rm` kullanılmadı. Product canonical one-shot task archive surface'i henüz yok.
-- Bot daemon fresh compiled dist ile PID `1317315` olarak çalışıyor. Pending approval yok.
-- `.result` geçişi production-wired: worker claim'i ile host authority ayrıldı; exact
+- Bot daemon PID `242187` ile çalışıyor; source↔dist mismatch nedeniyle fresh source'u temsil
+  etmiyor. Pending approval yok; listelenen eski kayıtlar terminal `EXPIRED` audit geçmişidir.
+- Sprint-657 tarihsel `.result` dilimi production-wired: worker claim'i ile host authority ayrıldı; exact
   `testVerification`, criterion-polarity/evidence, prompt compile-plan ID, current delivery
   attribution ve git-derived work attribution canonical result/finalizer consumerlarına ulaşıyor.
   Sprint-657'nin yakaladığı typed command + coverage=0 yanlış debt sınıfı bounded ADR-D-007
@@ -45,6 +89,8 @@
   Fresh dist replay `DONE/100`; scoped changed battery 35 dosya/1,121 test, full lint ve
   `build:all` yeşil. Opus 5 owner-pair admission çözüldü fakat candidate-evidence producer provider
   çağrısından önce `limit_hold` verdi; usage/verdict/receipt yok, formal XVerify dürüstçe HOLD.
+  Sprint-661 strict-schema counter-evidence'ı full result cutover closure'ını supersede eder;
+  source recovery real-binary adoption görmeden yeniden production-wired sayılmaz.
 - Source→dist→provider runtime adoption production-wired: immutable composite receipt provider
   receipt + current DB lineage + source/build/entrypoint digest + canlı PID/start token'ı bağlıyor;
   real dist dry-run→apply→fresh-process replay aynı receipt'i verdi, DB/WAL/SHM değişmedi.
@@ -95,18 +141,35 @@
 
 ## Sıradaki yürütme sırası
 
-1. `APPROVAL-INGRESS-UNKNOWN-ID-001` disk truth/SSOT diffini landing ritüeliyle commit et; push yalnız
-   owner yeniden isterse. Parent `APPROVAL-001` broker residuallarını OPEN tut.
-2. Archive replay hardening'i `LOCAL_VERIFIED/LIVE_PROVEN` tut; formal XVerify'ın iki
+1. Claude, `ah-2026-08-24-codex-to-claude` PREPARED receipt'ini; branch/HEAD/origin, dirty-tree
+   grouping, Sprint-661 terminal receipt/archive, no-active-run ve provider/limit truth ile bağımsız
+   doğrular. `VERIFIED` receipt'ini yazar; owner'ın canlı yetki-devri talimatını exact
+   `authority-ref` ile `RECOVERY_COMMITTED` yapmadan mutation başlatmaz.
+2. Authority commit sonrası önce source↔dist kapanışı: full lint, `build:all`, documented bot
+   restart/reconnect, fresh compiled status/result/heartbeat/core/archive gerçek-binary proof.
+   Sprint-661 `ABORTED` kalır; worker sonuçları veya source tests nedeniyle elle COMPLETE yapılmaz.
+3. Sprint-661 dirty paketini shared-workspace dosyalarından bağımsız sınıflandır; scoped/full
+   verification green ise owner'ın landing talimatına göre commit/push öncesi branch-vv/HEAD/origin
+   ve exact diff'i yeniden doğrula. Codex bu paketi commit/push etmedi.
+4. Residual production closure'ı yeni outcome açmadan mevcut MASTER kapsamlarına işler:
+   canonical host event SSOT→monotonic `.hb`/`.log`→Status/UI/Dashboard/Nervous; Nervous
+   recommendation→local disposition→Telegram durable delivery; tek result ingress/schema/
+   evaluator authority; bounded FIX/no-birth settlement.
+5. Token ve coverage için aynı-workload measured A/B canary kur: prompt bytes, fresh input,
+   cache-read, turns/retries ve retry reason ayrı ölçülür; coverage `REQUIRED | NOT_APPLICABLE |
+   UNMEASURED` typed applicability + changed-code/critical-branch threshold olarak uygulanır.
+6. Local/real-binary proof green ise fresh different-provider XVerify'ı bir kez çalıştır; gerçek
+   call + provider usage + closed settlement + durable receipt yoksa typed HOLD bırak.
+7. Archive replay hardening'i `LOCAL_VERIFIED/LIVE_PROVEN` tut; formal XVerify'ın iki
    `UNCLEAR/HOLD` sonucu yeni evidence veya farklı-provider authority olmadan retry edilmez.
-3. `2026-08-24 20:00 Europe/Istanbul` sonrasında runtime hygiene different-provider XVerify.
-4. Aynı reset sonrasında D4 Approval Lifecycle formal XVerify/closure; ardından D5 retirement.
-5. Owner external key path'i sağlandığında Work 480 sign → append → closure gate → MASTER
+8. `2026-08-24 20:00 Europe/Istanbul` sonrasında runtime hygiene different-provider XVerify.
+9. Aynı reset sonrasında D4 Approval Lifecycle formal XVerify/closure; ardından D5 retirement.
+10. Owner external key path'i sağlandığında Work 480 sign → append → closure gate → MASTER
    settlement zincirini tamamla; key'i arama/okuma/loglama.
-6. 7091 account/limit authority yalnız provider-native fresh truth açıldığında yeniden denenir.
-7. Closure OS owner disposition batches → yedi günlük
+11. 7091 account/limit authority yalnız provider-native fresh truth açıldığında yeniden denenir.
+12. Closure OS owner disposition batches → yedi günlük
    health/ETA → cleanup/migration → release.
-8. Product surface ve `MODULAR-BOUNDARY-FREEZE-001`; fiziksel Core/Enterprise extraction yalnız
+13. Product surface ve `MODULAR-BOUNDARY-FREEZE-001`; fiziksel Core/Enterprise extraction yalnız
    dependency kapıları açıldıktan sonra.
 
 ## Ölçülmüş non-blocking finding
@@ -127,6 +190,41 @@
   owner-authorized force-finalize containment'ı tamamladı fakat
   `SPRINT_ARCHIVE_EXISTING_SEAL_IDENTITY_MISMATCH` raporladı. Canonical archive sonunda temizdir;
   finalizer idempotency/cleanup bulgusu mevcut runflow/recovery kapsamına aittir.
+- Sprint-660 shadow journal `legacyDecision` alanı gerçek legacy engine outputu değil,
+  live-observed diff'tir; reducer çalışmış fakat effect spawn öncesi fail etmiştir. `executedEngine`
+  parametresi caller tarafından geçirilmediğinden journal operatöre ters okunabilir. Bu finding
+  `SCHEDULER-SHADOW-EVIDENCE-001` kapsamındadır ve yeni sprint scheduler taskına bağlıdır.
+- Sprint-660 terminal projectionı hiç doğmamış 003 için `neverDispatched:false` ve empty attempt
+  `INVALID_IDENTITY` taşıdı; replan proposal concrete write ihtiyacını `access:read` yazdı. Bunlar
+  mevcut settlement/FIX authority scope'larına bağlı fresh counter-evidence'tır; historical satırlar
+  elle reopen edilmez.
+- Sprint-661 archived result aggregate'i 15,677,605 total token; 1,195,881 fresh input, 142,140
+  output ve 14,339,584 cache-read'dir. Prompt-minimization flags canlıydı; yüksek totalin baskın
+  kısmı cache-read ve repeated attempt/FIX/FIX-FIX'tir. Prefix saving kazanımı kaybolmuş diye
+  doğrudan hükmedilemez, fakat retry amplification end-to-end kazanımı geri vermiştir. En büyük
+  kaldıraç safety/context silmek değil, false retry loop'larını ve oversized tool-result tekrarını
+  yok etmektir.
+- Rubric, schema-validity, criterion polarity, debt ve final disposition bugün operatör yüzeyinde
+  birbirine karışıyor: Sprint-661'de rubric 100 olan işler coverage=0 yüzünden NO_GO, testleri geçen
+  Task 006 schema gate yüzünden rubric 0, bazı DONE sonuçları GO_WITH_TECH_DEBT oldu. UI her criterion
+  için `success polarity`, `evidence`, `schema validity`, `rubric score`, `final disposition`ı ayrı
+  göstermelidir; no-go criterion için `UNMET` başarı olabilir.
+- Coverage test sayısı değildir; executed statement/branch/function/line oranıdır. Yaklaşık 40k
+  testin tamamını her worker'da coverage ile çalıştırmak pahalı ve yanlış teşviklidir. Riskli slice
+  için changed-code/critical-module branch coverage, aggregate trend için ayrı CI/nightly cohort;
+  targeted tests + wiring + real-binary proof primary kalmalıdır. Coverage ölçülmediyse `0` değil
+  typed `UNMEASURED/NOT_APPLICABLE` yazılır.
+- Aktif sprint PAUSED iken önce clean gate HOLD verdiği halde doğrudan `tsc + copy-assets`
+  çalıştırılması Codex operasyon kuralı ihlalidir. Sprint sonrası source tekrar değiştiği için bu
+  build zaten stale'dir; handoff'ta gizlenmez ve tekrar kullanılmaz.
+- `deckent kill <taskId>` canlı exact Docker worker varken `Worker bulunamadı` döndürdü; owner'ın
+  explicit kill talimatıyla exact containerlar durduruldu. Control/status projection ile process
+  truth ayrışması ve `FIX_PHASE_FAILED: relPath.replace is not a function` mevcut RUNFLOW/status
+  kapsamlarında blocker olarak kalır.
+- Aynı terminal receipt içinde `logicalProgress=7 done/1 blocked/1 active`,
+  `terminalEvidence.completedLogicalTaskCount=6` ve archived task projectionı 6 DONE/3 ABORTED
+  ayrışır. Bu tek-sprint için üç farklı completion sayacı operator surface'ine taşınamaz; canonical
+  settlement reducerından tek monotonic read-model üretilmelidir.
 
 ## Sabit yürütme contractı
 

@@ -135,6 +135,7 @@ import { evaluatePromptGate } from './prompt-gate.js';
 import type { PromptGateResult } from '../core/prompt-gate-types.js';
 import type { InvocationReceiptRef } from '../core/invocation-receipt.js';
 import { applyWorkerExecutionBudgetPolicy } from '../core/execution-plan-digest.js';
+import { compileCanonicalScope } from '../core/execution-write-scope-policy.js';
 import {
   evaluateTestDiscoverability,
   resolveTestDiscoveryContracts,
@@ -1021,6 +1022,30 @@ export async function planSprint(
         `${promptGate.findings.length} finding(s), ${promptGate.blockers.length} blocker(s), ok=${promptGate.ok}`,
       );
     }
+
+    // PLAN persistence is an admission boundary, not merely a warning
+    // surface. Replace each legacy scope with the compiler's exact projection
+    // before any task JSON can be written; malformed/wildcard/cross-platform
+    // ambiguous input therefore cannot reach the scheduler even when another
+    // prompt-gate finding is acknowledged.
+    for (const task of tasks) {
+      const compiledScope = compileCanonicalScope({
+        scope: task.scope,
+        inventory: gateTrackedFiles,
+      });
+      if (!compiledScope.ok) {
+        throw new BrainError(
+          `PLAN_SCOPE_PREFLIGHT_HOLD:${task.id}:${compiledScope.holds
+            .map(hold => `${hold.code}:${hold.field}:${hold.value}`).join('|')}`,
+          SprintPhase.PLAN,
+        );
+      }
+      task.scope = {
+        directories: [...compiledScope.manifest.scope.directories],
+        filesRead: [...compiledScope.manifest.scope.filesRead],
+        filesWrite: [...compiledScope.manifest.scope.filesWrite],
+      };
+    }
   } catch (poolErr) {
     debugLog('planSprint:routing-v3', `Routing/prompt admission failed closed: ${poolErr}`);
     if (poolErr instanceof BrainError) throw poolErr;
@@ -1431,7 +1456,7 @@ export function injectCriticalDebtTasks(
       ? `${strippedNote.slice(0, 100)}…`
       : strippedNote;
 
-    tasks.push(createTask({
+    const fixTask = createTask({
       title: `Fix debt: ${titleNote}`,
       // sprint-573/574: debt notes routinely open with verification receipts
       // before naming the residual gap; without this framing, fix workers
@@ -1467,7 +1492,20 @@ export function injectCriticalDebtTasks(
       isPriorityFix: true,
       fixForTaskId: item.originTaskId,
       initialStatus,
-    }, seq++));
+    }, seq++);
+    const compiledFixScope = compileCanonicalScope({ scope: fixTask.scope });
+    if (!compiledFixScope.ok) {
+      throw new TypeError(
+        `FIX_SCOPE_PREFLIGHT_HOLD:${fixTask.id}:${compiledFixScope.holds
+          .map(hold => `${hold.code}:${hold.field}:${hold.value}`).join('|')}`,
+      );
+    }
+    fixTask.scope = {
+      directories: [...compiledFixScope.manifest.scope.directories],
+      filesRead: [...compiledFixScope.manifest.scope.filesRead],
+      filesWrite: [...compiledFixScope.manifest.scope.filesWrite],
+    };
+    tasks.push(fixTask);
   }
 
   return { tasks, nextSeq: seq, skipped, skippedNoop };

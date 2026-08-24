@@ -14,6 +14,20 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint661] - 2026-08-24
+
+### Added
+
+- Canonical scope compiler and prompt admission
+- Scheduler admission settlement, quiescence and journal truth
+
+### Changed
+
+- Repair preserved modular layer gate implementation (completed with tech debt)
+
+
+_Tasks: 9 total, 3 done, 1 tech debt, 0 no-go_
+
 ## [sprint659] - 2026-08-24
 
 ### Added

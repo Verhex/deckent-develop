@@ -36,6 +36,7 @@ import { sanitizeScope } from './scope-sanitizer.js';
 import { lintScopeSatisfiability } from './scope-satisfiability.js';
 import { isRealPathCandidate } from '../core/task-builder-scope.js';
 import { getMessage } from '../cli/helpers/messages.js';
+import { compileCanonicalScope } from '../core/execution-write-scope-policy.js';
 
 export type {
   PromptGateFinding,
@@ -402,6 +403,19 @@ export function evaluatePromptGate(input: PromptGateInput): PromptGateResult {
   for (const task of input.tasks) {
     const agentId = task.assignedAgent ?? 'generic';
 
+    const compiledScope = compileCanonicalScope({ scope: task.scope, inventory: input.trackedFiles });
+    if (!compiledScope.ok) {
+      for (const hold of compiledScope.holds) findings.push({
+        taskId: task.id,
+        lint: 'scope-silent-drop',
+        level: 'block',
+        agentId,
+        message: `CANONICAL_SCOPE_HOLD:${hold.code}:${hold.field}:${hold.value}`,
+        suggestion: 'Use portable exact paths; migrate wildcards to an explicit selector before planning.',
+      });
+      continue;
+    }
+
     if (agentId !== 'generic') {
       const agent = input.agentPool.get(agentId);
 
@@ -438,7 +452,10 @@ export function evaluatePromptGate(input: PromptGateInput): PromptGateResult {
   }
 
   const blockers = findings.filter((f) => f.level === 'block');
-  const overrideApplied = blockers.length > 0 && input.acknowledgePromptGate === true;
+  const nonOverridableScopeHold = blockers.some(f => f.message.startsWith('CANONICAL_SCOPE_HOLD:'));
+  const overrideApplied = blockers.length > 0
+    && !nonOverridableScopeHold
+    && input.acknowledgePromptGate === true;
   const ok = blockers.length === 0 || overrideApplied;
   return { ok, findings, blockers, overrideApplied: overrideApplied || undefined };
 }

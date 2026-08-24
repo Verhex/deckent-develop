@@ -44,7 +44,7 @@ describe('buildWorkerCoreSystemPrompt (7094-F3)', () => {
     const insp = buildWorkerCoreSystemPrompt(makeTask({
       scope: { directories: [], filesRead: ['src/a.ts'], filesWrite: [] },
     }));
-    expect(insp).toContain('## Karpathy Discipline (read-only)');
+    expect(insp).toContain('## Read-Only Role Policy');
   });
 
   it('ctx.coreExternalized suppresses the inline blocks; OFF keeps them (parity)', () => {

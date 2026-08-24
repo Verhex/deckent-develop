@@ -9,6 +9,11 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import type { ProductionWiringPlanEvidence, RunPolicyPlanAuthority, Task, TaskScope } from '../core/task-types.js';
 import { createPromptCompilePlan, type PromptCompilePlan, type ScopedVerificationCommand } from '../core/prompt-compile-plan.js';
+import { compileCanonicalScope } from '../core/execution-write-scope-policy.js';
+import {
+  renderWorkerActivityHeartbeatInstruction,
+  type WorkerActivityBackend,
+} from '../core/worker-activity-heartbeat.js';
 import {
   PRODUCTION_WIRING_EVIDENCE_VERSION,
   createGoNoGoCriterionItem,
@@ -99,6 +104,11 @@ export interface SegmentedPrompt {
  * Callers construct this from their available data.
  */
 export interface SprintContext {
+  /** Host-bound identity for the one-write worker activity projection. */
+  heartbeatIdentity?: {
+    readonly attemptId: string;
+    readonly backend: WorkerActivityBackend;
+  };
   /** Precompiled authority; absent callers compile exactly once at this entrypoint. */
   compilePlan?: PromptCompilePlan;
   /** Agent prompt content (full PROMPT.md text) */
@@ -608,16 +618,17 @@ function structuredCriteriaForTask(task: Task): GoNoGoCriterionItem[] {
 
 /** Compile the sole immutable authority consumed by prompt rendering. */
 export function compileTaskPromptPlan(task: Task, ctx: SprintContext): PromptCompilePlan {
-  const overlap = task.scope.filesRead.filter(path => task.scope.filesWrite.includes(path));
-  if (overlap.length > 0) {
-    throw new TypeError(`PROMPT_COMPILE_HOLD:SCOPE_READ_WRITE_OVERLAP:${[...new Set(overlap)].sort().join(',')}`);
-  }
+  const compiledScope = compileCanonicalScope({ scope: task.scope, inventory: ctx.trackedFiles });
+  if (!compiledScope.ok) throw new TypeError(
+    `PROMPT_COMPILE_HOLD:CANONICAL_SCOPE:${compiledScope.holds.map(hold => `${hold.code}:${hold.field}:${hold.value}`).join('|')}`,
+  );
+  const canonicalScope = compiledScope.manifest.scope;
   const declared = task.verification?.commands ?? [];
   const verificationCommands: ScopedVerificationCommand[] = declared.map(command => ({
     command, scope: resolveTargetedTestPaths(task, ctx.trackedFiles),
   }));
   if (verificationCommands.length === 0 && !hasTaskScopedVerificationAuthority(task) && ctx.verifyCommands) {
-    if (ctx.verifyCommands.check) verificationCommands.push({ command: ctx.verifyCommands.check, scope: [...task.scope.filesWrite] });
+    if (ctx.verifyCommands.check) verificationCommands.push({ command: ctx.verifyCommands.check, scope: [...canonicalScope.filesWrite] });
     const paths = resolveTargetedTestPaths(task, ctx.trackedFiles);
     if (ctx.verifyCommands.test && paths.length > 0) verificationCommands.push({
       command: `${ctx.verifyCommands.test} ${paths.join(' ')}`, scope: paths,
@@ -628,7 +639,11 @@ export function compileTaskPromptPlan(task: Task, ctx: SprintContext): PromptCom
     verificationCommands,
     testApplicability: resolveTaskPromptProfile(taskDocProfileSignals(task), ctx.taskProfiles) === 'doc-only'
       ? 'NOT_APPLICABLE' : 'REQUIRED',
-    scope: task.scope,
+    scope: {
+      directories: [...canonicalScope.directories],
+      filesRead: [...canonicalScope.filesRead],
+      filesWrite: [...canonicalScope.filesWrite],
+    },
     rolePolicyIdentity: `worker:${ctx.agentId ?? task.assignedAgent ?? 'generic'}`,
   });
 }
@@ -650,7 +665,17 @@ export function buildTaskPrompt(task: Task, ctx: SprintContext): PromptArtifact 
  * stays byte-identical to its pre-330-019 output on the default path.
  */
 export function buildTaskPromptSegmented(task: Task, ctx: SprintContext): SegmentedPrompt {
-  const compilePlan = ctx.compilePlan ?? compileTaskPromptPlan(task, ctx);
+  // Recompile the task-carried scope even when the caller supplies a compile
+  // plan. Otherwise a stale/forged plan could bypass admission and let a raw
+  // legacy wildcard reach the spawn prompt. The supplied plan remains the
+  // authority for the other already-compiled fields, but its scope must be the
+  // exact canonical projection of this task.
+  const admissionPlan = compileTaskPromptPlan(task, { ...ctx, compilePlan: undefined });
+  if (ctx.compilePlan
+    && JSON.stringify(ctx.compilePlan.scope) !== JSON.stringify(admissionPlan.scope)) {
+    throw new TypeError('PROMPT_COMPILE_HOLD:CANONICAL_SCOPE:COMPILE_PLAN_SCOPE_MISMATCH');
+  }
+  const compilePlan = ctx.compilePlan ?? admissionPlan;
   const effort = ctx.effort ?? 'medium';
   const agentId = ctx.agentId ?? task.assignedAgent ?? 'generic';
   const skillNames: string[] = [];
@@ -757,6 +782,7 @@ export function buildTaskPromptSegmented(task: Task, ctx: SprintContext): Segmen
     runPolicyBlock,
     productionWiringBlock,
     workerGuideContract: ctx.workerGuideContract,
+    heartbeatIdentity: ctx.heartbeatIdentity,
     task,
     effort,
     modelTier: ctx.modelTier,
@@ -1965,6 +1991,8 @@ interface RenderInput {
   productionWiringBlock: string;
   /** Host-verified WORKER-GUIDE managed-contract state. */
   workerGuideContract?: ManagedContractInspection;
+  /** Host-bound activity identity; absent is rendered as an explicit HOLD. */
+  heartbeatIdentity?: SprintContext['heartbeatIdentity'];
   task: Task;
   effort: string;
   /** Registry-resolved model tier; changes guidance only, never prompt completeness. */
@@ -2603,15 +2631,20 @@ ${buildVerifyPrecedenceNote(verificationMode)}${buildBehaviorPrecedenceNote(task
   // Dependencies (only if non-empty)
   if (depsBlock) push('T2', 'deps', depsBlock);
 
-  // Heartbeat — WP-18 (DASH-RT-1 complement): the worker must keep currentAction
-  // fresh so the dashboard shows live progress instead of a stuck "Starting…".
-  // 7094-F1d: single-write heartbeat. The host only ever checks the file's
-  // EXISTENCE (result-evaluator hasHeartbeatFile) and never reads its
-  // mtime/sequence (heartbeat-monitor documents this), so periodic re-writes
-  // only burned cached-context turns. One write at start is the whole
-  // protocol; batch it with your first real tool call.
+  // One write is the complete worker-authored activity protocol. Attempt and
+  // backend must be host-bound; prompt compilation must never guess either.
+  const heartbeatInstruction = input.heartbeatIdentity
+    ? renderWorkerActivityHeartbeatInstruction({
+      taskId: task.id,
+      workerId: `w-${task.id}`,
+      attemptId: input.heartbeatIdentity.attemptId,
+      backend: input.heartbeatIdentity.backend,
+    })
+    : 'HEARTBEAT_IDENTITY_HOLD: attemptId/backend were not host-bound. Do not write an ambiguous legacy heartbeat or infer identity from its filename.';
   push('T2', 'heartbeat', `## Heartbeat
-Create .tasks/task-${task.id}.hb ONCE, before ${isInspectionOnlyTask ? 'inspection' : 'starting work'}, with workerId "w-${task.id}", status "EXECUTING", a UTC ISO timestamp, and a short currentAction. That single write is the entire heartbeat protocol — do NOT spend further turns updating it; batch the write together with your first real tool call.`);
+Before ${isInspectionOnlyTask ? 'inspection' : 'starting work'}, write .tasks/task-${task.id}.hb exactly once and batch that write with your first real tool call.
+${heartbeatInstruction}
+That single write is the entire heartbeat protocol; never refresh it.`);
 
   // Result + self-assessment — single authority section. Folds the former
   // separate "## Result File" and "## Honest Self-Assessment" sections so the

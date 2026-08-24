@@ -4,7 +4,10 @@ import type { Command } from 'commander';
 import { AgentStatus, SprintPhase, SprintStatus, TaskStatus } from '../../core/types.js';
 import type { AgentInfo, DashboardState, Task } from '../../core/types.js';
 import { DASHBOARD_FILE, TASKS_DIR, DECKENT_DIR } from '../../core/constants.js';
-import { checkWorkerLiveness } from '../../orchestra/worker-liveness.js';
+import {
+  checkWorkerLiveness,
+  type WorkerLivenessStatus,
+} from '../../orchestra/worker-liveness.js';
 import { print, printError, formatDashboard, formatTable, formatHumanStatus, formatStandaloneStatus, isNoColor, stripAnsi , isDashboardOrphaned } from '../helpers/output.js';
 import type { CIBaseline, CIReport } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
@@ -45,7 +48,6 @@ import {
 } from '../../core/run-status-read-model.js';
 import { DeckentError } from '../../core/errors.js';
 import { DEFAULT_HEARTBEAT_TIMEOUT_MS, loadConfig } from '../../core/config.js';
-import { isPidAlive } from '../../core/pid-liveness.js';
 
 interface StatusOpts {
   watch?: boolean;
@@ -212,21 +214,16 @@ export interface StatusCommandDeps {
   ) => readonly ProviderConcurrencyRuntimeProjection[];
   /** Effective heartbeat lease, resolved once by the command's config authority. */
   readonly heartbeatTimeoutMs?: number;
-  /** Injectable portable process probe for deterministic projection tests. */
-  readonly workerProcessAlive?: (pid: number) => boolean;
-}
-
-interface WorkerProcessProjection extends AgentInfo {
-  readonly pid?: number;
+  /** Injectable exact-attempt host authority read model for deterministic tests. */
+  readonly workerLiveness?: (task: Task, projectRoot: string) => WorkerLivenessStatus;
 }
 
 export interface WorkerLivenessProjectionOptions {
   readonly heartbeatTimeoutMs: number;
-  readonly nowMs?: number;
   readonly lang?: string;
-  readonly isProcessAlive?: (pid: number) => boolean;
-  /** 7094-F1d: root for the container/log liveness probe (default: cwd). */
+  /** Resolved once at the command boundary; never use the caller cwd. */
   readonly projectRoot?: string;
+  readonly workerLiveness?: (task: Task, projectRoot: string) => WorkerLivenessStatus;
 }
 
 const ACTIVE_AGENT_STATUSES = new Set<AgentStatus>([
@@ -248,51 +245,31 @@ export function projectWorkerLiveness(
   state: DashboardState,
   options: WorkerLivenessProjectionOptions,
 ): DashboardState {
-  const nowMs = options.nowMs ?? Date.now();
   const lang = options.lang ?? 'en';
-  const processAlive = options.isProcessAlive ?? isPidAlive;
   let provenActive = 0;
 
   const agents = state.agents.map((agent): AgentInfo => {
     if (!ACTIVE_AGENT_STATUSES.has(agent.status)) return agent;
-    const heartbeatAt = agent.lastHeartbeat === undefined
-      ? Number.NaN
-      : Date.parse(agent.lastHeartbeat);
-    const heartbeatAgeMs = nowMs - heartbeatAt;
-    const heartbeatFresh = Number.isFinite(heartbeatAt)
-      && heartbeatAgeMs >= 0
-      && heartbeatAgeMs < options.heartbeatTimeoutMs;
-    const pid = (agent as WorkerProcessProjection).pid;
-    const processProven = typeof pid === 'number' && processAlive(pid);
-    // 7094-F1d (2026-08-19): the heartbeat is a single spawn-time write, so
-    // heartbeatFresh goes false ~2min into every healthy run; and the pid
-    // fallback was structurally dead (AgentInfo never carries a pid). Probe
-    // the worker itself (live container / growing log / partial-result vote)
-    // before branding it stale — this was the exact source of the 566/567
-    // "Bayat worker … doğrulanamadı" false alarms.
-    const probeProven = ((): boolean => {
-      if (heartbeatFresh || processProven || !agent.taskId) return false;
-      try {
-        return checkWorkerLiveness(
-          { id: agent.taskId, assignedWorker: agent.id } as Task,
-          options.projectRoot ?? process.cwd(),
-        ).status === 'alive';
-      } catch { return false; }
-    })();
-    if (heartbeatFresh || processProven || probeProven) {
+    if (!agent.taskId) return agent;
+    const task = { id: agent.taskId, assignedWorker: agent.id } as Task;
+    const status = options.projectRoot === undefined
+      ? 'unavailable'
+      : options.workerLiveness?.(task, options.projectRoot)
+        ?? checkWorkerLiveness(task, options.projectRoot).status;
+    // HOLD/unavailable is deliberately distinct from dead: lack of a host
+    // observation cannot manufacture an ERROR row. A terminal result is also
+    // not a stale worker merely because its frozen activity file is old.
+    if (status !== 'dead') {
       provenActive += 1;
       return agent;
     }
 
-    const ageMinutes = Number.isFinite(heartbeatAgeMs) && heartbeatAgeMs >= 0
-      ? String(Math.floor(heartbeatAgeMs / 60_000))
-      : '?';
     const staleHeader = getMessage('resume.stale_header', lang, { count: '1' }).trim();
     const staleDetail = getMessage('resume.stale_item', lang, {
       workerId: agent.id,
       taskId: agent.taskId ?? '?',
       reason: getMessage('tui.inbox_liveness_unknown', lang),
-      age: ageMinutes,
+      age: '?',
     }).trim();
     return {
       ...agent,
@@ -313,12 +290,14 @@ export function projectWorkerLiveness(
 
 function statusLivenessOptions(
   deps: StatusCommandDeps,
+  projectRoot: string,
   lang = 'en',
 ): WorkerLivenessProjectionOptions {
   return {
     heartbeatTimeoutMs: deps.heartbeatTimeoutMs ?? DEFAULT_HEARTBEAT_TIMEOUT_MS,
     lang,
-    isProcessAlive: deps.workerProcessAlive,
+    projectRoot,
+    workerLiveness: deps.workerLiveness,
   };
 }
 
@@ -1138,7 +1117,7 @@ export function buildStatusJsonSnapshot(
     tasks,
     authority,
     readModel?.logicalProgress,
-    statusLivenessOptions(deps, getLangFromRoot(root)),
+    statusLivenessOptions(deps, root, getLangFromRoot(root)),
   );
   const projectedState = projection.dashboard;
   const snapshot = verbose
@@ -1534,7 +1513,7 @@ export function registerStatus(
             tasks,
             authority,
             readModel?.logicalProgress,
-            statusLivenessOptions(commandDeps, lang),
+            statusLivenessOptions(commandDeps, root, lang),
           ).dashboard;
           const taskSettlements = loadStatusTaskSettlements(root, tasks, commandDeps);
           const sections: string[] = [];
@@ -1624,7 +1603,7 @@ export function registerStatus(
           tasks,
           authority,
           readModel?.logicalProgress,
-          statusLivenessOptions(commandDeps, lang),
+          statusLivenessOptions(commandDeps, root, lang),
         ).dashboard;
         // ─── W0-TRUTH (#491) orphan-gate ─────────────────────────────
         // Crash-case: an ACTIVE-shaped .dashboard whose writer died must not be

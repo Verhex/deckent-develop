@@ -87,6 +87,29 @@ export interface FixClassification {
   readonly reason: string;
   /** True when a fix task may be created; false means park for an operator/Brain decision. */
   readonly allowsFixTask: boolean;
+  /** Authority the repair task must carry. Scope repair is a write operation. */
+  readonly requiredAccess?: 'access:write';
+  /** Which lineage node owns the repair. */
+  readonly repairTarget: 'current' | 'upstream' | 'replan';
+}
+
+export interface TypedFailureEvidence {
+  readonly testVerification?: {
+    readonly applicability: 'REQUIRED' | 'OPTIONAL' | 'NOT_APPLICABLE';
+    readonly outcome: 'PASSED' | 'FAILED' | 'NOT_EXECUTED';
+  };
+  readonly criteriaEvidence?: readonly {
+    readonly criterionId: string;
+    readonly outcome: 'MET' | 'UNMET' | 'UNVERIFIED';
+  }[];
+  readonly attribution?: {
+    readonly state: 'VERIFIED' | 'HOLD';
+    readonly reasonCode?: string;
+    readonly claimedOutsideScope?: readonly string[];
+  };
+  readonly dependencyLineage?: {
+    readonly failedUpstreamTaskId?: string;
+  };
 }
 
 /** Honest-gate violation codes the evaluator and worker emit into `notes`. */
@@ -156,6 +179,8 @@ export interface ClassifyFixFailureInput {
   readonly acceptanceFailureFingerprint?: string | null;
   /** Fingerprint persisted on the FIX task when its parent failed. */
   readonly priorAcceptanceFailureFingerprint?: string | null;
+  /** Single typed evidence envelope used by every routing branch. */
+  readonly evidence?: TypedFailureEvidence;
 }
 
 /**
@@ -173,6 +198,9 @@ export const ZERO_DIFF_FUTILITY_THRESHOLD = 2;
 export function classifyFixFailure(input: ClassifyFixFailureInput): FixClassification {
   const { result, exitCode } = input;
   const notes = notesOf(result);
+  const typedAttribution = input.evidence?.attribution;
+  const upstreamTaskId = input.evidence?.dependencyLineage?.failedUpstreamTaskId;
+  const current = { repairTarget: 'current' as const };
 
   // 0. Provider-limit death with a measured zero-write diff (born 3324). This
   //    runs FIRST for two reasons. It is host-minted into `workAttribution` —
@@ -190,6 +218,7 @@ export function classifyFixFailure(input: ClassifyFixFailureInput): FixClassific
       reason: 'the provider hit its limit and the attempt died having written nothing, so the '
         + 'task definition is untested and the same task is restarted cleanly',
       allowsFixTask: true,
+      ...current,
     };
   }
 
@@ -200,18 +229,25 @@ export function classifyFixFailure(input: ClassifyFixFailureInput): FixClassific
       code: 'INFRASTRUCTURE_FAILURE',
       reason: 'the execution environment failed, so the same task is re-run unchanged',
       allowsFixTask: true,
+      ...current,
     };
   }
 
   // 2. Scope or authority violation — re-running the same scope reproduces it.
-  const violation = hasScopeViolation(result);
+  const typedScopeViolation = typedAttribution?.state === 'HOLD'
+    && ((typedAttribution.claimedOutsideScope?.length ?? 0) > 0 || typedAttribution.reasonCode?.includes('SCOPE'))
+    ? typedAttribution.reasonCode ?? 'CLAIM_OUTSIDE_WRITE_SCOPE'
+    : undefined;
+  const violation = typedScopeViolation ?? hasScopeViolation(result);
   if (violation) {
     return {
       disposition: 'reviseScope',
       code: violation,
       reason: `the declared scope or write authority was violated (${violation}), `
         + 'so the scope must be revised before this work is attempted again',
-      allowsFixTask: false,
+      allowsFixTask: true,
+      requiredAccess: 'access:write',
+      repairTarget: upstreamTaskId ? 'upstream' : 'current',
     };
   }
 
@@ -228,6 +264,7 @@ export function classifyFixFailure(input: ClassifyFixFailureInput): FixClassific
       reason: 'the FIX reproduced the identical typed acceptance failure, so another '
         + 'fix-of-fix is refused and the task must be re-planned',
       allowsFixTask: false,
+      repairTarget: 'replan',
     };
   }
 
@@ -249,6 +286,7 @@ export function classifyFixFailure(input: ClassifyFixFailureInput): FixClassific
         : `${input.priorZeroDiffAttempts} prior attempts in this lineage changed nothing, so `
           + 're-running the same definition is provably futile and it is escalated instead',
       allowsFixTask: false,
+      repairTarget: 'replan',
     };
   }
 
@@ -262,6 +300,7 @@ export function classifyFixFailure(input: ClassifyFixFailureInput): FixClassific
       reason: 'the worker claimed completion without performing the work, so the same task '
         + 'is re-issued with a hardened instruction rather than trusted prose',
       allowsFixTask: true,
+      ...current,
     };
   }
 
@@ -278,6 +317,7 @@ export function classifyFixFailure(input: ClassifyFixFailureInput): FixClassific
       reason: `real work landed (${filesChanged} file(s), ${linesAdded} line(s) added) but `
         + 'verification did not pass, so only that gap is corrected',
       allowsFixTask: true,
+      ...current,
     };
   }
 
@@ -295,6 +335,7 @@ export function classifyFixFailure(input: ClassifyFixFailureInput): FixClassific
       reason: 'the worker ran and reported a result that did not meet the acceptance '
         + 'criteria, which is the ordinary case a fix attempt is for',
       allowsFixTask: true,
+      ...current,
     };
   }
 
@@ -307,5 +348,6 @@ export function classifyFixFailure(input: ClassifyFixFailureInput): FixClassific
     reason: 'no result evidence exists for this task, so the failure cannot be classified '
       + 'and is escalated for a decision instead of re-run blindly',
     allowsFixTask: false,
+    repairTarget: 'replan',
   };
 }

@@ -179,6 +179,11 @@ describe('finalizeShadowSchedulerTick — born-676 additive executedEngine field
 
     const [record] = readJournalRecords(root, SPRINT_ID);
     expect(record!.executedEngine).toBe('reducer');
+    expect(record!.executedDecision).toEqual({
+      spawnedTaskIds: ['q1'],
+      cascadeSkippedTaskIds: [],
+    });
+    expect(record!.decidedEffects).toContain('SpawnTask:q1');
   });
 
   it('dual-read: an old-style 4-arg call (no executedEngine) still produces a valid record with the field absent, not defaulted to "legacy"', async () => {
@@ -209,6 +214,39 @@ describe('finalizeShadowSchedulerTick — born-676 additive executedEngine field
     const [record] = readJournalRecords(root, SPRINT_ID);
     expect(record!.executedEngine).toBeUndefined();
     expect(record!.legacyDecision.spawnedTaskIds).toEqual(['q2']); // pre-existing fields untouched
+  });
+
+  it('does not report a decided but skipped reducer spawn as an executed spawn', async () => {
+    const q3 = makeTask('q3');
+    const sprint = makeSprint([q3]);
+    const snapshot = captureShadowSchedulerSnapshot({
+      trigger: { kind: 'watcher', sequence: 3 },
+      strategy: 'continuous',
+      nowMs: NOW_MS,
+      costStop: false,
+      slotBudget: 5,
+      dependencyPipelineEnabled: true,
+      sprint,
+      remainingQueue: [q3],
+      assignedTaskIds: new Set(),
+      collectedIds: new Set(),
+      completedTaskIds: [],
+    });
+
+    await finalizeShadowSchedulerTick(root, SPRINT_ID, snapshot, {
+      assignedTaskIdsAfter: new Set(),
+      collectedIdsAfter: new Set(),
+      landedEffects: [],
+      spawnSkipReasons: [{ taskId: 'q3', reasonCode: 'spawn-retry-backoff' }],
+    }, 'reducer');
+
+    const [record] = readJournalRecords(root, SPRINT_ID);
+    expect(record!.decidedEffects).toContain('SpawnTask:q3');
+    expect(record!.landedEffects).toEqual([]);
+    expect(record!.executedDecision?.spawnedTaskIds).toEqual([]);
+    expect(record!.spawnSkipReasons).toEqual([
+      { taskId: 'q3', reasonCode: 'spawn-retry-backoff' },
+    ]);
   });
 });
 

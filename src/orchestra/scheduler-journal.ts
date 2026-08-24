@@ -44,6 +44,14 @@ export interface SchedulerShadowRecord {
    * absence (dual-read).
    */
   readonly executedEngine?: 'legacy' | 'reducer';
+  /** Effects observed to have landed for the executed engine, not its plan. */
+  readonly executedDecision?: {
+    readonly spawnedTaskIds: readonly string[];
+    readonly cascadeSkippedTaskIds: readonly string[];
+  };
+  readonly decidedEffects?: readonly string[];
+  readonly landedEffects?: readonly string[];
+  readonly spawnSkipReasons?: readonly { readonly taskId: string; readonly reasonCode: string }[];
   readonly divergence: readonly SchedulerShadowDivergenceEntry[];
 }
 

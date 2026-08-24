@@ -116,7 +116,19 @@ import {
 } from '../core/task-result-settlement.js';
 import { projectDockerRecoveryPreDispatchSettlement } from '../core/pre-dispatch-settlement.js';
 import { normalizeTaskResultShape } from '../core/task-result-schema.js';
-import { resolvePromptDeliveryAttribution } from '../core/prompt-delivery-receipt.js';
+import type { CanonicalScopeManifest, ScopeSelector } from '../core/execution-write-scope-policy.js';
+import {
+  finalizePromptDeliveryReceipt,
+  publishWorkerCoreArtifact,
+  readPromptDeliveryReceipt,
+  resolvePromptDeliveryAttribution,
+  type PromptInjectionChannel,
+  type WorkerCoreArtifact,
+} from '../core/prompt-delivery-receipt.js';
+import {
+  createWorkerActivityHeartbeat,
+  serializeWorkerActivityHeartbeat,
+} from '../core/worker-activity-heartbeat.js';
 import {
   listRetiredExecutionLandings,
   readExecutionLandingCheckpointByRef,
@@ -134,6 +146,7 @@ import type {
 } from './spawn-backend.js';
 import { SpawnBackendError, checkLethalGuard } from './spawn-backend.js';
 import { getDefaultProviderName } from './sprint-utils.js';
+import { assembleCanonicalIngressResult } from './result-ingress.js';
 import { installGitGuard, buildDockerGitGuardArgs, buildGitGuardDir, CONTAINER_GIT_PATH } from './git-worker-guard.js';
 import { captureStreamToLog } from './spawn-backend-subprocess.js';
 import { makeActivityOnEvent, type ActivityTapContext } from '../agents/worker-activity.js';
@@ -990,8 +1003,39 @@ export function persistDockerTaskResultSettlement(
     state: delivery.state,
     ...(delivery.state === 'HOLD' ? { reason: delivery.reason } : {}),
   };
-  atomicWriteFileSync(resultPath, `${JSON.stringify(result, null, 2)}\n`);
-  const settlement = createTaskResultSettlement({ ref, exitCode, result });
+  const effectiveModel = model === 'unknown'
+    ? (typeof task?.model === 'string' ? task.model : 'unknown')
+    : model;
+  let effectiveProvider = getDefaultProviderName();
+  try {
+    effectiveProvider = getProviderForModel(effectiveModel as ModelType);
+  } catch {
+    // Recovery of old attempts may not retain a registered model identity.
+  }
+  const canonical = assembleCanonicalIngressResult(result, {
+    taskId: ref.taskId,
+    workerId: typeof result.workerId === 'string' ? result.workerId : `docker-${ref.taskId}`,
+    provider: effectiveProvider,
+    model: effectiveModel,
+    ...(task?.sprintId ? { sprintId: task.sprintId } : {}),
+    ...(task?.promptCompilePlanId
+      ? { promptCompilePlanId: task.promptCompilePlanId }
+      : {}),
+    ...(task?.verification
+      ? { verificationCommands: task.verification.commands }
+      : {}),
+    isPriorityFix: task?.isPriorityFix ?? false,
+    fixForTaskId: task?.fixForTaskId ?? null,
+  });
+  // Compatibility aliases are projections only; the canonical V1 fields above
+  // remain the sole parsed authority consumed downstream.
+  const settledResult: Record<string, unknown> = {
+    ...canonical,
+    ...(canonical.agent ? { agentId: canonical.agent } : {}),
+    skillIds: [...canonical.skills],
+  };
+  atomicWriteFileSync(resultPath, `${JSON.stringify(settledResult, null, 2)}\n`);
+  const settlement = createTaskResultSettlement({ ref, exitCode, result: settledResult });
   writeTaskResultSettlementAtomic(settlement);
   return true;
 }
@@ -2334,6 +2378,60 @@ function normalizedScopeFiles(values: readonly string[]): string[] {
     .sort((a, b) => a.localeCompare(b));
 }
 
+function globSelectorRegex(pattern: string): RegExp {
+  const normalized = normalizedScopeFiles([pattern])[0];
+  if (!normalized) throw new TypeError('empty attribution glob');
+  let source = '^';
+  for (let index = 0; index < normalized.length; index++) {
+    const char = normalized[index]!;
+    if (char === '*') {
+      if (normalized[index + 1] === '*') {
+        source += '.*';
+        index++;
+      } else source += '[^/]*';
+    } else if (char === '?') source += '[^/]';
+    else if ('\\^$+?.()|{}[]'.includes(char)) source += `\\${char}`;
+    else source += char;
+  }
+  return new RegExp(`${source}$`, 'u');
+}
+
+function selectorMatches(selector: ScopeSelector, path: string): boolean {
+  if (selector.kind === 'exact-file') return path === selector.path;
+  if (selector.kind === 'directory-tree') {
+    return path === selector.path || path.startsWith(`${selector.path}/`);
+  }
+  return globSelectorRegex(selector.pattern).test(path);
+}
+
+/**
+ * Expand only the compiled selector authority. Raw authored strings never take
+ * part in settlement comparison. Portable case collisions fail closed.
+ */
+export function resolveCanonicalAttributionFiles(
+  manifest: CanonicalScopeManifest,
+  inventory: readonly string[],
+): string[] {
+  const normalizedInventory = normalizedScopeFiles(inventory);
+  const byPortableKey = new Map<string, string>();
+  for (const path of normalizedInventory) {
+    const key = path.normalize('NFC').toLowerCase();
+    const previous = byPortableKey.get(key);
+    if (previous && previous !== path) {
+      throw new TypeError(`portable attribution path collision:${previous}|${path}`);
+    }
+    byPortableKey.set(key, path);
+  }
+  const selectors = manifest.selectors.filesWrite;
+  const exact = selectors
+    .filter((selector): selector is Extract<ScopeSelector, { kind: 'exact-file' }> => selector.kind === 'exact-file')
+    .map(selector => selector.path);
+  return normalizedScopeFiles([
+    ...exact,
+    ...normalizedInventory.filter(path => selectors.some(selector => selectorMatches(selector, path))),
+  ]);
+}
+
 function scopeAttributionDigest(values: readonly string[]): string {
   return createHash('sha256').update(canonicalJson(normalizedScopeFiles(values))).digest('hex');
 }
@@ -2376,6 +2474,10 @@ export interface ReconcileDockerResultWorkAttributionInput {
   readonly baselinePath: string;
   readonly attemptId: string | undefined;
   readonly scopeFilesWrite: readonly string[];
+  /** Preferred single authority; raw scope is compatibility-only when absent. */
+  readonly scopeManifest?: CanonicalScopeManifest;
+  /** Spawn-time inventory plus matching files created during the attempt. */
+  readonly scopeInventory?: readonly string[];
   /**
    * Host-owned durable limit-death evidence for THIS attempt (born 3324). Only
    * a stop record the host itself persisted counts; nothing here is ever read
@@ -2531,6 +2633,29 @@ function resultClaimedPaths(result: Record<string, unknown>): string[] {
   }).map(path => path.replace(/\\/g, '/').replace(/^\.\//, ''));
 }
 
+function previouslyMeasuredChanges(result: Record<string, unknown>): Array<{
+  path: string;
+  status: 'added' | 'modified' | 'deleted';
+  linesAdded: number;
+  linesRemoved: number;
+}> {
+  if (!Array.isArray(result.filesChanged)) return [];
+  return result.filesChanged.flatMap(entry => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return [];
+    const value = entry as Record<string, unknown>;
+    if (typeof value.path !== 'string') return [];
+    const status = value.status;
+    if (status !== 'added' && status !== 'modified' && status !== 'deleted') return [];
+    if (!Number.isSafeInteger(value.linesAdded) || !Number.isSafeInteger(value.linesRemoved)) return [];
+    return [{
+      path: value.path,
+      status,
+      linesAdded: Number(value.linesAdded),
+      linesRemoved: Number(value.linesRemoved),
+    }];
+  });
+}
+
 function writeAttributionResult(
   input: ReconcileDockerResultWorkAttributionInput,
   result: Record<string, unknown>,
@@ -2540,6 +2665,19 @@ function writeAttributionResult(
   changes: readonly { path: string; status: 'added' | 'modified' | 'deleted'; linesAdded: number; linesRemoved: number }[],
   baselineSha256?: string,
 ): void {
+  const priorClaim = result.workerWorkClaim && typeof result.workerWorkClaim === 'object'
+    ? result.workerWorkClaim as Record<string, unknown> : undefined;
+  const workerClaim = {
+    filesChanged: Array.isArray(priorClaim?.filesChanged)
+      ? priorClaim.filesChanged.filter((path): path is string => typeof path === 'string')
+      : resultClaimedPaths(result),
+    linesAdded: priorClaim && (priorClaim.linesAdded === null || Number.isSafeInteger(priorClaim.linesAdded))
+      ? priorClaim.linesAdded as number | null
+      : Number.isSafeInteger(result.linesAdded) ? Number(result.linesAdded) : null,
+    linesRemoved: priorClaim && (priorClaim.linesRemoved === null || Number.isSafeInteger(priorClaim.linesRemoved))
+      ? priorClaim.linesRemoved as number | null
+      : Number.isSafeInteger(result.linesRemoved) ? Number(result.linesRemoved) : null,
+  };
   const canonicalShape = result.schemaVersion === '1.0' || result.schemaVersion === 1
     || (Array.isArray(result.filesChanged) && result.filesChanged.some(entry => entry && typeof entry === 'object'));
   result.filesChanged = canonicalShape ? changes : [...outcome.filesChanged];
@@ -2558,6 +2696,13 @@ function writeAttributionResult(
     ...(outcome.reasonCode ? { reasonCode: outcome.reasonCode } : {}),
     ...(claimedOutsideScope.length > 0 ? { claimedOutsideScope } : {}),
   };
+  result.workerWorkClaim = {
+    ...workerClaim,
+    mismatch: JSON.stringify([...workerClaim.filesChanged].sort())
+      !== JSON.stringify([...outcome.filesChanged].sort())
+      || (workerClaim.linesAdded !== null && workerClaim.linesAdded !== outcome.linesAdded)
+      || (workerClaim.linesRemoved !== null && workerClaim.linesRemoved !== outcome.linesRemoved),
+  };
   if (outcome.state === 'HOLD') {
     result.selfAssessment = 'NO_GO';
     const existing = typeof result.notes === 'string' ? result.notes : '';
@@ -2575,7 +2720,22 @@ export async function reconcileDockerResultWorkAttribution(
   input: ReconcileDockerResultWorkAttributionInput,
 ): Promise<DockerResultWorkAttributionOutcome> {
   const result = JSON.parse(readFileSync(input.resultPath, 'utf-8')) as Record<string, unknown>;
-  const scopeFiles = normalizedScopeFiles(input.scopeFilesWrite);
+  let scopeFiles: string[];
+  try {
+    scopeFiles = input.scopeManifest
+      ? resolveCanonicalAttributionFiles(
+          input.scopeManifest,
+          input.scopeInventory ?? input.scopeManifest.scope.filesWrite,
+        )
+      : normalizedScopeFiles(input.scopeFilesWrite);
+  } catch (error) {
+    debugLog('docker-backend:scope-selector', error);
+    const fallbackScope = normalizedScopeFiles(input.scopeFilesWrite);
+    const scopeDigest = scopeAttributionDigest(fallbackScope);
+    const outcome = { state: 'HOLD' as const, filesChanged: [] as string[], linesAdded: 0, linesRemoved: 0, reasonCode: 'ATTRIBUTION_AUTHORITY_MISMATCH' as const };
+    writeAttributionResult(input, result, outcome, scopeDigest, [], []);
+    return outcome;
+  }
   const scopeSet = new Set(scopeFiles);
   const scopeDigest = scopeAttributionDigest(scopeFiles);
   const claimedOutsideScope = resultClaimedPaths(result).filter(path => !scopeSet.has(path));
@@ -2583,8 +2743,18 @@ export async function reconcileDockerResultWorkAttribution(
     ? createHash('sha256').update(readFileSync(input.baselinePath)).digest('hex')
     : undefined;
   const hold = (reasonCode: KnownWorkAttributionReasonCode): DockerResultWorkAttributionOutcome => {
-    const outcome = { state: 'HOLD' as const, filesChanged: [], linesAdded: 0, linesRemoved: 0, reasonCode };
-    writeAttributionResult(input, result, outcome, scopeDigest, claimedOutsideScope, [], baselineSha256);
+    const priorMeasured = (result.workAttribution as { state?: unknown } | undefined)?.state === 'VERIFIED'
+      ? previouslyMeasuredChanges(result) : [];
+    const outcome = {
+      state: 'HOLD' as const,
+      filesChanged: priorMeasured.map(change => change.path),
+      linesAdded: priorMeasured.reduce((sum, change) => sum + change.linesAdded, 0),
+      linesRemoved: priorMeasured.reduce((sum, change) => sum + change.linesRemoved, 0),
+      reasonCode,
+    };
+    writeAttributionResult(
+      input, result, outcome, scopeDigest, claimedOutsideScope, priorMeasured, baselineSha256,
+    );
     return outcome;
   };
   if (!input.attemptId || !existsSync(input.baselinePath)) return hold('ATTRIBUTION_AUTHORITY_UNAVAILABLE');
@@ -3902,7 +4072,40 @@ export function observeDockerHeartbeatAuthority(input: {
   });
   if (observed.state === 'HOLD') {
     debugLog('docker-backend:heartbeat-authority-hold', observed.detail);
+    return;
   }
+
+  // Runtime surfaces consume `.hb` as an activity projection, while the
+  // append-only host authority above owns liveness, sequence and terminal
+  // truth. Project the exact accepted host observation here so a worker can
+  // never leave an ambiguous legacy heartbeat (`EXECUTING` forever) after the
+  // container has exited. The projection carries the same attempt identity and
+  // host timestamp; every consumer can deterministically join it back to the
+  // authority journal and result settlement.
+  const latest = observed.authority.latest;
+  if (!latest) return;
+  const terminal = latest.hostProcessOutcome.state === 'exited';
+  const status = terminal
+    ? latest.workerTaskVerdict === 'done' ? 'DONE'
+      : latest.workerTaskVerdict === 'no-go' ? 'NO_GO'
+        : 'HOLD'
+    : 'EXECUTING';
+  const currentAction = terminal
+    ? `Host settled attempt: ${latest.workerTaskVerdict}`
+    : 'Host admitted provider process';
+  const heartbeat = createWorkerActivityHeartbeat({
+    taskId: settlementRef.taskId,
+    workerId: identity.workerId,
+    attemptId: settlementRef.attemptId,
+    backend: 'docker',
+    status,
+    currentAction,
+    observedAt: latest.hostObservedAt,
+  });
+  atomicWriteFileSync(
+    join(input.tasksDir, `task-${settlementRef.taskId}.hb`),
+    serializeWorkerActivityHeartbeat(heartbeat),
+  );
 }
 
 export interface DockerProviderExecutionObservationIngest {
@@ -6228,12 +6431,12 @@ export class DockerSpawnBackend implements SpawnBackend {
     // deckent-owned. The core file is content-addressed so an unchanged core
     // maps to the same path across workers (stable system-prompt identity).
     let coreArgs: readonly string[] = [];
+    let coreArtifact: WorkerCoreArtifact | null = null;
+    let injectionChannel: PromptInjectionChannel | null = null;
     if (providerBinary === 'claude' && opts?.systemPromptCore) {
-      const coreDigest = createHash('sha256').update(opts.systemPromptCore, 'utf-8')
-        .digest('hex').slice(0, 12);
-      const coreName = `.worker-core-${coreDigest}.md`;
-      const coreHostPath = join(tasksDir, coreName);
-      if (!existsSync(coreHostPath)) writeFileSync(coreHostPath, opts.systemPromptCore, 'utf-8');
+      coreArtifact = publishWorkerCoreArtifact(dir, opts.systemPromptCore);
+      const coreName = `.worker-core-${coreArtifact.sha256}.md`;
+      injectionChannel = 'claude-system-prompt-file';
       // F3-v2 (measured 2026-08-19, sprint-570): `--bare` also bypassed
       // credential discovery in the container (init apiKeySource:"none" →
       // "Not logged in", two $0 honest NO_GOs, scheduler fail-fast). The
@@ -6258,11 +6461,9 @@ export class DockerSpawnBackend implements SpawnBackend {
       && this.codexCoreChannel
       && opts?.systemPromptCore
     ) {
-      const coreDigest = createHash('sha256').update(opts.systemPromptCore, 'utf-8')
-        .digest('hex').slice(0, 12);
-      const coreName = `.worker-core-${coreDigest}.md`;
-      const coreHostPath = join(tasksDir, coreName);
-      if (!existsSync(coreHostPath)) writeFileSync(coreHostPath, opts.systemPromptCore, 'utf-8');
+      coreArtifact = publishWorkerCoreArtifact(dir, opts.systemPromptCore);
+      const coreName = `.worker-core-${coreArtifact.sha256}.md`;
+      injectionChannel = 'codex-model-instructions-file';
       const containerCorePath = `${CONTAINER_WORKSPACE}/${TASKS_DIR}/${coreName}`;
       coreArgs = spec.systemPromptCoreArgs(containerCorePath);
     }
@@ -6308,6 +6509,30 @@ export class DockerSpawnBackend implements SpawnBackend {
         ? undefined
         : opts?.excludeDynamicPromptSections,
     });
+    if (coreArtifact && injectionChannel) {
+      const compileReceipt = readPromptDeliveryReceipt(dir, taskId);
+      if (compileReceipt.state !== 'AVAILABLE') {
+        throw new SpawnBackendError(
+          `Prompt delivery receipt unavailable for exact runtime binding: ${compileReceipt.reason}`,
+          this.name,
+        );
+      }
+      finalizePromptDeliveryReceipt({
+        projectRoot: dir,
+        taskId,
+        attemptId: attemptRef.attemptId,
+        provider,
+        coreArtifactPath: coreArtifact.relativePath,
+        coreSha256: coreArtifact.sha256,
+        coreBytes: coreArtifact.bytes,
+        roleProfile: compileReceipt.receipt.rolePolicyIdentity,
+        injectionChannel,
+        contextSuppressionFlags: providerBinary === 'claude'
+          ? ['CLAUDE_CODE_DISABLE_CLAUDE_MDS=1', '--disable-slash-commands']
+          : this.codexSuppressProjectDoc ? [...(spec.contextSuppressionArgs ?? [])] : [],
+        providerArgv: workerCmd,
+      });
+    }
     // WORKER-GIT-GUARD (381-001): shadow `git` inside the container with a
     // denylist shim (stash/reset/checkout/clean/rebase/commit/revert -> exit
     // 97). Host-writes the shim then bind-mounts it READ-ONLY (same

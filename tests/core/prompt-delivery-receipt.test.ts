@@ -5,6 +5,9 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   buildPromptDeliveryReceipt,
+  finalizePromptDeliveryReceipt,
+  promptAttemptDeliveryReceiptPath,
+  publishWorkerCoreArtifact,
   promptDeliveryReceiptPath,
   readPromptDeliveryReceipt,
   resolvePromptDeliveryAttribution,
@@ -27,6 +30,68 @@ function receipt() {
 }
 
 describe('prompt delivery receipt', () => {
+  it('publishes full-digest immutable core bytes and binds exact runtime argv', () => {
+    root = mkdtempSync(join(tmpdir(), 'prompt-delivery-receipt-'));
+    const core = publishWorkerCoreArtifact(root, 'immutable core');
+    expect(core.relativePath).toBe(
+      `.tasks/.worker-core-${createHash('sha256').update('immutable core').digest('hex')}.md`,
+    );
+    expect(readFileSync(core.path, 'utf8')).toBe('immutable core');
+    expect(publishWorkerCoreArtifact(root, 'immutable core')).toEqual(core);
+
+    expect(writePromptDeliveryReceipt(root, receipt())).toBe(true);
+    const providerArgv = `codex -c model_instructions_file=/workspace/${core.relativePath} exec`;
+    const finalized = finalizePromptDeliveryReceipt({
+      projectRoot: root,
+      taskId: '654-002',
+      attemptId: 'attempt-1',
+      provider: 'codex',
+      coreArtifactPath: core.relativePath,
+      coreSha256: core.sha256,
+      coreBytes: core.bytes,
+      roleProfile: 'worker:implementer',
+      injectionChannel: 'codex-model-instructions-file',
+      contextSuppressionFlags: ['-c', 'project_doc_max_bytes=0'],
+      providerArgv,
+    });
+    expect(finalized.runtimeDelivery).toMatchObject({
+      attemptId: 'attempt-1',
+      provider: 'codex',
+      coreSha256: core.sha256,
+      coreBytes: Buffer.byteLength('immutable core'),
+      injectionChannel: 'codex-model-instructions-file',
+      providerArgvSha256: createHash('sha256').update(providerArgv).digest('hex'),
+    });
+    expect(readFileSync(
+      promptAttemptDeliveryReceiptPath(root, '654-002', 'attempt-1', 'codex'),
+      'utf8',
+    )).toBe(`${JSON.stringify(finalized)}\n`);
+  });
+
+  it('fails closed when existing digest-path bytes or runtime argv do not match', () => {
+    root = mkdtempSync(join(tmpdir(), 'prompt-delivery-receipt-'));
+    const core = publishWorkerCoreArtifact(root, 'immutable core');
+    writeFileSync(core.path, 'different bytes', 'utf8');
+    expect(() => publishWorkerCoreArtifact(root, 'immutable core'))
+      .toThrow(/WORKER_CORE_ARTIFACT_COLLISION/u);
+
+    writeFileSync(core.path, 'immutable core', 'utf8');
+    expect(writePromptDeliveryReceipt(root, receipt())).toBe(true);
+    expect(() => finalizePromptDeliveryReceipt({
+      projectRoot: root,
+      taskId: '654-002',
+      attemptId: 'attempt-1',
+      provider: 'codex',
+      coreArtifactPath: core.relativePath,
+      coreSha256: core.sha256,
+      coreBytes: core.bytes,
+      roleProfile: 'worker:implementer',
+      injectionChannel: 'codex-model-instructions-file',
+      contextSuppressionFlags: [],
+      providerArgv: 'codex exec',
+    })).toThrow('PROMPT_DELIVERY_RECEIPT_PROVIDER_ARGV_MISMATCH');
+  });
+
   it('atomically round-trips deterministic bytes bound to final rendered segments', () => {
     root = mkdtempSync(join(tmpdir(), 'prompt-delivery-receipt-'));
     const first = receipt();

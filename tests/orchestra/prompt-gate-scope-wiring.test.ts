@@ -55,6 +55,21 @@ function task(over: Partial<Task> & { id: string }): Task {
 const EMPTY_POOL = new Map<string, AgentDefinition>();
 
 describe('SAN-1 wiring — render keeps tracked root files (397-011/012 failure mode)', () => {
+  it('fail-closes wildcard and cross-platform ambiguous legacy scope before scheduling', () => {
+    const wildcard = task({ id: 'wild', scope: { directories: [], filesRead: [], filesWrite: ['src/**/*.ts'] } });
+    const drive = task({ id: 'drive', scope: { directories: [], filesRead: [], filesWrite: ['C:\\repo\\x.ts'] } });
+    const result = evaluatePromptGate({ tasks: [wildcard, drive], agentPool: EMPTY_POOL });
+    expect(result.ok).toBe(false);
+    expect(result.blockers.map(item => item.message)).toEqual(expect.arrayContaining([
+      expect.stringContaining('LEGACY_WILDCARD_REQUIRES_SELECTOR'),
+      expect.stringContaining('INVALID_PATH'),
+    ]));
+    const forced = evaluatePromptGate({
+      tasks: [wildcard], agentPool: EMPTY_POOL, acknowledgePromptGate: true,
+    });
+    expect(forced.ok).toBe(false);
+    expect(forced.overrideApplied).toBeUndefined();
+  });
   it('buildScopeBlock renders README.md/README-TR.md when they are tracked root files', () => {
     const warnings: string[] = [];
     const block = buildScopeBlock(

@@ -386,6 +386,7 @@ describe('executeSchedulerDecision — SpawnTask/KillWorker regression (must sta
 
     await executeSchedulerDecision(decision, baseDeps(root, taskMap, { backend }));
     expect(readFileSync(resultPath, 'utf-8')).toBe(firstBytes);
+    expect(backend.spawn).toHaveBeenCalledTimes(1);
   });
 
   it('keeps an unclassified spawn exception retryable and does not forge a settlement', async () => {
@@ -402,6 +403,41 @@ describe('executeSchedulerDecision — SpawnTask/KillWorker regression (must sta
     expect(result.spawnSkips).toEqual(expect.arrayContaining([
       expect.objectContaining({ taskId: task.id, reasonCode: 'spawn-threw' }),
     ]));
+    const persisted = JSON.parse(readFileSync(join(root, '.tasks', `task-${task.id}.json`), 'utf-8'));
+    expect(persisted.schedulerSpawnAttempts).toBe(1);
+    expect(persisted.retryAfter).toBeGreaterThan(Date.now());
+  });
+
+  it('bounds unknown host retries with durable backoff and terminal HOLD', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+    const task = makeTask('800-063');
+    const taskMap = new Map([[task.id, task]]);
+    const backend = makeMockBackend();
+    backend.spawn = vi.fn(() => { throw new Error('transient transport reset'); });
+    const decision = makeDecision([{ kind: 'SpawnTask', taskId: task.id, reason: 'queue-drain' }]);
+
+    await executeSchedulerDecision(decision, baseDeps(root, taskMap, { backend }));
+    const duringBackoff = await executeSchedulerDecision(decision, baseDeps(root, taskMap, { backend }));
+    expect(backend.spawn).toHaveBeenCalledTimes(1);
+    expect(duringBackoff.spawnSkips).toEqual(expect.arrayContaining([
+      expect.objectContaining({ reasonCode: 'spawn-retry-backoff' }),
+    ]));
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    await executeSchedulerDecision(decision, baseDeps(root, taskMap, { backend }));
+    await vi.advanceTimersByTimeAsync(2_000);
+    const terminal = await executeSchedulerDecision(decision, baseDeps(root, taskMap, { backend }));
+
+    expect(backend.spawn).toHaveBeenCalledTimes(3);
+    expect(task.status).toBe(TaskStatus.PAUSED);
+    expect(terminal.spawnSkips).toEqual(expect.arrayContaining([
+      expect.objectContaining({ reasonCode: 'spawn-retry-held' }),
+    ]));
+    const persisted = JSON.parse(readFileSync(join(root, '.tasks', `task-${task.id}.json`), 'utf-8'));
+    expect(persisted).toMatchObject({ status: TaskStatus.PAUSED, schedulerSpawnAttempts: 3 });
+    expect(persisted.retryAfter).toBeUndefined();
+    vi.useRealTimers();
   });
 
   it('kills a worker via the injected killWorker dep for a KillWorker effect', async () => {

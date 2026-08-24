@@ -181,6 +181,8 @@ export interface ShadowTickObservedOutcome {
   readonly assignedTaskIdsAfter: ReadonlySet<string>;
   /** `collected` read AFTER the live tick completed. */
   readonly collectedIdsAfter: ReadonlySet<string>;
+  readonly landedEffects?: readonly string[];
+  readonly spawnSkipReasons?: readonly { readonly taskId: string; readonly reasonCode: string }[];
 }
 
 function diffSpawned(before: ReadonlySet<string>, after: ReadonlySet<string>): string[] {
@@ -207,6 +209,19 @@ function diffCascadeSkipped(
     out.push(id);
   }
   return out.sort();
+}
+
+function landedTaskIds(
+  landedEffects: readonly string[] | undefined,
+  kind: 'SpawnTask' | 'CascadeSkip',
+): string[] | undefined {
+  if (landedEffects === undefined) return undefined;
+  const prefix = `${kind}:`;
+  return landedEffects
+    .filter(effect => effect.startsWith(prefix))
+    .map(effect => effect.slice(prefix.length))
+    .filter(taskId => taskId.length > 0)
+    .sort();
 }
 
 function computeDivergence(
@@ -283,6 +298,9 @@ export async function finalizeShadowSchedulerTick(
       reducerCascadeSkippedTaskIds,
     );
 
+    const landedSpawnedTaskIds = landedTaskIds(observed.landedEffects, 'SpawnTask');
+    const landedCascadeSkippedTaskIds = landedTaskIds(observed.landedEffects, 'CascadeSkip');
+
     appendSchedulerShadowRecord(projectRoot, sprintId, {
       seq: snapshot.trigger.sequence,
       trigger: snapshot.trigger.kind,
@@ -299,6 +317,17 @@ export async function finalizeShadowSchedulerTick(
         blockedTaskIds: reducerBlockedTaskIds,
       },
       executedEngine,
+      executedDecision: executedEngine === 'reducer'
+        ? {
+          spawnedTaskIds: landedSpawnedTaskIds ?? reducerSpawnedTaskIds,
+          cascadeSkippedTaskIds: landedCascadeSkippedTaskIds ?? reducerCascadeSkippedTaskIds,
+        }
+        : executedEngine === 'legacy'
+          ? { spawnedTaskIds: legacySpawnedTaskIds, cascadeSkippedTaskIds: legacyCascadeSkippedTaskIds }
+          : undefined,
+      decidedEffects: decision.orderedEffects.map(effect => `${effect.kind}:${'taskId' in effect ? effect.taskId : ''}`),
+      landedEffects: observed.landedEffects,
+      spawnSkipReasons: observed.spawnSkipReasons,
       divergence,
     });
   } catch (err) {
@@ -365,6 +394,9 @@ export interface SchedulerDriverTickResult {
   readonly engine: SchedulerEngine;
   readonly spawnedTaskIds: readonly string[];
   readonly killedWorkerIds: readonly string[];
+  readonly decidedEffects: readonly string[];
+  readonly landedEffects: readonly string[];
+  readonly spawnSkipReasons: readonly { readonly taskId: string; readonly reasonCode: string }[];
 }
 
 export interface SchedulerDriverDeps {
@@ -421,10 +453,10 @@ export function createSchedulerDriver(
       // already tripped the gate; otherwise an initial tick can spawn one more
       // wave before the outer watcher guard gets a chance to run.
       if (deps.getCostStop()) {
-        return { engine: 'legacy', spawnedTaskIds: [], killedWorkerIds: [] };
+        return { engine: 'legacy', spawnedTaskIds: [], killedWorkerIds: [], decidedEffects: [], landedEffects: [], spawnSkipReasons: [] };
       }
       await input.runLegacyTick();
-      return { engine: 'legacy', spawnedTaskIds: [], killedWorkerIds: [] };
+      return { engine: 'legacy', spawnedTaskIds: [], killedWorkerIds: [], decidedEffects: [], landedEffects: [], spawnSkipReasons: [] };
     }
 
     sequence++;
@@ -449,7 +481,7 @@ export function createSchedulerDriver(
       });
     } catch (e) {
       debugLog('createSchedulerDriver:capture', e);
-      return { engine: 'reducer', spawnedTaskIds: [], killedWorkerIds: [] };
+      return { engine: 'reducer', spawnedTaskIds: [], killedWorkerIds: [], decidedEffects: [], landedEffects: [], spawnSkipReasons: [] };
     }
 
     const decision = reduceSchedulerTick(snapshot);
@@ -472,6 +504,9 @@ export function createSchedulerDriver(
       engine: 'reducer',
       spawnedTaskIds: execResult.spawnedTaskIds,
       killedWorkerIds: execResult.killedWorkerIds,
+      decidedEffects: execResult.decidedEffects.map(effect => `${effect.kind}:${'taskId' in effect ? effect.taskId : ''}`),
+      landedEffects: execResult.landedEffects.map(effect => `${effect.kind}:${'taskId' in effect ? effect.taskId : ''}`),
+      spawnSkipReasons: execResult.spawnSkips.map(skip => ({ taskId: skip.taskId, reasonCode: skip.reasonCode })),
     };
   };
 }

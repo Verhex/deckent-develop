@@ -136,6 +136,30 @@ const boundaryViolationSchema = z.object({
   reason: z.string(),
 });
 
+const workerWorkClaimSchema = z.object({
+  filesChanged: z.array(z.string()),
+  linesAdded: z.number().int().nonnegative().nullable(),
+  linesRemoved: z.number().int().nonnegative().nullable(),
+  mismatch: z.boolean(),
+});
+
+const criterionEvidenceSchema = z.object({
+  criterionId: z.string().min(1),
+  outcome: z.enum(['MET', 'UNMET', 'UNVERIFIED']),
+  evidence: z.array(z.string()),
+});
+
+/**
+ * Digest-bound worker verification ingress preserved by canonical settlement.
+ * These fields are consumed by the evaluator's task-authority parity gate; a
+ * strict canonical parse must not erase them after host normalization.
+ */
+const testVerificationSchema = z.object({
+  applicability: z.enum(['REQUIRED', 'OPTIONAL', 'NOT_APPLICABLE']),
+  outcome: z.enum(['PASSED', 'FAILED', 'NOT_EXECUTED']),
+  commands: z.array(z.string()),
+});
+
 /**
  * born 3324 (524-006): the work-attribution reason code is a TYPED union of the
  * codes this host mints, kept ADDITIVE — a non-empty code minted by a different
@@ -177,7 +201,7 @@ const tokenUsageSchema = z.object({
   cacheReadTokens: z.number().int().nonnegative().default(0),
   cacheCreationTokens: z.number().int().nonnegative().default(0),
   totalTokens: z.number().int().nonnegative(),
-  source: z.enum(['provider-adapter', 'tokenizer-fallback']),
+  source: z.enum(['provider-adapter', 'tokenizer-fallback', 'host-runtime-budget']),
 });
 
 /** Cross-provider cost (§1.4). Local/self-hosted → `{ usd: 0, isLocal: true }`. */
@@ -313,8 +337,11 @@ export const taskResultSchema = z.object({
   diskVerified: z.boolean().default(false),
   boundaryViolations: z.array(boundaryViolationSchema).default([]),
   workAttribution: workAttributionSchema.optional(),
+  /** Preserved ingress claim; never used as host attribution authority. */
+  workerWorkClaim: workerWorkClaimSchema.optional(),
   preDispatchSettlement: preDispatchSettlementSchema.optional(),
   promptDeliveryAttribution: promptDeliveryAttributionSchema.optional(),
+  promptCompilePlanId: z.string().min(1).optional(),
 
   // resource accounting (orchestrator, provider-agnostic)
   tokenUsage: tokenUsageSchema,
@@ -324,6 +351,9 @@ export const taskResultSchema = z.object({
   // verification (worker-run, orchestrator-captured)
   tests: testsSchema,
   tsc: tscSchema,
+  criteriaEvidence: z.array(criterionEvidenceSchema).default([]),
+  testVerification: testVerificationSchema.optional(),
+  techDebtCriterionIds: z.array(z.string()).default([]),
 
   // assessment (worker + brain)
   selfAssessment: selfAssessmentSchema,
@@ -494,4 +524,28 @@ export function normalizeTaskResultShape<T extends { notes?: unknown }>(result: 
   record['testCommands'] = commands;
   record['testsPassed'] = projectTestsPassed({ outcome });
   return result;
+}
+
+// ─── Shared result shapes (spec §1.2) ────────────────────────────────────────
+// Moved from orchestra/result-assembler so layer-clean ingress consumers can
+// type against the schema without importing orchestra (ADR-G-041 boundary).
+
+/** A git-derived per-file change (spec §1.2 `filesChanged[]` entry). */
+export interface FileChange {
+  path: string;
+  status: 'added' | 'modified' | 'deleted';
+  linesAdded: number;
+  linesRemoved: number;
+}
+
+/** Thrown when an assembled result fails canonical schema validation. */
+export class AssemblerError extends Error {
+  constructor(
+    message: string,
+    public readonly missingFields: string[],
+    public readonly errors: string[],
+  ) {
+    super(message);
+    this.name = 'AssemblerError';
+  }
 }

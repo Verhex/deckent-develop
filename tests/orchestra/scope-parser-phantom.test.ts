@@ -52,6 +52,9 @@ const DIRECTIVES_FIXTURE = `# DIRECTIVES
 ## Task 6: today's working single-dot slash-qualified paths
 - Files: src/orchestra/task-builder.ts, src/orchestra/scope-sanitizer.ts, tests/orchestra/scope-parser-phantom.test.ts
 - Scope: src/orchestra/, tests/orchestra/
+
+## Task 7: nested docs test path
+- Files: scripts/lint-layer-shims.mjs, tests/docs/layer-shims.test.ts
 `;
 
 describe('row 3312 — DIRECTIVES scope chain: no phantoms, no silent shrinks', () => {
@@ -125,6 +128,12 @@ describe('row 3312 — DIRECTIVES scope chain: no phantoms, no silent shrinks', 
 
     const { warnings } = render(scope);
     expect(warnings).toEqual([]);
+  });
+
+  it('(f) a nested tests/docs path never donates a shorter docs/ write target', () => {
+    const scope = taskByTitle(DIRECTIVES_FIXTURE, 'nested docs test path');
+    expect(scope.filesWrite).toContain('tests/docs/layer-shims.test.ts');
+    expect(scope.filesWrite).not.toContain('docs/layer-shims.test.ts');
   });
 
   it('one sanitize authority: re-sanitizing the plan-time result never re-narrows it', () => {

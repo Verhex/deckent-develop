@@ -616,4 +616,34 @@ describe('normal result — claim-time work attribution (3175)', () => {
       },
     });
   });
+
+  it('does not erase an already host-measured diff when later authority is held', async () => {
+    const repo = freshTmp();
+    await initRepo(repo);
+    const resultPath = join(repo, '.result.json');
+    writeFileSync(resultPath, JSON.stringify({
+      ...resultFixture('shared.ts'),
+      schemaVersion: '1.0',
+      filesChanged: [{ path: 'shared.ts', status: 'modified', linesAdded: 4, linesRemoved: 1 }],
+      totalLinesAdded: 4,
+      totalLinesRemoved: 1,
+      workAttribution: {
+        state: 'VERIFIED', attemptId: 'old', baselineRef: 'old', scopeDigest: 'a'.repeat(64),
+      },
+    }), 'utf-8');
+
+    const outcome = await reconcileDockerResultWorkAttribution({
+      projectRoot: repo,
+      resultPath,
+      baselinePath: join(repo, '.missing'),
+      attemptId: undefined,
+      scopeFilesWrite: ['shared.ts'],
+    });
+
+    expect(outcome).toMatchObject({ state: 'HOLD', linesAdded: 4, linesRemoved: 1 });
+    const persisted = JSON.parse(readFileSync(resultPath, 'utf-8')) as Record<string, unknown>;
+    expect(persisted.filesChanged).toEqual([
+      { path: 'shared.ts', status: 'modified', linesAdded: 4, linesRemoved: 1 },
+    ]);
+  });
 });

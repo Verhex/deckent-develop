@@ -25,6 +25,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ChildProcess } from 'node:child_process';
+import { createHash } from 'node:crypto';
 
 // ─── Mocks (mirrors spawn-backend-docker.test.ts / docker-multicli-buildarg.test.ts) ──
 
@@ -124,6 +125,25 @@ const FINAL_ONLY_TEST_CONTAINMENT = {
 function budgetedTaskRead(model?: string): typeof readFileSync {
   return ((path: unknown) => {
     const p = String(path);
+    if (p.includes('/.worker-core-')) return Buffer.from('stable worker core');
+    if (p.endsWith('.skill-delivery.json')) {
+      const taskId = /task-(.+)\.skill-delivery\.json$/u.exec(p)?.[1] ?? 'unknown';
+      return JSON.stringify({
+        version: 2,
+        taskId,
+        source: 'worker-prompt',
+        promptSha256: 'a'.repeat(64),
+        promptCompilePlanId: `prompt-compile-plan:sha256:${'b'.repeat(64)}`,
+        rolePolicyIdentity: 'worker:implementer',
+        assignedAgentId: 'implementer',
+        deliveredAgentId: 'implementer',
+        personaSegmentSha256: 'c'.repeat(64),
+        assignedSkillIds: [],
+        deliveredSkillIds: [],
+        forcedSkillIds: [],
+        undeliveredForcedSkillIds: [],
+      });
+    }
     if (p.includes('worker-heartbeat-authority')) {
       const error = new Error(`ENOENT: no such file or directory, open '${p}'`) as NodeJS.ErrnoException;
       error.code = 'ENOENT';
@@ -308,7 +328,8 @@ describe('DockerSpawnBackend: provider→cmd table (shared PROVIDER_COMMAND_SPEC
 
   it('emits the codex core file and composes spec-defined core + suppression argv when enabled', async () => {
     const core = 'stable worker core';
-    const corePath = '/test/project/.tasks/.worker-core-b938cc65a51b.md';
+    const digest = createHash('sha256').update(core).digest('hex');
+    const corePath = `/test/project/.tasks/.worker-core-${digest}.md`;
     mockExistsSync.mockImplementation(path => String(path) !== corePath);
     mockReadFileSync.mockImplementation(budgetedTaskRead('gpt-5.6-sol'));
     new DockerSpawnBackend('/test/project', {
@@ -327,14 +348,12 @@ describe('DockerSpawnBackend: provider→cmd table (shared PROVIDER_COMMAND_SPEC
 
     const command = providerCommandFrom(await workerScriptFor('codex-prefix-on'));
     expect(command).toContain(
-      'codex -c model_instructions_file=/workspace/.tasks/.worker-core-b938cc65a51b.md '
+      `codex -c model_instructions_file=/workspace/.tasks/.worker-core-${digest}.md `
       + '-c project_doc_max_bytes=0 exec --skip-git-repo-check --json',
     );
-    expect(mockWriteFileSync).toHaveBeenCalledWith(
-      corePath,
-      core,
-      'utf-8',
-    );
+    expect(command).toContain('model_instructions_file=/workspace/.tasks/.worker-core-');
+    expect(command).toContain(`${digest}.md`);
+    expect(mockWriteFileSync).toHaveBeenCalledWith(0, Buffer.from(core, 'utf8'));
     mockExistsSync.mockReturnValue(true);
   });
 

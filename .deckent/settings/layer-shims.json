@@ -1,51 +1,1326 @@
 {
- "note": "ADR-D-004 (C3) mcp/ <-> cli/ Layer-1 sanctioned-exception registry (D004-W5 data-file; task 362-012, 361-014 debt). WHAT THIS IS (honest framing): a REGISTRY-SCOPED ratchet, not a full mcp/-wide C3-edge scan. scripts/lint-layer-shims.mjs derives the set of governed files from this file's `shims[].from` values and verifies each governed file's cli/-crossing imports are all covered by a registered entry (same `to` module + symbols subset-of-allowed) -- 'no registry entry, no import' per ADR-D-004 C5. A brand-new mcp/ file that starts importing cli/ is NOT auto-discovered by this mechanism; extending to a full-edge, all-files scan is ADR-D-004's own documented D004-W6 (hard graph gate + full-edge scan), separate future work. `enforced: false` entries are recorded for context/precedent only (the pre-existing ADR-G-011 Surface-Parity/CLI-MCP-parity convention, broadly used elsewhere in mcp/tools/*.ts) and are not the crossing this ratchet actively protects; `enforced: true` entries are the crossing type this task's gate exists for. `expiry` is mandatory on every entry.",
- "shims": [
-  {
-   "id": "D004-SHIM-001",
-   "from": "src/mcp/tools/nervous.ts",
-   "to": "src/cli/commands/nervous.js",
-   "symbols": [
-    "acceptPanicGuard",
-    "listPendingPanicEvents"
-   ],
-   "reason": "MCP surface for Nervous panic-guard accept/list, reusing the CLI's read/plan logic instead of duplicating it -- the shipped ADR-G-011 (Surface Parity & Thin-Wrapper, formerly ADR-022 CLI/MCP Feature Parity, Sprint 147 Task 16) precedent that nervous-edit.ts's own header cites when justifying D004-SHIM-002.",
-   "adrRef": "ADR-D-004 (C3) / ADR-G-011",
-   "enforced": false,
-   "owner": "nervous-system",
-   "dateAdded": "2026-07-02",
-   "expiry": "2027-01-02 (review at ADR-D-004 W6 full-edge audit; renew, fold into ADR-G-011's parity allowlist, or relocate)"
+  "authority": {
+    "doesNotAuthorize": [
+      "module-loading",
+      "dependency-resolution",
+      "capability-registration",
+      "permission-grants",
+      "license-entitlement",
+      "state-migration-execution"
+    ],
+    "governedBy": [
+      "ADR-D-004",
+      "ADR-G-041"
+    ],
+    "mode": "classification-and-exception-index-only",
+    "reconcilesWith": {
+      "capabilities": "existing capability and plugin registries",
+      "compatibility": "package.json version and published contract versions",
+      "dependencies": "TypeScript source graph and package.json",
+      "entrypoints": "package.json exports/bin and existing composition roots",
+      "licenses": "package.json license and future commercial legal references",
+      "permissions": "existing permission-policy authorities",
+      "stateMigrations": "existing migration runners and owning stores"
+    }
   },
-  {
-   "id": "D004-SHIM-002",
-   "from": "src/mcp/tools/nervous-edit.ts",
-   "to": "src/cli/repl/nervous-bridge.js",
-   "symbols": [
-    "handleEdit",
-    "NervousPendingStore",
-    "NervousBridgePlanResult"
-   ],
-   "reason": "deckent_nervous_edit wraps 357-006/APPROVE-007b's accept-with-edited-payload plan builder (`handleEdit`) for MCP callers, following the D004-SHIM-001 precedent rather than duplicating the plan-building logic a second time. Sprint 361 Task 361-014 (DEFER-002-NERVOUS); this registry entry is that task's exception-registry follow-up.",
-   "adrRef": "ADR-D-004 (C3)",
-   "enforced": true,
-   "owner": "nervous-system",
-   "dateAdded": "2026-07-02",
-   "expiry": "2027-01-02 (review at ADR-D-004 W6 full-edge audit; renew or dissolve into a core/orchestra relocation)"
+  "baseline": {
+    "atoms": [
+      "src/api/autonomous-endpoint.ts|import|src/cli/helpers/messages.ts|getMessage",
+      "src/api/chat-stream.ts|import|src/cli/commands/chat-native.ts|ChatMessage,ChatProviderAdapter,StreamChunk",
+      "src/api/coverage-endpoint.ts|import|src/cli/commands/history.ts|parseSprintLog",
+      "src/api/docs-health-endpoint.ts|import|src/cli/commands/docs.ts|runDocsTrackStatus",
+      "src/api/nervous-endpoint.ts|import|src/cli/commands/nervous.ts|acceptPanicGuard,listPendingPanicEvents",
+      "src/api/process-endpoint.ts|import|src/cli/helpers/process-runtime.ts|buildProcessController",
+      "src/api/provider-authority-ingress.ts|import|src/cli/helpers/messages.ts|getLanguage,getMessage",
+      "src/api/run-flow-routes.ts|import|src/cli/helpers/detached-start.ts|buildFlowStartSpawn",
+      "src/api/server.ts|import|src/cli/commands/chat-provider-parity.ts|resolveChatAdapter",
+      "src/api/server.ts|import|src/cli/commands/doctor.ts|runDoctorChecks",
+      "src/api/server.ts|import|src/cli/commands/history.ts|parseSprintLog",
+      "src/api/server.ts|import|src/cli/helpers/messages.ts|getLanguage,getMessage",
+      "src/cli/commands/audit-verify.ts|import|src/api/terminal/audit-integrity.ts|loadOrCreateAuditKey,verifyAuditChain",
+      "src/cli/commands/serve.ts|import|src/api/serve-daemon-meta.ts|clearServeDaemonMeta,writeServeDaemonMeta",
+      "src/cli/commands/serve.ts|import|src/api/server.ts|AcceptanceConfirmationRuntimeAuditEvent,AcceptanceConfirmationRuntimeOptions,createHttpServer",
+      "src/cli/commands/serve.ts|import|src/api/terminal/session-backend.ts|LocalPtyBackend",
+      "src/core/config.ts|import|src/cli/helpers/messages.ts|getMessage",
+      "src/core/cost-gate.ts|import|src/cli/helpers/messages.ts|getMessage",
+      "src/core/directive-interrogator.ts|import|src/cli/helpers/messages.ts|getMessage",
+      "src/core/limit-preflight.ts|dynamic-import|src/providers/cross-provider-keys.ts|*",
+      "src/core/provider-auth-probe.ts|dynamic-import|src/providers/cross-provider-keys.ts|*",
+      "src/core/provider.ts|dynamic-import|src/providers/bedrock.ts|*",
+      "src/core/provider.ts|dynamic-import|src/providers/claude.ts|*",
+      "src/core/provider.ts|dynamic-import|src/providers/codex.ts|*",
+      "src/core/provider.ts|dynamic-import|src/providers/cross-provider-keys.ts|*",
+      "src/core/provider.ts|dynamic-import|src/providers/cursor.ts|*",
+      "src/core/provider.ts|dynamic-import|src/providers/gemini.ts|*",
+      "src/core/provider.ts|dynamic-import|src/providers/ollama.ts|*",
+      "src/core/provider.ts|dynamic-import|src/providers/openai-compatible.ts|*",
+      "src/core/provider.ts|dynamic-import|src/providers/openrouter.ts|*",
+      "src/core/scope-gate.ts|import|src/cli/helpers/messages.ts|getMessage",
+      "src/mcp/server.ts|import|src/cli/helpers/messages.ts|getLanguage",
+      "src/mcp/tools/approvals.ts|import|src/cli/helpers/messages.ts|getLanguage,getMessage",
+      "src/mcp/tools/audit.ts|import|src/cli/commands/audit.ts|runAuditRetention,runComplianceReport",
+      "src/mcp/tools/autonomous-approval.ts|import|src/cli/helpers/messages.ts|getLanguage,getMessage",
+      "src/mcp/tools/autonomous-surface.ts|import|src/cli/helpers/messages.ts|getLanguage,getMessage",
+      "src/mcp/tools/autonomous.ts|import|src/cli/commands/autonomous.ts|backlogAdd,backlogList,backlogRemove",
+      "src/mcp/tools/autonomous.ts|import|src/cli/helpers/messages.ts|getMessage",
+      "src/mcp/tools/description-catalog.ts|import|src/cli/helpers/messages.ts|getLanguage,getMessage",
+      "src/mcp/tools/docs.ts|import|src/cli/commands/docs.ts|runDocsTrackScan,runDocsTrackStatus",
+      "src/mcp/tools/doctor.ts|import|src/cli/commands/doctor.ts|buildProviderDiagnosticAuthChecks,runDoctorChecks,runProviderDiagnosticsWithOllama",
+      "src/mcp/tools/execution-authority.ts|import|src/cli/helpers/messages.ts|getMessage",
+      "src/mcp/tools/explain.ts|import|src/cli/commands/explain.ts|buildExplainOutput,extractGoalFromDirectives,extractGoalFromSprintLog,findLatestSprintLog,formatDuration,parseRetroLearnings,parseSprintLog,parseSprintNumber",
+      "src/mcp/tools/plan.ts|import|src/cli/helpers/messages.ts|getMessage",
+      "src/mcp/tools/process.ts|import|src/cli/helpers/process-runtime.ts|buildProcessController",
+      "src/mcp/tools/run.ts|dynamic-import|src/cli/commands/run.ts|*",
+      "src/mcp/tools/run.ts|import|src/cli/commands/spawn.ts|spawnWorkerMultiProvider",
+      "src/mcp/tools/run.ts|import|src/cli/helpers/messages.ts|getLanguage,getMessage",
+      "src/mcp/tools/start.ts|import|src/cli/helpers/detached-start.ts|spawnDetachedDeckent",
+      "src/mcp/tools/start.ts|import|src/cli/helpers/messages.ts|getLanguage,getMessage",
+      "src/mcp/tools/xverify.ts|import|src/cli/commands/xverify.ts|runXverifyForResult",
+      "src/mcp/tools/xverify.ts|import|src/cli/helpers/messages.ts|getMessage",
+      "src/mcp/writer-lease-gate.ts|import|src/cli/helpers/messages.ts|getMessage",
+      "src/orchestra/autonomous/backlog-eval.ts|import|src/monitor/auditor.ts|ADRViolation,VerificationResult,checkADRCompliance,isFileInScope,verifyWorkerResult",
+      "src/orchestra/autonomous/flow-reporter.ts|import|src/cli/helpers/messages.ts|getMessage",
+      "src/orchestra/autonomous/mission-store/mission-deliver.ts|import|src/cli/helpers/messages.ts|getMessage",
+      "src/orchestra/codex-spawn-readiness.ts|import|src/providers/codex.ts|CODEX_USAGE_EMIT_ARGS,CodexAdapter",
+      "src/orchestra/codex-spawn-readiness.ts|import|src/providers/codex.ts|CodexAuthMode",
+      "src/orchestra/codex-spawn-readiness.ts|import|src/providers/cross-provider-keys.ts|resolveCrossProviderCredentialKeys",
+      "src/orchestra/cross-verify-runner.ts|dynamic-import|src/cli/commands/spawn.ts|*",
+      "src/orchestra/prompt-gate.ts|import|src/cli/helpers/messages.ts|getMessage",
+      "src/orchestra/scheduler-effects.ts|import|src/orchestra/tmux.ts|spawnWorker",
+      "src/orchestra/spawn-backend-docker.ts|import|src/providers/claude.ts|createClaudeAdapter",
+      "src/orchestra/spawn-backend-docker.ts|import|src/providers/codex.ts|createCodexAdapter",
+      "src/orchestra/spawn-backend-docker.ts|import|src/providers/cross-provider-keys.ts|BASE_PROVIDER_CREDENTIAL_ENV",
+      "src/orchestra/spawn-backend-docker.ts|import|src/providers/cursor.ts|createCursorAdapter",
+      "src/orchestra/spawn-backend-docker.ts|import|src/providers/gemini.ts|createGeminiAdapter",
+      "src/orchestra/spawn-backend.ts|import|src/providers/codex.ts|CODEX_USAGE_EMIT_ARGS",
+      "src/orchestra/spawn-backend.ts|import|src/providers/sandbox.ts|SandboxOptions",
+      "src/orchestra/spawn-backend.ts|import|src/providers/sandbox.ts|SandboxSpawnBackend",
+      "src/orchestra/spawn-backend.ts|import|src/providers/subprocess.ts|CLAUDE_SUBPROCESS_CONFIG,SubprocessSpawnBackend",
+      "src/orchestra/spawn-backend.ts|import|src/providers/subprocess.ts|SubprocessProviderConfig",
+      "src/orchestra/sprint-controller.ts|import|src/cli/helpers/i18n.ts|detectLang",
+      "src/orchestra/sprint-controller.ts|import|src/cli/helpers/messages.ts|getMessage",
+      "src/orchestra/sprint-estimator.ts|import|src/monitor/auditor.ts|updateDashboard",
+      "src/orchestra/sprint-finalizer.ts|import|src/cli/helpers/messages.ts|getMessage",
+      "src/orchestra/sprint-finalizer.ts|import|src/cli/helpers/sprint-summary-rich.ts|formatRichSprintSummary",
+      "src/orchestra/sprint-lifecycle.ts|import|src/cli/helpers/i18n.ts|detectLang",
+      "src/orchestra/sprint-lifecycle.ts|import|src/cli/helpers/messages.ts|getMessage",
+      "src/orchestra/sprint-phases.ts|import|src/cli/helpers/splash.ts|showSplashIfEnabled",
+      "src/orchestra/sprint-planner.ts|import|src/cli/helpers/i18n.ts|detectLang",
+      "src/orchestra/sprint-planner.ts|import|src/cli/helpers/messages.ts|getMessage",
+      "src/orchestra/sprint-runner-entry.ts|dynamic-import|src/mcp/tools/job-runner.ts|*",
+      "src/orchestra/task-mode-runner.ts|import|src/cli/commands/run.ts|createRunTaskId",
+      "src/orchestra/task-mode-runner.ts|import|src/cli/commands/spawn.ts|spawnWorkerMultiProvider",
+      "src/orchestra/task-settlement-projection.ts|import|src/agents/worker.ts|readTask",
+      "src/orchestra/token-counter.ts|import|src/providers/session-usage-store.ts|NativeUsageQuery,readNativeUsage",
+      "src/orchestra/worker.ts|export|src/agents/worker.ts|RISKY_APPROVAL_SCOPES,classifyRiskyWorkerCommand,createOrchestraWorkerApprovalGate,guardRiskyWorkerAction",
+      "src/orchestra/workspace-artifacts.ts|import|src/cli/helpers/messages.ts|getMessage"
+    ],
+    "sccs": [
+      [
+        "src/agent/tools/exposure.ts",
+        "src/agent/tools/registry.ts"
+      ],
+      [
+        "src/agents/worker-ipc.ts",
+        "src/orchestra/ipc-registry.ts",
+        "src/orchestra/question-approval-bridge.ts"
+      ],
+      [
+        "src/agents/worker-verify.ts",
+        "src/agents/worker.ts"
+      ],
+      [
+        "src/api/auth.ts",
+        "src/api/middleware/token.ts"
+      ],
+      [
+        "src/cli/commands/chat-agentic-dispatch.ts",
+        "src/cli/commands/chat-native.ts",
+        "src/cli/commands/chat-session.ts"
+      ],
+      [
+        "src/cli/commands/provider-authority.ts",
+        "src/cli/commands/run.ts",
+        "src/cli/commands/spawn.ts",
+        "src/cli/commands/task-settlement.ts",
+        "src/cli/helpers/output.ts",
+        "src/cli/helpers/process.ts",
+        "src/cli/helpers/prompt.ts",
+        "src/cli/helpers/sprint-summary-rich.ts",
+        "src/cli/provider-authority-process-runtime.ts",
+        "src/orchestra/brain.ts",
+        "src/orchestra/cross-verify-docker-runtime-authority.ts",
+        "src/orchestra/cross-verify-invocation-authority.ts",
+        "src/orchestra/cross-verify-invocation-coordinator.ts",
+        "src/orchestra/cross-verify-production-ingress-authority.ts",
+        "src/orchestra/cross-verify-runner.ts",
+        "src/orchestra/directives-builder.ts",
+        "src/orchestra/execution-continuation-runner.ts",
+        "src/orchestra/managed-docs/content-generators.ts",
+        "src/orchestra/managed-docs/managed-doc-runner.ts",
+        "src/orchestra/model-selector.ts",
+        "src/orchestra/planner.ts",
+        "src/orchestra/pre-start-guards.ts",
+        "src/orchestra/prompt-gate.ts",
+        "src/orchestra/prompt-god-template.ts",
+        "src/orchestra/prompt-lint.ts",
+        "src/orchestra/resource-monitor.ts",
+        "src/orchestra/result-collector.ts",
+        "src/orchestra/scheduler-driver.ts",
+        "src/orchestra/scheduler-effects.ts",
+        "src/orchestra/spawn-backend-docker.ts",
+        "src/orchestra/spawn-backend.ts",
+        "src/orchestra/spawn-failure-authority.ts",
+        "src/orchestra/sprint-checkpoint.ts",
+        "src/orchestra/sprint-controller.ts",
+        "src/orchestra/sprint-docs-updater.ts",
+        "src/orchestra/sprint-finalizer.ts",
+        "src/orchestra/sprint-lifecycle.ts",
+        "src/orchestra/sprint-metrics.ts",
+        "src/orchestra/sprint-phases.ts",
+        "src/orchestra/sprint-planner.ts",
+        "src/orchestra/sprint-reporter.ts",
+        "src/orchestra/sprint-retro-writer.ts",
+        "src/orchestra/sprint-spawner.ts",
+        "src/orchestra/sprint-utils.ts",
+        "src/orchestra/task-builder.ts",
+        "src/orchestra/task-mode-runner.ts"
+      ],
+      [
+        "src/cli/repl/app.tsx",
+        "src/cli/repl/native-agent-bridge.ts"
+      ],
+      [
+        "src/connectors/voice/local-voice.ts",
+        "src/connectors/voice/openai-voice.ts",
+        "src/connectors/voice/types.ts"
+      ],
+      [
+        "src/core/acceptance-matrix.ts",
+        "src/core/agent-types.ts",
+        "src/core/approval-broker.ts",
+        "src/core/approval-channel-authenticator.ts",
+        "src/core/approval-contract.ts",
+        "src/core/approval-decision-ingress.ts",
+        "src/core/approval-lifecycle-policy.ts",
+        "src/core/approval-policy.ts",
+        "src/core/approval-rules-load.ts",
+        "src/core/approval-sla.ts",
+        "src/core/approval-store.ts",
+        "src/core/attended-execution-approval.ts",
+        "src/core/audit-writer.ts",
+        "src/core/capability-broker.ts",
+        "src/core/config-migration.ts",
+        "src/core/config-types.ts",
+        "src/core/config.ts",
+        "src/core/decision-types.ts",
+        "src/core/erp/connector.ts",
+        "src/core/erp/dynamics/driver.ts",
+        "src/core/erp/factory.ts",
+        "src/core/erp/handler.ts",
+        "src/core/erp/ifs/driver.ts",
+        "src/core/erp/odoo/driver.ts",
+        "src/core/erp/sap/driver.ts",
+        "src/core/event-stream.ts",
+        "src/core/execution-admission.ts",
+        "src/core/execution-budget-policy.ts",
+        "src/core/invocation-receipt.ts",
+        "src/core/live-execution-budget.ts",
+        "src/core/mode-presets.ts",
+        "src/core/model-equivalence.ts",
+        "src/core/monitoring-types.ts",
+        "src/core/notification-dispatcher.ts",
+        "src/core/notifications.ts",
+        "src/core/prompt-compile-plan.ts",
+        "src/core/prompt-cost-canary-task-authority.ts",
+        "src/core/provider-evidence-probe-contract.ts",
+        "src/core/provider-limit-policy.ts",
+        "src/core/provider-limit-truth.ts",
+        "src/core/provider-truth.ts",
+        "src/core/role-invocation-resolver.ts",
+        "src/core/routing-types.ts",
+        "src/core/routing/config.ts",
+        "src/core/routing/requirement-vector.ts",
+        "src/core/skill-types.ts",
+        "src/core/sprint-types.ts",
+        "src/core/task-result-schema.ts",
+        "src/core/task-types.ts",
+        "src/core/types.ts",
+        "src/core/utils.ts",
+        "src/core/verdict-types.ts",
+        "src/core/work-model.ts",
+        "src/core/xverify-verifier-tier-authority.ts"
+      ],
+      [
+        "src/core/cross-verify-execution-contract.ts",
+        "src/core/task-result-settlement.ts"
+      ],
+      [
+        "src/core/deck-broker.ts",
+        "src/core/provider-auth-probe.ts",
+        "src/core/provider.ts",
+        "src/core/session-interface.ts",
+        "src/orchestra/tmux.ts",
+        "src/providers/bedrock.ts",
+        "src/providers/claude.ts",
+        "src/providers/codex.ts",
+        "src/providers/cursor.ts",
+        "src/providers/gemini.ts",
+        "src/providers/ollama.ts",
+        "src/providers/openai-compatible.ts",
+        "src/providers/openrouter.ts",
+        "src/providers/provider.ts",
+        "src/providers/subprocess.ts"
+      ],
+      [
+        "src/core/event-trigger.ts",
+        "src/core/flow-scheduler.ts"
+      ],
+      [
+        "src/core/model-catalog.ts",
+        "src/core/model-registry.ts",
+        "src/core/ollama-models.ts"
+      ],
+      [
+        "src/core/run-status-authority.ts",
+        "src/core/sprint-status-authority.ts",
+        "src/core/sprint-terminal-publication-status.ts"
+      ],
+      [
+        "src/mcp/tools/help.ts",
+        "src/mcp/tools/index.ts"
+      ],
+      [
+        "src/orchestra/autonomous/mission-store/mission-acceptance.ts",
+        "src/orchestra/autonomous/mission-store/mission-kind-admission.ts",
+        "src/orchestra/autonomous/mission-store/mission-types.ts"
+      ],
+      [
+        "src/orchestra/exact-plan-start-service.ts",
+        "src/orchestra/run-flow-decision-service.ts",
+        "src/orchestra/run-flow-plan-service.ts"
+      ]
+    ],
+    "version": 1
   },
-  {
-   "id": "D004-SHIM-003",
-   "from": "src/mcp/tools/nervous.ts",
-   "to": "src/cli/helpers/messages.js",
-   "symbols": [
-    "getMessage",
-    "getLanguage"
-   ],
-   "reason": "i18n-FIRST: sprint-589 moved nervous MCP decision texts into the shared getMessage catalog (en+tr) instead of duplicating user-facing strings in the MCP layer -- same ADR-G-011 thin-wrapper precedent as D004-SHIM-001/002.",
-   "adrRef": "ADR-D-004 (C3) / ADR-G-011",
-   "enforced": false,
-   "owner": "nervous-system",
-   "dateAdded": "2026-08-21",
-   "expiry": "2027-02-21 (review at ADR-D-004 W6 full-edge audit; fold into a shared message-catalog layer if one is extracted)"
+  "manifestContract": {
+    "appliesTo": [
+      "compact-monolith",
+      "future-optional-module",
+      "future-enterprise-module"
+    ],
+    "futureModuleAdmission": {
+      "compatibilityValidation": "fail-closed-by-existing-composition-authority",
+      "coreRuntimeDependencyOnOptionalOrEnterprise": "forbidden",
+      "deepImportsIntoCoreInternals": "forbidden",
+      "dependencyValidation": "fail-closed-by-existing-composition-authority",
+      "entitlementBoundary": "module-admission-only",
+      "loaderDefinedHere": false,
+      "parallelRuntimeOrRegistryAuthority": "forbidden",
+      "stateNamespaceAndRollbackOwnership": "required",
+      "unsignedCommercialDefaultEnable": "forbidden"
+    },
+    "requiredMetadata": [
+      "manifestVersion",
+      "dependencies",
+      "capabilities",
+      "permissions",
+      "compatibility",
+      "publicImportPolicy",
+      "license",
+      "stateMigrationOwnership",
+      "entrypoints"
+    ],
+    "schemaVersion": 1,
+    "status": "governance-metadata-only"
+  },
+  "ownership": [
+    {
+      "currentOwner": "community-distribution",
+      "manifest": {
+        "capabilities": [
+          "community.public-api"
+        ],
+        "compatibility": {
+          "deckent": ">=0.100.0 <0.101.0",
+          "node": ">=24"
+        },
+        "dependencies": [
+          "deckent.agents",
+          "deckent.core",
+          "deckent.monitor",
+          "deckent.orchestra"
+        ],
+        "entrypoints": [
+          {
+            "kind": "library",
+            "publishedAs": ".",
+            "source": "src/index.ts"
+          }
+        ],
+        "license": {
+          "kind": "MIT",
+          "reference": "package.json#license"
+        },
+        "manifestVersion": 1,
+        "permissions": [],
+        "publicImportPolicy": {
+          "deepImports": "forbidden",
+          "exports": [
+            "."
+          ],
+          "public": true
+        },
+        "stateMigrationOwnership": {
+          "namespace": null,
+          "owner": "none",
+          "runner": null
+        }
+      },
+      "moduleId": "deckent.root-distribution",
+      "selector": {
+        "kind": "exact-file",
+        "path": "src/index.ts"
+      },
+      "targetOwner": "deckent-community-distribution"
+    },
+    {
+      "currentOwner": "agent-runtime",
+      "manifest": {
+        "capabilities": [
+          "agent.execution",
+          "agent.tool-use"
+        ],
+        "compatibility": {
+          "deckent": ">=0.100.0 <0.101.0",
+          "node": ">=24"
+        },
+        "dependencies": [
+          "deckent.core",
+          "deckent.providers"
+        ],
+        "entrypoints": [],
+        "license": {
+          "kind": "MIT",
+          "reference": "package.json#license"
+        },
+        "manifestVersion": 1,
+        "permissions": [
+          "workspace.read",
+          "workspace.write",
+          "tool.execute"
+        ],
+        "publicImportPolicy": {
+          "deepImports": "internal-only",
+          "exports": [],
+          "public": false
+        },
+        "stateMigrationOwnership": {
+          "namespace": "agent",
+          "owner": "agent-runtime",
+          "runner": "existing-agent-state-authority"
+        }
+      },
+      "moduleId": "deckent.agent-runtime",
+      "selector": {
+        "kind": "subtree",
+        "path": "src/agent"
+      },
+      "targetOwner": "deckent-runtime"
+    },
+    {
+      "currentOwner": "agent-catalog",
+      "manifest": {
+        "capabilities": [
+          "agent.catalog",
+          "agent.permission-guard"
+        ],
+        "compatibility": {
+          "deckent": ">=0.100.0 <0.101.0",
+          "node": ">=24"
+        },
+        "dependencies": [
+          "deckent.core"
+        ],
+        "entrypoints": [
+          {
+            "kind": "internal-barrel",
+            "publishedAs": null,
+            "source": "src/agents/index.ts"
+          }
+        ],
+        "license": {
+          "kind": "MIT",
+          "reference": "package.json#license"
+        },
+        "manifestVersion": 1,
+        "permissions": [],
+        "publicImportPolicy": {
+          "deepImports": "forbidden",
+          "exports": [
+            "src/agents/index.ts"
+          ],
+          "public": true
+        },
+        "stateMigrationOwnership": {
+          "namespace": null,
+          "owner": "none",
+          "runner": null
+        }
+      },
+      "moduleId": "deckent.agents",
+      "selector": {
+        "kind": "subtree",
+        "path": "src/agents"
+      },
+      "targetOwner": "deckent-runtime"
+    },
+    {
+      "currentOwner": "api-surface",
+      "manifest": {
+        "capabilities": [
+          "surface.http-api"
+        ],
+        "compatibility": {
+          "deckent": ">=0.100.0 <0.101.0",
+          "node": ">=24"
+        },
+        "dependencies": [
+          "deckent.core",
+          "deckent.orchestra"
+        ],
+        "entrypoints": [
+          {
+            "kind": "server",
+            "publishedAs": null,
+            "source": "src/api/server.ts"
+          }
+        ],
+        "license": {
+          "kind": "MIT",
+          "reference": "package.json#license"
+        },
+        "manifestVersion": 1,
+        "permissions": [
+          "network.listen"
+        ],
+        "publicImportPolicy": {
+          "deepImports": "internal-only",
+          "exports": [],
+          "public": false
+        },
+        "stateMigrationOwnership": {
+          "namespace": null,
+          "owner": "none",
+          "runner": null
+        }
+      },
+      "moduleId": "deckent.api",
+      "selector": {
+        "kind": "subtree",
+        "path": "src/api"
+      },
+      "targetOwner": "deckent-community-distribution"
+    },
+    {
+      "currentOwner": "cli-surface",
+      "manifest": {
+        "capabilities": [
+          "surface.cli",
+          "surface.terminal"
+        ],
+        "compatibility": {
+          "deckent": ">=0.100.0 <0.101.0",
+          "node": ">=24"
+        },
+        "dependencies": [
+          "deckent.core",
+          "deckent.orchestra"
+        ],
+        "entrypoints": [
+          {
+            "kind": "bin",
+            "publishedAs": "deckent",
+            "source": "src/cli/entry.ts"
+          },
+          {
+            "kind": "internal-barrel",
+            "publishedAs": null,
+            "source": "src/cli/index.ts"
+          }
+        ],
+        "license": {
+          "kind": "MIT",
+          "reference": "package.json#license"
+        },
+        "manifestVersion": 1,
+        "permissions": [
+          "process.spawn",
+          "terminal.io",
+          "workspace.read"
+        ],
+        "publicImportPolicy": {
+          "deepImports": "forbidden",
+          "exports": [
+            "deckent"
+          ],
+          "public": true
+        },
+        "stateMigrationOwnership": {
+          "namespace": null,
+          "owner": "none",
+          "runner": null
+        }
+      },
+      "moduleId": "deckent.cli",
+      "selector": {
+        "kind": "subtree",
+        "path": "src/cli"
+      },
+      "targetOwner": "deckent-community-distribution"
+    },
+    {
+      "currentOwner": "integration-adapters",
+      "manifest": {
+        "capabilities": [
+          "integration.connector",
+          "integration.gateway"
+        ],
+        "compatibility": {
+          "deckent": ">=0.100.0 <0.101.0",
+          "node": ">=24"
+        },
+        "dependencies": [
+          "deckent.core"
+        ],
+        "entrypoints": [],
+        "license": {
+          "kind": "MIT",
+          "reference": "package.json#license"
+        },
+        "manifestVersion": 1,
+        "permissions": [
+          "external-service.connect"
+        ],
+        "publicImportPolicy": {
+          "deepImports": "internal-only",
+          "exports": [],
+          "public": false
+        },
+        "stateMigrationOwnership": {
+          "namespace": "connectors",
+          "owner": "integration-adapters",
+          "runner": "existing-connector-state-authority"
+        }
+      },
+      "moduleId": "deckent.connectors",
+      "selector": {
+        "kind": "subtree",
+        "path": "src/connectors"
+      },
+      "targetOwner": "deckent-integration-sdk-and-adapters"
+    },
+    {
+      "currentOwner": "core-runtime",
+      "manifest": {
+        "capabilities": [
+          "core.contracts",
+          "core.kernel",
+          "core.persistence",
+          "core.policy"
+        ],
+        "compatibility": {
+          "deckent": ">=0.100.0 <0.101.0",
+          "node": ">=24"
+        },
+        "dependencies": [],
+        "entrypoints": [
+          {
+            "kind": "internal-barrel",
+            "publishedAs": null,
+            "source": "src/core/index.ts"
+          }
+        ],
+        "license": {
+          "kind": "MIT",
+          "reference": "package.json#license"
+        },
+        "manifestVersion": 1,
+        "permissions": [
+          "filesystem.local",
+          "state.local"
+        ],
+        "publicImportPolicy": {
+          "deepImports": "legacy-only-until-package-extraction",
+          "exports": [
+            "src/core/index.ts"
+          ],
+          "public": true
+        },
+        "stateMigrationOwnership": {
+          "namespace": "deckent_core",
+          "owner": "core-persistence",
+          "runner": "existing-core-migration-authority"
+        }
+      },
+      "moduleId": "deckent.core",
+      "selector": {
+        "kind": "subtree",
+        "path": "src/core"
+      },
+      "targetOwner": "deckent-core-packages"
+    },
+    {
+      "currentOwner": "dashboard-surface",
+      "manifest": {
+        "capabilities": [
+          "surface.dashboard"
+        ],
+        "compatibility": {
+          "browser": "modern",
+          "deckent": ">=0.100.0 <0.101.0"
+        },
+        "dependencies": [
+          "deckent.api"
+        ],
+        "entrypoints": [
+          {
+            "kind": "web",
+            "publishedAs": null,
+            "source": "src/dashboard/src/main.tsx"
+          }
+        ],
+        "license": {
+          "kind": "MIT",
+          "reference": "package.json#license"
+        },
+        "manifestVersion": 1,
+        "permissions": [
+          "network.client"
+        ],
+        "publicImportPolicy": {
+          "deepImports": "internal-only",
+          "exports": [],
+          "public": false
+        },
+        "stateMigrationOwnership": {
+          "namespace": "dashboard_preferences",
+          "owner": "dashboard-surface",
+          "runner": "existing-dashboard-client-state-authority"
+        }
+      },
+      "moduleId": "deckent.dashboard",
+      "selector": {
+        "kind": "subtree",
+        "path": "src/dashboard"
+      },
+      "targetOwner": "deckent-community-distribution"
+    },
+    {
+      "currentOwner": "desktop-surface",
+      "manifest": {
+        "capabilities": [
+          "surface.desktop"
+        ],
+        "compatibility": {
+          "deckent": ">=0.100.0 <0.101.0",
+          "node": ">=24"
+        },
+        "dependencies": [
+          "deckent.api"
+        ],
+        "entrypoints": [
+          {
+            "kind": "electron-main",
+            "publishedAs": null,
+            "source": "src/desktop/src/main/index.ts"
+          },
+          {
+            "kind": "electron-preload",
+            "publishedAs": null,
+            "source": "src/desktop/src/preload/index.ts"
+          },
+          {
+            "kind": "electron-renderer",
+            "publishedAs": null,
+            "source": "src/desktop/src/renderer/main.ts"
+          }
+        ],
+        "license": {
+          "kind": "MIT",
+          "reference": "package.json#license"
+        },
+        "manifestVersion": 1,
+        "permissions": [
+          "desktop.ipc",
+          "filesystem.local",
+          "process.spawn"
+        ],
+        "publicImportPolicy": {
+          "deepImports": "internal-only",
+          "exports": [],
+          "public": false
+        },
+        "stateMigrationOwnership": {
+          "namespace": "desktop_preferences",
+          "owner": "desktop-surface",
+          "runner": "existing-desktop-store-authority"
+        }
+      },
+      "moduleId": "deckent.desktop",
+      "selector": {
+        "kind": "subtree",
+        "path": "src/desktop"
+      },
+      "targetOwner": "deckent-community-distribution"
+    },
+    {
+      "currentOwner": "vscode-extension-surface",
+      "manifest": {
+        "capabilities": [
+          "surface.vscode"
+        ],
+        "compatibility": {
+          "deckent": ">=0.100.0 <0.101.0",
+          "vscode": "host-declared"
+        },
+        "dependencies": [
+          "deckent.api"
+        ],
+        "entrypoints": [
+          {
+            "kind": "extension",
+            "publishedAs": null,
+            "source": "src/extensions/vscode/src/deckent-panel.ts"
+          }
+        ],
+        "license": {
+          "kind": "MIT",
+          "reference": "package.json#license"
+        },
+        "manifestVersion": 1,
+        "permissions": [
+          "editor.api",
+          "network.client"
+        ],
+        "publicImportPolicy": {
+          "deepImports": "internal-only",
+          "exports": [],
+          "public": false
+        },
+        "stateMigrationOwnership": {
+          "namespace": null,
+          "owner": "none",
+          "runner": null
+        }
+      },
+      "moduleId": "deckent.vscode-extension",
+      "selector": {
+        "kind": "subtree",
+        "path": "src/extensions"
+      },
+      "targetOwner": "deckent-community-distribution"
+    },
+    {
+      "currentOwner": "mcp-surface",
+      "manifest": {
+        "capabilities": [
+          "integration.mcp-server",
+          "integration.mcp-tools"
+        ],
+        "compatibility": {
+          "deckent": ">=0.100.0 <0.101.0",
+          "node": ">=24"
+        },
+        "dependencies": [
+          "deckent.core",
+          "deckent.orchestra"
+        ],
+        "entrypoints": [
+          {
+            "kind": "bin",
+            "publishedAs": "deckent-mcp",
+            "source": "src/mcp/server.ts"
+          }
+        ],
+        "license": {
+          "kind": "MIT",
+          "reference": "package.json#license"
+        },
+        "manifestVersion": 1,
+        "permissions": [
+          "mcp.request",
+          "workspace.read"
+        ],
+        "publicImportPolicy": {
+          "deepImports": "forbidden",
+          "exports": [
+            "deckent-mcp"
+          ],
+          "public": true
+        },
+        "stateMigrationOwnership": {
+          "namespace": null,
+          "owner": "none",
+          "runner": null
+        }
+      },
+      "moduleId": "deckent.mcp",
+      "selector": {
+        "kind": "subtree",
+        "path": "src/mcp"
+      },
+      "targetOwner": "deckent-integration-sdk-and-adapters"
+    },
+    {
+      "currentOwner": "mcp-client-adapter",
+      "manifest": {
+        "capabilities": [
+          "integration.mcp-client"
+        ],
+        "compatibility": {
+          "deckent": ">=0.100.0 <0.101.0",
+          "node": ">=24"
+        },
+        "dependencies": [
+          "deckent.core"
+        ],
+        "entrypoints": [],
+        "license": {
+          "kind": "MIT",
+          "reference": "package.json#license"
+        },
+        "manifestVersion": 1,
+        "permissions": [
+          "network.client"
+        ],
+        "publicImportPolicy": {
+          "deepImports": "internal-only",
+          "exports": [],
+          "public": false
+        },
+        "stateMigrationOwnership": {
+          "namespace": "mcp_client",
+          "owner": "mcp-client-adapter",
+          "runner": "existing-mcp-client-registry-authority"
+        }
+      },
+      "moduleId": "deckent.mcp-client",
+      "selector": {
+        "kind": "subtree",
+        "path": "src/mcp-client"
+      },
+      "targetOwner": "deckent-integration-sdk-and-adapters"
+    },
+    {
+      "currentOwner": "monitoring-runtime",
+      "manifest": {
+        "capabilities": [
+          "runtime.audit",
+          "runtime.monitoring"
+        ],
+        "compatibility": {
+          "deckent": ">=0.100.0 <0.101.0",
+          "node": ">=24"
+        },
+        "dependencies": [
+          "deckent.core"
+        ],
+        "entrypoints": [
+          {
+            "kind": "internal-barrel",
+            "publishedAs": null,
+            "source": "src/monitor/index.ts"
+          }
+        ],
+        "license": {
+          "kind": "MIT",
+          "reference": "package.json#license"
+        },
+        "manifestVersion": 1,
+        "permissions": [
+          "audit.read",
+          "audit.write"
+        ],
+        "publicImportPolicy": {
+          "deepImports": "legacy-only-until-package-extraction",
+          "exports": [
+            "src/monitor/index.ts"
+          ],
+          "public": true
+        },
+        "stateMigrationOwnership": {
+          "namespace": "monitor",
+          "owner": "monitoring-runtime",
+          "runner": "existing-monitor-store-authority"
+        }
+      },
+      "moduleId": "deckent.monitor",
+      "selector": {
+        "kind": "subtree",
+        "path": "src/monitor"
+      },
+      "targetOwner": "deckent-runtime"
+    },
+    {
+      "currentOwner": "nervous-system",
+      "manifest": {
+        "capabilities": [
+          "runtime.anomaly-detection",
+          "runtime.recovery-proposal"
+        ],
+        "compatibility": {
+          "deckent": ">=0.100.0 <0.101.0",
+          "node": ">=24"
+        },
+        "dependencies": [
+          "deckent.core",
+          "deckent.orchestra"
+        ],
+        "entrypoints": [],
+        "license": {
+          "kind": "MIT",
+          "reference": "package.json#license"
+        },
+        "manifestVersion": 1,
+        "permissions": [
+          "audit.read",
+          "runtime.propose"
+        ],
+        "publicImportPolicy": {
+          "deepImports": "internal-only",
+          "exports": [],
+          "public": false
+        },
+        "stateMigrationOwnership": {
+          "namespace": "nervous",
+          "owner": "nervous-system",
+          "runner": "existing-nervous-state-authority"
+        }
+      },
+      "moduleId": "deckent.nervous",
+      "selector": {
+        "kind": "subtree",
+        "path": "src/nervous"
+      },
+      "targetOwner": "deckent-runtime"
+    },
+    {
+      "currentOwner": "orchestration-runtime",
+      "manifest": {
+        "capabilities": [
+          "runtime.orchestration",
+          "runtime.recovery",
+          "runtime.worker-supervision"
+        ],
+        "compatibility": {
+          "deckent": ">=0.100.0 <0.101.0",
+          "node": ">=24"
+        },
+        "dependencies": [
+          "deckent.core"
+        ],
+        "entrypoints": [
+          {
+            "kind": "internal-barrel",
+            "publishedAs": null,
+            "source": "src/orchestra/index.ts"
+          }
+        ],
+        "license": {
+          "kind": "MIT",
+          "reference": "package.json#license"
+        },
+        "manifestVersion": 1,
+        "permissions": [
+          "process.spawn",
+          "state.local",
+          "workspace.read"
+        ],
+        "publicImportPolicy": {
+          "deepImports": "legacy-only-until-package-extraction",
+          "exports": [
+            "src/orchestra/index.ts"
+          ],
+          "public": true
+        },
+        "stateMigrationOwnership": {
+          "namespace": "orchestra",
+          "owner": "orchestration-runtime",
+          "runner": "existing-orchestra-store-authority"
+        }
+      },
+      "moduleId": "deckent.orchestra",
+      "selector": {
+        "kind": "subtree",
+        "path": "src/orchestra"
+      },
+      "targetOwner": "deckent-runtime"
+    },
+    {
+      "currentOwner": "provider-adapters",
+      "manifest": {
+        "capabilities": [
+          "provider.adapter",
+          "provider.execution"
+        ],
+        "compatibility": {
+          "deckent": ">=0.100.0 <0.101.0",
+          "node": ">=24"
+        },
+        "dependencies": [
+          "deckent.core"
+        ],
+        "entrypoints": [],
+        "license": {
+          "kind": "MIT",
+          "reference": "package.json#license"
+        },
+        "manifestVersion": 1,
+        "permissions": [
+          "network.client",
+          "process.spawn",
+          "secret.read-scoped"
+        ],
+        "publicImportPolicy": {
+          "deepImports": "internal-only",
+          "exports": [],
+          "public": false
+        },
+        "stateMigrationOwnership": {
+          "namespace": "providers",
+          "owner": "provider-adapters",
+          "runner": "existing-provider-state-authority"
+        }
+      },
+      "moduleId": "deckent.providers",
+      "selector": {
+        "kind": "subtree",
+        "path": "src/providers"
+      },
+      "targetOwner": "deckent-provider-sdk-and-adapters"
+    },
+    {
+      "currentOwner": "public-sdk",
+      "manifest": {
+        "capabilities": [
+          "application.client-sdk"
+        ],
+        "compatibility": {
+          "deckent": ">=0.100.0 <0.101.0",
+          "node": ">=24"
+        },
+        "dependencies": [
+          "deckent.core",
+          "deckent.orchestra"
+        ],
+        "entrypoints": [
+          {
+            "kind": "library",
+            "publishedAs": "./sdk",
+            "source": "src/sdk/index.ts"
+          }
+        ],
+        "license": {
+          "kind": "MIT",
+          "reference": "package.json#license"
+        },
+        "manifestVersion": 1,
+        "permissions": [
+          "network.client"
+        ],
+        "publicImportPolicy": {
+          "deepImports": "forbidden",
+          "exports": [
+            "./sdk"
+          ],
+          "public": true
+        },
+        "stateMigrationOwnership": {
+          "namespace": null,
+          "owner": "none",
+          "runner": null
+        }
+      },
+      "moduleId": "deckent.sdk",
+      "selector": {
+        "kind": "subtree",
+        "path": "src/sdk"
+      },
+      "targetOwner": "deckent-application-and-sdks"
+    },
+    {
+      "currentOwner": "training-tooling",
+      "manifest": {
+        "capabilities": [
+          "tooling.trace-extraction",
+          "tooling.training-corpus"
+        ],
+        "compatibility": {
+          "deckent": ">=0.100.0 <0.101.0",
+          "node": ">=24"
+        },
+        "dependencies": [
+          "deckent.core"
+        ],
+        "entrypoints": [],
+        "license": {
+          "kind": "MIT",
+          "reference": "package.json#license"
+        },
+        "manifestVersion": 1,
+        "permissions": [
+          "filesystem.local",
+          "workspace.read"
+        ],
+        "publicImportPolicy": {
+          "deepImports": "internal-only",
+          "exports": [],
+          "public": false
+        },
+        "stateMigrationOwnership": {
+          "namespace": "training_corpus",
+          "owner": "training-tooling",
+          "runner": "src/training/historical-trace-migration.ts"
+        }
+      },
+      "moduleId": "deckent.training",
+      "selector": {
+        "kind": "subtree",
+        "path": "src/training"
+      },
+      "targetOwner": "deckent-runtime-tooling"
+    }
+  ],
+  "registryId": "deckent.module-ownership-and-layer-exceptions",
+  "registryVersion": "2.0.0",
+  "schemaVersion": 2,
+  "shims": [
+    {
+      "adrRef": "ADR-D-004 C3; ADR-G-011",
+      "dateAdded": "2026-07-02",
+      "enforced": false,
+      "expiresOn": "2027-01-02",
+      "from": "src/mcp/tools/nervous.ts",
+      "id": "D004-SHIM-001",
+      "owner": "nervous-system",
+      "reason": "MCP nervous panic-guard accept/list remains a thin surface over the existing CLI read/plan implementation during application-service extraction.",
+      "replacement": "Expose acceptPanicGuard and listPendingPanicEvents through a public Deckent application service, migrate src/mcp/tools/nervous.ts to that service, then delete this exception.",
+      "symbols": [
+        "acceptPanicGuard",
+        "listPendingPanicEvents"
+      ],
+      "to": "src/cli/commands/nervous.js"
+    },
+    {
+      "adrRef": "ADR-D-004 C3",
+      "dateAdded": "2026-07-02",
+      "enforced": true,
+      "expiresOn": "2027-01-02",
+      "from": "src/mcp/tools/nervous-edit.ts",
+      "id": "D004-SHIM-002",
+      "owner": "nervous-system",
+      "reason": "The MCP edit tool temporarily reuses the single accept-with-edited-payload plan builder instead of duplicating plan authority.",
+      "replacement": "Move the edit-plan service and its public types behind a core/orchestra application entrypoint, update both CLI and MCP consumers, then delete this exception.",
+      "symbols": [
+        "handleEdit",
+        "NervousPendingStore",
+        "NervousBridgePlanResult"
+      ],
+      "to": "src/cli/repl/nervous-bridge.js"
+    },
+    {
+      "adrRef": "ADR-D-004 C3; ADR-G-011",
+      "dateAdded": "2026-08-21",
+      "enforced": false,
+      "expiresOn": "2027-02-21",
+      "from": "src/mcp/tools/nervous.ts",
+      "id": "D004-SHIM-003",
+      "owner": "nervous-system",
+      "reason": "The MCP nervous surface temporarily consumes the shared message catalog rather than duplicating localized decision text.",
+      "replacement": "Relocate the shared message catalog to the approved lower-layer i18n owner, update CLI and MCP imports, then delete this exception.",
+      "symbols": [
+        "getMessage",
+        "getLanguage"
+      ],
+      "to": "src/cli/helpers/messages.js"
+    }
+  ],
+  "sourcePolicy": {
+    "ignore": [
+      "src/**/node_modules/**",
+      "src/**/out/**",
+      "src/**/dist/**",
+      "src/**/dist-app/**",
+      "src/**/build/**",
+      "src/**/tests/**",
+      "src/**/__tests__/**",
+      "src/**/*.test.ts",
+      "src/**/*.test.tsx",
+      "src/**/*.spec.ts",
+      "src/**/*.spec.tsx"
+    ],
+    "matching": "A production source path must match exactly one ownership selector; exact-file and subtree selectors are non-overlapping by construction.",
+    "multipleMatchPolicy": "reject",
+    "productionRoots": [
+      {
+        "include": [
+          "**/*.ts",
+          "**/*.tsx"
+        ],
+        "path": "src"
+      }
+    ],
+    "unmatchedPolicy": "reject"
+  },
+  "topology": {
+    "brainFamily": [
+      "brain",
+      "debt-manager",
+      "index",
+      "resource-monitor",
+      "result-collector",
+      "result-evaluator",
+      "spawn-backend",
+      "spawn-backend-docker",
+      "sprint-controller",
+      "sprint-finalizer",
+      "sprint-lifecycle",
+      "sprint-phases",
+      "sprint-planner",
+      "sprint-spawner",
+      "sprint-utils"
+    ],
+    "brainInternals": [
+      "auditor",
+      "tmux",
+      "worker"
+    ],
+    "forbidden": [
+      "core>orchestra",
+      "core>providers",
+      "core>cli",
+      "core>api",
+      "core>mcp",
+      "orchestra>providers",
+      "orchestra>cli",
+      "orchestra>api",
+      "orchestra>mcp",
+      "cli>api",
+      "cli>mcp",
+      "api>cli",
+      "api>mcp",
+      "mcp>cli",
+      "mcp>api"
+    ],
+    "layers": [
+      "core",
+      "orchestra",
+      "providers",
+      "cli",
+      "api",
+      "mcp"
+    ],
+    "version": 1
   }
- ]
 }

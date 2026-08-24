@@ -800,6 +800,14 @@ export function handleEvaluation(
     priorZeroDiffAttempts: countZeroDiffAttempts(projectRoot, task.id),
     acceptanceFailureFingerprint,
     priorAcceptanceFailureFingerprint,
+    evidence: {
+      testVerification: result.testVerification,
+      criteriaEvidence: result.criteriaEvidence,
+      attribution: result.workAttribution,
+      dependencyLineage: (result as TaskResult & {
+        dependencyLineage?: { failedUpstreamTaskId?: string };
+      }).dependencyLineage,
+    },
   });
   if (!failureClass.allowsFixTask) {
     updateTaskStatus(projectRoot, task.id, TaskStatus.PAUSED);

@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "outcomeId": "RUNFLOW-001",
+  "role": "supervisor",
+  "baseSha": "6272c518bc4afd1908c5cdb2e42b888009ba73b7",
+  "headSha": "6272c518bc4afd1908c5cdb2e42b888009ba73b7",
+  "branch": "main",
+  "policyDigest": "sha256:c4c96a971833ee892174b7d361e08c7f0eb53c629873381235deaa573594d863",
+  "scopeDigest": "sha256:8329ae9548a4d200eaf0465c66da97091ac994e9b1dab78248970234e4025692",
+  "filesChanged": [],
+  "verification": [],
+  "findings": [],
+  "openActions": [
+    "Independently verify PREPARED receipt, branch HEAD/origin, dirty-tree grouping, Sprint-661 terminal archive, no-active-run and provider truth; then write VERIFIED",
+    "With explicit owner authority write RECOVERY_COMMITTED, then close source-dist via full lint, build:all, documented bot restart and fresh real-binary proof",
+    "Validate and land the Sprint-661 dirty package without changing ABORTED history or claiming unresolved lineage COMPLETE",
+    "Carry heartbeat/log/status UI, Nervous/Telegram, result-schema, bounded FIX and token/coverage residuals only in existing MASTER scopes"
+  ],
+  "recommendedNextAction": "Independently verify the PREPARED receipt and write VERIFIED; do not mutate until owner-authorized RECOVERY_COMMITTED exists",
+  "authorityHandoff": {
+    "protocolVersion": 1,
+    "handoffId": "ah-2026-08-24-codex-to-claude",
+    "sequence": 3,
+    "transition": "RECOVERY_COMMITTED",
+    "transitionActor": "transferee",
+    "currentAuthorityEpoch": 2,
+    "proposedAuthorityEpoch": 3,
+    "previousReceiptDigest": "sha256:e3b1fea2b31f8e28f9ba87da29b49650e656274f8a503dbea87bf53223c7de06",
+    "from": {
+      "hostId": "codex-cli",
+      "providerId": "codex",
+      "modelApiId": "gpt-5.6-sol",
+      "role": "supervisor",
+      "principalDigest": "sha256:1d1549ebd7282b91e0c19f892a1d68c3092d2c2f7fc05d3096b405c151d47bca",
+      "sessionDigest": "sha256:0847528f058f3945bf9533b6a80e62257f17f147075b772bc3942e009697e27d"
+    },
+    "to": {
+      "hostId": "claude-code-cli",
+      "providerId": "claude",
+      "modelApiId": "claude-fable-5",
+      "role": "supervisor",
+      "principalDigest": "sha256:1d1549ebd7282b91e0c19f892a1d68c3092d2c2f7fc05d3096b405c151d47bca",
+      "sessionDigest": "sha256:8d03e1f9f18126a2f06a85ba29b2e0800240f4ac699e2234f3f7de69e68d223f"
+    },
+    "trigger": {
+      "reasonCode": "OWNER_DIRECTIVE",
+      "authorityRef": "owner-live-2026-08-24-go-full-authority-claude-8workers"
+    },
+    "authorityScope": {
+      "goalId": "MASTER-PLAN",
+      "missionId": "RUNFLOW-001",
+      "flowId": "sprint-661-recovery-closure",
+      "runId": "sprint-661",
+      "roles": [
+        "supervisor"
+      ],
+      "includes": [
+        "Sprint-661 ABORTED terminal package and unlanded dirty source changes for existing RUNFLOW-001, EVALUATION-001, scheduler, prompt-authority, heartbeat/status, Nervous/notification, token-measurement and coverage scopes"
+      ],
+      "excludes": [
+        "owner-only Closure OS signing/private keys; unrelated shared-workspace files; new outcomes; manual MASTER DONE; commit/push before independent verification"
+      ]
+    },
+    "evidenceSnapshot": {
+      "observedAt": "2026-08-24T19:37:33.543Z",
+      "repoStateRef": "git:6272c518bc4afd1908c5cdb2e42b888009ba73b7:dirty=69",
+      "runtimeStateRef": "sprint-661 ABORTED generation=19 settlement=346910bbe3308fff8c345d8e6ba9ce98ad192b22f9498f2e5d8612baa4acb248 recovery=consistent active=false coordinator=absent botPid=242187-stale-dist",
+      "approvalStateRef": "deckent approvals list: no pending; only historical EXPIRED audits",
+      "verificationStateRef": "LOCAL_VERIFIED source: tsc-noEmit; scoped 89/89; fan-in 109/109; git-diff-check clean; no post-terminal full lint/build/real-binary",
+      "buildStateRef": "SOURCE_DIST_MISMATCH; bot PID 242187 runs stale dist; active-sprint build rule was violated during PAUSED and is not reusable evidence",
+      "ssotStateRef": "docs/MASTER-PLAN.md + follow-up-works/current-flow.md"
+    }
+  },
+  "receiptDigest": "sha256:09a1f774689ed4e785fa859dbd3f574406da02c87d2080c94d773c281a05117a"
+}

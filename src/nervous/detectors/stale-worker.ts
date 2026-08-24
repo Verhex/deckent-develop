@@ -1,50 +1,14 @@
 // src/nervous/detectors/stale-worker.ts
 //
-// StaleWorkerDetector — Sprint 145 T-011 Docker worker exit pattern'i + genel HB staleness.
-// 10dk+ heartbeat güncellemesi olmayan worker'ları tespit eder → WORKER_RESPAWN öneri.
+// StaleWorkerDetector — exact-attempt host-dead verdict → WORKER_RESPAWN proposal.
+// Worker-authored activity is identity/UI context only, never liveness evidence.
 //
 // Design spec: docs/superpowers/specs/2026-04-20-deckent-nervous-system-design.md Section 5.1
 // Sprint 147 Task 9
 
 import type { DetectorContext, DetectorResult } from '../../core/nervous-types.js';
 import { DEFAULT_HEARTBEAT_TIMEOUT_MS } from '../../core/config.js';
-import { checkWorkerLiveness } from '../../orchestra/worker-liveness.js';
-import type { Task } from '../../core/task-types.js';
-import { readFileSync, existsSync, statSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-
-/**
- * Activity-truth (Alperen, 2026-08-12 — nervous false-positive seli düzeltmesi):
- * worker kontratı hb'yi DOSYA DEĞİŞİMİNDE yazar; uzun okuma/analiz turlarında
- * `.hb` meşru olarak sessizdir ama worker `.partial-result`, `.landing-proposal.json`,
- * `.log` artefaktlarına yazmaya devam eder. Staleness kararı hb-dosyası
- * tek başına değil, bu artefakt kümesinin EN TAZE mtime'ı üzerinden verilir;
- * `.result` varsa worker settle olmuştur ve hiç aday değildir (projection lag).
- *
- * 7094-F1d (2026-08-19): `.plan` artık hiç yazılmıyor (listeden düştü) ve
- * docker backend'de KOŞU SIRASINDA host'ta hiçbir dosya tazelenmiyor (tek-yazım
- * hb; `.log` yalnız container çıkışında yazılır) — bu yüzden mtime-bayatlığı tek
- * başına respawn'a yetmez: canlı container probe'u (`checkWorkerLiveness` L2)
- * stale kararını VETO eder (KANUN 15: probe > mtime).
- */
-const ACTIVITY_SUFFIXES = ['.hb', '.partial-result', '.landing-proposal.json', '.log'] as const;
-
-function lastActivityMs(projectRoot: string, taskId: string, reportedHbIso: string): number | null {
-  if (!projectRoot) return new Date(reportedHbIso).getTime();
-  const base = join(projectRoot, '.tasks', `task-${taskId}`);
-  if (existsSync(`${base}.result`)) return null; // settled — asla stale adayı değil
-  let latest = new Date(reportedHbIso).getTime();
-  if (!Number.isFinite(latest)) latest = 0;
-  for (const suffix of ACTIVITY_SUFFIXES) {
-    try {
-      const m = statSync(`${base}${suffix}`).mtimeMs;
-      if (m > latest) latest = m;
-    } catch {
-      // artefakt yoksa sinyal de yok — sessizce geç
-    }
-  }
-  return latest;
-}
+import type { HostPrimaryLiveness } from '../../core/monitoring-types.js';
 
 /**
  * Per-scope adaptive threshold hesaplama.
@@ -59,23 +23,6 @@ export function computeAdaptiveThreshold(
   return Math.min(base * (1 + 0.02 * filesWriteCount + 0.03 * dirCount), base * 2);
 }
 
-function readTaskScope(projectRoot: string, taskId: string): { filesWrite: string[] } {
-  if (!projectRoot) return { filesWrite: [] };
-  const taskFile = join(projectRoot, '.tasks', `task-${taskId}.json`);
-  if (!existsSync(taskFile)) return { filesWrite: [] };
-  try {
-    const raw = readFileSync(taskFile, 'utf-8');
-    const parsed = JSON.parse(raw) as { scope?: { filesWrite?: string[] } };
-    return { filesWrite: parsed.scope?.filesWrite ?? [] };
-  } catch {
-    return { filesWrite: [] };
-  }
-}
-
-function countUniqueDirs(filesWrite: string[]): number {
-  if (filesWrite.length === 0) return 0;
-  return new Set(filesWrite.map(f => dirname(f))).size;
-}
 
 /**
  * Aktif worker'ların heartbeat'lerini izler.
@@ -90,15 +37,15 @@ export class StaleWorkerDetector {
   readonly detectorId = 'stale-worker';
 
   /**
-   * Episode-dedupe (Alperen, 2026-08-12): aynı worker aynı sessizlik-episodu
-   * içinde yalnız BİR kez bildirilir — anahtar, bildirim anındaki en-taze
-   * aktivite zaman damgasıdır; aktivite tazelenirse episode sıfırlanır ve
-   * yeni bir sessizlik yeniden bildirilebilir. Cron her tick'te yeniden
-   * bildirim basamaz.
+   * One exact host-dead observation produces one notification. A later host
+   * sequence is a new observation and may produce a new notification.
    */
-  private readonly notifiedEpisodes = new Map<string, number>();
+  private readonly notifiedEpisodes = new Set<string>();
 
-  constructor(private readonly staleThresholdMs = DEFAULT_HEARTBEAT_TIMEOUT_MS) {}
+  constructor(staleThresholdMs = DEFAULT_HEARTBEAT_TIMEOUT_MS) {
+    // Retain the public constructor shape while host authority replaces age.
+    void staleThresholdMs;
+  }
 
   detect(ctx: DetectorContext): DetectorResult | null {
     // Sadece cron veya filesystem kaynaklı event'leri işle
@@ -112,39 +59,14 @@ export class StaleWorkerDetector {
       return null;
     }
 
-    // Activity-truth staleness (hb + partial-result/landing/plan/log artefaktları)
-    // + settle-edilmiş worker'ı hiç aday saymama + episode-dedupe.
+    // Activity is presentation-only. Respawn admission is based solely on the
+    // exact-attempt host authority projected by sprint-state-tracker.
     const staleWorkers = ctx.sprintState.activeWorkers.filter(w => {
-      const activityMs = lastActivityMs(ctx.projectRoot, w.taskId, w.lastHeartbeat);
-      if (activityMs === null) {
-        this.notifiedEpisodes.delete(w.id); // settled — episode kapandı
-        return false;
-      }
-      const scope = readTaskScope(ctx.projectRoot, w.taskId);
-      const dirCount = countUniqueDirs(scope.filesWrite);
-      const threshold = computeAdaptiveThreshold(this.staleThresholdMs, scope.filesWrite.length, dirCount);
-      if (ctx.now.getTime() - activityMs <= threshold) {
-        this.notifiedEpisodes.delete(w.id); // aktivite tazelendi — episode sıfırla
-        return false;
-      }
-      // 7094-F1d liveness veto: file mtimes freeze at spawn on the docker
-      // backend, so a LIVE container outranks any stale-mtime verdict — never
-      // propose respawning a worker whose container is provably running.
-      if (ctx.projectRoot) {
-        try {
-          const probe = checkWorkerLiveness(
-            { id: w.taskId, assignedWorker: w.id } as Task,
-            ctx.projectRoot,
-          );
-          if (probe.status === 'alive') {
-            this.notifiedEpisodes.delete(w.id);
-            return false;
-          }
-        } catch { /* probe error — fall through to the mtime verdict */ }
-      }
-      // Stale — ama bu episode zaten bildirildiyse tekrar basma.
-      if (this.notifiedEpisodes.get(w.id) === activityMs) return false;
-      this.notifiedEpisodes.set(w.id, activityMs);
+      const liveness = (w as typeof w & { liveness?: HostPrimaryLiveness }).liveness;
+      if (!liveness || liveness.state !== 'dead') return false;
+      const episode = `${w.id}\u0000${w.taskId}\u0000${liveness.attemptId}\u0000${liveness.hostSequence}`;
+      if (this.notifiedEpisodes.has(episode)) return false;
+      this.notifiedEpisodes.add(episode);
       return true;
     });
 
@@ -157,7 +79,7 @@ export class StaleWorkerDetector {
       shouldNotify: true,
       severity: 'warning',
       title: `Stale worker${staleWorkers.length > 1 ? `s (${staleWorkers.length})` : ` ${staleWorkers[0]!.id}`}`,
-      message: `Heartbeat stale >${Math.round(this.staleThresholdMs / 60000)}min — respawn proposed for ${staleWorkers.map(w => w.id).join(', ')}`,
+      message: `Host reports exact worker attempt dead — respawn proposed for ${staleWorkers.map(w => w.id).join(', ')}`,
       groupKey: `stale-worker:${staleWorkers.map(w => w.id).join(',')}`,
       suggestedActions: staleWorkers.map(w => ({
         id: 'WORKER_RESPAWN',

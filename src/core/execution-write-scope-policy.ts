@@ -1,5 +1,219 @@
 import { posix } from 'node:path';
+import { createHash } from 'node:crypto';
 import type { Task } from './types.js';
+import type { TaskScope } from './task-types.js';
+
+export const CANONICAL_SCOPE_MANIFEST_VERSION = 1 as const;
+export const CANONICAL_SCOPE_POLICY_VERSION = 'portable-scope-v1' as const;
+
+export type ScopeSelector =
+  | { readonly kind: 'exact-file'; readonly path: string }
+  | { readonly kind: 'directory-tree'; readonly path: string }
+  | { readonly kind: 'glob'; readonly pattern: string };
+
+type PathScopeSelector = Extract<ScopeSelector, { readonly path: string }>;
+
+export type CanonicalScopeHoldCode =
+  | 'INVALID_PATH'
+  | 'LEGACY_WILDCARD_REQUIRES_SELECTOR'
+  | 'UNSUPPORTED_GLOB'
+  | 'PORTABLE_PATH_COLLISION'
+  | 'SYMLINK_AMBIGUITY';
+
+export interface CanonicalScopeHold {
+  readonly code: CanonicalScopeHoldCode;
+  readonly field: 'directories' | 'filesRead' | 'filesWrite' | 'inventory';
+  readonly value: string;
+}
+
+export interface CanonicalScopeManifest {
+  readonly version: typeof CANONICAL_SCOPE_MANIFEST_VERSION;
+  readonly policyVersion: typeof CANONICAL_SCOPE_POLICY_VERSION;
+  readonly policyDigest: string;
+  readonly digest: string;
+  readonly selectors: Readonly<{
+    readonly directories: readonly ScopeSelector[];
+    readonly filesRead: readonly ScopeSelector[];
+    readonly filesWrite: readonly ScopeSelector[];
+  }>;
+  readonly scope: Readonly<{
+    readonly directories: readonly string[];
+    readonly filesRead: readonly string[];
+    readonly filesWrite: readonly string[];
+  }>;
+}
+
+export type CanonicalScopeCompileResult =
+  | { readonly ok: true; readonly manifest: CanonicalScopeManifest }
+  | { readonly ok: false; readonly holds: readonly CanonicalScopeHold[] };
+
+export interface CompileCanonicalScopeInput {
+  readonly scope: TaskScope;
+  /** Deterministic project inventory. Required to expand directory-tree selectors. */
+  readonly inventory?: readonly string[];
+  /** Paths the inventory provider could not prove are non-symlinks. */
+  readonly ambiguousSymlinks?: readonly string[];
+}
+
+function compareCodePoint(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value !== null && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([a], [b]) => compareCodePoint(a, b))
+      .map(([key, entry]) => `${JSON.stringify(key)}:${canonicalJson(entry)}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function sha256(value: unknown): string {
+  return `sha256:${createHash('sha256').update(canonicalJson(value)).digest('hex')}`;
+}
+
+function containsWildcard(value: string): boolean {
+  return /[*?[\]{}!]/.test(value);
+}
+
+function normalizePortablePath(value: string): { path: string; key: string } | undefined {
+  const input = value.trim().normalize('NFC').replace(/\\/g, '/');
+  if (
+    input.length === 0
+    || input.startsWith('/')
+    || input.startsWith('//')
+    || /^[A-Za-z]:($|\/)/.test(input)
+  ) return undefined;
+  const segments: string[] = [];
+  for (const segment of input.split('/')) {
+    if (segment === '' || segment === '.') continue;
+    if (segment === '..') {
+      if (segments.length === 0) return undefined;
+      segments.pop();
+      continue;
+    }
+    if (segment.includes('\0') || segment.includes(':')) return undefined;
+    segments.push(segment);
+  }
+  if (segments.length === 0) return undefined;
+  const path = segments.join('/');
+  return { path, key: path.toLowerCase() };
+}
+
+/**
+ * Pure admission compiler for legacy TaskScope strings. Wildcards never receive
+ * implicit prefix/glob semantics: callers must migrate them to an explicit
+ * selector API before admission. The returned manifest is the sole exact scope
+ * authority for prompt compilation and downstream consumers.
+ */
+export function compileCanonicalScope(input: CompileCanonicalScopeInput): CanonicalScopeCompileResult {
+  const holds: CanonicalScopeHold[] = [];
+  const inventoryByKey = new Map<string, string>();
+  const inventoryCollisions = new Map<string, Set<string>>();
+  const inventory: string[] = [];
+  for (const raw of input.inventory ?? []) {
+    const normalized = normalizePortablePath(raw);
+    if (!normalized) {
+      holds.push({ code: 'INVALID_PATH', field: 'inventory', value: raw });
+      continue;
+    }
+    const previous = inventoryByKey.get(normalized.key);
+    if (previous && previous !== normalized.path) {
+      const variants = inventoryCollisions.get(normalized.key) ?? new Set([previous]);
+      variants.add(normalized.path);
+      inventoryCollisions.set(normalized.key, variants);
+    } else if (!previous) {
+      inventoryByKey.set(normalized.key, normalized.path);
+    }
+    inventory.push(normalized.path);
+  }
+  const ambiguous = new Set<string>();
+  for (const raw of input.ambiguousSymlinks ?? []) {
+    const normalized = normalizePortablePath(raw);
+    if (!normalized) holds.push({ code: 'INVALID_PATH', field: 'inventory', value: raw });
+    else ambiguous.add(normalized.key);
+  }
+
+  const parse = (
+    values: readonly string[],
+    field: CanonicalScopeHold['field'],
+    kind: PathScopeSelector['kind'],
+  ): PathScopeSelector[] => values.flatMap(raw => {
+    if (containsWildcard(raw)) {
+      holds.push({ code: 'LEGACY_WILDCARD_REQUIRES_SELECTOR', field, value: raw });
+      return [];
+    }
+    const normalized = normalizePortablePath(raw);
+    if (!normalized) {
+      holds.push({ code: 'INVALID_PATH', field, value: raw });
+      return [];
+    }
+    if (ambiguous.has(normalized.key)) {
+      holds.push({ code: 'SYMLINK_AMBIGUITY', field, value: raw });
+      return [];
+    }
+    return [{ kind, path: normalized.path }];
+  });
+
+  const directorySelectors = parse(input.scope.directories ?? [], 'directories', 'directory-tree');
+  const readSelectors = parse(input.scope.filesRead ?? [], 'filesRead', 'exact-file');
+  const writeSelectors = parse(input.scope.filesWrite ?? [], 'filesWrite', 'exact-file');
+  const authoredSelectors: readonly PathScopeSelector[] = [
+    ...directorySelectors,
+    ...readSelectors,
+    ...writeSelectors,
+  ];
+  for (const [key, variants] of inventoryCollisions) {
+    const isSelected = authoredSelectors.some(selector => {
+      const selectorKey = selector.path.toLowerCase();
+      return selector.kind === 'exact-file'
+        ? selectorKey === key
+        : key === selectorKey || key.startsWith(`${selectorKey}/`);
+    });
+    if (isSelected) {
+      holds.push({
+        code: 'PORTABLE_PATH_COLLISION',
+        field: 'inventory',
+        value: [...variants].sort(compareCodePoint).join('|'),
+      });
+    }
+  }
+  if (holds.length > 0) return { ok: false, holds: Object.freeze(holds) };
+
+  const sortSelectors = (values: ScopeSelector[]): readonly ScopeSelector[] => Object.freeze(
+    [...new Map(values.map(value => [`${value.kind}:${'path' in value ? value.path : value.pattern}`, value])).values()]
+      .sort((a, b) => compareCodePoint(canonicalJson(a), canonicalJson(b)))
+      .map(value => Object.freeze(value)),
+  );
+  const selectors = Object.freeze({
+    directories: sortSelectors(directorySelectors),
+    filesRead: sortSelectors(readSelectors),
+    filesWrite: sortSelectors(writeSelectors),
+  });
+  const writes = [...new Set(writeSelectors.map(selector => selector.path))].sort(compareCodePoint);
+  const writeKeys = new Set(writes.map(path => path.toLowerCase()));
+  const reads = [...new Set(readSelectors.map(selector => selector.path))]
+    .filter(path => !writeKeys.has(path.toLowerCase())).sort(compareCodePoint);
+  const directories = [...new Set(directorySelectors.map(selector => selector.path))].sort(compareCodePoint);
+  const policyIdentity = {
+    version: CANONICAL_SCOPE_MANIFEST_VERSION,
+    policyVersion: CANONICAL_SCOPE_POLICY_VERSION,
+    rules: ['slash', 'NFC', 'portable-casefold', 'no-drive-UNC-root-escape', 'symlink-hold'],
+  };
+  const payload = { ...policyIdentity, selectors, scope: { directories, filesRead: reads, filesWrite: writes }, inventory: [...new Set(inventory)].sort(compareCodePoint) };
+  return {
+    ok: true,
+    manifest: Object.freeze({
+      version: CANONICAL_SCOPE_MANIFEST_VERSION,
+      policyVersion: CANONICAL_SCOPE_POLICY_VERSION,
+      policyDigest: sha256(policyIdentity),
+      digest: sha256(payload),
+      selectors,
+      scope: Object.freeze({ directories: Object.freeze(directories), filesRead: Object.freeze(reads), filesWrite: Object.freeze(writes) }),
+    }),
+  };
+}
 
 export interface ExecutionWriteScopePolicy {
   readonly mode: 'closed-allowlist';

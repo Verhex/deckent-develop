@@ -49,6 +49,53 @@ afterEach(() => {
 });
 
 describe('canonical sprint archive reconciliation', () => {
+  it('archives only receipt-referenced full-digest core bytes and replay-verifies them', () => {
+    const core = 'canonical worker system prompt';
+    const digest = createHash('sha256').update(core).digest('hex');
+    write(`.tasks/.worker-core-${digest}.md`, core);
+    write('.tasks/.worker-core-deadbeefdead.md', 'historical short hash');
+    write('.tasks/task-621-009.attempt-attempt-2.codex.prompt-delivery.json', JSON.stringify({
+      version: 2,
+      taskId: '621-009',
+      runtimeDelivery: {
+        coreArtifactPath: '.tasks/.worker-core-deadbeefdead.md',
+        coreSha256: 'f'.repeat(64),
+        coreBytes: 21,
+      },
+    }));
+    write('.tasks/task-621-008.attempt-attempt-1.codex.prompt-delivery.json', JSON.stringify({
+      version: 2,
+      taskId: '621-008',
+      runtimeDelivery: {
+        coreArtifactPath: `.tasks/.worker-core-${digest}.md`,
+        coreSha256: digest,
+        coreBytes: Buffer.byteLength(core),
+      },
+    }));
+    write('.deckent/recently-works/sprint-621-terminal-receipt.json', JSON.stringify({
+      terminalOutcome: 'COMPLETE',
+    }));
+
+    const report = reconcileSprintArchive(root, SPRINT_ID, { apply: true, indexMemory: false });
+    const archivedCore = join(report.archiveDir, 'tasks', 'worker-cores', `.worker-core-${digest}.md`);
+    expect(readFileSync(archivedCore, 'utf8')).toBe(core);
+    expect(report.manifest.artifacts.some(
+      artifact => artifact.path.includes('deadbeefdead'),
+    )).toBe(false);
+    expect(report.manifest.artifacts.some(
+      artifact => artifact.path.includes('task-621-009'),
+    )).toBe(false);
+    expect(verifySprintArchive(root, SPRINT_ID).ok).toBe(true);
+
+    writeFileSync(archivedCore, 'tampered', 'utf8');
+    expect(verifySprintArchive(root, SPRINT_ID)).toMatchObject({
+      ok: false,
+      mismatched: expect.arrayContaining([
+        `tasks/worker-cores/.worker-core-${digest}.md`,
+      ]),
+    });
+  });
+
   it('collects split evidence, retires only exact-sprint legacy files, indexes Brain, and is idempotent', () => {
     const legacyBrain = '.brain/archive/sprints/sprint-621-tasks';
     write(`${legacyBrain}/task-621-001.json`, JSON.stringify({ id: '621-001', sprintId: SPRINT_ID }));

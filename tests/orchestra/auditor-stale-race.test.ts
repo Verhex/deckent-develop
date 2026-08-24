@@ -10,7 +10,13 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { scanHeartbeats, clearHeartbeatCache } from '../../src/monitor/auditor.js';
+import {
+  clearHeartbeatCache,
+  isWorkerStale,
+  scanHeartbeats,
+  writeScanToDashboard,
+} from '../../src/monitor/auditor.js';
+import type { HeartbeatAuthoritySnapshot } from '../../src/monitor/auditor.js';
 
 vi.mock('node:fs', () => ({
   readFileSync: vi.fn(),
@@ -69,12 +75,13 @@ vi.mock('../../src/core/memory-store.js', () => ({
   })),
 }));
 
-import { readdirSync, existsSync, statSync } from 'node:fs';
+import { readdirSync, existsSync, statSync, writeFileSync } from 'node:fs';
 import { readJsonSafe } from '../../src/core/utils.js';
 
 const mockedReaddirSync = vi.mocked(readdirSync);
 const mockedExistsSync = vi.mocked(existsSync);
 const mockedStatSync = vi.mocked(statSync);
+const mockedWriteFileSync = vi.mocked(writeFileSync);
 const mockedReadJsonSafe = vi.mocked(readJsonSafe);
 
 const PROJECT_ROOT = '/tmp/test-project';
@@ -99,6 +106,85 @@ beforeEach(() => {
 });
 
 describe('Auditor Stale Alert Race Condition Fix (Sprint 149)', () => {
+  it('projects a dynamic FIX heartbeat by its activity task identity', () => {
+    mockedExistsSync.mockReturnValue(true);
+    mockedReaddirSync.mockReturnValue([] as never);
+    mockedReadJsonSafe.mockImplementation((path: string) => {
+      if (path.endsWith('task-661-006-fix.json')) {
+        return {
+          id: '661-006-fix',
+          model: 'gpt-5.6-sol',
+          assignedAgent: 'bug-fixer',
+          createdAt: '2026-08-24T11:00:00.000Z',
+        } as never;
+      }
+      return null;
+    });
+
+    writeScanToDashboard(
+      PROJECT_ROOT,
+      { id: 'sprint-661', number: 661, phase: 'FIX', status: 'RUNNING' },
+      {
+        heartbeats: [{
+          workerId: 'w-661-006-fix',
+          taskId: '661-006-fix',
+          status: 'EXECUTING',
+          currentAction: 'repairing',
+          timestamp: '2026-08-24T12:00:00.000Z',
+          sequence: 0,
+          progress: 0,
+          filesChangedCount: 0,
+          backend: 'docker',
+        }] as never,
+        violations: [],
+        alerts: [],
+        locks: [],
+      },
+    );
+
+    const dashboardWrite = mockedWriteFileSync.mock.calls.find(
+      ([, contents]) => String(contents).includes('"agents"'),
+    );
+    expect(dashboardWrite).toBeDefined();
+    const dashboard = JSON.parse(String(dashboardWrite![1])) as {
+      agents: Array<{ taskId: string; currentAction: string }>;
+    };
+    expect(dashboard.agents).toContainEqual(expect.objectContaining({
+      taskId: '661-006-fix',
+      currentAction: 'repairing',
+    }));
+    expect(mockedReadJsonSafe).not.toHaveBeenCalledWith(
+      expect.stringContaining('task-undefined.json'),
+    );
+  });
+
+  it('uses exact-attempt host authority and never converts unavailable into dead', () => {
+    const hb = { ...createHeartbeat('host-1', 'w-host-1', STALE_TIMESTAMP), attemptId: 'attempt-1' };
+    const snapshot = (liveness: 'alive' | 'not-alive' | 'unknown'): HeartbeatAuthoritySnapshot => ({
+      identity: { runId: 'run', taskId: 'host-1', attemptId: 'attempt-1', workerId: 'docker-host-1', fence: 'f' },
+      authority: {
+        schemaVersion: 1,
+        identity: { runId: 'run', taskId: 'host-1', attemptId: 'attempt-1', workerId: 'docker-host-1', fence: 'f' },
+        holds: [],
+        latest: {
+          runId: 'run', taskId: 'host-1', attemptId: 'attempt-1', workerId: 'docker-host-1', fence: 'f',
+          hostSequence: 1,
+          hostObservedAt: new Date().toISOString(),
+          hostProcessOutcome: liveness === 'alive'
+            ? { state: 'running', exitCode: null }
+            : { state: 'exited', exitCode: 1 },
+          workerTaskVerdict: 'pending',
+          liveness,
+        },
+      },
+    });
+
+    expect(isWorkerStale(hb as never, PROJECT_ROOT, 120_000, undefined, snapshot('alive'))).toBe(false);
+    expect(isWorkerStale(hb as never, PROJECT_ROOT, 120_000, undefined, snapshot('unknown'))).toBe(false);
+    expect(isWorkerStale(hb as never, PROJECT_ROOT, 120_000, undefined, snapshot('not-alive'))).toBe(true);
+    expect(isWorkerStale(hb as never, PROJECT_ROOT, 120_000)).toBe(false);
+  });
+
   it('PENDING task with stale HB → no stale alert (false positive suppressed)', () => {
     const hb = createHeartbeat('001', 'w-001', STALE_TIMESTAMP);
     const task = { id: '001', status: 'PENDING', dependencies: [] };

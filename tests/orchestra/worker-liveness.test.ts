@@ -4,15 +4,15 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   checkWorkerLiveness,
-  LIVENESS_FRESHNESS_MS,
+  readHostHeartbeatAuthority,
 } from '../../src/orchestra/worker-liveness.js';
+import { createWorkerActivityHeartbeat } from '../../src/core/worker-activity-heartbeat.js';
 import type { Task } from '../../src/core/task-types.js';
-import { dockerContainerNameForTask } from '../../src/core/task-result-settlement.js';
 
 const baseTask: Task = {
   id: '191-009',
@@ -30,7 +30,7 @@ const baseTask: Task = {
   createdAt: new Date().toISOString(),
 } as Task;
 
-describe('checkWorkerLiveness — 5-layer signal evaluation', () => {
+describe('checkWorkerLiveness — host heartbeat authority read model', () => {
   let root: string;
 
   beforeEach(() => {
@@ -42,100 +42,92 @@ describe('checkWorkerLiveness — 5-layer signal evaluation', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('L1: never-spawned when assignedWorker missing — short-circuits without probing other signals', () => {
+  function writeActivity(overrides: Partial<ReturnType<typeof createWorkerActivityHeartbeat>> = {}): void {
+    writeFileSync(join(root, '.tasks', 'task-191-009.hb'), JSON.stringify({
+      ...createWorkerActivityHeartbeat({
+        taskId: '191-009', workerId: 'w-191-009', attemptId: 'attempt-a',
+        backend: 'docker', status: 'EXECUTING', currentAction: 'Working',
+        observedAt: '2026-08-24T12:00:00.000Z',
+      }),
+      ...overrides,
+    }), 'utf8');
+  }
+
+  it('never-spawned when assignedWorker missing', () => {
     const task = { ...baseTask, assignedWorker: undefined } as Task;
-    const result = checkWorkerLiveness(task, root, {
-      isDockerContainerRunning: () => {
-        throw new Error('should not probe docker when L1 fails');
-      },
-    });
+    const result = checkWorkerLiveness(task, root);
     expect(result.status).toBe('never-spawned');
     expect(result.signals.assignedWorker).toBe(false);
     expect(result.reason).toContain('dispatcher never reached');
   });
 
-  it('L2: alive when docker container running, even without heartbeat/log', () => {
+  it('uses an exact activity attempt identity and host authority alive result', () => {
     const task = { ...baseTask, assignedWorker: 'w-191-009' } as Task;
-    const result = checkWorkerLiveness(task, root, {
-      isDockerContainerRunning: (name) => {
-        expect(name).toBe(dockerContainerNameForTask(root, task.id));
-        return true;
-      },
-    });
+    writeActivity();
+    const result = checkWorkerLiveness(task, root, { readAuthority: (_root, activity) => {
+      expect(activity.attemptId).toBe('attempt-a');
+      return 'alive';
+    } });
     expect(result.status).toBe('alive');
-    expect(result.signals.dockerRunning).toBe(true);
+    expect(result.signals.authorityMatched).toBe(true);
   });
 
-  it('L3: alive when heartbeat fresh', () => {
+  it('does not use activity age as process truth', () => {
     const task = { ...baseTask, assignedWorker: 'w-191-009' } as Task;
-    const hbPath = join(root, '.tasks', 'task-191-009.hb');
-    writeFileSync(hbPath, '{"taskId":"191-009"}', 'utf-8');
-    const result = checkWorkerLiveness(task, root, {
-      isDockerContainerRunning: () => false,
-    });
-    expect(result.status).toBe('alive');
-    expect(result.signals.heartbeatFresh).toBe(true);
-  });
-
-  it('L3 negative: heartbeat older than 90s → not fresh', () => {
-    const task = { ...baseTask, assignedWorker: 'w-191-009' } as Task;
-    const hbPath = join(root, '.tasks', 'task-191-009.hb');
-    writeFileSync(hbPath, '{"taskId":"191-009"}', 'utf-8');
-    // Backdate mtime to 2 minutes ago
-    const staleSec = Date.now() / 1000 - 120;
-    utimesSync(hbPath, staleSec, staleSec);
-    const result = checkWorkerLiveness(task, root, {
-      isDockerContainerRunning: () => false,
-    });
-    expect(result.signals.heartbeatFresh).toBe(false);
-    expect(result.status).toBe('dead');
-  });
-
-  it('L4: alive when log file growing (mtime fresh) even without HB', () => {
-    const task = { ...baseTask, assignedWorker: 'w-191-009' } as Task;
-    const logPath = join(root, '.tasks', 'task-191-009.log');
-    writeFileSync(logPath, 'still writing...\n', 'utf-8');
-    const result = checkWorkerLiveness(task, root, {
-      isDockerContainerRunning: () => false,
-    });
-    expect(result.signals.logGrowing).toBe(true);
+    writeActivity({ observedAt: '2000-01-01T00:00:00.000Z' });
+    const result = checkWorkerLiveness(task, root, { readAuthority: () => 'alive' });
     expect(result.status).toBe('alive');
   });
 
-  it('L5: partial-result detected but ALONE does NOT promote to alive — needs docker/hb/log', () => {
+  it('preserves unavailable/HOLD instead of inventing dead', () => {
     const task = { ...baseTask, assignedWorker: 'w-191-009' } as Task;
-    const partialPath = join(root, '.tasks', 'task-191-009.partial-result');
-    writeFileSync(partialPath, '{"selfAssessment":"NO_GO"}', 'utf-8');
-    const result = checkWorkerLiveness(task, root, {
-      isDockerContainerRunning: () => false,
-    });
-    expect(result.signals.partialResultExists).toBe(true);
-    expect(result.status).toBe('dead');
-    expect(result.reason).toContain('partial=true');
+    writeActivity();
+    expect(checkWorkerLiveness(task, root, { readAuthority: () => 'unavailable' }).status)
+      .toBe('unavailable');
   });
 
-  it('dead: no signals at all → genuine timeout', () => {
+  it('returns dead only from explicit host authority', () => {
     const task = { ...baseTask, assignedWorker: 'w-191-009' } as Task;
-    const result = checkWorkerLiveness(task, root, {
-      isDockerContainerRunning: () => false,
-    });
-    expect(result.status).toBe('dead');
-    expect(result.signals.dockerRunning).toBe(false);
-    expect(result.signals.heartbeatFresh).toBe(false);
-    expect(result.signals.logGrowing).toBe(false);
-    expect(result.signals.partialResultExists).toBe(false);
+    writeActivity();
+    expect(checkWorkerLiveness(task, root, { readAuthority: () => 'dead' }).status).toBe('dead');
   });
 
-  it('docker probe errors fail closed (false, not throw)', () => {
+  it('does not call a result-settled worker stale when authority is unavailable', () => {
     const task = { ...baseTask, assignedWorker: 'w-191-009' } as Task;
-    const result = checkWorkerLiveness(task, root, {
-      isDockerContainerRunning: () => { throw new Error('docker absent'); },
-    });
-    // Should swallow throw → dead status
-    expect(result.status).toBe('dead');
+    writeFileSync(join(root, '.tasks', 'task-191-009.result'), '{}', 'utf8');
+    const result = checkWorkerLiveness(task, root);
+    expect(result.status).toBe('unavailable');
+    expect(result.signals.resultSettled).toBe(true);
   });
 
-  it('LIVENESS_FRESHNESS_MS is 90 seconds (matches RUNTIME_EXTENSION_HEARTBEAT_FRESH_S)', () => {
-    expect(LIVENESS_FRESHNESS_MS).toBe(90_000);
+  it('requires one matching exact attempt authority entry', () => {
+    writeActivity();
+    const runtime = join(root, '.deckent', 'runtime', 'worker-heartbeat-authority', 'entry');
+    mkdirSync(runtime, { recursive: true });
+    writeFileSync(join(runtime, 'identity.json'), JSON.stringify({ identity: {
+      taskId: '191-009', workerId: 'w-191-009', attemptId: 'attempt-a',
+    } }), 'utf8');
+    writeFileSync(join(runtime, '0000000000000001.json'), JSON.stringify({ liveness: 'alive' }), 'utf8');
+    const activity = createWorkerActivityHeartbeat({
+      taskId: '191-009', workerId: 'w-191-009', attemptId: 'attempt-a',
+      backend: 'docker', status: 'EXECUTING', currentAction: 'Working',
+      observedAt: '2026-08-24T12:00:00.000Z',
+    });
+    expect(readHostHeartbeatAuthority(root, activity)).toBe('alive');
+  });
+
+  it('uses the resolved project root identically from a nested cwd', () => {
+    const task = { ...baseTask, assignedWorker: 'w-191-009' } as Task;
+    writeActivity();
+    const nested = join(root, 'nested');
+    mkdirSync(nested);
+    const previousCwd = process.cwd();
+    try {
+      process.chdir(nested);
+      expect(checkWorkerLiveness(task, root, { readAuthority: () => 'alive' }).status)
+        .toBe('alive');
+    } finally {
+      process.chdir(previousCwd);
+    }
   });
 });

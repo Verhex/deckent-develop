@@ -24,7 +24,6 @@ import { archiveTaskArtifacts } from '../core/sprint-archive.js';
 import { readJsonSafe, debugLog } from '../core/utils.js';
 import { metric } from '../core/observability.js';
 import { writeEvent, CHANNELS } from '../orchestra/event-stream.js';
-import { voteWorkerLivenessFromRecord } from '../orchestra/heartbeat-monitor.js';
 import { clearOrphanLocks, clearOrphanSpawnLocks, clearStaleSpawnLocks } from '../core/file-lock.js';
 import { checkAuthority, emitAuthorityViolation } from '../orchestra/authority-enforcer.js';
 import { MemoryStore } from '../core/memory-store.js';
@@ -32,8 +31,8 @@ import { MEMORY_DB_FILE } from '../core/constants.js';
 import { ACTIVE_EXECUTION_STATUSES, COMPLETED_STATUSES } from '../core/heartbeat-types.js';
 import { DEFAULT_HEARTBEAT_TIMEOUT_MS } from '../core/config.js';
 import { validateTaskResult } from '../core/task-result-schema.js';
-import { RUNTIME_DIR } from '../core/constants.js';
 import { WorkerHeartbeatAuthorityStore } from '../core/worker-heartbeat-authority-store.js';
+import { parseWorkerActivityHeartbeat } from '../core/worker-activity-heartbeat.js';
 import { dockerContainerNameForTask } from '../core/task-result-settlement.js';
 import type {
   WorkerHeartbeatAuthorityIdentity,
@@ -79,7 +78,7 @@ export interface HeartbeatAuthoritySnapshot {
 const HEARTBEAT_AUTHORITY_DIRECTORY = 'worker-heartbeat-authority';
 
 function heartbeatAuthorityRoot(projectRoot: string): string {
-  return join(projectRoot, RUNTIME_DIR, HEARTBEAT_AUTHORITY_DIRECTORY);
+  return join(projectRoot, TASKS_DIR, HEARTBEAT_AUTHORITY_DIRECTORY);
 }
 
 function isHeartbeatAuthorityIdentity(value: unknown): value is WorkerHeartbeatAuthorityIdentity {
@@ -124,8 +123,11 @@ function snapshotsForHeartbeat(
   snapshots: readonly HeartbeatAuthoritySnapshot[],
   hb: Heartbeat,
 ): HeartbeatAuthoritySnapshot[] {
+  const attemptId = (hb as Heartbeat & { attemptId?: string }).attemptId;
+  if (!attemptId) return [];
   return snapshots.filter(snapshot =>
-    snapshot.identity.taskId === hb.taskId && snapshot.identity.workerId === hb.workerId);
+    snapshot.identity.taskId === hb.taskId
+    && snapshot.identity.attemptId === attemptId);
 }
 
 /**
@@ -144,11 +146,22 @@ export function readHeartbeatCached(hbPath: string): Heartbeat | null {
     }
 
     // mtime changed or not cached — re-read
-    const hb = readJsonSafe<Heartbeat>(hbPath);
-    if (!hb) {
+    const raw = readJsonSafe<unknown>(hbPath);
+    if (!raw) {
       heartbeatCache.delete(hbPath);
       return null;
     }
+    const activity = parseWorkerActivityHeartbeat(raw);
+    const hb: Heartbeat = activity.state === 'VALID'
+      ? {
+          ...activity.heartbeat,
+          timestamp: activity.heartbeat.observedAt,
+          sequence: 0,
+          progress: 0,
+          filesChangedCount: 0,
+          status: activity.heartbeat.status as AgentStatus,
+        }
+      : raw as Heartbeat;
 
     heartbeatCache.set(hbPath, {
       hb,
@@ -450,11 +463,19 @@ export function isWorkerStale(
   // task completion.
   if (authoritySnapshot) {
     const latest = authoritySnapshot.authority.latest;
-    if (latest === null) return true;
+    if (authoritySnapshot.authority.holds.length > 0 || latest === null) return false;
     if (latest.workerTaskVerdict === 'done') return false;
     if (latest.liveness === 'alive') return false;
-    const observedAt = Date.parse(latest.hostObservedAt);
-    return !Number.isFinite(observedAt) || currentTime - observedAt > heartbeatTimeoutMs;
+    if (latest.liveness === 'unknown') return false;
+    return true;
+  }
+
+  // New activity records carry exact attempt identity. Without its matching
+  // host snapshot liveness is typed unknown/HOLD, never inferred from activity
+  // age or mtime. Legacy records retain their compatibility path below.
+  if (typeof (hb as Heartbeat & { attemptId?: unknown }).attemptId === 'string') {
+    debugLog('auditor:isWorkerStale', 'exact-attempt host authority unavailable — HOLD');
+    return false;
   }
 
   // Bug-1: freshness from the host filesystem mtime (set on every write through
@@ -492,41 +513,12 @@ export function isWorkerStale(
     }
   }
 
-  // Signal B (TT553 adoption — task 420-001): the canonical HOST-PRIMARY decision
-  // (heartbeat-monitor.ts::decideWorkerLiveness) is the authority, reached through
-  // the single `voteWorkerLivenessFromRecord` adopter — no local liveness copy.
-  // host-signal inputs come from EXISTING records: the async-pre-warmed
-  // `livenessCache` (docker/tmux) and the record's own pid/.log (subprocess). This
-  // closes the 412-003 wrong-kill: a live subprocess worker with a stale/hardcoded
-  // `.hb` timestamp is no longer killed just because `isWorkerProcessAlive` returns
-  // false for the subprocess backend.
-  const vote = voteWorkerLivenessFromRecord(
-    {
-      taskId: hb.taskId,
-      workerId: hb.workerId,
-      backend: hb.backend,
-      pid: (hb as Heartbeat & { pid?: number }).pid,
-    },
-    {
-      cachedProcessAlive: livenessCache.get(hb.workerId),
-      tasksDir: join(projectRoot, TASKS_DIR),
-      now: () => currentTime,
-    },
-  );
-  if ('unavailable' in vote) {
-    // HONEST fallback (never silent): the host signal could not be derived, so
-    // log why and fall back to the pre-existing async-cache / sync process probe.
-    debugLog('auditor:isWorkerStale', vote.reason);
-    const cachedAlive = livenessCache.get(hb.workerId);
-    const processAlive = cachedAlive !== undefined ? cachedAlive : isWorkerProcessAlive(hb);
-    if (processAlive) {
-      return false; // Process alive — worker is running, just slow to update HB
-    }
-  } else if (vote.alive) {
-    return false; // Host signal says alive — suppress the wrong-kill.
-  }
-  // vote.alive === false (host says dead) → fall through to Signal C, preserving
-  // the exact pre-existing ordering for the genuinely-stale cases.
+  // Legacy compatibility only: new v1 records returned above unless an exact
+  // host snapshot was present. Old records keep their cached/process veto while
+  // they are phased out; this branch cannot adjudicate a v1 attempt.
+  const cachedAlive = livenessCache.get(hb.workerId);
+  const processAlive = cachedAlive !== undefined ? cachedAlive : isWorkerProcessAlive(hb);
+  if (processAlive) return false;
 
   // Signal C: Monotonic sequence check — sequence increased since last read
   if (hbPath) {

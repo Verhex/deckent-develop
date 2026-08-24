@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { projectWorkerLiveness } from '../../src/cli/commands/status.js';
 import {
@@ -9,8 +9,8 @@ import {
   type DashboardState,
 } from '../../src/core/types.js';
 
-const NOW = Date.parse('2026-08-11T01:00:00.000Z');
 const HEARTBEAT_TIMEOUT_MS = 90_000;
+const ROOT = '/resolved/project-root';
 
 function agent(overrides: Partial<AgentInfo> = {}): AgentInfo {
   return {
@@ -36,36 +36,34 @@ function dashboard(agents: AgentInfo[]): DashboardState {
     agents,
     progress: { done: 0, active: agents.length, blocked: 0, total: agents.length },
     alerts: [],
-    updatedAt: new Date(NOW).toISOString(),
+    updatedAt: '2026-08-11T01:00:00.000Z',
   };
 }
 
 describe('status worker liveness truth projection', () => {
-  it('preserves the active output contract for a fresh heartbeat', () => {
-    const source = dashboard([
-      agent({ lastHeartbeat: new Date(NOW - HEARTBEAT_TIMEOUT_MS + 1).toISOString() }),
-    ]);
-
+  it('keeps a frozen one-write activity row active when host authority says alive', () => {
+    const source = dashboard([agent({ lastHeartbeat: '2000-01-01T00:00:00.000Z' })]);
     const projected = projectWorkerLiveness(source, {
       heartbeatTimeoutMs: HEARTBEAT_TIMEOUT_MS,
-      nowMs: NOW,
-      isProcessAlive: vi.fn(() => false),
+      projectRoot: ROOT,
+      workerLiveness: (_task, root) => {
+        expect(root).toBe(ROOT);
+        return 'alive';
+      },
     });
 
     expect(projected.agents[0]).toEqual(source.agents[0]);
     expect(projected.progress.active).toBe(1);
   });
 
-  it('keeps a stale worker visible with a typed stale label and recovery hint', () => {
-    const source = dashboard([
-      agent({ lastHeartbeat: new Date(NOW - HEARTBEAT_TIMEOUT_MS).toISOString() }),
-    ]);
+  it('marks only an explicit host-authority dead worker stale with i18n text', () => {
+    const source = dashboard([agent({ lastHeartbeat: '2099-01-01T00:00:00.000Z' })]);
 
     const projected = projectWorkerLiveness(source, {
       heartbeatTimeoutMs: HEARTBEAT_TIMEOUT_MS,
-      nowMs: NOW,
       lang: 'en',
-      isProcessAlive: vi.fn(() => false),
+      projectRoot: ROOT,
+      workerLiveness: () => 'dead',
     });
 
     expect(projected.agents).toHaveLength(1);
@@ -75,7 +73,7 @@ describe('status worker liveness truth projection', () => {
     expect(projected.progress.active).toBe(0);
   });
 
-  it('never renders dead workers with stale heartbeats as writing or active', () => {
+  it('never renders host-dead workers as writing or active', () => {
     const deadWorkers = dashboard([
       agent({ id: 'w-a', lastHeartbeat: '2026-08-11T00:41:00.000Z' }),
       agent({ id: 'w-b', lastHeartbeat: '2026-08-11T00:41:30.000Z' }),
@@ -83,8 +81,8 @@ describe('status worker liveness truth projection', () => {
 
     const projected = projectWorkerLiveness(deadWorkers, {
       heartbeatTimeoutMs: HEARTBEAT_TIMEOUT_MS,
-      nowMs: Date.parse('2026-08-11T00:44:00.000Z'),
-      isProcessAlive: vi.fn(() => false),
+      projectRoot: ROOT,
+      workerLiveness: () => 'dead',
     });
 
     expect(projected.progress.active).toBe(0);
@@ -92,16 +90,11 @@ describe('status worker liveness truth projection', () => {
     expect(projected.agents.every(row => row.currentAction !== 'Writing code')).toBe(true);
   });
 
-  it('accepts a verifiably live process when heartbeat evidence is stale', () => {
-    const livePidAgent = agent({
-      lastHeartbeat: new Date(NOW - HEARTBEAT_TIMEOUT_MS).toISOString(),
-      pid: 4242,
-    } as Partial<AgentInfo> & { pid: number });
-
-    const projected = projectWorkerLiveness(dashboard([livePidAgent]), {
+  it('keeps unavailable or HOLD authority separate from dead', () => {
+    const projected = projectWorkerLiveness(dashboard([agent()]), {
       heartbeatTimeoutMs: HEARTBEAT_TIMEOUT_MS,
-      nowMs: NOW,
-      isProcessAlive: vi.fn(pid => pid === 4242),
+      projectRoot: ROOT,
+      workerLiveness: () => 'unavailable',
     });
 
     expect(projected.agents[0]?.status).toBe(AgentStatus.CODING);

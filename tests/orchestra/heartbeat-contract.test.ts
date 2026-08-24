@@ -24,6 +24,30 @@ import {
 } from '../../src/orchestra/heartbeat-daemon.js';
 import { ValidationError } from '../../src/core/validators.js';
 import { DECKENT_DIR } from '../../src/core/constants.js';
+import {
+  createWorkerActivityHeartbeat,
+  renderWorkerActivityHeartbeatInstruction,
+} from '../../src/core/worker-activity-heartbeat.js';
+
+describe('worker and generated prompt heartbeat contract', () => {
+  it('bind the same version, identity, backend, and activity-only fields', () => {
+    const identity = {
+      taskId: '661-003', workerId: 'w-661-003', attemptId: 'attempt-1',
+      backend: 'subprocess' as const,
+    };
+    const native = createWorkerActivityHeartbeat({
+      ...identity, status: 'EXECUTING', currentAction: 'Working',
+      observedAt: '2026-08-24T12:00:00.000Z',
+    });
+    const prompt = renderWorkerActivityHeartbeatInstruction(identity);
+
+    for (const key of Object.keys(native)) expect(prompt).toContain(`"${key}"`);
+    expect(Object.keys(native)).toEqual([
+      'version', 'kind', 'taskId', 'workerId', 'attemptId', 'backend',
+      'status', 'currentAction', 'observedAt',
+    ]);
+  });
+});
 
 /** The exact class `validateCommand` rejects. Mirrored here so a change to the
  *  production regex has to be made deliberately in two places. */

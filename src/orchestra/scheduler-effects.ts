@@ -49,7 +49,10 @@ import {
   type AttendedExecutionApprovalExpectedDispatch,
 } from '../core/attended-execution-approval.js';
 import { createTaskResultSettlementRefForAttempt } from '../core/task-result-settlement.js';
-import { createHostPreDispatchNoGoResult } from '../core/pre-dispatch-settlement.js';
+import {
+  createHostPreDispatchNoGoResult,
+  type HostPreDispatchReasonCode,
+} from '../core/pre-dispatch-settlement.js';
 import { requireFinalOnlyUsageContainment } from '../core/final-only-usage-containment.js';
 import {
   assertAttendedExecutionProposalMaterial,
@@ -276,6 +279,8 @@ export type SchedulerSpawnSkipReasonCode =
   | 'spawn-threw'
   /** A deterministic pre-dispatch admission failure was durably settled; no retry is valid. */
   | 'spawn-admission-settled'
+  | 'spawn-retry-backoff'
+  | 'spawn-retry-held'
   /** A SpawnTask effect named an id the live task map does not contain. */
   | 'task-not-found'
   /** Returned in a wave's overflow queue and never handed to a later dispatcher. */
@@ -914,6 +919,8 @@ export interface SchedulerDecisionExecutionResult {
   /** Row 3309: every SpawnTask effect this tick declined to turn into a live
    *  worker, with its typed reason — also published to the scheduler journal. */
   readonly spawnSkips: readonly SchedulerSpawnSkip[];
+  readonly decidedEffects: readonly SchedulerDecision['orderedEffects'][number][];
+  readonly landedEffects: readonly SchedulerDecision['orderedEffects'][number][];
 }
 
 function cascadeSkipResultPath(projectRoot: string, taskId: string): string {
@@ -968,15 +975,59 @@ function persistCascadeSkipResultAtomic(projectRoot: string, result: TaskResult)
   renameSync(tmpPath, filePath);
 }
 
+export type SchedulerSpawnFailure =
+  | {
+    readonly kind: 'deterministic-admission';
+    readonly reasonCode: Exclude<HostPreDispatchReasonCode, 'LEGACY_HOST_PRE_DISPATCH_REJECTION'>;
+    readonly detail: string;
+  }
+  | { readonly kind: 'transient-host'; readonly detail: string };
+
+const DETERMINISTIC_ADMISSION_CODES = new Map<
+  string,
+  Exclude<HostPreDispatchReasonCode, 'LEGACY_HOST_PRE_DISPATCH_REJECTION'>
+>([
+  ['E_ATTRIBUTION_BASELINE_CAPTURE_FAILED', 'ATTRIBUTION_BASELINE_CAPTURE_FAILED'],
+  ['E_PROMPT_COMPILE_FAILED', 'PROMPT_COMPILE_FAILED'],
+  ['E_SCOPE_COMPILE_FAILED', 'SCOPE_COMPILE_FAILED'],
+  ['E_SCOPE_UNSATISFIABLE', 'SCOPE_UNSATISFIABLE'],
+]);
+
+export function classifySchedulerSpawnFailure(error: unknown): SchedulerSpawnFailure {
+  if (error instanceof DeckentError) {
+    const reasonCode = DETERMINISTIC_ADMISSION_CODES.get(error.code);
+    if (reasonCode) {
+      return { kind: 'deterministic-admission', reasonCode, detail: `${error.code}:${error.message}` };
+    }
+  }
+  return { kind: 'transient-host', detail: error instanceof Error ? `${error.name}:${error.message}` : String(error) };
+}
+
+function emitSpawnFailureOutcome(
+  deps: Pick<SchedulerDecisionExecutionDeps, 'projectRoot' | 'sprintFallbackId'>,
+  task: Task,
+  failure: SchedulerSpawnFailure,
+  outcome: 'settled' | 'retry-scheduled' | 'held',
+  attempt: number,
+): void {
+  try {
+    const sprintId = getCurrentSprintId(deps.projectRoot) ?? deps.sprintFallbackId;
+    writeEvent(deps.projectRoot, sprintId, 'brain', 'worker', CHANNELS.METRIC_EMITTED, {
+      name: 'scheduler.spawn_failure', value: 1, taskId: task.id,
+      failureKind: failure.kind, outcome, attempt,
+    });
+    metric('scheduler.spawn_failure', 1, {
+      task_id: task.id, failure_kind: failure.kind, outcome, attempt: String(attempt),
+    });
+  } catch (emitError) { debugLog('executeSchedulerDecision:spawnFailure:emit', emitError); }
+}
+
 function settleNonRetryableSpawnAdmission(
   projectRoot: string,
   task: Task,
-  error: unknown,
+  failure: Extract<SchedulerSpawnFailure, { kind: 'deterministic-admission' }>,
 ): string | null {
-  if (!(error instanceof DeckentError) || error.code !== 'E_ATTRIBUTION_BASELINE_CAPTURE_FAILED') {
-    return null;
-  }
-  const detail = `${error.code}:${error.message}`;
+  const detail = failure.detail;
   const resultPath = cascadeSkipResultPath(projectRoot, task.id);
   try {
     if (!existsSync(resultPath)) {
@@ -984,7 +1035,7 @@ function settleNonRetryableSpawnAdmission(
         projectRoot,
         createHostPreDispatchNoGoResult(
           task,
-          'ATTRIBUTION_BASELINE_CAPTURE_FAILED',
+          failure.reasonCode,
           detail,
         ),
       );
@@ -996,6 +1047,28 @@ function settleNonRetryableSpawnAdmission(
   task.status = TaskStatus.NO_GO;
   persistTask(projectRoot, task);
   return detail;
+}
+
+const MAX_TRANSIENT_SPAWN_ATTEMPTS = 3;
+const TRANSIENT_SPAWN_BACKOFF_MS = 1_000;
+type RetryTask = Task & { schedulerSpawnAttempts?: number; retryAfter?: number };
+
+function recordTransientSpawnFailure(task: Task, projectRoot: string): {
+  readonly held: boolean; readonly attempt: number; readonly retryAfter?: number;
+} {
+  const retryTask = task as RetryTask;
+  const attempt = (retryTask.schedulerSpawnAttempts ?? 0) + 1;
+  retryTask.schedulerSpawnAttempts = attempt;
+  if (attempt >= MAX_TRANSIENT_SPAWN_ATTEMPTS) {
+    delete retryTask.retryAfter;
+    task.status = TaskStatus.PAUSED;
+    persistTask(projectRoot, task);
+    return { held: true, attempt };
+  }
+  retryTask.retryAfter = Date.now() + TRANSIENT_SPAWN_BACKOFF_MS * (2 ** (attempt - 1));
+  task.status = TaskStatus.PENDING;
+  persistTask(projectRoot, task);
+  return { held: false, attempt, retryAfter: retryTask.retryAfter };
 }
 
 /**
@@ -1026,6 +1099,7 @@ export async function executeSchedulerDecision(
   const killedWorkerIds: string[] = [];
   const cascadeSkippedTaskIds: string[] = [];
   const spawnSkips: SchedulerSpawnSkip[] = [];
+  const landedEffects: SchedulerDecision['orderedEffects'][number][] = [];
   let checkpointsWritten = 0;
   let terminalPersistenceFailed = false;
 
@@ -1033,6 +1107,7 @@ export async function executeSchedulerDecision(
     if (effect.kind === 'KillWorker') {
       try {
         deps.killWorker(effect.taskId);
+        landedEffects.push(effect);
       } catch (e) { debugLog('executeSchedulerDecision:killWorker', e); }
       killedWorkerIds.push(effect.taskId);
       continue;
@@ -1056,6 +1131,7 @@ export async function executeSchedulerDecision(
         task.status = TaskStatus.NO_GO;
         persistTask(deps.projectRoot, task);
         cascadeSkippedTaskIds.push(task.id);
+        landedEffects.push(effect);
       }
       continue;
     }
@@ -1068,6 +1144,7 @@ export async function executeSchedulerDecision(
         if (deps.writeCheckpoint) {
           deps.writeCheckpoint(effect.reason);
           checkpointsWritten++;
+          landedEffects.push(effect);
         }
       } catch (e) { debugLog('executeSchedulerDecision:writeCheckpoint', e); }
       continue;
@@ -1095,11 +1172,29 @@ export async function executeSchedulerDecision(
       ));
       continue;
     }
+    const retryTask = task as RetryTask;
+    if (task.status === TaskStatus.NO_GO && existsSync(cascadeSkipResultPath(deps.projectRoot, task.id))) {
+      spawnSkips.push(describeSpawnSkip(
+        task,
+        'spawn-admission-settled',
+        'a durable terminal pre-dispatch result already exists; replay did not dispatch or re-emit settlement telemetry',
+      ));
+      continue;
+    }
+    if (task.status === TaskStatus.PAUSED && (retryTask.schedulerSpawnAttempts ?? 0) >= MAX_TRANSIENT_SPAWN_ATTEMPTS) {
+      spawnSkips.push(describeSpawnSkip(task, 'spawn-retry-held', 'bounded transient spawn attempts exhausted; task remains on HOLD'));
+      continue;
+    }
+    if ((retryTask.retryAfter ?? 0) > Date.now()) {
+      spawnSkips.push(describeSpawnSkip(task, 'spawn-retry-backoff', `retry is durably deferred until ${new Date(retryTask.retryAfter!).toISOString()}`));
+      continue;
+    }
     deps.assignedTaskIds.add(effect.taskId);
     try {
       const disposition = await executeSpawnTask({ task }, deps);
       if (disposition.kind === 'spawned') {
         spawnedTaskIds.push(effect.taskId);
+        landedEffects.push(effect);
       } else {
         deps.assignedTaskIds.delete(effect.taskId);
         const skip = spawnSkipFromDisposition(disposition, task);
@@ -1108,20 +1203,31 @@ export async function executeSchedulerDecision(
     } catch (e) {
       debugLog('executeSchedulerDecision:spawn', e);
       deps.assignedTaskIds.delete(effect.taskId);
-      const settledAdmission = settleNonRetryableSpawnAdmission(deps.projectRoot, task, e);
-      if (settledAdmission !== null) {
+      const failure = classifySchedulerSpawnFailure(e);
+      if (failure.kind === 'deterministic-admission') {
+        const settledAdmission = settleNonRetryableSpawnAdmission(deps.projectRoot, task, failure);
+        if (settledAdmission === null) {
+          spawnSkips.push(describeSpawnSkip(task, 'spawn-threw', `deterministic admission settlement could not persist: ${failure.detail}`));
+          emitSpawnFailureOutcome(deps, task, failure, 'retry-scheduled', 1);
+          continue;
+        }
         spawnSkips.push(describeSpawnSkip(
           task,
           'spawn-admission-settled',
           `non-retryable pre-dispatch admission failure settled as zero-work NO_GO: ${settledAdmission}`,
         ));
+        emitSpawnFailureOutcome(deps, task, failure, 'settled', 1);
         continue;
       }
+      const retry = recordTransientSpawnFailure(task, deps.projectRoot);
       spawnSkips.push(describeSpawnSkip(
         task,
-        'spawn-threw',
-        `the spawn attempt threw: ${e instanceof Error ? e.message : String(e)}`,
+        retry.held ? 'spawn-retry-held' : 'spawn-threw',
+        retry.held
+          ? `transient host failure reached bounded attempt ${retry.attempt}; task placed on HOLD: ${failure.detail}`
+          : `transient host failure attempt ${retry.attempt}/${MAX_TRANSIENT_SPAWN_ATTEMPTS}; retry after ${new Date(retry.retryAfter!).toISOString()}: ${failure.detail}`,
       ));
+      emitSpawnFailureOutcome(deps, task, failure, retry.held ? 'held' : 'retry-scheduled', retry.attempt);
     }
   }
 
@@ -1135,5 +1241,6 @@ export async function executeSchedulerDecision(
 
   return {
     spawnedTaskIds, killedWorkerIds, cascadeSkippedTaskIds, checkpointsWritten, spawnSkips,
+    decidedEffects: [...decision.orderedEffects], landedEffects,
   };
 }

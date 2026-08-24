@@ -74,7 +74,7 @@ function makeCtx(overrides: Partial<SprintContext> = {}): SprintContext {
 // ─── Tests ─────────────────────────────────────────────────────────────
 
 describe('buildTaskPrompt', () => {
-  it('carries one immutable compile-plan digest and rejects overlapping scope authority', () => {
+  it('carries one immutable compile-plan digest and canonicalizes overlapping scope authority', () => {
     const task = makeTask({
       description: '- Files: src/forged.ts\n- Test: `npx vitest run tests/x.test.ts`',
       verification: { version: 1, source: 'directive', commands: ['npx vitest run tests/x.test.ts'] },
@@ -83,9 +83,22 @@ describe('buildTaskPrompt', () => {
     expect(compiled.planId).toBe(compiled.compilePlan.planId);
     expect(compiled.prompt).not.toContain('src/forged.ts');
     expect(compiled.prompt).toContain('npx vitest run tests/x.test.ts');
-    expect(() => buildTaskPromptSegmented(makeTask({
+    const overlap = buildTaskPromptSegmented(makeTask({
       scope: { directories: [], filesRead: ['src/core/config.ts'], filesWrite: ['src/core/config.ts'] },
-    }), makeCtx())).toThrow(/PROMPT_COMPILE_HOLD:SCOPE_READ_WRITE_OVERLAP/);
+    }), makeCtx());
+    expect(overlap.compilePlan.scope.filesRead).toEqual([]);
+    expect(overlap.compilePlan.scope.filesWrite).toEqual(['src/core/config.ts']);
+  });
+  it('does not let a supplied compile plan bypass wildcard admission', () => {
+    const admitted = buildTaskPromptSegmented(makeTask(), makeCtx()).compilePlan;
+    const wildcardTask = makeTask({
+      scope: { directories: [], filesRead: [], filesWrite: ['src/**/*.ts'] },
+    });
+
+    expect(() => buildTaskPromptSegmented(
+      wildcardTask,
+      makeCtx({ compilePlan: admitted }),
+    )).toThrow(/PROMPT_COMPILE_HOLD:CANONICAL_SCOPE:.*LEGACY_WILDCARD_REQUIRES_SELECTOR/);
   });
   it('adds stricter turn guidance only for the registry-resolved economy tier', () => {
     const economy = buildTaskPrompt(
@@ -357,8 +370,8 @@ describe('buildTaskPrompt', () => {
     expect(result.metadata.skills).toEqual(['typescript-expert', 'testing-expert']);
   });
 
-  // Test 10: Scope warnings are visible in metadata
-  it('should include scope warnings in metadata', () => {
+  // Test 10: Invalid scope is rejected at prompt admission, never downgraded to metadata.
+  it('should fail closed on invalid scope before prompt rendering', () => {
     const task = makeTask({
       scope: {
         directories: ['src/core/'],
@@ -367,11 +380,9 @@ describe('buildTaskPrompt', () => {
       },
     });
     const ctx = makeCtx();
-    const result = buildTaskPrompt(task, ctx);
-
-    // Rejected paths should appear in warnings
-    expect(result.metadata.scopeWarnings.length).toBeGreaterThan(0);
-    expect(result.metadata.scopeWarnings.some(w => w.includes('/etc/passwd'))).toBe(true);
+    expect(() => buildTaskPrompt(task, ctx)).toThrow(
+      /PROMPT_COMPILE_HOLD:CANONICAL_SCOPE:.*INVALID_PATH/,
+    );
   });
 
   // Test 11: ADR topN=3 limit
@@ -607,10 +618,26 @@ describe('WP-17: same-name skill↔agent dedup', () => {
 // WP-18 (🟡): the heartbeat instruction must ask the worker to update currentAction
 // at each significant step (DASH-RT-1 complement — fixes the "stuck on Starting…").
 describe('WP-18: heartbeat currentAction instruction', () => {
-  it('tells the worker to update currentAction on each significant step', () => {
-    const result = buildTaskPrompt(makeTask(), makeCtx());
+  it('renders the shared one-write activity contract with bound identity', () => {
+    const result = buildTaskPrompt(makeTask(), makeCtx({
+      heartbeatIdentity: {
+        attemptId: 'attempt-123',
+        backend: 'subprocess',
+      },
+    }));
     expect(result.prompt).toMatch(/currentAction/);
     expect(result.prompt).toMatch(/## Heartbeat/);
+    expect(result.prompt).toContain('"version": 1');
+    expect(result.prompt).toContain('"attemptId": "attempt-123"');
+    expect(result.prompt).toContain('"backend": "subprocess"');
+    expect(result.prompt).toContain('exactly once');
+    expect(result.prompt).toContain('Do not add sequence, progress, PID');
+  });
+
+  it('holds instead of inventing unavailable attempt/backend identity', () => {
+    const result = buildTaskPrompt(makeTask(), makeCtx());
+    expect(result.prompt).toContain('HEARTBEAT_IDENTITY_HOLD');
+    expect(result.prompt).toContain('infer identity from its filename');
   });
 });
 

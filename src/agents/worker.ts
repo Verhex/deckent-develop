@@ -48,6 +48,12 @@ import {
   type WorkerHeartbeatAuthorityStoreOptions,
 } from '../core/worker-heartbeat-authority-store.js';
 import type { WorkerHeartbeatAuthorityIdentity } from '../core/worker-heartbeat-authority.js';
+import {
+  createWorkerActivityHeartbeat,
+  serializeWorkerActivityHeartbeat,
+  type WorkerActivityHeartbeat,
+  type WorkerActivityHeartbeatInput,
+} from '../core/worker-activity-heartbeat.js';
 import { checkAuthority, emitAuthorityViolation } from '../orchestra/authority-enforcer.js';
 import { writeEvent, getCurrentSprintId, CHANNELS } from '../orchestra/event-stream.js';
 import { emitWorkerActivity } from './worker-activity.js';
@@ -343,6 +349,10 @@ export function writeTaskPlan(projectRoot: string, plan: TaskPlan): void {
 }
 
 export function createHeartbeat(
+  input: WorkerActivityHeartbeatInput,
+): WorkerActivityHeartbeat;
+/** @deprecated Legacy positional heartbeat compatibility path. */
+export function createHeartbeat(
   workerId: string,
   taskId: string,
   status: AgentStatus,
@@ -353,7 +363,25 @@ export function createHeartbeat(
   agentId?: string,
   backend?: 'docker' | 'tmux' | 'subprocess',
   pid?: number,
-): Heartbeat {
+): Heartbeat;
+export function createHeartbeat(
+  inputOrWorkerId: WorkerActivityHeartbeatInput | string,
+  taskId?: string,
+  status?: AgentStatus,
+  action?: string,
+  file?: string,
+  sequence?: number,
+  filesChangedCount?: number,
+  agentId?: string,
+  backend?: 'docker' | 'tmux' | 'subprocess',
+  pid?: number,
+): WorkerActivityHeartbeat | Heartbeat {
+  if (typeof inputOrWorkerId !== 'string') {
+    return createWorkerActivityHeartbeat(inputOrWorkerId);
+  }
+  if (taskId === undefined || status === undefined || action === undefined) {
+    throw new TypeError('legacy heartbeat requires taskId, status, and action');
+  }
   const count = filesChangedCount ?? 0;
   // TT553 (task 418-002): `pid` is an ADDITIVE, optional field — the input the
   // subprocess host-liveness probe (heartbeat-monitor.ts, `process-pid` signal)
@@ -364,7 +392,7 @@ export function createHeartbeat(
   // ignore the extra key, and liveness never depends on it being present.
   const resolvedPid = pid ?? process.pid;
   const hb: Heartbeat & { pid?: number } = {
-    workerId,
+    workerId: inputOrWorkerId,
     taskId,
     status,
     currentAction: action,
@@ -380,17 +408,24 @@ export function createHeartbeat(
   return hb;
 }
 
-export function writeHeartbeat(projectRoot: string, heartbeat: Heartbeat, sprintId?: string): void {
+export function writeHeartbeat(
+  projectRoot: string,
+  heartbeat: Heartbeat | WorkerActivityHeartbeat,
+  sprintId?: string,
+): void {
   ensureDir(join(projectRoot, TASKS_DIR));
   const path = heartbeatFilePath(projectRoot, heartbeat.taskId);
-  writeFileSync(path, JSON.stringify(heartbeat, null, 2), 'utf-8');
+  const canonical = 'version' in heartbeat;
+  writeFileSync(path, canonical
+    ? serializeWorkerActivityHeartbeat(heartbeat)
+    : JSON.stringify(heartbeat, null, 2), 'utf-8');
 
   const sid = sprintId ?? getCurrentSprintId(projectRoot);
   if (sid) {
     writeEvent(projectRoot, sid, 'worker', 'brain', CHANNELS.HEARTBEAT, {
       workerId: heartbeat.workerId,
       taskId: heartbeat.taskId,
-      sequence: heartbeat.sequence,
+      sequence: canonical ? undefined : heartbeat.sequence,
       phase: heartbeat.status,
       state: heartbeat.currentAction,
     });
@@ -405,7 +440,7 @@ export function writeHeartbeat(projectRoot: string, heartbeat: Heartbeat, sprint
         ...(heartbeat.workerId ? { workerId: heartbeat.workerId } : {}),
         line: `${heartbeat.status}${heartbeat.currentAction ? ` — ${heartbeat.currentAction}` : ''}`,
         kind: 'status',
-        detail: {
+        detail: canonical ? {} : {
           sequence: heartbeat.sequence,
           filesChangedCount: heartbeat.filesChangedCount ?? 0,
           ...(heartbeat.currentFile ? { currentFile: heartbeat.currentFile } : {}),

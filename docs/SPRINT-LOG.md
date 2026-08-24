@@ -16372,3 +16372,65 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 659-003: Canonical pending producer-to-consumer fan-in acceptance (DONE)
 
 ---
+## Sprint 660 — sprint-660
+
+**Status:** ABORTED
+**Date:** 2026-08-24
+**Duration:** 1734s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 1733703ms |
+
+### Tasks
+
+- 660-001: Full production graph engine and fail-closed CLI (DONE)
+- 660-002: Canonical module ownership and exception registry v2 (DONE)
+- 660-003: Measured exact baseline initialization and replay (PENDING)
+- 660-004: Adversarial hermetic graph-gate matrix (NO_GO)
+- 660-005: Topology projection, ADR truth and gate registry fan-in (PAUSED)
+
+---
+## Sprint 661 — sprint-661
+
+**Status:** ABORTED
+**Date:** 2026-08-24
+**Duration:** 1247s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 9 |
+| Completed | 7 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 1246856ms |
+
+### Tasks
+
+- 661-001-fix: Fix: Canonical scope compiler and prompt admission (DONE)
+- 661-001: Canonical scope compiler and prompt admission (DONE)
+- 661-002-fix: Fix: Scheduler admission settlement, quiescence and journal truth (DONE)
+- 661-002: Scheduler admission settlement, quiescence and journal truth (DONE)
+- 661-003: One-write worker activity heartbeat identity (DONE)
+- 661-004: Repair preserved modular layer gate implementation (DONE)
+- 661-005: Scope attribution, canonical result and FIX routing convergence (DONE)
+- 661-006-fix-fix: Fix: Fix: Host-primary heartbeat consumers for Auditor, Dashboard and Nervous (EXECUTING)
+- 661-006-fix: Fix: Host-primary heartbeat consumers for Auditor, Dashboard and Nervous (NO_GO)
+- 661-006: Host-primary heartbeat consumers for Auditor, Dashboard and Nervous (NO_GO)
+- 661-007: `deckent status` host-authority read model (DONE)
+- 661-008-fix-fix: Fix: Fix: Worker-core immutable delivery and archive provenance (EXECUTING)
+- 661-008-fix: Fix: Worker-core immutable delivery and archive provenance (PAUSED)
+- 661-008: Worker-core immutable delivery and archive provenance (NO_GO)
+- 661-009: Read-only adversarial fan-in and sprint-660 replay (PAUSED)
+
+---

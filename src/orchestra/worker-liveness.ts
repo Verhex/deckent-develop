@@ -3,38 +3,43 @@
  *
  * Memory: [[feedback_no_synthetic_results]] — sentetik NO_GO YASAK; gerçekliği doğrula.
  *
- * Five-layer liveness signals consulted BEFORE writing a synthetic NO_GO:
+ * Host-primary liveness signals consulted before writing a synthetic NO_GO:
  *   L1 spawn-attempted — task.assignedWorker set (dispatcher reached it)
- *   L2 process alive — exact project+task-scoped Docker container running
- *   L3 heartbeat fresh — .tasks/task-<id>.hb mtime within freshness window
- *   L4 log growing — .tasks/task-<id>.log mtime within freshness window
- *   L5 partial-result — .tasks/task-<id>.partial-result has bytes
+ *   L2 exact attempt — activity heartbeat supplies task/worker/attempt identity
+ *   L3 host authority — durable host observation says alive, dead, or HOLD
  *
  * Returned status drives runEvaluatePhase decision:
  *   - 'never-spawned' → DEFERRED (skip synthetic NO_GO; emit audit-trail event)
- *   - 'alive'         → caller grants extra grace poll before NO_GO
- *   - 'dead'          → genuine timeout, synthetic NO_GO acceptable
+ *   - 'alive'         → host has proven the exact attempt is still live
+ *   - 'dead'          → host explicitly observed the exact attempt dead
+ *   - 'unavailable'   → HOLD; no missing probe or activity age becomes dead
  */
 
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
 import type { Task } from '../core/task-types.js';
-import { dockerContainerNameForTask } from '../core/task-result-settlement.js';
+import { RUNTIME_DIR, TASKS_DIR } from '../core/constants.js';
+import {
+  parseWorkerActivityHeartbeat,
+  type WorkerActivityHeartbeat,
+} from '../core/worker-activity-heartbeat.js';
 
-export type WorkerLivenessStatus = 'alive' | 'dead' | 'never-spawned';
+export type WorkerLivenessStatus = 'alive' | 'dead' | 'unavailable' | 'never-spawned';
+
+/**
+ * Host-captured log activity freshness used by the legacy host-lifecycle
+ * adapter as a secondary subprocess signal. This is deliberately not worker
+ * heartbeat process truth; exact-attempt host authority remains authoritative.
+ */
+export const LIVENESS_FRESHNESS_MS = 90_000;
 
 export interface WorkerLivenessSignals {
   /** L1 — task.assignedWorker is non-empty (dispatcher reached the task). */
   assignedWorker: boolean;
-  /** L2 — canonical project+task-scoped Docker container currently running. */
-  dockerRunning: boolean;
-  /** L3 — heartbeat file mtime within freshness window. */
-  heartbeatFresh: boolean;
-  /** L4 — log file mtime within freshness window. */
-  logGrowing: boolean;
-  /** L5 — partial-result file present and non-empty. */
-  partialResultExists: boolean;
+  /** Host authority has an exact attempt identity for this worker. */
+  authorityMatched: boolean;
+  /** A terminal result exists, so the row must not be presented as stale. */
+  resultSettled: boolean;
 }
 
 export interface WorkerLivenessResult {
@@ -44,32 +49,78 @@ export interface WorkerLivenessResult {
   reason: string;
 }
 
-/** Freshness threshold for HB/log mtime (90s matches RUNTIME_EXTENSION_HEARTBEAT_FRESH_S). */
-export const LIVENESS_FRESHNESS_MS = 90_000;
-
-/** Docker ps check timeout — short to keep evaluate loop responsive. */
-const DOCKER_PROBE_TIMEOUT_MS = 3000;
-
-/**
- * Test seam: override docker-running probe (e.g. for unit tests).
- * Defaults to spawnSync('docker', ['ps', '--filter', ...]) when undefined.
- */
 export interface LivenessDeps {
-  isDockerContainerRunning?: (containerName: string) => boolean;
-  now?: () => number;
+  /** Host-owned exact-attempt authority read-model seam. */
+  readAuthority?: (
+    projectRoot: string,
+    activity: WorkerActivityHeartbeat,
+  ) => WorkerLivenessStatus;
 }
 
-function defaultDockerProbe(containerName: string): boolean {
+interface AuthorityIdentityRecord {
+  readonly identity?: {
+    readonly taskId?: unknown;
+    readonly workerId?: unknown;
+    readonly attemptId?: unknown;
+  };
+}
+
+function authorityOutcome(value: unknown): WorkerLivenessStatus {
+  if (value === true) return 'alive';
+  if (value === false) return 'dead';
+  if (typeof value === 'string') {
+    const normalized = value.toLowerCase();
+    if (normalized === 'alive' || normalized === 'running') return 'alive';
+    if (normalized === 'dead' || normalized === 'exited') return 'dead';
+    return 'unavailable';
+  }
+  if (value === null || typeof value !== 'object') return 'unavailable';
+  const record = value as Record<string, unknown>;
+  for (const key of ['state', 'status', 'outcome', 'alive']) {
+    if (key in record) return authorityOutcome(record[key]);
+  }
+  return 'unavailable';
+}
+
+/**
+ * Read the host-owned authority journal only after the worker activity record
+ * supplies its exact attempt identity. A missing, ambiguous, or malformed
+ * journal is HOLD/unavailable; it is never silently converted into dead.
+ */
+export function readHostHeartbeatAuthority(
+  projectRoot: string,
+  activity: WorkerActivityHeartbeat,
+): WorkerLivenessStatus {
+  const root = join(projectRoot, RUNTIME_DIR, 'worker-heartbeat-authority');
+  if (!existsSync(root)) return 'unavailable';
+
   try {
-    const res = spawnSync(
-      'docker',
-      ['ps', '--filter', `name=${containerName}`, '--format', '{{.Names}}'],
-      { encoding: 'utf-8', timeout: DOCKER_PROBE_TIMEOUT_MS },
-    );
-    if (res.status !== 0 || typeof res.stdout !== 'string') return false;
-    return res.stdout.split('\n').some((line) => line.trim() === containerName);
+    const matches = readdirSync(root).flatMap((entry) => {
+      const directory = join(root, entry);
+      try {
+        const record = JSON.parse(
+          readFileSync(join(directory, 'identity.json'), 'utf8'),
+        ) as AuthorityIdentityRecord;
+        const identity = record.identity;
+        if (
+          identity?.taskId !== activity.taskId
+          || identity.workerId !== activity.workerId
+          || identity.attemptId !== activity.attemptId
+        ) return [];
+        const revisions = readdirSync(directory)
+          .filter(name => /^[0-9]{16}\.json$/u.test(name))
+          .sort();
+        const latest = revisions.at(-1);
+        if (!latest) return ['unavailable' as const];
+        const observation = JSON.parse(readFileSync(join(directory, latest), 'utf8')) as Record<string, unknown>;
+        return [authorityOutcome(observation.liveness ?? observation.hostProcessOutcome)];
+      } catch {
+        return [];
+      }
+    });
+    return matches.length === 1 ? matches[0]! : 'unavailable';
   } catch {
-    return false;
+    return 'unavailable';
   }
 }
 
@@ -77,7 +128,8 @@ function defaultDockerProbe(containerName: string): boolean {
  * Inspect a task's runtime liveness signals.
  *
  * Pure with respect to disk reads only — never mutates files. Safe to call
- * during EVALUATE loop iteration.
+ * during EVALUATE loop iteration. Activity timestamps and mtimes are never
+ * consulted as process truth.
  */
 export function checkWorkerLiveness(
   task: Task,
@@ -85,15 +137,10 @@ export function checkWorkerLiveness(
   deps?: LivenessDeps,
 ): WorkerLivenessResult {
   const taskId = task.id;
-  const now = deps?.now ?? (() => Date.now());
-  const dockerProbe = deps?.isDockerContainerRunning ?? defaultDockerProbe;
-
   const signals: WorkerLivenessSignals = {
     assignedWorker: typeof task.assignedWorker === 'string' && task.assignedWorker.length > 0,
-    dockerRunning: false,
-    heartbeatFresh: false,
-    logGrowing: false,
-    partialResultExists: false,
+    authorityMatched: false,
+    resultSettled: existsSync(join(projectRoot, TASKS_DIR, `task-${taskId}.result`)),
   };
 
   // L1 — never-dispatched short-circuit
@@ -105,53 +152,35 @@ export function checkWorkerLiveness(
     };
   }
 
-  // L2 — docker container check (only meaningful when docker backend in use;
-  // probe returns false for non-docker backends, which is fine — other
-  // signals still vote). Fail closed on any error.
-  const containerName = dockerContainerNameForTask(projectRoot, taskId);
-  try {
-    signals.dockerRunning = dockerProbe(containerName);
-  } catch { /* fail closed — treat as not running */ }
-
-  // L3 — heartbeat freshness
   const hbPath = join(projectRoot, '.tasks', `task-${taskId}.hb`);
-  if (existsSync(hbPath)) {
-    try {
-      const ageMs = now() - statSync(hbPath).mtimeMs;
-      if (ageMs < LIVENESS_FRESHNESS_MS) signals.heartbeatFresh = true;
-    } catch { /* stat error — treat as stale */ }
-  }
-
-  // L4 — log mtime
-  const logPath = join(projectRoot, '.tasks', `task-${taskId}.log`);
-  if (existsSync(logPath)) {
-    try {
-      const ageMs = now() - statSync(logPath).mtimeMs;
-      if (ageMs < LIVENESS_FRESHNESS_MS) signals.logGrowing = true;
-    } catch { /* ignore */ }
-  }
-
-  // L5 — partial-result presence (Sprint 151 safety net)
-  const partialPath = join(projectRoot, '.tasks', `task-${taskId}.partial-result`);
-  if (existsSync(partialPath)) {
-    try {
-      const content = readFileSync(partialPath, 'utf-8');
-      if (content.trim().length > 0) signals.partialResultExists = true;
-    } catch { /* ignore */ }
-  }
-
-  const liveVote = signals.dockerRunning || signals.heartbeatFresh || signals.logGrowing;
-  if (liveVote) {
+  if (!existsSync(hbPath)) {
     return {
-      status: 'alive',
+      status: signals.resultSettled ? 'unavailable' : 'unavailable',
       signals,
-      reason: `worker still active — docker=${signals.dockerRunning} hb=${signals.heartbeatFresh} log=${signals.logGrowing} partial=${signals.partialResultExists}`,
+      reason: signals.resultSettled
+        ? 'terminal result is present; no worker stale projection is applied'
+        : 'worker activity identity is unavailable',
     };
   }
-
-  return {
-    status: 'dead',
-    signals,
-    reason: `no liveness signal — docker=${signals.dockerRunning} hb=${signals.heartbeatFresh} log=${signals.logGrowing} partial=${signals.partialResultExists}`,
-  };
+  try {
+    const parsed = parseWorkerActivityHeartbeat(
+      JSON.parse(readFileSync(hbPath, 'utf8')) as unknown,
+    );
+    if (parsed.state === 'HOLD') {
+      return { status: 'unavailable', signals, reason: `activity identity HOLD: ${parsed.reasonCode}` };
+    }
+    if (parsed.heartbeat.taskId !== taskId || parsed.heartbeat.workerId !== task.assignedWorker) {
+      return { status: 'unavailable', signals, reason: 'activity identity does not match task assignment' };
+    }
+    signals.authorityMatched = true;
+    const status = deps?.readAuthority?.(projectRoot, parsed.heartbeat)
+      ?? readHostHeartbeatAuthority(projectRoot, parsed.heartbeat);
+    return {
+      status,
+      signals,
+      reason: `host heartbeat authority returned ${status} for exact attempt ${parsed.heartbeat.attemptId}`,
+    };
+  } catch {
+    return { status: 'unavailable', signals, reason: 'activity heartbeat could not be read' };
+  }
 }

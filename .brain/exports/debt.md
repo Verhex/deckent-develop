@@ -36,6 +36,8 @@
 | debt-1780659451542-018 | Tech debt from 1780659451542-018: Declared verification passed: 3 files, 16 test | normal | sprint-1780659451542 | resolved |
 | debt-1780659451542-020 | Tech debt from 1780659451542-020: Evidence record cites bounded persisted source | normal | sprint-1780659451542 | resolved |
 | debt-1780659451542-019 | Tech debt from 1780659451542-019: npm run lint:master-plan reports docs/generate | normal | sprint-1780659451542 | resolved |
+| debt-661-004 | Tech debt from 661-004: Production registry now carries the generated exact base | normal | sprint-661 | resolved |
+| debt-661-003 | Tech debt from 661-003: Added a strict worker activity heartbeat v1 contract wit | normal | sprint-661 | resolved |
 | debt-657-002 | Tech debt from 657-002: Read-only acceptance completed within the exact authoriz | normal | sprint-657 | resolved |
 | debt-653-003 | Tech debt from 653-003: 7/7 goCriteria satisfied. One immutable PromptCompilePla | normal | sprint-653 | resolved |
 | debt-649-002 | Tech debt from 649-002: Project type checking remains blocked by three TS18047 s | normal | sprint-649 | resolved |

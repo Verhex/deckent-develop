@@ -815,12 +815,50 @@ function collectArchiveCandidates(projectRoot: string, sprintId: string): Archiv
     try { entries = readdirSync(liveTasks); } catch { /* absent */ }
     for (const name of entries) {
       if (!isSprintOwnedTaskArtifact(name, sprintId)) continue;
+      // Attempt receipts enter only as a verified receipt + referenced-core pair.
+      if (name.endsWith('.prompt-delivery.json')) continue;
       const source = join(liveTasks, name);
       try {
         if (lstatSync(source).isFile()) {
           candidates.push({ source, targetRelative: join(taskTarget, name), family: 'tasks', retireLegacy: false });
         }
       } catch { /* disappeared during read */ }
+    }
+    // Runtime prompt receipts are the sole authority for selecting immutable
+    // worker-core bytes. Never sweep unreferenced (including legacy short-hash)
+    // core files into a new canonical sprint archive.
+    for (const name of entries.filter(name => name.endsWith('.prompt-delivery.json'))) {
+      const receiptPath = join(liveTasks, name);
+      try {
+        const receipt = JSON.parse(readFileSync(receiptPath, 'utf8')) as {
+          runtimeDelivery?: { coreArtifactPath?: unknown; coreSha256?: unknown; coreBytes?: unknown };
+        };
+        const binding = receipt.runtimeDelivery;
+        if (!binding || typeof binding.coreArtifactPath !== 'string'
+          || typeof binding.coreSha256 !== 'string'
+          || !/^[a-f0-9]{64}$/u.test(binding.coreSha256)
+          || !Number.isSafeInteger(binding.coreBytes)) continue;
+        const coreName = `.worker-core-${binding.coreSha256}.md`;
+        const canonicalCoreSource = join(resolve(projectRoot, TASKS_DIR), coreName);
+        const coreSource = resolve(projectRoot, binding.coreArtifactPath);
+        if (basename(binding.coreArtifactPath) !== coreName
+          || coreSource !== canonicalCoreSource
+          || !existsSync(coreSource)) continue;
+        const identity = fileIdentity(coreSource);
+        if (identity.sha256 !== binding.coreSha256 || identity.bytes !== binding.coreBytes) continue;
+        candidates.push({
+          source: receiptPath,
+          targetRelative: join(taskTarget, name),
+          family: 'tasks',
+          retireLegacy: false,
+        });
+        candidates.push({
+          source: coreSource,
+          targetRelative: join(taskTarget, 'worker-cores', coreName),
+          family: 'tasks',
+          retireLegacy: false,
+        });
+      } catch { /* malformed receipt is retained as evidence but grants no core authority */ }
     }
   }
 
@@ -2466,6 +2504,36 @@ export function verifySprintArchive(projectRoot: string, sprintId: string): Spri
     }
     const identity = fileIdentity(path);
     if (identity.bytes !== artifact.bytes || identity.sha256 !== artifact.sha256) {
+      mismatched.push(artifact.path);
+    }
+  }
+  // Replay check: every archived runtime delivery receipt must resolve to the
+  // exact manifested core bytes it names. Digest-only evidence is insufficient.
+  for (const artifact of manifest.artifacts.filter(
+    item => item.path.endsWith('.prompt-delivery.json'),
+  )) {
+    try {
+      const receipt = JSON.parse(readFileSync(join(archiveDir, artifact.path), 'utf8')) as {
+        runtimeDelivery?: {
+          coreArtifactPath?: unknown;
+          coreSha256?: unknown;
+          coreBytes?: unknown;
+        };
+      };
+      const binding = receipt.runtimeDelivery;
+      if (!binding || typeof binding.coreSha256 !== 'string'
+        || !/^[a-f0-9]{64}$/u.test(binding.coreSha256)
+        || !Number.isSafeInteger(binding.coreBytes)) {
+        mismatched.push(artifact.path);
+        continue;
+      }
+      const corePath = `tasks/worker-cores/.worker-core-${binding.coreSha256}.md`;
+      const expectedSourcePath = `.tasks/.worker-core-${binding.coreSha256}.md`;
+      const coreArtifact = manifest.artifacts.find(item => item.path === corePath);
+      if (binding.coreArtifactPath !== expectedSourcePath
+        || !coreArtifact || coreArtifact.sha256 !== binding.coreSha256
+        || coreArtifact.bytes !== binding.coreBytes) mismatched.push(artifact.path);
+    } catch {
       mismatched.push(artifact.path);
     }
   }

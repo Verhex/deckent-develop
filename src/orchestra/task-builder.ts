@@ -1447,6 +1447,16 @@ export function validateScopeFilesWrite(filesWrite: string[]): ValidationResult 
  * here, so suppressing a tail can never shrink a granted authority.
  */
 function isPhantomTailToken(token: string, line: string, extracted: readonly string[]): boolean {
+  // A qualified scanner can still donate a shorter qualified tail. The live
+  // sprint-661 preflight case was `tests/docs/layer-shims.test.ts` donating
+  // `docs/layer-shims.test.ts` through the docs-file regex. Treat that exactly
+  // like the existing bare-basename phantoms, while preserving an explicitly
+  // authored `docs/...` token (there is no leading separator before it).
+  for (const separator of ['/', '\\']) {
+    const suffix = separator + token;
+    if (line.includes(suffix)) return true;
+    if (extracted.some(entry => entry !== token && entry.endsWith(suffix))) return true;
+  }
   if (token.includes('/') || token.includes('\\')) return false;
   for (const boundary of ['/', '\\', '.']) {
     const suffix = boundary + token;
