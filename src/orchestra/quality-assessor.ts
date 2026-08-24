@@ -142,7 +142,15 @@ function assessScopeAdherence(task: Task, result: TaskResult): number {
 
   let inScope = 0;
   let auxiliary = 0;
-  for (const file of result.filesChanged) {
+  for (const entry of result.filesChanged) {
+    // Canonical TaskResultV1 carries FileChange OBJECTS; legacy results carried
+    // plain strings. Both shapes reach evaluation — treating the object as a
+    // string killed EVALUATE for the whole run (live sprint-664:
+    // "file.startsWith is not a function", 0/5 evaluations).
+    const file = typeof entry === 'string'
+      ? entry
+      : String((entry as { path?: unknown })?.path ?? '');
+    if (file.length === 0) continue;
     const isAllowed =
       allowedFiles.includes(file) ||
       allowedDirs.some(d => file.startsWith(d)) ||

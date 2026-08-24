@@ -66,10 +66,17 @@ describe('canonical sprint archive reconciliation', () => {
     write('.tasks/task-621-008.attempt-attempt-1.codex.prompt-delivery.json', JSON.stringify({
       version: 2,
       taskId: '621-008',
+      source: 'worker-prompt',
       runtimeDelivery: {
+        attemptId: 'attempt-1',
+        provider: 'codex',
         coreArtifactPath: `.tasks/.worker-core-${digest}.md`,
         coreSha256: digest,
         coreBytes: Buffer.byteLength(core),
+        roleProfile: 'worker:implementer',
+        injectionChannel: 'codex-model-instructions-file',
+        contextSuppressionFlags: ['project_doc_max_bytes=0'],
+        providerArgvSha256: 'a'.repeat(64),
       },
     }));
     write('.deckent/recently-works/sprint-621-terminal-receipt.json', JSON.stringify({
@@ -87,6 +94,21 @@ describe('canonical sprint archive reconciliation', () => {
     )).toBe(false);
     expect(verifySprintArchive(root, SPRINT_ID).ok).toBe(true);
 
+    const archivedReceipt = join(
+      report.archiveDir,
+      'tasks',
+      'task-621-008.attempt-attempt-1.codex.prompt-delivery.json',
+    );
+    expect(JSON.parse(readFileSync(archivedReceipt, 'utf8'))).toMatchObject({
+      taskId: '621-008',
+      runtimeDelivery: {
+        attemptId: 'attempt-1',
+        provider: 'codex',
+        injectionChannel: 'codex-model-instructions-file',
+        providerArgvSha256: 'a'.repeat(64),
+      },
+    });
+
     writeFileSync(archivedCore, 'tampered', 'utf8');
     expect(verifySprintArchive(root, SPRINT_ID)).toMatchObject({
       ok: false,
@@ -94,6 +116,39 @@ describe('canonical sprint archive reconciliation', () => {
         `tasks/worker-cores/.worker-core-${digest}.md`,
       ]),
     });
+  });
+
+  it('rejects receipts whose exact invocation provenance contradicts their filename', () => {
+    const core = 'untrusted worker core';
+    const digest = createHash('sha256').update(core).digest('hex');
+    write(`.tasks/.worker-core-${digest}.md`, core);
+    write('.tasks/task-621-008.attempt-attempt-1.codex.prompt-delivery.json', JSON.stringify({
+      version: 2,
+      source: 'worker-prompt',
+      taskId: '621-008',
+      runtimeDelivery: {
+        attemptId: 'another-attempt',
+        provider: 'codex',
+        coreArtifactPath: `.tasks/.worker-core-${digest}.md`,
+        coreSha256: digest,
+        coreBytes: Buffer.byteLength(core),
+        roleProfile: 'worker:implementer',
+        injectionChannel: 'codex-model-instructions-file',
+        contextSuppressionFlags: [],
+        providerArgvSha256: 'b'.repeat(64),
+      },
+    }));
+    write('.deckent/recently-works/sprint-621-terminal-receipt.json', JSON.stringify({
+      terminalOutcome: 'COMPLETE',
+    }));
+
+    const report = reconcileSprintArchive(root, SPRINT_ID, { apply: true, indexMemory: false });
+
+    expect(report.manifest.artifacts.some(
+      artifact => artifact.path.includes('prompt-delivery')
+        || artifact.path.includes('worker-cores'),
+    )).toBe(false);
+    expect(existsSync(join(root, `.tasks/.worker-core-${digest}.md`))).toBe(true);
   });
 
   it('collects split evidence, retires only exact-sprint legacy files, indexes Brain, and is idempotent', () => {

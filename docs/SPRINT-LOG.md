@@ -16434,3 +16434,56 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 661-009: Read-only adversarial fan-in and sprint-660 replay (PAUSED)
 
 ---
+## Sprint 663 — sprint-663
+
+**Status:** ABORTED
+**Date:** 2026-08-24
+**Duration:** 235s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 235255ms |
+
+### Tasks
+
+- 663-001-fix: Fix: Host-primary heartbeat consumers for Auditor and Dashboard (PENDING)
+- 663-001: Host-primary heartbeat consumers for Auditor and Dashboard (PAUSED)
+- 663-002: Worker-core immutable delivery and archive provenance (PAUSED)
+- 663-003: Nervous accept resolves the recommendation store (PAUSED)
+- 663-004: Durable owner notification delivery for run and approval events (PAUSED)
+- 663-005: Read-only adversarial fan-in and sprint-661 replay (PAUSED)
+
+---
+## Sprint 664 — sprint-664
+
+**Status:** ABORTED
+**Date:** 2026-08-24
+**Duration:** 326s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 325585ms |
+
+### Tasks
+
+- 664-001: Host-primary heartbeat consumers for Auditor and Dashboard (EXECUTING)
+- 664-002: Worker-core immutable delivery and archive provenance (EXECUTING)
+- 664-003: Nervous accept resolves the recommendation store (EXECUTING)
+- 664-004: Durable owner notification delivery for run and approval events (PENDING)
+- 664-005: Read-only adversarial fan-in and sprint-661 replay (PENDING)
+
+---

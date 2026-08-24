@@ -16,9 +16,100 @@ import {
 import { ACTION_BY_ID, isFencedSchedulerAction } from './action-registry.js';
 import { awaitPanicGateApproval, isLockedPanicAction } from './panic-gate.js';
 import { recordDecision } from './decision-memory.js';
+import {
+  readRecommendations,
+  RECOMMENDATIONS_FILE,
+  type NervousRecommendation,
+} from './recommendation-log.js';
 import { randomUUID } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+
+// ─── Recommendation Disposition ─────────────────────────────────────────────────
+
+export type RecommendationDecision = 'accepted' | 'rejected';
+
+export interface RecommendationDisposition {
+  readonly decision: RecommendationDecision;
+  readonly decidedAt: string;
+  readonly decidedBy: 'user';
+  readonly reason?: string;
+}
+
+export type RecommendationDispositionResult =
+  | {
+      readonly ok: true;
+      readonly recommendationId: string;
+      readonly actionId: string;
+      readonly disposition: RecommendationDisposition;
+    }
+  | {
+      readonly ok: false;
+      readonly code: 'RECOMMENDATION_NOT_FOUND';
+      readonly recommendationId: string;
+    };
+
+type DisposedRecommendation = NervousRecommendation & {
+  readonly disposition: RecommendationDisposition;
+};
+
+/**
+ * Resolve an open recommendation in the store that produced its `rec-*` id.
+ * A disposition closes the inbox item and is persisted on that same durable
+ * JSONL record. Prefixes are accepted only when they identify one open item.
+ */
+export function disposeRecommendation(
+  projectRoot: string,
+  recommendationId: string,
+  decision: RecommendationDecision,
+  reason?: string,
+): RecommendationDispositionResult {
+  const recommendations = readRecommendations(projectRoot);
+  const matches = recommendations.filter(
+    (recommendation) => recommendation.status === 'open'
+      && (recommendation.id === recommendationId
+        || recommendation.id.startsWith(recommendationId)),
+  );
+  if (matches.length !== 1) {
+    return {
+      ok: false,
+      code: 'RECOMMENDATION_NOT_FOUND',
+      recommendationId,
+    };
+  }
+
+  const match = matches[0]!;
+  const disposition: RecommendationDisposition = {
+    decision,
+    decidedAt: new Date().toISOString(),
+    decidedBy: 'user',
+    ...(reason ? { reason } : {}),
+  };
+  const next = recommendations.map((recommendation): NervousRecommendation | DisposedRecommendation =>
+    recommendation.id === match.id
+      ? { ...recommendation, status: 'dismissed', disposition }
+      : recommendation,
+  );
+
+  const path = join(projectRoot, RECOMMENDATIONS_FILE);
+  const temporaryPath = join(
+    dirname(path),
+    `.nervous-recommendations.${process.pid}.${randomUUID()}.tmp`,
+  );
+  writeFileSync(
+    temporaryPath,
+    `${next.map((recommendation) => JSON.stringify(recommendation)).join('\n')}\n`,
+    'utf-8',
+  );
+  renameSync(temporaryPath, path);
+
+  return {
+    ok: true,
+    recommendationId: match.id,
+    actionId: match.actionId,
+    disposition,
+  };
+}
 
 // ─── NervousHistory Interface ────────────────────────────────────────────────
 // Defined here until history.ts (Task 8) is implemented.

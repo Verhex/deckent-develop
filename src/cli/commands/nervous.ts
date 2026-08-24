@@ -27,6 +27,7 @@ import {
 } from '../../nervous/recommendation-log.js';
 import { NERVOUS_HISTORY_FILE, NERVOUS_PENDING_FILE, PANIC_IPC_DIR } from '../../core/constants.js';
 import { removeNervousPending } from '../../core/pending-approvals.js';
+import { disposeRecommendation } from '../../nervous/executor.js';
 
 // ─── ANSI Color Helpers ─────────────────────────────────────────────────────
 
@@ -310,6 +311,14 @@ async function handleAccept(root: string, id: string, lang: string): Promise<voi
   const idx = pending.findIndex(n => n.id === id || n.id.startsWith(id) || n.shortCode === id.toLowerCase());
 
   if (idx === -1) {
+    const result = disposeRecommendation(root, id, 'accepted');
+    if (result.ok) {
+      print(colorize(
+        `  ${result.actionId} ${getMessage('nervous.label_accepted', lang)}`,
+        GREEN,
+      ));
+      return;
+    }
     printError(getMessage('nervous.not_found_pending', lang, { id }));
     process.exitCode = 1;
     return;
@@ -348,6 +357,15 @@ async function handleReject(root: string, id: string, lang: string, reason?: str
   const idx = pending.findIndex(n => n.id === id || n.id.startsWith(id) || n.shortCode === id.toLowerCase());
 
   if (idx === -1) {
+    const result = disposeRecommendation(root, id, 'rejected', reason);
+    if (result.ok) {
+      const reasonStr = reason ? getMessage('nervous.reject_reason', lang, { reason }) : '';
+      print(colorize('  ' + getMessage('nervous.rejected', lang, {
+        action: result.actionId,
+        reason: reasonStr,
+      }), RED));
+      return;
+    }
     printError(getMessage('nervous.not_found_pending', lang, { id }));
     process.exitCode = 1;
     return;

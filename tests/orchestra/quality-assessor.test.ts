@@ -71,6 +71,23 @@ describe('quality-assessor', () => {
       );
       expect(score.dimensions.scopeAdherence).toBe(100);
     });
+
+    it('reads canonical FileChange objects without throwing (live sprint-664 regression)', () => {
+      // EVALUATE aborted 0/5 with "file.startsWith is not a function" when
+      // TaskResultV1 filesChanged carried objects instead of legacy strings.
+      const score = assessQuality(
+        makeTask(),
+        makeResult({
+          filesChanged: [
+            { path: 'src/core/a.ts', status: 'modified', linesAdded: 1, linesRemoved: 0 },
+            { path: 'src/outside/b.ts', status: 'modified', linesAdded: 1, linesRemoved: 0 },
+          ] as unknown as string[],
+        }),
+        'DONE',
+      );
+      expect(score.dimensions.scopeAdherence).toBeLessThan(100);
+      expect(score.dimensions.scopeAdherence).toBeGreaterThan(0);
+    });
   });
 
   describe('assessSkillRelevance', () => {

@@ -6521,7 +6521,7 @@ export class DockerSpawnBackend implements SpawnBackend {
         projectRoot: dir,
         taskId,
         attemptId: attemptRef.attemptId,
-        provider,
+        provider: providerBinary,
         coreArtifactPath: coreArtifact.relativePath,
         coreSha256: coreArtifact.sha256,
         coreBytes: coreArtifact.bytes,

@@ -19,6 +19,13 @@
   `259c6472f` HIGH-3/4 (canary-arşiv lineage onarımı + config-owned thresholds) ·
   `06f201ae3` HIGH-5 + 7091 cursor build-arg fold. Formal mühürler: D4 discovery-purity
   `cfeaae18…` CONFIRMED, runtime-hygiene `094c1634…` CONFIRMED. Denetim-bulgu paketi 5/5 kapalı.
+- SIRADAKİ-ACİL (owner 2026-08-25): **skill-prompt tekrar-tekilleştirme** — her skill'in sonuna
+  eklenen `## Karpathy Notes` bloğu worker-prompt'una 3 kez enjekte ediliyor (ölçüldü:
+  `.tasks/.prompt-664-00{1,2,3}-*.txt` her birinde 3 kopya, satır ~67/~127/~214, ~36KB prompt).
+  Çözüm-yönü (owner): tekrar-eden setler skill-gövdesinden çıkar, worker doğarken system-prompt
+  kanalına (content-addressed `.worker-core-<digest>.md`) BİR kez enjekte edilir — biter gider.
+  Uygulama yeri: skill-pool compose + prompt-god-template skill-birleştirme + worker-core builder;
+  sprint-664 terminal olduktan sonraki İLK iş.
 - SIRADAKİ (sıra bağlayıcı): (1) sprint-662 DIRECTIVES'i — event-authority/heartbeat-UI +
   Nervous→Telegram delivery-bridge + result-ingress tekilleştirme residual'ları, 8-worker dogfood
   DAG'ı olarak; (2) 7094 gerçek A/B cohort koşusu (ölçüm-hattı artık açık) → owner-karar raporu;

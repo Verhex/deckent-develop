@@ -746,6 +746,65 @@ function isSprintTaskEndpoint(taskId: unknown, sprintId: string): taskId is stri
   return new RegExp(`^(?:task-)?${number}-[A-Za-z0-9][A-Za-z0-9._-]*$`, 'u').test(taskId);
 }
 
+interface ArchivedPromptRuntimeBinding {
+  readonly coreArtifactPath: string;
+  readonly coreSha256: string;
+  readonly coreBytes: number;
+}
+
+/**
+ * A runtime receipt is archive authority only when its filename, payload, and
+ * provider channel all identify the same exact invocation. The manifest then
+ * seals both this provenance receipt and the full-digest core bytes it names.
+ */
+function archivedPromptRuntimeBinding(
+  value: unknown,
+  filename: string,
+  sprintId: string,
+): ArchivedPromptRuntimeBinding | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const receipt = value as Record<string, unknown>;
+  const runtime = receipt.runtimeDelivery;
+  if (!runtime || typeof runtime !== 'object' || Array.isArray(runtime)) return null;
+  const binding = runtime as Record<string, unknown>;
+  if (receipt.version !== 2
+    || receipt.source !== 'worker-prompt'
+    || !isSprintTaskEndpoint(receipt.taskId, sprintId)
+    || typeof binding.attemptId !== 'string'
+    || !/^[a-z0-9][a-z0-9._-]*$/iu.test(binding.attemptId)
+    || typeof binding.provider !== 'string'
+    || !/^[a-z0-9][a-z0-9._-]*$/iu.test(binding.provider)
+    || typeof binding.coreArtifactPath !== 'string'
+    || typeof binding.coreSha256 !== 'string'
+    || !/^[a-f0-9]{64}$/u.test(binding.coreSha256)
+    || !Number.isSafeInteger(binding.coreBytes)
+    || (binding.coreBytes as number) < 0
+    || typeof binding.roleProfile !== 'string'
+    || binding.roleProfile.length === 0
+    || !Array.isArray(binding.contextSuppressionFlags)
+    || !binding.contextSuppressionFlags.every(flag => typeof flag === 'string')
+    || typeof binding.providerArgvSha256 !== 'string'
+    || !/^[a-f0-9]{64}$/u.test(binding.providerArgvSha256)) return null;
+
+  const expectedChannel = binding.provider === 'claude'
+    ? 'claude-system-prompt-file'
+    : binding.provider === 'codex'
+      ? 'codex-model-instructions-file'
+      : null;
+  const safeProvider = binding.provider.replace(/[^a-z0-9_-]/giu, '_');
+  const expectedFilename = `task-${receipt.taskId}.attempt-${binding.attemptId}.`
+    + `${safeProvider}.prompt-delivery.json`;
+  if (expectedChannel === null
+    || binding.injectionChannel !== expectedChannel
+    || filename !== expectedFilename) return null;
+
+  return {
+    coreArtifactPath: binding.coreArtifactPath,
+    coreSha256: binding.coreSha256,
+    coreBytes: binding.coreBytes as number,
+  };
+}
+
 /** Handoff filenames are not authority; endpoints and terminal status are. */
 function collectSettledHandoffCandidates(
   candidates: ArchiveCandidate[],
@@ -830,14 +889,12 @@ function collectArchiveCandidates(projectRoot: string, sprintId: string): Archiv
     for (const name of entries.filter(name => name.endsWith('.prompt-delivery.json'))) {
       const receiptPath = join(liveTasks, name);
       try {
-        const receipt = JSON.parse(readFileSync(receiptPath, 'utf8')) as {
-          runtimeDelivery?: { coreArtifactPath?: unknown; coreSha256?: unknown; coreBytes?: unknown };
-        };
-        const binding = receipt.runtimeDelivery;
-        if (!binding || typeof binding.coreArtifactPath !== 'string'
-          || typeof binding.coreSha256 !== 'string'
-          || !/^[a-f0-9]{64}$/u.test(binding.coreSha256)
-          || !Number.isSafeInteger(binding.coreBytes)) continue;
+        const binding = archivedPromptRuntimeBinding(
+          JSON.parse(readFileSync(receiptPath, 'utf8')) as unknown,
+          name,
+          sprintId,
+        );
+        if (!binding) continue;
         const coreName = `.worker-core-${binding.coreSha256}.md`;
         const canonicalCoreSource = join(resolve(projectRoot, TASKS_DIR), coreName);
         const coreSource = resolve(projectRoot, binding.coreArtifactPath);

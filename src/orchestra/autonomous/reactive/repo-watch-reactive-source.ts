@@ -34,7 +34,12 @@ export interface RepoWatchReactiveSourceDeps {
 const IGNORED_PREFIXES = ['.git/', 'node_modules/', 'dist/', '.deckent/', '.brain/', '.locks/', '.tasks/'];
 
 function isIgnored(relPath: string): boolean {
-  const p = relPath.replace(/\\/g, '/');
+  // fs.watch can hand a Buffer/null filename on some platforms and event
+  // bursts; a non-string here threw "relPath.replace is not a function" INSIDE
+  // the coordinator and aborted EXECUTE result collection for the whole run
+  // (live sprint-664, 0/5 results). Coerce and treat empty as ignored.
+  const p = String(relPath ?? '').replace(/\\/g, '/');
+  if (p.length === 0) return true;
   return IGNORED_PREFIXES.some((prefix) => p === prefix.slice(0, -1) || p.startsWith(prefix));
 }
 
