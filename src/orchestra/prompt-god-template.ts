@@ -913,6 +913,30 @@ function dedupeAgentNamedSkills(
 }
 
 /**
+ * Remove the skill-local Karpathy appendix now represented by the single
+ * prompt-level {@link KARPATHY_ESSENCE} anchor. Only an exact level-two heading
+ * starts a removal; every byte outside that section is retained.
+ */
+function stripSkillKarpathyNotes(content: string): string {
+  const heading = /^## Karpathy Notes(?=\r?$)/gm;
+  const nextSection = /^## /gm;
+  const parts: string[] = [];
+  let cursor = 0;
+
+  for (let match = heading.exec(content); match; match = heading.exec(content)) {
+    parts.push(content.slice(cursor, match.index));
+    nextSection.lastIndex = heading.lastIndex;
+    const next = nextSection.exec(content);
+    cursor = next?.index ?? content.length;
+    heading.lastIndex = cursor;
+  }
+
+  if (cursor === 0) return content;
+  parts.push(content.slice(cursor));
+  return parts.join('');
+}
+
+/**
  * Build the skill prompt section. Full SKILL.md content for every assigned
  * skill — no truncation, no effort-based clipping, no skip on overflow.
  *
@@ -934,7 +958,7 @@ export function buildSkillBlock(
   const parts: string[] = [header];
 
   for (const sp of skillPrompts) {
-    parts.push(`--- ${sp.name} ---\n${sp.content}`);
+    parts.push(`--- ${sp.name} ---\n${stripSkillKarpathyNotes(sp.content)}`);
     outNames.push(sp.name);
   }
 

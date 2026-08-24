@@ -16511,3 +16511,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 665-003: Read-only adversarial fan-in (PENDING)
 
 ---
+## Sprint 666 — sprint-666
+
+**Status:** ABORTED
+**Date:** 2026-08-24
+**Duration:** 263s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 1 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 262538ms |
+
+### Tasks
+
+- 666-001: Compose-time skill Karpathy dedup (DONE)
+- 666-002-fix: Fix: Read-only dedup fan-in (PAUSED)
+- 666-002: Read-only dedup fan-in (NO_GO)
+
+---

@@ -122,9 +122,18 @@ describe('buildTaskPrompt', () => {
         type: 'audit',
         scope: { directories: ['src/core/'], filesRead: ['src/core/config.ts'], filesWrite: [] },
       }),
-      makeCtx({ modelTier: 'premium' }),
+      makeCtx({
+        modelTier: 'premium',
+        skillPrompts: [{
+          name: 'testing-expert',
+          content: '# Testing Expert\n\n## Tests\nInspect evidence.\n\n## Karpathy Notes\nEditing advice.',
+        }],
+      }),
     ).prompt;
 
+    expect(prompt).toContain('## Read-Only Role Policy');
+    expect(prompt).not.toContain('## Karpathy Discipline');
+    expect(prompt).not.toContain('## Karpathy Notes');
     expect(prompt).toContain('5. Produce each NEW output file in ONE Write call');
     expect(prompt).toContain('Never grow a file through chained Write/Edit turns');
     expect(prompt).toContain('6. A simple single-deliverable inspection is TWO turns total');
@@ -368,6 +377,30 @@ describe('buildTaskPrompt', () => {
     expect(testIdx).toBeGreaterThan(-1);
     expect(tsIdx).toBeLessThan(testIdx);
     expect(result.metadata.skills).toEqual(['typescript-expert', 'testing-expert']);
+  });
+
+  it('deduplicates Karpathy Notes from a real multi-skill composition', () => {
+    const skillPrompts = [
+      {
+        name: 'python-expert',
+        content: '# Python Expert\n\n## Type Hints\nUse strict types.\n\n## Karpathy Notes\nPython-only notes.',
+      },
+      {
+        name: 'testing-expert',
+        content: '# Testing Expert\n\n## Test Pyramid\nPrefer unit tests.\n\n## Karpathy Notes\nTesting-only notes.\n\n## CI Integration\nRun targeted tests.',
+      },
+      {
+        name: 'typescript-expert',
+        content: '# TypeScript Expert\r\n\r\n## Strict Mode\r\nAvoid any.\r\n\r\n## Karpathy Notes\r\nTypeScript-only notes.\r\n\r\n## Anti-Patterns\r\nKeep exact bytes.\r\n## Karpathy Notes Extended\r\nThis near-match remains.',
+      },
+    ];
+
+    const prompt = buildTaskPrompt(makeTask(), makeCtx({ skillPrompts })).prompt;
+
+    expect(prompt.match(/^## Karpathy Discipline$/gm)).toHaveLength(1);
+    expect(prompt.match(/^## Karpathy Notes\r?$/gm) ?? []).toHaveLength(0);
+    expect(prompt).toContain('# Testing Expert\n\n## Test Pyramid\nPrefer unit tests.\n\n## CI Integration\nRun targeted tests.');
+    expect(prompt).toContain('# TypeScript Expert\r\n\r\n## Strict Mode\r\nAvoid any.\r\n\r\n## Anti-Patterns\r\nKeep exact bytes.\r\n## Karpathy Notes Extended\r\nThis near-match remains.');
   });
 
   // Test 10: Invalid scope is rejected at prompt admission, never downgraded to metadata.
