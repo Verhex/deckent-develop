@@ -1408,6 +1408,125 @@ describe('runCrossVerify — mandatory exact-coordinator enforcement', () => {
     });
   });
 
+  it('fans a truthful 2,169-character typed confirmation into the production runner and binds its exact raw output to the durable receipt', async () => {
+    writeResultFile('276-001', makeResult());
+    writeFileSync(
+      join(root, TASKS_DIR, 'task-276-001-xverify.json'),
+      `${JSON.stringify({ id: '276-001-xverify', status: TaskStatus.PENDING }, null, 2)}\n`,
+      'utf-8',
+    );
+    const typed = typedAdjudicationFixture('supported');
+    const terminal = 'VERDICT: CONFIRMED all authored assertions are supported';
+    const serializedWithoutReason = `${CROSS_VERIFY_ADJUDICATION_RESPONSE_PREFIX}${JSON.stringify({
+      ...typed.response,
+      assertionResults: typed.response.assertionResults.map(result => ({ ...result, reason: '' })),
+    })}\n${terminal}`;
+    typed.response.assertionResults[0]!.reason = 'r'.repeat(2_169 - serializedWithoutReason.length);
+    const output = `${CROSS_VERIFY_ADJUDICATION_RESPONSE_PREFIX}${JSON.stringify(typed.response)}\n${terminal}`;
+    expect(output).toHaveLength(2_169);
+
+    const exact = mandatoryComposition(exactCoordinatorSettled(output));
+    const verdictReceiptRef = `cross-verify-verdict:sha256:${'d'.repeat(64)}`;
+    const persist = vi.fn(() => ({
+      verdictReceiptRef,
+      validatedReceipt: {
+        verdictReceiptSha256: 'd'.repeat(64),
+        receipt: {},
+      } as never,
+    }));
+
+    const res = await runCrossVerify(
+      root, makeTask(), makeResult(), TaskEvaluation.DONE,
+      makeConfig({ enabled: true, enforce_refuted: true }),
+      { mandatoryInvocation: { ...exact.composition, adjudication: { contract: typed.contract, persist } } },
+    );
+
+    expect(res).toMatchObject({
+      ran: true,
+      outcome: 'confirmed',
+      disposition: 'allow',
+      blocked: false,
+      advisory: {
+        verifier: 'codex',
+        verifierModel: 'gpt-5.6-sol',
+        adjudicationReceiptRef: verdictReceiptRef,
+        execution: {
+          outcome: 'completed',
+          terminalAttemptId: '11111111-1111-4111-8111-111111111111',
+          cumulativeUsage: { turns: 2, totalTokens: 134 },
+        },
+      },
+    });
+    expect(exact.execute).toHaveBeenCalledOnce();
+    expect(persist).toHaveBeenCalledOnce();
+    expect(persist.mock.calls[0]![0].adjudication).toMatchObject({
+      verdict: 'confirmed', disposition: 'accepted', reasonCode: 'confirmed-all-criteria-satisfied',
+    });
+    expect(persist.mock.calls[0]![0].output).toBe(output);
+    expect(persist.mock.calls[0]![0].adjudication).toMatchObject({
+      claimDigest: typed.contract.claimDigest,
+      evidenceManifestDigest: typed.contract.evidenceManifestDigest,
+    });
+    expect(readResultFile('276-001').crossVerify).toMatchObject({
+      outcome: 'confirmed',
+      verifier: 'codex',
+      verifierModel: 'gpt-5.6-sol',
+      execution: { terminalAttemptId: '11111111-1111-4111-8111-111111111111' },
+    });
+    expect(JSON.parse(readFileSync(
+      join(root, TASKS_DIR, 'task-276-001-xverify.json'),
+      'utf-8',
+    ))).toMatchObject({ id: '276-001-xverify', status: TaskStatus.DONE });
+  });
+
+  it.each([
+    ['reason ceiling', (typed: ReturnType<typeof typedAdjudicationFixture>) => ({
+      ...typed.response,
+      assertionResults: typed.response.assertionResults.map(result => ({
+        ...result,
+        reason: 'x'.repeat(CROSS_VERIFY_ADJUDICATION_REASON_MAX_CHARS + 1),
+      })),
+    }), 'VERDICT: CONFIRMED oversized reason'],
+    ['schema', (typed: ReturnType<typeof typedAdjudicationFixture>) => ({
+      ...typed.response, schemaVersion: CROSS_VERIFY_ADJUDICATION_SCHEMA_VERSION + 1,
+    }), 'VERDICT: CONFIRMED unrelated schema version'],
+    ['citation', (typed: ReturnType<typeof typedAdjudicationFixture>) => ({
+      ...typed.response,
+      assertionResults: typed.response.assertionResults.map(result => ({ ...result, citations: [] })),
+    }), 'VERDICT: CONFIRMED unrelated citation violation'],
+    ['digest', (typed: ReturnType<typeof typedAdjudicationFixture>) => ({
+      ...typed.response, claimDigest: `sha256:${'f'.repeat(64)}`,
+    }), 'VERDICT: CONFIRMED unrelated digest violation'],
+    ['terminal', (typed: ReturnType<typeof typedAdjudicationFixture>) => typed.response,
+      'VERDICT: UNCLEAR unrelated terminal violation'],
+  ] as const)(
+    'keeps a hostile %s response at UNCLEAR/HOLD',
+    async (_control, mutate, terminal) => {
+      writeResultFile('276-001', makeResult());
+      const typed = typedAdjudicationFixture('supported');
+      const output = `${CROSS_VERIFY_ADJUDICATION_RESPONSE_PREFIX}${JSON.stringify(mutate(typed))}\n${terminal}`;
+      const exact = mandatoryComposition(exactCoordinatorSettled(output));
+      const persist = vi.fn(() => ({
+        verdictReceiptRef: `cross-verify-verdict:sha256:${'e'.repeat(64)}`,
+        validatedReceipt: { verdictReceiptSha256: 'e'.repeat(64), receipt: {} } as never,
+      }));
+
+      const res = await runCrossVerify(
+        root, makeTask(), makeResult(), TaskEvaluation.DONE,
+        makeConfig({ enabled: true, enforce_refuted: true }),
+        { mandatoryInvocation: { ...exact.composition, adjudication: { contract: typed.contract, persist } } },
+      );
+
+      expect(res).toMatchObject({
+        ran: true, outcome: 'unclear', disposition: 'hold', blocked: true,
+        advisory: { verdict: 'unclear', assurance: 'typed-host-adjudicated' },
+      });
+      expect(persist.mock.calls[0]![0].adjudication).toMatchObject({
+        verdict: 'unclear', disposition: 'fail-closed',
+      });
+    },
+  );
+
   it('propagates an exact schema rejection through adjudication, result and report', async () => {
     writeResultFile('276-001', makeResult());
     const typed = typedAdjudicationFixture('supported');

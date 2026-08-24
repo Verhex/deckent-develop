@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -12,11 +12,25 @@ import {
 } from '../../src/orchestra/cross-verify-runner.js';
 import { AttendedExecutionApprovalError } from '../../src/core/attended-execution-approval.js';
 import { TaskEvaluation } from '../../src/core/types.js';
+import {
+  claimTaskResultSettlementAttemptAtomic,
+  createTaskResultSettlementRefForAttempt,
+  taskResultSettlementActiveClaimDigest,
+  writeTaskResultSettlementAttemptAtomic,
+} from '../../src/core/task-result-settlement.js';
+import {
+  CROSS_VERIFY_COMPLETE_RESPONSE_MAX_CHARS,
+  CROSS_VERIFY_RAW_OUTPUT_MAX_BYTES,
+  CROSS_VERIFY_UTF8_WORST_CASE_BYTES_PER_JAVASCRIPT_CHAR,
+} from '../../src/core/cross-verify-response-limits.js';
 
 const roots: string[] = [];
+const originalDeckentHome = process.env.DECKENT_HOME;
 
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+  if (originalDeckentHome === undefined) delete process.env.DECKENT_HOME;
+  else process.env.DECKENT_HOME = originalDeckentHome;
 });
 
 function root(): string {
@@ -169,6 +183,42 @@ describe('cross-verify channel truth', () => {
       expect.objectContaining({ detail: '556-example' }),
       expect.objectContaining({ detail: 'readable composition failure' }),
     ]));
+  });
+
+  it('reaches ready when the semantic response byte capacity equals the durable receipt cap', () => {
+    const projectRoot = root();
+    const stateRoot = root();
+    process.env.DECKENT_HOME = stateRoot;
+    writeFileSync(join(projectRoot, 'evidence.ts'), 'export const evidence = true;\n');
+    const settlementRef = createTaskResultSettlementRefForAttempt(projectRoot, 'capacity-parity', '11111111-1111-4111-8111-111111111111');
+    writeTaskResultSettlementAttemptAtomic(settlementRef, '2026-08-24T00:00:00.000Z');
+    claimTaskResultSettlementAttemptAtomic(settlementRef, '2026-08-24T00:00:00.000Z');
+
+    const bootstrapped = bootstrapCrossVerifyRuntimeV2({
+      projectRoot,
+      task: {
+        id: 'capacity-parity',
+        title: 'capacity parity',
+        scope: { filesRead: ['evidence.ts'] },
+        goNogo: { items: [{
+          id: 'C1', polarity: 'go', statement: 'evidence is true',
+          evidenceRequirements: ['evidence.ts'],
+        }] },
+      } as never,
+      result: { taskId: 'capacity-parity', filesChanged: ['evidence.ts'] } as never,
+      settlementRef,
+      fenceTokenHash: taskResultSettlementActiveClaimDigest(settlementRef),
+      runtimeImageRef: `sha256:${'b'.repeat(64)}`,
+      producerSettlementDigest: 'c'.repeat(64),
+    });
+
+    expect(CROSS_VERIFY_COMPLETE_RESPONSE_MAX_CHARS
+      * CROSS_VERIFY_UTF8_WORST_CASE_BYTES_PER_JAVASCRIPT_CHAR)
+      .toBe(CROSS_VERIFY_RAW_OUTPUT_MAX_BYTES);
+    expect(bootstrapped).toMatchObject({
+      state: 'ready',
+      executionBinding: { maxEvidenceOutputChars: 12_000 },
+    });
   });
 
   it('persists bounded schema-rejected raw output and successful assertion breakdowns', () => {

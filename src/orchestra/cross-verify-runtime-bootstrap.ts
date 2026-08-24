@@ -13,15 +13,19 @@ import {
 import {
   captureCrossVerifyEvidenceSnapshotAtomic,
   claimCrossVerifyEvidenceSnapshotAtomic,
+  CROSS_VERIFY_RAW_OUTPUT_MAX_BYTES,
   crossVerifyEvidenceReceiptRef,
   writeCrossVerifyDecodedSlice,
   type CrossVerifyEvidenceClaimEnvelopeV1,
   type CrossVerifyEvidenceReceiptEnvelopeV1,
 } from '../core/cross-verify-evidence-broker.js';
+import {
+  CROSS_VERIFY_COMPLETE_RESPONSE_MAX_CHARS,
+  CROSS_VERIFY_UTF8_WORST_CASE_BYTES_PER_JAVASCRIPT_CHAR,
+} from '../core/cross-verify-response-limits.js';
 import type { CrossVerifyAdjudicationExecutionBindingV2 } from '../core/cross-verify-execution-contract.js';
 import {
   buildCrossVerifyAdjudicationPromptV2,
-  CROSS_VERIFY_ADJUDICATION_RESPONSE_MAX_CHARS,
   CROSS_VERIFY_EVIDENCE_OUTPUT_MAX_CHARS,
   CROSS_VERIFY_PROMPT_MAX_CHARS,
   CROSS_VERIFY_RATIONALE_MAX_CHARS,
@@ -314,12 +318,13 @@ export function bootstrapCrossVerifyRuntimeV2(
       evidenceAccess: 'snapshot-read-only',
       artifactMutationPolicy: 'attempt-private-output-only',
     };
-    if (CROSS_VERIFY_ADJUDICATION_RESPONSE_MAX_CHARS
-      > CROSS_VERIFY_EVIDENCE_OUTPUT_MAX_CHARS) {
+    if (CROSS_VERIFY_COMPLETE_RESPONSE_MAX_CHARS
+      * CROSS_VERIFY_UTF8_WORST_CASE_BYTES_PER_JAVASCRIPT_CHAR
+      > CROSS_VERIFY_RAW_OUTPUT_MAX_BYTES) {
       return bootstrapHold(
         input,
         'xverify_v2_bootstrap_failed',
-        'semantic response ceiling exceeds durable raw-output ceiling',
+        'semantic response byte capacity exceeds durable raw-output ceiling',
       );
     }
     return Object.freeze({

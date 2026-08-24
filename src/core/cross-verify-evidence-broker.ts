@@ -22,6 +22,7 @@ import {
 
 import { createJsonFileFirstWriterWins, createRawFileFirstWriterWins } from './approval-file-cas.js';
 import { canonicalJson } from './audit-writer.js';
+import { CROSS_VERIFY_RAW_OUTPUT_MAX_BYTES as canonicalCrossVerifyRawOutputMaxBytes } from './cross-verify-response-limits.js';
 import {
   assertTaskResultSettlementRef,
   readTaskResultSettlementActiveClaim,
@@ -38,7 +39,8 @@ export const CROSS_VERIFY_EVIDENCE_MAX_FILE_BYTES = 2 * 1024 * 1024;
 export const CROSS_VERIFY_EVIDENCE_MAX_TOTAL_BYTES = 16 * 1024 * 1024;
 export const CROSS_VERIFY_EVIDENCE_MAX_RELATIVE_PATH_BYTES = 1_024;
 export const CROSS_VERIFY_EVIDENCE_MAX_RECEIPT_BYTES = 1024 * 1024;
-export const CROSS_VERIFY_RAW_OUTPUT_MAX_BYTES = 12_000;
+/** Canonical raw-output ceiling, re-exported for durable verdict receipt callers. */
+export const CROSS_VERIFY_RAW_OUTPUT_MAX_BYTES = canonicalCrossVerifyRawOutputMaxBytes;
 
 const BROKER_DIRECTORY = 'cross-verify-evidence';
 const BLOBS_DIRECTORY = 'blobs';

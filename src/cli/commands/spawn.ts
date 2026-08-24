@@ -54,10 +54,8 @@ import {
 import { resolveHostExecutionBudget } from '../../orchestra/runtime-budget-monitor.js';
 import { resolveProviderExecutionCostClass } from '../../core/provider-execution-profile.js';
 import {
-  assertTaskResultSettlementRef,
   createTaskResultSettlementRef,
   createTaskResultSettlementRefForAttempt,
-  readClosedTaskResultSettlement,
   writeTaskResultSettlementAttemptAtomic,
   type TaskResultSettlementRefV1,
 } from '../../core/task-result-settlement.js';
@@ -67,6 +65,9 @@ import {
 } from '../../core/file-lock.js';
 import { openTaskSettlementProjection } from '../../core/task-settlement-authority.js';
 import { resolveTenant } from '../../core/tenant-context.js';
+import { finalizeTaskStatusFromSettlement } from '../../orchestra/task-settlement-projection.js';
+
+export { finalizeTaskStatusFromSettlement } from '../../orchestra/task-settlement-projection.js';
 
 /**
  * Build a comma-separated allowedTools string from a task's scope.
@@ -674,37 +675,6 @@ export function finalizeTaskStatusFromResult(root: string, taskId: string): Task
     return status;
   } catch (e) {
     debugLog('spawn:finalizeTaskStatus', e);
-    return null;
-  }
-}
-
-/** Finalize a Docker task only from the exact closed host-owned attempt receipt. */
-export function finalizeTaskStatusFromSettlement(
-  root: string,
-  taskId: string,
-  settlementRef: TaskResultSettlementRefV1,
-): TaskStatus | null {
-  assertTaskResultSettlementRef(root, taskId, settlementRef);
-  const settlement = readClosedTaskResultSettlement(settlementRef);
-  if (!settlement) return null;
-  const result = normalizeTaskResultShape(settlement.result as unknown as TaskResult);
-  if (!result || result.taskId !== taskId) return null;
-
-  const assessment = result.selfAssessment;
-  const status =
-    assessment === 'DONE' || assessment === 'GO_WITH_TECH_DEBT' ? TaskStatus.DONE
-    : assessment === 'NO_GO' ? TaskStatus.NO_GO
-    : null;
-  if (status === null) return null;
-
-  const taskPath = join(root, TASKS_DIR, `task-${taskId}.json`);
-  try {
-    const task = readTask(root, taskId);
-    task.status = status;
-    writeFileSync(taskPath, JSON.stringify(task, null, 2), 'utf-8');
-    return status;
-  } catch (e) {
-    debugLog('spawn:finalizeTaskStatusFromSettlement', e);
     return null;
   }
 }

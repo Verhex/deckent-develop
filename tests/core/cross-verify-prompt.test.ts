@@ -3,6 +3,7 @@ import {
   buildRefutePrompt,
   buildCrossVerifyAdjudicationPromptV2,
   CROSS_VERIFY_ADJUDICATION_RESPONSE_MAX_CHARS,
+  CROSS_VERIFY_COMPLETE_RESPONSE_MAX_CHARS,
   CROSS_VERIFY_ADJUDICATION_RESPONSE_PREFIX,
   CROSS_VERIFY_EVIDENCE_OUTPUT_MAX_CHARS,
   CROSS_VERIFY_PROMPT_MAX_CHARS,
@@ -21,6 +22,9 @@ import {
   CROSS_VERIFY_ADJUDICATION_SCHEMA_VERSION,
   createCrossVerifyAdjudicationContractV2,
 } from '../../src/core/cross-verify-adjudication.js';
+import {
+  CROSS_VERIFY_COMPLETE_RESPONSE_MAX_CHARS as CANONICAL_COMPLETE_RESPONSE_MAX_CHARS,
+} from '../../src/core/cross-verify-response-limits.js';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -359,6 +363,106 @@ describe('cross-verify-prompt · typed adjudication v2', () => {
     expect(parseCrossVerifyAdjudicationOutputV2(output)).toMatchObject({
       response,
       providerDeclaredVerdict: 'confirmed',
+    });
+  });
+
+  it('re-exports the canonical complete-response ceiling and preserves supported CONFIRMED output', () => {
+    const contract = adjudicationContract();
+    const response = {
+      schemaVersion: CROSS_VERIFY_ADJUDICATION_SCHEMA_VERSION,
+      protocol: CROSS_VERIFY_ADJUDICATION_PROTOCOL,
+      claimDigest: contract.claimDigest,
+      evidenceManifestDigest: contract.evidenceManifestDigest,
+      assertionResults: [{
+        assertionId: 'A1',
+        status: 'supported' as const,
+        citations: [{
+          evidenceId: 'E1',
+          locator: 'src/auth/middleware.ts#L10-L24',
+          evidenceSha256: `sha256:${'1'.repeat(64)}`,
+        }],
+        reason: '',
+      }],
+    };
+    const terminal = 'VERDICT: CONFIRMED all authored assertions are supported';
+    const prefix = `${CROSS_VERIFY_ADJUDICATION_RESPONSE_PREFIX}${JSON.stringify(response)}`;
+    response.assertionResults[0].reason = 'r'.repeat(2_169 - prefix.length - terminal.length - 1);
+    const output = `${CROSS_VERIFY_ADJUDICATION_RESPONSE_PREFIX}${JSON.stringify(response)}\n${terminal}`;
+
+    expect(CROSS_VERIFY_COMPLETE_RESPONSE_MAX_CHARS)
+      .toBe(CANONICAL_COMPLETE_RESPONSE_MAX_CHARS);
+    expect(CROSS_VERIFY_ADJUDICATION_RESPONSE_MAX_CHARS)
+      .toBe(CANONICAL_COMPLETE_RESPONSE_MAX_CHARS);
+    expect(output).toHaveLength(2_169);
+    expect(parseCrossVerifyAdjudicationOutputV2(output)).toMatchObject({
+      response,
+      providerDeclaredVerdict: 'confirmed',
+    });
+  });
+
+  it('accepts exact reason and response ceilings while rejecting each ceiling plus one', () => {
+    const contract = adjudicationContract();
+    const makeOutput = (reasonLength: number): string => {
+      const response = {
+        schemaVersion: CROSS_VERIFY_ADJUDICATION_SCHEMA_VERSION,
+        protocol: CROSS_VERIFY_ADJUDICATION_PROTOCOL,
+        claimDigest: contract.claimDigest,
+        evidenceManifestDigest: contract.evidenceManifestDigest,
+        assertionResults: [{
+          assertionId: 'A1',
+          status: 'supported',
+          citations: [{
+            evidenceId: 'E1',
+            locator: 'src/auth/middleware.ts#L10-L24',
+            evidenceSha256: `sha256:${'1'.repeat(64)}`,
+          }],
+          reason: 'r'.repeat(reasonLength),
+        }],
+      };
+      return `${CROSS_VERIFY_ADJUDICATION_RESPONSE_PREFIX}${JSON.stringify(response)}\n`
+        + 'VERDICT: CONFIRMED all authored assertions are supported';
+    };
+    const exactReason = makeOutput(CROSS_VERIFY_ADJUDICATION_REASON_MAX_CHARS);
+
+    expect(parseCrossVerifyAdjudicationOutputV2(exactReason).response)
+      .not.toBeNull();
+    expect(parseCrossVerifyAdjudicationOutputV2(
+      makeOutput(CROSS_VERIFY_ADJUDICATION_REASON_MAX_CHARS + 1),
+    )).toEqual({
+      response: null,
+      providerDeclaredVerdict: 'confirmed',
+      error: 'xverify v2 adjudication response rejected: assertionResults.0.reason: '
+        + `String must contain at most ${CROSS_VERIFY_ADJUDICATION_REASON_MAX_CHARS} character(s)`,
+    });
+
+    const results = Array.from({ length: 8 }, (_, index) => ({
+      assertionId: `A${index + 1}`,
+      status: 'supported' as const,
+      citations: [{
+        evidenceId: 'E1',
+        locator: 'src/auth/middleware.ts#L10-L24',
+        evidenceSha256: `sha256:${'1'.repeat(64)}`,
+      }],
+      reason: 'r'.repeat(CROSS_VERIFY_ADJUDICATION_REASON_MAX_CHARS),
+    }));
+    const terminal = 'VERDICT: CONFIRMED all authored assertions are supported';
+    const serialize = () => `${CROSS_VERIFY_ADJUDICATION_RESPONSE_PREFIX}${JSON.stringify({
+      schemaVersion: CROSS_VERIFY_ADJUDICATION_SCHEMA_VERSION,
+      protocol: CROSS_VERIFY_ADJUDICATION_PROTOCOL,
+      claimDigest: contract.claimDigest,
+      evidenceManifestDigest: contract.evidenceManifestDigest,
+      assertionResults: results,
+    })}\n${terminal}`;
+    const excess = serialize().length - CROSS_VERIFY_COMPLETE_RESPONSE_MAX_CHARS;
+    results[results.length - 1]!.reason = results[results.length - 1]!.reason.slice(0, -excess);
+    const atResponseCeiling = serialize();
+
+    expect(atResponseCeiling).toHaveLength(CROSS_VERIFY_COMPLETE_RESPONSE_MAX_CHARS);
+    expect(parseCrossVerifyAdjudicationOutputV2(atResponseCeiling).response).not.toBeNull();
+    expect(parseCrossVerifyAdjudicationOutputV2(`${atResponseCeiling} `)).toEqual({
+      response: null,
+      providerDeclaredVerdict: 'unclear',
+      error: 'xverify-v2-output-ceiling-exceeded',
     });
   });
 

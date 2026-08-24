@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { generateKeyPairSync } from 'node:crypto';
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -14,10 +15,9 @@ function fixture() {
   const decisionsPath = join(root, 'decisions.json');
   const masterPlanPath = join(root, 'master.json');
   const proposalPath = join(root, 'proposal-source.md');
+  const trustAnchorsPath = join(root, 'trust-anchors.json');
   const masterBase = {
     schemaVersion: 1,
-    tenantId: 'tenant-main',
-    projectId: 'deckent',
     sourceDigest: { algorithm: 'sha256(normalized-lf-utf8)', value: 'a'.repeat(64) },
     identityRegistry: [{ id: 'ROW-A' }],
     workItems: [{ id: 'ROW-A', state: 'active' }],
@@ -34,7 +34,12 @@ function fixture() {
   writeFileSync(decisionsPath, JSON.stringify(decisions));
   writeFileSync(masterPlanPath, JSON.stringify(master));
   writeFileSync(proposalPath, '# Owner proposal\n', 'utf8');
-  return { root, decisionsPath, masterPlanPath, proposalPath, decisions };
+  const publicKeyPem = generateKeyPairSync('ed25519').publicKey.export({ type: 'spki', format: 'pem' }).toString();
+  writeFileSync(trustAnchorsPath, JSON.stringify({
+    schemaVersion: 1,
+    anchors: [{ keyId: 'owner-a', publicKeyPem, tenantId: 'tenant-main', projectId: 'deckent' }],
+  }));
+  return { root, decisionsPath, masterPlanPath, proposalPath, trustAnchorsPath, decisions };
 }
 
 describe('Phase-5 dry-run bundle builder', () => {
@@ -87,5 +92,24 @@ describe('Phase-5 dry-run bundle builder', () => {
       'seqIntervalStart', 'seqIntervalEnd', 'authenticatedAt', 'decidedAt', 'authExpiresAt',
     ].sort());
     expect(JSON.stringify(summary)).not.toMatch(/signature|attestation|authorityProof/);
+    expect(summary).toMatchObject({ tenantId: 'tenant-main', projectId: 'deckent' });
+  });
+
+  it('accepts key rotation within one scope and rejects cross-scope anchors', () => {
+    const f = fixture();
+    const first = generateKeyPairSync('ed25519').publicKey.export({ type: 'spki', format: 'pem' }).toString();
+    const second = generateKeyPairSync('ed25519').publicKey.export({ type: 'spki', format: 'pem' }).toString();
+    const writeAnchors = (projectId: string) => writeFileSync(f.trustAnchorsPath, JSON.stringify({
+      schemaVersion: 1,
+      anchors: [
+        { keyId: 'owner-a', publicKeyPem: first, tenantId: 'tenant-main', projectId: 'deckent' },
+        { keyId: 'owner-b', publicKeyPem: second, tenantId: 'tenant-main', projectId },
+      ],
+    }));
+    writeAnchors('deckent');
+    expect(buildDryRunBundle({ ...f, outDir: join(f.root, 'same-scope') })).toMatchObject({ projectId: 'deckent' });
+    writeAnchors('other-project');
+    expect(() => buildDryRunBundle({ ...f, outDir: join(f.root, 'cross-scope') }))
+      .toThrowError(/E_DRYRUN_AUTHORITY.*TRUST_ANCHOR_SCOPE_CONFLICT/);
   });
 });

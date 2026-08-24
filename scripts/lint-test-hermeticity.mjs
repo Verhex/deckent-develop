@@ -589,11 +589,19 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // replacing the disconnected synthetic invocation fixture with the real
   // preparation → production-ingress → runner chain. The source-derived scan
   // reports zero confirmed live-authority violations.
-  // The live Opus response-bound recovery adds pure parser/prompt bounds plus a
-  // suite-owned tmpdir runner propagation proof; it reuses inventoried effects,
-  // so the effect count remains unchanged while callsite fingerprints move.
-  count: 16003,
-  digest: '8a456bb3bf03010f9f8ef3dc4c564453316ecffa47dd3e067e0e4a905220170d',
+  // 2026-08-24 XVERIFY-RESPONSE-BUDGET-001: +5 — exact semantic/raw budget
+  // parity exercises suite-owned tmpdir settlement roots and durable receipt
+  // boundaries. Parser-only limits remain effect-free; the source-derived scan
+  // reports zero confirmed live-authority violations.
+  // 2026-08-24 XVerify settlement projection parity: +1 — the production fan-in
+  // regression writes only its suite-owned tmpdir task projection and proves
+  // exact closed-settlement PENDING→DONE convergence. Scanner: zero confirmed
+  // live-authority violations.
+  // 2026-08-24 Closure trust-anchor identity wiring: +1 — Phase-5 dry-run
+  // rotation/conflict coverage writes only suite-owned tmpdir bundles and
+  // trust-anchor fixtures. Scanner: zero confirmed live-authority violations.
+  count: 16010,
+  digest: 'c3316e7dab1e5ab62a7500b9a159d08deb1dab986ff1250d96e75b402f52647e',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1049,11 +1057,17 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // The final causal candidate-window integration rewrite changes only which
   // already-inventoried production modules are reachable from that suite;
   // inventory membership remains count-neutral.
-  // The live Opus response-bound recovery keeps membership count-neutral while
-  // binding prompt disclosure and parse-diagnostic propagation into the same
-  // already-inventoried adjudication/prompt/runner production chain.
-  count: 1316,
-  digest: '90fb24f871d3b3e2dcf25bc09cb9550a2974ff811d6c025e52e3a54ec59ee421',
+  // 2026-08-24 XVERIFY-RESPONSE-BUDGET-001: +1 — the dependency-free canonical
+  // response-limit authority enters the governed inventory; adjudication,
+  // prompt, broker, bootstrap and runner consumers bind the same finite budget.
+  // 2026-08-24 XVerify settlement projection parity: +1 — one shared
+  // closed-settlement projection service is consumed by manual spawn and the
+  // mandatory exact-coordinator ingress; no provider prose can finalize it.
+  // 2026-08-24 Closure identity closure: count unchanged; digest binds Phase-5
+  // dry-run/claim/append to the canonical trust-anchor tenant/project scope
+  // and removes the unwired generated-MASTER identity assumption.
+  count: 1318,
+  digest: 'a08a0c2243e2dc78abb34d3bef8eed951ef403a693393826a5a9c7321bf147f3',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

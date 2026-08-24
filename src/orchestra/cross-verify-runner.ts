@@ -122,6 +122,7 @@ import {
   PROVIDER_EXECUTION_OBSERVATION_DATABASE_PATH,
   ProviderExecutionObservationStore,
 } from '../core/provider-execution-observation-store.js';
+import { finalizeTaskStatusFromSettlement } from './task-settlement-projection.js';
 
 // ─── Public types ────────────────────────────────────────────────────────────
 
@@ -1490,6 +1491,15 @@ export async function runCrossVerify(
       const verifierProvider = coordinated.calledProvider as ProviderName;
       dispatchedVerifier = verifierProvider;
       dispatchedVerifierModel = coordinated.calledModel;
+      // The exact coordinator owns transport settlement, but its production
+      // ingress used to skip the raw task projection that manual spawn already
+      // performs. Reuse the same closed-settlement service so a successful
+      // mandatory XVerify cannot leave `task-<id>-xverify.json` at PENDING.
+      finalizeTaskStatusFromSettlement(
+        projectRoot,
+        mandatory.input.executionContract.verifierTaskId,
+        coordinated.terminalSettlementRef,
+      );
       const retirement = retireSettledCrossVerifyProviderObservation({
         projectRoot,
         settlementRef: coordinated.terminalSettlementRef,

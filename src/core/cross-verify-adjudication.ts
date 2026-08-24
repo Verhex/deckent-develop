@@ -14,12 +14,12 @@ import { z } from 'zod';
 
 import { canonicalJson } from './audit-writer.js';
 import { createCrossVerifyContractError } from './errors.js';
+import { CROSS_VERIFY_ADJUDICATION_REASON_MAX_CHARS } from './cross-verify-response-limits.js';
+
+export { CROSS_VERIFY_ADJUDICATION_REASON_MAX_CHARS } from './cross-verify-response-limits.js';
 
 export const CROSS_VERIFY_ADJUDICATION_SCHEMA_VERSION = 2 as const;
 export const CROSS_VERIFY_ADJUDICATION_PROTOCOL = 'xverify-adjudication-v2' as const;
-/** Provider-authored explanation bound shared by the schema and prompt contract. */
-export const CROSS_VERIFY_ADJUDICATION_REASON_MAX_CHARS = 2_000;
-
 const MAX_ASSERTIONS = 64;
 const MAX_EVIDENCE_ENTRIES = 128;
 const MAX_REQUIREMENTS_PER_ASSERTION = 32;

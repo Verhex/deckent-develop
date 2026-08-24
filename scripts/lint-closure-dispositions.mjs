@@ -245,6 +245,46 @@ export function loadBatchSnapshots(dir) {
 const err = (code, message, seq) => ({ kind: 'error', code, message, seq });
 const hold = (code, message, seq) => ({ kind: 'hold', code, message, seq });
 
+/** Resolve the single tenant/project boundary authorized by the active trust-key
+ *  set. Key rotation may legitimately leave multiple keys active, but every key
+ *  in one Closure ledger must remain inside the same tenant/project boundary.
+ *  Empty or cross-boundary key sets fail closed instead of making callers infer
+ *  identity from MASTER, local config, or literals. */
+export function resolveTrustAnchorScope(anchors) {
+  if (!(anchors instanceof Map) || anchors.size === 0) {
+    return {
+      scope: null,
+      problems: [hold('TRUST_ANCHOR_SCOPE_UNRESOLVED', 'no trusted key can establish the Closure tenant/project scope')],
+    };
+  }
+  const scopes = new Map();
+  const problems = [];
+  for (const [keyId, anchor] of anchors) {
+    if (typeof anchor?.tenantId !== 'string' || anchor.tenantId.length === 0
+      || typeof anchor?.projectId !== 'string' || anchor.projectId.length === 0) {
+      problems.push(err('TRUST_ANCHOR_SCOPE_MALFORMED', `trusted key '${keyId}' has no non-empty tenant/project scope`));
+      continue;
+    }
+    const key = JSON.stringify([anchor.tenantId, anchor.projectId]);
+    const entry = scopes.get(key) ?? { tenantId: anchor.tenantId, projectId: anchor.projectId, keyIds: [] };
+    entry.keyIds.push(keyId);
+    scopes.set(key, entry);
+  }
+  if (problems.length > 0) return { scope: null, problems };
+  if (scopes.size !== 1) {
+    const rendered = [...scopes.values()]
+      .map((scope) => `${scope.tenantId}/${scope.projectId} [${scope.keyIds.sort().join(',')}]`)
+      .sort()
+      .join('; ');
+    return {
+      scope: null,
+      problems: [err('TRUST_ANCHOR_SCOPE_CONFLICT', `trusted keys span multiple Closure scopes: ${rendered}`)],
+    };
+  }
+  const [{ tenantId, projectId }] = scopes.values();
+  return { scope: { tenantId, projectId }, problems: [] };
+}
+
 const LEVELS = SCHEMA.levels.values;
 const LANES = new Set([...SCHEMA.lanes.values, SCHEMA.lanes.holdState]);
 const PRIORITIES = new Set(SCHEMA.priorities.values);

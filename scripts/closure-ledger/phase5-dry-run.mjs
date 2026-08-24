@@ -16,10 +16,12 @@ import {
   computeBatchManifestDigest,
 } from './canonical.mjs';
 import { registryIntegrityDigest } from '../master-plan-integrity.mjs';
+import { parseTrustAnchorsDoc, resolveTrustAnchorScope } from '../lint-closure-dispositions.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const DEFAULT_MASTER = join(ROOT, 'docs/generated/master-plan-active.json');
 const DEFAULT_PROPOSAL = join(ROOT, 'docs/governance/closure-classification-owner-proposal.md');
+const DEFAULT_TRUST_ANCHORS = join(ROOT, 'docs/governance/closure-trust-anchors.json');
 const DOCS_GOVERNANCE = join(ROOT, 'docs/governance');
 const HEX64 = /^[0-9a-f]{64}$/;
 const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/;
@@ -134,7 +136,17 @@ function outputPath(outDir, name) {
   return candidate;
 }
 
-export function createDryRunArtifacts({ events, master, proposalBytes }) {
+function closureScopeFromTrustAnchors(bytes, label) {
+  const parsed = parseTrustAnchorsDoc(bytes.toString('utf8'), label);
+  const resolved = resolveTrustAnchorScope(parsed.anchors);
+  const problems = [...parsed.problems, ...resolved.problems];
+  if (problems.length > 0 || resolved.scope === null) {
+    fail('E_DRYRUN_AUTHORITY', `trust-anchor scope is unavailable: ${problems.map((problem) => problem.code).join(', ') || 'unknown'}`);
+  }
+  return resolved.scope;
+}
+
+export function createDryRunArtifacts({ events, master, proposalBytes, closureScope }) {
   validateUnsignedEvents(events);
   if (master === null || typeof master !== 'object' || Array.isArray(master)) fail('E_DRYRUN_MASTER', 'MASTER must be a JSON object');
   const sourceDigest = master.sourceDigest;
@@ -142,10 +154,10 @@ export function createDryRunArtifacts({ events, master, proposalBytes }) {
   const registryDigest = registryIntegrityDigest(master);
   const embeddedRegistry = master.registryIntegrity;
   if (embeddedRegistry?.algorithm !== 'sha256(canonical-json-utf8)' || embeddedRegistry.value !== registryDigest) fail('E_DRYRUN_MASTER', 'MASTER registryIntegrity is missing, malformed, or stale');
-  const tenantId = master.tenantId;
-  const projectId = master.projectId;
-  requireString(tenantId, 'MASTER tenantId', 'master');
-  requireString(projectId, 'MASTER projectId', 'master');
+  const tenantId = closureScope?.tenantId;
+  const projectId = closureScope?.projectId;
+  requireString(tenantId, 'trust-anchor tenantId', 'authority');
+  requireString(projectId, 'trust-anchor projectId', 'authority');
   const unsignedManifestDigest = computeBatchManifestDigest(events);
   const proposalDigest = digestOf(proposalBytes.toString('utf8'));
   const seqs = events.map((event) => event.seq);
@@ -172,14 +184,21 @@ export function createDryRunArtifacts({ events, master, proposalBytes }) {
   return { summary: { ...subject, signedBindingPreview } };
 }
 
-export function buildDryRunBundle({ decisionsPath, outDir, masterPlanPath = DEFAULT_MASTER, proposalPath = DEFAULT_PROPOSAL }) {
+export function buildDryRunBundle({
+  decisionsPath,
+  outDir,
+  masterPlanPath = DEFAULT_MASTER,
+  proposalPath = DEFAULT_PROPOSAL,
+  trustAnchorsPath = DEFAULT_TRUST_ANCHORS,
+}) {
   if (typeof decisionsPath !== 'string' || decisionsPath.length === 0) fail('E_DRYRUN_ARGUMENT', 'decisionsPath is required');
   if (typeof outDir !== 'string' || outDir.length === 0) fail('E_DRYRUN_ARGUMENT', 'outDir is required');
   const decisions = parseJson(readRequired(decisionsPath, 'decisions'), 'decisions');
   const masterBytes = readRequired(masterPlanPath, 'MASTER');
   const master = parseJson(masterBytes, 'MASTER');
   const proposalBytes = readRequired(proposalPath, 'proposal');
-  const artifacts = createDryRunArtifacts({ events: decisions, master, proposalBytes });
+  const closureScope = closureScopeFromTrustAnchors(readRequired(trustAnchorsPath, 'trust anchors'), trustAnchorsPath);
+  const artifacts = createDryRunArtifacts({ events: decisions, master, proposalBytes, closureScope });
   const realOut = prepareOutputDirectory(outDir);
   const outputs = Object.fromEntries(['events.json', 'proposal.md', 'master-snapshot.json', 'dry-run-summary.json'].map((name) => [name, outputPath(realOut, name)]));
   writeFileSync(outputs['events.json'], `${canonicalize(decisions)}\n`, 'utf8');

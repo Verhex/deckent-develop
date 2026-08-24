@@ -6,10 +6,9 @@
 ## Canlı truth
 
 - `DOGFOOD_MODE=ON`, `WORKSPACE_MODE=MAIN`, `DELIVERY_MODE=DIRECT_MAIN`.
-- Aktif run yok. Son normal outcome run'ı `sprint-645`: beş-task paralel DAG terminal
-  `COMPLETE`. Finalizer re-entry ve `finalize --force` conflict'i bounded ADR-D-007 recovery
-  seam'inde kapandı; canonical terminal receipt generation 1, raw archive, manifest/hash/integrity
-  ve Brain archive projection zinciri doğrulandı.
+- Aktif run yok. Son normal outcome run'ı `sprint-646`: dört-task paralel DAG terminal
+  `COMPLETE`. Canonical terminal receipt generation 1, raw archive, manifest/hash/integrity ve
+  Brain archive projection zinciri doğrulandı.
 - Provider observation reconciliation canlı uygulandı: 19 active-open interval'ın exact
   run/attempt settlement sahibi olan 15'i digest-bound plan + interactive approval + immutable
   receipt ile `retired=true` oldu; dört `sprint-488` legacy-unowned interval forensic `HOLD`
@@ -18,7 +17,7 @@
 - Sprint-637'nin altı stale PENDING task artifact'ı canonical archive writer ile
   `.deckent/archive/sprints/sprint-637/tasks/` altına byte-identical taşındı; manifest/integrity
   6/6 yeşil, `.tasks` elle silinmedi.
-- Bot daemon fresh compiled dist ile PID `655230` olarak çalışıyor. Pending approval yok.
+- Bot daemon fresh compiled dist ile PID `745913` olarak çalışıyor. Pending approval yok.
 - Source→dist→provider runtime adoption production-wired: immutable composite receipt provider
   receipt + current DB lineage + source/build/entrypoint digest + canlı PID/start token'ı bağlıyor;
   real dist dry-run→apply→fresh-process replay aynı receipt'i verdi, DB/WAL/SHM değişmedi.
@@ -43,20 +42,29 @@
   `cross-verify-verdict:sha256:299d10b3f9b636be07cfa38a2607b6bf6ed1defb3733838109595257ba5ffd87`
   mevcut. MASTER satırı CM-04, PROVIDER-INGRESS-001 ve G1/G7 gate authority nedeniyle dürüstçe
   `BLOCKED` kalır; receipt veya state uydurulmaz.
+- XVerify response authority `reason=8192 char`, `semantic=65536 char`, `raw=196608 byte` olarak
+  tek contracttan çözülüyor; truncation yok, aşım typed HOLD. Manual spawn ve mandatory
+  exact-coordinator artık aynı closed-settlement task projection service'ini tüketiyor. Fresh
+  Opus canary `CONFIRMED/allow`; base ve internal task otomatik `DONE`.
+- Work 480 Opus teknik XVerify'ı `CONFIRMED/allow`. Closure OS dry-run bundle
+  `cb3eb74b4598…`, canonical request `aprcdb-cb3eb74b4598bacc49b9ea6204208cca` ve interactive
+  terminal `allow` kararı tamamlandı. Trust-anchor kimliği artık generated MASTER'dan
+  uydurulmuyor; dry-run/claim/append canonical anchor scope'unu tüketiyor. Ledger append owner
+  custody'deki repo-dışı Ed25519 key ile signing ceremony beklediği için Work 480 hâlâ OPEN/HOLD.
 - Status projection'daki dört unresolved provider interval fresh değildir: hepsi `sprint-488`
   legacy-unowned forensic kayıttır. Exact owner/run authority bulunmadan retire edilmeyecek ve
   yeni interval gibi sayılmayacak.
 
 ## Done-ready sayacı
 
-- 5/20 — canonical terminal archive/finalizer acceptance + provider-observation reconciliation +
+- 7/20 — canonical terminal archive/finalizer acceptance + provider-observation reconciliation +
   source/dist/provider runtime adoption + 7094 production measurement authority + Work 1055
-  XVerify production wiring.
+  XVerify production wiring + response-budget authority + settlement projection parity.
 
 ## Sıradaki yürütme sırası
 
-1. Dört `sprint-488` legacy-unowned interval için Work 3296→480 canonical ownership/settlement
-   authority'sini ölç; exact owner yoksa forensic HOLD'u koru, kör apply etme.
+1. Owner external key path'i sağlandığında Work 480 sign → append → closure gate → MASTER
+   settlement zincirini tamamla; key'i arama/okuma/loglama.
 2. Sıradaki multi-task dogfood run'ı 7094 plan-time authority'nin canlı canary'si yap; sonra aynı
    workload treatment cohort'u ile measuredHitRatio + provider-reported USD receipt'i üret.
 3. `2026-08-24 20:00 Europe/Istanbul` sonrasında runtime hygiene different-provider XVerify.

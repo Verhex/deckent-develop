@@ -39,6 +39,11 @@ import {
   writeCrossVerifyDecodedSlice,
 } from '../../src/core/cross-verify-evidence-broker.js';
 import {
+  CROSS_VERIFY_COMPLETE_RESPONSE_MAX_CHARS,
+  CROSS_VERIFY_RAW_OUTPUT_MAX_BYTES as CANONICAL_CROSS_VERIFY_RAW_OUTPUT_MAX_BYTES,
+  CROSS_VERIFY_UTF8_WORST_CASE_BYTES_PER_JAVASCRIPT_CHAR,
+} from '../../src/core/cross-verify-response-limits.js';
+import {
   claimTaskResultSettlementAttemptAtomic,
   createTaskResultSettlement,
   createTaskResultSettlementRefForAttempt,
@@ -441,6 +446,28 @@ describe.skipIf(!pinnedRuntimeAvailable)(
         ...input,
         adjudicationReceiptSha256: 'c'.repeat(64),
       }), 'IMMUTABLE_CONFLICT');
+
+      const tampered = JSON.parse(readFileSync(crossVerifyVerdictReceiptPath(ref), 'utf8')) as {
+        receipt: { outputByteLength: number };
+      };
+      tampered.receipt.outputByteLength = CROSS_VERIFY_RAW_OUTPUT_MAX_BYTES + 1;
+      writeFileSync(crossVerifyVerdictReceiptPath(ref), JSON.stringify(tampered), 'utf8');
+      expectBrokerCode(() => readCrossVerifyVerdictReceipt(projectRoot, ref), 'CORRUPT_RECEIPT');
+    });
+
+    it('shares the canonical raw byte ceiling at ASCII and worst-case Unicode boundaries', () => {
+      const ascii = 'a'.repeat(CROSS_VERIFY_COMPLETE_RESPONSE_MAX_CHARS);
+      const worstCaseUnicode = '\u0800'.repeat(CROSS_VERIFY_COMPLETE_RESPONSE_MAX_CHARS);
+
+      expect(CROSS_VERIFY_RAW_OUTPUT_MAX_BYTES)
+        .toBe(CANONICAL_CROSS_VERIFY_RAW_OUTPUT_MAX_BYTES);
+      expect(Buffer.byteLength(ascii, 'utf8'))
+        .toBe(CROSS_VERIFY_COMPLETE_RESPONSE_MAX_CHARS);
+      expect(Buffer.byteLength(worstCaseUnicode, 'utf8'))
+        .toBe(CROSS_VERIFY_RAW_OUTPUT_MAX_BYTES);
+      expect(CROSS_VERIFY_COMPLETE_RESPONSE_MAX_CHARS
+        * CROSS_VERIFY_UTF8_WORST_CASE_BYTES_PER_JAVASCRIPT_CHAR)
+        .toBe(CROSS_VERIFY_RAW_OUTPUT_MAX_BYTES);
     });
 
     it('publishes the host verdict receipt after the settlement is terminally closed', () => {

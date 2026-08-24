@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   CROSS_VERIFY_ADJUDICATION_PROTOCOL,
+  CROSS_VERIFY_ADJUDICATION_REASON_MAX_CHARS,
   CROSS_VERIFY_ADJUDICATION_SCHEMA_VERSION,
   canonicalCrossVerifyAdjudicationContractV2,
   createCrossVerifyAdjudicationContractV2,
@@ -512,5 +513,23 @@ describe('CrossVerifyAdjudicationV2 citation digest alias', () => {
     expect(() => parseCrossVerifyAdjudicationResponseV2(withCitation({
       evidenceId: 'E1', locator: 'src/input.ts#L10-L20', evidenceSha256: D1, contentSha256: D2,
     }))).toThrow(/contentSha256|unrecognized/iu);
+  });
+});
+
+describe('CrossVerifyAdjudicationV2 response-budget authority', () => {
+  it('re-exports the canonical reason limit and accepts its exact boundary only', () => {
+    const contract = createCrossVerifyAdjudicationContractV2(claim(), manifest());
+    const atLimit = supportedResponse(contract);
+    atLimit.assertionResults[0]!.reason = 'x'.repeat(CROSS_VERIFY_ADJUDICATION_REASON_MAX_CHARS);
+    const overLimit = clone(atLimit);
+    overLimit.assertionResults[0]!.reason = 'x'.repeat(
+      CROSS_VERIFY_ADJUDICATION_REASON_MAX_CHARS + 1,
+    );
+
+    expect(parseCrossVerifyAdjudicationResponseV2(atLimit).assertionResults[0]!.reason)
+      .toHaveLength(CROSS_VERIFY_ADJUDICATION_REASON_MAX_CHARS);
+    expect(() => parseCrossVerifyAdjudicationResponseV2(overLimit)).toThrow(
+      new RegExp(`at most ${CROSS_VERIFY_ADJUDICATION_REASON_MAX_CHARS} character`, 'u'),
+    );
   });
 });

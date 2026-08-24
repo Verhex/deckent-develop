@@ -31,8 +31,10 @@ import {
   loadBatchSnapshots,
   parseLedger,
   parseTrustAnchorsDoc,
+  resolveTrustAnchorScope,
   runGate,
 } from '../lint-closure-dispositions.mjs';
+import { registryIntegrityDigest } from '../master-plan-integrity.mjs';
 import { project, writeBundle } from './project.mjs';
 
 const ZERO_ANCHOR = '0'.repeat(64);
@@ -129,6 +131,17 @@ function readBundle(bundleDir) {
   return { dir, bytes, summary, subject: subjectFromSummary(summary), events, master };
 }
 
+function loadTrustAnchorAuthority(projectRoot) {
+  const path = join(projectRoot, 'docs/governance/closure-trust-anchors.json');
+  const parsed = parseTrustAnchorsDoc(requiredBytes(path, 'trust anchors').toString('utf8'), path);
+  const resolved = resolveTrustAnchorScope(parsed.anchors);
+  const problems = [...parsed.problems, ...resolved.problems];
+  if (problems.length > 0 || resolved.scope === null) {
+    fail('E_WRITER_TRUST_ANCHOR', `trust-anchor authority is unavailable: ${problems.map((problem) => problem.code).join(', ') || 'unknown'}`);
+  }
+  return { anchors: parsed.anchors, scope: resolved.scope };
+}
+
 function fsyncFile(path) {
   const fd = openSync(path, 'r+');
   try { fsyncSync(fd); } finally { closeSync(fd); }
@@ -202,6 +215,9 @@ function approvalRequest(subject, requestId, now) {
 export function fileClaim({ bundleDir, root, now = new Date() }) {
   const projectRoot = ensureRoot(root);
   const bundle = readBundle(bundleDir);
+  const authority = loadTrustAnchorAuthority(projectRoot);
+  const recomputed = recomputeBundleSubject(bundle, authority.scope);
+  if (!sameJson(bundle.subject, recomputed)) fail('E_WRITER_BUNDLE_DIGEST', 'dry-run summary does not match recomputed bundle bytes and trust-anchor scope');
   const claimPath = join(bundle.dir, 'claim.json');
   if (existsSync(claimPath)) {
     const claim = readExistingJson(claimPath, 'claim.json');
@@ -229,18 +245,20 @@ export function fileClaim({ bundleDir, root, now = new Date() }) {
   return claim;
 }
 
-function recomputeBundleSubject(bundle) {
+function recomputeBundleSubject(bundle, closureScope) {
   const seqs = bundle.events.map((event) => event?.seq);
   if (seqs.some((seq) => !Number.isInteger(seq))) fail('E_WRITER_BUNDLE', 'every event seq must be an integer');
   const masterSourceDigest = bundle.master?.sourceDigest?.value;
-  const registryIntegrityDigest = bundle.master?.registryIntegrity?.value;
-  if (typeof masterSourceDigest !== 'string' || typeof registryIntegrityDigest !== 'string') fail('E_WRITER_BUNDLE', 'master snapshot digest fields are missing');
+  const embeddedRegistryIntegrity = bundle.master?.registryIntegrity?.value;
+  if (typeof masterSourceDigest !== 'string' || typeof embeddedRegistryIntegrity !== 'string') fail('E_WRITER_BUNDLE', 'master snapshot digest fields are missing');
+  const computedRegistryIntegrity = registryIntegrityDigest(bundle.master);
+  if (embeddedRegistryIntegrity !== computedRegistryIntegrity) fail('E_WRITER_BUNDLE', 'master snapshot registryIntegrity is stale');
   return exactSubject({
     kind: 'closure-disposition-batch',
-    tenantId: bundle.master.tenantId,
-    projectId: bundle.master.projectId,
+    tenantId: closureScope.tenantId,
+    projectId: closureScope.projectId,
     masterSnapshotDigest: masterSourceDigest,
-    registryIntegrityDigest,
+    registryIntegrityDigest: computedRegistryIntegrity,
     proposalDigest: digestOf(bundle.bytes['proposal.md'].toString('utf8')),
     unsignedManifestDigest: computeBatchManifestDigest(bundle.events),
     eventCount: bundle.events.length,
@@ -340,13 +358,12 @@ export function appendBundle({ bundleDir, receiptPath, root }) {
   if (receipt.decision !== 'allow' || receipt.closureReason !== undefined) fail('E_WRITER_RECEIPT_DECISION', 'receipt is not an owner allow decision');
   if (receipt.claimRef !== `approval:${receipt.requestId}`) fail('E_WRITER_RECEIPT_CLAIM', 'receipt claimRef is invalid');
   const receiptSubject = exactSubject(receipt.subject, 'receipt subject');
-  const recomputed = recomputeBundleSubject(bundle);
+  const authority = loadTrustAnchorAuthority(projectRoot);
+  const recomputed = recomputeBundleSubject(bundle, authority.scope);
   if (!sameJson(bundle.subject, recomputed)) fail('E_WRITER_BUNDLE_DIGEST', 'dry-run summary does not match recomputed bundle bytes');
   if (!sameJson(receiptSubject, recomputed)) fail('E_WRITER_RECEIPT_SUBJECT', 'receipt subject does not match recomputed bundle bytes');
 
-  const anchorsPath = join(governanceDir, 'closure-trust-anchors.json');
-  const parsedAnchors = parseTrustAnchorsDoc(requiredBytes(anchorsPath, 'trust anchors').toString('utf8'), anchorsPath);
-  if (parsedAnchors.problems.length > 0) fail('E_WRITER_TRUST_ANCHOR', `trust-anchor validation failed: ${parsedAnchors.problems.map((p) => p.code).join(', ')}`);
+  const trustAnchors = authority.anchors;
   const ledgerPath = join(governanceDir, 'closure-dispositions.jsonl');
   const existingText = existsSync(ledgerPath) ? readFileSync(ledgerPath, 'utf8') : '';
   const parsedExisting = parseLedger(existingText);
@@ -384,9 +401,9 @@ export function appendBundle({ bundleDir, receiptPath, root }) {
       masterSourceDigest: bundle.master.sourceDigest?.value,
       batchManifests: manifests,
       verifyAuthority: true,
-      trustAnchors: parsedAnchors.anchors,
+      trustAnchors,
       batchSnapshots: loadBatchSnapshots(preBatches),
-      trustAnchorProblems: parsedAnchors.problems,
+      trustAnchorProblems: [],
       receiptProblems: problems,
     });
     assertGate(preResult, 'E_WRITER_PREFLIGHT_GATE');
@@ -407,7 +424,7 @@ export function appendBundle({ bundleDir, receiptPath, root }) {
   const projectionDir = join(governanceDir, 'closure-projections');
   try { writeBundle(projectionDir, renderedViews(allEvents, bundle.master)); }
   catch (error) { fail('E_WRITER_PROJECTION', 'atomic projection write failed after append', error); }
-  const finalResult = gateInputs(projectRoot, ledgerText, parsedAnchors.anchors);
+  const finalResult = gateInputs(projectRoot, ledgerText, trustAnchors);
   assertGate(finalResult, 'E_WRITER_POST_APPEND_GATE');
   return { requestId: receipt.requestId, eventCount: events.length, unsignedManifestDigest: recomputed.unsignedManifestDigest };
 }

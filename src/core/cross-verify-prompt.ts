@@ -13,13 +13,18 @@ import type { LogEvent } from './log-event.js';
 import type { ReachabilityOutcome } from './provider-truth.js';
 import { createCrossVerifyContractError } from './errors.js';
 import {
-  CROSS_VERIFY_ADJUDICATION_REASON_MAX_CHARS,
   canonicalCrossVerifyAdjudicationContractV2,
   parseCrossVerifyAdjudicationContractV2,
   parseCrossVerifyAdjudicationResponseV2,
   type CrossVerifyAdjudicationResponseV2,
   type CrossVerifyAdjudicationVerdict,
 } from './cross-verify-adjudication.js';
+import {
+  CROSS_VERIFY_ADJUDICATION_REASON_MAX_CHARS,
+  CROSS_VERIFY_COMPLETE_RESPONSE_MAX_CHARS,
+} from './cross-verify-response-limits.js';
+
+export { CROSS_VERIFY_COMPLETE_RESPONSE_MAX_CHARS } from './cross-verify-response-limits.js';
 
 // ─── Input types ─────────────────────────────────────────────────────────────
 
@@ -66,7 +71,8 @@ export const CROSS_VERIFY_EVIDENCE_OUTPUT_MAX_CHARS = 12_000;
 /** Pre-verdict response ceiling; the terminal line is additional. */
 export const CROSS_VERIFY_RATIONALE_MAX_CHARS = 2_000;
 /** Strict semantic response ceiling before JSON parsing. */
-export const CROSS_VERIFY_ADJUDICATION_RESPONSE_MAX_CHARS = 12_000;
+export const CROSS_VERIFY_ADJUDICATION_RESPONSE_MAX_CHARS =
+  CROSS_VERIFY_COMPLETE_RESPONSE_MAX_CHARS;
 
 export const CROSS_VERIFY_TRUNCATION_MARKER =
   '[HOST-TRUNCATED: terminal verdict must be UNCLEAR]';

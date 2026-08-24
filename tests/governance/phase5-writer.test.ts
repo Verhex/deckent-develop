@@ -43,10 +43,20 @@ function fixture(): Fixture {
   mkdirSync(governance, { recursive: true });
   mkdirSync(join(root, 'docs/generated'), { recursive: true });
   const definitionDigest = 'b'.repeat(64);
+  const { publicKey, privateKey } = generateKeyPairSync('ed25519');
+  const keyId = 'owner-test-key';
+  const trustAnchorsPath = join(governance, 'closure-trust-anchors.json');
+  writeFileSync(trustAnchorsPath, JSON.stringify({
+    schemaVersion: 1,
+    anchors: [{
+      keyId,
+      publicKeyPem: publicKey.export({ type: 'spki', format: 'pem' }).toString(),
+      tenantId: 'tenant-main',
+      projectId: 'deckent',
+    }],
+  }));
   const masterBase = {
     schemaVersion: 1,
-    tenantId: 'tenant-main',
-    projectId: 'deckent',
     sourceDigest: { algorithm: 'sha256(normalized-lf-utf8)', value: 'a'.repeat(64) },
     identityRegistry: [{ id: 'ROW-A', definitionDigest }],
     workItems: [{ id: 'ROW-A', state: 'active', priority: 'P0', definitionDigest }],
@@ -71,18 +81,7 @@ function fixture(): Fixture {
   writeFileSync(masterPath, JSON.stringify(master));
   writeFileSync(join(root, 'docs/generated/master-plan-active.json'), JSON.stringify(master));
   writeFileSync(proposalPath, '# Owner proposal\n');
-  const subject = buildDryRunBundle({ decisionsPath, outDir: bundleDir, masterPlanPath: masterPath, proposalPath });
-  const { publicKey, privateKey } = generateKeyPairSync('ed25519');
-  const keyId = 'owner-test-key';
-  writeFileSync(join(governance, 'closure-trust-anchors.json'), JSON.stringify({
-    schemaVersion: 1,
-    anchors: [{
-      keyId,
-      publicKeyPem: publicKey.export({ type: 'spki', format: 'pem' }).toString(),
-      tenantId: 'tenant-main',
-      projectId: 'deckent',
-    }],
-  }));
+  const subject = buildDryRunBundle({ decisionsPath, outDir: bundleDir, masterPlanPath: masterPath, proposalPath, trustAnchorsPath });
   return { root, bundleDir, subject, master, privateKey, keyId };
 }
 
