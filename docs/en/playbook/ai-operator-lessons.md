@@ -548,3 +548,19 @@ not a reason to spend another provider attempt on the same prompt.
   consumer side. A contract-changing sprint's landing debt (old fallback/notice/
   string-send pins) was realigned to the new typed contracts in one pass; the live
   Qwen proof ran on a fresh binary against the real server.
+- **2026-08-25 — sprint-662…666 night marathon (epoch-3 Claude)**: Four structural lessons.
+  (1) **Derive DIRECTIVES only from the last WORKING example** — never from memory: writing a
+  free-text scope line instead of the parser's `Files:`/`Reads:`/`Test:` keys killed two runs
+  before birth (662 prompt-gate, 663 empty-scope E077) while the working 661 file sat in the
+  snapshot all along. (2) **A shape-changing cutover closes with one projection over all
+  consumers**: once TaskResultV1 `filesChanged` became objects, point-patching was
+  whack-a-mole (two crashes in 664, two more in 665); the durable fix was the single
+  `normalizeChangedPaths` projection wired into all 10 consumers — read the crash stack from
+  `.brain/ERRORS.md`, and let metric timestamps tell you which run actually threw. (3) **A dead
+  coordinator does not lose the worker harvest**: `.result` files stay on disk; running the
+  brain evaluation yourself via the declared scoped tests and landing the harvest is a
+  legitimate narrow ADR-D-007 path — restart-containment's false NO_GO stamp is a symptom of
+  the cascade, not of the work. (4) **Type fan-in/read-only tasks as acceptance** — otherwise
+  the code rubric fails zero-diff as a correctness miss; the 661 futility machinery
+  (`REPEATED_ZERO_DIFF_NO_GO → escalateReplan`) chose typed escalation over looping, and that
+  behavior is the intended product.

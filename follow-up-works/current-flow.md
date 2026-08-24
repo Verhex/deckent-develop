@@ -27,7 +27,14 @@
   + 3 straggler-fix; nervous+monitor+connectors süpürmesi **906/906 yeşil** (661-rewrite
   sonrası 15-kırmızıydı). 663/664/665 dürüst-ABORTED arşivde; false-NO_GO damgası
   koordinatör-çökme kaskadıydı, kök kapandı.
-- SIRADAKİ-ACİL (owner 2026-08-25): **skill-prompt tekrar-tekilleştirme** — her skill'in sonuna
+- ✅ TAMAM (2026-08-25 03:15): **skill-prompt tekrar-tekilleştirme** — `eeca1725b`:
+  compose-anı süzme, tek `## Karpathy Discipline` çapası, 0 `## Karpathy Notes`
+  (53/53 pin; canlı-prompt kanıtı bir SONRAKİ run'ın `.prompt-*` dosyasından okunacak).
+  Sprint-666 = boru-hattı kanaryası: collect→evaluate→next-wave UÇTAN-UCA ÇALIŞTI
+  (666-001 ilk-denemede DONE); fan-in typed-escalation'la dürüst-duraklatıldı
+  (operatör-dersi: fan-in görevi acceptance-türüyle işaretle). Bonus canlı-kanıt:
+  `.deckent/runtime/owner-notifications.jsonl` doğdu (665-002 delivery-core wired).
+- ESKİ-KAYIT (tamamlandı, üstteki satıra katlandı): **skill-prompt tekrar-tekilleştirme** — her skill'in sonuna
   eklenen `## Karpathy Notes` bloğu worker-prompt'una 3 kez enjekte ediliyor (ölçüldü:
   `.tasks/.prompt-664-00{1,2,3}-*.txt` her birinde 3 kopya, satır ~67/~127/~214, ~36KB prompt).
   Çözüm-yönü (owner): tekrar-eden setler skill-gövdesinden çıkar, worker doğarken system-prompt

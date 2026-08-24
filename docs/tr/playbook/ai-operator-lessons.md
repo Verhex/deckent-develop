@@ -520,3 +520,18 @@ attempt harcama gerekçesi değil, host composition defect kanıtıdır.
   Sözleşme değiştiren sprint'in landing-borcu (eski fallback/notice/string-send
   pinleri) tek geçişte yeni typed sözleşmeye hizalandı; canlı Qwen kanıtı taze
   binary + gerçek sunucuyla alındı.
+- **2026-08-25 — sprint-662…666 gece-maratonu (epoch-3 Claude)**: Dört yapısal ders.
+  (1) **DIRECTIVES yalnız son-ÇALIŞAN örnekten türetilir** — gramer ezberden yazılmaz:
+  `Files:`/`Reads:`/`Test:` anahtarları yerine serbest-metin scope satırı yazmak iki run'ı
+  (662 prompt-gate, 663 boş-scope E077) doğmadan öldürdü; çalışan 661 dosyası baştan beri
+  eldeydi. (2) **Şekil-değiştiren cutover'da tüketici-envanteri tek-projeksiyonla kapatılır**:
+  TaskResultV1 `filesChanged` objeleşince nokta-yama köstebek-oyunu oldu (664 iki, 665 iki
+  ayrı string-API çökmesi); kalıcı çözüm `normalizeChangedPaths` tek-projeksiyonu ve 10
+  tüketicinin ona bağlanmasıydı — hata-imzasının stack'i `.brain/ERRORS.md`'den okunur,
+  metriklerdeki tarih hangi run'ın attığını söyler. (3) **Koordinatör ölse de worker-hasadı
+  kaybolmaz**: `.result`'lar disk'te kalır; brain-eval'i declared-scoped testlerle elle koşup
+  hasadı landing'e almak ADR-D-007'nin meşru dar-yoludur — restart-containment'ın false-NO_GO
+  damgası kaskad-belirtisidir, işin kendisi değil. (4) **Fan-in/read-only görevler
+  acceptance-türüyle işaretlenir** — aksi halde kod-rubriği zero-diff'i correctness diye
+  kırar; 661-futility makinesi (`REPEATED_ZERO_DIFF_NO_GO → escalateReplan`) döngü yerine
+  tipli-eskalasyon verdi ve bu davranış İSTENEN üründür.
