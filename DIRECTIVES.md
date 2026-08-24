@@ -1,50 +1,82 @@
-# CURSOR-PROVIDER-001: Production Image, Catalog, and Isolated Auth Closure
+# RECOVERY-BORN-490-BUILD-DIGEST-GATE-001: Source/Dist/Provider Runtime Adoption
 
 ## Goal
-Close the remaining Cursor production wiring for MASTER outcome 7091 without creating reports or docs/evidence: make the production image build surface install Cursor, keep canonical Cursor models visible when the remote catalog omits them, and bridge the host Cursor session into Docker through a credential-only cross-platform auth authority. Root operator owns post-terminal build, image, real-binary, auth, and different-provider XVerify proof.
+
+Close the production consumer gap behind MASTER Work 3300: after a terminal run and a fresh
+build, one immutable content-addressed receipt must prove that the invoked dist binary matches
+the settled source, the ownership-bound live bot runtime adopted that exact build, and the
+current provider-observation database lineage was verified against its immutable v1 preimage.
+This is one outcome. It does not mutate MASTER, closure dispositions, provider rows, auth, or
+documentation during the run.
 
 ## Execution contract
+
 - DOGFOOD_MODE=ON. Allocate the run ID only through canonical allocator authority.
-- Four-task dependency DAG: Tasks 1, 2, and 3 execute concurrently; Task 4 is the production fan-in and depends on Tasks 1 through 3.
-- No docs/evidence, MASTER, follow-up, ADR, changelog, provider login/auth mutation, execution-authority, Brain-memory, generated projection, or live database mutation by workers.
-- Preserve every unrelated dirty file. Never delete `.brain/memory.db` or clean `.tasks` manually.
-- No `npm run build`, `npm run build:all`, Docker image build, provider login, or full suite during the active run. Hermetic scoped Vitest and `npx tsc --noEmit` are allowed.
-- Production wiring must close producer -> consumer -> CLI/runtime entrypoint -> policy/config. Test-only imports are not completion.
-- All user-facing CLI strings use `getMessage(key, lang)` with English and Turkish entries. No new hardcoded visible text.
-- Provider/model/worker selection and concurrency are resolved only from effective config, registry, auth, reachability, limits, dependency DAG, and collision policy. Do not encode provider or model choice in task output.
-- Cursor auth must expose only the exact credential file, never the complete host config directory. Honor XDG config authority, native Windows APPDATA authority, and honest fallback semantics without platform-specific silent behavior.
-- Task-local acceptance is scoped source verification. The root operator performs the mandatory fresh-dist and real production image proof only after the run is terminal, because builds are forbidden while the run is active.
+- Five-task DAG: Tasks 1, 2, and 3 execute concurrently; Task 4 depends on all three; Task 5
+  depends on Task 4 and is the production fan-in.
+- No docs/evidence, MASTER, follow-up, ADR, changelog, provider login/auth mutation,
+  execution-authority, Brain-memory, generated projection, live database, or existing receipt
+  mutation by workers. Preserve every unrelated dirty file.
+- Never delete `.brain/memory.db`; never clean `.tasks` manually.
+- No `npm run build`, `npm run build:all`, provider call, daemon restart, or full suite while the
+  run is active. Hermetic Vitest, tmpdir-only compiled fixtures, and `npx tsc --noEmit` are allowed.
+- Production wiring must close producer -> consumer -> CLI entrypoint -> immutable receipt store.
+  Test-only imports or a pure reducer without a production caller are not completion.
+- User-visible text is i18n-first through `getMessage(key, lang)` in English and Turkish.
+- The receipt operation is verification/adoption only: provider DB mutation is always `none`.
+  Missing preimage, schema drift, source/dist mismatch, legacy runtime identity, dead/reused PID,
+  receipt conflict, path escape, symlink, or concurrent change must return a typed HOLD.
+- Cross-platform design is mandatory. Runtime self-attestation uses the existing ownership-bound
+  pid/start-token authority; unsupported ownership evidence is explicit HOLD, never Linux-only
+  silent success.
+- Root operator owns post-terminal `build:all`, bot restart/reconnect, real-binary dry-run/apply/
+  replay, current DB byte-diff proof, MASTER projection, and formal XVerify when eligible.
 
-## Task 1: Cursor production image CLI and complete image-command i18n
-- Files: src/cli/commands/image.ts, src/cli/helpers/messages.ts, tests/cli/image-build.test.ts, tests/cli/f1005-ollama-image.test.ts, tests/cli/helpers/messages.test.ts
-- Scope: src/cli/, tests/cli/
-- Type: feature
-- Goal: Add `withCursor` to the typed image build options, emit the exact `INSTALL_CURSOR=true` Docker build argument, and expose `deckent image build --with-cursor`. Migrate every user-visible string touched or already emitted by the image command, including option descriptions, dry-run lines, missing Dockerfile guidance, and Docker-launch errors, into existing `getMessage` English/Turkish authority. Preserve cwd-independent packaged Dockerfile resolution, shell-free argument vectors, existing provider flags, deprecated `--image`, and honest non-zero failures. Tests must prove the Cursor argument, complete EN/TR message coverage, spaces in paths, no Docker spawn on dry-run/missing Dockerfile, and adjacent Ollama behavior. Do not build an image during the run.
-
-## Task 2: Canonical Cursor catalog visibility
-- Files: src/core/model-catalog.ts, tests/core/model-catalog.test.ts, tests/core/model-catalog-bootstrap.test.ts, tests/core/catalog-apiid-merge.test.ts, tests/core/catalog-merge-id.test.ts
+## Task 1: Composite runtime-adoption contract and immutable store
+- Files: src/core/runtime-adoption.ts, src/core/runtime-adoption-receipt-store.ts, tests/core/runtime-adoption.test.ts, tests/core/runtime-adoption-receipt-store.test.ts
 - Scope: src/core/, tests/core/
-- Type: fix
-- Goal: Make every successful remote or cached catalog result retain canonical registry definitions that the external catalog omits, including all four Cursor models, while letting fresh external definitions override matching canonical API identities where their evidence is authoritative. Preserve deterministic order, provider/api-id identity, cache source metadata, warnings, offline fallback, bootstrap behavior, and no duplicate logical model. Tests cover remote omission of Cursor, cached omission, matching override, deterministic order, and registry bootstrap. Do not hardcode Cursor as a one-off CLI special case.
-
-## Task 3: Cross-platform Cursor Docker auth isolation
-- Files: src/core/provider-command-spec.ts, src/orchestra/spawn-backend-docker.ts, tests/core/provider-command-spec.test.ts, tests/orchestra/spawn-backend-docker.test.ts, tests/orchestra/docker-provider-auth.test.ts, tests/orchestra/docker-auth-precedence.test.ts, tests/orchestra/spawn-backend-docker-probe.test.ts, tests/providers/docker-bounded-reachability-evidence.test.ts
-- Scope: src/core/, src/orchestra/, tests/core/, tests/orchestra/, tests/providers/
 - Type: feature
-- Goal: Encode Cursor's container auth destination and add `auth.json` to the provider credential allowlist. Resolve the host credential root from XDG_CONFIG_HOME on Unix-like/WSL hosts, APPDATA on native Windows, and the documented home fallback, using explicit sanitized path authority rather than mounting the complete host config tree. Thread the resolved host source independently from the task-private container destination through both the credential broker and direct isolation path. Preserve file-only mounts, permission hardening, refresh broker locking, missing-required-file fail-closed behavior, API-only behavior, and every existing Claude/Codex/Gemini path. Tests cover Linux, macOS, native Windows, WSL/XDG override, unsafe or relative env input, required-file absence, probe use, and no full-directory mount.
+- Goal: Define a provider-neutral v1 plan and durable receipt binding the exact provider-observation adoption receipt identity/digest, current target database digest and lineage, Deckent build identity digest/source-tree identity, invoked entrypoint artifact digest, and ownership-bound live runtime identity. Implement canonical encoding, typed validation, plan digest, immutable content-addressed create-or-verify publication, fresh-process replay, tenant/environment scope derivation, strict permissions, atomic fsync publication, symlink/path/concurrency defenses, bounded discovery, and typed HOLD codes. The store must never mutate provider DB bytes or an existing receipt.
+- Test: npx vitest run tests/core/runtime-adoption.test.ts tests/core/runtime-adoption-receipt-store.test.ts
 
-## Task 4: Cursor production wiring fan-in
-- Files: tests/integration/cursor-production-wiring.integration.test.ts
-- Scope: tests/integration/
+## Task 2: Ownership-bound bot runtime build identity
+- Files: src/connectors/bot-daemon.ts, tests/connectors/bot-daemon.test.ts, tests/connectors/bot-lifecycle-honesty.test.ts
+- Scope: src/connectors/, tests/connectors/
+- Type: feature
+- Goal: Evolve the bot pid authority so the listener self-publishes a digest-bound runtime identity for the exact entrypoint bytes and build-identity bytes it loaded, alongside pid/startToken/project binding. Preserve safe parsing and compatibility for existing pid records, but mark legacy records as runtime-adoption-unavailable rather than promoting them. `inspectBotPid` must return the verified runtime identity only after the existing alive/start-token/project checks pass. Preserve Linux/macOS/Windows/WSL semantics through the existing process ownership adapter and keep start/stop/status behavior compatible.
+- Test: npx vitest run tests/connectors/bot-daemon.test.ts tests/connectors/bot-lifecycle-honesty.test.ts
+
+## Task 3: Fresh dist build-identity read model
+- Files: src/cli/worktree-binary-authority.ts, tests/cli/worktree-binary-authority.test.ts, tests/cli/worktree-binary-authority-live.test.ts, tests/scripts/build-identity.test.ts
+- Scope: src/cli/, tests/cli/, tests/scripts/
+- Type: feature
+- Goal: Add a reusable side-effect-free runtime build-identity read model that proves the executing module belongs to this checkout's `dist`, parses the exact build identity, recomputes current source-tree identity, hashes the build-identity and invoked entrypoint bytes with TOCTOU/symlink/size bounds, and returns either a normalized adoption binding or a typed HOLD. Diagnostic/source execution must not manufacture a dist identity. Preserve existing CLI binary authority decisions and cross-checkout fail-closed behavior.
+- Test: npx vitest run tests/cli/worktree-binary-authority.test.ts tests/cli/worktree-binary-authority-live.test.ts tests/scripts/build-identity.test.ts
+
+## Task 4: Provider-observation runtime adoption CLI composition
+- Files: src/cli/commands/provider-observations.ts, src/cli/helpers/messages.ts, tests/cli/provider-observations-migration.test.ts, tests/cli/provider-observation-adoption-receipt.integration.test.ts, tests/cli/provider-observation-messages.test.ts
+- Scope: src/cli/, tests/cli/
 - Dependencies: Task 1, Task 2, Task 3
+- Type: feature
+- Goal: Add an i18n-clean `provider-observations adopt-runtime` production subcommand with dry-run, explicit `--apply`, digest-bound `--plan-digest`, `--preimage`, and stable `--json`. It must run the existing current provider-adoption verification against the immutable preimage without database mutation, consume the fresh dist read model and verified running bot identity, publish or replay the provider adoption receipt, then publish or replay the composite runtime-adoption receipt. A partial first publication must be safely resumable/idempotent. Human output exposes bounded receipt IDs/reason codes, never raw provider identities, absolute paths, tokens, or database rows.
+- Test: npx vitest run tests/cli/provider-observations-migration.test.ts tests/cli/provider-observation-adoption-receipt.integration.test.ts tests/cli/provider-observation-messages.test.ts
+
+## Task 5: Real compiled producer-to-consumer fan-in
+- Files: tests/integration/provider-observation-runtime-adoption.integration.test.ts
+- Scope: tests/integration/
+- Dependencies: Task 4
 - Type: test
-- Goal: Add one integration battery that imports and exercises the actual production modules across the three seams: image build argument generation through the CLI handler, canonical-plus-remote catalog resolution exposing all Cursor model identities, and Cursor credential-only Docker auth preparation with the correct task-private destination. Assert that no full config/home directory is mounted, no provider auth file is mutated, existing provider behavior remains available, and the named Cursor verifier model resolves through the real registry/catalog chain. Run this test plus the exact adjacent scoped batteries and `npx tsc --noEmit`; do not modify production code or build dist/image during the run.
+- Goal: Exercise the actual compiled CLI in a tmpdir from provider v1 preimage + current v2 DB through ownership-bound live bot start, adopt-runtime dry-run, digest-bound apply, and a fresh-process replay. Verify one canonical composite receipt, provider receipt linkage, exact source/dist/entrypoint/runtime bindings, zero database/WAL/SHM byte mutation, no temp residue, no raw identity leakage, and typed HOLDs for stale build, legacy pid record, dead/reused process, wrong plan digest, symlink, and concurrent target change. Import and call production modules only; no fixture-local reimplementation of authority logic.
+- Test: npx vitest run tests/integration/provider-observation-runtime-adoption.integration.test.ts
 
 ## Outcome acceptance
-- The run is terminal with every exact implementation lineage settled; terminal state alone is not production closure.
-- Post-terminal fresh `npm run build:all` exposes `deckent image build --with-cursor` from dist and the active bot/runtime is restarted on the fresh binary.
-- A production `deckent-worker:latest` build with Cursor enabled contains a runnable `cursor-agent` at the expected version and preserves existing provider CLIs.
-- A fresh container reaches the real host Cursor session only through the isolated credential bridge; no host provider directory is mounted.
-- `deckent models list --provider cursor` exposes the four canonical Cursor models even when the external catalog omits them.
-- A real different-provider Cursor XVerify attempt uses the configured Cursor model, records the provider call and provider-reported usage, and produces a terminal durable receipt; any provider limit or unavailable evidence remains typed HOLD and does not become DONE.
-- Scoped tests, TypeScript, image-command i18n gates, real-binary proof, and canonical archive/finalizer integrity are green before landing.
+
+- The dogfood run is terminal with all five lineages settled; terminal state alone is not closure.
+- Post-terminal `npm run build:all` emits a fresh matching `dist/build-identity.json`; the active bot
+  is restarted through its documented ownership-safe flow and publishes the new runtime identity.
+- Real dist CLI `adopt-runtime` dry-run -> apply -> separate-process replay succeeds against the
+  current DB and immutable v1 preimage, while database/WAL/SHM digests remain byte-identical.
+- The composite receipt is content-addressed, canonical, immutable, provider-receipt-linked, and
+  binds source tree -> dist build -> invoked entrypoint -> live PID/start token -> provider lineage.
+- Scoped tests, adjacent legacy batteries, TypeScript/lint, archive/finalizer integrity, and real
+  binary proof are green before landing. Any unsupported authority remains typed HOLD, not DONE.

@@ -2160,17 +2160,31 @@ export function persistFinalizerTaskTerminalProjections(input: {
         attempt.identity.taskId === target.identity.taskId
         && (attempt.result.state === 'COMPLETE' || attempt.result.state === 'PARTIAL')
         && attempt.result.payload?.cascadeSkipped === true);
-      const evidence: TaskTerminalEvidence = input.terminalOutcome === 'ABORTED'
-        ? { kind: 'gate-terminal', logicalTaskId: target.logicalTask.logicalTaskId,
-            generation: input.coordinatorGeneration, attemptId: winnerAttemptId, outcome: 'ABORTED' }
-        : cascadeSkipped
+      // Task-terminal generation is fixed by the first durable projection. A
+      // restarted recovery coordinator may legitimately publish the OUTER run
+      // receipt at a later generation; that must not relabel already-terminal
+      // task truth or mistake the recovery checkpoint number for a task CAS.
+      // Exact logical-task/winner/terminal checks below still fail closed.
+      const taskGeneration = input.terminalOutcome === 'ABORTED'
+        ? current.generation
+        : input.coordinatorGeneration;
+      const evidence: TaskTerminalEvidence = cascadeSkipped
           ? { kind: 'gate-terminal', logicalTaskId: target.logicalTask.logicalTaskId,
-              generation: input.coordinatorGeneration, attemptId: winnerAttemptId, outcome: 'CASCADE_SKIPPED' }
+              generation: taskGeneration, attemptId: winnerAttemptId, outcome: 'CASCADE_SKIPPED' }
+          : target.logicalTask.state === 'COMPLETED' && winnerAttemptId !== null
+            ? { kind: 'attempt-result', logicalTaskId: target.logicalTask.logicalTaskId,
+                generation: taskGeneration, attemptId: winnerAttemptId, outcome: 'DONE' }
+          : target.logicalTask.state === 'FAILED' && winnerAttemptId !== null
+            ? { kind: 'attempt-result', logicalTaskId: target.logicalTask.logicalTaskId,
+                generation: taskGeneration, attemptId: winnerAttemptId, outcome: 'NO_GO' }
+          : input.terminalOutcome === 'ABORTED'
+            ? { kind: 'gate-terminal', logicalTaskId: target.logicalTask.logicalTaskId,
+                generation: taskGeneration, attemptId: null, outcome: 'ABORTED' }
           : winnerAttemptId === null
             ? { kind: 'gate-terminal', logicalTaskId: target.logicalTask.logicalTaskId,
-                generation: input.coordinatorGeneration, attemptId: null, outcome: 'NEVER_DISPATCHED' }
+                generation: taskGeneration, attemptId: null, outcome: 'NEVER_DISPATCHED' }
             : { kind: 'attempt-result', logicalTaskId: target.logicalTask.logicalTaskId,
-                generation: input.coordinatorGeneration, attemptId: winnerAttemptId,
+                generation: taskGeneration, attemptId: winnerAttemptId,
                 outcome: target.logicalTask.state === 'COMPLETED' ? 'DONE' : 'NO_GO' };
       const reduced = reduceTaskTerminalProjection(current, evidence);
       if (reduced.decision === 'hold') {
@@ -2826,15 +2840,6 @@ function publishFencedTerminalReceipt(
     attempts: input.truth.attempts,
     coordinatorEvidence: [receiptEvidence],
   });
-  // Receipt publication cannot outrun its task projections. Any reducer/CAS/
-  // durability failure propagates as a typed HOLD before receipt bytes exist.
-  persistFinalizerTaskTerminalProjections({
-    projectRoot: input.projectRoot,
-    sprintId: input.sprint.id,
-    truth: input.truth,
-    coordinatorGeneration,
-    terminalOutcome,
-  });
   // A′ / ADR-D-007 bounded recovery (owner onayı, 2026-08-17): a COMPLETE
   // terminal receipt asserts settled WORK. The sprint-535/536 chronology showed
   // an execute-handoff fault producing an EMPTY logical-task set — the vacuous
@@ -2858,6 +2863,17 @@ function publishFencedTerminalReceipt(
       );
     }
   }
+  // Receipt publication cannot outrun its task projections. Validate COMPLETE
+  // candidacy first so a rejected publication cannot terminalize task JSONs
+  // without a receipt. Reducer/CAS/durability failures still propagate as a
+  // typed HOLD before receipt bytes exist.
+  persistFinalizerTaskTerminalProjections({
+    projectRoot: input.projectRoot,
+    sprintId: input.sprint.id,
+    truth: input.truth,
+    coordinatorGeneration,
+    terminalOutcome,
+  });
   const artifact: PersistedSprintTerminalReceipt = {
     version: 1,
     terminalOutcome,

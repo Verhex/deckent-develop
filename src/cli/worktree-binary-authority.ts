@@ -1,5 +1,15 @@
 import { createHash } from 'node:crypto';
-import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
+import {
+  closeSync,
+  constants as fsConstants,
+  existsSync,
+  fstatSync,
+  lstatSync,
+  openSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+} from 'node:fs';
 import { dirname, join, posix, relative, resolve, win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { detectDeckentRepo } from '../orchestra/self-modifying-detector.js';
@@ -75,6 +85,44 @@ interface ResolveWorktreeBinaryAuthorityOptions {
   readonly platform?: NodeJS.Platform;
 }
 
+export interface ReadRuntimeBuildIdentityOptions {
+  /** Checkout whose current sources and dist output must be bound together. */
+  readonly projectRoot: string;
+  /** URL of the module that is actually executing (normally `import.meta.url`). */
+  readonly runtimeModuleUrl: string;
+}
+
+export type RuntimeBuildIdentityHoldIssue =
+  | 'runtime-module-url-invalid'
+  | 'runtime-not-checkout-dist'
+  | 'runtime-entrypoint-unsafe'
+  | 'build-identity-missing'
+  | 'build-identity-unsafe'
+  | 'build-identity-invalid'
+  | 'build-root-mismatch'
+  | 'build-source-unreadable'
+  | 'build-source-mismatch';
+
+export interface RuntimeBuildIdentityAdoptionBinding {
+  readonly runtimePackageRoot: string;
+  readonly entrypointPath: string;
+  readonly buildIdentityPath: string;
+  readonly buildIdentity: DeckentBuildIdentity;
+  readonly currentSourceTreeIdentity: DeckentSourceTreeIdentity;
+  readonly buildIdentitySha256: string;
+  readonly entrypointSha256: string;
+}
+
+export type RuntimeBuildIdentityReadResult =
+  | {
+      readonly status: 'adopt';
+      readonly binding: RuntimeBuildIdentityAdoptionBinding;
+    }
+  | {
+      readonly status: 'hold';
+      readonly issue: RuntimeBuildIdentityHoldIssue;
+    };
+
 function canonicalRoot(root: string): string {
   try {
     return realpathSync.native(root);
@@ -87,6 +135,88 @@ const SOURCE_INPUT_EXTENSIONS = Object.freeze(['.ts', '.tsx', '.json', '.md', '.
 const SOURCE_INPUT_EXCLUDED_DIRECTORIES = new Set(['dashboard', 'desktop']);
 const SOURCE_INPUT_FILE_LIMIT = 100_000;
 const SOURCE_INPUT_MAX_BYTES = 64 * 1024 * 1024;
+const BUILD_IDENTITY_MAX_BYTES = 64 * 1024;
+const RUNTIME_ENTRYPOINT_MAX_BYTES = 64 * 1024 * 1024;
+
+class BoundedReadError extends Error {}
+
+/**
+ * Read one regular file through a stable descriptor. The path is checked both
+ * before and after the read, while descriptor metadata proves that the bytes
+ * came from that exact inode. This intentionally rejects symlinks and hard
+ * links: neither is needed for files inside a checkout's real `dist` tree.
+ */
+function readStableFile(path: string, maxBytes: number): Buffer {
+  let before: ReturnType<typeof lstatSync>;
+  try {
+    before = lstatSync(path, { bigint: true });
+  } catch {
+    throw new BoundedReadError('missing');
+  }
+  if (
+    !before.isFile()
+    || before.isSymbolicLink()
+    || before.nlink !== 1n
+    || before.size > BigInt(maxBytes)
+  ) throw new BoundedReadError('unsafe');
+
+  let fd: number;
+  try {
+    fd = openSync(path, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0));
+  } catch {
+    throw new BoundedReadError('unsafe');
+  }
+  try {
+    const opened = fstatSync(fd, { bigint: true });
+    if (
+      !opened.isFile()
+      || opened.dev !== before.dev
+      || opened.ino !== before.ino
+      || opened.size !== before.size
+    ) throw new BoundedReadError('changed');
+    const bytes = readFileSync(fd);
+    const afterDescriptor = fstatSync(fd, { bigint: true });
+    const afterPath = lstatSync(path, { bigint: true });
+    if (
+      afterDescriptor.dev !== opened.dev
+      || afterDescriptor.ino !== opened.ino
+      || afterDescriptor.size !== opened.size
+      || afterDescriptor.mtimeNs !== opened.mtimeNs
+      || afterPath.dev !== opened.dev
+      || afterPath.ino !== opened.ino
+      || afterPath.size !== opened.size
+      || afterPath.mtimeNs !== opened.mtimeNs
+      || BigInt(bytes.byteLength) !== opened.size
+    ) throw new BoundedReadError('changed');
+    return bytes;
+  } catch (error) {
+    if (error instanceof BoundedReadError) throw error;
+    throw new BoundedReadError('unsafe');
+  } finally {
+    closeSync(fd);
+  }
+}
+
+function isPathInside(parent: string, candidate: string): boolean {
+  const rel = relative(parent, candidate);
+  return rel !== '' && !rel.startsWith(`..${posix.sep}`) && !rel.startsWith(`..${win32.sep}`)
+    && rel !== '..' && !posix.isAbsolute(rel) && !win32.isAbsolute(rel);
+}
+
+function pathFromParentIsSymlinkFree(parent: string, candidate: string): boolean {
+  const rel = relative(parent, candidate);
+  if (!isPathInside(parent, candidate)) return false;
+  let cursor = parent;
+  try {
+    for (const segment of rel.split(/[\\/]/u)) {
+      cursor = join(cursor, segment);
+      if (lstatSync(cursor).isSymbolicLink()) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function sourceInputFiles(root: string): string[] {
   const files: string[] = [];
@@ -309,7 +439,101 @@ function runtimeKindFor(modulePath: string, runtimePackageRoot: string): 'source
   return firstSegment === 'src' ? 'source' : 'dist';
 }
 
-function readRuntimeBuildIdentity(runtimePackageRoot: string): {
+/**
+ * Fresh, read-only proof that an executing module and the exact build manifest
+ * beside it belong to the requested checkout's `dist` output. No identity is
+ * synthesized for source or diagnostic execution: callers receive a typed
+ * HOLD unless all bytes and current source inputs can be bound exactly.
+ */
+export function readRuntimeBuildIdentity(
+  options: ReadRuntimeBuildIdentityOptions,
+): RuntimeBuildIdentityReadResult {
+  const runtimePackageRoot = canonicalRoot(options.projectRoot);
+  let modulePath: string;
+  try {
+    modulePath = fileURLToPath(options.runtimeModuleUrl);
+  } catch {
+    return { status: 'hold', issue: 'runtime-module-url-invalid' };
+  }
+
+  const distRoot = join(runtimePackageRoot, 'dist');
+  try {
+    if (!rootsEqual(realpathSync.native(distRoot), distRoot, process.platform)) {
+      return { status: 'hold', issue: 'runtime-not-checkout-dist' };
+    }
+  } catch {
+    return { status: 'hold', issue: 'runtime-not-checkout-dist' };
+  }
+  const unresolvedEntrypointPath = resolve(modulePath);
+  if (!isPathInside(distRoot, unresolvedEntrypointPath)) {
+    return { status: 'hold', issue: 'runtime-not-checkout-dist' };
+  }
+  if (!pathFromParentIsSymlinkFree(distRoot, unresolvedEntrypointPath)) {
+    return { status: 'hold', issue: 'runtime-entrypoint-unsafe' };
+  }
+  let entrypointPath: string;
+  try {
+    entrypointPath = realpathSync.native(modulePath);
+  } catch {
+    return { status: 'hold', issue: 'runtime-entrypoint-unsafe' };
+  }
+  if (!isPathInside(distRoot, entrypointPath)) {
+    return { status: 'hold', issue: 'runtime-not-checkout-dist' };
+  }
+
+  let entrypointBytes: Buffer;
+  try {
+    entrypointBytes = readStableFile(entrypointPath, RUNTIME_ENTRYPOINT_MAX_BYTES);
+  } catch {
+    return { status: 'hold', issue: 'runtime-entrypoint-unsafe' };
+  }
+
+  const buildIdentityPath = join(runtimePackageRoot, BUILD_IDENTITY_RELATIVE_PATH);
+  let buildIdentityBytes: Buffer;
+  try {
+    buildIdentityBytes = readStableFile(buildIdentityPath, BUILD_IDENTITY_MAX_BYTES);
+  } catch (error) {
+    return {
+      status: 'hold',
+      issue: error instanceof BoundedReadError && error.message === 'missing'
+        ? 'build-identity-missing'
+        : 'build-identity-unsafe',
+    };
+  }
+  const buildIdentity = parseBuildIdentity(buildIdentityBytes.toString('utf-8'));
+  if (!buildIdentity) return { status: 'hold', issue: 'build-identity-invalid' };
+  if (buildIdentity.sourceRootSha256 !== buildSourceRootSha256(runtimePackageRoot)) {
+    return { status: 'hold', issue: 'build-root-mismatch' };
+  }
+
+  let currentSourceTreeIdentity: DeckentSourceTreeIdentity;
+  try {
+    currentSourceTreeIdentity = buildSourceTreeIdentity(runtimePackageRoot);
+  } catch {
+    return { status: 'hold', issue: 'build-source-unreadable' };
+  }
+  if (
+    buildIdentity.sourceTreeSha256 !== currentSourceTreeIdentity.sourceTreeSha256
+    || buildIdentity.sourceTreeFileCount !== currentSourceTreeIdentity.sourceTreeFileCount
+  ) return { status: 'hold', issue: 'build-source-mismatch' };
+
+  const normalizedIdentity = Object.freeze({ ...buildIdentity });
+  const normalizedSourceTree = Object.freeze({ ...currentSourceTreeIdentity });
+  return {
+    status: 'adopt',
+    binding: Object.freeze({
+      runtimePackageRoot,
+      entrypointPath,
+      buildIdentityPath,
+      buildIdentity: normalizedIdentity,
+      currentSourceTreeIdentity: normalizedSourceTree,
+      buildIdentitySha256: createHash('sha256').update(buildIdentityBytes).digest('hex'),
+      entrypointSha256: createHash('sha256').update(entrypointBytes).digest('hex'),
+    }),
+  };
+}
+
+function readAuthorityBuildIdentity(runtimePackageRoot: string): {
   readonly identity: DeckentBuildIdentity | undefined;
   readonly state: 'missing' | 'invalid' | undefined;
 } {
@@ -337,7 +561,7 @@ export function resolveWorktreeBinaryAuthority(
   const projectRoot = canonicalRoot(options.projectRoot);
   const runtimeKind = runtimeKindFor(modulePath, runtimePackageRoot);
   const build = runtimeKind === 'dist'
-    ? readRuntimeBuildIdentity(runtimePackageRoot)
+    ? readAuthorityBuildIdentity(runtimePackageRoot)
     : { identity: undefined, state: undefined };
 
   return evaluateWorktreeBinaryAuthority({

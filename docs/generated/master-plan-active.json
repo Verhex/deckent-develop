@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "736e053eb8b3987e39eedcf354a03b071c5561492e62377f9b83327518ce7d95"
+    "value": "685b84ed9d83eb64b286bbef597845897c4570a6ad5e179d7e9b1617f3af523c"
   },
   "summary": {
     "total": 521,
@@ -3205,9 +3205,9 @@
       "program": "ASSURANCE",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-22",
+      "updated": "2026-08-24",
       "definitionDigest": "e12c2ac83a7ad957d5148e5fd48e176eb66abfe6bf3c5169b452f0e93d48294a",
-      "progressDigest": "6f3ad4f61cd9b8bcb3e63648a98462b0d8651e827dabcc423478c14282868081",
+      "progressDigest": "b05aa8d4fcfb8de8eaa42d85feb17582fd733668c0d92123f14190fdf86fc5ac",
       "terminalClosureDigest": null
     },
     {
@@ -18053,11 +18053,11 @@
       ],
       "state": "OPEN",
       "truth": {
-        "C": "0",
-        "W": "0",
+        "C": "1",
+        "W": "1",
         "E": "1",
         "H": "1",
-        "L": "0",
+        "L": "1",
         "X": "0",
         "S": "?"
       },
@@ -18069,8 +18069,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "With no active run, build completes, documented host reconnect/restart is applied and one machine-readable digest proves the invoked CLI binary corresponds to the settled source; mismatch blocks every following dogfood replay",
-      "evidence": "EK-3 open replay basamak; deliberately post-settlement and separate from implementation workers because active-sprint build is forbidden and stale `dist/` previously generated false recovery evidence 2026-08-22 truth-sync: sprint-local source/dist same-generation gate implementation landing'ini destekler; post-sprint owner reconnect/restart, invoked live binary digest veya adoption receipt'i değildir. Work 480/3296 kapanmaz; status `OPEN`. `proof=docs/evidence/PROVIDER-OBS-MIGRATION-001-result-2026-08-22.md`",
-      "updated": "2026-08-22"
+      "evidence": "EK-3 post-settlement gate artık production-wired: immutable composite authority provider-adoption receipt + current DB lineage + source-tree/build identity + invoked `dist/cli/entry.js` digest + ownership-bound live bot PID/start token zincirini tek receipt'te bağlıyor. Sprint-641 implementation DAG'ı active-run build yasağını ihlal eden fan-in nedeniyle dürüst `ABORTED` settlement aldı; bounded root recovery finalizer'ın generation/task-truth kusurunu kapattı, post-terminal `build:all` + bot restart uygulandı ve real dist dry-run→apply→fresh-process replay aynı `runtime receipt=sha256:f19ad800c9db049cb3aff4c77b641ba385c34ffd03d50f249b7c00ce1395ef7b` / `provider receipt=sha256:56a282c6aacf79f78774b94cf7d0b63cd5a12565dffb2f03ef1c2e80fbd9304d` kimliklerini döndürdü; DB/WAL/SHM byte digestleri apply/replay boyunca değişmedi. Scoped 148 test + lint yeşil. Authenticated disposition, dependency'ler ve formal XVerify açık olduğundan state `OPEN`; parent 3296 otomatik kapanmaz",
+      "updated": "2026-08-24"
     },
     {
       "order": 3301,
@@ -26831,6 +26831,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "fd9b956872dbf3c8e807af99ef82764be72ad7496f2a907b78521d5d6d42ce01"
+    "value": "7523954d8f4aa616ff8239871ffc263f6c20050ab13c449a7b7cc84282e58752"
   }
 }

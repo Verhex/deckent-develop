@@ -9,12 +9,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { spawn, type ChildProcess } from 'node:child_process';
 import {
+  createHash,
+} from 'node:crypto';
+import {
   existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
   writeFileSync,
+  realpathSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -44,14 +48,66 @@ describe('bot pidfile lifecycle', () => {
       expect(readBotPid(root)).toBe(process.pid);
       const raw = readFileSync(join(root, '.deckent', 'bot.pid'), 'utf8');
       expect(JSON.parse(raw)).toEqual(expect.objectContaining({
-        schemaVersion: 1,
+        schemaVersion: 2,
         pid: process.pid,
         startToken: expect.stringMatching(/^s\d+$/),
         projectRootDigest: expect.stringMatching(/^[a-f0-9]{64}$/),
+        runtimeIdentity: {
+          entrypointDigest: expect.stringMatching(/^[a-f0-9]{64}$/),
+          buildIdentityDigest: expect.stringMatching(/^[a-f0-9]{64}$/),
+        },
       }));
       expect(raw).not.toContain(root);
       clearBotPid(root);
       expect(readBotPid(root)).toBeNull();
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it('returns the listener-published runtime identity only for verified ownership', () => {
+    const root = tmp();
+    const runtimeIdentity = {
+      entrypointDigest: 'a'.repeat(64),
+      buildIdentityDigest: 'b'.repeat(64),
+    };
+    try {
+      expect(writeBotPid(root, 4242, {
+        isAlive: () => false,
+        startToken: () => 's100',
+        runtimeIdentity: () => runtimeIdentity,
+      })).toBe(true);
+      expect(inspectBotPid(root, {
+        isAlive: () => true,
+        startToken: () => 's100',
+      })).toEqual({ status: 'running', pid: 4242, runtimeIdentity });
+      expect(inspectBotPid(root, {
+        isAlive: () => true,
+        startToken: () => 's101',
+      })).toEqual({ status: 'not-running', reason: 'reused' });
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it('does not promote a verified schema-v1 record without runtime identity', () => {
+    const root = tmp();
+    try {
+      mkdirSync(join(root, '.deckent'), { recursive: true });
+      writeFileSync(join(root, '.deckent', 'bot.pid'), JSON.stringify({
+        schemaVersion: 1,
+        pid: 4242,
+        startToken: 's100',
+        projectRootDigest: createHash('sha256')
+          .update(realpathSync.native(root)).digest('hex'),
+        recordedAt: '2026-01-01T00:00:00.000Z',
+      }));
+      expect(inspectBotPid(root, {
+        isAlive: () => true,
+        startToken: () => 's100',
+      })).toEqual({
+        status: 'ownership-unknown',
+        pid: 4242,
+        reason: 'runtime-adoption-unavailable',
+      });
+      expect(JSON.parse(readFileSync(join(root, '.deckent', 'bot.pid'), 'utf8')))
+        .toHaveProperty('schemaVersion', 1);
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 
@@ -183,7 +239,11 @@ describe('startBotDaemon', () => {
     try {
       const res = startBotDaemon(root, {
         spawnFn: () => 9988,
-        readinessInspect: () => ({ status: 'running', pid: 9988 }),
+        readinessInspect: () => ({
+          status: 'running', pid: 9988, runtimeIdentity: {
+            entrypointDigest: 'a'.repeat(64), buildIdentityDigest: 'b'.repeat(64),
+          },
+        }),
       });
       expect(res).toEqual({ status: 'started', pid: 9988 });
     } finally { rmSync(root, { recursive: true, force: true }); }
@@ -195,7 +255,9 @@ describe('startBotDaemon', () => {
     const inspections = [
       { status: 'not-running' as const, reason: 'absent' as const },
       { status: 'not-running' as const, reason: 'absent' as const },
-      { status: 'running' as const, pid: 9988 },
+      { status: 'running' as const, pid: 9988, runtimeIdentity: {
+        entrypointDigest: 'a'.repeat(64), buildIdentityDigest: 'b'.repeat(64),
+      } },
     ];
     try {
       const res = startBotDaemon(root, {

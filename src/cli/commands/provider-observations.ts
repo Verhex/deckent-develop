@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { userInfo } from 'node:os';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import type { Command } from 'commander';
@@ -26,9 +27,12 @@ import {
   type ProviderExecutionObservationAdoptionPlan,
 } from '../../core/provider-execution-observation-adoption.js';
 import {
+  deriveProviderExecutionObservationAdoptionReceiptScope,
+  providerExecutionObservationAdoptionDurableReceiptId,
   ProviderExecutionObservationAdoptionReceiptStoreError,
   publishProviderExecutionObservationAdoptionReceipt,
   readProviderExecutionObservationAdoptionReceipt,
+  serializeProviderExecutionObservationAdoptionReceipt,
   type ProviderExecutionObservationAdoptionDurableReceipt,
 } from '../../core/provider-execution-observation-adoption-receipt-store.js';
 import {
@@ -51,10 +55,26 @@ import {
   type ProviderExecutionObservationReconciliationDurableReceipt,
 } from '../../core/provider-execution-observation-reconciliation-receipt-store.js';
 import { PROVIDER_EXECUTION_OBSERVATION_DATABASE_PATH } from '../../core/provider-execution-observation-store.js';
+import {
+  createRuntimeAdoptionPlan,
+  RuntimeAdoptionHoldError,
+  type RuntimeAdoptionPlan,
+} from '../../core/runtime-adoption.js';
+import {
+  publishRuntimeAdoptionReceipt,
+  readRuntimeAdoptionReceipt,
+  type RuntimeAdoptionReceipt,
+} from '../../core/runtime-adoption-receipt-store.js';
+import { processStartToken } from '../../core/pid-ownership.js';
 import { publishCanonicalRunStatusReadModel } from '../../core/run-status-read-model.js';
+import { inspectBotPid, type BotPidInspection } from '../../connectors/bot-daemon.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import {
+  readRuntimeBuildIdentity,
+  type RuntimeBuildIdentityReadResult,
+} from '../worktree-binary-authority.js';
 
 const PLAN_TIME = new Date(0);
 const HEX_256 = /^[a-f0-9]{64}$/u;
@@ -66,6 +86,7 @@ interface MigrationOptions extends CommonOptions {
 interface AdoptionOptions extends CommonOptions {
   readonly apply?: boolean; readonly planDigest?: string; readonly preimage?: string;
 }
+interface RuntimeAdoptionOptions extends AdoptionOptions {}
 interface ReconciliationOptions extends CommonOptions {
   readonly apply?: boolean; readonly approvalId?: string; readonly planDigest?: string;
   readonly runId?: readonly string[];
@@ -87,6 +108,15 @@ export interface ProviderObservationAdoptionProjection {
   readonly receipt?: ProviderExecutionObservationAdoptionDurableReceipt;
   readonly projectRelativeReceiptPath?: string;
 }
+export interface ProviderObservationRuntimeAdoptionProjection {
+  readonly operation: 'runtime-adoption';
+  readonly mode: 'dry-run' | 'persisted' | 'replay';
+  readonly providerAdoption: ProviderObservationAdoptionProjection;
+  readonly plan: RuntimeAdoptionPlan;
+  readonly receipt?: RuntimeAdoptionReceipt;
+  readonly providerReceiptId: string;
+  readonly runtimeReceiptId?: string;
+}
 export interface ProviderObservationReconciliationProjection {
   readonly operation: 'reconcile';
   readonly mode: 'inspect' | 'dry-run' | 'pending-approval' | 'applied' | 'replay';
@@ -101,7 +131,13 @@ export interface ProviderObservationsCommandDeps {
   readonly inspect?: (root: string, options: CommonOptions) => Promise<ProviderObservationMigrationProjection>;
   readonly migrate?: (root: string, options: MigrationOptions) => Promise<ProviderObservationMigrationProjection>;
   readonly adopt?: (root: string, options: AdoptionOptions) => Promise<ProviderObservationAdoptionProjection>;
+  readonly adoptRuntime?: (root: string, options: RuntimeAdoptionOptions) => Promise<ProviderObservationRuntimeAdoptionProjection>;
   readonly reconcile?: (root: string, options: ReconciliationOptions) => Promise<ProviderObservationReconciliationProjection>;
+  readonly inspectBotPidFn?: (root: string) => BotPidInspection;
+  readonly processStartTokenFn?: (pid: number) => string | null;
+  readonly readRuntimeBuildIdentityFn?: (options: {
+    readonly projectRoot: string; readonly runtimeModuleUrl: string;
+  }) => RuntimeBuildIdentityReadResult;
 }
 type JsonValue = null | boolean | number | string | readonly JsonValue[]
   | { readonly [key: string]: JsonValue };
@@ -147,6 +183,54 @@ function migrationPlan(projectRoot: string, relativeDatabasePath: string): {
 }
 function exactDigest(expected: string, supplied: string | undefined): void {
   if (!supplied || !HEX_256.test(supplied) || supplied !== expected) throw new Error('PLAN_DIGEST_MISMATCH');
+}
+
+function sha256(value: string | Buffer): string {
+  return `sha256:${createHash('sha256').update(value).digest('hex')}`;
+}
+
+function providerReceiptPreview(
+  projectRoot: string,
+  context: { readonly environmentId: string; readonly tenantId: string },
+  adoption: ProviderObservationAdoptionProjection,
+): { readonly receipt: ProviderExecutionObservationAdoptionDurableReceipt; readonly projectRelativeReceiptPath: string } {
+  if (!adoption.plan) throw new RuntimeAdoptionHoldError('INVALID_PLAN');
+  const { inspection, plan } = adoption;
+  const sourcePath = relative(projectRoot, plan.paths.v1PreimagePath).split(sep).join('/');
+  const targetPath = relative(projectRoot, plan.paths.currentDatabasePath).split(sep).join('/');
+  const body = {
+    schema: 'deckent.provider-observation-adoption-receipt' as const,
+    version: 1 as const,
+    scope: deriveProviderExecutionObservationAdoptionReceiptScope(context),
+    source: {
+      projectRelativePath: sourcePath, schemaVersion: 1 as const,
+      byteLength: readFileSync(plan.paths.v1PreimagePath).length,
+      contentDigest: `sha256:${inspection.sourceDatabaseDigest}`,
+      lineageDigest: `sha256:${inspection.sourceRowLineageDigest}`,
+      rowCount: inspection.adoptedLegacyRowCount,
+    },
+    target: {
+      projectRelativePath: targetPath, schemaVersion: 2 as const,
+      byteLength: readFileSync(plan.paths.currentDatabasePath).length,
+      contentDigest: `sha256:${inspection.targetDatabaseDigest}`,
+      legacyLineageDigest: `sha256:${inspection.adoptedLegacyRowLineageDigest}`,
+      legacyRowCount: inspection.adoptedLegacyRowCount,
+      runOwnedRowCount: inspection.extraRunOwnedRows.length,
+      totalRowCount: inspection.adoptedLegacyRowCount + inspection.extraRunOwnedRows.length,
+    },
+    planDigest: `sha256:${plan.planDigest}`,
+    verifiedAt: PLAN_TIME.toISOString(), databaseMutation: 'none' as const,
+  };
+  const receipt = Object.freeze({
+    ...body, receiptId: providerExecutionObservationAdoptionDurableReceiptId(body),
+  });
+  // Run the core serializer now so dry-run and apply share the exact durable
+  // provider-receipt validation boundary rather than a CLI-only approximation.
+  serializeProviderExecutionObservationAdoptionReceipt(receipt);
+  return {
+    receipt,
+    projectRelativeReceiptPath: `.deckent/provider-observation-adoption/receipts/v1/${receipt.scope.environmentKey}/${receipt.scope.tenantKey}/${receipt.receiptId.slice(7)}.json`,
+  };
 }
 
 async function defaultInspect(
@@ -247,6 +331,133 @@ async function defaultAdoption(
     mode: published.state === 'created' ? 'persisted' : 'replay',
     inspection, plan, receipt,
     projectRelativeReceiptPath: published.projectRelativeReceiptPath,
+  };
+}
+
+function runtimeObservation(
+  projectRoot: string,
+  context: { readonly environmentId: string; readonly tenantId: string },
+  deps: ProviderObservationsCommandDeps,
+) {
+  const inspect = deps.inspectBotPidFn ?? inspectBotPid;
+  const tokenOf = deps.processStartTokenFn ?? processStartToken;
+  const readBuild = deps.readRuntimeBuildIdentityFn ?? readRuntimeBuildIdentity;
+  const bot = inspect(projectRoot);
+  if (bot.status !== 'running') {
+    throw new RuntimeAdoptionHoldError('RUNTIME_OWNERSHIP_MISMATCH');
+  }
+  const startToken = tokenOf(bot.pid);
+  if (!startToken) throw new RuntimeAdoptionHoldError('RUNTIME_OWNERSHIP_MISMATCH');
+  const entrypoint = readBuild({
+    projectRoot,
+    runtimeModuleUrl: new URL('../entry.js', import.meta.url).href,
+  });
+  const identityModule = readBuild({
+    projectRoot,
+    runtimeModuleUrl: new URL('../../connectors/bot-daemon.js', import.meta.url).href,
+  });
+  if (entrypoint.status !== 'adopt') {
+    throw new RuntimeAdoptionHoldError('BUILD_IDENTITY_MISMATCH');
+  }
+  if (identityModule.status !== 'adopt') {
+    throw new RuntimeAdoptionHoldError('BUILD_IDENTITY_MISMATCH');
+  }
+  if (bot.runtimeIdentity.entrypointDigest !== entrypoint.binding.entrypointSha256
+    || bot.runtimeIdentity.buildIdentityDigest !== identityModule.binding.entrypointSha256
+    || entrypoint.binding.buildIdentitySha256 !== identityModule.binding.buildIdentitySha256) {
+    throw new RuntimeAdoptionHoldError('BUILD_IDENTITY_MISMATCH');
+  }
+  const ownerIdentityDigest = sha256([
+    'deckent:runtime-adoption-owner:v1', context.environmentId, context.tenantId,
+    sha256(projectRoot), String(bot.pid), startToken,
+  ].join('\0'));
+  return Object.freeze({
+    build: entrypoint.binding,
+    liveRuntime: Object.freeze({
+      runtimeId: stableId('runtime', [sha256(projectRoot), String(bot.pid), startToken]),
+      processId: bot.pid,
+      processStartIdentity: startToken,
+      ownerIdentityDigest,
+    }),
+  });
+}
+
+async function defaultRuntimeAdoption(
+  projectRoot: string,
+  options: RuntimeAdoptionOptions,
+  deps: ProviderObservationsCommandDeps,
+): Promise<ProviderObservationRuntimeAdoptionProjection> {
+  if (!options.preimage) throw new RuntimeAdoptionHoldError('INVALID_PATH');
+  const config = await loadConfig(projectRoot);
+  const context = {
+    projectRoot, environmentId: 'local-cli',
+    tenantId: config.approval?.authority?.tenant_id ?? 'local',
+  };
+  // Verification always runs against the immutable preimage first. This dry
+  // projection performs no receipt or database write.
+  const providerDry = await defaultAdoption(projectRoot, { ...options, apply: false });
+  const providerPreview = providerReceiptPreview(projectRoot, context, providerDry);
+  const observed = runtimeObservation(projectRoot, context, deps);
+  const build = observed.build;
+  const plan = createRuntimeAdoptionPlan({
+    adoptionId: stableId('runtime-adoption', [
+      providerPreview.receipt.receiptId, providerPreview.receipt.target.contentDigest,
+      build.buildIdentitySha256, build.entrypointSha256,
+      observed.liveRuntime.runtimeId,
+    ]),
+    providerObservationReceipt: {
+      projectRelativePath: providerPreview.projectRelativeReceiptPath,
+      receiptId: providerPreview.receipt.receiptId,
+      receiptDigest: sha256(serializeProviderExecutionObservationAdoptionReceipt(providerPreview.receipt)),
+    },
+    targetDatabase: {
+      projectRelativePath: providerPreview.receipt.target.projectRelativePath,
+      databaseDigest: providerPreview.receipt.target.contentDigest,
+      lineageDigest: providerPreview.receipt.target.legacyLineageDigest,
+    },
+    deckentBuild: {
+      buildIdentityDigest: `sha256:${build.buildIdentitySha256}`,
+      sourceTreeIdentityDigest: `sha256:${build.currentSourceTreeIdentity.sourceTreeSha256}`,
+    },
+    entrypoint: {
+      projectRelativePath: relative(projectRoot, build.entrypointPath).split(sep).join('/'),
+      artifactDigest: `sha256:${build.entrypointSha256}`,
+    },
+    liveRuntime: observed.liveRuntime,
+    plannedAt: PLAN_TIME.toISOString(),
+  });
+  if (!options.apply) return {
+    operation: 'runtime-adoption', mode: 'dry-run', providerAdoption: providerDry,
+    plan, providerReceiptId: providerPreview.receipt.receiptId,
+  };
+  exactDigest(plan.planDigest.slice('sha256:'.length), options.planDigest);
+  const providerAdoption = await defaultAdoption(projectRoot, {
+    ...options, apply: true, planDigest: providerDry.plan?.planDigest,
+  });
+  if (!providerAdoption.receipt
+    || providerAdoption.receipt.receiptId !== providerPreview.receipt.receiptId
+    || providerAdoption.projectRelativeReceiptPath !== providerPreview.projectRelativeReceiptPath) {
+    throw new RuntimeAdoptionHoldError('PROVIDER_RECEIPT_MISMATCH');
+  }
+  // Re-observe ownership at the publication boundary. If the process changed,
+  // the core store rejects it; the already-created provider receipt is safe to
+  // replay on the next invocation.
+  const publicationObservation = runtimeObservation(projectRoot, context, deps);
+  const published = publishRuntimeAdoptionReceipt({
+    ...context, plan, publishedAt: PLAN_TIME.toISOString(),
+    observedRuntime: publicationObservation.liveRuntime,
+  });
+  const receipt = readRuntimeAdoptionReceipt({
+    ...context, receiptId: published.receipt.receiptId,
+    expectedPlanDigest: plan.planDigest, fresh: true,
+    observedRuntime: publicationObservation.liveRuntime,
+  });
+  return {
+    operation: 'runtime-adoption',
+    mode: published.state === 'created' ? 'persisted' : 'replay',
+    providerAdoption, plan, receipt,
+    providerReceiptId: providerAdoption.receipt.receiptId,
+    runtimeReceiptId: receipt.receiptId,
   };
 }
 
@@ -382,7 +593,8 @@ async function defaultReconciliation(
 
 /** Canonical redacted output: project-relative paths, aggregates and digests only. */
 export function providerObservationJson(
-  value: ProviderObservationMigrationProjection | ProviderObservationAdoptionProjection | ProviderObservationReconciliationProjection,
+  value: ProviderObservationMigrationProjection | ProviderObservationAdoptionProjection
+    | ProviderObservationRuntimeAdoptionProjection | ProviderObservationReconciliationProjection,
   projectRoot: string,
 ): string {
   const base: Record<string, JsonValue> = { mode: value.mode, operation: value.operation };
@@ -436,6 +648,15 @@ export function providerObservationJson(
       targetProjectRelativePath: value.receipt.target.projectRelativePath,
       totalRowCount: value.receipt.target.totalRowCount,
     };
+  } else if (value.operation === 'runtime-adoption') {
+    base.plan = {
+      databaseMutation: value.plan.databaseMutation,
+      planDigest: value.plan.planDigest.slice('sha256:'.length),
+    };
+    base.receipts = {
+      providerReceiptId: value.providerReceiptId,
+      runtimeReceiptId: value.runtimeReceiptId ?? null,
+    };
   } else {
     base.inspection = {
       activeOpenCount: value.inspection.activeOpenCount,
@@ -466,7 +687,7 @@ export function providerObservationJson(
 }
 
 async function render(
-  operation: 'inspect' | 'migration' | 'adoption' | 'reconcile', options: MigrationOptions & AdoptionOptions & ReconciliationOptions,
+  operation: 'inspect' | 'migration' | 'adoption' | 'runtime-adoption' | 'reconcile', options: MigrationOptions & AdoptionOptions & ReconciliationOptions,
   deps: ProviderObservationsCommandDeps,
 ): Promise<void> {
   const projectRoot = resolve((deps.resolveProjectRootFn ?? resolveProjectRoot)());
@@ -478,11 +699,25 @@ async function render(
         ? await (deps.migrate ?? defaultMigration)(projectRoot, options)
         : operation === 'adoption'
           ? await (deps.adopt ?? defaultAdoption)(projectRoot, options)
-          : await (deps.reconcile ?? defaultReconciliation)(projectRoot, options);
+          : operation === 'runtime-adoption'
+            ? await (deps.adoptRuntime ?? ((root, runtimeOptions) => defaultRuntimeAdoption(root, runtimeOptions, deps)))(projectRoot, options)
+            : await (deps.reconcile ?? defaultReconciliation)(projectRoot, options);
     if (options.json) { print(providerObservationJson(result, projectRoot)); return; }
     if (result.mode === 'pending-approval' && result.operation === 'migration' && result.approval) {
       print(getMessage('provider_observation.migration.pending_approval', language, {
         approvalId: result.approval.request.id,
+      }));
+    } else if (result.operation === 'runtime-adoption' && result.mode === 'dry-run') {
+      print(getMessage('provider_observation.runtime_adoption.dry_run', language, {
+        planDigest: result.plan.planDigest.slice('sha256:'.length),
+      }));
+    } else if (result.operation === 'runtime-adoption' && result.mode === 'persisted' && result.runtimeReceiptId) {
+      print(getMessage('provider_observation.runtime_adoption.receipt_persisted', language, {
+        providerReceiptId: result.providerReceiptId, runtimeReceiptId: result.runtimeReceiptId,
+      }));
+    } else if (result.operation === 'runtime-adoption' && result.mode === 'replay' && result.runtimeReceiptId) {
+      print(getMessage('provider_observation.runtime_adoption.replay_verified', language, {
+        providerReceiptId: result.providerReceiptId, runtimeReceiptId: result.runtimeReceiptId,
       }));
     } else if (result.operation === 'reconcile' && result.mode === 'inspect') {
       print(getMessage('provider_observation.reconciliation.inspect', language, {
@@ -537,11 +772,14 @@ async function render(
     const adoptionHold = operation === 'adoption'
       && (error instanceof ProviderExecutionObservationAdoptionReceiptStoreError
         || error instanceof ProviderExecutionObservationAdoptionError);
+    const runtimeAdoptionHold = operation === 'runtime-adoption';
     const reconciliationHold = operation === 'reconcile';
     // Machine output is deliberately locale-independent and excludes exception
     // text: filesystem/database errors may contain an absolute path or identity.
     if (options.json) {
-      print(adoptionHold
+      print(runtimeAdoptionHold
+        ? canonical({ mode: 'hold', operation, reasonCode: code })
+        : adoptionHold
         ? canonical({ detail: code, mode: 'hold', operation, reasonCode: code })
         : reconciliationHold
           ? canonical({ mode: 'hold', operation, reasonCode: code })
@@ -549,7 +787,9 @@ async function render(
       process.exitCode = 1;
       return;
     }
-    printError(new Error(adoptionHold
+    printError(new Error(runtimeAdoptionHold
+      ? getMessage('provider_observation.runtime_adoption.hold', language, { reasonCode: code })
+      : adoptionHold
       ? getMessage('provider_observation.adoption.hold', language, { reasonCode: code, detail: code })
       : reconciliationHold
         ? getMessage('provider_observation.reconciliation.hold', language, { reasonCode: code })
@@ -587,6 +827,11 @@ export function registerProviderObservations(
     .option('--apply', getMessage('provider_observation.migration.adopted', language, { path: '-' }))
     .option('--plan-digest <digest>', getMessage('provider_observation.migration.dry_run', language))
     .action((options: AdoptionOptions) => render('adoption', options, deps));
+  common(parent.command('adopt-runtime'))
+    .requiredOption('--preimage <path>', getMessage('provider_observation.runtime_adoption.preimage', language))
+    .option('--apply', getMessage('provider_observation.runtime_adoption.apply', language))
+    .option('--plan-digest <digest>', getMessage('provider_observation.runtime_adoption.plan_digest', language))
+    .action((options: RuntimeAdoptionOptions) => render('runtime-adoption', options, deps));
   common(parent.command('reconcile'))
     .option('--run-id <id>', getMessage('provider_observation.reconciliation.run_id', language),
       (value: string, previous: string[] = []) => [...previous, value])

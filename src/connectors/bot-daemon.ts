@@ -29,7 +29,8 @@ import { isPidAlive } from '../core/pid-liveness.js';
 import { processStartToken } from '../core/pid-ownership.js';
 
 const BOT_PID_FILE = 'bot.pid';
-const BOT_PID_SCHEMA_VERSION = 1 as const;
+const BOT_PID_SCHEMA_VERSION = 2 as const;
+const LEGACY_BOT_PID_SCHEMA_VERSION = 1 as const;
 const MAX_BOT_PID_BYTES = 4_096;
 const SHA256_RE = /^[a-f0-9]{64}$/u;
 const START_TOKEN_RE = /^s\d+$/u;
@@ -39,8 +40,22 @@ const BOT_READY_WAITER = new Int32Array(
   new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT),
 );
 
+export interface BotRuntimeIdentity {
+  readonly entrypointDigest: string;
+  readonly buildIdentityDigest: string;
+}
+
 interface BotPidRecord {
   readonly schemaVersion: typeof BOT_PID_SCHEMA_VERSION;
+  readonly pid: number;
+  readonly startToken: string | null;
+  readonly projectRootDigest: string;
+  readonly runtimeIdentity: BotRuntimeIdentity;
+  readonly recordedAt: string;
+}
+
+interface LegacyBotPidRecord {
+  readonly schemaVersion: typeof LEGACY_BOT_PID_SCHEMA_VERSION;
   readonly pid: number;
   readonly startToken: string | null;
   readonly projectRootDigest: string;
@@ -48,7 +63,11 @@ interface BotPidRecord {
 }
 
 export type BotPidInspection =
-  | { readonly status: 'running'; readonly pid: number }
+  | {
+      readonly status: 'running';
+      readonly pid: number;
+      readonly runtimeIdentity: BotRuntimeIdentity;
+    }
   | {
       readonly status: 'not-running';
       readonly reason: 'absent' | 'dead' | 'reused' | 'foreign-legacy';
@@ -60,7 +79,8 @@ export type BotPidInspection =
         | 'malformed-record'
         | 'project-binding-mismatch'
         | 'start-token-unavailable'
-        | 'legacy-identity-unavailable';
+        | 'legacy-identity-unavailable'
+        | 'runtime-adoption-unavailable';
     };
 
 type LegacyIdentity = 'bot' | 'foreign' | 'unknown';
@@ -72,7 +92,14 @@ export interface BotPidRuntimeDeps {
   readonly legacyIdentity?: (root: string, pid: number) => LegacyIdentity;
   readonly kill?: (pid: number, signal: NodeJS.Signals) => void;
   readonly now?: () => Date;
+  /** Listener-owned seam for the exact runtime bytes loaded by this process. */
+  readonly runtimeIdentity?: () => BotRuntimeIdentity | null;
 }
+
+// Capture once during module evaluation. Re-reading either path when the pid
+// file is eventually published could attest replacement bytes that this
+// already-running listener never loaded.
+const LOADED_RUNTIME_IDENTITY = loadedRuntimeIdentity();
 
 function botPidPath(root: string): string {
   return join(root, '.deckent', BOT_PID_FILE);
@@ -96,7 +123,22 @@ function validTimestamp(value: unknown): value is string {
   return Number.isFinite(epochMs) && new Date(epochMs).toISOString() === value;
 }
 
-function parseBotPidRecord(raw: string): BotPidRecord | null {
+function validRuntimeIdentity(value: unknown): value is BotRuntimeIdentity {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const identity = value as Record<string, unknown>;
+  return Object.keys(identity).sort().join(',')
+      === 'buildIdentityDigest,entrypointDigest'
+    && typeof identity.entrypointDigest === 'string'
+    && SHA256_RE.test(identity.entrypointDigest)
+    && typeof identity.buildIdentityDigest === 'string'
+    && SHA256_RE.test(identity.buildIdentityDigest);
+}
+
+function parseStructuredBotPidRecord(
+  raw: string,
+): BotPidRecord | LegacyBotPidRecord | null {
   try {
     const value = JSON.parse(raw) as unknown;
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -104,14 +146,20 @@ function parseBotPidRecord(raw: string): BotPidRecord | null {
     }
     const record = value as Record<string, unknown>;
     const keys = Object.keys(record).sort();
-    if (JSON.stringify(keys) !== JSON.stringify([
+    const commonKeys = [
       'pid',
       'projectRootDigest',
       'recordedAt',
       'schemaVersion',
       'startToken',
-    ])) return null;
-    if (record.schemaVersion !== BOT_PID_SCHEMA_VERSION
+    ];
+    const current = record.schemaVersion === BOT_PID_SCHEMA_VERSION;
+    const expectedKeys = current
+      ? [...commonKeys, 'runtimeIdentity'].sort()
+      : commonKeys;
+    if (JSON.stringify(keys) !== JSON.stringify(expectedKeys)) return null;
+    if ((record.schemaVersion !== BOT_PID_SCHEMA_VERSION
+        && record.schemaVersion !== LEGACY_BOT_PID_SCHEMA_VERSION)
       || !Number.isSafeInteger(record.pid)
       || (record.pid as number) <= 0
       || (record.startToken !== null
@@ -119,15 +167,26 @@ function parseBotPidRecord(raw: string): BotPidRecord | null {
           || !START_TOKEN_RE.test(record.startToken)))
       || typeof record.projectRootDigest !== 'string'
       || !SHA256_RE.test(record.projectRootDigest)
-      || !validTimestamp(record.recordedAt)) {
+      || !validTimestamp(record.recordedAt)
+      || (current && !validRuntimeIdentity(record.runtimeIdentity))) {
       return null;
+    }
+    if (!current) {
+      return {
+        schemaVersion: LEGACY_BOT_PID_SCHEMA_VERSION,
+        pid: record.pid as number,
+        startToken: record.startToken as string | null,
+        projectRootDigest: record.projectRootDigest,
+        recordedAt: record.recordedAt as string,
+      };
     }
     return {
       schemaVersion: BOT_PID_SCHEMA_VERSION,
       pid: record.pid as number,
       startToken: record.startToken as string | null,
       projectRootDigest: record.projectRootDigest,
-      recordedAt: record.recordedAt,
+      runtimeIdentity: record.runtimeIdentity as BotRuntimeIdentity,
+      recordedAt: record.recordedAt as string,
     };
   } catch {
     return null;
@@ -226,16 +285,41 @@ function createBotPidRecord(
   root: string,
   pid: number,
   deps: BotPidRuntimeDeps,
-): BotPidRecord {
+): BotPidRecord | null {
   const tokenOf = deps.startToken ?? processStartToken;
   const recordedAt = (deps.now?.() ?? new Date()).toISOString();
+  const runtimeIdentity = deps.runtimeIdentity
+    ? deps.runtimeIdentity()
+    : LOADED_RUNTIME_IDENTITY;
+  if (!runtimeIdentity || !validRuntimeIdentity(runtimeIdentity)) return null;
   return {
     schemaVersion: BOT_PID_SCHEMA_VERSION,
     pid,
     startToken: tokenOf(pid),
     projectRootDigest: projectRootDigest(root),
+    runtimeIdentity,
     recordedAt,
   };
+}
+
+function sha256File(path: string): string {
+  return createHash('sha256').update(readFileSync(path)).digest('hex');
+}
+
+/** Digest the entrypoint and this build-identity module during module load. */
+function loadedRuntimeIdentity(): BotRuntimeIdentity | null {
+  try {
+    const loadedEntrypoint = process.argv[1];
+    if (!loadedEntrypoint) return null;
+    return {
+      entrypointDigest: sha256File(realpathSync.native(loadedEntrypoint)),
+      buildIdentityDigest: sha256File(
+        realpathSync.native(fileURLToPath(import.meta.url)),
+      ),
+    };
+  } catch {
+    return null;
+  }
 }
 
 function resolveExisting(path: string): string | null {
@@ -290,7 +374,7 @@ export function writeBotPid(
     const record = createBotPidRecord(root, pid, deps);
     // Never launch an unmanageable daemon. Until a platform adapter can prove
     // process generations, listener admission fails honestly before waiting.
-    if (record.startToken === null) return false;
+    if (!record || record.startToken === null) return false;
     return writeBotPidRecord(root, record);
   } catch {
     return false;
@@ -322,7 +406,8 @@ export function inspectBotPid(
   const isAlive = deps.isAlive ?? isPidAlive;
   const tokenOf = deps.startToken ?? processStartToken;
   const platform = deps.platform ?? process.platform;
-  const record = parseBotPidRecord(raw);
+  const structuredRecord = parseStructuredBotPidRecord(raw);
+  const record = structuredRecord;
   if (record) {
     let expectedRootDigest: string;
     try {
@@ -348,7 +433,18 @@ export function inspectBotPid(
     const liveToken = tokenOf(record.pid);
     if (record.startToken && liveToken) {
       if (record.startToken === liveToken) {
-        return { status: 'running', pid: record.pid };
+        if (record.schemaVersion === LEGACY_BOT_PID_SCHEMA_VERSION) {
+          return {
+            status: 'ownership-unknown',
+            pid: record.pid,
+            reason: 'runtime-adoption-unavailable',
+          };
+        }
+        return {
+          status: 'running',
+          pid: record.pid,
+          runtimeIdentity: record.runtimeIdentity,
+        };
       }
       retireBotPidRecord(path, raw);
       return { status: 'not-running', reason: 'reused' };
@@ -387,15 +483,11 @@ export function inspectBotPid(
       reason: 'legacy-identity-unavailable',
     };
   }
-  const migrated = createBotPidRecord(root, legacyPid, deps);
-  if (!migrated.startToken || !writeBotPidRecord(root, migrated, 'replace')) {
-    return {
-      status: 'ownership-unknown',
-      pid: legacyPid,
-      reason: 'start-token-unavailable',
-    };
-  }
-  return { status: 'running', pid: legacyPid };
+  return {
+    status: 'ownership-unknown',
+    pid: legacyPid,
+    reason: 'runtime-adoption-unavailable',
+  };
 }
 
 /** Compatibility read: only proven-owned processes are returned. */
@@ -420,7 +512,7 @@ export function clearBotPid(
   try {
     const raw = readBotPidRaw(path);
     if (raw === null) return true;
-    const record = parseBotPidRecord(raw);
+    const record = parseStructuredBotPidRecord(raw);
     const tokenOf = deps.startToken ?? processStartToken;
     if (record
       && record.pid === pid

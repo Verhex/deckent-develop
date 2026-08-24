@@ -188,6 +188,31 @@ describe('provider observation adoption receipt — real compiled CLI', () => {
     rmSync(compiledContainer, { recursive: true, force: true });
   });
 
+  it('exposes production adopt-runtime as a dry-run that fails closed without verified live-runtime authority', async () => {
+    const root = createFixture();
+    const sourcePath = join(root, PREIMAGE);
+    const targetPath = join(root, DATABASE);
+    const sourceBefore = snapshot(sourcePath);
+    const targetBefore = snapshot(targetPath);
+
+    const held = await runBinary(root, [
+      'provider-observations', 'adopt-runtime', '--preimage', PREIMAGE, '--json',
+    ]);
+
+    expect(held).toMatchObject({ code: 1, stderr: '', timedOut: false });
+    expect(JSON.parse(held.stdout)).toEqual({
+      mode: 'hold', operation: 'runtime-adoption', reasonCode: 'RUNTIME_OWNERSHIP_MISMATCH',
+    });
+    expect(held.stdout).not.toContain(root);
+    expect(held.stdout).not.toMatch(RAW_IDENTITIES);
+    expectSnapshot(sourceBefore);
+    expectSnapshot(targetBefore);
+    expect(readdirSync(join(root, '.deckent')).sort()).toEqual([
+      'provider-execution-observations-v1.db', 'provider-execution-observations.db',
+    ]);
+    expect(tempResidue(root)).toEqual([]);
+  }, 30_000);
+
   it('proves inspect → dry-run → apply → fresh-process replay with a canonical durable receipt and zero database mutation', async () => {
     const root = createFixture();
     const sourcePath = join(root, PREIMAGE);

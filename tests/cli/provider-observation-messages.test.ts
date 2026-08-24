@@ -35,6 +35,16 @@ const adoptionCases = [
   ['provider_observation.adoption.hold', ['detail', 'reasonCode']],
 ] as const satisfies readonly (readonly [string, readonly string[]])[];
 
+const runtimeAdoptionCases = [
+  ['provider_observation.runtime_adoption.preimage', []],
+  ['provider_observation.runtime_adoption.apply', []],
+  ['provider_observation.runtime_adoption.plan_digest', []],
+  ['provider_observation.runtime_adoption.dry_run', ['planDigest']],
+  ['provider_observation.runtime_adoption.receipt_persisted', ['providerReceiptId', 'runtimeReceiptId']],
+  ['provider_observation.runtime_adoption.replay_verified', ['providerReceiptId', 'runtimeReceiptId']],
+  ['provider_observation.runtime_adoption.hold', ['reasonCode']],
+] as const satisfies readonly (readonly [string, readonly string[]])[];
+
 function placeholders(template: string): string[] {
   return [...template.matchAll(/\{(\w+)\}/gu)]
     .map((match) => match[1]!)
@@ -99,6 +109,28 @@ describe('provider-observation adoption receipt messages', () => {
     for (const lang of ['en', 'tr'] as const) {
       expect(placeholders(getMessage(key, lang)))
         .not.toEqual(expect.arrayContaining([expect.stringMatching(forbiddenIdentityFields)]));
+    }
+  });
+});
+
+describe('provider-observation runtime-adoption messages', () => {
+  it.each(runtimeAdoptionCases)('%s has exact, distinct EN/TR entries', (key) => {
+    expect(MESSAGE_KEYS).toContain(key);
+    expect([...getMessageLanguages(key)].sort()).toEqual(['en', 'tr']);
+    expect(getMessage(key, 'en')).not.toBe(getMessage(key, 'tr'));
+  });
+
+  it.each(runtimeAdoptionCases)('%s pins its bounded placeholder contract', (key, expected) => {
+    for (const language of ['en', 'tr'] as const) {
+      expect(placeholders(getMessage(key, language))).toEqual([...expected].sort());
+    }
+  });
+
+  it.each(runtimeAdoptionCases)('%s never asks for a raw identity or path', (key) => {
+    for (const language of ['en', 'tr'] as const) {
+      expect(placeholders(getMessage(key, language))).not.toEqual(expect.arrayContaining([
+        expect.stringMatching(/^(?:account|email|identity|path|provider|secret|tenant|token|user|\w+Path)$/iu),
+      ]));
     }
   });
 });

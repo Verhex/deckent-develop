@@ -563,8 +563,13 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-24 Cursor production wiring: count unchanged, digest only — the
   // Docker probe now exercises the logical-provider auth bridge and the fan-in
   // suite uses async-disposable tmpdirs. No new unresolved effect is admitted.
-  count: 15823,
-  digest: '216a921e4801442796e9a0dd6df4e5267a677bcd7b44cdcfdbab4ac4342bd0fe',
+  // 2026-08-24 runtime-adoption closure: +16 — immutable receipt, compiled
+  // entrypoint, process-ownership and database byte-stability suites exercise
+  // suite-owned tmpdir/SQLite stores, permission/symlink fault injection and
+  // bounded child processes. The source-derived scan reports zero confirmed
+  // live-authority violations; no repository runtime state is test-owned.
+  count: 15839,
+  digest: 'd3ec8ab4a2de71046ec42229488d3b2b1e0421f8ae14a42f28354654b7222f2e',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1003,8 +1008,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // consumer wiring. No new production module entered the inventory.
   // Root consumer repair keeps the count unchanged and bounds unsupported
   // remote-catalog diagnostics to one deterministic aggregate warning.
-  count: 1309,
-  digest: '59c9a39bacf828c82c87c2ee2915c0a7115d98490a9bbd48c0c17065330386fd',
+  // 2026-08-24 runtime-adoption closure: +2 — the canonical composite plan
+  // contract and immutable no-replace/fsync receipt store enter production
+  // inventory; CLI, build identity and bot ownership consumers move content.
+  count: 1311,
+  digest: '24d140077fa1a14a82b911e8c6af63ca8ad368a77e0e157291f0dce37f9e1941',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

@@ -8,6 +8,7 @@ import type { Sprint, Task, TaskResult } from '../../src/core/types.js';
 import {
   FinalizerTerminalEvidenceError,
   buildFinalizerTerminalTruth,
+  publishFencedAbortedSprintTerminalReceipt,
   publishFencedSprintTerminalReceipt,
 } from '../../src/orchestra/sprint-finalizer.js';
 
@@ -87,7 +88,7 @@ describe('finalizer task terminal projection wiring', () => {
     expect(existsSync(publication.artifactPath)).toBe(true);
   });
 
-  it('projects terminal failure but holds COMPLETE receipt publication', () => {
+  it('holds a rejected COMPLETE receipt before mutating task terminal projections', () => {
     const projectRoot = root();
     const failed = task('621-002', 'PENDING');
     persistTasks(projectRoot, [failed]);
@@ -102,9 +103,53 @@ describe('finalizer task terminal projection wiring', () => {
     })).toThrow(FinalizerTerminalEvidenceError);
 
     expect(JSON.parse(readFileSync(join(projectRoot, '.tasks', 'task-621-002.json'), 'utf-8')))
-      .toMatchObject({ status: 'NO_GO', terminalProjection: { terminal: 'NO_GO', winnerAttemptId: 'attempt-failed' } });
+      .toMatchObject({ status: 'PENDING' });
+    expect(JSON.parse(readFileSync(join(projectRoot, '.tasks', 'task-621-002.json'), 'utf-8')))
+      .not.toHaveProperty('terminalProjection');
     expect(existsSync(join(projectRoot, '.deckent', 'recently-works', 'sprint-621-terminal-receipt.json')))
       .toBe(false);
+  });
+
+  it('keeps exact task truth when a later recovery generation aborts the outer run', () => {
+    const projectRoot = root();
+    const done = task('621-004', 'DONE');
+    const failed = task('621-005', 'NO_GO');
+    for (const [item, attemptId, terminal] of [
+      [done, 'attempt-done', 'DONE'],
+      [failed, 'attempt-failed', 'NO_GO'],
+    ] as const) {
+      writeFileSync(join(projectRoot, '.tasks', `task-${item.id}.json`), JSON.stringify({
+        ...item,
+        terminalProjection: {
+          logicalTaskId: item.id, generation: 1, winnerAttemptId: attemptId,
+          terminal, status: terminal, cascadeSkipped: false, neverDispatched: false,
+        },
+      }, null, 2));
+    }
+    const truth = buildFinalizerTerminalTruth({
+      tasks: [done, failed],
+      evaluations: new Map([
+        ['621-004', TaskEvaluation.DONE],
+        ['621-005', TaskEvaluation.NO_GO],
+      ]),
+      results: [result('621-004', 'attempt-done', 'DONE'), result('621-005', 'attempt-failed', 'NO_GO')],
+    });
+
+    const publication = publishFencedAbortedSprintTerminalReceipt({
+      projectRoot,
+      sprint: sprint([done, failed]),
+      truth,
+      coordinatorGeneration: 6,
+    });
+
+    expect(publication.receipt).toMatchObject({
+      terminalOutcome: 'ABORTED',
+      coordinatorGeneration: 6,
+    });
+    expect(JSON.parse(readFileSync(join(projectRoot, '.tasks', 'task-621-004.json'), 'utf-8')))
+      .toMatchObject({ terminalProjection: { generation: 1, terminal: 'DONE' } });
+    expect(JSON.parse(readFileSync(join(projectRoot, '.tasks', 'task-621-005.json'), 'utf-8')))
+      .toMatchObject({ terminalProjection: { generation: 1, terminal: 'NO_GO' } });
   });
 
   it('fails closed on a foreign generation instead of blind rewriting or publishing', () => {

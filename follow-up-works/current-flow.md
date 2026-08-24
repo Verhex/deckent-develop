@@ -6,9 +6,9 @@
 ## Canlı truth
 
 - `DOGFOOD_MODE=ON`, `WORKSPACE_MODE=MAIN`, `DELIVERY_MODE=DIRECT_MAIN`.
-- Aktif run yok. Son outcome run'ı `sprint-639`: 4-task paralel Cursor production DAG'ı terminal
-  `COMPLETE`; canonical archive 79/79 artifact, manifest digest, terminal seal ve Brain adoption
-  doğrulaması yeşil.
+- Aktif run yok. Son outcome run'ı `sprint-641`: 5-task runtime-adoption DAG'ı active-run build
+  yasağını ihlal eden fan-in nedeniyle dürüst `ABORTED`; dört implementation lineage'ı settled,
+  finalizer generation/task-truth recovery'si ve post-terminal production fan-in root seam'de kapandı.
 - Provider observation reconciliation canlı uygulandı: 19 active-open interval'ın exact
   run/attempt settlement sahibi olan 15'i digest-bound plan + interactive approval + immutable
   receipt ile `retired=true` oldu; dört `sprint-488` legacy-unowned interval forensic `HOLD`
@@ -16,6 +16,9 @@
   interval'ı projekte ediyor.
 - Bot daemon build sonrası yeniden başlatıldı ve ownership-bound PID ile çalışıyor. Pending
   approval yok.
+- Source→dist→provider runtime adoption production-wired: immutable composite receipt provider
+  receipt + current DB lineage + source/build/entrypoint digest + canlı PID/start token'ı bağlıyor;
+  real dist dry-run→apply→fresh-process replay aynı receipt'i verdi, DB/WAL/SHM değişmedi.
 - 7091 production image/entrypoint dilimi canlı: `deckent-worker:latest` image içinde Cursor CLI
   non-root UID/GID ile çalışıyor ve yalnız read-only `auth.json` taşıyan isolated login smoke'u
   yeşil. Outer 7091 DONE değildir: gerçek xverify canonical account authority stub'ında HOLD;
@@ -30,11 +33,13 @@
 
 ## Done-ready sayacı
 
-- 2/20 — canonical terminal archive/finalizer acceptance + provider-observation reconciliation.
+- 3/20 — canonical terminal archive/finalizer acceptance + provider-observation reconciliation +
+  source/dist/provider runtime adoption.
 
 ## Sıradaki yürütme sırası
 
-1. Provider resetini beklerken Closure OS truth-sync → source/dist/provider adoption.
+1. Sprint-641'den kalan dört exact-owned provider interval'ı digest-bound plan + interactive
+   approval + immutable reconciliation receipt ile kapat; legacy dört sprint-488 interval'ı koru.
 2. `2026-08-24 20:00 Europe/Istanbul` sonrasında runtime hygiene different-provider XVerify.
 3. Aynı reset sonrasında D4 Approval Lifecycle formal XVerify/closure; ardından D5 retirement.
 4. 7094 prefix/F2c default-ON ölçümü: measuredHitRatio + provider-reported USD.

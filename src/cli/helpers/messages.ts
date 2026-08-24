@@ -924,6 +924,34 @@ const MESSAGES: MessageMap = {
     en: 'ADOPTION_HOLD ({reasonCode}): {detail}. No receipt was persisted and existing provider observations were preserved.',
     tr: 'ADOPTION_HOLD ({reasonCode}): {detail}. Receipt kalıcılaştırılmadı ve mevcut provider observation kayıtları korundu.',
   },
+  'provider_observation.runtime_adoption.preimage': {
+    en: 'Project-relative immutable schema-v1 provider-observation preimage.',
+    tr: 'Proje göreli değişmez şema-v1 provider-observation ön görüntüsü.',
+  },
+  'provider_observation.runtime_adoption.apply': {
+    en: 'Publish the provider and composite runtime-adoption receipts for the exact plan.',
+    tr: 'Tam plan için provider ve bileşik runtime-adoption makbuzlarını yayımla.',
+  },
+  'provider_observation.runtime_adoption.plan_digest': {
+    en: 'Exact SHA-256 digest from the runtime-adoption dry-run.',
+    tr: 'Runtime-adoption dry-run çıktısındaki tam SHA-256 özeti.',
+  },
+  'provider_observation.runtime_adoption.dry_run': {
+    en: 'Runtime-adoption dry-run verified; plan {planDigest}; nothing was written.',
+    tr: 'Runtime-adoption dry-run doğrulandı; plan {planDigest}; hiçbir şey yazılmadı.',
+  },
+  'provider_observation.runtime_adoption.receipt_persisted': {
+    en: 'Runtime adoption persisted provider receipt {providerReceiptId} and composite receipt {runtimeReceiptId}.',
+    tr: 'Runtime adoption provider makbuzu {providerReceiptId} ve bileşik makbuz {runtimeReceiptId} kalıcılaştırıldı.',
+  },
+  'provider_observation.runtime_adoption.replay_verified': {
+    en: 'Runtime adoption replay verified provider receipt {providerReceiptId} and composite receipt {runtimeReceiptId}.',
+    tr: 'Runtime adoption replay’i provider makbuzu {providerReceiptId} ve bileşik makbuz {runtimeReceiptId} için doğrulandı.',
+  },
+  'provider_observation.runtime_adoption.hold': {
+    en: 'RUNTIME_ADOPTION_HOLD ({reasonCode}): no database was changed and no composite receipt was accepted.',
+    tr: 'RUNTIME_ADOPTION_HOLD ({reasonCode}): hiçbir veritabanı değiştirilmedi ve hiçbir bileşik makbuz kabul edilmedi.',
+  },
   'provider_observation.migration.already_v2': {
     en: 'Provider observations already use schema v2; no migration was required.',
     tr: 'Provider observation kayıtları zaten şema v2 kullanıyor; migration gerekmedi.',

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 import {
   BUILD_IDENTITY_RELATIVE_PATH,
@@ -11,6 +12,7 @@ import {
 import {
   buildSourceTreeIdentity as buildRuntimeSourceTreeIdentity,
   parseBuildIdentity,
+  readRuntimeBuildIdentity,
 } from '../../src/cli/worktree-binary-authority.js';
 
 const roots: string[] = [];
@@ -46,6 +48,9 @@ describe('copy-assets build identity', () => {
       .update(realpathSync.native(root))
       .digest('hex');
     const sourceTree = buildSourceTreeIdentity(root);
+    const entrypoint = join(root, 'dist', 'cli', 'entry.js');
+    mkdirSync(join(root, 'dist', 'cli'), { recursive: true });
+    writeFileSync(entrypoint, 'export {};\n');
     expect(buildRuntimeSourceTreeIdentity(root)).toEqual(sourceTree);
 
     expect(written).toBe(join(root, BUILD_IDENTITY_RELATIVE_PATH));
@@ -58,6 +63,16 @@ describe('copy-assets build identity', () => {
       sourceTreeFileCount: sourceTree.sourceTreeFileCount,
     });
     expect(raw).not.toContain(root);
+    expect(readRuntimeBuildIdentity({
+      projectRoot: root,
+      runtimeModuleUrl: pathToFileURL(entrypoint).href,
+    })).toMatchObject({
+      status: 'adopt',
+      binding: {
+        buildIdentitySha256: createHash('sha256').update(raw).digest('hex'),
+        entrypointSha256: createHash('sha256').update('export {};\n').digest('hex'),
+      },
+    });
 
     const first = raw;
     writeBuildIdentity(root);

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
@@ -9,6 +10,7 @@ import {
   buildSourceTreeIdentity,
   evaluateWorktreeBinaryAuthority,
   parseBuildIdentity,
+  readRuntimeBuildIdentity,
   resolveWorktreeBinaryAuthority,
   shouldCheckWorktreeBinaryAuthority,
   type DeckentBuildIdentity,
@@ -51,6 +53,14 @@ function foreignIdentity(): DeckentBuildIdentity {
   const root = makeRoot('deckent-stale-build');
   makeDeckentCheckout(root);
   return identityFor(root);
+}
+
+function writeDist(root: string, identity: DeckentBuildIdentity): string {
+  const entrypoint = join(root, 'dist', 'cli', 'entry.js');
+  mkdirSync(join(root, 'dist', 'cli'), { recursive: true });
+  writeFileSync(entrypoint, '#!/usr/bin/env node\nconsole.log("fixture");\n');
+  writeFileSync(join(root, 'dist', 'build-identity.json'), `${JSON.stringify(identity)}\n`);
+  return entrypoint;
 }
 
 afterEach(() => {
@@ -291,5 +301,83 @@ describe('worktree authority invocation classification', () => {
     ['unknown-command'],
   ])('checks operational invocation %j', (...args) => {
     expect(shouldCheckWorktreeBinaryAuthority(['node', 'deckent', ...args])).toBe(true);
+  });
+});
+
+describe('fresh runtime build-identity read model', () => {
+  it('returns a normalized binding to the exact manifest, source tree, and entrypoint bytes', () => {
+    const root = makeRoot('deckent-runtime-binding');
+    const identity = identityFor(root);
+    const entrypoint = writeDist(root, identity);
+    const result = readRuntimeBuildIdentity({
+      projectRoot: root,
+      runtimeModuleUrl: pathToFileURL(entrypoint).href,
+    });
+
+    expect(result).toEqual({
+      status: 'adopt',
+      binding: {
+        runtimePackageRoot: root,
+        entrypointPath: entrypoint,
+        buildIdentityPath: join(root, 'dist', 'build-identity.json'),
+        buildIdentity: identity,
+        currentSourceTreeIdentity: {
+          sourceTreeSha256: identity.sourceTreeSha256,
+          sourceTreeFileCount: identity.sourceTreeFileCount,
+        },
+        buildIdentitySha256: createHash('sha256')
+          .update(`${JSON.stringify(identity)}\n`)
+          .digest('hex'),
+        entrypointSha256: createHash('sha256')
+          .update('#!/usr/bin/env node\nconsole.log("fixture");\n')
+          .digest('hex'),
+      },
+    });
+    expect(result.status === 'adopt' && Object.isFrozen(result.binding)).toBe(true);
+  });
+
+  it('never manufactures a dist identity for direct source execution', () => {
+    const root = makeRoot('deckent-source-binding');
+    identityFor(root);
+
+    expect(readRuntimeBuildIdentity({
+      projectRoot: root,
+      runtimeModuleUrl: pathToFileURL(join(root, 'src', 'entry.ts')).href,
+    })).toEqual({ status: 'hold', issue: 'runtime-not-checkout-dist' });
+  });
+
+  it('holds when the executing module is another checkout or current sources drift', () => {
+    const root = makeRoot('deckent-binding-root');
+    const identity = identityFor(root);
+    const entrypoint = writeDist(root, identity);
+    const other = makeRoot('deckent-binding-other');
+    const otherEntrypoint = writeDist(other, identityFor(other));
+
+    expect(readRuntimeBuildIdentity({
+      projectRoot: root,
+      runtimeModuleUrl: pathToFileURL(otherEntrypoint).href,
+    })).toEqual({ status: 'hold', issue: 'runtime-not-checkout-dist' });
+
+    writeFileSync(join(root, 'src', 'entry.ts'), 'export const value = 99;\n');
+    expect(readRuntimeBuildIdentity({
+      projectRoot: root,
+      runtimeModuleUrl: pathToFileURL(entrypoint).href,
+    })).toEqual({ status: 'hold', issue: 'build-source-mismatch' });
+  });
+
+  it.skipIf(process.platform === 'win32')('rejects a symlinked build identity instead of hashing its target', () => {
+    const root = makeRoot('deckent-symlinked-manifest');
+    const identity = identityFor(root);
+    const entrypoint = writeDist(root, identity);
+    const manifest = join(root, 'dist', 'build-identity.json');
+    const target = join(root, 'identity-target.json');
+    rmSync(manifest);
+    writeFileSync(target, `${JSON.stringify(identity)}\n`);
+    symlinkSync(target, manifest);
+
+    expect(readRuntimeBuildIdentity({
+      projectRoot: root,
+      runtimeModuleUrl: pathToFileURL(entrypoint).href,
+    })).toEqual({ status: 'hold', issue: 'build-identity-unsafe' });
   });
 });
