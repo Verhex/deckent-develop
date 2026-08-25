@@ -13,6 +13,9 @@ different products.
 
 Load deckent-design-dna first.
 
+Apply the current owner decision ratchet loaded by deckent-design-dna. Refine accepted product
+semantics; do not restart direction exploration with rejected shells, modes or surface roles.
+
 ## Evidence to inspect
 
 - Current identity and primary-surface authority

@@ -1,0 +1,885 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Deckent Desktop — Rejected Basic State Language Exploration</title>
+  <style>
+    @font-face {
+      font-family: "Bricolage";
+      src: url("../../../src/desktop/src/renderer/fonts/bricolage-latin-ext.woff2") format("woff2");
+      font-style: normal;
+      font-weight: 400 700;
+      font-display: swap;
+      unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+    }
+    @font-face {
+      font-family: "Bricolage";
+      src: url("../../../src/desktop/src/renderer/fonts/bricolage-latin.woff2") format("woff2");
+      font-style: normal;
+      font-weight: 400 700;
+      font-display: swap;
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+    }
+    @font-face {
+      font-family: "Geist Mono";
+      src: url("../../../src/desktop/src/renderer/fonts/geistmono-latin-ext.woff2") format("woff2");
+      font-style: normal;
+      font-weight: 400 600;
+      font-display: swap;
+      unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+    }
+    @font-face {
+      font-family: "Geist Mono";
+      src: url("../../../src/desktop/src/renderer/fonts/geistmono-latin.woff2") format("woff2");
+      font-style: normal;
+      font-weight: 400 600;
+      font-display: swap;
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+    }
+
+    :root {
+      color-scheme: light;
+      --font-ui: "Bricolage", "Segoe UI", Arial, sans-serif;
+      --font-data: "Geist Mono", "SFMono-Regular", Consolas, monospace;
+      --frame: #111819;
+      --frame-2: #192123;
+      --frame-3: #263033;
+      --frame-text: #eef2ee;
+      --frame-muted: #93a09d;
+      --canvas: #e9ede9;
+      --paper: #fafbf7;
+      --paper-2: #f2f4ef;
+      --ink: #172022;
+      --ink-2: #465255;
+      --ink-3: #6c7777;
+      --line: #cbd2ce;
+      --line-2: #aeb9b4;
+      --oxide: #b74a30;
+      --oxide-dark: #81341f;
+      --oxide-soft: #f3dfd7;
+      --caution: #94630d;
+      --caution-soft: #f3e7c9;
+      --danger: #98383d;
+      --danger-soft: #f2dadd;
+      --proof: #286a60;
+      --proof-soft: #daebe5;
+      --unknown: #59666a;
+      --focus: #16728a;
+      --shadow: 0 14px 34px rgba(21, 31, 33, .09);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      min-width: 1120px;
+      background: var(--frame);
+      color: var(--ink);
+      font: 14px/1.45 var(--font-ui);
+      font-feature-settings: "ss01" 1, "ss02" 1;
+    }
+    button { font: inherit; }
+    button:focus-visible, [tabindex]:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 3px;
+    }
+
+    .topbar {
+      height: 62px;
+      padding: 0 28px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      color: var(--frame-text);
+      border-bottom: 1px solid var(--frame-3);
+      background: var(--frame);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      min-width: 250px;
+      font-size: 15px;
+      font-weight: 650;
+      letter-spacing: -.015em;
+    }
+    .mark {
+      width: 20px;
+      height: 20px;
+      position: relative;
+      border: 1px solid #80908d;
+      transform: rotate(45deg);
+    }
+    .mark::after {
+      content: "";
+      position: absolute;
+      inset: 5px;
+      background: var(--oxide);
+    }
+    .lab-title {
+      padding-left: 18px;
+      border-left: 1px solid var(--frame-3);
+      color: var(--frame-muted);
+      font-size: 12px;
+      letter-spacing: .04em;
+    }
+    .topbar-spacer { flex: 1; }
+    .scope {
+      color: #c8d0cd;
+      font: 11px/1 var(--font-data);
+      letter-spacing: .035em;
+    }
+
+    .controlbar {
+      min-height: 54px;
+      padding: 8px 28px;
+      display: flex;
+      align-items: center;
+      gap: 22px;
+      color: var(--frame-text);
+      background: var(--frame-2);
+      border-bottom: 1px solid var(--frame-3);
+    }
+    .control-group { display: flex; align-items: center; gap: 8px; }
+    .control-label {
+      margin-right: 4px;
+      color: var(--frame-muted);
+      font: 10px/1 var(--font-data);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .controlbar button {
+      min-height: 32px;
+      padding: 6px 11px;
+      border: 1px solid #394447;
+      border-radius: 3px;
+      color: #b9c3c0;
+      background: transparent;
+      cursor: pointer;
+    }
+    .controlbar button[aria-pressed="true"] {
+      border-color: #7a8986;
+      color: #fff;
+      background: #2b3537;
+      box-shadow: inset 0 -2px 0 var(--oxide);
+    }
+    .controlbar button:hover { border-color: #6f7d7a; color: #fff; }
+    .scenario-note {
+      margin-left: auto;
+      color: var(--frame-muted);
+      font-size: 12px;
+    }
+
+    main {
+      min-height: calc(100vh - 116px);
+      padding: 30px 30px 48px;
+      background:
+        linear-gradient(rgba(103, 115, 112, .055) 1px, transparent 1px),
+        var(--canvas);
+      background-size: 100% 24px;
+    }
+    .intro {
+      max-width: 1460px;
+      margin: 0 auto 24px;
+      display: grid;
+      grid-template-columns: minmax(400px, 1.1fr) minmax(520px, 1fr);
+      gap: 34px;
+      align-items: end;
+    }
+    .kicker {
+      margin: 0 0 8px;
+      color: var(--oxide-dark);
+      font: 600 10px/1 var(--font-data);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    h1 {
+      max-width: 760px;
+      margin: 0;
+      font-size: clamp(27px, 2.1vw, 38px);
+      line-height: 1.02;
+      font-weight: 590;
+      letter-spacing: -.035em;
+    }
+    .intro-copy {
+      max-width: 700px;
+      margin: 13px 0 0;
+      color: var(--ink-2);
+      font-size: 15px;
+    }
+
+    .truth-strip {
+      border-top: 1px solid var(--line-2);
+      border-bottom: 1px solid var(--line-2);
+      background: rgba(250, 251, 247, .58);
+    }
+    .truth-heading {
+      display: flex;
+      align-items: baseline;
+      gap: 9px;
+      padding: 9px 0 7px;
+      border-bottom: 1px solid var(--line);
+    }
+    .truth-heading strong { font-size: 12px; }
+    .truth-heading span { color: var(--ink-3); font-size: 11px; }
+    .truth-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+    .truth-axis { padding: 9px 12px 11px 0; }
+    .truth-axis + .truth-axis { padding-left: 12px; border-left: 1px solid var(--line); }
+    .axis-name {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--ink-3);
+      font: 9px/1 var(--font-data);
+      letter-spacing: .09em;
+      text-transform: uppercase;
+    }
+    .axis-value {
+      display: block;
+      font: 600 11px/1.25 var(--font-data);
+      letter-spacing: -.01em;
+    }
+
+    .directions {
+      max-width: 1460px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      align-items: start;
+    }
+    .direction {
+      min-width: 0;
+      border: 1px solid var(--line-2);
+      background: var(--paper);
+      box-shadow: var(--shadow);
+    }
+    .direction.recommended { border-top: 3px solid var(--oxide); }
+    .direction:not(.recommended) { border-top: 3px solid #667371; }
+    .direction-head {
+      min-height: 125px;
+      padding: 18px 19px 16px;
+      border-bottom: 1px solid var(--line);
+      background: var(--paper-2);
+    }
+    .direction-id {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--ink-3);
+      font: 10px/1 var(--font-data);
+      letter-spacing: .09em;
+      text-transform: uppercase;
+    }
+    .direction-id .recommendation {
+      color: var(--oxide-dark);
+      font-weight: 650;
+    }
+    .direction h2 {
+      margin: 13px 0 4px;
+      font-size: 20px;
+      line-height: 1.05;
+      letter-spacing: -.025em;
+    }
+    .direction-head p { margin: 0; color: var(--ink-2); font-size: 12px; }
+    .specimen { min-height: 420px; }
+    .specimen-context {
+      padding: 13px 18px 12px;
+      border-bottom: 1px solid var(--line);
+    }
+    .object-id {
+      color: var(--ink-3);
+      font: 10px/1.2 var(--font-data);
+      letter-spacing: .04em;
+    }
+    .object-name {
+      margin-top: 5px;
+      font-size: 16px;
+      font-weight: 620;
+      letter-spacing: -.02em;
+    }
+    .object-impact { margin-top: 4px; color: var(--ink-2); font-size: 12px; }
+
+    /* Direction A — Operational Index */
+    .index-state {
+      display: grid;
+      grid-template-columns: 105px minmax(0, 1fr);
+      min-height: 216px;
+      border-bottom: 1px solid var(--line);
+    }
+    .index-margin {
+      position: relative;
+      padding: 18px 12px 16px 18px;
+      color: var(--ink);
+      background: #e8ece7;
+      border-right: 1px solid var(--line-2);
+      overflow: hidden;
+    }
+    .index-margin::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; bottom: 0;
+      width: 5px;
+      background: var(--proof);
+    }
+    body[data-scenario="approval"] .index-margin::before { background: var(--caution); }
+    body[data-scenario="degraded"] .index-margin::before { background: var(--danger); }
+    .index-no {
+      color: var(--ink-3);
+      font: 10px/1 var(--font-data);
+    }
+    .index-verb {
+      margin-top: 48px;
+      font-size: 18px;
+      line-height: .95;
+      font-weight: 680;
+      letter-spacing: -.025em;
+      text-transform: uppercase;
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+    }
+    .index-main { padding: 19px 18px; }
+    .index-main h3 {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.14;
+      letter-spacing: -.024em;
+    }
+    .index-main p { margin: 9px 0 18px; color: var(--ink-2); font-size: 13px; }
+    .index-records { border-top: 1px solid var(--line); }
+    .index-record {
+      display: grid;
+      grid-template-columns: 76px 1fr;
+      gap: 8px;
+      padding: 7px 0;
+      border-bottom: 1px solid var(--line);
+      font: 10px/1.25 var(--font-data);
+    }
+    .index-record:last-child { border-bottom: 0; }
+    .index-record span:first-child { color: var(--ink-3); text-transform: uppercase; }
+    .index-record span:last-child { font-weight: 600; }
+    .index-next {
+      padding: 15px 18px 17px;
+      background: var(--paper-2);
+    }
+    .next-label {
+      color: var(--ink-3);
+      font: 9px/1 var(--font-data);
+      letter-spacing: .09em;
+      text-transform: uppercase;
+    }
+    .next-value { margin-top: 6px; font-size: 13px; font-weight: 620; }
+
+    /* Direction B — Transition Trace */
+    .trace-state { min-height: 216px; padding: 20px 18px 17px; border-bottom: 1px solid var(--line); }
+    .trace-heading {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .trace-heading strong { font-size: 17px; letter-spacing: -.02em; }
+    .trace-age { color: var(--ink-3); font: 10px/1 var(--font-data); }
+    .trace-copy { min-height: 39px; margin: 7px 0 17px; color: var(--ink-2); font-size: 12px; }
+    .track {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      margin: 7px 0 18px;
+    }
+    .track-step { position: relative; min-width: 0; }
+    .track-step::before {
+      content: "";
+      position: absolute;
+      top: 6px;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: var(--line-2);
+    }
+    .track-step:first-child::before { left: 7px; }
+    .track-step:last-child::before { right: calc(100% - 7px); }
+    .track-node {
+      position: relative;
+      z-index: 1;
+      width: 13px;
+      height: 13px;
+      border: 1px solid var(--ink-3);
+      background: var(--paper);
+      transform: rotate(45deg);
+    }
+    .track-step.done .track-node { border-color: var(--proof); background: var(--proof); }
+    .track-step.current .track-node { width: 15px; height: 15px; margin-top: -1px; border: 3px double var(--ink); }
+    body[data-scenario="approval"] .track-step.current .track-node { border-color: var(--caution); background: var(--caution-soft); }
+    body[data-scenario="degraded"] .track-step.current .track-node { border-color: var(--danger); background: var(--danger-soft); }
+    .track-label {
+      display: block;
+      max-width: 78px;
+      margin-top: 10px;
+      padding-right: 5px;
+      color: var(--ink-3);
+      font: 9px/1.2 var(--font-data);
+      text-transform: uppercase;
+    }
+    .track-step.current .track-label { color: var(--ink); font-weight: 650; }
+    .trace-proof {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+    .trace-proof div { padding: 8px 0; }
+    .trace-proof div + div { padding-left: 10px; border-left: 1px solid var(--line); }
+    .trace-proof small { display: block; color: var(--ink-3); font: 9px/1 var(--font-data); text-transform: uppercase; }
+    .trace-proof strong { display: block; margin-top: 4px; font: 600 10px/1.25 var(--font-data); }
+    .trace-next {
+      min-height: 93px;
+      padding: 15px 18px;
+      display: grid;
+      grid-template-columns: 18px 1fr;
+      gap: 10px;
+      background: var(--paper-2);
+    }
+    .trace-arrow { color: var(--oxide-dark); font: 18px/1 var(--font-data); }
+    .trace-next strong { display: block; font-size: 13px; }
+    .trace-next span { display: block; margin-top: 3px; color: var(--ink-3); font-size: 11px; }
+
+    /* Direction C — Exception Field */
+    .field-state { min-height: 216px; border-bottom: 1px solid var(--line); }
+    .field-signal {
+      min-height: 74px;
+      display: grid;
+      grid-template-columns: 14px 1fr;
+      border-bottom: 1px solid var(--line);
+    }
+    .signal-rail { background: #64716f; }
+    body[data-scenario="approval"] .signal-rail {
+      background: repeating-linear-gradient(-45deg, var(--caution) 0 5px, #d5b05f 5px 9px);
+    }
+    body[data-scenario="degraded"] .signal-rail {
+      background: repeating-linear-gradient(-45deg, var(--danger) 0 5px, #d18d91 5px 9px);
+    }
+    .signal-copy { padding: 14px 16px 13px; }
+    .signal-code {
+      color: var(--ink-3);
+      font: 650 10px/1 var(--font-data);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    body[data-scenario="approval"] .signal-code { color: var(--caution); }
+    body[data-scenario="degraded"] .signal-code { color: var(--danger); }
+    .signal-copy strong { display: block; margin-top: 7px; font-size: 16px; line-height: 1.12; letter-spacing: -.02em; }
+    .field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .field-axis {
+      position: relative;
+      min-height: 71px;
+      padding: 12px 13px 11px 31px;
+      border-right: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+    .field-axis:nth-child(2n) { border-right: 0; }
+    .field-axis:nth-last-child(-n+2) { border-bottom: 0; }
+    .field-mark {
+      position: absolute;
+      top: 16px;
+      left: 13px;
+      width: 8px;
+      height: 8px;
+      border: 1px solid var(--ink-3);
+      background: transparent;
+    }
+    .field-axis[data-emphasis="true"] .field-mark { background: currentColor; transform: rotate(45deg); }
+    .field-axis small { display: block; color: var(--ink-3); font: 9px/1 var(--font-data); text-transform: uppercase; }
+    .field-axis strong { display: block; margin-top: 5px; font: 600 10px/1.3 var(--font-data); }
+    .field-next {
+      min-height: 93px;
+      padding: 14px 18px 16px;
+      background: var(--paper-2);
+    }
+    .field-next-line {
+      margin-top: 7px;
+      padding-left: 13px;
+      border-left: 3px solid #64716f;
+      font-size: 13px;
+      font-weight: 620;
+    }
+    body[data-scenario="approval"] .field-next-line { border-left-color: var(--caution); }
+    body[data-scenario="degraded"] .field-next-line { border-left-color: var(--danger); }
+
+    .direction-foot {
+      min-height: 126px;
+      padding: 15px 18px;
+      color: var(--ink-2);
+      border-top: 1px solid var(--line-2);
+      background: #e7ebe7;
+      font-size: 11px;
+    }
+    .direction-foot strong { display: block; margin-bottom: 5px; color: var(--ink); font-size: 12px; }
+    .tradeoff {
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid var(--line);
+      color: var(--ink-3);
+    }
+
+    .principles {
+      max-width: 1460px;
+      margin: 22px auto 0;
+      display: grid;
+      grid-template-columns: 1fr 2fr;
+      gap: 16px;
+      border-top: 1px solid var(--line-2);
+      padding-top: 17px;
+    }
+    .principles h2 { margin: 0; font-size: 18px; letter-spacing: -.02em; }
+    .principle-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+    .principle-grid div { padding-left: 12px; border-left: 2px solid var(--line-2); }
+    .principle-grid strong { display: block; font-size: 12px; }
+    .principle-grid span { display: block; margin-top: 3px; color: var(--ink-2); font-size: 11px; }
+
+    @media (max-width: 1280px) {
+      .directions { grid-template-columns: 1fr 1fr; }
+      .direction.recommended { grid-column: 1 / -1; }
+      .direction.recommended .specimen { min-height: 0; display: grid; grid-template-columns: .8fr 1.2fr; grid-template-rows: auto auto; }
+      .direction.recommended .specimen-context { border-right: 1px solid var(--line); border-bottom: 0; }
+      .direction.recommended .field-state { border-bottom: 0; border-right: 1px solid var(--line); }
+      .direction.recommended .field-next { grid-column: 1 / -1; border-top: 1px solid var(--line); }
+      .intro { grid-template-columns: 1fr; gap: 18px; }
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      .direction { transition: border-color 140ms ease, transform 140ms ease; }
+      .direction:hover { transform: translateY(-2px); }
+    }
+    @media (forced-colors: active) {
+      .signal-rail, .index-margin::before, .field-next-line, .track-node { forced-color-adjust: none; }
+      .direction { box-shadow: none; }
+    }
+  </style>
+</head>
+<body data-domain="software" data-scenario="operating">
+  <header class="topbar">
+    <div class="brand"><span class="mark" aria-hidden="true"></span> deckent</div>
+    <div class="lab-title">Rejected exploration · retained as design history</div>
+    <div class="topbar-spacer"></div>
+    <div class="scope">ACME / DELIVERY / PRODUCTION</div>
+  </header>
+
+  <nav class="controlbar" aria-label="Prototype controls">
+    <div class="control-group" aria-label="Domain">
+      <span class="control-label">Domain</span>
+      <button type="button" data-domain-value="software" aria-pressed="true">Software delivery</button>
+      <button type="button" data-domain-value="operations" aria-pressed="false">Commerce &amp; production</button>
+    </div>
+    <div class="control-group" aria-label="State snapshot">
+      <span class="control-label">Truth</span>
+      <button type="button" data-scenario-value="operating" aria-pressed="true">Expected path</button>
+      <button type="button" data-scenario-value="approval" aria-pressed="false">Decision boundary</button>
+      <button type="button" data-scenario-value="degraded" aria-pressed="false">Proof gap</button>
+    </div>
+    <div class="scenario-note">All three directions render the same five-axis snapshot.</div>
+  </nav>
+
+  <main>
+    <section class="intro">
+      <div>
+        <p class="kicker">Rejected · too complex for Basic</p>
+        <h1>This exploration is not an active product direction.</h1>
+        <p class="intro-copy">These directions remove rounded status pills and generic “on track / running / complete” labels. Healthy work recedes; authority, proof and outcome exposure gain weight only when they change the operator’s next decision.</p>
+      </div>
+      <div class="truth-strip" aria-label="Canonical state snapshot">
+        <div class="truth-heading"><strong>Canonical snapshot</strong><span>shared source for A / B / C</span></div>
+        <div class="truth-grid">
+          <div class="truth-axis"><span class="axis-name">Lifecycle</span><span class="axis-value" data-slot="lifecycle"></span></div>
+          <div class="truth-axis"><span class="axis-name">Freshness</span><span class="axis-value" data-slot="freshness"></span></div>
+          <div class="truth-axis"><span class="axis-name">Authority</span><span class="axis-value" data-slot="authority"></span></div>
+          <div class="truth-axis"><span class="axis-name">Evidence</span><span class="axis-value" data-slot="evidence"></span></div>
+          <div class="truth-axis"><span class="axis-name">Outcome</span><span class="axis-value" data-slot="outcome"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="directions" aria-label="State language directions">
+      <article class="direction">
+        <header class="direction-head">
+          <div class="direction-id"><span>Direction A / editorial register</span></div>
+          <h2>Operational Index</h2>
+          <p>State reads like a controlled industrial record: one strong verb in the margin, exact age and proof in aligned rows.</p>
+        </header>
+        <div class="specimen">
+          <div class="specimen-context">
+            <div class="object-id" data-slot="objectId"></div>
+            <div class="object-name" data-slot="objectName"></div>
+            <div class="object-impact" data-slot="impact"></div>
+          </div>
+          <div class="index-state">
+            <div class="index-margin">
+              <div class="index-no">STATE / 01</div>
+              <div class="index-verb" data-slot="indexVerb"></div>
+            </div>
+            <div class="index-main">
+              <h3 data-slot="headline"></h3>
+              <p data-slot="explanation"></p>
+              <div class="index-records">
+                <div class="index-record"><span>Observed</span><span data-slot="freshness"></span></div>
+                <div class="index-record"><span>Permission</span><span data-slot="authority"></span></div>
+                <div class="index-record"><span>Proof</span><span data-slot="evidence"></span></div>
+                <div class="index-record"><span>Promise</span><span data-slot="outcome"></span></div>
+              </div>
+            </div>
+          </div>
+          <div class="index-next"><div class="next-label">Operator posture</div><div class="next-value" data-slot="next"></div></div>
+        </div>
+        <footer class="direction-foot">
+          <strong>Best for repeatable scanning</strong>
+          Distinctive, compact and audit-adjacent. The vertical verb gives every row a stable visual address without turning it into a badge.
+          <div class="tradeoff">Risk: the large verb can overstate healthy work unless it becomes materially quieter on the expected path.</div>
+        </footer>
+      </article>
+
+      <article class="direction">
+        <header class="direction-head">
+          <div class="direction-id"><span>Direction B / process notation</span></div>
+          <h2>Transition Trace</h2>
+          <p>Status is represented by where work is in a governed transition, what moved, and what must be true before it moves again.</p>
+        </header>
+        <div class="specimen">
+          <div class="specimen-context">
+            <div class="object-id" data-slot="objectId"></div>
+            <div class="object-name" data-slot="objectName"></div>
+            <div class="object-impact" data-slot="impact"></div>
+          </div>
+          <div class="trace-state">
+            <div class="trace-heading"><strong data-slot="traceTitle"></strong><span class="trace-age" data-slot="freshness"></span></div>
+            <div class="trace-copy" data-slot="explanation"></div>
+            <div class="track" aria-label="Process position">
+              <div class="track-step done"><div class="track-node"></div><span class="track-label" data-stage="0"></span></div>
+              <div class="track-step done"><div class="track-node"></div><span class="track-label" data-stage="1"></span></div>
+              <div class="track-step current"><div class="track-node"></div><span class="track-label" data-stage="2"></span></div>
+              <div class="track-step"><div class="track-node"></div><span class="track-label" data-stage="3"></span></div>
+            </div>
+            <div class="trace-proof">
+              <div><small>Gate</small><strong data-slot="authority"></strong></div>
+              <div><small>Proof carried</small><strong data-slot="evidence"></strong></div>
+            </div>
+          </div>
+          <div class="trace-next"><div class="trace-arrow">↳</div><div><strong data-slot="transition"></strong><span data-slot="next"></span></div></div>
+        </div>
+        <footer class="direction-foot">
+          <strong>Best for process comprehension</strong>
+          It explains progression without a percentage and works across code, order and production domains.
+          <div class="tradeoff">Risk: stage tracks become noisy when many parallel branches or non-linear recovery paths appear.</div>
+        </footer>
+      </article>
+
+      <article class="direction recommended">
+        <header class="direction-head">
+          <div class="direction-id"><span>Direction C / deviation grammar</span><span class="recommendation">Recommended base</span></div>
+          <h2>Exception Field</h2>
+          <p>The normal path is quiet. A decision window or proof gap changes the row’s structure, not merely its color.</p>
+        </header>
+        <div class="specimen">
+          <div class="specimen-context">
+            <div class="object-id" data-slot="objectId"></div>
+            <div class="object-name" data-slot="objectName"></div>
+            <div class="object-impact" data-slot="impact"></div>
+          </div>
+          <div class="field-state">
+            <div class="field-signal">
+              <div class="signal-rail" aria-hidden="true"></div>
+              <div class="signal-copy"><span class="signal-code" data-slot="signal"></span><strong data-slot="headline"></strong></div>
+            </div>
+            <div class="field-grid">
+              <div class="field-axis"><span class="field-mark" aria-hidden="true"></span><small>Position</small><strong data-slot="lifecycle"></strong></div>
+              <div class="field-axis" data-axis="authority"><span class="field-mark" aria-hidden="true"></span><small>Decision</small><strong data-slot="authority"></strong></div>
+              <div class="field-axis" data-axis="evidence"><span class="field-mark" aria-hidden="true"></span><small>Proof</small><strong data-slot="evidence"></strong></div>
+              <div class="field-axis" data-axis="outcome"><span class="field-mark" aria-hidden="true"></span><small>Exposure</small><strong data-slot="outcome"></strong></div>
+            </div>
+          </div>
+          <div class="field-next"><div class="next-label">What changes the picture</div><div class="field-next-line" data-slot="next"></div></div>
+        </div>
+        <footer class="direction-foot">
+          <strong>Best fit for Basic</strong>
+          It spends attention only when the operator’s posture must change. Shape, position, texture and copy carry meaning before semantic color.
+          <div class="tradeoff">Recommendation: use C as the hierarchy; borrow A’s exact timestamp/proof alignment inside expanded rows and drawers.</div>
+        </footer>
+      </article>
+    </section>
+
+    <section class="principles">
+      <h2>One state grammar,<br>five honest axes.</h2>
+      <div class="principle-grid">
+        <div><strong>No universal green badge</strong><span>Expected work becomes ambient context; it does not compete with decisions.</span></div>
+        <div><strong>Exception changes geometry</strong><span>Decision and proof gaps alter rail, texture and information order—not just hue.</span></div>
+        <div><strong>Terminal can translate it</strong><span>The same state sentence maps later to text hierarchy and marks without copying Desktop pixels.</span></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const requestedDomain = params.get("domain");
+    const requestedScenario = params.get("scenario");
+    if (["software", "operations"].includes(requestedDomain)) document.body.dataset.domain = requestedDomain;
+    if (["operating", "approval", "degraded"].includes(requestedScenario)) document.body.dataset.scenario = requestedScenario;
+
+    const snapshots = {
+      software: {
+        operating: {
+          objectId: "REL-1.24.0 / WEB PLATFORM",
+          objectName: "August production release",
+          impact: "Customer rollout remains inside the 14:30 release promise.",
+          lifecycle: "ACTIVE / RELEASE CHECKS",
+          freshness: "LIVE / 8s",
+          authority: "POLICY-BOUND / ALLOWED",
+          evidence: "5 OF 8 CHECKS PRESENT",
+          outcome: "PROMISE HELD / 14:30",
+          indexVerb: "Moving",
+          traceTitle: "Release checks are advancing",
+          headline: "Execution remains inside the expected boundary.",
+          explanation: "Five independent checks are present. The next gate can proceed under the current release policy.",
+          next: "No intervention. Review when the final verification arrives.",
+          transition: "Verify → Release",
+          signal: "Expected path",
+          stages: ["Prepared", "Built", "Verify", "Release"]
+        },
+        approval: {
+          objectId: "REL-1.24.0 / WEB PLATFORM",
+          objectName: "August production release",
+          impact: "Release is held before the production publish boundary.",
+          lifecycle: "HELD / SAFE BOUNDARY",
+          freshness: "LIVE / 12s",
+          authority: "DECISION REQUIRED / 08:42",
+          evidence: "6 OF 8 CHECKS PRESENT",
+          outcome: "PROMISE PROTECTED UNTIL 08:42",
+          indexVerb: "Held",
+          traceTitle: "Publish cannot cross this gate",
+          headline: "A bounded production decision is waiting.",
+          explanation: "The signed artifact is ready; production publish remains stopped until an authorized operator decides.",
+          next: "Decide before 08:42 or keep the release at the safe boundary.",
+          transition: "Verify ⇥ Production gate",
+          signal: "Decision window / 08:42",
+          stages: ["Prepared", "Built", "Verified", "Publish"]
+        },
+        degraded: {
+          objectId: "REL-1.24.0 / WEB PLATFORM",
+          objectName: "August production release",
+          impact: "Registry confirmation is missing after the package handoff.",
+          lifecycle: "BLOCKED / RECONCILING",
+          freshness: "STALE / 48s",
+          authority: "RECOVERY ALLOWED / RETRY HELD",
+          evidence: "UNKNOWN AFTER OP-1948",
+          outcome: "PROMISE EXPOSED / +24m",
+          indexVerb: "Unproven",
+          traceTitle: "The last side effect is not proven",
+          headline: "The registry handoff has a proof gap.",
+          explanation: "Deckent cannot confirm whether operation OP-1948 completed. Blind retry remains disabled to prevent duplicate publication.",
+          next: "Reconcile OP-1948, then choose resume or bounded retry.",
+          transition: "Handoff ⇥ Reconciliation",
+          signal: "Proof gap / since 09:18:12",
+          stages: ["Prepared", "Built", "Handoff", "Publish"]
+        }
+      },
+      operations: {
+        operating: {
+          objectId: "SO-4821 / NORTH REGION",
+          objectName: "Order fulfillment promise",
+          impact: "Allocation and production remain inside today’s 14:30 dispatch promise.",
+          lifecycle: "ACTIVE / PRODUCTION",
+          freshness: "LIVE / 8s",
+          authority: "POLICY-BOUND / ALLOWED",
+          evidence: "5 OF 8 EVENTS PRESENT",
+          outcome: "PROMISE HELD / 14:30",
+          indexVerb: "Moving",
+          traceTitle: "Fulfillment is advancing",
+          headline: "Execution remains inside the expected boundary.",
+          explanation: "Material is allocated and the production slot is confirmed. No exception changes the operator posture.",
+          next: "No intervention. Review at production completion.",
+          transition: "Produce → Dispatch",
+          signal: "Expected path",
+          stages: ["Demand", "Allocated", "Produce", "Dispatch"]
+        },
+        approval: {
+          objectId: "SO-4821 / NORTH REGION",
+          objectName: "Order fulfillment promise",
+          impact: "Inventory remains reserved but cannot be committed without authority.",
+          lifecycle: "HELD / SAFE BOUNDARY",
+          freshness: "LIVE / 12s",
+          authority: "DECISION REQUIRED / 08:42",
+          evidence: "6 OF 8 EVENTS PRESENT",
+          outcome: "PROMISE PROTECTED UNTIL 08:42",
+          indexVerb: "Held",
+          traceTitle: "Allocation cannot cross this gate",
+          headline: "A bounded inventory decision is waiting.",
+          explanation: "The requested reserve exceeds the autonomous threshold. No inventory has been committed beyond the safe boundary.",
+          next: "Approve once before 08:42 or keep inventory uncommitted.",
+          transition: "Reserve ⇥ Allocation gate",
+          signal: "Decision window / 08:42",
+          stages: ["Demand", "Reserve", "Allocate", "Produce"]
+        },
+        degraded: {
+          objectId: "SO-4821 / NORTH REGION",
+          objectName: "Order fulfillment promise",
+          impact: "ERP confirmation is missing after inventory transaction TX-1948.",
+          lifecycle: "BLOCKED / RECONCILING",
+          freshness: "STALE / 48s",
+          authority: "RECOVERY ALLOWED / RETRY HELD",
+          evidence: "UNKNOWN AFTER TX-1948",
+          outcome: "PROMISE EXPOSED / +24m",
+          indexVerb: "Unproven",
+          traceTitle: "The last side effect is not proven",
+          headline: "The inventory handoff has a proof gap.",
+          explanation: "Deckent cannot confirm whether TX-1948 committed in the ERP. Blind retry remains disabled to prevent double allocation.",
+          next: "Reconcile TX-1948, then choose resume or bounded retry.",
+          transition: "Allocate ⇥ Reconciliation",
+          signal: "Proof gap / since 09:18:12",
+          stages: ["Demand", "Reserve", "Allocate", "Produce"]
+        }
+      }
+    };
+
+    const setPressed = (selector, value, attribute) => {
+      document.querySelectorAll(selector).forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.getAttribute(attribute) === value));
+      });
+    };
+
+    function render() {
+      const domain = document.body.dataset.domain;
+      const scenario = document.body.dataset.scenario;
+      const state = snapshots[domain][scenario];
+      Object.entries(state).forEach(([key, value]) => {
+        if (key === "stages") return;
+        document.querySelectorAll(`[data-slot="${key}"]`).forEach((node) => { node.textContent = value; });
+      });
+      state.stages.forEach((stage, index) => {
+        document.querySelectorAll(`[data-stage="${index}"]`).forEach((node) => { node.textContent = stage; });
+      });
+      document.querySelectorAll(".field-axis").forEach((axis) => axis.removeAttribute("data-emphasis"));
+      if (scenario === "approval") document.querySelector('.field-axis[data-axis="authority"]').dataset.emphasis = "true";
+      if (scenario === "degraded") {
+        document.querySelector('.field-axis[data-axis="evidence"]').dataset.emphasis = "true";
+        document.querySelector('.field-axis[data-axis="outcome"]').dataset.emphasis = "true";
+      }
+    }
+
+    document.querySelectorAll("[data-domain-value]").forEach((button) => {
+      button.addEventListener("click", () => {
+        document.body.dataset.domain = button.dataset.domainValue;
+        setPressed("[data-domain-value]", button.dataset.domainValue, "data-domain-value");
+        render();
+      });
+    });
+    document.querySelectorAll("[data-scenario-value]").forEach((button) => {
+      button.addEventListener("click", () => {
+        document.body.dataset.scenario = button.dataset.scenarioValue;
+        setPressed("[data-scenario-value]", button.dataset.scenarioValue, "data-scenario-value");
+        render();
+      });
+    });
+    setPressed("[data-domain-value]", document.body.dataset.domain, "data-domain-value");
+    setPressed("[data-scenario-value]", document.body.dataset.scenario, "data-scenario-value");
+    render();
+  </script>
+</body>
+</html>

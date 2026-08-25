@@ -22,6 +22,11 @@ Before making a durable recommendation or editing a surface, read only the relev
 The reconciliation document supersedes stale visual direction. Repository truth supersedes a
 mockup. A live owner decision supersedes all persisted design guidance.
 
+For Deckent product, Desktop workspace or visual-language work, also read
+[references/current-owner-decisions.md](references/current-owner-decisions.md). Treat its accepted
+and rejected directions as a decision ratchet: do not re-propose settled or rejected context unless
+the reference's reopening rule is satisfied.
+
 ## Route by problem
 
 Use the smallest sufficient set:

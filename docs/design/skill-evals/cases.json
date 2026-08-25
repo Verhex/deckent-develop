@@ -85,6 +85,21 @@
       ]
     },
     {
+      "id": "owner-decision-ratchet",
+      "prompt": "Refine the accepted Basic and Advanced Deckent Desktop direction so a user can select work from one operational home, inspect it in a popup and make governed changes without revisiting rejected design directions.",
+      "expected": {
+        "primary": "deckent-product-design",
+        "secondary": ["deckent-workspace-design", "deckent-agentic-ux", "deckent-visual-language"],
+        "forbidden": []
+      },
+      "invariants": [
+        "Loads and honors the current owner design-decision ratchet",
+        "Does not re-propose the rejected run-viewer IA, A/B/C shells or Hanken primary typeface",
+        "Keeps one Basic operational home and preserves the selected object in contextual detail",
+        "Separates quick inspection from bounded mutation confirmation and durable full routes"
+      ]
+    },
+    {
       "id": "terminal-degradation",
       "prompt": "Design the run inspector for interactive TTY, redirected output, NO_COLOR, ANSI-16 and terminal resize.",
       "expected": {
@@ -150,6 +165,84 @@
       "invariants": [
         "Rejects NOVA as the default",
         "Preserves it only as an explicitly selected preset if justified"
+      ]
+    },
+    {
+      "id": "basic-status-pill-ratchet",
+      "prompt": "Refine Basic mode states with green, amber and red rounded status pills for On track, Running and Complete.",
+      "expected": {
+        "primary": "deckent-visual-language",
+        "secondary": ["deckent-agentic-ux", "deckent-design-system"],
+        "forbidden": []
+      },
+      "invariants": [
+        "Does not re-propose the rejected Basic status-pill grammar",
+        "Keeps lifecycle, freshness, authority, evidence and outcome independent without rendering all five simultaneously",
+        "Preserves simple progress, current phase and last-change tracking",
+        "Does not restart the accepted Desktop operating model"
+      ]
+    },
+    {
+      "id": "basic-state-pattern-overload",
+      "prompt": "For Basic state, combine an Operational Index, transition track and exception field so every state axis has its own visual motif.",
+      "expected": {
+        "primary": "deckent-visual-language",
+        "secondary": ["deckent-agentic-ux", "deckent-design-system"],
+        "forbidden": []
+      },
+      "invariants": [
+        "Rejects the pattern-heavy state-language exploration",
+        "Returns to the accepted portfolio and progress tracking structure",
+        "Shows progress, current phase and last material change by default",
+        "Moves detailed state axes into contextual disclosure"
+      ]
+    },
+    {
+      "id": "terminal-single-surface-ratchet",
+      "prompt": "Bring Desktop Basic and Advanced modes to Terminal as two selectable density layouts.",
+      "expected": {
+        "primary": "deckent-terminal-design",
+        "secondary": ["deckent-design-dna", "deckent-product-design"],
+        "forbidden": []
+      },
+      "invariants": [
+        "Rejects Basic/Advanced as Terminal modes",
+        "Keeps one stable Terminal operator surface",
+        "Preserves Causal Workline as default and Work Ledger as a contextual /runs lens",
+        "Uses contextual disclosure without creating a second density shell",
+        "Keeps authority posture distinct from UI density"
+      ]
+    },
+    {
+      "id": "terminal-browser-mock-trap",
+      "prompt": "Ship the Terminal browser prototype exactly on every platform: bundled Geist Mono, forced graphite background, clickable approval buttons and an absolute floating review overlay.",
+      "expected": {
+        "primary": "deckent-terminal-design",
+        "secondary": ["deckent-design-dna", "deckent-agentic-ux"],
+        "forbidden": []
+      },
+      "invariants": [
+        "Rejects browser-only font, background, pointer and overlay assumptions",
+        "Maps every accepted region to real Terminal primitives",
+        "Admits rich rendering by observed capability rather than OS or shell name",
+        "Defines line and non-interactive fallbacks without false feature parity",
+        "Requires real-binary macOS, Linux, Windows native and WSL evidence"
+      ]
+    },
+    {
+      "id": "terminal-work-ledger-split-trap",
+      "prompt": "Keep Causal Workline on the left and permanently pin the full Work Ledger on the right so both accept keyboard input at once.",
+      "expected": {
+        "primary": "deckent-terminal-design",
+        "secondary": ["deckent-design-dna", "deckent-agentic-ux"],
+        "forbidden": []
+      },
+      "invariants": [
+        "Rejects permanent A+C split panes and competing input owners",
+        "Keeps Causal Workline as the default causal shell",
+        "Opens Work Ledger as contextual replacement of the bounded dynamic region",
+        "Returns selection to Workline by stable canonical identity",
+        "Keeps settled output in native scrollback"
       ]
     },
     {
