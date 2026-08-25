@@ -640,8 +640,10 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // regression pin (quality-assessor) and worker-authored 664 suites.
   // 2026-08-25 canary token-authority (owner decision): count unchanged, digest
   // moved — kernel/default-flip pins reworked in place; suite-owned fixtures only.
-  count: 16093,
-  digest: 'b6b69008c3ee269b40b37289f60848836ab66129495990425625536a7446b8ae',
+  // 2026-08-25 directives pipeline gate: +10 — tests/scripts/lint-directives.test.ts
+  // (typed-problem pins + tmpdir import-scan roundtrip; fully tmpdir-hermetic).
+  count: 16103,
+  digest: 'bdf23d35e321a88bdbc7142a228046949d89b2159540ace9c6e20f70ed29d2bd',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1146,8 +1148,12 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-25 cache-regression waiver (owner decision): count unchanged, digest
   // moved — kernel waives the regression guard only under measured cost
   // reduction, typed reason; the absolute floor is never waived.
-  count: 1323,
-  digest: '2de2a1c49c38d29e39c7579efaec4b0ca0c753995bde50d10d48de41bbd919d4',
+  // 2026-08-25 directives pipeline: +2 REAL gate/generator scripts —
+  // scripts/lint-directives.mjs (pre-start gate over the compiled production
+  // parser) and scripts/gen-repair-directives.mjs (deterministic repair-wave
+  // DIRECTIVES generator); both registered in script-registry.
+  count: 1325,
+  digest: 'b018eea066f131a3067b607e79b657e96853ae114050f84d9951a7db44b686d0',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

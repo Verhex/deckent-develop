@@ -335,6 +335,17 @@
 lint/typecheck → real-binary proof → MASTER projection → zamanı geldiyse different-provider
 XVerify → landing`
 
+**DIRECTIVES-hattı (owner 2026-08-25 — plan-modu + deterministik doğrulama, İSTİSNASIZ):**
+her yeni DIRECTIVES = ① plan-modu onayı (dalga-planı: kümeler/scope/Reads/Test/riskler) →
+② içerik deterministik üretilir (repair-sınıfı: `node scripts/gen-repair-directives.mjs
+--files <kırmızı-liste> --chunk N` — Reads listesi test-importlarının taranmasından; elle
+yazımda da LLM-tahmini değil çalışan-örnek+lint) → ③ `npm run lint:directives` YEŞİL
+(gerçek dist-parser'la parse + D_EMPTY_SCOPE/D_NO_READS_FOR_SRC/D_SAME_LINE_READS_FILES/
+D_WRITE_COLLISION BLOCK'ları; sprint-670 dersi: Reads-eksiği 8/13 NO_GO yaptı) →
+④ `deckent plan --dry-run` önizleme temiz (scope-satisfiability + prompt-gate; BİLİNEN
+YAN-ETKİ: dry-run debt-preflight'ı `resolveDebt` YAZAR — yalnız lint-yeşilinden sonra 1 kez
+koş) → ⑤ start. Koşu izlemesi ana-oturumda değil sessiz nöbetçi-subagent'ta.
+
 - Finding başka outcome'a aitse otomatik implement edilmez.
 - `.brain/memory.db` silinmez; `.tasks` `rm` ile temizlenmez.
 - Aktif run sırasında build/auth mutation yapılmaz; canlı sprint owner onayı olmadan kill/cleanup

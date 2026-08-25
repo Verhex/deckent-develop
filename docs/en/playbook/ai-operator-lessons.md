@@ -571,3 +571,15 @@ not a reason to spend another provider attempt on the same prompt.
   lesson: instrument-and-reproduce before generalizing from one case — two permanent
   breadcrumbs (controller terminal-tail + outermost enter/sealed) gave a definitive diagnosis
   in a single run and stay in the product.
+- **2026-08-25 — Missing-Reads + deterministic DIRECTIVES pipeline lesson (sprint-670)**: The
+  repair-wave DIRECTIVES carried no `Reads:` line; bounded discovery correctly prevented workers
+  from reading the src contracts, and 8 of 13 tasks returned honest "scope did not authorize"
+  NO_GOs — an information-access failure, not a model-capability one, and a single authoring
+  omission cost an entire FIX phase. The permanent cure has three parts: (1) DIRECTIVES are never
+  written without plan-mode approval; (2) content is generated deterministically
+  (`scripts/gen-repair-directives.mjs` — Reads derived by scanning the test files' imports, zero
+  LLM guessing); (3) a pre-start gate (`npm run lint:directives`) validates with the actual
+  COMPILED production parser (no reimplementation) — D_NO_READS_FOR_SRC is this lesson made
+  typed, and the tool proved itself by catching 13/13 BLOCKs on the very 670 DIRECTIVES.
+  Side-lesson: monitoring noise never lands in the main session — a silent watcher subagent
+  relays findings only.

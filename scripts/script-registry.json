@@ -1124,6 +1124,26 @@
       "output": "exit 1 on a hardcoded model-version literal outside the allowlist",
       "expiry": "none — permanent lint gate (see notes: not wired via any package.json script)",
       "notes": "Sprint 208 READ-ONLY lint guard; test files always exempt. Predates / overlaps lint-no-model-literal.mjs's baseline-ratchet approach — potential consolidation candidate, not decided in this task."
+    },
+    {
+      "file": "scripts/lint-directives.mjs",
+      "class": "gate",
+      "owner": "sprint-orchestration",
+      "npmScript": "lint:directives",
+      "input": "DIRECTIVES.md (or --file <path>) parsed by the COMPILED production parser dist/orchestra/task-builder.js::parseStructuredDirectives; direct src-imports of listed test files",
+      "output": "task table + typed problems (D_EMPTY_SCOPE, D_NO_READS_FOR_SRC, D_SAME_LINE_READS_FILES, D_WRITE_COLLISION, D_NO_TEST, D_BARE_TOKEN); exit 1 on BLOCK, 2 on stale/missing dist or unreadable input",
+      "expiry": "none — permanent pre-start gate (owner decision 2026-08-25; run manually before every `deckent start`, deliberately NOT in lint:gates because DIRECTIVES content is transient)",
+      "notes": "Born from the sprint-670 lesson (missing Reads: sent 8/13 tasks to NO_GO) and sprint-663 grammar failures. No parser reimplementation: validates with the exact compiled module production runs, and revives the previously-unwired validateScopeFilesWrite for bare-token checks."
+    },
+    {
+      "file": "scripts/gen-repair-directives.mjs",
+      "class": "recurring-proof",
+      "owner": "sprint-orchestration",
+      "npmScript": null,
+      "input": "--files <list.txt> of failing test paths (+ --chunk N); direct src-imports scanned via lint-directives.mjs::scanDirectSrcImports",
+      "output": "deterministic repair-wave DIRECTIVES (stdout or --out) with generated Reads: lists; exit 2 on bad input",
+      "expiry": "none — reusable for every full-suite repair wave (owner decision 2026-08-25)",
+      "notes": "Zero LLM free-text: clustering is sorted+chunked, Reads derived from import scanning shared with the lint gate. Output must still pass lint-directives + `deckent plan --dry-run` before start (current-flow contract)."
     }
   ]
 }

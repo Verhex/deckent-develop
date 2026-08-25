@@ -541,3 +541,13 @@ attempt harcama gerekçesi değil, host composition defect kanıtıdır.
   "erken-çıkış" teşhisi kondu; 669 breadcrumb'ları gerçeği gösterdi). İkinci ders: tek-vakadan
   genelleme yapmadan önce enstrümante-et-ve-tekrar-üret — iki kalıcı-breadcrumb (controller
   terminal-tail + outermost enter/sealed) bir koşuda kesin-teşhis verdi ve üründe kaldı.
+- **2026-08-25 — Reads-eksiği + deterministik DIRECTIVES-hattı dersi (sprint-670)**: Repair-dalgası
+  DIRECTIVES'inde `Reads:` satırı yoktu; bounded-discovery worker'ların src-kontratını okumasını
+  doğru şekilde engelledi ve 13 task'ın 8'i "scope izin vermedi" dürüst-NO_GO'suyla döndü — model
+  yeteneği değil, BİLGİ-ERİŞİMİ hatasıydı ve tek yazım-eksiğinin bedeli koca bir FIX-fazıydı.
+  Kalıcı çözüm üç parça: (1) DIRECTIVES asla plan-modu onayı olmadan yazılmaz; (2) içerik
+  deterministik üretilir (`scripts/gen-repair-directives.mjs` — Reads listesi test-dosyalarının
+  import-taramasından, LLM-tahmini sıfır); (3) start-öncesi `npm run lint:directives` gerçek
+  DERLENMİŞ parser'la (reimplementasyon değil) doğrular — D_NO_READS_FOR_SRC bu dersin typed
+  kalıcılaşmasıdır ve aynı araç 670-DIRECTIVES'inde 13/13 BLOCK yakalayarak kendini kanıtladı.
+  Yan-ders: izleme-gürültüsü ana-oturuma basılmaz — sessiz nöbetçi-subagent yalnız bulgu taşır.
