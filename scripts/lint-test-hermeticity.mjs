@@ -697,7 +697,9 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // kaymalarini katlar.
   // 2026-08-26 01:00: ayni 16317, digest-only — oversize-filtre el-fix'i +
   // evidence-scope pini + lessons-doc.
-  digest: '6f7685434afa8a1bcdf1a113fe0b71ee1e265b3e86050e533114500160ca7f10',
+  // 2026-08-26 02:10: ayni 16317, digest-only — sprint-679 hasadi
+  // (dockerignore-pin suite + messages.ts oksuz-anahtar silimi).
+  digest: 'e623cc37b5bec846016749bef9393268430f75218346128d8846eb60a05a43c2',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1246,7 +1248,8 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-26 00:05: ayni 1336, digest-only — landing-kuyrugu src kaymalari.
   // 2026-08-26 xverify dalgasi: ayni 1336, digest-only — CLI/ingress src kaymalari.
   // 2026-08-26 01:00: ayni 1336, digest-only — oversize-filtre src kaymasi.
-  digest: '4699f4ed1859c53aab8d0647b6cb6502dc7d6e520abdd38c185a0eea2ee217b9',
+  // 2026-08-26 02:10: ayni 1336, digest-only — messages.ts silme kaymasi.
+  digest: 'cb57f2bc81643dcdf161b7a582a1aba95161dc5b5cb6392a4099fdbca8f79a5e',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

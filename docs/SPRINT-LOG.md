@@ -16893,3 +16893,26 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 678-002: producer-fence tabani + hold-detail gorunurlugu (DONE)
 
 ---
+## Sprint 679 — sprint-679
+
+**Status:** COMPLETE
+**Date:** 2026-08-25
+**Duration:** 209s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 208764ms |
+
+### Tasks
+
+- 679-001: dockerignore secret-dislama hermetik pini (DONE)
+- 679-002: oksuz cli.provider-observations.* i18n anahtarlarinin silinmesi (DONE)
+
+---

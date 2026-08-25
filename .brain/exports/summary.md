@@ -97,4 +97,4 @@
 - Violation pattern: doc_sync_ground_truth_mismatch (×12 sprints)
 - FIX lineage and post-FIX pause contract
 
-_Total entries: 3037 | Generated: 2026-08-25_
+_Total entries: 3039 | Generated: 2026-08-25_

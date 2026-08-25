@@ -14,6 +14,15 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint679] - 2026-08-25
+
+### Added
+
+- dockerignore secret-dislama hermetik pini
+
+
+_Tasks: 2 total, 2 done, 0 tech debt, 0 no-go_
+
 ## [sprint678] - 2026-08-25
 
 ### Added

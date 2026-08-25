@@ -8,6 +8,12 @@
 
 ## ŞU AN — çalışma-imleci (Claude epoch-4)
 
+- ✅ **MİKRO-DALGA + PROB KAPANDI (2026-08-26 ~02:10; sprint-679 COMPLETE 2/2):** dockerignore
+  hermetik-pini + öksüz i18n temizliği (679-002 honest-gate yanlış-pozitifinden fix'le geçti).
+  **KABUL-PROBU GEÇTİ:** koşu boyunca `xverify_producer_result_mismatch` SIFIR (679-001 tek
+  örneği alakasız eligibility-kapısı). MASTER 100 → VERIFY
+  (`GR-2026-08-26-DECK-LAYER-PROOF-01`): CANLI image-layer probu — gerçek full-context build,
+  runtime'da .deck/.env YOK, layer-tar'da sıfır .deck.
 - ✅ **XVERIFY-ONARIM DALGASI KAPANDI (2026-08-26 ~01:00; sprint-678 2/2 ilk-denemede, gate PASS + tsc TEMIZ):**
   üç kök kapandı (CLI evidence-scope · producer-fence tabanı [sol] · hold-detail) + landing
   el-fix'i (oversize-filtre: dirty runtime-db broker'ı kilitliyordu). CANLI kanıt-zinciri:
@@ -61,7 +67,11 @@
    inspect↔read-model parity · ölü `run-state-feed.ts` silimi · event-stream kayıpsız rotasyon ·
    Nervous observer filtre genişletmesi.
 5. "vitest-yeşil ama tsc-kirli" örüntüsü 675/676/677'de üst-üste + dalga-sonrası geniş mock-drift: adaylar — Auditor tsc-FAIL'inin otomatik FIX-task doğurması; tam-factory `vi.mock`'lar için importOriginal-spread ratchet'i.
-6. Worker'ların `HEARTBEAT_IDENTITY_HOLD` (attemptId/backend host-bound değil) gerekçesiyle hb
+6. Honest-gate silme-only yanlış-pozitifi (679-002): `STUB_WRITE_DETECTED /
+   SCOPE_VIOLATION_OR_EMPTY_WRITE` yalnız `linesAdded=0`'a bakıyor; 24-silme/0-ekleme +
+   goCriteria-MET meşru temizlik DONE→NO_GO override yedi — gate `linesRemoved`'ı da
+   hesaba katmalı.
+7. Worker'ların `HEARTBEAT_IDENTITY_HOLD` (attemptId/backend host-bound değil) gerekçesiyle hb
    yazmayı reddetmesi — 674'te gözlendi; prompt/host-bound kimlik akışı incelenmeli.
 
 ## SIRADAKİ yürütme sırası
@@ -74,7 +84,7 @@
    `.deckent/runtime/closure-staging/work-480/bundle`, request
    `aprcdb-cb3eb74b4598bacc49b9ea6204208cca`, decision=allow verilmiş; tek oturumda
    sign → append → lint yeşil → Work-480 OPEN→DONE.
-5. Bekleyen küçükler: orphan `cli.provider-observations.*` i18n-anahtarları · eski MCP-artık
+5. Bekleyen küçükler: eski MCP-artık
    süreçler (MCP server'lar hâlâ eski dist'te — restart owner-koordinasyonlu) · Slack/Teams secrets (owner) ·
    `.deckent/routing/decisions-v3/` ölü-dizin (owner-onaylı tek `rm -r`).
 
@@ -85,7 +95,7 @@
   canlı; 20-gate + build:all + tsc --noEmit yeşil; dist=src eşit.
 - Nöbetçi-deseni: sprint-izleme ana-oturumda değil Sonnet-subagent'ta (A–F tetikleri) — A3'te
   iki koşuda da başarıyla çalıştı.
-- Done-ready sayacı: **12/20** (+7 satır VERIFY'da owner-DONE bekliyor: 6 C-satırı + 60) — önceki 10 + A3 event-truth (3354 VERIFY) + exploration-bonus (9073 DONE).
+- Done-ready sayacı: **12/20** (+8 satır VERIFY'da owner-DONE bekliyor: 6 C-satırı + 60 + 100) — önceki 10 + A3 event-truth (3354 VERIFY) + exploration-bonus (9073 DONE).
 - Dogfood dist-gecikmesi kuralı (owner-anlatımı verildi): run başladığı dist'le biter;
   motor-fix'i aynı run'a etki edemez — sıcak-yol fix'i önce mini-run'la landılır.
 

@@ -3,19 +3,19 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "0c5313fb1f9ea329146c7fe2d5f4f6a2746b9caae619701875e4759775011c62"
+    "value": "96dfbf600356c3c5e2fe2b9ba3f065e98561e3abd5ad0e024b7bf6eca6fe4be1"
   },
   "summary": {
     "total": 531,
     "active": 464,
     "terminal": 67,
-    "receipts": 197,
+    "receipts": 198,
     "byState": {
-      "OPEN": 361,
+      "OPEN": 360,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
-      "VERIFY": 34,
+      "VERIFY": 35,
       "DONE": 67,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -212,10 +212,10 @@
       "id": "REPO-DECK-001",
       "program": "TRUTH",
       "priority": "P0",
-      "state": "OPEN",
-      "updated": "2026-08-10",
+      "state": "VERIFY",
+      "updated": "2026-08-25",
       "definitionDigest": "733250cf320fd9ab0a1c09a84df89e2691487a68c5f3dbdadd5f7ac943dd4118",
-      "progressDigest": "d444ed51e1dbe2b294e40349556ed60178c5c1a9fd1fd5e00dddbd97080006f8",
+      "progressDigest": "90e8c7df622a2342488d3a63717620b7e675b702a2cf3ea6b663bbacf4833b75",
       "terminalClosureDigest": null
     },
     {
@@ -7876,6 +7876,16 @@
         "transitionAt": "2026-08-26T00:30:23+03:00"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-26-DECK-LAYER-PROOF-01",
+      "authorityDigest": "187e7b708d8c908c512c6111fbaa7c5dbbc6cd593c9b45ed8602b9c8cc4b641e",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-26T01:12:54+03:00"
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -8172,7 +8182,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
         "W": "1",
@@ -8186,11 +8196,12 @@
       "blockerRemedy": null,
       "closureBlockedBy": [],
       "evidenceReceipts": [
-        "GR-2026-08-10-DECK-DOCKERIGNORE-01"
+        "GR-2026-08-10-DECK-DOCKERIGNORE-01",
+        "GR-2026-08-26-DECK-LAYER-PROOF-01"
       ],
       "acceptance": "`.dockerignore`, build-context negative test ve image-layer proof",
-      "evidence": "2026-07-21 decision; current `.dockerignore` gap; `receipt=GR-2026-08-10-DECK-DOCKERIGNORE-01`; 2026-08-10 MEKANİK DİLİM: .deck + .deck.* dışlaması eklendi (owner-side); sprint-507-002 kanıtı — worker render-time scope-shrink (yeni bulgu: plan-time trackedRootFiles koruması render'da yeniden-sanitize edilip kök dosyaları SESSİZCE düşürüyor) nedeniyle kök dosyaya yazamadı, dürüst NO_GO; kalan kapsam: hermetik dockerignore-parse testi + image-layer proof (worker dilimi, kök-dosya yazımı gerektirmez)",
-      "updated": "2026-08-10"
+      "evidence": "2026-07-21 decision; current `.dockerignore` gap; `receipt=GR-2026-08-10-DECK-DOCKERIGNORE-01`; 2026-08-10 MEKANİK DİLİM: .deck + .deck.* dışlaması eklendi (owner-side); sprint-507-002 kanıtı — worker render-time scope-shrink (yeni bulgu: plan-time trackedRootFiles koruması render'da yeniden-sanitize edilip kök dosyaları SESSİZCE düşürüyor) nedeniyle kök dosyaya yazamadı, dürüst NO_GO; kalan kapsam: hermetik dockerignore-parse testi + image-layer proof (worker dilimi, kök-dosya yazımı gerektirmez); `receipt=GR-2026-08-26-DECK-LAYER-PROOF-01`; 2026-08-25-gece kalan-kapsam kapandi: hermetik dockerignore-pini (679-001) + CANLI image-layer probu (gercek full-context build; runtime'da .deck/.deck.bak/.env YOK, layer-tar'da sifir .deck girdisi)",
+      "updated": "2026-08-25"
     },
     {
       "order": 120,
@@ -27332,6 +27343,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "e4ec0194bef0c5830a4fe05f52c55e21a77d2e3dd28e5d1d4bb6a1e156243fb3"
+    "value": "39e1579f2c084462163db45b638e8855eb356d90f3dc0cffd82d2489e04ef690"
   }
 }

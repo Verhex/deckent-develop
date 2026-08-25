@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):0c5313fb1f9ea329146c7fe2d5f4f6a2746b9caae619701875e4759775011c62`
+**Source digest:** `sha256(normalized-lf-utf8):96dfbf600356c3c5e2fe2b9ba3f065e98561e3abd5ad0e024b7bf6eca6fe4be1`
 
 **Rows:** 531 total · 464 active · 67 terminal
 
@@ -13,11 +13,11 @@
 
 | State | Count |
 |---|---:|
-| OPEN | 361 |
+| OPEN | 360 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 69 |
-| VERIFY | 34 |
+| VERIFY | 35 |
 | DONE | 67 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -33,7 +33,7 @@
 | 70 | `TEST-HERMETIC-001` | OPEN | P0 | TRUTH | `TEST-675` | — | Project root, HOME, `.tasks` ve tracked-file test writer discovery/migration |
 | 75 | `TEST-CONTAINMENT-001` | VERIFY | P0 | TRUTH | `TEST-675` | — | Process-birth, descendant ownership ve OS/OCI test containment authority foundation'ı |
 | 80 | `TEST-SPAWN-001` | OPEN | P1 | TRUTH | `TEST-HERMETIC-001` | — | Test `spawnSync` policy ve async migration |
-| 100 | `REPO-DECK-001` | OPEN | P0 | TRUTH | — | — | `.deck` secret'ını Docker context ve image layers'dan dışla |
+| 100 | `REPO-DECK-001` | VERIFY | P0 | TRUTH | — | — | `.deck` secret'ını Docker context ve image layers'dan dışla |
 | 120 | `STATE-RETENTION-001` | OPEN | P1 | TRUTH | `SSOT-002` | — | Runtime state/log retention, rotation, legal hold ve crash recovery contract |
 | 121 | `CRASH-FORENSICS-AUTHORITY-001` | OPEN | P1 | TRUTH | — | — | Crash artifact schema, privacy, collision-free retention, typed classification ve support/recovery consumption authority |
 | 122 | `NERVOUS-STATE-LIFECYCLE-001` | OPEN | P1 | TRUTH | `AUDIT-001`, `APPROVAL-001` | — | Nervous durable state, proposal, history ve IPC artefaktları için tenant-aware lifecycle, privacy ve recovery authority |
