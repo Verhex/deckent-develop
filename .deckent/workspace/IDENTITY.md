@@ -18,7 +18,7 @@ Direction (2026-06-29 pivot): Tool-driven, progressive-disclosure, full-control 
 Moat: Deterministik eval-backed orchestration · governance-by-construction · outcome→evidence→routing→promotion→training-trace kapalı öğrenme döngüsü
 SSOT: `docs/MASTER-PLAN.md` · core-memory: `.deckent/docs/core-memory/MEMORY.md` · yön gerekçesi: `docs/en/vision.md` (TR: `docs/tr/vision.md`)
 <!-- AUTOGEN:START id="identity-tests" -->
-Tests: 37,100 descriptors (parsed from tests/**/*.test.ts(x))
+Tests: 37,101 descriptors (parsed from tests/**/*.test.ts(x))
 Dashboard Tests: 96 descriptors (parsed from src/dashboard/src/**/*.test.tsx)
 Coverage: N/A
 <!-- AUTOGEN:END id="identity-tests" -->

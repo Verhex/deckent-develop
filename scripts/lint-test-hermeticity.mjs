@@ -1143,8 +1143,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-25 canary token-authority (owner decision): count unchanged, digest
   // moved — kernel costAuthority, usage auto-policy resolution, config default
   // flips (codex_core_channel/codex_suppress_project_doc ON, canary_cost_authority).
+  // 2026-08-25 cache-regression waiver (owner decision): count unchanged, digest
+  // moved — kernel waives the regression guard only under measured cost
+  // reduction, typed reason; the absolute floor is never waived.
   count: 1323,
-  digest: 'e98693ca99a2e44102d19713db0add0d1ec8d8699df9333cb62f71495dc177e4',
+  digest: '2de2a1c49c38d29e39c7579efaec4b0ca0c753995bde50d10d48de41bbd919d4',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

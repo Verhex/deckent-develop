@@ -29,6 +29,7 @@ export type PromptCostCanaryReasonCode =
   | 'cost_increase_exceeded'
   | 'cache_hit_ratio_below_minimum'
   | 'cache_hit_ratio_regression_exceeded'
+  | 'cache_regression_waived_by_cost_reduction'
   | 'duration_measurement_unavailable'
   | 'duration_increase_exceeded';
 
@@ -392,13 +393,22 @@ export function comparePromptCostCanary(plan: PromptCostCanaryPlan): PromptCostC
   }
 
   const rejectReasons: PromptCostCanaryReasonCode[] = [];
+  let cacheRegressionWaived = false;
   if (holdReasons.length === 0) {
     const thresholds = plan.thresholds;
     if (candidate.qualityPassRate < thresholds.minimumQualityPassRate) rejectReasons.push('quality_below_minimum');
     if (baseline.qualityPassRate - candidate.qualityPassRate > thresholds.maximumQualityPassRateRegression) rejectReasons.push('quality_regression_exceeded');
     if (deltas.costPerLineageIncreaseRatio > thresholds.maximumCostPerLineageIncreaseRatio) rejectReasons.push('cost_increase_exceeded');
     if (candidate.cacheHitRatio < thresholds.minimumCacheHitRatio) rejectReasons.push('cache_hit_ratio_below_minimum');
-    if (baseline.cacheHitRatio - candidate.cacheHitRatio > thresholds.maximumCacheHitRatioRegression) rejectReasons.push('cache_hit_ratio_regression_exceeded');
+    if (baseline.cacheHitRatio - candidate.cacheHitRatio > thresholds.maximumCacheHitRatioRegression) {
+      // Owner decision 2026-08-25: the regression guard exists to catch cache
+      // efficiency decaying WITHOUT a cost win. A measured cost-per-lineage
+      // reduction shrinks the cacheable prefix itself, so the hit-ratio drop is
+      // the SAME improvement seen from the other side — waive it, visibly.
+      // The absolute floor (minimumCacheHitRatio) is never waived.
+      if (deltas.costPerLineageIncreaseRatio < 0) cacheRegressionWaived = true;
+      else rejectReasons.push('cache_hit_ratio_regression_exceeded');
+    }
     if (thresholds.maximumDurationPerLineageIncreaseRatio !== undefined
       && deltas.durationPerLineageIncreaseRatio !== null
       && deltas.durationPerLineageIncreaseRatio > thresholds.maximumDurationPerLineageIncreaseRatio) {
@@ -406,8 +416,10 @@ export function comparePromptCostCanary(plan: PromptCostCanaryPlan): PromptCostC
     }
   }
   const disposition: PromptCostCanaryDisposition = holdReasons.length > 0 ? 'HOLD' : rejectReasons.length > 0 ? 'REJECT' : 'PROMOTE';
+  const waiverSuffix: PromptCostCanaryReasonCode[] = cacheRegressionWaived ? ['cache_regression_waived_by_cost_reduction'] : [];
   const reasonCodes: readonly PromptCostCanaryReasonCode[] = Object.freeze(
-    disposition === 'PROMOTE' ? ['thresholds_satisfied'] : disposition === 'HOLD' ? holdReasons : rejectReasons,
+    disposition === 'PROMOTE' ? ['thresholds_satisfied', ...waiverSuffix]
+      : disposition === 'HOLD' ? holdReasons : [...rejectReasons, ...waiverSuffix],
   );
   const planDigest = digestPromptCostCanaryPlan(plan);
   const unsigned = { version: PROMPT_COST_CANARY_VERSION, disposition, costAuthority, reasonCodes, planDigest, baseline, candidate, deltas };

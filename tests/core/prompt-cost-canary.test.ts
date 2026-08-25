@@ -81,6 +81,32 @@ describe('comparePromptCostCanary', () => {
       .toThrow(/must be provider-reported/u);
   });
 
+  it('waives the cache-regression guard only under a measured cost reduction, visibly and never the floor', () => {
+    const input = plan();
+    // Candidate: cheaper per lineage (USD 4→3) but cache-hit 0.55→0.25 — the
+    // shrunken-prefix class. Guard waived with a typed reason; still PROMOTE.
+    const cheaperLessCached = [
+      { ...candidateSamples[0]!, cacheReadTokens: 20, inputTokens: 80, providerReportedUsd: 1.5 },
+      { ...candidateSamples[1]!, cacheReadTokens: 30, inputTokens: 70, providerReportedUsd: 1.5 },
+    ];
+    const waived = comparePromptCostCanary({ ...input,
+      thresholds: { ...input.thresholds, minimumCacheHitRatio: 0, maximumDurationPerLineageIncreaseRatio: undefined },
+      candidate: { ...input.candidate, samples: cheaperLessCached } });
+    expect(waived).toMatchObject({ disposition: 'PROMOTE',
+      reasonCodes: ['thresholds_satisfied', 'cache_regression_waived_by_cost_reduction'] });
+    // Same cache regression WITHOUT a cost win still rejects — the guard's
+    // real target class is untouched, and the absolute floor is never waived.
+    const pricier = cheaperLessCached.map(sample => ({ ...sample, providerReportedUsd: 3 }));
+    expect(comparePromptCostCanary({ ...input,
+      thresholds: { ...input.thresholds, minimumCacheHitRatio: 0, maximumDurationPerLineageIncreaseRatio: undefined },
+      candidate: { ...input.candidate, samples: pricier } }).reasonCodes)
+      .toContain('cache_hit_ratio_regression_exceeded');
+    expect(comparePromptCostCanary({ ...input,
+      thresholds: { ...input.thresholds, minimumCacheHitRatio: 0.7, maximumDurationPerLineageIncreaseRatio: undefined },
+      candidate: { ...input.candidate, samples: cheaperLessCached } }).reasonCodes)
+      .toContain('cache_hit_ratio_below_minimum');
+  });
+
   it('rejects every failed promotion threshold with bounded reason codes', () => {
     const input = plan();
     const result = comparePromptCostCanary({ ...input, candidate: { ...input.candidate, samples: [
