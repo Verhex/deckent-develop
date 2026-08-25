@@ -16870,3 +16870,26 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 677-008: 540 clean-HOLD exit-kontrati — kalici alt-surec pini (kanitla-kapanis) (DONE)
 
 ---
+## Sprint 678 — sprint-678
+
+**Status:** COMPLETE
+**Date:** 2026-08-25
+**Duration:** 287s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 286857ms |
+
+### Tasks
+
+- 678-001: CLI evidence-scope koku — diff path-listesi + remedy bastirmama (DONE)
+- 678-002: producer-fence tabani + hold-detail gorunurlugu (DONE)
+
+---

@@ -76,6 +76,16 @@ function result(): TaskResult {
     linesAdded: 1,
     linesRemoved: 0,
     testsPassed: true,
+    testCommands: [
+      'npx vitest run tests/orchestra/cross-verify-production-ingress-authority.test.ts',
+    ],
+    testVerification: {
+      applicability: 'REQUIRED',
+      outcome: 'PASSED',
+      commands: [
+        'npx vitest run tests/orchestra/cross-verify-production-ingress-authority.test.ts',
+      ],
+    },
     coverage: 100,
     selfAssessment: 'DONE',
     notes: 'bounded result',

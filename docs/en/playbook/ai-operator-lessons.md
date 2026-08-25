@@ -583,3 +583,17 @@ not a reason to spend another provider attempt on the same prompt.
   typed, and the tool proved itself by catching 13/13 BLOCKs on the very 670 DIRECTIVES.
   Side-lesson: monitoring noise never lands in the main session — a silent watcher subagent
   relays findings only.
+- **2026-08-26 — overnight-autonomy lessons (sprint-674→678 + strike-5)**: (1) **Pipes
+  swallow exit codes** — `cmd | tail` reports the last pipe's `$?`; the same trap reproduced
+  twice in one night (full-suite verdict + a masked build-HOLD) and turned out to be the most
+  likely explanation for row 540's "exit-0" claim too. Capture verdicts without pipes. (2) **A
+  hot-path engine fix cannot help the run that lands it** — a run finishes on the dist it
+  started with; sprint-674 hit the very dependency bug it was fixing and honestly typed-PAUSED.
+  Land hot-path fixes via a mini-run first, then run the wave. (3) **XVerify claim discipline
+  refined** — composition holds are now typed layer by layer (evidence scope → size filter →
+  prompt ceiling → verdict) and hold detail finally carries the real cause; write claims to be
+  diff-decidable, keep `--files` small, and never assert unchanged-line facts from a diff
+  (sol's UNCLEAR was correct behavior). (4) **A healer must never move a file it could not
+  read** — strike-5: under fd pressure an io-error was treated as corruption and a healthy
+  92-key config was quarantined twice; healers may relocate only on parse-proof, io errors are
+  typed holds.

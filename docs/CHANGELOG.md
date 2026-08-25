@@ -14,6 +14,16 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint678] - 2026-08-25
+
+### Added
+
+- CLI evidence-scope koku — diff path-listesi + remedy bastirmama
+- producer-fence tabani + hold-detail gorunurlugu
+
+
+_Tasks: 2 total, 2 done, 0 tech debt, 0 no-go_
+
 ## [sprint677] - 2026-08-25
 
 ### Added

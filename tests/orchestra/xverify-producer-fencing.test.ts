@@ -22,6 +22,7 @@ import {
 } from '../../src/core/task-types.js';
 import {
   CrossVerifyProductionIngressAuthority,
+  XVERIFY_DOWNSTREAM_AUTHORED_FIELDS,
   XVERIFY_PRODUCER_ENRICHMENT_FIELDS,
   compareProducerFencedResult,
 } from '../../src/orchestra/cross-verify-production-ingress-authority.js';
@@ -33,7 +34,10 @@ const TASK_ID = 'born-3323-001';
  * it. Shape taken from the archived pairs under
  * `.brain/archive/sprints/sprint-522-tasks` and `sprint-523-tasks`.
  */
-function settledResult(): TaskResult {
+function settledResult(): TaskResult & {
+  brainEvaluation: string | null;
+  brainEvaluationReason: string | null;
+} {
   return {
     taskId: TASK_ID,
     workerId: `w-${TASK_ID}`,
@@ -41,6 +45,13 @@ function settledResult(): TaskResult {
     linesAdded: 12,
     linesRemoved: 3,
     testsPassed: true,
+    testVerification: {
+      applicability: 'REQUIRED',
+      outcome: 'PASSED',
+      commands: ['npx vitest run tests/orchestra/xverify-producer-fencing.test.ts'],
+    },
+    brainEvaluation: null,
+    brainEvaluationReason: null,
     coverage: 0,
     selfAssessment: 'DONE',
     notes: 'bounded producer note',
@@ -63,9 +74,15 @@ function settledResult(): TaskResult {
  * advisory dist-mutation flag. Every added field is an enrichment class; not
  * one core field moved.
  */
-function enrichedResult(): TaskResult {
+function enrichedResult(): TaskResult & {
+  brainEvaluation: string;
+  brainEvaluationReason: string;
+} {
   return {
     ...settledResult(),
+    testCommands: ['npx vitest run tests/orchestra/xverify-producer-fencing.test.ts'],
+    brainEvaluation: 'DONE',
+    brainEvaluationReason: 'All compiled criteria are closed.',
     tokenUsage: {
       inputTokens: 15241,
       outputTokens: 25184,
@@ -92,7 +109,7 @@ function enrichedResult(): TaskResult {
     totalLinesAdded: 12,
     totalLinesRemoved: 3,
     distMutated: true,
-  } as TaskResult;
+  } as TaskResult & { brainEvaluation: string; brainEvaluationReason: string };
 }
 
 function task(): Task {
@@ -143,7 +160,7 @@ function config(): ResolvedConfig {
  */
 async function composeAgainstClosedProducer(
   evaluateCopy: TaskResult,
-): Promise<{ state: string; reasonCode?: string }> {
+): Promise<{ state: string; reasonCode?: string; detail?: string }> {
   const base = mkdtempSync(join(tmpdir(), 'deckent-born-3323-'));
   const projectRoot = join(base, 'project');
   const stateRoot = join(base, 'host-state');
@@ -182,7 +199,7 @@ async function composeAgainstClosedProducer(
       config: config(),
       operationClass: 'verify-implementation',
       timeoutMs: 120_000,
-    }) as { state: string; reasonCode?: string };
+    }) as { state: string; reasonCode?: string; detail?: string };
   } finally {
     if (originalDeckentHome === undefined) delete process.env.DECKENT_HOME;
     else process.env.DECKENT_HOME = originalDeckentHome;
@@ -202,6 +219,36 @@ describe('born 3323 — producer fencing compares the pre-enrichment core', () =
       JSON.parse(JSON.stringify(settledResult())) as unknown,
       transported,
     )).toEqual({ state: 'equal' });
+  });
+
+  it('normalizes the settled copy before comparing test projections', () => {
+    expect(compareProducerFencedResult(settledResult(), enrichedResult()))
+      .toEqual({ state: 'equal' });
+  });
+
+  it('allows Brain to fill downstream-authored null fields after settlement', () => {
+    expect(compareProducerFencedResult(settledResult(), enrichedResult()))
+      .toEqual({ state: 'equal' });
+  });
+
+  it('rejects a changed value already present in a downstream-authored field', () => {
+    const settled = {
+      ...settledResult(),
+      brainEvaluation: 'NO_GO',
+      brainEvaluationReason: 'A settled Brain reason.',
+    };
+    expect(compareProducerFencedResult(settled, enrichedResult()))
+      .toEqual({
+        state: 'diverged',
+        divergingFields: ['brainEvaluation', 'brainEvaluationReason'],
+      });
+  });
+
+  it('still rejects a real worker-authored field difference', () => {
+    expect(compareProducerFencedResult(settledResult(), {
+      ...enrichedResult(),
+      filesChanged: ['src/orchestra/different.ts'],
+    })).toEqual({ state: 'diverged', divergingFields: ['filesChanged'] });
   });
 
   it('treats an explicit undefined value as an absent field, not a divergence', () => {
@@ -293,6 +340,17 @@ describe('born 3323 — producer fencing compares the pre-enrichment core', () =
         .not.toContain(workerAuthorable);
     }
   });
+
+  it('pins the downstream-authored exception separately from enrichment', () => {
+    expect(XVERIFY_DOWNSTREAM_AUTHORED_FIELDS).toEqual([
+      'brainEvaluation',
+      'brainEvaluationReason',
+    ]);
+    for (const field of XVERIFY_DOWNSTREAM_AUTHORED_FIELDS) {
+      expect(XVERIFY_PRODUCER_ENRICHMENT_FIELDS as readonly string[])
+        .not.toContain(field);
+    }
+  });
 });
 
 describe('born 3323 — production ingress wiring', () => {
@@ -307,14 +365,16 @@ describe('born 3323 — production ingress wiring', () => {
   });
 
   it('holds the fence when a core field was mutated after settlement', async () => {
-    await expect(composeAgainstClosedProducer({
+    const composed = await composeAgainstClosedProducer({
       ...enrichedResult(),
       selfAssessment: 'DONE',
       notes: 'ambient evaluate-time mutation',
-    })).resolves.toMatchObject({
+    });
+    expect(composed).toMatchObject({
       state: 'hold',
       reasonCode: 'xverify_producer_result_mismatch',
     });
+    expect(composed.detail).toContain('"divergingFields":["notes"]');
   });
 
   it('holds the fence when an UNKNOWN field is smuggled in', async () => {

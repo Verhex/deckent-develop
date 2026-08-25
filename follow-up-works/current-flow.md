@@ -8,6 +8,14 @@
 
 ## ŞU AN — çalışma-imleci (Claude epoch-4)
 
+- ✅ **XVERIFY-ONARIM DALGASI KAPANDI (2026-08-26 ~01:00; sprint-678 2/2 ilk-denemede, gate PASS + tsc TEMIZ):**
+  üç kök kapandı (CLI evidence-scope · producer-fence tabanı [sol] · hold-detail) + landing
+  el-fix'i (oversize-filtre: dirty runtime-db broker'ı kilitliyordu). CANLI kanıt-zinciri:
+  hold'lar ilk kez NEDENLİ konuştu (unsafe-.db → 19495/16000 tavan → verdict) ve formal boru
+  İLK gerçek hakem-çıktısını verdi (sol UNCLEAR, dürüst diff-karar-verilemez gerekçesi).
+  MASTER 350 kanıt-eki + 60 VERIFY (`GR-2026-08-26-TEST676-EVIDENCE-01`) bu commit'te.
+  **KABUL-PROBU:** sıradaki sprintin otomatik cross-verify'ında kronik
+  `xverify_producer_result_mismatch` SIFIR olmalı — ilk koşuda kontrol et.
 - ✅ **C-DALGASI KAPANDI (2026-08-25 gece; sprint-677 8/8 İLK-DENEMEDE, ~8dk):** 3350/3351/541/3352/3353/540 altı satır receipt'li VERIFY (`GR-2026-08-25-CWAVE-*-01` ×6). Landing el-paketi: 5 tsc daraltması (mcp/plan readiness-union + init-steps dil) + 39-dosya mock-drift onarımı (3 paralel ajan; 4 sözleşme yeniden-ifadesi: doctor mixed/17-check, ghost-rejection kanonik-domain, e2e canonical-producer) + closure-projection regen + baseline'lar. 3350 canlı-prob: dry-run temp-agent YAZMIYOR (2→2). ÖLÇÜM (bonus 0.05 ilk gerçek koşu): 38 karar / 35 izli / bonusDecisive 0 / tie 0 — güvenli ama bu görev-karışımında etkisiz (fark ~0.08; tasarım gereği yalnız kıl-payı çevirir). LANDING-KUYRUĞU: suite-4'ün 206 kırmızısı (mid-run mutasyon + mock-drift) 3-paralel-ajan onarımı + 6 el-fix'le sıfırlandı; 677-002'nin CLI yüzey-eki (--write-allowlist) iki contract-SSOT'a + EXECUTE_OPT_IN_RE bileşik-bayrak fix'ine + mcp approve-override'ına bağlandı; error-ratchet sıkılaştı. **FİNAL MÜNHASIR FULL-SUITE: 38743/0 TAM YEŞİL (exit-0)** — kadans-verdict'i temiz.
 - ✅ **EXPLORATION-BONUS DALGASI KAPANDI (2026-08-25 gece; MASTER 9073 DONE,
   `receipt=GR-2026-08-25-EXPLORATION-BONUS-01`):** sprint-676 3/3 ilk-denemede DONE (676-002
@@ -67,8 +75,7 @@
    `aprcdb-cb3eb74b4598bacc49b9ea6204208cca`, decision=allow verilmiş; tek oturumda
    sign → append → lint yeşil → Work-480 OPEN→DONE.
 5. Bekleyen küçükler: orphan `cli.provider-observations.*` i18n-anahtarları · eski MCP-artık
-   süreçler (MCP server'lar hâlâ eski dist'te — restart owner-koordinasyonlu) · XVerify
-   adjudicator-arızası (typed-HOLD'da; kör-retry yasak) · Slack/Teams secrets (owner) ·
+   süreçler (MCP server'lar hâlâ eski dist'te — restart owner-koordinasyonlu) · Slack/Teams secrets (owner) ·
    `.deckent/routing/decisions-v3/` ölü-dizin (owner-onaylı tek `rm -r`).
 
 ## Canlı truth (kompakt)
@@ -78,7 +85,7 @@
   canlı; 20-gate + build:all + tsc --noEmit yeşil; dist=src eşit.
 - Nöbetçi-deseni: sprint-izleme ana-oturumda değil Sonnet-subagent'ta (A–F tetikleri) — A3'te
   iki koşuda da başarıyla çalıştı.
-- Done-ready sayacı: **12/20** (+6 C-satırı VERIFY'da owner-DONE bekliyor) — önceki 10 + A3 event-truth (3354 VERIFY) + exploration-bonus (9073 DONE).
+- Done-ready sayacı: **12/20** (+7 satır VERIFY'da owner-DONE bekliyor: 6 C-satırı + 60) — önceki 10 + A3 event-truth (3354 VERIFY) + exploration-bonus (9073 DONE).
 - Dogfood dist-gecikmesi kuralı (owner-anlatımı verildi): run başladığı dist'le biter;
   motor-fix'i aynı run'a etki edemez — sıcak-yol fix'i önce mini-run'la landılır.
 

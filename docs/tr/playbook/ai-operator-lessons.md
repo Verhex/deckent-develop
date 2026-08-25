@@ -551,3 +551,16 @@ attempt harcama gerekçesi değil, host composition defect kanıtıdır.
   DERLENMİŞ parser'la (reimplementasyon değil) doğrular — D_NO_READS_FOR_SRC bu dersin typed
   kalıcılaşmasıdır ve aynı araç 670-DIRECTIVES'inde 13/13 BLOCK yakalayarak kendini kanıtladı.
   Yan-ders: izleme-gürültüsü ana-oturuma basılmaz — sessiz nöbetçi-subagent yalnız bulgu taşır.
+- **2026-08-26 — gece-otonom dersleri (sprint-674→678 + strike-5)**: (1) **Pipe exit-kodu
+  yutar** — `komut | tail` zincirinin `$?`'ı son borunun kodudur; aynı tuzak bir gecede iki kez
+  bağımsız üredi (full-suite verdict'i + build-HOLD'un maskelenmesi) ve 540'ın "exit-0"
+  iddiasının da en olası açıklaması çıktı. Verdict daima pipe'sız yakalanır. (2) **Motor
+  sıcak-yolu fix'i aynı run'a etki edemez** — run başladığı dist'le biter; 674 kendi düzelttiği
+  dependency-bug'ına eski-dist'te yakalanıp typed-PAUSE ile durdu. Sıcak-yol fix'i önce
+  mini-run'la landılır, dalga sonra koşar. (3) **XVerify iddia-disiplini rafine edildi** —
+  kompozisyon-hold'ları katman katman tiplendi (evidence-scope → boyut-filtresi →
+  prompt-tavanı → verdict) ve hold-detail artık gerçek nedeni taşıyor; iddialar
+  diff-karar-verilebilir yazılır, `--files` küçük tutulur, değişmeyen-satır iddiası diff'ten
+  kanıtlanamaz (sol'un UNCLEAR'ı doğru davranıştı). (4) **Heal, okuyamadığı dosyayı taşıyamaz**
+  — strike-5: fd-baskısı altında io-hatası "bozuk" sayılıp sağlam 92-anahtarlı config iki kez
+  karantinaya gitti; onarıcılar yalnız parse-kanıtıyla dosya taşır, io-hatası typed-HOLD'dur.

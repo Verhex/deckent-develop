@@ -38,6 +38,7 @@ import {
   taskResultSettlementActiveClaimDigest,
   writeTaskResultSettlementAttemptAtomic,
 } from '../core/task-result-settlement.js';
+import { normalizeTaskResultShape } from '../core/task-result-schema.js';
 import {
   TaskStatus,
   type ProviderName,
@@ -106,6 +107,11 @@ interface HostEnrichedResultExtras {
   distMutated?: boolean;
 }
 
+interface BrainAuthoredResultExtras {
+  brainEvaluation?: string | null;
+  brainEvaluationReason?: string | null;
+}
+
 type HostEnrichableResult = TaskResult & HostEnrichedResultExtras;
 
 /**
@@ -151,8 +157,21 @@ export const XVERIFY_PRODUCER_ENRICHMENT_FIELDS: readonly HostEnrichmentField[] 
     'providerBilling',
   ]);
 
+type DownstreamAuthoredField = Extract<
+  keyof BrainAuthoredResultExtras,
+  'brainEvaluation' | 'brainEvaluationReason'
+>;
+
+export const XVERIFY_DOWNSTREAM_AUTHORED_FIELDS: readonly DownstreamAuthoredField[] =
+  Object.freeze([
+    'brainEvaluation',
+    'brainEvaluationReason',
+  ]);
+
 const ENRICHMENT_FIELDS: ReadonlySet<string> =
   new Set<string>(XVERIFY_PRODUCER_ENRICHMENT_FIELDS);
+const DOWNSTREAM_AUTHORED_FIELDS: ReadonlySet<string> =
+  new Set<string>(XVERIFY_DOWNSTREAM_AUTHORED_FIELDS);
 
 export type CrossVerifyProducerFencingComparison =
   | { readonly state: 'equal' }
@@ -187,7 +206,10 @@ export function compareProducerFencedResult(
   settled: unknown,
   evaluated: unknown,
 ): CrossVerifyProducerFencingComparison {
-  const settledCore = producerFencedCore(settled);
+  const normalizedSettled = normalizeTaskResultShape(
+    settled as { notes?: unknown } | null,
+  );
+  const settledCore = producerFencedCore(normalizedSettled);
   const evaluatedCore = producerFencedCore(evaluated);
   if (!settledCore || !evaluatedCore) {
     return { state: 'diverged', divergingFields: ['<result-is-not-a-json-object>'] };
@@ -196,8 +218,15 @@ export function compareProducerFencedResult(
     ...Object.keys(settledCore),
     ...Object.keys(evaluatedCore),
   ])].sort();
-  const divergingFields = fields.filter(field =>
-    canonicalJson(settledCore[field]) !== canonicalJson(evaluatedCore[field]));
+  const divergingFields = fields.filter(field => {
+    if (DOWNSTREAM_AUTHORED_FIELDS.has(field)
+      && settledCore[field] === null
+      && evaluatedCore[field] !== null
+      && evaluatedCore[field] !== undefined) {
+      return false;
+    }
+    return canonicalJson(settledCore[field]) !== canonicalJson(evaluatedCore[field]);
+  });
   return divergingFields.length === 0
     ? { state: 'equal' }
     : { state: 'diverged', divergingFields };
@@ -271,6 +300,7 @@ function hold(
     state: 'hold',
     reasonCode,
     authorityEvidenceRef: evidenceRef(reasonCode, detail),
+    detail: typeof detail === 'string' ? detail : canonicalJson(detail),
     ...identity,
   };
 }

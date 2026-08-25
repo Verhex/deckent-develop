@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):5db90578a4e4690529f7da2d2a78f5658f81604c9f5aaa18fdb87d92ab3a8639`
+**Source digest:** `sha256(normalized-lf-utf8):0c5313fb1f9ea329146c7fe2d5f4f6a2746b9caae619701875e4759775011c62`
 
 **Rows:** 531 total · 464 active · 67 terminal
 
@@ -13,11 +13,11 @@
 
 | State | Count |
 |---|---:|
-| OPEN | 362 |
+| OPEN | 361 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 69 |
-| VERIFY | 33 |
+| VERIFY | 34 |
 | DONE | 67 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -29,7 +29,7 @@
 | 25 | `LEDGER-ISOLATED-COMMIT-PROOF-001` | OPEN | P2 | TRUTH | — | — | Canonical ledger uzlaştırmasının izole/fresh-clone commit kanıtı — SSOT-002 + SOURCE-MANIFEST-001 kapanışlarından taşınan canlı-kanıt boyutu |
 | 40 | `TRUTH-BASELINE-001` | BLOCKED | P0 | TRUTH | `TEST-675`, `TEST-676`, `TEST-HERMETIC-001` | `BASELINE_CONFLICT` | Current HEAD için tek reference test, build, binary ve environment baseline |
 | 50 | `TEST-675` | OPEN | P0 | TRUTH | — | — | Testlerin live `.tasks` alanına yazmasını kaldır ve writer discovery ratchet'i kur |
-| 60 | `TEST-676` | OPEN | P0 | TRUTH | — | — | Test koşumunda `dist` clean çağrısının fail-loud root cause'unu bul ve kapat |
+| 60 | `TEST-676` | VERIFY | P0 | TRUTH | — | — | Test koşumunda `dist` clean çağrısının fail-loud root cause'unu bul ve kapat |
 | 70 | `TEST-HERMETIC-001` | OPEN | P0 | TRUTH | `TEST-675` | — | Project root, HOME, `.tasks` ve tracked-file test writer discovery/migration |
 | 75 | `TEST-CONTAINMENT-001` | VERIFY | P0 | TRUTH | `TEST-675` | — | Process-birth, descendant ownership ve OS/OCI test containment authority foundation'ı |
 | 80 | `TEST-SPAWN-001` | OPEN | P1 | TRUTH | `TEST-HERMETIC-001` | — | Test `spawnSync` policy ve async migration |

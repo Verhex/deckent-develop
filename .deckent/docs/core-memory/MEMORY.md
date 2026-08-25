@@ -27,7 +27,7 @@
 - [XVerify claim disiplini](feedback_xverify_claim_discipline.md) — verify COMMIT'ten ÖNCE --files+--diff ile; nokta-iddia + eşlik eden target; evrenseller makine-gate işi (2026-08-17).
 - [Worker model tier routing](feedback_worker_model_tier_routing.md) — sol > opus > sonnet; kritik yüzey→üst tier, sonnet→stabil/kesin akış; terra/luna=sonnet-eşdeğeri ve altı; plan atamaları başlatmadan önce bu kurala karşı doğrulanır (2026-08-18).
 - [AI-Operatör Dersleri dokümanı](feedback_ai_operator_lessons_doc.md) — docs/{tr,en}/playbook/ai-operator-lessons.md yaşayan doküman; her sprint deneyiminden sonra ders+changelog güncellenir, iki dil senkron (2026-08-18).
-- [Full-suite kadansı](feedback_full_suite_cadence.md) — full vitest suite her landing'de DEĞİL, 3 landing'de bir; arada scoped+gate'ler yeter (2026-08-19).
+- [Full-suite kadansı](feedback_full_suite_cadence.md) — full vitest suite her landing'de DEĞİL, 5 landing'de bir (owner 2026-08-26; ~21dk/koşu ölçüldü); arada scoped+gate'ler yeter.
 - [Build-after-source-change](feedback_build_after_source_change.md) — sprint/el-kodu kaynak değiştirdiyse süreç-tamamlama `npm run build:all` ZORUNLU; dist=src eşitliği; sprint-koşarken build-yasağı aynen (2026-08-21).
 - [Provider-independent fallback yetki-devri](feedback_fallback_authority_handover.md) — limit/auth/reachability/context/host veya owner-directed engelde target effective config+kanıttan çözülür; iki taraf aynı `fallback-rules/authority-handoff.md` protokolünü uygular. Authority yalnız digest-chain'li `COMMITTED`/owner-recovery transition'ıyla geçer; dokümanı okumak devir değildir (Alperen 2026-08-21).
 ---

@@ -3,19 +3,19 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "5db90578a4e4690529f7da2d2a78f5658f81604c9f5aaa18fdb87d92ab3a8639"
+    "value": "0c5313fb1f9ea329146c7fe2d5f4f6a2746b9caae619701875e4759775011c62"
   },
   "summary": {
     "total": 531,
     "active": 464,
     "terminal": 67,
-    "receipts": 196,
+    "receipts": 197,
     "byState": {
-      "OPEN": 362,
+      "OPEN": 361,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
-      "VERIFY": 33,
+      "VERIFY": 34,
       "DONE": 67,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -157,10 +157,10 @@
       "id": "TEST-676",
       "program": "TRUTH",
       "priority": "P0",
-      "state": "OPEN",
-      "updated": "2026-07-28",
+      "state": "VERIFY",
+      "updated": "2026-08-25",
       "definitionDigest": "3b37c301f1bb6534470bdd6bac1860f197f0155583f4c31e1bdc8191965e7dee",
-      "progressDigest": "818044be813eef350a809e7d395d633ff4ab669054f1ef7e1d62bc9417486980",
+      "progressDigest": "c249e7a1c624170f015b07528aa184045947242ec88a67026b18a135fe64b470",
       "terminalClosureDigest": null
     },
     {
@@ -653,9 +653,9 @@
       "program": "TRUTH",
       "priority": "P0",
       "state": "BLOCKED",
-      "updated": "2026-07-26",
+      "updated": "2026-08-25",
       "definitionDigest": "7a95939b470339e2e62a9ddb942877bbfd24bbfd1ddf6bc151e1a3ac4cee7bab",
-      "progressDigest": "aa376297590cfe56b2dbdb9c22b0044549ff08b109671995b18cfa3a2e4e4824",
+      "progressDigest": "bf6b2a8955a57892c9623f90359ee928d7a2b90f4af981491cadbc3432b548d8",
       "terminalClosureDigest": null
     },
     {
@@ -7866,6 +7866,16 @@
         "transitionAt": "2026-08-25T23:38:13+03:00"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-26-TEST676-EVIDENCE-01",
+      "authorityDigest": "293892973fb8c8a4594a710f8a97298c853f9617ebdcc2d83da58500a2a75ebd",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-26T00:30:23+03:00"
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -8005,7 +8015,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
         "W": "1",
@@ -8023,11 +8033,12 @@
         "GR-2026-07-27-TEST-HERMETIC-02",
         "GR-2026-07-28-BUILD-RECOVERY-01",
         "GR-2026-07-28-EXECUTION-AUTHORITY-01",
-        "GR-2026-07-28-BOT-PID-AUTHORITY-01"
+        "GR-2026-07-28-BOT-PID-AUTHORITY-01",
+        "GR-2026-08-26-TEST676-EVIDENCE-01"
       ],
       "acceptance": "Caller trace, deterministic reproduction, forbid-clean guard ve stable binary proof",
-      "evidence": "`receipt=GR-2026-07-26-TEST-HERMETIC-01`; `receipt=GR-2026-07-27-TEST-HERMETIC-02`; `receipt=GR-2026-07-28-BUILD-RECOVERY-01`; `receipt=GR-2026-07-28-EXECUTION-AUTHORITY-01`; `receipt=GR-2026-07-28-BOT-PID-AUTHORITY-01`; clean authority is bound to the physical script root, rejects symlink/boundary ambiguity and validates all preserved entries before deletion; persistent execution anchors compare stable `dev+ino` generations across Linux mount namespaces while same-process pinned descriptors retain exact mount-ID validation and `.locks` replacement remains fail-closed; bot authority now uses a strict project-digest plus kernel-start-token record, atomic no-clobber publication and generation-bound clear, retires dead/reused/provably-foreign legacy records without signalling and fail-closes ambiguous identity; the exact stale raw PID 2 record was reconciled without signal; focused bot/CLI/clean proof passes 71/71, prior combined execution-authority proof passes 132/132, and full TypeScript/lint gates pass at hermetic identities `12125/1151`; final `npm run build` completed clean `ALLOW`, TypeScript and 111 copied assets at 2026-07-28 16:53 +03:00; authenticated runtime-wide ApprovalBroker bootstrap verifier, real committed/rollback recovery canary, native Windows bot/process ownership adapter and cross-platform proof remain open",
-      "updated": "2026-07-28"
+      "evidence": "`receipt=GR-2026-07-26-TEST-HERMETIC-01`; `receipt=GR-2026-07-27-TEST-HERMETIC-02`; `receipt=GR-2026-07-28-BUILD-RECOVERY-01`; `receipt=GR-2026-07-28-EXECUTION-AUTHORITY-01`; `receipt=GR-2026-07-28-BOT-PID-AUTHORITY-01`; clean authority is bound to the physical script root, rejects symlink/boundary ambiguity and validates all preserved entries before deletion; persistent execution anchors compare stable `dev+ino` generations across Linux mount namespaces while same-process pinned descriptors retain exact mount-ID validation and `.locks` replacement remains fail-closed; bot authority now uses a strict project-digest plus kernel-start-token record, atomic no-clobber publication and generation-bound clear, retires dead/reused/provably-foreign legacy records without signalling and fail-closes ambiguous identity; the exact stale raw PID 2 record was reconciled without signal; focused bot/CLI/clean proof passes 71/71, prior combined execution-authority proof passes 132/132, and full TypeScript/lint gates pass at hermetic identities `12125/1151`; final `npm run build` completed clean `ALLOW`, TypeScript and 111 copied assets at 2026-07-28 16:53 +03:00; authenticated runtime-wide ApprovalBroker bootstrap verifier, real committed/rollback recovery canary, native Windows bot/process ownership adapter and cross-platform proof remain open; `receipt=GR-2026-08-26-TEST676-EVIDENCE-01`; 2026-08-25-gece kanit-kapanisi: guard-zinciri CANLI ateslendi (suite-3 orta-kosu dist-rebuild'i HermeticDistIntegrityError ile yakalandi) + munhasir final-suite dist-dokunulmadan 38743/0 yesil + clean-HOLD alt-surec pini (bkz 540 receipt)",
+      "updated": "2026-08-25"
     },
     {
       "order": 70,
@@ -9625,8 +9636,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Provider/model rejection never masquerades as verifier judgment; structured cause survives all surfaces",
-      "evidence": "Legacy 671",
-      "updated": "2026-07-26"
+      "evidence": "Legacy 671; 2026-08-26 gece kanit-eki (sprint-678 xverify-onarimi + landing el-fix'i): kompozisyon-hold'lari artik katman-katman tipli ve NEDENLI — evidence-scope CLI-koku kapandi (diff→broker-guvenli path-listesi), producer-fence tabani duzeltildi (settled-taraf normalizer-simetrisi + brainEvaluation/Reason null→deger yasal-gecisi; 7-eleman allowlist DOKUNULMADI), hold() detail'i ledger'a tasiyor (canli zincir: bootstrap_failed 'unsafe/oversize .db' → ceiling '19495/16000' → verdict); ayni gece formal boru ILK kez gercek hakem-ciktisi uretti (sol UNCLEAR, dürüst 'undecidable-from-diff' gerekcesiyle) — abstention/rejection/UNCLEAR ayrimi canli gorunur. Kabul-probu: sprint-679+ otomatik cross-verify'inda kronik xverify_producer_result_mismatch imzasinin SIFIRLANMASI",
+      "updated": "2026-08-25"
     },
     {
       "order": 370,
@@ -27321,6 +27332,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "fad49d42ecc2a5e08e6b32c246545e7bda98702bc5734533b80c5a34b1e16e6c"
+    "value": "e4ec0194bef0c5830a4fe05f52c55e21a77d2e3dd28e5d1d4bb6a1e156243fb3"
   }
 }

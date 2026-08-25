@@ -666,7 +666,10 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // suite'leri (temp-agent-dryrun-purity, plan-preview-parity,
   // build-clean-hold-exit) + slice-onarimlarindaki fixture-effect ekleri;
   // hepsi tmpdir-hermetik, suite-owned.
-  count: 16315,
+  // 2026-08-26 xverify-onarim dalgasi (sprint-678): +2 — worker-authored
+  // tests/cli/xverify-evidence-scope.test.ts + fencing/ingress pin ekleri
+  // (tmpdir-hermetik, suite-owned).
+  count: 16317,
   // 2026-08-25 B-sweep: digest moved — --fix roundtrip pin, multi-label
   // parser pin, same-line rule downgraded to WARN (all suite-owned).
   // 2026-08-25 7141 wave: count unchanged, digest moved — the src-side
@@ -690,7 +693,11 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-26 00:05 landing-kuyrugu: ayni 16315, digest-only — suite-4
   // kalanlarinin onarimi (mcp-plan approve-override, contract SSOT x2,
   // EXECUTE_OPT_IN_RE bilesik-bayrak fix'i, error-baseline ratchet).
-  digest: 'a7729cb7abdb2784c287feba9607763a798f3d88d8409d163ed4371b348fccee',
+  // 2026-08-26 xverify dalgasi: digest evidence-scope/fence/detail src+test
+  // kaymalarini katlar.
+  // 2026-08-26 01:00: ayni 16317, digest-only — oversize-filtre el-fix'i +
+  // evidence-scope pini + lessons-doc.
+  digest: '6f7685434afa8a1bcdf1a113fe0b71ee1e265b3e86050e533114500160ca7f10',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1237,7 +1244,9 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // C-dalgasi src kaymalari (plan-purity, lock-ownership, close-stale,
   // budget-authoring, classifier) + landing el-fix'leri.
   // 2026-08-26 00:05: ayni 1336, digest-only — landing-kuyrugu src kaymalari.
-  digest: 'bc1b12a7b091a3f253e7d386b511aabfa6240ae81ecf3de023f2d0caccfb5f89',
+  // 2026-08-26 xverify dalgasi: ayni 1336, digest-only — CLI/ingress src kaymalari.
+  // 2026-08-26 01:00: ayni 1336, digest-only — oversize-filtre src kaymasi.
+  digest: '4699f4ed1859c53aab8d0647b6cb6502dc7d6e520abdd38c185a0eea2ee217b9',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

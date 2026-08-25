@@ -23,9 +23,10 @@
 
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { userInfo } from 'node:os';
 import { join } from 'node:path';
+import { CROSS_VERIFY_EVIDENCE_MAX_FILE_BYTES } from '../../core/cross-verify-evidence-broker.js';
 import type { Command } from 'commander';
 import type {
   Task,
@@ -223,6 +224,34 @@ function defaultCaptureDiff(root: string, files: readonly string[] = []): string
     return `${out}\n\n${body}`;
   } catch (err) {
     return `(git diff unavailable: ${err instanceof Error ? err.message : String(err)})`;
+  }
+}
+
+function defaultCaptureDiffPaths(root: string): string[] {
+  try {
+    const out = execFileSync('git', ['diff', '--name-only', 'HEAD'], {
+      cwd: root,
+      encoding: 'utf-8',
+      maxBuffer: 1024 * 1024,
+    });
+    return out
+      .split(/\r?\n/u)
+      .map((path) => path.trim())
+      .filter(Boolean)
+      // The v2 evidence broker refuses unsafe/oversize files with a hard hold;
+      // a derived path list must therefore pre-filter to broker-admissible
+      // files, otherwise one dirty runtime artifact (live case:
+      // provider-execution-observations.db) blocks the whole verification.
+      .filter((path) => {
+        try {
+          const stat = statSync(join(root, path));
+          return stat.isFile() && stat.size <= CROSS_VERIFY_EVIDENCE_MAX_FILE_BYTES;
+        } catch {
+          return false; // deleted/renamed-away paths carry no readable evidence
+        }
+      });
+  } catch {
+    return [];
   }
 }
 
@@ -581,10 +610,15 @@ export async function runXverifyForResult(
   // ── Synthetic verification envelope around the claim ──
   const id = `xv-${now.getTime()}-${randomUUID()}`;
   const filesFromFlag = (opts.files ?? '').split(',').map((f) => f.trim()).filter(Boolean);
+  const filesFromDiff = opts.diff ? defaultCaptureDiffPaths(root) : [];
   // Evidence requirements/scope cover both explicitly-changed files AND bounded
   // target paths (dedup) — diff scoping stays --files-only below, since a target
   // path is a read excerpt, not a claim about what changed.
-  const filesChanged = Array.from(new Set([...filesFromFlag, ...resolvedTargets.map((t) => t.path)]));
+  const filesChanged = Array.from(new Set([
+    ...filesFromFlag,
+    ...filesFromDiff,
+    ...resolvedTargets.map((t) => t.path),
+  ]));
   const diffText = opts.diff
     ? (deps.captureDiffFn ?? defaultCaptureDiff)(root, filesFromFlag)
     : undefined;
@@ -600,7 +634,7 @@ export async function runXverifyForResult(
       ).join('\n')
     : undefined;
   const evidenceContext = [diffText, targetsText].filter((p): p is string => Boolean(p)).join('\n\n') || undefined;
-  const hasEvidence = filesChanged.length > 0 || Boolean(opts.diff) || resolvedTargets.length > 0;
+  const hasEvidence = filesChanged.length > 0 || resolvedTargets.length > 0;
 
   // Requirement load: bare paths for --files entries WITHOUT a bounded target;
   // ranged requirements for every resolved target. A path that appears in both
