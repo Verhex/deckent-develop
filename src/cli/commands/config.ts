@@ -1,4 +1,11 @@
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, renameSync } from 'node:fs';
+
+/** Strike-5 (2026-08-25): config.json yazımı DAİMA tmp+rename — eşzamanlı okuyucu asla yarım dosya görmez. */
+function writeConfigFileAtomic(configPath: string, contents: string): void {
+  const tmpPath = `${configPath}.${process.pid}.tmp`;
+  writeFileSync(tmpPath, contents);
+  renameSync(tmpPath, configPath);
+}
 import { join } from 'node:path';
 import type { Command } from 'commander';
 import type { DeckentConfig } from '../../core/types.js';
@@ -67,7 +74,7 @@ export function importConfig(importPath: string, configPath: string): void {
   }
 
   const merged = deepMerge(existing, importData) as Record<string, unknown>;
-  writeFileSync(configPath, JSON.stringify(merged, null, 2) + '\n');
+  writeConfigFileAtomic(configPath, JSON.stringify(merged, null, 2) + '\n');
 }
 
 export function registerConfig(program: Command): void {
@@ -137,7 +144,7 @@ export function registerConfig(program: Command): void {
         }
 
         validatePartialConfig(existing);
-        writeFileSync(configPath, JSON.stringify(existing, null, 2) + '\n');
+        writeConfigFileAtomic(configPath, JSON.stringify(existing, null, 2) + '\n');
         print(getMessage('config.set', lang, { key, value: JSON.stringify(parsed) }));
       } catch (error) {
         if (error instanceof ConfigValidationError) {

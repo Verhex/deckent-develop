@@ -2193,26 +2193,53 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     await new Promise((resolve) => setTimeout(resolve, 150));
     projectConfig = await readJsonFile<Partial<DeckentConfig>>(projectConfigPath);
   }
+  // Strike-5 hardening (2026-08-25 night incident, owner-directed): readJsonFile
+  // returns null for BOTH parse failures and transient io failures (EMFILE-class
+  // fd pressure under a running full suite destroyed a healthy 92-key config
+  // twice tonight). Only a file that EXISTS, READS, and still FAILS TO PARSE is
+  // corrupted; an unreadable file is left untouched with a typed warning — a
+  // quarantine there loses data it never inspected.
   if (projectConfig === null && existsSync(projectConfigPath)) {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const backupPath = `${projectConfigPath}.corrupted.${timestamp}.bak`;
+    let rawText: string | null = null;
+    let parseCorrupt = false;
     try {
-      // Incident strike 4 (2026-08-25 12:33): move-then-write left the project
-      // WITHOUT a config when the fresh-default write failed after the rename.
-      // Safe order: stage the replacement FIRST, then swap — at every instant
-      // either the old or the new config exists at the canonical path.
-      const freshDefault = createDefaultConfig();
-      const tmpPath = `${projectConfigPath}.${process.pid}.tmp`;
-      writeFileSync(tmpPath, JSON.stringify(freshDefault, null, 2) + '\n');
-      renameSync(projectConfigPath, backupPath);
-      renameSync(tmpPath, projectConfigPath);
+      rawText = readFileSync(projectConfigPath, 'utf-8');
+    } catch (ioErr) {
       console.error(
-        `[deckent] Config dosyanız bozulmuştu, yedeklendi: ${backupPath}\n` +
-        `Defaults ile devam ediliyor. Düzeltme için: deckent config read`,
+        `[deckent] CONFIG_READ_IO_HOLD: config okunamadı (geçici io hatası — dosyaya DOKUNULMADI): `
+        + `${ioErr instanceof Error ? ioErr.message : String(ioErr)}. Defaults ile devam ediliyor; `
+        + `dosya diskte duruyor, bir sonraki yükleme yeniden dener.`,
       );
-      projectConfig = freshDefault;
-    } catch (backupErr) {
-      console.error(`[deckent] Config recovery failed: ${backupErr instanceof Error ? backupErr.message : String(backupErr)}`);
+    }
+    if (rawText !== null) {
+      try {
+        projectConfig = JSON.parse(rawText) as Partial<DeckentConfig>;
+        // Parses now → the earlier nulls were transient; the file is healthy.
+      } catch {
+        parseCorrupt = true; // exists + reads + does not parse = real corruption
+      }
+    }
+    if (parseCorrupt) {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const backupPath = `${projectConfigPath}.corrupted.${timestamp}.bak`;
+      try {
+        // Incident strike 4 (2026-08-25 12:33): move-then-write left the project
+        // WITHOUT a config when the fresh-default write failed after the rename.
+        // Safe order: stage the replacement FIRST, then swap — at every instant
+        // either the old or the new config exists at the canonical path.
+        const freshDefault = createDefaultConfig();
+        const tmpPath = `${projectConfigPath}.${process.pid}.tmp`;
+        writeFileSync(tmpPath, JSON.stringify(freshDefault, null, 2) + '\n');
+        renameSync(projectConfigPath, backupPath);
+        renameSync(tmpPath, projectConfigPath);
+        console.error(
+          `[deckent] Config dosyanız bozulmuştu, yedeklendi: ${backupPath}\n` +
+          `Defaults ile devam ediliyor. Düzeltme için: deckent config read`,
+        );
+        projectConfig = freshDefault;
+      } catch (backupErr) {
+        console.error(`[deckent] Config recovery failed: ${backupErr instanceof Error ? backupErr.message : String(backupErr)}`);
+      }
     }
   }
 

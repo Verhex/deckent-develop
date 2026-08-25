@@ -76,6 +76,25 @@ describe('corrupted config recovery', () => {
     expect(config.mode).toBeDefined();
   });
 
+  it('strike-5: io-error (EISDIR) does NOT quarantine — file untouched, no backup, defaults used', async () => {
+    // A transient read failure (EMFILE/EACCES/EISDIR class) must never move a
+    // file the healer could not even inspect. Hermetic io-error: a DIRECTORY at
+    // the config path — existsSync true, readFile throws EISDIR, parse never runs.
+    const configPath = join(tmpDir, '.deckent', 'config.json');
+    mkdirSync(configPath);
+
+    const stderrSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const config = await loadConfig(tmpDir, { force: true });
+    const warned = stderrSpy.mock.calls.some(c => String(c[0]).includes('CONFIG_READ_IO_HOLD'));
+    stderrSpy.mockRestore();
+
+    expect(config.mode).toBeDefined(); // defaults carried the load
+    expect(warned).toBe(true); // typed hold surfaced, not silent
+    const files = readdirSync(join(tmpDir, '.deckent'));
+    expect(files.filter(f => f.includes('.corrupted.')).length).toBe(0); // NO quarantine
+    expect(existsSync(configPath)).toBe(true); // path left exactly as found
+  });
+
   it('uses defaults when config file does not exist (no backup created)', async () => {
     // No config.json written — should just use defaults
     const config = await loadConfig(tmpDir, { force: true });
