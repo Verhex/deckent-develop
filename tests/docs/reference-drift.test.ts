@@ -63,9 +63,13 @@ describe('reference docs drift — cli-command-count sync', () => {
     expect(parityContent).toContain('deckent_models');
   });
 
-  it('cli.md reflects the native-terminal CLI reset rather than a stale models command', () => {
-    expect(cliContent).toContain('0 commands');
-    expect(cliContent).not.toMatch(/^## `models`$/m);
+  it('cli.md is the contract-generated full reference (surface-truth lane), not the reset-era stub', () => {
+    // The reset-era stub said '0 commands'; the surface-truth lane replaced it
+    // with the reference generated from the canonical CLI contract, where the
+    // real `models` command is legitimately documented again.
+    expect(cliContent).toContain('Auto-generated from the canonical CLI contract');
+    expect(cliContent).toContain('## Command index');
+    expect(cliContent).not.toContain('0 commands');
   });
 
   it('mcp.md documents CLI parity for the models tool', () => {

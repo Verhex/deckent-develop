@@ -650,7 +650,10 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // config-notification-outbox-fields suite (all tmpdir-hermetic).
   // 2026-08-25 config-loss hardening follow-up: +2 — additional worker pins
   // landed with the 671 harvest sweep (suite-owned tmpdir fixtures).
-  count: 16110,
+  // 2026-08-25 cli-surface-truth merge: +189 — the lane's three new guard
+  // suites (lint-cli-surface, cli-docs-contract, gen-reference-docs) and
+  // reworked cli test fixtures; all suite-owned.
+  count: 16299,
   // 2026-08-25 B-sweep: digest moved — --fix roundtrip pin, multi-label
   // parser pin, same-line rule downgraded to WARN (all suite-owned).
   // 2026-08-25 7141 wave: count unchanged, digest moved — the src-side
@@ -659,7 +662,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // progress contract (path-aware read-model harness) + incident-contract pins.
   // 2026-08-25 strike-4 fix: count unchanged, digest moved — config.ts
   // self-heal reordered to write-then-swap; scanned text shifted.
-  digest: 'e23afae9b4fbaa1d0c8d3e270fd9360f1fd80c1df6cfdc42a6c2e60eec4f0a39',
+  digest: '761d96dbb3f9a6fefa32b4c265d9be1bf1e0685020f79fe36e313aff9f32a726',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1178,7 +1181,9 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // digest moved — canonical done-counters (auditor/tracker), owner-notification
   // producers/drain wiring, terminal-aware sprint.lock release, event-stream
   // self-healing, live-events single-source, T0 config fields.
-  count: 1325,
+  // 2026-08-25 cli-surface-truth merge: lane production modules
+  // (cli-command-contract SSOT, governance catalog, generators).
+  count: 1335,
   // 2026-08-25 config-loss incident hardening: digest moved — atomic
   // last_sprint_id writer (refuse-mint + tmp+rename) and loadConfig
   // self-heal re-read-once + atomic fresh-default.
@@ -1188,7 +1193,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // DeckentError across 28 files (sprint-672 harvest + 1 manual serve.ts site).
   // 2026-08-25 strike-4 fix: digest moved — config.ts self-heal reordered
   // to write-then-swap (production text shifted).
-  digest: '76abeac3eb8f749394fb3a16e2f5fbfd869e62a8597588acfb2a77918ec37d1c',
+  digest: '4465c45b092301071afff056ca74b23d2aadc3aa6c8bd93c403abaadafa5c313',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

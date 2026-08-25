@@ -265,18 +265,26 @@ const staleDescriptionKeyGaps = baseline.descriptionKeyGaps.filter((g) => !descr
 // it must remain a real CLI-only command, carry the catalogued risk/capability,
 // and must fail (rather than merely warn as stale) if an MCP counterpart appears.
 const authorityIntentErrors = [];
-const registryContent = readFileSync(join(root, 'src', 'core', 'command-registry.ts'), 'utf8');
+// CLI-CONTRACT-001: the registry is now PROJECTED from the path-level SSOT in
+// cli-command-contract.ts — the old `entry('name', ...)` literals no longer
+// exist in command-registry.ts. Verify the catalogued authority against the
+// contract row's `registry` block + `surfaces` instead (same three facts:
+// risk, providers scope, CLI-only surface).
+const contractContent = readFileSync(join(root, 'src', 'core', 'cli-command-contract.ts'), 'utf8');
 for (const [name, intent] of Object.entries(baseline.intentionalCliAuthority)) {
   if (!baseline.cliOnly.includes(name) || !cliCommands.has(name) || findMcpForCli(name)) {
     authorityIntentErrors.push(`${name}: must remain a registered, baselined CLI-only command`);
   }
   const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const catalogEntry = new RegExp(
-    `entry\\('${escapedName}',\\s*'[^']+',\\s*'([^']+)',\\s*'([^']+)',\\s*\\[([^\\]]*)\\]`,
+  const contractRow = new RegExp(
+    `path:\\s*'${escapedName}'[^\\n]*`,
     'u',
-  ).exec(registryContent);
-  if (!catalogEntry || catalogEntry[1] !== intent.risk
-    || catalogEntry[2] !== 'providers' || catalogEntry[3].replace(/\s/gu, '') !== "'cli'") {
+  ).exec(contractContent)?.[0];
+  const familyRisk = contractRow ? /familyRisk:\s*'([^']+)'/u.exec(contractRow)?.[1] : undefined;
+  const scope = contractRow ? /scope:\s*'([^']+)'/u.exec(contractRow)?.[1] : undefined;
+  const surfaces = contractRow ? /surfaces:\s*\[([^\]]*)\]/u.exec(contractRow)?.[1] : undefined;
+  if (!contractRow || familyRisk !== intent.risk
+    || scope !== 'providers' || (surfaces ?? '').replace(/\s/gu, '') !== "'cli'") {
     authorityIntentErrors.push(`${name}: registry must catalog ${intent.risk}/providers/CLI-only authority`);
   }
   if (intent.capability !== 'provider-observation-migration'

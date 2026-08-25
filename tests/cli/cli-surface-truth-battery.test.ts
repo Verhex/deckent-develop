@@ -48,6 +48,12 @@ let buildProgram: () => Command;
 let program: Command;
 
 beforeAll(async () => {
+  // Hermeticity: the Commander tree resolves its descriptions at build time
+  // through resolveLanguage's env chain (DECKENT_LANGUAGE > ... > LANG). On a
+  // Turkish-locale host the whole tree renders TR and every EN binding check
+  // fails. Pin the language BEFORE the program is built; per-test TR checks
+  // set/restore DECKENT_LANGUAGE themselves.
+  process.env['DECKENT_LANGUAGE'] = 'en';
   const mod = await import('../../src/cli/index.js');
   buildProgram = mod.buildProgram;
   program = buildProgram();
