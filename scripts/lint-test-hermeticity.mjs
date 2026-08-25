@@ -657,7 +657,9 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // throw->DeckentError conversion shifted scanned text; tests/ untouched.
   // 2026-08-25 tail alignment: +1 — auditor suites re-pinned to the canonical
   // progress contract (path-aware read-model harness) + incident-contract pins.
-  digest: '0320135853a65d3807b9d7f0becabf4be97a05d2370d0fccddc72d28e3bcdb6b',
+  // 2026-08-25 strike-4 fix: count unchanged, digest moved — config.ts
+  // self-heal reordered to write-then-swap; scanned text shifted.
+  digest: 'e23afae9b4fbaa1d0c8d3e270fd9360f1fd80c1df6cfdc42a6c2e60eec4f0a39',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1184,7 +1186,9 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // extractScopeFromDirective (task-builder).
   // 2026-08-25 7141 wave: digest moved — 131 raw throws converted to typed
   // DeckentError across 28 files (sprint-672 harvest + 1 manual serve.ts site).
-  digest: 'db701cceb028c34c162a6b743b23c06e25891bec1dd12f780355f1fa03bc0efa',
+  // 2026-08-25 strike-4 fix: digest moved — config.ts self-heal reordered
+  // to write-then-swap (production text shifted).
+  digest: '76abeac3eb8f749394fb3a16e2f5fbfd869e62a8597588acfb2a77918ec37d1c',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

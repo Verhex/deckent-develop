@@ -2195,11 +2195,14 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const backupPath = `${projectConfigPath}.corrupted.${timestamp}.bak`;
     try {
-      renameSync(projectConfigPath, backupPath);
+      // Incident strike 4 (2026-08-25 12:33): move-then-write left the project
+      // WITHOUT a config when the fresh-default write failed after the rename.
+      // Safe order: stage the replacement FIRST, then swap — at every instant
+      // either the old or the new config exists at the canonical path.
       const freshDefault = createDefaultConfig();
-      // Atomic replace (same incident): never leave a truncate+write window.
       const tmpPath = `${projectConfigPath}.${process.pid}.tmp`;
       writeFileSync(tmpPath, JSON.stringify(freshDefault, null, 2) + '\n');
+      renameSync(projectConfigPath, backupPath);
       renameSync(tmpPath, projectConfigPath);
       console.error(
         `[deckent] Config dosyanız bozulmuştu, yedeklendi: ${backupPath}\n` +
