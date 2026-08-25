@@ -22,6 +22,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { DeckentError } from './errors.js';
 
 export const MAINTENANCE_ARCHIVE_MANIFEST_KIND = 'deckent.maintenance-archive-manifest';
 export const MAINTENANCE_ARCHIVE_MANIFEST_VERSION = 1 as const;
@@ -79,11 +80,17 @@ function portable(path: string): string {
 
 function safeRelativePath(value: string, label: string): string {
   if (value.length === 0 || isAbsolute(value) || value.includes('\0')) {
-    throw new Error(`MAINTENANCE_ARCHIVE_INVALID_${label.toUpperCase()}`);
+    throw new DeckentError(
+      'E_MAINTENANCE_ARCHIVE_INVALID_PATH',
+      `MAINTENANCE_ARCHIVE_INVALID_${label.toUpperCase()}`,
+    );
   }
   const normalized = portable(value).replace(/^\.\//u, '');
   if (normalized === '' || normalized === '.' || normalized.split('/').some(part => part === '..' || part === '')) {
-    throw new Error(`MAINTENANCE_ARCHIVE_INVALID_${label.toUpperCase()}`);
+    throw new DeckentError(
+      'E_MAINTENANCE_ARCHIVE_INVALID_PATH',
+      `MAINTENANCE_ARCHIVE_INVALID_${label.toUpperCase()}`,
+    );
   }
   return normalized;
 }
@@ -94,7 +101,10 @@ function withinProject(projectRoot: string, value: string, label: string): strin
   const absolute = resolve(root, relativePath);
   const projected = relative(root, absolute);
   if (projected === '' || projected.startsWith(`..${sep}`) || projected === '..' || isAbsolute(projected)) {
-    throw new Error(`MAINTENANCE_ARCHIVE_PATH_ESCAPE:${label}`);
+    throw new DeckentError(
+      'E_MAINTENANCE_ARCHIVE_PATH_ESCAPE',
+      `MAINTENANCE_ARCHIVE_PATH_ESCAPE:${label}`,
+    );
   }
   return absolute;
 }
@@ -107,10 +117,15 @@ function assertNoSymlink(root: string, absolutePath: string): void {
     if (!part) continue;
     cursor = join(cursor, part);
     try {
-      if (lstatSync(cursor).isSymbolicLink()) throw new Error('symlink');
+      if (lstatSync(cursor).isSymbolicLink()) {
+        throw new DeckentError('E_MAINTENANCE_ARCHIVE_SYMLINK', 'symlink');
+      }
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
-      throw new Error(`MAINTENANCE_ARCHIVE_SYMLINK_REJECTED:${portable(projected)}`);
+      throw new DeckentError(
+        'E_MAINTENANCE_ARCHIVE_SYMLINK_REJECTED',
+        `MAINTENANCE_ARCHIVE_SYMLINK_REJECTED:${portable(projected)}`,
+      );
     }
   }
 }
@@ -202,8 +217,18 @@ export function publishMaintenanceArchive(
   const sourcePath = withinProject(root, sourceRelative, 'source');
   assertNoSymlink(root, sourcePath);
   const sourceStat = lstatSync(sourcePath);
-  if (!sourceStat.isFile()) throw new Error('MAINTENANCE_ARCHIVE_SOURCE_NOT_REGULAR');
-  if (options.lineage.trim() === '') throw new Error('MAINTENANCE_ARCHIVE_INVALID_LINEAGE');
+  if (!sourceStat.isFile()) {
+    throw new DeckentError(
+      'E_MAINTENANCE_ARCHIVE_SOURCE_NOT_REGULAR',
+      'MAINTENANCE_ARCHIVE_SOURCE_NOT_REGULAR',
+    );
+  }
+  if (options.lineage.trim() === '') {
+    throw new DeckentError(
+      'E_MAINTENANCE_ARCHIVE_INVALID_LINEAGE',
+      'MAINTENANCE_ARCHIVE_INVALID_LINEAGE',
+    );
+  }
 
   const archiveRelative = safeRelativePath(
     options.archiveRoot ?? DEFAULT_MAINTENANCE_ARCHIVE_ROOT,
@@ -217,12 +242,18 @@ export function publishMaintenanceArchive(
   const contentPath = withinProject(root, contentRelative, 'content');
   const sourceBytes = readFileSync(sourcePath);
   if (createHash('sha256').update(sourceBytes).digest('hex') !== source.digest) {
-    throw new Error('MAINTENANCE_ARCHIVE_SOURCE_CHANGED');
+    throw new DeckentError(
+      'E_MAINTENANCE_ARCHIVE_SOURCE_CHANGED',
+      'MAINTENANCE_ARCHIVE_SOURCE_CHANGED',
+    );
   }
   const contentCreated = publishImmutable(contentPath, sourceBytes, 0o400);
   const contentFresh = hashOpenFile(contentPath);
   if (contentFresh.digest !== source.digest || contentFresh.bytes !== source.bytes) {
-    throw new Error('MAINTENANCE_ARCHIVE_PUBLICATION_UNVERIFIED');
+    throw new DeckentError(
+      'E_MAINTENANCE_ARCHIVE_PUBLICATION_UNVERIFIED',
+      'MAINTENANCE_ARCHIVE_PUBLICATION_UNVERIFIED',
+    );
   }
 
   const projection: Omit<MaintenanceArchiveManifest, 'manifestDigest'> = {
@@ -246,7 +277,12 @@ export function publishMaintenanceArchive(
     0o400,
   );
   const verification = verifyMaintenanceArchive(root, manifestRelative);
-  if (!verification.ok) throw new Error('MAINTENANCE_ARCHIVE_MANIFEST_UNVERIFIED');
+  if (!verification.ok) {
+    throw new DeckentError(
+      'E_MAINTENANCE_ARCHIVE_MANIFEST_UNVERIFIED',
+      'MAINTENANCE_ARCHIVE_MANIFEST_UNVERIFIED',
+    );
+  }
 
   let sourceRetired = false;
   if (options.retireSource) {
@@ -257,7 +293,10 @@ export function publishMaintenanceArchive(
       || freshStat.size !== sourceStat.size || freshStat.mtimeMs !== sourceStat.mtimeMs
       || (freshStat.mode & 0o777) !== (sourceStat.mode & 0o777)
       || fresh.digest !== source.digest || fresh.bytes !== source.bytes) {
-      throw new Error('MAINTENANCE_ARCHIVE_SOURCE_RETIREMENT_UNVERIFIED');
+      throw new DeckentError(
+        'E_MAINTENANCE_ARCHIVE_SOURCE_RETIREMENT_UNVERIFIED',
+        'MAINTENANCE_ARCHIVE_SOURCE_RETIREMENT_UNVERIFIED',
+      );
     }
     unlinkSync(sourcePath);
     sourceRetired = true;
@@ -308,7 +347,12 @@ export function replayMaintenanceArchive(
   destination: string,
 ): void {
   const verification = verifyMaintenanceArchive(projectRoot, manifestRelativePath);
-  if (!verification.ok || !verification.manifest) throw new Error('MAINTENANCE_ARCHIVE_REPLAY_UNVERIFIED');
+  if (!verification.ok || !verification.manifest) {
+    throw new DeckentError(
+      'E_MAINTENANCE_ARCHIVE_REPLAY_UNVERIFIED',
+      'MAINTENANCE_ARCHIVE_REPLAY_UNVERIFIED',
+    );
+  }
   const root = resolve(projectRoot);
   const destinationPath = withinProject(root, destination, 'destination');
   assertNoSymlink(root, destinationPath);
@@ -325,7 +369,10 @@ export function replayMaintenanceArchive(
   const replay = hashOpenFile(destinationPath);
   if (replay.digest !== verification.manifest.contentDigest || replay.bytes !== verification.manifest.bytes) {
     try { unlinkSync(destinationPath); } catch { /* retain verification failure */ }
-    throw new Error('MAINTENANCE_ARCHIVE_REPLAY_MISMATCH');
+    throw new DeckentError(
+      'E_MAINTENANCE_ARCHIVE_REPLAY_MISMATCH',
+      'MAINTENANCE_ARCHIVE_REPLAY_MISMATCH',
+    );
   }
 }
 

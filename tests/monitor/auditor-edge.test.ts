@@ -496,8 +496,13 @@ describe('writeScanToDashboard — edge cases', () => {
   const sprintInfo = { id: 'sprint-001', number: 1, phase: 'EXECUTE', status: 'ACTIVE' };
 
   it('corrupted existing dashboard JSON starts fresh without throwing', () => {
+    // T-671-002: progress now comes from the canonical read-model; route the
+    // fs mocks path-aware so the read-model lookup succeeds while the
+    // dashboard read stays corrupted.
+    const readModel = JSON.stringify({ logicalProgress: { done: 0, active: 0, blocked: 0, total: 0 } });
     mockedExistsSync.mockReturnValue(true);
-    mockedReadFileSync.mockReturnValueOnce('{ corrupt json {{' as never);
+    mockedReadFileSync.mockImplementation(((path: unknown) =>
+      String(path).endsWith('run-status-read-model.json') ? readModel : '{ corrupt json {{') as never);
 
     expect(() => {
       writeScanToDashboard('/project', sprintInfo, {
@@ -512,7 +517,12 @@ describe('writeScanToDashboard — edge cases', () => {
   });
 
   it('violation count is sum of all violation types', () => {
-    mockedExistsSync.mockReturnValue(false);
+    const readModel = JSON.stringify({ logicalProgress: { done: 0, active: 0, blocked: 0, total: 0 } });
+    mockedExistsSync.mockImplementation((path: unknown) => String(path).endsWith('run-status-read-model.json'));
+    mockedReadFileSync.mockImplementation(((path: unknown) => {
+      if (String(path).endsWith('run-status-read-model.json')) return readModel;
+      throw new Error('ENOENT');
+    }) as never);
 
     writeScanToDashboard('/project', sprintInfo, {
       heartbeats: [],

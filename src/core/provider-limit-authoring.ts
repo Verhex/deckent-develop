@@ -54,6 +54,7 @@ import {
 } from './provider-limit-policy.js';
 import { deriveProviderQuotaScopeRefHash } from './provider-limit-truth.js';
 import type { ProviderExecutionProfile, ReachabilityBackendScope } from './provider-truth.js';
+import { DeckentError } from './errors.js';
 
 const DEFAULT_ACCOUNT_IDENTITY_MAX_TTL_MS = 60_000;
 
@@ -493,7 +494,10 @@ export async function prepareProviderLimitsAuthorityWrite(
     const proposedEntries = proposalSnapshot.parent!.config.policies;
     const proposedEntry = proposedEntries[0];
     if (!proposedEntry || proposedEntries.length !== 1) {
-      throw new Error('Provider-limit proposal must contain exactly one policy');
+      throw new DeckentError(
+        'Provider-limit proposal must contain exactly one policy',
+        'Provider-limit proposal must contain exactly one policy',
+      );
     }
     const proposedSelectorKey = canonicalJson(proposedEntry.selector);
     const existingIndex = normalizedCurrent.policies.findIndex(
@@ -529,7 +533,10 @@ export async function prepareProviderLimitsAuthorityWrite(
       parent: { scope: 'global', config },
     });
     if (runtime.state === 'hold') {
-      throw new Error(`${runtime.reasonCode}:${runtime.detail}`);
+      throw new DeckentError(
+        runtime.reasonCode,
+        `${runtime.reasonCode}:${runtime.detail}`,
+      );
     }
     return {
       state: 'ready',

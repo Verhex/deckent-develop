@@ -23,6 +23,7 @@ import {
 } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
+import { DeckentError } from './errors.js';
 import { publishMaintenanceArchive } from './maintenance-archive.js';
 
 export const RUNTIME_LOG_RETENTION_VERSION = 1 as const;
@@ -103,7 +104,7 @@ function safeRelative(value: string): string {
   const normalized = portable(value).replace(/^\.\//u, '');
   if (normalized === '' || isAbsolute(value) || normalized.includes('\0')
     || normalized.split('/').some(part => part === '' || part === '.' || part === '..')) {
-    throw new Error('RUNTIME_LOG_INVALID_RELATIVE_PATH');
+    throw new DeckentError('RUNTIME_LOG_INVALID_RELATIVE_PATH', 'RUNTIME_LOG_INVALID_RELATIVE_PATH');
   }
   return normalized;
 }
@@ -142,8 +143,8 @@ function discover(root: string): string[] {
 
 function identity(path: string): Omit<RuntimeLogCandidate, 'source' | 'kind' | 'action'> {
   const before = lstatSync(path);
-  if (!before.isFile()) throw new Error('RUNTIME_LOG_NOT_REGULAR');
-  if (before.nlink !== 1) throw new Error('RUNTIME_LOG_MULTIPLY_LINKED');
+  if (!before.isFile()) throw new DeckentError('RUNTIME_LOG_NOT_REGULAR', 'RUNTIME_LOG_NOT_REGULAR');
+  if (before.nlink !== 1) throw new DeckentError('RUNTIME_LOG_MULTIPLY_LINKED', 'RUNTIME_LOG_MULTIPLY_LINKED');
   const descriptor = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
   const hash = createHash('sha256');
   const buffer = Buffer.allocUnsafe(64 * 1024);
@@ -157,7 +158,7 @@ function identity(path: string): Omit<RuntimeLogCandidate, 'source' | 'kind' | '
   const after = statSync(path);
   if (after.dev !== before.dev || after.ino !== before.ino || after.size !== before.size
     || after.mtimeMs !== before.mtimeMs || after.nlink !== 1) {
-    throw new Error('RUNTIME_LOG_CHANGED_DURING_INSPECTION');
+    throw new DeckentError('RUNTIME_LOG_CHANGED_DURING_INSPECTION', 'RUNTIME_LOG_CHANGED_DURING_INSPECTION');
   }
   return {
     bytes: after.size,
@@ -176,7 +177,7 @@ export function planRuntimeLogRetention(
   const root = resolve(projectRoot);
   const now = options.now ?? new Date();
   const maxAgeDays = options.maxAgeDays ?? DEFAULT_MAX_AGE_DAYS;
-  if (!Number.isInteger(maxAgeDays) || maxAgeDays < 1) throw new Error('RUNTIME_LOG_INVALID_MAX_AGE_DAYS');
+  if (!Number.isInteger(maxAgeDays) || maxAgeDays < 1) throw new DeckentError('RUNTIME_LOG_INVALID_MAX_AGE_DAYS', 'RUNTIME_LOG_INVALID_MAX_AGE_DAYS');
   const archiveRoot = safeRelative(options.archiveRoot ?? DEFAULT_ARCHIVE_ROOT);
   const writers = new Set((options.currentWriters ?? []).map(safeRelative));
   const retire: RuntimeLogCandidate[] = [];
@@ -229,7 +230,7 @@ export function applyRuntimeLogRetention(
   plan: RuntimeLogRetentionPlan,
   options: { readonly now?: Date; readonly currentWriters?: readonly string[] } = {},
 ): RuntimeLogRetentionApplyResult {
-  if (plan.version !== RUNTIME_LOG_RETENTION_VERSION) throw new Error('RUNTIME_LOG_INVALID_PLAN');
+  if (plan.version !== RUNTIME_LOG_RETENTION_VERSION) throw new DeckentError('RUNTIME_LOG_INVALID_PLAN', 'RUNTIME_LOG_INVALID_PLAN');
   const root = resolve(plan.projectRoot);
   const writers = new Set((options.currentWriters ?? []).map(safeRelative));
   const retired: string[] = [];
@@ -257,16 +258,16 @@ export function applyRuntimeLogRetention(
         archiveManifestPath = publication.manifestPath;
         archived.push(publication.manifestPath);
       }
-      if (!sameIdentity(path, candidate)) throw new Error('SOURCE_CHANGED');
+      if (!sameIdentity(path, candidate)) throw new DeckentError('SOURCE_CHANGED', 'SOURCE_CHANGED');
       if (candidate.action === 'retire-empty' && (candidate.bytes !== 0 || candidate.sha256 !== EMPTY_SHA256)) {
-        throw new Error('EMPTY_PROOF_INVALID');
+        throw new DeckentError('EMPTY_PROOF_INVALID', 'EMPTY_PROOF_INVALID');
       }
       const retiredAt = (options.now ?? new Date()).toISOString();
       const receiptProjection = { source, action: candidate.action, bytes: candidate.bytes, sha256: candidate.sha256, retiredAt, archiveManifestPath };
       const receiptId = createHash('sha256').update(JSON.stringify(receiptProjection)).digest('hex');
       const receipt = { version: RUNTIME_LOG_RETENTION_VERSION, receiptId, ...receiptProjection } satisfies RuntimeLogRetirementReceipt;
       const receiptPath = writeReceipt(root, plan.archiveRoot, receipt);
-      if (!sameIdentity(path, candidate)) throw new Error('SOURCE_CHANGED');
+      if (!sameIdentity(path, candidate)) throw new DeckentError('SOURCE_CHANGED', 'SOURCE_CHANGED');
       unlinkSync(path);
       receipts.push(receiptPath);
       retired.push(source);

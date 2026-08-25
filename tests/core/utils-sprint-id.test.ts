@@ -264,12 +264,12 @@ describe('updateLastSprintId', () => {
     expect(written.projectName).toBe('test');
   });
 
-  it('creates config if missing', () => {
+  it('refuses to mint a config when the file is missing (2026-08-25 incident contract)', () => {
+    // Writing `{last_sprint_id}` from an empty base erased every owner setting
+    // three times live — an absent config now means SKIP, never create.
     mockExistsSync.mockReturnValue(false);
     updateLastSprintId('/project', 'sprint-005');
-    expect(mockWriteFileSync).toHaveBeenCalledTimes(1);
-    const written = JSON.parse(mockWriteFileSync.mock.calls[0]![1] as string);
-    expect(written.last_sprint_id).toBe('sprint-005');
+    expect(mockWriteFileSync).not.toHaveBeenCalled();
   });
 
   it('preserves existing config fields when updating', () => {

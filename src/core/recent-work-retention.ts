@@ -20,6 +20,7 @@ import {
 } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 
+import { DeckentError } from './errors.js';
 import {
   reconcileSprintArchive,
   verifySprintArchive,
@@ -76,7 +77,9 @@ function portable(path: string): string {
 
 function identity(path: string): { bytes: number; sha256: string } {
   const metadata = lstatSync(path);
-  if (!metadata.isFile()) throw new Error('RECENT_WORK_NOT_REGULAR');
+  if (!metadata.isFile()) {
+    throw new DeckentError('RECENT_WORK_NOT_REGULAR', 'RECENT_WORK_NOT_REGULAR');
+  }
   const descriptor = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
   const hash = createHash('sha256');
   const buffer = Buffer.allocUnsafe(1024 * 1024);
@@ -121,7 +124,9 @@ export function planRecentWorkRetention(
   projectRoot: string,
   sprintId: string,
 ): RecentWorkRetentionPlan {
-  if (!SPRINT_ID.test(sprintId)) throw new Error(`INVALID_SPRINT_ID:${sprintId}`);
+  if (!SPRINT_ID.test(sprintId)) {
+    throw new DeckentError('INVALID_SPRINT_ID', `INVALID_SPRINT_ID:${sprintId}`);
+  }
   const root = resolve(projectRoot);
   const recentRoot = join(root, '.deckent', 'recently-works');
   const retire: RecentWorkRetirementCandidate[] = [];
@@ -177,7 +182,10 @@ export function applyRecentWorkRetention(
   plan: RecentWorkRetentionPlan,
 ): RecentWorkRetentionApplyResult {
   if (plan.version !== RECENT_WORK_RETENTION_VERSION || !SPRINT_ID.test(plan.sprintId)) {
-    throw new Error('INVALID_RECENT_WORK_RETENTION_PLAN');
+    throw new DeckentError(
+      'INVALID_RECENT_WORK_RETENTION_PLAN',
+      'INVALID_RECENT_WORK_RETENTION_PLAN',
+    );
   }
   const root = resolve(plan.projectRoot);
   const recentRoot = join(root, '.deckent', 'recently-works');

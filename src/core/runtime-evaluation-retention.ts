@@ -21,6 +21,7 @@ import {
 } from 'node:fs';
 import { basename, join, relative, resolve, sep } from 'node:path';
 
+import { DeckentError } from './errors.js';
 import {
   SPRINT_ARCHIVE_MANIFEST_FILE,
   publishSprintArchiveArtifact,
@@ -86,7 +87,9 @@ function portable(path: string): string {
 
 function identity(path: string): { bytes: number; sha256: string } {
   const metadata = lstatSync(path);
-  if (!metadata.isFile()) throw new Error('EVALUATION_NOT_REGULAR');
+  if (!metadata.isFile()) {
+    throw new DeckentError('EVALUATION_NOT_REGULAR', 'EVALUATION_NOT_REGULAR');
+  }
   const descriptor = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
   const hash = createHash('sha256');
   const buffer = Buffer.allocUnsafe(DIGEST_BUFFER_BYTES);
@@ -154,7 +157,9 @@ export function planRuntimeEvaluationRetention(
   options: Pick<RuntimeEvaluationRetentionOptions, 'currentSprintIds'> = {},
 ): RuntimeEvaluationRetentionPlan {
   const sprint = SPRINT_ID.exec(sprintId);
-  if (!sprint?.[1]) throw new Error(`INVALID_SPRINT_ID:${sprintId}`);
+  if (!sprint?.[1]) {
+    throw new DeckentError('INVALID_SPRINT_ID', `INVALID_SPRINT_ID:${sprintId}`);
+  }
   const root = resolve(projectRoot);
   const evaluationRoot = join(root, '.deckent', 'runtime', 'evaluations', sprintId);
   const currentWindow = [...new Set(options.currentSprintIds ?? [])].sort();
@@ -210,7 +215,10 @@ export function applyRuntimeEvaluationRetention(
   plan: RuntimeEvaluationRetentionPlan,
 ): RuntimeEvaluationRetentionResult {
   if (plan.version !== RUNTIME_EVALUATION_RETENTION_VERSION || !SPRINT_ID.test(plan.sprintId)) {
-    throw new Error('INVALID_RUNTIME_EVALUATION_RETENTION_PLAN');
+    throw new DeckentError(
+      'INVALID_RUNTIME_EVALUATION_RETENTION_PLAN',
+      'INVALID_RUNTIME_EVALUATION_RETENTION_PLAN',
+    );
   }
   const root = resolve(plan.projectRoot);
   const evaluationRoot = join(root, '.deckent', 'runtime', 'evaluations', plan.sprintId);

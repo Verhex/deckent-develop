@@ -33,7 +33,9 @@ describe('audit-operation-ingress — report-only fs-write/delete measurement', 
       readFileSync(join(process.cwd(), 'scripts/operation-ingress-baseline.json'), 'utf-8'),
     ) as { total: number; digest: string; mediated: number };
     expect(baseline.total).toBe(709);
-    expect(report.total).toBe(746);
+    // 747: +1 fs-write site — the atomic tmp+rename writer added by the
+    // 2026-08-25 config-loss incident hardening (utils/config).
+    expect(report.total).toBe(747);
     expect(baseline.digest).not.toBe(report.digest);
     expect(baseline.mediated).toBe(0);
   });

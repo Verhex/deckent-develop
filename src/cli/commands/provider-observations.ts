@@ -8,6 +8,7 @@ import { ApprovalStore } from '../../core/approval-store.js';
 import { bootstrapApprovalAuthority } from '../../core/approval-authority-bootstrap.js';
 import { openApprovalAuthorityRuntime } from '../../core/approval-authority-runtime.js';
 import { loadConfig } from '../../core/config.js';
+import { DeckentError } from '../../core/errors.js';
 import type { ResolvedConfig } from '../../core/config-types.js';
 import {
   inspectProviderExecutionObservationMigration, planProviderExecutionObservationMigration,
@@ -153,11 +154,11 @@ function stableId(prefix: string, values: readonly string[]): string {
   return prefix + '-' + createHash('sha256').update(values.join('\0')).digest('hex').slice(0, 32);
 }
 function projectRelativePath(projectRoot: string, candidate: string): string {
-  if (candidate.trim() === '' || isAbsolute(candidate)) throw new Error('INVALID_PATH');
+  if (candidate.trim() === '' || isAbsolute(candidate)) throw new DeckentError('INVALID_PATH', 'INVALID_PATH');
   const root = resolve(projectRoot);
   const within = relative(root, resolve(root, candidate));
   if (within === '' || within === '..' || within.startsWith('..' + sep) || isAbsolute(within)) {
-    throw new Error('PATH_ESCAPE');
+    throw new DeckentError('PATH_ESCAPE', 'PATH_ESCAPE');
   }
   return within;
 }
@@ -182,7 +183,9 @@ function migrationPlan(projectRoot: string, relativeDatabasePath: string): {
   return { inspection, plan };
 }
 function exactDigest(expected: string, supplied: string | undefined): void {
-  if (!supplied || !HEX_256.test(supplied) || supplied !== expected) throw new Error('PLAN_DIGEST_MISMATCH');
+  if (!supplied || !HEX_256.test(supplied) || supplied !== expected) {
+    throw new DeckentError('PLAN_DIGEST_MISMATCH', 'PLAN_DIGEST_MISMATCH');
+  }
 }
 
 function sha256(value: string | Buffer): string {
@@ -254,7 +257,9 @@ async function defaultMigration(
   const config = await loadConfig(projectRoot);
   const authority = config.approval?.authority;
   const lifecycle = config.approval?.lifecycle;
-  if (authority?.enabled !== true || !lifecycle) throw new Error('APPROVAL_AUTHORITY_REQUIRED');
+  if (authority?.enabled !== true || !lifecycle) {
+    throw new DeckentError('APPROVAL_AUTHORITY_REQUIRED', 'APPROVAL_AUTHORITY_REQUIRED');
+  }
   const now = (): Date => new Date();
   const opened = bootstrapApprovalAuthority(projectRoot, config, {
     broker: new ApprovalBroker(projectRoot, { lifecycle, clock: now }),
@@ -262,7 +267,7 @@ async function defaultMigration(
   });
   if (opened.state !== 'ready') {
     const reason = opened.state === 'hold' ? opened.reasonCode : 'approval_authority_disabled';
-    throw new Error('APPROVAL_AUTHORITY_HOLD:' + reason);
+    throw new DeckentError('APPROVAL_AUTHORITY_HOLD', 'APPROVAL_AUTHORITY_HOLD:' + reason);
   }
   try {
     const existing = options.approvalId ? opened.runtime.broker.getRequest(options.approvalId) : null;
@@ -295,7 +300,7 @@ async function defaultMigration(
 async function defaultAdoption(
   projectRoot: string, options: AdoptionOptions,
 ): Promise<ProviderObservationAdoptionProjection> {
-  if (!options.preimage) throw new Error('PREIMAGE_REQUIRED');
+  if (!options.preimage) throw new DeckentError('PREIMAGE_REQUIRED', 'PREIMAGE_REQUIRED');
   const paths = {
     v1PreimagePath: resolve(projectRoot, projectRelativePath(projectRoot, options.preimage)),
     currentDatabasePath: providerObservationProjectPath(projectRoot, options.database).databasePath,
@@ -492,7 +497,9 @@ export function openReconciliationApprovalRuntime(
   config: ResolvedConfig,
 ) {
   const authority = config.approval?.authority;
-  if (authority?.enabled !== true) throw new Error('APPROVAL_AUTHORITY_REQUIRED');
+  if (authority?.enabled !== true) {
+    throw new DeckentError('APPROVAL_AUTHORITY_REQUIRED', 'APPROVAL_AUTHORITY_REQUIRED');
+  }
   return openApprovalAuthorityRuntime({
     projectRoot,
     tenantId: authority.tenant_id,
@@ -510,10 +517,14 @@ async function defaultReconciliation(
     const { plan } = reconciliationPlan(projectRoot, options.database, options.runId);
     return { operation: 'reconcile', mode: 'dry-run', inspection, plan };
   }
-  if (!options.planDigest || !HEX_256.test(options.planDigest)) throw new Error('PLAN_DIGEST_MISMATCH');
+  if (!options.planDigest || !HEX_256.test(options.planDigest)) {
+    throw new DeckentError('PLAN_DIGEST_MISMATCH', 'PLAN_DIGEST_MISMATCH');
+  }
   const config = await loadConfig(projectRoot);
   const authorityConfig = config.approval?.authority;
-  if (authorityConfig?.enabled !== true) throw new Error('APPROVAL_AUTHORITY_REQUIRED');
+  if (authorityConfig?.enabled !== true) {
+    throw new DeckentError('APPROVAL_AUTHORITY_REQUIRED', 'APPROVAL_AUTHORITY_REQUIRED');
+  }
   const receiptContext = { projectRoot, tenantId: authorityConfig.tenant_id, environmentId: 'local-cli' };
   let existingReceipt: ProviderExecutionObservationReconciliationDurableReceipt | undefined;
   try {
@@ -529,7 +540,10 @@ async function defaultReconciliation(
   // bootstrap here made a correctly configured terminal authority unreachable.
   const opened = openReconciliationApprovalRuntime(projectRoot, config);
   if (opened.state !== 'ready') {
-    throw new Error('APPROVAL_AUTHORITY_HOLD:' + opened.reasonCode);
+    throw new DeckentError(
+      'APPROVAL_AUTHORITY_HOLD',
+      'APPROVAL_AUTHORITY_HOLD:' + opened.reasonCode,
+    );
   }
   try {
     const existing = options.approvalId ? opened.service.broker.getRequest(options.approvalId) : null;

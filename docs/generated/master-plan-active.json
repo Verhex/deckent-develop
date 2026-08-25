@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "76d6620fc3dc1e9ecc574846041098c2a298ea3f553749eae9df2c7b3a3761af"
+    "value": "d8cd25d8ee0d506a1644a46f0d9fb3bc0586b3776a70734f3fd369233807f71e"
   },
   "summary": {
     "total": 522,
@@ -5033,7 +5033,7 @@
       "state": "OPEN",
       "updated": "2026-08-25",
       "definitionDigest": "72a12fb1047dea839dc72cd935cbc4a6032ad1dd7300dbe0e4db271a8b41e22c",
-      "progressDigest": "c60d3b6774be56d64c36a81fed7c8e7e4b779bb2addd7aae04fbba4f2dda184d",
+      "progressDigest": "8e771c0f51a2f89b92b6f2916f80941b4ebdf062a2eeb91d3533c746b648dc01",
       "terminalClosureDigest": null
     },
     {
@@ -24032,7 +24032,7 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "`npm run lint:errors` 0 yeni-occurrence ile yeşil; error-handling-unification + error-registry-lint testleri baseline-mutabakatıyla geçer; dönüşüm assertion/ratchet zayıflatmadan, dosya-kümeli onarım-dalgası olarak koşulur (gen-repair-directives + lint:directives hattı); typed hata-sınıfları mevcut DeckentError/registry desenini izler",
-      "evidence": "Sprint-670 kanıtı: 3 FIX-turu boyunca worker'lar ratchet'i savunup NO_GO yazdı (task-670-006*.result); 131-site envanteri lint:errors çıktısında; sprint-670 arşivi `.deckent/archive/sprints/sprint-670`",
+      "evidence": "2026-08-25 dalga-kapanisi: sprint-672 (9 task, 8 tek-FIX-turda RESOLVED; 672-005 SCOPED_PROOF_HOLD verification-authority gap ile unresolved — kod-defekti degil, site elle cevrildi). 131/131 site typed DeckentError (ad-hoc aile; mesaj-baytlari korunur, baseline dokunulmadi). Kanit: `npm run lint:errors` -> `0 new violation(s), 319 known baseline occurrence(s)` exit-0; guard-suite 204/204; tsc-0; alan spot-suite 29/29; Tier-1 gercek-binary smoke stderr typed-kod (`(INVALID_PATH)`); 28 dosya +417/-131. Full-suite %100 kosusu landing-commit mesajinda. Kalan-VERIFY: owner satir-kabulu + farkli-provider xverify muhru (adjudicator-arizasi acikken typed-HOLD)",
       "updated": "2026-08-25"
     },
     {
@@ -26876,6 +26876,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "1eaf9adb4d9882529f25d60526e045c4802fd20272051778e96c6642e3a32c5c"
+    "value": "795558cfeed3c4b657b257a340d721b8e64a63aa4c23170713775e8c795e71f8"
   }
 }

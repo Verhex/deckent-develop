@@ -26,6 +26,7 @@ import {
   verifySprintArchive,
 } from './sprint-archive.js';
 import { parseSprintOrdinal } from './utils.js';
+import { DeckentError } from './errors.js';
 
 /**
  * Directory scanned for sprint-prefixed machine artifacts. Sprint-NNN-*.jsonl /
@@ -103,13 +104,15 @@ function reconcileTouchedSprintArchives(root: string, sprintIds: Iterable<string
       indexMemory: true,
     });
     if (report.failures.length > 0) {
-      throw new Error(
+      throw new DeckentError(
+        'E_SPRINT_RETENTION_RECONCILE_FAILED',
         `SPRINT_RETENTION_RECONCILE_FAILED:${sprintId}:${report.failures.join('|')}`,
       );
     }
     const verification = verifySprintArchive(root, sprintId);
     if (!verification.ok) {
-      throw new Error(
+      throw new DeckentError(
+        'E_SPRINT_RETENTION_VERIFY_FAILED',
         `SPRINT_RETENTION_VERIFY_FAILED:${sprintId}:missing=${verification.missing.length}:`
         + `mismatched=${verification.mismatched.length}:untracked=${verification.untracked.length}:`
         + `manifestDigestValid=${verification.manifestDigestValid}`,

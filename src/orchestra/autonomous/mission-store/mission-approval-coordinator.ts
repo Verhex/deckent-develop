@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import type { ApprovalRequestInput } from '../../../core/approval-broker.js';
+import { DeckentError } from '../../../core/errors.js';
 import {
   APPROVAL_CONTRACT_V2_VERSION,
   validateApprovalRequest,
@@ -194,7 +195,7 @@ export class MissionApprovalCoordinator implements MissionApprovalCoordinatorLik
       let invalidReason = '';
       try {
         if (!this.lifecycle.enabled) {
-          throw new Error('APPROVAL_LIFECYCLE_DISABLED');
+          throw new DeckentError('DECKENT_E004', 'APPROVAL_LIFECYCLE_DISABLED');
         }
         const draft = this.requestFactory(item, mission, now);
         const effectClass = autonomousApprovalEffectClass({
@@ -283,7 +284,7 @@ export class MissionApprovalCoordinator implements MissionApprovalCoordinatorLik
       if (!durable) {
         try {
           if (binding.request.version !== APPROVAL_CONTRACT_V2_VERSION) {
-            throw new Error(`MISSION_APPROVAL_V2_REQUIRED: ${binding.requestId}`);
+            throw new DeckentError('DECKENT_E004', `MISSION_APPROVAL_V2_REQUIRED: ${binding.requestId}`);
           }
           const publishedRequest = await this.publisher.submitLifecycle(binding.request);
           if (isApprovalFileAclHold(publishedRequest)) continue;

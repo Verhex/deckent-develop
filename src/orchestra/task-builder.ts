@@ -2930,7 +2930,7 @@ export function buildWorkerPrompt(
     segments: artifact.segments,
   });
   if (publishDeliveryReceipt && !writePromptDeliveryReceipt(projectRoot, receipt)) {
-    throw new Error(`PROMPT_DELIVERY_RECEIPT_WRITE_HOLD:${task.id}`);
+    throw new DeckentError('DECKENT_E077', `PROMPT_DELIVERY_RECEIPT_WRITE_HOLD:${task.id}`);
   }
 
   // Compatibility observer: its values are projected from the canonical receipt,

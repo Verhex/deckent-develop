@@ -7,6 +7,7 @@ import {
   acceptanceConfirmationDigest, canonicalAcceptanceConfirmationJson,
   validateAcceptanceConfirmationReceipt, type AcceptanceConfirmationReceipt,
 } from './acceptance-confirmation-contract.js';
+import { DeckentError } from './errors.js';
 
 export const ACCEPTANCE_RECONCILIATION_SCHEMA_VERSION = 1 as const;
 const HASH = /^[a-f0-9]{64}$/u;
@@ -152,10 +153,15 @@ export class AcceptanceReconciliationStore {
       try {
         const envelope = JSON.parse(bytes.toString('utf8')) as Record<string, unknown>;
         const parsed = validateAcceptanceConfirmationReceipt(envelope.confirmationReceipt);
-        if (!parsed.ok || typeof envelope.debtProjectionDigest !== 'string' || !HASH.test(envelope.debtProjectionDigest)) throw new Error('legacy receipt payload is invalid');
+        if (!parsed.ok || typeof envelope.debtProjectionDigest !== 'string' || !HASH.test(envelope.debtProjectionDigest)) {
+          throw new DeckentError('ACCEPTANCE_RECONCILIATION_LEGACY_RECEIPT_INVALID', 'legacy receipt payload is invalid');
+        }
         const write = this.#appendOne({ confirmationReceipt: parsed.value, debtProjectionDigest: envelope.debtProjectionDigest,
           ...(typeof envelope.appliedAt === 'string' ? { appliedAt: envelope.appliedAt } : {}) });
-        if (write.state === 'HOLD') throw new Error(write.message); sequence = write.receipt.sequence; adopted += 1;
+        if (write.state === 'HOLD') {
+          throw new DeckentError('ACCEPTANCE_RECONCILIATION_LEGACY_WRITE_HOLD', write.message);
+        }
+        sequence = write.receipt.sequence; adopted += 1;
       } catch (error) { problem = error instanceof Error ? error.message : 'legacy receipt is invalid'; invalid += 1; }
       this.#db.prepare('INSERT INTO acceptance_reconciliation_legacy_sources (source_path, source_digest, source_bytes, adopted_sequence, validation_error) VALUES (?, ?, ?, ?, ?)').run(path, sourceDigest, bytes, sequence, problem);
     })).immediate();
@@ -199,12 +205,16 @@ export class AcceptanceReconciliationStore {
   #readRow(row: Row): AcceptanceReconciliationReadResult {
     try {
       const parsed = validateAcceptanceConfirmationReceipt(JSON.parse(row.confirmation_json));
-      if (!parsed.ok) throw new Error('confirmation payload validation failed');
+      if (!parsed.ok) {
+        throw new DeckentError('ACCEPTANCE_RECONCILIATION_CONFIRMATION_INVALID', 'confirmation payload validation failed');
+      }
       const body = unsigned(row.sequence, parsed.value, row.debt_projection_digest);
       if (row.reconciliation_key !== body.reconciliationKey || row.tenant_id !== body.tenantId || row.project_id !== body.projectId
         || row.confirmation_id !== body.confirmationId || row.receipt_state !== body.state || row.predecessor_digest !== body.predecessorDigest
         || row.confirmation_digest !== body.confirmationDigest || row.recorded_at !== body.recordedAt || !HASH.test(row.debt_projection_digest)
-        || acceptanceConfirmationDigest(body) !== row.receipt_digest) throw new Error('persisted receipt digest or envelope mismatch');
+        || acceptanceConfirmationDigest(body) !== row.receipt_digest) {
+        throw new DeckentError('ACCEPTANCE_RECONCILIATION_PERSISTED_RECEIPT_MISMATCH', 'persisted receipt digest or envelope mismatch');
+      }
       return { state: 'FOUND', receipt: Object.freeze({ ...body, receiptDigest: row.receipt_digest }) };
     } catch (error) { return this.#corrupt(`corrupt reconciliation row ${row.sequence}: ${error instanceof Error ? error.message : 'invalid data'}`); }
   }

@@ -10,6 +10,7 @@
 import { existsSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 
+import { DeckentError } from './errors.js';
 import {
   publishMaintenanceArchive,
   type MaintenanceArchivePublication,
@@ -220,7 +221,7 @@ export function applyRunFlowRetention(
   const now = (options.now ?? new Date()).getTime();
   const staleAfterMs = options.staleAfterMs ?? DEFAULT_STALE_AFTER_MS;
   if (!Number.isFinite(now) || !Number.isSafeInteger(staleAfterMs) || staleAfterMs < 0) {
-    throw new Error('RUN_FLOW_RETENTION_INVALID_TIME_POLICY');
+    throw new DeckentError('RUN_FLOW_RETENTION_INVALID_TIME_POLICY', 'RUN_FLOW_RETENTION_INVALID_TIME_POLICY');
   }
   const root = resolve(projectRoot);
   const archived: RunFlowRetentionArchive[] = [];

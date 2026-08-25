@@ -12,6 +12,7 @@ import {
   openAcceptanceConfirmationComposition,
   type AcceptanceConfirmationAuthority,
 } from './acceptance-confirmation-composition.js';
+import { DeckentError } from '../core/errors.js';
 
 export const ACCEPTANCE_RECONCILIATION_MAX_PAGE_SIZE = ACCEPTANCE_CONFIRMATION_MAX_CANDIDATES;
 
@@ -168,16 +169,16 @@ export async function runAcceptanceConfirmationReconciliation(
   deps: AcceptanceConfirmationReconcilerDeps,
   input: RunAcceptanceConfirmationReconciliationInput,
 ): Promise<AcceptanceReconciliationRunResult> {
-  if (!validKey(input.tenantId)) throw new Error('acceptance reconciliation requires a tenant id');
+  if (!validKey(input.tenantId)) throw new DeckentError('DECKENT_E004', 'acceptance reconciliation requires a tenant id');
   if (!Number.isSafeInteger(input.limit) || input.limit < 1 || input.limit > ACCEPTANCE_RECONCILIATION_MAX_PAGE_SIZE) {
-    throw new Error(`acceptance reconciliation limit must be 1..${ACCEPTANCE_RECONCILIATION_MAX_PAGE_SIZE}`);
+    throw new DeckentError('DECKENT_E004', `acceptance reconciliation limit must be 1..${ACCEPTANCE_RECONCILIATION_MAX_PAGE_SIZE}`);
   }
   const cursor = input.cursor ?? null;
-  if (cursor !== null && !validKey(cursor)) throw new Error('acceptance reconciliation cursor is invalid');
+  if (cursor !== null && !validKey(cursor)) throw new DeckentError('DECKENT_E004', 'acceptance reconciliation cursor is invalid');
   const page = await deps.confirmations.scanTenantPartition({ tenantId: input.tenantId, after: cursor, limit: input.limit });
-  if (page.rows.length > input.limit) throw new Error('acceptance reconciliation confirmation store exceeded its bounded page');
+  if (page.rows.length > input.limit) throw new DeckentError('DECKENT_E004', 'acceptance reconciliation confirmation store exceeded its bounded page');
   if (page.nextCursor !== null && (!validKey(page.nextCursor) || (cursor !== null && page.nextCursor <= cursor))) {
-    throw new Error('acceptance reconciliation confirmation store returned a non-monotonic cursor');
+    throw new DeckentError('DECKENT_E004', 'acceptance reconciliation confirmation store returned a non-monotonic cursor');
   }
 
   const observations: AcceptanceReconciliationObservation[] = [];
@@ -206,7 +207,7 @@ export async function runAcceptanceConfirmationReconciliation(
   // All legal states for each requested key may coexist while the durable
   // projection compacts. Coalesce those duplicates, but retain a hard bound.
   if (receiptRows.length > confirmationIds.length * 4) {
-    throw new Error('acceptance reconciliation receipt store exceeded its bounded projection');
+    throw new DeckentError('DECKENT_E004', 'acceptance reconciliation receipt store exceeded its bounded projection');
   }
   const requested = new Set(confirmationIds);
   const states = new Map<string, AcceptanceReceiptState>();

@@ -1575,11 +1575,11 @@ export async function runCrossVerify(
             output: coordinated.output,
           });
           if (!persisted.validatedReceipt) {
-            throw new Error('validated durable verdict receipt is missing');
+            throw createCrossVerifyContractError('validated durable verdict receipt is missing');
           }
           const derivedReceiptRef = crossVerifyVerdictReceiptRef(persisted.validatedReceipt);
           if (persisted.verdictReceiptRef !== derivedReceiptRef) {
-            throw new Error('durable verdict receipt reference does not match its validated receipt');
+            throw createCrossVerifyContractError('durable verdict receipt reference does not match its validated receipt');
           }
           adjudicationReceiptRef = persisted.verdictReceiptRef;
           validatedAdjudicationReceipt = persisted.validatedReceipt;

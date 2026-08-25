@@ -1925,7 +1925,7 @@ export function materializeDockerGitIsolation(isolation: DockerGitIsolation): vo
   if (existsSync(adapter.hostPath)) {
     const current = readFileSync(adapter.hostPath, 'utf-8');
     if (current !== adapter.content) {
-      throw new Error(`Docker Git adapter identity conflict at ${adapter.hostPath}`);
+      throw new DeckentError('DECKENT_E004', `Docker Git adapter identity conflict at ${adapter.hostPath}`);
     }
     return;
   }

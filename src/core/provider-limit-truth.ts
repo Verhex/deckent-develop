@@ -14,6 +14,7 @@ import {
   assertOpaqueSha256,
 } from './provider-truth.js';
 import type { LimitEvidence } from './role-invocation-resolver.js';
+import { DeckentError } from './errors.js';
 
 export const PROVIDER_LIMIT_SCHEMA_VERSION = 1 as const;
 
@@ -373,7 +374,7 @@ function assertPolicy(policy: ProviderLimitPolicy): void {
   if (policy.ratioEnforcement !== undefined
     && policy.ratioEnforcement !== 'enforce'
     && policy.ratioEnforcement !== 'observe_only') {
-    throw new Error('Invalid provider limit ratio enforcement mode');
+    throw new DeckentError('DECKENT_E004', 'Invalid provider limit ratio enforcement mode');
   }
   if (!Number.isFinite(policy.warnAtRatio) || !Number.isFinite(policy.blockAtRatio)
     || policy.warnAtRatio < 0 || policy.warnAtRatio >= policy.blockAtRatio

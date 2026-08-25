@@ -961,9 +961,13 @@ export function listAcceptanceConfirmationCandidatesReadOnly(
     const canonicalPath = join(query.status === 'pending' ? pendingDir(projectRoot) : settledDir(projectRoot), `${entry.id}.json`);
     const loaded = existsSync(canonicalPath) ? readNormalizedFile(projectRoot, canonicalPath, options, false) : null;
     try {
-      if (!loaded || (query.status === 'settled' && !loaded.outcome)) throw new Error('stale');
+      if (!loaded || (query.status === 'settled' && !loaded.outcome)) {
+        throw new DeckentError('E_CONFIRMATION_INDEX_STALE', 'stale');
+      }
       assertExpectedAcceptanceLineage(loaded.request, entry.lineage);
-      if (loaded.request.requestedAt !== entry.requestedAt) throw new Error('stale');
+      if (loaded.request.requestedAt !== entry.requestedAt) {
+        throw new DeckentError('E_CONFIRMATION_INDEX_STALE', 'stale');
+      }
     } catch {
       quarantineProjection.push({ key, reasonCode: 'stale-index-row' });
       continue;

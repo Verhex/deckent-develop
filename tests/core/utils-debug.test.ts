@@ -101,6 +101,9 @@ describe('updateLastSprintId — silent catch behavior', () => {
   it('writes config successfully when path and deckent dir are valid', () => {
     const deckentDir = join(TMP, '.deckent');
     mkdirSync(deckentDir, { recursive: true });
+    // Refuse-mint contract (2026-08-25 config-loss incident): the updater only
+    // ever edits an EXISTING config — an absent file is never created.
+    writeFileSync(join(deckentDir, 'config.json'), '{}\n');
     updateLastSprintId(TMP, 'sprint-042');
     const config = readJsonSafe<Record<string, unknown>>(join(deckentDir, 'config.json'));
     expect(config).not.toBeNull();

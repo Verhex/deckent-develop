@@ -10,6 +10,7 @@ import { lstatSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 
 import type { RuntimeArtifactFamilyRetentionConfig } from './config-types.js';
+import { DeckentError } from './errors.js';
 import {
   publishMaintenanceArchive,
   type MaintenanceArchivePublication,
@@ -120,7 +121,7 @@ function validateBounds(bounds: RuntimeArtifactFamilyRetentionConfig): void {
   if (!Number.isInteger(bounds.max_age_days) || bounds.max_age_days < 1
     || !Number.isInteger(bounds.max_count) || bounds.max_count < 1
     || !Number.isFinite(bounds.max_size_mb) || bounds.max_size_mb <= 0) {
-    throw new Error('INVALID_RUNTIME_JOB_RETENTION_BOUNDS');
+    throw new DeckentError('INVALID_RUNTIME_JOB_RETENTION_BOUNDS', 'INVALID_RUNTIME_JOB_RETENTION_BOUNDS');
   }
 }
 
@@ -153,11 +154,11 @@ export function planRuntimeJobRetention(
     }
     try {
       const parsed = JSON.parse(readFileSync(absolute, 'utf8')) as unknown;
-      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new Error('invalid');
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new DeckentError('invalid', 'invalid');
       const record = parsed as Readonly<Record<string, unknown>>;
       const identified = identityAndNamespace(fileName, record);
       const status = text(record['status']);
-      if (!identified || status === undefined) throw new Error('invalid');
+      if (!identified || status === undefined) throw new DeckentError('invalid', 'invalid');
       views.push({ fileName, source, ...identified, status, updatedAtMs: timestamp(record, stat.mtimeMs), bytes: stat.size, record });
     } catch {
       hold.push({ fileName, source, reason: 'invalid-record' });
@@ -224,7 +225,7 @@ export function planRuntimeJobRetention(
 
 /** Archive and retire exactly the individually planned records. */
 export function applyRuntimeJobRetention(plan: RuntimeJobRetentionPlan): RuntimeJobRetentionResult {
-  if (plan.version !== RUNTIME_JOB_RETENTION_VERSION) throw new Error('INVALID_RUNTIME_JOB_RETENTION_PLAN');
+  if (plan.version !== RUNTIME_JOB_RETENTION_VERSION) throw new DeckentError('INVALID_RUNTIME_JOB_RETENTION_PLAN', 'INVALID_RUNTIME_JOB_RETENTION_PLAN');
   const retired: string[] = [];
   const publications: MaintenanceArchivePublication[] = [];
   const failures: string[] = [];

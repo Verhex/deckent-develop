@@ -37,6 +37,7 @@ import {
 } from '../core/approval-lifecycle-policy.js';
 import { readConfirmation } from '../core/confirmation-store.js';
 import type { ResolvedApprovalLifecycleConfig } from '../core/config-types.js';
+import { DeckentError } from '../core/errors.js';
 import type { FederatedPendingItem } from '../core/approval-inbox-federation.js';
 import { makeApprovalGate } from './autonomous/approval-adapter.js';
 import {
@@ -109,7 +110,7 @@ function assertFederatedMirrorIdentity(
         || request.source.reference !== (item.sourceReference ?? `federated:${item.origin}:${item.id}`)
         || request.lifecycleGeneration !== (item.lifecycleGeneration
           ?? `federated-${digestFederatedSource(item).slice(0, 24)}`)))) {
-    throw new Error(`federated mirror identity collision: ${item.id}`);
+    throw new DeckentError('DECKENT_E077', `federated mirror identity collision: ${item.id}`);
   }
 }
 
@@ -142,10 +143,10 @@ export async function mirrorFederatedItemToBroker(
   const lifecycle = resolveApprovalLifecyclePolicy({ enabled: true });
   const profile = lifecycle.profiles[origin];
   const createdAtMs = item.requestedAt === undefined ? now.getTime() : Date.parse(item.requestedAt);
-  if (!Number.isFinite(createdAtMs)) throw new Error(`invalid federated source timestamp: ${item.id}`);
+  if (!Number.isFinite(createdAtMs)) throw new DeckentError('DECKENT_E077', `invalid federated source timestamp: ${item.id}`);
   const producerExpiryMs = item.expiresAt === undefined ? Number.POSITIVE_INFINITY : Date.parse(item.expiresAt);
   if (item.expiresAt !== undefined && !Number.isFinite(producerExpiryMs)) {
-    throw new Error(`invalid federated producer expiry: ${item.id}`);
+    throw new DeckentError('DECKENT_E077', `invalid federated producer expiry: ${item.id}`);
   }
   const expiresAtMs = Math.min(producerExpiryMs, createdAtMs + profile.ttlMs);
   const riskTier = maxApprovalRiskTier(profile.riskTier, item.riskTier ?? 'routine');
@@ -196,7 +197,7 @@ export async function mirrorFederatedItemToBroker(
       slaStage: item.lifecycleStage ?? 'initial',
     });
     if (isApprovalFileAclHold(submitted)) {
-      throw new Error(`federated mirror private-store HOLD: ${submitted.reasonCode}`);
+      throw new DeckentError('DECKENT_E077', `federated mirror private-store HOLD: ${submitted.reasonCode}`);
     }
     return submitted;
   } catch (error) {

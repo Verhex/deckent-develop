@@ -9,6 +9,7 @@
 import { lstatSync, readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
 
+import { DeckentError } from './errors.js';
 import type { LineageUsageAuthorityAggregate, LineageUsageAttempt } from './lineage-usage-authority.js';
 import {
   parsePromptCostCanaryTaskAuthority,
@@ -160,7 +161,12 @@ function record(value: unknown): JsonRecord | null {
 
 function readJsonFile(path: string): unknown {
   const metadata = lstatSync(path);
-  if (!metadata.isFile() || metadata.isSymbolicLink()) throw new Error('not a regular archive file');
+  if (!metadata.isFile() || metadata.isSymbolicLink()) {
+    throw new DeckentError(
+      'E_PROMPT_COST_CANARY_ARCHIVE_INVALID_ARTIFACT',
+      'not a regular archive file',
+    );
+  }
   return JSON.parse(readFileSync(path, 'utf8')) as unknown;
 }
 
@@ -468,19 +474,35 @@ function readSprint(
     try {
       if (normalized === exactTerminalPath) {
         if (artifact.family !== 'run' || terminalArtifact) {
-          throw new Error('terminal receipt role is duplicated or mislabeled');
+          throw new DeckentError(
+            'E_PROMPT_COST_CANARY_ARCHIVE_INVALID_ARTIFACT',
+            'terminal receipt role is duplicated or mislabeled',
+          );
         }
         terminalArtifact = parseTerminal(readJsonFile(join(archiveDir, artifact.path)), sprintId);
-        if (!terminalArtifact) throw new Error('invalid canonical terminal lineage receipt');
+        if (!terminalArtifact) {
+          throw new DeckentError(
+            'E_PROMPT_COST_CANARY_ARCHIVE_INVALID_ARTIFACT',
+            'invalid canonical terminal lineage receipt',
+          );
+        }
         continue;
       }
       if (normalized === 'terminal-seal-receipt.json') {
         if (artifact.family !== 'run' || sealedTerminalReceipt) {
-          throw new Error('terminal seal receipt role is duplicated or mislabeled');
+          throw new DeckentError(
+            'E_PROMPT_COST_CANARY_ARCHIVE_INVALID_ARTIFACT',
+            'terminal seal receipt role is duplicated or mislabeled',
+          );
         }
         const seal = record(readJsonFile(join(archiveDir, artifact.path)));
         sealedTerminalReceipt = record(seal?.['terminalReceipt']);
-        if (!sealedTerminalReceipt) throw new Error('terminal seal receipt is invalid');
+        if (!sealedTerminalReceipt) {
+          throw new DeckentError(
+            'E_PROMPT_COST_CANARY_ARCHIVE_INVALID_ARTIFACT',
+            'terminal seal receipt is invalid',
+          );
+        }
         continue;
       }
       const taskMatch = TASK_PATH.exec(normalized);
@@ -503,9 +525,19 @@ function readSprint(
           }));
           continue;
         }
-        if (tasks.has(pathTaskId)) throw new Error('duplicate task artifact');
+        if (tasks.has(pathTaskId)) {
+          throw new DeckentError(
+            'E_PROMPT_COST_CANARY_ARCHIVE_INVALID_ARTIFACT',
+            'duplicate task artifact',
+          );
+        }
         const parsed = parseTask(value, pathTaskId);
-        if (!parsed) throw new Error('invalid task or prompt-canary authority');
+        if (!parsed) {
+          throw new DeckentError(
+            'E_PROMPT_COST_CANARY_ARCHIVE_INVALID_ARTIFACT',
+            'invalid task or prompt-canary authority',
+          );
+        }
         tasks.set(pathTaskId, parsed);
       } else if (resultMatch) {
         const pathTaskId = resultMatch[1]!;
@@ -515,23 +547,44 @@ function readSprint(
           }));
           continue;
         }
-        if (results.has(pathTaskId)) throw new Error('duplicate result artifact');
+        if (results.has(pathTaskId)) {
+          throw new DeckentError(
+            'E_PROMPT_COST_CANARY_ARCHIVE_INVALID_ARTIFACT',
+            'duplicate result artifact',
+          );
+        }
         const parsed = parseResult(value, pathTaskId);
-        if (!parsed) throw new Error('invalid result or exact attempt identity');
-        if (seenAttemptIds.has(parsed.attemptId)) throw new Error('duplicate exact attempt identity');
+        if (!parsed) {
+          throw new DeckentError(
+            'E_PROMPT_COST_CANARY_ARCHIVE_INVALID_ARTIFACT',
+            'invalid result or exact attempt identity',
+          );
+        }
+        if (seenAttemptIds.has(parsed.attemptId)) {
+          throw new DeckentError(
+            'E_PROMPT_COST_CANARY_ARCHIVE_INVALID_ARTIFACT',
+            'duplicate exact attempt identity',
+          );
+        }
         seenAttemptIds.add(parsed.attemptId);
         results.set(pathTaskId, parsed);
         resultsByAttemptId.set(parsed.attemptId, parsed);
       } else {
         const parsed = parseEvaluation(value);
         if (!parsed || !isSprintOwnedTaskArtifact(`task-${parsed.taskId}.json`, sprintId)) {
-          throw new Error('invalid evaluation or task identity');
+          throw new DeckentError(
+            'E_PROMPT_COST_CANARY_ARCHIVE_INVALID_ARTIFACT',
+            'invalid evaluation or task identity',
+          );
         }
         if (isPendingEvaluation(parsed)) {
           pendingEvaluations.push(parsed);
         } else {
           if (evaluationsByAttemptId.has(parsed.attemptId)) {
-            throw new Error('duplicate evaluation exact attempt identity');
+            throw new DeckentError(
+              'E_PROMPT_COST_CANARY_ARCHIVE_INVALID_ARTIFACT',
+              'duplicate evaluation exact attempt identity',
+            );
           }
           evaluationsByAttemptId.set(parsed.attemptId, parsed);
         }

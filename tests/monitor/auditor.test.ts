@@ -964,6 +964,36 @@ describe('startScanLoop with callback', () => {
   });
 });
 
+/**
+ * T-671-002 canonical-progress harness: writeScanToDashboard now reads the
+ * done/active/blocked/total quadruple from the run-status read-model and
+ * fail-closes (skips the write) when it is absent and no existing progress
+ * can be preserved. Route the generic fs mocks path-aware so the read-model
+ * lookup no longer consumes the tests' positional mockReturnValueOnce chains.
+ */
+function seedFsWithReadModel(options: {
+  progress?: { done: number; active: number; blocked: number; total: number } | null;
+  files?: Record<string, string>;
+  existsDefault?: boolean;
+}): void {
+  const files: Record<string, string> = { ...(options.files ?? {}) };
+  if (options.progress) {
+    files['run-status-read-model.json'] = JSON.stringify({ logicalProgress: options.progress });
+  }
+  const hit = (path: unknown): string | undefined => {
+    const p = String(path);
+    for (const key of Object.keys(files)) if (p.endsWith(key)) return files[key];
+    return undefined;
+  };
+  mockedExistsSync.mockImplementation((path: unknown) =>
+    hit(path) !== undefined ? true : (options.existsDefault ?? false));
+  mockedReadFileSync.mockImplementation(((path: unknown) => {
+    const content = hit(path);
+    if (content === undefined) throw new Error(`ENOENT: ${String(path)}`);
+    return content;
+  }) as never);
+}
+
 describe('writeScanToDashboard', () => {
   const sprintInfo = { id: 'sprint-001', number: 1, phase: 'EXECUTE', status: 'ACTIVE' };
 
@@ -1065,7 +1095,7 @@ describe('writeScanToDashboard', () => {
   });
 
   it('handles no existing dashboard (fresh start)', () => {
-    mockedExistsSync.mockReturnValue(false);
+    seedFsWithReadModel({ progress: { done: 0, active: 0, blocked: 0, total: 0 } });
 
     writeScanToDashboard('/project', sprintInfo, {
       heartbeats: [],
@@ -1115,7 +1145,7 @@ describe('writeScanToDashboard', () => {
   });
 
   it('includes auditorLastScan in output', () => {
-    mockedExistsSync.mockReturnValue(false);
+    seedFsWithReadModel({ progress: { done: 0, active: 0, blocked: 0, total: 0 } });
 
     writeScanToDashboard('/project', sprintInfo, {
       heartbeats: [],
@@ -1130,7 +1160,7 @@ describe('writeScanToDashboard', () => {
   });
 
   it('includes violations count', () => {
-    mockedExistsSync.mockReturnValue(false);
+    seedFsWithReadModel({ progress: { done: 0, active: 0, blocked: 0, total: 0 } });
 
     writeScanToDashboard('/project', sprintInfo, {
       heartbeats: [],
@@ -1147,7 +1177,7 @@ describe('writeScanToDashboard', () => {
   });
 
   it('dashboard JSON contains all DashboardState fields', () => {
-    mockedExistsSync.mockReturnValue(false);
+    seedFsWithReadModel({ progress: { done: 0, active: 0, blocked: 0, total: 0 } });
 
     writeScanToDashboard('/project', sprintInfo, {
       heartbeats: [],
@@ -1392,11 +1422,11 @@ describe('scanResultFiles', () => {
 describe('writeScanToDashboard — result file progress', () => {
   const sprintInfo = { id: 'sprint-001', number: 1, phase: 'EXECUTE', status: 'ACTIVE' };
 
-  it('sets progress.done from .result file count', () => {
-    mockedReadFileSync.mockImplementation(() => { throw new Error('ENOENT'); });
-    mockedExistsSync
-      .mockReturnValueOnce(false)  // dashPath does not exist
-      .mockReturnValueOnce(true);  // tasksDir exists for scanResultFiles
+  it('takes progress.done from the canonical read-model, never the result-file count (T-671-002)', () => {
+    // Two result files on disk but the canonical quadruple says done=4 — the
+    // dashboard MUST publish 4. Raw file counts (NO_GO + -fix attempts
+    // included) produced the measured done=24-vs-4 drift.
+    seedFsWithReadModel({ progress: { done: 4, active: 1, blocked: 0, total: 9 }, existsDefault: true });
     mockedReaddirSync.mockReturnValue(['task-001.result', 'task-002.result'] as never);
 
     writeScanToDashboard('/project', sprintInfo, {
@@ -1407,14 +1437,11 @@ describe('writeScanToDashboard — result file progress', () => {
     });
 
     const written = JSON.parse(mockedWriteFileSync.mock.calls[0]![1] as string);
-    expect(written.progress.done).toBe(2);
+    expect(written.progress.done).toBe(4);
   });
 
-  it('sets progress.active to heartbeats without matching result', () => {
-    mockedReadFileSync.mockImplementation(() => { throw new Error('ENOENT'); });
-    mockedExistsSync
-      .mockReturnValueOnce(false)  // dashPath
-      .mockReturnValueOnce(true);  // tasksDir
+  it('takes progress.active from the canonical read-model (heartbeats are presentation-only)', () => {
+    seedFsWithReadModel({ progress: { done: 1, active: 1, blocked: 0, total: 2 }, existsDefault: true });
     mockedReaddirSync.mockReturnValue(['task-001.result'] as never);
 
     writeScanToDashboard('/project', sprintInfo, {
@@ -1432,11 +1459,8 @@ describe('writeScanToDashboard — result file progress', () => {
     expect(written.progress.active).toBe(1);
   });
 
-  it('sets progress.done=0 and active=heartbeat count when no result files', () => {
-    mockedReadFileSync.mockImplementation(() => { throw new Error('ENOENT'); });
-    mockedExistsSync
-      .mockReturnValueOnce(false)  // dashPath
-      .mockReturnValueOnce(true);  // tasksDir
+  it('publishes the read-model quadruple verbatim when no result files exist', () => {
+    seedFsWithReadModel({ progress: { done: 0, active: 1, blocked: 0, total: 1 }, existsDefault: true });
     mockedReaddirSync.mockReturnValue(['task-001.json', 'task-001.hb'] as never);
 
     writeScanToDashboard('/project', sprintInfo, {
@@ -1462,10 +1486,8 @@ describe('writeScanToDashboard — result file progress', () => {
       alerts: [],
       updatedAt: new Date().toISOString(),
     };
-    mockedExistsSync
-      .mockReturnValueOnce(true)   // dashPath exists
-      .mockReturnValueOnce(true);  // tasksDir exists
-    mockedReadFileSync.mockReturnValue(JSON.stringify(existingDash) as never);
+    seedFsWithReadModel({ progress: { done: 1, active: 0, blocked: 0, total: 2 },
+      files: { '.dashboard': JSON.stringify(existingDash) }, existsDefault: true });
     mockedReaddirSync.mockReturnValue(['task-001.result'] as never);
 
     writeScanToDashboard('/project', sprintInfo, {
@@ -1479,7 +1501,7 @@ describe('writeScanToDashboard — result file progress', () => {
     expect(written.agents[0].status).toBe('DONE');
   });
 
-  it('preserves progress.total and progress.blocked from existing dashboard', () => {
+  it('preserves the existing progress quadruple when the read-model is unavailable (fail-closed)', () => {
     const existingDash: DashboardState = {
       sprint: { id: 'sprint-001', number: 1, phase: 'EXECUTE' as never, status: 'ACTIVE' as never },
       agents: [],
@@ -1488,10 +1510,10 @@ describe('writeScanToDashboard — result file progress', () => {
       alerts: [],
       updatedAt: new Date().toISOString(),
     };
-    mockedExistsSync
-      .mockReturnValueOnce(true)   // dashPath exists
-      .mockReturnValueOnce(true);  // tasksDir exists
-    mockedReadFileSync.mockReturnValue(JSON.stringify(existingDash) as never);
+    // No read-model on disk: the auditor must NOT re-count result files (three
+    // on disk!) — it preserves the existing quadruple untouched.
+    seedFsWithReadModel({ progress: null,
+      files: { '.dashboard': JSON.stringify(existingDash) }, existsDefault: true });
     mockedReaddirSync.mockReturnValue([
       'task-001.result', 'task-002.result', 'task-003.result',
     ] as never);
@@ -1504,7 +1526,7 @@ describe('writeScanToDashboard — result file progress', () => {
     });
 
     const written = JSON.parse(mockedWriteFileSync.mock.calls[0]![1] as string);
-    expect(written.progress.done).toBe(3);
+    expect(written.progress.done).toBe(1);
     expect(written.progress.total).toBe(8);
     expect(written.progress.blocked).toBe(1);
   });

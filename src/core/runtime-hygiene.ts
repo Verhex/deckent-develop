@@ -28,6 +28,7 @@ import {
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import type { RuntimeArtifactFamilyRetentionConfig } from './config-types.js';
+import { ErrorRegistry } from './errors.js';
 import {
   applyRecentWorkRetention,
   planRecentWorkRetention,
@@ -166,20 +167,34 @@ function safeRelative(value: string): string {
   const normalized = portable(value).replace(/^\.\//u, '');
   if (normalized === '' || isAbsolute(value) || value.includes('\0')
     || normalized.split('/').some(part => part === '' || part === '.' || part === '..')) {
-    throw new Error('RUNTIME_HYGIENE_INVALID_RELATIVE_PATH');
+    throw ErrorRegistry.createError('DECKENT_E004', {
+      message: 'RUNTIME_HYGIENE_INVALID_RELATIVE_PATH',
+    });
   }
   return normalized;
 }
 
 function validateLimit(value: number, label: string): number {
-  if (!Number.isSafeInteger(value) || value < 1) throw new Error(`RUNTIME_HYGIENE_INVALID_${label}`);
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw ErrorRegistry.createError('DECKENT_E004', {
+      message: `RUNTIME_HYGIENE_INVALID_${label}`,
+    });
+  }
   return value;
 }
 
 function identity(path: string): { bytes: number; sha256: string } {
   const before = lstatSync(path);
-  if (!before.isFile()) throw new Error('RUNTIME_HYGIENE_NOT_REGULAR');
-  if (before.nlink !== 1) throw new Error('RUNTIME_HYGIENE_MULTIPLY_LINKED');
+  if (!before.isFile()) {
+    throw ErrorRegistry.createError('DECKENT_E004', {
+      message: 'RUNTIME_HYGIENE_NOT_REGULAR',
+    });
+  }
+  if (before.nlink !== 1) {
+    throw ErrorRegistry.createError('DECKENT_E004', {
+      message: 'RUNTIME_HYGIENE_MULTIPLY_LINKED',
+    });
+  }
   const descriptor = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
   const hash = createHash('sha256');
   const buffer = Buffer.allocUnsafe(64 * 1024);
@@ -195,7 +210,9 @@ function identity(path: string): { bytes: number; sha256: string } {
   const after = statSync(path);
   if (after.dev !== before.dev || after.ino !== before.ino || after.size !== bytes
     || after.mtimeMs !== before.mtimeMs || after.nlink !== 1) {
-    throw new Error('RUNTIME_HYGIENE_CHANGED_DURING_INVENTORY');
+    throw ErrorRegistry.createError('DECKENT_E004', {
+      message: 'RUNTIME_HYGIENE_CHANGED_DURING_INVENTORY',
+    });
   }
   return { bytes, sha256: hash.digest('hex') };
 }
@@ -236,7 +253,11 @@ function inventory(root: string, limit: number): InventoryEntry[] {
       }
       const family = classify(source);
       if (family === null) continue;
-      if (entries.length === limit) throw new Error(`RUNTIME_HYGIENE_INVENTORY_LIMIT_EXCEEDED:${limit}`);
+      if (entries.length === limit) {
+        throw ErrorRegistry.createError('DECKENT_E004', {
+          message: `RUNTIME_HYGIENE_INVENTORY_LIMIT_EXCEEDED:${limit}`,
+        });
+      }
       if (!metadata.isFile()) continue;
       try {
         entries.push({ family, source, ...identity(path) });
@@ -295,7 +316,9 @@ export function planRuntimeHygiene(projectRoot: string, options: RuntimeHygieneO
   const current = new Set(options.currentSprintIds ?? []);
   const sprintIds = [...new Set(options.sprintIds ?? [])].sort();
   if (sprintIds.some(sprintId => current.has(sprintId))) {
-    throw new Error('RUNTIME_HYGIENE_CURRENT_SPRINT_MUTATION_REJECTED');
+    throw ErrorRegistry.createError('DECKENT_E004', {
+      message: 'RUNTIME_HYGIENE_CURRENT_SPRINT_MUTATION_REJECTED',
+    });
   }
   const entries = inventory(root, maxInventoryEntries);
   const recentWork = sprintIds.map(sprintId => planRecentWorkRetention(root, sprintId));
@@ -317,11 +340,17 @@ export function planRuntimeHygiene(projectRoot: string, options: RuntimeHygieneO
   const sources = candidateSources(recentWork, jobs, evaluations, flowSources, logs);
   const candidateSet = new Set(FAMILY_ORDER.flatMap(family => sources[family]));
   if (candidateSet.size > maxApplyItems) {
-    throw new Error(`RUNTIME_HYGIENE_APPLY_LIMIT_EXCEEDED:${maxApplyItems}`);
+    throw ErrorRegistry.createError('DECKENT_E004', {
+      message: `RUNTIME_HYGIENE_APPLY_LIMIT_EXCEEDED:${maxApplyItems}`,
+    });
   }
   const authority = entries.filter(entry => candidateSet.has(entry.source))
     .map(({ source, bytes, sha256 }) => ({ source, bytes, sha256 }));
-  if (authority.length !== candidateSet.size) throw new Error('RUNTIME_HYGIENE_CANDIDATE_OUTSIDE_INVENTORY');
+  if (authority.length !== candidateSet.size) {
+    throw ErrorRegistry.createError('DECKENT_E004', {
+      message: 'RUNTIME_HYGIENE_CANDIDATE_OUTSIDE_INVENTORY',
+    });
+  }
   const counters = emptyCounters();
   for (const entry of entries) {
     const prior = counters[entry.family];
@@ -382,7 +411,9 @@ function parseReceipt(bytes: Buffer, digest: string): RuntimeHygieneReceipt {
         || !Number.isSafeInteger(outcome.retiredBytes) || outcome.retiredBytes < 0
         || !Array.isArray(outcome.failures) || outcome.failures.some(item => typeof item !== 'string');
     })) {
-    throw new Error('RUNTIME_HYGIENE_RECEIPT_CONFLICT');
+    throw ErrorRegistry.createError('DECKENT_E004', {
+      message: 'RUNTIME_HYGIENE_RECEIPT_CONFLICT',
+    });
   }
   return parsed as RuntimeHygieneReceipt;
 }
@@ -390,20 +421,26 @@ function parseReceipt(bytes: Buffer, digest: string): RuntimeHygieneReceipt {
 function readReceiptBytes(path: string): Buffer {
   const before = lstatSync(path);
   if (!before.isFile() || before.nlink !== 1 || before.size > MAX_RUNTIME_HYGIENE_RECEIPT_BYTES) {
-    throw new Error('RUNTIME_HYGIENE_RECEIPT_CONFLICT');
+    throw ErrorRegistry.createError('DECKENT_E004', {
+      message: 'RUNTIME_HYGIENE_RECEIPT_CONFLICT',
+    });
   }
   const descriptor = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
   try {
     const opened = fstatSync(descriptor);
     if (opened.dev !== before.dev || opened.ino !== before.ino || opened.nlink !== 1
       || opened.size !== before.size || opened.mtimeMs !== before.mtimeMs) {
-      throw new Error('RUNTIME_HYGIENE_RECEIPT_CONFLICT');
+      throw ErrorRegistry.createError('DECKENT_E004', {
+        message: 'RUNTIME_HYGIENE_RECEIPT_CONFLICT',
+      });
     }
     const bytes = readFileSync(descriptor);
     const after = fstatSync(descriptor);
     if (bytes.length !== before.size || after.dev !== before.dev || after.ino !== before.ino
       || after.nlink !== 1 || after.size !== before.size || after.mtimeMs !== before.mtimeMs) {
-      throw new Error('RUNTIME_HYGIENE_RECEIPT_CONFLICT');
+      throw ErrorRegistry.createError('DECKENT_E004', {
+        message: 'RUNTIME_HYGIENE_RECEIPT_CONFLICT',
+      });
     }
     return bytes;
   } finally {
@@ -422,7 +459,9 @@ export function readRuntimeHygieneReceipt(
   receiptRoot = DEFAULT_RUNTIME_HYGIENE_RECEIPT_ROOT,
 ): RuntimeHygieneApplyResult | null {
   if (!RUNTIME_HYGIENE_DIGEST_PATTERN.test(planDigest)) {
-    throw new Error('RUNTIME_HYGIENE_PLAN_DIGEST_INVALID');
+    throw ErrorRegistry.createError('DECKENT_E004', {
+      message: 'RUNTIME_HYGIENE_PLAN_DIGEST_INVALID',
+    });
   }
   const root = resolve(projectRoot);
   const relativeRoot = safeRelative(receiptRoot);
@@ -491,9 +530,17 @@ export function applyRuntimeHygiene(
   plan: RuntimeHygienePlan,
   options: ApplyRuntimeHygieneOptions = {},
 ): RuntimeHygieneApplyResult {
-  if (plan.version !== RUNTIME_HYGIENE_VERSION) throw new Error('RUNTIME_HYGIENE_INVALID_PLAN');
+  if (plan.version !== RUNTIME_HYGIENE_VERSION) {
+    throw ErrorRegistry.createError('DECKENT_E004', {
+      message: 'RUNTIME_HYGIENE_INVALID_PLAN',
+    });
+  }
   const { planDigest: ignored, ...projection } = plan;
-  if (digestPlan(projection) !== plan.planDigest) throw new Error('RUNTIME_HYGIENE_PLAN_DIGEST_INVALID');
+  if (digestPlan(projection) !== plan.planDigest) {
+    throw ErrorRegistry.createError('DECKENT_E004', {
+      message: 'RUNTIME_HYGIENE_PLAN_DIGEST_INVALID',
+    });
+  }
   const root = resolve(plan.projectRoot);
   const path = receiptPath(plan);
   if (existsSync(join(root, path))) {

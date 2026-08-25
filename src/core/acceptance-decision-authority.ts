@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 
 import type { AcceptanceConfirmationLineage } from './acceptance-confirmation-contract.js';
 import { crossVerifyVerdictReceiptRef, readCrossVerifyVerdictReceipt } from './cross-verify-evidence-broker.js';
+import { DeckentError } from './errors.js';
 import type { TaskResultSettlementRefV1 } from './task-result-settlement.js';
 
 const VERSION = 1 as const;
@@ -35,7 +36,9 @@ const sha256 = (value: string): string => createHash('sha256').update(value).dig
 const sameBytes = (a: string, b: string): boolean => { const x = Buffer.from(a); const y = Buffer.from(b);
   return x.length === y.length && timingSafeEqual(x, y); };
 const bindingPath = (root: string, id: string): string => {
-  if (!/^[A-Za-z0-9_-]{1,128}$/.test(id)) throw new Error('invalid acceptance confirmation id');
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(id)) {
+    throw new DeckentError('ACCEPTANCE_CONFIRMATION_ID_INVALID', 'invalid acceptance confirmation id');
+  }
   return join(root, '.deckent', 'private', 'acceptance-decision-authority', `${id}.json`);
 };
 const sameRef = (a: TaskResultSettlementRefV1, b: TaskResultSettlementRefV1): boolean =>
@@ -44,17 +47,23 @@ const sameRef = (a: TaskResultSettlementRefV1, b: TaskResultSettlementRefV1): bo
 const expectedVerdict = (verdict: AcceptanceAuthorityDecision['verdict']) => verdict === 'CONFIRMED' ? 'CONFIRMED' : 'REFUTED';
 
 function parseBinding(value: unknown): LlmAcceptanceDecisionBindingV1 {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('invalid authority binding');
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new DeckentError('ACCEPTANCE_AUTHORITY_BINDING_INVALID', 'invalid authority binding');
+  }
   const record = value as Record<string, unknown>;
   const expected = ['bindingSha256', 'confirmationId', 'kind', 'lineage', 'receiptRef', 'settlementRef', 'verdict', 'version'].sort();
   if (canonical(Object.keys(record).sort()) !== canonical(expected) || record.version !== VERSION
     || record.kind !== 'llm-acceptance-decision-binding' || typeof record.confirmationId !== 'string'
     || (record.verdict !== 'CONFIRMED' && record.verdict !== 'FAILED') || typeof record.receiptRef !== 'string'
     || !RECEIPT_REF_RE.test(record.receiptRef)
-    || typeof record.bindingSha256 !== 'string' || !DIGEST_RE.test(record.bindingSha256)) throw new Error('invalid authority binding schema');
+    || typeof record.bindingSha256 !== 'string' || !DIGEST_RE.test(record.bindingSha256)) {
+    throw new DeckentError('ACCEPTANCE_AUTHORITY_BINDING_SCHEMA_INVALID', 'invalid authority binding schema');
+  }
   const binding = record as unknown as LlmAcceptanceDecisionBindingV1;
   const { bindingSha256: _digest, ...payload } = binding;
-  if (!sameBytes(binding.bindingSha256, sha256(canonical(payload)))) throw new Error('authority binding digest mismatch');
+  if (!sameBytes(binding.bindingSha256, sha256(canonical(payload)))) {
+    throw new DeckentError('ACCEPTANCE_AUTHORITY_BINDING_DIGEST_MISMATCH', 'authority binding digest mismatch');
+  }
   return binding;
 }
 
@@ -65,7 +74,7 @@ export function writeLlmAcceptanceDecisionBindingFirstWriterWins(input: {
   const receipt = readCrossVerifyVerdictReceipt(input.projectRoot, input.settlementRef);
   if (crossVerifyVerdictReceiptRef(receipt) !== input.receiptRef || !sameRef(receipt.receipt, input.settlementRef)
     || receipt.receipt.effectiveVerdict !== expectedVerdict(input.verdict))
-    throw new Error('LLM authority evidence mismatch');
+    throw new DeckentError('ACCEPTANCE_LLM_AUTHORITY_EVIDENCE_MISMATCH', 'LLM authority evidence mismatch');
   const payload = { version: VERSION, kind: 'llm-acceptance-decision-binding' as const,
     confirmationId: input.confirmationId, lineage: input.lineage, verdict: input.verdict,
     receiptRef: input.receiptRef, settlementRef: input.settlementRef };

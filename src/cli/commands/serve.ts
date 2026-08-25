@@ -13,6 +13,7 @@ import { print, printError } from '../helpers/output.js';
 import { getDashboardStaticDir } from '../helpers/dashboard-dir.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
 import { loadConfig } from '../../core/config.js';
+import { DeckentError } from '../../core/errors.js';
 import { bootstrapProviders } from '../../core/provider.js';
 import {
   bootstrapApprovalAuthority,
@@ -97,7 +98,7 @@ export function registerServe(program: Command): void {
       const port = parseInt(opts.port ?? '3100', 10);
 
       if (isNaN(port) || port < 1 || port > 65535) {
-        printError(new Error(`Invalid port: ${opts.port}`));
+        printError(new DeckentError('INVALID_PORT', `Invalid port: ${opts.port}`));
         process.exitCode = 1;
         return;
       }
@@ -244,7 +245,7 @@ export function registerServe(program: Command): void {
             correlationId: event.correlationId,
             metadata: { ...event },
           });
-          if (!written) throw new Error('ACCEPTANCE_CONFIRMATION_AUDIT_WRITE_FAILED');
+          if (!written) throw new DeckentError('E_ACCEPTANCE_CONFIRMATION_AUDIT_WRITE_FAILED', 'ACCEPTANCE_CONFIRMATION_AUDIT_WRITE_FAILED');
         };
         acceptanceConfirmation = Object.freeze({
           authority: Object.freeze({ tenantId, projectRoot: root }),

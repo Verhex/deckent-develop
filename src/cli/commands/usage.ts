@@ -25,6 +25,7 @@ import { getMessage, getLanguage } from '../helpers/messages.js';
 import { formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { loadConfig, DEFAULT_PROMPT_CONFIG } from '../../core/config.js';
+import { DeckentError } from '../../core/errors.js';
 import { parseTranscriptUsage, limitCost, resolveModelPrice } from '../../core/limit-ledger.js';
 import type { UsageRecord, LedgerOpts, LedgerPrices } from '../../core/limit-ledger.js';
 import { summarizeSprint, buildTranscriptTaskMap, evaluateCacheGate } from '../../core/limit-ledger-report.js';
@@ -461,7 +462,12 @@ async function runUsageCanary(options: UsageCommandOptions, deps: UsageDeps, roo
   }
   const receiptDecision = projection as unknown as PromptCostCanaryComparisonDecision;
   const decisionDigest = promptCostCanaryDecisionDigest(receiptDecision);
-  if (options.apply && options.decisionDigest !== decisionDigest) throw new Error(getMessage('usage.canary.apply_digest_mismatch', lang));
+  if (options.apply && options.decisionDigest !== decisionDigest) {
+    throw new DeckentError(
+      'USAGE_CANARY_APPLY_DIGEST_MISMATCH',
+      getMessage('usage.canary.apply_digest_mismatch', lang),
+    );
+  }
   const receiptScope = { projectRoot: root, environmentId: options.environment ?? 'default', tenantId: options.tenant ?? 'default' };
   let published: null | Pick<PublishPromptCostCanaryReceiptResult, 'state' | 'receipt'> = null;
   if (options.apply) {
@@ -519,12 +525,30 @@ export async function runUsageCommand(
   const lang = getLanguage(cfg.language);
   const hasBaseline = options.baselineSprint !== undefined;
   const hasCandidate = options.candidateSprint !== undefined;
-  if (hasBaseline !== hasCandidate) throw new Error(getMessage('usage.canary.both_sprints_required', lang));
-  if (!hasBaseline && (options.decisionDigest || options.environment || options.tenant)) {
-    throw new Error(getMessage('usage.canary.scope_requires_comparison', lang));
+  if (hasBaseline !== hasCandidate) {
+    throw new DeckentError(
+      'USAGE_CANARY_BOTH_SPRINTS_REQUIRED',
+      getMessage('usage.canary.both_sprints_required', lang),
+    );
   }
-  if (hasBaseline && (options.sprint || options.since || options.until || options.lineage)) throw new Error(getMessage('usage.canary.mutually_exclusive', lang));
-  if (options.apply && !hasBaseline) throw new Error(getMessage('usage.canary.apply_requires_comparison', lang));
+  if (!hasBaseline && (options.decisionDigest || options.environment || options.tenant)) {
+    throw new DeckentError(
+      'USAGE_CANARY_SCOPE_REQUIRES_COMPARISON',
+      getMessage('usage.canary.scope_requires_comparison', lang),
+    );
+  }
+  if (hasBaseline && (options.sprint || options.since || options.until || options.lineage)) {
+    throw new DeckentError(
+      'USAGE_CANARY_MUTUALLY_EXCLUSIVE',
+      getMessage('usage.canary.mutually_exclusive', lang),
+    );
+  }
+  if (options.apply && !hasBaseline) {
+    throw new DeckentError(
+      'USAGE_CANARY_APPLY_REQUIRES_COMPARISON',
+      getMessage('usage.canary.apply_requires_comparison', lang),
+    );
+  }
   if (hasBaseline) { await runUsageCanary(options, deps, root, lang); return; }
 
   // ─── Lineage mode (--lineage) ──────────────────────────────────────

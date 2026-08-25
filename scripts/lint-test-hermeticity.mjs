@@ -650,10 +650,14 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // config-notification-outbox-fields suite (all tmpdir-hermetic).
   // 2026-08-25 config-loss hardening follow-up: +2 — additional worker pins
   // landed with the 671 harvest sweep (suite-owned tmpdir fixtures).
-  count: 16109,
+  count: 16110,
   // 2026-08-25 B-sweep: digest moved — --fix roundtrip pin, multi-label
   // parser pin, same-line rule downgraded to WARN (all suite-owned).
-  digest: '645d1d9ff635eaf5eda4749bb711b5676a1283a5b69118753c461b7b263c7b9e',
+  // 2026-08-25 7141 wave: count unchanged, digest moved — the src-side
+  // throw->DeckentError conversion shifted scanned text; tests/ untouched.
+  // 2026-08-25 tail alignment: +1 — auditor suites re-pinned to the canonical
+  // progress contract (path-aware read-model harness) + incident-contract pins.
+  digest: '0320135853a65d3807b9d7f0becabf4be97a05d2370d0fccddc72d28e3bcdb6b',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1178,7 +1182,9 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // self-heal re-read-once + atomic fresh-default.
   // 2026-08-25 B-sweep: digest moved — parser multi-label merge in
   // extractScopeFromDirective (task-builder).
-  digest: '932a3e3abf74ed6be05c557a6673140d546a51e962043be262c2d5942c13570d',
+  // 2026-08-25 7141 wave: digest moved — 131 raw throws converted to typed
+  // DeckentError across 28 files (sprint-672 harvest + 1 manual serve.ts site).
+  digest: 'db701cceb028c34c162a6b743b23c06e25891bec1dd12f780355f1fa03bc0efa',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

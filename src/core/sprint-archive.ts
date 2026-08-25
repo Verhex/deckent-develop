@@ -52,6 +52,7 @@ import {
   TASKS_DIR,
 } from './constants.js';
 import { canonicalJson } from './audit-writer.js';
+import { DeckentError } from './errors.js';
 import { writeGuardedExports } from './memory-export.js';
 import { MemoryStore } from './memory-store.js';
 import type { SprintTerminalReceiptV1 } from './sprint-terminal-publication.js';
@@ -213,7 +214,7 @@ interface PublishedCandidate extends ArchiveCandidate {
 
 function assertSprintId(sprintId: string): void {
   if (!SPRINT_ID_PATTERN.test(sprintId)) {
-    throw new Error(`INVALID_SPRINT_ID:${sprintId}`);
+    throw new DeckentError('INVALID_SPRINT_ID', `INVALID_SPRINT_ID:${sprintId}`);
   }
 }
 
@@ -280,7 +281,9 @@ export function resolveTaskArtifactReadDirs(projectRoot: string, sprintId: strin
 
 function sprintNumber(sprintId: string): string {
   const match = SPRINT_ID_PATTERN.exec(sprintId);
-  if (!match?.[1]) throw new Error(`INVALID_SPRINT_ID:${sprintId}`);
+  if (!match?.[1]) {
+    throw new DeckentError('INVALID_SPRINT_ID', `INVALID_SPRINT_ID:${sprintId}`);
+  }
   return match[1];
 }
 
@@ -311,7 +314,12 @@ function hashFile(path: string): string {
 
 function fileIdentity(path: string): { bytes: number; sha256: string } {
   const metadata = lstatSync(path);
-  if (!metadata.isFile()) throw new Error(`ARCHIVE_SOURCE_NOT_REGULAR_FILE:${path}`);
+  if (!metadata.isFile()) {
+    throw new DeckentError(
+      'ARCHIVE_SOURCE_NOT_REGULAR_FILE',
+      `ARCHIVE_SOURCE_NOT_REGULAR_FILE:${path}`,
+    );
+  }
   return { bytes: statSync(path).size, sha256: hashFile(path) };
 }
 
@@ -375,7 +383,10 @@ function retireExactPublishedSource(source: string, destination: string): boolea
   const destinationIdentity = fileIdentity(destination);
   const sourceIdentity = fileIdentity(source);
   if (!identicalFileIdentity(destinationIdentity, sourceIdentity)) {
-    throw new Error(`ARCHIVE_RETIREMENT_DIGEST_MISMATCH:${source}`);
+    throw new DeckentError(
+      'ARCHIVE_RETIREMENT_DIGEST_MISMATCH',
+      `ARCHIVE_RETIREMENT_DIGEST_MISMATCH:${source}`,
+    );
   }
   unlinkSync(source);
   return true;
@@ -401,7 +412,10 @@ function publishVerifiedCopy(source: string, requestedDestination: string): {
       if (conflict.bytes === identity.bytes && conflict.sha256 === identity.sha256) {
         return { destination, state, identity };
       }
-      throw new Error(`ARCHIVE_CONFLICT_COLLISION:${destination}`);
+      throw new DeckentError(
+        'ARCHIVE_CONFLICT_COLLISION',
+        `ARCHIVE_CONFLICT_COLLISION:${destination}`,
+      );
     }
   }
 
@@ -411,7 +425,10 @@ function publishVerifiedCopy(source: string, requestedDestination: string): {
     copyFileSync(source, temporary, fsConstants.COPYFILE_EXCL | fsConstants.COPYFILE_FICLONE);
     const temporaryIdentity = fileIdentity(temporary);
     if (temporaryIdentity.bytes !== identity.bytes || temporaryIdentity.sha256 !== identity.sha256) {
-      throw new Error(`ARCHIVE_COPY_DIGEST_MISMATCH:${source}`);
+      throw new DeckentError(
+        'ARCHIVE_COPY_DIGEST_MISMATCH',
+        `ARCHIVE_COPY_DIGEST_MISMATCH:${source}`,
+      );
     }
     const descriptor = openSync(temporary, 'r');
     try { fsyncSync(descriptor); } finally { closeSync(descriptor); }
@@ -453,7 +470,12 @@ export function publishSprintArchiveArtifact(
     targetRelative.trim() === ''
     || isAbsolute(targetRelative)
     || !destination.startsWith(`${resolve(archiveDir)}${sep}`)
-  ) throw new Error(`INVALID_ARCHIVE_TARGET:${targetRelative}`);
+  ) {
+    throw new DeckentError(
+      'INVALID_ARCHIVE_TARGET',
+      `INVALID_ARCHIVE_TARGET:${targetRelative}`,
+    );
+  }
 
   if (!isSprintArchiveNamespaceSafe(projectRoot, sprintId)) {
     throw new SprintArchivePublicationError('ARCHIVE_UNSAFE_NAMESPACE', archiveDir);
@@ -497,7 +519,12 @@ function moveVerified(source: string, requestedDestination: string): string {
   if (
     destinationIdentity.bytes !== sourceIdentity.bytes
     || destinationIdentity.sha256 !== sourceIdentity.sha256
-  ) throw new Error(`ARCHIVE_MOVE_PRECONDITION_FAILED:${source}`);
+  ) {
+    throw new DeckentError(
+      'ARCHIVE_MOVE_PRECONDITION_FAILED',
+      `ARCHIVE_MOVE_PRECONDITION_FAILED:${source}`,
+    );
+  }
   unlinkSync(source);
   return published.destination;
 }
@@ -1263,7 +1290,12 @@ export function reconcileSprintArchive(
           if (
             conflictIdentity
             && (conflictIdentity.bytes !== identity.bytes || conflictIdentity.sha256 !== identity.sha256)
-          ) throw new Error(`ARCHIVE_CONFLICT_COLLISION:${plannedDestination}`);
+          ) {
+            throw new DeckentError(
+              'ARCHIVE_CONFLICT_COLLISION',
+              `ARCHIVE_CONFLICT_COLLISION:${plannedDestination}`,
+            );
+          }
         }
         plannedIdentities.set(resolve(plannedDestination), identity);
         published.push({
@@ -1287,7 +1319,12 @@ export function reconcileSprintArchive(
         if (
           destinationIdentity.bytes !== publication.identity.bytes
           || destinationIdentity.sha256 !== publication.identity.sha256
-        ) throw new Error(`ARCHIVE_RETIREMENT_DIGEST_MISMATCH:${candidate.source}`);
+        ) {
+          throw new DeckentError(
+            'ARCHIVE_RETIREMENT_DIGEST_MISMATCH',
+            `ARCHIVE_RETIREMENT_DIGEST_MISMATCH:${candidate.source}`,
+          );
+        }
         unlinkSync(candidate.source);
         removeEmptyTree(dirname(candidate.source));
         retired += 1;

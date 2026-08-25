@@ -11,6 +11,7 @@ import { join } from 'node:path';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { createHash, randomUUID } from 'node:crypto';
 import { debugLog } from './utils.js';
+import { DeckentError } from './errors.js';
 import {
   discoverSprintArchiveIds, publishSprintArchiveArtifact, resolveSprintArchiveDir,
 } from './sprint-archive.js';
@@ -94,7 +95,7 @@ export function rotateMetricsFile(
       || publication.bytes !== gzipped.length
       || publication.sha256 !== digest
       || !readFileSync(archivePath).equals(gzipped)
-    ) throw new Error('METRICS_ARCHIVE_VERIFY_FAILED');
+    ) throw new DeckentError('DECKENT_E008', 'METRICS_ARCHIVE_VERIFY_FAILED');
   } finally {
     // This is process-owned staging, never an archive artifact.
     try { unlinkSync(stagingPath); } catch { /* staging was never created or already removed */ }

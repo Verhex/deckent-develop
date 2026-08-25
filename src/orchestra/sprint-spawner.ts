@@ -13,6 +13,7 @@ import {
   TaskStatus, AgentStatus, SprintPhase,
 } from '../core/types.js';
 import { BrainError } from './sprint-lifecycle.js';
+import { DeckentError } from '../core/errors.js';
 
 // ─── Core (type imports) ───────────────────────────────────────────
 import type {
@@ -1115,7 +1116,7 @@ export async function spawnWorkers(
     // for event projection; it never publishes a scheduler-specific sidecar.
     const promptDelivery = readPromptDeliveryReceipt(projectRoot, task.id);
     if (promptDelivery.state !== 'AVAILABLE') {
-      throw new Error(`PROMPT_DELIVERY_RECEIPT_HOLD:${task.id}:${promptDelivery.reason}`);
+      throw new DeckentError('DECKENT_E077', `PROMPT_DELIVERY_RECEIPT_HOLD:${task.id}:${promptDelivery.reason}`);
     }
     const model = task.model;
     // Row 4061: same authority, same formatter as every other backend. The

@@ -273,6 +273,9 @@ describe('run-flow-decision-service — shared decide/start (SURF-6)', () => {
       proposal: chain.proposal,
     });
     decideRunFlow(root, flowId, { decision: 'approve', actor: ACTOR });
+    // Refuse-mint contract (2026-08-25): the sprint-ordinal persist path only
+    // edits an EXISTING config — seed one so retirement can record the floor.
+    writeFileSync(join(root, '.deckent', 'config.json'), '{}\n');
     writeRetirementTasks(root, tasks);
 
     expect(getNextSprintId(root)).toBe('sprint-001');

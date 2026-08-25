@@ -13,6 +13,8 @@ import {
 } from 'node:fs';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 
+import { DeckentError } from './errors.js';
+
 export const PROMPT_DELIVERY_RECEIPT_VERSION = 2 as const;
 
 export type PromptInjectionChannel =
@@ -175,7 +177,7 @@ export function publishWorkerCoreArtifact(
     if (existing.length !== bytes.length
       || createHash('sha256').update(existing).digest('hex') !== digest
       || !existing.equals(bytes)) {
-      throw new Error(`WORKER_CORE_ARTIFACT_COLLISION:${path}`);
+      throw new DeckentError('WORKER_CORE_ARTIFACT_COLLISION', `WORKER_CORE_ARTIFACT_COLLISION:${path}`);
     }
   } finally {
     try { unlinkSync(temporary); } catch { /* absent after an early failure */ }
@@ -330,7 +332,9 @@ export function promptAttemptDeliveryReceiptPath(
 ): string {
   if (![taskId, attemptId, provider].every(
     value => /^[a-z0-9][a-z0-9._-]*$/iu.test(value),
-  )) throw new Error('PROMPT_DELIVERY_RECEIPT_UNSAFE_IDENTITY');
+  )) {
+    throw new DeckentError('PROMPT_DELIVERY_RECEIPT_UNSAFE_IDENTITY', 'PROMPT_DELIVERY_RECEIPT_UNSAFE_IDENTITY');
+  }
   const safeProvider = provider.replace(/[^a-z0-9_-]/giu, '_');
   return join(
     projectRoot,
@@ -345,26 +349,26 @@ export function finalizePromptDeliveryReceipt(
 ): PromptDeliveryReceipt {
   const current = readPromptDeliveryReceipt(input.projectRoot, input.taskId);
   if (current.state !== 'AVAILABLE') {
-    throw new Error(`PROMPT_DELIVERY_RECEIPT_FINALIZE_HOLD:${current.reason}`);
+    throw new DeckentError('PROMPT_DELIVERY_RECEIPT_FINALIZE_HOLD', `PROMPT_DELIVERY_RECEIPT_FINALIZE_HOLD:${current.reason}`);
   }
   if (input.roleProfile !== current.receipt.rolePolicyIdentity) {
-    throw new Error('PROMPT_DELIVERY_RECEIPT_ROLE_PROFILE_MISMATCH');
+    throw new DeckentError('PROMPT_DELIVERY_RECEIPT_ROLE_PROFILE_MISMATCH', 'PROMPT_DELIVERY_RECEIPT_ROLE_PROFILE_MISMATCH');
   }
   const tasksRoot = resolve(input.projectRoot, '.tasks');
   const corePath = resolve(input.projectRoot, input.coreArtifactPath);
   const projected = relative(tasksRoot, corePath);
   if (projected === '' || projected === '..' || projected.startsWith(`..${sep}`)) {
-    throw new Error('PROMPT_DELIVERY_RECEIPT_CORE_PATH_OUTSIDE_TASKS');
+    throw new DeckentError('PROMPT_DELIVERY_RECEIPT_CORE_PATH_OUTSIDE_TASKS', 'PROMPT_DELIVERY_RECEIPT_CORE_PATH_OUTSIDE_TASKS');
   }
   const coreBytes = readFileSync(corePath);
   const expectedCoreName = `.worker-core-${input.coreSha256}.md`;
   if (corePath !== join(tasksRoot, expectedCoreName)
     || basename(corePath) !== expectedCoreName) {
-    throw new Error('PROMPT_DELIVERY_RECEIPT_CORE_PATH_MISMATCH');
+    throw new DeckentError('PROMPT_DELIVERY_RECEIPT_CORE_PATH_MISMATCH', 'PROMPT_DELIVERY_RECEIPT_CORE_PATH_MISMATCH');
   }
   if (coreBytes.length !== input.coreBytes
     || createHash('sha256').update(coreBytes).digest('hex') !== input.coreSha256) {
-    throw new Error('PROMPT_DELIVERY_RECEIPT_CORE_BYTES_MISMATCH');
+    throw new DeckentError('PROMPT_DELIVERY_RECEIPT_CORE_BYTES_MISMATCH', 'PROMPT_DELIVERY_RECEIPT_CORE_BYTES_MISMATCH');
   }
   const expectedProvider = input.injectionChannel === 'claude-system-prompt-file'
     ? 'claude'
@@ -373,7 +377,7 @@ export function finalizePromptDeliveryReceipt(
     || !input.providerArgv.includes(expectedCoreName)
     || (expectedProvider === 'claude' && !input.providerArgv.includes('--system-prompt-file'))
     || (expectedProvider === 'codex' && !input.providerArgv.includes('model_instructions_file='))) {
-    throw new Error('PROMPT_DELIVERY_RECEIPT_PROVIDER_ARGV_MISMATCH');
+    throw new DeckentError('PROMPT_DELIVERY_RECEIPT_PROVIDER_ARGV_MISMATCH', 'PROMPT_DELIVERY_RECEIPT_PROVIDER_ARGV_MISMATCH');
   }
   const binding: PromptRuntimeDeliveryBinding = {
     attemptId: input.attemptId,
@@ -408,7 +412,7 @@ export function finalizePromptDeliveryReceipt(
       || readFileSync(target, 'utf8') !== serialized) throw error;
   }
   if (!writePromptDeliveryReceipt(input.projectRoot, finalized)) {
-    throw new Error('PROMPT_DELIVERY_RECEIPT_COMPATIBILITY_WRITE_HOLD');
+    throw new DeckentError('PROMPT_DELIVERY_RECEIPT_COMPATIBILITY_WRITE_HOLD', 'PROMPT_DELIVERY_RECEIPT_COMPATIBILITY_WRITE_HOLD');
   }
   return finalized;
 }

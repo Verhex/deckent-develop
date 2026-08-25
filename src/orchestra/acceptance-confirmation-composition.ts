@@ -6,6 +6,7 @@ import { acceptanceConfirmationDigest, applyAcceptanceConfirmationReceipt,
 import { AcceptanceReconciliationStore } from '../core/acceptance-reconciliation-store.js';
 import type { ApprovalLifecycleClock } from '../core/approval-lifecycle-policy.js';
 import type { ResolvedApprovalLifecycleConfig } from '../core/config-types.js';
+import { DeckentError } from '../core/errors.js';
 import { readAcceptanceConfirmation, readAcceptanceConfirmationTerminalTruth,
   readConfirmation, settleConfirmation } from '../core/confirmation-store.js';
 import { createAcceptanceRouteDebt, getDebtItems,
@@ -66,7 +67,7 @@ export function openAcceptanceConfirmationComposition(
   supplied: AcceptanceConfirmationAuthority,
 ): AcceptanceConfirmationComposition {
   if ((supplied.verifyAuthority === undefined) === (supplied.decisionAuthority === undefined)) {
-    throw new Error('exactly one acceptance decision authority must be supplied');
+    throw new DeckentError('DECKENT_E004', 'exactly one acceptance decision authority must be supplied');
   }
   const authority = Object.freeze({ ...supplied, projectRoot: realpathSync(supplied.projectRoot) });
   const verifyAuthority: VerifyAcceptanceAuthority = supplied.decisionAuthority
