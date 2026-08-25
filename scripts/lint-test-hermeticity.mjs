@@ -658,7 +658,10 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // event-stream-monotonic, run-status-readiness, status-readiness-parity,
   // event-truth-wave-evidence) + the owner-directed task-result-field-order pin;
   // all tmpdir-hermetic, suite-owned.
-  count: 16306,
+  // 2026-08-25 exploration-bonus wave (sprint-676): +1 — worker-authored
+  // tests/core/routing/exploration-bonus.test.ts (default-0 neutrality +
+  // nonzero behavior pins; tmpdir-hermetic, suite-owned).
+  count: 16307,
   // 2026-08-25 B-sweep: digest moved — --fix roundtrip pin, multi-label
   // parser pin, same-line rule downgraded to WARN (all suite-owned).
   // 2026-08-25 7141 wave: count unchanged, digest moved — the src-side
@@ -674,7 +677,9 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-25 A3 wave: digest folds the seven new suites plus src-side shifts
   // (hb primitive, event-seq CAS, read-model CAS/readiness, flow-terminal join,
   // status readiness cutover, dependency shape-fix, result field-order serializer).
-  digest: '85cafa7c35a5b596aed0d1226cce20053d867726e54b4d25306eb29082a927d5',
+  // 2026-08-25 exploration-bonus wave: digest folds the new suite plus
+  // config-knob/blend/story src shifts and worker test-file edits.
+  digest: 'c6a21f0b337214a6b9eab45d02c58a75e441a869fc0b9b6023e1297f6c1d496b',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1195,7 +1200,9 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // self-healing, live-events single-source, T0 config fields.
   // 2026-08-25 cli-surface-truth merge: lane production modules
   // (cli-command-contract SSOT, governance catalog, generators).
-  count: 1335,
+  // 2026-08-25 exploration-bonus wave: +1 — the route-task-v3 exploration
+  // bonus derivation adds one production effect site (cells ledger read).
+  count: 1336,
   // 2026-08-25 config-loss incident hardening: digest moved — atomic
   // last_sprint_id writer (refuse-mint + tmp+rename) and loadConfig
   // self-heal re-read-once + atomic fresh-default.
@@ -1213,7 +1220,9 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-25 A3 event-truth wave: same 1335 count, digest only — src-side
   // effect-site text shifted (hb primitive rewires, event-seq CAS, read-model
   // CAS, status readiness cutover, result field-order serializer).
-  digest: '4c4cb03be951728c8d591b3ba47afc251c93c64260b011e56810fde4fd7f36aa',
+  // 2026-08-25 exploration-bonus wave: digest folds the rank blend,
+  // config knob and story visibility src shifts.
+  digest: '0ef3500f1c261e6d70f4428ac4626b657c114f8930f2ce64ad94de67587d38bf',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

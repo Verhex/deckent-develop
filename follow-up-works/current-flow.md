@@ -8,7 +8,20 @@
 
 ## ŞU AN — çalışma-imleci (Claude epoch-4)
 
-- ✅ **A3 EVENT-TRUTH DALGASI KAPANDI (2026-08-25 akşam; landing bekliyor — commit owner-isteğiyle):**
+- ✅ **EXPLORATION-BONUS DALGASI KAPANDI (2026-08-25 gece; MASTER 9073 DONE,
+  `receipt=GR-2026-08-25-EXPLORATION-BONUS-01`):** sprint-676 3/3 ilk-denemede DONE (676-002
+  sol-tier blend-mekaniği), gate PASS (tsc 0 + 84/84 vitest + 0 honesty), hiç fix-retry yok.
+  Mekanizma flag-gated `routing_v3.explorationBonus` DEFAULT 0 = OFF; blend `s+b*(1-s)`;
+  soğuk-eşik CELL_MIN_USES tek-kaynak; story-detail bonus+bonusDecisive. Gerçek-binary
+  nötrlük: bonus-kodlu dist'te plan-digest bonus-öncesiyle birebir (`ca8837d8…`), canlı
+  karar-kaydında sıfır exploration-izi. **ENABLEMENT AYRI OWNER KARARI:** öneri
+  `.deckent/config.json` → `routing_v3.explorationBonus: 0.05` deneme + sonraki gerçek
+  sprintte decisions-jsonl'den flip/tie ölçümü. Yeni gözlemler (bulgu-listesine): sprint-state
+  "FIXING'de donuk" projection-gecikmesi 675+676'da tekrarladı · koordinatör post-COMPLETE
+  ~13dk geç çıktı (sızıntı değil, yavaş kapanış) · xverify yeni reason
+  `xverify_producer_result_mismatch` (676-001).
+
+- ✅ **A3 EVENT-TRUTH DALGASI KAPANDI + LANDLENDİ (`1616d5ac5` origin/main):**
   9/9 logical task DONE. sprint-674 (5/9; kendisinin düzelttiği dependency-attribution bug'ına
   eski-dist'te yakalandı → dürüst typed-PAUSE → owner-onaylı force-finalize ABORTED) +
   sprint-675 (4/4, 002/003 birer fix-retry). Landing el-paketi (ADR-D-007, owner-directed):
@@ -45,8 +58,8 @@
 
 ## SIRADAKİ yürütme sırası
 
-1. **A3 landing-commit** — owner "commit et" deyince: `git branch -vv` → tek commit + push.
-2. Keşif-payı (explorationBonus) — A2-sonrası cells-ölçümüyle; ci-guardian ranked-listede.
+1. **exploration-bonus landing-commit** — full-suite yeşili sonrası tek commit + push (owner akış-onayı verili).
+2. explorationBonus ENABLEMENT kararı (owner): 0.05 deneme değeri + ölçüm — mekanizma landed-OFF.
 3. Ed25519 Work-480 töreni (OWNER-KATILIMLI; key repo-DIŞI): bundle
    `.deckent/runtime/closure-staging/work-480/bundle`, request
    `aprcdb-cb3eb74b4598bacc49b9ea6204208cca`, decision=allow verilmiş; tek oturumda
@@ -60,11 +73,11 @@
 ## Canlı truth (kompakt)
 
 - `DOGFOOD_MODE=ON`, `WORKSPACE_MODE=MAIN`, `DELIVERY_MODE=DIRECT_MAIN`.
-- Aktif sprint/worker YOK (674 ABORTED-arşivli, 675 COMPLETE-arşivli); bot daemon fresh-dist'te
+- Aktif sprint/worker YOK (674 ABORTED, 675/676 COMPLETE — hepsi arşivli); bot daemon fresh-dist'te
   canlı; 20-gate + build:all + tsc --noEmit yeşil; dist=src eşit.
 - Nöbetçi-deseni: sprint-izleme ana-oturumda değil Sonnet-subagent'ta (A–F tetikleri) — A3'te
   iki koşuda da başarıyla çalıştı.
-- Done-ready sayacı: **11/20** — önceki 10 + A3 event-truth (3354 VERIFY; 3210 kanıt-eki).
+- Done-ready sayacı: **12/20** — önceki 10 + A3 event-truth (3354 VERIFY) + exploration-bonus (9073 DONE).
 - Dogfood dist-gecikmesi kuralı (owner-anlatımı verildi): run başladığı dist'le biter;
   motor-fix'i aynı run'a etki edemez — sıcak-yol fix'i önce mini-run'la landılır.
 

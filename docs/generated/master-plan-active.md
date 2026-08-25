@@ -5,9 +5,9 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):a98cc2b38a11db751cfc9f86f85a842afaac37007a9f9287dd943440672a19e2`
+**Source digest:** `sha256(normalized-lf-utf8):2931a6c5f80e7f2bd59a6b4af3272242df73af049927caaf6c3575331887ea1c`
 
-**Rows:** 530 total · 464 active · 66 terminal
+**Rows:** 531 total · 464 active · 67 terminal
 
 ## State summary
 
@@ -18,7 +18,7 @@
 | IN_PROGRESS | 0 |
 | BLOCKED | 69 |
 | VERIFY | 27 |
-| DONE | 66 |
+| DONE | 67 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
 

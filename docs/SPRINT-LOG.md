@@ -16817,3 +16817,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 675-004: dalga evidence harness (DONE)
 
 ---
+## Sprint 676 — sprint-676
+
+**Status:** COMPLETE
+**Date:** 2026-08-25
+**Duration:** 518s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 517691ms |
+
+### Tasks
+
+- 676-001: config knob — routing_v3.explorationBonus (default 0) (DONE)
+- 676-002: bonus mekanigi + gorunurluk (finalScore-katmani blend) (DONE)
+- 676-003: davranis-bekcisi — default-0 notrluk + nonzero davranis pinleri (DONE)
+
+---

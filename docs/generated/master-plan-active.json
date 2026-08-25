@@ -3,27 +3,27 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "a98cc2b38a11db751cfc9f86f85a842afaac37007a9f9287dd943440672a19e2"
+    "value": "2931a6c5f80e7f2bd59a6b4af3272242df73af049927caaf6c3575331887ea1c"
   },
   "summary": {
-    "total": 530,
+    "total": 531,
     "active": 464,
-    "terminal": 66,
-    "receipts": 189,
+    "terminal": 67,
+    "receipts": 190,
     "byState": {
       "OPEN": 368,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
       "VERIFY": 27,
-      "DONE": 66,
+      "DONE": 67,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
     "byPriority": {
       "P0": 338,
       "P1": 148,
-      "P2": 44
+      "P2": 45
     },
     "byProgram": {
       "API": 5,
@@ -41,7 +41,7 @@
       "ENTERPRISE": 4,
       "EVAL": 5,
       "EVOLUTION": 4,
-      "KERNEL": 124,
+      "KERNEL": 125,
       "LEARNING": 9,
       "OBS": 9,
       "ONBOARDING": 1,
@@ -5730,6 +5730,17 @@
       "terminalClosureDigest": "5b79ded1448aefd93cb36f8bb60549a6e424cf94a60f5b8012a5aa749a6d2474"
     },
     {
+      "order": 9073,
+      "id": "ROUTING-EXPLORATION-BONUS-001",
+      "program": "KERNEL",
+      "priority": "P2",
+      "state": "DONE",
+      "updated": "2026-08-25",
+      "definitionDigest": "7560bdd08569bf6291b9de627848dc4b135d691dbf63d3794b1efdac5f3cb6e0",
+      "progressDigest": "353a4e3fa091ac8873ce5afcad534631a6f9f24d8dfe853926aa37b6b5161d92",
+      "terminalClosureDigest": "d34f2ccae53388d555e678b9e79cb1204fbc2f9028fd9edecfdd402419d62864"
+    },
+    {
       "order": 10000,
       "id": "SCALE-001",
       "program": "SCALE",
@@ -7783,6 +7794,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-25T20:37:46+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-25-EXPLORATION-BONUS-01",
+      "authorityDigest": "88fde2d4169bbeccdc81b3c2e485a04ea8be6df8b01d47ea9d4708376cd1caaa",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-25T22:08:29+03:00"
       },
       "g7AttemptIdentity": null
     }
@@ -27228,6 +27249,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "3ac1f90ebb8e60ccadce0065763a1861d84b2b2e559270f734de45b8d720bc22"
+    "value": "03b954d5aa2019e356045faea127f07496d4629a3b7c090c200365e1cbfee9ec"
   }
 }

@@ -89,6 +89,49 @@ describe('ci-guardian routing eligibility', () => {
     }
   });
 
+  it('lets a cold eligible ci-guardian win through a nonzero exploration bonus', async () => {
+    const manifest = readManifest(BUILTIN_MANIFEST_PATH);
+    const guardian: AgentCandidate = {
+      agentId: manifest.id,
+      capabilities: manifest.capabilities,
+      source: 'builtin',
+    };
+    const incumbent: AgentCandidate = {
+      agentId: 'incumbent',
+      capabilities: manifest.capabilities,
+      source: 'builtin',
+    };
+    const catalog: RouteCatalog = {
+      agents: [guardian, incumbent],
+      skills: [],
+      vocabulary: {
+        domains: BUILTIN_DOMAINS,
+        knownDomainIds: new Set(BUILTIN_DOMAINS.map((domain) => domain.id)),
+      },
+    };
+    const syntheticRequirement = requirement('fix');
+    const cells = new Map([
+      ['fix|test/quality|incumbent', { uses: 3, successes: 3, qualitySum: 3 }],
+    ]);
+    const contentFit = async () =>
+      new Map([
+        ['ci-guardian', { score: 0.7, evidence: ['fixture'] }],
+        ['incumbent', { score: 0.8, evidence: ['fixture'] }],
+      ]);
+
+    const decision = await routeTaskV3(TASK, catalog, {
+      config: { ...DEFAULT_ROUTING_V3_CONFIG, enabled: true, explorationBonus: 0.5 },
+      requirement: syntheticRequirement,
+      cells,
+      contentFit,
+    });
+
+    expect(decision.agentId).toBe('ci-guardian');
+    const rankStep = decision.story.steps.find((step) => step.stage === 'rank');
+    expect(rankStep?.detail).toMatchObject({ bonusDecisive: true });
+    expect(decision.story.summary).toContain('exploration share');
+  });
+
   it('keeps review primary while synchronizing both manifest copies byte-for-byte', () => {
     const builtinBytes = readFileSync(BUILTIN_MANIFEST_PATH, 'utf8');
     const workspaceBytes = readFileSync(WORKSPACE_MANIFEST_PATH, 'utf8');

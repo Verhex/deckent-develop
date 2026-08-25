@@ -33,6 +33,8 @@ export interface StoryTrace {
   indecision: Indecision | null;
   escalation: BrainEscalation | null;
   provenance: 'deterministic' | 'ai';
+  explorationBonuses?: ReadonlyArray<{ agentId: string; explorationBonus: number }>;
+  bonusDecisive?: boolean;
 }
 
 /** Which axis carried the winner — the decisive-axis clause of the summary. */
@@ -89,6 +91,10 @@ export function buildStory(trace: StoryTrace): DecisionStory {
         finalScore: trace.winner.finalScore,
         runnerUp: trace.runnerUp,
         decisiveAxis: axis,
+        ...(trace.explorationBonuses && trace.explorationBonuses.length > 0
+          ? { explorationBonuses: trace.explorationBonuses }
+          : {}),
+        ...(trace.bonusDecisive ? { bonusDecisive: true } : {}),
       },
     });
   }
@@ -112,7 +118,9 @@ export function buildStory(trace: StoryTrace): DecisionStory {
   const summary = trace.escalation
     ? `Escalated to Brain (${trace.escalation.reason}) for ${trace.workType} work over [${trace.domains.join(', ')}].`
     : trace.winner
-      ? `${trace.winner.agentId} wins ${trace.workType} work on the ${decisiveAxis(trace.winner.axisScores)} axis (score ${trace.winner.finalScore.toFixed(2)}, confidence ${trace.confidence.toFixed(2)}).`
+      ? trace.bonusDecisive
+        ? `${trace.winner.agentId} wins ${trace.workType} work with exploration share (score ${trace.winner.finalScore.toFixed(2)}, confidence ${trace.confidence.toFixed(2)}).`
+        : `${trace.winner.agentId} wins ${trace.workType} work on the ${decisiveAxis(trace.winner.axisScores)} axis (score ${trace.winner.finalScore.toFixed(2)}, confidence ${trace.confidence.toFixed(2)}).`
       : `No candidate for ${trace.workType} work over [${trace.domains.join(', ')}].`;
 
   return {

@@ -159,6 +159,21 @@ describe('foundation round-trip — 3-layer vocabulary build', () => {
     expect(structuralConfidence).toBe(0.55);
     expect(structuralConfidence).not.toBe(DEFAULT_ROUTING_V3_CONFIG.structuralConfidence);
   });
+
+  it('carries explorationBonus through default, global, and project layers', () => {
+    const globalOnly = resolveRoutingV3Config(
+      { routing_v3: { explorationBonus: 0.2 } },
+      null,
+    );
+    const projectOverride = resolveRoutingV3Config(
+      { routing_v3: { explorationBonus: 0.2 } },
+      { routing_v3: { explorationBonus: 0.35 } },
+    );
+
+    expect(DEFAULT_ROUTING_V3_CONFIG.explorationBonus).toBe(0);
+    expect(globalOnly.explorationBonus).toBe(0.2);
+    expect(projectOverride.explorationBonus).toBe(0.35);
+  });
 });
 
 // ─── Stage 2: 6 representative task shapes -> schema-valid RequirementVector

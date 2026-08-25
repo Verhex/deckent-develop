@@ -14,6 +14,17 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint676] - 2026-08-25
+
+### Added
+
+- config knob — routing_v3.explorationBonus (default 0)
+- bonus mekanigi + gorunurluk (finalScore-katmani blend)
+- davranis-bekcisi — default-0 notrluk + nonzero davranis pinleri
+
+
+_Tasks: 3 total, 3 done, 0 tech debt, 0 no-go_
+
 ## [sprint675] - 2026-08-25
 
 ### Added

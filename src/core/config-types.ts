@@ -586,6 +586,9 @@ export interface RoutingV3Config {
    *  numerical spread 0.051 vs content 0.368 and a 71% low-confidence rate.
    *  Default: true. Rollback: `signalGatedNumerical: false`. */
   signalGatedNumerical: boolean;
+  /** Exploration share (0-1). Default: 0 (OFF); exploration activates only
+   *  when explicitly configured. Rollback: `explorationBonus: 0`. */
+  explorationBonus: number;
 }
 
 // ─── Cost Guard Config ───────────────────────────────────────────────

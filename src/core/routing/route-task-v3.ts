@@ -20,7 +20,7 @@ import { eliminate } from './stage-eliminate.js';
 import type { AgentCandidate } from './stage-eliminate.js';
 import { scoreContentDeterministic, PROFICIENCY_SCORE } from './axis-content.js';
 import { scorePositional } from './axis-positional.js';
-import { scoreNumerical, hasWarmCells, NEUTRAL } from './axis-numerical.js';
+import { scoreNumerical, hasWarmCells, NEUTRAL, CELL_MIN_USES } from './axis-numerical.js';
 import type { TieJudgeFn } from './tie-judge.js';
 import { debugLog } from '../utils.js';
 import type { CellStat } from './axis-numerical.js';
@@ -223,10 +223,27 @@ export async function routeTaskV3(
       positional: { score: positional.score, evidence: [...positional.evidence, ...positional.issues] },
       numerical,
     };
-    return { agentId: candidate.agentId, axisScores };
+    if (config.explorationBonus === 0) {
+      return { agentId: candidate.agentId, axisScores };
+    }
+    let totalUses = 0;
+    for (const [key, cell] of cells) {
+      if (key.endsWith(`|${candidate.agentId}`)) {
+        totalUses += cell.uses;
+      }
+    }
+    const explorationBonus =
+      config.explorationBonus * Math.max(0, 1 - totalUses / CELL_MIN_USES);
+    return { agentId: candidate.agentId, axisScores, explorationBonus };
   });
 
   const ranking = rank(rankInputs, effectiveConfig);
+  const bonusDecisive =
+    config.explorationBonus > 0 &&
+    rank(
+      rankInputs.map(({ agentId, axisScores }) => ({ agentId, axisScores })),
+      effectiveConfig,
+    ).top?.agentId !== ranking.top?.agentId;
   const sourceOf = (agentId: string): AgentCandidate['source'] | undefined =>
     catalog.agents.find((a) => a.agentId === agentId)?.source;
   let ordered: ScoredCandidate[] = enforceAntiTemp(ranking.ordered, sourceOf, TIE_EPSILON);
@@ -317,7 +334,27 @@ export async function routeTaskV3(
 
   // 9 · Story + final decision.
   const winnerCapability = catalog.agents.find((a) => a.agentId === judgedTop.agentId)!.capabilities;
-  const story = buildStory(storyTrace(task, requirement, catalog, eliminated, verifierDrops, ordered, confidence, ranking.indecision, escalation, judgedProvenance));
+  const story = buildStory(
+    storyTrace(
+      task,
+      requirement,
+      catalog,
+      eliminated,
+      verifierDrops,
+      ordered,
+      confidence,
+      ranking.indecision,
+      escalation,
+      judgedProvenance,
+      rankInputs
+        .filter((candidate) => (candidate.explorationBonus ?? 0) > 0)
+        .map(({ agentId, explorationBonus }) => ({
+          agentId,
+          explorationBonus: explorationBonus!,
+        })),
+      bonusDecisive,
+    ),
+  );
 
   return finalizeDecision({
     agentId: judgedTop.agentId,
@@ -471,6 +508,8 @@ function storyTrace(
   indecision: StoryTrace['indecision'],
   escalation: BrainEscalation | null,
   provenance: 'deterministic' | 'ai',
+  explorationBonuses: NonNullable<StoryTrace['explorationBonuses']>,
+  bonusDecisive: boolean,
 ): StoryTrace {
   const top = ordered[0] ?? null;
   const runnerUp = ordered[1] ?? null;
@@ -487,5 +526,7 @@ function storyTrace(
     indecision,
     escalation,
     provenance,
+    ...(explorationBonuses.length > 0 ? { explorationBonuses } : {}),
+    ...(bonusDecisive ? { bonusDecisive: true } : {}),
   };
 }

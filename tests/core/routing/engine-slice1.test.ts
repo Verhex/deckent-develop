@@ -305,6 +305,41 @@ describe('stage-4 ranking', () => {
     expect(calibrateConfidence(0.9, 0.5)).toBeGreaterThan(calibrateConfidence(0.9, 0.8));
     expect(calibrateConfidence(0.9, 0.7)).toBeGreaterThan(calibrateConfidence(0.6, 0.4));
   });
+
+  it('optional bonus absence preserves the legacy weighted result bit-for-bit', () => {
+    const input = { agentId: 'a', axisScores: axes(0.8, 0.6, 0.4) };
+    const expected =
+      0.8 * CONFIG.weights.content +
+      0.6 * CONFIG.weights.positional +
+      0.4 * CONFIG.weights.numerical;
+
+    expect(rank([input], CONFIG).top?.finalScore).toBe(expected);
+  });
+
+  it('bonus blend never raises a score above one', () => {
+    const perfect = { agentId: 'perfect', axisScores: axes(1, 1, 1), explorationBonus: 1 };
+    const partial = { agentId: 'partial', axisScores: axes(0.9, 0.9, 0.9), explorationBonus: 1 };
+
+    expect(rank([perfect, partial], CONFIG).ordered.every((candidate) => candidate.finalScore <= 1)).toBe(true);
+  });
+
+  it('bonus ranking is deterministic for identical inputs', () => {
+    const inputs = [
+      { agentId: 'warm', axisScores: axes(0.8, 0.8, 0.8), explorationBonus: 0 },
+      { agentId: 'cold', axisScores: axes(0.7, 0.7, 0.7), explorationBonus: 0.5 },
+    ];
+
+    expect(rank(inputs, CONFIG)).toEqual(rank(inputs, CONFIG));
+  });
+
+  it('preserves the tie-break chain when blended scores tie', () => {
+    const inputs = [
+      { agentId: 'z', axisScores: axes(0.8, 0.7, 0.5), explorationBonus: 0.25 },
+      { agentId: 'a', axisScores: axes(0.8, 0.7, 0.5), explorationBonus: 0.25 },
+    ];
+
+    expect(rank(inputs, CONFIG).ordered.map((candidate) => candidate.agentId)).toEqual(['a', 'z']);
+  });
 });
 
 // ─── verifier ────────────────────────────────────────────────────────────────

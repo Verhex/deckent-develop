@@ -13,6 +13,7 @@ export type Indecision = 'tie' | 'low-confidence';
 export interface RankInput {
   agentId: string;
   axisScores: AxisScores;
+  explorationBonus?: number;
 }
 
 export interface RankResult {
@@ -50,14 +51,17 @@ export function rank(candidates: readonly RankInput[], config: RoutingV3Config):
   const { weights } = config;
 
   const ordered: ScoredCandidate[] = candidates
-    .map((c) => ({
-      agentId: c.agentId,
-      axisScores: c.axisScores,
-      finalScore:
+    .map((c) => {
+      const base =
         c.axisScores.content.score * weights.content +
         c.axisScores.positional.score * weights.positional +
-        c.axisScores.numerical.score * weights.numerical,
-    }))
+        c.axisScores.numerical.score * weights.numerical;
+      return {
+        agentId: c.agentId,
+        axisScores: c.axisScores,
+        finalScore: base + (c.explorationBonus ?? 0) * (1 - base),
+      };
+    })
     .sort(
       (a, b) =>
         b.finalScore - a.finalScore ||

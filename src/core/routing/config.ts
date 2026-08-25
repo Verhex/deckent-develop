@@ -43,6 +43,7 @@ export const ROUTING_V3_SCHEMA = z
     topK: z.number().int().positive(),
     structuralConfidence: z.number().min(0).max(1),
     signalGatedNumerical: z.boolean(),
+    explorationBonus: z.number().min(0).max(1),
   })
   .strict();
 
@@ -71,6 +72,9 @@ export const DEFAULT_ROUTING_V3_CONFIG: RoutingV3Config = {
   // decision-wide signal-free components (cold cells / absent live) from its
   // mean instead of neutral-flattening. Rollback: `signalGatedNumerical: false`.
   signalGatedNumerical: true,
+  // 0 = OFF; exploration share activates only when explicitly configured.
+  // Rollback: `explorationBonus: 0`.
+  explorationBonus: 0,
 };
 
 const WEIGHTS_SUM_EPSILON = 1e-9;

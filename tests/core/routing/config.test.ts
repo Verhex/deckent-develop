@@ -28,6 +28,10 @@ describe('DEFAULT_ROUTING_V3_CONFIG', () => {
   it('passes its own schema + weights-sum validation', () => {
     expect(() => validateRoutingV3Config(DEFAULT_ROUTING_V3_CONFIG)).not.toThrow();
   });
+
+  it('defaults explorationBonus to 0 (OFF)', () => {
+    expect(DEFAULT_ROUTING_V3_CONFIG.explorationBonus).toBe(0);
+  });
 });
 
 describe('ROUTING_V3_SCHEMA', () => {
@@ -56,6 +60,22 @@ describe('ROUTING_V3_SCHEMA', () => {
 
   it('rejects confidenceFloor outside [0,1]', () => {
     const result = ROUTING_V3_SCHEMA.safeParse({ ...DEFAULT_ROUTING_V3_CONFIG, confidenceFloor: 1.5 });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts explorationBonus inside [0,1]', () => {
+    const result = ROUTING_V3_SCHEMA.safeParse({
+      ...DEFAULT_ROUTING_V3_CONFIG,
+      explorationBonus: 0.25,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it.each([-0.01, 1.01])('rejects explorationBonus outside [0,1]: %s', (explorationBonus) => {
+    const result = ROUTING_V3_SCHEMA.safeParse({
+      ...DEFAULT_ROUTING_V3_CONFIG,
+      explorationBonus,
+    });
     expect(result.success).toBe(false);
   });
 });
