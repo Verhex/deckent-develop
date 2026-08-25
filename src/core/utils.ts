@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, appendFileSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, appendFileSync, existsSync, readdirSync, renameSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
@@ -208,17 +208,21 @@ export function updateLastSprintId(projectRoot: string, sprintId: string): void 
     }
     // Read existing config — use empty object ONLY if file doesn't exist yet
     // If file exists but is corrupted/unreadable, skip update to preserve whatever is there
-    let config: Record<string, unknown>;
-    if (existsSync(configPath)) {
-      const parsed = readJsonSafe<Record<string, unknown>>(configPath);
-      if (!parsed) {
-        debugLog('updateLastSprintId', 'config.json exists but unreadable — skipping to preserve settings');
-        return;
-      }
-      config = parsed;
-    } else {
-      config = {};
+    if (!existsSync(configPath)) {
+      // A missing project config is an anomaly (crash/race window), never a
+      // license to mint one: writing `{last_sprint_id}` from an empty base has
+      // erased every owner setting three times live (2026-08-25 incident —
+      // 37-byte config.json.bak evidence). The ordinal is derivable from
+      // sprint-state/archives; losing it is cheaper than losing the config.
+      debugLog('updateLastSprintId', 'config.json absent — refusing to mint a single-field config');
+      return;
     }
+    const parsed = readJsonSafe<Record<string, unknown>>(configPath);
+    if (!parsed) {
+      debugLog('updateLastSprintId', 'config.json exists but unreadable — skipping to preserve settings');
+      return;
+    }
+    const config = parsed;
     const currentOrdinal = parseSprintOrdinal(config.last_sprint_id);
     const nextOrdinal = parseSprintOrdinal(sprintId);
     if (nextOrdinal === null || (currentOrdinal !== null && nextOrdinal < currentOrdinal)) {
@@ -226,7 +230,12 @@ export function updateLastSprintId(projectRoot: string, sprintId: string): void 
       return;
     }
     config.last_sprint_id = sprintId;
-    writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
+    // Atomic replace: a plain truncate+write let concurrent readers observe a
+    // half-written file, which the loadConfig self-healer then falsely moved
+    // aside as "corrupted" (same incident). tmp+rename is atomic on POSIX.
+    const tmpPath = `${configPath}.${process.pid}.tmp`;
+    writeFileSync(tmpPath, JSON.stringify(config, null, 2) + '\n');
+    renameSync(tmpPath, configPath);
   } catch (e) { debugLog('updateLastSprintId', e); }
 }
 

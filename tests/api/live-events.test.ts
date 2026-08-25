@@ -73,8 +73,45 @@ describe('live-events bridge', () => {
     expect(typeof hb.ts).toBe('string');
   });
 
-  // ── 2. result → worker_done ──────────────────────────────────
-  it('pushes a worker_done when a .result file appears', async () => {
+  // ── 2. canonical event tail WORKER→BRAIN:RESULT → worker_done ────
+  // Realigned (671-009): worker_done now has ONE source — the canonical event
+  // log tail. The SSE contract itself is unchanged: same typed frame, same
+  // taskId, still asserted; only the producing source moved.
+  it('pushes a worker_done when the canonical event tail carries a RESULT line', async () => {
+    mkdirSync(join(root, '.deckent', 'recently-works'), { recursive: true });
+    writeFileSync(
+      join(root, '.deckent', 'sprint-state.json'),
+      JSON.stringify({ sprintId: 'sprint-test' }),
+      'utf-8',
+    );
+    const jsonl = join(root, '.deckent', 'recently-works', 'sprint-test-events.jsonl');
+    writeFileSync(jsonl, '', 'utf-8');
+
+    start();
+    await sleep(40);
+
+    appendFileSync(
+      jsonl,
+      JSON.stringify({
+        timestamp: '2026-06-12T00:00:00.000Z',
+        sequence: 3,
+        protocol_version: '1.0',
+        source: 'worker',
+        target: 'brain',
+        channel: 'WORKER→BRAIN:RESULT',
+        payload: { taskId: '284-001', selfAssessment: 'DONE' },
+      }) + '\n',
+      'utf-8',
+    );
+
+    await waitFor(() => events.some((e) => e.type === 'worker_done'));
+    const done = events.find((e) => e.type === 'worker_done')!;
+    expect(done.taskId).toBe('284-001');
+    expect(typeof done.ts).toBe('string');
+  });
+
+  // ── 2b. the .result fs-watch is NO LONGER a worker_done source ───
+  it('does not push a worker_done when only a .result file appears', async () => {
     mkdirSync(join(root, '.tasks'), { recursive: true });
     start();
     await sleep(40);
@@ -84,11 +121,19 @@ describe('live-events bridge', () => {
       JSON.stringify({ taskId: '284-001', selfAssessment: 'DONE' }),
       'utf-8',
     );
+    // A heartbeat write after the result proves the .tasks watcher is still live
+    // and debouncing normally — the silence below is source-narrowing, not a
+    // dead watcher.
+    writeFileSync(
+      join(root, '.tasks', 'task-284-001.hb'),
+      JSON.stringify({ taskId: '284-001', status: 'EXECUTING' }),
+      'utf-8',
+    );
 
-    await waitFor(() => events.some((e) => e.type === 'worker_done'));
-    const done = events.find((e) => e.type === 'worker_done')!;
-    expect(done.taskId).toBe('284-001');
+    await waitFor(() => events.some((e) => e.type === 'worker_heartbeat'));
+    expect(events.some((e) => e.type === 'worker_done')).toBe(false);
   });
+
 
   // ── 3. jsonl tail → deckent_event ────────────────────────────
   it('tails the active sprint event-stream JSONL into deckent_event', async () => {

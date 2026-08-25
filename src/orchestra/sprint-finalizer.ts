@@ -452,6 +452,14 @@ import { createPreArchiveSnapshot, classifyTaskFiles } from './task-restoration.
 // ─── Notify (DECKENT→USER:NOTIFY — Hot Fix H6) ────────────────────
 import { notify } from '../core/notify.js';
 
+// ─── Terminal package (671-006) ───────────────────────────────────
+// Durable terminal-kind owner notification (same outbox as the lifecycle
+// enqueues in sprint-lifecycle.ts) + terminal-aware sprint-lock release,
+// both fired at the common COMPLETE/ABORTED end-point next to clearPid.
+import { enqueueOwnerNotification } from '../connectors/notification-delivery.js';
+import { resolveOwnerNotificationLang } from './sprint-lifecycle.js';
+import { releaseSprintLockForTerminatedSprint } from '../core/multi-ide.js';
+
 // ─── Sprint State + PID cleanup (Sprint 223 Task 013) ─────────────
 // Mark sprint-state.json as terminal (COMPLETE/COMPLETE) and remove
 // `.deckent/pids/<id>.pid` + `.snapshot.json` so the next `deckent start`
@@ -4891,6 +4899,56 @@ export async function finalizeSprint(
  *   source-compatible; `upsertSprintLog` falls back to each task's own
  *   status when an id is missing from the map.
  */
+/**
+ * 671-006 — terminal package shared by the COMPLETE and ABORTED publishers.
+ * Runs adjacent to the terminal clearPid call on BOTH paths and closes two
+ * leases at once, best-effort (it must never block or fail finalization):
+ *   (a) enqueue the durable terminal-kind owner notification exactly once —
+ *       the deterministic id (`terminal:<sprintId>:<outcome>`) additionally
+ *       keeps a re-finalize idempotent at the outbox dedup layer;
+ *   (b) release `.deckent/sprint.lock` by terminated-sprint identity so a
+ *       finalize running in a foreign process (owner PID dead or different)
+ *       cannot leave the lock behind as a stale lease.
+ */
+function closeTerminalSprintPackage(
+  projectRoot: string,
+  sprintId: string,
+  outcome: SprintTerminalOutcome,
+  progress: {
+    readonly done: number;
+    readonly total: number;
+    readonly debt: number;
+    readonly noGo: number;
+    readonly unevaluated: number;
+  },
+  lang?: string,
+): void {
+  try {
+    const resolvedLang = lang ?? resolveOwnerNotificationLang(projectRoot);
+    // Both strings come from the existing getMessage catalogue (en + tr);
+    // the outcome token (COMPLETE/ABORTED) is the canonical untranslated
+    // terminal-status literal, exactly as `finalize.aborted` renders it.
+    enqueueOwnerNotification(projectRoot, {
+      id: `terminal:${sprintId}:${outcome}`,
+      kind: 'terminal',
+      sprintId,
+      title: getMessage('finalize.notification_title', resolvedLang, { sprintId }),
+      message: `${outcome} — ${getMessage('finalize.notification_summary', resolvedLang, {
+        done: String(progress.done),
+        total: String(progress.total),
+        debt: String(progress.debt),
+        noGo: String(progress.noGo),
+        unevaluated: String(progress.unevaluated),
+      })}`,
+      lang: resolvedLang,
+    });
+  } catch (e) { debugLog('closeTerminalSprintPackage:enqueue', e); }
+  try {
+    const release = releaseSprintLockForTerminatedSprint(projectRoot, sprintId);
+    debugLog('closeTerminalSprintPackage:releaseSprintLock', `${sprintId}: ${release.state}`);
+  } catch (e) { debugLog('closeTerminalSprintPackage:releaseSprintLock', e); }
+}
+
 export function publishFinalSprintAuthority(
   projectRoot: string,
   sprint: Sprint,
@@ -4900,6 +4958,15 @@ export function publishFinalSprintAuthority(
 ): void {
   debugLog('finalizeSprint:breadcrumb', 'terminal authority publication — entering');
   persistFinalSprintState(projectRoot, sprint);
+  // 671-006: terminal package — adjacent to the clearPid call that
+  // persistFinalSprintState just performed; shared with the ABORTED publisher.
+  closeTerminalSprintPackage(projectRoot, sprint.id, 'COMPLETE', {
+    done: metrics.completedTasks,
+    total: metrics.totalTasks,
+    debt: metrics.techDebtTasks ?? 0,
+    noGo: metrics.noGoTasks ?? 0,
+    unevaluated: metrics.unevaluatedTasks ?? 0,
+  }, lang);
   // Sprint log projection (row 3298): sprint.status is genuinely COMPLETE at
   // this point (persistFinalSprintState just set it) — this is the only
   // place the true terminal status is known, so it is the correct place to
@@ -4999,6 +5066,14 @@ export function publishAbortedSprintAuthority(
   removeOwnedJsonProjection(join(projectRoot, SPRINT_ACTIVE_FILE), sprint.id);
   cleanupCheckpointFiles(projectRoot, sprint.id);
   clearPid(projectRoot, sprint.id);
+  // 671-006: terminal package — same shared end-point as the COMPLETE path.
+  closeTerminalSprintPackage(projectRoot, sprint.id, 'ABORTED', {
+    done: metrics.completedTasks,
+    total: metrics.totalTasks,
+    debt: metrics.techDebtTasks,
+    noGo: metrics.noGoTasks,
+    unevaluated: metrics.unevaluatedTasks,
+  });
 
   const dashboard = {
     sprint: {

@@ -168,4 +168,37 @@ describe('sprint-state-tracker — worker freshness uses .hb mtime (clock-skew-p
       expect.objectContaining({ taskId: '290-001-fix', liveness: expect.objectContaining({ state: 'alive' }) }),
     ]));
   });
+
+  // Pin for task 671-003: countCompletedTasks used to count raw `.result` files,
+  // so a FIX attempt's own `.result` inflated the completed count past the true
+  // logical-task total. It now binds to the canonical logical-progress authority
+  // (projectLogicalProgress), which folds a logical task and its FIX attempts
+  // into ONE lineage before counting.
+  it('completedTasks counts distinct logical tasks, excluding fix-attempt inflation', () => {
+    const r = setup(['290-020', '290-021']);
+    // Original attempt for 290-020 finished (NO_GO) ...
+    writeFileSync(
+      join(r, '.tasks', 'task-290-020.result'),
+      JSON.stringify({ selfAssessment: 'NO_GO' }),
+      'utf-8',
+    );
+    // ...and its FIX attempt also wrote its own `.result` artifact. Both are real
+    // attempt-level artifacts on disk, but they belong to the SAME logical task
+    // (290-020) and must count once, not twice.
+    writeFileSync(
+      join(r, '.tasks', 'task-290-020-fix.result'),
+      JSON.stringify({ selfAssessment: 'DONE' }),
+      'utf-8',
+    );
+    // A second, unrelated logical task with a single attempt.
+    writeFileSync(
+      join(r, '.tasks', 'task-290-021.result'),
+      JSON.stringify({ selfAssessment: 'DONE' }),
+      'utf-8',
+    );
+
+    const snap = getSprintStateSnapshot(r);
+    // 2 logical tasks completed (290-020, 290-021), NOT 3 attempt-level artifacts.
+    expect(snap.completedTasks).toBe(2);
+  });
 });

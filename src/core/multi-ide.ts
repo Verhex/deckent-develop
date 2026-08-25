@@ -198,3 +198,65 @@ export function releaseSprintLock(projectRoot: string): void {
     try { unlinkSync(filePath); } catch { /* ignore */ }
   }
 }
+
+/**
+ * Typed outcome of a terminal-aware sprint lock release (671-006).
+ * Discriminates exactly what happened — no throw, no undifferentiated success:
+ * - `released`     — the lock recorded the terminated sprint's id and was unlinked
+ * - `not-matching` — a lock exists but its recorded sprintId does not (provably)
+ *                    match the requested sprintId, so it was left untouched
+ * - `absent`       — no lock file exists (including the unlink ENOENT race)
+ */
+export type TerminatedSprintLockReleaseResult =
+  | { readonly state: 'released'; readonly recordedSprintId: string }
+  | { readonly state: 'not-matching'; readonly recordedSprintId: string | null }
+  | { readonly state: 'absent' };
+
+/**
+ * Release the sprint lock for a sprint that has reached a terminal state
+ * (COMPLETE/ABORTED), regardless of which PID acquired it.
+ *
+ * `releaseSprintLock` above is owner-PID-only: a finalize running in a
+ * different process can never clear the lock, so it survives as a stale
+ * lease. Here the caller's finalizer context is the terminal evidence; the
+ * ONLY deletion criteria are file existence plus the sprintId recorded in
+ * the lock file matching the requested sprintId. Everything else — a foreign
+ * live PID included — is deliberately not consulted: a live foreign PID
+ * whose sprint has terminated is exactly the stale-lease hole being closed,
+ * while a lock recorded for ANY other sprint is never touched. Unlike
+ * `acquireSprintLock`, a corrupt/unreadable lock is NOT blindly removed —
+ * without a provable sprintId match this function has no deletion authority.
+ *
+ * @param root - Absolute path to the project root
+ * @param sprintId - The terminated sprint whose lease may be released
+ */
+export function releaseSprintLockForTerminatedSprint(
+  root: string,
+  sprintId: string,
+): TerminatedSprintLockReleaseResult {
+  const filePath = lockPath(root);
+  if (!existsSync(filePath)) return { state: 'absent' };
+
+  let recorded: string | null;
+  try {
+    const data = JSON.parse(readFileSync(filePath, 'utf-8')) as Partial<LockFileData>;
+    recorded = typeof data.sprintId === 'string' ? data.sprintId : null;
+  } catch (e) {
+    // Unreadable/corrupt lock: a sprintId match cannot be proven, so nothing
+    // is deleted on this path.
+    debugLog('releaseSprintLockForTerminatedSprint:read', e);
+    return { state: 'not-matching', recordedSprintId: null };
+  }
+  if (recorded !== sprintId) return { state: 'not-matching', recordedSprintId: recorded };
+
+  try {
+    unlinkSync(filePath);
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return { state: 'absent' };
+    // The lock provably matched but could not be unlinked — report it as
+    // still standing rather than throwing or claiming success.
+    debugLog('releaseSprintLockForTerminatedSprint:unlink', e);
+    return { state: 'not-matching', recordedSprintId: recorded };
+  }
+  return { state: 'released', recordedSprintId: recorded };
+}

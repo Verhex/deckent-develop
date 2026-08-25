@@ -248,11 +248,51 @@ export function readSequence(projectRoot: string, sprintId: string): number {
 }
 
 /**
+ * High-water mark of the sequences already recorded in the canonical event log.
+ * Returns 0 when the log is absent, empty or unreadable (fail-safe).
+ *
+ * Only consulted when the `<sprint>-seq` sidecar is missing or unusable, so the
+ * common write path never pays for this scan.
+ */
+function maxSequenceInEventLog(projectRoot: string, sprintId: string): number {
+  const filePath = eventsFilePath(projectRoot, sprintId);
+  if (!existsSync(filePath)) return 0;
+  try {
+    let max = 0;
+    for (const line of readFileSync(filePath, 'utf-8').split('\n')) {
+      if (line.trim().length === 0) continue;
+      try {
+        const parsed = JSON.parse(line) as { sequence?: unknown };
+        if (typeof parsed.sequence === 'number' && Number.isFinite(parsed.sequence) && parsed.sequence > max) {
+          max = parsed.sequence;
+        }
+      } catch {
+        // Malformed line — skip it; the rest of the log still bounds the sequence.
+      }
+    }
+    return max;
+  } catch (err) {
+    debugLog('event-stream:maxSequenceInEventLog', err);
+    return 0;
+  }
+}
+
+/**
  * Increment and persist the sequence number atomically.
  * Returns the new sequence value.
+ *
+ * Self-healing (671-008): the `<sprint>-seq` sidecar can disappear while the
+ * canonical `<sprint>-events.jsonl` survives (retention deletes the sidecar, a
+ * late emitter then writes again). Restarting at 1 would re-issue sequence numbers
+ * that already exist in the log. When the sidecar is missing or holds an unusable
+ * value we therefore recover the counter from the log's own maximum, which makes
+ * that collision structurally impossible rather than merely unlikely.
  */
 function nextSequence(projectRoot: string, sprintId: string): number {
-  const current = readSequence(projectRoot, sprintId);
+  let current = readSequence(projectRoot, sprintId);
+  if (current <= 0) {
+    current = maxSequenceInEventLog(projectRoot, sprintId);
+  }
   const next = current + 1;
   const seqPath = sequenceFilePath(projectRoot, sprintId);
   try {
@@ -311,6 +351,38 @@ export function getCurrentSprintId(projectRoot: string): string | null {
   return null;
 }
 
+/** A writeEvent attempt whose event was lost to an I/O failure (671-008). */
+export interface EventWriteFailure {
+  kind: 'failed';
+  sprintId: string;
+  channel: string;
+  /** Message of the underlying I/O error. */
+  reason: string;
+  /** ISO-8601 timestamp of the failed attempt. */
+  at: string;
+}
+
+/**
+ * Typed outcome of an event write. `writeEvent` projects this down to
+ * `DeckentEvent | null` for its existing callers; `writeEventDetailed` exposes it
+ * so a caller that cares can tell a dropped duplicate from a lost write.
+ */
+export type EventWriteResult =
+  | { kind: 'written'; event: DeckentEvent }
+  | { kind: 'suppressed'; sprintId: string; channel: string }
+  | EventWriteFailure;
+
+/** Last write lost to I/O — visibility for callers that only ever see `null`. */
+let lastEventWriteFailure: EventWriteFailure | null = null;
+
+/**
+ * The most recent `writeEvent` I/O failure, or null if none happened in this
+ * process. Lets a `null`-receiving caller inspect what was lost.
+ */
+export function getLastEventWriteFailure(): EventWriteFailure | null {
+  return lastEventWriteFailure;
+}
+
 /**
  * Write a single event to the sprint event stream.
  * Fail-safe: never throws — logs warning on failure.
@@ -321,7 +393,7 @@ export function getCurrentSprintId(projectRoot: string): string | null {
  * @param target - Event target component
  * @param channel - Channel code from CHANNELS
  * @param payload - Event-specific data
- * @returns The written event, or null on failure
+ * @returns The written event, or null on failure (contract unchanged)
  */
 export function writeEvent(
   projectRoot: string,
@@ -332,6 +404,23 @@ export function writeEvent(
   payload: unknown,
   lineage?: AuditLineage,
 ): DeckentEvent | null {
+  const result = writeEventDetailed(projectRoot, sprintId, source, target, channel, payload, lineage);
+  return result.kind === 'written' ? result.event : null;
+}
+
+/**
+ * Same write as `writeEvent`, but returns the typed outcome instead of collapsing
+ * failure and suppression into `null`. Fail-safe: never throws.
+ */
+export function writeEventDetailed(
+  projectRoot: string,
+  sprintId: string,
+  source: DeckentEvent['source'],
+  target: DeckentEvent['target'],
+  channel: string,
+  payload: unknown,
+  lineage?: AuditLineage,
+): EventWriteResult {
   try {
     // Sprint 183 W1-2 — DEPENDENCY_BLOCKED spam debounce.
     // Channel-aware suppression: when the same taskId has the same set of
@@ -342,7 +431,7 @@ export function writeEvent(
       const decision = applyDependencyBlockedDedupe(sprintId, payload);
       if (decision === 'suppress') {
         debugLog('event-stream:writeEvent', `Suppressed duplicate DEPENDENCY_BLOCKED for sprint=${sprintId}`);
-        return null;
+        return { kind: 'suppressed', sprintId, channel };
       }
     }
 
@@ -369,16 +458,27 @@ export function writeEvent(
     // B-AUTONOMOUS-LOG: bound the long-lived 'autonomous' stream (rotate at cap).
     rotateEventFileIfLarge(eventsPath);
     appendFileSync(eventsPath, line, 'utf-8');
-    return event;
+    return { kind: 'written', event };
   } catch (err) {
-    // Fail-safe: NEVER crash the sprint due to event stream I/O.
+    // Fail-safe: NEVER crash the sprint due to event stream I/O — but never lose the
+    // write silently either (671-008): record a typed failure and emit a debugLog
+    // record so the dropped event stays visible after the fact.
+    const reason = err instanceof Error ? err.message : String(err);
     // Under the test runner, stay silent: partial node:fs mocks (no appendFileSync
     // export) make this path noisy and can flake tests that assert on console.warn.
     if (!process.env.VITEST) {
-      console.warn(`[event-stream] writeEvent failed: ${err instanceof Error ? err.message : String(err)}`);
+      console.warn(`[event-stream] writeEvent failed: ${reason}`);
     }
-    debugLog('event-stream:writeEvent', err);
-    return null;
+    const failure: EventWriteFailure = {
+      kind: 'failed',
+      sprintId,
+      channel,
+      reason,
+      at: new Date().toISOString(),
+    };
+    lastEventWriteFailure = failure;
+    debugLog('event-stream:writeEvent', `write failed sprint=${sprintId} channel=${channel}: ${reason}`);
+    return failure;
   }
 }
 

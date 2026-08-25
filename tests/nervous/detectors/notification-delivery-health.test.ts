@@ -3,8 +3,16 @@
 // NotificationDeliveryHealthDetector — 3 test case
 // ADR-003: vitest over Jest
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { NotificationDeliveryHealthDetector } from '../../../src/nervous/detectors/notification-delivery-health.js';
+import {
+  enqueueOwnerNotification,
+  deliverPendingOwnerNotifications,
+} from '../../../src/connectors/notification-delivery.js';
+import type { OwnerNotificationTransport } from '../../../src/connectors/notification-delivery.js';
 import type {
   DetectorContext,
   SprintStateSnapshot,
@@ -108,6 +116,94 @@ describe('NotificationDeliveryHealthDetector', () => {
     expect(result!.suggestedActions[0].payload).toMatchObject({
       sent: 6,
       failed: 4,
+    });
+  });
+
+  // ─── 671-007: durable owner-notification outbox age signal ─────────────────
+
+  describe('durable outbox pending-age signal', () => {
+    const tmpDirs: string[] = [];
+
+    afterEach(() => {
+      while (tmpDirs.length > 0) {
+        const dir = tmpDirs.pop();
+        if (dir) rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    function makeTmpProjectRoot(): string {
+      const dir = mkdtempSync(join(tmpdir(), 'ndh-outbox-'));
+      tmpDirs.push(dir);
+      return dir;
+    }
+
+    const PENDING_AGE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes — injected, never a literal in the detector
+
+    function makeCronEvent(): ObserverEvent {
+      return {
+        id: 'ev-cron-outbox',
+        source: 'cron',
+        type: 'CRON_TICK',
+        timestamp: BASE_NOW.toISOString(),
+        payload: {},
+        sprintId: 'sprint-151',
+      };
+    }
+
+    it('positive: aged pending durable-outbox record → warning alert', () => {
+      const projectRoot = makeTmpProjectRoot();
+      const agedCreatedAt = new Date(BASE_NOW.getTime() - 20 * 60 * 1000).toISOString(); // 20 min old
+      enqueueOwnerNotification(projectRoot, {
+        kind: 'sprint-started',
+        sprintId: 'sprint-151',
+        title: 'Sprint started',
+        message: 'Sprint 151 started',
+        lang: 'en',
+        createdAt: agedCreatedAt,
+      });
+
+      const detector = new NotificationDeliveryHealthDetector(
+        0.50,
+        () => PENDING_AGE_THRESHOLD_MS,
+      );
+      const result = detector.detect(makeCtx(makeCronEvent(), { projectRoot, now: BASE_NOW }));
+
+      expect(result).not.toBeNull();
+      expect(result!.severity).toBe('warning');
+      expect(result!.shouldNotify).toBe(true);
+      expect(result!.metadata).toMatchObject({
+        type: 'notification-delivery-health',
+        signal: 'durable-outbox',
+        pendingCount: 1,
+      });
+    });
+
+    it('negative: same record acknowledged → no alert', async () => {
+      const projectRoot = makeTmpProjectRoot();
+      const agedCreatedAt = new Date(BASE_NOW.getTime() - 20 * 60 * 1000).toISOString(); // 20 min old
+      enqueueOwnerNotification(projectRoot, {
+        kind: 'sprint-started',
+        sprintId: 'sprint-151',
+        title: 'Sprint started',
+        message: 'Sprint 151 started',
+        lang: 'en',
+        createdAt: agedCreatedAt,
+      });
+
+      // Acknowledge via the real async delivery path — never hand-write the
+      // receipts file — so the record is reconciled exactly as production does.
+      const transport: OwnerNotificationTransport = {
+        sendMessage: async () => {},
+      };
+      await deliverPendingOwnerNotifications(projectRoot, transport);
+
+      const detector = new NotificationDeliveryHealthDetector(
+        0.50,
+        () => PENDING_AGE_THRESHOLD_MS,
+      );
+      const result = detector.detect(makeCtx(makeCronEvent(), { projectRoot, now: BASE_NOW }));
+
+      expect(result).toBeNull();
     });
   });
 });

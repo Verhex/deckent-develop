@@ -19,6 +19,7 @@ import {
   BRAIN_DIR,
   DASHBOARD_FILE,
   RUNTIME_DIR,
+  RUN_STATUS_READ_MODEL_FILE,
 } from '../core/constants.js';
 import { archiveTaskArtifacts } from '../core/sprint-archive.js';
 
@@ -1591,6 +1592,116 @@ export function deduplicateAlerts(existing: Alert[], incoming: Alert[]): Alert[]
   return merged.slice(-ALERT_MAX);
 }
 
+// ─── Canonical Run-Status Progress Source (Sprint 671 T-671-002) ────
+
+/**
+ * Typed warning emitted when the canonical run-status read-model cannot
+ * supply the dashboard progress quadruple. The auditor NEVER falls back to
+ * counting result files (raw counts include NO_GO and `-fix` attempt
+ * results — measured drift: done=24 versus logical done=4) and NEVER
+ * writes an invented or zeroed number.
+ */
+export interface ProgressReadModelWarning {
+  readonly kind: 'READ_MODEL_UNAVAILABLE' | 'PROGRESS_INVARIANT_VIOLATION';
+  readonly detail: string;
+  readonly readModelPath: string;
+}
+
+/** The done/active/blocked/total quadruple published under `logicalProgress`. */
+export interface LogicalProgressQuadruple {
+  readonly done: number;
+  readonly active: number;
+  readonly blocked: number;
+  readonly total: number;
+}
+
+export type CanonicalProgressRead =
+  | { readonly kind: 'ok'; readonly progress: LogicalProgressQuadruple }
+  | { readonly kind: 'unavailable'; readonly warning: ProgressReadModelWarning }
+  | { readonly kind: 'invariant-violation'; readonly warning: ProgressReadModelWarning };
+
+const PROGRESS_QUADRUPLE_FIELDS = ['done', 'active', 'blocked', 'total'] as const;
+
+/**
+ * Reads the done/active/blocked/total quadruple from the `logicalProgress`
+ * block of the canonical run-status read-model published by the coordinator
+ * (~30s cadence, matching the auditor scan interval). The auditor is a
+ * separate process: it reads the published file and never re-derives the
+ * projection in-process. Absent/empty/unparseable/malformed input is a typed
+ * fail-closed outcome, never a fallback to file counting.
+ */
+export function readCanonicalLogicalProgress(projectRoot: string): CanonicalProgressRead {
+  const readModelPath = join(projectRoot, RUN_STATUS_READ_MODEL_FILE);
+  const unavailable = (detail: string): CanonicalProgressRead => ({
+    kind: 'unavailable',
+    warning: { kind: 'READ_MODEL_UNAVAILABLE', detail, readModelPath },
+  });
+
+  if (!existsSync(readModelPath)) return unavailable('read-model file is absent');
+
+  let content: string;
+  try {
+    content = readFileSync(readModelPath, 'utf-8');
+  } catch (error: unknown) {
+    return unavailable(
+      `read-model file is unreadable: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  if (typeof content !== 'string' || content.trim() === '') {
+    return unavailable('read-model file is empty');
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch (error: unknown) {
+    return unavailable(
+      `read-model file does not parse: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  if (parsed === null || typeof parsed !== 'object') {
+    return unavailable('read-model root is not an object');
+  }
+
+  const logicalProgress = (parsed as Record<string, unknown>)['logicalProgress'];
+  if (logicalProgress === null || typeof logicalProgress !== 'object') {
+    return unavailable('read-model has no logicalProgress block');
+  }
+  const block = logicalProgress as Record<string, unknown>;
+  const quadruple: Partial<Record<(typeof PROGRESS_QUADRUPLE_FIELDS)[number], number>> = {};
+  for (const field of PROGRESS_QUADRUPLE_FIELDS) {
+    const value = block[field];
+    if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
+      return unavailable(`logicalProgress.${field} is not a non-negative safe integer`);
+    }
+    quadruple[field] = value;
+  }
+  const progress = quadruple as LogicalProgressQuadruple;
+
+  // Invariant: done<=total, verified BEFORE anything is written.
+  if (progress.done > progress.total) {
+    return {
+      kind: 'invariant-violation',
+      warning: {
+        kind: 'PROGRESS_INVARIANT_VIOLATION',
+        detail: `logicalProgress.done (${progress.done}) exceeds total (${progress.total})`,
+        readModelPath,
+      },
+    };
+  }
+
+  return { kind: 'ok', progress };
+}
+
+/** Emits a typed progress warning through the project's existing logging seam. */
+function emitProgressWarning(warning: ProgressReadModelWarning): void {
+  debugLog(
+    'auditor:logical-progress',
+    `${warning.kind}: ${warning.detail} (${warning.readModelPath})`,
+  );
+  metric('auditor.progress_read_model_warning', 1, { kind: warning.kind });
+}
+
 export function writeScanToDashboard(
   projectRoot: string,
   sprintInfo: { id: string; number: number; phase: string; status: string },
@@ -1605,16 +1716,21 @@ export function writeScanToDashboard(
     }
   } catch { /* start fresh */ }
 
+  // T-671-002: the progress quadruple comes from the canonical run-status
+  // read-model, never from raw result-file counts. done<=total is verified
+  // before writing; on violation the entire dashboard write is skipped.
+  const canonicalProgress = readCanonicalLogicalProgress(projectRoot);
+  if (canonicalProgress.kind === 'invariant-violation') {
+    emitProgressWarning(canonicalProgress.warning);
+    return;
+  }
+
   // Merge alerts with deduplication
   const mergedAlerts = deduplicateAlerts(existing?.alerts ?? [], scanResult.alerts);
 
-  // Scan .result files to determine done task count
-  const { resultCount, doneTaskIds } = scanResultFiles(projectRoot);
-
-  // Active workers = heartbeats whose task does NOT yet have a .result file
-  const activeWorkerCount = scanResult.heartbeats.filter(
-    (hb) => !doneTaskIds.has(hb.taskId),
-  ).length;
+  // Result files still drive per-agent DONE status below — but they are no
+  // longer a source for the done/active/blocked/total progress counters.
+  const { doneTaskIds } = scanResultFiles(projectRoot);
 
   // Update known agents, then append workers that were born after the initial
   // dashboard snapshot (FIX/XFIX/dependency waves). The task artifact is the
@@ -1650,17 +1766,24 @@ export function writeScanToDashboard(
     });
   }
 
-  const existingProgress = existing?.progress ?? { done: 0, active: 0, blocked: 0, total: 0 };
+  let progress: DashboardState['progress'];
+  if (canonicalProgress.kind === 'ok') {
+    progress = { ...canonicalProgress.progress };
+  } else {
+    // Fail-closed: the read-model is absent/empty/unparseable. Leave the
+    // existing progress fields untouched. With no existing dashboard progress
+    // there is nothing safe to preserve — never write an invented or zeroed
+    // quadruple, so skip the dashboard write entirely.
+    emitProgressWarning(canonicalProgress.warning);
+    if (!existing?.progress) return;
+    progress = { ...existing.progress };
+  }
 
   updateDashboard(projectRoot, {
     // safe: sprintInfo fields (id, number, phase, status) match DashboardState['sprint'] — caller provides correct shape
     sprint: sprintInfo as DashboardState['sprint'],
     agents,
-    progress: {
-      ...existingProgress,
-      done: resultCount,
-      active: activeWorkerCount,
-    },
+    progress,
     alerts: mergedAlerts,
     updatedAt: new Date().toISOString(),
     auditorLastScan: new Date().toISOString(),

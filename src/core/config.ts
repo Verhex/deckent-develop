@@ -367,6 +367,7 @@ export const NERVOUS_DETECTOR_SCHEMA = z
     anomaly_threshold: z.number().min(0).max(1).optional(),
     auto_restore: z.boolean().optional(),
     reserve_for: z.string().optional(),
+    pending_age_threshold_ms: z.number().nonnegative().optional(),
   })
   .strict();
 
@@ -1980,6 +1981,8 @@ export function createDefaultConfig(): DeckentConfig {
     search_cache_ttl: 3600,
     // Notifications
     notify_on_complete: false,
+    // Bot-daemon durable owner-notification outbox drain cadence (671-001).
+    notify_outbox_drain_interval_ms: 30_000,
     notify_channel: null,
     notify_url: null,
     // Telemetry
@@ -2100,7 +2103,9 @@ export function createDefaultConfig(): DeckentConfig {
         token_spike: { enabled: false },
         agent_routing_anomaly: { enabled: false },
         scope_collision_rate: { enabled: false },
-        notification_delivery_health: { enabled: false },
+        // pending_age_threshold_ms (671-001): several multiples of the default
+        // notify_outbox_drain_interval_ms (30s) so a healthy drain never self-alarms.
+        notification_delivery_health: { enabled: false, pending_age_threshold_ms: 300_000 },
       },
       history_retention_days: 30,
     },
@@ -2178,13 +2183,24 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
 
   // Self-healing: if readJsonFile returned null but the file exists on disk,
   // it means the JSON is corrupted. Backup + fresh default.
+  // 2026-08-25 incident hardening: a concurrent non-atomic writer made a VALID
+  // config read as half-written once, and this healer then moved the intact
+  // file aside and lost it in the write race. Re-read once after a short beat —
+  // a genuinely corrupted file stays corrupted; a mid-write file heals itself.
+  if (projectConfig === null && existsSync(projectConfigPath)) {
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    projectConfig = await readJsonFile<Partial<DeckentConfig>>(projectConfigPath);
+  }
   if (projectConfig === null && existsSync(projectConfigPath)) {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const backupPath = `${projectConfigPath}.corrupted.${timestamp}.bak`;
     try {
       renameSync(projectConfigPath, backupPath);
       const freshDefault = createDefaultConfig();
-      writeFileSync(projectConfigPath, JSON.stringify(freshDefault, null, 2) + '\n');
+      // Atomic replace (same incident): never leave a truncate+write window.
+      const tmpPath = `${projectConfigPath}.${process.pid}.tmp`;
+      writeFileSync(tmpPath, JSON.stringify(freshDefault, null, 2) + '\n');
+      renameSync(tmpPath, projectConfigPath);
       console.error(
         `[deckent] Config dosyanız bozulmuştu, yedeklendi: ${backupPath}\n` +
         `Defaults ile devam ediliyor. Düzeltme için: deckent config read`,
@@ -2525,6 +2541,8 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     notify_connectors: (config as DeckentConfig).notify_connectors,
     approval_channels: config.approval_channels,
     notify_on_complete: (config as DeckentConfig).notify_on_complete,
+    // Bot-daemon durable owner-notification outbox drain cadence (671-001) — passed through.
+    notify_outbox_drain_interval_ms: (config as DeckentConfig).notify_outbox_drain_interval_ms,
     // Bot capabilities config — passed through (opt-in, default-off).
     bot_capabilities: (config as DeckentConfig).bot_capabilities,
     // Per-user identity↔RBAC config (ADR-092) — passed through (opt-in, default-off).
@@ -2945,6 +2963,18 @@ export const CONFIG_METADATA: Readonly<Record<string, ConfigMetadataEntry>> = {
     default: false,
     options: ['true', 'false'],
     category: 'Notifications',
+  },
+  notify_outbox_drain_interval_ms: {
+    description: 'Bot-daemon durable owner-notification outbox drain interval in ms (671-001).',
+    type: 'number',
+    default: 30_000,
+    category: 'Notifications',
+  },
+  'nervous_system.detectors.notification_delivery_health.pending_age_threshold_ms': {
+    description: 'notification_delivery_health-only pending-age threshold (ms) before a queued owner notification is flagged undelivered (671-001).',
+    type: 'number',
+    default: 300_000,
+    category: 'Nervous System',
   },
   notify_channel: {
     description: 'Notification delivery channel.',

@@ -1181,6 +1181,16 @@ export interface DeckentConfig {
   // ─── Notifications ─────────────────────────────────────────────────
   /** Notify on sprint completion (default: false) */
   notify_on_complete?: boolean;
+  /**
+   * Durable owner-notification outbox drain interval in ms (671-001). Consumer:
+   * the bot-daemon's durable owner-notification outbox drain loop
+   * (src/connectors/bot-daemon.ts), which polls the outbox at this cadence and
+   * redelivers pending owner notifications (e.g. sprint-pause alerts). Default:
+   * 30_000 (30s) — kept well under an operator's tolerance for a stuck
+   * pause-notification, so a drain stall surfaces quickly without hammering the
+   * outbox. Absent → the default applies.
+   */
+  notify_outbox_drain_interval_ms?: number;
   /** Notification channel. 'webhook' is wired (R4/B11): notify_channel='webhook' +
    *  notify_url posts notifications to a generic outbound HTTP endpoint via the
    *  NotifyDispatcher webhook adapter. slack/discord/email here remain legacy —
@@ -1857,6 +1867,15 @@ export interface NervousDetectorConfig {
   auto_restore?: boolean;
   /** Reserved for future sprint (reserve detectors only) */
   reserve_for?: string;
+  /**
+   * Owner-notification pending-age threshold in ms (notification_delivery_health
+   * only). Distinct from `threshold_ms` (documented stale_worker-only above) so
+   * the two detectors' semantics stay unambiguous — this field is never read by
+   * stale_worker. Default: 300_000 (5 min) — several multiples of the bot-daemon
+   * outbox drain cadence (`notify_outbox_drain_interval_ms`, default 30s) so a
+   * healthy drain cycle never trips this detector on its own latency.
+   */
+  pending_age_threshold_ms?: number;
 }
 
 /**
@@ -2135,6 +2154,9 @@ export interface ResolvedConfig {
   bot_agent?: BotAgentConfig;
   /** Notify on sprint completion (passed through). */
   notify_on_complete?: boolean;
+  /** Durable owner-notification outbox drain interval — passed through from
+   *  project config (671-001). @see DeckentConfig.notify_outbox_drain_interval_ms */
+  notify_outbox_drain_interval_ms?: number;
   // Auditor
   scan_interval?: number;
   heartbeat_timeout?: number;

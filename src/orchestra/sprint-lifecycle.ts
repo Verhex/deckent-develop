@@ -142,6 +142,16 @@ let _activeSprint: ActiveSprintRef | null = null;
 let _isInterrupted = false;
 
 /** Register the active sprint so SIGINT handler can clean it up. @internal */
+/**
+ * Orchestra-layer language resolution for owner notifications. The cli-helper
+ * import is grandfathered in THIS module's layer-shim atom; re-exposing it here
+ * keeps the finalizer (and future orchestra emitters) inside the layer without
+ * minting a new orchestra>cli crossing.
+ */
+export function resolveOwnerNotificationLang(projectRoot: string): string {
+  return detectLang(projectRoot);
+}
+
 export function setActiveSprint(projectRoot: string, sprint: Sprint, spawnBackend?: SpawnBackend): void {
   _activeSprint = { projectRoot, sprint, spawnBackend };
 }

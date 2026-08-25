@@ -75,14 +75,27 @@ vi.mock('../../src/core/memory-store.js', () => ({
   })),
 }));
 
-import { readdirSync, existsSync, statSync, writeFileSync } from 'node:fs';
-import { readJsonSafe } from '../../src/core/utils.js';
+import { readdirSync, existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { debugLog, readJsonSafe } from '../../src/core/utils.js';
+import {
+  DASHBOARD_FILE,
+  RUN_STATUS_READ_MODEL_FILE,
+  TASKS_DIR,
+} from '../../src/core/constants.js';
 
 const mockedReaddirSync = vi.mocked(readdirSync);
 const mockedExistsSync = vi.mocked(existsSync);
+const mockedReadFileSync = vi.mocked(readFileSync);
 const mockedStatSync = vi.mocked(statSync);
 const mockedWriteFileSync = vi.mocked(writeFileSync);
 const mockedReadJsonSafe = vi.mocked(readJsonSafe);
+const mockedDebugLog = vi.mocked(debugLog);
+
+// Real filesystem for hermetic tmpdir fixtures (node:fs is mocked module-wide;
+// fixture tests delegate mocked reads under the tmpdir root to the real fs).
+const realFs = await vi.importActual<typeof import('node:fs')>('node:fs');
 
 const PROJECT_ROOT = '/tmp/test-project';
 const STALE_TIMESTAMP = new Date(Date.now() - 300_000).toISOString(); // 5 min ago (stale)
@@ -109,6 +122,14 @@ describe('Auditor Stale Alert Race Condition Fix (Sprint 149)', () => {
   it('projects a dynamic FIX heartbeat by its activity task identity', () => {
     mockedExistsSync.mockReturnValue(true);
     mockedReaddirSync.mockReturnValue([] as never);
+    // T-671-002: the dashboard write requires the canonical run-status
+    // read-model — serve a minimal valid logicalProgress block.
+    mockedReadFileSync.mockImplementation(((path: unknown) => {
+      if (String(path).includes('run-status-read-model')) {
+        return JSON.stringify({ logicalProgress: { done: 0, active: 1, blocked: 0, total: 1 } });
+      }
+      throw new Error('ENOENT');
+    }) as never);
     mockedReadJsonSafe.mockImplementation((path: string) => {
       if (path.endsWith('task-661-006-fix.json')) {
         return {
@@ -313,5 +334,140 @@ describe('Auditor Stale Alert Race Condition Fix (Sprint 149)', () => {
     const criticalAlerts = result.alerts.filter(a => a.level === 'CRITICAL');
     expect(criticalAlerts).toHaveLength(0);
     expect(result.staleAgents).toHaveLength(0);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// T-671-002: dashboard progress comes from the canonical run-status
+// read-model (logicalProgress block), never from raw result-file counts.
+// Hermetic tmpdir fixtures; nothing is spawned (async spawn only).
+// ═══════════════════════════════════════════════════════════════════════
+
+const SPRINT_INFO = { id: 'sprint-671', number: 671, phase: 'EXECUTE', status: 'RUNNING' };
+
+function emptyScan() {
+  return { heartbeats: [], violations: [], alerts: [], locks: [] };
+}
+
+/** Route mocked fs reads under the tmpdir root to the real filesystem. */
+function delegateReadsToTmp(tmpRoot: string): void {
+  mockedExistsSync.mockImplementation(
+    (p: unknown) => typeof p === 'string' && p.startsWith(tmpRoot) && realFs.existsSync(p),
+  );
+  mockedReaddirSync.mockImplementation(
+    ((p: unknown) => realFs.readdirSync(String(p))) as never,
+  );
+  mockedReadFileSync.mockImplementation(
+    ((p: unknown) => realFs.readFileSync(String(p), 'utf-8')) as never,
+  );
+  mockedReadJsonSafe.mockImplementation(() => null);
+}
+
+function makeTmpRoot(): string {
+  return realFs.mkdtempSync(join(tmpdir(), 'auditor-read-model-'));
+}
+
+function writeResultFiles(tmpRoot: string, count: number): void {
+  realFs.mkdirSync(join(tmpRoot, TASKS_DIR), { recursive: true });
+  for (let i = 0; i < count; i++) {
+    realFs.writeFileSync(join(tmpRoot, TASKS_DIR, `task-671-00${i}.result`), '{}');
+  }
+}
+
+function writeReadModel(tmpRoot: string, logicalProgress: unknown): void {
+  const readModelPath = join(tmpRoot, RUN_STATUS_READ_MODEL_FILE);
+  realFs.mkdirSync(dirname(readModelPath), { recursive: true });
+  realFs.writeFileSync(readModelPath, JSON.stringify({ schemaVersion: 1, logicalProgress }));
+}
+
+function findDashboardWrite() {
+  return mockedWriteFileSync.mock.calls.find(
+    ([, contents]) => String(contents).includes('"progress"'),
+  );
+}
+
+describe('Dashboard done-counter reads the canonical run-status read-model (671-002)', () => {
+  it('dashboard done equals logicalProgress.done exactly, not the result-file count', () => {
+    const tmpRoot = makeTmpRoot();
+    try {
+      // OLD source: 7 result files on disk (deliberately differs from logical done=4,
+      // so this pin can distinguish the new source from the old one).
+      writeResultFiles(tmpRoot, 7);
+      writeReadModel(tmpRoot, {
+        done: 4, active: 2, blocked: 3, total: 9, attemptCount: 9, lineages: [],
+      });
+      delegateReadsToTmp(tmpRoot);
+
+      writeScanToDashboard(tmpRoot, SPRINT_INFO, emptyScan() as never);
+
+      const resultFileCount = realFs
+        .readdirSync(join(tmpRoot, TASKS_DIR))
+        .filter(f => f.endsWith('.result')).length;
+      expect(resultFileCount).toBe(7); // fixture really contains the divergent old source
+
+      const write = findDashboardWrite();
+      expect(write).toBeDefined();
+      const dashboard = JSON.parse(String(write![1])) as {
+        progress: { done: number; active: number; blocked: number; total: number };
+      };
+      expect(dashboard.progress).toEqual({ done: 4, active: 2, blocked: 3, total: 9 });
+      expect(dashboard.progress.done).not.toBe(resultFileCount);
+    } finally {
+      realFs.rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('absent read-model: existing progress left untouched + typed warning (no fabricated number)', () => {
+    const tmpRoot = makeTmpRoot();
+    try {
+      // 5 result files exist — the old source would have fabricated done=5.
+      writeResultFiles(tmpRoot, 5);
+      // Existing dashboard progress that must survive verbatim. No read-model file.
+      realFs.writeFileSync(join(tmpRoot, DASHBOARD_FILE), JSON.stringify({
+        sprint: { id: 'sprint-671', number: 671, phase: 'EXECUTE', status: 'RUNNING' },
+        agents: [],
+        progress: { done: 3, active: 1, blocked: 2, total: 9 },
+        alerts: [],
+        updatedAt: '2026-08-25T00:00:00.000Z',
+      }));
+      delegateReadsToTmp(tmpRoot);
+
+      writeScanToDashboard(tmpRoot, SPRINT_INFO, emptyScan() as never);
+
+      const write = findDashboardWrite();
+      expect(write).toBeDefined();
+      const dashboard = JSON.parse(String(write![1])) as {
+        progress: { done: number; active: number; blocked: number; total: number };
+      };
+      // Untouched: not the file count (5), not zeroed, not invented.
+      expect(dashboard.progress).toEqual({ done: 3, active: 1, blocked: 2, total: 9 });
+      expect(mockedDebugLog).toHaveBeenCalledWith(
+        'auditor:logical-progress',
+        expect.stringContaining('READ_MODEL_UNAVAILABLE'),
+      );
+    } finally {
+      realFs.rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('done>total invariant violation: no write at all + typed warning', () => {
+    const tmpRoot = makeTmpRoot();
+    try {
+      writeResultFiles(tmpRoot, 2);
+      writeReadModel(tmpRoot, {
+        done: 12, active: 0, blocked: 0, total: 9, attemptCount: 12, lineages: [],
+      });
+      delegateReadsToTmp(tmpRoot);
+
+      writeScanToDashboard(tmpRoot, SPRINT_INFO, emptyScan() as never);
+
+      expect(mockedWriteFileSync).not.toHaveBeenCalled();
+      expect(mockedDebugLog).toHaveBeenCalledWith(
+        'auditor:logical-progress',
+        expect.stringContaining('PROGRESS_INVARIANT_VIOLATION'),
+      );
+    } finally {
+      realFs.rmSync(tmpRoot, { recursive: true, force: true });
+    }
   });
 });

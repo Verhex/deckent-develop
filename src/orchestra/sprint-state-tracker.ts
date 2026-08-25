@@ -18,6 +18,7 @@ import { parseWorkerActivityHeartbeat } from '../core/worker-activity-heartbeat.
 import { WorkerHeartbeatAuthorityStore } from '../core/worker-heartbeat-authority-store.js';
 import type { WorkerHeartbeatAuthorityState } from '../core/worker-heartbeat-authority.js';
 import type { HostPrimaryLiveness } from '../core/monitoring-types.js';
+import { projectLogicalProgress, type LogicalProgressAttempt } from '../core/logical-progress-projection.js';
 
 export type { HostPrimaryLiveness } from '../core/monitoring-types.js';
 
@@ -191,13 +192,60 @@ function readExactAttemptLiveness(
   };
 }
 
+// Fix-attempt task ids follow the established `<logicalId>-fix(-fix)*` convention
+// used throughout the orchestrator — e.g. the dynamic FIX worker fixture below
+// (`290-001-fix`) and the residue-heartbeat case documented in readActiveWorkers
+// above (`500-003-fix-fix-fix`). Stripping the trailing run of `-fix` segments
+// recovers the logical/root task id a repair lineage shares.
+const FIX_SUFFIX_RE = /(-fix)+$/;
+
+function logicalTaskIdFor(taskId: string): string {
+  return taskId.replace(FIX_SUFFIX_RE, '');
+}
+
+// Caller-context rationale (task 671-003): countCompletedTasks binds to the
+// canonical logical-progress authority (`projectLogicalProgress`) instead of
+// independently re-deriving a count from its own `.result` file enumeration —
+// that old approach counted ATTEMPT-level artifacts, so a FIX attempt's own
+// `.result` file inflated the number past the true logical-task total (the same
+// defect being removed from the auditor's `scanResultFiles`/`resultCount`).
+//
+// Two canonical shapes are admissible: call `projectLogicalProgress` directly,
+// or consume the published `CanonicalRunStatusReadModel` (run-status-read-model.ts).
+// This function is reached from `getSprintStateSnapshot`, which per this file's
+// header is a synchronous, IN-PROCESS snapshot builder invoked directly by
+// NervousObserver via the `sprintStateProvider` callback wired in bootstrap.ts —
+// there is no separate, out-of-process reader here waiting on an asynchronously
+// published artifact. That in-process coordinator context is exactly what favours
+// the direct `projectLogicalProgress` call: it needs the freshest possible
+// snapshot on every invocation, not whatever the last async publish happened to
+// persist, and it already has the raw `.result` artifacts on hand from the same
+// `tasksDir` scan used elsewhere in this module.
 function countCompletedTasks(tasksDir: string): number {
   if (!existsSync(tasksDir)) return 0;
+  let files: string[];
   try {
-    return readdirSync(tasksDir).filter((f) => f.startsWith('task-') && f.endsWith('.result')).length;
+    files = readdirSync(tasksDir);
   } catch {
     return 0;
   }
+  const attempts: LogicalProgressAttempt[] = [];
+  for (const file of files) {
+    if (!file.startsWith('task-') || !file.endsWith('.result')) continue;
+    const taskId = file.slice('task-'.length, -'.result'.length);
+    if (!taskId) continue;
+    attempts.push({
+      id: taskId,
+      logicalTaskId: logicalTaskIdFor(taskId),
+      status: 'done',
+    });
+  }
+  if (attempts.length === 0) return 0;
+  const projected = projectLogicalProgress({ attempts });
+  // Task filenames under tasksDir are unique by construction, so a rejection
+  // diagnostic (e.g. duplicate-attempt-id) is defensive-only here — fail safe to
+  // 0 rather than throw out of a snapshot builder that must never crash its caller.
+  return projected.ok ? projected.projection.total : 0;
 }
 
 function countOpenDebt(projectRoot: string): number {

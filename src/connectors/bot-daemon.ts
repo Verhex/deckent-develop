@@ -25,8 +25,16 @@ import {
 } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { ResolvedConfig } from '../core/config-types.js';
 import { isPidAlive } from '../core/pid-liveness.js';
 import { processStartToken } from '../core/pid-ownership.js';
+import { debugLog } from '../core/utils.js';
+import {
+  deliverPendingOwnerNotifications,
+  type DeliveryOptions,
+  type DeliveryResult,
+  type OwnerNotificationTransport,
+} from './notification-delivery.js';
 
 const BOT_PID_FILE = 'bot.pid';
 const BOT_PID_SCHEMA_VERSION = 2 as const;
@@ -664,4 +672,278 @@ function defaultDetachedSpawn(root: string): number | null {
   } catch {
     return null;
   }
+}
+
+// ═══ durable owner-notification outbox drain (671-004) ═══════════════
+//
+// The outbox is append-only and only the bot may acknowledge a record, so an
+// undrained outbox strands owner notifications indefinitely (two pause records
+// sat pending from 24 August because nothing ever called the drain). The daemon
+// therefore schedules the drain itself, on the config-resolved cadence.
+//
+// Honesty rules encoded here:
+//   • the cadence is READ from `notify_outbox_drain_interval_ms` on the resolved
+//     config — an unresolvable cadence schedules NOTHING rather than inventing a
+//     literal fallback;
+//   • a disabled bot / unconfigured connector is a typed SKIP (debug log, no
+//     send attempt, no error, no partial delivery);
+//   • the receipt is written by `deliverPendingOwnerNotifications` only after the
+//     transport resolved, so a failed tick leaves the record pending for the next
+//     tick — no bespoke retry state machine lives here;
+//   • `stop()` clears the timer (and closes any transport this loop built) so no
+//     drain timer survives daemon shutdown.
+//
+// Operator-facing text: none. Every line below is an operator-only diagnostic on
+// the `debugLog` seam, deliberately NOT a `getMessage` catalogue entry.
+
+/** Diagnostic label for every drain-loop debug line. */
+const OWNER_NOTIFICATION_DRAIN_LOG = 'bot-daemon:notify-outbox-drain';
+
+export type OwnerNotificationDrainSkipReason =
+  | 'config-unavailable'
+  | 'bot-disabled'
+  | 'connector-unconfigured'
+  | 'transport-unavailable';
+
+export type OwnerNotificationDrainTick =
+  | {
+      readonly status: 'drained';
+      readonly delivered: number;
+      readonly pending: number;
+    }
+  | {
+      readonly status: 'skipped';
+      readonly reason: OwnerNotificationDrainSkipReason;
+    }
+  | { readonly status: 'failed'; readonly reason: string };
+
+/** A transport that may own resources the drain loop must release on stop. */
+interface ClosableOwnerNotificationTransport extends OwnerNotificationTransport {
+  close?(): Promise<void>;
+}
+
+export interface OwnerNotificationDrainDeps {
+  /** Resolved-config seam; production reads the cached layered config. */
+  readonly readConfig?: (root: string) => Promise<ResolvedConfig | undefined>;
+  /** Send seam; production reuses the existing telegram connector transport. */
+  readonly resolveTransport?: (
+    config: ResolvedConfig,
+  ) => Promise<OwnerNotificationTransport | null>;
+  /** Delivery seam; production is the durable outbox drain itself. */
+  readonly deliver?: (
+    root: string,
+    transport: OwnerNotificationTransport,
+    options?: DeliveryOptions,
+  ) => Promise<DeliveryResult>;
+  readonly deliveryOptions?: DeliveryOptions;
+  /** Diagnostic seam; production is `debugLog`. */
+  readonly log?: (event: string, detail: unknown) => void;
+}
+
+export interface OwnerNotificationDrainHandle {
+  /** Cadence read from the resolved config; null when it could not be read. */
+  readonly intervalMs: number | null;
+  /** Run exactly one drain tick. Never throws. */
+  tick(): Promise<OwnerNotificationDrainTick>;
+  isRunning(): boolean;
+  /** Clear the timer and release any transport this loop built. */
+  stop(): Promise<void>;
+}
+
+/** Read the cadence from the resolved config field; never substitute a literal. */
+function resolveDrainIntervalMs(config: ResolvedConfig | undefined): number | null {
+  const authored = config?.notify_outbox_drain_interval_ms;
+  return typeof authored === 'number'
+    && Number.isFinite(authored)
+    && authored > 0
+    ? Math.floor(authored)
+    : null;
+}
+
+type TelegramNotifyTarget = NonNullable<
+  NonNullable<ResolvedConfig['notify_connectors']>['telegram']
+>;
+
+/**
+ * Classify the configured outbound target BEFORE any transport is built, so a
+ * disabled bot or an unconfigured connector never reaches a send attempt.
+ */
+function classifyDrainTarget(
+  config: ResolvedConfig,
+):
+  | { readonly ok: true; readonly telegram: TelegramNotifyTarget }
+  | { readonly ok: false; readonly reason: OwnerNotificationDrainSkipReason } {
+  const telegram = config.notify_connectors?.telegram;
+  if (!telegram) return { ok: false, reason: 'connector-unconfigured' };
+  if (telegram.enabled !== true) return { ok: false, reason: 'bot-disabled' };
+  if (!telegram.token
+    || telegram.token.startsWith('$DECK:')
+    || !telegram.chat_id) {
+    return { ok: false, reason: 'connector-unconfigured' };
+  }
+  return { ok: true, telegram };
+}
+
+/** Read the already-resolved config; fall back to the layered async loader. */
+async function defaultReadConfig(root: string): Promise<ResolvedConfig | undefined> {
+  const mod = await import('../core/config.js');
+  return mod.getLoadedConfig(root) ?? await mod.loadConfig(root);
+}
+
+/**
+ * Reuse the EXISTING telegram send seam (`buildConnectorTargets` ->
+ * `IMessageConnector.sendMessage`). No new client is constructed here: the
+ * adapter is a thin closure over the connector the bootstrap already builds.
+ */
+async function defaultResolveTransport(
+  config: ResolvedConfig,
+): Promise<ClosableOwnerNotificationTransport | null> {
+  const gate = classifyDrainTarget(config);
+  if (!gate.ok) return null;
+  const { buildConnectorTargets } = await import('./connector-bootstrap.js');
+  const targets = await buildConnectorTargets({ telegram: gate.telegram });
+  const target = targets.find((candidate) => candidate.connector.id === 'telegram');
+  if (!target) {
+    await Promise.allSettled(targets.map((candidate) => candidate.connector.stop()));
+    return null;
+  }
+  return {
+    async sendMessage(message: string, idempotencyKey: string): Promise<void> {
+      // Failures PROPAGATE: notification-delivery owns retry/ack semantics.
+      await target.connector.sendMessage({
+        connector: target.connector.id,
+        channelId: target.chatId,
+        text: message,
+      });
+      debugLog(OWNER_NOTIFICATION_DRAIN_LOG, {
+        event: 'sent',
+        notificationId: idempotencyKey,
+      });
+    },
+    async close(): Promise<void> {
+      await target.connector.stop();
+    },
+  };
+}
+
+/**
+ * Schedule the durable owner-notification outbox drain on the config-resolved
+ * cadence. The returned handle owns the timer; `stop()` is how the daemon's
+ * shutdown path guarantees no drain timer is left running.
+ */
+export async function startOwnerNotificationDrain(
+  root: string,
+  deps: OwnerNotificationDrainDeps = {},
+): Promise<OwnerNotificationDrainHandle> {
+  const readConfig = deps.readConfig ?? defaultReadConfig;
+  const resolveTransport = deps.resolveTransport ?? defaultResolveTransport;
+  const deliver = deps.deliver ?? deliverPendingOwnerNotifications;
+  const log = deps.log ?? debugLog;
+
+  let transport: ClosableOwnerNotificationTransport | null = null;
+  let inFlight: Promise<OwnerNotificationDrainTick> | null = null;
+  let timer: ReturnType<typeof setInterval> | null = null;
+
+  const skip = (
+    reason: OwnerNotificationDrainSkipReason,
+  ): OwnerNotificationDrainTick => {
+    log(OWNER_NOTIFICATION_DRAIN_LOG, { event: 'skipped', reason });
+    return { status: 'skipped', reason };
+  };
+
+  const runTick = async (): Promise<OwnerNotificationDrainTick> => {
+    let config: ResolvedConfig | undefined;
+    try {
+      config = await readConfig(root);
+    } catch (error: unknown) {
+      config = undefined;
+      log(OWNER_NOTIFICATION_DRAIN_LOG, { event: 'config-read-failed', error });
+    }
+    if (!config) return skip('config-unavailable');
+
+    const gate = classifyDrainTarget(config);
+    if (!gate.ok) return skip(gate.reason);
+
+    if (transport === null) {
+      try {
+        transport = await resolveTransport(config);
+      } catch (error: unknown) {
+        transport = null;
+        log(OWNER_NOTIFICATION_DRAIN_LOG, {
+          event: 'transport-resolve-failed',
+          error,
+        });
+      }
+    }
+    if (transport === null) return skip('transport-unavailable');
+
+    try {
+      const result = await deliver(root, transport, deps.deliveryOptions);
+      log(OWNER_NOTIFICATION_DRAIN_LOG, {
+        event: 'drained',
+        delivered: result.delivered,
+        pending: result.pending,
+      });
+      return {
+        status: 'drained',
+        delivered: result.delivered,
+        pending: result.pending,
+      };
+    } catch (error: unknown) {
+      // Unacknowledged records simply stay pending for the next tick.
+      const reason = error instanceof Error ? error.message : String(error);
+      log(OWNER_NOTIFICATION_DRAIN_LOG, { event: 'drain-failed', reason });
+      return { status: 'failed', reason };
+    }
+  };
+
+  /** Ticks never overlap: a slow drain must not stack sends on the outbox. */
+  const tick = (): Promise<OwnerNotificationDrainTick> => {
+    inFlight ??= runTick().finally(() => { inFlight = null; });
+    return inFlight;
+  };
+
+  let bootConfig: ResolvedConfig | undefined;
+  try {
+    bootConfig = await readConfig(root);
+  } catch (error: unknown) {
+    bootConfig = undefined;
+    log(OWNER_NOTIFICATION_DRAIN_LOG, { event: 'config-read-failed', error });
+  }
+  const intervalMs = resolveDrainIntervalMs(bootConfig);
+  if (intervalMs === null) {
+    log(OWNER_NOTIFICATION_DRAIN_LOG, { event: 'interval-unresolved' });
+  } else {
+    timer = setInterval(() => { void tick(); }, intervalMs);
+    // Never hold the process open on the drain cadence alone.
+    (timer as { unref?: () => void }).unref?.();
+    log(OWNER_NOTIFICATION_DRAIN_LOG, { event: 'scheduled', intervalMs });
+  }
+
+  return {
+    intervalMs,
+    tick,
+    isRunning: (): boolean => timer !== null,
+    async stop(): Promise<void> {
+      if (timer !== null) {
+        clearInterval(timer);
+        timer = null;
+      }
+      const pending = inFlight;
+      if (pending) await pending.catch(() => undefined);
+      const owned = transport;
+      transport = null;
+      if (owned?.close) {
+        try {
+          await owned.close();
+        } catch (error: unknown) {
+          log(OWNER_NOTIFICATION_DRAIN_LOG, {
+            event: 'transport-close-failed',
+            error,
+          });
+        }
+      }
+      log(OWNER_NOTIFICATION_DRAIN_LOG, { event: 'stopped' });
+    },
+  };
 }

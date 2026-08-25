@@ -433,6 +433,15 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
     print(getMessage('bot.nervous_active', lang));
   }
 
+  // 671-004 closure wiring: the drain primitive lives in bot-daemon.ts but the
+  // LIVE listener process is this one — starting it here is what makes the
+  // durable owner-notification outbox actually reach Telegram in production.
+  let drainHandle: { stop(): Promise<void> } | null = null;
+  try {
+    const { startOwnerNotificationDrain } = await import('../../connectors/bot-daemon.js');
+    drainHandle = await startOwnerNotificationDrain(root);
+  } catch { /* drain is best-effort; the listener itself must keep running */ }
+
   const wait = opts.waitForever ?? waitForSignal;
   try {
     await wait();
@@ -442,6 +451,9 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
     // during SIGTERM-triggered shutdown must never leave it behind (ADR-G-013
     // pid hygiene) — the whole point of a graceful path over an operator's
     // OS-level `kill` fallback is that pid cleanup actually runs.
+    try {
+      await drainHandle?.stop();
+    } catch { /* pid cleanup below must still run */ }
     try {
       nervousHandle?.dispose();
     } catch { /* pid cleanup below must still run */ }

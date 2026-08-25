@@ -184,6 +184,7 @@ import {
 } from './sprint-lifecycle.js';
 import { getMessage } from '../cli/helpers/messages.js';
 import { detectLang } from '../cli/helpers/i18n.js';
+import { enqueueOwnerNotification } from '../connectors/notification-delivery.js';
 
 // ─── IPC Registry ─────────────────────────────────────────────────
 import { getChannelRegistry } from './ipc-registry.js';
@@ -2335,6 +2336,23 @@ export async function runSprint(
     // Nervous System: SPAWN→EXECUTE
     emitPhaseChange(SprintPhase.SPAWN, SprintPhase.EXECUTE, sprint.id);
 
+    // 671-005 closure: durable owner notification — sprint started (once, after
+    // a successful SPAWN). Best-effort; never blocks the run.
+    try {
+      const startLang = detectLang(projectRoot);
+      enqueueOwnerNotification(projectRoot, {
+        id: `sprint-started:${sprint.id}`,
+        kind: 'sprint-started',
+        sprintId: sprint.id,
+        title: getMessage('sprint.notify_started_title', startLang, { sprintId: sprint.id }),
+        message: getMessage('sprint.notify_started_summary', startLang, {
+          sprintId: sprint.id, tasks: String(sprint.tasks.length),
+        }),
+        lang: startLang,
+        createdAt: new Date().toISOString(),
+      });
+    } catch (e) { debugLog('runSprint:notify:sprint-started', e); }
+
     // Dependency release authority is established at result-ingest time. The
     // same map and runtime state are then reused by the phase-level EVALUATE
     // pass, so rubric/xverify/gates run exactly once per task.
@@ -2853,6 +2871,21 @@ export async function runSprint(
 
   // Nervous System: EVALUATE→FIX
   emitPhaseChange(SprintPhase.EVALUATE, SprintPhase.FIX, sprint.id);
+
+  // 671-005 closure: durable owner notification — FIX phase entered (the id is
+  // sprint-scoped, so repeated FIX rounds stay a single durable record).
+  try {
+    const fixLang = detectLang(projectRoot);
+    enqueueOwnerNotification(projectRoot, {
+      id: `fix-started:${sprint.id}`,
+      kind: 'fix-started',
+      sprintId: sprint.id,
+      title: getMessage('sprint.notify_fix_started_title', fixLang, { sprintId: sprint.id }),
+      message: getMessage('sprint.notify_fix_started_summary', fixLang, { sprintId: sprint.id }),
+      lang: fixLang,
+      createdAt: new Date().toISOString(),
+    });
+  } catch (e) { debugLog('runSprint:notify:fix-started', e); }
 
   // Phase 5: FIX
   const fixPhaseFailure = await runFixPhase(

@@ -7,6 +7,7 @@ import {
   bindSprintLockToExecution,
   isSprintLocked,
   releaseSprintLock,
+  releaseSprintLockForTerminatedSprint,
 } from '../../src/core/multi-ide.js';
 
 describe('multi-ide conflict prevention', () => {
@@ -171,6 +172,42 @@ describe('multi-ide conflict prevention', () => {
     const raw = readFileSync(join(lockDir, 'sprint.lock'), 'utf-8');
     const data = JSON.parse(raw);
     expect(data.pid).toBe(process.pid);
+  });
+
+  it('releaseSprintLockForTerminatedSprint releases a foreign-PID lock for a terminated sprint but never a live sprint lock', () => {
+    const lockDir = join(tempDir, '.deckent');
+    mkdirSync(lockDir, { recursive: true });
+    const lockFile = join(lockDir, 'sprint.lock');
+
+    // Lock held by a foreign, still-alive PID (1 — init, always alive) for a
+    // sprint that has terminated: owner-PID-only releaseSprintLock cannot
+    // clear this lease; the terminal-aware release must.
+    writeFileSync(lockFile, JSON.stringify({
+      pid: 1,
+      env: 'vscode',
+      sprintId: 'sprint-670',
+      acquiredAt: '2026-08-25T09:00:00.000Z',
+    }));
+    expect(releaseSprintLockForTerminatedSprint(tempDir, 'sprint-670'))
+      .toEqual({ state: 'released', recordedSprintId: 'sprint-670' });
+    expect(existsSync(lockFile)).toBe(false);
+
+    // With the lock gone, the typed result reports absent — never an
+    // undifferentiated success.
+    expect(releaseSprintLockForTerminatedSprint(tempDir, 'sprint-670'))
+      .toEqual({ state: 'absent' });
+
+    // A lock recorded for a DIFFERENT (live) sprint is never unlinked, even
+    // by a caller holding terminal evidence for another sprint.
+    writeFileSync(lockFile, JSON.stringify({
+      pid: 1,
+      env: 'vscode',
+      sprintId: 'sprint-671-live',
+      acquiredAt: '2026-08-25T09:05:00.000Z',
+    }));
+    expect(releaseSprintLockForTerminatedSprint(tempDir, 'sprint-670'))
+      .toEqual({ state: 'not-matching', recordedSprintId: 'sprint-671-live' });
+    expect(existsSync(lockFile)).toBe(true);
   });
 
   it('auto-detects env when not provided', () => {

@@ -6,7 +6,11 @@
 //
 // Design:
 //   - `.tasks/*.hb`   change → { type:'worker_heartbeat', taskId, status, currentAction, ts }
-//   - `.tasks/*.result`      → { type:'worker_done', taskId, ts }
+//   - canonical event tail `WORKER→BRAIN:RESULT` line →
+//     { type:'worker_done', taskId, ts } — worker_done is derived from the
+//     canonical event log ONLY. The `.tasks/*.result` fs-watch no longer emits
+//     it: that raw, attempt-level signal carried no lineage and double-counted
+//     against the canonical log. Every OTHER fs-watch signal is unchanged.
 //   - `<sprint>-events.jsonl` new lines → { type:'deckent_event', event, ts }
 //   - per-file debounce (≤250ms) coalesces rapid writes
 //   - fail-safe: a missing dir is silently retried until it appears; a watcher
@@ -20,7 +24,7 @@
 import { watch, existsSync, readFileSync, type FSWatcher } from 'node:fs';
 import { join } from 'node:path';
 import { TASKS_DIR, RECENT_WORKS_DIR } from '../core/constants.js';
-import { getCurrentSprintId, type DeckentEvent } from '../core/event-stream.js';
+import { CHANNELS, getCurrentSprintId, type DeckentEvent } from '../core/event-stream.js';
 import { debugLog } from '../core/utils.js';
 
 // ─── Types ───────────────────────────────────────────────────────
@@ -134,17 +138,17 @@ export function startLiveEventBridge(opts: LiveEventBridgeOptions): LiveEventBri
     emit({ type: 'worker_heartbeat', taskId, status, currentAction, ts: now() });
   }
 
+  // NOTE: `.result` files are deliberately NOT handled here. worker_done has a
+  // single source — the canonical event tail (see tailActiveEvents).
   function handleTaskFile(filename: string): void {
     if (closed || !filename) return;
     if (filename.endsWith('.hb')) {
       emitHeartbeat(filename);
-    } else if (filename.endsWith('.result')) {
-      emit({ type: 'worker_done', taskId: deriveTaskId(filename, '.result'), ts: now() });
     }
   }
 
   function scheduleTaskFile(filename: string): void {
-    if (closed || !filename || (!filename.endsWith('.hb') && !filename.endsWith('.result'))) return;
+    if (closed || !filename || !filename.endsWith('.hb')) return;
     const existing = debounceTimers.get(filename);
     if (existing) clearTimeout(existing);
     const t = setTimeout(() => {
@@ -187,6 +191,14 @@ export function startLiveEventBridge(opts: LiveEventBridgeOptions): LiveEventBri
       try {
         const event = JSON.parse(trimmed) as DeckentEvent;
         emit({ type: 'deckent_event', event, ts: now() });
+        // Single source for worker_done: the canonical WORKER→BRAIN:RESULT line.
+        // A missing/blank taskId is skipped rather than fabricated.
+        if (event?.channel === CHANNELS.RESULT) {
+          const taskId = (event.payload as { taskId?: unknown } | null | undefined)?.taskId;
+          if (typeof taskId === 'string' && taskId.length > 0) {
+            emit({ type: 'worker_done', taskId, ts: now() });
+          }
+        }
       } catch {
         // skip partial / malformed line — a later write completes it
       }

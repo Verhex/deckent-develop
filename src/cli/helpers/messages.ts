@@ -7151,6 +7151,22 @@ const MESSAGES: MessageMap = {
   'desktop.theme.watch.open-sea': { en: 'Open sea', tr: 'Açık deniz' },
 
   // ─── CLI command descriptions (559-002: commander .description() single source) ───
+  'sprint.notify_started_title': {
+    en: 'Sprint {sprintId} started',
+    tr: 'Sprint {sprintId} başladı',
+  },
+  'sprint.notify_started_summary': {
+    en: 'Sprint {sprintId} spawned successfully with {tasks} task(s); execution is underway.',
+    tr: 'Sprint {sprintId} {tasks} görevle başarıyla başlatıldı; yürütme sürüyor.',
+  },
+  'sprint.notify_fix_started_title': {
+    en: 'Sprint {sprintId} entered the FIX phase',
+    tr: 'Sprint {sprintId} FIX fazına girdi',
+  },
+  'sprint.notify_fix_started_summary': {
+    en: 'Evaluation found unresolved work in sprint {sprintId}; repair tasks are being dispatched.',
+    tr: 'Değerlendirme sprint {sprintId} içinde çözülmemiş iş buldu; onarım görevleri gönderiliyor.',
+  },
   'cli.provider-observations.desc': {
     en: 'Inspect and govern the provider execution-observation database (owner-controlled v1→v2 migration surface)',
     tr: 'Provider execution-observation veritabanını inceleyin ve yönetin (owner-kontrollü v1→v2 migration yüzeyi)',

@@ -645,8 +645,13 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-25 sprint-670 manual closure: count unchanged, digest moved —
   // nervous-flow host-primary fixture + finalize-orphan logicalMetrics mock
   // realigned in place (both suite-owned; no new tests).
-  count: 16103,
-  digest: '18ac109368ef866cfe85b8565c9857f93cb6e84a170acb6304a5ba3154cad5f8',
+  // 2026-08-25 sprint-671 wave harvest: +4 — worker-authored pins across
+  // notification-delivery/multi-ide/event-stream/auditor suites plus the new
+  // config-notification-outbox-fields suite (all tmpdir-hermetic).
+  // 2026-08-25 config-loss hardening follow-up: +2 — additional worker pins
+  // landed with the 671 harvest sweep (suite-owned tmpdir fixtures).
+  count: 16109,
+  digest: 'edb6c2efb36f9583e7407c445a07999b615c797ecdcfc928f95d2dab817120a5',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1161,8 +1166,15 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-25 same closure, follow-up: digest moved — the two --json machine
   // projections were removed as dead code (the legacy cleanup path holds on
   // --json before reaching them); the say guard stays.
+  // 2026-08-25 sprint-671 wave harvest + manual closure: count unchanged,
+  // digest moved — canonical done-counters (auditor/tracker), owner-notification
+  // producers/drain wiring, terminal-aware sprint.lock release, event-stream
+  // self-healing, live-events single-source, T0 config fields.
   count: 1325,
-  digest: 'bc4ade3b0210fc47bd390321a7661888d4b7df5c24cc01f302b0143909d75ed1',
+  // 2026-08-25 config-loss incident hardening: digest moved — atomic
+  // last_sprint_id writer (refuse-mint + tmp+rename) and loadConfig
+  // self-heal re-read-once + atomic fresh-default.
+  digest: '57ceed28f2494d4abcb51e52836e8fc8afacc73e311adabd2945c70aa94d0d13',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
