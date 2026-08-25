@@ -12,6 +12,10 @@ deckent-design-dna first and obtain the workflow/state contract from the relevan
 
 ## Current direction
 
+Apply the current owner decision ratchet loaded by deckent-design-dna before presenting a type,
+tone or composition candidate. A rejected family or visual grammar is not a fresh direction when
+only its name, accent or spacing changes.
+
 Precision Instrument is the default:
 
 - calm and formal rather than theatrical;

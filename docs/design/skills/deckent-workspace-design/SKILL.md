@@ -19,6 +19,10 @@ independent product shells; one information architecture and component authority
 
 ## Workspace model
 
+Apply the current owner decision ratchet loaded by deckent-design-dna. For the accepted Basic
+Desktop direction, prioritize one operational home plus a governed contextual detail surface;
+reserve durable routes and panes for deep or sustained work.
+
 Define:
 
 - global navigation and project/workspace scope;
