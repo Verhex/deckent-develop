@@ -14,9 +14,7 @@
   Mekanizma flag-gated `routing_v3.explorationBonus` DEFAULT 0 = OFF; blend `s+b*(1-s)`;
   soğuk-eşik CELL_MIN_USES tek-kaynak; story-detail bonus+bonusDecisive. Gerçek-binary
   nötrlük: bonus-kodlu dist'te plan-digest bonus-öncesiyle birebir (`ca8837d8…`), canlı
-  karar-kaydında sıfır exploration-izi. **ENABLEMENT AYRI OWNER KARARI:** öneri
-  `.deckent/config.json` → `routing_v3.explorationBonus: 0.05` deneme + sonraki gerçek
-  sprintte decisions-jsonl'den flip/tie ölçümü. Yeni gözlemler (bulgu-listesine): sprint-state
+  karar-kaydında sıfır exploration-izi. **ENABLEMENT CANLI (owner talimatı, ayni gece):** `routing_v3.explorationBonus: 0.05` set edildi; ölçüm sıradaki gerçek sprintte. Yeni gözlemler (bulgu-listesine): sprint-state
   "FIXING'de donuk" projection-gecikmesi 675+676'da tekrarladı · koordinatör post-COMPLETE
   ~13dk geç çıktı (sızıntı değil, yavaş kapanış) · xverify yeni reason
   `xverify_producer_result_mismatch` (676-001).
@@ -58,8 +56,10 @@
 
 ## SIRADAKİ yürütme sırası
 
-1. **exploration-bonus landing-commit** — full-suite yeşili sonrası tek commit + push (owner akış-onayı verili).
-2. explorationBonus ENABLEMENT kararı (owner): 0.05 deneme değeri + ölçüm — mekanizma landed-OFF.
+1. **explorationBonus 0.05 ÖLÇÜMÜ:** landing `a49a85bbb` + enablement CANLI (owner 2026-08-25
+   gece talimatı; disk-config `routing_v3.explorationBonus: 0.05`, canlı dry-run kararlarında
+   exploration-izi doğrulandı, bonusDecisive=0 — nazik mod). Sonraki gerçek sprintin
+   decisions-jsonl'inden bonusDecisive + tie-oranı okunur; değer ölçümle kalıcılaşır/ayarlanır.
 3. Ed25519 Work-480 töreni (OWNER-KATILIMLI; key repo-DIŞI): bundle
    `.deckent/runtime/closure-staging/work-480/bundle`, request
    `aprcdb-cb3eb74b4598bacc49b9ea6204208cca`, decision=allow verilmiş; tek oturumda
