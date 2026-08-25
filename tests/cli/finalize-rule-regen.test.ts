@@ -103,7 +103,10 @@ vi.mock('node:fs', async (importActual) => {
       if (typeof path === 'string' && path.includes('/sprints/')) return false;
       return true;
     }),
-    readdirSync: vi.fn(() => ['task-166-001.json', 'task-166-001.result']),
+    // The archive dual-read path lists recursively with withFileTypes — honor
+    // the option (empty Dirent list: no archived tasks in this fixture).
+    readdirSync: vi.fn((_path: unknown, options?: { withFileTypes?: boolean }) =>
+      options?.withFileTypes ? [] : ['task-166-001.json', 'task-166-001.result']),
     // buildSprintFromTasks reads canonical task records via readFileSync +
     // classifyTaskArtifact (filename/id must agree); everything else falls
     // through to the real fs.
