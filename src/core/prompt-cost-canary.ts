@@ -6,6 +6,14 @@ export const PROMPT_COST_CANARY_VERSION = 1 as const;
 export type PromptCostCanaryQualityVerdict = 'PASS' | 'FAIL';
 export type PromptCostCanaryDisposition = 'PROMOTE' | 'HOLD' | 'REJECT';
 
+/**
+ * Which measured dimension settles the cost threshold. Subscription billing
+ * reports no per-call USD, so an owner-accepted comparison may settle on the
+ * total-token measurement instead (owner decision 2026-08-25); the authority is
+ * part of the plan and therefore digest-bound — never a silent substitution.
+ */
+export type PromptCostCanaryCostAuthority = 'provider-reported-usd' | 'token-total';
+
 export type PromptCostCanaryReasonCode =
   | 'thresholds_satisfied'
   | 'empty_baseline_cohort'
@@ -41,8 +49,12 @@ export interface PromptCostCanarySample {
   readonly cacheReadTokens: number;
   readonly cacheCreationTokens: number;
   readonly outputTokens: number;
-  /** Authoritative value reported by the provider. Reference/repriced costs are not accepted. */
-  readonly providerReportedUsd: number;
+  /**
+   * Authoritative value reported by the provider. Reference/repriced costs are
+   * not accepted. `null` is legal ONLY under `token-total` cost authority and
+   * means subscription-unpriced — a fabricated 0 would be a repriced cost.
+   */
+  readonly providerReportedUsd: number | null;
   /** Optional because several real provider adapters do not expose wall time. */
   readonly durationMs?: number;
   readonly qualityVerdict: PromptCostCanaryQualityVerdict;
@@ -73,6 +85,12 @@ export interface PromptCostCanaryPlan {
   readonly baseline: PromptCostCanaryCohort;
   readonly candidate: PromptCostCanaryCohort;
   readonly thresholds: PromptCostCanaryThresholds;
+  /**
+   * Absent = `provider-reported-usd` (legacy plans keep byte-identical
+   * digests). `token-total` requires every sample's USD to be null and settles
+   * the cost threshold on input+cacheRead+cacheCreation+output tokens.
+   */
+  readonly costAuthority?: PromptCostCanaryCostAuthority;
 }
 
 export interface PromptCostCanaryAggregate {
@@ -81,7 +99,8 @@ export interface PromptCostCanaryAggregate {
   readonly cacheReadTokens: number;
   readonly cacheCreationTokens: number;
   readonly outputTokens: number;
-  readonly providerReportedUsd: number;
+  /** Null under `token-total` authority — subscription arms report no USD. */
+  readonly providerReportedUsd: number | null;
   readonly durationMs: number | null;
   readonly durationSampleCount: number;
   readonly qualityPassCount: number;
@@ -89,7 +108,9 @@ export interface PromptCostCanaryAggregate {
   readonly qualityPassRate: number;
   /** cacheRead / (input + cacheRead + cacheCreation); zero when the denominator is zero. */
   readonly cacheHitRatio: number;
-  readonly providerReportedUsdPerLineage: number;
+  readonly providerReportedUsdPerLineage: number | null;
+  /** Authority-resolved cost per lineage: USD, or total tokens under `token-total`. */
+  readonly costPerLineage: number;
   readonly durationMsPerLineage: number | null;
 }
 
@@ -99,12 +120,14 @@ export interface PromptCostCanaryDeltas {
   readonly cacheReadTokens: number;
   readonly cacheCreationTokens: number;
   readonly outputTokens: number;
-  readonly providerReportedUsd: number;
+  readonly providerReportedUsd: number | null;
   readonly durationMs: number | null;
   readonly qualityPassRate: number;
   readonly cacheHitRatio: number;
-  readonly providerReportedUsdPerLineage: number;
+  readonly providerReportedUsdPerLineage: number | null;
+  readonly costPerLineage: number;
   readonly durationMsPerLineage: number | null;
+  /** Relative increase of the authority-resolved `costPerLineage`. */
   readonly costPerLineageIncreaseRatio: number;
   readonly durationPerLineageIncreaseRatio: number | null;
 }
@@ -112,6 +135,7 @@ export interface PromptCostCanaryDeltas {
 export interface PromptCostCanaryDecision {
   readonly version: typeof PROMPT_COST_CANARY_VERSION;
   readonly disposition: PromptCostCanaryDisposition;
+  readonly costAuthority: PromptCostCanaryCostAuthority;
   readonly reasonCodes: readonly PromptCostCanaryReasonCode[];
   readonly planDigest: string;
   readonly decisionDigest: string;
@@ -172,7 +196,11 @@ function validateIdentity(name: string, identity: PromptCostCanaryCohortIdentity
   requireIdentifier(`${name}.featureId`, identity.featureId);
 }
 
-function validateCohort(name: string, cohort: PromptCostCanaryCohort): void {
+function validateCohort(
+  name: string,
+  cohort: PromptCostCanaryCohort,
+  costAuthority: PromptCostCanaryCostAuthority,
+): void {
   validateIdentity(`${name}.identity`, cohort.identity);
   const lineages = new Set<string>();
   cohort.samples.forEach((sample, index) => {
@@ -186,7 +214,16 @@ function validateCohort(name: string, cohort: PromptCostCanaryCohort): void {
     requireNonNegative(`${prefix}.cacheReadTokens`, sample.cacheReadTokens, true);
     requireNonNegative(`${prefix}.cacheCreationTokens`, sample.cacheCreationTokens, true);
     requireNonNegative(`${prefix}.outputTokens`, sample.outputTokens, true);
-    requireNonNegative(`${prefix}.providerReportedUsd`, sample.providerReportedUsd);
+    if (costAuthority === 'provider-reported-usd') {
+      if (sample.providerReportedUsd === null) {
+        throw new TypeError(`${prefix}.providerReportedUsd must be provider-reported under provider-reported-usd authority`);
+      }
+      requireNonNegative(`${prefix}.providerReportedUsd`, sample.providerReportedUsd);
+    } else if (sample.providerReportedUsd !== null) {
+      // A priced sample inside a token-authority cohort means the evidence was
+      // mis-selected — settling it on tokens would discard real billing truth.
+      throw new TypeError(`${prefix}.providerReportedUsd must be null (subscription-unpriced) under token-total authority`);
+    }
     if (sample.durationMs !== undefined) requireNonNegative(`${prefix}.durationMs`, sample.durationMs);
     if (sample.qualityVerdict !== 'PASS' && sample.qualityVerdict !== 'FAIL') {
       throw new TypeError(`${prefix}.qualityVerdict must be PASS or FAIL`);
@@ -194,12 +231,21 @@ function validateCohort(name: string, cohort: PromptCostCanaryCohort): void {
   });
 }
 
+function planCostAuthority(plan: PromptCostCanaryPlan): PromptCostCanaryCostAuthority {
+  if (plan.costAuthority !== undefined
+    && plan.costAuthority !== 'provider-reported-usd' && plan.costAuthority !== 'token-total') {
+    throw new TypeError(`unsupported prompt cost canary costAuthority ${String(plan.costAuthority)}`);
+  }
+  return plan.costAuthority ?? 'provider-reported-usd';
+}
+
 function validatePlan(plan: PromptCostCanaryPlan): void {
   if (plan.version !== PROMPT_COST_CANARY_VERSION) {
     throw new TypeError(`unsupported prompt cost canary version ${String(plan.version)}`);
   }
-  validateCohort('baseline', plan.baseline);
-  validateCohort('candidate', plan.candidate);
+  const costAuthority = planCostAuthority(plan);
+  validateCohort('baseline', plan.baseline, costAuthority);
+  validateCohort('candidate', plan.candidate, costAuthority);
   requireRatio('thresholds.minimumQualityPassRate', plan.thresholds.minimumQualityPassRate);
   requireRatio('thresholds.maximumQualityPassRateRegression', plan.thresholds.maximumQualityPassRateRegression);
   requireNonNegative('thresholds.maximumCostPerLineageIncreaseRatio', plan.thresholds.maximumCostPerLineageIncreaseRatio);
@@ -218,6 +264,8 @@ function canonicalPlan(plan: PromptCostCanaryPlan): PromptCostCanaryPlan {
     baseline: { identity: { ...plan.baseline.identity }, samples: sortSamples(plan.baseline.samples) },
     candidate: { identity: { ...plan.candidate.identity }, samples: sortSamples(plan.candidate.samples) },
     thresholds: { ...plan.thresholds },
+    // Absent stays absent so every pre-authority plan digest is unchanged.
+    ...(plan.costAuthority === undefined ? {} : { costAuthority: plan.costAuthority }),
   };
 }
 
@@ -227,13 +275,16 @@ export function digestPromptCostCanaryPlan(plan: PromptCostCanaryPlan): string {
   return digest(canonicalPlan(plan));
 }
 
-function aggregate(samples: readonly PromptCostCanarySample[]): PromptCostCanaryAggregate {
+function aggregate(
+  samples: readonly PromptCostCanarySample[],
+  costAuthority: PromptCostCanaryCostAuthority,
+): PromptCostCanaryAggregate {
   const totals = samples.reduce((sum, sample) => ({
     inputTokens: sum.inputTokens + sample.inputTokens,
     cacheReadTokens: sum.cacheReadTokens + sample.cacheReadTokens,
     cacheCreationTokens: sum.cacheCreationTokens + sample.cacheCreationTokens,
     outputTokens: sum.outputTokens + sample.outputTokens,
-    providerReportedUsd: sum.providerReportedUsd + sample.providerReportedUsd,
+    providerReportedUsd: sum.providerReportedUsd + (sample.providerReportedUsd ?? 0),
     durationMs: sum.durationMs + (sample.durationMs ?? 0),
     durationSampleCount: sum.durationSampleCount + (sample.durationMs === undefined ? 0 : 1),
     qualityPassCount: sum.qualityPassCount + (sample.qualityVerdict === 'PASS' ? 1 : 0),
@@ -242,20 +293,25 @@ function aggregate(samples: readonly PromptCostCanarySample[]): PromptCostCanary
   const sampleCount = samples.length;
   const cacheDenominator = totals.inputTokens + totals.cacheReadTokens + totals.cacheCreationTokens;
   const durationMeasured = totals.durationSampleCount === sampleCount;
+  const usdMeasured = costAuthority === 'provider-reported-usd';
+  const totalTokens = cacheDenominator + totals.outputTokens;
   return Object.freeze({
     sampleCount,
     inputTokens: totals.inputTokens,
     cacheReadTokens: totals.cacheReadTokens,
     cacheCreationTokens: totals.cacheCreationTokens,
     outputTokens: totals.outputTokens,
-    providerReportedUsd: totals.providerReportedUsd,
+    providerReportedUsd: usdMeasured ? totals.providerReportedUsd : null,
     durationMs: durationMeasured ? totals.durationMs : null,
     durationSampleCount: totals.durationSampleCount,
     qualityPassCount: totals.qualityPassCount,
     qualityFailCount: sampleCount - totals.qualityPassCount,
     qualityPassRate: sampleCount === 0 ? 0 : totals.qualityPassCount / sampleCount,
     cacheHitRatio: cacheDenominator === 0 ? 0 : totals.cacheReadTokens / cacheDenominator,
-    providerReportedUsdPerLineage: sampleCount === 0 ? 0 : totals.providerReportedUsd / sampleCount,
+    providerReportedUsdPerLineage: usdMeasured && sampleCount > 0 ? totals.providerReportedUsd / sampleCount
+      : usdMeasured ? 0 : null,
+    costPerLineage: sampleCount === 0 ? 0
+      : (usdMeasured ? totals.providerReportedUsd : totalTokens) / sampleCount,
     durationMsPerLineage: durationMeasured && sampleCount > 0 ? totals.durationMs / sampleCount : null,
   });
 }
@@ -299,23 +355,28 @@ function mismatchReasons(plan: PromptCostCanaryPlan): PromptCostCanaryReasonCode
  */
 export function comparePromptCostCanary(plan: PromptCostCanaryPlan): PromptCostCanaryDecision {
   validatePlan(plan);
-  const baseline = aggregate(plan.baseline.samples);
-  const candidate = aggregate(plan.candidate.samples);
+  const costAuthority = planCostAuthority(plan);
+  const baseline = aggregate(plan.baseline.samples, costAuthority);
+  const candidate = aggregate(plan.candidate.samples, costAuthority);
   const deltas: PromptCostCanaryDeltas = Object.freeze({
     inputTokens: candidate.inputTokens - baseline.inputTokens,
     cacheReadTokens: candidate.cacheReadTokens - baseline.cacheReadTokens,
     cacheCreationTokens: candidate.cacheCreationTokens - baseline.cacheCreationTokens,
     outputTokens: candidate.outputTokens - baseline.outputTokens,
-    providerReportedUsd: candidate.providerReportedUsd - baseline.providerReportedUsd,
+    providerReportedUsd: optionalDelta(baseline.providerReportedUsd, candidate.providerReportedUsd),
     durationMs: optionalDelta(baseline.durationMs, candidate.durationMs),
     qualityPassRate: candidate.qualityPassRate - baseline.qualityPassRate,
     cacheHitRatio: candidate.cacheHitRatio - baseline.cacheHitRatio,
-    providerReportedUsdPerLineage: candidate.providerReportedUsdPerLineage - baseline.providerReportedUsdPerLineage,
+    providerReportedUsdPerLineage: optionalDelta(
+      baseline.providerReportedUsdPerLineage,
+      candidate.providerReportedUsdPerLineage,
+    ),
+    costPerLineage: candidate.costPerLineage - baseline.costPerLineage,
     durationMsPerLineage: optionalDelta(
       baseline.durationMsPerLineage,
       candidate.durationMsPerLineage,
     ),
-    costPerLineageIncreaseRatio: relativeIncrease(baseline.providerReportedUsdPerLineage, candidate.providerReportedUsdPerLineage),
+    costPerLineageIncreaseRatio: relativeIncrease(baseline.costPerLineage, candidate.costPerLineage),
     durationPerLineageIncreaseRatio: optionalRelativeIncrease(
       baseline.durationMsPerLineage,
       candidate.durationMsPerLineage,
@@ -349,6 +410,6 @@ export function comparePromptCostCanary(plan: PromptCostCanaryPlan): PromptCostC
     disposition === 'PROMOTE' ? ['thresholds_satisfied'] : disposition === 'HOLD' ? holdReasons : rejectReasons,
   );
   const planDigest = digestPromptCostCanaryPlan(plan);
-  const unsigned = { version: PROMPT_COST_CANARY_VERSION, disposition, reasonCodes, planDigest, baseline, candidate, deltas };
+  const unsigned = { version: PROMPT_COST_CANARY_VERSION, disposition, costAuthority, reasonCodes, planDigest, baseline, candidate, deltas };
   return Object.freeze({ ...unsigned, decisionDigest: digest(unsigned) });
 }

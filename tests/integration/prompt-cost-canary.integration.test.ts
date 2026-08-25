@@ -334,7 +334,7 @@ describe('real production prompt-cost canary fan-in and hostile replay', () => {
 
   it('HOLDs rather than fabricating missing provider billing or an unmeasured cache denominator', async () => {
     resetArchives(undefined, result => { delete result.providerBilling; });
-    expect((await compare()).value.decision).toEqual({ disposition: 'HOLD', reasonCodes: ['provider_reported_usd_unavailable'], planDigest: null, kernelDecisionDigest: null });
+    expect((await compare()).value.decision).toEqual({ disposition: 'HOLD', costAuthority: null, reasonCodes: ['provider_reported_usd_unavailable'], planDigest: null, kernelDecisionDigest: null });
 
     resetArchives(undefined, (result, _ordinal, taskId) => {
       if (!taskId.endsWith('-fix-fix')) result.tokenUsage = { inputTokens: 0, outputTokens: 5, cacheReadTokens: 0, cacheCreationTokens: 0, totalTokens: 5, source: 'provider-adapter' };
@@ -368,10 +368,10 @@ describe('real production prompt-cost canary fan-in and hostile replay', () => {
     resetArchives();
     writeFileSync(join(archive(CANDIDATE), 'task-641-001.result'), '{"tampered":true}', 'utf8');
     const tampered = (await compare()).value;
-    expect(tampered.decision).toEqual({ disposition: 'HOLD', reasonCodes: ['archive_evidence_rejected'], planDigest: null, kernelDecisionDigest: null });
+    expect(tampered.decision).toEqual({ disposition: 'HOLD', costAuthority: null, reasonCodes: ['archive_evidence_rejected'], planDigest: null, kernelDecisionDigest: null });
     expect(tampered.providerReportedUsd).toEqual({
-      baseline: { available: false, sampleCount: 0, availableSampleCount: 0, exactUsd: null },
-      candidate: { available: false, sampleCount: 0, availableSampleCount: 0, exactUsd: null },
+      baseline: { available: false, pricing: 'unmeasured', sampleCount: 0, availableSampleCount: 0, exactUsd: null },
+      candidate: { available: false, pricing: 'unmeasured', sampleCount: 0, availableSampleCount: 0, exactUsd: null },
       delta: null,
     });
 

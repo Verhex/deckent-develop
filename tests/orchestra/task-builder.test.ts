@@ -566,8 +566,9 @@ describe('buildWorkerPrompt', () => {
     const task = makeTask({ scope: { directories: ['src/core/', 'src/cli/'], filesRead: [], filesWrite: [] } });
     const prompt = buildWorkerPrompt(task);
     expect(prompt).toContain('## Scope Rules');
-    expect(prompt).toContain('  - src/core/');
-    expect(prompt).toContain('  - src/cli/');
+    // compileCanonicalScope projects directories canonically: sorted, no
+    // trailing slash (sprint-661 canonical-scope authority).
+    expect(prompt).toContain('  - src/cli\n  - src/core');
   });
 
   it('includes filesWrite in scope section', () => {

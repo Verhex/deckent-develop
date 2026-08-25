@@ -53,6 +53,32 @@ describe('comparePromptCostCanary', () => {
     expect(result.deltas.cacheHitRatio).toBeCloseTo(0.2);
     expect(result.planDigest).toMatch(/^[a-f0-9]{64}$/u);
     expect(result.decisionDigest).toMatch(/^[a-f0-9]{64}$/u);
+    expect(result.costAuthority).toBe('provider-reported-usd');
+  });
+
+  it('settles fully-unpriced subscription cohorts on digest-bound token-total authority without fabricating USD', () => {
+    const input = plan();
+    const unpriced = (samples: PromptCostCanarySample[]) =>
+      samples.map(sample => ({ ...sample, providerReportedUsd: null }));
+    const tokenPlan: PromptCostCanaryPlan = { ...input, costAuthority: 'token-total',
+      baseline: { ...input.baseline, samples: unpriced(baselineSamples) },
+      candidate: { ...input.candidate, samples: unpriced(candidateSamples) } };
+    const result = comparePromptCostCanary(tokenPlan);
+    // Candidate 243 total tokens vs baseline 250 → cost ratio −0.028: PROMOTE.
+    expect(result).toMatchObject({ disposition: 'PROMOTE', costAuthority: 'token-total',
+      reasonCodes: ['thresholds_satisfied'] });
+    expect(result.baseline).toMatchObject({ providerReportedUsd: null, providerReportedUsdPerLineage: null, costPerLineage: 125 });
+    expect(result.candidate.costPerLineage).toBe(121.5);
+    expect(result.deltas).toMatchObject({ providerReportedUsd: null, costPerLineage: -3.5 });
+    expect(result.deltas.costPerLineageIncreaseRatio).toBeCloseTo(-0.028);
+    expect(result.planDigest).not.toBe(digestPromptCostCanaryPlan(input));
+    // Mixed evidence is refused in both directions — no silent blending.
+    expect(() => comparePromptCostCanary({ ...tokenPlan,
+      baseline: { ...tokenPlan.baseline, samples: [{ ...baselineSamples[0]!, providerReportedUsd: 2 }] } }))
+      .toThrow(/must be null \(subscription-unpriced\)/u);
+    expect(() => comparePromptCostCanary({ ...input,
+      baseline: { ...input.baseline, samples: unpriced(baselineSamples) } }))
+      .toThrow(/must be provider-reported/u);
   });
 
   it('rejects every failed promotion threshold with bounded reason codes', () => {

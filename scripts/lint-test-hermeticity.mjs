@@ -638,8 +638,10 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // token-proven legacy stop pin reworked in place; suite-owned fixtures only.
   // 2026-08-25 coordinator string-shape recovery: +2 — canonical FileChange
   // regression pin (quality-assessor) and worker-authored 664 suites.
+  // 2026-08-25 canary token-authority (owner decision): count unchanged, digest
+  // moved — kernel/default-flip pins reworked in place; suite-owned fixtures only.
   count: 16093,
-  digest: '1c9011bfe087fd87862abdbd3624f99d47e0a53b5453f804b3da421398763824',
+  digest: 'b6b69008c3ee269b40b37289f60848836ab66129495990425625536a7446b8ae',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1138,8 +1140,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // canary thresholds and result-schema hostTerminalProjection passthrough.
   // 2026-08-24 HIGH-5 + 7091 fold: count unchanged, digest moved — bot-daemon
   // token-proven legacy stop path and cursor image build-arg fold.
+  // 2026-08-25 canary token-authority (owner decision): count unchanged, digest
+  // moved — kernel costAuthority, usage auto-policy resolution, config default
+  // flips (codex_core_channel/codex_suppress_project_doc ON, canary_cost_authority).
   count: 1323,
-  digest: 'd0b15222ef8521aad4a7cf1b132102aaa6ea3bcd077afbd2029868f177e18136',
+  digest: 'e98693ca99a2e44102d19713db0add0d1ec8d8699df9333cb62f71495dc177e4',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

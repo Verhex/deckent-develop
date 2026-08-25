@@ -1215,22 +1215,22 @@ import {
   listConfigByCategory,
 } from '../../src/core/config.js';
 
-describe('prompt Codex schema seal (596-002)', () => {
-  it('keeps both Codex prompt flags default-off', () => {
-    expect(DEFAULT_PROMPT_CONFIG.codex_core_channel).toBe(false);
-    expect(DEFAULT_PROMPT_CONFIG.codex_suppress_project_doc).toBe(false);
+describe('prompt Codex schema seal (596-002, default flipped 2026-08-25)', () => {
+  it('keeps both Codex prompt flags default-on after the owner canary decision', () => {
+    expect(DEFAULT_PROMPT_CONFIG.codex_core_channel).toBe(true);
+    expect(DEFAULT_PROMPT_CONFIG.codex_suppress_project_doc).toBe(true);
 
     const config = getDefaultConfig();
-    expect(config.prompt.codex_core_channel).toBe(false);
-    expect(config.prompt.codex_suppress_project_doc).toBe(false);
+    expect(config.prompt.codex_core_channel).toBe(true);
+    expect(config.prompt.codex_suppress_project_doc).toBe(true);
   });
 
   it('continues to accept valid configs carrying either boolean value', () => {
     const config = getDefaultConfig();
     config.prompt = {
       ...config.prompt,
-      codex_core_channel: true,
-      codex_suppress_project_doc: true,
+      codex_core_channel: false,
+      codex_suppress_project_doc: false,
     };
 
     expect(() => validateConfig(config)).not.toThrow();
@@ -1244,7 +1244,7 @@ describe('prompt Codex schema seal (596-002)', () => {
       const metadata = getConfigHelp(key);
       expect(metadata).toMatchObject({
         type: 'boolean',
-        default: false,
+        default: true,
         options: ['true', 'false'],
         category: 'Prompt',
       });

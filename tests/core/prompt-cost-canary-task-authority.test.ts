@@ -54,7 +54,8 @@ describe('prompt-cost canary task authority', () => {
     expect(parsePromptCostCanaryTaskAuthority(authority)).toEqual(authority);
     expect(parsePromptCostCanaryTaskAuthority({
       ...authority,
-      featureSnapshot: { ...authority.featureSnapshot, codexCoreChannel: true },
+      // Default flipped ON 2026-08-25 — tampering toward OFF now diverges.
+      featureSnapshot: { ...authority.featureSnapshot, codexCoreChannel: false },
     })).toBeNull();
     expect(parsePromptCostCanaryTaskAuthority({
       ...authority,

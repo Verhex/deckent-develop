@@ -4958,7 +4958,7 @@ const MESSAGES: MessageMap = {
   'usage.canary.apply_requires_comparison': { en: '--apply requires baseline and candidate sprint options.', tr: '--apply temel ve aday sprint seçeneklerini gerektirir.' },
   'usage.canary.scope_requires_comparison': { en: 'Receipt digest and scope options require baseline and candidate sprint options.', tr: 'Makbuz digest ve kapsam seçenekleri temel ve aday sprint seçeneklerini gerektirir.' },
   'usage.canary.apply_digest_mismatch': { en: '--apply requires the exact --decision-digest from the dry-run.', tr: '--apply dry-run çıktısındaki tam --decision-digest değerini gerektirir.' },
-  'usage.canary.summary': { en: 'Canary {mode}: {decision} ({digest})', tr: 'Canary {mode}: {decision} ({digest})' },
+  'usage.canary.summary': { en: 'Canary {mode}: {decision} — cost authority: {authority} ({digest})', tr: 'Canary {mode}: {decision} — maliyet otoritesi: {authority} ({digest})' },
   'usage.no_transcript_dir': {
     en: 'Transcript directory not found — no usage data available.',
     tr: 'Transkript dizini bulunamadı — kullanım verisi mevcut değil.',

@@ -302,10 +302,11 @@ export const DEFAULT_PROMPT_CONFIG: Required<PromptConfig> = {
   // measurement rounds (582/583/584) met the owner's bar — deckent-owned
   // worker composition is now the default for every claude docker worker.
   worker_core_system_prompt: true,
-  // Design §c T7: schema-only flags. Both stay OFF until canary evidence supports
-  // a separate owner decision; this wave deliberately adds no consumer.
-  codex_core_channel: false,
-  codex_suppress_project_doc: false,
+  // Owner decision 2026-08-25: default ON after the sealed-cohort A/B bar was
+  // met (sprint-667 OFF vs sprint-668 ON: −41.2% total tokens, full quality
+  // parity, worker prompt 36.8KB→32.2KB). `false` restores the stock path.
+  codex_core_channel: true,
+  codex_suppress_project_doc: true,
   // 593-001 F2c: catalog mount mask OFF by default — flag-gated, so worker
   // `docker run` argv stays byte-identical until it is explicitly enabled.
   catalog_mount_mask: false,
@@ -319,6 +320,9 @@ export const DEFAULT_PROMPT_CONFIG: Required<PromptConfig> = {
     minimumCacheHitRatio: 0,
     maximumCacheHitRatioRegression: 0,
   },
+  // Owner decision 2026-08-25: subscription arms (no provider USD) settle the
+  // cost threshold on the token-total measurement; mixed pricing still HOLDs.
+  canary_cost_authority: 'auto',
   // 593-002: task-class profile SSOT (`resolveTaskPromptProfile`). The default IS
   // the set of literals the three former inline predicates carried, so resolving
   // through config changes NO classification — only where the values live.
@@ -2779,6 +2783,14 @@ export const CONFIG_METADATA: Readonly<Record<string, ConfigMetadataEntry>> = {
     type: 'boolean',
     default: DEFAULT_PROMPT_CONFIG.codex_suppress_project_doc,
     options: ['true', 'false'],
+    category: 'Prompt',
+  },
+  'prompt.canary_cost_authority': {
+    description: 'Usage canary cost-authority policy: auto settles fully-unpriced subscription arms on token totals; provider-usd-strict holds without full provider USD.',
+    descriptionTr: 'Usage canary maliyet-otoritesi politikası: auto tamamen fiyatsız abonelik kollarını token toplamıyla karara bağlar; provider-usd-strict tam provider USD olmadan HOLD verir.',
+    type: "'auto' | 'provider-usd-strict'",
+    default: DEFAULT_PROMPT_CONFIG.canary_cost_authority,
+    options: ['auto', 'provider-usd-strict'],
     category: 'Prompt',
   },
   'prompt.catalog_mount_mask': {

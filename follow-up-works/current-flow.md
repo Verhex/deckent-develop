@@ -80,6 +80,24 @@
   DAG'ı olarak; (2) 7094 gerçek A/B cohort koşusu (ölçüm-hattı artık açık) → owner-karar raporu;
   (3) D5 retirement dilimi; (4) MASTER satır-senkronu (4056 D4 + 7091/7092 evidence güncellemesi);
   (5) Work-480 imza + Slack/Teams secrets = OWNER-işi, beklemede.
+- ✅ OWNER-KARARLARI ALINDI (2026-08-25 sabah, AskUserQuestion ile): ① 7094 kernel →
+  **token-bazlı kabul**: `costAuthority: 'token-total'` kernel-plan alanı (digest-bound),
+  `prompt.canary_cost_authority: 'auto'` config-politikası (iki kol tamamen fiyatsızsa
+  token-toplamıyla karar; karışık-fiyat = HOLD; `provider-usd-strict` opt-out); USD-projeksiyonu
+  typed `pricing: subscription-unpriced`. ② prompt-bayrakları → **DEFAULT ON**
+  (`codex_core_channel` + `codex_suppress_project_doc` ürün-default'u true; repo-config
+  override'ları kaldırıldı — default'tan çözülüyor). ③ sprint-662 dalgası → **GO**.
+  ④ ŞİMDİ: Ed25519 tören-hazırlığı + full-suite borcu; Slack/Teams secrets beklemede.
+- **Ed25519 TÖREN-RUNBOOK (Work-480, owner-katılımlı — key'e ben DOKUNMAM):** bundle hazır
+  (`.deckent/runtime/closure-staging/work-480/bundle`, unsignedManifest `cb3eb74b4598…`,
+  request `aprcdb-cb3eb74b4598bacc49b9ea6204208cca`, decision=allow interactive'de verilmiş).
+  Owner tek-oturumda art-arda koşar (receipt auth-penceresi **10 dakika** — sign→append aynı
+  pencerede):
+  1. `node scripts/closure-ledger/phase5-sign.mjs --bundle .deckent/runtime/closure-staging/work-480/bundle --request aprcdb-cb3eb74b4598bacc49b9ea6204208cca --decision allow --key /MUTLAK/REPO-DIŞI/ed25519-private.pem --out .deckent/runtime/closure-staging/work-480/sign-receipt.json`
+     (key: mutlak-yol, repo-DIŞI, symlink değil, kısıtlı-mod; trust-anchor eşleşmesi zorunlu)
+  2. `node scripts/closure-ledger/phase5-writer.mjs --append --bundle .deckent/runtime/closure-staging/work-480/bundle --receipt .deckent/runtime/closure-staging/work-480/sign-receipt.json --root .`
+  3. Gate: `node scripts/lint-closure-dispositions.mjs` → yeşilse Work-480 MASTER settlement
+     satırı (OPEN→DONE) + `npm run docs:master-plan` regen. Ben 3. adımı devralırım.
 
 ## Canlı truth
 

@@ -1751,17 +1751,18 @@ export interface PromptConfig {
    */
   worker_core_system_prompt?: boolean;
   /**
-   * Design §c T7 schema seal for the Codex-owned core prompt channel.
-   * This wave intentionally adds no consumer: false preserves the current
-   * prompt path. Enabling the default is a separate owner decision after the
-   * canary evidence is accepted; it must never be flipped on blindly.
+   * Codex-owned core prompt channel (default: true — owner decision 2026-08-25
+   * after the canary bar was met: sealed-cohort A/B sprint-667 (OFF) vs
+   * sprint-668 (ON) measured −41.2% total tokens at full quality parity, and
+   * the worker prompt shrank 36.8KB→32.2KB). Set false to restore the
+   * pre-channel prompt path byte-for-byte.
    */
   codex_core_channel?: boolean;
   /**
-   * Design §c T7 schema seal for suppressing Codex project-document loading.
-   * This wave intentionally adds no consumer: false preserves current project
-   * document discovery. Enabling the default is a separate owner decision
-   * after the canary evidence is accepted; it must never be flipped on blindly.
+   * Suppress Codex project-document loading (default: true — same owner
+   * decision and sealed-cohort evidence as `codex_core_channel`, 2026-08-25;
+   * the two flags were measured together as one candidate feature). Set false
+   * to restore stock project-document discovery.
    */
   codex_suppress_project_doc?: boolean;
   /**
@@ -1776,6 +1777,15 @@ export interface PromptConfig {
     minimumCacheHitRatio?: number;
     maximumCacheHitRatioRegression?: number;
   };
+  /**
+   * Usage prompt-cost canary cost-authority policy (owner decision 2026-08-25).
+   * `auto` (default): full provider USD on both arms keeps USD authority; two
+   * fully-unpriced subscription arms settle the cost threshold on the
+   * total-token measurement (`token-total`, digest-bound in the kernel plan);
+   * partial/mixed pricing always HOLDs. `provider-usd-strict`: only full
+   * provider-reported USD settles — unpriced arms HOLD as before.
+   */
+  canary_cost_authority?: 'auto' | 'provider-usd-strict';
   /**
    * 593-001 F2c catalog mount mask (default: **false** — behavior stays
    * byte-identical until the flag is explicitly turned on).

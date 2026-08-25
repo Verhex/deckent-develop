@@ -313,20 +313,28 @@ function lineageLabel(key: string, lang: string, vars?: Record<string, string>):
   return getMessage(`usage.lineage_${key}`, lang, vars);
 }
 
-// PROMOTE/REJECT policy is config-owned (prompt.canary_thresholds, KANUN 10);
-// the strict defaults live in core/config.ts as the single source — on any
-// config-load failure this resolver falls back to those same defaults, never
-// to caller literals.
-async function resolveCanaryThresholds(root: string): Promise<PromptCostCanaryPlan['thresholds']> {
+// PROMOTE/REJECT policy is config-owned (prompt.canary_thresholds +
+// prompt.canary_cost_authority, KANUN 10); the strict defaults live in
+// core/config.ts as the single source — on any config-load failure this
+// resolver falls back to those same defaults, never to caller literals.
+interface CanaryPolicy {
+  readonly thresholds: PromptCostCanaryPlan['thresholds'];
+  readonly costAuthorityPolicy: 'auto' | 'provider-usd-strict';
+}
+
+async function resolveCanaryPolicy(root: string): Promise<CanaryPolicy> {
   const cfg = await loadConfig(root).catch(() => null);
   const configured = cfg?.prompt?.canary_thresholds;
   const defaults = DEFAULT_PROMPT_CONFIG.canary_thresholds;
   return {
-    minimumQualityPassRate: configured?.minimumQualityPassRate ?? defaults.minimumQualityPassRate!,
-    maximumQualityPassRateRegression: configured?.maximumQualityPassRateRegression ?? defaults.maximumQualityPassRateRegression!,
-    maximumCostPerLineageIncreaseRatio: configured?.maximumCostPerLineageIncreaseRatio ?? defaults.maximumCostPerLineageIncreaseRatio!,
-    minimumCacheHitRatio: configured?.minimumCacheHitRatio ?? defaults.minimumCacheHitRatio!,
-    maximumCacheHitRatioRegression: configured?.maximumCacheHitRatioRegression ?? defaults.maximumCacheHitRatioRegression!,
+    thresholds: {
+      minimumQualityPassRate: configured?.minimumQualityPassRate ?? defaults.minimumQualityPassRate!,
+      maximumQualityPassRateRegression: configured?.maximumQualityPassRateRegression ?? defaults.maximumQualityPassRateRegression!,
+      maximumCostPerLineageIncreaseRatio: configured?.maximumCostPerLineageIncreaseRatio ?? defaults.maximumCostPerLineageIncreaseRatio!,
+      minimumCacheHitRatio: configured?.minimumCacheHitRatio ?? defaults.minimumCacheHitRatio!,
+      maximumCacheHitRatioRegression: configured?.maximumCacheHitRatioRegression ?? defaults.maximumCacheHitRatioRegression!,
+    },
+    costAuthorityPolicy: cfg?.prompt?.canary_cost_authority ?? DEFAULT_PROMPT_CONFIG.canary_cost_authority,
   };
 }
 
@@ -336,12 +344,13 @@ export type UsageCanaryReasonCode = PromptCostCanaryDecision['reasonCodes'][numb
 
 interface UsageCanaryProjection {
   readonly schema: 'deckent.usage-canary'; readonly version: 1; readonly baselineSprint: string; readonly candidateSprint: string;
-  readonly decision: { readonly disposition: 'PROMOTE' | 'HOLD' | 'REJECT'; readonly reasonCodes: readonly UsageCanaryReasonCode[]; readonly planDigest: string | null; readonly kernelDecisionDigest: string | null };
+  readonly decision: { readonly disposition: 'PROMOTE' | 'HOLD' | 'REJECT'; readonly costAuthority: 'provider-reported-usd' | 'token-total' | null; readonly reasonCodes: readonly UsageCanaryReasonCode[]; readonly planDigest: string | null; readonly kernelDecisionDigest: string | null };
   readonly measuredHitRatio: { readonly denominator: 'inputTokens+cacheReadTokens+cacheCreationTokens'; readonly baseline: number | null; readonly candidate: number | null; readonly delta: number | null };
   readonly providerReportedUsd: { readonly baseline: UsdProjection; readonly candidate: UsdProjection; readonly delta: number | null };
   readonly qualityParity: { readonly baselinePassRate: number | null; readonly candidatePassRate: number | null; readonly delta: number | null };
 }
-interface UsdProjection { readonly available: boolean; readonly sampleCount: number; readonly availableSampleCount: number; readonly exactUsd: number | null }
+type UsdPricingClass = 'provider-reported' | 'subscription-unpriced' | 'partial' | 'unmeasured';
+interface UsdProjection { readonly available: boolean; readonly pricing: UsdPricingClass; readonly sampleCount: number; readonly availableSampleCount: number; readonly exactUsd: number | null }
 export interface UsageCanaryOutput extends UsageCanaryProjection {
   readonly mode: 'dry-run' | 'applied'; readonly decisionDigest: string;
   readonly receipt: null | { readonly state: 'created' | 'existing-identical'; readonly receiptId: string; readonly decisionDigest: string };
@@ -371,10 +380,14 @@ function featureComparisonId(baseline: string, candidate: string): string {
   return `sha256:${createHash('sha256').update(JSON.stringify([baseline, candidate]), 'utf8').digest('hex')}`;
 }
 
-function kernelSample(sample: PromptCostCanaryCohortSample): PromptCostCanarySample {
+function kernelSample(
+  sample: PromptCostCanaryCohortSample,
+  costAuthority: 'provider-reported-usd' | 'token-total',
+): PromptCostCanarySample {
   return { logicalLineageId: sample.logicalLineageId, inputTokens: sample.tokenUsage.inputTokens,
     cacheReadTokens: sample.tokenUsage.cacheReadTokens, cacheCreationTokens: sample.tokenUsage.cacheCreationTokens,
-    outputTokens: sample.tokenUsage.outputTokens, providerReportedUsd: sample.providerReportedUsd.usd!,
+    outputTokens: sample.tokenUsage.outputTokens,
+    providerReportedUsd: costAuthority === 'token-total' ? null : sample.providerReportedUsd.usd!,
     ...(sample.durationMs === null ? {} : { durationMs: sample.durationMs }),
     qualityVerdict: sample.verdict === 'NO_GO' ? 'FAIL' : 'PASS' };
 }
@@ -382,7 +395,10 @@ function kernelSample(sample: PromptCostCanaryCohortSample): PromptCostCanarySam
 function usdProjection(samples: readonly PromptCostCanaryCohortSample[]): UsdProjection {
   const available = samples.filter(sample => sample.providerReportedUsd.available && sample.providerReportedUsd.usd !== null);
   const complete = samples.length > 0 && available.length === samples.length;
-  return { available: complete, sampleCount: samples.length, availableSampleCount: available.length,
+  const pricing: UsdPricingClass = samples.length === 0 ? 'unmeasured'
+    : complete ? 'provider-reported'
+      : available.length === 0 ? 'subscription-unpriced' : 'partial';
+  return { available: complete, pricing, sampleCount: samples.length, availableSampleCount: available.length,
     exactUsd: complete ? available.reduce((sum, sample) => sum + sample.providerReportedUsd.usd!, 0) : null };
 }
 
@@ -395,7 +411,7 @@ function hasMeasuredCacheDenominator(samples: readonly PromptCostCanaryCohortSam
 function holdProjection(baselineSprint: string, candidateSprint: string, reasonCode: UsageCanaryReasonCode,
   baselineSamples: readonly PromptCostCanaryCohortSample[] = [], candidateSamples: readonly PromptCostCanaryCohortSample[] = []): UsageCanaryProjection {
   return { schema: 'deckent.usage-canary', version: 1, baselineSprint, candidateSprint,
-    decision: { disposition: 'HOLD', reasonCodes: [reasonCode], planDigest: null, kernelDecisionDigest: null },
+    decision: { disposition: 'HOLD', costAuthority: null, reasonCodes: [reasonCode], planDigest: null, kernelDecisionDigest: null },
     measuredHitRatio: { denominator: 'inputTokens+cacheReadTokens+cacheCreationTokens', baseline: null, candidate: null, delta: null },
     providerReportedUsd: { baseline: usdProjection(baselineSamples), candidate: usdProjection(candidateSamples), delta: null },
     qualityParity: { baselinePassRate: null, candidatePassRate: null, delta: null } };
@@ -412,7 +428,17 @@ async function runUsageCanary(options: UsageCommandOptions, deps: UsageDeps, roo
     const baselineUsd = usdProjection(baselineSamples); const candidateUsd = usdProjection(candidateSamples);
     const baselineFeature = homogeneousFeatureDigest(baselineSamples);
     const candidateFeature = homogeneousFeatureDigest(candidateSamples);
-    if (!baselineUsd.available || !candidateUsd.available) projection = holdProjection(baselineSprint, candidateSprint, 'provider_reported_usd_unavailable', baselineSamples, candidateSamples);
+    const policy = await resolveCanaryPolicy(root);
+    // Cost-authority resolution (owner decision 2026-08-25): full provider USD
+    // on both arms keeps USD authority; two fully-unpriced (subscription) arms
+    // settle on token-total under the `auto` policy; any partial/mixed pricing
+    // stays a typed HOLD — evidence classes are never blended.
+    const costAuthority: 'provider-reported-usd' | 'token-total' | null
+      = baselineUsd.available && candidateUsd.available ? 'provider-reported-usd'
+        : policy.costAuthorityPolicy === 'auto'
+          && baselineUsd.pricing === 'subscription-unpriced' && candidateUsd.pricing === 'subscription-unpriced'
+          ? 'token-total' : null;
+    if (costAuthority === null) projection = holdProjection(baselineSprint, candidateSprint, 'provider_reported_usd_unavailable', baselineSamples, candidateSamples);
     else if (baselineFeature === null || candidateFeature === null) {
       projection = holdProjection(baselineSprint, candidateSprint, 'feature_mismatch', baselineSamples, candidateSamples);
     }
@@ -422,10 +448,12 @@ async function runUsageCanary(options: UsageCommandOptions, deps: UsageDeps, roo
     else {
       const featureId = featureComparisonId(baselineFeature, candidateFeature);
       const kernel = (deps.canaryCompareFn ?? comparePromptCostCanary)({ version: 1,
-        baseline: { identity: cohortIdentity(baselineSamples, baselineSprint, featureId), samples: baselineSamples.map(kernelSample) },
-        candidate: { identity: cohortIdentity(candidateSamples, candidateSprint, featureId), samples: candidateSamples.map(kernelSample) }, thresholds: await resolveCanaryThresholds(root) });
+        baseline: { identity: cohortIdentity(baselineSamples, baselineSprint, featureId), samples: baselineSamples.map(sample => kernelSample(sample, costAuthority)) },
+        candidate: { identity: cohortIdentity(candidateSamples, candidateSprint, featureId), samples: candidateSamples.map(sample => kernelSample(sample, costAuthority)) },
+        thresholds: policy.thresholds,
+        ...(costAuthority === 'token-total' ? { costAuthority } : {}) });
       projection = { schema: 'deckent.usage-canary', version: 1, baselineSprint, candidateSprint,
-        decision: { disposition: kernel.disposition, reasonCodes: kernel.reasonCodes, planDigest: kernel.planDigest, kernelDecisionDigest: kernel.decisionDigest },
+        decision: { disposition: kernel.disposition, costAuthority, reasonCodes: kernel.reasonCodes, planDigest: kernel.planDigest, kernelDecisionDigest: kernel.decisionDigest },
         measuredHitRatio: { denominator: 'inputTokens+cacheReadTokens+cacheCreationTokens', baseline: kernel.baseline.cacheHitRatio, candidate: kernel.candidate.cacheHitRatio, delta: kernel.deltas.cacheHitRatio },
         providerReportedUsd: { baseline: baselineUsd, candidate: candidateUsd, delta: kernel.deltas.providerReportedUsd },
         qualityParity: { baselinePassRate: kernel.baseline.qualityPassRate, candidatePassRate: kernel.candidate.qualityPassRate, delta: kernel.deltas.qualityPassRate } };
@@ -461,7 +489,8 @@ async function runUsageCanary(options: UsageCommandOptions, deps: UsageDeps, roo
   const output: UsageCanaryOutput = { ...projection, mode: published ? 'applied' : 'dry-run', decisionDigest,
     receipt: published ? { state: published.state, receiptId: published.receipt.receiptId, decisionDigest: published.receipt.decisionDigest } : null };
   print(options.json ? JSON.stringify(output, null, 2) : getMessage('usage.canary.summary', lang,
-    { mode: output.mode, decision: output.decision.disposition, digest: output.decisionDigest }));
+    { mode: output.mode, decision: output.decision.disposition, digest: output.decisionDigest,
+      authority: output.decision.costAuthority ?? 'unresolved' }));
 }
 
 // ─── Run command ──────────────────────────────────────────────────────────────
