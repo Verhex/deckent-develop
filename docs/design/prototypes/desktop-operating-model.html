@@ -1,0 +1,2438 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Deckent Desktop — Operating Model</title>
+  <style>
+    @font-face {
+      font-family: "Bricolage";
+      src: url("../../../src/desktop/src/renderer/fonts/bricolage-latin-ext.woff2") format("woff2");
+      font-style: normal;
+      font-weight: 400 700;
+      font-display: swap;
+      unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+    }
+    @font-face {
+      font-family: "Bricolage";
+      src: url("../../../src/desktop/src/renderer/fonts/bricolage-latin.woff2") format("woff2");
+      font-style: normal;
+      font-weight: 400 700;
+      font-display: swap;
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+    }
+    @font-face {
+      font-family: "Geist Mono";
+      src: url("../../../src/desktop/src/renderer/fonts/geistmono-latin-ext.woff2") format("woff2");
+      font-style: normal;
+      font-weight: 400 600;
+      font-display: swap;
+      unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+    }
+    @font-face {
+      font-family: "Geist Mono";
+      src: url("../../../src/desktop/src/renderer/fonts/geistmono-latin.woff2") format("woff2");
+      font-style: normal;
+      font-weight: 400 600;
+      font-display: swap;
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+    }
+
+    :root {
+      color-scheme: light;
+      --font-ui: "Bricolage", "Segoe UI", Arial, sans-serif;
+      --font-data: "Geist Mono", "SFMono-Regular", Consolas, monospace;
+
+      --frame: #101719;
+      --frame-elevated: #182124;
+      --frame-border: #2a3538;
+      --frame-text: #eef2ef;
+      --frame-muted: #95a19f;
+
+      --canvas: #edf0ed;
+      --surface: #f8f9f6;
+      --surface-subtle: #f1f3ef;
+      --surface-strong: #e2e7e3;
+      --ink: #172022;
+      --ink-secondary: #485557;
+      --ink-muted: #6a7677;
+      --line: #ccd3cf;
+      --line-strong: #aeb9b4;
+
+      --accent: #b64a2f;
+      --accent-deep: #87341f;
+      --accent-soft: #f6e3dc;
+      --positive: #23735b;
+      --positive-soft: #deeee8;
+      --caution: #9a6812;
+      --caution-soft: #f5ead1;
+      --negative: #a03b3f;
+      --negative-soft: #f4dfe0;
+      --info: #326b78;
+      --info-soft: #deeaed;
+      --unknown: #687174;
+      --shadow: 0 10px 30px rgba(18, 27, 29, 0.08);
+
+      --r-xs: 3px;
+      --r-sm: 5px;
+      --r-md: 8px;
+      --topbar-h: 58px;
+      --scopebar-h: 36px;
+      --rail-w: 216px;
+      --inspector-w: 338px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      min-width: 1040px;
+      background: var(--frame);
+      color: var(--ink);
+      font-family: var(--font-ui);
+      font-size: 14px;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.005em;
+    }
+    button, input, select { font: inherit; }
+    button { color: inherit; }
+    button:focus-visible, [tabindex]:focus-visible, select:focus-visible {
+      outline: 2px solid #e96d4d;
+      outline-offset: 2px;
+    }
+    [hidden] { display: none !important; }
+
+    .icon {
+      width: 17px;
+      height: 17px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.7;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      flex: 0 0 auto;
+    }
+    .icon.sm { width: 14px; height: 14px; }
+
+    .prototype-ribbon {
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      border-bottom: 1px solid #343d40;
+      background: #0b1012;
+      color: #aeb9b6;
+      font: 600 9px/1 var(--font-data);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .prototype-ribbon strong { color: #f08a6d; font-weight: 600; }
+
+    .topbar {
+      height: var(--topbar-h);
+      display: grid;
+      grid-template-columns: var(--rail-w) minmax(280px, 1fr) auto;
+      align-items: center;
+      border-bottom: 1px solid var(--frame-border);
+      background: var(--frame);
+      color: var(--frame-text);
+    }
+    .brand {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 0 17px;
+      border-right: 1px solid var(--frame-border);
+    }
+    .brand-mark {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border: 1px solid #62706f;
+      border-radius: 50%;
+      color: #fff;
+      font: 600 11px/1 var(--font-data);
+    }
+    .brand-word {
+      font-size: 16px;
+      font-weight: 750;
+      letter-spacing: 0.01em;
+    }
+    .brand-word span { color: #f07858; }
+
+    .scope-path {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 18px;
+    }
+    .scope-select {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 8px;
+      border: 0;
+      border-radius: var(--r-sm);
+      background: transparent;
+      color: var(--frame-text);
+      cursor: pointer;
+    }
+    .scope-select:hover { background: var(--frame-elevated); }
+    .scope-label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 640;
+    }
+    .scope-sep { color: #60706f; }
+    .environment {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 7px;
+      border: 1px solid #4a5958;
+      border-radius: 999px;
+      color: #cbd4d1;
+      font: 600 9px/1 var(--font-data);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .environment::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #6db092;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-right: 14px;
+    }
+    .command-trigger {
+      width: 236px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border: 1px solid #3a4749;
+      border-radius: var(--r-sm);
+      background: #151d20;
+      color: #9eaaa8;
+      cursor: pointer;
+      text-align: left;
+    }
+    .command-trigger span:nth-child(2) { flex: 1; }
+    kbd {
+      padding: 2px 5px;
+      border: 1px solid #4a5658;
+      border-radius: 3px;
+      background: #202a2d;
+      color: #bec7c5;
+      font: 600 9px/1.2 var(--font-data);
+    }
+    .icon-button {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border: 1px solid transparent;
+      border-radius: var(--r-sm);
+      background: transparent;
+      color: #bac4c1;
+      cursor: pointer;
+    }
+    .icon-button:hover { border-color: #3a4749; background: #182124; }
+    .avatar {
+      width: 30px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: #d8e2dd;
+      color: #182124;
+      font: 700 10px/1 var(--font-data);
+    }
+
+    .mode-control {
+      display: flex;
+      padding: 3px;
+      border: 1px solid #3a4749;
+      border-radius: var(--r-sm);
+      background: #11181a;
+    }
+    .mode-control button {
+      padding: 6px 10px;
+      border: 0;
+      border-radius: 3px;
+      background: transparent;
+      color: #92a09e;
+      font-weight: 650;
+      cursor: pointer;
+    }
+    .mode-control button[aria-pressed="true"] {
+      background: #e9ece8;
+      color: #182023;
+    }
+
+    .scopebar {
+      height: var(--scopebar-h);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 14px 0 calc(var(--rail-w) + 16px);
+      border-bottom: 1px solid var(--line);
+      background: #dfe4e0;
+      color: var(--ink-secondary);
+    }
+    .scopebar-label {
+      margin-right: 4px;
+      color: var(--ink-muted);
+      font: 600 9px/1 var(--font-data);
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+    .domain-control, .scenario-control {
+      display: inline-flex;
+      padding: 2px;
+      border: 1px solid #bcc6c1;
+      border-radius: var(--r-xs);
+      background: #edf0ed;
+    }
+    .scopebar button {
+      padding: 4px 8px;
+      border: 0;
+      border-radius: 2px;
+      background: transparent;
+      color: #566264;
+      font-size: 12px;
+      font-weight: 620;
+      cursor: pointer;
+    }
+    .scopebar button[aria-pressed="true"] {
+      background: #fff;
+      color: #1d282a;
+      box-shadow: 0 1px 2px rgba(20, 30, 31, 0.12);
+    }
+    .scenario-control { margin-left: auto; }
+    .scope-freshness {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-left: 8px;
+      color: #49625b;
+      font: 600 10px/1 var(--font-data);
+    }
+    .scope-freshness::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--positive);
+    }
+    body[data-scenario="degraded"] .scope-freshness { color: var(--caution); }
+    body[data-scenario="degraded"] .scope-freshness::before { background: var(--caution); }
+
+    .app-shell {
+      height: calc(100vh - 28px - var(--topbar-h) - var(--scopebar-h));
+      min-height: 690px;
+      display: grid;
+      grid-template-columns: var(--rail-w) minmax(0, 1fr);
+      background: var(--canvas);
+    }
+
+    .rail {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--frame-border);
+      background: var(--frame);
+      color: var(--frame-text);
+    }
+    .workspace-card {
+      margin: 13px 12px 8px;
+      padding: 11px;
+      border: 1px solid #354144;
+      border-radius: var(--r-sm);
+      background: #151d20;
+    }
+    .workspace-card .eyebrow { color: #7e8b89; }
+    .workspace-name {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 5px;
+      color: #f2f4f1;
+      font-weight: 700;
+    }
+    .workspace-symbol {
+      width: 22px;
+      height: 22px;
+      display: grid;
+      place-items: center;
+      border-radius: var(--r-xs);
+      background: #283438;
+      color: #e1785c;
+      font: 600 9px/1 var(--font-data);
+    }
+    .workspace-meta {
+      margin-top: 6px;
+      color: #8e9b99;
+      font: 400 10px/1.4 var(--font-data);
+    }
+    .nav-group { padding: 8px 9px 0; }
+    .nav-label {
+      padding: 8px 9px 5px;
+      color: #687775;
+      font: 600 9px/1 var(--font-data);
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+    .nav-item {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 9px;
+      border: 0;
+      border-radius: var(--r-sm);
+      background: transparent;
+      color: #aeb9b6;
+      font-weight: 590;
+      text-align: left;
+      cursor: pointer;
+    }
+    .nav-item:hover { background: #182124; color: #eef2ef; }
+    .nav-item[aria-current="page"] {
+      background: #243034;
+      color: #fff;
+      box-shadow: inset 3px 0 0 #e36b4d;
+    }
+    .nav-item .count {
+      min-width: 20px;
+      margin-left: auto;
+      padding: 2px 5px;
+      border: 1px solid #445255;
+      border-radius: 999px;
+      color: #d8dfdd;
+      font: 600 9px/1.2 var(--font-data);
+      text-align: center;
+    }
+    .nav-item .count.attention {
+      border-color: #b98336;
+      background: #392a17;
+      color: #f2c77a;
+    }
+    .advanced-only-nav { display: none; }
+    body[data-mode="advanced"] .advanced-only-nav { display: flex; }
+    .rail-footer {
+      margin-top: auto;
+      padding: 12px 11px 14px;
+      border-top: 1px solid var(--frame-border);
+    }
+    .system-line {
+      display: grid;
+      grid-template-columns: 8px 1fr auto;
+      align-items: center;
+      gap: 8px;
+      color: #9ca9a6;
+      font-size: 11px;
+    }
+    .system-line + .system-line { margin-top: 8px; }
+    .state-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--positive); }
+    .state-dot.caution { background: #d09a47; }
+    .system-line code { color: #73817f; font: 400 9px/1 var(--font-data); }
+
+    .main {
+      min-width: 0;
+      min-height: 0;
+      overflow: auto;
+    }
+    .view { min-height: 100%; }
+    .basic-view { display: block; }
+    .advanced-view { display: none; }
+    body[data-mode="advanced"] .basic-view { display: none; }
+    body[data-mode="advanced"] .advanced-view { display: block; }
+
+    .context-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: end;
+      gap: 24px;
+      padding: 24px 28px 20px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface);
+    }
+    .eyebrow {
+      color: var(--ink-muted);
+      font: 600 9px/1.25 var(--font-data);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .title-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 6px;
+    }
+    h1 {
+      margin: 0;
+      color: var(--ink);
+      font-size: clamp(23px, 2vw, 31px);
+      font-weight: 730;
+      line-height: 1.1;
+      letter-spacing: -0.025em;
+    }
+    .context-summary {
+      max-width: 850px;
+      margin: 8px 0 0;
+      color: var(--ink-secondary);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+    .context-actions { display: flex; gap: 8px; }
+    .button {
+      min-height: 34px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 7px 11px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--r-sm);
+      background: var(--surface);
+      color: var(--ink);
+      font-weight: 670;
+      cursor: pointer;
+    }
+    .button:hover { border-color: #899691; background: #fff; }
+    .button.primary {
+      border-color: var(--accent-deep);
+      background: var(--accent);
+      color: #fff;
+    }
+    .button.primary:hover { background: var(--accent-deep); }
+    .button.negative {
+      border-color: #ba7779;
+      color: var(--negative);
+    }
+    .button.full { width: 100%; }
+    .button.small { min-height: 29px; padding: 5px 8px; font-size: 12px; }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 7px;
+      border: 1px solid currentColor;
+      border-radius: 999px;
+      font: 600 9px/1 var(--font-data);
+      letter-spacing: 0.045em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .status::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+    .status.live { color: var(--positive); background: var(--positive-soft); }
+    .status.attention { color: var(--caution); background: var(--caution-soft); }
+    .status.failed { color: var(--negative); background: var(--negative-soft); }
+    .status.neutral { color: var(--unknown); background: #e8ebea; }
+    .status.info { color: var(--info); background: var(--info-soft); }
+    .scenario-status .status { display: none; }
+    body[data-scenario="running"] .scenario-status .running,
+    body[data-scenario="approval"] .scenario-status .approval,
+    body[data-scenario="degraded"] .scenario-status .degraded { display: inline-flex; }
+
+    .basic-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 350px;
+      align-items: start;
+      min-height: calc(100vh - 240px);
+    }
+    .basic-main { min-width: 0; padding: 20px 22px 32px 28px; }
+    .basic-side {
+      min-height: 100%;
+      padding: 20px 20px 32px;
+      border-left: 1px solid var(--line);
+      background: #e8ece8;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 18px;
+      margin: 22px 0 10px;
+    }
+    .section-head:first-child { margin-top: 0; }
+    .basic-secondary-detail { display: none; }
+    .section-title { margin: 0; font-size: 15px; font-weight: 730; }
+    .section-caption { margin: 3px 0 0; color: var(--ink-muted); font-size: 11px; }
+    .text-link {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--accent-deep);
+      font-size: 12px;
+      font-weight: 680;
+      cursor: pointer;
+    }
+
+    .focus-panel {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--r-md);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .focus-accent { position: absolute; inset: 0 auto 0 0; width: 4px; background: #75817e; }
+    body[data-scenario="approval"] .focus-accent { background: var(--caution); }
+    body[data-scenario="degraded"] .focus-accent { background: var(--negative); }
+    .focus-copy {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 24px;
+      padding: 18px 20px 15px 23px;
+    }
+    .focus-copy h2 { margin: 6px 0 0; font-size: 19px; line-height: 1.25; letter-spacing: -0.015em; }
+    .focus-copy p { margin: 7px 0 0; color: var(--ink-secondary); line-height: 1.45; }
+    .focus-next {
+      width: 190px;
+      padding-left: 18px;
+      border-left: 1px solid var(--line);
+    }
+    .focus-next strong { display: block; margin-top: 6px; line-height: 1.25; }
+    .tracking-strip {
+      display: grid;
+      grid-template-columns: 1.15fr 1fr 1fr;
+      border-top: 1px solid var(--line);
+      background: var(--surface-subtle);
+    }
+    .tracking-cell {
+      min-width: 0;
+      padding: 11px 15px;
+      border-right: 1px solid var(--line);
+    }
+    .tracking-cell:last-child { border-right: 0; }
+    .tracking-label { display: block; color: var(--ink-muted); font-size: 10px; }
+    .tracking-cell strong { display: block; margin-top: 5px; font-size: 12px; line-height: 1.3; }
+    .tracking-progress-row {
+      display: grid;
+      grid-template-columns: minmax(70px, 1fr) auto;
+      align-items: center;
+      gap: 10px;
+      margin-top: 7px;
+    }
+    .tracking-progress-row .progress-label { margin: 0; color: var(--ink); font-weight: 680; white-space: nowrap; }
+
+    .portfolio {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--r-md);
+      background: var(--surface);
+    }
+    .portfolio-head, .portfolio-row {
+      display: grid;
+      grid-template-columns: minmax(220px, 1.8fr) minmax(120px, 1fr) 138px 94px 126px;
+      align-items: center;
+      column-gap: 12px;
+      padding: 0 14px;
+    }
+    .portfolio-head {
+      min-height: 34px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface-subtle);
+      color: var(--ink-muted);
+      font: 600 9px/1 var(--font-data);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .portfolio-row {
+      min-height: 58px;
+      border-bottom: 1px solid var(--line);
+      cursor: pointer;
+    }
+    .portfolio-row:last-child { border-bottom: 0; }
+    .portfolio-row:hover { background: #fbfcfa; }
+    .portfolio-row.selected { background: #f7ebe6; box-shadow: inset 3px 0 0 var(--accent); }
+    .row-primary { min-width: 0; }
+    .row-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+    .row-meta { margin-top: 3px; color: var(--ink-muted); font: 400 9px/1.3 var(--font-data); }
+    .progress-line { height: 4px; overflow: hidden; border-radius: 2px; background: #d7ddda; }
+    .progress-line span { display: block; height: 100%; background: var(--positive); }
+    .progress-label { margin-top: 4px; color: var(--ink-muted); font-size: 10px; }
+    .state-summary {
+      min-width: 0;
+      display: grid;
+      grid-template-columns: 8px minmax(0, 1fr);
+      align-items: start;
+      gap: 7px;
+    }
+    .state-summary .state-mark {
+      width: 8px;
+      height: 2px;
+      margin-top: 7px;
+      background: #6c7976;
+    }
+    .state-summary strong { display: block; font-size: 11px; line-height: 1.25; }
+    .state-summary small { display: block; margin-top: 3px; color: var(--ink-muted); font: 400 9px/1.25 var(--font-data); }
+    .state-summary.verified .state-mark { background: var(--positive); }
+    .state-summary.attention .state-mark {
+      height: 8px;
+      margin-top: 3px;
+      background: var(--caution);
+      transform: rotate(45deg);
+    }
+    .state-summary.failed .state-mark {
+      height: 8px;
+      margin-top: 3px;
+      background: var(--negative);
+    }
+    .evidence { font-size: 11px; font-weight: 650; }
+    .evidence.verified { color: var(--positive); }
+    .evidence.partial { color: var(--caution); }
+
+    .activity-ledger {
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+    .activity-row {
+      display: grid;
+      grid-template-columns: 72px 18px minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: start;
+      padding: 11px 2px;
+      border-bottom: 1px solid var(--line);
+    }
+    .activity-row:last-child { border-bottom: 0; }
+    .activity-time { color: var(--ink-muted); font: 400 9px/1.5 var(--font-data); }
+    .activity-marker {
+      width: 8px;
+      height: 8px;
+      margin-top: 4px;
+      border: 2px solid var(--positive);
+      border-radius: 50%;
+    }
+    .activity-marker.attention { border-color: var(--caution); }
+    .activity-marker.failed { border-color: var(--negative); }
+    .activity-copy strong { display: block; font-size: 12px; }
+    .activity-copy span { display: block; margin-top: 2px; color: var(--ink-muted); font-size: 11px; line-height: 1.4; }
+    .activity-owner { color: var(--ink-muted); font: 400 9px/1.4 var(--font-data); }
+
+    .side-section + .side-section {
+      margin-top: 20px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+    }
+    .side-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 10px;
+      font-size: 13px;
+      font-weight: 730;
+    }
+    .attention-count {
+      min-width: 20px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: var(--caution);
+      color: #fff;
+      font: 600 9px/1.4 var(--font-data);
+      text-align: center;
+    }
+    .decision-empty {
+      padding: 14px;
+      border: 1px dashed var(--line-strong);
+      border-radius: var(--r-sm);
+      color: var(--ink-secondary);
+      background: rgba(255,255,255,0.35);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .decision-card {
+      overflow: hidden;
+      border: 1px solid #c7a566;
+      border-radius: var(--r-sm);
+      background: #fffaf0;
+    }
+    .decision-card.degraded { border-color: #bd7779; background: #fff5f5; }
+    .decision-card-head { padding: 12px 13px 10px; border-bottom: 1px solid rgba(130, 93, 29, 0.2); }
+    .decision-card h3 { margin: 5px 0 0; font-size: 14px; line-height: 1.3; }
+    .decision-card p { margin: 6px 0 0; color: var(--ink-secondary); font-size: 11px; line-height: 1.45; }
+    .decision-facts { display: grid; gap: 6px; padding: 10px 13px; }
+    .decision-fact { display: grid; grid-template-columns: 72px 1fr; gap: 8px; font-size: 11px; }
+    .decision-fact span { color: var(--ink-muted); }
+    .decision-fact strong { font-weight: 620; }
+    .decision-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; padding: 10px 13px 13px; }
+
+    .system-list { border-top: 1px solid var(--line); }
+    .system-item {
+      display: grid;
+      grid-template-columns: 8px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 9px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .system-copy strong { display: block; font-size: 11px; }
+    .system-copy span { display: block; margin-top: 2px; color: var(--ink-muted); font: 400 9px/1.3 var(--font-data); }
+    .system-state { color: var(--positive); font: 600 9px/1 var(--font-data); text-transform: uppercase; }
+    .system-item.problem .state-dot { background: var(--negative); }
+    .system-item.problem .system-state { color: var(--negative); }
+    .system-item.warn .state-dot { background: var(--caution); }
+    .system-item.warn .system-state { color: var(--caution); }
+
+    .quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+
+    .advanced-shell {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) var(--inspector-w);
+      min-height: calc(100vh - 240px);
+    }
+    .advanced-main { min-width: 0; padding: 16px 18px 28px 22px; }
+    .inspector {
+      min-width: 0;
+      border-left: 1px solid var(--line);
+      background: var(--surface);
+    }
+    .operations-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 10px;
+    }
+    .toolbar-field {
+      height: 31px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 0 9px;
+      border: 1px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--surface);
+      color: var(--ink-secondary);
+      font-size: 11px;
+    }
+    .toolbar-spacer { flex: 1; }
+    .view-switch {
+      display: flex;
+      padding: 2px;
+      border: 1px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--surface);
+    }
+    .view-switch button { padding: 5px 8px; border: 0; border-radius: 3px; background: transparent; color: var(--ink-muted); font-size: 11px; cursor: pointer; }
+    .view-switch button[aria-pressed="true"] { background: var(--surface-strong); color: var(--ink); font-weight: 680; }
+
+    .topology-panel {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--r-md);
+      background: var(--surface);
+    }
+    .panel-head {
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 13px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface-subtle);
+    }
+    .panel-head h2 { margin: 0; font-size: 13px; }
+    .panel-meta { color: var(--ink-muted); font: 400 9px/1 var(--font-data); }
+    .quantity-chip {
+      min-height: 28px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+      padding: 4px 9px 4px 6px;
+      border: 1px solid #84a5aa;
+      border-radius: var(--r-sm);
+      background: var(--info-soft);
+      color: #214f59;
+    }
+    .quantity-glyph {
+      width: 18px;
+      height: 18px;
+      display: grid;
+      grid-template-columns: repeat(2, 5px);
+      grid-template-rows: repeat(2, 5px);
+      place-content: center;
+      gap: 2px;
+      border-radius: 3px;
+      background: #c6dde1;
+    }
+    .quantity-glyph i { display: block; border-radius: 1px; background: #397484; }
+    .quantity-chip strong { font: 600 12px/1 var(--font-data); }
+    .quantity-chip span:last-child { font-size: 10px; font-weight: 680; }
+    .topology {
+      position: relative;
+      min-height: 226px;
+      padding: 22px 26px;
+      background-image:
+        linear-gradient(to right, rgba(60,80,79,.05) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(60,80,79,.05) 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+    .flow-grid {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 1.08fr 32px 1fr 32px 1fr 32px .9fr;
+      align-items: center;
+      min-height: 180px;
+    }
+    .flow-column { display: grid; gap: 9px; }
+    .flow-arrow {
+      height: 1px;
+      position: relative;
+      background: #97a5a1;
+    }
+    .flow-arrow::after {
+      content: "";
+      position: absolute;
+      right: -1px;
+      top: -3px;
+      border-width: 4px 0 4px 6px;
+      border-style: solid;
+      border-color: transparent transparent transparent #97a5a1;
+    }
+    .node {
+      position: relative;
+      min-height: 60px;
+      padding: 10px 11px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--r-sm);
+      background: #fcfdfb;
+      cursor: pointer;
+    }
+    .node:hover { border-color: #7d8d88; }
+    .node.selected { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+    .node.attention { border-color: #c69845; background: #fffaf0; }
+    .node.failed { border-color: #bc7779; background: #fff6f6; }
+    .node-kicker { color: var(--ink-muted); font: 600 8px/1 var(--font-data); letter-spacing: .05em; text-transform: uppercase; }
+    .node-title { margin-top: 6px; font-size: 11px; font-weight: 720; line-height: 1.25; }
+    .node-meta { margin-top: 5px; color: var(--ink-muted); font: 400 8px/1.2 var(--font-data); }
+    .node-state {
+      position: absolute;
+      top: 9px;
+      right: 9px;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--positive);
+    }
+    .node.attention .node-state { background: var(--caution); }
+    .node.failed .node-state { background: var(--negative); }
+
+    .dense-panel {
+      margin-top: 12px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--r-md);
+      background: var(--surface);
+    }
+    .work-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .work-table th {
+      height: 30px;
+      padding: 0 9px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface-subtle);
+      color: var(--ink-muted);
+      font: 600 8px/1 var(--font-data);
+      letter-spacing: .05em;
+      text-align: left;
+      text-transform: uppercase;
+    }
+    .work-table td {
+      height: 41px;
+      padding: 0 9px;
+      border-bottom: 1px solid var(--line);
+      color: var(--ink-secondary);
+      font-size: 10px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .work-table tr:last-child td { border-bottom: 0; }
+    .work-table tbody tr { cursor: pointer; }
+    .work-table tbody tr:hover { background: #fafbf9; }
+    .work-table tbody tr.selected { background: #f7ebe6; box-shadow: inset 3px 0 0 var(--accent); }
+    .work-table .object-cell { color: var(--ink); font-weight: 690; }
+    .mono { font-family: var(--font-data); font-size: .92em; }
+    .axis-state { display: inline-flex; align-items: center; gap: 5px; }
+    .axis-state::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--positive); }
+    .axis-state.warn::before { background: var(--caution); }
+    .axis-state.fail::before { background: var(--negative); }
+    .axis-state.neutral::before { background: var(--unknown); }
+
+    .event-rail {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: 118px minmax(0, 1fr);
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--r-md);
+      background: var(--surface);
+    }
+    .event-rail-title { padding: 12px; border-right: 1px solid var(--line); background: var(--surface-subtle); }
+    .event-rail-title strong { display: block; font-size: 11px; }
+    .event-rail-title span { display: block; margin-top: 4px; color: var(--ink-muted); font: 400 8px/1.35 var(--font-data); }
+    .event-stream { display: flex; overflow: hidden; }
+    .event {
+      min-width: 170px;
+      padding: 10px 12px;
+      border-right: 1px solid var(--line);
+    }
+    .event time { color: var(--ink-muted); font: 400 8px/1 var(--font-data); }
+    .event strong { display: block; margin-top: 5px; font-size: 10px; }
+    .event span { display: block; margin-top: 3px; color: var(--ink-muted); font-size: 9px; }
+
+    .inspector-head {
+      padding: 16px 16px 13px;
+      border-bottom: 1px solid var(--line);
+    }
+    .inspector-head h2 { margin: 5px 0 0; font-size: 16px; line-height: 1.25; }
+    .inspector-tabs {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border-bottom: 1px solid var(--line);
+    }
+    .inspector-tabs button {
+      padding: 9px 3px 8px;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      background: transparent;
+      color: var(--ink-muted);
+      font-size: 10px;
+      cursor: pointer;
+    }
+    .inspector-tabs button[aria-selected="true"] { border-bottom-color: var(--accent); color: var(--ink); font-weight: 700; }
+    .inspector-body { padding: 14px 16px 24px; }
+    .inspector-section + .inspector-section { margin-top: 18px; padding-top: 15px; border-top: 1px solid var(--line); }
+    .fact-grid { display: grid; grid-template-columns: 95px minmax(0, 1fr); gap: 8px 10px; font-size: 10px; }
+    .fact-grid dt { color: var(--ink-muted); }
+    .fact-grid dd { min-width: 0; margin: 0; color: var(--ink); font-weight: 610; overflow-wrap: anywhere; }
+    .fact-grid dd.mono { font-weight: 400; }
+    .inspector-copy { margin: 6px 0 0; color: var(--ink-secondary); font-size: 11px; line-height: 1.5; }
+    .intervention-stack { display: grid; gap: 7px; margin-top: 10px; }
+    .evidence-meter {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 3px;
+      margin-top: 9px;
+    }
+    .evidence-meter span { height: 5px; border-radius: 2px; background: #d4dad7; }
+    .evidence-meter span.on { background: var(--positive); }
+    .code-line {
+      margin-top: 8px;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: var(--r-xs);
+      background: #edf1ee;
+      color: #344244;
+      font: 400 9px/1.45 var(--font-data);
+      overflow-wrap: anywhere;
+      white-space: pre-line;
+    }
+
+    dialog {
+      width: min(560px, calc(100vw - 40px));
+      padding: 0;
+      border: 1px solid #52605f;
+      border-radius: var(--r-md);
+      background: var(--surface);
+      color: var(--ink);
+      box-shadow: 0 28px 90px rgba(4, 10, 11, .4);
+    }
+    dialog::backdrop { background: rgba(9, 14, 16, .65); }
+    .dialog-head { display: flex; align-items: flex-start; gap: 12px; padding: 18px; border-bottom: 1px solid var(--line); }
+    .dialog-head-copy { flex: 1; }
+    .dialog-head h2 { margin: 5px 0 0; font-size: 18px; }
+    .dialog-close { border: 0; background: transparent; color: var(--ink-muted); cursor: pointer; font-size: 20px; }
+    .dialog-body { padding: 16px 18px; }
+    .dialog-warning { padding: 10px 11px; border-left: 3px solid var(--caution); background: var(--caution-soft); color: #5f4619; font-size: 11px; line-height: 1.45; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 13px 18px; border-top: 1px solid var(--line); background: var(--surface-subtle); }
+    .toast {
+      position: fixed;
+      right: 20px;
+      bottom: 18px;
+      z-index: 10;
+      max-width: 370px;
+      display: grid;
+      grid-template-columns: 22px 1fr;
+      gap: 10px;
+      padding: 12px 14px;
+      border: 1px solid #568673;
+      border-radius: var(--r-sm);
+      background: #15352b;
+      color: #eaf5f0;
+      box-shadow: 0 12px 36px rgba(0,0,0,.25);
+    }
+    .toast strong { display: block; font-size: 12px; }
+    .toast span { display: block; margin-top: 3px; color: #b8d7cb; font-size: 10px; }
+
+    .context-drawer {
+      width: min(500px, 94vw);
+      max-width: none;
+      height: 100vh;
+      max-height: none;
+      margin: 0 0 0 auto;
+      border: 0;
+      border-left: 1px solid #52605f;
+      border-radius: 0;
+      background: var(--surface);
+      box-shadow: -24px 0 72px rgba(4, 10, 11, .28);
+    }
+    .context-drawer::backdrop { background: rgba(9, 14, 16, .36); }
+    .drawer-shell { min-height: 100%; display: flex; flex-direction: column; }
+    .drawer-header {
+      padding: 18px 20px 15px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface);
+    }
+    .drawer-header-row { display: flex; align-items: flex-start; gap: 14px; }
+    .drawer-header-copy { min-width: 0; flex: 1; }
+    .drawer-header h2 { margin: 6px 0 0; font-size: 21px; line-height: 1.2; letter-spacing: -0.02em; }
+    .drawer-close {
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: var(--r-sm);
+      background: transparent;
+      color: var(--ink-muted);
+      cursor: pointer;
+      font-size: 20px;
+    }
+    .drawer-state-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+    .drawer-state-age { color: var(--ink-muted); font: 400 9px/1 var(--font-data); }
+    .drawer-tabs {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border-bottom: 1px solid var(--line);
+      background: var(--surface-subtle);
+    }
+    .drawer-tabs button {
+      padding: 11px 4px 9px;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      background: transparent;
+      color: var(--ink-muted);
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .drawer-tabs button[aria-selected="true"] { border-bottom-color: var(--accent); color: var(--ink); font-weight: 700; background: var(--surface); }
+    .drawer-body { flex: 1; overflow: auto; padding: 18px 20px 24px; }
+    .drawer-impact {
+      padding: 12px 13px;
+      border-left: 3px solid var(--accent);
+      background: var(--accent-soft);
+    }
+    .drawer-impact strong { display: block; font-size: 13px; }
+    .drawer-impact p { margin: 5px 0 0; color: var(--ink-secondary); font-size: 12px; line-height: 1.5; }
+    .drawer-section + .drawer-section { margin-top: 20px; padding-top: 17px; border-top: 1px solid var(--line); }
+    .drawer-section h3 { margin: 0; font-size: 13px; }
+    .drawer-section-copy { margin: 5px 0 0; color: var(--ink-secondary); font-size: 12px; line-height: 1.5; }
+    .context-drawer .fact-grid { font-size: 11px; }
+    .drawer-next {
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1fr);
+      gap: 9px;
+      margin-top: 11px;
+      padding: 11px;
+      border: 1px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--surface-subtle);
+    }
+    .drawer-next-index {
+      width: 24px;
+      height: 24px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--frame);
+      color: #fff;
+      font: 600 9px/1 var(--font-data);
+    }
+    .drawer-next strong { display: block; font-size: 12px; }
+    .drawer-next span:last-child { display: block; margin-top: 3px; color: var(--ink-muted); font-size: 11px; line-height: 1.4; }
+    .drawer-footer {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      padding: 13px 20px;
+      border-top: 1px solid var(--line);
+      background: var(--surface-subtle);
+    }
+    .control-list { display: grid; gap: 8px; margin-top: 12px; }
+    .control-item {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 12px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: var(--r-sm);
+      background: var(--surface);
+    }
+    .control-item strong { display: block; font-size: 12px; }
+    .control-item span { display: block; margin-top: 2px; color: var(--ink-muted); font-size: 10px; line-height: 1.4; }
+    .portfolio-row::after {
+      content: "Open";
+      position: absolute;
+      right: 12px;
+      opacity: 0;
+      color: var(--accent-deep);
+      font: 600 9px/1 var(--font-data);
+      text-transform: uppercase;
+    }
+    .portfolio-row { position: relative; padding-right: 56px; }
+    .portfolio-row:hover::after, .portfolio-row:focus-visible::after { opacity: 1; }
+
+    @media (max-width: 1380px) {
+      :root { --rail-w: 192px; --inspector-w: 310px; }
+      .command-trigger { width: 185px; }
+      .basic-grid { grid-template-columns: minmax(0, 1fr) 315px; }
+      .portfolio-head, .portfolio-row { grid-template-columns: minmax(190px, 1.7fr) minmax(110px, 1fr) 126px 108px; }
+      .portfolio-head > :nth-child(4), .portfolio-row > :nth-child(4) { display: none; }
+    }
+    @media (max-width: 1100px) {
+      :root { --rail-w: 168px; }
+      .command-trigger span:nth-child(2), .command-trigger kbd { display: none; }
+      .command-trigger { width: 34px; justify-content: center; }
+      .advanced-shell { grid-template-columns: minmax(0, 1fr); }
+      .inspector { border-top: 1px solid var(--line); border-left: 0; }
+      .basic-grid { grid-template-columns: minmax(0, 1fr); }
+      .basic-side { border-top: 1px solid var(--line); border-left: 0; }
+    }
+    @media (max-width: 720px) {
+      .context-drawer { width: 100vw; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+    }
+    @media (forced-colors: active) {
+      .status, .button, .node, .decision-card, .focus-panel { forced-color-adjust: auto; }
+      .state-dot, .node-state, .activity-marker, .status::before { forced-color-adjust: none; }
+    }
+  </style>
+</head>
+<body data-mode="basic" data-domain="software" data-scenario="running">
+  <svg width="0" height="0" aria-hidden="true" style="position:absolute">
+    <symbol id="i-overview" viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v10h-6zM4 14h6v6H4zM14 18h6v2h-6z"/></symbol>
+    <symbol id="i-work" viewBox="0 0 24 24"><path d="M4 7h16v13H4zM8 7V4h8v3M4 11h16M10 11v2h4v-2"/></symbol>
+    <symbol id="i-operations" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="8" r="2"/><circle cx="9" cy="18" r="2"/><path d="M8 7l8 1M7 8l2 8M17 10l-6 7"/></symbol>
+    <symbol id="i-agents" viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20c.5-4 2-6 5-6s4.5 2 5 6M13 15c1-.9 2.2-1.4 3.7-1.4 2.5 0 3.8 2.1 4.3 5.4"/></symbol>
+    <symbol id="i-decision" viewBox="0 0 24 24"><path d="M12 3l9 4v5c0 5-3.5 8-9 9-5.5-1-9-4-9-9V7zM8 12l2.5 2.5L16 9"/></symbol>
+    <symbol id="i-connection" viewBox="0 0 24 24"><path d="M9 8H6a4 4 0 000 8h3M15 8h3a4 4 0 010 8h-3M8 12h8"/></symbol>
+    <symbol id="i-governance" viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 4.5-3 7.5-8 9-5-1.5-8-4.5-8-9V7zM12 7v10M8 10h8"/></symbol>
+    <symbol id="i-audit" viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 10a6 6 0 0112 0v5l2 2H4l2-2zM10 20h4"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l4 4L19 6"/></symbol>
+  </svg>
+
+  <div class="prototype-ribbon">
+    <span><strong>Design evidence</strong> · representative target capability · not a live product surface</span>
+    <span>Desktop operating model · Terminal intentionally deferred</span>
+  </div>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">DK</div>
+      <div class="brand-word">deckent<span>.</span></div>
+    </div>
+    <div class="scope-path">
+      <button class="scope-select" type="button">
+        <span class="scope-label">Verhex Industries</span>
+        <svg class="icon sm"><use href="#i-chevron"/></svg>
+      </button>
+      <span class="scope-sep">/</span>
+      <button class="scope-select" type="button">
+        <span class="scope-label domain-workspace">Platform Delivery</span>
+        <svg class="icon sm"><use href="#i-chevron"/></svg>
+      </button>
+      <span class="environment">Production</span>
+    </div>
+    <div class="top-actions">
+      <button class="command-trigger" type="button" data-dialog="command">
+        <svg class="icon sm"><use href="#i-search"/></svg>
+        <span data-copy="command">Search or run a command</span>
+        <kbd>Ctrl K</kbd>
+      </button>
+      <div class="mode-control" aria-label="Operating mode">
+        <button type="button" data-mode-value="basic" aria-pressed="true">Basic</button>
+        <button type="button" data-mode-value="advanced" aria-pressed="false">Advanced</button>
+      </div>
+      <button class="icon-button" type="button" aria-label="Notifications"><svg class="icon"><use href="#i-bell"/></svg></button>
+      <div class="avatar" aria-label="Alperen">AL</div>
+    </div>
+  </header>
+
+  <div class="scopebar">
+    <span class="scopebar-label">Domain profile</span>
+    <div class="domain-control">
+      <button type="button" data-domain-value="software" aria-pressed="true">Software delivery</button>
+      <button type="button" data-domain-value="operations" aria-pressed="false">Commerce &amp; production</button>
+    </div>
+    <div class="scenario-control" aria-label="Scenario">
+      <button type="button" data-scenario-value="running" aria-pressed="true">Operating</button>
+      <button type="button" data-scenario-value="approval" aria-pressed="false">Approval</button>
+      <button type="button" data-scenario-value="degraded" aria-pressed="false">Degraded</button>
+    </div>
+    <span class="scope-freshness"><span class="freshness-copy">Live · 8s</span></span>
+  </div>
+
+  <div class="app-shell">
+    <aside class="rail">
+      <div class="workspace-card">
+        <div class="eyebrow">Active workspace</div>
+        <div class="workspace-name"><span class="workspace-symbol domain-symbol">PD</span><span class="domain-workspace">Platform Delivery</span></div>
+        <div class="workspace-meta"><span class="domain-scope-meta">12 projects · 24 active runs</span></div>
+      </div>
+
+      <nav class="nav-group" aria-label="Primary navigation">
+        <div class="nav-label">Manage</div>
+        <button class="nav-item" type="button" aria-current="page"><svg class="icon"><use href="#i-overview"/></svg><span>Overview</span></button>
+        <button class="nav-item" type="button"><svg class="icon"><use href="#i-work"/></svg><span>Work</span><span class="count domain-work-count">24</span></button>
+        <button class="nav-item advanced-only-nav" type="button"><svg class="icon"><use href="#i-operations"/></svg><span>Operations</span></button>
+        <button class="nav-item advanced-only-nav" type="button"><svg class="icon"><use href="#i-agents"/></svg><span>Agents</span><span class="count">18</span></button>
+        <button class="nav-item" type="button"><svg class="icon"><use href="#i-decision"/></svg><span>Decisions</span><span class="count attention scenario-decision-count">1</span></button>
+        <button class="nav-item" type="button"><svg class="icon"><use href="#i-connection"/></svg><span>Connections</span><span class="count scenario-connection-count">4</span></button>
+        <button class="nav-item advanced-only-nav" type="button"><svg class="icon"><use href="#i-governance"/></svg><span>Governance</span></button>
+        <button class="nav-item advanced-only-nav" type="button"><svg class="icon"><use href="#i-audit"/></svg><span>Audit</span></button>
+      </nav>
+
+      <div class="rail-footer">
+        <div class="nav-label">Runtime</div>
+        <div class="system-line"><span class="state-dot"></span><span>deckentd</span><code>v0.100.0</code></div>
+        <div class="system-line"><span class="state-dot scenario-runtime-dot"></span><span>Event stream</span><code class="runtime-state">live</code></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <section class="view basic-view" aria-label="Basic mode overview">
+        <header class="context-header">
+          <div>
+            <div class="eyebrow"><span class="domain-object-kind">Release program</span> · <span class="domain-object-id">REL-101</span> · updated <span class="scenario-age">8 seconds ago</span></div>
+            <div class="title-line">
+              <h1 class="domain-title">Release 0.101 — provider handoff</h1>
+            </div>
+            <p class="context-summary domain-summary">Ship cross-platform provider handoff without interrupting active runs. Deckent is coordinating implementation, verification and release evidence.</p>
+          </div>
+          <div class="context-actions">
+            <button class="button" type="button" data-open-primary-detail>Inspect &amp; manage</button>
+            <button class="button primary" type="button" data-switch-advanced>Open workspace</button>
+          </div>
+        </header>
+
+        <div class="basic-grid">
+          <div class="basic-main">
+            <div class="section-head">
+              <div><h2 class="section-title">Operational focus</h2><p class="section-caption">Most important outcome, risk and next safe action</p></div>
+              <button class="text-link" type="button" data-dialog="evidence">View evidence</button>
+            </div>
+            <article class="focus-panel">
+              <span class="focus-accent"></span>
+              <div class="focus-copy">
+                <div>
+                  <div class="eyebrow scenario-focus-kicker">Execution progressing</div>
+                  <h2 class="scenario-focus-title">Cross-platform validation is the current critical path</h2>
+                  <p class="scenario-focus-copy">Five of eight work items have verified evidence. The Windows handshake worker is delayed but remains inside the recovery window.</p>
+                </div>
+                <div class="focus-next">
+                  <div class="eyebrow">Next safe action</div>
+                  <strong class="scenario-next-action">Continue supervision; review W-03 if freshness exceeds 45 seconds.</strong>
+                </div>
+              </div>
+              <div class="tracking-strip">
+                <div class="tracking-cell">
+                  <span class="tracking-label">Progress</span>
+                  <div class="tracking-progress-row"><div class="progress-line"><span class="domain-row-1-progress" style="width:68%"></span></div><span class="progress-label domain-row-1-progress-label">5 of 8 complete</span></div>
+                </div>
+                <div class="tracking-cell"><span class="tracking-label">Now</span><strong class="scenario-track-phase">Cross-platform validation</strong></div>
+                <div class="tracking-cell"><span class="tracking-label">Last change</span><strong class="scenario-track-change">Windows handshake started · 8s ago</strong></div>
+              </div>
+            </article>
+
+            <div class="section-head">
+              <div><h2 class="section-title">Work portfolio</h2><p class="section-caption domain-portfolio-caption">Current delivery outcomes across this workspace · exact count</p></div>
+              <button class="text-link" type="button">Open all work</button>
+            </div>
+            <section class="portfolio" aria-label="Work portfolio">
+              <div class="portfolio-head"><span>Outcome</span><span>Progress</span><span>Now</span><span>Owner</span><span>Evidence</span></div>
+              <div class="portfolio-row selected" tabindex="0" role="button" aria-haspopup="dialog" data-work-index="0">
+                <div class="row-primary"><div class="row-title domain-row-1-title">Provider handoff</div><div class="row-meta domain-row-1-meta">REL-101 · Production · updated 8s ago</div></div>
+                <div><div class="progress-line"><span class="domain-row-1-progress" style="width:68%"></span></div><div class="progress-label domain-row-1-progress-label">5 of 8 complete</div></div>
+                <div class="state-summary scenario-primary-state-line"><span class="state-mark" aria-hidden="true"></span><div><strong class="scenario-primary-state">Validation</strong><small class="scenario-primary-state-meta">updated 8s ago</small></div></div>
+                <div class="domain-row-1-owner">Platform</div>
+                <div class="evidence partial domain-row-1-evidence">Partial · 5/8</div>
+              </div>
+              <div class="portfolio-row" tabindex="0" role="button" aria-haspopup="dialog" data-work-index="1">
+                <div class="row-primary"><div class="row-title domain-row-2-title">Release security review</div><div class="row-meta domain-row-2-meta">REL-099 · Staging · updated 4m ago</div></div>
+                <div><div class="progress-line"><span class="domain-row-2-progress" style="width:100%"></span></div><div class="progress-label domain-row-2-progress-label">6 of 6 complete</div></div>
+                <div class="state-summary verified"><span class="state-mark" aria-hidden="true"></span><div><strong>Verified</strong><small>settled 4m ago</small></div></div>
+                <div class="domain-row-2-owner">Security</div>
+                <div class="evidence verified domain-row-2-evidence">Verified</div>
+              </div>
+              <div class="portfolio-row" tabindex="0" role="button" aria-haspopup="dialog" data-work-index="2">
+                <div class="row-primary"><div class="row-title domain-row-3-title">Windows native packaging</div><div class="row-meta domain-row-3-meta">REL-104 · Test · updated 11m ago</div></div>
+                <div><div class="progress-line"><span class="domain-row-3-progress" style="width:36%"></span></div><div class="progress-label domain-row-3-progress-label">4 of 11 complete</div></div>
+                <div class="state-summary"><span class="state-mark" aria-hidden="true"></span><div><strong>Packaging</strong><small>updated 11m ago</small></div></div>
+                <div class="domain-row-3-owner">Release</div>
+                <div class="evidence partial domain-row-3-evidence">Pending · 4/11</div>
+              </div>
+            </section>
+
+            <div class="section-head basic-secondary-detail">
+              <div><h2 class="section-title">What changed</h2><p class="section-caption">Attributable updates since your last visit</p></div>
+              <button class="text-link" type="button">Open activity ledger</button>
+            </div>
+            <section class="activity-ledger basic-secondary-detail">
+              <div class="activity-row">
+                <time class="activity-time">10:44:31</time><span class="activity-marker scenario-activity-marker"></span>
+                <div class="activity-copy"><strong class="scenario-activity-1-title">Validation entered its final platform checks</strong><span class="scenario-activity-1-copy">Windows native and WSL remain; all other environments have evidence.</span></div>
+                <span class="activity-owner">Brain</span>
+              </div>
+              <div class="activity-row">
+                <time class="activity-time">10:42:18</time><span class="activity-marker"></span>
+                <div class="activity-copy"><strong class="domain-activity-2-title">Plan revision 04 accepted</strong><span class="domain-activity-2-copy">Scope remains bounded to four files; verifier assignment is unchanged.</span></div>
+                <span class="activity-owner">Alperen</span>
+              </div>
+              <div class="activity-row">
+                <time class="activity-time">10:41:06</time><span class="activity-marker"></span>
+                <div class="activity-copy"><strong class="domain-activity-3-title">Execution policy admitted the run</strong><span class="domain-activity-3-copy">Provider, budget and environment checks passed.</span></div>
+                <span class="activity-owner">Policy</span>
+              </div>
+            </section>
+          </div>
+
+          <aside class="basic-side">
+            <section class="side-section">
+              <h2 class="side-title">Attention <span class="attention-count scenario-side-count">0</span></h2>
+              <div class="decision-empty scenario-content" data-for="running">No decision is blocking the selected outcome. Deckent will surface material changes here.</div>
+              <article class="decision-card scenario-content" data-for="approval">
+                <div class="decision-card-head"><div class="eyebrow">Approval · expires in 08:42</div><h3 class="domain-approval-title">Allow bounded failover policy change</h3><p class="domain-approval-summary">W-03 requests one elevated mutation before validation can continue.</p></div>
+                <div class="decision-facts">
+                  <div class="decision-fact"><span>Scope</span><strong class="domain-approval-scope">4 files · production policy</strong></div>
+                  <div class="decision-fact"><span>Requested by</span><strong class="domain-approval-requestor">Worker W-03 via Brain</strong></div>
+                  <div class="decision-fact"><span>Consequence</span><strong class="domain-approval-consequence">Apply failover only to this release</strong></div>
+                </div>
+                <div class="decision-actions"><button class="button small" type="button" data-dialog="approval">Details</button><button class="button primary small" type="button" data-dialog="approval">Review &amp; decide</button></div>
+              </article>
+              <article class="decision-card degraded scenario-content" data-for="degraded">
+                <div class="decision-card-head"><div class="eyebrow">Reconciliation required</div><h3 class="domain-degraded-title">Artifact registry connection is stale</h3><p class="domain-degraded-summary">Last confirmed state is sequence 412. No success is inferred after disconnect.</p></div>
+                <div class="decision-facts">
+                  <div class="decision-fact"><span>Affected</span><strong class="domain-degraded-scope">2 release checks</strong></div>
+                  <div class="decision-fact"><span>Last evidence</span><strong>10:44:36 · 48s ago</strong></div>
+                  <div class="decision-fact"><span>Safe recovery</span><strong class="domain-degraded-recovery">Reconnect, replay, then reconcile</strong></div>
+                </div>
+                <div class="decision-actions"><button class="button small" type="button" data-switch-advanced>Inspect</button><button class="button primary small" type="button" data-dialog="recovery">Recover safely</button></div>
+              </article>
+            </section>
+
+            <section class="side-section">
+              <h2 class="side-title">Systems &amp; integrations</h2>
+              <div class="system-list">
+                <div class="system-item domain-system-1"><span class="state-dot"></span><div class="system-copy"><strong class="domain-system-1-name">Source control</strong><span class="domain-system-1-meta">healthy · 12 projects</span></div><span class="system-state">Live</span></div>
+                <div class="system-item domain-system-2"><span class="state-dot"></span><div class="system-copy"><strong class="domain-system-2-name">CI runners</strong><span class="domain-system-2-meta">18 available · 3 active</span></div><span class="system-state">Live</span></div>
+                <div class="system-item domain-system-3 scenario-system-target"><span class="state-dot"></span><div class="system-copy"><strong class="domain-system-3-name">Artifact registry</strong><span class="domain-system-3-meta">healthy · 124ms</span></div><span class="system-state scenario-system-state">Live</span></div>
+                <div class="system-item domain-system-4"><span class="state-dot"></span><div class="system-copy"><strong class="domain-system-4-name">Provider pool</strong><span class="domain-system-4-meta">3 connections · policy ready</span></div><span class="system-state">Live</span></div>
+              </div>
+              <button class="button full small" type="button" style="margin-top:10px">Manage connections</button>
+            </section>
+
+            <section class="side-section basic-secondary-detail">
+              <h2 class="side-title">Quick controls</h2>
+              <div class="quick-actions">
+                <button class="button small" type="button" data-dialog="guide">Guide</button>
+                <button class="button small" type="button" data-dialog="pause">Pause safely</button>
+                <button class="button small" type="button">Saved views</button>
+                <button class="button small" type="button">Export evidence</button>
+              </div>
+            </section>
+          </aside>
+        </div>
+      </section>
+
+      <section class="view advanced-view" aria-label="Advanced mode operations">
+        <header class="context-header">
+          <div>
+            <div class="eyebrow"><span class="domain-object-kind">Release program</span> · <span class="domain-object-id">REL-101</span> · canonical run <span class="domain-run-id">RUN-8421</span></div>
+            <div class="title-line">
+              <h1 class="domain-title">Release 0.101 — provider handoff</h1>
+              <span class="scenario-status"><span class="status live running">Running · live</span><span class="status attention approval">Approval required</span><span class="status failed degraded">Reconciliation required</span></span>
+            </div>
+            <p class="context-summary"><span class="domain-summary">Ship cross-platform provider handoff without interrupting active runs. Deckent is coordinating implementation, verification and release evidence.</span> <span class="mono">rev 04 · seq 412</span></p>
+          </div>
+          <div class="context-actions">
+            <button class="button" type="button" data-dialog="pause"><svg class="icon sm"><use href="#i-pause"/></svg>Pause at boundary</button>
+            <button class="button" type="button" data-dialog="guide">Revise guidance</button>
+            <button class="button primary scenario-content" data-for="approval" type="button" data-dialog="approval">Review approval</button>
+            <button class="button primary scenario-content" data-for="degraded" type="button" data-dialog="recovery">Reconcile</button>
+          </div>
+        </header>
+
+        <div class="advanced-shell">
+          <div class="advanced-main">
+            <div class="operations-toolbar">
+              <div class="toolbar-field"><svg class="icon sm"><use href="#i-search"/></svg>Filter work, principals or evidence</div>
+              <div class="toolbar-field">State: active + attention</div>
+              <div class="toolbar-field">Environment: production</div>
+              <span class="toolbar-spacer"></span>
+              <div class="view-switch"><button type="button" aria-pressed="true">Topology</button><button type="button" aria-pressed="false">Timeline</button></div>
+              <button class="icon-button" type="button" aria-label="More options" style="color:var(--ink-muted)"><svg class="icon"><use href="#i-more"/></svg></button>
+            </div>
+
+            <section class="topology-panel">
+              <header class="panel-head"><h2>Execution topology</h2><span class="panel-meta"><span class="domain-run-id">RUN-8421</span> · Goal → Flow → Run → WorkItem → Attempt → Operation</span><span class="quantity-chip" aria-label="8 work items"><span class="quantity-glyph" aria-hidden="true"><i></i><i></i><i></i><i></i></span><strong>8</strong><span>work items</span></span></header>
+              <div class="topology">
+                <div class="flow-grid">
+                  <div class="flow-column">
+                    <article class="node"><span class="node-state"></span><div class="node-kicker">Goal · <span class="domain-goal-id">G-18</span></div><div class="node-title domain-node-goal">Stabilize provider handoff</div><div class="node-meta">owner Alperen · policy admitted</div></article>
+                  </div>
+                  <span class="flow-arrow"></span>
+                  <div class="flow-column">
+                    <article class="node"><span class="node-state"></span><div class="node-kicker">Flow · <span class="domain-flow-id">F-7C8A</span></div><div class="node-title domain-node-flow">Cross-platform delivery</div><div class="node-meta">3 branches · rev 04</div></article>
+                  </div>
+                  <span class="flow-arrow"></span>
+                  <div class="flow-column">
+                    <article class="node"><span class="node-state"></span><div class="node-kicker">WorkItem · <span class="domain-work-id-1">W-02</span></div><div class="node-title domain-node-work-1">Linux + macOS validation</div><div class="node-meta">verified · 4 evidence items</div></article>
+                    <article class="node selected scenario-node-selected"><span class="node-state"></span><div class="node-kicker">WorkItem · <span class="domain-work-id-2">W-03</span></div><div class="node-title domain-node-work-2">Windows handshake</div><div class="node-meta scenario-node-meta">attempt 02 · active · age 18s</div></article>
+                    <article class="node"><span class="node-state"></span><div class="node-kicker">WorkItem · <span class="domain-work-id-3">W-04</span></div><div class="node-title domain-node-work-3">Release evidence</div><div class="node-meta">queued · dependency <span class="domain-work-id-2">W-03</span></div></article>
+                  </div>
+                  <span class="flow-arrow"></span>
+                  <div class="flow-column">
+                    <article class="node scenario-operation-node"><span class="node-state"></span><div class="node-kicker">Operation · <span class="domain-operation-id">OP-11</span></div><div class="node-title domain-node-operation">Validate native failover</div><div class="node-meta scenario-operation-meta">worker-03 · claude/standard</div></article>
+                    <article class="node"><span class="node-state"></span><div class="node-kicker">Verifier · <span class="domain-verifier-id">V-02</span></div><div class="node-title">Independent evidence review</div><div class="node-meta">different provider · pending</div></article>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="dense-panel">
+              <header class="panel-head"><h2>Active work</h2><span class="panel-meta">5 visible of 8 · exact · sorted by attention</span><button class="text-link" type="button" style="margin-left:auto">Save view</button></header>
+              <table class="work-table">
+                <colgroup><col style="width:25%"><col style="width:13%"><col style="width:12%"><col style="width:14%"><col style="width:12%"><col style="width:12%"><col style="width:12%"></colgroup>
+                <thead><tr><th>Object</th><th>Lifecycle</th><th>Freshness</th><th>Authority</th><th>Evidence</th><th>Principal</th><th>Cost / capacity</th></tr></thead>
+                <tbody>
+                  <tr class="selected"><td class="object-cell"><span class="domain-table-1">W-03 · Windows handshake</span></td><td><span class="axis-state scenario-table-lifecycle">Active</span></td><td><span class="axis-state scenario-table-freshness">Live · 18s</span></td><td><span class="axis-state scenario-table-authority">Allowed</span></td><td><span class="axis-state warn">Partial · 2/4</span></td><td class="mono domain-principal-1">worker-03</td><td class="mono domain-table-cost-1">$1.18</td></tr>
+                  <tr><td class="object-cell"><span class="domain-table-2">W-02 · Linux + macOS</span></td><td><span class="axis-state">Settled</span></td><td><span class="axis-state">Live · 24s</span></td><td><span class="axis-state">Allowed</span></td><td><span class="axis-state">Verified</span></td><td class="mono domain-principal-2">worker-02</td><td class="mono domain-table-cost-2">$0.92</td></tr>
+                  <tr><td class="object-cell"><span class="domain-table-3">W-04 · Release evidence</span></td><td><span class="axis-state neutral">Queued</span></td><td><span class="axis-state neutral">Not started</span></td><td><span class="axis-state">Allowed</span></td><td><span class="axis-state neutral">Pending</span></td><td class="mono domain-principal-3">unassigned</td><td class="mono domain-table-cost-3">$0.00</td></tr>
+                  <tr><td class="object-cell"><span class="domain-table-4">V-02 · Independent verify</span></td><td><span class="axis-state neutral">Waiting</span></td><td><span class="axis-state neutral">Not started</span></td><td><span class="axis-state">Admitted</span></td><td><span class="axis-state neutral">Pending</span></td><td class="mono domain-principal-4">verifier-02</td><td class="mono domain-table-cost-4">$0.00</td></tr>
+                </tbody>
+              </table>
+            </section>
+
+            <section class="event-rail">
+              <div class="event-rail-title"><strong>Event ledger</strong><span>Immutable projection<br>seq 408—412</span></div>
+              <div class="event-stream">
+                <div class="event"><time>10:42:06 · 408</time><strong>Intent recorded</strong><span>Alperen · conversation</span></div>
+                <div class="event"><time>10:42:18 · 409</time><strong>Plan rev 04 accepted</strong><span>policy · scope bounded</span></div>
+                <div class="event"><time>10:43:02 · 410</time><strong class="domain-event-3">Worker W-03 claimed</strong><span>attempt 02 · lease live</span></div>
+                <div class="event"><time>10:44:31 · 411</time><strong class="domain-event-4">Operation OP-11 started</strong><span>connection verified</span></div>
+                <div class="event"><time>10:44:36 · 412</time><strong class="scenario-event-5">Heartbeat observed</strong><span class="scenario-event-5-meta">freshness 8s · live</span></div>
+              </div>
+            </section>
+          </div>
+
+          <aside class="inspector">
+            <header class="inspector-head"><div class="eyebrow">Selected · canonical object</div><h2 class="domain-inspector-title">W-03 · Windows handshake</h2><div style="margin-top:8px" class="scenario-status"><span class="status live running">Active</span><span class="status attention approval">Approval required</span><span class="status failed degraded">Reconcile</span></div></header>
+            <div class="inspector-tabs" role="tablist">
+              <button type="button" role="tab" aria-selected="true" data-tab="summary">Summary</button>
+              <button type="button" role="tab" aria-selected="false" data-tab="policy">Policy</button>
+              <button type="button" role="tab" aria-selected="false" data-tab="evidence">Evidence</button>
+              <button type="button" role="tab" aria-selected="false" data-tab="audit">Audit</button>
+            </div>
+            <div class="inspector-body">
+              <div class="tab-panel" data-panel="summary">
+                <section class="inspector-section" style="margin-top:0;padding-top:0;border-top:0">
+                  <div class="eyebrow">Current operation</div>
+                  <p class="inspector-copy domain-inspector-copy">Validating native failover behavior without changing the active runtime.</p>
+                  <dl class="fact-grid">
+                    <dt>Lifecycle</dt><dd class="scenario-inspector-lifecycle">active · attempt 02</dd>
+                    <dt>Freshness</dt><dd class="scenario-inspector-freshness">live · 18 seconds</dd>
+                    <dt>Principal</dt><dd class="mono domain-inspector-principal">worker-03</dd>
+                    <dt>Provider</dt><dd class="mono domain-inspector-provider">connection/cdx-ent-01</dd>
+                    <dt>Scope</dt><dd class="domain-inspector-scope">4 files · production</dd>
+                    <dt>Checkpoint</dt><dd class="mono domain-inspector-checkpoint">cp_8421_011</dd>
+                  </dl>
+                </section>
+                <section class="inspector-section">
+                  <div class="eyebrow">Intervention</div>
+                  <p class="inspector-copy scenario-intervention-copy">No human action is required. Pause will occur after the current operation commits evidence.</p>
+                  <div class="intervention-stack">
+                    <button class="button full small scenario-content" data-for="running" type="button" data-dialog="guide">Guide this worker</button>
+                    <button class="button full small scenario-content" data-for="approval" type="button" data-dialog="approval">Review bounded approval</button>
+                    <button class="button full small scenario-content" data-for="degraded" type="button" data-dialog="recovery">Reconcile from checkpoint</button>
+                    <button class="button full small" type="button" data-dialog="pause">Pause at safe boundary</button>
+                  </div>
+                </section>
+                <section class="inspector-section">
+                  <div class="eyebrow">Evidence coverage</div>
+                  <div class="evidence-meter"><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span><span></span><span></span><span></span></div>
+                  <p class="inspector-copy"><strong>5 of 8</strong> required items are verified. Independent verifier remains pending.</p>
+                </section>
+              </div>
+              <div class="tab-panel" data-panel="policy" hidden>
+                <section class="inspector-section" style="margin-top:0;padding-top:0;border-top:0">
+                  <div class="eyebrow">Effective authority</div>
+                  <p class="inspector-copy">Allowed by the workspace execution policy. Elevated side effects require a bounded owner approval.</p>
+                  <dl class="fact-grid">
+                    <dt>Effective</dt><dd>allow with approval gate</dd>
+                    <dt>Inherited from</dt><dd class="mono">org/platform-ops</dd>
+                    <dt>Policy</dt><dd class="mono">policy:change/elevated</dd>
+                    <dt>Deny rules</dt><dd>none matched</dd>
+                    <dt>Valid until</dt><dd>run settlement</dd>
+                  </dl>
+                  <div class="code-line domain-policy-code">resource.workspace == "platform-delivery"
+action in ["inspect", "validate", "propose"]
+side_effect.elevated → owner_approval</div>
+                </section>
+              </div>
+              <div class="tab-panel" data-panel="evidence" hidden>
+                <section class="inspector-section" style="margin-top:0;padding-top:0;border-top:0">
+                  <div class="eyebrow">Evidence chain</div>
+                  <p class="inspector-copy">Proposal, policy decision, operation side effect and verifier result remain distinct.</p>
+                  <dl class="fact-grid">
+                    <dt>Input digest</dt><dd class="mono">sha256:9d2c…114f</dd>
+                    <dt>Operation</dt><dd class="mono">OP-11 · seq 411</dd>
+                    <dt>Artifacts</dt><dd>2 of 2 observed</dd>
+                    <dt>Verifier</dt><dd>pending · provider separated</dd>
+                    <dt>Receipt</dt><dd>not issued</dd>
+                  </dl>
+                </section>
+              </div>
+              <div class="tab-panel" data-panel="audit" hidden>
+                <section class="inspector-section" style="margin-top:0;padding-top:0;border-top:0">
+                  <div class="eyebrow">Audit attribution</div>
+                  <p class="inspector-copy">All actions are recorded against the initiating human, delegated agent and executing worker.</p>
+                  <dl class="fact-grid">
+                    <dt>Initiator</dt><dd>Alperen</dd>
+                    <dt>Delegation</dt><dd class="mono">Brain → worker-03</dd>
+                    <dt>Tenant</dt><dd class="mono">verhex-industries</dd>
+                    <dt>Environment</dt><dd>production</dd>
+                    <dt>Retention</dt><dd>365 days · immutable</dd>
+                  </dl>
+                </section>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="context-drawer" class="context-drawer" aria-labelledby="drawer-title">
+    <div class="drawer-shell">
+      <header class="drawer-header">
+        <div class="drawer-header-row">
+          <div class="drawer-header-copy">
+            <div class="eyebrow">Work detail · canonical object</div>
+            <h2 id="drawer-title" class="drawer-title">Provider handoff</h2>
+            <div class="drawer-state-row">
+              <div class="state-summary drawer-status-summary"><span class="state-mark" aria-hidden="true"></span><div><strong class="drawer-status">Validation</strong><small class="drawer-state-age">updated 8 seconds ago</small></div></div>
+            </div>
+          </div>
+          <button class="drawer-close" type="button" data-close-drawer aria-label="Close work detail">×</button>
+        </div>
+      </header>
+      <div class="drawer-tabs" role="tablist" aria-label="Work detail views">
+        <button type="button" role="tab" aria-selected="true" data-drawer-tab="overview">Overview</button>
+        <button type="button" role="tab" aria-selected="false" data-drawer-tab="control">Control</button>
+        <button type="button" role="tab" aria-selected="false" data-drawer-tab="evidence">Evidence</button>
+        <button type="button" role="tab" aria-selected="false" data-drawer-tab="audit">Audit</button>
+      </div>
+      <div class="drawer-body">
+        <div class="drawer-panel" data-drawer-panel="overview">
+          <div class="drawer-impact">
+            <strong class="drawer-impact-title">Delivery outcome remains on track</strong>
+            <p class="drawer-impact-copy">This work is on the selected outcome's critical path. Current delay remains inside the recovery window.</p>
+          </div>
+          <section class="drawer-section">
+            <h3>Current state</h3>
+            <p class="drawer-section-copy drawer-state-copy">Five of eight work items have verified evidence. Three workers remain active.</p>
+            <dl class="fact-grid" style="margin-top:12px">
+              <dt>Object</dt><dd class="mono drawer-object-id">REL-101</dd>
+              <dt>Environment</dt><dd>Production</dd>
+              <dt>Owner</dt><dd class="drawer-owner">Platform</dd>
+              <dt>Principal</dt><dd class="mono drawer-principal">Brain → worker-03</dd>
+              <dt>Evidence</dt><dd class="drawer-evidence">Partial · 5/8 verified</dd>
+              <dt>Cost / capacity</dt><dd class="mono drawer-cost">$4.28 / $8.00</dd>
+              <dt>Last evidence</dt><dd class="mono drawer-last-evidence">seq 412 · 8s ago</dd>
+            </dl>
+          </section>
+          <section class="drawer-section">
+            <h3>Next safe action</h3>
+            <div class="drawer-next"><span class="drawer-next-index">01</span><div><strong class="drawer-next-title">Continue supervision</strong><span class="drawer-next-copy">Review the selected worker if freshness exceeds its policy threshold.</span></div></div>
+          </section>
+        </div>
+
+        <div class="drawer-panel" data-drawer-panel="control" hidden>
+          <section class="drawer-section" style="margin-top:0;padding-top:0;border-top:0">
+            <h3>Available controls</h3>
+            <p class="drawer-section-copy">Availability comes from effective authority and runtime state, not from Basic or Advanced mode.</p>
+            <div class="control-list">
+              <div class="control-item"><div><strong>Guide selected work</strong><span>Updates guidance after the next safe boundary.</span></div><button class="button small" type="button" data-dialog="guide">Guide</button></div>
+              <div class="control-item"><div><strong>Pause safely</strong><span>Current operation may finish and record evidence first.</span></div><button class="button small" type="button" data-dialog="pause">Pause</button></div>
+              <div class="control-item drawer-approval-control" hidden><div><strong>Review bounded approval</strong><span class="domain-approval-consequence">Apply failover only to this release</span></div><button class="button primary small" type="button" data-dialog="approval">Review</button></div>
+              <div class="control-item drawer-recovery-control" hidden><div><strong>Reconcile from checkpoint</strong><span class="domain-degraded-recovery">Reconnect, replay, then reconcile</span></div><button class="button primary small" type="button" data-dialog="recovery">Recover</button></div>
+            </div>
+          </section>
+          <section class="drawer-section">
+            <div class="eyebrow">Effective authority</div>
+            <p class="drawer-section-copy drawer-authority-copy">Guidance and safe pause are allowed. Elevated side effects require a bounded approval.</p>
+            <div class="code-line drawer-policy">policy:execution/supervise · workspace scoped</div>
+          </section>
+        </div>
+
+        <div class="drawer-panel" data-drawer-panel="evidence" hidden>
+          <section class="drawer-section" style="margin-top:0;padding-top:0;border-top:0">
+            <h3>Outcome evidence</h3>
+            <p class="drawer-section-copy">Proposal, policy decision, side effect and verifier result are shown as separate evidence classes.</p>
+            <div class="evidence-meter"><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span><span></span><span></span><span></span></div>
+            <dl class="fact-grid" style="margin-top:14px">
+              <dt>Coverage</dt><dd class="drawer-evidence">Partial · 5/8 verified</dd>
+              <dt>Verifier</dt><dd>pending · provider separated</dd>
+              <dt>Receipt</dt><dd>not issued</dd>
+              <dt>Freshness</dt><dd class="drawer-last-evidence">seq 412 · 8s ago</dd>
+            </dl>
+          </section>
+        </div>
+
+        <div class="drawer-panel" data-drawer-panel="audit" hidden>
+          <section class="drawer-section" style="margin-top:0;padding-top:0;border-top:0">
+            <h3>Audit attribution</h3>
+            <p class="drawer-section-copy">The originating human, delegated agent, executing principal and affected environment remain attributable.</p>
+            <dl class="fact-grid" style="margin-top:14px">
+              <dt>Initiator</dt><dd>Alperen</dd>
+              <dt>Delegation</dt><dd class="mono drawer-principal">Brain → worker-03</dd>
+              <dt>Tenant</dt><dd class="mono">verhex-industries</dd>
+              <dt>Workspace</dt><dd class="domain-workspace">Platform Delivery</dd>
+              <dt>Environment</dt><dd>Production</dd>
+              <dt>Retention</dt><dd>365 days · immutable</dd>
+            </dl>
+          </section>
+        </div>
+      </div>
+      <footer class="drawer-footer">
+        <button class="button" type="button" data-close-drawer>Return to overview</button>
+        <button class="button primary" type="button" data-drawer-open-workspace>Open full workspace</button>
+      </footer>
+    </div>
+  </dialog>
+
+  <dialog id="action-dialog">
+    <form method="dialog">
+      <div class="dialog-head">
+        <div class="dialog-head-copy"><div class="eyebrow dialog-kicker">Bounded action</div><h2 class="dialog-title">Review action</h2></div>
+        <button class="dialog-close" type="submit" value="cancel" aria-label="Close">×</button>
+      </div>
+      <div class="dialog-body">
+        <p class="context-summary dialog-summary" style="margin-top:0">Review exact scope, authority and consequence before continuing.</p>
+        <dl class="fact-grid dialog-facts" style="margin:16px 0">
+          <dt>Workspace</dt><dd class="domain-workspace">Platform Delivery</dd>
+          <dt>Environment</dt><dd>Production</dd>
+          <dt>Object</dt><dd class="domain-object-id">REL-101</dd>
+          <dt>Requested by</dt><dd class="dialog-requestor">Alperen</dd>
+          <dt>Authority</dt><dd class="mono dialog-authority">policy:execution/guide</dd>
+          <dt>Audit</dt><dd>Attributed and durable</dd>
+        </dl>
+        <div class="dialog-warning"><strong>Consequence</strong><br><span class="dialog-consequence">This action changes guidance only; the active operation will continue until its next safe boundary.</span></div>
+      </div>
+      <div class="dialog-actions">
+        <button class="button" type="submit" value="cancel">Cancel</button>
+        <button class="button primary dialog-confirm" type="submit" value="confirm">Confirm bounded action</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" role="status" aria-live="polite" hidden>
+    <svg class="icon"><use href="#i-check"/></svg>
+    <div><strong>Action recorded</strong><span>Canonical state would be read back before success is shown in production.</span></div>
+  </div>
+
+  <script>
+    const state = {
+      mode: "basic",
+      domain: "software",
+      scenario: "running"
+    };
+
+    const domainData = {
+      software: {
+        workspace: "Platform Delivery",
+        symbol: "PD",
+        scopeMeta: "12 projects · 24 active runs",
+        workCount: "24",
+        objectKind: "Release program",
+        objectId: "REL-101",
+        runId: "RUN-8421",
+        title: "Release 0.101 — provider handoff",
+        summary: "Ship cross-platform provider handoff without interrupting active runs. Deckent is coordinating implementation, verification and release evidence.",
+        progress: "68%",
+        active: "3 of 8",
+        evidence: "5 / 8 verified",
+        cost: "$4.28 / $8.00",
+        portfolioCaption: "Current delivery outcomes across this workspace · exact count",
+        rows: [
+          ["Provider handoff", "REL-101 · Production · updated 8s ago", "5 of 8 complete", "Platform", "Partial · 5/8", "68%"],
+          ["Release security review", "REL-099 · Staging · updated 4m ago", "6 of 6 complete", "Security", "Verified", "100%"],
+          ["Windows native packaging", "REL-104 · Test · updated 11m ago", "4 of 11 complete", "Release", "Pending · 4/11", "36%"]
+        ],
+        activities: [
+          ["Plan revision 04 accepted", "Scope remains bounded to four files; verifier assignment is unchanged."],
+          ["Execution policy admitted the run", "Provider, budget and environment checks passed."]
+        ],
+        systems: [
+          ["Source control", "healthy · 12 projects"],
+          ["CI runners", "18 available · 3 active"],
+          ["Artifact registry", "healthy · 124ms"],
+          ["Provider pool", "3 connections · policy ready"]
+        ],
+        approval: ["Allow bounded failover policy change", "W-03 requests one elevated mutation before validation can continue.", "4 files · production policy", "Worker W-03 via Brain", "Apply failover only to this release"],
+        degraded: ["Artifact registry connection is stale", "Last confirmed state is sequence 412. No success is inferred after disconnect.", "2 release checks", "Reconnect, replay, then reconcile"],
+        nodes: ["Stabilize provider handoff", "Cross-platform delivery", "Linux + macOS validation", "Windows handshake", "Release evidence", "Validate native failover"],
+        graphIds: ["G-18", "F-7C8A", "W-02", "W-03", "W-04", "OP-11", "V-02"],
+        table: ["W-03 · Windows handshake", "W-02 · Linux + macOS", "W-04 · Release evidence", "V-02 · Independent verify"],
+        tableCosts: ["$1.18", "$0.92", "$0.00", "$0.00"],
+        principals: ["worker-03", "worker-02", "unassigned", "verifier-02"],
+        events: ["Worker W-03 claimed", "Operation OP-11 started"],
+        inspectorTitle: "W-03 · Windows handshake",
+        inspectorCopy: "Validating native failover behavior without changing the active runtime.",
+        inspectorScope: "4 files · production",
+        inspectorProvider: "connection/cdx-ent-01",
+        inspectorCheckpoint: "cp_8421_011",
+        policyCode: "resource.workspace == \"platform-delivery\"\naction in [\"inspect\", \"validate\", \"propose\"]\nside_effect.elevated → owner_approval",
+        details: [
+          {
+            id: "REL-101", owner: "Platform", principal: "Brain → worker-03",
+            evidence: "Partial · 5/8 verified", evidenceOn: 5, cost: "$4.28 / $8.00",
+            impact: "Delivery outcome remains on track",
+            impactCopy: "This work is on the release critical path. Current delay remains inside the recovery window.",
+            stateCopy: "Five of eight work items have verified evidence. Three workers remain active.",
+            next: "Continue supervision", nextCopy: "Review W-03 if freshness exceeds its policy threshold.",
+            policy: "policy:execution/supervise · release scoped", age: "updated 8 seconds ago", lastEvidence: "seq 412 · 8s ago"
+          },
+          {
+            id: "REL-099", owner: "Security", principal: "Brain → verifier-07",
+            evidence: "Verified · 6/6", evidenceOn: 8, cost: "$2.10 / $5.00",
+            impact: "Security review is complete",
+            impactCopy: "All required security evidence is verified and the result remains inspectable.",
+            stateCopy: "Six checks settled successfully. No human action is required.",
+            next: "Retain verified result", nextCopy: "Open the full evidence chain only if a release decision needs review.",
+            policy: "policy:evidence/read · release scoped", age: "updated 4 minutes ago", lastEvidence: "receipt · 4m ago"
+          },
+          {
+            id: "REL-104", owner: "Release", principal: "Brain → worker-09",
+            evidence: "Pending · 4/11", evidenceOn: 3, cost: "$1.84 / $9.00",
+            impact: "Packaging work is progressing",
+            impactCopy: "The work is independent of the selected release critical path and remains inside budget.",
+            stateCopy: "Four of eleven items are complete. Windows signing is the next dependency.",
+            next: "Continue execution", nextCopy: "Escalate only if signing capacity becomes unavailable.",
+            policy: "policy:execution/standard · project scoped", age: "updated 11 minutes ago", lastEvidence: "seq 366 · 11m ago"
+          }
+        ]
+      },
+      operations: {
+        workspace: "Order & Production Control",
+        symbol: "OP",
+        scopeMeta: "6 facilities · 184 active orders",
+        workCount: "184",
+        objectKind: "Customer fulfillment",
+        objectId: "ORD-78431",
+        runId: "RUN-9107",
+        title: "Order 78431 — priority fulfillment",
+        summary: "Deliver 1,240 units by 29 August without exceeding the approved expedite cost. Deckent is coordinating planning, material allocation, production and shipment evidence.",
+        progress: "62%",
+        active: "4 of 11",
+        evidence: "7 / 11 verified",
+        cost: "$18.4k / $24k",
+        portfolioCaption: "Current customer and production outcomes · exact at 10:44",
+        rows: [
+          ["Order 78431 · priority fulfillment", "ORD-78431 · Production · updated 8s ago", "7 of 11 complete", "Operations", "Partial · 7/11", "62%"],
+          ["Order 78418 · export shipment", "ORD-78418 · Dispatch · updated 3m ago", "9 of 9 complete", "Logistics", "Verified", "100%"],
+          ["Plant 04 · material replenishment", "MRP-24082 · Production · updated 7m ago", "3 of 8 complete", "Planning", "Pending · 3/8", "38%"]
+        ],
+        activities: [
+          ["Production plan revision 06 accepted", "Lot split remains bounded to Plant 04; delivery promise is unchanged."],
+          ["Fulfillment policy admitted the run", "Inventory, budget and facility-capacity checks passed."]
+        ],
+        systems: [
+          ["ERP Core", "healthy · tenant eu-01"],
+          ["MES Plant 04", "12 lines · 4 active"],
+          ["WMS West Hub", "healthy · 96ms"],
+          ["Carrier gateway", "7 services · policy ready"]
+        ],
+        approval: ["Approve alternate inventory allocation", "Batch PB-2408 requests a bounded allocation from reserve stock.", "240 units · Plant 04 reserve", "Planner Agent via Brain", "Reserve stock applies only to Order 78431"],
+        degraded: ["WMS West Hub synchronization is stale", "Last confirmed state is transaction 8F21. No inventory movement is inferred after disconnect.", "Order 78431 · 2 shipments", "Reconnect, replay, then reconcile stock"],
+        nodes: ["Fulfill order within promise", "Plan, produce and dispatch", "Material allocation", "Production batch PB-2408", "Shipment confirmation", "Commit inventory movement"],
+        graphIds: ["G-62", "F-90A2", "W-11", "W-12", "W-14", "OP-21", "V-19"],
+        table: ["PB-2408 · Production batch", "AL-1440 · Material allocation", "SHIP-384 · Shipment booking", "V-19 · Fulfillment verify"],
+        tableCosts: ["320 units", "1,240 units", "2 loads", "0"],
+        principals: ["worker-12", "worker-11", "unassigned", "verifier-19"],
+        events: ["Worker W-12 claimed batch", "Inventory operation started"],
+        inspectorTitle: "PB-2408 · Production batch",
+        inspectorCopy: "Coordinating lot allocation and production sequencing without changing the customer promise.",
+        inspectorScope: "240 units · Plant 04",
+        inspectorProvider: "connection/erp-core-eu01",
+        inspectorCheckpoint: "cp_9107_021",
+        policyCode: "resource.workspace == \"order-production-control\"\naction in [\"inspect\", \"allocate\", \"sequence\"]\nstock.reserve → owner_approval",
+        details: [
+          {
+            id: "ORD-78431", owner: "Operations", principal: "Brain → worker-12",
+            evidence: "Partial · 7/11 verified", evidenceOn: 5, cost: "$18.4k / $24k",
+            impact: "Customer promise remains achievable",
+            impactCopy: "This order is on the production critical path. Material allocation and line capacity determine the promise date.",
+            stateCopy: "Seven of eleven work items have verified evidence. Production sequencing remains active.",
+            next: "Continue supervision", nextCopy: "Review Plant 04 capacity if queue age exceeds twelve minutes.",
+            policy: "policy:fulfillment/supervise · order scoped", age: "updated 8 seconds ago", lastEvidence: "txn 8F21 · 8s ago"
+          },
+          {
+            id: "ORD-78418", owner: "Logistics", principal: "Brain → verifier-18",
+            evidence: "Verified · 9/9", evidenceOn: 8, cost: "2 loads · confirmed",
+            impact: "Export shipment is confirmed",
+            impactCopy: "Carrier booking, customs evidence and warehouse handoff are verified.",
+            stateCopy: "Nine work items settled successfully. No human action is required.",
+            next: "Retain verified result", nextCopy: "Open shipment evidence only for customer or compliance review.",
+            policy: "policy:evidence/read · shipment scoped", age: "updated 3 minutes ago", lastEvidence: "receipt · 3m ago"
+          },
+          {
+            id: "MRP-24082", owner: "Planning", principal: "Brain → worker-15",
+            evidence: "Pending · 3/8", evidenceOn: 3, cost: "1,240 units planned",
+            impact: "Replenishment is progressing",
+            impactCopy: "Material coverage remains above the safety threshold; no active order is blocked.",
+            stateCopy: "Three of eight work items are complete. Supplier confirmation is the next dependency.",
+            next: "Continue planning", nextCopy: "Escalate only if confirmed supply falls below the safety threshold.",
+            policy: "policy:planning/standard · facility scoped", age: "updated 7 minutes ago", lastEvidence: "txn 8E90 · 7m ago"
+          }
+        ]
+      }
+    };
+
+    const scenarioData = {
+      running: {
+        age: "8 seconds ago",
+        focusKicker: "Current phase",
+        focusTitle: "Cross-platform validation is the current critical path",
+        focusTitleOperations: "Production batch PB-2408 is the current critical path",
+        focusCopy: "Five of eight work items have verified evidence. The Windows handshake worker is delayed but remains inside the recovery window.",
+        focusCopyOperations: "Seven of eleven work items have verified evidence. Material allocation is confirmed and production sequencing is active.",
+        nextAction: "Continue supervision; review W-03 if freshness exceeds 45 seconds.",
+        nextActionOperations: "Continue supervision; review Plant 04 capacity if queue age exceeds 12 minutes.",
+        trackPhase: "Cross-platform validation",
+        trackPhaseOperations: "Production sequencing",
+        trackChange: "Windows handshake started · 8s ago",
+        trackChangeOperations: "Batch PB-2408 entered Line 04 · 8s ago",
+        primaryState: "Validation",
+        primaryStateOperations: "Production",
+        primaryStateMeta: "5 of 8 checks · updated 8s",
+        primaryStateMetaOperations: "7 of 11 steps · updated 8s",
+        attention: "None",
+        sideCount: "0",
+        decisionCount: "0",
+        connectionCount: "4",
+        activityTitle: "Validation entered its final platform checks",
+        activityTitleOperations: "Production sequencing entered the constrained batch",
+        activityCopy: "Windows native and WSL remain; all other environments have evidence.",
+        activityCopyOperations: "Line 04 is active; material and quality gates have evidence.",
+        nodeMeta: "attempt 02 · active · age 18s",
+        operationMeta: "worker-03 · claude/standard",
+        operationMetaOperations: "worker-12 · planner/standard",
+        lifecycle: "Active",
+        freshness: "Live · 18s",
+        authority: "Allowed",
+        inspectorLifecycle: "active · attempt 02",
+        inspectorFreshness: "live · 18 seconds",
+        intervention: "No human action is required. Pause will occur after the current operation commits evidence.",
+        event: "Heartbeat observed",
+        eventMeta: "freshness 8s · live",
+        runtime: "live",
+        freshnessTop: "Live · 8s"
+      },
+      approval: {
+        age: "12 seconds ago",
+        focusKicker: "Waiting at a safe boundary",
+        focusTitle: "A bounded policy change is waiting for your approval",
+        focusTitleOperations: "Reserve inventory allocation is waiting for your approval",
+        focusCopy: "Execution is paused at a safe boundary. The request expires in 08:42 and affects only the selected release.",
+        focusCopyOperations: "Production is paused before allocation. The request expires in 08:42 and affects only Order 78431.",
+        nextAction: "Review exact scope and consequence; approve once or deny.",
+        nextActionOperations: "Review stock, customer impact and rollback limit; approve once or deny.",
+        trackPhase: "Held before production mutation",
+        trackPhaseOperations: "Held before inventory allocation",
+        trackChange: "Approval requested · 12s ago",
+        trackChangeOperations: "Allocation approval requested · 12s ago",
+        primaryState: "Waiting for approval",
+        primaryStateOperations: "Waiting for approval",
+        primaryStateMeta: "expires 08:42 · safe boundary",
+        primaryStateMetaOperations: "expires 08:42 · no stock moved",
+        attention: "1 approval",
+        sideCount: "1",
+        decisionCount: "1",
+        connectionCount: "4",
+        activityTitle: "Elevated action paused before side effect",
+        activityTitleOperations: "Reserve allocation paused before inventory movement",
+        activityCopy: "No mutation has occurred. Worker W-03 is waiting at checkpoint cp_8421_011.",
+        activityCopyOperations: "No inventory has moved. Batch PB-2408 is waiting at a durable checkpoint.",
+        nodeMeta: "attempt 02 · approval required",
+        operationMeta: "policy:change/elevated · expires 08:42",
+        operationMetaOperations: "policy:inventory/reserve · expires 08:42",
+        lifecycle: "Blocked",
+        freshness: "Live · 12s",
+        authority: "Approval required",
+        inspectorLifecycle: "blocked · safe boundary",
+        inspectorFreshness: "live · 12 seconds",
+        intervention: "The requested side effect has not occurred. Review exact scope before approving once or denying.",
+        event: "Approval requested",
+        eventMeta: "no side effect · expires 08:42",
+        runtime: "live",
+        freshnessTop: "Live · 12s"
+      },
+      degraded: {
+        age: "48 seconds ago",
+        focusKicker: "Evidence interrupted",
+        focusTitle: "Artifact evidence cannot be confirmed after sequence 412",
+        focusTitleOperations: "Warehouse inventory cannot be confirmed after transaction 8F21",
+        focusCopy: "Execution stopped inferring new state. Two checks require replay and reconciliation before verification can continue.",
+        focusCopyOperations: "Deckent stopped inferring inventory movement. Two shipments require replay and reconciliation before fulfillment can continue.",
+        nextAction: "Reconnect the registry, replay from sequence 412, then reconcile observed artifacts.",
+        nextActionOperations: "Reconnect WMS West Hub, replay transaction 8F21, then reconcile stock.",
+        trackPhase: "Artifact reconciliation",
+        trackPhaseOperations: "Inventory reconciliation",
+        trackChange: "Registry confirmation lost · 48s ago",
+        trackChangeOperations: "WMS confirmation lost · 48s ago",
+        primaryState: "Needs reconciliation",
+        primaryStateOperations: "Needs reconciliation",
+        primaryStateMeta: "stale 48s · retry held",
+        primaryStateMetaOperations: "stale 48s · stock unknown",
+        attention: "1 incident",
+        sideCount: "1",
+        decisionCount: "1",
+        connectionCount: "3/4",
+        activityTitle: "Connection freshness exceeded policy threshold",
+        activityTitleOperations: "WMS transaction stream exceeded freshness threshold",
+        activityCopy: "Last known running state is preserved; terminal success is unknown.",
+        activityCopyOperations: "Last confirmed inventory state is preserved; stock movement is unknown.",
+        nodeMeta: "attempt 02 · reconciliation required",
+        operationMeta: "last evidence seq 412 · disconnected",
+        operationMetaOperations: "last transaction 8F21 · disconnected",
+        lifecycle: "Blocked",
+        freshness: "Stale · 48s",
+        authority: "Policy unavailable",
+        inspectorLifecycle: "blocked · reconciliation",
+        inspectorFreshness: "stale · 48 seconds",
+        intervention: "Do not retry blindly. Reconnect, replay from the checkpoint and reconcile observed side effects.",
+        event: "Connection lost",
+        eventMeta: "last confirmed seq 412 · state unknown",
+        runtime: "degraded",
+        freshnessTop: "Stale · 48s"
+      }
+    };
+
+    function setText(selector, value) {
+      document.querySelectorAll(selector).forEach(function (node) { node.textContent = value; });
+    }
+
+    function setPressed(selector, key, value) {
+      document.querySelectorAll(selector).forEach(function (button) {
+        button.setAttribute("aria-pressed", String(button.dataset[key] === value));
+      });
+    }
+
+    const contextDrawer = document.getElementById("context-drawer");
+    let selectedWorkIndex = 0;
+
+    function resetDrawerTabs() {
+      document.querySelectorAll("[data-drawer-tab]").forEach(function (tab) {
+        tab.setAttribute("aria-selected", String(tab.dataset.drawerTab === "overview"));
+      });
+      document.querySelectorAll("[data-drawer-panel]").forEach(function (panel) {
+        panel.hidden = panel.dataset.drawerPanel !== "overview";
+      });
+    }
+
+    function renderContextDrawer() {
+      const d = domainData[state.domain];
+      const detail = d.details[selectedWorkIndex];
+      const row = d.rows[selectedWorkIndex];
+      const isPrimary = selectedWorkIndex === 0;
+      const s = scenarioData[state.scenario];
+      let statusText = selectedWorkIndex === 1 ? "Verified" : "In progress";
+      let statusClass = selectedWorkIndex === 1 ? "live" : "info";
+      let impact = detail.impact;
+      let impactCopy = detail.impactCopy;
+      let stateCopy = detail.stateCopy;
+      let next = detail.next;
+      let nextCopy = detail.nextCopy;
+      let age = detail.age;
+      let lastEvidence = detail.lastEvidence;
+      let policy = detail.policy;
+
+      if (isPrimary && state.scenario === "running") {
+        statusText = state.domain === "operations" ? "Production" : "Validation";
+        statusClass = "live";
+      }
+      if (isPrimary && state.scenario === "approval") {
+        statusText = "Waiting for approval";
+        statusClass = "attention";
+        impact = state.domain === "operations" ? "Inventory movement is waiting for approval" : "An elevated change is waiting for approval";
+        impactCopy = state.domain === "operations"
+          ? "No reserve stock has moved. Production is paused at a durable safe boundary."
+          : "No elevated mutation has occurred. Validation is paused at a durable safe boundary.";
+        stateCopy = state.domain === "operations"
+          ? "The request affects 240 reserve units for this order and expires in 08:42."
+          : "The request affects four scoped files for this release and expires in 08:42.";
+        next = "Review exact scope";
+        nextCopy = "Approve once or deny after reviewing authority, consequence and rollback limits.";
+        age = "updated " + s.age;
+        lastEvidence = "approval · live · 12s";
+        policy = state.domain === "operations"
+          ? "policy:inventory/reserve · single use · order scoped"
+          : "policy:change/elevated · single use · release scoped";
+      }
+      if (isPrimary && state.scenario === "degraded") {
+        statusText = "Needs reconciliation";
+        statusClass = "failed";
+        impact = state.domain === "operations" ? "Warehouse state is no longer fresh" : "Artifact evidence is no longer fresh";
+        impactCopy = state.domain === "operations"
+          ? "No inventory movement is inferred after transaction 8F21. Two shipments are affected."
+          : "No artifact success is inferred after sequence 412. Two release checks are affected.";
+        stateCopy = "Last-known state is preserved. Blind retry is disabled until replay and reconciliation complete.";
+        next = "Recover from the last checkpoint";
+        nextCopy = state.domain === "operations"
+          ? "Reconnect WMS West Hub, replay transaction 8F21 and reconcile stock."
+          : "Reconnect the registry, replay sequence 412 and reconcile observed artifacts.";
+        age = "updated " + s.age;
+        lastEvidence = state.domain === "operations" ? "txn 8F21 · stale 48s" : "seq 412 · stale 48s";
+        policy = state.domain === "operations"
+          ? "policy:recovery/reconcile · WMS checkpoint scoped"
+          : "policy:recovery/reconcile · registry checkpoint scoped";
+      }
+
+      setText(".drawer-title", row[0]);
+      setText(".drawer-object-id", detail.id);
+      setText(".drawer-owner", detail.owner);
+      setText(".drawer-principal", detail.principal);
+      setText(".drawer-evidence", detail.evidence);
+      setText(".drawer-cost", detail.cost);
+      setText(".drawer-impact-title", impact);
+      setText(".drawer-impact-copy", impactCopy);
+      setText(".drawer-state-copy", stateCopy);
+      setText(".drawer-next-title", next);
+      setText(".drawer-next-copy", nextCopy);
+      setText(".drawer-policy", policy);
+      setText(".drawer-state-age", age);
+      setText(".drawer-last-evidence", lastEvidence);
+      const statusNode = document.querySelector(".drawer-status");
+      statusNode.textContent = statusText;
+      const statusSummary = document.querySelector(".drawer-status-summary");
+      statusSummary.classList.remove("attention", "failed", "verified");
+      if (statusClass === "attention") statusSummary.classList.add("attention");
+      if (statusClass === "failed") statusSummary.classList.add("failed");
+      if (selectedWorkIndex === 1) statusSummary.classList.add("verified");
+      document.querySelector(".drawer-approval-control").hidden = !(isPrimary && state.scenario === "approval");
+      document.querySelector(".drawer-recovery-control").hidden = !(isPrimary && state.scenario === "degraded");
+      setText(
+        ".drawer-authority-copy",
+        isPrimary && state.scenario === "approval"
+          ? "The requested side effect requires a single-use bounded owner approval."
+          : isPrimary && state.scenario === "degraded"
+            ? "Recovery is allowed only through replay and reconciliation from the confirmed checkpoint."
+            : "Guidance and safe pause are allowed. Elevated side effects require a bounded approval."
+      );
+      document.querySelectorAll("#context-drawer .evidence-meter span").forEach(function (segment, index) {
+        segment.classList.toggle("on", index < detail.evidenceOn);
+      });
+    }
+
+    function openContextDrawer(index) {
+      selectedWorkIndex = index;
+      renderContextDrawer();
+      resetDrawerTabs();
+      if (!contextDrawer.open) contextDrawer.showModal();
+    }
+
+    function renderDomain() {
+      const d = domainData[state.domain];
+      setText(".domain-workspace", d.workspace);
+      setText(".domain-symbol", d.symbol);
+      setText(".domain-scope-meta", d.scopeMeta);
+      setText(".domain-work-count", d.workCount);
+      setText(".domain-object-kind", d.objectKind);
+      setText(".domain-object-id", d.objectId);
+      setText(".domain-run-id", d.runId);
+      setText(".domain-title", d.title);
+      setText(".domain-summary", d.summary);
+      setText(".domain-progress", d.progress);
+      setText(".domain-active", d.active);
+      setText(".domain-evidence", d.evidence);
+      setText(".domain-cost", d.cost);
+      setText(".domain-portfolio-caption", d.portfolioCaption);
+      d.rows.forEach(function (row, index) {
+        const n = index + 1;
+        setText(".domain-row-" + n + "-title", row[0]);
+        setText(".domain-row-" + n + "-meta", row[1]);
+        setText(".domain-row-" + n + "-progress-label", row[2]);
+        setText(".domain-row-" + n + "-owner", row[3]);
+        setText(".domain-row-" + n + "-evidence", row[4]);
+        document.querySelectorAll(".domain-row-" + n + "-progress").forEach(function (node) { node.style.width = row[5]; });
+      });
+      setText(".domain-activity-2-title", d.activities[0][0]);
+      setText(".domain-activity-2-copy", d.activities[0][1]);
+      setText(".domain-activity-3-title", d.activities[1][0]);
+      setText(".domain-activity-3-copy", d.activities[1][1]);
+      d.systems.forEach(function (system, index) {
+        const n = index + 1;
+        setText(".domain-system-" + n + "-name", system[0]);
+        setText(".domain-system-" + n + "-meta", system[1]);
+      });
+      setText(".domain-approval-title", d.approval[0]);
+      setText(".domain-approval-summary", d.approval[1]);
+      setText(".domain-approval-scope", d.approval[2]);
+      setText(".domain-approval-requestor", d.approval[3]);
+      setText(".domain-approval-consequence", d.approval[4]);
+      setText(".domain-degraded-title", d.degraded[0]);
+      setText(".domain-degraded-summary", d.degraded[1]);
+      setText(".domain-degraded-scope", d.degraded[2]);
+      setText(".domain-degraded-recovery", d.degraded[3]);
+      setText(".domain-node-goal", d.nodes[0]);
+      setText(".domain-node-flow", d.nodes[1]);
+      setText(".domain-node-work-1", d.nodes[2]);
+      setText(".domain-node-work-2", d.nodes[3]);
+      setText(".domain-node-work-3", d.nodes[4]);
+      setText(".domain-node-operation", d.nodes[5]);
+      setText(".domain-goal-id", d.graphIds[0]);
+      setText(".domain-flow-id", d.graphIds[1]);
+      setText(".domain-work-id-1", d.graphIds[2]);
+      setText(".domain-work-id-2", d.graphIds[3]);
+      setText(".domain-work-id-3", d.graphIds[4]);
+      setText(".domain-operation-id", d.graphIds[5]);
+      setText(".domain-verifier-id", d.graphIds[6]);
+      d.table.forEach(function (value, index) { setText(".domain-table-" + (index + 1), value); });
+      d.tableCosts.forEach(function (value, index) { setText(".domain-table-cost-" + (index + 1), value); });
+      d.principals.forEach(function (value, index) { setText(".domain-principal-" + (index + 1), value); });
+      setText(".domain-event-3", d.events[0]);
+      setText(".domain-event-4", d.events[1]);
+      setText(".domain-inspector-title", d.inspectorTitle);
+      setText(".domain-inspector-copy", d.inspectorCopy);
+      setText(".domain-inspector-scope", d.inspectorScope);
+      setText(".domain-inspector-principal", d.principals[0]);
+      setText(".domain-inspector-provider", d.inspectorProvider);
+      setText(".domain-inspector-checkpoint", d.inspectorCheckpoint);
+      setText(".domain-policy-code", d.policyCode);
+    }
+
+    function renderScenario() {
+      const s = scenarioData[state.scenario];
+      const operations = state.domain === "operations";
+      setText(".scenario-age", s.age);
+      setText(".scenario-focus-kicker", s.focusKicker);
+      setText(".scenario-focus-title", operations ? s.focusTitleOperations : s.focusTitle);
+      setText(".scenario-focus-copy", operations ? s.focusCopyOperations : s.focusCopy);
+      setText(".scenario-next-action", operations ? s.nextActionOperations : s.nextAction);
+      setText(".scenario-track-phase", operations ? s.trackPhaseOperations : s.trackPhase);
+      setText(".scenario-track-change", operations ? s.trackChangeOperations : s.trackChange);
+      setText(".scenario-primary-state", operations ? s.primaryStateOperations : s.primaryState);
+      setText(".scenario-primary-state-meta", operations ? s.primaryStateMetaOperations : s.primaryStateMeta);
+      setText(".scenario-attention", s.attention);
+      setText(".scenario-side-count", s.sideCount);
+      setText(".scenario-decision-count", s.decisionCount);
+      setText(".scenario-connection-count", s.connectionCount);
+      setText(".scenario-activity-1-title", operations ? s.activityTitleOperations : s.activityTitle);
+      setText(".scenario-activity-1-copy", operations ? s.activityCopyOperations : s.activityCopy);
+      setText(".scenario-node-meta", s.nodeMeta);
+      setText(".scenario-operation-meta", operations ? s.operationMetaOperations : s.operationMeta);
+      setText(".scenario-table-lifecycle", s.lifecycle);
+      setText(".scenario-table-freshness", s.freshness);
+      setText(".scenario-table-authority", s.authority);
+      setText(".scenario-inspector-lifecycle", s.inspectorLifecycle);
+      setText(".scenario-inspector-freshness", s.inspectorFreshness);
+      setText(".scenario-intervention-copy", s.intervention);
+      setText(".scenario-event-5", s.event);
+      setText(".scenario-event-5-meta", s.eventMeta);
+      setText(".runtime-state", s.runtime);
+      setText(".freshness-copy", s.freshnessTop);
+
+      document.querySelectorAll(".scenario-content").forEach(function (node) {
+        node.hidden = node.dataset.for !== state.scenario;
+      });
+      const primaryStateLine = document.querySelector(".scenario-primary-state-line");
+      primaryStateLine.classList.toggle("attention", state.scenario === "approval");
+      primaryStateLine.classList.toggle("failed", state.scenario === "degraded");
+
+      const marker = document.querySelector(".scenario-activity-marker");
+      marker.classList.toggle("attention", state.scenario === "approval");
+      marker.classList.toggle("failed", state.scenario === "degraded");
+      const selectedNode = document.querySelector(".scenario-node-selected");
+      const operationNode = document.querySelector(".scenario-operation-node");
+      selectedNode.classList.toggle("attention", state.scenario === "approval");
+      selectedNode.classList.toggle("failed", state.scenario === "degraded");
+      operationNode.classList.toggle("attention", state.scenario === "approval");
+      operationNode.classList.toggle("failed", state.scenario === "degraded");
+      const row = document.querySelector(".work-table tbody tr.selected");
+      row.querySelectorAll(".axis-state").forEach(function (node) { node.classList.remove("warn", "fail", "neutral"); });
+      if (state.scenario === "approval") {
+        row.querySelector(".scenario-table-lifecycle").classList.add("warn");
+        row.querySelector(".scenario-table-authority").classList.add("warn");
+      }
+      if (state.scenario === "degraded") {
+        row.querySelector(".scenario-table-lifecycle").classList.add("fail");
+        row.querySelector(".scenario-table-freshness").classList.add("fail");
+        row.querySelector(".scenario-table-authority").classList.add("fail");
+      }
+
+      const systemTarget = document.querySelector(".scenario-system-target");
+      systemTarget.classList.toggle("problem", state.scenario === "degraded");
+      setText(".scenario-system-state", state.scenario === "degraded" ? "Stale" : "Live");
+      if (state.scenario === "degraded") {
+        setText(".domain-system-3-meta", state.domain === "operations" ? "last confirmed · 48s ago" : "last confirmed seq 412 · 48s");
+      }
+      document.querySelector(".scenario-runtime-dot").classList.toggle("caution", state.scenario === "degraded");
+    }
+
+    function render() {
+      document.body.dataset.mode = state.mode;
+      document.body.dataset.domain = state.domain;
+      document.body.dataset.scenario = state.scenario;
+      setPressed("[data-mode-value]", "modeValue", state.mode);
+      setPressed("[data-domain-value]", "domainValue", state.domain);
+      setPressed("[data-scenario-value]", "scenarioValue", state.scenario);
+      renderDomain();
+      renderScenario();
+      if (contextDrawer.open) renderContextDrawer();
+      history.replaceState(null, "", "#" + [state.mode, state.domain, state.scenario].join("/"));
+    }
+
+    document.querySelectorAll("[data-mode-value]").forEach(function (button) {
+      button.addEventListener("click", function () { state.mode = button.dataset.modeValue; render(); });
+    });
+    document.querySelectorAll("[data-domain-value]").forEach(function (button) {
+      button.addEventListener("click", function () { state.domain = button.dataset.domainValue; render(); });
+    });
+    document.querySelectorAll("[data-scenario-value]").forEach(function (button) {
+      button.addEventListener("click", function () { state.scenario = button.dataset.scenarioValue; render(); });
+    });
+    document.querySelectorAll("[data-switch-advanced]").forEach(function (button) {
+      button.addEventListener("click", function () { state.mode = "advanced"; render(); document.querySelector(".main").scrollTop = 0; });
+    });
+    document.querySelectorAll("[data-work-index]").forEach(function (row) {
+      row.addEventListener("click", function () { openContextDrawer(Number(row.dataset.workIndex)); });
+      row.addEventListener("keydown", function (event) {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        openContextDrawer(Number(row.dataset.workIndex));
+      });
+    });
+    document.querySelectorAll("[data-open-primary-detail]").forEach(function (button) {
+      button.addEventListener("click", function () { openContextDrawer(0); });
+    });
+    document.querySelectorAll("[data-close-drawer]").forEach(function (button) {
+      button.addEventListener("click", function () { contextDrawer.close(); });
+    });
+    document.querySelectorAll("[data-drawer-tab]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        document.querySelectorAll("[data-drawer-tab]").forEach(function (tab) {
+          tab.setAttribute("aria-selected", String(tab === button));
+        });
+        document.querySelectorAll("[data-drawer-panel]").forEach(function (panel) {
+          panel.hidden = panel.dataset.drawerPanel !== button.dataset.drawerTab;
+        });
+      });
+    });
+    document.querySelector("[data-drawer-open-workspace]").addEventListener("click", function () {
+      contextDrawer.close();
+      state.mode = "advanced";
+      render();
+      document.querySelector(".main").scrollTop = 0;
+    });
+
+    document.querySelectorAll(".inspector-tabs button").forEach(function (button) {
+      button.addEventListener("click", function () {
+        document.querySelectorAll(".inspector-tabs button").forEach(function (tab) { tab.setAttribute("aria-selected", String(tab === button)); });
+        document.querySelectorAll(".tab-panel").forEach(function (panel) { panel.hidden = panel.dataset.panel !== button.dataset.tab; });
+      });
+    });
+
+    document.querySelectorAll(".nav-item").forEach(function (button) {
+      button.addEventListener("click", function () {
+        document.querySelectorAll(".nav-item").forEach(function (item) { item.removeAttribute("aria-current"); });
+        button.setAttribute("aria-current", "page");
+      });
+    });
+
+    const dialog = document.getElementById("action-dialog");
+    const dialogContent = {
+      guide: ["Guided intervention", "Revise guidance for the selected work", "Alperen", "policy:execution/guide", "Guidance changes after the active operation reaches its next safe boundary. Existing side effects are not rolled back.", "Record guidance"],
+      pause: ["Safe-boundary control", "Pause selected work at a safe boundary", "Alperen", "policy:execution/pause", "The current operation may finish and record evidence before the run pauses. Closing this dialog does not stop work.", "Request safe pause"],
+      approval: ["Bounded approval", "Review requested elevated action", "Worker via Brain", "policy:change/elevated", "Approval applies once to the displayed scope. It does not grant a standing permission or imply verified success.", "Approve once"],
+      recovery: ["Recovery and reconciliation", "Reconnect, replay and reconcile", "Alperen", "policy:recovery/reconcile", "Deckent will replay from the last confirmed checkpoint and compare observed side effects before continuing. Blind retry is not used.", "Start reconciliation"],
+      evidence: ["Evidence review", "Open outcome evidence", "Alperen", "policy:evidence/read", "Evidence may be partial or stale. The view will preserve provenance and will not infer a verified outcome.", "Open evidence"],
+      command: ["Command palette", "Search objects or run a governed command", "Alperen", "effective permission evaluated per result", "Every command result displays scope, consequence and shortcut before execution.", "Open command"]
+    };
+    let activeDialogKind = "guide";
+
+    document.querySelectorAll("[data-dialog]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        activeDialogKind = button.dataset.dialog;
+        const item = dialogContent[activeDialogKind];
+        setText(".dialog-kicker", item[0]);
+        setText(".dialog-title", item[1]);
+        setText(".dialog-requestor", item[2]);
+        setText(".dialog-authority", item[3]);
+        setText(".dialog-consequence", item[4]);
+        setText(".dialog-confirm", item[5]);
+        if (activeDialogKind === "approval") {
+          const d = domainData[state.domain];
+          setText(".dialog-requestor", d.approval[3]);
+          setText(".dialog-authority", state.domain === "operations" ? "policy:inventory/reserve" : "policy:change/elevated");
+          setText(".dialog-consequence", d.approval[4] + ". Approval is single-use and does not imply verified success.");
+        }
+        dialog.showModal();
+      });
+    });
+
+    dialog.addEventListener("close", function () {
+      if (dialog.returnValue !== "confirm") return;
+      const toast = document.querySelector(".toast");
+      toast.hidden = false;
+      window.setTimeout(function () { toast.hidden = true; }, 4200);
+    });
+
+    window.addEventListener("keydown", function (event) {
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement) return;
+      if (event.key.toLowerCase() === "b") { state.mode = "basic"; render(); }
+      if (event.key.toLowerCase() === "a") { state.mode = "advanced"; render(); }
+    });
+
+    const hash = location.hash.replace(/^#/, "").split("/");
+    if (["basic", "advanced"].includes(hash[0])) state.mode = hash[0];
+    if (["software", "operations"].includes(hash[1])) state.domain = hash[1];
+    if (["running", "approval", "degraded"].includes(hash[2])) state.scenario = hash[2];
+    render();
+    if (["detail0", "detail1", "detail2"].includes(hash[3])) {
+      openContextDrawer(Number(hash[3].replace("detail", "")));
+      if (["overview", "control", "evidence", "audit"].includes(hash[4])) {
+        document.querySelector('[data-drawer-tab="' + hash[4] + '"]').click();
+      }
+      if (["guide", "pause", "approval", "recovery"].includes(hash[5])) {
+        document.querySelector('#context-drawer [data-dialog="' + hash[5] + '"]').click();
+      }
+    }
+  </script>
+</body>
+</html>

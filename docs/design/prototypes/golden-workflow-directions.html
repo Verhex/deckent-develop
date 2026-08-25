@@ -1,0 +1,1643 @@
+<!doctype html>
+<html lang="en" data-theme="day">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Deckent Golden Workflow — Direction Review</title>
+  <style>
+    @font-face {
+      font-family: "Tektur";
+      font-weight: 700;
+      font-display: swap;
+      src: url("../../../src/desktop/src/renderer/fonts/tektur-700-latin-ext.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Chakra Petch";
+      font-weight: 400;
+      font-display: swap;
+      src: url("../../../src/desktop/src/renderer/fonts/chakrapetch-400-latin-ext.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Chakra Petch";
+      font-weight: 600;
+      font-display: swap;
+      src: url("../../../src/desktop/src/renderer/fonts/chakrapetch-600-latin-ext.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Spline Sans Mono";
+      font-weight: 400;
+      font-display: swap;
+      src: url("../../../src/desktop/src/renderer/fonts/splinemono-400-latin-ext.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Spline Sans Mono";
+      font-weight: 600;
+      font-display: swap;
+      src: url("../../../src/desktop/src/renderer/fonts/splinemono-600-latin-ext.woff2") format("woff2");
+    }
+
+    :root {
+      color-scheme: light;
+      --bg: #f2eddc;
+      --surface: #fbf8ec;
+      --surface-2: #f6f1e2;
+      --line: #ddd5bc;
+      --line-strong: #63676a;
+      --text: #2b2f33;
+      --muted: #63676a;
+      --accent: #a93368;
+      --accent-soft: rgba(169, 51, 104, 0.1);
+      --go: #2f7d46;
+      --go-soft: rgba(47, 125, 70, 0.1);
+      --caution: #8f6212;
+      --caution-soft: rgba(143, 98, 18, 0.1);
+      --abort: #c0453e;
+      --abort-soft: rgba(192, 69, 62, 0.1);
+      --focus: #a93368;
+      --terminal: #17191c;
+      --terminal-raised: #1e2125;
+      --terminal-text: #e9e4d7;
+      --terminal-muted: #a9a398;
+      --shadow: 0 18px 54px rgba(43, 47, 51, 0.12);
+      --radius: 10px;
+      --radius-small: 4px;
+      --font-display: "Tektur", system-ui, sans-serif;
+      --font-body: "Chakra Petch", system-ui, sans-serif;
+      --font-data: "Spline Sans Mono", ui-monospace, monospace;
+    }
+
+    html[data-theme="night"] {
+      color-scheme: dark;
+      --bg: #12151a;
+      --surface: #181c23;
+      --surface-2: #1d222a;
+      --line: #2a303a;
+      --line-strong: #9b948b;
+      --text: #e3dad2;
+      --muted: #9b948b;
+      --accent: #f0938a;
+      --accent-soft: rgba(240, 147, 138, 0.1);
+      --go: #7fa06a;
+      --go-soft: rgba(127, 160, 106, 0.12);
+      --caution: #c99a55;
+      --caution-soft: rgba(201, 154, 85, 0.12);
+      --abort: #e2766b;
+      --abort-soft: rgba(226, 118, 107, 0.12);
+      --focus: #f0938a;
+      --terminal: #0e1115;
+      --terminal-raised: #15191e;
+      --terminal-text: #e8e1d9;
+      --terminal-muted: #a49d94;
+      --shadow: 0 20px 64px rgba(0, 0, 0, 0.26);
+    }
+
+    * { box-sizing: border-box; }
+    html { background: var(--bg); }
+    body {
+      margin: 0;
+      min-width: 320px;
+      background: var(--bg);
+      color: var(--text);
+      font: 400 15px/1.45 var(--font-body);
+      transition: background-color 180ms ease-out, color 180ms ease-out;
+    }
+    button, select { font: inherit; }
+    button { color: inherit; }
+    button:focus-visible, select:focus-visible {
+      outline: 2px solid var(--focus);
+      outline-offset: 2px;
+    }
+    .mono { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+    .display { font-family: var(--font-display); }
+
+    .superseded-banner {
+      padding: 7px 16px;
+      border-bottom: 1px solid #81443d;
+      background: #2b1715;
+      color: #f1c2b9;
+      font: 600 10px/1.35 var(--font-data);
+      letter-spacing: 0.04em;
+      text-align: center;
+      text-transform: uppercase;
+    }
+
+    .review-bar {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) auto;
+      gap: 20px;
+      align-items: center;
+      padding: 12px clamp(16px, 3vw, 44px);
+      border-bottom: 1px solid var(--line);
+      background: color-mix(in srgb, var(--bg) 92%, transparent);
+      backdrop-filter: blur(12px);
+    }
+    .review-identity {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+    }
+    .mark {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      flex: 0 0 auto;
+      border: 1px solid var(--line-strong);
+      border-radius: 50%;
+      font: 700 13px/1 var(--font-data);
+    }
+    .review-title {
+      margin: 0;
+      font: 700 16px/1.15 var(--font-display);
+      letter-spacing: 0.025em;
+    }
+    .review-status {
+      margin: 3px 0 0;
+      color: var(--muted);
+      font: 400 11px/1.3 var(--font-data);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .review-controls {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .control-group {
+      display: inline-flex;
+      padding: 3px;
+      gap: 2px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface);
+    }
+    .control-button {
+      min-height: 32px;
+      padding: 5px 10px;
+      border: 0;
+      border-radius: 3px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .control-button:hover { color: var(--text); background: var(--surface-2); }
+    .control-button[aria-pressed="true"] {
+      background: var(--text);
+      color: var(--bg);
+    }
+    .control-select {
+      min-height: 38px;
+      padding: 6px 30px 6px 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--text);
+    }
+
+    main { padding: clamp(18px, 3vw, 44px); }
+    .review-brief {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+      gap: clamp(18px, 3vw, 44px);
+      max-width: 1680px;
+      margin: 0 auto 24px;
+      align-items: end;
+    }
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--accent);
+      font: 600 11px/1.2 var(--font-data);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .direction-title {
+      margin: 0;
+      max-width: 900px;
+      font: 700 clamp(30px, 4vw, 58px)/0.98 var(--font-display);
+      letter-spacing: -0.025em;
+    }
+    .direction-summary {
+      max-width: 820px;
+      margin: 14px 0 0;
+      color: var(--muted);
+      font-size: clamp(15px, 1.4vw, 18px);
+    }
+    .direction-meta {
+      display: grid;
+      gap: 10px;
+      margin: 0;
+      padding: 16px;
+      border-left: 3px solid var(--accent);
+      background: var(--surface);
+    }
+    .direction-meta div {
+      display: grid;
+      grid-template-columns: 92px 1fr;
+      gap: 12px;
+    }
+    .direction-meta dt {
+      color: var(--muted);
+      font: 600 10px/1.4 var(--font-data);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .direction-meta dd { margin: 0; }
+
+    .scenario-ruler {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      max-width: 1680px;
+      margin: 0 auto 12px;
+      border: 1px solid var(--line);
+      background: var(--surface);
+    }
+    .scenario-step {
+      position: relative;
+      padding: 10px 12px;
+      border: 0;
+      border-right: 1px solid var(--line);
+      background: transparent;
+      color: var(--muted);
+      font: 600 11px/1.2 var(--font-data);
+      text-align: left;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+    }
+    .scenario-step:last-child { border-right: 0; }
+    .scenario-step[aria-current="step"] {
+      color: var(--text);
+      background: var(--accent-soft);
+    }
+    .scenario-step[aria-current="step"]::after {
+      content: "";
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: -1px;
+      height: 3px;
+      background: var(--accent);
+    }
+
+    .stage {
+      max-width: 1680px;
+      margin: 0 auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .concept { display: none; }
+    .concept.is-active { display: block; }
+    .surface { display: none; }
+    .surface.is-active { display: block; }
+    .prototype-note {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface-2);
+      color: var(--muted);
+      font: 400 10px/1.3 var(--font-data);
+      letter-spacing: 0.045em;
+      text-transform: uppercase;
+    }
+
+    .window {
+      min-height: min(760px, calc(100vh - 260px));
+      background: var(--bg);
+    }
+    .window-chrome {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 14px;
+      min-height: 42px;
+      padding: 6px 12px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface);
+    }
+    .window-dots { display: flex; gap: 6px; }
+    .window-dots i {
+      width: 8px;
+      height: 8px;
+      border: 1px solid var(--line-strong);
+      border-radius: 50%;
+    }
+    .window-context {
+      overflow: hidden;
+      color: var(--muted);
+      font: 400 11px/1.2 var(--font-data);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .freshness {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font: 600 10px/1 var(--font-data);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .freshness::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--go);
+    }
+    body[data-scenario="stale"] .freshness::before { background: var(--caution); }
+    body[data-scenario="failure"] .freshness::before { background: var(--abort); }
+
+    .rail {
+      padding: 14px 10px;
+      border-right: 1px solid var(--line);
+      background: var(--surface);
+    }
+    .rail-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 7px 16px;
+      font: 700 13px/1 var(--font-display);
+    }
+    .rail-symbol {
+      display: grid;
+      place-items: center;
+      width: 24px;
+      height: 24px;
+      border: 1px solid var(--text);
+      border-radius: 50%;
+      font: 600 9px/1 var(--font-data);
+    }
+    .rail-label {
+      margin: 12px 8px 6px;
+      color: var(--muted);
+      font: 600 9px/1 var(--font-data);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .rail-item {
+      display: flex;
+      width: 100%;
+      align-items: center;
+      gap: 9px;
+      min-height: 34px;
+      padding: 7px 8px;
+      border: 0;
+      border-radius: var(--radius-small);
+      background: transparent;
+      text-align: left;
+      cursor: default;
+    }
+    .rail-item.is-current {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+    .rail-key {
+      color: var(--muted);
+      font: 400 9px/1 var(--font-data);
+      margin-left: auto;
+    }
+
+    .scope-bar {
+      display: flex;
+      min-height: 43px;
+      align-items: center;
+      gap: 12px;
+      padding: 7px 14px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface);
+      overflow-x: auto;
+    }
+    .scope-crumb {
+      color: var(--muted);
+      font: 400 11px/1.2 var(--font-data);
+      white-space: nowrap;
+    }
+    .scope-crumb strong { color: var(--text); }
+    .scope-divider { color: var(--line-strong); }
+    .scope-spacer { flex: 1; }
+
+    .status-chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      padding: 3px 8px;
+      border: 1px solid currentColor;
+      border-radius: 999px;
+      font: 600 9px/1 var(--font-data);
+      letter-spacing: 0.055em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .chip-go { color: var(--go); background: var(--go-soft); }
+    .chip-caution { color: var(--caution); background: var(--caution-soft); }
+    .chip-abort { color: var(--abort); background: var(--abort-soft); }
+    .chip-neutral { color: var(--muted); background: var(--surface-2); }
+    .chip-accent { color: var(--accent); background: var(--accent-soft); }
+
+    .panel-title {
+      margin: 0;
+      font: 700 15px/1.15 var(--font-display);
+      letter-spacing: 0.015em;
+    }
+    .panel-kicker {
+      margin: 0 0 5px;
+      color: var(--muted);
+      font: 600 9px/1.2 var(--font-data);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .subtle { color: var(--muted); }
+    .button {
+      display: inline-flex;
+      min-height: 34px;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 7px 12px;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-small);
+      background: var(--surface);
+      cursor: default;
+    }
+    .button.primary {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: var(--surface);
+    }
+    .button.danger {
+      border-color: var(--abort);
+      color: var(--abort);
+      background: var(--abort-soft);
+    }
+    .icon-box {
+      display: grid;
+      place-items: center;
+      width: 26px;
+      height: 26px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-small);
+      color: var(--muted);
+      font: 600 9px/1 var(--font-data);
+    }
+
+    .scenario-content { display: none; }
+    [hidden] { display: none !important; }
+    body[data-scenario="active"] .scenario-content[data-for="active"],
+    body[data-scenario="approval"] .scenario-content[data-for="approval"],
+    body[data-scenario="stale"] .scenario-content[data-for="stale"],
+    body[data-scenario="failure"] .scenario-content[data-for="failure"],
+    body[data-scenario="verified"] .scenario-content[data-for="verified"] { display: block; }
+
+    /* Direction A — Instrument Ledger */
+    .ledger-layout {
+      display: grid;
+      grid-template-columns: 214px minmax(420px, 1fr) minmax(300px, 360px);
+      min-height: inherit;
+    }
+    .ledger-main {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      border-right: 1px solid var(--line);
+    }
+    .ledger-heading {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--line);
+    }
+    .ledger-heading-copy { min-width: 0; flex: 1; }
+    .goal-title {
+      margin: 3px 0 0;
+      font: 600 clamp(17px, 1.6vw, 23px)/1.2 var(--font-body);
+    }
+    .run-code { color: var(--muted); font: 400 10px/1.2 var(--font-data); }
+    .progress-track {
+      height: 4px;
+      margin: 0 20px;
+      background: var(--line);
+    }
+    .progress-fill {
+      width: 63%;
+      height: 100%;
+      background: var(--accent);
+    }
+    body[data-scenario="approval"] .progress-fill { width: 26%; background: var(--caution); }
+    body[data-scenario="stale"] .progress-fill { width: 57%; background: var(--caution); }
+    body[data-scenario="failure"] .progress-fill { width: 68%; background: var(--abort); }
+    body[data-scenario="verified"] .progress-fill { width: 100%; background: var(--go); }
+    .ledger {
+      display: grid;
+      gap: 0;
+      padding: 14px 20px 30px;
+    }
+    .ledger-row {
+      display: grid;
+      grid-template-columns: 88px 18px minmax(0, 1fr) auto;
+      gap: 12px;
+      min-height: 58px;
+      align-items: start;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .ledger-row:last-child { border-bottom: 0; }
+    .ledger-time { color: var(--muted); font: 400 10px/1.3 var(--font-data); }
+    .ledger-mark {
+      display: block;
+      width: 10px;
+      height: 10px;
+      margin-top: 3px;
+      border: 2px solid var(--line-strong);
+      border-radius: 50%;
+      background: var(--bg);
+    }
+    .ledger-row.is-current .ledger-mark { border-color: var(--accent); background: var(--accent); }
+    .ledger-row.is-warning .ledger-mark { border-color: var(--caution); background: var(--caution); }
+    .ledger-row.is-failed .ledger-mark { border-color: var(--abort); background: var(--abort); }
+    .ledger-row.is-done .ledger-mark { border-color: var(--go); background: var(--go); }
+    .ledger-event strong { display: block; font-weight: 600; }
+    .ledger-event small { display: block; margin-top: 4px; color: var(--muted); }
+    .ledger-actor { color: var(--muted); font: 400 9px/1.3 var(--font-data); text-align: right; }
+    .ledger-inspector {
+      min-width: 0;
+      padding: 18px;
+      background: var(--surface);
+    }
+    .inspector-block {
+      padding: 13px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .inspector-block:last-child { border-bottom: 0; }
+    .fact-grid {
+      display: grid;
+      grid-template-columns: minmax(84px, 0.75fr) 1.25fr;
+      gap: 8px 12px;
+      margin-top: 12px;
+      font-size: 12px;
+    }
+    .fact-grid dt { color: var(--muted); }
+    .fact-grid dd { margin: 0; font-family: var(--font-data); }
+    .action-stack { display: grid; gap: 8px; margin-top: 12px; }
+
+    /* Direction B — Flow Topology */
+    .topology-layout {
+      display: grid;
+      grid-template-columns: 196px minmax(520px, 1fr) 318px;
+      min-height: inherit;
+    }
+    .topology-main {
+      display: grid;
+      grid-template-rows: auto minmax(420px, 1fr) 178px;
+      min-width: 0;
+      border-right: 1px solid var(--line);
+    }
+    .topology-heading {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 15px 18px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface);
+    }
+    .topology-canvas {
+      position: relative;
+      min-height: 420px;
+      overflow: hidden;
+      background-image:
+        linear-gradient(var(--line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--line) 1px, transparent 1px);
+      background-size: 28px 28px;
+      background-position: -1px -1px;
+    }
+    .topology-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    .topology-edge { stroke: var(--line-strong); stroke-width: 1.2; fill: none; }
+    .topology-edge.active { stroke: var(--accent); stroke-width: 2; }
+    .topology-node {
+      position: absolute;
+      display: grid;
+      width: 156px;
+      min-height: 74px;
+      padding: 10px;
+      border: 1px solid var(--line-strong);
+      border-left: 4px solid var(--line-strong);
+      border-radius: 5px;
+      background: var(--surface);
+      box-shadow: 0 8px 24px color-mix(in srgb, var(--text) 8%, transparent);
+    }
+    .topology-node.active { border-left-color: var(--accent); }
+    .topology-node.warning { border-left-color: var(--caution); }
+    .topology-node.failed { border-left-color: var(--abort); }
+    .topology-node.done { border-left-color: var(--go); }
+    .topology-node.goal { left: 5%; top: 39%; }
+    .topology-node.plan { left: 31%; top: 12%; }
+    .topology-node.worker-a { left: 55%; top: 8%; }
+    .topology-node.worker-b { left: 55%; top: 42%; }
+    .topology-node.verify { right: 3%; top: 29%; }
+    .node-type { color: var(--muted); font: 600 8px/1.2 var(--font-data); letter-spacing: 0.1em; }
+    .node-title { margin-top: 6px; font-weight: 600; }
+    .node-state { margin-top: 8px; color: var(--muted); font: 400 9px/1.2 var(--font-data); }
+    .topology-timeline {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(120px, 1fr));
+      overflow-x: auto;
+      border-top: 1px solid var(--line);
+      background: var(--surface);
+    }
+    .timeline-event {
+      padding: 13px;
+      border-right: 1px solid var(--line);
+    }
+    .timeline-event time { display: block; color: var(--muted); font: 400 9px/1 var(--font-data); }
+    .timeline-event strong { display: block; margin-top: 7px; font-size: 12px; }
+    .timeline-event small { display: block; margin-top: 4px; color: var(--muted); }
+    .topology-inspector {
+      padding: 18px;
+      background: var(--surface);
+    }
+    .tree-list { display: grid; gap: 3px; margin-top: 14px; }
+    .tree-row {
+      display: grid;
+      grid-template-columns: 18px 1fr auto;
+      gap: 8px;
+      align-items: center;
+      min-height: 30px;
+      padding: 5px 6px;
+      border-radius: 3px;
+      font-size: 12px;
+    }
+    .tree-row.selected { background: var(--accent-soft); }
+    .tree-depth { color: var(--muted); font-family: var(--font-data); }
+
+    /* Direction C — Progressive Briefing */
+    .briefing-layout {
+      display: grid;
+      grid-template-columns: 62px minmax(540px, 900px) minmax(280px, 360px);
+      justify-content: center;
+      min-height: inherit;
+    }
+    .briefing-rail {
+      display: grid;
+      align-content: start;
+      gap: 9px;
+      padding: 12px;
+      border-right: 1px solid var(--line);
+      background: var(--surface);
+    }
+    .briefing-rail .icon-box.is-current { border-color: var(--accent); color: var(--accent); }
+    .briefing-main {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      border-right: 1px solid var(--line);
+      background: var(--bg);
+    }
+    .briefing-thread {
+      display: grid;
+      gap: 16px;
+      padding: 28px clamp(18px, 4vw, 54px);
+    }
+    .message {
+      max-width: 76%;
+      padding: 13px 15px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+    }
+    .message.user {
+      justify-self: end;
+      border-color: var(--line-strong);
+    }
+    .message-meta {
+      margin-bottom: 6px;
+      color: var(--muted);
+      font: 600 9px/1.2 var(--font-data);
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+    .run-brief {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 13px;
+      padding: 16px;
+      border: 1px solid var(--line-strong);
+      border-left: 4px solid var(--accent);
+      border-radius: 5px;
+      background: var(--surface);
+    }
+    .run-brief > .status-chip { align-self: start; }
+    body[data-scenario="approval"] .run-brief { border-left-color: var(--caution); }
+    body[data-scenario="stale"] .run-brief { border-left-color: var(--caution); }
+    body[data-scenario="failure"] .run-brief { border-left-color: var(--abort); }
+    body[data-scenario="verified"] .run-brief { border-left-color: var(--go); }
+    .run-brief h3 { margin: 4px 0 0; font-size: 16px; }
+    .run-facts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px 14px;
+      margin-top: 10px;
+      color: var(--muted);
+      font: 400 10px/1.2 var(--font-data);
+    }
+    .briefing-input {
+      margin-top: auto;
+      padding: 14px clamp(18px, 4vw, 54px);
+      border-top: 1px solid var(--line);
+      background: var(--surface);
+    }
+    .command-line {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      padding: 7px;
+      border: 1px solid var(--line-strong);
+      border-radius: 999px;
+      background: var(--bg);
+    }
+    .command-line span { padding: 7px 10px; color: var(--muted); }
+    .briefing-inspector { padding: 18px; background: var(--surface); }
+    .disclosure-list { display: grid; gap: 7px; margin-top: 14px; }
+    .disclosure {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .disclosure small { display: block; color: var(--muted); margin-top: 3px; }
+
+    /* Terminal companions */
+    .terminal-wrap {
+      min-height: min(730px, calc(100vh - 260px));
+      padding: clamp(12px, 2vw, 28px);
+      background: #0b0d10;
+    }
+    .terminal-frame {
+      max-width: 1220px;
+      min-height: 650px;
+      margin: 0 auto;
+      border: 1px solid #42474f;
+      border-radius: 8px;
+      background: var(--terminal);
+      color: var(--terminal-text);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
+      overflow: hidden;
+      font: 400 13px/1.55 var(--font-data);
+    }
+    .terminal-bar {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 12px;
+      align-items: center;
+      min-height: 38px;
+      padding: 7px 12px;
+      border-bottom: 1px solid #353a42;
+      background: var(--terminal-raised);
+      color: var(--terminal-muted);
+      font-size: 10px;
+    }
+    .terminal-body {
+      display: grid;
+      gap: 5px;
+      padding: 18px 20px 22px;
+      overflow: auto;
+    }
+    .term-line {
+      display: grid;
+      grid-template-columns: 72px minmax(0, 1fr);
+      gap: 12px;
+    }
+    .term-time { color: var(--terminal-muted); }
+    .term-muted { color: var(--terminal-muted); }
+    .term-accent { color: #f0938a; }
+    .term-go { color: #a7c794; }
+    .term-warn { color: #e2b469; }
+    .term-abort { color: #f08a80; }
+    .term-card {
+      margin: 10px 0;
+      padding: 12px 14px;
+      border: 1px solid #555b65;
+      border-left: 3px solid #f0938a;
+      background: var(--terminal-raised);
+    }
+    body[data-scenario="approval"] .term-card { border-left-color: #e2b469; }
+    body[data-scenario="stale"] .term-card { border-left-color: #e2b469; }
+    body[data-scenario="failure"] .term-card { border-left-color: #f08a80; }
+    body[data-scenario="verified"] .term-card { border-left-color: #a7c794; }
+    .term-card-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    .term-grid {
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      gap: 3px 12px;
+      margin-top: 8px;
+    }
+    .term-tree { white-space: pre; }
+    .term-input {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid #353a42;
+      color: var(--terminal-text);
+    }
+    .term-footer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 18px;
+      margin-top: 8px;
+      color: var(--terminal-muted);
+      font-size: 10px;
+    }
+
+    .review-footer {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 18px;
+      max-width: 1680px;
+      margin: 20px auto 0;
+      padding: 16px 18px;
+      border: 1px solid var(--line);
+      background: var(--surface);
+    }
+    .review-footer p { margin: 0; color: var(--muted); }
+    .shortcut-list { font: 400 10px/1.4 var(--font-data); color: var(--muted); }
+    kbd {
+      min-width: 22px;
+      padding: 2px 5px;
+      border: 1px solid var(--line-strong);
+      border-bottom-width: 2px;
+      border-radius: 3px;
+      background: var(--bg);
+      color: var(--text);
+      font: inherit;
+      text-align: center;
+    }
+
+    @media (max-width: 1120px) {
+      .review-bar { grid-template-columns: 1fr; }
+      .review-controls { justify-content: flex-start; }
+      .review-brief { grid-template-columns: 1fr; }
+      .ledger-layout { grid-template-columns: 180px minmax(400px, 1fr); }
+      .ledger-inspector { grid-column: 1 / -1; border-top: 1px solid var(--line); }
+      .topology-layout { grid-template-columns: 168px minmax(500px, 1fr); }
+      .topology-inspector { grid-column: 1 / -1; border-top: 1px solid var(--line); }
+      .briefing-layout { grid-template-columns: 58px minmax(480px, 1fr); }
+      .briefing-inspector { grid-column: 1 / -1; border-top: 1px solid var(--line); }
+    }
+    @media (max-width: 760px) {
+      main { padding: 12px; }
+      .review-bar { position: static; padding: 12px; }
+      .control-group { width: 100%; }
+      .control-button { flex: 1; }
+      .control-select { flex: 1; min-width: 0; }
+      .scenario-ruler { grid-template-columns: 1fr; }
+      .scenario-step { border-right: 0; border-bottom: 1px solid var(--line); }
+      .stage { border-radius: 0; }
+      .window { overflow-x: auto; }
+      .ledger-layout, .topology-layout, .briefing-layout { min-width: 920px; }
+      .review-footer { grid-template-columns: 1fr; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.001ms !important;
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+      }
+    }
+    @media (forced-colors: active) {
+      .status-chip, .topology-node, .run-brief, .term-card { forced-color-adjust: auto; }
+      .progress-fill, .freshness::before, .scenario-step[aria-current="step"]::after {
+        background: CanvasText;
+      }
+    }
+  </style>
+</head>
+<body data-scenario="active">
+  <div class="superseded-banner">Rejected exploration · retained for design history · current authority: Desktop Operating Model</div>
+  <header class="review-bar">
+    <div class="review-identity">
+      <div class="mark" aria-hidden="true">DK</div>
+      <div>
+        <h1 class="review-title" data-i18n="reviewTitle"></h1>
+        <p class="review-status" data-i18n="reviewStatus"></p>
+      </div>
+    </div>
+    <div class="review-controls" aria-label="Prototype controls">
+      <div class="control-group" role="group" aria-label="Direction">
+        <button class="control-button direction-control" type="button" data-direction="a" aria-pressed="true">A</button>
+        <button class="control-button direction-control" type="button" data-direction="b" aria-pressed="false">B</button>
+        <button class="control-button direction-control" type="button" data-direction="c" aria-pressed="false">C</button>
+      </div>
+      <div class="control-group" role="group" aria-label="Surface">
+        <button class="control-button surface-control" type="button" data-surface="desktop" aria-pressed="true" data-i18n="desktop"></button>
+        <button class="control-button surface-control" type="button" data-surface="terminal" aria-pressed="false" data-i18n="terminal"></button>
+      </div>
+      <select class="control-select scenario-control" aria-label="Scenario">
+        <option value="active" data-i18n="scenarioActive"></option>
+        <option value="approval" data-i18n="scenarioApproval"></option>
+        <option value="stale" data-i18n="scenarioStale"></option>
+        <option value="failure" data-i18n="scenarioFailure"></option>
+        <option value="verified" data-i18n="scenarioVerified"></option>
+      </select>
+      <div class="control-group" role="group" aria-label="Theme">
+        <button class="control-button theme-control" type="button" data-theme="day" aria-pressed="true" data-i18n="day"></button>
+        <button class="control-button theme-control" type="button" data-theme="night" aria-pressed="false" data-i18n="night"></button>
+      </div>
+      <div class="control-group" role="group" aria-label="Language">
+        <button class="control-button language-control" type="button" data-language="en" aria-pressed="true">EN</button>
+        <button class="control-button language-control" type="button" data-language="tr" aria-pressed="false">TR</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="review-brief" aria-live="polite">
+      <div>
+        <p class="eyebrow" data-i18n="sameWorkflow"></p>
+        <h2 class="direction-title" id="direction-title"></h2>
+        <p class="direction-summary" id="direction-summary"></p>
+      </div>
+      <dl class="direction-meta">
+        <div><dt data-i18n="bestFor"></dt><dd id="direction-fit"></dd></div>
+        <div><dt data-i18n="strength"></dt><dd id="direction-strength"></dd></div>
+        <div><dt data-i18n="risk"></dt><dd id="direction-risk"></dd></div>
+      </dl>
+    </section>
+
+    <nav class="scenario-ruler" aria-label="Scenario states">
+      <button class="scenario-step" type="button" data-scenario="active" aria-current="step" data-i18n="scenarioActiveShort"></button>
+      <button class="scenario-step" type="button" data-scenario="approval" data-i18n="scenarioApprovalShort"></button>
+      <button class="scenario-step" type="button" data-scenario="stale" data-i18n="scenarioStaleShort"></button>
+      <button class="scenario-step" type="button" data-scenario="failure" data-i18n="scenarioFailureShort"></button>
+      <button class="scenario-step" type="button" data-scenario="verified" data-i18n="scenarioVerifiedShort"></button>
+    </nav>
+
+    <section class="stage" aria-label="Design direction prototype">
+      <article class="concept concept-a is-active" data-concept="a">
+        <div class="prototype-note"><span data-i18n="representative"></span><span>A / Instrument Ledger</span></div>
+        <section class="surface surface-desktop is-active" data-surface-view="desktop">
+          <div class="window">
+            <div class="window-chrome">
+              <div class="window-dots" aria-hidden="true"><i></i><i></i><i></i></div>
+              <div class="window-context">Verhex / deckent-dev / governed-local</div>
+              <div class="freshness" data-i18n="liveNow"></div>
+            </div>
+            <div class="scope-bar">
+              <span class="scope-crumb"><strong>deckent-dev</strong></span><span class="scope-divider">/</span>
+              <span class="scope-crumb">RUN-8421</span><span class="scope-divider">/</span>
+              <span class="scope-crumb" data-i18n="goalShort"></span>
+              <span class="scope-spacer"></span><span class="status-chip chip-neutral">local</span>
+              <span class="status-chip chip-accent">claude · standard</span>
+            </div>
+            <div class="ledger-layout">
+              <aside class="rail">
+                <div class="rail-brand"><span class="rail-symbol">D</span>Deckent</div>
+                <p class="rail-label" data-i18n="work"></p>
+                <button class="rail-item is-current"><span class="icon-box">01</span><span data-i18n="currentRun"></span><span class="rail-key">⌘1</span></button>
+                <button class="rail-item"><span class="icon-box">02</span><span data-i18n="conversations"></span><span class="rail-key">⌘2</span></button>
+                <button class="rail-item"><span class="icon-box">03</span><span data-i18n="runs"></span><span class="rail-key">⌘3</span></button>
+                <p class="rail-label" data-i18n="control"></p>
+                <button class="rail-item"><span class="icon-box">04</span><span data-i18n="approvals"></span><span class="status-chip chip-caution">1</span></button>
+                <button class="rail-item"><span class="icon-box">05</span><span data-i18n="connections"></span></button>
+                <p class="rail-label" data-i18n="tools"></p>
+                <button class="rail-item"><span class="icon-box">06</span><span data-i18n="terminal"></span><span class="rail-key">⌘J</span></button>
+                <button class="rail-item"><span class="icon-box">07</span><span data-i18n="changes"></span></button>
+              </aside>
+              <section class="ledger-main">
+                <header class="ledger-heading">
+                  <div class="ledger-heading-copy">
+                    <span class="run-code">RUN-8421 · rev 04 · flow 7c8a</span>
+                    <h3 class="goal-title" data-i18n="goal"></h3>
+                  </div>
+                  <span class="status-chip chip-accent scenario-content" data-for="active" data-i18n="running"></span>
+                  <span class="status-chip chip-caution scenario-content" data-for="approval" data-i18n="awaitingApproval"></span>
+                  <span class="status-chip chip-caution scenario-content" data-for="stale" data-i18n="stale"></span>
+                  <span class="status-chip chip-abort scenario-content" data-for="failure" data-i18n="failed"></span>
+                  <span class="status-chip chip-go scenario-content" data-for="verified" data-i18n="verified"></span>
+                </header>
+                <div class="progress-track" aria-label="Run progress"><div class="progress-fill"></div></div>
+                <div class="ledger">
+                  <div class="ledger-row is-done">
+                    <time class="ledger-time">10:42:06</time><i class="ledger-mark"></i>
+                    <div class="ledger-event"><strong data-i18n="intentRecorded"></strong><small data-i18n="intentDetail"></small></div>
+                    <span class="ledger-actor">Alperen</span>
+                  </div>
+                  <div class="ledger-row is-done">
+                    <time class="ledger-time">10:42:18</time><i class="ledger-mark"></i>
+                    <div class="ledger-event"><strong data-i18n="planAccepted"></strong><small>8 work items · digest 7c8a…19fe</small></div>
+                    <span class="ledger-actor">Brain</span>
+                  </div>
+                  <div class="ledger-row is-current scenario-content" data-for="active">
+                    <time class="ledger-time">10:44:31</time><i class="ledger-mark"></i>
+                    <div class="ledger-event"><strong data-i18n="workersActive"></strong><small data-i18n="workersDetail"></small></div>
+                    <span class="ledger-actor">W-02 · W-03</span>
+                  </div>
+                  <div class="ledger-row is-warning scenario-content" data-for="approval">
+                    <time class="ledger-time">10:43:52</time><i class="ledger-mark"></i>
+                    <div class="ledger-event"><strong data-i18n="approvalRequired"></strong><small data-i18n="approvalDetail"></small></div>
+                    <span class="ledger-actor">Policy</span>
+                  </div>
+                  <div class="ledger-row is-warning scenario-content" data-for="stale">
+                    <time class="ledger-time">10:44:08</time><i class="ledger-mark"></i>
+                    <div class="ledger-event"><strong data-i18n="connectionLost"></strong><small data-i18n="staleDetail"></small></div>
+                    <span class="ledger-actor">cursor 412</span>
+                  </div>
+                  <div class="ledger-row is-failed scenario-content" data-for="failure">
+                    <time class="ledger-time">10:45:17</time><i class="ledger-mark"></i>
+                    <div class="ledger-event"><strong data-i18n="workerFailed"></strong><small data-i18n="failureDetail"></small></div>
+                    <span class="ledger-actor">W-03</span>
+                  </div>
+                  <div class="ledger-row is-done scenario-content" data-for="verified">
+                    <time class="ledger-time">10:47:28</time><i class="ledger-mark"></i>
+                    <div class="ledger-event"><strong data-i18n="verificationClosed"></strong><small data-i18n="verifiedDetail"></small></div>
+                    <span class="ledger-actor">Verifier</span>
+                  </div>
+                  <div class="ledger-row">
+                    <time class="ledger-time">—</time><i class="ledger-mark"></i>
+                    <div class="ledger-event"><strong data-i18n="settlement"></strong><small data-i18n="settlementDetail"></small></div>
+                    <span class="ledger-actor">pending</span>
+                  </div>
+                </div>
+              </section>
+              <aside class="ledger-inspector">
+                <p class="panel-kicker" data-i18n="evidenceInspector"></p>
+                <h3 class="panel-title" data-i18n="selectedEvent"></h3>
+                <div class="inspector-block">
+                  <dl class="fact-grid">
+                    <dt data-i18n="authority"></dt><dd>policy:change/elevated</dd>
+                    <dt data-i18n="scope"></dt><dd>deckent-dev · 4 files</dd>
+                    <dt data-i18n="freshness"></dt><dd>seq 412 · 6s</dd>
+                    <dt data-i18n="cost"></dt><dd>$4.28 observed</dd>
+                    <dt data-i18n="evidence"></dt><dd>5/8 work items</dd>
+                  </dl>
+                </div>
+                <div class="inspector-block scenario-content" data-for="active">
+                  <p class="panel-kicker" data-i18n="nextSafeAction"></p>
+                  <strong data-i18n="observeOrGuide"></strong>
+                  <div class="action-stack"><button class="button" data-i18n="openWorker"></button><button class="button" data-i18n="pauseBoundary"></button></div>
+                </div>
+                <div class="inspector-block scenario-content" data-for="approval">
+                  <p class="panel-kicker" data-i18n="exactConsequence"></p>
+                  <strong data-i18n="approvalConsequence"></strong>
+                  <p class="subtle" data-i18n="approvalExpiry"></p>
+                  <div class="action-stack"><button class="button primary" data-i18n="approveOnce"></button><button class="button danger" data-i18n="deny"></button></div>
+                </div>
+                <div class="inspector-block scenario-content" data-for="stale">
+                  <p class="panel-kicker" data-i18n="lastKnown"></p>
+                  <strong data-i18n="replayNeeded"></strong>
+                  <div class="action-stack"><button class="button primary" data-i18n="reconnectReplay"></button></div>
+                </div>
+                <div class="inspector-block scenario-content" data-for="failure">
+                  <p class="panel-kicker" data-i18n="partialEffects"></p>
+                  <strong>2 files changed · not settled</strong>
+                  <div class="action-stack"><button class="button primary" data-i18n="retryCheckpoint"></button><button class="button" data-i18n="inspectChanges"></button></div>
+                </div>
+                <div class="inspector-block scenario-content" data-for="verified">
+                  <p class="panel-kicker" data-i18n="verification"></p>
+                  <strong class="mono">cross-verify-verdict:sha256:91fe…</strong>
+                  <div class="action-stack"><button class="button primary" data-i18n="reviewSettlement"></button></div>
+                </div>
+              </aside>
+            </div>
+          </div>
+        </section>
+        <section class="surface surface-terminal" data-surface-view="terminal">
+          <div class="terminal-wrap">
+            <div class="terminal-frame">
+              <div class="terminal-bar"><span>deckent</span><span>deckent-dev · RUN-8421 · Instrument Ledger</span><span class="freshness" data-i18n="liveNow"></span></div>
+              <div class="terminal-body">
+                <div class="term-line"><span class="term-time">10:42:06</span><span><b class="term-go">DONE</b> <span data-i18n="intentRecorded"></span> <span class="term-muted">· Alperen</span></span></div>
+                <div class="term-line"><span class="term-time">10:42:18</span><span><b class="term-go">DONE</b> <span data-i18n="planAccepted"></span> <span class="term-muted">· rev 04 · 7c8a…19fe</span></span></div>
+                <div class="scenario-content" data-for="active">
+                  <div class="term-line"><span class="term-time">10:44:31</span><span><b class="term-accent">LIVE</b> <span data-i18n="workersActive"></span> <span class="term-muted">· 5/8</span></span></div>
+                  <div class="term-card"><div class="term-card-head"><span data-i18n="currentRun"></span><span class="term-accent">RUNNING · 6s</span></div><div class="term-grid"><span class="term-muted">W-02</span><span>protocol-client boundary · active</span><span class="term-muted">W-03</span><span>Windows handoff matrix · delayed 18s</span><span class="term-muted">next</span><span data-i18n="observeOrGuide"></span></div></div>
+                </div>
+                <div class="scenario-content" data-for="approval">
+                  <div class="term-card"><div class="term-card-head"><span data-i18n="approvalRequired"></span><span class="term-warn">ELEVATED · 08:42</span></div><div class="term-grid"><span class="term-muted" data-i18n="scope"></span><span>deckent-dev · 4 files</span><span class="term-muted" data-i18n="authority"></span><span>policy:change/elevated</span><span class="term-muted" data-i18n="consequence"></span><span data-i18n="approvalConsequence"></span></div><div class="term-input"><span class="term-accent">y</span> <span data-i18n="approveOnce"></span> · <span class="term-abort">n</span> <span data-i18n="deny"></span> · d <span data-i18n="details"></span></div></div>
+                </div>
+                <div class="scenario-content" data-for="stale">
+                  <div class="term-card"><div class="term-card-head"><span data-i18n="connectionLost"></span><span class="term-warn">STALE · 36s</span></div><div data-i18n="staleDetail"></div><div class="term-input"><span class="term-accent">r</span> <span data-i18n="reconnectReplay"></span> · cursor 412</div></div>
+                </div>
+                <div class="scenario-content" data-for="failure">
+                  <div class="term-card"><div class="term-card-head"><span data-i18n="workerFailed"></span><span class="term-abort">FAILED · W-03</span></div><div data-i18n="failureDetail"></div><div class="term-input"><span class="term-accent">r</span> <span data-i18n="retryCheckpoint"></span> · d <span data-i18n="inspectChanges"></span></div></div>
+                </div>
+                <div class="scenario-content" data-for="verified">
+                  <div class="term-card"><div class="term-card-head"><span data-i18n="verificationClosed"></span><span class="term-go">VERIFIED</span></div><div class="term-grid"><span class="term-muted">receipt</span><span>cross-verify-verdict:sha256:91fe…</span><span class="term-muted" data-i18n="cost"></span><span>$4.28 observed</span><span class="term-muted">result</span><span>8/8 work items · 12 files</span></div></div>
+                </div>
+                <div class="term-input"><span class="term-accent">›</span> <span data-i18n="commandPrompt"></span><span class="term-accent">█</span></div>
+                <div class="term-footer"><span>ASK</span><span>claude · standard</span><span>RUN-8421</span><span>Σ 42.8k tok</span><span>NO_COLOR safe</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </article>
+
+      <article class="concept concept-b" data-concept="b">
+        <div class="prototype-note"><span data-i18n="representative"></span><span>B / Flow Topology</span></div>
+        <section class="surface surface-desktop is-active" data-surface-view="desktop">
+          <div class="window">
+            <div class="window-chrome"><div class="window-dots" aria-hidden="true"><i></i><i></i><i></i></div><div class="window-context">Verhex / deckent-dev / RUN-8421</div><div class="freshness" data-i18n="liveNow"></div></div>
+            <div class="topology-layout">
+              <aside class="rail">
+                <div class="rail-brand"><span class="rail-symbol">D</span>Deckent</div>
+                <p class="rail-label" data-i18n="hierarchy"></p>
+                <button class="rail-item"><span class="icon-box">G</span><span>Goal</span></button>
+                <button class="rail-item"><span class="icon-box">M</span><span>Mission</span></button>
+                <button class="rail-item"><span class="icon-box">F</span><span>Flow 7c8a</span></button>
+                <button class="rail-item is-current"><span class="icon-box">R</span><span>RUN-8421</span></button>
+                <p class="rail-label" data-i18n="views"></p>
+                <button class="rail-item is-current"><span class="icon-box">01</span><span data-i18n="topology"></span></button>
+                <button class="rail-item"><span class="icon-box">02</span><span data-i18n="timeline"></span></button>
+                <button class="rail-item"><span class="icon-box">03</span><span data-i18n="evidence"></span></button>
+              </aside>
+              <section class="topology-main">
+                <header class="topology-heading"><div><p class="panel-kicker">RUN-8421 · rev 04</p><h3 class="panel-title" data-i18n="goal"></h3></div><span class="scope-spacer"></span><span class="status-chip chip-accent scenario-content" data-for="active" data-i18n="running"></span><span class="status-chip chip-caution scenario-content" data-for="approval" data-i18n="awaitingApproval"></span><span class="status-chip chip-caution scenario-content" data-for="stale" data-i18n="stale"></span><span class="status-chip chip-abort scenario-content" data-for="failure" data-i18n="failed"></span><span class="status-chip chip-go scenario-content" data-for="verified" data-i18n="verified"></span></header>
+                <div class="topology-canvas">
+                  <svg class="topology-svg" viewBox="0 0 1000 520" preserveAspectRatio="none" role="img" aria-label="Run causal topology">
+                    <path class="topology-edge active" d="M190 255 C270 255 250 125 330 125"></path>
+                    <path class="topology-edge active" d="M480 125 C530 125 520 100 565 100"></path>
+                    <path class="topology-edge active" d="M480 155 C535 155 515 300 565 300"></path>
+                    <path class="topology-edge" d="M720 100 C800 100 790 235 840 235"></path>
+                    <path class="topology-edge" d="M720 300 C790 300 790 250 840 250"></path>
+                  </svg>
+                  <div class="topology-node goal done"><span class="node-type">GOAL</span><span class="node-title" data-i18n="goalShort"></span><span class="node-state">accepted · Alperen</span></div>
+                  <div class="topology-node plan done"><span class="node-type">FLOW · rev 04</span><span class="node-title" data-i18n="planAccepted"></span><span class="node-state">8 work items · digest 7c8a</span></div>
+                  <div class="topology-node worker-a active"><span class="node-type">WORKER · W-02</span><span class="node-title">Protocol client</span><span class="node-state scenario-content" data-for="active">active · hb 6s</span><span class="node-state scenario-content" data-for="approval">waiting on policy</span><span class="node-state scenario-content" data-for="stale">last known active · 36s</span><span class="node-state scenario-content" data-for="failure">completed · 3 changes</span><span class="node-state scenario-content" data-for="verified">verified · receipt bound</span></div>
+                  <div class="topology-node worker-b warning"><span class="node-type">WORKER · W-03</span><span class="node-title">Windows handoff</span><span class="node-state scenario-content" data-for="active">delayed · hb 18s</span><span class="node-state scenario-content" data-for="approval">approval required</span><span class="node-state scenario-content" data-for="stale">unknown · disconnected</span><span class="node-state scenario-content" data-for="failure">failed · partial effects</span><span class="node-state scenario-content" data-for="verified">verified · receipt bound</span></div>
+                  <div class="topology-node verify"><span class="node-type">VERIFIER</span><span class="node-title" data-i18n="verification"></span><span class="node-state scenario-content" data-for="active">pending · producer running</span><span class="node-state scenario-content" data-for="approval">not admitted</span><span class="node-state scenario-content" data-for="stale">unavailable · no fresh data</span><span class="node-state scenario-content" data-for="failure">waiting for recovery</span><span class="node-state scenario-content" data-for="verified">CONFIRMED · separate provider</span></div>
+                </div>
+                <div class="topology-timeline">
+                  <div class="timeline-event"><time>10:42:06</time><strong data-i18n="intentRecorded"></strong><small>Alperen</small></div>
+                  <div class="timeline-event"><time>10:42:18</time><strong data-i18n="planAccepted"></strong><small>rev 04 · 7c8a</small></div>
+                  <div class="timeline-event"><time>10:43:01</time><strong data-i18n="runAdmitted"></strong><small>receipt 8c31</small></div>
+                  <div class="timeline-event"><time>10:44:31</time><strong data-i18n="workersActive"></strong><small>W-02 · W-03</small></div>
+                  <div class="timeline-event"><time>—</time><strong data-i18n="verification"></strong><small>pending</small></div>
+                </div>
+              </section>
+              <aside class="topology-inspector">
+                <p class="panel-kicker" data-i18n="selectedNode"></p><h3 class="panel-title">W-03 · Windows handoff</h3>
+                <div class="tree-list">
+                  <div class="tree-row"><span class="tree-depth">└</span><span>Attempt 02</span><span class="status-chip chip-accent">live</span></div>
+                  <div class="tree-row selected"><span class="tree-depth"> ├</span><span>Operation 11</span><span class="status-chip chip-caution">18s</span></div>
+                  <div class="tree-row"><span class="tree-depth"> └</span><span>Operation 12</span><span class="status-chip chip-neutral">queued</span></div>
+                </div>
+                <div class="inspector-block"><dl class="fact-grid"><dt data-i18n="authority"></dt><dd>worker/standard</dd><dt data-i18n="scope"></dt><dd>Windows · WSL2</dd><dt data-i18n="freshness"></dt><dd>18s delayed</dd><dt data-i18n="evidence"></dt><dd>3 artifacts</dd></dl></div>
+                <div class="scenario-content" data-for="active"><div class="action-stack"><button class="button" data-i18n="guideWorker"></button><button class="button" data-i18n="pauseBoundary"></button></div></div>
+                <div class="scenario-content" data-for="approval"><div class="action-stack"><button class="button primary" data-i18n="reviewApproval"></button><button class="button danger" data-i18n="deny"></button></div></div>
+                <div class="scenario-content" data-for="stale"><div class="action-stack"><button class="button primary" data-i18n="reconnectReplay"></button></div></div>
+                <div class="scenario-content" data-for="failure"><div class="action-stack"><button class="button primary" data-i18n="retryCheckpoint"></button><button class="button" data-i18n="inspectChanges"></button></div></div>
+                <div class="scenario-content" data-for="verified"><div class="action-stack"><button class="button primary" data-i18n="reviewSettlement"></button></div></div>
+              </aside>
+            </div>
+          </div>
+        </section>
+        <section class="surface surface-terminal" data-surface-view="terminal">
+          <div class="terminal-wrap"><div class="terminal-frame"><div class="terminal-bar"><span>deckent</span><span>deckent-dev · RUN-8421 · Flow Topology</span><span class="freshness" data-i18n="liveNow"></span></div><div class="terminal-body">
+            <div class="term-card"><div class="term-card-head"><span data-i18n="causalTree"></span><span class="term-accent">RUN-8421</span></div><div class="term-tree">Goal  Stabilize cross-platform provider handoff
+└─ Flow 7c8a · rev 04
+   ├─ W-02 Protocol client       <span class="term-go">active · hb 6s</span>
+   │  ├─ op-09 schema adapter    <span class="term-go">done</span>
+   │  └─ op-10 replay cursor     <span class="term-accent">running</span>
+   └─ W-03 Windows handoff       <span class="term-warn">delayed · 18s</span>
+      ├─ op-11 native paths      <span class="term-accent">selected</span>
+      └─ op-12 WSL boundary      <span class="term-muted">queued</span>
+└─ Verify provider-separated     <span class="term-muted">pending</span></div></div>
+            <div class="scenario-content" data-for="active"><div class="term-line"><span class="term-time">focus</span><span>W-03/op-11 · <span data-i18n="observeOrGuide"></span></span></div></div>
+            <div class="scenario-content" data-for="approval"><div class="term-card"><div class="term-card-head"><span>W-03 / op-11</span><span class="term-warn" data-i18n="awaitingApproval"></span></div><div data-i18n="approvalConsequence"></div><div class="term-input">y <span data-i18n="approveOnce"></span> · n <span data-i18n="deny"></span> · d <span data-i18n="details"></span></div></div></div>
+            <div class="scenario-content" data-for="stale"><div class="term-card"><div class="term-card-head"><span>RUN-8421</span><span class="term-warn">STALE · cursor 412</span></div><div data-i18n="replayNeeded"></div><div class="term-input">r <span data-i18n="reconnectReplay"></span></div></div></div>
+            <div class="scenario-content" data-for="failure"><div class="term-card"><div class="term-card-head"><span>W-03 / op-11</span><span class="term-abort" data-i18n="failed"></span></div><div data-i18n="failureDetail"></div><div class="term-input">r <span data-i18n="retryCheckpoint"></span> · d <span data-i18n="inspectChanges"></span></div></div></div>
+            <div class="scenario-content" data-for="verified"><div class="term-card"><div class="term-card-head"><span>Verify</span><span class="term-go" data-i18n="verified"></span></div><div>cross-verify-verdict:sha256:91fe… · 8/8 · $4.28</div></div></div>
+            <div class="term-input"><span class="term-accent">›</span> /inspect W-03/op-11<span class="term-accent">█</span></div><div class="term-footer"><span>↑↓ focus</span><span>Enter inspect</span><span>Esc run</span><span>RUN-8421</span></div>
+          </div></div></div>
+        </section>
+      </article>
+
+      <article class="concept concept-c" data-concept="c">
+        <div class="prototype-note"><span data-i18n="representative"></span><span>C / Progressive Briefing</span></div>
+        <section class="surface surface-desktop is-active" data-surface-view="desktop">
+          <div class="window">
+            <div class="window-chrome"><div class="window-dots" aria-hidden="true"><i></i><i></i><i></i></div><div class="window-context">Verhex / deckent-dev / conversation CONV-219</div><div class="freshness" data-i18n="liveNow"></div></div>
+            <div class="briefing-layout">
+              <nav class="briefing-rail" aria-label="Workspace"><span class="icon-box is-current">01</span><span class="icon-box">02</span><span class="icon-box">03</span><span class="icon-box">04</span></nav>
+              <section class="briefing-main">
+                <div class="scope-bar"><span class="scope-crumb"><strong>deckent-dev</strong></span><span class="scope-divider">/</span><span class="scope-crumb">CONV-219</span><span class="scope-spacer"></span><span class="status-chip chip-neutral">guided</span></div>
+                <div class="briefing-thread">
+                  <article class="message user"><div class="message-meta">Alperen · 10:42</div><div data-i18n="goalUser"></div></article>
+                  <article class="message"><div class="message-meta">Deckent · 10:42</div><div data-i18n="goalResponse"></div></article>
+                  <article class="run-brief">
+                    <div><p class="panel-kicker">RUN-8421 · rev 04</p><h3 data-i18n="goal"></h3><div class="run-facts"><span>8 work items</span><span>4 files scope</span><span>$4.28 estimate</span><span>claude · standard</span></div></div>
+                    <span class="status-chip chip-accent scenario-content" data-for="active" data-i18n="running"></span><span class="status-chip chip-caution scenario-content" data-for="approval" data-i18n="awaitingApproval"></span><span class="status-chip chip-caution scenario-content" data-for="stale" data-i18n="stale"></span><span class="status-chip chip-abort scenario-content" data-for="failure" data-i18n="failed"></span><span class="status-chip chip-go scenario-content" data-for="verified" data-i18n="verified"></span>
+                  </article>
+                  <article class="message scenario-content" data-for="active"><div class="message-meta">Deckent · live</div><div data-i18n="workersDetail"></div></article>
+                  <article class="message scenario-content" data-for="approval"><div class="message-meta" data-i18n="approvalRequired"></div><div data-i18n="approvalConsequence"></div><div class="action-stack"><button class="button primary" data-i18n="reviewApproval"></button></div></article>
+                  <article class="message scenario-content" data-for="stale"><div class="message-meta" data-i18n="connectionLost"></div><div data-i18n="staleDetail"></div><div class="action-stack"><button class="button primary" data-i18n="reconnectReplay"></button></div></article>
+                  <article class="message scenario-content" data-for="failure"><div class="message-meta" data-i18n="workerFailed"></div><div data-i18n="failureDetail"></div><div class="action-stack"><button class="button primary" data-i18n="retryCheckpoint"></button></div></article>
+                  <article class="message scenario-content" data-for="verified"><div class="message-meta" data-i18n="verificationClosed"></div><div data-i18n="verifiedDetail"></div><div class="action-stack"><button class="button primary" data-i18n="reviewSettlement"></button></div></article>
+                </div>
+                <div class="briefing-input"><div class="command-line"><span data-i18n="commandPrompt"></span><button class="button primary" data-i18n="send"></button></div></div>
+              </section>
+              <aside class="briefing-inspector">
+                <p class="panel-kicker" data-i18n="runBrief"></p><h3 class="panel-title">RUN-8421</h3>
+                <div class="disclosure-list">
+                  <div class="disclosure"><div><strong data-i18n="plan"></strong><small>8 work items · rev 04</small></div><span>›</span></div>
+                  <div class="disclosure"><div><strong data-i18n="workers"></strong><small>2 active · 1 delayed</small></div><span>›</span></div>
+                  <div class="disclosure"><div><strong data-i18n="changes"></strong><small>4 scoped · 2 modified</small></div><span>›</span></div>
+                  <div class="disclosure"><div><strong data-i18n="evidence"></strong><small>5/8 · verifier pending</small></div><span>›</span></div>
+                  <div class="disclosure"><div><strong data-i18n="cost"></strong><small>$4.28 observed · $8 limit</small></div><span>›</span></div>
+                </div>
+                <div class="inspector-block"><p class="panel-kicker" data-i18n="nextSafeAction"></p><strong class="scenario-content" data-for="active" data-i18n="observeOrGuide"></strong><strong class="scenario-content" data-for="approval" data-i18n="reviewApproval"></strong><strong class="scenario-content" data-for="stale" data-i18n="reconnectReplay"></strong><strong class="scenario-content" data-for="failure" data-i18n="retryCheckpoint"></strong><strong class="scenario-content" data-for="verified" data-i18n="reviewSettlement"></strong></div>
+              </aside>
+            </div>
+          </div>
+        </section>
+        <section class="surface surface-terminal" data-surface-view="terminal">
+          <div class="terminal-wrap"><div class="terminal-frame"><div class="terminal-bar"><span>deckent</span><span>deckent-dev · CONV-219 · Progressive Briefing</span><span class="freshness" data-i18n="liveNow"></span></div><div class="terminal-body">
+            <div class="term-muted">Alperen · 10:42</div><div data-i18n="goalUser"></div>
+            <div class="term-muted">Deckent · 10:42</div><div data-i18n="goalResponse"></div>
+            <div class="term-card"><div class="term-card-head"><span>RUN-8421 · <span data-i18n="goalShort"></span></span><span class="term-accent scenario-content" data-for="active" data-i18n="running"></span><span class="term-warn scenario-content" data-for="approval" data-i18n="awaitingApproval"></span><span class="term-warn scenario-content" data-for="stale" data-i18n="stale"></span><span class="term-abort scenario-content" data-for="failure" data-i18n="failed"></span><span class="term-go scenario-content" data-for="verified" data-i18n="verified"></span></div><div>8 work items · 4 files · $4.28 estimate</div><div class="term-grid"><span class="term-muted" data-i18n="plan"></span><span>rev 04 · digest 7c8a…19fe</span><span class="term-muted" data-i18n="workers"></span><span>2 active · 1 delayed</span><span class="term-muted" data-i18n="evidence"></span><span>5/8 · verifier pending</span></div></div>
+            <div class="scenario-content" data-for="active"><div>Deckent · <span data-i18n="workersDetail"></span></div><div class="term-muted">Type /inspect RUN-8421 for operator detail.</div></div>
+            <div class="scenario-content" data-for="approval"><div class="term-card"><div class="term-card-head"><span data-i18n="approvalRequired"></span><span class="term-warn">08:42</span></div><div data-i18n="approvalConsequence"></div><div class="term-input">y <span data-i18n="approveOnce"></span> · n <span data-i18n="deny"></span> · d <span data-i18n="details"></span></div></div></div>
+            <div class="scenario-content" data-for="stale"><div class="term-card"><div class="term-card-head"><span data-i18n="connectionLost"></span><span class="term-warn">STALE · 36s</span></div><div data-i18n="staleDetail"></div><div class="term-input">r <span data-i18n="reconnectReplay"></span></div></div></div>
+            <div class="scenario-content" data-for="failure"><div class="term-card"><div class="term-card-head"><span data-i18n="workerFailed"></span><span class="term-abort">W-03</span></div><div data-i18n="failureDetail"></div><div class="term-input">r <span data-i18n="retryCheckpoint"></span> · d <span data-i18n="details"></span></div></div></div>
+            <div class="scenario-content" data-for="verified"><div>Deckent · <span data-i18n="verifiedDetail"></span></div><div class="term-go">cross-verify-verdict:sha256:91fe…</div></div>
+            <div class="term-input"><span class="term-accent">›</span> <span data-i18n="commandPrompt"></span><span class="term-accent">█</span></div><div class="term-footer"><span>ASK</span><span>claude · standard</span><span>CONV-219 / RUN-8421</span><span>Σ 42.8k tok</span></div>
+          </div></div></div>
+        </section>
+      </article>
+    </section>
+
+    <footer class="review-footer">
+      <p id="decision-prompt"></p>
+      <div class="shortcut-list"><kbd>1</kbd> A · <kbd>2</kbd> B · <kbd>3</kbd> C · <kbd>D</kbd> Desktop · <kbd>T</kbd> Terminal</div>
+    </footer>
+  </main>
+
+  <script>
+    const copy = {
+      en: {
+        reviewTitle: "Golden Workflow · Direction Review",
+        reviewStatus: "Design evidence · representative data · not a live product surface",
+        desktop: "Desktop",
+        terminal: "Terminal",
+        day: "Day",
+        night: "Night",
+        sameWorkflow: "Same workflow · same states · different spatial grammar",
+        bestFor: "Best for",
+        strength: "Strength",
+        risk: "Risk",
+        scenarioActive: "Scenario · active run",
+        scenarioApproval: "Scenario · approval",
+        scenarioStale: "Scenario · stale connection",
+        scenarioFailure: "Scenario · partial failure",
+        scenarioVerified: "Scenario · verified result",
+        scenarioActiveShort: "Active",
+        scenarioApprovalShort: "Approval",
+        scenarioStaleShort: "Stale",
+        scenarioFailureShort: "Failure",
+        scenarioVerifiedShort: "Verified",
+        representative: "Representative design scenario · no production-complete claim",
+        liveNow: "live · 6s",
+        goal: "Stabilize cross-platform provider handoff",
+        goalShort: "Provider handoff",
+        goalUser: "Stabilize provider handoff across macOS, Linux, Windows native and WSL without breaking active runs.",
+        goalResponse: "I mapped an eight-item run. Four files are in scope; elevated mutations will pause for your approval.",
+        work: "Work",
+        control: "Control",
+        tools: "Tools",
+        views: "Views",
+        hierarchy: "Hierarchy",
+        currentRun: "Current run",
+        conversations: "Conversations",
+        runs: "Runs",
+        approvals: "Approvals",
+        connections: "Connections",
+        changes: "Changes",
+        topology: "Topology",
+        timeline: "Timeline",
+        evidence: "Evidence",
+        running: "Running",
+        awaitingApproval: "Awaiting approval",
+        stale: "Stale",
+        failed: "Failed",
+        verified: "Verified",
+        intentRecorded: "Intent and scope recorded",
+        intentDetail: "Conversation CONV-219 linked to logical run RUN-8421",
+        planAccepted: "Plan revision accepted",
+        workersActive: "Workers executing",
+        workersDetail: "Five of eight work items have evidence; W-03 heartbeat is delayed.",
+        approvalRequired: "Elevated approval required",
+        approvalDetail: "Exact revision is parked before a governed mutation.",
+        connectionLost: "Connection interrupted",
+        staleDetail: "Last known running at sequence 412. No new state is inferred until replay.",
+        workerFailed: "Worker stopped after partial effects",
+        failureDetail: "Two files changed. Retry is safe only from checkpoint cp-019 after inspection.",
+        verificationClosed: "Independent verification closed",
+        verifiedDetail: "Separate-provider verdict, usage and durable receipt are bound to the result.",
+        settlement: "Settlement and cross-surface resume",
+        settlementDetail: "Final result remains pending until durable readback is complete.",
+        evidenceInspector: "Evidence inspector",
+        selectedEvent: "Selected causal event",
+        selectedNode: "Selected operation",
+        authority: "Authority",
+        scope: "Scope",
+        freshness: "Freshness",
+        cost: "Cost",
+        nextSafeAction: "Next safe action",
+        observeOrGuide: "Continue observing or guide one worker",
+        openWorker: "Open worker W-03",
+        pauseBoundary: "Pause at safe boundary",
+        exactConsequence: "Exact consequence",
+        consequence: "Consequence",
+        approvalConsequence: "Apply the approved failover policy to four scoped files; no credential value is exposed.",
+        approvalExpiry: "Single-use · expires in 08:42 · requested by W-03",
+        approveOnce: "Approve once",
+        deny: "Deny",
+        details: "details",
+        lastKnown: "Last-known state",
+        replayNeeded: "Reconnect and replay from cursor 412 before enabling intervention.",
+        reconnectReplay: "Reconnect + replay",
+        partialEffects: "Partial effects",
+        retryCheckpoint: "Retry from cp-019",
+        inspectChanges: "Inspect changes",
+        verification: "Verification",
+        reviewSettlement: "Review settlement",
+        runAdmitted: "Run admitted",
+        guideWorker: "Guide W-03",
+        reviewApproval: "Review exact approval",
+        commandPrompt: "Describe the next outcome or type / for commands",
+        send: "Send",
+        runBrief: "Run briefing",
+        plan: "Plan",
+        workers: "Workers",
+        causalTree: "Causal execution tree"
+      },
+      tr: {
+        reviewTitle: "Golden Workflow · Yön Değerlendirmesi",
+        reviewStatus: "Tasarım kanıtı · temsilî veri · canlı ürün yüzeyi değil",
+        desktop: "Desktop",
+        terminal: "Terminal",
+        day: "Gündüz",
+        night: "Gece",
+        sameWorkflow: "Aynı workflow · aynı durumlar · farklı mekânsal gramer",
+        bestFor: "En uygun",
+        strength: "Güç",
+        risk: "Risk",
+        scenarioActive: "Senaryo · aktif run",
+        scenarioApproval: "Senaryo · onay",
+        scenarioStale: "Senaryo · bayat bağlantı",
+        scenarioFailure: "Senaryo · kısmi hata",
+        scenarioVerified: "Senaryo · doğrulanmış sonuç",
+        scenarioActiveShort: "Aktif",
+        scenarioApprovalShort: "Onay",
+        scenarioStaleShort: "Bayat",
+        scenarioFailureShort: "Hata",
+        scenarioVerifiedShort: "Doğrulandı",
+        representative: "Temsilî tasarım senaryosu · production-complete iddiası yok",
+        liveNow: "canlı · 6sn",
+        goal: "Cross-platform provider handoff’unu kararlı hale getir",
+        goalShort: "Provider handoff",
+        goalUser: "Aktif run’ları bozmadan macOS, Linux, Windows native ve WSL arasında provider handoff’unu kararlı hale getir.",
+        goalResponse: "Sekiz işlik bir run çıkardım. Dört dosya scope’ta; elevated mutation’lar onayın için duracak.",
+        work: "Çalışma",
+        control: "Kontrol",
+        tools: "Araçlar",
+        views: "Görünümler",
+        hierarchy: "Hiyerarşi",
+        currentRun: "Aktif run",
+        conversations: "Konuşmalar",
+        runs: "Run’lar",
+        approvals: "Onaylar",
+        connections: "Bağlantılar",
+        changes: "Değişiklikler",
+        topology: "Topoloji",
+        timeline: "Zaman çizgisi",
+        evidence: "Kanıt",
+        running: "Çalışıyor",
+        awaitingApproval: "Onay bekliyor",
+        stale: "Bayat",
+        failed: "Başarısız",
+        verified: "Doğrulandı",
+        intentRecorded: "Niyet ve scope kaydedildi",
+        intentDetail: "CONV-219 konuşması RUN-8421 logical run’ına bağlandı",
+        planAccepted: "Plan revizyonu kabul edildi",
+        workersActive: "Worker’lar çalışıyor",
+        workersDetail: "Sekiz işin beşinde kanıt var; W-03 heartbeat’i gecikmiş.",
+        approvalRequired: "Elevated onay gerekiyor",
+        approvalDetail: "Exact revision governed mutation öncesinde park edildi.",
+        connectionLost: "Bağlantı kesildi",
+        staleDetail: "Son bilinen durum sequence 412’de running. Replay olmadan yeni state çıkarılmıyor.",
+        workerFailed: "Worker kısmi etkilerden sonra durdu",
+        failureDetail: "İki dosya değişti. Retry yalnız inceleme sonrası cp-019 checkpoint’inden güvenli.",
+        verificationClosed: "Bağımsız doğrulama kapandı",
+        verifiedDetail: "Farklı provider verdict’i, usage ve durable receipt sonuca bağlandı.",
+        settlement: "Settlement ve yüzeyler-arası resume",
+        settlementDetail: "Durable readback tamamlanana kadar final sonuç pending kalır.",
+        evidenceInspector: "Kanıt inspector’ı",
+        selectedEvent: "Seçili causal event",
+        selectedNode: "Seçili operation",
+        authority: "Authority",
+        scope: "Scope",
+        freshness: "Tazelik",
+        cost: "Maliyet",
+        nextSafeAction: "Sıradaki güvenli eylem",
+        observeOrGuide: "İzlemeyi sürdür veya tek worker’ı yönlendir",
+        openWorker: "W-03’ü aç",
+        pauseBoundary: "Güvenli sınırda duraklat",
+        exactConsequence: "Exact sonuç",
+        consequence: "Sonuç",
+        approvalConsequence: "Onaylı failover policy dört scope’lu dosyaya uygulanacak; credential değeri görünmeyecek.",
+        approvalExpiry: "Tek kullanımlık · 08:42 içinde sona erer · W-03 istedi",
+        approveOnce: "Bir kez onayla",
+        deny: "Reddet",
+        details: "ayrıntı",
+        lastKnown: "Son bilinen durum",
+        replayNeeded: "Müdahaleyi açmadan önce cursor 412’den bağlan ve replay et.",
+        reconnectReplay: "Bağlan + replay",
+        partialEffects: "Kısmi etkiler",
+        retryCheckpoint: "cp-019’dan yeniden dene",
+        inspectChanges: "Değişiklikleri incele",
+        verification: "Doğrulama",
+        reviewSettlement: "Settlement’ı incele",
+        runAdmitted: "Run kabul edildi",
+        guideWorker: "W-03’ü yönlendir",
+        reviewApproval: "Exact onayı incele",
+        commandPrompt: "Sıradaki sonucu anlat veya komutlar için / yaz",
+        send: "Gönder",
+        runBrief: "Run özeti",
+        plan: "Plan",
+        workers: "Worker’lar",
+        causalTree: "Causal execution ağacı"
+      }
+    };
+
+    const directions = {
+      en: {
+        a: {
+          title: "A · Instrument Ledger",
+          summary: "Chronology is the primary architecture. Intent, policy, execution, intervention and evidence stay in one inspectable causal ledger.",
+          fit: "Governed execution, audit-heavy operation, incident review",
+          strength: "Highest causal clarity and safest approval/recovery placement",
+          risk: "Parallel topology is less immediate; expert operators may want a secondary graph"
+        },
+        b: {
+          title: "B · Flow Topology",
+          summary: "Execution structure is primary. Goal, flow, workers, attempts and verifier form a navigable topology with a persistent event rail.",
+          fit: "Many concurrent workers, complex dependencies, expert supervision",
+          strength: "Fast anomaly localization and strong spatial memory",
+          risk: "Graph complexity and accessibility cost rise sharply at enterprise scale"
+        },
+        c: {
+          title: "C · Progressive Briefing",
+          summary: "Conversation remains primary. A compact run briefing expands into operator and forensic detail only when the state or user asks for it.",
+          fit: "First-run clarity, mixed-experience teams, assistant-led work",
+          strength: "Lowest initial cognitive load without hiding risk or evidence verdict",
+          risk: "Expert detail can become one interaction too far if disclosure rules are weak"
+        }
+      },
+      tr: {
+        a: {
+          title: "A · Instrument Ledger",
+          summary: "Ana mimari kronolojidir. Niyet, policy, execution, intervention ve evidence tek incelenebilir causal ledger içinde kalır.",
+          fit: "Governed execution, audit-ağır operasyon, incident incelemesi",
+          strength: "En güçlü causal clarity ve en güvenli approval/recovery yerleşimi",
+          risk: "Paralel topoloji daha az doğrudan; uzman operator ikincil graph isteyebilir"
+        },
+        b: {
+          title: "B · Flow Topology",
+          summary: "Execution yapısı merkezdir. Goal, flow, worker, attempt ve verifier kalıcı event rail’i olan gezilebilir bir topoloji kurar.",
+          fit: "Çok worker’lı işler, karmaşık dependency’ler, uzman supervision",
+          strength: "Anomaliyi hızlı bulma ve güçlü spatial memory",
+          risk: "Graph karmaşıklığı ve accessibility maliyeti enterprise ölçekte hızla artar"
+        },
+        c: {
+          title: "C · Progressive Briefing",
+          summary: "Konuşma merkezde kalır. Kompakt run briefing, yalnız state veya kullanıcı istediğinde operator ve forensic ayrıntıya açılır.",
+          fit: "İlk kullanım, mixed-experience ekipler, assistant-led işler",
+          strength: "Risk ve evidence verdict’ini saklamadan en düşük ilk bilişsel yük",
+          risk: "Disclosure kuralları zayıfsa expert detail bir etkileşim fazla uzakta kalabilir"
+        }
+      }
+    };
+
+    const state = {
+      direction: "a",
+      surface: "desktop",
+      scenario: "active",
+      theme: "day",
+      language: "en"
+    };
+
+    function setPressed(selector, dataKey, value) {
+      document.querySelectorAll(selector).forEach(function (button) {
+        button.setAttribute("aria-pressed", String(button.dataset[dataKey] === value));
+      });
+    }
+
+    function renderLanguage() {
+      document.documentElement.lang = state.language;
+      document.querySelectorAll("[data-i18n]").forEach(function (node) {
+        const value = copy[state.language][node.dataset.i18n];
+        if (value !== undefined) node.textContent = value;
+      });
+      document.querySelectorAll(".scenario-control option").forEach(function (option) {
+        const value = copy[state.language][option.dataset.i18n];
+        if (value !== undefined) option.textContent = value;
+      });
+      const direction = directions[state.language][state.direction];
+      document.getElementById("direction-title").textContent = direction.title;
+      document.getElementById("direction-summary").textContent = direction.summary;
+      document.getElementById("direction-fit").textContent = direction.fit;
+      document.getElementById("direction-strength").textContent = direction.strength;
+      document.getElementById("direction-risk").textContent = direction.risk;
+      document.getElementById("decision-prompt").textContent = state.language === "tr"
+        ? "Owner kararı: A, B veya C. Hybrid istenirse hangi yönün primary IA olduğunu açıkça belirt."
+        : "Owner decision: A, B, or C. If hybrid, name which direction owns the primary IA.";
+    }
+
+    function render() {
+      document.documentElement.dataset.theme = state.theme;
+      document.body.dataset.scenario = state.scenario;
+      document.querySelectorAll(".scenario-content").forEach(function (node) {
+        node.hidden = node.dataset.for !== state.scenario;
+      });
+      document.querySelectorAll(".concept").forEach(function (concept) {
+        concept.classList.toggle("is-active", concept.dataset.concept === state.direction);
+      });
+      document.querySelectorAll(".surface").forEach(function (surface) {
+        surface.classList.toggle("is-active", surface.dataset.surfaceView === state.surface);
+      });
+      document.querySelectorAll(".scenario-step").forEach(function (button) {
+        if (button.dataset.scenario === state.scenario) button.setAttribute("aria-current", "step");
+        else button.removeAttribute("aria-current");
+      });
+      document.querySelector(".scenario-control").value = state.scenario;
+      setPressed(".direction-control", "direction", state.direction);
+      setPressed(".surface-control", "surface", state.surface);
+      setPressed(".theme-control", "theme", state.theme);
+      setPressed(".language-control", "language", state.language);
+      renderLanguage();
+      history.replaceState(null, "", "#" + [state.direction, state.surface, state.scenario, state.theme, state.language].join("/"));
+    }
+
+    document.querySelectorAll(".direction-control").forEach(function (button) {
+      button.addEventListener("click", function () { state.direction = button.dataset.direction; render(); });
+    });
+    document.querySelectorAll(".surface-control").forEach(function (button) {
+      button.addEventListener("click", function () { state.surface = button.dataset.surface; render(); });
+    });
+    document.querySelectorAll(".theme-control").forEach(function (button) {
+      button.addEventListener("click", function () { state.theme = button.dataset.theme; render(); });
+    });
+    document.querySelectorAll(".language-control").forEach(function (button) {
+      button.addEventListener("click", function () { state.language = button.dataset.language; render(); });
+    });
+    document.querySelectorAll(".scenario-step").forEach(function (button) {
+      button.addEventListener("click", function () { state.scenario = button.dataset.scenario; render(); });
+    });
+    document.querySelector(".scenario-control").addEventListener("change", function (event) {
+      state.scenario = event.target.value;
+      render();
+    });
+    window.addEventListener("keydown", function (event) {
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement) return;
+      const key = event.key.toLowerCase();
+      if (key === "1") state.direction = "a";
+      else if (key === "2") state.direction = "b";
+      else if (key === "3") state.direction = "c";
+      else if (key === "d") state.surface = "desktop";
+      else if (key === "t") state.surface = "terminal";
+      else return;
+      render();
+    });
+
+    const hash = location.hash.replace(/^#/, "").split("/");
+    if (["a", "b", "c"].includes(hash[0])) state.direction = hash[0];
+    if (["desktop", "terminal"].includes(hash[1])) state.surface = hash[1];
+    if (["active", "approval", "stale", "failure", "verified"].includes(hash[2])) state.scenario = hash[2];
+    if (["day", "night"].includes(hash[3])) state.theme = hash[3];
+    if (["en", "tr"].includes(hash[4])) state.language = hash[4];
+    render();
+  </script>
+</body>
+</html>

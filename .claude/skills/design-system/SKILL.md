@@ -1,7 +1,6 @@
 ---
 name: design-system
-description: Token architecture, component specifications, and slide generation. Three-layer tokens (primitive→semantic→component), CSS variables, spacing/typography scales, component specs, strategic slide creation. Use for design tokens, systematic design, brand-compliant presentations.
-argument-hint: "[component or token]"
+description: Create generic token architecture, component specifications, CSS variables, and presentation systems. For Deckent product components or tokens, use deckent-design-system and design-tokens-pipeline instead.
 license: MIT
 metadata:
   author: claudekit
@@ -11,6 +10,9 @@ metadata:
 # Design System
 
 Token architecture, component specifications, systematic design, slide generation.
+
+This generic skill is not Deckent design-system authority. Deckent work routes through
+`deckent-design-dna`, `deckent-design-system`, and `design-tokens-pipeline`.
 
 ## When to Use
 

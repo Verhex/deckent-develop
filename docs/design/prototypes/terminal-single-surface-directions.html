@@ -1,0 +1,1182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Deckent Terminal — Single-Surface Directions</title>
+  <style>
+    @font-face {
+      font-family: "Bricolage";
+      src: url("../../../src/desktop/src/renderer/fonts/bricolage-latin.woff2") format("woff2");
+      font-style: normal;
+      font-weight: 400 700;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: "Geist Mono";
+      src: url("../../../src/desktop/src/renderer/fonts/geistmono-latin.woff2") format("woff2");
+      font-style: normal;
+      font-weight: 400 700;
+      font-display: swap;
+    }
+
+    :root {
+      color-scheme: dark;
+      --ui: "Bricolage", "Segoe UI", Arial, sans-serif;
+      --mono: "Geist Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      --page: #0b1012;
+      --page-2: #11181a;
+      --frame: #1d2729;
+      --term: #101718;
+      --term-2: #151e20;
+      --term-3: #1a2527;
+      --line: #304043;
+      --line-strong: #526265;
+      --ink: #e7ebe7;
+      --ink-2: #bac4c1;
+      --muted: #81908e;
+      --faint: #81908e;
+      --oxide: #ef795b;
+      --oxide-2: #bc5138;
+      --positive: #77b99b;
+      --caution: #d8ad61;
+      --negative: #dc7a76;
+      --info: #79adba;
+      --focus: #ff8a6d;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      min-width: 760px;
+      background: var(--page);
+      color: var(--ink);
+      font-family: var(--ui);
+      font-size: 14px;
+    }
+    button, input { font: inherit; }
+    button:focus-visible, input:focus-visible, [tabindex]:focus-visible {
+      outline: 2px solid var(--focus);
+      outline-offset: 2px;
+    }
+    [hidden] { display: none !important; }
+
+    .study-bar {
+      min-height: 68px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 18px;
+      padding: 10px 18px;
+      border-bottom: 1px solid var(--frame);
+      background: #0e1416;
+    }
+    .study-title { flex: 1 1 260px; }
+    .study-title strong {
+      display: block;
+      color: #f2f4f1;
+      font-size: 15px;
+      letter-spacing: .01em;
+    }
+    .study-title span {
+      display: block;
+      margin-top: 3px;
+      color: #8e9b99;
+      font: 500 10px/1.35 var(--mono);
+    }
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .group-label {
+      margin-right: 5px;
+      color: #6f7e7c;
+      font: 600 9px/1 var(--mono);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .study-bar button {
+      min-height: 30px;
+      padding: 5px 9px;
+      border: 1px solid #2d3a3d;
+      border-radius: 3px;
+      background: #151d1f;
+      color: #aeb9b6;
+      cursor: pointer;
+      font: 600 10px/1 var(--mono);
+    }
+    .study-bar button:hover { border-color: #5a696b; color: #f0f3ef; }
+    .study-bar button[aria-pressed="true"] {
+      border-color: #a64a37;
+      background: #2a1b18;
+      color: #ff9b81;
+    }
+
+    .stage {
+      min-height: calc(100vh - 68px);
+      display: grid;
+      place-items: center;
+      padding: 28px;
+      background:
+        linear-gradient(#11191b 1px, transparent 1px),
+        linear-gradient(90deg, #11191b 1px, transparent 1px),
+        var(--page);
+      background-size: 24px 24px;
+    }
+    .terminal-frame {
+      width: min(1240px, calc(100vw - 56px));
+      height: min(790px, calc(100vh - 124px));
+      min-height: 610px;
+      display: grid;
+      grid-template-rows: 32px minmax(0, 1fr) 32px;
+      border: 1px solid #465457;
+      border-radius: 5px;
+      overflow: hidden;
+      background: var(--term);
+      box-shadow: 0 22px 60px rgba(0, 0, 0, .35);
+      transition: width .18s ease;
+    }
+    body[data-width="80"] .terminal-frame { width: min(790px, calc(100vw - 56px)); }
+    body[data-width="40"] .terminal-frame { width: 480px; }
+
+    .frame-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 12px;
+      border-bottom: 1px solid #293638;
+      background: #172023;
+      color: #788684;
+      font: 500 10px/1 var(--mono);
+    }
+    .frame-mark { color: var(--oxide); font-weight: 700; }
+    .frame-title { color: #a9b4b1; }
+    .frame-note { margin-left: auto; color: #657472; }
+
+    .terminal {
+      min-height: 0;
+      position: relative;
+      display: grid;
+      grid-template-rows: 34px minmax(0, 1fr) 48px;
+      background: var(--term);
+      color: var(--ink);
+      font: 500 12px/1.48 var(--mono);
+      font-variant-numeric: tabular-nums;
+    }
+    .scope-line {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 0 13px;
+      border-bottom: 1px solid var(--line);
+      color: var(--ink-2);
+      white-space: nowrap;
+    }
+    .wordmark { color: #f1f4f0; font-weight: 700; }
+    .wordmark b { color: var(--oxide); }
+    .scope-sep { color: #445355; }
+    .scope-name { overflow: hidden; text-overflow: ellipsis; }
+    .connection { margin-left: auto; color: var(--positive); }
+    body[data-scenario="stale"] .connection { color: var(--caution); }
+    .authority { color: var(--info); }
+    .body-area { min-height: 0; overflow: hidden; }
+    .direction { height: 100%; min-height: 0; display: none; }
+    body[data-direction="workline"] [data-direction-panel="workline"],
+    body[data-direction="focus"] [data-direction-panel="focus"],
+    body[data-direction="ledger"] [data-direction-panel="ledger"] { display: grid; }
+
+    .workline {
+      grid-template-rows: auto minmax(0, 1fr) auto;
+    }
+    body[data-direction="workline"][data-lens="ledger"] .workline {
+      grid-template-rows: minmax(0, 1fr);
+    }
+    body[data-direction="workline"][data-lens="ledger"] .workline > .work-anchor,
+    body[data-direction="workline"][data-lens="ledger"] .workline > .stream,
+    body[data-direction="workline"][data-lens="ledger"] .workline > .decision-dock { display: none; }
+    .work-ledger-lens {
+      min-height: 0;
+      display: none;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+    }
+    body[data-direction="workline"][data-lens="ledger"] .work-ledger-lens { display: grid; }
+    .work-anchor {
+      display: grid;
+      grid-template-columns: minmax(260px, 1.2fr) minmax(220px, .8fr) auto;
+      gap: 18px;
+      padding: 12px 14px 11px;
+      border-bottom: 1px solid var(--line);
+      background: #121b1d;
+    }
+    .eyebrow {
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: .09em;
+      text-transform: uppercase;
+    }
+    .anchor-title { margin-top: 3px; color: #f0f2ef; font-size: 14px; font-weight: 650; }
+    .anchor-sub { margin-top: 2px; color: var(--muted); font-size: 10px; }
+    .progress-line { margin-top: 6px; color: var(--ink-2); }
+    .progress-line strong { color: #f4f5f2; }
+    .progress-track { display: inline-block; margin-right: 8px; color: var(--oxide); letter-spacing: -1px; }
+    .now-label { margin-top: 4px; color: #e8ebe8; }
+    .now-label .mark { color: var(--caution); }
+    .anchor-meta { text-align: right; color: var(--muted); }
+    .anchor-meta strong { display: block; color: var(--ink-2); font-weight: 600; }
+    .ledger-entry { display: block; margin-top: 5px; color: var(--ink-2); }
+    .ledger-entry .term-button { color: var(--oxide); }
+
+    .stream {
+      min-height: 0;
+      overflow: auto;
+      padding: 12px 14px 18px;
+      scrollbar-color: #3b494b transparent;
+    }
+    .event {
+      display: grid;
+      grid-template-columns: 68px 18px 122px minmax(0, 1fr) auto;
+      gap: 5px;
+      min-height: 25px;
+      align-items: baseline;
+      color: var(--ink-2);
+    }
+    .event time { color: var(--faint); }
+    .event .stem { color: #516163; }
+    .event .source { color: #99a8a5; }
+    .event .event-copy { min-width: 0; }
+    .event .event-copy strong { color: var(--ink); font-weight: 600; }
+    .event .event-state { color: var(--muted); text-align: right; }
+    .event.material .stem, .event.material .event-state { color: var(--caution); }
+    .event.success .stem, .event.success .event-state { color: var(--positive); }
+    .event.failure .stem, .event.failure .event-state { color: var(--negative); }
+    .event.proposed .stem, .event.proposed .event-state { color: var(--info); }
+    .event.user .source { color: var(--oxide); font-weight: 650; }
+    .event.extra { display: none; color: var(--muted); }
+    body[data-details="open"] .event.extra { display: grid; }
+    body:not([data-scenario="operating"]) .scenario-operating,
+    body:not([data-scenario="approval"]) .scenario-approval,
+    body:not([data-scenario="stale"]) .scenario-stale { display: none !important; }
+
+    .decision-dock {
+      border-top: 1px solid var(--line-strong);
+      background: var(--term-2);
+    }
+    .dock-row {
+      display: grid;
+      grid-template-columns: 104px minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      padding: 9px 14px;
+    }
+    .dock-kind { color: var(--caution); font-weight: 700; letter-spacing: .04em; }
+    .dock-kind.neutral { color: var(--info); }
+    .dock-kind.danger { color: var(--negative); }
+    .dock-copy { min-width: 0; color: var(--ink-2); }
+    .dock-copy strong { color: var(--ink); font-weight: 600; }
+    .dock-copy span { color: var(--muted); }
+    .term-actions { display: flex; align-items: center; gap: 8px; }
+    .term-button {
+      padding: 2px 0;
+      border: 0;
+      border-bottom: 1px solid transparent;
+      border-radius: 0;
+      background: transparent;
+      color: #d8ddda;
+      cursor: pointer;
+      font: 600 10px/1.2 var(--mono);
+    }
+    .term-button:hover { border-bottom-color: currentColor; color: #fff; }
+    .term-button.primary { background: transparent; color: #ffad98; }
+    .term-button.danger { color: #efa09b; }
+    kbd {
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      color: #bdc7c4;
+      font: 600 9px/1.2 var(--mono);
+    }
+
+    .focus-workspace {
+      grid-template-rows: auto minmax(0, 1fr);
+    }
+    .focus-head {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--line);
+      color: var(--ink-2);
+    }
+    .focus-head strong { color: var(--ink); font-size: 14px; }
+    .focus-head .head-progress { margin-left: auto; color: var(--oxide); }
+    .workspace-grid {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(300px, 34%);
+    }
+    .workspace-stream { min-height: 0; overflow: auto; padding: 13px 14px; }
+    .focus-pane {
+      min-width: 0;
+      overflow: auto;
+      padding: 13px 14px;
+      border-left: 1px solid var(--line-strong);
+      background: #141d1f;
+    }
+    .focus-pane h2 {
+      margin: 4px 0 4px;
+      color: #f2f4f1;
+      font: 650 14px/1.35 var(--mono);
+    }
+    .focus-pane p { margin: 0 0 12px; color: var(--muted); }
+    .fact-list { margin: 0; padding: 0; list-style: none; }
+    .fact-list li {
+      display: grid;
+      grid-template-columns: 92px minmax(0, 1fr);
+      gap: 9px;
+      padding: 5px 0;
+      border-top: 1px solid #263336;
+    }
+    .fact-list span { color: var(--muted); }
+    .fact-list strong { color: var(--ink-2); font-weight: 500; overflow-wrap: anywhere; }
+    .pane-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 13px; }
+    .pending-count { margin-top: 12px; color: var(--muted); }
+
+    .command-ledger {
+      grid-template-rows: auto minmax(0, 1fr);
+    }
+    .ledger-head {
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--line);
+      color: var(--ink-2);
+    }
+    .ledger-head strong { color: var(--ink); font-size: 14px; }
+    .ledger-return { float: right; }
+    .ledger-scroll { min-height: 0; overflow: auto; }
+    .ledger-columns, .ledger-row {
+      display: grid;
+      grid-template-columns: 34px minmax(210px, 1fr) 86px 120px 88px 98px;
+      gap: 10px;
+      align-items: center;
+      padding: 7px 14px;
+    }
+    .ledger-columns {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      border-bottom: 1px solid var(--line-strong);
+      background: var(--term-2);
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .ledger-row {
+      width: 100%;
+      border: 0;
+      border-bottom: 1px solid #253235;
+      background: transparent;
+      color: var(--ink-2);
+      cursor: pointer;
+      text-align: left;
+      font: inherit;
+    }
+    .ledger-row:hover, .ledger-row[aria-selected="true"] { background: #182326; }
+    .ledger-row[aria-selected="true"] .row-index { color: var(--oxide); }
+    .row-index::before { content: "  "; }
+    .ledger-row[aria-selected="true"] .row-index::before { content: "> "; }
+    .row-title strong { display: block; color: var(--ink); font-weight: 600; }
+    .row-title span { color: var(--muted); font-size: 10px; }
+    .state-attention { color: var(--caution); }
+    .state-running { color: var(--info); }
+    .state-success { color: var(--positive); }
+    .ledger-detail {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 16px;
+      padding: 12px 58px 14px;
+      border-bottom: 1px solid var(--line-strong);
+      background: #121b1d;
+    }
+    .ledger-detail p { margin: 0 0 4px; color: var(--ink-2); }
+    .ledger-detail .detail-muted { color: var(--muted); }
+    .ledger-hint {
+      padding: 9px 14px;
+      border-top: 1px solid var(--line-strong);
+      color: var(--muted);
+    }
+
+    .composer {
+      min-width: 0;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 9px;
+      padding: 0 13px;
+      border-top: 1px solid var(--line-strong);
+      background: #0d1416;
+    }
+    .prompt { color: var(--oxide); font-weight: 700; }
+    .composer input {
+      width: 100%;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: var(--ink);
+      font: 500 12px/1 var(--mono);
+    }
+    .composer input::placeholder { color: #60706e; }
+    .composer input:disabled { opacity: 1; cursor: default; }
+    .composer-hint { color: var(--muted); font-size: 10px; white-space: nowrap; }
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 12px;
+      border-top: 1px solid #293638;
+      background: #172023;
+      color: #758380;
+      font: 500 10px/1 var(--mono);
+    }
+    .status-bar strong { color: #abb6b3; font-weight: 600; }
+    .status-bar .recommend { margin-left: auto; color: #db8a74; }
+
+    .decision-review {
+      position: absolute;
+      z-index: 10;
+      inset: 34px 0 48px;
+      display: none;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      background: #11191b;
+    }
+    body[data-review="open"] .decision-review { display: grid; }
+    .review-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--line-strong);
+      color: var(--ink-2);
+    }
+    .review-head strong { color: var(--caution); }
+    .review-head button { margin-left: auto; }
+    .review-body { min-height: 0; overflow: auto; padding: 16px 14px 20px; }
+    .review-title { max-width: 850px; color: #f2f4f1; font-size: 15px; font-weight: 650; }
+    .review-summary { max-width: 850px; margin-top: 5px; color: var(--muted); }
+    .review-grid {
+      max-width: 980px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0 24px;
+      margin-top: 15px;
+      border-top: 1px solid var(--line);
+    }
+    .review-fact {
+      display: grid;
+      grid-template-columns: 130px minmax(0, 1fr);
+      gap: 12px;
+      padding: 7px 0;
+      border-bottom: 1px solid #263336;
+    }
+    .review-fact span { color: var(--muted); }
+    .review-fact strong { color: var(--ink-2); font-weight: 500; overflow-wrap: anywhere; }
+    .review-fact.critical strong { color: var(--caution); }
+    .review-note { max-width: 980px; margin-top: 14px; color: #b8c3c0; }
+    .review-result { margin-top: 12px; color: var(--positive); }
+    .review-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-top: 1px solid var(--line-strong);
+      background: var(--term-2);
+    }
+    .review-actions .action-context { margin-left: auto; color: var(--muted); }
+
+    body[data-term-bg="light"] .terminal-frame {
+      --term: #f7f7f3;
+      --term-2: #eeefea;
+      --term-3: #e5e8e3;
+      --line: #c7ceca;
+      --line-strong: #9ba8a4;
+      --ink: #17211f;
+      --ink-2: #34423f;
+      --muted: #586865;
+      --faint: #586865;
+      --oxide: #a53f2d;
+      --oxide-2: #843122;
+      --positive: #276c50;
+      --caution: #76540d;
+      --negative: #9a3534;
+      --info: #266476;
+      --focus: #a53f2d;
+      border-color: #87938f;
+      background: var(--term);
+      box-shadow: 0 22px 60px rgba(0, 0, 0, .2);
+    }
+    body[data-term-bg="light"] .frame-bar,
+    body[data-term-bg="light"] .status-bar {
+      border-color: #b9c2be;
+      background: #e6e9e5;
+      color: #53635f;
+    }
+    body[data-term-bg="light"] .frame-title,
+    body[data-term-bg="light"] .status-bar strong { color: #2f3d39; }
+    body[data-term-bg="light"] .frame-note { color: #60706c; }
+    body[data-term-bg="light"] .terminal,
+    body[data-term-bg="light"] .work-anchor,
+    body[data-term-bg="light"] .focus-pane,
+    body[data-term-bg="light"] .ledger-detail,
+    body[data-term-bg="light"] .decision-review,
+    body[data-term-bg="light"] .composer { background: var(--term); }
+    body[data-term-bg="light"] .decision-dock,
+    body[data-term-bg="light"] .ledger-columns,
+    body[data-term-bg="light"] .review-actions { background: var(--term-2); }
+    body[data-term-bg="light"] .wordmark,
+    body[data-term-bg="light"] .anchor-title,
+    body[data-term-bg="light"] .focus-pane h2,
+    body[data-term-bg="light"] .focus-head strong,
+    body[data-term-bg="light"] .ledger-head strong,
+    body[data-term-bg="light"] .row-title strong,
+    body[data-term-bg="light"] .review-title { color: #111b19; }
+    body[data-term-bg="light"] .progress-line strong,
+    body[data-term-bg="light"] .dock-copy strong,
+    body[data-term-bg="light"] .event .event-copy strong { color: #182320; }
+    body[data-term-bg="light"] .now-label,
+    body[data-term-bg="light"] .review-note { color: var(--ink-2); }
+    body[data-term-bg="light"] .event .source { color: var(--muted); }
+    body[data-term-bg="light"] .event.user .source { color: var(--oxide); }
+    body[data-term-bg="light"] .term-button,
+    body[data-term-bg="light"] kbd { color: var(--ink-2); }
+    body[data-term-bg="light"] .term-button.primary { color: var(--oxide); }
+    body[data-term-bg="light"] .term-button.danger { color: var(--negative); }
+    body[data-term-bg="light"] .composer input { color: #17211f; }
+    body[data-term-bg="light"] .composer input::placeholder { color: #687773; }
+    body[data-term-bg="light"] .ledger-row:hover,
+    body[data-term-bg="light"] .ledger-row[aria-selected="true"] { background: #e7ebe7; }
+    body[data-term-bg="light"] .ledger-row { border-color: var(--line); }
+
+    body[data-width="80"] .work-anchor { grid-template-columns: 1fr auto; }
+    body[data-width="80"] .work-anchor > :nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+    body[data-width="80"] .event { grid-template-columns: 60px 14px 100px minmax(0, 1fr); }
+    body[data-width="80"] .event-state { display: none; }
+    body[data-width="80"] .dock-row { grid-template-columns: 90px minmax(0, 1fr); }
+    body[data-width="80"] .dock-row .term-actions { grid-column: 2; }
+    body[data-width="80"] .workspace-grid { grid-template-columns: 1fr; }
+    body[data-width="80"] .focus-pane { border-top: 1px solid var(--line-strong); border-left: 0; }
+    body[data-width="80"] .ledger-columns, body[data-width="80"] .ledger-row {
+      grid-template-columns: 30px minmax(190px, 1fr) 84px 98px;
+    }
+    body[data-width="80"] .ledger-columns > :nth-child(5),
+    body[data-width="80"] .ledger-columns > :nth-child(6),
+    body[data-width="80"] .ledger-row > :nth-child(5),
+    body[data-width="80"] .ledger-row > :nth-child(6) { display: none; }
+    body[data-width="80"] .review-grid { grid-template-columns: 1fr; }
+    body[data-width="40"] .frame-note,
+    body[data-width="40"] .scope-name,
+    body[data-width="40"] .composer-hint,
+    body[data-width="40"] .status-bar > :nth-child(2) { display: none; }
+    body[data-width="40"] .scope-line { gap: 6px; }
+    body[data-width="40"] .connection { margin-left: auto; }
+    body[data-width="40"] .work-anchor { grid-template-columns: 1fr; gap: 8px; }
+    body[data-width="40"] .work-anchor > :nth-child(2) { grid-column: auto; grid-row: auto; }
+    body[data-width="40"] .anchor-meta { text-align: left; }
+    body[data-width="40"] .event { grid-template-columns: 54px 12px 82px minmax(0, 1fr); gap: 3px; }
+    body[data-width="40"] .event-state { display: none; }
+    body[data-width="40"] .stream { padding-inline: 9px; }
+    body[data-width="40"] .dock-row { grid-template-columns: 1fr; gap: 5px; padding-inline: 9px; }
+    body[data-width="40"] .dock-row .term-actions { grid-column: auto; }
+    body[data-width="40"] .workspace-grid { grid-template-columns: 1fr; }
+    body[data-width="40"] .workspace-stream { max-height: 43%; padding-inline: 9px; }
+    body[data-width="40"] .focus-pane { border-top: 1px solid var(--line-strong); border-left: 0; padding-inline: 9px; }
+    body[data-width="40"] .focus-head { display: grid; grid-template-columns: 1fr; gap: 2px; padding-inline: 9px; }
+    body[data-width="40"] .focus-head .head-progress { margin-left: 0; }
+    body[data-width="40"] .fact-list li { grid-template-columns: 78px minmax(0, 1fr); }
+    body[data-width="40"] .ledger-columns, body[data-width="40"] .ledger-row {
+      grid-template-columns: 38px minmax(150px, 1fr) 88px;
+      padding-inline: 9px;
+    }
+    body[data-width="40"] .ledger-columns > :nth-child(3),
+    body[data-width="40"] .ledger-columns > :nth-child(5),
+    body[data-width="40"] .ledger-columns > :nth-child(6),
+    body[data-width="40"] .ledger-row > :nth-child(3),
+    body[data-width="40"] .ledger-row > :nth-child(5),
+    body[data-width="40"] .ledger-row > :nth-child(6) { display: none; }
+    body[data-width="40"] .ledger-detail { grid-template-columns: 1fr; padding-inline: 46px 9px; }
+    body[data-width="40"] .review-grid { grid-template-columns: 1fr; }
+    body[data-width="40"] .review-fact { grid-template-columns: 104px minmax(0, 1fr); }
+    body[data-width="40"] .review-actions { flex-wrap: wrap; }
+    body[data-width="40"] .review-actions .action-context { width: 100%; margin-left: 0; }
+    body[data-width="40"] .status-bar { gap: 8px; }
+
+    @media (max-width: 980px) {
+      body { min-width: 620px; }
+      .study-title { flex-basis: 100%; }
+      .terminal-frame { width: calc(100vw - 34px); }
+      .stage { padding: 17px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body data-direction="workline" data-scenario="approval" data-width="120" data-details="closed" data-review="closed" data-term-bg="dark" data-glyph="unicode" data-lens="stream" data-selected-work="order">
+  <header class="study-bar">
+    <div class="study-title">
+      <strong>Terminal · Causal Workline with Work Ledger</strong>
+      <span>Review instrument only · bundled font, background and all controls are outside the product surface</span>
+    </div>
+    <div class="control-group" aria-label="Design direction">
+      <span class="group-label">Direction</span>
+      <button type="button" data-direction-value="workline" aria-pressed="true">A+C · Accepted</button>
+      <button type="button" data-direction-value="focus" aria-pressed="false">B · Focus</button>
+      <button type="button" data-direction-value="ledger" aria-pressed="false">C · Evidence</button>
+    </div>
+    <div class="control-group" aria-label="Scenario">
+      <span class="group-label">Scenario</span>
+      <button type="button" data-scenario-value="operating" aria-pressed="false">Operating</button>
+      <button type="button" data-scenario-value="approval" aria-pressed="true">Approval</button>
+      <button type="button" data-scenario-value="stale" aria-pressed="false">Stale</button>
+    </div>
+    <div class="control-group" aria-label="Viewport preview">
+      <span class="group-label">Viewport</span>
+      <button type="button" data-width-value="120" aria-pressed="true">120 col</button>
+      <button type="button" data-width-value="80" aria-pressed="false">80 col</button>
+      <button type="button" data-width-value="40" aria-pressed="false">40 col</button>
+    </div>
+    <div class="control-group" aria-label="Terminal background preview">
+      <span class="group-label">Background</span>
+      <button type="button" data-term-bg-value="dark" aria-pressed="true">Dark</button>
+      <button type="button" data-term-bg-value="light" aria-pressed="false">Light</button>
+    </div>
+    <div class="control-group" aria-label="Terminal glyph preview">
+      <span class="group-label">Glyphs</span>
+      <button type="button" data-glyph-value="unicode" aria-pressed="true">Unicode</button>
+      <button type="button" data-glyph-value="ascii" aria-pressed="false">ASCII</button>
+    </div>
+  </header>
+
+  <main class="stage">
+    <section class="terminal-frame" aria-label="Deckent Terminal design prototype">
+      <div class="frame-bar">
+        <span class="frame-mark">D</span>
+        <span class="frame-title">deckent · northstar / production-eu</span>
+        <span class="frame-note">reference capture · host owns font + background</span>
+      </div>
+
+      <div class="terminal">
+        <div class="scope-line">
+          <span class="wordmark">deck<b>ent</b></span>
+          <span class="scope-sep">/</span>
+          <span class="scope-name">northstar · production-eu · order-orchestration</span>
+          <span class="connection scenario-operating">connected · 3s</span>
+          <span class="connection scenario-approval">connected · 4s</span>
+          <span class="connection scenario-stale">stale · last evidence 11m</span>
+          <span class="scope-sep">|</span>
+          <span class="authority">authority ASK</span>
+        </div>
+
+        <div class="body-area">
+          <section class="direction workline" data-direction-panel="workline" aria-label="Accepted Causal Workline with contextual Work Ledger">
+            <div class="work-anchor">
+              <div>
+                <div class="eyebrow" id="anchor-eyebrow">Selected outcome · SO-10482</div>
+                <div class="anchor-title" id="anchor-title">Release customer order before 16:00 promise</div>
+                <div class="anchor-sub" id="anchor-sub">Flow 8f32c1 · initiated by Maya Chen · policy production-standard</div>
+              </div>
+              <div>
+                <div class="progress-line"><span class="progress-track" id="anchor-track">━━━━━╺━━</span><strong id="anchor-progress">5/8</strong> work items evidenced</div>
+                <div class="now-label scenario-operating"><span class="mark">│</span> now · validating inventory reservation</div>
+                <div class="now-label scenario-approval"><span class="mark">!</span> now · allocation approval required</div>
+                <div class="now-label scenario-stale"><span class="mark">?</span> now · ERP connection freshness unknown</div>
+              </div>
+              <div class="anchor-meta">
+                <strong id="anchor-changed">changed 42s ago</strong>
+                <span id="anchor-owner">owner · fulfillment-ai</span>
+                <span class="ledger-entry">3 active · 1 decision · <button class="term-button" type="button" data-open-work-ledger>[/runs] ledger</button></span>
+              </div>
+            </div>
+
+            <div class="stream" aria-label="Causal work stream" tabindex="0">
+              <div class="event user"><time>09:42:03</time><span class="stem">│</span><span class="source">maya</span><span class="event-copy">Release SO-10482 before the customer promise; preserve fraud and inventory policy.</span><span class="event-state">intent</span></div>
+              <div class="event proposed"><time>09:42:05</time><span class="stem">├</span><span class="source">planner</span><span class="event-copy"><strong>8 work items proposed</strong> · 2 dependency waves · digest 8f32c1b7d201…</span><span class="event-state">proposed</span></div>
+              <div class="event success"><time>09:42:08</time><span class="stem">├</span><span class="source">policy</span><span class="event-copy">Scope and topology admitted; concurrency 3/6.</span><span class="event-state">allowed</span></div>
+              <div class="event"><time>09:42:14</time><span class="stem">├</span><span class="source">erp.lookup</span><span class="event-copy">Read inventory for SKU-88 across WH-AMS-02 and WH-BER-01.</span><span class="event-state">read</span></div>
+              <div class="event success"><time>09:42:17</time><span class="stem">├</span><span class="source">evidence</span><span class="event-copy">Availability confirmed: 214 units · source revision erp:774021.</span><span class="event-state">verified</span></div>
+
+              <div class="event scenario-only scenario-operating"><time>09:42:21</time><span class="stem">├</span><span class="source">atlas-03</span><span class="event-copy"><strong>Reservation validation running</strong> · checkpoint reserve-2.</span><span class="event-state">active · 21s</span></div>
+              <div class="event scenario-only scenario-operating extra"><time>09:42:22</time><span class="stem">└</span><span class="source">provider</span><span class="event-copy">claude / sonnet profile · context 18% · cost evidence available.</span><span class="event-state">healthy</span></div>
+
+              <div class="event material scenario-only scenario-approval"><time>09:42:21</time><span class="stem">!</span><span class="source">policy</span><span class="event-copy"><strong>Approval required</strong> · allocate 180 units at WH-AMS-02.</span><span class="event-state">expires 08:34</span></div>
+              <div class="event scenario-only scenario-approval"><time>09:42:22</time><span class="stem">└</span><span class="source">erp.reserve</span><span class="event-copy">Waiting before side effect; no inventory mutation has occurred.</span><span class="event-state">blocked</span></div>
+              <div class="event scenario-only scenario-approval extra"><time>09:42:22</time><span class="stem">└</span><span class="source">authority</span><span class="event-copy">requester atlas-03 · policy inventory.high-value · default deny.</span><span class="event-state">bounded</span></div>
+
+              <div class="event failure scenario-only scenario-stale"><time>09:42:21</time><span class="stem">?</span><span class="source">erp.gateway</span><span class="event-copy"><strong>Heartbeat delayed</strong> · last confirmed response 11m ago.</span><span class="event-state">stale</span></div>
+              <div class="event scenario-only scenario-stale"><time>09:42:22</time><span class="stem">└</span><span class="source">controller</span><span class="event-copy">Reservation held before write; reconciliation not started.</span><span class="event-state">safe boundary</span></div>
+              <div class="event scenario-only scenario-stale extra"><time>09:42:22</time><span class="stem">└</span><span class="source">evidence</span><span class="event-copy">Known: lookup revision 774021. Unknown: current gateway session.</span><span class="event-state">partial</span></div>
+              <div class="event" id="dynamic-output"><time>09:42:23</time><span class="stem">│</span><span class="source">deckent</span><span class="event-copy">Focus preserved on SO-10482. Press [d] for evidence detail.</span><span class="event-state">ready</span></div>
+            </div>
+
+            <div class="decision-dock">
+              <div class="dock-row scenario-only scenario-operating">
+                <span class="dock-kind neutral">CURRENT</span>
+                <span class="dock-copy"><strong>atlas-03</strong> validates reservation · 21s · next: policy evaluation</span>
+                <span class="term-actions"><button class="term-button" type="button" data-toggle-details>[d] evidence</button></span>
+              </div>
+              <div class="dock-row scenario-only scenario-approval">
+                <span class="dock-kind">DECISION 1/3</span>
+                <span class="dock-copy"><strong>Allocate 180 units at WH-AMS-02</strong> <span>· high risk · expires 08:34 · default deny</span></span>
+                <span class="term-actions"><button class="term-button primary" type="button" data-open-review>[a] review approval</button><button class="term-button" type="button" data-toggle-details>[d] evidence</button></span>
+              </div>
+              <div class="dock-row scenario-only scenario-stale">
+                <span class="dock-kind danger">RECOVERY</span>
+                <span class="dock-copy"><strong>ERP evidence is stale</strong> <span>· writes held · reconcile only after reachability proof</span></span>
+                <span class="term-actions"><button class="term-button" type="button" data-toggle-details>[d] evidence</button></span>
+              </div>
+            </div>
+
+            <section class="work-ledger-lens" aria-label="Contextual Work Ledger">
+              <div class="ledger-head">
+                <strong>Work ledger</strong> · 3 active outcomes · 1 decision · refreshed 4s
+                <button class="term-button ledger-return" type="button" data-close-work-ledger>[Esc] workline</button>
+              </div>
+              <div class="ledger-scroll" aria-label="Live work ledger">
+                <div class="ledger-columns" aria-hidden="true"><span>#</span><span>Outcome</span><span>Progress</span><span>Now</span><span>Changed</span><span>Evidence</span></div>
+                <button class="ledger-row" type="button" aria-selected="true" data-work-row="order">
+                  <span class="row-index">01</span><span class="row-title"><strong>Release SO-10482</strong><span>northstar · production-eu</span></span><span>5/8</span><span class="state-attention">approval</span><span>42s</span><span>partial</span>
+                </button>
+                <button class="ledger-row" type="button" aria-selected="false" data-work-row="release">
+                  <span class="row-index">02</span><span class="row-title"><strong>Deploy release 4.18.2</strong><span>storefront · canary</span></span><span>11/14</span><span class="state-running">verifying</span><span>18s</span><span>pending</span>
+                </button>
+                <button class="ledger-row" type="button" aria-selected="false" data-work-row="invoice">
+                  <span class="row-index">03</span><span class="row-title"><strong>Reconcile invoice batch 771</strong><span>finance · sap-prod</span></span><span>24/24</span><span class="state-success">settling</span><span>2m</span><span>verified</span>
+                </button>
+              </div>
+              <div class="ledger-hint">↑↓ select · Enter focus in Workline · Esc return unchanged · ⟳ live · stable flow identity</div>
+            </section>
+          </section>
+
+          <section class="direction focus-workspace" data-direction-panel="focus" aria-label="Direction B Focus Workspace">
+            <div class="focus-head">
+              <strong>SO-10482 · Release customer order</strong>
+              <span>now: inventory allocation</span>
+              <span class="head-progress">5/8 evidenced · changed 42s</span>
+            </div>
+            <div class="workspace-grid">
+              <div class="workspace-stream" aria-label="Work stream" tabindex="0">
+                <div class="event user"><time>09:42:03</time><span class="stem">│</span><span class="source">maya</span><span class="event-copy">Release SO-10482 before 16:00; preserve policy.</span><span class="event-state">intent</span></div>
+                <div class="event proposed"><time>09:42:05</time><span class="stem">├</span><span class="source">planner</span><span class="event-copy">8 work items · 2 waves · digest 8f32c1…</span><span class="event-state">proposed</span></div>
+                <div class="event success"><time>09:42:17</time><span class="stem">├</span><span class="source">evidence</span><span class="event-copy">214 units confirmed at source revision 774021.</span><span class="event-state">verified</span></div>
+                <div class="event material scenario-only scenario-approval"><time>09:42:21</time><span class="stem">!</span><span class="source">policy</span><span class="event-copy">Allocation requires bounded approval.</span><span class="event-state">waiting</span></div>
+                <div class="event scenario-only scenario-operating"><time>09:42:21</time><span class="stem">├</span><span class="source">atlas-03</span><span class="event-copy">Validating reservation at checkpoint reserve-2.</span><span class="event-state">active</span></div>
+                <div class="event failure scenario-only scenario-stale"><time>09:42:21</time><span class="stem">?</span><span class="source">gateway</span><span class="event-copy">ERP heartbeat delayed; writes held.</span><span class="event-state">stale 11m</span></div>
+                <div class="event"><time>09:42:23</time><span class="stem">│</span><span class="source">deckent</span><span class="event-copy">Selected identity remains stable while new events arrive.</span><span class="event-state">live</span></div>
+              </div>
+              <aside class="focus-pane" aria-label="Selected work focus">
+                <div class="eyebrow scenario-operating">Focused operation</div>
+                <div class="eyebrow scenario-approval">Approval required · 1 of 3</div>
+                <div class="eyebrow scenario-stale">Recovery boundary</div>
+                <h2 class="scenario-operating">Validate inventory reservation</h2>
+                <h2 class="scenario-approval">Allocate 180 units at WH-AMS-02</h2>
+                <h2 class="scenario-stale">Restore ERP reachability evidence</h2>
+                <p class="scenario-operating">atlas-03 · active 21s · no material exception</p>
+                <p class="scenario-approval">No inventory side effect has occurred. Expires in 08:34.</p>
+                <p class="scenario-stale">Last confirmed response was 11m ago. Writes remain held.</p>
+                <ul class="fact-list">
+                  <li><span>Outcome</span><strong>Release SO-10482 before 16:00</strong></li>
+                  <li><span>Principal</span><strong>atlas-03 via fulfillment-ai</strong></li>
+                  <li><span>Scope</span><strong>northstar / production-eu / SO-10482</strong></li>
+                  <li class="scenario-operating"><span>Evidence</span><strong>inventory revision 774021 verified</strong></li>
+                  <li class="scenario-approval"><span>Default</span><strong>deny at expiry</strong></li>
+                  <li class="scenario-stale"><span>Unknown</span><strong>current ERP gateway session</strong></li>
+                </ul>
+                <div class="pane-actions scenario-approval"><button class="term-button primary" type="button" data-open-review>[a] review approval</button><button class="term-button" type="button" data-toggle-details>[d] evidence</button></div>
+                <div class="pane-actions scenario-operating"><button class="term-button" type="button" data-toggle-details>[d] evidence</button></div>
+                <div class="pane-actions scenario-stale"><button class="term-button" type="button" data-toggle-details>[d] recovery facts</button></div>
+                <div class="pending-count scenario-approval">+ 2 other decisions · open through the same focus rail</div>
+              </aside>
+            </div>
+          </section>
+
+          <section class="direction command-ledger" data-direction-panel="ledger" aria-label="Direction C Command Ledger">
+            <div class="ledger-head"><strong>Work ledger</strong> · 3 active outcomes · 1 decision · refreshed 4s</div>
+            <div class="ledger-scroll">
+              <div class="ledger-columns" aria-hidden="true"><span>#</span><span>Outcome</span><span>Progress</span><span>Now</span><span>Changed</span><span>Evidence</span></div>
+              <button class="ledger-row" type="button" aria-selected="true" data-ledger-row="order">
+                <span class="row-index">01</span><span class="row-title"><strong>Release SO-10482</strong><span>northstar · production-eu</span></span><span>5/8</span><span class="state-attention scenario-approval">approval</span><span class="state-running scenario-operating">validating</span><span class="state-attention scenario-stale">stale ERP</span><span>42s</span><span>partial</span>
+              </button>
+              <div class="ledger-detail" data-ledger-detail="order">
+                <div>
+                  <p class="scenario-operating">Current: atlas-03 validates reservation · next policy evaluation</p>
+                  <p class="scenario-approval">Decision: allocate 180 units at WH-AMS-02 · high risk · default deny</p>
+                  <p class="scenario-stale">Recovery: writes held until ERP reachability is proved</p>
+                  <p class="detail-muted">Flow 8f32c1 · owner fulfillment-ai · inventory evidence revision 774021</p>
+                </div>
+                <div class="term-actions scenario-approval"><button class="term-button primary" type="button" data-open-review>[a] review</button></div>
+              </div>
+              <button class="ledger-row" type="button" aria-selected="false" data-ledger-row="release">
+                <span class="row-index">02</span><span class="row-title"><strong>Deploy release 4.18.2</strong><span>storefront · canary</span></span><span>11/14</span><span class="state-running">verifying</span><span>18s</span><span>pending</span>
+              </button>
+              <div class="ledger-detail" data-ledger-detail="release" hidden>
+                <div><p>Current: canary verification in region eu-west</p><p class="detail-muted">No approval pending · verifier evidence expected next</p></div>
+              </div>
+              <button class="ledger-row" type="button" aria-selected="false" data-ledger-row="invoice">
+                <span class="row-index">03</span><span class="row-title"><strong>Reconcile invoice batch 771</strong><span>finance · sap-prod</span></span><span>24/24</span><span class="state-success">settling</span><span>2m</span><span>verified</span>
+              </button>
+              <div class="ledger-detail" data-ledger-detail="invoice" hidden>
+                <div><p>Current: durable settlement receipt is being indexed</p><p class="detail-muted">All 24 records verified · no side-effect discrepancy</p></div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <form class="composer" id="composer">
+          <span class="prompt">›</span>
+          <input id="command-input" autocomplete="off" aria-label="Tell Deckent what to do" placeholder="Tell Deckent what to do, / for commands, @ for context">
+          <span class="composer-hint" id="composer-hint">[/] commands · [/runs] ledger · [d] detail</span>
+        </form>
+
+        <section class="decision-review" aria-label="Bounded approval review" aria-hidden="true">
+          <div class="review-head"><strong>APPROVAL REVIEW</strong><span>apr-7fe12 · expires in 08:34</span><button class="term-button" type="button" data-close-review>[Esc] back</button></div>
+          <div class="review-body">
+            <div class="review-title">Allocate 180 units of SKU-88 at WH-AMS-02 for sales order SO-10482</div>
+            <div class="review-summary">This decision permits one inventory reservation. Shipment, invoicing and any later allocation remain outside this scope.</div>
+            <div class="review-grid">
+              <div class="review-fact"><span>Requestor</span><strong>atlas-03 · worker · fulfillment-ai</strong></div>
+              <div class="review-fact"><span>Authority</span><strong>inventory.high-value · approval required</strong></div>
+              <div class="review-fact"><span>Tenant / env</span><strong>northstar / production-eu</strong></div>
+              <div class="review-fact"><span>Affected object</span><strong>SO-10482 · SKU-88 · WH-AMS-02</strong></div>
+              <div class="review-fact"><span>Bounded scope</span><strong>reserve 180 units once · no substitution</strong></div>
+              <div class="review-fact critical"><span>Risk</span><strong>high · affects available-to-promise inventory</strong></div>
+              <div class="review-fact"><span>Expires</span><strong>09:51:00 · default deny</strong></div>
+              <div class="review-fact"><span>Cost / capacity</span><strong>180 units held · no provider cost materiality</strong></div>
+              <div class="review-fact"><span>Consequence</span><strong>other orders cannot allocate these units while held</strong></div>
+              <div class="review-fact"><span>Recovery limit</span><strong>reservation can be released before shipment; later reversal needs reconciliation</strong></div>
+              <div class="review-fact"><span>Source evidence</span><strong>ERP inventory revision 774021 · verified 34s ago</strong></div>
+              <div class="review-fact"><span>Arguments</span><strong>sku=SKU-88 warehouse=WH-AMS-02 quantity=180</strong></div>
+            </div>
+            <div class="review-note">Approve once grants only this request ID. It does not change the policy, create a reusable allow-scope or start a different run.</div>
+            <div class="review-result" id="review-result" role="status" aria-live="polite"></div>
+          </div>
+          <div class="review-actions"><button class="term-button primary" type="button" data-decision="approve">[y] approve once</button><button class="term-button danger" type="button" data-decision="deny">[n] deny</button><button class="term-button" type="button" data-toggle-details>[d] raw evidence</button><span class="action-context">decision is attributed to terminal principal maya.chen</span></div>
+        </section>
+      </div>
+
+      <footer class="status-bar">
+        <span><strong>A+C</strong> accepted · Workline default + contextual Work Ledger</span>
+        <span>prototype paths: <strong>/runs</strong> ledger · <strong>↑↓</strong> select · <strong>Enter</strong> focus · <strong>Esc</strong> return</span>
+        <span class="recommend">not Basic / Advanced</span>
+      </footer>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      var body = document.body;
+      var input = document.getElementById("command-input");
+      var composerHint = document.getElementById("composer-hint");
+      var review = document.querySelector(".decision-review");
+      var reviewResult = document.getElementById("review-result");
+      var workRows = Array.from(document.querySelectorAll("[data-work-row]"));
+      var selectedWorkIndex = 0;
+      var inputPlaceholder = input.getAttribute("placeholder");
+      var workItems = {
+        order: {
+          eyebrow: "Selected outcome · SO-10482",
+          title: "Release customer order before 16:00 promise",
+          sub: "Flow 8f32c1 · initiated by Maya Chen · policy production-standard",
+          progress: "5/8",
+          track: "━━━━━╺━━",
+          changed: "changed 42s ago",
+          owner: "owner · fulfillment-ai",
+          now: {
+            operating: "validating inventory reservation",
+            approval: "allocation approval required",
+            stale: "ERP connection freshness unknown"
+          }
+        },
+        release: {
+          eyebrow: "Selected outcome · REL-4.18.2",
+          title: "Deploy release 4.18.2 to storefront canary",
+          sub: "Flow 31bb2a · initiated by release-control · policy canary-standard",
+          progress: "11/14",
+          track: "━━━━━━━╺━━━",
+          changed: "changed 18s ago",
+          owner: "owner · platform-release",
+          scenario: "operating",
+          now: { operating: "canary verification awaiting independent evidence" }
+        },
+        invoice: {
+          eyebrow: "Selected outcome · INV-771",
+          title: "Reconcile invoice batch 771",
+          sub: "Flow a72de4 · initiated by finance-ops · policy sap-reconciliation",
+          progress: "24/24",
+          track: "━━━━━━━━━━━━",
+          changed: "changed 2m ago",
+          owner: "owner · finance-automation",
+          scenario: "operating",
+          now: { operating: "durable settlement receipt indexing" }
+        }
+      };
+
+      function press(group, value) {
+        var datasetKey = group.replace(/-([a-z])/g, function (_, letter) { return letter.toUpperCase(); }) + "Value";
+        document.querySelectorAll("[data-" + group + "-value]").forEach(function (button) {
+          button.setAttribute("aria-pressed", button.dataset[datasetKey] === value ? "true" : "false");
+        });
+      }
+
+      function applyGlyphs() {
+        var ascii = body.dataset.glyph === "ascii";
+        document.querySelectorAll(".stem, .progress-track, .mark").forEach(function (node) {
+          if (!node.dataset.unicodeText) node.dataset.unicodeText = node.textContent;
+          if (!ascii) {
+            node.textContent = node.dataset.unicodeText;
+            return;
+          }
+          node.textContent = node.dataset.unicodeText
+            .replaceAll("│", "|")
+            .replaceAll("├", "+")
+            .replaceAll("└", "\\")
+            .replaceAll("━", "=")
+            .replaceAll("╺", "+");
+        });
+      }
+
+      function closeReview() {
+        body.dataset.review = "closed";
+        review.setAttribute("aria-hidden", "true");
+      }
+
+      function openReview() {
+        body.dataset.review = "open";
+        review.setAttribute("aria-hidden", "false");
+        reviewResult.textContent = "";
+        document.querySelector("[data-close-review]").focus();
+      }
+
+      function selectWorkRow(index) {
+        if (workRows.length === 0) return;
+        selectedWorkIndex = (index + workRows.length) % workRows.length;
+        workRows.forEach(function (row, rowIndex) {
+          row.setAttribute("aria-selected", rowIndex === selectedWorkIndex ? "true" : "false");
+        });
+        workRows[selectedWorkIndex].focus({ preventScroll: true });
+      }
+
+      function openWorkLedger() {
+        if (body.dataset.direction !== "workline") return;
+        closeReview();
+        body.dataset.lens = "ledger";
+        input.disabled = true;
+        input.setAttribute("placeholder", "Work Ledger owns input · ↑↓ select · Enter focus · Esc return");
+        composerHint.textContent = "↑↓ select · [Enter] focus · [Esc] return";
+        var selectedId = body.dataset.selectedWork;
+        var selectedIndex = workRows.findIndex(function (row) { return row.dataset.workRow === selectedId; });
+        selectWorkRow(selectedIndex < 0 ? 0 : selectedIndex);
+      }
+
+      function closeWorkLedger(restoreFocus) {
+        body.dataset.lens = "stream";
+        input.disabled = false;
+        input.setAttribute("placeholder", inputPlaceholder);
+        composerHint.textContent = "[/] commands · [/runs] ledger · [d] detail";
+        if (restoreFocus !== false) input.focus();
+      }
+
+      function activateWorkSelection() {
+        var row = workRows[selectedWorkIndex];
+        if (!row) return;
+        var id = row.dataset.workRow;
+        var item = workItems[id];
+        if (!item) return;
+        body.dataset.selectedWork = id;
+        if (item.scenario) {
+          body.dataset.scenario = item.scenario;
+          press("scenario", item.scenario);
+        }
+        document.getElementById("anchor-eyebrow").textContent = item.eyebrow;
+        document.getElementById("anchor-title").textContent = item.title;
+        document.getElementById("anchor-sub").textContent = item.sub;
+        document.getElementById("anchor-progress").textContent = item.progress;
+        var track = document.getElementById("anchor-track");
+        track.dataset.unicodeText = item.track;
+        document.getElementById("anchor-changed").textContent = item.changed;
+        document.getElementById("anchor-owner").textContent = item.owner;
+        document.querySelectorAll(".workline > .work-anchor .now-label").forEach(function (node) {
+          var scenario = node.classList.contains("scenario-approval")
+            ? "approval"
+            : node.classList.contains("scenario-stale") ? "stale" : "operating";
+          var marker = scenario === "approval" ? "!" : scenario === "stale" ? "?" : "│";
+          var mark = document.createElement("span");
+          mark.className = "mark";
+          mark.textContent = marker;
+          node.replaceChildren(mark, " now · " + (item.now[scenario] || item.now.operating));
+        });
+        var output = document.getElementById("dynamic-output");
+        output.querySelector(".source").textContent = "deckent";
+        output.querySelector(".event-copy").textContent = "Focus changed to " + item.eyebrow.replace("Selected outcome · ", "") + "; settled history remains in native scrollback.";
+        output.querySelector(".event-state").textContent = "focused";
+        applyGlyphs();
+        closeWorkLedger(true);
+      }
+
+      var params = new URLSearchParams(window.location.search);
+      var requestedDirection = params.get("direction");
+      var requestedScenario = params.get("scenario");
+      var requestedWidth = params.get("width");
+      var requestedBackground = params.get("background");
+      var requestedGlyph = params.get("glyph");
+      var requestedLens = params.get("lens");
+      if (["workline", "focus", "ledger"].includes(requestedDirection)) body.dataset.direction = requestedDirection;
+      if (["operating", "approval", "stale"].includes(requestedScenario)) body.dataset.scenario = requestedScenario;
+      if (["120", "80", "40"].includes(requestedWidth)) body.dataset.width = requestedWidth;
+      if (["dark", "light"].includes(requestedBackground)) body.dataset.termBg = requestedBackground;
+      if (["unicode", "ascii"].includes(requestedGlyph)) body.dataset.glyph = requestedGlyph;
+      press("direction", body.dataset.direction);
+      press("scenario", body.dataset.scenario);
+      press("width", body.dataset.width);
+      press("term-bg", body.dataset.termBg);
+      press("glyph", body.dataset.glyph);
+      applyGlyphs();
+      if (requestedLens === "ledger") openWorkLedger();
+      if (params.get("review") === "open") openReview();
+
+      document.querySelectorAll("[data-direction-value]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          body.dataset.direction = button.dataset.directionValue;
+          press("direction", body.dataset.direction);
+          closeWorkLedger(false);
+          closeReview();
+        });
+      });
+      document.querySelectorAll("[data-scenario-value]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          body.dataset.scenario = button.dataset.scenarioValue;
+          press("scenario", body.dataset.scenario);
+          closeReview();
+        });
+      });
+      document.querySelectorAll("[data-width-value]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          body.dataset.width = button.dataset.widthValue;
+          press("width", body.dataset.width);
+        });
+      });
+      document.querySelectorAll("[data-term-bg-value]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          body.dataset.termBg = button.dataset.termBgValue;
+          press("term-bg", body.dataset.termBg);
+        });
+      });
+      document.querySelectorAll("[data-glyph-value]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          body.dataset.glyph = button.dataset.glyphValue;
+          press("glyph", body.dataset.glyph);
+          applyGlyphs();
+        });
+      });
+      document.querySelectorAll("[data-open-review]").forEach(function (button) {
+        button.addEventListener("click", openReview);
+      });
+      document.querySelectorAll("[data-close-review]").forEach(function (button) {
+        button.addEventListener("click", closeReview);
+      });
+      document.querySelectorAll("[data-open-work-ledger]").forEach(function (button) {
+        button.addEventListener("click", openWorkLedger);
+      });
+      document.querySelectorAll("[data-close-work-ledger]").forEach(function (button) {
+        button.addEventListener("click", function () { closeWorkLedger(true); });
+      });
+      workRows.forEach(function (row, index) {
+        row.addEventListener("click", function () { selectWorkRow(index); });
+      });
+      document.querySelectorAll("[data-toggle-details]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          body.dataset.details = body.dataset.details === "open" ? "closed" : "open";
+        });
+      });
+      document.querySelectorAll("[data-decision]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          reviewResult.textContent = button.dataset.decision === "approve"
+            ? "Prototype result: approval would be recorded for apr-7fe12; no production action was sent."
+            : "Prototype result: denial would be recorded for apr-7fe12; recovery remains available.";
+        });
+      });
+      document.querySelectorAll("[data-ledger-row]").forEach(function (row) {
+        row.addEventListener("click", function () {
+          document.querySelectorAll("[data-ledger-row]").forEach(function (candidate) {
+            candidate.setAttribute("aria-selected", candidate === row ? "true" : "false");
+          });
+          document.querySelectorAll("[data-ledger-detail]").forEach(function (detail) {
+            detail.hidden = detail.dataset.ledgerDetail !== row.dataset.ledgerRow;
+          });
+        });
+      });
+
+      document.getElementById("composer").addEventListener("submit", function (event) {
+        event.preventDefault();
+        var value = input.value.trim();
+        if (!value) return;
+        if (/^\/runs(?:\s+--follow)?$/i.test(value)) {
+          input.value = "";
+          openWorkLedger();
+          return;
+        }
+        var output = document.getElementById("dynamic-output");
+        output.querySelector(".source").textContent = "maya";
+        output.querySelector(".event-copy").textContent = value + " · prototype input only; no command was executed.";
+        output.querySelector(".event-state").textContent = "draft";
+        input.value = "";
+      });
+
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && body.dataset.review === "open") {
+          event.preventDefault();
+          closeReview();
+          input.focus();
+          return;
+        }
+        if (body.dataset.lens === "ledger" && body.dataset.direction === "workline" && body.dataset.review !== "open") {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            closeWorkLedger(true);
+            return;
+          }
+          if (event.key === "ArrowDown" || event.key.toLowerCase() === "j") {
+            event.preventDefault();
+            selectWorkRow(selectedWorkIndex + 1);
+            return;
+          }
+          if (event.key === "ArrowUp" || event.key.toLowerCase() === "k") {
+            event.preventDefault();
+            selectWorkRow(selectedWorkIndex - 1);
+            return;
+          }
+          if (event.key === "Enter") {
+            event.preventDefault();
+            activateWorkSelection();
+            return;
+          }
+        }
+        if (event.key === "/" && document.activeElement !== input && body.dataset.review !== "open") {
+          event.preventDefault();
+          input.focus();
+          return;
+        }
+        if (event.key.toLowerCase() === "d" && document.activeElement !== input) {
+          body.dataset.details = body.dataset.details === "open" ? "closed" : "open";
+          return;
+        }
+        if (event.key.toLowerCase() === "a" && document.activeElement !== input && body.dataset.scenario === "approval") {
+          openReview();
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

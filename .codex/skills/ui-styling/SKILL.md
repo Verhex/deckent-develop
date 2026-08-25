@@ -1,7 +1,6 @@
 ---
 name: ui-styling
-description: Create beautiful, accessible user interfaces with shadcn/ui components (built on Radix UI + Tailwind), Tailwind CSS utility-first styling, and canvas-based visual designs. Use when building user interfaces, implementing design systems, creating responsive layouts, adding accessible components (dialogs, dropdowns, forms, tables), customizing themes and colors, implementing dark mode, generating visual designs and posters, or establishing consistent styling patterns across applications.
-argument-hint: "[component or layout]"
+description: Create generic accessible interfaces with shadcn/ui, Radix, Tailwind, and canvas. For Deckent product surfaces, use only as an implementation helper after deckent-design-dna and the relevant Deckent-native domain skill have established product and visual authority.
 license: MIT
 metadata:
   author: claudekit
@@ -11,6 +10,9 @@ metadata:
 # UI Styling Skill
 
 Comprehensive skill for creating beautiful, accessible user interfaces combining shadcn/ui components, Tailwind CSS utility styling, and canvas-based visual design systems.
+
+For Deckent work, do not let framework defaults choose the product model or visual language.
+Load `deckent-design-dna` first and implement only the accepted Deckent contract.
 
 ## Reference
 

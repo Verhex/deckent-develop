@@ -1,7 +1,6 @@
 ---
 name: banner-design
-description: "Design banners for social media, ads, website heroes, creative assets, and print. Multiple art direction options with AI-generated visuals. Actions: design, create, generate banner. Platforms: Facebook, Twitter/X, LinkedIn, YouTube, Instagram, Google Display, website hero, print. Styles: minimalist, gradient, bold typography, photo-based, illustrated, geometric, retro, glassmorphism, 3D, neon, duotone, editorial, collage. Uses ui-ux-pro-max, frontend-design, ai-artist, ai-multimodal skills."
-argument-hint: "[platform] [style] [dimensions]"
+description: "Design banners for social media, ads, website heroes, creative assets, and print. Creates deliberate art-direction options using brand context, design-system constraints, ui-styling, and generated visuals when needed."
 license: MIT
 metadata:
   author: claudekit
@@ -39,8 +38,8 @@ Collect via AskUserQuestion:
 
 ### Step 2: Research & Art Direction
 
-1. Activate `ui-ux-pro-max` skill for design intelligence
-2. Use Chrome browser to research Pinterest for design references:
+1. Load `brand` and `design-system` context; define the art-direction criteria
+2. Use image or web research for relevant references when the task benefits from it:
    ```
    Navigate to pinterest.com → search "[purpose] banner design [style]"
    Screenshot 3-5 reference pins for art direction inspiration
@@ -52,7 +51,7 @@ Collect via AskUserQuestion:
 
 For each art direction option:
 
-1. **Create HTML/CSS banner** using `frontend-design` skill
+1. **Create HTML/CSS banner** using `ui-styling`
    - Use exact platform dimensions from size reference
    - Apply safe zone rules (critical content in central 70-80%)
    - Max 2 typefaces, single CTA, 4.5:1 contrast ratio

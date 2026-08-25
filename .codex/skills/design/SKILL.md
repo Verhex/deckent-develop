@@ -1,7 +1,6 @@
 ---
 name: design
-description: "Comprehensive design skill: brand identity, design tokens, UI styling, logo generation (55 styles, Gemini AI), corporate identity program (50 deliverables, CIP mockups), HTML presentations (Chart.js), banner design (22 styles, social/ads/web/print), icon design (15 styles, SVG, Gemini 3.1 Pro), social photos (HTML→screenshot, multi-platform). Actions: design logo, create CIP, generate mockups, build slides, design banner, generate icon, create social photos, social media images, brand identity, design system. Platforms: Facebook, Twitter, LinkedIn, YouTube, Instagram, Pinterest, TikTok, Threads, Google Ads."
-argument-hint: "[design-type] [context]"
+description: "Create generic brand identity, logos, corporate identity assets, presentations, banners, icons, and social images. Use deckent-design-dna instead for Deckent product, Desktop, Terminal, Dashboard, interaction, visual-language, or design-system work."
 license: MIT
 metadata:
   author: claudekit
@@ -11,6 +10,9 @@ metadata:
 # Design
 
 Unified design skill: brand, tokens, UI, logo, CIP, slides, banners, social photos, icons.
+
+For any Deckent product surface, stop and route through `deckent-design-dna`. This generic skill
+is not product or visual authority for Deckent.
 
 ## When to Use
 
@@ -66,7 +68,8 @@ python3 ~/.claude/skills/design/scripts/logo/generate.py --prompt "coffee shop v
 
 **IMPORTANT:** When scripts fail, try to fix them directly.
 
-After generation, **ALWAYS** ask user about HTML preview via `AskUserQuestion`. If yes, invoke `/ui-ux-pro-max` for gallery.
+After generation, ask whether an HTML preview is useful. If yes, build the gallery with
+`ui-styling` and the accepted `brand`/`design-system` context.
 
 ## CIP Design (Built-in)
 
@@ -131,15 +134,16 @@ Load `references/slides-create.md` for the creation workflow.
 
 ## Banner Design (Built-in)
 
-22 art direction styles across social, ads, web, print. Uses `frontend-design`, `ai-artist`, `ai-multimodal`, `chrome-devtools` skills.
+22 art direction styles across social, ads, web, print. Uses `brand`, `design-system`,
+`ui-styling`, image generation when needed, and browser rendering for verification.
 
 Load `references/banner-sizes-and-styles.md` for complete sizes and styles reference.
 
 ### Banner: Workflow
 
 1. **Gather requirements** via `AskUserQuestion` — purpose, platform, content, brand, style, quantity
-2. **Research** — Activate `ui-ux-pro-max`, browse Pinterest for references
-3. **Design** — Create HTML/CSS banner with `frontend-design`, generate visuals with `ai-artist`/`ai-multimodal`
+2. **Research** — Load the brand context and gather relevant visual references when needed
+3. **Design** — Create HTML/CSS with `ui-styling`; generate original visuals when the concept requires them
 4. **Export** — Screenshot to PNG at exact dimensions via `chrome-devtools`
 5. **Present** — Show all options side-by-side, iterate on feedback
 
@@ -216,7 +220,8 @@ python3 ~/.claude/skills/design/scripts/icon/generate.py --prompt "user profile"
 
 ## Social Photos (Built-in)
 
-Multi-platform social image design: HTML/CSS → screenshot export. Uses `ui-ux-pro-max`, `brand`, `design-system`, `chrome-devtools` skills.
+Multi-platform social image design: HTML/CSS → screenshot export. Uses `brand`,
+`design-system`, `ui-styling`, and browser rendering.
 
 Load `references/social-photos-design.md` for sizes, templates, best practices.
 
@@ -225,7 +230,7 @@ Load `references/social-photos-design.md` for sizes, templates, best practices.
 1. **Orchestrate** — `project-management` skill for TODO tasks; parallel subagents for independent work
 2. **Analyze** — Parse prompt: subject, platforms, style, brand context, content elements
 3. **Ideate** — 3-5 concepts, present via `AskUserQuestion`
-4. **Design** — `/ckm:brand` → `/ckm:design-system` → randomly invoke `/ck:ui-ux-pro-max` OR `/ck:frontend-design`; HTML per idea × size
+4. **Design** — Apply `brand` → `design-system` → `ui-styling`; use a deliberate accepted art direction for every size
 5. **Export** — `chrome-devtools` or Playwright screenshot at exact px (2x deviceScaleFactor)
 6. **Verify** — Use Chrome MCP or `chrome-devtools` skill to visually inspect exported designs; fix layout/styling issues and re-export
 7. **Report** — Summary to `plans/reports/` with design decisions
@@ -310,4 +315,4 @@ pip install google-genai pillow
 ## Integration
 
 **External sub-skills:** brand, design-system, ui-styling
-**Related Skills:** frontend-design, ui-ux-pro-max, ai-multimodal, chrome-devtools
+**Related Skills:** brand, design-system, ui-styling, imagegen
