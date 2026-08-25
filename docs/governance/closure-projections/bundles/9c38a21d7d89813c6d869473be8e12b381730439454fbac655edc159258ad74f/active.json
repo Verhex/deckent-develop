@@ -1,0 +1,4642 @@
+[
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "LEDGER-ISOLATED-COMMIT-PROOF-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "BLOCKED",
+    "workId": "TRUTH-BASELINE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "TEST-675"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "TEST-HERMETIC-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "VERIFY",
+    "workId": "TEST-CONTAINMENT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "TEST-SPAWN-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "STATE-RETENTION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "CRASH-FORENSICS-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "NERVOUS-STATE-LIFECYCLE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "RECENT-WORKS-ARTIFACT-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "BLOCKED",
+    "workId": "STATE-PRUNE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "DOCS-TOPOLOGY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "BLOCKED",
+    "workId": "DOCS-ARCHIVE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "DOCS-ADR-SYNC-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "DOCS-RELEASE-TRUTH-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "DOCS-DEPS-HOME-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "MANAGED-DOC-CACHE-TRUTH-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "WORKSPACE-CONTRACT-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "WORKSPACE-IDENTITY-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "WORKER-GUIDE-PROMPT-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "BOOT-RECOVERY-CONTRACT-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "WORKSPACE-TOOL-CATALOG-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "DOCS-I18N-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "MEMORY-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "BLOCKED",
+    "workId": "MEMORY-TRUTH-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "CONFIG-HEAL-IO-TRUTH-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "EVAL-TSC-FEEDBACK-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "HONEST-GATE-DELETION-AWARE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "STATUS-SWEEP-OUTPUT-HYGIENE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "DIRECTIVES-ENGINE-SELFCHANGE-LINT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "EVENT-TRUTH-A4-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "WORKER-IDENTITY-HOSTBOUND-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "REPO-CLEANUP-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "BLOCKED",
+    "workId": "REPO-CLEANUP-APPLY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "MEMORY-SYNC-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "MEMORY-SURFACE-PROJECTION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "BLOCKED",
+    "workId": "MEMORY-DB-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "ZERO-HARDCODE-PROVIDER-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "ZERO-HARDCODE-FLOW-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "SCRIPT-LIFECYCLE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "BLOCKED",
+    "workId": "SCRIPT-RETIRE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "BLOCKED",
+    "workId": "TEST-ORPHAN-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "TASK-RETENTION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "STATE-ARCHIVE-RESTORE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "OBS",
+    "state": "OPEN",
+    "workId": "RESOURCE-TELEMETRY-LIFECYCLE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "RUNTIME-ARTIFACT-CATALOG-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "RECOVERY-SNAPSHOT-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "ERROR-SEVERITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "OPS-BRANCH-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "BLOCKED",
+    "workId": "OPS-RETIRE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "BLOCKED",
+    "workId": "XVERIFY-TRUTH-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "BLOCKED",
+    "workId": "DOC-IMPACT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "BLOCKED",
+    "workId": "DEBT-GOVERNANCE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "OPS",
+    "state": "BLOCKED",
+    "workId": "HOST-STATE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "OPS",
+    "state": "BLOCKED",
+    "workId": "HOST-STATE-APPLY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "OPS",
+    "state": "BLOCKED",
+    "workId": "GIT-MAINT-REPORT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "OPS",
+    "state": "BLOCKED",
+    "workId": "GIT-MAINT-APPLY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "OPS",
+    "state": "OPEN",
+    "workId": "EXEC-TEMPO-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "ERROR-REGISTRY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "CONFIG-TRUTH-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "CONFIG-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "LAYER-BOUNDARY-GATE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "NERVOUS-CONFIG-EXECUTION-TRUTH-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "PROVIDER-OBS-MIGRATION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "MCP-ANNOTATION-SAFETY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "I18N-SURFACE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "I18N-CATALOG-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "CLI-VOCAB-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "VERIFY-HISTORICAL-CLOSURE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "TRUST-ANCHOR-003"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "CI-VITEST-WORKER-CRASH-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "SSOT-SETTLEMENT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "CI-NIGHTLY-GREEN-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "BLOCKED",
+    "workId": "CODEX-MAIN-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "BLOCKED",
+    "workId": "CM-01"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "OPEN",
+    "workId": "CM-02"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "OPEN",
+    "workId": "CM-03"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "OPEN",
+    "workId": "CM-04"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "OPEN",
+    "workId": "CM-05"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "BLOCKED",
+    "workId": "XVERIFY-WIRE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "OPEN",
+    "workId": "CODEX-COMPAT-POLICY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "VERIFY",
+    "workId": "PA-662"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "BLOCKED",
+    "workId": "CODEX-ADMISSION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "OPEN",
+    "workId": "FO-01"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "OPEN",
+    "workId": "FO-02"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "OPEN",
+    "workId": "FO-03"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "OPEN",
+    "workId": "FO-04"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "OPEN",
+    "workId": "FO-05"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "OPEN",
+    "workId": "FO-06"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "BLOCKED",
+    "workId": "FO-07"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "OPEN",
+    "workId": "FO-07B"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "OPEN",
+    "workId": "FO-08"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "OPEN",
+    "workId": "FO-09"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "OPEN",
+    "workId": "FO-10"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "OPEN",
+    "workId": "FO-10-I18N"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "OPEN",
+    "workId": "FO-11"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "OPEN",
+    "workId": "FO-12"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "OPEN",
+    "workId": "IM-01"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "OPEN",
+    "workId": "IM-02"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "OPEN",
+    "workId": "IM-03"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "BLOCKED",
+    "workId": "IM-04"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "BLOCKED",
+    "workId": "IM-05"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "BLOCKED",
+    "workId": "IM-06"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "BLOCKED",
+    "workId": "IM-07"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "BLOCKED",
+    "workId": "CODEX-CANARY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "BLOCKED",
+    "workId": "P01-TRUTH-GATE"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "BLOCKED",
+    "workId": "CODEX-C0"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "BLOCKED",
+    "workId": "CODEX-C1"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "BLOCKED",
+    "workId": "CODEX-C2"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "BLOCKED",
+    "workId": "CODEX-C3"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "BLOCKED",
+    "workId": "CODEX-C4"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "BLOCKED",
+    "workId": "CODEX-C5"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "BLOCKED",
+    "workId": "CODEX-C6"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "BLOCKED",
+    "workId": "CODEX-C7"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "BLOCKED",
+    "workId": "CODEX-C8"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "BLOCKED",
+    "workId": "CODEX-C9"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "CODEX",
+    "state": "BLOCKED",
+    "workId": "CODEX-C10"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "BLOCKED",
+    "workId": "P02-630"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "OPEN",
+    "workId": "P02-631"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "VERIFY",
+    "workId": "P02-632"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "OPEN",
+    "workId": "P02-633"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "OPEN",
+    "workId": "P02-634"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "OPEN",
+    "workId": "P02-635"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "OPEN",
+    "workId": "P02-636"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "OPEN",
+    "workId": "P02-637"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "OPEN",
+    "workId": "P02-638"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "OPEN",
+    "workId": "P02-639"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "OPEN",
+    "workId": "P02-640"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "OPEN",
+    "workId": "P02-641"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "BLOCKED",
+    "workId": "P02-642"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "OPEN",
+    "workId": "P02-643"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "OPEN",
+    "workId": "P02-644"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "OPEN",
+    "workId": "P02-645"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "OPEN",
+    "workId": "P02-646"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "OPEN",
+    "workId": "P02-647"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "BLOCKED",
+    "workId": "P02-648"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "BLOCKED",
+    "workId": "P02-648-CODEX"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "BLOCKED",
+    "workId": "P02-648-CLAUDE"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "BLOCKED",
+    "workId": "P02-648-GEMINI"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "OPEN",
+    "workId": "P02-649"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "OPEN",
+    "workId": "P02-650"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "BLOCKED",
+    "workId": "P02-651"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "OPEN",
+    "workId": "P02-651A"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "BLOCKED",
+    "workId": "P02-651B"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "OPEN",
+    "workId": "P02-651B-CODEX"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "OPEN",
+    "workId": "P02-651B-CLAUDE"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "OPEN",
+    "workId": "P02-651B-GEMINI"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "OPEN",
+    "workId": "P02-652"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "BLOCKED",
+    "workId": "P02-653"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "OPEN",
+    "workId": "P02-654"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "OPEN",
+    "workId": "P02-655"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PAEP",
+    "state": "BLOCKED",
+    "workId": "P02-656"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "BLOCKED",
+    "workId": "KERNEL-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "KERNEL-ONTOLOGY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "KERNEL-STATE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "KERNEL-ATTEMPT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "KERNEL-SETTLEMENT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "MISSION-KIND-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "GOAL-DAG-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "GOAL-POLICY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "GOAL-ACCEPTANCE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "GOAL-PROVIDER-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "GOAL-CRASH-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "GOAL-CUTOVER-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "AUTONOMOUS-CONTROL-PLANE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "AUTONOMOUS-PERPETUAL-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "BLOCKED",
+    "workId": "GOAL-CANARY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RUNFLOW-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RUNFLOW-STORE-RECONCILIATION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RUN-JOB-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "DETACHED-RUN-LOG-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "SCHEDULER-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "SCHEDULER-SHADOW-EVIDENCE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RUNNER-PROTOCOL-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "PAUSED-FINALIZE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-DECISION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-MODE-ADAPTERS-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-COMMAND-SERVICE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-TERMINATION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-STALE-PROJECTION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-ASSURANCE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-DOGFOOD-BORN-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "BUDGET-CONTINUATION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-480-HEARTBEAT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-480-SCOPE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-480-HOLD-CLASSIFICATION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-480-EVALUATE-ORPHAN-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-480-ATTRIBUTION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-480-FIX-PRIORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-480-FORCE-FINALIZE-ORPHAN-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-DO-DOGFOOD-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "ASSURANCE",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-480-POSTBUILD-BINARY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "BLOCKED",
+    "workId": "DO-CUTOVER-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-481-EXACT-PROVIDER-PROJECTION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-481-FAILED-RUN-STATUS-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-481-DO-PREVIEW-APPROVAL-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-481-GATE-TRUTH-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-482-CLOSED-SCOPE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-482-AGGREGATE-DEPENDENCY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-482-FIX-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "COST",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-482-SUBSCRIPTION-ACCOUNTING-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "BLOCKED",
+    "workId": "AUTONOMY-CUTOVER-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-483-EVALUATION-HONESTY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PROVIDER",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-483-PROVIDER-CONCURRENCY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "EVAL",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-483-XVERIFY-PAYLOAD-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-483-PROMPT-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-485-FIX-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "EVAL",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-485-SEMANTIC-VERDICT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "COST",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-485-USAGE-BILLING-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-485-PROMPT-POLICY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "PROCESS-CUTOVER-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "VERIFY",
+    "workId": "EVAL-NOCHANGE-VERDICT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "VERIFY",
+    "workId": "WORKER-ENV-TMPFS-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "BLOCKED",
+    "workId": "SURFACE-CUTOVER-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "BLOCKED",
+    "workId": "PLANNER-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "WORKER-REGISTRY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "SPRINT-HONESTY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "VERIFY",
+    "workId": "PRODUCTION-WIRING-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "WORKER-DISCOVERY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "WORKER-DISCOVERY-ADAPTERS-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "BLOCKED",
+    "workId": "RESULT-INGEST-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "VERIFY",
+    "workId": "RECOVERY-BORN-486-EXECUTE-FIX-QUIESCENCE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "VERIFY",
+    "workId": "RECOVERY-BORN-486-FINALIZE-CONTAINMENT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "COST",
+    "state": "VERIFY",
+    "workId": "RECOVERY-BORN-486-DOGFOOD-BUDGET-LOCALITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "VERIFY",
+    "workId": "RECOVERY-BORN-486-NERVOUS-COLLISION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "VERIFY",
+    "workId": "RECOVERY-BORN-486-SCOPED-SELF-AUDIT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "ASSURANCE",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-487-CONCURRENT-TYPECHECK-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "ASSURANCE",
+    "state": "VERIFY",
+    "workId": "RECOVERY-BORN-487-CLEAN-HOLD-EXIT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "VERIFY",
+    "workId": "RECOVERY-BORN-487-CLEANUP-ARTIFACT-IDENTITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "VERIFY",
+    "workId": "RECOVERY-BORN-488-DEPENDENCY-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-488-REPAIR-DISPATCH-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-488-LANDING-CHECKPOINT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-488-CONTINUOUS-REFILL-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "ASSURANCE",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-488-VERIFICATION-ISOLATION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-488-REPAIR-CAPABILITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "EVAL",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-488-EVALUATION-TRUTH-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "VERIFY",
+    "workId": "RECOVERY-BORN-488-RECOVERY-TERMINAL-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "VERIFY",
+    "workId": "RECOVERY-BORN-488-STATUS-PROJECTION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-490-DESCENDANT-CANCELLATION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-490-PROVIDER-OBSERVATION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "OBS",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "ASSURANCE",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-490-REPLAY-CERTIFICATION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "ASSURANCE",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-490-BUILD-DIGEST-GATE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "ASSURANCE",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-490-NOT-DISPATCHED-SKIPPED-REPLAY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "ASSURANCE",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-490-LANDING-CHECKPOINT-REPLAY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "ASSURANCE",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-490-MULTI-PROVIDER-REPLAY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "ASSURANCE",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-490-FULL-SUITE-CERTIFICATION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "LIFECYCLE-VOCAB-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-NATIVE-PLATFORM-MATRIX-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-LIVE-CONTINUATION-PROOF-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "ARCHIVE-PATH-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "PROD-SPAWNSYNC-ASYNC-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-515-TERMINAL-SUPERSESSION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "BOT-LIFECYCLE-HONESTY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "OBS",
+    "state": "BLOCKED",
+    "workId": "RECOVERY-BORN-522-DOCTOR-AUTHORITY-COVERAGE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "OBS",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-523-XVERIFY-PRODUCER-MISMATCH-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "OBS",
+    "state": "OPEN",
+    "workId": "RECOVERY-BORN-523-ATTRIBUTION-UNMEASURABLE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "PLATFORM-CLEAN-IDENTITY-ADAPTER-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "COMPOSITE-WORKER-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "PLATFORM-EXEC-AUTH-W3-DARWIN-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "AUTONOMOUS-SCHEDULER-FAIRNESS-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "ORCHESTRA-RELIABILITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "VERIFY",
+    "workId": "PLAN-PURE-PREVIEW-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "VERIFY",
+    "workId": "FIX-SPAWN-DEPENDENCY-FRESHNESS-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "VERIFY",
+    "workId": "TENANT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "AUTONOMOUS-TENANT-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "VERIFY",
+    "workId": "OPERATION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "CAPABILITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "APPROVAL-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "APPROVAL-READ-CROSSPLATFORM-PROOF-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "VERIFY",
+    "workId": "APPROVAL-INGRESS-UNKNOWN-ID-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "APPROVAL-DECISION-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "NERVOUS-APPROVAL-SETTLEMENT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "APPROVAL-SURFACE-UNIFICATION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "VERIFY",
+    "workId": "TOOL-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "WRITE-SCOPE-BACKEND-PARITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "RECEIPT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "REACHABILITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "LIMIT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "LIMIT-SPEND-ENFORCE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "SPEND-LEDGER-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "PERMISSION-MEMORY-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "BLOCKED",
+    "workId": "PROVIDER-INGRESS-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "VERIFY",
+    "workId": "PROVIDER-HOLD-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "PROVIDER-HOLD-LIVE-PROOF-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "ATTENDED-STOP-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "AUDIT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "NERVOUS-EFFECT-OUTCOME-TRUTH-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "GROUND-TRUTH-OVERRIDE-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "SPRINT-EVENT-STREAM-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "PROVENANCE-CONTEXT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "AUDIT-SECRET-CUSTODY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "BLOCKED",
+    "workId": "API-SECURITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "RUNTIME-CREDENTIAL-LIFECYCLE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "TERMINAL-SESSION-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "ENTERPRISE-AUTH-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "ALP-RUNTIME-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "VERIFY",
+    "workId": "MCP-LEASE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "BLOCKED",
+    "workId": "APPROVAL-QOL-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "TRUST-HANDOFF-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "SEC-OWASP-ASI-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "SEC-ADR-CROSSWALK-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "SEC-ENFORCE-WIRE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "CONFIG-AUTHORITY-CONSOLIDATION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "AUTHORITY",
+    "state": "OPEN",
+    "workId": "ADR-GOVERNANCE-PROCEDURE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TERMINAL",
+    "state": "BLOCKED",
+    "workId": "TERMINAL-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TERMINAL",
+    "state": "OPEN",
+    "workId": "TERMINAL-TOOLS-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TERMINAL",
+    "state": "OPEN",
+    "workId": "TERMINAL-DEV-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TERMINAL",
+    "state": "OPEN",
+    "workId": "TERMINAL-LIVE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TERMINAL",
+    "state": "OPEN",
+    "workId": "TERMINAL-REPL-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TERMINAL",
+    "state": "OPEN",
+    "workId": "REPL-HISTORY-PRIVACY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TERMINAL",
+    "state": "OPEN",
+    "workId": "TERMINAL-REF-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TERMINAL",
+    "state": "OPEN",
+    "workId": "TERMINAL-ONBOARD-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TERMINAL",
+    "state": "BLOCKED",
+    "workId": "TERMINAL-AUTH-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TERMINAL",
+    "state": "BLOCKED",
+    "workId": "NATIVE-DEV-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TERMINAL",
+    "state": "OPEN",
+    "workId": "TERMINAL-XPLAT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TERMINAL",
+    "state": "OPEN",
+    "workId": "TERMINAL-CONTEXT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TERMINAL",
+    "state": "OPEN",
+    "workId": "TERMINAL-COLLAB-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PRODUCT",
+    "state": "BLOCKED",
+    "workId": "SURFACES-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PRODUCT",
+    "state": "OPEN",
+    "workId": "APP-SERVICE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PRODUCT",
+    "state": "OPEN",
+    "workId": "AGENT-CUSTOM-MANAGEMENT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PRODUCT",
+    "state": "OPEN",
+    "workId": "SKILL-CUSTOM-MANAGEMENT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PRODUCT",
+    "state": "OPEN",
+    "workId": "CONVERSATION-RUN-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PRODUCT",
+    "state": "OPEN",
+    "workId": "SURFACE-CONTRACT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "DESKTOP",
+    "state": "OPEN",
+    "workId": "DESKTOP-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "DESKTOP",
+    "state": "OPEN",
+    "workId": "DESKTOP-RUNTIME-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PROVIDER",
+    "state": "OPEN",
+    "workId": "PROVIDER-CONNECTION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "DESKTOP",
+    "state": "OPEN",
+    "workId": "DESKTOP-SECURITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "DESKTOP",
+    "state": "OPEN",
+    "workId": "DESKTOP-ENTERPRISE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "DESKTOP",
+    "state": "OPEN",
+    "workId": "DESKTOP-REBORN-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PRODUCT",
+    "state": "OPEN",
+    "workId": "RUN-INSPECTOR-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PRODUCT",
+    "state": "OPEN",
+    "workId": "MCP-HUB-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "API",
+    "state": "OPEN",
+    "workId": "API-CONTRACT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "API",
+    "state": "OPEN",
+    "workId": "API-IDENTITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "CONNECTOR",
+    "state": "OPEN",
+    "workId": "CONNECTOR-IDENTITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "DASHBOARD",
+    "state": "OPEN",
+    "workId": "DASHBOARD-OBS-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "DASHBOARD",
+    "state": "OPEN",
+    "workId": "AUTONOMOUS-OBSERVABILITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PRODUCT",
+    "state": "BLOCKED",
+    "workId": "SURFACE-PARITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "API",
+    "state": "OPEN",
+    "workId": "API-EVENT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "API",
+    "state": "OPEN",
+    "workId": "API-DEVELOPER-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "API",
+    "state": "OPEN",
+    "workId": "API-OPERATIONS-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "PRODUCT",
+    "state": "OPEN",
+    "workId": "SURFACE-ADAPTER-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "DESKTOP",
+    "state": "OPEN",
+    "workId": "DESKTOP-CUSTOMIZE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "DESKTOP",
+    "state": "OPEN",
+    "workId": "DESKTOP-WORKSPACE-LAYOUT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "PRODUCT",
+    "state": "OPEN",
+    "workId": "DESIGN-SYSTEM-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "PRODUCT",
+    "state": "OPEN",
+    "workId": "DESIGN-PRECISION-INSTRUMENT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "CONNECTOR",
+    "state": "OPEN",
+    "workId": "ERP-AGENT-CONTRACT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "ECOSYSTEM",
+    "state": "OPEN",
+    "workId": "ECOSYSTEM-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "ECOSYSTEM",
+    "state": "OPEN",
+    "workId": "AGENT-SKILL-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "ECOSYSTEM",
+    "state": "OPEN",
+    "workId": "AGENT-CATALOG-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "ECOSYSTEM",
+    "state": "OPEN",
+    "workId": "SKILL-CATALOG-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "ECOSYSTEM",
+    "state": "OPEN",
+    "workId": "SKILL-SYNC-CANONICALITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "ECOSYSTEM",
+    "state": "OPEN",
+    "workId": "CATALOG-STATS-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "SECURITY",
+    "state": "OPEN",
+    "workId": "SUPPLY-CHAIN-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "SECURITY",
+    "state": "OPEN",
+    "workId": "SKILL-SUPPLY-CHAIN-INGRESS-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "SECURITY",
+    "state": "OPEN",
+    "workId": "PLUGIN-SANDBOX-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "SECURITY",
+    "state": "OPEN",
+    "workId": "PLUGIN-SANDBOX-WIRE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "SECURITY",
+    "state": "OPEN",
+    "workId": "PLUGIN-SUPPLY-CHAIN-INGRESS-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "ECOSYSTEM",
+    "state": "OPEN",
+    "workId": "PLUGIN-PACKAGE-RUNTIME-TRUTH-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "SECURITY",
+    "state": "OPEN",
+    "workId": "PLUGIN-SECURITY-CONFIG-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "SECURITY",
+    "state": "OPEN",
+    "workId": "MCP-TRUST-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "ECOSYSTEM",
+    "state": "BLOCKED",
+    "workId": "HUB-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "TOOL",
+    "state": "OPEN",
+    "workId": "TOOL-COMPUTER-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "PROVIDER",
+    "state": "OPEN",
+    "workId": "PROVIDER-EXTENSION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "PROVIDER",
+    "state": "VERIFY",
+    "workId": "MODEL-ACTIVATION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "PROVIDER",
+    "state": "VERIFY",
+    "workId": "OWNER-MODEL-POLICY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PROVIDER",
+    "state": "OPEN",
+    "workId": "LOCAL-LLM-MODEL-IDENTITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TERMINAL",
+    "state": "OPEN",
+    "workId": "NATIVE-AGENT-HORIZON-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "SURFACE",
+    "state": "OPEN",
+    "workId": "IDE-ADAPTER-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "XVERIFY-CHANNEL-TRUTH-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TERMINAL",
+    "state": "OPEN",
+    "workId": "NATIVE-CONTENT-WORKSPACE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TERMINAL",
+    "state": "OPEN",
+    "workId": "NATIVE-RUNFLOW-BOOTSTRAP-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "OPEN",
+    "workId": "CLOSURE-OS-TRANSITION-TRUTH-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TERMINAL",
+    "state": "OPEN",
+    "workId": "CLI-SURFACE-TRUTH-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TERMINAL",
+    "state": "OPEN",
+    "workId": "NATIVE-CONTEXT-LIFECYCLE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TERMINAL",
+    "state": "OPEN",
+    "workId": "ATREF-TOOL-MEDIATED-READ-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TERMINAL",
+    "state": "OPEN",
+    "workId": "CLI-SURFACE-CONSOLIDATION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TERMINAL",
+    "state": "OPEN",
+    "workId": "NATIVE-SESSION-LEDGER-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "TRUTH",
+    "state": "BLOCKED",
+    "workId": "ORPHAN-WIRE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "TERMINAL",
+    "state": "OPEN",
+    "workId": "CURSOR-PROVIDER-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "VERIFY",
+    "workId": "RECOVERY-TRUTH-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "WORKER-PROMPT-COST-ARCHITECTURE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "PRODUCT",
+    "state": "OPEN",
+    "workId": "AGENT-PERMISSION-MATRIX-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "DEBT-DEPENDENCY-REPAIR-7094R-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "EVALUATOR-HONESTY-GONOGO-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "SKILL-ROUTING-RESIDUAL-MICRO-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "SECURITY",
+    "state": "OPEN",
+    "workId": "DEP-SUPPLY-DEFENSE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "ECOSYSTEM",
+    "state": "OPEN",
+    "workId": "A2A-INTEROP-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "ECOSYSTEM",
+    "state": "BLOCKED",
+    "workId": "SKILLMD-INGEST-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "ECOSYSTEM",
+    "state": "OPEN",
+    "workId": "SKILLMD-V3-RECONCILIATION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "PROVIDER",
+    "state": "OPEN",
+    "workId": "AGENT-RUNTIME-ADAPTER-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "KERNEL",
+    "state": "OPEN",
+    "workId": "ERROR-REGISTRY-THROW-CONVERSION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "XPLAT",
+    "state": "OPEN",
+    "workId": "EVERY-ENV-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "XPLAT",
+    "state": "OPEN",
+    "workId": "ENV-ADAPTER-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "ONBOARDING",
+    "state": "OPEN",
+    "workId": "INSTALL-SCOPE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "XPLAT",
+    "state": "OPEN",
+    "workId": "PLATFORM-PROOF-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "RELEASE",
+    "state": "OPEN",
+    "workId": "PACKAGING-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "DOCS",
+    "state": "BLOCKED",
+    "workId": "DOCS-PRODUCT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "DOCS",
+    "state": "OPEN",
+    "workId": "AGENT-DOCS-TRUTH-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "DOCS",
+    "state": "OPEN",
+    "workId": "SKILL-DOCS-TRUTH-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "RELEASE",
+    "state": "BLOCKED",
+    "workId": "RELEASE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "REPO",
+    "state": "OPEN",
+    "workId": "REPO-MIGRATION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "OPS",
+    "state": "OPEN",
+    "workId": "OPERATIONS-PACK-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "RELEASE",
+    "state": "OPEN",
+    "workId": "RELEASE-BETA-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "RELEASE",
+    "state": "OPEN",
+    "workId": "NPM-CHANNEL-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "DOCS",
+    "state": "OPEN",
+    "workId": "DOCS-TRUTH-PASS-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "PRODUCT",
+    "state": "OPEN",
+    "workId": "LAUNCH-COMMS-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "DOCS",
+    "state": "OPEN",
+    "workId": "DOCS-VISION-002"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "PRODUCT",
+    "state": "OPEN",
+    "workId": "NAIVE-COOPETITION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "PRODUCT",
+    "state": "OPEN",
+    "workId": "METRICS-NORTHSTAR-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "PRODUCT",
+    "state": "OPEN",
+    "workId": "FLAGSHIP-PROOF-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "PRODUCT",
+    "state": "OPEN",
+    "workId": "COMPETITIVE-INTEL-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "REPO",
+    "state": "VERIFY",
+    "workId": "CI-POSTMERGE-127-TRUTH-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "LEARNING",
+    "state": "OPEN",
+    "workId": "LEARNING-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "LEARNING",
+    "state": "OPEN",
+    "workId": "TRAINING-TRACE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "LEARNING",
+    "state": "OPEN",
+    "workId": "PROMPT-INJECTION-TRACE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "DATA",
+    "state": "OPEN",
+    "workId": "TRACE-DATA-GOVERNANCE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "LEARNING",
+    "state": "OPEN",
+    "workId": "TRACE-AUTHORITY-SCHEMA-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "LEARNING",
+    "state": "OPEN",
+    "workId": "TRACE-CAPTURE-CUTOVER-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "DATA",
+    "state": "OPEN",
+    "workId": "TRACE-HISTORICAL-MIGRATION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "LEARNING",
+    "state": "OPEN",
+    "workId": "TRACE-CORPUS-PIPELINE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "ASSURANCE",
+    "state": "OPEN",
+    "workId": "TRACE-QUALITY-LEAKAGE-GATE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "OBS",
+    "state": "OPEN",
+    "workId": "WORKER-LOG-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PROMPT",
+    "state": "OPEN",
+    "workId": "PROMPT-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "PROMPT",
+    "state": "OPEN",
+    "workId": "PROMPT-V3-GOLDEN-EVAL-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "PROMPT",
+    "state": "OPEN",
+    "workId": "AGENT-PROMPT-SYNC-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "PROMPT",
+    "state": "OPEN",
+    "workId": "PROMPT-COMPILE-EVIDENCE-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "ROUTING",
+    "state": "OPEN",
+    "workId": "ROUTING-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "ROUTING",
+    "state": "OPEN",
+    "workId": "ROUTING-V3-LIVE-QUALITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "ROUTING",
+    "state": "OPEN",
+    "workId": "AGENT-ROUTING-ELIGIBILITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "ROUTING",
+    "state": "OPEN",
+    "workId": "SKILL-ROUTING-ELIGIBILITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "ROUTING",
+    "state": "OPEN",
+    "workId": "PROJECT-STACK-CACHE-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "ROUTING",
+    "state": "OPEN",
+    "workId": "ROUTING-JOURNAL-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "ROUTING",
+    "state": "OPEN",
+    "workId": "ROUTING-OUTCOME-LEARNING-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "EVAL",
+    "state": "OPEN",
+    "workId": "EVALUATION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "EVAL",
+    "state": "OPEN",
+    "workId": "EVALUATION-EVIDENCE-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "EVOLUTION",
+    "state": "OPEN",
+    "workId": "PROMOTION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "EVOLUTION",
+    "state": "OPEN",
+    "workId": "AGENT-EVOLUTION-LIFECYCLE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "EVOLUTION",
+    "state": "OPEN",
+    "workId": "AGENT-STATE-MIGRATION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "EVOLUTION",
+    "state": "OPEN",
+    "workId": "SKILL-EVOLUTION-LIFECYCLE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "LEARNING",
+    "state": "OPEN",
+    "workId": "LEARNING-DOGFOOD-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "LEARNING",
+    "state": "OPEN",
+    "workId": "FINE-TUNE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "LEARNING",
+    "state": "OPEN",
+    "workId": "DECKENT-CORE-MODEL-LIFECYCLE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "SCALE",
+    "state": "OPEN",
+    "workId": "SCALE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "DURABILITY",
+    "state": "OPEN",
+    "workId": "STORAGE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "DURABILITY",
+    "state": "OPEN",
+    "workId": "AUTONOMOUS-STATE-AUTHORITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "DATA",
+    "state": "OPEN",
+    "workId": "DATA-GOV-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "RESILIENCE",
+    "state": "OPEN",
+    "workId": "HA-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "OBS",
+    "state": "OPEN",
+    "workId": "SLO-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "ASSURANCE",
+    "state": "OPEN",
+    "workId": "LOAD-CHAOS-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "COST",
+    "state": "OPEN",
+    "workId": "COST-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "COST",
+    "state": "OPEN",
+    "workId": "COST-CONFIG-RECONCILIATION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "ENTERPRISE",
+    "state": "OPEN",
+    "workId": "ENTERPRISE-MODULARITY-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P1",
+    "priorityFromLedger": false,
+    "program": "ENTERPRISE",
+    "state": "OPEN",
+    "workId": "MODULAR-BOUNDARY-FREEZE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "ENTERPRISE",
+    "state": "OPEN",
+    "workId": "CORE-PACKAGE-EXTRACTION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "ENTERPRISE",
+    "state": "OPEN",
+    "workId": "ENTERPRISE-ADDON-EXTRACTION-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P2",
+    "priorityFromLedger": false,
+    "program": "ASSURANCE",
+    "state": "OPEN",
+    "workId": "MODULAR-CUTOVER-ASSURANCE-001"
+  },
+  {
+    "classified": false,
+    "lane": null,
+    "level": null,
+    "priority": "P0",
+    "priorityFromLedger": false,
+    "program": "ASSURANCE",
+    "state": "OPEN",
+    "workId": "ASSURANCE-PACK-001"
+  }
+]

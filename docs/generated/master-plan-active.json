@@ -3,27 +3,27 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "474edae473d62c169ec3f86ef496456ef38df946ab81b5b1070b3725d995b916"
+    "value": "f8aa3c4b3adb063047dbea4350e152cc31968b8f9cc0130fed298c584f37417c"
   },
   "summary": {
-    "total": 531,
+    "total": 538,
     "active": 464,
-    "terminal": 67,
+    "terminal": 74,
     "receipts": 198,
     "byState": {
-      "OPEN": 360,
+      "OPEN": 367,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
-      "VERIFY": 35,
-      "DONE": 67,
+      "VERIFY": 28,
+      "DONE": 74,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
     "byPriority": {
       "P0": 338,
-      "P1": 148,
-      "P2": 45
+      "P1": 151,
+      "P2": 49
     },
     "byProgram": {
       "API": 5,
@@ -59,7 +59,7 @@
       "SURFACE": 1,
       "TERMINAL": 22,
       "TOOL": 1,
-      "TRUTH": 97,
+      "TRUTH": 104,
       "XPLAT": 3
     }
   },
@@ -157,11 +157,11 @@
       "id": "TEST-676",
       "program": "TRUTH",
       "priority": "P0",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-25",
       "definitionDigest": "3b37c301f1bb6534470bdd6bac1860f197f0155583f4c31e1bdc8191965e7dee",
-      "progressDigest": "c249e7a1c624170f015b07528aa184045947242ec88a67026b18a135fe64b470",
-      "terminalClosureDigest": null
+      "progressDigest": "9e04dbb9f7d6894aa6e9687e4dfc3345a6be55f62b4b8507c8108f72df3693d8",
+      "terminalClosureDigest": "ac0b6590f2571cdc59fb0342f54845f8ce7d20ae1ee3988fed73ceb1c093a05f"
     },
     {
       "order": 70,
@@ -212,11 +212,11 @@
       "id": "REPO-DECK-001",
       "program": "TRUTH",
       "priority": "P0",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-25",
       "definitionDigest": "733250cf320fd9ab0a1c09a84df89e2691487a68c5f3dbdadd5f7ac943dd4118",
-      "progressDigest": "90e8c7df622a2342488d3a63717620b7e675b702a2cf3ea6b663bbacf4833b75",
-      "terminalClosureDigest": null
+      "progressDigest": "c1c63af1a6932420c502cb75fa842e1578d77b90dc1fca8f8fee1917f814ca41",
+      "terminalClosureDigest": "15af3e947f0d0073d4185f0a8a590d5edd96c2f4c971c5183d4d77a1de85750d"
     },
     {
       "order": 110,
@@ -436,6 +436,83 @@
       "updated": "2026-07-26",
       "definitionDigest": "987468dd72dc03cfd48ab7381a2e61ea86ee8821a37a48febc125af8bca3d135",
       "progressDigest": "bb206ad8116a40ca25b281206f27642802d7920ce0524747d9167cc5fe4f9c36",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 201,
+      "id": "CONFIG-HEAL-IO-TRUTH-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-25",
+      "definitionDigest": "7ae3c824670da1000aaaaf4fad78608c6687da62ff7c067af68e64ec0e050686",
+      "progressDigest": "d2203eb6e3cc136aa03ce9c465aee4d94920e63acb66572ae50880abb54401e5",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 202,
+      "id": "EVAL-TSC-FEEDBACK-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-25",
+      "definitionDigest": "a40a55bca1256eae091bd026c2ea5ec9add5bdd0393ca78680fe0a3ccbadaa2a",
+      "progressDigest": "97e0e9793d4d4080f2aec8f0d2b8b92cf0d17a56b1fbb2d98711a9179160d582",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 203,
+      "id": "HONEST-GATE-DELETION-AWARE-001",
+      "program": "TRUTH",
+      "priority": "P2",
+      "state": "OPEN",
+      "updated": "2026-08-25",
+      "definitionDigest": "7e3926c0275742ed1a4b8bf62a38ff7ded1552e376f35977f3355cf66f5bb768",
+      "progressDigest": "6f02f5ed25faedf23e5f5e215e6ca787b89409521253ef1ecc35e75437ab7b03",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 204,
+      "id": "STATUS-SWEEP-OUTPUT-HYGIENE-001",
+      "program": "TRUTH",
+      "priority": "P2",
+      "state": "OPEN",
+      "updated": "2026-08-25",
+      "definitionDigest": "5405c187be482fe14c208853785cbdcb021d351e577266ac914f841e2580f660",
+      "progressDigest": "e3e86a8738071261ca663fbd53350380cd428d0adc64bddd4b6e7cadc29a1846",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 205,
+      "id": "DIRECTIVES-ENGINE-SELFCHANGE-LINT-001",
+      "program": "TRUTH",
+      "priority": "P2",
+      "state": "OPEN",
+      "updated": "2026-08-25",
+      "definitionDigest": "e401b0bd6edd64bf73e267796dfc20740a8eaa1ce218367cb1ac87a8ef745b61",
+      "progressDigest": "eb8f2b9866facc9a44aac4c8af47f2328a6830605a46344a79d54a91910545e2",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 206,
+      "id": "EVENT-TRUTH-A4-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-25",
+      "definitionDigest": "227ffe0e09a8c0dcd9d0d3e4b6b7aaab024eb2bb2ee3eb8e399dbf88edc63d37",
+      "progressDigest": "6bfe9b47b538681543eba6b9800a034d3b1f6acaf0215b51e5cb76e59e08b60c",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 207,
+      "id": "WORKER-IDENTITY-HOSTBOUND-001",
+      "program": "TRUTH",
+      "priority": "P2",
+      "state": "OPEN",
+      "updated": "2026-08-25",
+      "definitionDigest": "12573ddab0a50acb8fdc19e8ba2ee99e25c8f408e869a4deff1e4838bef5c04c",
+      "progressDigest": "a15ff54a2145c23b87046f47a39a55bc349b565c65fa74a3584b7d04f5de7d19",
       "terminalClosureDigest": null
     },
     {
@@ -1158,22 +1235,22 @@
       "id": "BUILD-CLEAN-HOLD-HONESTY-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-25",
       "definitionDigest": "a6ebdccd6ed4058d9eddbd00e7cee0346e5d906287267f8f0ca62153c8498e24",
-      "progressDigest": "a530e6002aad408e68046e42fe3a4d2fdb7d10bee124f47000a19fd8b244b277",
-      "terminalClosureDigest": null
+      "progressDigest": "3613ec3409375eedd270aebd7edb04ea4c650596a46591f1eae2ae9e30434c93",
+      "terminalClosureDigest": "df237ff2cf5d8d44822205ad20a5029aa3f7a785b8b81e71dd8b2bd015f0c969"
     },
     {
       "order": 541,
       "id": "PROJECTION-VALIDATOR-ARTIFACT-CLASS-001",
       "program": "TRUTH",
       "priority": "P2",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-25",
       "definitionDigest": "9ca1bb3fb83e43d87904741e0d6ae9f0f55eb1a6ed2783e2cd93a7f77d8ae77b",
-      "progressDigest": "4fe0e34d70de1f5564bbf25f9ac1e0a0a1e597b13e9d3f11046ead810d2a81c2",
-      "terminalClosureDigest": null
+      "progressDigest": "31cf31185b2bf633fabade38b7e88aa0695434225dca319f2f0518e63409a76e",
+      "terminalClosureDigest": "8f10860f5ae4edffc886612de7bc94bf10f6145eb4f6403f4081f36ff324503c"
     },
     {
       "order": 1000,
@@ -3600,33 +3677,33 @@
       "id": "SPAWN-RETRY-TASK-IMMUTABILITY-001",
       "program": "KERNEL",
       "priority": "P1",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-25",
       "definitionDigest": "48dfd636153467e7f1c09cb45da7fc1cb48c12f8fad90c60ab57d62f6f04af09",
-      "progressDigest": "bdd7e84aa7097add9103f68934f583905c03a297ae28904f62aec72dad4fdf11",
-      "terminalClosureDigest": null
+      "progressDigest": "282e8a774898cb294e45546c497722120332163fa0e8039ed015ecf74779dc07",
+      "terminalClosureDigest": "484f52599f209d7c47c1ab97be8bb552ef38b61b6b310d9d26af831429aa955d"
     },
     {
       "order": 3352,
       "id": "RESUME-STALE-LOCK-RECONCILIATION-001",
       "program": "KERNEL",
       "priority": "P1",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-25",
       "definitionDigest": "5918564bbe90ea0815b4dd681a9e4b9f43dabbb4602fa5351f3ed2ec1d9d1fa1",
-      "progressDigest": "3f4f26ca76c8d0d8667b5ed15c368e6f8dc7b22a14e1f9fa3113cbf71b1f67f7",
-      "terminalClosureDigest": null
+      "progressDigest": "e54d1c2c4daaf74a364543e73d87e8d87fcc335e6ee8f7e6e80f13c4cedd66b1",
+      "terminalClosureDigest": "0fe47c4a0668565c8679a55149c80004c7acb13fa1b01d8575ef749e00127518"
     },
     {
       "order": 3353,
       "id": "SUBPROCESS-FINITE-BUDGET-ADMISSION-001",
       "program": "KERNEL",
       "priority": "P2",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-25",
       "definitionDigest": "931584ab5e50c162d7bfdaf9f7a146b763d5c638f28400d0cb2ce2dd2300d056",
-      "progressDigest": "3dde8b15790ca6f5df46b43b3abbbb0b525b32f85b874c0e4790a18d159c566a",
-      "terminalClosureDigest": null
+      "progressDigest": "ed63b830e725bd08b31c92bf7a964f515cfe1dfbde317a54cbab68591a07eb49",
+      "terminalClosureDigest": "a3f1e72377a2622d71eb7a65952e494318457a79f1061c215efd1f93e856e950"
     },
     {
       "order": 3354,
@@ -7954,7 +8031,6 @@
       "blockerRemedy": "`TEST-675`, `TEST-676`, `TEST-HERMETIC-001`",
       "closureBlockedBy": [
         "TEST-675",
-        "TEST-676",
         "TEST-HERMETIC-001"
       ],
       "evidenceReceipts": [],
@@ -8005,50 +8081,6 @@
       "acceptance": "Dynamic ve static scan; tüm writers tmpdir; root-write gate fail-loud",
       "evidence": "`receipt=GR-2026-07-26-TEST-HERMETIC-01`; `receipt=GR-2026-07-27-TEST-HERMETIC-02`; `receipt=GR-2026-07-27-TEST-HERMETIC-03`; `receipt=GR-2026-07-27-TEST-HERMETIC-04`; `receipt=GR-2026-07-27-TEST-CONTAINMENT-01`; clean-index source-derived static/eager writer registry scans 2,443 files with 0 confirmed violations; full SHA-256 ratchets bind `8939:350bb34cd2a9517f9a1a1b0a2098e5180b8448592d2449a4fee488d3810bbb5a` unresolved effects and `1134:1abcdc8d8c35a01116bc5d605ca054279b72e1f09398745145feac19c06199c8` production inventory, including the exact nineteen-module containment inventory; dirty shared-worktree scans are intentionally ineligible to advance either ratchet; changed containment scope contributes zero unresolved effects; the approved 97-event ambient-allocation reduction was independently rejected and fully rolled back because writable global bindings plus missing catch/class-expression binding coverage made `proven-nonwriter` unsound; exact `import.meta.main` recognition changes existing callsite positions without reducing or accepting unresolved debt; default gate exits 0 and strict mode fails with `E_HERMETIC_UNRESOLVED_STRICT`; runtime guard blocks post-setup project, `.tasks` and `dist` writes across canonical root/dashboard/desktop Vitest surfaces; authenticated live measurement, native adapter execution, inherited/pre-opened descriptor closure and OS-level canary remain open under TEST-CONTAINMENT-001",
       "updated": "2026-07-27"
-    },
-    {
-      "order": 60,
-      "id": "TEST-676",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "Test koşumunda `dist` clean çağrısının fail-loud root cause'unu bul ve kapat",
-      "priority": "P0",
-      "dependsOn": [],
-      "dependents": [
-        "CODEX-C5",
-        "CODEX-MAIN-001",
-        "KERNEL-001",
-        "RECOVERY-BORN-480-POSTBUILD-BINARY-001",
-        "TRUTH-BASELINE-001"
-      ],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "~",
-        "H": "~",
-        "L": "1",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-07-26-TEST-HERMETIC-01",
-        "GR-2026-07-27-TEST-HERMETIC-02",
-        "GR-2026-07-28-BUILD-RECOVERY-01",
-        "GR-2026-07-28-EXECUTION-AUTHORITY-01",
-        "GR-2026-07-28-BOT-PID-AUTHORITY-01",
-        "GR-2026-08-26-TEST676-EVIDENCE-01"
-      ],
-      "acceptance": "Caller trace, deterministic reproduction, forbid-clean guard ve stable binary proof",
-      "evidence": "`receipt=GR-2026-07-26-TEST-HERMETIC-01`; `receipt=GR-2026-07-27-TEST-HERMETIC-02`; `receipt=GR-2026-07-28-BUILD-RECOVERY-01`; `receipt=GR-2026-07-28-EXECUTION-AUTHORITY-01`; `receipt=GR-2026-07-28-BOT-PID-AUTHORITY-01`; clean authority is bound to the physical script root, rejects symlink/boundary ambiguity and validates all preserved entries before deletion; persistent execution anchors compare stable `dev+ino` generations across Linux mount namespaces while same-process pinned descriptors retain exact mount-ID validation and `.locks` replacement remains fail-closed; bot authority now uses a strict project-digest plus kernel-start-token record, atomic no-clobber publication and generation-bound clear, retires dead/reused/provably-foreign legacy records without signalling and fail-closes ambiguous identity; the exact stale raw PID 2 record was reconciled without signal; focused bot/CLI/clean proof passes 71/71, prior combined execution-authority proof passes 132/132, and full TypeScript/lint gates pass at hermetic identities `12125/1151`; final `npm run build` completed clean `ALLOW`, TypeScript and 111 copied assets at 2026-07-28 16:53 +03:00; authenticated runtime-wide ApprovalBroker bootstrap verifier, real committed/rollback recovery canary, native Windows bot/process ownership adapter and cross-platform proof remain open; `receipt=GR-2026-08-26-TEST676-EVIDENCE-01`; 2026-08-25-gece kanit-kapanisi: guard-zinciri CANLI ateslendi (suite-3 orta-kosu dist-rebuild'i HermeticDistIntegrityError ile yakalandi) + munhasir final-suite dist-dokunulmadan 38743/0 yesil + clean-HOLD alt-surec pini (bkz 540 receipt)",
-      "updated": "2026-08-25"
     },
     {
       "order": 70,
@@ -8168,40 +8200,6 @@
       "acceptance": "Capability-classified bounded exceptions; remaining calls ratcheted",
       "evidence": "2026-07-21 tests/scripts analyses; 2026-08-03 (PAZARTESI P11, owner onaylı): kapsam genişledi — test tarafı dışında ÜRETİM hot-path'ine 4 yeni spawnSync eklendi (spawn-backend-docker.ts: git hash-object -w ×2, cat-file blob, diff --numstat). Ratchet --update ile sessiz affetmediği için aynı dosyanın mevcut sahip etiketi altına kaydedildi (hotPathDebt 40 → 44). Owner kararı: bu 4 çağrı async'e taşınacak ve ratchet'ten düşürülecek; kod geri alınmıyor çünkü provider-observation v2'nin dosya-diff kanıtı buna bağlı",
       "updated": "2026-08-03"
-    },
-    {
-      "order": 100,
-      "id": "REPO-DECK-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "`.deck` secret'ını Docker context ve image layers'dan dışla",
-      "priority": "P0",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "0",
-        "H": "?",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-10-DECK-DOCKERIGNORE-01",
-        "GR-2026-08-26-DECK-LAYER-PROOF-01"
-      ],
-      "acceptance": "`.dockerignore`, build-context negative test ve image-layer proof",
-      "evidence": "2026-07-21 decision; current `.dockerignore` gap; `receipt=GR-2026-08-10-DECK-DOCKERIGNORE-01`; 2026-08-10 MEKANİK DİLİM: .deck + .deck.* dışlaması eklendi (owner-side); sprint-507-002 kanıtı — worker render-time scope-shrink (yeni bulgu: plan-time trackedRootFiles koruması render'da yeniden-sanitize edilip kök dosyaları SESSİZCE düşürüyor) nedeniyle kök dosyaya yazamadı, dürüst NO_GO; kalan kapsam: hermetik dockerignore-parse testi + image-layer proof (worker dilimi, kök-dosya yazımı gerektirmez); `receipt=GR-2026-08-26-DECK-LAYER-PROOF-01`; 2026-08-25-gece kalan-kapsam kapandi: hermetik dockerignore-pini (679-001) + CANLI image-layer probu (gercek full-context build; runtime'da .deck/.deck.bak/.env YOK, layer-tar'da sifir .deck girdisi)",
-      "updated": "2026-08-25"
     },
     {
       "order": 120,
@@ -8952,6 +8950,223 @@
       "acceptance": "13-record truth; watch renew/promote/close; capacity config-derived; MASTER sole tracker",
       "evidence": "Core-memory read-only audit",
       "updated": "2026-07-26"
+    },
+    {
+      "order": 201,
+      "id": "CONFIG-HEAL-IO-TRUTH-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Config self-heal io-vs-parse ayriminin kalici kaydi + ERRORS.md forensic-penceresi",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Strike-5 fix'inin (heal yalniz parse-kanitiyla; io-hatasi typed CONFIG_READ_IO_HOLD, dosya tasinmaz; config-CLI yazimlari tmp+rename) kalici satir-kaydi; ek dilim: ERRORS.md 600-satir kirpma-penceresi forensic icin genisletilir veya kritik-sinif girdiler ayri kalici kanala akar",
+      "evidence": "owner-admission 2026-08-25-gece (gece-bulgu #1); fix landed `ff48978fb` + hermetik EISDIR pini; canli sinav: suite baski-altinda config sag kaldi",
+      "updated": "2026-08-25"
+    },
+    {
+      "order": 202,
+      "id": "EVAL-TSC-FEEDBACK-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Auditor tsc-FAIL'i FIX-fazina geri beslenir; tam-factory vi.mock'lara importOriginal-ratchet",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Gate tsc FAIL verdiginde sprint COMPLETE'e tsc-kirli kapanamaz: Auditor bulgusu bounded FIX-task dogurur veya settlement typed-residual tasir; ayrica tam-factory node:fs/config mock'lari icin importOriginal-spread ratchet'i (yeni tam-factory eklenemez) tanimlanir",
+      "evidence": "owner-admission 2026-08-25-gece (gece-bulgu #5); kanit-oruntusu: 675/676/677 ust-uste vitest-yesil+tsc-kirli, gece 206-kirmizi mock-drift onarimi",
+      "updated": "2026-08-25"
+    },
+    {
+      "order": 203,
+      "id": "HONEST-GATE-DELETION-AWARE-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Honest-gate stub-sezgisi silme-only isleri yanlis-pozitiflemez",
+      "priority": "P2",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "STUB_WRITE_DETECTED/SCOPE_VIOLATION_OR_EMPTY_WRITE karari linesAdded=0 iken linesRemoved>0 + goCriteria-kaniti varsa DONE'u override etmez; silme-only fixture pini eklenir; gercek stub (0/0 + kanitsiz) HALA yakalanir",
+      "evidence": "owner-admission 2026-08-25-gece (gece-bulgu #6); canli vaka: 679-002 24-silme/0-ekleme goCriteria-MET iken DONE→NO_GO override",
+      "updated": "2026-08-25"
+    },
+    {
+      "order": 204,
+      "id": "STATUS-SWEEP-OUTPUT-HYGIENE-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "status deathSweep ciktisi sinif-ozetli olur; olu flow-handle artiklari tipli temizlik akisina baglanir",
+      "priority": "P2",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "deathSweep.skipped ham-liste yerine sinif-bazli sayim + ornek doner (JSON sozlesme additive); 100 handle'siz/log'suz legacy flow-artigi icin runs yuzeyinde owner-onayli tipli temizlik akisi tanimlanir; status ciktisi bit-notr kucultme pini",
+      "evidence": "owner-admission 2026-08-25-gece (gece-bulgu #2); canli vaka: status --json 100 'no flow found' satiri dokuyor",
+      "updated": "2026-08-25"
+    },
+    {
+      "order": 205,
+      "id": "DIRECTIVES-ENGINE-SELFCHANGE-LINT-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "lint-directives motor-sicak-yolu self-change'inde typed uyari verir",
+      "priority": "P2",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Files kumesi motor-sicak-yolu listesiyle (task-builder, prompt-compile, result-collector, scheduler, spawner) kesisen task ile ayni DAG'da ona etki-bagimli task varsa typed WARN: 'etki next-run-only — mini-run onerisi'; liste tek-kaynak ve testli",
+      "evidence": "owner-admission 2026-08-25-gece (gece-bulgu #3); ders: sprint-674 kendi fix'ine eski-dist'te yakalanip typed-PAUSE etti",
+      "updated": "2026-08-25"
+    },
+    {
+      "order": 206,
+      "id": "EVENT-TRUTH-A4-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "A3'un bilincli-ertelenenleri: hb-sema emekliligi, log tek-format, inspect-parity, olu-feed silimi, kayipsiz rotasyon, Nervous-filtre",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Program-satiri (dilimlenecek): legacy .hb semasi canonical'a emekli edilir (subprocess pid-liveness devri dahil); .tasks log'lari tek-format; run-inspector read-model'i tuketir (HOLD-parity); olu run-state-feed.ts kaldirilir; event-stream rotasyonu kayipsiz arsivlenir; Nervous observer filtre-genisletmesi — her dilim kendi admission'iyla acilir",
+      "evidence": "owner-admission 2026-08-25-gece (gece-bulgu #4 / A3 negative-space listesi); on-kesif A3 dalga-raporlarinda",
+      "updated": "2026-08-25"
+    },
+    {
+      "order": 207,
+      "id": "WORKER-IDENTITY-HOSTBOUND-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Worker attemptId/backend host-bound kimlik akisi: HEARTBEAT_IDENTITY_HOLD reddi kapanir",
+      "priority": "P2",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Prompt/cagri zinciri worker'a host-bound attemptId+backend'i kanitli tasir; worker hb-yazimi kimlik-belirsizliginde typed-HOLD yerine dogru kimlikle yazar; 674-sinifi 'identity not host-bound' reddi hermetik pinlenir",
+      "evidence": "owner-admission 2026-08-25-gece (gece-bulgu #7); canli vaka: 674 worker'lari hb yazmayi HEARTBEAT_IDENTITY_HOLD ile reddetti",
+      "updated": "2026-08-25"
     },
     {
       "order": 210,
@@ -10426,72 +10641,6 @@
       "updated": "2026-08-10"
     },
     {
-      "order": 540,
-      "id": "BUILD-CLEAN-HOLD-HONESTY-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "Worktree-ortamında `npm run build` clean-HOLD'unun (execution-lock authority state missing dalı) exit-0 ile başarı gibi yayımlanması iddiasının reprodüksiyonu ve dürüst non-zero kapanışı",
-      "priority": "P1",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "?",
-        "L": "-",
-        "X": "-",
-        "S": "-"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-25-CWAVE-540-01"
-      ],
-      "acceptance": "Önce reproduce: authority-state-missing worktree fixture'ında gözlenen exit-0 kanıtlanır (ana-checkout'ta 2026-08-25 canlı-probe exit-1 verdi — vaka dal-özgü); reprodükte edilirse o dal typed non-zero döner ve build-zinciri tsc'ye geçmeden dürüst-FAIL eder; reprodükte edilemezse satır kanıtla kapatılır",
-      "evidence": "cli-surface-truth lane bulgular.md (owner admission 2026-08-25); worktree /tmp/deckent-cli-surface-truth; madde 17; ana-checkout karşı-kanıt: build-hold-probe exit-1; `receipt=GR-2026-08-25-CWAVE-540-01`; `proof=clean-hold-subprocess-contract-pin-plus-byteequal-md5`; 2026-08-25 gece kanit-kapanisi: kod-tarafinda reprodukte edilemez (byte-es clean.mjs, tek cikis exitCode=1); gozlenen exit-0 pipe-yutmus olcum-artefakti (ayni tuzak bu gece landing sirasinda bagimsiz reproduke edildi); kalici alt-surec kontrat-pini yesil",
-      "updated": "2026-08-25"
-    },
-    {
-      "order": 541,
-      "id": "PROJECTION-VALIDATOR-ARTIFACT-CLASS-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "Projection-validator'ın `*.prompt-delivery.json` receipt'lerini task-artifact'ı gibi sınıflandırmaması",
-      "priority": "P2",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "?",
-        "L": "-",
-        "X": "-",
-        "S": "-"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-25-CWAVE-541-01"
-      ],
-      "acceptance": "Dosya-adı deseni gerçek task-projection şemasıyla daraltılır; delivery-receipt'ler aynı namespace'te dursa da task-state olarak parse edilmez; regresyon-pini eklenir",
-      "evidence": "cli-surface-truth lane bulgular.md (owner admission 2026-08-25); worktree /tmp/deckent-cli-surface-truth; madde 12; `receipt=GR-2026-08-25-CWAVE-541-01`; 2026-08-25 gece C-dalgasi (sprint-677 004): prompt-delivery reason + refuse-arm korumali pinler; canli spawn-parity gecisi yeni dist ile bir sonraki gercek runda dogrulanacak",
-      "updated": "2026-08-25"
-    },
-    {
       "order": 1000,
       "id": "CODEX-MAIN-001",
       "parent": "P01",
@@ -10559,7 +10708,6 @@
       "blockerRemedy": "exact `DependsOn`; resolved all-ingress runtime truth",
       "closureBlockedBy": [
         "TEST-675",
-        "TEST-676",
         "APPROVAL-001",
         "RECEIPT-001",
         "LIMIT-001",
@@ -12244,7 +12392,6 @@
       "closureBlockedBy": [
         "CODEX-C4",
         "TEST-675",
-        "TEST-676",
         "FO-12",
         "XVERIFY-WIRE-001"
       ],
@@ -14201,7 +14348,6 @@
       "blockerRemedy": "exact ledger `DependsOn` IDs",
       "closureBlockedBy": [
         "TEST-675",
-        "TEST-676",
         "CODEX-C5",
         "APPROVAL-001",
         "RECEIPT-001",
@@ -14238,10 +14384,7 @@
         "COMPOSITE-WORKER-001",
         "PLATFORM-EXEC-AUTH-W3-DARWIN-001",
         "ORCHESTRA-RELIABILITY-001",
-        "PLAN-PURE-PREVIEW-001",
-        "SPAWN-RETRY-TASK-IMMUTABILITY-001",
-        "RESUME-STALE-LOCK-RECONCILIATION-001",
-        "SUBPROCESS-FINITE-BUDGET-ADMISSION-001"
+        "PLAN-PURE-PREVIEW-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "One lifecycle, one state authority, one evidence chain and all-surface cutover",
@@ -16099,8 +16242,7 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "RECOVERY-ASSURANCE-001",
-        "TEST-676"
+        "RECOVERY-ASSURANCE-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "`npm run build` followed immediately by the isolated recovery binary test deterministically emits the typed JSON payload; exit-zero/empty-output is forbidden; no sleep, retry masking or mock-only substitution",
@@ -19065,108 +19207,6 @@
       ],
       "acceptance": "Aynı DIRECTIVES+config altında dry-run ile gerçek-plan aynı eligible-agent kataloğunu görür ve aynı task-projection/digest'i üretir (bilinçli-farklar typed olarak beyan edilir); dry-run `.deckent/agents/temp-*` profili ÜRETMEZ; routing decision-journal iki yol için tek-katalog kanıtı taşır. Not: debt-preflight yazımı KN4 owner-tasarımıdır, bu satırın kapsamı katalog/yan-etki eşitliğidir",
       "evidence": "cli-surface-truth lane bulgular.md (owner admission 2026-08-25); worktree /tmp/deckent-cli-surface-truth; maddeler 3+4; DIRECTIVES-hattının 4. kapısı bu önizlemeye dayanır; `receipt=GR-2026-08-25-CWAVE-3350-01`; `proof=dryrun-temp-purity-live-2to2-plus-parity-pins`; 2026-08-25 gece C-dalgasi (sprint-677 001+002, 002 el-fix tip-daraltmasiyla): dry-run temp-agent YAZMAZ (canli gercek-binary prob: temp-* 2->2), katalog sessiz-cokusleri typed-sesli, MCP dryRun gercek, writeScopePolicy digest-paritesi + iki-yol katalog-pini",
-      "updated": "2026-08-25"
-    },
-    {
-      "order": 3351,
-      "id": "SPAWN-RETRY-TASK-IMMUTABILITY-001",
-      "parent": "KERNEL-001",
-      "program": "KERNEL",
-      "outcome": "Spawn-retry yolunda in-memory task mutasyonunun (estimatedTokens/promptCompilePlanId) yapay `EXACT_PLAN_TASK_ARTIFACT_DRIFT` üretmemesi",
-      "priority": "P1",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G2",
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "?",
-        "L": "-",
-        "X": "-",
-        "S": "-"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-25-CWAVE-3351-01"
-      ],
-      "acceptance": "buildWorkerPrompt approved-task'ı mutate etmez (immutable clone) veya retry-öncesi rollback garanti edilir; budget-gate'te duran ilk-attempt sonrası ikinci-attempt drift üretmez; regresyon-pini gerçek retry-fixture'ıyla",
-      "evidence": "cli-surface-truth lane bulgular.md (owner admission 2026-08-25); worktree /tmp/deckent-cli-surface-truth; madde 6; `receipt=GR-2026-08-25-CWAVE-3351-01`; 2026-08-25 gece C-dalgasi (sprint-677 003, sol): runtime-only alan istisnasi + gercek-zincir fixture (mutate-twice->authority-passes, gercek-drift hala yakalanir); canli retry senaryosu bir sonraki dogal budget-gate vakasinda dogrulanacak",
-      "updated": "2026-08-25"
-    },
-    {
-      "order": 3352,
-      "id": "RESUME-STALE-LOCK-RECONCILIATION-001",
-      "parent": "KERNEL-001",
-      "program": "KERNEL",
-      "outcome": "PAUSED-resume yolunda stale coordinator-lock (PID-namespace görünmezliği dahil) typed reconciliation ile çözülür; detached start-attempt journal'ı `runs --close-stale` kapsamına girer",
-      "priority": "P1",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G2",
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "?",
-        "L": "-",
-        "X": "-",
-        "S": "-"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-25-CWAVE-3352-01"
-      ],
-      "acceptance": "Status PAUSED+koordinatörsüz iken resume, sandbox-PID'li bayat-lock'a çarpmaz: lock sahipliği pid+startToken/namespace-kanıtıyla çözülür, bayatsa typed temizlik+devam; pre-admission start-attempt kayıtları close-stale sweep'ince sınıflandırılır (terminal-yol 2026-08-25 releaseSprintLockForTerminatedSprint ile kapandı; bu satır paused/orphan-resume yoludur)",
-      "evidence": "cli-surface-truth lane bulgular.md (owner admission 2026-08-25); worktree /tmp/deckent-cli-surface-truth; maddeler 1+11; `receipt=GR-2026-08-25-CWAVE-3352-01`; 2026-08-25 gece C-dalgasi (sprint-677 005 sol + 006): startToken-sahiplik + typed acquire-reconciliation + close-stale start-attempt siniflandirmasi; canli paused-resume senaryosu dogal vakada dogrulanacak",
-      "updated": "2026-08-25"
-    },
-    {
-      "order": 3353,
-      "id": "SUBPROCESS-FINITE-BUDGET-ADMISSION-001",
-      "parent": "KERNEL-001",
-      "program": "KERNEL",
-      "outcome": "Init/default'ların çalışamayan kombinasyon üretmemesi: `spawn_backend=subprocess` + finite token-budget, measured-streaming desteğiyle admission-safe çözülür",
-      "priority": "P2",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G2",
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "?",
-        "L": "-",
-        "X": "-",
-        "S": "-"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-25-CWAVE-3353-01"
-      ],
-      "acceptance": "Backend capability-projection'ı (liveUsageBudgetSupport) provider-adapter gerçeğini yansıtır; finite-budget yalnız measured-stream kanıtı olan kombinasyonlara yazılır, aksi halde init/config-katmanında typed düzeltme/uyarı üretilir; 'Live execution budget requires measured streaming usage' fail-closed'ı kullanıcı-üretimi default'larla tetiklenemez",
-      "evidence": "cli-surface-truth lane bulgular.md (owner admission 2026-08-25); worktree /tmp/deckent-cli-surface-truth; madde 5; `receipt=GR-2026-08-25-CWAVE-3353-01`; 2026-08-25 gece C-dalgasi (sprint-677 007, el-fix dil-daraltmasiyla): init unmetered_backend authoring + typed admission-error (mesaj-pini korunarak); canli init akisi bir sonraki gercek init vakasinda dogrulanacak",
       "updated": "2026-08-25"
     },
     {
@@ -27343,6 +27383,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "03a1a1f71a3f1e4cc8c1b360ebdb8871220363e9a95117b3d7f552485cd6e0e4"
+    "value": "3f9d396c76426c164ce0c2d511e9a7c5ef1b105ed80573fb0e4652dabb94b461"
   }
 }

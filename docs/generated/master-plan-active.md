@@ -5,20 +5,20 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):474edae473d62c169ec3f86ef496456ef38df946ab81b5b1070b3725d995b916`
+**Source digest:** `sha256(normalized-lf-utf8):f8aa3c4b3adb063047dbea4350e152cc31968b8f9cc0130fed298c584f37417c`
 
-**Rows:** 531 total · 464 active · 67 terminal
+**Rows:** 538 total · 464 active · 74 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 360 |
+| OPEN | 367 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 69 |
-| VERIFY | 35 |
-| DONE | 67 |
+| VERIFY | 28 |
+| DONE | 74 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
 
@@ -29,11 +29,9 @@
 | 25 | `LEDGER-ISOLATED-COMMIT-PROOF-001` | OPEN | P2 | TRUTH | — | — | Canonical ledger uzlaştırmasının izole/fresh-clone commit kanıtı — SSOT-002 + SOURCE-MANIFEST-001 kapanışlarından taşınan canlı-kanıt boyutu |
 | 40 | `TRUTH-BASELINE-001` | BLOCKED | P0 | TRUTH | `TEST-675`, `TEST-676`, `TEST-HERMETIC-001` | `BASELINE_CONFLICT` | Current HEAD için tek reference test, build, binary ve environment baseline |
 | 50 | `TEST-675` | OPEN | P0 | TRUTH | — | — | Testlerin live `.tasks` alanına yazmasını kaldır ve writer discovery ratchet'i kur |
-| 60 | `TEST-676` | VERIFY | P0 | TRUTH | — | — | Test koşumunda `dist` clean çağrısının fail-loud root cause'unu bul ve kapat |
 | 70 | `TEST-HERMETIC-001` | OPEN | P0 | TRUTH | `TEST-675` | — | Project root, HOME, `.tasks` ve tracked-file test writer discovery/migration |
 | 75 | `TEST-CONTAINMENT-001` | VERIFY | P0 | TRUTH | `TEST-675` | — | Process-birth, descendant ownership ve OS/OCI test containment authority foundation'ı |
 | 80 | `TEST-SPAWN-001` | OPEN | P1 | TRUTH | `TEST-HERMETIC-001` | — | Test `spawnSync` policy ve async migration |
-| 100 | `REPO-DECK-001` | VERIFY | P0 | TRUTH | — | — | `.deck` secret'ını Docker context ve image layers'dan dışla |
 | 120 | `STATE-RETENTION-001` | OPEN | P1 | TRUTH | `SSOT-002` | — | Runtime state/log retention, rotation, legal hold ve crash recovery contract |
 | 121 | `CRASH-FORENSICS-AUTHORITY-001` | OPEN | P1 | TRUTH | — | — | Crash artifact schema, privacy, collision-free retention, typed classification ve support/recovery consumption authority |
 | 122 | `NERVOUS-STATE-LIFECYCLE-001` | OPEN | P1 | TRUTH | `AUDIT-001`, `APPROVAL-001` | — | Nervous durable state, proposal, history ve IPC artefaktları için tenant-aware lifecycle, privacy ve recovery authority |
@@ -53,6 +51,13 @@
 | 180 | `DOCS-I18N-001` | OPEN | P1 | TRUTH | `DOCS-TOPOLOGY-001`, `DOCS-RELEASE-TRUTH-001` | — | Documentation i18n contract for en, tr, zh-Hans, es, ja and hi |
 | 190 | `MEMORY-AUTHORITY-001` | OPEN | P0 | TRUTH | `SSOT-002` | — | Repo-local provider-neutral canonical memory; provider HOME surfaces projections only |
 | 200 | `MEMORY-TRUTH-001` | BLOCKED | P1 | TRUTH | `MEMORY-AUTHORITY-001` | `DEPENDENCY_UNSATISFIED` | Memory index count, stale watch, task-capacity and phantom ledger drift'lerini hükme bağla |
+| 201 | `CONFIG-HEAL-IO-TRUTH-001` | OPEN | P1 | TRUTH | — | — | Config self-heal io-vs-parse ayriminin kalici kaydi + ERRORS.md forensic-penceresi |
+| 202 | `EVAL-TSC-FEEDBACK-001` | OPEN | P1 | TRUTH | — | — | Auditor tsc-FAIL'i FIX-fazina geri beslenir; tam-factory vi.mock'lara importOriginal-ratchet |
+| 203 | `HONEST-GATE-DELETION-AWARE-001` | OPEN | P2 | TRUTH | — | — | Honest-gate stub-sezgisi silme-only isleri yanlis-pozitiflemez |
+| 204 | `STATUS-SWEEP-OUTPUT-HYGIENE-001` | OPEN | P2 | TRUTH | — | — | status deathSweep ciktisi sinif-ozetli olur; olu flow-handle artiklari tipli temizlik akisina baglanir |
+| 205 | `DIRECTIVES-ENGINE-SELFCHANGE-LINT-001` | OPEN | P2 | TRUTH | — | — | lint-directives motor-sicak-yolu self-change'inde typed uyari verir |
+| 206 | `EVENT-TRUTH-A4-001` | OPEN | P1 | TRUTH | — | — | A3'un bilincli-ertelenenleri: hb-sema emekliligi, log tek-format, inspect-parity, olu-feed silimi, kayipsiz rotasyon, Nervous-filtre |
+| 207 | `WORKER-IDENTITY-HOSTBOUND-001` | OPEN | P2 | TRUTH | — | — | Worker attemptId/backend host-bound kimlik akisi: HEARTBEAT_IDENTITY_HOLD reddi kapanir |
 | 210 | `REPO-CLEANUP-001` | OPEN | P2 | TRUTH | `SSOT-002` | — | Repository filesystem, tracked-ephemeral and orphan disposition manifest |
 | 220 | `REPO-CLEANUP-APPLY-001` | BLOCKED | P2 | TRUTH | `REPO-CLEANUP-001` | `FRESH_DESTRUCTIVE_APPROVAL_REQUIRED` | Apply approved repository-filesystem cleanup manifest |
 | 230 | `MEMORY-SYNC-001` | OPEN | P0 | TRUTH | `MEMORY-AUTHORITY-001` | — | Provider-neutral revisioned memory sync and projections |
@@ -94,8 +99,6 @@
 | 532 | `CI-VITEST-WORKER-CRASH-001` | OPEN | P2 | TRUTH | — | — | Docs+Scripts job'unun belgeli 'testler yeşil ama vitest onTaskUpdate worker-crash ile exit-1' flake sınıfı: run 31056929295'te 101/101 pass + exit-1 (job continue-on-error ile maskeli — job-level yeşil kanıtları kirletiyor) |
 | 534 | `SSOT-SETTLEMENT-001` | OPEN | P0 | TRUTH | `APPROVAL-001`, `RECEIPT-001`, `KERNEL-SETTLEMENT-001`, `AUDIT-001` | — | MASTER settlement-closure authority: authenticated historical authority, external immutable/self-hosting-safe grant ledger, commit-bound settlement ve Git trust-anchor |
 | 538 | `CI-NIGHTLY-GREEN-001` | OPEN | P1 | TRUTH | — | — | Gece Coverage'ın 3 drift kırığı kapanır: O3 operation-ingress baseline canlıyla eşitlenir (673→674, debt-manager buildReplanProposal yazması), decisions.md'deki Context'siz ADR tamamlanır, KNOWN_ORPHANS pini operation-catalog/index.ts'i kaydeder |
-| 540 | `BUILD-CLEAN-HOLD-HONESTY-001` | VERIFY | P1 | TRUTH | — | — | Worktree-ortamında `npm run build` clean-HOLD'unun (execution-lock authority state missing dalı) exit-0 ile başarı gibi yayımlanması iddiasının reprodüksiyonu ve dürüst non-zero kapanışı |
-| 541 | `PROJECTION-VALIDATOR-ARTIFACT-CLASS-001` | VERIFY | P2 | TRUTH | — | — | Projection-validator'ın `*.prompt-delivery.json` receipt'lerini task-artifact'ı gibi sınıflandırmaması |
 | 1000 | `CODEX-MAIN-001` | BLOCKED | P0 | CODEX | `SSOT-003`, `TEST-675`, `TEST-676`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `CONFIG_CUTOVER_INCOMPLETE` | Codex-main transition parent |
 | 1010 | `CM-01` | BLOCKED | P0 | CODEX | `SSOT-003` | `CONFIG_CUTOVER_INCOMPLETE` | Canonical resolved provider/model contract across every ingress |
 | 1020 | `CM-02` | OPEN | P0 | CODEX | `CM-01` | — | Sol, Terra and Luna entitlement evidence matrix |
@@ -291,9 +294,6 @@
 | 3348 | `AUTONOMOUS-SCHEDULER-FAIRNESS-001` | OPEN | P0 | KERNEL | `AUTONOMOUS-CONTROL-PLANE-001`, `GOAL-DAG-001` | — | Tenant-fair autonomous scheduling, parked-approval progress ve bounded backpressure |
 | 3349 | `ORCHESTRA-RELIABILITY-001` | OPEN | P0 | KERNEL | — | — | FIX-worker protokol quote bug'ı + result-JSON kontrol-karakteri toleransı + stale-spawnlock dispatch-watchdog |
 | 3350 | `PLAN-PURE-PREVIEW-001` | VERIFY | P1 | KERNEL | `PLANNER-001` | — | `plan --dry-run` gerçek-planning'i temsil eder ve yan-etkisizdir: bootstrap'sız katalog-farkı (21-vs-14 agent, farklı seçim/digest) ve temp-agent üretimi kapanır |
-| 3351 | `SPAWN-RETRY-TASK-IMMUTABILITY-001` | VERIFY | P1 | KERNEL | — | — | Spawn-retry yolunda in-memory task mutasyonunun (estimatedTokens/promptCompilePlanId) yapay `EXACT_PLAN_TASK_ARTIFACT_DRIFT` üretmemesi |
-| 3352 | `RESUME-STALE-LOCK-RECONCILIATION-001` | VERIFY | P1 | KERNEL | — | — | PAUSED-resume yolunda stale coordinator-lock (PID-namespace görünmezliği dahil) typed reconciliation ile çözülür; detached start-attempt journal'ı `runs --close-stale` kapsamına girer |
-| 3353 | `SUBPROCESS-FINITE-BUDGET-ADMISSION-001` | VERIFY | P2 | KERNEL | — | — | Init/default'ların çalışamayan kombinasyon üretmemesi: `spawn_backend=subprocess` + finite token-budget, measured-streaming desteğiyle admission-safe çözülür |
 | 3354 | `FIX-SPAWN-DEPENDENCY-FRESHNESS-001` | VERIFY | P1 | KERNEL | `ORCHESTRA-RELIABILITY-001` | — | FIX-spawn dependency-settlement tazeliği: FIX dalgası spawn edilirken dependency lineage'ı result-ingest SONRASI taze snapshot'tan okunur; bayat 'Pending' penceresi kapanır |
 | 4000 | `AUTHORITY-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | Unified runtime authority parent |
 | 4020 | `TENANT-001` | VERIFY | P0 | AUTHORITY | `PRINCIPAL-001` | — | Canonical tenant/project/session scope enforcement |
