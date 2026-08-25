@@ -7,10 +7,14 @@
 > `RECOVERY_COMMITTED` (transferee Claude), receipt
 > `sha256:09a1f774689ed4e785fa859dbd3f574406da02c87d2080c94d773c281a05117a`;
 > authority-ref `owner-live-2026-08-24-go-full-authority-claude-8workers`.
-> **Yürütme yetkisi CLAUDE'da. Session-devri (Claude→Claude, CONTEXT_EXHAUSTION) owner-directed
-> olarak hazırlanıyor — yeni receipt zinciri `docs/execution/handoffs/` altında; PREPARED'ı gören
-> yeni oturum ÖNCE `fallback-rules/authority-handoff.md` §6'yı uygular (VERIFIED yazar, COMMITTED/
-> RECOVERY_COMMITTED görmeden mutation yapmaz).**
+> **Yürütme yetkisi CLAUDE'da. Session-devri (Claude→Claude, CONTEXT_EXHAUSTION) PREPARED:
+> `ah-2026-08-25-zfv8yl`, proposed epoch 4, receipt
+> `sha256:dd488f48bb751325623deba1856c3179bcc3ef7e392a0ce824641e5761154673`
+> (`docs/execution/handoffs/ah-2026-08-25-zfv8yl/0001-prepared.json`). Yeni oturum ÖNCE
+> `fallback-rules/authority-handoff.md` §6'yı uygular: disk-reconcile → VERIFIED yazar →
+> COMMITTED/owner-authorized RECOVERY_COMMITTED görmeden HİÇBİR mutation yapmaz. Transferor
+> (bu oturum) canlıysa VERIFIED'ı görüp COMMITTED yazar; kapanmışsa owner'ın canlı kararı +
+> authority-ref ile RECOVERY_COMMITTED yolu kullanılır (emsal: epoch-3 devri).**
 
 ## ŞU AN — çalışma-imleci (Claude epoch-3)
 

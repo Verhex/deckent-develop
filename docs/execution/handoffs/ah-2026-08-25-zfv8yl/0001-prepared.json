@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "outcomeId": "dogfood-continuation-epoch-supervision",
+  "role": "supervisor",
+  "baseSha": "47c76bc9715d8f5582fea690654b8a48520f1752",
+  "headSha": "47c76bc9715d8f5582fea690654b8a48520f1752",
+  "branch": "main",
+  "policyDigest": "sha256:c4c96a971833ee892174b7d361e08c7f0eb53c629873381235deaa573594d863",
+  "scopeDigest": "sha256:871079e7731b9418980839452534f0b9cf12ad4a8f9e7c6062bbc8a4d3f6e06d",
+  "filesChanged": [],
+  "verification": [],
+  "findings": [],
+  "openActions": [
+    "A3 event-feed DIRECTIVES via plan-mode + deterministic pipeline (lint:directives, plan --dry-run, quiet-sentinel monitoring)",
+    "Fold MASTER 3354 dependency-freshness fix into the A3 wave as a task",
+    "Config self-heal strike-5 RCA (3 valid-JSON baks born 2026-08-25 after strike-4; live config intact)"
+  ],
+  "recommendedNextAction": "Read follow-up-works/current-flow.md cursor, then prepare the A3 event-feed wave plan for owner plan-mode approval",
+  "authorityHandoff": {
+    "protocolVersion": 1,
+    "handoffId": "ah-2026-08-25-zfv8yl",
+    "sequence": 1,
+    "transition": "PREPARED",
+    "transitionActor": "transferor",
+    "currentAuthorityEpoch": 1,
+    "proposedAuthorityEpoch": 2,
+    "previousReceiptDigest": null,
+    "from": {
+      "hostId": "claude-code-cli",
+      "providerId": "claude",
+      "modelApiId": "claude-fable-5",
+      "role": "supervisor",
+      "principalDigest": "sha256:1d1549ebd7282b91e0c19f892a1d68c3092d2c2f7fc05d3096b405c151d47bca",
+      "sessionDigest": "sha256:c113449ca63f803e7d882f930d6cc8fdf64a0ce176dfa3084e52a697012e5ee8"
+    },
+    "to": {
+      "hostId": "claude-code-cli",
+      "providerId": "claude",
+      "modelApiId": "claude-fable-5",
+      "role": "supervisor",
+      "principalDigest": "sha256:1d1549ebd7282b91e0c19f892a1d68c3092d2c2f7fc05d3096b405c151d47bca",
+      "sessionDigest": "sha256:c113449ca63f803e7d882f930d6cc8fdf64a0ce176dfa3084e52a697012e5ee8"
+    },
+    "trigger": {
+      "reasonCode": "CONTEXT_EXHAUSTION",
+      "authorityRef": "owner-live-instruction"
+    },
+    "authorityScope": {
+      "goalId": "n/a",
+      "missionId": "n/a",
+      "flowId": "n/a",
+      "runId": "n/a",
+      "roles": [
+        "supervisor"
+      ],
+      "includes": [
+        "MASTER SSOT execution continuation: A3 event-feed wave (owner GO), row 3354 FIX-spawn freshness, explorationBonus measurement, C-row waves 3350-3353/540-541, config self-heal strike-5 RCA, small-queue items in follow-up-works/current-flow.md"
+      ],
+      "excludes": [
+        "owner-only and unadmitted work"
+      ]
+    },
+    "evidenceSnapshot": {
+      "observedAt": "2026-08-25T15:12:24.779Z",
+      "repoStateRef": "git:47c76bc9715d8f5582fea690654b8a48520f1752:dirty=12",
+      "runtimeStateRef": "see follow-up-works/current-flow.md",
+      "approvalStateRef": "deckent approvals list @ observedAt",
+      "verificationStateRef": "see MASTER + .analysis/xverify",
+      "buildStateRef": "build:all@47c76bc9715d8f5582fea690654b8a48520f1752",
+      "ssotStateRef": "docs/MASTER-PLAN.md + follow-up-works/current-flow.md"
+    }
+  },
+  "receiptDigest": "sha256:dd488f48bb751325623deba1856c3179bcc3ef7e392a0ce824641e5761154673"
+}
