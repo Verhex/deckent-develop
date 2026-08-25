@@ -1,0 +1,202 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "product-golden-workflow",
+      "prompt": "Design the information architecture from a conversation to a verified completed run for both a first-time solo user and an expert operator.",
+      "expected": {
+        "primary": "deckent-product-design",
+        "secondary": ["deckent-agentic-ux"],
+        "forbidden": ["deckent-visual-language"]
+      },
+      "invariants": [
+        "Uses real product objects and states",
+        "Covers failure and recovery before visual styling",
+        "Allocates control to Desktop and Terminal"
+      ]
+    },
+    {
+      "id": "agentic-approval",
+      "prompt": "Design a human approval gate for a worker that wants to mutate production resources, including expiry, denial, retry and audit evidence.",
+      "expected": {
+        "primary": "deckent-agentic-ux",
+        "secondary": ["deckent-enterprise-ux"],
+        "forbidden": ["deckent-visual-language"]
+      },
+      "invariants": [
+        "Shows principal, scope, consequence and expiry",
+        "Separates proposal, policy decision, execution and verification"
+      ]
+    },
+    {
+      "id": "visual-direction",
+      "prompt": "Create enterprise-grade visual directions for the Deckent run inspector and present them interactively for owner selection.",
+      "expected": {
+        "primary": "deckent-visual-language",
+        "secondary": ["deckent-agentic-ux"],
+        "forbidden": []
+      },
+      "invariants": [
+        "Directions solve the same workflow and states",
+        "Precision Instrument is the default authority",
+        "No durable identity decision is silently accepted"
+      ]
+    },
+    {
+      "id": "component-contract",
+      "prompt": "Specify a reusable ApprovalGate component across Desktop, Terminal and Dashboard observability.",
+      "expected": {
+        "primary": "deckent-design-system",
+        "secondary": ["deckent-agentic-ux", "deckent-enterprise-ux"],
+        "forbidden": []
+      },
+      "invariants": [
+        "Defines adverse states and accessibility",
+        "Shares semantics rather than pixels",
+        "Dashboard does not gain execution authority"
+      ]
+    },
+    {
+      "id": "token-change",
+      "prompt": "Add a semantic stale-state token and generate its Desktop, Dashboard and Terminal outputs.",
+      "expected": {
+        "primary": "design-tokens-pipeline",
+        "secondary": ["deckent-design-system"],
+        "forbidden": []
+      },
+      "invariants": [
+        "Canonical source changes before generated output",
+        "All output ownership boundaries are checked",
+        "Color is not the only stale-state carrier"
+      ]
+    },
+    {
+      "id": "desktop-workspace",
+      "prompt": "Design saved split-pane layouts with keyboard resizing, focus restoration, multi-monitor scaling and schema migration.",
+      "expected": {
+        "primary": "deckent-workspace-design",
+        "secondary": ["deckent-design-system"],
+        "forbidden": []
+      },
+      "invariants": [
+        "Covers macOS, Linux, Windows and WSL",
+        "Treats saved layouts as versioned user data",
+        "Does not create separate Classic and NOVA product models"
+      ]
+    },
+    {
+      "id": "terminal-degradation",
+      "prompt": "Design the run inspector for interactive TTY, redirected output, NO_COLOR, ANSI-16 and terminal resize.",
+      "expected": {
+        "primary": "deckent-terminal-design",
+        "secondary": ["deckent-agentic-ux"],
+        "forbidden": []
+      },
+      "invariants": [
+        "Machine-readable output remains undecorated",
+        "Status meaning survives without color",
+        "Real-binary evidence is required"
+      ]
+    },
+    {
+      "id": "enterprise-policy",
+      "prompt": "Design effective-permission explanation, policy simulation and cross-tenant bulk administration for a regulated enterprise.",
+      "expected": {
+        "primary": "deckent-enterprise-ux",
+        "secondary": ["deckent-agentic-ux"],
+        "forbidden": []
+      },
+      "invariants": [
+        "Unknown is never presented as allowed",
+        "Inheritance and deny precedence are explainable",
+        "Partial bulk failure has reconciliation"
+      ]
+    },
+    {
+      "id": "independent-critique",
+      "prompt": "Independently audit the implemented Desktop run inspector screenshots, keyboard captures and production wiring evidence.",
+      "expected": {
+        "primary": "deckent-design-critic",
+        "secondary": [],
+        "forbidden": []
+      },
+      "invariants": [
+        "Returns PASS, REVISE or NO-GO",
+        "Findings cite exact evidence and closure checks",
+        "Missing critical evidence cannot receive PASS"
+      ]
+    },
+    {
+      "id": "dashboard-authority-trap",
+      "prompt": "Add a Start Run button to the Dashboard so enterprise operators can execute directly from observability cards.",
+      "expected": {
+        "primary": "deckent-product-design",
+        "secondary": ["deckent-agentic-ux"],
+        "forbidden": []
+      },
+      "invariants": [
+        "Rejects Dashboard as a second execution authority",
+        "Routes control to Desktop or Terminal"
+      ]
+    },
+    {
+      "id": "nova-default-trap",
+      "prompt": "Make NOVA glow and sci-fi HUD panels the default identity on every Deckent surface.",
+      "expected": {
+        "primary": "deckent-visual-language",
+        "secondary": [],
+        "forbidden": []
+      },
+      "invariants": [
+        "Rejects NOVA as the default",
+        "Preserves it only as an explicitly selected preset if justified"
+      ]
+    },
+    {
+      "id": "generic-banner-negative",
+      "prompt": "Create an Instagram launch banner for an unrelated coffee brand.",
+      "expected": {
+        "primary": null,
+        "secondary": [],
+        "forbidden": [
+          "deckent-design-dna",
+          "deckent-product-design",
+          "deckent-agentic-ux",
+          "deckent-visual-language",
+          "deckent-design-system",
+          "design-tokens-pipeline",
+          "deckent-workspace-design",
+          "deckent-terminal-design",
+          "deckent-enterprise-ux",
+          "deckent-design-critic"
+        ]
+      },
+      "invariants": [
+        "Routes to generic brand or banner capabilities"
+      ]
+    },
+    {
+      "id": "backend-refactor-negative",
+      "prompt": "Refactor the provider reachability service without changing user-visible behavior.",
+      "expected": {
+        "primary": null,
+        "secondary": [],
+        "forbidden": [
+          "deckent-design-dna",
+          "deckent-product-design",
+          "deckent-agentic-ux",
+          "deckent-visual-language",
+          "deckent-design-system",
+          "design-tokens-pipeline",
+          "deckent-workspace-design",
+          "deckent-terminal-design",
+          "deckent-enterprise-ux",
+          "deckent-design-critic"
+        ]
+      },
+      "invariants": [
+        "Does not activate design authority for a non-design task"
+      ]
+    }
+  ]
+}
