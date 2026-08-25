@@ -345,6 +345,15 @@ D_WRITE_COLLISION BLOCK'ları; sprint-670 dersi: Reads-eksiği 8/13 NO_GO yaptı
 ④ `deckent plan --dry-run` önizleme temiz (scope-satisfiability + prompt-gate; BİLİNEN
 YAN-ETKİ: dry-run debt-preflight'ı `resolveDebt` YAZAR — yalnız lint-yeşilinden sonra 1 kez
 koş) → ⑤ start. Koşu izlemesi ana-oturumda değil sessiz nöbetçi-subagent'ta.
+**B-süpürme kapanışı (owner 2026-08-25 öğle):** ① `lint-directives --fix` LANDED
+(system-assignment: eksik Reads import-taramasından, eksik Test Files'tan; fix-then-verify
+tek-komut; sentetik kanıt FIXED×2→OK). ② Parser multi-label fix: `Files:`+`Reads:` aynı
+satırda artık İKİSİ de işlenir (erken-dönüş veri-kaybı bitti; D_SAME_LINE artık WARN).
+③ Limit-ayarları (owner-config): `landing.reserve_ratio` 0.25→0.35 (671-005'in 11>10
+landing-rezerv ölümü sınıfı) + `worker_memory_limit` 6g (671-001 SIGKILL sınıfı;
+8-worker overcommit bilinçli). ④ DÜZELTME — yanlış-bulgu geri-çekildi: `plan --dry-run`
+debt-preflight yazımı YAN-ETKİ DEĞİL, belgeli owner-tasarımı (sprint-450 KN4 yorumu:
+"gösterilen plan = başlatılacak plan; kanıt-temelli+idempotent") — bulgu-listesinden düşür.
 **Hedef-mimari bağı (owner 2026-08-25):** DIRECTIVES kullanıcı-yüzü DEĞİL, arka-yüz
 ara-temsilidir — asıl hedef native-language tetikleme = MASTER **3180 DO-CUTOVER-001**
 (intent→preview→approval→run; 3183 immutable-proposal + 3185 closed-allowlist kanıtları

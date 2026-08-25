@@ -651,7 +651,9 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-25 config-loss hardening follow-up: +2 — additional worker pins
   // landed with the 671 harvest sweep (suite-owned tmpdir fixtures).
   count: 16109,
-  digest: 'edb6c2efb36f9583e7407c445a07999b615c797ecdcfc928f95d2dab817120a5',
+  // 2026-08-25 B-sweep: digest moved — --fix roundtrip pin, multi-label
+  // parser pin, same-line rule downgraded to WARN (all suite-owned).
+  digest: '645d1d9ff635eaf5eda4749bb711b5676a1283a5b69118753c461b7b263c7b9e',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1174,7 +1176,9 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-25 config-loss incident hardening: digest moved — atomic
   // last_sprint_id writer (refuse-mint + tmp+rename) and loadConfig
   // self-heal re-read-once + atomic fresh-default.
-  digest: '57ceed28f2494d4abcb51e52836e8fc8afacc73e311adabd2945c70aa94d0d13',
+  // 2026-08-25 B-sweep: digest moved — parser multi-label merge in
+  // extractScopeFromDirective (task-builder).
+  digest: '932a3e3abf74ed6be05c557a6673140d546a51e962043be262c2d5942c13570d',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

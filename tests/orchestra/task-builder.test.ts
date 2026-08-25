@@ -198,6 +198,12 @@ describe('extractScopeFromDirective', () => {
     expect(scope.filesRead).toEqual([]);
   });
 
+  it('keeps BOTH grants when Files and Reads share one line (671-review multi-label fix)', () => {
+    const scope = extractScopeFromDirective('- Files: tests/a.test.ts, Reads: src/core/x.ts');
+    expect(scope.filesWrite).toEqual(['tests/a.test.ts']);
+    expect(scope.filesRead).toEqual(['src/core/x.ts']);
+  });
+
   it('parses Reads as exact read-only authority without leaking into write scope', () => {
     const scope = extractScopeFromDirective(
       'Reads: src/core/utils.ts, docs/MASTER-PLAN.md, .deckent/provider-execution-observations.db',

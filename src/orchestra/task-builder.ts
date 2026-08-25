@@ -1477,6 +1477,27 @@ export function extractScopeFromDirective(line: string): TaskScope {
   const filesRead: string[] = [];
   const filesWrite: string[] = [];
 
+  // 671-review fix: a line carrying MORE THAN ONE scope label (e.g.
+  // `Files: a.test.ts, Reads: src/x.ts`) used to hit the Reads early-return
+  // below and silently DROP the write grant. Split at each label boundary and
+  // parse every segment independently; single-label lines take the exact
+  // pre-existing path byte-for-byte.
+  const scopeLabels = line.match(/\b(?:Files?|Dosya|Reads?|Oku|Okuma|Scope|Kapsam)\s*:/giu) ?? [];
+  if (scopeLabels.length > 1) {
+    const merged: TaskScope = { directories: [], filesRead: [], filesWrite: [] };
+    const segments = line
+      .split(/(?=\b(?:Files?|Dosya|Reads?|Oku|Okuma|Scope|Kapsam)\s*:)/iu)
+      .map(segment => segment.replace(/[,\s]+$/u, ''))
+      .filter(segment => segment.trim().length > 0);
+    for (const segment of segments) {
+      const part = extractScopeFromDirective(segment);
+      for (const d of part.directories) if (!merged.directories.includes(d)) merged.directories.push(d);
+      for (const f of part.filesRead) if (!merged.filesRead.includes(f)) merged.filesRead.push(f);
+      for (const f of part.filesWrite) if (!merged.filesWrite.includes(f)) merged.filesWrite.push(f);
+    }
+    return merged;
+  }
+
   // Structured DIRECTIVES previously had no way to express read-only
   // authority: every explicit path was parsed through Files:/Scope: and
   // therefore became writable. `Reads:` is a disjoint exact-file channel.

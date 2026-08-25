@@ -14,7 +14,7 @@
 // Exit: 0 = temiz (WARN olabilir), 1 = BLOCK bulundu, 2 = altyapı (dosya yok,
 // dist bayat/eksik, parse-crash).
 
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync, writeFileSync, renameSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -78,8 +78,10 @@ export function checkDirectives({ repoRoot, content, tasks, validateScopeFilesWr
   const table = [];
 
   for (const line of findSameLineReadsFiles(content)) {
-    problems.push({ code: 'D_SAME_LINE_READS_FILES', severity: SEVERITY.BLOCK, task: null,
-      detail: `satır ${line}: aynı satırda hem Reads: hem Files: — parser Reads'te erken döner, write-yetkisi SESSİZCE kaybolur` });
+    // 671-review: the parser's early-return data loss is fixed (multi-label
+    // lines now merge); mixed labels on one line remain a style warning only.
+    problems.push({ code: 'D_SAME_LINE_READS_FILES', severity: SEVERITY.WARN, task: null,
+      detail: `satır ${line}: aynı satırda hem Reads: hem Files: — parser artık ikisini de işler; okunabilirlik için ayrı satırlara böl` });
   }
 
   const writesSeen = new Map();
@@ -158,16 +160,81 @@ function renderTable(table) {
   return lines.join('\n');
 }
 
+/**
+ * System-assignment (`--fix`, owner decision 2026-08-25): deterministically
+ * repair the auto-repairable problem classes IN the DIRECTIVES text —
+ * D_NO_READS_FOR_SRC (append the exact missing src paths to the task's
+ * `- Reads:` line, creating it after `- Files:` when absent) and D_NO_TEST
+ * (derive a `- Test:` line from the task's own test files). This is the
+ * nullable-field system-assignment layer of the NL→DIRECTIVES pipeline: an
+ * LLM-authored draft may omit these; the fix derives them from the same
+ * import-scan the gate itself validates with — zero free-text guessing.
+ * Task blocks are matched to parsed tasks by heading order (the parser's own
+ * split order), so the edit lands in the right block by construction.
+ */
+export function applyDirectivesFixes({ content, table, problems }) {
+  const headingRe = /^##\s+(?:G[öo]rev|Task)\s+\d+[^:]*:.*$/gmu;
+  const headings = [...content.matchAll(headingRe)];
+  const blockRange = (index) => {
+    if (index >= headings.length) return null;
+    const start = headings[index].index;
+    const end = index + 1 < headings.length ? headings[index + 1].index : content.length;
+    return { start, end };
+  };
+  let out = content;
+  const applied = [];
+  // Apply from the LAST task backwards so earlier block offsets stay valid.
+  const byTask = new Map();
+  for (const p of problems) {
+    if (!p.task) continue;
+    if (!byTask.has(p.task)) byTask.set(p.task, []);
+    byTask.get(p.task).push(p);
+  }
+  const indices = [...byTask.keys()]
+    .map((t) => Number(t.replace('task-', '')) - 1)
+    .sort((a, b) => b - a);
+  for (const index of indices) {
+    const range = blockRange(index);
+    if (!range) continue;
+    let block = out.slice(range.start, range.end);
+    const taskId = `task-${index + 1}`;
+    const row = table[index];
+    for (const p of byTask.get(taskId)) {
+      if (p.code === 'D_NO_READS_FOR_SRC' && Array.isArray(p.uncoveredSrc) && p.uncoveredSrc.length > 0) {
+        const readsLine = block.match(/^\s*-\s*(?:Reads?|Oku|Okuma)\s*:.*$/mu);
+        if (readsLine) {
+          block = block.replace(readsLine[0], `${readsLine[0].replace(/\s*$/u, '')}, ${p.uncoveredSrc.join(', ')}`);
+        } else {
+          const filesLine = block.match(/^\s*-\s*(?:Files?|Dosya)\s*:.*$/mu);
+          if (!filesLine) continue;
+          block = block.replace(filesLine[0], `${filesLine[0]}\n- Reads: ${p.uncoveredSrc.join(', ')}`);
+        }
+        applied.push({ task: taskId, code: p.code, added: p.uncoveredSrc });
+      } else if (p.code === 'D_NO_TEST' && row) {
+        const testFiles = row.filesWrite.filter((f) => /\.test\.[cm]?[jt]sx?$/u.test(f));
+        if (testFiles.length === 0) continue;
+        const filesLine = block.match(/^\s*-\s*(?:Files?|Dosya)\s*:.*$/mu);
+        if (!filesLine) continue;
+        block = block.replace(filesLine[0], `${filesLine[0]}\n- Test: VITEST_MAX_FORKS=2 npx vitest run ${testFiles.join(' ')}`);
+        applied.push({ task: taskId, code: p.code, added: testFiles });
+      }
+    }
+    out = out.slice(0, range.start) + block + out.slice(range.end);
+  }
+  return { content: out, applied };
+}
+
 function isMain() {
   return process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 }
 
 async function runCli(argv) {
-  let file = 'DIRECTIVES.md'; let root = REPO_ROOT; let json = false;
+  let file = 'DIRECTIVES.md'; let root = REPO_ROOT; let json = false; let fix = false;
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === '--file') file = argv[++i];
     else if (argv[i] === '--root') root = resolve(argv[++i]);
     else if (argv[i] === '--json') json = true;
+    else if (argv[i] === '--fix') fix = true;
     else { console.error(`[directives-lint] bilinmeyen bayrak: ${argv[i]}`); process.exit(2); }
   }
   const filePath = resolve(root, file);
@@ -190,7 +257,22 @@ async function runCli(argv) {
     console.error(`[directives-lint] ✗ D_PARSE_THROW — üretim parser'ı fırlattı: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
   }
-  const result = checkDirectives({ repoRoot: root, content, tasks, validateScopeFilesWrite: tb.validateScopeFilesWrite });
+  let result = checkDirectives({ repoRoot: root, content, tasks, validateScopeFilesWrite: tb.validateScopeFilesWrite });
+
+  if (fix && !result.ok) {
+    const fixed = applyDirectivesFixes({ content, table: result.table, problems: result.problems });
+    if (fixed.applied.length > 0) {
+      // Atomic replace — a truncate+write window on DIRECTIVES cost us live
+      // config-loss today; the same discipline applies to every authored file.
+      const tmpPath = `${filePath}.${process.pid}.tmp`;
+      writeFileSync(tmpPath, fixed.content);
+      renameSync(tmpPath, filePath);
+      for (const a of fixed.applied) console.log(`  [FIXED] ${a.task} ${a.code} — eklendi: ${a.added.join(', ')}`);
+      // Re-validate through the SAME production parser: fix-then-verify.
+      const reTasks = tb.parseStructuredDirectives(fixed.content);
+      result = checkDirectives({ repoRoot: root, content: fixed.content, tasks: reTasks, validateScopeFilesWrite: tb.validateScopeFilesWrite });
+    }
+  }
 
   if (json) { console.log(JSON.stringify(result, null, 2)); }
   else {
