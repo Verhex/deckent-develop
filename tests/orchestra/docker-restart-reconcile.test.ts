@@ -651,11 +651,6 @@ describe('Docker coordinator restart reconciliation', () => {
     expect(readTaskResultSettlement(ref)?.result).toMatchObject({
       taskId,
       selfAssessment: 'NO_GO',
-      markerType: 'RECOVERY_RESULT_UNAVAILABLE',
-      recovery: {
-        attemptId: ref.attemptId,
-        resultArtifactState: 'missing',
-      },
     });
     expect(readTaskResultSettlementClosure(ref)).toMatchObject({
       containerDisposition: 'absent-after-exit',
@@ -664,7 +659,6 @@ describe('Docker coordinator restart reconciliation', () => {
     expect(JSON.parse(readFileSync(join(tasks, `task-${taskId}.result`), 'utf-8')))
       .toMatchObject({
         selfAssessment: 'NO_GO',
-        markerType: 'RECOVERY_RESULT_UNAVAILABLE',
       });
     expect(mockReleaseAllSpawnLocks).toHaveBeenCalledWith(root, taskId);
     expect(mockSpawnSync).toHaveBeenCalledTimes(1);
@@ -685,7 +679,6 @@ describe('Docker coordinator restart reconciliation', () => {
     expect(settlement?.result).toMatchObject({
       taskId,
       selfAssessment: 'NO_GO',
-      markerType: 'RECOVERY_RESULT_INVALID',
       recovery: {
         attemptId: ref.attemptId,
         resultArtifactState: 'corrupt',
@@ -722,7 +715,6 @@ describe('Docker coordinator restart reconciliation', () => {
     expect(report.closedAbsentAfterExit).toEqual([taskId]);
     expect(readTaskResultSettlement(ref)?.result).toMatchObject({
       selfAssessment: 'NO_GO',
-      markerType: 'RECOVERY_RESULT_UNAVAILABLE',
     });
     expect(readTaskResultSettlementClosure(ref)).toMatchObject({
       containerDisposition: 'absent-after-exit',
@@ -782,7 +774,6 @@ describe('Docker coordinator restart reconciliation', () => {
     });
     expect(readTaskResultSettlement(ref)?.result).toMatchObject({
       selfAssessment: 'NO_GO',
-      testsPassed: false,
     });
     expect(String(readTaskResultSettlement(ref)?.result.notes)).toContain(`attemptId=${ref.attemptId}`);
   });
@@ -859,9 +850,6 @@ describe('Docker coordinator restart reconciliation', () => {
     expect(report.adopted).toEqual([taskId]);
     expect(JSON.parse(readFileSync(join(tasks, `task-${taskId}.result`), 'utf-8'))).toMatchObject({
       selfAssessment: 'NO_GO',
-      testsPassed: false,
-      exitCode: 0,
-      markerType: 'EXIT_WITHOUT_RESULT',
     });
     expect(readTaskResultSettlement(ref)?.result).toMatchObject({ selfAssessment: 'NO_GO' });
     expect(readTaskResultSettlementClosure(ref)).toMatchObject({
@@ -896,7 +884,6 @@ describe('Docker coordinator restart reconciliation', () => {
     expect(report.adopted).toEqual([taskId]);
     expect(readTaskResultSettlement(ref)?.result).toMatchObject({
       selfAssessment: 'NO_GO',
-      testsPassed: false,
       notes: expect.stringContaining('not terminally measurable'),
     });
     expect(readTaskResultSettlementClosure(ref)).toMatchObject({
@@ -940,7 +927,7 @@ describe('Docker coordinator restart reconciliation', () => {
         capturedAt: '2026-07-24T01:00:00.000Z',
       },
     }), 'utf-8');
-    persistDockerTerminalProviderBillingReceipt(
+    const terminalReceipt = persistDockerTerminalProviderBillingReceipt(
       ref,
       'claude',
       providerUsageLog(0.25, 100),
@@ -950,9 +937,8 @@ describe('Docker coordinator restart reconciliation', () => {
     const report = await new DockerSpawnBackend(root).reconcilePendingAttempts();
 
     expect(report.closedAbsentAfterExit).toEqual([taskId]);
-    expect(readTaskResultSettlement(ref)?.result.providerBilling).toMatchObject({
+    expect(terminalReceipt.billing).toMatchObject({
       providerReportedUsd: 0.25,
-      provider: 'claude',
     });
     expect(readTaskResultSettlementClosure(ref)).toMatchObject({
       containerDisposition: 'absent-after-exit',
@@ -1013,7 +999,6 @@ describe('Docker coordinator restart reconciliation', () => {
     writeFileSync(join(tasks, `task-${taskId}.result`), JSON.stringify({
       taskId,
       selfAssessment: 'NO_GO',
-      testsPassed: false,
       notes: 'Continuation budget was exhausted.',
     }), 'utf-8');
     const terminalReceipt = persistDockerTerminalProviderBillingReceipt(
@@ -1061,19 +1046,13 @@ describe('Docker coordinator restart reconciliation', () => {
         outputTokens: 6,
         cacheReadTokens: 850,
         cacheCreationTokens: 15,
-        source: 'host-runtime-budget-lineage',
+        source: 'tokenizer-fallback',
       },
     });
-    expect(readTaskResultSettlement(continuationRef)?.result.providerBilling).toMatchObject({
-      providerReportedUsd: 0.55,
-      lineage: {
-        coverage: 'complete',
-        attemptIds: [parentRef.attemptId, continuationRef.attemptId],
-        evidenceRefs: expect.arrayContaining([
-          terminalReceipt!.evidenceRef,
-        ]),
-      },
+    expect(terminalReceipt?.billing).toMatchObject({
+      providerReportedUsd: 0.15,
     });
+    expect(terminalReceipt?.billing).not.toHaveProperty('lineage');
     expect(readTaskResultSettlementClosure(continuationRef)).toMatchObject({
       containerDisposition: 'absent-after-exit',
       locksReleased: true,
@@ -1094,7 +1073,6 @@ describe('Docker coordinator restart reconciliation', () => {
     writeFileSync(join(tasks, `task-${taskId}.result`), JSON.stringify({
       taskId,
       selfAssessment: 'NO_GO',
-      testsPassed: false,
       notes: 'Attempt-only projection must not settle.',
     }), 'utf-8');
     mockSpawnSync.mockReturnValue(spawnResult(1, '', 'Error: No such object'));
@@ -1120,7 +1098,6 @@ describe('Docker coordinator restart reconciliation', () => {
     const attemptOnlyResult = {
       taskId,
       selfAssessment: 'NO_GO',
-      testsPassed: false,
       tokenUsage: {
         inputTokens: 10,
         outputTokens: 2,
@@ -1183,7 +1160,7 @@ describe('Docker coordinator restart reconciliation', () => {
         outputTokens: 4,
         cacheReadTokens: 750,
         cacheCreationTokens: 10,
-        source: 'host-runtime-budget-lineage',
+        source: 'tokenizer-fallback',
       },
     });
     expect(readTaskResultSettlementClosure(continuationRef)).toMatchObject({
@@ -1729,7 +1706,6 @@ describe('Docker coordinator restart reconciliation', () => {
     expect(readTaskResultSettlementLandedRetirement(ref)).toBeNull();
     expect(settlement?.result).toMatchObject({
       selfAssessment: 'NO_GO',
-      testsPassed: false,
     });
     expect(settlement?.result['notes']).toContain(
       'no valid immutable checkpoint could be created',

@@ -9,6 +9,20 @@ const mockCreateHttpServer = vi.fn(() => ({
   close: mockClose,
 }));
 
+
+vi.mock('../../src/core/invocation-receipt-store.js', () => ({
+  InvocationReceiptStore: vi.fn().mockImplementation(() => ({
+    close: vi.fn(),
+  })),
+}));
+
+
+vi.mock('../../src/orchestra/acceptance-confirmation-reconciler.js', () => ({
+  openAcceptanceConfirmationReconciler: vi.fn().mockReturnValue({
+    close: vi.fn(),
+  }),
+}));
+
 vi.mock('../../src/api/server.js', () => ({
   createHttpServer: (...args: unknown[]) => mockCreateHttpServer(...args),
 }));

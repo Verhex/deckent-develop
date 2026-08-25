@@ -69,25 +69,6 @@ vi.mock('../../src/orchestra/sprint-reporter.js', () => ({
   archiveOrphanTasks: vi.fn().mockReturnValue(0),
 }));
 
-vi.mock('../../src/core/memory-store.js', () => ({
-  MemoryStore: vi.fn().mockImplementation(() => ({
-    insertRelation: vi.fn(),
-    close: vi.fn(),
-    insert: vi.fn(),
-    upsert: vi.fn(),
-    getById: vi.fn(),
-    getByType: vi.fn().mockReturnValue([]),
-    countByType: vi.fn().mockReturnValue(new Map()),
-    totalCount: vi.fn().mockReturnValue(0),
-    getSchemaVersion: vi.fn().mockReturnValue(1),
-    getRawDb: vi.fn(),
-    getRelationsFrom: vi.fn().mockReturnValue([]),
-    getRelationsTo: vi.fn().mockReturnValue([]),
-    getRelations: vi.fn().mockReturnValue([]),
-    countRelations: vi.fn().mockReturnValue(0),
-  })),
-}));
-
 vi.mock('../../src/orchestra/result-evaluator.js', () => ({
   GO_WITH_GATE_FAILURE: 'GO_WITH_GATE_FAILURE',
   getRecentSprintStats: vi.fn().mockReturnValue({ sprintCount: 0, avgNoGoRate: 0, avgCoverage: 80 }),
@@ -186,29 +167,8 @@ vi.mock('../../src/core/identity-generator.js', () => ({
   runMemoryExport: vi.fn().mockResolvedValue({ success: true, filesWritten: [], errors: [] }),
 }));
 
-vi.mock('../../src/orchestra/event-stream.js', () => ({
-  writeEvent: vi.fn().mockReturnValue(null),
-  getCurrentSprintId: vi.fn().mockReturnValue('sprint-591'),
-  readSequence: vi.fn().mockReturnValue(0),
-  CHANNELS: {
-    TASK_ASSIGN: 'BRAIN→WORKER:TASK_ASSIGN',
-    HEARTBEAT: 'WORKER→BRAIN:HEARTBEAT',
-    RESULT: 'WORKER→BRAIN:RESULT',
-    QUESTION: 'WORKER→BRAIN:QUESTION',
-    ANSWER: 'BRAIN→WORKER:ANSWER',
-    CODE_VERIFY_REQUEST: 'WORKER→AUDITOR:CODE_VERIFY_REQUEST',
-    VERIFICATION_RESULT: 'AUDITOR→BRAIN:VERIFICATION_RESULT',
-    SCOPE_COLLISION_DETECTED: 'AUDITOR→BRAIN:SCOPE_COLLISION_DETECTED',
-    ADR_VIOLATION: 'AUDITOR→BRAIN:ADR_VIOLATION',
-    GATE_COMPUTED: 'AUDITOR→BRAIN:GATE_COMPUTED',
-    LOAD_REPORT_WRITTEN: 'AUDITOR→BRAIN:LOAD_REPORT_WRITTEN',
-    METRIC_EMITTED: 'BRAIN→*:METRIC_EMITTED',
-    FIX_REQUEST: 'BRAIN→WORKER:FIX_REQUEST',
-    SPRINT_PHASE_CHANGE: 'BRAIN→*:SPRINT_PHASE_CHANGE',
-    NOTIFY: 'DECKENT→USER:NOTIFY',
-    ORPHAN_HB_DETECTED: 'AUDITOR→BRAIN:ORPHAN_HB_DETECTED',
-    AUTHORITY_VIOLATION: 'AUDITOR→BRAIN:AUTHORITY_VIOLATION',
-  },
+vi.mock('../../src/orchestra/event-stream.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/orchestra/event-stream.js')>()),
 }));
 
 import { finalizeSprint } from '../../src/orchestra/sprint-finalizer.js';
@@ -223,6 +183,26 @@ afterAll(() => {
 // ─── Fixture Helpers ──────────────────────────────────────────────────────
 
 function makeSprint(id: string, tasks: Task[]): Sprint {
+  mkdirSync(join(PROJECT_ROOT, '.tasks'), { recursive: true });
+  mkdirSync(join(PROJECT_ROOT, '.brain'), { recursive: true });
+  mkdirSync(join(PROJECT_ROOT, '.deckent', 'recently-works'), { recursive: true });
+  writeFileSync(
+    join(PROJECT_ROOT, '.deckent', 'sprint-state.json'),
+    JSON.stringify({ sprintId: id }),
+    'utf-8',
+  );
+  writeFileSync(
+    join(PROJECT_ROOT, '.deckent', 'recently-works', `${id}-events.jsonl`),
+    '',
+    'utf-8',
+  );
+  for (const task of tasks) {
+    writeFileSync(
+      join(PROJECT_ROOT, '.tasks', `task-${task.id}.json`),
+      JSON.stringify(task),
+      'utf-8',
+    );
+  }
   return {
     id,
     number: 591,
@@ -336,12 +316,12 @@ describe('avgCoverage — agent block (sprint-finalizer 8d2 sync)', () => {
       makeResultNoCoverage('t2'),
       makeResult('t3', { coverage: 80 }),
     ];
-    const sprint = makeSprint('sprint-591a', tasks);
+    const sprint = makeSprint('sprint-5911', tasks);
 
     await finalizeSprint(PROJECT_ROOT, sprint, makeEvaluations(tasks), results, { skipDecay: true, skipHooks: true });
 
     // Real-disk proof the finalize actually settled (terminal receipt published).
-    expect(existsSync(join(PROJECT_ROOT, '.deckent', 'recently-works', 'sprint-591a-terminal-receipt.json'))).toBe(true);
+    expect(existsSync(join(PROJECT_ROOT, '.deckent', 'recently-works', 'sprint-5911-terminal-receipt.json'))).toBe(true);
 
     const saved = { stats: readSidecar(PROJECT_ROOT).agents!['bug-fixer']! };
     // (90+80)/2 = 85 — NOT (90+0+80)/3 = 56.67 (the old phantom-zero-dilution result)
@@ -363,7 +343,7 @@ describe('avgCoverage — agent block (sprint-finalizer 8d2 sync)', () => {
       makeResultNoCoverage('t2'),
       makeResult('t3', { coverage: 80 }),
     ];
-    const sprint = makeSprint('sprint-591b', tasks);
+    const sprint = makeSprint('sprint-5912', tasks);
 
     await finalizeSprint(PROJECT_ROOT, sprint, makeEvaluations(tasks), results, { skipDecay: true, skipHooks: true });
 
@@ -379,7 +359,7 @@ describe('avgCoverage — agent block (sprint-finalizer 8d2 sync)', () => {
 
     const tasks = [makeTask('t1', { assignedAgent: 'bug-fixer' })];
     const results = [makeResult('t1', { coverage: 0 })];
-    const sprint = makeSprint('sprint-591c', tasks);
+    const sprint = makeSprint('sprint-5913', tasks);
 
     await finalizeSprint(PROJECT_ROOT, sprint, makeEvaluations(tasks), results, { skipDecay: true, skipHooks: true });
 
@@ -407,12 +387,12 @@ describe('avgCoverage — skill block (sprint-finalizer 8d2 sync)', () => {
       makeResultNoCoverage('t2'),
       makeResult('t3', { coverage: 60 }),
     ];
-    const sprint = makeSprint('sprint-591d', tasks);
+    const sprint = makeSprint('sprint-5914', tasks);
 
     await finalizeSprint(PROJECT_ROOT, sprint, makeEvaluations(tasks), results, { skipDecay: true, skipHooks: true });
 
     // Real-disk proof the finalize actually settled (terminal receipt published).
-    expect(existsSync(join(PROJECT_ROOT, '.deckent', 'recently-works', 'sprint-591d-terminal-receipt.json'))).toBe(true);
+    expect(existsSync(join(PROJECT_ROOT, '.deckent', 'recently-works', 'sprint-5914-terminal-receipt.json'))).toBe(true);
 
     const saved = { stats: readSidecar(PROJECT_ROOT).skills!['typescript-expert']! };
     // (100+60)/2 = 80 — NOT diluted by t2's measurement gap, and no longer stuck at 0.
@@ -424,7 +404,7 @@ describe('avgCoverage — skill block (sprint-finalizer 8d2 sync)', () => {
 
     const tasks = [makeTask('t1', { assignedSkills: ['typescript-expert'] })];
     const results = [makeResult('t1', { coverage: 100 })];
-    const sprint = makeSprint('sprint-591e', tasks);
+    const sprint = makeSprint('sprint-5915', tasks);
 
     await finalizeSprint(PROJECT_ROOT, sprint, makeEvaluations(tasks), results, { skipDecay: true, skipHooks: true });
 

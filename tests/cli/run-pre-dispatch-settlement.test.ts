@@ -46,6 +46,7 @@ vi.mock('node:fs', () => ({
     on: vi.fn(),
     close: vi.fn(),
   })),
+  renameSync: vi.fn(),
 }));
 
 vi.mock('../../src/core/utils.js', async (importOriginal) => {

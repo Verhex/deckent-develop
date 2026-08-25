@@ -12,23 +12,28 @@ import {
   writeTaskResultAtomic,
   type CanonicalTaskResultDocument,
 } from '../../src/core/task-result-write-authority.js';
+import { validateTaskResult } from '../../src/core/task-result-schema.js';
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 
 function result(taskId = '621-002'): Record<string, unknown> {
-  return {
+  const candidate = {
     schemaVersion: '1.0', taskId, workerId: 'w-621-002', provider: 'codex', model: 'gpt',
     agent: null, skills: [], attempt: 1, isPriorityFix: false, fixForTaskId: null,
     filesChanged: [], diskVerified: false, boundaryViolations: [],
     totalLinesAdded: 1, totalLinesRemoved: 0,
     tokenUsage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheCreationTokens: 0, totalTokens: 2, source: 'provider-adapter' },
     cost: { usd: 0, currency: 'USD', pricingSource: 'test', isLocal: false },
-    tests: { passed: 1, failed: 0, total: 1, coverage: null, command: null, orchestratorVerified: false },
+    tests: { passed: 1, failed: 0, total: 1, coverage: null, command: null, orchestratorVerified: false,
+      applicability: 'REQUIRED', outcome: 'PASSED' },
     tsc: { clean: true, errors: 0 }, selfAssessment: 'DONE', goCriteria: [], notes: '',
     brainEvaluation: null, brainEvaluationReason: null, rubricScores: null, totalScore: null,
     honestGate: { flagged: false, violation: null }, handoffNotes: null, sharedNotes: [], auditorValidation: null,
   };
+  const validated = validateTaskResult(candidate);
+  if (!validated.ok) throw new Error(validated.errors.join('; '));
+  return validated.value;
 }
 
 describe('task result write authority', () => {

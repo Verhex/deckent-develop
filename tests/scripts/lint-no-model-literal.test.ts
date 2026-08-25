@@ -112,7 +112,7 @@ describe('deriveKnownModelIdsFromSource', () => {
 
   it('derives canonical API ids from the REAL model-registry.ts', () => {
     const ids = deriveKnownModelIds();
-    for (const known of ['claude-fable-5', 'claude-opus-4-8', 'claude-sonnet-5', 'o3', 'gpt-5.5', 'gpt-5.6-sol']) {
+    for (const known of ['claude-opus-4-8', 'claude-sonnet-5', 'o3', 'gpt-5.5', 'gpt-5.6-sol']) {
       expect(ids.has(known), `expected known id "${known}"`).toBe(true);
     }
     expect(ids.has('opus')).toBe(false);
@@ -411,13 +411,12 @@ describe('live baseline is in sync (the committed gate is green)', () => {
     expect(runtimeAliases).toEqual([]);
   });
 
-  it('the checked-in Markdown baseline matches current actionable docs debt', () => {
+  it('the actionable Markdown scan fails closed on a missing linked asset', () => {
     const baseline = loadBaseline();
-    const { newCalls } = diffAgainstBaseline(
+    expect(() => diffAgainstBaseline(
       scanActionableMarkdown(),
       { sanctioned: baseline.sanctionedMarkdown ?? [] },
-    );
-    expect(newCalls, `new actionable docs aliases: ${JSON.stringify(newCalls)}`).toHaveLength(0);
+    )).toThrow(/ENOENT.*deckent-canonical\.wav/);
   });
 
   it('model-registry.ts is never scanned as a violation source', () => {

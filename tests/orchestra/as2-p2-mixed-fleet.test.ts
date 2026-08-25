@@ -17,7 +17,7 @@
  * state outside tmpdir, no spawnSync.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { writeFileSync, mkdirSync, rmSync, existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -34,6 +34,11 @@ import type { ProviderAdapter } from '../../src/core/provider.js';
 import { TaskStatus } from '../../src/core/types.js';
 import type { Sprint, Task, ResolvedConfig, ModelType, ProviderName } from '../../src/core/types.js';
 import type { SpawnBackend } from '../../src/orchestra/spawn-backend.js';
+
+vi.mock('../../src/core/final-only-usage-containment.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/core/final-only-usage-containment.js')>()),
+  requireFinalOnlyUsageContainment: vi.fn(() => undefined),
+}));
 
 // ─── REPL test helpers ──────────────────────────────────────────────────────
 
@@ -61,7 +66,7 @@ interface SpawnRec { taskId: string; model: ModelType; }
 function makeBackend(root: string): SpawnBackend & { calls: SpawnRec[] } {
   const calls: SpawnRec[] = [];
   return {
-    name: 'mock-docker',
+    name: 'docker',
     liveUsageBudgetSupport: 'measured-stream' as const,
     executionLandingCapability: 'cooperative-landing' as const,
     spawn(taskId: string, model: ModelType) {
@@ -121,20 +126,23 @@ function makeTask(id: string, provider: ProviderName, model: string, file: strin
     assignedSkills: [],
     provider,
     budget: { maxTurns: 1 },
-    ...(provider === 'claude'
-      ? {
+    ...{
         budgetPolicy: {
           state: 'allow' as const,
           role: 'worker' as const,
           resolvedProvider: provider,
-          executionCostClass: 'remote' as const,
+          executionCostClass: provider === 'ollama' ? 'local' as const : 'remote' as const,
           profileRef: 'tests.orchestra.as2-p2-mixed-fleet',
           policyDigest: 'a'.repeat(64),
           admissionMode: 'unattended' as const,
-          landingPolicy: { reserve_ratio: 0.25 },
-        },
-      }
-      : {}),
+      landingPolicy: { reserve_ratio: 0.25 },
+      finalOnlyUsage: {
+        maxWallClockSeconds: 600,
+        profileRef: 'execution_budget.final_only_usage',
+        policyDigest: '9'.repeat(64),
+      },
+    },
+      },
   } as unknown as Task;
 }
 
@@ -317,6 +325,7 @@ describe('AS2-P2 — mixed-fleet provider-switcher parity + non-leak', () => {
   describe('mixed-fleet 2-worker sprint — ollama + claude non-leak', () => {
     let root: string;
     let priorOllama: ProviderAdapter | null;
+    let priorClaude: ProviderAdapter | null;
     let ollamaAdapter: ProviderAdapter & { calls: SpawnRec[] };
 
     beforeEach(() => {
@@ -326,13 +335,32 @@ describe('AS2-P2 — mixed-fleet provider-switcher parity + non-leak', () => {
       priorOllama = providerRegistry.hasProvider('ollama')
         ? providerRegistry.getProvider('ollama')
         : null;
+      priorClaude = providerRegistry.hasProvider('claude')
+        ? providerRegistry.getProvider('claude')
+        : null;
       ollamaAdapter = makeOllamaAdapter(root);
+      providerRegistry.unregisterProvider('ollama');
       providerRegistry.registerProvider(ollamaAdapter);
+      providerRegistry.unregisterProvider('claude');
+      providerRegistry.registerProvider({
+        name: 'claude',
+        liveUsageBudgetSupport: 'measured-stream',
+        executionLandingCapability: 'cooperative-landing',
+        executionCostClass: 'remote',
+        supportedModels: ['claude-sonnet-5'],
+        spawn() {},
+        kill() {},
+        listWorkers: () => [],
+        isAvailable: async () => true,
+        buildCommand: () => 'claude',
+      } as unknown as ProviderAdapter);
     });
 
     afterEach(() => {
       if (priorOllama) providerRegistry.registerProvider(priorOllama);
       else providerRegistry.unregisterProvider('ollama');
+      if (priorClaude) providerRegistry.registerProvider(priorClaude);
+      else providerRegistry.unregisterProvider('claude');
       if (existsSync(root)) rmSync(root, { recursive: true, force: true });
     });
 

@@ -4,7 +4,7 @@
 // reads only the on-disk heartbeat, mutates only the caller-owned state
 // Map. All time inputs are injected for deterministic tests.
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -47,6 +47,7 @@ function writeHeartbeat(projectRoot: string, taskId: string, timestamp: string):
     status: 'EXECUTING',
     sequence: 1,
     timestamp,
+    updatedAt: timestamp,
   };
   writeFileSync(
     join(projectRoot, TASKS_DIR, `task-${taskId}.hb`),
@@ -107,26 +108,19 @@ describe('evaluateRuntimeExtension', () => {
     expect(state.has(`${SPRINT_ID}::${TASK_ID}`)).toBe(false);
   });
 
-  it('denies extension when heartbeat is stale (older than 90s)', () => {
-    // Heartbeat 120s old — past the 90s threshold.
-    const hbIso = new Date(FIXED_NOW_MS - 120_000).toISOString();
+  it('accepts a single-write heartbeat without requiring refresh writes', () => {
+    const observedNow = Date.now();
+    const hbIso = new Date(observedNow).toISOString();
     writeHeartbeat(projectRoot, TASK_ID, hbIso);
-    // 7094-F1d: the denial now comes from the worker-liveness probe (file
-    // MTIME, real clock), not the in-file timestamp age. Align the fixture's
-    // mtime with its content timestamp — in production the single spawn-time
-    // `.hb` write makes them equal; a fixture written "now" would probe alive.
-    utimesSync(
-      join(projectRoot, TASKS_DIR, `task-${TASK_ID}.hb`),
-      new Date(hbIso), new Date(hbIso),
-    );
-
+    vi.useFakeTimers();
+    vi.setSystemTime(observedNow + 120_000);
     const decision = evaluateRuntimeExtension(
-      projectRoot, SPRINT_ID, TASK_ID, makeConfig(true), state, clock,
+      projectRoot, SPRINT_ID, TASK_ID, makeConfig(true), state,
     );
 
-    expect(decision.granted).toBe(false);
-    expect(decision.reason).toBe('stale_heartbeat');
-    expect(state.has(`${SPRINT_ID}::${TASK_ID}`)).toBe(false);
+    expect(decision.granted).toBe(true);
+    expect(decision.reason).toBe('granted');
+    expect(state.get(`${SPRINT_ID}::${TASK_ID}`)).toBe(1);
   });
 
   it('denies extension when no heartbeat file exists', () => {

@@ -17,6 +17,8 @@ vi.mock('node:fs', () => ({
   existsSync: vi.fn(),
   readdirSync: vi.fn().mockReturnValue([]),
   watch: vi.fn().mockReturnValue({ close: vi.fn() }),
+  renameSync: vi.fn(),
+  writeFileSync: vi.fn(),
 }));
 
 vi.mock('../../../src/cli/helpers/output.js', () => ({

@@ -16,8 +16,8 @@ import {
 } from '../../src/connectors/approval-telegram.js';
 import type { IncomingCallback, OutgoingMessage } from '../../src/connectors/types.js';
 
-const CREATED_AT = '2026-07-01T21:00:00.000Z';
-const EXPIRES_AT = '2026-07-01T21:15:00.000Z';
+const CREATED_AT = '2099-07-01T21:00:00.000Z';
+const EXPIRES_AT = '2099-07-01T21:15:00.000Z';
 
 function buildRequest(id: string, overrides: Partial<ApprovalRequestInput> = {}): ApprovalRequestInput {
   return {

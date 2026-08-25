@@ -13,7 +13,7 @@
 // taraması testte koşulmaz" instruction. Async spawn only — no spawnSync.
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { spawn } from 'node:child_process';
@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 
 const I18N_HARDCODE_SRC = fileURLToPath(new URL('../../scripts/lint-i18n-hardcode.mjs', import.meta.url));
 const CLI_MCP_PARITY_SRC = fileURLToPath(new URL('../../scripts/lint-cli-mcp-parity.mjs', import.meta.url));
+const COMMAND_REGISTRY_SRC = fileURLToPath(new URL('../../src/core/command-registry.ts', import.meta.url));
 
 function runScript(scriptPath: string, args: string[] = []): Promise<{ code: number | null; stdout: string; stderr: string }> {
   return new Promise((resolvePromise) => {
@@ -120,6 +121,8 @@ function writeBaseline(tmpRoot: string): void {
 /** Full clean tree: CLI+MCP+catalog all consistent, both scripts should pass. */
 function buildFullCleanTree(tmpRoot: string): void {
   installScripts(tmpRoot);
+  writeFileEnsuringDir(join(tmpRoot, 'src', 'core', '.fixture-anchor'), '');
+  copyFileSync(COMMAND_REGISTRY_SRC, join(tmpRoot, 'src', 'core', 'command-registry.ts'));
   mkdirSync(join(tmpRoot, 'src', 'desktop', 'src', 'main'), { recursive: true });
   writeCliFoo(tmpRoot, ".description(getMessage('cli.foo.desc', getLanguage(undefined)))");
   writeCliIndex(tmpRoot);
@@ -200,7 +203,7 @@ describe('lint-cli-mcp-parity.mjs — description-key parity (559-005)', () => {
 
     const result = await runScript(join(tmpRoot, 'scripts', 'lint-cli-mcp-parity.mjs'));
     expect(result.code).toBe(1);
-    expect(result.stdout).toContain('deckent_foo:cli.foo.WRONG_DESC_KEY');
+    expect(result.stdout + result.stderr).toContain('deckent_foo:cli.foo.WRONG_DESC_KEY');
   });
 
   it('passes (exit 0) when the cli-shared binding key matches the CLI command\'s real key', async () => {

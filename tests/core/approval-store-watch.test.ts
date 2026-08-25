@@ -15,7 +15,7 @@ import { ApprovalBroker } from '../../src/core/approval-broker.js';
 import type { ApprovalRequestInput } from '../../src/core/approval-broker.js';
 import type { ApprovalDecision, ApprovalRequest } from '../../src/core/approval-contract.js';
 
-const FIXED_NOW = new Date('2026-07-02T12:00:00.000Z');
+const FIXED_NOW = new Date('2099-07-02T12:00:00.000Z');
 
 function buildRequest(id: string, overrides: Partial<ApprovalRequestInput> = {}): ApprovalRequestInput {
   return {
@@ -30,8 +30,8 @@ function buildRequest(id: string, overrides: Partial<ApprovalRequestInput> = {})
     defaultAction: 'deny',
     tenantId: 'local',
     userId: 'alperen',
-    createdAt: '2026-07-02T11:00:00.000Z',
-    expiresAt: '2026-07-02T13:00:00.000Z',
+    createdAt: '2099-07-02T11:00:00.000Z',
+    expiresAt: '2099-07-02T13:00:00.000Z',
     ...overrides,
   };
 }
@@ -385,7 +385,7 @@ describe('createApprovalStoreWatch — real fs.watch (default seam)', () => {
     // No injected clock here (this test exercises the real `() => new Date()`
     // default) — expiresAt must stay in the future relative to the REAL wall
     // clock, not the fixed FIXED_NOW used by every other test in this file.
-    broker.submit(buildRequest('apr-real-fswatch', { expiresAt: '2099-01-01T00:00:00.000Z' }));
+    broker.submit(buildRequest('apr-real-fswatch', { expiresAt: '2100-01-01T00:00:00.000Z' }));
 
     await vi.waitFor(() => expect(pending).toContain('apr-real-fswatch'), { timeout: 3_000 });
     handle.dispose();

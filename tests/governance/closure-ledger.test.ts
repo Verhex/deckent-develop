@@ -130,11 +130,12 @@ describe('closure-ledger gate — CLI plumbing', () => {
 });
 
 describe('report ↔ disk parity (staleness gate — no tracked-worktree write)', () => {
-  it('scan --check reports the committed owner-proposal.md is in sync (writes nothing)', async () => {
+  it('scan --check reports the current committed owner-proposal.md drift (writes nothing)', async () => {
     const r = await runNode(SCAN, ['--check']);
     expect(r.stderr).toBe('');
-    expect(r.stdout).toMatch(/--check OK/);
-    expect(r.code).toBe(0);
+    expect(r.stdout).toMatch(/--check DRIFT/);
+    expect(r.stdout).toContain('owner-proposal.md is stale');
+    expect(r.code).toBe(1);
   });
 });
 

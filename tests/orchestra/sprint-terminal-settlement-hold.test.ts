@@ -310,7 +310,7 @@ describe('live sprint terminal settlement HOLD', () => {
     expect(audit).toMatchObject({
       decision: 'NO_GO',
       decisionRationale:
-        `host_runtime_budget_exhausted:${ref.attemptId} | post-rubric: runtime-budget-authority:NO_GO`,
+        `host_runtime_budget_exhausted:${ref.attemptId} | post-rubric: path:main → runtime-budget-authority:NO_GO`,
     });
   });
 

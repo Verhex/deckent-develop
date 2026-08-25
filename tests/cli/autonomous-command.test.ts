@@ -269,7 +269,10 @@ describe('deckent autonomous CLI (226-007)', () => {
     mkdirSync(configDir, { recursive: true });
     writeFileSync(
       join(configDir, 'config.json'),
-      JSON.stringify({ autonomous: { enabled: true } }, null, 2),
+      JSON.stringify({
+        autonomous: { enabled: true },
+        approval: { lifecycle: { enabled: true } },
+      }, null, 2),
       'utf-8',
     );
 
@@ -286,29 +289,22 @@ describe('deckent autonomous CLI (226-007)', () => {
       handleStart({ root, lang: 'en', intervalMs: '1', maxIterations: '1' }),
     );
 
-    // Audit event: cycle outcome is 'pending' (parked, not denied).
     const eventsFile = join(root, '.deckent', 'recently-works', 'autonomous-events.jsonl');
     expect(existsSync(eventsFile)).toBe(true);
     const lines = readFileSync(eventsFile, 'utf-8').split('\n').filter((l) => l.length > 0);
     expect(lines.length).toBeGreaterThanOrEqual(1);
     const ev = JSON.parse(lines[0]!) as { payload: { outcome: string; reason: string } };
-    // AUT-3: outcome is 'pending' (park), not 'denied'. The security guarantee is the same:
-    // auto-execution is blocked. Human must explicitly approve before anything runs.
     expect(ev.payload.outcome).toBe('pending');
     expect(ev.payload.reason.toLowerCase()).toContain('approval');
 
-    // Oto-exec yok assertion (strengthened): check that the backlog entry is still
-    // 'pending', NOT 'running'. execute-dispatcher calls updateStatus('running') as its
-    // very first step — if status is still 'pending', the executor was never invoked.
+    // The request is parked and cannot reach execution without a human decision.
     const backlogFile = join(root, '.deckent', 'autonomous', 'backlog.json');
     expect(existsSync(backlogFile)).toBe(true);
     const backlog = JSON.parse(readFileSync(backlogFile, 'utf-8')) as {
       entries: Array<{ id: string; status: string; policy: string }>;
     };
-    const parkedEntry = backlog.entries.find((e) => e.id.startsWith('flow-flow-external'));
-    expect(parkedEntry).toBeDefined();
-    expect(parkedEntry!.status).toBe('pending');
-    expect(parkedEntry!.policy).toBe('approval-required');
+    const parkedEntry = backlog.entries.find((entry) => entry.id.startsWith('flow-flow-external'));
+    expect(parkedEntry).toMatchObject({ status: 'pending', policy: 'approval-required' });
   });
 
   it('CLI wiring — `autonomous status` parses + emits status header', async () => {

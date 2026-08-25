@@ -19,6 +19,8 @@ vi.mock('../../src/orchestra/tmux.js', () => ({
 }));
 
 vi.mock('../../src/core/config.js', () => ({
+  DEFAULT_APPROVE_TIMEOUT_ATTENDED_MS: 300_000,
+  DEFAULT_APPROVE_TIMEOUT_UNATTENDED_MS: 30_000,
   resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn(async () => ({

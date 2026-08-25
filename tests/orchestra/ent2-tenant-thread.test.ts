@@ -127,7 +127,7 @@ function setupProjectRoot(): string {
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe('ENT-2 autonomous backlog tenant isolation', () => {
-  it('filters tenant-b entries when tenant-a requests with strict_tenant_isolation:true', () => {
+  it('rejects an unsigned tenant claim when strict_tenant_isolation:true', () => {
     projectRoot = setupProjectRoot();
     const { res, cap } = mockRes();
     const req = mockReq('tenant-a');
@@ -142,17 +142,8 @@ describe('ENT-2 autonomous backlog tenant isolation', () => {
     );
 
     expect(handled).toBe(true);
-    expect(cap.status).toBe(200);
-
-    const entries = JSON.parse(cap.body) as Array<{ id: string; title: string }>;
-    const ids = entries.map((e) => e.id);
-
-    // tenant-a entries visible
-    expect(ids).toContain('entry-a-1');
-    expect(ids).toContain('entry-a-2');
-
-    // tenant-b entry NOT visible — the core isolation assertion
-    expect(ids).not.toContain('entry-b-1');
+    expect(cap.status).toBe(403);
+    expect(JSON.parse(cap.body)).toMatchObject({ error: expect.any(String) });
   });
 
   it('returns all entries when strictTenantIsolation is false (backward-compat)', () => {
@@ -195,7 +186,7 @@ describe('ENT-2 autonomous backlog tenant isolation', () => {
     expect(ids).toContain('entry-b-1');
   });
 
-  it('admin role sees all entries even with strict_tenant_isolation:true', () => {
+  it('does not grant admin access from an unsigned role claim', () => {
     projectRoot = setupProjectRoot();
     const { res, cap } = mockRes();
     const req = mockReq('tenant-a', 'admin');
@@ -209,12 +200,8 @@ describe('ENT-2 autonomous backlog tenant isolation', () => {
       { strictTenantIsolation: true },
     );
 
-    const entries = JSON.parse(cap.body) as Array<{ id: string }>;
-    const ids = entries.map((e) => e.id);
-
-    // Admin sees everyone's entries
-    expect(ids).toContain('entry-a-1');
-    expect(ids).toContain('entry-b-1');
+    expect(cap.status).toBe(403);
+    expect(JSON.parse(cap.body)).toMatchObject({ error: expect.any(String) });
   });
 
   it('does not match non-autonomous routes (returns false)', () => {

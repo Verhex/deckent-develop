@@ -102,13 +102,13 @@ describe('normalizeTaskResultShape (disk-read boundary)', () => {
     expect(normalizeTaskResultShape(r)!.notes).toBe('plain');
   });
 
-  it('preserves legacy command arrays and restores a DONE boolean claim', () => {
+  it('preserves legacy command arrays without inventing a successful boolean claim', () => {
     const r = {
       ...makeCodexResult(),
       testsPassed: ['node example.ts', 'test -f README.md'] as unknown as boolean,
     };
     const normalized = normalizeTaskResultShape(r)!;
-    expect(normalized.testsPassed).toBe(true);
+    expect(normalized.testsPassed).toBe(false);
     expect((normalized as TaskResult).testCommands).toEqual([
       'node example.ts',
       'test -f README.md',

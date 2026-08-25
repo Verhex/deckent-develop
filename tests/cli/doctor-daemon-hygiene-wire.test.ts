@@ -17,7 +17,8 @@ import { Command } from 'commander';
 
 // ─── Mocks (hoisted) ─────────────────────────────────────────────────
 
-vi.mock('node:fs', () => ({
+vi.mock('node:fs', async (importOriginal) => ({
+  ...await importOriginal<typeof import('node:fs')>(),
   readFileSync: vi.fn().mockReturnValue(''),
   existsSync: vi.fn().mockReturnValue(false),
   readdirSync: vi.fn().mockReturnValue([]),

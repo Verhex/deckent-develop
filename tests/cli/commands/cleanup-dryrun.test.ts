@@ -28,8 +28,8 @@ vi.mock('../../../src/cli/helpers/output.js', () => ({
   printError: (err: unknown) => output.push(String(err)),
 }));
 
-vi.mock('../../../src/cli/helpers/messages.js', () => ({
-  getMessage: (key: string) => key,
+vi.mock('../../../src/cli/helpers/messages.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/cli/helpers/messages.js')>()),
   getLanguage: () => 'en',
   resolveLanguage: () => 'en',
 }));

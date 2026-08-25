@@ -21,6 +21,13 @@ vi.mock('fs', () => ({
   existsSync: vi.fn().mockImplementation((p: string) => fsStore.has(p)),
   readFileSync: vi.fn().mockImplementation((p: string) => fsStore.get(p) ?? '{}'),
   writeFileSync: vi.fn().mockImplementation((p: string, data: string) => { fsStore.set(p, data); }),
+  renameSync: vi.fn().mockImplementation((from: string, to: string) => {
+    const value = fsStore.get(from);
+    if (value !== undefined) {
+      fsStore.set(to, value);
+      fsStore.delete(from);
+    }
+  }),
   mkdirSync: vi.fn(),
   cpSync: vi.fn(),
   readdirSync: vi.fn().mockReturnValue([]),

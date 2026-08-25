@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):9e4c531c58b201441ed09dec08dab0d8024debc58f2efd42696ed53b3f12bc4f`
+**Source digest:** `sha256(normalized-lf-utf8):76d6620fc3dc1e9ecc574846041098c2a298ea3f553749eae9df2c7b3a3761af`
 
-**Rows:** 521 total · 456 active · 65 terminal
+**Rows:** 522 total · 457 active · 65 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 361 |
+| OPEN | 362 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 69 |
@@ -416,6 +416,7 @@
 | 7120 | `SKILLMD-INGEST-001` | BLOCKED | P1 | ECOSYSTEM | — | `SKILL_V3_PROFILE_RECONCILIATION_REQUIRED` | Anthropic Agent-Skills (SKILL.md) open-standard ingest: `deckent skill import --format=skill-md` converter, typed `source` provenance ve frontmatter parser sertleştirmesi |
 | 7121 | `SKILLMD-V3-RECONCILIATION-001` | OPEN | P0 | ECOSYSTEM | `SKILL-CATALOG-AUTHORITY-001`, `SKILL-ROUTING-ELIGIBILITY-001`, `SKILL-SUPPLY-CHAIN-INGRESS-001` | — | SKILLMD-INGEST-001'in immutable V2 activation kabulünü production V3 SkillProfile ve fail-closed package ingress contractıyla lossless uzlaştır |
 | 7130 | `AGENT-RUNTIME-ADAPTER-001` | OPEN | P2 | PROVIDER | `COMPOSITE-WORKER-001` | — | Harici agent-runtime adapter ailesi değerlendirmesi: generic ACP worker adapter + Hermes/OpenClaw/Codex-remote/ADK sınıfı runtime'ların governed composite worker olarak admission'ı |
+| 7141 | `ERROR-REGISTRY-THROW-CONVERSION-001` | OPEN | P1 | KERNEL | — | — | Maraton-birikimi 131 ham `throw new Error(...)` sitesinin typed error-registry kontratına taşınması (owner admission 2026-08-25; sprint-670-006 dürüst-NO_GO bulgusu) |
 | 8000 | `EVERY-ENV-001` | OPEN | P0 | XPLAT | `SSOT-003`, `TEST-PLATFORM-001` | — | Every-environment architecture and release parent |
 | 8010 | `ENV-ADAPTER-001` | OPEN | P0 | XPLAT | `KERNEL-001`, `AUTHORITY-001` | — | PlatformAdapter contracts for process, paths, locks, IPC, credentials, terminal and services |
 | 8020 | `INSTALL-SCOPE-001` | OPEN | P0 | ONBOARDING | `ENV-ADAPTER-001`, `MEMORY-AUTHORITY-001` | — | Global install plus project-scoped state and learning |

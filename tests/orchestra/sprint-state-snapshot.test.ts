@@ -51,7 +51,7 @@ describe('sprint-state-tracker (Sprint 180 W1-1)', () => {
     expect(a.currentPhase).toBe(b.currentPhase);
   });
 
-  it('(d) excludes a FINISHED worker (.result present) from activeWorkers — stale-worker false-positive fix', () => {
+  it('(d) excludes heartbeat-only and raw-result workers without host-active evidence', () => {
     writeFileSync(
       join(tmp, '.deckent/sprint-state.json'),
       JSON.stringify({ sprintId: 'sprint-x', phase: 'EXECUTE', taskIds: ['x-001', 'x-002'] }),
@@ -72,7 +72,13 @@ describe('sprint-state-tracker (Sprint 180 W1-1)', () => {
     );
     writeFileSync(
       join(tmp, '.tasks/task-x-001.hb'),
-      JSON.stringify({ workerId: 'w-x-001', taskId: 'x-001', timestamp: new Date().toISOString() }),
+      JSON.stringify({
+        workerId: 'w-x-001',
+        taskId: 'x-001',
+        sequence: 1,
+        currentAction: 'testing',
+        timestamp: new Date().toISOString(),
+      }),
     );
     // Worker B: finished — heartbeat AND a .result (its .hb is never deleted).
     writeFileSync(
@@ -83,8 +89,8 @@ describe('sprint-state-tracker (Sprint 180 W1-1)', () => {
 
     const snap = getSprintStateSnapshot(tmp);
     const ids = snap.activeWorkers.map((w) => w.id);
-    expect(ids).toContain('w-x-001'); // active worker stays
-    expect(ids).not.toContain('w-x-002'); // finished worker is excluded (not "stale")
-    expect(snap.activeWorkers).toHaveLength(1);
+    expect(ids).not.toContain('w-x-001');
+    expect(ids).not.toContain('w-x-002');
+    expect(snap.activeWorkers).toHaveLength(0);
   });
 });

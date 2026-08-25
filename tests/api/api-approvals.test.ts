@@ -68,7 +68,7 @@ describe('/api/approvals', () => {
       expect(res.status).toBe(200);
       // SURF-kuyruk-E: `expired` is a first-class observable bucket (TTL-swept
       // approvals were invisible here until the expiry chaos-leg smoke caught it)
-      expect(res.json()).toEqual({ pending: [], approved: [], denied: [], expired: [] });
+      expect(res.json()).toEqual({ pending: [], approved: [], denied: [], expired: [], quarantined: [] });
     });
 
     it('lists pending/approved buckets, maskedArgs-only — no rawArgsRef leak', async () => {

@@ -165,16 +165,17 @@ describe('F2.1b: buildScopeBlock classifies write targets when trackedFiles is g
     expect(out).not.toMatch(/STOP and write a NO_GO/);
   });
 
-  // LP-4 (scope taxonomy): the scope block must exempt .tasks/ protocol files so the
-  // "ONLY these files" authority does not contradict the required lifecycle writes.
-  it('exempts .tasks/ protocol files from the scope audit (LP-4) — both branches', () => {
+  // LP-4 (scope taxonomy): the scope block must name the exact lifecycle exceptions so
+  // the "ONLY these files" authority does not contradict the required protocol writes.
+  it('names the exact .tasks/ lifecycle write exceptions — both branches', () => {
     const withFiles = buildScopeBlock(
       { directories: ['src/core/'], filesRead: [], filesWrite: ['src/core/x.ts'] }, [], false);
-    expect(withFiles).toMatch(/\.tasks\/.*exempt from this scope audit/s);
-    expect(withFiles).toContain('always writable');
+    expect(withFiles).toContain('`.tasks/task-<task-id>.hb`');
+    expect(withFiles).toContain('`.tasks/task-<task-id>.result`');
+    expect(withFiles).toContain('No other `.tasks/` path is authorized');
     const dirOnly = buildScopeBlock(
       { directories: ['src/x/'], filesRead: [], filesWrite: [] }, [], false);
-    expect(dirOnly).toMatch(/\.tasks\/.*exempt from this scope audit/s);
+    expect(dirOnly).toContain('`.tasks/task-<task-id>.question`');
   });
 });
 

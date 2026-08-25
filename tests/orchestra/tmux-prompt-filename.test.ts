@@ -120,7 +120,8 @@ describe('Sprint 170 P0-3 — tmux prompt filename taskId-aware', () => {
 
     // Two prompts on disk:
     //   - active tmux worker prompt (new pattern)        — must be PRESERVED
-    //   - truly orphan prompt with no live worker        — must be DELETED
+    //   - unrelated prompt lacking attributable ownership — must be PRESERVED
+    //     because cleanup now fails closed on ambiguous filenames
     mockedReaddirSync.mockReturnValueOnce([
       `.prompt-${activeTaskId}-cafebabe.txt`,
       '.prompt-orphan-deadbeef.txt',
@@ -135,7 +136,7 @@ describe('Sprint 170 P0-3 — tmux prompt filename taskId-aware', () => {
     ).toBe(false);
     expect(
       unlinked.some((p) => p.endsWith('.prompt-orphan-deadbeef.txt')),
-      'orphan prompt must be deleted',
-    ).toBe(true);
+      'an unattributed prompt must not be deleted by selective cleanup',
+    ).toBe(false);
   });
 });

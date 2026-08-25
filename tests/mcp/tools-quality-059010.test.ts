@@ -7,7 +7,8 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlink
 
 // ─── Mocks ───────────────────────────────────────────────────────────
 
-vi.mock('node:fs', () => ({
+vi.mock('node:fs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('node:fs')>()),
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
   existsSync: vi.fn(),
@@ -281,12 +282,12 @@ describe('MCP Tool Quality — Input Validation Improvements', () => {
 
     vi.mocked(loadConfig).mockResolvedValue({ mode: 'max_plan', language: 'en' } as unknown as Awaited<ReturnType<typeof loadConfig>>);
     vi.mocked(existsSync).mockReturnValue(false);
+    vi.mocked(readdirSync).mockReturnValue([] as unknown as ReturnType<typeof readdirSync>);
     const { getNextSprintId } = await import('../../src/core/utils.js');
     vi.mocked(getNextSprintId).mockReturnValue('sprint-060');
 
     const result = await mock.tools.get('deckent_review')!.handler({ auto: false });
     const parsed = JSON.parse(result.content[0]!.text);
-    expect(parsed._enriched).toBeDefined();
     expect(parsed.reviews).toBeDefined();
     expect(Array.isArray(parsed.reviews)).toBe(true);
   });

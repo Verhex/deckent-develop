@@ -10,6 +10,8 @@ vi.mock('node:fs', () => ({
   readdirSync: vi.fn(),
   mkdirSync: vi.fn(),
   unlinkSync: vi.fn(),
+  statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false })),
+  renameSync: vi.fn(),
 }));
 
 vi.mock('../../../src/cli/helpers/output.js', () => ({
@@ -153,14 +155,14 @@ async function runReview(args: string[]): Promise<void> {
   const program = new Command();
   program.exitOverride();
   registerReview(program);
-  try { await program.parseAsync(['node', 'test', ...args]); } catch { /* exitOverride */ }
+  await program.parseAsync(['node', 'test', ...args]);
 }
 
 async function runFinalize(args: string[]): Promise<void> {
   const program = new Command();
   program.exitOverride();
   registerFinalize(program);
-  try { await program.parseAsync(['node', 'test', ...args]); } catch { /* exitOverride */ }
+  await program.parseAsync(['node', 'test', ...args]);
 }
 
 // ─── Review Tests ───────────────────────────────────────────────────
@@ -346,10 +348,13 @@ describe('finalize overhaul', () => {
     });
     vi.mocked(readJsonSafe).mockReturnValue(null);
     vi.mocked(existsSync).mockImplementation((p: any) => {
-      if (String(p).includes('.tasks') && !String(p).includes('task-')) return true;
+      if (String(p) === '/mock/root/.tasks' || String(p).includes('task-001.json')) return true;
       return false;
     });
-    vi.mocked(readdirSync).mockReturnValue(['task-001.json'] as any);
+    vi.mocked(readdirSync).mockImplementation(((_p: unknown, options?: { withFileTypes?: boolean }) =>
+      options?.withFileTypes
+        ? [{ name: 'task-001.json', isFile: () => true, isDirectory: () => false }]
+        : ['task-001.json']) as any);
     await runFinalize(['finalize']);
     const calls = vi.mocked(print).mock.calls.map(c => c[0]);
     expect(calls.join('\n')).toContain('Cannot finalize');
@@ -365,10 +370,13 @@ describe('finalize overhaul', () => {
     });
     vi.mocked(readJsonSafe).mockReturnValue(null);
     vi.mocked(existsSync).mockImplementation((p: any) => {
-      if (String(p).includes('.tasks') && !String(p).includes('task-')) return true;
+      if (String(p) === '/mock/root/.tasks' || String(p).includes('task-001.json')) return true;
       return false;
     });
-    vi.mocked(readdirSync).mockReturnValue(['task-001.json'] as any);
+    vi.mocked(readdirSync).mockImplementation(((_p: unknown, options?: { withFileTypes?: boolean }) =>
+      options?.withFileTypes
+        ? [{ name: 'task-001.json', isFile: () => true, isDirectory: () => false }]
+        : ['task-001.json']) as any);
     await runFinalize(['finalize', '--force']);
     // born-610: live workers must die before terminal settlement…
     expect(killSingle).toHaveBeenCalledWith('/mock/root', '001', 'en');
@@ -397,7 +405,10 @@ describe('finalize overhaul', () => {
       if (s.includes('sprints/sprint-057.md')) return true;
       return false;
     });
-    vi.mocked(readdirSync).mockReturnValue(['task-001.json'] as any);
+    vi.mocked(readdirSync).mockImplementation(((_p: unknown, options?: { withFileTypes?: boolean }) =>
+      options?.withFileTypes
+        ? [{ name: 'task-001.json', isFile: () => true, isDirectory: () => false }]
+        : ['task-001.json']) as any);
     await runFinalize(['finalize']);
     const calls = vi.mocked(print).mock.calls.map(c => c[0]);
     expect(calls.join('\n')).toContain('already been finalized');
@@ -422,7 +433,13 @@ describe('finalize overhaul', () => {
       if (s.endsWith('.tasks')) return true;
       return false;
     });
-    vi.mocked(readdirSync).mockReturnValue(['task-001.json', 'task-002.json'] as any);
+    vi.mocked(readdirSync).mockImplementation(((_p: unknown, options?: { withFileTypes?: boolean }) =>
+      options?.withFileTypes
+        ? [
+            { name: 'task-001.json', isFile: () => true, isDirectory: () => false },
+            { name: 'task-002.json', isFile: () => true, isDirectory: () => false },
+          ]
+        : ['task-001.json', 'task-002.json']) as any);
     await runFinalize(['finalize']);
     const calls = vi.mocked(print).mock.calls.map(c => c[0]);
     // Real catalog string: 'Warning: mixed sprint IDs detected: …'
@@ -442,7 +459,7 @@ describe('finalize overhaul', () => {
     }) as any);
     vi.mocked(existsSync).mockImplementation((p: any) => {
       const s = String(p);
-      if (s.includes('.tasks') && !s.includes('task-')) return true;
+      if (s === '/mock/root/.tasks' || s.includes('task-001.json')) return true;
       if (s.includes('.brain/reviews/review-sprint-057.json')) return true;
       return false;
     });

@@ -63,6 +63,14 @@ vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
 }));
 
+vi.mock('../../src/core/prompt-delivery-receipt.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/core/prompt-delivery-receipt.js')>()),
+  readPromptDeliveryReceipt: vi.fn(() => ({
+    state: 'AVAILABLE',
+    receipt: { deliveredSkillIds: [] },
+  })),
+}));
+
 vi.mock('../../src/orchestra/tmux.js', () => ({
   ensureSession: vi.fn(),
   spawnWorker: vi.fn(),
@@ -155,6 +163,56 @@ vi.mock('../../src/core/live-execution-budget.js', async (importOriginal) => {
     assertLiveUsageBudgetSupport: vi.fn(),
   };
 });
+
+vi.mock('../../src/core/final-only-usage-containment.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/core/final-only-usage-containment.js')>()),
+  requireFinalOnlyUsageContainment: vi.fn(() => undefined),
+}));
+
+const backendFixtures = vi.hoisted(() => ({ spawn: vi.fn() }));
+
+vi.mock('../../src/orchestra/spawn-backend.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/orchestra/spawn-backend.js')>()),
+  SpawnBackendFactory: {
+    create: vi.fn(() => ({
+      name: 'test-measured',
+      liveUsageBudgetSupport: 'measured-stream',
+      executionLandingCapability: 'cooperative-landing',
+      spawn: backendFixtures.spawn.mockImplementation((taskId: string) => {
+        const taskPath = join(RUN_ROOT, '.tasks', `task-${taskId}.json`);
+        const resultPath = join(RUN_ROOT, '.tasks', `task-${taskId}.result`);
+        if (!actualFs.existsSync(taskPath) || !actualFs.existsSync(resultPath)) return;
+        const task = JSON.parse(actualFs.readFileSync(taskPath, 'utf-8')) as Task;
+        const result = JSON.parse(actualFs.readFileSync(resultPath, 'utf-8')) as Record<string, unknown>;
+        result.promptCompilePlanId = task.promptCompilePlanId;
+        result.testVerification = {
+          applicability: 'REQUIRED',
+          outcome: result.testsPassed === false ? 'FAILED' : 'PASSED',
+          commands: ['fixture verification'],
+        };
+        result.criteriaEvidence = (task.goNogo.items ?? []).map(item => ({
+          criterionId: item.id,
+          outcome: item.polarity === 'go'
+            ? result.selfAssessment === 'NO_GO' ? 'UNMET' : 'MET'
+            : result.selfAssessment === 'NO_GO' ? 'MET' : 'UNMET',
+          evidence: ['fixture result evidence'],
+        }));
+        result.techDebtCriterionIds = [];
+        actualFs.writeFileSync(resultPath, JSON.stringify(result), 'utf-8');
+      }),
+      kill: vi.fn(),
+      list: vi.fn(() => []),
+    })),
+  },
+}));
+
+vi.mock('../../src/orchestra/runtime-budget-monitor.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/orchestra/runtime-budget-monitor.js')>()),
+  waitForTerminalRuntimeBudgetUsage: vi.fn().mockResolvedValue({
+    terminal: true,
+    decision: { state: 'within-budget' },
+  }),
+}));
 
 vi.mock('../../src/orchestra/planner.js', () => ({
   resolvePlanTimeoutMs: vi.fn(() => 900_000), // F-2: sprint-planner/do.ts resolve the plan timeout through this
@@ -257,7 +315,31 @@ const mockedMemoryStore = vi.mocked(MemoryStore);
 // implementations, so `mocked*.mock.calls` assertions keep working.
 function useRealFileSystem(): void {
   mockedReadFileSync.mockImplementation(actualFs.readFileSync as never);
-  mockedWriteFileSync.mockImplementation(actualFs.writeFileSync as never);
+  mockedWriteFileSync.mockImplementation(((path: unknown, data: unknown, options?: unknown) => {
+    actualFs.writeFileSync(path as never, data as never, options as never);
+    const normalized = String(path).replaceAll('\\', '/');
+    const match = /\/\.tasks\/task-([^/]+)\.json$/u.exec(normalized);
+    if (!match) return;
+    const resultPath = join(RUN_ROOT, '.tasks', `task-${match[1]}.result`);
+    if (!actualFs.existsSync(resultPath)) return;
+    const task = JSON.parse(String(data)) as Task;
+    const result = JSON.parse(actualFs.readFileSync(resultPath, 'utf-8')) as Record<string, unknown>;
+    result.promptCompilePlanId = task.promptCompilePlanId;
+    result.testVerification = {
+      applicability: 'REQUIRED',
+      outcome: result.testsPassed === false ? 'FAILED' : 'PASSED',
+      commands: ['fixture verification'],
+    };
+    result.criteriaEvidence = (task.goNogo.items ?? []).map(item => ({
+      criterionId: item.id,
+      outcome: item.polarity === 'go'
+        ? result.selfAssessment === 'NO_GO' ? 'UNMET' : 'MET'
+        : result.selfAssessment === 'NO_GO' ? 'MET' : 'UNMET',
+      evidence: ['fixture result evidence'],
+    }));
+    result.techDebtCriterionIds = [];
+    actualFs.writeFileSync(resultPath, JSON.stringify(result), 'utf-8');
+  }) as never);
   mockedExistsSync.mockImplementation(actualFs.existsSync as never);
   mockedMkdirSync.mockImplementation(actualFs.mkdirSync as never);
   mockedReaddirSync.mockImplementation(actualFs.readdirSync as never);
@@ -392,7 +474,28 @@ afterAll(() => {
 });
 
 function makeRunConfig(): ResolvedConfig {
-  return makeConfig({ projectRoot: RUN_ROOT });
+  return makeConfig({
+    projectRoot: RUN_ROOT,
+    spawn_backend: 'docker',
+    execution_budget: {
+      roles: {
+        worker: {
+          default: {
+            maxTokens: 1_000_000,
+            maxTurns: 48,
+            maxCacheReadTokens: 1_000_000,
+            maxOutputTokens: 100_000,
+          },
+        },
+      },
+      landing: { reserve_ratio: 0.25 },
+      final_only_usage: {
+        action: 'allow-wall-clock-containment',
+        roles: ['worker'],
+        max_wall_clock_seconds: 600,
+      },
+    },
+  });
 }
 
 function makeRunResult(
@@ -734,10 +837,16 @@ describe('buildWorkerPrompt', () => {
     expect(prompt).toContain('NO_GO');
   });
 
-  it('shows scope directories when available', () => {
-    const task = makeTask({ scope: { directories: ['src/core/'], filesRead: [], filesWrite: [] } });
+  it('shows canonical read scope when available', () => {
+    const task = makeTask({
+      scope: {
+        directories: ['src/core/'],
+        filesRead: ['src/core/index.ts'],
+        filesWrite: [],
+      },
+    });
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('src/core/');
+    expect(prompt).toContain('src/core/index.ts');
   });
 
   it('shows fallback message when no scope directories', () => {
@@ -753,9 +862,11 @@ describe('buildWorkerPrompt', () => {
   });
 
   it('includes explicit vitest run instruction', () => {
-    const task = makeTask();
+    const task = makeTask({
+      description: '- Test: npx vitest run tests/orchestra/brain.test.ts',
+    });
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('npx vitest run');
+    expect(prompt).toContain('`npx vitest run tests/orchestra/brain.test.ts`');
   });
 
   it('includes explicit tsc verify instruction', () => {
@@ -848,7 +959,7 @@ describe('planSprint', () => {
     const ctx = makeContext('Create src/utils/hello.ts in src/utils/');
     const sprint = await planSprint(ROOT, config, ctx, recommendation);
     const task = sprint.tasks[0];
-    expect(task?.scope.directories).toContain('src/utils/');
+    expect(task?.scope.directories).toContain('src/utils');
     expect(task?.scope.filesWrite).toContain('src/utils/hello.ts');
   });
 
@@ -1888,12 +1999,13 @@ describe('runSprint', () => {
 
   it('recovers from RETRO/DECAY errors', async () => {
     setupRealSprint();
+    const fixtureWrite = mockedWriteFileSync.getMockImplementation()!;
     // Fail only the legacy sprint-log projection. Terminal archive adoption
     // now refreshes guarded `.brain/exports`, which is required authority and
     // must remain real even while the recoverable RETRO projection fails.
     mockedWriteFileSync.mockImplementation(((path: unknown, ...rest: unknown[]) => {
       if (String(path).includes(join('.brain', 'sprints'))) throw new Error('write fail');
-      return (actualFs.writeFileSync as (...a: unknown[]) => void)(path, ...rest);
+      return fixtureWrite(path, ...rest);
     }) as never);
 
     const sprint = await runSprint(RUN_ROOT, makeRunConfig());
@@ -1906,9 +2018,9 @@ describe('runSprint', () => {
 
     await runSprint(RUN_ROOT, makeRunConfig(), { autoApprove: true });
     // spawnWorker should have been called with autoApprove: true
-    const calls = mockedSpawnWorker.mock.calls;
+    const calls = backendFixtures.spawn.mock.calls;
     expect(calls.length).toBeGreaterThan(0);
-    const opts = calls[0]?.[4] as { autoApprove?: boolean } | undefined;
+    const opts = calls[0]?.[3] as { autoApprove?: boolean } | undefined;
     expect(opts?.autoApprove).toBe(true);
   });
 });
@@ -2201,21 +2313,18 @@ describe('buildWorkerPrompt heartbeat instruction (Sprint 14)', () => {
 
 // ─── Sprint 19: buildWorkerPrompt UTC timestamp instruction ────────
 describe('buildWorkerPrompt UTC timestamp instruction (Sprint 19)', () => {
-  it('instructs worker to write a UTC ISO timestamp (7094-F1d single-write heartbeat wording)', () => {
-    // The Sprint-19 wording carried the literal `new Date().toISOString()`;
-    // the F1d single-write heartbeat protocol states the same contract in
-    // prose ("a UTC ISO timestamp") — the pin follows the contract, not the
-    // retired code literal.
+  it('fails closed when heartbeat execution identity was not host-bound', () => {
     const task = makeTask({ id: '019-002' });
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('a UTC ISO timestamp');
-    expect(prompt).toContain('ONCE');
+    expect(prompt).toContain('HEARTBEAT_IDENTITY_HOLD');
+    expect(prompt).toContain('exactly once');
   });
 
-  it('instructs worker to use UTC ISO 8601 format', () => {
+  it('forbids inferring missing heartbeat identity', () => {
     const task = makeTask({ id: '019-002' });
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('UTC');
+    expect(prompt).toContain('Do not write an ambiguous legacy heartbeat');
+    expect(prompt).toContain('infer identity');
   });
 
   it('mentions timestamp refresh instruction in heartbeat hint', () => {

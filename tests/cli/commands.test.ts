@@ -11,6 +11,7 @@ const spawnBackend = vi.hoisted(() => ({ spawn: vi.fn(), kill: vi.fn() }));
 vi.mock('node:fs', () => ({
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
+  renameSync: vi.fn(),
   existsSync: vi.fn(),
   mkdirSync: vi.fn(),
   readdirSync: vi.fn(),
@@ -153,6 +154,16 @@ vi.mock('../../src/orchestra/brain.js', () => ({
       this.phase = phase;
     }
   },
+}));
+
+vi.mock('../../src/orchestra/spawn-backend-docker.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/orchestra/spawn-backend-docker.js')>()),
+  archivePromptFiles: vi.fn(() => ({ archived: 0, cleaned: 0 })),
+}));
+
+vi.mock('../../src/orchestra/sprint-docs-updater.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/orchestra/sprint-docs-updater.js')>()),
+  cleanTasksArchive: vi.fn(() => 0),
 }));
 
 // `deckent plan` no longer plans through brain.planSprint — the production seam
@@ -355,6 +366,9 @@ function makeConfig(overrides?: Partial<ResolvedConfig>): ResolvedConfig {
     projectRoot: '/tmp/test',
     version: '0.1.0',
     spawn_backend: 'subprocess',
+    approval: {
+      lifecycle: { default_ttl_ms: 900_000, default_action: 'deny' },
+    } as ResolvedConfig['approval'],
     ...overrides,
   };
 }
@@ -385,6 +399,7 @@ function makeTask(overrides?: Partial<Task>): Task {
     reason: 'test', scope: { directories: [], filesRead: [], filesWrite: [] },
     dependencies: [], goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' },
     status: TaskStatus.PENDING,
+    sprintId: 'sprint-001', createdAt: '2026-08-01T00:00:00.000Z',
     ...overrides,
   };
 }
@@ -1043,7 +1058,7 @@ describe('cleanup command', () => {
     vi.mocked(destroy).mockImplementation(() => {});
     await runCommand(registerCleanup, ['cleanup']);
     expect(cleanup).toHaveBeenCalled();
-    expect(stdout()).toContain('Cleanup complete');
+    expect(stdout(), stderr()).toContain('Cleanup complete');
     expect(stdout()).toContain('1 tasks');
   });
 
@@ -1053,7 +1068,7 @@ describe('cleanup command', () => {
     vi.mocked(cleanup).mockImplementation(() => {});
     vi.mocked(destroy).mockImplementation(() => {});
     await runCommand(registerCleanup, ['cleanup']);
-    expect(stdout()).toContain('0 tasks');
+    expect(stdout(), stderr()).toContain('0 tasks');
   });
 
   it('handles missing tasks dir', async () => {
@@ -1071,7 +1086,7 @@ describe('cleanup command', () => {
     vi.mocked(cleanup).mockImplementation(() => {});
     vi.mocked(destroy).mockImplementation(() => {});
     await runCommand(registerCleanup, ['cleanup']);
-    expect(stdout()).toContain('0 tasks');
+    expect(stdout(), stderr()).toContain('0 tasks');
   });
 
   it('handles destroy() throwing silently', async () => {
@@ -1652,7 +1667,7 @@ describe('init command', () => {
     expect(mkdirCalls.some(c => c.includes('plugins'))).toBe(true);
   });
 
-  it('creates i18n directory', async () => {
+  it('does not create a legacy per-project i18n directory', async () => {
     const mockQuestion = vi.fn()
       .mockResolvedValueOnce('1')
       .mockResolvedValueOnce('1')
@@ -1667,7 +1682,7 @@ describe('init command', () => {
     await runCommand(registerInit, ['init']);
 
     const mkdirCalls = vi.mocked(mkdirSync).mock.calls.map(c => String(c[0]));
-    expect(mkdirCalls.some(c => c.includes('i18n'))).toBe(true);
+    expect(mkdirCalls.some(c => c.includes('i18n'))).toBe(false);
   });
 
   it('creates TOOLS.md in workspace', async () => {
@@ -1710,7 +1725,7 @@ describe('init command', () => {
     expect(writeCalls.length).toBeGreaterThan(0);
   });
 
-  it('creates en.json in i18n', async () => {
+  it('does not copy the legacy en.json catalog into the project', async () => {
     const mockQuestion = vi.fn()
       .mockResolvedValueOnce('1')
       .mockResolvedValueOnce('1')
@@ -1727,12 +1742,10 @@ describe('init command', () => {
     const writeCalls = vi.mocked(writeFileSync).mock.calls.filter(
       c => String(c[0]).includes('en.json'),
     );
-    expect(writeCalls.length).toBeGreaterThan(0);
-    const content = JSON.parse(String(writeCalls[0]?.[1]));
-    expect(content).toHaveProperty('sprint_started');
+    expect(writeCalls).toEqual([]);
   });
 
-  it('creates tr.json in i18n', async () => {
+  it('does not copy the legacy tr.json catalog into the project', async () => {
     const mockQuestion = vi.fn()
       .mockResolvedValueOnce('1')
       .mockResolvedValueOnce('1')
@@ -1749,10 +1762,7 @@ describe('init command', () => {
     const writeCalls = vi.mocked(writeFileSync).mock.calls.filter(
       c => String(c[0]).includes('tr.json'),
     );
-    expect(writeCalls.length).toBeGreaterThan(0);
-    const content = JSON.parse(String(writeCalls[0]?.[1]));
-    expect(content).toHaveProperty('sprint_started');
-    expect(content.sprint_started).toContain('baslatildi');
+    expect(writeCalls).toEqual([]);
   });
 
   it('creates DECKENT.md with full template', async () => {

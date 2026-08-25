@@ -16,8 +16,8 @@ import {
   type ApprovalStreamEvent,
 } from '../../src/core/approval-eventstream.js';
 
-const CREATED_AT = '2026-07-01T21:00:00.000Z';
-const EXPIRES_AT = '2026-07-01T21:15:00.000Z';
+const CREATED_AT = '2099-07-01T21:00:00.000Z';
+const EXPIRES_AT = '2099-07-01T21:15:00.000Z';
 
 function buildRequest(id: string, overrides: Partial<ApprovalRequestInput> = {}): ApprovalRequestInput {
   return {
@@ -84,7 +84,7 @@ describe('ApprovalEventStream — per-client filters', () => {
       decision: 'allow',
       decidedBy: 'alperen',
       channel: 'test-direct',
-      decidedAt: '2026-07-01T21:05:00.000Z',
+      decidedAt: '2099-07-01T21:05:00.000Z',
     });
 
     const eventA2 = await readOne(subA.events);
@@ -136,7 +136,7 @@ describe('ApprovalEventStream — late-join backfill', () => {
       decision: 'allow',
       decidedBy: 'alperen',
       channel: 'test-direct',
-      decidedAt: '2026-07-01T21:05:00.000Z',
+      decidedAt: '2099-07-01T21:05:00.000Z',
     });
     broker.submit(buildRequest('es-backfill-still-pending'));
 

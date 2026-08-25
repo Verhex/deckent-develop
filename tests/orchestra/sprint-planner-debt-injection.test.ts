@@ -57,10 +57,10 @@ describe('Sprint 179 W1-1 — injectCriticalDebtTasks', () => {
     // Sprint 260 BOUNDARY-TEST-PATTERN: mirrorTestScope auto-adds tests/orchestra/
     // alongside src/orchestra/ for code-development tasks so workers can add tests
     // without a BOUNDARY_VIOLATION.
-    expect(fix.scope.directories).toEqual(['src/orchestra/', 'tests/orchestra/']);
+    expect(fix.scope.directories).toEqual(['src/orchestra', 'tests/orchestra']);
     expect(fix.scope.filesWrite).toEqual(['src/orchestra/event-stream.ts']);
     // Directories are already navigation context; exact reads mirror targets.
-    expect(fix.scope.filesRead).toEqual(['src/orchestra/event-stream.ts']);
+    expect(fix.scope.filesRead).toEqual([]);
     expect(fix.priority).toBe('CRITICAL');
     expect(fix.isPriorityFix).toBe(true);
     expect(fix.fixForTaskId).toBe('178-001');
@@ -82,10 +82,7 @@ describe('Sprint 179 W1-1 — injectCriticalDebtTasks', () => {
 
     const result = injectCriticalDebtTasks(debt, SPRINT_ID, MODEL, 1, TaskStatus.PENDING);
     const fix = result.tasks[0]!;
-    expect(fix.scope.filesRead).toEqual([
-      'package.json',
-      'scripts/lint-sprint-archive-writers.mjs',
-    ]);
+    expect(fix.scope.filesRead).toEqual([]);
 
     const { prompt } = buildTaskPrompt(fix, {
       effort: 'high',
@@ -96,7 +93,7 @@ describe('Sprint 179 W1-1 — injectCriticalDebtTasks', () => {
       prompt.indexOf('WRITE authority (canonical'),
     );
     const writeBlock = prompt.slice(prompt.indexOf('WRITE authority (canonical'));
-    expect(readBlock).toContain('  - package.json');
+    expect(readBlock).not.toContain('  - package.json');
     expect(writeBlock).not.toContain('  - package.json');
     expect(writeBlock).toContain('  - scripts/lint-sprint-archive-writers.mjs');
   });
@@ -140,20 +137,20 @@ describe('Sprint 179 W1-1 — injectCriticalDebtTasks', () => {
     const fix = result.tasks[0]!;
     expect(fix.type).toBe('code-development');
     expect(fix.scope).toEqual({
-      directories: ['src/core/', 'tests/core/'],
+      directories: ['src/core', 'tests/core'],
       filesRead: [],
       filesWrite: [],
     });
 
     const { prompt } = buildTaskPrompt(fix, { effort: 'high' });
     expect(prompt).toContain('You may ONLY modify files in these directories:');
-    expect(prompt).toContain('src/core/');
-    expect(prompt).toContain('tests/core/');
+    expect(prompt).toContain('src/core');
+    expect(prompt).toContain('tests/core');
     expect(prompt).not.toContain('## Scope Rules (inspection-only)');
     expect(prompt).not.toContain('PROJECT WRITE authority: NONE');
 
     expect(buildDockerAllowedTools(fix.scope)).toBe(
-      'Read,Write(.tasks/,src/core/,tests/core/),Edit(.tasks/,src/core/,tests/core/),Bash,Glob,Grep',
+      'Read,Write(.tasks/,src/core,tests/core),Edit(.tasks/,src/core,tests/core),Bash,Glob,Grep',
     );
   });
 
@@ -171,8 +168,8 @@ describe('Sprint 179 W1-1 — injectCriticalDebtTasks', () => {
     const fix = result.tasks[0]!;
     // Sprint 260 BOUNDARY-TEST-PATTERN: mirrorTestScope auto-adds tests/ alongside src/
     // for code-development tasks.
-    expect(fix.scope.directories).toEqual(['src/', 'tests/']);
-    expect(fix.scope.filesWrite).toEqual(['src/']);
+    expect(fix.scope.directories).toEqual(['src', 'tests']);
+    expect(fix.scope.filesWrite).toEqual(['src']);
     expect(fix.priority).toBe('CRITICAL');
     expect(fix.isPriorityFix).toBe(true);
     expect(result.skipped).toEqual([]);

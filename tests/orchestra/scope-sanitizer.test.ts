@@ -86,14 +86,8 @@ describe('scope-sanitizer', () => {
       createdAt: new Date().toISOString(),
     };
 
-    const prompt = buildWorkerPrompt(task as any);
-    // dist/cli/entry.js should NOT appear in prompt
-    expect(prompt).not.toContain('dist/cli/entry.js');
-    // config.json (unqualified global protected) should NOT appear
-    expect(prompt).not.toContain('  - config.json');
-    // ../etc/passwd should NOT appear in scope files listing
-    expect(prompt).not.toContain('  - ../etc/passwd');
-    // src/core/config.ts should appear
-    expect(prompt).toContain('src/core/config.ts');
+    expect(() => buildWorkerPrompt(task as any)).toThrow(
+      'PROMPT_COMPILE_HOLD:CANONICAL_SCOPE:INVALID_PATH:filesWrite:../etc/passwd',
+    );
   });
 });

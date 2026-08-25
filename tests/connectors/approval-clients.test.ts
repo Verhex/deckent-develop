@@ -25,8 +25,8 @@ import {
   type TeamsMessagePayload,
 } from '../../src/connectors/approval-teams.js';
 
-const CREATED_AT = '2026-07-01T21:00:00.000Z';
-const EXPIRES_AT = '2026-07-01T21:15:00.000Z';
+const CREATED_AT = '2099-07-01T21:00:00.000Z';
+const EXPIRES_AT = '2099-07-01T21:15:00.000Z';
 
 function buildRequest(id: string, overrides: Partial<ApprovalRequestInput> = {}): ApprovalRequestInput {
   return {
@@ -230,13 +230,17 @@ describe('ApprovalSlackChannel — cross-decided -> update in place or fallback 
 });
 
 describe('ApprovalSlackChannel — onDecision (block action -> decision)', () => {
-  it('maps an approve press to an allow decision', () => {
+  it('maps an approve press to an allow decision', async () => {
     const fake = makeFakeSlackTransport();
     const channel = new ApprovalSlackChannel({ transport: fake.transport, channelId: 'C-1' });
 
     const handler = vi.fn();
     channel.onDecision(handler);
-    fake.fireAction({ channelId: 'C-1', userId: 'u-1', actionValue: 'approve:apr-sl-5' });
+    await channel.send({ kind: 'pending', request: buildRequest('apr-sl-5') as never });
+    const actionValue = (fake.sent[0]!.blocks[1] as {
+      elements: ReadonlyArray<{ value: string }>;
+    }).elements[0]!.value;
+    fake.fireAction({ channelId: 'C-1', userId: 'u-1', actionValue });
 
     expect(handler).toHaveBeenCalledTimes(1);
     expect(handler).toHaveBeenCalledWith(
@@ -244,13 +248,17 @@ describe('ApprovalSlackChannel — onDecision (block action -> decision)', () =>
     );
   });
 
-  it('maps a reject press to a deny decision', () => {
+  it('maps a reject press to a deny decision', async () => {
     const fake = makeFakeSlackTransport();
     const channel = new ApprovalSlackChannel({ transport: fake.transport, channelId: 'C-1' });
 
     const handler = vi.fn();
     channel.onDecision(handler);
-    fake.fireAction({ channelId: 'C-1', userId: 'u-2', actionValue: 'reject:apr-sl-6' });
+    await channel.send({ kind: 'pending', request: buildRequest('apr-sl-6') as never });
+    const actionValue = (fake.sent[0]!.blocks[1] as {
+      elements: ReadonlyArray<{ value: string }>;
+    }).elements[1]!.value;
+    fake.fireAction({ channelId: 'C-1', userId: 'u-2', actionValue });
 
     expect(handler).toHaveBeenCalledWith(
       expect.objectContaining({ requestId: 'apr-sl-6', decision: 'deny', decidedBy: 'u-2' }),
@@ -320,7 +328,10 @@ describe('ApprovalSlackChannel — wired into a real ApprovalRelay + ApprovalBro
     const req = broker.submit(buildRequest('apr-sl-8'));
     const waiting = broker.awaitDecision(req.id);
 
-    fake.fireAction({ channelId: 'C-1', userId: 'alperen', actionValue: `approve:${req.id}` });
+    const actionValue = (fake.sent[0]!.blocks[1] as {
+      elements: ReadonlyArray<{ value: string }>;
+    }).elements[0]!.value;
+    fake.fireAction({ channelId: 'C-1', userId: 'alperen', actionValue });
 
     const decision = await waiting;
     expect(decision.decision).toBe('allow');
@@ -419,13 +430,17 @@ describe('ApprovalTeamsChannel — cross-decided -> update in place or fallback 
 });
 
 describe('ApprovalTeamsChannel — onDecision (card action -> decision)', () => {
-  it('maps an approve press to an allow decision', () => {
+  it('maps an approve press to an allow decision', async () => {
     const fake = makeFakeTeamsTransport();
     const channel = new ApprovalTeamsChannel({ transport: fake.transport, channelId: 'T-1' });
 
     const handler = vi.fn();
     channel.onDecision(handler);
-    fake.fireCardAction({ channelId: 'T-1', userId: 'u-1', actionValue: 'approve:apr-tm-5' });
+    await channel.send({ kind: 'pending', request: buildRequest('apr-tm-5') as never });
+    const actionValue = (fake.sent[0]!.attachments[0]!.content.actions[0]!.data as {
+      value: string;
+    }).value;
+    fake.fireCardAction({ channelId: 'T-1', userId: 'u-1', actionValue });
 
     expect(handler).toHaveBeenCalledTimes(1);
     expect(handler).toHaveBeenCalledWith(
@@ -433,13 +448,17 @@ describe('ApprovalTeamsChannel — onDecision (card action -> decision)', () => 
     );
   });
 
-  it('maps a reject press to a deny decision', () => {
+  it('maps a reject press to a deny decision', async () => {
     const fake = makeFakeTeamsTransport();
     const channel = new ApprovalTeamsChannel({ transport: fake.transport, channelId: 'T-1' });
 
     const handler = vi.fn();
     channel.onDecision(handler);
-    fake.fireCardAction({ channelId: 'T-1', userId: 'u-2', actionValue: 'reject:apr-tm-6' });
+    await channel.send({ kind: 'pending', request: buildRequest('apr-tm-6') as never });
+    const actionValue = (fake.sent[0]!.attachments[0]!.content.actions[1]!.data as {
+      value: string;
+    }).value;
+    fake.fireCardAction({ channelId: 'T-1', userId: 'u-2', actionValue });
 
     expect(handler).toHaveBeenCalledWith(
       expect.objectContaining({ requestId: 'apr-tm-6', decision: 'deny', decidedBy: 'u-2' }),
@@ -509,7 +528,10 @@ describe('ApprovalTeamsChannel — wired into a real ApprovalRelay + ApprovalBro
     const req = broker.submit(buildRequest('apr-tm-8'));
     const waiting = broker.awaitDecision(req.id);
 
-    fake.fireCardAction({ channelId: 'T-1', userId: 'alperen', actionValue: `approve:${req.id}` });
+    const actionValue = (fake.sent[0]!.attachments[0]!.content.actions[0]!.data as {
+      value: string;
+    }).value;
+    fake.fireCardAction({ channelId: 'T-1', userId: 'alperen', actionValue });
 
     const decision = await waiting;
     expect(decision.decision).toBe('allow');

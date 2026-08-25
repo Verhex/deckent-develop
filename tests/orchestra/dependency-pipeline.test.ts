@@ -16,15 +16,35 @@ import {
 } from '../../src/core/types.js';
 import type { Task, Sprint, ResolvedConfig } from '../../src/core/types.js';
 
+const { mockFsFiles } = vi.hoisted(() => ({
+  mockFsFiles: new Map<string, string>(),
+}));
+
 // ─── Mocks ──────────────────────────────────────────────────────────
 
 vi.mock('node:fs', () => ({
-  readFileSync: vi.fn(),
-  writeFileSync: vi.fn(),
-  existsSync: vi.fn().mockReturnValue(false),
+  readFileSync: vi.fn((path: unknown) => {
+    const value = mockFsFiles.get(String(path));
+    if (value === undefined) {
+      const error = new Error(`ENOENT: ${String(path)}`) as NodeJS.ErrnoException;
+      error.code = 'ENOENT';
+      throw error;
+    }
+    return value;
+  }),
+  writeFileSync: vi.fn((path: unknown, data: unknown) => {
+    mockFsFiles.set(String(path), String(data));
+  }),
+  existsSync: vi.fn((path: unknown) => mockFsFiles.has(String(path))),
   mkdirSync: vi.fn(),
+  renameSync: vi.fn((from: unknown, to: unknown) => {
+    const value = mockFsFiles.get(String(from));
+    if (value === undefined) throw new Error(`ENOENT: ${String(from)}`);
+    mockFsFiles.set(String(to), value);
+    mockFsFiles.delete(String(from));
+  }),
   readdirSync: vi.fn().mockReturnValue([]),
-  unlinkSync: vi.fn(),
+  unlinkSync: vi.fn((path: unknown) => { mockFsFiles.delete(String(path)); }),
   statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
   appendFileSync: vi.fn(),
   // Sprint 139 async I/O migration: sprint-finalizer and other modules use
@@ -72,7 +92,10 @@ vi.mock('../../src/core/utils.js', async (importOriginal) => {
     countBrainLines: vi.fn().mockReturnValue(100),
     getNextSprintId: vi.fn().mockReturnValue('sprint-134'),
     updateLastSprintId: vi.fn(),
-    readJsonSafe: vi.fn().mockReturnValue(null),
+    readJsonSafe: vi.fn((path: string) => {
+      const value = mockFsFiles.get(path);
+      return value === undefined ? null : JSON.parse(value);
+    }),
     debugLog: vi.fn(),
   };
 });
@@ -146,6 +169,15 @@ vi.mock('../../src/core/plugin-hooks.js', () => ({
   loadPluginHooks: vi.fn(),
   runHooks: vi.fn(),
   clearHooks: vi.fn(),
+}));
+
+vi.mock('../../src/core/prompt-delivery-receipt.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/core/prompt-delivery-receipt.js')>()),
+  writePromptDeliveryReceipt: vi.fn(() => true),
+  readPromptDeliveryReceipt: vi.fn(() => ({
+    state: 'AVAILABLE',
+    receipt: { deliveredSkillIds: [], deliveredAgentId: null },
+  })),
 }));
 
 vi.mock('../../src/cli/helpers/sprint-summary-rich.js', () => ({
@@ -497,18 +529,12 @@ Task without dependencies.
       expect(spawned).toEqual([]);
     });
 
-    // TODO(sprint-142): Sprint 139 Task 028 dependency scheduler (Kahn's
-    // topological sort) treats unknown dependency ids as "external / ignored"
-    // which makes this fixture's t3 (deps=['134-004'] with no such task in
-    // the sprint) eligible for spawning. The original test intent was
-    // "t1 cannot run because its own deps chain contains something PENDING" —
-    // but under the new scheduler semantics the chain unwinds differently.
-    // Re-author this test with a scheduler-aware fixture in Sprint 142.
-    it.skip('does not spawn tasks with still-pending deps', async () => {
+    it('does not spawn tasks with still-pending deps', async () => {
       const t1 = makeTask({ id: '134-001', dependencies: ['134-002', '134-003'], status: TaskStatus.PENDING });
       const t2 = makeTask({ id: '134-002', dependencies: [], status: TaskStatus.DONE });
       const t3 = makeTask({ id: '134-003', dependencies: ['134-004'], status: TaskStatus.PENDING });
-      const sprint = makeSprint({ tasks: [t1, t2, t3] });
+      const t4 = makeTask({ id: '134-004', dependencies: [], status: TaskStatus.EXECUTING });
+      const sprint = makeSprint({ tasks: [t1, t2, t3, t4] });
       const config = makeConfig({ dependency_pipeline_enabled: true });
 
       const spawned = await respawnEligibleTasks('/tmp/test', sprint, config);
@@ -607,7 +633,7 @@ Task without dependencies.
     // unknown dependency ids as satisfied, so the "no eligible tasks"
     // scenario cannot be reproduced with the previous fixture shape.
     // Re-author alongside the other skipped test in Sprint 142.
-    it.skip('does not call onWaveTransition when no tasks spawned', async () => {
+    it('does not call onWaveTransition when no tasks spawned', async () => {
       const t1 = makeTask({ id: '134-001', dependencies: ['134-002'], status: TaskStatus.PENDING });
       const t2 = makeTask({ id: '134-002', dependencies: ['134-003'], status: TaskStatus.PENDING });
       const sprint = makeSprint({ tasks: [t1, t2] });

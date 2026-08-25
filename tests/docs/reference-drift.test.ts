@@ -63,8 +63,9 @@ describe('reference docs drift — cli-command-count sync', () => {
     expect(parityContent).toContain('deckent_models');
   });
 
-  it('cli.md contains models command entry', () => {
-    expect(cliContent).toContain('models');
+  it('cli.md reflects the native-terminal CLI reset rather than a stale models command', () => {
+    expect(cliContent).toContain('0 commands');
+    expect(cliContent).not.toMatch(/^## `models`$/m);
   });
 
   it('mcp.md documents CLI parity for the models tool', () => {

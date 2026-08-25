@@ -499,7 +499,9 @@ describe('DEBT-005: buildWorkerPrompt — test-writing instructions', () => {
 
   it('instructs worker to run vitest', () => {
     const prompt = buildWorkerPrompt(makeTask());
-    expect(prompt).toContain('npx vitest run');
+    expect(prompt).toContain(
+      'SCOPED_PROOF_HOLD: no exact task-local targeted test command was compiled',
+    );
   });
 
   it('instructs worker to run tsc', () => {
@@ -541,8 +543,8 @@ describe('DEBT-005: buildWorkerPrompt — test-writing instructions', () => {
   it('scope reflects task directories (comma-separated)', () => {
     const task = makeTask('001-001', ['src/orchestra/', 'src/core/']);
     const prompt = buildWorkerPrompt(task);
-    expect(prompt).toContain('src/orchestra/');
-    expect(prompt).toContain('src/core/');
+    expect(prompt).toContain('src/orchestra');
+    expect(prompt).toContain('src/core');
   });
 
   it('preserves single quotes in prompt (tmux handles escaping)', () => {

@@ -85,6 +85,11 @@ vi.mock('../../src/orchestra/task-result-authority.js', () => ({
   readVerificationIsolationEvaluationAuthority: vi.fn(() => null),
 }));
 
+vi.mock('../../src/core/final-only-usage-containment.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/core/final-only-usage-containment.js')>()),
+  requireFinalOnlyUsageContainment: vi.fn(() => undefined),
+}));
+
 // Result evaluator: rubric scoring and FailureContext type are real; only
 // evaluateWithRubric is overridden so tests can drive evaluation outcomes.
 vi.mock('../../src/orchestra/result-evaluator.js', async (importOriginal) => {
@@ -219,6 +224,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { readJsonSafe } from '../../src/core/utils.js';
 import { evaluateWithRubric } from '../../src/orchestra/result-evaluator.js';
 import { waitForResults } from '../../src/orchestra/sprint-controller.js';
+import { readAuthoritativeTaskResult } from '../../src/orchestra/task-result-authority.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -282,7 +288,12 @@ function makeConfig(): ResolvedConfig {
     execution_budget: {
       roles: {
         worker: {
-          default: { maxCacheReadTokens: 5_000_000, maxTurns: 48 },
+          default: {
+            maxTokens: 5_000_000,
+            maxCacheReadTokens: 5_000_000,
+            maxOutputTokens: 100_000,
+            maxTurns: 48,
+          },
         },
       },
       landing: { reserve_ratio: 0.25 },
@@ -419,7 +430,7 @@ describe('Sprint 156 Task 003 — Cascade / Unblock Runtime Wire', () => {
 
   // ─── runFixPhase: fix DONE → 2 dependents UNBLOCKED ─────────────
 
-  it('runFixPhase: fix DONE unblocks 2 PAUSED dependents (PAUSED → PENDING)', async () => {
+  it('runFixPhase: result-only DONE cannot unblock without verification-isolation authority', async () => {
     // Arrange — T1 was NO_GO, T2 + T3 were cascade-blocked PAUSED.
     // Fix task for T1 succeeds → T2 + T3 should go back to PENDING.
     const t1 = makeTask('156-001', [], { status: TaskStatus.NO_GO });
@@ -442,6 +453,12 @@ describe('Sprint 156 Task 003 — Cascade / Unblock Runtime Wire', () => {
 
     const fixResult = makeResult(fixTask.id, { selfAssessment: 'DONE' });
     vi.mocked(waitForResults).mockResolvedValue([fixResult]);
+    vi.mocked(readAuthoritativeTaskResult).mockReturnValue({
+      state: 'settled',
+      result: fixResult,
+      settlementRef: null,
+      rawResultPath: `/tmp/test-project/.tasks/task-${fixTask.id}.result`,
+    } as never);
     vi.mocked(evaluateWithRubric).mockReturnValue(makeEvalResult('DONE'));
 
     // Act
@@ -450,32 +467,17 @@ describe('Sprint 156 Task 003 — Cascade / Unblock Runtime Wire', () => {
       undefined, 'v1', undefined,
     );
 
-    // Assert — original T1 flipped to DONE (so doneTasks set sees it)
-    expect(t1.status).toBe(TaskStatus.DONE);
+    // The landed fail-closed contract does not promote or unblock from an
+    // unverified result-only claim.
+    expect(t1.status).toBe(TaskStatus.NO_GO);
+    expect(t2.status).toBe(TaskStatus.PAUSED);
+    expect(t3.status).toBe(TaskStatus.PAUSED);
 
-    // Assert — T2 + T3 unblocked back to PENDING
-    expect(t2.status).toBe(TaskStatus.PENDING);
-    expect(t3.status).toBe(TaskStatus.PENDING);
-
-    // Assert — aggregate unblock event emitted
     const unblockEvents = capturedEvents.filter(
       e => e.channel === 'BRAIN→*:DEPENDENCY_UNBLOCK_APPLIED',
     );
-    expect(unblockEvents).toHaveLength(1);
-    const payload = unblockEvents[0].payload as {
-      resolvedTaskId: string;
-      fixTaskId: string;
-      unblockedTaskIds: string[];
-      totalUnblocked: number;
-    };
-    expect(payload.resolvedTaskId).toBe('156-001');
-    expect(payload.fixTaskId).toBe('156-001-fix');
-    expect(payload.unblockedTaskIds.sort()).toEqual(['156-002', '156-003']);
-    expect(payload.totalUnblocked).toBe(2);
+    expect(unblockEvents).toHaveLength(0);
 
-    // Broadcast target
-    expect(unblockEvents[0].source).toBe('brain');
-    expect(unblockEvents[0].target).toBe('*');
   });
 
   // ─── runFixPhase: fix NO_GO → no unblock ────────────────────────

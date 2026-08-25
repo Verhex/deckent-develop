@@ -19,6 +19,7 @@ vi.mock('node:fs', () => ({
   appendFileSync: vi.fn(),
   statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
   unlinkSync: vi.fn(),
+  renameSync: vi.fn(),
   promises: {
     readFile: vi.fn(async () => ''),
     writeFile: vi.fn(async () => undefined),
@@ -46,6 +47,8 @@ vi.mock('../../src/core/constants.js', () => ({
   DEBT_FILE: 'DEBT.md',
   DECKENT_VERSION: '0.0.0-test',
   DECKENT_DIR: '.deckent',
+  ARCHIVE_DIR: 'archive',
+  ARCHIVE_SPRINTS_SUBDIR: 'sprints',
   SETTINGS_DIR: '.deckent/settings',  // born-630 allowscope-zinciri modül-yüklemede okur
 }));
 

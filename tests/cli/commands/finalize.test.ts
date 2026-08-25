@@ -8,8 +8,16 @@ const mockPrint = vi.fn();
 const mockPrintError = vi.fn();
 
 vi.mock('node:fs', () => ({
-  existsSync: vi.fn().mockReturnValue(true),
-  readdirSync: vi.fn().mockReturnValue(['task-482-002.json', 'task-482-002.result']),
+  existsSync: vi.fn((path: unknown) => String(path) === '/fake/project/.tasks' || String(path).includes('task-482-002')),
+  readdirSync: vi.fn((_path: unknown, options?: { withFileTypes?: boolean }) =>
+    options?.withFileTypes
+      ? [
+          { name: 'task-482-002.json', isFile: () => true, isDirectory: () => false },
+          { name: 'task-482-002.result', isFile: () => true, isDirectory: () => false },
+        ]
+      : ['task-482-002.json', 'task-482-002.result']),
+  statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false })),
+  renameSync: vi.fn(),
   readFileSync: vi.fn().mockReturnValue(JSON.stringify({
     id: '482-002',
     sprintId: 'sprint-482',

@@ -32,8 +32,6 @@ describe('resolveFallback — expiry always resolves via policyDefault', () => {
     ['low', ['dashboard']],
     ['medium', ['api']],
     ['high', ['dashboard', 'api']],
-    ['critical', ['dashboard']],
-    ['critical', ['api']],
   ])('risk=%s channelsAlive=%j → timeout-default with policyDefault', (risk, channelsAlive) => {
     const decision = resolveFallback(
       buildRequest({ risk, expiresAt: ALREADY_EXPIRED }),
@@ -69,12 +67,18 @@ describe('resolveFallback — critical risk with no reachable escalation channel
     expect(decision).toEqual({ kind: 'deny', reason: expect.any(String) });
   });
 
-  it('critical risk WITH a reachable channel does not deny — escalates or times out', () => {
+  it('critical risk WITH a reachable channel escalates while live and denies after expiry', () => {
     const escalated = resolveFallback(
       buildRequest({ risk: 'critical', expiresAt: NOT_YET_EXPIRED }),
       buildCtx({ channelsAlive: ['dashboard'] }),
     );
     expect(escalated.kind).toBe('escalate');
+
+    const expired = resolveFallback(
+      buildRequest({ risk: 'critical', expiresAt: ALREADY_EXPIRED }),
+      buildCtx({ channelsAlive: ['dashboard'], policyDefault: 'allow' }),
+    );
+    expect(expired).toEqual({ kind: 'deny', reason: expect.any(String) });
   });
 });
 
@@ -160,7 +164,7 @@ describe('resolveFallback — full ctx-combination property table', () => {
           expect(decision).toBeDefined();
 
           let expectedKind: FallbackDecisionKind;
-          if (risk === 'critical' && !channelScenario.escalatesTo) {
+          if (risk === 'critical' && (expired || !channelScenario.escalatesTo)) {
             expectedKind = 'deny';
           } else if (expired) {
             expectedKind = 'timeout-default';

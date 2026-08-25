@@ -9,6 +9,8 @@ vi.mock('node:fs', () => ({
   existsSync: vi.fn(),
   readdirSync: vi.fn(),
   mkdirSync: vi.fn(),
+  statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false })),
+  renameSync: vi.fn(),
 }));
 
 vi.mock('../../../src/cli/helpers/output.js', () => ({
@@ -245,15 +247,15 @@ describe('review command', () => {
 
   it('--json outputs JSON state', async () => {
     vi.mocked(existsSync).mockImplementation((p: any) => {
-      if (String(p).includes('.tasks') && !String(p).includes('task-')) return true;
+      if (String(p).endsWith('/.tasks')) return true;
       if (String(p).includes('task-001.json')) return true;
       return false;
     });
     vi.mocked(readdirSync).mockReturnValue(['task-001.json'] as any);
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify(sampleTask));
     await runCommand(['review', '--json']);
-    const calls = vi.mocked(print).mock.calls.map((c) => c[0]);
-    const jsonOutput = calls.find((c) => {
+    const outputs = vi.mocked(print).mock.calls.map((c) => String(c[0]));
+    const jsonOutput = outputs.find((c) => {
       try { JSON.parse(c); return true; } catch { return false; }
     });
     expect(jsonOutput).toBeDefined();
@@ -307,15 +309,15 @@ describe('review command', () => {
 
   it('detects sprint id from tasks', async () => {
     vi.mocked(existsSync).mockImplementation((p: any) => {
-      if (String(p).includes('.tasks') && !String(p).includes('task-')) return true;
+      if (String(p).endsWith('/.tasks')) return true;
       if (String(p).includes('task-001.json')) return true;
       return false;
     });
     vi.mocked(readdirSync).mockReturnValue(['task-001.json'] as any);
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ ...sampleTask, sprintId: 'sprint-042' }));
     await runCommand(['review', '--json']);
-    const calls = vi.mocked(print).mock.calls.map((c) => c[0]);
-    const jsonOutput = calls.find((c) => {
+    const outputs = vi.mocked(print).mock.calls.map((c) => String(c[0]));
+    const jsonOutput = outputs.find((c) => {
       try { JSON.parse(c); return true; } catch { return false; }
     });
     const parsed = JSON.parse(jsonOutput!);

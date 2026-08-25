@@ -172,6 +172,7 @@ vi.mock('../../src/orchestra/task-builder.js', () => ({
   resolveWorkerEffort: vi.fn(),
 }));
 
+
 vi.mock('../../src/orchestra/debt-manager.js', () => ({
   handleEvaluation: vi.fn(),
   handleCrossDependencies: vi.fn(),
@@ -181,7 +182,10 @@ vi.mock('../../src/orchestra/debt-manager.js', () => ({
   decay: vi.fn(),
 }));
 
-vi.mock('../../src/orchestra/sprint-reporter.js', () => ({
+vi.mock('../../src/orchestra/sprint-reporter.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/orchestra/sprint-reporter.js')>();
+  return {
+  ...actual,
   appendRetroSection: vi.fn(),
   trimMemoryWithHeader: vi.fn(),
   writeRetrospective: vi.fn(),
@@ -196,7 +200,8 @@ vi.mock('../../src/orchestra/sprint-reporter.js', () => ({
   buildAgentPerformance: vi.fn().mockReturnValue([
     { agent: 'worker-001', tasks: 2, done: 2, debt: 0, noGo: 0, avgCoverage: 90 },
   ]),
-}));
+  };
+});
 
 vi.mock('../../src/orchestra/coverage-validator.js', () => ({
   parseCoverageFromVitest: vi.fn(),
@@ -419,17 +424,22 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     status: TaskStatus.PENDING,
     sprintId: 'sprint-001',
     createdAt: new Date().toISOString(),
-    budget: { maxTurns: 1 },
+    budget: resolvedProvider === 'claude' ? { maxTurns: 1 } : undefined,
     budgetPolicy: {
       state: 'allow',
       role: 'worker',
       taskKind: 'code-development',
       resolvedProvider,
-      executionCostClass: 'remote',
+      executionCostClass: resolvedProvider === 'claude' ? 'remote' : 'local',
       profileRef: 'tests.orchestra.sprint-controller',
       policyDigest: '8'.repeat(64),
       admissionMode: 'unattended',
       landingPolicy: { reserve_ratio: 0.25 },
+      finalOnlyUsage: {
+        maxWallClockSeconds: 600,
+        profileRef: 'execution_budget.final_only_usage',
+        policyDigest: '9'.repeat(64),
+      },
     },
     ...overrides,
   };
@@ -473,6 +483,31 @@ function setupFileMocks(): void {
   mockedWriteFileSync.mockReturnValue(undefined);
   mockedMkdirSync.mockReturnValue(undefined as never);
   mockedUnlinkSync.mockReturnValue(undefined);
+}
+
+function setupPromptDeliveryMocks(): void {
+  mockedExistsSync.mockImplementation((path: unknown) =>
+    String(path).endsWith('.skill-delivery.json'));
+  mockedReadFileSync.mockImplementation((path: unknown) => {
+    const p = String(path);
+    if (!p.endsWith('.skill-delivery.json')) return '';
+    const taskId = /task-(.+)\.skill-delivery\.json$/u.exec(p)?.[1] ?? '';
+    return JSON.stringify({
+      version: 2,
+      taskId,
+      source: 'worker-prompt',
+      promptSha256: 'a'.repeat(64),
+      promptCompilePlanId: `prompt-compile-plan:sha256:${'b'.repeat(64)}`,
+      rolePolicyIdentity: 'worker:generic',
+      assignedAgentId: 'generic',
+      deliveredAgentId: 'generic',
+      personaSegmentSha256: 'c'.repeat(64),
+      assignedSkillIds: [],
+      deliveredSkillIds: [],
+      forcedSkillIds: [],
+      undeliveredForcedSkillIds: [],
+    });
+  });
 }
 
 // ─── Real-tmpdir harness (pause/resume/finalize honest contracts) ────
@@ -694,7 +729,23 @@ describe('pauseSprint', () => {
     vi.clearAllMocks();
     useRealFileSystem();
     freshProjectRoot();
+    realFs.mkdirSync(join(PROJECT_ROOT, '.brain'), { recursive: true });
     realFs.mkdirSync(join(PROJECT_ROOT, '.tasks'), { recursive: true });
+    realFs.mkdirSync(join(PROJECT_ROOT, '.deckent', 'recently-works'), {
+      recursive: true,
+    });
+    realFs.writeFileSync(
+      join(PROJECT_ROOT, '.deckent', 'recently-works', 'sprint-001-pre-archive.tar.gz'),
+      'archive-fixture',
+    );
+    realFs.mkdirSync(join(PROJECT_ROOT, '.tasks'), { recursive: true });
+    realFs.mkdirSync(join(PROJECT_ROOT, '.deckent', 'recently-works'), {
+      recursive: true,
+    });
+    realFs.writeFileSync(
+      join(PROJECT_ROOT, '.deckent', 'recently-works', 'sprint-001-pre-archive.tar.gz'),
+      'archive-fixture',
+    );
   });
 
   it('transitions PENDING tasks to PAUSED', () => {
@@ -796,6 +847,8 @@ describe('resumeSprint', () => {
     vi.clearAllMocks();
     useRealFileSystem();
     freshProjectRoot();
+    realFs.mkdirSync(join(PROJECT_ROOT, '.brain'), { recursive: true });
+    realFs.mkdirSync(join(PROJECT_ROOT, '.tasks'), { recursive: true });
     realFs.mkdirSync(join(PROJECT_ROOT, '.tasks'), { recursive: true });
     // Resume happens under a LIVE coordinator: the ACTIVE authority branch in
     // readCanonicalRunStatus requires .deckent/pids/<sprintId>.pid to point at
@@ -1182,6 +1235,7 @@ describe('resolveDefaultUsageCli', () => {
 describe('spawnWorkers — provider routing', () => {
   const mockCodexAdapter = {
     name: 'codex',
+    executionCostClass: 'local' as const,
     liveUsageBudgetSupport: 'measured-stream' as const,
     executionLandingCapability: 'cooperative-landing' as const,
     supportedModels: ['gpt-4.1', 'o3', 'o4-mini'],
@@ -1194,6 +1248,7 @@ describe('spawnWorkers — provider routing', () => {
 
   const mockGeminiAdapter = {
     name: 'gemini',
+    executionCostClass: 'local' as const,
     liveUsageBudgetSupport: 'measured-stream' as const,
     executionLandingCapability: 'cooperative-landing' as const,
     supportedModels: ['gemini-2.5-pro', 'gemini-2.5-flash'],
@@ -1206,6 +1261,7 @@ describe('spawnWorkers — provider routing', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    setupPromptDeliveryMocks();
     mockedListWorkers.mockReturnValue([] as unknown as ReturnType<typeof listWorkers>);
     // By default, getProvider throws (no adapters registered)
     mockedProviderRegistry.getProvider.mockImplementation((name: string) => {
@@ -1216,7 +1272,11 @@ describe('spawnWorkers — provider routing', () => {
   });
 
   it('holds Claude tasks before tmux worker dispatch', async () => {
-    const task = makeTask({ id: '001-001', model: 'claude-opus-4-8' });
+    const task = makeTask({
+      id: '001-001',
+      model: 'claude-opus-4-8',
+      budget: { maxTurns: 1 },
+    });
     const sprint = makeSprint({ tasks: [task] });
     const config = makeConfig();
 
@@ -1697,6 +1757,17 @@ describe('Task Router wiring in sprint-controller', () => {
 // tests/orchestra/finalize-sprint.test.ts (same production truth).
 
 function makeSettledSprint(tasks: Task[] = [makeTask({ status: TaskStatus.DONE })]): Sprint {
+  realFs.mkdirSync(join(PROJECT_ROOT, '.tasks'), { recursive: true });
+  for (const task of tasks) {
+    realFs.writeFileSync(
+      join(PROJECT_ROOT, '.tasks', `task-${task.id}.json`),
+      JSON.stringify(task),
+    );
+    realFs.writeFileSync(
+      join(PROJECT_ROOT, '.tasks', `task-${task.id}.result`),
+      JSON.stringify(makeVerifiedResult(task.id)),
+    );
+  }
   return makeSprint({
     tasks,
     status: SprintStatus.COMPLETE,
@@ -1735,6 +1806,14 @@ describe('finalizeSprint — rich output integration', () => {
     // runs over a real mkdtemp root with passthrough fs spies.
     useRealFileSystem();
     freshProjectRoot();
+    realFs.mkdirSync(join(PROJECT_ROOT, '.brain'), { recursive: true });
+    realFs.mkdirSync(join(PROJECT_ROOT, '.deckent', 'recently-works'), {
+      recursive: true,
+    });
+    realFs.writeFileSync(
+      join(PROJECT_ROOT, '.deckent', 'recently-works', 'sprint-001-pre-archive.tar.gz'),
+      'archive-fixture',
+    );
     mockedSpawnSync.mockReturnValue({
       status: 0,
       stdout: ' src/foo.ts | 10 ++++\n 1 file changed, 10 insertions(+)\n',
@@ -1761,7 +1840,7 @@ describe('finalizeSprint — rich output integration', () => {
     const evaluations = new Map<string, TaskEvaluation>([[sprint.tasks[0]!.id, TaskEvaluation.DONE]]);
     const results = [makeVerifiedResult(sprint.tasks[0]!.id)];
 
-    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true, skipArchive: true });
 
     expect(mockedFormatRichSprintSummary).toHaveBeenCalled();
   });
@@ -1771,7 +1850,7 @@ describe('finalizeSprint — rich output integration', () => {
     const evaluations = new Map<string, TaskEvaluation>([[sprint.tasks[0]!.id, TaskEvaluation.DONE]]);
     const results = [makeVerifiedResult(sprint.tasks[0]!.id)];
 
-    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true, skipArchive: true });
 
     const callArgs = mockedFormatRichSprintSummary.mock.calls[0]!;
     expect(callArgs[0]).toMatchObject({ id: sprint.id });
@@ -1787,7 +1866,7 @@ describe('finalizeSprint — rich output integration', () => {
     const evaluations = new Map<string, TaskEvaluation>([[sprint.tasks[0]!.id, TaskEvaluation.DONE]]);
     const results = [makeVerifiedResult(sprint.tasks[0]!.id, { filesChanged: ['src/foo.ts'] })];
 
-    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true, skipArchive: true });
 
     const callArgs = mockedFormatRichSprintSummary.mock.calls[0]!;
     const opts = callArgs[2];
@@ -1801,7 +1880,7 @@ describe('finalizeSprint — rich output integration', () => {
     const evaluations = new Map<string, TaskEvaluation>([[sprint.tasks[0]!.id, TaskEvaluation.DONE]]);
     const results = [makeVerifiedResult(sprint.tasks[0]!.id)];
 
-    const metrics = await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+    const metrics = await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true, skipArchive: true });
     expect(metrics).toBeDefined();
     expect(metrics.totalTasks).toBeDefined();
   });
@@ -1823,7 +1902,7 @@ describe('finalizeSprint — rich output integration', () => {
     const evaluations = new Map<string, TaskEvaluation>([[sprint.tasks[0]!.id, TaskEvaluation.DONE]]);
     const results = [makeVerifiedResult(sprint.tasks[0]!.id)];
 
-    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true, skipArchive: true });
 
     const callArgs = mockedFormatRichSprintSummary.mock.calls[0]!;
     expect(callArgs[2]?.outputMode).toBe('normal');
@@ -1838,7 +1917,7 @@ describe('finalizeSprint — rich output integration', () => {
       const evaluations = new Map<string, TaskEvaluation>([[sprint.tasks[0]!.id, TaskEvaluation.DONE]]);
       const results = [makeVerifiedResult(sprint.tasks[0]!.id)];
 
-      await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+      await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true, skipArchive: true });
 
       expect(consoleSpy).toHaveBeenCalledWith('RICH OUTPUT HERE');
     } finally {
@@ -1851,7 +1930,7 @@ describe('finalizeSprint — rich output integration', () => {
     const evaluations = new Map<string, TaskEvaluation>([[sprint.tasks[0]!.id, TaskEvaluation.DONE]]);
     const results = [makeVerifiedResult(sprint.tasks[0]!.id)];
 
-    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true, skipArchive: true });
 
     const callArgs = mockedFormatRichSprintSummary.mock.calls[0]!;
     const opts = callArgs[2];
@@ -2249,6 +2328,7 @@ describe('spawnWorkers — task status update to EXECUTING', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    setupPromptDeliveryMocks();
     mockedListWorkers.mockReturnValue([] as unknown as ReturnType<typeof listWorkers>);
   });
 
@@ -2529,6 +2609,14 @@ describe('finalizeSprint — job output reform', () => {
     // terminal receipt needs a real write→readback root.
     useRealFileSystem();
     freshProjectRoot();
+    realFs.mkdirSync(join(PROJECT_ROOT, '.brain'), { recursive: true });
+    realFs.mkdirSync(join(PROJECT_ROOT, '.deckent', 'recently-works'), {
+      recursive: true,
+    });
+    realFs.writeFileSync(
+      join(PROJECT_ROOT, '.deckent', 'recently-works', 'sprint-001-pre-archive.tar.gz'),
+      'archive-fixture',
+    );
     resetInterruptState();
     clearActiveSprint();
     mockedSpawnSync.mockReturnValue({
@@ -2565,7 +2653,7 @@ describe('finalizeSprint — job output reform', () => {
       notes: 'All tests pass, feature complete',
     })];
 
-    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true, skipArchive: true });
 
     const jobWriteCall = mockedWriteFileSync.mock.calls.find(call =>
       typeof call[0] === 'string' && call[0].includes('jobs/') && call[0].endsWith('.json'),
@@ -2600,7 +2688,7 @@ describe('finalizeSprint — job output reform', () => {
       notes: 'Tests passed but no new test files written',
     })];
 
-    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true, skipArchive: true });
 
     const jobWriteCall = mockedWriteFileSync.mock.calls.find(call =>
       typeof call[0] === 'string' && call[0].includes('jobs/') && call[0].endsWith('.json'),
@@ -2633,7 +2721,7 @@ describe('finalizeSprint — job output reform', () => {
       crossAssignments: 0, contextLinesUsed: 0,
     });
 
-    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true });
+    await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true, skipArchive: true });
 
     const jobWriteCall = mockedWriteFileSync.mock.calls.find(call =>
       typeof call[0] === 'string' && call[0].includes('jobs/') && call[0].endsWith('.json'),
@@ -2663,7 +2751,7 @@ describe('finalizeSprint — job output reform', () => {
     const results: TaskResult[] = []; // no result
 
     await expect(
-      finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true }),
+      finalizeSprint(PROJECT_ROOT, sprint, evaluations, results, { skipDecay: true, skipHooks: true, skipArchive: true }),
     ).rejects.toThrow(/TERMINAL_/);
   });
 });

@@ -189,7 +189,8 @@ vi.mock('../../src/core/system-profile.js', () => ({
   }),
 }));
 
-vi.mock('../../src/core/config.js', () => ({
+vi.mock('../../src/core/config.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/core/config.js')>()),
   resolveBrainModel: () => 'claude-sonnet-5',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   readAuthMode: vi.fn().mockReturnValue('subscription'),
   resolveLiveTraceEnabled: vi.fn().mockReturnValue(false),
@@ -249,6 +250,9 @@ const DEBT_SEPARATOR = '|----|-------------|------|--------|----------|------|--
 const EXPECTED_SPRINT_ID = 'sprint-001';
 const EXPECTED_TASK_ID = '001-001';
 const EXPECTED_DEBT_ID = `debt-${EXPECTED_TASK_ID}`;
+const EXPECTED_PROMPT_PLAN_ID = 'prompt-compile-plan:sha256:067659252077cd533078bcc8f66a8ded101f48b419d9ea91abc8ef297a6384d3';
+const EXPECTED_GO_ID = 'criterion-go-e16f92d6b55a1192b6252c14611d1ac698c18b03101e02b73ccfbe0d4484723e';
+const EXPECTED_NO_GO_ID = 'criterion-no-go-fc594d10a78178485c24651ed7bb614e0a6d0eabb7fe3b8d2e9133e6c8314e00';
 
 // ─── Real project root (fresh per test) ─────────────────────────────
 
@@ -322,6 +326,7 @@ function makeTaskResult(opts: {
   selfAssessment: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
   testsPassed?: boolean;
   coverage?: number;
+  fixForTaskId?: string;
 }): string {
   const taskId = opts.taskId ?? EXPECTED_TASK_ID;
   // Host-authored claim-time attribution is part of the terminal-evidence data
@@ -344,6 +349,31 @@ function makeTaskResult(opts: {
     coverage: opts.coverage ?? (opts.selfAssessment === 'NO_GO' ? 0 : 95),
     selfAssessment: opts.selfAssessment,
     notes: 'Integration test result',
+    promptCompilePlanId: EXPECTED_PROMPT_PLAN_ID,
+    testVerification: {
+      applicability: 'REQUIRED',
+      outcome: opts.selfAssessment === 'NO_GO' ? 'FAILED' : 'PASSED',
+      commands: [],
+    },
+    criteriaEvidence: [
+      {
+        criterionId: EXPECTED_GO_ID,
+        outcome: opts.selfAssessment === 'NO_GO'
+          ? 'UNMET'
+          : opts.selfAssessment === 'GO_WITH_TECH_DEBT' ? 'UNVERIFIED' : 'MET',
+        evidence: ['integration fixture observation'],
+      },
+      {
+        criterionId: EXPECTED_NO_GO_ID,
+        outcome: opts.selfAssessment === 'NO_GO' ? 'MET' : 'UNMET',
+        evidence: ['integration fixture observation'],
+      },
+    ],
+    techDebtCriterionIds: opts.selfAssessment === 'GO_WITH_TECH_DEBT'
+      ? [EXPECTED_GO_ID]
+      : [],
+    isPriorityFix: opts.fixForTaskId !== undefined,
+    fixForTaskId: opts.fixForTaskId,
     workAttribution: {
       state: 'VERIFIED',
       attemptId,
@@ -530,7 +560,7 @@ describe('runSprint Phase 4 — debt resolution integration', () => {
 
   // ── isPriorityFix + DONE ─────────────────────────────────────────
 
-  it('resolves fixForTaskId debt when isPriorityFix task evaluates to DONE', async () => {
+  it('does not resolve origin debt from worker-claimed fix lineage alone', async () => {
     const originTaskId = '999-001';
     const fixDebtId = `debt-${originTaskId}`;
 
@@ -552,7 +582,7 @@ describe('runSprint Phase 4 — debt resolution integration', () => {
 
     await runSprint(PROJECT_ROOT, makeConfig());
 
-    expect(readDebt(fixDebtId)?.status).toBe('resolved');
+    expect(readDebt(fixDebtId)?.status).toBe('active');
   });
 
   // ── PLAN: verified-no-result debt is resolved, not re-injected (365-001) ──

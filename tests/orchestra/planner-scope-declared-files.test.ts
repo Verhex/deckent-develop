@@ -208,8 +208,8 @@ describe('structured planner declared-file write authority', () => {
 
     expect(sprint.tasks).toHaveLength(1);
     expect(sprint.tasks[0]?.scope.directories).toEqual([
-      'src/orchestra/',
-      'tests/orchestra/',
+      'src/orchestra',
+      'tests/orchestra',
     ]);
     expect(sprint.tasks[0]?.scope.filesWrite).toEqual([]);
   });

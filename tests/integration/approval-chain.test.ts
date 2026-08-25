@@ -20,7 +20,7 @@ import { ApprovalExpiryDriver } from '../../src/core/approval-expiry-driver.js';
 import { loadApprovalRules } from '../../src/core/approval-rules-load.js';
 import { decidePolicy } from '../../src/core/approval-policy.js';
 
-const CREATED_AT = '2026-07-01T21:00:00.000Z';
+const CREATED_AT = '2099-07-01T21:00:00.000Z';
 
 function buildRequest(id: string, overrides: Partial<ApprovalRequest> = {}): ApprovalRequest {
   return {
@@ -37,7 +37,7 @@ function buildRequest(id: string, overrides: Partial<ApprovalRequest> = {}): App
     tenantId: 'local',
     userId: 'alperen',
     createdAt: CREATED_AT,
-    expiresAt: '2026-07-01T21:30:00.000Z',
+    expiresAt: '2099-07-01T21:30:00.000Z',
     maskedArgs: { cmd: '***REDACTED***' },
     rawArgsRef: null,
     ...overrides,
@@ -132,7 +132,7 @@ describe('Approval chain E2E — contract -> rules-load -> policy -> broker -> r
       requestId: submittedA.id,
       decision: 'allow',
       decidedBy: 'alperen',
-      decidedAt: '2026-07-01T21:05:00.000Z',
+      decidedAt: '2099-07-01T21:05:00.000Z',
     });
     const decisionA = await waitingA;
     expect(decisionA).toMatchObject({ decision: 'allow', channel: 'channel-a' });
@@ -144,7 +144,7 @@ describe('Approval chain E2E — contract -> rules-load -> policy -> broker -> r
     expect(channelB.sent[1]).toMatchObject({ kind: 'cross-decided', decision: decisionA });
     expect(await nextEvent(iter)).toMatchObject({ kind: 'cross-decided', decision: decisionA });
 
-    store.index(new Date('2026-07-01T21:05:00.000Z'));
+    store.index(new Date('2099-07-01T21:05:00.000Z'));
     expect(store.load().approved.map((e) => e.request.id)).toEqual([submittedA.id]);
 
     // ── request B: no rule matches -> safe-side fallback, resolved via an
@@ -162,12 +162,12 @@ describe('Approval chain E2E — contract -> rules-load -> policy -> broker -> r
 
     // Re-sync the store's in-memory index so it knows about B before transitioning it —
     // the store only ever sees what its own index()/constructor scan discovered.
-    store.index(new Date('2026-07-01T21:05:30.000Z'));
+    store.index(new Date('2099-07-01T21:05:30.000Z'));
     const decisionB = store.transition(submittedB.id, 'denied', {
       decision: 'deny',
       decidedBy: 'alperen',
       channel: 'dashboard',
-      decidedAt: '2026-07-01T21:06:00.000Z',
+      decidedAt: '2099-07-01T21:06:00.000Z',
     });
 
     // The broker only learns of a store-written decision via its poll seam —
@@ -182,7 +182,7 @@ describe('Approval chain E2E — contract -> rules-load -> policy -> broker -> r
       risk: 'low',
       scope: 'file-read',
       defaultAction: 'deny',
-      expiresAt: '2026-07-01T21:02:00.000Z',
+      expiresAt: '2099-07-01T21:02:00.000Z',
     });
     const policyC = decidePolicy(draftC, rules);
     const submittedC = broker.submit({ ...draftC, policy: policyC.policy });
@@ -191,7 +191,7 @@ describe('Approval chain E2E — contract -> rules-load -> policy -> broker -> r
     const driver = new ApprovalExpiryDriver({
       broker,
       store,
-      clock: () => new Date('2026-07-01T22:00:00.000Z'),
+      clock: () => new Date('2099-07-01T22:00:00.000Z'),
     });
     driver.tick();
 
@@ -238,7 +238,7 @@ describe('Invariant — raw payload is never serialized', () => {
       decision: 'allow',
       decidedBy: 'alperen',
       channel: 'audit-channel',
-      decidedAt: '2026-07-01T21:05:00.000Z',
+      decidedAt: '2099-07-01T21:05:00.000Z',
     });
 
     const requestOnDisk = readFileSync(join(storeDir, `${submitted.id}.request.json`), 'utf-8');
@@ -290,7 +290,7 @@ describe('Invariant — risk:critical can never resolve to policy:auto-approve',
     const draft = buildRequest('apr-inv-critical-3', {
       risk: 'critical',
       defaultAction: 'deny',
-      expiresAt: '2026-07-01T21:02:00.000Z',
+      expiresAt: '2099-07-01T21:02:00.000Z',
     });
     const policyResult = decidePolicy(draft, rules);
     expect(policyResult.policy).toBe('deny');
@@ -298,7 +298,7 @@ describe('Invariant — risk:critical can never resolve to policy:auto-approve',
     const submitted = broker.submit({ ...draft, policy: policyResult.policy });
     expect(submitted.policy).toBe('deny');
 
-    const driver = new ApprovalExpiryDriver({ broker, store, clock: () => new Date('2026-07-01T22:00:00.000Z') });
+    const driver = new ApprovalExpiryDriver({ broker, store, clock: () => new Date('2099-07-01T22:00:00.000Z') });
     driver.tick();
 
     const snapshot = store.load();
@@ -310,16 +310,16 @@ describe('Invariant — risk:critical can never resolve to policy:auto-approve',
 
 describe('Invariant — restart-survive: a brand-new store instance recovers full state from disk', () => {
   it('recovers pending/approved/denied/expired categorization with zero shared in-memory state', () => {
-    const pending = broker.submit(buildRequest('apr-inv-restart-pending', { expiresAt: '2026-07-01T22:00:00.000Z' }));
+    const pending = broker.submit(buildRequest('apr-inv-restart-pending', { expiresAt: '2099-07-01T22:00:00.000Z' }));
 
     const approved = broker.submit(buildRequest('apr-inv-restart-approved'));
-    broker.decide(approved.id, { decision: 'allow', decidedBy: 'a', channel: 'cli', decidedAt: '2026-07-01T21:05:00.000Z' });
+    broker.decide(approved.id, { decision: 'allow', decidedBy: 'a', channel: 'cli', decidedAt: '2099-07-01T21:05:00.000Z' });
 
     const denied = broker.submit(buildRequest('apr-inv-restart-denied'));
-    broker.decide(denied.id, { decision: 'deny', decidedBy: 'a', channel: 'cli', decidedAt: '2026-07-01T21:05:00.000Z' });
+    broker.decide(denied.id, { decision: 'deny', decidedBy: 'a', channel: 'cli', decidedAt: '2099-07-01T21:05:00.000Z' });
 
-    broker.submit(buildRequest('apr-inv-restart-ttl', { defaultAction: 'deny', expiresAt: '2026-07-01T21:02:00.000Z' }));
-    broker.expire(new Date('2026-07-01T21:20:00.000Z'));
+    broker.submit(buildRequest('apr-inv-restart-ttl', { defaultAction: 'deny', expiresAt: '2099-07-01T21:02:00.000Z' }));
+    broker.expire(new Date('2099-07-01T21:20:00.000Z'));
 
     // "Restart" = throw away every in-memory reference (broker, relay, eventstream,
     // the ORIGINAL store instance) and construct a brand-new store on the same
@@ -328,7 +328,7 @@ describe('Invariant — restart-survive: a brand-new store instance recovers ful
     // The constructor's own initial index() has no `now` override (real wall
     // clock) — re-index with the timeline's fixed `now` for deterministic,
     // hermetic categorization, matching the pending/expired boundary above.
-    restartedStore.index(new Date('2026-07-01T21:25:00.000Z'));
+    restartedStore.index(new Date('2099-07-01T21:25:00.000Z'));
     const snapshot = restartedStore.load();
 
     expect(snapshot.pending.map((e) => e.request.id)).toEqual([pending.id]);
@@ -337,7 +337,7 @@ describe('Invariant — restart-survive: a brand-new store instance recovers ful
     expect(snapshot.expired.map((e) => e.request.id)).toEqual(['apr-inv-restart-ttl']);
 
     // A pure, stateless one-shot scan agrees with the live re-indexed instance.
-    const staticSnapshot = ApprovalStore.load(storeDir, new Date('2026-07-01T21:25:00.000Z'));
+    const staticSnapshot = ApprovalStore.load(storeDir, new Date('2099-07-01T21:25:00.000Z'));
     expect(staticSnapshot.expired.map((e) => e.request.id)).toEqual(['apr-inv-restart-ttl']);
 
     // The broker also hydrates validated canonical request/decision state so

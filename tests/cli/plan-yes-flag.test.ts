@@ -26,6 +26,7 @@ vi.mock('node:fs', () => ({
   mkdirSync: vi.fn(),
   readdirSync: vi.fn().mockReturnValue([]),
   constants: { W_OK: 2, R_OK: 4, F_OK: 0 },
+  renameSync: vi.fn(),
 }));
 
 vi.mock('node:readline/promises', () => ({

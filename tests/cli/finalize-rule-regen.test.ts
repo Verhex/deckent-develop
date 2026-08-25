@@ -75,7 +75,7 @@ vi.mock('../../src/core/utils.js', async (importActual) => ({
   readJsonSafe: vi.fn((path: string) => {
     if (path.endsWith('.json')) {
       return {
-        id: '001-001',
+        id: '166-001',
         title: 'demo',
         sprintId: 'sprint-166',
         status: 'DONE',
@@ -84,7 +84,7 @@ vi.mock('../../src/core/utils.js', async (importActual) => ({
     }
     if (path.endsWith('.result')) {
       return {
-        taskId: '001-001',
+        taskId: '166-001',
         filesChanged: ['x.ts'],
         testsPassed: true,
         selfAssessment: 'DONE',
@@ -103,14 +103,14 @@ vi.mock('node:fs', async (importActual) => {
       if (typeof path === 'string' && path.includes('/sprints/')) return false;
       return true;
     }),
-    readdirSync: vi.fn(() => ['task-001-001.json', 'task-001-001.result']),
+    readdirSync: vi.fn(() => ['task-166-001.json', 'task-166-001.result']),
     // buildSprintFromTasks reads canonical task records via readFileSync +
     // classifyTaskArtifact (filename/id must agree); everything else falls
     // through to the real fs.
     readFileSync: vi.fn((path: unknown, ...rest: unknown[]) => {
-      if (typeof path === 'string' && path.endsWith('task-001-001.json')) {
+      if (typeof path === 'string' && path.endsWith('task-166-001.json')) {
         return JSON.stringify({
-          id: '001-001',
+          id: '166-001',
           title: 'demo',
           sprintId: 'sprint-166',
           status: 'DONE',

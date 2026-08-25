@@ -51,10 +51,18 @@ function makeSprintState(activeWorkers: SprintStateSnapshot['activeWorkers']): S
   };
 }
 
-function makeCtx(lastHeartbeat: string): DetectorContext {
+function makeCtx(
+  lastHeartbeat: string,
+  liveness: NonNullable<SprintStateSnapshot['activeWorkers'][number]['liveness']>,
+): DetectorContext {
   return {
     event: makeEvent(),
-    sprintState: makeSprintState([{ id: 'w-303', taskId: 'task-303', lastHeartbeat }]),
+    sprintState: makeSprintState([{
+      id: 'w-303',
+      taskId: 'task-303',
+      lastHeartbeat,
+      liveness,
+    }]),
     projectRoot: '/workspace',
     now: BASE_NOW,
   };
@@ -77,29 +85,37 @@ describe('LIVE-W1 (a): stale-HB SSOT — detector + auditor inherit config.heart
     expect(ns!.detectors.stale_worker.threshold_ms).toBe(DEFAULT_HEARTBEAT_TIMEOUT_MS);
   });
 
-  it('StaleWorkerDetector() with no threshold detects worker stale by HB_TIMEOUT+1ms', () => {
-    const detector = new StaleWorkerDetector(); // inherits DEFAULT_HEARTBEAT_TIMEOUT_MS
+  it('StaleWorkerDetector detects a host-confirmed dead worker attempt', () => {
+    const detector = new StaleWorkerDetector();
     const staleMs = DEFAULT_HEARTBEAT_TIMEOUT_MS + 1;
     const lastHeartbeat = new Date(BASE_NOW.getTime() - staleMs).toISOString();
 
-    const result = detector.detect(makeCtx(lastHeartbeat));
+    const result = detector.detect(makeCtx(lastHeartbeat, {
+      state: 'dead',
+      attemptId: 'attempt-live-w1',
+      hostSequence: 7,
+    }));
 
     expect(result).not.toBeNull();
     expect(result!.suggestedActions[0]!.id).toBe('WORKER_RESPAWN');
   });
 
-  it('StaleWorkerDetector() with no threshold does NOT alert when worker is fresh by HB_TIMEOUT-1ms', () => {
+  it('StaleWorkerDetector does not alert while the host reports the attempt alive', () => {
     const detector = new StaleWorkerDetector();
     const freshMs = DEFAULT_HEARTBEAT_TIMEOUT_MS - 1;
     const lastHeartbeat = new Date(BASE_NOW.getTime() - freshMs).toISOString();
 
-    expect(detector.detect(makeCtx(lastHeartbeat))).toBeNull();
+    expect(detector.detect(makeCtx(lastHeartbeat, {
+      state: 'alive',
+      attemptId: 'attempt-live-w1',
+      hostSequence: 7,
+    }))).toBeNull();
   });
 
   it('detector and auditor share the same SSOT value (both equal DEFAULT_HEARTBEAT_TIMEOUT_MS)', () => {
     // auditor.scanHeartbeats uses DEFAULT_HEARTBEAT_TIMEOUT_MS as its default parameter.
-    // StaleWorkerDetector() uses DEFAULT_HEARTBEAT_TIMEOUT_MS as its constructor default.
-    // Both were changed in LIVE-W1 to import from core/config.ts — verified by constant equality.
+    // The detector consumes host-authoritative liveness; the timeout remains the
+    // shared policy used by the host-side heartbeat classification and auditor.
     const AUDITOR_DEFAULT = DEFAULT_HEARTBEAT_TIMEOUT_MS; // same constant used in scanHeartbeats
     const DETECTOR_DEFAULT = DEFAULT_HEARTBEAT_TIMEOUT_MS; // same constant used in StaleWorkerDetector
     expect(AUDITOR_DEFAULT).toBe(DETECTOR_DEFAULT);

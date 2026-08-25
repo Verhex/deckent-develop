@@ -55,12 +55,16 @@ const identity = {
 
 const report = {
   identity,
+  disposition: 'GO' as const,
   audit: { overallGate: 'PASS' as const },
   orphanIpcDirs: [],
   staleLocksCleaned: 0,
   staleSpawnLocksCleaned: 0,
   taskFilesArchived: 2,
   taskFilesPreserved: 1,
+  artifactPolicy: {
+    checkpoint: { disposition: 'PRESERVED' as const, digest: 'checkpoint-digest' },
+  },
 };
 
 async function runCommand(args: string[]): Promise<void> {
@@ -98,7 +102,10 @@ describe('deckent recover CLI application adapter', () => {
         },
       },
     );
-    expect(mockPrint).toHaveBeenCalledWith(expect.stringContaining('Recovery complete'));
+    expect(mockPrint).toHaveBeenCalledWith(
+      expect.stringContaining('Task files:      2 archived, 1 preserved'),
+    );
+    expect(mockPrintError).not.toHaveBeenCalled();
     expect(process.exitCode).not.toBe(1);
   });
 

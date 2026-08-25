@@ -223,7 +223,16 @@ describe('waitForRunResult', () => {
     const result = await waitForRunResult('/project', 'run-1', 5000);
     // born-484: the disk-read boundary normalizer fills the contractual
     // `notes: string` field ('' when the worker omitted it).
-    expect(result).toEqual({ ...fakeResult, notes: '' });
+    expect(result).toEqual({
+      ...fakeResult,
+      notes: '',
+      testCommands: [],
+      testVerification: {
+        applicability: 'REQUIRED',
+        outcome: 'PASSED',
+        commands: [],
+      },
+    });
   });
 
   it('returns null if timeout expires without result', async () => {

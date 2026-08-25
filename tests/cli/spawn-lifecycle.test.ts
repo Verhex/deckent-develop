@@ -206,7 +206,7 @@ beforeEach(() => {
   vi.mocked(loadConfig).mockResolvedValue({
     language: 'en',
     spawn_backend: 'docker',
-    routing_engine: 'v2',
+    routing_engine: 'v1',
     execution_budget: {
       roles: { worker: { default: { maxTurns: 1 } } },
       landing: { reserve_ratio: 0.25 },
@@ -358,7 +358,7 @@ describe('registerRun — --model-effort flag path', () => {
       settleResult(taskId, 'DONE', opts);
     });
 
-    await runCommand(['run', 'do a thing', '--model-effort', 'high', '--timeout', '3000']);
+    await runCommand(['run', 'do a thing', '--model', 'claude-sonnet-5', '--model-effort', 'high', '--scope', 'src/', '--timeout', '3000']);
 
     expect(backendSpawn).toHaveBeenCalledOnce();
     const opts = backendSpawn.mock.calls[0]?.[3] as { reasoningEffort?: string };
@@ -370,7 +370,7 @@ describe('registerRun — --model-effort flag path', () => {
       settleResult(taskId, 'DONE', opts);
     });
 
-    await runCommand(['run', 'do a thing', '--model-effort', 'turbo', '--timeout', '3000']);
+    await runCommand(['run', 'do a thing', '--model', 'claude-sonnet-5', '--model-effort', 'turbo', '--scope', 'src/', '--timeout', '3000']);
 
     expect(backendSpawn).toHaveBeenCalledOnce();
     const opts = backendSpawn.mock.calls[0]?.[3] as { reasoningEffort?: string };

@@ -19,6 +19,7 @@ vi.mock('node:fs', () => {
     openSync: vi.fn(),
     closeSync: vi.fn(),
     fsyncSync: vi.fn(),
+    renameSync: vi.fn(),
     fstatSync: vi.fn(() => ({ size: 0 })),
     realpathSync: vi.fn((p: string) => p),
   };

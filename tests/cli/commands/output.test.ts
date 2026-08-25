@@ -15,6 +15,7 @@ vi.mock('node:fs', () => ({
   existsSync: vi.fn(),
   statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
   readdirSync: vi.fn(),
+  renameSync: vi.fn(),
 }));
 
 vi.mock('../../../src/cli/helpers/output.js', () => ({

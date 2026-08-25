@@ -17,6 +17,18 @@ vi.mock('../../../src/cli/helpers/output.js', () => ({
   print: vi.fn(),
   printError: vi.fn(),
 }));
+vi.mock('../../../src/core/invocation-receipt-store.js', () => ({
+  InvocationReceiptStore: vi.fn().mockImplementation(() => ({
+    projectId: 'test-project',
+    close: vi.fn(),
+  })),
+}));
+vi.mock('../../../src/orchestra/acceptance-confirmation-reconciler.js', () => ({
+  openAcceptanceConfirmationReconciler: vi.fn().mockReturnValue({
+    run: vi.fn().mockResolvedValue({ observations: [], outcomes: [] }),
+    close: vi.fn(),
+  }),
+}));
 
 const mockedFs = vi.mocked(fs);
 

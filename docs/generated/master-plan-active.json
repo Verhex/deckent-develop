@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "9e4c531c58b201441ed09dec08dab0d8024debc58f2efd42696ed53b3f12bc4f"
+    "value": "76d6620fc3dc1e9ecc574846041098c2a298ea3f553749eae9df2c7b3a3761af"
   },
   "summary": {
-    "total": 521,
-    "active": 456,
+    "total": 522,
+    "active": 457,
     "terminal": 65,
     "receipts": 187,
     "byState": {
-      "OPEN": 361,
+      "OPEN": 362,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
@@ -22,7 +22,7 @@
     },
     "byPriority": {
       "P0": 338,
-      "P1": 141,
+      "P1": 142,
       "P2": 42
     },
     "byProgram": {
@@ -41,7 +41,7 @@
       "ENTERPRISE": 4,
       "EVAL": 5,
       "EVOLUTION": 4,
-      "KERNEL": 117,
+      "KERNEL": 118,
       "LEARNING": 9,
       "OBS": 9,
       "ONBOARDING": 1,
@@ -5024,6 +5024,17 @@
       "definitionDigest": "db257570be7d97728b470b283e0b57eeed3b09e3680f8ba7122539a72c7fbad7",
       "progressDigest": "0b3c696a280164102344a408bc45104acfc377d7146129c4a18c5a6e36d6db75",
       "terminalClosureDigest": "fc2f610f6852f9691800abac947805b31d9fdb6685a5149363439e2caa337e35"
+    },
+    {
+      "order": 7141,
+      "id": "ERROR-REGISTRY-THROW-CONVERSION-001",
+      "program": "KERNEL",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-25",
+      "definitionDigest": "72a12fb1047dea839dc72cd935cbc4a6032ad1dd7300dbe0e4db271a8b41e22c",
+      "progressDigest": "c60d3b6774be56d64c36a81fed7c8e7e4b779bb2addd7aae04fbba4f2dda184d",
+      "terminalClosureDigest": null
     },
     {
       "order": 8000,
@@ -22342,7 +22353,8 @@
         "A2A-INTEROP-001",
         "SKILLMD-V3-RECONCILIATION-001",
         "AGENT-RUNTIME-ADAPTER-001",
-        "RUN-POLICY-DELIVERY-001"
+        "RUN-POLICY-DELIVERY-001",
+        "ERROR-REGISTRY-THROW-CONVERSION-001"
       ],
       "gates": [
         "G2",
@@ -22398,7 +22410,8 @@
         "DEP-SUPPLY-DEFENSE-001",
         "A2A-INTEROP-001",
         "SKILLMD-V3-RECONCILIATION-001",
-        "AGENT-RUNTIME-ADAPTER-001"
+        "AGENT-RUNTIME-ADAPTER-001",
+        "ERROR-REGISTRY-THROW-CONVERSION-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Provenance, install, permissions, sandbox, update, revoke and quarantine are one trust plane",
@@ -23989,6 +24002,38 @@
       "acceptance": "Owner G2 kararı: hangi runtime ailelerinin adapter alacağı, ACP (agent session/runtime transport) ile MCP (capability erişimi) rol ayrımı, version-pin + adapter conformance + canary-pool disiplini ve XVERIFY-PROVIDER-SEPARATION'ın dış-runtime çıktısına uygulanışı tiplenir; PAEP (P02) model-provider düzlemini, bu satır agent-runtime düzlemini kapsar",
       "evidence": "Açılış: Alperen 2026-08-04 reconciliation onayı. Tetikleyici: 2026-07/08 rekabet günlüğü — OpenClaw `agent exec` headless one-shot runner (CLI agent koşturmak metalaşıyor), AG2 ACP+MCP session-scoped capability injection, Hermes v0.20 çift-yönlü A2A + plugin SDK; ledger'da dış agent-runtime adapter karşılığı yok; A2A-INTEROP-001 outbound yönü bu ailenin A2A üyesidir",
       "updated": "2026-08-04"
+    },
+    {
+      "order": 7141,
+      "id": "ERROR-REGISTRY-THROW-CONVERSION-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "KERNEL",
+      "outcome": "Maraton-birikimi 131 ham `throw new Error(...)` sitesinin typed error-registry kontratına taşınması (owner admission 2026-08-25; sprint-670-006 dürüst-NO_GO bulgusu)",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "`npm run lint:errors` 0 yeni-occurrence ile yeşil; error-handling-unification + error-registry-lint testleri baseline-mutabakatıyla geçer; dönüşüm assertion/ratchet zayıflatmadan, dosya-kümeli onarım-dalgası olarak koşulur (gen-repair-directives + lint:directives hattı); typed hata-sınıfları mevcut DeckentError/registry desenini izler",
+      "evidence": "Sprint-670 kanıtı: 3 FIX-turu boyunca worker'lar ratchet'i savunup NO_GO yazdı (task-670-006*.result); 131-site envanteri lint:errors çıktısında; sprint-670 arşivi `.deckent/archive/sprints/sprint-670`",
+      "updated": "2026-08-25"
     },
     {
       "order": 8000,
@@ -26831,6 +26876,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "16ced82dfecf73588dc361ad6cc8450614a9c65dd96cdd7ead58eb619e97ebbb"
+    "value": "1eaf9adb4d9882529f25d60526e045c4802fd20272051778e96c6642e3a32c5c"
   }
 }

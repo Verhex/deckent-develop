@@ -803,9 +803,7 @@ export function registerProviderObservations(
 ): void {
   const language = getLanguage(undefined);
   const parent = program.command('provider-observations')
-    .description(getMessage('provider_observation.migration.inspect', language, {
-      sourcePath: PROVIDER_EXECUTION_OBSERVATION_DATABASE_PATH, schemaVersion: '1', action: 'migrate',
-    }));
+    .description(getMessage('cli.provider-observations.desc', language));
   const common = (command: Command): Command => command
     .option('--database <path>', getMessage('provider_observation.migration.inspect', language, {
       sourcePath: PROVIDER_EXECUTION_OBSERVATION_DATABASE_PATH, schemaVersion: '1', action: 'inspect',
@@ -814,13 +812,16 @@ export function registerProviderObservations(
       inspected: '-', eligible: '-', migrated: '-', adopted: '-', held: '-', rejected: '-',
     }));
   common(parent.command('inspect'))
+    .description(getMessage('cli.provider-observations.inspect.desc', language))
     .action((options: CommonOptions) => render('inspect', options, deps));
   common(parent.command('migrate'))
+    .description(getMessage('cli.provider-observations.migrate.desc', language))
     .option('--apply', getMessage('provider_observation.migration.pending_approval', language, { approvalId: '-' }))
     .option('--plan-digest <digest>', getMessage('provider_observation.migration.dry_run', language))
     .option('--approval-id <id>', getMessage('provider_observation.migration.pending_approval', language, { approvalId: '-' }))
     .action((options: MigrationOptions) => render('migration', options, deps));
   common(parent.command('adopt'))
+    .description(getMessage('cli.provider-observations.adopt.desc', language))
     .requiredOption('--preimage <path>', getMessage('provider_observation.migration.inspect', language, {
       sourcePath: '-', schemaVersion: '1', action: 'adopt',
     }))
@@ -828,11 +829,13 @@ export function registerProviderObservations(
     .option('--plan-digest <digest>', getMessage('provider_observation.migration.dry_run', language))
     .action((options: AdoptionOptions) => render('adoption', options, deps));
   common(parent.command('adopt-runtime'))
+    .description(getMessage('cli.provider-observations.adopt-runtime.desc', language))
     .requiredOption('--preimage <path>', getMessage('provider_observation.runtime_adoption.preimage', language))
     .option('--apply', getMessage('provider_observation.runtime_adoption.apply', language))
     .option('--plan-digest <digest>', getMessage('provider_observation.runtime_adoption.plan_digest', language))
     .action((options: RuntimeAdoptionOptions) => render('runtime-adoption', options, deps));
   common(parent.command('reconcile'))
+    .description(getMessage('cli.provider-observations.reconcile.desc', language))
     .option('--run-id <id>', getMessage('provider_observation.reconciliation.run_id', language),
       (value: string, previous: string[] = []) => [...previous, value])
     .option('--apply', getMessage('provider_observation.reconciliation.apply', language))

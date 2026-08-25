@@ -228,6 +228,24 @@ function makeEvalResult(decision: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO'): Evalu
   };
 }
 
+function mockCollectedWave(results: TaskResult[]): void {
+  vi.mocked(waitForResults).mockImplementation(async (
+    _projectRoot,
+    waitedSprint,
+    _timeout,
+    _queue,
+    spawnOptions,
+  ) => {
+    for (const result of results) {
+      const task = waitedSprint.tasks.find(candidate => candidate.id === result.taskId);
+      if (task && spawnOptions?.evaluateCollectedResult) {
+        await spawnOptions.evaluateCollectedResult(task, result);
+      }
+    }
+    return results;
+  });
+}
+
 function reDispatchResultEvent(): Record<string, unknown> | undefined {
   const call = vi.mocked(writeEvent).mock.calls.find(c => c[4] === 'BRAIN→WORKER:RE_DISPATCH_RESULT');
   return call?.[5] as Record<string, unknown> | undefined;
@@ -253,7 +271,7 @@ describe('FIX Phase — NOT_DISPATCHED re-dispatch execution (354-010)', () => {
     const sprint = makeSprint([task]);
     const evaluations = new Map<string, TaskEvaluation>([['354-777', TaskEvaluation.NOT_DISPATCHED]]);
 
-    vi.mocked(waitForResults).mockResolvedValue([makeResult('354-777')]);
+    mockCollectedWave([makeResult('354-777')]);
     vi.mocked(evaluateWithRubric).mockReturnValue(makeEvalResult('DONE'));
 
     await runFixPhase(root, sprint, evaluations, [], makeConfig(), undefined, 'v1', undefined);
@@ -404,7 +422,7 @@ describe('FIX Phase — NOT_DISPATCHED re-dispatch execution (354-010)', () => {
         notes: 'TypeError: cannot read property of undefined',
       }),
     ];
-    vi.mocked(waitForResults).mockResolvedValue([makeResult('354-788')]);
+    mockCollectedWave([makeResult('354-788')]);
     vi.mocked(evaluateWithRubric).mockReturnValue(makeEvalResult('DONE'));
 
     await runFixPhase(root, sprint, evaluations, results, makeConfig(), undefined, 'v1', undefined);

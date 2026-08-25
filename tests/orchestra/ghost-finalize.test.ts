@@ -279,9 +279,10 @@ describe('restoreSprintFromCheckpoint — ghost-finalize guard', () => {
     expect(existsSync(checkpointJsonPath(root, 'sprint-271'))).toBe(false);
   });
 
-  it('13. leftover + NOT finalized + all terminal → "complete" preserved (crash-before-finalize)', () => {
+  it('13. leftover + NOT finalized + all terminal → resume-evaluate for authoritative finalization', () => {
     // Brain crashed AFTER all tasks DONE but BEFORE finalize: no sprint-state
-    // COMPLETE, no sprint-log. This MUST keep its legitimate completion path.
+    // COMPLETE, no sprint-log. Evaluation/finalization must be replayed rather
+    // than trusting the checkpoint's derived terminal projection.
     writeTaskJson(root, makeTask('260-001', TaskStatus.DONE));
     writeTaskJson(root, makeTask('260-002', TaskStatus.DONE));
     writeCheckpointFile(root, baseCheckpoint('sprint-260', {
@@ -291,7 +292,7 @@ describe('restoreSprintFromCheckpoint — ghost-finalize guard', () => {
     const result = restoreSprintFromCheckpoint(root, 'sprint-260');
 
     expect(result.restored).toBe(true);
-    expect(result.action).toBe('complete');
+    expect(result.action).toBe('resume-evaluate');
     expect(result.restoredSprint).toBeDefined();
     expect(result.restoredSprint!.tasks).toHaveLength(2);
     // Checkpoint untouched — runSprint still owns finalization of this sprint.

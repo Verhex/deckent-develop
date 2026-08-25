@@ -106,7 +106,10 @@ vi.mock('../../src/core/identity-generator.js', () => ({
   runMemoryExport: vi.fn().mockResolvedValue({ success: true, filesWritten: [], errors: [] }),
 }));
 vi.mock('../../src/core/memory-export.js', () => ({ writeGuardedExports: vi.fn(() => ({ written: [], skipped: [] })) }));
-vi.mock('../../src/orchestra/task-restoration.js', () => ({ createPreArchiveSnapshot: vi.fn(), classifyTaskFiles: vi.fn(() => ({ archive: [], keep: [] })) }));
+vi.mock('../../src/orchestra/task-restoration.js', () => ({
+  createPreArchiveSnapshot: vi.fn(),
+  classifyTaskFiles: vi.fn(() => ({ archive: [], keep: [], preserve: [] })),
+}));
 vi.mock('../../src/core/notify.js', () => ({ notify: vi.fn() }));
 vi.mock('../../src/orchestra/sprint-utils.js', () => ({
   readFileSafe: vi.fn(() => ''), now: vi.fn(() => '2026-06-05T00:00:00Z'),
@@ -115,6 +118,24 @@ vi.mock('../../src/orchestra/sprint-utils.js', () => ({
 vi.mock('../../src/orchestra/sprint-pid-manager.js', () => ({ clearPid: vi.fn() }));
 vi.mock('../../src/core/sprint-file-retention.js', () => ({ runRetention: vi.fn() }));
 vi.mock('../../src/core/debt-store.js', () => ({ getDebtItems: vi.fn(() => []) }));
+vi.mock('../../src/core/sprint-archive.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/sprint-archive.js')>();
+  return {
+    ...actual,
+    archiveTaskArtifacts: vi.fn((projectRoot: string, sprintId: string) => {
+      const destination = join(projectRoot, '.deckent', 'archive', 'sprints', sprintId, 'tasks');
+      return {
+        destination,
+        preservedDestination: join(destination, 'preserved'),
+        archived: [],
+        preserved: [],
+        consolidated: [],
+        residueSwept: [],
+        failures: [],
+      };
+    }),
+  };
+});
 
 // Imports after mocks
 import { runDecay } from '../../src/orchestra/debt-manager.js';
@@ -136,13 +157,20 @@ const settledTask = (taskId: string): Task => ({
   model: 'test-model', priority: 'NORMAL', reason: 'fixture',
   scope: { directories: ['.'], filesRead: [], filesWrite: [] },
   dependencies: [],
-  goNogo: { goCriteria: 'done', noGoCriteria: 'failed', techDebtAcceptable: 'minor' },
+  goNogo: {
+    goCriteria: 'done', noGoCriteria: 'failed', techDebtAcceptable: 'minor', items: [],
+  },
   status: 'DONE', createdAt: '2026-06-05T00:00:00Z',
 } as unknown as Task);
 
 const settledResult = (taskId: string): TaskResult => ({
   taskId, workerId: `w-${taskId}`, filesChanged: [], linesAdded: 0, linesRemoved: 0,
   testsPassed: true, coverage: 0, selfAssessment: 'DONE', notes: '',
+  testVerification: {
+    applicability: 'REQUIRED', outcome: 'PASSED', commands: ['fixture-check'],
+  },
+  criteriaEvidence: [],
+  techDebtCriterionIds: [],
   workAttribution: {
     state: 'VERIFIED', attemptId: `attempt-${taskId}-1`,
     baselineRef: `baseline-${taskId}`, scopeDigest: `scope-${taskId}`,
@@ -199,13 +227,17 @@ describe('finalizeSprint → runDecay receives config.decay_after_sprints', () =
   it('wires decaySprints=20 from config when budget OVER (force-path)', async () => {
     mockAuditBrainBudget.mockReturnValue({ status: 'OVER', decayableLines: 2000, permanentLines: 100, totalLines: 2100 });
     const config = { decay_after_sprints: 20, memory_budget: 900 } as ResolvedConfig;
-    await finalizeSprint(
-      makeProjectRoot(),
-      makeSprint('sprint-243', [settledTask('243-001')]),
+    const root = makeProjectRoot();
+    const task = settledTask('243-001');
+    mkdirSync(join(root, '.tasks'), { recursive: true });
+    writeFileSync(join(root, '.tasks', 'task-243-001.json'), JSON.stringify(task));
+    await expect(finalizeSprint(
+      root,
+      makeSprint('sprint-243', [task]),
       new Map([['243-001', TaskEvaluation.DONE]]),
       [settledResult('243-001')],
       { skipHooks: true, config },
-    );
+    )).rejects.toThrow('SPRINT_ARCHIVE_TASK_SETTLEMENT_FAILED');
     expect(mockDecay).toHaveBeenCalled();
     expect(lastDecaySprintsArg()).toBe(20);
     expect(lastDecaySprintsArg()).not.toBe(8); // regression guard — PRIMARY bug
@@ -218,13 +250,17 @@ describe('finalizeSprint → runDecay receives config.decay_after_sprints', () =
     // budget so store.decay() actually runs end-to-end.
     mockTotalCount.mockReturnValue(2000);
     const config = { decay_after_sprints: 20, memory_budget: 900 } as ResolvedConfig;
-    await finalizeSprint(
-      makeProjectRoot(),
-      makeSprint('sprint-243', [settledTask('243-001')]),
+    const root = makeProjectRoot();
+    const task = settledTask('243-001');
+    mkdirSync(join(root, '.tasks'), { recursive: true });
+    writeFileSync(join(root, '.tasks', 'task-243-001.json'), JSON.stringify(task));
+    await expect(finalizeSprint(
+      root,
+      makeSprint('sprint-243', [task]),
       new Map([['243-001', TaskEvaluation.DONE]]),
       [settledResult('243-001')],
       { skipHooks: true, config },
-    );
+    )).rejects.toThrow('SPRINT_ARCHIVE_TASK_SETTLEMENT_FAILED');
     expect(mockDecay).toHaveBeenCalled();
     expect(lastDecaySprintsArg()).toBe(20);
   });

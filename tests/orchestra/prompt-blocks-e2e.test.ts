@@ -97,8 +97,8 @@ describe('prompt-blocks-e2e (born-674 / 428-003, W674C)', () => {
     expect(prompt).toContain('python3=yes docker=no rg=yes');
 
     // Block 2 — CRITICAL VERIFY STEPS: real stack-resolved check/test commands.
-    expect(prompt).toContain('Run: `npx tsc --noEmit` — this project\'s resolved type-check command');
-    expect(prompt).toContain('Run: `npx vitest run <path-to-the-test-file(s)-you-changed>`');
+    expect(prompt).toContain('Run: `npx tsc --noEmit` — this project\'s compiled type-check command.');
+    expect(prompt).toContain('SCOPED_PROOF_HOLD');
 
     // Block 3 — Tool Surface: real computeToolAllowlist output (code-development +
     // writable scope grants the edit group, which includes Write).
@@ -116,6 +116,6 @@ describe('prompt-blocks-e2e (born-674 / 428-003, W674C)', () => {
 
     expect(prompt).not.toContain('## Environment Tool Inventory');
     expect(prompt).not.toContain('## Tool Surface (narrowed for this task)');
-    expect(prompt).toContain('Examples: `tsc --noEmit` (TypeScript), `mypy` (Python), `go vet ./...` (Go), `cargo check` (Rust)');
+    expect(prompt).toContain('SCOPED_PROOF_HOLD');
   });
 });

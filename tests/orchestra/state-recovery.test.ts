@@ -102,7 +102,7 @@ describe('restoreSprintFromCheckpoint (Sprint 162 T-004)', () => {
     expect(result.restoredSprint).toBeUndefined();
   });
 
-  it('2. all DONE and no active workers → action:"complete"', () => {
+  it('2. raw DONE tasks without host evidence → action:"resume-evaluate"', () => {
     writeTaskJson(root, makeTask('160-001', TaskStatus.DONE));
     writeTaskJson(root, makeTask('160-002', TaskStatus.DONE));
 
@@ -120,11 +120,11 @@ describe('restoreSprintFromCheckpoint (Sprint 162 T-004)', () => {
 
     const result = restoreSprintFromCheckpoint(root, 'sprint-160');
     expect(result.restored).toBe(true);
-    expect(result.action).toBe('complete');
+    expect(result.action).toBe('resume-evaluate');
     expect(result.restoredSprint).toBeDefined();
     expect(result.restoredSprint!.tasks).toHaveLength(2);
-    expect(result.restoredSprint!.phase).toBe(SprintPhase.COMPLETE);
-    expect(result.restoredSprint!.status).toBe(SprintStatus.COMPLETE);
+    expect(result.restoredSprint!.phase).toBe(SprintPhase.EVALUATE);
+    expect(result.restoredSprint!.status).toBe(SprintStatus.EVALUATING);
   });
 
   it('3. stale EXECUTING with .result on disk → staleTasksWithResult populated, action:"resume-evaluate"', () => {
@@ -184,13 +184,13 @@ describe('restoreSprintFromCheckpoint (Sprint 162 T-004)', () => {
     expect(result.restored).toBe(true);
     expect(result.action).toBe('resume-evaluate');
     expect(result.staleTasksWithResult).toEqual([]);
-    expect(result.staleTasksMarkedNoGo).toEqual(['162-002']);
+    expect(result.staleTasksMarkedNoGo).toEqual([]);
     // Task status overwritten on disk
     const t = readTaskJson(root, '162-002');
-    expect(t!.status).toBe(TaskStatus.NO_GO);
+    expect(t!.status).toBe(TaskStatus.PENDING);
     // And reflected in the rebuilt in-memory Sprint
     const inMemTask = result.restoredSprint!.tasks.find(x => x.id === '162-002');
-    expect(inMemTask!.status).toBe(TaskStatus.NO_GO);
+    expect(inMemTask!.status).toBe(TaskStatus.PENDING);
   });
 
   it('holds restore when a raw DONE is backed by a pending Docker settlement', () => {

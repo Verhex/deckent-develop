@@ -429,6 +429,9 @@ describe('known-consumer allowlist (Sprint-1 pin evolved for Sprint-2: preview-s
       // store now imports the contract's RunFlowEvent type to append/read
       // sequenced events — the designed persistence consumer, not a leak.
       'core/run-flow-store.ts',
+      // Retention is the designed lifecycle consumer that prunes durable run
+      // records without owning reducer mutation.
+      'core/run-flow-retention.ts',
       // Sprint-2 dilim (424-001): the shared actual-preview layer is the
       // designed consumer of the contract/reducer pair — not a leak.
       'orchestra/plan-preview-service.ts',

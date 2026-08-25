@@ -60,13 +60,13 @@ describe('buildReplanProposal', () => {
   });
 
   it('carries the current scope verbatim so the decision is made against real authority', () => {
-    const result = makeResult({ notes: '[honest-gate] BOUNDARY_VIOLATION: wrote outside scope' });
-    const classification = classifyFixFailure({ result });
+    const result = makeResult({ notes: 'needed src/core/thing.ts' });
+    const classification = classifyFixFailure({ result, taskDefinitionUnsatisfiable: true });
     const proposal = buildReplanProposal({ taskId: 't-1', classification, scope: SCOPE, result });
 
     expect(proposal!.currentScope.directories).toEqual(['docs/reference/']);
     expect(proposal!.currentScope.filesWrite).toEqual(['docs/reference/model-activation.md']);
-    expect(proposal!.disposition).toBe('reviseScope');
+    expect(proposal!.disposition).toBe('escalateReplan');
   });
 
   it('states that a named path is evidence and never a grant', () => {
@@ -78,7 +78,7 @@ describe('buildReplanProposal', () => {
     expect(JSON.stringify(proposal)).not.toMatch(/granted|approved/iu);
   });
 
-  it('treats a host attribution claim outside scope as a write request even when prose omits it', () => {
+  it('does not treat an untrusted worker attribution claim as replan authority', () => {
     const result = makeResult({
       notes: 'nothing unusual to report',
       workAttribution: {
@@ -89,13 +89,9 @@ describe('buildReplanProposal', () => {
         claimedOutsideScope: ['src/elsewhere.ts'],
       },
     });
-    const classification = classifyFixFailure({ result });
+    const classification = classifyFixFailure({ result, taskDefinitionUnsatisfiable: true });
     const proposal = buildReplanProposal({ taskId: 't-1', classification, scope: SCOPE, result });
-
-    const claimed = proposal!.requestedPaths.find(p => p.path === 'src/elsewhere.ts');
-    expect(claimed).toBeDefined();
-    expect(claimed!.access).toBe('write');
-    expect(claimed!.alreadyReviewed).toBe(false);
+    expect(proposal).toBeNull();
   });
 
   it('marks a path already inside the reviewed directories as needing no new authority', () => {

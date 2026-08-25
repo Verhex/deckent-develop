@@ -19,6 +19,7 @@ vi.mock('node:fs', () => ({
   unlinkSync: vi.fn(),
   createReadStream: vi.fn(),
   watch: vi.fn(),
+  renameSync: vi.fn(),
 }));
 
 vi.mock('../../src/core/utils.js', async (importOriginal) => {

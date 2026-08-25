@@ -15,8 +15,8 @@ import { ApprovalBroker, ApprovalBrokerError } from '../../src/core/approval-bro
 import type { ApprovalRequestInput } from '../../src/core/approval-broker.js';
 import type { ApprovalDecision, ApprovalRequest } from '../../src/core/approval-contract.js';
 
-const CREATED_AT = '2026-07-01T21:00:00.000Z';
-const FIXED_NOW = new Date('2026-07-01T21:05:00.000Z');
+const CREATED_AT = '2099-07-01T21:00:00.000Z';
+const FIXED_NOW = new Date('2099-07-01T21:05:00.000Z');
 
 function buildRequest(id: string, overrides: Partial<ApprovalRequestInput> = {}): ApprovalRequestInput {
   return {
@@ -32,7 +32,7 @@ function buildRequest(id: string, overrides: Partial<ApprovalRequestInput> = {})
     tenantId: 'local',
     userId: 'alperen',
     createdAt: CREATED_AT,
-    expiresAt: '2026-07-01T21:15:00.000Z',
+    expiresAt: '2099-07-01T21:15:00.000Z',
     ...overrides,
   };
 }
@@ -65,7 +65,7 @@ describe('ApprovalStore — construction', () => {
       // Far-future expiresAt — this test asserts the default STOREDIR PATH,
       // not time-based categorization, so it must stay pending under the
       // real wall-clock `now` the constructor defaults to.
-      defaultBroker.submit(buildRequest('apr-default-1', { expiresAt: '2030-01-01T00:00:00.000Z' }));
+      defaultBroker.submit(buildRequest('apr-default-1', { expiresAt: '2100-01-01T00:00:00.000Z' }));
 
       const store = new ApprovalStore(defaultRoot);
       expect(idsOf(store.load().pending)).toEqual(['apr-default-1']);
@@ -75,10 +75,13 @@ describe('ApprovalStore — construction', () => {
     }
   });
 
-  it('creates storeDir if missing and starts with an empty snapshot', () => {
-    const store = new ApprovalStore(projectRoot, { storeDir: join(projectRoot, 'fresh-approvals') });
-    expect(existsSync(join(projectRoot, 'fresh-approvals'))).toBe(true);
-    expect(store.load()).toEqual({ pending: [], approved: [], denied: [], expired: [] });
+  it('keeps a missing storeDir lazy and starts with an empty snapshot', () => {
+    const storeDir = join(projectRoot, 'fresh-approvals');
+    const store = new ApprovalStore(projectRoot, { storeDir });
+    expect(existsSync(storeDir)).toBe(false);
+    expect(store.load()).toEqual({
+      pending: [], approved: [], denied: [], expired: [], quarantined: [],
+    });
   });
 });
 
@@ -95,9 +98,9 @@ describe('ApprovalStore — categorization from broker-written fixtures', () => 
   });
 
   it('categorizes an overdue, unswept request as expired (time-only, no decision file)', () => {
-    broker.submit(buildRequest('apr-overdue-1', { expiresAt: '2026-07-01T21:00:01.000Z' }));
+    broker.submit(buildRequest('apr-overdue-1', { expiresAt: '2099-07-01T21:00:01.000Z' }));
     const store = new ApprovalStore(projectRoot, { storeDir });
-    store.index(new Date('2026-07-01T22:00:00.000Z'));
+    store.index(new Date('2099-07-01T22:00:00.000Z'));
 
     expect(idsOf(store.load().expired)).toEqual(['apr-overdue-1']);
     expect(store.load().expired[0]!.decision).toBeNull();
@@ -129,10 +132,10 @@ describe('ApprovalStore — categorization from broker-written fixtures', () => 
 
   it('categorizes a broker.expire() TTL sweep as expired (channel ttl-expire)', () => {
     const req = broker.submit(buildRequest('apr-ttl-1', { defaultAction: 'deny' }));
-    broker.expire(new Date('2026-07-01T21:20:00.000Z'));
+    broker.expire(new Date('2099-07-01T21:20:00.000Z'));
 
     const store = new ApprovalStore(projectRoot, { storeDir });
-    store.index(new Date('2026-07-01T21:25:00.000Z'));
+    store.index(new Date('2099-07-01T21:25:00.000Z'));
     expect(idsOf(store.load().expired)).toEqual([req.id]);
     expect(store.load().expired[0]!.decision?.channel).toBe('ttl-expire');
   });
@@ -171,17 +174,17 @@ describe('ApprovalStore — categorization from broker-written fixtures', () => 
 
 describe('ApprovalStore — restart simulation', () => {
   it('a brand-new instance recovers the exact same categorized state purely from disk', () => {
-    const pending = broker.submit(buildRequest('apr-restart-pending', { expiresAt: '2026-07-01T22:00:00.000Z' }));
+    const pending = broker.submit(buildRequest('apr-restart-pending', { expiresAt: '2099-07-01T22:00:00.000Z' }));
     const approved = broker.submit(buildRequest('apr-restart-approved'));
     broker.decide(approved.id, { decision: 'allow', decidedBy: 'a', channel: 'cli', decidedAt: FIXED_NOW.toISOString() });
     const denied = broker.submit(buildRequest('apr-restart-denied'));
     broker.decide(denied.id, { decision: 'deny', decidedBy: 'a', channel: 'cli', decidedAt: FIXED_NOW.toISOString() });
     broker.submit(buildRequest('apr-restart-ttl', { defaultAction: 'allow' }));
-    broker.expire(new Date('2026-07-01T21:20:00.000Z'));
+    broker.expire(new Date('2099-07-01T21:20:00.000Z'));
 
     // "Restart" = throw away every in-memory reference and construct fresh.
     const restarted = new ApprovalStore(projectRoot, { storeDir });
-    restarted.index(new Date('2026-07-01T21:25:00.000Z'));
+    restarted.index(new Date('2099-07-01T21:25:00.000Z'));
     const snap = restarted.load();
 
     expect(idsOf(snap.pending)).toEqual([pending.id]);
@@ -248,15 +251,13 @@ describe('ApprovalStore.transition', () => {
   });
 
   it('writes an "expired" decision (channel ttl-expire) for an overdue pending request', () => {
-    broker.submit(buildRequest('apr-trans-expire', { expiresAt: '2026-07-01T21:00:01.000Z' }));
+    broker.submit(buildRequest('apr-trans-expire', { expiresAt: '2099-07-01T21:00:01.000Z' }));
     const store = new ApprovalStore(projectRoot, { storeDir });
-    store.index(new Date('2026-07-01T22:00:00.000Z'));
+    store.index(new Date('2099-07-01T22:00:00.000Z'));
 
     const decision = store.transition('apr-trans-expire', 'expired', {
-      decision: 'deny',
-      decidedBy: 'system',
-      channel: 'ttl-expire',
-      decidedAt: new Date('2026-07-01T22:00:00.000Z').toISOString(),
+      decision: 'deny', decidedBy: 'system', channel: 'ttl-expire',
+      decidedAt: new Date('2099-07-01T22:00:00.000Z').toISOString(),
     });
 
     expect(decision.channel).toBe('ttl-expire');
@@ -379,7 +380,9 @@ describe('ApprovalStore.prune', () => {
     // tombstone remains the logical authority and the record stays retired.
     writeFileSync(join(storeDir, `${req.id}.request.json`), JSON.stringify(req), 'utf-8');
     writeFileSync(join(storeDir, `${req.id}.decision.json`), JSON.stringify(decision), 'utf-8');
-    expect(ApprovalStore.load(storeDir, FIXED_NOW)).toEqual({ pending: [], approved: [], denied: [], expired: [] });
+    expect(ApprovalStore.load(storeDir, FIXED_NOW)).toEqual({
+      pending: [], approved: [], denied: [], expired: [], quarantined: [],
+    });
   });
 
   it('prevents a stale broker/store snapshot from resurrecting a pruned id', () => {
@@ -396,7 +399,7 @@ describe('ApprovalStore.prune', () => {
       expect.unreachable();
     } catch (error) {
       expect(error).toBeInstanceOf(ApprovalBrokerError);
-      expect((error as ApprovalBrokerError).code).toBe('APR_UNKNOWN_REQUEST');
+      expect((error as ApprovalBrokerError).code).toBe('APR_ALREADY_DECIDED');
     }
 
     try {

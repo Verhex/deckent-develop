@@ -21,6 +21,11 @@ import { randomBytes } from 'node:crypto';
 import type { Task, Sprint, TaskResult } from '../../src/core/types.js';
 import { TaskStatus, SprintPhase, SprintStatus } from '../../src/core/types.js';
 
+const PROMPT_PLAN_ID = `prompt-compile-plan:sha256:${'a'.repeat(64)}`;
+const GO_ID = `criterion-go-${'b'.repeat(64)}`;
+const NO_GO_ID = `criterion-no-go-${'c'.repeat(64)}`;
+const VERIFY_COMMAND = 'npx vitest run tests/orchestra/result-ingest-idnorm.test.ts';
+
 // ─── Mocks required to load result-collector without side-effects ─────────
 vi.mock('../../src/orchestra/tmux.js', () => ({
   spawnWorker: vi.fn(),
@@ -75,7 +80,15 @@ function makeTask(id: string): Task {
     reason: 'test',
     scope: { directories: [], filesRead: [], filesWrite: [] },
     dependencies: [],
-    goNogo: { goCriteria: 'pass', noGoCriteria: 'fail', techDebtAcceptable: 'none' },
+    goNogo: {
+      goCriteria: 'pass', noGoCriteria: 'fail', techDebtAcceptable: 'none',
+      items: [
+        { id: GO_ID, polarity: 'go', statement: 'pass' },
+        { id: NO_GO_ID, polarity: 'no-go', statement: 'fail' },
+      ],
+    },
+    promptCompilePlanId: PROMPT_PLAN_ID,
+    verification: { version: 1, source: 'directive', commands: [VERIFY_COMMAND] },
     status: TaskStatus.EXECUTING,
     sprintId: 'sprint-test',
     createdAt: new Date().toISOString(),
@@ -109,6 +122,15 @@ function writeResult(dir: string, fileId: string, contentTaskId: string): void {
     coverage: 90,
     selfAssessment: 'DONE',
     notes: 'work done',
+    promptCompilePlanId: PROMPT_PLAN_ID,
+    testVerification: {
+      applicability: 'REQUIRED', outcome: 'PASSED', commands: [VERIFY_COMMAND],
+    },
+    criteriaEvidence: [
+      { criterionId: GO_ID, outcome: 'MET', evidence: ['targeted test passed'] },
+      { criterionId: NO_GO_ID, outcome: 'UNMET', evidence: ['forbidden condition absent'] },
+    ],
+    techDebtCriterionIds: [],
   };
   writeFileSync(join(dir, '.tasks', `task-${fileId}.result`), JSON.stringify(result), 'utf-8');
 }
@@ -128,6 +150,15 @@ function makeRawResult(taskId: string): TaskResult {
     coverage: 90,
     selfAssessment: 'DONE',
     notes: 'work done',
+    promptCompilePlanId: PROMPT_PLAN_ID,
+    testVerification: {
+      applicability: 'REQUIRED', outcome: 'PASSED', commands: [VERIFY_COMMAND],
+    },
+    criteriaEvidence: [
+      { criterionId: GO_ID, outcome: 'MET', evidence: ['targeted test passed'] },
+      { criterionId: NO_GO_ID, outcome: 'UNMET', evidence: ['forbidden condition absent'] },
+    ],
+    techDebtCriterionIds: [],
   } as TaskResult;
 }
 
@@ -197,7 +228,7 @@ describe('result-ingest taskId normalize (born-655 / TT550D)', () => {
   });
 
   // ── GREEN wire: collectResults normalizes at ingest (handleEvaluation pin) ──
-  it('GREEN: collectResults normalizes a `task-`-prefixed content id so buildResultsMap no longer misses (phantom-fix doğmaz)', async () => {
+  it('GREEN: collectResults keys a drifted result by the filename id and fails the invalid ingress closed', async () => {
     const dir = tmp();
     const sprint = makeSprint([makeTask('417-002')]);
     writeResult(dir, '417-002', 'task-417-002'); // file=417-002, content DRIFTED to task-417-002
@@ -208,15 +239,15 @@ describe('result-ingest taskId normalize (born-655 / TT550D)', () => {
     expect(results).toHaveLength(1);
     expect(results[0]!.taskId).toBe('417-002'); // ← RED on unfixed code (would be 'task-417-002')
 
-    // handleEvaluation-level pin: the downstream index now HITS by the sprint task
-    // id, so no phantom fix task is born and the real result/label is preserved.
+    // Downstream indexing still hits the canonical task, while strict ingress
+    // settlement refuses to preserve the forged DONE verdict.
     const map = buildResultsMap(results);
     expect(map.get('417-002')).toBeDefined();
-    expect(map.get('417-002')!.selfAssessment).toBe('DONE');
+    expect(map.get('417-002')!.selfAssessment).toBe('NO_GO');
     expect(map.get('task-417-002')).toBeUndefined();
   });
 
-  it('GREEN: the normalized id is persisted back to disk BEFORE persistEnrichedResult (repairs the file, no task-task-<id> orphan)', async () => {
+  it('GREEN: strict ingest leaves the worker-authored file immutable while canonicalizing the collected projection', async () => {
     const dir = tmp();
     const sprint = makeSprint([makeTask('417-002')]);
     writeResult(dir, '417-002', 'task-417-002');
@@ -224,10 +255,9 @@ describe('result-ingest taskId normalize (born-655 / TT550D)', () => {
 
     await waitForResults(dir, sprint, 100);
 
-    // persistEnrichedResult writes task-<result.taskId>.result; if normalize ran
-    // first, the ORIGINAL file is rewritten with the bare id (not a task-task-…
-    // orphan). Proves ordering: normalize precedes enrich/persist.
-    expect(readResultFile(dir, '417-002').taskId).toBe('417-002');
+    // Worker ingress is evidence, not a repair target: host canonicalization
+    // must not rewrite the worker-authored claim in place.
+    expect(readResultFile(dir, '417-002').taskId).toBe('task-417-002');
   });
 
   it('GREEN: a correctly-formed content id flows through untouched with NO spurious warn', async () => {

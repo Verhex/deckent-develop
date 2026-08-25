@@ -183,6 +183,7 @@ describe('getMessage — fallback behaviour', () => {
 vi.mock('node:fs', () => ({
   readFileSync: vi.fn(),
   existsSync: vi.fn(),
+  renameSync: vi.fn(),
 }));
 
 import { readFileSync, existsSync } from 'node:fs';

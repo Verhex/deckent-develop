@@ -14,6 +14,7 @@ vi.mock('node:fs', () => ({
   readdirSync: vi.fn(),
   openSync: vi.fn(() => 42),
   closeSync: vi.fn(),
+  renameSync: vi.fn(),
   constants: { O_WRONLY: 1, O_CREAT: 64, O_EXCL: 128 },
 }));
 

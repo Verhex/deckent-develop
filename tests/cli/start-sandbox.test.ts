@@ -8,6 +8,7 @@ vi.mock('node:fs', () => ({
   writeFileSync: vi.fn(),
   existsSync: vi.fn().mockReturnValue(true),
   mkdirSync: vi.fn(),
+  renameSync: vi.fn(),
 }));
 
 vi.mock('../../src/core/config.js', () => ({

@@ -232,7 +232,7 @@ const SHAPES: readonly ShapeFixture[] = [
     description: 'Cover the widget renderer edge cases with regression tests.',
     directories: ['tests/widgets/'],
     filesWrite: ['tests/widgets/renderer.test.ts'],
-    expectedDomainIds: [],
+    expectedDomainIds: ['test/quality'],
     expectedDeliverables: [{ type: 'code-test', ratio: 1 }],
     expectedWorkType: 'build',
   },

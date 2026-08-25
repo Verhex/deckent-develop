@@ -128,10 +128,17 @@ function makeFullSurfaceCtx(overrides: Partial<SprintContext> = {}): SprintConte
  * same window to one entry).
  */
 function findLiteralRepeats(text: string, winLen: number): string[] {
+  // Result-ingress identities and polarity guidance are deliberately repeated
+  // between the field-shape contract and the per-criterion checklist. They are
+  // machine-authoritative protocol scaffolding, not duplicated task guidance.
+  const prose = text
+    .split('\n')
+    .filter((line) => !/prompt-compile-plan:sha256:|criterion-(?:go|no-go)-|SCOPED_PROOF_HOLD:|evidence: <explicit evidence|MET means the forbidden condition occurred/.test(line))
+    .join('\n');
   const seen = new Set<string>();
   const repeats = new Set<string>();
-  for (let i = 0; i + winLen <= text.length; i++) {
-    const win = text.slice(i, i + winLen);
+  for (let i = 0; i + winLen <= prose.length; i++) {
+    const win = prose.slice(i, i + winLen);
     if (seen.has(win)) repeats.add(win);
     else seen.add(win);
   }

@@ -74,6 +74,11 @@ describe('523-010 — documentation-class guidance names ONLY task-declared chec
         '',
         '**Test:** `node scripts/lint-docs.mjs docs/cookbook/migration.md`',
       ].join('\n'),
+      verification: {
+        version: 1,
+        source: 'directive',
+        commands: ['node scripts/lint-docs.mjs docs/cookbook/migration.md'],
+      },
       scope: { directories: ['docs/'], filesRead: [], filesWrite: ['docs/cookbook/migration.md'] },
       assignedAgent: 'doc-writer',
     });
@@ -122,6 +127,11 @@ describe('523-010 — source-writing task guidance stays byte-identical', () => 
         '',
         '**Test:** `npx vitest run tests/core/config-validator.test.ts`',
       ].join('\n'),
+      verification: {
+        version: 1,
+        source: 'directive',
+        commands: ['npx vitest run tests/core/config-validator.test.ts'],
+      },
       scope: { directories: ['src/core/'], filesRead: [], filesWrite: ['src/core/config-validator.ts'] },
     });
     const { prompt } = buildTaskPrompt(task, makeCtx());

@@ -5,12 +5,14 @@ import type { DashboardState, AgentInfo, Alert } from '../../src/core/types.js';
 
 // ─── Mocks ──────────────────────────────────────────────────────────
 
-vi.mock('node:fs', () => ({
+vi.mock('node:fs', async (importOriginal) => ({
+  ...await importOriginal<typeof import('node:fs')>(),
   readFileSync: vi.fn(),
   existsSync: vi.fn(),
 }));
 
-vi.mock('../../src/core/constants.js', () => ({
+vi.mock('../../src/core/constants.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../src/core/constants.js')>(),
   RUNTIME_DIR: '.deckent/runtime',  // sprint-429 (429-011) tool-inventory yolu modül-yüklemede okur
   SETTINGS_DIR: '.deckent/settings',  // born-630 allowscope-zinciri modül-yüklemede okur
   DASHBOARD_FILE: '.dashboard',

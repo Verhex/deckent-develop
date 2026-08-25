@@ -3,7 +3,8 @@ import { Command } from 'commander';
 
 // ─── Module-level mocks ──────────────────────────────────────────────────────
 
-vi.mock('node:fs', () => ({
+vi.mock('node:fs', async (importOriginal) => ({
+  ...await importOriginal<typeof import('node:fs')>(),
   existsSync: vi.fn().mockReturnValue(true),
   readFileSync: vi.fn().mockReturnValue(''),
   writeFileSync: vi.fn(),

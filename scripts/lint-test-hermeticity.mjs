@@ -642,8 +642,11 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // moved — kernel/default-flip pins reworked in place; suite-owned fixtures only.
   // 2026-08-25 directives pipeline gate: +10 — tests/scripts/lint-directives.test.ts
   // (typed-problem pins + tmpdir import-scan roundtrip; fully tmpdir-hermetic).
+  // 2026-08-25 sprint-670 manual closure: count unchanged, digest moved —
+  // nervous-flow host-primary fixture + finalize-orphan logicalMetrics mock
+  // realigned in place (both suite-owned; no new tests).
   count: 16103,
-  digest: 'bdf23d35e321a88bdbc7142a228046949d89b2159540ace9c6e20f70ed29d2bd',
+  digest: '18ac109368ef866cfe85b8565c9857f93cb6e84a170acb6304a5ba3154cad5f8',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1152,8 +1155,14 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // scripts/lint-directives.mjs (pre-start gate over the compiled production
   // parser) and scripts/gen-repair-directives.mjs (deterministic repair-wave
   // DIRECTIVES generator); both registered in script-registry.
+  // 2026-08-25 sprint-670 manual closure: count unchanged, digest moved —
+  // cleanup.ts --json prose guard (say helper + machine projections) and
+  // provider-observations bilingual catalog descriptions (670-004/002).
+  // 2026-08-25 same closure, follow-up: digest moved — the two --json machine
+  // projections were removed as dead code (the legacy cleanup path holds on
+  // --json before reaching them); the say guard stays.
   count: 1325,
-  digest: 'b018eea066f131a3067b607e79b657e96853ae114050f84d9951a7db44b686d0',
+  digest: 'bc4ade3b0210fc47bd390321a7661888d4b7df5c24cc01f302b0143909d75ed1',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

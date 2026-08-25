@@ -278,6 +278,24 @@ function makeEvalResult(decision: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO'): Evalu
   };
 }
 
+function mockCollectedWave(results: TaskResult[]): void {
+  vi.mocked(waitForResults).mockImplementation(async (
+    _projectRoot,
+    waitedSprint,
+    _timeout,
+    _queue,
+    spawnOptions,
+  ) => {
+    for (const result of results) {
+      const task = waitedSprint.tasks.find(candidate => candidate.id === result.taskId);
+      if (task && spawnOptions?.evaluateCollectedResult) {
+        await spawnOptions.evaluateCollectedResult(task, result);
+      }
+    }
+    return results;
+  });
+}
+
 /** Publish the given fix tasks as REAL `.tasks/task-<id>.json` files on disk. */
 function publishFixTasks(fixTasks: Task[]): void {
   for (const task of fixTasks) {
@@ -424,7 +442,7 @@ describe('487-019 — runFixPhase dispatch & dependency continuation', () => {
     const evaluations = new Map([['487-010', TaskEvaluation.NO_GO]]);
 
     publishFixTasks([fixTask]);
-    vi.mocked(waitForResults).mockResolvedValue([makeResult(fixTask.id)]);
+    mockCollectedWave([makeResult(fixTask.id)]);
     vi.mocked(evaluateWithRubric).mockReturnValue(makeEvalResult('DONE'));
 
     await runFix(sprint, evaluations);
@@ -449,7 +467,7 @@ describe('487-019 — runFixPhase dispatch & dependency continuation', () => {
     const evaluations = new Map([['487-020', TaskEvaluation.NO_GO]]);
 
     publishFixTasks([fixTask]);
-    vi.mocked(waitForResults).mockResolvedValue([makeResult(fixTask.id)]);
+    mockCollectedWave([makeResult(fixTask.id)]);
     vi.mocked(evaluateWithRubric).mockReturnValue(makeEvalResult('DONE'));
 
     await runFix(sprint, evaluations);
@@ -485,7 +503,7 @@ describe('487-019 — runFixPhase dispatch & dependency continuation', () => {
 
     publishFixTasks([fixTask]);
     // The repair worker still SELF-CLAIMS DONE; the Brain verdict is NO_GO.
-    vi.mocked(waitForResults).mockResolvedValue([
+    mockCollectedWave([
       makeResult(fixTask.id, { selfAssessment: 'DONE', testsPassed: false }),
     ]);
     vi.mocked(evaluateWithRubric).mockReturnValue(makeEvalResult('NO_GO'));
@@ -525,7 +543,7 @@ describe('487-019 — runFixPhase dispatch & dependency continuation', () => {
     const evaluations = new Map([['487-040', TaskEvaluation.NO_GO]]);
 
     publishFixTasks([fixA, fixB]);
-    vi.mocked(waitForResults).mockResolvedValue([makeResult(fixA.id)]);
+    mockCollectedWave([makeResult(fixA.id)]);
     vi.mocked(evaluateWithRubric).mockReturnValue(makeEvalResult('DONE'));
 
     await runFix(sprint, evaluations);

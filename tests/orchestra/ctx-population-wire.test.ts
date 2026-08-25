@@ -95,7 +95,7 @@ describe('ctx-population-wire (born-674 / 428-001)', () => {
       expect(prompt).not.toContain('<path-to-the-test-file(s)-you-changed>');
     });
 
-    it('cites the stack-resolved check/test commands in CRITICAL VERIFY STEPS', () => {
+    it('fails closed when no task-local verification command was compiled', () => {
       root = mkdtempSync(join(tmpdir(), 'ctx-pop-verify-'));
       // A bare tsconfig.json is sufficient for stack-detector.ts detectFresh to
       // classify language=typescript (Layer 4 fallback: hasTS=true, <3 source
@@ -106,11 +106,11 @@ describe('ctx-population-wire (born-674 / 428-001)', () => {
 
       const prompt = buildWorkerPrompt(task, undefined, undefined, root);
 
-      expect(prompt).toContain('Run: `npx tsc --noEmit` — this project\'s resolved type-check command');
-      expect(prompt).toContain('Run: `npx vitest run <path-to-the-test-file(s)-you-changed>`');
+      expect(prompt).toContain("Run: `npx tsc --noEmit` — this project's compiled type-check command.");
+      expect(prompt).toContain('SCOPED_PROOF_HOLD: no exact task-local targeted test command was compiled');
     });
 
-    it('falls back to the legacy generic-examples lines when the stack resolves no commands', () => {
+    it('uses the same fail-closed proof hold when the stack resolves no commands', () => {
       root = mkdtempSync(join(tmpdir(), 'ctx-pop-noverify-'));
       // No stack markers at all → detectFresh yields language 'unknown' →
       // resolveCommandKey returns a key absent from STACK_COMMANDS → both
@@ -119,8 +119,8 @@ describe('ctx-population-wire (born-674 / 428-001)', () => {
 
       const prompt = buildWorkerPrompt(task, undefined, undefined, root);
 
-      expect(prompt).toContain('Examples: `tsc --noEmit` (TypeScript), `mypy` (Python), `go vet ./...` (Go), `cargo check` (Rust)');
-      expect(prompt).toContain('Example: `npx vitest run tests/orchestra/my-module.test.ts`');
+      expect(prompt).toContain('SCOPED_PROOF_HOLD: no task-local type-check command was compiled.');
+      expect(prompt).toContain('SCOPED_PROOF_HOLD: no exact task-local targeted test command was compiled');
     });
   });
 });

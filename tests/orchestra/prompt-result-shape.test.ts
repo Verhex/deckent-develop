@@ -72,7 +72,7 @@ describe('worker-prompt result-shape source guard (born-484)', () => {
   it('states workerId, testsPassed, and coverage with parser-safe scalar shapes', () => {
     const prompt = buildTaskPrompt(makeTask(), makeCtx()).prompt;
     expect(prompt).toContain('workerId ("w-367-003-fixture")');
-    expect(prompt).toMatch(/`testsPassed`.*boolean.*true.*false/);
+    expect(prompt).toMatch(/`testsPassed`.*boolean compatibility projection.*true only.*PASSED/);
     expect(prompt).toMatch(/`coverage`.*finite number from 0 to 100/);
     expect(prompt).toMatch(/use `0` to mean "not measured"/);
   });

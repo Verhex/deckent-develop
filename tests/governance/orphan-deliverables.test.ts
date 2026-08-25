@@ -433,6 +433,7 @@ const KNOWN_ORPHANS = [
   'src/api/sprint-job-runner.ts',
   'src/core/cascade-detector.ts',
   'src/core/production-wiring-typescript-adapter.ts',
+  'src/core/prompt-canary-bench.ts',
   'src/nervous/recovery-notification.ts',
   'src/orchestra/cross-verify-admission-policy.ts',
   'src/orchestra/recovery-adapters/run-flow-recovery-adapter.ts',
@@ -497,6 +498,7 @@ const KNOWN_ORPHANS = [
   // autonomous startup calls openLocalProviderAuthorityRuntime().
   'src/core/provider-capabilities.ts',
   'src/core/rate-limiter.ts',
+  'src/core/runtime-artifact-classifier.ts',
   'src/core/skill-registry.ts',
   'src/core/spawn-safety.ts',
   // Settlement slice (sprint 457-460, committed 2026-07-28): admission core
@@ -552,7 +554,7 @@ const KNOWN_ORPHANS = [
 
 describe('KNOWN_ORPHANS allowlist sanity', () => {
   it('has the expected count and only well-formed src/**/*.ts(x) entries', () => {
-    expect(KNOWN_ORPHANS.length).toBe(90); // 2026-08-21 sweep: -2 wired approval connectors, -1 wired RPC handler
+    expect(KNOWN_ORPHANS.length).toBe(92);
     for (const entry of KNOWN_ORPHANS) {
       expect(entry.startsWith('src/')).toBe(true);
       expect(entry.endsWith('.ts') || entry.endsWith('.tsx')).toBe(true);

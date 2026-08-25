@@ -345,6 +345,12 @@ D_WRITE_COLLISION BLOCK'ları; sprint-670 dersi: Reads-eksiği 8/13 NO_GO yaptı
 ④ `deckent plan --dry-run` önizleme temiz (scope-satisfiability + prompt-gate; BİLİNEN
 YAN-ETKİ: dry-run debt-preflight'ı `resolveDebt` YAZAR — yalnız lint-yeşilinden sonra 1 kez
 koş) → ⑤ start. Koşu izlemesi ana-oturumda değil sessiz nöbetçi-subagent'ta.
+**Hedef-mimari bağı (owner 2026-08-25):** DIRECTIVES kullanıcı-yüzü DEĞİL, arka-yüz
+ara-temsilidir — asıl hedef native-language tetikleme = MASTER **3180 DO-CUTOVER-001**
+(intent→preview→approval→run; 3183 immutable-proposal + 3185 closed-allowlist kanıtları
+sprint-483'te canlı). Bu lint/generator o hattın makine-kapısıdır; LLM'in dolduracağı
+nullable alanlar için SIRADAKİ küçük-iş: `lint-directives --fix` (system-assignment —
+eksik Reads'i import-taramasından, eksik Test'i Files'tan otomatik tamamla).
 
 - Finding başka outcome'a aitse otomatik implement edilmez.
 - `.brain/memory.db` silinmez; `.tasks` `rm` ile temizlenmez.

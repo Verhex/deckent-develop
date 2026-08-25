@@ -50,7 +50,7 @@ let broker: ApprovalBroker;
 beforeEach(() => {
   projectRoot = mkdtempSync(join(tmpdir(), 'expired-decide-'));
   storeDir = join(projectRoot, 'approvals');
-  broker = new ApprovalBroker(projectRoot, { storeDir });
+  broker = new ApprovalBroker(projectRoot, { storeDir, clock: () => BEFORE_EXPIRY });
 });
 
 afterEach(() => {
@@ -60,7 +60,7 @@ afterEach(() => {
 // ─── decideChecked — honest typed expired outcome ────────────────────────────
 
 describe('expired-decide-response — decideChecked honest expired outcome', () => {
-  it('an approve attempt on an overdue, never-decided request returns typed expired and writes nothing', () => {
+  it('an approve attempt on an overdue request returns typed expired and persists the TTL denial', () => {
     const req = broker.submit(buildRequest('apr-exp-approve'));
     const result = broker.decideChecked(
       req.id,
@@ -72,10 +72,10 @@ describe('expired-decide-response — decideChecked honest expired outcome', () 
     if (!isExpiredDecideResult(result)) throw new Error('expected expired result');
     expect(result.requestId).toBe(req.id);
     expect(result.expiresAt).toBe(EXPIRES_AT);
-    expect(existsSync(join(storeDir, `${req.id}.decision.json`))).toBe(false);
+    expect(existsSync(join(storeDir, `${req.id}.decision.json`))).toBe(true);
   });
 
-  it('a reject attempt on the same overdue request also returns typed expired and writes nothing', () => {
+  it('a reject attempt on the same overdue request also returns typed expired and persists the TTL denial', () => {
     const req = broker.submit(buildRequest('apr-exp-reject'));
     const result = broker.decideChecked(
       req.id,
@@ -86,7 +86,7 @@ describe('expired-decide-response — decideChecked honest expired outcome', () 
     expect(isExpiredDecideResult(result)).toBe(true);
     if (!isExpiredDecideResult(result)) throw new Error('expected expired result');
     expect(result.requestId).toBe(req.id);
-    expect(existsSync(join(storeDir, `${req.id}.decision.json`))).toBe(false);
+    expect(existsSync(join(storeDir, `${req.id}.decision.json`))).toBe(true);
   });
 
   it('a late decide attempt AFTER the TTL sweep already closed it also returns typed expired (never throws, never double-decides)', () => {
@@ -196,7 +196,7 @@ describe('expired-decide-response — end-to-end button-press round trip', () =>
     const callbackData = approvalCallbackData('approve', req.id);
 
     const parsed = parseApprovalCallback(callbackData);
-    expect(parsed).toEqual({ action: 'approve', triggerId: req.id });
+    expect(parsed).toMatchObject({ state: 'legacy', action: 'approve', triggerId: req.id });
     if (!parsed) throw new Error('expected parsed callback');
 
     const result = broker.decideChecked(

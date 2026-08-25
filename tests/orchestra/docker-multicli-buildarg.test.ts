@@ -309,8 +309,10 @@ describe('Dockerfile.worker — multi-CLI ARG blocks default-off (F1-DF, verifie
 
   it('opt-in RUN guards install the provider CLIs only when the build-arg is true', async () => {
     const df = await readDockerfileWorker();
-    expect(df).toMatch(/if\s*\[\s*"\$INSTALL_CODEX"\s*=\s*"true"\s*\];?\s*then\s+npm i -g @openai\/codex/);
-    expect(df).toMatch(/if\s*\[\s*"\$INSTALL_GEMINI"\s*=\s*"true"\s*\];?\s*then\s+npm i -g @google\/gemini-cli/);
+    expect(df).toContain('if [ "$INSTALL_CODEX" = "true" ]; then');
+    expect(df).toContain('@openai/codex');
+    expect(df).toContain('if [ "$INSTALL_GEMINI" = "true" ]; then');
+    expect(df).toContain('@google/gemini-cli');
   });
 
   it('claude CLI stays unconditionally baked in (always-present default)', async () => {

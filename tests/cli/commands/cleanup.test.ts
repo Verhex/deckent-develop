@@ -650,13 +650,13 @@ describe('cleanup E) prompt archive (isolated)', () => {
     expect(calls.some(c => String(c).includes('52') && String(c).includes('archive'))).toBe(true);
   });
 
-  it('E) prints cleaned count when old archives were removed', async () => {
+  it('E) ignores the retired cleaned counter from the archive adapter', async () => {
     vi.mocked(existsSync).mockReturnValue(false);
     vi.mocked(cleanup).mockImplementation(() => {});
     vi.mocked(archivePromptFiles).mockReturnValue({ archived: 0, cleaned: 15 });
     await runCommand(['cleanup']);
     const calls = vi.mocked(print).mock.calls.map(c => c[0]);
-    expect(calls.some(c => String(c).includes('15') && String(c).toLowerCase().includes('removed'))).toBe(true);
+    expect(calls.some(c => String(c).includes('15'))).toBe(false);
   });
 
   it('E) reads prompt_archive_retention from config (default 5)', async () => {
@@ -715,12 +715,12 @@ describe('cleanup F) .timeout and retention policy (isolated)', () => {
     expect(calls.some(c => String(c).includes('5 task file(s)'))).toBe(true);
   });
 
-  it('F) dry-run prints retention policy info', async () => {
+  it('F) dry-run does not invoke either archive retention mutator', async () => {
     vi.mocked(existsSync).mockImplementation((p: any) => String(p).includes('.tasks'));
     vi.mocked(readdirSync).mockReturnValue([] as any);
     await runCommand(['cleanup', '--dry-run']);
-    const calls = vi.mocked(print).mock.calls.map(c => c[0]);
-    expect(calls.some(c => String(c).toLowerCase().includes('retention'))).toBe(true);
+    expect(archivePromptFiles).not.toHaveBeenCalled();
+    expect(cleanTasksArchive).not.toHaveBeenCalled();
   });
 
   it('F) calls cleanTasksArchive with retention count after normal cleanup', async () => {

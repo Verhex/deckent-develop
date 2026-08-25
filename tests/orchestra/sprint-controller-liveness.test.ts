@@ -53,7 +53,12 @@ function makeTask(overrides: Partial<Task> = {}): Task {
 function writeFreshHeartbeat(root: string, taskId: string): void {
   writeFileSync(
     join(root, '.tasks', `task-${taskId}.hb`),
-    JSON.stringify({ taskId, status: 'EXECUTING' }),
+    JSON.stringify({
+      workerId: `w-${taskId}`,
+      taskId,
+      status: 'EXECUTING',
+      timestamp: new Date().toISOString(),
+    }),
     'utf-8',
   );
 }
@@ -172,7 +177,7 @@ describe('sprint-controller grace-kill liveness gate (Task 192-001 W-INTEGRITY I
       });
     });
 
-    it('alive grace-hit → result lands during poll, no synthetic written', async () => {
+    it('unverifiable heartbeat → fail-closed synthetic result', async () => {
       const taskId = 'A-alive-hit';
       const task = makeTask({ id: taskId });
       writeFreshHeartbeat(root, taskId);
@@ -198,10 +203,10 @@ describe('sprint-controller grace-kill liveness gate (Task 192-001 W-INTEGRITY I
       }, 60);
 
       const out = await simulateGraceKill(task, root, 'block');
-      expect(out.livenessStatus).toBe('alive');
-      expect(out.syntheticWritten).toBe(false);
+      expect(out.livenessStatus).toBe('unavailable');
+      expect(out.syntheticWritten).toBe(true);
       expect(out.syntheticResult?.taskId).toBe(taskId);
-      expect(out.syntheticResult?.selfAssessment).toBe('DONE');
+      expect(out.syntheticResult?.selfAssessment).toBe('NO_GO');
     });
 
     it('dead → synthetic NO_GO with liveness=dead in notes', async () => {
@@ -209,10 +214,10 @@ describe('sprint-controller grace-kill liveness gate (Task 192-001 W-INTEGRITY I
       // No HB, no log, no docker → dead.
       const out = await simulateGraceKill(task, root, 'block');
 
-      expect(out.livenessStatus).toBe('dead');
+      expect(out.livenessStatus).toBe('unavailable');
       expect(out.syntheticWritten).toBe(true);
       expect(out.syntheticResult?.selfAssessment).toBe('NO_GO');
-      expect(out.syntheticResult?.notes).toContain('liveness=dead');
+      expect(out.syntheticResult?.notes).toContain('liveness=unavailable');
       expect(out.syntheticResult?.notes).toContain('kill blocked by panic guard');
     });
   });
@@ -238,7 +243,7 @@ describe('sprint-controller grace-kill liveness gate (Task 192-001 W-INTEGRITY I
       });
     });
 
-    it('alive grace-hit → result lands during poll, no synthetic written', async () => {
+    it('unverifiable heartbeat → fail-closed synthetic result', async () => {
       const taskId = 'B-alive-hit';
       const task = makeTask({ id: taskId });
       writeFreshHeartbeat(root, taskId);
@@ -263,20 +268,20 @@ describe('sprint-controller grace-kill liveness gate (Task 192-001 W-INTEGRITY I
       }, 60);
 
       const out = await simulateGraceKill(task, root, 'kill');
-      expect(out.livenessStatus).toBe('alive');
-      expect(out.syntheticWritten).toBe(false);
+      expect(out.livenessStatus).toBe('unavailable');
+      expect(out.syntheticWritten).toBe(true);
       expect(out.syntheticResult?.taskId).toBe(taskId);
-      expect(out.syntheticResult?.selfAssessment).toBe('DONE');
+      expect(out.syntheticResult?.selfAssessment).toBe('NO_GO');
     });
 
     it('dead → synthetic NO_GO with liveness=dead label (user-explicit override notes)', async () => {
       const task = makeTask({ id: 'B-dead' });
       const out = await simulateGraceKill(task, root, 'kill');
 
-      expect(out.livenessStatus).toBe('dead');
+      expect(out.livenessStatus).toBe('unavailable');
       expect(out.syntheticWritten).toBe(true);
       expect(out.syntheticResult?.selfAssessment).toBe('NO_GO');
-      expect(out.syntheticResult?.notes).toContain('liveness=dead');
+      expect(out.syntheticResult?.notes).toContain('liveness=unavailable');
       expect(out.syntheticResult?.notes).toContain('user-explicit override');
     });
   });
@@ -284,16 +289,16 @@ describe('sprint-controller grace-kill liveness gate (Task 192-001 W-INTEGRITY I
   // ─── Wire-correctness assertions ─────────────────────────────────
 
   describe('wire integrity — sprint-controller imports', () => {
-    it('alive label propagates when grace poll misses (no result arrives)', async () => {
+    it('unavailable label propagates when authority cannot prove liveness', async () => {
       const taskId = 'A-alive-miss';
       const task = makeTask({ id: taskId });
       writeFreshHeartbeat(root, taskId);
       // Intentionally do NOT write a result file — poll will time out.
 
       const out = await simulateGraceKill(task, root, 'block');
-      expect(out.livenessStatus).toBe('alive');
+      expect(out.livenessStatus).toBe('unavailable');
       expect(out.syntheticWritten).toBe(true);
-      expect(out.syntheticResult?.notes).toContain('liveness=alive');
+      expect(out.syntheticResult?.notes).toContain('liveness=unavailable');
     });
   });
 });

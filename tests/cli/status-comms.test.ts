@@ -8,6 +8,7 @@ vi.mock('node:fs', () => ({
   watch: vi.fn().mockReturnValue({ close: vi.fn() }),
   statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
   mkdirSync: vi.fn(),
+  renameSync: vi.fn(),
 }));
 
 vi.mock('../../src/cli/helpers/messages.js', async (importOriginal) => {

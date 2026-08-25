@@ -65,6 +65,12 @@ vi.mock('../../src/core/config.js', async (importOriginal) => {
         engine: 'v1',
         interval_ms: 1,
       },
+      approval: {
+        lifecycle: {
+          default_ttl_ms: 900_000,
+          default_action: 'deny',
+        },
+      },
       ...(state.configured
         ? {
             provider_limit_authority: {

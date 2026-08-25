@@ -48,7 +48,7 @@ function task(id: string, overrides: Partial<Task> = {}): Task {
     dependencies: [],
     goNogo: { goCriteria: 'closed', noGoCriteria: 'open', techDebtAcceptable: 'none' },
     status: TaskStatus.DONE,
-    sprintId: 'sprint-canary',
+    sprintId: 'sprint-999',
     createdAt: '2026-07-31T12:00:00.000Z',
     ...overrides,
   } as Task;
@@ -108,7 +108,7 @@ describe('canonical production-wiring closure canary', () => {
       scope: { directories: [], filesRead: [], filesWrite: ['src/independent.ts'] },
     });
     const schedulerSprint = {
-      id: 'sprint-canary', number: 1, status: SprintStatus.ACTIVE,
+      id: 'sprint-999', number: 999, status: SprintStatus.ACTIVE,
       phase: SprintPhase.EXECUTE, tasks: [owner, competitor, independent],
       workers: [], planningMode: 'structured',
     } as Sprint;
@@ -151,14 +151,14 @@ describe('canonical production-wiring closure canary', () => {
       results: [result(failed.id, 'NO_GO'), result(repaired.id, 'DONE')],
     });
     const sprint = {
-      id: 'sprint-canary', number: 1, tasks: [failed, repaired],
+      id: 'sprint-999', number: 999, tasks: [failed, repaired],
     } as Parameters<typeof publishFencedSprintTerminalReceipt>[0]['sprint'];
     publishFencedSprintTerminalReceipt({
       projectRoot: root, sprint, truth, runId: 'run-canary', coordinatorGeneration: 1,
       now: () => '2026-07-31T12:02:00.000Z',
     });
     writeFileSync(join(root, '.deckent', 'sprint-state.json'), JSON.stringify({
-      sprintId: 'sprint-canary', phase: 'COMPLETE', status: 'COMPLETE',
+      sprintId: 'sprint-999', phase: 'COMPLETE', status: 'COMPLETE',
     }));
     expect(truth.logicalProgress).toMatchObject({ done: 1, total: 1, attemptCount: 2 });
 
@@ -184,7 +184,7 @@ describe('canonical production-wiring closure canary', () => {
     });
     expect(projectMcpTerminalPublication(root, status.authority)).toMatchObject({
       state: 'receipt-observed',
-      receipt: { sprintId: 'sprint-canary' },
+      receipt: { sprintId: 'sprint-999' },
     });
   });
 });

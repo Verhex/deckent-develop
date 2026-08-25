@@ -17,6 +17,7 @@ vi.mock('node:fs', () => ({
   readFileSync: vi.fn(),
   existsSync: vi.fn(),
   readdirSync: vi.fn(),
+  renameSync: vi.fn(),
   accessSync: vi.fn(),
   constants: { W_OK: 2 },
 }));
@@ -98,6 +99,8 @@ vi.mock('../../../src/core/deck-file.js', () => ({
 }));
 
 vi.mock('../../../src/core/constants.js', () => ({
+  ARCHIVE_DIR: 'archive',
+  ARCHIVE_SPRINTS_SUBDIR: 'sprints',
   RUNTIME_DIR: '.deckent/runtime',  // sprint-429 (429-011) tool-inventory yolu modül-yüklemede okur
   DECKENT_DIR: '.deckent',
   SETTINGS_DIR: '.deckent/settings',  // born-630 allowscope-zinciri modül-yüklemede okur

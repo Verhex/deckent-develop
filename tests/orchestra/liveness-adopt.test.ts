@@ -133,17 +133,16 @@ describe('auditor kill-path (isWorkerStale) — RED→GREEN', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('GREEN: stale-ts .hb for a LIVE subprocess worker is NOT stale (host-primary keeps it alive)', () => {
+  it('stale unauthenticated .hb remains stale even when its claimed subprocess pid is live', () => {
     const hb = {
       workerId: 'w-A1', taskId: 'A1', status: 'EXECUTING',
       currentAction: 'thinking', timestamp: STALE_TS,
       filesChangedCount: 0, sequence: 1, progress: 50,
       backend: 'subprocess' as const, pid: LIVE_PID,
     };
-    // No hbPath → the OLD path judged from hb.timestamp (stale) + subprocess
-    // isWorkerProcessAlive===false ⇒ it returned STALE (the wrong-kill). The NEW
-    // host-primary vote (live pid) suppresses it.
-    expect(isWorkerStale(hb as never, root, 120_000)).toBe(false);
+    // A worker-authored pid is not host process authority. Without an hbPath
+    // that binds the heartbeat to a host observation, age remains decisive.
+    expect(isWorkerStale(hb as never, root, 120_000)).toBe(true);
   });
 
   it('a genuinely dead worker (no backend, stale ts, no result) is still stale (fallback preserved)', () => {

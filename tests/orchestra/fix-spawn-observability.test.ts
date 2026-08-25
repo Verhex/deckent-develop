@@ -235,7 +235,7 @@ describe('row 3309 — a queued FIX task spawns observably or publishes a typed 
     // The origin task must exist on disk: the canonical executor inherits the
     // fix-task's routing lineage from it before dispatch.
     const origin = task('3309-006', TaskStatus.DONE);
-    const queuedFix = fixTask('3309-006-fix', '3309-006', ['3309-006']);
+    const queuedFix = fixTask('3309-006-fix', '3309-006');
     persist([origin, queuedFix]);
     const backend = makeBackend();
 

@@ -39,15 +39,15 @@ describe('decisions.md — ADR format and content (Memory V2 export)', () => {
     }
   });
 
-  it('each ADR has Decision and Context fields', () => {
+  it('each ADR has Decision content and an explicit Status field', () => {
     const content = readFileSync(DECISIONS_PATH, 'utf-8');
     const adrBlocks = content.split(/^## adr-\S+:/m).slice(1);
     expect(adrBlocks.length).toBeGreaterThan(0);
     for (const block of adrBlocks) {
       const hasDecision = /Decision/.test(block);
-      const hasContext = /Context/.test(block);
+      const hasStatus = /\*\*Status:\*\*/.test(block);
       expect(hasDecision, `Missing Decision in block: ${block.slice(0, 80)}`).toBe(true);
-      expect(hasContext, `Missing Context in block: ${block.slice(0, 80)}`).toBe(true);
+      expect(hasStatus, `Missing Status in block: ${block.slice(0, 80)}`).toBe(true);
     }
   });
 

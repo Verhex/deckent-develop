@@ -101,7 +101,7 @@ describe('buildWorkerPrompt — skillPrompts parameter', () => {
     const prompt = buildWorkerPrompt(task, undefined, skillPrompts);
     const skillIdx = prompt.indexOf('=== Skills ===');
     const workerIdx = prompt.indexOf('You are a Deckent worker agent');
-    expect(skillIdx).toBeLessThan(workerIdx);
+    expect(workerIdx).toBeLessThan(skillIdx);
   });
 
   it('skill section appears before agent section when both present', () => {
@@ -111,8 +111,8 @@ describe('buildWorkerPrompt — skillPrompts parameter', () => {
     const skillIdx = prompt.indexOf('=== Skills ===');
     const agentIdx = prompt.indexOf('=== Agent:');
     const workerIdx = prompt.indexOf('You are a Deckent worker agent');
+    expect(workerIdx).toBeLessThan(skillIdx);
     expect(skillIdx).toBeLessThan(agentIdx);
-    expect(agentIdx).toBeLessThan(workerIdx);
   });
 
   it('standard prompt unchanged when no agent and no skills', () => {

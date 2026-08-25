@@ -26,8 +26,8 @@ import type {
 } from '../../src/connectors/approval-teams.js';
 import type { TelegramApprovalTransport } from '../../src/connectors/approval-telegram.js';
 
-const CREATED_AT = '2026-07-02T21:00:00.000Z';
-const EXPIRES_AT = '2026-07-02T21:15:00.000Z';
+const CREATED_AT = '2099-07-02T21:00:00.000Z';
+const EXPIRES_AT = '2099-07-02T21:15:00.000Z';
 const SECRET_VALUE = 'xoxb-real-secret-should-never-leak-123456';
 
 function buildRequest(id: string, overrides: Partial<ApprovalRequestInput> = {}): ApprovalRequestInput {
@@ -423,7 +423,10 @@ describe('attachConfiguredApprovalChannels — full pending -> decision roundtri
     expect(slack.sent).toHaveLength(1);
     expect(slack.sent[0]!.channel).toBe('C-1');
 
-    slack.fireAction({ channelId: 'C-1', userId: 'alperen', actionValue: `approve:${req.id}` });
+    const actionValue = (slack.sent[0]!.blocks[1] as {
+      elements: ReadonlyArray<{ value: string }>;
+    }).elements[0]!.value;
+    slack.fireAction({ channelId: 'C-1', userId: 'alperen', actionValue });
 
     const decision = await waiting;
     expect(decision.decision).toBe('allow');
@@ -450,7 +453,10 @@ describe('attachConfiguredApprovalChannels — full pending -> decision roundtri
     expect(teams.sent).toHaveLength(1);
     expect(teams.sent[0]!.channelId).toBe('T-1');
 
-    teams.fireCardAction({ channelId: 'T-1', userId: 'alperen', actionValue: `reject:${req.id}` });
+    const actionValue = (teams.sent[0]!.attachments[0]!.content.actions[1]!.data as {
+      value: string;
+    }).value;
+    teams.fireCardAction({ channelId: 'T-1', userId: 'alperen', actionValue });
 
     const decision = await waiting;
     expect(decision.decision).toBe('deny');

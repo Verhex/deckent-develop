@@ -20,15 +20,35 @@ import {
 } from '../../src/core/types.js';
 import type { Task, Sprint, ResolvedConfig, TaskResult } from '../../src/core/types.js';
 
+const { mockFsFiles } = vi.hoisted(() => ({
+  mockFsFiles: new Map<string, string>(),
+}));
+
 // ─── Mocks (mirror dependency-pipeline-wire.test.ts pattern) ─────────
 
 vi.mock('node:fs', () => ({
-  readFileSync: vi.fn(),
-  writeFileSync: vi.fn(),
-  existsSync: vi.fn().mockReturnValue(false),
+  readFileSync: vi.fn((path: unknown) => {
+    const value = mockFsFiles.get(String(path));
+    if (value === undefined) {
+      const error = new Error(`ENOENT: ${String(path)}`) as NodeJS.ErrnoException;
+      error.code = 'ENOENT';
+      throw error;
+    }
+    return value;
+  }),
+  writeFileSync: vi.fn((path: unknown, data: unknown) => {
+    mockFsFiles.set(String(path), String(data));
+  }),
+  existsSync: vi.fn((path: unknown) => mockFsFiles.has(String(path))),
   mkdirSync: vi.fn(),
+  renameSync: vi.fn((from: unknown, to: unknown) => {
+    const value = mockFsFiles.get(String(from));
+    if (value === undefined) throw new Error(`ENOENT: ${String(from)}`);
+    mockFsFiles.set(String(to), value);
+    mockFsFiles.delete(String(from));
+  }),
   readdirSync: vi.fn().mockReturnValue([]),
-  unlinkSync: vi.fn(),
+  unlinkSync: vi.fn((path: unknown) => { mockFsFiles.delete(String(path)); }),
   statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
   appendFileSync: vi.fn(),
   promises: {
@@ -73,7 +93,10 @@ vi.mock('../../src/core/utils.js', async (importOriginal) => {
     countBrainLines: vi.fn().mockReturnValue(100),
     getNextSprintId: vi.fn().mockReturnValue('sprint-164'),
     updateLastSprintId: vi.fn(),
-    readJsonSafe: vi.fn().mockReturnValue(null),
+    readJsonSafe: vi.fn((path: string) => {
+      const value = mockFsFiles.get(path);
+      return value === undefined ? null : JSON.parse(value);
+    }),
     debugLog: vi.fn(),
   };
 });

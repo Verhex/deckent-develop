@@ -162,6 +162,11 @@ vi.mock('../../src/orchestra/runtime-budget-monitor.js', async (importOriginal) 
   }),
 }));
 
+vi.mock('../../src/core/final-only-usage-containment.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/core/final-only-usage-containment.js')>()),
+  requireFinalOnlyUsageContainment: vi.fn(() => undefined),
+}));
+
 // ─── Rollback mock (spy-able, COMPLETE export list) ──────────────────
 // The spies below are called by PRODUCTION code (runPreStartGuards /
 // runRollbackCheck), not by any test-local reimplementation. Every runtime
@@ -210,7 +215,8 @@ vi.mock('../../src/core/system-profile.js', () => ({
   }),
 }));
 
-vi.mock('../../src/core/config.js', () => ({
+vi.mock('../../src/core/config.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/core/config.js')>()),
   resolveBrainModel: () => 'claude-sonnet-5',
   readAuthMode: vi.fn().mockReturnValue('subscription'),
   resolveLiveTraceEnabled: vi.fn().mockReturnValue(false),
@@ -248,7 +254,7 @@ vi.mock('../../src/agents/worker-ipc.js', () => ({
 // ── MemoryStore mock for DB-first code paths ─────────────────────
 // ─── Imports (after mocks) ───────────────────────────────────────────
 import {
-  mkdtempSync, rmSync, mkdirSync, writeFileSync,
+  mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -321,8 +327,22 @@ function makeConfig(): ResolvedConfig {
     modes: {} as never,
     spawn_backend: 'docker',
     execution_budget: {
-      roles: { worker: { default: { maxTurns: 1 } } },
+      roles: {
+        worker: {
+          default: {
+            maxTokens: 1_000_000,
+            maxTurns: 48,
+            maxCacheReadTokens: 1_000_000,
+            maxOutputTokens: 100_000,
+          },
+        },
+      },
       landing: { reserve_ratio: 0.25 },
+      final_only_usage: {
+        action: 'allow-wall-clock-containment',
+        roles: ['worker'],
+        max_wall_clock_seconds: 600,
+      },
     },
   };
 }
@@ -345,6 +365,9 @@ function makeTaskResult(opts: {
   return JSON.stringify({
     taskId,
     workerId: `w-${taskId}`,
+    promptCompilePlanId: taskId === "001-001"
+      ? "prompt-compile-plan:sha256:067659252077cd533078bcc8f66a8ded101f48b419d9ea91abc8ef297a6384d3"
+      : undefined,
     filesChanged: ['src/foo.ts'],
     linesAdded: 10,
     linesRemoved: 0,
@@ -443,7 +466,33 @@ describe('RunSprintOptions.rollback', () => {
       name: 'test-measured',
       liveUsageBudgetSupport: 'measured-stream',
       executionLandingCapability: 'cooperative-landing',
-      spawn: vi.fn(),
+      spawn: vi.fn((taskId: string) => {
+        const taskPath = join(PROJECT_ROOT, '.tasks', `task-${taskId}.json`);
+        const resultPath = join(PROJECT_ROOT, '.tasks', `task-${taskId}.result`);
+        if (!existsSync(taskPath) || !existsSync(resultPath)) return;
+        const task = JSON.parse(readFileSync(taskPath, 'utf-8')) as {
+          promptCompilePlanId?: string;
+          goNogo?: { items?: Array<{ id: string; polarity: 'go' | 'no-go' }> };
+        };
+        const result = JSON.parse(readFileSync(resultPath, 'utf-8')) as Record<string, unknown>;
+        if (task.promptCompilePlanId) {
+          result.promptCompilePlanId = task.promptCompilePlanId;
+        }
+        result.testVerification = {
+          applicability: 'REQUIRED',
+          outcome: result.testsPassed === false ? 'FAILED' : 'PASSED',
+          commands: ['fixture verification'],
+        };
+        result.criteriaEvidence = (task.goNogo?.items ?? []).map(item => ({
+          criterionId: item.id,
+          outcome: item.polarity === 'go'
+            ? result.selfAssessment === 'NO_GO' ? 'UNMET' : 'MET'
+            : result.selfAssessment === 'NO_GO' ? 'MET' : 'UNMET',
+          evidence: ['fixture result evidence'],
+        }));
+        result.techDebtCriterionIds = [];
+        writeFileSync(resultPath, JSON.stringify(result), 'utf-8');
+      }),
       kill: vi.fn(),
       list: vi.fn().mockReturnValue([]),
     } as never);

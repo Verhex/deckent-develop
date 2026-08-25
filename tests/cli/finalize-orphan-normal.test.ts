@@ -67,6 +67,18 @@ vi.mock('../../src/orchestra/brain.js', () => ({
   }),
 }));
 
+vi.mock('../../src/orchestra/sprint-finalizer.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../src/orchestra/sprint-finalizer.js')>(),
+  forceAbortSprint: vi.fn(() => ({
+    outcome: 'ABORTED',
+    receiptPublication: {},
+    // logicalMetrics landed with the force-finalize summary line (proved live
+    // on sprint-670: "9/13 logical tasks were done") — the mock mirrors it.
+    terminalTruth: { status: 'ABORTED',
+      logicalMetrics: { totalTasks: 1, completedTasks: 0, techDebtTasks: 0, noGoTasks: 1 } },
+  })),
+}));
+
 // loadConfig must not consult ~/.deckent (hermeticity) — deterministic {}.
 vi.mock('../../src/core/config.js', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -82,7 +94,7 @@ vi.mock('../../src/core/rule-generator.js', () => ({
 const printed: string[] = [];
 vi.mock('../../src/cli/helpers/output.js', () => ({
   print: vi.fn((msg: string) => { printed.push(msg); }),
-  printError: vi.fn(),
+  printError: vi.fn((msg: string) => { printed.push(`ERROR: ${msg}`); }),
 }));
 
 import { Command } from 'commander';
@@ -120,6 +132,16 @@ function makeResult(taskId: string, overrides: Partial<TaskResult> = {}): TaskRe
     linesAdded: 10,
     linesRemoved: 1,
     testsPassed: true,
+    testVerification: {
+      applicability: 'REQUIRED',
+      outcome: 'PASSED',
+      commands: ['npx vitest run tests/fixture.test.ts'],
+    },
+    criteriaEvidence: [
+      { criterionId: 'fixture-go', outcome: 'MET', evidence: ['fixture passed'] },
+      { criterionId: 'fixture-no-go', outcome: 'UNMET', evidence: ['not observed'] },
+    ],
+    techDebtCriterionIds: [],
     coverage: 95,
     selfAssessment: 'DONE',
     evaluationDecision: 'DONE',

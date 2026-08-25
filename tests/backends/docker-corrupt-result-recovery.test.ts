@@ -111,8 +111,12 @@ describe('Docker exit-zero corrupt result recovery', () => {
     expect(readTaskResultSettlement(ref)?.result).toMatchObject({
       workerId: 'w-exit-zero-valid',
       selfAssessment: 'DONE',
-      testsPassed: true,
+      notes: 'verified',
     });
+    expect(readTaskResultSettlement(ref)?.result).not.toHaveProperty(
+      'markerType',
+      'RECOVERY_RESULT_INVALID',
+    );
   });
 
   it.each([

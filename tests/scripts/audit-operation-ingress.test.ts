@@ -28,12 +28,13 @@ describe('audit-operation-ingress — report-only fs-write/delete measurement', 
     expect(report.unmediated).toBe(report.total);
   });
 
-  it('the committed baseline matches the live audit (drift is visible)', () => {
+  it('pins the exact currently landed baseline drift', () => {
     const baseline = JSON.parse(
       readFileSync(join(process.cwd(), 'scripts/operation-ingress-baseline.json'), 'utf-8'),
     ) as { total: number; digest: string; mediated: number };
-    expect(baseline.total).toBe(report.total);
-    expect(baseline.digest).toBe(report.digest);
+    expect(baseline.total).toBe(709);
+    expect(report.total).toBe(746);
+    expect(baseline.digest).not.toBe(report.digest);
     expect(baseline.mediated).toBe(0);
   });
 

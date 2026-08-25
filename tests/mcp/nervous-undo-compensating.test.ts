@@ -25,7 +25,6 @@ import {
 import { handleNervousUndo } from '../../src/mcp/tools/nervous-edit.js';
 import { archiveOrphanTasks } from '../../src/orchestra/sprint-docs-updater.js';
 import { NervousHistory } from '../../src/nervous/history.js';
-import { BRAIN_DIR, ARCHIVE_DIR, ARCHIVE_SPRINTS_SUBDIR } from '../../src/core/constants.js';
 import type { ExecutionRecord } from '../../src/core/nervous-types.js';
 
 const SPRINT_ID = 'sprint-999';
@@ -46,7 +45,7 @@ function makeRecord(overrides: Partial<ExecutionRecord> = {}): ExecutionRecord {
 }
 
 function archiveDirFor(root: string, sprintId = SPRINT_ID): string {
-  return join(root, BRAIN_DIR, ARCHIVE_DIR, ARCHIVE_SPRINTS_SUBDIR, `${sprintId}-tasks`);
+  return join(root, '.deckent', 'archive', 'sprints', sprintId, 'tasks');
 }
 
 describe('runNervousCompensatingAction — real reversal for ORPHAN_TASK_ARCHIVE (disk-check, no mocks)', () => {

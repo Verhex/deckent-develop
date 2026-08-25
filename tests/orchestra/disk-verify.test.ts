@@ -316,6 +316,7 @@ describe('restoreSprintFromCheckpoint — disk-verify recovery gate', () => {
         status: 'EXECUTING',
         spawnedAt: new Date().toISOString(),
       }],
+      taskStates: [{ id: taskId, status: TaskStatus.EXECUTING }],
       brainPhase: SprintPhase.EXECUTE,
       eventStreamOffset: 0,
     };
@@ -326,7 +327,7 @@ describe('restoreSprintFromCheckpoint — disk-verify recovery gate', () => {
     );
   }
 
-  it('(i) stale EXECUTING with on-disk changes → MANUAL_REVIEW_REQUIRED', () => {
+  it('(i) stale EXECUTING with on-disk changes → PENDING for non-terminal recovery', () => {
     const taskId = 'i-001';
     writeTaskAndCheckpoint(taskId);
     // Worker did NOT write .result, but did modify a tracked file before crashing.
@@ -339,28 +340,29 @@ describe('restoreSprintFromCheckpoint — disk-verify recovery gate', () => {
     expect(out.restored).toBe(true);
     // The task should NOT be in staleTasksMarkedNoGo (gate prevented synthetic NO_GO).
     expect(out.staleTasksMarkedNoGo).not.toContain(taskId);
-    // Status on disk should now be MANUAL_REVIEW_REQUIRED.
+    // Recovery no longer manufactures a terminal/manual-review outcome from
+    // mutable disk evidence; the task returns to the dispatchable state.
     const taskJson = JSON.parse(
       readFileSync(join(projectRoot, '.tasks', `task-${taskId}.json`), 'utf-8'),
     ) as Task;
-    expect(taskJson.status).toBe(TaskStatus.MANUAL_REVIEW_REQUIRED);
+    expect(taskJson.status).toBe(TaskStatus.PENDING);
   });
 
-  it('(j) stale EXECUTING with empty disk → NO_GO (legacy behavior preserved)', () => {
+  it('(j) stale EXECUTING with empty disk → PENDING without synthetic NO_GO', () => {
     const taskId = 'j-001';
     writeTaskAndCheckpoint(taskId);
     // No disk changes.
 
     const out = restoreSprintFromCheckpoint(projectRoot, sprintId);
     expect(out.restored).toBe(true);
-    expect(out.staleTasksMarkedNoGo).toContain(taskId);
+    expect(out.staleTasksMarkedNoGo).not.toContain(taskId);
     const taskJson = JSON.parse(
       readFileSync(join(projectRoot, '.tasks', `task-${taskId}.json`), 'utf-8'),
     ) as Task;
-    expect(taskJson.status).toBe(TaskStatus.NO_GO);
+    expect(taskJson.status).toBe(TaskStatus.PENDING);
   });
 
-  it('(k) emits BRAIN→AUDITOR:DISK_VS_CLAIM_MISMATCH event when gate fires', () => {
+  it('(k) does not emit a terminal mismatch event during non-terminal recovery', () => {
     const taskId = 'k-001';
     writeTaskAndCheckpoint(taskId);
     appendFileSync(
@@ -372,14 +374,7 @@ describe('restoreSprintFromCheckpoint — disk-verify recovery gate', () => {
 
     // Verify the audit event appears in the sprint event stream.
     const eventsPath = join(projectRoot, '.deckent', 'recently-works', `${sprintId}-events.jsonl`);
-    expect(existsSync(eventsPath)).toBe(true);
-    const raw = readFileSync(eventsPath, 'utf-8');
-    const lines = raw.split('\n').filter(l => l.trim().length > 0);
-    const events = lines.map(l => JSON.parse(l) as { channel: string; payload: { taskId?: string; cause?: string } });
-    const match = events.find(e => e.channel === DISK_VS_CLAIM_MISMATCH_CHANNEL);
-    expect(match).toBeDefined();
-    expect(match?.payload.taskId).toBe(taskId);
-    expect(match?.payload.cause).toBe('checkpoint-recovery-stale-executing');
+    expect(existsSync(eventsPath)).toBe(false);
   });
 });
 
@@ -566,6 +561,7 @@ describe('Sprint 197 197-001 — untracked file gate invariants', () => {
           status: 'EXECUTING',
           spawnedAt: new Date().toISOString(),
         }],
+        taskStates: [{ id: taskId, status: TaskStatus.EXECUTING }],
         brainPhase: SprintPhase.EXECUTE,
         eventStreamOffset: 0,
       };
@@ -589,19 +585,11 @@ describe('Sprint 197 197-001 — untracked file gate invariants', () => {
       const taskJson = JSON.parse(
         readFileSync(join(projectRoot, '.tasks', `task-${taskId}.json`), 'utf-8'),
       ) as Task;
-      expect(taskJson.status).toBe(TaskStatus.MANUAL_REVIEW_REQUIRED);
+      expect(taskJson.status).toBe(TaskStatus.PENDING);
 
       // Audit event must be emitted with the untracked path in the payload.
       const eventsPath = join(projectRoot, '.deckent', 'recently-works', `${sprintId}-events.jsonl`);
-      expect(existsSync(eventsPath)).toBe(true);
-      const raw = readFileSync(eventsPath, 'utf-8');
-      const events = raw.split('\n').filter(l => l.trim().length > 0).map(l =>
-        JSON.parse(l) as { channel: string; payload: { taskId?: string; untrackedFiles?: string[] } },
-      );
-      const match = events.find(e => e.channel === DISK_VS_CLAIM_MISMATCH_CHANNEL);
-      expect(match).toBeDefined();
-      expect(match?.payload.taskId).toBe(taskId);
-      expect(match?.payload.untrackedFiles).toContain('src/orchestra/token-counter.ts');
+      expect(existsSync(eventsPath)).toBe(false);
     });
   });
 });

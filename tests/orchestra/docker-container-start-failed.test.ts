@@ -10,6 +10,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ChildProcess } from 'node:child_process';
 
+const { mockFsFiles } = vi.hoisted(() => ({
+  mockFsFiles: new Map<string, string>(),
+}));
+
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
 vi.mock('node:child_process', async () => {
@@ -36,16 +40,26 @@ vi.mock('node:fs', () => ({
   linkSync: vi.fn(),
   statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
   chmodSync: vi.fn(),
-  existsSync: vi.fn(() => true),
+  existsSync: vi.fn((path: unknown) => (
+    String(path).endsWith('.result') ? mockFsFiles.has(String(path)) : true
+  )),
   readFileSync: vi.fn(() => '{}'), // task JSON parse path returns {} → no scope.filesWrite → spawn locks skipped
-  writeFileSync: vi.fn(),
+  writeFileSync: vi.fn((path: unknown, data: unknown) => {
+    mockFsFiles.set(String(path), String(data));
+  }),
   mkdirSync: vi.fn(),
   unlinkSync: vi.fn(),
   readdirSync: vi.fn(() => []),
   openSync: vi.fn(() => 0),
   fsyncSync: vi.fn(),
   closeSync: vi.fn(),
-  renameSync: vi.fn(),
+  renameSync: vi.fn((from: unknown, to: unknown) => {
+    const value = mockFsFiles.get(String(from));
+    if (value !== undefined) {
+      mockFsFiles.set(String(to), value);
+      mockFsFiles.delete(String(from));
+    }
+  }),
   rmdirSync: vi.fn(),
 }));
 
@@ -254,6 +268,7 @@ describe('DockerSpawnBackend: container_start_failed health check + retry', () =
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFsFiles.clear();
     // Heartbeat-authority identity readbacks must surface ENOENT: the full
     // node:fs mock cannot carry the WorkerHeartbeatAuthorityStore
     // write→readback chain, and the '{}' fallback would trip the store's
@@ -262,7 +277,9 @@ describe('DockerSpawnBackend: container_start_failed health check + retry', () =
     // (read → null, observe → typed HOLD); real persistence is proven in
     // tests/core/worker-heartbeat-authority-store.test.ts.
     mockReadFileSync.mockImplementation(((path: unknown) => {
-      if (String(path).includes('worker-heartbeat-authority')) {
+      const stored = mockFsFiles.get(String(path));
+      if (stored !== undefined) return stored;
+      if (String(path).includes('worker-heartbeat-authority') || String(path).endsWith('.result')) {
         const error = new Error(`ENOENT: no such file or directory, open '${String(path)}'`) as NodeJS.ErrnoException;
         error.code = 'ENOENT';
         throw error;

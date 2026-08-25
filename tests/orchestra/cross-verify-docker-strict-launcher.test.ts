@@ -71,8 +71,8 @@ vi.mock('../../src/core/active-workers.js', () => ({
 vi.mock('../../src/core/worker-heartbeat-authority-store.js', () => ({
   WorkerHeartbeatAuthorityStore: class {
     initialize() { return { state: 'READY' }; }
-    read() { return { latest: { hostSequence: 0 } }; }
-    observe() { return { state: 'ACCEPTED' }; }
+    read() { return null; }
+    observe() { return { state: 'ACCEPTED', authority: { holds: [], latest: null } }; }
   },
 }));
 vi.mock('../../src/core/task-result-settlement.js', () =>

@@ -56,7 +56,7 @@ describe('ClaudeAdapter._cleanupOrphanedPromptFiles (Sprint 168 C0e selective fi
     expect(existsSync(join(TEST_ROOT, '.tasks', '.prompt-168-002-hash2.txt'))).toBe(false);
   });
 
-  it('deletes all prompt files when no active workers exist (legacy behavior)', () => {
+  it('fails closed when an explicit active-worker snapshot is empty', () => {
     // No .hb files at all
     writeFileSync(join(TEST_ROOT, '.tasks', '.prompt-old-hash.txt'), 'orphan');
 
@@ -64,6 +64,6 @@ describe('ClaudeAdapter._cleanupOrphanedPromptFiles (Sprint 168 C0e selective fi
     (adapter as unknown as { _cleanupOrphanedPromptFiles: (ids?: string[]) => void })
       ._cleanupOrphanedPromptFiles([]);
 
-    expect(existsSync(join(TEST_ROOT, '.tasks', '.prompt-old-hash.txt'))).toBe(false);
+    expect(existsSync(join(TEST_ROOT, '.tasks', '.prompt-old-hash.txt'))).toBe(true);
   });
 });

@@ -296,7 +296,8 @@ describe('renderPanelHtml', () => {
     expect(html).toContain('completed');
     expect(html).toContain('main');
     expect(html).toContain('dailyTokens: 1000');
-    expect(html).toContain('{&quot;id&quot;:&quot;a1&quot;}');
+    expect(html).toContain('<code>#a1</code>');
+    expect(html).toContain('data-approval-id="a1"');
   });
 
   it('renders an error message for a failed section', () => {

@@ -21,7 +21,7 @@ import { ApprovalEventStream, type ApprovalStreamEvent } from '../../src/core/ap
 import { createApprovalTerminalChannel } from '../../src/cli/repl/approval-terminal-channel.js';
 
 const CREATED_AT = '2026-07-01T21:00:00.000Z';
-const EXPIRES_AT = '2026-07-01T21:15:00.000Z';
+const EXPIRES_AT = '2099-07-01T21:15:00.000Z';
 
 function buildRequest(id: string, overrides: Partial<ApprovalRequestInput> = {}): ApprovalRequestInput {
   return {
@@ -82,7 +82,10 @@ let eventStream: ApprovalEventStream;
 
 beforeEach(() => {
   projectRoot = mkdtempSync(join(tmpdir(), 'approval-terminal-channel-'));
-  broker = new ApprovalBroker(projectRoot, { storeDir: join(projectRoot, 'approvals') });
+  broker = new ApprovalBroker(projectRoot, {
+    storeDir: join(projectRoot, 'approvals'),
+    clock: () => new Date('2026-07-01T21:05:00.000Z'),
+  });
   relay = new ApprovalRelay(broker);
   eventStream = new ApprovalEventStream(relay);
 });

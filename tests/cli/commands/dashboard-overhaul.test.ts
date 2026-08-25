@@ -24,6 +24,8 @@ vi.mock('../../../src/core/constants.js', () => ({
   // sprint-428 import-zinciri (task-builder→sprint-pid-manager) modül-yüklemede okur
   DECKENT_DIR: '.deckent',
   BRAIN_DIR: '.brain',
+  ARCHIVE_DIR: 'archive',
+  ARCHIVE_SPRINTS_SUBDIR: 'sprints',
   TASKS_DIR: '.tasks',  // FAZ4B: spawn-backend-docker.ts import zinciri modül-yüklemede okur
   LOCKS_DIR: '.locks',
 }));

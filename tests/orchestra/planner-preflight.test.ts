@@ -2,8 +2,8 @@
  * Plan-time scope preflight — 423-003 (born-650 + 653 + 661).
  *
  * RED→GREEN discipline: every fix is proven against the REAL defect first.
- *   - 653: the real `extractScopeFromDirective` STILL produces the phantom paths
- *     (RED, live defect) → `stripPhantomScope` removes them (GREEN).
+ *   - 653: `extractScopeFromDirective` no longer produces the phantom paths;
+ *     `stripPhantomScope` remains an idempotent defense-in-depth pass.
  *   - 650: the real `lintScopeSatisfiability` STILL emits a BLOCK for the code/money
  *     token (RED) → the wired gate (`evaluatePromptGate`) filters it (GREEN), while a
  *     genuinely-missing real path STILL blocks (NO_GO guard: gate not weakened).
@@ -56,21 +56,21 @@ describe('born-653 — scope derivation phantom paths', () => {
   // 414-001 real case: a Files list with `tests/docs/release-docs.test.ts` — the real
   // extractScopeFromDirective substring-matches `docs/release-docs.test.ts` and pushes
   // both a phantom `docs/` directory and a phantom `docs/release-docs.test.ts` file.
-  it('RED: real extractScopeFromDirective produces the 414-001 docs/ phantoms', () => {
+  it('real extractScopeFromDirective no longer produces the 414-001 docs/ phantoms', () => {
     const scope = extractScopeFromDirective('- Files: tests/docs/release-docs.test.ts');
-    // Live defect: the phantom docs/-root file + dir exist today.
-    expect(scope.filesWrite).toContain('docs/release-docs.test.ts');
-    expect(scope.directories).toContain('docs/');
+    expect(scope.filesWrite).toEqual(['tests/docs/release-docs.test.ts']);
+    expect(scope.filesWrite).not.toContain('docs/release-docs.test.ts');
+    expect(scope.directories).not.toContain('docs/');
   });
 
-  it('GREEN: stripPhantomScope removes the 414-001 phantoms, keeps the real path', () => {
+  it('stripPhantomScope is idempotent after source extraction keeps only the real path', () => {
     const declared = ['tests/docs/release-docs.test.ts'];
     const scope = extractScopeFromDirective('- Files: tests/docs/release-docs.test.ts');
     const { scope: clean, removed } = stripPhantomScope(scope, declared);
     expect(clean.filesWrite).toContain('tests/docs/release-docs.test.ts');
     expect(clean.filesWrite).not.toContain('docs/release-docs.test.ts');
     expect(clean.directories).not.toContain('docs/');
-    expect(removed).toEqual(expect.arrayContaining(['docs/release-docs.test.ts', 'docs/']));
+    expect(removed).toEqual([]);
     // Phantom-zero: nothing outside the declared intent survives as a fake path.
     expect(clean.directories.filter((d) => d.startsWith('docs/'))).toHaveLength(0);
   });

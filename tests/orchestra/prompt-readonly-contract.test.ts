@@ -146,13 +146,9 @@ describe('inspection-only worker prompt contract', () => {
   it('rejecting every authored read path never widens authority to the directories', () => {
     const task = makeInspectionTask();
     task.scope.filesRead = ['../outside.ts'];
-    const { prompt } = buildTaskPrompt(task, { effort: 'low' });
-
-    expect(prompt).toContain('## Scope Rules (inspection-only)');
-    expect(prompt).toContain('PROJECT WRITE authority: NONE');
-    expect(prompt).toContain('no valid read targets remain after path validation');
-    expect(prompt).not.toContain('You may ONLY modify files in these directories');
-    expect(prompt).not.toContain('you may write to any file within the directories above');
+    expect(() => buildTaskPrompt(task, { effort: 'low' })).toThrow(
+      'PROMPT_COMPILE_HOLD:CANONICAL_SCOPE:INVALID_PATH:filesRead:../outside.ts',
+    );
   });
 
   it('renders exact repo-root manifests as reads while preserving zero project-write authority', () => {
@@ -179,16 +175,8 @@ describe('inspection-only worker prompt contract', () => {
       'src/',
       'package.json',
     ];
-    const { prompt } = buildTaskPrompt(task, { effort: 'low' });
-    const exactReads = prompt.slice(
-      prompt.indexOf('Exact project files to inspect:'),
-      prompt.indexOf('PROJECT WRITE authority: NONE'),
+    expect(() => buildTaskPrompt(task, { effort: 'low' })).toThrow(
+      /PROMPT_COMPILE_HOLD:CANONICAL_SCOPE:.*INVALID_PATH:filesRead:\/etc\/passwd.*LEGACY_WILDCARD_REQUIRES_SELECTOR/,
     );
-
-    expect(exactReads).toContain('  - package.json');
-    for (const rejected of task.scope.filesRead.slice(0, -1)) {
-      expect(exactReads).not.toContain(`  - ${rejected}`);
-    }
-    expect(prompt).toContain('PROJECT WRITE authority: NONE');
   });
 });

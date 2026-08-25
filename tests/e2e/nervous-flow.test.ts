@@ -12,7 +12,7 @@
 //   5. Debt trend analysis after RETRO phase
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync, existsSync, utimesSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
@@ -350,19 +350,40 @@ describe('Nervous System E2E — Full Sprint Simulation', () => {
 
   // ─── Scenario 3: Stale Worker Respawn Suggestion ───────────────────────────
 
-  it('detects stale worker with 3+ minutes of no heartbeat', async () => {
-    // Arrange: Worker w-147-009 hasn't sent heartbeat in 4 minutes
-    const staleTime = new Date(NOW.getTime() - 4 * 60 * 1000).toISOString(); // 4 min ago
+  it('detects a worker whose exact attempt the host authority reports dead', async () => {
+    // Arrange: since the sprint-661 host-primary cutover, StaleWorkerDetector
+    // admits respawn ONLY from the host-confirmed exact-attempt liveness
+    // projection (liveness.state === 'dead') — heartbeat mtime age is
+    // presentation-only and no longer a detection signal.
+    const staleTime = new Date(NOW.getTime() - 31 * 60 * 1000).toISOString();
     const freshTime = new Date(NOW.getTime() - 30 * 1000).toISOString(); // 30s ago
-
+    for (const [taskId, workerId, timestamp] of [
+      ['147-009', 'w-147-009', staleTime],
+      ['147-010', 'w-147-010', freshTime],
+    ] as const) {
+      const heartbeatPath = join(root, '.tasks', `task-${taskId}.hb`);
+      writeFileSync(
+        heartbeatPath,
+        JSON.stringify({ taskId, workerId, status: 'EXECUTING', sequence: 1, timestamp }),
+        'utf8',
+      );
+      writeFileSync(
+        join(root, '.tasks', `task-${taskId}.json`),
+        JSON.stringify({ id: taskId, status: 'EXECUTING', workerId }),
+        'utf8',
+      );
+      const heartbeatTime = new Date(timestamp);
+      utimesSync(heartbeatPath, heartbeatTime, heartbeatTime);
+    }
+    const deadWorker = { id: 'w-147-009', taskId: '147-009', lastHeartbeat: staleTime,
+      liveness: { state: 'dead' as const, attemptId: 'attempt-147-009-1', hostSequence: 7, reason: 'host-confirmed exact attempt exit' } };
+    const aliveWorker = { id: 'w-147-010', taskId: '147-010', lastHeartbeat: freshTime,
+      liveness: { state: 'alive' as const, attemptId: 'attempt-147-010-1', hostSequence: 3, reason: 'host-confirmed running' } };
     const ctx = makeContext(root, {
       event: { source: 'cron', type: 'TICK' },
       sprintState: {
         currentPhase: 'EXECUTE',
-        activeWorkers: [
-          { id: 'w-147-009', taskId: '147-009', lastHeartbeat: staleTime },
-          { id: 'w-147-010', taskId: '147-010', lastHeartbeat: freshTime },
-        ],
+        activeWorkers: [deadWorker, aliveWorker],
       },
     });
 
@@ -388,7 +409,7 @@ describe('Nervous System E2E — Full Sprint Simulation', () => {
       config: makeBalancedConfig(),
       root,
       title: 'Stale worker detected',
-      message: 'Worker w-147-009 has not sent heartbeat for 4 minutes',
+      message: 'Worker w-147-009 has not sent heartbeat for 31 minutes',
     });
 
     // Assert: Decision — WORKER_RESPAWN is medium-risk, balanced → suggest-30m

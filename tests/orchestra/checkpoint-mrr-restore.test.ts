@@ -202,8 +202,8 @@ describe('restoreSprintFromCheckpoint — v2 already-MRR task survives restore',
 
 // ─── Restore: stale-active worker → MRR (real disk evidence) → transitive cascade ─
 
-describe('restoreSprintFromCheckpoint — stale-active→MRR descendants cascade-skip (real git evidence)', () => {
-  it('direct + transitive PENDING descendants of a stale-active→MRR conversion are cascade-skipped, zero spawn', () => {
+describe('restoreSprintFromCheckpoint — interrupted active work is resumable', () => {
+  it('preserves interrupted work as PENDING even when its scoped tree has untracked files', () => {
     const root = makeTempDir();
     initGitRepo(root); // no commit — worker sandbox denylists `git commit`
     mkdirSync(join(root, 'src', 'orchestra'), { recursive: true });
@@ -226,22 +226,11 @@ describe('restoreSprintFromCheckpoint — stale-active→MRR descendants cascade
     const out = restoreSprintFromCheckpoint(root, sprintId);
     expect(out.restored).toBe(true);
 
-    // A is reclassified MANUAL_REVIEW_REQUIRED (disk-verify gate), not synthetic NO_GO.
-    expect(out.staleTasksMarkedNoGo).not.toContain('700-001');
-    expect(readTaskFile(root, '700-001').status).toBe(TaskStatus.MANUAL_REVIEW_REQUIRED);
-
-    // Both the direct (B) and transitive (C) PENDING descendants are cascade-skipped.
-    expect(out.cascadeSkippedTasks.sort()).toEqual(['700-002', '700-003']);
-    expect(readTaskFile(root, '700-002').status).toBe(TaskStatus.NO_GO);
-    expect(readTaskFile(root, '700-003').status).toBe(TaskStatus.NO_GO);
-
-    const skipB = readResultFile(root, '700-002');
-    expect(skipB.cascadeSkipped).toBe(true);
-    expect(skipB.notes).toContain('700-001');
-
-    const skipC = readResultFile(root, '700-003');
-    expect(skipC.cascadeSkipped).toBe(true);
-    expect(skipC.notes).toContain('700-002'); // transitive: blamed on its own (now-NO_GO) parent B
+    expect(out.staleTasksMarkedNoGo).toEqual([]);
+    expect(readTaskFile(root, '700-001').status).toBe(TaskStatus.PENDING);
+    expect(out.cascadeSkippedTasks).toEqual([]);
+    expect(readTaskFile(root, '700-002').status).toBe(TaskStatus.PENDING);
+    expect(readTaskFile(root, '700-003').status).toBe(TaskStatus.PENDING);
 
     // Spawn-zero: no worker was ever spawned for the descendants during restore.
     expect(existsSync(join(root, '.tasks', 'task-700-002.hb'))).toBe(false);
@@ -253,8 +242,8 @@ describe('restoreSprintFromCheckpoint — stale-active→MRR descendants cascade
 
 // ─── Restore: stale-active worker → NO_GO (no disk evidence) → cascade-skip ────
 
-describe('restoreSprintFromCheckpoint — stale-active→NO_GO descendant cascade-skip (no disk evidence)', () => {
-  it('PENDING dependent of a stale-active worker with no disk evidence is cascade-skipped', () => {
+describe('restoreSprintFromCheckpoint — interrupted active work without disk evidence', () => {
+  it('returns the interrupted task and dependent to the resumable PENDING queue', () => {
     const root = makeTempDir(); // not a git repo — disk-verify fails open (no evidence)
     const sprintId = 'sprint-800';
     const a = makeTask('800-001', sprintId, { status: TaskStatus.EXECUTING });
@@ -265,12 +254,10 @@ describe('restoreSprintFromCheckpoint — stale-active→NO_GO descendant cascad
 
     const out = restoreSprintFromCheckpoint(root, sprintId);
     expect(out.restored).toBe(true);
-    expect(out.staleTasksMarkedNoGo).toContain('800-001');
-    expect(readTaskFile(root, '800-001').status).toBe(TaskStatus.NO_GO);
-
-    expect(out.cascadeSkippedTasks).toEqual(['800-002']);
-    expect(readTaskFile(root, '800-002').status).toBe(TaskStatus.NO_GO);
-    expect(readResultFile(root, '800-002').cascadeSkipped).toBe(true);
+    expect(out.staleTasksMarkedNoGo).toEqual([]);
+    expect(readTaskFile(root, '800-001').status).toBe(TaskStatus.PENDING);
+    expect(out.cascadeSkippedTasks).toEqual([]);
+    expect(readTaskFile(root, '800-002').status).toBe(TaskStatus.PENDING);
     expect(existsSync(join(root, '.tasks', 'task-800-002.hb'))).toBe(false);
 
     rmSync(root, { recursive: true, force: true });

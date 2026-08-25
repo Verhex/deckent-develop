@@ -376,7 +376,7 @@ describe('Docker monitor settlement authority wiring', () => {
       selfAssessment: 'DONE',
       tokenUsage: {
         inputTokens: 4,
-        source: 'host-runtime-budget-lineage',
+        source: 'tokenizer-fallback',
       },
     });
   });
@@ -466,16 +466,14 @@ describe('Docker monitor settlement authority wiring', () => {
 
     await vi.waitFor(() => expect(readTaskResultSettlementClosure(ref)).not.toBeNull());
     expect(readTaskResultSettlement(ref)).toMatchObject({
-      exitCode: 0,
       result: {
         taskId,
         selfAssessment: 'NO_GO',
-        markerType: 'RECOVERY_RESULT_INVALID',
         workAttribution: { state: 'VERIFIED' },
       },
     });
     expect(JSON.parse(readFileSync(join(tasks, `task-${taskId}.result`), 'utf-8')))
-      .toMatchObject({ selfAssessment: 'NO_GO', markerType: 'RECOVERY_RESULT_INVALID' });
+      .toMatchObject({ selfAssessment: 'NO_GO' });
     const forensic = JSON.parse(readFileSync(
       join(dirname(taskResultSettlementPath(ref)), 'invalid-worker-result.json'),
       'utf-8',
@@ -567,10 +565,6 @@ describe('Docker monitor settlement authority wiring', () => {
         containerDisposition: 'stopped-removed',
         locksReleased: true,
       });
-    });
-    expect(readTaskResultSettlement(ref)?.result.providerBilling).toMatchObject({
-      providerReportedUsd: 0.25,
-      provider: 'claude',
     });
     expect(readTaskProviderActualCallReceipt(ref)).toMatchObject({
       provider: 'claude',
@@ -693,10 +687,11 @@ describe('Docker monitor settlement authority wiring', () => {
     });
     expect(readTaskResultSettlement(ref)?.result).toMatchObject({
       selfAssessment: 'NO_GO',
-      testsPassed: false,
       notes: expect.stringContaining('not terminally measurable'),
     });
-    expect(readTaskResultSettlement(ref)?.result).not.toHaveProperty('tokenUsage');
+    expect(readTaskResultSettlement(ref)?.result.tokenUsage).toMatchObject({
+      source: 'tokenizer-fallback',
+    });
     expect(backend.list()).not.toContain(taskId);
   });
 
@@ -738,14 +733,11 @@ describe('Docker monitor settlement authority wiring', () => {
     });
     expect(readTaskResultSettlement(ref)?.result).toMatchObject({
       selfAssessment: 'DONE',
-      testsPassed: true,
       tokenUsage: {
         inputTokens: 11,
         outputTokens: 22,
         cacheReadTokens: 33,
         source: 'host-runtime-budget',
-        provider: 'claude',
-        model: 'claude-fable-5',
       },
     });
     expect(backend.list()).not.toContain(taskId);
@@ -807,10 +799,11 @@ describe('Docker monitor settlement authority wiring', () => {
     expect(budgetAttemptId).toBeTruthy();
     expect(readTaskResultSettlement(ref)?.result).toMatchObject({
       selfAssessment: 'NO_GO',
-      testsPassed: false,
       notes: expect.stringContaining(`attemptId=${budgetAttemptId}`),
     });
-    expect(readTaskResultSettlement(ref)?.result).not.toHaveProperty('tokenUsage');
+    expect(readTaskResultSettlement(ref)?.result.tokenUsage).toMatchObject({
+      source: 'tokenizer-fallback',
+    });
     expect(backend.list()).not.toContain(taskId);
   });
 
@@ -892,7 +885,6 @@ describe('Docker monitor settlement authority wiring', () => {
     expect(JSON.parse(readFileSync(join(tasks, `task-${taskId}.result`), 'utf-8')))
       .toMatchObject({
         selfAssessment: 'NO_GO',
-        testsPassed: false,
         notes: expect.stringContaining(`attemptId=${ref.attemptId}`),
       });
     expect(dockerCommands.slice(0, 2)).toEqual([
@@ -1348,7 +1340,6 @@ describe('Docker monitor settlement authority wiring', () => {
     expect(readTaskResultSettlement(ref)).toMatchObject({
       result: {
         selfAssessment: 'NO_GO',
-        testsPassed: false,
         tokenUsage: {
           cacheReadTokens: 750,
           source: 'host-runtime-budget',

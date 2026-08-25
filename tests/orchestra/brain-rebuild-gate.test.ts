@@ -14,6 +14,7 @@ vi.mock('node:fs', () => ({
   statSync: vi.fn(() => ({ isFile: () => true, isDirectory: () => false, size: 2, mtimeMs: 0 })),
   mkdirSync: vi.fn(),
   appendFileSync: vi.fn(),
+  renameSync: vi.fn(),
 }));
 
 vi.mock('../../src/orchestra/event-stream.js', () => ({

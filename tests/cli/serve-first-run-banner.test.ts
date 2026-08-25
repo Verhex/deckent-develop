@@ -6,6 +6,24 @@ import { Command } from 'commander';
 vi.mock('node:fs', () => ({
   existsSync: vi.fn().mockReturnValue(true),
   readdirSync: vi.fn().mockReturnValue(['index.html', 'assets']),
+  renameSync: vi.fn(),
+  readFileSync: vi.fn().mockReturnValue('{}'),
+  writeFileSync: vi.fn(),
+  mkdirSync: vi.fn(),
+}));
+
+
+vi.mock('../../src/core/invocation-receipt-store.js', () => ({
+  InvocationReceiptStore: vi.fn().mockImplementation(() => ({
+    close: vi.fn(),
+  })),
+}));
+
+
+vi.mock('../../src/orchestra/acceptance-confirmation-reconciler.js', () => ({
+  openAcceptanceConfirmationReconciler: vi.fn().mockReturnValue({
+    close: vi.fn(),
+  }),
 }));
 
 vi.mock('../../src/api/server.js', () => ({

@@ -182,6 +182,15 @@ vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
 }));
 
+vi.mock('../../src/core/prompt-delivery-receipt.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/core/prompt-delivery-receipt.js')>()),
+  writePromptDeliveryReceipt: vi.fn(() => true),
+  readPromptDeliveryReceipt: vi.fn(() => ({
+    state: 'AVAILABLE',
+    receipt: { deliveredSkillIds: ['testing-expert'], deliveredAgentId: null },
+  })),
+}));
+
 vi.mock('../../src/orchestra/tmux.js', () => ({
   ensureSession: vi.fn(),
   spawnWorker: vi.fn(),

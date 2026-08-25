@@ -15,7 +15,28 @@ import type { SpawnBackend } from '../../src/orchestra/spawn-backend.js';
 // ─── Mocks (must be before imports of the module under test) ────────
 
 vi.mock('node:fs', () => ({
-  readFileSync: vi.fn(),
+  readFileSync: vi.fn((path: unknown) => {
+    const p = String(path);
+    if (p.endsWith('.skill-delivery.json')) {
+      const taskId = /task-(.+)\.skill-delivery\.json$/u.exec(p)?.[1] ?? '';
+      return JSON.stringify({
+        version: 2,
+        taskId,
+        source: 'worker-prompt',
+        promptSha256: 'a'.repeat(64),
+        promptCompilePlanId: `prompt-compile-plan:sha256:${'b'.repeat(64)}`,
+        rolePolicyIdentity: 'worker:generic',
+        assignedAgentId: 'generic',
+        deliveredAgentId: 'generic',
+        personaSegmentSha256: 'c'.repeat(64),
+        assignedSkillIds: [],
+        deliveredSkillIds: [],
+        forcedSkillIds: [],
+        undeliveredForcedSkillIds: [],
+      });
+    }
+    return '';
+  }),
   writeFileSync: vi.fn(),
   existsSync: vi.fn().mockReturnValue(true),
   mkdirSync: vi.fn(),
@@ -144,6 +165,7 @@ vi.mock('../../src/orchestra/task-builder.js', () => ({
   plannerTaskToParams: vi.fn(),
   resolveWorkerEffort: vi.fn(),
 }));
+
 
 vi.mock('../../src/orchestra/debt-manager.js', () => ({
   handleEvaluation: vi.fn(),
@@ -343,17 +365,22 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     status: TaskStatus.PENDING,
     sprintId: 'sprint-test',
     createdAt: new Date().toISOString(),
-    budget: { maxTurns: 1 },
+    budget: resolvedProvider === 'claude' ? { maxTurns: 1 } : undefined,
     budgetPolicy: {
       state: 'allow',
       role: 'worker',
       taskKind: 'code-development',
       resolvedProvider,
-      executionCostClass: 'remote',
+      executionCostClass: resolvedProvider === 'claude' ? 'remote' : 'local',
       profileRef: 'tests.orchestra.spawn-prevention',
       policyDigest: '8'.repeat(64),
       admissionMode: 'unattended',
       landingPolicy: { reserve_ratio: 0.25 },
+      finalOnlyUsage: {
+        maxWallClockSeconds: 600,
+        profileRef: 'execution_budget.final_only_usage',
+        policyDigest: '9'.repeat(64),
+      },
     },
     ...overrides,
   } as Task;
@@ -382,7 +409,8 @@ function makeConfig(): ResolvedConfig {
 
 function makeMockBackend(): SpawnBackend {
   return {
-    name: 'mock',
+    name: 'docker',
+    executionCostClass: 'local',
     liveUsageBudgetSupport: 'measured-stream',
     executionLandingCapability: 'cooperative-landing',
     spawn: vi.fn(),
@@ -446,7 +474,7 @@ describe('spawnWorkers — spawn prevention (backend vs legacy)', () => {
     expect(mockedEnsureSession).not.toHaveBeenCalled();
   });
 
-  it('should NOT call adapter spawn when backend is provided (non-tmux provider)', async () => {
+  it('holds an owner-mismatched final-only route before backend or adapter spawn', async () => {
     // Even if the task provider is non-tmux (Codex), backend takes priority
     mockedResolveTaskProvider.mockReturnValue('codex');
     mockedIsTmuxProvider.mockReturnValue(false);
@@ -455,20 +483,32 @@ describe('spawnWorkers — spawn prevention (backend vs legacy)', () => {
       spawn: vi.fn(),
       kill: vi.fn(),
       name: 'codex',
+      executionCostClass: 'local',
       liveUsageBudgetSupport: 'measured-stream',
       executionLandingCapability: 'cooperative-landing',
     };
     mockedGetProviderAdapterForTask.mockReturnValue(mockAdapter as never);
 
-    const task = makeTask({ provider: 'codex' as never });
+    const task = makeTask({
+      provider: 'codex' as never,
+      budget: { maxTurns: 1 },
+    });
+    task.budgetPolicy!.executionCostClass = 'remote';
     const sprint = makeSprint([task]);
-    const config = makeConfig();
+    const config = {
+      ...makeConfig(),
+      spawn_backend: 'docker',
+    } as ResolvedConfig;
     const mockBackend = makeMockBackend();
 
-    await spawnWorkers('/tmp/test-project', sprint, config, { spawnBackend: mockBackend });
+    await expect(
+      spawnWorkers('/tmp/test-project', sprint, config, { spawnBackend: mockBackend }),
+    ).rejects.toThrow(
+      'FINAL_ONLY_USAGE_CONTAINMENT_HOLD:owner-authorization-mismatch',
+    );
 
-    // Backend path wins — adapter should NOT be called
-    expect(mockBackend.spawn).toHaveBeenCalledTimes(1);
+    // Fail closed before either execution surface spends provider work.
+    expect(mockBackend.spawn).not.toHaveBeenCalled();
     expect(mockAdapter.spawn).not.toHaveBeenCalled();
     expect(mockedSpawnWorker).not.toHaveBeenCalled();
   });
@@ -476,7 +516,7 @@ describe('spawnWorkers — spawn prevention (backend vs legacy)', () => {
   it('should fail closed when legacy tmux cannot meter the task budget', async () => {
     mockedIsTmuxProvider.mockReturnValue(true);
 
-    const task = makeTask();
+    const task = makeTask({ budget: { maxTurns: 1 } });
     const sprint = makeSprint([task]);
     const config = makeConfig();
 
@@ -495,6 +535,7 @@ describe('spawnWorkers — spawn prevention (backend vs legacy)', () => {
 
     const mockAdapter = {
       name: 'codex',
+      executionCostClass: 'local',
       liveUsageBudgetSupport: 'measured-stream',
       executionLandingCapability: 'cooperative-landing',
       spawn: vi.fn(),

@@ -229,8 +229,12 @@ describe('createSchedulerDriver — legacy engine (default): pure passthrough', 
     });
 
     expect(callLog).toEqual(['initial', 'watcher']);
-    expect(initialResult).toEqual({ engine: 'legacy', spawnedTaskIds: [], killedWorkerIds: [] });
-    expect(watcherResult).toEqual({ engine: 'legacy', spawnedTaskIds: [], killedWorkerIds: [] });
+    const emptyLegacyResult = {
+      engine: 'legacy', spawnedTaskIds: [], killedWorkerIds: [],
+      decidedEffects: [], landedEffects: [], spawnSkipReasons: [],
+    };
+    expect(initialResult).toEqual(emptyLegacyResult);
+    expect(watcherResult).toEqual(emptyLegacyResult);
     // The driver itself never spawns — everything happens inside runLegacyTick,
     // which this test's closures leave empty of any backend call.
     expect(backend.calls).toHaveLength(0);
@@ -247,7 +251,10 @@ describe('createSchedulerDriver — legacy engine (default): pure passthrough', 
     const result = await driver({ trigger: 'initial', completedTaskIds: [], runLegacyTick });
 
     expect(runLegacyTick).not.toHaveBeenCalled();
-    expect(result).toEqual({ engine: 'legacy', spawnedTaskIds: [], killedWorkerIds: [] });
+    expect(result).toEqual({
+      engine: 'legacy', spawnedTaskIds: [], killedWorkerIds: [],
+      decidedEffects: [], landedEffects: [], spawnSkipReasons: [],
+    });
   });
 
   it('is selected for every engine value other than the literal "reducer" (config absent, {}, and "reducer" typo)', async () => {

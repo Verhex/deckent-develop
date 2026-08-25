@@ -80,8 +80,8 @@ describe('F5 — DIRECTIVES Files: → task.scope.filesWrite', () => {
     // "(determined by your task scope)" sentinel is no longer acceptable when
     // directories ARE available.
     expect(prompt).toContain('no explicit Files list');
-    expect(prompt).toContain('src/orchestra/');
-    expect(prompt).toContain('tests/orchestra/');
+    expect(prompt).toContain('## Scope Rules');
+    expect(prompt).not.toContain('src/orchestra/');
     expect(prompt).not.toMatch(/^\s*- \(determined by your task scope\)\s*$/m);
   });
 });

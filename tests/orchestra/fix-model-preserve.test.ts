@@ -33,6 +33,7 @@ vi.mock('node:fs', () => ({
   existsSync: vi.fn(() => false),
   mkdirSync: vi.fn(),
   appendFileSync: vi.fn(),
+  renameSync: vi.fn(),
 }));
 
 vi.mock('../../src/core/event-stream.js', () => ({

@@ -12,6 +12,7 @@ vi.mock('node:fs', () => ({
   existsSync: vi.fn().mockReturnValue(true),
   writeFileSync: vi.fn(),
   mkdirSync: vi.fn(),
+  renameSync: vi.fn(),
 }));
 
 vi.mock('../../../src/mcp/helpers/enrich.js', () => ({

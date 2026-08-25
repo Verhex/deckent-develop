@@ -287,6 +287,24 @@ function makeFixTask(id: string, fixForTaskId: string, overrides: Partial<Task> 
   } as Partial<Task>);
 }
 
+function mockCollectedFixResults(results: TaskResult[]): void {
+  vi.mocked(waitForResults).mockImplementation(async (
+    _projectRoot,
+    waitedSprint,
+    _timeout,
+    _queue,
+    spawnOptions,
+  ) => {
+    for (const result of results) {
+      const task = waitedSprint.tasks.find(candidate => candidate.id === result.taskId);
+      if (task && spawnOptions?.evaluateCollectedResult) {
+        await spawnOptions.evaluateCollectedResult(task, result);
+      }
+    }
+    return results;
+  });
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe('runEvaluatePhase extension-hit fault armor (369-001)', () => {
@@ -407,7 +425,7 @@ describe('runFixPhase re-eval fault armor (369-001)', () => {
 
     const resultA = makeResult(fixA.id, { selfAssessment: 'DONE' });
     const resultB = makeResult(fixB.id, { selfAssessment: 'DONE' });
-    vi.mocked(waitForResults).mockResolvedValue([resultA, resultB]);
+    mockCollectedFixResults([resultA, resultB]);
 
     vi.mocked(evaluateWithRubric).mockImplementation((res: TaskResult) => {
       if (res.taskId === fixA.id) {
@@ -430,7 +448,7 @@ describe('runFixPhase re-eval fault armor (369-001)', () => {
     const sprint = makeSprint([makeTask('369-orig-c', { status: TaskStatus.NO_GO })]);
 
     const resultA = makeResult(fixA.id, { selfAssessment: 'NO_GO', testsPassed: false });
-    vi.mocked(waitForResults).mockResolvedValue([resultA]);
+    mockCollectedFixResults([resultA]);
 
     vi.mocked(evaluateWithRubric).mockImplementation(() => {
       throw new TypeError('boom');
@@ -448,7 +466,7 @@ describe('runFixPhase re-eval fault armor (369-001)', () => {
     const sprint = makeSprint([makeTask('369-orig-d', { status: TaskStatus.NO_GO })]);
 
     const resultA = makeResult(fixA.id, { selfAssessment: 'DONE' });
-    vi.mocked(waitForResults).mockResolvedValue([resultA]);
+    mockCollectedFixResults([resultA]);
 
     vi.mocked(evaluateWithRubric).mockImplementation(() => {
       throw new TypeError('boom');

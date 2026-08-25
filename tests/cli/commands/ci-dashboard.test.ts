@@ -4,13 +4,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('node:fs', () => ({
   readFileSync: vi.fn(),
+  renameSync: vi.fn(),
   existsSync: vi.fn(),
   readdirSync: vi.fn(),
   accessSync: vi.fn(),
   constants: { W_OK: 2 },
 }));
 
-vi.mock('node:os', () => ({
+vi.mock('node:os', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('node:os')>()),
   platform: vi.fn().mockReturnValue('linux'),
 }));
 
@@ -37,7 +39,8 @@ vi.mock('../../../src/core/deck-file.js', () => ({
   KNOWN_DECK_KEYS: ['DECKENT_CLAUDE_API_KEY', 'DECKENT_OPENAI_API_KEY'],
 }));
 
-vi.mock('../../../src/core/constants.js', () => ({
+vi.mock('../../../src/core/constants.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/core/constants.js')>()),
   RUNTIME_DIR: '.deckent/runtime',  // sprint-429 (429-011) tool-inventory yolu modül-yüklemede okur
   DECKENT_DIR: '.deckent',
   SETTINGS_DIR: '.deckent/settings',  // born-630 allowscope-zinciri modül-yüklemede okur

@@ -13,7 +13,7 @@
  * fail-closed closure mechanism for exactly these broken runs.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, existsSync, readdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readdirSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -116,10 +116,22 @@ describe('terminal receipt publication — zero-task/evidence fail-closed (535/5
 
   it('a fully settled single-task truth still publishes a COMPLETE receipt (healthy path preserved)', () => {
     const task = makeTask('990-001');
+    const result = verifiedResult(task.id);
+    mkdirSync(join(root, '.tasks'), { recursive: true });
+    writeFileSync(
+      join(root, '.tasks', `task-${task.id}.result`),
+      JSON.stringify(result),
+      'utf-8',
+    );
+    writeFileSync(
+      join(root, '.tasks', `task-${task.id}.json`),
+      JSON.stringify(task),
+      'utf-8',
+    );
     const truth = buildFinalizerTerminalTruth({
       tasks: [task],
       evaluations: new Map([[task.id, 'DONE' as TaskEvaluation]]),
-      results: [verifiedResult(task.id)],
+      results: [result],
     });
 
     const publication = publishFencedSprintTerminalReceipt({

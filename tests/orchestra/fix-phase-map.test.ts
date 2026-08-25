@@ -228,6 +228,24 @@ function makeEvalResult(decision: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO'): Evalu
   };
 }
 
+function mockCollectedWave(results: TaskResult[]): void {
+  vi.mocked(waitForResults).mockImplementation(async (
+    _projectRoot,
+    waitedSprint,
+    _timeout,
+    _queue,
+    spawnOptions,
+  ) => {
+    for (const result of results) {
+      const task = waitedSprint.tasks.find(candidate => candidate.id === result.taskId);
+      if (task && spawnOptions?.evaluateCollectedResult) {
+        await spawnOptions.evaluateCollectedResult(task, result);
+      }
+    }
+    return results;
+  });
+}
+
 /** Persist a task JSON into the scratch root's real `.tasks/` directory. */
 function writeTaskFile(projectRoot: string, task: Task): void {
   writeFileSync(
@@ -430,7 +448,7 @@ describe('FIX Phase — evaluations Map mutation', () => {
 
     // Mock: fix worker returns a successful result
     const fixResult = makeResult(fixTask.id, { testsPassed: true, selfAssessment: 'DONE' });
-    vi.mocked(waitForResults).mockResolvedValue([fixResult]);
+    mockCollectedWave([fixResult]);
 
     // Mock: evaluateWithRubric returns DONE for fix result
     vi.mocked(evaluateWithRubric).mockReturnValue(makeEvalResult('DONE'));
@@ -455,7 +473,7 @@ describe('FIX Phase — evaluations Map mutation', () => {
     writeTaskFile(root, fixTask);
 
     const fixResult = makeResult(fixTask.id, { testsPassed: true, selfAssessment: 'GO_WITH_TECH_DEBT' });
-    vi.mocked(waitForResults).mockResolvedValue([fixResult]);
+    mockCollectedWave([fixResult]);
     vi.mocked(evaluateWithRubric).mockReturnValue(makeEvalResult('GO_WITH_TECH_DEBT'));
 
     // Act
@@ -480,7 +498,7 @@ describe('FIX Phase — evaluations Map mutation', () => {
     writeTaskFile(root, fixTask);
 
     const fixResult = makeResult(fixTask.id, { testsPassed: false, selfAssessment: 'NO_GO' });
-    vi.mocked(waitForResults).mockResolvedValue([fixResult]);
+    mockCollectedWave([fixResult]);
     vi.mocked(evaluateWithRubric).mockReturnValue(makeEvalResult('NO_GO'));
 
     // Act
@@ -509,7 +527,7 @@ describe('FIX Phase — evaluations Map mutation', () => {
     writeTaskFile(root, fixTask);
 
     const fixResult = makeResult(fixTask.id, { testsPassed: true, selfAssessment: 'DONE' });
-    vi.mocked(waitForResults).mockResolvedValue([fixResult]);
+    mockCollectedWave([fixResult]);
     vi.mocked(evaluateWithRubric).mockReturnValue(makeEvalResult('DONE'));
 
     // Act — should not throw even though fixForTaskId is undefined
@@ -534,7 +552,7 @@ describe('FIX Phase — evaluations Map mutation', () => {
     writeTaskFile(root, fixTask);
 
     const fixResult = makeResult(fixTask.id, { testsPassed: true, selfAssessment: 'DONE' });
-    vi.mocked(waitForResults).mockResolvedValue([fixResult]);
+    mockCollectedWave([fixResult]);
     vi.mocked(evaluateWithRubric).mockReturnValue(makeEvalResult('DONE'));
 
     // Act
@@ -576,13 +594,27 @@ describe('FIX Phase — evaluations Map mutation', () => {
       }
       return undefined as never;
     });
-    vi.mocked(waitForResults)
-      .mockResolvedValueOnce([
-        makeResult(firstFix.id, { testsPassed: false, selfAssessment: 'NO_GO' }),
-      ])
-      .mockResolvedValueOnce([
-        makeResult(secondFix.id, { testsPassed: true, selfAssessment: 'DONE' }),
-      ]);
+    const waves = [
+      [makeResult(firstFix.id, { testsPassed: false, selfAssessment: 'NO_GO' })],
+      [makeResult(secondFix.id, { testsPassed: true, selfAssessment: 'DONE' })],
+    ];
+    let waveIndex = 0;
+    vi.mocked(waitForResults).mockImplementation(async (
+      _projectRoot,
+      waitedSprint,
+      _timeout,
+      _queue,
+      spawnOptions,
+    ) => {
+      const wave = waves[waveIndex++] ?? [];
+      for (const result of wave) {
+        const task = waitedSprint.tasks.find(candidate => candidate.id === result.taskId);
+        if (task && spawnOptions?.evaluateCollectedResult) {
+          await spawnOptions.evaluateCollectedResult(task, result);
+        }
+      }
+      return wave;
+    });
     vi.mocked(evaluateWithRubric)
       .mockReturnValueOnce(makeEvalResult('NO_GO'))
       .mockReturnValueOnce(makeEvalResult('DONE'));
@@ -620,7 +652,7 @@ describe('FIX Phase — evaluations Map mutation', () => {
       expect.objectContaining({ id: secondFix.id, fixForTaskId: firstFix.id }),
       TaskEvaluation.DONE,
       expect.objectContaining({ taskId: secondFix.id }),
-      { allowPriorityFixCreation: false },
+      { allowPriorityFixCreation: true },
     );
     expect(evaluations.get(originalTask.id)).toBe(TaskEvaluation.DONE);
     expect(evaluations.get(firstFix.id)).toBe(TaskEvaluation.NO_GO);

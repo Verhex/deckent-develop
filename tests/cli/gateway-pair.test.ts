@@ -6,6 +6,16 @@ import { join } from 'node:path';
 import { handleGatewayPairApprove, handleGatewayPairList, handleGatewayPairReject } from '../../src/cli/commands/gateway.js';
 import { loadGatewayAccess } from '../../src/connectors/gateway/gateway-access.js';
 import { loadProjectRegistry } from '../../src/connectors/gateway/project-registry.js';
+import { resolveApprovalLifecyclePolicy } from '../../src/core/approval-lifecycle-policy.js';
+
+const lifecycle = resolveApprovalLifecyclePolicy({ enabled: true });
+
+const pairingScope = (projectPath: string) => ({
+  tenantId: 'default',
+  projectPath,
+  lifecycleGeneration: 'test-generation',
+  lifecycle,
+});
 
 describe('gateway pair CLI', () => {
   it('approve moves a pending pairing onto the project allowlist', async () => {
@@ -13,7 +23,7 @@ describe('gateway pair CLI', () => {
     process.env['DECKENT_GATEWAY_HOME'] = dir;
     try {
       const access = await loadGatewayAccess();
-      await access.requestPairing('telegram:77');
+      await access.requestPairing('telegram:77', pairingScope('/proj'));
       const code = access.listPairings()[0]!.code;
       const out: string[] = [];
       await handleGatewayPairApprove({ code, project: '/proj', lang: 'en', print: (s) => out.push(s) });
@@ -32,7 +42,7 @@ describe('gateway pair CLI', () => {
       const projects = await loadProjectRegistry();
       await projects.add('foo', '/home/me/foo');           // name → canonical path
       const access = await loadGatewayAccess();
-      await access.requestPairing('telegram:88');
+      await access.requestPairing('telegram:88', pairingScope('/home/me/foo'));
       const code = access.listPairings()[0]!.code;
       await handleGatewayPairApprove({ code, project: 'foo', lang: 'en', print: () => {} }); // owner types the NAME
       const after = await loadGatewayAccess();
@@ -50,7 +60,7 @@ describe('gateway pair CLI', () => {
       await handleGatewayPairList({ lang: 'en', print: (s) => empty.push(s) });
       expect(empty.join(' ')).toMatch(/no pending pairings/i);
       const access = await loadGatewayAccess();
-      await access.requestPairing('telegram:55');
+      await access.requestPairing('telegram:55', pairingScope('/proj'));
       const out: string[] = [];
       await handleGatewayPairList({ lang: 'en', print: (s) => out.push(s) });
       expect(out.join(' ')).toContain('telegram:55');
@@ -64,7 +74,7 @@ describe('gateway pair CLI', () => {
     process.env['DECKENT_GATEWAY_HOME'] = dir;
     try {
       const access = await loadGatewayAccess();
-      await access.requestPairing('telegram:66');
+      await access.requestPairing('telegram:66', pairingScope('/proj'));
       const code = access.listPairings()[0]!.code;
       const ok: string[] = [];
       await handleGatewayPairReject({ code, lang: 'en', print: (s) => ok.push(s) });

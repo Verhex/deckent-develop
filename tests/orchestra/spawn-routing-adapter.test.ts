@@ -309,7 +309,7 @@ describe('spawnWorkers — host-HTTP adapter routing', () => {
     expect(existsSync(join(testRoot, '.tasks', 'task-250-LZ.result'))).toBe(false); // no honest-fail
   });
 
-  it('PSL-1 verify hook: `- Backend: docker` forces a host-adapter provider onto the spawn backend (not host adapter)', async () => {
+  it('holds a forced Docker host-adapter route without live provider usage capability', async () => {
     // The ollama adapter IS registered — normally the task would route to it.
     // `- Backend: docker` (matching spawn_backend=docker) must bypass host-adapter
     // routing and use the spawn backend instead, so codex/gemini/ollama can be
@@ -324,11 +324,18 @@ describe('spawnWorkers — host-HTTP adapter routing', () => {
     const sprint = makeSprint('sprint-bk', [task]);
     const backend = makeMockBackend();
 
-    await spawnWorkers(testRoot, sprint, makeConfig({ spawn_backend: 'docker' }), { spawnBackend: backend });
+    await expect(
+      spawnWorkers(testRoot, sprint, makeConfig({ spawn_backend: 'docker' }), {
+        spawnBackend: backend,
+      }),
+    ).rejects.toThrow(
+      'FINAL_ONLY_USAGE_CONTAINMENT_HOLD:provider-live-usage-capability-unavailable',
+    );
 
-    // host-adapter bypassed even though it is registered; spawn backend used instead
+    // The explicit route bypasses the adapter, but cannot dispatch without the
+    // provider-side live-usage capability required by the landed budget gate.
     expect(ollamaAdapter.spawnCalls.map(c => c.taskId)).not.toContain('250-BK');
-    expect(backend.calls.map(c => c.taskId)).toContain('250-BK');
+    expect(backend.calls.map(c => c.taskId)).not.toContain('250-BK');
   });
 
   it('mixed sprint — ollama hits adapter, claude hits backend', async () => {

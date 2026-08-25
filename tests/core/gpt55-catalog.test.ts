@@ -69,9 +69,9 @@ describe('model-registry: canonical gpt-5.5', () => {
 
 describe('model-registry: gpt-5.6 family (Alperen 2026-07-11, feed-verified)', () => {
   const FAMILY = [
-    { id: 'gpt-5.6-sol', tier: 'premium_plus', cost: { input: 5, output: 30 } },
-    { id: 'gpt-5.6-terra', tier: 'standard', cost: { input: 2.5, output: 15 } },
-    { id: 'gpt-5.6-luna', tier: 'economy', cost: { input: 1, output: 6 } },
+    { id: 'gpt-5.6-sol', tier: 'premium_plus', cost: { input: 5, output: 30, cacheReadInput: 0.5 } },
+    { id: 'gpt-5.6-terra', tier: 'standard', cost: { input: 2.5, output: 15, cacheReadInput: 0.25 } },
+    { id: 'gpt-5.6-luna', tier: 'economy', cost: { input: 1, output: 6, cacheReadInput: 0.1 } },
   ] as const;
 
   it('declares all three pinned API IDs with official pricing evidence', () => {

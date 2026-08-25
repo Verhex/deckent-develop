@@ -267,6 +267,9 @@ export function registerCleanup(program: Command): void {
     .action((opts: RuntimeHygieneCleanupOptions & { decay?: boolean; sprint?: string }) => {
       const root = resolveProjectRoot();
       const lang = getLangFromConfig(root);
+      // --json contract: human prose never reaches stdout in json mode; every
+      // narrative line below goes through this guard (670-004 closure).
+      const say = (message: string): void => { if (!opts.json) print(message); };
       const tasksDir = join(root, TASKS_DIR);
       const authority = readCanonicalRunStatus(root);
       const requestedSprintId = opts.sprint?.trim();
@@ -404,17 +407,17 @@ export function registerCleanup(program: Command): void {
           )
           : [];
 
-        print(getMessage('cleanup.dry_run.archive_header', lang));
-        for (const file of promptFiles) print(getMessage('cleanup.dry_run.prompt', lang, { file }));
-        print(getMessage('cleanup.dry_run.delete_header', lang));
-        for (const file of taskFiles) print(getMessage('cleanup.dry_run.task', lang, { file }));
-        for (const file of lockFiles) print(getMessage('cleanup.dry_run.lock', lang, { file }));
-        print(getMessage('cleanup.dry_run.task_count', lang, { count: String(taskFiles.length) }));
-        print(getMessage('cleanup.dry_run.lock_count', lang, { count: String(lockFiles.length) }));
-        print(getMessage('cleanup.dry_run.prompt_count', lang, { count: String(promptFiles.length) }));
-        print(getMessage('cleanup.dry_run.tmux', lang));
-        print(getMessage('cleanup.dry_run.reconcile', lang));
-        print(getMessage('cleanup.dry_run.execute', lang));
+        say(getMessage('cleanup.dry_run.archive_header', lang));
+        for (const file of promptFiles) say(getMessage('cleanup.dry_run.prompt', lang, { file }));
+        say(getMessage('cleanup.dry_run.delete_header', lang));
+        for (const file of taskFiles) say(getMessage('cleanup.dry_run.task', lang, { file }));
+        for (const file of lockFiles) say(getMessage('cleanup.dry_run.lock', lang, { file }));
+        say(getMessage('cleanup.dry_run.task_count', lang, { count: String(taskFiles.length) }));
+        say(getMessage('cleanup.dry_run.lock_count', lang, { count: String(lockFiles.length) }));
+        say(getMessage('cleanup.dry_run.prompt_count', lang, { count: String(promptFiles.length) }));
+        say(getMessage('cleanup.dry_run.tmux', lang));
+        say(getMessage('cleanup.dry_run.reconcile', lang));
+        say(getMessage('cleanup.dry_run.execute', lang));
         return;
       }
 
@@ -435,17 +438,17 @@ export function registerCleanup(program: Command): void {
         } catch { /* use defaults */ }
         if (opts.decay) {
           const result = runDecay(root, 'sprint-cleanup', { force: true, memoryBudget: decayMemoryBudget, decaySprints: decayAfterSprints });
-          print(getMessage('cleanup.decay_complete', lang, {
+          say(getMessage('cleanup.decay_complete', lang, {
             before: String(result.linesBefore),
             after: String(result.linesAfter),
           }));
           if (result.archivedSprints.length > 0) {
-            print(getMessage('cleanup.archived_sprints', lang, {
+            say(getMessage('cleanup.archived_sprints', lang, {
               sprints: result.archivedSprints.join(', '),
             }));
           }
           if (result.removedDebtCount > 0 || result.removedPatternCount > 0) {
-            print(getMessage('cleanup.removed_items', lang, {
+            say(getMessage('cleanup.removed_items', lang, {
               debt: String(result.removedDebtCount),
               patterns: String(result.removedPatternCount),
             }));
@@ -478,7 +481,7 @@ export function registerCleanup(program: Command): void {
         const executingTasks = tasks.filter(t => t.status === TaskStatus.EXECUTING || t.status === TaskStatus.CLAIMED);
         if (executingTasks.length > 0) {
           const ids = executingTasks.map(t => t.id).join(', ');
-          print(`Warning: ${executingTasks.length} task(s) are still active (${ids}). Their locks will be released.`);
+          say(`Warning: ${executingTasks.length} task(s) are still active (${ids}). Their locks will be released.`);
         }
 
         // B) Build sprint from real task data — not a synthetic placeholder
@@ -561,7 +564,7 @@ export function registerCleanup(program: Command): void {
           taskIdPrefix ?? undefined,
         );
         if (archiveResult.archived > 0) {
-          print(getMessage('cleanup.prompts_archived', lang, {
+          say(getMessage('cleanup.prompts_archived', lang, {
             count: String(archiveResult.archived),
             sprintId: archiveSprintId,
           }));
@@ -571,7 +574,7 @@ export function registerCleanup(program: Command): void {
         // never deleted by this compatibility pass.
         const tasksArchiveCleaned = cleanTasksArchive(root, promptArchiveRetention);
         if (tasksArchiveCleaned > 0) {
-          print(getMessage('cleanup.legacy_archives_consolidated', lang, {
+          say(getMessage('cleanup.legacy_archives_consolidated', lang, {
             count: String(tasksArchiveCleaned),
           }));
         }
@@ -589,13 +592,13 @@ export function registerCleanup(program: Command): void {
 
           const retResult = runRetention(root, sprintId ?? null, retentionConfig);
           if (retResult.countersDeleted.length > 0) {
-            print(`Deleted ${retResult.countersDeleted.length} counter file(s) (-seq, -checkpoint-seq)`);
+            say(`Deleted ${retResult.countersDeleted.length} counter file(s) (-seq, -checkpoint-seq)`);
           }
           if (retResult.forensicMoved.length > 0) {
-            print(`Moved ${retResult.forensicMoved.length} forensic file(s) → docs/audits/`);
+            say(`Moved ${retResult.forensicMoved.length} forensic file(s) → docs/audits/`);
           }
           if (retResult.archived.length > 0) {
-            print(`Archived ${retResult.archived.length} sprint file(s) (retention: keep_last_n=${retentionConfig.keep_last_n ?? 10})`);
+            say(`Archived ${retResult.archived.length} sprint file(s) (retention: keep_last_n=${retentionConfig.keep_last_n ?? 10})`);
           }
         } catch (error) {
           // Retention may already have published immutable bytes. Hiding a
@@ -623,7 +626,7 @@ export function registerCleanup(program: Command): void {
         }
         try {
           const prunedIds = pruneExpiredNervousPending(root, Date.now());
-          if (prunedIds.length > 0) print(getMessage('cleanup.pruned_expired_approvals', lang, { count: String(prunedIds.length) }));
+          if (prunedIds.length > 0) say(getMessage('cleanup.pruned_expired_approvals', lang, { count: String(prunedIds.length) }));
         } catch { /* fail-soft */ }
 
         // Cleanup retires the final run identity. Publish IDLE only after the
@@ -633,13 +636,13 @@ export function registerCleanup(program: Command): void {
 
         // Only print cleanup.complete when not in decay mode (decay already showed its own summary)
         if (!opts.decay) {
-          print(getMessage('cleanup.complete', lang, { count: String(tasks.length) }));
+          say(getMessage('cleanup.complete', lang, { count: String(tasks.length) }));
         }
 
         // Budget warning: check .brain/ size after cleanup
         const brainLines = getMemoryEntryCount(root);
         if (brainLines > decayMemoryBudget) {
-          print(`\nWarning: .brain/ has ${brainLines} lines (budget: ${decayMemoryBudget}). Run \`deckent cleanup --decay\` to reduce memory.`);
+          say(`\nWarning: .brain/ has ${brainLines} lines (budget: ${decayMemoryBudget}). Run \`deckent cleanup --decay\` to reduce memory.`);
         }
       } catch (error) {
         printError(error);

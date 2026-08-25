@@ -83,7 +83,17 @@ vi.mock('../../src/core/worker-heartbeat-authority-store.js', () => ({
     }
 
     observe() {
-      return { state: 'ACCEPTED', authority: { holds: [], latest: { hostSequence: 1 } } };
+      return {
+        state: 'ACCEPTED',
+        authority: {
+          holds: [],
+          latest: {
+            hostSequence: 1,
+            hostProcessOutcome: { state: 'running' },
+            workerTaskVerdict: 'pending',
+          },
+        },
+      };
     }
   },
 }));

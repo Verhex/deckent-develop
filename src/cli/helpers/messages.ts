@@ -7151,6 +7151,30 @@ const MESSAGES: MessageMap = {
   'desktop.theme.watch.open-sea': { en: 'Open sea', tr: 'Açık deniz' },
 
   // ─── CLI command descriptions (559-002: commander .description() single source) ───
+  'cli.provider-observations.desc': {
+    en: 'Inspect and govern the provider execution-observation database (owner-controlled v1→v2 migration surface)',
+    tr: 'Provider execution-observation veritabanını inceleyin ve yönetin (owner-kontrollü v1→v2 migration yüzeyi)',
+  },
+  'cli.provider-observations.inspect.desc': {
+    en: 'Read-only inspection of observation rows, schema version and migration eligibility',
+    tr: 'Gözlem satırlarının, şema sürümünün ve migration uygunluğunun salt-okunur incelemesi',
+  },
+  'cli.provider-observations.migrate.desc': {
+    en: 'Plan or apply the owner-approved v1→v2 observation schema migration',
+    tr: 'Owner-onaylı v1→v2 gözlem şema migration\'ını planlayın veya uygulayın',
+  },
+  'cli.provider-observations.adopt.desc': {
+    en: 'Adopt a verified pre-image observation snapshot into the canonical database',
+    tr: 'Doğrulanmış bir pre-image gözlem anlık görüntüsünü kanonik veritabanına devralın',
+  },
+  'cli.provider-observations.adopt-runtime.desc': {
+    en: 'Adopt live runtime observation evidence into the canonical database',
+    tr: 'Canlı runtime gözlem kanıtını kanonik veritabanına devralın',
+  },
+  'cli.provider-observations.reconcile.desc': {
+    en: 'Reconcile observation rows against runtime truth and report drift',
+    tr: 'Gözlem satırlarını runtime gerçeğiyle mutabık kılın ve sapmayı raporlayın',
+  },
   'cli.gateway.listen.desc': {
     en: 'Run the gateway listener in the foreground (attaches every paired connector)',
     tr: 'Gateway dinleyicisini ön planda çalıştırın (eşleşmiş tüm connector\'lara bağlanır)',
