@@ -23,11 +23,12 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createOrchestraWorkerApprovalGate, writeHeartbeat } from './worker.js';
+import { createOrchestraWorkerApprovalGate } from './worker.js';
 import type { ApprovalGateLike } from './agentic-worker-tools.js';
 import type { WorkerActionDescriptor, GateVerdict } from '../core/approval-worker-gate.js';
 import { TASKS_DIR, HEARTBEAT_WRITE_INTERVAL_MS } from '../core/constants.js';
 import type { Heartbeat } from '../core/types.js';
+import { writeTaskHeartbeatFile } from '../core/worker-activity-heartbeat.js';
 
 export const APPROVAL_GATE_ENV = 'DECKENT_APPROVAL_GATE';
 export const APPROVAL_SCOPE_ENV = 'DECKENT_APPROVAL_SCOPE_ID';
@@ -50,12 +51,12 @@ function heartbeatFilePath(projectRoot: string, taskId: string): string {
 
 /** Fail-soft: a missing/unparsable heartbeat file is skipped, never thrown —
  *  a hb-refresh hiccup must not abort (or fail) an in-flight approval wait. */
-function refreshWaitingHeartbeat(projectRoot: string, taskId: string): void {
+export function refreshWaitingHeartbeat(projectRoot: string, taskId: string): void {
   const path = heartbeatFilePath(projectRoot, taskId);
   if (!existsSync(path)) return;
   try {
     const hb = JSON.parse(readFileSync(path, 'utf-8')) as Heartbeat;
-    writeHeartbeat(projectRoot, {
+    writeTaskHeartbeatFile(path, {
       ...hb,
       timestamp: new Date().toISOString(),
       sequence: (hb.sequence ?? 0) + 1,

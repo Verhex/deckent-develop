@@ -3,19 +3,19 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "2131dd61bc06d21260aed5ef503054b940bcafed27ba3dad768b67dba0cc7538"
+    "value": "a98cc2b38a11db751cfc9f86f85a842afaac37007a9f9287dd943440672a19e2"
   },
   "summary": {
     "total": 530,
     "active": 464,
     "terminal": 66,
-    "receipts": 188,
+    "receipts": 189,
     "byState": {
-      "OPEN": 369,
+      "OPEN": 368,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
-      "VERIFY": 26,
+      "VERIFY": 27,
       "DONE": 66,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -2789,7 +2789,7 @@
       "state": "BLOCKED",
       "updated": "2026-08-25",
       "definitionDigest": "2b65e08312116577e0a74758aaa86113f9bd762a059f57704d3004efdf0b26bf",
-      "progressDigest": "9f329a18846ba20096c88a66143d5eac437fe756bf8776ad50cabd5bec4af9ec",
+      "progressDigest": "df7e25262dfbb553753a66ae91b53e9f047191944971985207f987848877a310",
       "terminalClosureDigest": null
     },
     {
@@ -3633,10 +3633,10 @@
       "id": "FIX-SPAWN-DEPENDENCY-FRESHNESS-001",
       "program": "KERNEL",
       "priority": "P1",
-      "state": "OPEN",
+      "state": "VERIFY",
       "updated": "2026-08-25",
       "definitionDigest": "06c71724be78a6b3e7ce6f77ff58e8157f1356ab531632be647c76b349fcb04d",
-      "progressDigest": "82af0cc555534a2fa3e57c46c060a6d524e7a3d08555c1a2292ac8f6c94b8d99",
+      "progressDigest": "3a600f647cf5ea65200f0b9b0185e628c63d64d14859cb4077ae72aa70fae73e",
       "terminalClosureDigest": null
     },
     {
@@ -7773,6 +7773,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-25T12:00:00+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-25-EVENT-TRUTH-A3-01",
+      "authorityDigest": "01a83fbf7897ddd357b52cbcffb4ef038b1115eca16db03b122f19e49f6e7000",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-25T20:37:46+03:00"
       },
       "g7AttemptIdentity": null
     }
@@ -16930,7 +16940,7 @@
         "GR-2026-07-28-RUNFLOW-START-ACTOR-01"
       ],
       "acceptance": "No surface-owned execution/state engine; parity and contract tests",
-      "evidence": "`receipt=GR-2026-07-28-EXECUTION-AUTHORITY-01`; `receipt=GR-2026-07-28-BOT-PID-AUTHORITY-01`; `receipt=GR-2026-07-28-RUNFLOW-START-ACTOR-01`; optional namespace-local mount-metadata reconciliation is one canonical service exposed through CLI and MCP; bot ownership is bound to project and kernel-start identity; RunFlow exact-start now preserves the same durable approval principal through CLI and Terminal instead of allowing an adapter-local actor label to change authorization, with focused cross-surface/start-service proof and fresh independent Fable 5 confirmation; the repaired live start remains pending, and RunFlow coordinator, autonomous status/approve, cancel, review/finalize/cleanup and recovery semantics still diverge across API, terminal and Desktop, while dashboard remains intentionally read-only; 2026-08-03 ölçüm (PAZARTESI P3): CLI paketi 117 → 95 kırık. Kök neden status yüzeyinin authority-first sözleşmesi: canlı status canonical persisted read model yoksa RUN_STATUS_READ_MODEL_UNAVAILABLE ile HOLD'a düşüyor (src/cli/commands/status.ts:737) ve quiescent run authority, .tasks dosyaları var olsa bile 'aktif sprint yok'a kısa devre yapıyor (status.ts:910-916). Testler eski sözleşmeyi kodluyordu; guard gevşetilmedi, testler yeni sözleşmeye göre yeniden ifade edildi (commands/status.test.ts 20 → 0). Kanıtlamadığı: cleanup komutu, worktree-binary-authority ve spawn spy drift'i ayrı köklerde açık 2026-08-25 cli-surface-truth lane kanıt-ekleri (bulgular.md #2/#7/#10/#13): status death-sweep read-yolunun gözlenen kapanışı gerçekleştirmemesi; FAILED-Flow ile ORPHANED/resumable-Sprint çift-gerçeği; tek status çıktısında top-level UNAVAILABLE vs nested PAUSED çelişkisi; FIX-retry pending/terminal sayımlarının kullanıcı-yüzeyinde açıklanmaması — dördü de tek-monotonic-status-authority ihtiyacının bağımsız yeniden-üretimleridir",
+      "evidence": "`receipt=GR-2026-07-28-EXECUTION-AUTHORITY-01`; `receipt=GR-2026-07-28-BOT-PID-AUTHORITY-01`; `receipt=GR-2026-07-28-RUNFLOW-START-ACTOR-01`; optional namespace-local mount-metadata reconciliation is one canonical service exposed through CLI and MCP; bot ownership is bound to project and kernel-start identity; RunFlow exact-start now preserves the same durable approval principal through CLI and Terminal instead of allowing an adapter-local actor label to change authorization, with focused cross-surface/start-service proof and fresh independent Fable 5 confirmation; the repaired live start remains pending, and RunFlow coordinator, autonomous status/approve, cancel, review/finalize/cleanup and recovery semantics still diverge across API, terminal and Desktop, while dashboard remains intentionally read-only; 2026-08-03 ölçüm (PAZARTESI P3): CLI paketi 117 → 95 kırık. Kök neden status yüzeyinin authority-first sözleşmesi: canlı status canonical persisted read model yoksa RUN_STATUS_READ_MODEL_UNAVAILABLE ile HOLD'a düşüyor (src/cli/commands/status.ts:737) ve quiescent run authority, .tasks dosyaları var olsa bile 'aktif sprint yok'a kısa devre yapıyor (status.ts:910-916). Testler eski sözleşmeyi kodluyordu; guard gevşetilmedi, testler yeni sözleşmeye göre yeniden ifade edildi (commands/status.test.ts 20 → 0). Kanıtlamadığı: cleanup komutu, worktree-binary-authority ve spawn spy drift'i ayrı köklerde açık 2026-08-25 cli-surface-truth lane kanıt-ekleri (bulgular.md #2/#7/#10/#13): status death-sweep read-yolunun gözlenen kapanışı gerçekleştirmemesi; FAILED-Flow ile ORPHANED/resumable-Sprint çift-gerçeği; tek status çıktısında top-level UNAVAILABLE vs nested PAUSED çelişkisi; FIX-retry pending/terminal sayımlarının kullanıcı-yüzeyinde açıklanmaması — dördü de tek-monotonic-status-authority ihtiyacının bağımsız yeniden-üretimleridir; 2026-08-25 A3 event-truth dalgası (sprint-674 5/9 + sprint-675 4/4, toplam 9/9 logical DONE) dört bulgunun kapanış-kanıtı: (a) death-sweep senkron + JSON-yolu dahil authority-okumadan önce (`deathSweep` alanı) (b) authority flow-terminal join — kanıtlı-ölü flow ABORTED+resumable:false, REPL/status tek gerçek (c) union-dışı UNAVAILABLE sentezi üç yüzeyden kalktı → tek resolveRunStatusReadiness + `readiness` alanı, PAUSED+resumable pini (d) fixRetry retry-pending/budget-exhausted ayrımı read-model+CLI render; CLI-MCP-API parity pini tests/mcp/status-readiness-parity.test.ts; gerçek-binary: status --json lifecycle=COMPLETE readiness=READY 0-UNAVAILABLE",
       "updated": "2026-08-25"
     },
     {
@@ -19059,7 +19069,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
         "W": "0",
@@ -19074,9 +19084,11 @@
       "closureBlockedBy": [
         "ORCHESTRA-RELIABILITY-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-25-EVENT-TRUTH-A3-01"
+      ],
       "acceptance": "FIX-prompt derlenirken her dependency'nin logical-lineage aggregate'i result-collector ingest'iyle aynı settlement okumasından gelir; ingest ile FIX-spawn arasında dependency-state yeniden-doğrulanır; bayat-pencere fixture'ı (result-yazıldı→FIX-prompt-derlendi sırası) hermetik pinlenir",
-      "evidence": "2026-08-25 sprint-673 owner-admitted RCA: 673-001.result 14:58:05'te DONE yazıldı; 14:58:49–14:59:02'de derlenen üç FIX-prompt'u aynı dependency'yi hâlâ 'Pending' gördü (44–57sn bayat-pencere) → üç task zincir-NO_GO + circuit-breaker; kayıp mutasyon yok, salt tazelik. Emsal: sprint-670/671 force-finalize ailesindeki 'dependency-blocked FIX' örüntüsü aynı kök",
+      "evidence": "2026-08-25 sprint-673 owner-admitted RCA: 673-001.result 14:58:05'te DONE yazıldı; 14:58:49–14:59:02'de derlenen üç FIX-prompt'u aynı dependency'yi hâlâ 'Pending' gördü (44–57sn bayat-pencere) → üç task zincir-NO_GO + circuit-breaker; kayıp mutasyon yok, salt tazelik. Emsal: sprint-670/671 force-finalize ailesindeki 'dependency-blocked FIX' örüntüsü aynı kök; `receipt=GR-2026-08-25-EVENT-TRUTH-A3-01`; 2026-08-25 A3 dalgası KÖK-DÜZELTME (owner plan-onayı acceptance yeniden-ifadesini kapsar): tazelik hipotezi ampirik ÇÜRÜTÜLDÜ — gerçek kök `.result` obje-form filesChanged'in string[] varsayan exactDependencyPath filtresini TypeError'la patlatması + task-builder çıplak-catch yutumu → prompt kalıcı '(Pending)'; fix=674-008 (string/obje-path normalize + typed catch + obje-form fixture pini tests/orchestra/dependency-aggregate-fix-aware.test.ts). CANLI ÖZ-KANIT: sprint-674 aynı imzayı kendisi yeniden üretti (3 DONE bağımlılık eski-dist derlemede Pending → 3×NO_GO → typed PAUSE; receipt'ler dakikalarca diskteydi — zamana bağlı değil), fix dist'e alınınca sprint-675'te imza SIFIR tekrar + wave-harness pini (tests/integration/event-truth-wave-evidence.test.ts)",
       "updated": "2026-08-25"
     },
     {
@@ -27216,6 +27228,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "50599cb2497c812a78926ee9b70bb553c428b505248447d2947fe8e5cbe991eb"
+    "value": "3ac1f90ebb8e60ccadce0065763a1861d84b2b2e559270f734de45b8d720bc22"
   }
 }

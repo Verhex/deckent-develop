@@ -22,7 +22,7 @@ import type {
   LockInfo,
   TaskScope,
 } from '../core/types.js';
-import type { TaskResultV1 } from '../core/task-result-schema.js';
+import { serializeTaskResultForDisk, type TaskResultV1 } from '../core/task-result-schema.js';
 import {
   TaskResultWriteError,
   writeTaskResultAtomic,
@@ -50,7 +50,7 @@ import {
 import type { WorkerHeartbeatAuthorityIdentity } from '../core/worker-heartbeat-authority.js';
 import {
   createWorkerActivityHeartbeat,
-  serializeWorkerActivityHeartbeat,
+  writeTaskHeartbeatFile,
   type WorkerActivityHeartbeat,
   type WorkerActivityHeartbeatInput,
 } from '../core/worker-activity-heartbeat.js';
@@ -416,9 +416,7 @@ export function writeHeartbeat(
   ensureDir(join(projectRoot, TASKS_DIR));
   const path = heartbeatFilePath(projectRoot, heartbeat.taskId);
   const canonical = 'version' in heartbeat;
-  writeFileSync(path, canonical
-    ? serializeWorkerActivityHeartbeat(heartbeat)
-    : JSON.stringify(heartbeat, null, 2), 'utf-8');
+  writeTaskHeartbeatFile(path, heartbeat);
 
   const sid = sprintId ?? getCurrentSprintId(projectRoot);
   if (sid) {
@@ -595,7 +593,7 @@ export function writeResult(
     // in-process/auth-preflight callers, whose consumers read top-level fields.
     // It still uses the established fsync+rename writer and JSON escaping; the
     // strict authority path above must never wrap a legacy result by accident.
-    writeLegacyResultAtomic(path, JSON.stringify(result, null, 2));
+    writeLegacyResultAtomic(path, serializeTaskResultForDisk(result));
   }
 
   const newStatus: TaskStatus =

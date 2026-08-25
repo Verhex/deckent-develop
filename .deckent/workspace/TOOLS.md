@@ -72,13 +72,13 @@ Toplam: 51
 <!-- DECKENT:CONTRACT:END id="tools" -->
 
 ## CLI Commands
-<!-- DECKENT:CONTRACT id="tools" schema="1" sha256="232a8fc392b65edde983fa00f93d740b4bfbd9d72d3ec1a69b7b7c7e32a60061" -->
+<!-- DECKENT:CONTRACT id="tools" schema="1" sha256="9b00895354b85f2cafedb7133c5b98692b4231441e6117b1d5c42db85e0dd92f" -->
 Bu tablo kayıtlı cross-surface command tree üzerinden üretilir; helper module dosya adları dışlanır.
 
 | Komut | Kategori | Risk | Yüzeyler |
 |---|---|---|---|
 | `deckent agent` | Core | Değiştir | cli, mcp, repl |
-| `deckent analyze` | Core | Oku | cli, mcp, repl |
+| `deckent analyze` | Core | Değiştir | cli, mcp, repl |
 | `deckent approvals` | Enterprise | Değiştir | cli, mcp |
 | `deckent archive` | Core | Değiştir | cli |
 | `deckent archive-debt` | Core | Oku | cli |
@@ -99,7 +99,7 @@ Bu tablo kayıtlı cross-surface command tree üzerinden üretilir; helper modul
 | `deckent dashboard` | Core | Oku | cli |
 | `deckent do` | Run | Çalıştır | cli, repl |
 | `deckent docs` | Core | Değiştir | cli, mcp |
-| `deckent doctor` | Core | Oku | cli, mcp, repl |
+| `deckent doctor` | Core | Değiştir | cli, mcp, repl |
 | `deckent evolve` | Enterprise | Oku | cli |
 | `deckent execution-authority` | Enterprise | Değiştir | cli, mcp |
 | `deckent explain` | Memory | Oku | cli, mcp, repl |
@@ -127,7 +127,7 @@ Bu tablo kayıtlı cross-surface command tree üzerinden üretilir; helper modul
 | `deckent openrouter-probe` | Core | Oku | cli |
 | `deckent output` | Core | Oku | cli |
 | `deckent plan` | Run | Değiştir | cli, mcp, repl |
-| `deckent plan-nl` | Run | Oku | cli |
+| `deckent plan-nl` | Run | Değiştir | cli |
 | `deckent plugin` | Core | Değiştir | cli |
 | `deckent process` | Enterprise | Çalıştır | cli, mcp |
 | `deckent provider-authority` | Enterprise | Değiştir | cli |
@@ -141,7 +141,7 @@ Bu tablo kayıtlı cross-surface command tree üzerinden üretilir; helper modul
 | `deckent retro` | Memory | Oku | cli, mcp, repl |
 | `deckent review` | Run | Değiştir | cli, mcp, repl |
 | `deckent run` | Run | Çalıştır | cli, mcp |
-| `deckent runs` | Run | Oku | cli, repl |
+| `deckent runs` | Run | Değiştir | cli, repl |
 | `deckent serve` | Run | Çalıştır | cli |
 | `deckent set-directives` | Run | Değiştir | cli, mcp, repl |
 | `deckent skill` | Core | Değiştir | cli, mcp, repl |
@@ -152,9 +152,9 @@ Bu tablo kayıtlı cross-surface command tree üzerinden üretilir; helper modul
 | `deckent task` | Run | Değiştir | cli |
 | `deckent test` | Run | Çalıştır | cli |
 | `deckent trace` | Core | Değiştir | cli |
-| `deckent truth` | Core | Oku | cli, mcp |
+| `deckent truth` | Core | Değiştir | cli, mcp |
 | `deckent upgrade` | Core | Çalıştır | cli |
-| `deckent usage` | Core | Oku | cli, mcp, repl |
+| `deckent usage` | Core | Değiştir | cli, mcp, repl |
 | `deckent watch` | Run | Oku | cli, mcp |
 | `deckent xverify` | Core | Oku | cli, mcp |
 

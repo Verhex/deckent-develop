@@ -223,6 +223,8 @@ export type AdaptiveTimeoutFields = {
 
 export const DEFAULT_ADAPTIVE_MULTIPLIER = 1.5;
 export const DEFAULT_RUNTIME_EXTENSION_MAX = 5;
+/** Single source of truth for the number of FIX attempts allowed after an original attempt. */
+export const DEFAULT_MAX_FIX_RETRIES = 2;
 
 export const DEFAULT_TIMEOUT_CONFIG: TimeoutConfig & AdaptiveTimeoutFields = {
   docker_min_timeout: 1200,
@@ -1948,7 +1950,7 @@ export function createDefaultConfig(): DeckentConfig {
     human_checkpoints: [],
     // Sprint
     fix_phase_enabled: true,
-    max_fix_retries: 2,
+    max_fix_retries: DEFAULT_MAX_FIX_RETRIES,
     fix_circuit_breaker: { ...DEFAULT_FIX_CIRCUIT_BREAKER_CONFIG },
     lifecycle_recovery: { ...DEFAULT_LIFECYCLE_RECOVERY_CONFIG },
     // @deprecated retained as the aspirational seed for legacy configs.
@@ -3130,7 +3132,7 @@ export const CONFIG_METADATA: Readonly<Record<string, ConfigMetadataEntry>> = {
   max_fix_retries: {
     description: 'Maximum number of fix retries per task during the fix phase.',
     type: 'number',
-    default: 2,
+    default: DEFAULT_MAX_FIX_RETRIES,
     category: 'Sprint',
   },
   fix_circuit_breaker: {

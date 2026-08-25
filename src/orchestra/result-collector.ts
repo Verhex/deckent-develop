@@ -341,7 +341,7 @@ export type { ProviderExecutionHold };
 
 // Sprint 195 195-001 (W-INTEGRITY) — disk-verify gate before synthetic NO_GO.
 import { verifyDiskAgainstClaim, DISK_VS_CLAIM_MISMATCH_CHANNEL } from './disk-verify.js';
-import { normalizeTaskResultShape, validateTaskResult } from '../core/task-result-schema.js';
+import { normalizeTaskResultShape, serializeTaskResultForDisk, validateTaskResult } from '../core/task-result-schema.js';
 import {
   sanitizeHostFacingFiles,
   CONTAINER_PATH_SANITIZED_CHANNEL,
@@ -1012,7 +1012,7 @@ function persistEnrichedResult(projectRoot: string, result: TaskResult): void {
   try {
     const path = join(projectRoot, TASKS_DIR, `task-${result.taskId}.result`);
     const tmp = `${path}.enrich-tmp`;
-    writeFileSync(tmp, JSON.stringify(result, null, 2), 'utf-8');
+    writeFileSync(tmp, serializeTaskResultForDisk(result), 'utf-8');
     renameSync(tmp, path);
   } catch (err) {
     debugLog('persistEnrichedResult', err);

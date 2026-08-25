@@ -182,4 +182,89 @@ describe('Bug A: Dependency aggregate fix-aware', () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it('(i) normalizes object-form filesChanged into a dependency entry', () => {
+    const root = mkdtempSync(join(tmpdir(), 'deckent-dependency-object-entry-'));
+    const sprintId = 'sprint-dependency-object-entry';
+    const taskId = 'dep-object-entry';
+    const tasksDir = join(root, '.tasks');
+    const evalDir = join(root, '.deckent', 'runtime', 'evaluations', sprintId);
+    mkdirSync(tasksDir, { recursive: true });
+    mkdirSync(evalDir, { recursive: true });
+    writeFileSync(join(tasksDir, `task-${taskId}.json`), JSON.stringify({
+      id: taskId, sprintId, scope: { directories: [], filesRead: [], filesWrite: [] },
+      dependencies: [],
+    }));
+    writeFileSync(join(tasksDir, `task-${taskId}.result`), JSON.stringify({
+      taskId, workerId: 'w-object',
+      filesChanged: [
+        { path: 'src/object-dependency.ts', status: 'modified', linesAdded: 3 },
+        { status: 'modified', linesAdded: 1 },
+        42,
+      ],
+      linesAdded: 3, linesRemoved: 0, testsPassed: true, coverage: 100,
+      selfAssessment: 'DONE', notes: 'object payload settled',
+    }));
+    writeFileSync(
+      join(evalDir, `${taskId}-attempt-1.json`),
+      JSON.stringify({ decision: 'DONE' }),
+    );
+
+    try {
+      const entry = collectDependencyResultEntries(root, sprintId).get(taskId);
+      expect(entry).toMatchObject({
+        verdict: 'DONE',
+        filesChanged: ['src/object-dependency.ts'],
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('(j) renders object-form dependency paths instead of Pending in the worker prompt', () => {
+    const root = mkdtempSync(join(tmpdir(), 'deckent-dependency-object-prompt-'));
+    const sprintId = 'sprint-dependency-object-prompt';
+    const dependencyId = 'dep-object-prompt';
+    const tasksDir = join(root, '.tasks');
+    const evalDir = join(root, '.deckent', 'runtime', 'evaluations', sprintId);
+    mkdirSync(tasksDir, { recursive: true });
+    mkdirSync(evalDir, { recursive: true });
+    writeFileSync(join(tasksDir, `task-${dependencyId}.json`), JSON.stringify({
+      id: dependencyId, sprintId,
+      scope: { directories: [], filesRead: [], filesWrite: [] }, dependencies: [],
+    }));
+    writeFileSync(join(tasksDir, `task-${dependencyId}.result`), JSON.stringify({
+      taskId: dependencyId, workerId: 'w-object-prompt',
+      filesChanged: [{
+        path: 'src/object-prompt-dependency.ts',
+        status: 'modified',
+        linesAdded: 4,
+        linesRemoved: 1,
+      }],
+      linesAdded: 4, linesRemoved: 1, testsPassed: true, coverage: 100,
+      selfAssessment: 'DONE', notes: 'object prompt payload settled',
+    }));
+    writeFileSync(
+      join(evalDir, `${dependencyId}-attempt-1.json`),
+      JSON.stringify({ decision: 'DONE' }),
+    );
+    const dependent: Task = {
+      id: 'object-prompt-dependent', title: 'dependent', description: 'dependent',
+      model: 'test-model', effort: 'normal', priority: 'NORMAL', reason: 'test',
+      scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
+      dependencies: [dependencyId],
+      goNogo: { goCriteria: 'pass', noGoCriteria: 'fail', techDebtAcceptable: '' },
+      status: TaskStatus.PENDING, sprintId,
+    };
+
+    try {
+      const prompt = buildWorkerPrompt(dependent, undefined, undefined, root);
+      expect(prompt).toContain(`Dependency ${dependencyId} (aggregate: DONE)`);
+      expect(prompt).not.toContain(`Dependency ${dependencyId} (Pending)`);
+      expect(prompt).toContain('src/object-prompt-dependency.ts');
+      expect(dependent.scope.filesRead).toContain('src/object-prompt-dependency.ts');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

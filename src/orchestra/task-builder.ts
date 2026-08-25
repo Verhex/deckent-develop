@@ -151,6 +151,22 @@ function exactDependencyPath(value: string): boolean {
   return value.split('/').every(segment => segment.length > 0 && segment !== '.' && segment !== '..');
 }
 
+function normalizeDependencyFilesChanged(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap(entry => {
+    if (typeof entry === 'string') return [entry];
+    if (typeof entry !== 'object' || entry === null || !('path' in entry)) return [];
+    return typeof entry.path === 'string' ? [entry.path] : [];
+  });
+}
+
+function isExpectedDependencyResultReadError(error: unknown): boolean {
+  if (error instanceof SyntaxError) return true;
+  return error instanceof Error
+    && 'code' in error
+    && typeof error.code === 'string';
+}
+
 /**
  * Collect host-evaluated dependency attempts and fold FIX/FIX-FIX records back
  * to their logical root. Raw worker selfAssessment is deliberately ignored:
@@ -229,13 +245,18 @@ export function collectDependencyResultEntries(
       const rootId = rootIdFor(taskId);
       entries.set(taskId, {
         verdict: decision,
-        filesChanged: (result.filesChanged ?? []).filter(exactDependencyPath),
+        filesChanged: normalizeDependencyFilesChanged(result.filesChanged).filter(exactDependencyPath),
         linesAdded: result.linesAdded,
         linesRemoved: result.linesRemoved,
         notes: typeof result.notes === 'string' ? result.notes : undefined,
         ...(rootId !== taskId ? { originalTaskId: rootId } : {}),
       });
-    } catch { /* unavailable/contradictory authority stays pending */ }
+    } catch (error) {
+      // Missing/unreadable or malformed evidence remains pending by contract.
+      if (!isExpectedDependencyResultReadError(error)) {
+        debugLog('collectDependencyResultEntries', error);
+      }
+    }
   }
   return entries;
 }

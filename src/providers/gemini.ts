@@ -5,7 +5,6 @@ import {
   type SpawnOptions as NodeSpawnOptions,
 } from 'node:child_process';
 import {
-  writeFileSync,
   appendFileSync,
   mkdirSync,
   existsSync,
@@ -29,6 +28,7 @@ import { modelRegistry } from '../core/model-registry.js';
 import { normalizeUsage, type TokenUsage } from '../core/token-usage.js';
 import { killProcessGroupWithEscalation } from './subprocess.js';
 import { resolveCrossProviderCredentialKeys } from './cross-provider-keys.js';
+import { writeTaskHeartbeatFile } from '../core/worker-activity-heartbeat.js';
 
 // ─── Constants ───────────────────────────────────────────────────────
 
@@ -806,7 +806,7 @@ export class GeminiAdapter implements ProviderAdapter {
       sequence: 0,
     };
     try {
-      writeFileSync(hbPath, JSON.stringify(hb, null, 2), 'utf-8');
+      writeTaskHeartbeatFile(hbPath, hb);
     } catch {
       // Non-fatal: heartbeat write failure should not stop the worker
     }

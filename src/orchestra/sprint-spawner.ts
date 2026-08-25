@@ -6,6 +6,7 @@
 // ─── Node Builtins ─────────────────────────────────────────────────
 import { buildWorkerCoreSystemPrompt } from './prompt-god-template.js';
 import { readFileSync, writeFileSync, appendFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
+import { serializeTaskResultForDisk } from '../core/task-result-schema.js';
 import { join, dirname } from 'node:path';
 
 // ─── Core (value imports — enums used at runtime) ──────────────────
@@ -540,7 +541,7 @@ function writeProviderUnavailableNoGo(task: Task, projectRoot: string): void {
   try {
     writeFileSync(
       join(projectRoot, TASKS_DIR, `task-${task.id}.result`),
-      JSON.stringify(result, null, 2),
+      serializeTaskResultForDisk(result),
       'utf-8',
     );
   } catch (e) {
@@ -594,7 +595,7 @@ function writeForcedSkillUnavailableNoGo(
   try {
     writeFileSync(
       join(projectRoot, TASKS_DIR, `task-${task.id}.result`),
-      JSON.stringify(result, null, 2),
+      serializeTaskResultForDisk(result),
       'utf-8',
     );
   } catch (e) {

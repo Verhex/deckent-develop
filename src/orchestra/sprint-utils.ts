@@ -5,7 +5,7 @@
 import { extractStructuredGoNogo, unescapeListItem } from './directives-builder.js';
 import {
   readFileSync, existsSync, writeFileSync,
-  mkdirSync, unlinkSync, statSync,
+  mkdirSync, renameSync, unlinkSync, statSync,
 } from 'node:fs';
 import { join } from 'node:path';
 
@@ -328,8 +328,9 @@ export interface SprintState {
  * Non-fatal: errors are silently ignored.
  */
 export function writeSprintState(projectRoot: string, sprint: Sprint): void {
+  const statePath = join(projectRoot, SPRINT_STATE_FILE);
+  const tmpPath = `${statePath}.tmp.${process.pid}`;
   try {
-    const statePath = join(projectRoot, SPRINT_STATE_FILE);
     const state: SprintState = {
       sprintId: sprint.id,
       phase: sprint.phase,
@@ -339,8 +340,10 @@ export function writeSprintState(projectRoot: string, sprint: Sprint): void {
       taskIds: sprint.tasks.map(t => t.id),
     };
     mkdirSync(join(projectRoot, '.deckent'), { recursive: true });
-    writeFileSync(statePath, JSON.stringify(state, null, 2), 'utf-8');
+    writeFileSync(tmpPath, JSON.stringify(state, null, 2), 'utf-8');
+    renameSync(tmpPath, statePath);
   } catch (e) {
+    try { unlinkSync(tmpPath); } catch { /* no temporary file to clean */ }
     debugLog('persistSprintState:writeFile', e);
   }
 }

@@ -954,7 +954,9 @@ export function resetDashboard(
     alerts: [],
     updatedAt: new Date().toISOString(),
   };
-  writeFileSync(dashPath, JSON.stringify(freshState, null, 2), 'utf-8');
+  const tmpPath = `${dashPath}.tmp.${process.pid}`;
+  writeFileSync(tmpPath, JSON.stringify(freshState, null, 2), 'utf-8');
+  renameSync(tmpPath, dashPath);
 }
 
 export function updateDashboard(

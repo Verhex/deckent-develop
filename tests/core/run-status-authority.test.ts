@@ -4,6 +4,11 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { readCanonicalRunStatus } from '../../src/core/run-status-authority.js';
+import {
+  appendFlowEvent,
+  savePlannedSprint,
+  saveRunHandle,
+} from '../../src/core/run-flow-store.js';
 
 function fixture(): string {
   const root = mkdtempSync(join(tmpdir(), 'deckent-run-authority-'));
@@ -82,6 +87,110 @@ describe('canonical run status authority', () => {
       active: false,
       resumable: true,
       coordinator: 'dead',
+      recoveryCommand: `deckent recover ${sprintId} --resume`,
+    });
+  });
+
+  it('vetoes resumable ORPHANED when the identity-proven flow failed', () => {
+    const root = fixture();
+    const sprintId = 'sprint-flow-failed';
+    const flowId = 'flow-failed';
+    json(root, '.deckent/sprint-active.json', { sprintId });
+    json(root, '.deckent/sprint-state.json', { sprintId, phase: 'EXECUTE', status: 'ACTIVE' });
+    json(root, `.deckent/pids/${sprintId}.pid`, {
+      pid: 2_147_483_647,
+      startToken: 'process-generation-failed',
+    });
+    json(root, `.deckent/${sprintId}-checkpoint.json`, { sprintId });
+    savePlannedSprint(root, flowId, { revision: 1, sprint: { id: sprintId } });
+    saveRunHandle(root, {
+      flowId,
+      revision: 1,
+      planDigest: 'legacy-opaque-digest',
+      handle: { flowId, jobId: 'job-failed', logRef: 'log-failed' },
+      startedAt: '2026-08-25T10:00:00.000Z',
+      pid: 2_147_483_647,
+      startToken: 'process-generation-failed',
+    });
+    json(root, '.deckent/runtime/jobs/job-failed.json', {
+      status: 'FAILED',
+      completionRecord: { flowId },
+      error: 'worker exited',
+    });
+
+    expect(readCanonicalRunStatus(root)).toMatchObject({
+      lifecycle: 'ABORTED',
+      active: false,
+      resumable: false,
+      sprintId,
+      status: 'FAILED',
+      reason: 'flow-terminal-failed',
+      recoveryCommand: null,
+    });
+  });
+
+  it('projects COMPLETE from an identity-proven terminal flow event', () => {
+    const root = fixture();
+    const sprintId = 'sprint-flow-complete';
+    const flowId = 'flow-complete';
+    json(root, '.deckent/sprint-state.json', { sprintId, phase: 'EXECUTE', status: 'ACTIVE' });
+    json(root, `.deckent/pids/${sprintId}.pid`, {
+      pid: 2_147_483_647,
+      startToken: 'process-generation-complete',
+    });
+    savePlannedSprint(root, flowId, { revision: 1, sprint: { id: sprintId } });
+    saveRunHandle(root, {
+      flowId,
+      revision: 1,
+      planDigest: 'legacy-opaque-digest',
+      handle: { flowId, jobId: 'job-complete', logRef: 'log-complete' },
+      startedAt: '2026-08-25T10:00:00.000Z',
+      pid: 2_147_483_647,
+      startToken: 'process-generation-complete',
+    });
+    appendFlowEvent(root, flowId, {
+      schemaVersion: 1,
+      flowId,
+      type: 'RUN_COMPLETED',
+      timestamp: '2026-08-25T10:05:00.000Z',
+      summary: 'done',
+    });
+
+    expect(readCanonicalRunStatus(root)).toMatchObject({
+      lifecycle: 'COMPLETE',
+      active: false,
+      resumable: false,
+      sprintId,
+      status: 'COMPLETE',
+      recoveryCommand: null,
+    });
+  });
+
+  it('keeps ORPHANED recovery when terminal flow identity cannot be proven', () => {
+    const root = fixture();
+    const sprintId = 'sprint-flow-unproven';
+    const flowId = 'flow-unproven';
+    json(root, '.deckent/sprint-state.json', { sprintId, phase: 'EXECUTE', status: 'ACTIVE' });
+    json(root, `.deckent/pids/${sprintId}.pid`, { pid: 2_147_483_647 });
+    json(root, `.deckent/${sprintId}-checkpoint.json`, { sprintId });
+    savePlannedSprint(root, flowId, { revision: 1, sprint: { id: sprintId } });
+    saveRunHandle(root, {
+      flowId,
+      revision: 1,
+      planDigest: 'legacy-opaque-digest',
+      handle: { flowId, jobId: 'job-unproven', logRef: 'log-unproven' },
+      startedAt: '2026-08-25T10:00:00.000Z',
+      pid: 2_147_483_647,
+      startToken: 'handle-only-token',
+    });
+    json(root, '.deckent/runtime/jobs/job-unproven.json', {
+      status: 'FAILED',
+      completionRecord: { flowId },
+    });
+
+    expect(readCanonicalRunStatus(root)).toMatchObject({
+      lifecycle: 'ORPHANED',
+      resumable: true,
       recoveryCommand: `deckent recover ${sprintId} --resume`,
     });
   });

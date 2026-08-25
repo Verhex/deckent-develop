@@ -653,7 +653,12 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-25 cli-surface-truth merge: +189 — the lane's three new guard
   // suites (lint-cli-surface, cli-docs-contract, gen-reference-docs) and
   // reworked cli test fixtures; all suite-owned.
-  count: 16299,
+  // 2026-08-25 A3 event-truth wave (sprint-674+675 + landing hand-fixes): +7 —
+  // worker-authored suites (worker-heartbeat-file, worker-heartbeat-single-writer,
+  // event-stream-monotonic, run-status-readiness, status-readiness-parity,
+  // event-truth-wave-evidence) + the owner-directed task-result-field-order pin;
+  // all tmpdir-hermetic, suite-owned.
+  count: 16306,
   // 2026-08-25 B-sweep: digest moved — --fix roundtrip pin, multi-label
   // parser pin, same-line rule downgraded to WARN (all suite-owned).
   // 2026-08-25 7141 wave: count unchanged, digest moved — the src-side
@@ -666,7 +671,10 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // (cells contract, journal coverage, doctor health, ci-guardian manifest).
   // 2026-08-25 docs consolidation: dead github-pages-deploy test removed with
   // its PAUSED workflow (one unresolved entry retired).
-  digest: 'c661879abd8369725eb46e2c822f1e8c3d865a58292f9e397e68122d578f4374',
+  // 2026-08-25 A3 wave: digest folds the seven new suites plus src-side shifts
+  // (hb primitive, event-seq CAS, read-model CAS/readiness, flow-terminal join,
+  // status readiness cutover, dependency shape-fix, result field-order serializer).
+  digest: '85cafa7c35a5b596aed0d1226cce20053d867726e54b4d25306eb29082a927d5',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1202,7 +1210,10 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // coverage, doctor journal-health, ci-guardian manifest).
   // 2026-08-25 docs consolidation follow-up: auditor dependency-inventory read
   // path moved to docs/en/reference/dependencies.md.
-  digest: '032024c4f3d4fe5795f695f90a145c718227c71f24ef68fd6d1cf079c2455cec',
+  // 2026-08-25 A3 event-truth wave: same 1335 count, digest only — src-side
+  // effect-site text shifted (hb primitive rewires, event-seq CAS, read-model
+  // CAS, status readiness cutover, result field-order serializer).
+  digest: '4c4cb03be951728c8d591b3ba47afc251c93c64260b011e56810fde4fd7f36aa',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

@@ -14,6 +14,21 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint675] - 2026-08-25
+
+### Added
+
+- kalan bagimsiz hb yazicilarinin primitive'e rewire'i
+- MCP + API readiness parity
+- dalga evidence harness
+
+### Fixed
+
+- CLI status — sweep senkron + UNAVAILABLE yerine readiness + dedup + fixRetry render
+
+
+_Tasks: 4 total, 4 done, 0 tech debt, 0 no-go_
+
 ## [sprint669] - 2026-08-24
 
 ### Added

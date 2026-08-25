@@ -3271,6 +3271,7 @@ export function patchResultUsageFromEnvelope(
  * @returns The number of LogEvent rows written.
  */
 export function writeNormalizedDockerLog(logPath: string, logContent: string, provider: string): number {
+  let seq = maxDockerLogSequence(logPath) + 1;
   // born-639 (404-005 TRACE-TAIL): a provider whose docker spec has no NDJSON
   // stream flag (gemini's docker spec is `--output-format json` — ONE envelope,
   // which may be pretty-printed across several lines) dumps a SINGLE JSON value
@@ -3283,11 +3284,10 @@ export function writeNormalizedDockerLog(logPath: string, logContent: string, pr
   const trimmed = logContent.trim();
   if (trimmed.length > 0 && isSingleJsonValue(trimmed)) {
     const raw = normalizeDockerLogLine(trimmed, provider);
-    writeLogEvent(logPath, normalizeStreamEvent(raw, provider), 1);
+    writeLogEvent(logPath, normalizeStreamEvent(raw, provider), seq);
     return 1;
   }
 
-  let seq = 1;
   let written = 0;
   for (const line of logContent.split(/\r?\n/)) {
     if (line.trim().length === 0) continue;
@@ -3297,6 +3297,28 @@ export function writeNormalizedDockerLog(logPath: string, logContent: string, pr
     written += 1;
   }
   return written;
+}
+
+function maxDockerLogSequence(logPath: string): number {
+  if (!existsSync(logPath)) return 0;
+  try {
+    let max = 0;
+    for (const line of readFileSync(logPath, 'utf-8').split(/\r?\n/)) {
+      if (line.trim().length === 0) continue;
+      try {
+        const parsed = JSON.parse(line) as { seq?: unknown };
+        if (typeof parsed.seq === 'number' && Number.isFinite(parsed.seq) && parsed.seq > max) {
+          max = parsed.seq;
+        }
+      } catch {
+        // Ignore malformed historical rows; valid rows still provide the floor.
+      }
+    }
+    return max;
+  } catch (error: unknown) {
+    debugLog('docker-backend:max-log-sequence', error);
+    return 0;
+  }
 }
 
 /** True iff `text` parses as exactly one JSON value (object/array/scalar). */

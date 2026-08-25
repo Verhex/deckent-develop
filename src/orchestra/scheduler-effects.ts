@@ -34,6 +34,7 @@ import { join, dirname } from 'node:path';
 
 import type { Task, ResolvedConfig, TaskResult } from '../core/types.js';
 import { TaskStatus } from '../core/types.js';
+import { serializeTaskResultForDisk } from '../core/task-result-schema.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { resolveLiveTraceEnabled } from '../core/config.js';
 import { debugLog } from '../core/utils.js';
@@ -545,7 +546,7 @@ function writeProviderUnavailableResult(projectRoot: string, task: Task): void {
   try {
     writeFileSync(
       join(projectRoot, TASKS_DIR, `task-${task.id}.result`),
-      JSON.stringify(result, null, 2),
+      serializeTaskResultForDisk(result),
       'utf-8',
     );
   } catch (e) { debugLog('executeSpawnTask:writeProviderUnavailableResult', e); }
@@ -971,7 +972,7 @@ function buildCascadeSkipResult(task: Task, failedDependencyId: string): TaskRes
 function persistCascadeSkipResultAtomic(projectRoot: string, result: TaskResult): void {
   const filePath = cascadeSkipResultPath(projectRoot, result.taskId);
   const tmpPath = `${filePath}.tmp`;
-  writeFileSync(tmpPath, JSON.stringify(result, null, 2), 'utf-8');
+  writeFileSync(tmpPath, serializeTaskResultForDisk(result), 'utf-8');
   renameSync(tmpPath, filePath);
 }
 

@@ -9,7 +9,6 @@ import {
   type SpawnOptions as NodeSpawnOptions,
 } from 'node:child_process';
 import {
-  writeFileSync,
   mkdirSync,
   existsSync,
   openSync,
@@ -28,6 +27,7 @@ import { ProviderError, buildCliInvocation, scrubCrossProviderEnv } from '../cor
 import { resolveProviderExecutionCostClass } from '../core/provider-execution-profile.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { resolveCrossProviderCredentialKeys } from './cross-provider-keys.js';
+import { writeTaskHeartbeatFile } from '../core/worker-activity-heartbeat.js';
 import type { ModelTier } from '../core/model-equivalence.js';
 import {
   modelRegistry,
@@ -787,7 +787,7 @@ export class OllamaAdapter implements ProviderAdapter {
       sequence: 0,
     };
     try {
-      writeFileSync(hbPath, JSON.stringify(hb, null, 2), 'utf-8');
+      writeTaskHeartbeatFile(hbPath, hb);
     } catch {
       // Non-fatal: heartbeat write failure should not stop the worker
     }

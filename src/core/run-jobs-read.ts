@@ -16,6 +16,13 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { JOBS_DIR } from './constants.js';
+import { RUN_FLOW_TERMINAL_STATES, type RunFlowState } from './run-flow-contract.js';
+import {
+  listFlowIds,
+  loadPlannedSprint,
+  loadRunHandle,
+  readFlowEvents,
+} from './run-flow-store.js';
 
 export interface TerminalJobClosure {
   /** The RunFlow state the execution truth maps to. */
@@ -61,4 +68,92 @@ export function readTerminalJobClosures(root: string): Map<string, TerminalJobCl
     }
   }
   return closures;
+}
+
+interface SprintProcessIdentity {
+  readonly pid?: unknown;
+  readonly startToken?: unknown;
+}
+
+function sprintIdOf(value: unknown): string | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  return nonEmpty((value as Record<string, unknown>)['id']);
+}
+
+function readSprintProcessIdentity(
+  root: string,
+  sprintId: string,
+): SprintProcessIdentity | undefined {
+  try {
+    return JSON.parse(
+      readFileSync(join(root, '.deckent', 'pids', `${sprintId}.pid`), 'utf-8'),
+    ) as SprintProcessIdentity;
+  } catch {
+    return undefined;
+  }
+}
+
+function terminalEventClosure(
+  root: string,
+  flowId: string,
+): TerminalJobClosure | undefined {
+  for (const event of [...readFlowEvents(root, flowId)].reverse()) {
+    const state: RunFlowState | undefined = event.type === 'RUN_COMPLETED'
+      ? 'COMPLETED'
+      : event.type === 'RUN_FAILED'
+        ? 'FAILED'
+        : event.type === 'FLOW_ABORTED'
+          ? 'CANCELLED'
+          : undefined;
+    if (state === undefined || !RUN_FLOW_TERMINAL_STATES.has(state)) continue;
+    if (state === 'COMPLETED' && event.type === 'RUN_COMPLETED') {
+      return {
+        state,
+        completedAt: event.timestamp,
+        ...(event.summary !== undefined ? { summary: event.summary } : {}),
+      };
+    }
+    if (state === 'FAILED' && event.type === 'RUN_FAILED') {
+      return { state, completedAt: event.timestamp, error: event.error };
+    }
+    return undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Join a Sprint to the terminal execution truth of its exact RunFlow process.
+ * Sprint correlation alone is insufficient: both PID and non-empty start token
+ * must match the Sprint coordinator record, preventing PID reuse or an older
+ * flow for the same Sprint from becoming lifecycle authority.
+ */
+export function readRunFlowTerminalClosureForSprint(
+  root: string,
+  sprintId: string,
+): TerminalJobClosure | null {
+  const sprintIdentity = readSprintProcessIdentity(root, sprintId);
+  if (
+    typeof sprintIdentity?.pid !== 'number'
+    || !Number.isInteger(sprintIdentity.pid)
+    || sprintIdentity.pid <= 0
+    || nonEmpty(sprintIdentity.startToken) === undefined
+  ) {
+    return null;
+  }
+
+  const jobClosures = readTerminalJobClosures(root);
+  for (const flowId of listFlowIds(root)) {
+    const plan = loadPlannedSprint(root, flowId);
+    if (sprintIdOf(plan?.sprint) !== sprintId) continue;
+    const handle = loadRunHandle(root, flowId);
+    if (
+      handle?.pid !== sprintIdentity.pid
+      || nonEmpty(handle.startToken) !== nonEmpty(sprintIdentity.startToken)
+    ) {
+      continue;
+    }
+    const closure = jobClosures.get(flowId) ?? terminalEventClosure(root, flowId);
+    if (closure !== undefined) return closure;
+  }
+  return null;
 }

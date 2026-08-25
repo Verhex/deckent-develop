@@ -4,8 +4,12 @@
 // Root cause: a PAUSED authority required a persisted read-model that pause
 // never republished — although the authority already carries the recovery
 // command. These pins hold the gate relaxation and the banner contract.
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import {
+  buildStatusJsonSnapshot,
   requiresPersistedRunStatusReadModel,
   formatPausedRunBanner,
 } from '../../src/cli/commands/status.js';
@@ -50,6 +54,36 @@ describe('RECOVERY-PAUSE-STATUS — gate + banner', () => {
     expect(out).toMatch(/sprint-001/u);
     expect(out).toMatch(/deckent recover sprint-001 --resume/u);
     expect(out).toMatch(/NO_GO/u); // the reason is surfaced, not swallowed
+  });
+
+  it('keeps PAUSED as the top-level lifecycle with self-sufficient readiness', () => {
+    const root = mkdtempSync(join(tmpdir(), 'deckent-paused-status-'));
+    try {
+      mkdirSync(join(root, '.deckent'), { recursive: true });
+      writeFileSync(join(root, '.deckent', 'sprint-state.json'), JSON.stringify({
+        sprintId: 'sprint-001',
+        phase: 'EXECUTE',
+        status: 'PAUSED',
+      }));
+      mkdirSync(join(root, '.tasks'), { recursive: true });
+      writeFileSync(join(root, '.tasks', 'task-001-001.json'), JSON.stringify({
+        id: '001-001',
+        title: 'Blocked task',
+        status: 'NO_GO',
+        sprintId: 'sprint-001',
+      }));
+
+      const status = buildStatusJsonSnapshot(root, join(root, '.dashboard'), {});
+
+      expect(status).toMatchObject({
+        lifecycle: 'PAUSED',
+        resumable: true,
+        readiness: { state: 'SELF_SUFFICIENT', reason: 'reconciled-paused' },
+      });
+      expect(status).not.toHaveProperty('error');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('the banner falls back to a derived recover command when the authority omits one', () => {

@@ -133,6 +133,16 @@ describe('reconcileStatusResponse', () => {
     expect(agents).toHaveLength(1);
   });
 
+  it('preserves canonical lifecycle while holding an unavailable read model', () => {
+    writeSprintState(root, {
+      sprintId: 'sprint-901', status: 'ACTIVE', phase: 'EXECUTE', taskIds: [],
+    });
+    const result = reconcileStatusResponse(root, buildStaleDash('sprint-901')) as Record<string, unknown>;
+    expect(result['lifecycle']).toBe('ORPHANED');
+    expect(result['readiness']).toBe('HOLD');
+    expect(result['alerts']).toEqual([{ code: 'RUN_STATUS_READ_MODEL_UNAVAILABLE' }]);
+  });
+
   // ── test 3: no sprint-state file → idle ─────────────────────────
 
   it('returns idle when sprint-state file is missing (no active sprint)', () => {

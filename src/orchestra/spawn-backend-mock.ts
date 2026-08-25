@@ -7,6 +7,7 @@ import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ModelType } from '../core/types.js';
 import { TASKS_DIR } from '../core/constants.js';
+import { serializeTaskResultForDisk } from '../core/task-result-schema.js';
 import type { SpawnBackend, SpawnBackendOptions } from './spawn-backend.js';
 
 // ─── Mock Scenario ────────────────────────────────────────────────────────
@@ -76,7 +77,7 @@ export class MockSpawnBackend implements SpawnBackend {
           selfAssessment: scenario,
           notes: `Mock worker: ${scenario} for task ${taskId} (model: ${model})`,
         };
-        writeFileSync(join(tasksDir, `task-${taskId}.result`), JSON.stringify(result, null, 2), 'utf-8');
+        writeFileSync(join(tasksDir, `task-${taskId}.result`), serializeTaskResultForDisk(result), 'utf-8');
       }
 
       // Update heartbeat to DONE

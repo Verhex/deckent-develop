@@ -5,12 +5,15 @@ import {
   readFileSync,
   readdirSync,
   renameSync,
+  rmdirSync,
+  statSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { canonicalJson } from './audit-writer.js';
+import { DEFAULT_MAX_FIX_RETRIES, getLoadedConfig } from './config.js';
 import {
   DECKENT_DIR,
   RECENT_WORKS_DIR,
@@ -37,6 +40,9 @@ import { inspectTaskResultSettlementAuthority } from './task-result-settlement.j
 import { classifyTaskArtifact } from './task-artifact-classifier.js';
 
 export const RUN_STATUS_READ_MODEL_SCHEMA_VERSION = 1 as const;
+export const RUN_STATUS_READ_MODEL_LOCK_STALE_MS = 30_000;
+const RUN_STATUS_READ_MODEL_LOCK_WAIT_MS = 5_000;
+const RUN_STATUS_READ_MODEL_LOCK_RETRY_MS = 10;
 
 export type RunStatusReadModelHoldReason =
   | 'authority-conflict'
@@ -56,6 +62,30 @@ export interface CanonicalRunLogicalProgress {
   readonly total: number;
   readonly attemptCount: number;
   readonly lineages: readonly LogicalProgressLineage[];
+  readonly fixRetry: readonly CanonicalRunFixRetry[];
+}
+
+export interface CanonicalRunFixRetry {
+  readonly logicalTaskId: string;
+  readonly attemptCount: number;
+  readonly maxFixRetries: number;
+  readonly disposition: 'retry-pending' | 'budget-exhausted';
+}
+
+function projectFixRetry(
+  lineages: readonly LogicalProgressLineage[],
+  maxFixRetries: number,
+): readonly CanonicalRunFixRetry[] {
+  return Object.freeze(lineages
+    .filter(lineage => lineage.status === 'blocked')
+    .map(lineage => Object.freeze({
+      logicalTaskId: lineage.logicalTaskId,
+      attemptCount: lineage.attemptCount,
+      maxFixRetries,
+      disposition: lineage.attemptCount <= maxFixRetries
+        ? 'retry-pending' as const
+        : 'budget-exhausted' as const,
+    })));
 }
 
 export interface CanonicalRunStatusReadModel {
@@ -92,11 +122,12 @@ export interface CanonicalRunStatusReadModelBuildInput {
   readonly holds?: readonly RunStatusReadModelHold[];
   readonly previous?: CanonicalRunStatusReadModel | null;
   readonly publishedAt: string;
+  readonly maxFixRetries?: number;
 }
 
 export class RunStatusReadModelError extends Error {
   constructor(
-    readonly code: 'INVALID_MODEL' | 'DIGEST_MISMATCH' | 'PERSIST_FAILED',
+    readonly code: 'INVALID_MODEL' | 'DIGEST_MISMATCH' | 'PERSIST_FAILED' | 'CAS_CONFLICT',
     message: string,
   ) {
     super(message);
@@ -137,6 +168,7 @@ function taskSequence(task: Task): number | undefined {
 
 export function projectCanonicalRunLogicalProgress(
   tasks: readonly Task[],
+  maxFixRetries = DEFAULT_MAX_FIX_RETRIES,
 ): CanonicalRunLogicalProgress {
   const tasksById = new Map(tasks.map(task => [task.id, task]));
   const projected = projectLogicalProgress({
@@ -159,7 +191,10 @@ export function projectCanonicalRunLogicalProgress(
       `Canonical logical progress rejected task lineage: ${projected.diagnostic}`,
     );
   }
-  return projected.projection;
+  return Object.freeze({
+    ...projected.projection,
+    fixRetry: projectFixRetry(projected.projection.lineages, maxFixRetries),
+  });
 }
 
 function semanticPayload(input: Omit<CanonicalRunStatusReadModel, 'revision' | 'publishedAt' | 'modelDigest'>) {
@@ -173,7 +208,8 @@ export function buildCanonicalRunStatusReadModel(
     schemaVersion: RUN_STATUS_READ_MODEL_SCHEMA_VERSION,
     runGeneration: input.runGeneration,
     authority: input.authority,
-    logicalProgress: input.logicalProgress ?? projectCanonicalRunLogicalProgress(input.tasks),
+    logicalProgress: input.logicalProgress
+      ?? projectCanonicalRunLogicalProgress(input.tasks, input.maxFixRetries),
     providerConcurrency: Object.freeze([...input.providerConcurrency]),
     terminalPublication: input.terminalPublication,
     holds: Object.freeze([...(input.holds ?? [])]),
@@ -305,6 +341,7 @@ function terminalLogicalProgress(
   projectRoot: string,
   authority: CanonicalRunStatus,
   terminalPublication: ReturnType<typeof projectTerminalPublicationStatus>,
+  maxFixRetries: number,
 ): CanonicalRunLogicalProgress | null {
   if (!authority.sprintId || !terminalPublication.receipt) return null;
   const raw = readJson(join(
@@ -335,7 +372,11 @@ function terminalLogicalProgress(
       0,
     )
   ) return null;
-  return Object.freeze(progress);
+  return Object.freeze({
+    ...progress,
+    // Schema v1 terminal receipts written before this additive projection remain readable.
+    fixRetry: projectFixRetry(progress.lineages, maxFixRetries),
+  });
 }
 
 export function resolveCanonicalRunStatusReadModelPath(projectRoot: string): string {
@@ -370,6 +411,77 @@ export function runStatusReadModelMatchesAuthority(
   return canonicalJson(model.authority) === canonicalJson(authority);
 }
 
+export type RunStatusReadiness =
+  | { readonly state: 'READY'; readonly model: CanonicalRunStatusReadModel }
+  | {
+    readonly state: 'SELF_SUFFICIENT';
+    readonly reason: 'reconciled-paused' | 'proven-active-liveness' | 'quiescent';
+  }
+  | { readonly state: 'HOLD'; readonly code: 'RUN_STATUS_READ_MODEL_UNAVAILABLE' };
+
+/** One shared readiness predicate for every status delivery surface. */
+export function resolveRunStatusReadiness(
+  authority: CanonicalRunStatus,
+  model: CanonicalRunStatusReadModel | null,
+): RunStatusReadiness {
+  if (model !== null && runStatusReadModelMatchesAuthority(model, authority)) {
+    return { state: 'READY', model };
+  }
+  // A reconciled pause is a complete recovery projection even when it is resumable.
+  if (authority.lifecycle === 'PAUSED') {
+    return { state: 'SELF_SUFFICIENT', reason: 'reconciled-paused' };
+  }
+  if (
+    authority.lifecycle === 'ACTIVE'
+    && authority.active
+    && authority.coordinator === 'alive'
+  ) {
+    return { state: 'SELF_SUFFICIENT', reason: 'proven-active-liveness' };
+  }
+  if (
+    authority.lifecycle === 'IDLE'
+    || authority.lifecycle === 'COMPLETE'
+    || authority.lifecycle === 'ABORTED'
+  ) {
+    return { state: 'SELF_SUFFICIENT', reason: 'quiescent' };
+  }
+  return { state: 'HOLD', code: 'RUN_STATUS_READ_MODEL_UNAVAILABLE' };
+}
+
+function sleep(milliseconds: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
+}
+
+function removeStalePublicationLock(lockPath: string, nowMs: number): boolean {
+  try {
+    if (nowMs - statSync(lockPath).mtimeMs <= RUN_STATUS_READ_MODEL_LOCK_STALE_MS) return false;
+    rmdirSync(lockPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function acquirePublicationLock(lockPath: string): void {
+  const startedAt = Date.now();
+  while (true) {
+    try {
+      mkdirSync(lockPath, { mode: 0o700 });
+      return;
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      if (removeStalePublicationLock(lockPath, Date.now())) continue;
+      if (Date.now() - startedAt >= RUN_STATUS_READ_MODEL_LOCK_WAIT_MS) {
+        throw new RunStatusReadModelError(
+          'CAS_CONFLICT',
+          'Run status read model publication lock remained held',
+        );
+      }
+      sleep(RUN_STATUS_READ_MODEL_LOCK_RETRY_MS);
+    }
+  }
+}
+
 export function publishCanonicalRunStatusReadModel(
   projectRoot: string,
   options: { readonly publishedAt?: string; readonly authority?: CanonicalRunStatus } = {},
@@ -392,13 +504,16 @@ export function publishCanonicalRunStatusReadModel(
     currentAttemptIdsByTaskId,
   });
   const terminalPublication = projectTerminalPublicationStatus(projectRoot, authority);
+  const maxFixRetries = getLoadedConfig(projectRoot)?.max_fix_retries
+    ?? DEFAULT_MAX_FIX_RETRIES;
   const exactTerminalProgress = terminalLogicalProgress(
     projectRoot,
     authority,
     terminalPublication,
+    maxFixRetries,
   );
   const previous = readCanonicalRunStatusReadModel(projectRoot);
-  const model = buildCanonicalRunStatusReadModel({
+  const buildInput = {
     authority,
     tasks: loaded.tasks,
     ...(exactTerminalProgress ? { logicalProgress: exactTerminalProgress } : {}),
@@ -417,25 +532,38 @@ export function publishCanonicalRunStatusReadModel(
     ],
     previous,
     publishedAt: options.publishedAt ?? new Date().toISOString(),
-  });
+    maxFixRetries,
+  } satisfies CanonicalRunStatusReadModelBuildInput;
+  const model = buildCanonicalRunStatusReadModel(buildInput);
   if (model === previous) return model;
   const path = resolveCanonicalRunStatusReadModelPath(projectRoot);
   mkdirSync(dirname(path), { recursive: true });
-  const temporary = `${path}.tmp.${process.pid}.${randomUUID()}`;
+  const lockPath = `${path}.lock`;
+  acquirePublicationLock(lockPath);
+  let temporary: string | null = null;
   try {
-    writeFileSync(temporary, `${JSON.stringify(model, null, 2)}\n`, 'utf-8');
+    const current = readCanonicalRunStatusReadModel(projectRoot);
+    const candidate = current?.revision === previous?.revision
+      ? model
+      : buildCanonicalRunStatusReadModel({ ...buildInput, previous: current });
+    if (candidate === current) return current;
+    temporary = `${path}.tmp.${process.pid}.${randomUUID()}`;
+    writeFileSync(temporary, `${JSON.stringify(candidate, null, 2)}\n`, 'utf-8');
     renameSync(temporary, path);
+    temporary = null;
     const persisted = readCanonicalRunStatusReadModel(projectRoot);
-    if (!persisted || persisted.modelDigest !== model.modelDigest) {
+    if (!persisted || persisted.modelDigest !== candidate.modelDigest) {
       throw new RunStatusReadModelError('PERSIST_FAILED', 'Run status read model readback failed');
     }
     return persisted;
   } catch (error) {
-    try { if (existsSync(temporary)) unlinkSync(temporary); } catch { /* preserve original failure */ }
+    try { if (temporary !== null && existsSync(temporary)) unlinkSync(temporary); } catch { /* preserve original failure */ }
     if (error instanceof RunStatusReadModelError) throw error;
     throw new RunStatusReadModelError(
       'PERSIST_FAILED',
       `Run status read model publication failed: ${error instanceof Error ? error.message : String(error)}`,
     );
+  } finally {
+    try { rmdirSync(lockPath); } catch { /* stale lock cleanup is age-pinned */ }
   }
 }

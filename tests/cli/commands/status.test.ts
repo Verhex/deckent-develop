@@ -81,7 +81,8 @@ vi.mock('../../../src/core/run-status-authority.js', () => ({
   readCanonicalRunStatus: vi.fn(() => runAuthorityState.current),
 }));
 
-vi.mock('../../../src/core/run-status-read-model.js', () => ({
+vi.mock('../../../src/core/run-status-read-model.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/core/run-status-read-model.js')>()),
   readCanonicalRunStatusReadModel: vi.fn(() => ({
     schemaVersion: 1,
     revision: 1,
@@ -92,6 +93,11 @@ vi.mock('../../../src/core/run-status-read-model.js', () => ({
     authority: {},
   })),
   runStatusReadModelMatchesAuthority: vi.fn(() => true),
+}));
+
+const deathSweep = vi.hoisted(() => vi.fn(() => ({ scanned: 0, closed: [], skipped: [] })));
+vi.mock('../../../src/orchestra/run-flow-death-sweep.js', () => ({
+  sweepDeadDetachedRuns: deathSweep,
 }));
 
 const shutdownHookState = vi.hoisted(() => ({
@@ -155,6 +161,15 @@ describe('status command (isolated)', () => {
     vi.clearAllMocks();
     shutdownHookState.hooks.length = 0;
     process.exitCode = undefined;
+  });
+
+  it('sweeps detached run deaths exactly once before rendering status', async () => {
+    vi.mocked(existsSync).mockReturnValue(false);
+
+    await runCommand(['status']);
+
+    expect(deathSweep).toHaveBeenCalledOnce();
+    expect(deathSweep).toHaveBeenCalledWith('/mock/root');
   });
   afterEach(() => {
     process.exitCode = undefined;
@@ -225,7 +240,7 @@ describe('status command (isolated)', () => {
     });
     vi.mocked(readdirSync).mockReturnValue(['task-001.json'] as any);
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify({
-      id: '001', title: 'Test', status: 'PENDING', sprintId: 'sprint-002',
+      id: '001', title: 'Test', status: 'PENDING', sprintId: 'sprint-001',
       dependencies: [], model: 'claude-sonnet-5', effort: 'normal',
     }));
     const close = vi.fn();
@@ -270,7 +285,7 @@ describe('status command (isolated)', () => {
   });
 
   it('projects all status tasks through one bulk read instead of per-task queries', async () => {
-    setActiveRunAuthority();
+    setActiveRunAuthority('sprint-bulk');
     vi.mocked(existsSync).mockImplementation((path: any) => {
       if (String(path).includes('.dashboard')) return false;
       if (String(path).includes('.tasks')) return true;
@@ -330,7 +345,7 @@ describe('status command (isolated)', () => {
     });
     vi.mocked(readdirSync).mockReturnValue(['task-001.json'] as any);
     vi.mocked(readFileSync).mockReturnValue(JSON.stringify({
-      id: '001', title: 'Test', status: 'PENDING', sprintId: 'sprint-002',
+      id: '001', title: 'Test', status: 'PENDING', sprintId: 'sprint-001',
       dependencies: [], model: 'claude-sonnet-5', effort: 'normal',
     }));
     const projection = {

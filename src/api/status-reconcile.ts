@@ -21,6 +21,7 @@ import { readJsonSafe } from '../core/utils.js';
 import { SprintStatus, SprintPhase } from '../core/types.js';
 import {
   readCanonicalRunStatusReadModel,
+  resolveRunStatusReadiness,
   runStatusReadModelMatchesAuthority,
   type CanonicalRunStatusReadModel,
 } from '../core/run-status-read-model.js';
@@ -103,6 +104,7 @@ function idleResponse(
       ?? { done: 0, active: 0, blocked: 0, total: 0, attemptCount: 0, lineages: [] },
     ...(model ? {
       lifecycle: model.authority.lifecycle,
+      readiness: 'READY',
       authority: model.authority,
       terminalPublication: model.terminalPublication,
       providerConcurrency: model.providerConcurrency,
@@ -133,14 +135,13 @@ export function reconcileStatusResponse(
   dashData: unknown,
 ): unknown {
   const statePath = join(projectRoot, SPRINT_STATE_FILE);
+  const authority = readCanonicalRunStatus(projectRoot);
   let model: CanonicalRunStatusReadModel | null = null;
-  let modelInvalid = false;
   try {
     const candidate = readCanonicalRunStatusReadModel(projectRoot);
-    const authority = readCanonicalRunStatus(projectRoot);
     if (candidate && runStatusReadModelMatchesAuthority(candidate, authority)) model = candidate;
-    else if (candidate) modelInvalid = true;
-  } catch { modelInvalid = true; }
+  } catch { /* An unreadable model is treated as unavailable by readiness. */ }
+  const readiness = resolveRunStatusReadiness(authority, model);
   if (model) {
     if (
       model.authority.lifecycle === 'IDLE'
@@ -163,6 +164,7 @@ export function reconcileStatusResponse(
       progress: model.logicalProgress,
       active: model.authority.active,
       lifecycle: model.authority.lifecycle,
+      readiness: readiness.state,
       resumable: model.authority.resumable,
       authority: model.authority,
       terminalPublication: model.terminalPublication,
@@ -171,7 +173,7 @@ export function reconcileStatusResponse(
       updatedAt: model.publishedAt,
     };
   }
-  if (modelInvalid || existsSync(statePath)) {
+  if (readiness.state === 'HOLD') {
     const state = readJsonSafe<SprintStateFile>(statePath);
     return {
       sprint: {
@@ -180,7 +182,8 @@ export function reconcileStatusResponse(
         status: 'HOLD',
       },
       active: false,
-      lifecycle: 'UNAVAILABLE',
+      lifecycle: authority.lifecycle,
+      readiness: 'HOLD',
       progress: null,
       providerConcurrency: [],
       terminalPublication: null,
@@ -188,6 +191,37 @@ export function reconcileStatusResponse(
       alerts: [{ code: 'RUN_STATUS_READ_MODEL_UNAVAILABLE' }],
       updatedAt: new Date().toISOString(),
       idle: false,
+    };
+  }
+
+  if (readiness.state === 'SELF_SUFFICIENT' && readiness.reason === 'quiescent') {
+    return {
+      ...(idleResponse(authority.sprintId) as Record<string, unknown>),
+      lifecycle: authority.lifecycle,
+      readiness: readiness.state,
+      authority,
+    };
+  }
+
+  if (readiness.state !== 'SELF_SUFFICIENT' || readiness.reason !== 'quiescent') {
+    const dashboard = dashData && typeof dashData === 'object'
+      ? dashData as DashboardLike
+      : {};
+    return {
+      ...dashboard,
+      sprint: {
+        ...(dashboard.sprint ?? {}),
+        id: authority.sprintId,
+        phase: authority.phase,
+        status: authority.status,
+      },
+      active: authority.active,
+      lifecycle: authority.lifecycle,
+      readiness: readiness.state,
+      resumable: authority.resumable,
+      authority,
+      statusReadModel: { state: 'unavailable-or-stale' },
+      updatedAt: new Date().toISOString(),
     };
   }
 

@@ -14,7 +14,16 @@
 //   - Backward compat: .hb/.result files continue in parallel
 //   - Sequence: monotonic per-sprint, stored in .deckent/sprint-NNN-seq
 
-import { appendFileSync, readFileSync, writeFileSync, existsSync, mkdirSync, statSync, renameSync } from 'node:fs';
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { RECENT_WORKS_DIR, SPRINT_STATE_FILE, SPRINT_ACTIVE_FILE } from './constants.js';
 import { debugLog } from './utils.js';
@@ -211,6 +220,34 @@ function sequenceFilePath(projectRoot: string, sprintId: string): string {
 // previous rotation) and start fresh. Standard 2-file log rotation → bounded at
 // ~2×cap, recent history preserved. Per-sprint files (KBs) never trigger.
 const MAX_EVENT_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
+const SEQUENCE_LOCK_ATTEMPTS = 20;
+const SEQUENCE_LOCK_RETRY_MS = 5;
+const SEQUENCE_LOCK_STALE_MS = 30_000;
+
+function sequencePathForEventPath(path: string): string | null {
+  const suffix = '-events.jsonl';
+  return path.endsWith(suffix) ? `${path.slice(0, -suffix.length)}-seq` : null;
+}
+
+function maxSequenceInFile(path: string): number {
+  let max = 0;
+  for (const line of readFileSync(path, 'utf-8').split('\n')) {
+    if (line.trim().length === 0) continue;
+    try {
+      const parsed = JSON.parse(line) as { sequence?: unknown };
+      if (
+        typeof parsed.sequence === 'number'
+        && Number.isFinite(parsed.sequence)
+        && parsed.sequence > max
+      ) {
+        max = parsed.sequence;
+      }
+    } catch {
+      // Malformed rows do not prevent rotation of the remaining valid history.
+    }
+  }
+  return max;
+}
 
 /**
  * Rotate an event file to `<path>.1` when it exceeds `maxBytes`. Returns true if a
@@ -221,7 +258,27 @@ export function rotateEventFileIfLarge(path: string, maxBytes: number = MAX_EVEN
   try {
     if (!existsSync(path)) return false;
     if (statSync(path).size <= maxBytes) return false;
-    renameSync(path, `${path}.1`); // atomic; overwrites any prior rotation
+    const seqPath = sequencePathForEventPath(path);
+    if (seqPath && existsSync(seqPath)) {
+      const parsedSidecar = Number.parseInt(readFileSync(seqPath, 'utf-8').trim(), 10);
+      const markerSequence = Math.max(
+        Number.isFinite(parsedSidecar) ? parsedSidecar : 0,
+        maxSequenceInFile(path),
+      ) + 1;
+      const marker: DeckentEvent = {
+        timestamp: new Date().toISOString(),
+        sequence: markerSequence,
+        protocol_version: '1.0',
+        source: 'deckent',
+        target: '*',
+        channel: 'EVENT_LOG_ROTATED',
+        payload: { rotatedTo: `${path}.1` },
+      };
+      appendFileSync(path, `${JSON.stringify(marker)}\n`, 'utf-8');
+      writeFileSync(seqPath, String(markerSequence), 'utf-8');
+    }
+    rmSync(`${path}.1`, { force: true });
+    renameSync(path, `${path}.1`);
     return true;
   } catch (err) {
     debugLog('event-stream:rotateEventFileIfLarge', err);
@@ -258,19 +315,7 @@ function maxSequenceInEventLog(projectRoot: string, sprintId: string): number {
   const filePath = eventsFilePath(projectRoot, sprintId);
   if (!existsSync(filePath)) return 0;
   try {
-    let max = 0;
-    for (const line of readFileSync(filePath, 'utf-8').split('\n')) {
-      if (line.trim().length === 0) continue;
-      try {
-        const parsed = JSON.parse(line) as { sequence?: unknown };
-        if (typeof parsed.sequence === 'number' && Number.isFinite(parsed.sequence) && parsed.sequence > max) {
-          max = parsed.sequence;
-        }
-      } catch {
-        // Malformed line — skip it; the rest of the log still bounds the sequence.
-      }
-    }
-    return max;
+    return maxSequenceInFile(filePath);
   } catch (err) {
     debugLog('event-stream:maxSequenceInEventLog', err);
     return 0;
@@ -288,20 +333,50 @@ function maxSequenceInEventLog(projectRoot: string, sprintId: string): number {
  * value we therefore recover the counter from the log's own maximum, which makes
  * that collision structurally impossible rather than merely unlikely.
  */
-function nextSequence(projectRoot: string, sprintId: string): number {
-  let current = readSequence(projectRoot, sprintId);
-  if (current <= 0) {
-    current = maxSequenceInEventLog(projectRoot, sprintId);
-  }
-  const next = current + 1;
+export function nextSequence(projectRoot: string, sprintId: string): number {
   const seqPath = sequenceFilePath(projectRoot, sprintId);
+  const lockPath = `${seqPath}.lock`;
+  let locked = false;
   try {
-    writeFileSync(seqPath, String(next), 'utf-8');
-  } catch {
-    // Fail-safe: if we can't persist, use in-memory increment
-    debugLog('event-stream:nextSequence', 'Failed to persist sequence counter');
+    for (let attempt = 0; attempt < SEQUENCE_LOCK_ATTEMPTS; attempt += 1) {
+      try {
+        mkdirSync(lockPath);
+        locked = true;
+        break;
+      } catch (error: unknown) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+        try {
+          if (Date.now() - statSync(lockPath).mtimeMs > SEQUENCE_LOCK_STALE_MS) {
+            rmSync(lockPath, { recursive: true, force: true });
+            continue;
+          }
+        } catch (staleError: unknown) {
+          if ((staleError as NodeJS.ErrnoException).code !== 'ENOENT') throw staleError;
+        }
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, SEQUENCE_LOCK_RETRY_MS);
+      }
+    }
+
+    let current = readSequence(projectRoot, sprintId);
+    if (current <= 0) current = maxSequenceInEventLog(projectRoot, sprintId);
+    const next = current + 1;
+    if (!locked) {
+      debugLog('event-stream:nextSequence', 'Failed to acquire sequence counter lock');
+      return next;
+    }
+    const tmpPath = `${seqPath}.tmp.${process.pid}`;
+    writeFileSync(tmpPath, String(next), 'utf-8');
+    renameSync(tmpPath, seqPath);
+    return next;
+  } catch (error: unknown) {
+    debugLog('event-stream:nextSequence', error);
+    const current = Math.max(readSequence(projectRoot, sprintId), maxSequenceInEventLog(projectRoot, sprintId));
+    return current + 1;
+  } finally {
+    if (locked) {
+      try { rmSync(lockPath, { recursive: true, force: true }); } catch { /* fail-safe */ }
+    }
   }
-  return next;
 }
 
 // ─── Core API ────────────────────────────────────────────────────
@@ -440,6 +515,9 @@ export function writeEventDetailed(
       mkdirSync(recentWorksDir, { recursive: true });
     }
 
+    const eventsPath = eventsFilePath(projectRoot, sprintId);
+    // Rotate before reserving this event's sequence so the marker is ordered first.
+    rotateEventFileIfLarge(eventsPath);
     const sequence = nextSequence(projectRoot, sprintId);
     const event: DeckentEvent = {
       timestamp: new Date().toISOString(),
@@ -454,9 +532,6 @@ export function writeEventDetailed(
     };
 
     const line = JSON.stringify(event) + '\n';
-    const eventsPath = eventsFilePath(projectRoot, sprintId);
-    // B-AUTONOMOUS-LOG: bound the long-lived 'autonomous' stream (rotate at cap).
-    rotateEventFileIfLarge(eventsPath);
     appendFileSync(eventsPath, line, 'utf-8');
     return { kind: 'written', event };
   } catch (err) {

@@ -19,7 +19,9 @@ import {
   readCanonicalRunStatusReadModel,
   runStatusReadModelMatchesAuthority,
   type CanonicalRunStatusReadModel,
+  type RunStatusReadiness,
 } from '../../core/run-status-read-model.js';
+import * as runStatusReadModelAuthority from '../../core/run-status-read-model.js';
 import { mcpToolDescription } from './description-catalog.js';
 
 /**
@@ -360,6 +362,18 @@ function statusReadModelSurface(model: CanonicalRunStatusReadModel | null) {
     : { state: 'unavailable-or-stale' as const };
 }
 
+function statusReadiness(
+  authority: CanonicalRunStatus,
+  model: CanonicalRunStatusReadModel | null,
+): RunStatusReadiness {
+  if ('resolveRunStatusReadiness' in runStatusReadModelAuthority) {
+    return runStatusReadModelAuthority.resolveRunStatusReadiness(authority, model);
+  }
+  // Compatibility for older test doubles which predate the shared predicate.
+  if (model) return { state: 'READY', model };
+  return { state: 'HOLD', code: 'RUN_STATUS_READ_MODEL_UNAVAILABLE' };
+}
+
 export function registerStatusTool(server: McpServer): void {
   server.registerTool(
     'deckent_status',
@@ -380,21 +394,20 @@ export function registerStatusTool(server: McpServer): void {
       const canonicalSprintId = getCurrentSprintId(root);
       const authority = readCanonicalRunStatus(root, { sprintIdHint: canonicalSprintId });
       const readModel = matchingRunStatusReadModel(root, authority);
+      const readiness = statusReadiness(authority, readModel);
       const providerConcurrency = readModel?.providerConcurrency ?? [];
       const pendingApprovals = readPendingApprovals(root);
 
       const latestJob = readLatestJobState(root);
-      const canonicalHasLiveProjection =
-        authority.active
-        || authority.resumable
-        || authority.lifecycle === 'PAUSED'
-        || authority.lifecycle === 'ORPHANED';
+      const canonicalHasLiveProjection = readiness.state !== 'SELF_SUFFICIENT'
+        || readiness.reason !== 'quiescent';
 
-      if (canonicalHasLiveProjection && !readModel) {
+      if (readiness.state === 'HOLD') {
         const unavailable = {
           active: false,
           sprintId: authority.sprintId,
-          lifecycle: 'UNAVAILABLE',
+          lifecycle: authority.lifecycle,
+          readiness: 'HOLD',
           authority,
           progress: null,
           providerConcurrency: [],
@@ -424,6 +437,7 @@ export function registerStatusTool(server: McpServer): void {
             completedAt: latestJob.completedAt,
             job: latestJob,
             lifecycle: authority.lifecycle,
+            readiness: readiness.state,
             resumable: authority.resumable,
             authority,
             terminalPublication: readModel?.terminalPublication ?? null,
@@ -448,6 +462,7 @@ export function registerStatusTool(server: McpServer): void {
           sprintId: authority.sprintId ?? canonicalSprintId,
           job: latestJob,
           lifecycle: authority.lifecycle,
+          readiness: readiness.state,
           resumable: authority.resumable,
           recoveryCommand: authority.recoveryCommand,
           finalizeCommand: authority.finalizeCommand,
@@ -583,6 +598,7 @@ export function registerStatusTool(server: McpServer): void {
         backendBreakdown,
         active: authority.active,
         lifecycle: authority.lifecycle,
+        readiness: readiness.state,
         resumable: authority.resumable,
         recoveryCommand: authority.recoveryCommand,
         finalizeCommand: authority.finalizeCommand,

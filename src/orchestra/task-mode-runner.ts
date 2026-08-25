@@ -35,7 +35,7 @@ import { enrichResultCost, enrichResultTokenUsage, resolveAgentPrompt, resolveSk
 import { eventBus } from './event-bus.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { debugLog, readJsonSafe } from '../core/utils.js';
-import { normalizeTaskResultShape } from '../core/task-result-schema.js';
+import { normalizeTaskResultShape, serializeTaskResultForDisk } from '../core/task-result-schema.js';
 import type { TaskResultSettlementRefV1 } from '../core/task-result-settlement.js';
 import { writeEvent } from './event-stream.js';
 
@@ -115,7 +115,7 @@ function persistTaskModeResult(projectRoot: string, result: TaskResult): void {
   try {
     const path = join(projectRoot, TASKS_DIR, `task-${result.taskId}.result`);
     const tmp = `${path}.enrich-tmp`;
-    writeFileSync(tmp, JSON.stringify(result, null, 2), 'utf-8');
+    writeFileSync(tmp, serializeTaskResultForDisk(result), 'utf-8');
     renameSync(tmp, path);
   } catch (err) {
     debugLog('task-mode-runner:persistTaskModeResult', err);

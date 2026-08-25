@@ -39,6 +39,7 @@ import {
 import { setupWorkerApprovalGateFromEnv } from './worker-approval-env.js';
 import { normalizeUsage } from '../core/token-usage.js';
 import { resolveLiveTraceEnabled } from '../core/config.js';
+import { writeTaskHeartbeatFile } from '../core/worker-activity-heartbeat.js';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -149,7 +150,7 @@ function writeHeartbeat(
     sequence,
   };
   try {
-    writeFileSync(join(tasksDir, `task-${taskId}.hb`), JSON.stringify(hb, null, 2), 'utf-8');
+    writeTaskHeartbeatFile(join(tasksDir, `task-${taskId}.hb`), hb);
   } catch {
     // Non-fatal: heartbeat write failure should not stop the worker.
   }

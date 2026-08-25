@@ -459,7 +459,11 @@ describe('deckent status --json — canonical ACTIVE liveness gate (504-001)', (
       const snapshot = buildStatusJsonSnapshot(root, join(root, '.dashboard'), {});
       expect(snapshot).toMatchObject({
         active: false,
-        lifecycle: 'UNAVAILABLE',
+        lifecycle: 'ORPHANED',
+        readiness: {
+          state: 'HOLD',
+          code: 'RUN_STATUS_READ_MODEL_UNAVAILABLE',
+        },
         error: { code: 'RUN_STATUS_READ_MODEL_UNAVAILABLE', disposition: 'HOLD' },
       });
     } finally {

@@ -254,7 +254,7 @@ import {
   cleanup,
 } from './sprint-controller.js';
 import type { RunSprintOptions } from './sprint-controller.js';
-import { normalizeTaskResultShape } from '../core/task-result-schema.js';
+import { normalizeTaskResultShape, serializeTaskResultForDisk } from '../core/task-result-schema.js';
 
 
 // ═══ Local Helpers (duplicated from sprint-controller to avoid circular init-time deps) ══
@@ -2136,7 +2136,7 @@ export async function runEvaluatePhase(
           // so finalizeSprint's tryCodeVerifiedDone cannot re-promote it.
           try {
             const resultPath = join(projectRoot, '.tasks', `task-${task.id}.result`);
-            writeFileSync(resultPath, JSON.stringify(result, null, 2) + '\n', 'utf-8');
+            writeFileSync(resultPath, serializeTaskResultForDisk(result) + '\n', 'utf-8');
           } catch (e) { debugLog('runEvaluatePhase:gated-write', e); }
           debugLog('runEvaluatePhase:honestGate', `task=${task.id} violation=${gated.violation} → forced NO_GO`);
         }

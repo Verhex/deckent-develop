@@ -1,4 +1,12 @@
 import { z } from 'zod';
+import {
+  closeSync,
+  fsyncSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from 'node:fs';
 
 export const WORKER_ACTIVITY_HEARTBEAT_VERSION = 1 as const;
 export const WORKER_ACTIVITY_HEARTBEAT_KIND = 'worker-activity-heartbeat' as const;
@@ -50,6 +58,10 @@ export interface WorkerActivityHeartbeatHold {
 export type WorkerActivityHeartbeatParseResult =
   | { readonly state: 'VALID'; readonly heartbeat: WorkerActivityHeartbeat }
   | WorkerActivityHeartbeatHold;
+
+export type WorkerHeartbeatFileWriteResult =
+  | { readonly state: 'WRITTEN' }
+  | { readonly state: 'SKIPPED'; readonly reasonCode: 'MONOTONIC_REGRESSION' };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -115,6 +127,59 @@ export function parseWorkerActivityHeartbeat(
     reasonCode: 'MALFORMED',
     detail: parsed.error.issues.map(issue => issue.message).join('; '),
   };
+}
+
+function isMonotonicRegression(current: unknown, next: unknown): boolean {
+  const currentParsed = parseWorkerActivityHeartbeat(current);
+  const nextParsed = parseWorkerActivityHeartbeat(next);
+  if (currentParsed.state === 'VALID' && nextParsed.state === 'VALID') {
+    const sameAttempt = currentParsed.heartbeat.taskId === nextParsed.heartbeat.taskId
+      && currentParsed.heartbeat.attemptId === nextParsed.heartbeat.attemptId;
+    return sameAttempt && Date.parse(nextParsed.heartbeat.observedAt)
+      < Date.parse(currentParsed.heartbeat.observedAt);
+  }
+  if (!isRecord(current) || !isRecord(next)) return false;
+  if (
+    (currentParsed.state !== 'VALID' && currentParsed.reasonCode === 'MALFORMED')
+    || (nextParsed.state !== 'VALID' && nextParsed.reasonCode === 'MALFORMED')
+  ) {
+    return false;
+  }
+  if (current['taskId'] !== next['taskId']) return false;
+  const currentTimestamp = Date.parse(String(current['timestamp']));
+  const nextTimestamp = Date.parse(String(next['timestamp']));
+  const timestampRegressed = Number.isFinite(currentTimestamp)
+    && Number.isFinite(nextTimestamp)
+    && nextTimestamp < currentTimestamp;
+  const currentSequence = current['sequence'];
+  const nextSequence = next['sequence'];
+  const sequenceRegressed = typeof currentSequence === 'number'
+    && typeof nextSequence === 'number'
+    && nextSequence < currentSequence;
+  return timestampRegressed || sequenceRegressed;
+}
+
+/** Atomically persists canonical or legacy heartbeat data without clock regression. */
+export function writeTaskHeartbeatFile<TPayload extends object>(
+  path: string,
+  payload: TPayload,
+): WorkerHeartbeatFileWriteResult {
+  try {
+    const current = JSON.parse(readFileSync(path, 'utf8')) as unknown;
+    if (isMonotonicRegression(current, payload)) {
+      return { state: 'SKIPPED', reasonCode: 'MONOTONIC_REGRESSION' };
+    }
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT' && !(error instanceof SyntaxError)) {
+      throw error;
+    }
+  }
+  const temporary = `${path}.tmp`;
+  writeFileSync(temporary, JSON.stringify(payload, null, 2), 'utf8');
+  const descriptor = openSync(temporary, 'r');
+  try { fsyncSync(descriptor); } finally { closeSync(descriptor); }
+  renameSync(temporary, path);
+  return { state: 'WRITTEN' };
 }
 
 /** Prompt projection of the same contract; compilation never invents its clock. */

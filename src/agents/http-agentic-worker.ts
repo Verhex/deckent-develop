@@ -69,6 +69,7 @@ import {
   type EntryTokenUsage,
 } from './agentic-worker-entry.js';
 import { normalizeUsage } from '../core/token-usage.js';
+import { writeTaskHeartbeatFile } from '../core/worker-activity-heartbeat.js';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
@@ -567,7 +568,7 @@ function writeHeartbeat(
     sequence,
   };
   try {
-    writeFileSync(join(tasksDir, `task-${taskId}.hb`), JSON.stringify(hb, null, 2), 'utf-8');
+    writeTaskHeartbeatFile(join(tasksDir, `task-${taskId}.hb`), hb);
   } catch {
     // Non-fatal: a heartbeat write failure must not stop the worker.
   }

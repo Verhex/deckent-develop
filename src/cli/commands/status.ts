@@ -1,9 +1,9 @@
 import { readFileSync, existsSync, readdirSync, watch } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
-import { AgentStatus, SprintPhase, SprintStatus, TaskStatus } from '../../core/types.js';
+import { AgentStatus, SprintPhase, SprintStatus } from '../../core/types.js';
 import type { AgentInfo, DashboardState, Task } from '../../core/types.js';
-import { DASHBOARD_FILE, TASKS_DIR, DECKENT_DIR } from '../../core/constants.js';
+import { DASHBOARD_FILE, DECKENT_DIR } from '../../core/constants.js';
 import {
   checkWorkerLiveness,
   type WorkerLivenessStatus,
@@ -30,24 +30,22 @@ import {
 } from './task-settlement.js';
 import { readCanonicalRunStatus } from '../../core/run-status-authority.js';
 import type { CanonicalRunStatus } from '../../core/run-status-authority.js';
-import {
-  foldTaskLineages,
-  resolveTaskLineageRootId,
-} from '../../core/task-lineage.js';
-import { classifyTaskArtifact } from '../../core/task-artifact-classifier.js';
-import {
-  projectLogicalProgress,
-  type LogicalProgressStatus,
-} from '../../core/logical-progress-projection.js';
+import { foldTaskLineages } from '../../core/task-lineage.js';
 import { projectTerminalPublicationStatus as projectSharedTerminalPublicationStatus } from '../../core/sprint-terminal-publication-status.js';
 import type { ProviderConcurrencyRuntimeProjection } from '../../core/provider-limit-admission.js';
 import {
   readCanonicalRunStatusReadModel,
+  loadCanonicalRunTasks,
+  projectCanonicalRunLogicalProgress,
+  resolveRunStatusReadiness,
   runStatusReadModelMatchesAuthority,
   type CanonicalRunStatusReadModel,
 } from '../../core/run-status-read-model.js';
-import { DeckentError } from '../../core/errors.js';
 import { DEFAULT_HEARTBEAT_TIMEOUT_MS, loadConfig } from '../../core/config.js';
+import {
+  sweepDeadDetachedRuns,
+  type DeathSweepReport,
+} from '../../orchestra/run-flow-death-sweep.js';
 
 interface StatusOpts {
   watch?: boolean;
@@ -216,6 +214,11 @@ export interface StatusCommandDeps {
   readonly heartbeatTimeoutMs?: number;
   /** Injectable exact-attempt host authority read model for deterministic tests. */
   readonly workerLiveness?: (task: Task, projectRoot: string) => WorkerLivenessStatus;
+  /** Injectable synchronous sweep for deterministic command tests. */
+  readonly sweepDeadDetachedRuns?: (projectRoot: string) => DeathSweepReport;
+  /** Command-scoped sweep projection, populated before any authority read. */
+  readonly deathSweepReport?: Pick<DeathSweepReport, 'closed' | 'skipped'>;
+  readonly deathSweepWarning?: { readonly code: 'RUN_FLOW_DEATH_SWEEP_FAILED'; readonly message: string };
 }
 
 export interface WorkerLivenessProjectionOptions {
@@ -329,24 +332,7 @@ function runStatusReadModelSurface(
 }
 
 export function requiresPersistedRunStatusReadModel(authority: CanonicalRunStatus): boolean {
-  // RECOVERY-PAUSE-STATUS-001 (smoke 2026-08-07): PAUSED is intentionally NOT
-  // here. A typed-PAUSED authority is a RECONCILED state that already carries
-  // lifecycle/reason/recoveryCommand — requiring a republished read-model only
-  // produced RUN_STATUS_READ_MODEL_UNAVAILABLE and hid the recover remedy. The
-  // JSON fall-through renders the authority (with recoveryCommand); the human
-  // paths short-circuit to a paused banner (below). ORPHANED stays — it is a
-  // CONTESTED state (the authority emits conflicts[]) where the born-688
-  // read-model safety still earns its keep.
-  // An ACTIVE lifecycle claim alone is not enough: stale sprint residue can
-  // retain it after its process has died. The authority's `alive` coordinator
-  // verdict is the sole exception, because it is derived from canonical PID
-  // evidence.
-  const hasProvenActiveLiveness = authority.active && authority.coordinator === 'alive';
-  return !hasProvenActiveLiveness && (
-    authority.active
-    || authority.resumable
-    || authority.lifecycle === 'ORPHANED'
-  );
+  return resolveRunStatusReadiness(authority, null).state === 'HOLD';
 }
 
 /**
@@ -450,6 +436,34 @@ function formatStatusTaskSettlements(
     lines.push(`  ${settlement.taskId} · ${formatTaskSettlementProjection(projection, lang)}`);
   }
   return lines.join('\n');
+}
+
+export function formatFixRetryDispositions(
+  logicalProgress: CanonicalRunStatusReadModel['logicalProgress'] | null,
+  lang: string,
+): string | null {
+  if (!logicalProgress || logicalProgress.fixRetry.length === 0) return null;
+  const lines = [lang === 'tr' ? '--- FIX Yeniden Deneme ---' : '--- FIX Retry ---'];
+  for (const retry of logicalProgress.fixRetry) {
+    if (retry.disposition === 'retry-pending') {
+      lines.push(lang === 'tr'
+        ? `  ${retry.logicalTaskId} · yeniden deneme bekliyor (${retry.attemptCount}/${retry.maxFixRetries + 1} deneme)`
+        : `  ${retry.logicalTaskId} · retry pending (${retry.attemptCount}/${retry.maxFixRetries + 1} attempts)`);
+    } else {
+      lines.push(lang === 'tr'
+        ? `  ${retry.logicalTaskId} · yeniden deneme bütçesi tükendi (${retry.attemptCount} deneme)`
+        : `  ${retry.logicalTaskId} · retry budget exhausted (${retry.attemptCount} attempts)`);
+    }
+  }
+  return lines.join('\n');
+}
+
+function loadFixRetrySection(root: string, lang: string): string | null {
+  const authority = readCanonicalRunStatus(root);
+  return formatFixRetryDispositions(
+    matchingRunStatusReadModel(root, authority)?.logicalProgress ?? null,
+    lang,
+  );
 }
 
 export function appendTaskSettlementsToFollowSnapshot(
@@ -577,56 +591,13 @@ export function getLangFromRoot(root: string): string {
 }
 
 export function loadTaskFiles(root: string): Task[] {
-  const tasksDir = join(root, TASKS_DIR);
-  if (!existsSync(tasksDir)) return [];
-  const files = readdirSync(tasksDir)
-    .sort((left, right) => left.localeCompare(right));
-  const tasks: Task[] = [];
-  for (const f of files) {
-    try {
-      const content = readFileSync(join(tasksDir, f), 'utf-8');
-      const artifact = classifyTaskArtifact(f, content);
-      if (artifact.kind !== 'task-record') continue;
-      const parsed: unknown = JSON.parse(content);
-      if (typeof parsed !== 'object' || parsed === null) continue;
-      const data = parsed as Partial<Task>;
-      if (
-        data.id !== artifact.taskId
-        || typeof data.title !== 'string'
-        || data.status !== artifact.record.status
-      ) continue;
-      tasks.push(data as Task);
-    } catch {
-      // Skip malformed task files
-    }
-  }
-  const activeSprintId = getCurrentSprintId(root);
-  const scopedTasks = activeSprintId
-    ? tasks.filter(task => task.sprintId === activeSprintId)
-    : tasks;
-  return scopedTasks.sort((left, right) => left.id.localeCompare(right.id));
+  return [...loadCanonicalRunTasks(root, readCanonicalRunStatus(root)).tasks];
 }
 
 function loadStatusSurfaceTasks(root: string): Task[] {
   return isQuiescentRunAuthority(readCanonicalRunStatus(root))
     ? []
     : loadTaskFiles(root);
-}
-
-function logicalProgressStatus(status: Task['status']): LogicalProgressStatus {
-  if (status === TaskStatus.DONE) return 'done';
-  if (status === TaskStatus.CLAIMED
-    || status === TaskStatus.EXECUTING
-    || status === TaskStatus.TESTING
-    || status === TaskStatus.DOCUMENTING) return 'active';
-  return 'blocked';
-}
-
-function taskSequence(task: Task): number | undefined {
-  const timestamp = task.updatedAt ?? task.createdAt;
-  if (!timestamp) return undefined;
-  const value = Date.parse(timestamp);
-  return Number.isSafeInteger(value) ? value : undefined;
 }
 
 /**
@@ -641,25 +612,7 @@ export function projectStatusLogicalProgress(tasks: readonly Task[]): {
   readonly total: number;
   readonly attemptCount: number;
 } {
-  const tasksById = new Map(tasks.map(task => [task.id, task]));
-  const result = projectLogicalProgress({
-    attempts: tasks.map(task => {
-      const sequence = taskSequence(task);
-      return {
-        id: task.id,
-        logicalTaskId: resolveTaskLineageRootId(task, tasksById),
-        status: logicalProgressStatus(task.status),
-        ...(task.isPriorityFix && task.fixForTaskId
-          ? { fixForAttemptId: task.fixForTaskId }
-          : {}),
-        ...(sequence !== undefined ? { sequence } : {}),
-      };
-    }),
-  });
-  if (!result.ok) {
-    throw new DeckentError('E_STATUS_LOGICAL_PROGRESS', `STATUS_LOGICAL_PROGRESS_${result.diagnostic}`);
-  }
-  return result.projection;
+  return projectCanonicalRunLogicalProgress(tasks);
 }
 
 export function projectTerminalPublicationStatus(
@@ -830,12 +783,6 @@ export function buildWorkerCommsSection(root: string, lang: string): string | nu
  * never has to guess what to run. Returns null when nothing is parked.
  */
 export function buildPendingApprovalsSection(root: string, lang: string): string | null {
-  // born-698c: same read-path pattern for detached-run deaths — a flow whose
-  // run process died without finalizing gets an honest RUN_FAILED closure
-  // the moment ANY surface reads status (never a silent limbo).
-  void import('../../orchestra/run-flow-death-sweep.js')
-    .then(({ sweepDeadDetachedRuns }) => sweepDeadDetachedRuns(root))
-    .catch(() => { /* fail-soft: status must render even if the sweep cannot run */ });
   const pending = readPendingApprovals(root);
   if (pending.length === 0) return null;
   const lines: string[] = [getMessage('status.pending_approvals.header', lang, { count: String(pending.length) })];
@@ -846,6 +793,71 @@ export function buildPendingApprovalsSection(root: string, lang: string): string
     lines.push('  ' + getMessage('status.pending_approvals.more', lang, { count: String(pending.length - 5) }));
   }
   return lines.join('\n');
+}
+
+function readinessSurface(
+  authority: CanonicalRunStatus,
+  model: CanonicalRunStatusReadModel | null,
+): Record<string, unknown> {
+  const readiness = resolveRunStatusReadiness(authority, model);
+  if (readiness.state === 'READY') return { state: readiness.state };
+  if (readiness.state === 'SELF_SUFFICIENT') {
+    return { state: readiness.state, reason: readiness.reason };
+  }
+  return { state: readiness.state, code: readiness.code };
+}
+
+function deathSweepSurface(
+  deps: StatusCommandDeps,
+): Pick<DeathSweepReport, 'closed' | 'skipped'> {
+  return deps.deathSweepReport ?? { closed: [], skipped: [] };
+}
+
+function deathSweepFailureMessage(lang: string, detail: string): string {
+  const prefix = lang === 'tr'
+    ? 'RUN_FLOW_DEATH_SWEEP_FAILED: ayrılmış run ölüm taraması başarısız oldu'
+    : 'RUN_FLOW_DEATH_SWEEP_FAILED: detached-run death sweep failed';
+  return `${prefix}: ${detail}`;
+}
+
+function noActiveStatusJsonFromAuthority(
+  root: string,
+  deps: StatusCommandDeps,
+  authority: CanonicalRunStatus,
+): Record<string, unknown> {
+  const readModel = matchingRunStatusReadModel(root, authority);
+  const readiness = resolveRunStatusReadiness(authority, readModel);
+  const common = {
+    active: authority.active,
+    lifecycle: authority.lifecycle,
+    resumable: authority.resumable,
+    sprintId: authority.sprintId,
+    authority,
+    readiness: readinessSurface(authority, readModel),
+    deathSweep: deathSweepSurface(deps),
+    ...(deps.deathSweepWarning ? { warning: deps.deathSweepWarning } : {}),
+    statusReadModel: runStatusReadModelSurface(readModel),
+    pendingApprovals: readPendingApprovals(root),
+  };
+  if (readiness.state === 'HOLD') {
+    return {
+      ...common,
+      logicalProgress: null,
+      terminalPublication: null,
+      providerConcurrency: [],
+      error: { code: readiness.code, disposition: 'HOLD' },
+    };
+  }
+  return {
+    ...common,
+    phase: authority.phase,
+    status: authority.status,
+    reason: authority.reason,
+    recoveryCommand: authority.recoveryCommand,
+    finalizeCommand: authority.finalizeCommand,
+    terminalPublication: readModel?.terminalPublication ?? null,
+    providerConcurrency: readModel?.providerConcurrency ?? [],
+  };
 }
 
 /**
@@ -859,41 +871,7 @@ export function buildNoActiveStatusJson(
   _deps: StatusCommandDeps = {},
 ): Record<string, unknown> {
   const authority = readCanonicalRunStatus(root);
-  const readModel = matchingRunStatusReadModel(root, authority);
-  if (requiresPersistedRunStatusReadModel(authority) && !readModel) {
-    return {
-      active: false,
-      lifecycle: 'UNAVAILABLE',
-      resumable: authority.resumable,
-      sprintId: authority.sprintId,
-      authority,
-      logicalProgress: null,
-      terminalPublication: null,
-      providerConcurrency: [],
-      statusReadModel: runStatusReadModelSurface(null),
-      error: {
-        code: 'RUN_STATUS_READ_MODEL_UNAVAILABLE',
-        disposition: 'HOLD',
-      },
-      pendingApprovals: readPendingApprovals(root),
-    };
-  }
-  return {
-    active: authority.active,
-    lifecycle: authority.lifecycle,
-    resumable: authority.resumable,
-    sprintId: authority.sprintId,
-    phase: authority.phase,
-    status: authority.status,
-    reason: authority.reason,
-    recoveryCommand: authority.recoveryCommand,
-    finalizeCommand: authority.finalizeCommand,
-    authority,
-    terminalPublication: readModel?.terminalPublication ?? null,
-    providerConcurrency: readModel?.providerConcurrency ?? [],
-    statusReadModel: runStatusReadModelSurface(readModel),
-    pendingApprovals: readPendingApprovals(root),
-  };
+  return noActiveStatusJsonFromAuthority(root, _deps, authority);
 }
 
 export interface CanonicalDashboardProjection {
@@ -1039,14 +1017,15 @@ export function buildStatusJsonSnapshot(
   const authority = readCanonicalRunStatus(root);
   const tasks = isQuiescentRunAuthority(authority) ? [] : loadTaskFiles(root);
   const readModel = matchingRunStatusReadModel(root, authority);
-  if (requiresPersistedRunStatusReadModel(authority) && !readModel) {
-    return buildNoActiveStatusJson(root, deps);
+  const readiness = resolveRunStatusReadiness(authority, readModel);
+  if (readiness.state === 'HOLD') {
+    return noActiveStatusJsonFromAuthority(root, deps, authority);
   }
   if (isQuiescentRunAuthority(authority)) {
-    return buildNoActiveStatusJson(root, deps);
+    return noActiveStatusJsonFromAuthority(root, deps, authority);
   }
   if (!existsSync(dashPath)) {
-    if (tasks.length === 0) return buildNoActiveStatusJson(root, deps);
+    if (tasks.length === 0) return noActiveStatusJsonFromAuthority(root, deps, authority);
     const sprintId = authority.sprintId ?? getCurrentSprintId(root) ?? detectSprintId(tasks);
     const lineages = foldTaskLineages(tasks);
     return {
@@ -1056,6 +1035,9 @@ export function buildStatusJsonSnapshot(
       resumable: authority.resumable,
       sprintId,
       authority,
+      readiness: readinessSurface(authority, readModel),
+      deathSweep: deathSweepSurface(deps),
+      ...(deps.deathSweepWarning ? { warning: deps.deathSweepWarning } : {}),
       terminalPublication: readModel?.terminalPublication ?? null,
       providerConcurrency: readModel?.providerConcurrency ?? [],
       statusReadModel: runStatusReadModelSurface(readModel),
@@ -1092,7 +1074,7 @@ export function buildStatusJsonSnapshot(
       || authority.lifecycle === 'ABORTED'
     )
   ) {
-    return buildNoActiveStatusJson(root, deps);
+    return noActiveStatusJsonFromAuthority(root, deps, authority);
   }
 
   const state = JSON.parse(readFileSync(dashPath, 'utf-8')) as DashboardState;
@@ -1107,7 +1089,7 @@ export function buildStatusJsonSnapshot(
     || sprint.status === 'COMPLETE'
     || sprint.phase === 'COMPLETE'
   ) {
-    return buildNoActiveStatusJson(root, deps);
+    return noActiveStatusJsonFromAuthority(root, deps, authority);
   }
 
   const taskSettlements = loadStatusTaskSettlements(root, tasks, deps);
@@ -1144,6 +1126,9 @@ export function buildStatusJsonSnapshot(
     recoveryCommand: authority.recoveryCommand,
     finalizeCommand: authority.finalizeCommand,
     authority,
+    readiness: readinessSurface(authority, readModel),
+    deathSweep: deathSweepSurface(deps),
+    ...(deps.deathSweepWarning ? { warning: deps.deathSweepWarning } : {}),
     terminalPublication: readModel?.terminalPublication ?? null,
     providerConcurrency: readModel?.providerConcurrency ?? [],
     statusReadModel: runStatusReadModelSurface(readModel),
@@ -1173,13 +1158,29 @@ export function registerStatus(
       const root = resolveProjectRoot();
       const dashPath = join(root, DASHBOARD_FILE);
       const lang = getLangFromRoot(root);
+      let deathSweepReport: DeathSweepReport | undefined;
+      let deathSweepWarning: StatusCommandDeps['deathSweepWarning'];
+      try {
+        deathSweepReport = (deps.sweepDeadDetachedRuns ?? sweepDeadDetachedRuns)(root);
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        deathSweepWarning = {
+          code: 'RUN_FLOW_DEATH_SWEEP_FAILED',
+          message: deathSweepFailureMessage(lang, detail),
+        };
+      }
       const resolvedConfig = await loadConfig(root);
       const commandDeps: StatusCommandDeps = {
         ...deps,
+        ...(deathSweepReport ? { deathSweepReport } : {}),
+        ...(deathSweepWarning ? { deathSweepWarning } : {}),
         heartbeatTimeoutMs: (resolvedConfig.heartbeat_timeout ?? (DEFAULT_HEARTBEAT_TIMEOUT_MS / 1000)) * 1000,
       };
       const resolvedMode = opts.mode ? resolveOutputMode(opts.mode) : undefined;
       const jsonMode = opts.json === true || resolvedMode === 'json';
+      if (deathSweepWarning && !jsonMode) {
+        printError(new Error(deathSweepWarning.message));
+      }
 
       // RECOVERY-PAUSE-STATUS-001: a typed-PAUSED run is rendered from the
       // authority BEFORE any dashboard/task-file branching. Earlier the
@@ -1428,6 +1429,8 @@ export function registerStatus(
             output(formatStandaloneStatus(tasks, sprintId));
             const settlementsStandalone = formatStatusTaskSettlements(taskSettlements, lang);
             if (settlementsStandalone) output(settlementsStandalone);
+            const fixRetryStandalone = loadFixRetrySection(root, lang);
+            if (fixRetryStandalone) output(fixRetryStandalone);
             const commsStandalone = buildWorkerCommsSection(root, lang);
             if (commsStandalone) output(commsStandalone);
             const pendingStandalone = buildPendingApprovalsSection(root, lang);
@@ -1544,6 +1547,11 @@ export function registerStatus(
             }));
             const settlementsWatch = formatStatusTaskSettlements(taskSettlements, lang);
             if (settlementsWatch) sections.push(settlementsWatch);
+            const fixRetryWatch = formatFixRetryDispositions(
+              readModel?.logicalProgress ?? null,
+              lang,
+            );
+            if (fixRetryWatch) sections.push(fixRetryWatch);
             const commsWatch = buildWorkerCommsSection(root, lang);
             if (commsWatch) sections.push(commsWatch);
             const pendingWatch = buildPendingApprovalsSection(root, lang);
@@ -1696,6 +1704,11 @@ export function registerStatus(
             }
             const settlementsDefault = formatStatusTaskSettlements(taskSettlements, lang);
             if (settlementsDefault) output(settlementsDefault);
+            const fixRetryDefault = formatFixRetryDispositions(
+              readModel?.logicalProgress ?? null,
+              lang,
+            );
+            if (fixRetryDefault) output(fixRetryDefault);
             const commsDefault = buildWorkerCommsSection(root, lang);
             if (commsDefault) output(commsDefault);
             const pendingDefault = buildPendingApprovalsSection(root, lang);

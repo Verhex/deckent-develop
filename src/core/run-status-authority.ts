@@ -10,6 +10,7 @@ import {
   TASKS_DIR,
 } from './constants.js';
 import { isPidAlive } from './pid-liveness.js';
+import { readRunFlowTerminalClosureForSprint } from './run-jobs-read.js';
 import {
   readSprintStatusRecoveryReconciliation,
   type SprintStatusRecoveryReconciliation,
@@ -329,6 +330,39 @@ function readCanonicalRunStatusBase(
   }
 
   if (sprintId && !isTerminal(rawStatus) && (stateId || activeId || resumableEvidence)) {
+    const flowTerminal = readRunFlowTerminalClosureForSprint(projectRoot, sprintId);
+    if (flowTerminal?.state === 'FAILED') {
+      return {
+        schemaVersion: 1,
+        lifecycle: 'ABORTED',
+        active: false,
+        resumable: false,
+        sprintId,
+        phase,
+        status: 'FAILED',
+        reason: 'flow-terminal-failed',
+        recoveryCommand: null,
+        finalizeCommand: null,
+        coordinator,
+        conflicts,
+      };
+    }
+    if (flowTerminal?.state === 'COMPLETED') {
+      return {
+        schemaVersion: 1,
+        lifecycle: 'COMPLETE',
+        active: false,
+        resumable: false,
+        sprintId,
+        phase,
+        status: 'COMPLETE',
+        reason: null,
+        recoveryCommand: null,
+        finalizeCommand: null,
+        coordinator,
+        conflicts,
+      };
+    }
     return {
       schemaVersion: 1,
       lifecycle: 'ORPHANED',

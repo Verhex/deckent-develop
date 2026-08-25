@@ -16759,3 +16759,61 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 673-007: Wave real-run evidence harness (PAUSED)
 
 ---
+## Sprint 674 — sprint-674
+
+**Status:** ABORTED
+**Date:** 2026-08-25
+**Duration:** 584s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 9 |
+| Completed | 5 |
+| Tech Debt | 0 |
+| No-Go | 3 |
+| Coverage | 0.0% |
+| Duration | 583751ms |
+
+### Tasks
+
+- 674-001: hb atomic+monotonic yazim primitive'i + worker.ts rewire (DONE)
+- 674-002-fix: Fix: kalan bagimsiz hb yazicilarinin primitive'e rewire'i (PAUSED)
+- 674-002: kalan bagimsiz hb yazicilarinin primitive'e rewire'i (NO_GO)
+- 674-003: append/persist disiplini — event-seq CAS, docker-log seq, sprint-state atomic, dashboard reset fence (DONE)
+- 674-004: read-model publisher CAS + resolveRunStatusReadiness + fixRetry gorunurlugu (DONE)
+- 674-005: authority flow-terminal join — olu run tek gercek (DONE)
+- 674-006-fix: Fix: CLI status — sweep senkron + UNAVAILABLE yerine readiness + dedup + fixRetry render (PAUSED)
+- 674-006: CLI status — sweep senkron + UNAVAILABLE yerine readiness + dedup + fixRetry render (NO_GO)
+- 674-007-fix: Fix: MCP + API readiness parity (PAUSED)
+- 674-007: MCP + API readiness parity (NO_GO)
+- 674-008: 3354 kok onarimi — dependency filesChanged shape-normalize + typed catch (DONE)
+- 674-009: dalga evidence harness (PAUSED)
+
+---
+## Sprint 675 — sprint-675
+
+**Status:** COMPLETE
+**Date:** 2026-08-25
+**Duration:** 646s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 646152ms |
+
+### Tasks
+
+- 675-001: kalan bagimsiz hb yazicilarinin primitive'e rewire'i (DONE)
+- 675-002: CLI status — sweep senkron + UNAVAILABLE yerine readiness + dedup + fixRetry render (DONE)
+- 675-003: MCP + API readiness parity (DONE)
+- 675-004: dalga evidence harness (DONE)
+
+---

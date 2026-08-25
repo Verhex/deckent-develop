@@ -402,6 +402,56 @@ export function getRequiredTaskResultFields(): string[] {
 /** The canonical worker-result type — inferred from {@link taskResultSchema}. */
 export type TaskResultV1 = z.infer<typeof taskResultSchema>;
 
+/**
+ * Human-first canonical field order for `.result` files on disk (owner
+ * decision 2026-08-25): identity → verdict → narrative → evidence → change →
+ * timing → assignment plumbing → cost. Parsers are key-order-insensitive, so
+ * this affects only readability; historical files are never rewritten (their
+ * bytes may be pinned by receipts). Fields not listed here are appended after
+ * the ordered block in their original insertion order, so additive schema
+ * growth degrades to "readable prefix + tail" instead of breaking.
+ */
+export const TASK_RESULT_FIELD_ORDER: readonly string[] = [
+  // kimlik
+  'schemaVersion', 'taskId', 'sprintId', 'attempt', 'attemptId', 'isPriorityFix', 'fixForTaskId',
+  // verdict
+  'selfAssessment', 'brainEvaluation', 'brainEvaluationReason', 'totalScore', 'rubricScores', 'honestGate',
+  // anlatı
+  'notes', 'handoffNotes', 'sharedNotes',
+  // kanıt
+  'goCriteria', 'criteriaEvidence', 'techDebtCriterionIds', 'tests', 'testsPassed', 'testCommands',
+  'testVerification', 'tsc', 'coverage', 'crossVerify', 'xverifyTaskSettlement', 'auditorValidation',
+  'diskVerified', 'boundaryViolations', 'productionWiringEvidence', 'runPolicyEvidence',
+  // değişim
+  'filesChanged', 'linesAdded', 'linesRemoved', 'totalLinesAdded', 'totalLinesRemoved',
+  // zamanlama
+  'spawnedAt', 'startedAt', 'completedAt', 'durationMs',
+  // atama / tesisat
+  'workerId', 'agent', 'agentId', 'skills', 'skillIds', 'provider', 'model', 'modelEffort',
+  'backend', 'status', 'workAttribution', 'workerWorkClaim', 'preDispatchSettlement',
+  'promptDeliveryAttribution', 'promptCompilePlanId', 'hostTerminalProjection',
+  // maliyet
+  'tokenUsage', 'cost', 'providerBilling',
+];
+
+/** Return a copy of `result` with keys in {@link TASK_RESULT_FIELD_ORDER}; unknown keys keep their original relative order at the end. */
+export function canonicalizeTaskResultFieldOrder<T extends object>(result: T): T {
+  const source = result as Record<string, unknown>;
+  const ordered: Record<string, unknown> = {};
+  for (const key of TASK_RESULT_FIELD_ORDER) {
+    if (key in source) ordered[key] = source[key];
+  }
+  for (const key of Object.keys(source)) {
+    if (!(key in ordered)) ordered[key] = source[key];
+  }
+  return ordered as T;
+}
+
+/** The single serializer every flat `task-*.result` disk write must go through. */
+export function serializeTaskResultForDisk(result: object): string {
+  return JSON.stringify(canonicalizeTaskResultFieldOrder(result), null, 2);
+}
+
 // ─── Validator (non-throwing) ────────────────────────────────────────────────
 
 /** Successful validation — `value` is the parsed, defaulted result. */

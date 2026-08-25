@@ -30,6 +30,7 @@ import { makeActivityOnEvent } from '../agents/worker-activity.js';
 import type { ProviderDefinition } from '../core/config-types.js';
 import type { DeckBrokerDenial } from '../core/deck-broker.js';
 import { resolveCrossProviderCredentialKeys } from './cross-provider-keys.js';
+import { writeTaskHeartbeatFile } from '../core/worker-activity-heartbeat.js';
 import { scrubCrossProviderEnv } from './provider.js';
 import {
   installGitGuard,
@@ -711,7 +712,7 @@ export class SubprocessSpawnBackend implements ProviderAdapter {
       sequence,
     };
     try {
-      writeFileSync(hbPath, JSON.stringify(hb, null, 2), 'utf-8');
+      writeTaskHeartbeatFile(hbPath, hb);
     } catch {
       // Non-fatal: heartbeat write failure should not stop the worker
     }
