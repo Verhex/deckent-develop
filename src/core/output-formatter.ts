@@ -217,6 +217,12 @@ export function resolveOutputMode(configValue?: string): OutputMode {
   if (configValue && (VALID as string[]).includes(configValue)) {
     return configValue as OutputMode;
   }
+  // Surface-truth finding #15 (2026-08-25): the historical public identifiers
+  // are misspellings. The CORRECT English spellings are now accepted as
+  // canonical input; the stored OutputMode values stay the historical strings
+  // so every existing consumer/config remains byte-compatible.
+  if (configValue === 'explanatory') return 'explainatory';
+  if (configValue === 'standard') return 'standart';
   // Map legacy quiet/normal/verbose to new modes
   if (configValue === 'quiet')  return 'standart';
   if (configValue === 'normal') return 'standart';

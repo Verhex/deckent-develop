@@ -1193,7 +1193,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // DeckentError across 28 files (sprint-672 harvest + 1 manual serve.ts site).
   // 2026-08-25 strike-4 fix: digest moved — config.ts self-heal reordered
   // to write-then-swap (production text shifted).
-  digest: '4465c45b092301071afff056ca74b23d2aadc3aa6c8bd93c403abaadafa5c313',
+  digest: '8d8efa680c07b66f4491961cf2d1930bbfd679824f77f1d396af98e96b9e6a86',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

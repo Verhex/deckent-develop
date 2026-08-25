@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "d8cd25d8ee0d506a1644a46f0d9fb3bc0586b3776a70734f3fd369233807f71e"
+    "value": "ba897fdc97399fff208665516b7f9556777e1df1a75eed06890b356d4498af23"
   },
   "summary": {
-    "total": 522,
-    "active": 457,
+    "total": 528,
+    "active": 463,
     "terminal": 65,
     "receipts": 187,
     "byState": {
-      "OPEN": 362,
+      "OPEN": 368,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
@@ -22,8 +22,8 @@
     },
     "byPriority": {
       "P0": 338,
-      "P1": 142,
-      "P2": 42
+      "P1": 146,
+      "P2": 44
     },
     "byProgram": {
       "API": 5,
@@ -41,7 +41,7 @@
       "ENTERPRISE": 4,
       "EVAL": 5,
       "EVOLUTION": 4,
-      "KERNEL": 118,
+      "KERNEL": 122,
       "LEARNING": 9,
       "OBS": 9,
       "ONBOARDING": 1,
@@ -59,7 +59,7 @@
       "SURFACE": 1,
       "TERMINAL": 22,
       "TOOL": 1,
-      "TRUTH": 95,
+      "TRUTH": 97,
       "XPLAT": 3
     }
   },
@@ -1152,6 +1152,28 @@
       "definitionDigest": "241173426e94961b5c42aecb071157c2d15d38a0873087f2f8fbe8269b415925",
       "progressDigest": "7c7dd871e4467e58c3fb45c00137d0e5c95bfde3dc798b24f3947496a87b80a5",
       "terminalClosureDigest": "5808d85ad4b6b592978a0233e2a61df6066bc7b6b9ece02cf3d87f85c13962fe"
+    },
+    {
+      "order": 540,
+      "id": "BUILD-CLEAN-HOLD-HONESTY-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-25",
+      "definitionDigest": "a6ebdccd6ed4058d9eddbd00e7cee0346e5d906287267f8f0ca62153c8498e24",
+      "progressDigest": "193ebd23c88839f673b513ca1c4e3f812659a62436d1c94dbc3caeb0fb897a0c",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 541,
+      "id": "PROJECTION-VALIDATOR-ARTIFACT-CLASS-001",
+      "program": "TRUTH",
+      "priority": "P2",
+      "state": "OPEN",
+      "updated": "2026-08-25",
+      "definitionDigest": "9ca1bb3fb83e43d87904741e0d6ae9f0f55eb1a6ed2783e2cd93a7f77d8ae77b",
+      "progressDigest": "8d9eff14c013fb11d8dbbf6184853d60effd73af34e1f05614a003fca5dbe692",
+      "terminalClosureDigest": null
     },
     {
       "order": 1000,
@@ -2765,9 +2787,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "BLOCKED",
-      "updated": "2026-08-03",
+      "updated": "2026-08-25",
       "definitionDigest": "2b65e08312116577e0a74758aaa86113f9bd762a059f57704d3004efdf0b26bf",
-      "progressDigest": "4e929ad26773059b8b0727c71753dfea78d99c0b45398df12e8dfe31d85f9195",
+      "progressDigest": "9f329a18846ba20096c88a66143d5eac437fe756bf8776ad50cabd5bec4af9ec",
       "terminalClosureDigest": null
     },
     {
@@ -3560,6 +3582,50 @@
       "updated": "2026-08-18",
       "definitionDigest": "e04be6c0c6218271942cd17342317cef682c1d3e09bbf28946d0e499993f661a",
       "progressDigest": "897300f033b34064e5bdb848c8107713abd356623e59c911ce3f79f5e671e5cd",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3350,
+      "id": "PLAN-PURE-PREVIEW-001",
+      "program": "KERNEL",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-25",
+      "definitionDigest": "5b6c453c56844112ebb2722971a87214e24899bbb1568503094a276d23dfd8b1",
+      "progressDigest": "1c3cab5518ab0b0506e3455c5e7ba47fbe0d176412960dd303194aa7b46ac6ad",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3351,
+      "id": "SPAWN-RETRY-TASK-IMMUTABILITY-001",
+      "program": "KERNEL",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-25",
+      "definitionDigest": "48dfd636153467e7f1c09cb45da7fc1cb48c12f8fad90c60ab57d62f6f04af09",
+      "progressDigest": "58e653454292e182fc8c1952d627f4b5bd75fdf38cb980fe9e662f2b007b6e58",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3352,
+      "id": "RESUME-STALE-LOCK-RECONCILIATION-001",
+      "program": "KERNEL",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-25",
+      "definitionDigest": "5918564bbe90ea0815b4dd681a9e4b9f43dabbb4602fa5351f3ed2ec1d9d1fa1",
+      "progressDigest": "69d87c14956c09d58180dbcd74c40d62f621e1a460ee92968e58b38205d1df7a",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3353,
+      "id": "SUBPROCESS-FINITE-BUDGET-ADMISSION-001",
+      "program": "KERNEL",
+      "priority": "P2",
+      "state": "OPEN",
+      "updated": "2026-08-25",
+      "definitionDigest": "931584ab5e50c162d7bfdaf9f7a146b763d5c638f28400d0cb2ce2dd2300d056",
+      "progressDigest": "ff8f24a937ec382379d530d4461c039b6c71dc646977ebf92b97c281786db39b",
       "terminalClosureDigest": null
     },
     {
@@ -10215,6 +10281,68 @@
       "updated": "2026-08-10"
     },
     {
+      "order": 540,
+      "id": "BUILD-CLEAN-HOLD-HONESTY-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Worktree-ortamında `npm run build` clean-HOLD'unun (execution-lock authority state missing dalı) exit-0 ile başarı gibi yayımlanması iddiasının reprodüksiyonu ve dürüst non-zero kapanışı",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Önce reproduce: authority-state-missing worktree fixture'ında gözlenen exit-0 kanıtlanır (ana-checkout'ta 2026-08-25 canlı-probe exit-1 verdi — vaka dal-özgü); reprodükte edilirse o dal typed non-zero döner ve build-zinciri tsc'ye geçmeden dürüst-FAIL eder; reprodükte edilemezse satır kanıtla kapatılır",
+      "evidence": "cli-surface-truth lane bulgular.md (owner admission 2026-08-25); worktree /tmp/deckent-cli-surface-truth; madde 17; ana-checkout karşı-kanıt: build-hold-probe exit-1",
+      "updated": "2026-08-25"
+    },
+    {
+      "order": 541,
+      "id": "PROJECTION-VALIDATOR-ARTIFACT-CLASS-001",
+      "parent": "P00",
+      "program": "TRUTH",
+      "outcome": "Projection-validator'ın `*.prompt-delivery.json` receipt'lerini task-artifact'ı gibi sınıflandırmaması",
+      "priority": "P2",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Dosya-adı deseni gerçek task-projection şemasıyla daraltılır; delivery-receipt'ler aynı namespace'te dursa da task-state olarak parse edilmez; regresyon-pini eklenir",
+      "evidence": "cli-surface-truth lane bulgular.md (owner admission 2026-08-25); worktree /tmp/deckent-cli-surface-truth; madde 12",
+      "updated": "2026-08-25"
+    },
+    {
       "order": 1000,
       "id": "CODEX-MAIN-001",
       "parent": "P01",
@@ -13900,7 +14028,11 @@
         "COMPOSITE-WORKER-001",
         "PLATFORM-EXEC-AUTH-W2-PROBE-001",
         "PLATFORM-EXEC-AUTH-W3-DARWIN-001",
-        "ORCHESTRA-RELIABILITY-001"
+        "ORCHESTRA-RELIABILITY-001",
+        "PLAN-PURE-PREVIEW-001",
+        "SPAWN-RETRY-TASK-IMMUTABILITY-001",
+        "RESUME-STALE-LOCK-RECONCILIATION-001",
+        "SUBPROCESS-FINITE-BUDGET-ADMISSION-001"
       ],
       "gates": [
         "G2",
@@ -13956,7 +14088,11 @@
         "PLATFORM-CLEAN-IDENTITY-ADAPTER-001",
         "COMPOSITE-WORKER-001",
         "PLATFORM-EXEC-AUTH-W3-DARWIN-001",
-        "ORCHESTRA-RELIABILITY-001"
+        "ORCHESTRA-RELIABILITY-001",
+        "PLAN-PURE-PREVIEW-001",
+        "SPAWN-RETRY-TASK-IMMUTABILITY-001",
+        "RESUME-STALE-LOCK-RECONCILIATION-001",
+        "SUBPROCESS-FINITE-BUDGET-ADMISSION-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "One lifecycle, one state authority, one evidence chain and all-surface cutover",
@@ -16760,8 +16896,8 @@
         "GR-2026-07-28-RUNFLOW-START-ACTOR-01"
       ],
       "acceptance": "No surface-owned execution/state engine; parity and contract tests",
-      "evidence": "`receipt=GR-2026-07-28-EXECUTION-AUTHORITY-01`; `receipt=GR-2026-07-28-BOT-PID-AUTHORITY-01`; `receipt=GR-2026-07-28-RUNFLOW-START-ACTOR-01`; optional namespace-local mount-metadata reconciliation is one canonical service exposed through CLI and MCP; bot ownership is bound to project and kernel-start identity; RunFlow exact-start now preserves the same durable approval principal through CLI and Terminal instead of allowing an adapter-local actor label to change authorization, with focused cross-surface/start-service proof and fresh independent Fable 5 confirmation; the repaired live start remains pending, and RunFlow coordinator, autonomous status/approve, cancel, review/finalize/cleanup and recovery semantics still diverge across API, terminal and Desktop, while dashboard remains intentionally read-only; 2026-08-03 ölçüm (PAZARTESI P3): CLI paketi 117 → 95 kırık. Kök neden status yüzeyinin authority-first sözleşmesi: canlı status canonical persisted read model yoksa RUN_STATUS_READ_MODEL_UNAVAILABLE ile HOLD'a düşüyor (src/cli/commands/status.ts:737) ve quiescent run authority, .tasks dosyaları var olsa bile 'aktif sprint yok'a kısa devre yapıyor (status.ts:910-916). Testler eski sözleşmeyi kodluyordu; guard gevşetilmedi, testler yeni sözleşmeye göre yeniden ifade edildi (commands/status.test.ts 20 → 0). Kanıtlamadığı: cleanup komutu, worktree-binary-authority ve spawn spy drift'i ayrı köklerde açık",
-      "updated": "2026-08-03"
+      "evidence": "`receipt=GR-2026-07-28-EXECUTION-AUTHORITY-01`; `receipt=GR-2026-07-28-BOT-PID-AUTHORITY-01`; `receipt=GR-2026-07-28-RUNFLOW-START-ACTOR-01`; optional namespace-local mount-metadata reconciliation is one canonical service exposed through CLI and MCP; bot ownership is bound to project and kernel-start identity; RunFlow exact-start now preserves the same durable approval principal through CLI and Terminal instead of allowing an adapter-local actor label to change authorization, with focused cross-surface/start-service proof and fresh independent Fable 5 confirmation; the repaired live start remains pending, and RunFlow coordinator, autonomous status/approve, cancel, review/finalize/cleanup and recovery semantics still diverge across API, terminal and Desktop, while dashboard remains intentionally read-only; 2026-08-03 ölçüm (PAZARTESI P3): CLI paketi 117 → 95 kırık. Kök neden status yüzeyinin authority-first sözleşmesi: canlı status canonical persisted read model yoksa RUN_STATUS_READ_MODEL_UNAVAILABLE ile HOLD'a düşüyor (src/cli/commands/status.ts:737) ve quiescent run authority, .tasks dosyaları var olsa bile 'aktif sprint yok'a kısa devre yapıyor (status.ts:910-916). Testler eski sözleşmeyi kodluyordu; guard gevşetilmedi, testler yeni sözleşmeye göre yeniden ifade edildi (commands/status.test.ts 20 → 0). Kanıtlamadığı: cleanup komutu, worktree-binary-authority ve spawn spy drift'i ayrı köklerde açık 2026-08-25 cli-surface-truth lane kanıt-ekleri (bulgular.md #2/#7/#10/#13): status death-sweep read-yolunun gözlenen kapanışı gerçekleştirmemesi; FAILED-Flow ile ORPHANED/resumable-Sprint çift-gerçeği; tek status çıktısında top-level UNAVAILABLE vs nested PAUSED çelişkisi; FIX-retry pending/terminal sayımlarının kullanıcı-yüzeyinde açıklanmaması — dördü de tek-monotonic-status-authority ihtiyacının bağımsız yeniden-üretimleridir",
+      "updated": "2026-08-25"
     },
     {
       "order": 3220,
@@ -16776,6 +16912,7 @@
       ],
       "dependents": [
         "DO-CUTOVER-001",
+        "PLAN-PURE-PREVIEW-001",
         "PRODUCTION-WIRING-AUTHORITY-001",
         "RECOVERY-BORN-480-SCOPE-001",
         "RECOVERY-BORN-481-GATE-TRUTH-001",
@@ -18738,6 +18875,138 @@
       "acceptance": "Protokol landing-proposal Bash kompozisyonu quote-güvenli (üç sprint'i öldüren 'unexpected EOF' sınıfı reproducer'lı); worker result yazımı kontrol-karakteri sanitize + collector/evaluator tolerant/typed parse (bozuk result artık dispatch'i sessizce kilitleyemez); dispatch başına tek bounded stale-spawnlock sweep — release yalnız üç-kanıt (yaş>5dk + owner-pid ölü + result terminal) + typed audit event'le, canlı worker lock'ına asla dokunmaz",
       "evidence": "ACİL ADMISSION (Alperen goal-onayı `deckent do` exact-plan dcedec38cd28…, 2026-08-18) + PACKAGE LANDED aynı gün: sprint-549 golden-flow (goal→exact plan→approve→run; 2/4 dogfood-DONE: 001 quote-fix 5/5 kriter, 002-fix sanitize+tolerant 283 test; 003 watchdog unit-kanıtlı ama dispatch sahası scope-dışıydı → production wiring sprint-spawner.ts spawnWorkers girişine Brain el-koduyla; 004 e2e-doc görevi dependency-blocked kaldı — üç fix'in kendi hermetik suite'leri regression'ı taşıdığından mock-ağırlıklı kopya yazılmadı, konsolidasyon kararı bu hücrede). Kanıt: 326/326 targeted battery (7 suite), tsc 0, build yeşil; Sol xverify 3 koşum dürüst UNCLEAR (receipt'ler `…4aa838b8`/`…01932d4b` — claim-yazım dersi: sıralama-iddiaları excerpt sınırına taşıyor; kapanış kanıtı makine-gate zinciri). Multi-provider dağıtım kanıtı: routing 003'ü gpt-5.6-sol'a (premium_plus concurrency gerekçeli), 004'ü economy gpt-5.6-luna'ya atadı; local-llm Qwen worker-role admission'ı ayrı config kararı bekliyor (owner)",
       "updated": "2026-08-18"
+    },
+    {
+      "order": 3350,
+      "id": "PLAN-PURE-PREVIEW-001",
+      "parent": "KERNEL-001",
+      "program": "KERNEL",
+      "outcome": "`plan --dry-run` gerçek-planning'i temsil eder ve yan-etkisizdir: bootstrap'sız katalog-farkı (21-vs-14 agent, farklı seçim/digest) ve temp-agent üretimi kapanır",
+      "priority": "P1",
+      "dependsOn": [
+        "PLANNER-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "PLANNER-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Aynı DIRECTIVES+config altında dry-run ile gerçek-plan aynı eligible-agent kataloğunu görür ve aynı task-projection/digest'i üretir (bilinçli-farklar typed olarak beyan edilir); dry-run `.deckent/agents/temp-*` profili ÜRETMEZ; routing decision-journal iki yol için tek-katalog kanıtı taşır. Not: debt-preflight yazımı KN4 owner-tasarımıdır, bu satırın kapsamı katalog/yan-etki eşitliğidir",
+      "evidence": "cli-surface-truth lane bulgular.md (owner admission 2026-08-25); worktree /tmp/deckent-cli-surface-truth; maddeler 3+4; DIRECTIVES-hattının 4. kapısı bu önizlemeye dayanır",
+      "updated": "2026-08-25"
+    },
+    {
+      "order": 3351,
+      "id": "SPAWN-RETRY-TASK-IMMUTABILITY-001",
+      "parent": "KERNEL-001",
+      "program": "KERNEL",
+      "outcome": "Spawn-retry yolunda in-memory task mutasyonunun (estimatedTokens/promptCompilePlanId) yapay `EXACT_PLAN_TASK_ARTIFACT_DRIFT` üretmemesi",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "buildWorkerPrompt approved-task'ı mutate etmez (immutable clone) veya retry-öncesi rollback garanti edilir; budget-gate'te duran ilk-attempt sonrası ikinci-attempt drift üretmez; regresyon-pini gerçek retry-fixture'ıyla",
+      "evidence": "cli-surface-truth lane bulgular.md (owner admission 2026-08-25); worktree /tmp/deckent-cli-surface-truth; madde 6",
+      "updated": "2026-08-25"
+    },
+    {
+      "order": 3352,
+      "id": "RESUME-STALE-LOCK-RECONCILIATION-001",
+      "parent": "KERNEL-001",
+      "program": "KERNEL",
+      "outcome": "PAUSED-resume yolunda stale coordinator-lock (PID-namespace görünmezliği dahil) typed reconciliation ile çözülür; detached start-attempt journal'ı `runs --close-stale` kapsamına girer",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Status PAUSED+koordinatörsüz iken resume, sandbox-PID'li bayat-lock'a çarpmaz: lock sahipliği pid+startToken/namespace-kanıtıyla çözülür, bayatsa typed temizlik+devam; pre-admission start-attempt kayıtları close-stale sweep'ince sınıflandırılır (terminal-yol 2026-08-25 releaseSprintLockForTerminatedSprint ile kapandı; bu satır paused/orphan-resume yoludur)",
+      "evidence": "cli-surface-truth lane bulgular.md (owner admission 2026-08-25); worktree /tmp/deckent-cli-surface-truth; maddeler 1+11",
+      "updated": "2026-08-25"
+    },
+    {
+      "order": 3353,
+      "id": "SUBPROCESS-FINITE-BUDGET-ADMISSION-001",
+      "parent": "KERNEL-001",
+      "program": "KERNEL",
+      "outcome": "Init/default'ların çalışamayan kombinasyon üretmemesi: `spawn_backend=subprocess` + finite token-budget, measured-streaming desteğiyle admission-safe çözülür",
+      "priority": "P2",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Backend capability-projection'ı (liveUsageBudgetSupport) provider-adapter gerçeğini yansıtır; finite-budget yalnız measured-stream kanıtı olan kombinasyonlara yazılır, aksi halde init/config-katmanında typed düzeltme/uyarı üretilir; 'Live execution budget requires measured streaming usage' fail-closed'ı kullanıcı-üretimi default'larla tetiklenemez",
+      "evidence": "cli-surface-truth lane bulgular.md (owner admission 2026-08-25); worktree /tmp/deckent-cli-surface-truth; madde 5",
+      "updated": "2026-08-25"
     },
     {
       "order": 4000,
@@ -26876,6 +27145,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "795558cfeed3c4b657b257a340d721b8e64a63aa4c23170713775e8c795e71f8"
+    "value": "0a900ea6f404577633e700fd15975ffe5001929bccca9f4abcc3f5d0a6ed8283"
   }
 }

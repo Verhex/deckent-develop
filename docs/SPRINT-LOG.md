@@ -16601,3 +16601,129 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 669-001: Append the next sequential bench case (DONE)
 
 ---
+## Sprint 670 — sprint-670
+
+**Status:** ABORTED
+**Date:** 2026-08-25
+**Duration:** 3547s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 13 |
+| Completed | 9 |
+| Tech Debt | 0 |
+| No-Go | 2 |
+| Coverage | 0.0% |
+| Duration | 3547262ms |
+
+### Tasks
+
+- 670-001-fix: Fix: Align failing agents/api suites (cluster 1) to landed contracts (DONE)
+- 670-001: Align failing agents/api suites (cluster 1) to landed contracts (DONE)
+- 670-002-fix-fix: Fix: Fix: Align failing api/approvals/backends/brain/cli suites (cluster 2) to landed contracts (PAUSED)
+- 670-002-fix: Fix: Align failing api/approvals/backends/brain/cli suites (cluster 2) to landed contracts (NO_GO)
+- 670-002: Align failing api/approvals/backends/brain/cli suites (cluster 2) to landed contracts (NO_GO)
+- 670-003-fix: Fix: Align failing cli suites (cluster 3) to landed contracts (DONE)
+- 670-003: Align failing cli suites (cluster 3) to landed contracts (DONE)
+- 670-004-fix-fix: Fix: Fix: Align failing cli suites (cluster 4) to landed contracts (PAUSED)
+- 670-004-fix: Fix: Align failing cli suites (cluster 4) to landed contracts (NO_GO)
+- 670-004: Align failing cli suites (cluster 4) to landed contracts (NO_GO)
+- 670-005: Align failing cli suites (cluster 5) to landed contracts (DONE)
+- 670-006-fix-fix-fix-fix: Fix: Fix: Fix: Fix: Align failing connectors/core suites (cluster 6) to landed contracts (PENDING)
+- 670-006-fix-fix-fix: Fix: Fix: Fix: Align failing connectors/core suites (cluster 6) to landed contracts (NO_GO)
+- 670-006-fix-fix: Fix: Fix: Align failing connectors/core suites (cluster 6) to landed contracts (NO_GO)
+- 670-006-fix: Fix: Align failing connectors/core suites (cluster 6) to landed contracts (NO_GO)
+- 670-006: Align failing connectors/core suites (cluster 6) to landed contracts (NO_GO)
+- 670-007-fix-fix-fix-fix: Fix: Fix: Fix: Fix: Align failing core/docs/e2e/extensions/governance/integration/mcp suites (cluster 7) to landed contracts (PENDING)
+- 670-007-fix-fix-fix: Fix: Fix: Fix: Align failing core/docs/e2e/extensions/governance/integration/mcp suites (cluster 7) to landed contracts (NO_GO)
+- 670-007-fix-fix: Fix: Fix: Align failing core/docs/e2e/extensions/governance/integration/mcp suites (cluster 7) to landed contracts (NO_GO)
+- 670-007-fix: Fix: Align failing core/docs/e2e/extensions/governance/integration/mcp suites (cluster 7) to landed contracts (NO_GO)
+- 670-007: Align failing core/docs/e2e/extensions/governance/integration/mcp suites (cluster 7) to landed contracts (NO_GO)
+- 670-008: Align failing mcp/orchestra suites (cluster 8) to landed contracts (DONE)
+- 670-009: Align failing orchestra suites (cluster 9) to landed contracts (DONE)
+- 670-010: Align failing orchestra suites (cluster 10) to landed contracts (DONE)
+- 670-011: Align failing orchestra suites (cluster 11) to landed contracts (DONE)
+- 670-012-fix: Fix: Align failing orchestra suites (cluster 12) to landed contracts (DONE)
+- 670-012: Align failing orchestra suites (cluster 12) to landed contracts (DONE)
+- 670-013-fix: Fix: Align failing orchestra/providers/scripts/security/unit suites (cluster 13) to landed contracts (DONE)
+- 670-013: Align failing orchestra/providers/scripts/security/unit suites (cluster 13) to landed contracts (DONE)
+
+---
+## Sprint 671 — sprint-671
+
+**Status:** ABORTED
+**Date:** 2026-08-25
+**Duration:** 1788s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 9 |
+| Completed | 6 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 1788268ms |
+
+### Tasks
+
+- 671-001-fix: Fix: Config authority for owner-notification outbox drain interval and pending-age threshold (DONE)
+- 671-001: Config authority for owner-notification outbox drain interval and pending-age threshold (DONE)
+- 671-002: Auditor done-counter reads the canonical run-status read-model (DONE)
+- 671-003: Remove the duplicated completion counter in sprint-state-tracker (DONE)
+- 671-004: Bot-daemon drains the durable owner-notification outbox (DONE)
+- 671-005-fix: Fix: Wire the missing controller-side notification producers (PENDING)
+- 671-005: Wire the missing controller-side notification producers (NO_GO)
+- 671-006-fix: Fix: Finalizer terminal package — terminal notification and terminal-aware sprint lock release (PENDING)
+- 671-006: Finalizer terminal package — terminal notification and terminal-aware sprint lock release (NO_GO)
+- 671-007-fix: Fix: Delivery-health detector watches the durable owner-notification outbox (PENDING)
+- 671-007: Delivery-health detector watches the durable owner-notification outbox (NO_GO)
+- 671-008: Event-stream sequence self-healing and honest write failures (DONE)
+- 671-009: live-events single-source worker_done (DONE)
+
+---
+## Sprint 672 — sprint-672
+
+**Status:** ABORTED
+**Date:** 2026-08-25
+**Duration:** 1515s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 9 |
+| Completed | 8 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 1515422ms |
+
+### Tasks
+
+- 672-001-fix: Fix: Convert runtime-hygiene raw throws (DONE)
+- 672-001: Convert runtime-hygiene raw throws (DONE)
+- 672-002-fix: Fix: Convert maintenance-archive family raw throws (DONE)
+- 672-002: Convert maintenance-archive family raw throws (DONE)
+- 672-003-fix: Fix: Convert canary-archive family raw throws (DONE)
+- 672-003: Convert canary-archive family raw throws (DONE)
+- 672-004-fix: Fix: Convert sprint-archive family raw throws (DONE)
+- 672-004: Convert sprint-archive family raw throws (DONE)
+- 672-005-fix-fix-fix-fix: Fix: Fix: Fix: Fix: Tier-1 CLI conversions with real-binary smoke (PENDING)
+- 672-005-fix-fix-fix: Fix: Fix: Fix: Tier-1 CLI conversions with real-binary smoke (NO_GO)
+- 672-005-fix-fix: Fix: Fix: Tier-1 CLI conversions with real-binary smoke (NO_GO)
+- 672-005-fix: Fix: Tier-1 CLI conversions with real-binary smoke (NO_GO)
+- 672-005: Tier-1 CLI conversions with real-binary smoke (NO_GO)
+- 672-006-fix: Fix: Convert log/job-retention family raw throws (DONE)
+- 672-006: Convert log/job-retention family raw throws (DONE)
+- 672-007-fix: Fix: Convert delivery/acceptance-core family raw throws (DONE)
+- 672-007: Convert delivery/acceptance-core family raw throws (DONE)
+- 672-008-fix: Fix: Convert orchestra acceptance/verify family raw throws (DONE)
+- 672-008: Convert orchestra acceptance/verify family raw throws (DONE)
+- 672-009-fix: Fix: Surgical conversions inside baselined-debt files (DONE)
+- 672-009: Surgical conversions inside baselined-debt files (DONE)
+
+---
