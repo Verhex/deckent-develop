@@ -207,7 +207,7 @@ export function registerCuStatus(program: Command): void {
   program
     .command('cu-status')
     .description(getMessage('cli.cu_status.desc', getLanguage(undefined)))
-    .option('--json', 'Output as JSON')
+    .option('--json', getMessage('cli.governance.opt.json', getLanguage(undefined)))
     .action(async (cmdOpts: CuStatusOptions) => {
       await runCuStatusCommand(cmdOpts);
     });

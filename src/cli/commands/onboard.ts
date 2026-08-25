@@ -37,6 +37,7 @@ import {
   type OnboardingApplyResult,
   type OnboardingApplyFieldChange,
 } from '../helpers/onboarding-apply.js';
+import { cliContractMessage } from '../helpers/message-catalog/cli-run.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -500,16 +501,17 @@ export async function runOnboardApply(root: string, opts: OnboardingApplyFlowOpt
 }
 
 export function registerOnboard(program: Command): void {
+  const helpLang = getLanguage(undefined);
   program
     .command('onboard')
     .description(getMessage('cli.onboard.desc', getLanguage(undefined)))
-    .option('--non-interactive', 'Skip interactive prompts, use defaults')
-    .option('--force', 'Re-run onboarding even if already initialized')
-    .option('--plan-only', 'Print the onboarding plan without prompting (non-interactive, CI/test path)')
-    .option('--json', 'Output the --plan-only report as JSON')
-    .option('--apply', 'Apply the onboarding config plan: plan preview -> confirm -> write (project-scope)')
-    .option('--dry-run', 'Preview the onboarding apply without writing anything (implies --apply)')
-    .option('-y, --yes', 'Skip the apply confirmation prompt (implies --apply)')
+    .option('--non-interactive', cliContractMessage('cliContract.onboard.opt.non_interactive', helpLang))
+    .option('--force', cliContractMessage('cliContract.onboard.opt.force', helpLang))
+    .option('--plan-only', cliContractMessage('cliContract.onboard.opt.plan_only', helpLang))
+    .option('--json', cliContractMessage('cliContract.onboard.opt.json', helpLang))
+    .option('--apply', cliContractMessage('cliContract.onboard.opt.apply', helpLang))
+    .option('--dry-run', cliContractMessage('cliContract.onboard.opt.dry_run', helpLang))
+    .option('-y, --yes', cliContractMessage('cliContract.onboard.opt.yes', helpLang))
     .action(async (opts: {
       nonInteractive?: boolean;
       force?: boolean;

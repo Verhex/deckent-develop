@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // gen-reference-docs.mjs — Sprint 172 Task C2
-// Single source of truth for reference docs (MCP tools/resources, ADR index, CLI, agents).
+// Single source of truth for MCP tools/resources, ADR index, and agent docs.
+// CLI docs are generated exclusively by scripts/generate-cli-docs.ts from the
+// canonical CliCommandContract; this script deliberately does not own them.
 // Modes:
 //   --check  → exit 1 if any target file drifts from generated content (CI gate)
 //   --write  → overwrite targets in place
@@ -132,37 +134,6 @@ export function parseAdrs(adrDir) {
   });
 }
 
-// ─── CLI command parser ──────────────────────────────────────────────────────
-
-const COMMAND_RE = /\.command\(\s*['"]([^'"]+)['"]\s*\)\s*(?:\.alias\([^)]*\))?\s*\.description\(\s*['"`]([\s\S]*?)['"`]\s*\)/g;
-
-export function parseCliCommands(cmdDir) {
-  const files = listFilesRecursive(cmdDir, (n) => n.endsWith('.ts') && !n.endsWith('.d.ts'));
-  const cmds = [];
-  for (const file of files) {
-    const src = readFileSync(file, 'utf-8');
-    let m;
-    COMMAND_RE.lastIndex = 0;
-    while ((m = COMMAND_RE.exec(src)) !== null) {
-      const signature = m[1].trim();
-      const description = m[2].replace(/\s+/g, ' ').trim();
-      const name = signature.split(/\s+/)[0];
-      cmds.push({ name, signature, description });
-    }
-  }
-  // Dedup by signature; preserve insertion order for stability then sort by name.
-  const seen = new Set();
-  const unique = [];
-  for (const c of cmds) {
-    const key = `${c.signature}|${c.description}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    unique.push(c);
-  }
-  unique.sort((a, b) => a.name.localeCompare(b.name) || a.signature.localeCompare(b.signature));
-  return unique;
-}
-
 // ─── Agents parser ───────────────────────────────────────────────────────────
 
 export function parseAgents(agentsDir) {
@@ -245,18 +216,6 @@ export function renderAdrs(adrs) {
   lines.push('|----|-------|--------|------|');
   for (const a of adrs) {
     lines.push(`| ${a.id} | ${tableCell(a.title)} | ${a.status} | [\`${a.file}\`](./${a.file}) |`);
-  }
-  return lines.join('\n') + '\n';
-}
-
-export function renderCliCommands(commands) {
-  const lines = [];
-  lines.push(`> ${commands.length} commands. Generated from \`src/cli/commands/*.ts\`.`);
-  lines.push('');
-  lines.push('| Command | Description |');
-  lines.push('|---------|-------------|');
-  for (const c of commands) {
-    lines.push(`| \`deckent ${c.signature}\` | ${tableCell(c.description)} |`);
   }
   return lines.join('\n') + '\n';
 }
@@ -367,7 +326,6 @@ export const REFERENCE_LOCALES = [
         '# MCP Tools Reference\n\n> **Auto-generated** — do not edit AUTOGEN block by hand. Run `npm run docs:ref` to regenerate.\n\nDeckent ships an MCP server that exposes orchestration to MCP-compatible IDEs (Claude Code, Cursor, etc.). The tools below are registered in `src/mcp/tools/*.ts` and surfaced via `deckent-mcp` stdio transport.',
       mcpResources:
         '# MCP Resources Reference\n\n> **Auto-generated** — do not edit AUTOGEN block by hand. Run `npm run docs:ref` to regenerate.\n\nMCP resources expose live project state (dashboard, directives, memory, debt, tasks, …) to MCP-compatible IDEs via the `deckent://` URI scheme.',
-      cli: '# CLI Command Index\n\n> **Auto-generated** — do not edit AUTOGEN block by hand. Run `npm run docs:ref` to regenerate.\n> **Source-parsed** — extracted from `src/cli/commands/*.ts` `.command(...)` registrations.',
       agents:
         '# Agents Reference\n\n> **Auto-generated** — do not edit AUTOGEN block by hand. Run `npm run docs:ref` to regenerate.\n\nAgents are domain specialists that Brain assigns per task. Built-in agents live under `.deckent/agents/`; `temp-*` agents are runtime-generated and auto-promoted/demoted by the Evolution Pipeline.',
     },
@@ -380,7 +338,6 @@ export const REFERENCE_LOCALES = [
         '# MCP Tool Referansı\n\n> **Otomatik üretilir** — AUTOGEN bloğunu elle düzenlemeyin. Yeniden üretmek için `npm run docs:ref` çalıştırın.\n\nDeckent, orchestration yüzeyini MCP-uyumlu IDE\'lere (Claude Code, Cursor vb.) açan bir MCP sunucusu içerir. Aşağıdaki tool\'lar `src/mcp/tools/*.ts` içinde kayıtlıdır ve `deckent-mcp` stdio transport üzerinden sunulur.\n\n> Tablo içeriği koddan gelen tanımlayıcılardır (tool adları, parametreler); çevrilmez.',
       mcpResources:
         '# MCP Kaynak Referansı\n\n> **Otomatik üretilir** — AUTOGEN bloğunu elle düzenlemeyin. Yeniden üretmek için `npm run docs:ref` çalıştırın.\n\nMCP kaynakları; canlı proje durumunu (dashboard, directives, memory, debt, tasks, …) `deckent://` URI şeması üzerinden MCP-uyumlu IDE\'lere açar.\n\n> Tablo içeriği koddan gelen tanımlayıcılardır; çevrilmez.',
-      cli: '# CLI Komut Dizini\n\n> **Otomatik üretilir** — AUTOGEN bloğunu elle düzenlemeyin. Yeniden üretmek için `npm run docs:ref` çalıştırın.\n> **Kaynaktan ayrıştırılır** — `src/cli/commands/*.ts` içindeki `.command(...)` kayıtlarından çıkarılır.\n\n> Komut adları ve bayraklar tanımlayıcıdır; çevrilmez.',
       agents:
         '# Agent Referansı\n\n> **Otomatik üretilir** — AUTOGEN bloğunu elle düzenlemeyin. Yeniden üretmek için `npm run docs:ref` çalıştırın.\n\nAgent\'lar, Brain\'in task başına atadığı alan uzmanlarıdır. Yerleşik agent\'lar `.deckent/agents/` altında yaşar; `temp-*` agent\'ları runtime\'da üretilir ve Evolution Pipeline tarafından otomatik terfi/tenzil edilir.\n\n> Tablo içeriği koddan gelen tanımlayıcılardır; çevrilmez.',
     },
@@ -393,13 +350,11 @@ export function collectGenerations({ root = DEFAULT_ROOT } = {}) {
   const toolsDir = join(root, 'src/mcp/tools');
   const resDir = join(root, 'src/mcp/resources');
   const adrDir = join(root, 'docs/adr');
-  const cliDir = join(root, 'src/cli/commands');
   const agentsDir = join(root, '.deckent/agents');
 
   const tools = parseMcpTools(toolsDir);
   const resources = parseMcpResources(resDir);
   const adrs = parseAdrs(adrDir);
-  const commands = parseCliCommands(cliDir);
   const agents = parseAgents(agentsDir);
 
   const generations = [
@@ -421,15 +376,6 @@ export function collectGenerations({ root = DEFAULT_ROOT } = {}) {
         header: locale.headers.mcpResources,
         body: renderMcpResources(resources),
         count: resources.length,
-      },
-      {
-        id: `cli-${locale.lang}`,
-        target: `${locale.dir}/cli.md`,
-        targetDir: locale.dir,
-        mode: 'embed',
-        header: locale.headers.cli,
-        body: renderCliCommands(commands),
-        count: commands.length,
       },
       {
         id: `agents-${locale.lang}`,

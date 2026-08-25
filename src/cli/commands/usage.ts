@@ -22,6 +22,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import type { Command } from 'commander';
 import { print } from '../helpers/output.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
+import { memoryCatalogMessage } from '../helpers/message-catalog/cli-memory-catalog.js';
 import { formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { loadConfig, DEFAULT_PROMPT_CONFIG } from '../../core/config.js';
@@ -809,6 +810,7 @@ export function registerUsage(program: Command): void {
     .option('--decision-digest <sha256>', getMessage('usage.option.decision_digest', getLanguage(undefined)))
     .option('--environment <id>', getMessage('usage.option.environment', getLanguage(undefined)))
     .option('--tenant <id>', getMessage('usage.option.tenant', getLanguage(undefined)))
+    .addHelpText('after', memoryCatalogMessage('cli.memcat.usage.help.authority', getLanguage(undefined)))
     .action(async (opts) => {
       await runUsageCommand(opts);
     });

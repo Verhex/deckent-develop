@@ -1,16 +1,27 @@
 // src/core/command-registry.ts
 // ═══ TERM-3 — categorized cross-surface command registry ═══════════════════
 //
-// Single catalog of every deckent command/capability, tagged with the
-// metadata a command-discovery UI needs (category, plain-language risk,
-// subsystem scope, i18n summary key, and which surfaces expose it today).
+// COMPATIBILITY PROJECTION (CLI-CONTRACT-001). This module no longer DECLARES
+// command metadata — every row is now projected from the path-level SSOT in
+// ./cli-command-contract.ts (`CLI_COMMAND_CONTRACTS`), which carries one row
+// per REAL command path (`agent`, `agent list`, …) plus the repl/mcp-only
+// capability rows. Rows that carry a `registry` projection block surface here,
+// in the coarse top-level grain every existing consumer already expects:
 //
-// Ground truth (see .tasks/task-351-002.plan for the full extraction trail):
-//   - cli:  top-level commands registered by buildProgram() (src/cli/index.ts)
-//   - mcp:  TOOL_CATALOG, the project's MCP-tool SSOT
-//           (src/core/mcp-tool-catalog.ts, B-MCPCATALOG-SSOT)
-//   - repl: SLASH_CATALOG (./chat-slash-registry.js) — same surface, safe to
-//           import directly.
+//   name             ← the contract row's single-segment path
+//   category/scope   ← contract row's `registry` block
+//   mcpNames         ← contract row's `registry` block
+//   risk             ← family override, else derived from the row's `effect`
+//   summaryKey       ← DERIVED as `cmdCatalog.<name>.summary`
+//   surfaces         ← contract row's `surfaces`
+//   catalogDependent ← contract row's `catalogDependent`
+//
+// Nothing downstream changes: the exported shape, the query API, and the
+// projected values are identical to the hand-maintained table this replaced
+// (proved row-by-row in tests/cli/command-registry.test.ts). What changed is
+// that a new command can no longer be added here without adding its
+// path-level contract row, and the contract row is mechanically verified
+// against the live Commander tree (src/cli/helpers/command-contract.ts).
 //
 // ADR-D-004 (Layer-1 import direction / surface non-cross-import): delivery
 // surfaces consume this lower-layer registry and never import one another.
@@ -21,35 +32,29 @@
 // section (the domain a command's functionality belongs to — every command
 // file physically lives under src/cli/commands/, so a literal-directory
 // scope would be meaningless; domain-based scope is the only useful one).
-//
-// Pure data + query API only — UI wiring (REPL slash-menu grouping, i18n
-// message-key population in helpers/messages.ts) is an explicit follow-up.
 
-/** UX grouping shown in a command-discovery surface. */
-export type CommandCategory = 'Core' | 'Run' | 'Memory' | 'MCP' | 'Enterprise' | 'Danger';
+import { DeckentError } from './errors.js';
+import {
+  CLI_COMMAND_CONTRACTS,
+  EFFECT_TO_RISK,
+  type CliCommandContract,
+} from './cli-command-contract.js';
 
-/**
- * TERM-5 plain-risk-language ladder: read-only < local-state modification <
- * execute/spawn a process < autonomous continuous-loop control.
- */
-export type CommandRisk = 'Oku' | 'Değiştir' | 'Çalıştır' | 'Otonom';
+// The vocabulary types stay exported from here for every existing importer —
+// but they are DEFINED once, in the contract SSOT.
+export type {
+  CommandCategory,
+  CommandRisk,
+  CommandSurface,
+  CommandScope,
+} from './cli-command-contract.js';
 
-/** Which surface(s) actually expose this capability today. */
-export type CommandSurface = 'cli' | 'mcp' | 'repl';
-
-/** Subsystem domain the command's functionality belongs to (CLAUDE.md Architecture map). */
-export type CommandScope =
-  | 'orchestra'
-  | 'core'
-  | 'agents'
-  | 'nervous'
-  | 'monitor'
-  | 'connectors'
-  | 'providers'
-  | 'api'
-  | 'mcp'
-  | 'cli'
-  | 'dashboard';
+import type {
+  CommandCategory,
+  CommandRisk,
+  CommandSurface,
+  CommandScope,
+} from './cli-command-contract.js';
 
 export interface CommandRegistryEntry {
   /** Canonical id — the real top-level CLI command name where one exists. */
@@ -78,161 +83,34 @@ export interface CommandRegistryEntry {
   readonly catalogDependent?: boolean;
 }
 
-function entry(
-  name: string,
-  category: CommandCategory,
-  risk: CommandRisk,
-  scope: CommandScope,
-  surfaces: readonly CommandSurface[],
-  mcpNames?: readonly string[],
-  catalogDependent?: boolean,
-): CommandRegistryEntry {
-  return { name, category, risk, scope, summaryKey: `cmdCatalog.${name}.summary`, surfaces, mcpNames, catalogDependent };
+/** Project ONE contract row into the coarse registry grain. */
+export function projectRegistryEntry(contract: CliCommandContract): CommandRegistryEntry {
+  const projection = contract.registry;
+  if (projection === undefined) {
+    throw new DeckentError('E_CONTRACT_ROW_REGISTRY_PROJECTION_MISSING', `contract row "${contract.path.join(' ')}" carries no registry projection`);
+  }
+  const name = contract.path.join(' ');
+  return {
+    name,
+    category: projection.category,
+    risk: projection.familyRisk ?? EFFECT_TO_RISK[contract.effect],
+    scope: projection.scope,
+    summaryKey: `cmdCatalog.${name}.summary`,
+    surfaces: contract.surfaces,
+    mcpNames: projection.mcpNames,
+    catalogDependent: contract.catalogDependent === true ? true : undefined,
+  };
 }
 
 /**
- * CANONICAL cross-surface command registry (TERM-3, DIRECTIVES row 42).
- * Every top-level CLI command (buildProgram()) and every registered MCP
- * tool (TOOL_CATALOG) must resolve here — enforced by
- * tests/cli/command-registry.test.ts.
+ * CANONICAL cross-surface command registry (TERM-3, DIRECTIVES row 42),
+ * projected from the path-level contract SSOT. Every top-level CLI command
+ * (buildProgram()) and every registered MCP tool (TOOL_CATALOG) must resolve
+ * here — enforced by tests/cli/command-registry.test.ts.
  */
-export const COMMAND_REGISTRY: readonly CommandRegistryEntry[] = [
-  // ─── Core ──────────────────────────────────────────────────────────────
-  entry('init', 'Core', 'Değiştir', 'core', ['cli', 'mcp'], ['deckent_init']),
-  entry('status', 'Core', 'Oku', 'orchestra', ['cli', 'mcp', 'repl'], ['deckent_status']),
-  // RUN-INSPECTOR-001: logical run listing + lineage detail read-model faces.
-  entry('inspect', 'Core', 'Oku', 'orchestra', ['cli', 'mcp'], ['deckent_inspect']),
-  entry('doctor', 'Core', 'Oku', 'core', ['cli', 'mcp', 'repl'], ['deckent_doctor']),
-  entry('cu-status', 'Core', 'Oku', 'core', ['cli']),
-  entry('config', 'Core', 'Değiştir', 'core', ['cli', 'mcp', 'repl'], ['deckent_config']),
-  entry('plugin', 'Core', 'Değiştir', 'core', ['cli']),
-  entry('upgrade', 'Core', 'Çalıştır', 'cli', ['cli']),
-  entry('onboard', 'Core', 'Değiştir', 'cli', ['cli']),
-  entry('analyze', 'Core', 'Oku', 'core', ['cli', 'mcp', 'repl'], ['deckent_analyze_project']),
-  // Overnight 2026-07-02 additions (rounds 5-9): registered commands must appear
-  // here — the registry⊇commands invariant test enforces it.
-  entry('plan-nl', 'Run', 'Oku', 'orchestra', ['cli']), // dry-run preview by default; --write mutates DIRECTIVES
-  entry('connect', 'Core', 'Oku', 'core', ['cli']),     // diagnostic wizard, no mutation
-  entry('do', 'Run', 'Çalıştır', 'orchestra', ['cli', 'repl']), // golden-flow; default dry-run, --run executes. 'repl': 452-002 /do slash (RunFlow chain via app.tsx)
-  entry('archive-debt', 'Core', 'Oku', 'orchestra', ['cli']),
-  entry('archive', 'Core', 'Değiştir', 'core', ['cli']),
-  entry('dashboard', 'Core', 'Oku', 'monitor', ['cli']),
-  entry('sync', 'Core', 'Değiştir', 'orchestra', ['cli', 'mcp', 'repl'], ['deckent_sync']),
-  entry('agent', 'Core', 'Değiştir', 'core', ['cli', 'mcp', 'repl'], ['deckent_agent_list', 'deckent_agent_manage']),
-  entry('skill', 'Core', 'Değiştir', 'core', ['cli', 'mcp', 'repl'], ['deckent_skill_list', 'deckent_skill_manage']),
-  entry('docs', 'Core', 'Değiştir', 'orchestra', ['cli', 'mcp'], ['deckent_docs']),
-  entry('output', 'Core', 'Oku', 'monitor', ['cli']),
-  entry('trace', 'Core', 'Değiştir', 'core', ['cli']),
-  entry('mode', 'Core', 'Değiştir', 'core', ['cli']),
-  entry('features', 'Core', 'Oku', 'core', ['cli', 'mcp', 'repl'], ['deckent_feature_query']),
-  // born-640b (404-002): feature truth-chain report — read-only diagnostic.
-  entry('truth', 'Core', 'Oku', 'core', ['cli', 'mcp'], ['deckent_truth']),
-  entry('audit-verify', 'Core', 'Oku', 'orchestra', ['cli']),
-  entry('models', 'Core', 'Değiştir', 'core', ['cli', 'mcp', 'repl'], ['deckent_models'], true),
-  entry('local-llm', 'Core', 'Çalıştır', 'providers', ['cli']),
-  entry('resources', 'Core', 'Oku', 'monitor', ['cli', 'repl']),
-  entry('usage', 'Core', 'Oku', 'api', ['cli', 'mcp', 'repl'], ['deckent_usage']),
-  entry('limits', 'Core', 'Oku', 'core', ['cli']),          // 361-002 subscription limit-probe
-  entry('openrouter-probe', 'Core', 'Oku', 'core', ['cli']), // 366-003 canlı-probe (key'siz dürüst-unavailable)
-  entry('provider-authority', 'Enterprise', 'Değiştir', 'providers', ['cli']),
-  // Migration prepare/decision/apply authority stays operator-only: MCP must
-  // not gain a provider-observation mutation tool implicitly through parity.
-  entry('provider-observations', 'Enterprise', 'Değiştir', 'providers', ['cli']),
-  entry('execution-authority', 'Enterprise', 'Değiştir', 'core', ['cli', 'mcp'], ['deckent_execution_authority']), // mount-adopt: yerel execution-lock authority mutasyonu
-  // approvals: CLI `list` + `decide --allow/--deny` mutates approval-admission state ('Değiştir');
-  // the folded MCP tool `deckent_approvals` is a READ-ONLY pending inbox only — deciding stays
-  // CLI-only behind interactive live-auth (no allow/deny/decide/self-approval over MCP).
-  entry('approvals', 'Enterprise', 'Değiştir', 'core', ['cli', 'mcp'], ['deckent_approvals']),
-  // confirmations: ADR-G-040 Evaluation Surface adapter runtime — `list` + `decide`
-  // (interactive live-auth, approvals-decide TTY sözleşmesinin aynısı) + `run`
-  // (cross-provider LLM adjudication). CLI-only karar yüzeyi; MCP decide YOK (§12.2).
-  entry('confirmations', 'Enterprise', 'Değiştir', 'core', ['cli']),
-
-  entry('xverify', 'Core', 'Oku', 'orchestra', ['cli', 'mcp'], ['deckent_xverify']), // XVERIFY-TOOL host-adjudicated cross-provider hakem
-  entry('kpi', 'Core', 'Oku', 'orchestra', ['cli', 'mcp', 'repl'], ['deckent_kpi']),
-  entry('image', 'Core', 'Değiştir', 'core', ['cli']),
-  entry('help-info', 'Core', 'Oku', 'cli', ['cli', 'mcp', 'repl'], ['deckent_help']),
-  entry('audit', 'Core', 'Çalıştır', 'orchestra', ['cli', 'mcp', 'repl'], ['deckent_audit']),
-
-  // ─── Run (sprint/task lifecycle execution) ──────────────────────────────
-  entry('start', 'Run', 'Çalıştır', 'orchestra', ['cli', 'mcp'], ['deckent_start'], true),
-  entry('plan', 'Run', 'Değiştir', 'orchestra', ['cli', 'mcp', 'repl'], ['deckent_plan'], true),
-  entry('attach', 'Run', 'Çalıştır', 'cli', ['cli']),
-  entry('spawn', 'Run', 'Çalıştır', 'agents', ['cli']),
-  entry('serve', 'Run', 'Çalıştır', 'api', ['cli']),
-  entry('watch', 'Run', 'Oku', 'monitor', ['cli', 'mcp'], ['deckent_watch']),
-  entry('run', 'Run', 'Çalıştır', 'orchestra', ['cli', 'mcp'], ['deckent_run'], true),
-  entry('task', 'Run', 'Değiştir', 'core', ['cli']),
-  entry('test', 'Run', 'Çalıştır', 'orchestra', ['cli']),
-  entry('review', 'Run', 'Değiştir', 'orchestra', ['cli', 'mcp', 'repl'], ['deckent_review']),
-  entry('finalize', 'Run', 'Değiştir', 'orchestra', ['cli']),
-  entry('set-directives', 'Run', 'Değiştir', 'orchestra', ['cli', 'mcp', 'repl'], ['deckent_set_directives']),
-  entry('heartbeat', 'Run', 'Çalıştır', 'orchestra', ['cli']),
-  entry('chat', 'Run', 'Çalıştır', 'cli', ['cli'], undefined, true),
-  entry('checkpoint', 'Run', 'Değiştir', 'orchestra', ['cli', 'mcp', 'repl'], ['deckent_checkpoint']),
-  entry('resume', 'Run', 'Çalıştır', 'orchestra', ['cli', 'repl']),
-  entry('interrogate', 'Run', 'Oku', 'orchestra', ['repl']),
-  entry('runs', 'Run', 'Oku', 'orchestra', ['cli', 'repl']), // F-3: CLI parity for the /runs inbox; --close-stale --yes writes durable closures
-  entry('cancel', 'Run', 'Değiştir', 'cli', ['repl']),
-
-  // ─── Memory ──────────────────────────────────────────────────────────────
-  entry('retro', 'Memory', 'Oku', 'orchestra', ['cli', 'mcp', 'repl'], ['deckent_retro']),
-  entry('history', 'Memory', 'Oku', 'orchestra', ['cli', 'mcp', 'repl'], ['deckent_history']),
-  entry('explain', 'Memory', 'Oku', 'orchestra', ['cli', 'mcp', 'repl'], ['deckent_explain']),
-  entry('recall', 'Memory', 'Oku', 'core', ['cli', 'mcp', 'repl'], ['deckent_memory_query']),
-  entry('remember', 'Memory', 'Değiştir', 'core', ['cli']),
-  entry('memory', 'Memory', 'Değiştir', 'core', ['cli', 'mcp'], ['deckent_memory_manage']),
-
-  // ─── MCP (managing/bridging MCP itself) ───────────────────────────────────
-  entry('mcp', 'MCP', 'Değiştir', 'mcp', ['cli']),
-  entry('mcp-bridge', 'MCP', 'Çalıştır', 'mcp', ['repl']),
-
-  // ─── Enterprise ────────────────────────────────────────────────────────
-  entry('process', 'Enterprise', 'Çalıştır', 'orchestra', ['cli', 'mcp'], ['deckent_process']),
-  entry('cost', 'Enterprise', 'Değiştir', 'core', ['cli', 'mcp'], ['deckent_cost']),
-  entry('nervous', 'Enterprise', 'Değiştir', 'nervous', ['cli', 'mcp', 'repl'], [
-    'deckent_nervous_subscribe',
-    'deckent_nervous_accept',
-    'deckent_nervous_reject',
-    'deckent_nervous_status',
-    'deckent_nervous_config',
-    'deckent_nervous_edit',
-    'deckent_nervous_undo',
-  ]),
-  entry('flow', 'Enterprise', 'Çalıştır', 'orchestra', ['cli']),
-  entry('rbac', 'Enterprise', 'Değiştir', 'core', ['cli']),
-  entry('evolve', 'Enterprise', 'Oku', 'orchestra', ['cli']),
-  entry('autonomous', 'Enterprise', 'Otonom', 'orchestra', ['cli', 'mcp', 'repl'], [
-    'deckent_autonomous',
-    'deckent_autonomous_backlog',
-    'deckent_autonomous_status',
-    'deckent_autonomous_approve',
-    'deckent_autonomous_reject',
-  ]),
-  entry('autonomous-mission', 'Enterprise', 'Otonom', 'orchestra', ['cli']),
-  entry('bot', 'Enterprise', 'Çalıştır', 'connectors', ['cli']),
-  entry('gateway', 'Enterprise', 'Çalıştır', 'connectors', ['cli']),
-  entry('gateway-runtime', 'Enterprise', 'Otonom', 'connectors', ['cli']),
-
-  // ─── Danger ────────────────────────────────────────────────────────────
-  entry('kill', 'Danger', 'Çalıştır', 'agents', ['cli', 'mcp', 'repl'], ['deckent_kill']),
-  entry('cleanup', 'Danger', 'Değiştir', 'orchestra', ['cli', 'mcp', 'repl'], ['deckent_cleanup']),
-  entry('recover', 'Danger', 'Değiştir', 'orchestra', ['cli', 'mcp', 'repl'], ['deckent_recover']),
-
-  // ─── REPL-only session UX (no cli/mcp equivalent) ───────────────────────
-  entry('model', 'Core', 'Değiştir', 'providers', ['repl']),
-  entry('provider', 'Core', 'Değiştir', 'providers', ['repl']),
-  // /renew renews only the WORKING budget epoch of a native session (7083);
-  // billing/usage/audit accrual is untouched — session-state mutation tier.
-  entry('renew', 'Core', 'Değiştir', 'cli', ['repl']),
-  entry('approve', 'Core', 'Değiştir', 'cli', ['repl']),
-  // /term switches the Ask/Run/Control session mode (term-mode.ts) — mutates
-  // session state like /approve, hence the same Değiştir tier.
-  entry('term', 'Core', 'Değiştir', 'cli', ['repl']),
-  entry('cd', 'Core', 'Değiştir', 'cli', ['repl']),
-  entry('clear', 'Core', 'Oku', 'cli', ['repl']),
-  entry('exit', 'Core', 'Oku', 'cli', ['repl']),
-];
+export const COMMAND_REGISTRY: readonly CommandRegistryEntry[] = Object.freeze(
+  CLI_COMMAND_CONTRACTS.filter((contract) => contract.registry !== undefined).map(projectRegistryEntry),
+);
 
 // ─── Query API ─────────────────────────────────────────────────────────────
 

@@ -18,6 +18,7 @@ import { dirname, isAbsolute, join } from 'node:path';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
+import { bindGovernanceArgumentDescriptions } from '../helpers/message-catalog/cli-governance.js';
 import {
   buildEngineRuntime,
   runAutonomousLoop,
@@ -1756,8 +1757,8 @@ export function registerAutonomous(program: Command): void {
   cmd
     .command('enable')
     .description(getMessage('cli.autonomous.enable.desc', getLanguage(undefined)))
-    .option('--root <path>', 'Project root override')
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--root <path>', getMessage('cli.governance.opt.root', getLanguage(undefined)))
+    .option('--lang <code>', getMessage('cli.governance.opt.lang', getLanguage(undefined)))
     .action((opts: AutonomousEnableOptions) => {
       try {
         handleEnable(opts);
@@ -1770,10 +1771,10 @@ export function registerAutonomous(program: Command): void {
   cmd
     .command('start')
     .description(getMessage('cli.autonomous.start.desc', getLanguage(undefined)))
-    .option('--interval-ms <ms>', 'Idle-tick sleep in ms', '1000')
-    .option('--max-iterations <n>', 'Stop after N cycles (default: run until aborted)')
-    .option('--root <path>', 'Project root override')
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--interval-ms <ms>', getMessage('cli.governance.autonomous.opt.interval_ms', getLanguage(undefined)), '1000')
+    .option('--max-iterations <n>', getMessage('cli.governance.autonomous.opt.max_iterations', getLanguage(undefined)))
+    .option('--root <path>', getMessage('cli.governance.opt.root', getLanguage(undefined)))
+    .option('--lang <code>', getMessage('cli.governance.opt.lang', getLanguage(undefined)))
     .action(async (opts: AutonomousStartOptions) => {
       try {
         await handleStart(opts);
@@ -1783,17 +1784,20 @@ export function registerAutonomous(program: Command): void {
       }
     });
 
-  cmd
-    .command('plan <goal>')
+  bindGovernanceArgumentDescriptions(
+    cmd.command('plan <goal>'),
+    getLanguage(undefined),
+    { goal: 'cli.governance.autonomous.arg.goal' },
+  )
     .description(getMessage('cli.autonomous.plan.desc', getLanguage(undefined)))
-    .option('--from <ref>', 'Artifact reference: file or file#section (seed open checklist items)')
-    .option('--policy <policy>', 'Default per-item policy', 'auto')
-    .option('--max-items <n>', 'Max items (default 30)')
+    .option('--from <ref>', getMessage('cli.governance.autonomous.opt.from', getLanguage(undefined)))
+    .option('--policy <policy>', getMessage('cli.governance.autonomous.opt.policy', getLanguage(undefined)), 'auto')
+    .option('--max-items <n>', getMessage('cli.governance.autonomous.opt.max_items', getLanguage(undefined)))
     .option('--model <model>', getMessage('run.opt_model', getLanguage(undefined)))
     .option('--provider <name>', getMessage('run.opt_provider', getLanguage(undefined), { providers: ALL_PROVIDER_NAMES.join('|') }))
-    .option('--dry-run', 'Generate + print but do not write')
-    .option('--root <path>', 'Project root override')
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--dry-run', getMessage('cli.governance.autonomous.opt.dry_run', getLanguage(undefined)))
+    .option('--root <path>', getMessage('cli.governance.opt.root', getLanguage(undefined)))
+    .option('--lang <code>', getMessage('cli.governance.opt.lang', getLanguage(undefined)))
     .action(async (goal: string, o: { from?: string; policy?: string; maxItems?: string; model?: string; provider?: string; dryRun?: boolean; root?: string; lang?: string }) => {
       try {
         const root = o.root ?? resolveProjectRoot();
@@ -1815,8 +1819,8 @@ export function registerAutonomous(program: Command): void {
   cmd
     .command('status')
     .description(getMessage('cli.autonomous.status.desc', getLanguage(undefined)))
-    .option('--root <path>', 'Project root override')
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--root <path>', getMessage('cli.governance.opt.root', getLanguage(undefined)))
+    .option('--lang <code>', getMessage('cli.governance.opt.lang', getLanguage(undefined)))
     .action((opts: AutonomousStatusOptions) => {
       try {
         handleStatus(opts);
@@ -1829,8 +1833,8 @@ export function registerAutonomous(program: Command): void {
   cmd
     .command('stop')
     .description(getMessage('cli.autonomous.stop.desc', getLanguage(undefined)))
-    .option('--root <path>', 'Project root override')
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--root <path>', getMessage('cli.governance.opt.root', getLanguage(undefined)))
+    .option('--lang <code>', getMessage('cli.governance.opt.lang', getLanguage(undefined)))
     .action((opts: AutonomousStopOptions) => {
       try {
         handleStop(opts);
@@ -1843,8 +1847,8 @@ export function registerAutonomous(program: Command): void {
   cmd
     .command('cleanup')
     .description(getMessage('cli.autonomous.cleanup.desc', getLanguage(undefined)))
-    .option('--root <path>', 'Project root override')
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--root <path>', getMessage('cli.governance.opt.root', getLanguage(undefined)))
+    .option('--lang <code>', getMessage('cli.governance.opt.lang', getLanguage(undefined)))
     .action((opts: AutonomousCleanupOptions) => {
       try {
         handleCleanup(opts);
@@ -1857,8 +1861,8 @@ export function registerAutonomous(program: Command): void {
   cmd
     .command('pending')
     .description(getMessage('cli.autonomous.pending.desc', getLanguage(undefined)))
-    .option('--root <path>', 'Project root override')
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--root <path>', getMessage('cli.governance.opt.root', getLanguage(undefined)))
+    .option('--lang <code>', getMessage('cli.governance.opt.lang', getLanguage(undefined)))
     .action(async (opts: AutonomousPendingOptions) => {
       try {
         await handlePending(opts);
@@ -1868,12 +1872,15 @@ export function registerAutonomous(program: Command): void {
       }
     });
 
-  cmd
-    .command('approve <triggerId>')
+  bindGovernanceArgumentDescriptions(
+    cmd.command('approve <triggerId>'),
+    getLanguage(undefined),
+    { triggerId: 'cli.governance.autonomous.arg.trigger_id' },
+  )
     .description(getMessage('cli.autonomous.approve.desc', getLanguage(undefined)))
-    .option('--reason <text>', 'Optional reason recorded with the decision')
-    .option('--root <path>', 'Project root override')
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--reason <text>', getMessage('cli.governance.autonomous.opt.decision_reason', getLanguage(undefined)))
+    .option('--root <path>', getMessage('cli.governance.opt.root', getLanguage(undefined)))
+    .option('--lang <code>', getMessage('cli.governance.opt.lang', getLanguage(undefined)))
     .action(async (triggerId: string, opts: Omit<AutonomousResolveOptions, 'triggerId'>) => {
       try {
         await handleApprove({ triggerId, ...opts });
@@ -1883,12 +1890,15 @@ export function registerAutonomous(program: Command): void {
       }
     });
 
-  cmd
-    .command('reject <triggerId>')
+  bindGovernanceArgumentDescriptions(
+    cmd.command('reject <triggerId>'),
+    getLanguage(undefined),
+    { triggerId: 'cli.governance.autonomous.arg.trigger_id' },
+  )
     .description(getMessage('cli.autonomous.reject.desc', getLanguage(undefined)))
-    .option('--reason <text>', 'Optional reason recorded with the decision')
-    .option('--root <path>', 'Project root override')
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--reason <text>', getMessage('cli.governance.autonomous.opt.decision_reason', getLanguage(undefined)))
+    .option('--root <path>', getMessage('cli.governance.opt.root', getLanguage(undefined)))
+    .option('--lang <code>', getMessage('cli.governance.opt.lang', getLanguage(undefined)))
     .action(async (triggerId: string, opts: Omit<AutonomousResolveOptions, 'triggerId'>) => {
       try {
         await handleReject({ triggerId, ...opts });
@@ -1906,17 +1916,17 @@ export function registerAutonomous(program: Command): void {
   backlog
     .command('add')
     .description(getMessage('cli.autonomous.add.desc', getLanguage(undefined)))
-    .requiredOption('--id <id>', 'Unique entry id')
-    .requiredOption('--title <title>', 'Human-readable title')
-    .option('--kind <kind>', 'Entry kind: task (default), sprint, or capability', 'task')
-    .option('--description <text>', 'Task description or directives ref', '')
-    .option('--policy <policy>', 'Policy: auto (default), approval-required, or risk-tagged', 'auto')
-    .option('--cron <expr>', '5-field cron expression — entry recurs at this cadence (omit for one-off)')
-    .option('--capability <verb>', 'kind=capability: dotted verb to invoke (e.g. fs.read, db.query)')
-    .option('--args <json>', 'kind=capability: JSON object of handler args')
-    .option('--connector <id>', 'kind=capability: preferred backend/connector (e.g. odoo, imap)')
-    .option('--root <path>', 'Project root override')
-    .option('--lang <code>', 'Language override (en|tr)')
+    .requiredOption('--id <id>', getMessage('cli.governance.autonomous.opt.entry_id', getLanguage(undefined)))
+    .requiredOption('--title <title>', getMessage('cli.governance.autonomous.opt.entry_title', getLanguage(undefined)))
+    .option('--kind <kind>', getMessage('cli.governance.autonomous.opt.entry_kind', getLanguage(undefined)), 'task')
+    .option('--description <text>', getMessage('cli.governance.autonomous.opt.entry_description', getLanguage(undefined)), '')
+    .option('--policy <policy>', getMessage('cli.governance.autonomous.opt.entry_policy', getLanguage(undefined)), 'auto')
+    .option('--cron <expr>', getMessage('cli.governance.autonomous.opt.cron', getLanguage(undefined)))
+    .option('--capability <verb>', getMessage('cli.governance.autonomous.opt.capability', getLanguage(undefined)))
+    .option('--args <json>', getMessage('cli.governance.autonomous.opt.args', getLanguage(undefined)))
+    .option('--connector <id>', getMessage('cli.governance.autonomous.opt.connector', getLanguage(undefined)))
+    .option('--root <path>', getMessage('cli.governance.opt.root', getLanguage(undefined)))
+    .option('--lang <code>', getMessage('cli.governance.opt.lang', getLanguage(undefined)))
     .action((opts: {
       id: string; title: string; kind: string; description: string;
       policy: string; cron?: string; capability?: string; args?: string;
@@ -1946,8 +1956,8 @@ export function registerAutonomous(program: Command): void {
   backlog
     .command('list')
     .description(getMessage('cli.autonomous.list.desc', getLanguage(undefined)))
-    .option('--root <path>', 'Project root override')
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--root <path>', getMessage('cli.governance.opt.root', getLanguage(undefined)))
+    .option('--lang <code>', getMessage('cli.governance.opt.lang', getLanguage(undefined)))
     .action((opts: { root?: string; lang?: string }) => {
       try {
         const lang = getLanguage(opts.lang);
@@ -1969,12 +1979,15 @@ export function registerAutonomous(program: Command): void {
       }
     });
 
-  backlog
-    .command('remove [id]')
+  bindGovernanceArgumentDescriptions(
+    backlog.command('remove [id]'),
+    getLanguage(undefined),
+    { id: 'cli.governance.autonomous.arg.backlog_id' },
+  )
     .description(getMessage('cli.autonomous.remove.desc', getLanguage(undefined)))
-    .option('--id <id>', 'Entry id to remove (consistent with `backlog add --id`; alternative to the positional argument)')
-    .option('--root <path>', 'Project root override')
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--id <id>', getMessage('cli.governance.autonomous.opt.remove_id', getLanguage(undefined)))
+    .option('--root <path>', getMessage('cli.governance.opt.root', getLanguage(undefined)))
+    .option('--lang <code>', getMessage('cli.governance.opt.lang', getLanguage(undefined)))
     .action((positionalId: string | undefined, opts: { id?: string; root?: string; lang?: string }) => {
       try {
         const lang = getLanguage(opts.lang);

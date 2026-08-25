@@ -5,6 +5,7 @@ import { BRAIN_DIR, SPRINTS_DIR, DECKENT_DIR } from '../../core/constants.js';
 import { print, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage } from '../helpers/messages.js';
+import { memoryCatalogMessage } from '../helpers/message-catalog/cli-memory-catalog.js';
 import { detectLang } from '../helpers/i18n.js';
 import { collectSprintFiles } from '../../orchestra/sprint-reporter.js';
 
@@ -224,9 +225,9 @@ export function registerHistory(program: Command): void {
   program
     .command('history')
     .description(getMessage('history.desc', registerLang))
-    .option('--agent <name>', 'Filter by agent name')
-    .option('--skill <name>', 'Filter by skill name')
-    .option('--json', 'Output as JSON')
+    .option('--agent <name>', memoryCatalogMessage('cli.memcat.history.opt.agent', registerLang))
+    .option('--skill <name>', memoryCatalogMessage('cli.memcat.history.opt.skill', registerLang))
+    .option('--json', memoryCatalogMessage('cli.memcat.shared.opt.json', registerLang))
     .option('--last <n>', getMessage('history.opt_last', registerLang))
     .option('--trend', getMessage('history.opt_trend', registerLang))
     .action((opts: HistoryOpts) => {

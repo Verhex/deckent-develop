@@ -350,7 +350,7 @@ export function registerLimits(program: Command): void {
   program
     .command('limits')
     .description(getMessage('cli.limits.desc', getLanguage(undefined)))
-    .option('--json', 'Output as JSON')
+    .option('--json', getMessage('cli.governance.opt.json', getLanguage(undefined)))
     .action(async (opts: LimitsCommandOpts) => {
       await runLimitsCommand(opts);
     });

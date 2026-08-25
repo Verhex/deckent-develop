@@ -44,6 +44,7 @@ import { registerOpenRouterModelFromCache, readFreeModelCache } from '../../core
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
+import { bindGovernanceArgumentDescriptions } from '../helpers/message-catalog/cli-governance.js';
 import type { VerifierDispatchRejection } from '../../core/cross-verify-prompt.js';
 import type { TaskResultSettlementRefV1 } from '../../core/task-result-settlement.js';
 import { crossVerifyVerdictReceiptRef } from '../../core/cross-verify-evidence-broker.js';
@@ -1075,8 +1076,11 @@ export async function runXverifyCommand(
 // ─── Registration ───────────────────────────────────────────────────────
 
 export function registerXverifyCommand(program: Command, deps: XverifyDeps = {}): void {
-  program
-    .command('xverify <claim>')
+  bindGovernanceArgumentDescriptions(
+    program.command('xverify <claim>'),
+    getLanguage(undefined),
+    { claim: 'cli.governance.xverify.arg.claim' },
+  )
     .description(getMessage('xverify.cmd_desc', getLanguage(undefined)))
     .option('--author <provider>', getMessage('xverify.opt_author', getLanguage(undefined), { providers: ALL_PROVIDER_NAMES.join('|') }))
     .option('--author-model <apiId>', getMessage('xverify.opt_author_model', getLanguage(undefined)))

@@ -66,6 +66,7 @@ import {
 import { openTaskSettlementProjection } from '../../core/task-settlement-authority.js';
 import { resolveTenant } from '../../core/tenant-context.js';
 import { finalizeTaskStatusFromSettlement } from '../../orchestra/task-settlement-projection.js';
+import { cliContractMessage, bindArgumentDescriptions } from '../helpers/message-catalog/cli-run.js';
 
 export { finalizeTaskStatusFromSettlement } from '../../orchestra/task-settlement-projection.js';
 
@@ -680,15 +681,15 @@ export function finalizeTaskStatusFromResult(root: string, taskId: string): Task
 }
 
 export function registerSpawn(program: Command): void {
-  program
-    .command('spawn <taskId>')
+  const helpLang = getLanguage(undefined);
+  bindArgumentDescriptions(program.command('spawn <taskId>'), helpLang, { taskId: 'cliContract.spawn.arg.taskId' })
     // NOTE: with the docker backend this command BLOCKS until the worker
     // container exits — DockerSpawnBackend.monitorContainer keeps a `docker wait`
     // child alive, so the CLI process only returns once the worker is finished.
     // tmux/subprocess spawns remain fire-and-forget.
-    .description(getMessage('cli.spawn.desc', getLanguage(undefined)))
-    .option('--force', 'Force respawn even if task is DONE or NO_GO')
-    .option('--auto-approve', 'Enable auto-approve mode for the worker')
+    .description(getMessage('cli.spawn.desc', helpLang))
+    .option('--force', cliContractMessage('cliContract.spawn.opt.force', helpLang))
+    .option('--auto-approve', cliContractMessage('cliContract.spawn.opt.auto_approve', helpLang))
     .action(async (taskId: string, opts: { force?: boolean; autoApprove?: boolean }) => {
       const root = resolveProjectRoot();
       let lang = getLanguage(undefined);

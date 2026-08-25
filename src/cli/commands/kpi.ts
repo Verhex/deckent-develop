@@ -23,6 +23,7 @@ import Database from 'better-sqlite3';
 import type { Command } from 'commander';
 import { print, formatTable } from '../helpers/output.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
+import { memoryCatalogMessage } from '../helpers/message-catalog/cli-memory-catalog.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { loadConfig } from '../../core/config.js';
 import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
@@ -326,10 +327,10 @@ export function registerKpi(program: Command): void {
   program
     .command('kpi')
     .description(getMessage('cli.kpi.desc', getLanguage(undefined)))
-    .option('--sprint <id>', 'Sprint id to score (defaults to the current sprint)')
-    .option('--trend <kpiId>', 'Show trend series for a specific KPI')
-    .option('-n, --n <count>', 'Number of sprints to include in the trend (default 10)')
-    .option('--json', 'Output raw JSON')
+    .option('--sprint <id>', memoryCatalogMessage('cli.memcat.kpi.opt.sprint', getLanguage(undefined)))
+    .option('--trend <kpiId>', memoryCatalogMessage('cli.memcat.kpi.opt.trend', getLanguage(undefined)))
+    .option('-n, --n <count>', memoryCatalogMessage('cli.memcat.kpi.opt.n', getLanguage(undefined)))
+    .option('--json', memoryCatalogMessage('cli.memcat.shared.opt.json_raw', getLanguage(undefined)))
     .action(async (opts) => {
       await runKpiCommand(opts);
     });

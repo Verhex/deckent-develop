@@ -19,6 +19,15 @@
 // matches (the character right after `(`/`:` is not a quote) — no separate
 // getMessage-skip needed for correctness on this scan.
 //
+// Third scan (CLI-CONTRACT-001): the REST of the commander help surface —
+// `.option(`/`.requiredOption(` flag help, `.argument(` positional help,
+// `.helpOption(` and `.addHelpText(` — in src/cli/commands/*.ts +
+// src/cli/index.ts. These carry hundreds of pre-existing English literals, so
+// they are a RATCHET rather than an immediate hard gate: the observed hit
+// count must never exceed SURFACE_RATCHET_BASELINE (a new hardcoded flag
+// description therefore fails the gate), and `--surface-gate` turns the whole
+// surface into a hard gate for the closure family tasks that migrate it.
+//
 // Exits 1 when a hit is found. Wired into `npm run lint` via lint:gates
 // (W7 terfi, 2026-07-07 — enforces the i18n-FIRST quality bar in CLAUDE.md;
 // desktop-glob added born-601/394-003; description scan added 559-005).
@@ -95,6 +104,37 @@ const DESCRIPTION_CALL_TEMPLATE_RE = /\.description\(\s*`([^`]*)`/g;
 const DESCRIPTION_PROP_SINGLE_RE = /\bdescription\s*:\s*'([^'\\]*(?:\\.[^'\\]*)*)'/g;
 const DESCRIPTION_PROP_DOUBLE_RE = /\bdescription\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/g;
 const DESCRIPTION_PROP_TEMPLATE_RE = /\bdescription\s*:\s*`([^`]*)`/g;
+
+// ── commander help-surface patterns (CLI-CONTRACT-001) ──────────────────────
+// The description argument of the remaining commander help surfaces. Each
+// regex skips the FIRST argument (the flags/name/position token — always a
+// technical literal) and captures the SECOND argument only when it is itself
+// a quoted literal, so `.option('--json', getMessage(k, lang))` structurally
+// never matches.
+const FIRST_ARG = "(?:'[^'\\\\]*(?:\\\\.[^'\\\\]*)*'|\"[^\"\\\\]*(?:\\\\.[^\"\\\\]*)*\")";
+
+/**
+ * Build the three quote-flavored regexes that capture the second argument of
+ * `.<call>(<first-arg>, <literal>)`.
+ * @param {string} call  method name alternation, e.g. 'option|requiredOption'
+ * @returns {Array<[RegExp, string]>} [regex, label] pairs
+ */
+function surfaceSecondArgPatterns(call) {
+  const head = `\\.(?:${call})\\(\\s*${FIRST_ARG}\\s*,\\s*`;
+  return [
+    [new RegExp(head + "'([^'\\\\]*(?:\\\\.[^'\\\\]*)*)'", 'g'), 'single-quote'],
+    [new RegExp(head + '"([^"\\\\]*(?:\\\\.[^"\\\\]*)*)"', 'g'), 'double-quote'],
+    [new RegExp(head + '`([^`]*)`', 'g'), 'template'],
+  ];
+}
+
+/** label -> regexes, for the four commander help surfaces this scan covers. */
+const SURFACE_PATTERNS = [
+  ['option', surfaceSecondArgPatterns('option|requiredOption')],
+  ['argument', surfaceSecondArgPatterns('argument')],
+  ['help-option', surfaceSecondArgPatterns('helpOption')],
+  ['add-help-text', surfaceSecondArgPatterns('addHelpText')],
+];
 
 // ── MESSAGES catalog stale-ADR ratchet patterns (563-003) ───────────────────
 // `en: '...'` / `tr: '...'` catalog-value literals in
@@ -227,6 +267,36 @@ const descriptionCallScanTargets = [...cliFiles, cliIndexFile, ...mcpToolsFiles]
 // surface, so that is the only target for this pattern.
 const descriptionPropScanTargets = [...mcpToolsFiles];
 
+// ── commander help-surface scan targets + ratchet knobs ─────────────────────
+// Same target list as the .description() scan MINUS the MCP tool modules
+// (commander flags/arguments exist only on the CLI side).
+const surfaceScanTargets = [...cliFiles, cliIndexFile];
+
+/**
+ * Ratchet baseline: the number of commander help-surface literals present
+ * when this scan was introduced (CLI-CONTRACT-001). It is a CEILING — the
+ * count may only go down. Lower it whenever a closure family task migrates a
+ * batch onto getMessage(); never raise it.
+ */
+const SURFACE_RATCHET_BASELINE = 370;
+
+const argv = process.argv.slice(2);
+/** `--surface-gate`: treat every help-surface literal as a hard failure. */
+const surfaceGate = argv.includes('--surface-gate');
+/** `--surface-baseline <n>` / `--surface-baseline=<n>`: override the ceiling. */
+function readBaselineOverride() {
+  const inline = argv.find((a) => a.startsWith('--surface-baseline='));
+  if (inline) return Number.parseInt(inline.slice('--surface-baseline='.length), 10);
+  const idx = argv.indexOf('--surface-baseline');
+  if (idx !== -1 && argv[idx + 1] !== undefined) return Number.parseInt(argv[idx + 1], 10);
+  return undefined;
+}
+const baselineOverride = readBaselineOverride();
+const surfaceBaseline =
+  baselineOverride !== undefined && Number.isFinite(baselineOverride)
+    ? baselineOverride
+    : SURFACE_RATCHET_BASELINE;
+
 // ── Scan ──────────────────────────────────────────────────────────────────────
 
 /** @type {Array<{file: string, line: number, call: string, text: string}>} */
@@ -285,6 +355,30 @@ for (const { filePath, relPath } of descriptionPropScanTargets) {
   scanContentForHits(content, relPath, DESCRIPTION_PROP_SINGLE_RE, 'description-prop-single-quote');
   scanContentForHits(content, relPath, DESCRIPTION_PROP_DOUBLE_RE, 'description-prop-double-quote');
   scanContentForHits(content, relPath, DESCRIPTION_PROP_TEMPLATE_RE, 'description-prop-template');
+}
+
+// ── commander help-surface scan (CLI-CONTRACT-001) ──────────────────────────
+// Collected SEPARATELY from `hits`: this surface is a ratchet by default (see
+// SURFACE_RATCHET_BASELINE), and only merges into the hard gate under
+// `--surface-gate`.
+
+/** @type {Array<{file: string, line: number, call: string, text: string}>} */
+const surfaceHits = [];
+
+{
+  const collected = [];
+  const sink = hits.splice(0, hits.length); // park the real gate hits
+  for (const { filePath, relPath } of surfaceScanTargets) {
+    const content = readFileSync(filePath, 'utf8');
+    for (const [surface, patterns] of SURFACE_PATTERNS) {
+      for (const [re, flavor] of patterns) {
+        scanContentForHits(content, relPath, re, `${surface}-${flavor}`);
+      }
+    }
+  }
+  collected.push(...hits.splice(0, hits.length));
+  hits.push(...sink);
+  surfaceHits.push(...collected);
 }
 
 // ── MESSAGES catalog stale-ADR ratchet scan (563-003) ───────────────────────
@@ -416,6 +510,15 @@ ALLOWLIST.push(
 
 const allowed = (hit) =>
   ALLOWLIST.some((a) => a.file === hit.file && hit.text.includes(a.contains));
+const gatedSurfaceHits = surfaceHits.filter((h) => !allowed(h));
+surfaceHits.length = 0;
+surfaceHits.push(...gatedSurfaceHits);
+surfaceHits.sort((a, b) => (a.file !== b.file ? a.file.localeCompare(b.file) : a.line - b.line));
+// `--surface-gate` promotes the whole help surface into the hard gate.
+if (surfaceGate) hits.push(...surfaceHits);
+
+const surfaceRatchetBroken = !surfaceGate && surfaceHits.length > surfaceBaseline;
+
 const suppressed = hits.filter(allowed).length;
 const gated = hits.filter((h) => !allowed(h));
 hits.length = 0;
@@ -440,6 +543,7 @@ console.log('');
 console.log(`  Files scanned  : ${scanTargets.length}  (${cliFiles.length} src/cli/commands + ${desktopFiles.length} src/desktop/src/main)`);
 console.log(`  Description scan: ${descriptionCallScanTargets.length} .description() targets (${cliFiles.length} src/cli/commands + 1 src/cli/index.ts + ${mcpToolsFiles.length} src/mcp/tools), ${descriptionPropScanTargets.length} description: targets (src/mcp/tools)`);
 console.log(`  Hits (gated)   : ${hits.length}${suppressed ? `  (+${suppressed} allowlisted)` : ''}`);
+console.log(`  Surface scan   : ${surfaceScanTargets.length} .option/.argument/.helpOption/.addHelpText targets — ${surfaceHits.length} literal(s), ratchet ceiling ${surfaceBaseline}${surfaceGate ? ' (HARD GATE: --surface-gate)' : ''}`);
 console.log('');
 console.log(line);
 
@@ -460,16 +564,37 @@ if (hits.length === 0) {
   }
 }
 
+// ── commander help-surface report ───────────────────────────────────────────
+if (surfaceHits.length > 0 && !surfaceGate) {
+  console.log('');
+  console.log(line);
+  console.log(`  Commander help-surface literals (ratchet, ceiling ${surfaceBaseline}) — ${surfaceHits.length} item(s):\n`);
+  const SHOWN = 20;
+  for (const hit of surfaceHits.slice(0, SHOWN)) {
+    console.log(`    ${hit.file}:${hit.line}  [${hit.call}]  "${hit.text}"`);
+  }
+  if (surfaceHits.length > SHOWN) {
+    console.log(`    ... +${surfaceHits.length - SHOWN} more (run with --surface-gate to fail on all of them)`);
+  }
+}
+
 console.log('');
 console.log(line);
+if (surfaceRatchetBroken) {
+  console.log(`  ✗ GATE FAIL — commander help-surface ratchet broken: ${surfaceHits.length} literal(s) > ceiling ${surfaceBaseline}.`);
+  console.log('    Route the new .option()/.argument()/.helpOption()/.addHelpText()');
+  console.log('    text through getMessage(key, lang) (src/cli/helpers/messages.ts).');
+}
 if (hits.length > 0) {
   console.log('  ✗ GATE FAIL — route the string(s) through getMessage(key, lang)');
   console.log('    (src/cli/helpers/messages.ts, en+tr). Heuristic false positive?');
   console.log('    Add an ALLOWLIST entry in this script with a reason.');
-} else {
+} else if (!surfaceRatchetBroken) {
   console.log('  ✓ i18n gate clean.');
 }
 console.log(line);
 console.log('');
 
-process.exit(hits.length > 0 ? 1 : 0);
+// Assigning exitCode lets piped stdout/stderr drain. `process.exit(...)` can
+// truncate the short reports produced by hermetic fixtures and CI wrappers.
+process.exitCode = hits.length > 0 || surfaceRatchetBroken ? 1 : 0;

@@ -14,6 +14,7 @@ import {
 import { print, printError, formatSprintSummary } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
+import { cliContractMessage, renderContractHelp } from '../helpers/message-catalog/cli-run.js';
 
 export type TestReporter = 'default' | 'junit' | 'tap';
 
@@ -85,16 +86,18 @@ export function formatTAP(tasks: Array<{ title: string; status: string }>): stri
 }
 
 export function registerTestRun(program: Command): void {
+  const helpLang = getLanguage(undefined);
   program
     .command('test')
-    .description(getMessage('cli.test_run.test.desc', getLanguage(undefined)))
-    .option('--keep', 'Skip cleanup — leave task files in place')
-    .option('--timeout <ms>', 'Maximum sprint duration in milliseconds', String(DEFAULT_TIMEOUT_MS))
-    .option('--directives <file>', 'Path to a custom directives file (overrides DIRECTIVES.md)')
-    .option('--sandbox', 'Stash working tree changes before running, restore after (git stash)')
-    .option('--model <model>', 'Force all tasks to use a specific model')
-    .option('--reporter <format>', 'Output format: default, junit, tap', 'default')
-    .option('--min-coverage <percent>', 'Fail if coverage falls below this percentage (0-100)')
+    .description(getMessage('cli.test_run.test.desc', helpLang))
+    .addHelpText('after', renderContractHelp('test', helpLang))
+    .option('--keep', cliContractMessage('cliContract.test.opt.keep', helpLang))
+    .option('--timeout <ms>', cliContractMessage('cliContract.test.opt.timeout', helpLang), String(DEFAULT_TIMEOUT_MS))
+    .option('--directives <file>', cliContractMessage('cliContract.test.opt.directives', helpLang))
+    .option('--sandbox', cliContractMessage('cliContract.test.opt.sandbox', helpLang))
+    .option('--model <model>', cliContractMessage('cliContract.test.opt.model', helpLang))
+    .option('--reporter <format>', cliContractMessage('cliContract.test.opt.reporter', helpLang), 'default')
+    .option('--min-coverage <percent>', cliContractMessage('cliContract.test.opt.min_coverage', helpLang))
     .action(async (opts: TestCommandOpts) => {
       const root = resolveProjectRoot();
       const reporter = (opts.reporter ?? 'default') as TestReporter;

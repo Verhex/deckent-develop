@@ -17,6 +17,7 @@ import { DeckentError } from '../../core/errors.js';
 import type { SprintTerminalReceiptV1 } from '../../core/sprint-terminal-publication.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
 import { getMessage } from '../helpers/messages.js';
+import { memoryCatalogMessage } from '../helpers/message-catalog/cli-memory-catalog.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 
@@ -254,6 +255,9 @@ export function registerArchive(program: Command): void {
   const archive = program
     .command('archive')
     .description(getMessage('archive.description', getLangFromConfig(resolveProjectRoot())));
+
+  // Read vs mutation is a PATH-level fact here — state it on the parent path.
+  archive.addHelpText('after', memoryCatalogMessage('cli.memcat.archive.help.paths', getLangFromConfig(resolveProjectRoot())));
 
   archive
     .command('inspect')

@@ -7,17 +7,20 @@ import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
+import { memoryCatalogMessage } from '../helpers/message-catalog/cli-memory-catalog.js';
 import { detectLang } from '../helpers/i18n.js';
 
 export function registerRecall(program: Command): void {
   program
-    .command('recall <query>')
+    .command('recall')
+    .argument('<query>', memoryCatalogMessage('cli.memcat.recall.arg.query', getLanguage(undefined)))
     .description(getMessage('cli.recall.desc', getLanguage(undefined)))
-    .option('-t, --type <types>', 'Filter by type (comma-separated: adr,memory,sprint,debt,pattern)', '')
-    .option('-n, --limit <n>', 'Max results', '5')
-    .option('--sprint-min <n>', 'Minimum sprint number')
-    .option('-m, --mode <mode>', 'FTS5 token join mode: or (default, broader) | and (all tokens must match)', 'or')
-    .option('--json', 'Output results as JSON')
+    .option('-t, --type <types>', memoryCatalogMessage('cli.memcat.recall.opt.type', getLanguage(undefined)), '')
+    .option('-n, --limit <n>', memoryCatalogMessage('cli.memcat.recall.opt.limit', getLanguage(undefined)), '5')
+    .option('--sprint-min <n>', memoryCatalogMessage('cli.memcat.recall.opt.sprint_min', getLanguage(undefined)))
+    .option('-m, --mode <mode>', memoryCatalogMessage('cli.memcat.recall.opt.mode', getLanguage(undefined)), 'or')
+    .option('--json', memoryCatalogMessage('cli.memcat.shared.opt.json', getLanguage(undefined)))
+    .addHelpText('after', memoryCatalogMessage('cli.memcat.recall.help.paths', getLanguage(undefined)))
     .action((query: string, opts) => {
       const root = resolveProjectRoot();
       const lang = detectLang(root);

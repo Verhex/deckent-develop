@@ -27,6 +27,15 @@ import {
   type CommandSurface,
 } from '../../src/cli/command-registry.js';
 import { buildSlashRegistry } from '../../src/cli/commands/chat-slash-registry.js';
+import {
+  CLI_COMMAND_CONTRACTS,
+  EFFECT_TO_RISK,
+  contractPathKey,
+  getContract,
+  registryContracts,
+  type CliCommandContract,
+} from '../../src/core/cli-command-contract.js';
+import { projectRegistryEntry } from '../../src/core/command-registry.js';
 
 const VALID_CATEGORIES: readonly CommandCategory[] = ['Core', 'Run', 'Memory', 'MCP', 'Enterprise', 'Danger'];
 const VALID_RISKS: readonly CommandRisk[] = ['Oku', 'Değiştir', 'Çalıştır', 'Otonom'];
@@ -213,5 +222,93 @@ describe('Query API', () => {
 
   it('search returns empty array for blank query', () => {
     expect(search('   ')).toEqual([]);
+  });
+});
+
+// ─── CLI-CONTRACT-001 — registry is a PROJECTION of the path-level SSOT ─────
+//
+// COMMAND_REGISTRY is no longer hand-maintained: every row is projected from
+// a CLI_COMMAND_CONTRACTS row that carries a `registry` block. These tests
+// pin the projection rules field-by-field, so a future edit cannot smuggle a
+// registry row in without its path-level contract row (which is itself
+// verified against the live Commander tree by the surface-truth battery).
+
+describe('COMMAND_REGISTRY — projection of CLI_COMMAND_CONTRACTS (CLI-CONTRACT-001)', () => {
+  it('has exactly one entry per contract row carrying a registry block', () => {
+    const rows = registryContracts();
+    expect(rows.length).toBeGreaterThan(0);
+    expect(COMMAND_REGISTRY.length).toBe(rows.length);
+    expect(COMMAND_REGISTRY.map((e) => e.name)).toEqual(rows.map((r) => contractPathKey(r.path)));
+  });
+
+  it('every registry entry resolves back to its contract row', () => {
+    const orphans = COMMAND_REGISTRY.filter((e) => getContract(e.name)?.registry === undefined);
+    expect(orphans.map((e) => e.name)).toEqual([]);
+  });
+
+  it('risk is derived from path effect unless the top-level family declares an aggregate override', () => {
+    const mismatched: string[] = [];
+    for (const entry of COMMAND_REGISTRY) {
+      const contract = getContract(entry.name);
+      if (!contract) continue;
+      const expected = contract.registry?.familyRisk ?? EFFECT_TO_RISK[contract.effect];
+      if (entry.risk !== expected) mismatched.push(entry.name);
+    }
+    expect(mismatched).toEqual([]);
+  });
+
+  it('aggregate risk overrides preserve mutating family discovery without mislabeling bare group paths', () => {
+    const groupsWithMutation = registryContracts().filter((contract) =>
+      contract.effect === 'group' && contract.registry?.familyRisk !== undefined);
+    expect(groupsWithMutation.length).toBeGreaterThan(20);
+    for (const contract of groupsWithMutation) {
+      expect(contract.defaultExecution).toBe('read');
+      expect(contract.authority).toBe('open');
+      expect(projectRegistryEntry(contract).risk).toBe(contract.registry!.familyRisk);
+    }
+  });
+
+  it('category / scope / mcpNames / surfaces / catalogDependent come from the contract row verbatim', () => {
+    const drift: string[] = [];
+    for (const entry of COMMAND_REGISTRY) {
+      const contract = getContract(entry.name);
+      if (!contract?.registry) continue;
+      const sameMcp =
+        JSON.stringify(entry.mcpNames ?? null) === JSON.stringify(contract.registry.mcpNames ?? null);
+      const sameSurfaces = JSON.stringify([...entry.surfaces]) === JSON.stringify([...contract.surfaces]);
+      const sameCatalog = (entry.catalogDependent === true) === (contract.catalogDependent === true);
+      if (
+        entry.category !== contract.registry.category ||
+        entry.scope !== contract.registry.scope ||
+        !sameMcp ||
+        !sameSurfaces ||
+        !sameCatalog
+      ) {
+        drift.push(entry.name);
+      }
+    }
+    expect(drift).toEqual([]);
+  });
+
+  it('summaryKey is derived as cmdCatalog.<name>.summary for every projected row', () => {
+    for (const entry of COMMAND_REGISTRY) {
+      expect(entry.summaryKey).toBe(`cmdCatalog.${entry.name}.summary`);
+    }
+  });
+
+  it('projectRegistryEntry refuses a contract row without a registry block', () => {
+    const pathOnlyRow = CLI_COMMAND_CONTRACTS.find((c) => c.registry === undefined);
+    expect(pathOnlyRow, 'contract must contain at least one non-projected sub-path row').toBeDefined();
+    expect(() => projectRegistryEntry(pathOnlyRow as CliCommandContract)).toThrow(/no registry projection/);
+  });
+
+  it('catalog-dependent commands are exactly the contract rows flagged catalogDependent', () => {
+    const fromRegistry = COMMAND_REGISTRY.filter((e) => e.catalogDependent === true).map((e) => e.name).sort();
+    const fromContract = registryContracts()
+      .filter((c) => c.catalogDependent)
+      .map((c) => contractPathKey(c.path))
+      .sort();
+    expect(fromRegistry).toEqual(fromContract);
+    expect(fromRegistry.length).toBeGreaterThan(0);
   });
 });

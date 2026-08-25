@@ -14,6 +14,7 @@ import { ErrorRegistry } from '../../core/errors.js';
 import { readCatalogStats } from '../../core/catalog-stats-read-model.js';
 import { analyzeNewSkill, persistSkillActivation } from '../../orchestra/ecosystem-intelligence.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
+import { memoryCatalogMessage } from '../helpers/message-catalog/cli-memory-catalog.js';
 // Note: `skill publish` is registered by registerSkillMarketplace() below —
 // the unified pipeline (sandbox + Ed25519 sign + registry upload) lives there.
 
@@ -246,8 +247,8 @@ export function registerSkill(program: Command): void {
   skillCmd
     .command('list')
     .description(getMessage('cli.skill.list.desc', getLanguage(undefined)))
-    .option('--json', 'Output as JSON')
-    .option('--category <cat>', 'Filter by category')
+    .option('--json', memoryCatalogMessage('cli.memcat.shared.opt.json', getLanguage(undefined)))
+    .option('--category <cat>', memoryCatalogMessage('cli.memcat.skill.opt.category', getLanguage(undefined)))
     .action(async (opts: { json?: boolean; category?: string }) => {
       try {
         const root = resolveProjectRoot();
@@ -307,7 +308,8 @@ export function registerSkill(program: Command): void {
 
   // ─── skill create ───────────────────────────────────────────────
   skillCmd
-    .command('create <name>')
+    .command('create')
+    .argument('<name>', memoryCatalogMessage('cli.memcat.skill.arg.new_name', getLanguage(undefined)))
     .description(getMessage('cli.skill.create.desc', getLanguage(undefined)))
     .action(async (name: string) => {
       try {
@@ -351,9 +353,10 @@ export function registerSkill(program: Command): void {
 
   // ─── skill install ──────────────────────────────────────────────
   skillCmd
-    .command('install <source>')
+    .command('install')
+    .argument('<source>', memoryCatalogMessage('cli.memcat.skill.arg.source', getLanguage(undefined)))
     .description(getMessage('cli.skill.install.desc', getLanguage(undefined)))
-    .option('--force', 'Overwrite existing')
+    .option('--force', memoryCatalogMessage('cli.memcat.skill.opt.force', getLanguage(undefined)))
     .action(async (source: string, opts: { force?: boolean }) => {
       try {
         const root = resolveProjectRoot();
@@ -521,7 +524,8 @@ export function registerSkill(program: Command): void {
 
   // ─── skill update ──────────────────────────────────────────────
   skillCmd
-    .command('update <name>')
+    .command('update')
+    .argument('<name>', memoryCatalogMessage('cli.memcat.skill.arg.name', getLanguage(undefined)))
     .description(getMessage('cli.skill.update.desc', getLanguage(undefined)))
     .action(async (name: string) => {
       try {
@@ -594,7 +598,8 @@ export function registerSkill(program: Command): void {
 
   // ─── skill enable ──────────────────────────────────────────────
   skillCmd
-    .command('enable <name>')
+    .command('enable')
+    .argument('<name>', memoryCatalogMessage('cli.memcat.skill.arg.name', getLanguage(undefined)))
     .description(getMessage('cli.skill.enable.desc', getLanguage(undefined)))
     .action(async (name: string) => {
       try {
@@ -616,7 +621,8 @@ export function registerSkill(program: Command): void {
 
   // ─── skill disable ─────────────────────────────────────────────
   skillCmd
-    .command('disable <name>')
+    .command('disable')
+    .argument('<name>', memoryCatalogMessage('cli.memcat.skill.arg.name', getLanguage(undefined)))
     .description(getMessage('cli.skill.disable.desc', getLanguage(undefined)))
     .action(async (name: string) => {
       try {
@@ -638,7 +644,8 @@ export function registerSkill(program: Command): void {
 
   // ─── skill delete ──────────────────────────────────────────────
   skillCmd
-    .command('delete <name>')
+    .command('delete')
+    .argument('<name>', memoryCatalogMessage('cli.memcat.skill.arg.name', getLanguage(undefined)))
     .description(getMessage('cli.skill.delete.desc', getLanguage(undefined)))
     .action(async (name: string) => {
       try {
@@ -657,9 +664,10 @@ export function registerSkill(program: Command): void {
 
   // ─── skill info ───────────────────────────────────────────────
   skillCmd
-    .command('info <name>')
+    .command('info')
+    .argument('<name>', memoryCatalogMessage('cli.memcat.skill.arg.name', getLanguage(undefined)))
     .description(getMessage('cli.skill.info.desc', getLanguage(undefined)))
-    .option('--stats', 'Show usage statistics')
+    .option('--stats', memoryCatalogMessage('cli.memcat.skill.opt.stats', getLanguage(undefined)))
     .action(async (name: string, opts: { stats?: boolean }) => {
       try {
         const root = resolveProjectRoot();

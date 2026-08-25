@@ -162,7 +162,7 @@ export function registerOpenRouterProbe(program: Command): void {
   program
     .command('openrouter-probe')
     .description(getMessage('cli.openrouter_probe.desc', getLanguage(undefined)))
-    .option('--json', 'Output as JSON')
+    .option('--json', getMessage('cli.governance.opt.json', getLanguage(undefined)))
     .action(async (opts: OpenRouterProbeCommandOpts) => {
       await runOpenRouterProbeCommand(opts);
     });

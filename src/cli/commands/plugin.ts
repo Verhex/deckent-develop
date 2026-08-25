@@ -6,6 +6,7 @@ import { loadPlugin, scanPlugins, createPlugin, installPlugin, removePlugin, lis
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
+import { memoryCatalogMessage } from '../helpers/message-catalog/cli-memory-catalog.js';
 
 export function registerPlugin(program: Command): void {
   const cmd = program
@@ -14,9 +15,10 @@ export function registerPlugin(program: Command): void {
 
   // ─── plugin install ─────────────────────────────────────────────
   cmd
-    .command('install <source>')
+    .command('install')
+    .argument('<source>', memoryCatalogMessage('cli.memcat.plugin.arg.source', getLanguage(undefined)))
     .description(getMessage('cli.plugin.install.desc', getLanguage(undefined)))
-    .option('--force', 'Overwrite existing plugin')
+    .option('--force', memoryCatalogMessage('cli.memcat.plugin.opt.force', getLanguage(undefined)))
     .action(async (source: string, _opts: { force?: boolean }) => {
       try {
         const root = resolveProjectRoot();
@@ -33,7 +35,8 @@ export function registerPlugin(program: Command): void {
 
   // ─── plugin remove ──────────────────────────────────────────────
   cmd
-    .command('remove <name>')
+    .command('remove')
+    .argument('<name>', memoryCatalogMessage('cli.memcat.plugin.arg.name', getLanguage(undefined)))
     .description(getMessage('cli.plugin.remove.desc', getLanguage(undefined)))
     .action(async (name: string) => {
       try {
@@ -54,7 +57,8 @@ export function registerPlugin(program: Command): void {
 
   // ─── plugin update ──────────────────────────────────────────────
   cmd
-    .command('update <source>')
+    .command('update')
+    .argument('<source>', memoryCatalogMessage('cli.memcat.plugin.arg.source', getLanguage(undefined)))
     .description(getMessage('cli.plugin.update.desc', getLanguage(undefined)))
     .action(async (source: string) => {
       try {
@@ -75,7 +79,7 @@ export function registerPlugin(program: Command): void {
   cmd
     .command('list')
     .description(getMessage('cli.plugin.list.desc', getLanguage(undefined)))
-    .option('--json', 'Output as JSON')
+    .option('--json', memoryCatalogMessage('cli.memcat.shared.opt.json', getLanguage(undefined)))
     .action((opts: { json?: boolean }) => {
       try {
         const root = resolveProjectRoot();
@@ -112,7 +116,8 @@ export function registerPlugin(program: Command): void {
 
   // ─── plugin info ────────────────────────────────────────────────
   cmd
-    .command('info <dir>')
+    .command('info')
+    .argument('<dir>', memoryCatalogMessage('cli.memcat.plugin.arg.dir', getLanguage(undefined)))
     .description(getMessage('cli.plugin.info.desc', getLanguage(undefined)))
     .action((dir: string) => {
       try {
@@ -140,7 +145,8 @@ export function registerPlugin(program: Command): void {
 
   // ─── plugin test ────────────────────────────────────────────────
   cmd
-    .command('test <name>')
+    .command('test')
+    .argument('<name>', memoryCatalogMessage('cli.memcat.plugin.arg.name', getLanguage(undefined)))
     .description(getMessage('cli.plugin.test.desc', getLanguage(undefined)))
     .action((name: string) => {
       try {
@@ -214,7 +220,8 @@ export function registerPlugin(program: Command): void {
 
   // ─── plugin create ──────────────────────────────────────────────
   cmd
-    .command('create <name>')
+    .command('create')
+    .argument('<name>', memoryCatalogMessage('cli.memcat.plugin.arg.new_name', getLanguage(undefined)))
     .description(getMessage('cli.plugin.create.desc', getLanguage(undefined)))
     .action(async (name: string) => {
       try {

@@ -17,6 +17,7 @@ import { resolveProjectRoot } from '../helpers/process.js';
 import { AgentPoolManager } from '../../core/agent-pool.js';
 import { SkillPoolManager } from '../../core/skill-pool.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
+import { memoryCatalogMessage } from '../helpers/message-catalog/cli-memory-catalog.js';
 
 // ─── Localized Help Content ─────────────────────────────────────────
 
@@ -182,7 +183,7 @@ export function registerHelp(program: Command): void {
     .command('help-info')
     .description(getMessage('cli.help.help_info.desc', getLanguage(undefined)))
     .alias('info')
-    .option('--lang <lang>', 'Language override: en or tr')
+    .option('--lang <lang>', memoryCatalogMessage('cli.memcat.help_info.opt.lang', getLanguage(undefined)))
     .action((opts: { lang?: string }) => {
       let root: string;
       try {

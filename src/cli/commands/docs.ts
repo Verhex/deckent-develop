@@ -13,6 +13,7 @@ import { loadDocTrackingConfig } from '../../core/doc-tracking/config.js';
 import { scanDocs } from '../../core/doc-tracking/scanner.js';
 import { DocTrackingStore } from '../../core/doc-tracking/store.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
+import { memoryCatalogMessage } from '../helpers/message-catalog/cli-memory-catalog.js';
 
 // ─── doc-tracking handlers (ADR-090; exported for testability) ─────────────
 export async function runDocsTrackScan(
@@ -69,12 +70,13 @@ export function registerDocs(program: Command): void {
 
   // ─── docs add ─────────────────────────────────────────────────────────
   docs
-    .command('add <path>')
+    .command('add')
+    .argument('<path>', memoryCatalogMessage('cli.memcat.docs.arg.path', getLanguage(undefined)))
     .description(getMessage('cli.docs.add.desc', getLanguage(undefined)))
-    .option('--auto <sections>', 'Comma-separated auto-update section headings')
-    .option('--protect <sections>', 'Comma-separated protected section headings')
-    .option('--skills <skills>', 'Comma-separated skill IDs')
-    .option('--max-lines <n>', 'Max lines for auto sections', parseInt)
+    .option('--auto <sections>', memoryCatalogMessage('cli.memcat.docs.opt.auto', getLanguage(undefined)))
+    .option('--protect <sections>', memoryCatalogMessage('cli.memcat.docs.opt.protect', getLanguage(undefined)))
+    .option('--skills <skills>', memoryCatalogMessage('cli.memcat.docs.opt.skills', getLanguage(undefined)))
+    .option('--max-lines <n>', memoryCatalogMessage('cli.memcat.docs.opt.max_lines', getLanguage(undefined)), parseInt)
     .action((filePath: string, opts: { auto?: string; protect?: string; skills?: string; maxLines?: number }) => {
       const root = resolveProjectRoot();
       const fullPath = join(root, filePath);
@@ -102,7 +104,8 @@ export function registerDocs(program: Command): void {
 
   // ─── docs remove ──────────────────────────────────────────────────────
   docs
-    .command('remove <pathOrId>')
+    .command('remove')
+    .argument('<pathOrId>', memoryCatalogMessage('cli.memcat.docs.arg.path_or_id', getLanguage(undefined)))
     .description(getMessage('cli.docs.remove.desc', getLanguage(undefined)))
     .action((pathOrId: string) => {
       const root = resolveProjectRoot();
@@ -142,12 +145,13 @@ export function registerDocs(program: Command): void {
 
   // ─── docs update ──────────────────────────────────────────────────────
   docs
-    .command('update <pathOrId>')
+    .command('update')
+    .argument('<pathOrId>', memoryCatalogMessage('cli.memcat.docs.arg.path_or_id', getLanguage(undefined)))
     .description(getMessage('cli.docs.update.desc', getLanguage(undefined)))
-    .option('--add-auto <sections>', 'Add auto-update sections (comma-separated)')
-    .option('--add-protect <sections>', 'Add protected sections (comma-separated)')
-    .option('--remove-auto <sections>', 'Remove auto sections (comma-separated)')
-    .option('--max-lines <n>', 'Set max lines', parseInt)
+    .option('--add-auto <sections>', memoryCatalogMessage('cli.memcat.docs.opt.add_auto', getLanguage(undefined)))
+    .option('--add-protect <sections>', memoryCatalogMessage('cli.memcat.docs.opt.add_protect', getLanguage(undefined)))
+    .option('--remove-auto <sections>', memoryCatalogMessage('cli.memcat.docs.opt.remove_auto', getLanguage(undefined)))
+    .option('--max-lines <n>', memoryCatalogMessage('cli.memcat.docs.opt.set_max_lines', getLanguage(undefined)), parseInt)
     .action((pathOrId: string, opts: { addAuto?: string; addProtect?: string; removeAuto?: string; maxLines?: number }) => {
       const root = resolveProjectRoot();
       const config = loadDocsConfig(root);
@@ -181,7 +185,7 @@ export function registerDocs(program: Command): void {
   docs
     .command('run')
     .description(getMessage('cli.docs.run.desc', getLanguage(undefined)))
-    .option('--no-cache', 'Clear the doc cache before running')
+    .option('--no-cache', memoryCatalogMessage('cli.memcat.docs.opt.no_cache', getLanguage(undefined)))
     .action((opts: { cache?: boolean }) => {
       const root = resolveProjectRoot();
       if (opts.cache === false) {
@@ -213,10 +217,10 @@ export function registerDocs(program: Command): void {
   track
     .command('scan')
     .description(getMessage('cli.docs.scan.desc', getLanguage(undefined)))
-    .option('--no-write', 'Do not modify front-matter (DB-only)')
-    .option('--prune', 'Remove records for deleted docs')
-    .option('--check', 'After scan, exit non-zero if any CRITICAL_STALE doc exists (CI gate)')
-    .option('--max-rank <n>', 'With --check, only gate on docs with doc_rank <= n', parseInt)
+    .option('--no-write', memoryCatalogMessage('cli.memcat.docs.opt.no_write', getLanguage(undefined)))
+    .option('--prune', memoryCatalogMessage('cli.memcat.docs.opt.prune', getLanguage(undefined)))
+    .option('--check', memoryCatalogMessage('cli.memcat.docs.opt.check', getLanguage(undefined)))
+    .option('--max-rank <n>', memoryCatalogMessage('cli.memcat.docs.opt.max_rank', getLanguage(undefined)), parseInt)
     .action(async (opts: { write: boolean; prune?: boolean; check?: boolean; maxRank?: number }) => {
       const root = resolveProjectRoot();
       const lang = getLanguage();
@@ -237,9 +241,9 @@ export function registerDocs(program: Command): void {
   track
     .command('status')
     .description(getMessage('cli.docs.status.desc', getLanguage(undefined)))
-    .option('--stale', 'Only DRIFT/STALE/CRITICAL_STALE')
-    .option('--rank <n>', 'Only docs with doc_rank <= n', parseInt)
-    .option('--json', 'Raw JSON output')
+    .option('--stale', memoryCatalogMessage('cli.memcat.docs.opt.stale', getLanguage(undefined)))
+    .option('--rank <n>', memoryCatalogMessage('cli.memcat.docs.opt.rank', getLanguage(undefined)), parseInt)
+    .option('--json', memoryCatalogMessage('cli.memcat.shared.opt.json', getLanguage(undefined)))
     .action((opts: { stale?: boolean; rank?: number; json?: boolean }) => {
       const root = resolveProjectRoot();
       const lang = getLanguage();

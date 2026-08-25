@@ -62,6 +62,7 @@ import { resolvePlanTimeoutMs } from '../../orchestra/planner.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provider-authority-composition.js';
 import { preflightCliBrainProviderAuthority } from '../provider-authority-process-runtime.js';
 import { RunFlowPlanServiceError } from '../../orchestra/run-flow-plan-service.js';
+import { cliContractMessage, bindArgumentDescriptions } from '../helpers/message-catalog/cli-run.js';
 
 export interface DoCommandOptions {
   run?: boolean;
@@ -438,15 +439,15 @@ export function createDoSeams(
 // ═══ Command registration ════════════════════════════════════════════════
 
 export function registerDo(program: Command, deps: DoSeamDeps = {}): void {
-  program
-    .command('do <goal>')
+  const helpLang = getLanguage(undefined);
+  bindArgumentDescriptions(program.command('do <goal>'), helpLang, { goal: 'cliContract.do.arg.goal' })
     .description(getMessage('cli.do.desc', getLanguage(undefined)))
-    .option('--run', 'Approve and start the sprint for real (default is a dry-run preview only)')
-    .option('--yes', 'Non-interactive approval when RunFlow (terminal.run_flow_v2) is enabled — required together with --run to actually start; otherwise an honest reject (no interactive prompt)')
-    .option('--force-scope', 'Bypass the pre-spawn scope gate (front-door mirror AND the detached child) — same consent as `deckent start --force-scope`')
+    .option('--run', cliContractMessage('cliContract.do.opt.run', helpLang))
+    .option('--yes', cliContractMessage('cliContract.do.opt.yes', helpLang))
+    .option('--force-scope', cliContractMessage('cliContract.do.opt.force_scope', helpLang))
     .option(
       '--write-allowlist <paths...>',
-      getMessage('do.write_allowlist_option', 'en'),
+      getMessage('do.write_allowlist_option', helpLang),
     )
     .action(async (goal: string, opts: DoCommandOptions) => {
       const trimmedGoal = goal.trim();

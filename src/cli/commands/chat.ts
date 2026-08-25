@@ -1,10 +1,10 @@
-// ═══ Chat Command (Sprint 190 T-190-004) ════════════════════════════
+// ═══ Chat Command ═══════════════════════════════════════════════════
 // Path B — `deckent chat` spawns the user's installed AI CLI
 // (claude/codex/gemini) with stdio inheritance, signal forwarding,
 // and DECKENT_MCP_AUTO_ATTACH=1 environment hint.
 //
-// MCP auto-attach wiring + tool-use loop control lives in T-190-005
-// (src/cli/helpers/mcp-attach.ts). This command just sets the env flag
+// MCP auto-attach wiring + tool-use loop control lives in
+// src/cli/helpers/mcp-attach.ts. This command just sets the env flag
 // so downstream attachment helpers can opt in.
 
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -12,6 +12,10 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import type { Command } from 'commander';
+import {
+  getGovernanceMessage,
+  governancePrerequisiteHelp,
+} from '../helpers/message-catalog/cli-governance.js';
 
 import { runChatNativeLoop, createSubscriptionChatAdapter, type ChatProviderAdapter } from './chat-native.js';
 import { createCliToolDispatcher } from './chat-tool-bridge.js';
@@ -140,7 +144,7 @@ async function runConfiguredNativeChat(
   return true;
 }
 
-// ─── Naïve Mode (Sprint 190 T-190-007) ──────────────────────────────
+// ─── Naïve Mode ─────────────────────────────────────────────────────
 //
 // The user can say "merhaba" without triggering an MCP tool, OR ask
 // Deckent to do something actionable. The host AI CLI is told the rule
@@ -378,7 +382,7 @@ export async function detectLocalProvider(projectRoot: string): Promise<LocalPro
   };
 }
 
-// ─── Chat Resume (Sprint 190 T-190-006) ─────────────────────────────
+// ─── Chat Resume ────────────────────────────────────────────────────
 
 /**
  * Load the last N turns of a stored chat session for `deckent chat --resume`.
@@ -490,14 +494,20 @@ export function registerChat(program: Command): void {
   program
     .command('chat')
     .description(getMessage('cli.chat.desc', getLanguage(undefined)))
-    .option('--tool <name>', 'AI CLI to launch (claude | codex | gemini)')
-    .option('--local', 'Use a local LLM (Ollama) — reserved for T-190-009')
-    .option('--check-mcp', 'Verify Deckent MCP is attached before starting (T-190-005)')
-    .option('--resume <sessionId>', 'Resume a previous chat session — prints recent turns before launch')
-    .option('--resume-limit <n>', `Number of prior turns to show with --resume (default ${DEFAULT_RESUME_LIMIT})`)
-    .option('--native', 'Use native tool-use loop instead of spawning host AI CLI')
-    .option('--once', 'Single-turn mode: send one message and exit (use with --native)')
-    .option('--message <text>', 'Message text for single-turn mode (implies --native --once)')
+    .addHelpText('after', governancePrerequisiteHelp('host-ai-cli', getLanguage(undefined)))
+    .option('--tool <name>', getGovernanceMessage('cli.governance.chat.opt.tool', getLanguage(undefined)))
+    .option('--local', getGovernanceMessage('cli.governance.chat.opt.local', getLanguage(undefined)))
+    .option('--check-mcp', getGovernanceMessage('cli.governance.chat.opt.check_mcp', getLanguage(undefined)))
+    .option('--resume <sessionId>', getGovernanceMessage('cli.governance.chat.opt.resume', getLanguage(undefined)))
+    .option(
+      '--resume-limit <n>',
+      getMessage('cli.governance.chat.opt.resume_limit_with_default', getLanguage(undefined), {
+        default: String(DEFAULT_RESUME_LIMIT),
+      }),
+    )
+    .option('--native', getGovernanceMessage('cli.governance.chat.opt.native', getLanguage(undefined)))
+    .option('--once', getGovernanceMessage('cli.governance.chat.opt.once', getLanguage(undefined)))
+    .option('--message <text>', getGovernanceMessage('cli.governance.chat.opt.message', getLanguage(undefined)))
     .action(async (opts: ChatOptions) => {
       const projectRoot = resolveProjectRoot();
 

@@ -15,21 +15,20 @@ never be confused for one another again.
 | Yol · Path | Üreten · Producer | Komut · Command |
 |---|---|---|
 | `master-plan-active.{md,json}` | `scripts/lint-master-plan.mjs` | `npm run docs:master-plan` |
-| `en/reference/*.md` · `tr/reference/*.md` | `scripts/gen-reference-docs.mjs` | `npm run docs:ref` |
-| `en/reference/cli.md` (elle-derlenmiş bölümler · curated sections) | `scripts/generate-cli-docs.ts` | `npm run docs:generate-cli` |
+| `en/reference/mcp-*.md`, `tr/reference/mcp-*.md`, `*/reference/agents.md` | `scripts/gen-reference-docs.mjs` | `npm run docs:ref` |
+| `en/reference/cli.md`, `tr/reference/cli.md`, `cli-manifest.json` | `scripts/generate-cli-docs.ts` | `npm run docs:generate-cli` |
 
 Sürüklenme kontrolü · drift gate: `npm run docs:ref:check` ve `npm run lint:master-plan`.
 
-> **⚠️ Sıra önemlidir · Order matters.** `en/reference/cli.md`'yi iki üretici birden yazar:
-> `docs:generate-cli` tüm dosyayı (derlenmiş prose dahil) üretir, `docs:ref` ise onun içine
-> AUTOGEN komut-dizini bloğunu gömer. **Her zaman `docs:generate-cli` → `docs:ref` sırasıyla**
-> çalıştırın; ters sırada derlenmiş bölümler kaybolur.
-> Always run `docs:generate-cli` before `docs:ref`, or the curated prose is lost.
+CLI reference’ın tek üreticisi `scripts/generate-cli-docs.ts` dosyasıdır. `npm run docs:ref`
+bu üreticiyi ve diğer reference üreticisini sabit sırada çalıştırır; iki script artık aynı
+hedefi yazmaz. The CLI reference has one producer; the pipelines never overwrite each other.
 
 ## Kurallar · Rules
 
 1. **Elle düzenleme yok.** Bir içerik yanlışsa kaynağı düzeltilir (`src/mcp/tools/*.ts`,
-   `src/cli/commands/*.ts`, `.deckent/agents/*`, `docs/MASTER-PLAN.md`), sonra üretici koşulur.
+   `src/core/cli-command-contract.ts`, i18n catalog, `.deckent/agents/*`,
+   `docs/MASTER-PLAN.md`), sonra üretici koşulur.
    Fix the source, then regenerate — never the output.
 2. **`docs/en/reference/` ve `docs/tr/reference/` insan yazımıdır** ve bu ağaçla aynı adı
    taşıyan dosyalar içerebilir; ikisi farklı şeydir ve birbirinin yerine geçmez.

@@ -2274,17 +2274,17 @@ export function registerDoctor(program: Command): void {
   program
     .command('doctor')
     .description(getMessage('cli.doctor.desc', getLanguage(undefined)))
-    .option('--profile', 'Show system profile information')
-    .option('--legacy', 'Use legacy output format')
-    .option('--json', 'Output results as JSON')
-    .option('--pre-flight', 'Run pre-flight health check before sprint spawn (stricter gates)')
-    .option('--providers', 'Show detailed provider diagnostics (binary, version, auth) for Claude/Codex/Gemini')
-    .option('--memory', 'Show host RAM detection (/proc/meminfo first, os.totalmem fallback) and suggested max_workers')
-    .option('--ram-experiment', 'Show 6-worker × 2g RAM scenario verdict (Safe/Risky) based on current config and host RAM')
-    .option('--fix-image', 'Rebuild the worker docker image after an interactive confirmation when it is missing/stale')
-    .option('--fix', 'Preview safe repairs (missing .deckent/.tasks dirs, stale .deck-shadow permissions, missing/corrupt config, stale worker locks) — a closed whitelist, no delete-of-live-data/docker/login. Dry-run by default; combine with --yes to apply.')
-    .option('-y, --yes', 'Apply the repairs listed by --fix (no effect without --fix)')
-    .option('--dry-run', 'Explicit alias for the default --fix preview (no writes) — wins over --yes if both are passed')
+    .option('--profile', getMessage('cli.runtime.doctor.opt.profile', getLanguage(undefined)))
+    .option('--legacy', getMessage('cli.runtime.doctor.opt.legacy', getLanguage(undefined)))
+    .option('--json', getMessage('cli.runtime.doctor.opt.json', getLanguage(undefined)))
+    .option('--pre-flight', getMessage('cli.runtime.doctor.opt.pre_flight', getLanguage(undefined)))
+    .option('--providers', getMessage('cli.runtime.doctor.opt.providers', getLanguage(undefined)))
+    .option('--memory', getMessage('cli.runtime.doctor.opt.memory', getLanguage(undefined)))
+    .option('--ram-experiment', getMessage('cli.runtime.doctor.opt.ram_experiment', getLanguage(undefined)))
+    .option('--fix-image', getMessage('cli.runtime.doctor.opt.fix_image', getLanguage(undefined)))
+    .option('--fix', getMessage('cli.runtime.doctor.opt.fix', getLanguage(undefined)))
+    .option('-y, --yes', getMessage('cli.runtime.doctor.opt.yes', getLanguage(undefined)))
+    .option('--dry-run', getMessage('cli.runtime.doctor.opt.dry_run', getLanguage(undefined)))
     .action(async (opts: { profile?: boolean; legacy?: boolean; json?: boolean; preFlight?: boolean; providers?: boolean; memory?: boolean; ramExperiment?: boolean; fixImage?: boolean; fix?: boolean; yes?: boolean; dryRun?: boolean }) => {
       let root: string;
       try {

@@ -10,6 +10,7 @@ import { FEATURES_MANIFEST_FILE } from '../../core/constants.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
+import { memoryCatalogMessage } from '../helpers/message-catalog/cli-memory-catalog.js';
 import { detectLang } from '../helpers/i18n.js';
 
 interface FeatureEntry {
@@ -91,9 +92,9 @@ export function registerFeatures(program: Command): void {
     .command('features')
     .alias('feature-query')
     .description(getMessage('cli.features.desc', getLanguage(undefined)))
-    .option('-c, --category <category>', 'Filter by category: active, lightly_used, dormant, dead, all', 'all')
-    .option('--json', 'Output as JSON')
-    .option('--id <featureId>', 'Show details for a specific feature')
+    .option('-c, --category <category>', memoryCatalogMessage('cli.memcat.features.opt.category', getLanguage(undefined)), 'all')
+    .option('--json', memoryCatalogMessage('cli.memcat.shared.opt.json', getLanguage(undefined)))
+    .option('--id <featureId>', memoryCatalogMessage('cli.memcat.features.opt.id', getLanguage(undefined)))
     .action((opts: { category: string; json: boolean; id?: string }) => {
       const root = resolveProjectRoot();
       const lang = detectLang(root);

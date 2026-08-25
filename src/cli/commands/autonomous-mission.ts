@@ -5,8 +5,6 @@
 //
 // ADR-012: registerAutonomousMission(program) pattern.
 // i18n: all user-facing output via getMessage(). Keys prefixed autonomous_mission.*.
-// NOTE: message keys are not yet registered in messages.ts (outside scope.filesWrite);
-//       getMessage falls back to the key string — tracked as tech debt.
 
 import { Command } from 'commander';
 import { existsSync, readFileSync } from 'node:fs';
@@ -14,6 +12,7 @@ import { join } from 'node:path';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
+import { bindGovernanceArgumentDescriptions } from '../helpers/message-catalog/cli-governance.js';
 import { detectLang } from '../helpers/i18n.js';
 import { SqliteMissionStore } from '../../orchestra/autonomous/mission-store/sqlite-mission-store.js';
 import { createListMission } from '../../orchestra/autonomous/mission-store/mission-ingest.js';
@@ -263,19 +262,22 @@ export function registerAutonomousMission(program: Command): void {
     .description(getMessage('cli.autonomous_mission.desc', getLanguage(undefined)));
 
   // create-list <title>
-  grp
-    .command('create-list <title>')
+  bindGovernanceArgumentDescriptions(
+    grp.command('create-list <title>'),
+    getLanguage(undefined),
+    { title: 'cli.governance.mission.arg.title' },
+  )
     .description(getMessage('cli.autonomous_mission.create_list.desc', getLanguage(undefined)))
     .option(
       '--item <kind:spec>',
-      'Work item (repeatable): kind or kind:json-spec',
+      getMessage('cli.governance.mission.opt.item', getLanguage(undefined)),
       (val: string, acc: string[]) => [...acc, val],
       [] as string[],
     )
-    .option('--items-file <path>', 'JSON file containing an array of {kind, spec?, id?} items')
-    .option('--id <id>', 'Mission id (auto-generated if omitted)')
-    .option('--tenant <tenant>', 'Tenant identifier')
-    .option('--deliver-to <channel>', 'Delivery channel for settled notification')
+    .option('--items-file <path>', getMessage('cli.governance.mission.opt.items_file', getLanguage(undefined)))
+    .option('--id <id>', getMessage('cli.governance.mission.opt.id', getLanguage(undefined)))
+    .option('--tenant <tenant>', getMessage('cli.governance.opt.tenant', getLanguage(undefined)))
+    .option('--deliver-to <channel>', getMessage('cli.governance.mission.opt.deliver_to', getLanguage(undefined)))
     .action((title: string, opts: {
       item: string[];
       itemsFile?: string;
@@ -303,14 +305,17 @@ export function registerAutonomousMission(program: Command): void {
     });
 
   // create-goal <goal>
-  grp
-    .command('create-goal <goal>')
+  bindGovernanceArgumentDescriptions(
+    grp.command('create-goal <goal>'),
+    getLanguage(undefined),
+    { goal: 'cli.governance.mission.arg.goal' },
+  )
     .description(getMessage('cli.autonomous_mission.create_goal.desc', getLanguage(undefined)))
-    .option('--accept <criteria>', 'Acceptance criteria string')
-    .option('--title <title>', 'Mission title (defaults to goal text)')
-    .option('--id <id>', 'Mission id (auto-generated if omitted)')
-    .option('--tenant <tenant>', 'Tenant identifier')
-    .option('--deliver-to <channel>', 'Delivery channel for settled notification')
+    .option('--accept <criteria>', getMessage('cli.governance.mission.opt.accept', getLanguage(undefined)))
+    .option('--title <title>', getMessage('cli.governance.mission.opt.title', getLanguage(undefined)))
+    .option('--id <id>', getMessage('cli.governance.mission.opt.id', getLanguage(undefined)))
+    .option('--tenant <tenant>', getMessage('cli.governance.opt.tenant', getLanguage(undefined)))
+    .option('--deliver-to <channel>', getMessage('cli.governance.mission.opt.deliver_to', getLanguage(undefined)))
     .action((goal: string, opts: {
       accept?: string;
       title?: string;
@@ -336,8 +341,8 @@ export function registerAutonomousMission(program: Command): void {
   grp
     .command('list')
     .description(getMessage('cli.autonomous_mission.list.desc', getLanguage(undefined)))
-    .option('--json', 'Output as JSON')
-    .option('--tenant <tenant>', 'Filter by tenant')
+    .option('--json', getMessage('cli.governance.opt.json', getLanguage(undefined)))
+    .option('--tenant <tenant>', getMessage('cli.governance.opt.tenant_filter', getLanguage(undefined)))
     .action((opts: { json?: boolean; tenant?: string }) => {
       const root = resolveProjectRoot();
       const lang = detectLang(root);

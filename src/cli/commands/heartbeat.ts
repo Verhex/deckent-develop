@@ -10,6 +10,7 @@ import {
 } from '../../orchestra/heartbeat-daemon.js';
 import type { HeartbeatRunResult } from '../../orchestra/heartbeat-daemon.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
+import { cliContractMessage } from '../helpers/message-catalog/cli-run.js';
 
 function printResult(result: HeartbeatRunResult): void {
   print(`Heartbeat complete: ${result.executed} executed, ${result.passed} passed, ${result.failed} failed (${result.total} total tasks)`);
@@ -20,12 +21,13 @@ function printResult(result: HeartbeatRunResult): void {
 }
 
 export function registerHeartbeat(program: Command): void {
+  const helpLang = getLanguage(undefined);
   program
     .command('heartbeat')
     .description(getMessage('cli.heartbeat.desc', getLanguage(undefined)))
-    .option('--daemon', 'Run in daemon mode (keeps running in foreground)')
-    .option('--interval <minutes>', 'Heartbeat interval in minutes (default: 30)', '30')
-    .option('--stop', 'Stop a running heartbeat daemon')
+    .option('--daemon', cliContractMessage('cliContract.heartbeat.opt.daemon', helpLang))
+    .option('--interval <minutes>', cliContractMessage('cliContract.heartbeat.opt.interval', helpLang), '30')
+    .option('--stop', cliContractMessage('cliContract.heartbeat.opt.stop', helpLang))
     .action((opts: { daemon?: boolean; interval?: string; stop?: boolean }) => {
       const root = resolveProjectRoot();
 

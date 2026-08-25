@@ -361,5 +361,7 @@ console.log('');
 console.log(line);
 console.log('');
 
-process.exit(newCliOnly.length > 0 || newMcpOnly.length > 0
-  || newDescriptionKeyGaps.length > 0 || authorityIntentErrors.length > 0 ? 1 : 0);
+// Assigning exitCode lets piped stdout/stderr drain. `process.exit(...)` can
+// truncate the short reports produced by hermetic fixtures and CI wrappers.
+process.exitCode = newCliOnly.length > 0 || newMcpOnly.length > 0
+  || newDescriptionKeyGaps.length > 0 || authorityIntentErrors.length > 0 ? 1 : 0;

@@ -13,7 +13,7 @@
 // taraması testte koşulmaz" instruction. Async spawn only — no spawnSync.
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { copyFileSync, mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { spawn } from 'node:child_process';
@@ -21,7 +21,6 @@ import { fileURLToPath } from 'node:url';
 
 const I18N_HARDCODE_SRC = fileURLToPath(new URL('../../scripts/lint-i18n-hardcode.mjs', import.meta.url));
 const CLI_MCP_PARITY_SRC = fileURLToPath(new URL('../../scripts/lint-cli-mcp-parity.mjs', import.meta.url));
-const COMMAND_REGISTRY_SRC = fileURLToPath(new URL('../../src/core/command-registry.ts', import.meta.url));
 
 function runScript(scriptPath: string, args: string[] = []): Promise<{ code: number | null; stdout: string; stderr: string }> {
   return new Promise((resolvePromise) => {
@@ -118,11 +117,31 @@ function writeBaseline(tmpRoot: string): void {
   writeFileEnsuringDir(path, JSON.stringify({ cliOnly: [], mcpOnly: [], descriptionKeyGaps: [] }, null, 2) + '\n');
 }
 
+/**
+ * The parity gate reads `src/core/command-registry.ts` unconditionally (it
+ * cross-checks the baseline's `intentionalCliAuthority` rows against the
+ * registry catalog), so a hermetic fixture must provide one or the script dies
+ * with ENOENT before printing anything. The fixture baseline declares no
+ * authority intent, so a registry with no catalog rows is the correct clean
+ * tree. `src/core` is outside every i18n-gate scan root, so this file cannot
+ * perturb the lint-i18n-hardcode.mjs fixtures above.
+ */
+function writeCoreCommandRegistry(tmpRoot: string): void {
+  const path = join(tmpRoot, 'src', 'core', 'command-registry.ts');
+  writeFileEnsuringDir(
+    path,
+    [
+      '// Fixture registry — projection of the path-level contract SSOT.',
+      'export const COMMAND_REGISTRY = [];',
+      '',
+    ].join('\n'),
+  );
+}
+
 /** Full clean tree: CLI+MCP+catalog all consistent, both scripts should pass. */
 function buildFullCleanTree(tmpRoot: string): void {
   installScripts(tmpRoot);
-  writeFileEnsuringDir(join(tmpRoot, 'src', 'core', '.fixture-anchor'), '');
-  copyFileSync(COMMAND_REGISTRY_SRC, join(tmpRoot, 'src', 'core', 'command-registry.ts'));
+  writeCoreCommandRegistry(tmpRoot);
   mkdirSync(join(tmpRoot, 'src', 'desktop', 'src', 'main'), { recursive: true });
   writeCliFoo(tmpRoot, ".description(getMessage('cli.foo.desc', getLanguage(undefined)))");
   writeCliIndex(tmpRoot);
@@ -203,7 +222,7 @@ describe('lint-cli-mcp-parity.mjs — description-key parity (559-005)', () => {
 
     const result = await runScript(join(tmpRoot, 'scripts', 'lint-cli-mcp-parity.mjs'));
     expect(result.code).toBe(1);
-    expect(result.stdout + result.stderr).toContain('deckent_foo:cli.foo.WRONG_DESC_KEY');
+    expect(result.stdout).toContain('deckent_foo:cli.foo.WRONG_DESC_KEY');
   });
 
   it('passes (exit 0) when the cli-shared binding key matches the CLI command\'s real key', async () => {
@@ -213,5 +232,104 @@ describe('lint-cli-mcp-parity.mjs — description-key parity (559-005)', () => {
     const result = await runScript(join(tmpRoot, 'scripts', 'lint-cli-mcp-parity.mjs'));
     expect(result.code).toBe(0);
     expect(result.stdout).toContain('No NEW parity gaps beyond the accepted baseline');
+  });
+});
+
+// ─── CLI-CONTRACT-001 — commander help-surface scan ─────────────────────────
+//
+// The i18n gate now also scans the REST of the commander help surface —
+// `.option(`/`.requiredOption(`, `.argument(`, `.helpOption(` and
+// `.addHelpText(` — in src/cli/commands/*.ts + src/cli/index.ts.
+//
+// That surface carries hundreds of pre-existing English literals, so it is a
+// RATCHET by default (observed count may never exceed the declared ceiling)
+// with an opt-in `--surface-gate` hard mode for the closure family tasks that
+// migrate it. Both modes are proven hermetically below, on tmpdir fixtures —
+// never against the real repo.
+
+/** A clean tree whose `foo` command chains `extraChain` after .description(). */
+function buildTreeWithChain(tmpRoot: string, extraChain: string): void {
+  buildFullCleanTree(tmpRoot);
+  writeCliFoo(
+    tmpRoot,
+    `.description(getMessage('cli.foo.desc', getLanguage(undefined)))\n    ${extraChain}`,
+  );
+}
+
+describe('lint-i18n-hardcode.mjs — commander help-surface scan (CLI-CONTRACT-001)', () => {
+  let tmpRoot: string | undefined;
+  afterEach(() => {
+    if (tmpRoot) rmSync(tmpRoot, { recursive: true, force: true });
+    tmpRoot = undefined;
+  });
+
+  const HARDCODED_OPTION = ".option('--verbose', 'Print a lot of detail while running')";
+
+  it('reports a hardcoded .option() description but stays exit 0 under the declared ratchet ceiling', async () => {
+    tmpRoot = mkdtempSync(join(tmpdir(), 'lint-i18n-surface-'));
+    buildTreeWithChain(tmpRoot, HARDCODED_OPTION);
+
+    const result = await runScript(join(tmpRoot, 'scripts', 'lint-i18n-hardcode.mjs'));
+    expect(result.code).toBe(0);
+    // Reported (never silent) — with the surface label and the literal itself.
+    expect(result.stdout).toContain('Print a lot of detail while running');
+    expect(result.stdout).toContain('option-single-quote');
+    expect(result.stdout).toContain('Surface scan');
+  });
+
+  it('--surface-gate turns the same .option() literal into a hard failure', async () => {
+    tmpRoot = mkdtempSync(join(tmpdir(), 'lint-i18n-surface-'));
+    buildTreeWithChain(tmpRoot, HARDCODED_OPTION);
+
+    const result = await runScript(join(tmpRoot, 'scripts', 'lint-i18n-hardcode.mjs'), ['--surface-gate']);
+    expect(result.code).toBe(1);
+    expect(result.stdout).toContain('Print a lot of detail while running');
+  });
+
+  it('--surface-baseline 0 fails the ratchet (a NEW help-surface literal cannot slip in)', async () => {
+    tmpRoot = mkdtempSync(join(tmpdir(), 'lint-i18n-surface-'));
+    buildTreeWithChain(tmpRoot, HARDCODED_OPTION);
+
+    const result = await runScript(join(tmpRoot, 'scripts', 'lint-i18n-hardcode.mjs'), ['--surface-baseline', '0']);
+    expect(result.code).toBe(1);
+    expect(result.stdout).toContain('ratchet broken');
+    expect(result.stdout).not.toContain('✓ i18n gate clean');
+  });
+
+  it.each([
+    ['argument', ".argument('<file>', 'Path to the input file to read')", 'Path to the input file to read'],
+    ['helpOption', ".helpOption('-h, --help', 'Show this help message right here')", 'Show this help message right here'],
+    ['addHelpText', ".addHelpText('after', 'Some trailing help prose for the operator')", 'Some trailing help prose for the operator'],
+    ['requiredOption', ".requiredOption('--target <t>', 'Target directory to operate on')", 'Target directory to operate on'],
+  ])('scans the %s surface too (hard-gated under --surface-gate)', async (_surface, chain, text) => {
+    tmpRoot = mkdtempSync(join(tmpdir(), 'lint-i18n-surface-'));
+    buildTreeWithChain(tmpRoot, chain);
+
+    const result = await runScript(join(tmpRoot, 'scripts', 'lint-i18n-hardcode.mjs'), ['--surface-gate']);
+    expect(result.code).toBe(1);
+    expect(result.stdout).toContain(text);
+  });
+
+  it('does not false-positive when the help-surface text resolves through getMessage()', async () => {
+    tmpRoot = mkdtempSync(join(tmpdir(), 'lint-i18n-surface-'));
+    buildTreeWithChain(
+      tmpRoot,
+      ".option('--verbose', getMessage('cli.foo.opt_verbose', getLanguage(undefined)))\n"
+      + "    .argument('<file>', getMessage('cli.foo.arg_file', getLanguage(undefined)))",
+    );
+
+    const strict = await runScript(join(tmpRoot, 'scripts', 'lint-i18n-hardcode.mjs'), ['--surface-gate']);
+    expect(strict.code).toBe(0);
+    expect(strict.stdout).toContain('0 literal(s)');
+  });
+
+  it('a flags/name token is never itself treated as help text (first argument is skipped)', async () => {
+    tmpRoot = mkdtempSync(join(tmpdir(), 'lint-i18n-surface-'));
+    // `--dry-run` and `<sprintId>` are technical tokens in first position with
+    // NO second argument at all — nothing to gate.
+    buildTreeWithChain(tmpRoot, ".option('--dry-run')\n    .argument('<sprintId>')");
+
+    const result = await runScript(join(tmpRoot, 'scripts', 'lint-i18n-hardcode.mjs'), ['--surface-gate']);
+    expect(result.code).toBe(0);
   });
 });

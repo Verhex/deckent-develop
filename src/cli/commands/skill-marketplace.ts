@@ -12,6 +12,7 @@ import { print, printError, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { ErrorRegistry } from '../../core/errors.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
+import { memoryCatalogMessage } from '../helpers/message-catalog/cli-memory-catalog.js';
 
 // ─── Registry Cache ───────────────────────────────────────────────────────────
 
@@ -95,11 +96,12 @@ function loadLocalSkills(root: string): Array<{ name: string; description: strin
 export function registerSkillMarketplace(parentCmd: Command): void {
   // ─── skill search ────────────────────────────────────────────────────────
   parentCmd
-    .command('search <query>')
+    .command('search')
+    .argument('<query>', memoryCatalogMessage('cli.memcat.skill_marketplace.arg.query', getLanguage(undefined)))
     .description(getMessage('cli.skill_marketplace.search.desc', getLanguage(undefined)))
-    .option('--category <cat>', 'Filter by category')
-    .option('--json', 'Output as JSON')
-    .option('--limit <n>', 'Max results per page', '20')
+    .option('--category <cat>', memoryCatalogMessage('cli.memcat.skill_marketplace.opt.category', getLanguage(undefined)))
+    .option('--json', memoryCatalogMessage('cli.memcat.shared.opt.json', getLanguage(undefined)))
+    .option('--limit <n>', memoryCatalogMessage('cli.memcat.skill_marketplace.opt.limit', getLanguage(undefined)), '20')
     .action(async (query: string, opts: { category?: string; json?: boolean; limit?: string }) => {
       try {
         const client = new RegistryClient();
@@ -170,11 +172,12 @@ export function registerSkillMarketplace(parentCmd: Command): void {
   //   3. Ed25519 sign (unless --no-sign)
   //   4. Registry upload (unless --dry-run)
   parentCmd
-    .command('publish <skillPath>')
+    .command('publish')
+    .argument('<skillPath>', memoryCatalogMessage('cli.memcat.skill_marketplace.arg.skill_path', getLanguage(undefined)))
     .description(getMessage('cli.skill_marketplace.publish.desc', getLanguage(undefined)))
-    .option('--dry-run', 'Validate + sign without uploading to registry')
-    .option('--key-dir <dir>', 'Custom keypair directory (default: ~/.deckent/keys)')
-    .option('--no-sign', 'Skip Ed25519 signing (registry upload only)')
+    .option('--dry-run', memoryCatalogMessage('cli.memcat.skill_marketplace.opt.dry_run', getLanguage(undefined)))
+    .option('--key-dir <dir>', memoryCatalogMessage('cli.memcat.skill_marketplace.opt.key_dir', getLanguage(undefined)))
+    .option('--no-sign', memoryCatalogMessage('cli.memcat.skill_marketplace.opt.no_sign', getLanguage(undefined)))
     .action(async (skillPath: string, opts: { dryRun?: boolean; keyDir?: string; sign?: boolean }) => {
       try {
         // ─── Step 1: Validate skill path + files ─────────────────────────

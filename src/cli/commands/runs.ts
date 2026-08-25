@@ -35,6 +35,7 @@ import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
 import type { ActorContext } from '../../core/work-model.js';
+import { cliContractMessage } from '../helpers/message-catalog/cli-run.js';
 
 const SHORT_ID_LEN = 8;
 const ALL_INBOX_ROWS = Number.MAX_SAFE_INTEGER;
@@ -274,22 +275,23 @@ export function buildRetireSupersededLines(report: RetireSupersededReport, lang:
 }
 
 export function registerRuns(program: Command): void {
+  const helpLang = getLanguage(undefined);
   program
     .command('runs')
-    .description(getMessage('cli.runs.desc', getLanguage(undefined)))
-    .argument('[n]', 'Run to target: the list number, or (for decide flags) a unique flowId prefix')
-    .option('--limit <n>', 'Show up to n inbox rows (default: the recent window; a flow-id prefix always resolves against every flow)', Number)
-    .option('--close-stale', 'Classify stale runs (dead process / unverifiable record); dry-run unless --yes')
-    .option('--retire-superseded', 'Classify pending-approval runs a newer plan over the same source replaced; dry-run unless --yes')
-    .option('--yes', 'With --close-stale/--retire-superseded: durably write the closures')
-    .option('--approve', 'Approve run #n (SLOW AHEAD; add --start for FULL AHEAD)')
-    .option('--reject', 'Reject run #n (STOP)')
-    .option('--retire', 'Retire an unstarted approved run #n (CANCELLED)')
-    .option('--reason <text>', 'Reason recorded with --reject')
-    .option('--start', 'Start the approved run #n as a detached background run')
-    .option('--diff', "Show run #n's real footprint as a unified diff (583/N1)")
-    .option('--commit', "Review-then-commit run #n's changes (583/N4; shows the proposal, prompts unless --yes)")
-    .option('--message <text>', 'With --commit: use this commit message instead of the suggested one')
+    .description(getMessage('cli.runs.desc', helpLang))
+    .argument('[n]', cliContractMessage('cliContract.runs.arg.n', helpLang))
+    .option('--limit <n>', cliContractMessage('cliContract.runs.opt.limit', helpLang), Number)
+    .option('--close-stale', cliContractMessage('cliContract.runs.opt.close_stale', helpLang))
+    .option('--retire-superseded', cliContractMessage('cliContract.runs.opt.retire_superseded', helpLang))
+    .option('--yes', cliContractMessage('cliContract.runs.opt.yes', helpLang))
+    .option('--approve', cliContractMessage('cliContract.runs.opt.approve', helpLang))
+    .option('--reject', cliContractMessage('cliContract.runs.opt.reject', helpLang))
+    .option('--retire', cliContractMessage('cliContract.runs.opt.retire', helpLang))
+    .option('--reason <text>', cliContractMessage('cliContract.runs.opt.reason', helpLang))
+    .option('--start', cliContractMessage('cliContract.runs.opt.start', helpLang))
+    .option('--diff', cliContractMessage('cliContract.runs.opt.diff', helpLang))
+    .option('--commit', cliContractMessage('cliContract.runs.opt.commit', helpLang))
+    .option('--message <text>', cliContractMessage('cliContract.runs.opt.message', helpLang))
     .action(async (n: string | undefined, opts: { closeStale?: boolean; retireSuperseded?: boolean; yes?: boolean; diff?: boolean; commit?: boolean; limit?: number; message?: string } & DecideFlags) => {
       const root = resolveProjectRoot();
       const lang = getLangFromConfig(root);

@@ -18,6 +18,7 @@ import {
 } from '../../core/model-activation-store.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
+import { memoryCatalogMessage } from '../helpers/message-catalog/cli-memory-catalog.js';
 
 // ─── Tier Display ──────────────────────────────────────────────────────────
 
@@ -116,15 +117,18 @@ export function registerModels(program: Command): void {
     .command('models')
     .description(getMessage('cli.models.desc', getLanguage(undefined)));
 
+  // list/activation/active-set/tier = read paths; activate/deactivate/refresh/policy <mode> = mutation paths.
+  models.addHelpText('after', memoryCatalogMessage('cli.memcat.models.help.paths', getLanguage(undefined)));
+
   // ── deckent models list [--provider <name>] ──────────────────────────────
   models
     .command('list')
     .description(getMessage('cli.models.list.desc', getLanguage(undefined)))
     .option(
       '--provider <name>',
-      `Filter by provider (${Object.keys(PROVIDER_COLORS).join(', ')})`,
+      memoryCatalogMessage('cli.memcat.models.opt.provider_filter', getLanguage(undefined), { providers: Object.keys(PROVIDER_COLORS).join(', ') }),
     )
-    .option('--offline', 'Use cached or bundled catalog without network')
+    .option('--offline', memoryCatalogMessage('cli.memcat.models.opt.offline', getLanguage(undefined)))
     .action(async (opts: { provider?: string; offline?: boolean }) => {
       try {
         const loaderOpts: CatalogLoadOptions = { offline: opts.offline };
@@ -170,9 +174,10 @@ export function registerModels(program: Command): void {
   }
 
   models
-    .command('activate <model>')
+    .command('activate')
+    .argument('<model>', memoryCatalogMessage('cli.memcat.models.arg.model', getLanguage(undefined)))
     .description(getMessage('cli.models.activate.desc', getLanguage(undefined)))
-    .requiredOption('--provider <name>', 'Provider that serves this model')
+    .requiredOption('--provider <name>', memoryCatalogMessage('cli.memcat.models.opt.provider_required', getLanguage(undefined)))
     .action((model: string, opts: { provider: string }) => {
       try {
         withStore((store) => store.setActivation(opts.provider, model, true));
@@ -184,9 +189,10 @@ export function registerModels(program: Command): void {
     });
 
   models
-    .command('deactivate <model>')
+    .command('deactivate')
+    .argument('<model>', memoryCatalogMessage('cli.memcat.models.arg.model', getLanguage(undefined)))
     .description(getMessage('cli.models.deactivate.desc', getLanguage(undefined)))
-    .requiredOption('--provider <name>', 'Provider that serves this model')
+    .requiredOption('--provider <name>', memoryCatalogMessage('cli.memcat.models.opt.provider_required', getLanguage(undefined)))
     .action((model: string, opts: { provider: string }) => {
       try {
         withStore((store) => store.setActivation(opts.provider, model, false));
@@ -228,7 +234,9 @@ export function registerModels(program: Command): void {
   // can never auto-enter). `default_model` is a preferred pick, not a ceiling —
   // the hard limit is this active-set.
   models
-    .command('policy [provider] [mode]')
+    .command('policy')
+    .argument('[provider]', memoryCatalogMessage('cli.memcat.models.arg.policy_provider', getLanguage(undefined)))
+    .argument('[mode]', memoryCatalogMessage('cli.memcat.models.arg.policy_mode', getLanguage(undefined)))
     .description(getMessage('cli.models.policy.desc', getLanguage(undefined)))
     .action((provider: string | undefined, mode: string | undefined) => {
       try {
@@ -324,9 +332,10 @@ export function registerModels(program: Command): void {
 
   // ── deckent models tier <model> ──────────────────────────────────────────
   models
-    .command('tier <model>')
+    .command('tier')
+    .argument('<model>', memoryCatalogMessage('cli.memcat.models.arg.model', getLanguage(undefined)))
     .description(getMessage('cli.models.tier.desc', getLanguage(undefined)))
-    .option('--offline', 'Use cached or bundled catalog without network')
+    .option('--offline', memoryCatalogMessage('cli.memcat.models.opt.offline', getLanguage(undefined)))
     .action(async (modelId: string, opts: { offline?: boolean }) => {
       try {
         const result = await loadCatalog({ offline: opts.offline });

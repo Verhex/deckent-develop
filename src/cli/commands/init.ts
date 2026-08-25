@@ -85,6 +85,7 @@ import {
   writeProviderConfig,
   ALL_ENV_NAMES,
 } from './init-steps.js';
+import { cliContractMessage } from '../helpers/message-catalog/cli-run.js';
 
 // ─── Re-exports for backward compatibility ──────────────────────────
 
@@ -343,20 +344,20 @@ export function registerInit(program: Command): void {
   const optionLang = getLanguage();
   program
     .command('init')
-    .description(getMessage('cli.init.desc', getLanguage(undefined)))
-    .option('--auto', 'Auto-detect system, subscription, and project to generate recommendations')
-    .option('--manual', 'Skip auto-detection, use interactive prompts only')
-    .option('--cursor', 'Configure for Cursor IDE environment')
-    .option('--claude-code', 'Configure for Claude Code environment (default)')
-    .option('--env <envs>', 'Comma-separated environments to configure (codex,cursor,gemini,vscode,shell)')
-    .option('--all-envs', 'Configure ALL environment configs')
-    .option('--upgrade', 'Update existing files while preserving user customizations (merge strategy)')
-    .option('--force', 'Force overwrite of existing env files without warning')
-    .option('--repair', 'Show which init steps failed and how to fix them')
+    .description(getMessage('cli.init.desc', optionLang))
+    .option('--auto', cliContractMessage('cliContract.init.opt.auto', optionLang))
+    .option('--manual', cliContractMessage('cliContract.init.opt.manual', optionLang))
+    .option('--cursor', cliContractMessage('cliContract.init.opt.cursor', optionLang))
+    .option('--claude-code', cliContractMessage('cliContract.init.opt.claude_code', optionLang))
+    .option('--env <envs>', cliContractMessage('cliContract.init.opt.env', optionLang))
+    .option('--all-envs', cliContractMessage('cliContract.init.opt.all_envs', optionLang))
+    .option('--upgrade', cliContractMessage('cliContract.init.opt.upgrade', optionLang))
+    .option('--force', cliContractMessage('cliContract.init.opt.force', optionLang))
+    .option('--repair', cliContractMessage('cliContract.init.opt.repair', optionLang))
     .option('-y, --yes', getMessage('init.option_yes', optionLang))
     .option('--install', getMessage('init.option_install', optionLang))
     .option('--no-install', getMessage('init.option_no_install', optionLang))
-    .option('--no-image', 'Skip the opt-in worker Docker image build offer (no prompt)')
+    .option('--no-image', cliContractMessage('cliContract.init.opt.no_image', optionLang))
     .action(async (options: { auto?: boolean; manual?: boolean; cursor?: boolean; claudeCode?: boolean; env?: string; allEnvs?: boolean; upgrade?: boolean; force?: boolean; repair?: boolean; yes?: boolean; install?: boolean; image?: boolean }) => {
       const root = resolveProjectRoot();
       const failedSteps: Array<{ step: string; error: string }> = [];

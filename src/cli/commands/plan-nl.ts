@@ -42,6 +42,7 @@ import { resolveProjectRoot } from '../helpers/process.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
 import { print, printError } from '../helpers/output.js';
+import { cliContractMessage } from '../helpers/message-catalog/cli-run.js';
 
 export interface PlanNlCommandOptions {
   write?: boolean;
@@ -122,11 +123,12 @@ function backupExistingDirectives(directivesPath: string): string | null {
 }
 
 export function registerPlanNl(program: Command): void {
+  const helpLang = getLanguage(undefined);
   program
     .command('plan-nl')
     .description(getMessage('cli.plan_nl.desc', getLanguage(undefined)))
-    .argument('<goal>', 'Free-form description of what the sprint should accomplish')
-    .option('--write', 'Write the scaffold to DIRECTIVES.md (any existing file is backed up first)')
+    .argument('<goal>', cliContractMessage('cliContract.plan_nl.arg.goal', helpLang))
+    .option('--write', cliContractMessage('cliContract.plan_nl.opt.write', helpLang))
     .action(async (goal: string, opts: PlanNlCommandOptions) => {
       const trimmedGoal = goal.trim();
       if (!trimmedGoal) {

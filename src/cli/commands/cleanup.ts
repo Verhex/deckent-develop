@@ -257,12 +257,12 @@ export function registerCleanup(program: Command): void {
   program
     .command('cleanup')
     .description(getMessage('cli.cleanup.desc', getLanguage(undefined)))
-    .option('--decay', 'Force run memory decay (compress .brain/ files)')
-    .option('--dry-run', 'Preview what would be deleted without actually deleting')
-    .option('--history', 'Plan bounded runtime-history hygiene (dry-run by default)')
-    .option('--apply', 'Apply a runtime-history hygiene plan')
-    .option('--plan-digest <digest>', 'Exact runtime-history plan digest required by --apply')
-    .option('--json', 'Emit one path-free runtime-history JSON projection')
+    .option('--decay', getMessage('cli.runtime.cleanup.opt.decay', registerLang))
+    .option('--dry-run', getMessage('cli.runtime.cleanup.opt.dry_run', registerLang))
+    .option('--history', getMessage('cli.runtime.cleanup.opt.history', registerLang))
+    .option('--apply', getMessage('cli.runtime.cleanup.opt.apply', registerLang))
+    .option('--plan-digest <digest>', getMessage('cli.runtime.cleanup.opt.plan_digest', registerLang))
+    .option('--json', getMessage('cli.runtime.cleanup.opt.json', registerLang))
     .option('--sprint <id>', getMessage('cleanup.sprint_option', registerLang))
     .action((opts: RuntimeHygieneCleanupOptions & { decay?: boolean; sprint?: string }) => {
       const root = resolveProjectRoot();

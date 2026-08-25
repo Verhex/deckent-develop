@@ -11,6 +11,7 @@ import { existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync, wat
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
+import { bindGovernanceArgumentDescriptions } from '../helpers/message-catalog/cli-governance.js';
 import { registerShutdownHook } from '../helpers/shutdown-hooks.js';
 import type {
   NervousNotification,
@@ -731,7 +732,7 @@ export function registerNervous(program: Command): void {
   const nervousCmd = program
     .command('nervous')
     .description(getMessage('cli.nervous.desc', getLanguage(undefined)))
-    .option('--lang <code>', 'Language override (en|tr)');
+    .option('--lang <code>', getMessage('cli.governance.opt.lang', getLanguage(undefined)));
 
   // Default action: show dashboard
   nervousCmd.action((_opts: unknown, cmd: Command) => {
@@ -743,49 +744,61 @@ export function registerNervous(program: Command): void {
   nervousCmd
     .command('enable')
     .description(getMessage('cli.nervous.enable.desc', getLanguage(undefined)))
-    .option('--mode <preset>', 'Authority preset (strict|balanced|autopilot|full-auto)')
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--mode <preset>', getMessage('cli.governance.nervous.opt.mode', getLanguage(undefined)))
+    .option('--lang <code>', getMessage('cli.governance.opt.lang', getLanguage(undefined)))
     .action((opts: { mode?: string }, cmd: Command) => {
       const root = resolveProjectRoot();
       handleEnableNervous(root, langOf(cmd), opts.mode);
     });
 
   // deckent nervous accept <id>
-  nervousCmd
-    .command('accept <id>')
+  bindGovernanceArgumentDescriptions(
+    nervousCmd.command('accept <id>'),
+    getLanguage(undefined),
+    { id: 'cli.governance.nervous.arg.id' },
+  )
     .description(getMessage('cli.nervous.accept.desc', getLanguage(undefined)))
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--lang <code>', getMessage('cli.governance.opt.lang', getLanguage(undefined)))
     .action(async (id: string, _opts: unknown, cmd: Command) => {
       const root = resolveProjectRoot();
       await handleAccept(root, id, langOf(cmd));
     });
 
   // deckent nervous reject <id>
-  nervousCmd
-    .command('reject <id>')
+  bindGovernanceArgumentDescriptions(
+    nervousCmd.command('reject <id>'),
+    getLanguage(undefined),
+    { id: 'cli.governance.nervous.arg.id' },
+  )
     .description(getMessage('cli.nervous.reject.desc', getLanguage(undefined)))
-    .option('--reason <text>', 'Rejection reason')
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--reason <text>', getMessage('cli.governance.opt.reason', getLanguage(undefined)))
+    .option('--lang <code>', getMessage('cli.governance.opt.lang', getLanguage(undefined)))
     .action(async (id: string, opts: { reason?: string }, cmd: Command) => {
       const root = resolveProjectRoot();
       await handleReject(root, id, langOf(cmd), opts.reason);
     });
 
   // deckent nervous edit <id>
-  nervousCmd
-    .command('edit <id>')
+  bindGovernanceArgumentDescriptions(
+    nervousCmd.command('edit <id>'),
+    getLanguage(undefined),
+    { id: 'cli.governance.nervous.arg.id' },
+  )
     .description(getMessage('cli.nervous.edit.desc', getLanguage(undefined)))
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--lang <code>', getMessage('cli.governance.opt.lang', getLanguage(undefined)))
     .action(async (id: string, _opts: unknown, cmd: Command) => {
       const root = resolveProjectRoot();
       await handleEdit(root, id, langOf(cmd));
     });
 
   // deckent nervous undo <action-id>
-  nervousCmd
-    .command('undo <action-id>')
+  bindGovernanceArgumentDescriptions(
+    nervousCmd.command('undo <action-id>'),
+    getLanguage(undefined),
+    { 'action-id': 'cli.governance.nervous.arg.action_id' },
+  )
     .description(getMessage('cli.nervous.undo.desc', getLanguage(undefined)))
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--lang <code>', getMessage('cli.governance.opt.lang', getLanguage(undefined)))
     .action((actionId: string, _opts: unknown, cmd: Command) => {
       const root = resolveProjectRoot();
       handleUndo(root, actionId, langOf(cmd));
@@ -795,9 +808,9 @@ export function registerNervous(program: Command): void {
   nervousCmd
     .command('history')
     .description(getMessage('cli.nervous.history.desc', getLanguage(undefined)))
-    .option('--limit <n>', 'Number of records to show', '20')
-    .option('--since <duration>', 'Show records since (e.g. 1d, 2h, 30m)')
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--limit <n>', getMessage('cli.governance.opt.limit', getLanguage(undefined)), '20')
+    .option('--since <duration>', getMessage('cli.governance.nervous.opt.since', getLanguage(undefined)))
+    .option('--lang <code>', getMessage('cli.governance.opt.lang', getLanguage(undefined)))
     .action((opts: { limit: string; since?: string }, cmd: Command) => {
       const root = resolveProjectRoot();
       showHistory(root, parseInt(opts.limit, 10) || 20, langOf(cmd), opts.since);
@@ -808,10 +821,10 @@ export function registerNervous(program: Command): void {
     .command('recommendations')
     .alias('recs')
     .description(getMessage('cli.nervous.recommendations.desc', getLanguage(undefined)))
-    .option('--all', 'Include dismissed recommendations (default: open only)')
-    .option('--limit <n>', 'Number of records to show', '20')
-    .option('--dismiss <id>', 'Dismiss an open recommendation by id (or unique rec- prefix)')
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--all', getMessage('cli.governance.nervous.opt.all', getLanguage(undefined)))
+    .option('--limit <n>', getMessage('cli.governance.opt.limit', getLanguage(undefined)), '20')
+    .option('--dismiss <id>', getMessage('cli.governance.nervous.opt.dismiss', getLanguage(undefined)))
+    .option('--lang <code>', getMessage('cli.governance.opt.lang', getLanguage(undefined)))
     .action((opts: { all?: boolean; limit: string; dismiss?: string }, cmd: Command) => {
       const root = resolveProjectRoot();
       const lang = langOf(cmd);
@@ -826,18 +839,21 @@ export function registerNervous(program: Command): void {
   nervousCmd
     .command('log')
     .description(getMessage('cli.nervous.log.desc', getLanguage(undefined)))
-    .option('--follow', 'Watch for new entries (live tail)')
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--follow', getMessage('cli.governance.nervous.opt.follow', getLanguage(undefined)))
+    .option('--lang <code>', getMessage('cli.governance.opt.lang', getLanguage(undefined)))
     .action((opts: { follow?: boolean }, cmd: Command) => {
       const root = resolveProjectRoot();
       showLog(root, opts.follow === true, langOf(cmd));
     });
 
   // deckent nervous accept-panic <task-id> (Sprint 180 W4-2)
-  nervousCmd
-    .command('accept-panic <task-id>')
+  bindGovernanceArgumentDescriptions(
+    nervousCmd.command('accept-panic <task-id>'),
+    getLanguage(undefined),
+    { 'task-id': 'cli.governance.nervous.arg.task_id' },
+  )
     .description(getMessage('cli.nervous.accept_panic.desc', getLanguage(undefined)))
-    .option('--reason <text>', 'Optional reason for the approval')
+    .option('--reason <text>', getMessage('cli.governance.nervous.opt.panic_reason', getLanguage(undefined)))
     .action((taskId: string, opts: { reason?: string }) => {
       const root = resolveProjectRoot();
       handleAcceptPanic(root, taskId, opts.reason);

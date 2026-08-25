@@ -6,15 +6,18 @@ import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
+import { memoryCatalogMessage } from '../helpers/message-catalog/cli-memory-catalog.js';
 import { detectLang } from '../helpers/i18n.js';
 
 export function registerRemember(program: Command): void {
   program
-    .command('remember <note>')
+    .command('remember')
+    .argument('<note>', memoryCatalogMessage('cli.memcat.remember.arg.note', getLanguage(undefined)))
     .description(getMessage('cli.remember.desc', getLanguage(undefined)))
-    .option('-t, --type <type>', 'Entry type (default: memory)', 'memory')
-    .option('--tags <tags>', 'Comma-separated tags', '')
-    .option('--title <title>', 'Entry title (default: first 60 chars of note)')
+    .option('-t, --type <type>', memoryCatalogMessage('cli.memcat.remember.opt.type', getLanguage(undefined)), 'memory')
+    .option('--tags <tags>', memoryCatalogMessage('cli.memcat.remember.opt.tags', getLanguage(undefined)), '')
+    .option('--title <title>', memoryCatalogMessage('cli.memcat.remember.opt.title', getLanguage(undefined)))
+    .addHelpText('after', memoryCatalogMessage('cli.memcat.remember.help.paths', getLanguage(undefined)))
     .action((note: string, opts) => {
       const root = resolveProjectRoot();
       const lang = detectLang(root);

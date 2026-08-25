@@ -6,6 +6,7 @@ import { loadConfig } from '../../core/config.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
+import { cliContractMessage } from '../helpers/message-catalog/cli-run.js';
 
 /**
  * Count task blocks in DIRECTIVES.md content.
@@ -29,11 +30,12 @@ async function readStdin(): Promise<string> {
 }
 
 export function registerSetDirectives(program: Command): void {
+  const helpLang = getLanguage(undefined);
   program
     .command('set-directives')
     .description(getMessage('cli.set_directives.desc', getLanguage(undefined)))
-    .option('--content <string>', 'Directive content to write directly')
-    .option('--file <path>', 'Read content from a file')
+    .option('--content <string>', cliContractMessage('cliContract.set_directives.opt.content', helpLang))
+    .option('--file <path>', cliContractMessage('cliContract.set_directives.opt.file', helpLang))
     .action(async (opts: { content?: string; file?: string }) => {
       const root = resolveProjectRoot();
 

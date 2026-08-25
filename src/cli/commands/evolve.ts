@@ -54,8 +54,8 @@ export function registerEvolve(program: Command): void {
   evolve
     .command('report')
     .description(getMessage('cli.evolve.report.desc', getLanguage(undefined)))
-    .option('-n, --sprints <n>', 'Number of sprints to analyze', '10')
-    .option('--json', 'Output as JSON')
+    .option('-n, --sprints <n>', getMessage('cli.governance.evolve.opt.sprints', getLanguage(undefined)), '10')
+    .option('--json', getMessage('cli.governance.opt.json', getLanguage(undefined)))
     .action((opts: { sprints: string; json: boolean }) => {
       const root = process.cwd();
       const n = Math.max(1, parseInt(opts.sprints, 10) || 10);
