@@ -147,7 +147,7 @@ projection'ıdır. Ürün kullanıcı belleği bundan ayrıdır ve `.brain/memor
   API/CLI/MCP/autonomous/process/connectors aynı application-service authority'nin
   adapterlarıdır. Yön ve gerekçe `docs/en/vision.md` + `docs/tr/vision.md`; iş SSOT'u
   `docs/MASTER-PLAN.md`.
-- **CLOSURE-OS-LEDGER-AUTHORITY.** Closure disposition / sidecar-ledger mutation yalnız authenticated batch authority + append-only gate (`scripts/lint-closure-dispositions.mjs`) + projection settlement üzerinden yapılır; elle MASTER/ledger sınıflandırması veya sahte receipt YASAK. Phase-4 foundation + owner-verified public genesis trust anchor main'de (PR #127, commit `88637d5d6`; private signer key repo DIŞINDA owner custody — dokunma/okuma/loglama yasak); Phase-5 writer/signer CANLI — ilk authenticated batch (`dba89c03…`, 2 event) append edildi, 8101+7140 settlement'ı bu batch'e bağlıdır (2026-08-17). Ayrıntı: `docs/governance/closure-os-sidecar-ledger.md`.
+- **CLOSURE-OS-LEDGER-AUTHORITY.** Closure disposition / sidecar-ledger mutation yalnız authenticated batch authority + append-only gate (`scripts/lint-closure-dispositions.mjs`) + projection settlement üzerinden yapılır; elle MASTER/ledger sınıflandırması veya sahte receipt YASAK. Phase-4 foundation + owner-verified public genesis trust anchor main'de (PR #127, commit `88637d5d6`; private signer key repo DIŞINDA owner custody — dokunma/okuma/loglama yasak); Phase-5 writer/signer CANLI — ilk authenticated batch (`dba89c03…`, 2 event) append edildi, 8101+7140 settlement'ı bu batch'e bağlıdır (2026-08-17). Ayrıntı: `docs/archive/governance-2026-08/closure-os-sidecar-ledger.md`.
 </operating_rules>
 
 <execution_mode>

@@ -4,25 +4,25 @@
 
 Deckent; Assistant, parallel Worker'lar ve Platform control plane'i tek authority chain çevresinde birleştirir: `Goal → Mission → Flow → Run → WorkItem → Attempt → Operation`. Terminal ve Desktop primary operator surface'lerdir; CLI, MCP, API, process/autonomous girişleri ve connectors adapter'dır; Dashboard bir observability projection'dır. [Kanıt: `.deckent/workspace/IDENTITY.md:2-10,16-17`]
 
-[English documentation](https://github.com/VerhexIO/deckent/blob/main/docs/en/overview.md) · [Türkçe dokümantasyon](https://github.com/VerhexIO/deckent/blob/main/docs/tr/overview.md) · [Güncel gerçeklik farkları](https://github.com/VerhexIO/deckent/blob/main/docs/analysis/CODE-DOC-DIFF-2026-08.md)
+[English documentation](https://github.com/VerhexIO/deckent/blob/main/docs/en/overview.md) · [Türkçe dokümantasyon](https://github.com/VerhexIO/deckent/blob/main/docs/tr/overview.md) · [Güncel sürtünmeler](https://github.com/VerhexIO/deckent/blob/main/docs/tr/operations/current-frictions.md)
 
-## Neden var?
+## Neden var
 
-Kullanışlı bir agent runtime yalnız code üretmemelidir. Deckent provider ve model policy'yi çözer, dependency-aware work'ü ayrıştırır, write scope'u sınırlar, Attempt ve Operation'ları kaydeder, sonuçları değerlendirir, evidence settlement yapar, memory tutar ve recovery yolları sunar. Bu sorumluluklar güncel orchestration, configuration, memory, authority ve RunFlow modüllerinde görülebilir. [Kanıt: `src/orchestra/sprint-controller.ts`; `src/orchestra/dependency-scheduler.ts`; `src/core/config.ts`; `src/core/memory-store.ts`; `src/core/run-flow-store.ts`; `src/core/task-settlement-authority.ts`]
+Faydalı bir agent runtime kod üretmekten fazlasını yapmalıdır. Deckent; provider ve model policy'sini çözer, dependency-aware iş ayrıştırır, write scope'unu sınırlar, attempt ve operation kaydeder, sonuçları değerlendirir, kanıtı settle eder, memory tutar ve recovery yolları sunar. Bu sorumluluklar güncel orchestration, configuration, memory, authority ve run-flow modüllerinde görünür durumdadır. [Kanıt: `src/orchestra/sprint-controller.ts`; `src/orchestra/dependency-scheduler.ts`; `src/core/config.ts`; `src/core/memory-store.ts`; `src/core/run-flow-store.ts`; `src/core/task-settlement-authority.ts`]
 
-Ürün aynı anda iki kitle için tasarlanır: düşük sürtünmeyle control isteyen solo kullanıcı ve multi-project, multi-tenant, cross-platform policy/audit isteyen kurumlar. macOS, Linux, Windows native ve WSL2 üzerinde çalışmalı; bir capability yoksa açıkça fail etmelidir. [Kanıt: `AGENTS.md:13-35`; `.deckent/workspace/IDENTITY.md:6,15`]
+Ürün iki kitleye aynı anda tasarlanır: düşük sürtünmeli kontrol isteyen solo kullanıcı ve multi-project, multi-tenant, cross-platform policy + audit gerektiren kurumlar. macOS, Linux, Windows native ve WSL2 üzerinde çalışmalı; bir yetenek yoksa bunu açıkça söyleyerek durmalıdır. [Kanıt: `AGENTS.md:13-35`; `.deckent/workspace/IDENTITY.md:6,15`]
 
-## Installation contract
+## Kurulum sözleşmesi
 
-npm package; `deckent` ve `deckent-mcp` binary'lerini sunar, Node.js `>=24.0.0` ister ve compiled `dist` ağacını yayımlar. [Kanıt: `package.json:2-20,115-123`]
+npm paketi `deckent` ve `deckent-mcp` binary'lerini sunar, Node.js `>=24.0.0` ister ve derlenmiş `dist` ağacını yayınlar. [Kanıt: `package.json`]
 
-Published-package installation için bildirilen komut `npm install -g deckent`'tir. Bu documentation audit network ve global state mutation yapan bu komutu **çalıştırmadı**; registry installation publish pipeline doğrulayana kadar `HOLD`'dur. Repository build komutu `npm run build:all`, bu yeniden-yazımdan hemen önce owner tarafından çalıştırıldı. [Kanıt: `package.json:22-38`; owner run bildirimi, 2026-08-01; `docs/analysis/OPEN-QUESTIONS-2026-08.md`]
+Yayınlanmış-paket kurulumu için beyan edilen komut `npm install -g deckent`'tir. `0.100.0` tag'siz bir version/changelog rebaseline'ıdır, yayınlanmış release değildir; registry'den kurulum owner-gated release kapanana kadar `HOLD`'dur. Repo build komutu `npm run build:all`'dur. [Kanıt: `package.json`; `docs/MASTER-PLAN.md` RELEASE-001]
 
-Release'ler manuel değil, governed'dır. `main` bir GitHub merge queue ile korunur; bu yüzden CI required check'leri yalnız pull-request branch'inde değil final merge result üzerinde yeniden koşar — CI workflow tam bu nedenle `merge_group` event'ini dinler. Ardından bir `v*` tag tek publish authority'yi çalıştırır: install → `build:all` → `validate:publish` → smoke gate → `npm publish` → GitHub Release. Eski publish workflow'u read-only dry-run'a indirgenmiştir ve registry'ye asla yükleme yapmaz. [Kanıt: `.github/workflows/ci.yml:3-11,17-23`; `.github/workflows/release.yml:1-11`; `.github/workflows/publish.yml:1-12`]
+Release'ler manuel değil governed'dır. `main` GitHub merge queue ile korunur; CI, required check'leri nihai merge sonucu üzerinde yeniden koşar (`merge_group` trigger'ı tam bu nedenle vardır). Publish **tasarım gereği owner-manual'dır**: release workflow'u yalnız build/validate/attestation üretir ve read-only izinlerle çalışır — otomatik npm-publish ve GitHub-Release adımları bilinçli olarak kaldırıldı (2026-08-14); `npm publish` daima owner tarafından elle koşulur. [Kanıt: `.github/workflows/ci.yml:3-11`; `.github/workflows/release.yml`; `tests/governance/release-workflow-unify.test.ts`]
 
-## Doğrulanmış beş dakikalık orientation
+## Doğrulanmış beş dakikalık yönelim
 
-Aşağıdaki dört komut 2026-08-01'de güncel compiled binary üzerinde gerçekten çalıştırıldı. Hepsi read-only'dir: binary identity'yi, readiness'i, onboarding preview'ını ve mevcut run authority'yi okur.
+Aşağıdaki dört komut 2026-08-25'te güncel derlenmiş binary üzerinde koşuldu. Read-only'dirler; binary'yi kimliklendirir, hazırlığı inceler, onboarding'i önizler ve güncel run authority'sini okurlar.
 
 ```bash
 node dist/cli/entry.js --version-json
@@ -31,74 +31,74 @@ node dist/cli/entry.js onboard --plan-only --json
 node dist/cli/entry.js status --json
 ```
 
-Gözlenen checkpoints:
+Gözlenen kontrol noktaları:
 
-- Version; `0.100.0`, Node `v24.15.0`, Linux bildirdi; exit 0.
-- Doctor `ok: true` döndürdü; honest summary bu workspace'te 15 ready ve required olmayan 2 missing check bildirdi; exit 0.
-- Onboarding; `applied: false` olan project-scoped, balanced config plan döndürdü; logged-in Claude ve Codex session'larını tespit etti ve planı yazmadı; exit 0.
-- Status; `active: false`, `lifecycle: IDLE` ve exact current-run task set dışındaki dört unresolved interval için dürüst provider-observation `HOLD` döndürdü; exit 0.
+- Version `0.100.0`, Node `v24.15.0`, Linux; exit 0.
+- Doctor `ok: true` döndü — 18 kontrolün 14'ü hazır, 4'ü non-required dikkat; yeni routing-journal sağlık kontrolü daha İLK koşusunda gerçek bir tarihsel bozuk journal artığını yakaladı; exit 0.
+- Onboarding `applied: false` ile project-scoped config planı döndü ve yazmadı; exit 0.
+- Status `active: false` ve son run'ın dürüst terminal durumunu (`ABORTED` — force-finalize edilen dogfood run'ları neyse o olarak kaydedilir, asla yeniden-etiketlenmez) döndü; exit 0.
 
-[Kanıt: dört komutun real-binary output'u, 2026-08-01; read-only contract'lar `src/cli/commands/doctor.ts:2190-2245`, `src/cli/commands/onboard.ts:301-316,502-546`, `src/cli/commands/status.ts:725-781,1024-1040`]
+[Kanıt: dört komutun gerçek-binary çıktıları, 2026-08-25; read-only kontratlar `src/cli/commands/doctor-checks.ts`, `src/cli/commands/onboard.ts`, `src/cli/commands/status.ts`]
 
-Gerçek work başlatma burada doğrulanmış gibi sunulmaz. Audit'in sprint/run/autonomous execution komutu çalıştırması açıkça yasaklandı. Bu yüzden exact execution proof uydurulmadı; typed `HOLD` olarak kaydedildi. [Kanıt: owner boundary; `docs/analysis/OPEN-QUESTIONS-2026-08.md` OQ-20]
+Gerçek işi başlatmak burada bilinçli olarak "doğrulanmış" sunulmaz: sprint/run/autonomous execution iddiaları `docs/MASTER-PLAN.md`'deki dogfood kanıt zincirine aittir; orada her iddia ekran görüntüsüne değil receipt'lere bağlıdır.
 
-## Bir workflow seçin
+## İş akışı seç
 
-| İhtiyaç | Surface | Güncel user contract | Repository gerçeği |
+| İhtiyaç | Yüzey | Güncel kullanıcı sözleşmesi | Repo gerçeği |
 |---|---|---|---|
-| Conversational control | Argümansız `deckent` veya `deckent chat --native` | Interactive agentic REPL | Argümansız çağrı native chat'e yönlenir; interactive TTY, Ink REPL kullanır. [Kanıt: `src/cli/entry.ts:51-107,157-171,664-713`] |
-| Goal preview / governed start | `deckent do <goal>` | Varsayılan preview; RunFlow v2 açıkken `--run --yes` explicit non-interactive start yoludur | Proposal compilation gerçek provider call'dır; RunFlow yolu başlamadan da proposal persist edebilir, bu nedenle audit'te çalıştırılmadı. [Kanıt: `src/cli/commands/do.ts:132-179,219-357,440-517`] |
-| Structured lifecycle | `plan`, `start`, `status`, `review`, `retro` | Planlama, execution, observation, adjudication, learning | Tüm command/help contract'ları canlı; state-changing path'ler bu audit'te yalnız help ile doğrulandı. [Kanıt: `src/cli/commands/plan.ts:121-205`; `src/cli/commands/start.ts:329-345`; `src/cli/commands/status.ts:1024-1040`; `src/cli/commands/review.ts:184-224`; `src/cli/commands/retro.ts:334-342`] |
-| One-shot work | `run <description>` | Sprint cycle olmadan tek task yürütür | Aynı `run` parent lifecycle alias'larını da taşır; bu belgelenmiş bir CLI ambiguity'dir. [Kanıt: `src/cli/commands/run.ts:451-476,920-939`] |
-| Run inbox ve kararlar | `deckent runs [n]` | Run-flow'ları listeler, sonra tek bir run'ı `--approve`, `--reject`, `--start`, `--retire`, `--diff` veya `--commit` ile karara bağlar; `--limit <n>` listelenen pencereyi genişletir, `--close-stale` ölü kayıtları sınıflar | Bu flag'lerin tümü tek bir `runs` komutunda kayıtlıdır. `--retire` onaylanmış ama hiç başlamamış bir run'ı iptal eder; flow-id prefix'i `--limit`'ten bağımsız olarak tüm flow'lara karşı çözülür. [Kanıt: `src/cli/commands/runs.ts:249-262`] |
-| Owner-managed model activation | `deckent models list/activate/deactivate/activation` | Detection provider'ın ne sunduğunu bildirir; activation owner'ın routing pool'a neyi kabul ettiğini kaydeder | `activate` ve `deactivate` `--provider` ister; kaydı olmayan model active sayılır, bu yüzden dokunulmamış proje değişmez. [Kanıt: `src/cli/commands/models.ts:158-205`] |
-| Durable process work | `process submit/status/result` | Bir `ExecutionRequest` submit eder; side effect approval için park edebilir | CLI surface kayıtlıdır ve process service'lere gider. [Kanıt: `src/cli/commands/process.ts:142-190`] |
-| Continuous work | `autonomous …` | Durable backlog, approvals, status ve loop control | Manifest runtime'ı active ama default-off işaretler; MCP parity eksiği ve attach-only reactive bridge kaydeder. [Kanıt: `.deckent/settings/features-manifest.json`; `src/cli/commands/autonomous.ts:1710-1946`] |
-| Remote/programmatic control | HTTP/SSE ve MCP | API server ve 49 MCP tool / 8 resource | 49 tool kayıtlıdır; CLI/MCP parity gate hâlâ baseline ile 37 CLI-only ve 1 MCP-only gap kabul eder. [Kanıt: `src/mcp/tools/index.ts:68-125`; `src/mcp/server.ts`; `npm run lint:parity`, 2026-08-01] |
+| Konuşmalı kontrol | Çıplak `deckent` veya `deckent chat --native` | Etkileşimli agentic REPL | Çıplak çağrı native chat'e yönlenir; etkileşimli TTY Ink REPL kullanır. [Kanıt: `src/cli/entry.ts`] |
+| Goal önizleme / governed başlatma | `deckent do <goal>` | Varsayılan önizleme; RunFlow v2 açıkken `--run --yes` açık non-interactive başlatma yoludur | Proposal derlemesi gerçek provider çağrısıdır; RunFlow yolu başlatmadan da proposal kalıcılaştırabilir. [Kanıt: `src/cli/commands/do.ts`] |
+| Yapılandırılmış yaşam döngüsü | `plan`, `start`, `status`, `review`, `retro` | Planla, yürüt, gözle, karara bağla, öğren | Tüm komut/yardım kontratları canlı ve CLI surface-truth bataryasıyla (504 gerçek `--help` koşusu) sınanıyor. [Kanıt: `tests/cli/cli-surface-truth-battery.test.ts`] |
+| Tek atımlık iş | `run <açıklama>` | Sprint döngüsü olmadan tek task çalıştır | Aynı `run` ebeveyni lifecycle alias'larını da taşır; belgelenmiş bir CLI belirsizliğidir. [Kanıt: `src/cli/commands/run.ts`] |
+| Run gelen kutusu ve kararlar | `deckent runs [n]` | Run-flow'ları listele; tek run'ı `--approve`, `--reject`, `--start`, `--retire`, `--diff` veya `--commit` ile karara bağla | Tüm flag'ler tek `runs` komutunda kayıtlı; flow-id prefix'i `--limit`'ten bağımsız tüm flow'lara çözülür. [Kanıt: `src/cli/commands/runs.ts`] |
+| Owner-yönetimli model aktivasyonu | `deckent models list/activate/deactivate/activation` | Detection provider'ın sunduğunu raporlar; activation owner'ın routing havuzuna neye izin verdiğini kaydeder | Tek authority `ModelActivationStore`'dur; explicit-active modda hiçbir tespit edilen model havuza sessizce giremez. [Kanıt: `src/cli/commands/models.ts`; `src/core/model-activation-store.ts`] |
+| Kalıcı process işi | `process submit/status/result` | `ExecutionRequest` gönder; yan etkiler approval için park edilebilir | CLI yüzeyi kayıtlı ve process service'lerine bağlı. [Kanıt: `src/cli/commands/process.ts`] |
+| Sürekli iş | `autonomous …` | Kalıcı backlog, approvals, status ve döngü kontrolleri | Runtime aktif ama default-off; reactive bridge attach-only'dir. [Kanıt: `.deckent/settings/features-manifest.json`; `src/cli/commands/autonomous.ts`] |
+| Uzak/programatik kontrol | HTTP/SSE ve MCP | API server ve MCP tool/resource'ları (sayılar aşağıda) | Approvals MCP üzerinde tasarım gereği read-only'dir — allow/deny kararları yalnız etkileşimli CLI yüzeyinde vardır. [Kanıt: `src/mcp/tools/index.ts`; `src/mcp/server.ts`] |
 
-## Product capabilities
+## Ürün yetenekleri
 
-- Deterministic, evaluation-backed lifecycle orchestration, dependency scheduling, FIX retry'ları, checkpoints, retrospectives ve rollback policy. [Kanıt: `src/orchestra/sprint-phases.ts`; `src/orchestra/dependency-scheduler.ts`; `src/orchestra/sprint-checkpoint.ts`; `src/orchestra/rollback.ts`]
-- Hard-coded product provider yerine effective config, model registry, live authority, reachability, limits ve budget'tan provider-neutral routing. [Kanıt: `.deckent/workspace/IDENTITY.md:10`; `src/core/config.ts`; `src/core/model-registry.ts`; `src/core/routing/route-task-v3.ts`]
-- SQLite/FTS5 tabanlı DB-first memory; relation/history, document freshness, KPI store'ları, recall ve export/backup operation'ları. [Kanıt: `src/core/memory-store.ts:100-338`; `src/core/memory-query.ts`; `src/cli/commands/memory.ts`; `src/cli/commands/recall.ts:11-20`]
-- Runtime-wide approval, authority, audit, scope ve immutable settlement contract'ları. [Kanıt: `src/core/approval-broker.ts`; `src/orchestra/authority-enforcer.ts`; `src/core/task-settlement-authority.ts`; `src/core/invocation-receipt-store.ts:705-850`]
-- Native REPL, terminal dashboard, web/API server, Desktop, VS Code extension, connectors, CLI ve MCP surface'leri. [Kanıt: `src/cli/entry.ts:664-713`; `src/cli/commands/dashboard.ts:147-214`; `src/cli/commands/serve.ts:72-80`; `src/desktop`; `src/extensions/vscode`; `src/connectors`; `src/mcp`]
-- 75 top-level komut altında 215 visible CLI command path, 51 canonical MCP tool, 8 MCP resource, 21 built-in agent ve 31 built-in skill. Identity projection aynı agent ve skill sayılarını bildirir. [Kanıt: recursive `buildProgram()` ve `TOOL_CATALOG` introspection ile filesystem sayımları, 2026-08-18; `.deckent/workspace/IDENTITY.md` `identity-summary` bloğu]
+- Deterministik, evaluation-backed lifecycle orchestration; dependency scheduling, FIX retry'ları, checkpoint'ler, retrospektifler ve rollback policy'si. [Kanıt: `src/orchestra/sprint-phases.ts`; `src/orchestra/dependency-scheduler.ts`; `src/orchestra/sprint-checkpoint.ts`; `src/orchestra/rollback.ts`]
+- Hard-coded ürün provider'ı yerine effective config, model registry, canlı authority, reachability, limit ve bütçeden çözülen provider-neutral routing — anahtarları vocabulary'ye bağlı bir learning-cells outcome ledger'ı ile; altyapı kaynaklı ölümler (OOM, usage limit, auth kaybı) bir ajanın yetenek skorunu asla cezalandırmaz. [Kanıt: `src/core/routing/route-task-v3.ts`; `src/core/routing/learning-cells.ts`]
+- SQLite/FTS5 ile DB-first memory; relation/history, doküman tazeliği, KPI store'ları, recall ve export/backup operasyonları. [Kanıt: `src/core/memory-store.ts`; `src/core/memory-query.ts`; `src/cli/commands/memory.ts`]
+- Runtime genelinde approval, authority, audit, scope ve immutable settlement kontratları — private key'i repo dışında owner custody'sinde duran Ed25519 trust-anchor'lı append-only closure ledger dahil. [Kanıt: `src/core/approval-broker.ts`; `src/orchestra/authority-enforcer.ts`; `scripts/lint-closure-dispositions.mjs`; `docs/governance/`]
+- Native REPL, terminal dashboard, web/API server, Desktop, VS Code extension, connectors (Telegram teslimi canlı-kanıtlı), CLI ve MCP yüzeyleri. [Kanıt: `src/cli/entry.ts`; `src/cli/commands/dashboard.ts`; `src/cli/commands/serve.ts`; `src/desktop`; `src/extensions/vscode`; `src/connectors`; `src/mcp`]
+- Gerçek Commander ağacının yürünmesi ve 504 gerçek `--help` koşusuyla ölçülmüş 253 görünür CLI komut yolu, 548 option ve 103 positional argüman (2026-08-25). MCP tool/resource, agent ve skill sayıları aşağıda generator-sahiplidir. [Kanıt: `tests/cli/cli-surface-truth-battery.test.ts`; `docs/generated/cli-manifest.json`]
 
-## Güncel repository gerçeği
+## Güncel repo gerçeği
 
-Detaylı dokümanlardaki status label'ları:
+Ayrıntılı dokümanlardaki durum etiketleri:
 
-- `✅ canlı`: source wiring vardır ve güncel runtime evidence iddiayı destekler.
-- `⚠️ kısmi`: code vardır; flag, eksik proof, parity gap veya production closure iddiayı sınırlar.
-- `🔜 roadmap`: design/history vardır fakat current production closure yoktur.
+- `✅ live`: source wiring mevcut ve güncel runtime kanıtı iddiayı destekliyor.
+- `⚠️ partial`: kod mevcut; ama bir flag, eksik kanıt, parity açığı veya production closure iddiayı sınırlıyor.
+- `🔜 roadmap`: tasarım/tarihçe mevcut, güncel production closure yok.
 
-Feature manifest şu anda 21 active, 4 lightly used, 9 dormant ve 1 dead entry listeler. Canlı `truth --json` check beş truth contract bildirdi: training trace code/wired/enabled/proven; tool surface, worker approval gate ve routing journal runtime proof'suz; prompt-gate-block detected callsite olmadan tek half-wire candidate. [Kanıt: `.deckent/settings/features-manifest.json`; real `node dist/cli/entry.js features --json` ve `truth --json` output'ları, 2026-08-01]
+Feature manifest'i şu anda 35 girdi listeler. Canlı `truth --json` kontrolü 2026-08-25'te beş truth kontratı raporladı: training trace code/wired/enabled/proven; tool surface ve worker approval gate wired+enabled ama runtime kanıtı eksik; routing decision journal wired (journal dosyaları canlı yazılıyor) fakat enabling flag tespit edilmedi; prompt-gate-block'un tespit edilen callsite'ı yok ve tek half-wire adayı olmayı sürdürüyor. [Kanıt: gerçek `node dist/cli/entry.js features --json` ve `truth --json` çıktıları, 2026-08-25]
 
-Son dogfood handoff unattended production reliability'yi certify etmez: Codex audit 0/31 intervention-free run kaydeder ve sıralı certification ladder isteyen settlement/gate contradiction'ları belgeler. Bunlar product language arkasına saklanmaz; [Güncel sürtünmeler](https://github.com/VerhexIO/deckent/blob/main/docs/tr/operations/current-frictions.md) ve [fark raporuna](https://github.com/VerhexIO/deckent/blob/main/docs/analysis/CODE-DOC-DIFF-2026-08.md) bakın. [Kanıt: `docs/MASTER-PLAN.md` — RECOVERY-BORN-488 ailesi, RECOVERY-BORN-490-REPLAY-CERTIFICATION-001 ve CODEX-MAIN-001 karar satırı]
+Dogfood dürüstlüğü ürünün parçasıdır: Deckent kendini kendi run'larıyla geliştirir ve o run'ların başarısızlıkları yeniden-etiketlenmek yerine `docs/MASTER-PLAN.md`'de kök-neden satırlarıyla `ABORTED` olarak kaydedilir. Gözetimsiz production güvenilirliği sertifikalı değildir; bkz. [Güncel sürtünmeler](https://github.com/VerhexIO/deckent/blob/main/docs/tr/operations/current-frictions.md).
 
 ## Dokümantasyon haritası
 
-- [Başlangıç](https://github.com/VerhexIO/deckent/blob/main/docs/tr/guide/getting-started.md)
-- [Run lifecycle](https://github.com/VerhexIO/deckent/blob/main/docs/tr/guide/run-lifecycle.md)
-- [Execution modes](https://github.com/VerhexIO/deckent/blob/main/docs/tr/guide/execution-modes.md)
-- [Interactive surfaces](https://github.com/VerhexIO/deckent/blob/main/docs/tr/guide/interactive-surfaces.md)
-- [Feature catalog](https://github.com/VerhexIO/deckent/blob/main/docs/tr/features/catalog.md)
-- [CLI reference](https://github.com/VerhexIO/deckent/blob/main/docs/tr/cli.md)
-- [MCP reference](https://github.com/VerhexIO/deckent/blob/main/docs/tr/mcp.md)
-- [Database reference](https://github.com/VerhexIO/deckent/blob/main/docs/tr/db.md)
-- [Configuration](https://github.com/VerhexIO/deckent/blob/main/docs/tr/configuration.md)
-- [Tam çift-dilli dokümantasyon index'i](https://github.com/VerhexIO/deckent/blob/main/docs/index.md)
-- [Code–documentation fark raporu](https://github.com/VerhexIO/deckent/blob/main/docs/analysis/CODE-DOC-DIFF-2026-08.md)
+- [Başlarken](https://github.com/VerhexIO/deckent/blob/main/docs/tr/guide/getting-started.md)
+- [Run yaşam döngüsü](https://github.com/VerhexIO/deckent/blob/main/docs/tr/guide/run-lifecycle.md)
+- [Yürütme modları](https://github.com/VerhexIO/deckent/blob/main/docs/tr/guide/execution-modes.md)
+- [Etkileşimli yüzeyler](https://github.com/VerhexIO/deckent/blob/main/docs/tr/guide/interactive-surfaces.md)
+- [Özellik kataloğu](https://github.com/VerhexIO/deckent/blob/main/docs/tr/features/catalog.md)
+- [CLI referansı](https://github.com/VerhexIO/deckent/blob/main/docs/tr/cli.md)
+- [MCP referansı](https://github.com/VerhexIO/deckent/blob/main/docs/tr/mcp.md)
+- [Veritabanı referansı](https://github.com/VerhexIO/deckent/blob/main/docs/tr/db.md)
+- [Yapılandırma](https://github.com/VerhexIO/deckent/blob/main/docs/tr/configuration.md)
+- [Bağımlılık gerekçe defteri](https://github.com/VerhexIO/deckent/blob/main/docs/tr/reference/dependencies.md)
+- [Tam iki dilli dokümantasyon dizini](https://github.com/VerhexIO/deckent/blob/main/docs/index.md)
 
-## Constitutional constraints
+## Anayasal kısıtlar
 
-Deckent'in üç Immutable Law'u Dual Lens + Scale, Every Environment ve Never MVP'dir. Tam governance yorumu [Immutable Laws](https://github.com/VerhexIO/deckent/blob/main/docs/tr/governance/immutable-laws.md) içinde belgelenir. [Kanıt: `AGENTS.md:9-35`]
+Deckent'in üç değişmez yasası: Dual Lens + Scale, Every Environment ve Never MVP. Tam governance yorumu [Immutable Laws](https://github.com/VerhexIO/deckent/blob/main/docs/tr/governance/immutable-laws.md) belgesindedir. [Kanıt: `AGENTS.md:9-35`]
 
-License: MIT. [Kanıt: `package.json:90-91`; `LICENSE`]
+License: MIT. [Kanıt: `package.json`; `LICENSE`]
 
 <!-- AUTOGEN:START id="badges" -->
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-37228%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-492%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.100.0-orange)](https://github.com/VerhexIO/deckent) [![CI](https://img.shields.io/github/actions/workflow/status/VerhexIO/deckent/ci.yml?label=ci)](https://github.com/VerhexIO/deckent/actions)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-37198%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-492%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.100.0-orange)](https://github.com/VerhexIO/deckent) [![CI](https://img.shields.io/github/actions/workflow/status/VerhexIO/deckent/ci.yml?label=ci)](https://github.com/VerhexIO/deckent/actions)
 <!-- AUTOGEN:END id="badges" -->
 
 <!-- AUTOGEN:START id="stat-counts" -->

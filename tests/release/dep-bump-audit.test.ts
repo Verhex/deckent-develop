@@ -19,7 +19,7 @@ function readJson(relPath: string): any {
   return JSON.parse(readFileSync(join(PROJECT_ROOT, relPath), 'utf-8'));
 }
 
-// Advisory IDs this bump closes — see docs/reference/dependencies.md "Security Bump Log".
+// Advisory IDs this bump closes — see docs/en/reference/dependencies.md "Security Bump Log".
 const CLOSED_ADVISORY_IDS = [
   '1117870', // fast-uri — GHSA-q3j6-qgpj-74h6
   '1117884', // fast-uri — GHSA-v39h-62p7-jpjc

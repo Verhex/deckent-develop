@@ -35,7 +35,7 @@
 // No new dependency was added for it: `string-width`/`wcwidth`-family packages
 // exist only as transitive `node_modules` of `ink`, not a declared
 // package.json dependency, and ADR-D-005 requires a documented rationale + a
-// `docs/reference/dependencies.md` entry before adding one — out of this
+// `docs/en/reference/dependencies.md` entry before adding one — out of this
 // task's write scope. The rest of this directory's pure-core family
 // (input-queue.ts, stream-segmenter.ts) is deliberately dependency-free too.
 

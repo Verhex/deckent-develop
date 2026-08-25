@@ -2463,7 +2463,7 @@ const PILOT_ADR_RULES: Map<string, ADREnforcementRule> = new Map([
  *
  * The retired ADR-010 count-cap ("≤ N runtime deps") is replaced by the
  * merit-based policy: a dependency is admitted at ANY count, but every one MUST
- * carry a rationale entry in `docs/reference/dependencies.md`. This warns
+ * carry a rationale entry in `docs/en/reference/dependencies.md`. This warns
  * (severity `warning` — NEVER a NO_GO) for each `package.json` runtime/optional
  * dependency whose name is absent from that inventory.
  *
@@ -2492,7 +2492,7 @@ export function checkDependencyInventoryDrift(
 
   let inventory: string;
   try {
-    inventory = readFileSync(join(projectRoot, 'docs', 'reference', 'dependencies.md'), 'utf-8');
+    inventory = readFileSync(join(projectRoot, 'docs', 'en', 'reference', 'dependencies.md'), 'utf-8');
   } catch {
     return []; // no inventory doc to assess against — stay silent (advisory)
   }
@@ -2509,7 +2509,7 @@ export function checkDependencyInventoryDrift(
         adrTitle: 'Dependency Policy & Inventory',
         violation:
           `Runtime dependency "${dep}" has no rationale entry in `
-          + `docs/reference/dependencies.md (ADR-D-005: every dependency is admitted `
+          + `docs/en/reference/dependencies.md (ADR-D-005: every dependency is admitted `
           + `on merit and MUST be documented). Advisory — add a rationale row.`,
         severity: 'warning',
       });

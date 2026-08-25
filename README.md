@@ -4,7 +4,7 @@
 
 Deckent unifies an assistant, parallel workers, and a platform control plane around one authority chain: `Goal → Mission → Flow → Run → WorkItem → Attempt → Operation`. Terminal and Desktop are the primary operator surfaces; CLI, MCP, API, process/autonomous entry points, and connectors are adapters; Dashboard is an observability projection. [Evidence: `.deckent/workspace/IDENTITY.md:2-10,16-17`]
 
-[English documentation](https://github.com/VerhexIO/deckent/blob/main/docs/en/overview.md) · [Türkçe dokümantasyon](https://github.com/VerhexIO/deckent/blob/main/docs/tr/overview.md) · [Current truth gaps](https://github.com/VerhexIO/deckent/blob/main/docs/analysis/CODE-DOC-DIFF-2026-08.md)
+[English documentation](https://github.com/VerhexIO/deckent/blob/main/docs/en/overview.md) · [Türkçe dokümantasyon](https://github.com/VerhexIO/deckent/blob/main/docs/tr/overview.md) · [Current frictions](https://github.com/VerhexIO/deckent/blob/main/docs/en/operations/current-frictions.md)
 
 ## Why it exists
 
@@ -14,15 +14,15 @@ The product is designed for two audiences at once: a solo user who wants low-fri
 
 ## Installation contract
 
-The npm package exposes `deckent` and `deckent-mcp`, requires Node.js `>=24.0.0`, and publishes the compiled `dist` tree. [Evidence: `package.json:2-20,115-123`]
+The npm package exposes `deckent` and `deckent-mcp`, requires Node.js `>=24.0.0`, and publishes the compiled `dist` tree. [Evidence: `package.json`]
 
-For a published-package installation, the declared command is `npm install -g deckent`. This documentation audit did **not** execute that networked, global mutation, so installation-from-registry remains `HOLD` until the publish pipeline verifies it. The repository build command `npm run build:all` was run by the owner immediately before this rewrite. [Evidence: `package.json:22-38`; owner run statement, 2026-08-01; `docs/analysis/OPEN-QUESTIONS-2026-08.md`]
+For a published-package installation, the declared command is `npm install -g deckent`. `0.100.0` is a tagless version/changelog rebaseline, not a published release; installation-from-registry remains `HOLD` until the owner-gated release closes. The repository build command is `npm run build:all`. [Evidence: `package.json`; `docs/MASTER-PLAN.md` RELEASE-001]
 
-Releases are governed rather than manual. `main` is protected by a GitHub merge queue, so CI re-runs the required checks on the final merge result and not only on the pull-request branch; the CI workflow listens on `merge_group` for exactly that reason. A `v*` tag then runs a single publish authority: install → `build:all` → `validate:publish` → smoke gate → `npm publish` → GitHub Release. The older publish workflow is retired to a read-only dry-run and never uploads to the registry. [Evidence: `.github/workflows/ci.yml:3-11,17-23`; `.github/workflows/release.yml:1-11`; `.github/workflows/publish.yml:1-12`]
+Releases are governed rather than manual. `main` is protected by a GitHub merge queue, so CI re-runs the required checks on the final merge result; the CI workflow listens on `merge_group` for exactly that reason. Publishing is **owner-manual by design**: the release workflow only builds, validates, and produces attestation artifacts with read-only permissions — the automatic npm-publish and GitHub-Release steps were deliberately removed (2026-08-14), and `npm publish` is always executed by the owner. [Evidence: `.github/workflows/ci.yml:3-11`; `.github/workflows/release.yml`; `tests/governance/release-workflow-unify.test.ts`]
 
 ## Verified five-minute orientation
 
-The following four commands were executed against the current compiled binary on 2026-08-01. They are read-only; they identify the binary, inspect readiness, preview onboarding, and read current run authority.
+The following four commands were executed against the current compiled binary on 2026-08-25. They are read-only; they identify the binary, inspect readiness, preview onboarding, and read current run authority.
 
 ```bash
 node dist/cli/entry.js --version-json
@@ -34,36 +34,36 @@ node dist/cli/entry.js status --json
 Observed checkpoints:
 
 - Version reported `0.100.0`, Node `v24.15.0`, Linux; exit 0.
-- Doctor returned `ok: true`; its honest summary reported 15 ready and 2 non-required missing checks in this workspace; exit 0.
-- Onboarding returned a project-scoped, balanced config plan with `applied: false`; it detected logged-in Claude and Codex sessions and did not write the plan; exit 0.
-- Status returned `active: false`, `lifecycle: IDLE`, and an honest provider-observation `HOLD` for four unresolved intervals outside the exact current-run task set; exit 0.
+- Doctor returned `ok: true` with 14 ready and 4 non-required attention checks out of 18 — including a new routing-journal health check that surfaced a real historic corrupt journal relic on its first run; exit 0.
+- Onboarding returned a project-scoped config plan with `applied: false` and did not write; exit 0.
+- Status returned `active: false` with the last run's honest terminal state (`ABORTED` — force-finalized dogfood runs are recorded as what they were, never relabeled); exit 0.
 
-[Evidence: real-binary outputs for all four commands, 2026-08-01; read-only contracts `src/cli/commands/doctor.ts:2190-2245`, `src/cli/commands/onboard.ts:301-316,502-546`, `src/cli/commands/status.ts:725-781,1024-1040`]
+[Evidence: real-binary outputs for all four commands, 2026-08-25; read-only contracts in `src/cli/commands/doctor-checks.ts`, `src/cli/commands/onboard.ts`, `src/cli/commands/status.ts`]
 
-Starting actual work is intentionally not presented as verified here. The audit was expressly prohibited from running sprint/run/autonomous execution commands. The exact execution-proof authority is therefore typed `HOLD` rather than replaced with fabricated output. [Evidence: owner boundary; `docs/analysis/OPEN-QUESTIONS-2026-08.md` OQ-20]
+Starting actual work is intentionally not presented as verified here: sprint/run/autonomous execution claims belong to the dogfood evidence chain in `docs/MASTER-PLAN.md`, where each is tied to receipts rather than screenshots.
 
 ## Choose a workflow
 
 | Need | Surface | Current user contract | Repository truth |
 |---|---|---|---|
-| Conversational control | Bare `deckent` or `deckent chat --native` | Interactive agentic REPL | Bare invocation routes to native chat; interactive TTY uses the Ink REPL. [Evidence: `src/cli/entry.ts:51-107,157-171,664-713`] |
-| Goal preview / governed start | `deckent do <goal>` | Preview by default; `--run --yes` is the explicit non-interactive start path when RunFlow v2 is enabled | Proposal compilation is a real provider call; the RunFlow path can persist a proposal even without starting, so it was not run in this audit. [Evidence: `src/cli/commands/do.ts:132-179,219-357,440-517`] |
-| Structured lifecycle | `plan`, `start`, `status`, `review`, `retro` | Plan, execute, observe, adjudicate, learn | All command/help contracts are live; state-changing paths were help-verified only in this audit. [Evidence: `src/cli/commands/plan.ts:121-205`; `src/cli/commands/start.ts:329-345`; `src/cli/commands/status.ts:1024-1040`; `src/cli/commands/review.ts:184-224`; `src/cli/commands/retro.ts:334-342`] |
-| One-shot work | `run <description>` | Execute one task without a sprint cycle | The same `run` parent also owns lifecycle aliases, a documented CLI ambiguity. [Evidence: `src/cli/commands/run.ts:451-476,920-939`] |
-| Run inbox and decisions | `deckent runs [n]` | List run-flows, then decide a single run with `--approve`, `--reject`, `--start`, `--retire`, `--diff`, or `--commit`; `--limit <n>` widens the listed window and `--close-stale` classifies dead records | All of those flags are registered on one `runs` command. `--retire` cancels an approved run that never started; a flow-id prefix resolves against every flow regardless of `--limit`. [Evidence: `src/cli/commands/runs.ts:249-262`] |
-| Owner-managed model activation | `deckent models list/activate/deactivate/activation` | Detection reports what a provider offers; activation records what the owner allows into the routing pool | `activate` and `deactivate` both require `--provider`; a model with no recorded decision counts as active, so an untouched project is unchanged. [Evidence: `src/cli/commands/models.ts:158-205`] |
-| Durable process work | `process submit/status/result` | Submit an `ExecutionRequest`; side effects can park for approval | CLI surface is registered and points at process services. [Evidence: `src/cli/commands/process.ts:142-190`] |
-| Continuous work | `autonomous …` | Durable backlog, approvals, status, and loop controls | Manifest marks runtime active but default-off and records missing MCP parity plus an attach-only reactive bridge. [Evidence: `.deckent/settings/features-manifest.json`; `src/cli/commands/autonomous.ts:1710-1946`] |
-| Remote/programmatic control | HTTP/SSE and MCP | API server and 49 MCP tools / 8 resources | 49 tools are registered; CLI/MCP parity gate still accepts 37 CLI-only and 1 MCP-only baseline gaps. [Evidence: `src/mcp/tools/index.ts:68-125`; `src/mcp/server.ts`; `npm run lint:parity`, 2026-08-01] |
+| Conversational control | Bare `deckent` or `deckent chat --native` | Interactive agentic REPL | Bare invocation routes to native chat; interactive TTY uses the Ink REPL. [Evidence: `src/cli/entry.ts`] |
+| Goal preview / governed start | `deckent do <goal>` | Preview by default; `--run --yes` is the explicit non-interactive start path when RunFlow v2 is enabled | Proposal compilation is a real provider call; the RunFlow path can persist a proposal even without starting. [Evidence: `src/cli/commands/do.ts`] |
+| Structured lifecycle | `plan`, `start`, `status`, `review`, `retro` | Plan, execute, observe, adjudicate, learn | All command/help contracts are live and exercised by the CLI surface-truth battery (504 real `--help` invocations). [Evidence: `tests/cli/cli-surface-truth-battery.test.ts`] |
+| One-shot work | `run <description>` | Execute one task without a sprint cycle | The same `run` parent also owns lifecycle aliases, a documented CLI ambiguity. [Evidence: `src/cli/commands/run.ts`] |
+| Run inbox and decisions | `deckent runs [n]` | List run-flows, then decide a single run with `--approve`, `--reject`, `--start`, `--retire`, `--diff`, or `--commit` | All flags registered on one `runs` command; a flow-id prefix resolves against every flow regardless of `--limit`. [Evidence: `src/cli/commands/runs.ts`] |
+| Owner-managed model activation | `deckent models list/activate/deactivate/activation` | Detection reports what a provider offers; activation records what the owner allows into the routing pool | Single authority is `ModelActivationStore`; in explicit-active mode no detected model enters the pool silently. [Evidence: `src/cli/commands/models.ts`; `src/core/model-activation-store.ts`] |
+| Durable process work | `process submit/status/result` | Submit an `ExecutionRequest`; side effects can park for approval | CLI surface registered and pointing at process services. [Evidence: `src/cli/commands/process.ts`] |
+| Continuous work | `autonomous …` | Durable backlog, approvals, status, and loop controls | Runtime active but default-off; reactive bridge is attach-only. [Evidence: `.deckent/settings/features-manifest.json`; `src/cli/commands/autonomous.ts`] |
+| Remote/programmatic control | HTTP/SSE and MCP | API server and MCP tools/resources (counts below) | Approvals are read-only over MCP by design — allow/deny decisions exist only on the interactive CLI surface. [Evidence: `src/mcp/tools/index.ts`; `src/mcp/server.ts`] |
 
 ## Product capabilities
 
 - Deterministic, evaluation-backed lifecycle orchestration, dependency scheduling, FIX retries, checkpoints, retrospectives, and rollback policy. [Evidence: `src/orchestra/sprint-phases.ts`; `src/orchestra/dependency-scheduler.ts`; `src/orchestra/sprint-checkpoint.ts`; `src/orchestra/rollback.ts`]
-- Provider-neutral routing from effective config, model registry, live authority, reachability, limits, and budget rather than a hard-coded product provider. [Evidence: `.deckent/workspace/IDENTITY.md:10`; `src/core/config.ts`; `src/core/model-registry.ts`; `src/core/routing/route-task-v3.ts`]
-- DB-first memory with SQLite/FTS5, relation/history support, document freshness, KPI stores, recall, and export/backup operations. [Evidence: `src/core/memory-store.ts:100-338`; `src/core/memory-query.ts`; `src/cli/commands/memory.ts`; `src/cli/commands/recall.ts:11-20`]
-- Runtime-wide approval, authority, audit, scope, and immutable settlement contracts. [Evidence: `src/core/approval-broker.ts`; `src/orchestra/authority-enforcer.ts`; `src/core/task-settlement-authority.ts`; `src/core/invocation-receipt-store.ts:705-850`]
-- Native REPL, terminal dashboard, web/API server, Desktop, VS Code extension, connectors, CLI, and MCP surfaces. [Evidence: `src/cli/entry.ts:664-713`; `src/cli/commands/dashboard.ts:147-214`; `src/cli/commands/serve.ts:72-80`; `src/desktop`; `src/extensions/vscode`; `src/connectors`; `src/mcp`]
-- 215 visible CLI command paths under 75 top-level commands, 51 canonical MCP tools, 8 MCP resources, 21 built-in agents, and 31 built-in skills. The identity projection reports the same agent and skill counts. [Evidence: recursive `buildProgram()` and `TOOL_CATALOG` introspection plus filesystem counts, 2026-08-18; `.deckent/workspace/IDENTITY.md` `identity-summary` block]
+- Provider-neutral routing from effective config, model registry, live authority, reachability, limits, and budget rather than a hard-coded product provider — with a learning-cells outcome ledger whose keys are vocabulary-bound and whose infrastructure failures (OOM, usage limits, auth loss) never penalize an agent's capability score. [Evidence: `src/core/routing/route-task-v3.ts`; `src/core/routing/learning-cells.ts`]
+- DB-first memory with SQLite/FTS5, relation/history support, document freshness, KPI stores, recall, and export/backup operations. [Evidence: `src/core/memory-store.ts`; `src/core/memory-query.ts`; `src/cli/commands/memory.ts`]
+- Runtime-wide approval, authority, audit, scope, and immutable settlement contracts, including an append-only closure ledger with an Ed25519 trust anchor whose private key lives outside the repository in owner custody. [Evidence: `src/core/approval-broker.ts`; `src/orchestra/authority-enforcer.ts`; `scripts/lint-closure-dispositions.mjs`; `docs/governance/`]
+- Native REPL, terminal dashboard, web/API server, Desktop, VS Code extension, connectors (Telegram delivery is live-proven), CLI, and MCP surfaces. [Evidence: `src/cli/entry.ts`; `src/cli/commands/dashboard.ts`; `src/cli/commands/serve.ts`; `src/desktop`; `src/extensions/vscode`; `src/connectors`; `src/mcp`]
+- 253 visible CLI command paths carrying 548 options and 103 positional arguments, measured by walking the real Commander tree and running 504 real `--help` invocations (2026-08-25). MCP tool/resource, agent, and skill counts are generator-owned below. [Evidence: `tests/cli/cli-surface-truth-battery.test.ts`; `docs/generated/cli-manifest.json`]
 
 ## Current repository truth
 
@@ -73,9 +73,9 @@ Status labels in the detailed docs mean:
 - `⚠️ partial`: code exists, but a flag, missing proof, parity gap, or production closure limits the claim.
 - `🔜 roadmap`: design/history exists without current production closure.
 
-The feature manifest currently lists 21 active, 4 lightly used, 9 dormant, and 1 dead entry. The live `truth --json` check reported five truth contracts: training trace was code/wired/enabled/proven; tool surface, worker approval gate, and routing journal lacked runtime proof; prompt-gate-block had no detected callsite and was the single half-wire candidate. [Evidence: `.deckent/settings/features-manifest.json`; real `node dist/cli/entry.js features --json` and `truth --json` outputs, 2026-08-01]
+The feature manifest currently lists 35 entries. The live `truth --json` check reported five truth contracts on 2026-08-25: training trace was code/wired/enabled/proven; tool surface and worker approval gate are wired and enabled but lack runtime proof; the routing decision journal is wired (journal files are being written live) with no enabling flag detected; prompt-gate-block has no detected callsite and remains the single half-wire candidate. [Evidence: real `node dist/cli/entry.js features --json` and `truth --json` outputs, 2026-08-25]
 
-The latest dogfood handoff does not certify unattended production reliability: its Codex audit records 0/31 intervention-free runs and documents settlement/gate contradictions that require the ordered certification ladder. These are not hidden behind product language; see [Current frictions](https://github.com/VerhexIO/deckent/blob/main/docs/en/operations/current-frictions.md) and the [difference report](https://github.com/VerhexIO/deckent/blob/main/docs/analysis/CODE-DOC-DIFF-2026-08.md). [Evidence: `docs/MASTER-PLAN.md` — RECOVERY-BORN-488 family, RECOVERY-BORN-490-REPLAY-CERTIFICATION-001 and CODEX-MAIN-001 decision line]
+Dogfood honesty is part of the product: Deckent develops itself through its own runs, and those runs' failures are recorded as `ABORTED` with root-cause rows in `docs/MASTER-PLAN.md` rather than being relabeled. Unattended production reliability is not certified; see [Current frictions](https://github.com/VerhexIO/deckent/blob/main/docs/en/operations/current-frictions.md).
 
 ## Documentation map
 
@@ -88,17 +88,17 @@ The latest dogfood handoff does not certify unattended production reliability: i
 - [MCP reference](https://github.com/VerhexIO/deckent/blob/main/docs/en/mcp.md)
 - [Database reference](https://github.com/VerhexIO/deckent/blob/main/docs/en/db.md)
 - [Configuration](https://github.com/VerhexIO/deckent/blob/main/docs/en/configuration.md)
+- [Dependency rationale ledger](https://github.com/VerhexIO/deckent/blob/main/docs/en/reference/dependencies.md)
 - [Complete bilingual documentation index](https://github.com/VerhexIO/deckent/blob/main/docs/index.md)
-- [Code–documentation difference report](https://github.com/VerhexIO/deckent/blob/main/docs/analysis/CODE-DOC-DIFF-2026-08.md)
 
 ## Constitutional constraints
 
 Deckent's three immutable laws are Dual Lens + Scale, Every Environment, and Never MVP. The complete governance interpretation is documented in [Immutable Laws](https://github.com/VerhexIO/deckent/blob/main/docs/en/governance/immutable-laws.md). [Evidence: `AGENTS.md:9-35`]
 
-License: MIT. [Evidence: `package.json:90-91`; `LICENSE`]
+License: MIT. [Evidence: `package.json`; `LICENSE`]
 
 <!-- AUTOGEN:START id="badges" -->
-[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-37228%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-492%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.100.0-orange)](https://github.com/VerhexIO/deckent) [![CI](https://img.shields.io/github/actions/workflow/status/VerhexIO/deckent/ci.yml?label=ci)](https://github.com/VerhexIO/deckent/actions)
+[![npm version](https://img.shields.io/npm/v/deckent.svg)](https://www.npmjs.com/package/deckent) [![tests](https://img.shields.io/badge/tests-37198%2B-brightgreen)](https://github.com/VerhexIO/deckent) [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![sprints](https://img.shields.io/badge/sprints-492%2B-teal)](https://github.com/VerhexIO/deckent) [![version](https://img.shields.io/badge/version-v0.100.0-orange)](https://github.com/VerhexIO/deckent) [![CI](https://img.shields.io/github/actions/workflow/status/VerhexIO/deckent/ci.yml?label=ci)](https://github.com/VerhexIO/deckent/actions)
 <!-- AUTOGEN:END id="badges" -->
 
 <!-- AUTOGEN:START id="stat-counts" -->

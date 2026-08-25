@@ -41,7 +41,7 @@ philosophy as adapted for AI-agent workflows.
 - Prefer flat code over nested abstractions. Each layer of indirection must earn its existence by making the call-site simpler AND reducing duplication.
 - When in doubt between two approaches, choose the one with fewer new lines of code — all else equal.
 - Do NOT introduce new runtime dependencies unless the task explicitly requires it and the dependency is already in package.json.
-- Follow ADR-D-005 (Dependency Policy): dependencies are admitted on **merit, not by count** — a real capability, version-pinned, source-audited, with rationale recorded in `docs/reference/dependencies.md`. Prefer a Node.js built-in where one genuinely suffices (a heuristic, not the retired "single runtime dependency" dogma); when you add a package, document its rationale + governing ADR.
+- Follow ADR-D-005 (Dependency Policy): dependencies are admitted on **merit, not by count** — a real capability, version-pinned, source-audited, with rationale recorded in `docs/en/reference/dependencies.md`. Prefer a Node.js built-in where one genuinely suffices (a heuristic, not the retired "single runtime dependency" dogma); when you add a package, document its rationale + governing ADR.
 
 **Anti-patterns to avoid:**
 - Creating a helper function used exactly once

@@ -270,8 +270,15 @@ const authorityIntentErrors = [];
 // exist in command-registry.ts. Verify the catalogued authority against the
 // contract row's `registry` block + `surfaces` instead (same three facts:
 // risk, providers scope, CLI-only surface).
-const contractContent = readFileSync(join(root, 'src', 'core', 'cli-command-contract.ts'), 'utf8');
-for (const [name, intent] of Object.entries(baseline.intentionalCliAuthority)) {
+// Hermetic fixtures build a minimal src tree without the contract file; the
+// authority-intent rule is then visibly skipped (the real repo always has it).
+let contractContent = null;
+try {
+  contractContent = readFileSync(join(root, 'src', 'core', 'cli-command-contract.ts'), 'utf8');
+} catch {
+  console.log('[cli-mcp-parity] WARN: cli-command-contract.ts absent — authority-intent rule skipped');
+}
+for (const [name, intent] of contractContent === null ? [] : Object.entries(baseline.intentionalCliAuthority)) {
   if (!baseline.cliOnly.includes(name) || !cliCommands.has(name) || findMcpForCli(name)) {
     authorityIntentErrors.push(`${name}: must remain a registered, baselined CLI-only command`);
   }

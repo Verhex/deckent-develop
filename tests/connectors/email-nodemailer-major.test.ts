@@ -4,7 +4,7 @@
 // blocked for this worker: no write scope on the lockfile, and tests/release/dep-bump-audit.
 // test.ts (also outside this worker's write scope) currently pins nodemailer at ^6.9.14 and
 // asserts exactly 2 nodemailer exceptions remain, pending a host-side lockfile mutation.
-// See docs/reference/dependencies.md "DEP669B" entry for the full breaking-change analysis.
+// See docs/en/reference/dependencies.md "DEP669B" entry for the full breaking-change analysis.
 //
 // This file instead locks in the usage-surface inventory that analysis depends on: nodemailer's
 // 7.0.0 (SES SDK removal), 8.0.0 ('NoAuth' -> 'ENOAUTH' rename), and 9.0.0 (TLS-verify-by-default

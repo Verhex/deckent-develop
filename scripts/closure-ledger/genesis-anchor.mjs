@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Closure OS — genesis trust-anchor PROVISIONING tool (the "REPORTED procedure",
-// docs/governance/closure-os-sidecar-ledger.md §5 / closure-classification-schema.json
+// docs/archive/governance-2026-08/closure-os-sidecar-ledger.md §5 / closure-classification-schema.json
 // trustAnchorRootOfTrust.genesis). This is the SEPARATE genesis PR's engine.
 //
 // WHAT IT IS. A buildless ceremony/verification tool with two provisioning modes:

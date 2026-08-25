@@ -5,20 +5,20 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):ba897fdc97399fff208665516b7f9556777e1df1a75eed06890b356d4498af23`
+**Source digest:** `sha256(normalized-lf-utf8):2131dd61bc06d21260aed5ef503054b940bcafed27ba3dad768b67dba0cc7538`
 
-**Rows:** 528 total · 463 active · 65 terminal
+**Rows:** 530 total · 464 active · 66 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 368 |
+| OPEN | 369 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 69 |
 | VERIFY | 26 |
-| DONE | 65 |
+| DONE | 66 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
 
@@ -294,6 +294,7 @@
 | 3351 | `SPAWN-RETRY-TASK-IMMUTABILITY-001` | OPEN | P1 | KERNEL | — | — | Spawn-retry yolunda in-memory task mutasyonunun (estimatedTokens/promptCompilePlanId) yapay `EXACT_PLAN_TASK_ARTIFACT_DRIFT` üretmemesi |
 | 3352 | `RESUME-STALE-LOCK-RECONCILIATION-001` | OPEN | P1 | KERNEL | — | — | PAUSED-resume yolunda stale coordinator-lock (PID-namespace görünmezliği dahil) typed reconciliation ile çözülür; detached start-attempt journal'ı `runs --close-stale` kapsamına girer |
 | 3353 | `SUBPROCESS-FINITE-BUDGET-ADMISSION-001` | OPEN | P2 | KERNEL | — | — | Init/default'ların çalışamayan kombinasyon üretmemesi: `spawn_backend=subprocess` + finite token-budget, measured-streaming desteğiyle admission-safe çözülür |
+| 3354 | `FIX-SPAWN-DEPENDENCY-FRESHNESS-001` | OPEN | P1 | KERNEL | `ORCHESTRA-RELIABILITY-001` | — | FIX-spawn dependency-settlement tazeliği: FIX dalgası spawn edilirken dependency lineage'ı result-ingest SONRASI taze snapshot'tan okunur; bayat 'Pending' penceresi kapanır |
 | 4000 | `AUTHORITY-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | Unified runtime authority parent |
 | 4020 | `TENANT-001` | VERIFY | P0 | AUTHORITY | `PRINCIPAL-001` | — | Canonical tenant/project/session scope enforcement |
 | 4021 | `AUTONOMOUS-TENANT-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001` | — | Autonomous read, mutation, approval ve reactive ingress için fail-closed tenant authority |

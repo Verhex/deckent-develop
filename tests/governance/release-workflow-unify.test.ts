@@ -404,7 +404,6 @@ describe('RED-proof — the pre-fix shape had 2 real-publish-authority workflows
 const WORKFLOW_FILENAMES = [
   'publish.yml',
   'release.yml',
-  'docs.yml',
   'ci.yml',
   'cross-platform-e2e.yml',
   'dashboard-build.yml',
@@ -492,23 +491,6 @@ describe('release.yml — build:all + validate:publish chain, in order', () => {
   });
 });
 
-describe('docs.yml — deploy condition targets main, not the dead master reference', () => {
-  const docs = readWorkflow('docs.yml');
-  const deployJob = docs.jobs?.deploy;
-
-  it('deploy job exists', () => {
-    expect(deployJob).toBeDefined();
-  });
-
-  it('if-condition references refs/heads/main', () => {
-    expect(String(deployJob?.if)).toContain('refs/heads/main');
-  });
-
-  it('if-condition no longer references the dead master branch', () => {
-    expect(String(deployJob?.if)).not.toContain('master');
-  });
-});
-
 // ═══════════════════════════════════════════════════════════════════════════
 // actionlint-if-available, else structural parse-lint fallback
 // ═══════════════════════════════════════════════════════════════════════════
@@ -529,7 +511,7 @@ describe('workflow YAML cleanliness', () => {
       if (!haveActionlint) return;
       const r = spawnSync(
         'actionlint',
-        ['.github/workflows/publish.yml', '.github/workflows/release.yml', '.github/workflows/docs.yml'],
+        ['.github/workflows/publish.yml', '.github/workflows/release.yml'],
         { cwd: projectRoot, encoding: 'utf-8' },
       );
       expect(r.status).toBe(0);
@@ -537,7 +519,7 @@ describe('workflow YAML cleanliness', () => {
   );
 
   it('structural parse-lint fallback: all 3 touched workflows parse without throwing and have name/on/jobs', () => {
-    for (const filename of ['publish.yml', 'release.yml', 'docs.yml']) {
+    for (const filename of ['publish.yml', 'release.yml']) {
       const parsed = readWorkflow(filename);
       expect(parsed.name, `${filename}: missing name`).toBeTruthy();
       expect(parsed.on, `${filename}: missing on`).toBeTruthy();

@@ -1815,7 +1815,7 @@ describe('checkADRCompliance', () => {
   // DEP-POLICY-WIRE (ADR-D-005): the ADR-010 count_check ("dep count > 3 →
   // advisory") is retired. The replacement is the merit-based inventory-drift
   // advisory: any dep count is fine, but each dep must be documented in
-  // docs/reference/dependencies.md. It fires only on a package.json change and
+  // docs/en/reference/dependencies.md. It fires only on a package.json change and
   // only warns (never NO_GO). The count-based tests are rewritten accordingly.
 
   it('inventory-drift: no advisory when changedFiles excludes package.json', () => {

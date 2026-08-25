@@ -653,7 +653,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-25 cli-surface-truth merge: +189 — the lane's three new guard
   // suites (lint-cli-surface, cli-docs-contract, gen-reference-docs) and
   // reworked cli test fixtures; all suite-owned.
-  count: 16300,
+  count: 16299,
   // 2026-08-25 B-sweep: digest moved — --fix roundtrip pin, multi-label
   // parser pin, same-line rule downgraded to WARN (all suite-owned).
   // 2026-08-25 7141 wave: count unchanged, digest moved — the src-side
@@ -664,7 +664,9 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // self-heal reordered to write-then-swap; scanned text shifted.
   // 2026-08-25 A2 routing-fairness wave: lane harvest + manual closure
   // (cells contract, journal coverage, doctor health, ci-guardian manifest).
-  digest: '568aeed60689f461f8e586d6ec49ba4825fcf7f1e0efa283ad14e4bed12994cd',
+  // 2026-08-25 docs consolidation: dead github-pages-deploy test removed with
+  // its PAUSED workflow (one unresolved entry retired).
+  digest: 'c661879abd8369725eb46e2c822f1e8c3d865a58292f9e397e68122d578f4374',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1198,7 +1200,9 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-25 A2 routing-fairness wave: digest moved — production modules
   // (dominantDomain/failureClass threading, cells contract, journal
   // coverage, doctor journal-health, ci-guardian manifest).
-  digest: '86a6cdd8c42af85c7e382699a61df2f2b18650a2e716997f3606f3b5a4e4d987',
+  // 2026-08-25 docs consolidation follow-up: auditor dependency-inventory read
+  // path moved to docs/en/reference/dependencies.md.
+  digest: '032024c4f3d4fe5795f695f90a145c718227c71f24ef68fd6d1cf079c2455cec',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

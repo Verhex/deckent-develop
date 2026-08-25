@@ -16727,3 +16727,35 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 672-009: Surgical conversions inside baselined-debt files (DONE)
 
 ---
+## Sprint 673 — sprint-673
+
+**Status:** ABORTED
+**Date:** 2026-08-25
+**Duration:** 6209s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 7 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 3 |
+| Coverage | 0.0% |
+| Duration | 6208770ms |
+
+### Tasks
+
+- 673-001: routingMeta.dominantDomain + failureClass types + single-task journal coverage (DONE)
+- 673-002-fix: Fix: Finalizer cells write — vocabulary-true keys, meta-sourced domain, outside V2 marker (PAUSED)
+- 673-002: Finalizer cells write — vocabulary-true keys, meta-sourced domain, outside V2 marker (NO_GO)
+- 673-003-fix: Fix: Learning-cells legacy-key self-healing + infra-skip gate (DONE)
+- 673-003: Learning-cells legacy-key self-healing + infra-skip gate (DONE)
+- 673-004-fix: Fix: result-collector writes failureClass into TaskResult (PAUSED)
+- 673-004: result-collector writes failureClass into TaskResult (NO_GO)
+- 673-005-fix: Fix: Mid-sprint journal + doctor (legacy-dir warning + replay check) (PAUSED)
+- 673-005: Mid-sprint journal + doctor (legacy-dir warning + replay check) (NO_GO)
+- 673-006: ci-guardian manifest repair (identity-preserving) (DONE)
+- 673-007: Wave real-run evidence harness (PAUSED)
+
+---
