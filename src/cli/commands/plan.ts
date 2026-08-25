@@ -43,6 +43,7 @@ import {
   formatTopologyLines,
 } from '../repl/plan-preview-card.js';
 import { DeckentError } from '../../core/errors.js';
+import { cliContractMessage } from '../helpers/message-catalog/cli-run.js';
 
 export type RlFactory = () => {
   question: (q: string) => Promise<string>;
@@ -121,25 +122,26 @@ export async function runInterrogation(
 }
 
 export function registerPlan(program: Command): void {
+  const helpLang = getLanguage(undefined);
   program
     .command('plan')
     .description(getMessage('cli.plan.desc', getLanguage(undefined)))
-    .option('--no-confirm', 'Skip confirmation, auto-approve plan')
-    .option('-y, --yes', 'Non-interactive: auto-approve the plan (DRAFT → PENDING) without prompting')
-    .option('--structured', 'Force structured parsing (skip AI)')
-    .option('--dry-run', 'Show plan without writing task files to disk')
-    .option('--interrogate', 'Challenge directives with structural questions before planning')
-    .option('--force-prompt-gate', 'Bypass the plan-time prompt-gate BLOCK (persona-capability mismatch)')
-    .option('--force-scope', getMessage('plan.force_scope_option', 'en'))
-    .option('--adopt-existing <sprintId>', getMessage('plan.adopt_existing_option', 'en'))
-    .option('--expected-plan-digest <sha256>', getMessage('plan.expected_plan_digest_option', 'en'))
-    .option('--expected-projection-digest <sha256>', getMessage('plan.expected_projection_digest_option', 'en'))
+    .option('--no-confirm', cliContractMessage('cliContract.plan.opt.no_confirm', helpLang))
+    .option('-y, --yes', cliContractMessage('cliContract.plan.opt.yes', helpLang))
+    .option('--structured', cliContractMessage('cliContract.plan.opt.structured', helpLang))
+    .option('--dry-run', cliContractMessage('cliContract.plan.opt.dry_run', helpLang))
+    .option('--interrogate', cliContractMessage('cliContract.plan.opt.interrogate', helpLang))
+    .option('--force-prompt-gate', cliContractMessage('cliContract.plan.opt.force_prompt_gate', helpLang))
+    .option('--force-scope', getMessage('plan.force_scope_option', helpLang))
+    .option('--adopt-existing <sprintId>', getMessage('plan.adopt_existing_option', helpLang))
+    .option('--expected-plan-digest <sha256>', getMessage('plan.expected_plan_digest_option', helpLang))
+    .option('--expected-projection-digest <sha256>', getMessage('plan.expected_projection_digest_option', helpLang))
     .option(
       '--expected-canonical-projection-digest <sha256>',
-      getMessage('plan.expected_canonical_projection_digest_option', 'en'),
+      getMessage('plan.expected_canonical_projection_digest_option', helpLang),
     )
-    .option('--adoption-actor <actorId>', getMessage('plan.adoption_actor_option', 'en'))
-    .option('--adoption-justification <text>', getMessage('plan.adoption_justification_option', 'en'))
+    .option('--adoption-actor <actorId>', getMessage('plan.adoption_actor_option', helpLang))
+    .option('--adoption-justification <text>', getMessage('plan.adoption_justification_option', helpLang))
     .action(async (opts: {
       confirm?: boolean;
       yes?: boolean;

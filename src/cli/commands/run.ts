@@ -42,6 +42,7 @@ import type {
 import { resolveTenant } from '../../core/tenant-context.js';
 import { resolveTaskSettlementBackend } from './task-settlement.js';
 import { canonicalJson } from '../../core/audit-writer.js';
+import { cliContractMessage, renderContractHelp } from '../helpers/message-catalog/cli-run.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -452,18 +453,20 @@ export function registerRun(
   program: Command,
   runtime: RunCommandRuntime = {},
 ): void {
+  const helpLang = getLanguage(undefined);
   const runCmd = program
     .command('run')
-    .argument('<description>')
-    .description(getMessage('cli.run.desc', getLanguage(undefined)))
-    .option('--model <model>', getMessage('run.opt_model', getLanguage(undefined)))
-    .option('--provider <name>', getMessage('run.opt_provider', getLanguage(undefined), { providers: ALL_PROVIDER_NAMES.join('|') }))
-    .option('--model-effort <level>', 'Native model reasoning-effort (claude: low|medium|high|xhigh|max, codex: minimal|low|medium|high). Opt-in; unsupported/invalid levels are ignored')
-    .option('--scope <dir>', 'Worker scope directory (default: ./)', './')
-    .option('--timeout <ms>', 'Maximum wait time in milliseconds (default: 300000)', '300000')
-    .option('--keep', 'Keep task files after completion (skip cleanup)')
-    .option('--auto-approve', 'Pass auto-approve flag to the worker')
-    .option('--verbose', 'Stream worker log output to stdout in real-time')
+    .argument('<description>', cliContractMessage('cliContract.run.arg.description', helpLang))
+    .description(getMessage('cli.run.desc', helpLang))
+    .addHelpText('after', renderContractHelp('run', helpLang))
+    .option('--model <model>', getMessage('run.opt_model', helpLang))
+    .option('--provider <name>', getMessage('run.opt_provider', helpLang, { providers: ALL_PROVIDER_NAMES.join('|') }))
+    .option('--model-effort <level>', cliContractMessage('cliContract.run.opt.model_effort', helpLang))
+    .option('--scope <dir>', cliContractMessage('cliContract.run.opt.scope', helpLang), './')
+    .option('--timeout <ms>', cliContractMessage('cliContract.run.opt.timeout', helpLang), '300000')
+    .option('--keep', cliContractMessage('cliContract.run.opt.keep', helpLang))
+    .option('--auto-approve', cliContractMessage('cliContract.run.opt.auto_approve', helpLang))
+    .option('--verbose', cliContractMessage('cliContract.run.opt.verbose', helpLang))
     .action(async (description: string, opts: RunCommandOpts) => {
       const root = resolveProjectRoot();
       const scopeDir = opts.scope ?? './';
@@ -925,8 +928,8 @@ export function registerRun(
   for (const target of RUN_ALIAS_TARGETS) {
     runCmd
       .command(target)
-      .description(getMessage('run.alias_note', getLanguage(undefined)))
-      .argument('[args...]')
+      .description(getMessage('run.alias_note', helpLang))
+      .argument('[args...]', cliContractMessage('cliContract.run.arg.alias_args', helpLang))
       // passThroughOptions would demand enablePositionalOptions on the SHARED
       // root program (global parse-semantics change — too risky). Empirically
       // verified: allowUnknownOption + variadic capture keeps raw tokens in

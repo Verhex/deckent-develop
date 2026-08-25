@@ -6,6 +6,7 @@ import { print, printError, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { promptConfirm } from '../helpers/prompt.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
+import { memoryCatalogMessage } from '../helpers/message-catalog/cli-memory-catalog.js';
 import { ErrorRegistry } from '../../core/errors.js';
 import { BRAIN_DIR, SPRINTS_DIR } from '../../core/constants.js';
 import { loadConfig, resolveDefaultModel } from '../../core/config.js';
@@ -227,7 +228,7 @@ export function registerAgent(program: Command): void {
   agentCmd
     .command('lint')
     .description(getMessage('cli.agent.lint.desc', getLanguage(undefined)))
-    .option('--json', 'Output as JSON')
+    .option('--json', memoryCatalogMessage('cli.memcat.shared.opt.json', getLanguage(undefined)))
     .action(async (opts: { json?: boolean }) => {
       try {
         const root = resolveProjectRoot();
@@ -312,7 +313,7 @@ export function registerAgent(program: Command): void {
   agentCmd
     .command('list')
     .description(getMessage('cli.agent.list.desc', getLanguage(undefined)))
-    .option('--json', 'Output as JSON')
+    .option('--json', memoryCatalogMessage('cli.memcat.shared.opt.json', getLanguage(undefined)))
     .action(async (opts: { json?: boolean }) => {
       try {
         const root = resolveProjectRoot();
@@ -363,7 +364,8 @@ export function registerAgent(program: Command): void {
 
   // ─── agent create ───────────────────────────────────────────────
   agentCmd
-    .command('create <name>')
+    .command('create')
+    .argument('<name>', memoryCatalogMessage('cli.memcat.agent.arg.new_name', registrationLang))
     .description(getMessage('agent.create.description', registrationLang))
     .option('--model <model>', getMessage('agent.create.option_model', registrationLang))
     .option('--triggers <triggers...>', getMessage('agent.create.option_triggers', registrationLang))
@@ -449,9 +451,10 @@ export function registerAgent(program: Command): void {
 
   // ─── agent stats ────────────────────────────────────────────────
   agentCmd
-    .command('stats <name>')
+    .command('stats')
+    .argument('<name>', memoryCatalogMessage('cli.memcat.agent.arg.name', getLanguage(undefined)))
     .description(getMessage('cli.agent.stats.desc', getLanguage(undefined)))
-    .option('--json', 'Output as JSON')
+    .option('--json', memoryCatalogMessage('cli.memcat.shared.opt.json', getLanguage(undefined)))
     .action(async (name: string, opts: { json?: boolean }) => {
       try {
         const root = resolveProjectRoot();
@@ -492,7 +495,8 @@ export function registerAgent(program: Command): void {
 
   // ─── agent enable ───────────────────────────────────────────────
   agentCmd
-    .command('enable <name>')
+    .command('enable')
+    .argument('<name>', memoryCatalogMessage('cli.memcat.agent.arg.name', getLanguage(undefined)))
     .description(getMessage('cli.agent.enable.desc', getLanguage(undefined)))
     .action(async (name: string) => {
       try {
@@ -511,7 +515,8 @@ export function registerAgent(program: Command): void {
 
   // ─── agent disable ──────────────────────────────────────────────
   agentCmd
-    .command('disable <name>')
+    .command('disable')
+    .argument('<name>', memoryCatalogMessage('cli.memcat.agent.arg.name', getLanguage(undefined)))
     .description(getMessage('cli.agent.disable.desc', getLanguage(undefined)))
     .action(async (name: string) => {
       try {
@@ -530,9 +535,10 @@ export function registerAgent(program: Command): void {
 
   // ─── agent delete ──────────────────────────────────────────────
   agentCmd
-    .command('delete <name>')
+    .command('delete')
+    .argument('<name>', memoryCatalogMessage('cli.memcat.agent.arg.name', getLanguage(undefined)))
     .description(getMessage('cli.agent.delete.desc', getLanguage(undefined)))
-    .option('--force', 'Skip the confirmation prompt')
+    .option('--force', memoryCatalogMessage('cli.memcat.agent.delete.opt.force', getLanguage(undefined)))
     .action(async (name: string, opts: { force?: boolean }) => {
       try {
         const root = resolveProjectRoot();
@@ -560,14 +566,15 @@ export function registerAgent(program: Command): void {
 
   // ─── agent edit ────────────────────────────────────────────────
   agentCmd
-    .command('edit <name>')
+    .command('edit')
+    .argument('<name>', memoryCatalogMessage('cli.memcat.agent.arg.name', getLanguage(undefined)))
     .description(getMessage('cli.agent.edit.desc', getLanguage(undefined)))
-    .option('--model <model>', 'Update model')
-    .option('--description <desc>', 'Update description')
-    .option('--enable', 'Enable the agent')
-    .option('--disable', 'Disable the agent')
-    .option('--triggers <triggers...>', 'Update trigger keywords')
-    .option('--sync-prompt', 'Re-sync systemPrompt from PROMPT.md')
+    .option('--model <model>', memoryCatalogMessage('cli.memcat.agent.edit.opt.model', getLanguage(undefined)))
+    .option('--description <desc>', memoryCatalogMessage('cli.memcat.agent.edit.opt.description', getLanguage(undefined)))
+    .option('--enable', memoryCatalogMessage('cli.memcat.agent.edit.opt.enable', getLanguage(undefined)))
+    .option('--disable', memoryCatalogMessage('cli.memcat.agent.edit.opt.disable', getLanguage(undefined)))
+    .option('--triggers <triggers...>', memoryCatalogMessage('cli.memcat.agent.edit.opt.triggers', getLanguage(undefined)))
+    .option('--sync-prompt', memoryCatalogMessage('cli.memcat.agent.edit.opt.sync_prompt', getLanguage(undefined)))
     .action(async (name: string, opts: { model?: string; description?: string; enable?: boolean; disable?: boolean; triggers?: string[]; syncPrompt?: boolean }) => {
       try {
         const root = resolveProjectRoot();
@@ -637,11 +644,11 @@ export function registerAgent(program: Command): void {
   agentCmd
     .command('reclassify')
     .description(getMessage('cli.agent.reclassify.desc', getLanguage(undefined)))
-    .requiredOption('--sprint <id>', 'Sprint id (e.g. sprint-191)')
-    .requiredOption('--task <id>', 'Task id within the sprint')
-    .requiredOption('--decision <decision>', 'New evaluation: DONE | GO_WITH_TECH_DEBT | NO_GO')
-    .option('--reason <text>', 'Free-form justification for the audit trail')
-    .option('--no-audit', 'Skip writing the audit-trail entry to memory store')
+    .requiredOption('--sprint <id>', memoryCatalogMessage('cli.memcat.agent.reclassify.opt.sprint', getLanguage(undefined)))
+    .requiredOption('--task <id>', memoryCatalogMessage('cli.memcat.agent.reclassify.opt.task', getLanguage(undefined)))
+    .requiredOption('--decision <decision>', memoryCatalogMessage('cli.memcat.agent.reclassify.opt.decision', getLanguage(undefined)))
+    .option('--reason <text>', memoryCatalogMessage('cli.memcat.agent.reclassify.opt.reason', getLanguage(undefined)))
+    .option('--no-audit', memoryCatalogMessage('cli.memcat.agent.reclassify.opt.no_audit', getLanguage(undefined)))
     .action(async (opts: { sprint: string; task: string; decision: string; reason?: string; audit?: boolean }) => {
       try {
         const root = resolveProjectRoot();
@@ -705,7 +712,8 @@ export function registerAgent(program: Command): void {
 
   // ─── agent info ────────────────────────────────────────────────
   agentCmd
-    .command('info <name>')
+    .command('info')
+    .argument('<name>', memoryCatalogMessage('cli.memcat.agent.arg.name', getLanguage(undefined)))
     .description(getMessage('cli.agent.info.desc', getLanguage(undefined)))
     .action(async (name: string) => {
       try {

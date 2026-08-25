@@ -19,6 +19,10 @@ import { isDecisionFederatedOrigin, mirrorFederatedItemToBroker, settleFederated
 import { gatewayHome } from '../../connectors/gateway/gateway-paths.js';
 import { userInfo } from 'node:os';
 import type { Command } from 'commander';
+import {
+  bindGovernanceArgumentDescriptions,
+  getGovernanceMessage,
+} from '../helpers/message-catalog/cli-governance.js';
 
 import { loadConfig } from '../../core/config.js';
 import { ApprovalStore } from '../../core/approval-store.js';
@@ -120,9 +124,12 @@ export function registerApprovalsCommand(program: Command): void {
     .command('approvals')
     .description(getMessage('approvals.cmd_desc', lang));
 
+  // Access classification stated in help: a list is a read, a decide is an
+  // authenticated decision. The two used to look interchangeable in `--help`.
   approvals
     .command('list')
     .description(getMessage('approvals.list_desc', lang))
+    .addHelpText('after', `\n${getGovernanceMessage('cli.governance.approvals.list.note', lang)}\n`)
     .action(async () => {
       const root = resolveProjectRoot();
       const config = await loadConfig(root);
@@ -235,9 +242,13 @@ export function registerApprovalsCommand(program: Command): void {
       }
     });
 
-  approvals
-    .command('decide <requestId>')
+  bindGovernanceArgumentDescriptions(
+    approvals.command('decide <requestId>'),
+    lang,
+    { requestId: 'cli.governance.approvals.arg.request_id' },
+  )
     .description(getMessage('approvals.decide_desc', lang))
+    .addHelpText('after', `\n${getGovernanceMessage('cli.governance.approvals.decide.note', lang)}\n`)
     .option('--allow', getMessage('approvals.opt_allow', lang))
     .option('--deny', getMessage('approvals.opt_deny', lang))
     .option('--reason <text>', getMessage('approvals.opt_reason', lang))
@@ -538,7 +549,8 @@ export function registerApprovalsCommand(program: Command): void {
 
   const rules = approvals
     .command('rules')
-    .description(getMessage('approvals.rules_desc', lang));
+    .description(getMessage('approvals.rules_desc', lang))
+    .addHelpText('after', `\n${getGovernanceMessage('cli.governance.approvals.rules.note', lang)}\n`);
 
   rules
     .command('list')
@@ -642,13 +654,19 @@ export function registerApprovalsCommand(program: Command): void {
       }
     });
 
-  rules.command('disable <id>')
+  bindGovernanceArgumentDescriptions(rules.command('disable <id>'), lang, {
+    id: 'cli.governance.approvals.arg.rule_id',
+  })
     .description(getMessage('approvals.rules_disable_desc', lang))
     .action((id: string) => mutateRule(id, 'disable'));
-  rules.command('enable <id>')
+  bindGovernanceArgumentDescriptions(rules.command('enable <id>'), lang, {
+    id: 'cli.governance.approvals.arg.rule_id',
+  })
     .description(getMessage('approvals.rules_enable_desc', lang))
     .action((id: string) => mutateRule(id, 'enable'));
-  rules.command('remove <id>')
+  bindGovernanceArgumentDescriptions(rules.command('remove <id>'), lang, {
+    id: 'cli.governance.approvals.arg.rule_id',
+  })
     .description(getMessage('approvals.rules_remove_desc', lang))
     .action((id: string) => mutateRule(id, 'remove'));
 }

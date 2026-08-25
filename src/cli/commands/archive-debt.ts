@@ -3,6 +3,7 @@ import { print } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getDebtItems } from '../../core/debt-store.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
+import { memoryCatalogMessage } from '../helpers/message-catalog/cli-memory-catalog.js';
 
 /**
  * `deckent archive-debt` — report tech-debt status from the Memory V2 DB.
@@ -17,8 +18,8 @@ export function registerArchiveDebt(program: Command): void {
   program
     .command('archive-debt')
     .description(getMessage('cli.archive_debt.desc', getLanguage(undefined)))
-    .option('--count', 'Show only the open/resolved counts')
-    .option('--before <sprint>', 'Also report resolved items originating before this sprint ID')
+    .option('--count', memoryCatalogMessage('cli.memcat.archive_debt.opt.count', getLanguage(undefined)))
+    .option('--before <sprint>', memoryCatalogMessage('cli.memcat.archive_debt.opt.before', getLanguage(undefined)))
     .action((opts: { count?: boolean; before?: string }) => {
       const root = resolveProjectRoot();
       const all = getDebtItems(root);

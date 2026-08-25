@@ -6,12 +6,10 @@ import {
   parseMcpTools,
   parseMcpResources,
   parseAdrs,
-  parseCliCommands,
   parseAgents,
   renderMcpTools,
   renderMcpResources,
   renderAdrs,
-  renderCliCommands,
   renderAgents,
   replaceAutogenBlock,
   collectGenerations,
@@ -144,44 +142,6 @@ describe('parseAdrs', () => {
   });
 });
 
-// ─── parseCliCommands ─────────────────────────────────────────────────────────
-
-describe('parseCliCommands', () => {
-  it('extracts CLI command names and descriptions from commander source', () => {
-    const cmdDir = join(tmpRoot, 'src/cli/commands');
-    mkdirSync(cmdDir, { recursive: true });
-    writeFileSync(
-      join(cmdDir, 'init.ts'),
-      `
-import type { Command } from 'commander';
-export function registerInit(program: Command): void {
-  program
-    .command('init')
-    .description('Initialize a new Deckent project')
-    .action(async () => {});
-}
-`,
-    );
-    writeFileSync(
-      join(cmdDir, 'start.ts'),
-      `
-export function registerStart(program: Command): void {
-  program
-    .command('start [description]')
-    .description('Start a new sprint')
-    .action(async () => {});
-}
-`,
-    );
-    const cmds = parseCliCommands(cmdDir);
-    expect(cmds.length).toBeGreaterThanOrEqual(2);
-    const init = cmds.find((c: { name: string }) => c.name === 'init');
-    const start = cmds.find((c: { name: string }) => c.name === 'start');
-    expect(init?.description).toContain('Initialize');
-    expect(start?.signature).toContain('start [description]');
-  });
-});
-
 // ─── parseAgents ──────────────────────────────────────────────────────────────
 
 describe('parseAgents', () => {
@@ -254,16 +214,6 @@ describe('renderers', () => {
     expect(md).toContain('rest-api');
   });
 
-  it('renderCliCommands lists command signatures', () => {
-    const md = renderCliCommands([
-      { name: 'init', signature: 'init', description: 'Init project' },
-      { name: 'start', signature: 'start [description]', description: 'Start sprint' },
-    ]);
-    expect(md).toContain('deckent init');
-    expect(md).toContain('deckent start');
-    expect(md).toContain('Init project');
-  });
-
   it('renderMcpResources lists URI + mimeType', () => {
     const md = renderMcpResources([
       { name: 'dashboard', uri: 'deckent://dashboard', title: 'Dashboard', description: 'Live status', mimeType: 'application/json' },
@@ -306,13 +256,11 @@ describe('collectGenerations (--check round-trip)', () => {
     const toolsDir = join(tmpRoot, 'src/mcp/tools');
     const resDir = join(tmpRoot, 'src/mcp/resources');
     const adrDir = join(tmpRoot, 'docs/adr');
-    const cliDir = join(tmpRoot, 'src/cli/commands');
     const agentsDir = join(tmpRoot, '.deckent/agents');
     const refDir = join(tmpRoot, 'docs/generated/en/reference');
     mkdirSync(toolsDir, { recursive: true });
     mkdirSync(resDir, { recursive: true });
     mkdirSync(adrDir, { recursive: true });
-    mkdirSync(cliDir, { recursive: true });
     mkdirSync(join(agentsDir, 'security-auditor'), { recursive: true });
     mkdirSync(refDir, { recursive: true });
 
@@ -325,10 +273,6 @@ describe('collectGenerations (--check round-trip)', () => {
       `server.registerResource('dashboard', 'deckent://dashboard', { title: 'D', description: 'd', mimeType: 'application/json' }, async () => ({}));`,
     );
     writeFileSync(join(adrDir, '001-x.md'), `# ADR-001: TS\n\n**Status:** accepted\n`);
-    writeFileSync(
-      join(cliDir, 'init.ts'),
-      `program.command('init').description('Initialize project').action(()=>{});`,
-    );
     writeFileSync(
       join(agentsDir, 'security-auditor', 'agent.json'),
       JSON.stringify({ id: 'security-auditor', name: 'Security', description: 'Sec.', expertise: ['security'] }),
@@ -357,9 +301,8 @@ describe('collectGenerations (--check round-trip)', () => {
     const toolsDir = join(tmpRoot, 'src/mcp/tools');
     const resDir = join(tmpRoot, 'src/mcp/resources');
     const adrDir = join(tmpRoot, 'docs/adr');
-    const cliDir = join(tmpRoot, 'src/cli/commands');
     const agentsDir = join(tmpRoot, '.deckent/agents');
-    [toolsDir, resDir, adrDir, cliDir, agentsDir].forEach((d) => mkdirSync(d, { recursive: true }));
+    [toolsDir, resDir, adrDir, agentsDir].forEach((d) => mkdirSync(d, { recursive: true }));
 
     const gens = collectGenerations({ root: tmpRoot });
     const targets = gens.map((g: { target: string }) => g.target);
@@ -367,7 +310,6 @@ describe('collectGenerations (--check round-trip)', () => {
     for (const lang of ['en', 'tr']) {
       expect(targets).toContain(`docs/generated/${lang}/reference/mcp-tools.md`);
       expect(targets).toContain(`docs/generated/${lang}/reference/mcp-resources.md`);
-      expect(targets).toContain(`docs/generated/${lang}/reference/cli.md`);
       expect(targets).toContain(`docs/generated/${lang}/reference/agents.md`);
     }
     // Generated docs must never land inside the hand-written docs/<lang>/reference tree.

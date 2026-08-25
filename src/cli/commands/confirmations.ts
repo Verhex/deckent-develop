@@ -1,5 +1,9 @@
 // Thin CLI projection over the acceptance-confirmation service. It owns no store/debt mutation.
 import { Command } from 'commander';
+import {
+  bindGovernanceArgumentDescriptions,
+  getGovernanceMessage,
+} from '../helpers/message-catalog/cli-governance.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
 import { print, printError } from '../helpers/output.js';
@@ -131,7 +135,10 @@ export function registerConfirmationsCommand(program: Command, deps: Confirmatio
     for (const request of model.pending) print(describe(request, lang));
   });
   // A TTY is not authentication. Human decisions route to the unified authenticated surface.
-  confirmations.command('decide <id>').description(getMessage('confirmations.decide_desc', lang))
+  bindGovernanceArgumentDescriptions(confirmations.command('decide <id>'), lang, {
+    id: 'cli.governance.confirmations.arg.id',
+  }).description(getMessage('confirmations.decide_desc', lang))
+    .addHelpText('after', `\n${getGovernanceMessage('cli.governance.confirmations.decide.note', lang)}\n`)
     // Parse the legacy flags only so callers receive the migration route rather
     // than Commander's syntax error. They are never interpreted as authority.
     .option('--confirm', getMessage('confirmations.opt_confirm', lang))

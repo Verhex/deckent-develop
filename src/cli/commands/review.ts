@@ -7,6 +7,7 @@ import { print, printError, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { readAuthoritativeTaskResult } from '../../orchestra/task-result-authority.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
+import { cliContractMessage } from '../helpers/message-catalog/cli-run.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -270,13 +271,14 @@ async function handleRetryRespawn(state: ReviewState, root: string): Promise<voi
 // ─── Registration ───────────────────────────────────────────────────
 
 export function registerReview(program: Command): void {
+  const helpLang = getLanguage(undefined);
   program
     .command('review')
     .description(getMessage('cli.review.desc', getLanguage(undefined)))
-    .option('--auto', 'Auto-approve/reject based on task results')
-    .option('--json', 'Output review state as JSON')
-    .option('--approve-all', 'Approve all pending tasks')
-    .option('--reject-all', 'Reject all pending tasks')
+    .option('--auto', cliContractMessage('cliContract.review.opt.auto', helpLang))
+    .option('--json', cliContractMessage('cliContract.review.opt.json', helpLang))
+    .option('--approve-all', cliContractMessage('cliContract.review.opt.approve_all', helpLang))
+    .option('--reject-all', cliContractMessage('cliContract.review.opt.reject_all', helpLang))
     .action(async (opts: { auto?: boolean; json?: boolean; approveAll?: boolean; rejectAll?: boolean }) => {
       try {
         const root = resolveProjectRoot();

@@ -9,6 +9,7 @@ import {
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
+import { memoryCatalogMessage } from '../helpers/message-catalog/cli-memory-catalog.js';
 
 /**
  * `deckent audit-verify` — walk the audit HMAC chain in `.brain/memory.db`
@@ -23,7 +24,7 @@ export function registerAuditVerify(program: Command): void {
   program
     .command('audit-verify')
     .description(getMessage('cli.audit_verify.desc', getLanguage(undefined)))
-    .option('--json', 'Output raw JSON only')
+    .option('--json', memoryCatalogMessage('cli.memcat.shared.opt.json_raw', getLanguage(undefined)))
     .action((opts: { json?: boolean }) => {
       const root = resolveProjectRoot();
       const dbPath = join(root, '.brain', 'memory.db');

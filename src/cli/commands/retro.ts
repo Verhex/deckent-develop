@@ -6,6 +6,7 @@ import { MemoryStore } from '../../core/memory-store.js';
 import { print } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
+import { memoryCatalogMessage } from '../helpers/message-catalog/cli-memory-catalog.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
 
 // R4-SSOT: canonical RichSprintSummary lives in retro-parser.ts (consumed by
@@ -335,11 +336,11 @@ export function registerRetro(program: Command): void {
   program
     .command('retro')
     .description(getMessage('cli.retro.desc', getLanguage(undefined)))
-    .option('--raw', 'Show raw RETRO.md content without formatting')
-    .option('--compare', 'Show delta comparison with previous sprint')
-    .option('--json', 'Output results as JSON')
-    .option('--perf', 'Show agent/skill performance tables')
-    .option('--trend [n]', 'Show success rate trend across last N sprints (default: 5)')
+    .option('--raw', memoryCatalogMessage('cli.memcat.retro.opt.raw', getLanguage(undefined)))
+    .option('--compare', memoryCatalogMessage('cli.memcat.retro.opt.compare', getLanguage(undefined)))
+    .option('--json', memoryCatalogMessage('cli.memcat.shared.opt.json', getLanguage(undefined)))
+    .option('--perf', memoryCatalogMessage('cli.memcat.retro.opt.perf', getLanguage(undefined)))
+    .option('--trend [n]', memoryCatalogMessage('cli.memcat.retro.opt.trend', getLanguage(undefined)))
     .action((opts: { raw?: boolean; compare?: boolean; json?: boolean; perf?: boolean; trend?: string | boolean }) => {
       const root = resolveProjectRoot();
       const lang = getLangFromConfig(root);

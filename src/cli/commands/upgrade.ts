@@ -12,6 +12,7 @@ import {
 } from '../../core/worker-image-check.js';
 import { handleImageBuild } from './image.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
+import { cliContractMessage } from '../helpers/message-catalog/cli-run.js';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -462,15 +463,16 @@ export async function reprovisionWorkerImageAfterUpgrade(
 }
 
 export function registerUpgrade(program: Command): void {
+  const helpLang = getLanguage(undefined);
   program
     .command('upgrade')
     .description(getMessage('cli.upgrade.desc', getLanguage(undefined)))
-    .option('--check', 'Only check for updates, do not install')
-    .option('--changelog', 'Show changelog for the latest version and exit')
-    .option('--canary', 'Install from canary channel (pre-release)')
-    .option('--beta', 'Install from beta channel (pre-release)')
-    .option('--rollback', 'Roll back to the previous version')
-    .option('--local <path>', 'Install from a local .tgz file (beta development)')
+    .option('--check', cliContractMessage('cliContract.upgrade.opt.check', helpLang))
+    .option('--changelog', cliContractMessage('cliContract.upgrade.opt.changelog', helpLang))
+    .option('--canary', cliContractMessage('cliContract.upgrade.opt.canary', helpLang))
+    .option('--beta', cliContractMessage('cliContract.upgrade.opt.beta', helpLang))
+    .option('--rollback', cliContractMessage('cliContract.upgrade.opt.rollback', helpLang))
+    .option('--local <path>', cliContractMessage('cliContract.upgrade.opt.local', helpLang))
     .action((opts: { check?: boolean; changelog?: boolean; canary?: boolean; beta?: boolean; rollback?: boolean; local?: string }) => {
       if (opts.local) {
         const current = DECKENT_VERSION;

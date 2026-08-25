@@ -25,6 +25,7 @@ import { updatePricing, formatUpdateResult } from '../../core/pricing-updater.js
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
+import { memoryCatalogMessage } from '../helpers/message-catalog/cli-memory-catalog.js';
 
 // ─── Subcommand: show ──────────────────────────────────────────────────────
 
@@ -215,11 +216,14 @@ async function runBudget(options: { set?: string; daily?: string; monthly?: stri
 export function registerCostCommand(program: Command): void {
   const cost = program.command('cost').description(getMessage('cli.cost.desc', getLanguage(undefined)));
 
+  // show = read path; update/budget = mutation paths.
+  cost.addHelpText('after', memoryCatalogMessage('cli.memcat.cost.help.paths', getLanguage(undefined)));
+
   cost
     .command('show')
     .description(getMessage('cli.cost.show.desc', getLanguage(undefined)))
-    .option('--provider <name>', 'Filter by provider (anthropic, openai, google)')
-    .option('--model <id>', 'Show single model details')
+    .option('--provider <name>', memoryCatalogMessage('cli.memcat.cost.opt.provider_filter', getLanguage(undefined)))
+    .option('--model <id>', memoryCatalogMessage('cli.memcat.cost.opt.model', getLanguage(undefined)))
     .action(async (options) => {
       await runShow(options);
     });
@@ -227,9 +231,9 @@ export function registerCostCommand(program: Command): void {
   cost
     .command('update')
     .description(getMessage('cli.cost.update.desc', getLanguage(undefined)))
-    .option('--provider <name>', 'Update only this provider')
-    .option('--dry-run', 'Preview changes without writing')
-    .option('--skip-validation', 'Skip OpenRouter delta check')
+    .option('--provider <name>', memoryCatalogMessage('cli.memcat.cost.opt.provider_update', getLanguage(undefined)))
+    .option('--dry-run', memoryCatalogMessage('cli.memcat.cost.opt.dry_run', getLanguage(undefined)))
+    .option('--skip-validation', memoryCatalogMessage('cli.memcat.cost.opt.skip_validation', getLanguage(undefined)))
     .action(async (options) => {
       await runUpdate(options);
     });
@@ -237,9 +241,9 @@ export function registerCostCommand(program: Command): void {
   cost
     .command('budget')
     .description(getMessage('cli.cost.budget.desc', getLanguage(undefined)))
-    .option('--set <usd>', 'Set sprint max budget in USD')
-    .option('--daily <usd>', 'Set daily max budget in USD')
-    .option('--monthly <usd>', 'Set monthly max budget in USD')
+    .option('--set <usd>', memoryCatalogMessage('cli.memcat.cost.opt.set', getLanguage(undefined)))
+    .option('--daily <usd>', memoryCatalogMessage('cli.memcat.cost.opt.daily', getLanguage(undefined)))
+    .option('--monthly <usd>', memoryCatalogMessage('cli.memcat.cost.opt.monthly', getLanguage(undefined)))
     .action(async (options) => {
       await runBudget(options);
     });

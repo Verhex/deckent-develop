@@ -18,6 +18,7 @@ import {
   formatTaskSettlementProjection,
   settlementProjectionDto,
 } from './task-settlement.js';
+import { cliContractMessage, bindArgumentDescriptions, renderContractHelp } from '../helpers/message-catalog/cli-run.js';
 
 interface OutputOpts {
   tail?: string;
@@ -128,13 +129,14 @@ export function registerOutput(
   program: Command,
   deps: OutputCommandDeps = {},
 ): void {
-  program
-    .command('output <taskId>')
-    .description(getMessage('cli.output.desc', getLanguage(undefined)))
-    .option('--tail <n>', 'Show last N lines (default: 50)', '50')
-    .option('--follow', 'Follow output file (poll every 2 seconds)')
-    .option('--sprint-id <sprintId>', 'Sprint ID to read from (defaults to current sprint)')
-    .option('--json', 'Output raw JSON')
+  const helpLang = getLanguage(undefined);
+  bindArgumentDescriptions(program.command('output <taskId>'), helpLang, { taskId: 'cliContract.output.arg.taskId' })
+    .description(getMessage('cli.output.desc', helpLang))
+    .option('--tail <n>', cliContractMessage('cliContract.output.opt.tail', helpLang), '50')
+    .option('--follow', cliContractMessage('cliContract.output.opt.follow', helpLang))
+    .option('--sprint-id <sprintId>', cliContractMessage('cliContract.output.opt.sprint_id', helpLang))
+    .option('--json', cliContractMessage('cliContract.output.opt.json', helpLang))
+    .addHelpText('after', renderContractHelp('output', helpLang))
     .action((taskId: string, opts: OutputOpts) => {
       const root = (deps.resolveProjectRootFn ?? resolveProjectRoot)();
       const lang = getLanguage(undefined);

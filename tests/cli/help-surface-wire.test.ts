@@ -1,297 +1,277 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+/**
+ * help-surface-wire.test.ts — CLI-CONTRACT-001
+ *
+ * `deckent --help` used to render Turkish command descriptions inside an
+ * English frame: Commander emits its own section headings ('Usage:',
+ * 'Options:', 'Commands:', …), its built-in `--help` labels, and index.ts
+ * baked the root footer and the version-flag descriptions in as literals.
+ *
+ * This file proves the closure on both sides:
+ *   1. WIRING   — the localized help chrome is actually attached to the real
+ *                 program returned by buildProgram(), across the whole tree.
+ *   2. NO-REGRESSION — the ENGLISH help output is byte-identical to what
+ *                 Commander/index.ts rendered before (the `en` catalog rows
+ *                 are the old literals), so localization changed nothing for
+ *                 English users.
+ *   3. CATALOG  — the family-merge mechanism rejects key collisions, and every
+ *                 injected key is a real bilingual row.
+ */
+import { describe, it, expect, beforeAll } from 'vitest';
+import { Command, Help } from 'commander';
 
 import {
-  runChatNativeLoop,
-  buildHelpCatalogEntries,
-  buildHelpCatalogLabels,
-  type ChatNativeOptions,
-  type ChatProviderAdapter,
-  type McpToolDispatcher,
-  type ProviderResponse,
-} from '../../src/cli/commands/chat-native.js';
-import { getVisibleCommands } from '../../src/cli/commands/chat-mode.js';
-import { buildSlashRegistry } from '../../src/cli/commands/chat-slash-registry.js';
-import { getMessage } from '../../src/cli/helpers/messages.js';
+  COMMANDER_DEFAULT_HEADINGS,
+  COMMANDER_DEFAULT_HELP_DESCRIPTION,
+  CLI_HELP_MESSAGE_KEYS,
+  applyLocalizedHelp,
+  attachRootHelpFooter,
+  buildCliHelpLabels,
+  collectCommandTree,
+  localizeHelpTitle,
+} from '../../src/cli/helpers/cli-help.js';
+import {
+  MESSAGE_CATALOG_FAMILIES,
+  getMessage,
+  getMessageLanguages,
+  mergeMessageFamilies,
+} from '../../src/cli/helpers/messages.js';
+import { CLI_COMMON_MESSAGES } from '../../src/cli/helpers/message-catalog/cli-common.js';
+import { CLI_RUN_MESSAGES } from '../../src/cli/helpers/message-catalog/cli-run.js';
+import { CLI_MEMORY_CATALOG_MESSAGES } from '../../src/cli/helpers/message-catalog/cli-memory-catalog.js';
+import { CLI_GOVERNANCE_MESSAGES } from '../../src/cli/helpers/message-catalog/cli-governance.js';
+import { CLI_RUNTIME_HELP_MESSAGES } from '../../src/cli/helpers/message-catalog/cli-runtime-help.js';
+import { CLI_REFERENCE_MESSAGES } from '../../src/cli/helpers/message-catalog/cli-reference.js';
 
-// Sprint 358 T-358-005 — HELP-SURFACE-WIRE.
-//
-// Verifies /help wires (1) getVisibleCommands(mode) — mode-filtered command
-// list, mode sourced from ChatNativeOptions.termMode ('control' -> enterprise,
-// everything else -> user) and (2) a trust-badged "Tools/Actions" catalog
-// section (357-002 renderCatalog + 357-001 classifyToolTrust) appended to the
-// SAME single output() call as the registry render.
+let buildProgram: () => Command;
 
-// eslint-disable-next-line no-control-regex
-const ANSI_RE = /\x1b\[/;
+beforeAll(async () => {
+  const mod = await import('../../src/cli/index.js');
+  buildProgram = mod.buildProgram;
+});
 
-// ─── Harness (mirrors repl-slash-registry-wire.test.ts) ────────────────────
-
-async function* lines(...items: string[]): AsyncIterable<string> {
-  for (const item of items) yield item;
+/** A throwaway 2-level program — no dependency on the real CLI registration. */
+function fixtureProgram(): Command {
+  const root = new Command()
+    .name('root')
+    .description('root description')
+    .option('-f, --flag', 'a flag');
+  root
+    .command('child')
+    .description('child description')
+    .argument('<name>', 'the name')
+    .option('--deep', 'a deep flag');
+  return root;
 }
 
-function queuedProvider(responses: ProviderResponse[]): {
-  adapter: ChatProviderAdapter;
-  sendSpy: ReturnType<typeof vi.fn>;
-} {
-  const remaining = [...responses];
-  const sendSpy = vi.fn(async () => {
-    const next = remaining.shift();
-    if (!next) throw new Error('queuedProvider: response queue exhausted');
-    return next;
-  });
-  return { adapter: { send: sendSpy }, sendSpy };
-}
-
-function fakeDispatcher(canned: string = 'tool-ok'): {
-  dispatcher: McpToolDispatcher;
-  dispatchSpy: ReturnType<typeof vi.fn>;
-} {
-  const dispatchSpy = vi.fn(async () => canned);
-  return { dispatcher: { dispatch: dispatchSpy }, dispatchSpy };
-}
-
-function baseOpts(overrides: Partial<ChatNativeOptions> & {
-  provider: ChatProviderAdapter;
-  dispatcher: McpToolDispatcher;
-  input: AsyncIterable<string>;
-}): ChatNativeOptions {
-  return {
-    output: vi.fn(),
-    ...overrides,
-  };
-}
-
-// ─── NO_COLOR env save/restore ──────────────────────────────────────────────
-
-let origNoColor: string | undefined;
-function saveEnv(): void {
-  origNoColor = process.env['NO_COLOR'];
-}
-function restoreEnv(): void {
-  if (origNoColor === undefined) delete process.env['NO_COLOR'];
-  else process.env['NO_COLOR'] = origNoColor;
-}
-afterEach(restoreEnv);
-
-// ─── /help mode-filtered render (goCriteria: user-mode excludes, control-mode includes) ──
-
-describe('runChatNativeLoop — /help mode-filtered visibility (T-358-005)', () => {
-  it('default (no termMode) /help hides /audit — user mode is the safe default', async () => {
-    const { adapter, sendSpy } = queuedProvider([]);
-    const { dispatcher, dispatchSpy } = fakeDispatcher();
-    const output = vi.fn();
-
-    const transcript = await runChatNativeLoop(baseOpts({
-      provider: adapter,
-      dispatcher,
-      input: lines('/help'),
-      output,
-    }));
-
-    expect(sendSpy).not.toHaveBeenCalled();
-    expect(dispatchSpy).not.toHaveBeenCalled();
-    // Single-emit regression guard (matches repl-slash-registry-wire.test.ts).
-    expect(output).toHaveBeenCalledTimes(1);
-    const helpText = output.mock.calls[0]![0] as string;
-    expect(helpText).toContain('Komutlar:');
-    expect(helpText).toContain('/help');
-    expect(helpText).toContain('/status');
-    expect(helpText).not.toContain('/audit');
-    expect(transcript).toEqual([]);
+describe('cli-help — English output is byte-identical to Commander defaults', () => {
+  it('every `en` heading row equals the exact string Commander emits', () => {
+    const labels = buildCliHelpLabels('en');
+    expect(labels.headings.usage).toBe(COMMANDER_DEFAULT_HEADINGS.usage);
+    expect(labels.headings.arguments).toBe(COMMANDER_DEFAULT_HEADINGS.arguments);
+    expect(labels.headings.options).toBe(COMMANDER_DEFAULT_HEADINGS.options);
+    expect(labels.headings.globalOptions).toBe(COMMANDER_DEFAULT_HEADINGS.globalOptions);
+    expect(labels.headings.commands).toBe(COMMANDER_DEFAULT_HEADINGS.commands);
   });
 
-  it("termMode: 'ask' /help hides /audit (maps to user)", async () => {
-    const { adapter } = queuedProvider([]);
-    const { dispatcher } = fakeDispatcher();
-    const output = vi.fn();
-
-    await runChatNativeLoop(baseOpts({
-      provider: adapter,
-      dispatcher,
-      input: lines('/help'),
-      output,
-      termMode: 'ask',
-    }));
-
-    const helpText = output.mock.calls[0]![0] as string;
-    expect(helpText).not.toContain('/audit');
+  it('the `en` built-in help labels equal Commander\'s own description', () => {
+    const labels = buildCliHelpLabels('en');
+    expect(labels.helpOptionDescription).toBe(COMMANDER_DEFAULT_HELP_DESCRIPTION);
+    expect(labels.helpCommandDescription).toBe(COMMANDER_DEFAULT_HELP_DESCRIPTION);
   });
 
-  it("termMode: 'run' /help hides /audit (maps to user)", async () => {
-    const { adapter } = queuedProvider([]);
-    const { dispatcher } = fakeDispatcher();
-    const output = vi.fn();
-
-    await runChatNativeLoop(baseOpts({
-      provider: adapter,
-      dispatcher,
-      input: lines('/help'),
-      output,
-      termMode: 'run',
-    }));
-
-    const helpText = output.mock.calls[0]![0] as string;
-    expect(helpText).not.toContain('/audit');
+  it('the `en` root footer is the exact literal index.ts used to inline', () => {
+    expect(buildCliHelpLabels('en').rootFooter).toBe(
+      '\nRun `deckent info` for a localized (TR/EN) quick-reference of common commands.\n',
+    );
   });
 
-  it("termMode: 'control' /help INCLUDES /audit (enterprise mode)", async () => {
-    const { adapter } = queuedProvider([]);
-    const { dispatcher } = fakeDispatcher();
-    const output = vi.fn();
+  it('the `en` version-flag descriptions are the exact previous literals', () => {
+    const labels = buildCliHelpLabels('en');
+    expect(labels.versionOptionDescription).toBe('output the version number with splash');
+    expect(labels.versionJsonOptionDescription).toBe('output version info as JSON');
+  });
 
-    await runChatNativeLoop(baseOpts({
-      provider: adapter,
-      dispatcher,
-      input: lines('/help'),
-      output,
-      termMode: 'control',
-    }));
+  it('applying `en` labels leaves a fixture program\'s help output unchanged', () => {
+    const before = fixtureProgram().helpInformation();
+    const after = applyLocalizedHelp(fixtureProgram(), buildCliHelpLabels('en')).helpInformation();
+    expect(after).toBe(before);
+  });
 
-    expect(output).toHaveBeenCalledTimes(1);
-    const helpText = output.mock.calls[0]![0] as string;
-    expect(helpText).toContain('/audit');
-    expect(helpText).toContain('/help');
-    expect(helpText).toContain('/status');
+  it('applying `en` labels leaves a SUBCOMMAND\'s help output unchanged', () => {
+    const plain = fixtureProgram().commands[0]!.helpInformation();
+    const wired = applyLocalizedHelp(fixtureProgram(), buildCliHelpLabels('en')).commands[0]!.helpInformation();
+    expect(wired).toBe(plain);
   });
 });
 
-// ─── /help "Tools/Actions" trust-badge catalog section ──────────────────────
-
-describe('runChatNativeLoop — /help trust-badge catalog section (T-358-005)', () => {
-  it('appends a trust-badge catalog section after the command list, in the SAME output() call', async () => {
-    saveEnv();
-    process.env['NO_COLOR'] = '1'; // structural assertion below needs plain (unpainted) badge text
-    const { adapter } = queuedProvider([]);
-    const { dispatcher } = fakeDispatcher();
-    const output = vi.fn();
-
-    await runChatNativeLoop(baseOpts({
-      provider: adapter,
-      dispatcher,
-      input: lines('/help'),
-      output,
-    }));
-
-    expect(output).toHaveBeenCalledTimes(1);
-    const helpText = output.mock.calls[0]![0] as string;
-    // Section header (getMessage('nervous.actions_label', 'en') === 'Actions:').
-    expect(helpText).toContain(getMessage('nervous.actions_label', 'en'));
-    // Core trust badge glyph must appear for at least one builtin command.
-    expect(helpText).toContain('C /help');
-    // Danger trust badge glyph for the always-confirm destructive commands.
-    expect(helpText).toContain('! /kill');
-    expect(helpText).toContain('! /cleanup');
-    expect(helpText).toContain('! /recover');
+describe('cli-help — localization actually reaches the rendered output', () => {
+  it('translates every known heading and passes unknown titles through', () => {
+    const tr = buildCliHelpLabels('tr');
+    expect(localizeHelpTitle('Usage:', tr)).toBe(tr.headings.usage);
+    expect(localizeHelpTitle('Options:', tr)).toBe(tr.headings.options);
+    expect(localizeHelpTitle('Commands:', tr)).toBe(tr.headings.commands);
+    expect(localizeHelpTitle('Arguments:', tr)).toBe(tr.headings.arguments);
+    expect(localizeHelpTitle('Global Options:', tr)).toBe(tr.headings.globalOptions);
+    // A heading a future Commander adds must NOT be silently swallowed.
+    expect(localizeHelpTitle('Some Future Heading:', tr)).toBe('Some Future Heading:');
   });
 
-  it('control-mode catalog section shows /audit under the Enterprise trust tier', async () => {
-    saveEnv();
-    process.env['NO_COLOR'] = '1'; // structural assertion below needs plain (unpainted) badge text
-    const { adapter } = queuedProvider([]);
-    const { dispatcher } = fakeDispatcher();
-    const output = vi.fn();
-
-    await runChatNativeLoop(baseOpts({
-      provider: adapter,
-      dispatcher,
-      input: lines('/help'),
-      output,
-      termMode: 'control',
-    }));
-
-    const helpText = output.mock.calls[0]![0] as string;
-    expect(helpText).toContain('E /audit');
+  it('renders Turkish headings in a fixture program\'s help output', () => {
+    const tr = buildCliHelpLabels('tr');
+    const output = applyLocalizedHelp(fixtureProgram(), tr).helpInformation();
+    expect(output).toContain(tr.headings.usage);
+    expect(output).toContain(tr.headings.options);
+    expect(output).toContain(tr.headings.commands);
+    expect(output).not.toContain('Usage:');
+    expect(output).not.toContain('Options:');
   });
 
-  it('honors NO_COLOR — no ANSI escape codes anywhere in /help output', async () => {
-    saveEnv();
-    process.env['NO_COLOR'] = '1';
-    const { adapter } = queuedProvider([]);
-    const { dispatcher } = fakeDispatcher();
-    const output = vi.fn();
-
-    await runChatNativeLoop(baseOpts({
-      provider: adapter,
-      dispatcher,
-      input: lines('/help'),
-      output,
-    }));
-
-    const helpText = output.mock.calls[0]![0] as string;
-    expect(helpText).not.toMatch(ANSI_RE);
+  it('renders the Turkish built-in --help description', () => {
+    const tr = buildCliHelpLabels('tr');
+    const output = applyLocalizedHelp(fixtureProgram(), tr).helpInformation();
+    expect(output).toContain(tr.helpOptionDescription);
+    expect(output).not.toContain(COMMANDER_DEFAULT_HELP_DESCRIPTION);
   });
 
-  it('emits ANSI color codes by default when NO_COLOR is unset (color path is reachable)', async () => {
-    saveEnv();
-    delete process.env['NO_COLOR'];
-    const { adapter } = queuedProvider([]);
-    const { dispatcher } = fakeDispatcher();
-    const output = vi.fn();
+  it('localizes SUBCOMMAND help too, including the Arguments heading', () => {
+    const tr = buildCliHelpLabels('tr');
+    const child = applyLocalizedHelp(fixtureProgram(), tr).commands[0]!;
+    const output = child.helpInformation();
+    expect(output).toContain(tr.headings.arguments);
+    expect(output).toContain(tr.headings.usage);
+    expect(output).not.toContain('Arguments:');
+  });
 
-    await runChatNativeLoop(baseOpts({
-      provider: adapter,
-      dispatcher,
-      input: lines('/help'),
-      output,
-    }));
+  it('never rewrites a non-help option description', () => {
+    const tr = buildCliHelpLabels('tr');
+    const output = applyLocalizedHelp(fixtureProgram(), tr).helpInformation();
+    expect(output).toContain('a flag');
+  });
 
-    const helpText = output.mock.calls[0]![0] as string;
-    expect(helpText).toMatch(ANSI_RE);
+  it('is idempotent — re-applying with a different language replaces cleanly', () => {
+    const program = fixtureProgram();
+    applyLocalizedHelp(program, buildCliHelpLabels('tr'));
+    applyLocalizedHelp(program, buildCliHelpLabels('en'));
+    expect(program.helpInformation()).toBe(fixtureProgram().helpInformation());
+  });
+
+  it('collectCommandTree returns root first, then every descendant', () => {
+    const program = fixtureProgram();
+    const tree = collectCommandTree(program);
+    expect(tree[0]).toBe(program);
+    expect(tree).toHaveLength(2);
+    expect(tree[1]!.name()).toBe('child');
+  });
+
+  it('attachRootHelpFooter appends the footer to the ROOT only', () => {
+    const tr = buildCliHelpLabels('tr');
+    const program = attachRootHelpFooter(fixtureProgram(), tr);
+    expect(program.helpInformation()).toContain(tr.rootFooter.trim());
+    expect(program.commands[0]!.helpInformation()).not.toContain(tr.rootFooter.trim());
   });
 });
 
-// ─── buildHelpCatalogEntries — direct unit coverage ─────────────────────────
-
-describe('buildHelpCatalogEntries — trust classification', () => {
-  it('classifies /kill /cleanup /recover as Danger (always-confirm clamp)', () => {
-    const entries = buildHelpCatalogEntries(getVisibleCommands('enterprise'));
-    const byId = new Map(entries.map((e) => [e.id, e]));
-    expect(byId.get('/kill')?.trustTier).toBe('Danger');
-    expect(byId.get('/cleanup')?.trustTier).toBe('Danger');
-    expect(byId.get('/recover')?.trustTier).toBe('Danger');
-    expect(byId.get('/kill')?.riskLevel).toBe('critical');
+describe('cli-help — wiring into the real buildProgram() tree', () => {
+  it('the real root program renders the localized footer', () => {
+    const output = buildProgram().helpInformation();
+    expect(output).toContain(buildCliHelpLabels('en').rootFooter.trim());
   });
 
-  it('classifies a plain builtin read command (/status) as Core, non-critical', () => {
-    const entries = buildHelpCatalogEntries(getVisibleCommands('enterprise'));
-    const status = entries.find((e) => e.id === '/status');
-    expect(status?.trustTier).toBe('Core');
-    expect(status?.riskLevel).not.toBe('critical');
+  it('the real root program describes its version flags from the catalog', () => {
+    const labels = buildCliHelpLabels('en');
+    const flags = buildProgram().options.map((o) => ({ flags: o.flags, description: o.description }));
+    const version = flags.find((o) => o.flags === '-V, --version');
+    const versionJson = flags.find((o) => o.flags === '--version-json');
+    expect(version?.description).toBe(labels.versionOptionDescription);
+    expect(versionJson?.description).toBe(labels.versionJsonOptionDescription);
   });
 
-  it('classifies /audit as Enterprise', () => {
-    const entries = buildHelpCatalogEntries(getVisibleCommands('enterprise'));
-    const audit = entries.find((e) => e.id === '/audit');
-    expect(audit?.trustTier).toBe('Enterprise');
+  it('EVERY command in the real tree carries the localized help configuration', () => {
+    const program = buildProgram();
+    const tr = buildCliHelpLabels('tr');
+    // Re-apply Turkish to the already-built tree — this is exactly the
+    // per-invocation language switch, and it must reach every node.
+    applyLocalizedHelp(program, tr);
+    const unlocalized = collectCommandTree(program).filter((command) => {
+      const helper = command.createHelp() as Help;
+      return helper.styleTitle?.('Usage:') !== tr.headings.usage;
+    });
+    expect(unlocalized.map((c) => c.name())).toEqual([]);
+    expect(collectCommandTree(program).length).toBeGreaterThan(100);
   });
 
-  it('drops the /quit alias, mirroring renderHelp', () => {
-    const entries = buildHelpCatalogEntries(buildSlashRegistry());
-    expect(entries.some((e) => e.id === '/quit')).toBe(false);
-  });
-
-  it('every visible command maps to exactly one catalog entry', () => {
-    const visible = getVisibleCommands('user');
-    const entries = buildHelpCatalogEntries(visible);
-    expect(entries.length).toBe(visible.filter((c) => c.name !== '/quit').length);
+  it('the real English help output still contains Commander\'s own headings', () => {
+    const output = buildProgram().helpInformation();
+    expect(output).toContain('Usage:');
+    expect(output).toContain('Commands:');
+    expect(output).toContain('Options:');
   });
 });
 
-// ─── buildHelpCatalogLabels — string-free / i18n-sourced ────────────────────
-
-describe('buildHelpCatalogLabels — labels injected via getMessage', () => {
-  it('emptyState resolves through getMessage for both supported languages, distinct text', () => {
-    const en = buildHelpCatalogLabels('en').emptyState;
-    const tr = buildHelpCatalogLabels('tr').emptyState;
-    expect(en).toBeTruthy();
-    expect(tr).toBeTruthy();
-    expect(en).not.toBe(tr);
+describe('message-catalog family merge — collisions are mechanical, not review-based', () => {
+  it('the cli-common family is registered and non-empty', () => {
+    expect(MESSAGE_CATALOG_FAMILIES['cli-common']).toBe(CLI_COMMON_MESSAGES);
+    expect(MESSAGE_CATALOG_FAMILIES['cli-run']).toBe(CLI_RUN_MESSAGES);
+    expect(MESSAGE_CATALOG_FAMILIES['cli-memory-catalog']).toBe(CLI_MEMORY_CATALOG_MESSAGES);
+    expect(MESSAGE_CATALOG_FAMILIES['cli-governance']).toBe(CLI_GOVERNANCE_MESSAGES);
+    expect(MESSAGE_CATALOG_FAMILIES['cli-runtime-help']).toBe(CLI_RUNTIME_HELP_MESSAGES);
+    expect(MESSAGE_CATALOG_FAMILIES['cli-reference']).toBe(CLI_REFERENCE_MESSAGES);
+    expect(Object.keys(CLI_COMMON_MESSAGES).length).toBeGreaterThan(0);
   });
 
-  it('categoryName/entryName are pure identity passthroughs (technical tokens, not prose)', () => {
-    const labels = buildHelpCatalogLabels('en');
-    expect(labels.categoryName('Core')).toBe('Core');
-    expect(labels.entryName('/status')).toBe('/status');
+  it('every cli-common key lives in the reserved `cli.help.` namespace', () => {
+    for (const key of Object.keys(CLI_COMMON_MESSAGES)) {
+      expect(key.startsWith('cli.help.')).toBe(true);
+    }
+  });
+
+  it('every key cli-help injects is a real bilingual (en+tr) catalog row', () => {
+    for (const key of Object.values(CLI_HELP_MESSAGE_KEYS)) {
+      const langs = getMessageLanguages(key);
+      expect(langs, `${key} must be bilingual`).toContain('en');
+      expect(langs, `${key} must be bilingual`).toContain('tr');
+      expect(getMessage(key, 'tr')).not.toBe(key);
+    }
+  });
+
+  it('the injected keys are exactly the cli-common family keys', () => {
+    expect(Object.values(CLI_HELP_MESSAGE_KEYS).slice().sort()).toEqual(
+      Object.keys(CLI_COMMON_MESSAGES).slice().sort(),
+    );
+  });
+
+  it('merging a family whose key already exists in the base THROWS', () => {
+    expect(() =>
+      mergeMessageFamilies(
+        { 'a.key': { en: 'base', tr: 'taban' } },
+        { intruder: { 'a.key': { en: 'other', tr: 'diğer' } } },
+      ),
+    ).toThrow(/family key collision/);
+  });
+
+  it('merging two families that share a key THROWS and names the family', () => {
+    expect(() =>
+      mergeMessageFamilies(
+        {},
+        {
+          first: { 'shared.key': { en: 'one', tr: 'bir' } },
+          second: { 'shared.key': { en: 'two', tr: 'iki' } },
+        },
+      ),
+    ).toThrow(/second:shared\.key/);
+  });
+
+  it('a clean merge keeps base rows and adds family rows', () => {
+    const merged = mergeMessageFamilies(
+      { 'base.key': { en: 'base', tr: 'taban' } },
+      { fam: { 'fam.key': { en: 'fam', tr: 'aile' } } },
+    );
+    expect(merged['base.key']).toEqual({ en: 'base', tr: 'taban' });
+    expect(merged['fam.key']).toEqual({ en: 'fam', tr: 'aile' });
+  });
+
+  it('a real cli-common key resolves through getMessage() in both languages', () => {
+    expect(getMessage('cli.help.heading.options', 'en')).toBe('Options:');
+    expect(getMessage('cli.help.heading.options', 'tr')).toBe('Seçenekler:');
   });
 });

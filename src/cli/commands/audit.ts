@@ -14,6 +14,7 @@ import { RECENT_WORKS_DIR } from '../../core/constants.js';
 import { loadConfig } from '../../core/config.js';
 import { print, printError } from '../helpers/output.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
+import { memoryCatalogMessage } from '../helpers/message-catalog/cli-memory-catalog.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { DeckentError } from '../../core/errors.js';
 
@@ -248,22 +249,24 @@ export function runAuditRetention(
 
 export function registerAudit(program: Command): void {
   program
-    .command('audit [sprint-id]')
+    .command('audit')
+    .argument('[sprint-id]', memoryCatalogMessage('cli.memcat.audit.arg.sprint_id', getLanguage(undefined)))
     .description(getMessage('cli.audit.desc', getLanguage(undefined)))
-    .option('--json', 'Output raw JSON only')
-    .option('--sprint <id>', 'Sprint ID for audit query/compliance/forward/retention subcommands', 'sprint-001')
-    .option('--tenant <id>', 'Filter audit events by tenant ID (used with query subcommand)')
-    .option('--action <channel>', 'Filter audit events by action/channel (used with query subcommand)')
-    .option('--since <timestamp>', 'Filter audit events at or after ISO 8601 timestamp (used with query subcommand)')
-    .option('--role <role>', 'Caller role for RBAC enforcement: admin|operator|viewer (used with query subcommand)')
-    .option('--out <path>', 'Output file for the forward subcommand (default: .deckent/siem-export.jsonl)')
-    .option('--url <url>', 'POST audit records to an HTTP(S) SIEM endpoint (forward subcommand; takes precedence over --syslog and --out)')
-    .option('--syslog <host[:port]>', 'Send audit records to a syslog collector, RFC 5424 (forward subcommand; takes precedence over --out)')
-    .option('--syslog-protocol <protocol>', 'Syslog wire protocol: udp|tcp (forward subcommand)', 'udp')
-    .option('--keep-days <n>', 'Retention: prune audit events older than n days (retention subcommand)')
-    .option('--keep-count <n>', 'Retention: archive audit events beyond the most recent n (retention subcommand)')
-    .option('--apply', 'Retention: apply the plan — without it the run is a dry-run (retention subcommand)')
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--json', memoryCatalogMessage('cli.memcat.shared.opt.json_raw', getLanguage(undefined)))
+    .option('--sprint <id>', memoryCatalogMessage('cli.memcat.audit.opt.sprint', getLanguage(undefined)), 'sprint-001')
+    .option('--tenant <id>', memoryCatalogMessage('cli.memcat.audit.opt.tenant', getLanguage(undefined)))
+    .option('--action <channel>', memoryCatalogMessage('cli.memcat.audit.opt.action', getLanguage(undefined)))
+    .option('--since <timestamp>', memoryCatalogMessage('cli.memcat.audit.opt.since', getLanguage(undefined)))
+    .option('--role <role>', memoryCatalogMessage('cli.memcat.audit.opt.role', getLanguage(undefined)))
+    .option('--out <path>', memoryCatalogMessage('cli.memcat.audit.opt.out', getLanguage(undefined)))
+    .option('--url <url>', memoryCatalogMessage('cli.memcat.audit.opt.url', getLanguage(undefined)))
+    .option('--syslog <host[:port]>', memoryCatalogMessage('cli.memcat.audit.opt.syslog', getLanguage(undefined)))
+    .option('--syslog-protocol <protocol>', memoryCatalogMessage('cli.memcat.audit.opt.syslog_protocol', getLanguage(undefined)), 'udp')
+    .option('--keep-days <n>', memoryCatalogMessage('cli.memcat.audit.opt.keep_days', getLanguage(undefined)))
+    .option('--keep-count <n>', memoryCatalogMessage('cli.memcat.audit.opt.keep_count', getLanguage(undefined)))
+    .option('--apply', memoryCatalogMessage('cli.memcat.audit.opt.apply', getLanguage(undefined)))
+    .option('--lang <code>', memoryCatalogMessage('cli.memcat.shared.opt.lang', getLanguage(undefined)))
+    .addHelpText('after', memoryCatalogMessage('cli.memcat.audit.help.paths', getLanguage(undefined)))
     .action(async (sprintId: string | undefined, opts: AuditOpts) => {
       const root = resolveProjectRoot();
       const lang = getLanguage(opts.lang);
@@ -425,7 +428,7 @@ export function registerAudit(program: Command): void {
       }
 
       if (!sprintId) {
-        printError(new Error('audit: sprint-id required (e.g. deckent audit sprint-210) or use: deckent audit query [options]'));
+        printError(new Error(memoryCatalogMessage('cli.memcat.audit.error.sprint_required', getLanguage(undefined))));
         process.exitCode = 1;
         return;
       }

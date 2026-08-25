@@ -31,6 +31,7 @@ import { getLangFromConfig } from '../helpers/config-reader.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
 import { print, printError } from '../helpers/output.js';
 import { buildAuthStateReport, type AuthStateResult } from './doctor.js';
+import { cliContractMessage } from '../helpers/message-catalog/cli-run.js';
 
 export interface ConnectCommandOptions {
   provider?: string;
@@ -196,11 +197,12 @@ export function formatConnectReport(
 }
 
 export function registerConnect(program: Command): void {
+  const helpLang = getLanguage(undefined);
   program
     .command('connect')
     .description(getMessage('cli.connect.desc', getLanguage(undefined)))
-    .option('--provider <name>', `Scope the report to a single provider (${CONNECT_PROVIDERS.join('|')})`)
-    .option('--json', 'Output the report as JSON')
+    .option('--provider <name>', cliContractMessage('cliContract.connect.opt.provider', helpLang, { providers: CONNECT_PROVIDERS.join('|') }))
+    .option('--json', cliContractMessage('cliContract.connect.opt.json', helpLang))
     .action(async (opts: ConnectCommandOptions) => {
       const target = resolveConnectTarget(opts);
       if ('error' in target) {

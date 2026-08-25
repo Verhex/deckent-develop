@@ -11,6 +11,7 @@ import { registerShutdownHook } from '../helpers/shutdown-hooks.js';
 // Re-exported here so the former `dashboard.js` import path keeps working
 // against the single source of truth — no duplicate body.
 import { isNoColor } from '../helpers/output.js';
+import { cliContractMessage } from '../helpers/message-catalog/cli-run.js';
 export { isNoColor } from '../helpers/output.js';
 
 interface DashboardOpts {
@@ -145,12 +146,13 @@ export function readDashboardFile(dashPath: string): DashboardState | null {
 }
 
 export function registerDashboard(program: Command): void {
+  const helpLang = getLanguage(undefined);
   program
     .command('dashboard')
     .description(getMessage('cli.dashboard.desc', getLanguage(undefined)))
-    .option('--interval <ms>', 'Refresh interval in milliseconds (used as fallback when fs.watch unavailable)', '2000')
-    .option('--no-color', 'Disable ANSI colors (also respects NO_COLOR env var)')
-    .option('--json', 'Output dashboard state as raw JSON and exit (shared format with deckent status --raw)')
+    .option('--interval <ms>', cliContractMessage('cliContract.dashboard.opt.interval', helpLang), '2000')
+    .option('--no-color', cliContractMessage('cliContract.dashboard.opt.no_color', helpLang))
+    .option('--json', cliContractMessage('cliContract.dashboard.opt.json', helpLang))
     .action((opts: DashboardOpts) => {
       const root = resolveProjectRoot();
       const dashPath = join(root, DASHBOARD_FILE);

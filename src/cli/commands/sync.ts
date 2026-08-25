@@ -16,6 +16,7 @@ import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
 import { ensureCursorRules } from '../helpers/cursor-config.js';
+import { cliContractMessage } from '../helpers/message-catalog/cli-run.js';
 
 // ─── Constants ───────────────────────────────────────────────────────
 
@@ -657,13 +658,14 @@ export function syncAgentCapabilities(root: string, dryRun = false): AgentCapabi
 // ─── Command Registration ───────────────────────────────────────────
 
 export function registerSync(program: Command): void {
+  const helpLang = getLanguage(undefined);
   program
     .command('sync')
     .description(getMessage('cli.sync.desc', getLanguage(undefined)))
-    .option('--git-only', 'Only detect git changes (skip adapter file sync)')
-    .option('--adapters-only', 'Only sync adapter files (skip git change detection)')
-    .option('--dry-run', 'Preview changes without writing anything')
-    .option('--json', 'Output result as JSON')
+    .option('--git-only', cliContractMessage('cliContract.sync.opt.git_only', helpLang))
+    .option('--adapters-only', cliContractMessage('cliContract.sync.opt.adapters_only', helpLang))
+    .option('--dry-run', cliContractMessage('cliContract.sync.opt.dry_run', helpLang))
+    .option('--json', cliContractMessage('cliContract.sync.opt.json', helpLang))
     .action((opts: { gitOnly?: boolean; adaptersOnly?: boolean; dryRun?: boolean; json?: boolean }) => {
       const root = resolveProjectRoot();
 

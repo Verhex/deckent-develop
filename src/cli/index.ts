@@ -90,6 +90,11 @@ import {
   openTaskSettlementProjection,
 } from '../core/task-settlement-authority.js';
 import { getLanguage, getMessage } from './helpers/messages.js';
+import {
+  applyLocalizedHelp,
+  attachRootHelpFooter,
+  buildCliHelpLabels,
+} from './helpers/cli-help.js';
 
 export interface CliProgramRuntime {
   readonly providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
@@ -105,13 +110,19 @@ export interface CliProgramRuntime {
 export function buildProgram(runtime: CliProgramRuntime = {}): Command {
   installFatalHandlers();
 
+  // CLI-CONTRACT-001 — every string Commander itself would render in English
+  // (section headings, built-in help labels, the root footer, the version
+  // flags) is caller-injected from the `cli-common` message-catalog family.
+  // The `en` catalog rows are byte-identical to the previous literals, so
+  // English help output is unchanged; only the localized faces are new.
+  const helpLabels = buildCliHelpLabels(getLanguage(undefined));
+
   const program = new Command()
     .name('deckent')
     .description(getMessage('cli.program.desc', getLanguage(undefined)))
-    .addHelpText('after', '\nRun `deckent info` for a localized (TR/EN) quick-reference of common commands.\n')
     .showSuggestionAfterError(true)
-    .option('-V, --version', 'output the version number with splash')
-    .option('--version-json', 'output version info as JSON')
+    .option('-V, --version', helpLabels.versionOptionDescription)
+    .option('--version-json', helpLabels.versionJsonOptionDescription)
     .on('option:version', () => {
       console.log(showSplash(DECKENT_VERSION));
       console.log(`\n  ${buildVersionString(DECKENT_VERSION)}`);
@@ -232,6 +243,12 @@ export function buildProgram(runtime: CliProgramRuntime = {}): Command {
   registerCuStatus(program);
   registerLocalLlm(program);
   registerHelp(program);
+
+  // Applied AFTER every registration so the localized help configuration
+  // reaches the whole tree (Commander only copies inherited settings at
+  // subcommand-creation time). The root footer belongs to the root only.
+  attachRootHelpFooter(program, helpLabels);
+  applyLocalizedHelp(program, helpLabels);
 
   return program;
 }

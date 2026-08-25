@@ -27,6 +27,7 @@ import { detectLang } from '../helpers/i18n.js';
 import { formatTable, print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
+import { memoryCatalogMessage } from '../helpers/message-catalog/cli-memory-catalog.js';
 
 // ─── Scope handling ─────────────────────────────────────────────────
 
@@ -319,15 +320,22 @@ export function handleGet(name: string, opts: GetOptions): void {
 // ─── Registration (ADR-012 pattern) ─────────────────────────────────
 
 export function registerMcp(program: Command): void {
-  const mcpCmd = program.command('mcp').description(getMessage('cli.mcp.desc', getLanguage(undefined)));
+  const mcpCmd = program.command('mcp').description(memoryCatalogMessage('cli.memcat.mcp.desc', getLanguage(undefined)));
+
+  // MCP is a host-neutral standard — the help says so instead of framing the
+  // command as parity with one particular client.
+  mcpCmd.addHelpText('after', memoryCatalogMessage('cli.memcat.mcp.help.paths', getLanguage(undefined)));
 
   mcpCmd
-    .command('add <name> <cmdOrUrl> [args...]')
+    .command('add')
+    .argument('<name>', memoryCatalogMessage('cli.memcat.mcp.arg.name', getLanguage(undefined)))
+    .argument('<cmdOrUrl>', memoryCatalogMessage('cli.memcat.mcp.arg.cmd_or_url', getLanguage(undefined)))
+    .argument('[args...]', memoryCatalogMessage('cli.memcat.mcp.arg.args', getLanguage(undefined)))
     .description(getMessage('cli.mcp.add.desc', getLanguage(undefined)))
-    .option('--scope <scope>', 'Config scope: project | user | local', 'project')
-    .option('--transport <transport>', 'Transport: stdio | http (auto-detected if omitted)')
-    .option('--header <kv...>', 'HTTP header as key=value (repeatable)')
-    .option('--env <kv...>', 'stdio env as key=value (repeatable)')
+    .option('--scope <scope>', memoryCatalogMessage('cli.memcat.mcp.opt.scope_add', getLanguage(undefined)), 'project')
+    .option('--transport <transport>', memoryCatalogMessage('cli.memcat.mcp.opt.transport', getLanguage(undefined)))
+    .option('--header <kv...>', memoryCatalogMessage('cli.memcat.mcp.opt.header', getLanguage(undefined)))
+    .option('--env <kv...>', memoryCatalogMessage('cli.memcat.mcp.opt.env', getLanguage(undefined)))
     .action((name: string, cmdOrUrl: string, args: string[], opts: AddOptions) => {
       try {
         handleAdd(name, cmdOrUrl, args, opts);
@@ -340,7 +348,7 @@ export function registerMcp(program: Command): void {
   mcpCmd
     .command('list')
     .description(getMessage('cli.mcp.list.desc', getLanguage(undefined)))
-    .option('--json', 'Output as JSON')
+    .option('--json', memoryCatalogMessage('cli.memcat.shared.opt.json', getLanguage(undefined)))
     .action((opts: ListOptions) => {
       try {
         handleList(opts);
@@ -351,9 +359,10 @@ export function registerMcp(program: Command): void {
     });
 
   mcpCmd
-    .command('remove <name>')
+    .command('remove')
+    .argument('<name>', memoryCatalogMessage('cli.memcat.mcp.arg.name', getLanguage(undefined)))
     .description(getMessage('cli.mcp.remove.desc', getLanguage(undefined)))
-    .option('--scope <scope>', 'Restrict removal to scope: project | user | local')
+    .option('--scope <scope>', memoryCatalogMessage('cli.memcat.mcp.opt.scope_remove', getLanguage(undefined)))
     .action((name: string, opts: RemoveOptions) => {
       try {
         handleRemove(name, opts);
@@ -364,9 +373,10 @@ export function registerMcp(program: Command): void {
     });
 
   mcpCmd
-    .command('get <name>')
+    .command('get')
+    .argument('<name>', memoryCatalogMessage('cli.memcat.mcp.arg.name', getLanguage(undefined)))
     .description(getMessage('cli.mcp.get.desc', getLanguage(undefined)))
-    .option('--json', 'Output as JSON')
+    .option('--json', memoryCatalogMessage('cli.memcat.shared.opt.json', getLanguage(undefined)))
     .action((name: string, opts: GetOptions) => {
       try {
         handleGet(name, opts);

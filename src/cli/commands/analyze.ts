@@ -7,6 +7,7 @@ import { getLanguage, getMessage } from '../helpers/messages.js';
 import { print, printError } from '../helpers/output.js';
 import { formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { cliContractMessage } from '../helpers/message-catalog/cli-run.js';
 
 export function formatAnalysisResult(analysis: ProjectAnalysis): string {
   const headers = ['Property', 'Value'];
@@ -26,12 +27,13 @@ export function formatAnalysisResult(analysis: ProjectAnalysis): string {
 }
 
 export function registerAnalyze(program: Command): void {
+  const helpLang = getLanguage(undefined);
   program
     .command('analyze')
     .alias('analyze-project')
     .description(getMessage('cli.analyze.desc', getLanguage(undefined)))
-    .option('--json', 'Output raw JSON')
-    .option('--bootstrap-vocabulary', 'Derive and write the project routing-vocabulary layer (.deckent/routing/vocabulary.json)')
+    .option('--json', cliContractMessage('cliContract.analyze.opt.json', helpLang))
+    .option('--bootstrap-vocabulary', cliContractMessage('cliContract.analyze.opt.bootstrap_vocabulary', helpLang))
     .action(async (opts: { json?: boolean; bootstrapVocabulary?: boolean }) => {
       let root: string;
       try {

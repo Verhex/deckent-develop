@@ -61,6 +61,7 @@ import { preflightCliBrainProviderAuthority } from '../provider-authority-proces
 import { ProviderExecutionIngressHoldError } from '../../core/provider-execution-ingress-authority.js';
 import { readCanonicalRunStatus } from '../../core/run-status-authority.js';
 import { DeckentError } from '../../core/errors.js';
+import { cliContractMessage, bindArgumentDescriptions } from '../helpers/message-catalog/cli-run.js';
 
 // ─── Provider Cache ───────────────────────────────────────────────
 
@@ -340,27 +341,27 @@ async function runStartEnvironmentPreflight(input: {
 }
 
 export function registerStart(program: Command, runtime: StartCommandRuntime = {}): void {
-  program
-    .command('start [description]')
-    .description(getMessage('cli.start.desc', getLanguage(undefined)))
-    .option('--auto-approve', 'Auto-approve worker actions (--dangerously-skip-permissions)')
-    .option('--sandbox-mode', 'Run in sandbox mode (git stash + restore)')
-    .option('--sandbox', 'Use sandbox spawn backend (memory-cap + path-jail isolation, no Docker required)')
-    .option('--dry-run', 'Plan sprint without spawning workers')
-    .option('--force', 'Skip doctor pre-flight checks')
-    .option('--force-scope', 'Bypass the pre-spawn scope gate (allow write paths that do not exist / look like typos)')
-    .option('--force-prompt-gate', 'Bypass the plan-time prompt-gate BLOCK (persona-capability mismatch)')
-    .option('--force-replan', 'Consciously bypass the approved-flow guard: plan fresh even though an approved, not-yet-executed RunFlow snapshot exists')
-    .option('--consume-approved <flowId>', 'B1b: consume a specific approved, not-yet-executed RunFlow snapshot through the canonical run-flow machinery (needed only when several approved flows exist)')
-    .option('--watch', 'Automatically open watch mode after sprint spawns workers')
-    .option('--timeout <ms>', 'Sprint timeout in milliseconds (default: 30 minutes)')
-    .option('--force-directives', 'Override existing DIRECTIVES.md in zero-config mode')
-    .option('--flow-id <id>', 'TERM-FLOW-UNIFY (426-001): consume an approved RunFlow snapshot instead of planning fresh — requires --revision, --plan-digest and config.terminal.run_flow_v2=true')
-    .option('--revision <n>', 'RunFlow proposal revision to CAS-verify against the approved snapshot (used with --flow-id)')
-    .option('--plan-digest <digest>', 'RunFlow planDigest to CAS-verify against the approved snapshot (used with --flow-id)')
-    .addOption(new Option('--exact-attempt-id <id>').hideHelp())
-    .addOption(new Option('--exact-owner-nonce <nonce>').hideHelp())
-    .addOption(new Option('--exact-log-ref <path>').hideHelp())
+  const helpLang = getLanguage(undefined);
+  bindArgumentDescriptions(program.command('start [description]'), helpLang, { description: 'cliContract.start.arg.description' })
+    .description(getMessage('cli.start.desc', helpLang))
+    .option('--auto-approve', cliContractMessage('cliContract.start.opt.auto_approve', helpLang))
+    .option('--sandbox-mode', cliContractMessage('cliContract.start.opt.sandbox_mode', helpLang))
+    .option('--sandbox', cliContractMessage('cliContract.start.opt.sandbox', helpLang))
+    .option('--dry-run', cliContractMessage('cliContract.start.opt.dry_run', helpLang))
+    .option('--force', cliContractMessage('cliContract.start.opt.force', helpLang))
+    .option('--force-scope', cliContractMessage('cliContract.start.opt.force_scope', helpLang))
+    .option('--force-prompt-gate', cliContractMessage('cliContract.start.opt.force_prompt_gate', helpLang))
+    .option('--force-replan', cliContractMessage('cliContract.start.opt.force_replan', helpLang))
+    .option('--consume-approved <flowId>', cliContractMessage('cliContract.start.opt.consume_approved', helpLang))
+    .option('--watch', cliContractMessage('cliContract.start.opt.watch', helpLang))
+    .option('--timeout <ms>', cliContractMessage('cliContract.start.opt.timeout', helpLang))
+    .option('--force-directives', cliContractMessage('cliContract.start.opt.force_directives', helpLang))
+    .option('--flow-id <id>', cliContractMessage('cliContract.start.opt.flow_id', helpLang))
+    .option('--revision <n>', cliContractMessage('cliContract.start.opt.revision', helpLang))
+    .option('--plan-digest <digest>', cliContractMessage('cliContract.start.opt.plan_digest', helpLang))
+    .addOption(new Option('--exact-attempt-id <id>', cliContractMessage('cliContract.start.opt.exact_attempt_id', helpLang)).hideHelp())
+    .addOption(new Option('--exact-owner-nonce <nonce>', cliContractMessage('cliContract.start.opt.exact_owner_nonce', helpLang)).hideHelp())
+    .addOption(new Option('--exact-log-ref <path>', cliContractMessage('cliContract.start.opt.exact_log_ref', helpLang)).hideHelp())
     .action(async (description: string | undefined, opts: StartCommandOpts) => {
       const root = resolveProjectRoot();
       let authorityConfig: Awaited<ReturnType<typeof loadConfig>> | undefined;

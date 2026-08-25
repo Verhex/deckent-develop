@@ -20,6 +20,10 @@
 //     update is a loud `KEYRING_CONCURRENT_UPDATE`, never a silent clobber.
 
 import type { Command } from 'commander';
+import {
+  getGovernanceMessage,
+  governancePrerequisiteHelp,
+} from '../helpers/message-catalog/cli-governance.js';
 
 import { loadConfig } from '../../core/config.js';
 import {
@@ -479,9 +483,18 @@ export function registerProviderAuthorityCommand(
     .command('keyring')
     .description(getMessage('provider_authority.keyring.cmd_desc', lang));
 
+  // Access classification stated in help: `status` reads, `init` and
+  // `rotate` are authenticated mutations of durable key material. All three
+  // depend on the OS credential store, so each states that prerequisite and
+  // the honest-unavailable contract that goes with it.
   keyring
     .command('status')
     .description(getMessage('provider_authority.keyring.status_desc', lang))
+    .addHelpText(
+      'after',
+      `\n${getGovernanceMessage('cli.governance.provider_authority.keyring.status.note', lang)}\n`
+      + governancePrerequisiteHelp('os-keyring', lang),
+    )
     .action(() => {
       try {
         runKeyringStatus(deps);
@@ -494,6 +507,11 @@ export function registerProviderAuthorityCommand(
   keyring
     .command('init')
     .description(getMessage('provider_authority.keyring.init_desc', lang))
+    .addHelpText(
+      'after',
+      `\n${getGovernanceMessage('cli.governance.provider_authority.keyring.init.note', lang)}\n`
+      + governancePrerequisiteHelp('os-keyring', lang),
+    )
     .action(() => {
       try {
         runKeyringInit(deps);
@@ -506,6 +524,11 @@ export function registerProviderAuthorityCommand(
   keyring
     .command('rotate')
     .description(getMessage('provider_authority.keyring.rotate_desc', lang))
+    .addHelpText(
+      'after',
+      `\n${getGovernanceMessage('cli.governance.provider_authority.keyring.rotate.note', lang)}\n`
+      + governancePrerequisiteHelp('os-keyring', lang),
+    )
     .option('--expect-revision <hash>', getMessage('provider_authority.keyring.opt_expect_revision', lang))
     .action((opts: { expectRevision?: string }) => {
       try {

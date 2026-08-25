@@ -21,6 +21,7 @@ import {
   releaseAllLocks,
   releaseAllSpawnLocks,
 } from '../../core/file-lock.js';
+import { cliContractMessage, bindArgumentDescriptions } from '../helpers/message-catalog/cli-run.js';
 
 interface KillRuntimeConfig {
   readonly spawn_backend?: BackendType;
@@ -523,12 +524,12 @@ export async function shouldProceedKillAll(
 }
 
 export function registerKill(program: Command): void {
-  program
-    .command('kill [taskId]')
+  const helpLang = getLanguage(undefined);
+  bindArgumentDescriptions(program.command('kill [taskId]'), helpLang, { taskId: 'cliContract.kill.arg.taskId' })
     .description(getMessage('cli.kill.desc', getLanguage(undefined)))
-    .option('--all', 'Kill all active workers')
-    .option('--force', 'Force kill (bypass panic guard)')
-    .option('--user-explicit', 'Explicit user confirmation for panic kill override')
+    .option('--all', cliContractMessage('cliContract.kill.opt.all', helpLang))
+    .option('--force', cliContractMessage('cliContract.kill.opt.force', helpLang))
+    .option('--user-explicit', cliContractMessage('cliContract.kill.opt.user_explicit', helpLang))
     .action(async (taskId: string | undefined, opts: { all?: boolean; force?: boolean; userExplicit?: boolean }) => {
       const root = resolveProjectRoot();
       const config = await loadConfig(root).catch(() => ({

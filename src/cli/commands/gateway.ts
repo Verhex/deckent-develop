@@ -1,5 +1,10 @@
 // src/cli/commands/gateway.ts
 import type { Command } from 'commander';
+import {
+  getGovernanceMessage,
+  governancePrerequisiteHelp,
+  bindGovernanceArgumentDescriptions,
+} from '../helpers/message-catalog/cli-governance.js';
 import { writeFileSync, readFileSync, existsSync, unlinkSync, mkdirSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { dirname, join } from 'node:path';
@@ -52,8 +57,10 @@ function entryPath(): string {
 }
 
 async function resolveGatewayToken(): Promise<string> {
-  // G1: gateway bot token comes from the current project's config (.deck-interpolated)
-  // as a bootstrap; a dedicated gateway .deck is an impl detail (spec §5.1).
+  // The gateway bot token comes from the current project's config
+  // (.deck-interpolated) as a bootstrap; a dedicated gateway .deck stays an
+  // implementation detail. No token configured => the connector is honestly
+  // reported as offline, never silently simulated.
   const cfg = await loadConfig(resolveProjectRoot());
   return cfg.notify_connectors?.telegram?.token ?? '';
 }
@@ -136,11 +143,14 @@ export async function handleGatewayPairReject(opts: { code: string; lang?: strin
 
 export function registerGateway(program: Command): void {
   const lang = getLanguage(undefined);
-  const cmd = program.command('gateway').description(getMessage('gateway.group_desc', lang));
+  const cmd = program.command('gateway')
+    .description(getMessage('gateway.group_desc', lang))
+    .addHelpText('after', governancePrerequisiteHelp('connector-token', lang));
 
   cmd.command('listen')
     .description(getMessage('cli.gateway.listen.desc', lang))
-    .option('--lang <code>', 'Language override (en|tr)')
+    .addHelpText('after', governancePrerequisiteHelp('connector-token', lang))
+    .option('--lang <code>', getGovernanceMessage('cli.governance.opt.lang', lang))
     .action(async (opts: { lang?: string }) => {
       const l = getLanguage(opts.lang);
       const token = await resolveGatewayToken();
@@ -156,7 +166,8 @@ export function registerGateway(program: Command): void {
 
   cmd.command('start')
     .description(getMessage('cli.gateway.start.desc', lang))
-    .option('--lang <code>', 'Language override (en|tr)')
+    .addHelpText('after', governancePrerequisiteHelp('connector-token', lang))
+    .option('--lang <code>', getGovernanceMessage('cli.governance.opt.lang', lang))
     .action((opts: { lang?: string }) => {
       const l = getLanguage(opts.lang);
       const existing = readPid();
@@ -175,7 +186,7 @@ export function registerGateway(program: Command): void {
 
   cmd.command('stop')
     .description(getMessage('cli.gateway.stop.desc', lang))
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--lang <code>', getGovernanceMessage('cli.governance.opt.lang', lang))
     .action((opts: { lang?: string }) => {
       const l = getLanguage(opts.lang);
       const pid = readPid();
@@ -190,7 +201,7 @@ export function registerGateway(program: Command): void {
 
   cmd.command('status')
     .description(getMessage('cli.gateway.status.desc', lang))
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--lang <code>', getGovernanceMessage('cli.governance.opt.lang', lang))
     .action((opts: { lang?: string }) => {
       const l = getLanguage(opts.lang);
       const pid = readPid();
@@ -201,19 +212,34 @@ export function registerGateway(program: Command): void {
       );
     });
 
-  const pair = cmd.command('pair').description(getMessage('gateway.pair_usage', getLanguage(undefined)));
-  pair.command('list').description(getMessage('cli.gateway.pair.list.desc', lang)).option('--lang <code>', 'Language override (en|tr)')
+  // The parent's description is the PURPOSE of the pairing surface. The
+  // usage text it used to carry is not a description — it is a usage block —
+  // so it now renders in its own help section below the option list.
+  const pair = cmd.command('pair')
+    .description(getGovernanceMessage('cli.governance.gateway.pair.desc', lang))
+    .addHelpText(
+      'after',
+      `\n${getGovernanceMessage('cli.governance.gateway.pair.usage_heading', lang)}\n`
+      + `${getMessage('gateway.pair_usage', lang)}\n`,
+    );
+  pair.command('list').description(getMessage('cli.gateway.pair.list.desc', lang)).option('--lang <code>', getGovernanceMessage('cli.governance.opt.lang', lang))
     .action(async (opts: { lang?: string }) => { await handleGatewayPairList(opts); });
-  pair.command('approve <code> <project>').description(getMessage('cli.gateway.pair.approve.desc', lang)).option('--lang <code>', 'Language override (en|tr)')
+  bindGovernanceArgumentDescriptions(pair.command('approve <code> <project>'), lang, {
+    code: 'cli.governance.gateway.arg.pair_code',
+    project: 'cli.governance.gateway.arg.project',
+  }).description(getMessage('cli.gateway.pair.approve.desc', lang)).option('--lang <code>', getGovernanceMessage('cli.governance.opt.lang', lang))
     .action(async (code: string, project: string, opts: { lang?: string }) => { await handleGatewayPairApprove({ code, project, lang: opts.lang }); });
-  pair.command('reject <code>').description(getMessage('cli.gateway.pair.reject.desc', lang)).option('--lang <code>', 'Language override (en|tr)')
+  bindGovernanceArgumentDescriptions(pair.command('reject <code>'), lang, {
+    code: 'cli.governance.gateway.arg.pair_code',
+  }).description(getMessage('cli.gateway.pair.reject.desc', lang)).option('--lang <code>', getGovernanceMessage('cli.governance.opt.lang', lang))
     .action(async (code: string, opts: { lang?: string }) => { await handleGatewayPairReject({ code, lang: opts.lang }); });
 
   // Hidden child entry — spawned by the supervisor for per-project runtime, not for direct use.
   program.command('gateway-runtime', { hidden: true })
     .description(getMessage('gateway.runtime_desc', getLanguage(undefined)))
-    .requiredOption('--project <path>', 'Bound project root')
-    .option('--lang <code>', 'Language override (en|tr)')
+    .addHelpText('after', governancePrerequisiteHelp('connector-token', lang))
+    .requiredOption('--project <path>', getGovernanceMessage('cli.governance.gateway.opt.project', lang))
+    .option('--lang <code>', getGovernanceMessage('cli.governance.opt.lang', lang))
     .action((opts: { project: string; lang?: string }) => {
       runGatewayRuntimeChild({ projectPath: opts.project, lang: opts.lang });
     });

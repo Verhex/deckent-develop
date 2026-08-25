@@ -1161,14 +1161,14 @@ export function registerStatus(
   program
     .command('status')
     .description(getMessage('status.desc', registerLang))
-    .option('--watch', 'Auto-refresh every 2 seconds')
-    .option('-f, --follow', 'Follow mode: snapshot + live event tail')
-    .option('--json', 'Output raw JSON instead of formatted dashboard')
-    .option('--raw', 'Show legacy raw dashboard (box format)')
-    .option('--verbose', 'Show detailed agent and skill assignment info')
-    .option('--no-color', 'Disable colored output')
-    .option('--graph', 'Display dependency graph as Mermaid diagram')
-    .option('--mode <mode>', 'Output render mode: explainatory | standart | verbose | json')
+    .option('--watch', getMessage('cli.runtime.status.opt.watch', registerLang))
+    .option('-f, --follow', getMessage('cli.runtime.status.opt.follow', registerLang))
+    .option('--json', getMessage('cli.runtime.status.opt.json', registerLang))
+    .option('--raw', getMessage('cli.runtime.status.opt.raw', registerLang))
+    .option('--verbose', getMessage('cli.runtime.status.opt.verbose', registerLang))
+    .option('--no-color', getMessage('cli.runtime.status.opt.no_color', registerLang))
+    .option('--graph', getMessage('cli.runtime.status.opt.graph', registerLang))
+    .option('--mode <mode>', getMessage('cli.runtime.status.opt.mode', registerLang))
     .action(async (opts: StatusOpts) => {
       const root = resolveProjectRoot();
       const dashPath = join(root, DASHBOARD_FILE);

@@ -5,6 +5,7 @@ import { print, printError, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
 import { registerShutdownHook } from '../helpers/shutdown-hooks.js';
+import { bindGovernanceArgumentDescriptions } from '../helpers/message-catalog/cli-governance.js';
 import { FlowRegistry } from '../../core/flow-registry.js';
 import { parseCronExpr } from '../../core/scheduled-flow.js';
 import { FlowRuntime } from '../../core/flow-runtime.js';
@@ -143,8 +144,8 @@ export function registerFlow(program: Command): void {
   flowCmd
     .command('list')
     .description(getMessage('cli.flow.list.desc', getLanguage(undefined)))
-    .option('--tenant <id>', 'Filter by tenant ID')
-    .option('--json', 'Output as JSON')
+    .option('--tenant <id>', getMessage('cli.governance.opt.tenant_filter', getLanguage(undefined)))
+    .option('--json', getMessage('cli.governance.opt.json', getLanguage(undefined)))
     .action((opts: { tenant?: string; json?: boolean }) => {
       try {
         const root = resolveProjectRoot();
@@ -177,10 +178,16 @@ export function registerFlow(program: Command): void {
     });
 
   // ─── flow add ─────────────────────────────────────────────────────
-  flowCmd
-    .command('add <cron> <action>')
+  bindGovernanceArgumentDescriptions(
+    flowCmd.command('add <cron> <action>'),
+    getLanguage(undefined),
+    {
+      cron: 'cli.governance.flow.arg.cron',
+      action: 'cli.governance.flow.arg.action',
+    },
+  )
     .description(getMessage('cli.flow.add.desc', getLanguage(undefined)))
-    .option('--tenant <id>', 'Tenant ID', 'default')
+    .option('--tenant <id>', getMessage('cli.governance.flow.opt.add_tenant', getLanguage(undefined)), 'default')
     .action((cron: string, action: string, opts: { tenant: string }) => {
       try {
         parseCronExpr(cron); // validate — throws on invalid
@@ -206,8 +213,8 @@ export function registerFlow(program: Command): void {
   flowCmd
     .command('run')
     .description(getMessage('cli.flow.run.desc', getLanguage(undefined)))
-    .option('--once', 'Run a single FlowRuntime tick and exit')
-    .option('--tenant <id>', 'Filter flows by tenant ID')
+    .option('--once', getMessage('cli.governance.flow.opt.once', getLanguage(undefined)))
+    .option('--tenant <id>', getMessage('cli.governance.opt.tenant_filter', getLanguage(undefined)))
     .action((opts: { once?: boolean; tenant?: string }) => {
       try {
         const root = resolveProjectRoot();
@@ -242,8 +249,11 @@ export function registerFlow(program: Command): void {
     });
 
   // ─── flow approve ─────────────────────────────────────────────────
-  flowCmd
-    .command('approve <id>')
+  bindGovernanceArgumentDescriptions(
+    flowCmd.command('approve <id>'),
+    getLanguage(undefined),
+    { id: 'cli.governance.flow.arg.id' },
+  )
     .description(getMessage('cli.flow.approve.desc', getLanguage(undefined)))
     .action((id: string) => {
       try {

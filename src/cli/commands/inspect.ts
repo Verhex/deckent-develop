@@ -7,6 +7,7 @@ import {
 import { getMessage, getLanguage } from '../helpers/messages.js';
 import { print } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { bindArgumentDescriptions } from '../helpers/message-catalog/cli-run.js';
 
 type InspectorRecord = Record<string, unknown>;
 type InspectorReader = (projectRoot: string, taskId: string) => unknown | Promise<unknown>;
@@ -223,8 +224,7 @@ export function registerInspect(
   dependencies: InspectCommandDependencies = {},
 ): void {
   const lang = dependencies.language ?? getLanguage(undefined);
-  program
-    .command('inspect [taskId]')
+  bindArgumentDescriptions(program.command('inspect [taskId]'), lang, { taskId: 'cliContract.inspect.arg.taskId' })
     .description(getMessage('inspect.description', lang))
     .option('--json', getMessage('inspect.option.json', lang))
     .option('--follow', getMessage('inspect.option.follow', lang))

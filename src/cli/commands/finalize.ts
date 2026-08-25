@@ -32,6 +32,7 @@ import {
 import { DeckentError } from '../../core/errors.js';
 import { resolveTaskArtifactReadDirs } from '../../core/sprint-archive.js';
 import { readSprintTerminalReceiptSummary } from '../../core/sprint-terminal-publication-status.js';
+import { renderContractHelp } from '../helpers/message-catalog/cli-run.js';
 
 /**
  * Project the task record a surviving `.result` proves must have existed, for
@@ -387,13 +388,15 @@ export function buildFinalizeSprintProjection(
 }
 
 export function registerFinalize(program: Command): void {
+  const helpLang = getLanguage(undefined);
   program
     .command('finalize')
-    .description(getMessage('finalize.description', getLanguage(undefined)))
-    .option('--sprint <id>', getMessage('finalize.sprint_option', 'en'))
-    .option('--skip-decay', getMessage('finalize.skip_decay_option', 'en'))
-    .option('--skip-hooks', getMessage('finalize.skip_hooks_option', 'en'))
-    .option('--force', getMessage('finalize.force_option', 'en'))
+    .description(getMessage('finalize.description', helpLang))
+    .option('--sprint <id>', getMessage('finalize.sprint_option', helpLang))
+    .option('--skip-decay', getMessage('finalize.skip_decay_option', helpLang))
+    .option('--skip-hooks', getMessage('finalize.skip_hooks_option', helpLang))
+    .option('--force', getMessage('finalize.force_option', helpLang))
+    .addHelpText('after', renderContractHelp('finalize', helpLang))
     .action(async (opts: { sprint?: string; skipDecay?: boolean; skipHooks?: boolean; force?: boolean }) => {
       const root = resolveProjectRoot();
       const lang = getLangFromConfig(root);

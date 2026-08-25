@@ -5,6 +5,7 @@ import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { loadConfig } from '../../core/config.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
+import { cliContractMessage } from '../helpers/message-catalog/cli-run.js';
 
 /** F) List all windows in the deckent tmux session */
 function listTmuxWindows(sessionName: string): string[] {
@@ -23,10 +24,11 @@ function isInsideTmux(): boolean {
 }
 
 export function registerAttach(program: Command): void {
+  const helpLang = getLanguage(undefined);
   program
     .command('attach')
     .description(getMessage('cli.attach.desc', getLanguage(undefined)))
-    .option('--list', 'List all tmux windows without attaching')
+    .option('--list', cliContractMessage('cliContract.attach.opt.list', helpLang))
     .action(async (opts: { list?: boolean }) => {
       const root = resolveProjectRoot();
       const config = await loadConfig(root).catch(() => ({ language: 'en' }));

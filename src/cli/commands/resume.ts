@@ -50,6 +50,7 @@ import {
   type RecoveryResumeOutcome,
 } from '../../core/recovery-resume-outcome.js';
 import { DeckentError } from '../../core/errors.js';
+import { cliContractMessage, bindArgumentDescriptions } from '../helpers/message-catalog/cli-run.js';
 
 // ─── Register ───────────────────────────────────────────────────────
 
@@ -245,15 +246,15 @@ function printResumeOutcome(outcome: RecoveryResumeOutcome, lang: string): void 
 }
 
 export function registerResume(program: Command): void {
-  const command = program
-    .command('resume <sprintId>')
-    .description(getMessage('cli.resume.desc', getLanguage(undefined)))
-    .option('--auto-approve', 'Auto-approve all worker actions (skip permission prompts)', false)
-    .option('--dry-run', 'Show what would be resumed without actually running', false)
-    .option('--force-scope', getMessage('recover.force_scope_option', detectLang(resolveProjectRoot())), false)
-    .option('--root <path>', 'Project root directory (defaults to cwd)')
-    .addOption(new Option('--test-mode').hideHelp())
-    .addOption(new Option('--outcome-file <path>').hideHelp());
+  const helpLang = getLanguage(undefined);
+  const command = bindArgumentDescriptions(program.command('resume <sprintId>'), helpLang, { sprintId: 'cliContract.resume.arg.sprintId' })
+    .description(getMessage('cli.resume.desc', helpLang))
+    .option('--auto-approve', cliContractMessage('cliContract.resume.opt.auto_approve', helpLang), false)
+    .option('--dry-run', cliContractMessage('cliContract.resume.opt.dry_run', helpLang), false)
+    .option('--force-scope', getMessage('recover.force_scope_option', helpLang), false)
+    .option('--root <path>', cliContractMessage('cliContract.resume.opt.root', helpLang))
+    .addOption(new Option('--test-mode', cliContractMessage('cliContract.resume.opt.test_mode', helpLang)).hideHelp())
+    .addOption(new Option('--outcome-file <path>', cliContractMessage('cliContract.resume.opt.outcome_file', helpLang)).hideHelp());
   command.action(async (sprintId: string, opts: { autoApprove: boolean; dryRun: boolean; forceScope: boolean; testMode?: boolean; root?: string; outcomeFile?: string }) => {
       const projectRoot = opts.root ?? resolveProjectRoot();
       const lang = detectLang(projectRoot);

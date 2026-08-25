@@ -3,6 +3,10 @@ import { readFileSync } from 'node:fs';
 import { userInfo } from 'node:os';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import type { Command } from 'commander';
+import {
+  getGovernanceMessage,
+  governancePrerequisiteHelp,
+} from '../helpers/message-catalog/cli-governance.js';
 import { ApprovalBroker } from '../../core/approval-broker.js';
 import { ApprovalStore } from '../../core/approval-store.js';
 import { bootstrapApprovalAuthority } from '../../core/approval-authority-bootstrap.js';
@@ -802,41 +806,91 @@ export function registerProviderObservations(
   program: Command, deps: ProviderObservationsCommandDeps = {},
 ): void {
   const language = getLanguage(undefined);
-  const parent = program.command('provider-observations')
-    .description(getMessage('provider_observation.migration.inspect', language, {
-      sourcePath: PROVIDER_EXECUTION_OBSERVATION_DATABASE_PATH, schemaVersion: '1', action: 'migrate',
-    }));
-  const common = (command: Command): Command => command
-    .option('--database <path>', getMessage('provider_observation.migration.inspect', language, {
-      sourcePath: PROVIDER_EXECUTION_OBSERVATION_DATABASE_PATH, schemaVersion: '1', action: 'inspect',
-    }))
-    .option('--json', getMessage('provider_observation.migration.forensic_counts', language, {
-      inspected: '-', eligible: '-', migrated: '-', adopted: '-', held: '-', rejected: '-',
-    }));
+  // Path-level contract (CLI-CONTRACT-005).
+  //
+  // Before: the parent and all five subcommands registered with either NO
+  // description or a rendered operation-result message ('... inspected 0,
+  // migrated 0 ...') pressed into service as help text with '-' sentinels in
+  // its placeholders. A result message answers "what happened on one run";
+  // help must answer "what does this path/flag always do". They are different
+  // contracts and no longer share a string.
+  //
+  // Access split stated in help: 'inspect' is a strictly local read;
+  // 'migrate', 'adopt', 'adopt-runtime' and 'reconcile' are authenticated
+  // mutations that plan by default and only write under --apply.
+  const prerequisite = (command: Command): Command =>
+    command.addHelpText('after', governancePrerequisiteHelp('native-sqlite', language));
+
+  const parent = prerequisite(program.command('provider-observations')
+    .description(getGovernanceMessage('cli.governance.provider_observations.desc', language)));
+
+  const common = (command: Command): Command => prerequisite(command
+    .option(
+      '--database <path>',
+      getGovernanceMessage('cli.governance.provider_observations.opt.database', language),
+    )
+    .option('--json', getGovernanceMessage('cli.governance.opt.json', language)));
+
   common(parent.command('inspect'))
+    .description(getGovernanceMessage('cli.governance.provider_observations.inspect.desc', language))
     .action((options: CommonOptions) => render('inspect', options, deps));
+
   common(parent.command('migrate'))
-    .option('--apply', getMessage('provider_observation.migration.pending_approval', language, { approvalId: '-' }))
-    .option('--plan-digest <digest>', getMessage('provider_observation.migration.dry_run', language))
-    .option('--approval-id <id>', getMessage('provider_observation.migration.pending_approval', language, { approvalId: '-' }))
+    .description(getGovernanceMessage('cli.governance.provider_observations.migrate.desc', language))
+    .option('--apply', getGovernanceMessage('cli.governance.provider_observations.opt.apply', language))
+    .option(
+      '--plan-digest <digest>',
+      getGovernanceMessage('cli.governance.provider_observations.opt.plan_digest', language),
+    )
+    .option(
+      '--approval-id <id>',
+      getGovernanceMessage('cli.governance.provider_observations.opt.approval_id', language),
+    )
     .action((options: MigrationOptions) => render('migration', options, deps));
+
   common(parent.command('adopt'))
-    .requiredOption('--preimage <path>', getMessage('provider_observation.migration.inspect', language, {
-      sourcePath: '-', schemaVersion: '1', action: 'adopt',
-    }))
-    .option('--apply', getMessage('provider_observation.migration.adopted', language, { path: '-' }))
-    .option('--plan-digest <digest>', getMessage('provider_observation.migration.dry_run', language))
+    .description(getGovernanceMessage('cli.governance.provider_observations.adopt.desc', language))
+    .requiredOption(
+      '--preimage <path>',
+      getGovernanceMessage('cli.governance.provider_observations.opt.preimage', language),
+    )
+    .option('--apply', getGovernanceMessage('cli.governance.provider_observations.opt.apply', language))
+    .option(
+      '--plan-digest <digest>',
+      getGovernanceMessage('cli.governance.provider_observations.opt.plan_digest', language),
+    )
     .action((options: AdoptionOptions) => render('adoption', options, deps));
+
   common(parent.command('adopt-runtime'))
-    .requiredOption('--preimage <path>', getMessage('provider_observation.runtime_adoption.preimage', language))
-    .option('--apply', getMessage('provider_observation.runtime_adoption.apply', language))
-    .option('--plan-digest <digest>', getMessage('provider_observation.runtime_adoption.plan_digest', language))
+    .description(
+      getGovernanceMessage('cli.governance.provider_observations.adopt_runtime.desc', language),
+    )
+    .requiredOption(
+      '--preimage <path>',
+      getGovernanceMessage('cli.governance.provider_observations.opt.preimage', language),
+    )
+    .option('--apply', getGovernanceMessage('cli.governance.provider_observations.opt.apply', language))
+    .option(
+      '--plan-digest <digest>',
+      getGovernanceMessage('cli.governance.provider_observations.opt.plan_digest', language),
+    )
     .action((options: RuntimeAdoptionOptions) => render('runtime-adoption', options, deps));
+
   common(parent.command('reconcile'))
-    .option('--run-id <id>', getMessage('provider_observation.reconciliation.run_id', language),
-      (value: string, previous: string[] = []) => [...previous, value])
-    .option('--apply', getMessage('provider_observation.reconciliation.apply', language))
-    .option('--plan-digest <digest>', getMessage('provider_observation.reconciliation.plan_digest', language))
-    .option('--approval-id <id>', getMessage('provider_observation.reconciliation.approval_id', language))
+    .description(getGovernanceMessage('cli.governance.provider_observations.reconcile.desc', language))
+    .option(
+      '--run-id <id>',
+      getGovernanceMessage('cli.governance.provider_observations.opt.run_id', language),
+      (value: string, previous: string[] = []) => [...previous, value],
+    )
+    .option('--apply', getGovernanceMessage('cli.governance.provider_observations.opt.apply', language))
+    .option(
+      '--plan-digest <digest>',
+      getGovernanceMessage('cli.governance.provider_observations.opt.plan_digest', language),
+    )
+    .option(
+      '--approval-id <id>',
+      getGovernanceMessage('cli.governance.provider_observations.opt.approval_id', language),
+    )
     .action((options: ReconciliationOptions) => render('reconcile', options, deps));
 }

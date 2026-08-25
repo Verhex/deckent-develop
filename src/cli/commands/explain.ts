@@ -7,6 +7,7 @@ import { print } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
+import { memoryCatalogMessage } from '../helpers/message-catalog/cli-memory-catalog.js';
 
 /** Parsed sprint log data */
 export interface SprintSummary {
@@ -364,10 +365,10 @@ export function registerExplain(program: Command): void {
   program
     .command('explain')
     .description(getMessage('cli.explain.desc', getLanguage(undefined)))
-    .option('--sprint <id>', 'Show a specific sprint by ID (e.g. 042)')
-    .option('--task <taskId>', 'Show routing decision log for a specific task (e.g. 146-001)')
-    .option('--json', 'Output results as JSON')
-    .option('--verbose', 'Show all learnings and full task details (default shows max 3 learnings)')
+    .option('--sprint <id>', memoryCatalogMessage('cli.memcat.explain.opt.sprint', getLanguage(undefined)))
+    .option('--task <taskId>', memoryCatalogMessage('cli.memcat.explain.opt.task', getLanguage(undefined)))
+    .option('--json', memoryCatalogMessage('cli.memcat.shared.opt.json', getLanguage(undefined)))
+    .option('--verbose', memoryCatalogMessage('cli.memcat.explain.opt.verbose', getLanguage(undefined)))
     .action((opts: { sprint?: string; task?: string; json?: boolean; verbose?: boolean }) => {
       const root = resolveProjectRoot();
       const lang = getLangFromConfig(root);

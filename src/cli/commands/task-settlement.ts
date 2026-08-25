@@ -22,6 +22,7 @@ import { resolveWorkerExecutionRoute, withTaskExecutionFence } from './spawn.js'
 import { getLanguage, getMessage } from '../helpers/messages.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { bindArgumentDescriptions } from '../helpers/message-catalog/cli-run.js';
 
 const TASK_SETTLEMENT_DTO_VERSION = 1 as const;
 
@@ -270,8 +271,7 @@ export function registerTaskSettlement(
     .command('task')
     .description(getMessage('task.cmd_desc', registerLang));
 
-  task
-    .command('settle <taskId>')
+  bindArgumentDescriptions(task.command('settle <taskId>'), registerLang, { taskId: 'cliContract.task.arg.taskId' })
     .description(getMessage('task.settle.desc', registerLang))
     .option('--apply', getMessage('task.settle.opt_apply', registerLang))
     .option(

@@ -12,6 +12,7 @@ import type {
 } from '../../core/config-types.js';
 import { ErrorRegistry } from '../../core/errors.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
+import { memoryCatalogMessage } from '../helpers/message-catalog/cli-memory-catalog.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print } from '../helpers/output.js';
 import { deriveEffectiveContext, type EffectiveContextResult } from '../../agent/context-budget.js';
@@ -337,6 +338,9 @@ export function registerLocalLlm(program: Command): void {
   const lang = getLanguage(undefined);
   const command = program.command(PROVIDER_NAME)
     .description(getMessage('local_llm.cmd_desc', lang));
+
+  // status = read path; start/stop = mutation paths.
+  command.addHelpText('after', memoryCatalogMessage('cli.memcat.local_llm.help.paths', lang));
   command.command('start')
     .description(getMessage('local_llm.start_desc', lang))
     .action(async () => {

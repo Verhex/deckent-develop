@@ -150,8 +150,8 @@ export function registerMemory(program: Command): void {
   // ── Backup subcommand ─────────────────────────────────────────
   mem.command('backup')
     .description(getMessage('memory.backup.desc', getLanguage(undefined)))
-    .option('--output <path>', 'Output path for backup file')
-    .option('--checkpoint', 'Print WAL checkpoint info before backup (checkpoint always runs)')
+    .option('--output <path>', getMessage('cli.runtime.memory.backup.opt.output', getLanguage(undefined)))
+    .option('--checkpoint', getMessage('cli.runtime.memory.backup.opt.checkpoint', getLanguage(undefined)))
     .action(async (opts: { output?: string; checkpoint?: boolean }) => {
       const root = resolveProjectRoot();
       const config = await loadConfig(root).catch(() => ({ language: 'en', last_sprint_id: undefined as string | undefined }));

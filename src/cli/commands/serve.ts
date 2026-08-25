@@ -87,11 +87,11 @@ export function registerServe(program: Command): void {
   program
     .command('serve')
     .description(getMessage('cli.serve.desc', getLanguage(undefined)))
-    .option('--port <number>', 'Port to listen on', '3100')
-    .option('--dev', 'Enable dev proxy mode — expects Vite dev server on --dev-port')
-    .option('--dev-port <number>', 'Vite dev server port for --dev proxy mode', '5173')
-    .option('--host <addr>', 'Bind address for the server', '127.0.0.1')
-    .option('--no-terminal', 'Disable the embedded web terminal')
+    .option('--port <number>', getMessage('cli.governance.serve.opt.port', getLanguage(undefined)), '3100')
+    .option('--dev', getMessage('cli.governance.serve.opt.dev', getLanguage(undefined)))
+    .option('--dev-port <number>', getMessage('cli.governance.serve.opt.dev_port', getLanguage(undefined)), '5173')
+    .option('--host <addr>', getMessage('cli.governance.serve.opt.host', getLanguage(undefined)), '127.0.0.1')
+    .option('--no-terminal', getMessage('cli.governance.serve.opt.no_terminal', getLanguage(undefined)))
     .action(async (opts: ServeOpts) => {
       const root = resolveProjectRoot();
       const port = parseInt(opts.port ?? '3100', 10);

@@ -7,6 +7,7 @@ import { loadConfig, saveGlobalConfig, loadGlobalConfig } from '../../core/confi
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
+import { bindGovernanceArgumentDescriptions } from '../helpers/message-catalog/cli-governance.js';
 
 const VALID_STYLES = ['sprint', 'task', 'process'] as const;
 type DeckentStyle = (typeof VALID_STYLES)[number];
@@ -152,8 +153,11 @@ export function registerMode(program: Command): void {
       }
     });
 
-  mode
-    .command('global <style>')
+  bindGovernanceArgumentDescriptions(
+    mode.command('global <style>'),
+    lang,
+    { style: 'cli.governance.mode.arg.style' },
+  )
     .description(getMessage('mode.global_desc', lang))
     .action(async (style: string) => {
       try {

@@ -7,6 +7,7 @@ import { can, isValidRole, PERMISSION_MATRIX } from '../../core/rbac.js';
 import type { Role, Permission } from '../../core/rbac.js';
 import { print, printError } from '../helpers/output.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
+import { bindGovernanceArgumentDescriptions } from '../helpers/message-catalog/cli-governance.js';
 
 const DEFAULT_TENANT = 'default';
 
@@ -28,10 +29,16 @@ export function registerRbac(program: Command): void {
     .description(getMessage('cli.rbac.desc', getLanguage(undefined)));
 
   // ── deckent rbac check <role> <action> ──────────────────────────────────────
-  rbac
-    .command('check <role> <action>')
+  bindGovernanceArgumentDescriptions(
+    rbac.command('check <role> <action>'),
+    getLanguage(undefined),
+    {
+      role: 'cli.governance.rbac.arg.role',
+      action: 'cli.governance.rbac.arg.action',
+    },
+  )
     .description(getMessage('cli.rbac.check.desc', getLanguage(undefined)))
-    .option('--tenant <id>', 'Tenant ID to check against', DEFAULT_TENANT)
+    .option('--tenant <id>', getMessage('cli.governance.rbac.opt.tenant', getLanguage(undefined)), DEFAULT_TENANT)
     .action((role: string, action: string, opts: { tenant: string }) => {
       if (!isValidRole(role)) {
         printError(new Error(`Unknown role: "${role}". Valid roles: admin, operator, viewer`));
@@ -66,8 +73,14 @@ export function registerRbac(program: Command): void {
     });
 
   // ── deckent rbac grant <user> <role> ────────────────────────────────────────
-  rbac
-    .command('grant <user> <role>')
+  bindGovernanceArgumentDescriptions(
+    rbac.command('grant <user> <role>'),
+    getLanguage(undefined),
+    {
+      user: 'cli.governance.rbac.arg.user',
+      role: 'cli.governance.rbac.arg.role',
+    },
+  )
     .description(getMessage('cli.rbac.grant.desc', getLanguage(undefined)))
     .action((user: string, role: string) => {
       if (!isValidRole(role)) {
@@ -81,8 +94,11 @@ export function registerRbac(program: Command): void {
     });
 
   // ── deckent rbac revoke <user> ───────────────────────────────────────────────
-  rbac
-    .command('revoke <user>')
+  bindGovernanceArgumentDescriptions(
+    rbac.command('revoke <user>'),
+    getLanguage(undefined),
+    { user: 'cli.governance.rbac.arg.user' },
+  )
     .description(getMessage('cli.rbac.revoke.desc', getLanguage(undefined)))
     .action((user: string) => {
       if (!userRoles.has(user)) {

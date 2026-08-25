@@ -4,6 +4,7 @@ import type { Command } from 'commander';
 import { print, printError, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
+import { bindArgumentDescriptions } from '../helpers/message-catalog/cli-run.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -62,7 +63,14 @@ function updateCheckpointStatus(root: string, sprintId: string, phase: string, s
 
 // ─── Registration ───────────────────────────────────────────────────
 
+/** Bilingual help for the positional arguments `approve`/`reject` share. */
+const CHECKPOINT_ARGUMENT_HELP = {
+  sprintId: 'cliContract.checkpoint.arg.sprintId',
+  phase: 'cliContract.checkpoint.arg.phase',
+} as const;
+
 export function registerCheckpoint(program: Command): void {
+  const helpLang = getLanguage(undefined);
   const cmd = program
     .command('checkpoint')
     .description(getMessage('cli.checkpoint.desc', getLanguage(undefined)));
@@ -124,8 +132,7 @@ export function registerCheckpoint(program: Command): void {
       }
     });
 
-  cmd
-    .command('approve <sprintId> <phase>')
+  bindArgumentDescriptions(cmd.command('approve <sprintId> <phase>'), helpLang, CHECKPOINT_ARGUMENT_HELP)
     .description(getMessage('cli.checkpoint.approve.desc', getLanguage(undefined)))
     .option('--lang <code>', getMessage('checkpoint.lang_option', getLanguage(undefined)))
     .action((sprintId: string, phase: string, opts: { lang?: string }) => {
@@ -145,8 +152,7 @@ export function registerCheckpoint(program: Command): void {
       }
     });
 
-  cmd
-    .command('reject <sprintId> <phase>')
+  bindArgumentDescriptions(cmd.command('reject <sprintId> <phase>'), helpLang, CHECKPOINT_ARGUMENT_HELP)
     .description(getMessage('cli.checkpoint.reject.desc', getLanguage(undefined)))
     .option('--lang <code>', getMessage('checkpoint.lang_option', getLanguage(undefined)))
     .action((sprintId: string, phase: string, opts: { lang?: string }) => {

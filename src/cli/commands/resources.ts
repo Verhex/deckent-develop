@@ -171,8 +171,8 @@ export function registerResources(program: Command): void {
   program
     .command('resources')
     .description(getMessage('cli.resources.desc', getLanguage(undefined)))
-    .option('--log [path]', 'Show resource log summary (defaults to config log_path or .deckent/settings/resource-log.jsonl)')
-    .option('--json', 'Output as JSON')
+    .option('--log [path]', getMessage('cli.governance.resources.opt.log', getLanguage(undefined)))
+    .option('--json', getMessage('cli.governance.opt.json', getLanguage(undefined)))
     .action(async (opts: { log?: string | boolean; json?: boolean }) => {
       const root = process.cwd();
       const lang = getLangFromConfig(root);

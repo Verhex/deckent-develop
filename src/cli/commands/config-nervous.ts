@@ -13,6 +13,7 @@ import type { Command } from 'commander';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { print, printError } from '../helpers/output.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
+import { bindGovernanceArgumentDescriptions } from '../helpers/message-catalog/cli-governance.js';
 import { ACTION_BY_ID, isSafetyFloorAction } from '../../nervous/action-registry.js';
 import type { AuthorityMode, ApprovalPolicy } from '../../core/nervous-types.js';
 
@@ -398,7 +399,7 @@ export function registerConfigNervous(program: Command): void {
     .description(
       getMessage('cli.config_nervous.nervous.desc', getLanguage(undefined)),
     )
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--lang <code>', getMessage('cli.governance.opt.lang', getLanguage(undefined)))
     .action(async (_opts: unknown, cmd: Command) => {
       const root = resolveProjectRoot();
       await handleInteractive(root, langOf(cmd));
@@ -408,9 +409,9 @@ export function registerConfigNervous(program: Command): void {
   nervousCmd
     .command('set')
     .description(getMessage('cli.config_nervous.set.desc', getLanguage(undefined)))
-    .argument('<key>', 'Configuration key (e.g. mode)')
-    .argument('<value>', 'Value to set')
-    .option('--lang <code>', 'Language override (en|tr)')
+    .argument('<key>', getMessage('cli.governance.config_nervous.arg.key', getLanguage(undefined)))
+    .argument('<value>', getMessage('cli.governance.config_nervous.arg.value', getLanguage(undefined)))
+    .option('--lang <code>', getMessage('cli.governance.opt.lang', getLanguage(undefined)))
     .action((key: string, value: string, _opts: unknown, cmd: Command) => {
       const root = resolveProjectRoot();
       const lang = langOf(cmd);
@@ -423,10 +424,16 @@ export function registerConfigNervous(program: Command): void {
     });
 
   // deckent config nervous override <ACTION_ID> <policy>
-  nervousCmd
-    .command('override <actionId> <policy>')
+  bindGovernanceArgumentDescriptions(
+    nervousCmd.command('override <actionId> <policy>'),
+    getLanguage(undefined),
+    {
+      actionId: 'cli.governance.config_nervous.arg.action_id',
+      policy: 'cli.governance.config_nervous.arg.policy',
+    },
+  )
     .description(getMessage('cli.config_nervous.override.desc', getLanguage(undefined)))
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--lang <code>', getMessage('cli.governance.opt.lang', getLanguage(undefined)))
     .action((actionId: string, policy: string, _opts: unknown, cmd: Command) => {
       const root = resolveProjectRoot();
       handleOverride(root, actionId, policy, langOf(cmd));
@@ -436,7 +443,7 @@ export function registerConfigNervous(program: Command): void {
   nervousCmd
     .command('list')
     .description(getMessage('cli.config_nervous.list.desc', getLanguage(undefined)))
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--lang <code>', getMessage('cli.governance.opt.lang', getLanguage(undefined)))
     .action((_opts: unknown, cmd: Command) => {
       const root = resolveProjectRoot();
       handleList(root, langOf(cmd));
@@ -446,7 +453,7 @@ export function registerConfigNervous(program: Command): void {
   nervousCmd
     .command('reset')
     .description(getMessage('cli.config_nervous.reset.desc', getLanguage(undefined)))
-    .option('--lang <code>', 'Language override (en|tr)')
+    .option('--lang <code>', getMessage('cli.governance.opt.lang', getLanguage(undefined)))
     .action((_opts: unknown, cmd: Command) => {
       const root = resolveProjectRoot();
       handleReset(root, langOf(cmd));

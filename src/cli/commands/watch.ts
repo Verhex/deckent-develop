@@ -10,6 +10,7 @@ import { resolveProjectRoot } from '../helpers/process.js';
 import { getDefaultProviderName } from '../../orchestra/sprint-utils.js';
 import { dockerContainerNameForTask } from '../../core/task-result-settlement.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
+import { cliContractMessage } from '../helpers/message-catalog/cli-run.js';
 
 /** H) Export cleanupWatchWindow so cleanup.ts can call it. */
 export function cleanupWatchWindow(): void {
@@ -133,10 +134,11 @@ function computeSplitRatio(): number {
 }
 
 export function registerWatch(program: Command): void {
+  const helpLang = getLanguage(undefined);
   program
     .command('watch')
     .description(getMessage('cli.watch.desc', getLanguage(undefined)))
-    .option('--follow <taskId>', 'Follow a specific worker live — docker logs -f (docker backend), tmux pane, or subprocess log')
+    .option('--follow <taskId>', cliContractMessage('cliContract.watch.opt.follow', helpLang))
     .action((opts: { follow?: string }) => {
       const root = resolveProjectRoot();
 

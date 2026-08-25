@@ -20,6 +20,7 @@ import { resolveProjectRoot } from '../helpers/process.js';
 import { buildProcessController } from '../helpers/process-runtime.js';
 import { loadBacklog } from '../../orchestra/autonomous/backlog.js';
 import type { ProcessController } from '../../orchestra/process-controller.js';
+import { cliContractMessage, bindArgumentDescriptions } from '../helpers/message-catalog/cli-run.js';
 
 // ─── Factory type (injectable for tests) ─────────────────────────────────────
 
@@ -140,19 +141,19 @@ export async function handleProcessResult(
 // ─── register ─────────────────────────────────────────────────────────────────
 
 export function registerProcess(program: Command): void {
+  const helpLang = getLanguage(undefined);
   const cmd = program
     .command('process')
     .description(getMessage('cli.process.desc', getLanguage(undefined)));
 
-  cmd
-    .command('submit <description>')
-    .description(getMessage('cli.process.submit.desc', getLanguage(undefined)))
-    .option('--kind <kind>', 'Execution kind: task (default), sprint, capability')
-    .option('--scope-dir <dir>', 'Scope directory for a code task (drives risk classification)')
-    .option('--provider <provider>', 'Provider override')
-    .option('--model <model>', 'Model override')
-    .option('--root <path>', 'Project root override')
-    .option('--lang <code>', 'Language override (en|tr)')
+  bindArgumentDescriptions(cmd.command('submit <description>'), helpLang, { description: 'cliContract.process.arg.description' })
+    .description(getMessage('cli.process.submit.desc', helpLang))
+    .option('--kind <kind>', cliContractMessage('cliContract.process.opt.kind', helpLang))
+    .option('--scope-dir <dir>', cliContractMessage('cliContract.process.opt.scope_dir', helpLang))
+    .option('--provider <provider>', cliContractMessage('cliContract.process.opt.provider', helpLang))
+    .option('--model <model>', cliContractMessage('cliContract.process.opt.model', helpLang))
+    .option('--root <path>', cliContractMessage('cliContract.process.opt.root', helpLang))
+    .option('--lang <code>', cliContractMessage('cliContract.process.opt.lang', helpLang))
     .action(async (description: string, opts: ProcessSubmitOptions) => {
       try {
         await handleProcessSubmit(description, opts);
@@ -162,11 +163,10 @@ export function registerProcess(program: Command): void {
       }
     });
 
-  cmd
-    .command('status <executionId>')
-    .description(getMessage('cli.process.status.desc', getLanguage(undefined)))
-    .option('--root <path>', 'Project root override')
-    .option('--lang <code>', 'Language override (en|tr)')
+  bindArgumentDescriptions(cmd.command('status <executionId>'), helpLang, { executionId: 'cliContract.process.arg.executionId' })
+    .description(getMessage('cli.process.status.desc', helpLang))
+    .option('--root <path>', cliContractMessage('cliContract.process.opt.root', helpLang))
+    .option('--lang <code>', cliContractMessage('cliContract.process.opt.lang', helpLang))
     .action(async (executionId: string, opts: ProcessStatusOptions) => {
       try {
         await handleProcessStatus(executionId, opts);
@@ -176,11 +176,10 @@ export function registerProcess(program: Command): void {
       }
     });
 
-  cmd
-    .command('result <executionId>')
-    .description(getMessage('cli.process.result.desc', getLanguage(undefined)))
-    .option('--root <path>', 'Project root override')
-    .option('--lang <code>', 'Language override (en|tr)')
+  bindArgumentDescriptions(cmd.command('result <executionId>'), helpLang, { executionId: 'cliContract.process.arg.executionId' })
+    .description(getMessage('cli.process.result.desc', helpLang))
+    .option('--root <path>', cliContractMessage('cliContract.process.opt.root', helpLang))
+    .option('--lang <code>', cliContractMessage('cliContract.process.opt.lang', helpLang))
     .action(async (executionId: string, opts: ProcessResultOptions) => {
       try {
         await handleProcessResult(executionId, opts);

@@ -1,8 +1,22 @@
 // ─── Localized Messages ──────────────────────────────────────────────
 
+import { CLI_COMMON_MESSAGES } from './message-catalog/cli-common.js';
+import { CLI_RUN_MESSAGES } from './message-catalog/cli-run.js';
+import { CLI_MEMORY_CATALOG_MESSAGES } from './message-catalog/cli-memory-catalog.js';
+import { CLI_GOVERNANCE_MESSAGES } from './message-catalog/cli-governance.js';
+import { CLI_RUNTIME_HELP_MESSAGES } from './message-catalog/cli-runtime-help.js';
+import { CLI_REFERENCE_MESSAGES } from './message-catalog/cli-reference.js';
+
 type MessageMap = Record<string, Record<string, string>>;
 
-const MESSAGES: MessageMap = {
+/**
+ * Base catalog. NEW keys for a bounded feature family belong in their own
+ * file under ./message-catalog/ and are merged in below — see
+ * `mergeMessageFamilies`. That keeps concurrent tasks off this single
+ * ~8k-line literal (no edit collision) while still resolving through one
+ * `getMessage()`.
+ */
+const BASE_MESSAGES: MessageMap = {
   // ─── runtime hygiene operator vocabulary (RH14-I18N) ────────────────
   // Only bounded aggregate fields cross this presentation boundary. In
   // particular, paths, authority identities, digests, and secrets are never
@@ -5533,8 +5547,8 @@ const MESSAGES: MessageMap = {
     en: 'Note: Daemon does not survive reboot automatically — set up an OS supervisor (systemd/pm2).',
   },
   'gateway.group_desc': {
-    tr: 'Proje-kapsamlı mesajlaşma gateway (G1)',
-    en: 'Project-scoped messaging gateway (G1)',
+    tr: 'Proje kapsamlı mesajlaşma gateway oturumlarını ve eşleştirmeyi yönetin',
+    en: 'Manage project-scoped messaging gateway sessions and pairing',
   },
   'gateway.runtime_desc': {
     tr: 'Dahili: bir projeye bağlı runtime child (supervisor spawn eder; doğrudan kullanım için değil)',
@@ -6664,8 +6678,8 @@ const MESSAGES: MessageMap = {
 
   // ─── cu-status (TOOL-CU CLI surface, Sprint 374 Task 374-002) ───────────────
   'cuStatus.title': {
-    en: 'Computer-Use Status (TOOL-CU)',
-    tr: 'Bilgisayar-Kullanımı Durumu (TOOL-CU)',
+    en: 'Computer-Use Status',
+    tr: 'Bilgisayar-Kullanımı Durumu',
   },
   'cuStatus.flag_disabled': {
     en: 'Flag: disabled — {reason}',
@@ -7339,24 +7353,24 @@ const MESSAGES: MessageMap = {
     tr: 'tmux orchestra oturumuna bağlanın',
   },
   'cli.audit_verify.desc': {
-    en: 'Verify the audit HMAC chain (I4 invariant — tamper-evident audit log)',
-    tr: 'Audit HMAC zincirini doğrulayın (I4 invariant — kurcalamayı belli eden audit log)',
+    en: 'Verify the audit log HMAC chain for tamper evidence',
+    tr: 'Kurcalama kanıtı için audit log HMAC zincirini doğrulayın',
   },
   'cli.audit.desc': {
     en: 'Run Brain Self-Audit Gate for a sprint, or query/export/retain audit log events (query | compliance | forward | retention)',
     tr: 'Bir sprint için Brain Self-Audit Gate çalıştırın veya audit log olaylarını sorgulayın/dışa aktarın/saklayın (query | compliance | forward | retention)',
   },
   'cli.autonomous_mission.desc': {
-    en: 'Manage autonomous v2 missions — list missions, goal missions',
-    tr: 'Autonomous v2 mission\'larını yönetin — list mission\'lar, goal mission\'lar',
+    en: 'Manage autonomous missions created from work lists or goals',
+    tr: 'İş listelerinden veya hedeflerden oluşturulan autonomous mission\'ları yönetin',
   },
   'cli.autonomous_mission.create_list.desc': {
-    en: 'Create a Type-1 list mission from N work-items',
-    tr: 'N iş-kaleminden Type-1 list mission oluşturun',
+    en: 'Create an autonomous mission from one or more work items',
+    tr: 'Bir veya daha fazla iş kaleminden autonomous mission oluşturun',
   },
   'cli.autonomous_mission.create_goal.desc': {
-    en: 'Create a Type-2 goal mission (runs until the goal is reached)',
-    tr: 'Type-2 goal mission oluşturun (hedefe ulaşılana kadar çalışır)',
+    en: 'Create an autonomous mission that runs until its goal is reached',
+    tr: 'Hedefine ulaşılana kadar çalışan autonomous mission oluşturun',
   },
   'cli.autonomous_mission.list.desc': {
     en: 'List all missions (summary table)',
@@ -7375,8 +7389,8 @@ const MESSAGES: MessageMap = {
     tr: 'Autonomous döngüyü başlatın (default-deny + insan onayı kapısı)',
   },
   'cli.autonomous.plan.desc': {
-    en: 'Decompose a high-level goal into a lightweight autonomous backlog (Phase 1)',
-    tr: 'Üst düzey bir hedefi hafif bir autonomous backlog\'a ayrıştırın (Faz 1)',
+    en: 'Decompose a high-level goal into pending autonomous backlog items',
+    tr: 'Üst düzey bir hedefi bekleyen autonomous backlog kalemlerine ayrıştırın',
   },
   'cli.autonomous.status.desc': {
     en: 'Show autonomous runtime summary (pending + last audit events)',
@@ -7515,8 +7529,8 @@ const MESSAGES: MessageMap = {
     tr: 'Maliyet bütçelerini görüntüleyin veya ayarlayın',
   },
   'cli.cu_status.desc': {
-    en: 'Show computer-use (TOOL-CU) status: flag state + per-capability availability',
-    tr: 'Computer-use (TOOL-CU) durumunu gösterin: flag durumu + yetenek bazında kullanılabilirlik',
+    en: 'Show computer-use configuration and availability for each capability',
+    tr: 'Computer-use yapılandırmasını ve her yeteneğin kullanılabilirliğini gösterin',
   },
   'cli.dashboard.desc': {
     en: 'Show terminal dashboard with auto-refresh (see also: deckent status --watch)',
@@ -8446,6 +8460,54 @@ const MESSAGES: MessageMap = {
     tr: 'Scope gate: greenfield repo (takip edilen dizin yok) — {count} yazma yolu takip edilen dosyalara karşı doğrulanamadı; sadece danışma amaçlı devam ediliyor (born-584).',
   },
 };
+
+/** A separately-authored catalog file merged into the base map. */
+export type MessageCatalogFamily = Readonly<Record<string, Readonly<Record<string, string>>>>;
+
+/**
+ * Merge family catalogs into the base catalog, REJECTING any key that is
+ * already defined (by the base map or by an earlier family). A duplicate key
+ * is a real defect — two owners rendering different text for one key — so it
+ * throws at module load instead of letting last-write-wins decide silently.
+ *
+ * Exported for tests: this is the mechanism that lets family catalogs live in
+ * separate files without creating cross-task key collisions.
+ */
+export function mergeMessageFamilies(
+  base: MessageMap,
+  families: Readonly<Record<string, MessageCatalogFamily>>,
+): MessageMap {
+  const merged: MessageMap = { ...base };
+  const collisions: string[] = [];
+  for (const [familyName, family] of Object.entries(families)) {
+    for (const [key, row] of Object.entries(family)) {
+      if (Object.prototype.hasOwnProperty.call(merged, key)) {
+        collisions.push(`${familyName}:${key}`);
+        continue;
+      }
+      merged[key] = { ...row };
+    }
+  }
+  if (collisions.length > 0) {
+    throw new Error(`message-catalog family key collision: ${collisions.join(', ')}`);
+  }
+  return merged;
+}
+
+/**
+ * Registered catalog families. Add a family here (plus a file under
+ * ./message-catalog/) instead of appending to BASE_MESSAGES.
+ */
+export const MESSAGE_CATALOG_FAMILIES: Readonly<Record<string, MessageCatalogFamily>> = Object.freeze({
+  'cli-common': CLI_COMMON_MESSAGES,
+  'cli-run': CLI_RUN_MESSAGES,
+  'cli-memory-catalog': CLI_MEMORY_CATALOG_MESSAGES,
+  'cli-governance': CLI_GOVERNANCE_MESSAGES,
+  'cli-runtime-help': CLI_RUNTIME_HELP_MESSAGES,
+  'cli-reference': CLI_REFERENCE_MESSAGES,
+});
+
+const MESSAGES: MessageMap = mergeMessageFamilies(BASE_MESSAGES, MESSAGE_CATALOG_FAMILIES);
 
 /** All catalog keys — lets tests/tools enumerate keys without re-parsing this source file. */
 export const MESSAGE_KEYS: readonly string[] = Object.freeze(Object.keys(MESSAGES));

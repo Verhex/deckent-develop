@@ -38,6 +38,7 @@ import { resolveProjectRoot } from '../helpers/process.js';
 import { detectLang } from '../helpers/i18n.js';
 import { print, printError, isNoColor } from '../helpers/output.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
+import { memoryCatalogMessage } from '../helpers/message-catalog/cli-memory-catalog.js';
 
 /** Pinned half-wire ratchet baseline, relative to projectRoot. */
 export const TRUTH_BASELINE_FILE = '.deckent/truth-baseline.json';
@@ -311,7 +312,7 @@ export function writeBaseline(root: string, candidates: readonly string[], nowIs
   const payload: TruthBaseline = {
     halfWireCandidates: [...candidates].sort(),
     generatedAt: nowIso,
-    note: 'Pinned half-wire candidate ratchet (born-640b). Regenerate with `deckent truth --check --write`.',
+    note: memoryCatalogMessage('cli.memcat.truth.baseline_note', 'en'),
   };
   writeFileSync(p, JSON.stringify(payload, null, 2) + '\n', 'utf-8');
   return p;
@@ -388,9 +389,9 @@ export function registerTruth(program: Command): void {
   program
     .command('truth')
     .description(getMessage('cli.truth.desc', getLanguage(undefined)))
-    .option('--json', 'Output raw truth data as JSON')
-    .option('--check', 'Ratchet new half-wire candidates against .deckent/truth-baseline.json (exit 1 = new, exit 2 = no baseline)')
-    .option('--write', 'With --check: (re)write the pinned baseline to the current half-wire candidate set')
+    .option('--json', memoryCatalogMessage('cli.memcat.truth.opt.json', getLanguage(undefined)))
+    .option('--check', memoryCatalogMessage('cli.memcat.truth.opt.check', getLanguage(undefined)))
+    .option('--write', memoryCatalogMessage('cli.memcat.truth.opt.write', getLanguage(undefined)))
     .action(async (opts: { json?: boolean; check?: boolean; write?: boolean }) => {
       const root = resolveProjectRoot();
       const lang = detectLang(root);

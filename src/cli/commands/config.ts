@@ -10,6 +10,7 @@ import { getMessage, getLanguage } from '../helpers/messages.js';
 import { detectLang } from '../helpers/i18n.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { ErrorRegistry } from '../../core/errors.js';
+import { cliContractMessage, bindArgumentDescriptions } from '../helpers/message-catalog/cli-run.js';
 
 /**
  * Strip JSON comments (block and line) from a string.
@@ -70,10 +71,11 @@ export function importConfig(importPath: string, configPath: string): void {
 }
 
 export function registerConfig(program: Command): void {
+  const helpLang = getLanguage(undefined);
   const cmd = program
     .command('config')
     .description(getMessage('cli.config.desc', getLanguage(undefined)))
-    .option('--raw', 'Show raw project config without merging defaults')
+    .option('--raw', cliContractMessage('cliContract.config.opt.raw', helpLang))
     .action(async (opts: { raw?: boolean }) => {
       try {
         const root = resolveProjectRoot();
@@ -107,8 +109,7 @@ export function registerConfig(program: Command): void {
       }
     });
 
-  cmd
-    .command('set <key> <value>')
+  bindArgumentDescriptions(cmd.command('set <key> <value>'), helpLang, { key: 'cliContract.config.arg.key', value: 'cliContract.config.arg.value' })
     .description(getMessage('cli.config.set.desc', getLanguage(undefined)))
     .action(async (key: string, value: string) => {
       const root = resolveProjectRoot();
@@ -148,8 +149,7 @@ export function registerConfig(program: Command): void {
       }
     });
 
-  cmd
-    .command('get <key>')
+  bindArgumentDescriptions(cmd.command('get <key>'), helpLang, { key: 'cliContract.config.arg.key' })
     .description(getMessage('cli.config.get.desc', getLanguage(undefined)))
     .action(async (key: string) => {
       const root = resolveProjectRoot();
@@ -169,8 +169,7 @@ export function registerConfig(program: Command): void {
       }
     });
 
-  cmd
-    .command('export [file]')
+  bindArgumentDescriptions(cmd.command('export [file]'), helpLang, { file: 'cliContract.config.arg.export_file' })
     .description(getMessage('cli.config.export.desc', getLanguage(undefined)))
     .action((file?: string) => {
       const root = resolveProjectRoot();
@@ -187,8 +186,7 @@ export function registerConfig(program: Command): void {
       }
     });
 
-  cmd
-    .command('import <file>')
+  bindArgumentDescriptions(cmd.command('import <file>'), helpLang, { file: 'cliContract.config.arg.import_file' })
     .description(getMessage('cli.config.import.desc', getLanguage(undefined)))
     .action((file: string) => {
       const root = resolveProjectRoot();
@@ -238,7 +236,7 @@ export function registerConfig(program: Command): void {
   cmd
     .command('migrate')
     .description(getMessage('cli.config.migrate.desc', getLanguage(undefined)))
-    .option('--dry-run', 'Show what would be changed without modifying files')
+    .option('--dry-run', cliContractMessage('cliContract.config.opt.dry_run', helpLang))
     .action((opts: { dryRun?: boolean }) => {
       const root = resolveProjectRoot();
       const lang = detectLang(root);

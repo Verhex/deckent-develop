@@ -4,7 +4,7 @@ import type { Command } from 'commander';
 import { restoreFromSnapshot } from '../../orchestra/task-restoration.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
-import { getMessage } from '../helpers/messages.js';
+import { getMessage, getLanguage } from '../helpers/messages.js';
 import { detectLang } from '../helpers/i18n.js';
 import { readCanonicalRunStatus } from '../../core/run-status-authority.js';
 import {
@@ -20,6 +20,7 @@ import {
   type SprintRecoveryReport,
 } from '../../orchestra/sprint-recovery-operation.js';
 import { DeckentError } from '../../core/errors.js';
+import { bindArgumentDescriptions } from '../helpers/message-catalog/cli-run.js';
 
 export interface ResumeRecoveryProcessOptions {
   autoApprove?: boolean;
@@ -169,9 +170,8 @@ export async function runRecovery(
 }
 
 export function registerRecover(program: Command): void {
-  const registerLang = detectLang(resolveProjectRoot());
-  program
-    .command('recover <sprint-id>')
+  const registerLang = getLanguage(undefined);
+  bindArgumentDescriptions(program.command('recover <sprint-id>'), registerLang, { 'sprint-id': 'cliContract.recover.arg.sprint_id' })
     .description(getMessage('recover.description', registerLang))
     .option('--dry-run', getMessage('recover.dry_run_option', registerLang))
     .option('--force', getMessage('recover.force_option', registerLang))
