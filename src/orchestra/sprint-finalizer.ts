@@ -4176,34 +4176,51 @@ export async function finalizeSprint(
           routingVersion: 'v2',
         });
 
-        // ROUTING-V3 learning cells (Slice-2): tasks routed by V3 also feed
-        // the workType×domain×agent cell ledger — PER-TASK DNA by contract
-        // (the tasks[0] class cannot recur), ghost-gated at the source.
-        const v3Meta = task.routingMeta;
-        if (v3Meta?.routingVersion === 'v3' && terminalOutcome.agentId) {
-          try {
-            const { recordOutcome: recordCell } = await import('../core/routing/learning-cells.js');
-            const { producePositional } = await import('../core/routing/requirement-vector.js');
-            const { loadVocabulary } = await import('../core/routing/vocabulary.js');
-            const vocabulary = await loadVocabulary(projectRoot);
-            const positional = producePositional(task, { domains: vocabulary.domains });
-            const dominantDomain = [...positional.domains].sort((a, b) => b.weight - a.weight)[0]?.id ?? 'core-runtime';
-            recordCell(projectRoot, {
-              taskId: task.id,
-              sprintId: sprint.id,
-              workType: (v3Meta.workType ?? 'build') as import('../core/routing/types.js').WorkType,
-              domain: dominantDomain,
-              agentId: terminalOutcome.agentId,
-              verdict: evaluation as unknown as 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO',
-              quality: qualityScore ?? 50,
-            });
-          } catch (e) {
-            debugLog('finalizeSprint:routing-cells', e);
-          }
-        }
       }
       writeCatalogStatsTerminalOutcomes(projectRoot, sprint.id, catalogOutcomes);
       debugLog('finalizeSprint:routing-outcomes', `Recorded ${sprint.tasks.length} routing outcomes to learnings.json`);
+    }
+
+    // ROUTING-V3 learning cells (673-002 closure). Deliberately OUTSIDE the V2
+    // `statsAlreadyRecorded` wrapper: learning-cells carries its own
+    // (taskId, sprintId) idempotency, so a re-finalize can repair a V3 ledger
+    // the V2 marker would otherwise lock out forever. Three contract fixes vs
+    // the retired in-wrapper block: (a) the domain comes from the route-time
+    // `routingMeta.dominantDomain` — never re-derived at finalize time;
+    // (b) NO fallback key: a task without a route-time domain writes NO cell
+    // (the old `?? 'core-runtime'` literal minted keys the reader can never
+    // match — a measured 279-uses black hole); (c) infra deaths pass
+    // `failureClass` through so the ledger can skip them (no capability
+    // signal in an OOM/SIGKILL).
+    try {
+      const { recordOutcome: recordCell } = await import('../core/routing/learning-cells.js');
+      const v3Outcomes = collectCatalogStatsTerminalOutcomes(projectRoot, attemptTasks, evaluations, resultsMap);
+      for (const outcome of v3Outcomes) {
+        const task = attemptTasks.find(t => t.id === outcome.taskId);
+        const v3Meta = task?.routingMeta;
+        if (!task || v3Meta?.routingVersion !== 'v3' || !outcome.agentId) continue;
+        const dominantDomain = v3Meta.dominantDomain;
+        if (!dominantDomain) continue;
+        const taskResult = resultsMap.get(task.id);
+        let qualityScore: number | undefined;
+        if (taskResult) {
+          try {
+            qualityScore = assessQuality(task, taskResult, outcome.evaluation as unknown as string).overall;
+          } catch (e) { debugLog('finalizeSprint:assessQuality:v3', e); }
+        }
+        recordCell(projectRoot, {
+          taskId: task.id,
+          sprintId: sprint.id,
+          workType: (v3Meta.workType ?? 'build') as import('../core/routing/types.js').WorkType,
+          domain: dominantDomain,
+          agentId: outcome.agentId,
+          verdict: outcome.evaluation as unknown as 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO',
+          quality: qualityScore ?? 50,
+          ...(taskResult?.failureClass ? { failureClass: taskResult.failureClass } : {}),
+        });
+      }
+    } catch (e) {
+      debugLog('finalizeSprint:routing-cells', e);
     }
 
     // 8d. Evolve routing rules from accumulated data

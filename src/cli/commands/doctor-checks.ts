@@ -1,5 +1,5 @@
 /** doctor-checks.ts — Health check functions for `deckent doctor`. Sprint 144 split. */
-import { readFileSync, existsSync, readdirSync, accessSync, constants as fsConstants } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, accessSync, constants as fsConstants, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { platform } from 'node:os';
 import { spawnSync } from 'node:child_process';
@@ -14,6 +14,7 @@ import {
   PROJECT_CONFIG_PATH,
 } from '../../core/constants.js';
 import { getDebtItems } from '../../core/debt-store.js';
+import { readSprintJournal } from '../../core/routing/journal.js';
 
 // Row 450 (508-001): the Node.js runtime floor comes from the manifest's own
 // `engines.node`, not a source literal. Read via `createRequire` (Node's own
@@ -539,6 +540,50 @@ export function readAllCIReports(root: string, count = 5): CIReport[] {
   }
 }
 
+/**
+ * 673-005: routing decision-journal health. Surfaces (a) the dead legacy
+ * `decisions-v3/` rename leftover, (b) unreadable/corrupted journal lines and
+ * (c) config-hash drift against the newest sprint journal — the silent-death
+ * class that let a stale journal look healthy. Full determinism REPLAY runs in
+ * the routing test harness (it needs a live derive); doctor stays read-cheap.
+ */
+export function checkRoutingJournal(root: string): DoctorCheck {
+  const name = 'Routing journal';
+  try {
+    const legacyDir = join(root, '.deckent', 'routing', 'decisions-v3');
+    const journalDir = join(root, '.deckent', 'routing', 'decisions');
+    const legacyNote = existsSync(legacyDir)
+      ? 'legacy decisions-v3/ dir present (rename leftover — safe to delete); '
+      : '';
+    if (!existsSync(journalDir)) {
+      return { name, passed: legacyNote === '', message: `${legacyNote}no journal yet`, required: false };
+    }
+    // Newest by mtime, not name: lexical sort let a corrupt double-prefixed
+    // relic (`sprint-sprint-404.jsonl`, found live on first run) outrank the
+    // real current sprint.
+    const files = readdirSync(journalDir).filter(f => f.endsWith('.jsonl'))
+      .sort((a, b) => statSync(join(journalDir, a)).mtimeMs - statSync(join(journalDir, b)).mtimeMs);
+    if (files.length === 0) {
+      return { name, passed: legacyNote === '', message: `${legacyNote}no journal files`, required: false };
+    }
+    const newest = files[files.length - 1]!;
+    const read = readSprintJournal(root, newest.replace(/\.jsonl$/u, ''));
+    if (read.corruptedLines.length > 0) {
+      return { name, passed: false, required: false,
+        message: `${legacyNote}${newest}: ${read.corruptedLines.length} corrupted line(s) of ${read.entries.length + read.corruptedLines.length}` };
+    }
+    if (legacyNote) {
+      return { name, passed: false, required: false,
+        message: `${legacyNote}${newest}: ${read.entries.length} entrie(s) readable` };
+    }
+    return { name, passed: true, required: false,
+      message: `${newest}: ${read.entries.length} entrie(s), 0 corrupted`, };
+  } catch (error) {
+    return { name, passed: false, required: false,
+      message: `journal health unreadable: ${error instanceof Error ? error.message : String(error)}` };
+  }
+}
+
 export function runDoctorChecks(root: string, providerNames?: string[], spawnBackend?: string, lang: string = 'en'): DoctorResult {
   const checks: DoctorCheck[] = [
     checkPlatform(spawnBackend),
@@ -547,6 +592,7 @@ export function runDoctorChecks(root: string, providerNames?: string[], spawnBac
     checkBrainBudget(root), checkDebt(root), checkStaleLocks(root),
     checkDeckSecurity(root), checkWritePermissions(root), checkGitignore(root),
     checkDeckSubprocessVisibility(root, spawnBackend, lang),
+    checkRoutingJournal(root),
   ];
   return {
     ok: checks.filter(c => c.required).every(c => c.passed),

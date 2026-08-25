@@ -191,6 +191,8 @@ export interface RouteTasksV3Result {
   contentFallbacks: Array<{ taskId: string; reason: string }>;
   /** Skills excluded from V3 candidacy, each with a typed reason (never silent). */
   skillRejections: RouteTasksV3SkillRejection[];
+  /** Number of decision-journal appends that failed during this routing call. */
+  journalFailures: number;
 }
 
 /**
@@ -207,6 +209,7 @@ export async function routeTasksV3ForPlan(
 ): Promise<RouteTasksV3Result> {
   const result: RouteTasksV3Result = {
     routed: [], escalations: [], contentFallbacks: [], skillRejections: [],
+    journalFailures: 0,
   };
 
   // ── Catalog ────────────────────────────────────────────────────────────
@@ -295,6 +298,13 @@ export async function routeTasksV3ForPlan(
       // directive outlives whatever V3 picked (see mergeForcePreservingSkillIds).
       task.assignedSkills = mergeForcePreservingSkillIds(task, decision.skillIds);
       const storyWorkType = decision.story.steps[0]?.detail['workType'];
+      const dominantDomain = positional.domains.reduce<
+        (typeof positional.domains)[number] | undefined
+      >(
+        (strongest, domain) =>
+          strongest === undefined || domain.weight > strongest.weight ? domain : strongest,
+        undefined,
+      )?.id;
       task.routingMeta = {
         routingVersion: 'v3',
         workType: requirement?.content.workType
@@ -303,6 +313,7 @@ export async function routeTasksV3ForPlan(
         provenance: decision.provenance,
         personaSlices: decision.personaSlices,
         storySummary: decision.story.summary,
+        ...(dominantDomain ? { dominantDomain } : {}),
         ...(decision.escalation ? { escalation: decision.escalation.reason } : {}),
       };
       result.routed.push(task.id);
@@ -343,6 +354,7 @@ export async function routeTasksV3ForPlan(
             decision,
           });
         } catch (err) {
+          result.journalFailures += 1;
           debugLog('routing-plan-adapter:journal', err);
         }
       }
@@ -432,7 +444,6 @@ export async function routeSingleTaskV3(
     [task],
     projectRoot,
     (await import('../core/routing/config.js')).resolveRoutingV3Config(null, {}),
-    { journal: false },
   );
   const meta = task.routingMeta;
   if (!task.assignedAgent) {

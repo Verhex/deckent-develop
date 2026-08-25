@@ -89,7 +89,11 @@
         },
         {
           "type": "build",
-          "proficiency": "never"
+          "proficiency": "able"
+        },
+        {
+          "type": "fix",
+          "proficiency": "able"
         }
       ],
       "expertise": [
@@ -110,6 +114,10 @@
       "domains": [
         {
           "id": "devops/ci",
+          "proficiency": "primary"
+        },
+        {
+          "id": "test/quality",
           "proficiency": "primary"
         }
       ],

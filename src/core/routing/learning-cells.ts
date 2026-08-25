@@ -27,6 +27,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { readJsonSafe } from '../utils.js';
+import type { ProviderFailureKind } from '../provider-failure-classifier.js';
 import { InvalidWorkTypeError } from './types.js';
 import type { WorkType } from './types.js';
 import { isWorkType } from './vocabulary-builtin.js';
@@ -61,12 +62,20 @@ export interface RoutingCellsFile {
   recentKeys: string[];
   /** Visible rejected-outcome counters by reason (ghost gate, 446-013) — never silent drops. */
   rejectedOutcomes: Record<string, number>;
+  /** NO_GO outcomes omitted because the provider failure was classified as infrastructure. */
+  skippedInfraOutcomes: number;
 }
 
 // ─── Internals — read / write ──────────────────────────────────────────
 
 function emptyFile(): RoutingCellsFile {
-  return { schemaVersion: CELLS_SCHEMA_VERSION, cells: {}, recentKeys: [], rejectedOutcomes: {} };
+  return {
+    schemaVersion: CELLS_SCHEMA_VERSION,
+    cells: {},
+    recentKeys: [],
+    rejectedOutcomes: {},
+    skippedInfraOutcomes: 0,
+  };
 }
 
 /** Count a rejected outcome in the ledger (atomic write; cells untouched). */
@@ -76,15 +85,46 @@ function bumpRejectedCounter(projectRoot: string, reason: string): void {
   writeCellsFileAtomic(projectRoot, file);
 }
 
+/** Count an infrastructure outcome skipped by the learning gate (cells untouched). */
+function bumpSkippedInfraCounter(projectRoot: string): void {
+  const file = readCellsFile(projectRoot);
+  file.skippedInfraOutcomes += 1;
+  writeCellsFileAtomic(projectRoot, file);
+}
+
+function normalizeLegacyCellKeys(
+  cells: Record<string, RoutingCell>,
+): { cells: Record<string, RoutingCell>; changed: boolean } {
+  const normalized: Record<string, RoutingCell> = {};
+  let changed = false;
+
+  for (const [key, cell] of Object.entries(cells)) {
+    const normalizedKey = key.replace(/(^|\|)core-runtime\|/, '$1core/runtime|');
+    changed ||= normalizedKey !== key;
+    const existing = normalized[normalizedKey];
+    normalized[normalizedKey] = existing
+      ? {
+          uses: existing.uses + cell.uses,
+          successes: existing.successes + cell.successes,
+          qualitySum: existing.qualitySum + cell.qualitySum,
+          lastSprint: existing.lastSprint > cell.lastSprint ? existing.lastSprint : cell.lastSprint,
+        }
+      : cell;
+  }
+
+  return { cells: normalized, changed };
+}
+
 /** Defensive read — a missing/corrupt/malformed ledger degrades to an empty one, never throws. */
 function readCellsFile(projectRoot: string): RoutingCellsFile {
   const raw = readJsonSafe<Partial<RoutingCellsFile>>(path.join(projectRoot, CELLS_RELATIVE_PATH));
   if (!raw || typeof raw !== 'object') return emptyFile();
 
-  const cells =
+  const storedCells =
     raw.cells && typeof raw.cells === 'object' && !Array.isArray(raw.cells)
       ? (raw.cells as Record<string, RoutingCell>)
       : {};
+  const normalized = normalizeLegacyCellKeys(storedCells);
   const recentKeys = Array.isArray(raw.recentKeys)
     ? raw.recentKeys.filter((k): k is string => typeof k === 'string')
     : [];
@@ -94,12 +134,20 @@ function readCellsFile(projectRoot: string): RoutingCellsFile {
       ? (raw.rejectedOutcomes as Record<string, number>)
       : {};
 
-  return {
+  const file: RoutingCellsFile = {
     schemaVersion: typeof raw.schemaVersion === 'number' ? raw.schemaVersion : CELLS_SCHEMA_VERSION,
-    cells,
+    cells: normalized.cells,
     recentKeys,
     rejectedOutcomes,
+    skippedInfraOutcomes:
+      typeof raw.skippedInfraOutcomes === 'number' ? raw.skippedInfraOutcomes : 0,
   };
+
+  if (normalized.changed) {
+    writeCellsFileAtomic(projectRoot, file);
+  }
+
+  return file;
 }
 
 /** Recursively Object.freeze a plain-object/array tree (mirrors vocabulary.ts's own deepFreeze — duplicated rather than exported/shared across files for one small helper, YAGNI). */
@@ -160,6 +208,8 @@ export interface RecordOutcomeInput {
   readonly verdict: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
   /** 0-100 quality score (QualityAssessor scale) — summed into the cell's qualitySum. */
   readonly quality: number;
+  /** Provider classifier result, when available; `unknown` remains a normal outcome. */
+  readonly failureClass?: ProviderFailureKind;
 }
 
 export interface RecordOutcomeResult {
@@ -205,6 +255,14 @@ export function recordOutcome(
   }
 
   const cellKey = buildCellKey(input.workType, input.domain, input.agentId);
+
+  const isInfrastructureFailure = input.failureClass === 'usage-limit'
+    || input.failureClass === 'auth'
+    || input.failureClass === 'oom';
+  if (input.verdict === 'NO_GO' && isInfrastructureFailure) {
+    bumpSkippedInfraCounter(projectRoot);
+    return { recorded: false, cellKey };
+  }
 
   // Ghost gate: a contentless entity never accumulates signal. Rejected —
   // visibly (counted in the ledger's rejectedOutcomes), the store's cells

@@ -25,6 +25,7 @@ import type {
   PostSettlementIngress,
 } from './post-settlement-verification.js';
 import type { PromptCostCanaryTaskAuthority } from './prompt-cost-canary-task-authority.js';
+import type { ProviderFailureKind } from './provider-failure-classifier.js';
 
 // ─── Models ──────────────────────────────────────────────────────────
 
@@ -756,6 +757,8 @@ export interface Task {
     routingVersion?: 'v2' | 'v3';
     /** Routing Engine v3 semantic work classification. */
     workType?: string;
+    /** Strongest domain captured from the requirement at routing time. */
+    dominantDomain?: string;
     /** Decision provenance emitted by the v3 vector pipeline. */
     provenance?: string;
     /** Persona guidance slices selected in the same decision as agent + skills. */
@@ -1113,6 +1116,8 @@ export interface TaskResult {
   coverage: number;
   selfAssessment: SelfAssessment;
   notes: string;
+  /** Provider-side failure classification attached by result processing. */
+  failureClass?: ProviderFailureKind;
   /**
    * 7097-B4: the worker's OWN structured statement of what remains undone
    * when selfAssessment is GO_WITH_TECH_DEBT — the residual gap ONLY, never

@@ -216,8 +216,11 @@ export class MidSprintAdapter {
       (probe as { assignedAgent?: string }).assignedAgent = undefined;
       (probe as { assignedSkills?: string[] }).assignedSkills = undefined;
       const v3Config = resolveRoutingV3Config(null, {});
+      // 673-005 closure: this IS a real assignment decision (the re-route that
+      // replaces a failed agent), so it belongs in the determinism journal like
+      // every other routing decision — `journal: false` here left mid-sprint
+      // assignments permanently invisible to replay/evolution.
       const result = await routeTasksV3ForPlan([probe], this.projectRoot, v3Config, {
-        journal: false,
         excludeAgentIds,
       });
       void result;

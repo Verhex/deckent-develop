@@ -1407,6 +1407,25 @@ export async function waitForResults(
           // in place, reclassify task status to MANUAL_REVIEW_REQUIRED, and
           // emit BRAIN→AUDITOR:DISK_VS_CLAIM_MISMATCH. Disk-evidence absent →
           // NO_GO stays (legacy behavior preserved).
+          // 673-004 closure: persist the provider-failure classification into
+          // the collected result so the routing learning-ledger can SKIP infra
+          // deaths (an OOM/usage-limit kill carries zero signal about the
+          // agent's capability). Only a positively classified infra kind is
+          // written; 'unknown' and healthy results leave the field absent.
+          if (result.selfAssessment === 'NO_GO' && result.failureClass === undefined) {
+            try {
+              const inferredKind = classifyProviderFailure({
+                workerLog: undefined,
+                resultNotes: result.notes,
+                exitCode: undefined,
+                producedWork: (result.filesChanged?.length ?? 0) > 0,
+              });
+              if (inferredKind === 'usage-limit' || inferredKind === 'auth' || inferredKind === 'oom') {
+                result.failureClass = inferredKind;
+              }
+            } catch { /* classification is advisory — never blocks ingest */ }
+          }
+
           const isSyntheticExitNoResult =
             result.selfAssessment === 'NO_GO'
             && (!result.filesChanged || result.filesChanged.length === 0)

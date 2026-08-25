@@ -6,7 +6,14 @@
 // touches the real project's `.deckent/stats/routing-cells.json`.
 
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -55,7 +62,13 @@ describe('readCellsSnapshot — fresh project', () => {
 
     const snapshot = readCellsSnapshot(root);
 
-    expect(snapshot).toEqual({ schemaVersion: CELLS_SCHEMA_VERSION, cells: {}, recentKeys: [], rejectedOutcomes: {} });
+    expect(snapshot).toEqual({
+      schemaVersion: CELLS_SCHEMA_VERSION,
+      cells: {},
+      recentKeys: [],
+      rejectedOutcomes: {},
+      skippedInfraOutcomes: 0,
+    });
     expect(Object.isFrozen(snapshot)).toBe(true);
     expect(Object.isFrozen(snapshot.cells)).toBe(true);
     expect(Object.isFrozen(snapshot.recentKeys)).toBe(true);
@@ -69,7 +82,13 @@ describe('readCellsSnapshot — fresh project', () => {
 
     expect(() => readCellsSnapshot(root)).not.toThrow();
     const snapshot = readCellsSnapshot(root);
-    expect(snapshot).toEqual({ schemaVersion: CELLS_SCHEMA_VERSION, cells: {}, recentKeys: [], rejectedOutcomes: {} });
+    expect(snapshot).toEqual({
+      schemaVersion: CELLS_SCHEMA_VERSION,
+      cells: {},
+      recentKeys: [],
+      rejectedOutcomes: {},
+      skippedInfraOutcomes: 0,
+    });
   });
 
   it('degrades a well-formed-JSON-but-wrong-shape file (cells as an array) to an empty valid snapshot', () => {
@@ -81,6 +100,51 @@ describe('readCellsSnapshot — fresh project', () => {
     const snapshot = readCellsSnapshot(root);
     expect(snapshot.cells).toEqual({});
     expect(snapshot.recentKeys).toEqual([]);
+  });
+
+  it('persistently normalizes and merges legacy core-runtime cell keys on load', () => {
+    const root = makeSandbox();
+    const dir = join(root, '.deckent', 'stats');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'routing-cells.json'),
+      JSON.stringify({
+        schemaVersion: 1,
+        cells: {
+          'build|core-runtime|implementer': {
+            uses: 279,
+            successes: 200,
+            qualitySum: 20_000,
+            lastSprint: 'sprint-600',
+          },
+          'build|core/runtime|implementer': {
+            uses: 21,
+            successes: 18,
+            qualitySum: 1_800,
+            lastSprint: 'sprint-673',
+          },
+        },
+        recentKeys: [],
+        rejectedOutcomes: {},
+      }),
+      'utf8',
+    );
+
+    const snapshot = readCellsSnapshot(root);
+
+    expect(snapshot.cells).toEqual({
+      'build|core/runtime|implementer': {
+        uses: 300,
+        successes: 218,
+        qualitySum: 21_800,
+        lastSprint: 'sprint-673',
+      },
+    });
+    expect(
+      JSON.parse(
+        readFileSync(join(dir, 'routing-cells.json'), 'utf8'),
+      ) as { cells: Record<string, unknown> },
+    ).toMatchObject({ cells: snapshot.cells });
   });
 });
 
@@ -126,6 +190,38 @@ describe('recordOutcome — write + accumulate', () => {
     const snapshot = readCellsSnapshot(root);
     const cell = snapshot.cells[buildCellKey('build', 'core/runtime', 'implementer')];
     expect(cell).toEqual({ uses: 1, successes: 0, qualitySum: 10, lastSprint: 'sprint-446' });
+  });
+
+  it('skips infra NO_GO learning, increments visibility, and keeps unknown on the penalty path', () => {
+    const root = makeSandbox();
+    recordOutcome(root, baseInput({ taskId: 'baseline' }));
+    const beforeInfra = readCellsSnapshot(root);
+
+    const skipped = recordOutcome(
+      root,
+      baseInput({ taskId: 'infra', verdict: 'NO_GO', quality: 0, failureClass: 'oom' }),
+    );
+    const afterInfra = readCellsSnapshot(root);
+
+    expect(skipped.recorded).toBe(false);
+    expect(afterInfra.cells).toEqual(beforeInfra.cells);
+    expect(afterInfra.recentKeys).toEqual(beforeInfra.recentKeys);
+    expect(afterInfra.skippedInfraOutcomes).toBe(1);
+
+    recordOutcome(
+      root,
+      baseInput({ taskId: 'unknown', verdict: 'NO_GO', quality: 10, failureClass: 'unknown' }),
+    );
+
+    const snapshot = readCellsSnapshot(root);
+    expect(snapshot.cells[buildCellKey('build', 'core/runtime', 'implementer')]).toEqual({
+      uses: 2,
+      successes: 1,
+      qualitySum: 90,
+      lastSprint: 'sprint-446',
+    });
+    expect(snapshot.skippedInfraOutcomes).toBe(1);
+    expect(snapshot.recentKeys).toContain('unknown|sprint-446');
   });
 
   it('two DISTINCT work-type/domain/agent shapes each get their OWN independent cell (K4 pin — no cross-task DNA sharing)', () => {

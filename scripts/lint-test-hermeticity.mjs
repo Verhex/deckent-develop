@@ -653,7 +653,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-25 cli-surface-truth merge: +189 — the lane's three new guard
   // suites (lint-cli-surface, cli-docs-contract, gen-reference-docs) and
   // reworked cli test fixtures; all suite-owned.
-  count: 16299,
+  count: 16300,
   // 2026-08-25 B-sweep: digest moved — --fix roundtrip pin, multi-label
   // parser pin, same-line rule downgraded to WARN (all suite-owned).
   // 2026-08-25 7141 wave: count unchanged, digest moved — the src-side
@@ -662,7 +662,9 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // progress contract (path-aware read-model harness) + incident-contract pins.
   // 2026-08-25 strike-4 fix: count unchanged, digest moved — config.ts
   // self-heal reordered to write-then-swap; scanned text shifted.
-  digest: '761d96dbb3f9a6fefa32b4c265d9be1bf1e0685020f79fe36e313aff9f32a726',
+  // 2026-08-25 A2 routing-fairness wave: lane harvest + manual closure
+  // (cells contract, journal coverage, doctor health, ci-guardian manifest).
+  digest: '568aeed60689f461f8e586d6ec49ba4825fcf7f1e0efa283ad14e4bed12994cd',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1193,7 +1195,10 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // DeckentError across 28 files (sprint-672 harvest + 1 manual serve.ts site).
   // 2026-08-25 strike-4 fix: digest moved — config.ts self-heal reordered
   // to write-then-swap (production text shifted).
-  digest: '8d8efa680c07b66f4491961cf2d1930bbfd679824f77f1d396af98e96b9e6a86',
+  // 2026-08-25 A2 routing-fairness wave: digest moved — production modules
+  // (dominantDomain/failureClass threading, cells contract, journal
+  // coverage, doctor journal-health, ci-guardian manifest).
+  digest: '86a6cdd8c42af85c7e382699a61df2f2b18650a2e716997f3606f3b5a4e4d987',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([
