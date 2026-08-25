@@ -31,6 +31,8 @@ This glossary defines Deckent terms against current code and repository contract
 | Do / task mode | A direct user task surface that can construct bounded work without requiring the full manual sprint workflow. | `src/cli/commands/do.ts`; `src/orchestra/task-mode-runner.ts` |
 | Dogfood | Using Deckent's own Goal/Mission/Flow/Run/Autonomous/Do surfaces to implement Deckent, with manual work restricted to typed recovery seams. | `AGENTS.md:75-79` |
 | Effective config | The validated runtime result after layering config and resolving policy/provider facts; it is more authoritative than one config file. | `src/core/config.ts:1829-2230`; `docs/en/reference/configuration-schema.md` |
+| Execution Posture | The exact resolved contract defining where an Attempt runs, how it sees the workspace, which effect/capability/secrets authority it has, and how its result lands. Direct, staged, isolated, brokered, and remote names may be presets; the exact contract is authority. | `.deckent/workspace/IDENTITY.md:32`; `docs/en/vision.md` |
+| Execution realm | The host process, container, microVM, or remote-executor boundary inside an Execution Posture. Docker or Firecracker is a realm adapter, not product identity. | `src/orchestra/spawn-backend.ts`; `docs/en/vision.md` |
 | Evidence reference | A durable identifier pointing to proof without embedding or reinterpreting the proof as authority. | `src/core/invocation-receipt.ts`; `src/core/task-settlement-authority.ts` |
 | FIX | The repair phase/attempt path for eligible NO_GO work. | `src/orchestra/sprint-controller.ts:2665-2859` |
 | Flow | A governed progression from proposal/preview/approval through run start and terminal states. | `src/core/run-flow-contract.ts:23-121,313-380` |

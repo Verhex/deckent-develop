@@ -2,7 +2,7 @@
 
 > **Status:** Owner-approved product/design north-star; implementation SSOT değildir.
 > **Scope:** Desktop App, Terminal/TUI, Chat, MCP, Provider Connections, Extensions, Cross-Platform Architecture, Design System
-> **Preservation:** Alperen'in 2026-08-12 tarihli 55 bölümlük taslak planı başlıkları, kararları, örnekleri ve sıralamasıyla kayıpsız korunmuştur. Yalnız bu authority/preservation üst bilgisi ve repository-relative reconciliation bağlantısı eklenmiştir.
+> **Preservation:** Alperen'in 2026-08-12 tarihli 55 bölümlük taslak planı başlıkları ve sıralamasıyla korunmuştur. 2026-08-25 canlı owner amendment'ı; §5.1 Execution Mediation, DECISION-20 ve bunların enterprise/success/North Star sonuçlarını mevcut tek ürün yönüne additive biçimde eklemiştir; ana bölümler yeniden numaralanmamıştır.
 > **Authority:** İş durumu ve teslimat authority'si [`docs/MASTER-PLAN.md`](../MASTER-PLAN.md), implementasyon gerçeği repository kodu ve executable kanıttır. Bu belge mevcut genel ürün vizyonunun yerine geçmez ve kodu kendisine uydurma yetkisi vermez.
 > **Repository reconciliation:** [Desktop & Terminal Repository Reconciliation](./DECKENT-DESKTOP-TERMINAL-RECONCILIATION.md)
 
@@ -217,6 +217,7 @@ Bu workflow Deckent'in aşağıdaki temel yeteneklerini aynı UX içinde kanıtl
           │ Skills                        │
           │ Tools                         │
           │ Policies                      │
+          │ Execution Mediation           │
           │ Secrets                       │
           │ Memory                        │
           │ Verification                  │
@@ -247,6 +248,70 @@ deckent resume run_7F21
 ```
 
 Desktop aynı `run_7F21` kimliğini canlı olarak göstermelidir.
+
+## 5.1 Execution Mediation ve Resolved Postures
+
+Execution mediation Deckent'in dördüncü ürün yüzü veya yalnız enterprise'a ait ayrı bir security ürünü değildir. Assistant, Worker ve Platform'ın tamamında aynı execution-authority zincirini gerçek workspace, host ve external system etkilerine bağlayan cross-cutting kernel katmanıdır.
+
+```text
+User intent / external trigger
+            │
+            ▼
+Goal → Mission → Flow → Run → WorkItem → Attempt → Operation
+                                      │
+                         Resolved Execution Posture
+                                      │
+          ┌───────────────────────────┼───────────────────────────┐
+          ▼                           ▼                           ▼
+   Direct host effects        Isolated/staged realm       Brokered/remote effects
+```
+
+Deckent'in kurulduğu yer ve effective policy, AI'nın gerçek dünyaya nasıl bağlanacağını değiştirir; ürün modelini değiştirmez. Canonical authority bir preset etiketi değil aşağıdaki exact contracttır:
+
+| Contract axis | Zorunlu karar | Hedef vocabulary |
+|---|---|---|
+| `realm` | Execution nerede gerçekleşir? | `host`, `container`, `microvm`, `remote` |
+| `workspaceProjection` | Canonical workspace hangi görünümle sunulur? | `shared-rw`, `read-only`, `snapshot-cow`, `artifact-only`, `none` |
+| `effects` | Mutation ne zaman gerçek sisteme ulaşır? | `immediate`, `staged`, `approval-gated` |
+| `filesystem` | Hangi read/write selector'ları geçerlidir? | exact file, directory tree, glob; read ve write bağımsız |
+| `network` | Hangi destination/protocol erişimi vardır? | deny, explicit allowlist, broker-only |
+| `secrets` | Credential custody/exposure nasıl çözülür? | none, scoped reference, broker injection |
+| `landing` | Output canonical sisteme nasıl geçer? | direct, verified apply, approval-gated apply, reconcile |
+
+Posture resolution şu girdilerin kesişimidir:
+
+```text
+installation topology
+  + tenant / organization policy
+  + workspace / project / environment policy
+  + task requirements and derived risk
+  + platform capability and live availability evidence
+  = exact resolved Execution Posture
+```
+
+Inheritance authority'yi yalnız daraltır; explicit deny kazanır ve unknown asla allowed'a dönüşmez. `Direct`, `Protected`, `Enterprise Isolated` gibi adlar yalnız user-facing preset olabilir. Admission, audit, evidence ve settlement exact resolved axis'leri ve bunların policy/evidence kaynaklarını taşır.
+
+Canonical çalışma biçimleri ayrı edition değil aynı contractın örnek kompozisyonlarıdır:
+
+| Working form | Tipik resolved contract | Etki/recovery gerçeği |
+|---|---|---|
+| **Direct** | host veya container + shared-RW + immediate effects | En düşük friction; cancel sonrası partial host effects mümkün, reconciliation gerekebilir |
+| **Staged** | container/host + snapshot-COW + staged effects | Worker proposal üretir; verify/land veya discard ayrı authority kararıdır |
+| **Isolated** | container/microVM + read-only veya snapshot workspace + scoped network/secrets | Realm güçlü containment sağlar; exact capabilities yine ayrıca sınırlanır |
+| **Brokered** | workspace none/read-only + external effects yalnız capability broker üzerinden | Worker doğrudan credential/host authority almaz; broker exact operation'ı yürütür |
+| **Remote** | remote executor + tenant/environment-bound policy + artifact/evidence return | Fleet, data residency ve large-scale execution; aynı Run/Attempt identity korunur |
+
+Aynı Attempt hibrit olabilir: source read-only, output snapshot/COW, test execution microVM, GitHub read brokered, deployment approval-gated. Firecracker bu hedefte `microvm` realm adapter'ıdır; Docker, host process veya future remote executor gibi replaceable bir platform capability'sidir. Firecracker kullanılamadığında sistem direct host mutation'a sessizce düşmez: policy'nin önceden izin verdiği eşdeğer/daha dar adapter seçilir veya typed `HOLD` üretilir.
+
+Golden Workflow her posture'da aynı üst zinciri korur fakat effect lifecycle'ı dürüstçe ayrışır:
+
+```text
+Direct:   admit → execute/effect → verify → settle/reconcile
+Staged:   admit → materialize → execute → propose → verify → land|discard → settle
+Brokered: admit → propose operation → approve if required → broker execute → reconcile → settle
+```
+
+Desktop ve Terminal aynı resolved posture'u ve aynı intervention contractını gösterir. Basic, “Doğrudan projenizde çalışıyor” veya “Korunan bir kopyada çalışıyor; doğrulamadan sonra uygulanacak” gibi consequence-first bir özet verir. Advanced; realm, workspace projection, capabilities, policy inheritance, secrets/network exposure, landing, freshness ve evidence refs'i gösterir. Dashboard yalnız bu authority'nin observability projection'ıdır.
 
 ---
 
@@ -1236,6 +1301,7 @@ Chat
 + Files
 + GitHub
 + Local Tools
++ Direct or protected local posture
 ```
 
 ```text
@@ -1254,6 +1320,8 @@ Shared Workspaces
 + Shared Agents
 + Shared MCP
 + Roles
++ Staged work
++ Verified landing
 ```
 
 ```text
@@ -1266,13 +1334,19 @@ Governance
 + Cost Control
 + Remote Runtime
 + Private Models
++ Tenant-bound execution posture policy
++ Brokered secrets/network/effects
++ Container, microVM and remote realm adapters
++ Data-residency and cross-tenant isolation evidence
 ```
+
+Bu büyüme ayrı runtime veya edition yaratmaz. Solo, team ve enterprise aynı posture contractını kullanır; fark, effective policy'nin authority'yi ne kadar daralttığı ve hangi realm/effect adapter'larını zorunlu kıldığıdır.
 
 ---
 
 # 28. Enterprise UX
 
-Kurumsal ürün tarafında aşağıdakiler consideration scope'a alınmalıdır:
+Kurumsal ürün hedefi aşağıdaki governance ve execution-mediation contractlarının tamamını kapsar:
 
 * RBAC
 * SSO
@@ -1295,10 +1369,20 @@ Kurumsal ürün tarafında aşağıdakiler consideration scope'a alınmalıdır:
 * quotas
 * environment isolation
 * local/remote runtimes
+* container/microVM/remote realm policy
+* workspace projection ve landing policy
+* capability-brokered filesystem/network/external effects
 * compliance
 * data residency
+* cross-tenant isolation proof
+* policy simulation ve effective-permission explanation
+* immutable, filterable, deep-linkable evidence/audit
 
-Bu özelliklerin tamamının ilk sürüme girmesi gerektiği varsayılmamalıdır.
+Enterprise, Core'da bulunmayan governance veya security'yi ilk kez yaratmaz. Core'daki principal, capability, scope, approval, evidence ve posture contractlarını organization-scale inheritance, deny precedence, delegation, retention, residency, assurance ve operations ile derinleştirir. Alt seviye policy üst seviyenin deny kararını geri açamaz; unknown hiçbir yüzeyde allowed gösterilemez.
+
+Execution posture tenant → organization → workspace → project → environment → Run/WorkItem/Attempt zincirinde açıklanabilir olmalıdır. UI effective sonucu ve nedenini; hangi policy'nin inherited, explicit, shadowed, conflicting, expired veya unavailable olduğunu göstermelidir. Policy preview bağlayıcı karar gibi gösterilemez. Bulk posture/policy değişiklikleri selection scope, exclusions, partial failure ve rollback/reconciliation sınırlarını açıkça taşır.
+
+Milyon ölçeğinde posture ve audit kayıtları server-authoritative pagination/streaming, stable sort, search, filters, saved views, exact/sampled/delayed count ayrımı, tenant-safe export ve immutable evidence links gerektirir. Implementation sequence dependency'leri yönetebilir; ürün hedefinin kapsamını küçültemez veya ikinci bir enterprise kernel/evidence chain üretemez.
 
 ---
 
@@ -1396,6 +1480,10 @@ Yüksek bilgi yoğunluğu düzensizlik anlamına gelmemelidir.
 ## Same runtime, many surfaces.
 
 Desktop, CLI, TUI ve gelecekteki client'lar aynı state'i kullanmalıdır.
+
+## One kernel, many execution postures.
+
+Direct, staged, isolated, brokered ve remote çalışma biçimleri aynı product/kernel authority'sinin resolved projection'larıdır. Realm adapter'ı değişebilir; Goal→Operation causality, policy, evidence ve settlement anlamı değişmez.
 
 ---
 
@@ -2061,6 +2149,10 @@ Repository analizi sırasında aşağıdaki konular kesin cevaplanmalıdır:
 * tool permission modeli mevcut mu?
 * policy engine mevcut mu?
 * local vs enterprise security boundary nasıl?
+* exact Execution Posture hangi authority ve inheritance zincirinden resolve ediliyor?
+* workspace projection, network, secrets, effects ve landing aynı durable contractta mı?
+* stronger realm unavailable olduğunda fail-closed `HOLD` mu, yoksa izinli adapter seçimi mi uygulanıyor?
+* hiçbir yol isolated execution'dan direct host mutation'a sessiz downgrade edebiliyor mu?
 
 ---
 
@@ -2244,6 +2336,22 @@ Status: Accepted Design Direction
 
 ---
 
+## DECISION-20
+
+**Execution mediation tek Deckent kernel'i içinde config-resolved bir çalışma katmanıdır; direct, staged, isolated, brokered ve remote postures ayrı ürün/edition değildir.**
+
+Status: Accepted Product Architecture — owner decision 2026-08-25
+
+Contract:
+
+* durable authority exact realm/workspace/effect/capability/secrets/landing contractını taşır,
+* user-facing profil adları yalnız preset'tir,
+* Docker/Firecracker/remote executor replaceable realm adapter'larıdır,
+* unavailable isolation direct host effects'e silent downgrade üretmez,
+* solo ve enterprise aynı kernel, policy, evidence ve settlement zincirini kullanır.
+
+---
+
 # 51. Recommended Immediate Repository Tasks
 
 Codex ve Fable ilk turda implementation yapmamalıdır.
@@ -2336,11 +2444,15 @@ Adds tools/context/MCP
 ↓
 Escalates task into agent execution
 ↓
+Reviews the resolved execution posture and consequences
+↓
 Observes workers
 ↓
 Controls autonomy
 ↓
 Reviews verification
+↓
+Lands, discards or reconciles effects under policy
 ↓
 Continues same run from terminal or desktop
 ↓
@@ -2362,6 +2474,8 @@ Deckent'in tasarım hedefi yalnızca güzel bir desktop application üretmek de�
 Hedef:
 
 > **Models, agents, tools, people and enterprise systems için ortak, kontrollü ve genişletilebilir bir çalışma ortamı oluşturmak.**
+
+Bu ortam, installation topology ve effective policy'ye göre AI'yı doğrudan kullanıcının sisteminde çalıştırabilmeli veya isolated, capability-bound, brokered ve verified bir boundary üzerinden gerçek dünyaya bağlayabilmelidir. Her iki yol da aynı Deckent kernel'ini, authority chain'ini ve evidence modelini kullanır.
 
 Başka bir ifadeyle:
 

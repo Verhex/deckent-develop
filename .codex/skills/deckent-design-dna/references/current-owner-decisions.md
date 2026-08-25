@@ -16,6 +16,15 @@ direction under a new name.
   same bounded dynamic region. It remains subject to real-terminal feasibility and platform proof.
 - Software delivery is one domain profile. Orders, production, ERP and other governed business
   processes use the same execution, permission, intervention, evidence and audit semantics.
+- Execution mediation is a cross-cutting capability of the one Deckent kernel, not a fourth product
+  face or an isolation-only product identity. The same product may execute directly in a canonical
+  workspace or mediate AI through staged, isolated, brokered or remote realms according to
+  installation topology, effective policy, task risk and platform capability evidence.
+- Named execution profiles are user-facing presets only. Durable authority records the exact
+  resolved realm, workspace projection, effects, filesystem/network/secrets capabilities and
+  landing policy; an unavailable stronger realm never silently downgrades to direct host effects.
+- Docker, Firecracker or another container/microVM/runtime is an execution-realm adapter, never a
+  separate Deckent edition, kernel or product identity.
 - Basic and Advanced are Desktop-only disclosure modes over one object, state, permission and
   command model. They are not separate shells, runtimes, editions or products.
 - Terminal has one stable operator surface. Do not add Basic/Advanced, density variants or a

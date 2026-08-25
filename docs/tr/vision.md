@@ -64,6 +64,38 @@ Zincir, sistemdeki her etkinin yukarı doğru bir niyete, aşağı doğru bir ak
 
 Zincir ayrıca özyinelemeli (recursive) birleşir: delege edilen bir takım veya harici bir runtime, yetkisini üst halkasından bir authority tavanı ve bütçe tavanı olarak alır — asla taze bir yetki olarak değil. Delegasyon yetkiyi daraltır; asla genişletmez.
 
+## Execution mediation: tek ürün, resolved çalışma biçimleri
+
+Deckent yalnız host üzerinde çalışan bir agent runtime olmadığı gibi yalnız AI ile host arasına konan bir isolation ürünü de değildir. **Execution mediation**, Assistant · Worker · Platform'ın tamamının kullandığı tek kernel içindeki cross-cutting bir katmandır. Deckent kurulduğu yere ve effective policy'ye göre AI'yı doğrudan canonical workspace'e bağlayabilir veya host ve gerçek sistemler arasındaki etkileri staged, isolated, brokered ya da remote bir boundary üzerinden yönetebilir. Bunlar ayrı ürün, edition veya authority değildir. [Kanıt: `.deckent/workspace/IDENTITY.md:32`]
+
+Her `Attempt`, kullanıcıya dönük bir preset adından değil exact ve durable bir **Execution Posture** contractından authority alır:
+
+| Eksen | Contract'ın cevapladığı soru | Örnek hedef değerler |
+|---|---|---|
+| **Execution realm** | Kod veya agent nerede çalışır? | host process, container, microVM, remote executor |
+| **Workspace projection** | Gerçek workspace nasıl görünür? | shared read-write, read-only, snapshot/COW, artifact-only, none |
+| **Effect model** | Etki ne zaman gerçek olur? | immediate, staged, approval-gated |
+| **Capabilities** | Hangi filesystem, network, tool ve external-system işlemleri mümkündür? | explicit read/write scopes, allowlist, brokered operations |
+| **Secrets** | Credential hangi custody ve exposure sınırında kullanılır? | none, scoped reference, broker injection |
+| **Landing** | Üretilen değişiklik canonical sisteme nasıl geçer? | direct, verified apply, approval-gated apply, external reconciliation |
+
+Resolved posture şu bileşimin sonucudur:
+
+```text
+installation topology
+  + tenant / organization policy
+  + workspace / project / environment policy
+  + task requirements and derived risk
+  + platform capability and live availability evidence
+  = resolved Execution Posture
+```
+
+Policy inheritance yalnız authority'yi daraltır; deny precedence korunur ve bilinmeyen durum allowed sayılmaz. Kullanıcının seçtiği `Direct`, `Protected` veya benzeri profil adları UX preset'i olabilir fakat audit, admission ve settlement exact resolved contractı taşır. Daha güçlü bir realm kullanılamıyorsa Deckent açıkça `HOLD` üretir veya yalnız önceden yetkilendirilmiş eşdeğer/daha dar bir adapter'a geçer; isolated execution'dan direct host mutation'a sessiz downgrade yapmaz.
+
+Bu model hibrittir. Aynı attempt source'u read-only görebilir, output'u snapshot/COW içinde üretebilir, testleri bir microVM'de çalıştırabilir, GitHub'ı capability broker üzerinden okuyabilir ve deployment etkisini approval sonrası host authority'ye bırakabilir. Firecracker bu modelde güçlü bir `microVM` realm adapter'ıdır; Deckent'in yeni kimliği veya ayrı enterprise ürünü değildir.
+
+Solo kullanıcı düşük friction için direct posture seçebilir. Takım staged ve verified landing kullanabilir. Regüle enterprise; tenant-bound policy, brokered secrets/network, microVM veya remote realm, data-residency ve approval-gated external effect talep edebilir. Hepsi aynı Goal → Mission → Flow → Run → WorkItem → Attempt → Operation zincirini, policy sistemini, evidence lineage'ını ve kontrol yüzeylerini kullanır.
+
 ## Altı yürütme bağlamı
 
 "Her yerde" ifadesi somuttur. Altı bağlam demektir; her birinin kullanıcı biçimi farklı, döngüsü aynıdır — iste, kabul et, yönlendir, yürüt, doğrula, hatırla.
@@ -128,6 +160,8 @@ Deckent'in ne olmadığını adlandırmak, vizyonu aşınmaya karşı korur.
 - **Kontrolsüz otonomi değildir.** Sistem nerede kendi başına hareket ederse etsin, yetki kullanıcıda kalır. Müdahalesiz uçtan uca yürütme bugün sertifikalı değildir; süregelen HOLD ve sertifikasyon merdiveni [Güncel sürtünmeler](./operations/current-frictions.md) dosyasındadır. Scope, onay kapıları, bütçeler ve audit trail bu otonominin bedelidir; önündeki engel değil.
 - **Identity provider değildir.** Bir agent'ın kim olduğunun otoritesi enterprise identity, PAM ve non-human-identity sistemlerinde kalır. Deckent onlarla entegre olur ve kimliği; task-scoped, süresi dolan ve kanıta bağlı execution yetkisine çevirir.
 - **Başka bir agent runtime değildir.** Deckent agent runtime'larıyla session, UI numarası veya execution özelliği yarışına girmez. Kendi yüzeyleri — Terminal, Desktop, dashboard, API — yönetişimli yürütmeyi kontrol etmek, bağlamak ve gözlemlemek için vardır; yeni bir runtime veya yüzeyin bağlanması daima kolay kalmalıdır. Amaç birinin agent'ını ondan iyi çalıştırmak değil, her agent'ı yönetebilmektir.
+- **Isolation-only ürün değildir.** Direct host/main, staged, isolated, brokered ve remote çalışma biçimleri aynı ürünün resolved posture'larıdır; hiçbiri tek başına Deckent'in kimliği değildir.
+- **Tek execution topology dayatmaz.** Container, microVM, host process veya remote executor yalnız adapter'dır. Kurulum ve policy farkları ikinci kernel veya ikinci evidence chain yaratmaz.
 - **Metrik vitrini değildir.** Agent, tool ve komut sayıları üretilmiş durum bilgisidir, kimlik değil. Bu dokümanda yer almazlar.
 
 ## Bu vizyonu ne yanlışlar
@@ -139,6 +173,7 @@ Yanlışlanamayan vizyon süstür. Aşağıdaki sinyaller, Deckent'in iddia etti
 - Kanıtın törene dönüşmesi — artifact'lar sonucu kanıtlamadığı halde settlement'ın geçmesi ve tamamlanmanın yeniden self-report'a düşmesi.
 - Bağımsızlığın aşınması — ürünün gerçekte yalnız tek provider'da çalışması, diğerlerinin demo seviyesinde kalması.
 - Core governance'in yapısal özellik olmaktan çıkması veya Enterprise modüllerinin ikinci kernel, policy authority ya da evidence chain yaratarak solo ve enterprise ürünleri fork'laması.
+- Execution posture'un yalnız bir profil adına indirgenmesi; exact realm/effect/capability/landing authority'sinin kaybolması veya isolation backend'i kullanılamadığında direct host mutation'a sessiz downgrade edilmesi.
 - Öğrenmenin yürütmeyi değiştirmeyi bırakması — memory birikir ama planlama ve routing bu yüzden iyileşmez.
 - Ölçeğin daraltarak elde edilmesi — motorun yalnız kod-biçimli işte çalışması ve diğer yürütme bağlamlarının sessizce yol haritasından düşmesi.
 

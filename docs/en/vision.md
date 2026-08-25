@@ -64,6 +64,38 @@ The chain exists so every effect in the system is traceable upward to an intent 
 
 The chain also composes recursively: a delegated team or an external runtime receives an authority ceiling and a budget ceiling from its parent link, never a fresh grant — delegation narrows authority; it never widens it.
 
+## Execution mediation: one product, resolved ways of working
+
+Deckent is neither only an agent runtime that runs on the host nor only an isolation product placed between AI and the host. **Execution mediation** is a cross-cutting layer inside the one kernel used by Assistant · Worker · Platform. Depending on where Deckent is installed and the effective policy, it can connect AI directly to the canonical workspace or govern host and real-system effects through a staged, isolated, brokered, or remote boundary. These are not separate products, editions, or authorities. [Evidence: `.deckent/workspace/IDENTITY.md:32`]
+
+Each `Attempt` receives authority from an exact, durable **Execution Posture** contract rather than from a user-facing preset name:
+
+| Axis | Question answered by the contract | Example target values |
+|---|---|---|
+| **Execution realm** | Where does code or the agent run? | host process, container, microVM, remote executor |
+| **Workspace projection** | How is the real workspace exposed? | shared read-write, read-only, snapshot/COW, artifact-only, none |
+| **Effect model** | When does an effect become real? | immediate, staged, approval-gated |
+| **Capabilities** | Which filesystem, network, tool, and external-system operations are possible? | explicit read/write scopes, allowlist, brokered operations |
+| **Secrets** | Within which custody and exposure boundary is a credential used? | none, scoped reference, broker injection |
+| **Landing** | How does produced work reach the canonical system? | direct, verified apply, approval-gated apply, external reconciliation |
+
+The resolved posture is the result of this composition:
+
+```text
+installation topology
+  + tenant / organization policy
+  + workspace / project / environment policy
+  + task requirements and derived risk
+  + platform capability and live availability evidence
+  = resolved Execution Posture
+```
+
+Policy inheritance only narrows authority, deny precedence is preserved, and unknown is never treated as allowed. User-facing names such as `Direct` or `Protected` may be UX presets, but audit, admission, and settlement carry the exact resolved contract. When a stronger realm is unavailable, Deckent emits an explicit `HOLD` or selects only a pre-authorized equivalent or narrower adapter; it never silently downgrades isolated execution to direct host mutation.
+
+The model is composable. The same attempt may see source read-only, produce output inside snapshot/COW, run tests in a microVM, read GitHub through a capability broker, and leave deployment effects to host authority after approval. Firecracker is a strong `microVM` realm adapter in this model, not a new Deckent identity or a separate enterprise product.
+
+A solo user may select a low-friction direct posture. A team may use staged work and verified landing. A regulated enterprise may require tenant-bound policy, brokered secrets and network access, microVM or remote realms, data residency, and approval-gated external effects. All of them use the same Goal → Mission → Flow → Run → WorkItem → Attempt → Operation chain, policy system, evidence lineage, and control surfaces.
+
 ## Six execution contexts
 
 "Everywhere" is concrete. It means six contexts, each with a different user shape and the same loop — request, admit, route, execute, verify, remember.
@@ -128,6 +160,8 @@ Naming what Deckent is not protects the vision from erosion.
 - **Not autonomy without control.** Wherever the system acts on its own, the user stays in authority. Unattended end-to-end execution is not certified today; [Current frictions](./operations/current-frictions.md) carries the standing HOLD and the certification ladder. Scope, approval gates, budgets, and audit trails are the price of that autonomy, not an obstacle to it.
 - **Not an identity provider.** Enterprise identity, PAM, and non-human-identity systems remain the authority on who an agent is. Deckent integrates with them and converts identity into task-scoped, expiring execution authority bound to evidence.
 - **Not another agent runtime.** Deckent does not race agent runtimes on sessions, UI tricks, or execution features. Its own surfaces — Terminal, Desktop, dashboard, API — exist to control, connect, and observe governed execution, and connecting a new runtime or surface must stay easy. Running someone's agent better than they do is not the goal; governing every agent is.
+- **Not an isolation-only product.** Direct host/main, staged, isolated, brokered, and remote ways of working are resolved postures of the same product; none is Deckent's identity by itself.
+- **Not one mandatory execution topology.** A container, microVM, host process, or remote executor is an adapter. Installation and policy differences do not create a second kernel or evidence chain.
 - **Not a metrics showcase.** Counts of agents, tools, and commands are generated status, not identity. They do not appear in this document.
 
 ## What would falsify this vision
@@ -139,6 +173,7 @@ A vision that cannot be wrong is decoration. These signals would mean Deckent is
 - Evidence becomes ceremony — settlement passes while the artifacts do not prove the outcome, and completion turns into self-report again.
 - Neutrality erodes — the product only really works on one provider, and the others are demo-grade.
 - Core governance ceases to be structural, or Enterprise modules introduce a second kernel, policy authority, or evidence chain and thereby fork the solo and enterprise products.
+- Execution posture collapses into a profile label, losing exact realm/effect/capability/landing authority, or an unavailable isolation backend silently downgrades to direct host mutation.
 - Learning stops changing execution — memory accumulates, but planning and routing do not improve because of it.
 - Scale is achieved by narrowing — the engine works only on code-shaped work, and the other execution contexts quietly fall out of the roadmap.
 

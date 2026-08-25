@@ -31,6 +31,8 @@ Bu glossary Deckent term'lerini current code ve repository contract'larına gör
 | Do / task mode | Full manual sprint workflow gerektirmeden bounded work kurabilen direct user task surface. | `src/cli/commands/do.ts`; `src/orchestra/task-mode-runner.ts` |
 | Dogfood | Deckent'i Deckent'in Goal/Mission/Flow/Run/Autonomous/Do surface'leriyle implement etme; manual work typed recovery seam ile sınırlıdır. | `AGENTS.md:75-79` |
 | Effective config | Layered config ve resolved policy/provider fact sonrasında validate edilmiş runtime result; tek config file'dan daha authoritative'dir. | `src/core/config.ts:1829-2230`; `docs/tr/reference/configuration-schema.md` |
+| Execution Posture | Bir Attempt'ın nerede çalıştığını, workspace'i nasıl gördüğünü, hangi effect/capability/secrets authority'sine sahip olduğunu ve sonucu nasıl land ettiğini belirleyen exact resolved contract. Direct, staged, isolated, brokered ve remote adları preset olabilir; authority exact contracttır. | `.deckent/workspace/IDENTITY.md:32`; `docs/tr/vision.md` |
+| Execution realm | Execution Posture içindeki host process, container, microVM veya remote executor gibi çalışma boundary'si. Docker veya Firecracker ürün kimliği değil realm adapter'ıdır. | `src/orchestra/spawn-backend.ts`; `docs/tr/vision.md` |
 | Evidence reference | Proof'u authority olarak reinterpret etmeden ona işaret eden durable identifier. | `src/core/invocation-receipt.ts`; `src/core/task-settlement-authority.ts` |
 | FIX | Eligible NO_GO work için repair phase/attempt path. | `src/orchestra/sprint-controller.ts:2665-2859` |
 | Flow | Proposal/preview/approval'dan run start ve terminal state'e governed progression. | `src/core/run-flow-contract.ts:23-121,313-380` |
