@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "96dfbf600356c3c5e2fe2b9ba3f065e98561e3abd5ad0e024b7bf6eca6fe4be1"
+    "value": "474edae473d62c169ec3f86ef496456ef38df946ab81b5b1070b3725d995b916"
   },
   "summary": {
     "total": 531,
@@ -422,9 +422,9 @@
       "program": "TRUTH",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-11",
+      "updated": "2026-08-25",
       "definitionDigest": "90234d8c92771eaf35c44a6b87d41c53bff4cd3d86f8ba7c0193327b09ba6d99",
-      "progressDigest": "f2ed07e641e3ed469f71f684d7aef1319cc30af2eb6bada2011e62a3927c2816",
+      "progressDigest": "182c45c1e3c2b591c120f2a1623c87d2b16ce2bce4905b6093fb63e5f76f0a8e",
       "terminalClosureDigest": null
     },
     {
@@ -8914,8 +8914,8 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Revision/hash conflict journal; no silent delete; Claude, Codex, Gemini parity",
-      "evidence": "Stop hook single-target fix 2026-07-30; design `docs/superpowers/specs/2026-07-30-provider-agnostic-memory-projection-design.md` + analysis `docs/alperen-analysis/2026-07-30-memory-projection-rev3-yuzey-analizi.md`; Cursor+Copilot extension carried by MEMORY-SURFACE-PROJECTION-001 2026-08-11: memory authority contract dokümanı (B10 task 6) bu satıra bağlandı ve delete-on-consume ile 2026-08-11'de silindi; içerik özü: revision/hash conflict journal + no-silent-delete + üç-provider projection parity gap'leri admission-sized dilimlere bölünmüş durumda, implementation admission owner penceresini bekliyor (git-history: follow-up-works/memory-authority-contract-2026-08-11.md)",
-      "updated": "2026-08-11"
+      "evidence": "Stop hook single-target fix 2026-07-30; design `docs/superpowers/specs/2026-07-30-provider-agnostic-memory-projection-design.md` + analysis `docs/alperen-analysis/2026-07-30-memory-projection-rev3-yuzey-analizi.md`; Cursor+Copilot extension carried by MEMORY-SURFACE-PROJECTION-001 2026-08-11: memory authority contract dokümanı (B10 task 6) bu satıra bağlandı ve delete-on-consume ile 2026-08-11'de silindi; içerik özü: revision/hash conflict journal + no-silent-delete + üç-provider projection parity gap'leri admission-sized dilimlere bölünmüş durumda, implementation admission owner penceresini bekliyor (git-history: follow-up-works/memory-authority-contract-2026-08-11.md); 2026-08-26-gece CANLI-KANIT: host-HOME projection'i canonical repo-local kaynaktan iki kez sessizce geri-yazildi (cadence amendment'i once yalniz HOME'a yazilinca kayboldu; dogru akis canonical'a yazinca kalici oldu) — tasarimin 'HOME=projection' tezi fiilen dogrulandi, eksik olan revision/conflict-journal gorunurlugu (sessiz geri-yazim operatore hicbir iz birakmadi); implementation admission hala owner-penceresinde",
+      "updated": "2026-08-25"
     },
     {
       "order": 200,
@@ -27343,6 +27343,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "39e1579f2c084462163db45b638e8855eb356d90f3dc0cffd82d2489e04ef690"
+    "value": "03a1a1f71a3f1e4cc8c1b360ebdb8871220363e9a95117b3d7f552485cd6e0e4"
   }
 }

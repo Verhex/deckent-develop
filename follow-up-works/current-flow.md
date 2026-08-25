@@ -6,6 +6,39 @@
 > Yürütme yetkisi: **epoch 4, CLAUDE** — `ah-2026-08-25-zfv8yl` COMMITTED
 > (`sha256:9cb638e4a58904a0514b341dac3509e6afa6bea763791602734d821012b4c5b7`, origin/main `dda40ec0d`).
 
+## 🌅 SABAH-RAPORU (Alperen için — gece-otonom özeti, 2026-08-25 23:30 → 02:30)
+
+**6 landing origin/main'de** (gece 4): `5f9e851b` C-dalgası · `ff48978f` strike-5 · `0d565b36`
+xverify-onarımı · `75fac1b9` mikro-dalga+prob (+öğleden: A3 `1616d5ac`, bonus `a49a85bb`).
+**4 sprint KOŞTU-KAPANDI:** 677 (8/8 ilk-denemede) · 678 (2/2, tsc-temiz gate) · 679 (2/2).
+**MASTER:** 8 satır VERIFY'a settle (owner-DONE bekliyor: 6 C-satırı + 60 + 100), 350+190
+kanıt-ekli, 198 receipt, projeksiyonlar senkron. **Full-suite:** 38743/0 TAM-YEŞİL (münhasır);
+kadans senin talimatınla 5'e alındı, sayaç: sıradaki suite 3 landing sonra.
+
+**Gece-incident'i (kapalı):** config.json iki kez daha heal yedi ve KAYBOLDU — kök
+fd-baskısında io-hatasının "bozuk" sayılması; strike-5 fix'i landlendi (heal yalnız
+parse-kanıtıyla; io→typed-HOLD), 92-anahtar config bak4'ten atomik restore + bonus yeniden
+uygulandı; suite-5 baskı-altında config'i SAĞLAM tuttu (fix'in canlı sınavı geçti).
+
+**XVerify borusu ONARILDI:** üç kök (CLI evidence-scope · producer-fence tabanı · hold-detail)
++ oversize-filtre; hold'lar artık NEDENLİ, formal boru İLK gerçek hakem-çıktısını verdi
+(sol UNCLEAR, dürüst gerekçe). **Kabul-probu GEÇTİ:** 679'da kronik mismatch-imzası SIFIR.
+
+**explorationBonus 0.05:** canlı, izli, bonusDecisive=0/tie=0 (677'de 38 karar) — güvenli ama
+bu görev-karışımında etkisiz; ilk gerçek etki test/quality-şekilli görevlerde beklenir.
+
+**Kararını bekleyen bulgular** (yukarıdaki OWNER-ADMISSION listesi, 7 madde — yeniler: #6
+honest-gate silme-only yanlış-pozitifi; ayrıca 190'a canlı memory-projection kanıtı eklendi;
+xverify `candidate_not_eligible` baskınlığı [94 vaka] ayrı ayar-konusu olarak not edildi).
+
+**Sistem sağlığı (03:00 doctor):** READY-with-warnings — bilinen 4 dikkat (brain-budget boyutu ·
+debt-backlog · decisions-v3 ölü-dizin [senin rm-onayın] · gemini-auth). Bot fresh-dist'te,
+aktif sprint yok, dist=src, çalışma-ağacı temiz (5 .bak kanıt-dosyası hariç — silme kararın).
+
+**Gece-durdurma gerekçesi (~02:30):** admitted-ve-gece-güvenli kuyruk tükendi; kalan OPEN'lar
+ya owner-pencereli (190) ya environment-bloklu (173-177 Windows/macOS-kanıtı) ya
+program-ölçekli (50/70/3210). 09:00'a kadar bekleme-modundayım.
+
 ## ŞU AN — çalışma-imleci (Claude epoch-4)
 
 - ✅ **MİKRO-DALGA + PROB KAPANDI (2026-08-26 ~02:10; sprint-679 COMPLETE 2/2):** dockerignore
