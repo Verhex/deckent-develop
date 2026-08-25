@@ -31,10 +31,19 @@ vi.mock('node:fs', () => ({
   existsSync: vi.fn().mockReturnValue(true),
   openSync: vi.fn().mockReturnValue(3),
   closeSync: vi.fn(),
+  // 675-001: heartbeat writes now delegate to the writeTaskHeartbeatFile
+  // primitive (core/worker-activity-heartbeat), which reads the current hb for
+  // monotonic-regression detection then lands atomically (tmp write + fsync +
+  // rename). Model that surface: fresh-file ENOENT read + fd plumbing.
+  readFileSync: vi.fn(() => {
+    throw Object.assign(new Error('ENOENT: no such file'), { code: 'ENOENT' });
+  }),
+  fsyncSync: vi.fn(),
+  renameSync: vi.fn(),
 }));
 
 import { spawn } from 'node:child_process';
-import { writeFileSync, mkdirSync, existsSync, openSync, closeSync } from 'node:fs';
+import { writeFileSync, mkdirSync, existsSync, openSync, closeSync, renameSync } from 'node:fs';
 
 const mockSpawn = spawn as unknown as MockInstance;
 const mockWriteFileSync = writeFileSync as unknown as MockInstance;
@@ -42,6 +51,7 @@ const mockMkdirSync = mkdirSync as unknown as MockInstance;
 const mockExistsSync = existsSync as unknown as MockInstance;
 const mockOpenSync = openSync as unknown as MockInstance;
 const mockCloseSync = closeSync as unknown as MockInstance;
+const mockRenameSync = renameSync as unknown as MockInstance;
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -215,9 +225,20 @@ describe('SubprocessSpawnBackend', () => {
 
     it('should defer log fd close to child exit handler (not immediate)', () => {
       setupMockChild();
+      // 675-001: the hb primitive legitimately opens+fsyncs+closes its OWN tmp
+      // fd during spawn — hand out distinct fds so the BUG-26 contract (the
+      // LOG fd stays open until child exit) stays pinned exactly as before.
+      let nextFd = 10;
+      mockOpenSync.mockImplementation(() => nextFd++);
       backend.spawn('task-001', 'claude-opus-4-8', 'test');
-      // BUG-26 fix: closeSync deferred to child exit — not called immediately after spawn
-      expect(mockCloseSync).not.toHaveBeenCalled();
+      const logOpenIndex = mockOpenSync.mock.calls.findIndex(
+        ([p]: [unknown, unknown]) => String(p).includes('task-001.log'),
+      );
+      expect(logOpenIndex).toBeGreaterThan(-1);
+      const logFd = mockOpenSync.mock.results[logOpenIndex].value;
+      // BUG-26 fix: closeSync of the log fd deferred to child exit — not called
+      // immediately after spawn (the hb tmp fd close is not the log fd).
+      expect(mockCloseSync.mock.calls.map(([fd]: [unknown]) => fd)).not.toContain(logFd);
     });
 
     it('should create tasks dir if it does not exist', () => {
@@ -405,20 +426,35 @@ describe('SubprocessSpawnBackend', () => {
       const b2 = new LocalSubprocessTestBackend(projectDir);
       setupMockChild();
       b2.spawn('task-hb', 'claude-opus-4-8', 'test');
-      // writeFileSync should have been called for heartbeat
+      // 675-001: spawn also writes the git-guard script via writeFileSync, and
+      // the hb write is delegated to writeTaskHeartbeatFile (atomic tmp write
+      // then renameSync onto task-hb.hb) — select the hb write by path instead
+      // of assuming it is the first call. Same content contract as before.
       expect(mockWriteFileSync).toHaveBeenCalled();
-      const [hbPath, content] = mockWriteFileSync.mock.calls[0];
-      expect(hbPath).toContain('task-hb.hb');
-      const parsed = JSON.parse(content as string);
+      const hbCall = mockWriteFileSync.mock.calls.find(
+        ([p]: [unknown, unknown]) => String(p).includes('task-hb.hb'),
+      );
+      expect(hbCall).toBeDefined();
+      const [tmpPath, content] = hbCall as [string, string];
+      const parsed = JSON.parse(content);
       expect(parsed.taskId).toBe('task-hb');
       expect(parsed.status).toBe('EXECUTING');
+      const renameCall = mockRenameSync.mock.calls.find(
+        ([, to]: [unknown, unknown]) => String(to).endsWith('task-hb.hb'),
+      );
+      expect(renameCall?.[0]).toBe(tmpPath);
     });
 
     it('should include timestamp in heartbeat', () => {
       setupMockChild();
       backend.spawn('task-ts', 'claude-opus-4-8', 'test');
-      const [, content] = mockWriteFileSync.mock.calls[0];
-      const parsed = JSON.parse(content as string);
+      // 675-001: hb write delegated to writeTaskHeartbeatFile — select it by
+      // path (spawn's first writeFileSync is the git-guard script).
+      const hbCall = mockWriteFileSync.mock.calls.find(
+        ([p]: [unknown, unknown]) => String(p).includes('task-ts.hb'),
+      );
+      expect(hbCall).toBeDefined();
+      const parsed = JSON.parse((hbCall as [string, string])[1]);
       expect(parsed.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
     });
   });

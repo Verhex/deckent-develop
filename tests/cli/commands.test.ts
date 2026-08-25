@@ -67,6 +67,14 @@ vi.mock('../../src/core/run-status-read-model.js', () => ({
   // cleanup retires the run identity through this seam — the hand-written mock
   // must keep pace with the module's real export list (publish added later).
   publishCanonicalRunStatusReadModel: vi.fn(),
+  loadCanonicalRunTasks: vi.fn(() => ({ tasks: [], holds: [] })),
+  // Real semantics under this file's mocks: a matching model is READY; without a
+  // model the mocked ACTIVE+alive authority proves liveness (never HOLD here).
+  resolveRunStatusReadiness: vi.fn((_authority: unknown, model: unknown) => (
+    model
+      ? { state: 'READY', model }
+      : { state: 'SELF_SUFFICIENT', reason: 'proven-active-liveness' }
+  )),
 }));
 
 vi.mock('../../src/core/run-status-authority.js', () => ({

@@ -1526,6 +1526,7 @@ export const CLI_RUN_FAMILY_CONTRACTS: readonly CliContractRow[] = Object.freeze
       { flags: '--interrogate', descriptionKey: 'cliContract.plan.opt.interrogate' },
       { flags: '--force-prompt-gate', descriptionKey: 'cliContract.plan.opt.force_prompt_gate' },
       { flags: '--force-scope', descriptionKey: 'plan.force_scope_option' },
+      { flags: '--write-allowlist <paths...>', descriptionKey: 'do.write_allowlist_option' },
       { flags: '--adopt-existing <sprintId>', descriptionKey: 'plan.adopt_existing_option' },
       { flags: '--expected-plan-digest <sha256>', descriptionKey: 'plan.expected_plan_digest_option' },
       { flags: '--expected-projection-digest <sha256>', descriptionKey: 'plan.expected_projection_digest_option' },

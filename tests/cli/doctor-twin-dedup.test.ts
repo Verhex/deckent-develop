@@ -112,14 +112,16 @@ describe('runDoctorChecks — runtime delegation proof (regression lock)', () =>
       const result = doctorModule.runDoctorChecks(root, undefined, 'subprocess', 'en');
       expect(result.checks.some((c) => c.name === '.deck Subprocess Visibility')).toBe(true);
       // Before/after inventory (born-651 goCriteria): the live check-set doctor.ts
-      // prints today is unchanged in size or membership by this dedup — same 16
-      // named checks, same order, just a single source of truth now.
+      // prints today — 17 named checks, same order, single source of truth.
+      // 2026-08-25 (A2 fairness wave): 'Routing journal' check appended in
+      // doctor-checks.ts (journal covers every routing path) — inventory grew 16→17.
       expect(result.checks.map((c) => c.name)).toEqual([
         'Platform', 'Node.js', 'git', 'tmux', 'Docker', 'Claude CLI',
         'Workspace', 'Brain Dir', 'Directives',
         'Brain Budget', 'Debt', 'Locks',
         '.deck Security', 'Write Permissions', 'Gitignore',
         '.deck Subprocess Visibility',
+        'Routing journal',
       ]);
     } finally {
       rmSync(root, { recursive: true, force: true });

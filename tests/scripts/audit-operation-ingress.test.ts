@@ -33,9 +33,16 @@ describe('audit-operation-ingress — report-only fs-write/delete measurement', 
       readFileSync(join(process.cwd(), 'scripts/operation-ingress-baseline.json'), 'utf-8'),
     ) as { total: number; digest: string; mediated: number };
     expect(baseline.total).toBe(709);
-    // 747: +1 fs-write site — the atomic tmp+rename writer added by the
-    // 2026-08-25 config-loss incident hardening (utils/config).
-    expect(report.total).toBe(747);
+    // 750 (was 747, verified per-file against the 747-pin commit 3a1d74cdb):
+    //  −7  675-001 heartbeat-primitive rewire — per-callsite writeFileSync hb
+    //      writes (agents/worker, agentic-worker-entry, http-agentic-worker,
+    //      providers/{gemini,ollama,subprocess}, cli/commands/config) now
+    //      delegate to core/worker-activity-heartbeat…
+    //  +1  …whose writeTaskHeartbeatFile is the ONE new write site.
+    //  +9  2026-08-25 A3 event-truth wave atomic/monotonic writers:
+    //      core/event-stream +5, core/run-status-read-model +2,
+    //      core/multi-ide +1, orchestra/sprint-utils +1.
+    expect(report.total).toBe(750);
     expect(baseline.digest).not.toBe(report.digest);
     expect(baseline.mediated).toBe(0);
   });

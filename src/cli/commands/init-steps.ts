@@ -12,6 +12,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { platform } from 'node:os';
 import type { PlanMode } from '../../core/types.js';
+import type { ExecutionBudgetPolicyConfig } from '../../core/config-types.js';
 import type { FullStackResult } from '../../core/stack-detector.js';
 import type { DetectedEnv } from '../../core/environment.js';
 import type { ProjectStack } from '../../core/skill-types.js';
@@ -93,6 +94,31 @@ export function appendToGitignore(root: string, entries: string[]): void {
 /** Valid environment names for --env flag */
 export type EnvName = 'codex' | 'cursor' | 'gemini' | 'vscode' | 'shell';
 export const ALL_ENV_NAMES: EnvName[] = ['codex', 'cursor', 'gemini', 'vscode', 'shell'];
+
+const DEFAULT_INIT_EXECUTION_BUDGET: ExecutionBudgetPolicyConfig = {
+  roles: {
+    worker: {
+      default: {
+        maxTurns: 40,
+        maxTokens: 4_000_000,
+      },
+    },
+  },
+  landing: { reserve_ratio: 0.25 },
+};
+
+const UNMETERED_BUDGET_WARNING_KEY = 'init.unmetered_backend_budget_hold';
+const UNMETERED_BUDGET_WARNING_FALLBACK = {
+  en: 'Finite worker budgets cannot run on the unmetered subprocess backend; execution_budget.unmetered_backend is set to hold. Use Docker or another measured-stream backend.',
+  tr: 'Sonlu worker butceleri olcumsuz subprocess backendinde calisamaz; execution_budget.unmetered_backend hold olarak ayarlandi. Docker veya measured-stream destekli bir backend kullanin.',
+} as const;
+
+function unmeteredBudgetWarning(language: string): string {
+  const message = getMessage(UNMETERED_BUDGET_WARNING_KEY, language);
+  return message === UNMETERED_BUDGET_WARNING_KEY
+    ? UNMETERED_BUDGET_WARNING_FALLBACK[language === 'tr' ? 'tr' : 'en']
+    : message;
+}
 
 export interface IdeAdapterResult {
   path: string;
@@ -196,6 +222,17 @@ export async function writeConfig(
 ): Promise<void> {
   const configPath = join(root, DECKENT_DIR, 'config.json');
   const newConfig: Record<string, unknown> = { mode, language, projectName };
+  let existingConfig: Record<string, unknown> | undefined;
+  if (existsSync(configPath)) {
+    try {
+      existingConfig = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
+    } catch {
+      // The existing parse failure is handled by the established write path below.
+    }
+  }
+  if (existingConfig?.['execution_budget'] === undefined) {
+    newConfig.execution_budget = structuredClone(DEFAULT_INIT_EXECUTION_BUDGET);
+  }
   // Apply tier-based model_strategy from mode preset
   const modePreset = getModePreset(mode);
   if (modePreset) {
@@ -230,6 +267,17 @@ export async function writeConfig(
       }
     } else if (decision.daemonDowngraded) {
       print(`  ${getMessage('init.docker_daemon_down_fallback', configLang)}`);
+    }
+  }
+
+  if (newConfig.spawn_backend === 'subprocess') {
+    const authoredPolicy = (newConfig.execution_budget
+      ?? existingConfig?.['execution_budget']) as ExecutionBudgetPolicyConfig | undefined;
+    if (authoredPolicy?.roles.worker?.default) {
+      newConfig.execution_budget = deepMerge(authoredPolicy, {
+        unmetered_backend: { action: 'hold' },
+      });
+      print(`  ${unmeteredBudgetWarning(configLang)}`);
     }
   }
 

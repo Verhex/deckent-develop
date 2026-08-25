@@ -493,6 +493,13 @@ describe('known-consumer allowlist (Sprint-1 pin evolved for Sprint-2: preview-s
       'orchestra/autonomous/execute-dispatcher.ts',
       'orchestra/autonomous/mission-store/mission-kind-admission.ts',
       'orchestra/autonomous/mission-store/mission-types.ts',
+      // 2026-08-25 A3 event-truth wave: the Layer-0 terminal-jobs closure
+      // reader joins jobs-dir execution truth to flows via run-flow-store READ
+      // functions (listFlowIds/loadPlannedSprint/loadRunHandle/readFlowEvents)
+      // + the contract's RUN_FLOW_TERMINAL_STATES constant. READ-ONLY by
+      // module contract — the durable event log stays the only transition
+      // authority; reducer mutation remains owned by run-flow-coordinator.
+      'core/run-jobs-read.ts',
     ];
     expect(offenders.filter((o) => !KNOWN_CONSUMERS.includes(o))).toEqual([]);
   });

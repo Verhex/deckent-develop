@@ -422,6 +422,15 @@
           "hidden": false
         },
         {
+          "flags": "--write-allowlist <paths...>",
+          "descriptionKey": "do.write_allowlist_option",
+          "description": {
+            "en": "Bind the exact plan to an existing-file closed write allowlist; repeat paths after the option",
+            "tr": "Exact planı mevcut dosyalardan oluşan kapalı write allowlist’e bağla; option sonrasında path’leri sıralayın"
+          },
+          "hidden": false
+        },
+        {
           "flags": "--adopt-existing <sprintId>",
           "descriptionKey": "plan.adopt_existing_option",
           "description": {

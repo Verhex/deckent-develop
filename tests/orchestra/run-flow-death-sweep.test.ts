@@ -106,7 +106,8 @@ describe('run-flow death sweep (born-698c)', () => {
     detachedFlow(root, 'flow-legacy');
     const report = sweepDeadDetachedRuns(root);
     expect(report.closed).toHaveLength(0);
-    expect(report.skipped.find((s) => s.flowId === 'flow-legacy')?.outcome).toBe('no-pid-record');
+    expect(report.skipped.find((s) => s.flowId === 'flow-legacy')?.outcome)
+      .toBe('run-handle-ownership-unknown');
   });
 
   it('sweep is idempotent: a second pass over a closed flow does nothing', () => {
@@ -203,6 +204,41 @@ describe('sweepStaleRuns — operator stale-run sweep (F-3)', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
+  function preparedOnlyFlow(flowId: string, pid: number, startToken: string | null): void {
+    const c = getRunFlowCoordinator(root);
+    c.proposeFlow({ proposal: proposal(flowId) });
+    c.recordPreview({ preview: preview(flowId) });
+    c.grantApproval({ flowId, revision: 1, planDigest: 'd-1', approvedBy: { id: 'u' } });
+    c.requestStart({ flowId, revision: 1, planDigest: 'd-1' });
+    prepareStartAttempt(root, {
+      flowId,
+      revision: 1,
+      planDigest: 'd-1',
+      attemptId: `attempt-${flowId}`,
+      preparedAt: '2026-08-25T10:00:00.000Z',
+      lineage: {
+        tenantId: 'local',
+        projectId: 'p',
+        actor: { id: 'u' },
+        origin: 'api',
+        correlationId: `correlation-${flowId}`,
+        idempotencyKey: `idempotency-${flowId}`,
+        parentPlanLineageHash: 'a'.repeat(64),
+        parentCorrelationId: `plan-${flowId}`,
+        authorizationAuthority: 'approved-actor:u',
+      },
+      owner: {
+        process: {
+          pid,
+          startToken,
+          evidence: startToken === null ? 'unavailable' : 'verified',
+        },
+        ownerNonce: `nonce-${flowId}`,
+        leaseUntil: '2099-08-25T10:01:00.000Z',
+      },
+    });
+  }
+
   it('dry-run classifies dead + unverifiable + alive WITHOUT writing any closure', () => {
     detachedFlow(root, 'flow-dead', deadPid());
     detachedFlow(root, 'flow-legacy');
@@ -236,6 +272,37 @@ describe('sweepStaleRuns — operator stale-run sweep (F-3)', () => {
     expect(c.getFlow('flow-dead').state).toBe('FAILED');
     expect(c.getFlow('flow-legacy').state).toBe('CANCELLED');
     expect(c.getFlow('flow-alive').state).toBe('DETACHED_RUNNING'); // never guesses a kill
+  });
+
+  it('apply closes a PREPARED-only dead start attempt as CANCELLED — durably', () => {
+    preparedOnlyFlow('flow-prepared-dead', deadPid(), 'dead-start-token');
+
+    const report = sweepStaleRuns(root, { apply: true });
+
+    expect(report.unverifiable).toEqual([
+      expect.objectContaining({
+        flowId: 'flow-prepared-dead',
+        classification: 'stale-start-attempt',
+        closedAs: 'cancelled',
+      }),
+    ]);
+    _resetRunFlowCoordinatorsForTests();
+    expect(getRunFlowCoordinator(root).getFlow('flow-prepared-dead').state).toBe('CANCELLED');
+  });
+
+  it('a PREPARED-only live start attempt is typed and never closed', () => {
+    const token = processStartToken(process.pid);
+    if (token === null) throw new Error('test host did not expose the current process start token');
+    preparedOnlyFlow('flow-prepared-live', process.pid, token);
+
+    const report = sweepStaleRuns(root, { apply: true });
+
+    expect(report.unverifiable).toHaveLength(0);
+    expect(report.skipped).toContainEqual(expect.objectContaining({
+      flowId: 'flow-prepared-live',
+      outcome: 'start-attempt-alive',
+    }));
+    expect(getRunFlowCoordinator(root).getFlow('flow-prepared-live').state).toBe('STARTING');
   });
 
   it('a jobs-terminal flow is NEVER closed — its execution truth already won (skip, not a lie)', () => {

@@ -1,13 +1,19 @@
 // tests/cli/messages-completeness.test.ts
 //
-// Structural guard: ensures the MESSAGES i18n dictionary in messages.ts stays
-// consistent. Catches drift when new keys are added with missing translations,
-// empty values, or mismatched {param} placeholders.
+// Structural guard: ensures the MESSAGES i18n dictionary stays consistent.
+// Catches drift when new keys are added with missing translations, empty
+// values, or mismatched {param} placeholders.
 //
-// Hermetic: reads committed source file only — no gitignored state.
+// 2026-08-25: messages.ts split its single literal into BASE_MESSAGES plus
+// merged catalog-family files under src/cli/helpers/message-catalog/. The
+// parser now covers the base block AND every family file, so the guard spans
+// the full merged MESSAGES surface (mergeMessageFamilies is collision-checked
+// in source; parity/emptiness/placeholder checks live here).
+//
+// Hermetic: reads committed source files only — no gitignored state.
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 // ─── Source parser ───────────────────────────────────────────────────────────
@@ -32,18 +38,7 @@ function extractLiteralValue(block: string, language: 'en' | 'tr'): string | nul
     .join('');
 }
 
-function parseMessageEntries(): MessageEntry[] {
-  const sourcePath = join(process.cwd(), 'src/cli/helpers/messages.ts');
-  const source = readFileSync(sourcePath, 'utf-8');
-
-  const bodyStart = source.indexOf('const MESSAGES: MessageMap = {');
-  const bodyEnd = source.indexOf('\nexport function getMessage', bodyStart);
-  if (bodyStart === -1 || bodyEnd === -1) {
-    throw new Error('Could not locate MESSAGES block in src/cli/helpers/messages.ts');
-  }
-  const body = source.slice(bodyStart, bodyEnd);
-
-  const entries: MessageEntry[] = [];
+function parseEntriesFromBody(body: string, entries: MessageEntry[]): void {
   // Match lines: "  'key': {" (2-space indent, single-quoted key, opening brace)
   const keyRe = /^  '([^']+)':\s*\{(.*)/gm;
   let keyMatch: RegExpExecArray | null;
@@ -67,6 +62,50 @@ function parseMessageEntries(): MessageEntry[] {
       enText: extractLiteralValue(block, 'en'),
       trText: extractLiteralValue(block, 'tr'),
     });
+  }
+}
+
+function parseMessageEntries(): MessageEntry[] {
+  const entries: MessageEntry[] = [];
+
+  // 1) BASE_MESSAGES literal in messages.ts (up to its top-level closing "};")
+  const sourcePath = join(process.cwd(), 'src/cli/helpers/messages.ts');
+  const source = readFileSync(sourcePath, 'utf-8');
+  const bodyStart = source.indexOf('const BASE_MESSAGES: MessageMap = {');
+  const bodyEnd = source.indexOf('\n};', bodyStart);
+  if (bodyStart === -1 || bodyEnd === -1) {
+    throw new Error('Could not locate BASE_MESSAGES block in src/cli/helpers/messages.ts');
+  }
+  parseEntriesFromBody(source.slice(bodyStart, bodyEnd), entries);
+
+  // 2) Every catalog-family file merged into MESSAGES at load time.
+  //    readdirSync (not a hardcoded list) so a newly registered family is
+  //    guarded automatically.
+  const catalogDir = join(process.cwd(), 'src/cli/helpers/message-catalog');
+  const familyFiles = readdirSync(catalogDir).filter(f => f.endsWith('.ts')).sort();
+  if (familyFiles.length === 0) {
+    throw new Error('No message-catalog family files found in src/cli/helpers/message-catalog');
+  }
+  for (const file of familyFiles) {
+    const familySource = readFileSync(join(catalogDir, file), 'utf-8');
+    const familyStart = familySource.search(/export const \w+: MessageFamily = Object\.freeze\(\{/);
+    const familyEnd = familySource.indexOf('\n});', familyStart);
+    if (familyStart === -1 || familyEnd === -1) {
+      throw new Error(`Could not locate MessageFamily literal in message-catalog/${file}`);
+    }
+    parseEntriesFromBody(familySource.slice(familyStart, familyEnd), entries);
+  }
+
+  // The merge in messages.ts throws on collisions at runtime; mirror that
+  // structural property here so the static parse cannot double-count a key.
+  const seen = new Set<string>();
+  const duplicates: string[] = [];
+  for (const entry of entries) {
+    if (seen.has(entry.key)) duplicates.push(entry.key);
+    seen.add(entry.key);
+  }
+  if (duplicates.length > 0) {
+    throw new Error(`Duplicate message keys across base+families: ${duplicates.join(', ')}`);
   }
 
   return entries;

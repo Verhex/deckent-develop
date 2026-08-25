@@ -93,7 +93,7 @@ describe('generatePlanPreview', () => {
 
   // ─── Read-only pin ──────────────────────────────────────────────────────
 
-  it('forces dryRun:true on the underlying planSprint call — PlanPreviewOptions has no dryRun/asDraft knob to override it', async () => {
+  it('keeps the shared preview service read-only for CLI dry-run and default MCP planning', async () => {
     mockPlanSprint.mockReturnValue(makeSprint() as any);
     await generatePlanPreview('/mock/root', makeConfig(), makeContext(), makeRecommendation(), { mode: 'structured' });
 
@@ -170,21 +170,30 @@ describe('generatePlanPreview', () => {
     expect(a.planDigest).not.toBe(b.planDigest);
   });
 
-  // ─── CLI/MCP parity (by construction — same shared function) ───────────
+  // ─── Digest input forwarding ────────────────────────────────────────────
 
-  it('two callers (simulating CLI --dry-run and MCP deckent_plan) hitting generatePlanPreview with the same inputs get an identical preview', async () => {
+  it('includes a surface-resolved writeScopePolicy in the digest context', async () => {
     mockPlanSprint.mockReturnValue(makeSprint() as any);
-    const config = makeConfig();
-    const context = makeContext();
-    const recommendation = makeRecommendation();
+    const preview = await generatePlanPreview(
+      '/mock/root',
+      makeConfig(),
+      makeContext(),
+      makeRecommendation(),
+      {
+        mode: 'structured',
+        writeScopePolicy: {
+          mode: 'closed-allowlist',
+          filesWrite: ['src/a.ts'],
+          plannedNewFiles: ['src/a.ts'],
+        },
+      },
+    );
 
-    const cliPreview = await generatePlanPreview('/mock/root', config, context, recommendation, { mode: 'structured' });
-    const mcpPreview = await generatePlanPreview('/mock/root', config, context, recommendation, { mode: 'structured' });
-
-    expect(mcpPreview.planDigest).toBe(cliPreview.planDigest);
-    expect(mcpPreview.taskSummaries).toEqual(cliPreview.taskSummaries);
-    expect(mcpPreview.gateResult).toBe(cliPreview.gateResult);
-    expect(mcpPreview.policyDecision).toBe(cliPreview.policyDecision);
+    expect(preview.planDigestContext.writeScopePolicy).toEqual({
+      mode: 'closed-allowlist',
+      filesWrite: ['src/a.ts'],
+      plannedNewFiles: ['src/a.ts'],
+    });
   });
 
   // ─── taskSummaries / gate / policy mapping ──────────────────────────────

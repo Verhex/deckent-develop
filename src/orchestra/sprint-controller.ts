@@ -71,8 +71,10 @@ import type { Connector } from './connector.js';
 import {
   acquireSprintLock,
   bindSprintLockToExecution,
+  reconcileSprintLockAfterAcquireFailure,
   releaseSprintLock,
 } from '../core/multi-ide.js';
+import { readCanonicalRunStatus } from '../core/run-status-authority.js';
 
 // ─── Core — pre-spawn scope gate (Dimension B, born-573/518) ──────
 import { spawnSync } from 'node:child_process';
@@ -1804,10 +1806,29 @@ export async function runSprint(
     opts?.preplannedSprint?.id
     ?? readSprintState(projectRoot)?.sprintId
     ?? 'planning';
-  const lockAcquired = acquireSprintLock(projectRoot, sprintLockId);
+  let lockAcquired = acquireSprintLock(projectRoot, sprintLockId);
+  if (!lockAcquired) {
+    const authority = readCanonicalRunStatus(projectRoot, {
+      sprintIdHint: sprintLockId,
+    });
+    const reconciliation = reconcileSprintLockAfterAcquireFailure(
+      projectRoot,
+      sprintLockId,
+      authority.coordinator,
+    );
+    if (reconciliation.state === 'cleared-stale') {
+      structuredLog('warn', 'SPRINT_LOCK_STALE_RECONCILED', {
+        sprintPhase: 'PLAN',
+        sprintId: reconciliation.sprintId,
+        ownership: reconciliation.ownership,
+        coordinator: reconciliation.coordinator,
+      });
+      lockAcquired = acquireSprintLock(projectRoot, sprintLockId);
+    }
+  }
   if (!lockAcquired) {
     throw new BrainError(
-      'Another sprint is already running in this project. Use --force or wait for the active sprint to complete.',
+      'SPRINT_LOCK_OWNERSHIP_UNVERIFIED: Another sprint is already running in this project. Use --force or wait for the active sprint to complete.',
       SprintPhase.PLAN,
     );
   }

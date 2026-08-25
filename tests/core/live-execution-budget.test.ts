@@ -7,6 +7,7 @@ import {
   hasLiveUsageCeiling,
 } from '../../src/core/live-execution-budget.js';
 import { normalizeStreamEvent } from '../../src/core/log-event.js';
+import { DeckentError } from '../../src/core/errors.js';
 
 function claudeBlock(id: string, usage: Record<string, number>, blockType = 'text') {
   return {
@@ -325,6 +326,29 @@ describe('LiveExecutionBudgetGuard', () => {
       'ollama',
       'local',
     )).toThrow('does not declare that capability');
+  });
+
+  it('uses the typed admission error with an actionable unmetered-backend remedy', () => {
+    let thrown: unknown;
+    try {
+      assertLiveUsageBudgetSupport(
+        { maxTurns: 2 },
+        undefined,
+        'subprocess',
+      );
+    } catch (error: unknown) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(DeckentError);
+    expect(thrown).toMatchObject({
+      code: 'DECKENT_E078',
+      message: 'Live execution budget requires measured streaming usage; executor "subprocess" does not declare that capability. Spawn blocked before provider work.',
+    });
+    expect((thrown as DeckentError).suggestion).toContain(
+      'execution_budget.unmetered_backend',
+    );
+    expect((thrown as DeckentError).suggestion).toContain('Docker');
   });
 
   it('keeps metering and landing capability independent at final admission', () => {

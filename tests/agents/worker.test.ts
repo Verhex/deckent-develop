@@ -1328,7 +1328,10 @@ describe('verify-delta: end-to-end honest self-assessment chain', () => {
       if (String(filePath).endsWith('.verify-delta.json') && storedBaseline) {
         return JSON.stringify(storedBaseline);
       }
-      throw new Error('ENOENT: no such file');
+      // Model real fs semantics: ENOENT errors carry .code = 'ENOENT'
+      const notFound = new Error('ENOENT: no such file') as NodeJS.ErrnoException;
+      notFound.code = 'ENOENT';
+      throw notFound;
     });
   });
 

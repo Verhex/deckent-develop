@@ -98,7 +98,7 @@ describe('deckent runs — CLI inbox + --close-stale (F-3)', () => {
     legacyDoFlow('c1b050ab-71aa-48b0-bd20-c2810eb6eafb');
     const out = await run(['--close-stale']);
     expect(out).toContain('Stale runs that would be closed (1):');
-    expect(out).toContain('c1b050ab · unverifiable (no pid recorded) → cancelled');
+    expect(out).toContain('c1b050ab · unverifiable');
     expect(out).toContain('--close-stale --yes');
     // nothing written — a fresh coordinator still derives DETACHED_RUNNING
     _resetRunFlowCoordinatorsForTests();

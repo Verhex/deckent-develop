@@ -6,6 +6,7 @@ import {
   acquireSprintLock,
   bindSprintLockToExecution,
   isSprintLocked,
+  reconcileSprintLockAfterAcquireFailure,
   releaseSprintLock,
   releaseSprintLockForTerminatedSprint,
 } from '../../src/core/multi-ide.js';
@@ -32,6 +33,7 @@ describe('multi-ide conflict prevention', () => {
     const raw = readFileSync(join(tempDir, '.deckent', 'sprint.lock'), 'utf-8');
     const data = JSON.parse(raw);
     expect(data.pid).toBe(process.pid);
+    expect(data.startToken).toMatch(/^s\d+$/);
     expect(data.env).toBe('cursor');
     expect(data.sprintId).toBe('sprint-046');
     expect(data.acquiredAt).toBeTruthy();
@@ -101,6 +103,87 @@ describe('multi-ide conflict prevention', () => {
     const data = JSON.parse(raw);
     expect(data.pid).toBe(process.pid);
     expect(data.sprintId).toBe('sprint-046');
+  });
+
+  it('takes over a live PID lock when its start token proves PID reuse', () => {
+    const lockDir = join(tempDir, '.deckent');
+    mkdirSync(lockDir, { recursive: true });
+    const lockFile = join(lockDir, 'sprint.lock');
+    writeFileSync(lockFile, JSON.stringify({
+      pid: process.pid,
+      startToken: 's0',
+      env: 'cursor',
+      sprintId: 'sprint-old',
+      acquiredAt: '2026-08-25T09:00:00.000Z',
+    }));
+
+    expect(acquireSprintLock(tempDir, 'sprint-new', 'vscode')).toBe(true);
+    expect(JSON.parse(readFileSync(lockFile, 'utf-8'))).toMatchObject({
+      pid: process.pid,
+      sprintId: 'sprint-new',
+    });
+  });
+
+  it('preserves a live lock whose PID and start token match', () => {
+    expect(acquireSprintLock(tempDir, 'sprint-live', 'vscode')).toBe(true);
+    const lockFile = join(tempDir, '.deckent', 'sprint.lock');
+    const before = readFileSync(lockFile, 'utf-8');
+
+    expect(acquireSprintLock(tempDir, 'sprint-other', 'cursor')).toBe(false);
+    expect(readFileSync(lockFile, 'utf-8')).toBe(before);
+  });
+
+  it('keeps a tokenless legacy live lock on the liveness-only path', () => {
+    const lockDir = join(tempDir, '.deckent');
+    mkdirSync(lockDir, { recursive: true });
+    const lockFile = join(lockDir, 'sprint.lock');
+    writeFileSync(lockFile, JSON.stringify({
+      pid: process.pid,
+      env: 'vscode',
+      sprintId: 'sprint-legacy',
+      acquiredAt: '2026-08-25T09:00:00.000Z',
+    }));
+
+    expect(acquireSprintLock(tempDir, 'sprint-new', 'cursor')).toBe(false);
+    expect(existsSync(lockFile)).toBe(true);
+  });
+
+  it('clears a planning lock during resume reconciliation only with stale evidence', () => {
+    const lockDir = join(tempDir, '.deckent');
+    mkdirSync(lockDir, { recursive: true });
+    const lockFile = join(lockDir, 'sprint.lock');
+    writeFileSync(lockFile, JSON.stringify({
+      pid: process.pid,
+      startToken: 's0',
+      env: 'vscode',
+      sprintId: 'planning',
+      acquiredAt: '2026-08-25T09:00:00.000Z',
+    }));
+
+    expect(reconcileSprintLockAfterAcquireFailure(tempDir, 'planning', 'dead'))
+      .toEqual({
+        state: 'cleared-stale',
+        sprintId: 'planning',
+        ownership: 'reused',
+        coordinator: 'dead',
+      });
+    expect(existsSync(lockFile)).toBe(false);
+  });
+
+  it('does not reconcile an unknown owner even with a dead coordinator projection', () => {
+    const lockDir = join(tempDir, '.deckent');
+    mkdirSync(lockDir, { recursive: true });
+    const lockFile = join(lockDir, 'sprint.lock');
+    writeFileSync(lockFile, JSON.stringify({
+      pid: process.pid,
+      env: 'vscode',
+      sprintId: 'planning',
+      acquiredAt: '2026-08-25T09:00:00.000Z',
+    }));
+
+    expect(reconcileSprintLockAfterAcquireFailure(tempDir, 'planning', 'dead'))
+      .toMatchObject({ state: 'preserved', reason: 'insufficient-evidence' });
+    expect(existsSync(lockFile)).toBe(true);
   });
 
   it('releaseSprintLock removes the lock file', () => {

@@ -68,6 +68,14 @@ vi.mock('../../src/orchestra/run-flow-plan-service.js', () => ({
   RunFlowPlanServiceError: class RunFlowPlanServiceError extends Error {},
 }));
 
+// A3 event-truth wave: /api/status artık tek canonical run-status authority
+// zincirinden geçer (status-reconcile → readCanonicalRunStatus). Bu seam
+// mock'lanmazsa boş mocked-fs üzerinde authority her zaman quiescent-IDLE
+// döner ve dashboard sprint id'si yüzeye çıkamaz.
+vi.mock('../../src/core/run-status-authority.js', () => ({
+  readCanonicalRunStatus: vi.fn(),
+}));
+
 import { readFileSync, existsSync, readdirSync, writeFileSync, watch } from 'node:fs';
 import { createHttpServer, parseBody, _resetActiveJob, type HttpApi } from '../../src/api/server.js';
 import { watchDashboard } from '../../src/api/watcher.js';
@@ -79,6 +87,7 @@ import { runSprint, cleanup } from '../../src/orchestra/brain.js';
 import { validatePartialConfig, deepMerge } from '../../src/core/config.js';
 import { startSprintDetached } from '../../src/api/sprint-job-runner.js';
 import { planRunFlow } from '../../src/orchestra/run-flow-plan-service.js';
+import { readCanonicalRunStatus, type CanonicalRunStatus } from '../../src/core/run-status-authority.js';
 
 const mockReadFileSync = vi.mocked(readFileSync);
 const mockExistsSync = vi.mocked(existsSync);
@@ -94,6 +103,34 @@ const mockReadJsonSafe = vi.mocked(readJsonSafe);
 const mockValidatePartialConfig = vi.mocked(validatePartialConfig);
 const mockDeepMerge = vi.mocked(deepMerge);
 const mockPlanRunFlow = vi.mocked(planRunFlow);
+const mockReadCanonicalRunStatus = vi.mocked(readCanonicalRunStatus);
+
+/** Boş projede gerçek readCanonicalRunStatus'un döndürdüğü quiescent-IDLE authority. */
+const IDLE_AUTHORITY: CanonicalRunStatus = {
+  schemaVersion: 1,
+  lifecycle: 'IDLE',
+  active: false,
+  resumable: false,
+  sprintId: null,
+  phase: null,
+  status: null,
+  reason: null,
+  recoveryCommand: null,
+  finalizeCommand: null,
+  coordinator: 'absent',
+  conflicts: [],
+};
+
+/** Canlı bir run'ın canonical authority projeksiyonu (dashboard snapshot ile tutarlı). */
+const ACTIVE_AUTHORITY: CanonicalRunStatus = {
+  ...IDLE_AUTHORITY,
+  lifecycle: 'ACTIVE',
+  active: true,
+  sprintId: 'sprint-001',
+  phase: 'EXECUTE',
+  status: 'EXECUTING',
+  coordinator: 'alive',
+};
 
 /** Varsayılan planRunFlow davranışı — route'un `{...sprint, runFlow, preview}`
  *  cevabını üretebilmesi için canonical PlanRunFlowResult iskeleti. */
@@ -187,6 +224,7 @@ describe('createHttpServer', () => {
     _resetActiveJob();
     mockExistsSync.mockReturnValue(false);
     mockReadJsonSafe.mockReturnValue(null);
+    mockReadCanonicalRunStatus.mockReturnValue(IDLE_AUTHORITY);
     armDefaultPlanRunFlow();
     // Auth bypass for non-auth-focused tests
     process.env['DECKENT_API_AUTH_DISABLED'] = '1';
@@ -225,6 +263,9 @@ describe('createHttpServer', () => {
 
     it('returns dashboard JSON when file exists', async () => {
       mockReadJsonSafe.mockReturnValue(JSON.parse(dashboardJson));
+      // Canlı dashboard snapshot'ı gerçek sistemde canonical authority ile
+      // birlikte var olur; A3 sonrası sprint kimliği authority'den yüzeye çıkar.
+      mockReadCanonicalRunStatus.mockReturnValue(ACTIVE_AUTHORITY);
 
       api = createHttpServer(PROJECT_ROOT, 0);
       await new Promise<void>((r) => api.server.once('listening', r));

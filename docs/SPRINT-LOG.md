@@ -16841,3 +16841,32 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 676-003: davranis-bekcisi — default-0 notrluk + nonzero davranis pinleri (DONE)
 
 ---
+## Sprint 677 — sprint-677
+
+**Status:** COMPLETE
+**Date:** 2026-08-25
+**Duration:** 490s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 8 |
+| Completed | 8 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 489705ms |
+
+### Tasks
+
+- 677-001: 3350a plan-purity cekirdegi — dry-run temp-agent yazmaz, katalog sessiz-cokusu typed olur (DONE)
+- 677-002: 3350b preview-parity yuzeyleri — CLI writeScopePolicy paritesi + MCP dryRun gercek olur (DONE)
+- 677-003: 3351 spawn-retry immunity — runtime-only alanlar drift-karsilastirmasindan cikar (DONE)
+- 677-004: 541 artifact-class — prompt-delivery receipt'i task sayilmaz (DONE)
+- 677-005: 3352a lock-ownership — sprint.lock startToken kaniti + resume typed reconciliation (DONE)
+- 677-006: 3352b close-stale kapsami — start-attempt journal'i operator sweep'ine girer (DONE)
+- 677-007: 3353 budget-authoring — calisamayan subprocess+finite-budget kombinasyonu init/config'te onlenir (DONE)
+- 677-008: 540 clean-HOLD exit-kontrati — kalici alt-surec pini (kanitla-kapanis) (DONE)
+
+---

@@ -63,15 +63,41 @@ vi.mock('../../src/api/sprint-job-runner.js', () => ({
   startSprintDetached: vi.fn(() => ({ jobId: `job-${Date.now()}` })),
 }));
 
+// A3 event-truth wave: /api/status artık tek canonical run-status authority
+// zincirinden geçer (status-reconcile → readCanonicalRunStatus). Boş mocked-fs
+// üzerinde gerçek modül her zaman quiescent-IDLE döner; canlı-run senaryosu
+// bu seam üzerinden arm edilir.
+vi.mock('../../src/core/run-status-authority.js', () => ({
+  readCanonicalRunStatus: vi.fn(),
+}));
+
 import { writeFileSync } from 'node:fs';
 import { createHttpServer, parseBody, _resetActiveJob, SlidingWindowRateLimiter, type HttpApi } from '../../src/api/server.js';
 import { readJsonSafe } from '../../src/core/utils.js';
 import { deepMerge } from '../../src/core/config.js';
 import { startSprintDetached } from '../../src/api/sprint-job-runner.js';
+import { readCanonicalRunStatus, type CanonicalRunStatus } from '../../src/core/run-status-authority.js';
 
 const mockWriteFileSync = vi.mocked(writeFileSync);
 const mockReadJsonSafe = vi.mocked(readJsonSafe);
 const mockDeepMerge = vi.mocked(deepMerge);
+const mockReadCanonicalRunStatus = vi.mocked(readCanonicalRunStatus);
+
+/** Boş projede gerçek readCanonicalRunStatus'un döndürdüğü quiescent-IDLE authority. */
+const IDLE_AUTHORITY: CanonicalRunStatus = {
+  schemaVersion: 1,
+  lifecycle: 'IDLE',
+  active: false,
+  resumable: false,
+  sprintId: null,
+  phase: null,
+  status: null,
+  reason: null,
+  recoveryCommand: null,
+  finalizeCommand: null,
+  coordinator: 'absent',
+  conflicts: [],
+};
 
 const PROJECT_ROOT = '/tmp/test-project';
 
@@ -79,6 +105,7 @@ const PROJECT_ROOT = '/tmp/test-project';
 let _stderrSpy: ReturnType<typeof vi.spyOn>;
 beforeEach(() => {
   process.env['DECKENT_API_AUTH_DISABLED'] = '1';
+  mockReadCanonicalRunStatus.mockReturnValue(IDLE_AUTHORITY);
   _stderrSpy = vi.spyOn(process.stderr, 'write').mockReturnValue(true);
 });
 afterEach(() => {
@@ -292,6 +319,17 @@ describe('Server Security Hardening', () => {
   describe('API versioning (/api/v1/ prefix)', () => {
     it('/api/v1/status routes to /api/status', async () => {
       mockReadJsonSafe.mockReturnValue({ sprint: { id: 'sprint-001' } });
+      // Canlı dashboard snapshot'ı gerçek sistemde canonical authority ile
+      // birlikte var olur; A3 sonrası sprint kimliği authority'den yüzeye çıkar.
+      mockReadCanonicalRunStatus.mockReturnValue({
+        ...IDLE_AUTHORITY,
+        lifecycle: 'ACTIVE',
+        active: true,
+        sprintId: 'sprint-001',
+        phase: 'EXECUTE',
+        status: 'EXECUTING',
+        coordinator: 'alive',
+      });
       api = createHttpServer(PROJECT_ROOT, { port: 0, rateLimit: 0 });
       await new Promise<void>((r) => api.server.once('listening', r));
 

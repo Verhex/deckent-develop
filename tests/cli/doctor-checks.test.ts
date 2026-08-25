@@ -48,6 +48,18 @@ vi.mock('../../src/core/errors.js', () => ({
   ErrorRegistry: {
     get: vi.fn().mockReturnValue({ suggestion: 'test suggestion' }),
   },
+  // Gercek imzayla uyumlu davranissal-notr stub (routing/journal zinciri
+  // DeckentError'u modul yukunde referansliyor).
+  DeckentError: class DeckentError extends Error {
+    constructor(
+      public readonly code: string,
+      message: string,
+      public readonly suggestion?: string,
+    ) {
+      super(message);
+      this.name = 'DeckentError';
+    }
+  },
 }));
 
 const mockMemoryStore = {
@@ -485,9 +497,9 @@ describe('runDoctorChecks (checks module)', () => {
     expect(result.ok).toBe(true);
   });
 
-  it('returns checks array with 16 items', () => {
+  it('returns checks array with 17 items', () => {
     const result = runDoctorChecks('/mock');
-    expect(result.checks.length).toBe(16); // 15 + '.deck Subprocess Visibility' (411-002, SEC-02 honesty slice)
+    expect(result.checks.length).toBe(17); // 15 + '.deck Subprocess Visibility' (411-002) + 'Routing journal' (A2 dalgasi, 7b80acfc8)
   });
 
   it('returns ok=false when node missing', () => {

@@ -19,7 +19,10 @@ function backend(reconcilePendingAttempts?: SpawnBackend['reconcilePendingAttemp
 describe('runSprint restart reconciliation seam', () => {
   it('keeps recovery after project leadership and before checkpoint interpretation', () => {
     const source = readFileSync(join(process.cwd(), 'src/orchestra/sprint-controller.ts'), 'utf-8');
-    const lockIndex = source.indexOf('const lockAcquired = acquireSprintLock');
+    // 2026-08-25: stale-lock reconciliation retry made the binding mutable
+    // (`let lockAcquired`) so a cleared-stale lease can re-acquire; the ordering
+    // contract (lock → backend reconcile → checkpoint restore) is unchanged.
+    const lockIndex = source.indexOf('let lockAcquired = acquireSprintLock');
     const reconcileIndex = source.indexOf('await reconcileSpawnBackendBeforeRestore(recoveryBackend)');
     const restoreIndex = source.indexOf('const recovery = restoreSprintFromCheckpoint');
 

@@ -3,19 +3,19 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "2931a6c5f80e7f2bd59a6b4af3272242df73af049927caaf6c3575331887ea1c"
+    "value": "5db90578a4e4690529f7da2d2a78f5658f81604c9f5aaa18fdb87d92ab3a8639"
   },
   "summary": {
     "total": 531,
     "active": 464,
     "terminal": 67,
-    "receipts": 190,
+    "receipts": 196,
     "byState": {
-      "OPEN": 368,
+      "OPEN": 362,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
-      "VERIFY": 27,
+      "VERIFY": 33,
       "DONE": 67,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -1158,10 +1158,10 @@
       "id": "BUILD-CLEAN-HOLD-HONESTY-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "OPEN",
+      "state": "VERIFY",
       "updated": "2026-08-25",
       "definitionDigest": "a6ebdccd6ed4058d9eddbd00e7cee0346e5d906287267f8f0ca62153c8498e24",
-      "progressDigest": "193ebd23c88839f673b513ca1c4e3f812659a62436d1c94dbc3caeb0fb897a0c",
+      "progressDigest": "a530e6002aad408e68046e42fe3a4d2fdb7d10bee124f47000a19fd8b244b277",
       "terminalClosureDigest": null
     },
     {
@@ -1169,10 +1169,10 @@
       "id": "PROJECTION-VALIDATOR-ARTIFACT-CLASS-001",
       "program": "TRUTH",
       "priority": "P2",
-      "state": "OPEN",
+      "state": "VERIFY",
       "updated": "2026-08-25",
       "definitionDigest": "9ca1bb3fb83e43d87904741e0d6ae9f0f55eb1a6ed2783e2cd93a7f77d8ae77b",
-      "progressDigest": "8d9eff14c013fb11d8dbbf6184853d60effd73af34e1f05614a003fca5dbe692",
+      "progressDigest": "4fe0e34d70de1f5564bbf25f9ac1e0a0a1e597b13e9d3f11046ead810d2a81c2",
       "terminalClosureDigest": null
     },
     {
@@ -3589,10 +3589,10 @@
       "id": "PLAN-PURE-PREVIEW-001",
       "program": "KERNEL",
       "priority": "P1",
-      "state": "OPEN",
+      "state": "VERIFY",
       "updated": "2026-08-25",
       "definitionDigest": "5b6c453c56844112ebb2722971a87214e24899bbb1568503094a276d23dfd8b1",
-      "progressDigest": "1c3cab5518ab0b0506e3455c5e7ba47fbe0d176412960dd303194aa7b46ac6ad",
+      "progressDigest": "89eb15a1dbda4ae89e1074c78cd0f22cf6f994e44474993f637d3eb311a4dada",
       "terminalClosureDigest": null
     },
     {
@@ -3600,10 +3600,10 @@
       "id": "SPAWN-RETRY-TASK-IMMUTABILITY-001",
       "program": "KERNEL",
       "priority": "P1",
-      "state": "OPEN",
+      "state": "VERIFY",
       "updated": "2026-08-25",
       "definitionDigest": "48dfd636153467e7f1c09cb45da7fc1cb48c12f8fad90c60ab57d62f6f04af09",
-      "progressDigest": "58e653454292e182fc8c1952d627f4b5bd75fdf38cb980fe9e662f2b007b6e58",
+      "progressDigest": "bdd7e84aa7097add9103f68934f583905c03a297ae28904f62aec72dad4fdf11",
       "terminalClosureDigest": null
     },
     {
@@ -3611,10 +3611,10 @@
       "id": "RESUME-STALE-LOCK-RECONCILIATION-001",
       "program": "KERNEL",
       "priority": "P1",
-      "state": "OPEN",
+      "state": "VERIFY",
       "updated": "2026-08-25",
       "definitionDigest": "5918564bbe90ea0815b4dd681a9e4b9f43dabbb4602fa5351f3ed2ec1d9d1fa1",
-      "progressDigest": "69d87c14956c09d58180dbcd74c40d62f621e1a460ee92968e58b38205d1df7a",
+      "progressDigest": "3f4f26ca76c8d0d8667b5ed15c368e6f8dc7b22a14e1f9fa3113cbf71b1f67f7",
       "terminalClosureDigest": null
     },
     {
@@ -3622,10 +3622,10 @@
       "id": "SUBPROCESS-FINITE-BUDGET-ADMISSION-001",
       "program": "KERNEL",
       "priority": "P2",
-      "state": "OPEN",
+      "state": "VERIFY",
       "updated": "2026-08-25",
       "definitionDigest": "931584ab5e50c162d7bfdaf9f7a146b763d5c638f28400d0cb2ce2dd2300d056",
-      "progressDigest": "ff8f24a937ec382379d530d4461c039b6c71dc646977ebf92b97c281786db39b",
+      "progressDigest": "3dde8b15790ca6f5df46b43b3abbbb0b525b32f85b874c0e4790a18d159c566a",
       "terminalClosureDigest": null
     },
     {
@@ -7806,6 +7806,66 @@
         "transitionAt": "2026-08-25T22:08:29+03:00"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-25-CWAVE-3350-01",
+      "authorityDigest": "64a8047527019d14b6b2e5e1848686b6e52796aa26282c3ee0b4ea85651c38d0",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-25T23:38:13+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-25-CWAVE-3351-01",
+      "authorityDigest": "53689bea9ab1b5f4a25b13fab4c8527b5f15ce721186d21ba66f1eea182a4f25",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-25T23:38:13+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-25-CWAVE-541-01",
+      "authorityDigest": "90db7d1bef7d039eed47fd81149282144db91cf5c48b2e99485e87d077e2bfd5",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-25T23:38:13+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-25-CWAVE-3352-01",
+      "authorityDigest": "dbebb98fea109bb8ebcb59972bfa42f7fd656b8cad893a996b5a9ec77c1821a7",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-25T23:38:13+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-25-CWAVE-3353-01",
+      "authorityDigest": "a9527384511185b8b3fb8e1658d1c25cd60a13f888273dcb9fa9669ac88a4867",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-25T23:38:13+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-25-CWAVE-540-01",
+      "authorityDigest": "402fa94d8a12eb89d4dd96165045859eaaacfe68842251a3779c044df89f9b52",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-25T23:38:13+03:00"
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -10356,22 +10416,24 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
+        "C": "1",
+        "W": "1",
+        "E": "1",
         "H": "?",
-        "L": "0",
-        "X": "?",
-        "S": "?"
+        "L": "-",
+        "X": "-",
+        "S": "-"
       },
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-25-CWAVE-540-01"
+      ],
       "acceptance": "Önce reproduce: authority-state-missing worktree fixture'ında gözlenen exit-0 kanıtlanır (ana-checkout'ta 2026-08-25 canlı-probe exit-1 verdi — vaka dal-özgü); reprodükte edilirse o dal typed non-zero döner ve build-zinciri tsc'ye geçmeden dürüst-FAIL eder; reprodükte edilemezse satır kanıtla kapatılır",
-      "evidence": "cli-surface-truth lane bulgular.md (owner admission 2026-08-25); worktree /tmp/deckent-cli-surface-truth; madde 17; ana-checkout karşı-kanıt: build-hold-probe exit-1",
+      "evidence": "cli-surface-truth lane bulgular.md (owner admission 2026-08-25); worktree /tmp/deckent-cli-surface-truth; madde 17; ana-checkout karşı-kanıt: build-hold-probe exit-1; `receipt=GR-2026-08-25-CWAVE-540-01`; `proof=clean-hold-subprocess-contract-pin-plus-byteequal-md5`; 2026-08-25 gece kanit-kapanisi: kod-tarafinda reprodukte edilemez (byte-es clean.mjs, tek cikis exitCode=1); gozlenen exit-0 pipe-yutmus olcum-artefakti (ayni tuzak bu gece landing sirasinda bagimsiz reproduke edildi); kalici alt-surec kontrat-pini yesil",
       "updated": "2026-08-25"
     },
     {
@@ -10387,22 +10449,24 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
+        "C": "1",
+        "W": "1",
+        "E": "1",
         "H": "?",
-        "L": "0",
-        "X": "?",
-        "S": "?"
+        "L": "-",
+        "X": "-",
+        "S": "-"
       },
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-25-CWAVE-541-01"
+      ],
       "acceptance": "Dosya-adı deseni gerçek task-projection şemasıyla daraltılır; delivery-receipt'ler aynı namespace'te dursa da task-state olarak parse edilmez; regresyon-pini eklenir",
-      "evidence": "cli-surface-truth lane bulgular.md (owner admission 2026-08-25); worktree /tmp/deckent-cli-surface-truth; madde 12",
+      "evidence": "cli-surface-truth lane bulgular.md (owner admission 2026-08-25); worktree /tmp/deckent-cli-surface-truth; madde 12; `receipt=GR-2026-08-25-CWAVE-541-01`; 2026-08-25 gece C-dalgasi (sprint-677 004): prompt-delivery reason + refuse-arm korumali pinler; canli spawn-parity gecisi yeni dist ile bir sonraki gercek runda dogrulanacak",
       "updated": "2026-08-25"
     },
     {
@@ -18959,24 +19023,26 @@
         "G2",
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
+        "C": "1",
+        "W": "1",
+        "E": "1",
         "H": "?",
-        "L": "0",
-        "X": "?",
-        "S": "?"
+        "L": "-",
+        "X": "-",
+        "S": "-"
       },
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
         "PLANNER-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-25-CWAVE-3350-01"
+      ],
       "acceptance": "Aynı DIRECTIVES+config altında dry-run ile gerçek-plan aynı eligible-agent kataloğunu görür ve aynı task-projection/digest'i üretir (bilinçli-farklar typed olarak beyan edilir); dry-run `.deckent/agents/temp-*` profili ÜRETMEZ; routing decision-journal iki yol için tek-katalog kanıtı taşır. Not: debt-preflight yazımı KN4 owner-tasarımıdır, bu satırın kapsamı katalog/yan-etki eşitliğidir",
-      "evidence": "cli-surface-truth lane bulgular.md (owner admission 2026-08-25); worktree /tmp/deckent-cli-surface-truth; maddeler 3+4; DIRECTIVES-hattının 4. kapısı bu önizlemeye dayanır",
+      "evidence": "cli-surface-truth lane bulgular.md (owner admission 2026-08-25); worktree /tmp/deckent-cli-surface-truth; maddeler 3+4; DIRECTIVES-hattının 4. kapısı bu önizlemeye dayanır; `receipt=GR-2026-08-25-CWAVE-3350-01`; `proof=dryrun-temp-purity-live-2to2-plus-parity-pins`; 2026-08-25 gece C-dalgasi (sprint-677 001+002, 002 el-fix tip-daraltmasiyla): dry-run temp-agent YAZMAZ (canli gercek-binary prob: temp-* 2->2), katalog sessiz-cokusleri typed-sesli, MCP dryRun gercek, writeScopePolicy digest-paritesi + iki-yol katalog-pini",
       "updated": "2026-08-25"
     },
     {
@@ -18993,22 +19059,24 @@
         "G2",
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
+        "C": "1",
+        "W": "1",
+        "E": "1",
         "H": "?",
-        "L": "0",
-        "X": "?",
-        "S": "?"
+        "L": "-",
+        "X": "-",
+        "S": "-"
       },
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-25-CWAVE-3351-01"
+      ],
       "acceptance": "buildWorkerPrompt approved-task'ı mutate etmez (immutable clone) veya retry-öncesi rollback garanti edilir; budget-gate'te duran ilk-attempt sonrası ikinci-attempt drift üretmez; regresyon-pini gerçek retry-fixture'ıyla",
-      "evidence": "cli-surface-truth lane bulgular.md (owner admission 2026-08-25); worktree /tmp/deckent-cli-surface-truth; madde 6",
+      "evidence": "cli-surface-truth lane bulgular.md (owner admission 2026-08-25); worktree /tmp/deckent-cli-surface-truth; madde 6; `receipt=GR-2026-08-25-CWAVE-3351-01`; 2026-08-25 gece C-dalgasi (sprint-677 003, sol): runtime-only alan istisnasi + gercek-zincir fixture (mutate-twice->authority-passes, gercek-drift hala yakalanir); canli retry senaryosu bir sonraki dogal budget-gate vakasinda dogrulanacak",
       "updated": "2026-08-25"
     },
     {
@@ -19025,22 +19093,24 @@
         "G2",
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
+        "C": "1",
+        "W": "1",
+        "E": "1",
         "H": "?",
-        "L": "0",
-        "X": "?",
-        "S": "?"
+        "L": "-",
+        "X": "-",
+        "S": "-"
       },
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-25-CWAVE-3352-01"
+      ],
       "acceptance": "Status PAUSED+koordinatörsüz iken resume, sandbox-PID'li bayat-lock'a çarpmaz: lock sahipliği pid+startToken/namespace-kanıtıyla çözülür, bayatsa typed temizlik+devam; pre-admission start-attempt kayıtları close-stale sweep'ince sınıflandırılır (terminal-yol 2026-08-25 releaseSprintLockForTerminatedSprint ile kapandı; bu satır paused/orphan-resume yoludur)",
-      "evidence": "cli-surface-truth lane bulgular.md (owner admission 2026-08-25); worktree /tmp/deckent-cli-surface-truth; maddeler 1+11",
+      "evidence": "cli-surface-truth lane bulgular.md (owner admission 2026-08-25); worktree /tmp/deckent-cli-surface-truth; maddeler 1+11; `receipt=GR-2026-08-25-CWAVE-3352-01`; 2026-08-25 gece C-dalgasi (sprint-677 005 sol + 006): startToken-sahiplik + typed acquire-reconciliation + close-stale start-attempt siniflandirmasi; canli paused-resume senaryosu dogal vakada dogrulanacak",
       "updated": "2026-08-25"
     },
     {
@@ -19057,22 +19127,24 @@
         "G2",
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
+        "C": "1",
+        "W": "1",
+        "E": "1",
         "H": "?",
-        "L": "0",
-        "X": "?",
-        "S": "?"
+        "L": "-",
+        "X": "-",
+        "S": "-"
       },
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-25-CWAVE-3353-01"
+      ],
       "acceptance": "Backend capability-projection'ı (liveUsageBudgetSupport) provider-adapter gerçeğini yansıtır; finite-budget yalnız measured-stream kanıtı olan kombinasyonlara yazılır, aksi halde init/config-katmanında typed düzeltme/uyarı üretilir; 'Live execution budget requires measured streaming usage' fail-closed'ı kullanıcı-üretimi default'larla tetiklenemez",
-      "evidence": "cli-surface-truth lane bulgular.md (owner admission 2026-08-25); worktree /tmp/deckent-cli-surface-truth; madde 5",
+      "evidence": "cli-surface-truth lane bulgular.md (owner admission 2026-08-25); worktree /tmp/deckent-cli-surface-truth; madde 5; `receipt=GR-2026-08-25-CWAVE-3353-01`; 2026-08-25 gece C-dalgasi (sprint-677 007, el-fix dil-daraltmasiyla): init unmetered_backend authoring + typed admission-error (mesaj-pini korunarak); canli init akisi bir sonraki gercek init vakasinda dogrulanacak",
       "updated": "2026-08-25"
     },
     {
@@ -27249,6 +27321,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "03b954d5aa2019e356045faea127f07496d4629a3b7c090c200365e1cbfee9ec"
+    "value": "fad49d42ecc2a5e08e6b32c246545e7bda98702bc5734533b80c5a34b1e16e6c"
   }
 }

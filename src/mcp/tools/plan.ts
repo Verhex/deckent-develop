@@ -7,6 +7,7 @@ import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { loadConfig } from '../../core/config.js';
 import { readContext } from '../../orchestra/brain.js';
+import { generatePlanPreview } from '../../orchestra/plan-preview-service.js';
 import { planRunFlow } from '../../orchestra/run-flow-plan-service.js';
 import { bootstrapProviders } from '../../core/provider.js';
 import { debugLog } from '../../core/utils.js';
@@ -73,9 +74,10 @@ export function registerPlanTool(server: McpServer): void {
         modelConstraint: null,
         reason: 'No usage constraints',
       };
-      // MCP plan never writes legacy task JSON. It does persist the canonical
-      // exact plan/event authority so a later start can consume this digest
-      // without re-planning; optional approval snapshots the same object.
+      // Preview is the default MCP contract. Durable exact-plan/event
+      // authority is entered by an explicit dryRun:false OR by an explicit
+      // approval/adoption intent — `approve: true` on a pure preview would
+      // silently approve nothing, which is worse than overriding the default.
       const projectName = config.projectName || basename(root);
       const heading = context.directives
         .split(/\r?\n/)
@@ -85,7 +87,8 @@ export function registerPlanTool(server: McpServer): void {
         .trim();
       const flowId = randomUUID();
       const revision = 1;
-      const planned = await planRunFlow({
+      const dryRun = input.dryRun !== false && input.approve !== true;
+      const planned = dryRun ? undefined : await planRunFlow({
         projectRoot: root,
         config,
         recommendation,
@@ -125,8 +128,13 @@ export function registerPlanTool(server: McpServer): void {
             }
           : {}),
       });
-      const sprint = planned.sprint;
-      const preview = planned.preview;
+      const generatedPreview = dryRun
+        ? await generatePlanPreview(root, config, context, recommendation, {
+            mode: input.mode as BrainPlanningMode | undefined,
+          })
+        : undefined;
+      const sprint = generatedPreview?.sprint ?? planned!.sprint;
+      const preview = generatedPreview ?? planned!.preview;
       const topology = preview.topology;
       if (!topology) throw new Error('E_PLAN_TOPOLOGY_MISSING');
 
@@ -172,22 +180,34 @@ export function registerPlanTool(server: McpServer): void {
         modelDistribution,
         riskAssessment,
         promptGate,
-        scopeGate: {
-          result: preview.scopeGateResult ?? 'skipped',
-          ...(preview.scopeGateMessage !== undefined
-            ? { message: preview.scopeGateMessage }
-            : {}),
-          overridden: preview.scopeGateOverridden === true,
-        },
+        scopeGate: 'scopeGateResult' in preview
+          ? {
+            result: preview.scopeGateResult ?? 'skipped',
+            ...(preview.scopeGateMessage !== undefined
+              ? { message: preview.scopeGateMessage }
+              : {}),
+            overridden: preview.scopeGateOverridden === true,
+          }
+          : {
+            // Preview-path (PlanPreviewResult) carries the same
+            // pass|fail|skipped vocabulary under gateResult; no override
+            // concept exists before adoption.
+            result: preview.gateResult,
+            overridden: false,
+          },
         executionTopology: topology,
         topologyGate: preview.topologyGateResult,
         // planDigest (TERM2 424-001) — content hash of the real plan preview
         // (task summaries + gate/policy outcome), for future digest-bound
         // approval flows (design doc "Net Öneri"). Additive field only.
-        flowId: planned.flowId,
-        revision: planned.revision,
-        approval: planned.approval,
-        planDigest: planned.planDigest,
+        ...(planned !== undefined
+          ? {
+              flowId: planned.flowId,
+              revision: planned.revision,
+              approval: planned.approval,
+            }
+          : { approval: 'preview' as const }),
+        planDigest: generatedPreview?.planDigest ?? planned!.planDigest,
         planDigestVersion: preview.planDigestVersion,
       };
 

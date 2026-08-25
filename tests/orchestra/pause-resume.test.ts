@@ -89,6 +89,10 @@ vi.mock('../../src/core/config.js', () => ({
   resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   resolveEffectiveWorkers: vi.fn().mockReturnValue(4),
+  // 2026-08-25 read-model fixRetry resolution: publishCanonicalRunStatusReadModel now
+  // resolves max_fix_retries via getLoadedConfig(projectRoot) ?? DEFAULT_MAX_FIX_RETRIES.
+  getLoadedConfig: vi.fn(() => undefined),
+  DEFAULT_MAX_FIX_RETRIES: 2,
 }));
 
 vi.mock('../../src/orchestra/model-selector.js', () => ({

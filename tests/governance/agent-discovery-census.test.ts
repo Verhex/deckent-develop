@@ -99,19 +99,19 @@ const KNOWN_AGENT_DISCOVERY_SITES = [
   'agents-dir-definition:src/cli/commands/agent.ts:49',
   'agents-dir-definition:src/cli/commands/sync.ts:34',
   'agents-dir-definition:src/core/agent-manifest-sync.ts:22',
-  'agents-dir-definition:src/core/agent-pool.ts:274',
+  'agents-dir-definition:src/core/agent-pool.ts:312',
   'agents-dir-definition:src/core/agent-prompt-sync.ts:23',
   'agents-dir-definition:src/mcp/resources/agents.ts:6',
   'agents-dir-definition:src/orchestra/temp-agent-generator.ts:16',
   'raw-agent-directory-read:src/cli/commands/sync.ts:601',
-  'raw-agent-directory-read:src/core/agent-pool.ts:885',
-  'raw-agent-directory-read:src/core/agent-pool.ts:923',
-  'raw-agent-directory-read:src/core/agent-pool.ts:951',
+  'raw-agent-directory-read:src/core/agent-pool.ts:929',
+  'raw-agent-directory-read:src/core/agent-pool.ts:967',
+  'raw-agent-directory-read:src/core/agent-pool.ts:995',
   'raw-agent-directory-read:src/mcp/tools/help.ts:131',
-  'raw-agent-directory-read:src/monitor/auditor.ts:1098',
+  'raw-agent-directory-read:src/monitor/auditor.ts:1100',
   'raw-agent-directory-read:src/orchestra/planner.ts:1596',
   // Line shifted by the phantom-tail suppressor documentation block (7096/7097 era).
-  'raw-agent-directory-read:src/orchestra/task-builder.ts:1313',
+  'raw-agent-directory-read:src/orchestra/task-builder.ts:1334',
 ];
 
 afterEach(() => {

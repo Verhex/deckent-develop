@@ -134,6 +134,10 @@ vi.mock('../../src/core/config.js', () => ({
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   resolveEffectiveWorkers: vi.fn().mockReturnValue(4),
   resolveLiveTraceEnabled: () => false,  // 583/N5 — spawn gate reads it; false = pre-N5 byte-stable opts
+  // 2026-08-25 read-model fixRetry resolution: publishCanonicalRunStatusReadModel now
+  // resolves max_fix_retries via getLoadedConfig(projectRoot) ?? DEFAULT_MAX_FIX_RETRIES.
+  getLoadedConfig: vi.fn(() => undefined),
+  DEFAULT_MAX_FIX_RETRIES: 2,
 }));
 
 vi.mock('../../src/orchestra/result-watcher.js', () => ({

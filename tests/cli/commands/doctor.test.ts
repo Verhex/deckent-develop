@@ -692,7 +692,7 @@ describe('i18n integration', () => {
     const passedMsg = calls.find(c => String(c).includes('checks passed'));
     expect(passedMsg).toBeDefined();
     // runDoctorChecks returns 16 checks total (15 + '.deck Subprocess Visibility', 411-002/412-003)
-    expect(String(passedMsg)).toMatch(/\/16/);
+    expect(String(passedMsg)).toMatch(/\/17/); // 17. check: Routing journal (A2)
   });
 
   it('uses tr language when config has language=tr in legacy mode', async () => {

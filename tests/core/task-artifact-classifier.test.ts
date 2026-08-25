@@ -23,6 +23,11 @@ describe('task artifact classifier', () => {
     ['task-486-002.landing-proposal.json', taskContent(), 'proposal'],
     ['task-486-002.replan-proposal.json', taskContent(), 'replan-proposal'],
     ['task-486-002.skill-delivery.json', taskContent(), 'skill-delivery'],
+    [
+      'task-486-002.attempt-5207a413-41a4-4af9-9592-5ba1da226906.codex.prompt-delivery.json',
+      taskContent(),
+      'prompt-delivery',
+    ],
     ['task-486-002.lock', taskContent(), 'lock'],
     ['task-486-002.json.partial', taskContent(), 'partial'],
     ['task-486-002.json', taskContent(), 'archived', 'archive'],

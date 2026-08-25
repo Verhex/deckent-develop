@@ -15,6 +15,7 @@ export type NonTaskArtifactReason =
   | 'proposal'
   | 'replan-proposal'
   | 'skill-delivery'
+  | 'prompt-delivery'
   | 'lock'
   | 'temporary'
   | 'partial'
@@ -53,6 +54,7 @@ function residueReason(filename: string): NonTaskArtifactReason | null {
   if (/\.landing-proposal\.json$/.test(filename)) return 'proposal';
   if (/\.replan-proposal\.json$/.test(filename)) return 'replan-proposal';
   if (/\.skill-delivery\.json$/.test(filename)) return 'skill-delivery';
+  if (/\.prompt-delivery\.json$/.test(filename)) return 'prompt-delivery';
   if (/\.lock$|\.spawnlock$/.test(filename)) return 'lock';
   if (/\.tmp$|\.temp$/.test(filename)) return 'temporary';
   if (/\.partial$/.test(filename)) return 'partial';

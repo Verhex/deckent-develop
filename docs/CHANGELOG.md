@@ -14,6 +14,22 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint677] - 2026-08-25
+
+### Added
+
+- 3350a plan-purity cekirdegi — dry-run temp-agent yazmaz, katalog sessiz-cokusu typed olur
+- 3350b preview-parity yuzeyleri — CLI writeScopePolicy paritesi + MCP dryRun gercek olur
+- 3351 spawn-retry immunity — runtime-only alanlar drift-karsilastirmasindan cikar
+- 541 artifact-class — prompt-delivery receipt'i task sayilmaz
+- 3352a lock-ownership — sprint.lock startToken kaniti + resume typed reconciliation
+- 3352b close-stale kapsami — start-attempt journal'i operator sweep'ine girer
+- 3353 budget-authoring — calisamayan subprocess+finite-budget kombinasyonu init/config'te onlenir
+- 540 clean-HOLD exit-kontrati — kalici alt-surec pini (kanitla-kapanis)
+
+
+_Tasks: 8 total, 8 done, 0 tech debt, 0 no-go_
+
 ## [sprint676] - 2026-08-25
 
 ### Added

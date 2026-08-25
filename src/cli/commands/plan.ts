@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { spawn } from 'node:child_process';
 import { principalToActor, resolveLocalOsPrincipal } from '../../core/principal.js';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
@@ -44,11 +45,52 @@ import {
 } from '../repl/plan-preview-card.js';
 import { DeckentError } from '../../core/errors.js';
 import { cliContractMessage } from '../helpers/message-catalog/cli-run.js';
+import {
+  bindExecutionWriteScopePolicy,
+  normalizeExecutionWriteScopePolicy,
+  type ExecutionWriteScopePolicy,
+} from '../../core/execution-write-scope-policy.js';
 
 export type RlFactory = () => {
   question: (q: string) => Promise<string>;
   close: () => void;
 };
+
+async function bindPreviewWriteScopePolicy(
+  root: string,
+  policy: ExecutionWriteScopePolicy | undefined,
+  acknowledgeScopePaths: boolean,
+): Promise<ExecutionWriteScopePolicy | undefined> {
+  if (!policy) return undefined;
+  const normalized = normalizeExecutionWriteScopePolicy(policy);
+  const trackedFiles = await new Promise<readonly string[]>((resolve, reject) => {
+    const child = spawn('git', ['ls-files'], {
+      cwd: root,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    let stdout = '';
+    child.stdout.setEncoding('utf-8');
+    child.stdout.on('data', (chunk: string) => { stdout += chunk; });
+    child.once('error', reject);
+    child.once('close', (code) => {
+      if (code !== 0) {
+        reject(new Error(`git ls-files exited with code ${String(code)}`));
+        return;
+      }
+      resolve(stdout.split(/\r?\n/).filter(Boolean));
+    });
+  }).catch((error: unknown) => {
+    throw new RunFlowPlanServiceError('CLOSED_WRITE_SCOPE_HOLD', {
+      reason: 'tracked_scope_evidence_unavailable',
+      diagnostic: error instanceof Error ? error.message : String(error),
+    });
+  });
+  return bindExecutionWriteScopePolicy(
+    normalized,
+    trackedFiles,
+    acknowledgeScopePaths,
+  );
+}
 
 function directivePlanSummary(directives: string, projectName: string): string {
   const heading = directives
@@ -133,6 +175,7 @@ export function registerPlan(program: Command): void {
     .option('--interrogate', cliContractMessage('cliContract.plan.opt.interrogate', helpLang))
     .option('--force-prompt-gate', cliContractMessage('cliContract.plan.opt.force_prompt_gate', helpLang))
     .option('--force-scope', getMessage('plan.force_scope_option', helpLang))
+    .option('--write-allowlist <paths...>', getMessage('do.write_allowlist_option', helpLang))
     .option('--adopt-existing <sprintId>', getMessage('plan.adopt_existing_option', helpLang))
     .option('--expected-plan-digest <sha256>', getMessage('plan.expected_plan_digest_option', helpLang))
     .option('--expected-projection-digest <sha256>', getMessage('plan.expected_projection_digest_option', helpLang))
@@ -150,6 +193,7 @@ export function registerPlan(program: Command): void {
       interrogate?: boolean;
       forcePromptGate?: boolean;
       forceScope?: boolean;
+      writeAllowlist?: string[];
       adoptExisting?: string;
       expectedPlanDigest?: string;
       expectedProjectionDigest?: string;
@@ -259,9 +303,17 @@ export function registerPlan(program: Command): void {
             // delegate to the shared plan-preview-service (TERM2 424-001)
             // instead of calling planSprint ad hoc, so CLI/MCP share one
             // real-plan-generation + digest code path.
+            const writeScopePolicy = await bindPreviewWriteScopePolicy(
+              root,
+              opts.writeAllowlist === undefined
+                ? undefined
+                : { mode: 'closed-allowlist', filesWrite: opts.writeAllowlist },
+              opts.forceScope === true,
+            );
             const preview = await generatePlanPreview(root, config, context, recommendation, {
               mode: planMode,
               acknowledgePromptGate: opts.forcePromptGate === true,
+              ...(writeScopePolicy !== undefined ? { writeScopePolicy } : {}),
             });
             sprint = preview.sprint;
             if (adoptionRequested) {
@@ -340,6 +392,14 @@ export function registerPlan(program: Command): void {
               previewOptions: {
                 mode: planMode,
                 acknowledgePromptGate: opts.forcePromptGate === true,
+                ...(opts.writeAllowlist !== undefined
+                  ? {
+                      writeScopePolicy: {
+                        mode: 'closed-allowlist' as const,
+                        filesWrite: opts.writeAllowlist,
+                      },
+                    }
+                  : {}),
               },
               acknowledgeScopePaths: opts.forceScope === true,
               ...(adoptionRequested

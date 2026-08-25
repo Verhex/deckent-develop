@@ -44,7 +44,11 @@ vi.mock('../../../src/cli/helpers/process.js', () => ({
 // and live status is held unless the canonical persisted read model exists. These cases
 // exercise rendering, so both are supplied here. (Same pattern as
 // tests/cli/commands/status.test.ts — see the note there.)
-vi.mock('../../../src/core/run-status-read-model.js', () => ({
+// importOriginal spread: status.ts artık loadCanonicalRunTasks +
+// resolveRunStatusReadiness gibi ek export'ları da çağırıyor — gerçekleri
+// mocked-fs üzerinde davranışsal-nötr çalışır (ACTIVE+alive authority HOLD üretmez).
+vi.mock('../../../src/core/run-status-read-model.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/core/run-status-read-model.js')>()),
   readCanonicalRunStatusReadModel: vi.fn(() => ({
     schemaVersion: 1, revision: 1, runGeneration: 1, modelDigest: 'digest-test',
     holds: [], providerConcurrency: [], authority: {},

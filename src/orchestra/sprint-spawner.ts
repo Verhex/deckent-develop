@@ -301,14 +301,20 @@ export function readSpawnTaskAuthority(
   const freshPath = join(projectRoot, TASKS_DIR, `task-${task.id}.json`);
   try {
     const diskTask = JSON.parse(readFileSync(freshPath, 'utf-8')) as Task;
+    const planSnapshot = structuredClone(task);
+    const diskSnapshot = structuredClone(diskTask);
+    delete planSnapshot.estimatedTokens;
+    delete planSnapshot.promptCompilePlanId;
+    delete diskSnapshot.estimatedTokens;
+    delete diskSnapshot.promptCompilePlanId;
     if (
       exactPlanAuthority
-      && canonicalJson(diskTask) !== canonicalJson(task)
+      && canonicalJson(diskSnapshot) !== canonicalJson(planSnapshot)
     ) {
       throw new ExactPlanSpawnAuthorityError(
         'EXACT_PLAN_TASK_ARTIFACT_DRIFT',
         task.id,
-        computeExactPlanDrift(task, diskTask),
+        computeExactPlanDrift(planSnapshot, diskSnapshot),
       );
     }
     return diskTask;

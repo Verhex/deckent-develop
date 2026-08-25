@@ -47,6 +47,44 @@ export function __setBuiltinAgentsDirForTests(dir: string | null): void {
   builtinAgentsDirOverrideForTests = dir;
 }
 
+export type AgentPoolDegradedCode =
+  | 'builtin-project-config-missing'
+  | 'builtin-catalog-directory-missing';
+
+export interface AgentPoolDegradation {
+  readonly code: AgentPoolDegradedCode;
+  readonly message: Readonly<{ en: string; tr: string }>;
+}
+
+/** AgentPool remains Map-compatible; readers may opt in to catalog diagnostics. */
+export interface ObservableAgentPool extends Map<string, AgentDefinition> {
+  degraded?: AgentPoolDegradation[];
+}
+
+const AGENT_POOL_DEGRADED_MESSAGES: Readonly<
+  Record<AgentPoolDegradedCode, Readonly<{ en: string; tr: string }>>
+> = {
+  'builtin-project-config-missing': {
+    en: 'Builtin agent catalog was not loaded because .deckent/config.json is missing.',
+    tr: 'Yerleşik agent kataloğu .deckent/config.json bulunamadığı için yüklenmedi.',
+  },
+  'builtin-catalog-directory-missing': {
+    en: 'Builtin agent catalog directory is missing; the agent pool is degraded.',
+    tr: 'Yerleşik agent katalog dizini bulunamadı; agent havuzu eksik durumda.',
+  },
+};
+
+function markBuiltinCatalogDegraded(
+  pool: ObservableAgentPool,
+  code: AgentPoolDegradedCode,
+): void {
+  const message = AGENT_POOL_DEGRADED_MESSAGES[code];
+  (pool.degraded ??= []).push({ code, message });
+  // stderr, deliberately one line so operators and log collectors cannot miss it.
+  // eslint-disable-next-line no-console
+  console.error(`[deckent][${code}] ${message.en} / ${message.tr}`);
+}
+
 /**
  * Resolve the builtin agents directory relative to THIS module's own file
  * location (src/core/agent-pool.ts or dist/core/agent-pool.js — builtins/ is
@@ -584,8 +622,8 @@ export class AgentPoolManager {
    * builtin. A colliding L2 record composes only its runtime-derived fields onto the L1
    * record — see composeL1WithL2RuntimeFields().
    */
-  loadAgents(): AgentPool {
-    const pool: AgentPool = new Map();
+  loadAgents(): ObservableAgentPool {
+    const pool: ObservableAgentPool = new Map();
     this.invalidManifests = [];
 
     // Load persistent agents from .deckent/agents/ (never evicted)
@@ -671,10 +709,16 @@ export class AgentPoolManager {
    * happens to contain a `.deckent/agents/<id>/` subdirectory).
    */
   private _loadBuiltinFallback(pool: AgentPool): void {
-    if (!fs.existsSync(path.join(this.projectRoot, CONFIG_FILENAME))) return;
+    if (!fs.existsSync(path.join(this.projectRoot, CONFIG_FILENAME))) {
+      markBuiltinCatalogDegraded(pool, 'builtin-project-config-missing');
+      return;
+    }
 
     const builtinDir = resolveBuiltinAgentsDir();
-    if (!fs.existsSync(builtinDir)) return;
+    if (!fs.existsSync(builtinDir)) {
+      markBuiltinCatalogDegraded(pool, 'builtin-catalog-directory-missing');
+      return;
+    }
 
     let entries: fs.Dirent[];
     try {

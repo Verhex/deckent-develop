@@ -180,7 +180,9 @@ describe('doctor --profile flag', () => {
     expect(doctorCmd).toBeDefined();
     const profileOpt = doctorCmd!.options.find(o => o.long === '--profile');
     expect(profileOpt).toBeDefined();
-    expect(profileOpt!.description).toContain('system profile');
+    // 2026-08-25 (C-dalgası): description artık i18n katalogdan gelir
+    // ('cli.runtime.doctor.opt.profile', EN default) — yeni sözleşme metni.
+    expect(profileOpt!.description).toBe('Show the detected host, runtime, and platform-adapter profile.');
   });
 
   it('without --profile: system profile not shown', async () => {

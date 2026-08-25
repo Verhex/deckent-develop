@@ -52,7 +52,7 @@ describe('KN3 — projection parity vs. settled-task artifacts (landing-proposal
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 
-  it('a mix of settled-task residue (.result, .hb, proposal sidecars, skill-delivery.json) is fully excluded — parity passes', () => {
+  it('a mix of settled-task residue (.result, .hb, proposal and delivery sidecars) is fully excluded — parity passes', () => {
     const root = mkdtempSync(join(tmpdir(), 'kn3-artifacts-'));
     try {
       seedTasks(root, ['523-004']);
@@ -68,6 +68,11 @@ describe('KN3 — projection parity vs. settled-task artifacts (landing-proposal
         taskId: '523-001',
         state: 'not-required',
       }));
+      writeArtifact(
+        root,
+        'task-523-001.attempt-attempt-1.codex.prompt-delivery.json',
+        JSON.stringify({ version: 2, taskId: '523-001', source: 'worker-prompt' }),
+      );
       expect(() => assertTaskProjectionParity(root, sprintOf(['523-004']))).not.toThrow();
     } finally { rmSync(root, { recursive: true, force: true }); }
   });

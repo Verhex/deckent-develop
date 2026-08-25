@@ -316,9 +316,13 @@ export function assertLiveUsageBudgetSupport(
     );
   }
   if (hasLiveUsageCeiling(budget) && support !== 'measured-stream') {
-    throw new Error(
+    const error = createExecutionAdmissionError(
       `Live execution budget requires measured streaming usage; executor "${executor}" does not declare that capability. Spawn blocked before provider work.`,
     );
+    Object.defineProperty(error, 'suggestion', {
+      value: 'Set execution_budget.unmetered_backend.action to hold, or use Docker with a measured-stream-capable provider path.',
+    });
+    throw error;
   }
 }
 

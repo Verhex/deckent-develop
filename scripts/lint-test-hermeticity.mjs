@@ -661,7 +661,12 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-25 exploration-bonus wave (sprint-676): +1 — worker-authored
   // tests/core/routing/exploration-bonus.test.ts (default-0 neutrality +
   // nonzero behavior pins; tmpdir-hermetic, suite-owned).
-  count: 16307,
+  // 2026-08-25 gece C-dalgasi + strike-5 + mock-drift onarimi: +8 —
+  // strike-5 EISDIR pini (config-corrupted-recovery) + C-dalgasi worker
+  // suite'leri (temp-agent-dryrun-purity, plan-preview-parity,
+  // build-clean-hold-exit) + slice-onarimlarindaki fixture-effect ekleri;
+  // hepsi tmpdir-hermetik, suite-owned.
+  count: 16315,
   // 2026-08-25 B-sweep: digest moved — --fix roundtrip pin, multi-label
   // parser pin, same-line rule downgraded to WARN (all suite-owned).
   // 2026-08-25 7141 wave: count unchanged, digest moved — the src-side
@@ -679,7 +684,13 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // status readiness cutover, dependency shape-fix, result field-order serializer).
   // 2026-08-25 exploration-bonus wave: digest folds the new suite plus
   // config-knob/blend/story src shifts and worker test-file edits.
-  digest: 'c6a21f0b337214a6b9eab45d02c58a75e441a869fc0b9b6023e1297f6c1d496b',
+  // 2026-08-25 gece: digest yedi yeni/duzenlenmis suite + C-dalgasi ve
+  // el-fix src kaymalarini katlar (heal-gate, plan-purity, lock-ownership,
+  // close-stale, budget-authoring, classifier, spawn-authority).
+  // 2026-08-26 00:05 landing-kuyrugu: ayni 16315, digest-only — suite-4
+  // kalanlarinin onarimi (mcp-plan approve-override, contract SSOT x2,
+  // EXECUTE_OPT_IN_RE bilesik-bayrak fix'i, error-baseline ratchet).
+  digest: 'a7729cb7abdb2784c287feba9607763a798f3d88d8409d163ed4371b348fccee',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1222,7 +1233,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // CAS, status readiness cutover, result field-order serializer).
   // 2026-08-25 exploration-bonus wave: digest folds the rank blend,
   // config knob and story visibility src shifts.
-  digest: '0ef3500f1c261e6d70f4428ac4626b657c114f8930f2ce64ad94de67587d38bf',
+  // 2026-08-25 gece: ayni 1336 count, digest-only — strike-5 heal-gate +
+  // C-dalgasi src kaymalari (plan-purity, lock-ownership, close-stale,
+  // budget-authoring, classifier) + landing el-fix'leri.
+  // 2026-08-26 00:05: ayni 1336, digest-only — landing-kuyrugu src kaymalari.
+  digest: 'bc1b12a7b091a3f253e7d386b511aabfa6240ae81ecf3de023f2d0caccfb5f89',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

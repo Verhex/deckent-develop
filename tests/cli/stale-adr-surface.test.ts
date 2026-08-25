@@ -111,7 +111,9 @@ describe('stale-ADR surface scan — Commander command/option descriptions', () 
     const doctor = commands.find((c) => c.name() === 'doctor');
     const fixImage = doctor?.options.find((o) => o.flags.includes('--fix-image'));
     expect(fixImage?.description).toContain('interactive confirmation');
-    expect(fixImage?.description).toContain('worker docker image');
+    // 2026-08-25 (C-dalgası): 'cli.runtime.doctor.opt.fix_image' katalog metni
+    // "worker docker image" yerine "worker image" der — yeni sözleşme.
+    expect(fixImage?.description).toContain('rebuild the worker image');
 
     const reclassify = commands.find((c) => c.name() === 'reclassify');
     const noAudit = reclassify?.options.find((o) => o.flags.includes('--no-audit'));

@@ -30,7 +30,7 @@ describe('meta-intent dispatch descriptors (ONB-CHAT-DILIM-3)', () => {
   const input = { projectRoot: '/repo/proj', probes: healthyProbes() };
 
   const expectations: Array<{ reply: string; descriptor: OnboardingChatDispatchDescriptor }> = [
-    { reply: 'doctor', descriptor: { command: 'doctor', args: [], requiresConfirm: false } },
+    { reply: 'doctor', descriptor: { command: 'doctor', args: [], requiresConfirm: true } }, // doctor --fix/--fix-image tasidigi icin effect:'mixed' → Degistir (1bd45d065)
     { reply: 'connect provider', descriptor: { command: 'connect', args: [], requiresConfirm: false } },
     { reply: 'show my limits', descriptor: { command: 'limits', args: [], requiresConfirm: false } },
     { reply: 'sprint nasıl başlatırım', descriptor: { command: 'start', args: [], requiresConfirm: true } },
@@ -56,9 +56,9 @@ describe('meta-intent dispatch descriptors (ONB-CHAT-DILIM-3)', () => {
 
   it('requiresConfirm is derived from the registry risk tier, not hardcoded true for every bridge', async () => {
     const before = await startOnboardingChat(input);
-    const after = await replyToOnboardingChat(before, 'doctor', input);
+    const after = await replyToOnboardingChat(before, 'show my limits', input);
     const entry = getCommand(after.lastMetaDispatch!.command);
-    expect(entry?.risk).toBe('Oku');
+    expect(entry?.risk).toBe('Oku'); // read-only probe: limits (doctor artik mixed/Degistir)
     expect(after.lastMetaDispatch!.requiresConfirm).toBe(false);
   });
 

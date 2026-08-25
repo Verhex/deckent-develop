@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):2931a6c5f80e7f2bd59a6b4af3272242df73af049927caaf6c3575331887ea1c`
+**Source digest:** `sha256(normalized-lf-utf8):5db90578a4e4690529f7da2d2a78f5658f81604c9f5aaa18fdb87d92ab3a8639`
 
 **Rows:** 531 total · 464 active · 67 terminal
 
@@ -13,11 +13,11 @@
 
 | State | Count |
 |---|---:|
-| OPEN | 368 |
+| OPEN | 362 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 69 |
-| VERIFY | 27 |
+| VERIFY | 33 |
 | DONE | 67 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -94,8 +94,8 @@
 | 532 | `CI-VITEST-WORKER-CRASH-001` | OPEN | P2 | TRUTH | — | — | Docs+Scripts job'unun belgeli 'testler yeşil ama vitest onTaskUpdate worker-crash ile exit-1' flake sınıfı: run 31056929295'te 101/101 pass + exit-1 (job continue-on-error ile maskeli — job-level yeşil kanıtları kirletiyor) |
 | 534 | `SSOT-SETTLEMENT-001` | OPEN | P0 | TRUTH | `APPROVAL-001`, `RECEIPT-001`, `KERNEL-SETTLEMENT-001`, `AUDIT-001` | — | MASTER settlement-closure authority: authenticated historical authority, external immutable/self-hosting-safe grant ledger, commit-bound settlement ve Git trust-anchor |
 | 538 | `CI-NIGHTLY-GREEN-001` | OPEN | P1 | TRUTH | — | — | Gece Coverage'ın 3 drift kırığı kapanır: O3 operation-ingress baseline canlıyla eşitlenir (673→674, debt-manager buildReplanProposal yazması), decisions.md'deki Context'siz ADR tamamlanır, KNOWN_ORPHANS pini operation-catalog/index.ts'i kaydeder |
-| 540 | `BUILD-CLEAN-HOLD-HONESTY-001` | OPEN | P1 | TRUTH | — | — | Worktree-ortamında `npm run build` clean-HOLD'unun (execution-lock authority state missing dalı) exit-0 ile başarı gibi yayımlanması iddiasının reprodüksiyonu ve dürüst non-zero kapanışı |
-| 541 | `PROJECTION-VALIDATOR-ARTIFACT-CLASS-001` | OPEN | P2 | TRUTH | — | — | Projection-validator'ın `*.prompt-delivery.json` receipt'lerini task-artifact'ı gibi sınıflandırmaması |
+| 540 | `BUILD-CLEAN-HOLD-HONESTY-001` | VERIFY | P1 | TRUTH | — | — | Worktree-ortamında `npm run build` clean-HOLD'unun (execution-lock authority state missing dalı) exit-0 ile başarı gibi yayımlanması iddiasının reprodüksiyonu ve dürüst non-zero kapanışı |
+| 541 | `PROJECTION-VALIDATOR-ARTIFACT-CLASS-001` | VERIFY | P2 | TRUTH | — | — | Projection-validator'ın `*.prompt-delivery.json` receipt'lerini task-artifact'ı gibi sınıflandırmaması |
 | 1000 | `CODEX-MAIN-001` | BLOCKED | P0 | CODEX | `SSOT-003`, `TEST-675`, `TEST-676`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `CONFIG_CUTOVER_INCOMPLETE` | Codex-main transition parent |
 | 1010 | `CM-01` | BLOCKED | P0 | CODEX | `SSOT-003` | `CONFIG_CUTOVER_INCOMPLETE` | Canonical resolved provider/model contract across every ingress |
 | 1020 | `CM-02` | OPEN | P0 | CODEX | `CM-01` | — | Sol, Terra and Luna entitlement evidence matrix |
@@ -290,10 +290,10 @@
 | 3347 | `PLATFORM-EXEC-AUTH-W3-DARWIN-001` | OPEN | P1 | KERNEL | `PLATFORM-EXEC-AUTH-W1-INTERFACE-001`, `PLATFORM-EXEC-AUTH-W2-PROBE-001` | — | Darwin execution-authority adapter'ı: native openat-ailesi N-API modülü + W1 arayüzünün darwin impl'i + gerçek-Mac real-binary clean/lock kanıtı (W2 ölçümü: /dev/fd yolu ölü — native tek yol) |
 | 3348 | `AUTONOMOUS-SCHEDULER-FAIRNESS-001` | OPEN | P0 | KERNEL | `AUTONOMOUS-CONTROL-PLANE-001`, `GOAL-DAG-001` | — | Tenant-fair autonomous scheduling, parked-approval progress ve bounded backpressure |
 | 3349 | `ORCHESTRA-RELIABILITY-001` | OPEN | P0 | KERNEL | — | — | FIX-worker protokol quote bug'ı + result-JSON kontrol-karakteri toleransı + stale-spawnlock dispatch-watchdog |
-| 3350 | `PLAN-PURE-PREVIEW-001` | OPEN | P1 | KERNEL | `PLANNER-001` | — | `plan --dry-run` gerçek-planning'i temsil eder ve yan-etkisizdir: bootstrap'sız katalog-farkı (21-vs-14 agent, farklı seçim/digest) ve temp-agent üretimi kapanır |
-| 3351 | `SPAWN-RETRY-TASK-IMMUTABILITY-001` | OPEN | P1 | KERNEL | — | — | Spawn-retry yolunda in-memory task mutasyonunun (estimatedTokens/promptCompilePlanId) yapay `EXACT_PLAN_TASK_ARTIFACT_DRIFT` üretmemesi |
-| 3352 | `RESUME-STALE-LOCK-RECONCILIATION-001` | OPEN | P1 | KERNEL | — | — | PAUSED-resume yolunda stale coordinator-lock (PID-namespace görünmezliği dahil) typed reconciliation ile çözülür; detached start-attempt journal'ı `runs --close-stale` kapsamına girer |
-| 3353 | `SUBPROCESS-FINITE-BUDGET-ADMISSION-001` | OPEN | P2 | KERNEL | — | — | Init/default'ların çalışamayan kombinasyon üretmemesi: `spawn_backend=subprocess` + finite token-budget, measured-streaming desteğiyle admission-safe çözülür |
+| 3350 | `PLAN-PURE-PREVIEW-001` | VERIFY | P1 | KERNEL | `PLANNER-001` | — | `plan --dry-run` gerçek-planning'i temsil eder ve yan-etkisizdir: bootstrap'sız katalog-farkı (21-vs-14 agent, farklı seçim/digest) ve temp-agent üretimi kapanır |
+| 3351 | `SPAWN-RETRY-TASK-IMMUTABILITY-001` | VERIFY | P1 | KERNEL | — | — | Spawn-retry yolunda in-memory task mutasyonunun (estimatedTokens/promptCompilePlanId) yapay `EXACT_PLAN_TASK_ARTIFACT_DRIFT` üretmemesi |
+| 3352 | `RESUME-STALE-LOCK-RECONCILIATION-001` | VERIFY | P1 | KERNEL | — | — | PAUSED-resume yolunda stale coordinator-lock (PID-namespace görünmezliği dahil) typed reconciliation ile çözülür; detached start-attempt journal'ı `runs --close-stale` kapsamına girer |
+| 3353 | `SUBPROCESS-FINITE-BUDGET-ADMISSION-001` | VERIFY | P2 | KERNEL | — | — | Init/default'ların çalışamayan kombinasyon üretmemesi: `spawn_backend=subprocess` + finite token-budget, measured-streaming desteğiyle admission-safe çözülür |
 | 3354 | `FIX-SPAWN-DEPENDENCY-FRESHNESS-001` | VERIFY | P1 | KERNEL | `ORCHESTRA-RELIABILITY-001` | — | FIX-spawn dependency-settlement tazeliği: FIX dalgası spawn edilirken dependency lineage'ı result-ingest SONRASI taze snapshot'tan okunur; bayat 'Pending' penceresi kapanır |
 | 4000 | `AUTHORITY-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | Unified runtime authority parent |
 | 4020 | `TENANT-001` | VERIFY | P0 | AUTHORITY | `PRINCIPAL-001` | — | Canonical tenant/project/session scope enforcement |

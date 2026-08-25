@@ -31,6 +31,11 @@ export interface DeathSweepEntry {
     | 'closed-dead'
     | 'alive'
     | 'no-pid-record'
+    | 'run-handle-ownership-unknown'
+    | 'stale-start-attempt'
+    | 'start-attempt-alive'
+    | 'start-attempt-ownership-unknown'
+    | 'start-attempt-terminal'
     | 'ownership-unknown'
     | 'reconciled-admitted'
     | 'jobs-terminal'
@@ -175,7 +180,7 @@ export function sweepDeadDetachedRuns(projectRoot: string): DeathSweepReport {
         // never guesses a kill. Reported, not closed.
         report.skipped.push({
           flowId,
-          outcome: 'no-pid-record',
+          outcome: 'run-handle-ownership-unknown',
           detail: 'run handle carries no pid (pre-698 record) — liveness unknown, left untouched',
         });
         continue;
@@ -219,6 +224,7 @@ export interface StaleRunSweepEntry {
   flowId: string;
   detail: string;
   pid?: number;
+  classification: 'dead-run-handle' | 'unverifiable-run-handle' | 'stale-start-attempt';
   /** The durable closure this entry gets (or would get, in a dry-run):
    *  'failed' = RUN_FAILED fold; 'cancelled' = FLOW_ABORTED fold — the only
    *  closure a LEGACY flow (empty event log) can fold, since RUN_FAILED
@@ -287,12 +293,75 @@ export function sweepStaleRuns(projectRoot: string, opts: StaleRunSweepOptions):
 
       const handleRecord = loadRunHandle(projectRoot, flowId);
       if (handleRecord === undefined) {
-        // No start attempt was ever recorded — the state itself is the only
-        // claim, and there is no record to judge stale. Left untouched.
-        report.skipped.push({
+        const attempt = loadLatestStartAttempt(projectRoot, flowId);
+        if (attempt === undefined) {
+          // The state itself is the only claim: neither durable start record
+          // exists, so there is no process identity to reconcile.
+          report.skipped.push({
+            flowId,
+            outcome: 'no-pid-record',
+            detail: 'no run-handle or start-attempt record — start never recorded, left untouched',
+          });
+          continue;
+        }
+
+        if (isTerminalStartAttemptState(attempt.state)) {
+          report.skipped.push({
+            flowId,
+            outcome: 'start-attempt-terminal',
+            detail: `start attempt ${attempt.attemptId} is already ${attempt.state}; left for read-path reconciliation`,
+          });
+          continue;
+        }
+
+        const ownership = attemptOwnership(attempt);
+        const identity = attempt.state === 'PREPARED' ? attempt.owner.process : attempt.process;
+        if (ownership === 'owned') {
+          report.skipped.push({
+            flowId,
+            outcome: 'start-attempt-alive',
+            detail: `start attempt ${attempt.attemptId} process ${identity!.pid} owned`,
+          });
+          continue;
+        }
+        if (ownership === 'unknown') {
+          report.skipped.push({
+            flowId,
+            outcome: 'start-attempt-ownership-unknown',
+            detail: `start attempt ${attempt.attemptId} process ownership unavailable — fail-closed`,
+          });
+          continue;
+        }
+
+        const detail = `start attempt ${attempt.attemptId} process is ${ownership} (state was ${context.state})`;
+        if (opts.apply) {
+          const settledAt = new Date().toISOString();
+          settleStartAttempt(projectRoot, {
+            ...attemptCas(attempt),
+            settlement: {
+              state: 'FAILED',
+              code: ownership === 'dead' ? 'START_PROCESS_DEAD' : 'START_PROCESS_REUSED',
+              detail: `start attempt process is ${ownership}`,
+              settledAt,
+            },
+            authority: {
+              kind: attempt.state === 'PREPARED' ? 'preparer-recovery' : 'process-recovery',
+              observedOwnership: ownership,
+              observedAt: settledAt,
+            },
+          });
+          coordinator.abortFlow({
+            flowId,
+            reason: `${detail}; closed by operator stale-run sweep`,
+            commandId: `stale-attempt-sweep-${attempt.attemptId}`,
+          });
+        }
+        report.unverifiable.push({
           flowId,
-          outcome: 'no-pid-record',
-          detail: 'no run-handle record — start never recorded, left untouched',
+          detail,
+          pid: identity?.pid,
+          classification: 'stale-start-attempt',
+          closedAs: 'cancelled',
         });
         continue;
       }
@@ -307,7 +376,12 @@ export function sweepStaleRuns(projectRoot: string, opts: StaleRunSweepOptions):
             commandId: `stale-sweep-${flowId}`,
           });
         }
-        report.unverifiable.push({ flowId, detail, closedAs: 'cancelled' });
+        report.unverifiable.push({
+          flowId,
+          detail,
+          classification: 'unverifiable-run-handle',
+          closedAs: 'cancelled',
+        });
         continue;
       }
 
@@ -326,7 +400,13 @@ export function sweepStaleRuns(projectRoot: string, opts: StaleRunSweepOptions):
         if (opts.apply) {
           coordinator.recordRunFailure({ flowId, error: closure.error, commandId: closure.commandId });
         }
-        report.dead.push({ flowId, detail: closure.error, pid, closedAs: 'failed' });
+        report.dead.push({
+          flowId,
+          detail: closure.error,
+          pid,
+          classification: 'dead-run-handle',
+          closedAs: 'failed',
+        });
       } else {
         if (opts.apply) {
           coordinator.abortFlow({
@@ -335,7 +415,13 @@ export function sweepStaleRuns(projectRoot: string, opts: StaleRunSweepOptions):
             commandId: closure.commandId,
           });
         }
-        report.dead.push({ flowId, detail: closure.error, pid, closedAs: 'cancelled' });
+        report.dead.push({
+          flowId,
+          detail: closure.error,
+          pid,
+          classification: 'dead-run-handle',
+          closedAs: 'cancelled',
+        });
       }
     } catch (err) {
       report.skipped.push({

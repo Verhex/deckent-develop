@@ -56,6 +56,34 @@ function countBuiltinDirs(dir: string): number {
   ).length;
 }
 
+// 2026-08-25 — the README stat-counts block became generator-owned (AUTOGEN,
+// scripts/update-readme-stats.mjs). The generator counts the MATERIALIZED
+// catalog: .deckent/agents dirs with agent.json (minus archive/temp-*) and
+// .deckent/skills dirs with skill.json|manifest.json (minus archive). That is
+// intentionally narrower than the raw builtins tree (src/core/builtins/skills
+// holds 31 dirs, but `observability` ships only SKILL.md — pool-visible, not
+// materialized), so README assertions below mirror the generator's semantics
+// while the builtins sanity pin above stays on the authored tree.
+function countMaterializedAgents(dir: string): number {
+  return readdirSync(dir, { withFileTypes: true }).filter(
+    (d) =>
+      d.isDirectory() &&
+      d.name !== 'archive' &&
+      !d.name.startsWith('temp-') &&
+      readdirSync(join(dir, d.name)).includes('agent.json'),
+  ).length;
+}
+
+function countMaterializedSkills(dir: string): number {
+  return readdirSync(dir, { withFileTypes: true }).filter(
+    (d) => {
+      if (!d.isDirectory() || d.name === 'archive') return false;
+      const files = readdirSync(join(dir, d.name));
+      return files.includes('skill.json') || files.includes('manifest.json');
+    },
+  ).length;
+}
+
 function countDashboardPages(dir: string): number {
   return readdirSync(dir).filter((n) => n.endsWith('.tsx') && !n.endsWith('.test.tsx')).length;
 }
@@ -65,6 +93,8 @@ const MCP_TOOLS = countRegistrations(join(ROOT, 'src/mcp/tools'), /server\.regis
 const MCP_RESOURCES = countRegistrations(join(ROOT, 'src/mcp/resources'), /server\.registerResource\(\s*['"][a-zA-Z0-9_-]+['"]/g);
 const BUILTIN_AGENTS = countBuiltinDirs(join(ROOT, 'src/core/builtins/agents'));
 const BUILTIN_SKILLS = countBuiltinDirs(join(ROOT, 'src/core/builtins/skills'));
+const README_AGENTS = countMaterializedAgents(join(ROOT, '.deckent/agents'));
+const README_SKILLS = countMaterializedSkills(join(ROOT, '.deckent/skills'));
 const DASHBOARD_PAGES = countDashboardPages(join(ROOT, 'src/dashboard/src/pages'));
 
 // Sanity: these must match the numbers the task named as "GERÇEK" today. If a future
@@ -110,9 +140,9 @@ describe('README.md — number truth', () => {
     expect(content).toMatch(new RegExp(`\\b${MCP_RESOURCES}\\b[^\\n]{0,40}resources?\\b`, 'i'));
   });
 
-  it(`reflects the live built-in agent/skill counts (${BUILTIN_AGENTS}/${BUILTIN_SKILLS})`, () => {
-    expect(content).toMatch(new RegExp(`\\b${BUILTIN_AGENTS}\\b[^\\n]{0,40}(built-in|personas?|agents?)\\b`, 'i'));
-    expect(content).toMatch(new RegExp(`\\b${BUILTIN_SKILLS}\\b[^\\n]{0,40}skills?\\b`, 'i'));
+  it(`reflects the generator-owned agent/skill counts (${README_AGENTS}/${README_SKILLS})`, () => {
+    expect(content).toMatch(new RegExp(`\\b${README_AGENTS}\\b[^\\n]{0,40}(built-in|personas?|agents?)\\b`, 'i'));
+    expect(content).toMatch(new RegExp(`\\b${README_SKILLS}\\b[^\\n]{0,40}skills?\\b`, 'i'));
   });
 
   it.skip(`reflects the live dashboard page count (${DASHBOARD_PAGES})`, () => {
@@ -139,9 +169,9 @@ describe('README.tr.md — number truth', () => {
     expect(content).toMatch(new RegExp(`\\b${MCP_RESOURCES}\\b[^\\n]{0,40}resource`, 'i'));
   });
 
-  it(`reflects the live built-in agent/skill counts (${BUILTIN_AGENTS}/${BUILTIN_SKILLS})`, () => {
-    expect(content).toMatch(new RegExp(`\\b${BUILTIN_AGENTS}\\b[^\\n]{0,40}(built-in|persona|agent)`, 'i'));
-    expect(content).toMatch(new RegExp(`\\b${BUILTIN_SKILLS}\\b[^\\n]{0,40}skill`, 'i'));
+  it(`reflects the generator-owned agent/skill counts (${README_AGENTS}/${README_SKILLS})`, () => {
+    expect(content).toMatch(new RegExp(`\\b${README_AGENTS}\\b[^\\n]{0,40}(built-in|persona|agent)`, 'i'));
+    expect(content).toMatch(new RegExp(`\\b${README_SKILLS}\\b[^\\n]{0,40}skill`, 'i'));
   });
 
   it.skip(`reflects the live dashboard page count (${DASHBOARD_PAGES})`, () => {

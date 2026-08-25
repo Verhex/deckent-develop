@@ -21,7 +21,9 @@ const BASE = {
   taskId: 't-1',
   sprintId: 'sprint-x',
   workType: 'build' as const,
-  domain: 'core-runtime',
+  // 2026-08-25 (A2 fairness wave): canonical domain id is 'core/runtime';
+  // legacy 'core-runtime' keys are migrated on read (normalizeLegacyCellKeys).
+  domain: 'core/runtime',
   verdict: 'DONE' as const,
   quality: 90,
 };
@@ -50,7 +52,7 @@ describe('ghost rejection + quality gate', () => {
 
       const clamped = recordOutcome(root, { ...BASE, agentId: 'a', quality: 250 });
       expect(clamped.recorded).toBe(true);
-      const cell = readCellsSnapshot(root).cells['build|core-runtime|a'];
+      const cell = readCellsSnapshot(root).cells['build|core/runtime|a'];
       expect(cell?.qualitySum).toBe(100); // clamped to the scale ceiling
     });
   });
@@ -63,8 +65,8 @@ describe('ghost rejection + quality gate', () => {
       });
       expect(ok.recorded).toBe(true);
       const snapshot = readCellsSnapshot(root);
-      expect(snapshot.cells['build|core-runtime|real-agent']?.uses).toBe(1);
-      expect(snapshot.cells['build|core-runtime|ghost-agent']).toBeUndefined();
+      expect(snapshot.cells['build|core/runtime|real-agent']?.uses).toBe(1);
+      expect(snapshot.cells['build|core/runtime|ghost-agent']).toBeUndefined();
     });
   });
 });

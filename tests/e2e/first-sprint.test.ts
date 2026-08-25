@@ -74,6 +74,7 @@ vi.mock('../../src/agents/worker.js', () => ({
 
 import { createDefaultConfig } from '../../src/core/config.js';
 import { planSprint, readContext } from '../../src/orchestra/brain.js';
+import { writeSprintState } from '../../src/orchestra/sprint-utils.js';
 import { resetDashboard as actualResetDashboard } from '../../src/monitor/auditor.js';
 import { loadTaskFiles } from '../../src/cli/commands/status.js';
 import { runDoctorChecks } from '../../src/cli/commands/doctor.js';
@@ -314,7 +315,13 @@ describe('E2E: First Sprint Flow', () => {
     const context = readContext(root);
     const recommendation = { size: 'full' as const, maxWorkers: 4, modelConstraint: null, reason: 'Test' };
 
-    await planSprint(root, config, context, recommendation, { mode: 'structured' });
+    const sprint = await planSprint(root, config, context, recommendation, { mode: 'structured' });
+    // 2026-08-25 (A3 event-truth wave): loadTaskFiles projects through the
+    // canonical run-status read-model, which is authority-gated — without a
+    // run-status signal it truthfully reports no tasks. Persist the durable
+    // lifecycle signal via the CANONICAL producer (writeSprintState — what a
+    // real run writes at start), then project.
+    writeSprintState(root, sprint);
 
     const tasks = loadTaskFiles(root);
     expect(tasks.length).toBeGreaterThanOrEqual(2);

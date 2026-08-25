@@ -14,6 +14,21 @@ vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
 }));
 
+vi.mock('../../src/cli/helpers/output.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/cli/helpers/output.js')>();
+  return { ...actual, print: vi.fn() };
+});
+
+vi.mock('../../src/core/system-capacity.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/core/system-capacity.js')>();
+  return {
+    ...actual,
+    detectSystemCapacity: vi.fn(),
+    probeDockerDaemon: vi.fn(),
+    decideSpawnBackendTransaction: vi.fn(),
+  };
+});
+
 // Mock Docker backend so auto mode tests don't depend on Docker availability
 vi.mock('../../src/orchestra/spawn-backend-docker.js', () => ({
   DockerSpawnBackend: vi.fn().mockImplementation(() => ({
@@ -30,7 +45,18 @@ vi.mock('../../src/orchestra/spawn-backend-docker.js', () => ({
 }));
 
 import { spawnSync } from 'node:child_process';
+import { print } from '../../src/cli/helpers/output.js';
+import {
+  decideSpawnBackendTransaction,
+  detectSystemCapacity,
+  probeDockerDaemon,
+} from '../../src/core/system-capacity.js';
+import { writeConfig } from '../../src/cli/commands/init-steps.js';
 const mockSpawnSync = vi.mocked(spawnSync);
+const mockPrint = vi.mocked(print);
+const mockDetectSystemCapacity = vi.mocked(detectSystemCapacity);
+const mockProbeDockerDaemon = vi.mocked(probeDockerDaemon);
+const mockDecideSpawnBackendTransaction = vi.mocked(decideSpawnBackendTransaction);
 
 // ─── Mock tmux module (direct import used by TmuxBackend) ────────────────────
 
@@ -96,6 +122,78 @@ describe('SpawnBackend interface', () => {
     expect(typeof backend.kill).toBe('function');
     expect(typeof backend.list).toBe('function');
     expect(typeof backend.isAvailable).toBe('function');
+  });
+});
+
+describe('init execution-budget backend authoring', () => {
+  let root: string;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    root = mkdtempSync(pathJoin(osTmpdir(), 'init-budget-backend-'));
+    mkdirSync(pathJoin(root, '.deckent'), { recursive: true });
+    mockDetectSystemCapacity.mockReturnValue({
+      totalRamGB: 16,
+      cpuCores: 8,
+      dockerAvailable: false,
+    });
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('authors hold and warns when finite worker budgets fall back to subprocess', async () => {
+    mockDecideSpawnBackendTransaction.mockReturnValue({
+      backend: 'subprocess',
+      daemonDowngraded: true,
+    });
+
+    await writeConfig(root, 'balanced', 'en', 'project');
+
+    const config = JSON.parse(readFileSync(
+      pathJoin(root, '.deckent', 'config.json'),
+      'utf-8',
+    )) as {
+      spawn_backend?: string;
+      execution_budget?: { unmetered_backend?: { action?: string } };
+    };
+    expect(config.spawn_backend).toBe('subprocess');
+    expect(config.execution_budget?.unmetered_backend).toEqual({ action: 'hold' });
+    expect(mockPrint).toHaveBeenCalledWith(expect.stringContaining(
+      'execution_budget.unmetered_backend',
+    ));
+    expect(mockPrint).toHaveBeenCalledWith(expect.stringContaining('Docker'));
+  });
+
+  it('does not author unmetered_backend when Docker is selected', async () => {
+    mockDetectSystemCapacity.mockReturnValue({
+      totalRamGB: 16,
+      cpuCores: 8,
+      dockerAvailable: true,
+    });
+    mockProbeDockerDaemon.mockResolvedValue(true);
+    mockDecideSpawnBackendTransaction.mockReturnValue({
+      backend: 'docker',
+      daemonDowngraded: false,
+    });
+    mockSpawnSync.mockReturnValue({
+      status: 0,
+      stdout: 'image-id',
+      stderr: '',
+    } as ReturnType<typeof spawnSync>);
+
+    await writeConfig(root, 'balanced', 'en', 'project');
+
+    const config = JSON.parse(readFileSync(
+      pathJoin(root, '.deckent', 'config.json'),
+      'utf-8',
+    )) as {
+      spawn_backend?: string;
+      execution_budget?: { unmetered_backend?: unknown };
+    };
+    expect(config.spawn_backend).toBe('docker');
+    expect(config.execution_budget?.unmetered_backend).toBeUndefined();
   });
 });
 
@@ -382,7 +480,7 @@ describe('SpawnBackend swappability', () => {
 // project keeps closing — a config key that never reaches the resolved config).
 import { DEFAULT_WORKER_HOME_TMPFS_SIZE } from '../../src/orchestra/spawn-backend-docker.js';
 import { loadConfig } from '../../src/core/config.js';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir as osTmpdir } from 'node:os';
 import { join as pathJoin } from 'node:path';
 

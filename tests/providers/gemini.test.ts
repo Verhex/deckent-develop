@@ -35,14 +35,26 @@ vi.mock('node:fs', () => ({
   appendFileSync: vi.fn(),
   mkdirSync: vi.fn(),
   existsSync: vi.fn().mockReturnValue(true),
+  // 675-001: heartbeat writes now delegate to the writeTaskHeartbeatFile
+  // primitive (core/worker-activity-heartbeat), which reads the current hb for
+  // monotonic-regression detection then lands atomically (tmp write + fsync +
+  // rename). Model that surface: fresh-file ENOENT read + fd plumbing.
+  readFileSync: vi.fn(() => {
+    throw Object.assign(new Error('ENOENT: no such file'), { code: 'ENOENT' });
+  }),
+  openSync: vi.fn(() => 3),
+  closeSync: vi.fn(),
+  fsyncSync: vi.fn(),
+  renameSync: vi.fn(),
 }));
 
 import { spawn, spawnSync } from 'node:child_process';
-import { writeFileSync, appendFileSync, mkdirSync, existsSync } from 'node:fs';
+import { writeFileSync, appendFileSync, mkdirSync, existsSync, renameSync } from 'node:fs';
 
 const mockSpawn = spawn as unknown as MockInstance;
 const mockSpawnSync = spawnSync as unknown as MockInstance;
 const mockWriteFileSync = writeFileSync as unknown as MockInstance;
+const mockRenameSync = renameSync as unknown as MockInstance;
 const mockAppendFileSync = appendFileSync as unknown as MockInstance;
 const mockMkdirSync = mkdirSync as unknown as MockInstance;
 const mockExistsSync = existsSync as unknown as MockInstance;
@@ -346,12 +358,19 @@ describe('GeminiAdapter', () => {
     setupMockChild();
     adapter.spawn('task-002', 'gemini-2.5-flash', 'Test prompt');
 
+    // 675-001: the hb write is delegated to writeTaskHeartbeatFile — the
+    // payload lands on a .tmp sibling first, then renameSync moves it onto the
+    // canonical task-002.hb path. Same content contract as before.
     expect(mockWriteFileSync).toHaveBeenCalledTimes(1);
-    const [hbPath, content] = mockWriteFileSync.mock.calls[0];
-    expect(hbPath).toContain('task-002.hb');
+    const [tmpPath, content] = mockWriteFileSync.mock.calls[0];
+    expect(tmpPath).toContain('task-002.hb');
     const hb = JSON.parse(content);
     expect(hb.workerId).toBe('gemini-task-002');
     expect(hb.status).toBe('EXECUTING');
+    expect(mockRenameSync).toHaveBeenCalledTimes(1);
+    const [renameFrom, renameTo] = mockRenameSync.mock.calls[0];
+    expect(renameFrom).toBe(tmpPath);
+    expect(String(renameTo).endsWith('task-002.hb')).toBe(true);
   });
 
   it('spawn tracks worker entry', () => {

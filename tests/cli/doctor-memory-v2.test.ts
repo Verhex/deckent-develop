@@ -49,6 +49,18 @@ vi.mock('../../src/core/errors.js', () => ({
   ErrorRegistry: {
     get: vi.fn().mockReturnValue({ suggestion: 'test suggestion' }),
   },
+  // Gercek imzayla uyumlu davranissal-notr stub (routing/journal zinciri
+  // DeckentError'u modul yukunde referansliyor).
+  DeckentError: class DeckentError extends Error {
+    constructor(
+      public readonly code: string,
+      message: string,
+      public readonly suggestion?: string,
+    ) {
+      super(message);
+      this.name = 'DeckentError';
+    }
+  },
 }));
 
 const mockMemoryStore = {

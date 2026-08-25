@@ -8,6 +8,7 @@
 
 ## ŞU AN — çalışma-imleci (Claude epoch-4)
 
+- ✅ **C-DALGASI KAPANDI (2026-08-25 gece; sprint-677 8/8 İLK-DENEMEDE, ~8dk):** 3350/3351/541/3352/3353/540 altı satır receipt'li VERIFY (`GR-2026-08-25-CWAVE-*-01` ×6). Landing el-paketi: 5 tsc daraltması (mcp/plan readiness-union + init-steps dil) + 39-dosya mock-drift onarımı (3 paralel ajan; 4 sözleşme yeniden-ifadesi: doctor mixed/17-check, ghost-rejection kanonik-domain, e2e canonical-producer) + closure-projection regen + baseline'lar. 3350 canlı-prob: dry-run temp-agent YAZMIYOR (2→2). ÖLÇÜM (bonus 0.05 ilk gerçek koşu): 38 karar / 35 izli / bonusDecisive 0 / tie 0 — güvenli ama bu görev-karışımında etkisiz (fark ~0.08; tasarım gereği yalnız kıl-payı çevirir). LANDING-KUYRUĞU: suite-4'ün 206 kırmızısı (mid-run mutasyon + mock-drift) 3-paralel-ajan onarımı + 6 el-fix'le sıfırlandı; 677-002'nin CLI yüzey-eki (--write-allowlist) iki contract-SSOT'a + EXECUTE_OPT_IN_RE bileşik-bayrak fix'ine + mcp approve-override'ına bağlandı; error-ratchet sıkılaştı. **FİNAL MÜNHASIR FULL-SUITE: 38743/0 TAM YEŞİL (exit-0)** — kadans-verdict'i temiz.
 - ✅ **EXPLORATION-BONUS DALGASI KAPANDI (2026-08-25 gece; MASTER 9073 DONE,
   `receipt=GR-2026-08-25-EXPLORATION-BONUS-01`):** sprint-676 3/3 ilk-denemede DONE (676-002
   sol-tier blend-mekaniği), gate PASS (tsc 0 + 84/84 vitest + 0 honesty), hiç fix-retry yok.
@@ -51,7 +52,8 @@
 4. A4 ertelenenler (A3 negative-space): legacy `.hb` şema emekliliği · `.log` format-birleşimi ·
    inspect↔read-model parity · ölü `run-state-feed.ts` silimi · event-stream kayıpsız rotasyon ·
    Nervous observer filtre genişletmesi.
-5. Worker'ların `HEARTBEAT_IDENTITY_HOLD` (attemptId/backend host-bound değil) gerekçesiyle hb
+5. "vitest-yeşil ama tsc-kirli" örüntüsü 675/676/677'de üst-üste + dalga-sonrası geniş mock-drift: adaylar — Auditor tsc-FAIL'inin otomatik FIX-task doğurması; tam-factory `vi.mock`'lar için importOriginal-spread ratchet'i.
+6. Worker'ların `HEARTBEAT_IDENTITY_HOLD` (attemptId/backend host-bound değil) gerekçesiyle hb
    yazmayı reddetmesi — 674'te gözlendi; prompt/host-bound kimlik akışı incelenmeli.
 
 ## SIRADAKİ yürütme sırası
@@ -64,7 +66,6 @@
    `.deckent/runtime/closure-staging/work-480/bundle`, request
    `aprcdb-cb3eb74b4598bacc49b9ea6204208cca`, decision=allow verilmiş; tek oturumda
    sign → append → lint yeşil → Work-480 OPEN→DONE.
-4. C-satır dalgaları: 3350-3353 (plan-purity/spawn-retry/resume-lock/finite-budget) + 540-541.
 5. Bekleyen küçükler: orphan `cli.provider-observations.*` i18n-anahtarları · eski MCP-artık
    süreçler (MCP server'lar hâlâ eski dist'te — restart owner-koordinasyonlu) · XVerify
    adjudicator-arızası (typed-HOLD'da; kör-retry yasak) · Slack/Teams secrets (owner) ·
@@ -77,7 +78,7 @@
   canlı; 20-gate + build:all + tsc --noEmit yeşil; dist=src eşit.
 - Nöbetçi-deseni: sprint-izleme ana-oturumda değil Sonnet-subagent'ta (A–F tetikleri) — A3'te
   iki koşuda da başarıyla çalıştı.
-- Done-ready sayacı: **12/20** — önceki 10 + A3 event-truth (3354 VERIFY) + exploration-bonus (9073 DONE).
+- Done-ready sayacı: **12/20** (+6 C-satırı VERIFY'da owner-DONE bekliyor) — önceki 10 + A3 event-truth (3354 VERIFY) + exploration-bonus (9073 DONE).
 - Dogfood dist-gecikmesi kuralı (owner-anlatımı verildi): run başladığı dist'le biter;
   motor-fix'i aynı run'a etki edemez — sıcak-yol fix'i önce mini-run'la landılır.
 

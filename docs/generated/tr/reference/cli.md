@@ -370,6 +370,7 @@ Etkin directives üzerinden canonical task planını kurar. Dry-run task file ya
 | `--interrogate` | Planlamadan önce direktifleri yapısal sorularla sorgula |
 | `--force-prompt-gate` | Plan zamanı prompt-gate BLOCK kararını atla (persona-yetenek uyuşmazlığı) |
 | `--force-scope` | Bu exact plan için şüpheli kapsam yollarını açıkça kabul et |
+| `--write-allowlist <paths...>` | Exact planı mevcut dosyalardan oluşan kapalı write allowlist’e bağla; option sonrasında path’leri sıralayın |
 | `--adopt-existing <sprintId>` | Mevcut legacy Sprint projection’ını bu exact planla açıkça reconcile et |
 | `--expected-plan-digest <sha256>` | Adoption için gerekli, owner tarafından gözlemlenmiş V4 execution-plan digest’i |
 | `--expected-projection-digest <sha256>` | Adoption için gerekli, owner tarafından gözlemlenmiş legacy task-projection digest’i |

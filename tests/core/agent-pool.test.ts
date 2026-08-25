@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
@@ -27,7 +27,13 @@ vi.mock('../../src/core/token-counter.js', () => ({
 }));
 
 import * as fs from 'node:fs';
-import { AgentPoolManager, isTempAgentStale, DEFAULT_MAX_TEMP_AGENTS, DEFAULT_MAX_AGENT_AGE } from '../../src/core/agent-pool.js';
+import {
+  AgentPoolManager,
+  __setBuiltinAgentsDirForTests,
+  isTempAgentStale,
+  DEFAULT_MAX_TEMP_AGENTS,
+  DEFAULT_MAX_AGENT_AGE,
+} from '../../src/core/agent-pool.js';
 import { createAgentDefinition } from '../../src/core/agent-types.js';
 import type { AgentDefinition } from '../../src/core/agent-types.js';
 import { buildWorkerPrompt } from '../../src/orchestra/task-builder.js';
@@ -49,12 +55,52 @@ describe('AgentPoolManager', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    __setBuiltinAgentsDirForTests(null);
     manager = new AgentPoolManager(ROOT);
+  });
+
+  afterEach(() => {
+    __setBuiltinAgentsDirForTests(null);
+    vi.restoreAllMocks();
   });
 
   // ─── loadAgents ──────────────────────────────────────────────────────────────
 
   describe('loadAgents', () => {
+    it('emits a typed warning and marks the pool degraded when config.json is missing', () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      const stderr = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      const pool = manager.loadAgents();
+
+      expect(pool.size).toBe(0);
+      expect(pool.degraded).toEqual([
+        expect.objectContaining({ code: 'builtin-project-config-missing' }),
+      ]);
+      expect(stderr).toHaveBeenCalledOnce();
+      expect(stderr.mock.calls[0]?.[0]).toContain('.deckent/config.json');
+      expect(stderr.mock.calls[0]?.[0]).toContain('bulunamadığı');
+    });
+
+    it('emits a typed warning and marks the pool degraded when builtin dir is missing', () => {
+      const missingBuiltinDir = '/test/missing-builtin-agents';
+      __setBuiltinAgentsDirForTests(missingBuiltinDir);
+      vi.mocked(fs.existsSync).mockImplementation(
+        (candidate) => String(candidate).endsWith('.deckent/config.json'),
+      );
+      const stderr = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      const pool = manager.loadAgents();
+
+      expect(pool.size).toBe(0);
+      expect(pool.degraded).toEqual([
+        expect.objectContaining({ code: 'builtin-catalog-directory-missing' }),
+      ]);
+      expect(stderr).toHaveBeenCalledOnce();
+      expect(stderr.mock.calls[0]?.[0]).toContain('catalog directory is missing');
+      expect(stderr.mock.calls[0]?.[0]).toContain('katalog dizini bulunamadı');
+    });
+
     it('returns empty pool when no directories exist', () => {
       vi.mocked(fs.existsSync).mockReturnValue(false);
       const pool = manager.loadAgents();

@@ -370,6 +370,7 @@ Builds the canonical task plan from the active directives. Dry-run prints withou
 | `--interrogate` | Challenge directives with structural questions before planning |
 | `--force-prompt-gate` | Bypass the plan-time prompt-gate BLOCK (persona-capability mismatch) |
 | `--force-scope` | Acknowledge suspect scope paths for this exact plan |
+| `--write-allowlist <paths...>` | Bind the exact plan to an existing-file closed write allowlist; repeat paths after the option |
 | `--adopt-existing <sprintId>` | Explicitly reconcile an existing legacy Sprint projection into this exact plan |
 | `--expected-plan-digest <sha256>` | Owner-observed V4 execution-plan digest required for adoption |
 | `--expected-projection-digest <sha256>` | Owner-observed legacy task-projection digest required for adoption |

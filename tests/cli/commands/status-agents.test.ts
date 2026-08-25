@@ -45,7 +45,13 @@ vi.mock('../../../src/core/run-status-authority.js', () => ({
   })),
 }));
 
-vi.mock('../../../src/core/run-status-read-model.js', () => ({
+// importOriginal spread: loadTaskFiles artık canonical loadCanonicalRunTasks
+// üzerinden okur — bu describe'lar o GERÇEK davranışı (sidecar dışlama,
+// malformed atlama) mocked-fs fixture'larıyla test eder; kapalı factory onu
+// stub'layıp testleri anlamsızlaştırırdı. resolveRunStatusReadiness de gerçek
+// kalır (mocked ACTIVE+alive authority hiç HOLD üretmez).
+vi.mock('../../../src/core/run-status-read-model.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/core/run-status-read-model.js')>()),
   readCanonicalRunStatusReadModel: vi.fn(() => ({
     schemaVersion: 1, revision: 1, runGeneration: 1, modelDigest: 'digest-test',
     holds: [], providerConcurrency: [], authority: {},
@@ -88,6 +94,9 @@ function makeDashboard(overrides?: Partial<DashboardState>): DashboardState {
 function makeTask(overrides?: Partial<Task>): Task {
   return {
     id: '001',
+    // Canonical run-task admission: a task artifact surfaces only when it
+    // belongs to the authority's run identity (loadCanonicalRunTasks filter).
+    sprintId: 'sprint-001',
     title: 'Test task',
     description: 'A test task',
     model: 'sonnet',

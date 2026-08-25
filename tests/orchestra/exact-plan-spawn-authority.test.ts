@@ -8,7 +8,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { TaskStatus, type Task } from '../../src/core/types.js';
+import {
+  createGoNoGoCriterionItem,
+  TaskStatus,
+  type Task,
+} from '../../src/core/types.js';
+import { buildWorkerPrompt } from '../../src/orchestra/task-builder.js';
 import {
   assertExactPlanDependencies,
   assertExactPlanTaskUnchanged,
@@ -112,6 +117,50 @@ describe('exact plan spawn authority', () => {
         taskId: approved.id,
       }),
     );
+  });
+
+  it('ignores prompt-build runtime fields when an exact spawn is retried', () => {
+    const root = makeRoot();
+    const approved = task({
+      model: 'gpt-5.6-sol',
+      assignedAgent: 'implementer',
+      assignedSkills: [],
+      goNogo: {
+        goCriteria: 'The exact task is implemented.',
+        noGoCriteria: 'The exact task is not implemented.',
+        techDebtAcceptable: 'none',
+        items: [
+          createGoNoGoCriterionItem({
+            polarity: 'go',
+            statement: 'The exact task is implemented.',
+            evidenceRequirements: ['The exact task is implemented.'],
+          }),
+          createGoNoGoCriterionItem({
+            polarity: 'no-go',
+            statement: 'The exact task is not implemented.',
+            evidenceRequirements: ['The exact task is not implemented.'],
+          }),
+        ],
+      },
+    });
+    writeFileSync(
+      join(root, '.tasks', `task-${approved.id}.json`),
+      JSON.stringify(approved),
+      'utf8',
+    );
+
+    buildWorkerPrompt(approved, undefined, [], root);
+
+    expect(approved.estimatedTokens).toBeTypeOf('number');
+    expect(approved.promptCompilePlanId).toMatch(/^prompt-compile-plan:sha256:/u);
+    expect(readSpawnTaskAuthority(root, approved, authority)).toEqual(
+      expect.not.objectContaining({
+        estimatedTokens: expect.anything(),
+        promptCompilePlanId: expect.anything(),
+      }),
+    );
+
+    expect(() => buildWorkerPrompt(approved, undefined, [], root)).not.toThrow();
   });
 
   it('allows legacy disk refresh but rejects exact runtime route mutation', () => {
