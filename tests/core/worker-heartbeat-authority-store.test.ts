@@ -73,8 +73,66 @@ describe('WorkerHeartbeatAuthorityStore', () => {
     expect(store.observe(write({
       identity: { ...identity, workerId: 'foreign-worker' },
       expectedHostSequence: 1,
-    }))).toMatchObject({ state: 'HOLD', reasonCode: 'foreign-attempt' });
+    }))).toMatchObject({ state: 'HOLD', reasonCode: 'foreign-writer' });
     expect(store.read(identity)?.latest?.hostSequence).toBe(1);
+  });
+
+  it('rejects sprint-480 rollback and forged wall-time while preserving live process visibility', () => {
+    let millis = Date.parse('2026-07-31T10:00:00.000Z');
+    const store = new WorkerHeartbeatAuthorityStore(root(), {
+      hostNow: () => new Date(millis++),
+      maxWorkerClockSkewMs: 60_000,
+    });
+    store.initialize(identity);
+    for (let expectedHostSequence = 0; expectedHostSequence < 80; expectedHostSequence += 1) {
+      expect(store.observe(write({ expectedHostSequence })).state).toBe('ACCEPTED');
+    }
+
+    const rollback = store.observe(write({
+      expectedHostSequence: 1,
+      workerObservedAt: '2001-01-01T00:00:00.000Z',
+    }));
+    expect(rollback).toMatchObject({
+      state: 'HOLD',
+      reasonCode: 'stale-writer',
+      currentHostSequence: 80,
+      evidence: {
+        expectedHostSequence: 1,
+        contradictions: ['stale-writer', 'wall-time-skew'],
+      },
+    });
+    expect(store.read(identity)?.latest).toMatchObject({
+      hostSequence: 80,
+      hostProcessOutcome: { state: 'running', exitCode: null },
+      liveness: 'alive',
+    });
+
+    const forgedTime = store.observe(write({
+      expectedHostSequence: 80,
+      workerObservedAt: '2001-01-01T00:00:00.000Z',
+    }));
+    expect(forgedTime).toMatchObject({ state: 'HOLD', reasonCode: 'wall-time-skew' });
+    expect(store.read(identity)?.latest?.hostSequence).toBe(80);
+    expect(store.readConflicts(identity).map(conflict => conflict.reasonCode))
+      .toEqual(['stale-writer', 'wall-time-skew']);
+  });
+
+  it('records a same-attempt worker identity fence violation without replacing authority', () => {
+    const store = new WorkerHeartbeatAuthorityStore(root(), {
+      hostNow: () => new Date('2026-07-31T10:00:00.000Z'),
+    });
+    store.initialize(identity);
+    expect(store.observe(write()).state).toBe('ACCEPTED');
+
+    const rejected = store.observe(write({
+      identity: { ...identity, workerId: 'worker-side-writer', fence: 'worker-side-fence' },
+      expectedHostSequence: 1,
+    }));
+    expect(rejected).toMatchObject({ state: 'HOLD', reasonCode: 'foreign-writer' });
+    expect(store.read(identity)?.latest).toMatchObject({ hostSequence: 1, liveness: 'alive' });
+    expect(store.readConflicts(identity)).toEqual([
+      expect.objectContaining({ reasonCode: 'foreign-writer' }),
+    ]);
   });
 
   it('retains host process outcome separately from the worker verdict', () => {

@@ -14,6 +14,23 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint683] - 2026-08-26
+
+### Added
+
+- 3171 — heartbeat monotonic fence (worker sequence/walltime sahteciliği imkânsızlaşır)
+- 3173 — hold-sınıflandırma: scope/kod hatası provider usage-limit'i tetikleyemez
+- 3175 — attribution: predecessor diff'i sonraki attempt'e mal edilemez
+- 3177 — force-finalize eşleşen recovery-coordinator'ı emekli etmeden terminal dönemez
+
+### Fixed
+
+- 3174 — evaluate-lock orphan: NO_GO'lu task FIX'siz/karar'sız mahsur kalamaz
+- 3176 — priority-FIX collision/slot admission'da bloklu bağımlıları geçer
+
+
+_Tasks: 6 total, 6 done, 0 tech debt, 0 no-go_
+
 ## [sprint682] - 2026-08-26
 
 ### Added

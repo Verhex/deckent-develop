@@ -577,3 +577,16 @@ attempt harcama gerekçesi değil, host composition defect kanıtıdır.
   zinciri çalıştı, kusur direktif-yazarındaydı. Yan-kanıt: dalganın mekanik kapısı
   (`lint-config-writers`) ilk koşusunda dalganın kendisinin ulaşamadığı 11 kalıntı writer'ı
   buldu (CLI/API yüzeyleri) — kapı-önce-tarama, envanter-grep'ten daha güvenilirdir.
+- **2026-08-26 — Node-4 günü üç ders**: (1) **Pipe exit-yutması üçüncü kez tepti** — `lint |
+  tail` zinciri MASTER-validator kırmızısını yutup bozuk receipt'in push'lanmasına izin verdi
+  (dakikalar içinde onarıldı). Kural artık mutlak: doğrulama exit-kodu HİÇBİR ZAMAN pipe
+  arkasından okunmaz; `cmd > log 2>&1; echo $?` tek meşru desen. (2) **`ls` nokta-dosyaları
+  gizler — "boş dizin" iddiası `ls -A`'sız geçersizdir**: worker-core arşiv dizinleri "boş"
+  sanılıp defekt ilan edilecekken gerçekte content-addressed gizli-dosyalarla doluydu; disk-
+  kanıt iddiası nokta-farkındalıklı komutla verilir. (3) **Naive `task-*.json` glob'u sidecar
+  yer: canonical dosya-adı otoritesi kullan** — FIX-fazı loader'ı `.landing-proposal.json`
+  sınıfı sidecar'ları id'siz pseudo-task yükleyip yeni katı causal-sort'ta
+  `undefined.localeCompare` çöküşü üretti (sprint-683); kök onarım tek-kaynak
+  `isCanonicalTaskFilename` + id-tipi guard'ı ve regresyon-pini. Yan-ders: sıkı yeni kod,
+  latent eski kiri ölümcül yapabilir — sıkılaştırma dalgalarında çevre-kirliliği taraması
+  (yabancı/artık dosyalar) ön-adım olmalı.

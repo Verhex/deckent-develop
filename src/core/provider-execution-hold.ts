@@ -7,14 +7,42 @@
  */
 
 import { readEvents, writeEvent } from './event-stream.js';
+import type {
+  ProviderReportedUsageLimitEvidence,
+} from './provider-failure-classifier.js';
 
 export const PROVIDER_EXECUTION_HOLD_CHANNEL = 'PROVIDER_EXECUTION_HOLD';
 
-export interface ProviderExecutionHold {
+interface ProviderExecutionHoldBase {
   readonly provider: string;
-  readonly kind: 'auth' | 'usage-limit';
   readonly sourceTaskId: string;
   readonly reason: string | null;
+}
+
+export interface ProviderAuthExecutionHold extends ProviderExecutionHoldBase {
+  readonly kind: 'auth';
+}
+
+export interface ProviderUsageLimitExecutionHold extends ProviderExecutionHoldBase {
+  readonly kind: 'usage-limit';
+  readonly evidence: ProviderReportedUsageLimitEvidence;
+}
+
+export type ProviderExecutionHold =
+  | ProviderAuthExecutionHold
+  | ProviderUsageLimitExecutionHold;
+
+/** Publish only evidence-complete holds; usage-limit cannot be constructed bare. */
+export function publishProviderExecutionHold(
+  projectRoot: string,
+  sprintId: string,
+  hold: ProviderExecutionHold,
+): void {
+  writeEvent(projectRoot, sprintId, 'brain', 'auditor', PROVIDER_EXECUTION_HOLD_CHANNEL, {
+    ...hold,
+    state: 'held',
+    heldAt: new Date().toISOString(),
+  });
 }
 
 /** Project the ordered hold/clear event history into the currently active holds. */
@@ -41,12 +69,30 @@ export function readProviderExecutionHolds(
       ? payload.sourceTaskId
       : null;
     if (!kind || !sourceTaskId) continue;
-    holds.set(provider, {
+    const base = {
       provider,
-      kind,
       sourceTaskId,
       reason: typeof payload.reason === 'string' ? payload.reason : null,
-    });
+    };
+    if (kind === 'usage-limit') {
+      if (!payload.evidence || typeof payload.evidence !== 'object') continue;
+      const evidence = payload.evidence as Record<string, unknown>;
+      if (
+        evidence.kind !== 'provider-reported-usage-limit'
+        || typeof evidence.signal !== 'string'
+        || evidence.signal.trim().length === 0
+      ) continue;
+      holds.set(provider, {
+        ...base,
+        kind,
+        evidence: {
+          kind: 'provider-reported-usage-limit',
+          signal: evidence.signal,
+        },
+      });
+    } else {
+      holds.set(provider, { ...base, kind });
+    }
   }
   return [...holds.values()];
 }

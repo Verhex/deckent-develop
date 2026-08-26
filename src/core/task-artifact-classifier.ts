@@ -44,6 +44,18 @@ export type TaskArtifactClassification = TaskRecordArtifact | NonTaskArtifact;
 
 const TASK_FILENAME = /^task-([\w-]{1,100})\.json$/;
 
+/**
+ * Exact canonical task-record filename test. Sidecar artifacts
+ * (`task-<id>.landing-proposal.json`, `.skill-delivery.json`,
+ * `.prompt-delivery.json`, …) contain dots inside the id segment and are
+ * rejected — a naive `startsWith('task-') && endsWith('.json')` glob admits
+ * them as id-less pseudo-tasks (sprint-683 canlı vakası: FIX-fazı
+ * `undefined.localeCompare` çöküşü).
+ */
+export function isCanonicalTaskFilename(filename: string): boolean {
+  return TASK_FILENAME.test(filename);
+}
+
 function nonTask(reason: NonTaskArtifactReason): NonTaskArtifact {
   return { kind: 'non-task-artifact', reason };
 }

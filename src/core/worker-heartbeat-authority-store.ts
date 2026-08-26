@@ -26,6 +26,8 @@ import { DeckentError } from './errors.js';
 
 const STORE_SCHEMA_VERSION = 1 as const;
 const REVISION_FILE = /^([0-9]{16})\.json$/;
+const CONFLICT_FILE = /^conflict-[0-9a-f-]+\.json$/;
+const DEFAULT_MAX_WORKER_CLOCK_SKEW_MS = 5 * 60 * 1_000;
 
 export interface WorkerHeartbeatAuthorityWrite {
   readonly identity: WorkerHeartbeatAuthorityIdentity;
@@ -33,12 +35,16 @@ export interface WorkerHeartbeatAuthorityWrite {
   readonly hostProcessOutcome: WorkerHeartbeatAuthorityObservationInput['hostProcessOutcome'];
   readonly workerTaskVerdict: WorkerHeartbeatAuthorityObservationInput['workerTaskVerdict'];
   readonly liveness: WorkerHeartbeatAuthorityObservationInput['liveness'];
+  /** Diagnostic worker clock only. It never becomes the authority timestamp. */
+  readonly workerObservedAt?: string;
 }
 
 export type WorkerHeartbeatAuthorityStoreHoldReason =
   | 'attempt-not-initialized'
   | 'foreign-attempt'
+  | 'foreign-writer'
   | 'stale-writer'
+  | 'wall-time-skew'
   | 'write-in-progress'
   | 'invalid-observation';
 
@@ -47,6 +53,22 @@ export interface WorkerHeartbeatAuthorityStoreHold {
   readonly reasonCode: WorkerHeartbeatAuthorityStoreHoldReason;
   readonly attemptId: string;
   readonly currentHostSequence: number | null;
+  readonly detail: string;
+  readonly evidence: WorkerHeartbeatAuthorityConflictEvidence | null;
+}
+
+export interface WorkerHeartbeatAuthorityConflictEvidence {
+  readonly schemaVersion: typeof STORE_SCHEMA_VERSION;
+  readonly state: 'HOLD';
+  readonly reasonCode: WorkerHeartbeatAuthorityStoreHoldReason;
+  readonly contradictions: readonly WorkerHeartbeatAuthorityStoreHoldReason[];
+  readonly identity: WorkerHeartbeatAuthorityIdentity;
+  readonly expectedHostSequence: number;
+  readonly currentHostSequence: number | null;
+  readonly workerObservedAt: string | null;
+  readonly hostObservedAt: string;
+  readonly hostProcessOutcome: WorkerHeartbeatAuthorityObservationInput['hostProcessOutcome'];
+  readonly liveness: WorkerHeartbeatAuthorityObservationInput['liveness'];
   readonly detail: string;
 }
 
@@ -76,6 +98,8 @@ interface StoredIdentity {
 export interface WorkerHeartbeatAuthorityStoreOptions {
   /** Host clock injection seam. Worker observations never supply timestamps. */
   readonly hostNow?: () => Date;
+  /** Maximum tolerated difference for an optional, non-authoritative worker clock. */
+  readonly maxWorkerClockSkewMs?: number;
 }
 
 function sameIdentity(
@@ -104,8 +128,9 @@ function hold(
   attemptId: string,
   currentHostSequence: number | null,
   detail: string,
+  evidence: WorkerHeartbeatAuthorityConflictEvidence | null = null,
 ): WorkerHeartbeatAuthorityStoreHold {
-  return { state: 'HOLD', reasonCode, attemptId, currentHostSequence, detail };
+  return { state: 'HOLD', reasonCode, attemptId, currentHostSequence, detail, evidence };
 }
 
 /**
@@ -152,10 +177,16 @@ function publishExclusive(path: string, value: unknown): boolean {
 export class WorkerHeartbeatAuthorityStore {
   readonly #root: string;
   readonly #hostNow: () => Date;
+  readonly #maxWorkerClockSkewMs: number;
 
   constructor(root: string, options: WorkerHeartbeatAuthorityStoreOptions = {}) {
     this.#root = resolve(root);
     this.#hostNow = options.hostNow ?? (() => new Date());
+    this.#maxWorkerClockSkewMs = options.maxWorkerClockSkewMs
+      ?? DEFAULT_MAX_WORKER_CLOCK_SKEW_MS;
+    if (!Number.isFinite(this.#maxWorkerClockSkewMs) || this.#maxWorkerClockSkewMs < 0) {
+      throw new TypeError('maxWorkerClockSkewMs must be a finite non-negative number');
+    }
     mkdirSync(this.#root, { recursive: true, mode: 0o700 });
   }
 
@@ -188,7 +219,18 @@ export class WorkerHeartbeatAuthorityStore {
       throw error;
     }
     if (!sameIdentity(storedIdentity, input.identity)) {
-      return hold('foreign-attempt', input.identity.attemptId, null, 'writer does not own the exact fenced attempt');
+      const sameAttempt = storedIdentity.runId === input.identity.runId
+        && storedIdentity.taskId === input.identity.taskId
+        && storedIdentity.attemptId === input.identity.attemptId;
+      return this.#recordHold(
+        directory,
+        input,
+        sameAttempt ? 'foreign-writer' : 'foreign-attempt',
+        null,
+        sameAttempt
+          ? 'worker identity or host-issued writer fence does not own authority'
+          : 'writer does not own the exact fenced attempt',
+      );
     }
 
     const lockPath = join(directory, 'write.lock');
@@ -205,11 +247,36 @@ export class WorkerHeartbeatAuthorityStore {
       const authority = this.#readState(directory, storedIdentity);
       const currentSequence = authority.latest?.hostSequence ?? 0;
       if (input.expectedHostSequence !== currentSequence) {
-        return hold('stale-writer', input.identity.attemptId, currentSequence, 'expected host sequence does not match authority');
+        const hostObservedAt = this.#hostTimestamp();
+        const contradictions: WorkerHeartbeatAuthorityStoreHoldReason[] = ['stale-writer'];
+        if (this.#workerClockViolatesFence(input.workerObservedAt, hostObservedAt)) {
+          contradictions.push('wall-time-skew');
+        }
+        return this.#recordHold(
+          directory,
+          input,
+          'stale-writer',
+          currentSequence,
+          'expected host sequence does not match authority',
+          hostObservedAt,
+          contradictions,
+        );
       }
 
       const hostSequence = currentSequence + 1;
       const hostObservedAt = this.#nextTimestamp(authority);
+      if (input.workerObservedAt !== undefined) {
+        if (this.#workerClockViolatesFence(input.workerObservedAt, hostObservedAt)) {
+          return this.#recordHold(
+            directory,
+            input,
+            'wall-time-skew',
+            currentSequence,
+            'worker wall-time is malformed or outside the host-clock skew fence',
+            hostObservedAt,
+          );
+        }
+      }
       const observation: WorkerHeartbeatAuthorityObservationInput = {
         ...storedIdentity,
         hostSequence,
@@ -254,6 +321,22 @@ export class WorkerHeartbeatAuthorityStore {
     return this.#readState(directory, storedIdentity);
   }
 
+  /** Durable typed evidence for rejected writers; never replaces live authority. */
+  readConflicts(identity: WorkerHeartbeatAuthorityIdentity): readonly WorkerHeartbeatAuthorityConflictEvidence[] {
+    const directory = this.#attemptDirectory(identity);
+    const identityPath = join(directory, 'identity.json');
+    try {
+      if (!sameIdentity(this.#readIdentity(identityPath), identity)) return [];
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+      throw error;
+    }
+    return readdirSync(directory)
+      .filter(name => CONFLICT_FILE.test(name))
+      .map(name => JSON.parse(readFileSync(join(directory, name), 'utf8')) as WorkerHeartbeatAuthorityConflictEvidence)
+      .sort((left, right) => Date.parse(left.hostObservedAt) - Date.parse(right.hostObservedAt));
+  }
+
   #attemptDirectory(identity: WorkerHeartbeatAuthorityIdentity): string {
     return join(this.#root, attemptKey(identity));
   }
@@ -296,5 +379,47 @@ export class WorkerHeartbeatAuthorityStore {
     if (!Number.isFinite(observedMillis)) throw new DeckentError('E_HOST_CLOCK_RETURNED_AN_INVALID_DATE', 'Host clock returned an invalid date');
     const previousMillis = authority.latest === null ? -1 : Date.parse(authority.latest.hostObservedAt);
     return new Date(Math.max(observedMillis, previousMillis + 1)).toISOString();
+  }
+
+  #recordHold(
+    directory: string,
+    input: WorkerHeartbeatAuthorityWrite,
+    reasonCode: WorkerHeartbeatAuthorityStoreHoldReason,
+    currentHostSequence: number | null,
+    detail: string,
+    hostObservedAt = this.#hostTimestamp(),
+    contradictions: readonly WorkerHeartbeatAuthorityStoreHoldReason[] = [reasonCode],
+  ): WorkerHeartbeatAuthorityStoreHold {
+    const evidence: WorkerHeartbeatAuthorityConflictEvidence = {
+      schemaVersion: STORE_SCHEMA_VERSION,
+      state: 'HOLD',
+      reasonCode,
+      contradictions,
+      identity: input.identity,
+      expectedHostSequence: input.expectedHostSequence,
+      currentHostSequence,
+      workerObservedAt: input.workerObservedAt ?? null,
+      hostObservedAt,
+      hostProcessOutcome: input.hostProcessOutcome,
+      liveness: input.liveness,
+      detail,
+    };
+    publishExclusive(join(directory, `conflict-${randomUUID()}.json`), evidence);
+    return hold(reasonCode, input.identity.attemptId, currentHostSequence, detail, evidence);
+  }
+
+  #hostTimestamp(): string {
+    const observed = this.#hostNow();
+    if (!Number.isFinite(observed.getTime())) {
+      throw new DeckentError('E_HOST_CLOCK_RETURNED_AN_INVALID_DATE', 'Host clock returned an invalid date');
+    }
+    return observed.toISOString();
+  }
+
+  #workerClockViolatesFence(workerObservedAt: string | undefined, hostObservedAt: string): boolean {
+    if (workerObservedAt === undefined) return false;
+    const workerMillis = Date.parse(workerObservedAt);
+    return !Number.isFinite(workerMillis)
+      || Math.abs(workerMillis - Date.parse(hostObservedAt)) > this.#maxWorkerClockSkewMs;
   }
 }

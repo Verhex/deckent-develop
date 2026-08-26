@@ -44,6 +44,78 @@ export interface ExecutionRecoveryProcessIdentityAuthority {
   >;
 }
 
+/**
+ * Fresh, exact-identity evidence used to decide whether an evaluate-lock owner
+ * is making progress. A PID/state-file observation is deliberately not part of
+ * this contract: `ALIVE` means the authority verified both the coordinator
+ * identity and its platform liveness primitive (kill-0 on POSIX).
+ */
+export interface ExecutionRecoveryCoordinatorObservationAuthority {
+  observe(
+    identity: ExecutionRecoveryServiceIdentity,
+  ): Promise<ExecutionRecoveryIdentityObservation>;
+}
+
+export interface ExecutionRecoveryProcessObservationAuthority {
+  observe(
+    identity: ExecutionRecoveryServiceIdentity,
+  ): Promise<ExecutionRecoveryIdentityObservation>;
+}
+
+export interface ExecutionRecoveryEvaluateLockAuthority {
+  observe(
+    identity: ExecutionRecoveryServiceIdentity,
+  ): Promise<ExecutionRecoveryEvaluateLockObservation>;
+}
+
+export type ExecutionRecoveryIdentityObservation =
+  | { readonly state: 'ALIVE'; readonly evidenceRef: string }
+  | { readonly state: 'ABSENT'; readonly evidenceRef: string }
+  | { readonly state: 'UNKNOWN'; readonly reason: string };
+
+export type ExecutionRecoveryEvaluateLockObservation =
+  | {
+      readonly state: 'OBSERVED';
+      readonly identity: ExecutionRecoveryServiceIdentity;
+      readonly previousProgressSequence: number;
+      readonly observedProgressSequence: number;
+      readonly evidenceRef: string;
+    }
+  | { readonly state: 'UNKNOWN'; readonly reason: string };
+
+export type ExecutionRecoveryEvaluateLockClassification =
+  | {
+      readonly state: 'HEALTHY' | 'STALLED' | 'ORPHANED';
+      readonly identity: ExecutionRecoveryServiceIdentity;
+      readonly evidenceRefs: readonly string[];
+    }
+  | {
+      readonly state: 'HOLD';
+      readonly resumable: true;
+      readonly identity: ExecutionRecoveryServiceIdentity;
+      readonly reason: string;
+      readonly evidenceRefs: readonly string[];
+    };
+
+export interface ExecutionRecoveryNoGoResolutionReceipt {
+  readonly version: 1;
+  readonly resolutionId: string;
+  readonly recordedAt: string;
+  readonly identity: ExecutionRecoveryServiceIdentity;
+  readonly classification: ExecutionRecoveryEvaluateLockClassification['state'];
+  readonly disposition: 'REPAIR_REQUIRED' | 'HOLD';
+  readonly resumable: boolean;
+  readonly repairOperation?: 'CREATE_EXACT_FIX_ATTEMPT';
+  readonly reason: string;
+  readonly evidenceRefs: readonly string[];
+}
+
+export interface ExecutionRecoveryNoGoPersistence {
+  commitNoGoResolution(
+    receipt: ExecutionRecoveryNoGoResolutionReceipt,
+  ): Promise<boolean>;
+}
+
 export interface ExecutionRecoveryCoordinatorDeathAuthority {
   verifyDead(
     identity: ExecutionRecoveryServiceIdentity,
@@ -129,6 +201,10 @@ export interface ExecutionRecoveryServiceDependencies {
   readonly clock: ExecutionRecoveryClock;
   readonly processIdentity: ExecutionRecoveryProcessIdentityAuthority;
   readonly coordinatorDeath?: ExecutionRecoveryCoordinatorDeathAuthority;
+  readonly coordinatorObservation?: ExecutionRecoveryCoordinatorObservationAuthority;
+  readonly processObservation?: ExecutionRecoveryProcessObservationAuthority;
+  readonly evaluateLock?: ExecutionRecoveryEvaluateLockAuthority;
+  readonly noGoPersistence?: ExecutionRecoveryNoGoPersistence;
   readonly persistence: ExecutionRecoveryPersistence;
   readonly adapters: readonly ExecutionRecoveryAdapterRegistration<never>[];
 }
@@ -165,6 +241,10 @@ export class ExecutionRecoveryService {
   readonly #clock: ExecutionRecoveryClock;
   readonly #processIdentity: ExecutionRecoveryProcessIdentityAuthority;
   readonly #coordinatorDeath?: ExecutionRecoveryCoordinatorDeathAuthority;
+  readonly #coordinatorObservation?: ExecutionRecoveryCoordinatorObservationAuthority;
+  readonly #processObservation?: ExecutionRecoveryProcessObservationAuthority;
+  readonly #evaluateLock?: ExecutionRecoveryEvaluateLockAuthority;
+  readonly #noGoPersistence?: ExecutionRecoveryNoGoPersistence;
   readonly #persistence: ExecutionRecoveryPersistence;
   readonly #adapters: ReadonlyMap<string, ExecutionRecoveryModeAdapter<unknown>>;
 
@@ -172,6 +252,10 @@ export class ExecutionRecoveryService {
     this.#clock = dependencies.clock;
     this.#processIdentity = dependencies.processIdentity;
     this.#coordinatorDeath = dependencies.coordinatorDeath;
+    this.#coordinatorObservation = dependencies.coordinatorObservation;
+    this.#processObservation = dependencies.processObservation;
+    this.#evaluateLock = dependencies.evaluateLock;
+    this.#noGoPersistence = dependencies.noGoPersistence;
     this.#persistence = dependencies.persistence;
     const adapters = new Map<string, ExecutionRecoveryModeAdapter<unknown>>();
     for (const registration of dependencies.adapters) {
@@ -205,6 +289,89 @@ export class ExecutionRecoveryService {
       identity: target.identity,
       outcome: decideExecutionRecovery(inspected.value),
     };
+  }
+
+  /**
+   * Classify an evaluate-lock from fresh exact-identity evidence. HEALTHY and
+   * STALLED both require two positive liveness proofs; ORPHANED requires two
+   * positive absence proofs. Every other combination fails closed as a
+   * resumable HOLD, so stale PID/state files can never manufacture activity.
+   */
+  async classifyEvaluateLock(
+    identity: ExecutionRecoveryServiceIdentity,
+  ): Promise<ExecutionRecoveryEvaluateLockClassification> {
+    if (!this.#coordinatorObservation || !this.#processObservation || !this.#evaluateLock) {
+      return this.#evaluationHold(identity, 'authoritative-evaluate-lock-probe-unavailable', []);
+    }
+
+    const [coordinator, process, lock] = await Promise.all([
+      this.#coordinatorObservation.observe(identity),
+      this.#processObservation.observe(identity),
+      this.#evaluateLock.observe(identity),
+    ]);
+    const evidenceRefs = [coordinator, process]
+      .filter((item): item is Exclude<ExecutionRecoveryIdentityObservation, { state: 'UNKNOWN' }> => item.state !== 'UNKNOWN')
+      .map(item => item.evidenceRef);
+    if (lock.state === 'UNKNOWN') {
+      return this.#evaluationHold(identity, lock.reason, evidenceRefs);
+    }
+    if (!sameIdentity(lock.identity, identity)) {
+      return this.#evaluationHold(identity, 'evaluate-lock-identity-mismatch', evidenceRefs);
+    }
+    const refs = [...evidenceRefs, lock.evidenceRef];
+    if (!Number.isSafeInteger(lock.previousProgressSequence)
+      || lock.previousProgressSequence < 0
+      || !Number.isSafeInteger(lock.observedProgressSequence)
+      || lock.observedProgressSequence < lock.previousProgressSequence) {
+      return this.#evaluationHold(identity, 'evaluate-lock-progress-invalid', refs);
+    }
+    if (coordinator.state === 'ALIVE' && process.state === 'ALIVE') {
+      return {
+        state: lock.observedProgressSequence > lock.previousProgressSequence
+          ? 'HEALTHY'
+          : 'STALLED',
+        identity,
+        evidenceRefs: refs,
+      };
+    }
+    if (coordinator.state === 'ABSENT'
+      && process.state === 'ABSENT'
+      && lock.observedProgressSequence === lock.previousProgressSequence) {
+      return { state: 'ORPHANED', identity, evidenceRefs: refs };
+    }
+    return this.#evaluationHold(
+      identity,
+      'coordinator-process-liveness-inconclusive',
+      refs,
+    );
+  }
+
+  /** Persist a complete NO_GO repair choice, or a durable resumable HOLD. */
+  async resolveNoGo(
+    identity: ExecutionRecoveryServiceIdentity,
+  ): Promise<ExecutionRecoveryNoGoResolutionReceipt | { readonly code: 'DURABILITY_FAILURE' }> {
+    const classification = await this.classifyEvaluateLock(identity);
+    const repairable = classification.state === 'ORPHANED';
+    const receipt: ExecutionRecoveryNoGoResolutionReceipt = Object.freeze({
+      version: 1,
+      resolutionId: `${identity.executionId}:${identity.generation}:${identity.attemptId}:no-go`,
+      recordedAt: this.#clock.now(),
+      identity: Object.freeze({ ...identity }),
+      classification: classification.state,
+      disposition: repairable ? 'REPAIR_REQUIRED' : 'HOLD',
+      resumable: !repairable,
+      ...(repairable ? { repairOperation: 'CREATE_EXACT_FIX_ATTEMPT' as const } : {}),
+      reason: repairable
+        ? 'evaluate-lock-owner-is-authoritatively-orphaned'
+        : classification.state === 'HOLD'
+          ? classification.reason
+          : `evaluate-lock-owner-${classification.state.toLowerCase()}`,
+      evidenceRefs: Object.freeze([...classification.evidenceRefs]),
+    });
+    if (!this.#noGoPersistence || !await this.#noGoPersistence.commitNoGoResolution(receipt)) {
+      return { code: 'DURABILITY_FAILURE' };
+    }
+    return receipt;
   }
 
   async mutate<TNativeEvidence>(
@@ -307,6 +474,14 @@ export class ExecutionRecoveryService {
   ): ExecutionRecoveryFencedEffect | undefined {
     return deriveFencedEffects(identity, outcome)
       .find(effect => effect.capability === capabilityFor(operation));
+  }
+
+  #evaluationHold(
+    identity: ExecutionRecoveryServiceIdentity,
+    reason: string,
+    evidenceRefs: readonly string[],
+  ): ExecutionRecoveryEvaluateLockClassification {
+    return { state: 'HOLD', resumable: true, identity, reason, evidenceRefs };
   }
 
   #adapter(

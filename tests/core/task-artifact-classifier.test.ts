@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { classifyTaskArtifact } from '../../src/core/task-artifact-classifier.js';
+import { classifyTaskArtifact, isCanonicalTaskFilename } from '../../src/core/task-artifact-classifier.js';
 
 function taskContent(id = '486-002'): string {
   return JSON.stringify({ id, status: 'PENDING' });
@@ -59,5 +59,25 @@ describe('task artifact classifier', () => {
       kind: 'non-task-artifact',
       reason: 'path-like-filename',
     });
+  });
+});
+
+// sprint-683 canlı-çöküş regresyonu: sidecar dosya adları canonical task-record
+// sayılamaz — naive glob bunları id'siz pseudo-task olarak FIX-fazına sokup
+// causal-fold sort'unu undefined.localeCompare ile düşürmüştü.
+describe('isCanonicalTaskFilename (sprint-683 regression)', () => {
+  it('accepts exact canonical task-record filenames', () => {
+    expect(isCanonicalTaskFilename('task-683-001.json')).toBe(true);
+    expect(isCanonicalTaskFilename('task-xv-1787682688606-bcaa9b15-1d54-4836-8bce-b5a3f76cfe72.json')).toBe(true);
+    expect(isCanonicalTaskFilename('task-run-1787551920419-0.json')).toBe(true);
+  });
+
+  it('rejects every sidecar artifact filename', () => {
+    expect(isCanonicalTaskFilename('task-683-001.landing-proposal.json')).toBe(false);
+    expect(isCanonicalTaskFilename('task-683-001.skill-delivery.json')).toBe(false);
+    expect(isCanonicalTaskFilename('task-683-001.attempt-54583642.codex.prompt-delivery.json')).toBe(false);
+    expect(isCanonicalTaskFilename('task-683-001.replan-proposal.json')).toBe(false);
+    expect(isCanonicalTaskFilename('task-683-001.result')).toBe(false);
+    expect(isCanonicalTaskFilename('task-683-001.json.supersede-123')).toBe(false);
   });
 });

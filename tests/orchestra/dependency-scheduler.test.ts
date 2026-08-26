@@ -35,6 +35,10 @@ import type {
   CascadeTransitionEvent,
   DependencyGraph,
 } from '../../src/orchestra/dependency-scheduler.js';
+import { prioritizePendingFixTasks } from '../../src/orchestra/sprint-spawner.js';
+import { planDispatch } from '../../src/orchestra/result-collector.js';
+import { executeSpawnTask } from '../../src/orchestra/scheduler-effects.js';
+import type { SpawnBackend } from '../../src/orchestra/spawn-backend.js';
 
 // ─── Test Helpers ─────────────────────────────────────────────────
 
@@ -725,6 +729,72 @@ describe('applyFailureCascade (Task 029)', () => {
 // ═══ Integration Scenario — Sprint 139 ══════════════════════════════
 
 describe('Integration: full sprint lifecycle', () => {
+
+  describe('sprint-480 priority-FIX admission regression', () => {
+    it('orders appended 006-fix before blocked 007 for shared-write serialization', () => {
+      const original = createTask('480-006', [], ['src/shared.ts'], TaskStatus.NO_GO);
+      const dependant = createTask('480-007', [original.id], ['src/shared.ts']);
+      const fix = createTask('480-006-fix', [], ['src/shared.ts']);
+      fix.isPriorityFix = true;
+      fix.fixForTaskId = original.id;
+
+      const ordered = prioritizePendingFixTasks([original, dependant, fix]);
+      const graph = buildDependencyGraph([original, dependant, fix], false);
+      const dependencyAdmission = enforceWaveDependency(
+        graph,
+        ordered.map(task => task.id),
+        new Set<string>(),
+      );
+
+      expect(ordered.map(task => task.id)).toEqual([fix.id, dependant.id]);
+      expect(dependencyAdmission.eligible).toEqual([fix.id]);
+      expect(dependencyAdmission.blocked).toEqual([dependant.id]);
+    });
+
+    it('keeps a blocked queue entry and fills the free slot from dispatchable work', () => {
+      const upstream = createTask('480-006', [], [], TaskStatus.EXECUTING);
+      const blocked = createTask('480-007', [upstream.id], ['src/shared.ts']);
+      const independent = createTask('480-008', [], ['src/independent.ts']);
+      const remainingQueue = [blocked, independent];
+
+      const plan = planDispatch({
+        sprint: { tasks: [upstream, blocked, independent] } as never,
+        config: { dependency_pipeline_enabled: true },
+        maxWorkers: 2,
+        assignedTaskIds: new Set<string>(),
+        collectedIds: new Set<string>(),
+        remainingQueue,
+        completedTaskIds: [],
+      }, {});
+
+      expect(plan.toSpawn.map(task => task.id)).toEqual([independent.id]);
+      expect(remainingQueue.map(task => task.id)).toEqual([blocked.id]);
+      expect(blocked.status).toBe(TaskStatus.PENDING);
+    });
+
+    it('does not mark a task EXECUTING when backend dispatch did not spawn a worker', async () => {
+      const task = createTask('480-009');
+      task.model = 'claude-sonnet-5' as Task['model'];
+      task.provider = 'claude';
+      const backend = {
+        name: 'regression-throwing-backend',
+        spawn: vi.fn(() => { throw new Error('worker was not spawned'); }),
+      } as unknown as SpawnBackend;
+
+      await expect(executeSpawnTask({ task }, {
+        projectRoot: tmpdir(),
+        sprintFallbackId: 'sprint-480',
+        config: undefined,
+        backend,
+        resolveAgentPrompt: async () => undefined,
+        resolveSkillPrompts: async () => [],
+        buildWriteTargets: () => [],
+      })).rejects.toThrow();
+
+      expect(backend.spawn).not.toHaveBeenCalled();
+      expect(task.status).toBe(TaskStatus.PENDING);
+    });
+  });
 
   it('should enforce correct wave ordering with deps + collisions', () => {
     // Sprint 139 scenario: Wave 2 Task 14 must not run before Wave 1 Task 13

@@ -669,7 +669,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-26 xverify-onarim dalgasi (sprint-678): +2 — worker-authored
   // tests/cli/xverify-evidence-scope.test.ts + fencing/ingress pin ekleri
   // (tmpdir-hermetik, suite-owned).
-  count: 16502,
+  count: 16504,
   // 2026-08-25 B-sweep: digest moved — --fix roundtrip pin, multi-label
   // parser pin, same-line rule downgraded to WARN (all suite-owned).
   // 2026-08-25 7141 wave: count unchanged, digest moved — the src-side
@@ -708,7 +708,10 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-26 10:02: 16497→16502 — Node-5 settlement-atomigi (sprint-682 4/4):
   // landing-proposal-entry + checkpoint-freshness + causal-authority +
   // descendant-cancellation suite eklentileri.
-  digest: '713b5cf809e2714e91da5af60ad869b63a60238061d6c2314c6a3113cfccee5b',
+  // 2026-08-26 10:36: 16502→16504 — Node-4 recovery-born mikro-paketi
+  // (sprint-683 6/6 + sidecar-loader hotfix): heartbeat-fence / classifier /
+  // attribution-baseline / finalize-retirement + isCanonicalTaskFilename pinleri.
+  digest: 'ad28206b6f6ddcd4abf395f1b76d77de8931c33abd9d9af96c671b662541d938',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1264,7 +1267,10 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // (finalizer runner-seam) + ERRORS-critical kanal + selfchange-WARN kaymalari.
   // 2026-08-26 10:03: ayni 1339, digest-only — Node-5 src kaymalari
   // (landing-proposal-entry + coordinator/worker/lineage/controller edits).
-  digest: '2e0e65e676a5e8d411b25f57933c4e9997203269a19747c257825a8621cd36c4',
+  // 2026-08-26 10:37: ayni 1339, digest-only — Node-4 src kaymalari
+  // (heartbeat-authority / classifier / recovery-service / scheduler /
+  // finalizer + sidecar-loader hotfix).
+  digest: 'f8b7aec68d77905db14444373d2ddbd515ac794f184717af8ed083698eab3575',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

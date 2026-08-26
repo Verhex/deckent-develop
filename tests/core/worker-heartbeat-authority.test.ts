@@ -103,6 +103,22 @@ describe('worker-heartbeat-authority reducer', () => {
     expect(state.latest).toBeNull();
   });
 
+  it('classifies a competing writer on the same attempt as a writer-fence conflict', () => {
+    const accepted = foldWorkerHeartbeatAuthority(
+      createInitialWorkerHeartbeatAuthorityState(identity),
+      heartbeat({ hostSequence: 80 }),
+    );
+    const attacked = foldWorkerHeartbeatAuthority(accepted, heartbeat({
+      workerId: 'worker-impostor',
+      fence: 'worker-chosen-fence',
+      hostSequence: 81,
+      hostObservedAt: '2026-07-31T10:01:00.000Z',
+    }));
+
+    expect(attacked.holds.at(-1)?.reasonCode).toBe('foreign-writer');
+    expect(attacked.latest).toBe(accepted.latest);
+  });
+
   it('holds process/liveness and exit-code/task-verdict contradictions without conflating their fields', () => {
     let state = foldWorkerHeartbeatAuthority(createInitialWorkerHeartbeatAuthorityState(identity), heartbeat({
       liveness: 'not-alive',

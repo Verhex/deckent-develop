@@ -27,8 +27,9 @@ import { DEFAULT_LIFECYCLE_RECOVERY_CONFIG } from '../../core/config-types.js';
 import {
   containSprintRecoveryCoordinator,
   readSprintRecoverySettlementIdentity,
-  runSprintRecoveryOperation,
 } from '../../orchestra/sprint-recovery-operation.js';
+import type { SprintRecoverySettlementIdentity } from '../../orchestra/sprint-recovery-operation.js';
+import type { CoordinatorTerminalEvidence } from '../../orchestra/sprint-terminal-evidence.js';
 import { DeckentError } from '../../core/errors.js';
 import { resolveTaskArtifactReadDirs } from '../../core/sprint-archive.js';
 import { readSprintTerminalReceiptSummary } from '../../core/sprint-terminal-publication-status.js';
@@ -387,6 +388,45 @@ export function buildFinalizeSprintProjection(
   };
 }
 
+/**
+ * Retire the exact-sprint resume/recovery coordinator and convert the two
+ * independent proofs (durable recovery identity plus kernel death check) into
+ * terminal-receipt evidence. The containment authority owns all signalling;
+ * force-finalize never sends an additional or unconditional signal.
+ */
+export async function proveForceFinalizeCoordinatorRetirement(
+  root: string,
+  sprintId: string,
+  identity: SprintRecoverySettlementIdentity,
+  terminationPolicy: typeof DEFAULT_LIFECYCLE_RECOVERY_CONFIG,
+  contain: typeof containSprintRecoveryCoordinator = containSprintRecoveryCoordinator,
+): Promise<CoordinatorTerminalEvidence> {
+  const retirement = await contain(root, sprintId, {
+    expectedIdentity: identity,
+    terminationPolicy,
+  });
+  if (retirement.action !== 'terminated' && retirement.action !== 'already-stopped') {
+    throw new DeckentError(
+      'E_FORCE_FINALIZE_COORDINATOR_OWNERSHIP_HOLD',
+      `FORCE_FINALIZE_COORDINATOR_OWNERSHIP_HOLD:${sprintId}:${retirement.action}`,
+    );
+  }
+  return {
+    evidenceId: `force-finalize-coordinator-retirement:${sprintId}`,
+    kind: 'recovery-coordinator-retirement',
+    state: 'VERIFIED',
+    evidenceRef: [
+      `sprint=${sprintId}`,
+      `generation=${identity.generation}`,
+      `fence=${identity.fenceToken}`,
+      `pid=${retirement.pid ?? 'registry-absent'}`,
+      `kill0=dead`,
+      `action=${retirement.action}`,
+    ].join(';'),
+    requiredForCleanup: true,
+  };
+}
+
 export function registerFinalize(program: Command): void {
   const helpLang = getLanguage(undefined);
   program
@@ -502,17 +542,13 @@ export function registerFinalize(program: Command): void {
         // typed HOLD cannot produce a false terminal finalize result.
         if (opts.force) {
           const identity = readSprintRecoverySettlementIdentity(root, sprintId);
-          await runSprintRecoveryOperation(root, sprintId, {
-            skipAudit: true,
-            intent: 'FINALIZE_CONTAINMENT',
-            approval: {
-              approvalRef: 'cli:force-finalize',
-              idempotencyKey:
-                `cli:force-finalize:${sprintId}:${identity.generation}:${identity.fenceToken}`,
+          const coordinatorRetirementEvidence =
+            await proveForceFinalizeCoordinatorRetirement(
+              root,
+              sprintId,
               identity,
-            },
-            terminationPolicy,
-          });
+              terminationPolicy,
+            );
           const priorTerminal = readSprintTerminalReceiptSummary(root, sprintId).receipt;
           if (priorTerminal?.terminalOutcome === 'COMPLETE') {
             const completedSprint = buildFinalizeSprintProjection(root, sprintId, tasks, false);
@@ -541,6 +577,8 @@ export function registerFinalize(program: Command): void {
             defaultAuthMode: config.auth_mode,
             runId: sprintId,
             coordinatorGeneration: Math.max(1, identity.generation),
+            coordinatorRetirementEvidence,
+            requireCoordinatorRetirementEvidence: true,
           });
           const metrics = settlement.terminalTruth.logicalMetrics;
           print(getMessage('finalize.aborted', lang, {

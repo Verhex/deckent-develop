@@ -32,6 +32,13 @@
 export type ProviderFailureKind = 'usage-limit' | 'auth' | 'oom' | 'unknown';
 
 /** Input to {@link classifyProviderFailure} — any subset may be present. */
+export interface ProviderReportedUsageLimitEvidence {
+  /** Discriminant proving that the signal came from the invoked provider. */
+  readonly kind: 'provider-reported-usage-limit';
+  /** Verbatim provider/adapter signal. It is still signature-checked below. */
+  readonly signal: string;
+}
+
 export interface ProviderFailureInput {
   /** Raw worker process log / CLI stdout+stderr, if captured. */
   workerLog?: string;
@@ -48,6 +55,13 @@ export interface ProviderFailureInput {
    * deleting `rate-limiter.ts` whose notes mention "rate-limit" (sprint-324 FIX-skip bug).
    */
   producedWork?: boolean;
+  /**
+   * Authoritative usage evidence captured at the provider boundary. Text in a
+   * task result is never sufficient to assert provider exhaustion.
+   */
+  usageLimitEvidence?: ProviderReportedUsageLimitEvidence;
+  /** Known repair ownership. These failures must remain in the FIX path. */
+  failureOwner?: 'task' | 'dependency' | 'provider' | 'unknown';
 }
 
 /**
@@ -126,12 +140,22 @@ export function classifyProviderFailure(input: ProviderFailureInput): ProviderFa
     return 'unknown';
   }
 
+  // Planner, scope, and code failures are task/dependency repair outcomes. A
+  // provider can be reachable while their notes happen to mention quota terms.
+  if (input.failureOwner === 'task' || input.failureOwner === 'dependency') {
+    return 'unknown';
+  }
+
   const text = `${input.workerLog ?? ''}\n${input.resultNotes ?? ''}`;
   if (text.trim().length === 0) {
     return 'unknown';
   }
 
-  if (USAGE_LIMIT_PATTERNS.some(p => p.test(text))) return 'usage-limit';
+  const usageSignal = input.usageLimitEvidence?.signal ?? '';
+  if (
+    usageSignal.trim().length > 0
+    && USAGE_LIMIT_PATTERNS.some(pattern => pattern.test(usageSignal))
+  ) return 'usage-limit';
   if (AUTH_PATTERNS.some(p => p.test(text))) return 'auth';
   if (OOM_PATTERNS.some(p => p.test(text))) return 'oom';
   return 'unknown';

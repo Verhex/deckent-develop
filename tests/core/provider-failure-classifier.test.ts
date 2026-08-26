@@ -20,19 +20,39 @@ describe('classifyProviderFailure — signatures', () => {
   it('classifies the Claude CLI "Usage limit reached" message', () => {
     expect(classifyProviderFailure({
       workerLog: 'Claude usage limit reached. Your limit will reset at 3pm.',
+      usageLimitEvidence: {
+        kind: 'provider-reported-usage-limit',
+        signal: 'Claude usage limit reached. Your limit will reset at 3pm.',
+      },
     })).toBe('usage-limit');
   });
 
   it('classifies an HTTP 429 / too many requests as usage-limit', () => {
     expect(classifyProviderFailure({
       resultNotes: 'request failed: 429 Too Many Requests',
+      usageLimitEvidence: {
+        kind: 'provider-reported-usage-limit',
+        signal: 'request failed: 429 Too Many Requests',
+      },
     })).toBe('usage-limit');
   });
 
   it('classifies a generic rate limit / rate_limit_error as usage-limit', () => {
-    expect(classifyProviderFailure({ workerLog: 'rate_limit_error: slow down' }))
+    expect(classifyProviderFailure({
+      workerLog: 'rate_limit_error: slow down',
+      usageLimitEvidence: {
+        kind: 'provider-reported-usage-limit',
+        signal: 'rate_limit_error: slow down',
+      },
+    }))
       .toBe('usage-limit');
-    expect(classifyProviderFailure({ resultNotes: 'hit the rate limit' }))
+    expect(classifyProviderFailure({
+      resultNotes: 'hit the rate limit',
+      usageLimitEvidence: {
+        kind: 'provider-reported-usage-limit',
+        signal: 'hit the rate limit',
+      },
+    }))
       .toBe('usage-limit');
   });
 
@@ -90,6 +110,10 @@ describe('classifyProviderFailure — signatures', () => {
     // usage-limit is scanned first (most actionable park signal).
     expect(classifyProviderFailure({
       workerLog: '429 too many requests; also 401 earlier',
+      usageLimitEvidence: {
+        kind: 'provider-reported-usage-limit',
+        signal: '429 too many requests',
+      },
     })).toBe('usage-limit');
   });
 });
@@ -112,11 +136,65 @@ describe('classifyProviderFailure — producedWork discriminator (sprint-324 fal
     expect(classifyProviderFailure({
       resultNotes: 'Claude usage limit reached. Your limit will reset at 3pm.',
       producedWork: false,
+      usageLimitEvidence: {
+        kind: 'provider-reported-usage-limit',
+        signal: 'Claude usage limit reached. Your limit will reset at 3pm.',
+      },
     })).toBe('usage-limit');
   });
 
   it('producedWork=true never masks a real OOM (exitCode 137 hard-rule wins)', () => {
     expect(classifyProviderFailure({ exitCode: 137, producedWork: true })).toBe('oom');
+  });
+});
+
+describe('classifyProviderFailure — authoritative usage evidence (sprint-480 seq-18)', () => {
+  it('rejects usage-limit text without provider-reported evidence', () => {
+    expect(classifyProviderFailure({
+      workerLog: 'usage limit reached; 429 too many requests',
+      resultNotes: 'quota exhausted',
+      producedWork: false,
+    })).toBe('unknown');
+  });
+
+  it('keeps planner, scope, and code failures in task/dependency repair', () => {
+    const evidence = {
+      kind: 'provider-reported-usage-limit' as const,
+      signal: 'usage limit reached',
+    };
+    expect(classifyProviderFailure({
+      resultNotes: 'SCOPE_VIOLATION: usage-limit wording in task subject',
+      usageLimitEvidence: evidence,
+      failureOwner: 'task',
+    })).toBe('unknown');
+    expect(classifyProviderFailure({
+      resultNotes: 'planner dependency is missing',
+      usageLimitEvidence: evidence,
+      failureOwner: 'dependency',
+    })).toBe('unknown');
+  });
+
+  it('does not quarantine sprint-480 partial execution with high usage and a diff', () => {
+    expect(classifyProviderFailure({
+      workerLog: '242000 input tokens; 5200 output tokens',
+      resultNotes: 'SCOPE_VIOLATION after writing a substantive diff; usage limit',
+      producedWork: true,
+      usageLimitEvidence: {
+        kind: 'provider-reported-usage-limit',
+        signal: 'usage limit reached',
+      },
+      failureOwner: 'task',
+    })).toBe('unknown');
+  });
+
+  it('rejects non-limit provider evidence instead of guessing from result notes', () => {
+    expect(classifyProviderFailure({
+      resultNotes: 'usage limit reached',
+      usageLimitEvidence: {
+        kind: 'provider-reported-usage-limit',
+        signal: 'provider process exited for an unspecified reason',
+      },
+    })).toBe('unknown');
   });
 });
 
@@ -132,7 +210,13 @@ describe('summarizeProviderFailures — worker-ran NO_GOs do not skip FIX (sprin
 });
 
 describe('summarizeProviderFailures — FIX-skip threshold', () => {
-  const limit = { resultNotes: 'usage limit reached' };
+  const limit = {
+    resultNotes: 'usage limit reached',
+    usageLimitEvidence: {
+      kind: 'provider-reported-usage-limit' as const,
+      signal: 'usage limit reached',
+    },
+  };
   const code = { resultNotes: '3 tests failed' };
 
   it('flags skipFix when ALL failures are usage-limit', () => {

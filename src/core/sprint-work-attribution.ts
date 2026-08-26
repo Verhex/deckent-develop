@@ -23,6 +23,27 @@ export interface SprintWorkAttributionProjection {
   readonly fileAttemptIds: Readonly<Record<string, readonly string[]>>;
 }
 
+const SHA256_PATTERN = /^[a-f0-9]{64}$/;
+
+/**
+ * A VERIFIED label is not itself authorship evidence.  The projection accepts
+ * it only when the host has bound the exact attempt to the immutable,
+ * content-addressed claim-time baseline.  Older/partial shapes are ambiguous
+ * and therefore become a typed HOLD rather than inheriting the worker's claim.
+ */
+function hasExactClaimTimeAuthority(result: TaskResult): boolean {
+  const attribution = result.workAttribution;
+  if (attribution?.state !== 'VERIFIED') return false;
+  const baselineSha256 = attribution.baselineSha256;
+  return attribution.attemptId.trim().length > 0
+    && typeof baselineSha256 === 'string'
+    && SHA256_PATTERN.test(baselineSha256)
+    && attribution.baselineRef
+      === `task-result-work-attribution-baseline:sha256:${baselineSha256}`
+    && SHA256_PATTERN.test(attribution.scopeDigest)
+    && attribution.reasonCode === undefined;
+}
+
 /**
  * Project one worker claim into sprint-summary evidence. Only host-VERIFIED,
  * claim-time attribution may contribute files or line counts. HOLD and legacy
@@ -49,6 +70,16 @@ export function projectAttributedTaskWork(
       attemptId: attribution?.attemptId ?? null,
       reasonCode: attribution?.reasonCode
         ?? (result ? 'ATTRIBUTION_AUTHORITY_UNAVAILABLE' : 'RESULT_UNAVAILABLE'),
+      filesChanged: [],
+      linesAdded: 0,
+      linesRemoved: 0,
+    };
+  }
+  if (!hasExactClaimTimeAuthority(result)) {
+    return {
+      state: 'HOLD',
+      attemptId: attribution.attemptId,
+      reasonCode: 'ATTRIBUTION_AUTHORITY_MISMATCH',
       filesChanged: [],
       linesAdded: 0,
       linesRemoved: 0,

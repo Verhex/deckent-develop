@@ -21,6 +21,7 @@ import {
   SprintStatus, AlertLevel, ALL_PROVIDER_NAMES,
 } from '../core/types.js';
 import { DeckentError, createExecutionAuthorityError } from '../core/errors.js';
+import { isCanonicalTaskFilename } from '../core/task-artifact-classifier.js';
 
 // ─── Core (type imports) ──────────────────────────────────────────
 import type {
@@ -3561,12 +3562,17 @@ export async function runFixPhase(
         sprint.tasks.map(task => [task.id, task]),
       );
       if (existsSync(tasksPath)) {
-        for (const file of readdirSync(tasksPath).filter(f => f.startsWith('task-') && f.endsWith('.json'))) {
+        // sprint-683 canlı vakası: naive glob sidecar'ları (landing-proposal /
+        // skill-delivery / prompt-delivery) id'siz pseudo-task olarak yükleyip
+        // causal-fold sort'unu undefined.localeCompare ile çökertti — yalnız
+        // canonical task-record dosya adları kabul edilir.
+        for (const file of readdirSync(tasksPath).filter(isCanonicalTaskFilename)) {
           const task = readJsonSafe<Task>(join(tasksPath, file));
           // Explicit foreign ownership is rejected. Missing sprintId remains a
           // compatibility seam for pre-namespace FIX JSONs; lineage/root
           // membership and the current sprint object still bound selection.
-          if (task && (task.sprintId === undefined || task.sprintId === sprint.id)) {
+          if (task && typeof task.id === 'string'
+            && (task.sprintId === undefined || task.sprintId === sprint.id)) {
             allSprintTasksById.set(task.id, task);
           }
         }

@@ -16999,3 +16999,30 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 682-004: 3295 — settlement'ta redundant-descendant cancellation (transactional) (DONE)
 
 ---
+## Sprint 683 — sprint-683
+
+**Status:** COMPLETE
+**Date:** 2026-08-26
+**Duration:** 283s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 6 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 283455ms |
+
+### Tasks
+
+- 683-001: 3171 — heartbeat monotonic fence (worker sequence/walltime sahteciliği imkânsızlaşır) (DONE)
+- 683-002: 3173 — hold-sınıflandırma: scope/kod hatası provider usage-limit'i tetikleyemez (DONE)
+- 683-003: 3175 — attribution: predecessor diff'i sonraki attempt'e mal edilemez (DONE)
+- 683-004: 3174 — evaluate-lock orphan: NO_GO'lu task FIX'siz/karar'sız mahsur kalamaz (DONE)
+- 683-005: 3176 — priority-FIX collision/slot admission'da bloklu bağımlıları geçer (DONE)
+- 683-006: 3177 — force-finalize eşleşen recovery-coordinator'ı emekli etmeden terminal dönemez (DONE)
+
+---

@@ -14,6 +14,7 @@ import {
   type ExecutionRecoveryPersistence,
   type ExecutionRecoveryReceipt,
   type ExecutionRecoveryReservation,
+  type ExecutionRecoveryServiceDependencies,
   type ExecutionRecoveryServiceIdentity,
 } from '../../src/orchestra/execution-recovery-service.js';
 
@@ -75,6 +76,7 @@ function makePersistence() {
 
 function makeHarness(
   applyResult: ExecutionRecoveryAdapterResult<void> = { ok: true, value: undefined },
+  recoveryDependencies: Partial<ExecutionRecoveryServiceDependencies> = {},
 ) {
   const apply = vi.fn((_effect: ExecutionRecoveryFencedEffect) => applyResult);
   const inspect = vi.fn(
@@ -102,6 +104,7 @@ function makeHarness(
     processIdentity,
     persistence,
     adapters: [{ adapter }] as never,
+    ...recoveryDependencies,
   });
   const target = {
     mode: 'sprint' as const,
@@ -131,6 +134,105 @@ describe('ExecutionRecoveryService.inspect', () => {
     expect(harness.processIdentity.verify).not.toHaveBeenCalled();
     expect(harness.persistence.reserve).not.toHaveBeenCalled();
     expect(harness.persistence.commit).not.toHaveBeenCalled();
+  });
+});
+
+describe('ExecutionRecoveryService evaluate-lock recovery', () => {
+  function observationHarness(
+    coordinatorState: 'ALIVE' | 'ABSENT' | 'UNKNOWN',
+    processState: 'ALIVE' | 'ABSENT' | 'UNKNOWN',
+    previousProgressSequence: number,
+    observedProgressSequence: number,
+  ) {
+    const observation = (state: 'ALIVE' | 'ABSENT' | 'UNKNOWN', subject: string) =>
+      state === 'UNKNOWN'
+        ? ({ state, reason: `${subject}-unverified` } as const)
+        : ({ state, evidenceRef: `${subject}:kill-0:exact` } as const);
+    const commitNoGoResolution = vi.fn(async () => true);
+    const harness = makeHarness(undefined, {
+      coordinatorObservation: {
+        observe: vi.fn(async () => observation(coordinatorState, 'coordinator')),
+      },
+      processObservation: {
+        observe: vi.fn(async () => observation(processState, 'process')),
+      },
+      evaluateLock: {
+        observe: vi.fn(async () => ({
+          state: 'OBSERVED',
+          identity,
+          previousProgressSequence,
+          observedProgressSequence,
+          evidenceRef: 'evaluate-lock:progress:exact',
+        } as const)),
+      },
+      noGoPersistence: { commitNoGoResolution },
+    });
+    return { ...harness, commitNoGoResolution };
+  }
+
+  it.each([
+    ['ALIVE', 'ALIVE', 8, 9, 'HEALTHY'],
+    ['ALIVE', 'ALIVE', 9, 9, 'STALLED'],
+    ['ABSENT', 'ABSENT', 9, 9, 'ORPHANED'],
+  ] as const)(
+    'classifies exact coordinator %s / process %s / lock %d→%d as %s',
+    async (coordinator, process, previous, observed, expected) => {
+      const harness = observationHarness(coordinator, process, previous, observed);
+
+      const result = await harness.service.classifyEvaluateLock(identity);
+
+      expect(result).toMatchObject({ state: expected, identity });
+      expect(result.evidenceRefs).toContain('evaluate-lock:progress:exact');
+    },
+  );
+
+  it('does not report a stale PID/state projection as live non-resumable execution', async () => {
+    const harness = observationHarness('ALIVE', 'UNKNOWN', 9, 9);
+
+    const result = await harness.service.classifyEvaluateLock(identity);
+
+    expect(result).toEqual(expect.objectContaining({
+      state: 'HOLD',
+      resumable: true,
+      reason: 'coordinator-process-liveness-inconclusive',
+    }));
+  });
+
+  it('durably resolves orphaned NO_GO with a complete exact-fix repair decision', async () => {
+    const harness = observationHarness('ABSENT', 'ABSENT', 9, 9);
+
+    const result = await harness.service.resolveNoGo(identity);
+
+    expect(result).toMatchObject({
+      disposition: 'REPAIR_REQUIRED',
+      resumable: false,
+      repairOperation: 'CREATE_EXACT_FIX_ATTEMPT',
+      identity,
+      classification: 'ORPHANED',
+    });
+    expect(harness.commitNoGoResolution).toHaveBeenCalledWith(result);
+  });
+
+  it('durably parks every inconclusive NO_GO as a resumable HOLD', async () => {
+    const harness = observationHarness('ALIVE', 'UNKNOWN', 9, 9);
+
+    const result = await harness.service.resolveNoGo(identity);
+
+    expect(result).toMatchObject({
+      disposition: 'HOLD',
+      resumable: true,
+      classification: 'HOLD',
+    });
+    expect(harness.commitNoGoResolution).toHaveBeenCalledWith(result);
+  });
+
+  it('never claims a NO_GO resolution when its decision is not durable', async () => {
+    const harness = observationHarness('ABSENT', 'ABSENT', 9, 9);
+    harness.commitNoGoResolution.mockResolvedValue(false);
+
+    await expect(harness.service.resolveNoGo(identity)).resolves.toEqual({
+      code: 'DURABILITY_FAILURE',
+    });
   });
 });
 

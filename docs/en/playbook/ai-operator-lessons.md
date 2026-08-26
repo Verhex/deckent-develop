@@ -609,3 +609,17 @@ not a reason to spend another provider attempt on the same prompt.
   worked, the defect was the directive author's. Side-proof: the wave's mechanical gate
   (`lint-config-writers`) found 11 residual writers the wave itself never reached (CLI/API
   surfaces) on its first run — gate-first scanning beats inventory grep.
+- **2026-08-26 — three Node-4-day lessons**: (1) **Pipe exit-swallowing struck a third
+  time** — a `lint | tail` chain swallowed a MASTER-validator red and let a malformed
+  receipt get pushed (repaired within minutes). The rule is now absolute: never read a
+  verification exit code from behind a pipe; `cmd > log 2>&1; echo $?` is the only
+  legitimate pattern. (2) **`ls` hides dotfiles — an "empty directory" claim is invalid
+  without `ls -A`**: worker-core archive dirs were about to be declared defective while
+  actually full of content-addressed hidden files; disk-evidence claims must use
+  dot-aware commands. (3) **A naive `task-*.json` glob eats sidecars: use the canonical
+  filename authority** — the FIX-phase loader ingested `.landing-proposal.json`-class
+  sidecars as id-less pseudo-tasks, and the new strict causal sort crashed on
+  `undefined.localeCompare` (sprint-683); the root fix is the single-source
+  `isCanonicalTaskFilename` + an id-type guard with a regression pin. Side-lesson:
+  stricter new code can make latent old dirt fatal — hardening waves should start with an
+  environment-pollution sweep (foreign/residual files).

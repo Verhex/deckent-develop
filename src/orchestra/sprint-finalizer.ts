@@ -2176,7 +2176,12 @@ interface PersistedSprintTerminalReceipt {
   readonly receipt: SprintTerminalReceiptV1;
   readonly terminalEvidence: Pick<
     SprintTerminalEvidence<TaskResult>,
-    'version' | 'summary' | 'cleanupEligibility' | 'holds' | 'attributionExclusions'
+    | 'version'
+    | 'summary'
+    | 'cleanupEligibility'
+    | 'holds'
+    | 'attributionExclusions'
+    | 'coordinatorEvidence'
   >;
   readonly logicalProgress: LogicalProgressProjection;
   readonly lineageUsage: readonly LineageUsageAuthorityAggregate[];
@@ -3006,7 +3011,10 @@ function publishFencedTerminalReceipt(
   };
   const terminalEvidence = assembleSprintTerminalEvidence({
     attempts: input.truth.attempts,
-    coordinatorEvidence: [receiptEvidence],
+    coordinatorEvidence: [
+      ...input.truth.terminalEvidence.coordinatorEvidence,
+      receiptEvidence,
+    ],
   });
   // A′ / ADR-D-007 bounded recovery (owner onayı, 2026-08-17): a COMPLETE
   // terminal receipt asserts settled WORK. The sprint-535/536 chronology showed
@@ -3052,6 +3060,7 @@ function publishFencedTerminalReceipt(
       summary: terminalEvidence.summary,
       cleanupEligibility: terminalEvidence.cleanupEligibility,
       holds: terminalEvidence.holds,
+      coordinatorEvidence: terminalEvidence.coordinatorEvidence,
       // RCPT-1: bounded exclusion DETAIL — the receipt used to carry only a
       // count, so diagnosing a cleanup block meant task-file archaeology.
       // Each record names the attempt, the reason, the claimed paths and
@@ -3150,14 +3159,37 @@ export function forceAbortSprint(
     readonly defaultAuthMode?: 'subscription' | 'api' | 'hybrid';
     readonly runId?: string;
     readonly coordinatorGeneration?: number;
+    /**
+     * Exact-sprint recovery-coordinator retirement proof captured by the CLI
+     * before terminal publication. Legacy in-process callers may omit it;
+     * force-finalize sets `requireCoordinatorRetirementEvidence` and therefore
+     * cannot publish or return without this proof.
+     */
+    readonly coordinatorRetirementEvidence?: CoordinatorTerminalEvidence;
+    readonly requireCoordinatorRetirementEvidence?: boolean;
   } = {},
 ): ForceAbortSprintSettlement {
+  const coordinatorRetirementEvidence = opts.coordinatorRetirementEvidence;
+  if (opts.requireCoordinatorRetirementEvidence) {
+    if (
+      coordinatorRetirementEvidence?.kind !== 'recovery-coordinator-retirement'
+      || coordinatorRetirementEvidence.state !== 'VERIFIED'
+      || !coordinatorRetirementEvidence.evidenceRef
+    ) {
+      throw new FinalizerTerminalEvidenceError(
+        'FORCE_FINALIZE_COORDINATOR_OWNERSHIP_HOLD',
+      );
+    }
+  }
   const attemptTasks = loadFinalizerAttemptTasks(projectRoot, sprint);
   const truth = buildFinalizerTerminalTruth({
     tasks: attemptTasks,
     evaluations,
     results: [...results],
     defaultAuthMode: opts.defaultAuthMode,
+    coordinatorEvidence: coordinatorRetirementEvidence
+      ? [coordinatorRetirementEvidence]
+      : [],
     notDispatchedSettlements: projectNotDispatchedSettlements(
       attemptTasks,
       evaluations,

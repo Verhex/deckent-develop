@@ -57,6 +57,7 @@ export function parseWorkerHeartbeatAuthorityObservation(
 export type WorkerHeartbeatAuthorityHoldReason =
   | 'missing-fence'
   | 'foreign-attempt'
+  | 'foreign-writer'
   | 'stale-sequence'
   | 'stale-timestamp'
   | 'process-liveness-contradiction'
@@ -117,6 +118,15 @@ function sameIdentity(
     && expected.fence === observed.fence;
 }
 
+function sameAttempt(
+  expected: WorkerHeartbeatAuthorityIdentity,
+  observed: WorkerHeartbeatAuthorityObservationInput,
+): boolean {
+  return expected.runId === observed.runId
+    && expected.taskId === observed.taskId
+    && expected.attemptId === observed.attemptId;
+}
+
 function sameObservation(
   left: WorkerHeartbeatAuthorityObservationInput,
   right: WorkerHeartbeatAuthorityObservationInput,
@@ -173,7 +183,14 @@ export function foldWorkerHeartbeatAuthority(
     return appendHold(state, observation, 'missing-fence', 'host fence is empty or blank');
   }
   if (!sameIdentity(state.identity, observation)) {
-    return appendHold(state, observation, 'foreign-attempt', 'observation identity does not match the fenced attempt');
+    return appendHold(
+      state,
+      observation,
+      sameAttempt(state.identity, observation) ? 'foreign-writer' : 'foreign-attempt',
+      sameAttempt(state.identity, observation)
+        ? 'worker identity or host-issued writer fence does not match authority'
+        : 'observation identity does not match the fenced attempt',
+    );
   }
 
   const invalid = contradiction(observation);
