@@ -63,3 +63,38 @@ Landing ana-şerit admission'ıyla: tam lokal full-suite + 20-gate yeşil şart�
 ## 3. Teslim
 Faz-A: push + HANDOFF + tek-mesaj özet (CI-run linkleri/yeşil-durumu + teklif-listesi
 sayıları + FINDING'ler). Owner onay-penceresi → lease → Faz-B → ikinci teslim.
+
+
+## EK — ANA-ŞERİT ÖLÇÜM-ENVANTERİ (2026-08-26 salt-okuma keşfi; Faz-A'nın başlangıç-zemini — yeniden ölçme, DOĞRULA ve üzerine inşa et)
+
+**Hacim:** tests/ altında 2.923 dosya / 718.051 satır; yükün %69'u orchestra(748)+core(643)+cli(606).
+Boy-dağılımı: <80s:384 · 80-199:1129 · 200-499:1211 · 500+:199 → sorun mikro-dosya değil,
+orta-üst gövde; iş birleştirme+budama karışımı.
+
+**GERÇEK indirim-sınıfları (teklif-listeni bunlardan kur):**
+1. YÜKSEK/DÜŞÜK-RİSK — arşiv-korpusa pinli ölü docs-assertion'ları: tests/docs/ (38 skip'in
+   çoğu; vitepress.test.ts 6/6 tam-skip; readme.test.ts kendi "archived corpus" itirafıyla).
+2. YÜKSEK/KARAR-GEREK — CI'da hiç set edilmeyen env-kapılı e2e gövdeleri:
+   DECKENT_DOCKER_E2E / DECKENT_PROVIDER_INTEGRATION hiçbir workflow'da yok →
+   tests/e2e/docker-backend.test.ts (1818s) + provider-smoke her koşuda toplanıp hiç
+   doğrulamıyor. Karar-önerisi sun: CI'da kapıyı aç MI, ayrı opt-in config'e taşı MI.
+3. ORTA — aynı-katman düz-vs-iç-içe İKİZLER (25 çakışma; ağırlık tests/cli/ ve tests/mcp/:
+   cli/chat vs cli/commands/chat deseni; init/onboard/dashboard/run/sync/watch/recall/
+   splash/output aynı desen; mcp/help|format|job-runner|… vs mcp/tools|helpers) →
+   modül-başına TEK dosyaya birleştirme (kapsam-kaybı yok).
+4. ORTA — tests/unit/ yetim-dizini (4 dosya, konuları orchestra'dakilerden AYRIK —
+   mükerrer değil): orchestra/ içine katla, dizin-konvansiyonunu tekilleştir.
+5. BÜYÜK-GÖVDE — modül-başına-konsolidasyon: spawn-backend-docker'ı 63 AYRI test dosyası
+   import ediyor; `*wire*` ailesi 117 dosya (her sprint kendi wire-dosyasını açmış).
+   Buradaki kazanç silme değil fixture/mock-bootstrap eriten birleştirmedir.
+
+**DOKUNMA (yanlış-pozitif tuzakları — ana-şerit ölçümüyle sabit):**
+- Cross-surface parity ailesi (73 basename + 36 *parity*) — bilinçli yüzey-eşitlik sözleşmesi.
+- tests/integration/ (37 dosya/13.5k satır) — en yoğun davranışsal değer.
+- Sprint/ADR-damgalı testler: 1433 dosya içerikte "Sprint N" taşıyor — damga KÖKEN
+  anotasyonudur, bayatlık sinyali DEĞİL; ada/başlığa bakarak emeklilik listesi kurma.
+- skipIf'lerin çoğu meşru platform-kapısı (isWindows/docker/tmux) — ölü sayma.
+
+**Config-gerçeği:** dashboard default-koşuda hariç (ayrı config), e2e DAHİL;
+maxForks CI-2/lokal-4; coverage-threshold lines 82 / functions 89 / branches 80 —
+silme-tekliflerinde threshold-etkisini raporla.
