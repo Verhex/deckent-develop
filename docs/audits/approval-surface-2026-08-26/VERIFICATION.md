@@ -60,7 +60,7 @@ sha256sum <audited sources>
 node --input-type=module -e <WorkID content digest calculation>
 ```
 
-Final artifact verification ve git allowlist sonuçları bu dosyanın sonundaki `Settlement verification` bölümüne settlement commit'inden önce işlenecektir.
+Final artifact verification ve git allowlist sonuçları aşağıdaki `Settlement verification` bölümünde dondurulmuştur.
 
 ## HOLD / koşulmayan kanıtlar
 
@@ -74,4 +74,12 @@ Bu HOLD'lar bulguları zayıflatmaz; production closure veya runtime PASS iddias
 
 ## Settlement verification
 
-Bu bölüm final doğrulama turunda exact sonuçlarla güncellenecektir.
+- `node --check docs/audits/approval-surface-2026-08-26/verify-artifacts.mjs` → exit 0.
+- `node docs/audits/approval-surface-2026-08-26/verify-artifacts.mjs` → `PASS 227/227 checks`; base SHA, 9 finding (`CRITICAL 3`, `HIGH 6`) ve 16 matrix row yeniden doğrulandı.
+- `git diff --check` → exit 0.
+- `git diff origin/main...HEAD --name-only` → yalnız yedi `docs/audits/approval-surface-2026-08-26/**` content artifact'ı; settlement için untracked görülen yalnız allowlist-içi `HANDOFF.md` ve kök `LANE-STATUS.md` idi.
+- `git branch -vv` → commit öncesi lane `origin/main` üstünde ve yalnız lane commit'i kadar ahead.
+- Source manifest → 49/49 file digest; MASTER → 9/9 WorkID content digest. Validator MASTER line numarası kullanmadı.
+- Production code/config/state değişikliği → 0.
+
+Bu statik artifact sonucu `LOCAL_VERIFIED` olarak yalnız audit korpusu için geçerlidir; production runtime closure sonucu değildir.
