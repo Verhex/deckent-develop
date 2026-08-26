@@ -3,19 +3,19 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "5268559c4e640cad7953da4a75e6ae0b23bcb8b61d4cff5c61ed7bd5081c519b"
+    "value": "1bd8e7df00b3b03e4d1286abbbc6f541004840a1fb0cc35f463c184e77acae39"
   },
   "summary": {
     "total": 538,
     "active": 464,
     "terminal": 74,
-    "receipts": 202,
+    "receipts": 203,
     "byState": {
-      "OPEN": 363,
+      "OPEN": 359,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
-      "VERIFY": 32,
+      "VERIFY": 36,
       "DONE": 74,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -443,10 +443,10 @@
       "id": "CONFIG-HEAL-IO-TRUTH-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "OPEN",
-      "updated": "2026-08-25",
+      "state": "VERIFY",
+      "updated": "2026-08-26",
       "definitionDigest": "7ae3c824670da1000aaaaf4fad78608c6687da62ff7c067af68e64ec0e050686",
-      "progressDigest": "d2203eb6e3cc136aa03ce9c465aee4d94920e63acb66572ae50880abb54401e5",
+      "progressDigest": "15c4f4d1b2a54b349ca361ebca513faaa5d802404bc3699ba7e517f63dc4774a",
       "terminalClosureDigest": null
     },
     {
@@ -454,10 +454,10 @@
       "id": "EVAL-TSC-FEEDBACK-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "OPEN",
-      "updated": "2026-08-25",
+      "state": "VERIFY",
+      "updated": "2026-08-26",
       "definitionDigest": "a40a55bca1256eae091bd026c2ea5ec9add5bdd0393ca78680fe0a3ccbadaa2a",
-      "progressDigest": "97e0e9793d4d4080f2aec8f0d2b8b92cf0d17a56b1fbb2d98711a9179160d582",
+      "progressDigest": "9c532178a6d7e4473121ba3097fe65a84690632349f06f67cdb9a939539253ea",
       "terminalClosureDigest": null
     },
     {
@@ -465,10 +465,10 @@
       "id": "HONEST-GATE-DELETION-AWARE-001",
       "program": "TRUTH",
       "priority": "P2",
-      "state": "OPEN",
-      "updated": "2026-08-25",
+      "state": "VERIFY",
+      "updated": "2026-08-26",
       "definitionDigest": "7e3926c0275742ed1a4b8bf62a38ff7ded1552e376f35977f3355cf66f5bb768",
-      "progressDigest": "6f02f5ed25faedf23e5f5e215e6ca787b89409521253ef1ecc35e75437ab7b03",
+      "progressDigest": "b859a0e1c40ef77178acc026a8f9737c9ac99269ce1b2c54773edf7e627e55f9",
       "terminalClosureDigest": null
     },
     {
@@ -487,10 +487,10 @@
       "id": "DIRECTIVES-ENGINE-SELFCHANGE-LINT-001",
       "program": "TRUTH",
       "priority": "P2",
-      "state": "OPEN",
-      "updated": "2026-08-25",
+      "state": "VERIFY",
+      "updated": "2026-08-26",
       "definitionDigest": "e401b0bd6edd64bf73e267796dfc20740a8eaa1ce218367cb1ac87a8ef745b61",
-      "progressDigest": "eb8f2b9866facc9a44aac4c8af47f2328a6830605a46344a79d54a91910545e2",
+      "progressDigest": "8aa8c4a9fde252536545709bdb15471ac371feab8bd2be17219ef3321e449bf6",
       "terminalClosureDigest": null
     },
     {
@@ -8003,6 +8003,16 @@
         "transitionAt": "2026-08-26T08:16:44+03:00"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-26-NODE2-QUALITY-01",
+      "authorityDigest": "d9842e593201910669908a2c722c23692e220b7e3be8a32c582ab611b518c5c0",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-26T08:37:36+03:00"
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -9004,7 +9014,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "0",
         "W": "0",
@@ -9017,10 +9027,12 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-26-NODE2-QUALITY-01"
+      ],
       "acceptance": "Strike-5 fix'inin (heal yalniz parse-kanitiyla; io-hatasi typed CONFIG_READ_IO_HOLD, dosya tasinmaz; config-CLI yazimlari tmp+rename) kalici satir-kaydi; ek dilim: ERRORS.md 600-satir kirpma-penceresi forensic icin genisletilir veya kritik-sinif girdiler ayri kalici kanala akar",
-      "evidence": "owner-admission 2026-08-25-gece (gece-bulgu #1); fix landed `ff48978fb` + hermetik EISDIR pini; canli sinav: suite baski-altinda config sag kaldi",
-      "updated": "2026-08-25"
+      "evidence": "owner-admission 2026-08-25-gece (gece-bulgu #1); fix landed `ff48978fb` + hermetik EISDIR pini; canli sinav: suite baski-altinda config sag kaldi; 2026-08-26 Node-2 kapanışı: ERRORS-critical forensic-kanalı canlı (CONFIG_*/_HOLD sınıfı, bağımsız tavan; strike-5 kalıcı kaydı bu satır + G0-A 471 dilim-kanıtı); `receipt=GR-2026-08-26-NODE2-QUALITY-01`",
+      "updated": "2026-08-26"
     },
     {
       "order": 202,
@@ -9035,7 +9047,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "0",
         "W": "0",
@@ -9048,10 +9060,12 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-26-NODE2-QUALITY-01"
+      ],
       "acceptance": "Gate tsc FAIL verdiginde sprint COMPLETE'e tsc-kirli kapanamaz: Auditor bulgusu bounded FIX-task dogurur veya settlement typed-residual tasir; ayrica tam-factory node:fs/config mock'lari icin importOriginal-spread ratchet'i (yeni tam-factory eklenemez) tanimlanir",
-      "evidence": "owner-admission 2026-08-25-gece (gece-bulgu #5); kanit-oruntusu: 675/676/677 ust-uste vitest-yesil+tsc-kirli, gece 206-kirmizi mock-drift onarimi",
-      "updated": "2026-08-25"
+      "evidence": "owner-admission 2026-08-25-gece (gece-bulgu #5); kanit-oruntusu: 675/676/677 ust-uste vitest-yesil+tsc-kirli, gece 206-kirmizi mock-drift onarimi; 2026-08-26 Node-2 kapanışı: evaluation.tsc_settlement_gate default-ON tam-zincir + mock-factory ratchet (276 baseline) canlı; aynı gün canlı doğrulama — 681'in kendi sol-worker'ı evaluation-required tipini eklerken 1 literal kırığı çıktı ve el-daraltıldı (desenin ta kendisi); `receipt=GR-2026-08-26-NODE2-QUALITY-01`",
+      "updated": "2026-08-26"
     },
     {
       "order": 203,
@@ -9066,7 +9080,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "0",
         "W": "0",
@@ -9079,10 +9093,12 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-26-NODE2-QUALITY-01"
+      ],
       "acceptance": "STUB_WRITE_DETECTED/SCOPE_VIOLATION_OR_EMPTY_WRITE karari linesAdded=0 iken linesRemoved>0 + goCriteria-kaniti varsa DONE'u override etmez; silme-only fixture pini eklenir; gercek stub (0/0 + kanitsiz) HALA yakalanir",
-      "evidence": "owner-admission 2026-08-25-gece (gece-bulgu #6); canli vaka: 679-002 24-silme/0-ekleme goCriteria-MET iken DONE→NO_GO override",
-      "updated": "2026-08-25"
+      "evidence": "owner-admission 2026-08-25-gece (gece-bulgu #6); canli vaka: 679-002 24-silme/0-ekleme goCriteria-MET iken DONE→NO_GO override; 2026-08-26 Node-2 kapanışı: silme-only DONE-koruması + 679-002 regresyon-fixture'ı + gerçek-stub hâlâ NO_GO pini; `receipt=GR-2026-08-26-NODE2-QUALITY-01`",
+      "updated": "2026-08-26"
     },
     {
       "order": 204,
@@ -9128,7 +9144,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "0",
         "W": "0",
@@ -9141,10 +9157,12 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-26-NODE2-QUALITY-01"
+      ],
       "acceptance": "Files kumesi motor-sicak-yolu listesiyle (task-builder, prompt-compile, result-collector, scheduler, spawner) kesisen task ile ayni DAG'da ona etki-bagimli task varsa typed WARN: 'etki next-run-only — mini-run onerisi'; liste tek-kaynak ve testli",
-      "evidence": "owner-admission 2026-08-25-gece (gece-bulgu #3); ders: sprint-674 kendi fix'ine eski-dist'te yakalanip typed-PAUSE etti",
-      "updated": "2026-08-25"
+      "evidence": "owner-admission 2026-08-25-gece (gece-bulgu #3); ders: sprint-674 kendi fix'ine eski-dist'te yakalanip typed-PAUSE etti; 2026-08-26 Node-2 kapanışı: D_ENGINE_SELF_CHANGE typed WARN + ENGINE_HOT_PATHS tek-kaynak export + sahte-parser testleri; `receipt=GR-2026-08-26-NODE2-QUALITY-01`",
+      "updated": "2026-08-26"
     },
     {
       "order": 206,
@@ -27430,6 +27448,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "32012f69c71a9a13574c4eadc29657285fe6765e401bc7fb65459c699c78a747"
+    "value": "392811e8e258128fb03cd4b187cffd3be9d8c5d941e3bf87003ff2c8cd330042"
   }
 }

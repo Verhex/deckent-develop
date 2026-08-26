@@ -16,8 +16,8 @@
 1. ~~KANIT-6 batch'i~~ **TÜKETİLDİ 2026-08-26**: 8095+7096+3169 → VERIFY (3 yeni receipt);
    3298 kanıt-güçlendirildi (flip 3290 DONE olunca); 4070/4080 zemin-kanıtı eklendi —
    ikisi de önkoşul-gated çıktı (PRINCIPAL/TENANT · RECEIPT-001), KANIT'la kapanamaz.
-2. **Kalite-kapıları dalgası** — 202 (tsc-FAIL→FIX beslemesi + mock-ratchet) + 203
-   (deletion-aware honest-gate) + 201 (ERRORS.md forensic dilimi) + 205 (sıcak-yol lint'i).
+2. ~~Kalite-kapıları dalgası~~ **TÜKETİLDİ 2026-08-26** (sprint-681 4/5 + el-tamamlama;
+   201/202/203/205 → VERIFY, receipt GR-2026-08-26-NODE2-QUALITY-01).
 3. **Replay-merdiveni** — 3300 → 3301 → 3302 → 3303 → 3304 (sıralı basamaklar; hepsi yeşilse
    3299 zincir-receipt'le kapanır). Önkoşul: 3302 için 3276/3285 (bkz node 5).
 4. **RECOVERY-BORN mikro-paketi-1** — 3171 · 3173 · 3174 · 3175 · 3176 · 3177 (event-truth

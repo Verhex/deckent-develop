@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):5268559c4e640cad7953da4a75e6ae0b23bcb8b61d4cff5c61ed7bd5081c519b`
+**Source digest:** `sha256(normalized-lf-utf8):1bd8e7df00b3b03e4d1286abbbc6f541004840a1fb0cc35f463c184e77acae39`
 
 **Rows:** 538 total · 464 active · 74 terminal
 
@@ -13,11 +13,11 @@
 
 | State | Count |
 |---|---:|
-| OPEN | 363 |
+| OPEN | 359 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 69 |
-| VERIFY | 32 |
+| VERIFY | 36 |
 | DONE | 74 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -51,11 +51,11 @@
 | 180 | `DOCS-I18N-001` | OPEN | P1 | TRUTH | `DOCS-TOPOLOGY-001`, `DOCS-RELEASE-TRUTH-001` | — | Documentation i18n contract for en, tr, zh-Hans, es, ja and hi |
 | 190 | `MEMORY-AUTHORITY-001` | OPEN | P0 | TRUTH | `SSOT-002` | — | Repo-local provider-neutral canonical memory; provider HOME surfaces projections only |
 | 200 | `MEMORY-TRUTH-001` | BLOCKED | P1 | TRUTH | `MEMORY-AUTHORITY-001` | `DEPENDENCY_UNSATISFIED` | Memory index count, stale watch, task-capacity and phantom ledger drift'lerini hükme bağla |
-| 201 | `CONFIG-HEAL-IO-TRUTH-001` | OPEN | P1 | TRUTH | — | — | Config self-heal io-vs-parse ayriminin kalici kaydi + ERRORS.md forensic-penceresi |
-| 202 | `EVAL-TSC-FEEDBACK-001` | OPEN | P1 | TRUTH | — | — | Auditor tsc-FAIL'i FIX-fazina geri beslenir; tam-factory vi.mock'lara importOriginal-ratchet |
-| 203 | `HONEST-GATE-DELETION-AWARE-001` | OPEN | P2 | TRUTH | — | — | Honest-gate stub-sezgisi silme-only isleri yanlis-pozitiflemez |
+| 201 | `CONFIG-HEAL-IO-TRUTH-001` | VERIFY | P1 | TRUTH | — | — | Config self-heal io-vs-parse ayriminin kalici kaydi + ERRORS.md forensic-penceresi |
+| 202 | `EVAL-TSC-FEEDBACK-001` | VERIFY | P1 | TRUTH | — | — | Auditor tsc-FAIL'i FIX-fazina geri beslenir; tam-factory vi.mock'lara importOriginal-ratchet |
+| 203 | `HONEST-GATE-DELETION-AWARE-001` | VERIFY | P2 | TRUTH | — | — | Honest-gate stub-sezgisi silme-only isleri yanlis-pozitiflemez |
 | 204 | `STATUS-SWEEP-OUTPUT-HYGIENE-001` | OPEN | P2 | TRUTH | — | — | status deathSweep ciktisi sinif-ozetli olur; olu flow-handle artiklari tipli temizlik akisina baglanir |
-| 205 | `DIRECTIVES-ENGINE-SELFCHANGE-LINT-001` | OPEN | P2 | TRUTH | — | — | lint-directives motor-sicak-yolu self-change'inde typed uyari verir |
+| 205 | `DIRECTIVES-ENGINE-SELFCHANGE-LINT-001` | VERIFY | P2 | TRUTH | — | — | lint-directives motor-sicak-yolu self-change'inde typed uyari verir |
 | 206 | `EVENT-TRUTH-A4-001` | OPEN | P1 | TRUTH | — | — | A3'un bilincli-ertelenenleri: hb-sema emekliligi, log tek-format, inspect-parity, olu-feed silimi, kayipsiz rotasyon, Nervous-filtre |
 | 207 | `WORKER-IDENTITY-HOSTBOUND-001` | OPEN | P2 | TRUTH | — | — | Worker attemptId/backend host-bound kimlik akisi: HEARTBEAT_IDENTITY_HOLD reddi kapanir |
 | 210 | `REPO-CLEANUP-001` | OPEN | P2 | TRUTH | `SSOT-002` | — | Repository filesystem, tracked-ephemeral and orphan disposition manifest |
