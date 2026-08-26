@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "d9fbc7b7106e47aba804a4c8a1a23adbd60450e3c1d624f975d144016305fd97"
+    "value": "b571eccdd47c82735c041250f4cdedaf5f46066e8229bf43823654cd70d262cd"
   },
   "summary": {
     "total": 538,
@@ -3326,9 +3326,9 @@
       "program": "ASSURANCE",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-01",
+      "updated": "2026-08-26",
       "definitionDigest": "9ab710c788e786706b495778b90a3e04496cb0651d3ea24246c2a35a6a28af3f",
-      "progressDigest": "dc5a16d06804a1bcf7fa03943270a4d0a69375ad907b70aaa81e35b122a46d3c",
+      "progressDigest": "4e39579a4711a2dd268ddba73fe1c491766efb00e2e7b711b228cf85d1208ebf",
       "terminalClosureDigest": null
     },
     {
@@ -18737,8 +18737,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "A controlled replay advances structured host-owned checkpoints after every material mutation, rejects stale/malformed evidence with a resumable typed outcome, resumes without duplicate work and publishes one terminal receipt whose lineage and disk attribution match",
-      "evidence": "EK-3 open replay basamak; uses the Sprint-488 defect class, not historical artifact reinterpretation, and starts only after implementation settlement plus built-binary identity proof",
-      "updated": "2026-08-01"
+      "evidence": "EK-3 open replay basamak; uses the Sprint-488 defect class, not historical artifact reinterpretation, and starts only after implementation settlement plus built-binary identity proof; 2026-08-26 DÖRT HÜKÜM DE CANLI DİSK-KANITLI (üretim-replay korpusu): (1) yapısal host-owned proposal/checkpoint zinciri gerçek koşularda ilerliyor — 688/689 arşivlerinde structured landing-proposal sidecar'ları (2+4 adet, yeni stdin-JSON entry'siyle) + terminal-öncesi freshness-gate'i COMPLETE'lerde canlı geçti (682/684/688); (2) stale/malformed red: gerçek-binary smoke LANDING_PROPOSAL_MALFORMED + exit-1 + sıfır-yazım, stale/missing typed-HOLD pinleri 682-002'de; (3) duplicate'siz resume: sprint-683 typed-PAUSE→onarım→resume→COMPLETE, 6/6 DONE bit-korunarak sıfır yeniden-yürütme; (4) terminal-receipt + lineage/disk-attribution eşleşmesi: 683 arşiv-manifesti + SPRINT-LOG tam-bir bölüm + VERIFIED-etiketinin digest-binding zorunluluğu (683-003). VERIFY-flip bağımlılık 3284 REPAIR-DISPATCH kapanınca",
+      "updated": "2026-08-26"
     },
     {
       "order": 3303,
@@ -27539,6 +27539,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "352e3bb0d94fb4b24d370b1e3866cefc6174f0ef93cdc057195a26e7ddb018b4"
+    "value": "7f650b445a54c2e951f04c311947e67be89b3a2a164376067adf74bc11880a02"
   }
 }

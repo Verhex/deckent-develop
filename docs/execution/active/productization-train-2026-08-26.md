@@ -20,7 +20,7 @@
    201/202/203/205 → VERIFY, receipt GR-2026-08-26-NODE2-QUALITY-01).
 3. **Replay-merdiveni (KISMEN)** — ~~3300~~ SERTİFİKALANDI 2026-08-26 (çift-kutup canlı kanıt,
    receipt'li VERIFY) → 3301 ilk-deneme iki typed-gate'e çarptı (E078 · ZERO_TASK_HOLD),
-   tasarımlı replay-harness dilimi gerekiyor → ~~3303~~ SERTİFİKALANDI 2026-08-26 (sprint-689 canlı çok-provider, receipt'li VERIFY) → 3302 · 3304 sırada; hepsi yeşilse
+   tasarımlı replay-harness dilimi gerekiyor → ~~3303~~ SERTİFİKALANDI 2026-08-26 (sprint-689 canlı çok-provider, receipt'li VERIFY) → 3302 kanıt-TAM (flip 3284'e bağlı) → 3304 full-suite KOŞUYOR; hepsi yeşilse
    3299 zincir-receipt'le kapanır.
 4. ~~RECOVERY-BORN mikro-paketi-1~~ **TÜKETİLDİ 2026-08-26** (sprint-683 6/6 + in-package
    motor-hotfix; 6 satır → VERIFY, receipt GR-2026-08-26-NODE4-RECOVERY-01).
