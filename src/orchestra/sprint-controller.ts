@@ -11,7 +11,7 @@
 
 // ─── Node Builtins ─────────────────────────────────────────────────
 import { readFile, stat, writeFile } from 'node:fs/promises';
-import { readFileSync, existsSync, writeFileSync, readdirSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync, readdirSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 
 // ─── Core (value imports) ──────────────────────────────────────────
@@ -107,9 +107,11 @@ import {
   SPRINT_TERMINAL_COMPLETED_CHANNEL,
 } from './sprint-finalizer.js';
 import {
+  decideRedundantRepairDescendantCancellations,
   evaluateFixCircuitBreaker,
   projectNotDispatchedSettlements,
 } from '../core/task-lineage.js';
+import type { RepairDescendantCancellationDecision } from '../core/types.js';
 
 // ─── Pre-Start Guards (born-672a/672b — snapshot-start guard wiring) ─
 import { runPreStartGuards } from './pre-start-guards.js';
@@ -615,6 +617,43 @@ export function readTaskJsonFresh(projectRoot: string, taskId: string): Task {
     throw new Error(`task.json not found: ${path}`);
   }
   return JSON.parse(readFileSync(path, 'utf-8')) as Task;
+}
+
+export interface RedundantRepairSettlement {
+  readonly decisions: readonly RepairDescendantCancellationDecision[];
+  readonly supersededAttemptIds: ReadonlySet<string>;
+}
+
+/** Atomically retire redundant descendants at the settlement/dispatch boundary. */
+export function settleRedundantRepairDescendants(
+  projectRoot: string,
+  tasks: readonly Task[],
+  acceptedResolvingAttemptId: string,
+): RedundantRepairSettlement {
+  const decisions = decideRedundantRepairDescendantCancellations(
+    tasks,
+    acceptedResolvingAttemptId,
+  );
+  const tasksById = new Map(tasks.map(task => [task.id, task]));
+  const supersededAttemptIds = new Set<string>();
+  for (const decision of decisions) {
+    const descendant = tasksById.get(decision.descendantAttemptId);
+    if (!descendant) continue;
+    supersededAttemptIds.add(descendant.id);
+    descendant.status = TaskStatus.PAUSED;
+    descendant.assignedWorker = undefined;
+    const persisted = descendant as Task & {
+      supersededBy?: string;
+      supersededReason?: 'REDUNDANT_REPAIR_DESCENDANT';
+    };
+    persisted.supersededBy = acceptedResolvingAttemptId;
+    persisted.supersededReason = 'REDUNDANT_REPAIR_DESCENDANT';
+    const taskPath = join(projectRoot, TASKS_DIR, `task-${descendant.id}.json`);
+    const temporaryPath = `${taskPath}.supersede-${process.pid}`;
+    writeFileSync(temporaryPath, `${JSON.stringify(descendant, null, 2)}\n`, 'utf-8');
+    renameSync(temporaryPath, taskPath);
+  }
+  return { decisions, supersededAttemptIds };
 }
 
 /**
@@ -2379,11 +2418,16 @@ export async function runSprint(
     // pass, so rubric/xverify/gates run exactly once per task.
     const aggregateCrossVerifyInvocationFactory =
       await ensureCrossVerifyInvocationFactory();
+    const supersededRepairAttemptIds = new Set<string>();
 
     const evaluateAndConsumeCollectedAttempt = async (
       task: Task,
       result: TaskResult,
     ): Promise<TaskEvaluation> => {
+      if (supersededRepairAttemptIds.has(task.id)) {
+        evaluations.set(task.id, TaskEvaluation.DONE);
+        return TaskEvaluation.DONE;
+      }
       const replay = consumeControllerEvaluationSettlement({
         projectRoot,
         sprintId: sprint.id,
@@ -2433,6 +2477,21 @@ export async function runSprint(
           'DECKENT_E091',
           `controller-evaluation-settlement-hold:${task.id}:${settlement.reason}:${settlement.detail}`,
         );
+      }
+      if (
+        settlement.evaluation === TaskEvaluation.DONE
+        || settlement.evaluation === TaskEvaluation.GO_WITH_TECH_DEBT
+      ) {
+        task.status = TaskStatus.DONE;
+        const redundant = settleRedundantRepairDescendants(
+          projectRoot,
+          sprint.tasks,
+          task.id,
+        );
+        for (const descendantId of redundant.supersededAttemptIds) {
+          supersededRepairAttemptIds.add(descendantId);
+          evaluations.set(descendantId, TaskEvaluation.DONE);
+        }
       }
       return settlement.evaluation;
     };

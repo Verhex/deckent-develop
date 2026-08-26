@@ -535,6 +535,7 @@ export function writeResult(
   result: TaskResult | TaskResultV1,
   sprintId?: string,
   attemptId?: string,
+  landingCheckpoint?: WorkerTerminalLandingCheckpoint,
 ): void {
   ensureDir(join(projectRoot, TASKS_DIR));
 
@@ -571,6 +572,28 @@ export function writeResult(
   }
 
   const path = resultFilePath(projectRoot, result.taskId);
+  if (landingCheckpoint) {
+    const materialMutationCount = new Set(
+      result.filesChanged.map(file => typeof file === 'string' ? file : file.path),
+    ).size;
+    const expectedSequence = Math.max(
+      landingCheckpoint.expectedSequence,
+      materialMutationCount + 1,
+    );
+    const checkpoint = writeHostWorkerLandingProposal({
+      projectRoot,
+      taskId: result.taskId,
+      attemptId: landingCheckpoint.attemptId,
+      capability: landingCheckpoint.capability,
+      notBefore: landingCheckpoint.notBefore,
+      expectedSequence,
+    });
+    if (checkpoint.state === 'hold') {
+      throw createExecutionAuthorityError(
+        `${checkpoint.reason}; resumable-attribution=${JSON.stringify(checkpoint.attribution)}`,
+      );
+    }
+  }
   if ('schemaVersion' in result && result.schemaVersion === '1.0') {
     const resolvedAttemptId = attemptId
       ?? result.workAttribution?.attemptId
@@ -670,7 +693,24 @@ export function verifyResultPersisted(
 
 export type HostWorkerLandingWriteResult =
   | { state: 'written'; proposalSha256: string; observedMtime: string; sequence: number }
-  | { state: 'hold'; reason: string };
+  | {
+      state: 'hold';
+      reason: string;
+      attribution: {
+        taskId: string;
+        attemptId: string;
+        expectedSequence: number;
+        observedSequence: number | null;
+      };
+    };
+
+export interface WorkerTerminalLandingCheckpoint {
+  attemptId: string;
+  capability: ExecutionLandingCapability | undefined;
+  notBefore: string;
+  /** Initial checkpoint plus the existing attempt's material mutation count. */
+  expectedSequence: number;
+}
 
 /** True only for the capability this host writer republishes through. */
 export function isCooperativeExecutionLandingCapability(
@@ -697,17 +737,32 @@ export function writeHostWorkerLandingProposal(input: {
   capability: ExecutionLandingCapability | undefined;
   /** Reject a proposal file that predates this ISO-8601 instant (e.g. dispatch time). */
   notBefore: string;
+  expectedSequence?: number;
 }): HostWorkerLandingWriteResult {
+  const expectedSequence = input.expectedSequence ?? 1;
+  const hold = (reason: string, observedSequence: number | null): HostWorkerLandingWriteResult => ({
+    state: 'hold',
+    reason,
+    attribution: {
+      taskId: input.taskId,
+      attemptId: input.attemptId,
+      expectedSequence,
+      observedSequence,
+    },
+  });
   if (!isCooperativeExecutionLandingCapability(input.capability)) {
-    return {
-      state: 'hold',
-      reason: `Host worker landing writer does not accept capability "${input.capability ?? 'unsupported'}" — `
+    return hold(
+      `Host worker landing writer does not accept capability "${input.capability ?? 'unsupported'}" — `
         + 'only "cooperative-landing" backends republish through it; "checkpoint-stop" is owned by the Docker '
         + 'execution landing coordinator.',
-    };
+      null,
+    );
   }
   const { projectRoot, taskId, attemptId, notBefore } = input;
   const path = executionLandingProposalPath(projectRoot, taskId);
+  if (!existsSync(path)) {
+    return hold('Host worker execution landing checkpoint is missing', null);
+  }
   const stat = lstatSync(path);
   if (
     !stat.isFile()
@@ -715,27 +770,41 @@ export function writeHostWorkerLandingProposal(input: {
     || stat.size <= 0
     || stat.size > EXECUTION_LANDING_PROPOSAL_MAX_BYTES
   ) {
-    throw createExecutionAuthorityError(
-      'Host worker execution landing proposal file is absent, unsafe, empty, or exceeds its byte ceiling',
-    );
+    return hold('Host worker execution landing checkpoint is malformed or unsafe', null);
   }
   const notBeforeMs = Date.parse(notBefore);
   if (!Number.isFinite(notBeforeMs) || stat.mtimeMs + 1 < notBeforeMs) {
     throw createExecutionAuthorityError('Host worker execution landing proposal file predates the current attempt');
   }
-  const candidate = JSON.parse(readFileSync(path, 'utf-8')) as unknown;
-  const semanticState = (
-    candidate !== null
-    && typeof candidate === 'object'
-    && !Array.isArray(candidate)
-    && (candidate as Record<string, unknown>).version === 2
-  )
-    ? parseLandingProposalV2(candidate)
-    : readExecutionLandingProposal(projectRoot, { taskId, attemptId, notBefore }).proposal;
+  let semanticState:
+    | ReturnType<typeof parseLandingProposalV2>
+    | ReturnType<typeof readExecutionLandingProposal>['proposal'];
+  try {
+    const candidate = JSON.parse(readFileSync(path, 'utf-8')) as unknown;
+    semanticState = (
+      candidate !== null
+      && typeof candidate === 'object'
+      && !Array.isArray(candidate)
+      && (candidate as Record<string, unknown>).version === 2
+    )
+      ? parseLandingProposalV2(candidate)
+      : readExecutionLandingProposal(projectRoot, { taskId, attemptId, notBefore }).proposal;
+  } catch (error) {
+    return hold(
+      `Host worker execution landing checkpoint is malformed: ${error instanceof Error ? error.message : String(error)}`,
+      null,
+    );
+  }
 
   if (semanticState.taskId !== taskId || semanticState.attemptId !== attemptId) {
     throw createExecutionAuthorityError(
       'Host worker execution landing proposal conflicts with the settlement attempt',
+    );
+  }
+  if (semanticState.sequence < expectedSequence) {
+    return hold(
+      `Host worker execution landing checkpoint sequence ${semanticState.sequence} is stale; expected at least ${expectedSequence}`,
+      semanticState.sequence,
     );
   }
 

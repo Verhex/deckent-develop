@@ -127,7 +127,46 @@ export function projectNotDispatchedSettlements(
 }
 
 function timestamp(task: Task): string {
-  return task.updatedAt ?? task.createdAt ?? '';
+  // Admission order is a birth-time fact. A later status write must not turn
+  // an older sibling into a newly authoritative repair.
+  return task.createdAt ?? task.updatedAt ?? '';
+}
+
+function compareAttempts(
+  left: Task,
+  right: Task,
+  tasksById: ReadonlyMap<string, Task>,
+): number {
+  const depthDelta =
+    resolveFixAttemptDepth(left, tasksById) - resolveFixAttemptDepth(right, tasksById);
+  if (depthDelta !== 0) return depthDelta;
+  const timeDelta = timestamp(left).localeCompare(timestamp(right));
+  return timeDelta !== 0 ? timeDelta : left.id.localeCompare(right.id);
+}
+
+/**
+ * Follow the one repair edge that was causally available from each failed
+ * head. The earliest direct child is the admitted successor; siblings were
+ * born from a head that ceased to be current at that admission point. A DONE
+ * head is absorbing, so descendants recorded after settlement are diagnostic
+ * history only.
+ */
+function resolveCausalLineageHead(
+  rootTask: Task,
+  attempts: readonly Task[],
+  tasksById: ReadonlyMap<string, Task>,
+): Task {
+  let head = rootTask;
+  const seen = new Set<string>();
+  while (head.status === TaskStatus.NO_GO && !seen.has(head.id)) {
+    seen.add(head.id);
+    const successor = attempts
+      .filter(attempt => attempt.fixForTaskId === head.id)
+      .sort((left, right) => compareAttempts(left, right, tasksById))[0];
+    if (!successor) break;
+    head = successor;
+  }
+  return head;
 }
 
 /**
@@ -225,9 +264,10 @@ export function decideRedundantRepairDescendantCancellations(
 /**
  * Fold raw task attempts into logical root-task lineages.
  *
- * Pending/running FIX attempts intentionally become the resolved projection:
- * a root that is currently being repaired is PENDING/FIXING, not a second task
- * beside an already terminal NO_GO parent.
+ * A repair becomes the projection only when it is the admitted direct child of
+ * the current failed head. Successful settlement is absorbing: later, stale,
+ * or parallel repair records remain in `attempts` for diagnosis but cannot
+ * replace the settled leaf or reopen the logical task.
  */
 export function foldTaskLineages(tasks: readonly Task[]): readonly TaskLineage[] {
   const tasksById = new Map(tasks.map(task => [task.id, task]));
@@ -241,15 +281,10 @@ export function foldTaskLineages(tasks: readonly Task[]): readonly TaskLineage[]
 
   const lineages: TaskLineage[] = [];
   for (const [rootId, attempts] of grouped) {
-    const sorted = [...attempts].sort((left, right) => {
-      const depthDelta =
-        resolveFixAttemptDepth(left, tasksById) - resolveFixAttemptDepth(right, tasksById);
-      if (depthDelta !== 0) return depthDelta;
-      const timeDelta = timestamp(left).localeCompare(timestamp(right));
-      return timeDelta !== 0 ? timeDelta : left.id.localeCompare(right.id);
-    });
+    const sorted = [...attempts].sort((left, right) =>
+      compareAttempts(left, right, tasksById));
     const rootTask = tasksById.get(rootId) ?? sorted[0]!;
-    const resolvedTask = sorted.at(-1)!;
+    const resolvedTask = resolveCausalLineageHead(rootTask, sorted, tasksById);
     lineages.push({
       rootId,
       rootTask,
@@ -342,10 +377,14 @@ export function selectPendingFixTasks(
 ): readonly Task[] {
   if (maxFixRetries <= 0) return [];
   const tasksById = new Map(tasks.map(task => [task.id, task]));
+  const authorizedHeadIds = new Set(
+    foldTaskLineages(tasks).map(lineage => lineage.resolvedTask.id),
+  );
   const candidates = tasks
     .filter(task =>
       task.isPriorityFix === true
       && task.status === TaskStatus.PENDING
+      && authorizedHeadIds.has(task.id)
       && !attemptedIds.has(task.id)
       && resolveFixAttemptDepth(task, tasksById) <= maxFixRetries
       && (

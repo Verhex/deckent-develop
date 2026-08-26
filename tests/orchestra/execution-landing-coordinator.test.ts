@@ -19,6 +19,7 @@ import {
 } from '../../src/core/task-result-settlement.js';
 import { TaskStatus, type Task } from '../../src/core/task-types.js';
 import {
+  ExecutionLandingHoldError,
   prepareDockerExecutionLanding,
   stampDockerExecutionLandingCheckpoint,
 } from '../../src/orchestra/execution-landing-coordinator.js';
@@ -161,7 +162,9 @@ describe('Docker execution landing coordinator', () => {
     expect(prepared.context).not.toBeNull();
     const now = new Date().toISOString();
 
-    expect(() => stampDockerExecutionLandingCheckpoint({
+    let held: unknown;
+    try {
+      stampDockerExecutionLandingCheckpoint({
       projectRoot: root,
       settlementRef,
       terminalUsage: terminalUsage(settlementRef, {
@@ -204,7 +207,21 @@ describe('Docker execution landing coordinator', () => {
         },
         requestedAt: now,
       },
-    })).toThrow();
+      });
+    } catch (error) {
+      held = error;
+    }
+    expect(held).toBeInstanceOf(ExecutionLandingHoldError);
+    expect(held).toMatchObject({
+      code: 'DECKENT_EXECUTION_LANDING_HOLD',
+      reasonCode: 'checkpoint-missing',
+      attribution: {
+        taskId: task.id,
+        attemptId: settlementRef.attemptId,
+        expectedSequence: 1,
+        observedSequence: null,
+      },
+    });
     expect(readExecutionLandingCheckpoint(root, {
       schemaVersion: 1,
       projectId: settlementRef.projectRootSha256,
@@ -372,7 +389,7 @@ describe('Docker execution landing coordinator', () => {
       },
     });
 
-    expect(stamp).toThrow(/did not advance after scoped disk changes/);
+    expect(stamp).toThrow(/sequence 1 is stale; expected at least 2/);
 
     writeFileSync(proposalPath, JSON.stringify({
       version: 1,
@@ -397,6 +414,93 @@ describe('Docker execution landing coordinator', () => {
       taskId: task.id,
       attemptId: settlementRef.attemptId,
     })).toBeNull();
+  });
+
+  it('holds the terminal production path with resumable attribution for a regressed sequence', () => {
+    const { root, task } = fixture();
+    writeFileSync(join(root, 'second.ts'), 'export const second = 1;\n');
+    task.scope.filesRead.push('second.ts');
+    task.scope.filesWrite.push('second.ts');
+    const settlementRef = createTaskResultSettlementRef(root, task.id);
+    writeTaskResultSettlementAttemptAtomic(settlementRef);
+    claimTaskResultSettlementAttemptAtomic(settlementRef);
+    prepareDockerExecutionLanding({
+      projectRoot: root,
+      task,
+      prompt: 'ORIGINAL WORKER PROMPT',
+      calledProvider: 'claude',
+      calledModel: 'claude-fable-5',
+      auth: 'subscription',
+      settlementRef,
+    });
+    writeFileSync(join(root, 'source.ts'), 'export const value = 2;\n');
+    writeFileSync(join(root, 'second.ts'), 'export const second = 2;\n');
+    writeFileSync(executionLandingProposalPath(root, task.id), JSON.stringify({
+      version: 1,
+      taskId: task.id,
+      attemptId: settlementRef.attemptId,
+      sequence: 2,
+      summary: 'Only one material mutation was checkpointed.',
+      completedWork: ['updated source.ts'],
+      remainingWork: ['checkpoint second.ts'],
+      nextAction: 'resume after the second mutation',
+      unresolvedRisks: [],
+      updatedAt: new Date().toISOString(),
+    }));
+    const counters = {
+      turns: 4,
+      inputTokens: 12,
+      outputTokens: 24,
+      cacheReadTokens: 800,
+      cacheCreationTokens: 0,
+      totalTokens: 836,
+      maxContextTokens: 800,
+    };
+
+    let held: unknown;
+    try {
+      stampDockerExecutionLandingCheckpoint({
+        projectRoot: root,
+        settlementRef,
+        terminalUsage: terminalUsage(settlementRef, counters),
+        landing: {
+          version: 2,
+          projectId: settlementRef.projectRootSha256,
+          taskId: task.id,
+          attemptId: settlementRef.attemptId,
+          budgetFingerprint: 'b'.repeat(64),
+          backend: 'docker',
+          state: 'landing-requested',
+          budget: { maxCacheReadTokens: 1_000 },
+          decision: {
+            state: 'landing-requested',
+            reasons: ['reserve reached'],
+            counters,
+            consecutiveCacheReadEvents: 1,
+          },
+          providerSequence: {
+            firstSequence: 1,
+            lastSequence: 4,
+            eventCount: 4,
+            eventDigest: 'c'.repeat(64),
+          },
+          requestedAt: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      held = error;
+    }
+
+    expect(held).toBeInstanceOf(ExecutionLandingHoldError);
+    expect(held).toMatchObject({
+      reasonCode: 'checkpoint-stale',
+      attribution: {
+        taskId: task.id,
+        attemptId: settlementRef.attemptId,
+        expectedSequence: 3,
+        observedSequence: 2,
+      },
+    });
   });
 
   it('stamps host truth around an untrusted attempt-bound semantic proposal', () => {

@@ -77,6 +77,49 @@ interface DockerLandingProposalEvidence {
   };
 }
 
+export type ExecutionLandingHoldReason =
+  | 'checkpoint-missing'
+  | 'checkpoint-malformed'
+  | 'checkpoint-stale';
+
+export interface ExecutionLandingResumableAttribution {
+  readonly taskId: string;
+  readonly attemptId: string;
+  readonly expectedSequence: number;
+  readonly observedSequence: number | null;
+}
+
+/**
+ * A recoverable execution stop, rather than terminal task failure.  Recovery
+ * gets the exact attempt and sequence fence without having to parse prose.
+ */
+export class ExecutionLandingHoldError extends Error {
+  readonly code = 'DECKENT_EXECUTION_LANDING_HOLD' as const;
+
+  constructor(
+    readonly reasonCode: ExecutionLandingHoldReason,
+    readonly attribution: ExecutionLandingResumableAttribution,
+    detail: string,
+  ) {
+    super(detail);
+    this.name = 'ExecutionLandingHoldError';
+  }
+}
+
+function landingHold(
+  input: Pick<ExecutionLandingResumableAttribution, 'taskId' | 'attemptId'>,
+  reasonCode: ExecutionLandingHoldReason,
+  expectedSequence: number,
+  observedSequence: number | null,
+  detail: string,
+): ExecutionLandingHoldError {
+  return new ExecutionLandingHoldError(reasonCode, {
+    ...input,
+    expectedSequence,
+    observedSequence,
+  }, detail);
+}
+
 /**
  * Docker workers may propose semantic progress, but never publish the durable
  * landing envelope themselves. The host validates the bounded proposal and
@@ -88,6 +131,10 @@ function writeDockerLandingProposal(input: {
   readonly notBefore: string;
 }): DockerLandingProposalEvidence {
   const path = executionLandingProposalPath(input.projectRoot, input.settlementRef.taskId);
+  if (!existsSync(path)) {
+    throw landingHold(input.settlementRef, 'checkpoint-missing', 1, null,
+      'Execution landing checkpoint is missing');
+  }
   const stat = lstatSync(path);
   if (
     !stat.isFile()
@@ -95,28 +142,36 @@ function writeDockerLandingProposal(input: {
     || stat.size <= 0
     || stat.size > EXECUTION_LANDING_PROPOSAL_MAX_BYTES
   ) {
-    throw createExecutionAuthorityError(
-      'Docker execution landing proposal file is absent, unsafe, empty, or exceeds its byte ceiling',
-    );
+    throw landingHold(input.settlementRef, 'checkpoint-malformed', 1, null,
+      'Execution landing checkpoint is unsafe, empty, or exceeds its byte ceiling');
   }
   const notBeforeMs = Date.parse(input.notBefore);
   if (!Number.isFinite(notBeforeMs) || stat.mtimeMs + 1 < notBeforeMs) {
     throw createExecutionAuthorityError('Docker execution landing proposal file predates the current attempt');
   }
 
-  const candidate = JSON.parse(readFileSync(path, 'utf-8')) as unknown;
-  const semanticState = (
-    candidate !== null
-    && typeof candidate === 'object'
-    && !Array.isArray(candidate)
-    && (candidate as Record<string, unknown>).version === 2
-  )
-    ? parseLandingProposalV2(candidate)
-    : readExecutionLandingProposal(input.projectRoot, {
-        taskId: input.settlementRef.taskId,
-        attemptId: input.settlementRef.attemptId,
-        notBefore: input.notBefore,
-      }).proposal;
+  let semanticState:
+    | ReturnType<typeof parseLandingProposalV2>
+    | ReturnType<typeof readExecutionLandingProposal>['proposal'];
+  try {
+    const candidate = JSON.parse(readFileSync(path, 'utf-8')) as unknown;
+    semanticState = (
+      candidate !== null
+      && typeof candidate === 'object'
+      && !Array.isArray(candidate)
+      && (candidate as Record<string, unknown>).version === 2
+    )
+      ? parseLandingProposalV2(candidate)
+      : readExecutionLandingProposal(input.projectRoot, {
+          taskId: input.settlementRef.taskId,
+          attemptId: input.settlementRef.attemptId,
+          notBefore: input.notBefore,
+        }).proposal;
+  } catch (error) {
+    if (error instanceof ExecutionLandingHoldError) throw error;
+    throw landingHold(input.settlementRef, 'checkpoint-malformed', 1, null,
+      `Execution landing checkpoint is malformed: ${error instanceof Error ? error.message : String(error)}`);
+  }
 
   if (
     semanticState.taskId !== input.settlementRef.taskId
@@ -331,12 +386,16 @@ export function stampDockerExecutionLandingCheckpoint(input: {
     contextEnvelope,
     input.landing.requestedAt,
   );
+  // `changedPaths` is the attempt schema's existing material-mutation set.
+  // One initial checkpoint plus one advancement per material path makes
+  // freshness deterministic and independent of provider narration/model.
+  const expectedSequence = diskEvidence.changedPaths.length + 1;
+  if (proposalEnvelope.sequence < expectedSequence) {
+    throw landingHold(input.settlementRef, 'checkpoint-stale', expectedSequence,
+      proposalEnvelope.sequence,
+      `Execution landing checkpoint sequence ${proposalEnvelope.sequence} is stale; expected at least ${expectedSequence}`);
+  }
   if (diskEvidence.changedPaths.length > 0) {
-    if (proposalEnvelope.sequence < 2) {
-      throw createExecutionAuthorityError(
-        'Execution landing proposal did not advance after scoped disk changes',
-      );
-    }
     const proposalMtimeMs = Date.parse(proposalEnvelope.observedMtime);
     for (const changedPath of diskEvidence.changedPaths) {
       const absolutePath = resolve(input.projectRoot, changedPath);

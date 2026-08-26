@@ -117,6 +117,28 @@ describe('task lineage authority', () => {
       .toEqual([]);
   });
 
+  it('does not select a parallel repair that is outside the causal head', () => {
+    const original = task('parallel', TaskStatus.NO_GO);
+    const admitted = task('parallel-fix-a', TaskStatus.PENDING, {
+      isPriorityFix: true,
+      fixForTaskId: 'parallel',
+      createdAt: '2026-08-01T00:00:01Z',
+    });
+    const staleSibling = task('parallel-fix-b', TaskStatus.PENDING, {
+      isPriorityFix: true,
+      fixForTaskId: 'parallel',
+      createdAt: '2026-08-01T00:00:02Z',
+    });
+
+    expect(selectPendingFixTasks([original, staleSibling, admitted], 1).map(item => item.id))
+      .toEqual(['parallel-fix-a']);
+    expect(selectPendingFixTasks(
+      [original, staleSibling, admitted],
+      1,
+      new Set(['parallel-fix-a']),
+    )).toEqual([]);
+  });
+
   it('derives attempt depth and bounded ancestors from explicit parent authority', () => {
     const tasks = [
       task('4', TaskStatus.NO_GO),

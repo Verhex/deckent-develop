@@ -1,119 +1,114 @@
-# KALİTE-KAPILARI DALGASI (Tren Node-2) — tsc-settlement-truth · mock-ratchet · deletion-aware honest-gate · ERRORS-forensic · motor-selfchange-WARN
+# SETTLEMENT-ATOMİĞİ DALGASI (Tren Node-5) — landing-proposal yazarı · host-checkpoint · lineage-settlement authority · descendant-cancellation
 
 ## Goal
 
-Gece-bulgu admission satırları 202/203/201/205 kapanır (owner-onaylı tren sırası): (1)
-EVAL-TSC-FEEDBACK-001 — sprint tsc-kirliyken sessizce COMPLETE'e kapanamaz; settlement typed
-residual taşır + Auditor'a event gider; tam-factory node:fs mock'larına yeni-eklenemez
-ratchet'i gelir. (2) HONEST-GATE-DELETION-AWARE-001 — silme-only işler (679-002 canlı vakası:
-24-silme/0-ekleme, goCriteria MET) yanlış-pozitif NO_GO'ya düşmez; gerçek stub hâlâ yakalanır.
-(3) CONFIG-HEAL-IO-TRUTH-001 ek dilimi — kritik-sınıf hata girdileri ERRORS.md 600-satır
-kırpmasında forensic-kaybolmaz. (4) DIRECTIVES-ENGINE-SELFCHANGE-LINT-001 — motor-sıcak-yolu
-dosyalarına dokunan task + ona etki-bağımlı task aynı DAG'daysa typed WARN (674-dersi).
+RECOVERY-BORN settlement-atomiği dörtlüsü kapanır (owner-onaylı tren sırası; 3302
+replay-basamağının önkoşulu): (1) 3276 — worker landing-proposal'ları serbest-shell
+serileştirmesiyle değil TEK yapılandırılmış cross-platform atomic yazarla yazılır; malformed
+proposal sessizce geçemez, typed HOLD/diagnostic üretir. (2) 3285 — host-owned structured
+landing checkpoint her materyal attempt-mutasyonundan sonra ve terminal result'tan önce
+ilerler; stale/malformed/missing → resumable-attribution'lı typed HOLD; helper'ın gerçek
+production caller'ı olur. (3) 3282 — logical-task lineage'ının TEK causal settlement
+authority'si: repair yalnız güncel unresolved lineage-head'inden yetkilenir, başarılı leaf
+stale/redundant XFIX ile değiştirilemez, DONE yeniden açılamaz, progress çift sayılamaz.
+(4) 3295 — başarılı settlement, henüz başlamamış redundant FIX/XFIX torunlarını dispatch
+ÖNCESİ atomik superseded işaretler; aktif torunlara typed cancellation kararı gider.
 
 ## Execution contract
 
 - Otorite: main'deki kontratlar; assertion zayıflatılmaz. Yalnız kendi Files listendeki
   dosyalara yaz; Reads listendekileri OKU. Scope dışına çıkma.
-- Testler hermetik (tmpdir; gerçek `.brain`/`.deckent` dosyalarına yazılmaz). VITEST_MAX_FORKS=2.
+- Bu satırlar 2026-08-01 kod-truth'una dayanır; HER task önce GÜNCEL durumu teşhis eder
+  (modüller o günden beri evrildi) ve kapanmış alt-parçayı yeniden yazmaz — kalan exact
+  residual'ı kapatır; teşhisini result notes'a yazar.
+- Testler hermetik (tmpdir; spawnSync YASAK). VITEST_MAX_FORKS=2.
 - Değiştirdiğin dosyalar için `npx tsc --noEmit` SIFIR hata; çıktıyı result notes'a yaz.
 - Aktif run sırasında build/provider-auth/bot mutation YASAK.
-- YENİ config anahtarı eklenirken CFG-003 dersi bağlayıcı: authored type + default +
-  resolved projection + gerçek consumer zinciri AYNI task'ta tamamlanır (resolver'da
-  düşen alan bırakılamaz); 0-hardcode (eşik/deşen constants veya config'ten).
+- Dosya-sahipliği ayrıktır: Task-3 YALNIZ task-lineage.ts'e, Task-4 YALNIZ
+  controller/scheduler tarafına yazar; birinin öbürünün dosyasında değişiklik ihtiyacı
+  doğarsa result notes'a FINDING yazılır, edit YAPILMAZ.
 
-## Task 1: Settlement tsc-truth gate — sprint tsc-kirli COMPLETE olamaz
-- Files: src/orchestra/sprint-finalizer.ts, src/core/config-types.ts, src/core/config.ts, tests/orchestra/tsc-settlement-gate.test.ts
-- Reads: src/orchestra/sprint-phases.ts, src/core/utils.ts, docs/MASTER-PLAN.md
+## Task 1: 3276 — worker landing-proposal'ı için yapılandırılmış atomic yazar girişi
+- Files: src/core/execution-landing-proposal.ts, src/agents/landing-proposal-entry.ts, tests/core/execution-landing-proposal.test.ts
+- Reads: src/orchestra/sprint-spawner.ts, src/orchestra/spawn-backend-docker.ts, src/agents/worker.ts
+- Priority: HIGH
+- Test: VITEST_MAX_FORKS=2 npx vitest run tests/core/execution-landing-proposal.test.ts
+### Description
+Teşhis-önce: bugün worker'lar proposal'ı hangi yolla yazıyor (prompt-segment shell-echo mu,
+başka mekanizma mı) — buildExecutionLandingProposalPromptSegment tüketimini Reads'te izle.
+Kapanış: (a) YENİ standalone node girişi `src/agents/landing-proposal-entry.ts`
+(sprint-runner-entry emsali; CLI-kataloğuna GİRMEZ, 510-vocabulary'ye dokunulmaz) — stdin
+veya argv'den JSON alır, mevcut exact attempt-şemasıyla parse/validate eder
+(parseExecutionLandingProposal aynı otorite; İKİNCİ şema yazılmaz) ve
+writeExecutionLandingProposal'ın same-directory atomic rename yoluyla diske koyar; invalid
+girdi → stderr'e typed diagnostic (`LANDING_PROPOSAL_MALFORMED` sınıfı) + nonzero exit,
+diske HİÇBİR ŞEY yazılmaz; (b) prompt-segment'i worker'a bu girişi kullandıracak şekilde
+güncellenir (serbest shell-JSON serileştirme talimatı emekli; entry yolu dist-relatif ve
+provider-nötr — docker/subprocess/codex hepsinde node mevcut varsayımını Reads'ten doğrula,
+değilse dürüst FINDING); (c) host parse fail-closed davranışı korunur fakat malformed
+artık sessiz-yok-sayma değil typed diagnostic taşır (mevcut hold/diagnostic kanalına).
+Test eklentileri: entry'nin valid/invalid/oversize yolları (execFile ile GERÇEK node girişi
+— async, spawnSync yok), atomicity (yarım dosya asla görünmez), mevcut suite bit-yeşil.
+tsc sıfır.
+
+## Task 2: 3285 — host-owned checkpoint zinciri production'a bağlanır
+- Files: src/orchestra/execution-landing-coordinator.ts, src/agents/worker.ts, tests/orchestra/execution-landing-coordinator.test.ts, tests/core/execution-landing-checkpoint.test.ts
+- Reads: src/core/execution-landing-proposal.ts, src/orchestra/sprint-phases.ts, src/core/execution-landing-checkpoint.ts, src/core/execution-landing-context.ts, src/core/task-result-settlement.ts, src/core/task-types.ts
 - Priority: CRITICAL
 - Model: gpt-5.6-sol
-- Test: VITEST_MAX_FORKS=2 npx vitest run tests/orchestra/tsc-settlement-gate.test.ts tests/orchestra/sprint-finalizer-row-upsert.test.ts
+- Dependencies: Task 1
+- Test: VITEST_MAX_FORKS=2 npx vitest run tests/orchestra/execution-landing-coordinator.test.ts tests/core/execution-landing-checkpoint.test.ts
 ### Description
-Yeni config anahtarı `evaluation.tsc_settlement_gate` (boolean, default TRUE; authored tip
-config-types.ts + createDefaultConfig default'u + resolved projection — ÜÇÜ BİRDEN, CFG-003
-dersi). Consumer: sprint-finalizer'ın normal-finalize yolunda, terminal COMPLETE yayınından
-ÖNCE bounded bir `npx tsc --noEmit` koşulur (async spawn, spawnSync YASAK; timeout
-config-resolved makul sabit constants'tan, örn. 240sn; TS-projesi değilse/ tsc yoksa typed
-skip). FAIL ise: (a) settlement'a typed residual eklenir (`TSC_DIRTY_RESIDUAL` + ilk 20 hata
-satırı bounded), sprint sonucu COMPLETE yerine mevcut tech-debt/residual taşıyan settlement
-sınıfına düşer — hangi mevcut alan/mekanizma kullanılacaksa REICAT ETME, sprint-finalizer'ın
-var olan residual/debt kanalını kullan (Reads'te gör); (b) Auditor'a `BRAIN→AUDITOR` event'i
-yazılır (sprint-phases.ts:2119 STUB_WRITE_DETECTED emsalindeki writeEvent deseni). Gate
-fault'u (tsc çalıştırılamadı) typed WARN + treat-as-pass DEĞİL — typed `TSC_GATE_FAULT`
-residual'ı (dürüstlük: koşamadıysak temiz diyemeyiz, ama sprint'i de kilitlemeyiz). YENİ
-hermetik test: sahte-proje tmpdir'de (a) gate-ON + kirli-ts → residual + event, (b) gate-ON +
-temiz → COMPLETE bit-değişmez, (c) gate-OFF → tsc hiç çağrılmaz, (d) fault → TSC_GATE_FAULT.
-tsc-koşusunu testte gerçek npx yerine enjekte-edilebilir runner seam'iyle sür (finalizer'a
-opsiyonel runTscFn parametresi — mevcut DI desenleriyle uyumlu). tsc sıfır.
+Teşhis-önce: satırın 2026-08-01 kanıtı "yeni host helper'ın production caller'ı yok" ve
+"checkpoint freshness model-bağımlı" diyordu — coordinator'ın bugünkü gerçek çağrı-zincirini
+çıkar (kim üretiyor, kim tüketiyor, hangi fazda). Kapanış: (a) worker-lifecycle'ın sahip
+olduğu schema-validated same-directory atomic checkpoint yazarı her MATERYAL disk-mutasyonu
+sonrası ve terminal result yazımı ÖNCESİ sequence+content ilerletir (materyal-mutasyon
+tanımını mevcut attempt-şemasından türet; yeni kavram icat etme); (b) stale (sequence geri),
+malformed veya missing checkpoint → typed execution HOLD + resumable attribution (hangi
+attempt/sequence'ta kalındığı kaydedilir; recovery bu bilgiyle devam edebilir) — provider
+düzyazısı veya shell-quoting checkpoint otoritesi DEĞİLDİR; (c) zincirin production
+caller'ı kanıtlanır: EVALUATE/terminal yolunda checkpoint-freshness kontrolünün gerçekten
+çalıştığı testle pinlenir. Mevcut iki suite bit-yeşil kalır; yeni pinler eklenir. tsc sıfır.
 
-## Task 2: Mock-factory ratchet — tam-factory node:fs mock'u yeni eklenemez
-- Files: scripts/lint-mock-factories.mjs, scripts/script-registry.json, package.json, tests/scripts/lint-mock-factories.test.ts
-- Reads: scripts/lint-config-writers.mjs, scripts/lint-test-hermeticity.mjs
-- Priority: HIGH
-- Agent: ci-guardian
-- Test: VITEST_MAX_FORKS=2 npx vitest run tests/scripts/lint-mock-factories.test.ts
+## Task 3: 3282 — lineage causal-settlement authority (foldTaskLineages)
+- Files: src/core/task-lineage.ts, tests/core/task-lineage.test.ts, tests/core/lineage-causal-authority.test.ts
+- Reads: src/orchestra/sprint-controller.ts, tests/core/ent3-lineage.test.ts
+- Priority: CRITICAL
+- Model: gpt-5.6-sol
+- Test: VITEST_MAX_FORKS=2 npx vitest run tests/core/task-lineage.test.ts tests/core/lineage-causal-authority.test.ts
 ### Description
-YENİ gate `scripts/lint-mock-factories.mjs` (yapı emsali Reads'teki lint-config-writers —
-export'lu check fonksiyonu + main + yalnız-azalma baseline): tests/** içinde
-`vi.mock('node:fs'` (ve `'node:fs/promises'`) çağrısı olup factory gövdesinde
-`importOriginal` ÇAĞRILMAYAN her dosya "tam-factory" sayılır (2026-08-26 mock-gap dersi:
-authority-zinciri fs-yüzeyi ekleyince tam-factory'ler sessizce kırılıyor). Mevcut
-tam-factory'ler script-içi CONFIG... benzeri baseline Set'ine dosya-yolu anahtarıyla ledger-yorumla
-alınır (kuruluş ölçümünü koş ve GERÇEK listeyi yaz; sayıyı result notes'a raporla); YENİ
-dosya fail-closed, baseline yalnız azalır (stale-baseline kırmızı). Gate script-registry'ye
-kayıt + package.json lint:gates zincirinin sonuna eklenir (mevcut sözdizimini birebir
-kopyala; lint-config-writers'tan SONRA). Hermetik test: tmpdir mini-ağaçta tam-factory /
-importOriginal'li / mock'suz üç fixture + gerçek-repo yeşil koşusu pini. tsc etkilenmez.
+Teşhis-önce: foldTaskLineages (task-lineage.ts:232) bugün leaf'i neye göre seçiyor —
+2026-08-01 kanıtı "later attempt depth/time, causal authorization'sız" idi; güncel durumu
+çıkar. Kapanış (task-lineage.ts İÇİNDE — controller'a YAZMA, gerekirse FINDING): (a) repair
+yalnız GÜNCEL unresolved lineage-head'inden yetkilidir — head-dışı/paralel-doğmuş XFIX
+lineage'ı settle EDEMEZ; (b) başarılı repair logical task'ı TAM BİR KEZ settle eder: stale
+veya redundant XFIX başarılı leaf'i DEĞİŞTİREMEZ, DONE'u yeniden AÇAMAZ, progress'i çift
+SAYAMAZ, dependant'ları zehirleyemez (settled-DONE bir root'un torunları için sonraki
+NO_GO'lu stale-leaf aggregate verdict'i düşürmez); (c) sprint-488 vakası regresyon-fixture
+olur: 001/010/013 başarılıyken doğan gereksiz XFIX'lerin fold sonucu settled-DONE'u
+koruması pinlenir; (d) forcedByBlockedDependents akışının bu authority'yi BYPASS edemediği
+task-lineage tarafındaki karar-yüzeyinde pinlenir (controller-tarafı tüketim değişikliği
+gerekiyorsa exact FINDING). YENİ test dosyası causal-authority senaryolarını taşır; mevcut
+lineage suite'leri bit-yeşil. tsc sıfır.
 
-## Task 3: Deletion-aware honest-gate — silme-only iş yanlış-pozitiflenmez
-- Files: src/orchestra/result-evaluator.ts, tests/orchestra/honest-gate-deletion-aware.test.ts
-- Reads: src/orchestra/sprint-phases.ts, tests/orchestra/dishonest-detector.test.ts
-- Priority: HIGH
-- Test: VITEST_MAX_FORKS=2 npx vitest run tests/orchestra/honest-gate-deletion-aware.test.ts tests/orchestra/dishonest-detector.test.ts
+## Task 4: 3295 — settlement'ta redundant-descendant cancellation (transactional)
+- Files: src/orchestra/sprint-controller.ts, tests/orchestra/lineage-descendant-cancellation.test.ts
+- Reads: src/core/task-lineage.ts, src/orchestra/sprint-phases.ts, src/orchestra/scheduler-effects.ts
+- Priority: CRITICAL
+- Dependencies: Task 3
+- Test: VITEST_MAX_FORKS=2 npx vitest run tests/orchestra/lineage-descendant-cancellation.test.ts
 ### Description
-`enforceHonestResultGate` (result-evaluator.ts ~:3033) karar sırası 679-002 canlı vakasına
-göre düzeltilir: selfAssessment başarı iddiasında linesAdded=0 İKEN linesRemoved>0 VE
-goCriteria-kanıtı mevcutsa (result.notes/testsPassed zinciri) hiçbir stub/empty-write
-override'ı DONE'u düşürmez — 679-002'nin gerçekte hangi dala takıldığını ÖNCE teşhis et
-(isStubResult literal'i mi, diskVerify yolu mu, SCOPE_VIOLATION_OR_EMPTY_WRITE mi) ve fix'i
-o dala uygula; komşu davranış bit-korunur. YENİ test dosyası: (a) 679-002 şekli regresyon
-fixture'ı (24-silme/0-ekleme, goCriteria MET, testsPassed=true → DONE KALIR), (b) gerçek
-stub (0/0 + kanıtsız) HÂLÂ NO_GO, (c) silme-only ama kanıtsız (linesRemoved>0, testsPassed
-false/iddiasız) mevcut davranışını korur — zayıflatma yok. Mevcut dishonest-detector suite
-yeşil kalır. tsc sıfır.
-
-## Task 4: ERRORS.md forensic-kanalı — kritik-sınıf girdiler kırpmada kaybolmaz
-- Files: src/core/utils.ts, src/core/constants.ts, tests/core/errors.test.ts
-- Reads: docs/MASTER-PLAN.md
-- Priority: NORMAL
-- Test: VITEST_MAX_FORKS=2 npx vitest run tests/core/errors.test.ts
-### Description
-`.brain/ERRORS.md` 600-satır kırpması (utils.ts append + ERRORS_MAX_LINES) forensic'i
-öldürüyor (201 satırının ek dilimi). Ekleme: kritik-sınıf girdiler (error-code'u
-`CONFIG_` öneki taşıyan VEYA `_HOLD` soneki taşıyan sınıf — desen constants.ts'te tek-kaynak
-export, örn. ERRORS_CRITICAL_CLASS_RE) normal ERRORS.md akışına EK olarak
-`.brain/ERRORS-critical.md`'ye de append edilir; bu dosya kendi bağımsız tavanıyla kırpılır
-(constants.ts yeni `ERRORS_CRITICAL_MAX_LINES`, 2000 — gerekçe-yorumlu; retention-domain 120
-satırına dokunulmaz, dosya .brain altında aynı yazım-deseniyle). Yazım non-fatal (mevcut
-logError sözleşmesi korunur). Test: errors.test.ts'e (a) kritik-sınıf girdinin çift-kanala
-düştüğü, (b) kritik-olmayanın yalnız ERRORS.md'ye gittiği, (c) critical-kırpmanın kendi
-tavanını uyguladığı, (d) mevcut 600-trim pinlerinin bit-korunduğu eklenir (tmpdir). tsc sıfır.
-
-## Task 5: lint-directives motor-selfchange typed WARN (674-dersi)
-- Files: scripts/lint-directives.mjs, tests/scripts/lint-directives.test.ts
-- Reads: src/orchestra/task-builder.ts
-- Priority: NORMAL
-- Test: VITEST_MAX_FORKS=2 npx vitest run tests/scripts/lint-directives.test.ts
-### Description
-lint-directives'e yeni WARN sınıfı `D_ENGINE_SELF_CHANGE`: motor-sıcak-yolu listesi
-(export edilen tek-kaynak sabit ENGINE_HOT_PATHS — src/orchestra/task-builder.ts,
-src/orchestra/prompt-compile* ailesi, src/core/result-collector* / src/orchestra/result-*,
-src/orchestra/scheduler*, src/orchestra/sprint-spawner.ts; GERÇEK dosya adlarını Reads +
-repo-grep ile doğrula, hayalet yol yazma) ile bir task'ın filesWrite kümesi kesişiyor VE
-aynı DIRECTIVES'te ona Dependencies ile bağlı (doğrudan veya geçişli) başka task varsa:
-`task-N motoru değiştiriyor ve task-M ona bağımlı — etki next-run-only, mini-run önerisi
-(sprint-674 dersi)` metinli WARN (BLOCK değil). Liste export'u test-edilebilir; mevcut
-checkDirectives saf-çekirdek desenine ek parametre olarak girer (parser enjeksiyonu
-bozulmaz). Test: lint-directives.test.ts'e sahte-parser'lı iki senaryo — kesişim+bağımlılık
-→ WARN üretilir; kesişim ama bağımlısız → WARN üretilmez; mevcut testler bit-korunur. tsc
-etkilenmez (mjs), test tsc'ye girmez.
+Teşhis-önce: FIX/XFIX doğum→kuyruk→dispatch zincirinin bugünkü exact yolunu çıkar
+(sprint-controller + scheduler-effects; sprint-490 vakası: 013 ikinci-FIX'te başarılıyken
+önceden-kuyruklu üçüncü repair yine spawn edildi). Kapanış (controller/scheduler tarafında;
+task-lineage.ts'e YAZMA — Task-3'ün authority API'sini TÜKET): (a) kabul edilen repair
+logical-root'u settle ettiği anda henüz BAŞLAMAMIŞ kuyruklu FIX/XFIX torunları dispatch
+ÖNCESİ atomik olarak superseded işaretlenir (işaret + dispatch-atlaması aynı karar
+noktasında — yarış penceresi kalmaz); (b) o anda AKTİF (spawn edilmiş) redundant torun
+varsa typed cancellation kararı alır (öldürme semantiği mevcut kill/cleanup yasaklarına
+uygun: zorla-kill değil, sonucu superseded-sınıfıyla düşürme — mevcut mekanizmadan türet);
+(c) progress muhasebesi TEK logical DONE kalır; sonraki stale leaf yeniden açamaz (Task-3
+authority'siyle uçtan-uca test); (d) NEGATİF kapsam pinli: global retry-cap konmaz,
+ilgisiz lineage'lara dokunulmaz. YENİ hermetik test: 490-vakası regresyon senaryosu +
+aktif-torun typed-cancellation + ilgisiz-lineage dokunulmazlığı. tsc sıfır.

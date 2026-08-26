@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import {
   mkdtempSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -154,6 +155,17 @@ describe('host-owned execution landing checkpoint authority', () => {
     });
     expect(() => writeExecutionLandingCheckpointAtomic(root, conflicting))
       .toThrow(/Conflicting immutable/);
+  });
+
+  it('publishes schema-validated authority atomically without leaving a sibling temporary file', () => {
+    const { root } = fixture();
+    const checkpoint = createExecutionLandingCheckpoint(root, input());
+    writeExecutionLandingCheckpointAtomic(root, checkpoint);
+    const path = executionLandingCheckpointPath(checkpoint.checkpoint);
+    const siblings = readdirSync(join(path, '..'));
+
+    expect(readExecutionLandingCheckpoint(root, checkpoint.checkpoint)).toEqual(checkpoint);
+    expect(siblings).toEqual(['checkpoint.json']);
   });
 
   it('fails loudly on tampering, unknown fields and cross-project authority', () => {

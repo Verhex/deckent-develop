@@ -16974,3 +16974,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 681-005: lint-directives motor-selfchange typed WARN (674-dersi) (DONE)
 
 ---
+## Sprint 682 — sprint-682
+
+**Status:** COMPLETE
+**Date:** 2026-08-26
+**Duration:** 935s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 934786ms |
+
+### Tasks
+
+- 682-001: 3276 — worker landing-proposal'ı için yapılandırılmış atomic yazar girişi (DONE)
+- 682-002: 3285 — host-owned checkpoint zinciri production'a bağlanır (DONE)
+- 682-003: 3282 — lineage causal-settlement authority (foldTaskLineages) (DONE)
+- 682-004: 3295 — settlement'ta redundant-descendant cancellation (transactional) (DONE)
+
+---

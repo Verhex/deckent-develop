@@ -64,6 +64,27 @@ export interface WriteExecutionLandingProposalResult {
   observedMtime: string;
 }
 
+export const LANDING_PROPOSAL_MALFORMED = 'LANDING_PROPOSAL_MALFORMED' as const;
+
+/** Typed fail-closed diagnostic shared by worker ingress and host readers. */
+export class LandingProposalMalformedError extends Error {
+  readonly code = LANDING_PROPOSAL_MALFORMED;
+
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = 'LandingProposalMalformedError';
+  }
+}
+
+function malformed(error: unknown): LandingProposalMalformedError {
+  if (error instanceof LandingProposalMalformedError) return error;
+  const detail = error instanceof Error ? error.message : String(error);
+  return new LandingProposalMalformedError(
+    `Execution landing proposal is malformed: ${detail}`,
+    error instanceof Error ? { cause: error } : undefined,
+  );
+}
+
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
@@ -204,9 +225,14 @@ export function parseLandingProposalV2(value: unknown): LandingProposalV2 {
 
 export function writeExecutionLandingProposal(
   projectRoot: string,
-  value: LandingProposalV2,
+  value: LandingProposalV2 | ExecutionLandingProposalV1,
 ): WriteExecutionLandingProposalResult {
-  const proposal = parseLandingProposalV2(value);
+  const proposal = value.version === EXECUTION_LANDING_PROPOSAL_SCHEMA_VERSION
+    ? parseExecutionLandingProposal(value, {
+        taskId: value.taskId,
+        attemptId: value.attemptId,
+      })
+    : parseLandingProposalV2(value);
   const root = resolve(projectRoot);
   const tasksDirectory = resolve(root, TASKS_DIR);
   if (relative(root, tasksDirectory).startsWith('..')) {
@@ -315,6 +341,18 @@ export function parseExecutionLandingProposal(
   };
 }
 
+/** Parse JSON and preserve schema failures as a stable diagnostic code. */
+export function parseExecutionLandingProposalJson(
+  raw: string,
+  expected: { taskId: string; attemptId: string },
+): ExecutionLandingProposalV1 {
+  try {
+    return parseExecutionLandingProposal(JSON.parse(raw) as unknown, expected);
+  } catch (error: unknown) {
+    throw malformed(error);
+  }
+}
+
 export function readExecutionLandingProposal(
   projectRoot: string,
   input: {
@@ -325,15 +363,20 @@ export function readExecutionLandingProposal(
 ): ExecutionLandingProposalEnvelopeV1 {
   const path = executionLandingProposalPath(projectRoot, input.taskId);
   const stat = statSync(path);
-  if (!stat.isFile() || stat.size <= 0 || stat.size > EXECUTION_LANDING_PROPOSAL_MAX_BYTES) {
+  if (!stat.isFile()) {
     throw createExecutionAuthorityError('Execution landing proposal file is absent, empty, or exceeds its byte ceiling');
+  }
+  if (stat.size <= 0 || stat.size > EXECUTION_LANDING_PROPOSAL_MAX_BYTES) {
+    throw new LandingProposalMalformedError(
+      'Execution landing proposal file is empty or exceeds its byte ceiling',
+    );
   }
   const notBeforeMs = Date.parse(input.notBefore);
   if (!Number.isFinite(notBeforeMs) || stat.mtimeMs + 1 < notBeforeMs) {
     throw createExecutionAuthorityError('Execution landing proposal file predates the current attempt');
   }
   const raw = readFileSync(path, 'utf-8');
-  const proposal = parseExecutionLandingProposal(JSON.parse(raw), {
+  const proposal = parseExecutionLandingProposalJson(raw, {
     taskId: input.taskId,
     attemptId: input.attemptId,
   });
@@ -347,24 +390,6 @@ export function readExecutionLandingProposal(
 
 function quoteBashArgument(value: string): string {
   return `'${value.replaceAll("'", `'"'"'`)}'`;
-}
-
-function buildAtomicProposalWriteStep(
-  path: string,
-  proposal: ExecutionLandingProposalV1,
-): string {
-  const serialized = `${JSON.stringify(proposal, null, 2)}\n`;
-  return [
-    `proposal_path=${quoteBashArgument(path)}`,
-    `proposal_json=${quoteBashArgument(serialized)}`,
-    // Brace-free bash on purpose: a `${...}` sequence in this generated script
-    // gets evaluated as a JS template by a downstream prompt-interpolation layer
-    // (the sprint-553-004 'ReferenceError: proposal_path is not defined' class),
-    // so every expansion here uses the `$name` form only.
-    'proposal_tmp="$proposal_path.tmp.$$"',
-    'printf \'%s\' "$proposal_json" > "$proposal_tmp"',
-    'mv -- "$proposal_tmp" "$proposal_path"',
-  ].join('\n');
 }
 
 export function buildExecutionLandingProposalPromptSegment(
@@ -388,7 +413,11 @@ export function buildExecutionLandingProposalPromptSegment(
     unresolvedRisks: ['specific unresolved risk'],
     updatedAt: 'best-effort current ISO-8601 timestamp',
   };
-  const atomicWriteStep = buildAtomicProposalWriteStep(path, initialProposal);
+  const entryCommand = [
+    'node dist/agents/landing-proposal-entry.js',
+    quoteBashArgument(taskId),
+    quoteBashArgument(attemptId),
+  ].join(' ');
   const writeCadence = mode === 'finite-adjudication'
     ? [
         'This is a finite read-only adjudication. Do not spend a standalone tool call on this proposal.',
@@ -408,9 +437,11 @@ export function buildExecutionLandingProposalPromptSegment(
     'This execution has a host-enforced hard budget and a reserved landing window. The hard ceiling is unchanged.',
     `Maintain one bounded semantic proposal at \`${path}\` for task \`${taskId}\`, attempt \`${attemptId}\`.`,
     ...writeCadence,
-    'Use this quote-safe composition for the first write and every replacement: serialize the complete JSON first, quote each dynamic value as one Bash argument with the same single-quote escape, then atomically rename the temporary file.',
+    'Use the provider-neutral structured writer below. Pass the complete JSON on stdin; do not serialize JSON with shell variables, echo, temporary files, or mv. The Node entry validates the exact attempt schema and publishes by same-directory atomic rename.',
     '```bash',
-    atomicWriteStep,
+    `${entryCommand} <<'LANDING_PROPOSAL_JSON'`,
+    JSON.stringify(initialProposal, null, 2),
+    'LANDING_PROPOSAL_JSON',
     '```',
     'Use exactly this JSON shape and no extra fields:',
     '```json',

@@ -1,11 +1,15 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   buildExecutionLandingProposalPromptSegment,
   executionLandingProposalPath,
+  LANDING_PROPOSAL_MALFORMED,
+  LandingProposalMalformedError,
   parseLandingProposalV2,
   parseExecutionLandingProposal,
   readExecutionLandingProposal,
@@ -51,6 +55,35 @@ function proposalV2(overrides: Record<string, unknown> = {}): Record<string, unk
     },
     ...overrides,
   };
+}
+
+interface EntryExecution {
+  code: number | null;
+  stderr: string;
+}
+
+function executeEntry(
+  projectRoot: string,
+  input: string,
+  argv: readonly string[] = [],
+): Promise<EntryExecution> {
+  const entryPath = join(process.cwd(), 'src/agents/landing-proposal-entry.ts');
+  const tsxLoader = pathToFileURL(join(process.cwd(), 'node_modules/tsx/dist/loader.mjs')).href;
+  return new Promise((resolveExecution, reject) => {
+    const child = execFile(
+      process.execPath,
+      ['--import', tsxLoader, entryPath, 'm1-007', ATTEMPT, ...argv],
+      { cwd: projectRoot, encoding: 'utf8' },
+      (error, _stdout, stderr) => {
+        if (error && error.code === 'ENOENT') {
+          reject(error);
+          return;
+        }
+        resolveExecution({ code: child.exitCode, stderr });
+      },
+    );
+    child.stdin?.end(input);
+  });
 }
 
 afterEach(() => {
@@ -150,6 +183,24 @@ describe('execution landing proposal', () => {
     })).toThrow(/predates the current attempt/);
   });
 
+  it('surfaces malformed host input through the typed diagnostic', () => {
+    const projectRoot = root();
+    const path = executionLandingProposalPath(projectRoot, 'm1-007');
+    writeFileSync(path, '{not-json');
+
+    try {
+      readExecutionLandingProposal(projectRoot, {
+        taskId: 'm1-007',
+        attemptId: ATTEMPT,
+        notBefore: T0,
+      });
+      throw new Error('expected malformed proposal to be rejected');
+    } catch (error: unknown) {
+      expect(error).toBeInstanceOf(LandingProposalMalformedError);
+      expect((error as LandingProposalMalformedError).code).toBe(LANDING_PROPOSAL_MALFORMED);
+    }
+  });
+
   it('emits one bounded attempt-specific volatile protocol segment', () => {
     const segment = buildExecutionLandingProposalPromptSegment('m1-007', ATTEMPT);
     expect(segment).toContain('.tasks/task-m1-007.landing-proposal.json');
@@ -162,13 +213,11 @@ describe('execution landing proposal', () => {
     expect(segment).toContain('sequence 2 or higher');
     expect(segment).toContain('SAME assistant turn');
     expect(segment).toContain('stop early and report NO_GO');
-    expect(segment).toContain('quote-safe composition');
-    expect(segment).toContain('proposal_tmp="$proposal_path.tmp.$$"');
-    expect(segment).toContain('mv -- "$proposal_tmp" "$proposal_path"');
-    // sprint-553-004 regression: a `${...}` sequence in this segment gets
-    // evaluated as a JS template by a downstream prompt-interpolation layer
-    // (ReferenceError: proposal_path is not defined) — the whole segment must
-    // stay brace-expansion-free forever.
+    expect(segment).toContain("node dist/agents/landing-proposal-entry.js 'm1-007'");
+    expect(segment).toContain("<<'LANDING_PROPOSAL_JSON'");
+    expect(segment).toContain('same-directory atomic rename');
+    expect(segment).not.toContain('proposal_tmp');
+    expect(segment).not.toContain('mv --');
     expect(segment).not.toContain('${');
     expect(segment.length).toBeLessThan(3_500);
   });
@@ -183,11 +232,41 @@ describe('execution landing proposal', () => {
     expect(segment).toContain('SAME single Bash tool call');
     expect(segment).toContain('Do not update the proposal after the evidence pass');
     expect(segment).toContain('only permitted project-file mutation');
-    expect(segment).toContain('quote-safe composition');
-    expect(segment).toContain('mv -- "$proposal_tmp" "$proposal_path"');
-    // sprint-553-004 regression (same class as the continuous-mode segment).
+    expect(segment).toContain("node dist/agents/landing-proposal-entry.js 'm3-010-xverify'");
+    expect(segment).not.toContain('mv --');
     expect(segment).not.toContain('${');
     expect(segment).not.toContain('after your plan and after each coherent completed step');
     expect(segment.length).toBeLessThan(4_000);
+  });
+
+  it('publishes valid stdin through the real Node entry without partial files', async () => {
+    const projectRoot = root();
+    const raw = JSON.stringify(proposal());
+    const observed: string[] = [];
+    const timer = setInterval(() => {
+      try { observed.push(readFileSync(executionLandingProposalPath(projectRoot, 'm1-007'), 'utf8')); } catch { /* not published yet */ }
+    }, 0);
+
+    const execution = await executeEntry(projectRoot, raw);
+    clearInterval(timer);
+
+    expect(execution).toEqual({ code: 0, stderr: '' });
+    expect(JSON.parse(readFileSync(executionLandingProposalPath(projectRoot, 'm1-007'), 'utf8'))).toEqual(proposal());
+    expect(observed.every(candidate => {
+      try { return JSON.parse(candidate).taskId === 'm1-007'; } catch { return false; }
+    })).toBe(true);
+    expect(readdirSync(join(projectRoot, '.tasks')).filter(name => name.endsWith('.tmp'))).toEqual([]);
+  });
+
+  it.each([
+    ['invalid', '{not-json'],
+    ['oversize', 'x'.repeat(64 * 1024 + 1)],
+  ])('rejects %s entry input with a typed diagnostic and no publication', async (_name, raw) => {
+    const projectRoot = root();
+    const execution = await executeEntry(projectRoot, raw);
+    expect(execution.code).not.toBe(0);
+    expect(execution.stderr).toContain('LANDING_PROPOSAL_MALFORMED');
+    expect(() => readFileSync(executionLandingProposalPath(projectRoot, 'm1-007'))).toThrow();
+    expect(readdirSync(join(projectRoot, '.tasks'))).toEqual([]);
   });
 });
