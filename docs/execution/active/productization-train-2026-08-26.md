@@ -13,8 +13,9 @@
    MASTER 471 evidence). **G0-B (sıradaki config dalgası):** SecretReference/redaction +
    backup-ailesi custody/disposition (rename mode-taşıma residual'ı dahil) — owner-karar #3
    (secret migration deadline) bağlı; başlatma owner-penceresine sunulur.
-1. **KANIT-6 batch'i** — 3298 · 3169 · 4070 · 4080 · 7096 · 8095: kanıt-toplama + receipt
-   ile kapanış (540/60 emsali; kod-yazımı beklenmiyor, çıkarsa satır KOSULABILIR'e düşer).
+1. ~~KANIT-6 batch'i~~ **TÜKETİLDİ 2026-08-26**: 8095+7096+3169 → VERIFY (3 yeni receipt);
+   3298 kanıt-güçlendirildi (flip 3290 DONE olunca); 4070/4080 zemin-kanıtı eklendi —
+   ikisi de önkoşul-gated çıktı (PRINCIPAL/TENANT · RECEIPT-001), KANIT'la kapanamaz.
 2. **Kalite-kapıları dalgası** — 202 (tsc-FAIL→FIX beslemesi + mock-ratchet) + 203
    (deletion-aware honest-gate) + 201 (ERRORS.md forensic dilimi) + 205 (sıcak-yol lint'i).
 3. **Replay-merdiveni** — 3300 → 3301 → 3302 → 3303 → 3304 (sıralı basamaklar; hepsi yeşilse

@@ -3,19 +3,19 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "ec7a64aac62d058bb3730ca093debec7cee68a71ee7a437f4daaa0c5da1b6c1b"
+    "value": "5268559c4e640cad7953da4a75e6ae0b23bcb8b61d4cff5c61ed7bd5081c519b"
   },
   "summary": {
     "total": 538,
     "active": 464,
     "terminal": 74,
-    "receipts": 199,
+    "receipts": 202,
     "byState": {
-      "OPEN": 366,
+      "OPEN": 363,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
-      "VERIFY": 29,
+      "VERIFY": 32,
       "DONE": 74,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -2478,10 +2478,10 @@
       "id": "RECOVERY-DOGFOOD-BORN-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "OPEN",
-      "updated": "2026-07-30",
+      "state": "VERIFY",
+      "updated": "2026-08-26",
       "definitionDigest": "471131c799a8485ca429a748508eda1dc73b931c26bd6c7273ca3a6d563e2cc8",
-      "progressDigest": "2ddf1bb297486c85f96f60bf1c2b3d4332f4a6fe360f2e262fc608e60e613b6c",
+      "progressDigest": "abb8335a0c0074fdec54a3be3fb5caf035403039e6eccbed6a5f69c1b16d8421",
       "terminalClosureDigest": null
     },
     {
@@ -3282,9 +3282,9 @@
       "program": "OBS",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-11",
+      "updated": "2026-08-26",
       "definitionDigest": "fc4310af2b2911ab8fc8acc9d1072c2f547f9ac783aa148d6d82fcedb629e19b",
-      "progressDigest": "36d2cadc9acde25ec4724da03ec902c3b549ea87f6ca430f1847af6337662b98",
+      "progressDigest": "f892f11ed9bb3e6575064d4ecba0d01ccefafa73d9bf475863664ad6cfd6979c",
       "terminalClosureDigest": null
     },
     {
@@ -3887,9 +3887,9 @@
       "program": "AUTHORITY",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-11",
+      "updated": "2026-08-26",
       "definitionDigest": "72947a9e7a072e920074677501fe5ce907f57ceab601fabcb21e27c32c3f8a9b",
-      "progressDigest": "bc79249969038c167deed1d0394491edd366d78017537c77fd10a4c6bfee14db",
+      "progressDigest": "64ab808073cbd547a9c470dd1b18202b609818380a272480c89029f75174593a",
       "terminalClosureDigest": null
     },
     {
@@ -3898,9 +3898,9 @@
       "program": "AUTHORITY",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-26",
+      "updated": "2026-08-26",
       "definitionDigest": "b14f5ebbfd951ac907a4fad7e5c8491e5b3aa1fe7efeeb9d76501697d7ad066b",
-      "progressDigest": "81a5891258c69e85eefce6b26425a629fab6dc5ced00accf3969053f13529003",
+      "progressDigest": "4fcb65c1c3140024cedf566b8ff5d42ece4577478caf48611f527d05fcbe92ba",
       "terminalClosureDigest": null
     },
     {
@@ -5085,10 +5085,10 @@
       "id": "DEBT-DEPENDENCY-REPAIR-7094R-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "OPEN",
-      "updated": "2026-08-19",
+      "state": "VERIFY",
+      "updated": "2026-08-26",
       "definitionDigest": "60ac0bc5083e39776b574024ff3344ce469424c2a8bf3ce45db97dfebbef2692",
-      "progressDigest": "ffbfa36685c0d8479bb6033147586b306a6f03577286e59e0c0de2d7668e3998",
+      "progressDigest": "e0555ffcc46d47ed68d486205f8d650d8546f787ca352537801ff6d14bcf9e93",
       "terminalClosureDigest": null
     },
     {
@@ -5371,10 +5371,10 @@
       "id": "DOCS-VISION-002",
       "program": "DOCS",
       "priority": "P1",
-      "state": "OPEN",
-      "updated": "2026-08-04",
+      "state": "VERIFY",
+      "updated": "2026-08-26",
       "definitionDigest": "c155d16950b2cd4403e463453885a0fcbdf7764d8aa17db14acb082dbfd42476",
-      "progressDigest": "d0c39236837e94518c150e7672450b6b4627e2437835056cca6d59f39f8304d8",
+      "progressDigest": "f3870122ebe87408f6224e6974c2ac7eb923e506a24e45a19c10aacd2a9eab8b",
       "terminalClosureDigest": null
     },
     {
@@ -7971,6 +7971,36 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-26T02:07:06+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-26-KANIT6-8095-01",
+      "authorityDigest": "cf98f00f7b82f757e02ca9062160979628a471490a3e3adba240eae0765113ea",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-26T08:16:44+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-26-KANIT6-7096-01",
+      "authorityDigest": "275fad424bde7e962f1bac81e742116743275128f158b14945db973e3f98489d",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-26T08:16:44+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-26-KANIT6-3169-01",
+      "authorityDigest": "23e238064c5b6ed4d3c60324dd73a3d3fcd4a9fa095117004ff2f04845fadfd4",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-26T08:16:44+03:00"
       },
       "g7AttemptIdentity": null
     }
@@ -15772,7 +15802,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
         "W": "0",
@@ -15834,11 +15864,12 @@
         "RECOVERY-BORN-523-ATTRIBUTION-UNMEASURABLE-001"
       ],
       "evidenceReceipts": [
-        "GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01"
+        "GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01",
+        "GR-2026-08-26-KANIT6-3169-01"
       ],
       "acceptance": "Before any emergent dogfood defect is fixed, one immutable `RECOVERY-BORN-*` child records trigger, affected product and dogfood surfaces, exact evidence, priority, dependencies, acceptance and negative scope; duplicates link to the canonical born ID instead of creating parallel patches",
-      "evidence": "`receipt=GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01`; owner explicitly requires born-first continuation for every finding from this dogfood program; generated projections and execution prompts must retain the Work ID lineage",
-      "updated": "2026-07-30"
+      "evidence": "`receipt=GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01`; owner explicitly requires born-first continuation for every finding from this dogfood program; generated projections and execution prompts must retain the Work ID lineage; 2026-08-26 tren-node1 KANIT-kapanışı: born-first disiplininin ledger-genelinde işlediği disk-doğrulandı (15+ born-child satırı, 7'si lifecycle-receipt'li, lineage projections'ta korunuyor); `receipt=GR-2026-08-26-KANIT6-3169-01`",
+      "updated": "2026-08-26"
     },
     {
       "order": 3170,
@@ -18430,8 +18461,8 @@
         "GR-2026-08-11-CAMPAIGN-DONE-01"
       ],
       "acceptance": "After terminal receipt and canonical lifecycle authority publication, `docs/SPRINT-LOG.md` contains exactly one idempotently upserted section for the exact sprint with COMPLETE or ABORTED status; unrelated sections are byte-preserved, partial writes are impossible and this human projection never becomes settlement authority",
-      "evidence": "EK-3 source trace: normal finalize invokes the Tier-1 sprint-log updater while `sprint.status=RETROSPECTIVE`, then terminal authority changes to COMPLETE without reconciling the section; `forceAbortSprint` publishes a fenced ABORTED receipt/state but never invokes the updater, so Sprint-489 is absent. Canonical receipts remain complete; this is projection completeness, not authority loss ; `receipt=GR-2026-08-11-CAMPAIGN-DONE-01`; `proof=sprint-log-two-live-wiring-proofs-5of5`; 2026-08-11 statü-mutabakat turu: DONE-adayıydı, validator kuralı gereği OPEN tutuldu (DependsOn RECOVERY-BORN-488-RECOVERY-TERMINAL-001 henuz DONE degil); işin kendisi landed+doğrulanmış, kapanış koşul sağlanınca",
-      "updated": "2026-08-11"
+      "evidence": "EK-3 source trace: normal finalize invokes the Tier-1 sprint-log updater while `sprint.status=RETROSPECTIVE`, then terminal authority changes to COMPLETE without reconciling the section; `forceAbortSprint` publishes a fenced ABORTED receipt/state but never invokes the updater, so Sprint-489 is absent. Canonical receipts remain complete; this is projection completeness, not authority loss ; `receipt=GR-2026-08-11-CAMPAIGN-DONE-01`; `proof=sprint-log-two-live-wiring-proofs-5of5`; 2026-08-11 statü-mutabakat turu: DONE-adayıydı, validator kuralı gereği OPEN tutuldu (DependsOn RECOVERY-BORN-488-RECOVERY-TERMINAL-001 henuz DONE degil); işin kendisi landed+doğrulanmış, kapanış koşul sağlanınca; 2026-08-26 CANLI ÇİFT-KANIT: sprint-679 normal-finalize → SPRINT-LOG'da tam-bir COMPLETE bölümü; sprint-680 forceAbortSprint (aynı gün, fenced-ABORTED) → tam-bir ABORTED bölümü (grep-sayım 1/1, satır 16896/16919) — satırın açılış şikayeti olan force-abort-reconciliation canlı-yolda kapalı; 3 projection test-suite'i yeşil (sprint-log-projection + doc-updaters/sprint-log + backfill-sprint-log-rows); VERIFY-flip 3290 RECOVERY-TERMINAL DONE olunca",
+      "updated": "2026-08-26"
     },
     {
       "order": 3299,
@@ -19947,8 +19978,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Requested/resolved/called identity, authority, fallback, usage and settlement provenance",
-      "evidence": "Legacy 594 2026-08-11: invocation receipt design dokümanı (B7 çıktısı) bu satıra bağlıydı ve delete-on-consume ile silindi; implementation admission owner penceresini bekliyor (git-history: follow-up-works/invocation-receipt-design-2026-08-11.md)",
-      "updated": "2026-08-11"
+      "evidence": "Legacy 594 2026-08-11: invocation receipt design dokümanı (B7 çıktısı) bu satıra bağlıydı ve delete-on-consume ile silindi; implementation admission owner penceresini bekliyor (git-history: follow-up-works/invocation-receipt-design-2026-08-11.md); 2026-08-26 tren-node1 zemin-kanıtı: 7094 ölçüm-authority dilimi digest-bound immutable receipt + canonical manifest/terminal-seal archive reader + provider-envelope USD ayrımını üretime bağladı (sprint-642 sonrası recovery kanıtı satır 7094'te) — InvocationReceipt tasarımının çekirdek mekanizması kısmen sahada; tam contract implementation owner-penceresi admission'ını bekliyor (design-doc git-history'de)",
+      "updated": "2026-08-26"
     },
     {
       "order": 4080,
@@ -19986,8 +20017,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "known, unknown, stale and unavailable with TTL and evidence; catalog is not reachability",
-      "evidence": "Legacy 595",
-      "updated": "2026-07-26"
+      "evidence": "Legacy 595; 2026-08-26 tren-node1 zemin-kanıtı: reachability bugün iki canlı yüzeyde işliyor — xverify verifier-admission provider reachability-probe'u (onay-receipt'leri owner-delegated-2026-08-19) ve CONFIG-RESOLVED SUPERVISION zinciri (effective config + registry + auth + reachability birlikte çözülür); typed known/unknown/stale/unavailable TTL contract'ı henüz tek authority'de toplanmadı — RECEIPT-001 önkoşulu sürüyor",
+      "updated": "2026-08-26"
     },
     {
       "order": 4090,
@@ -24268,7 +24299,7 @@
         "G1",
         "G2"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "0",
         "W": "0",
@@ -24281,10 +24312,12 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-26-KANIT6-7096-01"
+      ],
       "acceptance": "**UYGULANDI (ayni gun):** D1 resolveDependencyRef index-formlari (pure-integer + Task-N) yalniz isPriorityFix-olmayan directive alt-listesine baglanir; slot-id/title-token tam-listede kalir (task-builder.ts; +7 pin dep-ref-loud; eski-dist/yeni-dist gercek-binary before-after kaniti). D2-minimal result-evaluator: doc/audit sinifinda testsPassed NOTR (durust false = uyduran true, yalan primi de ceza da yok; resolveRubricTaskType SSOT — getRubric ile ayni authority) + worker self-NO_GO TAVANI (rubrik puani asla DONE'a yukseltemez; yalniz kanit-tabanli reconcile kaldirir) + legacy evaluateResult doc fast-path tests-vetosu ONUNE alindi + reconstruct yolu hizalandi; KAPSAMLISI 7097. D3 success-echo DebtClass: uretim recordDebtEntry notu salt-basari ise `class:success-echo` damgalar; injector typed-class'i + class'siz eski kayitlarda ayni metin-testini skippedNoop olarak atlar (asla resolve etmez — yanlis-pozitif acik kalir); \"Fix debt\" basligindan sabit evaluator-onsozu soyulur + description'a \"yalniz residual-gap'i uygula\" cercevesi. D4 KANITLA KAPANDI — kod degisikligi GEREKMEDI: breaker yalniz gercekten-bagimli task'lari bloke sayiyor, NOT_DISPATCHED redispatch (sprint-354) + DEPENDENCY_UNBLOCK zinciri mevcut; R2/R3 \"bagimsiz gorev blokaji\" %100 D1-remap belirtisiydi; eklenen tek sey blockedDependencyEdges teshisi (bloke←kok kenarlari pause-mesajinda, i18n-sablonsuz). Testler: 683+197 scoped yesil, 18/18 lineage, tsc 0, hermetic+gates yesil (baseline 14465/+1 yeni suite + inventory digest bilincli)",
-      "evidence": "Owner kararlari 2026-08-19: (a) 7094-alti tek satir, (b) F3 urun-default HAYIR (3 tam temiz tur sarti; \"varsayimla ilerlemeyecegiz, debtleri yonet\"), (c) \"simdi uygula, sonra maliyet/turn-opt isine don\". Kanitlar: evaluations/sprint-573 kayitlari (573-006 4× \"tests failed; self-assessment DONE\"), scheduler-shadow/sprint-573.jsonl dependency-remap diski, f3-stability-results.txt 3-tur olcumu, unit-repro debt'li listede Task 5→566-005. Landed-verify 2026-08-19: D3 success-echo injector CONFIRMED `…8286ed3230a6` + D4 blocked-edges CONFIRMED `…6c8faed229f6`; D1/D2 2'ser deneme durust-HOLD (buyuk-dosya verifier evidence-map sinifi 9-11. vakalar — task-builder/result-evaluator; birincil kanit: 7 dep-ref pini + eski/yeni-dist gercek-binary before-after + 197 evaluator testi). Full-suite kadansi ODENDI (37 fail triage: 7 duzeltildi — 4 F1d fixture-mtime hizasi + 2 bilincli-pin + 1 GERCEK URUN KENARI: directories-only scope'ta skillDomainOverlap weight-0 tum skill'leri eliyordu, evidence-varligi=1 sayilir; kalan 15 = 7091 landing full-suite borcu, finding). Owner debt-karari uygulandi: debt-561-002/003/562-002-fix resolved (resolveDebt kanonik yol), residual'lar 7098'e; kalan critical debt 0. Ek finding: reachability-probe onayi her xverify kosusunda yeniden isteniyor (kayit kalicilasmiyor) — xverify-ux defekt adayi; owner canli devirle cozuldu (onay receipt'leri `--reason owner-delegated-2026-08-19`)",
-      "updated": "2026-08-19"
+      "evidence": "Owner kararlari 2026-08-19: (a) 7094-alti tek satir, (b) F3 urun-default HAYIR (3 tam temiz tur sarti; \"varsayimla ilerlemeyecegiz, debtleri yonet\"), (c) \"simdi uygula, sonra maliyet/turn-opt isine don\". Kanitlar: evaluations/sprint-573 kayitlari (573-006 4× \"tests failed; self-assessment DONE\"), scheduler-shadow/sprint-573.jsonl dependency-remap diski, f3-stability-results.txt 3-tur olcumu, unit-repro debt'li listede Task 5→566-005. Landed-verify 2026-08-19: D3 success-echo injector CONFIRMED `…8286ed3230a6` + D4 blocked-edges CONFIRMED `…6c8faed229f6`; D1/D2 2'ser deneme durust-HOLD (buyuk-dosya verifier evidence-map sinifi 9-11. vakalar — task-builder/result-evaluator; birincil kanit: 7 dep-ref pini + eski/yeni-dist gercek-binary before-after + 197 evaluator testi). Full-suite kadansi ODENDI (37 fail triage: 7 duzeltildi — 4 F1d fixture-mtime hizasi + 2 bilincli-pin + 1 GERCEK URUN KENARI: directories-only scope'ta skillDomainOverlap weight-0 tum skill'leri eliyordu, evidence-varligi=1 sayilir; kalan 15 = 7091 landing full-suite borcu, finding). Owner debt-karari uygulandi: debt-561-002/003/562-002-fix resolved (resolveDebt kanonik yol), residual'lar 7098'e; kalan critical debt 0. Ek finding: reachability-probe onayi her xverify kosusunda yeniden isteniyor (kayit kalicilasmiyor) — xverify-ux defekt adayi; owner canli devirle cozuldu (onay receipt'leri `--reason owner-delegated-2026-08-19`); 2026-08-26 tren-node1 KANIT-kapanışı: satırın landed kanıt zinciri (D3/D4 CONFIRMED mühürleri, D1/D2 dürüst-HOLD + bağımsız birincil kanıt, debt-kararı uygulanmış, critical-debt 0) receipt'e bağlandı; `receipt=GR-2026-08-26-KANIT6-7096-01`",
+      "updated": "2026-08-26"
     },
     {
       "order": 7097,
@@ -25227,7 +25260,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
         "W": "1",
@@ -25240,10 +25273,12 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-26-KANIT6-8095-01"
+      ],
       "acceptance": "Onaylı dört edit (E1 hyperscaler tavanı, E2 runtime-neutrality bölümü+başlığı, E4 recursive delegasyon, E5 iki non-goal) `docs/en/vision.md` + `docs/tr/vision.md`'ye 13-heading paritesi korunarak uygulanır; E3 (policy-enforcement metni) ALP-RUNTIME-001 ürünleşmesine yönlendirildi, E6 (runtime-neutrality falsifier'ı) owner kararı almadı — ikisi de vision-metni olarak HOLD",
-      "evidence": "Owner canlı onayı 2026-08-04: E1, E2, E4 aynen; E5 şu kayıtla — dashboard + desktop app yapılacak ve kolayca bağlanılabilir olacak (CLI mevcut), non-goal metni bu kaydı içerir. Edit'ler aynı oturumda working tree'ye uygulandı; docs build/parity koşusu ve commit provenance açık",
-      "updated": "2026-08-04"
+      "evidence": "Owner canlı onayı 2026-08-04: E1, E2, E4 aynen; E5 şu kayıtla — dashboard + desktop app yapılacak ve kolayca bağlanılabilir olacak (CLI mevcut), non-goal metni bu kaydı içerir. Edit'ler aynı oturumda working tree'ye uygulandı; docs build/parity koşusu ve commit provenance açık; 2026-08-26 tren-node1 KANIT-kapanışı: dört onaylı edit iki dilde satır-exact mevcut (E1 en:23/tr:23, E2 en:132/tr:138, E4 en:65/tr:65, E5 en:160-161/tr:161-162), heading-parite 14/14, E3+E6 doğru şekilde yok-HOLD; `receipt=GR-2026-08-26-KANIT6-8095-01`",
+      "updated": "2026-08-26"
     },
     {
       "order": 8096,
@@ -27395,6 +27430,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "b59ef78e267838c491b84853bdabf8afc5f0035bf19c91fe9c0c568d0d0aa7e5"
+    "value": "32012f69c71a9a13574c4eadc29657285fe6765e401bc7fb65459c699c78a747"
   }
 }
