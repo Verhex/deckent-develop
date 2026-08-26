@@ -10,6 +10,40 @@
 > ikinci-göz; sabaha-kadar otonom devam TEYİTLİ. Sınırlar aynen: destructive/publish/memory.db/
 > onaysız kill-cleanup/admission'sız MASTER-satırı YOK.
 
+## 🌅 SABAH-RAPORU (Alperen için — gece-otonom özeti, 2026-08-26 23:00 → 02:30)
+
+**ONAYLI 3-DALGALI SKILL-EVRİMİ PLANI TAMAMLANDI** — üç dalga da landed:
+`091338676` Dalga-1 (profil-v2 + sync skill-kolu + unroutable-gate + stack-detector) ·
+`d49758cfa` Dalga-2 (4 deckent-* builtin skill + test-guardian agent [7094-F1c KAPANDI] +
+2 revizyon + preflight-fix) · `71bb8ec0e` Dalga-3 (WORKER-GUIDE/BOOT motor-gerçekleri +
+sync workspace-kolu). origin/main = `71bb8ec0e`.
+
+**4 sprint koştu:** 692 (4/4+FIX) · 696 (forced-closure 3/4 + 003 bağımsız-doğrulama) ·
+697 (2/2 İLK-DENEMEDE, 0 NO_GO — directive-disiplini kanıtı) · (693/694/695 preflight-kurbanı,
+task'ları arşivlendi). **Dogfood-avı:** preflight clean-deadlock kökü bulunup fix'lendi
+(runTscCheck typecheck-tercihi). **Skill-kataloğu 31→35** (idempotency kanıtlı), agent'lar 21→22.
+
+**NO_GO analizi (sorduğun soru):** 696'daki ~7 NO_GO'nun ~5'i benim Test-komutu tasarımım
+(global-gate çapraz-kirlenmesi), ~2'si Reads-eksiği (vocabulary-körlüğü); düzeltilen
+directive-disiplini 697'de 0 NO_GO verdi. Ayrıntı MASTER 7010 evidence + bu dosyanın
+bulgu-listesi.
+
+**Hijyen-disiplini kuruldu (talimatın):** .tasks süpürüldü (13 öksüz + 5 xv-artefaktı →
+archive/orphaned-2026-08-27), memory'ye kalıcı kural yazıldı, her kapanış-ritüelinin son
+adımı artık .tasks-envanteri.
+
+**XVerify:** preflight-fix claim'i verifier-codex UNCLEAR (çürütme yok; formal-criterion
+eşleme sorunu; receipt 78e7d604…) — makine-kanıt esas alındı, kör-retry yapılmadı.
+
+**Remote CI (advisory):** d49758cfa E2E+Secret SUCCESS; 71bb8ec0e koşuları saat ~02:30'da
+in-progress — sabah kontrol edilmeli (beklenti yeşil; kırmızıysa sınıflandırıp raporlarım).
+
+**Kararını bekleyen:** (1) preflight typecheck-invariant regresyon-pini + directive-dersleri
+MASTER-admission; (2) clean-guard'ın öksüz-artefakt tipli-imha yolu (finding); (3) bozuk
+flow-envelope 23d494c8 (INVALID_EVENT_ENVELOPE — clean'li tam build hâlâ bundan bloklu;
+clean'siz build ile dist=src, işlev-kaybı yok); (4) "Budget OVER" cleanup --decay onayı;
+(5) ladder yeni-dalga işleri (3301/3302/3304/3299) + K-paketi zamanlaması.
+
 ## GÜNÜN LANDED ÖZETİ (2026-08-26 → origin/main `091338676`)
 
 1. **CI-tam-kapanış:** codex Faz-B test-slim admission (2.923→2.859 dosya, wire 117→78,
@@ -30,7 +64,8 @@
 
 ## ŞU AN — çalışma-imleci
 
-- ▶ **Sprint-696 CANLI (Dalga-2 dogfood-süiti):** 004 test-guardian agent DONE ✓;
+- ✅ 3-dalga TAMAM; aktif sprint YOK; bot canlı; süpervizyon/bekleme modundayım.
+- (arşiv-imleç) Sprint-696 (Dalga-2 dogfood-süiti):** 004 test-guardian agent DONE ✓;
   001/002/003 fix-fix turunda (attempt 3/4). Kök-teşhis (benim directive-hatam, iki katman):
   (a) 002 worker'ı canonical V3 vocabulary'yi göremiyor (read-allowlist eksiği) → tahmini
   değerler şema-ihlali; (b) her task'ın Test'i GLOBAL `lint-manifests` koştuğundan komşunun
