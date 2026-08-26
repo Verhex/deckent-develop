@@ -3,19 +3,19 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "1bd8e7df00b3b03e4d1286abbbc6f541004840a1fb0cc35f463c184e77acae39"
+    "value": "7ae9c9a2e774b22e89e2744653adca503d147484645db42de58bcc035ed7b610"
   },
   "summary": {
     "total": 538,
     "active": 464,
     "terminal": 74,
-    "receipts": 203,
+    "receipts": 204,
     "byState": {
-      "OPEN": 359,
+      "OPEN": 355,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
-      "VERIFY": 36,
+      "VERIFY": 40,
       "DONE": 74,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -3039,10 +3039,10 @@
       "id": "RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001",
       "program": "KERNEL",
       "priority": "P1",
-      "state": "OPEN",
-      "updated": "2026-07-31",
+      "state": "VERIFY",
+      "updated": "2026-08-26",
       "definitionDigest": "384be8866b2f3707585ca2d633b978653d2f45dc9a053c5697a64af2a7e1cfcb",
-      "progressDigest": "422d758e6e6424de3cde46d83ad3710011a5c3d7f959bb309bcc7633136831c5",
+      "progressDigest": "f53502bd5760ff0fe8650a48201f630b3c0a3a8dd55f786f844c0be9532db4a9",
       "terminalClosureDigest": null
     },
     {
@@ -3105,10 +3105,10 @@
       "id": "RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "OPEN",
-      "updated": "2026-08-01",
+      "state": "VERIFY",
+      "updated": "2026-08-26",
       "definitionDigest": "a3fc83e06b1c6280071fac04dbc92c9679919a2dd921ebd0c5e4b7c5139643e0",
-      "progressDigest": "d137b36e650cc3e4fbfd827214c10648370c28dbe5ed6459835987271d8cf360",
+      "progressDigest": "af2800a7769898c1254c790d2a41f2b2c5637363ac5c0dadc91b96570211d821",
       "terminalClosureDigest": null
     },
     {
@@ -3138,10 +3138,10 @@
       "id": "RECOVERY-BORN-488-LANDING-CHECKPOINT-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "OPEN",
-      "updated": "2026-08-01",
+      "state": "VERIFY",
+      "updated": "2026-08-26",
       "definitionDigest": "bc86c483c5f0a87db5498e37a5e82dc226f4264f30ea469f59dd588b65818761",
-      "progressDigest": "a6818e10a41596d8fffe1f5a94c49b4bf7d65c52db241ec57eb70c3b014efa25",
+      "progressDigest": "0d78d65e67d91c2de8171af7e81b0f0353a232ba75482847af0554a4ba11fcfc",
       "terminalClosureDigest": null
     },
     {
@@ -3248,10 +3248,10 @@
       "id": "RECOVERY-BORN-490-DESCENDANT-CANCELLATION-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "OPEN",
-      "updated": "2026-08-01",
+      "state": "VERIFY",
+      "updated": "2026-08-26",
       "definitionDigest": "72dba947ca53e9d415c04c0fe8f9cf76ccaf6c9d46c8d3074384fc447c190d6d",
-      "progressDigest": "eac759d9a621ad63047e2477826a6418d92550ff9cef44955cd5ba990c092140",
+      "progressDigest": "f4ec2b7c3ca5d778e841f10aec34cdf58617822dedc6329de4f094b41dc5064f",
       "terminalClosureDigest": null
     },
     {
@@ -8011,6 +8011,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-26T08:37:36+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-26-NODE5-SETTLEMENT-01",
+      "authorityDigest": "459d633a7ec88b5a46abf8d968c70b0c7bfeb6e163977d55568116e840f9f798",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-26T10:05:16+03:00"
       },
       "g7AttemptIdentity": null
     }
@@ -17798,7 +17808,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "0",
         "W": "0",
@@ -17813,10 +17823,12 @@
       "closureBlockedBy": [
         "BUDGET-CONTINUATION-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-26-NODE5-SETTLEMENT-01"
+      ],
       "acceptance": "Every worker/runtime has one cross-platform structured writer that validates exact attempt schema before same-directory atomic rename; malformed proposal produces typed HOLD/diagnostic and cannot be treated as a valid checkpoint",
-      "evidence": "Sprint-487 produced malformed JSON in `487-004-xfix` (unquoted array item) and `487-027-fix` (literal `\\\\n` separators) despite the prompt schema. Host parsing is fail-closed, but free-form shell serialization remains unreliable; no cleanup may erase this residual from the ledger",
-      "updated": "2026-07-31"
+      "evidence": "Sprint-487 produced malformed JSON in `487-004-xfix` (unquoted array item) and `487-027-fix` (literal `\\\\n` separators) despite the prompt schema. Host parsing is fail-closed, but free-form shell serialization remains unreliable; no cleanup may erase this residual from the ledger; 2026-08-26 Node-5 kapanışı (sprint-682-001+fix): serbest shell-serileştirme emekli — worker'lar stdin-JSON'la dist/agents/landing-proposal-entry çağırıyor, malformed LANDING_PROPOSAL_MALFORMED + exit 1 ve diske yazım yok (real-binary smoke); `receipt=GR-2026-08-26-NODE5-SETTLEMENT-01`",
+      "updated": "2026-08-26"
     },
     {
       "order": 3277,
@@ -17956,7 +17968,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "~",
         "W": "0",
@@ -17974,10 +17986,12 @@
         "RECOVERY-BORN-482-REPAIR-SETTLEMENT-001",
         "RECOVERY-BORN-490-DESCENDANT-CANCELLATION-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-26-NODE5-SETTLEMENT-01"
+      ],
       "acceptance": "A repair is authorized only from the current unresolved lineage head; successful repair settles the logical task once; stale or redundant XFIX cannot replace a successful leaf, reopen DONE, double-count progress or poison dependants; repair continuation is evidence/risk policy plus operator authority, never an arbitrary global attempt ratio or silent infinite loop",
-      "evidence": "Sprint-488 repaired 002, 004, 011 and 014, then spawned unnecessary XFIX for already-successful 001, 010 and 013. `foldTaskLineages` selected later attempt depth/time without causal authorization and `forcedByBlockedDependents` bypassed ordinary thresholds. Baseline and raw artifacts are preserved in commit `f59503a4`",
-      "updated": "2026-08-01"
+      "evidence": "Sprint-488 repaired 002, 004, 011 and 014, then spawned unnecessary XFIX for already-successful 001, 010 and 013. `foldTaskLineages` selected later attempt depth/time without causal authorization and `forcedByBlockedDependents` bypassed ordinary thresholds. Baseline and raw artifacts are preserved in commit `f59503a4`; 2026-08-26 Node-5 kapanışı (sprint-682-003 sol): fold güncel unresolved head'den doğum-sıralı tek-successor yürür ve DONE'da durur; stale/redundant XFIX settled-DONE'u değiştiremez/yeniden açamaz/çift sayamaz; forcedByBlockedDependents authority'yi bypass edemez; 488-vakası regresyon-fixture'lı; `receipt=GR-2026-08-26-NODE5-SETTLEMENT-01`",
+      "updated": "2026-08-26"
     },
     {
       "order": 3283,
@@ -18085,7 +18099,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "~",
         "W": "0",
@@ -18101,10 +18115,12 @@
         "RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001",
         "BUDGET-CONTINUATION-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-26-NODE5-SETTLEMENT-01"
+      ],
       "acceptance": "Every runtime uses one schema-validated same-directory atomic writer owned by the worker lifecycle; sequence and content advance after each material disk mutation and before terminal result; stale, malformed or missing proposals produce typed execution HOLD with resumable attribution; provider prose and shell quoting are not checkpoint authority",
-      "evidence": "Sprint-488 attempts 002, 006, 011 and 014 changed disk after their last accepted proposal or never advanced beyond sequence 1. Host rejection was correctly fail-closed, but the new host helper had no production caller and checkpoint freshness remained model-dependent",
-      "updated": "2026-08-01"
+      "evidence": "Sprint-488 attempts 002, 006, 011 and 014 changed disk after their last accepted proposal or never advanced beyond sequence 1. Host rejection was correctly fail-closed, but the new host helper had no production caller and checkpoint freshness remained model-dependent; 2026-08-26 Node-5 kapanışı (sprint-682-002 sol): materyal-mutasyon → şema-validate advance → terminal-öncesi freshness zinciri production-caller'lı; stale/malformed/missing typed HOLD + resumable attribution; Docker coarse-check emekli; `receipt=GR-2026-08-26-NODE5-SETTLEMENT-01`",
+      "updated": "2026-08-26"
     },
     {
       "order": 3286,
@@ -18380,7 +18396,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "0",
         "W": "0",
@@ -18395,10 +18411,12 @@
       "closureBlockedBy": [
         "SCHEDULER-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-26-NODE5-SETTLEMENT-01"
+      ],
       "acceptance": "When an accepted repair settles the logical root, queued FIX/XFIX descendants are atomically marked superseded before dispatch, active descendants receive a typed cancellation decision, progress remains one logical DONE and no later stale leaf can reopen or replace it",
-      "evidence": "Sprint-490 task 013 reached a successful second FIX while a prequeued third repair still spawned and executed. This did not corrupt final settlement, but it wasted provider capacity and proves repair-birth cancellation is not yet transactionally wired. Negative scope: do not cap retries globally or cancel unrelated lineages",
-      "updated": "2026-08-01"
+      "evidence": "Sprint-490 task 013 reached a successful second FIX while a prequeued third repair still spawned and executed. This did not corrupt final settlement, but it wasted provider capacity and proves repair-birth cancellation is not yet transactionally wired. Negative scope: do not cap retries globally or cancel unrelated lineages; 2026-08-26 Node-5 kapanışı (sprint-682-004): kabul edilen settlement anında kuyruklu FIX/XFIX torunları dispatch-öncesi atomik superseded, aktif torun typed cancellation, tek logical DONE; 490-vakası regresyon-fixture'lı; negatif-kapsam korunur (global retry-cap yok, ilgisiz lineage dokunulmaz); `receipt=GR-2026-08-26-NODE5-SETTLEMENT-01`",
+      "updated": "2026-08-26"
     },
     {
       "order": 3296,
@@ -27448,6 +27466,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "392811e8e258128fb03cd4b187cffd3be9d8c5d941e3bf87003ff2c8cd330042"
+    "value": "d58f656636f9e011cfa4f972f8c4f4a45aaf0e999a1b949c914d676459ce1e03"
   }
 }

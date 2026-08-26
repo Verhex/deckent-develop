@@ -22,8 +22,8 @@
    3299 zincir-receipt'le kapanır). Önkoşul: 3302 için 3276/3285 (bkz node 5).
 4. **RECOVERY-BORN mikro-paketi-1** — 3171 · 3173 · 3174 · 3175 · 3176 · 3177 (event-truth
    A3 altyapısıyla hizalı altı dar satır; tek 6-task dalga).
-5. **Settlement-atomiği dalgası** — 3276 + 3285 (atomic landing-proposal + host-owned
-   checkpoint; 3302'nin önkoşulu) + 3282/3295 ardışığı.
+5. ~~Settlement-atomiği dalgası~~ **TÜKETİLDİ 2026-08-26** (sprint-682 4/4 DONE 0-debt;
+   3276+3285+3282+3295 → VERIFY, receipt GR-2026-08-26-NODE5-SETTLEMENT-01; 3302 önkoşulu AÇILDI).
 6. **Mekanik süpürme** — 7141 (131-throw typed dönüşümü, gen-repair-directives'le) + 3315
    (spawnSync kuyruğu) + 204 + 207.
 

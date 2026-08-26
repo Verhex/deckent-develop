@@ -14,6 +14,18 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint682] - 2026-08-26
+
+### Added
+
+- 3276 — worker landing-proposal'ı için yapılandırılmış atomic yazar girişi
+- 3285 — host-owned checkpoint zinciri production'a bağlanır
+- 3282 — lineage causal-settlement authority (foldTaskLineages)
+- 3295 — settlement'ta redundant-descendant cancellation (transactional)
+
+
+_Tasks: 4 total, 4 done, 0 tech debt, 0 no-go_
+
 ## [sprint679] - 2026-08-25
 
 ### Added

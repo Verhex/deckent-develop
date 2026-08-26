@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):1bd8e7df00b3b03e4d1286abbbc6f541004840a1fb0cc35f463c184e77acae39`
+**Source digest:** `sha256(normalized-lf-utf8):7ae9c9a2e774b22e89e2744653adca503d147484645db42de58bcc035ed7b610`
 
 **Rows:** 538 total · 464 active · 74 terminal
 
@@ -13,11 +13,11 @@
 
 | State | Count |
 |---|---:|
-| OPEN | 359 |
+| OPEN | 355 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 69 |
-| VERIFY | 36 |
+| VERIFY | 40 |
 | DONE | 74 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -255,21 +255,21 @@
 | 3273 | `RECOVERY-BORN-486-NERVOUS-COLLISION-001` | VERIFY | P1 | KERNEL | `SCHEDULER-001`, `RECOVERY-BORN-480-FIX-PRIORITY-001` | — | Nervous scope-collision decisions must execute real serialization or authority repair |
 | 3274 | `RECOVERY-BORN-486-SCOPED-SELF-AUDIT-001` | VERIFY | P0 | KERNEL | `TEST-DISCOVERY-001`, `PRODUCTION-WIRING-AUTHORITY-001` | — | Automatic finalization audits only the settled affected-test manifest |
 | 3275 | `RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001` | OPEN | P0 | KERNEL | `RECOVERY-BORN-485-TERMINAL-PUBLICATION-001`, `RECOVERY-BORN-486-SCOPED-SELF-AUDIT-001` | — | Built-binary verification is scheduled only after terminal settlement |
-| 3276 | `RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001` | OPEN | P1 | KERNEL | `BUDGET-CONTINUATION-001`, `RESULT-RECONCILIATION-001` | — | Worker landing proposals use a structured atomic writer and malformed evidence cannot pass silently |
+| 3276 | `RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001` | VERIFY | P1 | KERNEL | `BUDGET-CONTINUATION-001`, `RESULT-RECONCILIATION-001` | — | Worker landing proposals use a structured atomic writer and malformed evidence cannot pass silently |
 | 3277 | `RECOVERY-BORN-487-CONCURRENT-TYPECHECK-001` | OPEN | P1 | ASSURANCE | `RECOVERY-BORN-486-SCOPED-SELF-AUDIT-001`, `PRODUCTION-WIRING-AUTHORITY-001` | — | Worker verification cannot judge unrelated concurrent partial writes |
 | 3279 | `RECOVERY-BORN-487-CLEAN-HOLD-EXIT-001` | VERIFY | P0 | ASSURANCE | `RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001`, `RUN-STATUS-AUTHORITY-001` | — | Build cannot report success when clean is held by active execution authority |
 | 3280 | `RECOVERY-BORN-487-CLEANUP-ARTIFACT-IDENTITY-001` | VERIFY | P0 | KERNEL | `RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001`, `RUN-STATUS-AUTHORITY-001` | — | Cleanup consumes canonical task identity and retires only owned temporary residue |
-| 3282 | `RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001` | OPEN | P0 | KERNEL | `KERNEL-ATTEMPT-001`, `KERNEL-SETTLEMENT-001`, `RECOVERY-BORN-482-REPAIR-SETTLEMENT-001` | — | Logical task lineage has one causal settlement authority across original, FIX and XFIX attempts |
+| 3282 | `RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001` | VERIFY | P0 | KERNEL | `KERNEL-ATTEMPT-001`, `KERNEL-SETTLEMENT-001`, `RECOVERY-BORN-482-REPAIR-SETTLEMENT-001` | — | Logical task lineage has one causal settlement authority across original, FIX and XFIX attempts |
 | 3283 | `RECOVERY-BORN-488-DEPENDENCY-AUTHORITY-001` | VERIFY | P0 | KERNEL | `RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001`, `SCHEDULER-001`, `PROMPT-001` | — | Scheduler admission and worker prompt consume one aggregate dependency settlement |
 | 3284 | `RECOVERY-BORN-488-REPAIR-DISPATCH-001` | OPEN | P0 | KERNEL | `RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001`, `RECOVERY-BORN-488-DEPENDENCY-AUTHORITY-001`, `RECOVERY-BORN-486-EXECUTE-FIX-QUIESCENCE-001` | — | Every admitted repair enters one durable runnable queue and is dispatched before quiescence |
-| 3285 | `RECOVERY-BORN-488-LANDING-CHECKPOINT-001` | OPEN | P0 | KERNEL | `RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001`, `BUDGET-CONTINUATION-001`, `RESULT-RECONCILIATION-001` | — | Host-owned structured landing checkpoint follows every material attempt mutation |
+| 3285 | `RECOVERY-BORN-488-LANDING-CHECKPOINT-001` | VERIFY | P0 | KERNEL | `RECOVERY-BORN-487-LANDING-PROPOSAL-WRITER-001`, `BUDGET-CONTINUATION-001`, `RESULT-RECONCILIATION-001` | — | Host-owned structured landing checkpoint follows every material attempt mutation |
 | 3286 | `RECOVERY-BORN-488-CONTINUOUS-REFILL-001` | OPEN | P0 | KERNEL | `RECOVERY-BORN-488-REPAIR-DISPATCH-001`, `SCHEDULER-001`, `RECOVERY-BORN-483-PROVIDER-CONCURRENCY-001` | — | Free execution capacity refills from the whole run graph after every settlement |
 | 3287 | `RECOVERY-BORN-488-VERIFICATION-ISOLATION-001` | OPEN | P0 | ASSURANCE | `RECOVERY-BORN-487-CONCURRENT-TYPECHECK-001`, `RECOVERY-BORN-486-SCOPED-SELF-AUDIT-001`, `PRODUCTION-WIRING-AUTHORITY-001` | — | Attempt verification is isolated from unrelated concurrent workspace mutations |
 | 3288 | `RECOVERY-BORN-488-REPAIR-CAPABILITY-001` | OPEN | P0 | KERNEL | `RECOVERY-BORN-488-REPAIR-DISPATCH-001`, `PRODUCTION-WIRING-AUTHORITY-001`, `ROUTING-V3-CUTOVER-001` | — | Repair routing binds write capability, scope closure and fresh-eyes policy without contradiction |
 | 3289 | `RECOVERY-BORN-488-EVALUATION-TRUTH-001` | OPEN | P0 | EVAL | `RECOVERY-BORN-488-DEPENDENCY-AUTHORITY-001`, `RECOVERY-BORN-488-VERIFICATION-ISOLATION-001`, `RECOVERY-BORN-483-EVALUATION-HONESTY-001`, `PRODUCTION-WIRING-AUTHORITY-001` | — | Evaluation separates product defect from execution, authority, dependency and ambient verification failures |
 | 3290 | `RECOVERY-BORN-488-RECOVERY-TERMINAL-001` | VERIFY | P0 | KERNEL | `PAUSED-FINALIZE-001`, `RECOVERY-BORN-487-FINALIZER-RECEIPT-HOLD-001`, `RUN-STATUS-AUTHORITY-001`, `RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001` | — | Resume and force-finalize publish truthful terminal or resumable operator outcomes |
 | 3291 | `RECOVERY-BORN-488-STATUS-PROJECTION-001` | VERIFY | P0 | KERNEL | `RUN-STATUS-AUTHORITY-001`, `RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001`, `RECOVERY-BORN-488-RECOVERY-TERMINAL-001`, `RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001` | — | Every surface and metric projects one persisted logical run read model |
-| 3295 | `RECOVERY-BORN-490-DESCENDANT-CANCELLATION-001` | OPEN | P0 | KERNEL | `SCHEDULER-001` | — | Successful lineage settlement cancels every not-yet-started redundant repair descendant |
+| 3295 | `RECOVERY-BORN-490-DESCENDANT-CANCELLATION-001` | VERIFY | P0 | KERNEL | `SCHEDULER-001` | — | Successful lineage settlement cancels every not-yet-started redundant repair descendant |
 | 3296 | `RECOVERY-BORN-490-PROVIDER-OBSERVATION-001` | OPEN | P1 | KERNEL | `PROVIDER-HOLD-001`, `RUN-STATUS-AUTHORITY-001` | — | Terminal retirement closes or scopes historical provider execution intervals |
 | 3298 | `RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001` | OPEN | P1 | OBS | `RECOVERY-BORN-488-RECOVERY-TERMINAL-001`, `RECOVERY-BORN-490-TERMINALIZATION-EVENTS-001` | — | Human sprint log projects receipt-backed terminal COMPLETE and ABORTED truth exactly once |
 | 3299 | `RECOVERY-BORN-490-REPLAY-CERTIFICATION-001` | OPEN | P0 | ASSURANCE | `RECOVERY-BORN-490-DESCENDANT-CANCELLATION-001`, `RECOVERY-BORN-490-PROVIDER-OBSERVATION-001`, `RECOVERY-BORN-490-CONTROLLER-TEST-CONTRACT-001`, `RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001` | — | Recovery replay ladder certifies isolated failure classes before publish planning resumes |
