@@ -12,7 +12,6 @@ import type { AuthorityMode, NervousSystemConfigV1, ExecutionRecord } from '../.
 import {
   existsSync,
   readFileSync,
-  writeFileSync,
   readdirSync,
   copyFileSync,
   unlinkSync,
@@ -28,6 +27,10 @@ import {
 import { getMcpToolDescriptionLanguage, mcpToolDescription } from './description-catalog.js';
 import { loadConfig } from '../../core/config.js';
 import { getLanguage, getMessage } from '../../cli/helpers/messages.js';
+import {
+  withConfigWriteLock,
+  writeConfigJsonAtomic,
+} from '../../core/config-write-authority.js';
 
 // ─── Helper: Load nervous config from project ──────────────────────────────
 
@@ -54,13 +57,15 @@ function loadNervousConfig(root: string): NervousSystemConfigV1 {
 
 function saveNervousConfig(root: string, updates: Record<string, unknown>): void {
   const configPath = join(root, '.deckent', 'config.json');
-  let raw: Record<string, unknown> = {};
-  if (existsSync(configPath)) {
-    try { raw = JSON.parse(readFileSync(configPath, 'utf-8')); } catch { /* empty */ }
-  }
-  if (!raw.nervous_system) raw.nervous_system = {};
-  Object.assign(raw.nervous_system as Record<string, unknown>, updates);
-  writeFileSync(configPath, JSON.stringify(raw, null, 2) + '\n', 'utf-8');
+  withConfigWriteLock(configPath, () => {
+    let raw: Record<string, unknown> = {};
+    if (existsSync(configPath)) {
+      try { raw = JSON.parse(readFileSync(configPath, 'utf-8')); } catch { /* empty */ }
+    }
+    if (!raw.nervous_system) raw.nervous_system = {};
+    Object.assign(raw.nervous_system as Record<string, unknown>, updates);
+    writeConfigJsonAtomic(configPath, raw);
+  });
 }
 
 // ─── Subscribers (in-memory, process-lifetime) ──────────────────────────────

@@ -669,7 +669,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-26 xverify-onarim dalgasi (sprint-678): +2 — worker-authored
   // tests/cli/xverify-evidence-scope.test.ts + fencing/ingress pin ekleri
   // (tmpdir-hermetik, suite-owned).
-  count: 16317,
+  count: 16415,
   // 2026-08-25 B-sweep: digest moved — --fix roundtrip pin, multi-label
   // parser pin, same-line rule downgraded to WARN (all suite-owned).
   // 2026-08-25 7141 wave: count unchanged, digest moved — the src-side
@@ -699,7 +699,10 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // evidence-scope pini + lessons-doc.
   // 2026-08-26 02:10: ayni 16317, digest-only — sprint-679 hasadi
   // (dockerignore-pin suite + messages.ts oksuz-anahtar silimi).
-  digest: 'e623cc37b5bec846016749bef9393268430f75218346128d8846eb60a05a43c2',
+  // 2026-08-26 07:35: 16317→16415 — G0-A config-containment dalgasi (sprint-680
+  // + ADR-D-007 el-tamamlama): yeni suite'ler config-write-authority /
+  // heal-preimage / heal-race / lint-config-writers + init.test.ts mock-genisletme.
+  digest: 'f8e546d2a4c032057bedf26aa5800625715ebfc6b69dfc99c86af62cb7df9d6b',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1222,7 +1225,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // (cli-command-contract SSOT, governance catalog, generators).
   // 2026-08-25 exploration-bonus wave: +1 — the route-task-v3 exploration
   // bonus derivation adds one production effect site (cells ledger read).
-  count: 1336,
+  count: 1338,
   // 2026-08-25 config-loss incident hardening: digest moved — atomic
   // last_sprint_id writer (refuse-mint + tmp+rename) and loadConfig
   // self-heal re-read-once + atomic fresh-default.
@@ -1249,7 +1252,9 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-26 xverify dalgasi: ayni 1336, digest-only — CLI/ingress src kaymalari.
   // 2026-08-26 01:00: ayni 1336, digest-only — oversize-filtre src kaymasi.
   // 2026-08-26 02:10: ayni 1336, digest-only — messages.ts silme kaymasi.
-  digest: 'cb57f2bc81643dcdf161b7a582a1aba95161dc5b5cb6392a4099fdbca8f79a5e',
+  // 2026-08-26 07:36: 1336→1338 — G0-A: yeni src/core/config-write-authority.ts
+  // uretim moduli + dalga src kaymalari (config/mcp/cli/orchestra kablolama).
+  digest: 'e44440c19f9cf6d1c07452b6d5e8169d3585ae8cef13398b97d61219ffe274a5',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

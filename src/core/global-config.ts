@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import {
   GLOBAL_CONFIG_PATH,
   GLOBAL_CREDENTIALS_DIR,
@@ -7,6 +7,7 @@ import {
 import type { DeckentConfig } from './types.js';
 import { deepMerge } from './config.js';
 import { readJsonSafe } from './utils.js';
+import { withConfigWriteLock, writeConfigJsonAtomic } from './config-write-authority.js';
 
 // ─── Global Config Utilities ────────────────────────────────────────
 
@@ -42,7 +43,9 @@ export function readGlobalConfig(): Partial<DeckentConfig> | null {
  */
 export function writeGlobalConfig(config: Partial<DeckentConfig>): void {
   ensureGlobalDir();
-  writeFileSync(GLOBAL_CONFIG_PATH, JSON.stringify(config, null, 2) + '\n', 'utf-8');
+  withConfigWriteLock(GLOBAL_CONFIG_PATH, () =>
+    writeConfigJsonAtomic(GLOBAL_CONFIG_PATH, config),
+  );
 }
 
 /**

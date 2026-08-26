@@ -4,6 +4,7 @@
 
 // ─── Node Builtins ─────────────────────────────────────────────────
 import { normalizeChangedPaths } from '../core/task-result-schema.js';
+import { writeConfigJsonAtomic } from '../core/config-write-authority.js';
 import {
   readFileSync, writeFileSync, existsSync,
   mkdirSync, readdirSync, renameSync, unlinkSync,
@@ -1340,8 +1341,7 @@ export async function applyAdaptiveThresholds(projectRoot: string, config: Resol
 
   if (changes.length === 0) return;
 
-  // Async write updated config — Sprint 139 async migration
-  await fsPromises.writeFile(configPath, JSON.stringify(rawCfg, null, 2) + '\n');
+  writeConfigJsonAtomic(configPath, rawCfg);
 
   // Append adaptive-threshold notes to the sprint retro entry — B8 (DB-first).
   if (sprintId) {

@@ -21,6 +21,7 @@ import {
   autonomousPendingPath,
 } from '../core/constants.js';
 import { SprintStatus, SprintPhase, TaskStatus } from '../core/types.js';
+import { writeConfigJsonAtomic } from '../core/config-write-authority.js';
 import type { Task, Sprint } from '../core/types.js';
 import { readJsonSafe } from '../core/utils.js';
 import { deepMerge } from '../core/config.js';
@@ -1829,7 +1830,7 @@ async function handleRequest(
           }
           // Non-validation errors (e.g. missing function) are ignored — write proceeds
         }
-        writeFileSync(configPath, JSON.stringify(merged, null, 2), 'utf-8');
+        writeConfigJsonAtomic(configPath, merged);
         const changedKeys = Object.keys(parsed.data as Record<string, unknown>).join(', ');
         console.log(`[deckent] Config updated via dashboard: ${changedKeys}`);
         sendJson(res, merged);

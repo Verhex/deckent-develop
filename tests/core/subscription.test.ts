@@ -17,8 +17,12 @@ vi.mock('node:fs', () => ({
 // ─── Mock node:fs/promises ────────────────────────────────────────────
 
 vi.mock('node:fs/promises', () => ({
-  writeFile: vi.fn(),
   readFile: vi.fn(),
+}));
+
+vi.mock('../../src/core/config-write-authority.js', () => ({
+  withConfigWriteLock: vi.fn((_path: string, fn: () => void) => fn()),
+  writeConfigJsonAtomic: vi.fn(),
 }));
 
 // ─── Helpers ──────────────────────────────────────────────────────────
@@ -33,9 +37,8 @@ async function getExistsSync() {
   return mod.existsSync as ReturnType<typeof vi.fn>;
 }
 
-async function getWriteFile() {
-  const mod = await import('node:fs/promises');
-  return mod.writeFile as ReturnType<typeof vi.fn>;
+async function getConfigWriteAuthority() {
+  return import('../../src/core/config-write-authority.js');
 }
 
 async function getReadFile() {
@@ -238,32 +241,35 @@ describe('saveSubscriptionToConfig', () => {
 
   it('creates config file with subscription when no existing file', async () => {
     const existsSync = await getExistsSync();
-    const writeFile = await getWriteFile();
+    const authority = await getConfigWriteAuthority();
 
     existsSync.mockReturnValue(false);
-    writeFile.mockResolvedValue(undefined);
-
     await saveSubscriptionToConfig(profile, '/tmp/test-project');
 
-    expect(writeFile).toHaveBeenCalledOnce();
-    const [, content] = (writeFile as ReturnType<typeof vi.fn>).mock.calls[0] as [string, string];
-    const written = JSON.parse(content as string) as Record<string, unknown>;
-    expect(written['subscription']).toEqual(profile);
+    expect(authority.withConfigWriteLock).toHaveBeenCalledWith(
+      '/tmp/test-project/.deckent/config.json',
+      expect.any(Function),
+    );
+    expect(authority.writeConfigJsonAtomic).toHaveBeenCalledWith(
+      '/tmp/test-project/.deckent/config.json',
+      { subscription: profile },
+    );
   });
 
   it('merges subscription into existing config', async () => {
     const existsSync = await getExistsSync();
-    const writeFile = await getWriteFile();
+    const authority = await getConfigWriteAuthority();
     const readFile = await getReadFile();
 
     existsSync.mockReturnValue(true);
     readFile.mockResolvedValue(JSON.stringify({ mode: 'pro_plan', version: '1.0.0' }));
-    writeFile.mockResolvedValue(undefined);
-
     await saveSubscriptionToConfig(profile, '/tmp/test-project');
 
-    const [, content] = (writeFile as ReturnType<typeof vi.fn>).mock.calls[0] as [string, string];
-    const written = JSON.parse(content as string) as Record<string, unknown>;
+    expect(authority.writeConfigJsonAtomic).toHaveBeenCalledOnce();
+    const [, written] = vi.mocked(authority.writeConfigJsonAtomic).mock.calls[0] as [
+      string,
+      Record<string, unknown>,
+    ];
     expect(written['mode']).toBe('pro_plan');
     expect(written['version']).toBe('1.0.0');
     expect(written['subscription']).toEqual(profile);
@@ -271,32 +277,33 @@ describe('saveSubscriptionToConfig', () => {
 
   it('overwrites existing subscription field', async () => {
     const existsSync = await getExistsSync();
-    const writeFile = await getWriteFile();
+    const authority = await getConfigWriteAuthority();
     const readFile = await getReadFile();
 
     existsSync.mockReturnValue(true);
     const oldProfile: SubscriptionProfile = { ...profile, detected: 'pro', opusAvailable: false };
     readFile.mockResolvedValue(JSON.stringify({ subscription: oldProfile }));
-    writeFile.mockResolvedValue(undefined);
-
     await saveSubscriptionToConfig(profile, '/tmp/test-project');
 
-    const [, content] = (writeFile as ReturnType<typeof vi.fn>).mock.calls[0] as [string, string];
-    const written = JSON.parse(content as string) as Record<string, unknown>;
+    const [, written] = vi.mocked(authority.writeConfigJsonAtomic).mock.calls[0] as [
+      string,
+      Record<string, unknown>,
+    ];
     expect((written['subscription'] as SubscriptionProfile).detected).toBe('max');
   });
 
   it('handles corrupt existing config gracefully', async () => {
     const existsSync = await getExistsSync();
-    const writeFile = await getWriteFile();
+    const authority = await getConfigWriteAuthority();
     const readFile = await getReadFile();
 
     existsSync.mockReturnValue(true);
     readFile.mockResolvedValue('NOT_VALID_JSON{{{{');
-    writeFile.mockResolvedValue(undefined);
-
     await expect(saveSubscriptionToConfig(profile, '/tmp/test-project')).resolves.not.toThrow();
 
-    expect(writeFile).toHaveBeenCalledOnce();
+    expect(authority.writeConfigJsonAtomic).toHaveBeenCalledWith(
+      '/tmp/test-project/.deckent/config.json',
+      { subscription: profile },
+    );
   });
 });

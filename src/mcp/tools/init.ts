@@ -20,6 +20,10 @@ import { enrichResponse } from '../helpers/enrich.js';
 import { seedDocsConfig } from '../../orchestra/managed-docs/docs-config.js';
 import { initializeWorkspaceArtifacts } from '../../orchestra/workspace-artifacts.js';
 import { detectProjectStack } from '../../core/stack-detector.js';
+import {
+  withConfigWriteLock,
+  writeConfigJsonAtomic,
+} from '../../core/config-write-authority.js';
 import { mcpToolDescription } from './description-catalog.js';
 
 function ensureDir(dir: string): void {
@@ -90,17 +94,19 @@ export function registerInitTool(server: McpServer): void {
       // Config (merge — preserve existing fields; force=true overwrites entirely)
       const configPath = join(root, DECKENT_DIR, 'config.json');
       const newConfig: Record<string, unknown> = { mode: mode as PlanMode, language, projectName: resolvedProjectName };
-      if (existsSync(configPath) && !force) {
-        try {
-          const existing = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
-          Object.assign(existing, newConfig);
-          writeFileSync(configPath, JSON.stringify(existing, null, 2) + '\n');
-        } catch {
-          writeFileSync(configPath, JSON.stringify(newConfig, null, 2) + '\n');
+      withConfigWriteLock(configPath, () => {
+        if (existsSync(configPath) && !force) {
+          try {
+            const existing = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
+            Object.assign(existing, newConfig);
+            writeConfigJsonAtomic(configPath, existing);
+          } catch {
+            writeConfigJsonAtomic(configPath, newConfig);
+          }
+        } else {
+          writeConfigJsonAtomic(configPath, newConfig);
         }
-      } else {
-        writeFileSync(configPath, JSON.stringify(newConfig, null, 2) + '\n');
-      }
+      });
       created.push('.deckent/config.json');
 
       // Write helper that respects force flag

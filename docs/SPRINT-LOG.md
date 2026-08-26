@@ -16916,3 +16916,33 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 679-002: oksuz cli.provider-observations.* i18n anahtarlarinin silinmesi (DONE)
 
 ---
+## Sprint 680 — sprint-680
+
+**Status:** ABORTED
+**Date:** 2026-08-26
+**Duration:** 828s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 4 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 828444ms |
+
+### Tasks
+
+- 680-001: Core config-write-authority modülü (tmp+0600+fsync+lock+rename) (DONE)
+- 680-002: CFG-001 heal preimage-identity + CONCURRENT_REVISION_HOLD (DONE)
+- 680-003-fix: Fix: Writer-kablolama A — core yardımcıları + CLI authority'ye geçer (DONE)
+- 680-003: Writer-kablolama A — core yardımcıları + CLI authority'ye geçer (DONE)
+- 680-004-fix-fix: Fix: Fix: Writer-kablolama B — MCP/orchestra yüzeyleri authority'ye geçer (PAUSED)
+- 680-004-fix: Fix: Writer-kablolama B — MCP/orchestra yüzeyleri authority'ye geçer (NO_GO)
+- 680-004: Writer-kablolama B — MCP/orchestra yüzeyleri authority'ye geçer (NO_GO)
+- 680-005: Mekanik kapı — lint-config-writers fail-closed gate (PAUSED)
+- 680-006: Adversarial interleaving + custody kanıt bataryası (DONE)
+
+---

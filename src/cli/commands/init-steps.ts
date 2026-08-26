@@ -12,6 +12,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { platform } from 'node:os';
 import type { PlanMode } from '../../core/types.js';
+import { writeConfigJsonAtomic } from '../../core/config-write-authority.js';
 import type { ExecutionBudgetPolicyConfig } from '../../core/config-types.js';
 import type { FullStackResult } from '../../core/stack-detector.js';
 import type { DetectedEnv } from '../../core/environment.js';
@@ -303,12 +304,12 @@ export async function writeConfig(
     try {
       const existing = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
       const merged = deepMerge(existing, newConfig);
-      writeFileSync(configPath, JSON.stringify(merged, null, 2) + '\n');
+      writeConfigJsonAtomic(configPath, merged);
     } catch {
-      writeFileSync(configPath, JSON.stringify(newConfig, null, 2) + '\n');
+      writeConfigJsonAtomic(configPath, newConfig);
     }
   } else {
-    writeFileSync(configPath, JSON.stringify(newConfig, null, 2) + '\n');
+    writeConfigJsonAtomic(configPath, newConfig);
   }
 }
 
@@ -419,9 +420,9 @@ export function writeMultiEnvConfig(root: string, requestedEnvs: EnvName[]): voi
     try {
       const existing = JSON.parse(readFileSync(multiConfigPath, 'utf-8')) as Record<string, unknown>;
       existing['multi_ide_mode'] = true;
-      writeFileSync(multiConfigPath, JSON.stringify(existing, null, 2) + '\n');
+      writeConfigJsonAtomic(multiConfigPath, existing);
     } catch {
-      writeFileSync(multiConfigPath, JSON.stringify({ multi_ide_mode: true }, null, 2) + '\n');
+      writeConfigJsonAtomic(multiConfigPath, { multi_ide_mode: true });
     }
   }
 }
@@ -604,10 +605,10 @@ export function writeProviderConfig(
   try {
     const existing = JSON.parse(readFileSync(providerConfigPath, 'utf-8')) as Record<string, unknown>;
     const merged = deepMerge(existing, providerMerge);
-    writeFileSync(providerConfigPath, JSON.stringify(merged, null, 2) + '\n');
+    writeConfigJsonAtomic(providerConfigPath, merged);
   } catch {
     const freshConfig: Record<string, unknown> = { mode, language, projectName, ...providerMerge };
-    writeFileSync(providerConfigPath, JSON.stringify(freshConfig, null, 2) + '\n');
+    writeConfigJsonAtomic(providerConfigPath, freshConfig);
   }
 }
 

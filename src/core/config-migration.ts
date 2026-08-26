@@ -7,7 +7,6 @@
 
 import {
   readFileSync,
-  writeFileSync,
   existsSync,
   copyFileSync,
   readdirSync,
@@ -21,6 +20,7 @@ import type { DeckentConfig } from './types.js';
 import type { ModelTier } from './model-equivalence.js';
 import { canonicalizeProviderConfigAliases } from './provider-config-canonicalizer.js';
 import { canonicalizeModelConfigAliases, hasLegacyModelConfigAliases } from './model-config-canonicalizer.js';
+import { withConfigWriteLock, writeConfigJsonAtomic } from './config-write-authority.js';
 
 function replaceObjectContents(
   target: Record<string, unknown>,
@@ -328,7 +328,7 @@ export function migrateConfig(
     }
   }
 
-  writeFileSync(configPath, JSON.stringify(merged, null, 2) + '\n');
+  withConfigWriteLock(configPath, () => writeConfigJsonAtomic(configPath, merged));
 
   try {
     const pruned = pruneConfigBackups(configPath, 3);

@@ -8,6 +8,16 @@ vi.mock('node:fs', () => ({
   mkdirSync: vi.fn(),
   readFileSync: vi.fn(),
   existsSync: vi.fn(),
+  // config-write-authority (task 680-001) zinciri: init artık config.json'u
+  // tmp+fsync+rename authority'siyle yazıyor — mock-factory bu fs yüzeylerini
+  // de taşımalı, yoksa handler mock altında throw eder (2026-08-26 mock-gap dersi).
+  openSync: vi.fn(() => 3),
+  fsyncSync: vi.fn(),
+  closeSync: vi.fn(),
+  renameSync: vi.fn(),
+  rmSync: vi.fn(),
+  statSync: vi.fn(() => ({ mtimeMs: Date.now() })),
+  unlinkSync: vi.fn(),
   realpathSync: Object.assign(vi.fn((path: string) => path), {
     native: vi.fn((path: string) => path),
   }),
@@ -124,8 +134,10 @@ describe('registerInitTool', () => {
     it('creates config.json with correct fields', async () => {
       const tool = await getInitTool();
       await tool.handler({ projectName: 'test-project', mode: 'economic', language: 'tr' });
+      // Authority zinciri config'i tmp-dosyaya yazar ve kilit owner.json'u da
+      // 'config.json' içerir — payload yazımı .lock-dışı eşleşmedir.
       const writeCall = vi.mocked(writeFileSync).mock.calls.find(
-        (c) => String(c[0]).includes('config.json'),
+        (c) => String(c[0]).includes('config.json') && !String(c[0]).includes('.lock'),
       );
       expect(writeCall).toBeDefined();
       const content = JSON.parse(String(writeCall![1]));
@@ -227,7 +239,7 @@ describe('registerInitTool', () => {
       await tool.handler({ projectName: 'proj', mode: 'performance', language: 'en' });
 
       const configWriteCalls = vi.mocked(writeFileSync).mock.calls.filter(
-        (c) => String(c[0]).includes('config.json'),
+        (c) => String(c[0]).includes('config.json') && !String(c[0]).includes('.lock'),
       );
       expect(configWriteCalls.length).toBeGreaterThan(0);
       const content = JSON.parse(String(configWriteCalls[0]![1]));

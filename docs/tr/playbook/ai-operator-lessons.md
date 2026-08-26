@@ -564,3 +564,16 @@ attempt harcama gerekçesi değil, host composition defect kanıtıdır.
   kanıtlanamaz (sol'un UNCLEAR'ı doğru davranıştı). (4) **Heal, okuyamadığı dosyayı taşıyamaz**
   — strike-5: fd-baskısı altında io-hatası "bozuk" sayılıp sağlam 92-anahtarlı config iki kez
   karantinaya gitti; onarıcılar yalnız parse-kanıtıyla dosya taşır, io-hatası typed-HOLD'dur.
+- **2026-08-26 — G0-A dalgası dersi (sprint-680): Test-yolu disk-doğrulaması ve dürüst-NO_GO
+  zinciri**: DIRECTIVES'teki `Test:` satırı diskte VAR OLMAYAN iki test dosyası gösterdi
+  (`tests/mcp/config-tool.test.ts`, `tests/orchestra/managed-docs.test.ts`); worker'lar kodu
+  eksiksiz teslim edip description'daki "yakın suite koş" esnekliğine RAĞMEN exact-Test
+  otoritesini ihlal etmeyi reddetti → NO_GO → FIX-bütçesi aynı imkânsız komutta eridi → typed
+  PAUSE. Üç kalıcı çıkarım: (1) `Test:` satırındaki HER yol DIRECTIVES yazılırken `ls` ile
+  disk-doğrulanır — prompt-gate'in test-discoverability kontrolü yalnız desen-uyumsuzluğunu
+  yakalar, desen-uyumlu-ama-yok dosyayı yakalamaz (typed boşluk; planner-gate adayı);
+  (2) description-esnekliği exact-komut otoritesini EZEMEZ — esneklik gerekiyorsa Test
+  satırının kendisi esnek yazılır; (3) worker'ların NO_GO'su doğru davranıştı — dürüstlük
+  zinciri çalıştı, kusur direktif-yazarındaydı. Yan-kanıt: dalganın mekanik kapısı
+  (`lint-config-writers`) ilk koşusunda dalganın kendisinin ulaşamadığı 11 kalıntı writer'ı
+  buldu (CLI/API yüzeyleri) — kapı-önce-tarama, envanter-grep'ten daha güvenilirdir.

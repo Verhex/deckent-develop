@@ -1,1149 +1,1159 @@
 {
-  "schemaVersion": 1,
-  "purpose": "Lifecycle + proof-harness classification for every top-level scripts/*.mjs file (row 270). Classified by reading each script's header and package.json wiring — never guessed.",
-  "scope": {
-    "pattern": "scripts/*.mjs",
-    "recursive": false,
-    "excludes": [
-      "scripts/**/*.mjs inside subdirectories (archive/, hermeticity/, memory/, platform-probe/, security/) — outside the literal scripts/*.mjs glob named by this task",
-      "scripts/*.ts (e.g. generate-cli-docs.ts, run-self-audit.ts)",
-      "scripts/*.sh (e.g. bump-version.sh, fresh-env-test.sh, verify-publish.sh)",
-      "scripts/*.json (baseline/report data files, not scripts)"
-    ]
-  },
-  "classes": [
-    "gate",
-    "recurring-proof",
-    "admin-migration",
-    "one-shot",
-    "retired"
-  ],
-  "classDefinitions": {
-    "gate": "Fails a build/lint/publish step (or is designed to) with a fail-closed exit code — blocks CI, release, or sprint admission on violation.",
-    "recurring-proof": "A repeatable proof/audit/measurement harness (smoke, verify, audit) proving real end-to-end behavior; rerun on demand, does not itself block CI unless explicitly wired as a gate.",
-    "admin-migration": "A data-repair or repo-migration tool run by an operator against durable state (memory.db, another repo) — not part of any automated pipeline.",
-    "one-shot": "A manually invoked utility (dev tool, report generator, sync helper) with no CI/gate role and no migration semantics.",
-    "retired": "No longer used / superseded; kept only for historical reference. (No current scripts/*.mjs file qualifies as of 2026-08-11 — see notes on sync-to-product.mjs and zero-hardcode-audit.mjs for the closest borderline cases, neither of which is dead.)"
-  },
-  "generatedAt": "2026-08-11",
-  "derivedFrom": "task 517-006 — read scripts/*.mjs headers + package.json \"scripts\" block + intra-scripts/ import grep, 2026-08-11",
-  "entries": [
-    {
-      "file": "scripts/589-prototip-daemon.mjs",
-      "class": "one-shot",
-      "owner": "nova-design-loop",
-      "npmScript": null,
-      "input": "none (spawns its own daemon + generates its own auth token)",
-      "output": "stdout URLs for the NOVA/PULSE prototype daemon + browser tabs to open",
-      "expiry": "none — manual dev utility, rerun on demand while NOVA prototyping is active",
-      "notes": "Turkish header; launches an isolated deckent-dev daemon for real-data design-loop prototyping (anayasa E4 no-static-mock rule). Never wired to npm scripts."
-    },
-    {
-      "file": "scripts/adr-validator.mjs",
-      "class": "gate",
-      "owner": "adr-governance",
-      "npmScript": "lint:adr",
-      "input": ".brain/DECISIONS.md",
-      "output": "exit 0 valid / 1 validation error / 2 file not found",
-      "expiry": "none — permanent lint gate",
-      "notes": "Validates MADR v3 hybrid ADR format (required Decision/Context/Consequence fields, status enum)."
-    },
-    {
-      "file": "scripts/affected-tests.mjs",
-      "class": "gate",
-      "owner": "ci-gates",
-      "npmScript": null,
-      "input": "changed-file list (stdin or --changed) + static src/**+tests/** ESM import graph",
-      "output": "newline-separated list of tests/**/*.test.ts(x) files transitively affected",
-      "expiry": "none — permanent support library for the verify:affected gate",
-      "notes": "Pure resolver (born-400-001), never calls git itself; consumed by ccverify-affected.mjs (the GATE-RUNNER). Classified with its consumer."
-    },
-    {
-      "file": "scripts/agentic-do-verify.mjs",
-      "class": "recurring-proof",
-      "owner": "agentic-tool-dispatch-smoke",
-      "npmScript": null,
-      "input": "dist/cli/entry.js (built binary), tmpdir sandbox",
-      "output": "PASS/SKIP/FAIL on stdout — proves agentic write-tool dispatch actually writes a file",
-      "expiry": "none — rerun on demand / each release regression pass",
-      "notes": "Sprint 224 T-224-027 run-proven smoke harness."
-    },
-    {
-      "file": "scripts/approval-identity.mjs",
-      "class": "gate",
-      "owner": "closure-os-governance",
-      "npmScript": null,
-      "input": "an approval id string (in-memory)",
-      "output": "isCanonicalApprovalId(id) boolean + claimRefFor(id) string",
-      "expiry": "none — pure library",
-      "notes": "Buildless mirror of the canonical ApprovalBroker identity (src/core/approval-contract.ts approvalIdSchema), consumed by lint-closure-dispositions.mjs (the Closure OS gate) and pinned to that SOLE authority by tests/governance/approval-identity-parity.test.ts. Not a standalone CLI."
-    },
-    {
-      "file": "scripts/audit-install-ingress.mjs",
-      "class": "recurring-proof",
-      "owner": "install-ingress-census",
-      "npmScript": null,
-      "input": "workflow files, package.json scripts, docker spawn backend install call sites, nested npm roots (static enumeration only)",
-      "output": "report-only per-site records with typed unknownIngressClasses; --write refreshes the committed baseline; never fails the build, never executes an install",
-      "expiry": "none — Phase 0 census (row 7100); enforcement wiring is a later owner-gated phase",
-      "notes": "Sprint-522 task 12 (dep-supply Phase 0a, owner GO 2026-08-11). Explicitly NOT closed-world: 12 unknown-ingress classes documented in the report."
-    },
-    {
-      "file": "scripts/audit-operation-ingress.mjs",
-      "class": "recurring-proof",
-      "owner": "operation-ingress-audit",
-      "npmScript": "audit:operation-ingress",
-      "input": "src/ production fs-write/delete call sites",
-      "output": "report distinguishing catalog-mediated vs raw call sites (report-only, does not fail build)",
-      "expiry": "none — rerun on demand; deliberately excluded from lint:gates by design",
-      "notes": "OPERATION-001 O3 measurement baseline; header explicitly states it never fails the build."
-    },
-    {
-      "file": "scripts/audit-user-surfaces.mjs",
-      "class": "recurring-proof",
-      "owner": "user-surface-audit",
-      "npmScript": null,
-      "input": "dist/cli/entry.js real binary (serve/chat/dashboard surfaces)",
-      "output": "per-surface {surface, real, evidence, hollow_reason?} report",
-      "expiry": "none — rerun on demand to re-audit \"DONE\" user-surface tasks",
-      "notes": "Proof-of-Function DoD re-audit tool (Sprint 216 feedback_proof_of_function_dod)."
-    },
-    {
-      "file": "scripts/auth-mode-resolution-smoke.mjs",
-      "class": "recurring-proof",
-      "owner": "auth-mode-smoke",
-      "npmScript": null,
-      "input": "in-memory arg-build simulation only (no real Docker)",
-      "output": "PASS/FAIL on stdout",
-      "expiry": "none — rerun on demand",
-      "notes": "Validates docker env-forwarding auth-aware logic (API key forwarded on api mode, not subscription)."
-    },
-    {
-      "file": "scripts/autonomous-smoke.mjs",
-      "class": "recurring-proof",
-      "owner": "autonomous-smoke",
-      "npmScript": null,
-      "input": "dist/cli/entry.js autonomous start/status commands",
-      "output": "PASS/SKIP/FAIL on stdout",
-      "expiry": "none — rerun on demand",
-      "notes": "Sprint 228 T-228-004 e2e smoke; also asserts default-deny/no-auto-approve invariants hold."
-    },
-    {
-      "file": "scripts/backfill-relations.mjs",
-      "class": "admin-migration",
-      "owner": "brain-memory-ops",
-      "npmScript": null,
-      "input": ".brain/memory.db entries referencing ADRs",
-      "output": "preview report + (non-dry-run) inserted relation rows in memory.db",
-      "expiry": "none — retained as an on-demand data-repair tool, no fixed date",
-      "notes": "--dry-run/--db flags; scans memory.db for missing ADR relations and backfills them."
-    },
-    {
-      "file": "scripts/backfill-sprint-log-rows.mjs",
-      "class": "admin-migration",
-      "owner": "brain-memory-ops",
-      "npmScript": null,
-      "input": ".brain/archive/sprint-NNN-tasks/, .deckent/archive/sprints/, .brain/archive/DIRECTIVES-sprint-NNN.md",
-      "output": "reconstructed sprint-log-<num> rows written into .brain/memory.db",
-      "expiry": "none — retained as an on-demand data-repair tool, no fixed date",
-      "notes": "Sprint 198 198-002; repairs missing sprint-log rows left by a halted/crashed finalize."
-    },
-    {
-      "file": "scripts/build-dashboard.mjs",
-      "class": "gate",
-      "owner": "dashboard-build",
-      "npmScript": "build:dashboard",
-      "input": "src/dashboard/ (Vite project)",
-      "output": "dist/dashboard/ built bundle",
-      "expiry": "none — permanent build-pipeline step",
-      "notes": "Required by build:all; a failure here breaks `deckent serve`'s static dashboard."
-    },
-    {
-      "file": "scripts/build-design-tokens.mjs",
-      "class": "gate",
-      "owner": "design-tokens",
-      "npmScript": "build:tokens, lint:design-tokens (in lint:gates)",
-      "input": "design/tokens/ (DTCG source)",
-      "output": "src/dashboard theme.css, src/desktop theme-tokens.gen.ts, src/cli palette.ts (write mode) or drift exit 1 (--check)",
-      "expiry": "none — permanent build-pipeline + lint:gates member",
-      "notes": "design-tokens-pipeline skill contract; --check is wired into lint:gates."
-    },
-    {
-      "file": "scripts/build.mjs",
-      "class": "gate",
-      "owner": "build-pipeline",
-      "npmScript": null,
-      "input": "src/ (via tsc), src/dashboard/ (via build-dashboard.mjs), scripts/clean.mjs + scripts/copy-assets.mjs",
-      "output": "atomically committed dist/ tree + BUILD_COMMITTED/BUILD_RECOVERED JSON event on stdout",
-      "expiry": "none — permanent build-pipeline candidate (see notes: currently unwired)",
-      "notes": "Self-contained transactional/atomic build orchestrator (maintenance-lock, manifest, retention, recovery flow) covered by tests/scripts/build-lifecycle.test.ts. NOT referenced by any package.json script or by any other scripts/*.mjs as of 2026-08-11 — production npm run build/build:all instead call tsc + copy-assets.mjs + build-dashboard.mjs directly. Classified gate because its designed role (atomic dist/ commit, fail-closed exit codes) is a build gate once wired; flagged as a wiring gap in the task .result notes."
-    },
-    {
-      "file": "scripts/builtins-drift-check.mjs",
-      "class": "gate",
-      "owner": "builtins-drift",
-      "npmScript": "lint:builtins-drift (in lint:gates)",
-      "input": ".deckent/{agents,skills}/ vs src/core/builtins/{agents,skills}/",
-      "output": "drift inventory report; --check fails on any drift absent from the pinned baseline",
-      "expiry": "none — permanent lint:gates member",
-      "notes": "MASTER-PLAN 502 / 406-001 dilim-1; inventory + no-new-drift ratchet, does not decide canonicality."
-    },
-    {
-      "file": "scripts/bundle-builtins.mjs",
-      "class": "one-shot",
-      "owner": "builtins-sync",
-      "npmScript": null,
-      "input": ".deckent/agents/, .deckent/skills/ (dev workspace)",
-      "output": "src/core/builtins/{agents,skills}/ (npm-distributed copies, picked up later by copy-assets.mjs)",
-      "expiry": "none — manual sync tool, run ad hoc by developer",
-      "notes": "Sprint 150 Task 031; header explicitly warns \"DO NOT RUN BLINDLY\" (W7 audit 2026-07-07)."
-    },
-    {
-      "file": "scripts/ccverify-affected.mjs",
-      "class": "gate",
-      "owner": "ci-gates",
-      "npmScript": "verify:affected",
-      "input": "changed-file set (git diff/ls-files or --changed) via affected-tests.mjs resolver",
-      "output": "vitest run limited to the affected test files; fail-closed exit on any failure",
-      "expiry": "none — permanent gate, self-described GATE-RUNNER",
-      "notes": "born-400-002; never calls git when --changed is supplied (hermetic-test path)."
-    },
-    {
-      "file": "scripts/chat-native-smoke.mjs",
-      "class": "recurring-proof",
-      "owner": "chat-native-smoke",
-      "npmScript": null,
-      "input": "in-memory mock provider + simulated user input (no real CLI spawn)",
-      "output": "PASS/FAIL on stdout",
-      "expiry": "none — rerun on demand",
-      "notes": "End-to-end smoke for `deckent chat --native` tool-dispatch flow."
-    },
-    {
-      "file": "scripts/check-born-intake.mjs",
-      "class": "one-shot",
-      "owner": "born-intake",
-      "npmScript": null,
-      "input": "a drafted RECOVERY-BORN row text file (arg) + follow-up-works/born-intake-template.md",
-      "output": "exit 0 valid / exit 1 typed field gaps / exit 2 file not found",
-      "expiry": "none — manual pre-insertion aid; CI wiring is an explicit owner decision left open (row 3169)",
-      "notes": "B10 task 3 (row 3169). Validates mandatory born-row fields against the intake template; deliberately not wired into any lint chain."
-    },
-    {
-      "file": "scripts/check-dependency-audit.mjs",
-      "class": "gate",
-      "owner": "dependency-security",
-      "npmScript": null,
-      "input": "`npm audit --json --omit=dev` output + scripts/audit-exceptions.json signed exceptions",
-      "output": "exit 0 clean / 1 unaddressed high-or-critical finding",
-      "expiry": "none — permanent security gate (see notes: not wired via any package.json script)",
-      "notes": "SEC-05; replaces the old advisory-only npm audit CI step. Not found in package.json scripts as of 2026-08-11."
-    },
-    {
-      "file": "scripts/check-error-handling.mjs",
-      "class": "gate",
-      "owner": "error-handling-ratchet",
-      "npmScript": "lint:errors",
-      "input": "production TypeScript (throw new Error(...) call sites)",
-      "output": "exit 0 matches baseline / 1 new raw throws or stale baseline",
-      "expiry": "none — permanent ratchet gate",
-      "notes": "ErrorRegistry raw-throw ratchet; duplicate-aware path-bound fingerprint baseline."
-    },
-    {
-      "file": "scripts/check-test-failures.mjs",
-      "class": "gate",
-      "owner": "test-baseline-ratchet",
-      "npmScript": "lint:test-baseline",
-      "input": "vitest run results",
-      "output": "exit 0 no new failures / 1 new per-file failures vs baseline",
-      "expiry": "none — permanent ratchet gate",
-      "notes": "Per-file test-failure ratchet introduced after the 2026-08 CI outage (~560 failing tests); keeps signal without demanding an immediately-green suite."
-    },
-    {
-      "file": "scripts/ci-baseline-detect.mjs",
-      "class": "gate",
-      "owner": "ci-baseline-integrity",
-      "npmScript": null,
-      "input": "ci-baseline.json",
-      "output": "--check: exit 1 if garbage (testCount suspiciously low); --fix: rewrites descriptor-derived testCount",
-      "expiry": "none — permanent integrity gate (see notes: not wired via any package.json script)",
-      "notes": "Detects/fixes garbage baseline values written when runFullVitest() ran in a capacity-limited Docker worker."
-    },
-    {
-      "file": "scripts/ci-sim-capacity.mjs",
-      "class": "recurring-proof",
-      "owner": "hermeticity-ci-sim",
-      "npmScript": null,
-      "input": "tmpdir capacity-marker directory + PID liveness checks",
-      "output": "admission/release of a ci-sim capacity slot",
-      "expiry": "none — permanent support library for test:ci-sim / test:ci-sim:contained",
-      "notes": "Concurrency-capacity guard for the CI reproducer; not independently invoked, imported by the harness."
-    },
-    {
-      "file": "scripts/ci-sim-dependencies.mjs",
-      "class": "recurring-proof",
-      "owner": "hermeticity-ci-sim",
-      "npmScript": null,
-      "input": "repo tracked+selected-untracked file set",
-      "output": "cloned dependency snapshot in the disposable worktree",
-      "expiry": "none — permanent support library for test:ci-sim / test:ci-sim:contained",
-      "notes": "Declares CI_SIM_BOOTSTRAP_PATHS (the ci-sim-*.mjs module set itself) and clones dependencies for the sandbox."
-    },
-    {
-      "file": "scripts/ci-sim-durable-json.mjs",
-      "class": "recurring-proof",
-      "owner": "hermeticity-ci-sim",
-      "npmScript": null,
-      "input": "JSON-serializable state objects",
-      "output": "atomically written JSON files (temp-write + rename, fsync parent dir)",
-      "expiry": "none — permanent support library for test:ci-sim / test:ci-sim:contained",
-      "notes": "Crash-safe atomic JSON write helper used across the ci-sim module family."
-    },
-    {
-      "file": "scripts/ci-sim-process.mjs",
-      "class": "recurring-proof",
-      "owner": "hermeticity-ci-sim",
-      "npmScript": null,
-      "input": "child-process spawn args (command/args/options)",
-      "output": "promise-wrapped child process lifecycle (stdout/stderr, exit)",
-      "expiry": "none — permanent support library for test:ci-sim / test:ci-sim:contained",
-      "notes": "async spawn wrapper (no shell:true); shared by the ci-sim harness and its runner."
-    },
-    {
-      "file": "scripts/ci-sim-receipt.mjs",
-      "class": "recurring-proof",
-      "owner": "hermeticity-ci-sim",
-      "npmScript": null,
-      "input": "ci-sim snapshot (head/patch/tracked/untracked) + vitest args",
-      "output": "a signed snapshotReference payload (digests of tracked/skipped/omitted sets)",
-      "expiry": "none — permanent support library for test:ci-sim / test:ci-sim:contained",
-      "notes": "Builds the reproducibility receipt for a given ci-sim run."
-    },
-    {
-      "file": "scripts/ci-sim-runner.mjs",
-      "class": "recurring-proof",
-      "owner": "hermeticity-ci-sim",
-      "npmScript": null,
-      "input": "runNonce + executable + command args (argv)",
-      "output": "gated nested-process execution inside the ci-sim sandbox",
-      "expiry": "none — permanent support library for test:ci-sim / test:ci-sim:contained",
-      "notes": "Standalone entrypoint invoked by the workspace materializer to run the pinned command."
-    },
-    {
-      "file": "scripts/ci-sim-snapshot.mjs",
-      "class": "recurring-proof",
-      "owner": "hermeticity-ci-sim",
-      "npmScript": null,
-      "input": "git working tree (tracked+untracked files) minus PROTECTED_PATHS",
-      "output": "content digests + copied/symlinked snapshot tree",
-      "expiry": "none — permanent support library for test:ci-sim / test:ci-sim:contained",
-      "notes": "Defines PROTECTED_PATHS (memory.db, .locks, .tasks, etc.) that ci-sim must never touch."
-    },
-    {
-      "file": "scripts/ci-sim-state.mjs",
-      "class": "recurring-proof",
-      "owner": "hermeticity-ci-sim",
-      "npmScript": null,
-      "input": "containment-authority session evidence (scripts/hermeticity/containment-authority.mjs)",
-      "output": "versioned containment manifest (legacy v2 / current v3)",
-      "expiry": "none — permanent support library for test:ci-sim / test:ci-sim:contained",
-      "notes": "Bridges the ci-sim harness to the hermeticity/ containment-authority subsystem."
-    },
-    {
-      "file": "scripts/ci-sim-workspace.mjs",
-      "class": "recurring-proof",
-      "owner": "hermeticity-ci-sim",
-      "npmScript": null,
-      "input": "ci-sim dependency clone + process/snapshot helpers",
-      "output": "materialized/pinned/disposed tmpdir CI workspace",
-      "expiry": "none — permanent support library for test:ci-sim / test:ci-sim:contained",
-      "notes": "Top-level workspace lifecycle (materialize/pin/dispose) consumed by test-ci-sim(-contained).mjs."
-    },
-    {
-      "file": "scripts/clean-clone-smoke.mjs",
-      "class": "recurring-proof",
-      "owner": "clean-clone-smoke",
-      "npmScript": null,
-      "input": "HEAD snapshot archived into a tmpdir (or --source=cwd)",
-      "output": "PASS/FAIL proving deckent works from a clean checkout",
-      "expiry": "none — rerun on demand",
-      "notes": "Optional --keep / --skip-install flags for local debugging."
-    },
-    {
-      "file": "scripts/clean.mjs",
-      "class": "gate",
-      "owner": "clean-pipeline",
-      "npmScript": "clean (used by build, build:all)",
-      "input": "dist/ tree",
-      "output": "dist/ with everything removed EXCEPT dist/dashboard (preserves last build:all output)",
-      "expiry": "none — permanent build-pipeline step",
-      "notes": "Fixes the old rm -rf dist footgun that silently broke `deckent serve` after a TS-only build."
-    },
-    {
-      "file": "scripts/closure-classification-scan.mjs",
-      "class": "recurring-proof",
-      "owner": "closure-os-governance",
-      "npmScript": null,
-      "input": "docs/generated/master-plan-active.json + src/core/closure-classification-schema.json",
-      "output": "docs/governance/closure-classification-owner-proposal.md (--write) or a drift check (--check)",
-      "expiry": "none",
-      "notes": "Deterministic Level×Lane classification scanner and owner-proposal generator; report↔disk parity asserted in tests/governance/closure-ledger.test.ts."
-    },
-    {
-      "file": "scripts/copy-assets.mjs",
-      "class": "gate",
-      "owner": "asset-copy",
-      "npmScript": "build (postbuild), fix:bin",
-      "input": "src/ non-TS assets (JSON schemas, baseline data, bin shebangs)",
-      "output": "copied assets under dist/ + executable-bit-fixed bin entries",
-      "expiry": "none — permanent build-pipeline step",
-      "notes": "Sprint 141 141-SAFE-01; tsc does not copy non-.ts assets, so this closes that gap."
-    },
-    {
-      "file": "scripts/dashboard-e2e-smoke.mjs",
-      "class": "recurring-proof",
-      "owner": "dashboard-build",
-      "npmScript": null,
-      "input": "served dist/dashboard/ (index.html + hashed bundle) via a running daemon",
-      "output": "PASS/FAIL proving cache-bust + nav-route presence",
-      "expiry": "none — rerun on demand",
-      "notes": "Sprint 220 220-015; validates the actual browser-loaded dashboard is cache-bustable end to end."
-    },
-    {
-      "file": "scripts/dead-code-audit.mjs",
-      "class": "recurring-proof",
-      "owner": "dead-code-audit",
-      "npmScript": null,
-      "input": "src/ exports + import graph",
-      "output": "categorized report (Dead/Dormant/Lightly/Active), READ-ONLY (no deletion)",
-      "expiry": "none — rerun on demand",
-      "notes": "Sprint 139 Step 1; deliberately non-mutating."
-    },
-    {
-      "file": "scripts/directives-stress-simulator.mjs",
-      "class": "recurring-proof",
-      "owner": "directives-protection",
-      "npmScript": null,
-      "input": "live DIRECTIVES.md (requires DECKENT_STRESS_SIMULATE=1 or --force)",
-      "output": "DIRECTIVES.md deliberately overwritten then auto-restored after ~5s (timestamped backup)",
-      "expiry": "none — rerun on demand, guarded by explicit opt-in flag",
-      "notes": "Sprint 148/189; proves DirectivesMidSprintProtection under a live stress scenario. Covered by tests/scripts/stress-simulator.test.ts."
-    },
-    {
-      "file": "scripts/dt1-telsiz-smoke.mjs",
-      "class": "recurring-proof",
-      "owner": "desktop-daemon-smoke",
-      "npmScript": null,
-      "input": "dist daemon (no Electron) with/without DECKENT_CONTROL_MUTATIONS",
-      "output": "proves 403 without env-twin, 200 SSE with it, 200 {reply} fallback path",
-      "expiry": "none — rerun on demand",
-      "notes": "Turkish header; 583 tasarım-turu DT-1 \"Telsiz\" real-binary smoke."
-    },
-    {
-      "file": "scripts/extract-traces.mjs",
-      "class": "one-shot",
-      "owner": "trace-corpus-extraction",
-      "npmScript": "extract:traces",
-      "input": "Claude Code session transcripts (~/.claude/projects/**/*.jsonl or DECKENT_CC_DIR), dist/ compiled extractor",
-      "output": ".deckent/traces/extracted-aligned.jsonl + extracted-general.jsonl (gitignored)",
-      "expiry": "none — manual utility, rerun on demand when fresh transcripts exist",
-      "notes": "SP-2 Phase 2; build-gated and skip-safe when dist/ or the transcript dir is missing."
-    },
-    {
-      "file": "scripts/gen-platform-registry.mjs",
-      "class": "gate",
-      "owner": "platform-registry",
-      "npmScript": "docs:platform, docs:platform:check",
-      "input": "tests/**/*.test.ts(x) (skipIf gates + capability probes + process.platform guards)",
-      "output": "AUTOGEN block in tests/PLATFORM.md (write) or drift exit 1 (--check)",
-      "expiry": "none — permanent drift gate",
-      "notes": "row 90 2026-08-03; pure function of TRACKED files, no wall-clock input."
-    },
-    {
-      "file": "scripts/gen-reference-docs.mjs",
-      "class": "gate",
-      "owner": "reference-docs",
-      "npmScript": "docs:ref, docs:ref:check (in release/prepublishOnly)",
-      "input": "MCP tools/resources registrations, ADR index, agent/skill manifests",
-      "output": "generated reference docs (write) or drift exit 1 (--check)",
-      "expiry": "none — permanent drift gate, blocks release + prepublishOnly",
-      "notes": "Sprint 172 Task C2; single source of truth for reference docs."
-    },
-    {
-      "file": "scripts/generate-analysis-inventory.mjs",
-      "class": "one-shot",
-      "owner": "analysis-reporting",
-      "npmScript": null,
-      "input": ".analysis/ markdown files matching a hardcoded TODAY constant",
-      "output": "inventory report of matching analysis files",
-      "expiry": "stale — hardcoded TODAY=2026-07-18 in source; needs re-parameterization before its next real use",
-      "notes": "Never generalized to accept an actual date argument."
-    },
-    {
-      "file": "scripts/ink-pty-native-verify.mjs",
-      "class": "recurring-proof",
-      "owner": "repl-pty-smoke",
-      "npmScript": "verify:native-repl",
-      "input": "dist/cli/entry.js --native (real Ink + AgentSession, only the LLM mocked via DECKENT_NATIVE_MOCK)",
-      "output": "PASS/SKIP/FAIL proving the native REPL path end to end",
-      "expiry": "none — rerun on demand",
-      "notes": "SP-1 M3 T6; skip-safe when dist/ or node-pty is missing."
-    },
-    {
-      "file": "scripts/ink-pty-test.mjs",
-      "class": "recurring-proof",
-      "owner": "repl-pty-smoke",
-      "npmScript": null,
-      "input": "JSON keystroke steps (argv[2]) + real @lydell/node-pty session",
-      "output": "rendered terminal output + exit code, ANSI-stripped",
-      "expiry": "none — rerun on demand",
-      "notes": "Sprint 224; drives the real Ink REPL in a pseudo-terminal (script/printf cannot drive Ink stdin semantics)."
-    },
-    {
-      "file": "scripts/ink-pty-tool-verify.mjs",
-      "class": "recurring-proof",
-      "owner": "repl-pty-smoke",
-      "npmScript": "verify:repl-tools",
-      "input": "dist/cli/entry.js via real PTY, 4 tool-call scenarios (write+approval, bash, deny, multi-tag)",
-      "output": "PASS/SKIP/FAIL per scenario",
-      "expiry": "none — rerun on demand",
-      "notes": "Sprint 285 T-285-005; regression harness for the REPL tool-call protocol."
-    },
-    {
-      "file": "scripts/lint-adr-sync.mjs",
-      "class": "gate",
-      "owner": "adr-sync",
-      "npmScript": null,
-      "input": ".brain/memory.db accepted ADRs (read-only) + .brain/exports/decisions.md projection",
-      "output": "exit 1 typed on MISSING/DIVERGENT/STALE by normalized content digest",
-      "expiry": "none — designed as a fail-closed parity gate; CI wiring deferred to a later slice (row 160)",
-      "notes": "B10 task 5 (row 160). DB is SSOT, export is projection; not yet in lint:gates by design."
-    },
-    {
-      "file": "scripts/lint-cli-mcp-parity.mjs",
-      "class": "gate",
-      "owner": "cli-mcp-parity",
-      "npmScript": "lint:parity (in lint:gates)",
-      "input": "src/cli/commands/*.ts CLI names + src/mcp/tools/*.ts MCP registrations",
-      "output": "exit 1 on NEW gap vs scripts/cli-mcp-parity-baseline.json",
-      "expiry": "none — permanent lint:gates member",
-      "notes": "--update-baseline regenerates the known-intentional-gap baseline."
-    },
-    {
-      "file": "scripts/lint-closure-dispositions.mjs",
-      "class": "gate",
-      "owner": "closure-os-governance",
-      "npmScript": "part of lint:gates",
-      "input": "docs/governance/closure-dispositions.jsonl (append-only ledger) + closure-trust-anchors.json + closure-batches/ + closure-dispositions.receipts/ (currently absent)",
-      "output": "typed HOLD/error validation or OK; --self-check runs 127 in-process assertions",
-      "expiry": "none — permanent lint:gates member",
-      "notes": "SOLE validator for the Closure OS append-only decision-ledger: canonical digest chain, reviewed-parent trust-anchor, immutable batch-snapshot integrity, ed25519 attestation verification, append-only prefix. Empty ledger → nothing-to-validate OK (Phase-4 foundation; writer is Phase-5)."
-    },
-    {
-      "file": "scripts/lint-config-truth.mjs",
-      "class": "gate",
-      "owner": "config-truth",
-      "npmScript": null,
-      "input": "typed DeckentConfig declaration + createDefaultConfig()/loadConfig() static follow (no config import, no env)",
-      "output": "exit 1 fail-closed on CFG-03/CFG-04 truth drift",
-      "expiry": "none — designed as a fail-closed truth gate; CI wiring deferred (row 520-006 config-truth family)",
-      "notes": "Sprint-520 orphaned-fix harvest; statically verifies config metadata truth without importing the config module."
-    },
-    {
-      "file": "scripts/lint-desktop-api-sync.mjs",
-      "class": "gate",
-      "owner": "desktop-api-sync",
-      "npmScript": "lint:desktop-api-sync (in lint:gates)",
-      "input": "DeckentDesktopApi in src/desktop + its hand-mirrored copy in src/dashboard desktop-global.d.ts",
-      "output": "exit 1 on member drift (added/removed/renamed)",
-      "expiry": "none — permanent lint:gates member",
-      "notes": "392-008 DESK-B2-DASHBOARD-BRIDGE; brace/paren-depth scan, not a full TS parser."
-    },
-    {
-      "file": "scripts/lint-i18n-hardcode.mjs",
-      "class": "gate",
-      "owner": "i18n-lint",
-      "npmScript": "lint:i18n (in lint:gates)",
-      "input": "src/cli/commands/*.ts (flat) + src/desktop/src/main/**/*.ts (recursive)",
-      "output": "exit 1 on a console/stdout/stderr call with a natural-language literal not routed through getMessage()/t()",
-      "expiry": "none — permanent lint:gates member",
-      "notes": "Enforces the i18n-FIRST quality bar from CLAUDE.md."
-    },
-    {
-      "file": "scripts/lint-skill-routing-eligibility.mjs",
-      "class": "gate",
-      "owner": "skill-routing-lint",
-      "npmScript": null,
-      "input": "src/orchestra/**/*.ts + src/core/**/*.ts routing-surface files (skill selection call-sites)",
-      "output": "exit 1 on a routing-surface skill selection that bypasses the canonical eligibility adapter (D10: rogue resolver = FAILURE)",
-      "expiry": "none — permanent skill-routing eligibility gate (9034, sprint-561)",
-      "notes": "Added by 561-002; registry entry hand-closed (ADR-D-007) because scripts/script-registry.json was outside the task write authority."
-    },
-    {
-      "file": "scripts/lint-identity-md.mjs",
-      "class": "gate",
-      "owner": "identity-docs",
-      "npmScript": "lint:identity (in release/prepublishOnly)",
-      "input": ".deckent/workspace/IDENTITY.md AUTOGEN blocks",
-      "output": "exit 1 on drift (check) or in-place rewrite (--fix)",
-      "expiry": "none — permanent gate, blocks release + prepublishOnly",
-      "notes": "Delegates to update-readme-stats.mjs as the authoritative source."
-    },
-    {
-      "file": "scripts/lint-layer-shims.mjs",
-      "class": "gate",
-      "owner": "layer-shims-governance",
-      "npmScript": "lint:shims (in lint:gates)",
-      "input": ".deckent/settings/layer-shims.json registry + governed mcp/ files' cli/-crossing imports",
-      "output": "exit 1 on an unregistered import or symbol outside the allowed union",
-      "expiry": "none — permanent lint:gates member",
-      "notes": "ADR-D-004 (C3) exception ratchet; registry-scoped, not a full C3-edge scan (documented D004-W6 follow-up)."
-    },
-    {
-      "file": "scripts/lint-links.mjs",
-      "class": "gate",
-      "owner": "link-lint",
-      "npmScript": "lint:link (in validate-publish gates + release)",
-      "input": "Markdown files (relative links, VitePress site-relative links, anchor fragments)",
-      "output": "exit 1 on a dead link/anchor",
-      "expiry": "none — permanent gate, blocks validate:publish",
-      "notes": "Sprint 172 C3, OSS GA pre-flight."
-    },
-    {
-      "file": "scripts/lint-manifests.mjs",
-      "class": "gate",
-      "owner": "manifest-governance",
-      "npmScript": "lint:manifests (in lint:gates)",
-      "input": ".deckent/{agents,skills}/*/{agent,manifest}.json + src/core/builtins/{agents,skills}/*",
-      "output": "exit 1 on a malformed manifest (missing required / wrong-typed optional field)",
-      "expiry": "none — permanent lint:gates member",
-      "notes": "born-641 class-fix layer 2 (406-003); complements the pool-load fail-soft normalizer."
-    },
-    {
-      "file": "scripts/lint-master-plan.mjs",
-      "class": "gate",
-      "owner": "master-plan-governance",
-      "npmScript": "lint:master-plan (in lint:gates + release + prepublishOnly), docs:master-plan",
-      "input": "docs/MASTER-PLAN.md (canonical source)",
-      "output": "validation errors (--check) or refreshed docs/generated/master-plan-active.{md,json} (--write)",
-      "expiry": "none — permanent lint:gates member, blocks release + prepublishOnly",
-      "notes": "Canonical MASTER-PLAN validator and deterministic active-view generator."
-    },
-    {
-      "file": "scripts/lint-mcp-instructions.mjs",
-      "class": "gate",
-      "owner": "mcp-instructions-governance",
-      "npmScript": null,
-      "input": "DECKENT_MCP_INSTRUCTIONS in src/mcp/server.ts + server.registerTool() calls in src/mcp/tools/*.ts",
-      "output": "exit 0 in sync / 1 drift / 2 parse error",
-      "expiry": "none — permanent gate (see notes: not wired via any package.json script)",
-      "notes": "Not found in package.json scripts as of 2026-08-11."
-    },
-    {
-      "file": "scripts/lint-no-model-literal.mjs",
-      "class": "gate",
-      "owner": "model-literal-governance",
-      "npmScript": "lint:model-literal (in lint:gates)",
-      "input": "src/ (model-name string literals) vs BUILTIN_MODELS in model-registry.ts",
-      "output": "exit 1 on a NEW model-literal site absent from scripts/model-literal-baseline.json",
-      "expiry": "none — permanent lint:gates member",
-      "notes": "born-item 431-001; no-new-literal ratchet, existing sites grandfathered."
-    },
-    {
-      "file": "scripts/lint-no-spawnsync.mjs",
-      "class": "gate",
-      "owner": "spawnsync-governance",
-      "npmScript": "lint:spawnsync (in lint:gates)",
-      "input": "src/ spawnSync call sites vs scripts/spawnsync-baseline.json",
-      "output": "exit 1 on a NEW spawnSync site, or an un-listed hot-path spawnSync",
-      "expiry": "none — permanent lint:gates member",
-      "notes": "ADR-D-002 (C4/C5) + ADR-G-002; ratchet + hot-path hard-block."
-    },
-    {
-      "file": "scripts/lint-operating-policy.mjs",
-      "class": "gate",
-      "owner": "dev-operating-contract-governance",
-      "npmScript": "lint:operating-policy (in lint:gates), lint:operating-policy:write",
-      "input": "docs/governance/deckent-dev-operating-policy.md HOST-BLOCK + AGENTS.md/CLAUDE.md OPERATING-POLICY blocks + docs/execution/active/ capsules + docs/MASTER-PLAN.md rows",
-      "output": "exit 1 on host-block drift or capsule-hygiene violation (--check); host blocks rewritten from canonical (--write); canonical policy sha256 digest on every run",
-      "expiry": "none — permanent lint:gates member (DEV-OPERATING-CONTRACT-001)",
-      "notes": "Provider-neutral projection gate: AGENTS.md and CLAUDE.md must carry the byte-identical execution-mode contract; capsules must map to owner-admitted, non-terminal MASTER rows (delete-on-consume). Pure functions reused by tests/scripts/lint-operating-policy.test.ts."
-    },
-    {
-      "file": "scripts/lint-operation-catalog.mjs",
-      "class": "gate",
-      "owner": "operation-catalog-governance",
-      "npmScript": "lint:gates member (unaliased)",
-      "input": "the OPERATION-001 catalog (ids, enums, effect/gate/risk matrix, capabilities, i18n)",
-      "output": "exit 1 fail-closed on any malformed governance entry",
-      "expiry": "none — permanent lint:gates member",
-      "notes": "Treats the catalog as a governance artifact — a malformed entry is an authority defect, not a typo."
-    },
-    {
-      "file": "scripts/lint-rule-vocabulary.mjs",
-      "class": "gate",
-      "owner": "rule-vocabulary-governance",
-      "npmScript": null,
-      "input": ".deckent/agents/*/agent.json + .deckent/skills/*/manifest.json activation.rules/exclude",
-      "output": "flags domains.$contains/$in words that detectDomains() can never emit",
-      "expiry": "none — permanent gate (see notes: not wired via any package.json script)",
-      "notes": "born-589; not found in package.json scripts as of 2026-08-11."
-    },
-    {
-      "file": "scripts/lint-script-registry.mjs",
-      "class": "gate",
-      "owner": "script-lifecycle-registry-governance",
-      "npmScript": null,
-      "input": "scripts/script-registry.json + the real top-level scripts/*.mjs directory listing",
-      "output": "exit 0 registry covers exactly the real directory + every entry well-formed / 1 coverage-or-shape violation / 2 missing-or-unparsable registry",
-      "expiry": "none — permanent coverage+shape gate for this very registry",
-      "notes": "Task 517-006 (row 270); deliberately NOT wired into any npm script or lint:gates in this slice — that is a follow-up owner decision recorded in the task result notes. Self-registers (this file is itself scripts/*.mjs and required its own entry)."
-    },
-    {
-      "file": "scripts/lint-skill-catalog-determinism.mjs",
-      "class": "gate",
-      "owner": "skill-catalog-determinism",
-      "npmScript": null,
-      "input": "real-tree skill catalog via snapshotSkillCatalog (S5 canonical digest) + optional scripts/skill-catalog-determinism-baseline.json",
-      "output": "exit 0 IN_SYNC/DECLARED_DRIFT · exit 1 UNDECLARED_DRIFT or bare-allowlist entry · exit 2 infra",
-      "expiry": "none — S8 determinism gate (row 7012); lint:gates wiring is a named follow-up owner decision",
-      "notes": "Sprint-523 task 8. Derives the digest from the S5 snapshot; a second hash mechanism in this script is itself a violation (pinned by its test)."
-    },
-    {
-      "file": "scripts/lint-sprint-archive-writers.mjs",
-      "class": "gate",
-      "owner": "canonical-sprint-archive-authority",
-      "npmScript": "lint:gates member (unaliased)",
-      "input": "production src/** JS/JSX/MJS/CJS/TS/TSX filesystem mutations, provenance-resolved node:fs bindings, and exact symbol authority annotations",
-      "output": "exit 0 when canonical/legacy sprint archive writes and retirements remain authority-contained / 1 with typed source locations on violation",
-      "expiry": "none — permanent canonical sprint archive writer ratchet",
-      "notes": "CAF07 static authority gate; tracks canonical resolver/constants/property/wrapper data flow, fails closed on unresolved archive-derived targets, and admits only exact top-level publication/verified-retirement owners. Wired directly into lint:gates."
-    },
-    {
-      "file": "scripts/lint-acceptance-confirmation-authority.mjs",
-      "class": "gate",
-      "owner": "acceptance-confirmation-authority",
-      "npmScript": "lint:gates member (unaliased)",
-      "input": "production src/** acceptance-confirmation read/settle call sites and their authority annotations",
-      "output": "exit 0 when confirmation discovery stays side-effect-free and settlement stays driver/service-owned; exit 2 on violation",
-      "notes": "Sprint-661 closure follow-up 2026-08-24: gate was authored in 4a77f5704 but never registered; registration closes the UNWIRED gap (owner finding HIGH-1)."
-    },
-    {
-      "file": "scripts/lint-approval-lifecycle-authority.mjs",
-      "class": "gate",
-      "owner": "approval-lifecycle-authority",
-      "npmScript": "lint:gates member (unaliased)",
-      "input": "production src/** approval lifecycle policy/SLA/CAS writer call sites",
-      "output": "exit 0 when lifecycle mutations flow through the D4 policy chain only; exit 2 on violation",
-      "notes": "Sprint-661 closure follow-up 2026-08-24: gate was authored in e9bc6c83a but never registered; registration closes the UNWIRED gap (owner finding HIGH-1)."
-    },
-    {
-      "file": "scripts/lint-recovery-truth-authority.mjs",
-      "class": "gate",
-      "owner": "recovery-truth-authority",
-      "npmScript": "lint:gates member (unaliased)",
-      "input": "production src/** recovery artifact/finalizer/status authority call sites",
-      "output": "exit 0 when recovery truth writes stay inside the RECOVERY-TRUTH-001 authority modules; exit 2 on violation",
-      "notes": "Sprint-661 closure follow-up 2026-08-24: gate was authored in eaba99b31 but never registered; registration closes the UNWIRED gap (owner finding HIGH-1)."
-    },
-    {
-      "file": "scripts/lint-test-hermeticity.mjs",
-      "class": "gate",
-      "owner": "test-hermeticity-registry",
-      "npmScript": "lint:hermetic (in lint:gates)",
-      "input": "tests/**/*.test.ts(x) source (spawnSync/network/wall-clock/fs-escape patterns)",
-      "output": "exit 1 policy violations / 2 scan error, source-derived hermeticity registry",
-      "expiry": "none — permanent lint:gates member",
-      "notes": "Largest gate script in the tree (253KB); source-derived registry + fail-loud policy."
-    },
-    {
-      "file": "scripts/master-plan-integrity.mjs",
-      "class": "gate",
-      "owner": "master-plan-governance",
-      "npmScript": null,
-      "input": "a master-plan model object (in-memory)",
-      "output": "registryIntegrity = sha256(canonical-json-utf8) digest",
-      "expiry": "none — pure library",
-      "notes": "The SINGLE byte-semantic authority for master-plan-active.json registryIntegrity, reused verbatim by lint-master-plan.mjs (--check gate) and lint-closure-dispositions.mjs (archived-snapshot integrity). No standalone CLI; a regression fails both gates."
-    },
-    {
-      "file": "scripts/measure-prompt-cost.mjs",
-      "class": "one-shot",
-      "owner": "prompt-quality",
-      "npmScript": null,
-      "input": ">=8 real historical sprint task prompts via buildTaskPromptSegmented, real ADRs from .brain/memory.db",
-      "output": ".analysis/u4-olcum/report.md (per-prompt + average segment-byte breakdown)",
-      "expiry": "none — retained for re-measurement whenever persona_render mode changes",
-      "notes": "U4 harness (443-005); composes prompts in both full/guidance modes via the real production compose path."
-    },
-    {
-      "file": "scripts/multi-provider-fleet-smoke.mjs",
-      "class": "recurring-proof",
-      "owner": "provider-fleet-smoke",
-      "npmScript": null,
-      "input": "mocked 8-provider fleet (3 subscription + 4 API + 1 local) in an inline registry",
-      "output": "PASS/FAIL proving per-task routing, coexistence, subscription-to-API overflow",
-      "expiry": "none — rerun on demand",
-      "notes": "No real API calls; all adapters mocked."
-    },
-    {
-      "file": "scripts/multi-provider-smoke.mjs",
-      "class": "recurring-proof",
-      "owner": "provider-fleet-smoke",
-      "npmScript": null,
-      "input": "mocked claude+ollama+openai-compat adapters in an inline registry",
-      "output": "PASS/FAIL proving per-task provider routing",
-      "expiry": "none — rerun on demand",
-      "notes": "Simpler predecessor pattern of multi-provider-fleet-smoke.mjs."
-    },
-    {
-      "file": "scripts/n3-desktop-pty-smoke.mjs",
-      "class": "recurring-proof",
-      "owner": "desktop-pty-smoke",
-      "npmScript": null,
-      "input": "real dist daemon + real Desktop terminal-token/WS path (no Electron)",
-      "output": "PASS/FAIL proving bearer-gated real @lydell/node-pty shell attach + echo round-trip",
-      "expiry": "none — rerun on demand",
-      "notes": "Turkish header; 583/N3 \"Makine Dairesi\" real-binary smoke, proves ADR-G-029 inv#1/#2b."
-    },
-    {
-      "file": "scripts/n4-git-smoke.mjs",
-      "class": "recurring-proof",
-      "owner": "git-tool-smoke",
-      "npmScript": null,
-      "input": "real git fixture repo + dist `deckent runs` / chat-tool-exec dispatcher",
-      "output": "PASS/FAIL proving commit trailer + status→add→commit→log tool-exec round trip",
-      "expiry": "none — rerun on demand",
-      "notes": "583/N4 real-binary smoke, two legs (CLI + dispatcher)."
-    },
-    {
-      "file": "scripts/nova-tasarim-loop.mjs",
-      "class": "one-shot",
-      "owner": "nova-design-loop",
-      "npmScript": null,
-      "input": "none (spawns its own daemon, reference server, and vite renderer)",
-      "output": "stdout URLs for the isolated daemon (:3179), reference server (:3180/nova), live renderer (:5173)",
-      "expiry": "none — manual dev utility, rerun on demand while NOVA prototyping is active",
-      "notes": "Turkish header; three-leg design-iteration eye-loop runner, never touches Alperen's live daemon/sprints."
-    },
-    {
-      "file": "scripts/pre-flight-health-check.mjs",
-      "class": "gate",
-      "owner": "preflight-sprint-admission",
-      "npmScript": null,
-      "input": "tsc --noEmit, vitest baseline, .brain memory budget, .locks staleness, Docker/MCP reachability, deckent doctor --json",
-      "output": "per-component pass/fail summary gating whether a sprint may be spawned",
-      "expiry": "none — permanent admission gate",
-      "notes": "Sprint 139; not an npm script — invoked as a pre-sprint-spawn check."
-    },
-    {
-      "file": "scripts/prompt-linter.mjs",
-      "class": "gate",
-      "owner": "prompt-quality",
-      "npmScript": null,
-      "input": "worker prompt files (agent PROMPT.md content)",
-      "output": "per-file PromptLintResult score/issues; exit 0 avg>=75 / 1 avg<75 / 2 no files found",
-      "expiry": "none — permanent quality gate (see notes: not wired via any package.json script)",
-      "notes": "Not found in package.json scripts as of 2026-08-11."
-    },
-    {
-      "file": "scripts/provider-free-smoke.mjs",
-      "class": "recurring-proof",
-      "owner": "provider-fleet-smoke",
-      "npmScript": null,
-      "input": "provider binary resolution logic across subprocess/tmux/Docker backends (no real workers spawned)",
-      "output": "exit 0 all steps passed / 1 a step failed / 2 import/setup error",
-      "expiry": "none — rerun on demand",
-      "notes": "Sprint 202/203; routing-logic-only smoke, no live provider calls."
-    },
-    {
-      "file": "scripts/release-prepare.mjs",
-      "class": "one-shot",
-      "owner": "release-engineering",
-      "npmScript": null,
-      "input": "--version vX.Y.Z[-pre][+build] CLI arg",
-      "output": "atomically updated package.json, package-lock.json (both version fields), CHANGELOG.md skeleton section",
-      "expiry": "none — manual utility, run once per release cycle by the owner",
-      "notes": "Task 414-002 RC4B/REL-03-04; replaces scripts/bump-version.sh. Never tags/pushes/publishes — release.yml remains sole-publish-authority (born-608)."
-    },
-    {
-      "file": "scripts/repl-smoke-verify.mjs",
-      "class": "recurring-proof",
-      "owner": "repl-pty-smoke",
-      "npmScript": null,
-      "input": "dist/cli/entry.js REPL (non-PTY smoke)",
-      "output": "PASS/SKIP/FAIL proving /help latency, status-line, session-reuse perf, layout separation",
-      "expiry": "none — rerun on demand",
-      "notes": "Sprint 223 T-223-010 run-proven harness."
-    },
-    {
-      "file": "scripts/routing-distribution.mjs",
-      "class": "gate",
-      "owner": "routing-telemetry",
-      "npmScript": "lint:routing (in lint:gates, --ci)",
-      "input": ".deckent/routing/learnings.json",
-      "output": "agent+skill usage distribution report; --ci fails if a single agent claims >70% of tasks (--threshold configurable)",
-      "expiry": "none — permanent lint:gates member",
-      "notes": "Sprint 209 Task 005."
-    },
-    {
-      "file": "scripts/rt-latency-verify.mjs",
-      "class": "recurring-proof",
-      "owner": "rt-latency-smoke",
-      "npmScript": "verify:rt-latency",
-      "input": "real dist/cli/entry.js serve in a hermetic tmpdir project",
-      "output": "PASS/FAIL proving worker_heartbeat + log_line SSE events arrive within 2000ms",
-      "expiry": "none — rerun on demand",
-      "notes": "DASH-RT-1 (Sprint 284); exits 2 when dist/cli/entry.js is absent (fresh-checkout pass)."
-    },
-    {
-      "file": "scripts/series-metrics.mjs",
-      "class": "one-shot",
-      "owner": "analysis-reporting",
-      "npmScript": null,
-      "input": ".brain/archive/sprint-N-tasks/ (task JSON + .result files) across a sprint range",
-      "output": "JSON + Markdown per-sprint and cumulative task/DONE/DEBT/NO_GO/duration/agreement/fix-heal-rate rollup",
-      "expiry": "none — manual utility, rerun per retro/analysis request",
-      "notes": "Task 364-011 RETRO-SERIES-METRICS; deliberately reads raw per-task archive, not SPRINT-LOG.md's rollup table (found to disagree with itself in Sprint 357)."
-    },
-    {
-      "file": "scripts/serve-localhost-smoke.mjs",
-      "class": "recurring-proof",
-      "owner": "serve-localhost-smoke",
-      "npmScript": null,
-      "input": "in-process serve boot (localhost token flow)",
-      "output": "PASS/FAIL proving token injection + Bearer-gated 401/not-401 behavior",
-      "expiry": "none — rerun on demand",
-      "notes": "Validates out-of-box localhost token flow."
-    },
-    {
-      "file": "scripts/smoke-deck-lifecycle.mjs",
-      "class": "recurring-proof",
-      "owner": "deck-secret-lifecycle-security",
-      "npmScript": null,
-      "input": "src/core/deck-file.ts imported directly (no build step needed)",
-      "output": "\"SMOKE OK\" on stdout or exit 1",
-      "expiry": "none — rerun on demand",
-      "notes": "SEC-01 (task 411-001); proves DECK-OVERWRITE-GUARD + atomic 0600 write."
-    },
-    {
-      "file": "scripts/smoke-init-noninteractive.mjs",
-      "class": "recurring-proof",
-      "owner": "init-noninteractive-smoke",
-      "npmScript": null,
-      "input": "src/cli/commands/init.ts registerInit() via vite-node (current source, not dist/)",
-      "output": "PASS/FAIL proving `deckent init --yes` writes to disk and prints an outcome block",
-      "expiry": "none — rerun on demand",
-      "notes": "RC2C / born-652 (413-001); closes a hang-forever-silent-exit-0 regression."
-    },
-    {
-      "file": "scripts/sprint-retroactive-reclassify.mjs",
-      "class": "admin-migration",
-      "owner": "brain-memory-ops",
-      "npmScript": null,
-      "input": "--sprint/--task/--decision/--reason args or --from-file batch list",
-      "output": "reclassified task decision in .brain/memory.db + a per-day audit record in .deckent/decisions/",
-      "expiry": "none — retained as an on-demand data-repair tool, no fixed date",
-      "notes": "Optionally recomputes agent/skill stats."
-    },
-    {
-      "file": "scripts/surf-approval-smoke.mjs",
-      "class": "recurring-proof",
-      "owner": "surf-approval-smoke",
-      "npmScript": null,
-      "input": "a real cross-process ApprovalRequest via ApprovalBroker.submit + the packaged Desktop Approval view",
-      "output": "PASS/FAIL proving decide-UI + short-TTL expiry sweep, visible on both surfaces",
-      "expiry": "none — rerun on demand",
-      "notes": "SURF-5/6 kuyruk-E; closes twice-deferred approval legs end to end."
-    },
-    {
-      "file": "scripts/surf6-cross-surface-smoke.mjs",
-      "class": "recurring-proof",
-      "owner": "surf6-cross-surface-smoke",
-      "npmScript": null,
-      "input": "real daemon + real packaged/dev Electron Desktop + real CLI, PATH-shimmed fake-claude (no LLM/network)",
-      "output": "PASS/FAIL proving Terminal-to-Desktop and Desktop-to-Terminal parity + a daemon-restart chaos leg",
-      "expiry": "none — rerun on demand",
-      "notes": "SURF-6 dogfood smoke; hermetic (tmp everything)."
-    },
-    {
-      "file": "scripts/surf7-readonly-smoke.mjs",
-      "class": "recurring-proof",
-      "owner": "surf7-readonly-smoke",
-      "npmScript": null,
-      "input": "real daemon with built dashboard, config.api.control_mutations toggled",
-      "output": "PASS/FAIL proving monitoring stays alive, every former control endpoint returns honest 403, rollback clause works",
-      "expiry": "none — rerun on demand",
-      "notes": "SURF-7 authority-cutover smoke; also asserts the served bundle carries zero mutation-control markers."
-    },
-    {
-      "file": "scripts/sync-core-memory.mjs",
-      "class": "one-shot",
-      "owner": "core-memory-sync",
-      "npmScript": null,
-      "input": ".deckent/docs/core-memory/ (project authority) via --target or DECKENT_MEMORY_PROJECTION_PATH",
-      "output": "a host/provider memory-directory projection (never writes back to the authority)",
-      "expiry": "none — manual utility, rerun on demand",
-      "notes": "Enforces \"authority is always the project directory\" — no timestamp-based newer-wins."
-    },
-    {
-      "file": "scripts/sync-manifest.mjs",
-      "class": "one-shot",
-      "owner": "feature-manifest-sync",
-      "npmScript": null,
-      "input": "src/ tree (export + import-count scan)",
-      "output": ".deckent/settings/features-manifest.json (active/lightly_used/dormant/dead categorization)",
-      "expiry": "none — manual utility, rerun on demand as src/ evolves",
-      "notes": "Sprint 150 Task 029; --root/--dry-run/--json flags."
-    },
-    {
-      "file": "scripts/sync-to-product.mjs",
-      "class": "admin-migration",
-      "owner": "product-staging",
-      "npmScript": null,
-      "input": "deckent-develop HEAD (full history, internal sprint state)",
-      "output": "dry-run keep/drop + security report, or (--apply) an extracted tmp staging snapshot with EXCLUDE paths pruned",
-      "expiry": "pending — retained for the one-time GA-2 deckent-develop-to-deckent public migration (ADR-D-008), no scheduled date",
-      "notes": "ADR-D-008 (accepted 2026-06-30) supersedes the retired continuous-sync model (ADR-065); header explicitly says do not run as a recurring sync."
-    },
-    {
-      "file": "scripts/test-binary-contracts.mjs",
-      "class": "recurring-proof",
-      "owner": "binary-contracts-proof",
-      "npmScript": "test:binary-contracts",
-      "input": "built dist/ binaries (real spawn, tmpdir sandboxes)",
-      "output": "vitest-reported PASS/FAIL for binary-level contracts",
-      "expiry": "none — rerun on demand",
-      "notes": "No file-header comment block; classified from wiring + import shape (real spawn/tmpdir smoke pattern)."
-    },
-    {
-      "file": "scripts/test-ci-sim-contained.mjs",
-      "class": "recurring-proof",
-      "owner": "hermeticity-ci-sim",
-      "npmScript": "test:ci-sim:contained",
-      "input": "ci-sim-workspace.mjs materialized/pinned workspace + sanitized CI env",
-      "output": "contained CI-reproduction run result",
-      "expiry": "none — rerun on demand",
-      "notes": "Contained-execution variant of test-ci-sim.mjs."
-    },
-    {
-      "file": "scripts/test-ci-sim.mjs",
-      "class": "recurring-proof",
-      "owner": "hermeticity-ci-sim",
-      "npmScript": "test:ci-sim",
-      "input": "current tracked + selected-untracked source snapshot",
-      "output": "a disposable Git-worktree CI reproduction run result",
-      "expiry": "none — rerun on demand",
-      "notes": "Clean-state CI reproducer; never hides/renames live project state."
-    },
-    {
-      "file": "scripts/test-e2e-surfaces.mjs",
-      "class": "recurring-proof",
-      "owner": "e2e-surfaces-proof",
-      "npmScript": "test:e2e-surfaces",
-      "input": "real dist/cli/entry.js serve on a free random port",
-      "output": "PASS/FAIL proving GET / and GET /api/status contracts, with try/finally child cleanup",
-      "expiry": "none — permanent regression guard",
-      "notes": "Sprint 216 216-005, ADR-078 + karpathy-discipline Proof-of-Function; hermetic (tmpdir + HOME sandbox), skip-safe pre-build."
-    },
-    {
-      "file": "scripts/token-usage-report.mjs",
-      "class": "one-shot",
-      "owner": "token-usage-reporting",
-      "npmScript": null,
-      "input": "~/.claude/projects/**/*.jsonl session transcripts",
-      "output": "aggregated real API token-usage report (optionally --price cost estimate)",
-      "expiry": "none — manual utility, rerun on demand",
-      "notes": "Ground truth is API message.usage fields, not worker self-estimates; dedupes streamed-chunk message ids."
-    },
-    {
-      "file": "scripts/update-readme-stats.mjs",
-      "class": "gate",
-      "owner": "readme-stats",
-      "npmScript": "docs:stats, docs:stats:check (in lint:gates + release/prepublishOnly), docs:stats:refresh",
-      "input": "vitest test count, package.json version, src/mcp/* registrations, docs/adr/*, .deckent/{agents,skills}, .deckent/workspace/stats-snapshot.json",
-      "output": "updated AUTOGEN badge blocks in README.md/README.tr.md/IDENTITY.md (write) or drift exit 1 (--check)",
-      "expiry": "none — permanent lint:gates member, blocks release + prepublishOnly",
-      "notes": "Sprint 172 Task C1; MASTER-PLAN 521 CI-STATS-HERMETIC-001 — pure function of tracked files, volatile inputs frozen into a snapshot file."
-    },
-    {
-      "file": "scripts/validate-guidance.mjs",
-      "class": "gate",
-      "owner": "persona-guidance-governance",
-      "npmScript": null,
-      "input": "<agent-dir>/PROMPT.md (persona-guidance marker grammar, U4 PCOMP-8)",
-      "output": "grammar-issue report; exit 0/1/2",
-      "expiry": "none — permanent per-agent-authoring validation gate (see notes: not wired via any package.json script)",
-      "notes": "Mirrors parseGuidanceSections in src/core/persona-guidance.ts by hand (dependency-free .mjs since lint never runs build first) — must be kept in sync manually."
-    },
-    {
-      "file": "scripts/validate-publish.mjs",
-      "class": "gate",
-      "owner": "publish-readiness",
-      "npmScript": "validate:publish (in release)",
-      "input": "npm pack output, package.json, ADR/link lint results",
-      "output": "6 readiness gates (pack size, engines.node, entry points, no internal-state leak, adr_lint, link_lint)",
-      "expiry": "none — permanent gate, blocks release",
-      "notes": "Sprint 180 W5-1 Crisis Stabilization §6."
-    },
-    {
-      "file": "scripts/verify-gitignore.mjs",
-      "class": "gate",
-      "owner": "gitignore-hygiene",
-      "npmScript": "lint:gitignore (in lint:gates)",
-      "input": ".gitignore + `git ls-files`",
-      "output": "exit 0 OK / 1 problem (memory.db/-shm/-wal not ignored or actually tracked)",
-      "expiry": "none — permanent lint:gates member",
-      "notes": "Protects the SQLite memory store from being committed."
-    },
-    {
-      "file": "scripts/verify-recovery-hot-path.mjs",
-      "class": "gate",
-      "owner": "recovery-hot-path-governance",
-      "npmScript": null,
-      "input": "src/orchestra/sprint-spawner.ts source text",
-      "output": "process.exitCode 1 if a forbidden recovery-machinery symbol (sprint-recovery-operation, ApprovalBroker, ...) is referenced",
-      "expiry": "none — permanent regression-prevention gate (see notes: not wired via any package.json script)",
-      "notes": "No file-header comment block; single-purpose forbidden-import scanner."
-    },
-    {
-      "file": "scripts/xplat-install-smoke.mjs",
-      "class": "recurring-proof",
-      "owner": "xplat-install-smoke",
-      "npmScript": null,
-      "input": "npm pack tarball of the already-built repo (isolated npm_config_prefix + HOME)",
-      "output": "PASS/FAIL proving `npm install -g` + `deckent init --yes` works on the current OS (Linux/macOS/Windows)",
-      "expiry": "none — rerun on demand, one leg per platform in CI",
-      "notes": "XPLAT-01 (Task 415-001); every OS branch lives inside this script, none in CI YAML."
-    },
-    {
-      "file": "scripts/zero-hardcode-audit.mjs",
-      "class": "gate",
-      "owner": "model-literal-governance",
-      "npmScript": null,
-      "input": "src/ (hardcoded model-version string literals) minus allowlisted model-registry/catalog files",
-      "output": "exit 1 on a hardcoded model-version literal outside the allowlist",
-      "expiry": "none — permanent lint gate (see notes: not wired via any package.json script)",
-      "notes": "Sprint 208 READ-ONLY lint guard; test files always exempt. Predates / overlaps lint-no-model-literal.mjs's baseline-ratchet approach — potential consolidation candidate, not decided in this task."
-    },
-    {
-      "file": "scripts/lint-directives.mjs",
-      "class": "gate",
-      "owner": "sprint-orchestration",
-      "npmScript": "lint:directives",
-      "input": "DIRECTIVES.md (or --file <path>) parsed by the COMPILED production parser dist/orchestra/task-builder.js::parseStructuredDirectives; direct src-imports of listed test files",
-      "output": "task table + typed problems (D_EMPTY_SCOPE, D_NO_READS_FOR_SRC, D_SAME_LINE_READS_FILES, D_WRITE_COLLISION, D_NO_TEST, D_BARE_TOKEN); exit 1 on BLOCK, 2 on stale/missing dist or unreadable input",
-      "expiry": "none — permanent pre-start gate (owner decision 2026-08-25; run manually before every `deckent start`, deliberately NOT in lint:gates because DIRECTIVES content is transient)",
-      "notes": "Born from the sprint-670 lesson (missing Reads: sent 8/13 tasks to NO_GO) and sprint-663 grammar failures. No parser reimplementation: validates with the exact compiled module production runs, and revives the previously-unwired validateScopeFilesWrite for bare-token checks."
-    },
-    {
-      "file": "scripts/gen-repair-directives.mjs",
-      "class": "recurring-proof",
-      "owner": "sprint-orchestration",
-      "npmScript": null,
-      "input": "--files <list.txt> of failing test paths (+ --chunk N); direct src-imports scanned via lint-directives.mjs::scanDirectSrcImports",
-      "output": "deterministic repair-wave DIRECTIVES (stdout or --out) with generated Reads: lists; exit 2 on bad input",
-      "expiry": "none — reusable for every full-suite repair wave (owner decision 2026-08-25)",
-      "notes": "Zero LLM free-text: clustering is sorted+chunked, Reads derived from import scanning shared with the lint gate. Output must still pass lint-directives + `deckent plan --dry-run` before start (current-flow contract)."
-    }
+ "schemaVersion": 1,
+ "purpose": "Lifecycle + proof-harness classification for every top-level scripts/*.mjs file (row 270). Classified by reading each script's header and package.json wiring — never guessed.",
+ "scope": {
+  "pattern": "scripts/*.mjs",
+  "recursive": false,
+  "excludes": [
+   "scripts/**/*.mjs inside subdirectories (archive/, hermeticity/, memory/, platform-probe/, security/) — outside the literal scripts/*.mjs glob named by this task",
+   "scripts/*.ts (e.g. generate-cli-docs.ts, run-self-audit.ts)",
+   "scripts/*.sh (e.g. bump-version.sh, fresh-env-test.sh, verify-publish.sh)",
+   "scripts/*.json (baseline/report data files, not scripts)"
   ]
+ },
+ "classes": [
+  "gate",
+  "recurring-proof",
+  "admin-migration",
+  "one-shot",
+  "retired"
+ ],
+ "classDefinitions": {
+  "gate": "Fails a build/lint/publish step (or is designed to) with a fail-closed exit code — blocks CI, release, or sprint admission on violation.",
+  "recurring-proof": "A repeatable proof/audit/measurement harness (smoke, verify, audit) proving real end-to-end behavior; rerun on demand, does not itself block CI unless explicitly wired as a gate.",
+  "admin-migration": "A data-repair or repo-migration tool run by an operator against durable state (memory.db, another repo) — not part of any automated pipeline.",
+  "one-shot": "A manually invoked utility (dev tool, report generator, sync helper) with no CI/gate role and no migration semantics.",
+  "retired": "No longer used / superseded; kept only for historical reference. (No current scripts/*.mjs file qualifies as of 2026-08-11 — see notes on sync-to-product.mjs and zero-hardcode-audit.mjs for the closest borderline cases, neither of which is dead.)"
+ },
+ "generatedAt": "2026-08-11",
+ "derivedFrom": "task 517-006 — read scripts/*.mjs headers + package.json \"scripts\" block + intra-scripts/ import grep, 2026-08-11",
+ "entries": [
+  {
+   "file": "scripts/589-prototip-daemon.mjs",
+   "class": "one-shot",
+   "owner": "nova-design-loop",
+   "npmScript": null,
+   "input": "none (spawns its own daemon + generates its own auth token)",
+   "output": "stdout URLs for the NOVA/PULSE prototype daemon + browser tabs to open",
+   "expiry": "none — manual dev utility, rerun on demand while NOVA prototyping is active",
+   "notes": "Turkish header; launches an isolated deckent-dev daemon for real-data design-loop prototyping (anayasa E4 no-static-mock rule). Never wired to npm scripts."
+  },
+  {
+   "file": "scripts/adr-validator.mjs",
+   "class": "gate",
+   "owner": "adr-governance",
+   "npmScript": "lint:adr",
+   "input": ".brain/DECISIONS.md",
+   "output": "exit 0 valid / 1 validation error / 2 file not found",
+   "expiry": "none — permanent lint gate",
+   "notes": "Validates MADR v3 hybrid ADR format (required Decision/Context/Consequence fields, status enum)."
+  },
+  {
+   "file": "scripts/affected-tests.mjs",
+   "class": "gate",
+   "owner": "ci-gates",
+   "npmScript": null,
+   "input": "changed-file list (stdin or --changed) + static src/**+tests/** ESM import graph",
+   "output": "newline-separated list of tests/**/*.test.ts(x) files transitively affected",
+   "expiry": "none — permanent support library for the verify:affected gate",
+   "notes": "Pure resolver (born-400-001), never calls git itself; consumed by ccverify-affected.mjs (the GATE-RUNNER). Classified with its consumer."
+  },
+  {
+   "file": "scripts/agentic-do-verify.mjs",
+   "class": "recurring-proof",
+   "owner": "agentic-tool-dispatch-smoke",
+   "npmScript": null,
+   "input": "dist/cli/entry.js (built binary), tmpdir sandbox",
+   "output": "PASS/SKIP/FAIL on stdout — proves agentic write-tool dispatch actually writes a file",
+   "expiry": "none — rerun on demand / each release regression pass",
+   "notes": "Sprint 224 T-224-027 run-proven smoke harness."
+  },
+  {
+   "file": "scripts/approval-identity.mjs",
+   "class": "gate",
+   "owner": "closure-os-governance",
+   "npmScript": null,
+   "input": "an approval id string (in-memory)",
+   "output": "isCanonicalApprovalId(id) boolean + claimRefFor(id) string",
+   "expiry": "none — pure library",
+   "notes": "Buildless mirror of the canonical ApprovalBroker identity (src/core/approval-contract.ts approvalIdSchema), consumed by lint-closure-dispositions.mjs (the Closure OS gate) and pinned to that SOLE authority by tests/governance/approval-identity-parity.test.ts. Not a standalone CLI."
+  },
+  {
+   "file": "scripts/audit-install-ingress.mjs",
+   "class": "recurring-proof",
+   "owner": "install-ingress-census",
+   "npmScript": null,
+   "input": "workflow files, package.json scripts, docker spawn backend install call sites, nested npm roots (static enumeration only)",
+   "output": "report-only per-site records with typed unknownIngressClasses; --write refreshes the committed baseline; never fails the build, never executes an install",
+   "expiry": "none — Phase 0 census (row 7100); enforcement wiring is a later owner-gated phase",
+   "notes": "Sprint-522 task 12 (dep-supply Phase 0a, owner GO 2026-08-11). Explicitly NOT closed-world: 12 unknown-ingress classes documented in the report."
+  },
+  {
+   "file": "scripts/audit-operation-ingress.mjs",
+   "class": "recurring-proof",
+   "owner": "operation-ingress-audit",
+   "npmScript": "audit:operation-ingress",
+   "input": "src/ production fs-write/delete call sites",
+   "output": "report distinguishing catalog-mediated vs raw call sites (report-only, does not fail build)",
+   "expiry": "none — rerun on demand; deliberately excluded from lint:gates by design",
+   "notes": "OPERATION-001 O3 measurement baseline; header explicitly states it never fails the build."
+  },
+  {
+   "file": "scripts/audit-user-surfaces.mjs",
+   "class": "recurring-proof",
+   "owner": "user-surface-audit",
+   "npmScript": null,
+   "input": "dist/cli/entry.js real binary (serve/chat/dashboard surfaces)",
+   "output": "per-surface {surface, real, evidence, hollow_reason?} report",
+   "expiry": "none — rerun on demand to re-audit \"DONE\" user-surface tasks",
+   "notes": "Proof-of-Function DoD re-audit tool (Sprint 216 feedback_proof_of_function_dod)."
+  },
+  {
+   "file": "scripts/auth-mode-resolution-smoke.mjs",
+   "class": "recurring-proof",
+   "owner": "auth-mode-smoke",
+   "npmScript": null,
+   "input": "in-memory arg-build simulation only (no real Docker)",
+   "output": "PASS/FAIL on stdout",
+   "expiry": "none — rerun on demand",
+   "notes": "Validates docker env-forwarding auth-aware logic (API key forwarded on api mode, not subscription)."
+  },
+  {
+   "file": "scripts/autonomous-smoke.mjs",
+   "class": "recurring-proof",
+   "owner": "autonomous-smoke",
+   "npmScript": null,
+   "input": "dist/cli/entry.js autonomous start/status commands",
+   "output": "PASS/SKIP/FAIL on stdout",
+   "expiry": "none — rerun on demand",
+   "notes": "Sprint 228 T-228-004 e2e smoke; also asserts default-deny/no-auto-approve invariants hold."
+  },
+  {
+   "file": "scripts/backfill-relations.mjs",
+   "class": "admin-migration",
+   "owner": "brain-memory-ops",
+   "npmScript": null,
+   "input": ".brain/memory.db entries referencing ADRs",
+   "output": "preview report + (non-dry-run) inserted relation rows in memory.db",
+   "expiry": "none — retained as an on-demand data-repair tool, no fixed date",
+   "notes": "--dry-run/--db flags; scans memory.db for missing ADR relations and backfills them."
+  },
+  {
+   "file": "scripts/backfill-sprint-log-rows.mjs",
+   "class": "admin-migration",
+   "owner": "brain-memory-ops",
+   "npmScript": null,
+   "input": ".brain/archive/sprint-NNN-tasks/, .deckent/archive/sprints/, .brain/archive/DIRECTIVES-sprint-NNN.md",
+   "output": "reconstructed sprint-log-<num> rows written into .brain/memory.db",
+   "expiry": "none — retained as an on-demand data-repair tool, no fixed date",
+   "notes": "Sprint 198 198-002; repairs missing sprint-log rows left by a halted/crashed finalize."
+  },
+  {
+   "file": "scripts/build-dashboard.mjs",
+   "class": "gate",
+   "owner": "dashboard-build",
+   "npmScript": "build:dashboard",
+   "input": "src/dashboard/ (Vite project)",
+   "output": "dist/dashboard/ built bundle",
+   "expiry": "none — permanent build-pipeline step",
+   "notes": "Required by build:all; a failure here breaks `deckent serve`'s static dashboard."
+  },
+  {
+   "file": "scripts/build-design-tokens.mjs",
+   "class": "gate",
+   "owner": "design-tokens",
+   "npmScript": "build:tokens, lint:design-tokens (in lint:gates)",
+   "input": "design/tokens/ (DTCG source)",
+   "output": "src/dashboard theme.css, src/desktop theme-tokens.gen.ts, src/cli palette.ts (write mode) or drift exit 1 (--check)",
+   "expiry": "none — permanent build-pipeline + lint:gates member",
+   "notes": "design-tokens-pipeline skill contract; --check is wired into lint:gates."
+  },
+  {
+   "file": "scripts/build.mjs",
+   "class": "gate",
+   "owner": "build-pipeline",
+   "npmScript": null,
+   "input": "src/ (via tsc), src/dashboard/ (via build-dashboard.mjs), scripts/clean.mjs + scripts/copy-assets.mjs",
+   "output": "atomically committed dist/ tree + BUILD_COMMITTED/BUILD_RECOVERED JSON event on stdout",
+   "expiry": "none — permanent build-pipeline candidate (see notes: currently unwired)",
+   "notes": "Self-contained transactional/atomic build orchestrator (maintenance-lock, manifest, retention, recovery flow) covered by tests/scripts/build-lifecycle.test.ts. NOT referenced by any package.json script or by any other scripts/*.mjs as of 2026-08-11 — production npm run build/build:all instead call tsc + copy-assets.mjs + build-dashboard.mjs directly. Classified gate because its designed role (atomic dist/ commit, fail-closed exit codes) is a build gate once wired; flagged as a wiring gap in the task .result notes."
+  },
+  {
+   "file": "scripts/builtins-drift-check.mjs",
+   "class": "gate",
+   "owner": "builtins-drift",
+   "npmScript": "lint:builtins-drift (in lint:gates)",
+   "input": ".deckent/{agents,skills}/ vs src/core/builtins/{agents,skills}/",
+   "output": "drift inventory report; --check fails on any drift absent from the pinned baseline",
+   "expiry": "none — permanent lint:gates member",
+   "notes": "MASTER-PLAN 502 / 406-001 dilim-1; inventory + no-new-drift ratchet, does not decide canonicality."
+  },
+  {
+   "file": "scripts/bundle-builtins.mjs",
+   "class": "one-shot",
+   "owner": "builtins-sync",
+   "npmScript": null,
+   "input": ".deckent/agents/, .deckent/skills/ (dev workspace)",
+   "output": "src/core/builtins/{agents,skills}/ (npm-distributed copies, picked up later by copy-assets.mjs)",
+   "expiry": "none — manual sync tool, run ad hoc by developer",
+   "notes": "Sprint 150 Task 031; header explicitly warns \"DO NOT RUN BLINDLY\" (W7 audit 2026-07-07)."
+  },
+  {
+   "file": "scripts/ccverify-affected.mjs",
+   "class": "gate",
+   "owner": "ci-gates",
+   "npmScript": "verify:affected",
+   "input": "changed-file set (git diff/ls-files or --changed) via affected-tests.mjs resolver",
+   "output": "vitest run limited to the affected test files; fail-closed exit on any failure",
+   "expiry": "none — permanent gate, self-described GATE-RUNNER",
+   "notes": "born-400-002; never calls git when --changed is supplied (hermetic-test path)."
+  },
+  {
+   "file": "scripts/chat-native-smoke.mjs",
+   "class": "recurring-proof",
+   "owner": "chat-native-smoke",
+   "npmScript": null,
+   "input": "in-memory mock provider + simulated user input (no real CLI spawn)",
+   "output": "PASS/FAIL on stdout",
+   "expiry": "none — rerun on demand",
+   "notes": "End-to-end smoke for `deckent chat --native` tool-dispatch flow."
+  },
+  {
+   "file": "scripts/check-born-intake.mjs",
+   "class": "one-shot",
+   "owner": "born-intake",
+   "npmScript": null,
+   "input": "a drafted RECOVERY-BORN row text file (arg) + follow-up-works/born-intake-template.md",
+   "output": "exit 0 valid / exit 1 typed field gaps / exit 2 file not found",
+   "expiry": "none — manual pre-insertion aid; CI wiring is an explicit owner decision left open (row 3169)",
+   "notes": "B10 task 3 (row 3169). Validates mandatory born-row fields against the intake template; deliberately not wired into any lint chain."
+  },
+  {
+   "file": "scripts/check-dependency-audit.mjs",
+   "class": "gate",
+   "owner": "dependency-security",
+   "npmScript": null,
+   "input": "`npm audit --json --omit=dev` output + scripts/audit-exceptions.json signed exceptions",
+   "output": "exit 0 clean / 1 unaddressed high-or-critical finding",
+   "expiry": "none — permanent security gate (see notes: not wired via any package.json script)",
+   "notes": "SEC-05; replaces the old advisory-only npm audit CI step. Not found in package.json scripts as of 2026-08-11."
+  },
+  {
+   "file": "scripts/check-error-handling.mjs",
+   "class": "gate",
+   "owner": "error-handling-ratchet",
+   "npmScript": "lint:errors",
+   "input": "production TypeScript (throw new Error(...) call sites)",
+   "output": "exit 0 matches baseline / 1 new raw throws or stale baseline",
+   "expiry": "none — permanent ratchet gate",
+   "notes": "ErrorRegistry raw-throw ratchet; duplicate-aware path-bound fingerprint baseline."
+  },
+  {
+   "file": "scripts/check-test-failures.mjs",
+   "class": "gate",
+   "owner": "test-baseline-ratchet",
+   "npmScript": "lint:test-baseline",
+   "input": "vitest run results",
+   "output": "exit 0 no new failures / 1 new per-file failures vs baseline",
+   "expiry": "none — permanent ratchet gate",
+   "notes": "Per-file test-failure ratchet introduced after the 2026-08 CI outage (~560 failing tests); keeps signal without demanding an immediately-green suite."
+  },
+  {
+   "file": "scripts/ci-baseline-detect.mjs",
+   "class": "gate",
+   "owner": "ci-baseline-integrity",
+   "npmScript": null,
+   "input": "ci-baseline.json",
+   "output": "--check: exit 1 if garbage (testCount suspiciously low); --fix: rewrites descriptor-derived testCount",
+   "expiry": "none — permanent integrity gate (see notes: not wired via any package.json script)",
+   "notes": "Detects/fixes garbage baseline values written when runFullVitest() ran in a capacity-limited Docker worker."
+  },
+  {
+   "file": "scripts/ci-sim-capacity.mjs",
+   "class": "recurring-proof",
+   "owner": "hermeticity-ci-sim",
+   "npmScript": null,
+   "input": "tmpdir capacity-marker directory + PID liveness checks",
+   "output": "admission/release of a ci-sim capacity slot",
+   "expiry": "none — permanent support library for test:ci-sim / test:ci-sim:contained",
+   "notes": "Concurrency-capacity guard for the CI reproducer; not independently invoked, imported by the harness."
+  },
+  {
+   "file": "scripts/ci-sim-dependencies.mjs",
+   "class": "recurring-proof",
+   "owner": "hermeticity-ci-sim",
+   "npmScript": null,
+   "input": "repo tracked+selected-untracked file set",
+   "output": "cloned dependency snapshot in the disposable worktree",
+   "expiry": "none — permanent support library for test:ci-sim / test:ci-sim:contained",
+   "notes": "Declares CI_SIM_BOOTSTRAP_PATHS (the ci-sim-*.mjs module set itself) and clones dependencies for the sandbox."
+  },
+  {
+   "file": "scripts/ci-sim-durable-json.mjs",
+   "class": "recurring-proof",
+   "owner": "hermeticity-ci-sim",
+   "npmScript": null,
+   "input": "JSON-serializable state objects",
+   "output": "atomically written JSON files (temp-write + rename, fsync parent dir)",
+   "expiry": "none — permanent support library for test:ci-sim / test:ci-sim:contained",
+   "notes": "Crash-safe atomic JSON write helper used across the ci-sim module family."
+  },
+  {
+   "file": "scripts/ci-sim-process.mjs",
+   "class": "recurring-proof",
+   "owner": "hermeticity-ci-sim",
+   "npmScript": null,
+   "input": "child-process spawn args (command/args/options)",
+   "output": "promise-wrapped child process lifecycle (stdout/stderr, exit)",
+   "expiry": "none — permanent support library for test:ci-sim / test:ci-sim:contained",
+   "notes": "async spawn wrapper (no shell:true); shared by the ci-sim harness and its runner."
+  },
+  {
+   "file": "scripts/ci-sim-receipt.mjs",
+   "class": "recurring-proof",
+   "owner": "hermeticity-ci-sim",
+   "npmScript": null,
+   "input": "ci-sim snapshot (head/patch/tracked/untracked) + vitest args",
+   "output": "a signed snapshotReference payload (digests of tracked/skipped/omitted sets)",
+   "expiry": "none — permanent support library for test:ci-sim / test:ci-sim:contained",
+   "notes": "Builds the reproducibility receipt for a given ci-sim run."
+  },
+  {
+   "file": "scripts/ci-sim-runner.mjs",
+   "class": "recurring-proof",
+   "owner": "hermeticity-ci-sim",
+   "npmScript": null,
+   "input": "runNonce + executable + command args (argv)",
+   "output": "gated nested-process execution inside the ci-sim sandbox",
+   "expiry": "none — permanent support library for test:ci-sim / test:ci-sim:contained",
+   "notes": "Standalone entrypoint invoked by the workspace materializer to run the pinned command."
+  },
+  {
+   "file": "scripts/ci-sim-snapshot.mjs",
+   "class": "recurring-proof",
+   "owner": "hermeticity-ci-sim",
+   "npmScript": null,
+   "input": "git working tree (tracked+untracked files) minus PROTECTED_PATHS",
+   "output": "content digests + copied/symlinked snapshot tree",
+   "expiry": "none — permanent support library for test:ci-sim / test:ci-sim:contained",
+   "notes": "Defines PROTECTED_PATHS (memory.db, .locks, .tasks, etc.) that ci-sim must never touch."
+  },
+  {
+   "file": "scripts/ci-sim-state.mjs",
+   "class": "recurring-proof",
+   "owner": "hermeticity-ci-sim",
+   "npmScript": null,
+   "input": "containment-authority session evidence (scripts/hermeticity/containment-authority.mjs)",
+   "output": "versioned containment manifest (legacy v2 / current v3)",
+   "expiry": "none — permanent support library for test:ci-sim / test:ci-sim:contained",
+   "notes": "Bridges the ci-sim harness to the hermeticity/ containment-authority subsystem."
+  },
+  {
+   "file": "scripts/ci-sim-workspace.mjs",
+   "class": "recurring-proof",
+   "owner": "hermeticity-ci-sim",
+   "npmScript": null,
+   "input": "ci-sim dependency clone + process/snapshot helpers",
+   "output": "materialized/pinned/disposed tmpdir CI workspace",
+   "expiry": "none — permanent support library for test:ci-sim / test:ci-sim:contained",
+   "notes": "Top-level workspace lifecycle (materialize/pin/dispose) consumed by test-ci-sim(-contained).mjs."
+  },
+  {
+   "file": "scripts/clean-clone-smoke.mjs",
+   "class": "recurring-proof",
+   "owner": "clean-clone-smoke",
+   "npmScript": null,
+   "input": "HEAD snapshot archived into a tmpdir (or --source=cwd)",
+   "output": "PASS/FAIL proving deckent works from a clean checkout",
+   "expiry": "none — rerun on demand",
+   "notes": "Optional --keep / --skip-install flags for local debugging."
+  },
+  {
+   "file": "scripts/clean.mjs",
+   "class": "gate",
+   "owner": "clean-pipeline",
+   "npmScript": "clean (used by build, build:all)",
+   "input": "dist/ tree",
+   "output": "dist/ with everything removed EXCEPT dist/dashboard (preserves last build:all output)",
+   "expiry": "none — permanent build-pipeline step",
+   "notes": "Fixes the old rm -rf dist footgun that silently broke `deckent serve` after a TS-only build."
+  },
+  {
+   "file": "scripts/closure-classification-scan.mjs",
+   "class": "recurring-proof",
+   "owner": "closure-os-governance",
+   "npmScript": null,
+   "input": "docs/generated/master-plan-active.json + src/core/closure-classification-schema.json",
+   "output": "docs/governance/closure-classification-owner-proposal.md (--write) or a drift check (--check)",
+   "expiry": "none",
+   "notes": "Deterministic Level×Lane classification scanner and owner-proposal generator; report↔disk parity asserted in tests/governance/closure-ledger.test.ts."
+  },
+  {
+   "file": "scripts/copy-assets.mjs",
+   "class": "gate",
+   "owner": "asset-copy",
+   "npmScript": "build (postbuild), fix:bin",
+   "input": "src/ non-TS assets (JSON schemas, baseline data, bin shebangs)",
+   "output": "copied assets under dist/ + executable-bit-fixed bin entries",
+   "expiry": "none — permanent build-pipeline step",
+   "notes": "Sprint 141 141-SAFE-01; tsc does not copy non-.ts assets, so this closes that gap."
+  },
+  {
+   "file": "scripts/dashboard-e2e-smoke.mjs",
+   "class": "recurring-proof",
+   "owner": "dashboard-build",
+   "npmScript": null,
+   "input": "served dist/dashboard/ (index.html + hashed bundle) via a running daemon",
+   "output": "PASS/FAIL proving cache-bust + nav-route presence",
+   "expiry": "none — rerun on demand",
+   "notes": "Sprint 220 220-015; validates the actual browser-loaded dashboard is cache-bustable end to end."
+  },
+  {
+   "file": "scripts/dead-code-audit.mjs",
+   "class": "recurring-proof",
+   "owner": "dead-code-audit",
+   "npmScript": null,
+   "input": "src/ exports + import graph",
+   "output": "categorized report (Dead/Dormant/Lightly/Active), READ-ONLY (no deletion)",
+   "expiry": "none — rerun on demand",
+   "notes": "Sprint 139 Step 1; deliberately non-mutating."
+  },
+  {
+   "file": "scripts/directives-stress-simulator.mjs",
+   "class": "recurring-proof",
+   "owner": "directives-protection",
+   "npmScript": null,
+   "input": "live DIRECTIVES.md (requires DECKENT_STRESS_SIMULATE=1 or --force)",
+   "output": "DIRECTIVES.md deliberately overwritten then auto-restored after ~5s (timestamped backup)",
+   "expiry": "none — rerun on demand, guarded by explicit opt-in flag",
+   "notes": "Sprint 148/189; proves DirectivesMidSprintProtection under a live stress scenario. Covered by tests/scripts/stress-simulator.test.ts."
+  },
+  {
+   "file": "scripts/dt1-telsiz-smoke.mjs",
+   "class": "recurring-proof",
+   "owner": "desktop-daemon-smoke",
+   "npmScript": null,
+   "input": "dist daemon (no Electron) with/without DECKENT_CONTROL_MUTATIONS",
+   "output": "proves 403 without env-twin, 200 SSE with it, 200 {reply} fallback path",
+   "expiry": "none — rerun on demand",
+   "notes": "Turkish header; 583 tasarım-turu DT-1 \"Telsiz\" real-binary smoke."
+  },
+  {
+   "file": "scripts/extract-traces.mjs",
+   "class": "one-shot",
+   "owner": "trace-corpus-extraction",
+   "npmScript": "extract:traces",
+   "input": "Claude Code session transcripts (~/.claude/projects/**/*.jsonl or DECKENT_CC_DIR), dist/ compiled extractor",
+   "output": ".deckent/traces/extracted-aligned.jsonl + extracted-general.jsonl (gitignored)",
+   "expiry": "none — manual utility, rerun on demand when fresh transcripts exist",
+   "notes": "SP-2 Phase 2; build-gated and skip-safe when dist/ or the transcript dir is missing."
+  },
+  {
+   "file": "scripts/gen-platform-registry.mjs",
+   "class": "gate",
+   "owner": "platform-registry",
+   "npmScript": "docs:platform, docs:platform:check",
+   "input": "tests/**/*.test.ts(x) (skipIf gates + capability probes + process.platform guards)",
+   "output": "AUTOGEN block in tests/PLATFORM.md (write) or drift exit 1 (--check)",
+   "expiry": "none — permanent drift gate",
+   "notes": "row 90 2026-08-03; pure function of TRACKED files, no wall-clock input."
+  },
+  {
+   "file": "scripts/gen-reference-docs.mjs",
+   "class": "gate",
+   "owner": "reference-docs",
+   "npmScript": "docs:ref, docs:ref:check (in release/prepublishOnly)",
+   "input": "MCP tools/resources registrations, ADR index, agent/skill manifests",
+   "output": "generated reference docs (write) or drift exit 1 (--check)",
+   "expiry": "none — permanent drift gate, blocks release + prepublishOnly",
+   "notes": "Sprint 172 Task C2; single source of truth for reference docs."
+  },
+  {
+   "file": "scripts/generate-analysis-inventory.mjs",
+   "class": "one-shot",
+   "owner": "analysis-reporting",
+   "npmScript": null,
+   "input": ".analysis/ markdown files matching a hardcoded TODAY constant",
+   "output": "inventory report of matching analysis files",
+   "expiry": "stale — hardcoded TODAY=2026-07-18 in source; needs re-parameterization before its next real use",
+   "notes": "Never generalized to accept an actual date argument."
+  },
+  {
+   "file": "scripts/ink-pty-native-verify.mjs",
+   "class": "recurring-proof",
+   "owner": "repl-pty-smoke",
+   "npmScript": "verify:native-repl",
+   "input": "dist/cli/entry.js --native (real Ink + AgentSession, only the LLM mocked via DECKENT_NATIVE_MOCK)",
+   "output": "PASS/SKIP/FAIL proving the native REPL path end to end",
+   "expiry": "none — rerun on demand",
+   "notes": "SP-1 M3 T6; skip-safe when dist/ or node-pty is missing."
+  },
+  {
+   "file": "scripts/ink-pty-test.mjs",
+   "class": "recurring-proof",
+   "owner": "repl-pty-smoke",
+   "npmScript": null,
+   "input": "JSON keystroke steps (argv[2]) + real @lydell/node-pty session",
+   "output": "rendered terminal output + exit code, ANSI-stripped",
+   "expiry": "none — rerun on demand",
+   "notes": "Sprint 224; drives the real Ink REPL in a pseudo-terminal (script/printf cannot drive Ink stdin semantics)."
+  },
+  {
+   "file": "scripts/ink-pty-tool-verify.mjs",
+   "class": "recurring-proof",
+   "owner": "repl-pty-smoke",
+   "npmScript": "verify:repl-tools",
+   "input": "dist/cli/entry.js via real PTY, 4 tool-call scenarios (write+approval, bash, deny, multi-tag)",
+   "output": "PASS/SKIP/FAIL per scenario",
+   "expiry": "none — rerun on demand",
+   "notes": "Sprint 285 T-285-005; regression harness for the REPL tool-call protocol."
+  },
+  {
+   "file": "scripts/lint-adr-sync.mjs",
+   "class": "gate",
+   "owner": "adr-sync",
+   "npmScript": null,
+   "input": ".brain/memory.db accepted ADRs (read-only) + .brain/exports/decisions.md projection",
+   "output": "exit 1 typed on MISSING/DIVERGENT/STALE by normalized content digest",
+   "expiry": "none — designed as a fail-closed parity gate; CI wiring deferred to a later slice (row 160)",
+   "notes": "B10 task 5 (row 160). DB is SSOT, export is projection; not yet in lint:gates by design."
+  },
+  {
+   "file": "scripts/lint-cli-mcp-parity.mjs",
+   "class": "gate",
+   "owner": "cli-mcp-parity",
+   "npmScript": "lint:parity (in lint:gates)",
+   "input": "src/cli/commands/*.ts CLI names + src/mcp/tools/*.ts MCP registrations",
+   "output": "exit 1 on NEW gap vs scripts/cli-mcp-parity-baseline.json",
+   "expiry": "none — permanent lint:gates member",
+   "notes": "--update-baseline regenerates the known-intentional-gap baseline."
+  },
+  {
+   "file": "scripts/lint-closure-dispositions.mjs",
+   "class": "gate",
+   "owner": "closure-os-governance",
+   "npmScript": "part of lint:gates",
+   "input": "docs/governance/closure-dispositions.jsonl (append-only ledger) + closure-trust-anchors.json + closure-batches/ + closure-dispositions.receipts/ (currently absent)",
+   "output": "typed HOLD/error validation or OK; --self-check runs 127 in-process assertions",
+   "expiry": "none — permanent lint:gates member",
+   "notes": "SOLE validator for the Closure OS append-only decision-ledger: canonical digest chain, reviewed-parent trust-anchor, immutable batch-snapshot integrity, ed25519 attestation verification, append-only prefix. Empty ledger → nothing-to-validate OK (Phase-4 foundation; writer is Phase-5)."
+  },
+  {
+   "file": "scripts/lint-config-truth.mjs",
+   "class": "gate",
+   "owner": "config-truth",
+   "npmScript": null,
+   "input": "typed DeckentConfig declaration + createDefaultConfig()/loadConfig() static follow (no config import, no env)",
+   "output": "exit 1 fail-closed on CFG-03/CFG-04 truth drift",
+   "expiry": "none — designed as a fail-closed truth gate; CI wiring deferred (row 520-006 config-truth family)",
+   "notes": "Sprint-520 orphaned-fix harvest; statically verifies config metadata truth without importing the config module."
+  },
+  {
+   "file": "scripts/lint-desktop-api-sync.mjs",
+   "class": "gate",
+   "owner": "desktop-api-sync",
+   "npmScript": "lint:desktop-api-sync (in lint:gates)",
+   "input": "DeckentDesktopApi in src/desktop + its hand-mirrored copy in src/dashboard desktop-global.d.ts",
+   "output": "exit 1 on member drift (added/removed/renamed)",
+   "expiry": "none — permanent lint:gates member",
+   "notes": "392-008 DESK-B2-DASHBOARD-BRIDGE; brace/paren-depth scan, not a full TS parser."
+  },
+  {
+   "file": "scripts/lint-i18n-hardcode.mjs",
+   "class": "gate",
+   "owner": "i18n-lint",
+   "npmScript": "lint:i18n (in lint:gates)",
+   "input": "src/cli/commands/*.ts (flat) + src/desktop/src/main/**/*.ts (recursive)",
+   "output": "exit 1 on a console/stdout/stderr call with a natural-language literal not routed through getMessage()/t()",
+   "expiry": "none — permanent lint:gates member",
+   "notes": "Enforces the i18n-FIRST quality bar from CLAUDE.md."
+  },
+  {
+   "file": "scripts/lint-skill-routing-eligibility.mjs",
+   "class": "gate",
+   "owner": "skill-routing-lint",
+   "npmScript": null,
+   "input": "src/orchestra/**/*.ts + src/core/**/*.ts routing-surface files (skill selection call-sites)",
+   "output": "exit 1 on a routing-surface skill selection that bypasses the canonical eligibility adapter (D10: rogue resolver = FAILURE)",
+   "expiry": "none — permanent skill-routing eligibility gate (9034, sprint-561)",
+   "notes": "Added by 561-002; registry entry hand-closed (ADR-D-007) because scripts/script-registry.json was outside the task write authority."
+  },
+  {
+   "file": "scripts/lint-identity-md.mjs",
+   "class": "gate",
+   "owner": "identity-docs",
+   "npmScript": "lint:identity (in release/prepublishOnly)",
+   "input": ".deckent/workspace/IDENTITY.md AUTOGEN blocks",
+   "output": "exit 1 on drift (check) or in-place rewrite (--fix)",
+   "expiry": "none — permanent gate, blocks release + prepublishOnly",
+   "notes": "Delegates to update-readme-stats.mjs as the authoritative source."
+  },
+  {
+   "file": "scripts/lint-layer-shims.mjs",
+   "class": "gate",
+   "owner": "layer-shims-governance",
+   "npmScript": "lint:shims (in lint:gates)",
+   "input": ".deckent/settings/layer-shims.json registry + governed mcp/ files' cli/-crossing imports",
+   "output": "exit 1 on an unregistered import or symbol outside the allowed union",
+   "expiry": "none — permanent lint:gates member",
+   "notes": "ADR-D-004 (C3) exception ratchet; registry-scoped, not a full C3-edge scan (documented D004-W6 follow-up)."
+  },
+  {
+   "file": "scripts/lint-links.mjs",
+   "class": "gate",
+   "owner": "link-lint",
+   "npmScript": "lint:link (in validate-publish gates + release)",
+   "input": "Markdown files (relative links, VitePress site-relative links, anchor fragments)",
+   "output": "exit 1 on a dead link/anchor",
+   "expiry": "none — permanent gate, blocks validate:publish",
+   "notes": "Sprint 172 C3, OSS GA pre-flight."
+  },
+  {
+   "file": "scripts/lint-manifests.mjs",
+   "class": "gate",
+   "owner": "manifest-governance",
+   "npmScript": "lint:manifests (in lint:gates)",
+   "input": ".deckent/{agents,skills}/*/{agent,manifest}.json + src/core/builtins/{agents,skills}/*",
+   "output": "exit 1 on a malformed manifest (missing required / wrong-typed optional field)",
+   "expiry": "none — permanent lint:gates member",
+   "notes": "born-641 class-fix layer 2 (406-003); complements the pool-load fail-soft normalizer."
+  },
+  {
+   "file": "scripts/lint-master-plan.mjs",
+   "class": "gate",
+   "owner": "master-plan-governance",
+   "npmScript": "lint:master-plan (in lint:gates + release + prepublishOnly), docs:master-plan",
+   "input": "docs/MASTER-PLAN.md (canonical source)",
+   "output": "validation errors (--check) or refreshed docs/generated/master-plan-active.{md,json} (--write)",
+   "expiry": "none — permanent lint:gates member, blocks release + prepublishOnly",
+   "notes": "Canonical MASTER-PLAN validator and deterministic active-view generator."
+  },
+  {
+   "file": "scripts/lint-mcp-instructions.mjs",
+   "class": "gate",
+   "owner": "mcp-instructions-governance",
+   "npmScript": null,
+   "input": "DECKENT_MCP_INSTRUCTIONS in src/mcp/server.ts + server.registerTool() calls in src/mcp/tools/*.ts",
+   "output": "exit 0 in sync / 1 drift / 2 parse error",
+   "expiry": "none — permanent gate (see notes: not wired via any package.json script)",
+   "notes": "Not found in package.json scripts as of 2026-08-11."
+  },
+  {
+   "file": "scripts/lint-no-model-literal.mjs",
+   "class": "gate",
+   "owner": "model-literal-governance",
+   "npmScript": "lint:model-literal (in lint:gates)",
+   "input": "src/ (model-name string literals) vs BUILTIN_MODELS in model-registry.ts",
+   "output": "exit 1 on a NEW model-literal site absent from scripts/model-literal-baseline.json",
+   "expiry": "none — permanent lint:gates member",
+   "notes": "born-item 431-001; no-new-literal ratchet, existing sites grandfathered."
+  },
+  {
+   "file": "scripts/lint-no-spawnsync.mjs",
+   "class": "gate",
+   "owner": "spawnsync-governance",
+   "npmScript": "lint:spawnsync (in lint:gates)",
+   "input": "src/ spawnSync call sites vs scripts/spawnsync-baseline.json",
+   "output": "exit 1 on a NEW spawnSync site, or an un-listed hot-path spawnSync",
+   "expiry": "none — permanent lint:gates member",
+   "notes": "ADR-D-002 (C4/C5) + ADR-G-002; ratchet + hot-path hard-block."
+  },
+  {
+   "file": "scripts/lint-operating-policy.mjs",
+   "class": "gate",
+   "owner": "dev-operating-contract-governance",
+   "npmScript": "lint:operating-policy (in lint:gates), lint:operating-policy:write",
+   "input": "docs/governance/deckent-dev-operating-policy.md HOST-BLOCK + AGENTS.md/CLAUDE.md OPERATING-POLICY blocks + docs/execution/active/ capsules + docs/MASTER-PLAN.md rows",
+   "output": "exit 1 on host-block drift or capsule-hygiene violation (--check); host blocks rewritten from canonical (--write); canonical policy sha256 digest on every run",
+   "expiry": "none — permanent lint:gates member (DEV-OPERATING-CONTRACT-001)",
+   "notes": "Provider-neutral projection gate: AGENTS.md and CLAUDE.md must carry the byte-identical execution-mode contract; capsules must map to owner-admitted, non-terminal MASTER rows (delete-on-consume). Pure functions reused by tests/scripts/lint-operating-policy.test.ts."
+  },
+  {
+   "file": "scripts/lint-operation-catalog.mjs",
+   "class": "gate",
+   "owner": "operation-catalog-governance",
+   "npmScript": "lint:gates member (unaliased)",
+   "input": "the OPERATION-001 catalog (ids, enums, effect/gate/risk matrix, capabilities, i18n)",
+   "output": "exit 1 fail-closed on any malformed governance entry",
+   "expiry": "none — permanent lint:gates member",
+   "notes": "Treats the catalog as a governance artifact — a malformed entry is an authority defect, not a typo."
+  },
+  {
+   "file": "scripts/lint-rule-vocabulary.mjs",
+   "class": "gate",
+   "owner": "rule-vocabulary-governance",
+   "npmScript": null,
+   "input": ".deckent/agents/*/agent.json + .deckent/skills/*/manifest.json activation.rules/exclude",
+   "output": "flags domains.$contains/$in words that detectDomains() can never emit",
+   "expiry": "none — permanent gate (see notes: not wired via any package.json script)",
+   "notes": "born-589; not found in package.json scripts as of 2026-08-11."
+  },
+  {
+   "file": "scripts/lint-script-registry.mjs",
+   "class": "gate",
+   "owner": "script-lifecycle-registry-governance",
+   "npmScript": null,
+   "input": "scripts/script-registry.json + the real top-level scripts/*.mjs directory listing",
+   "output": "exit 0 registry covers exactly the real directory + every entry well-formed / 1 coverage-or-shape violation / 2 missing-or-unparsable registry",
+   "expiry": "none — permanent coverage+shape gate for this very registry",
+   "notes": "Task 517-006 (row 270); deliberately NOT wired into any npm script or lint:gates in this slice — that is a follow-up owner decision recorded in the task result notes. Self-registers (this file is itself scripts/*.mjs and required its own entry)."
+  },
+  {
+   "file": "scripts/lint-skill-catalog-determinism.mjs",
+   "class": "gate",
+   "owner": "skill-catalog-determinism",
+   "npmScript": null,
+   "input": "real-tree skill catalog via snapshotSkillCatalog (S5 canonical digest) + optional scripts/skill-catalog-determinism-baseline.json",
+   "output": "exit 0 IN_SYNC/DECLARED_DRIFT · exit 1 UNDECLARED_DRIFT or bare-allowlist entry · exit 2 infra",
+   "expiry": "none — S8 determinism gate (row 7012); lint:gates wiring is a named follow-up owner decision",
+   "notes": "Sprint-523 task 8. Derives the digest from the S5 snapshot; a second hash mechanism in this script is itself a violation (pinned by its test)."
+  },
+  {
+   "file": "scripts/lint-sprint-archive-writers.mjs",
+   "class": "gate",
+   "owner": "canonical-sprint-archive-authority",
+   "npmScript": "lint:gates member (unaliased)",
+   "input": "production src/** JS/JSX/MJS/CJS/TS/TSX filesystem mutations, provenance-resolved node:fs bindings, and exact symbol authority annotations",
+   "output": "exit 0 when canonical/legacy sprint archive writes and retirements remain authority-contained / 1 with typed source locations on violation",
+   "expiry": "none — permanent canonical sprint archive writer ratchet",
+   "notes": "CAF07 static authority gate; tracks canonical resolver/constants/property/wrapper data flow, fails closed on unresolved archive-derived targets, and admits only exact top-level publication/verified-retirement owners. Wired directly into lint:gates."
+  },
+  {
+   "file": "scripts/lint-acceptance-confirmation-authority.mjs",
+   "class": "gate",
+   "owner": "acceptance-confirmation-authority",
+   "npmScript": "lint:gates member (unaliased)",
+   "input": "production src/** acceptance-confirmation read/settle call sites and their authority annotations",
+   "output": "exit 0 when confirmation discovery stays side-effect-free and settlement stays driver/service-owned; exit 2 on violation",
+   "notes": "Sprint-661 closure follow-up 2026-08-24: gate was authored in 4a77f5704 but never registered; registration closes the UNWIRED gap (owner finding HIGH-1)."
+  },
+  {
+   "file": "scripts/lint-approval-lifecycle-authority.mjs",
+   "class": "gate",
+   "owner": "approval-lifecycle-authority",
+   "npmScript": "lint:gates member (unaliased)",
+   "input": "production src/** approval lifecycle policy/SLA/CAS writer call sites",
+   "output": "exit 0 when lifecycle mutations flow through the D4 policy chain only; exit 2 on violation",
+   "notes": "Sprint-661 closure follow-up 2026-08-24: gate was authored in e9bc6c83a but never registered; registration closes the UNWIRED gap (owner finding HIGH-1)."
+  },
+  {
+   "file": "scripts/lint-recovery-truth-authority.mjs",
+   "class": "gate",
+   "owner": "recovery-truth-authority",
+   "npmScript": "lint:gates member (unaliased)",
+   "input": "production src/** recovery artifact/finalizer/status authority call sites",
+   "output": "exit 0 when recovery truth writes stay inside the RECOVERY-TRUTH-001 authority modules; exit 2 on violation",
+   "notes": "Sprint-661 closure follow-up 2026-08-24: gate was authored in eaba99b31 but never registered; registration closes the UNWIRED gap (owner finding HIGH-1)."
+  },
+  {
+   "file": "scripts/lint-test-hermeticity.mjs",
+   "class": "gate",
+   "owner": "test-hermeticity-registry",
+   "npmScript": "lint:hermetic (in lint:gates)",
+   "input": "tests/**/*.test.ts(x) source (spawnSync/network/wall-clock/fs-escape patterns)",
+   "output": "exit 1 policy violations / 2 scan error, source-derived hermeticity registry",
+   "expiry": "none — permanent lint:gates member",
+   "notes": "Largest gate script in the tree (253KB); source-derived registry + fail-loud policy."
+  },
+  {
+   "file": "scripts/lint-config-writers.mjs",
+   "class": "gate",
+   "owner": "config-write-authority",
+   "npmScript": "lint:config-writers (in lint:gates)",
+   "input": "src/**/*.ts(x) source (write-family fs calls whose first arg is the canonical config.json family)",
+   "output": "exit 1 on any direct config write outside src/core/config-write-authority.ts; only-shrink baseline ledger in-script",
+   "expiry": "none — permanent lint:gates member (G0-A containment, MASTER 471 slice, CFG-007)",
+   "notes": "Two-pass textual scanner (decl-collect + first-arg resolve); cost-config/docs-config families deliberately out of scope; AST upgrade path noted for G1A."
+  },
+  {
+   "file": "scripts/master-plan-integrity.mjs",
+   "class": "gate",
+   "owner": "master-plan-governance",
+   "npmScript": null,
+   "input": "a master-plan model object (in-memory)",
+   "output": "registryIntegrity = sha256(canonical-json-utf8) digest",
+   "expiry": "none — pure library",
+   "notes": "The SINGLE byte-semantic authority for master-plan-active.json registryIntegrity, reused verbatim by lint-master-plan.mjs (--check gate) and lint-closure-dispositions.mjs (archived-snapshot integrity). No standalone CLI; a regression fails both gates."
+  },
+  {
+   "file": "scripts/measure-prompt-cost.mjs",
+   "class": "one-shot",
+   "owner": "prompt-quality",
+   "npmScript": null,
+   "input": ">=8 real historical sprint task prompts via buildTaskPromptSegmented, real ADRs from .brain/memory.db",
+   "output": ".analysis/u4-olcum/report.md (per-prompt + average segment-byte breakdown)",
+   "expiry": "none — retained for re-measurement whenever persona_render mode changes",
+   "notes": "U4 harness (443-005); composes prompts in both full/guidance modes via the real production compose path."
+  },
+  {
+   "file": "scripts/multi-provider-fleet-smoke.mjs",
+   "class": "recurring-proof",
+   "owner": "provider-fleet-smoke",
+   "npmScript": null,
+   "input": "mocked 8-provider fleet (3 subscription + 4 API + 1 local) in an inline registry",
+   "output": "PASS/FAIL proving per-task routing, coexistence, subscription-to-API overflow",
+   "expiry": "none — rerun on demand",
+   "notes": "No real API calls; all adapters mocked."
+  },
+  {
+   "file": "scripts/multi-provider-smoke.mjs",
+   "class": "recurring-proof",
+   "owner": "provider-fleet-smoke",
+   "npmScript": null,
+   "input": "mocked claude+ollama+openai-compat adapters in an inline registry",
+   "output": "PASS/FAIL proving per-task provider routing",
+   "expiry": "none — rerun on demand",
+   "notes": "Simpler predecessor pattern of multi-provider-fleet-smoke.mjs."
+  },
+  {
+   "file": "scripts/n3-desktop-pty-smoke.mjs",
+   "class": "recurring-proof",
+   "owner": "desktop-pty-smoke",
+   "npmScript": null,
+   "input": "real dist daemon + real Desktop terminal-token/WS path (no Electron)",
+   "output": "PASS/FAIL proving bearer-gated real @lydell/node-pty shell attach + echo round-trip",
+   "expiry": "none — rerun on demand",
+   "notes": "Turkish header; 583/N3 \"Makine Dairesi\" real-binary smoke, proves ADR-G-029 inv#1/#2b."
+  },
+  {
+   "file": "scripts/n4-git-smoke.mjs",
+   "class": "recurring-proof",
+   "owner": "git-tool-smoke",
+   "npmScript": null,
+   "input": "real git fixture repo + dist `deckent runs` / chat-tool-exec dispatcher",
+   "output": "PASS/FAIL proving commit trailer + status→add→commit→log tool-exec round trip",
+   "expiry": "none — rerun on demand",
+   "notes": "583/N4 real-binary smoke, two legs (CLI + dispatcher)."
+  },
+  {
+   "file": "scripts/nova-tasarim-loop.mjs",
+   "class": "one-shot",
+   "owner": "nova-design-loop",
+   "npmScript": null,
+   "input": "none (spawns its own daemon, reference server, and vite renderer)",
+   "output": "stdout URLs for the isolated daemon (:3179), reference server (:3180/nova), live renderer (:5173)",
+   "expiry": "none — manual dev utility, rerun on demand while NOVA prototyping is active",
+   "notes": "Turkish header; three-leg design-iteration eye-loop runner, never touches Alperen's live daemon/sprints."
+  },
+  {
+   "file": "scripts/pre-flight-health-check.mjs",
+   "class": "gate",
+   "owner": "preflight-sprint-admission",
+   "npmScript": null,
+   "input": "tsc --noEmit, vitest baseline, .brain memory budget, .locks staleness, Docker/MCP reachability, deckent doctor --json",
+   "output": "per-component pass/fail summary gating whether a sprint may be spawned",
+   "expiry": "none — permanent admission gate",
+   "notes": "Sprint 139; not an npm script — invoked as a pre-sprint-spawn check."
+  },
+  {
+   "file": "scripts/prompt-linter.mjs",
+   "class": "gate",
+   "owner": "prompt-quality",
+   "npmScript": null,
+   "input": "worker prompt files (agent PROMPT.md content)",
+   "output": "per-file PromptLintResult score/issues; exit 0 avg>=75 / 1 avg<75 / 2 no files found",
+   "expiry": "none — permanent quality gate (see notes: not wired via any package.json script)",
+   "notes": "Not found in package.json scripts as of 2026-08-11."
+  },
+  {
+   "file": "scripts/provider-free-smoke.mjs",
+   "class": "recurring-proof",
+   "owner": "provider-fleet-smoke",
+   "npmScript": null,
+   "input": "provider binary resolution logic across subprocess/tmux/Docker backends (no real workers spawned)",
+   "output": "exit 0 all steps passed / 1 a step failed / 2 import/setup error",
+   "expiry": "none — rerun on demand",
+   "notes": "Sprint 202/203; routing-logic-only smoke, no live provider calls."
+  },
+  {
+   "file": "scripts/release-prepare.mjs",
+   "class": "one-shot",
+   "owner": "release-engineering",
+   "npmScript": null,
+   "input": "--version vX.Y.Z[-pre][+build] CLI arg",
+   "output": "atomically updated package.json, package-lock.json (both version fields), CHANGELOG.md skeleton section",
+   "expiry": "none — manual utility, run once per release cycle by the owner",
+   "notes": "Task 414-002 RC4B/REL-03-04; replaces scripts/bump-version.sh. Never tags/pushes/publishes — release.yml remains sole-publish-authority (born-608)."
+  },
+  {
+   "file": "scripts/repl-smoke-verify.mjs",
+   "class": "recurring-proof",
+   "owner": "repl-pty-smoke",
+   "npmScript": null,
+   "input": "dist/cli/entry.js REPL (non-PTY smoke)",
+   "output": "PASS/SKIP/FAIL proving /help latency, status-line, session-reuse perf, layout separation",
+   "expiry": "none — rerun on demand",
+   "notes": "Sprint 223 T-223-010 run-proven harness."
+  },
+  {
+   "file": "scripts/routing-distribution.mjs",
+   "class": "gate",
+   "owner": "routing-telemetry",
+   "npmScript": "lint:routing (in lint:gates, --ci)",
+   "input": ".deckent/routing/learnings.json",
+   "output": "agent+skill usage distribution report; --ci fails if a single agent claims >70% of tasks (--threshold configurable)",
+   "expiry": "none — permanent lint:gates member",
+   "notes": "Sprint 209 Task 005."
+  },
+  {
+   "file": "scripts/rt-latency-verify.mjs",
+   "class": "recurring-proof",
+   "owner": "rt-latency-smoke",
+   "npmScript": "verify:rt-latency",
+   "input": "real dist/cli/entry.js serve in a hermetic tmpdir project",
+   "output": "PASS/FAIL proving worker_heartbeat + log_line SSE events arrive within 2000ms",
+   "expiry": "none — rerun on demand",
+   "notes": "DASH-RT-1 (Sprint 284); exits 2 when dist/cli/entry.js is absent (fresh-checkout pass)."
+  },
+  {
+   "file": "scripts/series-metrics.mjs",
+   "class": "one-shot",
+   "owner": "analysis-reporting",
+   "npmScript": null,
+   "input": ".brain/archive/sprint-N-tasks/ (task JSON + .result files) across a sprint range",
+   "output": "JSON + Markdown per-sprint and cumulative task/DONE/DEBT/NO_GO/duration/agreement/fix-heal-rate rollup",
+   "expiry": "none — manual utility, rerun per retro/analysis request",
+   "notes": "Task 364-011 RETRO-SERIES-METRICS; deliberately reads raw per-task archive, not SPRINT-LOG.md's rollup table (found to disagree with itself in Sprint 357)."
+  },
+  {
+   "file": "scripts/serve-localhost-smoke.mjs",
+   "class": "recurring-proof",
+   "owner": "serve-localhost-smoke",
+   "npmScript": null,
+   "input": "in-process serve boot (localhost token flow)",
+   "output": "PASS/FAIL proving token injection + Bearer-gated 401/not-401 behavior",
+   "expiry": "none — rerun on demand",
+   "notes": "Validates out-of-box localhost token flow."
+  },
+  {
+   "file": "scripts/smoke-deck-lifecycle.mjs",
+   "class": "recurring-proof",
+   "owner": "deck-secret-lifecycle-security",
+   "npmScript": null,
+   "input": "src/core/deck-file.ts imported directly (no build step needed)",
+   "output": "\"SMOKE OK\" on stdout or exit 1",
+   "expiry": "none — rerun on demand",
+   "notes": "SEC-01 (task 411-001); proves DECK-OVERWRITE-GUARD + atomic 0600 write."
+  },
+  {
+   "file": "scripts/smoke-init-noninteractive.mjs",
+   "class": "recurring-proof",
+   "owner": "init-noninteractive-smoke",
+   "npmScript": null,
+   "input": "src/cli/commands/init.ts registerInit() via vite-node (current source, not dist/)",
+   "output": "PASS/FAIL proving `deckent init --yes` writes to disk and prints an outcome block",
+   "expiry": "none — rerun on demand",
+   "notes": "RC2C / born-652 (413-001); closes a hang-forever-silent-exit-0 regression."
+  },
+  {
+   "file": "scripts/sprint-retroactive-reclassify.mjs",
+   "class": "admin-migration",
+   "owner": "brain-memory-ops",
+   "npmScript": null,
+   "input": "--sprint/--task/--decision/--reason args or --from-file batch list",
+   "output": "reclassified task decision in .brain/memory.db + a per-day audit record in .deckent/decisions/",
+   "expiry": "none — retained as an on-demand data-repair tool, no fixed date",
+   "notes": "Optionally recomputes agent/skill stats."
+  },
+  {
+   "file": "scripts/surf-approval-smoke.mjs",
+   "class": "recurring-proof",
+   "owner": "surf-approval-smoke",
+   "npmScript": null,
+   "input": "a real cross-process ApprovalRequest via ApprovalBroker.submit + the packaged Desktop Approval view",
+   "output": "PASS/FAIL proving decide-UI + short-TTL expiry sweep, visible on both surfaces",
+   "expiry": "none — rerun on demand",
+   "notes": "SURF-5/6 kuyruk-E; closes twice-deferred approval legs end to end."
+  },
+  {
+   "file": "scripts/surf6-cross-surface-smoke.mjs",
+   "class": "recurring-proof",
+   "owner": "surf6-cross-surface-smoke",
+   "npmScript": null,
+   "input": "real daemon + real packaged/dev Electron Desktop + real CLI, PATH-shimmed fake-claude (no LLM/network)",
+   "output": "PASS/FAIL proving Terminal-to-Desktop and Desktop-to-Terminal parity + a daemon-restart chaos leg",
+   "expiry": "none — rerun on demand",
+   "notes": "SURF-6 dogfood smoke; hermetic (tmp everything)."
+  },
+  {
+   "file": "scripts/surf7-readonly-smoke.mjs",
+   "class": "recurring-proof",
+   "owner": "surf7-readonly-smoke",
+   "npmScript": null,
+   "input": "real daemon with built dashboard, config.api.control_mutations toggled",
+   "output": "PASS/FAIL proving monitoring stays alive, every former control endpoint returns honest 403, rollback clause works",
+   "expiry": "none — rerun on demand",
+   "notes": "SURF-7 authority-cutover smoke; also asserts the served bundle carries zero mutation-control markers."
+  },
+  {
+   "file": "scripts/sync-core-memory.mjs",
+   "class": "one-shot",
+   "owner": "core-memory-sync",
+   "npmScript": null,
+   "input": ".deckent/docs/core-memory/ (project authority) via --target or DECKENT_MEMORY_PROJECTION_PATH",
+   "output": "a host/provider memory-directory projection (never writes back to the authority)",
+   "expiry": "none — manual utility, rerun on demand",
+   "notes": "Enforces \"authority is always the project directory\" — no timestamp-based newer-wins."
+  },
+  {
+   "file": "scripts/sync-manifest.mjs",
+   "class": "one-shot",
+   "owner": "feature-manifest-sync",
+   "npmScript": null,
+   "input": "src/ tree (export + import-count scan)",
+   "output": ".deckent/settings/features-manifest.json (active/lightly_used/dormant/dead categorization)",
+   "expiry": "none — manual utility, rerun on demand as src/ evolves",
+   "notes": "Sprint 150 Task 029; --root/--dry-run/--json flags."
+  },
+  {
+   "file": "scripts/sync-to-product.mjs",
+   "class": "admin-migration",
+   "owner": "product-staging",
+   "npmScript": null,
+   "input": "deckent-develop HEAD (full history, internal sprint state)",
+   "output": "dry-run keep/drop + security report, or (--apply) an extracted tmp staging snapshot with EXCLUDE paths pruned",
+   "expiry": "pending — retained for the one-time GA-2 deckent-develop-to-deckent public migration (ADR-D-008), no scheduled date",
+   "notes": "ADR-D-008 (accepted 2026-06-30) supersedes the retired continuous-sync model (ADR-065); header explicitly says do not run as a recurring sync."
+  },
+  {
+   "file": "scripts/test-binary-contracts.mjs",
+   "class": "recurring-proof",
+   "owner": "binary-contracts-proof",
+   "npmScript": "test:binary-contracts",
+   "input": "built dist/ binaries (real spawn, tmpdir sandboxes)",
+   "output": "vitest-reported PASS/FAIL for binary-level contracts",
+   "expiry": "none — rerun on demand",
+   "notes": "No file-header comment block; classified from wiring + import shape (real spawn/tmpdir smoke pattern)."
+  },
+  {
+   "file": "scripts/test-ci-sim-contained.mjs",
+   "class": "recurring-proof",
+   "owner": "hermeticity-ci-sim",
+   "npmScript": "test:ci-sim:contained",
+   "input": "ci-sim-workspace.mjs materialized/pinned workspace + sanitized CI env",
+   "output": "contained CI-reproduction run result",
+   "expiry": "none — rerun on demand",
+   "notes": "Contained-execution variant of test-ci-sim.mjs."
+  },
+  {
+   "file": "scripts/test-ci-sim.mjs",
+   "class": "recurring-proof",
+   "owner": "hermeticity-ci-sim",
+   "npmScript": "test:ci-sim",
+   "input": "current tracked + selected-untracked source snapshot",
+   "output": "a disposable Git-worktree CI reproduction run result",
+   "expiry": "none — rerun on demand",
+   "notes": "Clean-state CI reproducer; never hides/renames live project state."
+  },
+  {
+   "file": "scripts/test-e2e-surfaces.mjs",
+   "class": "recurring-proof",
+   "owner": "e2e-surfaces-proof",
+   "npmScript": "test:e2e-surfaces",
+   "input": "real dist/cli/entry.js serve on a free random port",
+   "output": "PASS/FAIL proving GET / and GET /api/status contracts, with try/finally child cleanup",
+   "expiry": "none — permanent regression guard",
+   "notes": "Sprint 216 216-005, ADR-078 + karpathy-discipline Proof-of-Function; hermetic (tmpdir + HOME sandbox), skip-safe pre-build."
+  },
+  {
+   "file": "scripts/token-usage-report.mjs",
+   "class": "one-shot",
+   "owner": "token-usage-reporting",
+   "npmScript": null,
+   "input": "~/.claude/projects/**/*.jsonl session transcripts",
+   "output": "aggregated real API token-usage report (optionally --price cost estimate)",
+   "expiry": "none — manual utility, rerun on demand",
+   "notes": "Ground truth is API message.usage fields, not worker self-estimates; dedupes streamed-chunk message ids."
+  },
+  {
+   "file": "scripts/update-readme-stats.mjs",
+   "class": "gate",
+   "owner": "readme-stats",
+   "npmScript": "docs:stats, docs:stats:check (in lint:gates + release/prepublishOnly), docs:stats:refresh",
+   "input": "vitest test count, package.json version, src/mcp/* registrations, docs/adr/*, .deckent/{agents,skills}, .deckent/workspace/stats-snapshot.json",
+   "output": "updated AUTOGEN badge blocks in README.md/README.tr.md/IDENTITY.md (write) or drift exit 1 (--check)",
+   "expiry": "none — permanent lint:gates member, blocks release + prepublishOnly",
+   "notes": "Sprint 172 Task C1; MASTER-PLAN 521 CI-STATS-HERMETIC-001 — pure function of tracked files, volatile inputs frozen into a snapshot file."
+  },
+  {
+   "file": "scripts/validate-guidance.mjs",
+   "class": "gate",
+   "owner": "persona-guidance-governance",
+   "npmScript": null,
+   "input": "<agent-dir>/PROMPT.md (persona-guidance marker grammar, U4 PCOMP-8)",
+   "output": "grammar-issue report; exit 0/1/2",
+   "expiry": "none — permanent per-agent-authoring validation gate (see notes: not wired via any package.json script)",
+   "notes": "Mirrors parseGuidanceSections in src/core/persona-guidance.ts by hand (dependency-free .mjs since lint never runs build first) — must be kept in sync manually."
+  },
+  {
+   "file": "scripts/validate-publish.mjs",
+   "class": "gate",
+   "owner": "publish-readiness",
+   "npmScript": "validate:publish (in release)",
+   "input": "npm pack output, package.json, ADR/link lint results",
+   "output": "6 readiness gates (pack size, engines.node, entry points, no internal-state leak, adr_lint, link_lint)",
+   "expiry": "none — permanent gate, blocks release",
+   "notes": "Sprint 180 W5-1 Crisis Stabilization §6."
+  },
+  {
+   "file": "scripts/verify-gitignore.mjs",
+   "class": "gate",
+   "owner": "gitignore-hygiene",
+   "npmScript": "lint:gitignore (in lint:gates)",
+   "input": ".gitignore + `git ls-files`",
+   "output": "exit 0 OK / 1 problem (memory.db/-shm/-wal not ignored or actually tracked)",
+   "expiry": "none — permanent lint:gates member",
+   "notes": "Protects the SQLite memory store from being committed."
+  },
+  {
+   "file": "scripts/verify-recovery-hot-path.mjs",
+   "class": "gate",
+   "owner": "recovery-hot-path-governance",
+   "npmScript": null,
+   "input": "src/orchestra/sprint-spawner.ts source text",
+   "output": "process.exitCode 1 if a forbidden recovery-machinery symbol (sprint-recovery-operation, ApprovalBroker, ...) is referenced",
+   "expiry": "none — permanent regression-prevention gate (see notes: not wired via any package.json script)",
+   "notes": "No file-header comment block; single-purpose forbidden-import scanner."
+  },
+  {
+   "file": "scripts/xplat-install-smoke.mjs",
+   "class": "recurring-proof",
+   "owner": "xplat-install-smoke",
+   "npmScript": null,
+   "input": "npm pack tarball of the already-built repo (isolated npm_config_prefix + HOME)",
+   "output": "PASS/FAIL proving `npm install -g` + `deckent init --yes` works on the current OS (Linux/macOS/Windows)",
+   "expiry": "none — rerun on demand, one leg per platform in CI",
+   "notes": "XPLAT-01 (Task 415-001); every OS branch lives inside this script, none in CI YAML."
+  },
+  {
+   "file": "scripts/zero-hardcode-audit.mjs",
+   "class": "gate",
+   "owner": "model-literal-governance",
+   "npmScript": null,
+   "input": "src/ (hardcoded model-version string literals) minus allowlisted model-registry/catalog files",
+   "output": "exit 1 on a hardcoded model-version literal outside the allowlist",
+   "expiry": "none — permanent lint gate (see notes: not wired via any package.json script)",
+   "notes": "Sprint 208 READ-ONLY lint guard; test files always exempt. Predates / overlaps lint-no-model-literal.mjs's baseline-ratchet approach — potential consolidation candidate, not decided in this task."
+  },
+  {
+   "file": "scripts/lint-directives.mjs",
+   "class": "gate",
+   "owner": "sprint-orchestration",
+   "npmScript": "lint:directives",
+   "input": "DIRECTIVES.md (or --file <path>) parsed by the COMPILED production parser dist/orchestra/task-builder.js::parseStructuredDirectives; direct src-imports of listed test files",
+   "output": "task table + typed problems (D_EMPTY_SCOPE, D_NO_READS_FOR_SRC, D_SAME_LINE_READS_FILES, D_WRITE_COLLISION, D_NO_TEST, D_BARE_TOKEN); exit 1 on BLOCK, 2 on stale/missing dist or unreadable input",
+   "expiry": "none — permanent pre-start gate (owner decision 2026-08-25; run manually before every `deckent start`, deliberately NOT in lint:gates because DIRECTIVES content is transient)",
+   "notes": "Born from the sprint-670 lesson (missing Reads: sent 8/13 tasks to NO_GO) and sprint-663 grammar failures. No parser reimplementation: validates with the exact compiled module production runs, and revives the previously-unwired validateScopeFilesWrite for bare-token checks."
+  },
+  {
+   "file": "scripts/gen-repair-directives.mjs",
+   "class": "recurring-proof",
+   "owner": "sprint-orchestration",
+   "npmScript": null,
+   "input": "--files <list.txt> of failing test paths (+ --chunk N); direct src-imports scanned via lint-directives.mjs::scanDirectSrcImports",
+   "output": "deterministic repair-wave DIRECTIVES (stdout or --out) with generated Reads: lists; exit 2 on bad input",
+   "expiry": "none — reusable for every full-suite repair wave (owner decision 2026-08-25)",
+   "notes": "Zero LLM free-text: clustering is sorted+chunked, Reads derived from import scanning shared with the lint gate. Output must still pass lint-directives + `deckent plan --dry-run` before start (current-flow contract)."
+  }
+ ]
 }

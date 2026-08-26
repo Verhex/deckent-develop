@@ -11,10 +11,11 @@
  */
 
 import { spawn as nodeSpawn } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 import type { PlanMode } from '../../core/types.js';
+import { writeConfigJsonAtomic } from '../../core/config-write-authority.js';
 import { generateSetupRecommendation } from '../auto-setup.js';
 import { getSystemProfile } from '../../core/system-profile.js';
 import { detectSubscription } from '../../core/subscription.js';
@@ -230,7 +231,7 @@ function downgradeDockerBackendToSubprocess(root: string): boolean {
     const cfg = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
     if (cfg['spawn_backend'] !== 'docker') return false;
     cfg['spawn_backend'] = 'subprocess';
-    writeFileSync(configPath, JSON.stringify(cfg, null, 2) + '\n');
+    writeConfigJsonAtomic(configPath, cfg);
     return true;
   } catch {
     return false;

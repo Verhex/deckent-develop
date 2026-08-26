@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):f8aa3c4b3adb063047dbea4350e152cc31968b8f9cc0130fed298c584f37417c`
+**Source digest:** `sha256(normalized-lf-utf8):ec7a64aac62d058bb3730ca093debec7cee68a71ee7a437f4daaa0c5da1b6c1b`
 
 **Rows:** 538 total · 464 active · 74 terminal
 
@@ -13,11 +13,11 @@
 
 | State | Count |
 |---|---:|
-| OPEN | 367 |
+| OPEN | 366 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 69 |
-| VERIFY | 28 |
+| VERIFY | 29 |
 | DONE | 74 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -89,7 +89,7 @@
 | 471 | `CONFIG-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `KERNEL-STATE-001` | — | Authored/effective config, secret resolution ve concurrent mutation için tek versioned authority |
 | 472 | `LAYER-BOUNDARY-GATE-001` | OPEN | P1 | TRUTH | `SSOT-003` | — | Architecture layer boundary gate'i source graphından tüm yeni crossing'leri discover edip exception authority'sini fail-closed enforce eder |
 | 475 | `NERVOUS-CONFIG-EXECUTION-TRUTH-001` | OPEN | P0 | TRUTH | `APPROVAL-001`, `AUDIT-001` | — | Nervous config, detector/action capability registry, host ownership ve status/docs projectionı tek execution truth üretir |
-| 480 | `PROVIDER-OBS-MIGRATION-001` | OPEN | P1 | TRUTH | — | — | Provider-execution-observation DB'sinin owner-controlled v1→v2 migration'ı: backup, migrate, adoption proof |
+| 480 | `PROVIDER-OBS-MIGRATION-001` | VERIFY | P1 | TRUTH | — | — | Provider-execution-observation DB'sinin owner-controlled v1→v2 migration'ı: backup, migrate, adoption proof |
 | 490 | `MCP-ANNOTATION-SAFETY-001` | OPEN | P1 | TRUTH | — | — | MCP tool annotation'ları gerçek side-effect sınıfını söyler: destructive/RW path'ler RO ilan edilemez |
 | 500 | `I18N-SURFACE-001` | OPEN | P1 | TRUTH | — | — | Ürün-yüzeyi runtime i18n/a11y enforcement: user-facing string'ler catalog'dan, lint tüm yüzeyleri kapsar |
 | 505 | `I18N-CATALOG-AUTHORITY-001` | OPEN | P1 | TRUTH | `PACKAGING-001`, `DOCS-RELEASE-TRUTH-001` | — | Runtime locale catalog, typed key projection, init/package dağıtımı ve project override için tek versioned authority |

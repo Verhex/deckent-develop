@@ -1,5 +1,13 @@
-import { writeFile, mkdir } from 'node:fs/promises';
-import { existsSync, statSync, writeFileSync, renameSync, readFileSync, copyFileSync } from 'node:fs';
+import { mkdir } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import {
+  copyFileSync,
+  existsSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  unlinkSync,
+} from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
 import {
@@ -16,6 +24,10 @@ import { canonicalizeProviderConfigAliases } from './provider-config-canonicaliz
 import { canonicalizeModelConfigAliases } from './model-config-canonicalizer.js';
 import { modelRegistry } from './model-registry.js';
 import { validateXVerifyVerifierTierAuthority } from './xverify-verifier-tier-authority.js';
+import {
+  withConfigWriteLock,
+  writeConfigJsonAtomic,
+} from './config-write-authority.js';
 // 593-002: the task-class profile defaults live in the work-model kind-SSOT, next
 // to the other reverse helpers; config only RE-EXPORTS them as the resolved
 // `prompt.task_profiles` default (import is type-erased-safe: work-model imports
@@ -2131,6 +2143,98 @@ export function getDefaultModes(): Record<string, PlanModeConfig> {
   return structuredClone(DEFAULT_MODES);
 }
 
+export interface ConfigPreimageIdentity {
+  sha256: string;
+  dev: number;
+  ino: number;
+  size: number;
+  mtimeMs: number;
+}
+
+export type HealCorruptProjectConfigResult =
+  | {
+      kind: 'healed';
+      config: DeckentConfig;
+      backupPath: string;
+      preimageIdentity: ConfigPreimageIdentity;
+    }
+  | {
+      kind: 'heldConcurrentRevision';
+      adoptedConfig?: Partial<DeckentConfig>;
+      preimageIdentity: ConfigPreimageIdentity;
+    }
+  | {
+      kind: 'failed';
+      error: unknown;
+      preimageIdentity?: ConfigPreimageIdentity;
+    };
+
+const CONFIG_CONCURRENT_REVISION_HOLD =
+  '[deckent] CONFIG_CONCURRENT_REVISION_HOLD: heal sırasında config başka bir ' +
+  'writer tarafından yenilendi — dosyaya dokunulmadı; yeni revizyon geçerli sayılır';
+
+function sha256Text(text: string): string {
+  return createHash('sha256').update(text).digest('hex');
+}
+
+/** Heal a confirmed-corrupt config without replacing a newer revision. */
+export function healCorruptProjectConfig(
+  projectConfigPath: string,
+  rawPreimageText: string,
+): HealCorruptProjectConfigResult {
+  let preimageIdentity: ConfigPreimageIdentity | undefined;
+  try {
+    const preimageStat = statSync(projectConfigPath);
+    const identity: ConfigPreimageIdentity = {
+      sha256: sha256Text(rawPreimageText),
+      dev: preimageStat.dev,
+      ino: preimageStat.ino,
+      size: preimageStat.size,
+      mtimeMs: preimageStat.mtimeMs,
+    };
+    preimageIdentity = identity;
+
+    return withConfigWriteLock(projectConfigPath, () => {
+      const freshDefault = createDefaultConfig();
+      const stagedPath = `${projectConfigPath}.${process.pid}.tmp`;
+      writeConfigJsonAtomic(stagedPath, freshDefault);
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const backupPath = `${projectConfigPath}.corrupted.${timestamp}.bak`;
+
+      const currentText = readFileSync(projectConfigPath, 'utf-8');
+      if (sha256Text(currentText) !== identity.sha256) {
+        try {
+          unlinkSync(stagedPath);
+        } catch {
+          // Best-effort cleanup; the concurrent canonical revision stays untouched.
+        }
+        console.error(CONFIG_CONCURRENT_REVISION_HOLD);
+
+        try {
+          return {
+            kind: 'heldConcurrentRevision',
+            adoptedConfig: JSON.parse(currentText) as Partial<DeckentConfig>,
+            preimageIdentity: identity,
+          };
+        } catch {
+          return { kind: 'heldConcurrentRevision', preimageIdentity: identity };
+        }
+      }
+
+      renameSync(projectConfigPath, backupPath);
+      renameSync(stagedPath, projectConfigPath);
+      return {
+        kind: 'healed',
+        config: freshDefault,
+        backupPath,
+        preimageIdentity: identity,
+      };
+    });
+  } catch (error: unknown) {
+    return { kind: 'failed', error, preimageIdentity };
+  }
+}
+
 
 /**
  * Load and resolve the full configuration by merging defaults, global config,
@@ -2220,25 +2324,21 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
       }
     }
     if (parseCorrupt) {
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const backupPath = `${projectConfigPath}.corrupted.${timestamp}.bak`;
-      try {
-        // Incident strike 4 (2026-08-25 12:33): move-then-write left the project
-        // WITHOUT a config when the fresh-default write failed after the rename.
-        // Safe order: stage the replacement FIRST, then swap — at every instant
-        // either the old or the new config exists at the canonical path.
-        const freshDefault = createDefaultConfig();
-        const tmpPath = `${projectConfigPath}.${process.pid}.tmp`;
-        writeFileSync(tmpPath, JSON.stringify(freshDefault, null, 2) + '\n');
-        renameSync(projectConfigPath, backupPath);
-        renameSync(tmpPath, projectConfigPath);
+      const healResult = healCorruptProjectConfig(projectConfigPath, rawText!);
+      if (healResult.kind === 'healed') {
         console.error(
-          `[deckent] Config dosyanız bozulmuştu, yedeklendi: ${backupPath}\n` +
+          `[deckent] Config dosyanız bozulmuştu, yedeklendi: ${healResult.backupPath}\n` +
           `Defaults ile devam ediliyor. Düzeltme için: deckent config read`,
         );
-        projectConfig = freshDefault;
-      } catch (backupErr) {
-        console.error(`[deckent] Config recovery failed: ${backupErr instanceof Error ? backupErr.message : String(backupErr)}`);
+        projectConfig = healResult.config;
+      } else if (healResult.kind === 'heldConcurrentRevision') {
+        projectConfig = healResult.adoptedConfig ?? null;
+      } else {
+        console.error(
+          `[deckent] Config recovery failed: ${healResult.error instanceof Error
+            ? healResult.error.message
+            : String(healResult.error)}`,
+        );
       }
     }
   }
@@ -2707,7 +2807,7 @@ export async function saveGlobalConfig(
   if (!existsSync(dir)) {
     await mkdir(dir, { recursive: true });
   }
-  await writeFile(cfgPath, JSON.stringify(config, null, 2) + '\n', 'utf-8');
+  withConfigWriteLock(cfgPath, () => writeConfigJsonAtomic(cfgPath, config));
 }
 
 // ─── Config Regen Guard ──────────────────────────────────────────────
@@ -2752,52 +2852,54 @@ export function regenerateConfigSafe(projectRoot?: string): RegenConfigResult {
   const root = resolve(projectRoot ?? process.cwd());
   const configPath = join(root, PROJECT_CONFIG_PATH);
 
-  let existingConfig: Record<string, unknown> = {};
+  return withConfigWriteLock(configPath, () => {
+    let existingConfig: Record<string, unknown> = {};
 
-  if (existsSync(configPath)) {
-    try {
-      const raw = readFileSync(configPath, 'utf-8');
-      const parsed = JSON.parse(raw) as unknown;
-      if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        existingConfig = parsed as Record<string, unknown>;
+    if (existsSync(configPath)) {
+      try {
+        const raw = readFileSync(configPath, 'utf-8');
+        const parsed = JSON.parse(raw) as unknown;
+        if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          existingConfig = parsed as Record<string, unknown>;
+        }
+      } catch {
+        // Unparseable config — treat as empty, template fills in all fields
       }
-    } catch {
-      // Unparseable config — treat as empty, template fills in all fields
+
+      const iso = new Date().toISOString().replace(/:/g, '-').replace(/\./g, '-');
+      const backupPath = `${configPath}.bak.regen-${iso}`;
+      copyFileSync(configPath, backupPath);
+
+      const added = Object.keys(REGEN_TEMPLATE_DEFAULTS).filter(
+        (k) => !(k in existingConfig),
+      );
+
+      // Template is the base; existing config overlays it — user fields always win
+      const merged = deepMerge(
+        REGEN_TEMPLATE_DEFAULTS as Record<string, unknown>,
+        existingConfig,
+      ) as Record<string, unknown>;
+
+      writeConfigJsonAtomic(configPath, merged);
+
+      return { backupPath, merged, added };
     }
 
+    // Config file does not exist — write template defaults as the new config.
+    // Atomic publication throws naturally if the parent directory is missing.
+    const deckentDir = join(root, '.deckent');
+    if (!existsSync(deckentDir)) {
+      // Preserve the existing missing-parent failure behavior.
+    }
+
+    const merged = structuredClone(REGEN_TEMPLATE_DEFAULTS) as Record<string, unknown>;
     const iso = new Date().toISOString().replace(/:/g, '-').replace(/\./g, '-');
     const backupPath = `${configPath}.bak.regen-${iso}`;
-    copyFileSync(configPath, backupPath);
 
-    const added = Object.keys(REGEN_TEMPLATE_DEFAULTS).filter(
-      (k) => !(k in existingConfig),
-    );
+    writeConfigJsonAtomic(configPath, merged);
 
-    // Template is the base; existing config overlays it — user fields always win
-    const merged = deepMerge(
-      REGEN_TEMPLATE_DEFAULTS as Record<string, unknown>,
-      existingConfig,
-    ) as Record<string, unknown>;
-
-    writeFileSync(configPath, JSON.stringify(merged, null, 2) + '\n', 'utf-8');
-
-    return { backupPath, merged, added };
-  }
-
-  // Config file does not exist — write template defaults as the new config
-  const deckentDir = join(root, '.deckent');
-  if (!existsSync(deckentDir)) {
-    // mkdirSync would require importing it — use writeFileSync path below which
-    // will throw naturally if the parent dir is missing (desired behaviour)
-  }
-
-  const merged = structuredClone(REGEN_TEMPLATE_DEFAULTS) as Record<string, unknown>;
-  const iso = new Date().toISOString().replace(/:/g, '-').replace(/\./g, '-');
-  const backupPath = `${configPath}.bak.regen-${iso}`;
-
-  writeFileSync(configPath, JSON.stringify(merged, null, 2) + '\n', 'utf-8');
-
-  return { backupPath, merged, added: Object.keys(REGEN_TEMPLATE_DEFAULTS) };
+    return { backupPath, merged, added: Object.keys(REGEN_TEMPLATE_DEFAULTS) };
+  });
 }
 
 // ─── Config Metadata ─────────────────────────────────────────────────

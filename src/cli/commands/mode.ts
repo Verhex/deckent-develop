@@ -1,7 +1,8 @@
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 import type { DeckentConfig } from '../../core/types.js';
+import { writeConfigJsonAtomic } from '../../core/config-write-authority.js';
 import { PROJECT_CONFIG_PATH } from '../../core/constants.js';
 import { loadConfig, saveGlobalConfig, loadGlobalConfig } from '../../core/config.js';
 import { print, printError } from '../helpers/output.js';
@@ -34,7 +35,7 @@ function readProjectConfig(configPath: string): Record<string, unknown> {
 function setProjectConfigValue(configPath: string, key: string, value: unknown): void {
   const config = readProjectConfig(configPath);
   config[key] = value;
-  writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
+  writeConfigJsonAtomic(configPath, config);
 }
 
 

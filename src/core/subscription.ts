@@ -1,9 +1,9 @@
 import { spawnSync } from 'node:child_process';
-import { writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { PROJECT_CONFIG_PATH } from './constants.js';
 import { readJsonSafeAsync } from './utils.js';
 import { modelRegistry } from './model-registry.js';
+import { withConfigWriteLock, writeConfigJsonAtomic } from './config-write-authority.js';
 import type {
   SubscriptionProfile,
   PlanMode,
@@ -155,5 +155,5 @@ export async function saveSubscriptionToConfig(
 
   existing['subscription'] = profile;
 
-  await writeFile(configPath, JSON.stringify(existing, null, 2) + '\n', 'utf-8');
+  withConfigWriteLock(configPath, () => writeConfigJsonAtomic(configPath, existing));
 }

@@ -3,9 +3,16 @@
 > Operating-policy §4 gereği MASTER'dan seçilmiş sıralı çalışma-ağacıdır; yeni work-identity
 > içermez. Tam sınıflandırma: `.analysis/master-triage-2026-08-26/`. Node'lar tüketildikçe
 > SİLİNİR (delete-on-consume); kalıcı kayıt MASTER satır-evidence'ıdır.
+> **2026-08-26 owner-onaylı yeniden-sıralama:** config-audit admission'ının G0
+> incident-containment şeridi (471 canonical owner) trenin ÖNÜNE alındı ("öneri kabul
+> edildi"); önceki 1-6 numaralı node'lar aynen bir kaydı.
 
 ## Sıra (her node = 1 dogfood-dalgası; DIRECTIVES-hattı aynen)
 
+0. ~~G0-A CONFIG CONTAINMENT~~ **TÜKETİLDİ 2026-08-26** (sprint-680 + el-tamamlama; kanıt
+   MASTER 471 evidence). **G0-B (sıradaki config dalgası):** SecretReference/redaction +
+   backup-ailesi custody/disposition (rename mode-taşıma residual'ı dahil) — owner-karar #3
+   (secret migration deadline) bağlı; başlatma owner-penceresine sunulur.
 1. **KANIT-6 batch'i** — 3298 · 3169 · 4070 · 4080 · 7096 · 8095: kanıt-toplama + receipt
    ile kapanış (540/60 emsali; kod-yazımı beklenmiyor, çıkarsa satır KOSULABILIR'e düşer).
 2. **Kalite-kapıları dalgası** — 202 (tsc-FAIL→FIX beslemesi + mock-ratchet) + 203

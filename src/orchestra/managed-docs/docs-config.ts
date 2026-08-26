@@ -1,9 +1,10 @@
 // ─── Docs Config ──────────────────────────────────────────────────────────
 // Load, save, and manage .deckent/docs.json for user-defined documents.
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, mkdirSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { DOCS_CONFIG_FILE } from '../../core/constants.js';
+import { writeConfigJsonAtomic } from '../../core/config-write-authority.js';
 import { debugLog } from '../../core/utils.js';
 import { workspaceManagedDocEntries } from '../../core/workspace-artifact-contract.js';
 import type { DocsConfig, ManagedDocEntry } from './types.js';
@@ -50,7 +51,7 @@ export function saveDocsConfig(projectRoot: string, config: DocsConfig): void {
   const configPath = join(projectRoot, DOCS_CONFIG_FILE);
   const dir = dirname(configPath);
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n', 'utf-8');
+  writeConfigJsonAtomic(configPath, config);
 }
 
 // ─── Path Safety ─────────────────────────────────────────────────────────

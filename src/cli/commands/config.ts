@@ -1,11 +1,4 @@
-import { readFileSync, writeFileSync, existsSync, renameSync } from 'node:fs';
-
-/** Strike-5 (2026-08-25): config.json yazımı DAİMA tmp+rename — eşzamanlı okuyucu asla yarım dosya görmez. */
-function writeConfigFileAtomic(configPath: string, contents: string): void {
-  const tmpPath = `${configPath}.${process.pid}.tmp`;
-  writeFileSync(tmpPath, contents);
-  renameSync(tmpPath, configPath);
-}
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 import type { DeckentConfig } from '../../core/types.js';
@@ -18,6 +11,7 @@ import { detectLang } from '../helpers/i18n.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { ErrorRegistry } from '../../core/errors.js';
 import { cliContractMessage, bindArgumentDescriptions } from '../helpers/message-catalog/cli-run.js';
+import { withConfigWriteLock, writeConfigJsonAtomic } from '../../core/config-write-authority.js';
 
 /**
  * Strip JSON comments (block and line) from a string.
@@ -74,7 +68,7 @@ export function importConfig(importPath: string, configPath: string): void {
   }
 
   const merged = deepMerge(existing, importData) as Record<string, unknown>;
-  writeConfigFileAtomic(configPath, JSON.stringify(merged, null, 2) + '\n');
+  withConfigWriteLock(configPath, () => writeConfigJsonAtomic(configPath, merged));
 }
 
 export function registerConfig(program: Command): void {
@@ -144,7 +138,7 @@ export function registerConfig(program: Command): void {
         }
 
         validatePartialConfig(existing);
-        writeConfigFileAtomic(configPath, JSON.stringify(existing, null, 2) + '\n');
+        withConfigWriteLock(configPath, () => writeConfigJsonAtomic(configPath, existing));
         print(getMessage('config.set', lang, { key, value: JSON.stringify(parsed) }));
       } catch (error) {
         if (error instanceof ConfigValidationError) {

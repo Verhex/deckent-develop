@@ -31,6 +31,7 @@ import {
   type ApprovalGateAdapter,
 } from '../../orchestra/autonomous/approval-adapter.js';
 import { FlowRegistry } from '../../core/flow-registry.js';
+import { writeConfigJsonAtomic } from '../../core/config-write-authority.js';
 import { notifyAsync } from '../../core/notify.js';
 import { autonomousPendingPath } from '../../core/constants.js';
 import { resolveLocalOsPrincipal } from '../../core/principal.js';
@@ -991,7 +992,7 @@ export function handleEnable(opts: AutonomousEnableOptions): void {
   autonomous['enabled'] = true;
   doc['autonomous'] = autonomous;
   mkdirSync(dirname(configPath), { recursive: true });
-  writeFileSync(configPath, JSON.stringify(doc, null, 2) + '\n', 'utf-8');
+  writeConfigJsonAtomic(configPath, doc);
   print(getMessage('autonomous.enabled_banner', lang, { path: PROJECT_CONFIG_PATH }));
 }
 

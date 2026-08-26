@@ -597,3 +597,15 @@ not a reason to spend another provider attempt on the same prompt.
   read** — strike-5: under fd pressure an io-error was treated as corruption and a healthy
   92-key config was quarantined twice; healers may relocate only on parse-proof, io errors are
   typed holds.
+- **2026-08-26 — G0-A wave lesson (sprint-680): disk-verify every Test path, honest-NO_GO
+  chain works**: the DIRECTIVES `Test:` line named two test files that do NOT exist on disk;
+  workers delivered the code fully yet refused to substitute a nearby suite against the exact
+  Test authority → NO_GO → the FIX budget burned on the same impossible command → typed PAUSE.
+  Three durable takeaways: (1) every path in a `Test:` line is `ls`-verified while authoring
+  DIRECTIVES — the prompt-gate's test-discoverability check only catches pattern mismatches,
+  not pattern-matching-but-absent files (a typed gap; planner-gate candidate); (2) description
+  flexibility can never override exact-command authority — if flexibility is needed, write it
+  into the Test line itself; (3) the workers' NO_GO was correct behavior — the honesty chain
+  worked, the defect was the directive author's. Side-proof: the wave's mechanical gate
+  (`lint-config-writers`) found 11 residual writers the wave itself never reached (CLI/API
+  surfaces) on its first run — gate-first scanning beats inventory grep.

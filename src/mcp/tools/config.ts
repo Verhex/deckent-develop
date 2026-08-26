@@ -1,9 +1,13 @@
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { PROJECT_CONFIG_PATH } from '../../core/constants.js';
 import { loadConfig, validatePartialConfig } from '../../core/config.js';
+import {
+  withConfigWriteLock,
+  writeConfigJsonAtomic,
+} from '../../core/config-write-authority.js';
 import { setNestedValue, getNestedValue } from '../../core/config-migration.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { mcpToolDescription } from './description-catalog.js';
@@ -64,13 +68,15 @@ export function registerConfigTool(server: McpServer): void {
         }
 
         const configPath = join(root, PROJECT_CONFIG_PATH);
-        let existing: Record<string, unknown> = {};
-        if (existsSync(configPath)) {
-          existing = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
-        }
-        setNestedValue(existing, key, value);
-        validatePartialConfig(existing);
-        writeFileSync(configPath, JSON.stringify(existing, null, 2) + '\n');
+        withConfigWriteLock(configPath, () => {
+          let existing: Record<string, unknown> = {};
+          if (existsSync(configPath)) {
+            existing = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
+          }
+          setNestedValue(existing, key, value);
+          validatePartialConfig(existing);
+          writeConfigJsonAtomic(configPath, existing);
+        });
 
         const enriched = enrichResponse('config', { action, key, value, success: true });
         return {

@@ -15,6 +15,18 @@ import {
 } from '../../src/core/config-migration.js';
 import { createDefaultConfig } from '../../src/core/config.js';
 import { ProviderConfigAliasConflictError } from '../../src/core/provider-config-canonicalizer.js';
+import * as configWriteAuthority from '../../src/core/config-write-authority.js';
+
+vi.mock('../../src/core/config-write-authority.js', async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import('../../src/core/config-write-authority.js')
+  >();
+  return {
+    ...actual,
+    withConfigWriteLock: vi.fn(actual.withConfigWriteLock),
+    writeConfigJsonAtomic: vi.fn(actual.writeConfigJsonAtomic),
+  };
+});
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -147,6 +159,10 @@ describe('migrateConfigInMemory', () => {
 // ─── migrateConfig (file-based) ─────────────────────────────────────
 
 describe('migrateConfig', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('returns error when file does not exist', () => {
     const result = migrateConfig('/nonexistent/path/config.json');
     expect(result.migrated).toBe(false);
@@ -203,6 +219,19 @@ describe('migrateConfig', () => {
       expect(migrated['scan_interval']).toBe(30);
       // Legacy mode name migrated to canonical name
       expect(migrated['mode']).toBe('performance');
+
+      expect(configWriteAuthority.withConfigWriteLock).toHaveBeenCalledWith(
+        p,
+        expect.any(Function),
+      );
+      expect(configWriteAuthority.writeConfigJsonAtomic).toHaveBeenCalledWith(
+        p,
+        expect.objectContaining({
+          memory_budget: 5000,
+          mode: 'performance',
+          scan_interval: 30,
+        }),
+      );
     } finally {
       cleanupTmp(p);
     }
