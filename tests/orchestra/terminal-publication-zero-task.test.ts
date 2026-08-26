@@ -25,6 +25,14 @@ import {
 } from '../../src/orchestra/sprint-finalizer.js';
 import type { Sprint, Task, TaskResult, TaskEvaluation } from '../../src/core/types.js';
 
+const coordinatorRetirementEvidence = {
+  evidenceId: 'test-coordinator-retirement',
+  kind: 'recovery-coordinator-retirement',
+  state: 'VERIFIED',
+  evidenceRef: 'test:coordinator-retired',
+  requiredForCleanup: true,
+} as const;
+
 function makeTask(id: string): Task {
   return {
     id,
@@ -56,8 +64,9 @@ function verifiedResult(taskId: string): TaskResult {
     workAttribution: {
       state: 'VERIFIED',
       attemptId: `attempt-${taskId}-1`,
-      baselineRef: `baseline-${taskId}`,
-      scopeDigest: `scope-${taskId}`,
+      baselineRef: `task-result-work-attribution-baseline:sha256:${'a'.repeat(64)}`,
+      baselineSha256: 'a'.repeat(64),
+      scopeDigest: 'b'.repeat(64),
     },
   } as unknown as TaskResult;
 }
@@ -132,6 +141,7 @@ describe('terminal receipt publication — zero-task/evidence fail-closed (535/5
       tasks: [task],
       evaluations: new Map([[task.id, 'DONE' as TaskEvaluation]]),
       results: [result],
+      coordinatorEvidence: [coordinatorRetirementEvidence],
     });
 
     const publication = publishFencedSprintTerminalReceipt({

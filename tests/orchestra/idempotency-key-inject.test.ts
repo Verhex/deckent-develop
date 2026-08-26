@@ -99,10 +99,11 @@ function persistBudgetedTask(taskId: string, model = 'claude-sonnet-5'): void {
 // ─── 1. spawn-backend-docker: IDEMPOTENCY_KEY env injection ───────────────
 
 describe('DockerSpawnBackend — IDEMPOTENCY_KEY env injection', () => {
-  it('injects IDEMPOTENCY_KEY=<16-hex> env var into docker run args', () => {
+  it('injects IDEMPOTENCY_KEY=<16-hex> env var into docker run args', async () => {
     persistBudgetedTask('test-001');
     const backend = new DockerSpawnBackend(projectDir, { timeoutSeconds: 600 });
     backend.spawn('test-001', 'claude-sonnet-5', 'prompt body', TEST_DOCKER_EXECUTION_OPTIONS);
+    await (backend as DockerSpawnBackend).lastSpawnCompletion;
 
     // Locate the `docker run` invocation in captured calls
     const runCall = spawnSyncCalls.find(
@@ -120,10 +121,11 @@ describe('DockerSpawnBackend — IDEMPOTENCY_KEY env injection', () => {
     expect(envEntry).toMatch(/^IDEMPOTENCY_KEY=[0-9a-f]{16}$/);
   });
 
-  it('emits the env var with the -e flag immediately preceding it', () => {
+  it('emits the env var with the -e flag immediately preceding it', async () => {
     persistBudgetedTask('test-002', 'claude-haiku-4-5-20251001');
     const backend = new DockerSpawnBackend(projectDir);
     backend.spawn('test-002', 'claude-haiku-4-5-20251001', 'prompt', TEST_DOCKER_EXECUTION_OPTIONS);
+    await (backend as DockerSpawnBackend).lastSpawnCompletion;
 
     const runCall = spawnSyncCalls.find(c => c.cmd === 'docker' && c.args[0] === 'run');
     expect(runCall).toBeDefined();
@@ -136,12 +138,14 @@ describe('DockerSpawnBackend — IDEMPOTENCY_KEY env injection', () => {
     expect(runCall!.args[idx - 1]).toBe('-e');
   });
 
-  it('generates a fresh IDEMPOTENCY_KEY for each spawn call', () => {
+  it('generates a fresh IDEMPOTENCY_KEY for each spawn call', async () => {
     persistBudgetedTask('test-003');
     persistBudgetedTask('test-004');
     const backend = new DockerSpawnBackend(projectDir);
     backend.spawn('test-003', 'claude-sonnet-5', 'prompt-a', TEST_DOCKER_EXECUTION_OPTIONS);
+    await (backend as DockerSpawnBackend).lastSpawnCompletion;
     backend.spawn('test-004', 'claude-sonnet-5', 'prompt-b', TEST_DOCKER_EXECUTION_OPTIONS);
+    await (backend as DockerSpawnBackend).lastSpawnCompletion;
 
     const runCalls = spawnSyncCalls.filter(c => c.cmd === 'docker' && c.args[0] === 'run');
     expect(runCalls.length).toBe(2);
@@ -183,13 +187,13 @@ describe('buildTaskPrompt — Idempotency Key directive', () => {
     } as Task;
   }
 
-  it('emits the "## Idempotency Key" header in the rendered prompt', () => {
+  it('emits the "## Idempotency Key" header in the rendered prompt', async () => {
     const ctx: SprintContext = { effort: 'medium' };
     const artifact = buildTaskPrompt(makeTask(), ctx);
     expect(artifact.prompt).toContain('## Idempotency Key');
   });
 
-  it('embeds the computed deterministic key (no literal ${IDEMPOTENCY_KEY} placeholder)', () => {
+  it('embeds the computed deterministic key (no literal ${IDEMPOTENCY_KEY} placeholder)', async () => {
     const ctx: SprintContext = { effort: 'medium' };
     const artifact = buildTaskPrompt(makeTask(), ctx);
     // Sprint 182 PQ-1 (F1): the literal `${IDEMPOTENCY_KEY}` placeholder is no
@@ -200,14 +204,14 @@ describe('buildTaskPrompt — Idempotency Key directive', () => {
     expect(artifact.prompt).toContain('sprint-156-156-006-0');
   });
 
-  it('includes the Idempotency-Key header usage directive', () => {
+  it('includes the Idempotency-Key header usage directive', async () => {
     const ctx: SprintContext = { effort: 'medium' };
     const artifact = buildTaskPrompt(makeTask(), ctx);
     expect(artifact.prompt).toContain('Idempotency-Key header');
     expect(artifact.prompt.toLowerCase()).toContain('retries safe');
   });
 
-  it('places the directive after "## Your Task" and before "## What To Do"', () => {
+  it('places the directive after "## Your Task" and before "## What To Do"', async () => {
     const ctx: SprintContext = { effort: 'low' };
     const artifact = buildTaskPrompt(makeTask(), ctx);
     const yourTaskIdx = artifact.prompt.indexOf('## Your Task');

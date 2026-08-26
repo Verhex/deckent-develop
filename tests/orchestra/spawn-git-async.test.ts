@@ -89,12 +89,12 @@ function resultFixture(paths: string[]): Record<string, unknown> {
   };
 }
 
-function writeBaselineAndResult(
+async function writeBaselineAndResult(
   repo: string,
   attemptId: string,
   scopeFilesWrite: string[],
   claimedPaths: string[],
-): { baselinePath: string; resultPath: string } {
+): Promise<{ baselinePath: string; resultPath: string }> {
   const baselinePath = join(repo, '.scope-baseline');
   const resultPath = join(repo, '.result.json');
   writeFileSync(
@@ -102,7 +102,7 @@ function writeBaselineAndResult(
     buildScopeAttributionManifest(
       attemptId,
       scopeFilesWrite,
-      computeScopeBaselineManifest(repo, scopeFilesWrite),
+      await computeScopeBaselineManifest(repo, scopeFilesWrite),
     ),
     'utf-8',
   );
@@ -136,7 +136,7 @@ describe('reconcileDockerResultWorkAttribution — async git evidence path', () 
     appendFileSync(join(repo, 'shared.ts'), '// predecessor work\n');
 
     const attemptId = 'attempt-511-a';
-    const { baselinePath } = writeBaselineAndResult(repo, attemptId, ['shared.ts'], ['shared.ts']);
+    const { baselinePath } = await writeBaselineAndResult(repo, attemptId, ['shared.ts'], ['shared.ts']);
     appendFileSync(join(repo, 'shared.ts'), '// current attempt work\n');
     const resultPath = join(repo, '.result.json');
     writeFileSync(resultPath, JSON.stringify(resultFixture(['shared.ts'])), 'utf-8');
@@ -194,7 +194,7 @@ describe('reconcileDockerResultWorkAttribution — async git evidence path', () 
     writeFileSync(join(repo, 'deleted.ts'), 'line one\nline two\n', 'utf-8');
     await stageBaseline(repo);
     const attemptId = 'attempt-511-delete-file';
-    const { baselinePath } = writeBaselineAndResult(repo, attemptId, ['deleted.ts'], ['deleted.ts']);
+    const { baselinePath } = await writeBaselineAndResult(repo, attemptId, ['deleted.ts'], ['deleted.ts']);
     rmSync(join(repo, 'deleted.ts'));
     const resultPath = join(repo, '.result.json');
     writeFileSync(resultPath, JSON.stringify(resultFixture(['deleted.ts'])), 'utf-8');
@@ -223,7 +223,7 @@ describe('reconcileDockerResultWorkAttribution — async git evidence path', () 
     appendFileSync(join(repo, 'shared.ts'), '// predecessor work\n');
 
     const attemptId = 'attempt-511-unchanged';
-    const { baselinePath, resultPath } = writeBaselineAndResult(repo, attemptId, ['shared.ts'], ['shared.ts']);
+    const { baselinePath, resultPath } = await writeBaselineAndResult(repo, attemptId, ['shared.ts'], ['shared.ts']);
 
     const outcome = await reconcileDockerResultWorkAttribution({
       projectRoot: repo,
@@ -251,7 +251,7 @@ describe('reconcileDockerResultWorkAttribution — async git evidence path', () 
 
     const attemptId = 'attempt-511-order';
     const scope = ['c.ts', 'a.ts', 'b.ts']; // deliberately not alphabetical
-    const { baselinePath } = writeBaselineAndResult(repo, attemptId, scope, scope);
+    const { baselinePath } = await writeBaselineAndResult(repo, attemptId, scope, scope);
 
     appendFileSync(join(repo, 'a.ts'), '// edit a\n');
     appendFileSync(join(repo, 'b.ts'), '// edit b\n');

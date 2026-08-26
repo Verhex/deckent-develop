@@ -9,6 +9,11 @@ vi.mock('node:fs', () => ({
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
   existsSync: vi.fn(),
+  renameSync: vi.fn(),
+  openSync: vi.fn().mockReturnValue(42),
+  closeSync: vi.fn(),
+  fsyncSync: vi.fn(),
+  rmSync: vi.fn(),
 }));
 
 vi.mock('node:fs/promises', () => ({
@@ -111,8 +116,9 @@ describe('deckent mode run (write-time alias)', () => {
     await run('mode', 'run');
 
     expect(writeFileSync).toHaveBeenCalledWith(
-      '/mock/root/.deckent/config.json',
+      expect.stringContaining('/.deckent/.config.json.'),
       expect.stringContaining('"deckent_style": "sprint"'),
+      { mode: 0o600 },
     );
     expect(print).toHaveBeenCalledWith(expect.stringContaining('run mode'));
   });
@@ -126,8 +132,9 @@ describe('deckent mode sprint (unchanged — 378-003 must not alter it)', () => 
     await run('mode', 'sprint');
 
     expect(writeFileSync).toHaveBeenCalledWith(
-      '/mock/root/.deckent/config.json',
+      expect.stringContaining('/.deckent/.config.json.'),
       expect.stringContaining('"deckent_style": "sprint"'),
+      { mode: 0o600 },
     );
     expect(print).toHaveBeenCalledWith('✓ Switched to sprint mode (project override)');
   });

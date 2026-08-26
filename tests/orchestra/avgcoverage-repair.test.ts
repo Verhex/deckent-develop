@@ -238,6 +238,7 @@ function makeResult(taskId: string, overrides: Partial<TaskResult> = {}): TaskRe
   // finalizer correctly refuses to settle (TERMINAL_EVIDENCE_HOLD). Shape mirrors
   // tests/orchestra/finalize-sprint.test.ts (FAZ4A-S2 canonical fixture).
   const attemptId = `attempt-${taskId}`;
+  const baselineSha256 = 'b'.repeat(64);
   return {
     taskId,
     workerId: `w-${taskId}`,
@@ -250,8 +251,9 @@ function makeResult(taskId: string, overrides: Partial<TaskResult> = {}): TaskRe
     workAttribution: {
       state: 'VERIFIED' as const,
       attemptId,
-      baselineRef: `baseline:${attemptId}`,
-      scopeDigest: attemptId.padEnd(64, '0').slice(0, 64),
+      baselineRef: `task-result-work-attribution-baseline:sha256:${baselineSha256}`,
+      baselineSha256,
+      scopeDigest: 'c'.repeat(64),
     },
     ...overrides,
   } as unknown as TaskResult;

@@ -102,19 +102,19 @@ const TEST_EXECUTION_OPTIONS = TEST_DOCKER_EXECUTION_OPTIONS;
 // ─── 1. Pure helper — the regression guard ──────────────────────────────────
 
 describe('buildDistReadOnlyMountArgs (BUILD-VIOLATION-GUARD regression guard)', () => {
-  it('mounts /workspace/dist read-only when dist/ exists', () => {
+  it('mounts /workspace/dist read-only when dist/ exists', async () => {
     const args = buildDistReadOnlyMountArgs(true, '/proj/dist');
     expect(args).toEqual(['-v', '/proj/dist:/workspace/dist:ro']);
   });
 
-  it('emits NO mount when dist/ is absent (avoids phantom host dist/)', () => {
+  it('emits NO mount when dist/ is absent (avoids phantom host dist/)', async () => {
     // The security-critical branch: mounting a not-yet-built dist/ read-only would
     // make docker phantom-create an empty host dist/ (nested bind mount materializes
     // a missing target), blocking the next legitimate `npm run build`. No dist/ ⇒ no mount.
     expect(buildDistReadOnlyMountArgs(false, '/proj/dist')).toEqual([]);
   });
 
-  it('always mounts read-only (never rw — a worker must not write dist/)', () => {
+  it('always mounts read-only (never rw — a worker must not write dist/)', async () => {
     const args = buildDistReadOnlyMountArgs(true, '/x/dist');
     expect(args[1]).toMatch(/:ro$/);
     expect(args[1]).toContain(':/workspace/dist:');
@@ -192,28 +192,31 @@ describe('DockerSpawnBackend: dist/ read-only mount wiring (born-644 B542)', () 
     installSpawnRouter();
   });
 
-  it('adds the read-only dist/ mount to `docker run` argv when dist/ exists', () => {
+  it('adds the read-only dist/ mount to `docker run` argv when dist/ exists', async () => {
     const backend = new DockerSpawnBackend('/test/project');
     backend.spawn('dist-guard-present', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
+    await (backend as DockerSpawnBackend).lastSpawnCompletion;
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
     expect(argv).toContain('/test/project/dist:/workspace/dist:ro');
   });
 
-  it('omits the dist/ mount when dist/ does not exist (no phantom host dir)', () => {
+  it('omits the dist/ mount when dist/ does not exist (no phantom host dir)', async () => {
     distAbsentPath = '/test/project/dist';
     const backend = new DockerSpawnBackend('/test/project');
     backend.spawn('dist-guard-absent', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
+    await (backend as DockerSpawnBackend).lastSpawnCompletion;
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
     expect(argv.some((a) => a.includes(':/workspace/dist:'))).toBe(false);
   });
 
-  it('keeps every pre-existing mount byte-identical — only the new ro-mount is additive', () => {
+  it('keeps every pre-existing mount byte-identical — only the new ro-mount is additive', async () => {
     const backend = new DockerSpawnBackend('/test/project');
     backend.spawn('dist-guard-parity', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
+    await (backend as DockerSpawnBackend).lastSpawnCompletion;
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;

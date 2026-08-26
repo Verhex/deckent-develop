@@ -9,6 +9,10 @@ const spawnBackend = vi.hoisted(() => ({ spawn: vi.fn(), kill: vi.fn() }));
 // ─── Common Mocks ───────────────────────────────────────────────────
 
 vi.mock('node:fs', () => ({
+  rmSync: vi.fn(),
+  openSync: vi.fn().mockReturnValue(1),
+  closeSync: vi.fn(),
+  fsyncSync: vi.fn(),
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
   renameSync: vi.fn(),

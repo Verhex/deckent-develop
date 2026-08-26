@@ -22,6 +22,11 @@ vi.mock('node:fs', () => ({
   mkdirSync: vi.fn(),
   readFileSync: vi.fn(),
   existsSync: vi.fn().mockReturnValue(false),
+  openSync: vi.fn().mockReturnValue(42),
+  closeSync: vi.fn(),
+  fsyncSync: vi.fn(),
+  renameSync: vi.fn(),
+  rmSync: vi.fn(),
   // 524-010 sınıfı: initializeWorkspaceArtifacts realpathSync.native + lstatSync ister.
   realpathSync: Object.assign(vi.fn((path: string) => path), {
     native: vi.fn((path: string) => path),

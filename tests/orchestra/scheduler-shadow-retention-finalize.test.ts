@@ -67,6 +67,7 @@ function makeSprint(id: string, number: number): Sprint {
 }
 
 function makeResult(taskId: string, selfAssessment: TaskResult['selfAssessment'] = 'DONE'): TaskResult {
+  const baselineSha256 = 'a'.repeat(64);
   return {
     taskId,
     workerId: `w-${taskId}`,
@@ -83,8 +84,9 @@ function makeResult(taskId: string, selfAssessment: TaskResult['selfAssessment']
     workAttribution: {
       state: 'VERIFIED',
       attemptId: `attempt-${taskId}-1`,
-      baselineRef: `baseline-${taskId}`,
-      scopeDigest: `scope-${taskId}`,
+      baselineRef: `task-result-work-attribution-baseline:sha256:${baselineSha256}`,
+      baselineSha256,
+      scopeDigest: 'b'.repeat(64),
     },
   };
 }

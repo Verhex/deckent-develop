@@ -150,15 +150,17 @@ function installSpawnRouter(imagePresent: boolean): void {
 }
 
 /** Run spawn() and return the thrown error message (or '' if it did not throw). */
-function spawnExpectMessage(taskId: string, model: string): string {
+async function spawnExpectMessage(taskId: string, model: string): Promise<string> {
   try {
     mockReadFileSync.mockImplementation(path => budgetedDockerTaskJson(path, { model }));
-    new DockerSpawnBackend('/test/project').spawn(
+    const backend = new DockerSpawnBackend('/test/project');
+    backend.spawn(
       taskId,
       model as never,
       'prompt-body',
       TEST_DOCKER_EXECUTION_OPTIONS,
     );
+    await backend.lastSpawnCompletion;
     return '';
   } catch (err) {
     return err instanceof Error ? err.message : String(err);
@@ -172,7 +174,7 @@ function spawnExpectMessage(taskId: string, model: string): string {
 describe('workerImageBuildCmdForProvider — provider → build-arg threading (F1-005)', () => {
   const IMG = 'deckent-worker:latest';
 
-  it('codex → assembles `--build-arg INSTALL_CODEX=true` against Dockerfile.worker', () => {
+  it('codex → assembles `--build-arg INSTALL_CODEX=true` against Dockerfile.worker', async () => {
     const cmd = workerImageBuildCmdForProvider(IMG, 'codex');
     expect(cmd).toContain('--build-arg INSTALL_CODEX=true');
     expect(cmd).toContain('-f Dockerfile.worker');
@@ -180,26 +182,26 @@ describe('workerImageBuildCmdForProvider — provider → build-arg threading (F
     expect(cmd).not.toContain('INSTALL_GEMINI'); // only the requested provider's CLI
   });
 
-  it('gemini → assembles `--build-arg INSTALL_GEMINI=true`', () => {
+  it('gemini → assembles `--build-arg INSTALL_GEMINI=true`', async () => {
     const cmd = workerImageBuildCmdForProvider(IMG, 'gemini');
     expect(cmd).toContain('--build-arg INSTALL_GEMINI=true');
     expect(cmd).not.toContain('INSTALL_CODEX');
   });
 
-  it('claude → NONE (default lean image): no `--build-arg`, still targets the image', () => {
+  it('claude → NONE (default lean image): no `--build-arg`, still targets the image', async () => {
     const cmd = workerImageBuildCmdForProvider(IMG, 'claude');
     expect(cmd).not.toContain('--build-arg');
     expect(cmd).toContain('-f Dockerfile.worker');
     expect(cmd).toContain(`-t ${IMG}`);
   });
 
-  it('host-only / unknown provider (e.g. ollama) → lean image, no `--build-arg`', () => {
+  it('host-only / unknown provider (e.g. ollama) → lean image, no `--build-arg`', async () => {
     // ollama never reaches the docker backend (honest-fail earlier); if it did it
     // must NOT trigger a codex/gemini build-arg.
     expect(workerImageBuildCmdForProvider(IMG, 'ollama')).not.toContain('--build-arg');
   });
 
-  it('honors a custom image tag (multi-tenant / private registry)', () => {
+  it('honors a custom image tag (multi-tenant / private registry)', async () => {
     const cmd = workerImageBuildCmdForProvider('myorg/deckent-worker:v2', 'codex');
     expect(cmd).toContain('--build-arg INSTALL_CODEX=true');
     expect(cmd).toContain('-t myorg/deckent-worker:v2');
@@ -217,29 +219,29 @@ describe('DockerSpawnBackend: provider-aware image-not-ready honest-fail (F1-005
     installSpawnRouter(/* imagePresent */ false);
   });
 
-  it('codex worker HOLDs on final-only usage before image inspection', () => {
-    const msg = spawnExpectMessage('mc-codex', 'gpt-5.6-sol');
+  it('codex worker HOLDs on final-only usage before image inspection', async () => {
+    const msg = await spawnExpectMessage('mc-codex', 'gpt-5.6-sol');
     expect(msg).toMatch(/does not expose incremental measured usage/);
     expect(capturedDockerRunArgs).toHaveLength(0);
     expect(capturedDockerBuildArgs).toHaveLength(0);
   });
 
-  it('codex metering HOLD does NOT silently fall back to a claude container', () => {
-    spawnExpectMessage('mc-codex-nofallback', 'gpt-5.6-sol');
+  it('codex metering HOLD does NOT silently fall back to a claude container', async () => {
+    await spawnExpectMessage('mc-codex-nofallback', 'gpt-5.6-sol');
     // Never spawned a worker container, and never auto-built — honest-fail only.
     expect(capturedDockerRunArgs.length).toBe(0);
     expect(capturedDockerBuildArgs.length).toBe(0);
   });
 
-  it('gemini worker HOLDs on final-only usage before image inspection', () => {
-    const msg = spawnExpectMessage('mc-gemini', 'gemini-2.5-flash');
+  it('gemini worker HOLDs on final-only usage before image inspection', async () => {
+    const msg = await spawnExpectMessage('mc-gemini', 'gemini-2.5-flash');
     expect(msg).toMatch(/does not expose incremental measured usage/);
     expect(capturedDockerRunArgs).toHaveLength(0);
     expect(capturedDockerBuildArgs).toHaveLength(0);
   });
 
-  it('claude worker, image absent → throws WITHOUT any `--build-arg` (NONE / default image)', () => {
-    const msg = spawnExpectMessage('mc-claude', 'claude-sonnet-5');
+  it('claude worker, image absent → throws WITHOUT any `--build-arg` (NONE / default image)', async () => {
+    const msg = await spawnExpectMessage('mc-claude', 'claude-sonnet-5');
     expect(msg).toMatch(/not found locally for provider 'claude'/);
     expect(msg).not.toContain('--build-arg');
     expect(msg).toContain('-f Dockerfile.worker');
@@ -256,7 +258,7 @@ describe('DockerSpawnBackend: claude worker uses the default image unchanged (F1
     installSpawnRouter(/* imagePresent */ true);
   });
 
-  it('image present → claude worker runs the default image with NO `--build-arg` and NO docker build', () => {
+  it('image present → claude worker runs the default image with NO `--build-arg` and NO docker build', async () => {
     // Heartbeat-authority identity readbacks must surface ENOENT: the full
     // node:fs mock cannot carry the WorkerHeartbeatAuthorityStore
     // write→readback chain, and the '{}' fallback would trip the store's
@@ -271,12 +273,14 @@ describe('DockerSpawnBackend: claude worker uses the default image unchanged (F1
       }
       return budgetedDockerTaskJson(path, { model: 'claude-sonnet-5' });
     }) as typeof readFileSync);
-    new DockerSpawnBackend('/test/project').spawn(
+    const backend = new DockerSpawnBackend('/test/project');
+    backend.spawn(
       'mc-claude-ok',
       'claude-sonnet-5' as never,
       'prompt-body',
       TEST_DOCKER_EXECUTION_OPTIONS,
     );
+    await backend.lastSpawnCompletion;
     expect(capturedDockerRunArgs.length).toBe(1);
     expect(capturedDockerBuildArgs.length).toBe(0);
     const argv = capturedDockerRunArgs[0]!;

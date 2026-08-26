@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Command } from 'commander';
 import { SprintStatus, SprintPhase } from '../../../src/core/types.js';
-import type { DashboardState } from '../../../src/core/types.js';
+import type { DashboardState, Task } from '../../../src/core/types.js';
 
 // ─── Mocks ───────────────────────────────────────────────────────────
 
@@ -13,6 +13,7 @@ vi.mock('node:fs', () => ({
   mkdirSync: vi.fn(),
   renameSync: vi.fn(),
   writeFileSync: vi.fn(),
+  statSync: vi.fn(() => ({ mtimeMs: Date.now() })),
 }));
 
 vi.mock('../../../src/cli/helpers/output.js', () => ({
@@ -65,6 +66,8 @@ const runAuthorityState = vi.hoisted(() => ({
   } as Record<string, unknown>,
 }));
 
+const canonicalTaskState = vi.hoisted(() => ({ current: [] as Task[] }));
+
 function setActiveRunAuthority(sprintId = 'sprint-001'): void {
   runAuthorityState.current = {
     ...runAuthorityState.current,
@@ -93,11 +96,24 @@ vi.mock('../../../src/core/run-status-read-model.js', async (importOriginal) => 
     authority: {},
   })),
   runStatusReadModelMatchesAuthority: vi.fn(() => true),
+  loadCanonicalRunTasks: vi.fn(() => ({
+    tasks: canonicalTaskState.current,
+    diagnostics: [],
+  })),
 }));
 
 const deathSweep = vi.hoisted(() => vi.fn(() => ({ scanned: 0, closed: [], skipped: [] })));
 vi.mock('../../../src/orchestra/run-flow-death-sweep.js', () => ({
   sweepDeadDetachedRuns: deathSweep,
+  summarizeDeathSweepSkipped: vi.fn((skipped: readonly unknown[]) => ({
+    total: skipped.length,
+    classes: [],
+  })),
+}));
+
+vi.mock('../../../src/core/config.js', () => ({
+  DEFAULT_HEARTBEAT_TIMEOUT_MS: 30_000,
+  loadConfig: vi.fn().mockResolvedValue({ heartbeat_timeout: 30 }),
 }));
 
 const shutdownHookState = vi.hoisted(() => ({
@@ -136,14 +152,32 @@ function makeDashboard(overrides?: Partial<DashboardState>): DashboardState {
   };
 }
 
+function makeTask(overrides: Partial<Task> = {}): Task {
+  return {
+    id: '001',
+    title: 'Test',
+    description: 'Status fixture',
+    model: 'sonnet',
+    effort: 'normal',
+    priority: 'NORMAL',
+    reason: 'status contract test',
+    scope: { directories: [], filesRead: [], filesWrite: [] },
+    dependencies: [],
+    goNogo: { goCriteria: '', noGoCriteria: '', techDebtAcceptable: '' },
+    status: 'PENDING',
+    sprintId: 'sprint-001',
+    ...overrides,
+  } as Task;
+}
+
 async function runCommand(args: string[]): Promise<void> {
   const program = new Command();
   program.exitOverride();
   registerStatus(program);
   try {
     await program.parseAsync(['node', 'test', ...args]);
-  } catch {
-    // Commander exitOverride
+  } catch (error) {
+    throw error;
   }
 }
 
@@ -160,6 +194,7 @@ describe('status command (isolated)', () => {
     runAuthorityState.current = { ...runAuthorityState.current, lifecycle: 'IDLE', active: false, resumable: false, sprintId: null, phase: null, status: null, coordinator: 'absent' };
     vi.clearAllMocks();
     shutdownHookState.hooks.length = 0;
+    canonicalTaskState.current = [];
     process.exitCode = undefined;
   });
 
@@ -194,6 +229,7 @@ describe('status command (isolated)', () => {
 
   it('(A) shows standalone status from task files when no dashboard', async () => {
     setActiveRunAuthority();
+    canonicalTaskState.current = [makeTask({ status: 'EXECUTING', title: 'Test Task' } as Partial<Task>)];
     vi.mocked(existsSync).mockImplementation((p: any) => {
       if (String(p).includes('.dashboard')) return false;
       if (String(p).includes('.tasks')) return true;
@@ -217,11 +253,7 @@ describe('status command (isolated)', () => {
       if (String(p).includes('.tasks')) return true;
       return false;
     });
-    vi.mocked(readdirSync).mockReturnValue(['task-001.json'] as any);
-    vi.mocked(readFileSync).mockReturnValue(JSON.stringify({
-      id: '001', title: 'Test', status: 'DONE', sprintId: 'sprint-002',
-      dependencies: [], model: 'sonnet', effort: 'normal',
-    }));
+    canonicalTaskState.current = [makeTask({ status: 'DONE', sprintId: 'sprint-002' } as Partial<Task>)];
     await runCommand(['status', '--json']);
     const printCalls = vi.mocked(print).mock.calls;
     const jsonCall = printCalls.find(c => c[0].includes('standalone'));
@@ -238,11 +270,7 @@ describe('status command (isolated)', () => {
       if (String(p).includes('.tasks')) return true;
       return false;
     });
-    vi.mocked(readdirSync).mockReturnValue(['task-001.json'] as any);
-    vi.mocked(readFileSync).mockReturnValue(JSON.stringify({
-      id: '001', title: 'Test', status: 'PENDING', sprintId: 'sprint-001',
-      dependencies: [], model: 'claude-sonnet-5', effort: 'normal',
-    }));
+    canonicalTaskState.current = [makeTask({ model: 'claude-sonnet-5' })];
     const close = vi.fn();
     const projection = {
       rawStatus: 'PENDING',
@@ -291,22 +319,12 @@ describe('status command (isolated)', () => {
       if (String(path).includes('.tasks')) return true;
       return false;
     });
-    vi.mocked(readdirSync).mockReturnValue([
-      'task-run-2.json',
-      'task-run-1.json',
-    ] as any);
-    vi.mocked(readFileSync).mockImplementation((path: any) => {
-      const taskId = String(path).includes('task-run-1.json') ? 'run-1' : 'run-2';
-      return JSON.stringify({
-        id: taskId,
-        title: taskId,
-        status: 'PENDING',
-        sprintId: 'sprint-bulk',
-        dependencies: [],
-        model: 'gpt-5.6-sol',
-        effort: 'normal',
-      });
-    });
+    canonicalTaskState.current = ['run-1', 'run-2'].map(taskId => makeTask({
+      id: taskId,
+      title: taskId,
+      sprintId: 'sprint-bulk',
+      model: 'gpt-5.6-sol',
+    }));
     const projectTaskExecutionState = vi.fn();
     const projectTaskExecutionStates = vi.fn(inputs => inputs.map(input => ({
       rawStatus: input.rawStatus,
@@ -338,6 +356,7 @@ describe('status command (isolated)', () => {
 
   it('surfaces open receipt reconciliation evidence in human status', async () => {
     setActiveRunAuthority();
+    canonicalTaskState.current = [makeTask({ model: 'claude-sonnet-5' })];
     vi.mocked(existsSync).mockImplementation((p: any) => {
       if (String(p).includes('.dashboard')) return false;
       if (String(p).includes('.tasks')) return true;

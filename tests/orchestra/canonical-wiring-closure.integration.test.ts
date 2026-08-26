@@ -55,6 +55,7 @@ function task(id: string, overrides: Partial<Task> = {}): Task {
 }
 
 function result(taskId: string, verdict: 'DONE' | 'NO_GO'): TaskResult {
+  const baselineSha256 = 'b'.repeat(64);
   return {
     taskId,
     workerId: `w-${taskId}`,
@@ -68,7 +69,8 @@ function result(taskId: string, verdict: 'DONE' | 'NO_GO'): TaskResult {
     workAttribution: {
       state: 'VERIFIED',
       attemptId: `attempt-${taskId}`,
-      baselineRef: `baseline:${taskId}`,
+      baselineRef: `task-result-work-attribution-baseline:sha256:${baselineSha256}`,
+      baselineSha256,
       scopeDigest: 'a'.repeat(64),
     },
   } as TaskResult;

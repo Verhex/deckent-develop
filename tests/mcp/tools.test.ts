@@ -70,6 +70,13 @@ vi.mock('../../src/core/utils.js', () => ({
   debugLog: vi.fn(),
 }));
 
+vi.mock('../../src/core/config-write-authority.js', () => ({
+  withConfigWriteLock: (_path: string, write: () => void) => write(),
+  writeConfigJsonAtomic: (path: string, value: unknown) => {
+    writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
+  },
+}));
+
 vi.mock('../../src/orchestra/brain.js', () => ({
   runSprint: vi.fn(),
   readContext: vi.fn(),

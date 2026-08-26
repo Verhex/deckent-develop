@@ -4,6 +4,10 @@ import { Command } from 'commander';
 // ─── Mocks ───────────────────────────────────────────────────────────
 
 vi.mock('node:fs', () => ({
+  rmSync: vi.fn(),
+  openSync: vi.fn().mockReturnValue(1),
+  closeSync: vi.fn(),
+  fsyncSync: vi.fn(),
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
   existsSync: vi.fn(),
@@ -176,7 +180,7 @@ describe('config export/import commands', () => {
       });
       vi.mocked(validatePartialConfig).mockImplementation(() => {});
       importConfig('/import.json', '/config.json');
-      const writeCall = vi.mocked(writeFileSync).mock.calls[0];
+      const writeCall = vi.mocked(writeFileSync).mock.calls.find(call => String(call[0]).endsWith(".tmp"))!;
       const written = JSON.parse(String(writeCall![1]));
       expect(written.mode).toBe('max_plan');
       expect(written.projectName).toBe('oldname');
@@ -188,7 +192,7 @@ describe('config export/import commands', () => {
       vi.mocked(readFileSync).mockReturnValue('{"mode":"pro_plan"}');
       vi.mocked(validatePartialConfig).mockImplementation(() => {});
       importConfig('/import.json', '/config.json');
-      const writeCall = vi.mocked(writeFileSync).mock.calls[0];
+      const writeCall = vi.mocked(writeFileSync).mock.calls.find(call => String(call[0]).endsWith(".tmp"))!;
       const written = JSON.parse(String(writeCall![1]));
       expect(written.mode).toBe('pro_plan');
     });
@@ -202,7 +206,7 @@ describe('config export/import commands', () => {
       vi.mocked(validatePartialConfig).mockImplementation(() => {});
       // Should not throw
       expect(() => importConfig('/import.json', '/config.json')).not.toThrow();
-      const writeCall = vi.mocked(writeFileSync).mock.calls[0];
+      const writeCall = vi.mocked(writeFileSync).mock.calls.find(call => String(call[0]).endsWith(".tmp"))!;
       const written = JSON.parse(String(writeCall![1]));
       expect(written.mode).toBe('max_plan');
     });
@@ -221,7 +225,7 @@ describe('config export/import commands', () => {
       vi.mocked(readFileSync).mockReturnValue('{}');
       vi.mocked(validatePartialConfig).mockImplementation(() => {});
       expect(() => importConfig('/import.json', '/config.json')).not.toThrow();
-      const writeCall = vi.mocked(writeFileSync).mock.calls[0];
+      const writeCall = vi.mocked(writeFileSync).mock.calls.find(call => String(call[0]).endsWith(".tmp"))!;
       const written = JSON.parse(String(writeCall![1]));
       expect(written).toEqual({});
     });
@@ -234,7 +238,7 @@ describe('config export/import commands', () => {
       });
       vi.mocked(validatePartialConfig).mockImplementation(() => {});
       importConfig('/import.json', '/config.json');
-      const writeCall = vi.mocked(writeFileSync).mock.calls[0];
+      const writeCall = vi.mocked(writeFileSync).mock.calls.find(call => String(call[0]).endsWith(".tmp"))!;
       const written = JSON.parse(String(writeCall![1]));
       expect(written.customField).toBe('preserved');
       expect(written.projectName).toBe('myapp');
@@ -249,7 +253,7 @@ describe('config export/import commands', () => {
       });
       vi.mocked(validatePartialConfig).mockImplementation(() => {});
       importConfig('/import.json', '/config.json');
-      const writeCall = vi.mocked(writeFileSync).mock.calls[0];
+      const writeCall = vi.mocked(writeFileSync).mock.calls.find(call => String(call[0]).endsWith(".tmp"))!;
       const written = JSON.parse(String(writeCall![1]));
       expect(written.max_workers).toBe(5);
     });
@@ -262,7 +266,7 @@ describe('config export/import commands', () => {
       });
       vi.mocked(validatePartialConfig).mockImplementation(() => {});
       importConfig('/import.json', '/config.json');
-      const writeCall = vi.mocked(writeFileSync).mock.calls[0];
+      const writeCall = vi.mocked(writeFileSync).mock.calls.find(call => String(call[0]).endsWith(".tmp"))!;
       const written = JSON.parse(String(writeCall![1]));
       expect(written.mode).toBe('pro_plan');
     });
@@ -361,7 +365,7 @@ describe('config export/import commands', () => {
       });
       vi.mocked(validatePartialConfig).mockImplementation(() => {});
       await runCommand(['config', 'import', '/tmp/import.json']);
-      const writeCall = vi.mocked(writeFileSync).mock.calls[0];
+      const writeCall = vi.mocked(writeFileSync).mock.calls.find(call => String(call[0]).endsWith(".tmp"))!;
       const written = JSON.parse(String(writeCall![1]));
       expect(written.mode).toBe('max_plan');
       expect(written.projectName).toBe('myproject');

@@ -166,35 +166,41 @@ describe('DockerSpawnBackend: final-only usage containment (XVER-CODEX)', () => 
     expect(capturedRunArgs).toHaveLength(0);
   });
 
-  it('narrows the container wall clock to the owner-authorized window', () => {
-    new DockerSpawnBackend('/test/project', { timeoutSeconds: 2700 }).spawn(
+  it('narrows the container wall clock to the owner-authorized window', async () => {
+    const backend = new DockerSpawnBackend('/test/project', { timeoutSeconds: 2700 });
+    backend.spawn(
       'final-only-narrowed',
       'gpt-5.6-sol' as ModelType,
       'bounded verifier prompt',
       { ...LIVE_CEILING_OPTIONS, finalOnlyUsageContainment: GRANT },
     );
+    await backend.lastSpawnCompletion;
     expect(capturedRunArgs).toHaveLength(1);
     expect(capturedTaskTimeout()).toBe(300);
   });
 
-  it('never widens the configured timeout, even with a larger authorization', () => {
-    new DockerSpawnBackend('/test/project', { timeoutSeconds: 600 }).spawn(
+  it('never widens the configured timeout, even with a larger authorization', async () => {
+    const backend = new DockerSpawnBackend('/test/project', { timeoutSeconds: 600 });
+    backend.spawn(
       'final-only-no-widen',
       'gpt-5.6-sol' as ModelType,
       'bounded verifier prompt',
       { ...LIVE_CEILING_OPTIONS, finalOnlyUsageContainment: { ...GRANT, maxWallClockSeconds: 3000 } },
     );
+    await backend.lastSpawnCompletion;
     expect(capturedTaskTimeout()).toBe(600);
   });
 
-  it('leaves an incremental-usage provider on its configured timeout', () => {
+  it('leaves an incremental-usage provider on its configured timeout', async () => {
     mockReadFileSync.mockImplementation(budgetedTaskRead('claude-sonnet-5'));
-    new DockerSpawnBackend('/test/project', { timeoutSeconds: 2700 }).spawn(
+    const backend = new DockerSpawnBackend('/test/project', { timeoutSeconds: 2700 });
+    backend.spawn(
       'incremental-untouched',
       'claude-sonnet-5' as ModelType,
       'bounded verifier prompt',
       { ...LIVE_CEILING_OPTIONS, finalOnlyUsageContainment: GRANT },
     );
+    await backend.lastSpawnCompletion;
     expect(capturedTaskTimeout()).toBe(2700);
   });
 });

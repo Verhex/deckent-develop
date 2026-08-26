@@ -11,6 +11,10 @@ vi.mock('node:fs', () => ({
   readdirSync: vi.fn(),
   unlinkSync: vi.fn(),
   rmSync: vi.fn(),
+  openSync: vi.fn().mockReturnValue(42),
+  closeSync: vi.fn(),
+  fsyncSync: vi.fn(),
+  renameSync: vi.fn(),
   realpathSync: Object.assign(vi.fn((path: string) => path), {
     native: vi.fn((path: string) => path),
   }),

@@ -4,8 +4,13 @@ import { Command } from 'commander';
 // ─── Mocks ───────────────────────────────────────────────────────────
 
 vi.mock('node:fs', () => ({
+  rmSync: vi.fn(),
+  openSync: vi.fn().mockReturnValue(1),
+  closeSync: vi.fn(),
+  fsyncSync: vi.fn(),
   writeFileSync: vi.fn(),
   mkdirSync: vi.fn(),
+  renameSync: vi.fn(),
   readFileSync: vi.fn(),
   existsSync: vi.fn().mockReturnValue(false),
   realpathSync: Object.assign(vi.fn((path: string) => path), {
@@ -1951,8 +1956,15 @@ describe('human-friendly init output', () => {
         return '';
       });
       await runCommand(['init', '--auto']);
-      // deepMerge should be called for both initial config merge and provider config merge
-      expect(deepMerge).toHaveBeenCalledTimes(2);
+      // Aşama-sayısı backend-çözümüne göre değişebilir (:278 yalnız subprocess'te);
+      // değer-taşıyan sözleşme SAYI değil KORUMA'dır: merge çağrılır VE mevcut
+      // config'in newConfig'te olmayan anahtarları son yazıma bit-taşınır.
+      expect(deepMerge).toHaveBeenCalled();
+      const configWrites = vi.mocked(writeFileSync).mock.calls
+        .filter(c => String(c[0]).includes('config.json') && !String(c[0]).includes('.lock'));
+      expect(configWrites.length).toBeGreaterThanOrEqual(1);
+      const finalPayload = JSON.parse(String(configWrites.at(-1)![1]));
+      expect(finalPayload.modes?.max_plan?.workers).toBe(8); // existing korunur
     });
 
     it('writes fresh config when no existing config exists', async () => {

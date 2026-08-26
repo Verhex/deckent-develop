@@ -250,19 +250,19 @@ function flagValue(argv: string[], flag: string): string | undefined {
 // ─── deriveSwapFromLimitBytes ───────────────────────────────────────────────
 
 describe('deriveSwapFromLimitBytes', () => {
-  it('derives swap at 1.5× the limit (matches 4g/6g default ratio)', () => {
+  it('derives swap at 1.5× the limit (matches 4g/6g default ratio)', async () => {
     const fourGB = 4 * 1024 * 1024 * 1024;
     const sixGB = 6 * 1024 * 1024 * 1024;
     const sixGBmb = Math.floor(sixGB / (1024 * 1024));
     expect(deriveSwapFromLimitBytes(fourGB)).toBe(`${sixGBmb}m`);
   });
 
-  it('derives swap for 768m limit → 1152m', () => {
+  it('derives swap for 768m limit → 1152m', async () => {
     const limitBytes = parseMemoryString('768m')!;
     expect(deriveSwapFromLimitBytes(limitBytes)).toBe('1152m');
   });
 
-  it('derives swap for 1536m limit → 2304m', () => {
+  it('derives swap for 1536m limit → 2304m', async () => {
     const limitBytes = parseMemoryString('1536m')!;
     expect(deriveSwapFromLimitBytes(limitBytes)).toBe('2304m');
   });
@@ -277,12 +277,13 @@ describe('DockerSpawnBackend: kind-based memory limits (Sprint 272 T-005)', () =
     mockTaskJson = '{}';
   });
 
-  it('applies documentation kind limit when task type matches', () => {
+  it('applies documentation kind limit when task type matches', async () => {
     mockTaskJson = persistedTaskJson('task-doc-001', 'documentation');
     const backend = new DockerSpawnBackend('/test/project', {
       kindMemoryLimits: { documentation: '768m', 'code-development': '1536m' },
     });
     backend.spawn('task-doc-001', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
+    await (backend as DockerSpawnBackend).lastSpawnCompletion;
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
@@ -291,12 +292,13 @@ describe('DockerSpawnBackend: kind-based memory limits (Sprint 272 T-005)', () =
     expect(flagValue(argv, '--memory-swap')).toBe('1152m');
   });
 
-  it('applies code-development kind limit when task type matches', () => {
+  it('applies code-development kind limit when task type matches', async () => {
     mockTaskJson = persistedTaskJson('task-code-001', 'code-development');
     const backend = new DockerSpawnBackend('/test/project', {
       kindMemoryLimits: { documentation: '768m', 'code-development': '1536m' },
     });
     backend.spawn('task-code-001', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
+    await (backend as DockerSpawnBackend).lastSpawnCompletion;
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
@@ -305,12 +307,13 @@ describe('DockerSpawnBackend: kind-based memory limits (Sprint 272 T-005)', () =
     expect(flagValue(argv, '--memory-swap')).toBe('2304m');
   });
 
-  it('falls back to default 4g when task kind is not in kindMemoryLimits', () => {
+  it('falls back to default 4g when task kind is not in kindMemoryLimits', async () => {
     mockTaskJson = persistedTaskJson('task-audit-001', 'audit'); // 'audit' not in map
     const backend = new DockerSpawnBackend('/test/project', {
       kindMemoryLimits: { documentation: '768m', 'code-development': '1536m' },
     });
     backend.spawn('task-audit-001', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
+    await (backend as DockerSpawnBackend).lastSpawnCompletion;
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
@@ -318,10 +321,11 @@ describe('DockerSpawnBackend: kind-based memory limits (Sprint 272 T-005)', () =
     expect(flagValue(argv, '--memory-swap')).toBe(DEFAULT_WORKER_MEMORY_SWAP);
   });
 
-  it('falls back to default 4g when kindMemoryLimits is empty (zero-config behavior)', () => {
+  it('falls back to default 4g when kindMemoryLimits is empty (zero-config behavior)', async () => {
     mockTaskJson = persistedTaskJson('task-noconfig-001', 'code-development');
     const backend = new DockerSpawnBackend('/test/project');
     backend.spawn('task-noconfig-001', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
+    await (backend as DockerSpawnBackend).lastSpawnCompletion;
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
@@ -329,7 +333,7 @@ describe('DockerSpawnBackend: kind-based memory limits (Sprint 272 T-005)', () =
     expect(flagValue(argv, '--memory-swap')).toBe(DEFAULT_WORKER_MEMORY_SWAP);
   });
 
-  it('fails closed before Docker dispatch when task JSON has no canonical kind', () => {
+  it('fails closed before Docker dispatch when task JSON has no canonical kind', async () => {
     mockTaskJson = persistedTaskJson('task-notype-001'); // no type
     const backend = new DockerSpawnBackend('/test/project', {
       kindMemoryLimits: { 'code-development': '1536m' },
@@ -344,19 +348,19 @@ describe('DockerSpawnBackend: kind-based memory limits (Sprint 272 T-005)', () =
     expect(capturedDockerRunArgs).toHaveLength(0);
   });
 
-  it('throws at construction time for invalid memory limit strings', () => {
+  it('throws at construction time for invalid memory limit strings', async () => {
     expect(() => new DockerSpawnBackend('/test/project', {
       kindMemoryLimits: { 'code-development': 'not-valid-memory' },
     })).toThrow(/Invalid memory limit for kind 'code-development'/);
   });
 
-  it('throws at construction time for zero memory limit', () => {
+  it('throws at construction time for zero memory limit', async () => {
     expect(() => new DockerSpawnBackend('/test/project', {
       kindMemoryLimits: { documentation: '0m' },
     })).toThrow(/Invalid memory limit for kind 'documentation'/);
   });
 
-  it('accepts mixed kinds and applies the matching one only', () => {
+  it('accepts mixed kinds and applies the matching one only', async () => {
     mockTaskJson = persistedTaskJson('task-test-001', 'test');
     const backend = new DockerSpawnBackend('/test/project', {
       kindMemoryLimits: {
@@ -367,6 +371,7 @@ describe('DockerSpawnBackend: kind-based memory limits (Sprint 272 T-005)', () =
       },
     });
     backend.spawn('task-test-001', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
+    await (backend as DockerSpawnBackend).lastSpawnCompletion;
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
@@ -387,23 +392,25 @@ describe('SpawnBackendFactory: B-WORKERMEM config-driven --memory wire', () => {
     mockTaskJson = '{}';
   });
 
-  it('threads dockerMemoryLimit into the docker --memory flag', () => {
+  it('threads dockerMemoryLimit into the docker --memory flag', async () => {
     mockTaskJson = persistedTaskJson('task-mem-1', 'code-development');
     const backend = SpawnBackendFactory.create({
       backend: 'docker', projectDir: '/test/project', dockerMemoryLimit: '2g',
     });
     backend.spawn('task-mem-1', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
+    await (backend as DockerSpawnBackend).lastSpawnCompletion;
     const argv = capturedDockerRunArgs.at(-1) ?? [];
     // Pre-wire the factory ignored dockerMemoryLimit → '4g' (RED). Now '2g'.
     expect(flagValue(argv, '--memory')).toBe('2g');
   });
 
-  it('falls back to DEFAULT_WORKER_MEMORY_LIMIT when dockerMemoryLimit unset', () => {
+  it('falls back to DEFAULT_WORKER_MEMORY_LIMIT when dockerMemoryLimit unset', async () => {
     mockTaskJson = persistedTaskJson('task-mem-2', 'code-development');
     const backend = SpawnBackendFactory.create({
       backend: 'docker', projectDir: '/test/project',
     });
     backend.spawn('task-mem-2', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
+    await (backend as DockerSpawnBackend).lastSpawnCompletion;
     const argv = capturedDockerRunArgs.at(-1) ?? [];
     expect(flagValue(argv, '--memory')).toBe(DEFAULT_WORKER_MEMORY_LIMIT);
   });

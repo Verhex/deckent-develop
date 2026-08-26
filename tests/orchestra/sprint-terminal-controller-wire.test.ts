@@ -42,7 +42,10 @@ function task(id: string, sprintId: string): Task {
     reason: 'terminal handoff test',
     provider: 'claude',
     authMode: 'subscription',
-    scope: { directories: ['src/orchestra/'], filesRead: [], filesWrite: [] },
+    scope: {
+      directories: ['src/orchestra/'], filesRead: [],
+      filesWrite: ['src/orchestra/sprint-controller.ts'],
+    },
     dependencies: [],
     goNogo: { goCriteria: 'handoff', noGoCriteria: 'early complete', techDebtAcceptable: 'none' },
     status: 'DONE',
@@ -66,13 +69,21 @@ function result(id: string, verdict: 'DONE' | 'NO_GO'): TaskResult {
     workAttribution: {
       state: 'VERIFIED',
       attemptId: `attempt-${id}-${verdict.toLowerCase()}`,
-      baselineRef: `baseline:${id}`,
+      baselineRef: `task-result-work-attribution-baseline:sha256:${'a'.repeat(64)}`,
+      baselineSha256: 'a'.repeat(64),
       scopeDigest: (verdict === 'DONE' ? 'd' : 'f').repeat(64),
     },
   };
 }
 
 const metrics = { velocity: 1 } as unknown as SprintMetrics;
+const coordinatorRetirementEvidence = {
+  evidenceId: 'test-coordinator-retirement',
+  kind: 'recovery-coordinator-retirement',
+  state: 'VERIFIED',
+  evidenceRef: 'test:coordinator-retired',
+  requiredForCleanup: true,
+} as const;
 
 /** Publish a real fenced receipt for `sprintId` into a fresh project root. */
 function publishReceipt(options: {
@@ -91,6 +102,7 @@ function publishReceipt(options: {
     tasks: [sprintTask],
     evaluations: new Map([[taskId, options.verdict === 'DONE' ? TaskEvaluation.DONE : TaskEvaluation.NO_GO]]),
     results: [result(taskId, options.verdict)],
+    coordinatorEvidence: [coordinatorRetirementEvidence],
   });
   const publication = publishFencedSprintTerminalReceipt({
     projectRoot: options.root,

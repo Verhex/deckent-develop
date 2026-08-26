@@ -437,7 +437,7 @@ describe('FIX Phase — evaluations Map mutation', () => {
 
   it('fix task DONE → original task evaluation updated to DONE in Map', async () => {
     // Arrange
-    const originalTask = makeTask({ id: '129-001', status: TaskStatus.DONE });
+    const originalTask = makeTask({ id: '129-001', status: TaskStatus.NO_GO });
     const fixTask = makeFixTask('129-001');
     const sprint = makeSprint([originalTask]);
     const evaluations = new Map<string, TaskEvaluation>();

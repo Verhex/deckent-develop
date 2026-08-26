@@ -446,6 +446,7 @@ function settledFixture(sprint: Sprint): {
       { mode: 0o600 },
     );
     const attemptId = `attempt-${task.id}`;
+    const baselineSha256 = 'a'.repeat(64);
     evaluations.set(task.id, TaskEvaluation.DONE);
     results.push({
       taskId: task.id,
@@ -460,8 +461,9 @@ function settledFixture(sprint: Sprint): {
       workAttribution: {
         state: 'VERIFIED' as const,
         attemptId,
-        baselineRef: `baseline:${attemptId}`,
-        scopeDigest: attemptId.padEnd(64, '0').slice(0, 64),
+        baselineRef: `task-result-work-attribution-baseline:sha256:${baselineSha256}`,
+        baselineSha256,
+        scopeDigest: 'b'.repeat(64),
       },
     });
   }

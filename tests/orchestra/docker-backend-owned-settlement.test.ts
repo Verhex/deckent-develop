@@ -61,6 +61,7 @@ const EXECUTION_OPTIONS = {
 };
 
 class FakeChild extends EventEmitter {
+  readonly stdin = new PassThrough();
   readonly stdout = new PassThrough();
   readonly stderr = new PassThrough();
   readonly kill = vi.fn(() => true);
@@ -122,8 +123,16 @@ function fixture(taskId: string): { root: string; tasks: string } {
 }
 
 function installChildRouter(): void {
-  mockSpawn.mockImplementation((_command, args) => {
+  mockSpawn.mockImplementation((command, args) => {
     const subcommand = String(args?.[0] ?? '');
+    if (command === 'git' && subcommand === 'hash-object') {
+      const child = new FakeChild();
+      queueMicrotask(() => {
+        child.stdout.end('f'.repeat(40) + '\n');
+        child.emit('close', 0, null);
+      });
+      return child as unknown as ChildProcess;
+    }
     if (subcommand !== 'wait' && subcommand !== 'logs') {
       throw new Error(`unexpected docker child subcommand: ${subcommand}`);
     }
@@ -152,7 +161,7 @@ beforeEach(() => {
 });
 
 describe('Docker backend-owned settlement authority', () => {
-  it('prepares and dispatches a durable exact attempt when the caller supplies no ref', () => {
+  it('prepares and dispatches a durable exact attempt when the caller supplies no ref', async () => {
     const taskId = 'owned-ref';
     const { root } = fixture(taskId);
     const containerId = 'a'.repeat(64);
@@ -184,12 +193,14 @@ describe('Docker backend-owned settlement authority', () => {
       return spawnResult(0);
     });
 
-    new DockerSpawnBackend(root).spawn(
+    const backend = new DockerSpawnBackend(root);
+    backend.spawn(
       taskId,
       'claude-fable-5',
       'bounded prompt',
       EXECUTION_OPTIONS,
     );
+    await backend.lastSpawnCompletion;
 
     const ref = readLatestTaskResultSettlementRef(root, taskId);
     expect(ref).not.toBeNull();
@@ -200,7 +211,7 @@ describe('Docker backend-owned settlement authority', () => {
     });
   });
 
-  it('reuses an exact caller ref idempotently and rejects a conflicting active attempt pre-dispatch', () => {
+  it('reuses an exact caller ref idempotently and rejects a conflicting active attempt pre-dispatch', async () => {
     const taskId = 'owned-conflict';
     const { root } = fixture(taskId);
     const containerId = 'b'.repeat(64);
@@ -229,30 +240,35 @@ describe('Docker backend-owned settlement authority', () => {
       return spawnResult(0);
     });
 
-    expect(() => new DockerSpawnBackend(root).spawn(
+    const backend = new DockerSpawnBackend(root);
+    backend.spawn(
       taskId,
       'claude-fable-5',
       'same attempt',
       { ...EXECUTION_OPTIONS, settlementRef: active },
-    )).not.toThrow();
+    );
+    await backend.lastSpawnCompletion;
     expect(readTaskResultSettlementDispatch(active)).toMatchObject({ containerId });
 
     mockSpawnSync.mockClear();
 
     const conflicting = createTaskResultSettlementRef(root, taskId);
-    expect(() => new DockerSpawnBackend(root).spawn(
+    const conflictingBackend = new DockerSpawnBackend(root);
+    conflictingBackend.spawn(
       taskId,
       'claude-fable-5',
       'conflicting attempt',
       { ...EXECUTION_OPTIONS, settlementRef: conflicting },
-    )).toThrow(/Conflicting active Docker result settlement attempt/);
+    );
+    await expect(conflictingBackend.lastSpawnCompletion)
+      .rejects.toThrow(/Conflicting active Docker result settlement attempt/);
 
     expect(mockSpawnSync.mock.calls.filter(call => call[0] === 'docker' && call[1]?.[0] === 'run'))
       .toHaveLength(0);
     expect(readLatestTaskResultSettlementRef(root, taskId)).toEqual(active);
   });
 
-  it('leaves an ambiguous Docker ACK open for restart reconciliation instead of sealing not-dispatched', () => {
+  it('leaves an ambiguous Docker ACK open for restart reconciliation instead of sealing not-dispatched', async () => {
     const taskId = 'owned-authority-unavailable';
     const { root } = fixture(taskId);
 
@@ -278,12 +294,14 @@ describe('Docker backend-owned settlement authority', () => {
       return spawnResult(0);
     });
 
-    expect(() => new DockerSpawnBackend(root).spawn(
+    const backend = new DockerSpawnBackend(root);
+    backend.spawn(
       taskId,
       'claude-fable-5',
       'ambiguous dispatch',
       EXECUTION_OPTIONS,
-    )).toThrow(/DECKENT_E090/);
+    );
+    await expect(backend.lastSpawnCompletion).rejects.toThrow(/DECKENT_E090/);
 
     const ref = readLatestTaskResultSettlementRef(root, taskId);
     expect(ref).not.toBeNull();

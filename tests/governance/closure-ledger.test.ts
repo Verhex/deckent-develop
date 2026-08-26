@@ -98,11 +98,12 @@ describe('closure-ledger projector CLI', () => {
     expect(a.stdout).toMatch(/unsignedManifestDigest/);
     expect(a.stdout).toBe(b.stdout); // deterministic
   });
-  it('--check on the live non-empty ledger is OK and writes nothing', async () => {
+  it('--check reports the landed live projection drift and writes nothing', async () => {
     const r = await runNode(PROJECT, ['--check']);
-    expect(r.code).toBe(0);
+    expect(r.code).toBe(1);
     expect(r.stderr).toBe('');
-    expect(r.stdout).toMatch(/--check OK/);
+    expect(r.stdout).toContain('--check DRIFT: active.json');
+    expect(r.stdout).toContain('--check DRIFT: closure-health.json');
   });
 });
 

@@ -4,6 +4,7 @@ import { buildReporterLogicalLineageSummary } from '../../src/orchestra/sprint-r
 import type { TaskResult } from '../../src/core/task-types.js';
 
 function result(overrides: Partial<TaskResult> = {}): TaskResult {
+  const baselineSha256 = 'a'.repeat(64);
   return {
     taskId: '486-012',
     workerId: 'w-486-012',
@@ -17,7 +18,8 @@ function result(overrides: Partial<TaskResult> = {}): TaskResult {
     workAttribution: {
       state: 'VERIFIED',
       attemptId: 'attempt-original',
-      baselineRef: '.tasks/task-486-012.scope-baseline',
+      baselineRef: `task-result-work-attribution-baseline:sha256:${baselineSha256}`,
+      baselineSha256,
       scopeDigest: 'a'.repeat(64),
     },
     ...overrides,
@@ -35,7 +37,8 @@ describe('buildReporterLogicalLineageSummary', () => {
           workAttribution: {
             state: 'VERIFIED',
             attemptId: 'attempt-fix',
-            baselineRef: '.tasks/task-486-012-fix.scope-baseline',
+            baselineRef: `task-result-work-attribution-baseline:sha256:${'b'.repeat(64)}`,
+            baselineSha256: 'b'.repeat(64),
             scopeDigest: 'b'.repeat(64),
           },
         }),
@@ -46,7 +49,7 @@ describe('buildReporterLogicalLineageSummary', () => {
           workAttribution: {
             state: 'HOLD',
             attemptId: 'attempt-held',
-            baselineRef: '.tasks/task-486-013.scope-baseline',
+            baselineRef: 'task-result-work-attribution-baseline:unavailable',
             scopeDigest: 'c'.repeat(64),
             reasonCode: 'SCOPE_EVIDENCE_UNAVAILABLE',
           },
@@ -113,7 +116,7 @@ describe('buildReporterLogicalLineageSummary', () => {
         workAttribution: {
           state: 'HOLD',
           attemptId: 'attempt-held',
-          baselineRef: '.tasks/task-486-012.scope-baseline',
+          baselineRef: 'task-result-work-attribution-baseline:unavailable',
           scopeDigest: 'd'.repeat(64),
           reasonCode: 'SCOPE_EVIDENCE_UNAVAILABLE',
         },

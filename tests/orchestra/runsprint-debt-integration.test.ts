@@ -377,8 +377,9 @@ function makeTaskResult(opts: {
     workAttribution: {
       state: 'VERIFIED',
       attemptId,
-      baselineRef: `baseline:${attemptId}`,
-      scopeDigest: attemptId.padEnd(64, '0').slice(0, 64),
+      baselineRef: `task-result-work-attribution-baseline:sha256:${'a'.repeat(64)}`,
+      baselineSha256: 'a'.repeat(64),
+      scopeDigest: 'b'.repeat(64),
     },
   });
 }

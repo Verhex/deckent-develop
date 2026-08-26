@@ -147,6 +147,7 @@ function makeResult(taskId: string, overrides: Partial<TaskResult> = {}): TaskRe
   // Host-authored claim-time attribution is therefore part of the honest
   // fixture shape (mirrors tests/orchestra/finalize-sprint.test.ts).
   const attemptId = `attempt-${taskId}`;
+  const baselineSha256 = 'a'.repeat(64);
   return {
     taskId,
     workerId: `w-${taskId}`,
@@ -160,8 +161,9 @@ function makeResult(taskId: string, overrides: Partial<TaskResult> = {}): TaskRe
     workAttribution: {
       state: 'VERIFIED' as const,
       attemptId,
-      baselineRef: `baseline:${attemptId}`,
-      scopeDigest: attemptId.padEnd(64, '0').slice(0, 64),
+      baselineSha256,
+      baselineRef: `task-result-work-attribution-baseline:sha256:${baselineSha256}`,
+      scopeDigest: 'b'.repeat(64),
     },
     ...overrides,
   } as TaskResult;

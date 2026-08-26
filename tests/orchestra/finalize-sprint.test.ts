@@ -301,7 +301,7 @@ function createTestTask(id: string, title: string = `Task ${id}`): Task {
     effort: 'normal',
     priority: 'NORMAL',
     reason: 'test',
-    scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
+    scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/test.ts'] },
     dependencies: [],
     goNogo: { goCriteria: 'Tests pass', noGoCriteria: 'Build fails', techDebtAcceptable: '' },
     status: TaskStatus.DONE,
@@ -320,18 +320,22 @@ function createTestResult(taskId: string, passed: boolean = true, coverage: numb
   return {
     taskId,
     workerId: `w-${taskId}`,
-    filesChanged: ['src/test.ts'],
-    linesAdded: 50,
-    linesRemoved: 10,
+    filesChanged: [],
+    linesAdded: 0,
+    linesRemoved: 0,
     testsPassed: passed,
     coverage,
     selfAssessment: passed ? 'DONE' : 'NO_GO',
     notes: 'test result',
+    testVerification: { applicability: 'REQUIRED', outcome: 'PASSED', commands: ['fixture-check'] },
+    criteriaEvidence: [],
+    techDebtCriterionIds: [],
     workAttribution: {
       state: 'VERIFIED' as const,
       attemptId,
-      baselineRef: `baseline:${attemptId}`,
-      scopeDigest: attemptId.padEnd(64, '0').slice(0, 64),
+      baselineRef: 'task-result-work-attribution-baseline:sha256:' + 'a'.repeat(64),
+      baselineSha256: 'a'.repeat(64),
+      scopeDigest: 'b'.repeat(64),
     },
   };
 }
@@ -396,7 +400,6 @@ describe('finalizeSprint', () => {
       ['042-002', TaskEvaluation.GO_WITH_TECH_DEBT],
     ]);
     const results = [createTestResult('042-001'), createTestResult('042-002', true, 80)];
-
     const metrics = await finalizeSprint(PROJECT_ROOT, sprint, evaluations, results);
 
     expect(metrics).toBeDefined();

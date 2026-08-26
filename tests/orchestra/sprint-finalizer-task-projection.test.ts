@@ -33,12 +33,15 @@ function task(id: string, status: Task['status'] = 'EXECUTING', fixForTaskId?: s
 }
 
 function result(taskId: string, attemptId: string, verdict: 'DONE' | 'NO_GO'): TaskResult {
+  const baselineSha256 = 'a'.repeat(64);
   return {
     taskId, workerId: `w-${taskId}`, filesChanged: [], linesAdded: 0, linesRemoved: 0,
     testsPassed: true, coverage: verdict === 'DONE' ? 100 : 0, selfAssessment: verdict, notes: '',
     workAttribution: {
-      state: 'VERIFIED', attemptId, baselineRef: `baseline:${attemptId}`,
-      scopeDigest: 'a'.repeat(64),
+      state: 'VERIFIED', attemptId,
+      baselineRef: `task-result-work-attribution-baseline:sha256:${baselineSha256}`,
+      baselineSha256,
+      scopeDigest: 'b'.repeat(64),
     },
   };
 }

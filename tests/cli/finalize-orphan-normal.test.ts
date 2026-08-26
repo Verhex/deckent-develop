@@ -309,20 +309,14 @@ describe('finalize (normal path) — orphan coordinator termination (334-003)', 
 
     await runFinalizeCli(['--force']);
 
-    expect(mockContainCoordinator).not.toHaveBeenCalled();
-    expect(mockRunSprintRecoveryOperation).toHaveBeenCalledTimes(1);
-    expect(mockRunSprintRecoveryOperation).toHaveBeenCalledWith(
+    expect(mockContainCoordinator).toHaveBeenCalledTimes(1);
+    expect(mockContainCoordinator).toHaveBeenCalledWith(
       root,
       SPRINT_ID,
       expect.objectContaining({
-        skipAudit: true,
-        intent: 'FINALIZE_CONTAINMENT',
+        expectedIdentity: expect.objectContaining({ fenceToken: 'test-fence' }),
         terminationPolicy: expect.objectContaining({
           coordinator_termination_grace_ms: 5_000,
-        }),
-        approval: expect.objectContaining({
-          approvalRef: 'cli:force-finalize',
-          identity: expect.objectContaining({ fenceToken: 'test-fence' }),
         }),
       }),
     );
@@ -332,12 +326,12 @@ describe('finalize (normal path) — orphan coordinator termination (334-003)', 
     seedCompleteSprint(root, { status: 'EXECUTING' });
     const externalPid = process.ppid;
     seedPid(root, externalPid);
-    mockRunSprintRecoveryOperation.mockRejectedValueOnce(new Error('typed coordinator HOLD'));
+    mockContainCoordinator.mockRejectedValueOnce(new Error('typed coordinator HOLD'));
 
     await runFinalizeCli(['--force']);
 
     expect(process.exitCode).toBe(1);
-    expect(mockRunSprintRecoveryOperation).toHaveBeenCalledTimes(1);
+    expect(mockContainCoordinator).toHaveBeenCalledTimes(1);
   });
 
   it('HOLDs before terminal settlement when an in-progress worker cannot be contained', async () => {
@@ -356,18 +350,17 @@ describe('finalize (normal path) — orphan coordinator termination (334-003)', 
 
     await runFinalizeCli(['--force']);
 
-    expect(mockContainCoordinator).not.toHaveBeenCalled();
-    expect(mockRunSprintRecoveryOperation).toHaveBeenCalledTimes(1);
+    expect(mockContainCoordinator).toHaveBeenCalledTimes(1);
     expect(process.exitCode).not.toBe(1);
   });
 
   it('does not print terminal success when shared force settlement fails', async () => {
     seedCompleteSprint(root, { status: 'PENDING' });
-    mockRunSprintRecoveryOperation.mockRejectedValueOnce(new Error('typed settlement HOLD'));
+    mockContainCoordinator.mockRejectedValueOnce(new Error('typed settlement HOLD'));
 
     await runFinalizeCli(['--force']);
 
-    expect(mockRunSprintRecoveryOperation).toHaveBeenCalledTimes(1);
+    expect(mockContainCoordinator).toHaveBeenCalledTimes(1);
     expect(printed.some(m => m.includes('Complete'))).toBe(false);
     expect(process.exitCode).toBe(1);
   });

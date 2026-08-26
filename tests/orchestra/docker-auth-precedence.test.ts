@@ -216,7 +216,7 @@ describe('DockerSpawnBackend: env-forwarding auth-precedence (Sprint 214 T-001)'
     vi.unstubAllEnvs();
   });
 
-  it('subscription + ANTHROPIC_API_KEY set → does NOT forward ANTHROPIC_API_KEY', () => {
+  it('subscription + ANTHROPIC_API_KEY set → does NOT forward ANTHROPIC_API_KEY', async () => {
     // Subscription = no task-level "Auth: api" override. existsSync defaults
     // to the explicit persisted subscription envelope.
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-host-leak');
@@ -229,13 +229,14 @@ describe('DockerSpawnBackend: env-forwarding auth-precedence (Sprint 214 T-001)'
       'prompt',
       TEST_DOCKER_EXECUTION_OPTIONS,
     );
+    await (backend as DockerSpawnBackend).lastSpawnCompletion;
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
     expect(hasEnvFlag(argv, 'ANTHROPIC_API_KEY')).toBe(false);
   });
 
-  it('api authMode + ANTHROPIC_API_KEY set → forwards ANTHROPIC_API_KEY', () => {
+  it('api authMode + ANTHROPIC_API_KEY set → forwards ANTHROPIC_API_KEY', async () => {
     stubTaskEnvelope('t-auth-api', 'claude-sonnet-5', 'api');
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-api-mode');
 
@@ -246,13 +247,14 @@ describe('DockerSpawnBackend: env-forwarding auth-precedence (Sprint 214 T-001)'
       'prompt',
       TEST_DOCKER_EXECUTION_OPTIONS,
     );
+    await (backend as DockerSpawnBackend).lastSpawnCompletion;
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
     expect(hasEnvFlag(argv, 'ANTHROPIC_API_KEY')).toBe(true);
   });
 
-  it('codex provider (gpt-4.1) → metering HOLD before any credential forwarding', () => {
+  it('codex provider (gpt-4.1) → metering HOLD before any credential forwarding', async () => {
     vi.stubEnv('OPENAI_API_KEY', 'sk-openai');
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-anthropic-irrelevant');
 
@@ -266,7 +268,7 @@ describe('DockerSpawnBackend: env-forwarding auth-precedence (Sprint 214 T-001)'
     expect(capturedDockerRunArgs).toHaveLength(0);
   });
 
-  it('gemini provider → metering HOLD before any credential forwarding', () => {
+  it('gemini provider → metering HOLD before any credential forwarding', async () => {
     vi.stubEnv('GOOGLE_API_KEY', 'ya29-google');
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-anthropic-irrelevant');
 
@@ -280,7 +282,7 @@ describe('DockerSpawnBackend: env-forwarding auth-precedence (Sprint 214 T-001)'
     expect(capturedDockerRunArgs).toHaveLength(0);
   });
 
-  it('claude provider + subscription → does NOT forward OPENAI_API_KEY even if set', () => {
+  it('claude provider + subscription → does NOT forward OPENAI_API_KEY even if set', async () => {
     // Regression bonus: OPENAI_API_KEY should also not leak into a claude
     // worker (cross-provider auth confusion guard, symmetric to ANTHROPIC).
     vi.stubEnv('OPENAI_API_KEY', 'sk-openai-leak');
@@ -293,6 +295,7 @@ describe('DockerSpawnBackend: env-forwarding auth-precedence (Sprint 214 T-001)'
       'prompt',
       TEST_DOCKER_EXECUTION_OPTIONS,
     );
+    await (backend as DockerSpawnBackend).lastSpawnCompletion;
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;

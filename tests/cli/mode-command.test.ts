@@ -7,6 +7,11 @@ vi.mock('node:fs', () => ({
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
   existsSync: vi.fn(),
+  renameSync: vi.fn(),
+  openSync: vi.fn().mockReturnValue(42),
+  closeSync: vi.fn(),
+  fsyncSync: vi.fn(),
+  rmSync: vi.fn(),
 }));
 
 vi.mock('node:fs/promises', () => ({
@@ -48,7 +53,7 @@ vi.mock('../../src/cli/helpers/process.js', () => ({
   resolveProjectRoot: vi.fn().mockReturnValue('/mock/root'),
 }));
 
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, renameSync } from 'node:fs';
 import { loadConfig, loadGlobalConfig, saveGlobalConfig } from '../../src/core/config.js';
 import { print, printError } from '../../src/cli/helpers/output.js';
 import { registerMode } from '../../src/cli/commands/mode.js';
@@ -100,9 +105,11 @@ describe('deckent mode', () => {
       await run('mode', 'sprint');
 
       expect(writeFileSync).toHaveBeenCalledWith(
-        '/mock/root/.deckent/config.json',
+        expect.stringMatching(/^\/mock\/root\/\.deckent\/\.config\.json\.\d+\.[^.]+\.tmp$/),
         expect.stringContaining('"deckent_style": "sprint"'),
+        { mode: 0o600 },
       );
+      expect(renameSync).toHaveBeenCalledWith(expect.stringContaining('.config.json.'), '/mock/root/.deckent/config.json');
       expect(print).toHaveBeenCalledWith(expect.stringContaining('sprint mode'));
     });
   });
@@ -115,8 +122,9 @@ describe('deckent mode', () => {
       await run('mode', 'task');
 
       expect(writeFileSync).toHaveBeenCalledWith(
-        '/mock/root/.deckent/config.json',
+        expect.stringContaining('/.deckent/.config.json.'),
         expect.stringContaining('"deckent_style": "task"'),
+        { mode: 0o600 },
       );
       expect(print).toHaveBeenCalledWith(expect.stringContaining('task mode'));
     });
@@ -136,8 +144,9 @@ describe('deckent mode', () => {
       await run('mode', 'auto');
 
       expect(writeFileSync).toHaveBeenCalledWith(
-        '/mock/root/.deckent/config.json',
+        expect.stringContaining('/.deckent/.config.json.'),
         expect.stringContaining('"deckent_style": "sprint"'),
+        { mode: 0o600 },
       );
       expect(print).toHaveBeenCalledWith(expect.stringContaining('Auto-detected: sprint'));
     });
@@ -154,8 +163,9 @@ describe('deckent mode', () => {
       await run('mode', 'auto');
 
       expect(writeFileSync).toHaveBeenCalledWith(
-        '/mock/root/.deckent/config.json',
+        expect.stringContaining('/.deckent/.config.json.'),
         expect.stringContaining('"deckent_style": "task"'),
+        { mode: 0o600 },
       );
       expect(print).toHaveBeenCalledWith(expect.stringContaining('Auto-detected: task'));
     });

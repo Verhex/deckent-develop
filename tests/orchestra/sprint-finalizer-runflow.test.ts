@@ -138,8 +138,9 @@ describe('buildSprintCompletionRecord — TERM5-FIN rich completion-record', () 
         workAttribution: {
           state: 'VERIFIED',
           attemptId: 'attempt-427-001-1',
-          baselineRef: 'baseline-427-001',
-          scopeDigest: 'scope-digest-427-001',
+          baselineRef: `task-result-work-attribution-baseline:sha256:${'a'.repeat(64)}`,
+          baselineSha256: 'a'.repeat(64),
+          scopeDigest: 'b'.repeat(64),
         },
       })],
     ]);

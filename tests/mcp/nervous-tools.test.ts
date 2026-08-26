@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerNervousTools } from '../../src/mcp/tools/nervous.js';
 import { loadConfig } from '../../src/core/config.js';
+import { writeConfigJsonAtomic } from '../../src/core/config-write-authority.js';
 
 // ─── Test Utilities ─────────────────────────────────────────────────────────
 
@@ -82,6 +83,11 @@ vi.mock('../../src/core/config.js', async (importOriginal) => ({
   resolveBrainModel: () => 'sonnet',  // sprint-431 (431-003) compiler-cagri-zinciri okur
   resolveBrainPlanningMode: (c: any) => c?.brain_planning ?? c?.activeModeConfig?.brain_planning ?? 'auto',  // sprint-429 (429-006)
   loadConfig: vi.fn().mockResolvedValue({ nervous_system: { mode: 'balanced', enabled: true } }),
+}));
+
+vi.mock('../../src/core/config-write-authority.js', () => ({
+  withConfigWriteLock: (_path: string, write: () => void) => write(),
+  writeConfigJsonAtomic: vi.fn(),
 }));
 
 vi.mock('node:fs', async () => {
@@ -185,12 +191,16 @@ describe('Nervous System MCP Tools', () => {
 
   // Test 9: deckent_nervous_config set_preset persists
   it('deckent_nervous_config set_preset autopilot → persisted', async () => {
-    const { writeFileSync } = await import('node:fs');
     const result = await callTool(tools, 'deckent_nervous_config', { action: 'set_preset', preset: 'autopilot' });
     const data = JSON.parse(result.content[0].text);
     expect(data.action).toBe('set_preset');
     expect(data.preset).toBe('autopilot');
-    expect(writeFileSync).toHaveBeenCalled();
+    expect(writeConfigJsonAtomic).toHaveBeenCalledWith(
+      expect.stringContaining('config.json'),
+      expect.objectContaining({
+        nervous_system: expect.objectContaining({ mode: 'autopilot' }),
+      }),
+    );
   });
 
   // Test 10: Total registered tool count = 5 nervous tools

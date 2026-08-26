@@ -3,10 +3,16 @@ import http from 'node:http';
 
 // ─── Mocks ──────────────────────────────────────────────────────
 vi.mock('node:fs', () => ({
+  rmSync: vi.fn(),
+  openSync: vi.fn().mockReturnValue(1),
+  closeSync: vi.fn(),
+  fsyncSync: vi.fn(),
   readFileSync: vi.fn(),
   existsSync: vi.fn(() => false),
   readdirSync: vi.fn(),
   writeFileSync: vi.fn(),
+  mkdirSync: vi.fn(),
+  renameSync: vi.fn(),
   watch: vi.fn(() => ({ close: vi.fn() })),
 }));
 

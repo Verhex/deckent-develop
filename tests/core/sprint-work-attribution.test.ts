@@ -61,7 +61,8 @@ describe('sprint work-attribution projection', () => {
       workAttribution: {
         state: 'VERIFIED',
         attemptId: 'attempt-a',
-        baselineRef: 'baseline:a',
+        baselineSha256: 'a'.repeat(64),
+        baselineRef: `task-result-work-attribution-baseline:sha256:${'a'.repeat(64)}`,
         scopeDigest: 'b'.repeat(64),
       },
     });
@@ -73,7 +74,8 @@ describe('sprint work-attribution projection', () => {
       workAttribution: {
         state: 'VERIFIED',
         attemptId: 'attempt-b',
-        baselineRef: 'baseline:b',
+        baselineSha256: 'd'.repeat(64),
+        baselineRef: `task-result-work-attribution-baseline:sha256:${'d'.repeat(64)}`,
         scopeDigest: 'c'.repeat(64),
       },
     });

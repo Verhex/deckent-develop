@@ -18,9 +18,15 @@ import * as fs from 'node:fs';
 // ─── Mocks ───────────────────────────────────────────────────────────
 
 vi.mock('node:fs', () => ({
+  rmSync: vi.fn(),
+  openSync: vi.fn().mockReturnValue(1),
+  closeSync: vi.fn(),
+  fsyncSync: vi.fn(),
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
   existsSync: vi.fn(),
+  mkdirSync: vi.fn(),
+  renameSync: vi.fn(),
 }));
 
 vi.mock('../../../src/core/config.js', () => {
@@ -219,7 +225,7 @@ describe('JSON comment import support (D)', () => {
     vi.mocked(writeFileSync).mockImplementation(() => {});
     await runCommand(['config', 'import', '/tmp/import.json']);
     expect(writeFileSync).toHaveBeenCalled();
-    const written = JSON.parse(String(vi.mocked(writeFileSync).mock.calls[0]![1]));
+    const written = JSON.parse(String(vi.mocked(writeFileSync).mock.calls.find(call => String(call[0]).endsWith(".tmp"))!![1]));
     expect(written.mode).toBe('pro_plan');
   });
 
@@ -237,7 +243,7 @@ describe('JSON comment import support (D)', () => {
     vi.mocked(validatePartialConfig).mockImplementation(() => {});
     vi.mocked(writeFileSync).mockImplementation(() => {});
     await runCommand(['config', 'import', '/tmp/import.json']);
-    const written = JSON.parse(String(vi.mocked(writeFileSync).mock.calls[0]![1]));
+    const written = JSON.parse(String(vi.mocked(writeFileSync).mock.calls.find(call => String(call[0]).endsWith(".tmp"))!![1]));
     expect(written.mode).toBe('max_plan');
   });
 });

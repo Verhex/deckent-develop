@@ -259,9 +259,10 @@ describe('DockerSpawnBackend: catalog mount mask wiring (593-001 F2c)', () => {
     installSpawnRouter();
   });
 
-  it('emits ZERO catalog mounts by DEFAULT (flag off) even though both catalogs exist', () => {
+  it('emits ZERO catalog mounts by DEFAULT (flag off) even though both catalogs exist', async () => {
     const backend = new DockerSpawnBackend('/test/project');
     backend.spawn('catalog-mask-default', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
+    await backend.lastSpawnCompletion;
 
     expect(capturedDockerRunArgs.length).toBe(1);
     expect(catalogMountArgs(capturedDockerRunArgs[0]!)).toEqual([]);
@@ -269,7 +270,7 @@ describe('DockerSpawnBackend: catalog mount mask wiring (593-001 F2c)', () => {
     expect(mockMkdirSync).not.toHaveBeenCalledWith(MASK_SOURCE, { recursive: true });
   });
 
-  it('threads effective prompt.catalog_mount_mask through the factory into docker argv', () => {
+  it('threads effective prompt.catalog_mount_mask through the factory into docker argv', async () => {
     const backend = SpawnBackendFactory.create({
       backend: 'docker',
       projectDir: '/test/project',
@@ -282,6 +283,7 @@ describe('DockerSpawnBackend: catalog mount mask wiring (593-001 F2c)', () => {
     });
 
     backend.spawn('catalog-mask-factory', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
+    await (backend as DockerSpawnBackend).lastSpawnCompletion;
 
     expect(capturedDockerRunArgs.length).toBe(1);
     expect(catalogMountArgs(capturedDockerRunArgs[0]!)).toEqual([
@@ -290,9 +292,10 @@ describe('DockerSpawnBackend: catalog mount mask wiring (593-001 F2c)', () => {
     ]);
   });
 
-  it('masks both catalogs read-only when the flag is on and both exist on the host', () => {
+  it('masks both catalogs read-only when the flag is on and both exist on the host', async () => {
     const backend = new DockerSpawnBackend('/test/project', { catalogMountMask: true });
     backend.spawn('catalog-mask-on', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
+    await backend.lastSpawnCompletion;
 
     expect(capturedDockerRunArgs.length).toBe(1);
     expect(catalogMountArgs(capturedDockerRunArgs[0]!)).toEqual([
@@ -302,10 +305,11 @@ describe('DockerSpawnBackend: catalog mount mask wiring (593-001 F2c)', () => {
     expect(mockMkdirSync).toHaveBeenCalledWith(MASK_SOURCE, { recursive: true });
   });
 
-  it('skips a catalog missing on the host (no phantom .claude/agents in the repo)', () => {
+  it('skips a catalog missing on the host (no phantom .claude/agents in the repo)', async () => {
     absentPaths = new Set([AGENTS_HOST]);
     const backend = new DockerSpawnBackend('/test/project', { catalogMountMask: true });
     backend.spawn('catalog-mask-partial', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
+    await backend.lastSpawnCompletion;
 
     expect(capturedDockerRunArgs.length).toBe(1);
     expect(catalogMountArgs(capturedDockerRunArgs[0]!)).toEqual([
@@ -313,19 +317,21 @@ describe('DockerSpawnBackend: catalog mount mask wiring (593-001 F2c)', () => {
     ]);
   });
 
-  it('emits no catalog mount at all when NEITHER catalog exists on the host', () => {
+  it('emits no catalog mount at all when NEITHER catalog exists on the host', async () => {
     absentPaths = new Set([SKILLS_HOST, AGENTS_HOST]);
     const backend = new DockerSpawnBackend('/test/project', { catalogMountMask: true });
     backend.spawn('catalog-mask-none', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
+    await backend.lastSpawnCompletion;
 
     expect(capturedDockerRunArgs.length).toBe(1);
     expect(catalogMountArgs(capturedDockerRunArgs[0]!)).toEqual([]);
     expect(mockMkdirSync).not.toHaveBeenCalledWith(MASK_SOURCE, { recursive: true });
   });
 
-  it('keeps every pre-existing mount byte-identical — the mask is purely additive', () => {
+  it('keeps every pre-existing mount byte-identical — the mask is purely additive', async () => {
     const backend = new DockerSpawnBackend('/test/project', { catalogMountMask: true });
     backend.spawn('catalog-mask-parity', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
+    await backend.lastSpawnCompletion;
 
     const argv = capturedDockerRunArgs[0]!;
     // Project root still read-write, .tasks/ and .locks/ untouched, dist/ still :ro.
@@ -335,7 +341,7 @@ describe('DockerSpawnBackend: catalog mount mask wiring (593-001 F2c)', () => {
     expect(argv).toContain('/test/project/dist:/workspace/dist:ro');
   });
 
-  it('produces argv identical to the unmasked spawn except for the mask args', () => {
+  it('produces argv identical to the unmasked spawn except for the mask args', async () => {
     // The per-spawn random promptId legitimately differs between two spawns (it rides
     // the git-guard dir name and IDEMPOTENCY_KEY); normalize ONLY those two tokens so
     // the comparison measures the mask's argv impact and nothing else.
@@ -345,11 +351,13 @@ describe('DockerSpawnBackend: catalog mount mask wiring (593-001 F2c)', () => {
 
     const backendOff = new DockerSpawnBackend('/test/project');
     backendOff.spawn('catalog-parity-off', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
+    await backendOff.lastSpawnCompletion;
     const offArgv = normalize(capturedDockerRunArgs[0]!);
 
     installSpawnRouter();
     const backendOn = new DockerSpawnBackend('/test/project', { catalogMountMask: true });
     backendOn.spawn('catalog-parity-off', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
+    await backendOn.lastSpawnCompletion;
     const onArgv = normalize(capturedDockerRunArgs[0]!);
 
     // Strip the two `-v <mask>` pairs; what remains must equal the flag-off argv.

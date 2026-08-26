@@ -669,7 +669,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-26 xverify-onarim dalgasi (sprint-678): +2 — worker-authored
   // tests/cli/xverify-evidence-scope.test.ts + fencing/ingress pin ekleri
   // (tmpdir-hermetik, suite-owned).
-  count: 16508,
+  count: 16511,
   // 2026-08-25 B-sweep: digest moved — --fix roundtrip pin, multi-label
   // parser pin, same-line rule downgraded to WARN (all suite-owned).
   // 2026-08-25 7141 wave: count unchanged, digest moved — the src-side
@@ -713,7 +713,8 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // attribution-baseline / finalize-retirement + isCanonicalTaskFilename pinleri.
   // 2026-08-26 11:04: 16504→16506 — Node-6a mekanik supurme (sprint-684 3/3):
   // death-sweep hijyen + worker-identity-hostbound + docker-git-async suiteleri.
-  digest: 'cee8a5ebee024081ade7ab79b2c9a72cdfd02f924dab38175deb7c4fd7d75357',
+  digest: 'dbec609b880770561f685d8e541922716ad858d9796def24943d00188224d274',
+  // 13:5x: 16508→16511 — sprint-691 66-dosya hizalama + init semantik-koruma pini.
   // 12:1x: ayni 16508, digest-only — 689 multi-provider dalga test-kaymalari.
   // 2026-08-26 11:48: 16506→16508 — 7141 devam-dalgalari (687-001 + 688 2/2):
   // typed-throw donusumu test-eklentileri.

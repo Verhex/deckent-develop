@@ -322,7 +322,7 @@ describe('finalize overhaul', () => {
     vi.mocked(readSprintRecoverySettlementIdentity).mockReturnValue({
       generation: 1, fenceToken: 'fence-1',
     } as any);
-    vi.mocked(containSprintRecoveryCoordinator).mockResolvedValue({ action: 'none' } as any);
+    vi.mocked(containSprintRecoveryCoordinator).mockResolvedValue({ action: 'already-stopped' } as any);
     vi.mocked(runSprintRecoveryOperation).mockResolvedValue(undefined as any);
     vi.mocked(killSingle).mockReturnValue('killed' as any);
     vi.mocked(forceAbortSprint).mockReturnValue({
@@ -381,7 +381,7 @@ describe('finalize overhaul', () => {
     // born-610: live workers must die before terminal settlement…
     expect(killSingle).toHaveBeenCalledWith('/mock/root', '001', 'en');
     // …then recovery containment + the fenced ABORTED settlement run.
-    expect(runSprintRecoveryOperation).toHaveBeenCalled();
+    expect(containSprintRecoveryCoordinator).toHaveBeenCalled();
     expect(forceAbortSprint).toHaveBeenCalled();
     expect(finalizeSprint).not.toHaveBeenCalled();
     const calls = vi.mocked(print).mock.calls.map(c => c[0]);

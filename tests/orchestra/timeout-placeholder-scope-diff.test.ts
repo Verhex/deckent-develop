@@ -281,7 +281,7 @@ describe('computeScopeBaselineManifest', () => {
     const repo = freshTmp();
     await initRepo(repo);
     writeFileSync(join(repo, 'a.ts'), 'export const a = 1;\n');
-    const manifest = computeScopeBaselineManifest(repo, ['a.ts', 'missing.ts', '  ', '']);
+    const manifest = await computeScopeBaselineManifest(repo, ['a.ts', 'missing.ts', '  ', '']);
     const lines = manifest.trim().split('\n');
     expect(lines.length).toBe(1);
     // git hash-object blob id (sha1 = 40 hex; sha256 repo = 64) after a TAB.
@@ -291,7 +291,7 @@ describe('computeScopeBaselineManifest', () => {
   it('returns an empty string when nothing can be baselined (all entries absent)', async () => {
     const repo = freshTmp();
     await initRepo(repo);
-    expect(computeScopeBaselineManifest(repo, ['nope.ts'])).toBe('');
+    await expect(computeScopeBaselineManifest(repo, ['nope.ts'])).resolves.toBe('');
   });
 });
 
@@ -311,7 +311,7 @@ describe('buildOnExitTrap — task-start baseline filter (455-003 TIMEOUT-BASELI
     // A previous task / operator left mine.ts dirty BEFORE this worker started.
     appendFileSync(join(repo, 'mine.ts'), '// pre-existing dirt from an earlier task\n');
     // The task-start baseline is captured NOW, with mine.ts already dirty.
-    const manifest = computeScopeBaselineManifest(repo, ['mine.ts']);
+    const manifest = await computeScopeBaselineManifest(repo, ['mine.ts']);
     // The worker itself touches NOTHING, then is killed (exit 1).
 
     const trap = buildOnExitTrap('t-preexist', 'sonnet', ['mine.ts']);
@@ -332,7 +332,7 @@ describe('buildOnExitTrap — task-start baseline filter (455-003 TIMEOUT-BASELI
     await stageBaseline(repo);
 
     appendFileSync(join(repo, 'mine.ts'), '// pre-existing dirt\n');
-    const manifest = computeScopeBaselineManifest(repo, ['mine.ts']);
+    const manifest = await computeScopeBaselineManifest(repo, ['mine.ts']);
     // The worker DOES do real work on top of the pre-existing dirt.
     appendFileSync(join(repo, 'mine.ts'), '// genuine task-local edit\n');
 
@@ -347,7 +347,7 @@ describe('buildOnExitTrap — task-start baseline filter (455-003 TIMEOUT-BASELI
     const repo = freshTmp();
     await initRepo(repo);
     // Baseline captured BEFORE new-file.ts exists → it has no manifest entry.
-    const manifest = computeScopeBaselineManifest(repo, ['new-file.ts']);
+    const manifest = await computeScopeBaselineManifest(repo, ['new-file.ts']);
     writeFileSync(join(repo, 'new-file.ts'), 'export const z = 1;\n');
 
     const trap = buildOnExitTrap('t-newfile', 'sonnet', ['new-file.ts']);
@@ -364,7 +364,7 @@ describe('buildOnExitTrap — task-start baseline filter (455-003 TIMEOUT-BASELI
     await stageBaseline(repo);
 
     appendFileSync(join(repo, 'old.ts'), '// pre-existing dirt\n');
-    const manifest = computeScopeBaselineManifest(repo, ['old.ts', 'fresh.ts']);
+    const manifest = await computeScopeBaselineManifest(repo, ['old.ts', 'fresh.ts']);
     // Worker creates a genuinely new in-scope file; old.ts is left as pre-existing dirt.
     writeFileSync(join(repo, 'fresh.ts'), 'export const b = 1;\n');
 
@@ -407,7 +407,7 @@ describe('normal result — claim-time work attribution (3175)', () => {
       buildScopeAttributionManifest(
         attemptId,
         ['shared.ts'],
-        computeScopeBaselineManifest(repo, ['shared.ts']),
+        await computeScopeBaselineManifest(repo, ['shared.ts']),
       ),
       'utf-8',
     );
@@ -452,7 +452,7 @@ describe('normal result — claim-time work attribution (3175)', () => {
       buildScopeAttributionManifest(
         attemptId,
         ['shared.ts'],
-        computeScopeBaselineManifest(repo, ['shared.ts']),
+        await computeScopeBaselineManifest(repo, ['shared.ts']),
       ),
       'utf-8',
     );
@@ -494,7 +494,7 @@ describe('normal result — claim-time work attribution (3175)', () => {
       buildScopeAttributionManifest(
         attemptId,
         ['canonical.ts'],
-        computeScopeBaselineManifest(repo, ['canonical.ts']),
+        await computeScopeBaselineManifest(repo, ['canonical.ts']),
       ),
       'utf-8',
     );
@@ -565,7 +565,7 @@ describe('normal result — claim-time work attribution (3175)', () => {
       buildScopeAttributionManifest(
         attemptId,
         ['deleted.ts'],
-        computeScopeBaselineManifest(repo, ['deleted.ts']),
+        await computeScopeBaselineManifest(repo, ['deleted.ts']),
       ),
       'utf-8',
     );

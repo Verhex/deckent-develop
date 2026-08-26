@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Command } from 'commander';
 
 const mockFinalizeSprint = vi.fn();
-const mockRunSprintRecoveryOperation = vi.fn();
+const mockContainSprintRecoveryCoordinator = vi.fn();
 const mockForceAbortSprint = vi.fn();
 const mockPrint = vi.fn();
 const mockPrintError = vi.fn();
@@ -51,7 +51,7 @@ vi.mock('../../../src/cli/commands/review.js', () => ({ loadReviewState: vi.fn()
 vi.mock('../../../src/core/task-result-schema.js', () => ({ normalizeTaskResultShape: (result: unknown) => result }));
 vi.mock('../../../src/orchestra/sprint-recovery-operation.js', () => ({
   readSprintRecoverySettlementIdentity: vi.fn().mockReturnValue({ generation: 1, fenceToken: 'fence' }),
-  runSprintRecoveryOperation: (...args: unknown[]) => mockRunSprintRecoveryOperation(...args),
+  containSprintRecoveryCoordinator: (...args: unknown[]) => mockContainSprintRecoveryCoordinator(...args),
 }));
 
 import { registerFinalize } from '../../../src/cli/commands/finalize.js';
@@ -59,7 +59,7 @@ import { registerFinalize } from '../../../src/cli/commands/finalize.js';
 describe('deckent finalize recovery adapter', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockRunSprintRecoveryOperation.mockRejectedValue(new Error('typed HOLD'));
+    mockContainSprintRecoveryCoordinator.mockRejectedValue(new Error('typed HOLD'));
     mockForceAbortSprint.mockReturnValue({
       outcome: 'ABORTED',
       terminalTruth: {
@@ -75,12 +75,11 @@ describe('deckent finalize recovery adapter', () => {
 
     await program.parseAsync(['node', 'test', 'finalize', '--force', '--sprint', 'sprint-482']);
 
-    expect(mockRunSprintRecoveryOperation).toHaveBeenCalledWith(
+    expect(mockContainSprintRecoveryCoordinator).toHaveBeenCalledWith(
       '/fake/project',
       'sprint-482',
       expect.objectContaining({
-        skipAudit: true,
-        intent: 'FINALIZE_CONTAINMENT',
+        expectedIdentity: { generation: 1, fenceToken: 'fence' },
       }),
     );
     expect(mockFinalizeSprint).not.toHaveBeenCalled();
@@ -89,7 +88,7 @@ describe('deckent finalize recovery adapter', () => {
   });
 
   it('routes --force to ABORTED settlement and never invokes normal finalize', async () => {
-    mockRunSprintRecoveryOperation.mockResolvedValue({});
+    mockContainSprintRecoveryCoordinator.mockResolvedValue({ action: 'already-stopped' });
     const program = new Command();
     program.exitOverride();
     registerFinalize(program);

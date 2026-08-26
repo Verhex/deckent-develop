@@ -123,9 +123,9 @@ function fixTaskStatus(fixState: FixState): TaskStatus | undefined {
 const EXPECTATION_TABLE: Record<string, Record<FixState, [boolean, boolean]>> = {
   [TaskStatus.DONE]: {
     'none': [true, false],
-    'pending-fix': [false, false],
+    'pending-fix': [true, false],
     'done-fix': [true, false],
-    'no_go-fix': [false, true],
+    'no_go-fix': [true, false],
   },
   [TaskStatus.NO_GO]: {
     'none': [false, true],
@@ -135,21 +135,21 @@ const EXPECTATION_TABLE: Record<string, Record<FixState, [boolean, boolean]>> = 
   },
   [TaskStatus.MANUAL_REVIEW_REQUIRED]: {
     'none': [false, true],
-    'pending-fix': [false, false],
-    'done-fix': [true, false],
+    'pending-fix': [false, true],
+    'done-fix': [false, true],
     'no_go-fix': [false, true],
   },
   [TaskStatus.PENDING]: {
     'none': [false, false],
     'pending-fix': [false, false],
-    'done-fix': [true, false],
-    'no_go-fix': [false, true],
+    'done-fix': [false, false],
+    'no_go-fix': [false, false],
   },
   [TaskStatus.EXECUTING]: {
     'none': [false, false],
     'pending-fix': [false, false],
-    'done-fix': [true, false],
-    'no_go-fix': [false, true],
+    'done-fix': [false, false],
+    'no_go-fix': [false, false],
   },
 };
 

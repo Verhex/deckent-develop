@@ -17197,3 +17197,30 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 690-003: Align failing orchestra/unit suites (cluster 3) to landed contracts (DONE)
 
 ---
+## Sprint 691 — sprint-691
+
+**Status:** COMPLETE
+**Date:** 2026-08-26
+**Duration:** 907s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 6 |
+| Completed | 6 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 907355ms |
+
+### Tasks
+
+- 691-001: Align failing api/cli suites (cluster 1) to landed contracts (DONE)
+- 691-002: Align failing cli/core/governance/mcp suites (cluster 2) to landed contracts (DONE)
+- 691-003: Align failing mcp/orchestra suites (cluster 3) to landed contracts (DONE)
+- 691-004: Align failing orchestra suites (cluster 4) to landed contracts (DONE)
+- 691-005: Align failing orchestra suites (cluster 5) to landed contracts (DONE)
+- 691-006: Align failing orchestra/scripts suites (cluster 6) to landed contracts (DONE)
+
+---

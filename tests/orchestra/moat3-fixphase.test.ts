@@ -183,6 +183,9 @@ function makeResult(taskId: string, overrides: Partial<TaskResult> = {}): TaskRe
     coverage: 85,
     selfAssessment: 'DONE',
     notes: 'OK',
+    testVerification: { applicability: 'REQUIRED', outcome: 'PASSED', commands: ['fixture-check'] },
+    criteriaEvidence: [],
+    techDebtCriterionIds: [],
     ...overrides,
   };
 }
@@ -365,15 +368,8 @@ describe('FIX Phase — NOT_DISPATCHED re-dispatch execution (354-010)', () => {
     expect(evaluations.get('354-781')).toBe(TaskEvaluation.NOT_DISPATCHED);
   });
 
-  it('skipFix provider-limit guard is never diluted by NOT_DISPATCHED entries (infra-classification stays separate from worker-crash)', async () => {
-    // A single genuine usage-limit NO_GO (producedWork=false) alongside several
-    // NOT_DISPATCHED entries. If NOT_DISPATCHED were wrongly folded into the
-    // provider-failure ratio's denominator, 1 usage-limit / (1 + 4 unknown) would
-    // fall below FIX_SKIP_USAGE_LIMIT_RATIO (0.5) and skipFix would wrongly stay
-    // false. The classifier only ever sees `ev === NO_GO` entries, so the ratio
-    // must be 1/1 = 1.0 and skipFix must fire — proving the two failure classes
-    // never mix.
-    const noGoTask = makeTask({ id: '354-782' });
+  it('unverified provider-limit prose never suppresses an honest NOT_DISPATCHED retry', async () => {
+    const noGoTask = makeTask({ id: '354-782', status: TaskStatus.NO_GO });
     const ndTasks = ['354-783', '354-784', '354-785', '354-786'].map(id => makeTask({ id }));
     const sprint = makeSprint([noGoTask, ...ndTasks]);
     const evaluations = new Map<string, TaskEvaluation>([
@@ -390,21 +386,20 @@ describe('FIX Phase — NOT_DISPATCHED re-dispatch execution (354-010)', () => {
         filesChanged: [],
         linesAdded: 0,
         linesRemoved: 0,
-        notes: 'Usage limit reached — please retry later.',
+        notes: 'Provider usage limit exceeded: usage_limit',
       }),
     ];
+    vi.mocked(waitForResults).mockResolvedValue([]);
 
     await runFixPhase(root, sprint, evaluations, results, makeConfig(), undefined, 'v1', undefined);
 
-    // Provider-limit guard fired and returned BEFORE the re-dispatch block ever ran.
-    expect(spawnWorkers).not.toHaveBeenCalled();
-    expect(waitForResults).not.toHaveBeenCalled();
-    expect(writeEvent).not.toHaveBeenCalledWith(
-      expect.anything(), expect.anything(), expect.anything(), expect.anything(),
-      'BRAIN→WORKER:RE_DISPATCH_RESULT', expect.anything(),
-    );
-    // NOT_DISPATCHED entries are untouched — no worker-blame applied to them
-    expect(evaluations.get('354-783')).toBe(TaskEvaluation.NOT_DISPATCHED);
+    expect(spawnWorkers).toHaveBeenCalledTimes(1);
+    const dispatchedSprint = vi.mocked(spawnWorkers).mock.calls[0]?.[1] as Sprint;
+    expect(dispatchedSprint.tasks.map(task => task.id)).toEqual(ndTasks.map(task => task.id));
+    expect(evaluations.get('354-782')).toBe(TaskEvaluation.NO_GO);
+    for (const task of ndTasks) {
+      expect(evaluations.get(task.id)).toBe(TaskEvaluation.NOT_DISPATCHED);
+    }
   });
 
   it('redispatch proceeds normally when NO_GO entries exist but are not usage-limit-flavored', async () => {

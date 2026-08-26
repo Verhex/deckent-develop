@@ -259,7 +259,7 @@ describe('DockerSpawnBackend production wiring', () => {
     });
   });
 
-  it('wires the host-authored wrapper and active claim fence into the real Docker spawn ingress', () => {
+  it('wires the host-authored wrapper and active claim fence into the real Docker spawn ingress', async () => {
     vi.stubEnv('DECKENT_AUTH_SKIP', '1');
     const root = freshRoot('deckent-provider-observation-spawn-');
     const tasksDir = join(root, '.tasks');
@@ -287,7 +287,8 @@ describe('DockerSpawnBackend production wiring', () => {
       'utf-8',
     );
 
-    new DockerSpawnBackend(root).spawn(taskId, 'claude-sonnet-5', 'prompt', {
+    const backend = new DockerSpawnBackend(root);
+    backend.spawn(taskId, 'claude-sonnet-5', 'prompt', {
       ...TEST_DOCKER_EXECUTION_OPTIONS,
       finalOnlyUsageContainment: {
         maxWallClockSeconds: 60,
@@ -295,6 +296,7 @@ describe('DockerSpawnBackend production wiring', () => {
         policyDigest: 'b'.repeat(64),
       },
     });
+    await backend.lastSpawnCompletion;
 
     expect(capturedDockerRuns).toHaveLength(1);
     const runArgs = capturedDockerRuns[0];

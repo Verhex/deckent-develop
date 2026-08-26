@@ -36,6 +36,13 @@ vi.mock('../../src/nervous/action-registry.js', () => ({
   ],
 }));
 
+vi.mock('../../src/core/config-write-authority.js', () => ({
+  withConfigWriteLock: (_path: string, write: () => void) => write(),
+  writeConfigJsonAtomic: (path: string, value: unknown) => {
+    writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
+  },
+}));
+
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 

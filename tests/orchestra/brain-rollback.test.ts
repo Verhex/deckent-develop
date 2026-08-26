@@ -362,6 +362,7 @@ function makeTaskResult(opts: {
   // logicalSettlementDigest — a byte-identical fixture across tests would be
   // a replay of the SAME settled authority (DUPLICATE_PUBLICATION HOLD).
   const attemptId = `attempt-${taskId}-${attemptNonce}`;
+  const baselineSha256 = 'b'.repeat(64);
   return JSON.stringify({
     taskId,
     workerId: `w-${taskId}`,
@@ -378,8 +379,9 @@ function makeTaskResult(opts: {
     workAttribution: {
       state: 'VERIFIED',
       attemptId,
-      baselineRef: `baseline:${attemptId}`,
-      scopeDigest: attemptId.padEnd(64, '0').slice(0, 64),
+      baselineRef: `task-result-work-attribution-baseline:sha256:${baselineSha256}`,
+      baselineSha256,
+      scopeDigest: 'c'.repeat(64),
     },
   });
 }

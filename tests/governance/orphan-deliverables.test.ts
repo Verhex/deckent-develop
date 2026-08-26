@@ -424,6 +424,7 @@ describe('findOrphanFiles — fixture determinism', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 const KNOWN_ORPHANS = [
+  'src/agents/landing-proposal-entry.ts',
   // 531 süpürme (2026-08-06): eight modules newly orphaned by the FAZ4-era
   // refactor waves — the live scan pinned them loudly, exactly as designed.
   // Four are RECOVERY-program modules (written-but-unwired recovery code);
@@ -554,7 +555,7 @@ const KNOWN_ORPHANS = [
 
 describe('KNOWN_ORPHANS allowlist sanity', () => {
   it('has the expected count and only well-formed src/**/*.ts(x) entries', () => {
-    expect(KNOWN_ORPHANS.length).toBe(92);
+    expect(KNOWN_ORPHANS.length).toBe(93);
     for (const entry of KNOWN_ORPHANS) {
       expect(entry.startsWith('src/')).toBe(true);
       expect(entry.endsWith('.ts') || entry.endsWith('.tsx')).toBe(true);

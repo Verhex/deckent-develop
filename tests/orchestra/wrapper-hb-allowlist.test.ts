@@ -364,6 +364,7 @@ describe('DockerSpawnBackend.spawn() — allowedTools SSOT integration', () => {
       ...TEST_DOCKER_EXECUTION_OPTIONS,
       allowedTools: 'Read,Write(.tasks/,docs/adr/,src/orchestra/spawn-backend-docker.ts),Edit(.tasks/,docs/adr/,src/orchestra/spawn-backend-docker.ts),Bash,Glob,Grep',
     });
+    await backend.lastSpawnCompletion;
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const scriptPath = join(tasksDir, `.worker-${taskId}.sh`);

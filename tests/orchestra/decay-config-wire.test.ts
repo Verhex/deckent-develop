@@ -173,7 +173,8 @@ const settledResult = (taskId: string): TaskResult => ({
   techDebtCriterionIds: [],
   workAttribution: {
     state: 'VERIFIED', attemptId: `attempt-${taskId}-1`,
-    baselineRef: `baseline-${taskId}`, scopeDigest: `scope-${taskId}`,
+    baselineRef: `task-result-work-attribution-baseline:sha256:${'b'.repeat(64)}`,
+    baselineSha256: 'b'.repeat(64), scopeDigest: 'c'.repeat(64),
   },
 } as TaskResult);
 

@@ -16,6 +16,13 @@ import { readCanonicalRunStatusReadModel } from '../../src/core/run-status-read-
 import { runRetroPhase } from '../../src/orchestra/sprint-phases.js';
 
 const temporaryRoots: string[] = [];
+const coordinatorRetirementEvidence = {
+  evidenceId: 'test-coordinator-retirement',
+  kind: 'recovery-coordinator-retirement',
+  state: 'VERIFIED',
+  evidenceRef: 'test:coordinator-retired',
+  requiredForCleanup: true,
+} as const;
 
 function projectRoot(): string {
   const root = mkdtempSync(join(tmpdir(), 'deckent-terminal-receipt-'));
@@ -34,7 +41,10 @@ function task(): Task {
     reason: 'terminal receipt test',
     provider: 'codex',
     authMode: 'subscription',
-    scope: { directories: ['src/orchestra/'], filesRead: [], filesWrite: [] },
+    scope: {
+      directories: ['src/orchestra/'], filesRead: [],
+      filesWrite: ['src/orchestra/sprint-finalizer.ts'],
+    },
     dependencies: [],
     goNogo: { goCriteria: 'receipt', noGoCriteria: 'early archive', techDebtAcceptable: 'none' },
     status: 'DONE',
@@ -58,7 +68,8 @@ function result(verdict: 'DONE' | 'NO_GO'): TaskResult {
     workAttribution: {
       state: 'VERIFIED',
       attemptId: `attempt-${verdict.toLowerCase()}`,
-      baselineRef: `baseline:${verdict}`,
+      baselineRef: `task-result-work-attribution-baseline:sha256:${'a'.repeat(64)}`,
+      baselineSha256: 'a'.repeat(64),
       scopeDigest: verdict === 'DONE' ? 'd'.repeat(64) : 'f'.repeat(64),
     },
   };
@@ -93,6 +104,7 @@ describe('fenced sprint terminal receipt archive boundary', () => {
       tasks: [sprintTask],
       evaluations: new Map([['487-002', TaskEvaluation.DONE]]),
       results: [result('DONE')],
+      coordinatorEvidence: [coordinatorRetirementEvidence],
     });
     const sprint = {
       id: 'sprint-487',
@@ -163,6 +175,7 @@ describe('fenced sprint terminal receipt archive boundary', () => {
       tasks: [sprintTask],
       evaluations: new Map([['487-002', TaskEvaluation.NO_GO]]),
       results: [result('NO_GO')],
+      coordinatorEvidence: [coordinatorRetirementEvidence],
     });
 
     // A' terminal-publication fail-closed (sprint-537 wave, 2026-08-17): a run

@@ -167,7 +167,11 @@ async function fixture(scope: readonly string[], seed: Record<string, string>): 
   const baselinePath = join(repo, '.scope-baseline');
   writeFileSync(
     baselinePath,
-    buildScopeAttributionManifest(ATTEMPT_ID, scope, computeScopeBaselineManifest(repo, scope)),
+    buildScopeAttributionManifest(
+      ATTEMPT_ID,
+      scope,
+      await computeScopeBaselineManifest(repo, scope),
+    ),
     'utf-8',
   );
   const resultPath = join(repo, '.result.json');

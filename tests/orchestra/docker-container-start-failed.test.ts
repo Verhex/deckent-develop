@@ -197,25 +197,25 @@ function findTimeoutWrite(): string | null {
 // ─── Pure helper tests ──────────────────────────────────────────────────────
 
 describe('classifyDockerError', () => {
-  it('maps image-not-found stderr to DECKENT_E081', () => {
+  it('maps image-not-found stderr to DECKENT_E081', async () => {
     const out = classifyDockerError("Unable to find image 'foo:bar' locally", 125);
     expect(out.code).toBe(DOCKER_ERROR_CODES.IMAGE_NOT_FOUND);
     expect(out.code).toBe('DECKENT_E081');
   });
 
-  it('maps port-collision stderr to DECKENT_E082', () => {
+  it('maps port-collision stderr to DECKENT_E082', async () => {
     const out = classifyDockerError('bind: address already in use', 125);
     expect(out.code).toBe(DOCKER_ERROR_CODES.PORT_COLLISION);
     expect(out.code).toBe('DECKENT_E082');
   });
 
-  it('maps resource-limit stderr to DECKENT_E083', () => {
+  it('maps resource-limit stderr to DECKENT_E083', async () => {
     const out = classifyDockerError('cannot allocate memory', 125);
     expect(out.code).toBe(DOCKER_ERROR_CODES.RESOURCE_LIMIT);
     expect(out.code).toBe('DECKENT_E083');
   });
 
-  it('falls back to DECKENT_E084 with exitCode + stderr in message', () => {
+  it('falls back to DECKENT_E084 with exitCode + stderr in message', async () => {
     const out = classifyDockerError('mysterious failure xyz', 42);
     expect(out.code).toBe(DOCKER_ERROR_CODES.UNKNOWN);
     expect(out.message).toContain('exitCode=42');
@@ -224,13 +224,13 @@ describe('classifyDockerError', () => {
 });
 
 describe('parseInspectOutput', () => {
-  it('parses true|0 as running', () => {
+  it('parses true|0 as running', async () => {
     expect(parseInspectOutput('true|0')).toEqual({ running: true, exitCode: 0 });
   });
-  it('parses false|137 as stopped', () => {
+  it('parses false|137 as stopped', async () => {
     expect(parseInspectOutput('false|137')).toEqual({ running: false, exitCode: 137 });
   });
-  it('returns null on malformed input', () => {
+  it('returns null on malformed input', async () => {
     expect(parseInspectOutput('garbage')).toBeNull();
     expect(parseInspectOutput('')).toBeNull();
     expect(parseInspectOutput('true|notanumber')).toBeNull();
@@ -238,7 +238,7 @@ describe('parseInspectOutput', () => {
 });
 
 describe('parseDockerAuthorityInspectOutput', () => {
-  it('preserves the full container ID and exact ownership labels', () => {
+  it('preserves the full container ID and exact ownership labels', async () => {
     const id = 'a'.repeat(64);
     expect(parseDockerAuthorityInspectOutput(
       `${id}|true|0|true|project-hash|task-hash|00000000-0000-4000-8000-000000000001`,
@@ -255,7 +255,7 @@ describe('parseDockerAuthorityInspectOutput', () => {
     });
   });
 
-  it('rejects malformed identity/state projections', () => {
+  it('rejects malformed identity/state projections', async () => {
     expect(parseDockerAuthorityInspectOutput('short|true|0|true|p|t|a')).toBeNull();
     expect(parseDockerAuthorityInspectOutput(`${'a'.repeat(64)}|unknown|0|true|p|t|a`)).toBeNull();
   });
@@ -292,13 +292,14 @@ describe('DockerSpawnBackend: container_start_failed health check + retry', () =
     });
   });
 
-  it('clean start: docker run + Running=true → no retry, no .timeout marker', () => {
+  it('clean start: docker run + Running=true → no retry, no .timeout marker', async () => {
     makeSpawnRouter({
       run: [{ stdout: 'container-id-abc123', stderr: '', status: 0 }],
       inspect: [{ stdout: 'true|0', stderr: '', status: 0 }],
     });
 
     backend.spawn('test-clean', 'claude-sonnet-5', 'prompt', TEST_EXECUTION_OPTIONS);
+    await (backend as DockerSpawnBackend).lastSpawnCompletion;
 
     expect(countDockerCalls('run')).toBe(1);
     expect(countDockerCalls('inspect')).toBe(1);
@@ -310,7 +311,7 @@ describe('DockerSpawnBackend: container_start_failed health check + retry', () =
     expect(backend.list()).toContain('test-clean');
   });
 
-  it('stopped non-zero current container is finalized without duplicate provider dispatch', () => {
+  it('stopped non-zero current container is finalized without duplicate provider dispatch', async () => {
     makeSpawnRouter({
       run: [
         { stdout: 'container-fail', stderr: '', status: 0 },
@@ -321,6 +322,7 @@ describe('DockerSpawnBackend: container_start_failed health check + retry', () =
     });
 
     backend.spawn('test-retry-ok', 'claude-sonnet-5', 'prompt', TEST_EXECUTION_OPTIONS);
+    await (backend as DockerSpawnBackend).lastSpawnCompletion;
 
     expect(countDockerCalls('run')).toBe(1);
     expect(countDockerCalls('inspect')).toBe(1);
@@ -329,7 +331,7 @@ describe('DockerSpawnBackend: container_start_failed health check + retry', () =
     expect(backend.list()).toContain('test-retry-ok');
   });
 
-  it('docker-run failure with no created container retries boundedly without rm', () => {
+  it('docker-run failure with no created container retries boundedly without rm', async () => {
     makeSpawnRouter({
       run: [
         { stdout: '', stderr: 'bind: address already in use', status: 125 },
@@ -342,6 +344,7 @@ describe('DockerSpawnBackend: container_start_failed health check + retry', () =
     });
 
     backend.spawn('test-retry-fail', 'claude-sonnet-5', 'prompt', TEST_EXECUTION_OPTIONS);
+    await (backend as DockerSpawnBackend).lastSpawnCompletion;
 
     // Exactly MAX_SPAWN_ATTEMPTS attempts were made
     expect(countDockerCalls('run')).toBe(MAX_SPAWN_ATTEMPTS);
@@ -357,7 +360,7 @@ describe('DockerSpawnBackend: container_start_failed health check + retry', () =
     expect(backend.list()).not.toContain('test-retry-fail');
   });
 
-  it('foreign name collision fails loud without rm, kill or second docker run', () => {
+  it('foreign name collision fails loud without rm, kill or second docker run', async () => {
     makeSpawnRouter({
       run: [{ stdout: '', stderr: 'Conflict. The container name is already in use.', status: 125 }],
       inspect: [{
@@ -368,6 +371,7 @@ describe('DockerSpawnBackend: container_start_failed health check + retry', () =
     });
 
     backend.spawn('test-foreign', 'claude-sonnet-5', 'prompt', TEST_EXECUTION_OPTIONS);
+    await (backend as DockerSpawnBackend).lastSpawnCompletion;
 
     expect(countDockerCalls('run')).toBe(1);
     expect(countDockerCalls('rm')).toBe(0);
@@ -376,7 +380,7 @@ describe('DockerSpawnBackend: container_start_failed health check + retry', () =
     expect(backend.list()).not.toContain('test-foreign');
   });
 
-  it('authority inspect permission failure fails closed without rm, kill or second docker run', () => {
+  it('authority inspect permission failure fails closed without rm, kill or second docker run', async () => {
     makeSpawnRouter({
       run: [{ stdout: '', stderr: 'name already in use', status: 125 }],
       inspect: [{
@@ -386,12 +390,13 @@ describe('DockerSpawnBackend: container_start_failed health check + retry', () =
       }],
     });
 
-    expect(() => backend.spawn(
+    backend.spawn(
       'test-authority-unavailable',
       'claude-sonnet-5',
       'prompt',
       TEST_EXECUTION_OPTIONS,
-    )).toThrow(DOCKER_ERROR_CODES.AUTHORITY_UNAVAILABLE);
+    );
+    await expect(backend.lastSpawnCompletion).rejects.toThrow(DOCKER_ERROR_CODES.AUTHORITY_UNAVAILABLE);
 
     expect(countDockerCalls('run')).toBe(1);
     expect(countDockerCalls('inspect')).toBe(1);
@@ -401,7 +406,7 @@ describe('DockerSpawnBackend: container_start_failed health check + retry', () =
     expect(backend.list()).not.toContain('test-authority-unavailable');
   });
 
-  it('exact-attempt collision adopts the full container ID without redispatch', () => {
+  it('exact-attempt collision adopts the full container ID without redispatch', async () => {
     const labels = new Map<string, string>();
     mockSpawnSync.mockImplementation((cmd, args) => {
       const argv = (args as string[] | undefined) ?? [];
@@ -444,6 +449,7 @@ describe('DockerSpawnBackend: container_start_failed health check + retry', () =
     });
 
     backend.spawn('test-adopt', 'claude-sonnet-5', 'prompt', TEST_EXECUTION_OPTIONS);
+    await (backend as DockerSpawnBackend).lastSpawnCompletion;
 
     expect(countDockerCalls('run')).toBe(1);
     expect(countDockerCalls('rm')).toBe(0);
@@ -452,13 +458,14 @@ describe('DockerSpawnBackend: container_start_failed health check + retry', () =
     expect(runArgs[runArgs.indexOf('--name') + 1]).toMatch(/^deckent-w-[a-f0-9]{12}-[a-f0-9]{16}$/);
   });
 
-  it('instant-exit ExitCode=0: container started and gracefully exited → success, no retry', () => {
+  it('instant-exit ExitCode=0: container started and gracefully exited → success, no retry', async () => {
     makeSpawnRouter({
       run: [{ stdout: 'container-instant', stderr: '', status: 0 }],
       inspect: [{ stdout: 'false|0', stderr: '', status: 0 }],
     });
 
     backend.spawn('test-instant', 'claude-sonnet-5', 'prompt', TEST_EXECUTION_OPTIONS);
+    await (backend as DockerSpawnBackend).lastSpawnCompletion;
 
     // No retry — instant-exit-success is treated as a clean spawn
     expect(countDockerCalls('run')).toBe(1);
@@ -474,15 +481,15 @@ describe('DockerSpawnBackend: container_start_failed health check + retry', () =
 // ─── Sanity: contract / wiring ──────────────────────────────────────────────
 
 describe('DockerSpawnBackend: retry policy constants', () => {
-  it('exposes MAX_SPAWN_ATTEMPTS=2 (task spec)', () => {
+  it('exposes MAX_SPAWN_ATTEMPTS=2 (task spec)', async () => {
     expect(MAX_SPAWN_ATTEMPTS).toBe(2);
   });
 
-  it('exposes HEALTH_CHECK_DELAY_MS=3000 (task spec — 3 seconds)', () => {
+  it('exposes HEALTH_CHECK_DELAY_MS=3000 (task spec — 3 seconds)', async () => {
     expect(HEALTH_CHECK_DELAY_MS).toBe(3_000);
   });
 
-  it('keeps the original start codes and exposes fail-closed ownership conflict', () => {
+  it('keeps the original start codes and exposes fail-closed ownership conflict', async () => {
     expect(DOCKER_ERROR_CODES.IMAGE_NOT_FOUND).toBe('DECKENT_E081');
     expect(DOCKER_ERROR_CODES.PORT_COLLISION).toBe('DECKENT_E082');
     expect(DOCKER_ERROR_CODES.RESOURCE_LIMIT).toBe('DECKENT_E083');

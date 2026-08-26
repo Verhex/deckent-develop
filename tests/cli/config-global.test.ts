@@ -4,6 +4,10 @@ import { Command } from 'commander';
 // ─── Mocks ───────────────────────────────────────────────────────────
 
 vi.mock('node:fs', () => ({
+  rmSync: vi.fn(),
+  openSync: vi.fn().mockReturnValue(1),
+  closeSync: vi.fn(),
+  fsyncSync: vi.fn(),
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
   existsSync: vi.fn(),
@@ -166,12 +170,14 @@ describe('importConfig', () => {
     // Strike-5 (2026-08-25): config.json yazımı DAİMA atomic tmp+rename —
     // içerik tmp dosyasına yazılır, sonra renameSync ile hedefe taşınır.
     expect(writeFileSync).toHaveBeenCalledWith(
-      expect.stringMatching(/^\/config\.json\..+\.tmp$/),
+      expect.stringMatching(/^\/\.config\.json\..+\.tmp$/),
       expect.stringContaining('"mode"'),
+      { mode: 0o600 },
     );
-    const tmpPath = String(vi.mocked(writeFileSync).mock.calls[0]?.[0]);
+    const configWrite = vi.mocked(writeFileSync).mock.calls.find(call => String(call[0]).endsWith('.tmp'))!;
+    const tmpPath = String(configWrite[0]);
     expect(renameSync).toHaveBeenCalledWith(tmpPath, '/config.json');
-    const written = JSON.parse(vi.mocked(writeFileSync).mock.calls[0][1] as string);
+    const written = JSON.parse(configWrite[1] as string);
     expect(written.mode).toBe('pro_plan');
     expect(written.language).toBe('en');
   });
@@ -194,7 +200,8 @@ describe('importConfig', () => {
       return 'malformed{{{';
     });
     importConfig('/import.json', '/config.json');
-    const written = JSON.parse(vi.mocked(writeFileSync).mock.calls[0][1] as string);
+    const configWrite = vi.mocked(writeFileSync).mock.calls.find(call => String(call[0]).endsWith('.tmp'))!;
+    const written = JSON.parse(configWrite[1] as string);
     expect(written.mode).toBe('pro_plan');
   });
 

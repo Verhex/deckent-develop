@@ -6,9 +6,14 @@ vi.mock('node:fs', () => ({
   mkdirSync: vi.fn(),
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
+  openSync: vi.fn().mockReturnValue(42),
+  closeSync: vi.fn(),
+  fsyncSync: vi.fn(),
+  renameSync: vi.fn(),
+  rmSync: vi.fn(),
 }));
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import {
   ensureGlobalDir,
   readGlobalConfig,
@@ -120,10 +125,11 @@ describe('writeGlobalConfig', () => {
     writeGlobalConfig(config);
 
     expect(mockedWriteFileSync).toHaveBeenCalledWith(
-      GLOBAL_CONFIG_PATH,
+      expect.stringContaining('/.deckent/.config.json.'),
       JSON.stringify(config, null, 2) + '\n',
-      'utf-8',
+      { mode: 0o600 },
     );
+    expect(renameSync).toHaveBeenCalledWith(expect.stringContaining('.config.json.'), GLOBAL_CONFIG_PATH);
   });
 
   it('calls ensureGlobalDir before writing', () => {
@@ -142,9 +148,9 @@ describe('writeGlobalConfig', () => {
     writeGlobalConfig({});
 
     expect(mockedWriteFileSync).toHaveBeenCalledWith(
-      GLOBAL_CONFIG_PATH,
+      expect.stringContaining('/.deckent/.config.json.'),
       '{}\n',
-      'utf-8',
+      { mode: 0o600 },
     );
   });
 });

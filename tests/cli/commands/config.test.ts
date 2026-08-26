@@ -4,9 +4,14 @@ import { Command } from 'commander';
 // ─── Mocks ───────────────────────────────────────────────────────────
 
 vi.mock('node:fs', () => ({
+  rmSync: vi.fn(),
+  openSync: vi.fn().mockReturnValue(1),
+  closeSync: vi.fn(),
+  fsyncSync: vi.fn(),
   readFileSync: vi.fn(),
   writeFileSync: vi.fn(),
   existsSync: vi.fn(),
+  mkdirSync: vi.fn(),
   renameSync: vi.fn(),
 }));
 
@@ -94,7 +99,7 @@ describe('config command (isolated)', () => {
     vi.mocked(validatePartialConfig).mockImplementation(() => {});
     await runCommand(['config', 'set', 'language', 'tr']);
     expect(writeFileSync).toHaveBeenCalled();
-    const writeCall = vi.mocked(writeFileSync).mock.calls[0];
+    const writeCall = vi.mocked(writeFileSync).mock.calls.find(call => String(call[0]).endsWith(".tmp"))!;
     const written = JSON.parse(String(writeCall![1]));
     expect(written.language).toBe('tr');
     expect(written.mode).toBe('max_plan');
@@ -105,7 +110,7 @@ describe('config command (isolated)', () => {
     vi.mocked(validatePartialConfig).mockImplementation(() => {});
     await runCommand(['config', 'set', 'max_workers', '4']);
     expect(writeFileSync).toHaveBeenCalled();
-    const writeCall = vi.mocked(writeFileSync).mock.calls[0];
+    const writeCall = vi.mocked(writeFileSync).mock.calls.find(call => String(call[0]).endsWith(".tmp"))!;
     const written = JSON.parse(String(writeCall![1]));
     expect(written.max_workers).toBe(4); // parsed as number, not string
   });
@@ -114,7 +119,7 @@ describe('config command (isolated)', () => {
     vi.mocked(existsSync).mockReturnValue(false);
     vi.mocked(validatePartialConfig).mockImplementation(() => {});
     await runCommand(['config', 'set', 'projectName', 'my-project']);
-    const writeCall = vi.mocked(writeFileSync).mock.calls[0];
+    const writeCall = vi.mocked(writeFileSync).mock.calls.find(call => String(call[0]).endsWith(".tmp"))!;
     const written = JSON.parse(String(writeCall![1]));
     expect(written.projectName).toBe('my-project');
   });
@@ -148,7 +153,7 @@ describe('config command (isolated)', () => {
     vi.mocked(existsSync).mockReturnValue(false);
     vi.mocked(validatePartialConfig).mockImplementation(() => {});
     await runCommand(['config', 'set', 'newKey', '"newValue"']);
-    const writeCall = vi.mocked(writeFileSync).mock.calls[0];
+    const writeCall = vi.mocked(writeFileSync).mock.calls.find(call => String(call[0]).endsWith(".tmp"))!;
     const written = JSON.parse(String(writeCall![1]));
     expect(written.newKey).toBe('newValue');
   });

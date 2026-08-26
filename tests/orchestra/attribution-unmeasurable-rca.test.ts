@@ -174,7 +174,7 @@ async function fixture(
     buildScopeAttributionManifest(
       ATTEMPT_ID,
       scope,
-      contentManifest ?? computeScopeBaselineManifest(repo, scope),
+      contentManifest ?? await computeScopeBaselineManifest(repo, scope),
     ),
     'utf-8',
   );
