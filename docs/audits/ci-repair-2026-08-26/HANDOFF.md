@@ -20,6 +20,7 @@ için push edilir, fakat ana-şerit bu HOLD'ları kapatmadan landing-green sayı
   "receiptId": "ci-repair-test-slim-phase-b-2026-08-26-v1",
   "lane": "lane/ci-repair-20260826",
   "baseSha": "567ecaf887891099dfc8c79989dc580a80870b25",
+  "implementationCommit": "d25b2ddb1c89e0dec04edc03f1f4e67bce537367",
   "phase": "B",
   "phaseBLease": "ACTIVE",
   "deliveryStatus": "HOLD_ADMISSION",
@@ -58,6 +59,7 @@ için push edilir, fakat ana-şerit bu HOLD'ları kapatmadan landing-green sayı
   },
   "lint": "HOLD_STALE_CANONICAL_RATCHETS",
   "srcFilesChanged": 0,
+  "remoteAdvisory": "NO_BRANCH_RUNS_FOR_D25B2DDB1_AT_DELIVERY_QUERY",
   "admissionAuthority": "main-lane"
 }
 HANDOFF-JSON -->
@@ -214,5 +216,7 @@ raporlarını yazıp `103` test failure nedeniyle exit `1` dönmüştür.
 - `LOCAL_VERIFIED`: scoped equality, Secret Scan, TSR/TSM/wire, CI-R001, F1–F5.
 - `LOCAL_FULL_SUITE`: kırmızı; green iddiası yok.
 - `LOCAL_20_GATE`: stale allowlist-dışı ratchet nedeniyle HOLD.
-- `REMOTE_ADVISORY`: branch push sonrası sınıflandırılacak.
+- `REMOTE_ADVISORY`: implementation push'undan sonra branch ve exact commit SHA ile iki
+  ayrı `gh run list` sorgusu `[]` döndürdü; bu workflow seti branch push'una koşu
+  üretmedi. Remote green iddiası yok; `NO_BRANCH_RUNS`.
 - `ADMISSION`: ana-şerit yetkisinde ve bu teslimde `HOLD_ADMISSION`.

@@ -17,7 +17,9 @@
 - Full suite: `FAIL — 13 files / 118 tests / 3 errors`
 - Coverage: `THRESHOLDS PASS — lines %86,52 / functions %95,22 / branches %83,77; command FAIL (103 tests)`
 - 20-gate lint: `HOLD — allowlist dışı stale canonical ratchets`
-- Remote branch admission: `PENDING_PUSH`
+- Implementation commit: `d25b2ddb1c89e0dec04edc03f1f4e67bce537367`
+- Remote advisory: `NO_BRANCH_RUNS` — branch ve exact SHA sorguları `[]`
+- Remote branch admission: `PUSHED — admission main-lane authority'de`
 
 Scoped Faz-B işi tamamlandı ve assertion zayıflatma yoktur. Admission HOLD'u test-slim
 merge'lerinden değil, `tests/hermeticity/runtime-write-guard.ts:523-529` local
