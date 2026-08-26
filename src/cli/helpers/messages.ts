@@ -2981,6 +2981,14 @@ const BASE_MESSAGES: MessageMap = {
     en: 'Skill manifests: {changed} changed, {unchanged} unchanged',
     tr: 'Skill manifestleri: {changed} değişti, {unchanged} değişmedi',
   },
+  'sync.workspace_updated': {
+    en: '{prefix}Workspace artifact updated: {path}',
+    tr: '{prefix}Workspace artifactı güncellendi: {path}',
+  },
+  'sync.workspace_summary': {
+    en: 'Workspace artifacts: {changed} changed, {unchanged} unchanged',
+    tr: 'Workspace artifactları: {changed} değişti, {unchanged} değişmedi',
+  },
 
   // ─── set-directives command ──────────────────────────────────────────
   'set_directives.updated': {

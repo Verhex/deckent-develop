@@ -14,6 +14,16 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint697] - 2026-08-26
+
+### Added
+
+- WORKER-GUIDE/BOOT render-içeriğini motor-gerçekleriyle hizala
+- deckent sync workspace-kolu — mevcut projede canonical regen yolu
+
+
+_Tasks: 2 total, 2 done, 0 tech debt, 0 no-go_
+
 ## [sprint692] - 2026-08-26
 
 ### Added

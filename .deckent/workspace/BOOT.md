@@ -2,7 +2,7 @@
 # Boot
 
 ## Boot Sequence
-<!-- DECKENT:CONTRACT id="boot" schema="1" sha256="8cf3e3b3e4336544b75e4e798069912b95e3cfefea62ea9f9b9d04f750d37cc3" -->
+<!-- DECKENT:CONTRACT id="boot" schema="1" sha256="b565fec667fd2633588f3d520ec708a5b3c39d16a1f5080acb8c4b66e2447b9e" -->
 1. **Authority yükle** — Brain `DIRECTIVES.md`, effective config ve `.brain/memory.db` kaynaklarını okur; generated projectionlar policy üretmez.
 2. **Planla ve admit et** — exact DAG, provider/model/auth/budget/reachability ve write scope dispatch öncesi çözülür.
 3. **Spawn** — yapılandırılmış platform adapterı yalnız admitted workerları başlatır.
@@ -10,6 +10,12 @@
 5. **Evaluate** — Brain disk truth, test, scope, cost ve policy kanıtını GO, FIX veya typed HOLD/NO_GO kararına uzlaştırır.
 6. **Fix** — uygun hatalar bounded FIX DAG’a girer; `processQueue` dependency completion uydurmaz.
 7. **Finalize ve archive** — canonical retention çalışmadan önce terminal settlement, Retrospective, memory, trace ve projectionlar yayımlanır.
+
+### Engine completion truth
+
+A spawn call returning is not completion evidence. Docker spawn completion is observed through `DockerSpawnBackend.lastSpawnCompletion`.
+
+A worker result settles through the attempt-bound execution-landing proposal and execution-landing coordinator chain. Only the host-coordinated durable settlement is completion truth.
 <!-- DECKENT:CONTRACT:END id="boot" -->
 
 ## Manual Recovery Chain

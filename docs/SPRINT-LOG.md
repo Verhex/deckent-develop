@@ -17284,3 +17284,26 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 696-004: test-guardian builtin agent — 7094-F1c kapanışı (DONE)
 
 ---
+## Sprint 697 — sprint-697
+
+**Status:** COMPLETE
+**Date:** 2026-08-26
+**Duration:** 204s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 203926ms |
+
+### Tasks
+
+- 697-001: WORKER-GUIDE/BOOT render-içeriğini motor-gerçekleriyle hizala (DONE)
+- 697-002: deckent sync workspace-kolu — mevcut projede canonical regen yolu (DONE)
+
+---

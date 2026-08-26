@@ -234,7 +234,16 @@ export function renderCliCommandsSection(language: string): string {
 
 export function renderBootSequenceSection(language: string): string {
   const lang = normalizedLanguage(language);
-  return renderManagedContractBlock('boot', getMessage('workspace.boot.sequence', lang));
+  const body = [
+    getMessage('workspace.boot.sequence', lang),
+    '',
+    '### Engine completion truth',
+    '',
+    'A spawn call returning is not completion evidence. Docker spawn completion is observed through `DockerSpawnBackend.lastSpawnCompletion`.',
+    '',
+    'A worker result settles through the attempt-bound execution-landing proposal and execution-landing coordinator chain. Only the host-coordinated durable settlement is completion truth.',
+  ].join('\n');
+  return renderManagedContractBlock('boot', body);
 }
 
 export function renderManualRecoverySection(language: string): string {
@@ -244,13 +253,23 @@ export function renderManualRecoverySection(language: string): string {
 
 export function renderWorkerContractSection(language: string): string {
   const lang = normalizedLanguage(language);
-  const body = getMessage('workspace.worker.contract', lang, {
-    schemaVersion: TASK_RESULT_SCHEMA_VERSION,
-    requiredFields: getRequiredTaskResultFields().join(', '),
-    done: getMessage('workspace.worker.dod.done', lang),
-    techDebt: getMessage('workspace.worker.dod.tech_debt', lang),
-    noGo: getMessage('workspace.worker.dod.no_go', lang),
-  });
+  const body = [
+    getMessage('workspace.worker.contract', lang, {
+      schemaVersion: TASK_RESULT_SCHEMA_VERSION,
+      requiredFields: getRequiredTaskResultFields().join(', '),
+      done: getMessage('workspace.worker.dod.done', lang),
+      techDebt: getMessage('workspace.worker.dod.tech_debt', lang),
+      noGo: getMessage('workspace.worker.dod.no_go', lang),
+    }),
+    '',
+    '### Engine-aligned lifecycle',
+    '',
+    'Write the task heartbeat exactly once at startup. It is activity context, not a refresh-based process-liveness lease.',
+    '',
+    'Publish progress with a provider-neutral, monotonically increasing proposal sequence token. A greater token proves progress; wall-clock freshness alone does not.',
+    '',
+    'The worker result is ingress, not canonical settlement. Publish the bounded, attempt-bound execution-landing proposal; the execution-landing coordinator validates and republishes it before the host finalizer settles the canonical result.',
+  ].join('\n');
   return renderManagedContractBlock('worker-guide', body);
 }
 

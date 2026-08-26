@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, statSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, statSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import type { Dirent } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -21,6 +21,11 @@ import { resolveProjectRoot } from '../helpers/process.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
 import { ensureCursorRules } from '../helpers/cursor-config.js';
 import { cliContractMessage } from '../helpers/message-catalog/cli-run.js';
+import {
+  initializeWorkspaceArtifacts,
+  type WorkspaceArtifactAction,
+} from '../../orchestra/workspace-artifacts.js';
+import { getWorkspaceArtifactDescriptor } from '../../core/workspace-artifact-contract.js';
 
 // ─── Constants ───────────────────────────────────────────────────────
 
@@ -63,6 +68,11 @@ export interface AdapterSyncError {
 export interface AdapterSyncReport {
   synced: string[];
   errors: AdapterSyncError[];
+}
+
+export interface WorkspaceSyncReport {
+  changed: string[];
+  unchanged: string[];
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -659,6 +669,74 @@ export function syncAgentCapabilities(root: string, dryRun = false): AgentCapabi
   return report;
 }
 
+// ─── Managed Workspace Artifact Sync (697-002) ─────────────────────
+
+const MANAGED_WORKSPACE_IDS = ['tools', 'boot', 'worker-guide'] as const;
+const PRESERVED_WORKSPACE_IDS = ['identity', 'stats-snapshot'] as const;
+
+interface FileSnapshot {
+  path: string;
+  content: string | null;
+}
+
+function snapshotWorkspaceFiles(root: string, includeManaged: boolean): FileSnapshot[] {
+  const ids = includeManaged
+    ? [...PRESERVED_WORKSPACE_IDS, ...MANAGED_WORKSPACE_IDS]
+    : [...PRESERVED_WORKSPACE_IDS];
+  return ids.map((id) => {
+    const path = join(root, getWorkspaceArtifactDescriptor(id).path);
+    return { path, content: existsSync(path) ? readFileSync(path, 'utf8') : null };
+  });
+}
+
+function restoreWorkspaceFiles(snapshots: FileSnapshot[]): void {
+  for (const snapshot of snapshots) {
+    if (snapshot.content === null) {
+      rmSync(snapshot.path, { force: true });
+    } else if (!existsSync(snapshot.path) || readFileSync(snapshot.path, 'utf8') !== snapshot.content) {
+      writeFileSync(snapshot.path, snapshot.content, 'utf8');
+    }
+  }
+}
+
+function readWorkspaceConfig(root: string): { projectName: string; language: string } {
+  try {
+    const value = JSON.parse(readFileSync(join(root, DECKENT_DIR, 'config.json'), 'utf8')) as {
+      projectName?: unknown;
+      language?: unknown;
+    };
+    return {
+      projectName: typeof value.projectName === 'string' ? value.projectName : root.split(/[\\/]/).pop() ?? 'project',
+      language: typeof value.language === 'string' ? value.language : getLanguage(),
+    };
+  } catch {
+    return { projectName: root.split(/[\\/]/).pop() ?? 'project', language: getLanguage() };
+  }
+}
+
+/** Regenerate only registry-owned workspace sections; user/snapshot artifacts stay byte-identical. */
+export function syncWorkspaceArtifacts(root: string, dryRun = false): WorkspaceSyncReport {
+  const snapshots = snapshotWorkspaceFiles(root, dryRun);
+  const config = readWorkspaceConfig(root);
+  let actions: WorkspaceArtifactAction[] = [];
+  try {
+    actions = initializeWorkspaceArtifacts({
+      projectRoot: root,
+      projectName: config.projectName,
+      language: config.language,
+    }).actions;
+  } finally {
+    restoreWorkspaceFiles(snapshots);
+  }
+
+  const managed = actions.filter((action) =>
+    (MANAGED_WORKSPACE_IDS as readonly string[]).includes(action.id));
+  return {
+    changed: managed.filter((action) => action.action !== 'unchanged').map((action) => action.path),
+    unchanged: managed.filter((action) => action.action === 'unchanged').map((action) => action.path),
+  };
+}
+
 // ─── Command Registration ───────────────────────────────────────────
 
 export function registerSync(program: Command): void {
@@ -680,6 +758,7 @@ export function registerSync(program: Command): void {
         agentManifestSync?: AgentManifestSyncReport;
         agentCapabilitiesSync?: AgentCapabilitiesSyncReport;
         skillManifestSync?: BuiltinSkillSyncReport;
+        workspaceSync?: WorkspaceSyncReport;
         gitChanges?: SyncResult | null;
         warnings?: string[];
       } = {};
@@ -792,6 +871,21 @@ export function registerSync(program: Command): void {
           print(getMessage('sync.skill_manifest_summary', getLanguage(), {
             changed: String(skillSyncReport.created.length + skillSyncReport.updated.length),
             unchanged: String(skillSyncReport.unchanged.length),
+          }));
+        }
+
+        const workspaceSyncReport = syncWorkspaceArtifacts(root, opts.dryRun);
+        output.workspaceSync = workspaceSyncReport;
+        if (!opts.json) {
+          for (const path of workspaceSyncReport.changed) {
+            print(getMessage('sync.workspace_updated', getLanguage(), {
+              prefix: opts.dryRun ? getMessage('sync.dry_run_prefix', getLanguage()) : '',
+              path,
+            }));
+          }
+          print(getMessage('sync.workspace_summary', getLanguage(), {
+            changed: String(workspaceSyncReport.changed.length),
+            unchanged: String(workspaceSyncReport.unchanged.length),
           }));
         }
       }

@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "24a8e39e4d6289af03653e78313f26b9ef872325a09a7214bc02fd8e9a9eea58"
+    "value": "efa1e1b264e12e15f97f6f1efbb5222bebb987c8e91c967055a126ec054f13ff"
   },
   "summary": {
     "total": 540,
@@ -400,9 +400,9 @@
       "program": "TRUTH",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-11",
+      "updated": "2026-08-26",
       "definitionDigest": "d69e5f61895e418abc42a1367fa79b64b85592e01e9506276cf9d6d899977314",
-      "progressDigest": "046d42d06cc933ed0de146592f5c474db64e9cf8647adaf3b787ebaa98e62ce1",
+      "progressDigest": "438ef01bf15ecb1fc416a216b54421d98f6d4f2dbb1e0277d47b37dd16ac6fd3",
       "terminalClosureDigest": null
     },
     {
@@ -8969,8 +8969,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "MCP satırları canonical lower-layer TOOL_CATALOGdan exact annotations/effect/idempotence/approval metadata ile, CLI satırları registered command tree'den üretilir; source filename veya helper modül adı capability sayılmaz; init, MCP, managed docs ve user/AI reference aynı rendererı tüketir; exact parity/count gate driftte fail eder; labels i18n catalogdan gelir; removed/renamed command versioned migration/disposition taşır; clean-package ve every-environment proof'u pass olur",
-      "evidence": "2026-08-11 kök-neden+implementation: filename-derived generator 40 araç gösterirken canonical MCP 49'du; 15 gerçek araç eksik, 6 sahteydi; CLI module sayısı gerçek 75 command yerine 107 gibi sunulabiliyordu. Canonical kataloglar `src/core/{mcp-tool-catalog,command-registry}.ts` lower-layer SSOT'a taşındı, surface compatibility projectionları korundu ve TOOLS renderer exact 49 MCP/75 CLI üretir; annotation/parity/count tests green; runtime locale authority cross-linki I18N-CATALOG-AUTHORITY-001'dir",
-      "updated": "2026-08-11"
+      "evidence": "2026-08-11 kök-neden+implementation: filename-derived generator 40 araç gösterirken canonical MCP 49'du; 15 gerçek araç eksik, 6 sahteydi; CLI module sayısı gerçek 75 command yerine 107 gibi sunulabiliyordu. Canonical kataloglar `src/core/{mcp-tool-catalog,command-registry}.ts` lower-layer SSOT'a taşındı, surface compatibility projectionları korundu ve TOOLS renderer exact 49 MCP/75 CLI üretir; annotation/parity/count tests green; runtime locale authority cross-linki I18N-CATALOG-AUTHORITY-001'dir; 2026-08-26-gece DALGA-3 dilimi (sprint-697 2/2 DONE ilk-denemede, 0 NO_GO — task-scoped-Test + authority-Reads directive-disiplininin ilk kaniti): workspace-artifacts render'lari motor-gercekleriyle hizalandi (WORKER-GUIDE worker-contract: landing-proposal settle zinciri + tek-yazim/monotonic hb + lastSpawnCompletion; BOOT sequence) ve deckent sync WORKSPACE-KOLU eklendi (skill-kolu emsali; managed CONTRACT-bloklari digest-karsilastirmali regen, kullanici-bolgeleri dokunulmaz, getMessage en+tr); gercek-binary kanit: fresh-dist sync BOOT+WORKER-GUIDE 2-changed sonra 0-changed idempotent; scoped 7/7 + tsc 0 + 20-gate yesil; project-stack dogrulugu runtime-cozumde (T4 stack-detector script-cozumu; preflight'larin kendisi canli tuketici)",
+      "updated": "2026-08-26"
     },
     {
       "order": 180,
@@ -27304,6 +27304,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "56637dceee153d9d218361a29bf6cd7f8c95d062e4e71dc065f53cff41c26ea0"
+    "value": "69920a0ecf4a6b1a20c05494ab5fbbf71956b2e408088c927d6e044b090b551f"
   }
 }

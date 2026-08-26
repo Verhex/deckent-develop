@@ -54,10 +54,18 @@ describe('initializeWorkspaceArtifacts', () => {
 
     expect(boot).toContain('deckent recover <sprint-id> --dry-run');
     expect(boot).toContain('deckent_run` accepts `{ description }`');
+    expect(boot).toContain('DockerSpawnBackend.lastSpawnCompletion');
+    expect(boot).toContain('execution-landing proposal and execution-landing coordinator chain');
+    expect(boot).toContain('Only the host-coordinated durable settlement is completion truth.');
     expect(boot).not.toContain('deckent kill --all');
     expect(boot).not.toContain('{ taskId:');
 
     expect(guide).toContain('Canonical schema-required fields (derived at runtime)');
+    expect(guide).toContain('Write the task heartbeat exactly once at startup.');
+    expect(guide).toContain('monotonically increasing proposal sequence token');
+    expect(guide).toContain('wall-clock freshness alone does not');
+    expect(guide).toContain('The worker result is ingress, not canonical settlement.');
+    expect(guide).toContain('the execution-landing coordinator validates and republishes it');
     expect(guide).not.toContain('tokenUsage.provider');
     expect(guide).not.toMatch(/≥80|50–79|<50/);
     expect(inspectWorkerGuideContract(root).state).toBe('VERIFIED');

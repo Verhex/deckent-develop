@@ -672,7 +672,9 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-26 23:4x: 16511→16513 — Dalga-1 (sprint-692) worker-suite'leri:
   // tests/cli/sync-skill.test.ts + tests/cli/skill-create-gate.test.ts
   // (tmpdir-hermetik, suite-owned) + v2-derivation fixture eklentileri.
-  count: 16513,
+  // 2026-08-27 02:0x: 16513→16514 — Dalga-3 (sprint-697) worker-suite'i:
+  // tests/cli/sync-workspace.test.ts (tmpdir-hermetik, suite-owned).
+  count: 16514,
   // 2026-08-25 B-sweep: digest moved — --fix roundtrip pin, multi-label
   // parser pin, same-line rule downgraded to WARN (all suite-owned).
   // 2026-08-25 7141 wave: count unchanged, digest moved — the src-side
@@ -716,7 +718,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // attribution-baseline / finalize-retirement + isCanonicalTaskFilename pinleri.
   // 2026-08-26 11:04: 16504→16506 — Node-6a mekanik supurme (sprint-684 3/3):
   // death-sweep hijyen + worker-identity-hostbound + docker-git-async suiteleri.
-  digest: '6afcde584fd00f134b8a752a19af2881d935013417cacbe6d16fb44d2a8422b3',
+  digest: '70f8b7c54684b76114bf644a81f4ba8faa34a6ad8524175e4dbff38c9611eff6',
   // 2026-08-26 17:4x: ayni 16511, digest-only — Faz-B test-slim merge
   // (66 kaynak emekli, equality 57/57) + CI-F004 guard flag-siniflandirmasi
   // (runtime-write-guard open-patch + probe/matris eklentileri) + CI-F005
@@ -1288,7 +1290,9 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // finalizer + sidecar-loader hotfix).
   // 2026-08-26 11:05: ayni 1339, digest-only — Node-6a src kaymalari
   // (death-sweep / prompt-template kimlik-esigi / docker async-git).
-  digest: 'bc33c919d5c33834701ae9f0dc000d9815448aec55b777affe8e5119c8be2945',
+  digest: '94ca645c87e6b6441c920f18405de962758de3165604b302bcd2cf2ed3e6a099',
+  // 2026-08-27 02:0x: ayni 1339, digest-only — Dalga-3 src kaymalari
+  // (workspace-artifacts render + sync workspace-kolu).
   // 2026-08-27 00:5x: ayni 1339, digest-only — Dalga-2 + preflight-fix
   // (plugin-hooks runTscCheck typecheck-tercihi) src kaymalari.
   // 2026-08-26 23:4x: ayni 1339, digest-only — Dalga-1 src kaymalari

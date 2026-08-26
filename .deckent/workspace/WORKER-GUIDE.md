@@ -2,7 +2,7 @@
 # Worker Guide
 
 ## Worker Contract
-<!-- DECKENT:CONTRACT id="worker-guide" schema="1" sha256="5ca844af5773a4cfc28dca9e15e5832b15db1211747829580b88eb04d87f8718" -->
+<!-- DECKENT:CONTRACT id="worker-guide" schema="1" sha256="2de8b00e407fa801484f7f61cc8ecd32943e05ec54fd1eafc2fb8c7976a39639" -->
 Bu contract worker runtime schemaları ve prompt policy üzerinden üretilir. Supporting contexttir; compiled ve digest-bound task prompt attempt authority olarak kalır.
 
 ### Result ingress ve canonical result
@@ -37,4 +37,12 @@ Percentage threshold yoktur. Verdicti her kriterin kanıtı belirler.
 | `stub()` veya hardcoded boş implementation | yasak | false GO üretir |
 | `scope.filesWrite` dışına yazma | yasak | ADR-037 authority ihlalidir |
 | verifier kanıtı olmadan DONE claim etme | yasak | honest-result gate ihlalidir |
+
+### Engine-aligned lifecycle
+
+Write the task heartbeat exactly once at startup. It is activity context, not a refresh-based process-liveness lease.
+
+Publish progress with a provider-neutral, monotonically increasing proposal sequence token. A greater token proves progress; wall-clock freshness alone does not.
+
+The worker result is ingress, not canonical settlement. Publish the bounded, attempt-bound execution-landing proposal; the execution-landing coordinator validates and republishes it before the host finalizer settles the canonical result.
 <!-- DECKENT:CONTRACT:END id="worker-guide" -->
