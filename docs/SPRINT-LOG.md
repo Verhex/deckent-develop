@@ -17224,3 +17224,29 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 691-006: Align failing orchestra/scripts suites (cluster 6) to landed contracts (DONE)
 
 ---
+## Sprint 692 — sprint-692
+
+**Status:** ABORTED
+**Date:** 2026-08-26
+**Duration:** 966s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 965820ms |
+
+### Tasks
+
+- 692-001: Skill-profil türetimi v2 — çöp-domain temizliği + yeniden-türetim kapısı (DONE)
+- 692-002-fix: Fix: Katman-senkronu — deckent sync skill kolu + builtin content-hash + observability onarımı (DONE)
+- 692-002: Katman-senkronu — deckent sync skill kolu + builtin content-hash + observability onarımı (DONE)
+- 692-003: Unroutable-gate — skill create zorunlu profil + lint-manifests fail-closed (DONE)
+- 692-004: Prompt-doğruluğu — stack-detector komutları package.json'dan + context sinyal-diyeti (DONE)
+
+---

@@ -51,7 +51,7 @@
     "totalUses": 0,
     "successCount": 0,
     "successRate": 0,
-    "avgCoverage": 0,
+    "avgScore": 0,
     "lastUsedInSprint": ""
   },
   "profile": {
@@ -70,12 +70,7 @@
         "proficiency": "able"
       }
     ],
-    "domains": [
-      {
-        "id": "workflow",
-        "proficiency": "primary"
-      }
-    ],
+    "domains": [],
     "expertise": [
       "cleanup",
       "code simplification, dead code removal, dry/kiss enforcement, complexity reduction",
@@ -102,8 +97,9 @@
   },
   "profileProvenance": {
     "origin": "derived-profile",
-    "derivationVersion": 1,
-    "persistedAt": "2026-08-18T15:34:53.943Z",
-    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
-  }
+    "derivationVersion": 2,
+    "persistedAt": "2026-08-26T20:30:27.575Z",
+    "authority": "deckent sync builtin content-hash"
+  },
+  "builtinContentHash": "sha256:7593007155426ee762b51ee6bb20f27287ca3590ffebd938277645af4818caee"
 }

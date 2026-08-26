@@ -85,6 +85,42 @@ export interface FullStackResult {
   detectedLanguages?: string[];
 }
 
+type StackCommands = FullStackResult['commands'];
+type CommandKind = keyof StackCommands;
+
+const PACKAGE_SCRIPT_ALIASES: Readonly<Record<CommandKind, readonly string[]>> = {
+  build: ['build', 'compile', 'bundle'],
+  test: ['test', 'tests', 'unit', 'test:unit'],
+  lint: ['lint', 'check:lint', 'lint:check'],
+  typecheck: ['typecheck', 'type-check', 'check:types', 'check:typecheck', 'types'],
+};
+
+function readPackageScripts(projectRoot: string): Record<string, string> {
+  const pkg = readJsonSafe<Record<string, unknown>>(path.join(projectRoot, 'package.json'));
+  if (!pkg || typeof pkg['scripts'] !== 'object' || pkg['scripts'] === null) return {};
+
+  return Object.fromEntries(
+    Object.entries(pkg['scripts']).filter(
+      (entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1].trim() !== '',
+    ),
+  );
+}
+
+function resolveCommands(projectRoot: string, fallback: StackCommands): StackCommands {
+  const scripts = readPackageScripts(projectRoot);
+  const resolve = (kind: CommandKind): string => {
+    const script = PACKAGE_SCRIPT_ALIASES[kind].find(name => scripts[name] !== undefined);
+    return script ? `npm run ${script}` : fallback[kind];
+  };
+
+  return {
+    build: resolve('build'),
+    test: resolve('test'),
+    lint: resolve('lint'),
+    typecheck: resolve('typecheck'),
+  };
+}
+
 // ─── detectProjectStack ────────────────────────────────────────────────────
 
 /**
@@ -201,7 +237,8 @@ export function detectFullStack(projectRoot: string): FullStackResult {
   const stack = detectProjectStack(projectRoot);
 
   const commandKey = resolveCommandKey(stack.language, stack.buildTool);
-  const commands = STACK_COMMANDS[commandKey] ?? { build: '', test: '', lint: '', typecheck: '' };
+  const fallback = STACK_COMMANDS[commandKey] ?? { build: '', test: '', lint: '', typecheck: '' };
+  const commands = resolveCommands(projectRoot, fallback);
 
   return {
     language: stack.language,

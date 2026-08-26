@@ -55,7 +55,7 @@
     "totalUses": 0,
     "successCount": 0,
     "successRate": 0,
-    "avgCoverage": 0,
+    "avgScore": 0,
     "lastUsedInSprint": ""
   },
   "profile": {
@@ -76,15 +76,19 @@
     ],
     "domains": [
       {
-        "id": "framework",
+        "id": "frontend",
         "proficiency": "primary"
       },
       {
-        "id": "react",
+        "id": "i18n",
         "proficiency": "secondary"
       },
       {
-        "id": "react-dom",
+        "id": "a11y",
+        "proficiency": "secondary"
+      },
+      {
+        "id": "test/quality",
         "proficiency": "secondary"
       }
     ],
@@ -112,8 +116,9 @@
   },
   "profileProvenance": {
     "origin": "derived-profile",
-    "derivationVersion": 1,
-    "persistedAt": "2026-08-18T15:34:53.948Z",
-    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
-  }
+    "derivationVersion": 2,
+    "persistedAt": "2026-08-26T20:30:27.585Z",
+    "authority": "deckent sync builtin content-hash"
+  },
+  "builtinContentHash": "sha256:1adf69b9902eab5bc027b39845cadf23c74f73fb7297628dd8cb783fbbc820c9"
 }

@@ -10,6 +10,10 @@ import { syncBuiltinAgentPrompts } from '../../core/agent-prompt-sync.js';
 import { syncBuiltinAgentManifests } from '../../core/agent-manifest-sync.js';
 import type { AgentManifestSyncReport } from '../../core/agent-manifest-sync.js';
 import type { AgentPromptSyncReport } from '../../core/agent-prompt-sync.js';
+import {
+  syncBuiltinSkillManifests,
+  type BuiltinSkillSyncReport,
+} from '../../core/skill-pool.js';
 import { migrateManifestV2toV3 } from '../../core/manifest-migrator.js';
 import { BUILTIN_DOMAINS } from '../../core/routing/vocabulary-builtin.js';
 import { print, printError } from '../helpers/output.js';
@@ -675,6 +679,7 @@ export function registerSync(program: Command): void {
         agentPromptSync?: AgentPromptSyncReport;
         agentManifestSync?: AgentManifestSyncReport;
         agentCapabilitiesSync?: AgentCapabilitiesSyncReport;
+        skillManifestSync?: BuiltinSkillSyncReport;
         gitChanges?: SyncResult | null;
         warnings?: string[];
       } = {};
@@ -760,6 +765,34 @@ export function registerSync(program: Command): void {
             print(`Warning: agent "${issue.agentId}" capabilities migration issue (${issue.code}) — ${issue.message}`);
           }
           print(`Agent capabilities: ${capabilitiesSyncReport.migrated.length} migrated, ${capabilitiesSyncReport.alreadyV3.length} already v3`);
+        }
+
+        // --- Builtin skill definition -> v2-derived shadow manifest sync ---
+        const skillSyncReport = syncBuiltinSkillManifests(root, { dryRun: opts.dryRun });
+        output.skillManifestSync = skillSyncReport;
+        if (!opts.json) {
+          for (const id of skillSyncReport.created) {
+            print(getMessage('sync.skill_manifest_created', getLanguage(), {
+              prefix: opts.dryRun ? getMessage('sync.dry_run_prefix', getLanguage()) : '', id,
+            }));
+          }
+          for (const id of skillSyncReport.updated) {
+            print(getMessage('sync.skill_manifest_updated', getLanguage(), {
+              prefix: opts.dryRun ? getMessage('sync.dry_run_prefix', getLanguage()) : '', id,
+            }));
+          }
+          for (const id of skillSyncReport.keptLocal) {
+            print(getMessage('sync.skill_manifest_kept_local', getLanguage(), { id }));
+          }
+          for (const issue of skillSyncReport.issues) {
+            print(getMessage('sync.skill_manifest_issue', getLanguage(), {
+              id: issue.skillId, reason: issue.reason,
+            }));
+          }
+          print(getMessage('sync.skill_manifest_summary', getLanguage(), {
+            changed: String(skillSyncReport.created.length + skillSyncReport.updated.length),
+            unchanged: String(skillSyncReport.unchanged.length),
+          }));
         }
       }
 

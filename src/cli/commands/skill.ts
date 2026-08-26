@@ -6,6 +6,7 @@ import { z } from 'zod';
 import type { Command } from 'commander';
 import type { SkillDefinition } from '../../core/skill-types.js';
 import { createSkillDefinition } from '../../core/skill-types.js';
+import { deriveCanonicalSkillProfile } from '../../core/skill-profile-derivation.js';
 import { print, printError, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { snapshotSkillCatalog } from '../../core/skill-pool.js';
@@ -21,6 +22,16 @@ import { memoryCatalogMessage } from '../helpers/message-catalog/cli-memory-cata
 // ─── Constants ──────────────────────────────────────────────────────
 
 const SKILLS_DIR = '.deckent/skills';
+
+/** Typed create-boundary failure: an unroutable skill must never reach disk. */
+export class SkillCreateProfileError extends Error {
+  readonly code = 'SKILL_CREATE_PROFILE_REQUIRED' as const;
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'SkillCreateProfileError';
+  }
+}
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -331,6 +342,25 @@ export function registerSkill(program: Command): void {
           name,
           description: `Custom skill: ${name}`,
         });
+
+        const profileDerivation = deriveCanonicalSkillProfile(skill);
+        if (profileDerivation.status === 'unroutable') {
+          const lang = getLanguage(undefined);
+          throw new SkillCreateProfileError(getMessage(
+            'cli.skill.create.profile_required',
+            lang,
+            { name, reason: profileDerivation.diagnostic.reasonCode },
+          ));
+        }
+        skill.profile = profileDerivation.profile;
+        if (profileDerivation.provenance !== null) {
+          skill.profileProvenance = {
+            origin: 'derived-profile',
+            derivationVersion: profileDerivation.provenance.derivationVersion,
+            persistedAt: new Date().toISOString(),
+            authority: 'deckent skill create',
+          };
+        }
 
         mkdirSync(skillDir, { recursive: true });
         writeFileSync(

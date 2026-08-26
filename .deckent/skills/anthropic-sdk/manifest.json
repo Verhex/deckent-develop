@@ -62,7 +62,7 @@
     "totalUses": 0,
     "successCount": 0,
     "successRate": 0,
-    "avgCoverage": 0,
+    "avgScore": 0,
     "lastUsedInSprint": ""
   },
   "profile": {
@@ -83,15 +83,11 @@
     ],
     "domains": [
       {
-        "id": "framework",
+        "id": "api",
         "proficiency": "primary"
       },
       {
-        "id": "@anthropic-ai/sdk",
-        "proficiency": "secondary"
-      },
-      {
-        "id": "claude_agent_sdk",
+        "id": "agents-catalog",
         "proficiency": "secondary"
       }
     ],
@@ -121,8 +117,9 @@
   },
   "profileProvenance": {
     "origin": "derived-profile",
-    "derivationVersion": 1,
-    "persistedAt": "2026-08-18T15:34:53.942Z",
-    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
-  }
+    "derivationVersion": 2,
+    "persistedAt": "2026-08-26T20:30:27.573Z",
+    "authority": "deckent sync builtin content-hash"
+  },
+  "builtinContentHash": "sha256:4fe3fdb5fe587e711d1f1a163b91564e06767e3744ea2f4fb4f3a4b0b8c85e5c"
 }

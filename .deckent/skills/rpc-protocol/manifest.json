@@ -75,11 +75,11 @@
     ],
     "domains": [
       {
-        "id": "domain",
+        "id": "test/quality",
         "proficiency": "primary"
       },
       {
-        "id": "zod",
+        "id": "agents-catalog",
         "proficiency": "secondary"
       }
     ],
@@ -109,8 +109,9 @@
   },
   "profileProvenance": {
     "origin": "derived-profile",
-    "derivationVersion": 1,
-    "persistedAt": "2026-08-18T15:34:53.948Z",
-    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
-  }
+    "derivationVersion": 2,
+    "persistedAt": "2026-08-26T20:30:27.586Z",
+    "authority": "deckent sync builtin content-hash"
+  },
+  "builtinContentHash": "sha256:30a1a09e7b1631bd33933a0065531a60e619615b39902c901b843fba873e8a8d"
 }

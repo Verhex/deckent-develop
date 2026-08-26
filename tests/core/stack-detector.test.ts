@@ -935,6 +935,71 @@ describe('detectFullStack', () => {
     expect(result.commands.typecheck).toBe('npx tsc --noEmit');
   });
 
+  it('prefers real package scripts and common aliases over language defaults', () => {
+    mockFileExistence(['package.json', 'tsconfig.json']);
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      if (String(p).endsWith('package.json')) {
+        return JSON.stringify({
+          devDependencies: { typescript: '^5.0.0' },
+          scripts: {
+            compile: 'vite build',
+            unit: 'vitest run',
+            'check:lint': 'eslint .',
+            'check:types': 'tsc --noEmit',
+          },
+        });
+      }
+      throw new Error('ENOENT');
+    });
+
+    const result = detectFullStack(ROOT);
+    expect(result.commands).toEqual({
+      build: 'npm run compile',
+      test: 'npm run unit',
+      lint: 'npm run check:lint',
+      typecheck: 'npm run check:types',
+    });
+  });
+
+  it('falls back per command without inventing absent package scripts', () => {
+    mockFileExistence(['package.json', 'tsconfig.json']);
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      if (String(p).endsWith('package.json')) {
+        return JSON.stringify({
+          devDependencies: { typescript: '^5.0.0' },
+          scripts: { test: 'vitest run' },
+        });
+      }
+      throw new Error('ENOENT');
+    });
+
+    const result = detectFullStack(ROOT);
+    expect(result.commands).toEqual({
+      build: 'npx tsc',
+      test: 'npm run test',
+      lint: 'npx eslint',
+      typecheck: 'npx tsc --noEmit',
+    });
+    expect(Object.values(result.commands)).not.toContain('npm run build');
+    expect(Object.values(result.commands)).not.toContain('npm run lint');
+    expect(Object.values(result.commands)).not.toContain('npm run typecheck');
+  });
+
+  it('ignores empty and non-string script entries', () => {
+    mockFileExistence(['package.json', 'tsconfig.json']);
+    vi.mocked(fs.readFileSync).mockImplementation((p) => {
+      if (String(p).endsWith('package.json')) {
+        return JSON.stringify({
+          devDependencies: { typescript: '^5.0.0' },
+          scripts: { build: '', test: null, lint: '   ' },
+        });
+      }
+      throw new Error('ENOENT');
+    });
+
+    expect(detectFullStack(ROOT).commands).toEqual(STACK_COMMANDS['typescript']);
+  });
+
   it('returns commands for Rust project', () => {
     mockFileExistence(['Cargo.toml']);
     vi.mocked(fs.readFileSync).mockImplementation(() => { throw new Error('ENOENT'); });

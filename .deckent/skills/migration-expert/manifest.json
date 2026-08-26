@@ -50,7 +50,7 @@
     "totalUses": 0,
     "successCount": 0,
     "successRate": 0,
-    "avgCoverage": 0,
+    "avgScore": 0,
     "lastUsedInSprint": ""
   },
   "profile": {
@@ -69,12 +69,7 @@
         "proficiency": "able"
       }
     ],
-    "domains": [
-      {
-        "id": "workflow",
-        "proficiency": "primary"
-      }
-    ],
+    "domains": [],
     "expertise": [
       "breaking-change",
       "codemod",
@@ -102,8 +97,9 @@
   },
   "profileProvenance": {
     "origin": "derived-profile",
-    "derivationVersion": 1,
-    "persistedAt": "2026-08-18T15:34:53.947Z",
-    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
-  }
+    "derivationVersion": 2,
+    "persistedAt": "2026-08-26T20:30:27.581Z",
+    "authority": "deckent sync builtin content-hash"
+  },
+  "builtinContentHash": "sha256:61313afd4356ab78b9b59225527c0638b4839db081a79fa84fdf6cd7bdecd13e"
 }

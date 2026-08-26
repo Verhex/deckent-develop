@@ -58,7 +58,7 @@
     "totalUses": 0,
     "successCount": 0,
     "successRate": 0,
-    "avgCoverage": 0,
+    "avgScore": 0,
     "lastUsedInSprint": ""
   },
   "profile": {
@@ -79,24 +79,8 @@
     ],
     "domains": [
       {
-        "id": "domain",
+        "id": "api",
         "proficiency": "primary"
-      },
-      {
-        "id": "express",
-        "proficiency": "secondary"
-      },
-      {
-        "id": "fastify",
-        "proficiency": "secondary"
-      },
-      {
-        "id": "hono",
-        "proficiency": "secondary"
-      },
-      {
-        "id": "koa",
-        "proficiency": "secondary"
       }
     ],
     "expertise": [
@@ -128,8 +112,9 @@
   },
   "profileProvenance": {
     "origin": "derived-profile",
-    "derivationVersion": 1,
-    "persistedAt": "2026-08-18T15:34:53.943Z",
-    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
-  }
+    "derivationVersion": 2,
+    "persistedAt": "2026-08-26T20:30:27.574Z",
+    "authority": "deckent sync builtin content-hash"
+  },
+  "builtinContentHash": "sha256:655df5bd4cdc5f330a0670f55ba448a580ebf46756b257bff2bbc7a24b58ff48"
 }

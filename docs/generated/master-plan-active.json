@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "d94f4ba3b0e75cb16171415216550fba9818b275a449125e2c10262f756aa42e"
+    "value": "93df85515e41726156af69045f3d9d0c6b5cd8756bd18c1ebe1c307e7d1d0f6a"
   },
   "summary": {
     "total": 540,
@@ -4712,9 +4712,9 @@
       "program": "ECOSYSTEM",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-11",
+      "updated": "2026-08-26",
       "definitionDigest": "9522359983224d1b91ce9790f06b86f42d6540f43803f487e25e6cd15c33d703",
-      "progressDigest": "d1aa5f79b2c49f6a786da6e2b42e19806d8fcd5b6ee66611b26abcc9081a9531",
+      "progressDigest": "d4152853dee14ef1f39e77197bc1ec46b8bf17e0a7f5e0d2c300c1a8a7769e86",
       "terminalClosureDigest": null
     },
     {
@@ -22957,8 +22957,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Manifests versioned; task role/skill selection measured; no catalog inflation or dead entries",
-      "evidence": "Legacy 85. 2026-08-11 `.deckent/stats` RCA: agent ve skill katalog metadatası ile kullanım projectionı ayrı truth'lara bölünmüş; canonical cross-catalog kapanış CATALOG-STATS-AUTHORITY-001 childındadır",
-      "updated": "2026-08-11"
+      "evidence": "Legacy 85. 2026-08-11 `.deckent/stats` RCA: agent ve skill katalog metadatası ile kullanım projectionı ayrı truth'lara bölünmüş; canonical cross-catalog kapanış CATALOG-STATS-AUTHORITY-001 childındadır; 2026-08-26 DALGA-1 MEKANIZMA-ONARIMI (sprint-692, owner 'b-ok', dogfood-run 4/4 DONE + 1 FIX-kaskadi): skill-profil turetimi v2 — cop-domain stop-term seti + derivationVersion yeniden-turetim kapisi (authored-profile authority aynen); deckent sync skill kolu — builtin content-hash, 31 manifest v2 re-persist + observability manifest onarimi, gercek-binary idempotency kaniti (ikinci kosum 0-changed); skill create fail-before-write zorunlu-profil + lint-manifests canonical V3 fail-closed (30 profilsiz mevcut icin tarihli yalniz-azalma baseline); stack-detector komutlari gercek package.json scripts'ten (honest-fallback, uydurma komut yok) + prompt context sinyal-diyeti; tsc-residual 3 hata ADR-D-007 seam ile ayni-gece kapandi, dalga-scoped 244/244 + tsc 0 + build:all yesil; run terminal-kaydi forced-closure (4/4 complete, 0 unresolved lineage)",
+      "updated": "2026-08-26"
     },
     {
       "order": 7011,
@@ -27304,6 +27304,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "0f04475dd38712582ea295668d69bbb12ab2e2cc9c9be75d4edef938c5d1bc00"
+    "value": "921ea7df2130c61c21a30ff51770b5e645b226dfa8ee46f74709e401ce812608"
   }
 }

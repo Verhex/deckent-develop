@@ -61,7 +61,7 @@
     "totalUses": 0,
     "successCount": 0,
     "successRate": 0,
-    "avgCoverage": 0,
+    "avgScore": 0,
     "lastUsedInSprint": ""
   },
   "profile": {
@@ -82,16 +82,8 @@
     ],
     "domains": [
       {
-        "id": "tool",
+        "id": "security",
         "proficiency": "primary"
-      },
-      {
-        "id": "docker",
-        "proficiency": "secondary"
-      },
-      {
-        "id": "docker-compose",
-        "proficiency": "secondary"
       }
     ],
     "expertise": [
@@ -125,8 +117,9 @@
   },
   "profileProvenance": {
     "origin": "derived-profile",
-    "derivationVersion": 1,
-    "persistedAt": "2026-08-18T15:34:53.944Z",
-    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
-  }
+    "derivationVersion": 2,
+    "persistedAt": "2026-08-26T20:30:27.577Z",
+    "authority": "deckent sync builtin content-hash"
+  },
+  "builtinContentHash": "sha256:30c011405f27c819c1c13e76808739c28b42385814f41e374e10c0b1ac13e7d3"
 }

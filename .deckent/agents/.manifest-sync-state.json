@@ -39,6 +39,10 @@
     "terminal-ux-engineer": {
       "builtinHash": "889398f37a13cfae60127c4afdaddf1fa8cfe8f5",
       "syncedAt": "2026-08-20T10:35:20.294Z"
+    },
+    "ci-guardian": {
+      "builtinHash": "efa321c01341ef45f8a7ac6c2db49fab02b2148a",
+      "syncedAt": "2026-08-26T20:30:27.568Z"
     }
   }
 }

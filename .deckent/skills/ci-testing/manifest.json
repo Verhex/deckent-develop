@@ -97,23 +97,11 @@
     ],
     "domains": [
       {
-        "id": "workflow",
+        "id": "devops/ci",
         "proficiency": "primary"
       },
       {
-        "id": "jest",
-        "proficiency": "secondary"
-      },
-      {
-        "id": "pytest",
-        "proficiency": "secondary"
-      },
-      {
-        "id": "typescript",
-        "proficiency": "secondary"
-      },
-      {
-        "id": "vitest",
+        "id": "test/quality",
         "proficiency": "secondary"
       }
     ],
@@ -155,8 +143,9 @@
   },
   "profileProvenance": {
     "origin": "derived-profile",
-    "derivationVersion": 1,
-    "persistedAt": "2026-08-18T15:34:53.943Z",
-    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
-  }
+    "derivationVersion": 2,
+    "persistedAt": "2026-08-26T20:30:27.575Z",
+    "authority": "deckent sync builtin content-hash"
+  },
+  "builtinContentHash": "sha256:e8ced85292e36ba939939bf3f55bfac41f23ca5ccf3a9c16e0f128b315a07bf0"
 }

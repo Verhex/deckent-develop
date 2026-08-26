@@ -6,13 +6,27 @@ import type {
   SkillProfileFieldProvenance,
   SkillProfileSourceField,
 } from './skill-types.js';
-import { BUILTIN_DOMAINS, WORK_TYPE_IDS } from './routing/vocabulary-builtin.js';
+import { BUILTIN_DOMAINS } from './routing/vocabulary-builtin.js';
 
 export const SKILL_PROFILE_DERIVATION_VERSION = 2 as const;
 
 type WorkType = WorkTypeEntry['type'];
 type Proficiency = WorkTypeEntry['proficiency'];
 const PROVENANCE_NOTE = 'canonical-profile-derived-from-manifest-source-metadata' as const;
+
+/**
+ * Words that carry no feature-domain meaning. Keep this as the single source
+ * for domain-token filtering so prose, names, and manifest tags cannot drift
+ * into separate notions of "generic".
+ */
+const GENERIC_DOMAIN_TERMS: ReadonlySet<string> = new Set([
+  'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'in', 'into',
+  'is', 'it', 'of', 'on', 'or', 'that', 'the', 'this', 'to', 'with',
+  'build', 'configure', 'create', 'develop', 'development', 'document', 'fix',
+  'implement', 'implementation', 'migrate', 'refactor', 'review', 'analyze',
+  'domain', 'framework', 'language', 'tool', 'workflow',
+  'capability', 'expert', 'expertise', 'general', 'generic', 'skill', 'specialist',
+]);
 
 const WORK_TYPE_CUES: Readonly<Record<WorkType, readonly string[]>> = {
   build: ['build', 'create', 'design', 'develop', 'implement', 'code', 'component', 'api'],
@@ -76,19 +90,34 @@ function deriveWorkTypes(skill: SkillDefinition, terms: readonly string[]): Work
 }
 
 function deriveDomains(skill: SkillDefinition): SkillProfile['domains'] {
-  // Only exact routing metadata is vocabulary authority. Generic manifest
-  // categories (domain/workflow/framework/tool) and prose are deliberately
-  // excluded: neither describes a feature domain.
-  const workTypeSignals = new Set<string>(WORK_TYPE_IDS);
-  const signals = new Set(normalized([
-    ...skill.triggers,
-    ...skill.stackDetection.files,
-    ...skill.stackDetection.dependencies,
-    ...skill.stackDetection.commands,
-  ]).filter((signal) => !workTypeSignals.has(signal)));
+  const singularRoot = (term: string): string => {
+    if (term.endsWith('ies') && term.length > 4) return `${term.slice(0, -3)}y`;
+    if (term.endsWith('s') && !term.endsWith('ss') && term.length > 3) {
+      return term.slice(0, -1);
+    }
+    return term;
+  };
+  const roots = (value: string): string[] => value
+    .toLowerCase()
+    .normalize('NFKC')
+    .split(/[^\p{L}\p{N}]+/u)
+    .map(singularRoot)
+    .filter((term) => term.length > 1 && !GENERIC_DOMAIN_TERMS.has(term));
+
+  // Domain authority is intentionally limited to human-authored semantic
+  // metadata: name, description, and manifest tags (`triggers`). File names,
+  // dependencies, commands, category defaults, and composition hints are not
+  // feature domains and were the source of v1 garbage-domain leakage.
+  const signals = new Set([
+    ...roots(skill.name),
+    ...roots(skill.description ?? ''),
+    ...skill.triggers.flatMap(roots),
+  ]);
+  const vocabularyRoots = (values: readonly string[]): Set<string> =>
+    new Set(values.flatMap(roots));
   const matched = BUILTIN_DOMAINS.filter((domain) =>
-    [domain.id, ...domain.aliases, ...domain.stackMarkers, ...domain.surfaces]
-      .some((signal) => signals.has(signal.toLowerCase())),
+    [...vocabularyRoots([domain.id, ...domain.aliases, ...domain.stackMarkers, ...domain.surfaces])]
+      .some((root) => signals.has(root)),
   ).map((domain) => domain.id);
 
   const domains: SkillProfile['domains'] = matched.map((id, index) => ({
@@ -114,7 +143,7 @@ function provenance(): SkillProfileFieldProvenance {
     derivationVersion: SKILL_PROFILE_DERIVATION_VERSION,
     fields: {
       workTypes: fieldProvenance(['category', 'triggers', 'stackDetection', 'composableWith', 'priority', 'description']),
-      domains: fieldProvenance(['triggers', 'stackDetection']),
+      domains: fieldProvenance(['triggers', 'description']),
       expertise: fieldProvenance(['category', 'triggers', 'stackDetection', 'composableWith', 'description']),
       deliverables: fieldProvenance(['category', 'triggers', 'stackDetection', 'composableWith', 'priority', 'description']),
     },
@@ -128,11 +157,16 @@ function provenance(): SkillProfileFieldProvenance {
  */
 export function deriveCanonicalSkillProfile(skill: SkillDefinition): SkillProfileDerivation {
   const persistedGenerated = skill.profileProvenance?.origin === 'derived-profile';
-  if (skill.profile !== undefined && skill.profile !== null && !persistedGenerated) {
+  const stalePersistedGenerated = persistedGenerated
+    && skill.profileProvenance?.derivationVersion !== SKILL_PROFILE_DERIVATION_VERSION;
+  if (skill.profile !== undefined && skill.profile !== null && !stalePersistedGenerated) {
     const authored = validateSkillProfile(skill.profile);
     if (authored.ok) {
       return {
-        status: 'routable', origin: 'manifest-profile', profile: authored.value, provenance: null,
+        status: 'routable',
+        origin: persistedGenerated ? 'derived-profile' : 'manifest-profile',
+        profile: authored.value,
+        provenance: persistedGenerated ? provenance() : null,
       };
     }
     return {

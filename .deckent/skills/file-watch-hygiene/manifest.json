@@ -80,12 +80,7 @@
         "proficiency": "able"
       }
     ],
-    "domains": [
-      {
-        "id": "tool",
-        "proficiency": "primary"
-      }
-    ],
+    "domains": [],
     "expertise": [
       "atomic-read",
       "chokidar",
@@ -111,8 +106,9 @@
   },
   "profileProvenance": {
     "origin": "derived-profile",
-    "derivationVersion": 1,
-    "persistedAt": "2026-08-18T15:34:53.945Z",
-    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
-  }
+    "derivationVersion": 2,
+    "persistedAt": "2026-08-26T20:30:27.578Z",
+    "authority": "deckent sync builtin content-hash"
+  },
+  "builtinContentHash": "sha256:a1cb1c441a43dae5121d35a635f2b3f9575ecb1af6af59a7f3eeb3543b29f892"
 }

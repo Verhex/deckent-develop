@@ -12,7 +12,10 @@ import type {
   SkillProfileDerivation,
 } from './skill-types.js';
 import { createDefaultSkillStats } from './skill-types.js';
-import { deriveCanonicalSkillProfile } from './skill-profile-derivation.js';
+import {
+  deriveCanonicalSkillProfile,
+  SKILL_PROFILE_DERIVATION_VERSION,
+} from './skill-profile-derivation.js';
 import { createDefaultActivationConfig } from './routing-types.js';
 import { readJsonSafe, debugLog } from './utils.js';
 
@@ -116,7 +119,7 @@ function synthesizeSkillManifest(id: string, skillMdPath: string): Record<string
     id,
     name,
     version: '0.1.0',
-    description: lead,
+    description: lead || name,
     entrypoint: SKILL_MD_FILENAME,
     category: 'domain',
     manifestVersion: 2,
@@ -135,6 +138,157 @@ function synthesizeSkillManifest(id: string, skillMdPath: string): Record<string
     // this entry.
     activation: createDefaultActivationConfig(),
   };
+}
+
+// ─── Builtin Materialization Sync (692-002) ─────────────────────────────────────
+
+export interface BuiltinSkillSyncIssue {
+  skillId: string;
+  reason: string;
+}
+
+export interface BuiltinSkillSyncReport {
+  created: string[];
+  updated: string[];
+  unchanged: string[];
+  keptLocal: string[];
+  issues: BuiltinSkillSyncIssue[];
+}
+
+export interface BuiltinSkillSyncOptions {
+  dryRun?: boolean;
+}
+
+function builtinSkillContentHash(manifestContent: string, skillContent: string): string {
+  return `sha256:${createHash('sha256')
+    .update(`derivation:${SKILL_PROFILE_DERIVATION_VERSION}\n`)
+    .update(manifestContent)
+    .update('\n--SKILL.md--\n')
+    .update(skillContent)
+    .digest('hex')}`;
+}
+
+/**
+ * Materialize every shipped builtin skill into an initialized project's shadow.
+ *
+ * The hash covers both builtin inputs and the profile derivation version. Thus a
+ * metadata/body change or a derivation-policy bump invalidates the persisted
+ * manifest without timestamps making an otherwise clean second run dirty.
+ * Project-authored manifests are never overwritten.
+ */
+export function syncBuiltinSkillManifests(
+  projectRoot: string,
+  options: BuiltinSkillSyncOptions = {},
+): BuiltinSkillSyncReport {
+  const report: BuiltinSkillSyncReport = {
+    created: [], updated: [], unchanged: [], keptLocal: [], issues: [],
+  };
+  if (!fs.existsSync(path.join(projectRoot, CONFIG_FILENAME))) return report;
+
+  const builtinDir = resolveBuiltinSkillsDir();
+  for (const entry of scanCatalogDirectory(builtinDir)) {
+    if (!entry.isDirectory()) continue;
+    const skillId = entry.name;
+    const sourceDir = path.join(builtinDir, skillId);
+    const skillPath = path.join(sourceDir, SKILL_MD_FILENAME);
+    let skillContent: string;
+    try {
+      skillContent = fs.readFileSync(skillPath, 'utf8');
+    } catch {
+      report.issues.push({ skillId, reason: 'builtin SKILL.md is unreadable' });
+      continue;
+    }
+
+    const builtinManifestPath = path.join(sourceDir, MANIFEST_FILENAME);
+    let sourceManifest: Record<string, unknown> | null;
+    let manifestHashInput: string;
+    if (fs.existsSync(builtinManifestPath)) {
+      try {
+        manifestHashInput = fs.readFileSync(builtinManifestPath, 'utf8');
+        const parsed = JSON.parse(manifestHashInput) as unknown;
+        sourceManifest = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+          ? parsed as Record<string, unknown>
+          : null;
+      } catch {
+        sourceManifest = null;
+        manifestHashInput = '';
+      }
+    } else {
+      sourceManifest = synthesizeSkillManifest(skillId, skillPath);
+      manifestHashInput = sourceManifest === null ? '' : JSON.stringify(sourceManifest);
+    }
+    if (sourceManifest === null) {
+      report.issues.push({ skillId, reason: 'builtin manifest cannot be materialized' });
+      continue;
+    }
+
+    const validation = SkillPoolManager.validateSkillDefinition(sourceManifest);
+    if (!validation.valid) {
+      report.issues.push({ skillId, reason: validation.errors.join('; ') });
+      continue;
+    }
+
+    const contentHash = builtinSkillContentHash(manifestHashInput, skillContent);
+    const targetDir = path.join(projectRoot, SKILLS_DIR, skillId);
+    const targetPath = path.join(targetDir, MANIFEST_FILENAME);
+    const existing = readJsonSafe<Record<string, unknown>>(targetPath);
+    if (existing && readDeclaredProvenance(existing) !== 'builtin') {
+      report.keptLocal.push(skillId);
+      continue;
+    }
+    if (
+      existing?.['builtinContentHash'] === contentHash
+      && existing.profileProvenance
+      && typeof existing.profileProvenance === 'object'
+      && (existing.profileProvenance as Record<string, unknown>)['derivationVersion']
+        === SKILL_PROFILE_DERIVATION_VERSION
+    ) {
+      report.unchanged.push(skillId);
+      continue;
+    }
+
+    const derivationInput = { ...sourceManifest };
+    delete derivationInput['profile'];
+    delete derivationInput['profileProvenance'];
+    normalizeSkillManifest(derivationInput);
+    const routing = deriveCanonicalSkillProfile(derivationInput as unknown as SkillDefinition);
+    if (routing.status !== 'routable') {
+      report.issues.push({ skillId, reason: routing.diagnostic.message });
+      continue;
+    }
+    const persisted: Record<string, unknown> = {
+      ...(existing ?? {}),
+      ...derivationInput,
+      source: 'builtin',
+      profile: routing.profile,
+      profileProvenance: {
+        origin: 'derived-profile',
+        derivationVersion: SKILL_PROFILE_DERIVATION_VERSION,
+        persistedAt: new Date().toISOString(),
+        authority: 'deckent sync builtin content-hash',
+      },
+      builtinContentHash: contentHash,
+    };
+    if (existing?.['enabled'] === false) persisted['enabled'] = false;
+
+    if (!options.dryRun) {
+      fs.mkdirSync(targetDir, { recursive: true });
+      const temporaryPath = `${targetPath}.${randomUUID()}.tmp`;
+      fs.writeFileSync(temporaryPath, `${JSON.stringify(persisted, null, 2)}\n`, 'utf8');
+      try {
+        fs.renameSync(temporaryPath, targetPath);
+      } catch (error) {
+        try { fs.unlinkSync(temporaryPath); } catch { /* best-effort cleanup */ }
+        report.issues.push({
+          skillId,
+          reason: error instanceof Error ? error.message : String(error),
+        });
+        continue;
+      }
+    }
+    (existing ? report.updated : report.created).push(skillId);
+  }
+  return report;
 }
 
 // ─── Validation Constants ───────────────────────────────────────────────────

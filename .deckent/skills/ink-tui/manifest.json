@@ -76,11 +76,23 @@
     ],
     "domains": [
       {
-        "id": "framework",
+        "id": "frontend",
         "proficiency": "primary"
       },
       {
-        "id": "ink",
+        "id": "cli/terminal",
+        "proficiency": "secondary"
+      },
+      {
+        "id": "i18n",
+        "proficiency": "secondary"
+      },
+      {
+        "id": "a11y",
+        "proficiency": "secondary"
+      },
+      {
+        "id": "test/quality",
         "proficiency": "secondary"
       }
     ],
@@ -110,8 +122,9 @@
   },
   "profileProvenance": {
     "origin": "derived-profile",
-    "derivationVersion": 1,
-    "persistedAt": "2026-08-18T15:34:53.946Z",
-    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
-  }
+    "derivationVersion": 2,
+    "persistedAt": "2026-08-26T20:30:27.581Z",
+    "authority": "deckent sync builtin content-hash"
+  },
+  "builtinContentHash": "sha256:8737195903a143e4524759e54fdb92381715b5ac6218b4d0007a62c1dde266c8"
 }

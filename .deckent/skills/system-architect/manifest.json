@@ -98,16 +98,7 @@
         "proficiency": "able"
       }
     ],
-    "domains": [
-      {
-        "id": "domain",
-        "proficiency": "primary"
-      },
-      {
-        "id": "typescript",
-        "proficiency": "secondary"
-      }
-    ],
+    "domains": [],
     "expertise": [
       "abstraction",
       "api-builder",
@@ -144,8 +135,9 @@
   },
   "profileProvenance": {
     "origin": "derived-profile",
-    "derivationVersion": 1,
-    "persistedAt": "2026-08-18T15:34:53.950Z",
-    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
-  }
+    "derivationVersion": 2,
+    "persistedAt": "2026-08-26T20:30:27.587Z",
+    "authority": "deckent sync builtin content-hash"
+  },
+  "builtinContentHash": "sha256:807d123b870657c01c0681ac1b912c1ab2c974dcb2bc6de24936d18205b920e6"
 }

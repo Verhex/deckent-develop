@@ -81,12 +81,7 @@
         "proficiency": "able"
       }
     ],
-    "domains": [
-      {
-        "id": "tool",
-        "proficiency": "primary"
-      }
-    ],
+    "domains": [],
     "expertise": [
       "container/wrapper shell scripting traps: $? masking, local, trap exit codes, timeout -k, untracked-git in diff detection",
       "dash",
@@ -113,8 +108,9 @@
   },
   "profileProvenance": {
     "origin": "derived-profile",
-    "derivationVersion": 1,
-    "persistedAt": "2026-08-18T15:34:53.949Z",
-    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
-  }
+    "derivationVersion": 2,
+    "persistedAt": "2026-08-26T20:30:27.587Z",
+    "authority": "deckent sync builtin content-hash"
+  },
+  "builtinContentHash": "sha256:25f1f81680acef19fadc0eac29cae519be3d166ed66ba26d2acde0ab5abe4ba7"
 }

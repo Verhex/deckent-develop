@@ -1,8 +1,8 @@
 {
-  "id": "api-design",
-  "name": "API Design",
+  "id": "observability",
+  "name": "Observability",
   "version": "0.1.0",
-  "description": "Schema-first API contract design for deckent's HTTP/RPC surfaces: strict zod envelopes at the boundary, auth-middleware wiring, honest error shapes, docs/reference/api-surface.md contract alignment",
+  "description": "Observability",
   "entrypoint": "SKILL.md",
   "category": "domain",
   "manifestVersion": 2,
@@ -36,35 +36,22 @@
     "profileVersion": 3,
     "workTypes": [
       {
-        "type": "build",
+        "type": "analyze",
         "proficiency": "primary"
       },
       {
-        "type": "fix",
+        "type": "build",
         "proficiency": "secondary"
       },
       {
-        "type": "document",
+        "type": "review",
         "proficiency": "able"
       }
     ],
-    "domains": [
-      {
-        "id": "api",
-        "proficiency": "primary"
-      },
-      {
-        "id": "security",
-        "proficiency": "secondary"
-      },
-      {
-        "id": "docs",
-        "proficiency": "secondary"
-      }
-    ],
+    "domains": [],
     "expertise": [
       "domain",
-      "schema-first api contract design for deckent's http/rpc surfaces: strict zod envelopes at the boundary, auth-middleware wiring, honest error shapes, docs/reference/api-surface.md contract alignment"
+      "observability"
     ],
     "deliverables": [
       "code-src",
@@ -75,8 +62,8 @@
   "profileProvenance": {
     "origin": "derived-profile",
     "derivationVersion": 2,
-    "persistedAt": "2026-08-26T20:30:27.574Z",
+    "persistedAt": "2026-08-26T20:30:27.582Z",
     "authority": "deckent sync builtin content-hash"
   },
-  "builtinContentHash": "sha256:3c55705038102248fec9b3d91d711d1e00e9623eed3a5ceabd3dbbfaaa7b762f"
+  "builtinContentHash": "sha256:6583bba4427ae6f62bf0220f8b0b2f4e422460fcc2184922e6fced8aef833913"
 }

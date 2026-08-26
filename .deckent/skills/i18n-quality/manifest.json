@@ -78,8 +78,12 @@
     ],
     "domains": [
       {
-        "id": "workflow",
+        "id": "i18n",
         "proficiency": "primary"
+      },
+      {
+        "id": "test/quality",
+        "proficiency": "secondary"
       }
     ],
     "expertise": [
@@ -102,8 +106,9 @@
   },
   "profileProvenance": {
     "origin": "derived-profile",
-    "derivationVersion": 1,
-    "persistedAt": "2026-08-18T15:34:53.946Z",
-    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
-  }
+    "derivationVersion": 2,
+    "persistedAt": "2026-08-26T20:30:27.580Z",
+    "authority": "deckent sync builtin content-hash"
+  },
+  "builtinContentHash": "sha256:bac50d2087dde97dfabaa5f7aa5fe8e2e0478ad531a65e2a6493a54d752f5bd2"
 }

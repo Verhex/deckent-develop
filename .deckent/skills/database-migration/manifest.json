@@ -58,7 +58,7 @@
     "totalUses": 0,
     "successCount": 0,
     "successRate": 0,
-    "avgCoverage": 0,
+    "avgScore": 0,
     "lastUsedInSprint": ""
   },
   "profile": {
@@ -79,28 +79,8 @@
     ],
     "domains": [
       {
-        "id": "domain",
+        "id": "data",
         "proficiency": "primary"
-      },
-      {
-        "id": "drizzle",
-        "proficiency": "secondary"
-      },
-      {
-        "id": "knex",
-        "proficiency": "secondary"
-      },
-      {
-        "id": "prisma",
-        "proficiency": "secondary"
-      },
-      {
-        "id": "sequelize",
-        "proficiency": "secondary"
-      },
-      {
-        "id": "typeorm",
-        "proficiency": "secondary"
       }
     ],
     "expertise": [
@@ -134,8 +114,9 @@
   },
   "profileProvenance": {
     "origin": "derived-profile",
-    "derivationVersion": 1,
-    "persistedAt": "2026-08-18T15:34:53.944Z",
-    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
-  }
+    "derivationVersion": 2,
+    "persistedAt": "2026-08-26T20:30:27.576Z",
+    "authority": "deckent sync builtin content-hash"
+  },
+  "builtinContentHash": "sha256:92027d8d729b9e4f081fb9b027888bcbecbdab87f8aafa41a3dcc1460cfca583"
 }

@@ -55,7 +55,7 @@
     "totalUses": 0,
     "successCount": 0,
     "successRate": 0,
-    "avgCoverage": 0,
+    "avgScore": 0,
     "lastUsedInSprint": ""
   },
   "profile": {
@@ -74,24 +74,7 @@
         "proficiency": "able"
       }
     ],
-    "domains": [
-      {
-        "id": "tool",
-        "proficiency": "primary"
-      },
-      {
-        "id": "lerna",
-        "proficiency": "secondary"
-      },
-      {
-        "id": "nx",
-        "proficiency": "secondary"
-      },
-      {
-        "id": "turbo",
-        "proficiency": "secondary"
-      }
-    ],
+    "domains": [],
     "expertise": [
       "build-cache",
       "ci-testing",
@@ -123,8 +106,9 @@
   },
   "profileProvenance": {
     "origin": "derived-profile",
-    "derivationVersion": 1,
-    "persistedAt": "2026-08-18T15:34:53.947Z",
-    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
-  }
+    "derivationVersion": 2,
+    "persistedAt": "2026-08-26T20:30:27.582Z",
+    "authority": "deckent sync builtin content-hash"
+  },
+  "builtinContentHash": "sha256:b9e8bf9fa1e0a6f5de5eb937081bbaf630b102e2f5b45f964ebf285a78e38d85"
 }

@@ -3,7 +3,10 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { describe, expect, it } from 'vitest';
 
-import { deriveCanonicalSkillProfile } from '../../src/core/skill-profile-derivation.js';
+import {
+  deriveCanonicalSkillProfile,
+  SKILL_PROFILE_DERIVATION_VERSION,
+} from '../../src/core/skill-profile-derivation.js';
 import { resolveSkillCatalog } from '../../src/core/skill-pool.js';
 import { createSkillDefinition } from '../../src/core/skill-types.js';
 import type { SkillDefinition } from '../../src/core/skill-types.js';
@@ -38,14 +41,14 @@ describe('deriveCanonicalSkillProfile', () => {
     expect(validateSkillProfile(first.profile).ok).toBe(true);
     expect(first.origin).toBe('derived-profile');
     expect(first.provenance).toEqual({
-      derivationVersion: 2,
+      derivationVersion: SKILL_PROFILE_DERIVATION_VERSION,
       fields: {
         workTypes: {
           sourceFields: ['category', 'triggers', 'stackDetection', 'composableWith', 'priority', 'description'],
           note: 'canonical-profile-derived-from-manifest-source-metadata',
         },
         domains: {
-          sourceFields: ['triggers', 'stackDetection'],
+          sourceFields: ['triggers', 'description'],
           note: 'canonical-profile-derived-from-manifest-source-metadata',
         },
         expertise: {
@@ -66,13 +69,15 @@ describe('deriveCanonicalSkillProfile', () => {
     ]);
   });
 
-  it('maps exact vocabulary signals and never promotes generic categories to domains', () => {
+  it('maps semantic roots and never promotes generic categories to domains', () => {
     const testing = deriveCanonicalSkillProfile(representative({
+      description: 'Testing workflows with Vitest',
       category: 'workflow',
       triggers: ['test'],
       stackDetection: { files: [], dependencies: ['vitest'], commands: [] },
     }));
     const generic = deriveCanonicalSkillProfile(representative({
+      description: 'General workflow capability',
       category: 'workflow', triggers: ['build'],
       stackDetection: { files: [], dependencies: [], commands: [] },
     }));
@@ -82,6 +87,51 @@ describe('deriveCanonicalSkillProfile', () => {
     if (testing.status !== 'routable' || generic.status !== 'routable') return;
     expect(testing.profile.domains).toEqual([{ id: 'test/quality', proficiency: 'primary' }]);
     expect(generic.profile.domains).toEqual([]);
+  });
+
+  it.each([
+    ['generic prose', {
+      name: 'General Workflow Expert',
+      description: 'A specialist skill to build, implement, review, and analyze workflows',
+      category: 'workflow' as const,
+      triggers: ['development', 'expertise'],
+      stackDetection: { files: [], dependencies: [], commands: [] },
+    }],
+    ['stack and composition metadata', {
+      name: 'Focused Specialist',
+      description: 'Provides focused specialist capability',
+      category: 'tool' as const,
+      triggers: [],
+      stackDetection: {
+        files: ['src/api/routes.ts'], dependencies: ['vitest'], commands: ['build'],
+      },
+      composableWith: ['security-expert'],
+    }],
+  ])('drops v1 garbage domains from %s', (_label, overrides) => {
+    const result = deriveCanonicalSkillProfile(representative(overrides));
+
+    expect(result.status).toBe('routable');
+    if (result.status !== 'routable') return;
+    expect(result.profile.domains).toEqual([]);
+  });
+
+  it('derives domains from singular roots in name, description, and tags', () => {
+    const result = deriveCanonicalSkillProfile(representative({
+      name: 'Endpoints Specialist',
+      description: 'Improves tests and databases',
+      category: 'domain',
+      triggers: ['translations'],
+      stackDetection: { files: [], dependencies: [], commands: [] },
+    }));
+
+    expect(result.status).toBe('routable');
+    if (result.status !== 'routable') return;
+    expect(result.profile.domains).toEqual([
+      { id: 'api', proficiency: 'primary' },
+      { id: 'data', proficiency: 'secondary' },
+      { id: 'i18n', proficiency: 'secondary' },
+      { id: 'test/quality', proficiency: 'secondary' },
+    ]);
   });
 
   it('keeps a valid human-authored profile byte-authoritative', () => {
@@ -98,6 +148,7 @@ describe('deriveCanonicalSkillProfile', () => {
 
   it('deterministically upgrades a stale persisted generated profile', () => {
     const stale = representative({
+      description: 'Testing workflows with Vitest',
       category: 'workflow',
       triggers: ['test'],
       stackDetection: { files: [], dependencies: ['vitest'], commands: [] },
@@ -116,8 +167,29 @@ describe('deriveCanonicalSkillProfile', () => {
     expect(first.status).toBe('routable');
     if (first.status !== 'routable') return;
     expect(first.origin).toBe('derived-profile');
-    expect(first.provenance?.derivationVersion).toBe(2);
+    expect(first.provenance?.derivationVersion).toBe(SKILL_PROFILE_DERIVATION_VERSION);
     expect(first.profile.domains).toEqual([{ id: 'test/quality', proficiency: 'primary' }]);
+  });
+
+  it('keeps a valid persisted profile produced by the current derivation version', () => {
+    const currentProfile = {
+      profileVersion: 3 as const,
+      workTypes: [{ type: 'review' as const, proficiency: 'primary' as const }],
+      domains: [{ id: 'security', proficiency: 'primary' as const }],
+      expertise: ['persisted-current'],
+      deliverables: ['doc' as const],
+    };
+    const result = deriveCanonicalSkillProfile(representative({
+      profile: currentProfile,
+      profileProvenance: {
+        origin: 'derived-profile',
+        derivationVersion: SKILL_PROFILE_DERIVATION_VERSION,
+      },
+    }));
+
+    expect(result).toMatchObject({
+      status: 'routable', origin: 'derived-profile', profile: currentProfile,
+    });
   });
 
   it('returns a typed unroutable HOLD when source metadata cannot produce a profile', () => {

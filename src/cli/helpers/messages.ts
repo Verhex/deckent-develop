@@ -2957,6 +2957,30 @@ const BASE_MESSAGES: MessageMap = {
     en: 'DECKENT.md not found. Run deckent init first.',
     tr: 'DECKENT.md bulunamadı. Önce deckent init çalıştırın.',
   },
+  'sync.dry_run_prefix': {
+    en: '[dry-run] ',
+    tr: '[kuru-çalıştırma] ',
+  },
+  'sync.skill_manifest_created': {
+    en: '{prefix}Skill manifest created: .deckent/skills/{id}/manifest.json',
+    tr: '{prefix}Skill manifesti oluşturuldu: .deckent/skills/{id}/manifest.json',
+  },
+  'sync.skill_manifest_updated': {
+    en: '{prefix}Skill manifest updated: .deckent/skills/{id}/manifest.json',
+    tr: '{prefix}Skill manifesti güncellendi: .deckent/skills/{id}/manifest.json',
+  },
+  'sync.skill_manifest_kept_local': {
+    en: 'Warning: skill manifest "{id}" kept as a local definition',
+    tr: 'Uyarı: "{id}" skill manifesti yerel tanım olarak korundu',
+  },
+  'sync.skill_manifest_issue': {
+    en: 'Warning: skill manifest "{id}" could not be synced ({reason})',
+    tr: 'Uyarı: "{id}" skill manifesti eşitlenemedi ({reason})',
+  },
+  'sync.skill_manifest_summary': {
+    en: 'Skill manifests: {changed} changed, {unchanged} unchanged',
+    tr: 'Skill manifestleri: {changed} değişti, {unchanged} değişmedi',
+  },
 
   // ─── set-directives command ──────────────────────────────────────────
   'set_directives.updated': {
@@ -8023,6 +8047,10 @@ const BASE_MESSAGES: MessageMap = {
   'cli.skill.create.desc': {
     en: 'Create a custom skill',
     tr: 'Özel bir skill oluşturun',
+  },
+  'cli.skill.create.profile_required': {
+    en: 'Skill "{name}" was not created because a required routing profile could not be generated ({reason}). Add a specific description and routing triggers, then try again.',
+    tr: 'Zorunlu yönlendirme profili üretilemediği için "{name}" skill\'i oluşturulmadı ({reason}). Belirli bir açıklama ve yönlendirme tetikleyicileri ekleyip yeniden deneyin.',
   },
   'cli.skill.install.desc': {
     en: 'Install a skill from local path or git URL (supports version pinning: url#tag)',

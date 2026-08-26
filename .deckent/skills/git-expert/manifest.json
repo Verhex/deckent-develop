@@ -56,7 +56,7 @@
     "totalUses": 0,
     "successCount": 0,
     "successRate": 0,
-    "avgCoverage": 0,
+    "avgScore": 0,
     "lastUsedInSprint": ""
   },
   "profile": {
@@ -75,16 +75,7 @@
         "proficiency": "able"
       }
     ],
-    "domains": [
-      {
-        "id": "tool",
-        "proficiency": "primary"
-      },
-      {
-        "id": "git",
-        "proficiency": "secondary"
-      }
-    ],
+    "domains": [],
     "expertise": [
       ".git/config",
       ".gitattributes",
@@ -114,8 +105,9 @@
   },
   "profileProvenance": {
     "origin": "derived-profile",
-    "derivationVersion": 1,
-    "persistedAt": "2026-08-18T15:34:53.945Z",
-    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
-  }
+    "derivationVersion": 2,
+    "persistedAt": "2026-08-26T20:30:27.579Z",
+    "authority": "deckent sync builtin content-hash"
+  },
+  "builtinContentHash": "sha256:396bf86450a8a32998a5431a61c7a556f5b70d3f1ad33b4dc7951539ce4945fe"
 }

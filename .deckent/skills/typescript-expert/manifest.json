@@ -60,7 +60,7 @@
     "totalUses": 0,
     "successCount": 0,
     "successRate": 0,
-    "avgCoverage": 0,
+    "avgScore": 0,
     "lastUsedInSprint": ""
   },
   "profile": {
@@ -81,12 +81,8 @@
     ],
     "domains": [
       {
-        "id": "language",
-        "proficiency": "primary"
-      },
-      {
-        "id": "typescript",
-        "proficiency": "secondary"
+        "id": "*",
+        "proficiency": "able"
       }
     ],
     "expertise": [
@@ -117,8 +113,9 @@
   },
   "profileProvenance": {
     "origin": "derived-profile",
-    "derivationVersion": 1,
-    "persistedAt": "2026-08-18T15:34:53.950Z",
-    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
-  }
+    "derivationVersion": 2,
+    "persistedAt": "2026-08-26T20:30:27.588Z",
+    "authority": "deckent sync builtin content-hash"
+  },
+  "builtinContentHash": "sha256:5154b8761673f33265c8039ed6cd2210c15da094e0ffa20954d260ae74f2fd7b"
 }

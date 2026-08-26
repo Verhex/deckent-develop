@@ -64,7 +64,7 @@
     "totalUses": 0,
     "successCount": 0,
     "successRate": 0,
-    "avgCoverage": 0,
+    "avgScore": 0,
     "lastUsedInSprint": ""
   },
   "profile": {
@@ -85,24 +85,8 @@
     ],
     "domains": [
       {
-        "id": "framework",
+        "id": "api",
         "proficiency": "primary"
-      },
-      {
-        "id": "@apollo/server",
-        "proficiency": "secondary"
-      },
-      {
-        "id": "@graphql-codegen/cli",
-        "proficiency": "secondary"
-      },
-      {
-        "id": "graphql",
-        "proficiency": "secondary"
-      },
-      {
-        "id": "type-graphql",
-        "proficiency": "secondary"
       }
     ],
     "expertise": [
@@ -136,8 +120,9 @@
   },
   "profileProvenance": {
     "origin": "derived-profile",
-    "derivationVersion": 1,
-    "persistedAt": "2026-08-18T15:34:53.946Z",
-    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
-  }
+    "derivationVersion": 2,
+    "persistedAt": "2026-08-26T20:30:27.579Z",
+    "authority": "deckent sync builtin content-hash"
+  },
+  "builtinContentHash": "sha256:cb37b120ab1a41e1e3446db26a9d9f24cf2c68091912a363b4010814796fdcb6"
 }

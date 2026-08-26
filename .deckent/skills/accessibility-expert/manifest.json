@@ -56,7 +56,7 @@
     "totalUses": 0,
     "successCount": 0,
     "successRate": 0,
-    "avgCoverage": 0,
+    "avgScore": 0,
     "lastUsedInSprint": ""
   },
   "profile": {
@@ -77,16 +77,8 @@
     ],
     "domains": [
       {
-        "id": "domain",
+        "id": "a11y",
         "proficiency": "primary"
-      },
-      {
-        "id": "@axe-core/react",
-        "proficiency": "secondary"
-      },
-      {
-        "id": "eslint-plugin-jsx-a11y",
-        "proficiency": "secondary"
       }
     ],
     "expertise": [
@@ -118,8 +110,9 @@
   },
   "profileProvenance": {
     "origin": "derived-profile",
-    "derivationVersion": 1,
-    "persistedAt": "2026-08-18T15:34:53.941Z",
-    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
-  }
+    "derivationVersion": 2,
+    "persistedAt": "2026-08-26T20:30:27.572Z",
+    "authority": "deckent sync builtin content-hash"
+  },
+  "builtinContentHash": "sha256:77559d8f93c18169c910e8c0bb2fdca4fb088ce4cd464ad56751969474f1fce5"
 }

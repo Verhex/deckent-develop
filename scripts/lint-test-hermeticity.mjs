@@ -669,7 +669,10 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-26 xverify-onarim dalgasi (sprint-678): +2 — worker-authored
   // tests/cli/xverify-evidence-scope.test.ts + fencing/ingress pin ekleri
   // (tmpdir-hermetik, suite-owned).
-  count: 16511,
+  // 2026-08-26 23:4x: 16511→16513 — Dalga-1 (sprint-692) worker-suite'leri:
+  // tests/cli/sync-skill.test.ts + tests/cli/skill-create-gate.test.ts
+  // (tmpdir-hermetik, suite-owned) + v2-derivation fixture eklentileri.
+  count: 16513,
   // 2026-08-25 B-sweep: digest moved — --fix roundtrip pin, multi-label
   // parser pin, same-line rule downgraded to WARN (all suite-owned).
   // 2026-08-25 7141 wave: count unchanged, digest moved — the src-side
@@ -713,7 +716,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // attribution-baseline / finalize-retirement + isCanonicalTaskFilename pinleri.
   // 2026-08-26 11:04: 16504→16506 — Node-6a mekanik supurme (sprint-684 3/3):
   // death-sweep hijyen + worker-identity-hostbound + docker-git-async suiteleri.
-  digest: 'b816db452c9002d5b3d222cbf9f56f4029b2d502404b8649b17da079e6875a50',
+  digest: '6afcde584fd00f134b8a752a19af2881d935013417cacbe6d16fb44d2a8422b3',
   // 2026-08-26 17:4x: ayni 16511, digest-only — Faz-B test-slim merge
   // (66 kaynak emekli, equality 57/57) + CI-F004 guard flag-siniflandirmasi
   // (runtime-write-guard open-patch + probe/matris eklentileri) + CI-F005
@@ -1285,7 +1288,10 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // finalizer + sidecar-loader hotfix).
   // 2026-08-26 11:05: ayni 1339, digest-only — Node-6a src kaymalari
   // (death-sweep / prompt-template kimlik-esigi / docker async-git).
-  digest: 'fac1323f67b4343df466abc25b673761548cd4de47dc3dd3d17ca13cacde6caa',
+  digest: 'e48a3692114a2503b004dbf2d7b92f07c0c2653f1e61087469700d2c2bc4a01b',
+  // 2026-08-26 23:4x: ayni 1339, digest-only — Dalga-1 src kaymalari
+  // (skill-profile-derivation v2, sync skill kolu, skill-create gate,
+  // stack-detector scripts-cozumu + tsc-residual el-kapanisi).
   // 2026-08-26 17:4x: ayni 1339, digest-only — Faz-B merge test-korpusu
   // kaymasi (production inventory metni ayni, referans-graf kaydi).
   // 2026-08-26 15:1x: ayni 1339, digest-only — CI-kapanis S1 fsync/i18n src kaymalari.

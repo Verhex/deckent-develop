@@ -14,6 +14,21 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint692] - 2026-08-26
+
+### Added
+
+- Katman-senkronu — deckent sync skill kolu + builtin content-hash + observability onarımı
+- Unroutable-gate — skill create zorunlu profil + lint-manifests fail-closed
+- Prompt-doğruluğu — stack-detector komutları package.json'dan + context sinyal-diyeti
+
+### Changed
+
+- Skill-profil türetimi v2 — çöp-domain temizliği + yeniden-türetim kapısı (completed with tech debt)
+
+
+_Tasks: 4 total, 4 done, 1 tech debt, 0 no-go_
+
 ## [sprint691] - 2026-08-26
 
 ### Added

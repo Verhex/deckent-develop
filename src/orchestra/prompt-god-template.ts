@@ -998,7 +998,20 @@ export function buildSkillBlock(
  */
 export function buildProjectContextBlock(projectContext: string | undefined): string {
   if (!projectContext || projectContext.trim() === '') return '';
-  return `=== Project Context ===\n${projectContext.trim()}\n`;
+  const context = projectContext.trim();
+  if (isGenericGeneratedProjectContext(context)) return '';
+  return `=== Project Context ===\n${context}\n`;
+}
+
+function isGenericGeneratedProjectContext(context: string): boolean {
+  if (!context.includes('# Project Conventions (Auto-Generated)')) return false;
+
+  const signalLines = context.split('\n').map(line => line.trim()).filter(line => {
+    if (line === '' || line.startsWith('#')) return false;
+    const value = line.match(/^-[^:]+:\s*(.*)$/)?.[1]?.trim().toLowerCase();
+    return value === undefined || !['', 'unknown', 'none', 'n/a', 'unspecified'].includes(value);
+  });
+  return signalLines.length === 0;
 }
 
 // ─── ADR Block Builder ─────────────────────────────────────────────────

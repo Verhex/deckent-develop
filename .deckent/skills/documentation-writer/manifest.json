@@ -51,7 +51,7 @@
     "totalUses": 0,
     "successCount": 0,
     "successRate": 0,
-    "avgCoverage": 0,
+    "avgScore": 0,
     "lastUsedInSprint": ""
   },
   "profile": {
@@ -72,8 +72,12 @@
     ],
     "domains": [
       {
-        "id": "workflow",
+        "id": "api",
         "proficiency": "primary"
+      },
+      {
+        "id": "docs",
+        "proficiency": "secondary"
       }
     ],
     "expertise": [
@@ -102,8 +106,9 @@
   },
   "profileProvenance": {
     "origin": "derived-profile",
-    "derivationVersion": 1,
-    "persistedAt": "2026-08-18T15:34:53.944Z",
-    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
-  }
+    "derivationVersion": 2,
+    "persistedAt": "2026-08-26T20:30:27.577Z",
+    "authority": "deckent sync builtin content-hash"
+  },
+  "builtinContentHash": "sha256:4841a47cd83a6e4dc4e785e5784972e1c386137bb8fc79d2e39baa433fb2cba3"
 }

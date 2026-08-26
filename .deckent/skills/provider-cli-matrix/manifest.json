@@ -76,7 +76,7 @@
     ],
     "domains": [
       {
-        "id": "domain",
+        "id": "cli/terminal",
         "proficiency": "primary"
       }
     ],
@@ -106,8 +106,9 @@
   },
   "profileProvenance": {
     "origin": "derived-profile",
-    "derivationVersion": 1,
-    "persistedAt": "2026-08-18T15:34:53.948Z",
-    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
-  }
+    "derivationVersion": 2,
+    "persistedAt": "2026-08-26T20:30:27.584Z",
+    "authority": "deckent sync builtin content-hash"
+  },
+  "builtinContentHash": "sha256:aa9a1f95add156416868ed2330c0fed04e9f13a1bfaa5466f37c6277707bdaa8"
 }

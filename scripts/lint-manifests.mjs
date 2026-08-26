@@ -62,6 +62,14 @@ const VALID_SKILL_CATEGORIES = ['language', 'framework', 'tool', 'domain', 'work
 const VALID_PROMPT_POSITIONS = ['prepend', 'append', 'section'];
 const VALID_AGENT_SOURCES = ['builtin', 'user', 'learned'];
 
+// Debt ledger (2026-08-26): 30 pre-existing skill manifests lack a canonical
+// routing profile. This ceiling is decrease-only: migrations may lower it, but
+// a new profileless manifest makes the gate fail instead of resetting the debt.
+const PROFILELESS_SKILL_BASELINE = 30;
+const VALID_WORK_TYPES = ['build', 'fix', 'refactor', 'document', 'review', 'configure', 'migrate', 'analyze'];
+const VALID_PROFICIENCIES = ['primary', 'secondary', 'able'];
+const VALID_DELIVERABLES = ['code-src', 'code-test', 'doc', 'config', 'workflow', 'migration', 'manifest'];
+
 // ── Manifest tree discovery ──────────────────────────────────────────────────
 
 /**
@@ -240,7 +248,60 @@ function validateSkillManifest(obj) {
   validateStats(o.stats, errors);
   validateActivation(o.activation, errors);
 
+  if (o.profile !== undefined && o.profile !== null) {
+    validateRoutingProfile(o.profile, errors);
+  }
+
   return errors;
+}
+
+/**
+ * Dependency-free mirror of the canonical V3 profile's fail-closed shape.
+ * @param {unknown} profile
+ * @param {string[]} errors
+ */
+function validateRoutingProfile(profile, errors) {
+  if (!profile || typeof profile !== 'object' || Array.isArray(profile)) {
+    errors.push('"profile" must be a canonical V3 routing profile object');
+    return;
+  }
+  const p = /** @type {Record<string, unknown>} */ (profile);
+  if (p.profileVersion !== 3) errors.push('"profile.profileVersion" must be 3');
+  for (const field of ['workTypes', 'domains', 'expertise', 'deliverables']) {
+    if (!Array.isArray(p[field])) errors.push(`"profile.${field}" must be an array`);
+  }
+  if (Array.isArray(p.workTypes) && p.workTypes.length === 0) {
+    errors.push('"profile.workTypes" must not be empty');
+  }
+  if (Array.isArray(p.workTypes)) {
+    p.workTypes.forEach((entry, index) => {
+      const item = /** @type {Record<string, unknown>} */ (entry ?? {});
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)
+        || !VALID_WORK_TYPES.includes(item.type)
+        || !VALID_PROFICIENCIES.includes(item.proficiency)) {
+        errors.push(`"profile.workTypes[${index}]" must contain a valid type and proficiency`);
+      }
+    });
+  }
+  if (Array.isArray(p.domains)) {
+    p.domains.forEach((entry, index) => {
+      const item = /** @type {Record<string, unknown>} */ (entry ?? {});
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)
+        || typeof item.id !== 'string' || item.id.trim() === ''
+        || !VALID_PROFICIENCIES.includes(item.proficiency)) {
+        errors.push(`"profile.domains[${index}]" must contain a non-empty id and valid proficiency`);
+      }
+    });
+  }
+  if (Array.isArray(p.expertise) && (p.expertise.length === 0 || !isStringArray(p.expertise))) {
+    errors.push('"profile.expertise" must be a non-empty array of strings');
+  }
+  if (Array.isArray(p.deliverables) && (p.deliverables.length === 0 || !isStringArray(p.deliverables))) {
+    errors.push('"profile.deliverables" must be a non-empty array of strings');
+  }
+  if (Array.isArray(p.deliverables) && p.deliverables.some((item) => !VALID_DELIVERABLES.includes(item))) {
+    errors.push('"profile.deliverables" contains an unsupported deliverable');
+  }
 }
 
 // ── Agent manifest validation (mirrors AgentPoolManager.validateAgentDefinition) ──
@@ -307,6 +368,7 @@ function validateAgentManifest(obj) {
 
 /** @type {Array<{ tree: string, id: string, path: string, errors: string[] }>} */
 const violations = [];
+let profilelessSkillCount = 0;
 
 /**
  * @param {Array<{ id: string, path: string }>} manifests
@@ -324,6 +386,10 @@ function scanTree(manifests, validator, treeLabel) {
       continue;
     }
     const errors = validator(raw);
+    if (treeLabel === 'skill' && raw && typeof raw === 'object'
+      && !Array.isArray(raw) && (raw.profile === undefined || raw.profile === null)) {
+      profilelessSkillCount += 1;
+    }
     if (errors.length > 0) {
       violations.push({ tree: treeLabel, id, path: relPath, errors });
     }
@@ -332,6 +398,17 @@ function scanTree(manifests, validator, treeLabel) {
 
 scanTree(skillManifests, validateSkillManifest, 'skill');
 scanTree(agentManifests, validateAgentManifest, 'agent');
+
+if (profilelessSkillCount > PROFILELESS_SKILL_BASELINE) {
+  violations.push({
+    tree: 'skill',
+    id: 'profileless-baseline',
+    path: '(skill manifest catalog)',
+    errors: [
+      `${profilelessSkillCount} profileless manifests exceed the decrease-only baseline of ${PROFILELESS_SKILL_BASELINE}`,
+    ],
+  });
+}
 
 // ── Report ────────────────────────────────────────────────────────────────────
 
@@ -345,6 +422,7 @@ console.log('└' + '─'.repeat(W) + '┘');
 console.log('');
 console.log(`  Skill manifests scanned : ${skillManifests.length}`);
 console.log(`  Agent manifests scanned : ${agentManifests.length}`);
+console.log(`  Profileless skill debt  : ${profilelessSkillCount}/${PROFILELESS_SKILL_BASELINE} maximum`);
 console.log(`  Violations              : ${violations.length}`);
 console.log('');
 console.log(line);

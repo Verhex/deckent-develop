@@ -54,7 +54,7 @@
     "totalUses": 0,
     "successCount": 0,
     "successRate": 0,
-    "avgCoverage": 0,
+    "avgScore": 0,
     "lastUsedInSprint": ""
   },
   "profile": {
@@ -75,7 +75,7 @@
     ],
     "domains": [
       {
-        "id": "tool",
+        "id": "devops/ci",
         "proficiency": "primary"
       }
     ],
@@ -108,8 +108,9 @@
   },
   "profileProvenance": {
     "origin": "derived-profile",
-    "derivationVersion": 1,
-    "persistedAt": "2026-08-18T15:34:53.944Z",
-    "authority": "ADR-D-007 hand-persist (sprint-561/561-001 lineage)"
-  }
+    "derivationVersion": 2,
+    "persistedAt": "2026-08-26T20:30:27.576Z",
+    "authority": "deckent sync builtin content-hash"
+  },
+  "builtinContentHash": "sha256:33fe31f17d42aeb48ee43931b0111114ba58b03ac22ee15911833fa163f59786"
 }
