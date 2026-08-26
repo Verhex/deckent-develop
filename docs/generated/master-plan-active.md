@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):b8de0849c05d6cdba6676a3f6f99a7cc9d5eff353c463775c613dca93bcf02b4`
+**Source digest:** `sha256(normalized-lf-utf8):d9fbc7b7106e47aba804a4c8a1a23adbd60450e3c1d624f975d144016305fd97`
 
 **Rows:** 538 total · 464 active · 74 terminal
 
@@ -13,11 +13,11 @@
 
 | State | Count |
 |---|---:|
-| OPEN | 345 |
+| OPEN | 344 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 69 |
-| VERIFY | 50 |
+| VERIFY | 51 |
 | DONE | 74 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -276,7 +276,7 @@
 | 3300 | `RECOVERY-BORN-490-BUILD-DIGEST-GATE-001` | VERIFY | P0 | ASSURANCE | `RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001`, `RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001` | — | Settled source is built once and source/dist identity is proven before binary replay |
 | 3301 | `RECOVERY-BORN-490-NOT-DISPATCHED-SKIPPED-REPLAY-001` | OPEN | P0 | ASSURANCE | `RECOVERY-BORN-490-BUILD-DIGEST-GATE-001`, `RECOVERY-BORN-490-PRE-DISPATCH-SETTLEMENT-001` | — | Synthetic NOT_DISPATCHED and dependency SKIPPED states reach truthful terminal settlement |
 | 3302 | `RECOVERY-BORN-490-LANDING-CHECKPOINT-REPLAY-001` | OPEN | P0 | ASSURANCE | `RECOVERY-BORN-490-BUILD-DIGEST-GATE-001`, `RECOVERY-BORN-488-LANDING-CHECKPOINT-001`, `RECOVERY-BORN-488-REPAIR-DISPATCH-001` | — | Sprint-488 landing and checkpoint defect classes recover through production authority |
-| 3303 | `RECOVERY-BORN-490-MULTI-PROVIDER-REPLAY-001` | OPEN | P0 | ASSURANCE | `RECOVERY-BORN-490-BUILD-DIGEST-GATE-001`, `RECOVERY-BORN-490-PROVIDER-OBSERVATION-001` | — | Multi-provider smoke proves config-resolved routing, auth isolation and provider observation retirement |
+| 3303 | `RECOVERY-BORN-490-MULTI-PROVIDER-REPLAY-001` | VERIFY | P0 | ASSURANCE | `RECOVERY-BORN-490-BUILD-DIGEST-GATE-001`, `RECOVERY-BORN-490-PROVIDER-OBSERVATION-001` | — | Multi-provider smoke proves config-resolved routing, auth isolation and provider observation retirement |
 | 3304 | `RECOVERY-BORN-490-FULL-SUITE-CERTIFICATION-001` | OPEN | P0 | ASSURANCE | `RECOVERY-BORN-490-NOT-DISPATCHED-SKIPPED-REPLAY-001`, `RECOVERY-BORN-490-LANDING-CHECKPOINT-REPLAY-001`, `RECOVERY-BORN-490-MULTI-PROVIDER-REPLAY-001` | — | One explicit full-suite run certifies the completed recovery train after all narrower gates |
 | 3305 | `LIFECYCLE-VOCAB-001` | OPEN | P1 | KERNEL | — | — | Canonical lifecycle phase vocabulary'si tek: enum, controller event'leri, doküman ve terminal projection aynı listeyi gösterir |
 | 3306 | `RECOVERY-NATIVE-PLATFORM-MATRIX-001` | OPEN | P2 | KERNEL | — | — | Recovery/finalize/status zincirinin native platform matrisi: Windows-native + macOS + namespace izolasyonu + Desktop/HA parity |

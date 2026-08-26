@@ -3,19 +3,19 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "b8de0849c05d6cdba6676a3f6f99a7cc9d5eff353c463775c613dca93bcf02b4"
+    "value": "d9fbc7b7106e47aba804a4c8a1a23adbd60450e3c1d624f975d144016305fd97"
   },
   "summary": {
     "total": 538,
     "active": 464,
     "terminal": 74,
-    "receipts": 208,
+    "receipts": 209,
     "byState": {
-      "OPEN": 345,
+      "OPEN": 344,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
-      "VERIFY": 50,
+      "VERIFY": 51,
       "DONE": 74,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -3336,10 +3336,10 @@
       "id": "RECOVERY-BORN-490-MULTI-PROVIDER-REPLAY-001",
       "program": "ASSURANCE",
       "priority": "P0",
-      "state": "OPEN",
-      "updated": "2026-08-01",
+      "state": "VERIFY",
+      "updated": "2026-08-26",
       "definitionDigest": "ca53cd385ae257a8c46ebc19e8212a12d4f19f0ee4da3eb6c592cb9cfe1cee39",
-      "progressDigest": "0fbe2515b57ef3e107ee019337d8eb7bc251e61a77b1dcedaab6e16f13f64785",
+      "progressDigest": "d5f703c8bbaad1447370f302c1c676db288a36b79011f1ba71cda5d88a0a4a0b",
       "terminalClosureDigest": null
     },
     {
@@ -5187,7 +5187,7 @@
       "state": "OPEN",
       "updated": "2026-08-26",
       "definitionDigest": "72a12fb1047dea839dc72cd935cbc4a6032ad1dd7300dbe0e4db271a8b41e22c",
-      "progressDigest": "af09218a4e88ba2091fc0bf4bfe5586a8da250d0a2523bb153ec502473cb715e",
+      "progressDigest": "cffeda2908d349aba134450b0567900b408603af8bcb57e6b54e2d32cd0900bc",
       "terminalClosureDigest": null
     },
     {
@@ -8061,6 +8061,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-26T11:09:35+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-26-NODE3-3303-01",
+      "authorityDigest": "6fdf5bc7e60e9e4d11addba7aeaf2f1f7ab103ee0e3de233e64a30b5cfc3a4eb",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-26T12:18:16+03:00"
       },
       "g7AttemptIdentity": null
     }
@@ -18748,7 +18758,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "0",
         "W": "0",
@@ -18764,10 +18774,12 @@
         "RECOVERY-BORN-490-BUILD-DIGEST-GATE-001",
         "RECOVERY-BORN-490-PROVIDER-OBSERVATION-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-26-NODE3-3303-01"
+      ],
       "acceptance": "At least two independently authenticated and reachable configured providers execute collision-free work under runtime-resolved routing; subscription/local/API accounting remains typed, XVerify separation is preserved, exact intervals close at settlement and unrelated historical intervals neither disappear nor block the next IDLE run",
-      "evidence": "EK-3 open replay basamak; provider/model/count are never encoded in instructions and are admitted only from effective config, registry, auth, reachability, limit and budget evidence at run time",
-      "updated": "2026-08-01"
+      "evidence": "EK-3 open replay basamak; provider/model/count are never encoded in instructions and are admitted only from effective config, registry, auth, reachability, limit and budget evidence at run time; 2026-08-26 SERTİFİKALANDI (sprint-689 canlı çok-provider koşusu — beş acceptance-hükmü de disk-kanıtlı; ayrıntı receipt'te); `receipt=GR-2026-08-26-NODE3-3303-01`",
+      "updated": "2026-08-26"
     },
     {
       "order": 3304,
@@ -24681,7 +24693,7 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "`npm run lint:errors` 0 yeni-occurrence ile yeşil; error-handling-unification + error-registry-lint testleri baseline-mutabakatıyla geçer; dönüşüm assertion/ratchet zayıflatmadan, dosya-kümeli onarım-dalgası olarak koşulur (gen-repair-directives + lint:directives hattı); typed hata-sınıfları mevcut DeckentError/registry desenini izler",
-      "evidence": "2026-08-25 dalga-kapanisi: sprint-672 (9 task, 8 tek-FIX-turda RESOLVED; 672-005 SCOPED_PROOF_HOLD verification-authority gap ile unresolved — kod-defekti degil, site elle cevrildi). 131/131 site typed DeckentError (ad-hoc aile; mesaj-baytlari korunur, baseline dokunulmadi). Kanit: `npm run lint:errors` -> `0 new violation(s), 319 known baseline occurrence(s)` exit-0; guard-suite 204/204; tsc-0; alan spot-suite 29/29; Tier-1 gercek-binary smoke stderr typed-kod (`(INVALID_PATH)`); 28 dosya +417/-131. Full-suite %100 kosusu landing-commit mesajinda. Kalan-VERIFY: owner satir-kabulu + farkli-provider xverify muhru (adjudicator-arizasi acikken typed-HOLD); 2026-08-26 devam-dalgaları (687-001 + sprint-688 2/2 COMPLETE 0-FIX; landing b22429eeb): en-yoğun 12 dosyada 242 site typed'a (26+110+106 → hepsi 0), baseline 318→77 occurrence / 286→72 entry yalnız-azalma budamasıyla; mesaj/akış bit-korundu, 10 suite + lint:errors + tsc-0 + 20-gate yeşil; 687-001'in tek-NO_GO'su direktif-tasarım artefaktıydı (imkânsız-yeşil Test-kombinasyonu — ders: baseline-tutarlılık testi worker-Test'ine konmaz, budama landing-host'ta); kalan 77 occurrence son-dalga adayı",
+      "evidence": "2026-08-25 dalga-kapanisi: sprint-672 (9 task, 8 tek-FIX-turda RESOLVED; 672-005 SCOPED_PROOF_HOLD verification-authority gap ile unresolved — kod-defekti degil, site elle cevrildi). 131/131 site typed DeckentError (ad-hoc aile; mesaj-baytlari korunur, baseline dokunulmadi). Kanit: `npm run lint:errors` -> `0 new violation(s), 319 known baseline occurrence(s)` exit-0; guard-suite 204/204; tsc-0; alan spot-suite 29/29; Tier-1 gercek-binary smoke stderr typed-kod (`(INVALID_PATH)`); 28 dosya +417/-131. Full-suite %100 kosusu landing-commit mesajinda. Kalan-VERIFY: owner satir-kabulu + farkli-provider xverify muhru (adjudicator-arizasi acikken typed-HOLD); 2026-08-26 devam-dalgaları (687-001 + sprint-688 2/2 COMPLETE 0-FIX; landing b22429eeb): en-yoğun 12 dosyada 242 site typed'a (26+110+106 → hepsi 0), baseline 318→77 occurrence / 286→72 entry yalnız-azalma budamasıyla; mesaj/akış bit-korundu, 10 suite + lint:errors + tsc-0 + 20-gate yeşil; 687-001'in tek-NO_GO'su direktif-tasarım artefaktıydı (imkânsız-yeşil Test-kombinasyonu — ders: baseline-tutarlılık testi worker-Test'ine konmaz, budama landing-host'ta); kalan 77 occurrence son-dalga adayı; 2026-08-26 son-dalga (689): +8 dosya/32-site (claude+codex karışık) — kümülatif 318→45 occurrence (286→43 entry); kalan 45 uzun-kuyruk (33 dosyada 1-3'erli) ayrı mini-dalga adayı",
       "updated": "2026-08-26"
     },
     {
@@ -27527,6 +27539,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "16a3a72b2aa7971b255315da46a4c1c04460467f53418bb39c7ec8991c8779a3"
+    "value": "352e3bb0d94fb4b24d370b1e3866cefc6174f0ef93cdc057195a26e7ddb018b4"
   }
 }
