@@ -41,7 +41,14 @@ Her şerit-brief'i bir **WRITE-ALLOWLIST** ilan eder; yan-şerit YALNIZ şunlara
 - Worktree-kökü `LANE-BRIEF.md` / `LANE-STATUS.md`
 
 Yasak (yan-şeritte): `src/**`, `tests/**`, `scripts/**`, `package.json`, `docs/MASTER-PLAN.md`,
-`.deckent/**`, `.brain/**`, DIRECTIVES.md, config dosyaları. Ana-şeridin sahipliğindeki bir
+`.deckent/**`, `.brain/**`, DIRECTIVES.md, config dosyaları.
+**Canlı-vaka sertleştirmesi (2026-08-26, sprint-685 olayı):** yan-şerit ANA-CHECKOUT
+dizininde (`/home/alperen/deckent-dev`) HİÇBİR komut koşmaz — bütün çalışması kendi
+worktree'sindedir; ana-repo'ya yalnız `git -C … fetch/worktree add` kurulum komutlarıyla
+dokunur. Deckent run/flow/sprint mutasyonu (set_directives, plan, start, approve, flow
+oluşturma) yan-şeritte KESİN yasaktır — analiz görevi hiçbir yorumla execution'a genişleyemez.
+Ana-şerit tarafı simetrik ders: DIRECTIVES'te kendi yazmadığı içerik bulan ana-şerit, owner
+açıkça işaret etmedikçe start vermez — tek-satır teyit alır. Ana-şeridin sahipliğindeki bir
 dosyada değişiklik GEREKİYORSA yan-şerit bunu FINDING olarak raporlar (exact dosya+satır+
 önerilen diff), asla kendisi uygulamaz. Ana-şerit isterse aynı dosyada eşzamanlı çalışır —
 tutarsızlık imkânsız çünkü tek yazar var.
