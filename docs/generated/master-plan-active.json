@@ -3,19 +3,19 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "749f8c17c2c42c43b5f40cb32ae515f4112a8d860d409f890c0dccdfb3ecb1f9"
+    "value": "3e1bbdb37a347e4b7b69b515a3e2402eba8029c5e9631cb36a456c6611cc66a0"
   },
   "summary": {
     "total": 538,
     "active": 464,
     "terminal": 74,
-    "receipts": 207,
+    "receipts": 208,
     "byState": {
-      "OPEN": 348,
+      "OPEN": 345,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
-      "VERIFY": 47,
+      "VERIFY": 50,
       "DONE": 74,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -476,10 +476,10 @@
       "id": "STATUS-SWEEP-OUTPUT-HYGIENE-001",
       "program": "TRUTH",
       "priority": "P2",
-      "state": "OPEN",
-      "updated": "2026-08-25",
+      "state": "VERIFY",
+      "updated": "2026-08-26",
       "definitionDigest": "5405c187be482fe14c208853785cbdcb021d351e577266ac914f841e2580f660",
-      "progressDigest": "e3e86a8738071261ca663fbd53350380cd428d0adc64bddd4b6e7cadc29a1846",
+      "progressDigest": "f4d710f58f28f047802ab84a17ba9d1b17f86be4af812facc95b3829f8212433",
       "terminalClosureDigest": null
     },
     {
@@ -509,10 +509,10 @@
       "id": "WORKER-IDENTITY-HOSTBOUND-001",
       "program": "TRUTH",
       "priority": "P2",
-      "state": "OPEN",
-      "updated": "2026-08-25",
+      "state": "VERIFY",
+      "updated": "2026-08-26",
       "definitionDigest": "12573ddab0a50acb8fdc19e8ba2ee99e25c8f408e869a4deff1e4838bef5c04c",
-      "progressDigest": "a15ff54a2145c23b87046f47a39a55bc349b565c65fa74a3584b7d04f5de7d19",
+      "progressDigest": "7c1b885638171ff013624ffd008aa25cce4f8e8dc6e22a3838694b9244e7df8f",
       "terminalClosureDigest": null
     },
     {
@@ -3468,10 +3468,10 @@
       "id": "PROD-SPAWNSYNC-ASYNC-001",
       "program": "KERNEL",
       "priority": "P1",
-      "state": "OPEN",
-      "updated": "2026-08-03",
+      "state": "VERIFY",
+      "updated": "2026-08-26",
       "definitionDigest": "b49217770cf4d9965c24f57a176ff35b48f9314e94bdf3c001e11bfdaa6717e5",
-      "progressDigest": "c4156f0c8472042c29e198dc49028eeda1776ec737af23983eba00abbd06b26d",
+      "progressDigest": "73212ac18c8d925f4a08951a5d67feafca78a77b2bae87bf9f0afa5de75a5e56",
       "terminalClosureDigest": null
     },
     {
@@ -8053,6 +8053,16 @@
         "transitionAt": "2026-08-26T10:46:31+03:00"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-26-NODE6A-SWEEP-01",
+      "authorityDigest": "b1721a1302c5566ff745cec4b96f3ba67e75cb7d7220fd71899718ad07542e12",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-26T11:09:35+03:00"
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -9153,7 +9163,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "0",
         "W": "0",
@@ -9166,10 +9176,12 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-26-NODE6A-SWEEP-01"
+      ],
       "acceptance": "deathSweep.skipped ham-liste yerine sinif-bazli sayim + ornek doner (JSON sozlesme additive); 100 handle'siz/log'suz legacy flow-artigi icin runs yuzeyinde owner-onayli tipli temizlik akisi tanimlanir; status ciktisi bit-notr kucultme pini",
-      "evidence": "owner-admission 2026-08-25-gece (gece-bulgu #2); canli vaka: status --json 100 'no flow found' satiri dokuyor",
-      "updated": "2026-08-25"
+      "evidence": "owner-admission 2026-08-25-gece (gece-bulgu #2); canli vaka: status --json 100 'no flow found' satiri dokuyor; 2026-08-26 Node-6a kapanışı (684-001): sınıf-bazlı özet (additive) + mevcut runs-seam'inde tipli dry-run/apply taşıma+manifest; hedef gate-uyumu için runtime-quarantine (kalıcı-arşive terfi ayrı owner-disposition); `receipt=GR-2026-08-26-NODE6A-SWEEP-01`",
+      "updated": "2026-08-26"
     },
     {
       "order": 205,
@@ -9248,7 +9260,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "0",
         "W": "0",
@@ -9261,10 +9273,12 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-26-NODE6A-SWEEP-01"
+      ],
       "acceptance": "Prompt/cagri zinciri worker'a host-bound attemptId+backend'i kanitli tasir; worker hb-yazimi kimlik-belirsizliginde typed-HOLD yerine dogru kimlikle yazar; 674-sinifi 'identity not host-bound' reddi hermetik pinlenir",
-      "evidence": "owner-admission 2026-08-25-gece (gece-bulgu #7); canli vaka: 674 worker'lari hb yazmayi HEARTBEAT_IDENTITY_HOLD ile reddetti",
-      "updated": "2026-08-25"
+      "evidence": "owner-admission 2026-08-25-gece (gece-bulgu #7); canli vaka: 674 worker'lari hb yazmayi HEARTBEAT_IDENTITY_HOLD ile reddetti; 2026-08-26 Node-6a kapanışı (684-002): kök buildWorkerPrompt'un binding-öncesi derlenmesiydi — dispatch host approval-receipt'li kimlikle HOLD'u ikame ediyor, kimliksiz akış dürüst typed-HOLD; 674-vakası fixture'lı; `receipt=GR-2026-08-26-NODE6A-SWEEP-01`",
+      "updated": "2026-08-26"
     },
     {
       "order": 210,
@@ -18931,7 +18945,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
         "W": "0",
@@ -18944,10 +18958,12 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-26-NODE6A-SWEEP-01"
+      ],
       "acceptance": "`spawn-backend-docker.ts`'teki `git hash-object -w` ×2, `cat-file blob` ve `diff --numstat` çağrıları dispatch'i bloklamayan async eşdeğerlerine taşınır; `spawnsync-baseline.json`'dan ilgili kayıtlar düşer; provider-observation v2'nin dosya-diff kanıtı davranış değişmeden korunur",
-      "evidence": "Alperen kararı 2026-08-02 (karar #2, PAZARTESI transkripsiyonu): kod geri alınmıyor — provider-observation v2'nin dosya-diff kanıtı buna bağlı; ratchet kaydı geçici kabul edildi ve bu satır kalıcı kapanışın sahibi. TEST-SPAWN-001 test-politikasıdır, bu satır ÜRETİM hot-path'idir; ikisi ayrı",
-      "updated": "2026-08-03"
+      "evidence": "Alperen kararı 2026-08-02 (karar #2, PAZARTESI transkripsiyonu): kod geri alınmıyor — provider-observation v2'nin dosya-diff kanıtı buna bağlı; ratchet kaydı geçici kabul edildi ve bu satır kalıcı kapanışın sahibi. TEST-SPAWN-001 test-politikasıdır, bu satır ÜRETİM hot-path'idir; ikisi ayrı; 2026-08-26 Node-6a kapanışı (684-003): kalan senkron git çağrıları async-runner desenine taşındı, spawnsync-baseline düşümü yalnız-azalma; provider-observation v2 diff-kanıtı davranış-değişmez (mock-suite yeşil); spawnInternal async-propagation kırığı worker'ın kendi doğrulamasında yakalandı; `receipt=GR-2026-08-26-NODE6A-SWEEP-01`",
+      "updated": "2026-08-26"
     },
     {
       "order": 3316,
@@ -27511,6 +27527,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "aa91b5126940aa8db793f676727c07e075557dd5d9b9d8bc88bce372e16db477"
+    "value": "d872bc4ec0d57e093169e780ca365616705b41573bd3fb3a1ffa075d92a9e1d5"
   }
 }

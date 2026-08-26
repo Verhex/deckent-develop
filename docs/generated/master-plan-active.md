@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):749f8c17c2c42c43b5f40cb32ae515f4112a8d860d409f890c0dccdfb3ecb1f9`
+**Source digest:** `sha256(normalized-lf-utf8):3e1bbdb37a347e4b7b69b515a3e2402eba8029c5e9631cb36a456c6611cc66a0`
 
 **Rows:** 538 total · 464 active · 74 terminal
 
@@ -13,11 +13,11 @@
 
 | State | Count |
 |---|---:|
-| OPEN | 348 |
+| OPEN | 345 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 69 |
-| VERIFY | 47 |
+| VERIFY | 50 |
 | DONE | 74 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -54,10 +54,10 @@
 | 201 | `CONFIG-HEAL-IO-TRUTH-001` | VERIFY | P1 | TRUTH | — | — | Config self-heal io-vs-parse ayriminin kalici kaydi + ERRORS.md forensic-penceresi |
 | 202 | `EVAL-TSC-FEEDBACK-001` | VERIFY | P1 | TRUTH | — | — | Auditor tsc-FAIL'i FIX-fazina geri beslenir; tam-factory vi.mock'lara importOriginal-ratchet |
 | 203 | `HONEST-GATE-DELETION-AWARE-001` | VERIFY | P2 | TRUTH | — | — | Honest-gate stub-sezgisi silme-only isleri yanlis-pozitiflemez |
-| 204 | `STATUS-SWEEP-OUTPUT-HYGIENE-001` | OPEN | P2 | TRUTH | — | — | status deathSweep ciktisi sinif-ozetli olur; olu flow-handle artiklari tipli temizlik akisina baglanir |
+| 204 | `STATUS-SWEEP-OUTPUT-HYGIENE-001` | VERIFY | P2 | TRUTH | — | — | status deathSweep ciktisi sinif-ozetli olur; olu flow-handle artiklari tipli temizlik akisina baglanir |
 | 205 | `DIRECTIVES-ENGINE-SELFCHANGE-LINT-001` | VERIFY | P2 | TRUTH | — | — | lint-directives motor-sicak-yolu self-change'inde typed uyari verir |
 | 206 | `EVENT-TRUTH-A4-001` | OPEN | P1 | TRUTH | — | — | A3'un bilincli-ertelenenleri: hb-sema emekliligi, log tek-format, inspect-parity, olu-feed silimi, kayipsiz rotasyon, Nervous-filtre |
-| 207 | `WORKER-IDENTITY-HOSTBOUND-001` | OPEN | P2 | TRUTH | — | — | Worker attemptId/backend host-bound kimlik akisi: HEARTBEAT_IDENTITY_HOLD reddi kapanir |
+| 207 | `WORKER-IDENTITY-HOSTBOUND-001` | VERIFY | P2 | TRUTH | — | — | Worker attemptId/backend host-bound kimlik akisi: HEARTBEAT_IDENTITY_HOLD reddi kapanir |
 | 210 | `REPO-CLEANUP-001` | OPEN | P2 | TRUTH | `SSOT-002` | — | Repository filesystem, tracked-ephemeral and orphan disposition manifest |
 | 220 | `REPO-CLEANUP-APPLY-001` | BLOCKED | P2 | TRUTH | `REPO-CLEANUP-001` | `FRESH_DESTRUCTIVE_APPROVAL_REQUIRED` | Apply approved repository-filesystem cleanup manifest |
 | 230 | `MEMORY-SYNC-001` | OPEN | P0 | TRUTH | `MEMORY-AUTHORITY-001` | — | Provider-neutral revisioned memory sync and projections |
@@ -282,7 +282,7 @@
 | 3306 | `RECOVERY-NATIVE-PLATFORM-MATRIX-001` | OPEN | P2 | KERNEL | — | — | Recovery/finalize/status zincirinin native platform matrisi: Windows-native + macOS + namespace izolasyonu + Desktop/HA parity |
 | 3307 | `RECOVERY-LIVE-CONTINUATION-PROOF-001` | OPEN | P2 | KERNEL | — | — | Canlı devam-kanıtları: fresh genuinely-PAUSED continuation, non-Sprint adapter'lar ve shared-digest'in tüm modlarda/ortamlarda kanıtı |
 | 3314 | `ARCHIVE-PATH-AUTHORITY-001` | OPEN | P1 | KERNEL | — | — | Task-artifact arşivi tek kanonik authority'ye yazar: settlement, recover ve cleanup aynı konuma, kalıntısız ve retention-kurallı |
-| 3315 | `PROD-SPAWNSYNC-ASYNC-001` | OPEN | P1 | KERNEL | — | — | Worker-dispatch hot-path'indeki 4 senkron git çağrısı async'e taşınır ve spawnsync ratchet'inden düşürülür |
+| 3315 | `PROD-SPAWNSYNC-ASYNC-001` | VERIFY | P1 | KERNEL | — | — | Worker-dispatch hot-path'indeki 4 senkron git çağrısı async'e taşınır ve spawnsync ratchet'inden düşürülür |
 | 3316 | `RECOVERY-BORN-515-TERMINAL-SUPERSESSION-001` | OPEN | P0 | KERNEL | `PAUSED-FINALIZE-001`, `RECEIPT-001`, `KERNEL-SETTLEMENT-001` | — | Cleanup-eligible olmayan erken terminal receipt recovery/finalize yolunu kalıcı kilitleyemez; immutable receipt append-only ve generation-fenced supersession taşır |
 | 3320 | `BOT-LIFECYCLE-HONESTY-001` | OPEN | P1 | KERNEL | — | — | Bot daemon lifecycle dürüstlüğü: recovery-sınıfı stop komutları identity-guard'a takılmaz, SIGTERM pid dosyasını temizler |
 | 3322 | `RECOVERY-BORN-522-DOCTOR-AUTHORITY-COVERAGE-001` | BLOCKED | P1 | OBS | — | `OWNER_CLOSURE_SIGNATURE_REQUIRED` | `deckent doctor` provider-limit-authority kapısını görmüyor ve operatörü yanlış remedy'ye (`keyring init`) yönlendiriyor |
