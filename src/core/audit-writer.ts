@@ -5,6 +5,7 @@
 
 import { createHash, createHmac } from 'node:crypto';
 import { writeEvent, readEvents } from './event-stream.js';
+import type { ApprovalSlaEvidence } from './approval-sla.js';
 
 // ─── Channel constant ─────────────────────────────────────────────
 
@@ -133,6 +134,14 @@ export interface AuditEventPayload extends AuditEvent {
   timestamp: string;
 }
 
+export interface ApprovalLifecycleAuditInput {
+  readonly tenantId: string;
+  readonly requestId: string;
+  readonly origin: string;
+  readonly evidence: ApprovalSlaEvidence;
+  readonly sourceReference: string;
+}
+
 // ─── Public API ───────────────────────────────────────────────────
 
 /**
@@ -201,6 +210,45 @@ export function writeAuditEvent(
   }
 
   return written !== null;
+}
+
+/**
+ * Persist one lifecycle stage/skip/expiry as a structured system audit event.
+ * Mechanism callers supply only typed metadata; timeout is never attributed to
+ * a human actor and no user-visible prose is stored as authority.
+ */
+export function writeApprovalLifecycleAuditEvent(
+  projectRoot: string,
+  sprintId: string,
+  input: ApprovalLifecycleAuditInput,
+): boolean {
+  if (!input.requestId || !input.origin || !input.sourceReference) return false;
+  if (input.evidence.requestId !== input.requestId) return false;
+  return writeAuditEvent(projectRoot, sprintId, {
+    tenantId: input.tenantId,
+    actor: input.evidence.kind === 'expired' ? 'system:expiry' : 'system:approval-sla',
+    action: input.evidence.kind === 'expired'
+      ? 'approval.timeout-disposition'
+      : input.evidence.kind === 'skipped'
+        ? 'approval.sla-stage-skipped'
+        : 'approval.sla-stage-due',
+    target: input.requestId,
+    correlationId: input.requestId,
+    causationId: input.evidence.eventId,
+    metadata: {
+      origin: input.origin,
+      sourceReference: input.sourceReference,
+      lifecycleGeneration: input.evidence.lifecycleGeneration,
+      stage: input.evidence.stage,
+      ordinal: input.evidence.ordinal,
+      kind: input.evidence.kind,
+      dueAt: input.evidence.dueAt,
+      observedAt: input.evidence.observedAt,
+      authoredPolicyDigest: input.evidence.authoredPolicyDigest,
+      appliedPolicyDigest: input.evidence.appliedPolicyDigest,
+      ...(input.evidence.reasonCode ? { reasonCode: input.evidence.reasonCode } : {}),
+    },
+  });
 }
 
 /**

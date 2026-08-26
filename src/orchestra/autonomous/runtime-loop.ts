@@ -35,6 +35,8 @@ import { makeActionExecutor } from './action-adapter.js';
 import { makeTriggerSource } from './trigger-adapter.js';
 // ─── Engine composition root (Task 7) imports ────────────────────────
 import type { ResolvedConfig } from '../../core/config-types.js';
+import type { ResolvedApprovalLifecycleConfig } from '../../core/config-types.js';
+import type { VerifiedPrincipal } from '../../core/principal.js';
 import type { CapabilityRegistry } from '../../core/capability-broker.js';
 import { createAuditedCapabilityRegistry } from '../../core/capability-runtime.js';
 import { buildErpConnectorFromConfig } from '../../core/erp/index.js';
@@ -91,6 +93,12 @@ export interface BuildAutonomousRuntimeOptions {
   now?: () => string;
   /** Optional nervous Executor delegate for approval accept/reject. */
   executor?: Pick<Executor, 'resolveApproval'>;
+  /** Canonical resolved lifecycle policy for newly parked autonomous work. */
+  approvalLifecycle?: ResolvedApprovalLifecycleConfig;
+  /** Tenant authority for the approval queue; never inferred from request data. */
+  principal?: VerifiedPrincipal;
+  /** Refuse a tenant-less approval caller when enterprise isolation is active. */
+  strictTenantIsolation?: boolean;
 }
 
 export interface AutonomousRuntimeBundle {
@@ -115,8 +123,12 @@ export function buildAutonomousRuntime(
   const audit = makeAuditSink(opts.projectRoot, opts.sprintId ?? 'autonomous');
   const approvalGate = makeApprovalGate({
     pendingPath: opts.pendingPath,
+    projectRoot: opts.projectRoot,
     now: opts.now,
     executor: opts.executor,
+    ...(opts.approvalLifecycle ? { lifecycle: opts.approvalLifecycle } : {}),
+    ...(opts.principal ? { principal: opts.principal } : {}),
+    strictTenantIsolation: opts.strictTenantIsolation ?? false,
   });
   const executor = makeActionExecutor(opts.actionHandlers);
   const triggerSource = makeTriggerSource({
@@ -353,6 +365,16 @@ export function buildEngineRuntime(
     }),
   );
 
+  const approvalPrincipal: VerifiedPrincipal = {
+    id: opts.actor?.id ?? 'autonomous-runtime',
+    identityClass: opts.actor?.identityClass ?? 'service',
+    assurance: opts.actor?.assurance ?? 'unverified',
+    provenance: opts.actor?.provenance ?? 'autonomous',
+    verifiedBy: opts.actor ? 'actor-context' : 'autonomous-runtime',
+    ...(opts.actor?.tenantId ? { tenantId: opts.actor.tenantId } : {}),
+    ...(opts.actor?.role ? { role: opts.actor.role } : {}),
+  };
+
   const base = buildAutonomousRuntime({
     projectRoot: opts.projectRoot,
     flows: opts.flows,
@@ -361,6 +383,11 @@ export function buildEngineRuntime(
     clock: opts.clock,
     now: opts.now,
     pendingPath: opts.pendingPath,
+    ...(opts.config.approval?.lifecycle
+      ? { approvalLifecycle: opts.config.approval.lifecycle }
+      : {}),
+    principal: approvalPrincipal,
+    strictTenantIsolation: opts.config.strict_tenant_isolation ?? false,
   });
 
   // Gap C — trusted-internal authority wrap.

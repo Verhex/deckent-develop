@@ -27,9 +27,14 @@
 
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod/v4';
-import { makeApprovalGate } from '../../orchestra/autonomous/approval-adapter.js';
+import {
+  ClosedApprovalRequestError,
+  UnknownApprovalRequestError,
+  makeApprovalGate,
+} from '../../orchestra/autonomous/approval-adapter.js';
 import { autonomousPendingPath } from '../../core/constants.js';
 import { loadConfig } from '../../core/config.js';
+import { resolveLocalOsPrincipal } from '../../core/principal.js';
 import { getLanguage, getMessage } from '../../cli/helpers/messages.js';
 import { getMcpToolDescriptionLanguage, mcpToolDescription } from './description-catalog.js';
 
@@ -42,9 +47,9 @@ function ok(data: Record<string, unknown>) {
   return { content: [{ type: 'text' as const, text: JSON.stringify({ success: true, ...data }) }] };
 }
 
-function fail(message: string) {
+function fail(message: string, detail: Record<string, unknown> = {}) {
   return {
-    content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message }) }],
+    content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message, ...detail }) }],
     isError: true,
   };
 }
@@ -74,11 +79,31 @@ export function registerAutonomousApproveTool(server: McpServer): void {
       if (!tid) return fail(getMessage('autonomous.mcp_approve.id_required', lang));
 
       try {
-        const gate = makeApprovalGate({ pendingPath: autonomousPendingPath(root), projectRoot: root });
+        const gate = makeApprovalGate({
+          pendingPath: autonomousPendingPath(root),
+          projectRoot: root,
+          lifecycle: appConfig.approval!.lifecycle,
+          principal: resolveLocalOsPrincipal('mcp'),
+          strictTenantIsolation: appConfig.strict_tenant_isolation ?? false,
+        });
         const wasPending = gate.pending().some((p) => p.triggerId === tid);
         gate.accept(tid, reason);
         return ok({ triggerId: tid, approved: true, wasPending });
       } catch (err) {
+        if (err instanceof ClosedApprovalRequestError) {
+          return fail(
+            err.reasonCode === 'expired'
+              ? getMessage('approval.channel.expired', lang, { id: tid })
+              : getMessage('autonomous.resolve_not_found', lang, { triggerId: tid }),
+            { code: err.code, reasonCode: err.reasonCode, triggerId: tid, expiresAt: err.expiresAt },
+          );
+        }
+        if (err instanceof UnknownApprovalRequestError) {
+          return fail(getMessage('autonomous.resolve_not_found', lang, { triggerId: tid }), {
+            code: err.code,
+            triggerId: tid,
+          });
+        }
         return fail(err instanceof Error ? err.message : String(err));
       }
     },
@@ -110,11 +135,31 @@ export function registerAutonomousRejectTool(server: McpServer): void {
       if (!tid) return fail(getMessage('autonomous.mcp_reject.id_required', lang));
 
       try {
-        const gate = makeApprovalGate({ pendingPath: autonomousPendingPath(root), projectRoot: root });
+        const gate = makeApprovalGate({
+          pendingPath: autonomousPendingPath(root),
+          projectRoot: root,
+          lifecycle: appConfig.approval!.lifecycle,
+          principal: resolveLocalOsPrincipal('mcp'),
+          strictTenantIsolation: appConfig.strict_tenant_isolation ?? false,
+        });
         const wasPending = gate.pending().some((p) => p.triggerId === tid);
         gate.reject(tid, reason);
         return ok({ triggerId: tid, rejected: true, wasPending });
       } catch (err) {
+        if (err instanceof ClosedApprovalRequestError) {
+          return fail(
+            err.reasonCode === 'expired'
+              ? getMessage('approval.channel.expired', lang, { id: tid })
+              : getMessage('autonomous.resolve_not_found', lang, { triggerId: tid }),
+            { code: err.code, reasonCode: err.reasonCode, triggerId: tid, expiresAt: err.expiresAt },
+          );
+        }
+        if (err instanceof UnknownApprovalRequestError) {
+          return fail(getMessage('autonomous.resolve_not_found', lang, { triggerId: tid }), {
+            code: err.code,
+            triggerId: tid,
+          });
+        }
         return fail(err instanceof Error ? err.message : String(err));
       }
     },

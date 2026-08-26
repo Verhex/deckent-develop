@@ -18,6 +18,7 @@ import { z } from 'zod';
 import {
   DASHBOARD_FILE, BRAIN_DIR, SPRINTS_DIR, TASKS_DIR, LOCKS_DIR,
   PROJECT_CONFIG_PATH, DIRECTIVES_FILE, MEMORY_DB_FILE, DECKENT_VERSION, RUNTIME_DIR,
+  autonomousPendingPath,
 } from '../core/constants.js';
 import { SprintStatus, SprintPhase, TaskStatus } from '../core/types.js';
 import type { Task, Sprint } from '../core/types.js';
@@ -93,6 +94,22 @@ import { ApprovalStore, type ApprovalStoreEntry, type ApprovalStoreCategory } fr
 import { ApprovalBroker } from '../core/approval-broker.js';
 import { approvalLookupIdSchema } from '../core/approval-contract.js';
 import { ApprovalExpiryDriver } from '../core/approval-expiry-driver.js';
+import { resolveApprovalLifecyclePolicy } from '../core/approval-lifecycle-policy.js';
+import type { ApprovalLifecycleConfig, ResolvedApprovalLifecycleConfig } from '../core/config-types.js';
+import { approvalSlaEventId, ApprovalSlaJournal } from '../core/approval-sla.js';
+import { writeApprovalLifecycleAuditEvent } from '../core/audit-writer.js';
+import { sweepExpiredConfirmations } from '../core/confirmation-store.js';
+import { ApprovalRelay } from '../core/approval-relay.js';
+import { ApprovalNotifyDedup } from '../core/approval-notify-dedup.js';
+import {
+  attachConfiguredApprovalChannels,
+  type ApprovalClientsWireConfig,
+  type ApprovalClientsWireTransports,
+} from '../connectors/approval-clients-wire.js';
+import { loadGatewayAccess } from '../connectors/gateway/gateway-access.js';
+import { gatewayHome } from '../connectors/gateway/gateway-paths.js';
+import { makeApprovalGate } from '../orchestra/autonomous/approval-adapter.js';
+import { settleFederatedTimeoutReceipt } from '../orchestra/approval-decision-federation.js';
 import type {
   ApprovalAuthorityRuntimeService,
 } from '../core/approval-authority-runtime.js';
@@ -613,7 +630,12 @@ export const CONTROL_MUTATION_DISABLED_MESSAGE =
  *  type and this endpoint never calls `resolveRawArgs`. */
 function serializeApprovalEntry(category: ApprovalStoreCategory, entry: ApprovalStoreEntry): Record<string, unknown> {
   const { rawArgsRef: _rawArgsRef, ...safeRequest } = entry.request;
-  return { category, request: safeRequest, decision: entry.decision };
+  return {
+    category,
+    request: safeRequest,
+    decision: entry.decision,
+    ...(entry.lifecycle ? { lifecycle: entry.lifecycle } : {}),
+  };
 }
 
 /** Find `id` across the store snapshot's 4 categories. */
@@ -764,7 +786,11 @@ async function handleRequest(
     readonly policy: ApprovalOidcPolicy;
     readonly verifier: ApprovalOidcAssertionVerifier;
   },
+  approvalLifecycleStore?: ApprovalStore,
   providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult,
+  approvalLifecycle?: ResolvedApprovalLifecycleConfig,
+  strictTenantIsolation = false,
+  approvalLang = 'en',
 ): Promise<void> {
   // Normalize /api/v1/... → /api/... for backward compat
   const rawUrl = req.url ?? '/';
@@ -1205,7 +1231,13 @@ async function handleRequest(
     // derived and tenant scoping is a no-op (every caller saw all tenants).
     if (registerMemorySearch(url, res, projectRoot, req)) return;
     if (registerNervousRoutes(url, method, res, projectRoot)) return;
-    if (registerAutonomousRoutes(url, method, res, projectRoot, req)) return;
+    if (registerAutonomousRoutes(url, method, res, projectRoot, req, {
+      ...(approvalLifecycle ? { lifecycle: approvalLifecycle } : {}),
+      strictTenantIsolation,
+      lang: approvalLang,
+      authGateVerified:
+        authMiddleware !== undefined && process.env['DECKENT_API_AUTH_DISABLED'] !== '1',
+    })) return;
     if (registerMissionsRoute(url, method, res, projectRoot, req)) return;
     // TERM-FLOW-UNIFY Sprint-7 (429-008/429-009, `terminal.run_flow_v2`):
     // flowId-scoped SSE stream BEFORE the REST routes below — both answer
@@ -1384,7 +1416,9 @@ async function handleRequest(
     // (356-002, ADR-G-033/ADR-G-020). Never flag-gated — dashboard monitoring
     // stays always-on regardless of `approval.api_decide`.
     if (url === '/api/approvals') {
-      const store = new ApprovalStore(projectRoot);
+      const store = approvalLifecycleStore ?? new ApprovalStore(projectRoot);
+      store.persistPolicyTransitions();
+      store.sweepExpired();
       const snapshot = store.load();
       sendJson(res, {
         pending: snapshot.pending.map((e) => serializeApprovalEntry('pending', e)),
@@ -1394,6 +1428,7 @@ async function handleRequest(
         // expired category was invisible here (the expiry chaos-leg smoke
         // caught the omission live). Additive field; monitoring never gated.
         expired: snapshot.expired.map((e) => serializeApprovalEntry('expired', e)),
+        quarantined: snapshot.quarantined,
       });
       return;
     }
@@ -1413,7 +1448,9 @@ async function handleRequest(
         sendError(res, 400, getMessage('api.approvals.invalid_id', lookupLang));
         return;
       }
-      const store = new ApprovalStore(projectRoot);
+      const store = approvalLifecycleStore ?? new ApprovalStore(projectRoot);
+      store.persistPolicyTransitions();
+      store.sweepExpired();
       const found = findApprovalEntry(store, id);
       if (!found) {
         sendError(res, 404, getMessage('api.approvals.not_found', lookupLang));
@@ -1467,7 +1504,13 @@ async function handleRequest(
     }
 
     if (registerNervousRoutes(url, method, res, projectRoot)) return;
-    if (registerAutonomousRoutes(url, method, res, projectRoot, req)) return;
+    if (registerAutonomousRoutes(url, method, res, projectRoot, req, {
+      ...(approvalLifecycle ? { lifecycle: approvalLifecycle } : {}),
+      strictTenantIsolation,
+      lang: approvalLang,
+      authGateVerified:
+        authMiddleware !== undefined && process.env['DECKENT_API_AUTH_DISABLED'] !== '1',
+    })) return;
     // TERM-FLOW-UNIFY Sprint-7 (429-008, `terminal.run_flow_v2`): propose/decision.
     if (await registerRunFlowRoutes(
       url,
@@ -1879,7 +1922,11 @@ async function handleRequest(
         return;
       }
 
-      const decisionStore = approvalAuthority?.runtime.store ?? new ApprovalStore(projectRoot);
+      const decisionStore = approvalLifecycleStore
+        ?? approvalAuthority?.runtime.store
+        ?? new ApprovalStore(projectRoot);
+      decisionStore.persistPolicyTransitions();
+      decisionStore.sweepExpired();
       const found = findApprovalEntry(decisionStore, id);
       if (!found) {
         sendError(res, 404, getMessage('api.approvals.not_found', approvalLang));
@@ -2017,6 +2064,12 @@ export interface HttpServerOptions {
    * hardcoded-default resolution chain as `host`/`terminal.bind` above.
    */
   approvalExpirySweepMs?: number;
+  /** Explicit resolved lifecycle authority; wins over project config. */
+  approvalLifecycle?: ResolvedApprovalLifecycleConfig;
+  /** Runtime transports are injected by the owner-provisioned connector host;
+   * secrets are never provisioned by the approval lifecycle package. */
+  approvalTransports?: ApprovalClientsWireTransports;
+  approvalChannelsConfig?: ApprovalClientsWireConfig;
   /**
    * Shared attended-execution authority. The server never opens custody or
    * constructs a verifier; production composition injects the process-scoped
@@ -2157,6 +2210,9 @@ export function createHttpServer(
   let resolvedOidc: HttpServerOptions['oidc'];
   let approvalExpirySweepMsOpt: number | undefined;
   let approvalAuthority: HttpServerOptions['approvalAuthority'];
+  let approvalLifecycleOpt: ResolvedApprovalLifecycleConfig | undefined;
+  let approvalTransports: ApprovalClientsWireTransports | undefined;
+  let approvalChannelsConfigOpt: ApprovalClientsWireConfig | undefined;
   let providerAuthority: HttpServerOptions['providerAuthority'];
 
   // TERM-CONFIG-WIRE (357-009): `terminal.bind` fallback for the server's
@@ -2183,7 +2239,9 @@ export function createHttpServer(
   // task's write scope, same gap `isApprovalApiDecideEnabled` below already
   // documents for `approval.api_decide` — read raw, never through
   // `ResolvedConfig`.
-  const rawCfgForApproval = readJsonSafe<{ approval?: { expiry_sweep_ms?: unknown } }>(
+  const rawCfgForApproval = readJsonSafe<ApprovalClientsWireConfig & {
+    approval?: { expiry_sweep_ms?: unknown; lifecycle?: ApprovalLifecycleConfig };
+  }>(
     join(projectRoot, PROJECT_CONFIG_PATH),
   );
   const approvalConfigSweepMs =
@@ -2204,6 +2262,9 @@ export function createHttpServer(
     terminalBackend = portOrOpts.terminalBackend;
     resolvedOidc = portOrOpts.oidc;
     approvalExpirySweepMsOpt = portOrOpts.approvalExpirySweepMs;
+    approvalLifecycleOpt = portOrOpts.approvalLifecycle;
+    approvalTransports = portOrOpts.approvalTransports;
+    approvalChannelsConfigOpt = portOrOpts.approvalChannelsConfig;
     approvalAuthority = portOrOpts.approvalAuthority;
     providerAuthority = portOrOpts.providerAuthority;
   } else {
@@ -2215,6 +2276,8 @@ export function createHttpServer(
 
   const resolvedApprovalExpirySweepMs =
     approvalExpirySweepMsOpt ?? approvalConfigSweepMs ?? DEFAULT_APPROVAL_EXPIRY_SWEEP_MS;
+  const resolvedApprovalLifecycle = approvalLifecycleOpt
+    ?? resolveApprovalLifecyclePolicy(rawCfgForApproval?.approval?.lifecycle);
 
   // Auto-generate token if requested and none provided
   if (!resolvedToken && autoGenerateToken) {
@@ -2391,15 +2454,98 @@ export function createHttpServer(
   let approvalBroker: ApprovalBroker | undefined;
   let approvalStore: ApprovalStore | undefined;
   let approvalExpiryDriver: ApprovalExpiryDriver | undefined;
+  let approvalRelay: ApprovalRelay | undefined;
   try {
-    approvalBroker = approvalAuthority?.runtime.broker ?? new ApprovalBroker(projectRoot);
-    approvalStore = approvalAuthority?.runtime.store ?? new ApprovalStore(projectRoot);
-    approvalExpiryDriver = new ApprovalExpiryDriver({ broker: approvalBroker, store: approvalStore });
+    approvalBroker = approvalAuthority?.runtime.broker ?? new ApprovalBroker(projectRoot, {
+      lifecycle: resolvedApprovalLifecycle,
+    });
+    approvalStore = new ApprovalStore(projectRoot, { lifecycle: resolvedApprovalLifecycle });
+    approvalRelay = new ApprovalRelay(
+      approvalBroker,
+      new ApprovalNotifyDedup(projectRoot),
+    );
+    attachConfiguredApprovalChannels(
+      approvalRelay,
+      approvalChannelsConfigOpt ?? rawCfgForApproval ?? undefined,
+      approvalTransports ?? {},
+      { lifecycleAckRoot: join(projectRoot, '.deckent', 'approvals', 'client-acks') },
+    );
+    approvalExpiryDriver = new ApprovalExpiryDriver({
+      broker: approvalBroker,
+      store: approvalStore,
+      slaJournal: new ApprovalSlaJournal({
+        storeDir: join(projectRoot, '.deckent', 'approvals', 'sla-journal'),
+      }),
+      onLifecycleStage: async (request, evidence) => {
+        const delivered = await approvalRelay?.dispatchLifecycleStage(request, evidence);
+        if (delivered === false) throw new Error(`approval lifecycle delivery failed: ${evidence.eventId}`);
+        writeApprovalLifecycleAuditEvent(projectRoot, request.scopeId, {
+          tenantId: request.tenantId,
+          requestId: request.id,
+          origin: request.origin,
+          sourceReference: request.source.reference,
+          evidence,
+        });
+      },
+      onLegacyLifecycleSweep: async (observedAt) => {
+        const pendingPath = autonomousPendingPath(projectRoot);
+        const operations: Promise<unknown>[] = [Promise.resolve().then(() => {
+          sweepExpiredConfirmations(projectRoot, {
+            lifecycle: resolvedApprovalLifecycle,
+            clock: () => observedAt,
+          });
+          makeApprovalGate({
+            pendingPath,
+            projectRoot,
+            lifecycle: resolvedApprovalLifecycle,
+            now: () => observedAt.toISOString(),
+          }).pending();
+        })];
+        const home = gatewayHome();
+        const pairingsPath = join(home, 'pairings.json');
+        if (existsSync(pairingsPath)) {
+          operations.push(loadGatewayAccess({
+            pairingsPath,
+            allowlistPath: join(home, 'allowlist.json'),
+            bindingsPath: join(home, 'bindings.json'),
+            clock: () => observedAt,
+          }).then(async (access) => await access.sweepExpiredPairings()));
+        }
+        const results = await Promise.allSettled(operations);
+        const failures = results.flatMap((result) => result.status === 'rejected' ? [result.reason] : []);
+        if (failures.length > 0) throw new AggregateError(failures, 'approval legacy lifecycle sweep failed');
+      },
+      onTimeoutReceipt: async (receipt) => {
+        const settled = await settleFederatedTimeoutReceipt(projectRoot, receipt);
+        if (settled.state === 'failed') {
+          throw new Error(`approval timeout settle-back failed: ${settled.reason}`);
+        }
+        writeApprovalLifecycleAuditEvent(projectRoot, receipt.scopeId, {
+          tenantId: receipt.tenantId,
+          requestId: receipt.requestId,
+          origin: receipt.origin,
+          sourceReference: receipt.sourceReference,
+          evidence: {
+            eventId: approvalSlaEventId(receipt.requestId, receipt.lifecycleGeneration, 'expired'),
+            requestId: receipt.requestId,
+            lifecycleGeneration: receipt.lifecycleGeneration,
+            stage: 'expired',
+            ordinal: 4,
+            kind: 'expired',
+            dueAt: receipt.expiresAt,
+            observedAt: receipt.decidedAt,
+            authoredPolicyDigest: receipt.authoredPolicyDigest,
+            appliedPolicyDigest: receipt.appliedPolicyDigest,
+          },
+        });
+      },
+    });
     approvalExpiryDriver.start(resolvedApprovalExpirySweepMs);
   } catch {
     approvalBroker = undefined;
     approvalStore = undefined;
     approvalExpiryDriver = undefined;
+    approvalRelay = undefined;
   }
 
   // Config-driven chat adapter for /api/chat/stream (Sprint 269 B-ChatStream).
@@ -2874,7 +3020,11 @@ export function createHttpServer(
         serveChatAdapter,
         terminalMgr,
         approvalAuthority,
+        approvalStore,
         providerAuthority,
+        resolvedApprovalLifecycle,
+        readStrictTenantIsolation(projectRoot),
+        lang,
       );
     })().catch((err: unknown) => {
       sendError(res, 500, err instanceof Error ? err.message : 'Internal server error');
@@ -2926,9 +3076,13 @@ export function createHttpServer(
       }
       sseClients.clear();
       outputCollector?.dispose();
-      return new Promise((resolve) => {
-        server.close(() => resolve());
-      });
+      return (async () => {
+        await approvalExpiryDriver?.settleInFlight();
+        approvalRelay?.dispose();
+        await new Promise<void>((resolve) => {
+          server.close(() => resolve());
+        });
+      })();
     },
   };
 }

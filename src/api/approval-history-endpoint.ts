@@ -83,7 +83,7 @@ function serializeHistoryEntry(category: ApprovalHistoryCategory, entry: Approva
     scope: request.scope,
     risk: request.risk,
     policy: request.policy,
-    maskedArgs: request.maskedArgs,
+    maskedArgs: request.maskedArgs ?? null,
     category,
     channel: decision?.channel ?? null,
     decidedBy: decision?.decidedBy ?? null,

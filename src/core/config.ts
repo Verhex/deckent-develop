@@ -21,6 +21,10 @@ import { modelRegistry } from './model-registry.js';
 // only types, so no runtime cycle).
 import { DEFAULT_TASK_PROFILES } from './work-model.js';
 import { loadApprovalRules } from './approval-rules-load.js';
+import {
+  ApprovalLifecyclePolicyError,
+  resolveApprovalLifecyclePolicy,
+} from './approval-lifecycle-policy.js';
 // Import cycle note: routing3/config.ts imports deepMerge from THIS module. The
 // cycle is init-safe — each side references the other's bindings only inside
 // function bodies (routing3's top-level code builds zod schemas only), never at
@@ -40,6 +44,7 @@ import type {
   PlanMode,
   PlanModeConfig,
   PromptConfig,
+  ResolvedApprovalLifecycleConfig,
   ResolvedConfig,
   SystemProfile,
   TerminalConfig,
@@ -586,6 +591,20 @@ export class ConfigValidationError extends Error {
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function resolveApprovalLifecycleLayer(
+  config: Partial<DeckentConfig> | null,
+  parent?: ResolvedApprovalLifecycleConfig,
+): ResolvedApprovalLifecycleConfig {
+  try {
+    return resolveApprovalLifecyclePolicy(config?.approval?.lifecycle, parent);
+  } catch (error) {
+    if (error instanceof ApprovalLifecyclePolicyError) {
+      throw new ConfigValidationError([error.message]);
+    }
+    throw error;
+  }
 }
 
 /** Project the canonical grouped provider block onto legacy runtime readers. */
@@ -1335,6 +1354,11 @@ export function validateConfig(config: DeckentConfig): string[] {
       if (apr.relay_enabled !== undefined && typeof apr.relay_enabled !== 'boolean') {
         errors.push('approval.relay_enabled must be a boolean');
       }
+      try {
+        resolveApprovalLifecyclePolicy(apr.lifecycle);
+      } catch (error) {
+        errors.push(error instanceof Error ? error.message : String(error));
+      }
     }
   }
 
@@ -1628,6 +1652,7 @@ export function resolveApprovalConfig(
     gate_enabled: config.approval?.gate_enabled ?? false,
     relay_enabled: config.approval?.relay_enabled ?? false,
     question_bridge: config.approval?.question_bridge === true,
+    lifecycle: resolveApprovalLifecyclePolicy(config.approval?.lifecycle),
     ...(config.approval?.authority
       ? {
           authority: {
@@ -1994,6 +2019,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
   }
 
   let config = createDefaultConfig();
+  let approvalLifecycle = resolveApprovalLifecycleLayer(null);
 
   const rawGlobalConfig = await readJsonFile<Partial<DeckentConfig>>(resolveGlobalConfigReadPath());
   let globalConfig: Partial<DeckentConfig> | null = null;
@@ -2007,6 +2033,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
       'global',
     );
     globalConfig = canonicalGlobalConfig as Partial<DeckentConfig>;
+    approvalLifecycle = resolveApprovalLifecycleLayer(globalConfig, approvalLifecycle);
     config = deepMerge(config, globalConfig);
   }
 
@@ -2038,6 +2065,7 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     const providerCanonicalization = canonicalizeProviderConfigAliases(rawProjectConfig, 'project');
     const modelCanonicalization = canonicalizeModelConfigAliases(providerCanonicalization.config, 'project');
     projectConfig = modelCanonicalization.config as Partial<DeckentConfig>;
+    approvalLifecycle = resolveApprovalLifecycleLayer(projectConfig, approvalLifecycle);
 
     // Preserve the unrelated spawn_backend/claude_backend compatibility rule.
     removeDuplicateKeys(projectConfig as Record<string, unknown>);
@@ -3048,6 +3076,7 @@ export function mergeConfigs(
     ]);
   }
   let config = createDefaultConfig();
+  let approvalLifecycle = resolveApprovalLifecycleLayer(null);
 
   if (globalConfig) {
     const { config: providerCanonicalGlobalConfig } = canonicalizeProviderConfigAliases(
@@ -3057,6 +3086,10 @@ export function mergeConfigs(
     const { config: canonicalGlobalConfig } = canonicalizeModelConfigAliases(
       providerCanonicalGlobalConfig,
       'global',
+    );
+    approvalLifecycle = resolveApprovalLifecycleLayer(
+      canonicalGlobalConfig as Partial<DeckentConfig>,
+      approvalLifecycle,
     );
     config = deepMerge(config, canonicalGlobalConfig as Partial<DeckentConfig>);
   }
@@ -3068,6 +3101,10 @@ export function mergeConfigs(
     const { config: canonicalProjectConfig } = canonicalizeModelConfigAliases(
       providerCanonicalProjectConfig,
       'project',
+    );
+    approvalLifecycle = resolveApprovalLifecycleLayer(
+      canonicalProjectConfig as Partial<DeckentConfig>,
+      approvalLifecycle,
     );
     config = deepMerge(config, canonicalProjectConfig as Partial<DeckentConfig>);
   }

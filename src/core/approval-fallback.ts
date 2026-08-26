@@ -32,12 +32,16 @@
 //     function itself.
 
 import type { ApprovalAction, ApprovalRequest } from './approval-contract.js';
+import type { ApprovalRiskTier } from './config-types.js';
+import { approvalRiskTierFor } from './approval-channel-authenticator.js';
 
 // ─── Input types ──────────────────────────────────────────────────────────────
 
 /** The only ApprovalRequest fields this resolver reads — never the full contract, to
  *  keep the pure-decision core decoupled from fields it has no business touching. */
-export type FallbackRequest = Pick<ApprovalRequest, 'risk' | 'expiresAt'>;
+export type FallbackRequest = Pick<ApprovalRequest, 'risk' | 'expiresAt'> & {
+  readonly riskTier?: ApprovalRiskTier;
+};
 
 /** Escalation-capable channel names. Deliberately excludes 'terminal' — this resolver
  *  runs precisely BECAUSE no terminal is available. */
@@ -105,12 +109,18 @@ function pickEscalationChannel(channelsAlive: readonly string[]): EscalationChan
  */
 export function resolveFallback(request: FallbackRequest, ctx: FallbackContext): FallbackDecision {
   const escalationChannel = pickEscalationChannel(ctx.channelsAlive);
+  const riskTier = approvalRiskTierFor(request);
+  const expired = Date.parse(request.expiresAt) <= Date.parse(ctx.expiresAt);
 
-  if (request.risk === 'critical' && !escalationChannel) {
-    return { kind: 'deny', reason: 'critical risk with no reachable escalation channel — fail safe' };
+  if (riskTier === null) {
+    return { kind: 'deny', reason: 'invalid risk tier — fail safe' };
   }
 
-  if (Date.parse(request.expiresAt) <= Date.parse(ctx.expiresAt)) {
+  if (riskTier === 'critical' && (expired || !escalationChannel)) {
+    return { kind: 'deny', reason: 'critical risk tier cannot fall back to allow/proceed' };
+  }
+
+  if (expired) {
     return {
       kind: 'timeout-default',
       action: ctx.policyDefault,

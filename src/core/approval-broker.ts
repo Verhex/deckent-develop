@@ -35,7 +35,8 @@ import {
 import { join } from 'node:path';
 import { z } from 'zod';
 import { DECKENT_DIR } from './constants.js';
-import { createJsonFileFirstWriterWins } from './approval-file-cas.js';
+import { createJsonFileFirstWriterWins, isApprovalFileAclHold } from './approval-file-cas.js';
+import type { ApprovalFileAclHold, ApprovalFileAclOptions } from './approval-file-cas.js';
 import {
   approvalLookupIdSchema,
   approvalTombstoneSchema,
@@ -45,9 +46,18 @@ import {
   validateStoredApprovalRequest,
   validateStoredApprovalDecision,
   type ApprovalRequest,
+  type ApprovalRequestV2,
   type ApprovalDecision,
   type ApprovalTombstone,
 } from './approval-contract.js';
+import type { ResolvedApprovalLifecycleConfig } from './config-types.js';
+import { DEFAULT_APPROVAL_LIFECYCLE_POLICY } from './approval-lifecycle-policy.js';
+import {
+  ApprovalStore,
+  ApprovalStoreError,
+  type ApprovalStoreTerminalCategory,
+  type ApprovalTimeoutReceipt,
+} from './approval-store.js';
 
 // ─── Input types (derived from the contract — never redeclared) ─────────────
 
@@ -97,7 +107,10 @@ export type ApprovalBrokerErrorCode =
   | 'APR_DUPLICATE_ID'
   | 'APR_INVALID_DECISION'
   | 'APR_UNKNOWN_REQUEST'
-  | 'APR_ALREADY_DECIDED';
+  | 'APR_ALREADY_DECIDED'
+  | 'APR_EXPIRED'
+  | 'APR_LIFECYCLE_DISABLED'
+  | 'APR_LIFECYCLE_ASYNC_REQUIRED';
 
 export class ApprovalBrokerError extends Error {
   constructor(
@@ -116,6 +129,12 @@ export interface ApprovalBrokerOptions {
    *  `<projectRoot>/.deckent/approvals`. Tests MUST override with a hermetic
    *  tmpdir — never point this at a real project's `.deckent`. */
   storeDir?: string;
+  /** Current lifecycle authority. Omission is fail-closed for governed writes. */
+  lifecycle?: ResolvedApprovalLifecycleConfig;
+  /** Shared authoritative clock used by submit/decide/expiry paths. */
+  clock?: () => Date;
+  /** Cross-platform private-file proof seam for governed writes. */
+  privateFileAcl?: ApprovalFileAclOptions;
 }
 
 export type ApprovalRecordStatus = 'pending' | 'decided';
@@ -140,6 +159,9 @@ export interface ApprovalBroker {
  */
 export class ApprovalBroker extends EventEmitter {
   private readonly storeDir: string;
+  private readonly lifecycle: ResolvedApprovalLifecycleConfig;
+  private readonly clock: () => Date;
+  private readonly privateFileAcl: ApprovalFileAclOptions;
   private readonly requestsById = new Map<string, ApprovalRequest>();
   private readonly decisionsById = new Map<string, ApprovalDecision>();
   private readonly waitersById = new Map<string, Array<(decision: ApprovalDecision) => void>>();
@@ -154,8 +176,21 @@ export class ApprovalBroker extends EventEmitter {
   ) {
     super();
     this.storeDir = opts.storeDir ?? join(projectRoot, DECKENT_DIR, 'approvals');
+    this.lifecycle = opts.lifecycle
+      ?? (DEFAULT_APPROVAL_LIFECYCLE_POLICY as ResolvedApprovalLifecycleConfig);
+    this.clock = opts.clock ?? (() => new Date());
+    this.privateFileAcl = opts.privateFileAcl ?? {};
     this.ensureStoreDir();
     this.hydrateFromDisk();
+  }
+
+  private lifecycleStore(): ApprovalStore {
+    return new ApprovalStore('', {
+      storeDir: this.storeDir,
+      lifecycle: this.lifecycle,
+      clock: this.clock,
+      privateFileAcl: this.privateFileAcl,
+    });
   }
 
   // ─── Store paths ────────────────────────────────────────────────────────
@@ -266,6 +301,12 @@ export class ApprovalBroker extends EventEmitter {
       );
     }
     const value = result.value;
+    if (value.version === '2.0') {
+      throw new ApprovalBrokerError(
+        'governed v2 requests require submitLifecycle() so private-file authority can be proven asynchronously',
+        'APR_LIFECYCLE_ASYNC_REQUIRED',
+      );
+    }
     if (this.requestsById.has(value.id)
       || existsSync(this.tombstoneFilePath(value.id))
       || existsSync(this.decisionFilePath(value.id))
@@ -275,6 +316,31 @@ export class ApprovalBroker extends EventEmitter {
     this.requestsById.set(value.id, value);
     this.emit('pending', value);
     return value;
+  }
+
+  /**
+   * Publish a governed v2 request through the private cross-platform CAS path.
+   * Gate-off rejects creation but never prevents reads or expiry draining.
+   */
+  async submitLifecycle(request: ApprovalRequestV2): Promise<ApprovalRequestV2 | ApprovalFileAclHold> {
+    try {
+      const published = await this.lifecycleStore().createLifecycleRequest(request);
+      if (isApprovalFileAclHold(published)) return published;
+      this.requestsById.set(published.id, published);
+      this.emit('pending', published);
+      return published;
+    } catch (error) {
+      if (error instanceof ApprovalStoreError) {
+        if (error.code === 'APR_STORE_LIFECYCLE_DISABLED') {
+          throw new ApprovalBrokerError(error.message, 'APR_LIFECYCLE_DISABLED');
+        }
+        if (error.code === 'APR_STORE_ALREADY_TERMINAL') {
+          throw new ApprovalBrokerError(error.message, 'APR_DUPLICATE_ID');
+        }
+        throw new ApprovalBrokerError(error.message, 'APR_INVALID_REQUEST');
+      }
+      throw error;
+    }
   }
 
   // ─── decide + awaitDecision ─────────────────────────────────────────────
@@ -318,6 +384,11 @@ export class ApprovalBroker extends EventEmitter {
    * `id` is already decided or the decision is invalid.
    */
   decide(id: string, input: ApprovalDecisionInput): ApprovalDecision {
+    return this.decideAt(id, input, this.clock());
+  }
+
+  private decideAt(id: string, input: ApprovalDecisionInput, now: Date): ApprovalDecision {
+    this.checkForExternalDecisions();
     if (this.decisionsById.has(id)) {
       throw new ApprovalBrokerError(`approval request already decided: ${id}`, 'APR_ALREADY_DECIDED');
     }
@@ -333,9 +404,35 @@ export class ApprovalBroker extends EventEmitter {
       throw new ApprovalBrokerError(`approval request not found or retired: ${id}`, 'APR_UNKNOWN_REQUEST');
     }
     this.requestsById.set(id, request);
+    const category: ApprovalStoreTerminalCategory = result.value.channel === 'ttl-expire'
+      ? 'expired'
+      : result.value.decision === 'allow'
+        ? 'approved'
+        : 'denied';
     try {
-      return this.settleDecision(result.value, { persist: true });
+      const durable = new ApprovalStore('', {
+        storeDir: this.storeDir,
+        lifecycle: this.lifecycle,
+        clock: () => now,
+        privateFileAcl: this.privateFileAcl,
+      }).transition(id, category, input);
+      return this.settleDecision(durable, { persist: false });
     } catch (error) {
+      if (error instanceof ApprovalStoreError) {
+        this.checkForExternalDecisions();
+        if (error.code === 'APR_STORE_EXPIRED') {
+          throw new ApprovalBrokerError(`approval request already expired: ${id}`, 'APR_EXPIRED');
+        }
+        if (error.code === 'APR_STORE_ALREADY_TERMINAL') {
+          throw new ApprovalBrokerError(`approval request already decided: ${id}`, 'APR_ALREADY_DECIDED');
+        }
+        if (error.code === 'APR_STORE_UNKNOWN_ID') {
+          throw new ApprovalBrokerError(`approval request not found or retired: ${id}`, 'APR_UNKNOWN_REQUEST');
+        }
+        if (error.code === 'APR_STORE_INVALID_DECISION' || error.code === 'APR_STORE_CATEGORY_MISMATCH') {
+          throw new ApprovalBrokerError(error.message, 'APR_INVALID_DECISION');
+        }
+      }
       if (error instanceof ApprovalBrokerError && error.code === 'APR_ALREADY_DECIDED') {
         this.checkForExternalDecisions();
       }
@@ -359,10 +456,22 @@ export class ApprovalBroker extends EventEmitter {
    * (a bot button press, a CLI approve/reject command) call this instead of
    * `decide()` directly.
    */
-  decideChecked(id: string, input: ApprovalDecisionInput, now: Date = new Date()): ApprovalDecideResult {
-    const expired = this.expiredResultFor(id, now);
-    if (expired) return expired;
-    return this.decide(id, input);
+  decideChecked(id: string, input: ApprovalDecisionInput, now?: Date): ApprovalDecideResult {
+    const effectiveNow = now ?? this.clock();
+    const expired = this.expiredResultFor(id, effectiveNow);
+    if (expired) {
+      if (this.decisionsById.get(id)?.channel !== 'ttl-expire') this.expire(effectiveNow);
+      return expired;
+    }
+    try {
+      return this.decideAt(id, input, effectiveNow);
+    } catch (error) {
+      if (error instanceof ApprovalBrokerError && error.code === 'APR_EXPIRED') {
+        const request = this.readRequestFromDisk(id) ?? this.requestsById.get(id);
+        return { outcome: 'expired', requestId: id, expiresAt: request?.expiresAt ?? effectiveNow.toISOString() };
+      }
+      throw error;
+    }
   }
 
   /** Returns the expired-outcome shape for `id` iff its TTL has already
@@ -370,6 +479,7 @@ export class ApprovalBroker extends EventEmitter {
    *  (non-TTL) channel is not "expired" here — that stays
    *  `APR_ALREADY_DECIDED` via the normal `decide()` path. */
   private expiredResultFor(id: string, now: Date): ApprovalDecideExpiredResult | undefined {
+    this.checkForExternalDecisions();
     const existingDecision = this.decisionsById.get(id);
     if (existingDecision) {
       if (existingDecision.channel !== 'ttl-expire') return undefined;
@@ -377,7 +487,7 @@ export class ApprovalBroker extends EventEmitter {
       return { outcome: 'expired', requestId: id, expiresAt };
     }
 
-    const request = this.requestsById.get(id);
+    const request = this.readRequestFromDisk(id) ?? this.requestsById.get(id);
     if (request && Date.parse(request.expiresAt) <= now.getTime()) {
       return { outcome: 'expired', requestId: id, expiresAt: request.expiresAt };
     }
@@ -420,34 +530,20 @@ export class ApprovalBroker extends EventEmitter {
    * `channel: 'ttl-expire'`). Returns the decisions produced (empty if
    * nothing expired). Already-decided requests are skipped.
    */
-  expire(now: Date = new Date()): ApprovalDecision[] {
-    const nowMs = now.getTime();
-    const produced: ApprovalDecision[] = [];
-    for (const [id, request] of this.requestsById) {
-      if (this.decisionsById.has(id)) continue;
-      if (Date.parse(request.expiresAt) > nowMs) continue;
+  expire(now?: Date): ApprovalDecision[] {
+    const effectiveNow = now ?? this.clock();
+    const ids = this.lifecycleStore().sweepExpired(effectiveNow);
+    const discovered = this.checkForExternalDecisions();
+    const byId = new Map(discovered.map((decision) => [decision.requestId, decision]));
+    return ids.flatMap((id) => {
+      const decision = byId.get(id) ?? this.decisionsById.get(id);
+      return decision ? [decision] : [];
+    });
+  }
 
-      const result = validateStoredApprovalDecision({
-        requestId: id,
-        decision: request.defaultAction,
-        decidedBy: 'system',
-        channel: 'ttl-expire',
-        decidedAt: now.toISOString(),
-        reason: 'TTL expired — defaultAction applied',
-      });
-      // Constructed from already-validated fields — cannot fail; fail-safe skip if it ever does.
-      if (!result.ok) continue;
-      try {
-        produced.push(this.settleDecision(result.value, { persist: true }));
-      } catch (error) {
-        if (error instanceof ApprovalBrokerError && error.code === 'APR_ALREADY_DECIDED') {
-          this.checkForExternalDecisions();
-          continue;
-        }
-        throw error;
-      }
-    }
-    return produced;
+  /** Read the durable timeout authority produced by either broker or store. */
+  getTimeoutReceipt(id: string): ApprovalTimeoutReceipt | null {
+    return this.lifecycleStore().getTimeoutReceipt(id);
   }
 
   // ─── list ───────────────────────────────────────────────────────────────

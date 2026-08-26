@@ -4,14 +4,24 @@ import type { SessionRegistry } from './session-registry.js';
 import type { ProjectRegistry } from './project-registry.js';
 import type { RuntimeSupervisor } from './runtime-supervisor.js';
 import { getMessage } from '../../cli/helpers/messages.js';
+import { ApprovalFileCasError } from '../../core/approval-file-cas.js';
+import type {
+  GatewayPairingRequestResult,
+  GatewayPairingRequestScope,
+} from './gateway-access.js';
 
 export interface GatewayRouterDeps {
   sessions: SessionRegistry;
   projects: ProjectRegistry;
   supervisor: RuntimeSupervisor;
   send: (chatKey: string, parts: string[], buttons?: ReadonlyArray<ReadonlyArray<InlineButton>>) => Promise<void>;
-  isAuthorized: (chatKey: string, projectPath: string) => boolean;
-  requestPairing: (chatKey: string) => Promise<string>;
+  isAuthorized: (chatKey: string, projectPath: string) => boolean | Promise<boolean>;
+  requestPairing: (
+    chatKey: string,
+    scope?: GatewayPairingRequestScope,
+  ) => Promise<GatewayPairingRequestResult | string>;
+  /** Resolve exact tenant/project lifecycle authority before a governed write. */
+  resolvePairingScope?: (chatKey: string, projectPath: string) => Promise<GatewayPairingRequestScope | null>;
   lang: string;
   newId: () => string;
 }
@@ -23,7 +33,7 @@ export function chatKeyOf(connector: string, channelId: string): string {
 
 /** Build the inbound message handler for the gateway. */
 export function makeGatewayRouter(deps: GatewayRouterDeps): (msg: IncomingMessage) => void {
-  const { sessions, projects, supervisor, send, isAuthorized, requestPairing, lang } = deps;
+  const { sessions, projects, supervisor, send, isAuthorized, requestPairing, resolvePairingScope, lang } = deps;
 
   return (msg: IncomingMessage): void => {
     const chatKey = chatKeyOf(msg.connector, msg.channelId);
@@ -44,7 +54,8 @@ export function makeGatewayRouter(deps: GatewayRouterDeps): (msg: IncomingMessag
       await send(chatKey, [getMessage('gateway.unbound', lang)]);
       return;
     }
-    if (!isAuthorized(chatKey, binding.projectPath)) return; // silent drop
+    const authorized = await resolveAuthorization(chatKey, binding.projectPath);
+    if (authorized !== true) return;
 
     const handle = supervisor.getOrSpawn(binding.projectPath);
     const resp = await handle.send({ id: deps.newId(), chatKey, kind: 'message', text });
@@ -59,8 +70,34 @@ export function makeGatewayRouter(deps: GatewayRouterDeps): (msg: IncomingMessag
         if (!arg) { await send(chatKey, [getMessage('gateway.use_usage', lang)]); return; }
         const proj = projects.resolve(arg);
         if (!proj) { await send(chatKey, [getMessage('gateway.use_unknown', lang, { name: arg })]); return; }
-        if (!isAuthorized(chatKey, proj.path)) {
-          const code = await requestPairing(chatKey);
+        const authorized = await resolveAuthorization(chatKey, proj.path, proj.name);
+        if (authorized === null) return;
+        if (!authorized) {
+          let scope: GatewayPairingRequestScope | null | undefined;
+          try {
+            scope = resolvePairingScope ? await resolvePairingScope(chatKey, proj.path) : undefined;
+          } catch (error) {
+            const reason = error instanceof ApprovalFileCasError ? error.reasonCode : 'lifecycle-config-unavailable';
+            await send(chatKey, [getMessage('approvals.quarantined', lang, { id: proj.name, reason })]);
+            return;
+          }
+          if (resolvePairingScope && !scope) {
+            await send(chatKey, [getMessage('approvals.lifecycle_disabled', lang, { id: proj.name })]);
+            return;
+          }
+          let request: GatewayPairingRequestResult | string;
+          try {
+            request = await requestPairing(chatKey, scope ?? undefined);
+          } catch (error) {
+            const reason = error instanceof ApprovalFileCasError ? error.reasonCode : 'pairing-store-unavailable';
+            await send(chatKey, [getMessage('approvals.quarantined', lang, { id: proj.name, reason })]);
+            return;
+          }
+          if (typeof request !== 'string' && request.state === 'HOLD') {
+            await send(chatKey, [getMessage('approvals.lifecycle_disabled', lang, { id: proj.name })]);
+            return;
+          }
+          const code = typeof request === 'string' ? request : request.code;
           await send(chatKey, [getMessage('gateway.pair_needed', lang, { project: proj.name, code })]);
           return;
         }
@@ -87,6 +124,20 @@ export function makeGatewayRouter(deps: GatewayRouterDeps): (msg: IncomingMessag
         // Unknown slash → treat as unbound-style guidance (no CLI leak).
         await send(chatKey, [getMessage('gateway.unbound', lang)]);
       }
+    }
+  }
+
+  async function resolveAuthorization(
+    chatKey: string,
+    projectPath: string,
+    displayId = projectPath,
+  ): Promise<boolean | null> {
+    try {
+      return await isAuthorized(chatKey, projectPath);
+    } catch (error) {
+      const reason = error instanceof ApprovalFileCasError ? error.reasonCode : 'pairing-store-unavailable';
+      await send(chatKey, [getMessage('approvals.quarantined', lang, { id: displayId, reason })]);
+      return null;
     }
   }
 }

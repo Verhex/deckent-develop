@@ -18,6 +18,7 @@ import type {
   ApprovalScope,
   RequesterRole,
 } from './approval-contract.js';
+import { approvalRiskTierFor } from './approval-channel-authenticator.js';
 
 // ─── Rule schema ──────────────────────────────────────────────────────────────
 
@@ -67,8 +68,6 @@ const DEFAULT_ACTION_TO_POLICY: Record<ApprovalAction, ApprovalPolicy> = {
   allow: 'auto-approve',
 };
 
-const CRITICAL_RISK: ApprovalRisk = 'critical';
-
 // ─── Rule matching ────────────────────────────────────────────────────────────
 
 function ruleMatches(request: ApprovalRequest, match: ApprovalPolicyRuleMatch): boolean {
@@ -115,11 +114,21 @@ export function decidePolicy(
         reason: `no rule matched — defaultAction=${request.defaultAction} (safe-side fallback)`,
       };
 
-  if (request.risk === CRITICAL_RISK && result.policy === 'auto-approve') {
+  const riskTier = approvalRiskTierFor(request);
+  if (riskTier === null) {
     return {
       ...result,
       policy: 'deny',
-      reason: `clamped: risk=critical must never auto-approve (was: ${result.reason})`,
+      reason: `clamped: invalid riskTier must fail closed (was: ${result.reason})`,
+    };
+  }
+
+  if (riskTier === 'critical' && result.policy === 'auto-approve') {
+    const legacyCritical = request.risk === 'critical' ? 'risk=critical, ' : '';
+    return {
+      ...result,
+      policy: 'deny',
+      reason: `clamped: ${legacyCritical}riskTier=critical must never auto-approve (was: ${result.reason})`,
     };
   }
 

@@ -19,12 +19,16 @@ import { createInterface } from 'node:readline/promises';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
 import { print, printError } from '../helpers/output.js';
+import { loadConfig } from '../../core/config.js';
 import {
+  listConfirmationQuarantine,
   listPendingConfirmations,
   readConfirmation,
   settleConfirmation,
-  type ConfirmationRequest,
+  type ConfirmationStoreOptions,
+  type LifecycleConfirmationRequest,
 } from '../../core/confirmation-store.js';
+import { DeckentError } from '../../core/errors.js';
 import { fromCrossVerifyVerdict } from '../../core/verdict-types.js';
 
 interface ConfirmationsDeps {
@@ -33,6 +37,8 @@ interface ConfirmationsDeps {
   /** Test seam for the interactive confirmation (defaults to real TTY read). */
   confirmInteractiveFn?: (prompt: string) => Promise<boolean>;
   resolveProjectRootFn?: typeof resolveProjectRoot;
+  loadConfigFn?: typeof loadConfig;
+  clock?: () => Date;
 }
 
 async function confirmViaTty(prompt: string): Promise<boolean> {
@@ -45,7 +51,7 @@ async function confirmViaTty(prompt: string): Promise<boolean> {
   }
 }
 
-function describe(request: ConfirmationRequest, lang: string): string {
+function describe(request: LifecycleConfirmationRequest, lang: string): string {
   return getMessage('confirmations.list_row', lang, {
     id: request.id,
     adapter: request.adapter,
@@ -54,7 +60,36 @@ function describe(request: ConfirmationRequest, lang: string): string {
     taskId: request.taskId,
     sprintId: request.sprintId,
     statement: request.statements[0] ?? '-',
+    riskTier: request.approval.riskTier,
+    generation: String(request.identity.generation),
+    expiresAt: request.expiresAt,
   });
+}
+
+async function resolveStoreOptions(
+  root: string,
+  deps: ConfirmationsDeps,
+): Promise<ConfirmationStoreOptions> {
+  const clock = deps.clock;
+  try {
+    const config = await (deps.loadConfigFn ?? loadConfig)(root);
+    return {
+      ...(clock ? { clock } : {}),
+      ...(config.approval?.lifecycle ? { lifecycle: config.approval.lifecycle } : {}),
+    };
+  } catch {
+    // Existing records pin reconstructible policy bytes. Config read failure
+    // must not invent a weaker policy or make the legacy inbox unavailable.
+    return clock ? { clock } : {};
+  }
+}
+
+function printSettlementError(error: unknown, id: string, lang: string): void {
+  const key = error instanceof DeckentError && error.code === 'E_CONFIRMATION_EXPIRED'
+    ? 'confirmations.err_expired'
+    : 'confirmations.err_not_pending';
+  printError(new Error(getMessage(key, lang, { id })));
+  process.exitCode = 1;
 }
 
 export function registerConfirmationsCommand(
@@ -70,13 +105,23 @@ export function registerConfirmationsCommand(
   confirmations
     .command('list')
     .description(getMessage('confirmations.list_desc', lang))
-    .action(() => {
-      const pending = listPendingConfirmations(resolveRoot());
-      if (pending.length === 0) {
+    .action(async () => {
+      const root = resolveRoot();
+      const storeOptions = await resolveStoreOptions(root, deps);
+      const pending = listPendingConfirmations(root, storeOptions);
+      const quarantined = listConfirmationQuarantine(root);
+      if (pending.length === 0 && quarantined.length === 0) {
         print(getMessage('confirmations.list_empty', lang));
         return;
       }
       for (const request of pending) print(describe(request, lang));
+      for (const entry of quarantined) {
+        print(getMessage('confirmations.quarantine_row', lang, {
+          file: entry.file,
+          reasonCode: entry.reasonCode,
+          sourceReference: entry.sourceReference,
+        }));
+      }
     });
 
   confirmations
@@ -87,14 +132,21 @@ export function registerConfirmationsCommand(
     .option('--reason <text>', getMessage('confirmations.opt_reason', lang))
     .action(async (id: string, opts: { confirm?: boolean; reject?: boolean; reason?: string }) => {
       const root = resolveRoot();
+      const storeOptions = await resolveStoreOptions(root, deps);
       if (Boolean(opts.confirm) === Boolean(opts.reject) || !opts.reason?.trim()) {
         printError(new Error(getMessage('confirmations.err_flag_required', lang)));
         process.exitCode = 1;
         return;
       }
-      const found = readConfirmation(root, id);
+      const found = readConfirmation(root, id, storeOptions);
       if (!found || found.state !== 'pending') {
-        printError(new Error(getMessage('confirmations.err_not_pending', lang, { id })));
+        const expired = found?.state === 'settled'
+          && found.request.outcome.closureReason === 'expired';
+        printError(new Error(getMessage(
+          expired ? 'confirmations.err_expired' : 'confirmations.err_not_pending',
+          lang,
+          { id },
+        )));
         process.exitCode = 1;
         return;
       }
@@ -112,12 +164,18 @@ export function registerConfirmationsCommand(
         process.exitCode = 1;
         return;
       }
-      const settled = settleConfirmation(root, id, {
-        verdict: opts.confirm ? 'CONFIRMED' : 'FAILED',
-        decidedBy: 'human',
-        reason: opts.reason.trim(),
-        decidedAt: new Date().toISOString(),
-      });
+      let settled;
+      try {
+        settled = settleConfirmation(root, id, {
+          verdict: opts.confirm ? 'CONFIRMED' : 'FAILED',
+          decidedBy: 'human',
+          reason: opts.reason.trim(),
+          decidedAt: (deps.clock ?? (() => new Date()))().toISOString(),
+        }, storeOptions);
+      } catch (error) {
+        printSettlementError(error, id, lang);
+        return;
+      }
       print(getMessage('confirmations.decided', lang, {
         id, verdict: settled.outcome.verdict, decidedBy: 'human', reason: settled.outcome.reason,
       }));
@@ -131,7 +189,8 @@ export function registerConfirmationsCommand(
     .option('--timeout <ms>', getMessage('confirmations.opt_run_timeout', lang))
     .action(async (opts: { id?: string; author?: string; timeout?: string }) => {
       const root = resolveRoot();
-      const pending = listPendingConfirmations(root)
+      const storeOptions = await resolveStoreOptions(root, deps);
+      const pending = listPendingConfirmations(root, storeOptions)
         .filter(request => request.adapter === 'llm')
         .filter(request => (opts.id ? request.id === opts.id : true));
       if (pending.length === 0) {
@@ -156,13 +215,19 @@ export function registerConfirmationsCommand(
         });
         const normative = outcome.verdict ? fromCrossVerifyVerdict(outcome.verdict) : null;
         if (normative === 'CONFIRMED' || normative === 'FAILED') {
-          const settled = settleConfirmation(root, request.id, {
-            verdict: normative,
-            decidedBy: 'llm',
-            reason: getMessage('confirmations.llm_reason', lang, { verdict: outcome.verdict ?? 'null' }),
-            ...(outcome.adjudicationReceiptRef ? { receipt: outcome.adjudicationReceiptRef } : {}),
-            decidedAt: new Date().toISOString(),
-          });
+          let settled;
+          try {
+            settled = settleConfirmation(root, request.id, {
+              verdict: normative,
+              decidedBy: 'llm',
+              reason: getMessage('confirmations.llm_reason', lang, { verdict: outcome.verdict ?? 'null' }),
+              ...(outcome.adjudicationReceiptRef ? { receipt: outcome.adjudicationReceiptRef } : {}),
+              decidedAt: (deps.clock ?? (() => new Date()))().toISOString(),
+            }, storeOptions);
+          } catch (error) {
+            printSettlementError(error, request.id, lang);
+            continue;
+          }
           print(getMessage('confirmations.decided', lang, {
             id: request.id, verdict: settled.outcome.verdict, decidedBy: 'llm',
             reason: settled.outcome.reason,

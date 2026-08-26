@@ -28,7 +28,7 @@ import {
   PRODUCTION_V2_RUNNER_REGISTRY,
   admitWorkItemBatch,
 } from '../../../../src/orchestra/autonomous/mission-store/mission-kind-admission.js';
-import type { ResolvedConfig } from '../../../../src/core/config-types.js';
+import type { ResolvedApprovalLifecycleConfig, ResolvedConfig } from '../../../../src/core/config-types.js';
 import { ApprovalBroker } from '../../../../src/core/approval-broker.js';
 import { ApprovalStore } from '../../../../src/core/approval-store.js';
 import type { ApprovalDecisionAuthority } from '../../../../src/core/approval-decision-ingress.js';
@@ -59,6 +59,15 @@ function cfg(autonomous: Record<string, unknown> = {}, maxWorkers: number | 'aut
 
 // Bounded run so the scheduler drains and returns instead of looping forever.
 const BOUNDED = 100;
+const APPROVAL_LIFECYCLE: ResolvedApprovalLifecycleConfig = {
+  enabled: true,
+  profiles: {
+    confirmation: { ttlMs: 480_000, slaMs: [60_000, 120_000, 240_000], riskTier: 'elevated', timeoutDisposition: 'park-undecidable', blocking: 'run' },
+    'autonomous-trigger': { ttlMs: 120_000, slaMs: [10_000, 30_000, 60_000], riskTier: 'elevated', timeoutDisposition: 'park-alert', blocking: 'trigger' },
+    'gateway-pairing': { ttlMs: 120_000, slaMs: [10_000, 30_000, 60_000], riskTier: 'critical', timeoutDisposition: 'deny-expire', blocking: 'security' },
+    'broker-native': { ttlMs: 120_000, slaMs: [10_000, 30_000, 60_000], riskTier: 'routine', timeoutDisposition: 'request-default', blocking: 'request' },
+  },
+};
 
 /** Mission-mechanics tests use an explicit hermetic coordinator; production absence is fail-closed. */
 async function runV2Engine(
@@ -275,8 +284,9 @@ describe('runV2Engine', () => {
       spec: { description: 'approved work' },
     });
 
-    const broker = new ApprovalBroker(r);
-    const decisions = new ApprovalStore(r);
+    const approvalClock = () => new Date('2026-07-22T00:00:00.000Z');
+    const broker = new ApprovalBroker(r, { lifecycle: APPROVAL_LIFECYCLE, clock: approvalClock });
+    const decisions = new ApprovalStore(r, { lifecycle: APPROVAL_LIFECYCLE, clock: approvalClock });
     // This test owns only composition threading. Cryptographic/session behavior
     // is covered by approval-decision-ingress + coordinator tests.
     const decisionAuthority = {
@@ -286,7 +296,8 @@ describe('runV2Engine', () => {
       store,
       publisher: broker,
       decisions,
-      requestFactory: (item, mission) => ({
+      lifecycle: APPROVAL_LIFECYCLE,
+      requestFactory: (item, mission, requestedAt) => ({
         requester: { role: 'brain', instanceId: 'wire-test' },
         summary: 'Run approved test work',
         details: { workItemId: item.id },
@@ -297,11 +308,11 @@ describe('runV2Engine', () => {
         defaultAction: 'deny',
         tenantId: mission.tenant,
         userId: 'wire-test-user',
-        createdAt: '2026-07-22T00:00:00.000Z',
-        expiresAt: '2026-07-23T00:00:00.000Z',
+        createdAt: requestedAt.toISOString(),
+        expiresAt: new Date(requestedAt.getTime() + 120_000).toISOString(),
       }),
       decisionAuthority,
-      now: () => new Date('2026-07-22T00:00:00.000Z'),
+      now: approvalClock,
     });
     const runTask = vi.fn(async (): Promise<{ ok: boolean }> => ({ ok: true }));
     const deps: RunV2EngineDeps = {

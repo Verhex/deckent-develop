@@ -214,6 +214,73 @@ export interface GateConfig {
 }
 
 // ─── Approval Config (runtime-wide ApprovalBroker, APR family) ───────
+export const APPROVAL_LIFECYCLE_ORIGINS = [
+  'confirmation',
+  'autonomous-trigger',
+  'gateway-pairing',
+  'broker-native',
+] as const;
+
+export const APPROVAL_RISK_TIERS = ['routine', 'elevated', 'critical'] as const;
+export const APPROVAL_TIMEOUT_DISPOSITIONS = [
+  'request-default',
+  'park-alert',
+  'park-undecidable',
+  'deny-expire',
+] as const;
+export const APPROVAL_LIFECYCLE_BLOCKING_SCOPES = [
+  'request',
+  'trigger',
+  'run',
+  'security',
+] as const;
+export const APPROVAL_LIFECYCLE_SLA_STAGES = [
+  'initial',
+  'renotify',
+  'alternate-channel',
+  'park-alert',
+  'expired',
+] as const;
+
+export type ApprovalLifecycleOrigin = typeof APPROVAL_LIFECYCLE_ORIGINS[number];
+export type ApprovalRiskTier = typeof APPROVAL_RISK_TIERS[number];
+export type ApprovalTimeoutDisposition = typeof APPROVAL_TIMEOUT_DISPOSITIONS[number];
+export type ApprovalLifecycleBlockingScope = typeof APPROVAL_LIFECYCLE_BLOCKING_SCOPES[number];
+export type ApprovalLifecycleStage = typeof APPROVAL_LIFECYCLE_SLA_STAGES[number];
+
+/** A tenant/project profile may only provide values that tighten its parent. */
+export interface ApprovalLifecycleProfileOverride {
+  /** Positive integer ceiling measured from the immutable source `createdAt`. */
+  ttlMs?: number;
+  /** Strictly increasing due offsets: renotify, alternate-channel, park-alert. */
+  slaMs?: [number, number, number];
+  /** Minimum effective risk. Overrides may raise, never lower, this floor. */
+  riskTier?: ApprovalRiskTier;
+  /** Typed system action applied at the immutable TTL boundary. */
+  timeoutDisposition?: ApprovalTimeoutDisposition;
+  /** Smallest execution boundary that remains blocked while/after pending. */
+  blocking?: ApprovalLifecycleBlockingScope;
+}
+
+export interface ResolvedApprovalLifecycleProfile {
+  ttlMs: number;
+  slaMs: [number, number, number];
+  riskTier: ApprovalRiskTier;
+  timeoutDisposition: ApprovalTimeoutDisposition;
+  blocking: ApprovalLifecycleBlockingScope;
+}
+
+export interface ApprovalLifecycleConfig {
+  /** Fail-closed rollout gate. False blocks new governed writes, but never draining. */
+  enabled?: boolean;
+  profiles?: Partial<Record<ApprovalLifecycleOrigin, ApprovalLifecycleProfileOverride>>;
+}
+
+export interface ResolvedApprovalLifecycleConfig {
+  enabled: boolean;
+  profiles: Record<ApprovalLifecycleOrigin, ResolvedApprovalLifecycleProfile>;
+}
+
 /**
  * `approval` config block — policy rules + gate/relay activation flags for the
  * runtime-wide ApprovalBroker (strategic-pivot §11.2, ADR-G-020). Sprint 355
@@ -229,6 +296,8 @@ export interface ApprovalConfig {
    *  order — first match wins. Validated fail-soft via `loadApprovalRules`
    *  at config-load time; this field only describes the raw JSON shape. */
   rules?: ApprovalPolicyRule[];
+  /** Single resolved authority for approval clocks, risk floors and timeout actions. */
+  lifecycle?: ApprovalLifecycleConfig;
   /** Activate the worker-side `WorkerApprovalGate` (approval-worker-gate.ts) —
    *  gates a risky worker action on a broker decision before it executes.
    *  Default: false. Wiring the gate into the live worker runtime is a
@@ -2123,6 +2192,7 @@ export interface ResolvedConfig {
     gate_enabled: boolean;
     relay_enabled: boolean;
     question_bridge: boolean;
+    lifecycle: ResolvedApprovalLifecycleConfig;
     authority?: ApprovalConfig['authority'];
   };
   /** Pinned API OIDC verifier input, passed through after config validation/interpolation. */

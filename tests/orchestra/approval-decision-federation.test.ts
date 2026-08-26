@@ -20,6 +20,7 @@ import {
   settleFederatedDecision,
 } from '../../src/orchestra/approval-decision-federation.js';
 import { createConfirmationRequest, readConfirmation } from '../../src/core/confirmation-store.js';
+import { resolveApprovalLifecyclePolicy } from '../../src/core/approval-lifecycle-policy.js';
 import { NervousIpcQueue } from '../../src/nervous/ipc-queue.js';
 
 function fixtureRoot(): string {
@@ -29,13 +30,13 @@ function fixtureRoot(): string {
 }
 
 describe('decision federation bridge', () => {
-  it('gates origins: D2a+D2b-1 set; panic/bot/pairing stay out', () => {
+  it('gates origins: lifecycle decision federation includes pairing; panic/bot stay out', () => {
     expect([...DECISION_FEDERATED_ORIGINS])
-      .toEqual(['confirmation', 'checkpoint', 'nervous', 'autonomous-trigger']);
-    for (const origin of ['confirmation', 'checkpoint', 'nervous', 'autonomous-trigger'] as const) {
+      .toEqual(['confirmation', 'checkpoint', 'nervous', 'autonomous-trigger', 'gateway-pairing']);
+    for (const origin of ['confirmation', 'checkpoint', 'nervous', 'autonomous-trigger', 'gateway-pairing'] as const) {
       expect(isDecisionFederatedOrigin(origin)).toBe(true);
     }
-    for (const origin of ['panic-guard', 'bot-action', 'gateway-pairing'] as const) {
+    for (const origin of ['panic-guard', 'bot-action'] as const) {
       expect(isDecisionFederatedOrigin(origin)).toBe(false);
     }
   });
@@ -56,10 +57,11 @@ describe('decision federation bridge', () => {
 
   it('settles an autonomous trigger through the gate authority (forged id fail-closed)', async () => {
     const root = fixtureRoot();
+    const requestedAt = new Date().toISOString();
     const dir = join(root, '.deckent', 'autonomous');
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, 'pending.json'), JSON.stringify([
-      { triggerId: 'trg-d2b1', action: 'run-audit', requestedBy: 'detector', enqueuedAt: '2026-08-20T10:00:00.000Z' },
+      { triggerId: 'trg-d2b1', action: 'run-audit', requestedBy: 'detector', enqueuedAt: requestedAt },
     ]), 'utf-8');
     const out = await settleFederatedDecision(root, 'autonomous-trigger', 'trg-d2b1', 'allow', 'unified surface');
     expect(out).toEqual({ state: 'settled', origin: 'autonomous-trigger' });
@@ -73,12 +75,14 @@ describe('decision federation bridge', () => {
 
   it('settles a confirmation back exactly as its consumers expect', async () => {
     const root = fixtureRoot();
+    const requestedAt = new Date().toISOString();
+    const lifecycle = resolveApprovalLifecyclePolicy({ enabled: true });
     const { id } = createConfirmationRequest(root, {
       sprintId: 's-1', taskId: 't-1', itemIds: [], kind: 'security',
       verdict: 'QUALIFIED', adapter: 'human', statements: ['sign-off?'],
-      evidenceRequirements: [], requestedAt: '2026-08-20T10:00:00.000Z',
+      evidenceRequirements: [], requestedAt,
       source: 'acceptance-matrix',
-    });
+    }, { lifecycle, clock: () => new Date(requestedAt) });
     const out = await settleFederatedDecision(root, 'confirmation', id, 'allow', 'unified surface');
     expect(out).toEqual({ state: 'settled', origin: 'confirmation' });
     const settled = readConfirmation(root, id);

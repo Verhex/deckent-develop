@@ -10,9 +10,23 @@
 // fails validation rather than silently passing through.
 
 import { z } from 'zod';
+import {
+  APPROVAL_LIFECYCLE_BLOCKING_SCOPES,
+  APPROVAL_LIFECYCLE_ORIGINS,
+  APPROVAL_LIFECYCLE_SLA_STAGES,
+  APPROVAL_RISK_TIERS,
+} from './config-types.js';
+import {
+  approvalLifecycleProfileDigest,
+  isApprovalRiskTierAtLeast,
+  mapLegacyApprovalRisk,
+} from './approval-lifecycle-policy.js';
 
 /** Contract version stamped on every ApprovalRequest. Bump on a breaking shape change. */
-export const APPROVAL_CONTRACT_VERSION = '1.0';
+export const APPROVAL_CONTRACT_V1_VERSION = '1.0' as const;
+export const APPROVAL_CONTRACT_V2_VERSION = '2.0' as const;
+/** Backward-compatible alias retained for existing v1 producers. */
+export const APPROVAL_CONTRACT_VERSION = APPROVAL_CONTRACT_V1_VERSION;
 
 const WINDOWS_RESERVED_DEVICE_RE = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i;
 
@@ -109,8 +123,7 @@ const sha256HexSchema = z.string().regex(/^[a-f0-9]{64}$/u, 'must be a lowercase
 
 // ─── ApprovalRequest ──────────────────────────────────────────────────────────
 
-const approvalRequestShape = {
-    version: z.literal(APPROVAL_CONTRACT_VERSION).default(APPROVAL_CONTRACT_VERSION),
+const approvalRequestBaseShape = {
     requester: requesterSchema,
     /** Short, human-readable one-liner (e.g. for a terminal approval card). */
     summary: z.string().min(1).max(200),
@@ -126,13 +139,71 @@ const approvalRequestShape = {
     createdAt: isoDateTimeSchema,
     expiresAt: isoDateTimeSchema,
     /** Redacted/safe-to-display args, present only when the action carries args. */
-    maskedArgs: z.record(z.string(), z.unknown()).nullable().default(null),
-    /** Opaque pointer to the raw args held out-of-band — never the raw value itself. */
-    rawArgsRef: z.string().min(1).nullable().default(null),
 };
 
-function buildApprovalRequestSchema(idSchema: z.ZodType<string>) {
-  return z.object({ id: idSchema, ...approvalRequestShape }).strict().superRefine((val, ctx) => {
+const approvalRequestNewWriteArgsShape = {
+  /** Redacted/safe-to-display args, present only when the action carries args. */
+  maskedArgs: z.record(z.string(), z.unknown()).nullable().default(null),
+  /** Opaque pointer to the raw args held out-of-band — never the raw value itself. */
+  rawArgsRef: z.string().min(1).nullable().default(null),
+};
+
+const approvalRequestStoredArgsShape = {
+  /** Stored-source compatibility: no defaults are injected while reading signed v1 bytes. */
+  maskedArgs: z.record(z.string(), z.unknown()).nullable().optional(),
+  rawArgsRef: z.string().min(1).nullable().optional(),
+};
+
+const approvalSourceSchema = z.object({
+  contractVersion: z.enum([APPROVAL_CONTRACT_V1_VERSION, APPROVAL_CONTRACT_V2_VERSION]),
+  requestDigest: sha256HexSchema,
+  reference: z.string().min(1),
+}).strict();
+
+const lifecycleDurationSchema = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
+const approvalLifecycleProfileSchema = z.object({
+  ttlMs: lifecycleDurationSchema,
+  slaMs: z.tuple([lifecycleDurationSchema, lifecycleDurationSchema, lifecycleDurationSchema]),
+  riskTier: z.enum(APPROVAL_RISK_TIERS),
+  timeoutDisposition: z.enum([
+    'request-default',
+    'park-alert',
+    'park-undecidable',
+    'deny-expire',
+  ]),
+  blocking: z.enum(APPROVAL_LIFECYCLE_BLOCKING_SCOPES),
+}).strict().superRefine((profile, ctx) => {
+  if (!(profile.slaMs[0] < profile.slaMs[1] && profile.slaMs[1] < profile.slaMs[2])) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['slaMs'],
+      message: 'slaMs must be strictly increasing',
+    });
+  }
+  if (profile.slaMs[2] >= profile.ttlMs) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['slaMs'],
+      message: 'slaMs entries must be earlier than ttlMs',
+    });
+  }
+});
+
+const approvalLifecycleV2Shape = {
+  origin: z.enum(APPROVAL_LIFECYCLE_ORIGINS),
+  riskTier: z.enum(APPROVAL_RISK_TIERS),
+  blocking: z.enum(APPROVAL_LIFECYCLE_BLOCKING_SCOPES),
+  /** Embedded per-origin bytes make the authored snapshot reconstructible after restart. */
+  lifecycleProfile: approvalLifecycleProfileSchema,
+  /** Canonical digest of `schemaVersion + origin + lifecycleProfile`. */
+  policySnapshotDigest: sha256HexSchema,
+  source: approvalSourceSchema,
+  lifecycleGeneration: z.string().min(1).max(128),
+  slaStage: z.enum(APPROVAL_LIFECYCLE_SLA_STAGES),
+};
+
+function withExpiryOrder<T extends z.ZodTypeAny>(schema: T): T {
+  return schema.superRefine((val: { createdAt: string; expiresAt: string }, ctx) => {
     if (Date.parse(val.expiresAt) <= Date.parse(val.createdAt)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -140,17 +211,82 @@ function buildApprovalRequestSchema(idSchema: z.ZodType<string>) {
         message: 'expiresAt must be after createdAt',
       });
     }
+  }) as unknown as T;
+}
+
+function buildApprovalRequestV1Schema(idSchema: z.ZodType<string>, stored: boolean) {
+  return withExpiryOrder(z.object({
+    id: idSchema,
+    version: stored
+      ? z.literal(APPROVAL_CONTRACT_V1_VERSION).optional()
+      : z.literal(APPROVAL_CONTRACT_V1_VERSION).default(APPROVAL_CONTRACT_V1_VERSION),
+    ...approvalRequestBaseShape,
+    ...(stored ? approvalRequestStoredArgsShape : approvalRequestNewWriteArgsShape),
+  }).strict());
+}
+
+function buildApprovalRequestV2Schema(idSchema: z.ZodType<string>, stored: boolean) {
+  return withExpiryOrder(z.object({
+    id: idSchema,
+    version: z.literal(APPROVAL_CONTRACT_V2_VERSION),
+    ...approvalRequestBaseShape,
+    ...(stored ? approvalRequestStoredArgsShape : approvalRequestNewWriteArgsShape),
+    ...approvalLifecycleV2Shape,
+  }).strict()).superRefine((value, ctx) => {
+    if (value.blocking !== value.lifecycleProfile.blocking) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['blocking'],
+        message: 'blocking must match the embedded lifecycleProfile',
+      });
+    }
+    if (!isApprovalRiskTierAtLeast(value.riskTier, value.lifecycleProfile.riskTier)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['riskTier'],
+        message: 'riskTier may not be lower than the embedded lifecycleProfile floor',
+      });
+    }
+    if (!isApprovalRiskTierAtLeast(value.riskTier, mapLegacyApprovalRisk(value.risk))) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['riskTier'],
+        message: 'riskTier may not be lower than the canonical legacy risk mapping',
+      });
+    }
+    if (Date.parse(value.expiresAt) > Date.parse(value.createdAt) + value.lifecycleProfile.ttlMs) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['expiresAt'],
+        message: 'expiresAt may not exceed the embedded lifecycleProfile ttlMs ceiling',
+      });
+    }
+    const expected = approvalLifecycleProfileDigest(value.origin, value.lifecycleProfile);
+    if (value.policySnapshotDigest !== expected) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['policySnapshotDigest'],
+        message: 'must match the embedded origin lifecycleProfile digest',
+      });
+    }
   });
 }
 
-/** Canonical new-write schema. */
-export const approvalRequestSchema = buildApprovalRequestSchema(approvalIdSchema);
+/** Explicit per-version schemas for producers and migration code. */
+export const approvalRequestV1Schema = buildApprovalRequestV1Schema(approvalIdSchema, false);
+export const approvalRequestV2Schema = buildApprovalRequestV2Schema(approvalIdSchema, false);
 
-/** Safe v1 persisted-reader schema; never use to authorize a new request id. */
-const storedApprovalRequestSchema = buildApprovalRequestSchema(approvalLookupIdSchema);
+/** Canonical versioned new-write schema. Omitted version remains the exact v1 compatibility path. */
+export const approvalRequestSchema = z.union([approvalRequestV2Schema, approvalRequestV1Schema]);
 
-/** The canonical approval-request type — inferred from {@link approvalRequestSchema}. */
-export type ApprovalRequest = z.infer<typeof approvalRequestSchema>;
+/** Persisted reader: v1 defaults remain absent so signed source bytes keep their exact digest. */
+const storedApprovalRequestV1Schema = buildApprovalRequestV1Schema(approvalLookupIdSchema, true);
+const storedApprovalRequestV2Schema = buildApprovalRequestV2Schema(approvalLookupIdSchema, true);
+
+export type ApprovalRequestV1 = z.infer<typeof storedApprovalRequestV1Schema>;
+export type ApprovalRequestV2 = z.infer<typeof approvalRequestV2Schema>;
+/** Versioned canonical request. A stored v1 may intentionally omit formerly defaulted fields. */
+export type ApprovalRequest = ApprovalRequestV1 | ApprovalRequestV2;
 
 // ─── ApprovalDecision ─────────────────────────────────────────────────────────
 
@@ -289,25 +425,39 @@ export interface ValidateApprovalRequestErr {
 }
 export type ValidateApprovalRequestResult = ValidateApprovalRequestOk | ValidateApprovalRequestErr;
 
+function requestVersionOf(obj: unknown): unknown {
+  return obj !== null && typeof obj === 'object' && !Array.isArray(obj)
+    ? (obj as Record<string, unknown>)['version']
+    : undefined;
+}
+
 /** Validate an unknown object against {@link approvalRequestSchema}. Never throws. */
 export function validateApprovalRequest(obj: unknown): ValidateApprovalRequestResult {
-  const parsed = approvalRequestSchema.safeParse(obj);
-  if (parsed.success) return { ok: true, value: parsed.data };
+  const schema = requestVersionOf(obj) === APPROVAL_CONTRACT_V2_VERSION
+    ? approvalRequestV2Schema
+    : approvalRequestV1Schema;
+  const parsed = schema.safeParse(obj);
+  if (parsed.success) return { ok: true, value: parsed.data as ApprovalRequest };
   const { missingFields, errors } = collectIssues(parsed.error.issues);
   return { ok: false, missingFields, errors };
 }
 
 /** Read an existing v1 record without permitting its legacy id on new writes. */
 export function validateStoredApprovalRequest(obj: unknown): ValidateApprovalRequestResult {
-  const parsed = storedApprovalRequestSchema.safeParse(obj);
-  if (parsed.success) return { ok: true, value: parsed.data };
+  const schema = requestVersionOf(obj) === APPROVAL_CONTRACT_V2_VERSION
+    ? storedApprovalRequestV2Schema
+    : storedApprovalRequestV1Schema;
+  const parsed = schema.safeParse(obj);
+  if (parsed.success) return { ok: true, value: parsed.data as ApprovalRequest };
   const { missingFields, errors } = collectIssues(parsed.error.issues);
   return { ok: false, missingFields, errors };
 }
 
 /** Type guard — true iff `obj` validates against {@link approvalRequestSchema}. */
 export function isApprovalRequest(obj: unknown): obj is ApprovalRequest {
-  return approvalRequestSchema.safeParse(obj).success;
+  return (requestVersionOf(obj) === APPROVAL_CONTRACT_V2_VERSION
+    ? approvalRequestV2Schema
+    : approvalRequestV1Schema).safeParse(obj).success;
 }
 
 export interface ValidateApprovalDecisionOk {

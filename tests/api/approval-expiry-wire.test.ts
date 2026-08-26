@@ -172,7 +172,7 @@ describe('live roundtrip: the composed driver actually sweeps an expired pending
       decidedBy: string;
     };
     expect(decision.channel).toBe('ttl-expire');
-    expect(decision.decidedBy).toBe('system');
+    expect(decision.decidedBy).toBe('system:expiry');
 
     // A fresh, independent ApprovalStore instance (same pattern GET
     // /api/approvals uses) now categorizes the entry as expired.
@@ -209,7 +209,7 @@ describe('live roundtrip: the composed driver actually sweeps an expired pending
       closureReason: string;
     };
     expect(decision.decision).toBe('deny');
-    expect(decision.decidedBy).toBe('system');
+    expect(decision.decidedBy).toBe('system:expiry');
     expect(decision.channel).toBe('ttl-expire');
     expect(decision.closureReason).toBe('expired');
   });

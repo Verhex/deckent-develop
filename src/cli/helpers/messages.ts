@@ -3250,8 +3250,12 @@ const MESSAGES: MessageMap = {
     tr: 'Bekleyen confirmation yok.',
   },
   'confirmations.list_row': {
-    en: '{id} · {adapter} · {kind}·{verdict} · task {taskId} ({sprintId}) — {statement}',
-    tr: '{id} · {adapter} · {kind}·{verdict} · görev {taskId} ({sprintId}) — {statement}',
+    en: '{id} · {adapter} · {kind}·{verdict} · risk {riskTier} · generation {generation} · expires {expiresAt} · task {taskId} ({sprintId}) — {statement}',
+    tr: '{id} · {adapter} · {kind}·{verdict} · risk {riskTier} · nesil {generation} · süre sonu {expiresAt} · görev {taskId} ({sprintId}) — {statement}',
+  },
+  'confirmations.quarantine_row': {
+    en: 'QUARANTINED · {file} · {reasonCode} · evidence {sourceReference}',
+    tr: 'KARANTİNADA · {file} · {reasonCode} · kanıt {sourceReference}',
   },
   'confirmations.decide_desc': {
     en: 'Decide one HUMAN-adapter confirmation (interactive terminal, single-shot)',
@@ -3293,6 +3297,10 @@ const MESSAGES: MessageMap = {
     en: 'Confirmation {id} is not pending (unknown or already settled).',
     tr: '{id} confirmation isteği beklemede değil (bilinmiyor ya da zaten karara bağlanmış).',
   },
+  'confirmations.err_expired': {
+    en: 'Confirmation {id} expired and is parked as UNDECIDABLE; a late decision cannot revive it.',
+    tr: '{id} confirmation isteğinin süresi doldu ve UNDECIDABLE olarak park edildi; geç karar isteği yeniden canlandıramaz.',
+  },
   'confirmations.err_wrong_adapter': {
     en: 'Confirmation {id} belongs to the {adapter} adapter — this surface only handles {expected}.',
     tr: '{id} confirmation isteği {adapter} adapterına ait — bu yüzey yalnız {expected} işler.',
@@ -3324,6 +3332,86 @@ const MESSAGES: MessageMap = {
   'confirmations.run_none': {
     en: 'No pending llm-adapter confirmations.',
     tr: 'Bekleyen llm-adapter confirmation yok.',
+  },
+  'approval.lifecycle.stage.initial': {
+    en: 'Approval requested',
+    tr: 'Onay istendi',
+  },
+  'approval.lifecycle.stage.renotify': {
+    en: 'Approval reminder',
+    tr: 'Onay hatırlatması',
+  },
+  'approval.lifecycle.stage.alternate-channel': {
+    en: 'Approval escalated to an alternate channel',
+    tr: 'Onay alternatif kanala yükseltildi',
+  },
+  'approval.lifecycle.stage.park-alert': {
+    en: 'Approval is about to park',
+    tr: 'Onay park edilmek üzere',
+  },
+  'approval.lifecycle.stage.expired': {
+    en: 'Approval expired',
+    tr: 'Onayın süresi doldu',
+  },
+  'approval.lifecycle.risk.routine': {
+    en: 'Routine risk',
+    tr: 'Rutin risk',
+  },
+  'approval.lifecycle.risk.elevated': {
+    en: 'Elevated risk',
+    tr: 'Yükseltilmiş risk',
+  },
+  'approval.lifecycle.risk.critical': {
+    en: 'Critical risk',
+    tr: 'Kritik risk',
+  },
+  'approval.lifecycle.timeout.park-undecidable': {
+    en: 'Timed out and parked as UNDECIDABLE',
+    tr: 'Zaman aşımına uğradı ve UNDECIDABLE olarak park edildi',
+  },
+  'approval.lifecycle.timeout.park-alert': {
+    en: 'Timed out and parked with an alert',
+    tr: 'Zaman aşımına uğradı ve uyarıyla park edildi',
+  },
+  'approval.lifecycle.timeout.deny-expire': {
+    en: 'Timed out and denied; access was not granted',
+    tr: 'Zaman aşımına uğradı ve reddedildi; erişim verilmedi',
+  },
+  'approval.lifecycle.timeout.request-default': {
+    en: 'Timed out with the request policy default',
+    tr: 'İstek policy varsayılanıyla zaman aşımına uğradı',
+  },
+  'approvals.lifecycle_detail': {
+    en: 'origin={origin} · risk={riskTier} · stage={stage} · expires={expiresAt}',
+    tr: 'kaynak={origin} · risk={riskTier} · aşama={stage} · süre sonu={expiresAt}',
+  },
+  'approvals.federated.row_quarantined': {
+    en: 'QUARANTINED · {origin} · {id} · {reason} · evidence {sourceReference}',
+    tr: 'KARANTİNADA · {origin} · {id} · {reason} · kanıt {sourceReference}',
+  },
+  'approvals.federated.row_lifecycle': {
+    en: '#{code} · [{origin}] {id} — {summary} · risk={riskTier} · stage={stage} · expires={expiresAt} · decide: {hint}',
+    tr: '#{code} · [{origin}] {id} — {summary} · risk={riskTier} · aşama={stage} · süre sonu={expiresAt} · karar: {hint}',
+  },
+  'approvals.lifecycle_disabled_hold': {
+    en: 'Approval lifecycle is disabled; creation is held fail-closed.',
+    tr: 'Onay lifecycle devre dışı; oluşturma fail-closed olarak bekletiliyor.',
+  },
+  'approvals.lifecycle_disabled': {
+    en: 'Approval lifecycle is disabled; no pending request was created.',
+    tr: 'Onay lifecycle devre dışı; bekleyen istek oluşturulmadı.',
+  },
+  'approvals.expired': {
+    en: 'Approval {id} expired at {expiresAt}; no late decision was applied.',
+    tr: '{id} onayının süresi {expiresAt} tarihinde doldu; geç karar uygulanmadı.',
+  },
+  'approvals.late_decision': {
+    en: 'Approval {id} is already terminal ({state}); the late decision was rejected.',
+    tr: '{id} onayı zaten terminal durumda ({state}); geç karar reddedildi.',
+  },
+  'approvals.quarantined': {
+    en: 'Approval {id} is quarantined or unavailable ({reason}); no decision was applied.',
+    tr: '{id} onayı karantinada veya kullanılamıyor ({reason}); karar uygulanmadı.',
   },
   'chat.tool_cli_missing': {
     en: 'Provider "{tool}" CLI not found in PATH. {details}',

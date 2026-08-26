@@ -12,6 +12,7 @@ import { loadConfig } from '../../core/config.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { loadGatewayAccess } from '../../connectors/gateway/gateway-access.js';
 import { loadProjectRegistry } from '../../connectors/gateway/project-registry.js';
+import { ApprovalFileCasError } from '../../core/approval-file-cas.js';
 
 function writePid(pid = process.pid): void {
   const p = gatewayPidPath();
@@ -61,9 +62,16 @@ export async function handleGatewayPairList(opts: { lang?: string; print?: (s: s
   const lang = getLanguage(opts.lang);
   const print = opts.print ?? ((s: string): void => console.log(s));
   const access = await loadGatewayAccess();
+  try {
+    await access.sweepExpiredPairings();
+  } catch (error) {
+    const reason = error instanceof ApprovalFileCasError ? error.reasonCode : 'pairing-store-unavailable';
+    print(getMessage('approvals.quarantined', lang, { id: 'pairings.json', reason }));
+    return;
+  }
   const pending = access.listPairings();
   if (pending.length === 0) { print(getMessage('gateway.pair_list_empty', lang)); return; }
-  for (const p of pending) print(getMessage('gateway.pair_list_row', lang, { code: p.code, chatKey: p.chatKey, requestedAt: p.requestedAt }));
+  for (const p of pending) print(getMessage('gateway.pair_list_row', lang, { code: p.code, chatKey: p.chatKey, requestedAt: p.createdAt }));
 }
 
 export async function handleGatewayPairApprove(opts: { code: string; project: string; lang?: string; print?: (s: string) => void }): Promise<void> {
@@ -72,18 +80,58 @@ export async function handleGatewayPairApprove(opts: { code: string; project: st
   const access = await loadGatewayAccess();
   const projects = await loadProjectRegistry();
   const projectPath = projects.resolve(opts.project)?.path ?? opts.project;
-  const res = await access.approvePairing(opts.code, projectPath);
-  print(res
-    ? getMessage('gateway.pair_approved', lang, { chatKey: res.chatKey, project: opts.project })
-    : getMessage('gateway.pair_unknown_code', lang, { code: opts.code }));
+  try {
+    const result = await access.decidePairing(opts.code, 'approve', { projectPath });
+    switch (result.state) {
+      case 'APPROVED':
+        print(getMessage('gateway.pair_approved', lang, { chatKey: result.chatKey, project: opts.project }));
+        return;
+      case 'EXPIRED':
+        print(getMessage('approvals.expired', lang, { id: result.pairingId, expiresAt: result.expiresAt }));
+        return;
+      case 'CLOSED':
+        print(getMessage('approvals.late_decision', lang, { id: result.pairingId, state: result.terminalState }));
+        return;
+      case 'HOLD':
+        print(getMessage('approvals.quarantined', lang, { id: opts.code, reason: result.reasonCode }));
+        return;
+      case 'NOT_FOUND':
+      case 'REJECTED':
+        print(getMessage('gateway.pair_unknown_code', lang, { code: opts.code }));
+    }
+  } catch (error) {
+    const reason = error instanceof ApprovalFileCasError ? error.reasonCode : 'pairing-store-unavailable';
+    print(getMessage('approvals.quarantined', lang, { id: opts.code, reason }));
+  }
 }
 
 export async function handleGatewayPairReject(opts: { code: string; lang?: string; print?: (s: string) => void }): Promise<void> {
   const lang = getLanguage(opts.lang);
   const print = opts.print ?? ((s: string): void => console.log(s));
   const access = await loadGatewayAccess();
-  const ok = await access.rejectPairing(opts.code);
-  print(ok ? getMessage('gateway.pair_rejected', lang, { code: opts.code }) : getMessage('gateway.pair_unknown_code', lang, { code: opts.code }));
+  try {
+    const result = await access.decidePairing(opts.code, 'reject');
+    switch (result.state) {
+      case 'REJECTED':
+        print(getMessage('gateway.pair_rejected', lang, { code: opts.code }));
+        return;
+      case 'EXPIRED':
+        print(getMessage('approvals.expired', lang, { id: result.pairingId, expiresAt: result.expiresAt }));
+        return;
+      case 'CLOSED':
+        print(getMessage('approvals.late_decision', lang, { id: result.pairingId, state: result.terminalState }));
+        return;
+      case 'HOLD':
+        print(getMessage('approvals.quarantined', lang, { id: opts.code, reason: result.reasonCode }));
+        return;
+      case 'NOT_FOUND':
+      case 'APPROVED':
+        print(getMessage('gateway.pair_unknown_code', lang, { code: opts.code }));
+    }
+  } catch (error) {
+    const reason = error instanceof ApprovalFileCasError ? error.reasonCode : 'pairing-store-unavailable';
+    print(getMessage('approvals.quarantined', lang, { id: opts.code, reason }));
+  }
 }
 
 export function registerGateway(program: Command): void {

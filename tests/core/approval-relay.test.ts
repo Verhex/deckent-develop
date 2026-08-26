@@ -69,7 +69,12 @@ let relay: ApprovalRelay;
 beforeEach(() => {
   projectRoot = mkdtempSync(join(tmpdir(), 'approval-relay-'));
   broker = new ApprovalBroker(projectRoot, { storeDir: join(projectRoot, 'approvals') });
-  relay = new ApprovalRelay(broker);
+  relay = new ApprovalRelay(
+    broker,
+    undefined,
+    undefined,
+    () => new Date('2026-07-01T21:05:00.000Z'),
+  );
 });
 
 afterEach(() => {
@@ -143,6 +148,7 @@ describe('ApprovalRelay — channel-decide resumes broker + cross-broadcasts', (
       localizedBroker,
       undefined,
       (d) => `[${d.channel}] ${d.decision === 'allow' ? 'ONAYLANDI' : 'REDDEDİLDİ'}`,
+      () => new Date('2026-07-01T21:05:00.000Z'),
     );
     const a = makeFakeChannel();
     const b = makeFakeChannel();

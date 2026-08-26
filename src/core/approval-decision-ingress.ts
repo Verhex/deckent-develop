@@ -5,11 +5,12 @@ import {
   ApprovalBrokerError,
   isExpiredDecideResult,
 } from './approval-broker.js';
-import type {
-  ApprovalAction,
-  ApprovalDecision,
-  ApprovalDecisionAuthorization,
-  ApprovalRequest,
+import {
+  APPROVAL_CONTRACT_V2_VERSION,
+  type ApprovalAction,
+  type ApprovalDecision,
+  type ApprovalDecisionAuthorization,
+  type ApprovalRequest,
 } from './approval-contract.js';
 import type { ProviderEvidenceProbeSubject } from './provider-evidence-probe-contract.js';
 
@@ -45,8 +46,35 @@ function safeDigestEqual(left: string, right: string): boolean {
   return timingSafeEqual(Buffer.from(left, 'hex'), Buffer.from(right, 'hex'));
 }
 
-export function approvalRequestDigest(request: ApprovalRequest): string {
-  return sha256(canonicalJson(request));
+export type ApprovalRequestDigestSource = ApprovalRequest;
+
+/** Exact v1 source projection: additive reader metadata can never perturb an existing MAC. */
+function v1DigestSource(request: ApprovalRequest): Record<string, unknown> {
+  return {
+    version: request.version,
+    id: request.id,
+    requester: request.requester,
+    summary: request.summary,
+    details: request.details,
+    scopeId: request.scopeId,
+    scope: request.scope,
+    risk: request.risk,
+    policy: request.policy,
+    defaultAction: request.defaultAction,
+    tenantId: request.tenantId,
+    userId: request.userId,
+    createdAt: request.createdAt,
+    expiresAt: request.expiresAt,
+    maskedArgs: request.maskedArgs,
+    rawArgsRef: request.rawArgsRef,
+  };
+}
+
+/** v1 signs only its exact source shape; v2 signs the complete lineage envelope. */
+export function approvalRequestDigest(source: ApprovalRequestDigestSource): string {
+  return sha256(canonicalJson(
+    source.version === APPROVAL_CONTRACT_V2_VERSION ? source : v1DigestSource(source),
+  ));
 }
 
 export interface ApprovalIntegrityStamp {

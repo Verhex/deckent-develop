@@ -6,6 +6,7 @@ import { join } from 'node:path';
 
 import { ApprovalBroker } from '../../../../src/core/approval-broker.js';
 import { ApprovalStore } from '../../../../src/core/approval-store.js';
+import type { ResolvedApprovalLifecycleConfig } from '../../../../src/core/config-types.js';
 import { validateApprovalRequest, type ApprovalAction, type ApprovalRequest } from '../../../../src/core/approval-contract.js';
 import {
   ApprovalDecisionAuthority,
@@ -26,6 +27,15 @@ import { settleMissionItem } from '../../../helpers/mission-store.js';
 const roots: string[] = [];
 const NOW = new Date('2026-07-22T00:00:00.000Z');
 const INTEGRITY_KEY = Buffer.from('mission-approval-hermetic-key-v1');
+const LIFECYCLE: ResolvedApprovalLifecycleConfig = {
+  enabled: true,
+  profiles: {
+    confirmation: { ttlMs: 8_000, slaMs: [1_000, 2_000, 4_000], riskTier: 'elevated', timeoutDisposition: 'park-undecidable', blocking: 'run' },
+    'autonomous-trigger': { ttlMs: 60_000, slaMs: [10_000, 20_000, 40_000], riskTier: 'elevated', timeoutDisposition: 'park-alert', blocking: 'trigger' },
+    'gateway-pairing': { ttlMs: 60_000, slaMs: [10_000, 20_000, 40_000], riskTier: 'critical', timeoutDisposition: 'deny-expire', blocking: 'security' },
+    'broker-native': { ttlMs: 60_000, slaMs: [10_000, 20_000, 40_000], riskTier: 'routine', timeoutDisposition: 'request-default', blocking: 'request' },
+  },
+};
 
 class TestIntegrity implements ApprovalDecisionIntegrityAuthority {
   sign(payload: string) {
@@ -67,8 +77,8 @@ function fixture() {
   const store = new SqliteMissionStore(root);
   store.migrate();
   store.createMission({ id: 'm', kind: 'list', title: 'Mission', tenant: 'tenant-a' });
-  const broker = new ApprovalBroker(root);
-  const decisions = new ApprovalStore(root);
+  const broker = new ApprovalBroker(root, { lifecycle: LIFECYCLE, clock: () => NOW });
+  const decisions = new ApprovalStore(root, { lifecycle: LIFECYCLE, clock: () => NOW });
   const authenticator = new TestAuthenticator();
   const integrity = new TestIntegrity();
   const decisionAuthority = new ApprovalDecisionAuthority(integrity, authenticator);
@@ -86,8 +96,7 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
-const requestFactory: MissionApprovalRequestFactory = (item, mission) => ({
-  version: '1.0',
+const requestFactory: MissionApprovalRequestFactory = (item, mission, requestedAt) => ({
   requester: { role: 'brain', instanceId: 'goal-v2' },
   summary: `Approve ${item.id}`,
   details: { missionId: mission.id, workItemId: item.id },
@@ -98,8 +107,8 @@ const requestFactory: MissionApprovalRequestFactory = (item, mission) => ({
   defaultAction: 'deny',
   tenantId: mission.tenant,
   userId: 'owner-a',
-  createdAt: NOW.toISOString(),
-  expiresAt: new Date(NOW.getTime() + 60_000).toISOString(),
+  createdAt: requestedAt.toISOString(),
+  expiresAt: new Date(requestedAt.getTime() + 60_000).toISOString(),
   maskedArgs: null,
   rawArgsRef: null,
 });
@@ -111,6 +120,7 @@ function coordinator(f: ReturnType<typeof fixture>) {
     decisions: f.decisions,
     requestFactory,
     decisionAuthority: f.decisionAuthority,
+    lifecycle: LIFECYCLE,
     now: () => NOW,
   });
 }
@@ -126,7 +136,7 @@ async function decide(f: ReturnType<typeof fixture>, requestId: string, action: 
 }
 
 describe('MissionApprovalCoordinator', () => {
-  it('waits for dependencies, then atomically parks and publishes one request', () => {
+  it('waits for dependencies, then atomically parks and publishes one request', async () => {
     const f = fixture();
     f.store.enqueueItem({ id: 'upstream', missionId: 'm', kind: 'task' });
     f.store.enqueueItem({
@@ -134,27 +144,27 @@ describe('MissionApprovalCoordinator', () => {
     });
     const c = coordinator(f);
 
-    expect(c.tick()).toMatchObject({ parked: 0, published: 0 });
+    expect(await c.tick()).toMatchObject({ parked: 0, published: 0 });
     expect(f.store.listApprovalBindings()).toEqual([]);
     settleMissionItem(f.store, 'upstream', 'done', { ok: true });
-    expect(c.tick()).toMatchObject({ parked: 1, published: 1 });
+    expect(await c.tick()).toMatchObject({ parked: 1, published: 1 });
 
     const binding = f.store.listApprovalBindings()[0]!;
     expect(binding.publishState).toBe('published');
     expect(binding.decisionState).toBe('pending');
     expect(f.store.listItems('m').find((item) => item.id === 'guarded')!.status).toBe('parked');
     expect(f.decisions.index(NOW).pending.map((entry) => entry.request.id)).toEqual([binding.requestId]);
-    expect(c.tick()).toMatchObject({ parked: 0, published: 0, decided: 0 });
+    expect(await c.tick()).toMatchObject({ parked: 0, published: 0, decided: 0 });
     expect(f.decisions.index(NOW).pending).toHaveLength(1);
     f.store.close();
   });
 
-  it('reconciles crash-after-submit/before-ack without a duplicate request', () => {
+  it('reconciles crash-after-submit/before-ack without a duplicate request', async () => {
     const f = fixture();
     const item = f.store.enqueueItem({ id: 'guarded', missionId: 'm', kind: 'task', policy: 'approval-required' });
     const mission = f.store.getMission('m')!;
     const id = approvalRequestIdForWorkItem(mission, item);
-    const parsed = validateApprovalRequest({ ...requestFactory(item, mission), id });
+    const parsed = validateApprovalRequest({ ...requestFactory(item, mission, NOW), id });
     if (!parsed.ok) throw new Error(parsed.errors.join('; '));
     const binding = f.store.parkItemForApproval(item.id, parsed.value)!;
     expect(binding.publishState).toBe('outbox');
@@ -162,15 +172,16 @@ describe('MissionApprovalCoordinator', () => {
 
     const restarted = new MissionApprovalCoordinator({
       store: f.store,
-      publisher: new ApprovalBroker(f.root),
-      decisions: new ApprovalStore(f.root),
+      publisher: new ApprovalBroker(f.root, { lifecycle: LIFECYCLE, clock: () => NOW }),
+      decisions: new ApprovalStore(f.root, { lifecycle: LIFECYCLE, clock: () => NOW }),
       requestFactory,
       decisionAuthority: f.decisionAuthority,
+      lifecycle: LIFECYCLE,
       now: () => NOW,
     });
-    expect(restarted.tick()).toMatchObject({ published: 1 });
+    expect(await restarted.tick()).toMatchObject({ published: 1 });
     expect(f.store.listApprovalBindings()[0]!.publishState).toBe('published');
-    expect(new ApprovalStore(f.root).index(NOW).pending).toHaveLength(1);
+    expect(new ApprovalStore(f.root, { lifecycle: LIFECYCLE, clock: () => NOW }).index(NOW).pending).toHaveLength(1);
     f.store.close();
   });
 
@@ -178,19 +189,20 @@ describe('MissionApprovalCoordinator', () => {
     const f = fixture();
     f.store.enqueueItem({ id: 'guarded', missionId: 'm', kind: 'task', policy: 'approval-required' });
     const c = coordinator(f);
-    c.tick();
+    await c.tick();
     const requestId = f.store.listApprovalBindings()[0]!.requestId;
     await decide(f, requestId, 'allow');
 
     const restarted = new MissionApprovalCoordinator({
       store: f.store,
-      publisher: new ApprovalBroker(f.root),
-      decisions: new ApprovalStore(f.root),
+      publisher: new ApprovalBroker(f.root, { lifecycle: LIFECYCLE, clock: () => NOW }),
+      decisions: new ApprovalStore(f.root, { lifecycle: LIFECYCLE, clock: () => NOW }),
       requestFactory,
       decisionAuthority: f.decisionAuthority,
+      lifecycle: LIFECYCLE,
       now: () => NOW,
     });
-    expect(restarted.tick()).toMatchObject({ decided: 1 });
+    expect(await restarted.tick()).toMatchObject({ decided: 1 });
     expect(f.store.listApprovalBindings()[0]!.decisionState).toBe('allowed');
     expect(f.store.queryDue().map((item) => item.id)).toEqual(['guarded']);
     expect(f.store.claimItem('guarded', 'one')).toBe(true);
@@ -198,11 +210,11 @@ describe('MissionApprovalCoordinator', () => {
     f.store.close();
   });
 
-  it('keeps an unattested legacy allow parked instead of turning it into Goal-v2 claim authority', () => {
+  it('keeps an unattested legacy allow parked instead of turning it into Goal-v2 claim authority', async () => {
     const f = fixture();
     f.store.enqueueItem({ id: 'guarded', missionId: 'm', kind: 'task', policy: 'approval-required' });
     const c = coordinator(f);
-    c.tick();
+    await c.tick();
     const requestId = f.store.listApprovalBindings()[0]!.requestId;
     f.broker.decide(requestId, {
       decision: 'allow',
@@ -211,7 +223,7 @@ describe('MissionApprovalCoordinator', () => {
       decidedAt: NOW.toISOString(),
     });
 
-    expect(c.tick()).toMatchObject({ decided: 0, invalid: 1 });
+    expect(await c.tick()).toMatchObject({ decided: 0, invalid: 1 });
     expect(f.store.listApprovalBindings()[0]!.decisionState).toBe('pending');
     expect(f.store.listItems('m')[0]!.status).toBe('parked');
     expect(f.store.claimItem('guarded', 'bypass')).toBe(false);
@@ -222,10 +234,10 @@ describe('MissionApprovalCoordinator', () => {
     const f = fixture();
     f.store.enqueueItem({ id: 'guarded', missionId: 'm', kind: 'task', policy: 'approval-required' });
     const c = coordinator(f);
-    c.tick();
+    await c.tick();
     const requestId = f.store.listApprovalBindings()[0]!.requestId;
     await decide(f, requestId, 'allow');
-    expect(c.tick()).toMatchObject({ decided: 1 });
+    expect(await c.tick()).toMatchObject({ decided: 1 });
     expect(f.store.listApprovalBindings()[0]!.decisionState).toBe('allowed');
 
     f.authenticator.active = false;
@@ -249,10 +261,10 @@ describe('MissionApprovalCoordinator', () => {
     const f = fixture();
     f.store.enqueueItem({ id: 'guarded', missionId: 'm', kind: 'task', policy: 'risk-tagged' });
     const c = coordinator(f);
-    c.tick();
+    await c.tick();
     const requestId = f.store.listApprovalBindings()[0]!.requestId;
     await decide(f, requestId, action);
-    expect(c.tick()).toMatchObject({ decided: 1 });
+    expect(await c.tick()).toMatchObject({ decided: 1 });
     expect(f.store.listApprovalBindings()[0]!.decisionState).toBe(state);
     expect(f.store.listItems('m')[0]!.status).toBe(status);
     expect(f.store.claimItem('guarded', 'bypass')).toBe(false);
@@ -264,7 +276,7 @@ describe('MissionApprovalCoordinator', () => {
     f.store.enqueueItem({ id: 'guarded', missionId: 'm', kind: 'task', policy: 'approval-required' });
     f.store.enqueueItem({ id: 'downstream', missionId: 'm', kind: 'task', dependsOn: ['guarded'] });
     const c = coordinator(f);
-    c.tick();
+    await c.tick();
     f.broker.expire(new Date(NOW.getTime() + 120_000));
     const calls: string[] = [];
 
@@ -289,7 +301,7 @@ describe('MissionApprovalCoordinator', () => {
     f.store.enqueueItem({ id: 'transitive', missionId: 'm', kind: 'task', dependsOn: ['direct'] });
     f.store.enqueueItem({ id: 'independent', missionId: 'm', kind: 'task' });
     const c = coordinator(f);
-    c.tick();
+    await c.tick();
     const requestId = f.store.listApprovalBindings()[0]!.requestId;
     await decide(f, requestId, 'deny');
     const calls: string[] = [];
@@ -329,10 +341,11 @@ describe('MissionApprovalCoordinator', () => {
     const restartCalls: string[] = [];
     const restarted = new MissionApprovalCoordinator({
       store: reopened,
-      publisher: new ApprovalBroker(f.root),
-      decisions: new ApprovalStore(f.root),
+      publisher: new ApprovalBroker(f.root, { lifecycle: LIFECYCLE, clock: () => NOW }),
+      decisions: new ApprovalStore(f.root, { lifecycle: LIFECYCLE, clock: () => NOW }),
       requestFactory,
       decisionAuthority: f.decisionAuthority,
+      lifecycle: LIFECYCLE,
       now: () => NOW,
     });
     const second = await runMissionScheduler(reopened, async (item) => {
@@ -353,40 +366,42 @@ describe('MissionApprovalCoordinator', () => {
     reopened.close();
   });
 
-  it('sweeps an overdue undecided request before hydration and blocks it durably', () => {
+  it('sweeps an overdue undecided request before hydration and blocks it durably', async () => {
     const f = fixture();
     f.store.enqueueItem({ id: 'guarded', missionId: 'm', kind: 'task', policy: 'approval-required' });
-    coordinator(f).tick();
+    await coordinator(f).tick();
     const later = new Date(NOW.getTime() + 120_000);
     const restarted = new MissionApprovalCoordinator({
       store: f.store,
-      publisher: new ApprovalBroker(f.root),
-      decisions: new ApprovalStore(f.root),
+      publisher: new ApprovalBroker(f.root, { lifecycle: LIFECYCLE, clock: () => later }),
+      decisions: new ApprovalStore(f.root, { lifecycle: LIFECYCLE, clock: () => later }),
       requestFactory,
       decisionAuthority: f.decisionAuthority,
+      lifecycle: LIFECYCLE,
       now: () => later,
     });
 
-    expect(restarted.tick()).toMatchObject({ decided: 1 });
+    expect(await restarted.tick()).toMatchObject({ decided: 1 });
     expect(f.store.listApprovalBindings()[0]!.decisionState).toBe('expired');
     expect(f.store.listItems('m')[0]!.status).toBe('blocked');
-    expect(new ApprovalStore(f.root).index(later).expired[0]!.decision?.closureReason).toBe('expired');
+    expect(new ApprovalStore(f.root, { lifecycle: LIFECYCLE, clock: () => later }).index(later).expired[0]!.decision?.closureReason).toBe('expired');
     f.store.close();
   });
 
-  it('durably parks missing request identity without creating approval authority', () => {
+  it('durably parks missing request identity without creating approval authority', async () => {
     const f = fixture();
     f.store.enqueueItem({ id: 'guarded', missionId: 'm', kind: 'task', policy: 'approval-required' });
-    const invalidFactory: MissionApprovalRequestFactory = (item, mission) => ({
-      ...requestFactory(item, mission),
+    const invalidFactory: MissionApprovalRequestFactory = (item, mission, requestedAt) => ({
+      ...requestFactory(item, mission, requestedAt),
       userId: '',
     });
     const c = new MissionApprovalCoordinator({
       store: f.store, publisher: f.broker, decisions: f.decisions,
-      requestFactory: invalidFactory, decisionAuthority: f.decisionAuthority, now: () => NOW,
+      requestFactory: invalidFactory, decisionAuthority: f.decisionAuthority,
+      lifecycle: LIFECYCLE, now: () => NOW,
     });
 
-    expect(c.tick()).toMatchObject({ invalid: 1, parked: 0, published: 0 });
+    expect(await c.tick()).toMatchObject({ invalid: 1, parked: 0, published: 0 });
     expect(f.store.listApprovalBindings()).toEqual([]);
     expect(f.store.listItems('m')[0]!.status).toBe('parked');
     expect(f.store.listItems('m')[0]!.lastResult?.reason).toContain('APPROVAL_REQUEST_INVALID');
@@ -405,6 +420,7 @@ describe('MissionApprovalCoordinator', () => {
       decisions: f.decisions,
       requestFactory: () => { throw new Error('identity unavailable'); },
       decisionAuthority: f.decisionAuthority,
+      lifecycle: LIFECYCLE,
       now: () => NOW,
     });
     const calls: string[] = [];
@@ -421,16 +437,16 @@ describe('MissionApprovalCoordinator', () => {
     f.store.close();
   });
 
-  it('fails loud when a deterministic request id is already bound to different Broker content', () => {
+  it('fails loud when a deterministic request id is already bound to different Broker content', async () => {
     const f = fixture();
     const item = f.store.enqueueItem({ id: 'guarded', missionId: 'm', kind: 'task', policy: 'approval-required' });
     const mission = f.store.getMission('m')!;
     const id = approvalRequestIdForWorkItem(mission, item);
-    const parsed = validateApprovalRequest({ ...requestFactory(item, mission), id, summary: 'Foreign content' });
+    const parsed = validateApprovalRequest({ ...requestFactory(item, mission, NOW), id, summary: 'Foreign content' });
     if (!parsed.ok) throw new Error(parsed.errors.join('; '));
     f.broker.submit(parsed.value);
 
-    expect(() => coordinator(f).tick()).toThrow('MISSION_APPROVAL_REQUEST_CONFLICT');
+    await expect(coordinator(f).tick()).rejects.toThrow('MISSION_APPROVAL_REQUEST_CONFLICT');
     expect(f.store.listItems('m')[0]!.status).toBe('parked');
     expect(f.store.listApprovalBindings()[0]!.publishState).toBe('outbox');
     f.store.close();
@@ -441,14 +457,14 @@ describe('MissionApprovalCoordinator', () => {
     const item = f.store.enqueueItem({ id: 'guarded', missionId: 'm', kind: 'task', policy: 'approval-required' });
     const mission = f.store.getMission('m')!;
     const id = approvalRequestIdForWorkItem(mission, item);
-    const expected = validateApprovalRequest({ ...requestFactory(item, mission), id });
-    const foreign = validateApprovalRequest({ ...requestFactory(item, mission), id, summary: 'Foreign allow target' });
+    const expected = validateApprovalRequest({ ...requestFactory(item, mission, NOW), id });
+    const foreign = validateApprovalRequest({ ...requestFactory(item, mission, NOW), id, summary: 'Foreign allow target' });
     if (!expected.ok || !foreign.ok) throw new Error('fixture invalid');
     f.store.parkItemForApproval(item.id, expected.value);
     f.broker.submit(foreign.value);
     await decide(f, id, 'allow');
 
-    expect(() => coordinator(f).tick()).toThrow('MISSION_APPROVAL_REQUEST_CONFLICT');
+    await expect(coordinator(f).tick()).rejects.toThrow('MISSION_APPROVAL_REQUEST_CONFLICT');
     expect(f.store.listItems('m')[0]!.status).toBe('parked');
     expect(f.store.listApprovalBindings()[0]!.decisionState).toBe('pending');
     f.store.close();
@@ -459,7 +475,7 @@ describe('MissionApprovalCoordinator', () => {
     const item = f.store.enqueueItem({ id: 'guarded', missionId: 'm', kind: 'task', policy: 'approval-required' });
     const mission = f.store.getMission('m')!;
     const id = approvalRequestIdForWorkItem(mission, item);
-    const parsed = validateApprovalRequest({ ...requestFactory(item, mission), id });
+    const parsed = validateApprovalRequest({ ...requestFactory(item, mission, NOW), id });
     if (!parsed.ok) throw new Error(parsed.errors.join('; '));
 
     const first = f.store.parkItemForApproval(item.id, parsed.value)!;

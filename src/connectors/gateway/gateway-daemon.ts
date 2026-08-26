@@ -8,6 +8,9 @@ import { loadGatewayAccess } from './gateway-access.js';
 import { runRuntimeLoop } from './gateway-runtime.js';
 import { getLanguage, getMessage } from '../../cli/helpers/messages.js';
 import { chunkMessage } from '../message-format.js';
+import { approvalLifecycleProfileDigest } from '../../core/approval-lifecycle-policy.js';
+import type { ResolvedConfig } from '../../core/config-types.js';
+import type { GatewayAccess, GatewayPairingRequestScope } from './gateway-access.js';
 
 export interface GatewayListenDeps {
   /** Test seam: construct a connector instead of lazy-loading the real module. */
@@ -18,6 +21,10 @@ export interface GatewayListenDeps {
   waitForever?: () => Promise<void>;
   /** Output sink. */
   print?: (s: string) => void;
+  /** Test/composition seam for one shared disk-backed authority adapter. */
+  loadAccess?: () => Promise<GatewayAccess>;
+  /** Resolve the tenant/project lifecycle snapshot at request creation. */
+  resolvePairingScope?: (chatKey: string, projectPath: string) => Promise<GatewayPairingRequestScope | null>;
 }
 
 export interface GatewayListenOptions {
@@ -48,6 +55,35 @@ async function loadRealConnector(id: 'telegram' | 'discord'): Promise<IMessageCo
   }
 }
 
+/**
+ * Resolve gateway pairing scope from project config. Explicit multi-tenant
+ * channel/authority identity wins; solo projects receive a stable local tenant
+ * namespace. Strict tenant isolation never synthesizes tenant authority.
+ */
+export function resolveGatewayPairingScopeFromConfig(
+  config: ResolvedConfig,
+  chatKey: string,
+  projectPath: string,
+): GatewayPairingRequestScope | null {
+  const lifecycle = config.approval?.lifecycle;
+  if (!lifecycle?.enabled) return null;
+  const channel = config.identity?.channels?.[chatKey];
+  if (channel && channel.projectPath !== projectPath) return null;
+  const tenantId = channel?.tenantId
+    ?? config.approval?.authority?.tenant_id
+    ?? config.identity?.owner?.tenantId
+    ?? (config.strict_tenant_isolation ? null : `project:${projectPath}`);
+  if (!tenantId) return null;
+  const profileDigest = approvalLifecycleProfileDigest('gateway-pairing', lifecycle.profiles['gateway-pairing']);
+  return {
+    tenantId,
+    projectPath,
+    lifecycle,
+    lifecycleGeneration: `gateway-config:${profileDigest}`,
+    sourceReference: `project-config:${projectPath}`,
+  };
+}
+
 /** Bring up the single connector + wire the gateway router. */
 export async function startGatewayListen(opts: GatewayListenOptions): Promise<GatewayHandle> {
   const lang = getLanguage(opts.lang);
@@ -55,7 +91,7 @@ export async function startGatewayListen(opts: GatewayListenOptions): Promise<Ga
 
   const sessions = await loadSessionRegistry();
   const projects = await loadProjectRegistry();
-  const access = await loadGatewayAccess();
+  const access = await (opts.deps?.loadAccess?.() ?? loadGatewayAccess());
   const supervisor = opts.deps?.supervisor ?? makeRuntimeSupervisor();
 
   const connector = opts.deps?.makeConnector
@@ -78,8 +114,15 @@ export async function startGatewayListen(opts: GatewayListenOptions): Promise<Ga
 
   const router = makeGatewayRouter({
     sessions, projects, supervisor, send,
-    isAuthorized: (chatKey, projectPath) => access.isAuthorized(chatKey, projectPath),
-    requestPairing: (chatKey) => access.requestPairing(chatKey),
+    isAuthorized: (chatKey, projectPath) => access.isAuthorizedFresh(chatKey, projectPath),
+    requestPairing: (chatKey, scope) => {
+      if (!scope) return Promise.resolve({ state: 'HOLD', reasonCode: 'invalid-scope' });
+      return access.requestPairing(chatKey, scope);
+    },
+    resolvePairingScope: opts.deps?.resolvePairingScope ?? (async (chatKey, projectPath) => {
+      const { loadConfig } = await import('../../core/config.js');
+      return resolveGatewayPairingScopeFromConfig(await loadConfig(projectPath), chatKey, projectPath);
+    }),
     lang, newId: nextId,
   });
   connector.onMessage(router);

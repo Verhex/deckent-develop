@@ -184,7 +184,12 @@ import {
 import { fromTaskEvaluation } from '../core/verdict-types.js';
 import { resolveAcceptance } from '../core/acceptance-matrix.js';
 import { applyAcceptanceEnforcement, type AcceptanceEnforcementResult } from './acceptance-enforcement.js';
-import { createConfirmationRequest } from '../core/confirmation-store.js';
+import {
+  confirmationContentDigest,
+  createConfirmationRequest,
+  type CreateConfirmationOptions,
+} from '../core/confirmation-store.js';
+import { resolveApprovalLifecyclePolicy } from '../core/approval-lifecycle-policy.js';
 
 // ─── Dependency Cascade / Unblock Wire (Sprint 156 — Task 003) ───
 // applyCascadeToSprint + applyUnblockToSprint were exported from
@@ -920,6 +925,97 @@ export function writeTaskEvaluationAudit(
       decisionRationale: rationale,
     });
   } catch (e) { debugLog('writeTaskEvaluationAudit', e); }
+}
+
+export interface DurableAcceptanceConfirmationInput {
+  readonly projectRoot: string;
+  readonly sprint: Pick<Sprint, 'id' | 'tasks'>;
+  readonly task: Task;
+  readonly result: TaskResult;
+  /** Pre-policy evaluation; retained when the pending write cannot be proven durable. */
+  readonly baselineEvaluation: EvaluationResult;
+  readonly enforcement: AcceptanceEnforcementResult;
+  readonly requestedAt: string;
+  readonly lifecycle?: CreateConfirmationOptions['lifecycle'];
+  readonly createFn?: typeof createConfirmationRequest;
+}
+
+export interface DurableAcceptanceConfirmationResult {
+  readonly enforcement: AcceptanceEnforcementResult;
+  readonly confirmation?: { readonly id: string; readonly created: boolean };
+  readonly writeError?: unknown;
+}
+
+/**
+ * Bind a ROUTE intent to exact attempt/evidence/revision bytes and publish it
+ * before allowing the post-rubric downgrade to become authoritative. A failed
+ * or disabled lifecycle write leaves the original rubric decision untouched.
+ */
+export function persistDurableAcceptanceConfirmation(
+  input: DurableAcceptanceConfirmationInput,
+): DurableAcceptanceConfirmationResult {
+  const pending = input.enforcement.pendingConfirmation;
+  if (!pending) return { enforcement: input.enforcement };
+
+  const attemptId = input.result.workAttribution?.attemptId
+    ?? `result:${confirmationContentDigest({
+      taskId: input.result.taskId,
+      workerId: input.result.workerId,
+      filesChanged: [...input.result.filesChanged].sort(),
+      testsPassed: input.result.testsPassed,
+      selfAssessment: input.result.selfAssessment,
+      notes: input.result.notes,
+    })}`;
+  const tasksById = new Map(input.sprint.tasks.map(candidate => [candidate.id, candidate]));
+  const generation = resolveFixAttemptDepth(input.task, tasksById) + 1;
+  const identity = {
+    attemptId,
+    generation,
+    sourceDigest: confirmationContentDigest(pending),
+    evidenceDigest: confirmationContentDigest({
+      evidenceRequirements: [...pending.evidenceRequirements].sort(),
+      workAttribution: input.result.workAttribution,
+      filesChanged: [...input.result.filesChanged].sort(),
+      testCommands: input.result.testCommands ?? [],
+      testsPassed: input.result.testsPassed,
+      coverage: input.result.coverage,
+      selfAssessment: input.result.selfAssessment,
+    }),
+    revisionDigest: confirmationContentDigest({
+      taskId: input.task.id,
+      title: input.task.title,
+      description: input.task.description,
+      scope: input.task.scope,
+      dependencies: [...input.task.dependencies].sort(),
+      goNogo: input.task.goNogo,
+      fixForTaskId: input.task.fixForTaskId,
+    }),
+  };
+  try {
+    const confirmation = (input.createFn ?? createConfirmationRequest)(input.projectRoot, {
+      ...pending,
+      identity,
+      requestedAt: input.requestedAt,
+    }, {
+      identity,
+      // Passing the resolved default explicitly is the fail-closed gate: an
+      // absent/disabled config cannot mint a governed pending record.
+      lifecycle: input.lifecycle ?? resolveApprovalLifecyclePolicy(),
+      clock: () => new Date(input.requestedAt),
+    });
+    return { enforcement: input.enforcement, confirmation };
+  } catch (writeError) {
+    const { postRubricCause: _discardedCause, ...unenforced } = input.enforcement;
+    void _discardedCause;
+    return {
+      enforcement: {
+        ...unenforced,
+        evaluation: input.baselineEvaluation,
+        enforced: false,
+      },
+      writeError,
+    };
+  }
 }
 
 /** Write error dashboard state — mirrors sprint-controller's private helper */
@@ -1899,21 +1995,29 @@ export async function runEvaluatePhase(
         // policy-adjustable, so that authority skips the layer entirely.
         let acceptanceEnforcement: AcceptanceEnforcementResult | undefined;
         if (!runtimeBudgetAuthority) {
+          const baselineEvaluation = rubricResult;
           acceptanceEnforcement = applyAcceptanceEnforcement(
             rubricResult, task, result, sprint.id, config);
+          const durable = persistDurableAcceptanceConfirmation({
+            projectRoot,
+            sprint,
+            task,
+            result,
+            baselineEvaluation,
+            enforcement: acceptanceEnforcement,
+            requestedAt: now(),
+            lifecycle: config?.approval?.lifecycle,
+          });
+          acceptanceEnforcement = durable.enforcement;
           rubricResult = acceptanceEnforcement.evaluation;
           if (acceptanceEnforcement.postRubricCause) {
             postRubricCauses.push(acceptanceEnforcement.postRubricCause);
           }
-          if (acceptanceEnforcement.pendingConfirmation) {
-            try {
-              const created = createConfirmationRequest(projectRoot, {
-                ...acceptanceEnforcement.pendingConfirmation,
-                requestedAt: now(),
-              });
-              debugLog('acceptance-enforcement',
-                `task=${task.id} confirmation ${created.id} ${created.created ? 'created' : 'already-known'} (adapter=${acceptanceEnforcement.outcome.adapter})`);
-            } catch (e) { debugLog('acceptance-enforcement:persist', e); }
+          if (durable.confirmation) {
+            debugLog('acceptance-enforcement',
+              `task=${task.id} confirmation ${durable.confirmation.id} ${durable.confirmation.created ? 'created' : 'already-known'} (adapter=${acceptanceEnforcement.outcome.adapter})`);
+          } else if (durable.writeError) {
+            debugLog('acceptance-enforcement:persist', durable.writeError);
           }
         }
         let evaluation = runtimeBudgetAuthority

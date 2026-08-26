@@ -10,11 +10,12 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DECKENT_DIR, NERVOUS_PENDING_FILE, autonomousPendingPath } from './constants.js';
 import { ApprovalStore } from './approval-store.js';
+import { mapLegacyApprovalRisk, maxApprovalRiskTier } from './approval-lifecycle-policy.js';
 import { readCanonicalRunStatus } from './run-status-authority.js';
 
 export interface PendingApproval {
   /** Which gate parked this approval. */
-  kind: 'nervous' | 'autonomous' | 'recovery';
+  kind: 'nervous' | 'autonomous' | 'recovery' | 'runtime';
   /** Stable id used by the accept/reject command. */
   id: string;
   /** Human-readable title for display. */
@@ -23,6 +24,9 @@ export interface PendingApproval {
   acceptCommand: string;
   /** The exact command an operator runs to reject. */
   rejectCommand: string;
+  expiresAt?: string;
+  riskTier?: 'routine' | 'elevated' | 'critical';
+  lifecycleStage?: 'initial' | 'renotify' | 'alternate-channel' | 'park-alert';
 }
 
 /** Read parked nervous approvals from `.deckent/nervous/nervous-pending.json`
@@ -108,6 +112,29 @@ function readRecovery(projectRoot: string): PendingApproval[] {
   }];
 }
 
+/** Runtime broker projection after an expiry sweep. Every projected row has a
+ * finite effective expiry; corrupt rows stay visible through the dedicated
+ * approvals quarantine view and are never misrepresented as actionable. */
+function readRuntime(projectRoot: string, now: Date): PendingApproval[] {
+  const storeDir = join(projectRoot, DECKENT_DIR, 'approvals');
+  if (!existsSync(storeDir)) return [];
+  const store = new ApprovalStore(projectRoot, { storeDir, clock: () => now });
+  store.sweepExpired(now);
+  return store.load().pending.map(({ request, lifecycle }) => ({
+    kind: 'runtime' as const,
+    id: request.id,
+    title: request.summary,
+    acceptCommand: `deckent approvals decide ${request.id} allow`,
+    rejectCommand: `deckent approvals decide ${request.id} deny`,
+    expiresAt: lifecycle?.effectiveExpiresAt ?? request.expiresAt,
+    riskTier: lifecycle?.riskTier
+      ?? maxApprovalRiskTier('routine', mapLegacyApprovalRisk(request.risk)),
+    lifecycleStage: request.version === '2.0' && request.slaStage !== 'expired'
+      ? request.slaStage
+      : 'initial',
+  }));
+}
+
 // ─── Runtime-wide sweep hook (EXPIRE-SWEEP wiring) ───────────────────────────
 // `readPendingApprovals` is the acknowledged single source of truth every
 // pending-approval surface (`deckent status`, `status --follow`, the dashboard,
@@ -164,8 +191,14 @@ export function sweepRuntimeApprovals(
  * dashboard, MCP) shows the SAME unified list with the correct per-kind command.
  */
 export function readPendingApprovals(projectRoot: string): PendingApproval[] {
+  const now = new Date();
   sweepRuntimeApprovals(projectRoot);
-  return [...readNervous(projectRoot), ...readAutonomous(projectRoot), ...readRecovery(projectRoot)];
+  return [
+    ...readNervous(projectRoot),
+    ...readAutonomous(projectRoot),
+    ...readRecovery(projectRoot),
+    ...readRuntime(projectRoot, now),
+  ];
 }
 
 // ─── Write-side lifecycle (W0-TRUTH, #491) ───────────────────────────────────

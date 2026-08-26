@@ -19,7 +19,10 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { listPendingConfirmations } from './confirmation-store.js';
+import { listPendingConfirmationsReadOnly } from './confirmation-store.js';
+import { parseGatewayPairingStore } from '../connectors/gateway/gateway-access.js';
+import { migrateApprovalLifecycleRecord } from './approval-lifecycle-migration.js';
+import { resolveApprovalLifecyclePolicy } from './approval-lifecycle-policy.js';
 
 /** Typed origin classes for federated rows (design §3.1 vocabulary subset). */
 export type FederatedOrigin =
@@ -39,6 +42,19 @@ export interface FederatedPendingItem {
   /** i18n key of the decision-command hint for this surface. */
   readonly decideHintKey: string;
   readonly requestedAt?: string;
+  readonly expiresAt?: string;
+  readonly tenantId?: string;
+  readonly projectPath?: string;
+  readonly riskTier?: 'routine' | 'elevated' | 'critical';
+  readonly lifecycleStage?: 'initial' | 'renotify' | 'alternate-channel' | 'park-alert' | 'expired';
+  readonly lifecycleGeneration?: string;
+  readonly policySnapshotDigest?: string;
+  readonly sourceRequestDigest?: string;
+  readonly sourceContractVersion?: '1.0' | '2.0';
+  readonly sourceSchema?: string;
+  readonly sourceReference?: string;
+  readonly quarantined?: boolean;
+  readonly lifecycleReasonCode?: string;
   /** Typed read fault — the row is a visibility marker, not a decidable item. */
   readonly unreadable?: boolean;
 }
@@ -53,18 +69,36 @@ function readJsonArray(path: string): { rows: unknown[]; fault: boolean } {
   }
 }
 
+function readJsonValue(path: string): { value: unknown; fault: boolean } {
+  if (!existsSync(path)) return { value: undefined, fault: false };
+  try {
+    return { value: JSON.parse(readFileSync(path, 'utf-8')) as unknown, fault: false };
+  } catch {
+    return { value: undefined, fault: true };
+  }
+}
+
 function faultRow(origin: FederatedOrigin, id: string, decideHintKey: string): FederatedPendingItem {
   return { origin, id, summary: 'unreadable store', decideHintKey, unreadable: true };
 }
 
 function confirmationRows(projectRoot: string): FederatedPendingItem[] {
   try {
-    return listPendingConfirmations(projectRoot).map(request => ({
+    return listPendingConfirmationsReadOnly(projectRoot).map(request => ({
       origin: 'confirmation' as const,
       id: request.id,
       summary: `${request.adapter} · ${request.kind}·${request.verdict} · task ${request.taskId} — ${request.statements[0] ?? '-'}`,
       decideHintKey: 'approvals.federated.hint_confirmation',
       requestedAt: request.requestedAt,
+      expiresAt: request.expiresAt,
+      tenantId: request.approval.tenantId,
+      riskTier: request.approval.riskTier,
+      lifecycleStage: request.approval.slaStage,
+      lifecycleGeneration: request.approval.lifecycleGeneration,
+      policySnapshotDigest: request.approval.policySnapshotDigest,
+      sourceRequestDigest: request.approval.source.requestDigest,
+      sourceContractVersion: request.approval.source.contractVersion,
+      sourceReference: request.approval.source.reference,
     }));
   } catch {
     return [faultRow('confirmation', 'confirmations-store', 'approvals.federated.hint_confirmation')];
@@ -74,15 +108,87 @@ function confirmationRows(projectRoot: string): FederatedPendingItem[] {
 function autonomousRows(projectRoot: string): FederatedPendingItem[] {
   const path = join(projectRoot, '.deckent', 'autonomous', 'pending.json');
   const { rows, fault } = readJsonArray(path);
-  const items: FederatedPendingItem[] = rows.flatMap(entry => {
-    const record = entry as { triggerId?: string; action?: string; requestedBy?: string; enqueuedAt?: string };
+  const lifecyclePolicy = resolveApprovalLifecyclePolicy({ enabled: true });
+  const observedAt = Date.now();
+  const items = rows.flatMap<FederatedPendingItem>(entry => {
+    const record = entry as {
+      triggerId?: string;
+      action?: string;
+      requestedBy?: string;
+      enqueuedAt?: string;
+      tenantId?: string;
+      risk?: 'none' | 'low' | 'medium' | 'high' | 'critical';
+      lifecycle?: {
+        state?: string;
+        expiresAt?: string;
+        riskTier?: 'routine' | 'elevated' | 'critical';
+        slaStage?: 'initial' | 'renotify' | 'alternate-channel' | 'park-alert' | 'expired';
+        lifecycleGeneration?: string;
+        policySnapshotDigest?: string;
+        sourceReference?: string;
+        sourceDigest?: string;
+      };
+    };
     if (typeof record?.triggerId !== 'string') return [];
+    const persisted = record.lifecycle;
+    const lifecycle = persisted?.state === 'migrated'
+      && typeof persisted.expiresAt === 'string'
+      && Number.isFinite(Date.parse(persisted.expiresAt))
+      && typeof persisted.lifecycleGeneration === 'string'
+      && typeof persisted.policySnapshotDigest === 'string'
+      && typeof persisted.sourceReference === 'string'
+      && typeof persisted.sourceDigest === 'string'
+      && ['routine', 'elevated', 'critical'].includes(String(persisted.riskTier))
+      && ['initial', 'renotify', 'alternate-channel', 'park-alert', 'expired'].includes(String(persisted.slaStage))
+      ? {
+          state: 'migrated' as const,
+          expiresAt: persisted.expiresAt,
+          riskTier: persisted.riskTier!,
+          slaStage: persisted.slaStage!,
+          lifecycleGeneration: persisted.lifecycleGeneration,
+          policySnapshotDigest: persisted.policySnapshotDigest,
+          sourceReference: persisted.sourceReference,
+          sourceDigest: persisted.sourceDigest,
+        }
+      : migrateApprovalLifecycleRecord({
+          origin: 'autonomous-trigger',
+          tenantId: record.tenantId ?? 'local',
+          sourceReference: `autonomous-pending:${record.tenantId ?? 'local'}:${record.triggerId}`,
+          sourceRecord: entry,
+          sourceTimestamp: record.enqueuedAt,
+          producerRisk: record.risk,
+          policy: lifecyclePolicy,
+        });
+    if (lifecycle.state === 'quarantined') {
+      return [{
+        origin: 'autonomous-trigger' as const,
+        id: record.triggerId,
+        summary: `${record.action ?? '?'} (by ${record.requestedBy ?? '?'})`,
+        decideHintKey: 'approvals.federated.hint_autonomous',
+        ...(record.enqueuedAt ? { requestedAt: record.enqueuedAt } : {}),
+        tenantId: record.tenantId ?? 'local',
+        quarantined: true,
+        lifecycleReasonCode: lifecycle.reasonCode,
+        sourceReference: lifecycle.sourceReference,
+      }];
+    }
+    if (observedAt >= Date.parse(lifecycle.expiresAt)) return [];
     return [{
       origin: 'autonomous-trigger' as const,
       id: record.triggerId,
       summary: `${record.action ?? '?'} (by ${record.requestedBy ?? '?'})`,
       decideHintKey: 'approvals.federated.hint_autonomous',
       ...(record.enqueuedAt ? { requestedAt: record.enqueuedAt } : {}),
+      expiresAt: lifecycle.expiresAt,
+      tenantId: record.tenantId ?? 'local',
+      riskTier: lifecycle.riskTier,
+      lifecycleStage: lifecycle.slaStage,
+      lifecycleGeneration: lifecycle.lifecycleGeneration,
+      policySnapshotDigest: lifecycle.policySnapshotDigest,
+      sourceRequestDigest: lifecycle.sourceDigest,
+      sourceContractVersion: '1.0',
+      sourceSchema: 'autonomous-pending/1',
+      sourceReference: lifecycle.sourceReference,
     }];
   });
   if (fault) items.push(faultRow('autonomous-trigger', 'pending.json', 'approvals.federated.hint_autonomous'));
@@ -184,19 +290,42 @@ function botActionRows(projectRoot: string): FederatedPendingItem[] {
 
 function pairingRows(gatewayHomeDir: string | undefined): FederatedPendingItem[] {
   if (!gatewayHomeDir) return [];
-  const { rows, fault } = readJsonArray(join(gatewayHomeDir, 'pairings.json'));
-  const items: FederatedPendingItem[] = rows.flatMap(entry => {
-    const record = entry as { code?: string; chatKey?: string; requestedAt?: string };
-    if (typeof record?.code !== 'string') return [];
-    return [{
+  const { value, fault: readFault } = readJsonValue(join(gatewayHomeDir, 'pairings.json'));
+  if (value === undefined && !readFault) return [];
+  const parsed = parseGatewayPairingStore(value);
+  const now = Date.now();
+  const items: FederatedPendingItem[] = parsed.records
+    .filter(record => record.state === 'PENDING' && now < Date.parse(record.expiresAt))
+    .map(record => ({
       origin: 'gateway-pairing' as const,
-      id: record.code,
-      summary: `chat ${record.chatKey ?? '?'}`,
+      id: record.pairingId,
+      summary: `chat ${record.chatKey}`,
+      decideHintKey: 'approvals.federated.hint_pairing',
+      requestedAt: record.createdAt,
+      expiresAt: record.expiresAt,
+      tenantId: record.tenantId,
+      projectPath: record.projectPath,
+      riskTier: record.riskTier,
+      lifecycleStage: record.slaStage,
+      lifecycleGeneration: record.lifecycleGeneration,
+      policySnapshotDigest: record.policySnapshotDigest,
+      sourceRequestDigest: record.source.requestDigest,
+      sourceContractVersion: '1.0',
+      sourceSchema: record.source.contractVersion,
+      sourceReference: record.source.reference,
+    }));
+  for (const record of parsed.legacy) {
+    items.push({
+      origin: 'gateway-pairing',
+      id: record.pairingId,
+      summary: `chat ${record.chatKey}`,
       decideHintKey: 'approvals.federated.hint_pairing',
       ...(record.requestedAt ? { requestedAt: record.requestedAt } : {}),
-    }];
-  });
-  if (fault) items.push(faultRow('gateway-pairing', 'pairings.json', 'approvals.federated.hint_pairing'));
+      quarantined: true,
+      lifecycleReasonCode: record.reasonCode,
+    });
+  }
+  if (readFault || parsed.fault) items.push(faultRow('gateway-pairing', 'pairings.json', 'approvals.federated.hint_pairing'));
   return items;
 }
 

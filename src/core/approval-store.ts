@@ -41,15 +41,31 @@ import {
 import { join } from 'node:path';
 import { z } from 'zod';
 import { DECKENT_DIR } from './constants.js';
-import { createJsonFileFirstWriterWins } from './approval-file-cas.js';
 import {
+  createJsonFileFirstWriterWins,
+  createPrivateJsonFileFirstWriterWins,
+  type ApprovalFileAclHold,
+  type ApprovalFileAclOptions,
+} from './approval-file-cas.js';
+import {
+  APPROVAL_CONTRACT_V2_VERSION,
   approvalDecisionSchema,
   approvalTombstoneSchema,
   validateStoredApprovalRequest,
   validateStoredApprovalDecision,
   type ApprovalRequest,
+  type ApprovalRequestV2,
   type ApprovalDecision,
 } from './approval-contract.js';
+import type { ResolvedApprovalLifecycleConfig, ResolvedApprovalLifecycleProfile } from './config-types.js';
+import {
+  DEFAULT_APPROVAL_LIFECYCLE_POLICY,
+  applyApprovalLifecycleProfileTransition,
+  approvalLifecycleProfileDigest,
+  mapLegacyApprovalRisk,
+  maxApprovalRiskTier,
+  resolveApprovalTimeout,
+} from './approval-lifecycle-policy.js';
 
 // ─── Input types (derived from the contract — never redeclared) ─────────────
 
@@ -73,6 +89,19 @@ export interface ApprovalStoreEntry {
    *  entry — every `approved`/`denied` entry, and a swept `expired` entry,
    *  always carries its decision. */
   readonly decision: ApprovalDecision | null;
+  readonly lifecycle?: ApprovalAppliedLifecycleView;
+}
+
+export interface ApprovalAppliedLifecycleView {
+  readonly origin: 'confirmation' | 'autonomous-trigger' | 'gateway-pairing' | 'broker-native';
+  readonly lifecycleGeneration: string;
+  readonly effectiveExpiresAt: string;
+  readonly riskTier: 'routine' | 'elevated' | 'critical';
+  readonly authoredPolicyDigest: string;
+  readonly appliedPolicyDigest: string;
+  readonly appliedProfile: ResolvedApprovalLifecycleProfile;
+  readonly policyTransitionChanged: boolean;
+  readonly weakeningIgnored: boolean;
 }
 
 export interface ApprovalStoreSnapshot {
@@ -80,10 +109,57 @@ export interface ApprovalStoreSnapshot {
   approved: ApprovalStoreEntry[];
   denied: ApprovalStoreEntry[];
   expired: ApprovalStoreEntry[];
+  quarantined: ApprovalStoreQuarantineEntry[];
 }
 
 function emptySnapshot(): ApprovalStoreSnapshot {
-  return { pending: [], approved: [], denied: [], expired: [] };
+  return { pending: [], approved: [], denied: [], expired: [], quarantined: [] };
+}
+
+export interface ApprovalStoreQuarantineEntry {
+  readonly file: string;
+  readonly sourceReference: string;
+  readonly reasonCode: 'unreadable-json' | 'invalid-request-contract' | 'filename-id-mismatch';
+}
+
+export interface ApprovalTimeoutReceipt {
+  readonly schemaVersion: 1;
+  readonly requestId: string;
+  readonly tenantId: string;
+  readonly scopeId: string;
+  readonly sourceReference: string;
+  readonly origin: 'confirmation' | 'autonomous-trigger' | 'gateway-pairing' | 'broker-native';
+  readonly lifecycleGeneration: string;
+  readonly actor: 'system:expiry';
+  readonly kind: 'timeout-disposition';
+  readonly action: 'park' | 'deny' | 'proceed-warn';
+  readonly terminalState: 'UNDECIDABLE' | 'EXPIRED';
+  readonly riskTier: 'routine' | 'elevated' | 'critical';
+  readonly expiresAt: string;
+  readonly decidedAt: string;
+  readonly authoredPolicyDigest: string;
+  readonly appliedPolicyDigest: string;
+  readonly replayAllowed: false;
+  readonly accessGrantAllowed: false;
+}
+
+export interface ApprovalTimeoutSettlement {
+  readonly decision: ApprovalDecision;
+  readonly receipt: ApprovalTimeoutReceipt;
+}
+
+export interface ApprovalPolicyTransitionReceipt {
+  readonly schemaVersion: 1;
+  readonly requestId: string;
+  readonly origin: ApprovalAppliedLifecycleView['origin'];
+  readonly lifecycleGeneration: string;
+  readonly kind: 'policy-transition';
+  readonly observedAt: string;
+  readonly authoredPolicyDigest: string;
+  readonly appliedPolicyDigest: string;
+  readonly transitionChanged: boolean;
+  readonly weakeningIgnored: boolean;
+  readonly appliedProfile: ResolvedApprovalLifecycleProfile;
 }
 
 // ─── Errors ───────────────────────────────────────────────────────────────────
@@ -93,7 +169,9 @@ export type ApprovalStoreErrorCode =
   | 'APR_STORE_ALREADY_TERMINAL'
   | 'APR_STORE_INVALID_DECISION'
   | 'APR_STORE_CATEGORY_MISMATCH'
-  | 'APR_STORE_RETIREMENT_CONFLICT';
+  | 'APR_STORE_RETIREMENT_CONFLICT'
+  | 'APR_STORE_EXPIRED'
+  | 'APR_STORE_LIFECYCLE_DISABLED';
 
 export class ApprovalStoreError extends Error {
   constructor(
@@ -113,6 +191,10 @@ export interface ApprovalStoreOptions {
    *  approvals`. Tests MUST override with a hermetic tmpdir — never point
    *  this at a real project's `.deckent`. */
   storeDir?: string;
+  /** Current policy is admission/tightening authority; absent is fail-closed. */
+  lifecycle?: ResolvedApprovalLifecycleConfig;
+  clock?: () => Date;
+  privateFileAcl?: ApprovalFileAclOptions;
 }
 
 // ─── Disk scan (pure — no instance state) ────────────────────────────────────
@@ -136,12 +218,43 @@ function categorize(request: ApprovalRequest, decision: ApprovalDecision | null,
   return decision.decision === 'allow' ? 'approved' : 'denied';
 }
 
+function appliedLifecycleView(
+  request: ApprovalRequest,
+  currentPolicy: ResolvedApprovalLifecycleConfig,
+): ApprovalAppliedLifecycleView | undefined {
+  if (request.version !== APPROVAL_CONTRACT_V2_VERSION) return undefined;
+  const transition = applyApprovalLifecycleProfileTransition(
+    request.lifecycleProfile,
+    currentPolicy.profiles[request.origin],
+  );
+  const profile = transition.profile;
+  const effectiveExpiresAt = new Date(Math.min(
+    Date.parse(request.expiresAt),
+    Date.parse(request.createdAt) + profile.ttlMs,
+  )).toISOString();
+  return {
+    origin: request.origin,
+    lifecycleGeneration: request.lifecycleGeneration,
+    effectiveExpiresAt,
+    riskTier: maxApprovalRiskTier(request.riskTier, profile.riskTier),
+    authoredPolicyDigest: request.policySnapshotDigest,
+    appliedPolicyDigest: approvalLifecycleProfileDigest(request.origin, profile),
+    appliedProfile: profile,
+    policyTransitionChanged: transition.transitionChanged,
+    weakeningIgnored: transition.weakeningIgnored,
+  };
+}
+
 /** Full disk scan of `dir` into a categorized snapshot. Malformed/torn/
  *  contract-invalid files are silently skipped (never thrown) — same
  *  tolerance policy as the broker's poll seam. A decision file whose
  *  `requestId` has no matching request file is skipped too (nothing to
  *  attach it to). */
-function scanStoreDir(dir: string, now: Date): ApprovalStoreSnapshot {
+function scanStoreDir(
+  dir: string,
+  now: Date,
+  lifecycle: ResolvedApprovalLifecycleConfig = DEFAULT_APPROVAL_LIFECYCLE_POLICY as ResolvedApprovalLifecycleConfig,
+): ApprovalStoreSnapshot {
   const snapshot = emptySnapshot();
   if (!existsSync(dir)) return snapshot;
 
@@ -169,11 +282,20 @@ function scanStoreDir(dir: string, now: Date): ApprovalStoreSnapshot {
   for (const file of files) {
     if (file.endsWith('.request.json')) {
       const parsed = readJson(join(dir, file));
-      if (parsed === undefined) continue;
+      if (parsed === undefined) {
+        snapshot.quarantined.push({ file, sourceReference: `approval-file:${file}`, reasonCode: 'unreadable-json' });
+        continue;
+      }
       const result = validateStoredApprovalRequest(parsed);
-      if (result.ok
-        && file === `${result.value.id}.request.json`
-        && !retiredIds.has(result.value.id)) requestsById.set(result.value.id, result.value);
+      if (!result.ok) {
+        snapshot.quarantined.push({ file, sourceReference: `approval-file:${file}`, reasonCode: 'invalid-request-contract' });
+        continue;
+      }
+      if (file !== `${result.value.id}.request.json`) {
+        snapshot.quarantined.push({ file, sourceReference: `approval-file:${file}`, reasonCode: 'filename-id-mismatch' });
+        continue;
+      }
+      if (!retiredIds.has(result.value.id)) requestsById.set(result.value.id, result.value);
     } else if (file.endsWith('.decision.json')) {
       const parsed = readJson(join(dir, file));
       if (parsed === undefined) continue;
@@ -187,9 +309,83 @@ function scanStoreDir(dir: string, now: Date): ApprovalStoreSnapshot {
   const nowMs = now.getTime();
   for (const [id, request] of requestsById) {
     const decision = decisionsById.get(id) ?? null;
-    snapshot[categorize(request, decision, nowMs)].push({ request, decision });
+    const applied = appliedLifecycleView(request, lifecycle);
+    const category = decision === null && applied !== undefined
+      ? Date.parse(applied.effectiveExpiresAt) <= nowMs ? 'expired' : 'pending'
+      : categorize(request, decision, nowMs);
+    snapshot[category].push({ request, decision, ...(applied ? { lifecycle: applied } : {}) });
   }
   return snapshot;
+}
+
+/** Shared broker/store timeout constructor: identical input yields identical receipt bytes. */
+export function buildApprovalTimeoutSettlement(
+  request: ApprovalRequest,
+  now: Date,
+  lifecycle: ResolvedApprovalLifecycleConfig = DEFAULT_APPROVAL_LIFECYCLE_POLICY as ResolvedApprovalLifecycleConfig,
+): ApprovalTimeoutSettlement {
+  const applied = appliedLifecycleView(request, lifecycle);
+  const origin = applied?.origin ?? 'broker-native';
+  const profile = applied?.appliedProfile ?? lifecycle.profiles['broker-native'];
+  const riskTier = applied?.riskTier
+    ?? maxApprovalRiskTier(profile.riskTier, mapLegacyApprovalRisk(request.risk));
+  const requestKind = typeof request.details['kind'] === 'string' ? request.details['kind'] : undefined;
+  const timeout = resolveApprovalTimeout({
+    origin,
+    profile,
+    riskTier,
+    requestDefaultAction: request.defaultAction,
+    requestKind,
+  });
+  const decisionValue = timeout.action === 'proceed-warn'
+    ? 'allow'
+    : timeout.action === 'deny'
+      ? 'deny'
+      : 'defer';
+  const decidedAt = now.toISOString();
+  const validated = validateStoredApprovalDecision({
+    requestId: request.id,
+    decision: decisionValue,
+    decidedBy: 'system:expiry',
+    channel: 'ttl-expire',
+    decidedAt,
+    closureReason: 'expired',
+  });
+  if (!validated.ok) {
+    throw new ApprovalStoreError(
+      `invalid timeout decision: ${validated.errors.join('; ')}`,
+      'APR_STORE_INVALID_DECISION',
+    );
+  }
+  const authoredPolicyDigest = applied?.authoredPolicyDigest
+    ?? approvalLifecycleProfileDigest('broker-native', profile);
+  const appliedPolicyDigest = applied?.appliedPolicyDigest
+    ?? approvalLifecycleProfileDigest('broker-native', profile);
+  return {
+    decision: validated.value,
+    receipt: {
+      schemaVersion: 1,
+      requestId: request.id,
+      tenantId: request.tenantId,
+      scopeId: request.scopeId,
+      sourceReference: request.version === APPROVAL_CONTRACT_V2_VERSION
+        ? request.source.reference
+        : `approval-request:${request.id}`,
+      origin,
+      lifecycleGeneration: applied?.lifecycleGeneration ?? 'legacy-v1',
+      actor: 'system:expiry',
+      kind: 'timeout-disposition',
+      action: timeout.action,
+      terminalState: timeout.terminalState,
+      riskTier,
+      expiresAt: applied?.effectiveExpiresAt ?? request.expiresAt,
+      decidedAt,
+      authoredPolicyDigest,
+      appliedPolicyDigest,
+      replayAllowed: false,
+      accessGrantAllowed: false,
+    },
+  };
 }
 
 /** Reject a `transition()` whose caller-asserted target category contradicts
@@ -232,12 +428,20 @@ function assertCategoryConsistency(to: ApprovalStoreTerminalCategory, decision: 
  */
 export class ApprovalStore {
   private readonly storeDir: string;
+  private readonly lifecycle: ResolvedApprovalLifecycleConfig;
+  private readonly clock: () => Date;
+  private readonly privateFileAcl: ApprovalFileAclOptions;
   private snapshot: ApprovalStoreSnapshot = emptySnapshot();
 
   constructor(projectRoot: string, opts: ApprovalStoreOptions = {}) {
     this.storeDir = opts.storeDir ?? join(projectRoot, DECKENT_DIR, 'approvals');
-    this.ensureStoreDir();
-    this.index();
+    this.lifecycle = opts.lifecycle
+      ?? (DEFAULT_APPROVAL_LIFECYCLE_POLICY as ResolvedApprovalLifecycleConfig);
+    this.clock = opts.clock ?? (() => new Date());
+    this.privateFileAcl = opts.privateFileAcl ?? {};
+    // Reads never create an empty authority directory. The first durable write
+    // creates it with private permissions through the CAS adapter.
+    this.index(this.clock());
   }
 
   private ensureStoreDir(): void {
@@ -258,6 +462,14 @@ export class ApprovalStore {
     return join(this.storeDir, `${id}.tombstone.json`);
   }
 
+  private timeoutReceiptFilePath(id: string): string {
+    return join(this.storeDir, `${id}.timeout.json`);
+  }
+
+  private policyTransitionReceiptFilePath(id: string, appliedPolicyDigest: string): string {
+    return join(this.storeDir, `${id}.${appliedPolicyDigest}.policy-transition.json`);
+  }
+
   // ─── load / index (restart-survive) ────────────────────────────────────
 
   /** Pure, one-shot disk scan — no instance required. Use this from a
@@ -274,7 +486,7 @@ export class ApprovalStore {
    *  re-sync after an external writer (a live broker, another `ApprovalStore`
    *  instance, a `deckent approve` CLI invocation) touched the directory. */
   index(now: Date = new Date()): ApprovalStoreSnapshot {
-    this.snapshot = scanStoreDir(this.storeDir, now);
+    this.snapshot = scanStoreDir(this.storeDir, now, this.lifecycle);
     return this.snapshot;
   }
 
@@ -282,6 +494,39 @@ export class ApprovalStore {
    *  constructor already ran one). */
   load(): ApprovalStoreSnapshot {
     return this.snapshot;
+  }
+
+  /**
+   * Author a governed v2 request. Gate-off blocks new pending records but does
+   * not affect compatibility reads or expiry draining of existing records.
+   */
+  async createLifecycleRequest(
+    request: ApprovalRequestV2,
+  ): Promise<ApprovalRequestV2 | ApprovalFileAclHold> {
+    if (!this.lifecycle.enabled) {
+      throw new ApprovalStoreError(
+        'approval lifecycle is disabled; new governed pending records are blocked',
+        'APR_STORE_LIFECYCLE_DISABLED',
+      );
+    }
+    const validated = validateStoredApprovalRequest(request);
+    if (!validated.ok || validated.value.version !== APPROVAL_CONTRACT_V2_VERSION) {
+      throw new ApprovalStoreError(
+        `invalid lifecycle request: ${validated.ok ? 'v2 required' : validated.errors.join('; ')}`,
+        'APR_STORE_INVALID_DECISION',
+      );
+    }
+    const published = await createPrivateJsonFileFirstWriterWins(
+      this.requestFilePath(request.id),
+      request,
+      this.privateFileAcl,
+    );
+    if (published.state === 'HOLD') return published;
+    if (!published.created) {
+      throw new ApprovalStoreError(`request already exists: ${request.id}`, 'APR_STORE_ALREADY_TERMINAL');
+    }
+    this.index(this.clock());
+    return request;
   }
 
   private findEntry(id: string): { category: ApprovalStoreCategory; entry: ApprovalStoreEntry } | undefined {
@@ -304,12 +549,18 @@ export class ApprovalStore {
    * decision whose actual category contradicts `to`.
    */
   transition(id: string, to: ApprovalStoreTerminalCategory, input: ApprovalDecisionInput): ApprovalDecision {
+    const now = this.clock();
+    this.index(now);
     const found = this.findEntry(id);
     if (!found) {
       throw new ApprovalStoreError(`no request found for id: ${id}`, 'APR_STORE_UNKNOWN_ID');
     }
     if (found.entry.decision) {
       throw new ApprovalStoreError(`request already decided: ${id}`, 'APR_STORE_ALREADY_TERMINAL');
+    }
+    if (found.category === 'expired') {
+      this.sweepExpired(now);
+      throw new ApprovalStoreError(`request already expired: ${id}`, 'APR_STORE_EXPIRED');
     }
 
     const result = validateStoredApprovalDecision({ ...input, requestId: id });
@@ -319,6 +570,7 @@ export class ApprovalStore {
     const decision = result.value;
     assertCategoryConsistency(to, decision);
 
+    this.ensureStoreDir();
     if (!createJsonFileFirstWriterWins(this.decisionFilePath(id), decision)) {
       this.index();
       throw new ApprovalStoreError(`request already decided: ${id}`, 'APR_STORE_ALREADY_TERMINAL');
@@ -372,29 +624,100 @@ export class ApprovalStore {
     const swept: string[] = [];
     let attempted = false;
     for (const entry of this.snapshot.expired) {
-      if (entry.decision) continue; // already swept/decided — idempotent skip
       const id = entry.request.id;
-      const result = validateStoredApprovalDecision({
-        requestId: id,
-        decision: entry.request.defaultAction,
-        decidedBy: 'system',
-        channel: 'ttl-expire',
-        decidedAt: now.toISOString(),
-        closureReason: 'expired',
-      });
-      // Built from already-validated request fields — cannot fail; fail-safe skip.
-      if (!result.ok) continue;
+      if (entry.decision) {
+        if (entry.decision.channel === 'ttl-expire') {
+          const settled = buildApprovalTimeoutSettlement(
+            entry.request,
+            new Date(entry.decision.decidedAt),
+            this.lifecycle,
+          );
+          this.ensureStoreDir();
+          createJsonFileFirstWriterWins(this.timeoutReceiptFilePath(id), settled.receipt);
+        }
+        continue;
+      }
+      const settled = buildApprovalTimeoutSettlement(entry.request, now, this.lifecycle);
       attempted = true;
-      if (createJsonFileFirstWriterWins(this.decisionFilePath(id), result.value)) {
+      this.ensureStoreDir();
+      if (createJsonFileFirstWriterWins(this.decisionFilePath(id), settled.decision)) {
         if (existsSync(this.tombstoneFilePath(id))) {
           try { unlinkSync(this.decisionFilePath(id)); } catch { /* prune may have won cleanup */ }
           continue;
         }
+        createJsonFileFirstWriterWins(this.timeoutReceiptFilePath(id), settled.receipt);
         swept.push(id);
       }
     }
     if (attempted) this.index(now);
     return swept;
+  }
+
+  /** Read a durable typed timeout receipt without changing store state. */
+  getTimeoutReceipt(id: string): ApprovalTimeoutReceipt | null {
+    const raw = readJson(this.timeoutReceiptFilePath(id));
+    if (raw === undefined || raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    const value = raw as Partial<ApprovalTimeoutReceipt>;
+    if (value.schemaVersion !== 1
+      || value.requestId !== id
+      || typeof value.tenantId !== 'string'
+      || typeof value.scopeId !== 'string'
+      || typeof value.sourceReference !== 'string'
+      || value.actor !== 'system:expiry'
+      || value.kind !== 'timeout-disposition'
+      || value.replayAllowed !== false
+      || value.accessGrantAllowed !== false) return null;
+    return value as ApprovalTimeoutReceipt;
+  }
+
+  /** Pure durable-recovery projection. Callers can retry idempotent
+   * settle-back/delivery after restart without re-running expiry mutation. */
+  listTimeoutReceipts(): ApprovalTimeoutReceipt[] {
+    if (!existsSync(this.storeDir)) return [];
+    return readdirSync(this.storeDir)
+      .filter((name) => name.endsWith('.timeout.json'))
+      .sort()
+      .flatMap((name) => {
+        const id = name.slice(0, -'.timeout.json'.length);
+        const receipt = this.getTimeoutReceipt(id);
+        return receipt ? [receipt] : [];
+      });
+  }
+
+  /**
+   * Persist stable evidence for every in-flight policy difference. Tightening
+   * changes the effective view; weakening remains ignored but is still visible.
+   * The applied digest is part of the filename, so retries are FWW-idempotent
+   * and a later stronger revision appends rather than overwrites history.
+   */
+  persistPolicyTransitions(now: Date = this.clock()): ApprovalPolicyTransitionReceipt[] {
+    this.index(now);
+    const written: ApprovalPolicyTransitionReceipt[] = [];
+    for (const category of ['pending', 'expired'] as const) {
+      for (const entry of this.snapshot[category]) {
+        const lifecycle = entry.lifecycle;
+        if (!lifecycle || (!lifecycle.policyTransitionChanged && !lifecycle.weakeningIgnored)) continue;
+        const receipt: ApprovalPolicyTransitionReceipt = {
+          schemaVersion: 1,
+          requestId: entry.request.id,
+          origin: lifecycle.origin,
+          lifecycleGeneration: lifecycle.lifecycleGeneration,
+          kind: 'policy-transition',
+          observedAt: now.toISOString(),
+          authoredPolicyDigest: lifecycle.authoredPolicyDigest,
+          appliedPolicyDigest: lifecycle.appliedPolicyDigest,
+          transitionChanged: lifecycle.policyTransitionChanged,
+          weakeningIgnored: lifecycle.weakeningIgnored,
+          appliedProfile: lifecycle.appliedProfile,
+        };
+        this.ensureStoreDir();
+        if (createJsonFileFirstWriterWins(
+          this.policyTransitionReceiptFilePath(entry.request.id, lifecycle.appliedPolicyDigest),
+          receipt,
+        )) written.push(receipt);
+      }
+    }
+    return written;
   }
 
   // ─── prune ──────────────────────────────────────────────────────────────

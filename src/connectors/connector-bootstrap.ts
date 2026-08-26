@@ -13,6 +13,7 @@
 import { join } from 'node:path';
 import type { NotificationAdapter } from '../core/notification-dispatcher.js';
 import type { DeckentConfig } from '../core/types.js';
+import type { ResolvedApprovalLifecycleConfig } from '../core/config-types.js';
 import type { ConnectorId, IMessageConnector, IncomingMessage } from './types.js';
 import { IdentityStore } from './identity/identity-store.js';
 import { createIdentityProvider } from './identity/index.js';
@@ -369,6 +370,10 @@ export type BrkDecider = (
 export interface ConnectorCommandsDeps extends ConnectorBootstrapDeps {
   /** Resolve an approval command. Default: disk-backed resolver bound to `root`. */
   resolve?: CommandResolver;
+  /** Canonical resolved lifecycle authority for autonomous approval commands. */
+  approvalLifecycle?: ResolvedApprovalLifecycleConfig;
+  /** Shared clock for fresh expiry checks at the connector ingress. */
+  approvalNow?: () => Date;
   /** Optional authority-backed resolver for versioned broker approval callbacks. */
   brkDecider?: BrkDecider;
   /** Exposes an already-started connector to the composition root. */
@@ -474,7 +479,10 @@ export async function bootstrapConnectorCommands(
   deps: ConnectorCommandsDeps = {},
 ): Promise<ConnectorCommandsHandle> {
   const lang = deps.lang ?? 'en';
-  const gateResolve = deps.resolve ?? makeCommandResolver(root, {}, lang);
+  const gateResolve = deps.resolve ?? makeCommandResolver(root, {
+    ...(deps.approvalLifecycle ? { lifecycle: deps.approvalLifecycle } : {}),
+    ...(deps.approvalNow ? { now: deps.approvalNow } : {}),
+  }, lang);
   const actionDispatcher = deps.actionDispatcher ?? createCliToolDispatcher();
   // Artifact store — single instance per connector (Task 13 unification).
   // Used by BOTH the inbound media gate (Task 8: register inbound photos/documents)

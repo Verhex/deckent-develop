@@ -19,7 +19,16 @@
 import { ApprovalSlackChannel, type SlackApprovalTransport } from './approval-slack.js';
 import { ApprovalTeamsChannel, type TeamsApprovalTransport } from './approval-teams.js';
 import { ApprovalTelegramChannel, type TelegramApprovalTransport } from './approval-telegram.js';
-import type { ApprovalRelay } from '../core/approval-relay.js';
+import { join } from 'node:path';
+import { getMessage } from '../cli/helpers/messages.js';
+import { ApprovalNotifyDedup } from '../core/approval-notify-dedup.js';
+import type {
+  ApprovalRelay,
+  ChannelDecisionInput,
+  RelayChannel,
+  RelayLifecycleNotification,
+  RelayNotification,
+} from '../core/approval-relay.js';
 
 /**
  * One `approval_channels.<name>` entry. `config-types.ts` (`DeckentConfig`) is
@@ -46,6 +55,7 @@ export interface ApprovalChannelsConfig {
   telegram?: {
     enabled?: boolean;
     chat_id?: string;
+    lang?: string;
   };
 }
 
@@ -64,6 +74,79 @@ export interface ApprovalClientsWireTransports {
   telegram?: TelegramApprovalTransport;
 }
 
+export interface ApprovalLifecycleClientAckStore {
+  wasNotified(eventId: string): boolean;
+  markNotified(eventId: string): void;
+}
+
+export interface ApprovalClientsWireOptions {
+  /**
+   * Durable parent directory for per-channel lifecycle ACK sets. One store per
+   * channel prevents a Slack ACK from suppressing Telegram/Teams delivery.
+   */
+  lifecycleAckRoot?: string;
+  /** Injection seam for a stronger/external durable ACK implementation. */
+  lifecycleAcks?: Partial<Record<'slack' | 'teams' | 'telegram', ApprovalLifecycleClientAckStore>>;
+}
+
+function lifecycleFormatter(lang = 'en'): (notification: RelayLifecycleNotification) => string {
+  return (notification) => getMessage(`approval.lifecycle.stage.${notification.evidence.stage}`, lang);
+}
+
+class LifecycleAckChannel implements RelayChannel {
+  private readonly inFlight = new Set<string>();
+
+  constructor(
+    private readonly channel: RelayChannel,
+    private readonly ack: ApprovalLifecycleClientAckStore,
+  ) {}
+
+  send(notification: RelayNotification): void | Promise<void> {
+    if (notification.kind !== 'lifecycle-stage') return this.channel.send(notification);
+    const eventId = notification.evidence.eventId;
+    if (this.ack.wasNotified(eventId) || this.inFlight.has(eventId)) return;
+    this.inFlight.add(eventId);
+    try {
+      const result = this.channel.send(notification);
+      if (result instanceof Promise) {
+        return result
+          .then(() => { this.ack.markNotified(eventId); })
+          .finally(() => { this.inFlight.delete(eventId); });
+      }
+      this.ack.markNotified(eventId);
+      this.inFlight.delete(eventId);
+    } catch (error) {
+      this.inFlight.delete(eventId);
+      throw error;
+    }
+  }
+
+  onDecision(handler: (input: ChannelDecisionInput) => void): void {
+    this.channel.onDecision(handler);
+  }
+}
+
+function lifecycleAck(
+  name: 'slack' | 'teams' | 'telegram',
+  options: ApprovalClientsWireOptions,
+): ApprovalLifecycleClientAckStore | undefined {
+  const injected = options.lifecycleAcks?.[name];
+  if (injected) return injected;
+  if (!options.lifecycleAckRoot) return undefined;
+  return new ApprovalNotifyDedup(options.lifecycleAckRoot, {
+    storeDir: join(options.lifecycleAckRoot, name),
+  });
+}
+
+function withLifecycleAck(
+  name: 'slack' | 'teams' | 'telegram',
+  channel: RelayChannel,
+  options: ApprovalClientsWireOptions,
+): RelayChannel {
+  const ack = lifecycleAck(name, options);
+  return ack ? new LifecycleAckChannel(channel, ack) : channel;
+}
+
 function skip(name: string, reason: string): void {
   console.error(`[approval-clients-wire] ${name}: ${reason} — skipping`);
 }
@@ -78,39 +161,57 @@ function attachSlack(
   relay: ApprovalRelay,
   cfg: ApprovalChannelEntryConfig | undefined,
   transport: SlackApprovalTransport | undefined,
+  options: ApprovalClientsWireOptions,
 ): void {
   if (!cfg?.enabled) return;
   if (!cfg.channel_id) return skip('slack', 'channel_id missing');
   if (!isResolvedSecret(cfg.token)) return skip('slack', 'token unresolved/missing (check .deck)');
   if (!transport) return skip('slack', 'enabled but no transport provided');
 
-  const channel = new ApprovalSlackChannel({ transport, channelId: cfg.channel_id, lang: cfg.lang });
-  relay.attachChannel('slack', channel);
+  const channel = new ApprovalSlackChannel({
+    transport,
+    channelId: cfg.channel_id,
+    lang: cfg.lang,
+    formatLifecycleStage: lifecycleFormatter(cfg.lang),
+  });
+  relay.attachChannel('slack', withLifecycleAck('slack', channel, options));
 }
 
 function attachTeams(
   relay: ApprovalRelay,
   cfg: ApprovalChannelEntryConfig | undefined,
   transport: TeamsApprovalTransport | undefined,
+  options: ApprovalClientsWireOptions,
 ): void {
   if (!cfg?.enabled) return;
   if (!cfg.channel_id) return skip('teams', 'channel_id missing');
   if (!isResolvedSecret(cfg.token)) return skip('teams', 'token unresolved/missing (check .deck)');
   if (!transport) return skip('teams', 'enabled but no transport provided');
 
-  const channel = new ApprovalTeamsChannel({ transport, channelId: cfg.channel_id, lang: cfg.lang });
-  relay.attachChannel('teams', channel);
+  const channel = new ApprovalTeamsChannel({
+    transport,
+    channelId: cfg.channel_id,
+    lang: cfg.lang,
+    formatLifecycleStage: lifecycleFormatter(cfg.lang),
+  });
+  relay.attachChannel('teams', withLifecycleAck('teams', channel, options));
 }
 
 function attachTelegram(
   relay: ApprovalRelay,
   cfg: ApprovalChannelsConfig['telegram'],
   transport: TelegramApprovalTransport | undefined,
+  options: ApprovalClientsWireOptions,
 ): void {
   if (!cfg?.enabled || !cfg.chat_id || !transport) return;
 
-  const channel = new ApprovalTelegramChannel({ transport, channelId: cfg.chat_id });
-  relay.attachChannel('telegram', channel);
+  const channel = new ApprovalTelegramChannel({
+    transport,
+    channelId: cfg.chat_id,
+    lang: cfg.lang,
+    formatLifecycleStage: lifecycleFormatter(cfg.lang),
+  });
+  relay.attachChannel('telegram', withLifecycleAck('telegram', channel, options));
 }
 
 /**
@@ -124,22 +225,23 @@ export function attachConfiguredApprovalChannels(
   relay: ApprovalRelay,
   config: ApprovalClientsWireConfig | undefined,
   transports: ApprovalClientsWireTransports,
+  options: ApprovalClientsWireOptions = {},
 ): void {
   const channels = config?.approval_channels;
   if (!channels) return;
 
   try {
-    attachSlack(relay, channels.slack, transports.slack);
+    attachSlack(relay, channels.slack, transports.slack, options);
   } catch (error) {
     console.error(`[approval-clients-wire] slack: attach failed — ${error instanceof Error ? error.message : String(error)}`);
   }
   try {
-    attachTeams(relay, channels.teams, transports.teams);
+    attachTeams(relay, channels.teams, transports.teams, options);
   } catch (error) {
     console.error(`[approval-clients-wire] teams: attach failed — ${error instanceof Error ? error.message : String(error)}`);
   }
   try {
-    attachTelegram(relay, channels.telegram, transports.telegram);
+    attachTelegram(relay, channels.telegram, transports.telegram, options);
   } catch (error) {
     console.error(`[approval-clients-wire] telegram: attach failed — ${error instanceof Error ? error.message : String(error)}`);
   }

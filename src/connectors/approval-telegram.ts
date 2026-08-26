@@ -37,9 +37,11 @@ import type {
   ChannelDecisionInput,
   RelayChannel,
   RelayCrossDecidedNotification,
+  RelayLifecycleNotification,
   RelayNotification,
 } from '../core/approval-relay.js';
 import type { ApprovalAction, ApprovalRequest } from '../core/approval-contract.js';
+import { approvalMayUseChannel } from '../core/approval-channel-authenticator.js';
 import type { IncomingCallback, InlineButton, OutgoingMessage } from './types.js';
 
 /**
@@ -63,6 +65,8 @@ export interface ApprovalTelegramChannelOptions {
   channelId: string;
   /** UI language for this channel's two fixed labels (header, buttons). Default 'en'. */
   lang?: string;
+  /** Caller-owned i18n projection for lifecycle events. */
+  formatLifecycleStage?: (notification: RelayLifecycleNotification) => string;
 }
 
 /** callback_data action -> broker decision vocabulary (approve/reject stays the
@@ -73,6 +77,10 @@ const DECISION_BY_ACTION: Readonly<Record<'approve' | 'reject', ApprovalAction>>
 };
 
 const CROCKFORD_BASE32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+function assertNeverNotification(_notification: never): never {
+  throw new Error('unsupported approval notification kind');
+}
 
 /** Stable 25-bit Crockford code used by human and callback decision paths. */
 function shortCodeFor(requestId: string): string {
@@ -94,20 +102,29 @@ export class ApprovalTelegramChannel implements RelayChannel {
   private readonly transport: TelegramApprovalTransport;
   private readonly channelId: string;
   private readonly lang: string;
+  private readonly formatLifecycleStage: (notification: RelayLifecycleNotification) => string;
   /** requestId -> platform message id, so a later cross-decided can edit in place. */
   private readonly messageIdByRequestId = new Map<string, string>();
   /** short-code + nonce -> raw broker id; raw ids never leave this process. */
   private readonly requestIdByCallbackKey = new Map<string, string>();
+  /** Only requests for which this instance emitted a live decision control. */
+  private readonly interactiveRequestIds = new Set<string>();
 
   constructor(opts: ApprovalTelegramChannelOptions) {
     this.transport = opts.transport;
     this.channelId = opts.channelId;
     this.lang = opts.lang ?? 'en';
+    this.formatLifecycleStage = opts.formatLifecycleStage ?? ((notification) =>
+      getMessage(`approval.lifecycle.stage.${notification.evidence.stage}`, this.lang));
   }
 
   send(notification: RelayNotification): Promise<void> {
-    if (notification.kind === 'pending') return this.sendPending(notification.request);
-    return this.sendCrossDecided(notification);
+    switch (notification.kind) {
+      case 'pending': return this.sendPending(notification.request);
+      case 'cross-decided': return this.sendCrossDecided(notification);
+      case 'lifecycle-stage': return this.sendLifecycleStage(notification);
+    }
+    return assertNeverNotification(notification);
   }
 
   onDecision(handler: (input: ChannelDecisionInput) => void): void {
@@ -127,6 +144,7 @@ export class ApprovalTelegramChannel implements RelayChannel {
         if (!mappedRequestId) return;
         requestId = mappedRequestId;
       }
+      if (!this.interactiveRequestIds.has(requestId)) return;
       handler({
         requestId,
         decision: DECISION_BY_ACTION[parsed.action],
@@ -150,6 +168,7 @@ export class ApprovalTelegramChannel implements RelayChannel {
   private buildButtons(request: ApprovalRequest, nonce: string): ReadonlyArray<ReadonlyArray<InlineButton>> {
     const shortCode = shortCodeFor(request.id);
     this.requestIdByCallbackKey.set(`${shortCode}:${nonce}`, request.id);
+    this.interactiveRequestIds.add(request.id);
     return [[
       { text: getMessage('cap.btn.approve', this.lang), callbackData: approvalCallbackData('brk', 'approve', shortCode, nonce) },
       { text: getMessage('cap.btn.reject', this.lang), callbackData: approvalCallbackData('brk', 'reject', shortCode, nonce) },
@@ -158,7 +177,8 @@ export class ApprovalTelegramChannel implements RelayChannel {
 
   private async sendPending(request: ApprovalRequest): Promise<void> {
     const header = getMessage('cap.approval.header', this.lang);
-    const criticalHint = request.risk === 'critical'
+    const mayDecideHere = approvalMayUseChannel(request);
+    const criticalHint = !mayDecideHere
       ? `\ndeckent approvals decide #${shortCodeFor(request.id)}`
       : '';
     const html = markdownToTelegramHtml(`🔐 ${header}\n${this.renderBody(request)}${criticalHint}`);
@@ -167,7 +187,7 @@ export class ApprovalTelegramChannel implements RelayChannel {
       channelId: this.channelId,
       text: html,
       parseMode: 'HTML',
-      ...(request.risk === 'critical' ? {} : { buttons: this.buildButtons(request, randomBytes(4).toString('hex')) }),
+      ...(mayDecideHere ? { buttons: this.buildButtons(request, randomBytes(4).toString('hex')) } : {}),
     };
     if (this.transport.sendMessageReturningId) {
       const mid = await this.transport.sendMessageReturningId(msg);
@@ -184,8 +204,29 @@ export class ApprovalTelegramChannel implements RelayChannel {
     if (mid && this.transport.editMessage) {
       await this.transport.editMessage(this.channelId, mid, html, 'HTML');
       this.messageIdByRequestId.delete(requestId);
+      this.interactiveRequestIds.delete(requestId);
       return;
     }
+    this.interactiveRequestIds.delete(requestId);
     await this.transport.sendMessage({ connector: 'telegram', channelId: this.channelId, text: html });
+  }
+
+  private async sendLifecycleStage(notification: RelayLifecycleNotification): Promise<void> {
+    const text = markdownToTelegramHtml(this.formatLifecycleStage(notification));
+    const requestId = notification.request.id;
+    const expired = notification.evidence.stage === 'expired';
+    const messageId = this.messageIdByRequestId.get(requestId);
+    if (expired) this.interactiveRequestIds.delete(requestId);
+    if (expired && messageId && this.transport.editMessage) {
+      await this.transport.editMessage(this.channelId, messageId, text, 'HTML');
+      this.messageIdByRequestId.delete(requestId);
+      return;
+    }
+    await this.transport.sendMessage({
+      connector: 'telegram',
+      channelId: this.channelId,
+      text,
+      parseMode: 'HTML',
+    });
   }
 }

@@ -44,7 +44,7 @@ import {
   type ApprovalClientsWireTransports,
 } from '../../connectors/approval-clients-wire.js';
 import { openApprovalAuthorityRuntime, type ApprovalAuthorityRuntimeOpenResult } from '../../core/approval-authority-runtime.js';
-import { ChannelLiveApprovalAuthenticator, channelTierFor } from '../../core/approval-channel-authenticator.js';
+import { ChannelLiveApprovalAuthenticator, approvalMayUseChannel } from '../../core/approval-channel-authenticator.js';
 import { resolveShortCode } from '../../core/approval-short-code.js';
 import { createApprovalStoreWatch, type ApprovalStoreWatchHandle } from '../../core/approval-store-watch.js';
 import type { ApprovalDecisionIngressOutcome } from '../../core/approval-decision-ingress.js';
@@ -183,7 +183,7 @@ export function setupBotApprovalRelay(input: {
       return getMessage('approval.channel.unknown', input.lang, { code: parsed.shortCode });
     }
     const pendingRequest = service.broker.getRequest(resolution.id);
-    if (pendingRequest && channelTierFor(pendingRequest.risk) === 'critical') {
+    if (pendingRequest && !approvalMayUseChannel(pendingRequest)) {
       return getMessage('approval.channel.critical_cli_only', input.lang, { id: parsed.shortCode });
     }
     const principal = chatCtx.resolvePrincipal();
@@ -341,6 +341,9 @@ export async function handleBotListen(opts: BotListenOptions = {}): Promise<void
           });
         },
         botCapabilities: config.bot_capabilities,
+        ...(config.approval?.lifecycle
+          ? { approvalLifecycle: config.approval.lifecycle }
+          : {}),
         // ADR-092 I-1 (final review): thread the per-user identity config into the
         // bootstrap so config.identity.channels bindings are seeded and the L2 RBAC
         // gate activates on the live path (it was previously inert — never wired).

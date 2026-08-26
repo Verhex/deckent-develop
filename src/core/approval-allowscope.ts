@@ -30,7 +30,14 @@ import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileS
 import { dirname, join } from 'node:path';
 import { z } from 'zod';
 import { SETTINGS_DIR } from './constants.js';
-import { ALL_APPROVAL_RISKS, ALL_APPROVAL_SCOPES, type ApprovalRequest, type ApprovalRisk } from './approval-contract.js';
+import {
+  ALL_APPROVAL_RISKS,
+  ALL_APPROVAL_SCOPES,
+  type ApprovalRequest,
+  type ApprovalRisk,
+} from './approval-contract.js';
+import type { ApprovalRiskTier } from './config-types.js';
+import { approvalRiskTierFor } from './approval-channel-authenticator.js';
 
 /** Root-relative path (under `<projectRoot>/`) to the persisted allow-list. */
 export const APPROVAL_ALLOWS_FILE = join(SETTINGS_DIR, 'approval-allows.json');
@@ -83,7 +90,9 @@ export type ApprovalAllowScopeGrantInput = Omit<z.input<typeof allowScopeRuleSch
 /** The narrow slice of {@link ApprovalRequest} {@link ApprovalAllowScopeStore.matchesAllow}
  *  needs — a structural subset so a caller can match against a full request or a
  *  minimal hand-built descriptor without adapting either shape. */
-export type ApprovalAllowScopeMatchInput = Pick<ApprovalRequest, 'scopeId' | 'scope' | 'risk'>;
+export type ApprovalAllowScopeMatchInput = Pick<ApprovalRequest, 'scopeId' | 'scope' | 'risk'> & {
+  readonly riskTier?: ApprovalRiskTier;
+};
 
 // ─── Errors ───────────────────────────────────────────────────────────────────
 
@@ -257,6 +266,9 @@ export class ApprovalAllowScopeStore {
       this.rules = live;
       this.persist();
     }
+
+    const riskTier = approvalRiskTierFor(request);
+    if (riskTier === null || riskTier === 'critical') return null;
 
     return (
       live.find(

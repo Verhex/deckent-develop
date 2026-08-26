@@ -16,10 +16,11 @@
 // its own file (`.notified.json`) and its own tiny schema, never touching a
 // request/decision file.
 
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DECKENT_DIR } from './constants.js';
+import { createJsonFileFirstWriterWins } from './approval-file-cas.js';
 
 export interface ApprovalNotifyDedupOptions {
   /** Absolute directory the state file lives under. Defaults to the SAME
@@ -57,12 +58,19 @@ function isNotifiedFileShape(value: unknown): value is NotifiedFileShape {
 export class ApprovalNotifyDedup {
   private readonly storeDir: string;
   private readonly filePath: string;
+  private readonly markerDir: string;
   private notifiedIds: Set<string>;
 
   constructor(projectRoot: string, opts: ApprovalNotifyDedupOptions = {}) {
     this.storeDir = opts.storeDir ?? join(projectRoot, DECKENT_DIR, 'approvals');
     this.filePath = join(this.storeDir, NOTIFIED_FILE_NAME);
+    this.markerDir = join(this.storeDir, '.notified-markers');
     this.notifiedIds = this.load();
+  }
+
+  private markerPath(id: string, kind: 'marked' | 'cleared'): string {
+    const digest = createHash('sha256').update(id).digest('hex');
+    return join(this.markerDir, `${digest}.${kind}.json`);
   }
 
   private ensureStoreDir(): void {
@@ -106,13 +114,17 @@ export class ApprovalNotifyDedup {
 
   /** Has `id` already been notified (in this process or a prior one)? */
   wasNotified(id: string): boolean {
+    if (existsSync(this.markerPath(id, 'cleared'))) return false;
+    if (existsSync(this.markerPath(id, 'marked'))) return true;
     return this.notifiedIds.has(id);
   }
 
   /** Record `id` as notified and persist immediately. A no-op (no disk
    *  write) if `id` is already marked. */
   markNotified(id: string): void {
-    if (this.notifiedIds.has(id)) return;
+    if (this.wasNotified(id) || existsSync(this.markerPath(id, 'cleared'))) return;
+    mkdirSync(this.markerDir, { recursive: true, mode: 0o700 });
+    createJsonFileFirstWriterWins(this.markerPath(id, 'marked'), { version: 1, id, state: 'marked' });
     this.notifiedIds.add(id);
     this.persist();
   }
@@ -124,6 +136,8 @@ export class ApprovalNotifyDedup {
   clear(ids: readonly string[]): void {
     let changed = false;
     for (const id of ids) {
+      mkdirSync(this.markerDir, { recursive: true, mode: 0o700 });
+      createJsonFileFirstWriterWins(this.markerPath(id, 'cleared'), { version: 1, id, state: 'cleared' });
       if (this.notifiedIds.delete(id)) changed = true;
     }
     if (changed) this.persist();
