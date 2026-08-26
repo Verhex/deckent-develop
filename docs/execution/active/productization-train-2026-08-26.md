@@ -27,8 +27,7 @@
 5. ~~Settlement-atomiği dalgası~~ **TÜKETİLDİ 2026-08-26** (sprint-682 4/4 DONE 0-debt;
    3276+3285+3282+3295 → VERIFY, receipt GR-2026-08-26-NODE5-SETTLEMENT-01; 3302 önkoşulu AÇILDI).
 6. **Mekanik süpürme (KISMEN)** — ~~3315 + 204 + 207~~ TÜKETİLDİ 2026-08-26 (sprint-684 3/3,
-   receipt GR-2026-08-26-NODE6A-SWEEP-01); kalan: 7141 devam-dalgası (gen-repair-directives'le,
-   ayrı koşu).
+   receipt GR-2026-08-26-NODE6A-SWEEP-01); 7141: 2026-08-26 devam-dalgalarıyla 318→77 occurrence (242 site typed); kalan 77 son-dalga adayı.
 
 ## Paralel şeritler (protokol: docs/governance/parallel-lane-protocol.md)
 - **AKTİF — lane/descriptor-registry-20260826 (Codex):** G1B descriptor-registry analiz+prototip;

@@ -14,6 +14,16 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint688] - 2026-08-26
+
+### Added
+
+- provider/budget kümesi (live-execution-budget · provider-limit-truth · provider-truth · scheduled-flow) — ham-throw'lar typed'a
+- settlement/mission kümesi (task-result-settlement · mission-migrate · mission-worker-invocation-coordinator · sqlite-mission-store) — ham-throw'lar typed'a
+
+
+_Tasks: 2 total, 2 done, 0 tech debt, 0 no-go_
+
 ## [sprint684] - 2026-08-26
 
 ### Added

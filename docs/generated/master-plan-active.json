@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "e36918968215e141bb23056d9e44fd388f33462719e06d78914d8cb0ba5d24f9"
+    "value": "b8de0849c05d6cdba6676a3f6f99a7cc9d5eff353c463775c613dca93bcf02b4"
   },
   "summary": {
     "total": 538,
@@ -5185,9 +5185,9 @@
       "program": "KERNEL",
       "priority": "P1",
       "state": "OPEN",
-      "updated": "2026-08-25",
+      "updated": "2026-08-26",
       "definitionDigest": "72a12fb1047dea839dc72cd935cbc4a6032ad1dd7300dbe0e4db271a8b41e22c",
-      "progressDigest": "8e771c0f51a2f89b92b6f2916f80941b4ebdf062a2eeb91d3533c746b648dc01",
+      "progressDigest": "af09218a4e88ba2091fc0bf4bfe5586a8da250d0a2523bb153ec502473cb715e",
       "terminalClosureDigest": null
     },
     {
@@ -24681,8 +24681,8 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "`npm run lint:errors` 0 yeni-occurrence ile yeşil; error-handling-unification + error-registry-lint testleri baseline-mutabakatıyla geçer; dönüşüm assertion/ratchet zayıflatmadan, dosya-kümeli onarım-dalgası olarak koşulur (gen-repair-directives + lint:directives hattı); typed hata-sınıfları mevcut DeckentError/registry desenini izler",
-      "evidence": "2026-08-25 dalga-kapanisi: sprint-672 (9 task, 8 tek-FIX-turda RESOLVED; 672-005 SCOPED_PROOF_HOLD verification-authority gap ile unresolved — kod-defekti degil, site elle cevrildi). 131/131 site typed DeckentError (ad-hoc aile; mesaj-baytlari korunur, baseline dokunulmadi). Kanit: `npm run lint:errors` -> `0 new violation(s), 319 known baseline occurrence(s)` exit-0; guard-suite 204/204; tsc-0; alan spot-suite 29/29; Tier-1 gercek-binary smoke stderr typed-kod (`(INVALID_PATH)`); 28 dosya +417/-131. Full-suite %100 kosusu landing-commit mesajinda. Kalan-VERIFY: owner satir-kabulu + farkli-provider xverify muhru (adjudicator-arizasi acikken typed-HOLD)",
-      "updated": "2026-08-25"
+      "evidence": "2026-08-25 dalga-kapanisi: sprint-672 (9 task, 8 tek-FIX-turda RESOLVED; 672-005 SCOPED_PROOF_HOLD verification-authority gap ile unresolved — kod-defekti degil, site elle cevrildi). 131/131 site typed DeckentError (ad-hoc aile; mesaj-baytlari korunur, baseline dokunulmadi). Kanit: `npm run lint:errors` -> `0 new violation(s), 319 known baseline occurrence(s)` exit-0; guard-suite 204/204; tsc-0; alan spot-suite 29/29; Tier-1 gercek-binary smoke stderr typed-kod (`(INVALID_PATH)`); 28 dosya +417/-131. Full-suite %100 kosusu landing-commit mesajinda. Kalan-VERIFY: owner satir-kabulu + farkli-provider xverify muhru (adjudicator-arizasi acikken typed-HOLD); 2026-08-26 devam-dalgaları (687-001 + sprint-688 2/2 COMPLETE 0-FIX; landing b22429eeb): en-yoğun 12 dosyada 242 site typed'a (26+110+106 → hepsi 0), baseline 318→77 occurrence / 286→72 entry yalnız-azalma budamasıyla; mesaj/akış bit-korundu, 10 suite + lint:errors + tsc-0 + 20-gate yeşil; 687-001'in tek-NO_GO'su direktif-tasarım artefaktıydı (imkânsız-yeşil Test-kombinasyonu — ders: baseline-tutarlılık testi worker-Test'ine konmaz, budama landing-host'ta); kalan 77 occurrence son-dalga adayı",
+      "updated": "2026-08-26"
     },
     {
       "order": 8000,
@@ -27527,6 +27527,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "e0402167e0b04ad787bdcde6b02f97ce18d67197245bd8e03399d4feb82346d8"
+    "value": "16a3a72b2aa7971b255315da46a4c1c04460467f53418bb39c7ec8991c8779a3"
   }
 }
