@@ -20,7 +20,7 @@ import {
   createGoNoGoCriterionItem,
   type GoNoGoCriterionItem,
 } from '../core/task-types.js';
-import { DeckentError } from '../core/errors.js';
+import { DeckentError, ErrorRegistry } from '../core/errors.js';
 import type { ParsedDirectiveTask } from './task-builder.js';
 
 // ═══ Types ═══════════════════════════════════════════════════════════════
@@ -354,10 +354,16 @@ function parseStructuredCriteriaItems(section: string): GoNoGoCriterionItem[] | 
   if (!match) return null;
   try {
     const value = JSON.parse(match[1] ?? '');
-    if (!Array.isArray(value) || value.length === 0) throw new Error('items must be a non-empty array');
+    if (!Array.isArray(value) || value.length === 0) {
+      throw ErrorRegistry.createError('DECKENT_E074', {
+        message: 'items must be a non-empty array',
+      });
+    }
     return value.map((candidate, index) => {
       if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
-        throw new Error(`item ${index} is not an object`);
+        throw ErrorRegistry.createError('DECKENT_E074', {
+          message: `item ${index} is not an object`,
+        });
       }
       const record = candidate as Record<string, unknown>;
       if (
@@ -366,7 +372,9 @@ function parseStructuredCriteriaItems(section: string): GoNoGoCriterionItem[] | 
         || !Array.isArray(record['evidenceRequirements'])
         || record['evidenceRequirements'].some(requirement => typeof requirement !== 'string')
       ) {
-        throw new Error(`item ${index} has an invalid shape`);
+        throw ErrorRegistry.createError('DECKENT_E074', {
+          message: `item ${index} has an invalid shape`,
+        });
       }
       const canonical = createGoNoGoCriterionItem({
         polarity: record['polarity'],
@@ -374,7 +382,9 @@ function parseStructuredCriteriaItems(section: string): GoNoGoCriterionItem[] | 
         evidenceRequirements: record['evidenceRequirements'] as string[],
       });
       if (record['id'] !== canonical.id) {
-        throw new Error(`item ${index} id is not canonical`);
+        throw ErrorRegistry.createError('DECKENT_E074', {
+          message: `item ${index} id is not canonical`,
+        });
       }
       return canonical;
     });

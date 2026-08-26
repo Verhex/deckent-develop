@@ -5,6 +5,7 @@ import type {
   InvocationReceiptRef,
   InvocationRole,
 } from '../../../core/invocation-receipt.js';
+import { ErrorRegistry } from '../../../core/errors.js';
 import type { Mission, WorkItem } from './mission-types.js';
 
 export const GOAL_ACCEPTANCE_SCHEMA_VERSION = 1 as const;
@@ -117,10 +118,22 @@ export function createGoalAcceptanceContract(
     authoredBy?: GoalAcceptanceContractV1['authoredBy'];
   } = {},
 ): GoalAcceptanceContractV1 {
-  if (!exactCriterion.trim()) throw new Error('GOAL_ACCEPTANCE_INVALID: criterion must be non-empty');
-  if (exactCriterion.length > 10_000) throw new Error('GOAL_ACCEPTANCE_INVALID: criterion exceeds 10000 characters');
+  if (!exactCriterion.trim()) {
+    throw ErrorRegistry.createError('DECKENT_E077', {
+      message: 'GOAL_ACCEPTANCE_INVALID: criterion must be non-empty',
+    });
+  }
+  if (exactCriterion.length > 10_000) {
+    throw ErrorRegistry.createError('DECKENT_E077', {
+      message: 'GOAL_ACCEPTANCE_INVALID: criterion exceeds 10000 characters',
+    });
+  }
   const authoredAt = opts.authoredAt ?? new Date().toISOString();
-  if (!isIsoDate(authoredAt)) throw new Error('GOAL_ACCEPTANCE_INVALID: authoredAt must be ISO-8601');
+  if (!isIsoDate(authoredAt)) {
+    throw ErrorRegistry.createError('DECKENT_E077', {
+      message: 'GOAL_ACCEPTANCE_INVALID: authoredAt must be ISO-8601',
+    });
+  }
   const authoredBy = opts.authoredBy ?? { surface: 'unknown', actorId: null };
   const criterion: GoalAcceptanceCriterionV1 = {
     id: `criterion-${digest(exactCriterion).slice(0, 24)}`,
@@ -175,7 +188,11 @@ export function readGoalAcceptanceContract(mission: Pick<Mission, 'spec'>): Goal
   const raw = mission.spec?.['acceptanceContract'];
   if (raw === undefined || raw === null) return null;
   const errors = validateGoalAcceptanceContract(raw);
-  if (errors.length > 0) throw new Error(`GOAL_ACCEPTANCE_CONTRACT_INVALID: ${errors.join('; ')}`);
+  if (errors.length > 0) {
+    throw ErrorRegistry.createError('DECKENT_E077', {
+      message: `GOAL_ACCEPTANCE_CONTRACT_INVALID: ${errors.join('; ')}`,
+    });
+  }
   return raw as GoalAcceptanceContractV1;
 }
 
@@ -381,13 +398,17 @@ export function validateMissionAcceptanceDecision(
 
 export function assertStoredMissionAcceptanceRecord(value: unknown): MissionAcceptanceDecisionRecord {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error('MISSION_ACCEPTANCE_CORRUPT: record must be an object');
+    throw ErrorRegistry.createError('DECKENT_E077', {
+      message: 'MISSION_ACCEPTANCE_CORRUPT: record must be an object',
+    });
   }
   const record = value as MissionAcceptanceDecisionRecord;
   if (!record.decision || !Array.isArray(record.validationErrors)
     || !['accepted', 'rejected', 'unknown'].includes(record.effectiveOutcome)
     || !isIsoDate(record.createdAt)) {
-    throw new Error('MISSION_ACCEPTANCE_CORRUPT: invalid record shape');
+    throw ErrorRegistry.createError('DECKENT_E077', {
+      message: 'MISSION_ACCEPTANCE_CORRUPT: invalid record shape',
+    });
   }
   return record;
 }

@@ -5,6 +5,7 @@ import { existsSync, readFileSync, readdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { atomicWriteFileSync } from '../../agents/worker-lifecycle.js';
 import { TASKS_DIR } from '../../core/constants.js';
+import { ErrorRegistry } from '../../core/errors.js';
 import type { BacklogEntry, BacklogFile, BacklogStatus } from './backlog-types.js';
 import { nextRun } from './scheduled-flow.js';
 
@@ -52,12 +53,22 @@ export function loadBacklog(path: string): BacklogFile {
   try {
     raw = JSON.parse(readFileSync(path, 'utf-8')) as BacklogFile;
   } catch (e) {
-    throw new Error(`backlog file at ${path} is not valid JSON: ${e instanceof Error ? e.message : String(e)}`);
+    throw ErrorRegistry.createError('DECKENT_E095', {
+      message: `backlog file at ${path} is not valid JSON: ${e instanceof Error ? e.message : String(e)}`,
+    });
   }
-  if (!Array.isArray(raw.entries)) throw new Error('backlog.entries must be an array');
+  if (!Array.isArray(raw.entries)) {
+    throw ErrorRegistry.createError('DECKENT_E095', {
+      message: 'backlog.entries must be an array',
+    });
+  }
   for (const e of raw.entries) {
     const err = validateBacklogEntry(e);
-    if (err) throw new Error(`Invalid backlog entry: ${err}`);
+    if (err) {
+      throw ErrorRegistry.createError('DECKENT_E095', {
+        message: `Invalid backlog entry: ${err}`,
+      });
+    }
   }
   return { _version: typeof raw._version === 'string' ? raw._version : '1.0', entries: raw.entries };
 }
@@ -86,7 +97,11 @@ export function updateStatus(
   lastResult: BacklogEntry['lastResult'],
 ): void {
   const e = bl.entries.find((x) => x.id === id);
-  if (!e) throw new Error(`backlog entry ${id} not found`);
+  if (!e) {
+    throw ErrorRegistry.createError('DECKENT_E095', {
+      message: `backlog entry ${id} not found`,
+    });
+  }
   e.status = status;
   // lastRun records run COMPLETION (set only when a non-null lastResult is supplied),
   // NOT run start. This is intentional: a partial/interrupted run does not advance lastRun,

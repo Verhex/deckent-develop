@@ -17148,3 +17148,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 688-002: settlement/mission kümesi (task-result-settlement · mission-migrate · mission-worker-invocation-coordinator · sqlite-mission-store) — ham-throw'lar typed'a (DONE)
 
 ---
+## Sprint 689 — sprint-689
+
+**Status:** ABORTED
+**Date:** 2026-08-26
+**Duration:** 1242s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 1 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 1241896ms |
+
+### Tasks
+
+- 689-001-fix-fix: Fix: Fix: CLI kümesi (agent · skill · process · recover) — claude-provider (PAUSED)
+- 689-001-fix: Fix: CLI kümesi (agent · skill · process · recover) — claude-provider (NO_GO)
+- 689-001: CLI kümesi (agent · skill · process · recover) — claude-provider (NO_GO)
+- 689-002: Orchestra kümesi (mission-acceptance · backlog · mission-approval-coordinator · directives-builder) — codex-provider (DONE)
+
+---

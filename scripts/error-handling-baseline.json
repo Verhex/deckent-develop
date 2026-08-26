@@ -2,26 +2,6 @@
   "version": 2,
   "entries": [
     {
-      "file": "src/cli/commands/agent.ts",
-      "fingerprint": "04bb5d16502074bf37dbd2773ed122210da5485abfe3ab3e4f89034ca0870bb9",
-      "count": 1
-    },
-    {
-      "file": "src/cli/commands/agent.ts",
-      "fingerprint": "2bd48437c1347d22a171be3fb8be7a348db481a5331eecc1e4e78b1d39ccddca",
-      "count": 1
-    },
-    {
-      "file": "src/cli/commands/agent.ts",
-      "fingerprint": "a09b986a66186b9958dc915645bc9668df353c851b068cccef768d8838a214c5",
-      "count": 1
-    },
-    {
-      "file": "src/cli/commands/agent.ts",
-      "fingerprint": "eecfba1469b041dca9f3642d16b86ebcd75a273e6fd83ca0777506d89384f27d",
-      "count": 1
-    },
-    {
       "file": "src/cli/commands/autonomous-mission.ts",
       "fingerprint": "90d8c25523ca7dcecfc660a9232b94154fc2726599bf18716660c08d54c18c0b",
       "count": 1
@@ -29,51 +9,6 @@
     {
       "file": "src/cli/commands/chat-session.ts",
       "fingerprint": "ad7d55c4da3af3a108f0952fd52ab630bac61964f177fc0fe24d3f8c8858b822",
-      "count": 1
-    },
-    {
-      "file": "src/cli/commands/process.ts",
-      "fingerprint": "cb402be29f26bae028720038fb45c463c943c406d4fee49bec38595b2443c9b4",
-      "count": 2
-    },
-    {
-      "file": "src/cli/commands/process.ts",
-      "fingerprint": "e341672d931bc557b59ef327d21c71a4f02b76a339403bc0ba4f479e0bbabbe5",
-      "count": 1
-    },
-    {
-      "file": "src/cli/commands/recover.ts",
-      "fingerprint": "173c991daa9bccb467e83abf58803753c0bb28b57cb2535b0fe89d419da56d21",
-      "count": 1
-    },
-    {
-      "file": "src/cli/commands/recover.ts",
-      "fingerprint": "3d47299007779c491a409d7d390e9c84f2e1040d955f7155bd773d7fb8a2898f",
-      "count": 1
-    },
-    {
-      "file": "src/cli/commands/recover.ts",
-      "fingerprint": "4588f7e2a0b492c8732a6de5aa5659e156ee3b60653b94c3b540fec9f42fa5ce",
-      "count": 1
-    },
-    {
-      "file": "src/cli/commands/skill.ts",
-      "fingerprint": "5a501d5d17c50e31f897a60ae36fbd544cc198e37ac480404532f554c1acc245",
-      "count": 1
-    },
-    {
-      "file": "src/cli/commands/skill.ts",
-      "fingerprint": "a5e00899ec8dfe75fbee4750170940d8da2290f24a763c18dd300c5a58b27413",
-      "count": 1
-    },
-    {
-      "file": "src/cli/commands/skill.ts",
-      "fingerprint": "e88d7677d263e621036bf8d179a1f8f0ac24f9af961ce0700a378f60208d0a26",
-      "count": 1
-    },
-    {
-      "file": "src/cli/commands/skill.ts",
-      "fingerprint": "f1254db9c8a647c6ad1f3ceb8cb889ee8ace930b061bbb4816b8f1aada025395",
       "count": 1
     },
     {
@@ -142,68 +77,8 @@
       "count": 1
     },
     {
-      "file": "src/orchestra/autonomous/backlog.ts",
-      "fingerprint": "5c8e70058d32ad7809aef5aad60e87d48cf9888e5f8d5310cc24220e4bc03860",
-      "count": 1
-    },
-    {
-      "file": "src/orchestra/autonomous/backlog.ts",
-      "fingerprint": "7fe7e568c9b4df0a93b0f93b5ba77002ff6b4350ab78cc166791c93046d4fe89",
-      "count": 1
-    },
-    {
-      "file": "src/orchestra/autonomous/backlog.ts",
-      "fingerprint": "89ae289468acee684323fa24cb253560bb4f26b1e0179fb942fed5609d2ce06d",
-      "count": 1
-    },
-    {
-      "file": "src/orchestra/autonomous/backlog.ts",
-      "fingerprint": "e96e66a93cfadcc8770d10e0e12753fffb1e054f376ba378d88dc2ad292da48c",
-      "count": 1
-    },
-    {
       "file": "src/orchestra/autonomous/mission-store/goal-mission.ts",
       "fingerprint": "f383c84d745848ee77c173b932c6cccfad1acbfe9c17c38d92bdb3a003e341fb",
-      "count": 1
-    },
-    {
-      "file": "src/orchestra/autonomous/mission-store/mission-acceptance.ts",
-      "fingerprint": "25603fa01160c0317427b83c9c1fc7b356609b7ef62c5bbfa2890609ee519663",
-      "count": 1
-    },
-    {
-      "file": "src/orchestra/autonomous/mission-store/mission-acceptance.ts",
-      "fingerprint": "55bbe5e44f242f7a4a641bceedf6242fdbdd456a2b5dc1d8ceb81f3139ff62b3",
-      "count": 1
-    },
-    {
-      "file": "src/orchestra/autonomous/mission-store/mission-acceptance.ts",
-      "fingerprint": "58e5bf8055a5203ea9f073915cbc6c08e2165e0ed9a86e447af4675eb30b38ba",
-      "count": 1
-    },
-    {
-      "file": "src/orchestra/autonomous/mission-store/mission-acceptance.ts",
-      "fingerprint": "5d9773685e250d23b9f250bbd87a1404e1dd375a5b96fc86349c168928c8a2a6",
-      "count": 1
-    },
-    {
-      "file": "src/orchestra/autonomous/mission-store/mission-acceptance.ts",
-      "fingerprint": "800b08cd08f4bcf7c2615bdd8cf2aa57875a0f566b1b0e996a3c4ace85f0853c",
-      "count": 1
-    },
-    {
-      "file": "src/orchestra/autonomous/mission-store/mission-acceptance.ts",
-      "fingerprint": "cd1fc90fd7b822ef26127ae3009060bd4db4191eb3bf2bc4ca1f6bd9e09bf7a2",
-      "count": 1
-    },
-    {
-      "file": "src/orchestra/autonomous/mission-store/mission-approval-coordinator.ts",
-      "fingerprint": "17c2ef5185e1db45f65e5fe6817254f249da4afa76b362626a07ee4456a0f81b",
-      "count": 3
-    },
-    {
-      "file": "src/orchestra/autonomous/mission-store/mission-approval-coordinator.ts",
-      "fingerprint": "cbd32a9bc5d8b41ed025a528aeb2488f95a74e69ec7f3cc150356ac2e712f41e",
       "count": 1
     },
     {
@@ -224,26 +99,6 @@
     {
       "file": "src/orchestra/codex-spawn-readiness.ts",
       "fingerprint": "2477e74151e7513a2bde38c5d91c729e2b2871d6f6c366b0ff6b60be150dba4e",
-      "count": 1
-    },
-    {
-      "file": "src/orchestra/directives-builder.ts",
-      "fingerprint": "0bc9e494d80b3db081e54835fefc08b43b29c2f9208581c017cb99b81450309e",
-      "count": 1
-    },
-    {
-      "file": "src/orchestra/directives-builder.ts",
-      "fingerprint": "169a72d94c0f5b0c73bcb8b67185a6393f91791c211d6af8c6bf44be95720b1c",
-      "count": 1
-    },
-    {
-      "file": "src/orchestra/directives-builder.ts",
-      "fingerprint": "592bba9950825a7cdf58c15fc48df567d7163b8e54a2e68185fa5fa983c1f25a",
-      "count": 1
-    },
-    {
-      "file": "src/orchestra/directives-builder.ts",
-      "fingerprint": "b389cbf3777c814f8de1f8979f854d6786e4660f3b4abf1d7a60babbbe48218b",
       "count": 1
     },
     {

@@ -713,7 +713,8 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // attribution-baseline / finalize-retirement + isCanonicalTaskFilename pinleri.
   // 2026-08-26 11:04: 16504→16506 — Node-6a mekanik supurme (sprint-684 3/3):
   // death-sweep hijyen + worker-identity-hostbound + docker-git-async suiteleri.
-  digest: '5940a6587f1a6429d02e82397d7d2c124add05ffa281e3e1a683cca16fa8fe03',
+  digest: 'cee8a5ebee024081ade7ab79b2c9a72cdfd02f924dab38175deb7c4fd7d75357',
+  // 12:1x: ayni 16508, digest-only — 689 multi-provider dalga test-kaymalari.
   // 2026-08-26 11:48: 16506→16508 — 7141 devam-dalgalari (687-001 + 688 2/2):
   // typed-throw donusumu test-eklentileri.
 });
@@ -1276,7 +1277,8 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // finalizer + sidecar-loader hotfix).
   // 2026-08-26 11:05: ayni 1339, digest-only — Node-6a src kaymalari
   // (death-sweep / prompt-template kimlik-esigi / docker async-git).
-  digest: 'ca3fe36b5c4a797d3068ae699bbd5960db50ba93fd981dfe4e2279d4d122738e',
+  digest: '0ec96ef82aafd7f95e83b7b6a1fb0ce5f7ffd81c59c7b8671ad45ea5fb45638e',
+  // 12:1x: ayni 1339, digest-only — 689 8-dosya typed-throw src kaymalari.
   // 11:49: ayni 1339, digest-only — 7141 typed-throw src kaymalari (12 dosya).
 });
 

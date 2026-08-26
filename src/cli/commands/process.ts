@@ -21,6 +21,7 @@ import { buildProcessController } from '../helpers/process-runtime.js';
 import { loadBacklog } from '../../orchestra/autonomous/backlog.js';
 import type { ProcessController } from '../../orchestra/process-controller.js';
 import { cliContractMessage, bindArgumentDescriptions } from '../helpers/message-catalog/cli-run.js';
+import { DeckentError } from '../../core/errors.js';
 
 // ─── Factory type (injectable for tests) ─────────────────────────────────────
 
@@ -49,7 +50,7 @@ export async function handleProcessSubmit(
   const lang = getLanguage(opts.lang);
   const root = opts.root ?? resolveProjectRoot();
   if (!description || !description.trim()) {
-    throw new Error(getMessage('process.description_required', lang));
+    throw new DeckentError('E_PROCESS_DESCRIPTION_REQUIRED', getMessage('process.description_required', lang));
   }
   const controller = await factory(root);
   try {
@@ -83,7 +84,7 @@ export async function handleProcessStatus(
   const lang = getLanguage(opts.lang);
   const root = opts.root ?? resolveProjectRoot();
   if (!executionId || !executionId.trim()) {
-    throw new Error(getMessage('process.executionId_required', lang));
+    throw new DeckentError('E_PROCESS_EXECUTION_ID_REQUIRED', getMessage('process.executionId_required', lang));
   }
   const controller = await factory(root);
   try {
@@ -116,7 +117,7 @@ export async function handleProcessResult(
   const lang = getLanguage(opts.lang);
   const root = opts.root ?? resolveProjectRoot();
   if (!executionId || !executionId.trim()) {
-    throw new Error(getMessage('process.executionId_required', lang));
+    throw new DeckentError('E_PROCESS_EXECUTION_ID_REQUIRED', getMessage('process.executionId_required', lang));
   }
   const controller = await factory(root);
   try {

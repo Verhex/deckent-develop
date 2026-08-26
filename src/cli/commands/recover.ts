@@ -188,7 +188,7 @@ export function registerRecover(program: Command): void {
       try {
         assertCanonicalSprintId(sprintId, lang);
         if (opts.dryRun && opts.restoreTasks) {
-          throw new Error(getMessage('recover.dry_run_restore_conflict', lang));
+          throw new DeckentError('E_RECOVER_DRY_RUN_RESTORE_CONFLICT', getMessage('recover.dry_run_restore_conflict', lang));
         }
         if (opts.resume && opts.restoreTasks) {
           throw new DeckentError('E_RECOVER_RESUME_RESTORE_CONFLICT', getMessage('recover.resume_restore_conflict', lang));
@@ -213,10 +213,10 @@ export function registerRecover(program: Command): void {
           return;
         }
         if (!opts.dryRun && opts.json && !opts.force) {
-          throw new Error(getMessage('recover.json_requires_force', lang));
+          throw new DeckentError('E_RECOVER_JSON_REQUIRES_FORCE', getMessage('recover.json_requires_force', lang));
         }
         if (opts.restoreTasks && !opts.force) {
-          throw new Error(getMessage('recover.restore_requires_force', lang));
+          throw new DeckentError('E_RECOVER_RESTORE_REQUIRES_FORCE', getMessage('recover.restore_requires_force', lang));
         }
 
         // born-562: rollback path — restore the pre-archive snapshot (createPreArchiveSnapshot

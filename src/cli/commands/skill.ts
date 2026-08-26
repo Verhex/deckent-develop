@@ -10,7 +10,7 @@ import { print, printError, formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { snapshotSkillCatalog } from '../../core/skill-pool.js';
 import { registerSkillMarketplace } from './skill-marketplace.js';
-import { ErrorRegistry } from '../../core/errors.js';
+import { DeckentError, ErrorRegistry } from '../../core/errors.js';
 import { readCatalogStats } from '../../core/catalog-stats-read-model.js';
 import { analyzeNewSkill, persistSkillActivation } from '../../orchestra/ecosystem-intelligence.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
@@ -538,7 +538,7 @@ export function registerSkill(program: Command): void {
 
         const meta = loadSourceMeta(skillDir);
         if (!meta) {
-          throw new Error(`No source metadata found for skill "${name}". Cannot update — was it installed via "skill install"?`);
+          throw new DeckentError('E_SKILL_SOURCE_META_MISSING', `No source metadata found for skill "${name}". Cannot update — was it installed via "skill install"?`);
         }
 
         print(`Updating skill "${name}" from ${meta.source}...`);
@@ -557,13 +557,13 @@ export function registerSkill(program: Command): void {
 
           const cloneResult = spawnSync('git', cloneArgs, { encoding: 'utf-8', timeout: 30_000 });
           if (cloneResult.status !== 0) {
-            throw new Error(`Git clone failed: ${cloneResult.stderr || 'unknown error'}`);
+            throw ErrorRegistry.createError('DECKENT_E026', { message: `Git clone failed: ${cloneResult.stderr || 'unknown error'}` });
           }
 
           const manifestPath = join(tmpDir, 'manifest.json');
           if (!existsSync(manifestPath)) {
             rmSync(tmpDir, { recursive: true, force: true });
-            throw new Error('No manifest.json in cloned repository');
+            throw ErrorRegistry.createError('DECKENT_E027', { message: 'No manifest.json in cloned repository' });
           }
 
           const dotGitDir = join(tmpDir, '.git');
@@ -575,7 +575,7 @@ export function registerSkill(program: Command): void {
         } else {
           const sourcePath = meta.source;
           if (!existsSync(sourcePath)) {
-            throw new Error(`Source path no longer exists: ${sourcePath}`);
+            throw ErrorRegistry.createError('DECKENT_E029', { message: `Source path no longer exists: ${sourcePath}` });
           }
           rmSync(skillDir, { recursive: true, force: true });
           cpSyncExcludeNodeModules(sourcePath, skillDir);

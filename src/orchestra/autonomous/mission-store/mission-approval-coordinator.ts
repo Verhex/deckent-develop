@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import type { ApprovalRequestInput } from '../../../core/approval-broker.js';
-import { DeckentError } from '../../../core/errors.js';
+import { DeckentError, ErrorRegistry } from '../../../core/errors.js';
 import {
   APPROVAL_CONTRACT_V2_VERSION,
   validateApprovalRequest,
@@ -169,7 +169,9 @@ export class MissionApprovalCoordinator implements MissionApprovalCoordinatorLik
       if (binding.decisionState !== 'pending') continue;
       const indexedRequest = indexedRequests.get(binding.requestId)?.request;
       if (indexedRequest && canonical(indexedRequest) !== canonical(binding.request)) {
-        throw new Error(`MISSION_APPROVAL_REQUEST_CONFLICT: ${binding.requestId}`);
+        throw ErrorRegistry.createError('DECKENT_E077', {
+          message: `MISSION_APPROVAL_REQUEST_CONFLICT: ${binding.requestId}`,
+        });
       }
       const settled = decisionState(snapshot, binding.requestId);
       if (!settled) continue;
@@ -189,7 +191,11 @@ export class MissionApprovalCoordinator implements MissionApprovalCoordinatorLik
     let parked = 0;
     for (const item of this.store.listApprovalCandidates()) {
       const mission = this.store.getMission(item.missionId);
-      if (!mission) throw new Error(`MISSION_APPROVAL_INVALID: mission not found for item ${item.id}`);
+      if (!mission) {
+        throw ErrorRegistry.createError('DECKENT_E077', {
+          message: `MISSION_APPROVAL_INVALID: mission not found for item ${item.id}`,
+        });
+      }
       const id = approvalRequestIdForWorkItem(mission, item);
       let request: ApprovalRequest | null = null;
       let invalidReason = '';
@@ -279,7 +285,9 @@ export class MissionApprovalCoordinator implements MissionApprovalCoordinatorLik
       if (binding.publishState !== 'outbox') continue;
       let durable = requestMap(snapshot).get(binding.requestId)?.request;
       if (durable && canonical(durable) !== canonical(binding.request)) {
-        throw new Error(`MISSION_APPROVAL_REQUEST_CONFLICT: ${binding.requestId}`);
+        throw ErrorRegistry.createError('DECKENT_E077', {
+          message: `MISSION_APPROVAL_REQUEST_CONFLICT: ${binding.requestId}`,
+        });
       }
       if (!durable) {
         try {
@@ -296,7 +304,9 @@ export class MissionApprovalCoordinator implements MissionApprovalCoordinatorLik
         }
       }
       if (canonical(durable) !== canonical(binding.request)) {
-        throw new Error(`MISSION_APPROVAL_REQUEST_CONFLICT: ${binding.requestId}`);
+        throw ErrorRegistry.createError('DECKENT_E077', {
+          message: `MISSION_APPROVAL_REQUEST_CONFLICT: ${binding.requestId}`,
+        });
       }
       this.store.markApprovalPublished(binding.requestId);
       published++;

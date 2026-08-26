@@ -7,7 +7,7 @@ import { resolveProjectRoot } from '../helpers/process.js';
 import { promptConfirm } from '../helpers/prompt.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
 import { memoryCatalogMessage } from '../helpers/message-catalog/cli-memory-catalog.js';
-import { ErrorRegistry } from '../../core/errors.js';
+import { DeckentError, ErrorRegistry } from '../../core/errors.js';
 import { BRAIN_DIR, SPRINTS_DIR } from '../../core/constants.js';
 import { loadConfig, resolveDefaultModel } from '../../core/config.js';
 import { modelRegistry, resolveCanonicalModelIdentity } from '../../core/model-registry.js';
@@ -388,7 +388,7 @@ export function registerAgent(program: Command): void {
         try {
           model = resolveCanonicalModelIdentity(requestedModel, { registerParametric: false }).id;
         } catch {
-          throw new Error(getMessage('agent.create.invalid_model', lang, {
+          throw new DeckentError('E_AGENT_INVALID_MODEL', getMessage('agent.create.invalid_model', lang, {
             model: requestedModel,
             models: modelRegistry.getAllModelIds().join(', '),
           }));
@@ -399,7 +399,7 @@ export function registerAgent(program: Command): void {
         if (triggers.length > 0) {
           const triggerErrors = validateTriggers(triggers, lang);
           if (triggerErrors.length > 0) {
-            throw new Error(getMessage('agent.create.invalid_triggers', lang, {
+            throw new DeckentError('E_AGENT_INVALID_TRIGGERS', getMessage('agent.create.invalid_triggers', lang, {
               errors: triggerErrors.join('\n  '),
             }));
           }
@@ -587,7 +587,7 @@ export function registerAgent(program: Command): void {
         if (opts.triggers) {
           const triggerErrors = validateTriggers(opts.triggers, lang);
           if (triggerErrors.length > 0) {
-            throw new Error(`Invalid triggers:\n  ${triggerErrors.join('\n  ')}`);
+            throw new DeckentError('E_AGENT_EDIT_INVALID_TRIGGERS', `Invalid triggers:\n  ${triggerErrors.join('\n  ')}`);
           }
           if (agent.preferredModel !== undefined) agent.triggerKeywords = opts.triggers;
           else agent.triggers = opts.triggers;
@@ -654,7 +654,7 @@ export function registerAgent(program: Command): void {
         const root = resolveProjectRoot();
         const valid = ['DONE', 'GO_WITH_TECH_DEBT', 'NO_GO'] as const;
         if (!(valid as readonly string[]).includes(opts.decision)) {
-          throw new Error(`Invalid --decision "${opts.decision}". Valid values: ${valid.join(', ')}`);
+          throw new DeckentError('E_AGENT_INVALID_DECISION', `Invalid --decision "${opts.decision}". Valid values: ${valid.join(', ')}`);
         }
         const decision = opts.decision as typeof valid[number];
 
