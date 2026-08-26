@@ -91,7 +91,7 @@ workflow'udur; ürünün bütünü veya tek execution authority'si değildir:
 > **Phase-5 CANLI (2026-08-17):** writer + owner sign ceremony sevk edildi; ilk authenticated
 > batch (`dba89c03…`, 2 event, owner-signed ed25519 receipt) append edildi, dört-view projection
 > üretildi ve 8101+7140 MASTER settlement'ı bu batch'e bağlı receipt'lerle kapandı. Tam referans:
-> [`docs/governance/closure-os-sidecar-ledger.md`](docs/governance/closure-os-sidecar-ledger.md).
+> [`docs/archive/governance-2026-08/closure-os-sidecar-ledger.md`](docs/archive/governance-2026-08/closure-os-sidecar-ledger.md).
 
 1. **`deckent_init`** — Projeyi başlat. `.deckent/`, `.brain/`, `.tasks/` dizinlerini ve seçili host adapterının provider-neutral kural/reference projection'larını oluşturur. Desteklenen her environment/project scope'unda bir kez çalıştırılır.
 

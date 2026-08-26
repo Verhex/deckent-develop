@@ -563,7 +563,7 @@ UI/UX referans araması generic dark/neon/glass “AI interface” yönünü ön
 §12.1 sidecar karar-defteri kontratı (rev-2) için **Phase-4 foundation** mekanik ve kanıt olarak
 **COMPLETE**'tir. Bu bir **mekanizma + governance foundation** kapanışıdır; **ürün wiring değildir** ve
 **canlı bir ledger mutation'ı yoktur** (ledger boş; gate `nothing to validate (OK)` döner). Tam teknik
-referans: [`docs/governance/closure-os-sidecar-ledger.md`](docs/governance/closure-os-sidecar-ledger.md).
+referans: [`docs/archive/governance-2026-08/closure-os-sidecar-ledger.md`](docs/archive/governance-2026-08/closure-os-sidecar-ledger.md).
 
 ### 14.1 Authority ayrımı (değişmedi, artık kodla zorlanıyor)
 

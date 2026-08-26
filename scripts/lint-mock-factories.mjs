@@ -93,9 +93,9 @@ export const MOCK_FACTORY_BASELINE = new Set([
   // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.
   "tests/cli/commands/init.test.ts",
   // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.
+  // 2026-08-26 Faz-B: emekli output/onboard/job-runner/resources path'leri canonical hedefleriyle birleşti — 3 dupe düşümü (yalnız-azalma).
   "tests/cli/commands/onboard.test.ts",
-  // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.
-  "tests/cli/commands/output.test.ts",
+  // 2026-08-26 Faz-B merge: output.test.ts canonical hedefi mock-temiz çıktı — girdi düşürüldü (yalnız-azalma ledger'ı).
   // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.
   "tests/cli/commands/resume.test.ts",
   // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.
@@ -157,7 +157,6 @@ export const MOCK_FACTORY_BASELINE = new Set([
   // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.
   "tests/cli/onboard-command.test.ts",
   // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.
-  "tests/cli/onboard.test.ts",
   // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.
   "tests/cli/plan-yes-flag.test.ts",
   // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.
@@ -251,7 +250,7 @@ export const MOCK_FACTORY_BASELINE = new Set([
   // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.
   "tests/mcp/branch-coverage.test.ts",
   // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.
-  "tests/mcp/job-runner.test.ts",
+  "tests/mcp/tools/job-runner.test.ts",
   // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.
   "tests/mcp/kill-force.test.ts",
   // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.
@@ -259,9 +258,8 @@ export const MOCK_FACTORY_BASELINE = new Set([
   // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.
   "tests/mcp/nervous-tools.test.ts",
   // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.
-  "tests/mcp/resources/resources.test.ts",
-  // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.
   "tests/mcp/resources.test.ts",
+  // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.
   // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.
   "tests/mcp/run-budget-authority.test.ts",
   // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.
@@ -301,7 +299,6 @@ export const MOCK_FACTORY_BASELINE = new Set([
   // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.
   "tests/mcp/tools/init.test.ts",
   // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.
-  "tests/mcp/tools/job-runner.test.ts",
   // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.
   "tests/mcp/tools/misc-tools.test.ts",
   // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.

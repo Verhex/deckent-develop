@@ -439,6 +439,31 @@ function assertUtf8StreamWritable(
   }
 }
 
+const WRITE_CAPABLE_OPEN_FLAG_BITS =
+  mutableFs.constants.O_WRONLY |
+  mutableFs.constants.O_RDWR |
+  mutableFs.constants.O_CREAT |
+  mutableFs.constants.O_TRUNC |
+  mutableFs.constants.O_APPEND;
+
+/**
+ * Classify open(2) flags. Only canonical read-only shapes ('r'/'rs', numeric
+ * without any write-capable bit, or omitted flags defaulting to 'r') are
+ * non-writable; every unknown shape stays fail-closed as write-capable.
+ */
+export function isWriteCapableOpenFlags(flags: unknown): boolean {
+  if (flags === undefined || flags === null) {
+    return false; // fs defaults omitted flags to 'r'
+  }
+  if (typeof flags === 'number') {
+    return (flags & WRITE_CAPABLE_OPEN_FLAG_BITS) !== 0;
+  }
+  if (typeof flags === 'string') {
+    return !/^[rs]+$/.test(flags); // 'r' / 'rs' read-only; '+', 'w', 'a' write
+  }
+  return true;
+}
+
 function installPatches(policy: RuntimeWritePolicy): () => void {
   const records: PatchRecord[] = [];
   const fsFunctions = mutableFs as unknown as MutableFunctionMap;
@@ -520,13 +545,23 @@ function installPatches(policy: RuntimeWritePolicy): () => void {
     policy.assertWritable('fs.promises.symlink:destination', args[1]);
   });
 
+  // open(2) mutates only when its flags are write-capable. Read-only and
+  // directory-pin descriptors (secure-open O_RDONLY/O_NOFOLLOW/O_DIRECTORY,
+  // fsync-only 'r') must pass through so fd mutation vectors stay covered by
+  // blocking every write-capable open instead — this guard cannot interpose
+  // numeric descriptors after they are granted (see installRuntimeWriteGuard).
   for (const key of ['open', 'openSync'] as const) {
     patchFunction(records, fsFunctions, key, args => {
-      policy.assertWritable(`fs.${key}`, args[0]);
+      const flags = typeof args[1] === 'function' ? undefined : args[1];
+      if (isWriteCapableOpenFlags(flags)) {
+        policy.assertWritable(`fs.${key}`, args[0]);
+      }
     });
   }
   patchFunction(records, promiseFunctions, 'open', args => {
-    policy.assertWritable('fs.promises.open', args[0]);
+    if (isWriteCapableOpenFlags(args[1])) {
+      policy.assertWritable('fs.promises.open', args[0]);
+    }
   });
 
   syncBuiltinESMExports();

@@ -26,3 +26,18 @@ merge'lerinden değil, `tests/hermeticity/runtime-write-guard.ts:523-529` local
 secure-open interposition kökü ile allowlist dışındaki canonical hermeticity/mock
 ratchet'larından gelir. Exact kanıt ve önerilen diffs:
 `docs/audits/ci-repair-2026-08-26/HANDOFF.md` ve `FINDINGS.md`.
+
+## ANA-ŞERİT ADMISSION KAPANIŞI — 2026-08-26 (protokol §6; lease SONA ERDİ)
+
+- Admission: **KABUL** — 147-dosya lane-diff %100 allowlist-içi; rebase-base `567ecaf88`;
+  wire 78 (hedef ≤78); equality 57/57 beyanı bağımsız worktree-koşusuyla sınıf-düzeyinde
+  yeniden-üretildi (secret ✅ tsc ✅ build ✅ lint-HOLD ✅ secure-open kökü ✅).
+- CI-F004 KAPANDI: runtime-write-guard open(2) flag-sınıflandırması (read-only/dir-pin
+  pass-through, bilinmeyen şekil fail-closed) + probe `'r+'` dönüşümü + 3 read-only vakası
+  + string/numeric flag-matrisi (5 test). CI-F005 KAPANDI: hermeticity digest ×2 (16511/1339
+  sayılar sabit) + mock-factory ledger (1 canonical path, 1 doymuş düşüm, 3 dupe birleşimi;
+  pin 276→272). CI-F006 KAPANDI: README/README.tr/IDENTITY projection'ları regen
+  (stats-snapshot'a dokunulmadı — owner-authority).
+- Landing-kanıtı: full-suite (fixed tree) **2.770/2.777 dosya — 1 kırmızı** (mock-pin,
+  aynı turda kapatıldı, scoped 25/25) · 20-gate lint=0 · tsc=0 · build:all=0 · bot canlı.
+- Test-freeze lease bu admission ile biter; `tests/**` yazımı ana-şeride döner.

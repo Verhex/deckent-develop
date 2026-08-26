@@ -74,7 +74,9 @@ describe('lint-mock-factories gate', () => {
   it('is green against the real repository and pins the measured ledger', () => {
     const result = checkMockFactories(process.cwd());
 
-    expect(MOCK_FACTORY_BASELINE.size).toBe(276);
+    // 2026-08-26 Faz-B: 276→272 — output.test.ts mock-temiz düşümü + emekli
+    // onboard/job-runner/resources girdilerinin canonical hedefleriyle birleşmesi (3 dupe).
+    expect(MOCK_FACTORY_BASELINE.size).toBe(272);
     expect(result.fresh).toEqual([]);
     expect(result.stale).toEqual([]);
   });

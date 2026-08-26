@@ -15,6 +15,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   createRuntimeWritePolicy,
   isPathWithin,
+  isWriteCapableOpenFlags,
   normalizeComparablePath,
   physicalAncestorFromModuleUrl,
   RUNTIME_FS_API_CLASSIFICATION,
@@ -96,17 +97,32 @@ async function runGuardProbe(root: string): Promise<Record<string, string | bool
     });
     result.distCopy = await observe(() => fs.copyFileSync(sourceFile, join(dist, 'copy.txt')));
     result.readFdMutation = await observe(() => {
-      const fd = fs.openSync(sentinel, 'r');
+      const fd = fs.openSync(sentinel, 'r+');
       fs.fchmodSync(fd, 0o644);
       fs.closeSync(fd);
     });
     result.readHandleMutation = await observe(async () => {
-      const handle = await fsp.open(sentinel, 'r');
+      const handle = await fsp.open(sentinel, 'r+');
       try {
         await handle.chmod(0o644);
       } finally {
         await handle.close();
       }
+    });
+    result.readOnlyOpen = await observe(() => {
+      const fd = fs.openSync(sentinel, 'r');
+      fs.closeSync(fd);
+    });
+    result.readOnlyNumericOpen = await observe(() => {
+      const fd = fs.openSync(
+        sentinel,
+        fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0),
+      );
+      fs.closeSync(fd);
+    });
+    result.readOnlyHandleOpen = await observe(async () => {
+      const handle = await fsp.open(sentinel, 'r');
+      await handle.close();
     });
     result.readStream = await observe(() => {
       const stream = fs.createReadStream(sentinel);
@@ -239,6 +255,9 @@ describe('runtime hermetic write guard', () => {
       distCopy: 'E_HERMETIC_DIST_CLEAN',
       readFdMutation: 'E_HERMETIC_TASKS_WRITE',
       readHandleMutation: 'E_HERMETIC_TASKS_WRITE',
+      readOnlyOpen: 'ALLOWED',
+      readOnlyNumericOpen: 'ALLOWED',
+      readOnlyHandleOpen: 'ALLOWED',
       readStream: 'E_HERMETIC_TASKS_WRITE',
       readStreamConstructor: 'E_HERMETIC_TASKS_WRITE',
       writeStreamConstructor: 'E_HERMETIC_DIST_CLEAN',
@@ -418,5 +437,42 @@ describe('cross-platform path comparison', () => {
       '/work/deckent/.tasks',
       'posix',
     )).toBe(false);
+  });
+});
+
+describe('open(2) flag classification', () => {
+  const { O_RDONLY, O_WRONLY, O_RDWR, O_CREAT, O_TRUNC, O_APPEND, O_NOFOLLOW, O_DIRECTORY } =
+    nodeFs.constants;
+
+  it('classifies canonical read-only string flags as pass-through', () => {
+    expect(isWriteCapableOpenFlags('r')).toBe(false);
+    expect(isWriteCapableOpenFlags('rs')).toBe(false);
+    expect(isWriteCapableOpenFlags(undefined)).toBe(false);
+    expect(isWriteCapableOpenFlags(null)).toBe(false);
+  });
+
+  it('classifies write-capable string flags as writes', () => {
+    for (const flags of ['r+', 'rs+', 'w', 'wx', 'w+', 'wx+', 'a', 'ax', 'a+', 'ax+', 'as', 'as+']) {
+      expect(isWriteCapableOpenFlags(flags), flags).toBe(true);
+    }
+  });
+
+  it('classifies numeric read-only and directory-pin flags as pass-through', () => {
+    expect(isWriteCapableOpenFlags(O_RDONLY)).toBe(false);
+    expect(isWriteCapableOpenFlags(O_RDONLY | (O_NOFOLLOW ?? 0))).toBe(false);
+    expect(isWriteCapableOpenFlags(O_RDONLY | (O_DIRECTORY ?? 0))).toBe(false);
+  });
+
+  it('classifies every write-capable numeric bit as a write', () => {
+    for (const bit of [O_WRONLY, O_RDWR, O_CREAT, O_TRUNC, O_APPEND]) {
+      expect(isWriteCapableOpenFlags(O_RDONLY | bit), String(bit)).toBe(true);
+    }
+    expect(isWriteCapableOpenFlags(O_RDWR | O_CREAT | O_TRUNC)).toBe(true);
+  });
+
+  it('fails closed on unknown flag shapes', () => {
+    expect(isWriteCapableOpenFlags({})).toBe(true);
+    expect(isWriteCapableOpenFlags(Symbol('flags'))).toBe(true);
+    expect(isWriteCapableOpenFlags(['r'])).toBe(true);
   });
 });

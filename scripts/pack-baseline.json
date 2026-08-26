@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-08-14T09:42:41.717Z",
-  "totalBytes": 19123852,
-  "totalFiles": 2294,
+  "generatedAt": "2026-08-26T13:19:01.807Z",
+  "totalBytes": 22161794,
+  "totalFiles": 2475,
   "categories": {
     ".::asset": {
       "count": 1,
@@ -9,83 +9,83 @@
     },
     ".::.md": {
       "count": 2,
-      "bytes": 26758
+      "bytes": 25390
     },
     "assets::asset": {
       "count": 1,
-      "bytes": 2483
+      "bytes": 3444
     },
     "dist/agent::.md": {
       "count": 1,
       "bytes": 1078
     },
     "dist/agent::.d.ts": {
-      "count": 22,
-      "bytes": 40145
+      "count": 26,
+      "bytes": 70886
     },
     "dist/agent::.js": {
-      "count": 22,
-      "bytes": 91995
+      "count": 26,
+      "bytes": 184256
     },
     "dist/agents::.d.ts": {
-      "count": 28,
-      "bytes": 84454
+      "count": 29,
+      "bytes": 86109
     },
     "dist/agents::.js": {
-      "count": 28,
-      "bytes": 256361
+      "count": 29,
+      "bytes": 261727
     },
     "dist/api::.d.ts": {
       "count": 44,
-      "bytes": 86102
+      "bytes": 89806
     },
     "dist/api::.js": {
       "count": 44,
-      "bytes": 401221
+      "bytes": 421939
     },
     "dist::.json": {
       "count": 1,
       "bytes": 295
     },
     "dist/cli::.d.ts": {
-      "count": 190,
-      "bytes": 569929
+      "count": 203,
+      "bytes": 654717
     },
     "dist/cli::.js": {
-      "count": 190,
-      "bytes": 2759942
+      "count": 203,
+      "bytes": 3488462
     },
     "dist/cli::asset": {
       "count": 1,
       "bytes": 724
     },
     "dist/connectors::.d.ts": {
-      "count": 62,
-      "bytes": 125054
+      "count": 63,
+      "bytes": 141428
     },
     "dist/connectors::.js": {
-      "count": 62,
-      "bytes": 275832
+      "count": 63,
+      "bytes": 341912
     },
     "dist/connectors::.md": {
       "count": 1,
       "bytes": 4418
     },
     "dist/core::.d.ts": {
-      "count": 373,
-      "bytes": 1781808
+      "count": 431,
+      "bytes": 2170000
     },
     "dist/core::.js": {
-      "count": 373,
-      "bytes": 3979433
+      "count": 431,
+      "bytes": 4989700
     },
     "dist/core::.json": {
-      "count": 54,
-      "bytes": 137828
+      "count": 55,
+      "bytes": 163143
     },
     "dist/core::.md": {
       "count": 55,
-      "bytes": 331387
+      "bytes": 331509
     },
     "dist/dashboard::.js": {
       "count": 12,
@@ -97,11 +97,11 @@
     },
     "dist/extensions::.d.ts": {
       "count": 4,
-      "bytes": 9895
+      "bytes": 10157
     },
     "dist/extensions::.js": {
       "count": 4,
-      "bytes": 15705
+      "bytes": 17132
     },
     "dist::.d.ts": {
       "count": 1,
@@ -120,44 +120,44 @@
       "bytes": 10301
     },
     "dist/mcp::.d.ts": {
-      "count": 59,
-      "bytes": 33674
+      "count": 61,
+      "bytes": 36034
     },
     "dist/mcp::.js": {
-      "count": 59,
-      "bytes": 390673
+      "count": 61,
+      "bytes": 400085
     },
     "dist/monitor::.d.ts": {
       "count": 6,
-      "bytes": 44540
+      "bytes": 46158
     },
     "dist/monitor::.js": {
       "count": 6,
-      "bytes": 135940
+      "bytes": 139895
     },
     "dist/nervous::.d.ts": {
       "count": 34,
-      "bytes": 85554
+      "bytes": 87778
     },
     "dist/nervous::.js": {
       "count": 34,
-      "bytes": 273783
+      "bytes": 277499
     },
     "dist/orchestra::.d.ts": {
-      "count": 222,
-      "bytes": 1110295
+      "count": 230,
+      "bytes": 1196666
     },
     "dist/orchestra::.js": {
-      "count": 222,
-      "bytes": 3959457
+      "count": 230,
+      "bytes": 4380200
     },
     "dist/providers::.d.ts": {
-      "count": 20,
-      "bytes": 116500
+      "count": 23,
+      "bytes": 123732
     },
     "dist/providers::.js": {
-      "count": 20,
-      "bytes": 331582
+      "count": 23,
+      "bytes": 354928
     },
     "dist/sdk::.d.ts": {
       "count": 2,
@@ -165,7 +165,7 @@
     },
     "dist/sdk::.js": {
       "count": 2,
-      "bytes": 9415
+      "bytes": 10141
     },
     "dist/training::.d.ts": {
       "count": 4,
@@ -177,7 +177,7 @@
     },
     ".::.json": {
       "count": 1,
-      "bytes": 6704
+      "bytes": 7558
     }
   }
 }

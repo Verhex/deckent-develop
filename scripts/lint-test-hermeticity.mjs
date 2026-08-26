@@ -713,7 +713,12 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // attribution-baseline / finalize-retirement + isCanonicalTaskFilename pinleri.
   // 2026-08-26 11:04: 16504→16506 — Node-6a mekanik supurme (sprint-684 3/3):
   // death-sweep hijyen + worker-identity-hostbound + docker-git-async suiteleri.
-  digest: '118d74c8e54f18c19d071fca97453f7dca2310eee51b3f86269c0fa5f6a918f0',
+  digest: 'b816db452c9002d5b3d222cbf9f56f4029b2d502404b8649b17da079e6875a50',
+  // 2026-08-26 17:4x: ayni 16511, digest-only — Faz-B test-slim merge
+  // (66 kaynak emekli, equality 57/57) + CI-F004 guard flag-siniflandirmasi
+  // (runtime-write-guard open-patch + probe/matris eklentileri) + CI-F005
+  // mock-factory ledger guncellemesi (1 canonical path + 1 dusum + 3 dupe
+  // birlesimi, pin-testi 276→272).
   // 2026-08-26 15:1x: ayni 16511, digest-only — CI-kapanis S1 src-fix'leri
   // (fsync 'r+' x3 + heartbeat dir-guard + i18n key) satir-kaydirmasi.
   // 13:5x: 16508→16511 — sprint-691 66-dosya hizalama + init semantik-koruma pini.
@@ -1280,7 +1285,9 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // finalizer + sidecar-loader hotfix).
   // 2026-08-26 11:05: ayni 1339, digest-only — Node-6a src kaymalari
   // (death-sweep / prompt-template kimlik-esigi / docker async-git).
-  digest: 'ed5cece405531434cbe8dc139a122b4891d519f5db80e1ada16519553b1b0767',
+  digest: 'fac1323f67b4343df466abc25b673761548cd4de47dc3dd3d17ca13cacde6caa',
+  // 2026-08-26 17:4x: ayni 1339, digest-only — Faz-B merge test-korpusu
+  // kaymasi (production inventory metni ayni, referans-graf kaydi).
   // 2026-08-26 15:1x: ayni 1339, digest-only — CI-kapanis S1 fsync/i18n src kaymalari.
   // 12:5x: ayni 1339, digest-only — spawn sync-restorasyonu + lastSpawnCompletion seam.
   // 12:1x: ayni 1339, digest-only — 689 8-dosya typed-throw src kaymalari.
