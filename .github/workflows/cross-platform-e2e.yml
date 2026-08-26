@@ -46,7 +46,24 @@ jobs:
       - run: npm ci
       - run: npm run ci:rebuild-native
 
+      # The clean maintenance authority is Linux/WSL-only until the approved
+      # Darwin adapter lands. Keep the guarded clean on Linux; on macOS, prove
+      # this is a fresh checkout before running the exact clean-less build
+      # payload. No clean bypass or authority downgrade is introduced.
       - run: npm run build
+        if: runner.os == 'Linux'
+
+      - name: Build without clean on fresh macOS checkout
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -e dist ]; then
+            echo "::error::clean-less macOS build requires an absent dist/ directory"
+            exit 1
+          fi
+          npx tsc
+          node scripts/copy-assets.mjs
 
       - name: Install tmux (macOS)
         if: matrix.backend == 'tmux' && matrix.os == 'macos-latest'
@@ -131,6 +148,12 @@ jobs:
       # this check exists to stop would pass again. These three legs are the ruleset's
       # required checks (20321963) — the enforcement guarantee lives here.
       - uses: actions/checkout@v4
+        env:
+          # Inject into checkout's own Git subprocesses. COUNT=0 makes the
+          # setting Windows-only while preserving the shared matrix step.
+          GIT_CONFIG_COUNT: ${{ runner.os == 'Windows' && '1' || '0' }}
+          GIT_CONFIG_KEY_0: core.longpaths
+          GIT_CONFIG_VALUE_0: 'true'
         with:
           fetch-depth: 0
 
@@ -182,6 +205,10 @@ jobs:
       npm_config_fetch_timeout: '300000'
     steps:
       - uses: actions/checkout@v4
+        env:
+          GIT_CONFIG_COUNT: ${{ runner.os == 'Windows' && '1' || '0' }}
+          GIT_CONFIG_KEY_0: core.longpaths
+          GIT_CONFIG_VALUE_0: 'true'
 
       - uses: actions/setup-node@v4
         with:
@@ -226,7 +253,26 @@ jobs:
             sleep 30
           done
 
-      - run: npm run build:all
+      # Linux retains the canonical clean authority. macOS/Windows currently
+      # lack the secure-open maintenance adapter, so a fresh-checkout-only
+      # build runs the same compile/copy/dashboard payload without claiming
+      # clean authority. A pre-existing dist fails closed instead of going stale.
+      - name: Build dist + dashboard (Linux guarded clean)
+        if: runner.os == 'Linux'
+        run: npm run build:all
+
+      - name: Build dist + dashboard without clean (macOS/Windows fresh checkout)
+        if: runner.os != 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -e dist ]; then
+            echo "::error::clean-less non-Linux build requires an absent dist/ directory"
+            exit 1
+          fi
+          npx tsc
+          node scripts/copy-assets.mjs
+          npm run build:dashboard
 
       - name: Packed-install smoke — npm pack → isolated-prefix global install → deckent init --yes → deckent doctor (bounded retry)
         shell: bash
@@ -300,6 +346,10 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        env:
+          GIT_CONFIG_COUNT: ${{ runner.os == 'Windows' && '1' || '0' }}
+          GIT_CONFIG_KEY_0: core.longpaths
+          GIT_CONFIG_VALUE_0: 'true'
 
       - uses: actions/setup-node@v4
         with:

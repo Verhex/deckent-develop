@@ -273,6 +273,13 @@ jobs:
     needs: typecheck
     steps:
       - uses: actions/checkout@v4
+        # Windows Git keeps long-path support default-off. This must be injected
+        # into checkout's own Git processes (a prior global-config step is not
+        # sufficient because actions/checkout temporarily replaces HOME).
+        env:
+          GIT_CONFIG_COUNT: '1'
+          GIT_CONFIG_KEY_0: core.longpaths
+          GIT_CONFIG_VALUE_0: 'true'
       - uses: actions/setup-node@v4
         with:
           node-version: '24.x'
