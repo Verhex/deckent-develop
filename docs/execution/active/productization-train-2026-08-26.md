@@ -38,3 +38,14 @@
   acceptance-amendment'ları, (b) gerçek Win/mac makine, (c) ertele.
 - **Dilimleme-seansları (91 PROGRAM):** haftada 2 seans; seans-başına 2-3 ebeveyn → dilim
   önerileri owner-admission'a.
+
+
+## ARA-FAZ-SONRASI İLK İŞ (owner-onaylı plan, 2026-08-26)
+**Dogfood-skill evrimi + katalog-reformu + core-doc tazeleme** — 3 dalga; tam plan
+`~/.claude/plans/snuggly-doodling-stream.md` + keşif-kanıtları (skill-seçim patolojisi:
+v1-çöp-domain profiller → her göreve aynı alfabetik-üçlü; seedBuiltins asla güncellemiyor;
+her prompt'a var-olmayan `npx eslint`; dogfood-bilgisi skill-kanalında sıfır).
+Sıra: Dalga-1 mekanizma-onarımı (profil-v2 kapısı + katman-senkronu + unroutable-gate +
+stack-doğruluk) → canlı çeşitlilik-ölçümü → Dalga-2 dogfood-süiti (4 yeni skill +
+test-guardian agent; 7094-F1c kapanışı) → Dalga-3 workspace/core-doc regen.
+MASTER-bağı: SKILL/AGENT-CATALOG-AUTHORITY satırları + 7094-F1c.
