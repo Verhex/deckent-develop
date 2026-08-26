@@ -27,7 +27,10 @@
 6. **Mekanik süpürme** — 7141 (131-throw typed dönüşümü, gen-repair-directives'le) + 3315
    (spawnSync kuyruğu) + 204 + 207.
 
-## Paralel şeritler (owner-kararına bağlı — trene girmedi)
+## Paralel şeritler (protokol: docs/governance/parallel-lane-protocol.md)
+- **AKTİF — lane/descriptor-registry-20260826 (Codex):** G1B descriptor-registry analiz+prototip;
+  worktree /tmp/deckent-lane-descriptor-registry, brief branch'te (LANE-BRIEF.md); admission 470'e.
+### Diğer adaylar (owner-kararına bağlı)
 - **Owner-penceresi (42):** günlük 20-30dk karar-turu önerisi — her gün 3-5 satır karar.
 - **Platform-lane (47 ENV):** karar bekliyor — (a) GitHub-CI matrix ADVISORY-kanıt + typed
   acceptance-amendment'ları, (b) gerçek Win/mac makine, (c) ertele.
