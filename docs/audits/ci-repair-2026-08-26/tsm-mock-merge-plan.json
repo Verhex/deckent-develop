@@ -1,0 +1,8 @@
+[
+  { "id": "TSM-001", "target": "tests/cli/commands/chat.test.ts", "source": "tests/cli/chat.test.ts" },
+  { "id": "TSM-004", "target": "tests/cli/commands/dashboard.test.ts", "source": "tests/cli/dashboard.test.ts" },
+  { "id": "TSM-008", "target": "tests/cli/commands/onboard.test.ts", "source": "tests/cli/onboard.test.ts" },
+  { "id": "TSM-009", "target": "tests/cli/commands/output.test.ts", "source": "tests/cli/helpers/output.test.ts", "destination": "tests/cli/output.test.ts" },
+  { "id": "TSM-010", "target": "tests/cli/commands/recall.test.ts", "source": "tests/cli/recall.test.ts" },
+  { "id": "TSM-017", "target": "tests/mcp/resources.test.ts", "source": "tests/mcp/resources/resources.test.ts" }
+]

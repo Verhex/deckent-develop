@@ -25,6 +25,17 @@ import { PROVIDER_EXECUTION_OBSERVATION_DATABASE_PATH } from '../../src/core/pro
 
 const execFileAsync = promisify(execFile);
 const temporaryDirectories: string[] = [];
+const REAL_PROCESS_TEST_TIMEOUT_MS = process.env.CI ? 30_000 : 10_000;
+const TEST_WORKER_ENVIRONMENT_KEYS = [
+  'VITEST',
+  'VITEST_MODE',
+  'VITEST_POOL_ID',
+  'VITEST_WORKER_ID',
+  'NODE_ENV',
+  'DECKENT_TEST_HERMETICITY',
+  'NODE_CHANNEL_FD',
+  'NODE_CHANNEL_SERIALIZATION_MODE',
+] as const;
 
 function createProject(): string {
   const root = mkdtempSync(join(tmpdir(), 'provider-observation-cli-'));
@@ -73,20 +84,16 @@ function createDatabase(path: string, version: 1 | 2, corrupt = false): void {
 }
 
 async function runProductionCommand(root: string, args: readonly string[]) {
-  const script = join(root, 'provider-observations-driver.ts');
-  const modulePath = join(process.cwd(), 'src/cli/commands/provider-observations.ts');
-  const commanderPath = join(process.cwd(), 'node_modules/commander/index.js');
-  writeFileSync(script, [
-    `import { Command } from ${JSON.stringify(commanderPath)};`,
-    `import { registerProviderObservations } from ${JSON.stringify(modulePath)};`,
-    `const program = new Command().exitOverride();`,
-    `registerProviderObservations(program, { resolveProjectRootFn: () => process.env.PROJECT_ROOT! });`,
-    `await program.parseAsync(['node', 'deckent', ...JSON.parse(process.env.COMMAND_ARGS!)]);`,
-  ].join('\n'));
+  const childEnv = { ...process.env };
+  for (const key of TEST_WORKER_ENVIRONMENT_KEYS) delete childEnv[key];
   try {
-    return await execFileAsync(join(process.cwd(), 'node_modules/.bin/vite-node'), [script], {
+    return await execFileAsync(process.execPath, [
+      join(process.cwd(), 'dist/cli/entry.js'),
+      ...args,
+    ], {
       cwd: root,
-      env: { ...process.env, PROJECT_ROOT: root, COMMAND_ARGS: JSON.stringify(args) },
+      env: childEnv,
+      timeout: REAL_PROCESS_TEST_TIMEOUT_MS,
     });
   } catch (error) {
     return error as Awaited<ReturnType<typeof execFileAsync>> & { code: number };

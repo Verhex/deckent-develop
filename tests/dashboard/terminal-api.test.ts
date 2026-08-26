@@ -5,6 +5,7 @@ import {
   SessionBuffer,
   createSession,
 } from '../../src/dashboard/src/lib/terminal-api.js';
+import { getBootstrapToken, createSession as createSession__tsm_013 } from "../../src/dashboard/src/lib/terminal-api.js";
 
 describe('SessionRegistry — multi-session management', () => {
   it('tracks multiple sessions and lists them all', () => {
@@ -111,3 +112,20 @@ describe('createSession + SessionRegistry integration', () => {
     expect(registry.get('new-1')).toEqual({ id: 'new-1', kind: 'shell', status: 'running' });
   });
 });
+
+// TSM-013: physically merged from tests/dashboard/terminal/terminal-api.test.ts.
+{
+describe('terminal-api', () => {
+    it('reads the injected bootstrap token', () => {
+        (window as unknown as Record<string, unknown>).__DECKENT_TERMINAL_TOKEN__ = 'tok-1';
+        expect(getBootstrapToken()).toBe('tok-1');
+    });
+    it('POSTs a session create', async () => {
+        const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: 's1' }) });
+        vi.stubGlobal('fetch', fetchMock);
+        const r = await createSession__tsm_013({ kind: 'shell' });
+        expect(r.id).toBe('s1');
+        expect(fetchMock).toHaveBeenCalledWith('/api/terminal/sessions', expect.objectContaining({ method: 'POST' }));
+    });
+});
+}

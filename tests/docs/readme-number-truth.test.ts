@@ -126,6 +126,13 @@ const STALE_PAGE_COUNTS = ['16 pages', '16 sayfa'];
 describe('README.md — number truth', () => {
   const content = readFileSync(join(ROOT, 'README.md'), 'utf-8');
 
+  it('is written in English without Turkish section headings', () => {
+    expect(content).not.toContain('Gereksinimler');
+    expect(content).not.toContain('Kurulum');
+    expect(content).not.toContain('Komutlar');
+    expect(content).not.toContain('Lisans');
+  });
+
   it('contains no legacy stale tool/agent/skill/page counts', () => {
     for (const stale of [...STALE_TOOL_COUNTS, ...STALE_AGENT_COUNTS, ...STALE_SKILL_COUNTS, ...STALE_PAGE_COUNTS]) {
       expect(content).not.toContain(stale);

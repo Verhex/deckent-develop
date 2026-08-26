@@ -82,6 +82,13 @@ describe('generated CLI reference', () => {
       expect(content).not.toContain('Bilinen CLI truth gap');
     }
   });
+
+  it('rejects the retired project-identity path and preserves the current identity authority', () => {
+    for (const path of [EN_PATH, TR_PATH]) {
+      expect(readFileSync(path, 'utf8')).not.toContain('PROJECT-IDENTITY');
+    }
+    expect(existsSync(join(ROOT, '.deckent/workspace/IDENTITY.md'))).toBe(true);
+  });
 });
 
 describe('scripts/generate-cli-docs.ts', () => {

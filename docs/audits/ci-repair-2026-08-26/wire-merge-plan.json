@@ -1,0 +1,47 @@
+[
+  { "id": "WIRE-001", "target": "tests/agents/worker-approval-gate-real-wire.test.ts", "source": "tests/agents/worker-approval-dispatcher-wire.test.ts" },
+  { "id": "WIRE-002", "target": "tests/agents/worker-heartbeat-authority-wire.test.ts", "source": "tests/agents/adaptive-agent-wire.test.ts" },
+  { "id": "WIRE-003", "target": "tests/agents/worker-verify-isolation-wire.test.ts", "source": "tests/agents/workergate-wire.test.ts" },
+
+  { "id": "WIRE-004", "target": "tests/api/approval-lifecycle-runtime-wire.test.ts", "source": "tests/api/acceptance-confirmation-runtime-wire.test.ts" },
+  { "id": "WIRE-005", "target": "tests/api/approval-expiry-wire.test.ts", "source": "tests/api/approval-history-wire.test.ts" },
+  { "id": "WIRE-006", "target": "tests/api/terminal-audit-wire.test.ts", "source": "tests/api/terminal-config-wire.test.ts" },
+  { "id": "WIRE-007", "target": "tests/api/server-tenant-scope-wire.test.ts", "source": "tests/api/terminal/server-command-guard-wire.test.ts" },
+
+  { "id": "WIRE-008", "target": "tests/cli/autonomous-flow-wire.test.ts", "source": "tests/cli/flow-wire.test.ts" },
+  { "id": "WIRE-009", "target": "tests/cli/calltool-exec-wire.test.ts", "source": "tests/cli/tool-repl-wire.test.ts" },
+  { "id": "WIRE-010", "target": "tests/cli/help-surface-wire.test.ts", "source": "tests/cli/native-flag-wire.test.ts" },
+  { "id": "WIRE-011", "target": "tests/cli/mcp-broker-wire.test.ts", "source": "tests/cli/repl-mcp-wire.test.ts" },
+  { "id": "WIRE-012", "target": "tests/cli/provider-limits-authoring-wire.test.ts", "source": "tests/cli/provider-limits-claude-docker-wire.test.ts" },
+  { "id": "WIRE-013", "target": "tests/cli/repl-agentic-enterprise-wire.test.ts", "source": "tests/cli/repl-agentic-wire.test.ts" },
+  { "id": "WIRE-014", "target": "tests/cli/repl-banner-wire.test.ts", "source": "tests/cli/repl-status-line-wire.test.ts" },
+  { "id": "WIRE-015", "target": "tests/cli/repl-do-slash-wire.test.ts", "source": "tests/cli/repl-slash-wire.test.ts" },
+  { "id": "WIRE-016", "target": "tests/cli/repl-slash-registry-wire.test.ts", "source": "tests/cli/slash-mode-wire.test.ts" },
+  { "id": "WIRE-017", "target": "tests/cli/repl-surface-wire.test.tsx", "source": "tests/cli/repl/app-surface-wire.test.tsx" },
+  { "id": "WIRE-018", "target": "tests/cli/app-approval-wire.test.tsx", "source": "tests/cli/repl/approval-xproc-wire.test.ts" },
+  { "id": "WIRE-019", "target": "tests/cli/trace-wire.test.ts", "source": "tests/cli/trn2-repl-trace-wire.test.ts" },
+
+  { "id": "WIRE-020", "target": "tests/connectors/approval-clients-wire.test.ts", "source": "tests/connectors/approval-clients-wire-sla.test.ts" },
+  { "id": "WIRE-021", "target": "tests/connectors/capabilities/enablement-wire.test.ts", "source": "tests/connectors/capabilities/bootstrap-wire.test.ts" },
+
+  { "id": "WIRE-022", "target": "tests/core/cfg-apr-wire.test.ts", "source": "tests/core/approval-probe-rule-wire.integration.test.ts" },
+  { "id": "WIRE-023", "target": "tests/core/deck-broker-audit-wire.test.ts", "source": "tests/core/erp-1-readwire.test.ts" },
+  { "id": "WIRE-024", "target": "tests/core/hook-dispatch-wire.test.ts", "source": "tests/core/notify-wire.test.ts" },
+  { "id": "WIRE-025", "target": "tests/core/provider-concurrency-admission-wire.test.ts", "source": "tests/core/models-dev-wire.test.ts" },
+  { "id": "WIRE-026", "target": "tests/core/plugin-sandbox-wire.test.ts", "source": "tests/core/spawn-safety-wire.test.ts" },
+
+  { "id": "WIRE-027", "target": "tests/nervous/nervous-apr-wire.test.ts", "source": "tests/nervous/panic-gate-wire.test.ts" },
+
+  { "id": "WIRE-028", "target": "tests/orchestra/adaptive-agent-outcome-wire.test.ts", "source": "tests/orchestra/specialization-drift-wire.test.ts" },
+  { "id": "WIRE-029", "target": "tests/orchestra/acceptance-all-branches-wire.test.ts", "source": "tests/orchestra/finalizer-cells-wire.test.ts" },
+  { "id": "WIRE-030", "target": "tests/orchestra/allowlist-flag-wire.test.ts", "source": "tests/orchestra/tool-allowlist-wire.test.ts" },
+  { "id": "WIRE-031", "target": "tests/orchestra/coordination-wire.test.ts", "source": "tests/orchestra/ctx-population-wire.test.ts" },
+  { "id": "WIRE-032", "target": "tests/orchestra/docker-heartbeat-authority-wire.test.ts", "source": "tests/orchestra/docker-provider-observation-wire.test.ts" },
+  { "id": "WIRE-033", "target": "tests/orchestra/handoff-recovery-wire.test.ts", "source": "tests/orchestra/handoff-prune-wire.test.ts" },
+  { "id": "WIRE-034", "target": "tests/orchestra/metering-live-wire.test.ts", "source": "tests/orchestra/resource-monitor-wire.test.ts" },
+  { "id": "WIRE-035", "target": "tests/orchestra/prompt-evolution-retro-wire.test.ts", "source": "tests/orchestra/prompt-evolution-wire.test.ts" },
+  { "id": "WIRE-036", "target": "tests/orchestra/prompt-rollback-wire.test.ts", "source": "tests/orchestra/planner-smoke-wire.test.ts" },
+  { "id": "WIRE-037", "target": "tests/orchestra/scheduler-collision-reorder-wire.test.ts", "source": "tests/orchestra/sprint-restart-reconcile-wire.test.ts" },
+  { "id": "WIRE-038", "target": "tests/orchestra/sprint-finalizer-terminal-wire.test.ts", "source": "tests/orchestra/sprint-terminal-controller-wire.test.ts" },
+  { "id": "WIRE-039", "target": "tests/orchestra/provider-routing-production-wire.test.ts", "source": "tests/orchestra/worker-approval-gate-wire.test.ts" }
+]

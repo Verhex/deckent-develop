@@ -1,23 +1,26 @@
 # Lane Status — CI Repair + Test Slim
 
-- Status: `READY_FOR_OWNER_REVIEW`
+- Status: `HOLD_ADMISSION`
 - Lane: `lane/ci-repair-20260826`
 - Worktree: `/tmp/deckent-lane-ci-repair`
-- Base: `5fd085737e4e2b918bf3c601f29c61d9d521b229`
-- Audit content head: `210b2fc5fed0f5c66d97f5098a2855ca76501ede`
-- Phase: `A`
-- Phase-B lease: `INACTIVE`
-- Workflow files changed: 2
-- Test files changed: 0
-- Src/script files changed: 0
-- Inventory: 2.923 files / 718.051 lines / 37.791 static calls
-- Retirement rows: 7
-- Merge rows: 18
-- Target file reduction: 62
-- Findings: 3 (`2 CRITICAL`, `1 HIGH`)
-- Local workflow contracts: `54/54 PASS`
-- Remote branch admission: `NOT_RUN`
+- Base: `567ecaf887891099dfc8c79989dc580a80870b25`
+- Phase: `B`
+- Phase-B lease: `ACTIVE`
+- Src files changed: `0`
+- Physical test inventory: `2.923 → 2.859` (`−64`)
+- Physical sources retired / new canonical targets: `66 / 2`
+- Wire: `117 → 78`
+- Static calls: `37.791 → 37.733`
+- Merge equality: `57/57 PASS` (`1.305` titles, `2.915` assertions)
+- Secret Scan: `PASS`
+- CI-R001 + F1–F5: `LOCAL_VERIFIED`
+- Full suite: `FAIL — 13 files / 118 tests / 3 errors`
+- Coverage: `THRESHOLDS PASS — lines %86,52 / functions %95,22 / branches %83,77; command FAIL (103 tests)`
+- 20-gate lint: `HOLD — allowlist dışı stale canonical ratchets`
+- Remote branch admission: `PENDING_PUSH`
 
-Owner decision and main-lane `lease-aktif` declaration are both required before Phase-B.
-The current handoff does not claim repository-wide CI green; the referenced main snapshot
-contains 70 independent failing test files outside the three diagnosed workflow roots.
+Scoped Faz-B işi tamamlandı ve assertion zayıflatma yoktur. Admission HOLD'u test-slim
+merge'lerinden değil, `tests/hermeticity/runtime-write-guard.ts:523-529` local
+secure-open interposition kökü ile allowlist dışındaki canonical hermeticity/mock
+ratchet'larından gelir. Exact kanıt ve önerilen diffs:
+`docs/audits/ci-repair-2026-08-26/HANDOFF.md` ve `FINDINGS.md`.

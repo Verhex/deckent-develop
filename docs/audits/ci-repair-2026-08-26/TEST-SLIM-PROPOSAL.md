@@ -340,3 +340,39 @@ Faz-B onayı olmadan uygulanmayacak exact policy:
   olarak kabul ediliyor mu?
 - Wire hedefi `115 → ≤78` yeterli mi, yoksa ilk green profiling sonrası modül bazında
   daha düşük/üst sınır mı konmalı?
+
+## Faz-B owner disposition ve uygulama sonucu
+
+Owner, `TSR-001..007` ile `TSM-001..018` satırlarının tamamını 2026-08-26'da onayladı;
+ana-şerit TEST-FREEZE lease'ini `ACTIVE` ilan etti. Uygulama yalnız canonical Faz-B
+allowlist'inde yapıldı. Bu bölüm teklifin tarihsel Faz-A ölçümünü değiştirmez; gerçekleşen
+Faz-B sonucunu ayrıca kaydeder.
+
+| Ölçüm | Faz-A baseline | Faz-B sonucu | Delta |
+|---|---:|---:|---:|
+| Fiziksel test dosyası | 2.923 | 2.859 | `−64` (`−%2,19`) |
+| Default Vitest fiziksel dosyası | 2.840 | 2.777 | `−63` |
+| Dashboard fiziksel dosyası | 83 | 82 | `−1` |
+| Test satırı | 718.051 | 716.502 | `−1.549` |
+| Statik `it/test` çağrısı | 37.791 | 37.733 | `−58` |
+| Raw `*wire*` dosyası | 117 | 78 | `−39` (`−%33,33`) |
+| Wire test kaydı | 1.038 | 1.038 | `0` |
+| Wire ölçülmüş süre | 44,71 sn | 34,57 sn | `−10,14 sn` (`−%22,68`) |
+
+`−58` statik çağrı, merge kaynaklı assertion azaltımı değildir: 57 fiziksel merge'de
+`1.305 → 1.305` title/test registration ve `2.915 → 2.915` structural assertion
+fingerprint'i korunmuştur. Düşüş, owner-onaylı archived/full-skip docs declaration'larının
+emekliliğinden gelir. `TSR-006/007` config grubu ayrıca `3 dosya / 72 test / 210
+assertion → 1 dosya / 72 test / 210 assertion` eşitliğindedir.
+
+Fiziksel `66` kaynak dosya kaldırılmış, `2` yeni canonical hedef oluşturulmuştur; net
+dosya deltası bu yüzden `−64`tür. Exact kaynak→hedef, title, assertion, import ve mock
+factory kanıtı `PHASE-B-EQUALITY.json` ile `HANDOFF.md` içindedir. Coverage threshold'u,
+Vitest include/exclude yüzeyi, Secret Scan regex'i ve baseline allowlist'i
+değiştirilmemiştir.
+
+Runtime hedefi açısından yalnız gerçekten karşılaştırılabilir iki scoped ölçüm
+kullanılmıştır: wire kümesi `−%22,68`, F4 provider-observations kümesi `45,81 → 11,89
+sn` (`−%74,0`). Full-suite/coverage koşusu allowlist dışı canonical gate drift'i ve
+lokal runtime-write-guard secure-open sınıfı yüzünden green kapanmadığından repository
+critical-path dakika kazanımı iddia edilmez; admission `HOLD` kalır.

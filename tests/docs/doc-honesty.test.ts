@@ -16,6 +16,17 @@ import { describe, it, expect } from 'vitest';
 const root = join(import.meta.dirname ?? __dirname, '../../');
 
 describe('doc-honesty', () => {
+  it('keeps current EN/TR vision positioning free of retired anti-X framing', () => {
+    const en = readFileSync(join(root, 'docs/en/vision.md'), 'utf8');
+    const tr = readFileSync(join(root, 'docs/tr/vision.md'), 'utf8');
+    for (const content of [en, tr]) {
+      expect(content).not.toMatch(/anti-Devin/i);
+      expect(content).not.toMatch(/anti-X/);
+    }
+    expect(en).toMatch(/independent execution plane/i);
+    expect(tr).toMatch(/bağımsız bir execution düzlemi/i);
+  });
+
   it('Gate #8 is marked PARTIAL in beta-tracker.md', () => {
     // beta-tracker.md was moved docs/release/ → docs/archive/ (superseded
     // internal-strategy doc, commit ebc55b03); its Gate #8 PARTIAL/Docker-runtime

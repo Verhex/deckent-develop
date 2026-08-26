@@ -41,6 +41,7 @@ import { CLI_MEMORY_CATALOG_MESSAGES } from '../../src/cli/helpers/message-catal
 import { CLI_GOVERNANCE_MESSAGES } from '../../src/cli/helpers/message-catalog/cli-governance.js';
 import { CLI_RUNTIME_HELP_MESSAGES } from '../../src/cli/helpers/message-catalog/cli-runtime-help.js';
 import { CLI_REFERENCE_MESSAGES } from '../../src/cli/helpers/message-catalog/cli-reference.js';
+import { isNativeAgentEnabled } from "../../src/cli/repl/native-flag.js";
 
 let buildProgram: () => Command;
 
@@ -275,3 +276,19 @@ describe('message-catalog family merge — collisions are mechanical, not review
     expect(getMessage('cli.help.heading.options', 'tr')).toBe('Seçenekler:');
   });
 });
+
+// WIRE-010: physically merged from tests/cli/native-flag-wire.test.ts.
+{
+describe('isNativeAgentEnabled', () => {
+    it('is on when DECKENT_NATIVE_AGENT=1', () => {
+        expect(isNativeAgentEnabled({ DECKENT_NATIVE_AGENT: '1' }, [])).toBe(true);
+    });
+    it('is on when --native is passed', () => {
+        expect(isNativeAgentEnabled({}, ['--native'])).toBe(true);
+    });
+    it('is OFF by default (legacy path)', () => {
+        expect(isNativeAgentEnabled({}, [])).toBe(false);
+        expect(isNativeAgentEnabled({ DECKENT_NATIVE_AGENT: '0' }, [])).toBe(false);
+    });
+});
+}

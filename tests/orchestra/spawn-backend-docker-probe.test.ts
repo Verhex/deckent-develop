@@ -2,7 +2,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   BOUNDED_REACHABILITY_CAPTURE_CEILING_BYTES,
   DockerSpawnBackend,
@@ -65,6 +65,7 @@ function cursorAuthenticatedHome(dir: string): string {
 }
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   for (const dir of roots.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
@@ -98,8 +99,10 @@ describe('DockerSpawnBackend bounded reachability probe', () => {
   it('uses logical Cursor provider authority to mount auth.json for the real probe entrypoint', async () => {
     const dir = root();
     let received: Parameters<DockerReachabilityProbeCommandRunner>[0] | undefined;
+    const homeDir = cursorAuthenticatedHome(dir);
+    vi.stubEnv('XDG_CONFIG_HOME', join(homeDir, '.config'));
     const backend = new DockerSpawnBackend(dir, {
-      homeDir: cursorAuthenticatedHome(dir),
+      homeDir,
       platform: 'linux',
       crossVerifyRuntimeCommandRunner: async (_command, args) => args[0] === 'image'
         ? { status: 0, stdout: `sha256:${'c'.repeat(64)}\n`, stderr: '' }
@@ -118,6 +121,29 @@ describe('DockerSpawnBackend bounded reachability probe', () => {
       .toBe(true);
     expect(args.join(' ')).not.toContain('src=' + join(dir, 'cursor-home', '.config', 'cursor') + ',dst=');
     expect(args.join(' ')).toContain('cursor-agent');
+  });
+
+  it('reports a Cursor XDG override without auth as unavailable before the probe runner', async () => {
+    const dir = root();
+    const homeDir = cursorAuthenticatedHome(dir);
+    const runner = vi.fn(async () => ({ status: 0, stdout: 'must-not-run', stderr: '' }));
+    vi.stubEnv('XDG_CONFIG_HOME', join(dir, 'credential-absent-xdg'));
+    const backend = new DockerSpawnBackend(dir, {
+      homeDir,
+      platform: 'linux',
+      crossVerifyRuntimeCommandRunner: async (_command, args) => args[0] === 'image'
+        ? { status: 0, stdout: `sha256:${'c'.repeat(64)}\n`, stderr: '' }
+        : { status: 0, stdout: '/usr/local/bin/cursor-agent\n', stderr: '' },
+      reachabilityProbeCommandRunner: runner,
+    });
+
+    await expect(backend.invokeBoundedReachabilityProbe(await cursorRequestFor(backend)))
+      .resolves.toMatchObject({
+        outcome: 'transport-error',
+        errorCode: 'credential_unavailable',
+        retryable: false,
+      });
+    expect(runner).not.toHaveBeenCalled();
   });
 
   it('classifies a dead Docker daemon as backend-unreachable', async () => {

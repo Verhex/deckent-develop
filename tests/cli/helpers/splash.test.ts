@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { KRAKEN_ASCII, showSplash, showSplashIfEnabled } from '../../../src/cli/helpers/splash.js';
+import { showSplashIfEnabled as showSplashIfEnabled__tsm_011 } from "../../../src/cli/helpers/splash.js";
 
 describe('splash', () => {
   const savedNoColor = process.env.NO_COLOR;
@@ -76,3 +77,23 @@ describe('splash', () => {
     });
   });
 });
+
+// TSM-011: physically merged from tests/cli/splash.test.ts.
+{
+describe('showSplashIfEnabled', () => {
+    it('returns null when output_splash is false', () => {
+        const result = showSplashIfEnabled__tsm_011({ output_splash: false }, 'x');
+        expect(result).toBeNull();
+    });
+    it('returns splash string when output_splash is true', () => {
+        const result = showSplashIfEnabled__tsm_011({ output_splash: true }, '1.0.0');
+        expect(result).not.toBeNull();
+        expect(typeof result).toBe('string');
+        expect(result).toContain('DECKENT');
+    });
+    it('returns null when output_splash is undefined (falsy gate)', () => {
+        const result = showSplashIfEnabled__tsm_011({}, 'x');
+        expect(result).toBeNull();
+    });
+});
+}

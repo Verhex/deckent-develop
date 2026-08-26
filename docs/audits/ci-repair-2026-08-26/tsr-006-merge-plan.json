@@ -1,0 +1,7 @@
+[
+  {
+    "id": "TSR-006",
+    "target": "tests/core/config-migration.test.ts",
+    "source": "tests/core/config-sprint063.test.ts"
+  }
+]

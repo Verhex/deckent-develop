@@ -109,9 +109,9 @@ yol yaklaşık 142 karakterdir ve validator portable ceiling'i `<=240` olarak pi
 multi-tenant isolation, replay ve v1/v2 duplicate receipt determinism'i test edilmeden
 şema değiştirilemez.
 
-## CI-F003 — Ana CI snapshot'ı test fixture/runtime drift nedeniyle ayrıca kırmızı
+## CI-F003 — Eski 70-file remote snapshot'ı ana-şeritte kapandı
 
-**Disposition:** `BLOCKS_REPO_GREEN`, bu lane'in Faz-A write allowlist'i dışında.
+**Disposition:** `CLOSED_BY_MAIN_REBASE`.
 
 `main@5fd085737` üzerinde 70 benzersiz test dosyası kırmızı. Baskın sınıflar:
 
@@ -123,11 +123,81 @@ multi-tenant isolation, replay ve v1/v2 duplicate receipt determinism'i test edi
 - `tests/core/acceptance-confirmation-race-scale.integration.test.ts:329` 10 saniye
   performans eşiği.
 
-Öneri: ana-şerit bu 70 dosyayı önce ortak kök bazında yeniden üretmeli; assertion
-beklentilerini topluca güncellememeli. Runtime-write-guard üretici düzeltmesi → partial fs
-mock contractı → attribution fixture → real-binary job ordering → scale threshold
-istatistik kalibrasyonu sırasıyla ayrı commits/gates. Bu testler “CI yeşillensin” diye
-emeklilik listesine alınamaz.
+Ana-şerit bu snapshot'taki beş kök-sınıfı `13bd3920d` ve önceki repair commitleriyle
+kapattı; `fa05abbed` ağacında lokal `2.830 dosya / 38.842 test / 0 fail` sertifikası
+verildi. Faz-B bu eski kırmızıları test emekliliğiyle maskelemedi. Daha sonraki F1–F5
+remote bulguları ayrı olarak CI Root Register'da işlendi.
 
-**Risk:** CRITICAL. Bu kırmızılar test-yükü azaltma ile maskelenirse production davranış
-regresyonları ve test infrastructure drift'i birbirine karışır.
+**Risk:** Kapalı historical snapshot. Yeni full-suite bulguları aşağıdaki CI-F004+
+kayıtlarıdır ve CI-F003'ün yeniden açıldığı anlamına gelmez.
+
+## CI-F004 — Lokal runtime-write-guard read-only `open` çağrılarını write kabul ediyor
+
+**Disposition:** `BLOCKS_LOCAL_FULL_SUITE` · approved F1–F5 dışında kaldığı için bu lane'de
+uygulanmadı.
+
+**Exact evidence:**
+
+- `tests/hermeticity/runtime-write-guard.ts:523-529` `open`, `openSync` ve
+  `fs.promises.open` çağrılarının flag'ine bakmadan `policy.assertWritable(...)` çağırıyor.
+- Bu interposition secure-open/pinning için `/tmp` altında yapılan read-only/directory
+  descriptor açılışlarını da yazma sayıyor. `src/core/file-lock.ts:1478-1578` fail-closed
+  sınıflandırması hatayı `secure-open-unsupported` olarak yüzeye çıkarıyor.
+- Exact Phase-B full-suite'te ortak kök `task-execution-admission` (25),
+  `clean-active-execution-guard` (13), task fence/file-lock/spawn/limits/settlement
+  ailelerinde downstream kırmızılara ve üç unhandled rejection'a yayıldı.
+- Aynı production ağacı remote Node 26 Core shard'ında
+  `task-execution-admission 26/26 PASS` verdi. Bu nedenle bulgu production secure-open
+  downgrade önerisi değil, lokal Node 24 test interposition semantiği bulgusudur.
+
+**Önerilen diff (uygulanmadı):** Node `open` flag'lerini canonical biçimde sınıflandıran
+tek helper ekle; yalnız `O_WRONLY`, `O_RDWR`, `O_CREAT`, `O_TRUNC`, `O_APPEND` veya bunların
+string eşdeğerleri için writable-policy uygula. `r`, numeric read-only ve directory pin
+open'ları pass-through kalırken writable/symlink escape vakaları fail-closed kalmalı.
+Acceptance aynı test dosyasında string/numeric flag matrisi + full-suite Node 24/26.
+
+**Risk:** CRITICAL. Bütün `open`ları serbest bırakmak hermeticity guard'ı zayıflatır;
+production `file-lock.ts`te fallback eklemek ise security downgrade olur.
+
+## CI-F005 — Canonical lint ratchet'ları onaylı test merge'lerinden sonra stale
+
+**Disposition:** `BLOCKS_20_GATE_LINT` · canonical scripts Phase-B write allowlist'i
+dışında; bu lane'de uygulanmadı.
+
+**Exact evidence:**
+
+- `scripts/lint-test-hermeticity.mjs:672,716` inventory count'i hâlâ `16511`, fakat
+  canonical digest `118d74c8e54f18c19d071fca97453f7dca2310eee51b3f86269c0fa5f6a918f0`;
+  Faz-B ağacı aynı count için
+  `127705b801c1a43af815ef49b656eafc3218ce2edefea3b6782c91a7aa3b0b0e` üretiyor.
+  `npm run lint` root ve Dashboard tsc katmanlarını geçtikten sonra bu gate'te durdu.
+- `scripts/lint-mock-factories.mjs:98,160,254,262` owner-onaylı merge ile kaldırılan dört
+  source path'i hâlâ canonical full-factory inventory'sinde tutuyor:
+  `tests/cli/commands/output.test.ts`, `tests/cli/onboard.test.ts`,
+  `tests/mcp/job-runner.test.ts`, `tests/mcp/resources/resources.test.ts`.
+- Canlı karşılıklar sırasıyla `tests/cli/output.test.ts`,
+  `tests/cli/commands/onboard.test.ts`, `tests/mcp/tools/job-runner.test.ts`,
+  `tests/mcp/resources.test.ts`; equality manifest import/mock yüzeyini korudu.
+
+**Önerilen diff (uygulanmadı):** ana-şerit canonical baseline update'i ayrı committe,
+tam `npm run lint` kanıtıyla yapmalı. Hermeticity count değişmemeli, yalnız reviewed
+digest güncellenmeli. Mock inventory'de dört eski path canonical hedefleriyle birebir
+değiştirilmeli; entry silerek gate'i gevşetmek yasak.
+
+**Risk:** HIGH. Baseline'ı körlemesine regenerate etmek gerçek yeni effect/mock drift'ini
+aklayabilir; exact reviewed delta gerekir.
+
+## CI-F006 — Generated README/IDENTITY truth Faz-B test sayımıyla uyumsuz
+
+**Disposition:** `RELATED_BUT_NONBLOCKING_DELIVERY` · generated targets allowlist dışı.
+
+Stats/readme doğrulaması current `2.859` fiziksel test dosyasıyla çalıştırıldığında
+`README.md`, `README.tr.md` ve `.deckent/workspace/IDENTITY.md` için generated delta
+bildiriyor. F2 testi bu dosyaların repo-root'ta mutate edilmediğini ayrıca kanıtlıyor.
+
+**Öneri:** Faz-B admission'ından sonra ana-şerit supported stats generator'ı bir kez
+çalıştırıp üç projection'ı aynı committe almalı; `.deckent/workspace/stats-snapshot.json`
+refresh'i ancak owner'ın deliberate snapshot authority'siyle yapılmalı.
+
+**Risk:** Orta. Sayıları elle düzenlemek producer/projection zincirini kırar; bu nedenle
+lane allowlist'ini aşarak “düzeltme” yapılmadı.

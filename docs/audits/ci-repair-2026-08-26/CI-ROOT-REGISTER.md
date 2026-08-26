@@ -32,12 +32,10 @@ Gerçek remote doğrulama ana-şerit admission'ından sonraki koşuya aittir.
 Bu diff test anlamını korur: numeric olmayan canonical `xv` task ID kabul edilmeye devam
 eder; yalnız UUID-benzeri gereksiz uzun suffix kaldırılır. Faz-A'da uygulanmamıştır.
 
-```diff
-diff --git a/tests/core/task-artifact-classifier.test.ts b/tests/core/task-artifact-classifier.test.ts
-@@
--    expect(isCanonicalTaskFilename('task-xv-1787682688606-bcaa9b15-1d54-4836-8bce-b5a3f76cfe72.json')).toBe(true);
-+    expect(isCanonicalTaskFilename('task-xv-1787682688606.json')).toBe(true);
-```
+Uygulanan diff, uzun UUID-benzeri suffix taşıyan eski fixture'ı
+`task-xv-1787682688606.json` ile değiştirdi. Eski secret-benzeri literal bu audit
+artefaktında da tutulmaz; Secret Scan'in audit belgesinin kendisini yeniden yakalaması
+önlenir.
 
 Faz-B acceptance:
 
@@ -68,3 +66,24 @@ paketinde kapatmadan branch admission koşusu “repo green” olamaz.
 - Faz-A tracked diff'i: yalnız `.github/workflows/**` ve bu audit korpusu/
   `LANE-STATUS.md`.
 
+## Faz-B kapanış kaydı
+
+Faz-A workflow düzeltmeleri main'e alındı ve `fa05abbed` sonrası remote sınıflandırmada
+macOS `3/3`, Windows checkout ve packed-install Windows yeşil doğrulandı. Faz-B lease'i
+aktif olduktan sonra CI-R001 fixture diff'i ile ana-şeridin F1–F5 ek bulguları aşağıdaki
+şekilde işlendi.
+
+| ID | Uygulama | Doğrulama | Durum |
+|---|---|---|---|
+| CI-R001 | `tests/core/task-artifact-classifier.test.ts` içindeki secret-benzeri uzun fixture `task-xv-1787682688606.json` yapıldı. Classifier ve Secret Scan regex'i değişmedi; baseline allowlist eklenmedi. | Classifier targeted PASS; `node scripts/security/secret-baseline.mjs`: `no unallowlisted secrets in 6873 tracked files`. | `LOCAL_VERIFIED` |
+| F1 | `tests/core/acceptance-confirmation-race-scale.integration.test.ts` sabit host-class çarpanı kullanıyor (`CI=3`, local=1); 10K row/digest/heap assertion'ları aynen korunuyor. Child sonucu stdout yerine typed IPC ile taşınıyor. | Targeted PASS. Coverage koşusunda 10K first=`6109,8ms`, replay=`3665,7ms`, local budget=`10000ms`; digest ve 256MiB heap floor'u korundu. | `LOCAL_VERIFIED` |
+| F2 | `tests/scripts/update-readme-stats.test.ts` refresh testi repo-root tracked generator hedeflerini before/after byte-equality ile pinliyor; generator yalnız test tmpdir'ine yazıyor. | Targeted PASS; `stats-snapshot.json`, `README.md`, `README.tr.md`, `IDENTITY.md` fingerprint'leri değişmedi. | `LOCAL_VERIFIED` |
+| F3 | `tests/core/config-write-authority.test.ts` temp file'ın `r+` açıldığını, aynı descriptor'ın rename'den önce `fsyncSync` aldığını ve payload'ın yayımlandığını pinliyor. | Targeted PASS; main'in Windows `FlushFileBuffers` üretim fix'ini tests/** içinden regression-gated yaptı. | `LOCAL_VERIFIED` |
+| F4 | `tests/cli/provider-observations.test.ts` her command için `vite-node` compile etmek yerine main'in supported shard-prebuild'i olan `dist/cli/entry.js` real binary'sini çağırıyor; test-worker env'i child'a sızmıyor; timeout local `10s`, CI `30s`. Assertion'lar değişmedi. | `CI=1`: `12/12 PASS`, `45,81 → 11,89 sn`, `−33,92 sn / −%74,0`. | `LOCAL_VERIFIED` |
+| F5 | Cursor positive fixture'ı kendi XDG auth authority'sini explicit kuruyor; auth'suz XDG override için typed `credential_unavailable`, `retryable:false` ve zero-runner-call negative capability testi eklendi. | `spawn-backend-docker` + probe targeted: `46/46 PASS`. Remote 32967941648'de producer suite zaten `34/34`; kırmızı yalnız ambient CI XDG'nin fixture auth'u gölgelemesiydi. | `LOCAL_VERIFIED` |
+
+Bu tablo repository-wide green iddiası değildir. Faz-B sonrası exact full-suite ve coverage
+koşuları, F1–F5 dışındaki ortak `tests/hermeticity/runtime-write-guard.ts:523-529`
+secure-open sınıfı ile allowlist dışı stale canonical lint baselinelarını görünür kıldı.
+Admission durumu ve exact kökler `HANDOFF.md`/`FINDINGS.md` içinde `HOLD_ADMISSION`
+olarak raporlanır.

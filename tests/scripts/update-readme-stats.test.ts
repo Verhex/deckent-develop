@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, writeFileSync, mkdirSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   collectStats,
   renderBadges,
@@ -19,6 +20,22 @@ import {
 } from '../../scripts/update-readme-stats.mjs';
 
 let tmpRoot: string;
+const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const trackedGeneratorTargets = [
+  STATS_SNAPSHOT_RELATIVE_PATH,
+  'README.md',
+  'README.tr.md',
+  '.deckent/workspace/IDENTITY.md',
+] as const;
+
+function readTrackedGeneratorTargets(): Map<string, string> {
+  return new Map(
+    trackedGeneratorTargets.map((relativePath) => [
+      relativePath,
+      readFileSync(join(repositoryRoot, relativePath), 'utf8'),
+    ]),
+  );
+}
 
 beforeEach(() => {
   tmpRoot = mkdtempSync(join(tmpdir(), 'update-readme-stats-test-'));
@@ -242,9 +259,13 @@ describe('readStatsSnapshot / refreshStatsSnapshot', () => {
     seedMinimalProject(tmpRoot);
     rmSync(join(tmpRoot, STATS_SNAPSHOT_RELATIVE_PATH));
     writeFileSync(join(tmpRoot, 'DIRECTIVES.md'), `# DIRECTIVES — Sprint 300: Y\n`);
+    const repositoryBefore = readTrackedGeneratorTargets();
+
     const exit = main(['--refresh-snapshot'], { root: tmpRoot });
+
     expect(exit).toBe(0);
     expect(readStatsSnapshot(tmpRoot).sprint).toBe(300);
+    expect(readTrackedGeneratorTargets()).toEqual(repositoryBefore);
   });
 });
 

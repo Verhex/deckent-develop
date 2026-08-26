@@ -68,7 +68,7 @@ describe('task artifact classifier', () => {
 describe('isCanonicalTaskFilename (sprint-683 regression)', () => {
   it('accepts exact canonical task-record filenames', () => {
     expect(isCanonicalTaskFilename('task-683-001.json')).toBe(true);
-    expect(isCanonicalTaskFilename('task-xv-1787682688606-bcaa9b15-1d54-4836-8bce-b5a3f76cfe72.json')).toBe(true);
+    expect(isCanonicalTaskFilename('task-xv-1787682688606.json')).toBe(true);
     expect(isCanonicalTaskFilename('task-run-1787551920419-0.json')).toBe(true);
   });
 

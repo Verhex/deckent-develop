@@ -15,10 +15,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
-  return { ...actual, renameSync: vi.fn(actual.renameSync) };
+  return {
+    ...actual,
+    fsyncSync: vi.fn(actual.fsyncSync),
+    openSync: vi.fn(actual.openSync),
+    renameSync: vi.fn(actual.renameSync),
+  };
 });
 
-import { renameSync } from 'node:fs';
+import { fsyncSync, openSync, renameSync } from 'node:fs';
 import {
   ConfigWriteLockTimeoutError,
   withConfigWriteLock,
@@ -26,6 +31,8 @@ import {
 } from '../../src/core/config-write-authority.js';
 
 const mockedRenameSync = vi.mocked(renameSync);
+const mockedOpenSync = vi.mocked(openSync);
+const mockedFsyncSync = vi.mocked(fsyncSync);
 let root: string;
 
 beforeEach(() => {
@@ -52,6 +59,26 @@ describe('writeConfigJsonAtomic', () => {
       `${JSON.stringify(payload, null, 2)}\n`,
     );
     expect(temporaryArtifacts()).toEqual([]);
+  });
+
+  it('opens the temporary file as r+ and fsyncs that descriptor before publication', () => {
+    const target = join(root, 'windows-flush-file-buffers.json');
+
+    writeConfigJsonAtomic(target, { durable: true });
+
+    const temporaryOpenIndex = mockedOpenSync.mock.calls.findIndex(
+      ([path]) => typeof path === 'string' && path.endsWith('.tmp'),
+    );
+    expect(temporaryOpenIndex).toBeGreaterThanOrEqual(0);
+    expect(mockedOpenSync.mock.calls[temporaryOpenIndex]?.[1]).toBe('r+');
+
+    const temporaryDescriptor = mockedOpenSync.mock.results[temporaryOpenIndex]?.value;
+    expect(typeof temporaryDescriptor).toBe('number');
+    expect(mockedFsyncSync).toHaveBeenCalledWith(temporaryDescriptor);
+    expect(mockedFsyncSync.mock.invocationCallOrder[0]).toBeLessThan(
+      mockedRenameSync.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    );
+    expect(readFileSync(target, 'utf8')).toBe('{\n  "durable": true\n}\n');
   });
 
   it('creates the published config with mode 0600 on POSIX', () => {
