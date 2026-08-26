@@ -1,0 +1,424 @@
+{
+  "schemaVersion": 1,
+  "check": "registry-authored-shape-vs-production-config-types",
+  "status": "MATCH",
+  "registryDigest": "sha256:7dd90f5c250e0b30d0fe969fcdc865c0c325dd8ffb26265f51edbf532c167e83",
+  "source": {
+    "path": "src/core/config-types.ts",
+    "sha256": "sha256:79763f0f766a796e4ad4c22004933f30f6265f4767b0b5b3fec45b6c69d8256b",
+    "bytes": 126190
+  },
+  "comparedFields": 20,
+  "matchedFields": 20,
+  "drift": [],
+  "fields": [
+    {
+      "path": "api_keys.*",
+      "status": "MATCH",
+      "expected": {
+        "type": "string",
+        "presence": "optional",
+        "key": {
+          "type": "string",
+          "memberPresence": "required"
+        }
+      },
+      "actual": {
+        "type": "string",
+        "presence": "optional",
+        "key": {
+          "type": "string",
+          "memberPresence": "required"
+        }
+      },
+      "evidence": {
+        "source": "src/core/config-types.ts",
+        "declaration": "DeckentConfig",
+        "line": 1156
+      },
+      "drift": []
+    },
+    {
+      "path": "bot_agent.providers",
+      "status": "MATCH",
+      "expected": {
+        "type": "Array<'ollama' | 'claude' | 'openai'>",
+        "presence": "optional"
+      },
+      "actual": {
+        "type": "Array<'ollama' | 'claude' | 'openai'>",
+        "presence": "optional"
+      },
+      "evidence": {
+        "source": "src/core/config-types.ts",
+        "declaration": "BotAgentConfig",
+        "line": 733
+      },
+      "drift": []
+    },
+    {
+      "path": "decay_after_sprints",
+      "status": "MATCH",
+      "expected": {
+        "type": "number",
+        "presence": "optional"
+      },
+      "actual": {
+        "type": "number",
+        "presence": "optional"
+      },
+      "evidence": {
+        "source": "src/core/config-types.ts",
+        "declaration": "DeckentConfig",
+        "line": 1351
+      },
+      "drift": []
+    },
+    {
+      "path": "dependency_pipeline_enabled",
+      "status": "MATCH",
+      "expected": {
+        "type": "boolean",
+        "presence": "optional"
+      },
+      "actual": {
+        "type": "boolean",
+        "presence": "optional"
+      },
+      "evidence": {
+        "source": "src/core/config-types.ts",
+        "declaration": "DeckentConfig",
+        "line": 1409
+      },
+      "drift": []
+    },
+    {
+      "path": "docker_timeout",
+      "status": "MATCH",
+      "expected": {
+        "type": "number",
+        "presence": "optional"
+      },
+      "actual": {
+        "type": "number",
+        "presence": "optional"
+      },
+      "evidence": {
+        "source": "src/core/config-types.ts",
+        "declaration": "DeckentConfig",
+        "line": 1073
+      },
+      "drift": []
+    },
+    {
+      "path": "execution_budget.roles.*",
+      "status": "MATCH",
+      "expected": {
+        "type": "ExecutionBudgetRolePolicyConfig",
+        "presence": "optional",
+        "key": {
+          "type": "ExecutionBudgetRole",
+          "memberPresence": "optional"
+        }
+      },
+      "actual": {
+        "type": "ExecutionBudgetRolePolicyConfig",
+        "presence": "optional",
+        "key": {
+          "type": "ExecutionBudgetRole",
+          "memberPresence": "optional"
+        }
+      },
+      "evidence": {
+        "source": "src/core/config-types.ts",
+        "declaration": "ExecutionBudgetPolicyConfig",
+        "line": 847
+      },
+      "drift": []
+    },
+    {
+      "path": "identity.provider",
+      "status": "MATCH",
+      "expected": {
+        "type": "IdentityProviderConfig",
+        "presence": "optional"
+      },
+      "actual": {
+        "type": "IdentityProviderConfig",
+        "presence": "optional"
+      },
+      "evidence": {
+        "source": "src/core/config-types.ts",
+        "declaration": "DeckentConfig.identity",
+        "line": 1256
+      },
+      "drift": []
+    },
+    {
+      "path": "language",
+      "status": "MATCH",
+      "expected": {
+        "type": "string",
+        "presence": "optional"
+      },
+      "actual": {
+        "type": "string",
+        "presence": "optional"
+      },
+      "evidence": {
+        "source": "src/core/config-types.ts",
+        "declaration": "DeckentConfig",
+        "line": 1035
+      },
+      "drift": []
+    },
+    {
+      "path": "memory_budget",
+      "status": "MATCH",
+      "expected": {
+        "type": "number",
+        "presence": "optional"
+      },
+      "actual": {
+        "type": "number",
+        "presence": "optional"
+      },
+      "evidence": {
+        "source": "src/core/config-types.ts",
+        "declaration": "DeckentConfig",
+        "line": 1348
+      },
+      "drift": []
+    },
+    {
+      "path": "mode",
+      "status": "MATCH",
+      "expected": {
+        "type": "PlanMode",
+        "presence": "required"
+      },
+      "actual": {
+        "type": "PlanMode",
+        "presence": "required"
+      },
+      "evidence": {
+        "source": "src/core/config-types.ts",
+        "declaration": "DeckentConfig",
+        "line": 1024
+      },
+      "drift": []
+    },
+    {
+      "path": "modes.*.brain_model",
+      "status": "MATCH",
+      "expected": {
+        "type": "ModelType",
+        "presence": "required_when_parent_present",
+        "key": {
+          "type": "string",
+          "memberPresence": "required"
+        }
+      },
+      "actual": {
+        "type": "ModelType",
+        "presence": "required_when_parent_present",
+        "key": {
+          "type": "string",
+          "memberPresence": "required"
+        }
+      },
+      "evidence": {
+        "source": "src/core/config-types.ts",
+        "declaration": "PlanModeConfig",
+        "line": 686
+      },
+      "drift": []
+    },
+    {
+      "path": "modes.*.max_workers",
+      "status": "MATCH",
+      "expected": {
+        "type": "number | 'auto'",
+        "presence": "required_when_parent_present",
+        "key": {
+          "type": "string",
+          "memberPresence": "required"
+        }
+      },
+      "actual": {
+        "type": "number | 'auto'",
+        "presence": "required_when_parent_present",
+        "key": {
+          "type": "string",
+          "memberPresence": "required"
+        }
+      },
+      "evidence": {
+        "source": "src/core/config-types.ts",
+        "declaration": "PlanModeConfig",
+        "line": 685
+      },
+      "drift": []
+    },
+    {
+      "path": "notifications",
+      "status": "MATCH",
+      "expected": {
+        "type": "NotificationConfig",
+        "presence": "optional"
+      },
+      "actual": {
+        "type": "NotificationConfig",
+        "presence": "optional"
+      },
+      "evidence": {
+        "source": "src/core/config-types.ts",
+        "declaration": "DeckentConfig",
+        "line": 1106
+      },
+      "drift": []
+    },
+    {
+      "path": "output_splash",
+      "status": "MATCH",
+      "expected": {
+        "type": "boolean",
+        "presence": "optional"
+      },
+      "actual": {
+        "type": "boolean",
+        "presence": "optional"
+      },
+      "evidence": {
+        "source": "src/core/config-types.ts",
+        "declaration": "DeckentConfig",
+        "line": 1160
+      },
+      "drift": []
+    },
+    {
+      "path": "prompt.adr_min_relevance",
+      "status": "MATCH",
+      "expected": {
+        "type": "number",
+        "presence": "optional"
+      },
+      "actual": {
+        "type": "number",
+        "presence": "optional"
+      },
+      "evidence": {
+        "source": "src/core/config-types.ts",
+        "declaration": "PromptConfig",
+        "line": 1726
+      },
+      "drift": []
+    },
+    {
+      "path": "prompt.adr_render",
+      "status": "MATCH",
+      "expected": {
+        "type": "'full' | 'operative'",
+        "presence": "optional"
+      },
+      "actual": {
+        "type": "'full' | 'operative'",
+        "presence": "optional"
+      },
+      "evidence": {
+        "source": "src/core/config-types.ts",
+        "declaration": "PromptConfig",
+        "line": 1735
+      },
+      "drift": []
+    },
+    {
+      "path": "provider_overrides.*",
+      "status": "MATCH",
+      "expected": {
+        "type": "ProviderName",
+        "presence": "optional",
+        "key": {
+          "type": "string",
+          "memberPresence": "required"
+        }
+      },
+      "actual": {
+        "type": "ProviderName",
+        "presence": "optional",
+        "key": {
+          "type": "string",
+          "memberPresence": "required"
+        }
+      },
+      "evidence": {
+        "source": "src/core/config-types.ts",
+        "declaration": "DeckentConfig",
+        "line": 1125
+      },
+      "drift": []
+    },
+    {
+      "path": "routing_v3.weights.content",
+      "status": "MATCH",
+      "expected": {
+        "type": "number",
+        "presence": "required_when_parent_present"
+      },
+      "actual": {
+        "type": "number",
+        "presence": "required_when_parent_present"
+      },
+      "evidence": {
+        "source": "src/core/config-types.ts",
+        "declaration": "RoutingV3Weights",
+        "line": 543
+      },
+      "drift": []
+    },
+    {
+      "path": "spawn_backend",
+      "status": "MATCH",
+      "expected": {
+        "type": "'docker' | 'tmux' | 'subprocess' | 'auto'",
+        "presence": "optional"
+      },
+      "actual": {
+        "type": "'docker' | 'tmux' | 'subprocess' | 'auto'",
+        "presence": "optional"
+      },
+      "evidence": {
+        "source": "src/core/config-types.ts",
+        "declaration": "DeckentConfig",
+        "line": 1069
+      },
+      "drift": []
+    },
+    {
+      "path": "timeout.model_multiplier.*",
+      "status": "MATCH",
+      "expected": {
+        "type": "number",
+        "presence": "optional",
+        "key": {
+          "type": "ModelTier",
+          "memberPresence": "optional"
+        }
+      },
+      "actual": {
+        "type": "number",
+        "presence": "optional",
+        "key": {
+          "type": "ModelTier",
+          "memberPresence": "optional"
+        }
+      },
+      "evidence": {
+        "source": "src/core/config-types.ts",
+        "declaration": "TimeoutConfig",
+        "line": 51
+      },
+      "drift": []
+    }
+  ]
+}

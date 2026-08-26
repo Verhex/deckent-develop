@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "registryId": "deckent.config.prototype",
+  "registryDigest": "sha256:7dd90f5c250e0b30d0fe969fcdc865c0c325dd8ffb26265f51edbf532c167e83",
+  "descriptors": 20,
+  "containers": 8,
+  "internalTypes": 2,
+  "externalTypes": 4,
+  "dynamicPaths": 6,
+  "arrayItemPaths": 0,
+  "lifecycle": {
+    "ACTIVE": 16,
+    "DEPRECATED": 3,
+    "OPT_IN": 1
+  },
+  "defaultKinds": {
+    "EFFECTIVE_DEFAULT": 10,
+    "NO_DEFAULT": 7,
+    "PLATFORM_RESOLVED": 1,
+    "POLICY_INHERITED": 1,
+    "STARTER_VALUE": 1
+  },
+  "impacts": {
+    "hot-reload": 2,
+    "next-run": 16,
+    "restart": 2
+  },
+  "sensitivities": {
+    "CONFIDENTIAL": 2,
+    "PUBLIC": 17,
+    "SECRET_MATERIAL_FORBIDDEN": 1
+  },
+  "typeKinds": [
+    "array",
+    "discriminatedUnion",
+    "enum",
+    "externalRef",
+    "literal",
+    "object",
+    "primitive",
+    "record",
+    "ref",
+    "union"
+  ]
+}
