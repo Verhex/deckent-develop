@@ -37,8 +37,8 @@ remote-karışıklığı yaratmasın diye); owner "push'la" derse tek komutla ka
   yalnız analysis-output untracked'ı vardı; teslimi zaten relay edilmişti).
 - **HOLD — recovery/d4-609:** worktree'sinde 116 değişik dosya (işlenmemiş gerçek iş olabilir,
   API/approval yüzeyleri) — owner-incelemesi olmadan SİLİNMEDİ.
-- **Origin-silmeleri BEKLEMEDE (izin-sınıflandırıcı engeli):** origin'deki merged train-* +
-  dev-operating-contract + fix/postmerge + checkpoint/d16 silinecek-listesi hazır; owner
-  tek komutla koşabilir (rapordaki komut) veya izin-kuralı ekleyip bana devredebilir.
+- **Origin-silmeleri TAMAMLANDI (owner-eliyle, 2026-08-26):** 53 origin-branch silindi
+  (train-* 50 + agent/dev-operating-contract + fix/postmerge-main-truth-closure +
+  checkpoint/d16-approval-20260720); lokal remote-ref'ler prune'landı.
 - KORUNAN: main · release/0.100.0-rebaseline · lane/approval-audit · lane/descriptor-registry ·
   audit/config-completion (üçü referans-kanıt, İş-değil) · recovery/d4-609 (HOLD).
