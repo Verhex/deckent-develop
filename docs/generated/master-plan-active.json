@@ -3,26 +3,26 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "fa91dc01e74d77ecc838012eeb9d46d459454d77692eef1ace5c4ff1f69c1418"
+    "value": "d94f4ba3b0e75cb16171415216550fba9818b275a449125e2c10262f756aa42e"
   },
   "summary": {
-    "total": 539,
+    "total": 540,
     "active": 456,
-    "terminal": 83,
-    "receipts": 209,
+    "terminal": 84,
+    "receipts": 210,
     "byState": {
       "OPEN": 345,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
       "VERIFY": 42,
-      "DONE": 83,
+      "DONE": 84,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
     "byPriority": {
       "P0": 338,
-      "P1": 152,
+      "P1": 153,
       "P2": 49
     },
     "byProgram": {
@@ -59,7 +59,7 @@
       "SURFACE": 1,
       "TERMINAL": 22,
       "TOOL": 1,
-      "TRUTH": 104,
+      "TRUTH": 105,
       "XPLAT": 3
     }
   },
@@ -1251,6 +1251,17 @@
       "definitionDigest": "9ca1bb3fb83e43d87904741e0d6ae9f0f55eb1a6ed2783e2cd93a7f77d8ae77b",
       "progressDigest": "31cf31185b2bf633fabade38b7e88aa0695434225dca319f2f0518e63409a76e",
       "terminalClosureDigest": "8f10860f5ae4edffc886612de7bc94bf10f6145eb4f6403f4081f36ff324503c"
+    },
+    {
+      "order": 542,
+      "id": "CI-REPAIR-TEST-SLIM-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "DONE",
+      "updated": "2026-08-26",
+      "definitionDigest": "8951d1bd117abe531fd835d4eb39a37462f10ce696dcdb4c25928d16392b4978",
+      "progressDigest": "d47c546da941fb035ea7f48cd40e62f1b6df004b23fc5b6a5e26ec8efa9aaa2a",
+      "terminalClosureDigest": "f6cbc7cc692b948a78f4bcd43f9af720d903dde9763971d1b8f5605e760463e3"
     },
     {
       "order": 1000,
@@ -8082,6 +8093,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-26T12:18:16+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-26-CI-REPAIR-SLIM-01",
+      "authorityDigest": "310733025a7aeadb2779c6f062bf629c7e73347dedc244c90c547fe4c3277504",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-26T23:18:16+03:00"
       },
       "g7AttemptIdentity": null
     }
@@ -27283,6 +27304,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "5ccb4efbcc1037afedc62fa90ff251c7e8b0839ad44857ae3a05a1bc5e0e2a36"
+    "value": "0f04475dd38712582ea295668d69bbb12ab2e2cc9c9be75d4edef938c5d1bc00"
   }
 }
