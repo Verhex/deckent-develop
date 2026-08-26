@@ -1,3 +1,9 @@
+import { type DeckentError, ErrorRegistry } from './errors.js';
+
+function scheduledFlowError(message: string): DeckentError {
+  return ErrorRegistry.createError('DECKENT_E101', { message });
+}
+
 /** Parsed representation of a 5-field cron expression. */
 export interface ParsedCronExpr {
   minute: string;
@@ -46,22 +52,22 @@ function validateField(field: string, min: number, max: number): boolean {
 export function parseCronExpr(expr: string): ParsedCronExpr {
   const fields = expr.trim().split(/\s+/);
   if (fields.length !== 5) {
-    throw new Error(`Invalid cron expression "${expr}": expected 5 fields, got ${fields.length}`);
+    throw scheduledFlowError(`Invalid cron expression "${expr}": expected 5 fields, got ${fields.length}`);
   }
 
   const [minute, hour, dayOfMonth, month, dayOfWeek] = fields as [string, string, string, string, string];
 
   for (const field of fields) {
     if (!CRON_FIELD_RE.test(field)) {
-      throw new Error(`Invalid cron field "${field}" in expression "${expr}"`);
+      throw scheduledFlowError(`Invalid cron field "${field}" in expression "${expr}"`);
     }
   }
 
-  if (!validateField(minute, 0, 59)) throw new Error(`Invalid minute field "${minute}"`);
-  if (!validateField(hour, 0, 23)) throw new Error(`Invalid hour field "${hour}"`);
-  if (!validateField(dayOfMonth, 1, 31)) throw new Error(`Invalid day-of-month field "${dayOfMonth}"`);
-  if (!validateField(month, 1, 12)) throw new Error(`Invalid month field "${month}"`);
-  if (!validateField(dayOfWeek, 0, 7)) throw new Error(`Invalid day-of-week field "${dayOfWeek}"`);
+  if (!validateField(minute, 0, 59)) throw scheduledFlowError(`Invalid minute field "${minute}"`);
+  if (!validateField(hour, 0, 23)) throw scheduledFlowError(`Invalid hour field "${hour}"`);
+  if (!validateField(dayOfMonth, 1, 31)) throw scheduledFlowError(`Invalid day-of-month field "${dayOfMonth}"`);
+  if (!validateField(month, 1, 12)) throw scheduledFlowError(`Invalid month field "${month}"`);
+  if (!validateField(dayOfWeek, 0, 7)) throw scheduledFlowError(`Invalid day-of-week field "${dayOfWeek}"`);
 
   return { minute, hour, dayOfMonth, month, dayOfWeek };
 }
@@ -198,5 +204,5 @@ export function nextRun(cronExpr: string, from: Date = new Date()): Date {
     return new Date(t);
   }
 
-  throw new Error(`nextRun: no match found within 1 year for cron expression "${cronExpr}"`);
+  throw scheduledFlowError(`nextRun: no match found within 1 year for cron expression "${cronExpr}"`);
 }

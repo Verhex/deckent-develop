@@ -2347,14 +2347,27 @@ export async function computeScopeBaselineManifest(
     let abs: string;
     try { abs = resolve(dir, rel); } catch { continue; }
     if (!existsSync(abs)) continue;
-    try {
-      const res = await runGitCommandAsync(dir, ['hash-object', '-w', '--', rel]);
-      const hash = res.stdout.toString('utf-8').trim();
-      if (res.status === 0 && /^[0-9a-f]{40,64}$/.test(hash)) {
-        lines.push(`${rel}${SCOPE_BASELINE_DELIM}${hash}`);
+    // sprint-686 canlı vakası: tek transient git-hatası (index/object-db yarışı
+    // sınıfı) fail-closed capture-throw'una dönüşüp bütün spawn'ı düşürdü ve
+    // stderr yalnız debugLog'a gitti. Bir kez kısa-beklemeli retry + son-deneme
+    // stderr'inin görünür loglanması; kalıcı hata yine dürüstçe omit edilir
+    // (dış katman typed E_ATTRIBUTION_BASELINE_CAPTURE_FAILED üretir).
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const res = await runGitCommandAsync(dir, ['hash-object', '-w', '--', rel]);
+        const hash = res.stdout.toString('utf-8').trim();
+        if (res.status === 0 && /^[0-9a-f]{40,64}$/.test(hash)) {
+          lines.push(`${rel}${SCOPE_BASELINE_DELIM}${hash}`);
+          break;
+        }
+        if (attempt === 1) {
+          console.error(`[deckent] scope-baseline capture failed for ${rel}: status=${String(res.status)} stderr=${res.stderr.toString('utf-8').slice(0, 200)}`);
+        }
+      } catch (e) {
+        debugLog('docker-backend:scope-baseline', e);
+        if (attempt === 1) break;
       }
-    } catch (e) {
-      debugLog('docker-backend:scope-baseline', e);
+      if (attempt === 0) await new Promise(r => setTimeout(r, 150));
     }
   }
   return lines.length ? lines.join('\n') + '\n' : '';

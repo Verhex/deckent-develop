@@ -117,6 +117,7 @@ import { getSprintStateSnapshot } from '../../orchestra/sprint-state-tracker.js'
 import type { DeckentConfig } from '../../core/types.js';
 import {
   DeckentError,
+  ErrorRegistry,
   createExecutionAuthorityError,
 } from '../../core/errors.js';
 import type { InvocationPurpose, InvocationReceiptRef, InvocationRole } from '../../core/invocation-receipt.js';
@@ -552,11 +553,11 @@ function realPlannerComplete(model: string): LlmComplete {
     const r = spawnSync(spawnArgs.command, spawnArgs.args, { encoding: 'utf-8', timeout: 120_000, maxBuffer: 10 * 1024 * 1024 });
     // Diagnostics (do not silently return empty → "no valid items" hides real failures):
     // surface spawn errors, timeouts, and non-zero exits so the operator sees the cause.
-    if (r.error) throw new Error(`planner spawn failed (${adapter.name}): ${r.error.message}`);
-    if (r.signal === 'SIGTERM') throw new Error(`planner timed out (${adapter.name}) — raise the timeout or narrow the goal`);
+    if (r.error) throw ErrorRegistry.createError('DECKENT_E095', { message: `planner spawn failed (${adapter.name}): ${r.error.message}` });
+    if (r.signal === 'SIGTERM') throw ErrorRegistry.createError('DECKENT_E095', { message: `planner timed out (${adapter.name}) — raise the timeout or narrow the goal` });
     const stdout = r.stdout ?? '';
     if (r.status !== 0 && !stdout) {
-      throw new Error(`planner exited status=${r.status ?? 'null'} (${adapter.name}): ${(r.stderr ?? '').slice(0, 300)}`);
+      throw ErrorRegistry.createError('DECKENT_E095', { message: `planner exited status=${r.status ?? 'null'} (${adapter.name}): ${(r.stderr ?? '').slice(0, 300)}` });
     }
     // Unwrap the provider-specific envelope (Claude `--output-format json` wraps the
     // model text in `.result`; Gemini/Codex differ) to the inner text — parsePlannedItems
@@ -591,7 +592,7 @@ export function resolvePlannerModelIdentity(
   try {
     return resolveExecutionModelIdentity(requested, provider).model;
   } catch (err) {
-    throw new Error(formatModelError(err, requested, provider, lang));
+    throw ErrorRegistry.createError('DECKENT_E095', { message: formatModelError(err, requested, provider, lang) });
   }
 }
 
@@ -863,11 +864,11 @@ function makeGoalRoleAdmissionGuard(
       },
       candidates: {},
       buildReservation: () => {
-        throw new Error('UNREACHABLE_GOAL_RESERVATION_WITHOUT_HOST_AUTHORITIES');
+        throw ErrorRegistry.createError('DECKENT_E095', { message: 'UNREACHABLE_GOAL_RESERVATION_WITHOUT_HOST_AUTHORITIES' });
       },
     });
     if (result.decision !== 'hold') {
-      throw new Error('GOAL_INVOCATION_ADMISSION_INVARIANT');
+      throw ErrorRegistry.createError('DECKENT_E095', { message: 'GOAL_INVOCATION_ADMISSION_INVARIANT' });
     }
     throw new GoalInvocationHeldError({
       schemaVersion: 1,
@@ -1114,7 +1115,7 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
           reason: 'MISSION_WORKER_INVOCATION_HOLD:exact_executor_unavailable',
         }),
         runAdmittedTask: async () => {
-          throw new Error('MISSION_WORKER_EXACT_ROUTE_LOCK_UNAVAILABLE');
+          throw ErrorRegistry.createError('DECKENT_E095', { message: 'MISSION_WORKER_EXACT_ROUTE_LOCK_UNAVAILABLE' });
         },
         executeSprint: async (context) => {
           const exactExecutor = createLiveAutonomousExactSprintExecutor({

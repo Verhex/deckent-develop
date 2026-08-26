@@ -755,6 +755,90 @@ registry.set('DECKENT_E094', {
   ],
 });
 
+registry.set('DECKENT_E095', {
+  message: 'autonomous planner or admission invariant failed',
+  suggestion: 'Inspect the planner provider output and autonomous admission authority before retrying',
+  whatHappened: 'The autonomous command could not complete planner execution or reached a fail-closed admission invariant.',
+  why: 'Provider process failures and impossible authority states must stop autonomous execution rather than continue with incomplete evidence.',
+  howToFix: [
+    'Inspect the detailed planner or invariant message',
+    'Verify the configured provider and autonomous host authorities are available',
+    'Retry after correcting the reported condition',
+  ],
+});
+
+registry.set('DECKENT_E096', {
+  message: 'chat provider request failed',
+  suggestion: 'Inspect the selected provider, endpoint, authentication, and timeout settings',
+  whatHappened: 'A subscription CLI or HTTP chat-provider request could not be completed.',
+  why: 'The provider exited unsuccessfully, rejected the request, timed out, or was not recognized.',
+  howToFix: [
+    'Inspect the detailed provider failure message',
+    'Verify provider authentication and endpoint availability',
+    'Correct the provider name or timeout setting before retrying',
+  ],
+});
+
+registry.set('DECKENT_E097', {
+  message: 'MCP command input or server lookup failed',
+  suggestion: 'Correct the MCP command arguments or verify the named server is registered',
+  whatHappened: 'The MCP CLI rejected an invalid option or could not find the requested server.',
+  why: 'MCP configuration writes and reads require valid scope, transport, key-value, target, and server-name inputs.',
+  howToFix: [
+    'Inspect the detailed MCP validation or lookup message',
+    'Use a supported scope and transport with correctly formed key=value options',
+    'List registered MCP servers before retrying a get or remove operation',
+  ],
+});
+
+registry.set('DECKENT_E098', {
+  message: 'file-lock filesystem safety check failed',
+  suggestion: 'Inspect the lock root and entries for symlinks, reparse targets, or concurrent replacement',
+  whatHappened: 'A file-lock traversal encountered an unsafe or concurrently changed filesystem entry.',
+  why: 'Lock cleanup must fail closed when directory identity or traversal safety cannot be established.',
+  howToFix: [
+    'Inspect the detailed file-lock safety message',
+    'Remove unexpected symlinks or reparse targets from the lock tree',
+    'Retry after concurrent filesystem changes have settled',
+  ],
+});
+
+registry.set('DECKENT_E099', {
+  message: 'provider truth validation failed',
+  suggestion: 'Correct the provider capability or reachability evidence named in the error',
+  whatHappened: 'Deckent rejected malformed or internally inconsistent provider truth evidence.',
+  why: 'Provider identity, capability, and live-proof evidence must remain canonical before dispatch decisions use it.',
+  howToFix: [
+    'Inspect the detailed validation message',
+    'Supply canonical provider, model, timestamp, and evidence identities',
+    'Retry after rebuilding the provider truth evidence',
+  ],
+});
+
+registry.set('DECKENT_E100', {
+  message: 'provider limit truth validation failed',
+  suggestion: 'Correct the provider limit observation, reservation, or durable evidence named in the error',
+  whatHappened: 'Deckent rejected malformed or internally inconsistent provider limit evidence.',
+  why: 'Limit windows and reservation evidence must be canonical and mutually consistent before admission.',
+  howToFix: [
+    'Inspect the detailed validation message',
+    'Correct the limit window, reservation, source, or timestamp evidence',
+    'Retry after persisting normalized provider limit evidence',
+  ],
+});
+
+registry.set('DECKENT_E101', {
+  message: 'scheduled flow cron validation failed',
+  suggestion: 'Correct the five-field cron expression named in the error',
+  whatHappened: 'Deckent could not parse or resolve a scheduled-flow cron expression.',
+  why: 'Scheduled flows require bounded, valid five-field cron expressions with a resolvable next run.',
+  howToFix: [
+    'Inspect the detailed cron validation message',
+    'Use valid minute, hour, day-of-month, month, and day-of-week fields',
+    'Choose an expression that produces a date within the supported search horizon',
+  ],
+});
+
 // ─── ErrorRegistry API ──────────────────────────────────────────────
 
 export const ErrorRegistry = {

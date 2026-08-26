@@ -455,7 +455,7 @@ function settlementTaskDir(ref: TaskResultSettlementRefV1): string {
 
 function settlementAttemptDir(ref: TaskResultSettlementRefV1): string {
   if (!hasValidRefShape(ref as unknown as Record<string, unknown>)) {
-    throw new Error('Invalid Docker result settlement reference');
+    throw createExecutionAuthorityError('Invalid Docker result settlement reference');
   }
   return resolve(settlementTaskDir(ref), ref.attemptId);
 }
@@ -479,7 +479,7 @@ function assertHostAuthorityOutsideProject(projectRoot: string, ref: TaskResultS
   const attemptDir = canonicalPathWithMissingLeaf(settlementAttemptDir(ref));
   const rel = relative(root, attemptDir);
   if (rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))) {
-    throw new Error(
+    throw createExecutionAuthorityError(
       `Docker result settlement authority must be outside the worker-mounted project root: ${attemptDir}`,
     );
   }
@@ -505,7 +505,7 @@ export function createTaskResultSettlementRefForAttempt(
     attemptId,
   });
   if (!hasValidRefShape(ref as unknown as Record<string, unknown>)) {
-    throw new Error('Invalid Docker result settlement reference');
+    throw createExecutionAuthorityError('Invalid Docker result settlement reference');
   }
   assertHostAuthorityOutsideProject(projectRoot, ref);
   return ref;
@@ -521,7 +521,7 @@ export function assertTaskResultSettlementRef(
     || ref.taskId !== taskId
     || ref.projectRootSha256 !== sha256(canonicalProjectRoot(projectRoot))
   ) {
-    throw new Error('Docker result settlement reference does not match project/task authority');
+    throw createExecutionAuthorityError('Docker result settlement reference does not match project/task authority');
   }
   assertHostAuthorityOutsideProject(projectRoot, ref);
 }
@@ -702,7 +702,7 @@ export function createTaskResultSettlement(input: {
   settledAt?: string;
 }): TaskResultSettlementV1 {
   if (input.result.taskId !== input.ref.taskId) {
-    throw new Error('Docker result settlement TaskResult does not match its attempt taskId');
+    throw createExecutionAuthorityError('Docker result settlement TaskResult does not match its attempt taskId');
   }
   return {
     ...input.ref,
@@ -1010,7 +1010,7 @@ function publishJsonFirstWriter(
       let existing: unknown;
       try { existing = JSON.parse(readFileSync(path, 'utf-8')); } catch { existing = null; }
       if (!acceptsExisting(existing)) {
-        throw new Error(`Conflicting immutable Docker result settlement already exists: ${path}`);
+        throw createExecutionAuthorityError(`Conflicting immutable Docker result settlement already exists: ${path}`);
       }
     }
     if (published) {
@@ -1435,7 +1435,7 @@ function resolveTaskResultSettlementClaimChain(
   for (let depth = 0; depth < 1024; depth++) {
     const claimPath = taskResultSettlementClaimPath(ref, previousAuthoritySha256);
     if (seenClaimPaths.has(claimPath)) {
-      throw new Error(`Cyclic Docker result settlement claim chain: ${claimPath}`);
+      throw createExecutionAuthorityError(`Cyclic Docker result settlement claim chain: ${claimPath}`);
     }
     seenClaimPaths.add(claimPath);
     if (!existsSync(claimPath)) {
@@ -1448,7 +1448,7 @@ function resolveTaskResultSettlementClaimChain(
       || claim.taskId !== ref.taskId
       || claimPredecessorSha256(claim) !== previousAuthoritySha256
     ) {
-      throw new Error(`Corrupt Docker result settlement claim chain: ${claimPath}`);
+      throw createExecutionAuthorityError(`Corrupt Docker result settlement claim chain: ${claimPath}`);
     }
     latest = claim;
     const closurePath = taskResultSettlementClosurePath(claim);
@@ -1467,7 +1467,7 @@ function resolveTaskResultSettlementClaimChain(
     if (hasClosure) {
       const closure = readTaskResultSettlementClosure(claim);
       if (!closure) {
-        throw new Error(`Corrupt Docker result settlement closure: ${closurePath}`);
+        throw createExecutionAuthorityError(`Corrupt Docker result settlement closure: ${closurePath}`);
       }
       nextAuthoritySha256 = closureDigest(closure);
     } else {
@@ -1480,7 +1480,7 @@ function resolveTaskResultSettlementClaimChain(
     closedAttemptIds.add(claim.attemptId);
     previousAuthoritySha256 = nextAuthoritySha256;
   }
-  throw new Error('Docker result settlement claim chain exceeds the bounded recovery depth');
+  throw createExecutionAuthorityError('Docker result settlement claim chain exceeds the bounded recovery depth');
 }
 
 export function readTaskResultSettlementActiveClaim(
@@ -1537,7 +1537,7 @@ export function readLatestTaskResultSettlementRef(
     readJson(taskResultSettlementAttemptPath(latest)),
   );
   if (!attempt || !sameRef(attempt, latest)) {
-    throw new Error(
+    throw createExecutionAuthorityError(
       `Corrupt Docker result settlement authority: ${taskResultSettlementAttemptPath(latest)}`,
     );
   }
@@ -1560,17 +1560,17 @@ export function claimTaskResultSettlementAttemptAtomic(
   claimedAt: string = new Date().toISOString(),
 ): 'claimed' | 'adopted' {
   if (!hasValidRefShape(ref as unknown as Record<string, unknown>)) {
-    throw new Error('Invalid Docker result settlement reference');
+    throw createExecutionAuthorityError('Invalid Docker result settlement reference');
   }
   const attempt = parseTaskResultSettlementAttempt(readJson(taskResultSettlementAttemptPath(ref)));
   if (!attempt || !sameRef(attempt, ref)) {
-    throw new Error('Docker result settlement claim has no matching durable pending attempt');
+    throw createExecutionAuthorityError('Docker result settlement claim has no matching durable pending attempt');
   }
   const chain = resolveTaskResultSettlementClaimChain(ref);
   if (chain.closedAttemptIds.has(ref.attemptId)) return 'adopted';
   if (chain.active) {
     if (sameRef(chain.active, ref)) return 'adopted';
-    throw new Error(
+    throw createExecutionAuthorityError(
       `Conflicting active Docker result settlement attempt: ${chain.active.taskId}/${chain.active.attemptId}`,
     );
   }
@@ -1607,7 +1607,7 @@ function assertPendingAttemptAndClaim(ref: TaskResultSettlementRefV1): void {
   const attempt = parseTaskResultSettlementAttempt(readJson(taskResultSettlementAttemptPath(ref)));
   const claim = readTaskResultSettlementActiveClaim(ref);
   if (!attempt || !sameRef(attempt, ref) || !claim || !sameRef(claim, ref)) {
-    throw new Error('Docker dispatch metadata has no matching durable pending attempt claim');
+    throw createExecutionAuthorityError('Docker dispatch metadata has no matching durable pending attempt claim');
   }
 }
 
@@ -1617,7 +1617,7 @@ export function writeTaskResultSettlementPreparedAtomic(
   preparedAt: string = new Date().toISOString(),
 ): TaskResultSettlementPreparedV1 {
   assertPendingAttemptAndClaim(ref);
-  if (!model.trim()) throw new Error('Docker dispatch model identity must be non-empty');
+  if (!model.trim()) throw createExecutionAuthorityError('Docker dispatch model identity must be non-empty');
   const prepared: TaskResultSettlementPreparedV1 = {
     ...ref,
     lifecycleVersion: TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION,
@@ -1655,7 +1655,7 @@ export function writeTaskResultSettlementDispatchAtomic(
 ): TaskResultSettlementDispatchV1 {
   assertPendingAttemptAndClaim(ref);
   const prepared = readTaskResultSettlementPrepared(ref);
-  if (!prepared) throw new Error('Docker dispatch has no matching immutable prepared metadata');
+  if (!prepared) throw createExecutionAuthorityError('Docker dispatch has no matching immutable prepared metadata');
   const dispatch: TaskResultSettlementDispatchV1 = {
     ...ref,
     lifecycleVersion: TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION,
@@ -1668,7 +1668,7 @@ export function writeTaskResultSettlementDispatchAtomic(
     preparedSha256: preparedDigest(prepared),
   };
   if (!parseTaskResultSettlementDispatch(dispatch)) {
-    throw new Error('Invalid Docker dispatch container identity');
+    throw createExecutionAuthorityError('Invalid Docker dispatch container identity');
   }
   publishJsonFirstWriter(
     taskResultSettlementDispatchPath(ref),
@@ -2163,12 +2163,12 @@ export function writeTaskResultSettlementAtomic(settlement: TaskResultSettlement
     );
   } catch { /* handled by the fail-closed branch below */ }
   if (!attempt || !sameRef(attempt, settlement)) {
-    throw new Error('Docker result settlement has no matching durable pending attempt');
+    throw createExecutionAuthorityError('Docker result settlement has no matching durable pending attempt');
   }
   if (existsSync(taskResultSettlementClaimsDir(settlement))) {
     const active = readTaskResultSettlementActiveClaim(settlement);
     if (!active || !sameRef(active, settlement)) {
-      throw new Error('Docker result settlement attempt does not own the active lifecycle claim');
+      throw createExecutionAuthorityError('Docker result settlement attempt does not own the active lifecycle claim');
     }
   }
   publishJsonFirstWriter(
@@ -2227,17 +2227,17 @@ export function readClosedTaskResultSettlement(
 
   if (!settlementExists) {
     if (closureExists) {
-      throw new Error(`Corrupt Docker result settlement closure without receipt: ${closurePath}`);
+      throw createExecutionAuthorityError(`Corrupt Docker result settlement closure without receipt: ${closurePath}`);
     }
     return null;
   }
   const settlement = readTaskResultSettlement(ref);
   if (!settlement) {
-    throw new Error(`Corrupt host-owned Docker result settlement: ${settlementPath}`);
+    throw createExecutionAuthorityError(`Corrupt host-owned Docker result settlement: ${settlementPath}`);
   }
   if (!closureExists) return null;
   if (!readTaskResultSettlementClosure(ref)) {
-    throw new Error(`Corrupt Docker result settlement closure: ${closurePath}`);
+    throw createExecutionAuthorityError(`Corrupt Docker result settlement closure: ${closurePath}`);
   }
   return settlement;
 }
@@ -2261,15 +2261,15 @@ export function writeTaskResultSettlementClosureAtomic(
       && existingClosure.locksReleased === input.locksReleased
       && existingClosure.evidenceRef === input.evidenceRef
     ) return existingClosure;
-    throw new Error(`Conflicting immutable Docker result settlement already exists: ${taskResultSettlementClosurePath(ref)}`);
+    throw createExecutionAuthorityError(`Conflicting immutable Docker result settlement already exists: ${taskResultSettlementClosurePath(ref)}`);
   }
   const active = readTaskResultSettlementActiveClaim(ref);
   if (!active || !sameRef(active, ref)) {
-    throw new Error('Cannot close a foreign or inactive Docker result settlement claim');
+    throw createExecutionAuthorityError('Cannot close a foreign or inactive Docker result settlement claim');
   }
   const settlement = readTaskResultSettlement(ref);
   if (!settlement) {
-    throw new Error('Cannot close an unsettled Docker result settlement claim');
+    throw createExecutionAuthorityError('Cannot close an unsettled Docker result settlement claim');
   }
   const closure: TaskResultSettlementClosureV1 = {
     ...ref,
@@ -2401,7 +2401,7 @@ export function inspectTaskResultSettlementAuthority(
       const attemptPath = resolve(taskDir, attemptName, 'attempt.json');
       const looksLikeAttempt = /^[0-9a-f-]{36}$/iu.test(attemptName);
       const attempt = parseTaskResultSettlementAttempt(readJson(attemptPath));
-      if (looksLikeAttempt && !attempt) throw new Error('Corrupt task settlement attempt');
+      if (looksLikeAttempt && !attempt) throw createExecutionAuthorityError('Corrupt task settlement attempt');
       if (
         !attempt
         || attempt.projectRootSha256 !== projectRootSha256
@@ -2458,7 +2458,7 @@ export function listPendingTaskResultSettlementAttempts(
       const attempt = parseTaskResultSettlementAttempt(readJson(attemptPath));
       const looksLikeAttempt = /^[0-9a-f-]{36}$/i.test(attemptName);
       if (looksLikeAttempt && !attempt) {
-        throw new Error(`Corrupt Docker result settlement attempt: ${attemptPath}`);
+        throw createExecutionAuthorityError(`Corrupt Docker result settlement attempt: ${attemptPath}`);
       }
       if (
         !attempt
@@ -2468,7 +2468,7 @@ export function listPendingTaskResultSettlementAttempts(
       ) continue;
       if (existsSync(taskResultSettlementClosurePath(attempt))) {
         const closure = readTaskResultSettlementClosure(attempt);
-        if (!closure) throw new Error(`Corrupt Docker result settlement closure: ${taskResultSettlementClosurePath(attempt)}`);
+        if (!closure) throw createExecutionAuthorityError(`Corrupt Docker result settlement closure: ${taskResultSettlementClosurePath(attempt)}`);
         continue;
       }
       if (existsSync(taskResultSettlementLandedRetirementPath(attempt))) {

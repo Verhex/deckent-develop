@@ -28,6 +28,7 @@ import { formatTable, print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
 import { memoryCatalogMessage } from '../helpers/message-catalog/cli-memory-catalog.js';
+import { ErrorRegistry } from '../../core/errors.js';
 
 // ─── Scope handling ─────────────────────────────────────────────────
 
@@ -137,7 +138,7 @@ function parseKeyValuePairs(items: readonly string[] | undefined, lang: string):
   for (const item of items) {
     const idx = item.indexOf('=');
     if (idx <= 0) {
-      throw new Error(mcpMessage('mcp.invalid_kv', lang, { value: item }));
+      throw ErrorRegistry.createError('DECKENT_E097', { message: mcpMessage('mcp.invalid_kv', lang, { value: item }) });
     }
     const k = item.slice(0, idx);
     const v = item.slice(idx + 1);
@@ -182,7 +183,7 @@ export function handleAdd(
 
   const scopeRaw = opts.scope ?? 'project';
   if (!isValidScope(scopeRaw)) {
-    throw new Error(mcpMessage('mcp.invalid_scope', lang, { scope: scopeRaw }));
+    throw ErrorRegistry.createError('DECKENT_E097', { message: mcpMessage('mcp.invalid_scope', lang, { scope: scopeRaw }) });
   }
   const scope: McpScope = scopeRaw;
 
@@ -192,13 +193,13 @@ export function handleAdd(
   } else if (opts.transport === 'stdio' || opts.transport === 'http') {
     transport = opts.transport;
   } else {
-    throw new Error(mcpMessage('mcp.invalid_transport', lang, { transport: opts.transport }));
+    throw ErrorRegistry.createError('DECKENT_E097', { message: mcpMessage('mcp.invalid_transport', lang, { transport: opts.transport }) });
   }
 
   let def: McpServerDef;
   if (transport === 'http') {
     if (!/^https?:\/\//i.test(target)) {
-      throw new Error(mcpMessage('mcp.http_needs_url', lang));
+      throw ErrorRegistry.createError('DECKENT_E097', { message: mcpMessage('mcp.http_needs_url', lang) });
     }
     const headers = parseKeyValuePairs(opts.header, lang);
     def = {
@@ -259,7 +260,7 @@ export function handleRemove(name: string, opts: RemoveOptions): void {
 
   const scopes: McpScope[] = opts.scope
     ? (isValidScope(opts.scope) ? [opts.scope] : (() => {
-        throw new Error(mcpMessage('mcp.invalid_scope', lang, { scope: opts.scope! }));
+        throw ErrorRegistry.createError('DECKENT_E097', { message: mcpMessage('mcp.invalid_scope', lang, { scope: opts.scope! }) });
       })())
     : ['local', 'project', 'user'];
 
@@ -274,7 +275,7 @@ export function handleRemove(name: string, opts: RemoveOptions): void {
     }
   }
 
-  throw new Error(mcpMessage('mcp.not_found', lang, { name }));
+  throw ErrorRegistry.createError('DECKENT_E097', { message: mcpMessage('mcp.not_found', lang, { name }) });
 }
 
 export function handleGet(name: string, opts: GetOptions): void {
@@ -283,7 +284,7 @@ export function handleGet(name: string, opts: GetOptions): void {
   const servers = loadMcpServers(root);
   const def = servers[name];
   if (!def) {
-    throw new Error(mcpMessage('mcp.not_found', lang, { name }));
+    throw ErrorRegistry.createError('DECKENT_E097', { message: mcpMessage('mcp.not_found', lang, { name }) });
   }
 
   if (opts.json) {

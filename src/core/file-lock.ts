@@ -25,7 +25,7 @@ import { LOCKS_DIR } from './constants.js';
 import { trace } from './observability.js';
 import { debugLog } from './utils.js';
 import type { LockInfo } from './types.js';
-import { DeckentError } from './errors.js';
+import { DeckentError, ErrorRegistry } from './errors.js';
 
 // ─── Error Classes ───────────────────────────────────────────────
 
@@ -1263,7 +1263,7 @@ function ensureExecutionLockDirectory(projectRoot: string): string {
   let canonicalRoot: string;
   try {
     canonicalRoot = realpathSync(projectRoot);
-    if (!lstatSync(canonicalRoot).isDirectory()) throw new Error('not-directory');
+    if (!lstatSync(canonicalRoot).isDirectory()) throw ErrorRegistry.createError('DECKENT_E098', { message: 'not-directory' });
   } catch {
     throw new ExecutionLockError(
       `Execution lock project root is unsafe: ${projectRoot}`,
@@ -1282,11 +1282,11 @@ function ensureExecutionLockDirectory(projectRoot: string): string {
   }
   try {
     const entry = lstatSync(locksDir);
-    if (!entry.isDirectory() || entry.isSymbolicLink()) throw new Error('unsafe-entry');
+    if (!entry.isDirectory() || entry.isSymbolicLink()) throw ErrorRegistry.createError('DECKENT_E098', { message: 'unsafe-entry' });
     const canonicalLocks = realpathSync(locksDir);
     const expectedLocks = join(canonicalRoot, LOCKS_DIR);
     if (!canonicalPathEquals(canonicalLocks, expectedLocks)) {
-      throw new Error('reparse-target');
+      throw ErrorRegistry.createError('DECKENT_E098', { message: 'reparse-target' });
     }
     return canonicalLocks;
   } catch {
@@ -1310,7 +1310,7 @@ function readBoundedRegularFile(path: string, maxBytes: number): string | null {
     || before.isSymbolicLink()
     || before.nlink !== 1
     || before.size > maxBytes) {
-    throw new Error('unsafe-entry');
+    throw ErrorRegistry.createError('DECKENT_E098', { message: 'unsafe-entry' });
   }
 
   let fd: number | undefined;
@@ -1325,7 +1325,7 @@ function readBoundedRegularFile(path: string, maxBytes: number): string | null {
       || opened.nlink !== 1
       || opened.dev !== before.dev
       || opened.ino !== before.ino) {
-      throw new Error('entry-changed');
+      throw ErrorRegistry.createError('DECKENT_E098', { message: 'entry-changed' });
     }
 
     const buffer = Buffer.allocUnsafe(maxBytes + 1);
@@ -1342,7 +1342,7 @@ function readBoundedRegularFile(path: string, maxBytes: number): string | null {
       || after.nlink !== 1
       || after.dev !== opened.dev
       || after.ino !== opened.ino) {
-      throw new Error('entry-changed');
+      throw ErrorRegistry.createError('DECKENT_E098', { message: 'entry-changed' });
     }
     return new TextDecoder('utf-8', { fatal: true }).decode(buffer.subarray(0, offset));
   } finally {

@@ -10,6 +10,11 @@ import type {
 import { getLegacyModelMigration } from './model-registry.js';
 import type { ReachabilityEvidence } from './role-invocation-resolver.js';
 import { isReachabilityProbeBudget, type ReachabilityProbeBudget } from './provider-evidence-probe-contract.js';
+import { type DeckentError, ErrorRegistry } from './errors.js';
+
+function providerTruthError(message: string): DeckentError {
+  return ErrorRegistry.createError('DECKENT_E099', { message });
+}
 
 export const PROVIDER_TRUTH_SCHEMA_VERSION = 1 as const;
 
@@ -233,27 +238,27 @@ const UNKNOWN_STAGE: CapabilityStageEvidence = Object.freeze({ state: 'unknown',
 
 function requireNonEmpty(name: string, value: string): void {
   if (!value || value !== value.trim() || value !== value.normalize('NFC') || /[\u0000-\u001f\u007f]/u.test(value)) {
-    throw new Error(`${name} must be a non-empty canonical value`);
+    throw providerTruthError(`${name} must be a non-empty canonical value`);
   }
 }
 
 export function assertCanonicalModelApiId(model: string): void {
   requireNonEmpty('model', model);
-  if (model.length > 256 || /\s/u.test(model)) throw new Error('model must be a bounded exact API identity');
-  if (getLegacyModelMigration(model)) throw new Error(`Legacy model alias is not a wire identity: ${model}`);
+  if (model.length > 256 || /\s/u.test(model)) throw providerTruthError('model must be a bounded exact API identity');
+  if (getLegacyModelMigration(model)) throw providerTruthError(`Legacy model alias is not a wire identity: ${model}`);
 }
 
 export function assertCanonicalProviderId(provider: string): void {
   requireNonEmpty('provider', provider);
-  if (!/^[a-z][a-z0-9-]{0,63}$/u.test(provider)) throw new Error('provider must be a canonical provider id');
+  if (!/^[a-z][a-z0-9-]{0,63}$/u.test(provider)) throw providerTruthError('provider must be a canonical provider id');
 }
 
 export function assertOpaqueSha256(name: string, value: string | null, required: boolean): void {
   if (value === null) {
-    if (required) throw new Error(`${name} is required for live proof`);
+    if (required) throw providerTruthError(`${name} is required for live proof`);
     return;
   }
-  if (!/^[a-f0-9]{64}$/u.test(value)) throw new Error(`${name} must be a SHA-256 digest`);
+  if (!/^[a-f0-9]{64}$/u.test(value)) throw providerTruthError(`${name} must be a SHA-256 digest`);
 }
 
 // A durable evidence reference is opaque in one of exactly two shapes: the
@@ -268,14 +273,14 @@ const OPAQUE_EVIDENCE_REF_CONTENT_ADDRESSED = /^[a-z][a-z0-9-]*:sha256:[a-f0-9]{
 
 export function assertOpaqueEvidenceRef(name: string, value: string | null, required: boolean): void {
   if (value === null) {
-    if (required) throw new Error(`${name} is required`);
+    if (required) throw providerTruthError(`${name} is required`);
     return;
   }
   if (value.length > 192
     || value.includes('://')
     || !(OPAQUE_EVIDENCE_REF_SINGLE.test(value)
       || OPAQUE_EVIDENCE_REF_CONTENT_ADDRESSED.test(value))) {
-    throw new Error(`${name} must be an opaque durable reference`);
+    throw providerTruthError(`${name} must be an opaque durable reference`);
   }
 }
 
@@ -318,7 +323,7 @@ function profileAllowsRequest(request: ReachabilityProbeRequest): boolean {
 }
 
 function assertTtl(ttlMs: number): void {
-  if (!Number.isSafeInteger(ttlMs) || ttlMs <= 0) throw new Error('ttlMs must be a positive integer');
+  if (!Number.isSafeInteger(ttlMs) || ttlMs <= 0) throw providerTruthError('ttlMs must be a positive integer');
 }
 
 function isFreshWindow(fetchedAt: string | null, expiresAt: string | null, at: Date): boolean {
@@ -341,7 +346,7 @@ export function createCapabilityCatalog(input: CapabilityCatalogInput): Capabili
     assertCanonicalProviderId(entry.provider);
     assertCanonicalModelApiId(entry.model);
     const key = `${entry.provider}\0${entry.model}`;
-    if (seen.has(key)) throw new Error(`Duplicate capability catalog identity: ${entry.provider}/${entry.model}`);
+    if (seen.has(key)) throw providerTruthError(`Duplicate capability catalog identity: ${entry.provider}/${entry.model}`);
     seen.add(key);
     return {
       provider: entry.provider,
@@ -531,7 +536,7 @@ export async function probeExactModelReachability(
 }
 
 export function assertCapabilityCatalog(catalog: CapabilityCatalog): void {
-  if (catalog.schemaVersion !== PROVIDER_TRUTH_SCHEMA_VERSION) throw new Error('Unsupported catalog schema');
+  if (catalog.schemaVersion !== PROVIDER_TRUTH_SCHEMA_VERSION) throw providerTruthError('Unsupported catalog schema');
   requireNonEmpty('tenantId', catalog.tenantId);
   requireNonEmpty('projectId', catalog.projectId);
   requireNonEmpty('catalogId', catalog.catalogId);
@@ -540,14 +545,14 @@ export function assertCapabilityCatalog(catalog: CapabilityCatalog): void {
   const expiresAt = catalog.source.expiresAt === null ? null : Date.parse(catalog.source.expiresAt);
   if (!Number.isFinite(fetchedAt)
     || (expiresAt !== null && (!Number.isFinite(expiresAt) || expiresAt <= fetchedAt))) {
-    throw new Error('Capability catalog timestamps are invalid');
+    throw providerTruthError('Capability catalog timestamps are invalid');
   }
   const seen = new Set<string>();
   for (const entry of catalog.entries) {
     assertCanonicalProviderId(entry.provider);
     assertCanonicalModelApiId(entry.model);
     const key = `${entry.provider}\0${entry.model}`;
-    if (seen.has(key)) throw new Error(`Duplicate capability catalog identity: ${entry.provider}/${entry.model}`);
+    if (seen.has(key)) throw providerTruthError(`Duplicate capability catalog identity: ${entry.provider}/${entry.model}`);
     seen.add(key);
     for (const stage of Object.values(entry.stages)) {
       if (stage.evidenceRef !== null) {
@@ -562,11 +567,11 @@ export function assertCapabilityCatalog(catalog: CapabilityCatalog): void {
     const proofRefs = new Set<string>();
     for (const proof of entry.liveProofs) {
       assertOpaqueEvidenceRef('live proof evidenceRef', proof.evidenceRef, true);
-      if (proofRefs.has(proof.evidenceRef)) throw new Error('Duplicate live proof evidence ref');
+      if (proofRefs.has(proof.evidenceRef)) throw providerTruthError('Duplicate live proof evidence ref');
       proofRefs.add(proof.evidenceRef);
-      if (!Number.isFinite(Date.parse(proof.expiresAt))) throw new Error('Live proof expiry is invalid');
+      if (!Number.isFinite(Date.parse(proof.expiresAt))) throw providerTruthError('Live proof expiry is invalid');
       if (!(['inference', 'tools', 'vision', 'streaming'] as const).includes(proof.capability)) {
-        throw new Error('Unknown live proof capability');
+        throw providerTruthError('Unknown live proof capability');
       }
       assertOpaqueSha256('live proof accountRefHash', proof.auth.accountRefHash, proof.auth.mode !== 'local');
       assertOpaqueSha256('live proof endpointRefHash', proof.backend.endpointRefHash, proof.backend.transport !== 'cli');
@@ -589,7 +594,7 @@ export function materializeCapabilityCatalog(
 }
 
 export function assertReachabilityResult(result: ReachabilityResult): void {
-  if (result.schemaVersion !== PROVIDER_TRUTH_SCHEMA_VERSION) throw new Error('Unsupported reachability schema');
+  if (result.schemaVersion !== PROVIDER_TRUTH_SCHEMA_VERSION) throw providerTruthError('Unsupported reachability schema');
   requireNonEmpty('tenantId', result.tenantId);
   requireNonEmpty('projectId', result.projectId);
   requireNonEmpty('reachabilityId', result.reachabilityId);
@@ -600,21 +605,21 @@ export function assertReachabilityResult(result: ReachabilityResult): void {
   const completed = Date.parse(result.probe.completedAt);
   const expires = Date.parse(result.probe.expiresAt);
   if (![started, completed, expires].every(Number.isFinite) || completed < started || expires <= completed) {
-    throw new Error('Reachability timestamps are invalid');
+    throw providerTruthError('Reachability timestamps are invalid');
   }
   const positive = result.state === 'known' || result.reachable || result.liveProven;
   if (!(['subscription', 'api', 'hybrid', 'local', 'unknown'] as const).includes(result.auth.mode)) {
-    throw new Error('Unknown auth mode');
+    throw providerTruthError('Unknown auth mode');
   }
   if (!(['cli', 'api', 'http', 'local-runtime'] as const).includes(result.backend.transport)) {
-    throw new Error('Unknown transport');
+    throw providerTruthError('Unknown transport');
   }
   if (!(['host-subprocess', 'docker', 'tmux', 'api', 'in-process', 'unknown'] as const)
     .includes(result.backend.executionBackend)) {
-    throw new Error('Unknown execution backend');
+    throw providerTruthError('Unknown execution backend');
   }
   if (!(['inference', 'tools', 'vision', 'streaming'] as const).includes(result.probe.capability)) {
-    throw new Error('Unknown reachability capability');
+    throw providerTruthError('Unknown reachability capability');
   }
   assertOpaqueSha256('accountRefHash', result.auth.accountRefHash, positive && result.auth.mode !== 'local');
   assertOpaqueSha256('endpointRefHash', result.backend.endpointRefHash, positive && result.backend.transport !== 'cli');
@@ -622,19 +627,19 @@ export function assertReachabilityResult(result: ReachabilityResult): void {
   assertOpaqueEvidenceRef('executionProfileRef', result.backend.executionProfileRef, true);
   assertOpaqueEvidenceRef('executionProfile.profileRef', result.executionProfile.profileRef, true);
   assertCanonicalProviderId(result.executionProfile.provider);
-  if (result.executionProfile.allowed.length === 0) throw new Error('Execution profile has no allowed tuple');
+  if (result.executionProfile.allowed.length === 0) throw providerTruthError('Execution profile has no allowed tuple');
   for (const item of result.executionProfile.allowed) {
     if (!(['subscription', 'api', 'hybrid', 'local', 'unknown'] as const).includes(item.authMode)
       || !(['cli', 'api', 'http', 'local-runtime'] as const).includes(item.transport)
       || !(['host-subprocess', 'docker', 'tmux', 'api', 'in-process', 'unknown'] as const)
         .includes(item.executionBackend)) {
-      throw new Error('Execution profile contains an unknown tuple');
+      throw providerTruthError('Execution profile contains an unknown tuple');
     }
   }
   assertOpaqueSha256('providerRequestRefHash', result.observed.providerRequestRefHash, false);
   if (result.observed.latencyMs !== null
     && (!Number.isFinite(result.observed.latencyMs) || result.observed.latencyMs < 0)) {
-    throw new Error('Reachability latency must be a non-negative finite number');
+    throw providerTruthError('Reachability latency must be a non-negative finite number');
   }
   assertOpaqueEvidenceRef('budgetRef', result.admission.budget.evidenceRef, positive);
   assertOpaqueEvidenceRef('approvalRef', result.admission.approvalRef, positive);
@@ -662,7 +667,7 @@ export function assertReachabilityResult(result: ReachabilityResult): void {
     || result.admission.limits.evidenceRefs.length === 0
     || !isFreshWindow(result.admission.limits.fetchedAt, result.admission.limits.expiresAt, new Date(completed))
     || !isFreshWindow(result.admission.approvalGrantedAt, result.admission.approvalExpiresAt, new Date(completed)))) {
-    throw new Error('Live proof requires fresh approval, limit and budget evidence');
+    throw providerTruthError('Live proof requires fresh approval, limit and budget evidence');
   }
   if (positive) {
     // 7094/7081: no expiry clamp against admission evidence — the freshness
@@ -670,7 +675,7 @@ export function assertReachabilityResult(result: ReachabilityResult): void {
     // window; the row's lifetime is its ttl (see probeExactModelReachability).
   }
   if (positive && (result.auth.mode === 'unknown' || result.backend.executionBackend === 'unknown')) {
-    throw new Error('Unknown auth or execution backend cannot carry live proof');
+    throw providerTruthError('Unknown auth or execution backend cannot carry live proof');
   }
   const exactLiveSuccess = result.probe.kind === 'model-invocation'
     && result.outcome === 'succeeded'
@@ -683,11 +688,11 @@ export function assertReachabilityResult(result: ReachabilityResult): void {
       || result.observed.verifiedCapability === result.probe.capability);
   if (positive) {
     if (!exactLiveSuccess || result.state !== 'known' || !result.reachable || !result.liveProven) {
-      throw new Error('Known reachability requires one exact successful live model invocation');
+      throw providerTruthError('Known reachability requires one exact successful live model invocation');
     }
   }
   if (result.state !== 'known' && (result.reachable || result.liveProven)) {
-    throw new Error('Non-known reachability cannot admit dispatch');
+    throw providerTruthError('Non-known reachability cannot admit dispatch');
   }
 }
 

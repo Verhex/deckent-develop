@@ -17099,3 +17099,52 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 686-003: settlement/mission kümesi (task-result-settlement · mission-migrate · mission-worker-invocation-coordinator · sqlite-mission-store) — ham-throw'lar typed'a (PENDING)
 
 ---
+## Sprint 687 — sprint-687
+
+**Status:** ABORTED
+**Date:** 2026-08-26
+**Duration:** 524s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 523998ms |
+
+### Tasks
+
+- 687-001-fix-fix: Fix: Fix: cli/core kümesi (autonomous · chat-provider-parity · mcp · file-lock) — ham-throw'lar typed'a (PAUSED)
+- 687-001-fix: Fix: cli/core kümesi (autonomous · chat-provider-parity · mcp · file-lock) — ham-throw'lar typed'a (NO_GO)
+- 687-001: cli/core kümesi (autonomous · chat-provider-parity · mcp · file-lock) — ham-throw'lar typed'a (NO_GO)
+- 687-002: provider/budget kümesi (live-execution-budget · provider-limit-truth · provider-truth · scheduled-flow) — ham-throw'lar typed'a (PAUSED)
+- 687-003: settlement/mission kümesi (task-result-settlement · mission-migrate · mission-worker-invocation-coordinator · sqlite-mission-store) — ham-throw'lar typed'a (PAUSED)
+
+---
+## Sprint 688 — sprint-688
+
+**Status:** COMPLETE
+**Date:** 2026-08-26
+**Duration:** 345s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 2 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 345445ms |
+
+### Tasks
+
+- 688-001: provider/budget kümesi (live-execution-budget · provider-limit-truth · provider-truth · scheduled-flow) — ham-throw'lar typed'a (DONE)
+- 688-002: settlement/mission kümesi (task-result-settlement · mission-migrate · mission-worker-invocation-coordinator · sqlite-mission-store) — ham-throw'lar typed'a (DONE)
+
+---

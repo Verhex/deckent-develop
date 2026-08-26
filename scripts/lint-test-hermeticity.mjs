@@ -669,7 +669,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-26 xverify-onarim dalgasi (sprint-678): +2 — worker-authored
   // tests/cli/xverify-evidence-scope.test.ts + fencing/ingress pin ekleri
   // (tmpdir-hermetik, suite-owned).
-  count: 16506,
+  count: 16508,
   // 2026-08-25 B-sweep: digest moved — --fix roundtrip pin, multi-label
   // parser pin, same-line rule downgraded to WARN (all suite-owned).
   // 2026-08-25 7141 wave: count unchanged, digest moved — the src-side
@@ -713,7 +713,9 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // attribution-baseline / finalize-retirement + isCanonicalTaskFilename pinleri.
   // 2026-08-26 11:04: 16504→16506 — Node-6a mekanik supurme (sprint-684 3/3):
   // death-sweep hijyen + worker-identity-hostbound + docker-git-async suiteleri.
-  digest: 'e078c162e316fb7bce1a7ee30b80654d731ba98e3d0254835c420e98bafc3737',
+  digest: '5940a6587f1a6429d02e82397d7d2c124add05ffa281e3e1a683cca16fa8fe03',
+  // 2026-08-26 11:48: 16506→16508 — 7141 devam-dalgalari (687-001 + 688 2/2):
+  // typed-throw donusumu test-eklentileri.
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1274,7 +1276,8 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // finalizer + sidecar-loader hotfix).
   // 2026-08-26 11:05: ayni 1339, digest-only — Node-6a src kaymalari
   // (death-sweep / prompt-template kimlik-esigi / docker async-git).
-  digest: 'c5a2767a7a18fbaac7012b1fcf3ac8d107d99b1ae2ce5a1f18a4a7df611dadda', // 11:08 quarantine-redirect el-fix'i dahil
+  digest: 'ca3fe36b5c4a797d3068ae699bbd5960db50ba93fd981dfe4e2279d4d122738e',
+  // 11:49: ayni 1339, digest-only — 7141 typed-throw src kaymalari (12 dosya).
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

@@ -1,3 +1,4 @@
+import { createExecutionAuthorityError } from '../../../core/errors.js';
 import { createHash } from 'node:crypto';
 
 import {
@@ -183,22 +184,22 @@ export function deriveMissionWorkerReservationIdentity(
 function canonicalTimestamp(label: string, value: string): void {
   const parsed = Date.parse(value);
   if (!Number.isFinite(parsed) || new Date(parsed).toISOString() !== value) {
-    throw new Error(`${label} must be a canonical ISO timestamp`);
+    throw createExecutionAuthorityError(`${label} must be a canonical ISO timestamp`);
   }
 }
 
 function assertSelection(label: string, selection: InvocationSelection): void {
   if (!SELECTION_SOURCES.has(selection.source) || !REASON_CODES.has(selection.reasonCode)) {
-    throw new Error(`${label} carries an unsupported selection source or reason`);
+    throw createExecutionAuthorityError(`${label} carries an unsupported selection source or reason`);
   }
   if ((selection.provider === null) !== (selection.model === null)) {
-    throw new Error(`${label} provider/model identity is incomplete`);
+    throw createExecutionAuthorityError(`${label} provider/model identity is incomplete`);
   }
   if (selection.provider !== null && selection.model !== null) {
     assertCanonicalProviderId(String(selection.provider));
     assertCanonicalModelApiId(selection.model);
   } else if (selection.source !== 'none') {
-    throw new Error(`${label} empty identity must use source=none`);
+    throw createExecutionAuthorityError(`${label} empty identity must use source=none`);
   }
 }
 
@@ -232,7 +233,7 @@ function assertClaim(input: MissionWorkerInvocationExecuteInput): void {
     || !claim.attemptId
     || digest(claim.fenceToken) !== claim.fenceTokenHash
     || !input.isClaimActive()) {
-    throw new Error('Mission dispatch claim is not an active exact host authority');
+    throw createExecutionAuthorityError('Mission dispatch claim is not an active exact host authority');
   }
 }
 
@@ -248,13 +249,13 @@ function assertPreparation(prepared: MissionWorkerInvocationPreparation): void {
   const invocation = prepared.admission.invocation;
   if (invocation.role !== 'worker'
     || (invocation.purpose ?? 'worker-execution') !== 'worker-execution') {
-    throw new Error('Mission task admission must use worker/worker-execution');
+    throw createExecutionAuthorityError('Mission task admission must use worker/worker-execution');
   }
   if (String(blueprint.configured.provider) !== String(invocation.primaryProvider)
     || blueprint.configured.model !== invocation.model
     || String(blueprint.requested.provider) !== String(invocation.primaryProvider)
     || blueprint.requested.model !== invocation.model) {
-    throw new Error('Receipt configured/requested identity differs from admission request');
+    throw createExecutionAuthorityError('Receipt configured/requested identity differs from admission request');
   }
 }
 
@@ -270,7 +271,7 @@ function bindAdmissionRequest(
       || candidate.reachabilityQuery.tenantId !== mission.tenant
       || candidate.reachabilityQuery.projectId !== projectId
       || candidate.limitQuery.tenantId !== mission.tenant) {
-      throw new Error('Candidate authority is outside the Mission tenant/project scope');
+      throw createExecutionAuthorityError('Candidate authority is outside the Mission tenant/project scope');
     }
   }
   return {
@@ -290,7 +291,7 @@ function bindAdmissionRequest(
         || reservation.receiptRef !== identity.receiptRef
         || reservation.reservationId !== expected.reservationId
         || reservation.idempotencyKey !== expected.idempotencyKey) {
-        throw new Error('Reservation identity is not the canonical Mission claim projection');
+        throw createExecutionAuthorityError('Reservation identity is not the canonical Mission claim projection');
       }
       return reservation;
     },
@@ -308,12 +309,12 @@ function buildReceipt(
   const blueprint = prepared.receipt;
   assertPreparation(prepared);
   if (!sameSelection(blueprint.configured, admission.resolution.configured)) {
-    throw new Error('Receipt configured identity differs from admission authority');
+    throw createExecutionAuthorityError('Receipt configured identity differs from admission authority');
   }
   const selected = admission.decision === 'allow' ? admission.reservation : null;
   const candidate = selected === null ? primaryCandidate(prepared.admission) : null;
   if (selected === null && !candidate) {
-    throw new Error('Held invocation lacks its configured candidate identity');
+    throw createExecutionAuthorityError('Held invocation lacks its configured candidate identity');
   }
   const backend = selected?.backend ?? {
     transport: candidate!.reachabilityQuery.transport,
@@ -354,7 +355,7 @@ function buildReceipt(
   ] as const) assertSelection(label, selection);
   for (const transition of receipt.fallbackChain) {
     if (transition.sequence < 1 || !Number.isInteger(transition.sequence)) {
-      throw new Error('Receipt fallback sequence is invalid');
+      throw createExecutionAuthorityError('Receipt fallback sequence is invalid');
     }
     assertCanonicalProviderId(String(transition.toProvider));
     assertCanonicalModelApiId(transition.toModel);
@@ -378,10 +379,10 @@ function buildReceipt(
       || String(receipt.called.provider) !== selected.provider
       || receipt.called.model !== selected.model
       || receipt.reachability.evidenceRef !== selected.reachabilityEvidenceRef) {
-      throw new Error('Receipt/reservation/Mission claim identity mismatch');
+      throw createExecutionAuthorityError('Receipt/reservation/Mission claim identity mismatch');
     }
     if (receipt.reachability.state !== 'known' || receipt.limits.state !== 'known') {
-      throw new Error('Executable receipt requires known reachability and limit evidence');
+      throw createExecutionAuthorityError('Executable receipt requires known reachability and limit evidence');
     }
   }
   return Object.freeze(receipt);
@@ -395,7 +396,7 @@ function assertExecution(
     || execution.consumerEvent.type !== 'consumer_settled'
     || (execution.providerSettlementEvent.type !== 'consumed'
       && execution.providerSettlementEvent.type !== 'released')) {
-    throw new Error('Executor returned an invalid terminal evidence bundle');
+    throw createExecutionAuthorityError('Executor returned an invalid terminal evidence bundle');
   }
   assertCanonicalProviderId(execution.actualCall.provider);
   assertCanonicalModelApiId(execution.actualCall.model);
@@ -407,27 +408,27 @@ function assertExecution(
     || execution.actualCall.backend.endpointRefHash !== admission.reservation.backend.endpointRefHash
     || execution.actualCall.auth.mode !== admission.reservation.authMode
     || execution.actualCall.auth.accountRefHash !== admission.reservation.accountRefHash) {
-    throw new Error('Actual provider call evidence differs from the exact execution grant');
+    throw createExecutionAuthorityError('Actual provider call evidence differs from the exact execution grant');
   }
   if (!REASON_CODES.has(execution.transportEvent.payload.reasonCode)
     || !REASON_CODES.has(execution.consumerEvent.payload.reasonCode)
     || !Number.isFinite(execution.transportEvent.payload.durationMs)
     || execution.transportEvent.payload.durationMs < 0
     || execution.providerSettlementEvent.fenceTokenHash !== admission.reservation.fenceTokenHash) {
-    throw new Error('Executor terminal evidence is malformed or outside the reservation fence');
+    throw createExecutionAuthorityError('Executor terminal evidence is malformed or outside the reservation fence');
   }
   if (execution.result.ok && (
     execution.transportEvent.payload.outcome !== 'succeeded'
     || execution.consumerEvent.payload.outcome !== 'accepted'
     || execution.providerSettlementEvent.type !== 'consumed'
   )) {
-    throw new Error('Successful result contradicts terminal transport/consumer/usage evidence');
+    throw createExecutionAuthorityError('Successful result contradicts terminal transport/consumer/usage evidence');
   }
   if (execution.providerSettlementEvent.type === 'released' && execution.result.ok) {
-    throw new Error('Released provider reservation cannot settle a successful result');
+    throw createExecutionAuthorityError('Released provider reservation cannot settle a successful result');
   }
   if (execution.result.dispatchDisposition !== undefined) {
-    throw new Error('Exact executor cannot author host dispatch disposition');
+    throw createExecutionAuthorityError('Exact executor cannot author host dispatch disposition');
   }
 }
 
@@ -495,7 +496,7 @@ function assertExistingReceiptIdentity(
     || receipt.callId !== identity.callId
     || receipt.role !== 'worker'
     || receipt.purpose !== 'worker-execution') {
-    throw new Error('Existing invocation receipt differs from the canonical Mission claim');
+    throw createExecutionAuthorityError('Existing invocation receipt differs from the canonical Mission claim');
   }
 }
 
@@ -609,7 +610,7 @@ export class MissionWorkerInvocationCoordinator implements MissionWorkerInvocati
         identity,
       });
       assertPreparation(prepared);
-      if (!input.isClaimActive()) throw new Error('Mission dispatch claim expired during preparation');
+      if (!input.isClaimActive()) throw createExecutionAuthorityError('Mission dispatch claim expired during preparation');
       const admissionRequest = bindAdmissionRequest(
         prepared, input.mission, input.claim, receiptLedger.projectId, identity,
       );
@@ -657,11 +658,11 @@ export class MissionWorkerInvocationCoordinator implements MissionWorkerInvocati
         );
       }
 
-      if (!input.isClaimActive()) throw new Error('Mission dispatch claim expired before provider grant');
+      if (!input.isClaimActive()) throw createExecutionAuthorityError('Mission dispatch claim expired before provider grant');
       const dispatchEvent = prepared.buildDispatchEvent(admission);
       if (dispatchEvent.type !== 'dispatched'
         || dispatchEvent.fenceTokenHash !== input.claim.fenceTokenHash) {
-        throw new Error('Dispatch event is outside the exact Mission claim fence');
+        throw createExecutionAuthorityError('Dispatch event is outside the exact Mission claim fence');
       }
       const dispatch = admissionRuntime.claimDispatch(admission, dispatchEvent);
       if (!dispatch.claimed) {

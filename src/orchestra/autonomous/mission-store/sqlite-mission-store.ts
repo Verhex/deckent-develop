@@ -384,7 +384,7 @@ export class SqliteMissionStore implements MissionStore {
   recover(engineLease: MissionEngineLease): readonly MissionRecoveredDispatchAttemptV1[] {
     const transaction = this.db.transaction((): readonly MissionRecoveredDispatchAttemptV1[] => {
       if (!this.isEngineLeaseActive(engineLease)) {
-        throw new Error(`MISSION_ENGINE_LEASE_LOST: recovery authority ${engineLease.ownerId}`);
+        throw createExecutionAuthorityError(`MISSION_ENGINE_LEASE_LOST: recovery authority ${engineLease.ownerId}`);
       }
       // Capture every complete running claim before ANY recovery mutation can
       // revoke its exact identity. Kind/trigger classification still owns the
@@ -455,7 +455,7 @@ export class SqliteMissionStore implements MissionStore {
               payload_hash: string;
             } | undefined;
           if (!existing || existing.payload_json !== payloadJson || existing.payload_hash !== payloadHash) {
-            throw new Error(`MISSION_DISPATCH_RECOVERY_CONFLICT: ${recoveryId}`);
+            throw createExecutionAuthorityError(`MISSION_DISPATCH_RECOVERY_CONFLICT: ${recoveryId}`);
           }
         }
       }
@@ -493,18 +493,18 @@ export class SqliteMissionStore implements MissionStore {
     for (const row of rows) {
       const recovery = this.readDispatchRecovery(row.payload_json, row.payload_hash);
       if (recovery.recoveryId !== row.recovery_id) {
-        throw new Error('MISSION_DISPATCH_RECOVERY_INTEGRITY_FAILURE');
+        throw createExecutionAuthorityError('MISSION_DISPATCH_RECOVERY_INTEGRITY_FAILURE');
       }
       if (row.ack_payload_json !== null || row.ack_payload_hash !== null) {
         if (row.ack_payload_json === null || row.ack_payload_hash === null) {
-          throw new Error('MISSION_DISPATCH_RECOVERY_ACK_INTEGRITY_FAILURE');
+          throw createExecutionAuthorityError('MISSION_DISPATCH_RECOVERY_ACK_INTEGRITY_FAILURE');
         }
         const acknowledgement = this.readDispatchRecoveryAcknowledgement(
           row.ack_payload_json,
           row.ack_payload_hash,
         );
         if (acknowledgement.recoveryId !== recovery.recoveryId) {
-          throw new Error('MISSION_DISPATCH_RECOVERY_ACK_INTEGRITY_FAILURE');
+          throw createExecutionAuthorityError('MISSION_DISPATCH_RECOVERY_ACK_INTEGRITY_FAILURE');
         }
         continue;
       }
@@ -518,12 +518,12 @@ export class SqliteMissionStore implements MissionStore {
   ): boolean {
     const transaction = this.db.transaction((): boolean => {
       if (!this.isEngineLeaseActive(engineLease)) {
-        throw new Error(`MISSION_ENGINE_LEASE_LOST: recovery acknowledgement ${engineLease.ownerId}`);
+        throw createExecutionAuthorityError(`MISSION_ENGINE_LEASE_LOST: recovery acknowledgement ${engineLease.ownerId}`);
       }
       this.assertDispatchRecoveryAcknowledgement(acknowledgement);
       const recovery = this.db.prepare(`SELECT 1 AS present FROM mission_dispatch_recoveries
         WHERE recovery_id=?`).get(acknowledgement.recoveryId);
-      if (!recovery) throw new Error(`MISSION_DISPATCH_RECOVERY_NOT_FOUND: ${acknowledgement.recoveryId}`);
+      if (!recovery) throw createExecutionAuthorityError(`MISSION_DISPATCH_RECOVERY_NOT_FOUND: ${acknowledgement.recoveryId}`);
       const payloadJson = this.canonical(acknowledgement);
       const payloadHash = this.claimTokenHash(payloadJson);
       const info = this.db.prepare(`INSERT INTO mission_dispatch_recovery_acknowledgements(
@@ -540,7 +540,7 @@ export class SqliteMissionStore implements MissionStore {
         FROM mission_dispatch_recovery_acknowledgements WHERE recovery_id=?`)
         .get(acknowledgement.recoveryId) as { payload_json: string; payload_hash: string } | undefined;
       if (!existing || existing.payload_json !== payloadJson || existing.payload_hash !== payloadHash) {
-        throw new Error(`MISSION_DISPATCH_RECOVERY_ACK_CONFLICT: ${acknowledgement.recoveryId}`);
+        throw createExecutionAuthorityError(`MISSION_DISPATCH_RECOVERY_ACK_CONFLICT: ${acknowledgement.recoveryId}`);
       }
       return false;
     });
@@ -856,7 +856,7 @@ export class SqliteMissionStore implements MissionStore {
     payloadHash: string,
   ): MissionRecoveredDispatchAttemptV1 {
     if (this.claimTokenHash(payloadJson) !== payloadHash) {
-      throw new Error('MISSION_DISPATCH_RECOVERY_INTEGRITY_FAILURE');
+      throw createExecutionAuthorityError('MISSION_DISPATCH_RECOVERY_INTEGRITY_FAILURE');
     }
     const value = JSON.parse(payloadJson) as MissionRecoveredDispatchAttemptV1;
     if (value.schemaVersion !== 1
@@ -868,7 +868,7 @@ export class SqliteMissionStore implements MissionStore {
       || !Number.isSafeInteger(value.observedByEngineEpoch)
       || value.observedByEngineEpoch < 1
       || !Number.isFinite(Date.parse(value.observedAt))) {
-      throw new Error('MISSION_DISPATCH_RECOVERY_INTEGRITY_FAILURE');
+      throw createExecutionAuthorityError('MISSION_DISPATCH_RECOVERY_INTEGRITY_FAILURE');
     }
     return Object.freeze(value);
   }
@@ -880,7 +880,7 @@ export class SqliteMissionStore implements MissionStore {
       || !/^[a-f0-9]{64}$/u.test(value.receiptEventHash)
       || !Number.isFinite(Date.parse(value.acknowledgedAt))
       || (value.outcome !== 'receipt-reconciled' && value.outcome !== 'receipt-already-terminal')) {
-      throw new Error('MISSION_DISPATCH_RECOVERY_ACK_INVALID');
+      throw createExecutionAuthorityError('MISSION_DISPATCH_RECOVERY_ACK_INVALID');
     }
   }
   private readDispatchRecoveryAcknowledgement(
@@ -888,7 +888,7 @@ export class SqliteMissionStore implements MissionStore {
     payloadHash: string,
   ): MissionDispatchRecoveryAcknowledgementV1 {
     if (this.claimTokenHash(payloadJson) !== payloadHash) {
-      throw new Error('MISSION_DISPATCH_RECOVERY_ACK_INTEGRITY_FAILURE');
+      throw createExecutionAuthorityError('MISSION_DISPATCH_RECOVERY_ACK_INTEGRITY_FAILURE');
     }
     const value = JSON.parse(payloadJson) as MissionDispatchRecoveryAcknowledgementV1;
     this.assertDispatchRecoveryAcknowledgement(value);
@@ -918,7 +918,7 @@ export class SqliteMissionStore implements MissionStore {
   private assertPersistableTrigger(item: NewWorkItem): void {
     const classification = this.classifyPersistedTrigger(item.trigger);
     if (classification.kind === 'invalid') {
-      throw new Error(`MISSION_TRIGGER_INVALID: ${item.id}`);
+      throw createExecutionAuthorityError(`MISSION_TRIGGER_INVALID: ${item.id}`);
     }
   }
 
@@ -1386,14 +1386,14 @@ export class SqliteMissionStore implements MissionStore {
     allowLegacyUnknownKindQuarantine: boolean,
   ): Mission {
     if (!m.id || m.id !== m.id.trim()) {
-      throw new Error('MISSION_BATCH_INVALID: mission id must be a non-empty canonical string');
+      throw createExecutionAuthorityError('MISSION_BATCH_INVALID: mission id must be a non-empty canonical string');
     }
     const normalizedItems = items.map((item): NewMissionWorkItem => {
       if (!item.id || item.id !== item.id.trim()) {
-        throw new Error('MISSION_BATCH_INVALID: work-item id must be a non-empty canonical string');
+        throw createExecutionAuthorityError('MISSION_BATCH_INVALID: work-item id must be a non-empty canonical string');
       }
       if (item.missionId !== m.id) {
-        throw new Error(`MISSION_BATCH_INVALID: item ${item.id} belongs to foreign mission ${item.missionId}`);
+        throw createExecutionAuthorityError(`MISSION_BATCH_INVALID: item ${item.id} belongs to foreign mission ${item.missionId}`);
       }
       if (!isCanonicalWorkItemKind(item.kind)) {
         if (!allowLegacyUnknownKindQuarantine || !isExactLegacyUnknownKindQuarantine(m, item)) {
@@ -1404,13 +1404,13 @@ export class SqliteMissionStore implements MissionStore {
       this.assertPersistableFence(item);
       const dependencies = item.dependsOn ?? [];
       if (dependencies.some((id) => !id || id !== id.trim())) {
-        throw new Error(`MISSION_BATCH_INVALID: item ${item.id} has a non-canonical dependency id`);
+        throw createExecutionAuthorityError(`MISSION_BATCH_INVALID: item ${item.id} has a non-canonical dependency id`);
       }
       if (new Set(dependencies).size !== dependencies.length) {
-        throw new Error(`MISSION_BATCH_INVALID: item ${item.id} has duplicate dependencies`);
+        throw createExecutionAuthorityError(`MISSION_BATCH_INVALID: item ${item.id} has duplicate dependencies`);
       }
       if (item.initialStatus !== undefined && !WORK_ITEM_STATUSES.has(item.initialStatus)) {
-        throw new Error(`MISSION_BATCH_INVALID: item ${item.id} has invalid initial status`);
+        throw createExecutionAuthorityError(`MISSION_BATCH_INVALID: item ${item.id} has invalid initial status`);
       }
       if (item.initialResult !== undefined && (
         item.initialStatus === undefined
@@ -1418,22 +1418,22 @@ export class SqliteMissionStore implements MissionStore {
         || typeof item.initialResult !== 'object'
         || typeof item.initialResult.ok !== 'boolean'
       )) {
-        throw new Error(`MISSION_BATCH_INVALID: item ${item.id} has invalid initial result`);
+        throw createExecutionAuthorityError(`MISSION_BATCH_INVALID: item ${item.id} has invalid initial result`);
       }
       return { ...item, dependsOn: [...dependencies].sort() };
     });
     const ids = new Set<string>();
     for (const item of normalizedItems) {
-      if (ids.has(item.id)) throw new Error(`MISSION_BATCH_INVALID: duplicate work-item id ${item.id}`);
+      if (ids.has(item.id)) throw createExecutionAuthorityError(`MISSION_BATCH_INVALID: duplicate work-item id ${item.id}`);
       ids.add(item.id);
     }
     for (const item of normalizedItems) {
       if (item.dependsOn?.includes(item.id)) {
-        throw new Error(`MISSION_BATCH_INVALID: self dependency ${item.id}`);
+        throw createExecutionAuthorityError(`MISSION_BATCH_INVALID: self dependency ${item.id}`);
       }
       const missing = item.dependsOn?.filter((id) => !ids.has(id)) ?? [];
       if (missing.length > 0) {
-        throw new Error(`MISSION_BATCH_INVALID: item ${item.id} depends on missing or foreign item ${missing.join(', ')}`);
+        throw createExecutionAuthorityError(`MISSION_BATCH_INVALID: item ${item.id} depends on missing or foreign item ${missing.join(', ')}`);
       }
     }
 
@@ -1454,7 +1454,7 @@ export class SqliteMissionStore implements MissionStore {
       const existing = this.getMission(m.id);
       if (existing) {
         if (normalizedItems.some((item) => item.initialStatus !== undefined || item.initialResult !== undefined)) {
-          throw new Error(`MISSION_BATCH_CONFLICT: mission ${m.id} import/recovery state requires external replay provenance`);
+          throw createExecutionAuthorityError(`MISSION_BATCH_CONFLICT: mission ${m.id} import/recovery state requires external replay provenance`);
         }
         const expectedMission = {
           id: m.id,
@@ -1502,7 +1502,7 @@ export class SqliteMissionStore implements MissionStore {
           this.canonical(actualMission) === this.canonical(expectedMission)
           && this.canonical(actualItems) === this.canonical(expectedItems)
         ) return existing;
-        throw new Error(`MISSION_BATCH_CONFLICT: mission ${m.id} already exists with different creation data`);
+        throw createExecutionAuthorityError(`MISSION_BATCH_CONFLICT: mission ${m.id} already exists with different creation data`);
       }
 
       const mission = this.createMission(m);
@@ -1550,7 +1550,7 @@ export class SqliteMissionStore implements MissionStore {
       return transaction.immediate();
     } catch (error) {
       if (error instanceof Error && error.message.startsWith('MISSION_BATCH_')) throw error;
-      throw new Error(`MISSION_BATCH_CONFLICT: ${error instanceof Error ? error.message : String(error)}`);
+      throw createExecutionAuthorityError(`MISSION_BATCH_CONFLICT: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
   getMission(id: string): Mission | null {
@@ -1578,10 +1578,10 @@ export class SqliteMissionStore implements MissionStore {
   recordAcceptanceDecision(decision: MissionAcceptanceDecisionV1): MissionAcceptanceDecisionRecord {
     const transaction = this.db.transaction((): MissionAcceptanceDecisionRecord => {
       const mission = this.getMission(decision.missionId);
-      if (!mission) throw new Error(`MISSION_ACCEPTANCE_INVALID: mission not found ${decision.missionId}`);
-      if (mission.kind !== 'goal') throw new Error(`MISSION_ACCEPTANCE_INVALID: mission ${decision.missionId} is not a goal`);
+      if (!mission) throw createExecutionAuthorityError(`MISSION_ACCEPTANCE_INVALID: mission not found ${decision.missionId}`);
+      if (mission.kind !== 'goal') throw createExecutionAuthorityError(`MISSION_ACCEPTANCE_INVALID: mission ${decision.missionId} is not a goal`);
       const contract = readGoalAcceptanceContract(mission);
-      if (!contract) throw new Error(`MISSION_ACCEPTANCE_INVALID: mission ${decision.missionId} has no v1 contract`);
+      if (!contract) throw createExecutionAuthorityError(`MISSION_ACCEPTANCE_INVALID: mission ${decision.missionId} has no v1 contract`);
 
       const existing = this.db.prepare(
         'SELECT * FROM mission_acceptance_decisions WHERE mission_id=? AND round=?',
@@ -1591,7 +1591,7 @@ export class SqliteMissionStore implements MissionStore {
         if (existing['contract_digest'] !== contract.digest
           || existing['decision_digest'] !== decision.decisionDigest
           || this.canonical(record.decision) !== this.canonical(decision)) {
-          throw new Error(`MISSION_ACCEPTANCE_CONFLICT: mission ${decision.missionId} round ${decision.round}`);
+          throw createExecutionAuthorityError(`MISSION_ACCEPTANCE_CONFLICT: mission ${decision.missionId} round ${decision.round}`);
         }
         return record;
       }
@@ -1648,15 +1648,15 @@ export class SqliteMissionStore implements MissionStore {
       return transaction.immediate();
     } catch (error) {
       if (error instanceof Error && error.message.startsWith('MISSION_ACCEPTANCE_')) throw error;
-      throw new Error(`MISSION_ACCEPTANCE_CONFLICT: ${error instanceof Error ? error.message : String(error)}`);
+      throw createExecutionAuthorityError(`MISSION_ACCEPTANCE_CONFLICT: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
   listAcceptanceDecisions(missionId: string): MissionAcceptanceDecisionRecord[] {
     const mission = this.getMission(missionId);
-    if (!mission) throw new Error(`MISSION_ACCEPTANCE_INVALID: mission not found ${missionId}`);
+    if (!mission) throw createExecutionAuthorityError(`MISSION_ACCEPTANCE_INVALID: mission not found ${missionId}`);
     const contract = readGoalAcceptanceContract(mission);
-    if (!contract) throw new Error(`MISSION_ACCEPTANCE_INVALID: mission ${missionId} has no v1 contract`);
+    if (!contract) throw createExecutionAuthorityError(`MISSION_ACCEPTANCE_INVALID: mission ${missionId} has no v1 contract`);
     const items = this.listItems(missionId);
     const rows = this.db.prepare(
       'SELECT * FROM mission_acceptance_decisions WHERE mission_id=? ORDER BY round',
@@ -1665,7 +1665,7 @@ export class SqliteMissionStore implements MissionStore {
       const record = assertStoredMissionAcceptanceRecord(this.p(row['record_json']));
       if (row['contract_digest'] !== record.decision.contractDigest
         || row['decision_digest'] !== record.decision.decisionDigest) {
-        throw new Error(`MISSION_ACCEPTANCE_CORRUPT: row mismatch ${missionId}`);
+        throw createExecutionAuthorityError(`MISSION_ACCEPTANCE_CORRUPT: row mismatch ${missionId}`);
       }
       const validationErrors = validateMissionAcceptanceDecision(
         record.decision,
@@ -1677,7 +1677,7 @@ export class SqliteMissionStore implements MissionStore {
       const effectiveOutcome = validationErrors.length === 0 ? record.decision.outcome : 'unknown';
       if (this.canonical(validationErrors) !== this.canonical(record.validationErrors)
         || effectiveOutcome !== record.effectiveOutcome) {
-        throw new Error(`MISSION_ACCEPTANCE_CORRUPT: validation mismatch ${missionId}`);
+        throw createExecutionAuthorityError(`MISSION_ACCEPTANCE_CORRUPT: validation mismatch ${missionId}`);
       }
       return record;
     });
@@ -1730,7 +1730,7 @@ export class SqliteMissionStore implements MissionStore {
       || !fence.registryRevision.trim()
       || !fence.registryDigest.trim()
       || !fence.runnerRevision.trim()) {
-      throw new Error(`MISSION_ADMISSION_FENCE_INVALID: ${item.id}`);
+      throw createExecutionAuthorityError(`MISSION_ADMISSION_FENCE_INVALID: ${item.id}`);
     }
   }
 
@@ -1755,12 +1755,12 @@ export class SqliteMissionStore implements MissionStore {
   private rowToApprovalBinding = (r: any): WorkItemApprovalBinding => {
     const request = validateStoredApprovalRequest(this.p<unknown>(r.request_json));
     if (!request.ok || request.value.id !== r.request_id) {
-      throw new Error(`MISSION_APPROVAL_CORRUPT: invalid request binding ${String(r.request_id)}`);
+      throw createExecutionAuthorityError(`MISSION_APPROVAL_CORRUPT: invalid request binding ${String(r.request_id)}`);
     }
     const rawDecision = this.p<unknown>(r.decision_json);
     const decision = rawDecision === null ? null : validateStoredApprovalDecision(rawDecision);
     if (decision !== null && (!decision.ok || decision.value.requestId !== r.request_id)) {
-      throw new Error(`MISSION_APPROVAL_CORRUPT: invalid decision binding ${String(r.request_id)}`);
+      throw createExecutionAuthorityError(`MISSION_APPROVAL_CORRUPT: invalid decision binding ${String(r.request_id)}`);
     }
     return {
       workItemId: r.work_item_id,
@@ -1826,14 +1826,14 @@ export class SqliteMissionStore implements MissionStore {
     const ids = new Set<string>();
     for (const item of items) {
       if (!item.id || item.id !== item.id.trim() || ids.has(item.id)) {
-        throw new Error(`MISSION_BATCH_INVALID: duplicate or non-canonical work-item id ${item.id}`);
+        throw createExecutionAuthorityError(`MISSION_BATCH_INVALID: duplicate or non-canonical work-item id ${item.id}`);
       }
       ids.add(item.id);
       assertCanonicalWorkItemKind(item.kind, item.id);
       this.assertPersistableTrigger(item);
       this.assertPersistableFence(item);
       if (!this.getMission(item.missionId)) {
-        throw new Error(`MISSION_BATCH_INVALID: mission not found ${item.missionId}`);
+        throw createExecutionAuthorityError(`MISSION_BATCH_INVALID: mission not found ${item.missionId}`);
       }
     }
     const transaction = this.db.transaction((): WorkItem[] => {
@@ -1887,7 +1887,7 @@ export class SqliteMissionStore implements MissionStore {
       return transaction.immediate();
     } catch (error) {
       if (error instanceof Error && error.message.startsWith('MISSION_BATCH_')) throw error;
-      throw new Error(`MISSION_BATCH_CONFLICT: ${error instanceof Error ? error.message : String(error)}`);
+      throw createExecutionAuthorityError(`MISSION_BATCH_CONFLICT: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -2017,7 +2017,7 @@ export class SqliteMissionStore implements MissionStore {
       if (existing) {
         const binding = this.rowToApprovalBinding(existing);
         if (binding.requestId !== request.id) {
-          throw new Error(`MISSION_APPROVAL_CONFLICT: item ${itemId} already bound to ${binding.requestId}`);
+          throw createExecutionAuthorityError(`MISSION_APPROVAL_CONFLICT: item ${itemId} already bound to ${binding.requestId}`);
         }
         return binding;
       }
@@ -2051,7 +2051,7 @@ export class SqliteMissionStore implements MissionStore {
       return transaction.immediate();
     } catch (error) {
       if (error instanceof Error && error.message.startsWith('MISSION_APPROVAL_')) throw error;
-      throw new Error(`MISSION_APPROVAL_CONFLICT: ${error instanceof Error ? error.message : String(error)}`);
+      throw createExecutionAuthorityError(`MISSION_APPROVAL_CONFLICT: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
   listApprovalBindings(): WorkItemApprovalBinding[] {
@@ -2077,7 +2077,7 @@ export class SqliteMissionStore implements MissionStore {
       || (state === 'escalated' && decision.decision === 'escalate' && decision.channel !== 'ttl-expire')
     );
     if (!semanticallyValid) {
-      throw new Error(`MISSION_APPROVAL_DECISION_INVALID: ${requestId} cannot transition to ${state}`);
+      throw createExecutionAuthorityError(`MISSION_APPROVAL_DECISION_INVALID: ${requestId} cannot transition to ${state}`);
     }
     const transaction = this.db.transaction((): ApprovalDecisionTransition | null => {
       const row = this.db.prepare(`SELECT approval.*, wi.mission_id FROM work_item_approvals approval
@@ -2086,7 +2086,7 @@ export class SqliteMissionStore implements MissionStore {
       const binding = this.rowToApprovalBinding(row);
       if (binding.decisionState !== 'pending') {
         if (binding.decisionState !== state || this.canonical(binding.decision) !== this.canonical(decision)) {
-          throw new Error(`MISSION_APPROVAL_DECISION_CONFLICT: request ${requestId} already settled as ${binding.decisionState}`);
+          throw createExecutionAuthorityError(`MISSION_APPROVAL_DECISION_CONFLICT: request ${requestId} already settled as ${binding.decisionState}`);
         }
         return { missionId: binding.missionId, workItemId: binding.workItemId, changed: false };
       }

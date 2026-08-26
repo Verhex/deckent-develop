@@ -1,3 +1,4 @@
+import { createExecutionAuthorityError } from '../../../core/errors.js';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -57,10 +58,10 @@ export function migrateBacklogJson(
   let parsed: unknown;
   try { parsed = JSON.parse(readFileSync(path, 'utf-8')) as unknown; }
   catch (error) {
-    throw new Error(`MISSION_MIGRATION_INVALID: backlog JSON is unreadable: ${error instanceof Error ? error.message : String(error)}`);
+    throw createExecutionAuthorityError(`MISSION_MIGRATION_INVALID: backlog JSON is unreadable: ${error instanceof Error ? error.message : String(error)}`);
   }
   if (!isRecord(parsed) || typeof parsed['_version'] !== 'string' || !Array.isArray(parsed['entries'])) {
-    throw new Error('MISSION_MIGRATION_INVALID: backlog must contain string _version and entries array');
+    throw createExecutionAuthorityError('MISSION_MIGRATION_INVALID: backlog must contain string _version and entries array');
   }
   const entries = parsed['entries'] as BacklogEntry[];
 
@@ -73,7 +74,7 @@ export function migrateBacklogJson(
     || !Object.hasOwn(STATUS_MAP, entry.status)
   ));
   if (invalidEntryIndex !== -1) {
-    throw new Error(`MISSION_MIGRATION_INVALID: legacy entry ${invalidEntryIndex} has invalid identity, kind, or status`);
+    throw createExecutionAuthorityError(`MISSION_MIGRATION_INVALID: legacy entry ${invalidEntryIndex} has invalid identity, kind, or status`);
   }
 
   const items: NewMissionWorkItem[] = entries.map((e) => {
@@ -139,7 +140,7 @@ export function migrateBacklogJson(
       : undefined;
     if (typeof recordedDigest === 'string') {
       if (recordedDigest !== sourceDigest) {
-        throw new Error('MISSION_MIGRATION_CONFLICT: legacy backlog changed after its recorded import');
+        throw createExecutionAuthorityError('MISSION_MIGRATION_CONFLICT: legacy backlog changed after its recorded import');
       }
       return 0;
     }
@@ -155,13 +156,13 @@ export function migrateBacklogJson(
       trigger: item.trigger,
     })).sort((left, right) => left.id.localeCompare(right.id));
     if (canonicalJson(storedDefinition) !== canonicalJson(importDefinition(items))) {
-      throw new Error('MISSION_MIGRATION_CONFLICT: pre-provenance legacy mission does not match source backlog');
+      throw createExecutionAuthorityError('MISSION_MIGRATION_CONFLICT: pre-provenance legacy mission does not match source backlog');
     }
     for (const item of items) {
       if ((item.initialStatus === 'done' || item.initialStatus === 'failed') && item.initialResult) {
         const stored = storedItems.find((candidate) => candidate.id === item.id);
         if (!stored) {
-          throw new Error(`MISSION_MIGRATION_CONFLICT: terminal item missing for ${item.id}`);
+          throw createExecutionAuthorityError(`MISSION_MIGRATION_CONFLICT: terminal item missing for ${item.id}`);
         }
         if (stored?.lastResult === null) {
           const backfilled = store.backfillLegacyTerminalResult(
@@ -175,12 +176,12 @@ export function migrateBacklogJson(
             if (!current
               || current.status !== item.initialStatus
               || canonicalJson(current.lastResult) !== canonicalJson(item.initialResult)) {
-              throw new Error(`MISSION_MIGRATION_CONFLICT: terminal evidence changed for ${item.id}`);
+              throw createExecutionAuthorityError(`MISSION_MIGRATION_CONFLICT: terminal evidence changed for ${item.id}`);
             }
           }
         } else if (stored.status !== item.initialStatus
           || canonicalJson(stored.lastResult) !== canonicalJson(item.initialResult)) {
-          throw new Error(`MISSION_MIGRATION_CONFLICT: terminal evidence changed for ${item.id}`);
+          throw createExecutionAuthorityError(`MISSION_MIGRATION_CONFLICT: terminal evidence changed for ${item.id}`);
         }
       }
     }

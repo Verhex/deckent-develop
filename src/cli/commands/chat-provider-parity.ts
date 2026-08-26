@@ -7,6 +7,7 @@ import {
   type SubscriptionSpawnFn,
 } from './chat-native.js';
 import { ALL_PROVIDER_NAMES } from '../../core/types.js';
+import { ErrorRegistry } from '../../core/errors.js';
 
 // ─── Provider Parity — unified adapter resolver ─────────────────────────────
 //
@@ -106,7 +107,7 @@ function buildCliSpawnAdapter(
       for await (const chunk of chunks) text += chunk;
       const { exitCode } = await wait;
       if (exitCode !== null && exitCode !== 0) {
-        throw new Error(subscriptionExitError(binary, exitCode, text));
+        throw ErrorRegistry.createError('DECKENT_E096', { message: subscriptionExitError(binary, exitCode, text) });
       }
       return { text, stopReason: 'end_turn' };
     },
@@ -121,7 +122,7 @@ function buildCliSpawnAdapter(
       }
       const { exitCode } = await wait;
       if (exitCode !== null && exitCode !== 0) {
-        throw new Error(subscriptionExitError(binary, exitCode, collected));
+        throw ErrorRegistry.createError('DECKENT_E096', { message: subscriptionExitError(binary, exitCode, collected) });
       }
       yield { done: { text: collected, stopReason: 'end_turn' } };
     },
@@ -164,7 +165,7 @@ async function fetchWithTimeout(
     return await fetchImpl(url, { ...init, signal: controller.signal });
   } catch (err) {
     if (isAbortError(err)) {
-      throw new Error(`Request timed out after ${timeoutMs}ms: ${url}`);
+      throw ErrorRegistry.createError('DECKENT_E096', { message: `Request timed out after ${timeoutMs}ms: ${url}` });
     }
     throw err;
   } finally {
@@ -193,7 +194,7 @@ function buildOllamaAdapter(opts: ResolveChatAdapterOptions): ChatProviderAdapte
         body: JSON.stringify({ model, prompt, stream: false }),
       }, timeoutMs);
       if (!res.ok) {
-        throw new Error(`Ollama request failed: ${res.status} ${res.statusText} (${host})`);
+        throw ErrorRegistry.createError('DECKENT_E096', { message: `Ollama request failed: ${res.status} ${res.statusText} (${host})` });
       }
       const data = (await res.json()) as { response?: string };
       return { text: data.response ?? '', stopReason: 'end_turn' };
@@ -226,7 +227,7 @@ function buildOpenAiCompatAdapter(opts: ResolveChatAdapterOptions): ChatProvider
         body: JSON.stringify(body),
       }, timeoutMs);
       if (!res.ok) {
-        throw new Error(`OpenAI-compat request failed: ${res.status} ${res.statusText} (${baseUrl})`);
+        throw ErrorRegistry.createError('DECKENT_E096', { message: `OpenAI-compat request failed: ${res.status} ${res.statusText} (${baseUrl})` });
       }
       type CompletionResp = { choices?: Array<{ message?: { content?: string } }> };
       const data = (await res.json()) as CompletionResp;
@@ -269,9 +270,9 @@ export function resolveChatAdapter(
       return buildOpenAiCompatAdapter(opts);
 
     default:
-      throw new Error(
-        `Unknown REPL provider: "${String(provider)}". ` +
-        `Valid providers: ${[...ALL_PROVIDER_NAMES, 'openai-compatible'].join(', ')}.`,
-      );
+      throw ErrorRegistry.createError('DECKENT_E096', {
+        message: `Unknown REPL provider: "${String(provider)}". ` +
+          `Valid providers: ${[...ALL_PROVIDER_NAMES, 'openai-compatible'].join(', ')}.`,
+      });
   }
 }
