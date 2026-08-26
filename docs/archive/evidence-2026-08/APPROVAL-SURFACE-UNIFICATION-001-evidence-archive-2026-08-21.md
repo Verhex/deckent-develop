@@ -149,3 +149,8 @@ Bu HOLD seal degildir ve tekrar denenmedi. Owner'in bu tur icin verdigi
 "verify basarisizsa islere devam et, sonra toplu analiz" karariyla implementation
 LOCAL_VERIFIED olarak tamamlandi; 4056 parent satiri formal uc-asama seal ve D5
 nedeniyle OPEN kalir. Commit/push owner tarafindan istenmedigi icin yapilmadi.
+
+
+## D2b-1 dilim-kanıtı (2026-08-26 hücreden arşive taşındı — kapasite)
+
+**D2b-1 UYGULANDI (nervous+autonomous karar-federasyonu, ABSORBE):** origins [confirmation, checkpoint, nervous, autonomous-trigger] (panic-guard bilerek DISARIDA — safety-floor); settle async — nervous ayni IPC-kuyruguna writeApproval (executor-poll degismedi), autonomous makeApprovalGate.accept/reject (guard+audit+decisions.json aynen; sahte-id APR_UNKNOWN_REQUEST fail-closed); inbox nervous-satiri GERCEK notification-id kimlikli (eski 5-char kod yalniz gorunum — ikinci kod-semasi ABSORBE edildi); kopru core→orchestra tasindi (katman-yasasi). Pin 19/19+9. UCTAN-UCA gercek-binary kanit (.analysis/xverify/d2b1-result-proof.txt): #CXZC1(nervous) ve #01XD4(autonomous) kisa-kodlariyla canli-TTY karar → IPC-dosyasi + decisions.json 'approved'. MUHURLER — uygulama: codex CONFIRMED `cross-verify-verdict:sha256:b10464288a38a2375f8e7f74109f3521e1ca4100c8bd28a04b9aa50b53b4a1ea`; sonuc: codex CONFIRMED `cross-verify-verdict:sha256:8ea9c61e0c54f0c33f37c5f07ba675afb52fa8ff1f48705c334fdbb2d93312ed`. (Muhur-notu: 3 ara-UNCLEAR — 1 hakem-bos-yanit, 1 hakem-harita-tutarsizligi, 1 dilim-eksigi — iddia-daraltma dersiyle asildi; receipts .analysis'te.). ASAMA-BAZLI-MUHUR SERTLESTIRMESI (owner 2026-08-20): tasarim/uygulama/sonuc AYRI muhur surecleridir; sonuc-muhru oncekileri ikame edemez — her dilimde uc asama ayri kapanir. 

@@ -17050,3 +17050,52 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 684-003: 3315 — dispatch sıcak-yolunda kalan senkron git çağrıları async olur (DONE)
 
 ---
+## Sprint 685 — sprint-685
+
+**Status:** ABORTED
+**Date:** 2026-08-26
+**Duration:** 245s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 245471ms |
+
+### Tasks
+
+- 685-001-fix: Fix: Current-truth baseline ve karşılaştırma kernel'i (PAUSED)
+- 685-001: Current-truth baseline ve karşılaştırma kernel'i (NO_GO)
+- 685-002: Source retrieval, Memory V2 dedup, durable notification ve watch service (PAUSED)
+- 685-003: Goal-v2 daily wiring, timezone, CLI, docs ve gerçek-binary closure (PAUSED)
+
+---
+## Sprint 686 — sprint-686
+
+**Status:** ABORTED
+**Date:** 2026-08-26
+**Duration:** 119s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 118783ms |
+
+### Tasks
+
+- 686-001: cli/core kümesi (autonomous · chat-provider-parity · mcp · file-lock) — ham-throw'lar typed'a (EXECUTING)
+- 686-002: provider/budget kümesi (live-execution-budget · provider-limit-truth · provider-truth · scheduled-flow) — ham-throw'lar typed'a (PENDING)
+- 686-003: settlement/mission kümesi (task-result-settlement · mission-migrate · mission-worker-invocation-coordinator · sqlite-mission-store) — ham-throw'lar typed'a (PENDING)
+
+---
