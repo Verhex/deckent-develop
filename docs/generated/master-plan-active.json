@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "1d90171b6e530826548560e5def8e06499ed19192f5a7d37999f11655c8d025a"
+    "value": "0f521c0d1a82f03fa06b3bfe7489a65003ebc8c4980c73d9bac22aa6ff6be235"
   },
   "summary": {
     "total": 538,
     "active": 464,
     "terminal": 74,
-    "receipts": 204,
+    "receipts": 205,
     "byState": {
       "OPEN": 355,
       "READY": 0,
@@ -864,7 +864,7 @@
       "state": "OPEN",
       "updated": "2026-08-26",
       "definitionDigest": "5c7491631d048c8cc869c5c83bcda3f3bbee1df0b161179aea888d39e6bfd4f2",
-      "progressDigest": "1ef08f97617570f9c56d0a128de62a2bde0fc08b09c308cedae8bc76c01d2ec9",
+      "progressDigest": "7e80e847a91f55e18dd785659e83ccb2054484eb3ef28a3ae5fb69742d1e24e5",
       "terminalClosureDigest": null
     },
     {
@@ -8023,6 +8023,16 @@
         "transitionAt": "2026-08-26T10:05:16+03:00"
       },
       "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-26-CFG011-DECISIONS-01",
+      "authorityDigest": "c74d5dae68d33391c21de965aefa149672c1214fc308309cd6ff7ffaa2c1458a",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-26T10:13:57+03:00"
+      },
+      "g7AttemptIdentity": null
     }
   ],
   "workItems": [
@@ -10252,9 +10262,11 @@
         "CONFIG-AUTHORITY-001",
         "NERVOUS-CONFIG-EXECUTION-TRUTH-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-26-CFG011-DECISIONS-01"
+      ],
       "acceptance": "164 config leaf için no-missing ve equality gate CI'da fail-closed; manifest default'u canonical config'ten türer",
-      "evidence": "CODE-DOC-DIFF-2026-08 CFG-03, CFG-04; 2026-08-11 `.deckent` settings/config RCA exact runtime authority closure'ını CONFIG-AUTHORITY-001 childına ayırdı; 2026-08-25 config-completion-audit admission (owner-directed; izole worktree audit/config-completion-20260825, base ff48978fb, cutoff 298e8188f, validator 79/79 PASS; kalıcı memo docs/archive/evidence-2026-08/config-completion-audit-2026-08-26.md). ACCEPTANCE AMENDMENT (Acceptance definitionDigest'in parçası olduğu için in-place değiştirilemez, validator IDENTITY_DEFINITION_DRIFT; bu kayıt bağlayıcıdır ve Acceptance'taki '164 config leaf' hedefini supersede eder): kabul, canonical descriptor registry sayımı ile üretilen schema/default/metadata/docs artifact sayımının lossless eşleşmesi + equality gate'in TypeChecker/schema-aware olarak CI'da required-fail-closed bağlanmasıdır; eski '164 config leaf' hedefi EN doc-katalog birimiydi ve kendi ekseninde bile eksikti — nüfus audit ontolojisine yeniden bağlandı (141 authored root / 1002 semantic leaf / 1146 normalized union path). CFG-021 — lint-config-truth pinned base'te 589 issue üretiyor (12 DIVERGENT + 400 MISSING_DEFAULT + 112 MISSING_METADATA + 65 MISSING_RUNTIME); 400'ün büyük kısmı false-positive (named secondary default authority'lerini görmüyor: DEFAULT_TIMEOUT_CONFIG, DEFAULT_PROMPT_CONFIG, DEFAULT_MODES vb.) ve gate CI'a bilerek bağlı değil (script-registry.json:542-548 deferred) — 589 defect sayısı DEĞİLDİR. CFG-012 — CONFIG_METADATA 55 entry/49 typed root, 92 typed root eksik, type-dışı chat_provider içeriyor; Dashboard 66-field katalog aynı el-yazımı drift. CFG-008 — 61 alan DEFAULT_NO_RUNTIME_PROJECTION sınıfında, 4'ü doğrulanmış resolution bug (output_splash, observability.rotation, notify_channel, notify_url), kalanı named-resolver parser-limiti; 34'ünün production consumer'ı var. CFG-011 — 6 çelişen default authority (mode, memory 5000/600/900, decay 20/5, spawn auto/docker, docker timeout, dependency pipeline) owner semantic kararına OWNER_DECISION_HOLD. CFG-014 — CLI-init/MCP-init/onboarding/regenerate ayrı sparse/template authority. CFG-018 — update_adr/adr_update/auto_adr diye gerçek config alanı yok, feature manifest curated grep. Sınıf-dağılımı dürüstlüğü: 755 optional / 205 conditional default'suz alan defect değil review-queue; tek unconditional gap modes ve named DEFAULT_MODES authority'siyle karşılanıyor; 2026-08-26 descriptor-registry lane Faz-A ADMISSION (paralel-şerit protokolü §6; branch lane/descriptor-registry-20260826 origin'de, artefakt-commit a5bccc515, receipt-commit 728c9a83c, artifact-set sha256:c0fc45ab…578bf6, receipt sha256:72fb38f7…1225e, validator ok, allowlist-diff %100 uyumlu): registry veri-modeli + complex-type grammar + generator/equality/cutover contract'ı + acceptance-gated ürünleştirme DAG'ı tasarlandı (DESIGN/PLAN branch'te); canlı sayım-reconciliation — root 141→142 (evaluation delta), truth-issue 589→592, CONFIG_METADATA 55 sabit (yeni root'u takip etmiyor, yalnız 4/55 entry'de descriptionTr); DR-001..010 bulgu-kaydı exact-diff önerili (truth-gate census, bölünmüş authority'ler, metadata/CLI/Dashboard/docs katalogları, open-world validation, starter-vs-effective ayrımı, gate'in required-pipeline dışılığı); CFG-011 6-default owner-karar MATRİSİ HANDOFF.md'de hazır (öneri: tek-değer-seçme değil taxonomy-rol ayrımı) — owner-receipt'i olmadan bu 6 alan cutover'a giremez; Faz-B prototip lab/descriptor-registry allowlist'inde ayrı teslim",
+      "evidence": "CODE-DOC-DIFF-2026-08 CFG-03, CFG-04; 2026-08-11 `.deckent` settings/config RCA exact runtime authority closure'ını CONFIG-AUTHORITY-001 childına ayırdı; 2026-08-25 config-completion-audit admission (owner-directed; izole worktree audit/config-completion-20260825, base ff48978fb, cutoff 298e8188f, validator 79/79 PASS; kalıcı memo docs/archive/evidence-2026-08/config-completion-audit-2026-08-26.md). ACCEPTANCE AMENDMENT (Acceptance definitionDigest'in parçası olduğu için in-place değiştirilemez, validator IDENTITY_DEFINITION_DRIFT; bu kayıt bağlayıcıdır ve Acceptance'taki '164 config leaf' hedefini supersede eder): kabul, canonical descriptor registry sayımı ile üretilen schema/default/metadata/docs artifact sayımının lossless eşleşmesi + equality gate'in TypeChecker/schema-aware olarak CI'da required-fail-closed bağlanmasıdır; eski '164 config leaf' hedefi EN doc-katalog birimiydi ve kendi ekseninde bile eksikti — nüfus audit ontolojisine yeniden bağlandı (141 authored root / 1002 semantic leaf / 1146 normalized union path). CFG-021 — lint-config-truth pinned base'te 589 issue üretiyor (12 DIVERGENT + 400 MISSING_DEFAULT + 112 MISSING_METADATA + 65 MISSING_RUNTIME); 400'ün büyük kısmı false-positive (named secondary default authority'lerini görmüyor: DEFAULT_TIMEOUT_CONFIG, DEFAULT_PROMPT_CONFIG, DEFAULT_MODES vb.) ve gate CI'a bilerek bağlı değil (script-registry.json:542-548 deferred) — 589 defect sayısı DEĞİLDİR. CFG-012 — CONFIG_METADATA 55 entry/49 typed root, 92 typed root eksik, type-dışı chat_provider içeriyor; Dashboard 66-field katalog aynı el-yazımı drift. CFG-008 — 61 alan DEFAULT_NO_RUNTIME_PROJECTION sınıfında, 4'ü doğrulanmış resolution bug (output_splash, observability.rotation, notify_channel, notify_url), kalanı named-resolver parser-limiti; 34'ünün production consumer'ı var. CFG-011 — 6 çelişen default authority (mode, memory 5000/600/900, decay 20/5, spawn auto/docker, docker timeout, dependency pipeline) owner semantic kararına OWNER_DECISION_HOLD. CFG-014 — CLI-init/MCP-init/onboarding/regenerate ayrı sparse/template authority. CFG-018 — update_adr/adr_update/auto_adr diye gerçek config alanı yok, feature manifest curated grep. Sınıf-dağılımı dürüstlüğü: 755 optional / 205 conditional default'suz alan defect değil review-queue; tek unconditional gap modes ve named DEFAULT_MODES authority'siyle karşılanıyor; 2026-08-26 descriptor-registry lane Faz-A ADMISSION (paralel-şerit protokolü §6; branch lane/descriptor-registry-20260826 origin'de, artefakt-commit a5bccc515, receipt-commit 728c9a83c, artifact-set sha256:c0fc45ab…578bf6, receipt sha256:72fb38f7…1225e, validator ok, allowlist-diff %100 uyumlu): registry veri-modeli + complex-type grammar + generator/equality/cutover contract'ı + acceptance-gated ürünleştirme DAG'ı tasarlandı (DESIGN/PLAN branch'te); canlı sayım-reconciliation — root 141→142 (evaluation delta), truth-issue 589→592, CONFIG_METADATA 55 sabit (yeni root'u takip etmiyor, yalnız 4/55 entry'de descriptionTr); DR-001..010 bulgu-kaydı exact-diff önerili (truth-gate census, bölünmüş authority'ler, metadata/CLI/Dashboard/docs katalogları, open-world validation, starter-vs-effective ayrımı, gate'in required-pipeline dışılığı); CFG-011 6-default owner-karar MATRİSİ HANDOFF.md'de hazır (öneri: tek-değer-seçme değil taxonomy-rol ayrımı) — owner-receipt'i olmadan bu 6 alan cutover'a giremez; Faz-B prototip lab/descriptor-registry allowlist'inde ayrı teslim; 2026-08-26 CFG-011 owner-kararları alındı — 6 default'un OWNER_DECISION_HOLD'u ÇÖZÜLDÜ, cutover artık karar-bağlı, docker_timeout 86400 canlı; `receipt=GR-2026-08-26-CFG011-DECISIONS-01`",
       "updated": "2026-08-26"
     },
     {
@@ -27466,6 +27478,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "df023075f0db917bed003df7c32e14dc3ae2b9d519e6019395a66d20e7c72a66"
+    "value": "f1721b39acb5e1fed8fce6b7c42890f5c2c01075ccea2907fb893b8c013731dd"
   }
 }
