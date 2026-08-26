@@ -827,7 +827,8 @@ function publishJsonFirstWriter(
   let published = false;
   try {
     writeFileSync(tmp, `${JSON.stringify(value, null, 2)}\n`, { encoding: 'utf-8', mode: 0o600 });
-    const fd = openSync(tmp, 'r');
+    // 'r+' (not 'r'): Windows FlushFileBuffers rejects read-only handles with EPERM.
+    const fd = openSync(tmp, 'r+');
     try { fsyncSync(fd); } finally { closeSync(fd); }
     try {
       linkSync(tmp, path);

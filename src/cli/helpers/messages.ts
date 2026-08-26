@@ -2801,6 +2801,10 @@ const BASE_MESSAGES: MessageMap = {
     en: 'Select your plan:',
     tr: 'Planınızı seçin:',
   },
+  'init.unmetered_backend_budget_hold': {
+    en: 'Finite worker budgets cannot run on the unmetered subprocess backend; execution_budget.unmetered_backend is set to hold. Use Docker or another measured-stream backend.',
+    tr: 'Sonlu worker bütçeleri ölçümsüz subprocess backend\'inde çalışamaz; execution_budget.unmetered_backend hold olarak ayarlandı. Docker veya measured-stream destekli bir backend kullanın.',
+  },
   'init.enter_project_name': {
     en: 'Project name:',
     tr: 'Proje adı:',

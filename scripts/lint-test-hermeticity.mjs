@@ -713,7 +713,9 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // attribution-baseline / finalize-retirement + isCanonicalTaskFilename pinleri.
   // 2026-08-26 11:04: 16504→16506 — Node-6a mekanik supurme (sprint-684 3/3):
   // death-sweep hijyen + worker-identity-hostbound + docker-git-async suiteleri.
-  digest: 'dbec609b880770561f685d8e541922716ad858d9796def24943d00188224d274',
+  digest: '118d74c8e54f18c19d071fca97453f7dca2310eee51b3f86269c0fa5f6a918f0',
+  // 2026-08-26 15:1x: ayni 16511, digest-only — CI-kapanis S1 src-fix'leri
+  // (fsync 'r+' x3 + heartbeat dir-guard + i18n key) satir-kaydirmasi.
   // 13:5x: 16508→16511 — sprint-691 66-dosya hizalama + init semantik-koruma pini.
   // 12:1x: ayni 16508, digest-only — 689 multi-provider dalga test-kaymalari.
   // 2026-08-26 11:48: 16506→16508 — 7141 devam-dalgalari (687-001 + 688 2/2):
@@ -1278,7 +1280,8 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // finalizer + sidecar-loader hotfix).
   // 2026-08-26 11:05: ayni 1339, digest-only — Node-6a src kaymalari
   // (death-sweep / prompt-template kimlik-esigi / docker async-git).
-  digest: '9f767022ad4c76de662a055c6d2aaa915f11c2b1e5614ca21518d16d33ae125d',
+  digest: 'ed5cece405531434cbe8dc139a122b4891d519f5db80e1ada16519553b1b0767',
+  // 2026-08-26 15:1x: ayni 1339, digest-only — CI-kapanis S1 fsync/i18n src kaymalari.
   // 12:5x: ayni 1339, digest-only — spawn sync-restorasyonu + lastSpawnCompletion seam.
   // 12:1x: ayni 1339, digest-only — 689 8-dosya typed-throw src kaymalari.
   // 11:49: ayni 1339, digest-only — 7141 typed-throw src kaymalari (12 dosya).

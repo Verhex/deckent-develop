@@ -150,7 +150,8 @@ export function writeConfigJsonAtomic(targetPath: string, payload: unknown): voi
     writeFileSync(temporaryPath, `${JSON.stringify(payload, null, 2)}\n`, {
       mode: 0o600,
     });
-    descriptor = openSync(temporaryPath, 'r');
+    // 'r+' (not 'r'): Windows FlushFileBuffers rejects read-only handles with EPERM.
+    descriptor = openSync(temporaryPath, 'r+');
     fsyncSync(descriptor);
     closeSync(descriptor);
     descriptor = undefined;

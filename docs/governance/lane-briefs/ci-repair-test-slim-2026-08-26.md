@@ -112,3 +112,22 @@ silme-tekliflerinde threshold-etkisini raporla.
   kapsama/taşıma-kanıtı HANDOFF'ta. Admission ana-şeritte.
 - Not: 70-kırmızı remote-snapshot'ı onarım-öncesi HEAD'e aittir; ana-şerit lokalde
   kapattı (sprint-691+el). Rebase'inde güncel main'i alacaksın.
+
+## ANA-ŞERİT EK-BULGULAR (2026-08-26, fa05abbed remote-CI sınıflandırması — Faz-B kapsam-içi)
+fa05abbed push'unun gerçek CI koşusu (run 32964388410/32964388355) sınıflandırıldı; Faz-A
+fix'lerin ÇALIŞTI (macOS 3/3 + Windows checkout yeşil). Ana-şerit kendi sahasını onardı
+(Windows fsync EPERM src-fix'i + CLI/Orchestra shard'larına dist-prebuild — rebase'inde gelecek).
+Sana kalan üç exact bulgu (hepsi tests/** — lease'inde):
+1. **F1 — `tests/core/acceptance-confirmation-race-scale.integration.test.ts:329`** 10sn
+   perf-eşiği CI-runner'da flake (Core+Agents 26.x kırmızısının tek kaynağı; senin CI-F003
+   listendeki sınıf). CI-ölçekli eşik/env-çarpanı veya deterministik ölçüm.
+2. **F2 — stats-snapshot hermeticity:** `tests/scripts/update-readme-stats.test.ts` (+
+   `tests/docs/readme-number-truth.test.ts` etki-alanı) tracked
+   `.deckent/workspace/stats-snapshot.json`'ı CI'da environment-bağımlı değerlerle
+   (sprint=300, coverage=null) İN-PLACE yeniden üretip README/IDENTITY sync'i assert ediyor →
+   Docs+Scripts shard'ı CI'da yapısal kırmızı, lokalde yeşil. Test tmpdir-sandbox'a alınmalı;
+   tracked workspace-dosyası test sırasında mutate edilmemeli.
+3. **F3 — regresyon-pini talebi:** ana-şerit `src/core/config-write-authority.ts` tmp-fd
+   fsync modunu `'r'`→`'r+'` yaptı (Windows FlushFileBuffers EPERM kökü; packed-install-Win
+   kırmızısının sebebi; aynı sınıf `execution-landing-context/checkpoint`). Uygun config-write
+   test dosyasına '`r+`-mod + fsync başarısı' pini ekle (tests/** senin allowlist'inde).

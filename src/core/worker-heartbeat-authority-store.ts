@@ -153,12 +153,14 @@ function publishExclusive(path: string, value: unknown): boolean {
       if ((error as NodeJS.ErrnoException).code === 'EEXIST') return false;
       throw error;
     }
-    const directoryDescriptor = openSync(dirname(path), 'r');
     try {
-      fsyncSync(directoryDescriptor);
-    } finally {
-      closeSync(directoryDescriptor);
-    }
+      const directoryDescriptor = openSync(dirname(path), 'r');
+      try {
+        fsyncSync(directoryDescriptor);
+      } finally {
+        closeSync(directoryDescriptor);
+      }
+    } catch { /* directory fsync is unsupported on some platforms */ }
     return true;
   } finally {
     if (descriptor !== undefined) closeSync(descriptor);

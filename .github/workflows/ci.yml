@@ -142,6 +142,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run ci:rebuild-native
+      - name: Build dist (real-binary tests need dist/cli/entry.js)
+        run: |
+          npx tsc
+          node scripts/copy-assets.mjs
       - name: Run orchestra tests
         # Orchestra suite is large (~118 test files) — historical OOM on default
         # 2GB heap. Bumped to 8GB + forks pool (isolated workers, no shared state).
@@ -171,6 +175,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run ci:rebuild-native
+      - name: Build dist (real-binary tests need dist/cli/entry.js)
+        run: |
+          npx tsc
+          node scripts/copy-assets.mjs
       - name: Run CLI tests
         run: npx vitest run tests/cli/
         timeout-minutes: 10
