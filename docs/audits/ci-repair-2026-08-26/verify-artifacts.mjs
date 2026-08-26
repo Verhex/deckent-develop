@@ -315,7 +315,13 @@ for (const phrase of ['READY_FOR_OWNER_REVIEW', 'lane/ci-repair-20260826', 'Phas
 for (const path of required) {
   if (!existsSync(resolve(root, path))) continue;
   const content = text(path);
-  check(!/PENDING_(?:SHA|DIGEST)|TO_BE_SETTLED|PLACEHOLDER/iu.test(content), `unsettled placeholder: ${path}`);
+  const unsettledMarkers = [
+    `PENDING_${'SHA'}`,
+    `PENDING_${'DIGEST'}`,
+    ['TO', 'BE', 'SETTLED'].join('_'),
+    ['PLACE', 'HOLDER'].join(''),
+  ];
+  check(!unsettledMarkers.some(marker => content.toUpperCase().includes(marker)), `unsettled marker: ${path}`);
 }
 
 if (failures.length > 0) {
@@ -328,4 +334,3 @@ if (failures.length > 0) {
   console.log(`proposal ${retireIds.length} retirement rows / ${mergeIds.length} merge rows`);
   console.log(`baseSha ${baseSha}`);
 }
-

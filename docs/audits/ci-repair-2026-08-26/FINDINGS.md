@@ -77,8 +77,10 @@ binding yoksa typed `secure-open-unsupported` korunmalıdır.
 
 - Tracked path maksimumu 295 karakter; 259 üstünde tam 1 dosya var.
 - `src/core/provider-execution-observation-reconciliation-receipt-store.ts:35` uzun
-  domain dizinini; `:103-109` üç ayrı 52-char scope hash'ini; `:171` bunları üç nested
-  component olarak; `:205-206` 64-char receipt hash filename'ini kuruyor.
+  domain dizinini; aynı dosya `:103-109` üç ayrı 52-char scope hash'ini, `:171` bunları
+  üç nested component olarak ve
+  `src/core/provider-execution-observation-reconciliation-receipt-store.ts:205-206`
+  64-char receipt hash filename'ini kuruyor.
 - Windows checkout bu yolu materialize etmeden exit 128 oluyor. Workflow longpaths
   onarımı taşıma katmanını düzeltir, portable path bütçesini düzeltmez.
 
@@ -129,4 +131,3 @@ emeklilik listesine alınamaz.
 
 **Risk:** CRITICAL. Bu kırmızılar test-yükü azaltma ile maskelenirse production davranış
 regresyonları ve test infrastructure drift'i birbirine karışır.
-
