@@ -15,15 +15,21 @@
 - Bir dosyaya iki şerit asla birlikte yazmaz (aşağıdaki §3). "10 numaralı dosya" problemi
   yapısal olarak imkânsızlaştırılır: çakışan ihtiyaç = finding, edit değil.
 
-## 2. Mekanizma: worktree + branch BİRLİKTE
+## 2. Mekanizma: worktree + branch BİRLİKTE (yaşam-döngüsü owner-kararı 2026-08-26)
 
-- Her yan-şerit işi: `git worktree add /tmp/deckent-lane-<konu> -b lane/<konu>-<tarih> origin/main`.
+- Her yan-şerit işi: yan-şerit KENDİ worktree'sini kendisi açar —
+  `git -C /home/alperen/deckent-dev fetch origin && git -C /home/alperen/deckent-dev worktree add /tmp/deckent-lane-<konu> -b lane/<konu>-<tarih> origin/main`.
   Worktree izolasyonu verir (ana çalışma-ağacına dokunamaz); branch kalıcılık verir
-  (worktree silinse de iş object-store'da yaşar).
+  (worktree silinse de iş object-store'da yaşar). Brief'ler main'de
+  `docs/governance/lane-briefs/` altında yaşar; yan-şerit taze worktree'sinde brief'ini
+  oradan okur.
 - Yan-şerit her oturum SONUNDA branch'ini origin'e push'lar (`git push -u origin lane/...`)
   — GitHub daima güncel; makine/worktree kaybı iş kaybetmez.
-- Branch'ler kısa-ömürlüdür (hedef ≤1 hafta); admission sonrası silinir veya
-  koruma-commit'iyle arşivlenir.
+- **Şişme-kontrolü:** admission tamamlanan işin worktree'si SİLİNİR
+  (`git -C /home/alperen/deckent-dev worktree remove /tmp/deckent-lane-<konu>`) — branch
+  origin'de/object-store'da yaşamaya devam eder, silme veri kaybetmez. Aynı anda en fazla
+  1-2 aktif lane-worktree hedeflenir. Branch'ler kısa-ömürlüdür (hedef ≤1 hafta);
+  admission sonrası silinir veya koruma-commit'iyle arşivlenir.
 
 ## 3. Çakışma-engeli: yazım-alanı sözleşmesi (yapısal, rica değil)
 
