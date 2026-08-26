@@ -98,3 +98,17 @@ orta-üst gövde; iş birleştirme+budama karışımı.
 **Config-gerçeği:** dashboard default-koşuda hariç (ayrı config), e2e DAHİL;
 maxForks CI-2/lokal-4; coverage-threshold lines 82 / functions 89 / branches 80 —
 silme-tekliflerinde threshold-etkisini raporla.
+
+
+## FAZ-B AKTİVASYONU (2026-08-26, owner-onaylı)
+- **Emeklilik onayı:** TSR-001..007'nin YEDİSİ de onaylandı. MERGE_THEN_RETIRE
+  satırlarında assertion-taşıma-kanıtı olmadan silme YASAĞI aynen bağlayıcı.
+- **Konsolidasyon onayı:** 18 same-layer merge + wire-ailesi 117→≤78 Faz-B kapsamında
+  (silme yok; assertion/title/coverage eşitliği kanıtla).
+- **TEST-FREEZE LEASE: AKTİF** (protokol §8) — ana-şerit tests/** + vitest.config.ts +
+  scripts/security/secret-baseline* yazmayacak; allowlist'in bu yollarla genişledi.
+  CI-R001 Secret-Scan fixture-diff'in de bu fazda uygulanır.
+- Landing-şartı: tam lokal full-suite + 20-gate yeşil; her silinen/taşınan için
+  kapsama/taşıma-kanıtı HANDOFF'ta. Admission ana-şeritte.
+- Not: 70-kırmızı remote-snapshot'ı onarım-öncesi HEAD'e aittir; ana-şerit lokalde
+  kapattı (sprint-691+el). Rebase'inde güncel main'i alacaksın.

@@ -42,3 +42,8 @@ remote-karışıklığı yaratmasın diye); owner "push'la" derse tek komutla ka
   checkpoint/d16-approval-20260720); lokal remote-ref'ler prune'landı.
 - KORUNAN: main · release/0.100.0-rebaseline · lane/approval-audit · lane/descriptor-registry ·
   audit/config-completion (üçü referans-kanıt, İş-değil) · recovery/d4-609 (HOLD).
+
+## 2026-08-26 — TEST-FREEZE LEASE AKTİF
+ci-repair Faz-B için lease aktive edildi (owner: TSR-7'li + konsolidasyon onayı).
+Ana-şerit tests/** yazmıyor; istisna=acil-hotfix (askıya-al+bildir). Lease, ci-repair
+admission'ı tamamlanınca kendiliğinden biter.
