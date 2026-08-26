@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "outcomeId": "config-completion-audit-2026-08-25",
+  "role": "implementer",
+  "baseSha": "ff48978fb78139ea34b8c5e98fc41532437af9c9",
+  "headSha": "ff48978fb78139ea34b8c5e98fc41532437af9c9",
+  "branch": "audit/config-completion-20260825",
+  "mainDriftComparedSha": "0d565b361ea599966cf7e485bef0d4eaade303c8",
+  "policyDigest": "sha256:a44c27d496e863fd69723e8d1168fce7cb4d6bcc6d687705559c42bb22f68795",
+  "scopeDigest": "sha256:859aef103d53c5de90401b8216f2915eee2833ae58c47c4512123742c5adb65d",
+  "scopeDigestCoverage": "SHA-256 of the UTF-8, compact, no-trailing-newline JSON string with lexicographically ordered keys {allowedFiles,baseSha,lane,outcomeId,role}; allowedFiles and lane are copied exactly from scope below and other values are exact receipt values.",
+  "scope": {
+    "lane": "configuration declaration, public types, defaults, validators, resolution precedence, environment overrides, migrations, aliases, deprecations, CONFIG_METADATA, config truth gate, audit inventory correctness",
+    "allowedFiles": [
+      "docs/audits/config-completion-2026-08-25/CONFIG-FIELD-MATRIX.md",
+      "docs/audits/config-completion-2026-08-25/agent-reports/01-schema-defaults.md",
+      "docs/audits/config-completion-2026-08-25/config-audit-inventory.mjs",
+      "docs/audits/config-completion-2026-08-25/consumer-index.json",
+      "docs/audits/config-completion-2026-08-25/field-universe.json",
+      "docs/audits/config-completion-2026-08-25/handoffs/01-schema-defaults.json"
+    ]
+  },
+  "filesChanged": [
+    "docs/audits/config-completion-2026-08-25/CONFIG-FIELD-MATRIX.md",
+    "docs/audits/config-completion-2026-08-25/agent-reports/01-schema-defaults.md",
+    "docs/audits/config-completion-2026-08-25/config-audit-inventory.mjs",
+    "docs/audits/config-completion-2026-08-25/consumer-index.json",
+    "docs/audits/config-completion-2026-08-25/field-universe.json",
+    "docs/audits/config-completion-2026-08-25/handoffs/01-schema-defaults.json"
+  ],
+  "verification": [
+    "LOCAL_VERIFIED: pinned branch audit/config-completion-20260825 at ff48978fb78139ea34b8c5e98fc41532437af9c9",
+    "LOCAL_VERIFIED: DeckentConfig AST root inventory = 141",
+    "LOCAL_VERIFIED: shared TypeChecker semantic inventory = 1002 leaf-patterns; independent 1106 walk reconciled exactly by excluding 98 string prototype paths and replacing 12 tuple indices with 6 canonical scalar/array paths",
+    "LOCAL_VERIFIED: regenerated inventory = 1146 union paths; presence buckets optional=755, required_when_parent_present=205, unconditional required-no-default=1 (modes, covered by named DEFAULT_MODES authority); genuine dynamic descendants=28; input-only undeclared=3",
+    "LOCAL_VERIFIED: raw default parser leaves=180, normalized default paths=178; fix_circuit_breaker__spread__86799 and lifecycle_recovery__spread__86866 quarantined as 2 synthetic parser artifacts and absent from field rows",
+    "LOCAL_VERIFIED: all 1146 field rows carry declaration/default/validation/effectiveResolution/behavioralConsumer/operatorSurface/documentation/tests/lifecycleMigration objects with nonempty typed disposition and reason plus evidence array; missing dimensions=0",
+    "LOCAL_VERIFIED: dynamic-contract boundary assertions passed: ordinary-container fixtures have dynamicAncestor=null; approval.authority declaration and worker_output_contract.enabled default are not NOT_APPLICABLE; modes.api.max_workers resolves to modes.*.max_workers; 142 N/A-bearing rows have zero missing/non-wildcard dynamicContractEvidence",
+    "LOCAL_VERIFIED: field-universe schema v2 is value-free for input projection; all 197 input rows serialize only inputPresent plus allowlisted inputValueKind (string=55, number=77, boolean=60, null=3, array=1, object=1), legacy/raw inputValue keys=0, and the embedded serialized sentinel assertion passed",
+    "LOCAL_VERIFIED: validation/effectiveResolution/behavioralConsumer/operatorSurface/documentation/tests/lifecycleMigration contain no STATIC_EVIDENCE promotions; static candidates are HOLD_STATIC_CANDIDATE_NOT_BEHAVIOR_PROOF or typed NONE/NOT_APPLICABLE",
+    "LOCAL_VERIFIED: public ResolvedConfig roots=117, truth runtime-parser leaves=185, non-authored parser artifacts quarantined=6; activeModeConfig absent from authored field rows",
+    "LOCAL_VERIFIED: candidate/evidence split = raw config candidates 801, environment candidates 1757, process.env evidence rows 2048 across 135 static names plus 241 dynamic rows; DECKENT_E* environment evidence=0",
+    "LOCAL_VERIFIED: resolver AST comparison = loadConfig 111 explicit roots, mergeConfigs 56 explicit roots, 55 load-only roots",
+    "LOCAL_VERIFIED: runtime mergeConfigs smoke returned 58 own keys and sampled omitted fields resolved undefined",
+    "EXPECTED_RED_DIAGNOSTIC: node scripts/lint-config-truth.mjs reported 589 issues (DIVERGENT 12, MISSING_DEFAULT 400, MISSING_METADATA 112, MISSING_RUNTIME 65)",
+    "SCOPED_GREEN: 4 Vitest files / 75 tests passed (config flag roundtrip, config migration, nervous schema, config truth gate)",
+    "SCOPED_GREEN: node --check config-audit-inventory.mjs and full generator regeneration completed; fields=1146, consumers=384, truthIssues=589",
+    "LOCAL_VERIFIED: read-only main delta ff48978fb78139ea34b8c5e98fc41532437af9c9..0d565b361ea599966cf7e485bef0d4eaade303c8 retains the init-only execution_budget authority; 5f9e851b572888e4239a6e2d0e3fa97b40b6db0b..0d565b361ea599966cf7e485bef0d4eaade303c8 is xverify-only and changes no schema/default/resolver authority",
+    "REMOTE_ADVISORY: not run; audit lane is local read-only analysis"
+  ],
+  "findings": [
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "CONFIG_RESOLVER_PROJECTION_SPLIT"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "RESOLVED_SECURITY_AND_BEHAVIOR_FLAGS_DROPPED"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "RUNTIME_PATHS_OUTSIDE_CANONICAL_TYPE"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "DEFAULT_AUTHORITIES_DIVERGE"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "CONFIG_METADATA_INCOMPLETE_AND_STALE"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "CONFIG_TRUTH_GATE_INCOMPLETE_AND_NOT_CI_ENFORCED"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "VALIDATION_OPEN_WORLD_AND_FRAGMENTED"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "NERVOUS_SCHEMA_TYPE_RUNTIME_DRIFT"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "MIGRATION_ENTRYPOINTS_NOT_SEMANTICALLY_EQUIVALENT"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "CONFIG_AUTHORING_SURFACES_DIVERGE"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "GLOBAL_CONFIG_READ_WRITE_ASYMMETRY"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "ALIAS_DEPRECATION_AND_ENV_PRECEDENCE_NOT_CENTRALIZED"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "MAIN_DELTA_ADDS_INIT_ONLY_EXECUTION_BUDGET_DEFAULT_AUTHORITY"
+    }
+  ],
+  "openActions": [
+    "Integrate CFG-SD-001 through CFG-SD-012 into the canonical config completion matrix without treating optional-no-default truth issues as automatic defects.",
+    "Admit a single authored-schema/resolved-schema/default/metadata/deprecation authority and generated strict parser as a product completion package.",
+    "Unify loadConfig and mergeConfigs behind one pure resolver and close all 117 ResolvedConfig root round-trip invariants.",
+    "Select owner-approved semantic defaults for mode, memory_budget, decay_after_sprints, spawn_backend, docker_timeout, and dependency_pipeline_enabled.",
+    "Unify file, in-memory, and full migration transforms; make read-time persistence explicit and receipted.",
+    "Replace the shallow truth parser with TypeChecker/schema-aware provenance evaluation, include secondary default resolvers, all authoring adapters, and wire it as a required local/CI gate.",
+    "On current main, classify DEFAULT_INIT_EXECUTION_BUDGET as canonical effective default versus generated starter policy, then regenerate the inventory without rebasing this pinned audit worktree."
+  ],
+  "recommendedNextAction": "Root supervisor should merge this evidence into the field universe and completion plan, preserve the audit-only boundary, and schedule CFG-SD-001/002 resolver-security closure before metadata or documentation cleanup.",
+  "receiptDigestCoverage": "SHA-256 of the UTF-8 canonical JSON object represented by this file with receiptDigest omitted: recursively lexicographically sorted object keys, array order preserved, compact JSON serialization, no trailing newline.",
+  "receiptDigest": "sha256:cea5b91ac6cae469647810d4cc7a1d4065f55db756a7f5facef894f694d36f96"
+}

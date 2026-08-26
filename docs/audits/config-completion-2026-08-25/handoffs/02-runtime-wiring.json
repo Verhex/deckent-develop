@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "outcomeId": "config-completion-audit-2026-08-25",
+  "role": "reviewer",
+  "baseSha": "ff48978fb78139ea34b8c5e98fc41532437af9c9",
+  "headSha": "ff48978fb78139ea34b8c5e98fc41532437af9c9",
+  "branch": "audit/config-completion-20260825",
+  "policyDigest": "sha256:a44c27d496e863fd69723e8d1168fce7cb4d6bcc6d687705559c42bb22f68795",
+  "scopeDigest": "sha256:301fb119bb7cc2e8912dc48323eeb13a454a22b27ba1d86db77e18741ab9a53b",
+  "scopeDigestCoverage": "SHA-256 of the UTF-8, no-trailing-newline JSON string {allowedFiles,baseSha,lane,outcomeId,role}; keys are lexicographically ordered and values are exact.",
+  "stateDigest": "sha256:47f733ecb1aa689c9dab36476875490f73317b885c634e4aab55641f6857cbf6",
+  "stateDigestCoverage": "SHA-256 of the UTF-8, no-trailing-newline JSON string {baseSha,branch,reportSha256,scopeDigest}; keys are lexicographically ordered. reportSha256=8ff701a6440cdfea95fd1203fbf5e932139df253e020662d1d4c4fd92b86ba22.",
+  "filesChanged": [
+    "docs/audits/config-completion-2026-08-25/agent-reports/02-runtime-wiring.md",
+    "docs/audits/config-completion-2026-08-25/handoffs/02-runtime-wiring.json"
+  ],
+  "verification": [
+    "LOCAL_VERIFIED: pinned branch audit/config-completion-20260825 remained at ff48978fb78139ea34b8c5e98fc41532437af9c9; no rebase or merge",
+    "LOCAL_VERIFIED: report SHA-256 8ff701a6440cdfea95fd1203fbf5e932139df253e020662d1d4c4fd92b86ba22",
+    "LOCAL_VERIFIED: final generated indexes reconciled at unionPaths=1146, normalizedDefaultPaths=178, matchedPaths=384, references=2372; parser and consumer candidates remain non-proof",
+    "LOCAL_VERIFIED: 286 relative path:line citations checked; zero missing files or past-EOF lines",
+    "LOCAL_VERIFIED: TypeScript AST source inventory found 270 typed DeckentConfig/ResolvedConfig accesses across 36 non-loader files and 107 normalized paths; this is a lower bound, not a pass verdict",
+    "LOCAL_VERIFIED: independent syntax AST found 149 exact process.env/import.meta.env member accesses across 81 keys; canonical config compiler reads seven config-related keys and exact import.meta.env count was zero",
+    "LOCAL_VERIFIED: filesystem destination-call AST produced 84 config-like candidates; project/global config reads and writes were manually separated from cost/provider/multi-IDE/IPC/tsconfig false positives",
+    "LOCAL_VERIFIED: loadConfig final literal has 111 syntactic properties, mergeConfigs has 56, with 55 load-only properties; mergeConfigs has no production caller outside its definition",
+    "LOCAL_VERIFIED: pinned corrupted-backup evidence SHA-256 34b6a7c25bca9a02ff2901682868e86ad4fc3bead05b2c4e5061cb249a686edb parses as JSON with 63 root keys",
+    "LOCAL_VERIFIED: path/mode-only current-main observation found canonical config plus five parse-valid corrupted backups at mode 0644; no secret values were inspected or reported",
+    "LOCAL_VERIFIED: main delta ff48978fb78139ea34b8c5e98fc41532437af9c9..0d565b361ea599966cf7e485bef0d4eaade303c8 inspected without merge; runtime-lane source changes were init-steps.ts, sprint-spawner.ts, cli/commands/xverify.ts, and cross-verify-production-ingress-authority.ts",
+    "LOCAL_VERIFIED: 5f9e851b572888e4239a6e2d0e3fa97b40b6db0b..0d565b361ea599966cf7e485bef0d4eaade303c8 strengthened cross_verify evidence scope, producer fencing, and durable HOLD detail; no config.ts/config-types/resolver/writer/secret/recovery source changed",
+    "LOCAL_VERIFIED: documentation-only audit; no source/test edit, build, product test, commit, push, or Deckent run-state mutation performed",
+    "REMOTE_ADVISORY: not run; audit lane is local read-only analysis"
+  ],
+  "findings": [
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "CONFIG_RUNTIME_SPLIT_AUTHORITY"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "RESOLVER_PROJECTION_UNREACHABLE_FIELDS"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "PROMPT_CONFIG_INGRESS_DROP"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "EXECUTION_AUTHORITY_FLAGS_UNREACHABLE"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "RAW_CONFIG_PRECEDENCE_AND_TEMPORAL_SPLIT"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "CONFIG_WRITER_NONATOMIC_MULTIWRITER"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "CORRUPTION_HEALER_TOCTOU"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "SECRET_CONFIG_CUSTODY_AND_EXFILTRATION"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "LOAD_MERGE_DIVERGENCE_FALSE_GREEN"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "DECLARED_ROOTS_WITHOUT_BEHAVIORAL_CONSUMERS"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "SURFACE_EFFECTIVE_CONFIG_PARITY_DRIFT"
+    }
+  ],
+  "openActions": [
+    "Merge RW-001 through RW-007 and the verified raw-reader/writer tables into DRIFT-REGISTER.md and the per-field matrix without treating literal-scanner candidates as wiring evidence.",
+    "Make one generated effective-config compiler the only resolver for production and tests; remove the hand-synchronized loadConfig/mergeConfigs projection literals.",
+    "Close output_splash, skill_routing, notify_channel/notify_url, doc_tracking, observability, memory V2, prompt ADR/task-profile, persona-integrity, and notify-on-complete producer-to-behavior chains with real entrypoint proofs.",
+    "Close enforce_rbac, enforce_least_privilege, and risk_gate_enabled at both resolver and production composition boundaries before any enforcement flag can be advertised.",
+    "Replace raw project-config readers with a provenance-bearing immutable effective snapshot API, including synchronous bootstrap consumers and explicit state namespaces for last_sprint_id/sprint timestamps.",
+    "Replace every project/global writer with one lock+CAS+atomic+fsync platform adapter; corruption recovery must compare exact file identity/digest before rename and HOLD on concurrent change.",
+    "Admit a secret-reference contract, owner-only cross-platform file custody, redacted CLI/MCP/API projections, sensitive-path authorization, backup retention, and audited reveal flow.",
+    "Generate config authoring/runtime/surface metadata from the same registry and require behavior-level production wiring tests; resolver self-reference and UI labels must never satisfy STATIC_CHAIN_PRESENT."
+  ],
+  "recommendedNextAction": "Root supervisor should ingest this NO_GO evidence into the canonical drift register and completion DAG, prioritizing corruption-healer CAS plus secret custody, then the single effective-config compiler and unreachable authority/prompt fields before documentation or UI cleanup.",
+  "receiptDigestCoverage": "SHA-256 of the UTF-8 canonical JSON object represented by this file with receiptDigest omitted: recursively lexicographically sorted object keys, array order preserved, compact JSON serialization, no trailing newline.",
+  "receiptDigest": "sha256:12259d59b6678215bfe9be965edce2bf3a698be80349aaa7578801da704f447b"
+}

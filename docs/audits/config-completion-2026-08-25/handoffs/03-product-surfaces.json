@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "outcomeId": "config-completion-audit-2026-08-25",
+  "role": "reviewer",
+  "baseSha": "ff48978fb78139ea34b8c5e98fc41532437af9c9",
+  "headSha": "ff48978fb78139ea34b8c5e98fc41532437af9c9",
+  "branch": "audit/config-completion-20260825",
+  "policyDigest": "sha256:a44c27d496e863fd69723e8d1168fce7cb4d6bcc6d687705559c42bb22f68795",
+  "scopeDigest": "sha256:5529df97f1a205d5ece2f295bb0f0ec42567f3f1fe3c8d2e3c29e4f489b733ea",
+  "scopeDigestCoverage": "SHA-256 of the UTF-8, no-trailing-newline JSON string {allowedFiles,baseSha,lane,outcomeId,role} shown in agent report scope; keys are already lexicographically ordered and values are exact.",
+  "filesChanged": [
+    "docs/audits/config-completion-2026-08-25/agent-reports/03-product-surfaces.md",
+    "docs/audits/config-completion-2026-08-25/handoffs/03-product-surfaces.json"
+  ],
+  "verification": [
+    "LOCAL_VERIFIED: pinned branch audit/config-completion-20260825 at ff48978fb78139ea34b8c5e98fc41532437af9c9; no rebase/merge from moving main",
+    "LOCAL_VERIFIED: pinned input SHA-256 34b6a7c25bca9a02ff2901682868e86ad4fc3bead05b2c4e5061cb249a686edb",
+    "LOCAL_VERIFIED: root-by-root product disposition table contains all 63/63 pinned input top-level roots in source insertion order and contains no input values",
+    "LOCAL_VERIFIED: final shared inventory reports 1146 union paths, 1002 semantic DeckentConfig leaf-patterns, 180 raw and 178 normalized default paths after quarantining 2 synthetic spread artifacts, 6 runtime-parser artifacts, 55 CONFIG_METADATA default entries, and 197 pinned input leaves; all 1146 matrix rows carry 9 typed evidence dimensions",
+    "LOCAL_VERIFIED: isolated real-binary probes reproduced accepted-invalid routing_v3 write then rejected read, accepted-unknown write then missing effective read, metadata omission, and migration false reassurance",
+    "LOCAL_VERIFIED: code trace proves write-time validatePartialConfig omits routing_v3 strict resolver and unknown-root closure before persistence",
+    "LOCAL_VERIFIED: CLI/MCP/API/Dashboard/Desktop/init/onboard/docs/feature-truth/approval/checkpoint/execution surfaces traced with pinned path:line evidence",
+    "LOCAL_VERIFIED: exact update_adr, adr_update, and auto_adr search found no pinned code/docs/history authority; conclusion remains UNKNOWN/HOLD while auto_docs.tier3 and autoDraftDecisions wiring gaps are evidenced separately",
+    "LOCAL_VERIFIED: operational key-path-only secret audit read no values; canonical config and 5/5 corrupted backups were mode 0644, with retained secret-bearing paths detected",
+    "DIAGNOSTIC_RED: config-focused battery 42 files/803 tests resulted 39 files pass, 3 fail; 789 pass, 13 fail, 1 skip; 11 failures are node:fs mocks missing renameSync and 2 are confirmation-output assertions",
+    "SCOPED_GREEN: approval/run/confirmation/checkpoint parity battery 16 files/142 tests passed; green does not prove single decision authority",
+    "LOCAL_VERIFIED: read-only main delta ff48978..0d565b3 shows the prior renameSync test-mock repairs, CLI init budget changes, MCP plan dry-run repair, and manifest refresh plus one 5f9e851..0d565b3 xverify evidence/fencing repair commit; no CLI/MCP/API/Dashboard config, secret/recovery, or approval/checkpoint authority production source changed; pinned findings unchanged",
+    "REMOTE_ADVISORY: not run; audit lane is local read-only analysis"
+  ],
+  "findings": [
+    {
+      "class": "BLOCKS_CURRENT_DONE",
+      "reasonCode": "CONFIG_WRITE_READ_SCHEMA_ASYMMETRY"
+    },
+    {
+      "class": "BLOCKS_CURRENT_DONE",
+      "reasonCode": "SECRET_PROJECTION_AND_BACKUP_LIFECYCLE_UNSCOPED"
+    },
+    {
+      "class": "BLOCKS_CURRENT_DONE",
+      "reasonCode": "CHECKPOINT_DECISION_BYPASSES_APPROVAL_AUTHORITY"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "CONFIG_DISCOVERY_METADATA_COVERAGE_COLLAPSE"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "CONFIG_WRITER_ATOMICITY_AND_ERROR_PARITY_DRIFT"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "DASHBOARD_CONFIG_PROJECTION_STALE_AND_INCOMPLETE"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "DESKTOP_CONFIG_MANAGEMENT_INGRESS_ABSENT"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "INIT_ONBOARD_MCP_AUTHORING_SERVICES_DIVERGE"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "GLOBAL_ONBOARDING_CONFIG_PATH_DUPLICATED"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "CONFIG_DOCS_GENERATED_REFERENCE_AND_DEFAULTS_DRIFT"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "FEATURE_MANIFEST_NOT_CONFIG_COMPLETENESS_AUTHORITY"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "ADR_AUTO_DOCS_PROMISE_UNWIRED"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "EXECUTION_APPROVAL_AND_ACKNOWLEDGEMENT_SEMANTICS_DIVERGE"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "READ_ONLY_APPROVAL_API_MUTATES_LIFECYCLE"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "CONFIG_SURFACE_I18N_CONTRACT_INCOMPLETE"
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "CONFIG_UNSET_RESET_PROVENANCE_LIFECYCLE_MISSING"
+    }
+  ],
+  "openActions": [
+    "Land a single strict authored schema and transaction service before expanding UI catalogs; close invalid and unknown write/read asymmetry across CLI, MCP, API, init, onboarding, and Desktop.",
+    "Remove secret values from config and backups into a tenant/principal/purpose-scoped Secret Broker; make every projection redacted server-side and every backup restrictive, retained, and receipted.",
+    "Converge legacy checkpoint approvals through the authenticated Approval Broker/federation and remove direct CLI/MCP checkpoint decision writes.",
+    "Generate CLI/MCP/Desktop/Dashboard/docs/on-init metadata from the canonical schema with provenance, deprecation, secret classification, and platform semantics.",
+    "Unify CLI init, MCP init, and onboarding behind the same profile planner and atomic transaction service; fix global platform path duplication.",
+    "Resolve or deprecate auto_docs.tier3 and define explicit ADR creation/update policy before advertising ADR/document emission.",
+    "Make plan adoption, provider autoApprove, human checkpoints, broker approvals, and one-shot acknowledgements separate typed contracts with cross-surface default parity.",
+    "Run the proposed cross-platform real-binary proof matrix after implementation; do not infer closure from current unit/parity green."
+  ],
+  "recommendedNextAction": "Root supervisor should promote the three BLOCKS_CURRENT_DONE findings into the completion DAG in this order: secret containment and strict config transaction foundation, authenticated checkpoint-authority convergence, then generated operator surfaces/docs and ADR behavior closure.",
+  "receiptDigestCoverage": "SHA-256 of the UTF-8 canonical JSON object represented by this file with receiptDigest omitted: recursively lexicographically sorted object keys, array order preserved, compact JSON serialization, no trailing newline.",
+  "receiptDigest": "sha256:0f31fdc63da433e1017f747cfb8f9a5fc74ee9584984814fcae73453813b6d98"
+}
