@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):3990243944952d3dc5d14fb7184a6900e882bcd0f7beec5144b067d1d372cfee`
+**Source digest:** `sha256(normalized-lf-utf8):fa91dc01e74d77ecc838012eeb9d46d459454d77692eef1ace5c4ff1f69c1418`
 
-**Rows:** 538 total · 455 active · 83 terminal
+**Rows:** 539 total · 456 active · 83 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 344 |
+| OPEN | 345 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 69 |
@@ -288,6 +288,7 @@
 | 3349 | `ORCHESTRA-RELIABILITY-001` | OPEN | P0 | KERNEL | — | — | FIX-worker protokol quote bug'ı + result-JSON kontrol-karakteri toleransı + stale-spawnlock dispatch-watchdog |
 | 3350 | `PLAN-PURE-PREVIEW-001` | VERIFY | P1 | KERNEL | `PLANNER-001` | — | `plan --dry-run` gerçek-planning'i temsil eder ve yan-etkisizdir: bootstrap'sız katalog-farkı (21-vs-14 agent, farklı seçim/digest) ve temp-agent üretimi kapanır |
 | 3354 | `FIX-SPAWN-DEPENDENCY-FRESHNESS-001` | VERIFY | P1 | KERNEL | `ORCHESTRA-RELIABILITY-001` | — | FIX-spawn dependency-settlement tazeliği: FIX dalgası spawn edilirken dependency lineage'ı result-ingest SONRASI taze snapshot'tan okunur; bayat 'Pending' penceresi kapanır |
+| 3355 | `EXECUTION-RESOURCE-REALM-001` | OPEN | P1 | KERNEL | — | — | Docker worker resource-policy + Firecracker execution-realm karar-paketi: kind-attribution telemetri dilimi, bounded light-kind memory-canary, typed ExecutionResourceEnvelope ile aggregate admission, renewable-lease ADR yönü ve KVM capability-probe tek owner-sıralı pakette (gündem-dışı park; owner 2026-08-26: uygun zamanda) |
 | 4000 | `AUTHORITY-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | Unified runtime authority parent |
 | 4020 | `TENANT-001` | VERIFY | P0 | AUTHORITY | `PRINCIPAL-001` | — | Canonical tenant/project/session scope enforcement |
 | 4021 | `AUTONOMOUS-TENANT-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001` | — | Autonomous read, mutation, approval ve reactive ingress için fail-closed tenant authority |

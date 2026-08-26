@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "3990243944952d3dc5d14fb7184a6900e882bcd0f7beec5144b067d1d372cfee"
+    "value": "fa91dc01e74d77ecc838012eeb9d46d459454d77692eef1ace5c4ff1f69c1418"
   },
   "summary": {
-    "total": 538,
-    "active": 455,
+    "total": 539,
+    "active": 456,
     "terminal": 83,
     "receipts": 209,
     "byState": {
-      "OPEN": 344,
+      "OPEN": 345,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
@@ -22,7 +22,7 @@
     },
     "byPriority": {
       "P0": 338,
-      "P1": 151,
+      "P1": 152,
       "P2": 49
     },
     "byProgram": {
@@ -41,7 +41,7 @@
       "ENTERPRISE": 4,
       "EVAL": 5,
       "EVOLUTION": 4,
-      "KERNEL": 125,
+      "KERNEL": 126,
       "LEARNING": 9,
       "OBS": 9,
       "ONBOARDING": 1,
@@ -3714,6 +3714,17 @@
       "updated": "2026-08-25",
       "definitionDigest": "06c71724be78a6b3e7ce6f77ff58e8157f1356ab531632be647c76b349fcb04d",
       "progressDigest": "3a600f647cf5ea65200f0b9b0185e628c63d64d14859cb4077ae72aa70fae73e",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3355,
+      "id": "EXECUTION-RESOURCE-REALM-001",
+      "program": "KERNEL",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-26",
+      "definitionDigest": "c1c04e5ff6880df6bfcb6a62d3169e5edb5048d46269f1d5de994887174433f1",
+      "progressDigest": "45b9902b4e46a24c7211fba5b0ba341cb3742429d143027fdfec84711848b886",
       "terminalClosureDigest": null
     },
     {
@@ -14256,7 +14267,8 @@
         "PLAN-PURE-PREVIEW-001",
         "SPAWN-RETRY-TASK-IMMUTABILITY-001",
         "RESUME-STALE-LOCK-RECONCILIATION-001",
-        "SUBPROCESS-FINITE-BUDGET-ADMISSION-001"
+        "SUBPROCESS-FINITE-BUDGET-ADMISSION-001",
+        "EXECUTION-RESOURCE-REALM-001"
       ],
       "gates": [
         "G2",
@@ -14311,7 +14323,8 @@
         "COMPOSITE-WORKER-001",
         "PLATFORM-EXEC-AUTH-W3-DARWIN-001",
         "ORCHESTRA-RELIABILITY-001",
-        "PLAN-PURE-PREVIEW-001"
+        "PLAN-PURE-PREVIEW-001",
+        "EXECUTION-RESOURCE-REALM-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "One lifecycle, one state authority, one evidence chain and all-surface cutover",
@@ -19165,6 +19178,38 @@
       "acceptance": "FIX-prompt derlenirken her dependency'nin logical-lineage aggregate'i result-collector ingest'iyle aynı settlement okumasından gelir; ingest ile FIX-spawn arasında dependency-state yeniden-doğrulanır; bayat-pencere fixture'ı (result-yazıldı→FIX-prompt-derlendi sırası) hermetik pinlenir",
       "evidence": "2026-08-25 sprint-673 owner-admitted RCA: 673-001.result 14:58:05'te DONE yazıldı; 14:58:49–14:59:02'de derlenen üç FIX-prompt'u aynı dependency'yi hâlâ 'Pending' gördü (44–57sn bayat-pencere) → üç task zincir-NO_GO + circuit-breaker; kayıp mutasyon yok, salt tazelik. Emsal: sprint-670/671 force-finalize ailesindeki 'dependency-blocked FIX' örüntüsü aynı kök; `receipt=GR-2026-08-25-EVENT-TRUTH-A3-01`; 2026-08-25 A3 dalgası KÖK-DÜZELTME (owner plan-onayı acceptance yeniden-ifadesini kapsar): tazelik hipotezi ampirik ÇÜRÜTÜLDÜ — gerçek kök `.result` obje-form filesChanged'in string[] varsayan exactDependencyPath filtresini TypeError'la patlatması + task-builder çıplak-catch yutumu → prompt kalıcı '(Pending)'; fix=674-008 (string/obje-path normalize + typed catch + obje-form fixture pini tests/orchestra/dependency-aggregate-fix-aware.test.ts). CANLI ÖZ-KANIT: sprint-674 aynı imzayı kendisi yeniden üretti (3 DONE bağımlılık eski-dist derlemede Pending → 3×NO_GO → typed PAUSE; receipt'ler dakikalarca diskteydi — zamana bağlı değil), fix dist'e alınınca sprint-675'te imza SIFIR tekrar + wave-harness pini (tests/integration/event-truth-wave-evidence.test.ts)",
       "updated": "2026-08-25"
+    },
+    {
+      "order": 3355,
+      "id": "EXECUTION-RESOURCE-REALM-001",
+      "parent": "KERNEL-001",
+      "program": "KERNEL",
+      "outcome": "Docker worker resource-policy + Firecracker execution-realm karar-paketi: kind-attribution telemetri dilimi, bounded light-kind memory-canary, typed ExecutionResourceEnvelope ile aggregate admission, renewable-lease ADR yönü ve KVM capability-probe tek owner-sıralı pakette (gündem-dışı park; owner 2026-08-26: uygun zamanda)",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "(K2) resource-log satırları TaskKind ve logical-attempt kimliği ile OOMKilled-kanıtı taşır; audit/documentation/config/design kind'ları 3g/4.5g bounded-canary'de en az bir hafta OOM-sıfır kanıtıyla değerlendirilip ancak ondan sonra default-terfi teklif edilir. (K3) typed ExecutionResourceEnvelope (hard/soft memory, memory+swap, CPU weight-önce quota-sonra, PID, disk/IO, network, GPU-claim, survivability/lease, progress/PSI kanıt alanları) Attempt-authority'de effective config + task requirements + risk + platform capabilities + tenant policy + aggregate capacity kesişiminden çözülür; aggregate admission flag-gated (advisory→enforce) devreye alınır. (K4) renewable execution lease elapsed-timeout'tan ayrı kavram olarak ADR-taslağıyla karara bağlanır. (K5) Firecracker yalnız microVM-realm capability-probe canary'siyle typed capability-matrisi üretir (linux/wsl/mac/win); BackendType genişletmesi ayrı owner-karardır. Hiçbir dilim docker_timeout 86400 survivability-invariant'ını düşürmez; sessiz fallback yok",
+      "evidence": "Analiz-korpusu: .deckent/artifacts/docker-firecracker-decision-2026-08-26/ (report.html + decision-evidence.md + decision-evidence.sqlite + analyze-resource-kind-join.mjs, paralel-session üretimi). Ana-şerit bağımsız doğrulama 2026-08-26: /dev/kvm ARTIK MEVCUT (crw-rw---- root:kvm; snapshot'taki 'absent' drift'lendi) fakat R/W open EACCES — tek engel kvm grup-üyeliği (owner tek-satır usermod); telemetri pencere-drifti kanıtlı (taze son-1000: peak-indiv 1462 MiB, peak-concurrent 4509 MiB ve yüzde-781 CPU, bireysel CPU tepesi yüzde-302 → CPU-quota hipotezi ölçülen yükü kırpardı, weight-önce düzeltmesi acceptance'a işlendi; 3 GiB üstü örnek 0/1000); spawn zaten attemptIdentity label'larını container'a basıyor (spawn-backend-docker.ts:6890) ve readTaskKind canlı (7570) → attribution açığı yalnız resource-log yazıcısında; worker_memory_limit_by_kind şema-destekli fakat canlı config'te UNSET; BackendType bugün tmux/subprocess/docker/auto/sandbox (spawn-backend.ts:671), firecracker yok; ADR-G-014 'tomorrow=firecracker' yönü ve North-Star:304 + Reconciliation:248 no-silent-fallback kanunuyla hizalı; docker_timeout 86400 invariant'ı CFG-011 karar-turunda owner-mühürlü (kaynak: CONFIG-TRUTH-001 satırının 2026-08-26 karar-receipt'i); Sıra-önerisi: skill-evrimi sonrası K2 (attribution+canary tek outcome) → K3 (K6 GPU-claim alanı içinde) → K4 ADR; K5 yan-şerit adayı",
+      "updated": "2026-08-26"
     },
     {
       "order": 4000,
@@ -27238,6 +27283,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "d97e029e78e08075a66de62eaf2e9b9124637566f89493407cbcbed44f039f63"
+    "value": "5ccb4efbcc1037afedc62fa90ff251c7e8b0839ad44857ae3a05a1bc5e0e2a36"
   }
 }
