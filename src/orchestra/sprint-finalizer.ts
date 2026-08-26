@@ -13,7 +13,7 @@ import {
 import { promises as fsPromises } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 
 // ─── Core (value imports) ──────────────────────────────────────────
 import {
@@ -489,6 +489,8 @@ export interface FinalizeSprintOptions {
   skipHooks?: boolean;
   /** Resolved config (used for updateProjectDocs) */
   config?: ResolvedConfig;
+  /** Hermetic seam for the final TypeScript truth check. */
+  runTscFn?: TscSettlementRunner;
   /** Skip post-finalize memory export */
   skipMemoryExport?: boolean;
   /** Skip post-finalize identity regeneration */
@@ -530,6 +532,83 @@ export interface FinalizeSprintOptions {
    * recovery-specific events can continue the original monotonic stream.
    */
   lifecycleContext?: 'live-execution' | 'completed-checkpoint-recovery';
+}
+
+const TSC_SETTLEMENT_TIMEOUT_MS = 240_000;
+const TSC_SETTLEMENT_ERROR_LINE_LIMIT = 20;
+
+export interface TscSettlementRunResult {
+  readonly exitCode: number | null;
+  readonly stdout: string;
+  readonly stderr: string;
+  readonly timedOut?: boolean;
+}
+
+export type TscSettlementRunner = (
+  projectRoot: string,
+  timeoutMs: number,
+) => Promise<TscSettlementRunResult>;
+
+export type TscSettlementGateResult =
+  | { readonly kind: 'pass' }
+  | { readonly kind: 'skip'; readonly reason: 'disabled' | 'not-typescript' | 'tsc-unavailable' }
+  | { readonly kind: 'residual'; readonly code: 'TSC_DIRTY_RESIDUAL' | 'TSC_GATE_FAULT'; readonly errors: readonly string[] };
+
+function boundedTscLines(result: TscSettlementRunResult): string[] {
+  return `${result.stdout}\n${result.stderr}`.split(/\r?\n/u)
+    .map(line => line.trim()).filter(Boolean).slice(0, TSC_SETTLEMENT_ERROR_LINE_LIMIT);
+}
+
+export const runTscSettlementCommand: TscSettlementRunner = (projectRoot, timeoutMs) =>
+  new Promise(resolve => {
+    const child = spawn('npx', ['tsc', '--noEmit'], {
+      cwd: projectRoot,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stdout = '';
+    let stderr = '';
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGTERM');
+    }, timeoutMs);
+    child.stdout?.on('data', chunk => { stdout += String(chunk); });
+    child.stderr?.on('data', chunk => { stderr += String(chunk); });
+    child.once('error', error => {
+      clearTimeout(timer);
+      resolve({ exitCode: null, stdout, stderr: `${stderr}\n${error.message}`, timedOut });
+    });
+    child.once('close', exitCode => {
+      clearTimeout(timer);
+      resolve({ exitCode, stdout, stderr, timedOut });
+    });
+  });
+
+export async function runTscSettlementGate(
+  projectRoot: string,
+  enabled: boolean,
+  runner: TscSettlementRunner = runTscSettlementCommand,
+): Promise<TscSettlementGateResult> {
+  if (!enabled) return { kind: 'skip', reason: 'disabled' };
+  if (!existsSync(join(projectRoot, 'tsconfig.json'))) {
+    return { kind: 'skip', reason: 'not-typescript' };
+  }
+  try {
+    const result = await runner(projectRoot, TSC_SETTLEMENT_TIMEOUT_MS);
+    const lines = boundedTscLines(result);
+    if (result.exitCode === 0 && result.timedOut !== true) return { kind: 'pass' };
+    if (result.exitCode !== null && !result.timedOut) {
+      const unavailable = lines.some(line => /could not determine executable|not found|MODULE_NOT_FOUND/u.test(line));
+      if (unavailable) return { kind: 'skip', reason: 'tsc-unavailable' };
+      return { kind: 'residual', code: 'TSC_DIRTY_RESIDUAL', errors: lines };
+    }
+    return { kind: 'residual', code: 'TSC_GATE_FAULT', errors: lines };
+  } catch (error: unknown) {
+    return {
+      kind: 'residual', code: 'TSC_GATE_FAULT',
+      errors: [error instanceof Error ? error.message : String(error)],
+    };
+  }
 }
 
 export type FinalizerRuntimeHygieneResult =
@@ -3719,6 +3798,39 @@ export async function finalizeSprint(
 
   // Build O(1) lookup index from results array — eliminates O(n²) linear scans
   const resultsMap = buildResultsMap(results);
+
+  // Settlement truth gate: a dirty or unexecutable compiler may not be
+  // represented as a pure COMPLETE. Reuse the existing per-task tech-debt
+  // channel so every downstream projection observes the same residual.
+  if (!manualReplayCandidate) {
+    const tscGate = await runTscSettlementGate(
+      projectRoot,
+      opts?.config?.evaluation?.tsc_settlement_gate ?? true,
+      opts?.runTscFn,
+    );
+    if (tscGate.kind === 'residual') {
+      const candidate = sprint.tasks.find(task => evaluations.get(task.id) === TaskEvaluation.DONE);
+      if (candidate) {
+        evaluations.set(candidate.id, TaskEvaluation.GO_WITH_TECH_DEBT);
+        const result = resultsMap.get(candidate.id);
+        if (result) {
+          const detail = [tscGate.code, ...tscGate.errors].join('\n');
+          result.selfAssessment = 'GO_WITH_TECH_DEBT';
+          result.notes = result.notes ? `${result.notes}\n${detail}` : detail;
+        }
+      }
+      writeEvent(
+        projectRoot, sprintIdForEvents, 'brain', 'auditor',
+        'BRAIN→AUDITOR:TSC_SETTLEMENT_GATE_RESIDUAL',
+        {
+          sprintId: sprint.id,
+          code: tscGate.code,
+          errors: [...tscGate.errors],
+          timestamp: new Date().toISOString(),
+        },
+      );
+    }
+  }
 
   // One canonical terminal projection owns every finalizer denominator. Exact
   // attempts remain on terminalTruth for evidence/usage, while downstream

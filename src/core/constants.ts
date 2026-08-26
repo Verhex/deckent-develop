@@ -81,6 +81,11 @@ export const DASHBOARD_FILE = '.dashboard' as const;
 // ─── Memory Files (relative to BRAIN_DIR) ────────────────────────────
 export const ERRORS_FILE = 'ERRORS.md' as const;
 export const ERRORS_MAX_LINES = 600 as const; // Sprint 140 pre-flight: 200→600 (3x)
+export const ERRORS_CRITICAL_FILE = 'ERRORS-critical.md' as const;
+// Critical configuration/hold forensics need a longer, independent window than
+// the high-volume general error stream so normal rotation cannot erase them.
+export const ERRORS_CRITICAL_MAX_LINES = 2000 as const;
+export const ERRORS_CRITICAL_CLASS_RE = /^(?:CONFIG_.*|.*_HOLD)$/;
 export const MEMORY_FILE = 'MEMORY.md' as const;
 /**
  * @deprecated since Sprint 179 (W3-6). Memory V2 source of truth is

@@ -1958,6 +1958,7 @@ export function createDefaultConfig(): DeckentConfig {
       landing: { reserve_ratio: 0.25 },
     },
     auth_mode: 'subscription',
+    evaluation: { tsc_settlement_gate: true },
     // Human Checkpoints (empty = fully autonomous)
     human_checkpoints: [],
     // Sprint
@@ -2603,6 +2604,9 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     scheduler: config.scheduler,
     // Gate — passed through (opt-in, default-off)
     gate: config.gate,
+    evaluation: {
+      tsc_settlement_gate: config.evaluation?.tsc_settlement_gate ?? true,
+    },
     // Approval — validated + defaulted via resolveApprovalConfig (Sprint 355 CFG-APR-WIRE)
     approval: resolveApprovalConfig(config),
     api_oidc: config.api_oidc,
@@ -3500,6 +3504,9 @@ export function mergeConfigs(
     scheduler: config.scheduler,
     // Gate — passed through (opt-in, default-off)
     gate: config.gate,
+    evaluation: {
+      tsc_settlement_gate: config.evaluation?.tsc_settlement_gate ?? true,
+    },
     // Approval — validated + defaulted via resolveApprovalConfig (Sprint 355 CFG-APR-WIRE)
     approval: resolveApprovalConfig(config),
     api_oidc: config.api_oidc,

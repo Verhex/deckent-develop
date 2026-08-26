@@ -3,11 +3,17 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { applyDirectivesFixes, checkDirectives, findSameLineReadsFiles } from '../../scripts/lint-directives.mjs';
+import {
+  applyDirectivesFixes,
+  checkDirectives,
+  ENGINE_HOT_PATHS,
+  findSameLineReadsFiles,
+} from '../../scripts/lint-directives.mjs';
 import { buildRepairDirectives } from '../../scripts/gen-repair-directives.mjs';
 
 type Scope = { directories: string[]; filesRead: string[]; filesWrite: string[] };
-const task = (title: string, scope: Scope, testTarget?: string) => ({ title, scope, testTarget });
+const task = (title: string, scope: Scope, testTarget?: string, dependencies: string[] = []) =>
+  ({ title, scope, testTarget, dependencies });
 
 describe('directives start-öncesi lint', () => {
   it('flags same-line Reads+Files, empty scope, write collision and missing test as typed problems', () => {
@@ -67,5 +73,39 @@ describe('directives start-öncesi lint', () => {
     const after = checkDirectives({ repoRoot: root, content: fixedOut.content,
       tasks: [task('hizala', { directories: [], filesRead: ['src/core/thing.ts'], filesWrite: ['tests/core/thing.test.ts'] }, 'x')] });
     expect(after.ok).toBe(true);
+  });
+
+  it('warns when a later task depends transitively on a task changing the engine', () => {
+    const fakeParser = () => [
+      task('motor', { directories: [], filesRead: [], filesWrite: ['src/orchestra/task-builder.ts'] }, 'test'),
+      task('ara', { directories: [], filesRead: ['src/a.ts'], filesWrite: [] }, undefined, ['task-1']),
+      task('tüketici', { directories: [], filesRead: ['src/b.ts'], filesWrite: [] }, undefined, ['task-2']),
+    ];
+
+    const result = checkDirectives({ repoRoot: '/nonexistent-root', content: '', tasks: fakeParser() });
+    const warning = result.problems.find((problem: { code: string }) =>
+      problem.code === 'D_ENGINE_SELF_CHANGE') as { severity: string; detail: string } | undefined;
+
+    expect(ENGINE_HOT_PATHS).toContain('src/orchestra/task-builder.ts');
+    expect(warning).toMatchObject({
+      severity: 'WARN',
+      detail: 'task-1 motoru değiştiriyor ve task-2 ona bağımlı — etki next-run-only, mini-run önerisi (sprint-674 dersi)',
+    });
+    expect(result.problems).toContainEqual(expect.objectContaining({
+      code: 'D_ENGINE_SELF_CHANGE',
+      detail: 'task-1 motoru değiştiriyor ve task-3 ona bağımlı — etki next-run-only, mini-run önerisi (sprint-674 dersi)',
+    }));
+  });
+
+  it('does not warn when an engine-changing task has no dependent task', () => {
+    const fakeParser = () => [
+      task('motor', { directories: [], filesRead: [], filesWrite: ['src/orchestra/task-builder.ts'] }, 'test'),
+      task('bağımsız', { directories: [], filesRead: ['src/a.ts'], filesWrite: [] }),
+    ];
+
+    const result = checkDirectives({ repoRoot: '/nonexistent-root', content: '', tasks: fakeParser() });
+
+    expect(result.problems.some((problem: { code: string }) =>
+      problem.code === 'D_ENGINE_SELF_CHANGE')).toBe(false);
   });
 });

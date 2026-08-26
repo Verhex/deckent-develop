@@ -16946,3 +16946,31 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 680-006: Adversarial interleaving + custody kanıt bataryası (DONE)
 
 ---
+## Sprint 681 — sprint-681
+
+**Status:** ABORTED
+**Date:** 2026-08-26
+**Duration:** 442s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 4 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 441821ms |
+
+### Tasks
+
+- 681-001: Settlement tsc-truth gate — sprint tsc-kirli COMPLETE olamaz (DONE)
+- 681-002-fix-fix: Fix: Fix: Mock-factory ratchet — tam-factory node:fs mock'u yeni eklenemez (PAUSED)
+- 681-002-fix: Fix: Mock-factory ratchet — tam-factory node:fs mock'u yeni eklenemez (NO_GO)
+- 681-002: Mock-factory ratchet — tam-factory node:fs mock'u yeni eklenemez (NO_GO)
+- 681-003: Deletion-aware honest-gate — silme-only iş yanlış-pozitiflenmez (DONE)
+- 681-004: ERRORS.md forensic-kanalı — kritik-sınıf girdiler kırpmada kaybolmaz (DONE)
+- 681-005: lint-directives motor-selfchange typed WARN (674-dersi) (DONE)
+
+---

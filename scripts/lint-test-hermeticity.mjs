@@ -669,7 +669,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-26 xverify-onarim dalgasi (sprint-678): +2 — worker-authored
   // tests/cli/xverify-evidence-scope.test.ts + fencing/ingress pin ekleri
   // (tmpdir-hermetik, suite-owned).
-  count: 16415,
+  count: 16497,
   // 2026-08-25 B-sweep: digest moved — --fix roundtrip pin, multi-label
   // parser pin, same-line rule downgraded to WARN (all suite-owned).
   // 2026-08-25 7141 wave: count unchanged, digest moved — the src-side
@@ -702,7 +702,10 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // 2026-08-26 07:35: 16317→16415 — G0-A config-containment dalgasi (sprint-680
   // + ADR-D-007 el-tamamlama): yeni suite'ler config-write-authority /
   // heal-preimage / heal-race / lint-config-writers + init.test.ts mock-genisletme.
-  digest: 'f8e546d2a4c032057bedf26aa5800625715ebfc6b69dfc99c86af62cb7df9d6b',
+  // 2026-08-26 08:35: 16415→16497 — Node-2 kalite-kapilari dalgasi (sprint-681):
+  // tsc-settlement-gate / honest-gate-deletion-aware / lint-mock-factories /
+  // lint-directives selfchange + errors.test.ts forensic-kanal eklentileri.
+  digest: '7ed02a5503ecdde99910ad9d7d322656a277aaa893b6b7d81e13251c710ea5fe',
 });
 
 export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
@@ -1225,7 +1228,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // (cli-command-contract SSOT, governance catalog, generators).
   // 2026-08-25 exploration-bonus wave: +1 — the route-task-v3 exploration
   // bonus derivation adds one production effect site (cells ledger read).
-  count: 1338,
+  count: 1339,
   // 2026-08-25 config-loss incident hardening: digest moved — atomic
   // last_sprint_id writer (refuse-mint + tmp+rename) and loadConfig
   // self-heal re-read-once + atomic fresh-default.
@@ -1254,7 +1257,9 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-26 02:10: ayni 1336, digest-only — messages.ts silme kaymasi.
   // 2026-08-26 07:36: 1336→1338 — G0-A: yeni src/core/config-write-authority.ts
   // uretim moduli + dalga src kaymalari (config/mcp/cli/orchestra kablolama).
-  digest: 'e44440c19f9cf6d1c07452b6d5e8169d3585ae8cef13398b97d61219ffe274a5',
+  // 2026-08-26 08:36: 1338→1339 — Node-2: evaluation.tsc_settlement_gate zinciri
+  // (finalizer runner-seam) + ERRORS-critical kanal + selfchange-WARN kaymalari.
+  digest: 'aa289860bfde7a636c00ed1ef7a1d7945fe76146873fc6330ef74344a231210c',
 });
 
 const PROTECTED_ROOT_POLICY = new Map([

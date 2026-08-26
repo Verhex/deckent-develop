@@ -230,6 +230,12 @@ export interface GateConfig {
   enforce_adr_compliance?: boolean;
 }
 
+/** Final settlement truth checks. Defaults are resolved in config.ts. */
+export interface EvaluationConfig {
+  /** Require a clean TypeScript compilation before publishing a pure COMPLETE. */
+  tsc_settlement_gate?: boolean;
+}
+
 // ─── Approval Config (runtime-wide ApprovalBroker, APR family) ───────
 export const APPROVAL_LIFECYCLE_ORIGINS = [
   'confirmation',
@@ -1453,6 +1459,8 @@ export interface DeckentConfig {
   // ─── Rubric-Based Evaluation ──────────────────────────────────────
   /** Custom evaluation rubric overrides (merged with DEFAULT_RUBRIC) */
   evaluation_rubric?: Partial<EvaluationRubric>;
+  /** Final settlement truth checks. */
+  evaluation?: EvaluationConfig;
   /** ADR-G-040 acceptance-matrix per-cell overrides (task-kind × verdict →
    *  ACCEPT/ROUTE/REJECT). Invalid rules are dropped with typed reasons at
    *  resolution time — a malformed line never changes acceptance silently. */
@@ -2285,6 +2293,8 @@ export interface ResolvedConfig {
   scheduler?: SchedulerConfig;
   /** Sprint outcome gate configuration (passed through from DeckentConfig). Default-disabled. */
   gate?: GateConfig;
+  /** Resolved final settlement truth checks (default: enabled). */
+  evaluation: Required<EvaluationConfig>;
   /** Resolved approval config (Sprint 355 CFG-APR-WIRE). Unlike the other
    *  passed-through opt-in blocks above, `rules` here is ALWAYS populated —
    *  `loadConfig`/`mergeConfigs` resolve it via `resolveApprovalConfig`

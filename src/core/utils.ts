@@ -8,6 +8,9 @@ import {
   DEBT_TABLE_HEADER,
   DECKENT_DIR,
   DECKENT_FILE,
+  ERRORS_CRITICAL_CLASS_RE,
+  ERRORS_CRITICAL_FILE,
+  ERRORS_CRITICAL_MAX_LINES,
   ERRORS_FILE,
   ERRORS_MAX_LINES,
   PROJECT_CONFIG_PATH,
@@ -39,27 +42,44 @@ export function debugLog(context: string, error: unknown): void {
  * Non-fatal: any write failure is silently ignored.
  */
 function appendToErrorsFile(context: string, message: string): void {
-  try {
-    // Skip writing to real .brain/ERRORS.md during vitest test runs.
-    // Tests generate hundreds of expected errors that overwhelm real sprint events.
-    if (process.env['VITEST'] || process.env['NODE_ENV'] === 'test') return;
-    const brainDir = BRAIN_DIR;
-    if (!existsSync(brainDir)) return; // No .brain/ dir — not initialized
-    const errorsPath = join(brainDir, ERRORS_FILE);
-    const timestamp = new Date().toISOString();
-    const sanitized = message.replace(/\n/g, ' ').slice(0, 200);
-    const entry = `| ${timestamp} | ${context} | ${sanitized} |\n`;
-    appendFileSync(errorsPath, entry, 'utf-8');
+  // Skip writing to real .brain/ERRORS.md during vitest test runs.
+  // Tests generate hundreds of expected errors that overwhelm real sprint events.
+  if (process.env['VITEST'] || process.env['NODE_ENV'] === 'test') return;
+  const brainDir = BRAIN_DIR;
+  if (!existsSync(brainDir)) return; // No .brain/ dir — not initialized
+  const timestamp = new Date().toISOString();
+  const sanitized = message.replace(/\n/g, ' ').slice(0, 200);
+  const entry = `| ${timestamp} | ${context} | ${sanitized} |\n`;
 
-    // Trim to max lines
-    const content = readFileSync(errorsPath, 'utf-8');
-    const lines = content.split('\n').filter(l => l.trim());
-    if (lines.length > ERRORS_MAX_LINES) {
-      const trimmed = lines.slice(-ERRORS_MAX_LINES).join('\n') + '\n';
-      writeFileSync(errorsPath, trimmed, 'utf-8');
+  appendWithLineLimit(join(brainDir, ERRORS_FILE), entry, ERRORS_MAX_LINES);
+
+  const errorCode = getErrorCode(message) ?? context;
+  if (
+    ERRORS_CRITICAL_CLASS_RE.test(context)
+    || ERRORS_CRITICAL_CLASS_RE.test(errorCode)
+  ) {
+    appendWithLineLimit(
+      join(brainDir, ERRORS_CRITICAL_FILE),
+      entry,
+      ERRORS_CRITICAL_MAX_LINES,
+    );
+  }
+}
+
+function getErrorCode(message: string): string | undefined {
+  return message.match(/\b(?:CONFIG_[A-Z0-9_]*|[A-Z][A-Z0-9_]*_HOLD)\b/)?.[0];
+}
+
+function appendWithLineLimit(filePath: string, entry: string, maxLines: number): void {
+  try {
+    appendFileSync(filePath, entry, 'utf-8');
+    const content = readFileSync(filePath, 'utf-8');
+    const lines = content.split('\n').filter(line => line.trim());
+    if (lines.length > maxLines) {
+      writeFileSync(filePath, `${lines.slice(-maxLines).join('\n')}\n`, 'utf-8');
     }
   } catch {
-    // Non-fatal: silently ignore file write errors
+    // Error logging must never alter the caller's control flow.
   }
 }
 

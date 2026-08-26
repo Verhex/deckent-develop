@@ -23,6 +23,52 @@ const REPO_ROOT = resolve(HERE, '..');
 
 export const SEVERITY = Object.freeze({ BLOCK: 'BLOCK', WARN: 'WARN' });
 
+// A single, exported source of truth for files whose changes only take effect
+// for tasks compiled/spawned after that change. A trailing `*` denotes the
+// named file family (not an arbitrary directory glob).
+export const ENGINE_HOT_PATHS = Object.freeze([
+  'src/orchestra/task-builder.ts',
+  'src/orchestra/prompt-compile*',
+  'src/core/result-collector*',
+  'src/orchestra/result-*',
+  'src/orchestra/scheduler*',
+  'src/orchestra/sprint-spawner.ts',
+]);
+
+function isEngineHotPath(path, hotPaths) {
+  return hotPaths.some((candidate) => candidate.endsWith('*')
+    ? path.startsWith(candidate.slice(0, -1))
+    : path === candidate);
+}
+
+function dependencyTaskIndex(dependency, tasks) {
+  const normalized = String(dependency).trim().toLocaleLowerCase('en-US');
+  const taskNumber = /^(?:task[-\s]*)?(\d+)$/u.exec(normalized)?.[1];
+  if (taskNumber) {
+    const index = Number(taskNumber) - 1;
+    if (index >= 0 && index < tasks.length) return index;
+  }
+  return tasks.findIndex((task) =>
+    (typeof task.id === 'string' && task.id.toLocaleLowerCase('en-US') === normalized)
+    || task.title.toLocaleLowerCase('en-US') === normalized);
+}
+
+function transitivelyDependsOn(tasks, dependentIndex, dependencyIndex) {
+  const pending = [dependentIndex];
+  const seen = new Set();
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (seen.has(current)) continue;
+    seen.add(current);
+    for (const dependency of tasks[current]?.dependencies ?? []) {
+      const index = dependencyTaskIndex(dependency, tasks);
+      if (index === dependencyIndex) return true;
+      if (index >= 0 && !seen.has(index)) pending.push(index);
+    }
+  }
+  return false;
+}
+
 /**
  * Bir test/kaynak dosyasının DOĞRUDAN src-importlarını deterministik çıkarır.
  * `from '…/src/x/y.js'` ve `vi.mock('…/src/x/y.js')` biçimleri; yol dosyanın
@@ -73,7 +119,8 @@ export function findSameLineReadsFiles(content) {
  * listesi ve tablo-projeksiyonu üretir. Parser dışarıdan enjekte edilir (testler
  * dist'e dokunmadan sahte-parser verebilir; üretim CLI dist'ten yükler).
  */
-export function checkDirectives({ repoRoot, content, tasks, validateScopeFilesWrite = undefined }) {
+export function checkDirectives({ repoRoot, content, tasks, validateScopeFilesWrite = undefined,
+  engineHotPaths = ENGINE_HOT_PATHS }) {
   const problems = [];
   const table = [];
 
@@ -138,6 +185,18 @@ export function checkDirectives({ repoRoot, content, tasks, validateScopeFilesWr
         problems.push({ code: 'D_BARE_TOKEN', severity: SEVERITY.WARN, task: id, detail: String(w) });
       }
     }
+  });
+
+  tasks.forEach((task, engineIndex) => {
+    const filesWrite = task.scope?.filesWrite ?? [];
+    if (!filesWrite.some((path) => isEngineHotPath(path, engineHotPaths))) return;
+    tasks.forEach((_dependent, dependentIndex) => {
+      if (dependentIndex === engineIndex
+        || !transitivelyDependsOn(tasks, dependentIndex, engineIndex)) return;
+      problems.push({ code: 'D_ENGINE_SELF_CHANGE', severity: SEVERITY.WARN,
+        task: `task-${engineIndex + 1}`,
+        detail: `task-${engineIndex + 1} motoru değiştiriyor ve task-${dependentIndex + 1} ona bağımlı — etki next-run-only, mini-run önerisi (sprint-674 dersi)` });
+    });
   });
 
   if (tasks.length === 0) {

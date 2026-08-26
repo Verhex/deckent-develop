@@ -1,5 +1,91 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  ERRORS_CRITICAL_MAX_LINES,
+  ERRORS_MAX_LINES,
+} from '../../src/core/constants.js';
 import { DeckentError, ErrorRegistry, formatHumanError } from '../../src/core/errors.js';
+import { debugLog } from '../../src/core/utils.js';
+
+const originalCwd = process.cwd();
+const originalVitest = process.env['VITEST'];
+const originalNodeEnv = process.env['NODE_ENV'];
+let errorLogRoot: string;
+
+beforeEach(() => {
+  errorLogRoot = mkdtempSync(join(tmpdir(), 'deckent-errors-test-'));
+  mkdirSync(join(errorLogRoot, '.brain'));
+  process.chdir(errorLogRoot);
+  delete process.env['VITEST'];
+  delete process.env['NODE_ENV'];
+});
+
+afterEach(() => {
+  process.chdir(originalCwd);
+  if (originalVitest === undefined) delete process.env['VITEST'];
+  else process.env['VITEST'] = originalVitest;
+  if (originalNodeEnv === undefined) delete process.env['NODE_ENV'];
+  else process.env['NODE_ENV'] = originalNodeEnv;
+  rmSync(errorLogRoot, { recursive: true, force: true });
+});
+
+describe('critical error forensic channel', () => {
+  it('appends a critical-class entry to both error channels', () => {
+    debugLog('CONFIG_INVALID', 'configuration failed');
+
+    expect(readFileSync(join(errorLogRoot, '.brain', 'ERRORS.md'), 'utf-8')).toContain('CONFIG_INVALID');
+    expect(readFileSync(join(errorLogRoot, '.brain', 'ERRORS-critical.md'), 'utf-8')).toContain('CONFIG_INVALID');
+  });
+
+  it('appends a non-critical entry only to the general channel', () => {
+    debugLog('readFileSafe', 'ordinary failure');
+
+    expect(readFileSync(join(errorLogRoot, '.brain', 'ERRORS.md'), 'utf-8')).toContain('readFileSafe');
+    expect(() => readFileSync(join(errorLogRoot, '.brain', 'ERRORS-critical.md'), 'utf-8')).toThrow();
+  });
+
+  it('trims the critical channel at its independent ceiling', () => {
+    const retained = Array.from(
+      { length: ERRORS_CRITICAL_MAX_LINES },
+      (_, index) => `critical-${index}`,
+    );
+    writeFileSync(join(errorLogRoot, '.brain', 'ERRORS-critical.md'), `${retained.join('\n')}\n`);
+
+    debugLog('WORKER_HOLD', 'latest critical event');
+
+    const lines = readFileSync(join(errorLogRoot, '.brain', 'ERRORS-critical.md'), 'utf-8')
+      .split('\n')
+      .filter(Boolean);
+    expect(lines).toHaveLength(ERRORS_CRITICAL_MAX_LINES);
+    expect(lines[0]).toBe('critical-1');
+    expect(lines.at(-1)).toContain('latest critical event');
+  });
+
+  it('preserves the existing 600-line general-channel trim contract', () => {
+    const retained = Array.from(
+      { length: ERRORS_MAX_LINES },
+      (_, index) => `general-${index}`,
+    );
+    writeFileSync(join(errorLogRoot, '.brain', 'ERRORS.md'), `${retained.join('\n')}\n`);
+
+    debugLog('ordinary-context', 'latest general event');
+
+    const lines = readFileSync(join(errorLogRoot, '.brain', 'ERRORS.md'), 'utf-8')
+      .split('\n')
+      .filter(Boolean);
+    expect(lines).toHaveLength(600);
+    expect(lines[0]).toBe('general-1');
+    expect(lines.at(-1)).toContain('latest general event');
+  });
+});
 
 // ─── DeckentError class ─────────────────────────────────────────────
 

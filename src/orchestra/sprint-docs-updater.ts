@@ -104,6 +104,7 @@ export function updateProjectDocs(projectRoot: string, sprintResult: SprintResul
     auto_docs: { tier1: true, tier2: true, tier3: false },
     coverage_threshold: 90,
     max_reroutes: 3,
+    evaluation: { tsc_settlement_gate: true },
     reroute_on_tech_debt: false,
     adaptive_thresholds: false,
     agent_min_score: 5,

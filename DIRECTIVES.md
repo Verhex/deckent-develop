@@ -1,172 +1,119 @@
-# G0-A CONFIG CONTAINMENT DALGASI — preimage-identity heal + tek transactional write-authority
+# KALİTE-KAPILARI DALGASI (Tren Node-2) — tsc-settlement-truth · mock-ratchet · deletion-aware honest-gate · ERRORS-forensic · motor-selfchange-WARN
 
 ## Goal
 
-Config-audit admission'ının (docs/archive/evidence-2026-08/config-completion-audit-2026-08-26.md)
-G0 incident-containment şeridi kapanır (MASTER 471 CONFIG-AUTHORITY-001 dilimi; owner onayı
-"öneri kabul edildi" 2026-08-26): (1) CFG-001 CRITICAL — self-heal artık parse-fail gördüğü
-EXACT preimage'i inode+content-digest ile doğrulamadan hiçbir rename/quarantine yapmaz;
-preimage değiştiyse typed CONCURRENT_REVISION_HOLD ile dosyaya DOKUNMAZ. (2) CFG-007 —
-`.deckent/config.json` (+global config) yazan 10+ dağınık writer tek transactional
-write-authority modülüne kablolanır (same-dir unique tmp + 0600 restrictive mode + fsync
-file/dir + rename + inter-process lock; approval-broker atomicWriteJson idiomunun
-sertleştirilmiş hali). (3) Mekanik kapı: authority dışı direct config-write'ı fail-closed
-yakalayan lint gate. (4) Adversarial interleaving kanıtı: hiçbir yarışta valid revision
-kaybolmaz. Strike-5 io/parse ayrımı ve strike-4 stage-then-swap davranışı AYNEN korunur —
-bu dalga onların ÜSTÜNE preimage-identity katmanını ekler.
+Gece-bulgu admission satırları 202/203/201/205 kapanır (owner-onaylı tren sırası): (1)
+EVAL-TSC-FEEDBACK-001 — sprint tsc-kirliyken sessizce COMPLETE'e kapanamaz; settlement typed
+residual taşır + Auditor'a event gider; tam-factory node:fs mock'larına yeni-eklenemez
+ratchet'i gelir. (2) HONEST-GATE-DELETION-AWARE-001 — silme-only işler (679-002 canlı vakası:
+24-silme/0-ekleme, goCriteria MET) yanlış-pozitif NO_GO'ya düşmez; gerçek stub hâlâ yakalanır.
+(3) CONFIG-HEAL-IO-TRUTH-001 ek dilimi — kritik-sınıf hata girdileri ERRORS.md 600-satır
+kırpmasında forensic-kaybolmaz. (4) DIRECTIVES-ENGINE-SELFCHANGE-LINT-001 — motor-sıcak-yolu
+dosyalarına dokunan task + ona etki-bağımlı task aynı DAG'daysa typed WARN (674-dersi).
 
 ## Execution contract
 
 - Otorite: main'deki kontratlar; assertion zayıflatılmaz. Yalnız kendi Files listendeki
   dosyalara yaz; Reads listendekileri OKU. Scope dışına çıkma.
-- Testler hermetik (tmpdir; gerçek `.deckent/config.json`'a ASLA yazılmaz). VITEST_MAX_FORKS=2.
+- Testler hermetik (tmpdir; gerçek `.brain`/`.deckent` dosyalarına yazılmaz). VITEST_MAX_FORKS=2.
 - Değiştirdiğin dosyalar için `npx tsc --noEmit` SIFIR hata; çıktıyı result notes'a yaz.
 - Aktif run sırasında build/provider-auth/bot mutation YASAK.
-- Mevcut strike-4/strike-5 heal pinleri (io-hold, stage-then-swap, parse-proof) YEŞİL kalır;
-  davranış değişikliği yalnız yeni preimage-guard ve 0600/fsync/lock katmanıdır.
-- Windows/WSL dürüstlüğü (LAW 2): chmod/fsync-dir POSIX-dışında best-effort try/catch ile
-  sarılır ve typed olarak loglanır; sessiz varsayım yok.
+- YENİ config anahtarı eklenirken CFG-003 dersi bağlayıcı: authored type + default +
+  resolved projection + gerçek consumer zinciri AYNI task'ta tamamlanır (resolver'da
+  düşen alan bırakılamaz); 0-hardcode (eşik/deşen constants veya config'ten).
 
-## Task 1: Core config-write-authority modülü (tmp+0600+fsync+lock+rename)
-- Files: src/core/config-write-authority.ts, tests/core/config-write-authority.test.ts
-- Reads: src/core/config.ts, src/cli/commands/config.ts, src/core/approval-broker.ts, src/core/constants.ts
+## Task 1: Settlement tsc-truth gate — sprint tsc-kirli COMPLETE olamaz
+- Files: src/orchestra/sprint-finalizer.ts, src/core/config-types.ts, src/core/config.ts, tests/orchestra/tsc-settlement-gate.test.ts
+- Reads: src/orchestra/sprint-phases.ts, src/core/utils.ts, docs/MASTER-PLAN.md
 - Priority: CRITICAL
 - Model: gpt-5.6-sol
-- Test: VITEST_MAX_FORKS=2 npx vitest run tests/core/config-write-authority.test.ts
+- Test: VITEST_MAX_FORKS=2 npx vitest run tests/orchestra/tsc-settlement-gate.test.ts tests/orchestra/sprint-finalizer-row-upsert.test.ts
 ### Description
-YENİ modül `src/core/config-write-authority.ts` — repo'nun yerleşik atomic-write idiomunun
-(approval-broker.ts atomicWriteJson: tmp(randomUUID)+write+rename+unlink-on-failure)
-config'e özel sertleştirilmiş tek kaynağı. Export'lar: (a)
-`writeConfigJsonAtomic(targetPath: string, payload: unknown): void` — same-directory unique
-tmp (`.${basename}.${pid}.${randomUUID-kısa}.tmp`), `writeFileSync(tmp, JSON.stringify(payload, null, 2)+'\n', {mode: 0o600})`,
-`fsyncSync` dosya (openSync/fsyncSync/closeSync), `renameSync(tmp, target)`, sonra dizin
-fsync (POSIX'te `openSync(dir, 'r')`+fsync; hata → try/catch + tek console.error typed not
-`CONFIG_DIR_FSYNC_SKIPPED`), başarısızlıkta tmp best-effort unlink + hata fırlatılır
-(sessiz yutma YOK); (b) `withConfigWriteLock<T>(targetPath: string, fn: () => T): T` —
-`${targetPath}.lock` dizini `mkdirSync` atomik primitifiyle alınır (EEXIST → stale kontrol:
-lock içindeki `owner.json` pid'i `process.kill(pid, 0)` ile ölü VE mtime>15sn ise devral,
-değilse bounded bekleme ~50ms×40 sonra typed `ConfigWriteLockTimeoutError` fırlat), finally
-ile serbest bırakılır; owner.json pid+startedAt taşır; (c) typed hata sınıfları
-`ConfigWriteLockTimeoutError` (name alanı sabit). 0-hardcode: config dosya adları caller'dan
-gelir, modül path-agnostiktir. Testler (hermetik tmpdir): atomicity (yarım yazım asla
-görünmez — büyük payload'da paralel okuyucu ya eskiyi ya yeniyi okur), mode 0600
-(process.platform POSIX ise assert, değilse skip-notu), tmp artığı kalmaz (başarı+hata
-yolları), lock contention (iki ardışık withConfigWriteLock serileşir; ölü-pid stale lock
-devralınır; canlı lock'ta timeout hatası), rename-sonrası içerik birebir. tsc sıfır.
+Yeni config anahtarı `evaluation.tsc_settlement_gate` (boolean, default TRUE; authored tip
+config-types.ts + createDefaultConfig default'u + resolved projection — ÜÇÜ BİRDEN, CFG-003
+dersi). Consumer: sprint-finalizer'ın normal-finalize yolunda, terminal COMPLETE yayınından
+ÖNCE bounded bir `npx tsc --noEmit` koşulur (async spawn, spawnSync YASAK; timeout
+config-resolved makul sabit constants'tan, örn. 240sn; TS-projesi değilse/ tsc yoksa typed
+skip). FAIL ise: (a) settlement'a typed residual eklenir (`TSC_DIRTY_RESIDUAL` + ilk 20 hata
+satırı bounded), sprint sonucu COMPLETE yerine mevcut tech-debt/residual taşıyan settlement
+sınıfına düşer — hangi mevcut alan/mekanizma kullanılacaksa REICAT ETME, sprint-finalizer'ın
+var olan residual/debt kanalını kullan (Reads'te gör); (b) Auditor'a `BRAIN→AUDITOR` event'i
+yazılır (sprint-phases.ts:2119 STUB_WRITE_DETECTED emsalindeki writeEvent deseni). Gate
+fault'u (tsc çalıştırılamadı) typed WARN + treat-as-pass DEĞİL — typed `TSC_GATE_FAULT`
+residual'ı (dürüstlük: koşamadıysak temiz diyemeyiz, ama sprint'i de kilitlemeyiz). YENİ
+hermetik test: sahte-proje tmpdir'de (a) gate-ON + kirli-ts → residual + event, (b) gate-ON +
+temiz → COMPLETE bit-değişmez, (c) gate-OFF → tsc hiç çağrılmaz, (d) fault → TSC_GATE_FAULT.
+tsc-koşusunu testte gerçek npx yerine enjekte-edilebilir runner seam'iyle sür (finalizer'a
+opsiyonel runTscFn parametresi — mevcut DI desenleriyle uyumlu). tsc sıfır.
 
-## Task 2: CFG-001 heal preimage-identity + CONCURRENT_REVISION_HOLD
-- Files: src/core/config.ts, tests/core/config-heal-preimage.test.ts
-- Reads: src/core/config-write-authority.ts, tests/core/config.test.ts, docs/archive/evidence-2026-08/config-completion-audit-2026-08-26.md
-- Priority: CRITICAL
-- Model: gpt-5.6-sol
-- Dependencies: Task 1
-- Test: VITEST_MAX_FORKS=2 npx vitest run tests/core/config-heal-preimage.test.ts
-### Description
-config.ts:2202-2244 heal bloğu şu sözleşmeye yükseltilir (strike-4/5 davranışı korunarak):
-(1) parse-fail anındaki EXACT preimage kayda alınır — `rawText`'in sha256 digest'i +
-`statSync` identity (dev, ino, size, mtimeMs); (2) quarantine/rename işlemi Task-1'in
-`withConfigWriteLock` kilidi ALTINDA yapılır; (3) rename'den HEMEN önce canonical path
-yeniden okunur (readFileSync) ve sha256'sı preimage digest'iyle karşılaştırılır — FARKLIYSA
-hiçbir dosyaya dokunulmaz, staged tmp unlink edilir ve tek typed mesaj basılır:
-`console.error('[deckent] CONFIG_CONCURRENT_REVISION_HOLD: heal sırasında config başka bir
-writer tarafından yenilendi — dosyaya dokunulmadı; yeni revizyon geçerli sayılır')`; okunan
-YENİ içerik parse edilir ve parse oluyorsa projectConfig olarak KULLANILIR (sağlıklı yeni
-revizyon kabul); parse olmuyorsa bu turda healsiz devam edilir (defaults ile; bir sonraki
-yükleme yeniden dener — recovery cold-lane ilkesi, sprint-348 ADR); (4) AYNIYSA mevcut
-stage-then-swap sırası aynen yürür, fresh-default staged yazımı Task-1
-`writeConfigJsonAtomic` ile yapılır (0600+fsync kazanımı), backup rename'i korunur; io-error
-kolu (strike-5 CONFIG_READ_IO_HOLD) bit-değişmez kalır. AYRICA (dosya-kilidi tek sahipte
-kalsın diye bu task'ta): config.ts içindeki DİĞER config yazım yolları da authority'ye
-delege edilir — config.ts:2710 (await writeFile), config.ts:2782 ve :2798 (merged write);
-davranış birebir, yalnız yazım mekaniği değişir. Heal çekirdeği test-sürülebilirlik
-için exported saf fonksiyona çıkarılır: `healCorruptProjectConfig(projectConfigPath, rawPreimageText)`
-— dönüş typed union {healed, heldConcurrentRevision+adoptedConfig?, failed}. Mevcut çağıran
-blok bu fonksiyonu kullanır. YENİ test dosyası deterministik interleaving'leri fonksiyon
-seviyesinde sürer: (a) preimage aynı → heal + backup + fresh default + 0600; (b) preimage
-farklı + yeni içerik valid → HOLD + dosya bit-değişmez + yeni config adopt; (c) preimage
-farklı + yeni içerik de corrupt → HOLD + dosyaya dokunulmaz; (d) mevcut heal pinleri yeşil kalır — Test komutuna EK olarak
-`VITEST_MAX_FORKS=2 npx vitest run tests/core/config.test.ts` de koşulur ve sonucu result
-notes'a yazılır. tsc sıfır.
-
-## Task 3: Writer-kablolama A — core yardımcıları + CLI authority'ye geçer
-- Files: src/core/config-migration.ts, src/core/subscription.ts, src/core/global-config.ts, src/cli/commands/config.ts, tests/core/config-migration.test.ts, tests/core/subscription.test.ts
-- Reads: src/core/config-write-authority.ts, src/core/utils.ts, src/core/config.ts
-- Priority: HIGH
-- Dependencies: Task 1
-- Test: VITEST_MAX_FORKS=2 npx vitest run tests/core/config-migration.test.ts tests/core/subscription.test.ts tests/cli/config-command.test.ts
-### Description
-(Gerçek-binary proof bilinçli olarak landing-host işidir — sprint build almaz; landing'de
-CLI config resolved-JSON smoke'u host tarafından koşulur.)
-Core yardımcı katmanındaki project/global config yazarları Task-1 authority'sine delege
-edilir — davranış birebir korunur, yalnız yazım mekaniği değişir: config-migration.ts:331,
-subscription.ts:158, global-config.ts:45 (global path — aynı authority, 0600).
-(config.ts'in KENDİ yazım yolları Task-2'nin işidir — bu task config.ts'e YAZMAZ, yalnız
-okur.) src/cli/commands/config.ts içindeki
-mevcut `writeConfigFileAtomic` yerel helper'ı SİLİNİR ve çağrıları core authority'ye
-yönlendirilir (tek kaynak; ikinci mekanizma bırakılmaz — KANUN 10 absorbe ilkesi).
-src/core/utils.ts:237'deki tmp+write deseninin HEDEFİNİ Reads ile doğrula: config-ailesi
-dosyası yazıyorsa delege et; değilse DOKUNMA ve result notes'a tek satır tespit yaz.
-Her dokunulan yazım yolunun mevcut testi yeşil kalır; mock'lanan fs çağrıları değiştiyse
-testlerdeki mock beklentileri gerçek yeni zincire (authority çağrısı) göre güncellenir —
-assertion zayıflatma YOK, çağrı-zinciri değişimi dürüstçe pinlenir. tsc sıfır.
-
-## Task 4: Writer-kablolama B — MCP/orchestra yüzeyleri authority'ye geçer
-- Files: src/mcp/tools/config.ts, src/mcp/tools/init.ts, src/mcp/tools/nervous.ts, src/orchestra/sprint-finalizer.ts, src/orchestra/managed-docs/docs-config.ts
-- Reads: src/core/config-write-authority.ts, src/core/constants.ts
-- Priority: HIGH
-- Dependencies: Task 1
-- Test: VITEST_MAX_FORKS=2 npx vitest run tests/mcp/config-tool.test.ts tests/orchestra/managed-docs.test.ts
-### Description
-Yüzey katmanındaki config yazarları aynı authority'ye delege edilir:
-src/mcp/tools/config.ts:73, src/mcp/tools/init.ts:97-102 (üç yazım),
-src/mcp/tools/nervous.ts:63, src/orchestra/sprint-finalizer.ts:1344.
-src/orchestra/managed-docs/docs-config.ts:53 için önce hedef dosyayı doğrula: `.deckent/config.json`
-ailesi DEĞİLSE (ör. ayrı docs-config dosyası) davranışı koru ama AYNI atomic idiom'a geçir
-(writeConfigJsonAtomic path-agnostiktir) ve result notes'a hedef-dosya tespitini yaz.
-MCP karar-yüzeyi semantiği DEĞİŞMEZ (read-only sınırlar aynen); yalnız yazım mekaniği
-atomikleşir. İlgili mevcut testler yeşil kalır; fs-mock beklentileri gerekiyorsa yeni
-zincire göre dürüstçe güncellenir. Test dosyası adları Reads sırasında diskte doğrulanır —
-listelenen test yoksa en yakın kapsayan mevcut suite koşulur ve result notes'a yazılır.
-tsc sıfır.
-
-## Task 5: Mekanik kapı — lint-config-writers fail-closed gate
-- Files: scripts/lint-config-writers.mjs, scripts/script-registry.json, package.json, tests/scripts/lint-config-writers.test.ts
-- Reads: scripts/lint-test-hermeticity.mjs, src/core/config-write-authority.ts
+## Task 2: Mock-factory ratchet — tam-factory node:fs mock'u yeni eklenemez
+- Files: scripts/lint-mock-factories.mjs, scripts/script-registry.json, package.json, tests/scripts/lint-mock-factories.test.ts
+- Reads: scripts/lint-config-writers.mjs, scripts/lint-test-hermeticity.mjs
 - Priority: HIGH
 - Agent: ci-guardian
-- Dependencies: Task 3, Task 4
-- Test: VITEST_MAX_FORKS=2 npx vitest run tests/scripts/lint-config-writers.test.ts
+- Test: VITEST_MAX_FORKS=2 npx vitest run tests/scripts/lint-mock-factories.test.ts
 ### Description
-YENİ gate `scripts/lint-config-writers.mjs`: src/** içinde `writeFileSync|writeFile(`
-çağrısı yapan ve hedef ifadesi config-ailesi deseni taşıyan (`config.json` literal'i,
-`PROJECT_CONFIG_PATH`, `GLOBAL_CONFIG_PATH` tanımlayıcıları) satırları tarar; authority
-modül dosyasının kendi içi (Reads'teki modül) hariç her isabet ihlaldir. Mevcut meşru kalıntılar
-için hermeticity-gate'in yerleşik deseni kullanılır: dosya-içi ledger-yorumlu baseline
-(sayı+digest; UNRESOLVED_BASELINE emsali scripts/lint-test-hermeticity.mjs) — YENİ ihlal
-fail-closed (exit 1), baseline azalması serbest, artışı bloklu. Kapı `scripts/script-registry.json`'a
-kayıt edilir ve package.json `lint` zincirine eklenir (mevcut 20-gate zincirinin sonuna;
-zincir sözdizimini package.json'dan birebir kopyala). Hermetik test: sahte mini-ağaçta
-(tmpdir) ihlalli/ihlalsiz iki fixture ile exit-code + mesaj pinlenir; gerçek repo koşusunda
-gate'in YEŞİL olduğu (Task 3+4 sonrası baseline=0 hedefi; kalan meşru istisna varsa
-ledger-yorumla gerekçeli) result notes'a yazılır. tsc etkilenmez (mjs); test tsc'ye girmez.
+YENİ gate `scripts/lint-mock-factories.mjs` (yapı emsali Reads'teki lint-config-writers —
+export'lu check fonksiyonu + main + yalnız-azalma baseline): tests/** içinde
+`vi.mock('node:fs'` (ve `'node:fs/promises'`) çağrısı olup factory gövdesinde
+`importOriginal` ÇAĞRILMAYAN her dosya "tam-factory" sayılır (2026-08-26 mock-gap dersi:
+authority-zinciri fs-yüzeyi ekleyince tam-factory'ler sessizce kırılıyor). Mevcut
+tam-factory'ler script-içi CONFIG... benzeri baseline Set'ine dosya-yolu anahtarıyla ledger-yorumla
+alınır (kuruluş ölçümünü koş ve GERÇEK listeyi yaz; sayıyı result notes'a raporla); YENİ
+dosya fail-closed, baseline yalnız azalır (stale-baseline kırmızı). Gate script-registry'ye
+kayıt + package.json lint:gates zincirinin sonuna eklenir (mevcut sözdizimini birebir
+kopyala; lint-config-writers'tan SONRA). Hermetik test: tmpdir mini-ağaçta tam-factory /
+importOriginal'li / mock'suz üç fixture + gerçek-repo yeşil koşusu pini. tsc etkilenmez.
 
-## Task 6: Adversarial interleaving + custody kanıt bataryası
-- Files: tests/core/config-heal-race.test.ts
-- Reads: src/core/config.ts, src/core/config-write-authority.ts, tests/core/config-heal-preimage.test.ts
+## Task 3: Deletion-aware honest-gate — silme-only iş yanlış-pozitiflenmez
+- Files: src/orchestra/result-evaluator.ts, tests/orchestra/honest-gate-deletion-aware.test.ts
+- Reads: src/orchestra/sprint-phases.ts, tests/orchestra/dishonest-detector.test.ts
 - Priority: HIGH
-- Dependencies: Task 2, Task 3
-- Test: VITEST_MAX_FORKS=2 npx vitest run tests/core/config-heal-race.test.ts
+- Test: VITEST_MAX_FORKS=2 npx vitest run tests/orchestra/honest-gate-deletion-aware.test.ts tests/orchestra/dishonest-detector.test.ts
 ### Description
-YENİ hermetik batarya (tmpdir sahte-proje; gerçek config'e dokunmaz) — G0 exit-gate
-kanıtının test tarafı: (1) YARIŞ: corrupt dosya + heal başlarken araya giren writer'ın
-yazdığı valid yeni revizyon HİÇBİR interleaving'de kaybolmaz (Task-2 seam'i üzerinden
-deterministik: parse-fail→re-read arası dosya değiştirilir → HOLD + adopt); (2)
-CRASH-NOKTALARI: staged tmp yazıldıktan sonra rename yapılmadan süreç ölürse canonical
-path'te DAİMA valid bir config vardır ve artık tmp bir sonraki heal'de yetim kalmaz
-(unlink-yolu); (3) CUSTODY: authority ile yazılan her dosya POSIX'te 0600'dür (backup dahil
-DEĞİL — backup rename ile taşınır, mevcut mode'unu korur; bu dürüstçe pinlenir ve G0-B'ye
-not düşülür); (4) LOCK: heal ile eşzamanlı ikinci heal serileşir (iki ardışık çağrı tek
-kazanan); (5) STRIKE-REGRESYON: io-error kolu (EMFILE simülasyonu — readFileSync throw
-mock'u) dosyaya dokunmaz, CONFIG_READ_IO_HOLD basar (strike-5 pini bu bataryada da yaşar).
-Her senaryo tek `it` bloğu, betimleyici ad, deterministik (sleep-yarışı YOK — seam-sürümlü).
-tsc sıfır.
+`enforceHonestResultGate` (result-evaluator.ts ~:3033) karar sırası 679-002 canlı vakasına
+göre düzeltilir: selfAssessment başarı iddiasında linesAdded=0 İKEN linesRemoved>0 VE
+goCriteria-kanıtı mevcutsa (result.notes/testsPassed zinciri) hiçbir stub/empty-write
+override'ı DONE'u düşürmez — 679-002'nin gerçekte hangi dala takıldığını ÖNCE teşhis et
+(isStubResult literal'i mi, diskVerify yolu mu, SCOPE_VIOLATION_OR_EMPTY_WRITE mi) ve fix'i
+o dala uygula; komşu davranış bit-korunur. YENİ test dosyası: (a) 679-002 şekli regresyon
+fixture'ı (24-silme/0-ekleme, goCriteria MET, testsPassed=true → DONE KALIR), (b) gerçek
+stub (0/0 + kanıtsız) HÂLÂ NO_GO, (c) silme-only ama kanıtsız (linesRemoved>0, testsPassed
+false/iddiasız) mevcut davranışını korur — zayıflatma yok. Mevcut dishonest-detector suite
+yeşil kalır. tsc sıfır.
+
+## Task 4: ERRORS.md forensic-kanalı — kritik-sınıf girdiler kırpmada kaybolmaz
+- Files: src/core/utils.ts, src/core/constants.ts, tests/core/errors.test.ts
+- Reads: docs/MASTER-PLAN.md
+- Priority: NORMAL
+- Test: VITEST_MAX_FORKS=2 npx vitest run tests/core/errors.test.ts
+### Description
+`.brain/ERRORS.md` 600-satır kırpması (utils.ts append + ERRORS_MAX_LINES) forensic'i
+öldürüyor (201 satırının ek dilimi). Ekleme: kritik-sınıf girdiler (error-code'u
+`CONFIG_` öneki taşıyan VEYA `_HOLD` soneki taşıyan sınıf — desen constants.ts'te tek-kaynak
+export, örn. ERRORS_CRITICAL_CLASS_RE) normal ERRORS.md akışına EK olarak
+`.brain/ERRORS-critical.md`'ye de append edilir; bu dosya kendi bağımsız tavanıyla kırpılır
+(constants.ts yeni `ERRORS_CRITICAL_MAX_LINES`, 2000 — gerekçe-yorumlu; retention-domain 120
+satırına dokunulmaz, dosya .brain altında aynı yazım-deseniyle). Yazım non-fatal (mevcut
+logError sözleşmesi korunur). Test: errors.test.ts'e (a) kritik-sınıf girdinin çift-kanala
+düştüğü, (b) kritik-olmayanın yalnız ERRORS.md'ye gittiği, (c) critical-kırpmanın kendi
+tavanını uyguladığı, (d) mevcut 600-trim pinlerinin bit-korunduğu eklenir (tmpdir). tsc sıfır.
+
+## Task 5: lint-directives motor-selfchange typed WARN (674-dersi)
+- Files: scripts/lint-directives.mjs, tests/scripts/lint-directives.test.ts
+- Reads: src/orchestra/task-builder.ts
+- Priority: NORMAL
+- Test: VITEST_MAX_FORKS=2 npx vitest run tests/scripts/lint-directives.test.ts
+### Description
+lint-directives'e yeni WARN sınıfı `D_ENGINE_SELF_CHANGE`: motor-sıcak-yolu listesi
+(export edilen tek-kaynak sabit ENGINE_HOT_PATHS — src/orchestra/task-builder.ts,
+src/orchestra/prompt-compile* ailesi, src/core/result-collector* / src/orchestra/result-*,
+src/orchestra/scheduler*, src/orchestra/sprint-spawner.ts; GERÇEK dosya adlarını Reads +
+repo-grep ile doğrula, hayalet yol yazma) ile bir task'ın filesWrite kümesi kesişiyor VE
+aynı DIRECTIVES'te ona Dependencies ile bağlı (doğrudan veya geçişli) başka task varsa:
+`task-N motoru değiştiriyor ve task-M ona bağımlı — etki next-run-only, mini-run önerisi
+(sprint-674 dersi)` metinli WARN (BLOCK değil). Liste export'u test-edilebilir; mevcut
+checkDirectives saf-çekirdek desenine ek parametre olarak girer (parser enjeksiyonu
+bozulmaz). Test: lint-directives.test.ts'e sahte-parser'lı iki senaryo — kesişim+bağımlılık
+→ WARN üretilir; kesişim ama bağımlısız → WARN üretilmez; mevcut testler bit-korunur. tsc
+etkilenmez (mjs), test tsc'ye girmez.

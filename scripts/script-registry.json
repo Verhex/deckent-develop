@@ -766,6 +766,16 @@
    "notes": "Two-pass textual scanner (decl-collect + first-arg resolve); cost-config/docs-config families deliberately out of scope; AST upgrade path noted for G1A."
   },
   {
+   "file": "scripts/lint-mock-factories.mjs",
+   "class": "gate",
+   "owner": "test-mock-hermeticity",
+   "npmScript": "lint:mock-factories (in lint:gates, after lint:config-writers)",
+   "input": "tests/**/*.{ts,tsx,js,jsx,mts,cts} source (vi.mock node:fs/node:fs/promises factory shape)",
+   "output": "exit 1 on a new full node:fs mock factory or stale baseline entry; only-shrink file-path ledger in-script",
+   "expiry": "none — permanent lint:gates member (681-002 mock-gap ratchet)",
+   "notes": "2026-08-26 foundation measurement: 276 existing full-factory files; AST scan requires the factory importer parameter to be called."
+  },
+  {
    "file": "scripts/master-plan-integrity.mjs",
    "class": "gate",
    "owner": "master-plan-governance",

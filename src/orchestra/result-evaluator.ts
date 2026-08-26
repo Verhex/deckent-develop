@@ -3075,8 +3075,21 @@ export function enforceHonestResultGate(
   // Boundary-violation (Check 2) is orthogonal and always runs.
   const hasDiskEvidence = diskVerify?.hasDiskEvidence === true;
 
+  // 681-003 / 679-002: deletion-only work has no added-line or surviving-file
+  // signal for the two zero-write heuristics. A successful test projection plus
+  // a non-empty result note is the existing go-criteria evidence chain for
+  // legacy results that predate structured criteriaEvidence. Keep this narrow:
+  // it does not excuse a boundary violation, a 0/0 stub, or failed/unclaimed
+  // verification.
+  const isEvidenceBackedDeletion =
+    result.selfAssessment === 'DONE' &&
+    (result.linesAdded ?? 0) === 0 &&
+    (result.linesRemoved ?? 0) > 0 &&
+    result.testsPassed === true &&
+    (result.notes?.trim().length ?? 0) > 0;
+
   // Check 1: stub literal (covers Sprint 156-011 CRITICAL debt + Sprint 164 replay)
-  if (!hasDiskEvidence && isStubResult(result)) {
+  if (!isEvidenceBackedDeletion && !hasDiskEvidence && isStubResult(result)) {
     const codeVerified = (result as TaskResult & { codeVerified?: string }).codeVerified;
     const violation: HonestyViolation =
       codeVerified === 'CODE_VERIFIED_DONE'
@@ -3117,6 +3130,7 @@ export function enforceHonestResultGate(
   // as linesAdded). Skip Check 3 when deletions are claimed; genuine stubs have
   // linesRemoved=0 and are still caught.
   if (
+    !isEvidenceBackedDeletion &&
     !hasDiskEvidence &&
     (result.filesChanged?.length ?? 0) > 0 &&
     (result.linesAdded ?? 0) === 0 &&
