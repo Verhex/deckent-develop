@@ -131,3 +131,17 @@ Sana kalan üç exact bulgu (hepsi tests/** — lease'inde):
    fsync modunu `'r'`→`'r+'` yaptı (Windows FlushFileBuffers EPERM kökü; packed-install-Win
    kırmızısının sebebi; aynı sınıf `execution-landing-context/checkpoint`). Uygun config-write
    test dosyasına '`r+`-mod + fsync başarısı' pini ekle (tests/** senin allowlist'inde).
+
+**82fae1eb7 koşusu sonrası ek (2026-08-26 ikinci sınıflandırma):** E2E 14/14 YEŞİL
+(packed-install-Win dahil — fsync-fix gerçek-Windows'ta kanıtlı); CI'da dist-ENOENT sınıfı
+ÖLDÜ ve prebuild iki maskeli sınıfı görünür kıldı (run 32967941648):
+4. **F4 — `tests/cli/provider-observations.test.ts`:** çoklu `Test timed out in 10000ms`
+   (CLI 26.x) — real-binary spawn'lar CI-runner'da 10sn'e sığmıyor; F1 ile aynı
+   CI-ölçekleme ailesi (eşik/env-çarpanı veya hızlandırılmış hermetik kurgu).
+5. **F5 — `tests/orchestra/spawn-backend-docker.test.ts` + `spawn-backend-docker-probe.test.ts`:**
+   `expected { outcome: 'transport-error' } to match { outcome: 'completed' }` (Orchestra 26.x) —
+   probe CI docker-ortamında completion bekliyor, transport-error alıyor; beklenti
+   capability-koşullu olmalı (dünkü dist-ENOENT bu testleri erken öldürdüğü için sınıf ilk kez
+   şimdi görünür; 24.x bacağı fail-fast iptaliyle ölçülemedi — düzeltmende iki node-sürümünü de doğrula).
+Bu beşliyle birlikte kalan TÜM CI-kırmızıları (Secret-Scan + Core/Agents-26 + CLI-26 +
+Orchestra-26 + Docs/Scripts) senin Faz-B allowlist'inin içindedir; ana-şerit CI-sahası temiz.
