@@ -194,7 +194,7 @@ describe('F1-014r (a): claude-subscription spawn — no OPENAI_API_KEY / GOOGLE_
     }
   });
 
-  it('does NOT inject OPENAI_API_KEY into claude (sonnet) container', () => {
+  it('does NOT inject OPENAI_API_KEY into claude (sonnet) container', async () => {
     const backend = new DockerSpawnBackend('/test/project');
     backend.spawn(
       't-f1014a-sonnet',
@@ -202,13 +202,14 @@ describe('F1-014r (a): claude-subscription spawn — no OPENAI_API_KEY / GOOGLE_
       'prompt',
       TEST_DOCKER_EXECUTION_OPTIONS,
     );
+    await backend.lastSpawnCompletion;
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
     expect(hasEnvFlag(argv, 'OPENAI_API_KEY')).toBe(false);
   });
 
-  it('does NOT inject GOOGLE_API_KEY into claude (sonnet) container', () => {
+  it('does NOT inject GOOGLE_API_KEY into claude (sonnet) container', async () => {
     const backend = new DockerSpawnBackend('/test/project');
     backend.spawn(
       't-f1014a-sonnet-g',
@@ -216,13 +217,14 @@ describe('F1-014r (a): claude-subscription spawn — no OPENAI_API_KEY / GOOGLE_
       'prompt',
       TEST_DOCKER_EXECUTION_OPTIONS,
     );
+    await backend.lastSpawnCompletion;
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
     expect(hasEnvFlag(argv, 'GOOGLE_API_KEY')).toBe(false);
   });
 
-  it('does NOT inject OPENAI_API_KEY into claude (opus) container', () => {
+  it('does NOT inject OPENAI_API_KEY into claude (opus) container', async () => {
     const backend = new DockerSpawnBackend('/test/project');
     backend.spawn(
       't-f1014a-opus',
@@ -230,6 +232,7 @@ describe('F1-014r (a): claude-subscription spawn — no OPENAI_API_KEY / GOOGLE_
       'prompt',
       TEST_DOCKER_EXECUTION_OPTIONS,
     );
+    await backend.lastSpawnCompletion;
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
@@ -317,7 +320,7 @@ describe('F1-014r (c): mixed-fleet — 2 workers each gets only its own provider
     if (savedGoogle === undefined) { delete process.env.GOOGLE_API_KEY; } else { process.env.GOOGLE_API_KEY = savedGoogle; }
   });
 
-  it('Claude container has no OPENAI/GOOGLE key; Codex is held before container work', () => {
+  it('Claude container has no OPENAI/GOOGLE key; Codex is held before container work', async () => {
     const claudeBackend = new DockerSpawnBackend('/test/project');
     claudeBackend.spawn(
       't-f1014c-claude',
@@ -325,6 +328,7 @@ describe('F1-014r (c): mixed-fleet — 2 workers each gets only its own provider
       'prompt',
       TEST_DOCKER_EXECUTION_OPTIONS,
     );
+    await claudeBackend.lastSpawnCompletion;
 
     const codexBackend = new DockerSpawnBackend('/test/project');
     expect(() => codexBackend.spawn(
@@ -342,7 +346,7 @@ describe('F1-014r (c): mixed-fleet — 2 workers each gets only its own provider
     expect(hasEnvFlag(claudeArgv, 'GOOGLE_API_KEY')).toBe(false);
   });
 
-  it('Claude container has no GOOGLE_API_KEY; Gemini is held before container work', () => {
+  it('Claude container has no GOOGLE_API_KEY; Gemini is held before container work', async () => {
     const claudeBackend = new DockerSpawnBackend('/test/project');
     claudeBackend.spawn(
       't-f1014c-claude2',
@@ -350,6 +354,7 @@ describe('F1-014r (c): mixed-fleet — 2 workers each gets only its own provider
       'prompt',
       TEST_DOCKER_EXECUTION_OPTIONS,
     );
+    await claudeBackend.lastSpawnCompletion;
 
     const geminiBackend = new DockerSpawnBackend('/test/project');
     expect(() => geminiBackend.spawn(
@@ -375,7 +380,7 @@ describe('F1-014r (d): CLAUDE_AUTH_REQUIRED injected only for claude provider', 
     installSpawnRouter();
   });
 
-  it('injects CLAUDE_AUTH_REQUIRED for claude (sonnet)', () => {
+  it('injects CLAUDE_AUTH_REQUIRED for claude (sonnet)', async () => {
     const backend = new DockerSpawnBackend('/test/project');
     backend.spawn(
       't-f1014d-claude',
@@ -383,6 +388,7 @@ describe('F1-014r (d): CLAUDE_AUTH_REQUIRED injected only for claude provider', 
       'prompt',
       TEST_DOCKER_EXECUTION_OPTIONS,
     );
+    await backend.lastSpawnCompletion;
 
     expect(capturedDockerRunArgs.length).toBe(1);
     expect(hasEnvFlag(capturedDockerRunArgs[0]!, 'CLAUDE_AUTH_REQUIRED')).toBe(true);

@@ -306,13 +306,13 @@ describe('DockerSpawnBackend exact xverify entrypoint', () => {
       });
   });
 
-  it('leaves the ordinary worker prompt transport unchanged', () => {
+  it('leaves the ordinary worker prompt transport unchanged', async () => {
     new DockerSpawnBackend('/test/project')
       .spawn('ordinary-worker', 'claude-fable-5', 'ordinary worker prompt', {
         ...exactOptions(),
       });
 
-    expect(dockerRuns).toHaveLength(1);
+    await vi.waitFor(() => expect(dockerRuns).toHaveLength(1));
     expect(mockWriteFileSync.mock.calls.some(
       ([path, value]) =>
         /\/\.tasks\/\.prompt-ordinary-worker-[a-f0-9]+\.txt$/u
@@ -323,9 +323,9 @@ describe('DockerSpawnBackend exact xverify entrypoint', () => {
       .not.toContain('target=/run/deckent-xverify-prompt.txt');
   });
 
-  it('mounts only the host-authority prompt read-only and returns a two-field handle', () => {
+  it('mounts only the host-authority prompt read-only and returns a two-field handle', async () => {
     const input = exactInput();
-    const handle = new DockerSpawnBackend('/test/project')
+    const handle = await new DockerSpawnBackend('/test/project')
       .spawnExactCrossVerify(input);
 
     expect(Object.keys(handle).sort()).toEqual(['outputArtifactRef', 'settlementRef']);
@@ -349,8 +349,8 @@ describe('DockerSpawnBackend exact xverify entrypoint', () => {
     )).toBe(false);
   });
 
-  it('isolates typed v2 from the project and mounts only broker evidence read-only', () => {
-    new DockerSpawnBackend('/test/project')
+  it('isolates typed v2 from the project and mounts only broker evidence read-only', async () => {
+    await new DockerSpawnBackend('/test/project')
       .spawnExactCrossVerify(exactV2Input());
 
     expect(dockerRuns).toHaveLength(1);
@@ -370,45 +370,45 @@ describe('DockerSpawnBackend exact xverify entrypoint', () => {
     expect(command).toContain(`sha256:${'9'.repeat(64)} sh -c`);
   });
 
-  it('holds prompt byte drift before durable preparation or docker run', () => {
+  it('holds prompt byte drift before durable preparation or docker run', async () => {
     const input = exactInput();
-    expect(() => new DockerSpawnBackend('/test/project').spawnExactCrossVerify({
+    await expect(new DockerSpawnBackend('/test/project').spawnExactCrossVerify({
       ...input,
       prompt: 'substituted prompt bytes',
-    })).toThrow(/prompt bytes differ/i);
+    })).rejects.toThrow(/prompt bytes differ/i);
     expect(dockerRuns).toHaveLength(0);
   });
 
-  it('re-verifies the immutable prompt after prepared evidence and before docker run', () => {
+  it('re-verifies the immutable prompt after prepared evidence and before docker run', async () => {
     mockReadPrompt.mockReturnValueOnce(null);
-    expect(() => new DockerSpawnBackend('/test/project')
+    await expect(new DockerSpawnBackend('/test/project')
       .spawnExactCrossVerify(exactInput()))
-      .toThrow(/final pre-dispatch authority verification failed/i);
+      .rejects.toThrow(/final pre-dispatch authority verification failed/i);
     expect(dockerRuns).toHaveLength(0);
   });
 
-  it('re-verifies the immutable execution contract before docker run', () => {
+  it('re-verifies the immutable execution contract before docker run', async () => {
     mockReadExecutionContract.mockReturnValueOnce(null);
-    expect(() => new DockerSpawnBackend('/test/project')
+    await expect(new DockerSpawnBackend('/test/project')
       .spawnExactCrossVerify(exactInput()))
-      .toThrow(/final pre-dispatch authority verification failed/i);
+      .rejects.toThrow(/final pre-dispatch authority verification failed/i);
     expect(dockerRuns).toHaveLength(0);
   });
 
-  it('re-verifies the persisted task snapshot immediately before docker run', () => {
-    expect(() => new DockerSpawnBackend('/test/project').spawnExactCrossVerify({
+  it('re-verifies the persisted task snapshot immediately before docker run', async () => {
+    await expect(new DockerSpawnBackend('/test/project').spawnExactCrossVerify({
       ...exactInput({ taskSnapshotSha256: 'e'.repeat(64) }),
-    })).toThrow(/final pre-dispatch authority verification failed/i);
+    })).rejects.toThrow(/final pre-dispatch authority verification failed/i);
     expect(dockerRuns).toHaveLength(0);
   });
 
-  it('holds a termination-binding failure before docker run', () => {
+  it('holds a termination-binding failure before docker run', async () => {
     bindPreparedAttempt.mockImplementationOnce(() => {
       throw new Error('termination ledger unavailable');
     });
-    expect(() => new DockerSpawnBackend('/test/project')
+    await expect(new DockerSpawnBackend('/test/project')
       .spawnExactCrossVerify(exactInput()))
-      .toThrow(/termination ledger unavailable/i);
+      .rejects.toThrow(/termination ledger unavailable/i);
     expect(dockerRuns).toHaveLength(0);
   });
 });

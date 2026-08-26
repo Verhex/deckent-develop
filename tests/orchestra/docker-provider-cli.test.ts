@@ -471,13 +471,13 @@ describe('DockerSpawnBackend: image-reality honest-fail (verifyProviderCliInImag
       expect(capturedRealRunArgs.length).toBe(0);
     });
 
-    it('claude is never probed even with the flag on (always baked in, no build-arg)', () => {
+    it('claude is never probed even with the flag on (always baked in, no build-arg)', async () => {
       const backend = new DockerSpawnBackend('/test/project', { verifyProviderCliInImage: true });
       const msg = spawnExpectMessage(backend, 'img-real-claude', 'claude-sonnet-5');
 
       expect(msg).toBe(''); // did not throw
       expect(capturedProbeRunArgs.length).toBe(0);
-      expect(capturedRealRunArgs.length).toBe(1);
+      await vi.waitFor(() => expect(capturedRealRunArgs).toHaveLength(1));
     });
   });
 

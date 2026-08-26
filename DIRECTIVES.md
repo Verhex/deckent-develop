@@ -1,49 +1,69 @@
-# 7141 SON-DALGA + 3303 MULTI-PROVIDER SMOKE — iki provider, iki küme, çakışmasız
+# FULL-SUITE TRUTH REPAIR (generated -- deterministic)
 
 ## Goal
 
-İki hedef tek koşuda: (1) 7141 typed-throw dönüşümünün en-yoğun kalan 8 dosyası (32 site)
-kapanır; (2) 3303 multi-provider replay-sertifikasyonunun canlı-kanıt tarafı üretilir — iki
-bağımsız-kimlikli provider (claude + codex) runtime-çözümlü routing altında ÇAKIŞMASIZ
-gerçek iş yürütür; hesaplaşma typed kalır, exact interval'lar settlement'ta kapanır.
+Listedeki kirmizi test dosyalarini BUGUNKU landed src kontratina hizala. Kirmizilar
+bayat pin / eski kontrat sinifidir; urun regresyonu kanitlanirsa dosyaya dokunmadan
+NO_GO + exact kanit yazilir.
 
 ## Execution contract
 
-- Otorite: main'deki kontratlar; assertion zayıflatılmaz. Yalnız kendi Files listendeki
-  dosyalara yaz; Reads listendekileri OKU. Scope dışına çıkma.
-- YENİ registry kodu EKLEME (errors.ts kilidi bu dalgada kimsede değil) — her site için
-  MEVCUT DECKENT_E* kataloğundan uygun kod seç; gerçekten uygun kod yoksa o siteyi
-  DÖNÜŞTÜRMEDEN bırak ve exact FINDING yaz (dürüst kısmi sonuç geçerli DONE'dur —
-  notes'ta dönüştürülen/atlanan sayımıyla).
-- scripts/error-handling-baseline.json'a DOKUNMA (budama landing-host'ta).
-- Mesaj-metni ve kontrol-akışı bit-korunur; testler hermetik; VITEST_MAX_FORKS=2.
-- Değişen dosyalara `npx tsc --noEmit` SIFIR; exit-kodlar PIPE'SIZ; result notes'a
-  önce/sonra ham-throw sayımı.
+- Otorite: main'deki src davranisi. Assertion ZAYIFLATILMAZ, test silinmez/skip'lenmez.
+- Yalnizca kendi Files listendeki test dosyalarina yaz; Reads listendeki src
+  dosyalarini kontrati ogrenmek icin OKU (yazma).
+- Testler hermetik kalir; VITEST_MAX_FORKS=2 disina cikma.
+- Her dosya icin kosum kaniti .result notes'ta; urun-bug kanitinda NO_GO + src dosya:satir.
 
-## Task 1: CLI kümesi (agent · skill · process · recover) — claude-provider
-- Files: src/cli/commands/agent.ts, src/cli/commands/skill.ts, src/cli/commands/process.ts, src/cli/commands/recover.ts
-- Reads: src/core/errors.ts, src/cli/helpers/messages.ts
-- Priority: HIGH
-- Provider: claude
-- Model: claude-sonnet-5
-- Test: VITEST_MAX_FORKS=2 npx vitest run tests/cli/agent-delete-confirm.test.ts tests/cli/recover-resume.test.ts tests/core/error-registry-lint.test.ts
-### Description
-7141 son-dalga CLI kümesi: dört dosyadaki ham `throw new Error(...)` siteleri (yaklaşık 14)
-mevcut DeckentError/registry kontratına taşınır (contract'taki kurallarla — yeni kod YOK,
-uygun-kod-yoksa FINDING+atla). Kullanıcıya görünen hata-mesajı davranışı birebir korunur;
-i18n-anahtarlı mesajlar varsa onlara dokunulmaz, yalnız taşıyıcı tip değişir. Test komutu
-TAM YEŞİL; registry-lint testinin baseline-bölümü mevcut baseline'la tutarlı kalır (sen
-baseline'a dokunmadığın ve yeni-ihlal üretmediğin sürece yeşildir). tsc sıfır.
 
-## Task 2: Orchestra kümesi (mission-acceptance · backlog · mission-approval-coordinator · directives-builder) — codex-provider
-- Files: src/orchestra/autonomous/mission-store/mission-acceptance.ts, src/orchestra/autonomous/backlog.ts, src/orchestra/autonomous/mission-store/mission-approval-coordinator.ts, src/orchestra/directives-builder.ts
-- Reads: src/core/errors.ts, src/orchestra/autonomous/backlog-types.ts
+## Task 1: Align failing orchestra suites (cluster 1) to landed contracts
+- Files: tests/orchestra/cross-verify-docker-strict-launcher.test.ts, tests/orchestra/docker-provider-auth.test.ts, tests/orchestra/docker-provider-cli.test.ts
+- Reads: src/core/active-workers.ts, src/core/audit-writer.ts, src/core/cross-verify-evidence-broker.ts, src/core/cross-verify-execution-contract.ts, src/core/file-lock.ts, src/core/provider-command-spec.ts, src/core/task-result-settlement.ts, src/core/types.ts, src/core/utils.ts, src/core/worker-heartbeat-authority-store.ts, src/orchestra/execution-landing-coordinator.ts, src/orchestra/spawn-backend-docker.ts, src/orchestra/spawn-backend.ts
 - Priority: HIGH
-- Provider: codex
-- Test: VITEST_MAX_FORKS=2 npx vitest run tests/orchestra/autonomous/mission-store/mission-acceptance.test.ts tests/orchestra/autonomous/mission-store/mission-approval-coordinator.test.ts tests/orchestra/backlog.test.ts tests/orchestra/directives-builder.test.ts
+- Test: VITEST_MAX_FORKS=2 npx vitest run tests/orchestra/cross-verify-docker-strict-launcher.test.ts tests/orchestra/docker-provider-auth.test.ts tests/orchestra/docker-provider-cli.test.ts
 ### Description
-7141 son-dalga orchestra kümesi: dört dosyadaki ham throw siteleri (yaklaşık 18) mevcut
-registry kodlarına taşınır (aynı kurallar: yeni kod YOK, uygun-yoksa FINDING+atla,
-davranış bit-korunur). Bu task bilinçli olarak Task-1'den FARKLI provider'da koşar
-(3303 multi-provider kanıtı): dosya-kümeleri ayrık olduğundan collision-free paralel
-yürütme beklenir. Test komutu TAM YEŞİL; tsc sıfır.
+Once Test komutunu kos ve kirmizi dosyalarin exact hatalarini topla. Sonra her
+kirmizi testi Reads listesindeki src kontratlarini OKUYARAK guncel davranisa
+hizala: bayat pin -> guncel deger, tasinan kontrat -> yeni sekil, eksik zorunlu
+fixture -> testte kur. Assertion zayiflatmak YASAK. Urun-bug kanitinda dosyaya
+dokunmadan NO_GO + exact src dosya:satir kaniti. Bitiste Test komutu bu kumede
+TAM YESIL olmali; kosum ciktisi .result notes'a.
+
+
+## Task 2: Align failing orchestra suites (cluster 2) to landed contracts
+- Files: tests/orchestra/f1014-auth-isolation.test.ts, tests/orchestra/spawn-backend-docker.test.ts, tests/orchestra/wm5-auth-guard.test.ts
+- Reads: src/core/active-workers.ts, src/core/file-lock.ts, src/core/provider-command-spec.ts, src/core/task-result-settlement.ts, src/core/types.ts, src/core/utils.ts, src/core/worker-heartbeat-authority-store.ts, src/orchestra/execution-landing-coordinator.ts, src/orchestra/spawn-backend-docker.ts, src/orchestra/spawn-backend.ts
+- Priority: HIGH
+- Test: VITEST_MAX_FORKS=2 npx vitest run tests/orchestra/f1014-auth-isolation.test.ts tests/orchestra/spawn-backend-docker.test.ts tests/orchestra/wm5-auth-guard.test.ts
+### Description
+Once Test komutunu kos ve kirmizi dosyalarin exact hatalarini topla. Sonra her
+kirmizi testi Reads listesindeki src kontratlarini OKUYARAK guncel davranisa
+hizala: bayat pin -> guncel deger, tasinan kontrat -> yeni sekil, eksik zorunlu
+fixture -> testte kur. Assertion zayiflatmak YASAK. Urun-bug kanitinda dosyaya
+dokunmadan NO_GO + exact src dosya:satir kaniti. Bitiste Test komutu bu kumede
+TAM YESIL olmali; kosum ciktisi .result notes'a.
+
+
+## Task 3: Align failing orchestra/unit suites (cluster 3) to landed contracts
+- Files: tests/orchestra/worker-auth-isolation.test.ts, tests/unit/spawn-backend-docker.test.ts
+- Reads: src/core/active-workers.ts, src/core/file-lock.ts, src/core/task-result-settlement.ts, src/core/types.ts, src/core/utils.ts, src/core/worker-heartbeat-authority-store.ts, src/orchestra/execution-landing-coordinator.ts, src/orchestra/spawn-backend-docker.ts, src/orchestra/spawn-backend.ts
+- Priority: HIGH
+- Test: VITEST_MAX_FORKS=2 npx vitest run tests/orchestra/worker-auth-isolation.test.ts tests/unit/spawn-backend-docker.test.ts
+### Description
+Once Test komutunu kos ve kirmizi dosyalarin exact hatalarini topla. Sonra her
+kirmizi testi Reads listesindeki src kontratlarini OKUYARAK guncel davranisa
+hizala: bayat pin -> guncel deger, tasinan kontrat -> yeni sekil, eksik zorunlu
+fixture -> testte kur. Assertion zayiflatmak YASAK. Urun-bug kanitinda dosyaya
+dokunmadan NO_GO + exact src dosya:satir kaniti. Bitiste Test komutu bu kumede
+TAM YESIL olmali; kosum ciktisi .result notes'a.
+
+
+## EK SÖZLEŞME-NOTU (bu onarımın kök-gerçeği — HER task için bağlayıcı)
+Landed kontrat: DockerSpawnBackend.spawn SYNC fire-and-forget'a geri döndü (guard'lar
+senkron THROW eder — eski beklentiler geçerli); capture+container-launch ise İÇ async
+kuyrukta akar ve `backend.lastSpawnCompletion` promise'inde gözlemlenir. Test-hizalama
+desenleri: (a) spawn-sonrası docker-invocation/marker/mount assert'lerinden ÖNCE
+`await backend.lastSpawnCompletion;` ekle; (b) kuyruk-içi hata bekleyen eski
+`expect(()=>spawn()).toThrow` desenleri `spawn(); await expect(backend.lastSpawnCompletion).rejects.toThrow(...)`
+olur (guard-sınıfı hatalar SENKRON throw kalır — onlara dokunma); (c) kuyruk-hatası ayrıca
+canonical EXIT_WITHOUT_RESULT-sınıfı marker yazar (yoksa) — buna çarpan assert'ler varsa
+marker-varlığını dürüstçe hesaba kat. Assertion ZAYIFLATMA; davranış-pinleri korunur.

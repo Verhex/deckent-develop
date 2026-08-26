@@ -99,27 +99,29 @@ describe('DockerSpawnBackend', () => {
   });
 
   describe('spawn', () => {
-    it('should throw SpawnBackendError when Docker image is not found', () => {
+    it('should throw SpawnBackendError when Docker image is not found', async () => {
       // 455-003: call 1 = `docker info` daemon preflight (healthy), call 2 =
       // `docker images -q` (empty → image not found).
       mockSpawnSync
         .mockReturnValueOnce(spawnResult({ stdout: 'Server: healthy', status: 0 }))
         .mockReturnValueOnce(spawnResult({ stdout: '', status: 0 }));
 
-      expect(() => backend.spawn('001-001', 'claude-sonnet-5', 'test prompt', TEST_EXECUTION_OPTIONS))
-        .toThrow(/not found locally for provider 'claude'/);
+      backend.spawn('001-001', 'claude-sonnet-5', 'test prompt', TEST_EXECUTION_OPTIONS);
+      await expect(backend.lastSpawnCompletion)
+        .rejects.toThrow(/not found locally for provider 'claude'/);
     });
 
-    it('image-missing failure carries the distinct IMAGE_NOT_FOUND code (not a daemon/CLI collapse)', () => {
+    it('image-missing failure carries the distinct IMAGE_NOT_FOUND code (not a daemon/CLI collapse)', async () => {
       mockSpawnSync
         .mockReturnValueOnce(spawnResult({ stdout: 'Server: healthy', status: 0 }))
         .mockReturnValueOnce(spawnResult({ stdout: '', status: 0 }));
 
-      expect(() => backend.spawn('001-001', 'claude-sonnet-5', 'test prompt', TEST_EXECUTION_OPTIONS))
-        .toThrow(DOCKER_ERROR_CODES.IMAGE_NOT_FOUND);
+      backend.spawn('001-001', 'claude-sonnet-5', 'test prompt', TEST_EXECUTION_OPTIONS);
+      await expect(backend.lastSpawnCompletion)
+        .rejects.toThrow(DOCKER_ERROR_CODES.IMAGE_NOT_FOUND);
     });
 
-    it('daemon permission-denied preflight is NOT reported as image-missing (distinct code)', () => {
+    it('daemon permission-denied preflight is NOT reported as image-missing (distinct code)', async () => {
       // 455-003 core NO-GO guard: a permission-denied daemon must surface E086,
       // never the IMAGE_NOT_FOUND path. `docker info` fails first → we never
       // reach the image lookup at all.
@@ -131,6 +133,7 @@ describe('DockerSpawnBackend', () => {
       let error: SpawnBackendError | null = null;
       try {
         backend.spawn('001-001', 'claude-sonnet-5', 'test prompt', TEST_EXECUTION_OPTIONS);
+        await backend.lastSpawnCompletion;
       } catch (e) {
         error = e as SpawnBackendError;
       }
@@ -141,17 +144,18 @@ describe('DockerSpawnBackend', () => {
       expect(mockSpawnSync).toHaveBeenCalledTimes(1);
     });
 
-    it('daemon-unavailable preflight surfaces E085 with evidence, never image-missing', () => {
+    it('daemon-unavailable preflight surfaces E085 with evidence, never image-missing', async () => {
       mockSpawnSync.mockReturnValueOnce(spawnResult({
         status: 1,
         stderr: 'Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?',
       }));
 
-      expect(() => backend.spawn('001-001', 'claude-sonnet-5', 'test prompt', TEST_EXECUTION_OPTIONS))
-        .toThrow(DOCKER_ERROR_CODES.DAEMON_UNAVAILABLE);
+      backend.spawn('001-001', 'claude-sonnet-5', 'test prompt', TEST_EXECUTION_OPTIONS);
+      await expect(backend.lastSpawnCompletion)
+        .rejects.toThrow(DOCKER_ERROR_CODES.DAEMON_UNAVAILABLE);
     });
 
-    it('should throw a SpawnBackendError instance with correct backendName', () => {
+    it('should throw a SpawnBackendError instance with correct backendName', async () => {
       mockSpawnSync
         .mockReturnValueOnce(spawnResult({ stdout: 'Server: healthy', status: 0 }))
         .mockReturnValueOnce(spawnResult({ stdout: '', status: 0 }));
@@ -159,6 +163,7 @@ describe('DockerSpawnBackend', () => {
       let error: SpawnBackendError | null = null;
       try {
         backend.spawn('001-001', 'claude-sonnet-5', 'test prompt', TEST_EXECUTION_OPTIONS);
+        await backend.lastSpawnCompletion;
       } catch (e) {
         error = e as SpawnBackendError;
       }

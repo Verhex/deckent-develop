@@ -1277,7 +1277,8 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // finalizer + sidecar-loader hotfix).
   // 2026-08-26 11:05: ayni 1339, digest-only — Node-6a src kaymalari
   // (death-sweep / prompt-template kimlik-esigi / docker async-git).
-  digest: '0ec96ef82aafd7f95e83b7b6a1fb0ce5f7ffd81c59c7b8671ad45ea5fb45638e',
+  digest: '9f767022ad4c76de662a055c6d2aaa915f11c2b1e5614ca21518d16d33ae125d',
+  // 12:5x: ayni 1339, digest-only — spawn sync-restorasyonu + lastSpawnCompletion seam.
   // 12:1x: ayni 1339, digest-only — 689 8-dosya typed-throw src kaymalari.
   // 11:49: ayni 1339, digest-only — 7141 typed-throw src kaymalari (12 dosya).
 });

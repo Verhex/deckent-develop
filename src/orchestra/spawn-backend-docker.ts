@@ -4956,6 +4956,12 @@ export class DockerSpawnBackend implements SpawnBackend {
   private readonly reachabilityProbeCommandRunner: DockerReachabilityProbeCommandRunner;
   private readonly platform: NodeJS.Platform;
   private readonly homeDir: string;
+  /**
+   * Son spawn'ın async-kuyruğu (capture + launch). Üretim fire-and-forget'tir ve
+   * bunu BEKLEMEZ; test/exact-xverify tüketicileri tamamlanma/red gözlemi için
+   * await edebilir. Aşağıdaki catch zinciri bağlı olduğundan reddi yetim kalamaz.
+   */
+  lastSpawnCompletion: Promise<void> = Promise.resolve();
   private readonly containers = new Map<string, {
     containerId: string;
     containerName: string;
@@ -5850,8 +5856,13 @@ export class DockerSpawnBackend implements SpawnBackend {
    * - API keys passed as env vars if available
   * - timeout wrapper kills container after limit
   */
-  async spawn(taskId: string, model: ModelType, prompt: string, opts?: SpawnBackendOptions): Promise<void> {
-    await this.spawnInternal(taskId, model, prompt, opts);
+  spawn(taskId: string, model: ModelType, prompt: string, opts?: SpawnBackendOptions): void {
+    // SpawnBackend arayüz-sözleşmesi (spawn-backend.ts:82) SYNC fire-and-forget'tir
+    // ve üretim-spawner await'siz çağırır. 684-003 async'leştirmesi bu sözleşmeyi
+    // kırıp guard-throw'ları yetim-rejection'a çevirmişti (full-suite 76-dosya
+    // regresyonu + sprint-686 FATAL sınıfı). Guard/hazırlık yeniden sync;
+    // yalnız capture+launch kuyruğu içeride async akar (spawnInternal).
+    this.spawnInternal(taskId, model, prompt, opts);
   }
 
   /**
@@ -5912,7 +5923,7 @@ export class DockerSpawnBackend implements SpawnBackend {
         this.name,
       );
     }
-    await this.spawnInternal(
+    this.spawnInternal(
       input.taskId,
       input.model,
       input.prompt,
@@ -5934,6 +5945,7 @@ export class DockerSpawnBackend implements SpawnBackend {
         executionContractSha256: contract.contractSha256,
       },
     );
+    await this.lastSpawnCompletion;
     const dispatch = readTaskResultSettlementDispatch(input.settlementRef);
     if (!dispatch) {
       throw new SpawnBackendError(
@@ -5947,7 +5959,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     });
   }
 
-  private async spawnInternal(
+  private spawnInternal(
     taskId: string,
     model: ModelType,
     prompt: string,
@@ -5961,7 +5973,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       | 'executionContractEvidenceRef'
       | 'executionContractSha256'
     >,
-  ): Promise<void> {
+  ): void {
     // GATE-W2 toggle-independent SAFETY_FLOOR guard — MUST run before any side
     // effect (markPending/mkdir/docker). The default backend previously skipped
     // it while tmux/subprocess enforced it: a lethal actionId could spawn here.
@@ -6213,27 +6225,49 @@ export class DockerSpawnBackend implements SpawnBackend {
     // if it fails — otherwise a transient docker error permanently blocks
     // the file scope for the next worker. monitorContainer's exit handler
     // is what releases on the happy path.
-    try {
-      await this.runSpawn(
-        taskId,
-        model,
-        preparedPrompt,
-        resolvedOpts,
-        dir,
-        effectiveTimeout,
-        tasksDir,
-        gitIsolation,
-        exactContext,
-      );
+    // Async kuyruk (capture + container-launch) fire-and-forget sözleşmesini
+    // bozmadan içeride akar; başarısızlık YETİM-rejection olamaz — temizlik +
+    // canonical EXIT_WITHOUT_RESULT-sınıfı typed marker ile attempt settle-edilebilir
+    // kalır (FIX-yolu tüketir; sprint-686 FATAL sınıfının kalıcı kapanışı).
+    const spawnTail = this.runSpawn(
+      taskId,
+      model,
+      preparedPrompt,
+      resolvedOpts,
+      dir,
+      effectiveTimeout,
+      tasksDir,
+      gitIsolation,
+      exactContext,
+    ).then(() => {
       if (!this.containers.has(taskId)) {
         cleanupDockerGitAdapter(gitIsolation.adapter?.hostPath);
       }
-    } catch (err) {
+    });
+    this.lastSpawnCompletion = spawnTail;
+    spawnTail.catch((err: unknown) => {
       clearPending(taskId);
       try { releaseAllSpawnLocks(dir, taskId); } catch (e) { debugLog('docker-backend:spawn-lock-release', e); }
       cleanupDockerGitAdapter(gitIsolation.adapter?.hostPath);
-      throw err;
-    }
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[deckent] docker spawn async-tail failed for ${taskId}: ${message}`);
+      try {
+        const resultPath = join(tasksDir, `task-${taskId}.result`);
+        if (!existsSync(resultPath)) {
+          const marker = buildExitWithoutResultMarker({
+            taskId,
+            model,
+            exitCode: 1,
+            workPresent: false,
+            source: 'host',
+          }) as unknown as Record<string, unknown>;
+          marker['notes'] = `${String(marker['notes'] ?? '')} | spawn-async-tail: ${message}`.trim();
+          atomicWriteFileSync(resultPath, `${JSON.stringify(marker, null, 2)}\n`);
+        }
+      } catch (writeErr) {
+        debugLog('docker-backend:spawn-async-fail-marker', writeErr);
+      }
+    });
   }
 
   private async runSpawn(

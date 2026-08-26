@@ -233,14 +233,15 @@ function resetFsStubs(): void {
 }
 
 /** Spawn one worker and return the credential keys forwarded into its container. */
-function forwardedKeysFor(
+async function forwardedKeysFor(
   model: ModelType,
   taskId: string,
   authMode: 'subscription' | 'api' = 'subscription',
-): string[] {
+): Promise<string[]> {
   stubTaskEnvelope(taskId, model, authMode);
   const backend = new DockerSpawnBackend('/test/project');
   backend.spawn(taskId, model, 'prompt', TEST_DOCKER_EXECUTION_OPTIONS);
+  await backend.lastSpawnCompletion;
   expect(capturedDockerRunArgs.length).toBe(1);
   return collectForwardedCredentialKeys(capturedDockerRunArgs[0]!);
 }
@@ -281,14 +282,14 @@ describe('DockerSpawnBackend: runtime per-worker auth non-leak (F1-014r)', () =>
     'claude-haiku-4-5-20251001',
   ] as ModelType[])(
     'subscription-Claude (%s) forwards NO credential key (no ANTHROPIC_API_KEY leak)',
-    (model) => {
-      expect(forwardedKeysFor(model, `t-sub-${model}`)).toEqual([]);
+    async (model) => {
+      expect(await forwardedKeysFor(model, `t-sub-${model}`)).toEqual([]);
     },
   );
 
   // ── api-mode Claude: ONLY Anthropic, no foreign keys ──
-  it('api-mode canonical Claude forwards ONLY ANTHROPIC_API_KEY', () => {
-    expect(forwardedKeysFor(
+  it('api-mode canonical Claude forwards ONLY ANTHROPIC_API_KEY', async () => {
+    expect(await forwardedKeysFor(
       'claude-sonnet-5' as ModelType,
       't-api-claude',
       'api',

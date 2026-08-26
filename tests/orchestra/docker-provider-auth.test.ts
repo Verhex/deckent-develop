@@ -265,13 +265,13 @@ describe('DockerSpawnBackend: provider-aware auth mount (Sprint 203 T-002)', () 
     expect(hasVolumeMount(argv, '.claude')).toBe(false);
   });
 
-  it('mounts only the Claude credential for canonical claude-sonnet-5 in subscription mode', () => {
+  it('mounts only the Claude credential for canonical claude-sonnet-5 in subscription mode', async () => {
     spawnBudgetedClaude(
       't-auth-claude',
       'claude-sonnet-5' as ModelType,
     );
 
-    expect(capturedDockerRunArgs.length).toBe(1);
+    await vi.waitFor(() => expect(capturedDockerRunArgs).toHaveLength(1));
     const argv = capturedDockerRunArgs[0]!;
     expect(hasCredentialMount(argv, '/claude/.credentials.json')).toBe(true);
     expect(argv.some(arg => arg.includes('dst=/run/deckent-auth-claude-.credentials.json'))).toBe(true);
@@ -286,13 +286,13 @@ describe('DockerSpawnBackend: provider-aware auth mount (Sprint 203 T-002)', () 
     expectDockerMeteringHold('t-auth-gemini', 'gemini-2.5-flash' as ModelType);
   });
 
-  it('mounts only the Claude credential for canonical Haiku (subscription default)', () => {
+  it('mounts only the Claude credential for canonical Haiku (subscription default)', async () => {
     spawnBudgetedClaude(
       't-auth-haiku',
       'claude-haiku-4-5-20251001' as ModelType,
     );
 
-    expect(capturedDockerRunArgs.length).toBe(1);
+    await vi.waitFor(() => expect(capturedDockerRunArgs).toHaveLength(1));
     const argv = capturedDockerRunArgs[0]!;
     expect(hasCredentialMount(argv, '/claude/.credentials.json')).toBe(true);
     expect(argv.some(arg => arg.includes('dst=/run/deckent-auth-claude-.credentials.json'))).toBe(true);

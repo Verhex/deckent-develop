@@ -17173,3 +17173,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 689-002: Orchestra kümesi (mission-acceptance · backlog · mission-approval-coordinator · directives-builder) — codex-provider (DONE)
 
 ---
+## Sprint 690 — sprint-690
+
+**Status:** COMPLETE
+**Date:** 2026-08-26
+**Duration:** 277s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 276574ms |
+
+### Tasks
+
+- 690-001: Align failing orchestra suites (cluster 1) to landed contracts (DONE)
+- 690-002: Align failing orchestra suites (cluster 2) to landed contracts (DONE)
+- 690-003: Align failing orchestra/unit suites (cluster 3) to landed contracts (DONE)
+
+---

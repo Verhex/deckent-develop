@@ -360,9 +360,10 @@ describe('DockerSpawnBackend: memory budget defaults (Sprint 191 T-001)', () => 
     expect(DEFAULT_WORKER_MEMORY_SWAP).toBe('6g');
   });
 
-  it('passes --memory 4g --memory-swap 6g to docker run when opts omitted', () => {
+  it('passes --memory 4g --memory-swap 6g to docker run when opts omitted', async () => {
     const backend = new DockerSpawnBackend('/test/project');
     backend.spawn('test-default-mem', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
+    await backend.lastSpawnCompletion;
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
@@ -370,12 +371,13 @@ describe('DockerSpawnBackend: memory budget defaults (Sprint 191 T-001)', () => 
     expect(flagValue(argv, '--memory-swap')).toBe('6g');
   });
 
-  it('uses constructor opts to override --memory / --memory-swap', () => {
+  it('uses constructor opts to override --memory / --memory-swap', async () => {
     const backend = new DockerSpawnBackend('/test/project', {
       memoryLimit: '8g',
       memorySwap: '12g',
     });
     backend.spawn('test-override-mem', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
+    await backend.lastSpawnCompletion;
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
@@ -500,6 +502,7 @@ describe('DockerSpawnBackend: per-task authMode (Sprint 193 wire)', () => {
 
     const backend = new DockerSpawnBackend('/test/project');
     backend.spawn('auth-default', 'claude-sonnet-5', 'prompt', TEST_EXECUTION_OPTIONS);
+    await backend.lastSpawnCompletion;
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
@@ -518,6 +521,7 @@ describe('DockerSpawnBackend: per-task authMode (Sprint 193 wire)', () => {
     try {
       const backend = new DockerSpawnBackend('/test/project');
       backend.spawn('auth-api', 'claude-sonnet-5', 'prompt', TEST_EXECUTION_OPTIONS);
+      await backend.lastSpawnCompletion;
 
       expect(capturedDockerRunArgs.length).toBe(1);
       const argv = capturedDockerRunArgs[0]!;
@@ -538,8 +542,8 @@ describe('DockerSpawnBackend: per-task authMode (Sprint 193 wire)', () => {
 
     try {
       const backend = new DockerSpawnBackend('/test/project');
-      expect(() => backend.spawn('auth-api-noenv', 'claude-sonnet-5', 'prompt', TEST_EXECUTION_OPTIONS))
-        .toThrow(/ANTHROPIC_API_KEY/);
+      backend.spawn('auth-api-noenv', 'claude-sonnet-5', 'prompt', TEST_EXECUTION_OPTIONS);
+      await expect(backend.lastSpawnCompletion).rejects.toThrow(/ANTHROPIC_API_KEY/);
     } finally {
       if (prevKey !== undefined) process.env.ANTHROPIC_API_KEY = prevKey;
     }
@@ -603,9 +607,10 @@ describe('DockerSpawnBackend: NODE_OPTIONS container env (Sprint 194 T-004)', ()
     installSpawnRouter();
   });
 
-  it('passes -e NODE_OPTIONS=... to docker run argv', () => {
+  it('passes -e NODE_OPTIONS=... to docker run argv', async () => {
     const backend = new DockerSpawnBackend('/test/project');
     backend.spawn('node-opts-present', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
+    await backend.lastSpawnCompletion;
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
@@ -615,13 +620,14 @@ describe('DockerSpawnBackend: NODE_OPTIONS container env (Sprint 194 T-004)', ()
     expect(argv[idx - 1]).toBe('-e');
   });
 
-  it('encodes the percentage value as 75 in the NODE_OPTIONS string', () => {
+  it('encodes the percentage value as 75 in the NODE_OPTIONS string', async () => {
     // Sentinel test: catches accidental edits to the percentage (e.g. 50/90)
     // that would silently change every worker's V8 heap ceiling.
     expect(WORKER_NODE_OPTIONS).toBe('NODE_OPTIONS=--max-old-space-size-percentage=75');
 
     const backend = new DockerSpawnBackend('/test/project');
     backend.spawn('node-opts-value', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
+    await backend.lastSpawnCompletion;
 
     const argv = capturedDockerRunArgs[0]!;
     const optsEntry = argv.find(a => a.startsWith('NODE_OPTIONS='));
@@ -629,7 +635,7 @@ describe('DockerSpawnBackend: NODE_OPTIONS container env (Sprint 194 T-004)', ()
     expect(optsEntry).toMatch(/--max-old-space-size-percentage=75$/);
   });
 
-  it('overrides any host process.env.NODE_OPTIONS — container always gets the Deckent value', () => {
+  it('overrides any host process.env.NODE_OPTIONS — container always gets the Deckent value', async () => {
     // Simulate a host shell that has leaked a different NODE_OPTIONS into the
     // parent process (e.g. a developer setting --inspect on their box). The
     // container MUST still receive only the Deckent-defined value, exactly
@@ -640,6 +646,7 @@ describe('DockerSpawnBackend: NODE_OPTIONS container env (Sprint 194 T-004)', ()
     try {
       const backend = new DockerSpawnBackend('/test/project');
       backend.spawn('node-opts-override', 'claude-sonnet-5', 'prompt-body', TEST_EXECUTION_OPTIONS);
+      await backend.lastSpawnCompletion;
 
       const argv = capturedDockerRunArgs[0]!;
       const nodeOptionEntries = argv.filter(a => a.startsWith('NODE_OPTIONS='));
@@ -773,7 +780,7 @@ describe('DockerSpawnBackend: daemon preflight (455-003 DOCKER-PREFLIGHT-TRUTH)'
     capturedDockerRunArgs.length = 0;
   });
 
-  it('permission-denied daemon → throws E086, image lookup + docker run never happen', () => {
+  it('permission-denied daemon → rejects E086, image lookup + docker run never happen', async () => {
     // `docker info` fails permission-denied; if the preflight were absent the code
     // would fall through to `docker images -q` (empty) and mis-throw image-missing.
     mockSpawnSync.mockImplementation((cmd, args) => {
@@ -791,16 +798,13 @@ describe('DockerSpawnBackend: daemon preflight (455-003 DOCKER-PREFLIGHT-TRUTH)'
       return { stdout: '', stderr: '', status: 0, signal: null, pid: 1, output: [] } as unknown as ReturnType<typeof spawnSync>;
     });
 
-    let error: SpawnBackendError | null = null;
-    try {
-      new DockerSpawnBackend('/test/project').spawn('t-preflight-perm', 'claude-sonnet-5', 'prompt', TEST_EXECUTION_OPTIONS);
-    } catch (e) {
-      error = e as SpawnBackendError;
-    }
+    const backend = new DockerSpawnBackend('/test/project');
+    backend.spawn('t-preflight-perm', 'claude-sonnet-5', 'prompt', TEST_EXECUTION_OPTIONS);
+    const error = await backend.lastSpawnCompletion.catch((cause: unknown) => cause);
 
     expect(error).toBeInstanceOf(SpawnBackendError);
-    expect(error!.message).toContain(DOCKER_ERROR_CODES.DAEMON_PERMISSION);
-    expect(error!.message).not.toContain(DOCKER_ERROR_CODES.IMAGE_NOT_FOUND);
+    expect((error as SpawnBackendError).message).toContain(DOCKER_ERROR_CODES.DAEMON_PERMISSION);
+    expect((error as SpawnBackendError).message).not.toContain(DOCKER_ERROR_CODES.IMAGE_NOT_FOUND);
     // The doomed container is never spawned.
     expect(capturedDockerRunArgs.length).toBe(0);
     // No `docker images -q` lookup either — the preflight short-circuits first.

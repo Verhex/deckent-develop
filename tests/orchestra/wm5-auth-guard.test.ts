@@ -173,7 +173,7 @@ describe('WM-5: CLAUDE_AUTH_REQUIRED provider-gate', () => {
     installSpawnRouter();
   });
 
-  it('sets CLAUDE_AUTH_REQUIRED for a claude model (sonnet)', () => {
+  it('sets CLAUDE_AUTH_REQUIRED for a claude model (sonnet)', async () => {
     const backend = new DockerSpawnBackend('/test/project');
     backend.spawn(
       't-wm5-claude',
@@ -181,13 +181,14 @@ describe('WM-5: CLAUDE_AUTH_REQUIRED provider-gate', () => {
       'prompt',
       TEST_DOCKER_EXECUTION_OPTIONS,
     );
+    await backend.lastSpawnCompletion;
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
     expect(hasEnvFlag(argv, 'CLAUDE_AUTH_REQUIRED')).toBe(true);
   });
 
-  it('sets CLAUDE_AUTH_REQUIRED for opus (claude model)', () => {
+  it('sets CLAUDE_AUTH_REQUIRED for opus (claude model)', async () => {
     const backend = new DockerSpawnBackend('/test/project');
     backend.spawn(
       't-wm5-opus',
@@ -195,6 +196,7 @@ describe('WM-5: CLAUDE_AUTH_REQUIRED provider-gate', () => {
       'prompt',
       TEST_DOCKER_EXECUTION_OPTIONS,
     );
+    await backend.lastSpawnCompletion;
 
     expect(capturedDockerRunArgs.length).toBe(1);
     const argv = capturedDockerRunArgs[0]!;
