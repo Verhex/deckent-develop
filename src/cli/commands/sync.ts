@@ -716,6 +716,12 @@ function readWorkspaceConfig(root: string): { projectName: string; language: str
 
 /** Regenerate only registry-owned workspace sections; user/snapshot artifacts stay byte-identical. */
 export function syncWorkspaceArtifacts(root: string, dryRun = false): WorkspaceSyncReport {
+  // A project without an initialized workspace (no .deckent dir) has nothing to
+  // regenerate — report empty instead of throwing from the renderer's realpath
+  // canonicalization. Init, not sync, owns first-time materialization.
+  if (!existsSync(join(root, DECKENT_DIR))) {
+    return { changed: [], unchanged: [] };
+  }
   const snapshots = snapshotWorkspaceFiles(root, dryRun);
   const config = readWorkspaceConfig(root);
   let actions: WorkspaceArtifactAction[] = [];

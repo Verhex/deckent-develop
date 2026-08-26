@@ -202,27 +202,27 @@ describe('Built-in Agent + Skill Seeding Pipeline', () => {
 });
 
 describe('Built-in Source Directory Integrity', () => {
-  it('src/core/builtins/agents/ contains exactly 21 agents', () => {
+  it('src/core/builtins/agents/ contains exactly 22 agents', () => {
     const builtinsAgentDir = join(process.cwd(), 'src', 'core', 'builtins', 'agents');
     expect(existsSync(builtinsAgentDir)).toBe(true);
     const agents = readdirSync(builtinsAgentDir);
     // 17 fully-wired (EXPECTED_AGENTS) + 3 manifest-incomplete carryovers
     // (api-designer, i18n-specialist, observability-engineer — sprint-369,
     // PROMPT.md only, no agent.json yet).
-    expect(agents.length).toBe(21); // 445: +implementer (F3)
+    expect(agents.length).toBe(22); // 445: +implementer (F3); 696: +test-guardian
     for (const agent of EXPECTED_AGENTS) {
       expect(agents).toContain(agent);
     }
   });
 
-  it('src/core/builtins/skills/ contains exactly 31 skills', () => {
+  it('src/core/builtins/skills/ contains exactly 35 skills', () => {
     const builtinsSkillDir = join(process.cwd(), 'src', 'core', 'builtins', 'skills');
     expect(existsSync(builtinsSkillDir)).toBe(true);
     const skills = readdirSync(builtinsSkillDir);
     // 28 fully-wired (EXPECTED_SKILLS) + 3 manifest-incomplete carryovers
     // (api-design, i18n-quality, observability — sprint-368, SKILL.md only,
     // no manifest.json yet).
-    expect(skills.length).toBe(31);
+    expect(skills.length).toBe(35); // 696: +4 deckent-* dogfood suite
     for (const skill of EXPECTED_SKILLS) {
       expect(skills).toContain(skill);
     }

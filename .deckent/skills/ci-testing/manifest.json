@@ -76,7 +76,7 @@
     "totalUses": 0,
     "successCount": 0,
     "successRate": 0,
-    "avgScore": 0,
+    "avgCoverage": 0,
     "lastUsedInSprint": ""
   },
   "profile": {

@@ -147,8 +147,8 @@ describe('AGSK-4: provider-cli-matrix catalog', () => {
     // (born-605 stats-sidecar'a kadar); manifest'in geri kalanı bire-bir eş kalmalı.
     // profile/profileProvenance da stats gibi canlı-havuz derived-state'idir
     // (sprint-561 skill-unlock persist'i yalnız project tree'ye yazar).
-    const { stats: _b, profile: _bp, profileProvenance: _bpp, ...builtinRest } = readManifest(BUILTINS_DIR, SKILL_ID) as Record<string, unknown> & { stats?: unknown; profile?: unknown; profileProvenance?: unknown };
-    const { stats: _p, profile: _pp, profileProvenance: _ppp, ...poolRest } = readManifest(POOL_DIR, SKILL_ID) as Record<string, unknown> & { stats?: unknown; profile?: unknown; profileProvenance?: unknown };
+    const { stats: _b, profile: _bp, profileProvenance: _bpp, builtinContentHash: _bch, ...builtinRest } = readManifest(BUILTINS_DIR, SKILL_ID) as Record<string, unknown> & { stats?: unknown; profile?: unknown; profileProvenance?: unknown; builtinContentHash?: unknown };
+    const { stats: _p, profile: _pp, profileProvenance: _ppp, builtinContentHash: _pch, ...poolRest } = readManifest(POOL_DIR, SKILL_ID) as Record<string, unknown> & { stats?: unknown; profile?: unknown; profileProvenance?: unknown; builtinContentHash?: unknown };
     expect(builtinRest).toEqual(poolRest);
   });
 

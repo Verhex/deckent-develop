@@ -59,6 +59,7 @@ const BUILTIN_IDS = [
   'refactorer',
   'security-auditor',
   'terminal-ux-engineer',
+  'test-guardian',
 ] as const;
 
 /**
@@ -66,7 +67,7 @@ const BUILTIN_IDS = [
  * `role`/`domain` on the other two) — in both the shipped copy and its project shadow.
  * Design §3.3: an undeclared additive field is a `warning` and the agent still loads.
  */
-const UNDECLARED_FIELD_IDS = ['ci-guardian', 'integration-engineer', 'terminal-ux-engineer'] as const;
+const UNDECLARED_FIELD_IDS = ['ci-guardian', 'integration-engineer', 'terminal-ux-engineer', 'test-guardian'] as const;
 
 /** The gitignored learned records (design §2.3) — asserted only when the machine has them. */
 const LEARNED_IDS = ['temp-react-specialist', 'temp-react-ts-specialist'] as const;

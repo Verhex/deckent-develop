@@ -123,7 +123,6 @@ export const MOCK_FACTORY_BASELINE = new Set([
   // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.
   "tests/cli/commands/status.test.ts",
   // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.
-  "tests/cli/commands/sync-onboard-upgrade-overhaul.test.ts",
   // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.
   "tests/cli/commands.test.ts",
   // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.
@@ -180,7 +179,6 @@ export const MOCK_FACTORY_BASELINE = new Set([
   // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.
   "tests/cli/status-follow.test.ts",
   // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.
-  "tests/cli/sync.test.ts",
   // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.
   "tests/cli/test-run.test.ts",
   // 2026-08-26 kuruluş ölçümü: mevcut tam-factory; yeni fs yüzeyleri eklenirken importOriginal'a taşınmalı.

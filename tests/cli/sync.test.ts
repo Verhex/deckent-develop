@@ -3,8 +3,11 @@ import { Command } from 'commander';
 import { existsSync, readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
-vi.mock('node:fs', () => ({
-  readFileSync: vi.fn(),
+vi.mock('node:fs', async (importOriginal) => ({
+  ...await importOriginal<typeof import('node:fs')>(),
+  lstatSync: vi.fn((p: unknown) => ({ isSymbolicLink: () => false, isDirectory: () => !/\.(md|json)$/i.test(String(p)), isFile: () => /\.(md|json)$/i.test(String(p)) })),
+  realpathSync: Object.assign(vi.fn((p: string) => p), { native: vi.fn((p: string) => p) }),
+  readFileSync: vi.fn(() => ''),
   writeFileSync: vi.fn(),
   appendFileSync: vi.fn(),
   existsSync: vi.fn(),

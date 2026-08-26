@@ -6,9 +6,12 @@ import { Command } from 'commander';
 
 // ─── Mocks ───────────────────────────────────────────────────────────
 
-vi.mock('node:fs', () => ({
+vi.mock('node:fs', async (importOriginal) => ({
+  ...await importOriginal<typeof import('node:fs')>(),
+  lstatSync: vi.fn((p: unknown) => ({ isSymbolicLink: () => false, isDirectory: () => !/\.(md|json)$/i.test(String(p)), isFile: () => /\.(md|json)$/i.test(String(p)) })),
+  realpathSync: Object.assign(vi.fn((p: string) => p), { native: vi.fn((p: string) => p) }),
   existsSync: vi.fn(),
-  readFileSync: vi.fn(),
+  readFileSync: vi.fn(() => ''),
   writeFileSync: vi.fn(),
   appendFileSync: vi.fn(),
   readdirSync: vi.fn(),

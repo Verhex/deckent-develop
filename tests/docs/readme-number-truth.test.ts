@@ -107,8 +107,8 @@ describe('live counts match the current known-true values', () => {
   });
 
   it('21 built-in agents, 31 built-in skills (src/core/builtins)', () => {
-    expect(BUILTIN_AGENTS).toBe(21); // 445: +implementer (F3)
-    expect(BUILTIN_SKILLS).toBe(31);
+    expect(BUILTIN_AGENTS).toBe(22); // 445: +implementer (F3); 696: +test-guardian
+    expect(BUILTIN_SKILLS).toBe(35); // 696: +4 deckent-* dogfood suite
   });
 
   it('20 dashboard pages', () => {

@@ -5,7 +5,7 @@ catalog authority and lookup implementation live in
 `src/cli/helpers/messages.ts`; bounded catalog families under its
 `message-catalog/` directory are valid only after that module registers them.
 
-## Required Catalog Contract
+## No Hardcoded User-Facing Strings
 
 - Add every user-facing message key to the registered catalog with a non-empty
   `en` **and** `tr` value. An English-only or Turkish-only row is incomplete even
@@ -26,24 +26,18 @@ lookup callback from the presentation boundary. This keeps mechanisms reusable a
 prevents a second, untracked message catalog from forming inside implementation
 code.
 
-When changing a surface:
-
-1. Identify each string that reaches a person, including errors, warnings, prompts,
-   headings, empty states, and help text.
-2. Add one catalog key with its non-empty `en`/`tr` pair to `messages.ts` or a
-   family that `MESSAGE_CATALOG_FAMILIES` registers.
-3. Resolve the key at the presentation boundary with the effective language and
-   pass the resulting label into lower-level mechanisms.
-4. Exercise both languages and the missing-key path in the relevant targeted test.
+When changing a surface: identify every string that reaches a person (errors,
+prompts, headings, help); add one key with its `en`/`tr` pair to `messages.ts`
+or a registered family; resolve it at the presentation boundary and pass the
+label down; exercise both languages plus the missing-key path in the targeted
+test.
 
 ## Lookup and Failure Behavior
 
-`getMessage` normalizes the requested language to `tr` or the default `en`, then
-uses the requested catalog value, the English value, or the key itself. An unknown
-key returns the key so the defect stays visible. In non-production environments it
-also writes a `[getMessage] missing i18n key` diagnostic to stderr; production
-suppresses that diagnostic. Never hide the development signal with an empty-string
-fallback or a catch that discards stderr.
+`getMessage` normalizes the language to `tr` or default `en`, then uses the
+requested value, the English value, or the key itself — an unknown key returns
+the key so the defect stays visible, and outside production it also writes a
+`[getMessage] missing i18n key` stderr diagnostic. Never hide that signal.
 
 `resolveLanguage` is the current locale authority. It considers
 `DECKENT_LANGUAGE`, `DECKENT_LANG`, configured language, `LC_ALL`, and `LANG`, and
@@ -60,9 +54,8 @@ falls back to English. Do not create a second locale-selection chain in a featur
   not `production`; production returns the key without writing the diagnostic.
 - Tests cover the real catalog/lookup path rather than a duplicate fixture map.
 
-Verify catalog parity through the task-declared targeted checks and tests that
-exercise the real `messages.ts` catalog, `getMessageLanguages`, and the changed
-surface. Do not invent a lint command or a second fixture catalog.
+Verify parity with the task-declared targeted tests against the real
+`messages.ts` catalog — never a second fixture catalog.
 
 ## Anti-Patterns
 - Hardcoding a user-facing string in any CLI/runtime surface instead of a

@@ -9,7 +9,8 @@ const fsMocks = vi.hoisted(() => ({
 const outputMocks = vi.hoisted(() => ({ print: vi.fn(), printError: vi.fn() }));
 const derivationMock = vi.hoisted(() => vi.fn());
 
-vi.mock('node:fs', () => ({
+vi.mock('node:fs', async (importOriginal) => ({
+  ...await importOriginal<typeof import('node:fs')>(),
   ...fsMocks,
   readdirSync: vi.fn(() => []),
   readFileSync: vi.fn(),

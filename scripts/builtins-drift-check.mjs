@@ -84,6 +84,9 @@ export function normalizeManifestForCompare(value, depth = 0) {
       // the PROJECT pool only — like stats it is live derived-state, never an
       // authored-drift signal against the builtin package tree.
       if (depth === 0 && (key === 'profile' || key === 'profileProvenance')) continue;
+      // sprint-692 sync content-hash: like profileProvenance this is sync-side
+      // bookkeeping persisted to the PROJECT pool only — never authored drift.
+      if (depth === 0 && key === 'builtinContentHash') continue;
       out[key] = normalizeManifestForCompare(value[key], depth + 1);
     }
     return out;

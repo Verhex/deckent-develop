@@ -76,7 +76,7 @@ describe('lint-mock-factories gate', () => {
 
     // 2026-08-26 Faz-B: 276→272 — output.test.ts mock-temiz düşümü + emekli
     // onboard/job-runner/resources girdilerinin canonical hedefleriyle birleşmesi (3 dupe).
-    expect(MOCK_FACTORY_BASELINE.size).toBe(272);
+    expect(MOCK_FACTORY_BASELINE.size).toBe(270); // 2026-08-27: sync ×2 importOriginal dönüşümü
     expect(result.fresh).toEqual([]);
     expect(result.stale).toEqual([]);
   });

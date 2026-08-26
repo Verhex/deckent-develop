@@ -180,8 +180,8 @@ describe('AGSK-3 dilim-3: rpc-protocol + onboarding-ux catalog', () => {
       // profile/profileProvenance da stats gibi canlı-havuz derived-state'idir:
       // sprint-561 skill-unlock persist'i (canonical V3 derivation) yalnız
       // project tree'ye yazar — builtin package tree authored kaynak kalır.
-      const { stats: _b, profile: _bp, profileProvenance: _bpp, ...builtinRest } = readManifest(BUILTINS_DIR, spec.id) as Record<string, unknown> & { stats?: unknown; profile?: unknown; profileProvenance?: unknown };
-      const { stats: _p, profile: _pp, profileProvenance: _ppp, ...poolRest } = readManifest(POOL_DIR, spec.id) as Record<string, unknown> & { stats?: unknown; profile?: unknown; profileProvenance?: unknown };
+      const { stats: _b, profile: _bp, profileProvenance: _bpp, builtinContentHash: _bch, ...builtinRest } = readManifest(BUILTINS_DIR, spec.id) as Record<string, unknown> & { stats?: unknown; profile?: unknown; profileProvenance?: unknown; builtinContentHash?: unknown };
+      const { stats: _p, profile: _pp, profileProvenance: _ppp, builtinContentHash: _pch, ...poolRest } = readManifest(POOL_DIR, spec.id) as Record<string, unknown> & { stats?: unknown; profile?: unknown; profileProvenance?: unknown; builtinContentHash?: unknown };
       expect(builtinRest).toEqual(poolRest);
     }
   });
