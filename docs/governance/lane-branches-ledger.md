@@ -24,3 +24,21 @@ remote-karışıklığı yaratmasın diye); owner "push'la" derse tek komutla ka
 - Admission bitince worktree SİLİNİR, branch origin'de yaşar (protokol §2) — silme veri kaybetmez.
 - Bu ledger'da **İş mi? = HAYIR** olan hiçbir branch gelecekte "bekleyen iş" sanılmaz;
   bekleyen işin tek otoritesi `docs/MASTER-PLAN.md`dir.
+
+
+## 2026-08-26 büyük-temizlik kaydı (owner emri: "maine merge bekleyen yoksa hepsini silelim")
+- SİLİNDİ (lokal, 62 branch): agent/design-lane · codex/cli-surface-truth ·
+  agent/dev-operating-contract · fix/postmerge-main-truth-closure · goal/m1-graceful-budget-landing ·
+  sp1-native-agent-finish · backup/pre-recommit-20260802 · feat/docs-json-ai-author ·
+  goal/release-gate-truth · master · checkpoint/d16-approval-20260720 · train-2026-08-* (51 adet).
+  Tüm tip-SHA'ları temizlik-anında kaydedildi (scratchpad branch-tips; reflog ~90 gün kurtarma-penceresi).
+- KALDIRILAN worktree'ler: .claude/worktrees/agent+dev-operating-contract ·
+  /tmp/deckent-cli-surface-truth · /tmp/deckent-competitive-watch-analysis (hatalı-session artığı,
+  yalnız analysis-output untracked'ı vardı; teslimi zaten relay edilmişti).
+- **HOLD — recovery/d4-609:** worktree'sinde 116 değişik dosya (işlenmemiş gerçek iş olabilir,
+  API/approval yüzeyleri) — owner-incelemesi olmadan SİLİNMEDİ.
+- **Origin-silmeleri BEKLEMEDE (izin-sınıflandırıcı engeli):** origin'deki merged train-* +
+  dev-operating-contract + fix/postmerge + checkpoint/d16 silinecek-listesi hazır; owner
+  tek komutla koşabilir (rapordaki komut) veya izin-kuralı ekleyip bana devredebilir.
+- KORUNAN: main · release/0.100.0-rebaseline · lane/approval-audit · lane/descriptor-registry ·
+  audit/config-completion (üçü referans-kanıt, İş-değil) · recovery/d4-609 (HOLD).
