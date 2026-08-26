@@ -3,20 +3,20 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "b571eccdd47c82735c041250f4cdedaf5f46066e8229bf43823654cd70d262cd"
+    "value": "3990243944952d3dc5d14fb7184a6900e882bcd0f7beec5144b067d1d372cfee"
   },
   "summary": {
     "total": 538,
-    "active": 464,
-    "terminal": 74,
+    "active": 455,
+    "terminal": 83,
     "receipts": 209,
     "byState": {
       "OPEN": 344,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
-      "VERIFY": 51,
-      "DONE": 74,
+      "VERIFY": 42,
+      "DONE": 83,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
@@ -443,55 +443,55 @@
       "id": "CONFIG-HEAL-IO-TRUTH-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-26",
       "definitionDigest": "7ae3c824670da1000aaaaf4fad78608c6687da62ff7c067af68e64ec0e050686",
-      "progressDigest": "15c4f4d1b2a54b349ca361ebca513faaa5d802404bc3699ba7e517f63dc4774a",
-      "terminalClosureDigest": null
+      "progressDigest": "2bbf699d55334e920aea0e01300f3056b9a09b4edce83b532f4d81141259a43c",
+      "terminalClosureDigest": "69104d77aa0da2a7a6026ae5834d61ebdf317994e42114407b409a5bf67a20d8"
     },
     {
       "order": 202,
       "id": "EVAL-TSC-FEEDBACK-001",
       "program": "TRUTH",
       "priority": "P1",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-26",
       "definitionDigest": "a40a55bca1256eae091bd026c2ea5ec9add5bdd0393ca78680fe0a3ccbadaa2a",
-      "progressDigest": "9c532178a6d7e4473121ba3097fe65a84690632349f06f67cdb9a939539253ea",
-      "terminalClosureDigest": null
+      "progressDigest": "bf30a1cb1201213771b632b82de9efd46dea5ec0a5daf293711c0b7bf15e3eff",
+      "terminalClosureDigest": "bf943f97f3aafa5435c918815163c7e7aa03b7cb402f9918f93849a0461cf8bd"
     },
     {
       "order": 203,
       "id": "HONEST-GATE-DELETION-AWARE-001",
       "program": "TRUTH",
       "priority": "P2",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-26",
       "definitionDigest": "7e3926c0275742ed1a4b8bf62a38ff7ded1552e376f35977f3355cf66f5bb768",
-      "progressDigest": "b859a0e1c40ef77178acc026a8f9737c9ac99269ce1b2c54773edf7e627e55f9",
-      "terminalClosureDigest": null
+      "progressDigest": "f0a7d611c0ee3d00b981b061d667ecd46509c7a557829510f8576857e02dd365",
+      "terminalClosureDigest": "2a4fb77ae589b18e97213f7aa49630dddb7d2c2d1b8e3588d815f22596b042d6"
     },
     {
       "order": 204,
       "id": "STATUS-SWEEP-OUTPUT-HYGIENE-001",
       "program": "TRUTH",
       "priority": "P2",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-26",
       "definitionDigest": "5405c187be482fe14c208853785cbdcb021d351e577266ac914f841e2580f660",
-      "progressDigest": "f4d710f58f28f047802ab84a17ba9d1b17f86be4af812facc95b3829f8212433",
-      "terminalClosureDigest": null
+      "progressDigest": "c09edee8c0644acc2d368ccaf6f08bc2d34dcfc9b325dcd7e200afce5cbfaf9c",
+      "terminalClosureDigest": "dd2b6cbfcd751853e2f2ec1463e00d59e08fc2cbe6d7946507c39dab3e0275c1"
     },
     {
       "order": 205,
       "id": "DIRECTIVES-ENGINE-SELFCHANGE-LINT-001",
       "program": "TRUTH",
       "priority": "P2",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-26",
       "definitionDigest": "e401b0bd6edd64bf73e267796dfc20740a8eaa1ce218367cb1ac87a8ef745b61",
-      "progressDigest": "8aa8c4a9fde252536545709bdb15471ac371feab8bd2be17219ef3321e449bf6",
-      "terminalClosureDigest": null
+      "progressDigest": "a5a07fe3f865bf51bff069ae49f2e063be759175f975a68112b6988a33885f36",
+      "terminalClosureDigest": "b103fe773c28997000a0986967032cbcc5315bd055dbd7cc7fcebed624a595e5"
     },
     {
       "order": 206,
@@ -509,11 +509,11 @@
       "id": "WORKER-IDENTITY-HOSTBOUND-001",
       "program": "TRUTH",
       "priority": "P2",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-26",
       "definitionDigest": "12573ddab0a50acb8fdc19e8ba2ee99e25c8f408e869a4deff1e4838bef5c04c",
-      "progressDigest": "7c1b885638171ff013624ffd008aa25cce4f8e8dc6e22a3838694b9244e7df8f",
-      "terminalClosureDigest": null
+      "progressDigest": "ac5a625c3cfadfb7148cf7464af5b9295b229cd4eb36c624e0227e81a51d04a8",
+      "terminalClosureDigest": "b7702e8c5cc66e8ca52f4a6a58746f77dd03939da2a88b29290f864d224c45bb"
     },
     {
       "order": 210,
@@ -3348,9 +3348,9 @@
       "program": "ASSURANCE",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-01",
+      "updated": "2026-08-26",
       "definitionDigest": "9bbf5e766a31cec69c38a1220d85bbb029601bd1278d713b28402c4a0291645e",
-      "progressDigest": "d595f3d6468abced4446f99c6f39cfee431844949b1ef0cb6fea8fb08e29a5c2",
+      "progressDigest": "a01ea39640779e8eab4d02fbb04e8b75f98f225ec69de1109638d124a91db32d",
       "terminalClosureDigest": null
     },
     {
@@ -3468,11 +3468,11 @@
       "id": "PROD-SPAWNSYNC-ASYNC-001",
       "program": "KERNEL",
       "priority": "P1",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-26",
       "definitionDigest": "b49217770cf4d9965c24f57a176ff35b48f9314e94bdf3c001e11bfdaa6717e5",
-      "progressDigest": "73212ac18c8d925f4a08951a5d67feafca78a77b2bae87bf9f0afa5de75a5e56",
-      "terminalClosureDigest": null
+      "progressDigest": "54c12affef4aaede5a1f043490c7c7bbcf660c07e140932a23bdceec09422ba6",
+      "terminalClosureDigest": "3d3727e6f1f77ad5b7d2a704b1403172903844f6e8bc56ba368e35e7d553f376"
     },
     {
       "order": 3316,
@@ -5085,11 +5085,11 @@
       "id": "DEBT-DEPENDENCY-REPAIR-7094R-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-26",
       "definitionDigest": "60ac0bc5083e39776b574024ff3344ce469424c2a8bf3ce45db97dfebbef2692",
-      "progressDigest": "e0555ffcc46d47ed68d486205f8d650d8546f787ca352537801ff6d14bcf9e93",
-      "terminalClosureDigest": null
+      "progressDigest": "bde2afecf1e5ebccc54bb14a266bc6af2eaa8eafec836c472e6a88c546b9fef6",
+      "terminalClosureDigest": "9630f3f83a44b630436c86938cbe3a41c6804564b34c489d2f5bc582f028ae27"
     },
     {
       "order": 7097,
@@ -5371,11 +5371,11 @@
       "id": "DOCS-VISION-002",
       "program": "DOCS",
       "priority": "P1",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-26",
       "definitionDigest": "c155d16950b2cd4403e463453885a0fcbdf7764d8aa17db14acb082dbfd42476",
-      "progressDigest": "f3870122ebe87408f6224e6974c2ac7eb923e506a24e45a19c10aacd2a9eab8b",
-      "terminalClosureDigest": null
+      "progressDigest": "775a6daeb644737a1c2c66bc801849e2dc4a39da06d34a6ab60d5ef56881390f",
+      "terminalClosureDigest": "015ff9b8dc3471b26294348854b480b72ec6a9796b03fb560fd2cb1f4fed870a"
     },
     {
       "order": 8096,
@@ -9062,171 +9062,6 @@
       "updated": "2026-07-26"
     },
     {
-      "order": 201,
-      "id": "CONFIG-HEAL-IO-TRUTH-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "Config self-heal io-vs-parse ayriminin kalici kaydi + ERRORS.md forensic-penceresi",
-      "priority": "P1",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "?",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-26-NODE2-QUALITY-01"
-      ],
-      "acceptance": "Strike-5 fix'inin (heal yalniz parse-kanitiyla; io-hatasi typed CONFIG_READ_IO_HOLD, dosya tasinmaz; config-CLI yazimlari tmp+rename) kalici satir-kaydi; ek dilim: ERRORS.md 600-satir kirpma-penceresi forensic icin genisletilir veya kritik-sinif girdiler ayri kalici kanala akar",
-      "evidence": "owner-admission 2026-08-25-gece (gece-bulgu #1); fix landed `ff48978fb` + hermetik EISDIR pini; canli sinav: suite baski-altinda config sag kaldi; 2026-08-26 Node-2 kapanışı: ERRORS-critical forensic-kanalı canlı (CONFIG_*/_HOLD sınıfı, bağımsız tavan; strike-5 kalıcı kaydı bu satır + G0-A 471 dilim-kanıtı); `receipt=GR-2026-08-26-NODE2-QUALITY-01`",
-      "updated": "2026-08-26"
-    },
-    {
-      "order": 202,
-      "id": "EVAL-TSC-FEEDBACK-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "Auditor tsc-FAIL'i FIX-fazina geri beslenir; tam-factory vi.mock'lara importOriginal-ratchet",
-      "priority": "P1",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "?",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-26-NODE2-QUALITY-01"
-      ],
-      "acceptance": "Gate tsc FAIL verdiginde sprint COMPLETE'e tsc-kirli kapanamaz: Auditor bulgusu bounded FIX-task dogurur veya settlement typed-residual tasir; ayrica tam-factory node:fs/config mock'lari icin importOriginal-spread ratchet'i (yeni tam-factory eklenemez) tanimlanir",
-      "evidence": "owner-admission 2026-08-25-gece (gece-bulgu #5); kanit-oruntusu: 675/676/677 ust-uste vitest-yesil+tsc-kirli, gece 206-kirmizi mock-drift onarimi; 2026-08-26 Node-2 kapanışı: evaluation.tsc_settlement_gate default-ON tam-zincir + mock-factory ratchet (276 baseline) canlı; aynı gün canlı doğrulama — 681'in kendi sol-worker'ı evaluation-required tipini eklerken 1 literal kırığı çıktı ve el-daraltıldı (desenin ta kendisi); `receipt=GR-2026-08-26-NODE2-QUALITY-01`",
-      "updated": "2026-08-26"
-    },
-    {
-      "order": 203,
-      "id": "HONEST-GATE-DELETION-AWARE-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "Honest-gate stub-sezgisi silme-only isleri yanlis-pozitiflemez",
-      "priority": "P2",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "?",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-26-NODE2-QUALITY-01"
-      ],
-      "acceptance": "STUB_WRITE_DETECTED/SCOPE_VIOLATION_OR_EMPTY_WRITE karari linesAdded=0 iken linesRemoved>0 + goCriteria-kaniti varsa DONE'u override etmez; silme-only fixture pini eklenir; gercek stub (0/0 + kanitsiz) HALA yakalanir",
-      "evidence": "owner-admission 2026-08-25-gece (gece-bulgu #6); canli vaka: 679-002 24-silme/0-ekleme goCriteria-MET iken DONE→NO_GO override; 2026-08-26 Node-2 kapanışı: silme-only DONE-koruması + 679-002 regresyon-fixture'ı + gerçek-stub hâlâ NO_GO pini; `receipt=GR-2026-08-26-NODE2-QUALITY-01`",
-      "updated": "2026-08-26"
-    },
-    {
-      "order": 204,
-      "id": "STATUS-SWEEP-OUTPUT-HYGIENE-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "status deathSweep ciktisi sinif-ozetli olur; olu flow-handle artiklari tipli temizlik akisina baglanir",
-      "priority": "P2",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "?",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-26-NODE6A-SWEEP-01"
-      ],
-      "acceptance": "deathSweep.skipped ham-liste yerine sinif-bazli sayim + ornek doner (JSON sozlesme additive); 100 handle'siz/log'suz legacy flow-artigi icin runs yuzeyinde owner-onayli tipli temizlik akisi tanimlanir; status ciktisi bit-notr kucultme pini",
-      "evidence": "owner-admission 2026-08-25-gece (gece-bulgu #2); canli vaka: status --json 100 'no flow found' satiri dokuyor; 2026-08-26 Node-6a kapanışı (684-001): sınıf-bazlı özet (additive) + mevcut runs-seam'inde tipli dry-run/apply taşıma+manifest; hedef gate-uyumu için runtime-quarantine (kalıcı-arşive terfi ayrı owner-disposition); `receipt=GR-2026-08-26-NODE6A-SWEEP-01`",
-      "updated": "2026-08-26"
-    },
-    {
-      "order": 205,
-      "id": "DIRECTIVES-ENGINE-SELFCHANGE-LINT-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "lint-directives motor-sicak-yolu self-change'inde typed uyari verir",
-      "priority": "P2",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "?",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-26-NODE2-QUALITY-01"
-      ],
-      "acceptance": "Files kumesi motor-sicak-yolu listesiyle (task-builder, prompt-compile, result-collector, scheduler, spawner) kesisen task ile ayni DAG'da ona etki-bagimli task varsa typed WARN: 'etki next-run-only — mini-run onerisi'; liste tek-kaynak ve testli",
-      "evidence": "owner-admission 2026-08-25-gece (gece-bulgu #3); ders: sprint-674 kendi fix'ine eski-dist'te yakalanip typed-PAUSE etti; 2026-08-26 Node-2 kapanışı: D_ENGINE_SELF_CHANGE typed WARN + ENGINE_HOT_PATHS tek-kaynak export + sahte-parser testleri; `receipt=GR-2026-08-26-NODE2-QUALITY-01`",
-      "updated": "2026-08-26"
-    },
-    {
       "order": 206,
       "id": "EVENT-TRUTH-A4-001",
       "parent": "P00",
@@ -9256,39 +9091,6 @@
       "acceptance": "Program-satiri (dilimlenecek): legacy .hb semasi canonical'a emekli edilir (subprocess pid-liveness devri dahil); .tasks log'lari tek-format; run-inspector read-model'i tuketir (HOLD-parity); olu run-state-feed.ts kaldirilir; event-stream rotasyonu kayipsiz arsivlenir; Nervous observer filtre-genisletmesi — her dilim kendi admission'iyla acilir",
       "evidence": "owner-admission 2026-08-25-gece (gece-bulgu #4 / A3 negative-space listesi); on-kesif A3 dalga-raporlarinda",
       "updated": "2026-08-25"
-    },
-    {
-      "order": 207,
-      "id": "WORKER-IDENTITY-HOSTBOUND-001",
-      "parent": "P00",
-      "program": "TRUTH",
-      "outcome": "Worker attemptId/backend host-bound kimlik akisi: HEARTBEAT_IDENTITY_HOLD reddi kapanir",
-      "priority": "P2",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "?",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-26-NODE6A-SWEEP-01"
-      ],
-      "acceptance": "Prompt/cagri zinciri worker'a host-bound attemptId+backend'i kanitli tasir; worker hb-yazimi kimlik-belirsizliginde typed-HOLD yerine dogru kimlikle yazar; 674-sinifi 'identity not host-bound' reddi hermetik pinlenir",
-      "evidence": "owner-admission 2026-08-25-gece (gece-bulgu #7); canli vaka: 674 worker'lari hb yazmayi HEARTBEAT_IDENTITY_HOLD ile reddetti; 2026-08-26 Node-6a kapanışı (684-002): kök buildWorkerPrompt'un binding-öncesi derlenmesiydi — dispatch host approval-receipt'li kimlikle HOLD'u ikame ediyor, kimliksiz akış dürüst typed-HOLD; 674-vakası fixture'lı; `receipt=GR-2026-08-26-NODE6A-SWEEP-01`",
-      "updated": "2026-08-26"
     },
     {
       "order": 210,
@@ -14505,7 +14307,6 @@
         "PRODUCTION-WIRING-AUTHORITY-001",
         "WORKER-DISCOVERY-001",
         "RESULT-INGEST-001",
-        "PROD-SPAWNSYNC-ASYNC-001",
         "PLATFORM-CLEAN-IDENTITY-ADAPTER-001",
         "COMPOSITE-WORKER-001",
         "PLATFORM-EXEC-AUTH-W3-DARWIN-001",
@@ -18817,8 +18618,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "The repository full suite runs exactly once after scoped tests, build/digest and all live replays pass; command, duration, pass/fail/skipped totals and failures are persisted, no retry masks a failure and any red result reopens the exact owning work item rather than being waived",
-      "evidence": "EK-3 final certification basamak. This is the explicit exception to the normal no-full-suite working rule; it is not admitted during an active sprint or before narrower failure localization is exhausted",
-      "updated": "2026-08-01"
+      "evidence": "EK-3 final certification basamak. This is the explicit exception to the normal no-full-suite working rule; it is not admitted during an active sprint or before narrower failure localization is exhausted; 2026-08-26 SERTİFİKA-KOŞUSU KANITI: explicit tam-suite koşusu YEŞİL — 2830 dosya passed / 10 skipped, 38.842 test passed / 197 skipped, 0 fail, süre 1158.02sn, komut `VITEST_MAX_FORKS=2 npx vitest run`, log kalıcı (scratchpad fullsuite-3304-r4); önceki üç koşu maskelenmedi — her kırmızı gerçek onarıma dönüştü (r1 76-dosya spawn-sözleşme restorasyonu, r2 66-dosya dalga-yankısı sprint-691, r3 tek ratchet-sayım drifti) ve logları kalıcı; VERIFY-flip merdiven-sırası gereği 3301+3302 kapanınca",
+      "updated": "2026-08-26"
     },
     {
       "order": 3305,
@@ -18943,39 +18744,6 @@
       "acceptance": "Tüm yollar (normal settlement, force-abort, recover, cleanup) aynı kanonik arşiv konumuna yazar; hiçbir yol .tasks kökünde kalıntı bırakmaz; konum ve retention effective config'ten çözülür; split-arşiv regresyon testiyle pinlenir",
       "evidence": "Açılış 2026-08-11 gece dogfood (Alperen onayı): sprint-508 settlement'ı sonuçları .brain/archive/sprints/sprint-508-tasks/'a taşıdı ama .tasks/archive/sprint-508/ altına yalnız worker script'leri düştü; sprint-507 recover'ı 6 dosyayı .tasks/archive/sprint-507/'ye arşivleyip 9 dosyayı .tasks kökünde bıraktı; 15 kalıntı owner talimatıyla elle .brain/archive/sprints/sprint-507-tasks/'a taşındı. 2026-08-24 normal multi-wave canary sprint-657 terminal COMPLETE: 52 artifact/438,838 byte canonical raw archive, manifest hash/integrity ve terminal seal verify `ok=true`, Brain index/summary refresh fresh; `.tasks` kökünde veya legacy `.tasks/archive`/`.brain/archive` altında 657 raw kalıntısı yok. Satır force-abort/recover/cleanup + retention/every-environment matrisi ve formal different-provider closure beklediği için OPEN",
       "updated": "2026-08-24"
-    },
-    {
-      "order": 3315,
-      "id": "PROD-SPAWNSYNC-ASYNC-001",
-      "parent": "KERNEL-001",
-      "program": "KERNEL",
-      "outcome": "Worker-dispatch hot-path'indeki 4 senkron git çağrısı async'e taşınır ve spawnsync ratchet'inden düşürülür",
-      "priority": "P1",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "0",
-        "E": "0",
-        "H": "?",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-26-NODE6A-SWEEP-01"
-      ],
-      "acceptance": "`spawn-backend-docker.ts`'teki `git hash-object -w` ×2, `cat-file blob` ve `diff --numstat` çağrıları dispatch'i bloklamayan async eşdeğerlerine taşınır; `spawnsync-baseline.json`'dan ilgili kayıtlar düşer; provider-observation v2'nin dosya-diff kanıtı davranış değişmeden korunur",
-      "evidence": "Alperen kararı 2026-08-02 (karar #2, PAZARTESI transkripsiyonu): kod geri alınmıyor — provider-observation v2'nin dosya-diff kanıtı buna bağlı; ratchet kaydı geçici kabul edildi ve bu satır kalıcı kapanışın sahibi. TEST-SPAWN-001 test-politikasıdır, bu satır ÜRETİM hot-path'idir; ikisi ayrı; 2026-08-26 Node-6a kapanışı (684-003): kalan senkron git çağrıları async-runner desenine taşındı, spawnsync-baseline düşümü yalnız-azalma; provider-observation v2 diff-kanıtı davranış-değişmez (mock-suite yeşil); spawnInternal async-propagation kırığı worker'ın kendi doğrulamasında yakalandı; `receipt=GR-2026-08-26-NODE6A-SWEEP-01`",
-      "updated": "2026-08-26"
     },
     {
       "order": 3316,
@@ -23063,7 +22831,6 @@
         "RECOVERY-TRUTH-001",
         "WORKER-PROMPT-COST-ARCHITECTURE-001",
         "AGENT-PERMISSION-MATRIX-001",
-        "DEBT-DEPENDENCY-REPAIR-7094R-001",
         "EVALUATOR-HONESTY-GONOGO-001",
         "SKILL-ROUTING-RESIDUAL-MICRO-001",
         "DEP-SUPPLY-DEFENSE-001",
@@ -24395,40 +24162,6 @@
       "updated": "2026-08-19"
     },
     {
-      "order": 7096,
-      "id": "DEBT-DEPENDENCY-REPAIR-7094R-001",
-      "parent": "ECOSYSTEM-001",
-      "program": "KERNEL",
-      "outcome": "**7094-alt onarim paketi (owner onayi 2026-08-19: \"4 duzeltmeyi tek MASTER satiri yap ve hepsini uygula\"):** 3-tur stabilite kosusunda canli yakalanan 5-halka defekt zinciri — (1) basari-raporu-notlu debt dogumu, (2) escalateDebt her kapanista critical'e geri yukseltir (deprioritize tek-tur omurlu), (3) plana debt-prepend slot kaydirir, (4) \"Task N\"/integer dependency-ref debt-DAHIL listeye indexlenir → durust gorevler debt'e baglanir (DISK KANIT: scheduler-shadow 573-004←573-001, 573-005←573-002), (5) anlamsiz debt-fix durust NO_GO → FIX-butce biter → breaker run'i park eder (573/574: 4/8 gorev hic kosmadi, kartopu). Ayrica NO_GO kok-nedeni: DOC_WRITE correctness testsPassed'e bagliydi — durust `false` yazan doc-worker NO_GO, \"tests passed\" uyduran DONE (573-006: attempt+3 fix DORDU ayni cezayla, ~$0.93 bosa; durustluk-cezasi/yalan-tesviki urun-defekti)",
-      "priority": "P0",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1",
-        "G2"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "0",
-        "L": "0",
-        "X": "?",
-        "S": "?"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-26-KANIT6-7096-01"
-      ],
-      "acceptance": "**UYGULANDI (ayni gun):** D1 resolveDependencyRef index-formlari (pure-integer + Task-N) yalniz isPriorityFix-olmayan directive alt-listesine baglanir; slot-id/title-token tam-listede kalir (task-builder.ts; +7 pin dep-ref-loud; eski-dist/yeni-dist gercek-binary before-after kaniti). D2-minimal result-evaluator: doc/audit sinifinda testsPassed NOTR (durust false = uyduran true, yalan primi de ceza da yok; resolveRubricTaskType SSOT — getRubric ile ayni authority) + worker self-NO_GO TAVANI (rubrik puani asla DONE'a yukseltemez; yalniz kanit-tabanli reconcile kaldirir) + legacy evaluateResult doc fast-path tests-vetosu ONUNE alindi + reconstruct yolu hizalandi; KAPSAMLISI 7097. D3 success-echo DebtClass: uretim recordDebtEntry notu salt-basari ise `class:success-echo` damgalar; injector typed-class'i + class'siz eski kayitlarda ayni metin-testini skippedNoop olarak atlar (asla resolve etmez — yanlis-pozitif acik kalir); \"Fix debt\" basligindan sabit evaluator-onsozu soyulur + description'a \"yalniz residual-gap'i uygula\" cercevesi. D4 KANITLA KAPANDI — kod degisikligi GEREKMEDI: breaker yalniz gercekten-bagimli task'lari bloke sayiyor, NOT_DISPATCHED redispatch (sprint-354) + DEPENDENCY_UNBLOCK zinciri mevcut; R2/R3 \"bagimsiz gorev blokaji\" %100 D1-remap belirtisiydi; eklenen tek sey blockedDependencyEdges teshisi (bloke←kok kenarlari pause-mesajinda, i18n-sablonsuz). Testler: 683+197 scoped yesil, 18/18 lineage, tsc 0, hermetic+gates yesil (baseline 14465/+1 yeni suite + inventory digest bilincli)",
-      "evidence": "Owner kararlari 2026-08-19: (a) 7094-alti tek satir, (b) F3 urun-default HAYIR (3 tam temiz tur sarti; \"varsayimla ilerlemeyecegiz, debtleri yonet\"), (c) \"simdi uygula, sonra maliyet/turn-opt isine don\". Kanitlar: evaluations/sprint-573 kayitlari (573-006 4× \"tests failed; self-assessment DONE\"), scheduler-shadow/sprint-573.jsonl dependency-remap diski, f3-stability-results.txt 3-tur olcumu, unit-repro debt'li listede Task 5→566-005. Landed-verify 2026-08-19: D3 success-echo injector CONFIRMED `…8286ed3230a6` + D4 blocked-edges CONFIRMED `…6c8faed229f6`; D1/D2 2'ser deneme durust-HOLD (buyuk-dosya verifier evidence-map sinifi 9-11. vakalar — task-builder/result-evaluator; birincil kanit: 7 dep-ref pini + eski/yeni-dist gercek-binary before-after + 197 evaluator testi). Full-suite kadansi ODENDI (37 fail triage: 7 duzeltildi — 4 F1d fixture-mtime hizasi + 2 bilincli-pin + 1 GERCEK URUN KENARI: directories-only scope'ta skillDomainOverlap weight-0 tum skill'leri eliyordu, evidence-varligi=1 sayilir; kalan 15 = 7091 landing full-suite borcu, finding). Owner debt-karari uygulandi: debt-561-002/003/562-002-fix resolved (resolveDebt kanonik yol), residual'lar 7098'e; kalan critical debt 0. Ek finding: reachability-probe onayi her xverify kosusunda yeniden isteniyor (kayit kalicilasmiyor) — xverify-ux defekt adayi; owner canli devirle cozuldu (onay receipt'leri `--reason owner-delegated-2026-08-19`); 2026-08-26 tren-node1 KANIT-kapanışı: satırın landed kanıt zinciri (D3/D4 CONFIRMED mühürleri, D1/D2 dürüst-HOLD + bağımsız birincil kanıt, debt-kararı uygulanmış, critical-debt 0) receipt'e bağlandı; `receipt=GR-2026-08-26-KANIT6-7096-01`",
-      "updated": "2026-08-26"
-    },
-    {
       "order": 7097,
       "id": "EVALUATOR-HONESTY-GONOGO-001",
       "parent": "ECOSYSTEM-001",
@@ -24755,7 +24488,6 @@
         "NPM-CHANNEL-001",
         "DOCS-TRUTH-PASS-001",
         "LAUNCH-COMMS-001",
-        "DOCS-VISION-002",
         "CI-POSTMERGE-127-TRUTH-001"
       ],
       "evidenceReceipts": [],
@@ -25355,39 +25087,6 @@
       "acceptance": "Demo asset (terminal recording), Show HN and X/LinkedIn drafts on verifiable-orchestration positioning, comparison page, weekly cadence plan; every outbound post owner-approved before publication",
       "evidence": "Competitor scan 2026-07-31: category consolidating (Terragon, vibe-kanban, Roo Code shut down), Ruflo owns distribution while its orchestration claims are audit-refuted — deckent counter-position is evidence-backed settlement",
       "updated": "2026-07-31"
-    },
-    {
-      "order": 8095,
-      "id": "DOCS-VISION-002",
-      "parent": "EVERY-ENV-001",
-      "program": "DOCS",
-      "outcome": "2026-08 rekabet-sentezi vision amendment: hyperscaler control-plane tavanı, provider+runtime bağımsızlığı, recursive delegasyon cümlesi ve iki yeni non-goal (identity provider değil; başka bir agent runtime değil), en+tr paritesiyle",
-      "priority": "P1",
-      "dependsOn": [],
-      "dependents": [],
-      "children": [],
-      "gates": [
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "-",
-        "H": "?",
-        "L": "-",
-        "X": "-",
-        "S": "-"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-26-KANIT6-8095-01"
-      ],
-      "acceptance": "Onaylı dört edit (E1 hyperscaler tavanı, E2 runtime-neutrality bölümü+başlığı, E4 recursive delegasyon, E5 iki non-goal) `docs/en/vision.md` + `docs/tr/vision.md`'ye 13-heading paritesi korunarak uygulanır; E3 (policy-enforcement metni) ALP-RUNTIME-001 ürünleşmesine yönlendirildi, E6 (runtime-neutrality falsifier'ı) owner kararı almadı — ikisi de vision-metni olarak HOLD",
-      "evidence": "Owner canlı onayı 2026-08-04: E1, E2, E4 aynen; E5 şu kayıtla — dashboard + desktop app yapılacak ve kolayca bağlanılabilir olacak (CLI mevcut), non-goal metni bu kaydı içerir. Edit'ler aynı oturumda working tree'ye uygulandı; docs build/parity koşusu ve commit provenance açık; 2026-08-26 tren-node1 KANIT-kapanışı: dört onaylı edit iki dilde satır-exact mevcut (E1 en:23/tr:23, E2 en:132/tr:138, E4 en:65/tr:65, E5 en:160-161/tr:161-162), heading-parite 14/14, E3+E6 doğru şekilde yok-HOLD; `receipt=GR-2026-08-26-KANIT6-8095-01`",
-      "updated": "2026-08-26"
     },
     {
       "order": 8096,
@@ -27539,6 +27238,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "7f650b445a54c2e951f04c311947e67be89b3a2a164376067adf74bc11880a02"
+    "value": "d97e029e78e08075a66de62eaf2e9b9124637566f89493407cbcbed44f039f63"
   }
 }

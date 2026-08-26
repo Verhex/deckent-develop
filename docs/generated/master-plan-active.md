@@ -5,9 +5,9 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):b571eccdd47c82735c041250f4cdedaf5f46066e8229bf43823654cd70d262cd`
+**Source digest:** `sha256(normalized-lf-utf8):3990243944952d3dc5d14fb7184a6900e882bcd0f7beec5144b067d1d372cfee`
 
-**Rows:** 538 total · 464 active · 74 terminal
+**Rows:** 538 total · 455 active · 83 terminal
 
 ## State summary
 
@@ -17,8 +17,8 @@
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 69 |
-| VERIFY | 51 |
-| DONE | 74 |
+| VERIFY | 42 |
+| DONE | 83 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
 
@@ -51,13 +51,7 @@
 | 180 | `DOCS-I18N-001` | OPEN | P1 | TRUTH | `DOCS-TOPOLOGY-001`, `DOCS-RELEASE-TRUTH-001` | — | Documentation i18n contract for en, tr, zh-Hans, es, ja and hi |
 | 190 | `MEMORY-AUTHORITY-001` | OPEN | P0 | TRUTH | `SSOT-002` | — | Repo-local provider-neutral canonical memory; provider HOME surfaces projections only |
 | 200 | `MEMORY-TRUTH-001` | BLOCKED | P1 | TRUTH | `MEMORY-AUTHORITY-001` | `DEPENDENCY_UNSATISFIED` | Memory index count, stale watch, task-capacity and phantom ledger drift'lerini hükme bağla |
-| 201 | `CONFIG-HEAL-IO-TRUTH-001` | VERIFY | P1 | TRUTH | — | — | Config self-heal io-vs-parse ayriminin kalici kaydi + ERRORS.md forensic-penceresi |
-| 202 | `EVAL-TSC-FEEDBACK-001` | VERIFY | P1 | TRUTH | — | — | Auditor tsc-FAIL'i FIX-fazina geri beslenir; tam-factory vi.mock'lara importOriginal-ratchet |
-| 203 | `HONEST-GATE-DELETION-AWARE-001` | VERIFY | P2 | TRUTH | — | — | Honest-gate stub-sezgisi silme-only isleri yanlis-pozitiflemez |
-| 204 | `STATUS-SWEEP-OUTPUT-HYGIENE-001` | VERIFY | P2 | TRUTH | — | — | status deathSweep ciktisi sinif-ozetli olur; olu flow-handle artiklari tipli temizlik akisina baglanir |
-| 205 | `DIRECTIVES-ENGINE-SELFCHANGE-LINT-001` | VERIFY | P2 | TRUTH | — | — | lint-directives motor-sicak-yolu self-change'inde typed uyari verir |
 | 206 | `EVENT-TRUTH-A4-001` | OPEN | P1 | TRUTH | — | — | A3'un bilincli-ertelenenleri: hb-sema emekliligi, log tek-format, inspect-parity, olu-feed silimi, kayipsiz rotasyon, Nervous-filtre |
-| 207 | `WORKER-IDENTITY-HOSTBOUND-001` | VERIFY | P2 | TRUTH | — | — | Worker attemptId/backend host-bound kimlik akisi: HEARTBEAT_IDENTITY_HOLD reddi kapanir |
 | 210 | `REPO-CLEANUP-001` | OPEN | P2 | TRUTH | `SSOT-002` | — | Repository filesystem, tracked-ephemeral and orphan disposition manifest |
 | 220 | `REPO-CLEANUP-APPLY-001` | BLOCKED | P2 | TRUTH | `REPO-CLEANUP-001` | `FRESH_DESTRUCTIVE_APPROVAL_REQUIRED` | Apply approved repository-filesystem cleanup manifest |
 | 230 | `MEMORY-SYNC-001` | OPEN | P0 | TRUTH | `MEMORY-AUTHORITY-001` | — | Provider-neutral revisioned memory sync and projections |
@@ -282,7 +276,6 @@
 | 3306 | `RECOVERY-NATIVE-PLATFORM-MATRIX-001` | OPEN | P2 | KERNEL | — | — | Recovery/finalize/status zincirinin native platform matrisi: Windows-native + macOS + namespace izolasyonu + Desktop/HA parity |
 | 3307 | `RECOVERY-LIVE-CONTINUATION-PROOF-001` | OPEN | P2 | KERNEL | — | — | Canlı devam-kanıtları: fresh genuinely-PAUSED continuation, non-Sprint adapter'lar ve shared-digest'in tüm modlarda/ortamlarda kanıtı |
 | 3314 | `ARCHIVE-PATH-AUTHORITY-001` | OPEN | P1 | KERNEL | — | — | Task-artifact arşivi tek kanonik authority'ye yazar: settlement, recover ve cleanup aynı konuma, kalıntısız ve retention-kurallı |
-| 3315 | `PROD-SPAWNSYNC-ASYNC-001` | VERIFY | P1 | KERNEL | — | — | Worker-dispatch hot-path'indeki 4 senkron git çağrısı async'e taşınır ve spawnsync ratchet'inden düşürülür |
 | 3316 | `RECOVERY-BORN-515-TERMINAL-SUPERSESSION-001` | OPEN | P0 | KERNEL | `PAUSED-FINALIZE-001`, `RECEIPT-001`, `KERNEL-SETTLEMENT-001` | — | Cleanup-eligible olmayan erken terminal receipt recovery/finalize yolunu kalıcı kilitleyemez; immutable receipt append-only ve generation-fenced supersession taşır |
 | 3320 | `BOT-LIFECYCLE-HONESTY-001` | OPEN | P1 | KERNEL | — | — | Bot daemon lifecycle dürüstlüğü: recovery-sınıfı stop komutları identity-guard'a takılmaz, SIGTERM pid dosyasını temizler |
 | 3322 | `RECOVERY-BORN-522-DOCTOR-AUTHORITY-COVERAGE-001` | BLOCKED | P1 | OBS | — | `OWNER_CLOSURE_SIGNATURE_REQUIRED` | `deckent doctor` provider-limit-authority kapısını görmüyor ve operatörü yanlış remedy'ye (`keyring init`) yönlendiriyor |
@@ -415,7 +408,6 @@
 | 7092 | `RECOVERY-TRUTH-001` | VERIFY | P0 | KERNEL | — | — | Sprint-564 E091 vakasının 7 kurtarma/settlement doğruluk defekti TEK recovery paketi olarak kapanır (KANUN 6 — paket yalnız kendi closure'ını taşır): (1) worker-result JSON-encoding gate'i — worker `.result` yazarken JSON doğrulanır, notes içi ham kontrol-karakteri/escape'siz tırnak üretimde reddedilir; (2) exit-0 + corrupt-result kör noktası — monitor'ün onarım dalı exit koduna değil parse-sonucuna bağlanır (spawn-backend-docker.ts:7187 sınıfı); (3) xverify CONFIRMED-koşu stub'ı PENDING+NO_TASK_RECEIPT kalıyor → clean-gate/build kilidi (kısır-döngü sınıfı) — xverify runner task-receipt + terminal statü yazar; (4) finalize task-dosyası statülerini terminal'e yazmıyor (cleanup'a kadar clean HOLD); (5) landing-proposal tüketim yüzeyi yok; (6) `review` ACTIVE-run "Invalid Docker result settlement reference" crash; (7) scheduler continuous-idle — Paused task cascadeSkip'siz, run terminal'e akmıyor |
 | 7094 | `WORKER-PROMPT-COST-ARCHITECTURE-001` | OPEN | P0 | KERNEL | — | — | **EN-ÖNEMLİ-İŞ (owner emri 2026-08-19, tam yetki):** worker prompt/maliyet mimarisi — kaliteden 0 kayıpla hedef ~%80 maliyet düşüşü; her çözüm yolunun kazanç/hız/kayıp üçlüsü 567-tarzı tekrar-koşularla ÖLÇÜLÜR ve xverify ile MÜHÜRLENIR; milyon-ölçek solo→enterprise herkes için doğru çözüm (LAW 1-2). Ölçülmüş taban (sprint-563 gerçek logları): maliyetin %91-95i cache-read; turn 10-50; task $1.15-4.81; kararlı CLI-prefix tam 18.264 tok (32 tool-şeması+34 slash+19 skill+8 agent kataloğu); .prompt 9.5-16.8k tok — %36 TAM ADR gövdesi (adr_render operative AÇIK ama ADRlerde worker-operative marker YOK → kesim çalışmıyor) + %21 göreve-DUYARSIZ 3 sabit skill (alfabetik-ilk-üç; 11 promptun 8inde bayt-aynı 14.207B) + %5 landing-önsözü EN BAŞTA (bayt-209da attempt-nonce → arkasındaki 15.211Blık bayt-aynı blok cache-hit alamıyor); CLAUDE.md 17.719B worker önekine giriyor (kapatma yok); .plan sıfır host-doğrulama + .hb yalnız existsSync → turn-katlanabilir; codexte scope-zorlama YOK + prefix stabilize edilemiyor + AGENTS.md 19.325B önek adayı |
 | 7095 | `AGENT-PERMISSION-MATRIX-001` | OPEN | P2 | PRODUCT | — | — | **Post-productization iyilestirme (owner 2026-08-19; URUN KAPSAMINDA DEGIL — bitmis/urunlesmis deckent uzerine):** enterprise-seviye, cok-detayli permission mimarisi: (1) worker TOOLLARI yonetilebilir olur (bugunku 7094-F2a sabit WORKER_AVAILABLE_TOOLS projeksiyonu matris-cozumlu hale gelir); (2) SABIT agent tanimlarina dokulmus **agent×skill matrisi** — agent ise gore skillini matristen alir; (3) agent, isin dogasi geregi VEYA agent-bazli permissionla dogar (orn. yalniz-Read denetci agent); dangerously-skip-permissions sinifinin yerini kademeli permission-dogumu alir; (4) app/CLI uzerinden musteri-customize; permission yapisini istemeyen OFF yapar — OFF ise worker FULL toolla dogar (bugunku davranis, sorun degil); (5) solo→team→enterprise profilleri (LAW 1-2), config-resolved, tek global ayar yok |
-| 7096 | `DEBT-DEPENDENCY-REPAIR-7094R-001` | VERIFY | P0 | KERNEL | — | — | **7094-alt onarim paketi (owner onayi 2026-08-19: "4 duzeltmeyi tek MASTER satiri yap ve hepsini uygula"):** 3-tur stabilite kosusunda canli yakalanan 5-halka defekt zinciri — (1) basari-raporu-notlu debt dogumu, (2) escalateDebt her kapanista critical'e geri yukseltir (deprioritize tek-tur omurlu), (3) plana debt-prepend slot kaydirir, (4) "Task N"/integer dependency-ref debt-DAHIL listeye indexlenir → durust gorevler debt'e baglanir (DISK KANIT: scheduler-shadow 573-004←573-001, 573-005←573-002), (5) anlamsiz debt-fix durust NO_GO → FIX-butce biter → breaker run'i park eder (573/574: 4/8 gorev hic kosmadi, kartopu). Ayrica NO_GO kok-nedeni: DOC_WRITE correctness testsPassed'e bagliydi — durust `false` yazan doc-worker NO_GO, "tests passed" uyduran DONE (573-006: attempt+3 fix DORDU ayni cezayla, ~$0.93 bosa; durustluk-cezasi/yalan-tesviki urun-defekti) |
 | 7097 | `EVALUATOR-HONESTY-GONOGO-001` | OPEN | P1 | KERNEL | — | — | **Evaluator durustluk + go/nogo kriter mimarisi (owner admission 2026-08-19: "2. maddeyi kapsamli ele alacagiz, go-nogo kriter iyilestirmeleriyle ortusuk bir madde"):** 7096-D2 minimal duzeltmesinin kalici tasarimi — (1) kanitsiz "tests passed" iddiasi CEZALANDIRILIR (test-iddiasi kanit-satiri/receipt ister; yalan-tesvikinin tam tersine cevrilmesi), (2) kriter-setleri gorev-sinifina gore uygulanabilirlik matrisiyle cozulur (testsPassed/coverage yalniz test-yuzeyi olan siniflarda puanlanir; N/A tipi acikca ayrilir), (3) task goNogo kriterleri ile rubrik kriterleri HIZALANIR (bugun iki ayri dogruluk-kaynagi: goCriteria metni vs rubric criterionScores — tek authority + typed eslesme), (4) worker result semasina typed `residualDebt` alani (GO_WITH_TECH_DEBT'in eksigi yapisal yazilir; debt-ledger notu basari-raporu yerine bu alandan beslenir — 7096-D3'un kalici cozumu), (5) fix-task'in evaluator'u attempt-1'le AYNI kuraldan degerlendirmesi dongusel-NO_GO'yu yapisal engeller |
 | 7098 | `SKILL-ROUTING-RESIDUAL-MICRO-001` | OPEN | P2 | KERNEL | — | — | **Debt-561-002/003 residual'larinin owner-onayli MASTER'a tasinmasi (Alperen 2026-08-19: "debtleri onerdigim gibi yonet, mikro isi MASTER'a tasi"):** (1) tests/orchestra/brain-skill.test.ts:187 civari test-local `profileVersion: 3` literal'i kaldirilip kanonik sabitten okunur (0-hardcode KANUN 10 hijyeni, test-locali); (2) assignedSkills WHOLESALE-overwrite kaynak-tarafi duzeltmesi — src/orchestra/routing-plan-adapter.ts:150 ve src/orchestra/task-mode-runner.ts:330 V3 kararini `task.assignedSkills`e toptan yazarken force-skill'leri ezebiliyor; buildWorkerPrompt guard'i bugun downstream onariyor (561-003 kaniti), kaynak-tarafi merge/force-koruma buraya gelir |
 | 7100 | `DEP-SUPPLY-DEFENSE-001` | OPEN | P1 | SECURITY | — | — | npm dependency supply-chain savunmasını ürün özelliği olarak değerlendir: worker/CI install yollarında install-script guard, lockfile-integrity gate, bilinen-IOC taraması ve editör-hook (workspace-trust) koruması |
@@ -439,7 +431,6 @@
 | 8091 | `NPM-CHANNEL-001` | OPEN | P0 | RELEASE | — | — | npm name reservation and beta dist-tag channel under owner-manual publish |
 | 8092 | `DOCS-TRUTH-PASS-001` | OPEN | P0 | DOCS | — | — | Beta-scope public README and top-level docs reality pass from current code truth |
 | 8093 | `LAUNCH-COMMS-001` | OPEN | P1 | PRODUCT | `RELEASE-BETA-001` | — | Launch communications, demo assets and recurring social cadence |
-| 8095 | `DOCS-VISION-002` | VERIFY | P1 | DOCS | — | — | 2026-08 rekabet-sentezi vision amendment: hyperscaler control-plane tavanı, provider+runtime bağımsızlığı, recursive delegasyon cümlesi ve iki yeni non-goal (identity provider değil; başka bir agent runtime değil), en+tr paritesiyle |
 | 8096 | `NAIVE-COOPETITION-001` | OPEN | P1 | PRODUCT | `OPERATION-001`, `APPROVAL-001` | — | Naive coopetition integration contract |
 | 8097 | `METRICS-NORTHSTAR-001` | OPEN | P1 | PRODUCT | `KERNEL-SETTLEMENT-001` | — | North-star KPI and guardrail metric framework |
 | 8098 | `FLAGSHIP-PROOF-001` | OPEN | P1 | PRODUCT | `METRICS-NORTHSTAR-001`, `XVERIFY-WIRE-001` | — | Eight-scenario flagship competitive acceptance suite on the production binary |

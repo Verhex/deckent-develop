@@ -14,6 +14,31 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint691] - 2026-08-26
+
+### Added
+
+- Align failing api/cli suites (cluster 1) to landed contracts
+- Align failing cli/core/governance/mcp suites (cluster 2) to landed contracts
+- Align failing mcp/orchestra suites (cluster 3) to landed contracts
+- Align failing orchestra suites (cluster 4) to landed contracts
+- Align failing orchestra suites (cluster 5) to landed contracts
+- Align failing orchestra/scripts suites (cluster 6) to landed contracts
+
+
+_Tasks: 6 total, 6 done, 0 tech debt, 0 no-go_
+
+## [sprint690] - 2026-08-26
+
+### Added
+
+- Align failing orchestra suites (cluster 1) to landed contracts
+- Align failing orchestra suites (cluster 2) to landed contracts
+- Align failing orchestra/unit suites (cluster 3) to landed contracts
+
+
+_Tasks: 3 total, 3 done, 0 tech debt, 0 no-go_
+
 ## [sprint688] - 2026-08-26
 
 ### Added

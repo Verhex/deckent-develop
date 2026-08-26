@@ -8,8 +8,7 @@ metadata:
 Full vitest suite'i her landing sonrasi kosma; **5 landing sureci sonrasinda bir** kos
 (Alperen 2026-08-26 gece amendment'i: "cok vakit kaybettiriyor, 5 turda 1 kosalim" —
 onceki 3-landing kadansi 2026-08-19). Aradaki landinglerde scoped/hedefli testler +
-20-gate lint + `tsc --noEmit` yeterlidir. Sayac: 2026-08-26 gece munhasir kosum
-(38743/0 yesil, C-dalgasi landing'i) = son kosum; sonraki full suite 5 landing sonra.
+20-gate lint + `tsc --noEmit` yeterlidir. Sayac SIFIRLANDI: 2026-08-26 13:5x sertifika-kosumu (2830-dosya/38.842 yesil; 3304-kaniti) = son kosum; sonraki full suite 5 landing sonra.
 
 **Why:** Full suite olculen maliyeti ~21 dk/kosum (38.7k test; 2026-08-26 gecesi 4 kosum
 ~80+ dk). Ayni gece full-suite gercek bir 206-kirmizi regresyon dalgasini yakaladi —
