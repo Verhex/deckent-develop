@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):136be0959af4597d53461b8948baa67ca7be8289a22a5ae0dd4b71e710384537`
+**Source digest:** `sha256(normalized-lf-utf8):749f8c17c2c42c43b5f40cb32ae515f4112a8d860d409f890c0dccdfb3ecb1f9`
 
 **Rows:** 538 total · 464 active · 74 terminal
 
@@ -13,11 +13,11 @@
 
 | State | Count |
 |---|---:|
-| OPEN | 349 |
+| OPEN | 348 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 69 |
-| VERIFY | 46 |
+| VERIFY | 47 |
 | DONE | 74 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -273,7 +273,7 @@
 | 3296 | `RECOVERY-BORN-490-PROVIDER-OBSERVATION-001` | OPEN | P1 | KERNEL | `PROVIDER-HOLD-001`, `RUN-STATUS-AUTHORITY-001` | — | Terminal retirement closes or scopes historical provider execution intervals |
 | 3298 | `RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001` | OPEN | P1 | OBS | `RECOVERY-BORN-488-RECOVERY-TERMINAL-001`, `RECOVERY-BORN-490-TERMINALIZATION-EVENTS-001` | — | Human sprint log projects receipt-backed terminal COMPLETE and ABORTED truth exactly once |
 | 3299 | `RECOVERY-BORN-490-REPLAY-CERTIFICATION-001` | OPEN | P0 | ASSURANCE | `RECOVERY-BORN-490-DESCENDANT-CANCELLATION-001`, `RECOVERY-BORN-490-PROVIDER-OBSERVATION-001`, `RECOVERY-BORN-490-CONTROLLER-TEST-CONTRACT-001`, `RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001` | — | Recovery replay ladder certifies isolated failure classes before publish planning resumes |
-| 3300 | `RECOVERY-BORN-490-BUILD-DIGEST-GATE-001` | OPEN | P0 | ASSURANCE | `RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001`, `RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001` | — | Settled source is built once and source/dist identity is proven before binary replay |
+| 3300 | `RECOVERY-BORN-490-BUILD-DIGEST-GATE-001` | VERIFY | P0 | ASSURANCE | `RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001`, `RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001` | — | Settled source is built once and source/dist identity is proven before binary replay |
 | 3301 | `RECOVERY-BORN-490-NOT-DISPATCHED-SKIPPED-REPLAY-001` | OPEN | P0 | ASSURANCE | `RECOVERY-BORN-490-BUILD-DIGEST-GATE-001`, `RECOVERY-BORN-490-PRE-DISPATCH-SETTLEMENT-001` | — | Synthetic NOT_DISPATCHED and dependency SKIPPED states reach truthful terminal settlement |
 | 3302 | `RECOVERY-BORN-490-LANDING-CHECKPOINT-REPLAY-001` | OPEN | P0 | ASSURANCE | `RECOVERY-BORN-490-BUILD-DIGEST-GATE-001`, `RECOVERY-BORN-488-LANDING-CHECKPOINT-001`, `RECOVERY-BORN-488-REPAIR-DISPATCH-001` | — | Sprint-488 landing and checkpoint defect classes recover through production authority |
 | 3303 | `RECOVERY-BORN-490-MULTI-PROVIDER-REPLAY-001` | OPEN | P0 | ASSURANCE | `RECOVERY-BORN-490-BUILD-DIGEST-GATE-001`, `RECOVERY-BORN-490-PROVIDER-OBSERVATION-001` | — | Multi-provider smoke proves config-resolved routing, auth isolation and provider observation retirement |

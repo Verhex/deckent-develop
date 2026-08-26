@@ -18,8 +18,10 @@
    ikisi de önkoşul-gated çıktı (PRINCIPAL/TENANT · RECEIPT-001), KANIT'la kapanamaz.
 2. ~~Kalite-kapıları dalgası~~ **TÜKETİLDİ 2026-08-26** (sprint-681 4/5 + el-tamamlama;
    201/202/203/205 → VERIFY, receipt GR-2026-08-26-NODE2-QUALITY-01).
-3. **Replay-merdiveni** — 3300 → 3301 → 3302 → 3303 → 3304 (sıralı basamaklar; hepsi yeşilse
-   3299 zincir-receipt'le kapanır). Önkoşul: 3302 için 3276/3285 (bkz node 5).
+3. **Replay-merdiveni (KISMEN)** — ~~3300~~ SERTİFİKALANDI 2026-08-26 (çift-kutup canlı kanıt,
+   receipt'li VERIFY) → 3301 ilk-deneme iki typed-gate'e çarptı (E078 · ZERO_TASK_HOLD),
+   tasarımlı replay-harness dilimi gerekiyor → 3302 · 3303 · 3304 sırada; hepsi yeşilse
+   3299 zincir-receipt'le kapanır.
 4. ~~RECOVERY-BORN mikro-paketi-1~~ **TÜKETİLDİ 2026-08-26** (sprint-683 6/6 + in-package
    motor-hotfix; 6 satır → VERIFY, receipt GR-2026-08-26-NODE4-RECOVERY-01).
 5. ~~Settlement-atomiği dalgası~~ **TÜKETİLDİ 2026-08-26** (sprint-682 4/4 DONE 0-debt;
