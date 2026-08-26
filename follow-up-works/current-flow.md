@@ -35,10 +35,18 @@ adımı artık .tasks-envanteri.
 **XVerify:** preflight-fix claim'i verifier-codex UNCLEAR (çürütme yok; formal-criterion
 eşleme sorunu; receipt 78e7d604…) — makine-kanıt esas alındı, kör-retry yapılmadı.
 
-**Remote CI (advisory):** d49758cfa E2E+Secret SUCCESS; 71bb8ec0e koşuları saat ~02:30'da
-in-progress — sabah kontrol edilmeli (beklenti yeşil; kırmızıysa sınıflandırıp raporlarım).
+**Remote CI (advisory) — SON DURUM 04:30: REPO TAM-YEŞİL.** 71bb8ec0e koşusu kırmızı çıktı
+(dalga-landing'leri scoped-only doğrulamayla indiği için katalog-pin borcu birikmişti);
+tam lokal full-suite koşuldu (2780 dosya), 18 kırık kök-sınıf kapatıldı ve `b25ac79e7`
+hizalama-batch'i ile CI+E2E+Secret ÜÇÜ DE SUCCESS. Batch'ten İKİ GERÇEK ÜRÜN-ONARIMI çıktı:
+(a) sync workspace-kolu .deckent'siz projede fırlatıyordu → fault-isolated boş-rapor;
+(b) 42 manifest'te legacy avgScore→avgCoverage canonical normalizasyonu (tarihî src-tutarsızlığı)
++ drift-normalize builtinContentHash istisnası. Mock-ratchet 272→270 (3 factory importOriginal).
 
-**Kararını bekleyen:** (1) preflight typecheck-invariant regresyon-pini + directive-dersleri
+**Kararını bekleyen (GÜNCEL):** (0-YENİ) katalog-dokunuşlu dalga landing'lerinde scoped-yerine
+mini-full-suite şartı (bu gecenin dersi: scoped-yeşil 3 landing pin-borcu biriktirdi) +
+sync-arm'a stats-normalizasyon seam'i (data-fix yapıldı, mekanizma-adayı);
+**Kararını bekleyen (önceki):** (1) preflight typecheck-invariant regresyon-pini + directive-dersleri
 MASTER-admission; (2) clean-guard'ın öksüz-artefakt tipli-imha yolu (finding); (3) bozuk
 flow-envelope 23d494c8 (INVALID_EVENT_ENVELOPE — clean'li tam build hâlâ bundan bloklu;
 clean'siz build ile dist=src, işlev-kaybı yok); (4) "Budget OVER" cleanup --decay onayı;
