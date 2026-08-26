@@ -63,3 +63,24 @@ falls back to English. Do not create a second locale-selection chain in a featur
 Verify catalog parity through the task-declared targeted checks and tests that
 exercise the real `messages.ts` catalog, `getMessageLanguages`, and the changed
 surface. Do not invent a lint command or a second fixture catalog.
+
+## Anti-Patterns
+- Hardcoding a user-facing string in any CLI/runtime surface instead of a
+  `getMessage(key, lang)` catalog entry.
+- Adding the `en` text and deferring the `tr` twin — both languages land in
+  the same change or the key does not land.
+- Using a catalog key in code before the catalog defines it (the runtime
+  logs a missing-key warning on stderr — that warning is a defect).
+- Baking labels into mechanism modules (TUI/render/controller) — mechanism
+  stays string-free; labels are injected by the caller.
+- Interpolating raw values into translated strings instead of the
+  catalog's typed variable slots.
+
+## Karpathy Notes
+- **Surgical:** an i18n fix adds exactly the missing key pair and its call
+  site — never a sweep-rewrite of neighbouring messages in the same change.
+- **Simplicity first:** reuse the existing catalog family and interpolation
+  helpers; no new translation layers.
+- **Goal-driven:** DONE means the surface renders from the catalog in both
+  languages on a real binary run with zero missing-key stderr — not that
+  the string constant moved files.

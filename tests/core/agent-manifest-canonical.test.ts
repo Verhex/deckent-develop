@@ -39,7 +39,7 @@ describe('canonical built-in agent manifests', () => {
   it('keeps every source built-in pool-visible with exact registered API model IDs', () => {
     const manifests = readManifests(BUILTIN_AGENTS_DIR);
 
-    expect(manifests).toHaveLength(21);
+    expect(manifests).toHaveLength(22);
     for (const manifest of manifests) {
       expectCanonicalModels(manifest);
       expect(AgentPoolManager.validateAgentDefinition(manifest).valid, manifest.id).toBe(true);
@@ -50,7 +50,7 @@ describe('canonical built-in agent manifests', () => {
       mkdirSync(join(projectRoot, '.deckent'), { recursive: true });
       writeFileSync(join(projectRoot, '.deckent', 'config.json'), '{}\n', 'utf8');
       const pool = new AgentPoolManager(projectRoot).loadAgents();
-      expect([...pool.values()].filter((agent) => agent.source === 'builtin')).toHaveLength(21);
+      expect([...pool.values()].filter((agent) => agent.source === 'builtin')).toHaveLength(22);
     } finally {
       rmSync(projectRoot, { recursive: true, force: true });
     }
@@ -59,7 +59,7 @@ describe('canonical built-in agent manifests', () => {
   it('keeps the project mirror model-identical to builtins, including nested routing models', () => {
     const builtins = new Map(readManifests(BUILTIN_AGENTS_DIR).map(manifest => [manifest.id, manifest]));
     const project = readManifests(PROJECT_AGENTS_DIR).filter(manifest => builtins.has(manifest.id));
-    expect(project).toHaveLength(21);
+    expect(project).toHaveLength(22);
     for (const manifest of project) {
       expectCanonicalModels(manifest);
       const builtin = builtins.get(manifest.id);

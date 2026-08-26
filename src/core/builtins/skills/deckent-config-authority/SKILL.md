@@ -89,3 +89,23 @@ baseline entry. Zero violations is the target state.
 - Failure is propagated and no success is claimed before fsync + rename.
 - `lint-config-writers` remains green with a non-growing baseline.
 
+
+## Anti-Patterns
+- Hand-rolled read-modify-write on config JSON instead of the
+  config-write-authority seam (atomic tmp + fsync + rename under lock).
+- Treating an I/O read error as corruption — healing may only trigger on
+  real parse evidence; transient errors are typed holds, never quarantine.
+- Adding a new config writer without registering it against the
+  only-shrink writer gate.
+- Inline secrets in config files — only governed references are accepted.
+- Silently adopting a concurrent revision instead of surfacing the typed
+  CONCURRENT_REVISION_HOLD.
+
+## Karpathy Notes
+- **Surgical:** a config change goes through the existing authority seam —
+  never add a parallel write path "just for this one field".
+- **Simplicity first:** one typed hold with an exact reason beats a clever
+  retry loop that hides the failure class.
+- **Goal-driven:** DONE means the write survives the adversarial
+  interleaving tests and the writer gate stays at or below its baseline —
+  not that a single happy-path write succeeded.

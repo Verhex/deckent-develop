@@ -1,59 +1,86 @@
 # i18n Quality
 
-## No Hardcoded User-Facing Strings
-- Every string a user sees goes through the project's message lookup (`getMessage(key, lang,
-  vars?)`), never a literal in the calling code — mechanism modules (TUI/render/controller
-  layers) stay string-free, with English as the fallback default and labels injected by the
-  caller, not authored inline in the mechanism.
-- A hardcoded string in either language is tech debt, not a shortcut — it cannot be found by
-  the translation-parity check below and silently drifts from the rest of the UI's language.
-- Keep the message TABLE (key → per-locale string) in one place; do not scatter per-feature
-  string maps that each reinvent lookup/fallback behavior.
+Use this skill when adding or changing text that a Deckent user can see. The current
+catalog authority and lookup implementation live in
+`src/cli/helpers/messages.ts`; bounded catalog families under its
+`message-catalog/` directory are valid only after that module registers them.
 
-## Template Interpolation Safety
-- Placeholders (`{varName}`) are replaced by a single regex pass over the resolved template —
-  never string-concatenate translated fragments around a value, since word order and
-  pluralization differ per language and concatenation bakes in one language's grammar.
-- A missing variable must render visibly (e.g. leave `{varName}` in place) rather than silently
-  dropping to an empty string — a silently-blanked placeholder is harder to notice in review
-  than a literal `{varName}` staring back at you.
-- A missing message KEY must fall back to returning the key itself (visibly wrong, greppable)
-  plus a dev-only stderr warning — never throw, and never fall back to a blank string that
-  looks like a legitimate (if empty) UI state.
+## Required Catalog Contract
 
-## Locale Fallback Chain
-- Resolve in a fixed order: requested locale → base/default language (English) → the key
-  literal. Every locale request must land on step 3 in the worst case — there is no "no
-  message" state.
-- Normalize unsupported/malformed locale codes to the default language rather than treating
-  them as a lookup miss on every single key.
+- Add every user-facing message key to the registered catalog with a non-empty
+  `en` **and** `tr` value. An English-only or Turkish-only row is incomplete even
+  though the runtime has an English fallback.
+- Resolve display copy through `getMessage(key, lang, vars?)`. Do not hardcode
+  English or Turkish user-facing literals at call sites.
+- Keep typed codes, protocol values, machine-readable JSON fields, paths, and
+  identifiers as data. Catalog the human-readable prose around them.
+- Use `{name}` placeholders in each locale's complete sentence. Do not assemble a
+  translation by concatenating fragments. If a variable is absent, the current
+  lookup deliberately leaves its placeholder visible.
 
-## Pluralization Discipline
-- Never build a plural by string-concatenating a count onto a singular noun — grammar rules
-  for pluralization vary per language (some have none, some have several plural forms) and
-  concatenation only ever produces the English rule.
-- Route count-dependent phrasing through the same `vars` interpolation mechanism as any other
-  variable, with the count-aware phrasing baked into each locale's own template string, not
-  computed by shared calling code.
+## String-Free Mechanisms
 
-## Translation Parity Testing
-- A CI-enforced test walks every message key and asserts it exists (and is non-empty) in every
-  supported locale — a key added for English and never backfilled for other locales is a defect
-  the type system cannot catch, because the message table is untyped string data.
-- Fail the parity test the moment a key exists in one locale and not another — a partial
-  translation should be a build-blocking gap, not a silent runtime fallback nobody notices.
+Mechanism modules—renderers, controllers, formatters, and reusable state or
+transport logic—must not author display copy. Inject already-localized labels or a
+lookup callback from the presentation boundary. This keeps mechanisms reusable and
+prevents a second, untracked message catalog from forming inside implementation
+code.
+
+When changing a surface:
+
+1. Identify each string that reaches a person, including errors, warnings, prompts,
+   headings, empty states, and help text.
+2. Add one catalog key with its non-empty `en`/`tr` pair to `messages.ts` or a
+   family that `MESSAGE_CATALOG_FAMILIES` registers.
+3. Resolve the key at the presentation boundary with the effective language and
+   pass the resulting label into lower-level mechanisms.
+4. Exercise both languages and the missing-key path in the relevant targeted test.
+
+## Lookup and Failure Behavior
+
+`getMessage` normalizes the requested language to `tr` or the default `en`, then
+uses the requested catalog value, the English value, or the key itself. An unknown
+key returns the key so the defect stays visible. In non-production environments it
+also writes a `[getMessage] missing i18n key` diagnostic to stderr; production
+suppresses that diagnostic. Never hide the development signal with an empty-string
+fallback or a catch that discards stderr.
+
+`resolveLanguage` is the current locale authority. It considers
+`DECKENT_LANGUAGE`, `DECKENT_LANG`, configured language, `LC_ALL`, and `LANG`, and
+falls back to English. Do not create a second locale-selection chain in a feature.
+
+## Review Gate
+
+- Every new or changed user-facing key has a non-empty `en`/`tr` pair.
+- No user-facing English or Turkish literal remains at the call site.
+- Mechanism modules receive localized labels instead of owning prose.
+- Placeholder names agree across the two translations and missing variables remain
+  visible.
+- Missing keys return the key and emit the stderr diagnostic when `NODE_ENV` is
+  not `production`; production returns the key without writing the diagnostic.
+- Tests cover the real catalog/lookup path rather than a duplicate fixture map.
+
+Verify catalog parity through the task-declared targeted checks and tests that
+exercise the real `messages.ts` catalog, `getMessageLanguages`, and the changed
+surface. Do not invent a lint command or a second fixture catalog.
 
 ## Anti-Patterns
-- A literal user-facing string inside a mechanism/render module instead of a `getMessage` call.
-- String-concatenating a translated fragment around an interpolated value or a plural count.
-- A missing key silently returning an empty string instead of the key itself + a dev warning.
-- An unsupported locale code treated as "no locale" instead of normalized to the default.
-- Adding a message key for one locale without a parity test catching the other locales' gap.
+- Hardcoding a user-facing string in any CLI/runtime surface instead of a
+  `getMessage(key, lang)` catalog entry.
+- Adding the `en` text and deferring the `tr` twin — both languages land in
+  the same change or the key does not land.
+- Using a catalog key in code before the catalog defines it (the runtime
+  logs a missing-key warning on stderr — that warning is a defect).
+- Baking labels into mechanism modules (TUI/render/controller) — mechanism
+  stays string-free; labels are injected by the caller.
+- Interpolating raw values into translated strings instead of the
+  catalog's typed variable slots.
 
 ## Karpathy Notes
-- **Simplicity first:** One message table, one lookup function, one fallback chain — don't
-  build a full ICU/pluralization engine until the project's actual locale set needs it.
-- **Surgical:** Adding a new user-facing string touches the message table and its call site —
-  never inline a literal "just this once" to save a round-trip through the table.
-- **Goal-driven:** DONE means the string renders correctly in every supported locale via the
-  real lookup path, with parity test green — not that it merely looks right in English.
+- **Surgical:** an i18n fix adds exactly the missing key pair and its call
+  site — never a sweep-rewrite of neighbouring messages in the same change.
+- **Simplicity first:** reuse the existing catalog family and interpolation
+  helpers; no new translation layers.
+- **Goal-driven:** DONE means the surface renders from the catalog in both
+  languages on a real binary run with zero missing-key stderr — not that
+  the string constant moved files.

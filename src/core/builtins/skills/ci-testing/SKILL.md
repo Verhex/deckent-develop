@@ -106,3 +106,23 @@ Do not report green from truncated output with an unproven producer exit code.
 DONE requires evidence from the declared checks. Do not claim nonexistent commands
 such as `test:ci-sim`, fixed coverage thresholds, or an always-required full-suite
 run when the repository or task does not declare them.
+
+## Anti-Patterns
+- Piping a verification command through `| tail` and reading the pipe's exit
+  code — always `cmd > log 2>&1; echo $?`.
+- Test shards without the dist prebuild step while real-binary tests need
+  `dist/cli/entry.js` — the ENOENT cascade masks the real signal.
+- Chaining gates with `&&` inside one declared test command: the first red
+  swallows every later gate's evidence.
+- Claiming "CI green" from a local run — report LOCAL_VERIFIED and
+  REMOTE_ADVISORY separately, by named class.
+- Opening a file read-only and fsyncing it — Windows FlushFileBuffers
+  rejects read-only handles with EPERM; fsync file descriptors as 'r+'.
+
+## Karpathy Notes
+- **Surgical:** a CI repair fixes the one failing class it names — timeout
+  raises are measured (observed duration × headroom), never guessed.
+- **Simplicity first:** copy the proven job-step precedent (e.g. the
+  dist-prebuild block) instead of inventing a new pipeline shape.
+- **Goal-driven:** DONE means the previously red job class is green on a
+  real remote run of the exact commit — not that the workflow YAML parses.

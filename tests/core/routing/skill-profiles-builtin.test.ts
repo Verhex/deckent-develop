@@ -107,6 +107,68 @@ const BUILTIN_SKILL_PROFILES: Readonly<Record<string, SkillProfile>> = {
     deliverables: ['code-src', 'code-test'],
     tokenCost: 1500,
   },
+  'deckent-config-authority': {
+    profileVersion: SKILL_PROFILE_VERSION,
+    workTypes: [
+      { type: 'configure', proficiency: 'primary' },
+      { type: 'migrate', proficiency: 'secondary' },
+    ],
+    domains: [
+      { id: 'configuration', proficiency: 'primary' },
+      { id: 'governance', proficiency: 'secondary' },
+    ],
+    expertise: ['config-authority', 'concurrency-safety'],
+    deliverables: ['config', 'manifest'],
+    tokenCost: 1500,
+  },
+  'deckent-hermetic-testing': {
+    profileVersion: SKILL_PROFILE_VERSION,
+    workTypes: [
+      { type: 'build', proficiency: 'primary' },
+      { type: 'fix', proficiency: 'secondary' },
+      { type: 'review', proficiency: 'able' },
+    ],
+    domains: [{ id: 'testing', proficiency: 'primary' }],
+    expertise: [
+      'fresh-checkout hermetic tests',
+      'suite-owned tmpdir fixtures',
+      'hermeticity ledger ratchets',
+      'runtime open-flag write guards',
+    ],
+    deliverables: ['code-test'],
+    tokenCost: 1500,
+  },
+  'deckent-repair-alignment': {
+    profileVersion: SKILL_PROFILE_VERSION,
+    workTypes: [
+      { type: 'fix', proficiency: 'primary' },
+      { type: 'analyze', proficiency: 'secondary' },
+    ],
+    domains: [
+      { id: 'testing', proficiency: 'primary' },
+      { id: 'quality', proficiency: 'secondary' },
+    ],
+    expertise: ['test-repair', 'root-cause-analysis'],
+    deliverables: ['workflow'],
+    tokenCost: 1500,
+  },
+  'deckent-worker-evidence': {
+    profileVersion: SKILL_PROFILE_VERSION,
+    workTypes: [
+      { type: 'review', proficiency: 'primary' },
+      { type: 'analyze', proficiency: 'secondary' },
+      { type: 'document', proficiency: 'able' },
+    ],
+    domains: [{ id: 'workers', proficiency: 'primary' }],
+    expertise: [
+      'disk-derived worker evidence',
+      'result ingress claims',
+      'typed NO_GO verdicts',
+      'real-binary proof of function',
+    ],
+    deliverables: ['doc'],
+    tokenCost: 1500,
+  },
   'anthropic-sdk': {
     profileVersion: SKILL_PROFILE_VERSION,
     workTypes: [

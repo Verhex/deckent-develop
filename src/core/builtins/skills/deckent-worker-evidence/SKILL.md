@@ -102,3 +102,11 @@ yeterli olabilir. Görev promptunun exact verify authority'sini genişletme.
 - Lifecycle dosyalarını `filesChanged` ürün listesine eklemek.
 - Critical açıkken DONE; minor olmayan açığı GO_WITH_TECH_DEBT ile gizlemek.
 - User-surface özelliğini mock-only testle “çalışıyor” ilan etmek.
+
+## Karpathy Notes
+- **Surgical:** evidence lists exactly the commands the task declared —
+  padding the result with unrelated green runs dilutes, not strengthens.
+- **Simplicity first:** one honest NO_GO with the exact failing output beats
+  three paragraphs of narrative around an unproven DONE.
+- **Goal-driven:** DONE maps every goCriteria item to a run artifact; if one
+  item has no artifact, the verdict is GO_WITH_TECH_DEBT or NO_GO, never DONE.

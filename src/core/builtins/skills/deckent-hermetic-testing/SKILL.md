@@ -101,3 +101,11 @@ bu yüzden static hermeticity gate ve tmpdir tasarımı asıl sınırdır.
 - Count/digest'i açıklamasız veya kirli tree ölçümünden kopyalamak.
 - Digest'i pinledikten sonra taranan içeriği değiştirmek.
 - Runtime guard'ı OS sandbox sanmak ya da unknown `open` flag'ini read-only saymak.
+
+## Karpathy Notes
+- **Surgical:** a hermeticity fix touches the one leaking test and its
+  fixture — never "harden" neighbouring green tests in the same change.
+- **Simplicity first:** prefer a tmpdir + explicit fixture over a mocking
+  layer; reach for interposition only when the real API cannot be sandboxed.
+- **Goal-driven:** DONE means the suite passes on a fresh checkout with the
+  ledger pinned last — not that it passes on your warmed-up working tree.

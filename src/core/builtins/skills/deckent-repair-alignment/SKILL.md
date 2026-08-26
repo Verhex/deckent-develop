@@ -74,3 +74,21 @@ required field explicitly. Preserve regression value, including edge cases.
 - No assertion was removed, weakened, skipped, or hidden.
 - The declared targeted verification was run without piping away its exit code.
 
+
+## Anti-Patterns
+- Weakening or deleting an assertion to make a red test pass.
+- "Fixing" a test without first reproducing the red and reading the landed
+  source contract it pins.
+- Classifying a product bug as a stale pin (or vice versa) without exact
+  file-and-line evidence.
+- Skipping a test (`.skip`) as a repair — a skip is a silent retirement.
+- Editing files outside the declared repair scope to silence a neighbour.
+
+## Karpathy Notes
+- **Surgical:** align exactly the stale pin to the landed contract — do not
+  reformat, rename, or "improve" the surrounding test while there.
+- **Simplicity first:** the smallest fixture that reproduces the contract
+  beats a shared helper invented for one repair.
+- **Goal-driven:** DONE means the declared test command is green AND the
+  product-bug branch was honestly ruled out (or reported as NO_GO with
+  file:line) — not merely that the diff compiles.

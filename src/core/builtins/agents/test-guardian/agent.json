@@ -115,7 +115,7 @@
           "proficiency": "primary"
         },
         {
-          "id": "build/quality",
+          "id": "build/release",
           "proficiency": "primary"
         }
       ],
@@ -123,7 +123,7 @@
       "writeAuthority": true,
       "role": "reviewer",
       "deliverables": [
-        "test",
+        "code-test",
         "config"
       ]
     },

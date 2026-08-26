@@ -203,14 +203,13 @@ export function syncBuiltinSkillManifests(
     let sourceManifest: Record<string, unknown> | null;
     let manifestHashInput: string;
     if (fs.existsSync(builtinManifestPath)) {
+      const parsed = readJsonSafe<Record<string, unknown>>(builtinManifestPath);
+      sourceManifest = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? parsed
+        : null;
       try {
         manifestHashInput = fs.readFileSync(builtinManifestPath, 'utf8');
-        const parsed = JSON.parse(manifestHashInput) as unknown;
-        sourceManifest = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-          ? parsed as Record<string, unknown>
-          : null;
       } catch {
-        sourceManifest = null;
         manifestHashInput = '';
       }
     } else {
