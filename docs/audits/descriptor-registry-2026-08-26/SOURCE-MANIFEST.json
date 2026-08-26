@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "analysisDate": "2026-08-26",
+  "analysisBaseSha": "abed38c50f6dda2e48041d9ead2605894a17d0a2",
+  "laneBranch": "lane/descriptor-registry-20260826",
+  "auditCorpus": {
+    "branch": "audit/config-completion-20260825",
+    "commit": "d2e9a1247",
+    "baseSha": "ff48978fb78139ea34b8c5e98fc41532437af9c9",
+    "counts": {
+      "deckentConfigRoots": 141,
+      "truthGateDeclarationLeaves": 449,
+      "semanticDeckentConfigLeaves": 1002,
+      "normalizedUnionPaths": 1146,
+      "rawDefaultLeaves": 180,
+      "normalizedDefaultPaths": 178,
+      "defaultParserArtifacts": 2,
+      "resolvedConfigRoots": 117,
+      "truthRuntimeParserLeaves": 185,
+      "runtimeParserArtifacts": 6,
+      "configMetadataEntries": 55,
+      "inputSnapshotLeaves": 197,
+      "truthIssues": 589,
+      "truthIssueKinds": {
+        "DIVERGENT": 12,
+        "MISSING_DEFAULT": 400,
+        "MISSING_METADATA": 112,
+        "MISSING_RUNTIME": 65
+      },
+      "optionalNoExplicitDefault": 755,
+      "conditionalNoExplicitDefault": 205,
+      "requiredNoTextualDefault": 1,
+      "genuineDynamicDescendants": 28
+    },
+    "sha256": {
+      "field-universe.json": "8cffb156596dc5057da934f01ef5892ba3a9a37642535d01af834853f2c9195f",
+      "CONFIG-FIELD-MATRIX.md": "61a9e0652f979aa9761d5a426498f13e306b5799dc3f32ae0e6bff3b92abf05c",
+      "DRIFT-REGISTER.md": "11be75abd8a17d7b6e67f4456c3178f16375b955f0f9d425b457ee834427388e",
+      "verify-audit-artifacts.mjs": "155c49fd97cad5c2421b56de9999d533297c2faaeef82034d3c573b700cea087"
+    }
+  },
+  "liveSource": {
+    "counts": {
+      "deckentConfigRoots": 142,
+      "truthGateDeclarationLeaves": 450,
+      "rawDefaultLeaves": 181,
+      "truthRuntimeParserLeaves": 186,
+      "configMetadataEntries": 55,
+      "dashboardConfigFields": 66,
+      "schemaDocDefaultRowsEn": 164,
+      "schemaDocDefaultRowsTr": 164,
+      "truthIssues": 592,
+      "truthIssueKinds": {
+        "DIVERGENT": 12,
+        "MISSING_DEFAULT": 401,
+        "MISSING_METADATA": 113,
+        "MISSING_RUNTIME": 66
+      },
+      "metadataEntriesWithTurkishDescription": 4
+    },
+    "files": [
+      {
+        "path": "src/core/config-types.ts",
+        "lines": 2452,
+        "sha256": "79763f0f766a796e4ad4c22004933f30f6265f4767b0b5b3fec45b6c69d8256b"
+      },
+      {
+        "path": "src/core/config.ts",
+        "lines": 3576,
+        "sha256": "3c2d3f1dc990cd2a4fff3132d980133b9f530fcbbacd6743328f5ae58abf16fe"
+      },
+      {
+        "path": "scripts/lint-config-truth.mjs",
+        "lines": 304,
+        "sha256": "f1327aa32927d489bf5cd5a2b66fcee0194fa136f94a6a50c709523464f031fb"
+      },
+      {
+        "path": "src/dashboard/src/pages/ConfigPage.tsx",
+        "lines": 420,
+        "sha256": "ad48ab5def9e629155906fdafc2ca2ae36fc5ab912da4519aaa6dcdbe156e726"
+      },
+      {
+        "path": "docs/en/reference/configuration-schema.md",
+        "lines": 206,
+        "sha256": "3d3f5372759fd463a74009cb95dc9bab473a618d0a16455d5a9f55b976e9e8be"
+      },
+      {
+        "path": "docs/tr/reference/configuration-schema.md",
+        "lines": 206,
+        "sha256": "44417f1796f36d71f869e15cdead77ebd115dff636d2e6087a13bc259c1b4e00"
+      },
+      {
+        "path": "docs/MASTER-PLAN.md",
+        "lines": 1851,
+        "sha256": "1bd8e7df00b3b03e4d1286abbbc6f541004840a1fb0cc35f463c184e77acae39"
+      }
+    ]
+  },
+  "authorityInputs": [
+    {
+      "path": "LANE-BRIEF.md",
+      "sha256": "8d0f9fe40781082b230fb8dd26522e76e8a9ede76df9bb18328fcefb6d32d723"
+    },
+    {
+      "path": "docs/governance/parallel-lane-protocol.md",
+      "sha256": "8c10f28c4a5d895848cc12bb20e210544983ab714c0fcca49bc7422a76dc3ff2"
+    }
+  ]
+}
