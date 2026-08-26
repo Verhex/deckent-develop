@@ -103,3 +103,14 @@ Admission-turu (config-audit emsali) sırası:
 - XVerify provider-ayrımı korunur (yan-şerit çıktısının mühürlenmesi farklı provider'la).
 - Bu protokol repo-development mekanizmasıdır (operating-policy tamamlayıcısı), Deckent
   ürün özelliği değildir; değişiklik yetkisi Alperen'dedir.
+
+
+## 8. ARA-FAZ TEST-FREEZE LEASE (owner onayı 2026-08-26)
+
+Ara-faz ilan edildiğinde ana-şerit `tests/**`, `vitest.config.ts` ve
+`scripts/security/secret-baseline*` yollarına YAZMAZ; bu yollar aktif ci-repair
+yan-şeridinin Faz-B allowlist'ine GEÇİCİ olarak devredilir. İstisna: acil-hotfix —
+lease askıya alınır, ledger'a işlenir, yan-şeride bildirilir; hotfix landing'i sonrası
+lease geri döner. Lease, yan-şerit admission'ı tamamlanınca kendiliğinden sona erer.
+`src/**` her durumda ana-şerit sahipliğinde kalır. Test SİLME her zaman owner-onaylı
+liste ister (assertion-kaybı sınıfı); onaysız silme lease altında da yasaktır.
