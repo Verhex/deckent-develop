@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):0f521c0d1a82f03fa06b3bfe7489a65003ebc8c4980c73d9bac22aa6ff6be235`
+**Source digest:** `sha256(normalized-lf-utf8):136be0959af4597d53461b8948baa67ca7be8289a22a5ae0dd4b71e710384537`
 
 **Rows:** 538 total · 464 active · 74 terminal
 
@@ -13,11 +13,11 @@
 
 | State | Count |
 |---|---:|
-| OPEN | 355 |
+| OPEN | 349 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 69 |
-| VERIFY | 40 |
+| VERIFY | 46 |
 | DONE | 74 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -210,13 +210,13 @@
 | 3168 | `RECOVERY-ASSURANCE-001` | OPEN | P0 | KERNEL | `RECOVERY-MODE-ADAPTERS-001`, `RECOVERY-COMMAND-SERVICE-001`, `RECOVERY-TERMINATION-001`, `RECOVERY-STALE-PROJECTION-001` | — | Recovery failure-injection, every-environment and million-scale assurance matrix |
 | 3169 | `RECOVERY-DOGFOOD-BORN-001` | VERIFY | P0 | KERNEL | — | — | Mandatory born ledger for recovery dogfood discoveries |
 | 3170 | `BUDGET-CONTINUATION-001` | OPEN | P0 | KERNEL | `LIMIT-001`, `RUNNER-PROTOCOL-001` | — | Landing, continuation reserve, task-kind budget sizing, timeout and measured termination contract |
-| 3171 | `RECOVERY-BORN-480-HEARTBEAT-001` | OPEN | P0 | KERNEL | `WORKER-REGISTRY-001`, `RECOVERY-DECISION-001` | — | Worker-writable heartbeat can regress monotonic recovery evidence |
+| 3171 | `RECOVERY-BORN-480-HEARTBEAT-001` | VERIFY | P0 | KERNEL | `WORKER-REGISTRY-001`, `RECOVERY-DECISION-001` | — | Worker-writable heartbeat can regress monotonic recovery evidence |
 | 3172 | `RECOVERY-BORN-480-SCOPE-001` | OPEN | P0 | KERNEL | `PLANNER-001`, `RECOVERY-COMMAND-SERVICE-001` | — | Dependency output is unreachable from downstream recovery surface read scope |
-| 3173 | `RECOVERY-BORN-480-HOLD-CLASSIFICATION-001` | OPEN | P0 | KERNEL | `PROVIDER-HOLD-001`, `RECOVERY-COMMAND-SERVICE-001` | — | Scope failure is misclassified as provider usage-limit hold |
-| 3174 | `RECOVERY-BORN-480-EVALUATE-ORPHAN-001` | OPEN | P0 | KERNEL | `RECOVERY-DECISION-001`, `RECOVERY-STALE-PROJECTION-001`, `KERNEL-SETTLEMENT-001` | — | EVALUATE lock can strand NO_GO without FIX or truthful recovery command |
-| 3175 | `RECOVERY-BORN-480-ATTRIBUTION-001` | OPEN | P0 | KERNEL | `KERNEL-SETTLEMENT-001`, `WORKER-REGISTRY-001` | — | Shared-worktree predecessor diff is attributed to a later failed attempt |
-| 3176 | `RECOVERY-BORN-480-FIX-PRIORITY-001` | OPEN | P0 | KERNEL | `SCHEDULER-001`, `RECOVERY-BORN-480-EVALUATE-ORPHAN-001` | — | Priority FIX must outrank blocked dependants in collision and slot admission |
-| 3177 | `RECOVERY-BORN-480-FORCE-FINALIZE-ORPHAN-001` | OPEN | P0 | KERNEL | `RECOVERY-TERMINATION-001`, `PAUSED-FINALIZE-001` | — | Force-finalize must retire or contain every matching recovery coordinator |
+| 3173 | `RECOVERY-BORN-480-HOLD-CLASSIFICATION-001` | VERIFY | P0 | KERNEL | `PROVIDER-HOLD-001`, `RECOVERY-COMMAND-SERVICE-001` | — | Scope failure is misclassified as provider usage-limit hold |
+| 3174 | `RECOVERY-BORN-480-EVALUATE-ORPHAN-001` | VERIFY | P0 | KERNEL | `RECOVERY-DECISION-001`, `RECOVERY-STALE-PROJECTION-001`, `KERNEL-SETTLEMENT-001` | — | EVALUATE lock can strand NO_GO without FIX or truthful recovery command |
+| 3175 | `RECOVERY-BORN-480-ATTRIBUTION-001` | VERIFY | P0 | KERNEL | `KERNEL-SETTLEMENT-001`, `WORKER-REGISTRY-001` | — | Shared-worktree predecessor diff is attributed to a later failed attempt |
+| 3176 | `RECOVERY-BORN-480-FIX-PRIORITY-001` | VERIFY | P0 | KERNEL | `SCHEDULER-001`, `RECOVERY-BORN-480-EVALUATE-ORPHAN-001` | — | Priority FIX must outrank blocked dependants in collision and slot admission |
+| 3177 | `RECOVERY-BORN-480-FORCE-FINALIZE-ORPHAN-001` | VERIFY | P0 | KERNEL | `RECOVERY-TERMINATION-001`, `PAUSED-FINALIZE-001` | — | Force-finalize must retire or contain every matching recovery coordinator |
 | 3178 | `RECOVERY-DO-DOGFOOD-001` | OPEN | P0 | KERNEL | `RECOVERY-COMMAND-SERVICE-001`, `DO-CUTOVER-001`, `RECOVERY-BORN-480-FORCE-FINALIZE-ORPHAN-001` | — | Next recovery slice through canonical `do` journey before Autonomous widening |
 | 3179 | `RECOVERY-BORN-480-POSTBUILD-BINARY-001` | OPEN | P0 | ASSURANCE | `RECOVERY-ASSURANCE-001`, `TEST-676` | — | Immediate post-build recovery binary proof can exit zero with empty stdout |
 | 3180 | `DO-CUTOVER-001` | BLOCKED | P0 | KERNEL | `RUNFLOW-001`, `PLANNER-001` | `DEPENDENCY_UNSATISFIED` | `do` becomes canonical intent→preview→approval→run journey |

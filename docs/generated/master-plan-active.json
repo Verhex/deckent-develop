@@ -3,19 +3,19 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "0f521c0d1a82f03fa06b3bfe7489a65003ebc8c4980c73d9bac22aa6ff6be235"
+    "value": "136be0959af4597d53461b8948baa67ca7be8289a22a5ae0dd4b71e710384537"
   },
   "summary": {
     "total": 538,
     "active": 464,
     "terminal": 74,
-    "receipts": 205,
+    "receipts": 206,
     "byState": {
-      "OPEN": 355,
+      "OPEN": 349,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
-      "VERIFY": 40,
+      "VERIFY": 46,
       "DONE": 74,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -2500,10 +2500,10 @@
       "id": "RECOVERY-BORN-480-HEARTBEAT-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "OPEN",
-      "updated": "2026-08-04",
+      "state": "VERIFY",
+      "updated": "2026-08-26",
       "definitionDigest": "f8a1ee26033cacb909049942436782bd0147057cdfd49f2cdbfa430a30023273",
-      "progressDigest": "8783c0fa1d1ee4f89a56e686147d58ca2a5fd0111d5712a43b0151282d4b62be",
+      "progressDigest": "dfe44651aea23e373f77878eb723c42a266ea08b3905da180125473e11455fda",
       "terminalClosureDigest": null
     },
     {
@@ -2522,10 +2522,10 @@
       "id": "RECOVERY-BORN-480-HOLD-CLASSIFICATION-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "OPEN",
-      "updated": "2026-07-30",
+      "state": "VERIFY",
+      "updated": "2026-08-26",
       "definitionDigest": "eb9e7b2872955c1ca557efdbcdc473e4b6b128f2d3d5f1dcc34bffbffd265abe",
-      "progressDigest": "1693357963b535373e367fce90437012780630a9b9fabc9d7e88eec174942758",
+      "progressDigest": "ca24795ffe1eec1124568b3870b4086ec7b4de4654c15f968b1746817d14926d",
       "terminalClosureDigest": null
     },
     {
@@ -2533,10 +2533,10 @@
       "id": "RECOVERY-BORN-480-EVALUATE-ORPHAN-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "OPEN",
-      "updated": "2026-07-30",
+      "state": "VERIFY",
+      "updated": "2026-08-26",
       "definitionDigest": "04f432bd563e118a818d966a21c02157a398fe00abd172bafbcb8e89ffb64706",
-      "progressDigest": "9ff68a97ae768d38cde8854b17cd485e5e12cbf95fca867af3f1e2ca5797aea3",
+      "progressDigest": "78e2a431c77de6ef26f68146b093b128e5f8ab4c63a13a927109268ad1950216",
       "terminalClosureDigest": null
     },
     {
@@ -2544,10 +2544,10 @@
       "id": "RECOVERY-BORN-480-ATTRIBUTION-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "OPEN",
-      "updated": "2026-07-31",
+      "state": "VERIFY",
+      "updated": "2026-08-26",
       "definitionDigest": "b6dd8ceed649e391a98858b21a9376a0d148c9a3d6907a1d8f192707483a19be",
-      "progressDigest": "d39ebe4ce6117549688b8824e492dae64d2b48328902e4e80945f512da5e81f5",
+      "progressDigest": "9fbff753c97718a1c5e923e71611038c8a9c8eb456a862e1ff7432bd2fb6af3f",
       "terminalClosureDigest": null
     },
     {
@@ -2555,10 +2555,10 @@
       "id": "RECOVERY-BORN-480-FIX-PRIORITY-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "OPEN",
-      "updated": "2026-07-30",
+      "state": "VERIFY",
+      "updated": "2026-08-26",
       "definitionDigest": "cceda5aa6c2d102b4024f6f1a1837f3ec0c9b150d79eee4c4f1119a65db93609",
-      "progressDigest": "4364e2140d775ebe06ae6675943bd613e3290cbdec4e56779d03a16cae7a377c",
+      "progressDigest": "6e5606b6fdd283ff92c77e4d75c935d3b5b94766e066156589a450cfa5c55182",
       "terminalClosureDigest": null
     },
     {
@@ -2566,10 +2566,10 @@
       "id": "RECOVERY-BORN-480-FORCE-FINALIZE-ORPHAN-001",
       "program": "KERNEL",
       "priority": "P0",
-      "state": "OPEN",
-      "updated": "2026-07-31",
+      "state": "VERIFY",
+      "updated": "2026-08-26",
       "definitionDigest": "249359322a5ceafe327ff34ca26c54dd760e6d3843b0ff1fe37eed9f51b95fcb",
-      "progressDigest": "0c4474d174aa421fd7802637e486d0f13acfb0691d006ffd181c87b6ce50b192",
+      "progressDigest": "fc1b9c5094d1d63d4f5454bc8d4524fbdc50e6b56813c8bedf23c1f217db1c34",
       "terminalClosureDigest": null
     },
     {
@@ -8031,6 +8031,16 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-26T10:13:57+03:00"
+      },
+      "g7AttemptIdentity": null
+    },
+    {
+      "id": "GR-2026-08-26-NODE4-RECOVERY-01",
+      "authorityDigest": "bbcbefd81a0275b9b4543ae272b4acc98ea544532245fa1c098a27a09b227ca6",
+      "lifecycle": {
+        "mode": "ONE_SHOT",
+        "status": "consumed",
+        "transitionAt": "2026-08-26T10:38:33+03:00"
       },
       "g7AttemptIdentity": null
     }
@@ -15967,7 +15977,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "0",
         "W": "0",
@@ -15984,11 +15994,12 @@
         "RECOVERY-DECISION-001"
       ],
       "evidenceReceipts": [
-        "GR-2026-08-04-FAZ4A-S7-01"
+        "GR-2026-08-04-FAZ4A-S7-01",
+        "GR-2026-08-26-NODE4-RECOVERY-01"
       ],
       "acceptance": "Heartbeat publication has one fenced writer or monotonic CAS; a worker cannot lower sequence, forge wall time or overwrite wrapper authority; regressions become typed contradictory evidence without hiding a live process",
-      "evidence": "Sprint-480 task 480-004 overwrote wrapper heartbeat sequence `80+` with `sequence=1` and hardcoded `2026-07-30T00:10:00.000Z` while host time was approximately `2026-07-30T19:47Z`; wrapper later projected sequence `111`, proving split writers. Sprint-482 reproduced the same split writer: Docker wrapper heartbeats reached sequence `7+`, worker-authored task heartbeats restarted at sequence `1`, and the wrapper later advanced again. Affected product and dogfood surfaces: Worker registry, status, recovery decision and Docker wrapper. Negative scope: no PID/time-only orphan verdict, no broad `.tasks` cleanup, no provider replay; `receipt=GR-2026-08-04-FAZ4A-S7-01`; 2026-08-04 FAZ4A-S7 settlement: wrapper-hb-allowlist 18/18 (8 kırıktan) — kırıklar izolasyon değil bayat beklentiydi: born-468 shell-heartbeat yazıcısı bilinçli emekli, otorite tek başına WorkerHeartbeatAuthorityStore (monotonik hostSequence + fence), wrapper inert compatibility seam; testler emekli kontratı değil güncel dürüst kontratı pinliyor (monotonik kanıt gerilemez — stale HBFILE'a dokunulmaz, eksik HBFILE fabrike edilmez); vestigial gözlem: script'te set edilmeyen HB_PID'e kill çağrıları duruyor (zararsız, temizlenebilir); üretim koduna dokunulmadı",
-      "updated": "2026-08-04"
+      "evidence": "Sprint-480 task 480-004 overwrote wrapper heartbeat sequence `80+` with `sequence=1` and hardcoded `2026-07-30T00:10:00.000Z` while host time was approximately `2026-07-30T19:47Z`; wrapper later projected sequence `111`, proving split writers. Sprint-482 reproduced the same split writer: Docker wrapper heartbeats reached sequence `7+`, worker-authored task heartbeats restarted at sequence `1`, and the wrapper later advanced again. Affected product and dogfood surfaces: Worker registry, status, recovery decision and Docker wrapper. Negative scope: no PID/time-only orphan verdict, no broad `.tasks` cleanup, no provider replay; `receipt=GR-2026-08-04-FAZ4A-S7-01`; 2026-08-04 FAZ4A-S7 settlement: wrapper-hb-allowlist 18/18 (8 kırıktan) — kırıklar izolasyon değil bayat beklentiydi: born-468 shell-heartbeat yazıcısı bilinçli emekli, otorite tek başına WorkerHeartbeatAuthorityStore (monotonik hostSequence + fence), wrapper inert compatibility seam; testler emekli kontratı değil güncel dürüst kontratı pinliyor (monotonik kanıt gerilemez — stale HBFILE'a dokunulmaz, eksik HBFILE fabrike edilmez); vestigial gözlem: script'te set edilmeyen HB_PID'e kill çağrıları duruyor (zararsız, temizlenebilir); üretim koduna dokunulmadı; 2026-08-26 Node-4 kapanışı (683-001 sol): heartbeat tek fenced-authority — sequence-geri/forged-walltime/wrapper-üzerine-yazım reddedilir ve typed çelişki-kanıtı olur, canlı süreç gizlenmez; 480-vakası fixture'lı; `receipt=GR-2026-08-26-NODE4-RECOVERY-01`",
+      "updated": "2026-08-26"
     },
     {
       "order": 3172,
@@ -16045,7 +16056,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
         "W": "1",
@@ -16061,10 +16072,12 @@
         "PROVIDER-HOLD-001",
         "RECOVERY-COMMAND-SERVICE-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-26-NODE4-RECOVERY-01"
+      ],
       "acceptance": "Failure classification is evidence-typed before hold publication; planner/scope/code failures remain task or dependency repair outcomes and never quarantine an otherwise reachable provider; only authoritative provider usage evidence can emit `usage-limit`",
-      "evidence": "Sprint-480 event sequence 18 emitted a false Codex usage hold for 480-006 despite 242,454 input tokens, 5,293 output tokens and a written source diff. Result classification now treats any real token/file/line production as executed work before provider-failure classification; focused regression passes. Fresh live mixed-provider replay remains open",
-      "updated": "2026-07-30"
+      "evidence": "Sprint-480 event sequence 18 emitted a false Codex usage hold for 480-006 despite 242,454 input tokens, 5,293 output tokens and a written source diff. Result classification now treats any real token/file/line production as executed work before provider-failure classification; focused regression passes. Fresh live mixed-provider replay remains open; 2026-08-26 Node-4 kapanışı (683-002): usage-limit yalnız authoritative provider-usage kanıtıyla; scope/kod/dependency hatası erişilebilir provider'ı karantinaya alamaz; 480-seq18 fixture'lı; worker-notu: sprint-phases provider-limit guard yorumları bayat kaldı (kozmetik); `receipt=GR-2026-08-26-NODE4-RECOVERY-01`",
+      "updated": "2026-08-26"
     },
     {
       "order": 3174,
@@ -16085,7 +16098,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
         "W": "1",
@@ -16102,10 +16115,12 @@
         "RECOVERY-STALE-PROJECTION-001",
         "KERNEL-SETTLEMENT-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-26-NODE4-RECOVERY-01"
+      ],
       "acceptance": "Exact coordinator/process identity and evaluate-lock progress decide HEALTHY, STALLED or ORPHANED; a durable NO_GO produces exactly one repair decision or resumable HOLD; status never reports coordinator alive or active non-resumable execution from stale PID/state alone",
-      "evidence": "Sprint-480 root cause was a priority inversion: dependency-blocked 480-007 preceded appended 480-006-fix in shared-write serialization, consumed the collision winner and prevented every fix spawn. Pending priority fixes now lead collision arbitration, blocked writers no longer consume worker slots and dashboard agents derive only from successful spawns; focused live-wire proof passes. Full EVALUATE no-progress→Nervous→resume settlement and fresh dogfood replay remain open",
-      "updated": "2026-07-30"
+      "evidence": "Sprint-480 root cause was a priority inversion: dependency-blocked 480-007 preceded appended 480-006-fix in shared-write serialization, consumed the collision winner and prevented every fix spawn. Pending priority fixes now lead collision arbitration, blocked writers no longer consume worker slots and dashboard agents derive only from successful spawns; focused live-wire proof passes. Full EVALUATE no-progress→Nervous→resume settlement and fresh dogfood replay remain open; 2026-08-26 Node-4 kapanışı (683-004 sol): coordinator/process-identity + evaluate-lock-progress ile HEALTHY/STALLED/ORPHANED; durable NO_GO tam-bir repair-kararı veya resumable-HOLD; bayat PID'den canlılık raporu yok; scheduler-tarafı bilinçli 3176'da; `receipt=GR-2026-08-26-NODE4-RECOVERY-01`",
+      "updated": "2026-08-26"
     },
     {
       "order": 3175,
@@ -16123,7 +16138,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
         "W": "1",
@@ -16139,10 +16154,12 @@
         "KERNEL-SETTLEMENT-001",
         "WORKER-REGISTRY-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-26-NODE4-RECOVERY-01"
+      ],
       "acceptance": "Attempt settlement binds files and bytes to its claim-time baseline and exact writer evidence; unchanged predecessor work is excluded from `filesChanged`; ambiguous ownership yields typed HOLD rather than a fabricated author claim",
-      "evidence": "Historical Sprint-480/482 attempts inherited predecessor files and hundreds of ambient lines. Docker settlement now captures a claim-time scoped blob manifest before provider birth, publishes immutable baseline bytes through the host settlement store, reconciles exact scoped bytes and persists `workAttribution`. Sprint-483 replay produced distinct VERIFIED attempt receipts. Recovery additionally makes finalizer, retrospective and rich summary aggregate only VERIFIED attempt work; HOLD, legacy and unavailable claims contribute zero files/lines while cost remains independently accounted, and each reported file retains exact attempt IDs. Focused attribution/schema/finalizer regressions pass. Item remains OPEN for native/scale proof and a fresh multi-attempt final-summary replay. Negative scope: no predecessor-result rewrite, no ownership inference from final shared-tree diff, no shared-tree cleanup",
-      "updated": "2026-07-31"
+      "evidence": "Historical Sprint-480/482 attempts inherited predecessor files and hundreds of ambient lines. Docker settlement now captures a claim-time scoped blob manifest before provider birth, publishes immutable baseline bytes through the host settlement store, reconciles exact scoped bytes and persists `workAttribution`. Sprint-483 replay produced distinct VERIFIED attempt receipts. Recovery additionally makes finalizer, retrospective and rich summary aggregate only VERIFIED attempt work; HOLD, legacy and unavailable claims contribute zero files/lines while cost remains independently accounted, and each reported file retains exact attempt IDs. Focused attribution/schema/finalizer regressions pass. Item remains OPEN for native/scale proof and a fresh multi-attempt final-summary replay. Negative scope: no predecessor-result rewrite, no ownership inference from final shared-tree diff, no shared-tree cleanup; 2026-08-26 Node-4 kapanışı (683-003, teşhis-önce): baseline/settlement/reconciliation zaten kapalıydı — projection'ın digest-binding'siz çıplak VERIFIED etiketine güveni kapatıldı ve üç acceptance hükmü ayrı pinlendi; `receipt=GR-2026-08-26-NODE4-RECOVERY-01`",
+      "updated": "2026-08-26"
     },
     {
       "order": 3176,
@@ -16164,7 +16181,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
         "W": "1",
@@ -16180,10 +16197,12 @@
         "SCHEDULER-001",
         "RECOVERY-BORN-480-EVALUATE-ORPHAN-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-26-NODE4-RECOVERY-01"
+      ],
       "acceptance": "Appended priority FIX wins shared-write serialization before its blocked dependants; blocked tasks remain queued, free slots fill from dispatchable work and dashboard never projects an unspawned worker as EXECUTING",
-      "evidence": "Sprint-480 480-006-fix existed but never spawned because 480-007 won the shared `messages.ts` collision while its dependency was unsatisfied. Scheduler now stable-partitions priority fixes, filters blocked work before worker-ceiling slicing, retains blocked queue entries and renders only successfully spawned agents; focused collision/slot tests pass; fresh live replay remains open",
-      "updated": "2026-07-30"
+      "evidence": "Sprint-480 480-006-fix existed but never spawned because 480-007 won the shared `messages.ts` collision while its dependency was unsatisfied. Scheduler now stable-partitions priority fixes, filters blocked work before worker-ceiling slicing, retains blocked queue entries and renders only successfully spawned agents; focused collision/slot tests pass; fresh live replay remains open; 2026-08-26 Node-4 kapanışı (683-005, teşhis-önce): üç hüküm mevcut scheduler'da zaten kapalıydı (stable-partition + blocked-filter + EXECUTING yalnız dispatch-sonrası) — 480 çakışma-vakası regresyon-pinlendi; `receipt=GR-2026-08-26-NODE4-RECOVERY-01`",
+      "updated": "2026-08-26"
     },
     {
       "order": 3177,
@@ -16203,7 +16222,7 @@
       "gates": [
         "G1"
       ],
-      "state": "OPEN",
+      "state": "VERIFY",
       "truth": {
         "C": "1",
         "W": "1",
@@ -16219,10 +16238,12 @@
         "RECOVERY-TERMINATION-001",
         "PAUSED-FINALIZE-001"
       ],
-      "evidenceReceipts": [],
+      "evidenceReceipts": [
+        "GR-2026-08-26-NODE4-RECOVERY-01"
+      ],
       "acceptance": "Force-finalize exact-sprint settlement cannot return terminal while a matching resume/recovery coordinator remains alive; death, ownership-HOLD or explicit external authority is part of the same receipt",
-      "evidence": "Sprint-480 force-finalize produced canonical COMPLETE but left the exact `deckent resume sprint-480` coordinator alive until the supervising session sent SIGINT and verified exit. Sprint-481 recurrence proved the other polarity: `deckent finalize --sprint sprint-481 --force` printed Complete and generated terminal docs/dashboard, but canonical status remained ORPHANED/resumable because `.deckent/sprint-state.json` stayed `PLANNING:SPAWN`; the build clean gate then correctly HOLDed on that authority plus three missing task receipts. Sprint-482 normal auto-finalization published canonical COMPLETE with `coordinator=absent` at `07:39:37Z` while exact PID 4159580 remained alive during the configured 180-second delayed cleanup and exited only at `07:42:37Z`; `runSprint:activeResourcesAtExit` and `lingerProbe` both reported `Timeout`, extending the same containment defect beyond the force surface. Force finalize now routes through the ownership/generation-fenced recovery operation before terminal publication; normal in-process finalization defers its single PID/state/dashboard/notification publisher until configured delayed cleanup has been awaited and completed, eliminating the ref'ed post-COMPLETE timer. A post-build real-binary fixture proved that an exact live coordinator receives bounded termination, is observed dead, and only then yields COMPLETE state with retired PID authority. Sprint-483 provided the fresh full normal-finalization replay: exact coordinator PID 282179 remained authoritative during delayed cleanup, `RUN_COMPLETED` was published only after cleanup, and the terminal proof converged to `COMPLETE`, `coordinator=absent`, with PID 282179 no longer present. Focused recovery/finalize/controller suites pass. Item remains OPEN for force/recovery-mode parity, native platform adapters and scale proof. Negative scope: no broad process-name kill, no PID-only signal, no clearing foreign generation authority, no second recovery service/store, no unref timer workaround",
-      "updated": "2026-07-31"
+      "evidence": "Sprint-480 force-finalize produced canonical COMPLETE but left the exact `deckent resume sprint-480` coordinator alive until the supervising session sent SIGINT and verified exit. Sprint-481 recurrence proved the other polarity: `deckent finalize --sprint sprint-481 --force` printed Complete and generated terminal docs/dashboard, but canonical status remained ORPHANED/resumable because `.deckent/sprint-state.json` stayed `PLANNING:SPAWN`; the build clean gate then correctly HOLDed on that authority plus three missing task receipts. Sprint-482 normal auto-finalization published canonical COMPLETE with `coordinator=absent` at `07:39:37Z` while exact PID 4159580 remained alive during the configured 180-second delayed cleanup and exited only at `07:42:37Z`; `runSprint:activeResourcesAtExit` and `lingerProbe` both reported `Timeout`, extending the same containment defect beyond the force surface. Force finalize now routes through the ownership/generation-fenced recovery operation before terminal publication; normal in-process finalization defers its single PID/state/dashboard/notification publisher until configured delayed cleanup has been awaited and completed, eliminating the ref'ed post-COMPLETE timer. A post-build real-binary fixture proved that an exact live coordinator receives bounded termination, is observed dead, and only then yields COMPLETE state with retired PID authority. Sprint-483 provided the fresh full normal-finalization replay: exact coordinator PID 282179 remained authoritative during delayed cleanup, `RUN_COMPLETED` was published only after cleanup, and the terminal proof converged to `COMPLETE`, `coordinator=absent`, with PID 282179 no longer present. Focused recovery/finalize/controller suites pass. Item remains OPEN for force/recovery-mode parity, native platform adapters and scale proof. Negative scope: no broad process-name kill, no PID-only signal, no clearing foreign generation authority, no second recovery service/store, no unref timer workaround; 2026-08-26 Node-4 kapanışı (683-006): force-finalize artık recovery-identity + doğrulanmış kernel-ölümü/ownership-HOLD/external-authority kanıtını AYNI receipt'e bağlamadan terminal dönemez; çift-polarite (480/481) fixture'lı; `receipt=GR-2026-08-26-NODE4-RECOVERY-01`",
+      "updated": "2026-08-26"
     },
     {
       "order": 3178,
@@ -27478,6 +27499,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "f1721b39acb5e1fed8fce6b7c42890f5c2c01075ccea2907fb893b8c013731dd"
+    "value": "51d93064cd024c0dbe03246a5a4be19ed2365c23c2ae31dd4fd2c07c72376aee"
   }
 }
