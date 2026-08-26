@@ -17250,3 +17250,37 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 692-004: Prompt-doğruluğu — stack-detector komutları package.json'dan + context sinyal-diyeti (DONE)
 
 ---
+## Sprint 696 — sprint-696
+
+**Status:** ABORTED
+**Date:** 2026-08-26
+**Duration:** 945s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 945180ms |
+
+### Tasks
+
+- 696-001-fix-fix: Fix: Fix: Yeni builtin skill'ler — deckent-hermetic-testing + deckent-worker-evidence (DONE)
+- 696-001-fix: Fix: Yeni builtin skill'ler — deckent-hermetic-testing + deckent-worker-evidence (NO_GO)
+- 696-001: Yeni builtin skill'ler — deckent-hermetic-testing + deckent-worker-evidence (DONE)
+- 696-002-fix-fix-fix: Fix: Fix: Fix: Yeni builtin skill'ler — deckent-repair-alignment + deckent-config-authority (DONE)
+- 696-002-fix-fix: Fix: Fix: Yeni builtin skill'ler — deckent-repair-alignment + deckent-config-authority (NO_GO)
+- 696-002-fix: Fix: Yeni builtin skill'ler — deckent-repair-alignment + deckent-config-authority (NO_GO)
+- 696-002: Yeni builtin skill'ler — deckent-repair-alignment + deckent-config-authority (DONE)
+- 696-003-fix-fix-fix-fix: Fix: Fix: Fix: Fix: Mevcut skill revizyonu — i18n-quality + ci-testing bugünkü gerçeklerle (PENDING)
+- 696-003-fix-fix-fix: Fix: Fix: Fix: Mevcut skill revizyonu — i18n-quality + ci-testing bugünkü gerçeklerle (NO_GO)
+- 696-003-fix-fix: Fix: Fix: Mevcut skill revizyonu — i18n-quality + ci-testing bugünkü gerçeklerle (NO_GO)
+- 696-003-fix: Fix: Mevcut skill revizyonu — i18n-quality + ci-testing bugünkü gerçeklerle (NO_GO)
+- 696-003: Mevcut skill revizyonu — i18n-quality + ci-testing bugünkü gerçeklerle (NO_GO)
+- 696-004: test-guardian builtin agent — 7094-F1c kapanışı (DONE)
+
+---

@@ -2,8 +2,8 @@
   "id": "ci-testing",
   "source": "builtin",
   "name": "CI Testing Expert",
-  "version": "1.0.0",
-  "description": "CI/CD testing expertise — regression detection, coverage analysis, test strategy",
+  "version": "1.2.1",
+  "description": "Deckent CI testing guidance for the current seven-job shard gate, real-binary dist prebuilds, secret and hermeticity ratchets, Windows fsync behavior, and honest exit capture",
   "manifestVersion": 2,
   "activation": {
     "rules": [

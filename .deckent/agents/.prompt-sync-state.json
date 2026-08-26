@@ -63,6 +63,10 @@
     "terminal-ux-engineer": {
       "builtinHash": "86250cd4bd3a688704a6a91096a83ea0705c61c3",
       "syncedAt": "2026-07-14T17:11:18.647Z"
+    },
+    "test-guardian": {
+      "builtinHash": "70aaf9ad50da725cfd4ddffe5cd6b4a57da2dfaf",
+      "syncedAt": "2026-08-26T21:15:17.128Z"
     }
   }
 }

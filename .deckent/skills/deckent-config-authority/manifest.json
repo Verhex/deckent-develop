@@ -1,0 +1,101 @@
+{
+  "id": "deckent-config-authority",
+  "source": "builtin",
+  "name": "Deckent Config Authority",
+  "version": "0.1.0",
+  "description": "Authority-critical Deckent config mutation: locked three-layer merge, atomic durable publication, typed concurrent-revision HOLD, and only-shrink writer governance",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "domains": {
+            "$contains": "configuration"
+          },
+          "intent.primary": "implementation"
+        },
+        "score": 10
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "domain",
+  "triggers": [
+    "config-write",
+    "config.json",
+    "writeConfigJsonAtomic",
+    "withConfigWriteLock",
+    "CONFIG_CONCURRENT_REVISION_HOLD",
+    "lint-config-writers",
+    "three-layer-merge"
+  ],
+  "stackDetection": {
+    "files": [],
+    "dependencies": [],
+    "commands": []
+  },
+  "composableWith": [
+    "typescript-expert",
+    "testing-expert"
+  ],
+  "priority": 8,
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1500
+  },
+  "enabled": true,
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": ""
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "configure",
+        "proficiency": "primary"
+      },
+      {
+        "type": "build",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "analyze",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [],
+    "expertise": [
+      "authority-critical deckent config mutation: locked three-layer merge, atomic durable publication, typed concurrent-revision hold, and only-shrink writer governance",
+      "config-write",
+      "config.json",
+      "config_concurrent_revision_hold",
+      "domain",
+      "lint-config-writers",
+      "testing-expert",
+      "three-layer-merge",
+      "typescript-expert",
+      "withconfigwritelock",
+      "writeconfigjsonatomic"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test",
+      "config",
+      "doc",
+      "workflow"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 2,
+    "persistedAt": "2026-08-26T21:13:42.311Z",
+    "authority": "deckent sync builtin content-hash"
+  },
+  "builtinContentHash": "sha256:16094616576da716f8094d6e9103fc5e2f57a8e70595312060f80dd14b573890"
+}

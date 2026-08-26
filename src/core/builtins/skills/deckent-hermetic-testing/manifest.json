@@ -1,0 +1,70 @@
+{
+  "id": "deckent-hermetic-testing",
+  "source": "builtin",
+  "name": "Deckent Hermetic Testing",
+  "version": "0.1.1",
+  "description": "Deckent workflow for fresh-checkout-safe tmpdir tests, measured hermeticity ledgers, VITEST_MAX_FORKS=2, only-shrink fs mocks, and open-flag write guards",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "domains": {
+            "$contains": "testing"
+          },
+          "intent.primary": "implementation"
+        },
+        "score": 10
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      { "type": "build", "proficiency": "primary" },
+      { "type": "fix", "proficiency": "secondary" },
+      { "type": "review", "proficiency": "able" }
+    ],
+    "domains": [
+      { "id": "testing", "proficiency": "primary" }
+    ],
+    "expertise": [
+      "fresh-checkout hermetic tests",
+      "suite-owned tmpdir fixtures",
+      "hermeticity ledger ratchets",
+      "runtime open-flag write guards"
+    ],
+    "deliverables": ["code-test"]
+  },
+  "entrypoint": "SKILL.md",
+  "category": "workflow",
+  "triggers": [
+    "hermetic-testing",
+    "tmpdir",
+    "vitest",
+    "test-hermeticity",
+    "runtime-write-guard",
+    "mock-factory"
+  ],
+  "stackDetection": {
+    "files": ["vitest.config.*", "tests/**/*.test.ts"],
+    "dependencies": ["vitest"],
+    "commands": ["vitest"]
+  },
+  "composableWith": ["typescript-expert", "testing-expert"],
+  "priority": 7,
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1500
+  },
+  "enabled": true,
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": ""
+  }
+}

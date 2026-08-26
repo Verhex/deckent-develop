@@ -1288,7 +1288,9 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // finalizer + sidecar-loader hotfix).
   // 2026-08-26 11:05: ayni 1339, digest-only — Node-6a src kaymalari
   // (death-sweep / prompt-template kimlik-esigi / docker async-git).
-  digest: 'e48a3692114a2503b004dbf2d7b92f07c0c2653f1e61087469700d2c2bc4a01b',
+  digest: 'bc33c919d5c33834701ae9f0dc000d9815448aec55b777affe8e5119c8be2945',
+  // 2026-08-27 00:5x: ayni 1339, digest-only — Dalga-2 + preflight-fix
+  // (plugin-hooks runTscCheck typecheck-tercihi) src kaymalari.
   // 2026-08-26 23:4x: ayni 1339, digest-only — Dalga-1 src kaymalari
   // (skill-profile-derivation v2, sync skill kolu, skill-create gate,
   // stack-detector scripts-cozumu + tsc-residual el-kapanisi).

@@ -1,0 +1,90 @@
+{
+  "id": "deckent-repair-alignment",
+  "source": "builtin",
+  "name": "Deckent Repair Alignment",
+  "version": "0.1.0",
+  "description": "Red-test repair discipline: reproduce first, distinguish stale pins from product bugs, learn contracts from scoped source, and preserve assertion strength",
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "fix",
+        "proficiency": "primary"
+      },
+      {
+        "type": "analyze",
+        "proficiency": "secondary"
+      }
+    ],
+    "domains": [
+      {
+        "id": "testing",
+        "proficiency": "primary"
+      },
+      {
+        "id": "quality",
+        "proficiency": "secondary"
+      }
+    ],
+    "expertise": [
+      "test-repair",
+      "root-cause-analysis"
+    ],
+    "deliverables": [
+      "workflow"
+    ]
+  },
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "intent.primary": "debugging"
+        },
+        "score": 10
+      },
+      {
+        "when": {
+          "domains": {
+            "$contains": "testing"
+          }
+        },
+        "score": 8
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "workflow",
+  "triggers": [
+    "red-test",
+    "test-repair",
+    "stale-pin",
+    "product-bug",
+    "repro-before-red",
+    "contract-alignment"
+  ],
+  "stackDetection": {
+    "files": [],
+    "dependencies": [],
+    "commands": []
+  },
+  "composableWith": [
+    "testing-expert",
+    "typescript-expert"
+  ],
+  "priority": 7,
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1500
+  },
+  "enabled": true,
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": ""
+  }
+}

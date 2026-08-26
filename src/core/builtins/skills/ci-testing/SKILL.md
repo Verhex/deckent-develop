@@ -1,174 +1,108 @@
 ---
 doc_rank: 50
 status: active
-last_updated: 2026-06-04
-content_hash: sha256:dbe71ba4d4705d2d14e0c72ae752e873797bb42d492e7f8681292bb726842b1f
+last_updated: 2026-08-26
 ---
 
 # CI Testing Expert
 
 ## Role
-You are a CI/CD testing specialist. Your responsibility is to ensure that every code change maintains or improves the build and test health of the project. You catch regressions before they reach the main branch.
 
-## Language Adaptation
+Use the repository's declared commands and the smallest relevant shard to diagnose
+CI failures. A local green run is evidence only when it reproduces the CI job's
+build inputs, platform assumptions, and exit status.
 
-Before applying any command, check the project's build and test toolchain. Never hardcode tool names.
+## Current Deckent Shards
 
-| Stack | Type Check / Lint | Test Suite | Coverage |
-|-------|-------------------|------------|----------|
-| TypeScript/Node | `tsc --noEmit` / `eslint` | `npx vitest run` / `jest` | vitest v8, `--coverage` |
-| Python | `mypy` / `ruff check` | `pytest` / `python -m pytest` | `pytest-cov`, `--cov` |
-| Go | `go vet ./...` | `go test ./...` | `go test -cover ./...` |
-| Rust | `cargo check` | `cargo test` | `cargo llvm-cov` |
-| Java/Gradle | `./gradlew check` | `./gradlew test` | JaCoCo via Gradle |
+The GitHub Actions test matrix is split by ownership: Core + Agents, Orchestra,
+CLI, remaining API/MCP/integration groups, Docs + Scripts, Dashboard, and an
+informational Windows leg. `Shards Green` fans the seven test jobs into one
+aggregate gate. The Docs + Scripts job is job-level `continue-on-error`; Windows
+is informational and its test step also allows failure. Neither setting turns a
+skipped or red shard into evidence that its behavior was covered.
 
-## Staged Test Execution Strategy
+Run the task-declared targeted command first. When reproducing a workflow failure,
+copy that job's Node version, environment, pool, and timeout rather than inventing
+a generic `npm test` command.
 
-Always run tests in stages to fail fast and minimize wait time. Map stages to the project's module structure:
+### Prebuild for real-binary tests
 
-1. **Core / foundation modules** — run tests for the lowest-level, most depended-on code first
-2. **Orchestration / business logic** — intermediate modules
-3. **Interface modules** — CLI, API, UI layers
-4. **Full suite** — only if all stages pass
+Tests that spawn the packaged CLI do not execute TypeScript sources. They require
+`dist/cli/entry.js`. The current Orchestra and CLI jobs therefore build before
+their Vitest step:
 
-Stop and fix failures before proceeding to the next stage. This isolates failures quickly.
-
-**Targeted run after file changes** (map source file → test file):
-- Node.js: `src/foo/bar.ts` → `tests/foo/bar.test.ts`
-- Python: `pkg/foo/bar.py` → `tests/test_bar.py` or `tests/foo/test_bar.py`
-- Go: `pkg/foo/bar.go` → `pkg/foo/bar_test.go`
-
-## Regression Detection
-
-Compare test counts between sprints. A drop in tests is a regression indicator.
-
-**Baseline capture (sprint start):**
 ```bash
-# Node.js / vitest
-npx vitest run --reporter=json 2>/dev/null | jq '.numPassedTests'
-# Python / pytest
-pytest --tb=no -q 2>/dev/null | tail -1
-# Go
-go test ./... 2>&1 | grep -c "^ok"
+npx tsc
+node scripts/copy-assets.mjs
 ```
 
-**After task completion:**
-- Run the same baseline command and compare counts
-- Count must equal or exceed baseline
+Keep this prebuild in every shard that contains real-binary tests. Today those are
+the Orchestra and CLI shards; do not copy the step into unrelated shards without
+a real-binary dependency. A missing `dist/cli/entry.js` in such a shard is CI
+setup failure, not evidence that the asserted product behavior failed. Do not
+silently replace a real-binary test with an in-process mock to avoid the prebuild.
 
-**Common regression causes (language-agnostic):**
-- Test file deleted or renamed without updating imports
-- Mock / stub mismatch when a module's public API changes
-- Shared mutable state between tests (isolation failure)
-- Circular import chains introduced by new code
+## Policy Gates and Ratchets
 
-## Coverage Analysis
+### Secret baseline
 
-Use the project's coverage tool. Target: lines ≥ 80%, branches ≥ 75%.
+The secret-baseline implementation is `scripts/security/secret-baseline.mjs`. It
+scans tracked files and fails on an unallowlisted secret-pattern hit. In CI it is
+reached through the repository's lint/gate chain, so do not invent a standalone
+workflow step. Treat a hit as real until reviewed. Remove or rotate a real secret;
+for a fixture, prefer equivalent non-secret-looking test data. `--build-baseline`
+rewrites `.secrets-baseline` and is an explicit, manually reviewed allowlist
+operation—not a routine way to turn the gate green.
 
-**Coverage drop checklist:**
-- New code added without tests → write tests
-- Branch not covered → add edge case test
-- Coverage was already low, new code added → debt item
+### Hermeticity and mocks
 
-Exclude generated code, type declarations, and barrel/re-export-only files from coverage metrics.
+`node scripts/lint-test-hermeticity.mjs` derives filesystem, process, network, and
+other effects from the test graph. Its unresolved-effect and production-inventory
+fingerprints are ratchets: drift must be explained and fixed or deliberately
+rebaselined from eligible evidence. Follow the script's build-free eligibility
+rules when rebaselining; do not lower a count, edit a digest, or add a mock merely
+to satisfy the snapshot.
 
-## Static Analysis / Type Check Error Categories
+Tests must use suite-owned temporary directories and restore environment, cwd,
+timers, and mocks. Never read or mutate tracked workspace state, `.deckent` runtime
+authority, home-directory configuration, or a developer's existing `dist/` as a
+fixture. A mock is acceptable only when it preserves the contract under test;
+duplicated mock factories and stale export shapes are drift, not isolation.
 
-| Category | Example | Fix |
-|----------|---------|-----|
-| Missing import / undefined | `Cannot find module` / `NameError` | Add import or create file |
-| Type mismatch | `Type 'str' is not 'int'` / `Type 'X' not assignable to 'Y'` | Fix the type or cast |
-| Missing property / attribute | `has no attribute 'x'` | Update class or add property |
-| Null safety violation | `Object is possibly 'undefined'` / `None` dereference | Add guard clause |
-| Return type error | `Function lacks return statement` | Add return or fix control flow |
+## Cross-Platform Filesystem Lesson
 
-**Fix order:** Always fix import/undefined errors first — they cascade into false positives.
-**Max 3 attempts:** If static analysis still fails after 3 fix attempts, write NO_GO with the exact error output.
+On Windows, `FlushFileBuffers` can return `EPERM` for a read-only file handle. Code
+that reopens a written file to fsync it must use update mode (`'r+'`), not `'r'`,
+before syncing and closing. Preserve tests for both the open mode and successful
+fsync path; do not skip the behavior on Windows to make the informational leg green.
 
-## Test Framework–Specific Patterns
+## Honest Exit Capture
 
-### TypeScript / Vitest or Jest
-- `vi.fn()` / `jest.fn()` for function mocks, `vi.spyOn()` / `jest.spyOn()` for partial mocking
-- Module mocking is hoisted — use factory function for explicit control
-- `vi.useFakeTimers()` + `vi.runAllTimers()` for time-dependent code (never real `setTimeout`)
-- ESM requires `.js` extension in imports even for `.ts` source files
+Never diagnose a command through `cmd | head` or `cmd | tail`: the displayed exit
+code normally belongs to the pager, not the command that failed. Capture the real
+status without a pipeline:
 
-### Python / pytest
-- Use `pytest.fixture` for setup/teardown; prefer function scope
-- `unittest.mock.patch` or `pytest-mock`'s `mocker.patch` for mocking
-- `freezegun` for time-dependent tests
-- Parametrize with `@pytest.mark.parametrize` instead of loops
-
-### Go
-- Co-locate test files: `foo.go` → `foo_test.go`
-- Use `t.Parallel()` for independent test cases
-- `testing.T.Cleanup()` for teardown
-- Use `testify/assert` or `testify/require` for readable assertions
-
-## GitHub Actions / CI Debugging
-
-**Matrix failures:**
-```yaml
-strategy:
-  matrix:
-    version: [...]
-  fail-fast: false  # See all failures, not just first
+```bash
+cmd > /tmp/deckent-check.log 2>&1
+status=$?
+cat /tmp/deckent-check.log
+echo "$status"
 ```
 
-**Timeout issues:**
-```yaml
-jobs:
-  test:
-    timeout-minutes: 15
-    steps:
-      - run: <test-command>
-        timeout-minutes: 10
-```
+When a pipeline is unavoidable under Bash, inspect `${PIPESTATUS[0]}` immediately.
+Do not report green from truncated output with an unproven producer exit code.
 
-**Artifact upload for debugging:**
-```yaml
-- name: Upload coverage
-  if: always()
-  uses: actions/upload-artifact@v4
-  with:
-    name: coverage-report
-    path: coverage/
-    retention-days: 7
-```
+## Failure Triage
 
-**Dependency caching** (adapt key to your lockfile):
-```yaml
-- uses: actions/cache@v4
-  with:
-    path: <dep-dir>
-    key: ${{ runner.os }}-deps-${{ hashFiles('<lockfile>') }}
-```
+1. Read the failing assertion and the exact job configuration.
+2. Classify setup failures first: missing dist output, native rebuild, wrong Node
+   matrix leg, unavailable platform capability, or contaminated workspace state.
+3. Reproduce the narrow shard with the same prerequisites.
+4. Fix the product or fixture contract. Do not weaken assertions, add retries, raise
+   timeouts, or introduce skips before identifying the root cause.
+5. Run exactly the verification commands authorized for the task and retain their
+   true exit codes.
 
-## Pre-Commit Checklist
-
-Before marking any task DONE, verify ALL of these:
-
-- [ ] Type check / static analysis → 0 errors
-- [ ] Test suite → 0 failures
-- [ ] Test count ≥ baseline (no regressions)
-- [ ] Coverage ≥ previous sprint (no drops)
-- [ ] New code has corresponding tests
-- [ ] No type-ignore / lint-disable comments left without explanation
-- [ ] No skipped tests left in (`.skip`, `xfail`, `t.Skip()`)
-
-**NEVER mark a task DONE if static analysis fails.** Type/lint errors block the entire build.
-
-## Anti-Patterns to Avoid
-- Hardcoding `npm test` / `vitest` without detecting the stack — read the toolchain first (see the Language Adaptation table).
-- Marking a task DONE while type check or lint still errors — static-analysis failures block the whole build.
-- Running the full suite before staged tests — you wait minutes to learn a core test failed in seconds.
-- Leaving `.skip` / `xfail` / `t.Skip()` in to make CI green — a skipped test is an untested path, not a passing one.
-- `spawnSync` for test subprocesses — it blocks the event loop and causes CI timeouts; use async `spawn`.
-- Reading gitignored local state (`.deckent/config.json`, `~/.deckent`) in tests — it fails on a fresh CI checkout; use tmpdir fixtures.
-- Treating coverage % as the goal — high coverage with weak assertions catches nothing.
-
-## Karpathy Notes
-- **Goal-driven:** The goal is a green build on a fresh checkout, not on your machine. Run `test:ci-sim` (hidden gitignored state) before claiming done.
-- **Think before coding:** Capture the test-count baseline at sprint start so you can prove no regression at the end.
-- **Surgical:** A failing test is a signal. Read it before changing it — the test may be right and the new code wrong.
+DONE requires evidence from the declared checks. Do not claim nonexistent commands
+such as `test:ci-sim`, fixed coverage thresholds, or an always-required full-suite
+run when the repository or task does not declare them.

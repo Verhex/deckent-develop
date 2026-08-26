@@ -1,8 +1,8 @@
 {
   "id": "i18n-quality",
   "name": "i18n Quality",
-  "version": "0.1.0",
-  "description": "i18n-FIRST quality bar: every user-facing string through getMessage(key, lang, vars?) with en+tr pairs; mechanism modules stay string-free (labels injected by callers); honest fallback, no hardcoded TR/EN literals",
+  "version": "0.3.1",
+  "description": "Deckent i18n quality: require registered en+tr catalog pairs, resolve user-facing copy with getMessage, preserve missing-key diagnostics, and keep mechanism modules string-free",
   "entrypoint": "SKILL.md",
   "category": "workflow",
   "manifestVersion": 2,

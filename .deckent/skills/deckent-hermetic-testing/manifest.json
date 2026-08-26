@@ -1,0 +1,117 @@
+{
+  "id": "deckent-hermetic-testing",
+  "source": "builtin",
+  "name": "Deckent Hermetic Testing",
+  "version": "0.1.1",
+  "description": "Deckent workflow for fresh-checkout-safe tmpdir tests, measured hermeticity ledgers, VITEST_MAX_FORKS=2, only-shrink fs mocks, and open-flag write guards",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "domains": {
+            "$contains": "testing"
+          },
+          "intent.primary": "implementation"
+        },
+        "score": 10
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "workflow",
+  "triggers": [
+    "hermetic-testing",
+    "tmpdir",
+    "vitest",
+    "test-hermeticity",
+    "runtime-write-guard",
+    "mock-factory"
+  ],
+  "stackDetection": {
+    "files": [
+      "vitest.config.*",
+      "tests/**/*.test.ts"
+    ],
+    "dependencies": [
+      "vitest"
+    ],
+    "commands": [
+      "vitest"
+    ]
+  },
+  "composableWith": [
+    "typescript-expert",
+    "testing-expert"
+  ],
+  "priority": 7,
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1500
+  },
+  "enabled": true,
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": ""
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "configure",
+        "proficiency": "primary"
+      },
+      {
+        "type": "analyze",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "build",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [
+      {
+        "id": "core/runtime",
+        "proficiency": "primary"
+      },
+      {
+        "id": "test/quality",
+        "proficiency": "secondary"
+      }
+    ],
+    "expertise": [
+      "deckent workflow for fresh-checkout-safe tmpdir tests, measured hermeticity ledgers, vitest_max_forks=2, only-shrink fs mocks, and open-flag write guards",
+      "hermetic-testing",
+      "mock-factory",
+      "runtime-write-guard",
+      "test-hermeticity",
+      "testing-expert",
+      "tests/**/*.test.ts",
+      "tmpdir",
+      "typescript-expert",
+      "vitest",
+      "vitest.config.*",
+      "workflow"
+    ],
+    "deliverables": [
+      "code-src",
+      "code-test",
+      "config",
+      "doc",
+      "workflow"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 2,
+    "persistedAt": "2026-08-26T21:13:42.312Z",
+    "authority": "deckent sync builtin content-hash"
+  },
+  "builtinContentHash": "sha256:efc63ecc340cc6be64eeda25c07aac0e65de58def9ee087d8beb88b2dd46bdc4"
+}

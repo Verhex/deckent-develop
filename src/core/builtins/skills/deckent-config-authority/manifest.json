@@ -1,0 +1,87 @@
+{
+  "id": "deckent-config-authority",
+  "source": "builtin",
+  "name": "Deckent Config Authority",
+  "version": "0.1.0",
+  "description": "Authority-critical Deckent config mutation: locked three-layer merge, atomic durable publication, typed concurrent-revision HOLD, and only-shrink writer governance",
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "configure",
+        "proficiency": "primary"
+      },
+      {
+        "type": "migrate",
+        "proficiency": "secondary"
+      }
+    ],
+    "domains": [
+      {
+        "id": "configuration",
+        "proficiency": "primary"
+      },
+      {
+        "id": "governance",
+        "proficiency": "secondary"
+      }
+    ],
+    "expertise": [
+      "config-authority",
+      "concurrency-safety"
+    ],
+    "deliverables": [
+      "config",
+      "manifest"
+    ]
+  },
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "domains": {
+            "$contains": "configuration"
+          },
+          "intent.primary": "implementation"
+        },
+        "score": 10
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "domain",
+  "triggers": [
+    "config-write",
+    "config.json",
+    "writeConfigJsonAtomic",
+    "withConfigWriteLock",
+    "CONFIG_CONCURRENT_REVISION_HOLD",
+    "lint-config-writers",
+    "three-layer-merge"
+  ],
+  "stackDetection": {
+    "files": [],
+    "dependencies": [],
+    "commands": []
+  },
+  "composableWith": [
+    "typescript-expert",
+    "testing-expert"
+  ],
+  "priority": 8,
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1500
+  },
+  "enabled": true,
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": ""
+  }
+}

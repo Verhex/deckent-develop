@@ -103,7 +103,7 @@ License: MIT. [Kanıt: `package.json`; `LICENSE`]
 
 <!-- AUTOGEN:START id="stat-counts" -->
 - **51 MCP tools** + **8 MCP resources**
-- **21 built-in agents**
-- **31 built-in skills**
+- **22 built-in agents**
+- **35 built-in skills**
 - **20 dashboard pages**
 <!-- AUTOGEN:END id="stat-counts" -->

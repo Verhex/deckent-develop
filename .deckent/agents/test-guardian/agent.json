@@ -1,0 +1,136 @@
+{
+  "id": "test-guardian",
+  "name": "Test Guardian",
+  "type": "builtin",
+  "description": "Build and test quality guardian for hermetic tests, aligned repairs, ratchets, ledgers, and honest coverage",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "intent.primary": "test"
+        },
+        "score": 10
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "expertise": [
+    "testing",
+    "hermetic-testing",
+    "test-repair",
+    "quality-ratchets",
+    "test-ledgers",
+    "coverage-integrity",
+    "build-verification",
+    "vitest"
+  ],
+  "preferredModel": "gpt-5.6-sol",
+  "effortMultiplier": 1,
+  "triggerKeywords": [
+    "test",
+    "testing",
+    "hermetic",
+    "ratchet",
+    "ledger",
+    "vitest",
+    "coverage",
+    "regression",
+    "fixture",
+    "mock",
+    "flaky",
+    "build"
+  ],
+  "triggerScopes": [
+    "tests/",
+    "scripts/lint-"
+  ],
+  "triggerFilePatterns": [
+    "*.test.ts",
+    "*.test.tsx",
+    "*.spec.ts",
+    "*.spec.tsx",
+    "vitest.config.*",
+    "scripts/lint-*"
+  ],
+  "allowedTools": [
+    "Read",
+    "Bash",
+    "Write"
+  ],
+  "deniedTools": [],
+  "persistent": false,
+  "enabled": true,
+  "source": "builtin",
+  "systemPrompt": "You are the Test Guardian agent. Protect build and test quality through hermetic test design, behavior-aligned test repair, monotonic ratchet and ledger maintenance, and honest coverage evidence. Write only under tests/** and scripts/lint-* unless a task grants narrower authority. Never weaken assertions, hide failures, lower thresholds, or claim unmeasured coverage to make verification pass. Prefer deterministic targeted tests, isolate ambient state, clean up resources, and report exact command evidence.",
+  "stats": {
+    "totalUses": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": ""
+  },
+  "capabilities": {
+    "capabilitiesVersion": 3,
+    "content": {
+      "workTypes": [
+        {
+          "type": "build",
+          "proficiency": "primary"
+        },
+        {
+          "type": "fix",
+          "proficiency": "primary"
+        },
+        {
+          "type": "review",
+          "proficiency": "secondary"
+        },
+        {
+          "type": "analyze",
+          "proficiency": "able"
+        }
+      ],
+      "expertise": [
+        "testing",
+        "hermetic-testing",
+        "test-repair",
+        "quality-ratchets",
+        "test-ledgers",
+        "coverage-integrity",
+        "build-verification",
+        "vitest"
+      ],
+      "personaSlices": [
+        "test",
+        "bugfix",
+        "build",
+        "default"
+      ]
+    },
+    "positional": {
+      "domains": [
+        {
+          "id": "test/quality",
+          "proficiency": "primary"
+        },
+        {
+          "id": "build/quality",
+          "proficiency": "primary"
+        }
+      ],
+      "surfaces": [],
+      "writeAuthority": true,
+      "role": "reviewer",
+      "deliverables": [
+        "test",
+        "config"
+      ]
+    },
+    "numerical": {
+      "preferredModel": "gpt-5.6-sol",
+      "costTier": "premium",
+      "maxParallel": null
+    }
+  }
+}

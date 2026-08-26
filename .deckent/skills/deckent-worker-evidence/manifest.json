@@ -1,0 +1,102 @@
+{
+  "id": "deckent-worker-evidence",
+  "source": "builtin",
+  "name": "Deckent Worker Evidence",
+  "version": "0.1.1",
+  "description": "Deckent workflow for disk-first result claims, captured verification output, typed honest verdicts, and real-binary proof of user-facing function",
+  "manifestVersion": 2,
+  "activation": {
+    "rules": [
+      {
+        "when": {
+          "domains": {
+            "$contains": "workers"
+          },
+          "intent.primary": "implementation"
+        },
+        "score": 10
+      }
+    ],
+    "exclude": [],
+    "minScore": 5
+  },
+  "entrypoint": "SKILL.md",
+  "category": "workflow",
+  "triggers": [
+    "worker-evidence",
+    "result-file",
+    "self-assessment",
+    "no-go",
+    "proof-of-function",
+    "disk-evidence"
+  ],
+  "stackDetection": {
+    "files": [
+      ".tasks/*.result",
+      ".claude/rules/worker-default.md"
+    ],
+    "dependencies": [],
+    "commands": []
+  },
+  "composableWith": [
+    "testing-expert",
+    "technical-writer"
+  ],
+  "priority": 7,
+  "promptInjection": {
+    "position": "prepend",
+    "maxTokens": 1500
+  },
+  "enabled": true,
+  "stats": {
+    "totalUses": 0,
+    "successCount": 0,
+    "successRate": 0,
+    "avgCoverage": 0,
+    "lastUsedInSprint": ""
+  },
+  "profile": {
+    "profileVersion": 3,
+    "workTypes": [
+      {
+        "type": "review",
+        "proficiency": "primary"
+      },
+      {
+        "type": "configure",
+        "proficiency": "secondary"
+      },
+      {
+        "type": "analyze",
+        "proficiency": "able"
+      }
+    ],
+    "domains": [],
+    "expertise": [
+      ".claude/rules/worker-default.md",
+      ".tasks/*.result",
+      "deckent workflow for disk-first result claims, captured verification output, typed honest verdicts, and real-binary proof of user-facing function",
+      "disk-evidence",
+      "no-go",
+      "proof-of-function",
+      "result-file",
+      "self-assessment",
+      "technical-writer",
+      "testing-expert",
+      "worker-evidence",
+      "workflow"
+    ],
+    "deliverables": [
+      "config",
+      "doc",
+      "workflow"
+    ]
+  },
+  "profileProvenance": {
+    "origin": "derived-profile",
+    "derivationVersion": 2,
+    "persistedAt": "2026-08-26T21:13:42.313Z",
+    "authority": "deckent sync builtin content-hash"
+  },
+  "builtinContentHash": "sha256:c40efd742726c58a185688d6d91392cacf5c0c2af1ed3a269a68977e1c41d488"
+}

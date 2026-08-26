@@ -25,8 +25,8 @@ Coverage: N/A
 <!-- AUTOGEN:START id="identity-summary" -->
 CLI Commands: 80+
 MCP: 51 tools, 8 resources
-Agents: 21 built-in
-Skills: 31 built-in
+Agents: 22 built-in
+Skills: 35 built-in
 <!-- AUTOGEN:END id="identity-summary" -->
 Core Capabilities: Deterministik lifecycle orchestration; durable execution/recovery; multi-provider routing and admission; runtime-wide approvals and governance; DB-first memory; evidence-backed evaluation; outcome-driven agent/skill evolution; training traces; multi-tenant security and audit; cross-platform worker backends; Terminal/Desktop/API/CLI/MCP/connector surfaces.
 Execution Mediation: AI ile host ve gerçek sistemler arasındaki ilişki installation topology, effective policy, task risk ve platform capability evidence üzerinden resolved `Execution Posture` ile kurulur. Direct host/main, staged, isolated, brokered ve remote execution aynı kernel'in çalışma biçimleridir; ayrı ürün, edition veya authority değildir.
@@ -40,6 +40,6 @@ Execution Mediation: AI ile host ve gerçek sistemler arasındaki ilişki instal
 | MCP Resources | 8 |
 | CLI Commands | 80+ |
 | Dashboard Pages | 20 |
-| Agents | 21 built-in |
-| Skills | 31 built-in |
+| Agents | 22 built-in |
+| Skills | 35 built-in |
 <!-- AUTOGEN:END id="identity-status" -->

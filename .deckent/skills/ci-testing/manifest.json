@@ -2,8 +2,8 @@
   "id": "ci-testing",
   "source": "builtin",
   "name": "CI Testing Expert",
-  "version": "1.0.0",
-  "description": "CI/CD testing expertise — regression detection, coverage analysis, test strategy",
+  "version": "1.2.1",
+  "description": "Deckent CI testing guidance for the current seven-job shard gate, real-binary dist prebuilds, secret and hermeticity ratchets, Windows fsync behavior, and honest exit capture",
   "manifestVersion": 2,
   "activation": {
     "rules": [
@@ -112,8 +112,8 @@
       "build",
       "cargo.toml",
       "ci",
-      "ci/cd testing expertise — regression detection, coverage analysis, test strategy",
       "coverage",
+      "deckent ci testing guidance for the current seven-job shard gate, real-binary dist prebuilds, secret and hermeticity ratchets, windows fsync behavior, and honest exit capture",
       "devops-engineer",
       "go.mod",
       "jest",
@@ -144,8 +144,8 @@
   "profileProvenance": {
     "origin": "derived-profile",
     "derivationVersion": 2,
-    "persistedAt": "2026-08-26T20:30:27.575Z",
+    "persistedAt": "2026-08-26T21:13:42.310Z",
     "authority": "deckent sync builtin content-hash"
   },
-  "builtinContentHash": "sha256:e8ced85292e36ba939939bf3f55bfac41f23ca5ccf3a9c16e0f128b315a07bf0"
+  "builtinContentHash": "sha256:e63886391f8f7189728fa41ad48864560c23ddfc64a3f5272dee2377d0a8e64e"
 }

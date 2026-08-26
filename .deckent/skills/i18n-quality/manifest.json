@@ -1,8 +1,8 @@
 {
   "id": "i18n-quality",
   "name": "i18n Quality",
-  "version": "0.1.0",
-  "description": "i18n-FIRST quality bar: every user-facing string through getMessage(key, lang, vars?) with en+tr pairs; mechanism modules stay string-free (labels injected by callers); honest fallback, no hardcoded TR/EN literals",
+  "version": "0.3.1",
+  "description": "Deckent i18n quality: require registered en+tr catalog pairs, resolve user-facing copy with getMessage, preserve missing-key diagnostics, and keep mechanism modules string-free",
   "entrypoint": "SKILL.md",
   "category": "workflow",
   "manifestVersion": 2,
@@ -68,11 +68,11 @@
         "proficiency": "primary"
       },
       {
-        "type": "review",
+        "type": "fix",
         "proficiency": "secondary"
       },
       {
-        "type": "configure",
+        "type": "review",
         "proficiency": "able"
       }
     ],
@@ -84,14 +84,18 @@
       {
         "id": "test/quality",
         "proficiency": "secondary"
+      },
+      {
+        "id": "agents-catalog",
+        "proficiency": "secondary"
       }
     ],
     "expertise": [
+      "deckent i18n quality: require registered en+tr catalog pairs, resolve user-facing copy with getmessage, preserve missing-key diagnostics, and keep mechanism modules string-free",
       "frontend-design",
       "getmessage",
       "hardcoded string",
       "i18n",
-      "i18n-first quality bar: every user-facing string through getmessage(key, lang, vars?) with en+tr pairs; mechanism modules stay string-free (labels injected by callers); honest fallback, no hardcoded tr/en literals",
       "localization",
       "typescript-expert",
       "workflow"
@@ -99,16 +103,14 @@
     "deliverables": [
       "code-src",
       "code-test",
-      "config",
-      "doc",
-      "workflow"
+      "doc"
     ]
   },
   "profileProvenance": {
     "origin": "derived-profile",
     "derivationVersion": 2,
-    "persistedAt": "2026-08-26T20:30:27.580Z",
+    "persistedAt": "2026-08-26T21:13:42.315Z",
     "authority": "deckent sync builtin content-hash"
   },
-  "builtinContentHash": "sha256:bac50d2087dde97dfabaa5f7aa5fe8e2e0478ad531a65e2a6493a54d752f5bd2"
+  "builtinContentHash": "sha256:3544615d3675ad8167df69f862f0ff837a768fb37a2e178a8e3f6ad40e18aca6"
 }

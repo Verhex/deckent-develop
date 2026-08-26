@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "93df85515e41726156af69045f3d9d0c6b5cd8756bd18c1ebe1c307e7d1d0f6a"
+    "value": "24a8e39e4d6289af03653e78313f26b9ef872325a09a7214bc02fd8e9a9eea58"
   },
   "summary": {
     "total": 540,
@@ -4714,7 +4714,7 @@
       "state": "OPEN",
       "updated": "2026-08-26",
       "definitionDigest": "9522359983224d1b91ce9790f06b86f42d6540f43803f487e25e6cd15c33d703",
-      "progressDigest": "d4152853dee14ef1f39e77197bc1ec46b8bf17e0a7f5e0d2c300c1a8a7769e86",
+      "progressDigest": "693e6850d764c262d9af3dab530b3efc8cb7c6ca0ec7503a8f275a9d58c499e1",
       "terminalClosureDigest": null
     },
     {
@@ -22957,7 +22957,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Manifests versioned; task role/skill selection measured; no catalog inflation or dead entries",
-      "evidence": "Legacy 85. 2026-08-11 `.deckent/stats` RCA: agent ve skill katalog metadatası ile kullanım projectionı ayrı truth'lara bölünmüş; canonical cross-catalog kapanış CATALOG-STATS-AUTHORITY-001 childındadır; 2026-08-26 DALGA-1 MEKANIZMA-ONARIMI (sprint-692, owner 'b-ok', dogfood-run 4/4 DONE + 1 FIX-kaskadi): skill-profil turetimi v2 — cop-domain stop-term seti + derivationVersion yeniden-turetim kapisi (authored-profile authority aynen); deckent sync skill kolu — builtin content-hash, 31 manifest v2 re-persist + observability manifest onarimi, gercek-binary idempotency kaniti (ikinci kosum 0-changed); skill create fail-before-write zorunlu-profil + lint-manifests canonical V3 fail-closed (30 profilsiz mevcut icin tarihli yalniz-azalma baseline); stack-detector komutlari gercek package.json scripts'ten (honest-fallback, uydurma komut yok) + prompt context sinyal-diyeti; tsc-residual 3 hata ADR-D-007 seam ile ayni-gece kapandi, dalga-scoped 244/244 + tsc 0 + build:all yesil; run terminal-kaydi forced-closure (4/4 complete, 0 unresolved lineage)",
+      "evidence": "Legacy 85. 2026-08-11 `.deckent/stats` RCA: agent ve skill katalog metadatası ile kullanım projectionı ayrı truth'lara bölünmüş; canonical cross-catalog kapanış CATALOG-STATS-AUTHORITY-001 childındadır; 2026-08-26 DALGA-1 MEKANIZMA-ONARIMI (sprint-692, owner 'b-ok', dogfood-run 4/4 DONE + 1 FIX-kaskadi): skill-profil turetimi v2 — cop-domain stop-term seti + derivationVersion yeniden-turetim kapisi (authored-profile authority aynen); deckent sync skill kolu — builtin content-hash, 31 manifest v2 re-persist + observability manifest onarimi, gercek-binary idempotency kaniti (ikinci kosum 0-changed); skill create fail-before-write zorunlu-profil + lint-manifests canonical V3 fail-closed (30 profilsiz mevcut icin tarihli yalniz-azalma baseline); stack-detector komutlari gercek package.json scripts'ten (honest-fallback, uydurma komut yok) + prompt context sinyal-diyeti; tsc-residual 3 hata ADR-D-007 seam ile ayni-gece kapandi, dalga-scoped 244/244 + tsc 0 + build:all yesil; run terminal-kaydi forced-closure (4/4 complete, 0 unresolved lineage); 2026-08-26-gece DALGA-2 DOGFOOD-SUITI (sprint-696 forced-closure 3/4 + 003 bagimsiz-dogrulama): 4 yeni builtin skill (deckent-hermetic-testing/worker-evidence/repair-alignment/config-authority; elle canonical V3 profile, priority 7-8) + i18n-quality/ci-testing bugunku-gercek revizyonu + test-guardian builtin agent (PROMPT.md kanonik, degraded=0) — 7094-F1c test-quality specialization BU agentla kapandi; gercek-binary kanit: fresh-dist sync 6-changed (katalog 31→35) + ikinci kosum 0-changed idempotent + SKILL.md komut-atiflari makine-taramada %100 mevcut; lint-manifests global-gate yesil, scoped 138/138, tsc 0, 20-gate yesil; 696-003 run-kaydinda unresolved (FIX-butcesi capraz-kirlenmeyle tukendi) fakat isi diskte tam ve exact Test-komutu bagimsiz yeniden-kosumda yesil; xverify netleştirme-turu: preflight-fix claim'i verifier-codex UNCLEAR (formal-criterion esleme; curutme yok, makine-kanit esas) — receipt cross-verify-verdict sha256 78e7d604...; directive-dersleri (global-gate capraz-NO_GO + vocabulary-Reads) AI-operator-lessons adayi",
       "updated": "2026-08-26"
     },
     {
@@ -27304,6 +27304,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "921ea7df2130c61c21a30ff51770b5e645b226dfa8ee46f74709e401ce812608"
+    "value": "56637dceee153d9d218361a29bf6cd7f8c95d062e4e71dc065f53cff41c26ea0"
   }
 }

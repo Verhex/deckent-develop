@@ -456,17 +456,21 @@ export function findTargetedTestFiles(filesChanged: string[], projectRoot: strin
  * @internal Exported for testing
  */
 export function runTscCheck(projectRoot: string): { passed: boolean; output: string } {
-  // Use stack-detected build command instead of hardcoded tsc
+  // Use stack-detected commands instead of hardcoded tsc. Prefer the dedicated
+  // typecheck command: this is a verification gate, and a script-resolved build
+  // (e.g. `npm run build` with a clean step) mutates dist and can deadlock on
+  // the active-execution clean guard while a run-flow is starting.
   const stack = detectFullStack(projectRoot);
   const rawBuild = stack.commands.build;
+  const rawTypecheck = stack.commands.typecheck;
 
-  // No build command → interpreted language (Python, Ruby, PHP) → skip
-  if (!rawBuild) {
+  // No typecheck and no build command → interpreted language (Python, Ruby, PHP) → skip
+  if (!rawTypecheck && !rawBuild) {
     return { passed: true, output: `No build step for ${stack.language} — skipped` };
   }
 
-  // TypeScript: add --noEmit to avoid generating output files
-  const buildCmd = rawBuild === 'npx tsc' ? 'npx tsc --noEmit' : rawBuild;
+  // TypeScript legacy shape: add --noEmit to avoid generating output files
+  const buildCmd = rawTypecheck || (rawBuild === 'npx tsc' ? 'npx tsc --noEmit' : rawBuild);
 
   const isWindows = process.platform === 'win32';
   const [cmd, ...args] = buildCmd.split(' ');

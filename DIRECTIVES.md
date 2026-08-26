@@ -1,89 +1,89 @@
-# DOGFOOD-SKILL EVRİMİ — DALGA-1: MEKANİZMA ONARIMI (owner-onaylı plan, 2026-08-26)
+# DOGFOOD-SKILL EVRİMİ — DALGA-2: DOGFOOD-SÜİTİ (SSOT=skill; owner-onaylı plan, 2026-08-26)
 
 ## Goal
 
-Skill-routing mekanizmasının dört kök-onarımı: (T1) profil-türetimi v2'ye çekilir ve
-çöp-domain sınıfı ölür; (T2) builtin-katmanı ile `.deckent/skills` manifest-katmanı
-senkron olur ve `deckent sync` skill kolu kazanır; (T3) profilsiz skill yaratmak ve
-unroutable manifest'i sessiz taşımak imkânsızlaşır (fail-closed gate); (T4) worker
-prompt'una giden proje-komutları ve context-bloğu gerçek-veriye hizalanır. Ürün
-kullanıcısı için karşılık: skill seçimi çeşitlenir (aynı-üçlü patolojisi ölür),
-prompt'taki komutlar projenin GERÇEK script'leridir.
+Deckent'in KENDİ işçilik-kanunları skill-kataloğuna taşınır (SSOT=skill): dört yeni
+builtin skill (deckent-hermetic-testing, deckent-worker-evidence,
+deckent-repair-alignment, deckent-config-authority), iki mevcut skill revizyonu
+(i18n-quality, ci-testing) ve test-guardian builtin agent'ı. Ürün karşılığı: her
+Deckent kullanıcısının worker'ları bu disiplinleri prompt-seviyesinde hazır bulur;
+dogfood karşılığı: 7094-F1c (test-quality specialization) kapanır.
 
 ## Execution contract
 
-- Kalite barı aynen: i18n-FIRST (user-facing string yalnız getMessage), 0-hardcode
-  (model/akış-değeri literal'i yasak; tek kaynak registry+config), no-MVP, hermetik
-  test (tmpdir; VITEST_MAX_FORKS=2), production wiring closure (producer→consumer→
-  entrypoint zinciri koşturulmadan DONE yok).
-- Mevcut deseni kullan, yeniden icat etme; assertion zayıflatma ve test silme YASAK.
-- Her task kendi Test komutunu koşar; koşum kanıtı .result notes'a. Ürün-bug
-  kanıtında dosyaya dokunmadan NO_GO + exact src dosya:satır.
-- Manifest yeniden-yazımları elle değil, GERÇEK binary komutla üretilir
-  (`node dist/cli/entry.js sync ...`) — proof-of-function.
+- Şablon: `src/core/builtins/skills/provider-cli-matrix/` (manifest.json + SKILL.md
+  deseni birebir; manifestVersion 2, activation.rules + triggers + stackDetection).
+- HER yeni manifest elle-yazılmış canonical V3 `profile` taşır (domains/workTypes/
+  expertise/deliverables; priority 6-8) — Dalga-1'in unroutable-gate'i profilsiz
+  manifest'i FAIL eder; 30-girdilik yalnız-azalma baseline'ı BÜYÜTÜLEMEZ.
+- SKILL.md içerikleri İngilizce (katalog dili); kod-yolu string'i yok, i18n-FIRST
+  yalnız CLI-yüzeyi için geçerli (bu dalgada CLI dokunuşu yok).
+- İçerik REPO-GERÇEĞİNDEN türetilir: SKILL.md'lerde atıf yapılan komut/script/gate
+  adları gerçekte var olmalı (uydurma komut yasak); Reads listesindeki kaynaklardan
+  damıt. Assertion zayıflatma/test silme yasak.
+- Her task kendi Test komutunu koşar; koşum kanıtı .result notes'a.
 
-## Task 1: Skill-profil türetimi v2 — çöp-domain temizliği + yeniden-türetim kapısı
-- Files: src/core/skill-profile-derivation.ts, tests/core/skill-profile-derivation.test.ts
-- Reads: src/core/skill-types.ts, src/core/skill-pool.ts, src/core/routing-engine.ts, tests/core/skill-pool.test.ts, tests/core/skill-profile-state.test.ts
-- Priority: CRITICAL
-- Model: gpt-5.6-sol
-- Test: VITEST_MAX_FORKS=2 npx vitest run tests/core/skill-profile-derivation.test.ts tests/core/skill-pool.test.ts tests/core/skill-profile-state.test.ts
-### Description
-deriveCanonicalSkillProfile (:129) + deriveDomains (:78) bugün v1 türetimiyle çöp-domain
-üretiyor (genel-geçer terimlerden anlamsız domain'ler; aynı-üçlü seçim patolojisinin kökü).
-deriveDomains v2: (a) domain'ler yalnız skill'in description/tags/name'inden anlamlı
-tekil köklerle türer, stop-word/jenerik-terim listesi tek-kaynak sabit olur; (b)
-SKILL_PROFILE_DERIVATION_VERSION artırılır ve persisted profileProvenance'ta eski
-derivationVersion görüldüğünde profil BAYAT sayılıp yeniden türetilir (derivationVersion
-guard'ı — persisted-generated profil eski sürümdeyse manifest-profile'a değil fresh
-v2 türetimine gider); (c) authored manifest-profile yolu AYNEN korunur (authority
-değişmez). Regresyon: çöp-domain örnekleri fixture'lanır (v1'de üreyen, v2'de ölen);
-version-guard fixture'ı (v1-provenance'lı persisted profil → v2 yeniden-türetim).
-
-## Task 2: Katman-senkronu — deckent sync skill kolu + builtin content-hash + observability onarımı
-- Files: src/cli/commands/sync.ts, src/core/skill-pool.ts, src/cli/helpers/messages.ts, tests/cli/sync-skill.test.ts, .deckent/skills/
-- Reads: src/core/skill-profile-derivation.ts, src/core/agent-pool.ts, src/core/agent-prompt-sync.ts, src/cli/commands/skill.ts, tests/cli/commands.test.ts
+## Task 1: Yeni builtin skill'ler — deckent-hermetic-testing + deckent-worker-evidence
+- Files: src/core/builtins/skills/deckent-hermetic-testing/manifest.json, src/core/builtins/skills/deckent-hermetic-testing/SKILL.md, src/core/builtins/skills/deckent-worker-evidence/manifest.json, src/core/builtins/skills/deckent-worker-evidence/SKILL.md
+- Reads: src/core/builtins/skills/provider-cli-matrix/manifest.json, src/core/builtins/skills/provider-cli-matrix/SKILL.md, src/core/skill-types.ts, src/core/skill-profile-derivation.ts, scripts/lint-test-hermeticity.mjs, scripts/lint-mock-factories.mjs, tests/hermeticity/runtime-write-guard.ts, .claude/rules/worker-default.md
 - Priority: HIGH
-- Dependencies: Task 1
-- Test: VITEST_MAX_FORKS=2 npx vitest run tests/cli/sync-skill.test.ts tests/core/skill-pool.test.ts
+- Agent: doc-writer
+- Test: node scripts/lint-manifests.mjs && VITEST_MAX_FORKS=2 npx vitest run tests/core/skill-pool.test.ts
 ### Description
-Task 1'e bağımlıdır (v2 türetimi landed olmalı). Agent-emsali desenle (agent-pool
-seedBuiltins + agent-prompt-sync content-hash akışı) `deckent sync`e skill kolu eklenir:
-builtin skill tanımı değiştiğinde content-hash uyuşmazlığı tespit edilir ve manifest
-GERÇEK binary koşusuyla yeniden-materialize edilir (elle JSON yazmak yasak). Bu koşu
-`.deckent/skills/*/manifest.json` altındaki ~30 manifesti v2 profilleriyle re-persist
-eder; `observability` skill'inin bozuk manifesti bu akışla onarılır (özel-durum
-elle düzeltme değil, sync'in genel yolu onarmalı). Kullanıcıya görünen yeni string'ler
-getMessage kataloğuna (en+tr) eklenir. Kanıt: sync koşusu öncesi/sonrası manifest
-diff özeti + yeniden koşulduğunda idempotent (ikinci koşu 0 değişiklik) .result'ta.
+deckent-hermetic-testing: tmpdir-hermetik test yazımı (fresh-checkout'ta geçer;
+global state/tracked dosya mutasyonu yok), VITEST_MAX_FORKS=2 disiplini, hermeticity
+ledger ritüeli (count/digest tarihli-yorumlu güncelleme; digest EN SON pinlenir),
+mock-factory only-shrink baseline kuralı, runtime-write-guard'ın open-flag
+semantiği. deckent-worker-evidence: .result kanıt-disiplini (files_changed,
+gerçek koşum çıktısı, DONE/GO_WITH_TECH_DEBT/NO_GO dürüstlüğü, typed NO_GO),
+disk-kanıt-önce-iddia (status-çıktısı kanıt değildir), proof-of-function
+(user-surface işte gerçek-binary koşu). İkisi de repo'daki gerçek gate/script
+adlarına atıfla yazılır (Reads'ten damıt). Manifest'ler provider-cli-matrix şablonu
++ elle canonical V3 profile (priority 7).
 
-## Task 3: Unroutable-gate — skill create zorunlu profil + lint-manifests fail-closed
-- Files: src/cli/commands/skill.ts, scripts/lint-manifests.mjs, src/cli/helpers/messages.ts, tests/cli/skill-create-gate.test.ts
-- Reads: src/core/skill-profile-derivation.ts, src/core/skill-types.ts, tests/core/skill-profile-derivation.test.ts
+## Task 2: Yeni builtin skill'ler — deckent-repair-alignment + deckent-config-authority
+- Files: src/core/builtins/skills/deckent-repair-alignment/manifest.json, src/core/builtins/skills/deckent-repair-alignment/SKILL.md, src/core/builtins/skills/deckent-config-authority/manifest.json, src/core/builtins/skills/deckent-config-authority/SKILL.md
+- Reads: src/core/builtins/skills/provider-cli-matrix/manifest.json, src/core/builtins/skills/provider-cli-matrix/SKILL.md, src/core/skill-types.ts, src/core/config-write-authority.ts, src/core/config.ts, scripts/lint-config-writers.mjs, docs/governance/lane-briefs/ci-repair-test-slim-2026-08-26.md
 - Priority: HIGH
-- Dependencies: Task 1
-- Test: VITEST_MAX_FORKS=2 npx vitest run tests/cli/skill-create-gate.test.ts && node scripts/lint-manifests.mjs
+- Agent: doc-writer
+- Test: node scripts/lint-manifests.mjs && VITEST_MAX_FORKS=2 npx vitest run tests/core/skill-pool.test.ts
 ### Description
-Task 1'e bağımlıdır (v2 kontratına karşı doğrulanır). İki kapak: (a) `deckent skill
-create` (skill.ts:309 bölgesi) profil-üretimi başarısızsa skill'i UNROUTABLE olarak
-sessizce yazamaz — typed hata + kullanıcıya getMessage'lı yönlendirme (en+tr), skill
-dosyası yazılmaz; (b) scripts/lint-manifests.mjs unroutable/profilsiz manifest
-gördüğünde fail-closed FAIL verir (bugünkü davranış neyse tespit edilip sıkılaştırılır;
-yalnız-azalma baseline gerekiyorsa tarihli ledger yorumuyla kurulur). Gate lint
-zincirindeki mevcut yerinde kalır; yeni gate icat edilmez.
+deckent-repair-alignment: kırmızı-test onarım disiplini — bayat-pin vs gerçek
+ürün-bug sınıflandırması (bug kanıtında dosyaya dokunmadan NO_GO ve exact kaynak-konum kanıtı, dosya adı ile satır numarası), assertion zayıflatma/silme/skip yasağı, kontrat-öğrenme — Reads listesindeki kaynak kodu okuyarak hizalama yapılır, repro-before-red. deckent-config-authority: config yazımı
+YALNIZ config-write-authority üzerinden (writeConfigJsonAtomic tmp+fsync+rename,
+withConfigWriteLock, CONFIG_CONCURRENT_REVISION_HOLD semantiği), 3-katman merge,
+typed HOLD desenleri, lint-config-writers only-shrink gate'i; elle RMW/truncate
+config yazımı yasak. Manifest'ler şablon + elle V3 profile (priority 7; config
+skill'i priority 8 — authority-kritik).
 
-## Task 4: Prompt-doğruluğu — stack-detector komutları package.json'dan + context sinyal-diyeti
-- Files: src/core/stack-detector.ts, src/orchestra/prompt-god-template.ts, tests/core/stack-detector.test.ts
-- Reads: src/orchestra/prompt-compile.ts, src/core/analyzer.ts, tests/orchestra/prompt-god-template.test.ts
-- Priority: HIGH
-- Test: VITEST_MAX_FORKS=2 npx vitest run tests/core/stack-detector.test.ts tests/orchestra/prompt-god-template.test.ts
+## Task 3: Mevcut skill revizyonu — i18n-quality + ci-testing bugünkü gerçeklerle
+- Files: src/core/builtins/skills/i18n-quality/manifest.json, src/core/builtins/skills/i18n-quality/SKILL.md, src/core/builtins/skills/ci-testing/manifest.json, src/core/builtins/skills/ci-testing/SKILL.md
+- Reads: src/cli/helpers/messages.ts, scripts/lint-i18n.mjs, .github/workflows/ci.yml, scripts/security/secret-baseline.mjs, scripts/lint-test-hermeticity.mjs, docs/governance/lane-briefs/ci-repair-test-slim-2026-08-26.md
+- Priority: MEDIUM
+- Agent: doc-writer
+- Test: node scripts/lint-manifests.mjs && VITEST_MAX_FORKS=2 npx vitest run tests/core/skill-pool.test.ts
 ### Description
-Bağımsız task (T1-T3'e bağlı değil). (a) stack-detector.ts:57 bölgesindeki dil-başına
-hardcoded komut tablosu (typescript: 'npx tsc' vb.) projenin GERÇEK package.json
-scripts'inden çözülür: script varsa `npm run <script>` kullanılır (build/test/lint/
-typecheck isim-eşleme + yaygın takma-adlar), yoksa mevcut dil-default'una dürüst
-fallback — asla var-olmayan komut uydurma (honest-empty kuralı aynen). Tablo yalnız
-fallback-katmanı olarak kalır. (b) prompt-god-template buildProjectContextBlock (:999
-bölgesi) sinyal-diyeti: boş/jenerik context-bloğu prompt'a katılmaz, mevcut davranış
-korunarak yalnız gerçek-sinyal metin geçer. Worker-prompt çıktısına fixture: scripts'li
-projede prompt gerçek komutları içerir, scripts'siz projede fallback + uydurma-komut-yok.
+i18n-quality: getMessage(key, lang) kataloğu (messages.ts en+tr çifti ZORUNLU;
+katalogda olmayan key = stderr missing-key), mekanizma-modülü string-free kuralı,
+hardcoded user-facing string yasağı — mevcut SKILL.md bugünkü katalog-gerçeğiyle
+güncellenir (var olmayan dosya/komut atıfları temizlenir). ci-testing: CI shard
+yapısının bugünü — test job'larında dist-prebuild adımı (real-binary testler
+dist/cli/entry.js ister), secret-baseline gate, hermeticity/mock ratchet'ları,
+Windows fsync 'r+' dersi (read-only handle FlushFileBuffers EPERM), pipe-exit
+kuralı (cmd > log 2>&1; echo $?). Mevcut activation/trigger yapısı korunur,
+içerik güncellenir; profile alanları varsa V3'e elle hizalanır.
+
+## Task 4: test-guardian builtin agent — 7094-F1c kapanışı
+- Files: src/core/builtins/agents/test-guardian/agent.json, src/core/builtins/agents/test-guardian/AGENT.md
+- Reads: src/core/builtins/agents/ci-guardian/, src/core/builtins/agents/code-reviewer/, src/core/agent-types.ts, src/core/agent-pool.ts, .claude/rules/worker-default.md
+- Priority: HIGH
+- Agent: doc-writer
+- Test: VITEST_MAX_FORKS=2 npx vitest run tests/core/agent-pool.test.ts && node scripts/lint-manifests.mjs
+### Description
+ci-guardian emsal-deseniyle (dizin/dosya yapısı, capability-şeması birebir)
+test-guardian agent'ı: uzmanlık = build×test kalitesi — hermetik test yazımı,
+test-onarım hizalaması, ratchet/ledger bakımı, coverage-dürüstlüğü; writeAuthority
+tests/** + scripts/lint-* sınıfı (emsal agent'lardaki authority alan-adlarıyla
+birebir aynı şema). Routing'in bu agent'ı test-kind task'larda seçebilmesi için
+capability/keyword alanları test/hermetic/ratchet/vitest sinyalleriyle donatılır.
+Var olmayan capability alanı İCAT EDİLMEZ — agent-types şemasında ne varsa o.

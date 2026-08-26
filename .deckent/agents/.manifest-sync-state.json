@@ -43,6 +43,10 @@
     "ci-guardian": {
       "builtinHash": "efa321c01341ef45f8a7ac6c2db49fab02b2148a",
       "syncedAt": "2026-08-26T20:30:27.568Z"
+    },
+    "test-guardian": {
+      "builtinHash": "076b495eafbbd86ee57cb4cedef1c201af445f18",
+      "syncedAt": "2026-08-26T21:13:42.305Z"
     }
   }
 }
