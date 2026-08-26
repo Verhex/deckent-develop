@@ -317,6 +317,29 @@ export interface SprintContext {
   tenantId?: string;
 }
 
+const HEARTBEAT_IDENTITY_HOLD = 'HEARTBEAT_IDENTITY_HOLD: attemptId/backend were not host-bound. Do not write an ambiguous legacy heartbeat or infer identity from its filename.';
+
+/**
+ * Replaces the compile-time HOLD only after the spawn boundary has obtained the
+ * host's durable attempt identity. This deliberately reuses the canonical
+ * worker-activity renderer rather than introducing a second identity shape.
+ */
+export function bindWorkerPromptHeartbeatIdentity(
+  prompt: string,
+  identity: {
+    readonly taskId: string;
+    readonly workerId: string;
+    readonly attemptId: string;
+    readonly backend: WorkerActivityBackend;
+  },
+): string {
+  if (!prompt.includes(HEARTBEAT_IDENTITY_HOLD)) return prompt;
+  return prompt.replace(
+    HEARTBEAT_IDENTITY_HOLD,
+    renderWorkerActivityHeartbeatInstruction(identity),
+  );
+}
+
 export interface WorkerExactExecutionAuthority {
   readonly flowId: string;
   readonly revision: number;
@@ -2664,7 +2687,7 @@ ${buildVerifyPrecedenceNote(verificationMode)}${buildBehaviorPrecedenceNote(task
       attemptId: input.heartbeatIdentity.attemptId,
       backend: input.heartbeatIdentity.backend,
     })
-    : 'HEARTBEAT_IDENTITY_HOLD: attemptId/backend were not host-bound. Do not write an ambiguous legacy heartbeat or infer identity from its filename.';
+    : HEARTBEAT_IDENTITY_HOLD;
   push('T2', 'heartbeat', `## Heartbeat
 Before ${isInspectionOnlyTask ? 'inspection' : 'starting work'}, write .tasks/task-${task.id}.hb exactly once and batch that write with your first real tool call.
 ${heartbeatInstruction}

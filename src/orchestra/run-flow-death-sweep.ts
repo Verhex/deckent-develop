@@ -7,6 +7,15 @@
 // whose recorded run pid is no longer alive gets an honest, durable RUN_FAILED
 // closure (system-authored narrative) — never a silent limbo.
 
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  renameSync,
+  writeFileSync,
+} from 'node:fs';
+import { join } from 'node:path';
+
 import { getRunFlowCoordinator } from './run-flow-coordinator-registry.js';
 import {
   loadLatestStartAttempt,
@@ -47,6 +56,48 @@ export interface DeathSweepReport {
   scanned: number;
   closed: DeathSweepEntry[];
   skipped: DeathSweepEntry[];
+  /** Additive, bounded projection for JSON/status consumers. */
+  skippedSummary: DeathSweepSkippedSummary;
+}
+
+export interface DeathSweepSkippedClassSummary {
+  outcome: DeathSweepEntry['outcome'];
+  count: number;
+  /** Deterministic sample; never more than three entries per class. */
+  examples: DeathSweepEntry[];
+}
+
+export interface DeathSweepSkippedSummary {
+  total: number;
+  classes: DeathSweepSkippedClassSummary[];
+}
+
+const MAX_SKIPPED_EXAMPLES_PER_CLASS = 3;
+
+export function summarizeDeathSweepSkipped(
+  skipped: readonly DeathSweepEntry[],
+): DeathSweepSkippedSummary {
+  const byOutcome = new Map<DeathSweepEntry['outcome'], DeathSweepEntry[]>();
+  for (const entry of skipped) {
+    const entries = byOutcome.get(entry.outcome) ?? [];
+    entries.push(entry);
+    byOutcome.set(entry.outcome, entries);
+  }
+  return {
+    total: skipped.length,
+    classes: [...byOutcome.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([outcome, entries]) => ({
+        outcome,
+        count: entries.length,
+        examples: entries.slice(0, MAX_SKIPPED_EXAMPLES_PER_CLASS),
+      })),
+  };
+}
+
+function finalizeDeathSweepReport(report: DeathSweepReport): DeathSweepReport {
+  report.skippedSummary = summarizeDeathSweepSkipped(report.skipped);
+  return report;
 }
 
 /** The dead-run closure payload — ONE source for both the read-path sweep and
@@ -83,7 +134,12 @@ function attemptCas(attempt: StartAttemptRecord) {
  * record never aborts the sweep (the EISDIR/expire-sweep lesson).
  */
 export function sweepDeadDetachedRuns(projectRoot: string): DeathSweepReport {
-  const report: DeathSweepReport = { scanned: 0, closed: [], skipped: [] };
+  const report: DeathSweepReport = {
+    scanned: 0,
+    closed: [],
+    skipped: [],
+    skippedSummary: { total: 0, classes: [] },
+  };
   const coordinator = getRunFlowCoordinator(projectRoot);
 
   let flowIds: string[] = [];
@@ -91,7 +147,7 @@ export function sweepDeadDetachedRuns(projectRoot: string): DeathSweepReport {
     flowIds = coordinator.listFlows();
   } catch (err) {
     debugLog('run-flow-death-sweep:list', err);
-    return report;
+    return finalizeDeathSweepReport(report);
   }
 
   for (const flowId of flowIds) {
@@ -208,7 +264,7 @@ export function sweepDeadDetachedRuns(projectRoot: string): DeathSweepReport {
     }
   }
 
-  return report;
+  return finalizeDeathSweepReport(report);
 }
 
 // ─── F-3 — operator stale-run sweep (`deckent runs --close-stale`) ───────────
@@ -224,12 +280,16 @@ export interface StaleRunSweepEntry {
   flowId: string;
   detail: string;
   pid?: number;
-  classification: 'dead-run-handle' | 'unverifiable-run-handle' | 'stale-start-attempt';
+  classification:
+    | 'dead-run-handle'
+    | 'unverifiable-run-handle'
+    | 'stale-start-attempt'
+    | 'handleless-logless-legacy-flow-artifact';
   /** The durable closure this entry gets (or would get, in a dry-run):
    *  'failed' = RUN_FAILED fold; 'cancelled' = FLOW_ABORTED fold — the only
    *  closure a LEGACY flow (empty event log) can fold, since RUN_FAILED
    *  requires a STARTING/DETACHED_RUNNING event-log state to fold from. */
-  closedAs: 'failed' | 'cancelled';
+  closedAs: 'failed' | 'cancelled' | 'archived';
 }
 
 export interface StaleRunSweepOptions {
@@ -252,6 +312,100 @@ export interface StaleRunSweepReport {
   skipped: DeathSweepEntry[];
   /** True when closures were durably written; false for a dry-run. */
   applied: boolean;
+  /** Handle-less and event-log-less legacy projections handled at this seam. */
+  legacyArtifacts: LegacyFlowArtifactSweepReport;
+}
+
+export interface LegacyFlowArtifactInventoryEntry {
+  flowId: string;
+  classification: 'handleless-logless-legacy-flow-artifact';
+  sourceFiles: string[];
+  archivedFiles: string[];
+  manifestPath?: string;
+}
+
+export interface LegacyFlowArtifactSweepReport {
+  scanned: number;
+  candidates: LegacyFlowArtifactInventoryEntry[];
+  applied: boolean;
+}
+
+export interface LegacyFlowArtifactSweepOptions {
+  /** Owner approval. False is a strictly read-only inventory. */
+  apply: boolean;
+}
+
+const LEGACY_PROJECTION_SUFFIXES = ['.snapshot.jsonl', '.plan.jsonl'] as const;
+
+/**
+ * Inventory legacy JSONL projections which have neither execution handle nor
+ * event log. With explicit approval, move (never delete) those projections to
+ * the archive and publish a manifest beside them. Canonical/modern records and
+ * every flow carrying a handle are hermetic to this operation.
+ */
+export function sweepLegacyFlowArtifacts(
+  projectRoot: string,
+  opts: LegacyFlowArtifactSweepOptions,
+): LegacyFlowArtifactSweepReport {
+  const coordinator = getRunFlowCoordinator(projectRoot);
+  const storeDir = join(projectRoot, '.deckent', 'runtime', 'run-flow-store');
+  // Gate-uyumu (lint-sprint-archive-writers): src kodu `.deckent/archive`
+  // legacy-ad-alanına YENİ içerik yazamaz — taşıma hedefi runtime-owned
+  // quarantine'dir; kalıcı arşive terfi ayrı owner-onaylı disposition işidir.
+  const archiveRoot = join(projectRoot, '.deckent', 'runtime', 'run-flow-legacy-artifacts');
+  const names = existsSync(storeDir) ? readdirSync(storeDir).sort() : [];
+  let flowIds: string[] = [];
+  try {
+    flowIds = coordinator.listFlows();
+  } catch (error) {
+    debugLog('run-flow-legacy-artifact-sweep:list', error);
+    return { scanned: 0, candidates: [], applied: opts.apply };
+  }
+
+  const report: LegacyFlowArtifactSweepReport = {
+    scanned: flowIds.length,
+    candidates: [],
+    applied: opts.apply,
+  };
+  for (const flowId of flowIds.sort()) {
+    try {
+      if (loadRunHandle(projectRoot, flowId) !== undefined) continue;
+      if (readFlowEvents(projectRoot, flowId).length > 0) continue;
+      const sourceFiles = LEGACY_PROJECTION_SUFFIXES
+        .map((suffix) => `${flowId}${suffix}`)
+        .filter((name) => names.includes(name));
+      if (sourceFiles.length === 0) continue;
+
+      const entry: LegacyFlowArtifactInventoryEntry = {
+        flowId,
+        classification: 'handleless-logless-legacy-flow-artifact',
+        sourceFiles: sourceFiles.map((name) => join(storeDir, name)),
+        archivedFiles: [],
+      };
+      if (opts.apply) {
+        const destination = join(archiveRoot, encodeURIComponent(flowId));
+        mkdirSync(destination, { recursive: true });
+        for (const name of sourceFiles) {
+          const sourcePath = join(storeDir, name);
+          const archivedPath = join(destination, name);
+          renameSync(sourcePath, archivedPath);
+          entry.archivedFiles.push(archivedPath);
+        }
+        entry.manifestPath = join(destination, 'manifest.json');
+        writeFileSync(entry.manifestPath, `${JSON.stringify({
+          schemaVersion: 1,
+          classification: entry.classification,
+          flowId,
+          archivedAt: new Date().toISOString(),
+          files: entry.archivedFiles,
+        }, null, 2)}\n`, { encoding: 'utf8', flag: 'wx' });
+      }
+      report.candidates.push(entry);
+    } catch (error) {
+      debugLog('run-flow-legacy-artifact-sweep:flow', `${flowId}: ${error}`);
+    }
+  }
+  return report;
 }
 
 /**
@@ -265,7 +419,26 @@ export interface StaleRunSweepReport {
  * closures an apply would write.
  */
 export function sweepStaleRuns(projectRoot: string, opts: StaleRunSweepOptions): StaleRunSweepReport {
-  const report: StaleRunSweepReport = { scanned: 0, dead: [], unverifiable: [], skipped: [], applied: opts.apply };
+  const legacyArtifacts = sweepLegacyFlowArtifacts(projectRoot, { apply: opts.apply });
+  const report: StaleRunSweepReport = {
+    scanned: 0,
+    dead: [],
+    unverifiable: [],
+    skipped: [],
+    applied: opts.apply,
+    legacyArtifacts,
+  };
+  const legacyArtifactFlowIds = new Set(
+    legacyArtifacts.candidates.map((entry) => entry.flowId),
+  );
+  report.unverifiable.push(...legacyArtifacts.candidates.map((entry) => ({
+    flowId: entry.flowId,
+    detail: opts.apply
+      ? `legacy flow artifact moved to archive with manifest ${entry.manifestPath ?? 'unavailable'}`
+      : `handle-less and event-log-less legacy flow artifact; ${entry.sourceFiles.length} file(s) would be archived`,
+    classification: entry.classification,
+    closedAs: 'archived' as const,
+  })));
   const coordinator = getRunFlowCoordinator(projectRoot);
 
   let flowIds: string[] = [];
@@ -279,6 +452,7 @@ export function sweepStaleRuns(projectRoot: string, opts: StaleRunSweepOptions):
   for (const flowId of flowIds) {
     report.scanned += 1;
     try {
+      if (legacyArtifactFlowIds.has(flowId)) continue;
       const context = coordinator.getFlow(flowId);
       if (!LIVE_RUN_STATES.has(context.state)) continue;
 

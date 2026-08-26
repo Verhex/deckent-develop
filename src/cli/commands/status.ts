@@ -44,6 +44,7 @@ import {
 import { DEFAULT_HEARTBEAT_TIMEOUT_MS, loadConfig } from '../../core/config.js';
 import {
   sweepDeadDetachedRuns,
+  summarizeDeathSweepSkipped,
   type DeathSweepReport,
 } from '../../orchestra/run-flow-death-sweep.js';
 
@@ -217,7 +218,8 @@ export interface StatusCommandDeps {
   /** Injectable synchronous sweep for deterministic command tests. */
   readonly sweepDeadDetachedRuns?: (projectRoot: string) => DeathSweepReport;
   /** Command-scoped sweep projection, populated before any authority read. */
-  readonly deathSweepReport?: Pick<DeathSweepReport, 'closed' | 'skipped'>;
+  readonly deathSweepReport?: Pick<DeathSweepReport, 'closed' | 'skipped'>
+    & Partial<Pick<DeathSweepReport, 'skippedSummary'>>;
   readonly deathSweepWarning?: { readonly code: 'RUN_FLOW_DEATH_SWEEP_FAILED'; readonly message: string };
 }
 
@@ -809,8 +811,17 @@ function readinessSurface(
 
 function deathSweepSurface(
   deps: StatusCommandDeps,
-): Pick<DeathSweepReport, 'closed' | 'skipped'> {
-  return deps.deathSweepReport ?? { closed: [], skipped: [] };
+): Pick<DeathSweepReport, 'closed' | 'skipped' | 'skippedSummary'> {
+  const report = deps.deathSweepReport ?? { closed: [], skipped: [] };
+  const skippedSummary = report.skippedSummary
+    ?? summarizeDeathSweepSkipped(report.skipped);
+  return {
+    closed: report.closed,
+    // Preserve the existing array field while bounding status JSON to the
+    // same <=3/class examples advertised by the additive summary.
+    skipped: skippedSummary.classes.flatMap((entry) => entry.examples),
+    skippedSummary,
+  };
 }
 
 function deathSweepFailureMessage(lang: string, detail: string): string {

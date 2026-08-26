@@ -14,6 +14,17 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint684] - 2026-08-26
+
+### Added
+
+- 204 — deathSweep sınıf-özetli çıktı + tipli legacy-temizlik akışı
+- 207 — host-bound attemptId+backend kimliği worker'a kanıtlı taşınır
+- 3315 — dispatch sıcak-yolunda kalan senkron git çağrıları async olur
+
+
+_Tasks: 3 total, 3 done, 0 tech debt, 0 no-go_
+
 ## [sprint683] - 2026-08-26
 
 ### Added

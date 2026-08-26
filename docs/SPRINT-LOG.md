@@ -17026,3 +17026,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 683-006: 3177 — force-finalize eşleşen recovery-coordinator'ı emekli etmeden terminal dönemez (DONE)
 
 ---
+## Sprint 684 — sprint-684
+
+**Status:** COMPLETE
+**Date:** 2026-08-26
+**Duration:** 335s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 334521ms |
+
+### Tasks
+
+- 684-001: 204 — deathSweep sınıf-özetli çıktı + tipli legacy-temizlik akışı (DONE)
+- 684-002: 207 — host-bound attemptId+backend kimliği worker'a kanıtlı taşınır (DONE)
+- 684-003: 3315 — dispatch sıcak-yolunda kalan senkron git çağrıları async olur (DONE)
+
+---

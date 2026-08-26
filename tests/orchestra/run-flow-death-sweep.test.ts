@@ -5,12 +5,17 @@
 // reported, not killed).
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-import { sweepDeadDetachedRuns, sweepStaleRuns } from '../../src/orchestra/run-flow-death-sweep.js';
+import {
+  summarizeDeathSweepSkipped,
+  sweepDeadDetachedRuns,
+  sweepLegacyFlowArtifacts,
+  sweepStaleRuns,
+} from '../../src/orchestra/run-flow-death-sweep.js';
 import { getRunFlowCoordinator, _resetRunFlowCoordinatorsForTests } from '../../src/orchestra/run-flow-coordinator-registry.js';
 import {
   admitStartAttempt,
@@ -123,6 +128,24 @@ describe('run-flow death sweep (born-698c)', () => {
     c.recordCompletion({ flowId: 'flow-done', summary: 'ok' });
     const report = sweepDeadDetachedRuns(root);
     expect(report.closed).toHaveLength(0);
+  });
+
+  it('summarizes 100 skipped entries by class with at most three examples', () => {
+    const skipped = Array.from({ length: 100 }, (_, index) => ({
+      flowId: `legacy-${index.toString().padStart(3, '0')}`,
+      outcome: index < 60 ? 'no-pid-record' as const : 'alive' as const,
+      detail: `fixture ${index}`,
+    }));
+
+    const summary = summarizeDeathSweepSkipped(skipped);
+
+    expect(summary.total).toBe(100);
+    expect(summary.classes).toEqual([
+      expect.objectContaining({ outcome: 'alive', count: 40 }),
+      expect.objectContaining({ outcome: 'no-pid-record', count: 60 }),
+    ]);
+    expect(summary.classes.every((entry) => entry.examples.length <= 3)).toBe(true);
+    expect(summary.classes.reduce((total, entry) => total + entry.count, 0)).toBe(100);
   });
 
   it('repairs ADMITTED+handle → RUN_STARTED after a crash between canonical commits', () => {
@@ -255,6 +278,54 @@ describe('sweepStaleRuns — operator stale-run sweep (F-3)', () => {
     const c = getRunFlowCoordinator(root);
     expect(c.getFlow('flow-dead').state).toBe('DETACHED_RUNNING');
     expect(c.getFlow('flow-legacy').state).toBe('DETACHED_RUNNING');
+  });
+
+  it('inventories 100 handleless/logless artifacts, then archives only with explicit approval', () => {
+    for (let index = 0; index < 100; index += 1) {
+      const flowId = `legacy-artifact-${index.toString().padStart(3, '0')}`;
+      saveApprovedSnapshot(root, {
+        flowId,
+        revision: 1,
+        planDigest: 'd-1',
+        approvedBy: { id: 'u' },
+        approvedAt: '2026-08-25T00:00:00.000Z',
+        sprint: { id: flowId, tasks: [] } as never,
+      });
+    }
+    detachedFlow(root, 'hermetic-handle', process.pid);
+
+    const dryRun = sweepLegacyFlowArtifacts(root, { apply: false });
+    expect(dryRun.candidates).toHaveLength(100);
+    expect(dryRun.candidates.every((entry) => entry.archivedFiles.length === 0)).toBe(true);
+    expect(existsSync(dryRun.candidates[0]!.sourceFiles[0]!)).toBe(true);
+
+    const applied = sweepLegacyFlowArtifacts(root, { apply: true });
+    expect(applied.candidates).toHaveLength(100);
+    expect(applied.candidates.every((entry) => entry.archivedFiles.length === 1)).toBe(true);
+    expect(applied.candidates.every((entry) => !existsSync(entry.sourceFiles[0]!))).toBe(true);
+    const manifestPath = applied.candidates[0]!.manifestPath!;
+    expect(JSON.parse(readFileSync(manifestPath, 'utf8'))).toMatchObject({
+      schemaVersion: 1,
+      classification: 'handleless-logless-legacy-flow-artifact',
+    });
+    expect(getRunFlowCoordinator(root).getFlow('hermetic-handle').state).toBe('DETACHED_RUNNING');
+  });
+
+  it('projects legacy artifact inventory through the existing stale-runs report seam', () => {
+    saveApprovedSnapshot(root, {
+      flowId: 'legacy-visible', revision: 1, planDigest: 'd-1',
+      approvedBy: { id: 'u' }, approvedAt: '2026-08-25T00:00:00.000Z',
+      sprint: { id: 'legacy-visible', tasks: [] } as never,
+    });
+
+    const report = sweepStaleRuns(root, { apply: false });
+
+    expect(report.legacyArtifacts.candidates).toHaveLength(1);
+    expect(report.unverifiable).toContainEqual(expect.objectContaining({
+      flowId: 'legacy-visible',
+      classification: 'handleless-logless-legacy-flow-artifact',
+      closedAs: 'archived',
+    }));
   });
 
   it('apply closes a dead pid as FAILED and an unverifiable record as CANCELLED — durably', () => {

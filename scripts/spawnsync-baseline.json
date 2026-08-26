@@ -441,16 +441,6 @@
     },
     {
       "file": "src/orchestra/spawn-backend-docker.ts",
-      "code": "const res = spawnSync('git', ['hash-object', '--', rel], {",
-      "owner": "HOTPATH-SPAWN-ASYNC (born; worker-dispatch/retry docker CLI calls)"
-    },
-    {
-      "file": "src/orchestra/spawn-backend-docker.ts",
-      "code": "const res = spawnSync('git', ['hash-object', '-w', '--', rel], {",
-      "owner": "HOTPATH-SPAWN-ASYNC (born; worker-dispatch/retry docker CLI calls)"
-    },
-    {
-      "file": "src/orchestra/spawn-backend-docker.ts",
       "code": "const result = spawnSync('docker', ['info'], {",
       "owner": "HOTPATH-SPAWN-ASYNC (born; worker-dispatch/retry docker CLI calls)"
     },

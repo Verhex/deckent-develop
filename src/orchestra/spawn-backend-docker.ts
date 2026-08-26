@@ -2336,7 +2336,10 @@ export const SCOPE_BASELINE_DELIM = '\t';
  * (real-git repo). Returns '' when nothing could be baselined (⇒ the trap falls
  * through to its unfiltered legacy behavior).
  */
-export function computeScopeBaselineManifest(dir: string, scopeFilesWrite: readonly string[]): string {
+export async function computeScopeBaselineManifest(
+  dir: string,
+  scopeFilesWrite: readonly string[],
+): Promise<string> {
   const lines: string[] = [];
   for (const raw of scopeFilesWrite) {
     const rel = typeof raw === 'string' ? raw.trim() : '';
@@ -2345,10 +2348,8 @@ export function computeScopeBaselineManifest(dir: string, scopeFilesWrite: reado
     try { abs = resolve(dir, rel); } catch { continue; }
     if (!existsSync(abs)) continue;
     try {
-      const res = spawnSync('git', ['hash-object', '-w', '--', rel], {
-        cwd: dir, encoding: 'utf-8', timeout: 5_000, stdio: ['pipe', 'pipe', 'pipe'],
-      });
-      const hash = (res.stdout ?? '').trim();
+      const res = await runGitCommandAsync(dir, ['hash-object', '-w', '--', rel]);
+      const hash = res.stdout.toString('utf-8').trim();
       if (res.status === 0 && /^[0-9a-f]{40,64}$/.test(hash)) {
         lines.push(`${rel}${SCOPE_BASELINE_DELIM}${hash}`);
       }
@@ -2449,13 +2450,13 @@ export function buildScopeAttributionManifest(
   return `${header}\n${contentManifest}`;
 }
 
-export function captureScopeAttributionManifest(
+export async function captureScopeAttributionManifest(
   projectRoot: string,
   attemptId: string,
   scopeFilesWrite: readonly string[],
-): string {
+): Promise<string> {
   const scopeFiles = normalizedScopeFiles(scopeFilesWrite);
-  const contentManifest = computeScopeBaselineManifest(projectRoot, scopeFiles);
+  const contentManifest = await computeScopeBaselineManifest(projectRoot, scopeFiles);
   const captured = new Set(contentManifest
     .split(/\r?\n/)
     .filter(Boolean)
@@ -5836,8 +5837,8 @@ export class DockerSpawnBackend implements SpawnBackend {
    * - API keys passed as env vars if available
   * - timeout wrapper kills container after limit
   */
-  spawn(taskId: string, model: ModelType, prompt: string, opts?: SpawnBackendOptions): void {
-    this.spawnInternal(taskId, model, prompt, opts);
+  async spawn(taskId: string, model: ModelType, prompt: string, opts?: SpawnBackendOptions): Promise<void> {
+    await this.spawnInternal(taskId, model, prompt, opts);
   }
 
   /**
@@ -5847,9 +5848,9 @@ export class DockerSpawnBackend implements SpawnBackend {
    * from the project `.tasks/` mount. The returned handle contains no
    * actual-call, usage or terminal facts.
    */
-  spawnExactCrossVerify(
+  async spawnExactCrossVerify(
     input: DockerExactCrossVerifySpawnInput,
-  ): DockerExactCrossVerifyDispatchHandle {
+  ): Promise<DockerExactCrossVerifyDispatchHandle> {
     assertCrossVerifyEnforcedAttemptContract(input.executionContract);
     const contract = input.executionContract;
     if (!input.terminationAuthority
@@ -5898,7 +5899,7 @@ export class DockerSpawnBackend implements SpawnBackend {
         this.name,
       );
     }
-    this.spawnInternal(
+    await this.spawnInternal(
       input.taskId,
       input.model,
       input.prompt,
@@ -5933,7 +5934,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     });
   }
 
-  private spawnInternal(
+  private async spawnInternal(
     taskId: string,
     model: ModelType,
     prompt: string,
@@ -5947,7 +5948,7 @@ export class DockerSpawnBackend implements SpawnBackend {
       | 'executionContractEvidenceRef'
       | 'executionContractSha256'
     >,
-  ): void {
+  ): Promise<void> {
     // GATE-W2 toggle-independent SAFETY_FLOOR guard — MUST run before any side
     // effect (markPending/mkdir/docker). The default backend previously skipped
     // it while tmux/subprocess enforced it: a lethal actionId could spawn here.
@@ -6200,7 +6201,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     // the file scope for the next worker. monitorContainer's exit handler
     // is what releases on the happy path.
     try {
-      this.runSpawn(
+      await this.runSpawn(
         taskId,
         model,
         preparedPrompt,
@@ -6222,7 +6223,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     }
   }
 
-  private runSpawn(
+  private async runSpawn(
     taskId: string,
     model: ModelType,
     prompt: string,
@@ -6232,7 +6233,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     tasksDir: string,
     gitIsolation: DockerGitIsolation,
     exact?: DockerExactCrossVerifyContext,
-  ): void {
+  ): Promise<void> {
     const exactV2 = exact?.executionContract.schemaVersion === 2;
     // F1-005 (Sprint 332): resolve this worker's provider up-front so the image
     // readiness honest-fail below can name the EXACT provider-aware rebuild
@@ -6989,7 +6990,7 @@ export class DockerSpawnBackend implements SpawnBackend {
     // authority is mandatory: capture failure blocks before provider process
     // birth instead of degrading to a final shared-tree diff.
     try {
-      const baselineManifest = captureScopeAttributionManifest(
+      const baselineManifest = await captureScopeAttributionManifest(
         dir,
         attemptRef.attemptId,
         scopeFilesWrite,

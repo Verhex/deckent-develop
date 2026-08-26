@@ -4,7 +4,10 @@
 //   routeSprintTasks()
 
 // ─── Node Builtins ─────────────────────────────────────────────────
-import { buildWorkerCoreSystemPrompt } from './prompt-god-template.js';
+import {
+  bindWorkerPromptHeartbeatIdentity,
+  buildWorkerCoreSystemPrompt,
+} from './prompt-god-template.js';
 import { readFileSync, writeFileSync, appendFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { serializeTaskResultForDisk } from '../core/task-result-schema.js';
 import { join, dirname } from 'node:path';
@@ -169,6 +172,23 @@ export interface ExactPlanSpawnAuthority {
   readonly revision: number;
   readonly planDigest: string;
   readonly sourceAuthority?: RunFlowPlanSourceAuthority;
+}
+
+export function bindHostBoundWorkerIdentity(
+  prompt: string,
+  input: {
+    readonly taskId: string;
+    readonly attemptId?: string;
+    readonly backend?: 'docker' | 'tmux' | 'subprocess';
+  },
+): string {
+  if (!input.attemptId || !input.backend) return prompt;
+  return bindWorkerPromptHeartbeatIdentity(prompt, {
+    taskId: input.taskId,
+    workerId: `w-${input.taskId}`,
+    attemptId: input.attemptId,
+    backend: input.backend,
+  });
 }
 
 // ─── Exact-plan drift diagnosability (RECOVERY-DO-DOGFOOD visibility) ───────
@@ -1110,7 +1130,7 @@ export async function spawnWorkers(
       }
     }
 
-    const prompt = buildWorkerPrompt(
+    let prompt = buildWorkerPrompt(
       task,
       agentPrompt,
       taskSkillPrompts,
@@ -1340,7 +1360,7 @@ export async function spawnWorkers(
         adapterRouted.name,
         adapterRouted.executionCostClass,
       );
-      assertExecutionLandingSupport({
+      const approvalGrant = assertExecutionLandingSupport({
         budget: task.budget,
         policy: task.budgetPolicy?.landingPolicy,
         mode: task.budgetPolicy?.admissionMode,
@@ -1350,6 +1370,11 @@ export async function spawnWorkers(
         approvalAuthority: spawnOpts?.attendedExecutionApprovalAuthority,
         approvalExpectedDispatch: approvalExpectedDispatch('host-adapter'),
         executionCostClass: adapterRouted.executionCostClass,
+      });
+      prompt = bindHostBoundWorkerIdentity(prompt, {
+        taskId: task.id,
+        attemptId: approvalGrant?.receipt.binding.attemptId,
+        backend: 'subprocess',
       });
       adapterRouted.spawn(task.id, model, prompt, {
         allowedTools,
@@ -1409,6 +1434,13 @@ export async function spawnWorkers(
           approvalGrant.receipt.binding.attemptId,
         )
         : undefined;
+      prompt = bindHostBoundWorkerIdentity(prompt, {
+        taskId: task.id,
+        attemptId: approvalGrant?.receipt.binding.attemptId,
+        backend: effectiveBackend.name === 'docker'
+          ? 'docker'
+          : effectiveBackend.name === 'tmux' ? 'tmux' : 'subprocess',
+      });
       effectiveBackend.spawn(task.id, model, prompt, {
         allowedTools,
         autoApprove: spawnOpts?.autoApprove ?? false,
@@ -1440,7 +1472,7 @@ export async function spawnWorkers(
           adapter.name,
           adapter.executionCostClass,
         );
-        assertExecutionLandingSupport({
+        const approvalGrant = assertExecutionLandingSupport({
           budget: task.budget,
           policy: task.budgetPolicy?.landingPolicy,
           mode: task.budgetPolicy?.admissionMode,
@@ -1450,6 +1482,11 @@ export async function spawnWorkers(
           approvalAuthority: spawnOpts?.attendedExecutionApprovalAuthority,
           approvalExpectedDispatch: approvalExpectedDispatch('host-adapter'),
           executionCostClass: adapter.executionCostClass,
+        });
+        prompt = bindHostBoundWorkerIdentity(prompt, {
+          taskId: task.id,
+          attemptId: approvalGrant?.receipt.binding.attemptId,
+          backend: 'subprocess',
         });
         adapter.spawn(task.id, model, prompt, {
           allowedTools,
