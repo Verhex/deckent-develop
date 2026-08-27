@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "a6de3d9f97798e0d8df8eaddad74a65af3f97975a0755f4e66f85348355a3c9d"
+    "value": "3970b36a6f31f8fa6cc3d63b6553bab5435bd0624ca2d11d74922e790a05f304"
   },
   "summary": {
     "total": 541,
@@ -3337,9 +3337,9 @@
       "program": "ASSURANCE",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-26",
+      "updated": "2026-08-27",
       "definitionDigest": "21332cbf64fef9a8298226f34c06a830d8dd30f23509078ffaf7116993574934",
-      "progressDigest": "33479cb41acad289e03975839a455421db77e4bab916785b38c1b51799e230d1",
+      "progressDigest": "6d69f1a6d0c59b957c32b8518e91edf96227c93e28b5a4206686ca28f0d29312",
       "terminalClosureDigest": null
     },
     {
@@ -18577,8 +18577,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "A bounded isolated run creates one host-proven zero-work NOT_DISPATCHED attempt and one causally dependent SKIPPED projection, emits no worker evidence for the former, never blames either as product NO_GO and reaches the exact receipt-backed terminal outcome required by policy",
-      "evidence": "EK-3 open replay basamak; must run alone so the intentional dispatch absence cannot contaminate normal implementation or multi-provider success denominators; 2026-08-26 ilk bounded-replay denemesi (izole tmp-proje, ollama-unmetered tetiği): hedef per-task NOT_DISPATCHED yerine iki farklı typed fail-closed gate'e çarptı — docker-modda DECKENT_E078 landing-policy spawn-bloku, subprocess-modda RETRO'da TERMINAL_PUBLICATION_ZERO_TASK_HOLD finalizer-hatası; sertifikasyon OLMADI (finalizer-hatası receipt'li-terminal değildir), per-task budget-hold yolunu süren tasarımlı replay-harness dilimi gerekiyor — flip yok, dürüst kanıt kaydı",
-      "updated": "2026-08-26"
+      "evidence": "EK-3 open replay basamak; must run alone so the intentional dispatch absence cannot contaminate normal implementation or multi-provider success denominators; 2026-08-26 ilk bounded-replay denemesi (izole tmp-proje, ollama-unmetered tetiği): hedef per-task NOT_DISPATCHED yerine iki farklı typed fail-closed gate'e çarptı — docker-modda DECKENT_E078 landing-policy spawn-bloku, subprocess-modda RETRO'da TERMINAL_PUBLICATION_ZERO_TASK_HOLD finalizer-hatası; sertifikasyon OLMADI (finalizer-hatası receipt'li-terminal değildir), per-task budget-hold yolunu süren tasarımlı replay-harness dilimi gerekiyor — flip yok, dürüst kanıt kaydı 2026-08-27 ikinci tasarımlı bounded-replay turu (izole tmp-proje /tmp/deckent-replay-3301-20260827, gerçek binary, 3-task DAG: 1 gerçek-koşan + 1 admission-reddi-hedefli + 1 bağımlı): ÜÇ tetik-sınıfı da hedef-zincire ULAŞMADI ve her biri typed duvar verdi — (a) subprocess-backend: live-budget tavanları executor measured-stream beyanı ister → run-düzeyi DECKENT_E078 spawn-reddi (per-task değil); (b) gemini-pin: adapter MEVCUT (auth'suz) → worker gerçekten doğdu → dürüst NO_GO + FIX-tüketimi + typed-PAUSE (zero-work değil); (c) forced-skill-reddi: host BY-DESIGN sentetik NO_GO yazar (sprint-spawner.ts:618 FORCED_SKILL_UNAVAILABLE, 487-023 kontratı) → FIX yine devreye girip bütçe yakıyor ve bağımlı SKIPPED yerine blocked-PAUSE kalıyor. NET BULGU: kabulün istediği \"zero-work NOT_DISPATCHED + dependent SKIPPED + FIX-suçlamasız terminal\" zinciri için tek aday classifier-yolu result-ABSENT sınıfı (result-evaluator.ts:3507 + result-collector.ts:2447 deadline-yolu); host pre-dispatch NoGo sınıfına FIX-bastırma + bağımlıya SKIPPED-projeksiyonu ürün-dilimi gerektiriyor — sertifikasyon flip YOK, dürüst kayıt; iki fixture-koşusu ABORTED-finalize ile mühürlü (sprint-002/003)",
+      "updated": "2026-08-27"
     },
     {
       "order": 3302,
@@ -27350,6 +27350,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "baae97243929f1d6e575a16e5eed8c4a9b333909e6cc5a0b6487db0b78699827"
+    "value": "127297c77457b539f26a093dd71de09221b57fe990dba8fe23c686142459eac0"
   }
 }
