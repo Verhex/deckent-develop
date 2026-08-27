@@ -1,4 +1,9 @@
-# CLI-SURFACE-REFORM — Karar-Dokümanı **v2** (owner yönlendirmeleri işlendi, 2026-08-27)
+# CLI-SURFACE-REFORM — Karar-Dokümanı **v2.1 — ✅ ONAYLANDI** (owner, 2026-08-27)
+
+> **DURUM: ONAYLI-TASARIM, execution-bekliyor.** Owner v2.1'i onayladı ("belki ileride
+> tekrar revize ederim" — gelecek-revizyon hakkı saklı). Bu doküman dilim-1 DIRECTIVES
+> yazıldığı an oraya dönüşür ve SİLİNİR; o âna kadar onaylı-tasarımın taşıyıcısıdır.
+> Sıra: ladder-dalga (3301/3302/3304→3299) → dilim-1.
 
 > **Silinme-tetiği (delete-on-consume):** Alperen v2 gruplamayı + §4 kalan-soruları
 > onaylayınca dilim-1 DIRECTIVES'ine dönüşür ve bu doküman SİLİNİR (kalıcı kayıt MASTER 545).
