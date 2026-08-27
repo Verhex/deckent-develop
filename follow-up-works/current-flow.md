@@ -56,6 +56,21 @@ sprint-settlement sonrası guard temiz), sync idempotent + authored-profil mekan
 çıkıyor + 20 diverged-body dürüst keptLocal (7013 kalan iş: yakınsama-politikası).
 MASTER 7013/7010/9034 evidence-append. Bot pid 40722.
 
+**LADDER-KEŞFİ (2026-08-27 öğleden sonra — 3301 tasarım-notu):**
+Aile durumu: 3300/3303/3295 SERTİFİKALI (VERIFY, GR-receipt'li) · 3304'ün full-suite
+sertifika-koşusu ZATEN yeşil-kayıtlı (flip 3301+3302'ye bağlı) · **gerçek kalan iş 3301**:
+bounded izole replay — bir task admission-reddiyle hiç doğmayacak (hb+log+result ÜÇÜ DE yok
+→ classifyMissingResult=NOT_DISPATCHED, result-evaluator.ts:3507), bağımlısı SKIPPED,
+ÜÇÜNCÜ bağımsız ucuz-task gerçekten koşacak (zero-task finalizer-hold'una çarpmamak için
+önceki denemenin dersi). Tetik-adayları: (a) per-task budget-hold (evidence-notunun işaret
+ettiği yol; execution-plan-digest applyWorkerExecutionBudgetPolicy taskKind-çözümlü),
+(b) MODEL_INACTIVE pre-dispatch typed HOLD (FAZ-0 kanıtlı mekanizma — ModelActivationStore
+explicit-active + forceModel; config-resolved, canary'li). Koşu ana-şerit canlı-replay
+deseniyle (Node-3/Node-5 emsali): izole tmp-proje + gerçek binary + GR-receipt.
+**ÖNEMLİ SIRALAMA BULGUSU:** 3302 özünü kanıtlamış ama `3284 REPAIR-DISPATCH-001` (KERNEL,
+OPEN — repair-queue dispatch mekanizması) kapanmadan flip edemez → ladder'ın TAM kapanışı
+(ve dolayısıyla publish-planning) 3284'e de bağlı; 3284 ayrı gerçek mühendislik işi.
+
 **SIRADAKİ (bu sıra ile):**
 1. ~~Mekanizma-sprint~~ ✅ sprint-698 4/4 DONE (yukarıdaki güncelleme).
 2. **Ladder yeni-dalga:** 3301/3302/3304/3299 (sıralama-onayı alındı).
