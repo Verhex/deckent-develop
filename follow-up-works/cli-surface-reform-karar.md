@@ -66,34 +66,33 @@ ayrı başlık yok; az-grup = profesyonel.)
 - `analyze-project` alias'ı, `plan-nl`, `archive-debt` → kaldırma-listesi (do /
   status --debt emer).
 
-## 5. v2 hedef `-h` (EN-default; TR = config lang)
+## 5. v2.1 hedef `-h` (owner: "daha sade" — 4 grup + Advanced)
 
 ```
 Usage: deckent [options] [prompt]
 
-  deckent "<prompt>"     start a native chat session            (dilim-3)
+  deckent "<prompt>"     start a native chat session
   deckent do "<goal>"    plan a run from a goal (dry-run first)
 
-Run           do · run · plan · start · runs · review
-Observe       status · watch · inspect · history · retro · resources
-Control       kill · recover · cleanup
-Approvals     approvals                       ← TEK onay-kapısı (federated inbox)
-Verify        xverify · audit · truth
-Autonomy      autonomous · nervous · heartbeat
-Enterprise    rbac · gateway · execution-authority · provider-authority
-Catalog       agent · skill · docs · models · memory
-Providers     connect · limits · usage · cost · local-llm
-Environment   init · onboard · config · doctor · sync · upgrade · plugin · analyze
-Services      serve · bot · mcp
-Advanced      deckent help advanced           ← spawn·test·process·mode·flow·task·archive·trace·image·set-directives·finalize·features·openrouter-probe·provider-observations
-
-Removals after one deprecation window:
-  confirmations · checkpoint · audit-verify · autonomous-mission · dashboard ·
-  attach · output · explain · recall · remember · plan-nl · archive-debt
+Run        do · run · plan · start · runs · review
+Observe    status · watch · inspect · history · retro
+Control    approvals · kill · recover · cleanup · autonomous · nervous · xverify
+System     init · config · doctor · sync · upgrade · connect · limits · usage ·
+           agent · skill · models · memory · serve · bot · mcp
+Advanced   deckent help advanced
 ```
 
-80 düz komut → **12 grup / ~44 görünür komut / 12 kaldırma**. İşlev kaybı yok — hepsi
-kanonik komutların altına taşınıyor.
+- **5 başlık, ~32 görünür komut** (80'den). Katalog/sağlayıcı/ortam/servis ayrı başlık
+  değil — hepsi System (claude/codex az-başlık ilkesi).
+- Autonomy ayrı başlık değil: `autonomous`/`nervous` Control'de (onay-verbleri zaten tek
+  inbox'ta); `heartbeat` Advanced.
+- Advanced'e inenler: heartbeat · rbac · gateway · audit · truth · cost · docs · plugin ·
+  analyze · onboard · local-llm · resources · cu-status · spawn · test · process · mode ·
+  flow · task · archive · trace · image · set-directives · finalize · features ·
+  openrouter-probe · provider-observations · execution-authority · provider-authority.
+  (Görünmez değil — `deckent help advanced` tam listeyi basar; enterprise/RBAC yüzeyi
+  burada yaşar, ürünleşince kendi başlığına terfi edebilir.)
+- Kaldırma-listesi (§4) aynen: 12 paralel komut pencere-sonrası silinir.
 
 ## 6. Kalan owner-soruları (v2 tüketim-koşulu)
 
