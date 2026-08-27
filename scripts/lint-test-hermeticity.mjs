@@ -676,6 +676,9 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // tests/cli/sync-workspace.test.ts (tmpdir-hermetik, suite-owned).
   // 2026-08-27 11:4x: ayni 16579, digest-only — CI-hizalama: race-barrier taban
   // hizasi + ingress-pin 739 + PLATFORM.md regen (taranan metin kaydi).
+  // 2026-08-27 15:1x: ayni 16588, digest-only — c204e09fe kirmizisi: canli-sinir
+  // kablosu (sprint-phases prepare-boundary) pin-SONRASI eklenip digest tazelenmeden
+  // commitlenmisti; digest-en-son ritueli ihlal kaydi + duzeltme.
   // 2026-08-27 14:3x: 16579→16588 — sprint-699 disposition-suite'leri (tmpdir-hermetik,
   // suite-owned): failure-disposition-policy + collector-disposition + disposition-event
   // + chain-seal; ana-serit seam-fix kaymalari dahil.
@@ -734,7 +737,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // attribution-baseline / finalize-retirement + isCanonicalTaskFilename pinleri.
   // 2026-08-26 11:04: 16504→16506 — Node-6a mekanik supurme (sprint-684 3/3):
   // death-sweep hijyen + worker-identity-hostbound + docker-git-async suiteleri.
-  digest: 'b9dc29cd0a926a98c7062c9036bc890eeb7e14615428a7fce820f545f08dc7cd',
+  digest: 'f2afb5277fdb0e9e7eaf1c6c2fa7a986fe0261e140fce2a7d481d188568b415d',
   // 2026-08-27 04:0x: ayni 16514, digest-only — full-suite hizalama batch'i
   // (pin/mock/census guncellemeleri + sync guard).
   // 2026-08-27 03:1x: ayni 16514, digest-only — CI-hizalama paketi
