@@ -143,6 +143,7 @@ import {
 } from './result-evaluator.js';
 import {
   isHostPreDispatchReasonCode,
+  isPolicyTerminalPreDispatchResult,
   resolveHostPreDispatchFailureDisposition,
   type FailureDispositionPolicyConfig,
 } from '../core/failure-disposition-policy.js';
@@ -457,6 +458,11 @@ export function enforceRecoveryBornEvaluationHonesty(
   evaluation: EvaluationResult,
   task?: Task,
 ): EvaluationResult {
+  // A policy-terminal host pre-dispatch settlement's truthful verdict is
+  // NOT_DISPATCHED: the worker never ran, so there is no worker failure for
+  // this boundary to preserve — re-blaming it as NO_GO would be the dishonest
+  // direction (3301 truthful-terminal, 2026-08-27 r7 kanıtı).
+  if (isPolicyTerminalPreDispatchResult(result)) return evaluation;
   return hasConcreteEvaluationFailure(result, task)
     ? preserveNoGo(evaluation, 'recovery-born honesty boundary: concrete failure evidence')
     : evaluation;
@@ -3372,6 +3378,36 @@ export function resolveFixContinuation(
  * spawn fix workers, evaluate fix results.
  * Mutates `sprint` (status, phase) in place.
  */
+export function partitionFixTasksByFailureDisposition(
+  fixTasks: readonly Task[],
+  results: readonly TaskResult[],
+  config: FailureDispositionPolicyConfig | undefined,
+): { eligible: Task[]; noMint: Array<{ task: Task; failedTaskId: string; reasonCode: string; evaluation: TaskEvaluation }> } {
+  const resultsById = new Map(results.map(result => [result.taskId, result]));
+  const eligible: Task[] = [];
+  const noMint: Array<{ task: Task; failedTaskId: string; reasonCode: string; evaluation: TaskEvaluation }> = [];
+  for (const task of fixTasks) {
+    const failedTaskId = task.fixForTaskId;
+    const settlement = failedTaskId
+      ? resultsById.get(failedTaskId)?.preDispatchSettlement
+      : undefined;
+    if (!failedTaskId || !settlement) {
+      eligible.push(task);
+      continue;
+    }
+    const reasonCode = isHostPreDispatchReasonCode(settlement.reasonCode)
+      ? settlement.reasonCode
+      : 'LEGACY_HOST_PRE_DISPATCH_REJECTION';
+    const disposition = resolveHostPreDispatchFailureDisposition(reasonCode, config);
+    if (disposition.fixEligible) {
+      eligible.push(task);
+    } else {
+      noMint.push({ task, failedTaskId, reasonCode, evaluation: disposition.evaluation });
+    }
+  }
+  return { eligible, noMint };
+}
+
 export async function runFixPhase(
   projectRoot: string,
   sprint: Sprint,
@@ -3612,7 +3648,7 @@ export async function runFixPhase(
       const currentRootIds = new Set(
         sprint.tasks.filter(task => !task.isPriorityFix).map(task => task.id),
       );
-      const fixTasks = [...selectPendingFixTasks(
+      let fixTasks = [...selectPendingFixTasks(
         allSprintTasks,
         maxFixRetries,
         attemptedFixIds,
@@ -3621,6 +3657,30 @@ export async function runFixPhase(
           currentRootIds.has(ancestorId),
         ),
       );
+      const dispositionGate = partitionFixTasksByFailureDisposition(
+        fixTasks,
+        results,
+        config as unknown as FailureDispositionPolicyConfig,
+      );
+      fixTasks = dispositionGate.eligible;
+      for (const blocked of dispositionGate.noMint) {
+        evaluations.set(blocked.failedTaskId, blocked.evaluation);
+        try {
+          writeEvent(
+            projectRoot,
+            getCurrentSprintId(projectRoot) ?? sprint.id,
+            'brain',
+            'worker',
+            'BRAIN→WORKER:REPAIR_NO_MINT',
+            {
+              taskId: blocked.task.id,
+              failedTaskId: blocked.failedTaskId,
+              reasonCode: blocked.reasonCode,
+              source: 'sprint-phases',
+            },
+          );
+        } catch (e) { debugLog('runFixPhase:repairNoMint', e); }
+      }
       if (fixTasks.length === 0) break;
       for (const task of fixTasks) attemptedFixIds.add(task.id);
 

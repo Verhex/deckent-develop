@@ -14,6 +14,24 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint700] - 2026-08-27
+
+### Added
+
+- Failure-disposition enforcement at scheduler and phase repair-mint sites
+- Integration tests for disposition-gated repair minting and constraint inheritance
+
+### Changed
+
+- Repair-task constraint inheritance for forceSkills and model (completed with tech debt)
+
+### Fixed
+
+- Failure-disposition admission gate at the evaluator FIX-birth path
+
+
+_Tasks: 4 total, 4 done, 1 tech debt, 0 no-go_
+
 ## [sprint699] - 2026-08-27
 
 ### Added

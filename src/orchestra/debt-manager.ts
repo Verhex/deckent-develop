@@ -930,7 +930,7 @@ export function handleEvaluation(
     title: `Fix: ${task.title}`,
     description: fixDescription,
     model: rotationStrategy.rotatedModel,
-    forceModel: rotationStrategy.rotatedModel,
+    ...(task.forceModel !== undefined ? { forceModel: task.forceModel } : {}),
     effort: task.effort,
     priority: 'CRITICAL',
     reason: enrichedReason,
@@ -973,7 +973,7 @@ export function handleEvaluation(
     // budget. Only the parent's genuine forceSkills carry the operator
     // contract; an unresolvable auto skill falls back to the documented
     // silent-drop.
-    ...(task.forceSkills !== undefined && task.forceSkills.length > 0
+    ...(task.forceSkills !== undefined
       ? { forceSkills: [...task.forceSkills] }
       : {}),
     createdAt: now(),
@@ -1077,7 +1077,7 @@ export function handleCrossDependencies(
           title: `Cross-fix: ${depTask.title}`,
           description: `Cross-dependency fix: ${noGoTask.id} (NO_GO) depends on ${depId}`,
           model: rotationStrategy.rotatedModel,
-          forceModel: rotationStrategy.rotatedModel,
+          ...(depTask.forceModel !== undefined ? { forceModel: depTask.forceModel } : {}),
           effort: depTask.effort,
           priority: 'CRITICAL',
           reason: `Cross-dependency: ${noGoTask.id} failed, may be caused by ${depId}`,
@@ -1099,7 +1099,7 @@ export function handleCrossDependencies(
           forceAgent: rotationStrategy.rotatedAgent,
           assignedSkills: rotatedSkills,
           // RCPT-2: same rule as the primary fix-task site above — no auto→force promotion.
-          ...(depTask.forceSkills !== undefined && depTask.forceSkills.length > 0
+          ...(depTask.forceSkills !== undefined
             ? { forceSkills: [...depTask.forceSkills] }
             : {}),
           createdAt: now(),

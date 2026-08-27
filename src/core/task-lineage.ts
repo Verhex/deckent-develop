@@ -74,7 +74,10 @@ export interface TaskLineageSettlementProjection {
 export type NotDispatchedSettlement =
   | { readonly state: 'RESUMABLE'; readonly reasonCode: 'DISPATCH_RETRY_AVAILABLE' }
   | { readonly state: 'FAILED'; readonly reasonCode: 'DISPATCH_EXHAUSTED' }
-  | { readonly state: 'SKIPPED'; readonly reasonCode: 'DEPENDENCY_STARVED' };
+  // POLICY_FIX_EXEMPT: the failure-disposition policy declared this host
+  // pre-dispatch settlement terminal (no FIX, no re-dispatch) — a resolved
+  // skip, never an unresolved failure (3301 truthful-terminal, 2026-08-27).
+  | { readonly state: 'SKIPPED'; readonly reasonCode: 'DEPENDENCY_STARVED' | 'POLICY_FIX_EXEMPT' };
 
 /**
  * Project NOT_DISPATCHED from a transient observation into an explicit lifecycle
@@ -85,6 +88,7 @@ export function projectNotDispatchedSettlements(
   tasks: readonly Task[],
   evaluations: ReadonlyMap<string, TaskEvaluation>,
   redispatchAttemptedIds: ReadonlySet<string>,
+  policyTerminalIds?: ReadonlySet<string>,
 ): ReadonlyMap<string, NotDispatchedSettlement> {
   const tasksById = new Map(tasks.map(task => [task.id, task]));
   const lineages = foldTaskLineages(tasks);
@@ -94,6 +98,10 @@ export function projectNotDispatchedSettlements(
   for (const lineage of lineages) {
     const attemptId = lineage.resolvedTask.id;
     if (evaluations.get(attemptId) !== TaskEvaluation.NOT_DISPATCHED) continue;
+    if (policyTerminalIds?.has(attemptId)) {
+      projected.set(attemptId, { state: 'SKIPPED', reasonCode: 'POLICY_FIX_EXEMPT' });
+      continue;
+    }
     projected.set(attemptId, redispatchAttemptedIds.has(attemptId)
       ? { state: 'FAILED', reasonCode: 'DISPATCH_EXHAUSTED' }
       : { state: 'RESUMABLE', reasonCode: 'DISPATCH_RETRY_AVAILABLE' });

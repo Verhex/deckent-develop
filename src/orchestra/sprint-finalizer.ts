@@ -415,6 +415,7 @@ import type { CostConfig } from '../core/cost-config-loader.js';
 
 // ─── Debt Manager ─────────────────────────────────────────────────
 import { runDecay, auditBrainBudget } from './debt-manager.js';
+import { isPolicyTerminalPreDispatchResult } from '../core/failure-disposition-policy.js';
 import { runDocTrackingSync } from '../core/doc-tracking/sync.js';
 
 // ─── Observability ────────────────────────────────────────────────
@@ -2567,6 +2568,10 @@ function terminalAttemptEvidence(
       taskId,
       attemptId: work.attemptId
         ?? preDispatchSettlement?.attemptId
+        // Host-authored cascade-skip synthetics carry a host identity — the
+        // dependent never had a worker attempt, and empty-string identity is
+        // an INVALID_IDENTITY publication hold (3301 r9 kanıtı, 2026-08-27).
+        ?? (result?.cascadeSkipped === true ? `host:cascade-skip:${taskId}` : undefined)
         ?? (settlement && settlement.state !== 'RESUMABLE' ? `host:${settlement.reasonCode}` : ''),
     };
   };
@@ -2597,6 +2602,7 @@ function terminalAttemptEvidence(
           state: 'TERMINAL',
           verdict: 'NO_GO',
           reasonCode: hostTerminalReasonCode,
+          hostTerminalNotDispatched: true,
           evidenceRef: hostTerminalEvidenceRef ?? sha256EvidenceRef('not-dispatched-settlement', {
             identity,
             settlement: notDispatchedSettlement,
@@ -3115,12 +3121,12 @@ export function publishTestModeSprintTerminalReceipt(
   const attemptTasks = loadFinalizerAttemptTasks(projectRoot, sprint);
   const terminalTruth = buildFinalizerTerminalTruth({
     tasks: attemptTasks,
-    evaluations,
+    evaluations: normalizePolicyTerminalEvaluations(evaluations, derivePolicyTerminalIdsFromResults(results)),
     results,
     defaultAuthMode: opts.defaultAuthMode,
     notDispatchedSettlements: projectNotDispatchedSettlements(
       attemptTasks,
-      evaluations,
+      normalizePolicyTerminalEvaluations(evaluations, derivePolicyTerminalIdsFromResults(results)),
       new Set(
         attemptTasks
           .filter(task => existsSync(join(
@@ -3130,6 +3136,7 @@ export function publishTestModeSprintTerminalReceipt(
           )))
           .map(task => task.id),
       ),
+      derivePolicyTerminalIdsFromResults(results),
     ),
   });
   const receiptPublication = publishFencedSprintTerminalReceipt({
@@ -3184,7 +3191,7 @@ export function forceAbortSprint(
   const attemptTasks = loadFinalizerAttemptTasks(projectRoot, sprint);
   const truth = buildFinalizerTerminalTruth({
     tasks: attemptTasks,
-    evaluations,
+    evaluations: normalizePolicyTerminalEvaluations(evaluations, derivePolicyTerminalIdsFromResults(results)),
     results: [...results],
     defaultAuthMode: opts.defaultAuthMode,
     coordinatorEvidence: coordinatorRetirementEvidence
@@ -3192,7 +3199,7 @@ export function forceAbortSprint(
       : [],
     notDispatchedSettlements: projectNotDispatchedSettlements(
       attemptTasks,
-      evaluations,
+      normalizePolicyTerminalEvaluations(evaluations, derivePolicyTerminalIdsFromResults(results)),
       new Set(
         attemptTasks
           .filter(task => existsSync(join(
@@ -3202,6 +3209,7 @@ export function forceAbortSprint(
           )))
           .map(task => task.id),
       ),
+      derivePolicyTerminalIdsFromResults(results),
     ),
   });
   const receiptPublication = publishFencedAbortedSprintTerminalReceipt({
@@ -3883,17 +3891,18 @@ export async function finalizeSprint(
   }));
   const terminalTruth = buildFinalizerTerminalTruth({
     tasks: attemptTasks,
-    evaluations,
+    evaluations: normalizePolicyTerminalEvaluations(evaluations, derivePolicyTerminalIdsFromResults(results)),
     results,
     defaultAuthMode: opts?.config?.auth_mode,
     notDispatchedSettlements: projectNotDispatchedSettlements(
       attemptTasks,
-      evaluations,
+      normalizePolicyTerminalEvaluations(evaluations, derivePolicyTerminalIdsFromResults(results)),
       new Set(
         attemptTasks
           .filter(task => existsSync(join(projectRoot, TASKS_DIR, `task-${task.id}.redispatch-attempted`)))
           .map(task => task.id),
       ),
+      derivePolicyTerminalIdsFromResults(results),
     ),
   });
   const tasksById = new Map(attemptTasks.map(task => [task.id, task]));
@@ -5371,4 +5380,35 @@ export function writeTerminalDashboardSnapshot(
   };
   writeFileSync(dashPath, JSON.stringify(snapshot, null, 2), 'utf-8');
   debugLog('writeTerminalDashboardSnapshot', `terminal snapshot written for ${sprint.id}`);
+}
+
+/**
+ * Truth-normalizasyonu (3301): policy-terminal pre-dispatch sonuçların verdikti
+ * her dalda NOT_DISPATCHED'tır; NO_GO yazılmışsa burada düzeltilir (kopya döner).
+ */
+function normalizePolicyTerminalEvaluations(
+  evaluations: ReadonlyMap<string, TaskEvaluation>,
+  policyTerminalIds: ReadonlySet<string>,
+): ReadonlyMap<string, TaskEvaluation> {
+  if (policyTerminalIds.size === 0) return evaluations;
+  const normalized = new Map(evaluations);
+  for (const id of policyTerminalIds) {
+    if (normalized.get(id) === TaskEvaluation.NO_GO) {
+      normalized.set(id, TaskEvaluation.NOT_DISPATCHED);
+    }
+  }
+  return normalized;
+}
+
+/** Task ids whose result is a policy-terminal host pre-dispatch settlement (3301). */
+function derivePolicyTerminalIdsFromResults(
+  results: Iterable<TaskResult> | ReadonlyMap<string, TaskResult>,
+): ReadonlySet<string> {
+  const iterable: Iterable<TaskResult> =
+    results instanceof Map ? results.values() : results as Iterable<TaskResult>;
+  const ids = new Set<string>();
+  for (const result of iterable) {
+    if (isPolicyTerminalPreDispatchResult(result)) ids.add(result.taskId);
+  }
+  return ids;
 }

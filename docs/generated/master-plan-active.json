@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "67869eef59fa67dcbced199b819369760a3e2837e69a14dbddbe578de30fa2af"
+    "value": "62b4d8bb111cd739a898adf8749a552726fb8b38ec8a581ca63faa1018d6b3be"
   },
   "summary": {
     "total": 542,
@@ -3152,7 +3152,7 @@
       "state": "OPEN",
       "updated": "2026-08-27",
       "definitionDigest": "32baf34f5fc318f1b0e51a375792836ad99a014cdb5ede4718377f895f8cabfd",
-      "progressDigest": "a8424ee3c6bb01a2376eaac781f1cd263ce817d15e3eb63886c62148eccf21c2",
+      "progressDigest": "6beda275c5f211fa29560007b2de55f737f6a389785f2c6dd737f58e1c6269eb",
       "terminalClosureDigest": null
     },
     {
@@ -3339,7 +3339,7 @@
       "state": "OPEN",
       "updated": "2026-08-27",
       "definitionDigest": "21332cbf64fef9a8298226f34c06a830d8dd30f23509078ffaf7116993574934",
-      "progressDigest": "f4edf76561fd705db4999a8a9b9185b247a2798acb308e5da5ca7af90e188122",
+      "progressDigest": "a88e99b324bde3bc99399d6f4104cec3cd8586d499b68b6cebce99262ee8c62c",
       "terminalClosureDigest": null
     },
     {
@@ -18036,7 +18036,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Original, FIX, FIX-FIX and cross-dependency repair births publish the same durable queue identity; per-result settlement immediately reevaluates ready work; phase transitions cannot hide a newly written task; PAUSE is legal only after the queue, active attempts and authorized repair decisions reach a fenced quiescent snapshot",
-      "evidence": "Sprint-488 POSTFIX evaluated 003, 005, 006 and 015, wrote four `-fix.json` artifacts, but those tasks were absent from the in-memory sprint subset and no fix worker spawned before circuit-breaker PAUSE. Manual recovery now routes local, reducer and dependency-respawn triggers through canonical spawn-time collision admission and reports only actual dispatches; fresh live replay remains required 2026-08-27 owner-ADMISSION (Q&A): keşif+sprint onaylandı (3301-deseni). Aynı gün canlı kanıt (bounded-replay sprint-004/005, izole fixture): repair-machinery, host pre-dispatch NoGo sınıfına da repair doğuruyor (\"repair settlement\" pause-mesajı) ve doğan repair-task orijinalin forceSkills kısıtını TAŞIMADAN koşup DONE üretebiliyor (yetki-düşmesi bulgusu — explicit operator kısıtı sessizce kayboluyor); failure-disposition-policy tüketimi repair-admission katmanına da kablolanmalı — 3301 tam-sertifikası bu tüketiciye bağlı",
+      "evidence": "Sprint-488 POSTFIX evaluated 003, 005, 006 and 015, wrote four `-fix.json` artifacts, but those tasks were absent from the in-memory sprint subset and no fix worker spawned before circuit-breaker PAUSE. Manual recovery now routes local, reducer and dependency-respawn triggers through canonical spawn-time collision admission and reports only actual dispatches; fresh live replay remains required 2026-08-27 owner-ADMISSION (Q&A): keşif+sprint onaylandı (3301-deseni). Aynı gün canlı kanıt (bounded-replay sprint-004/005, izole fixture): repair-machinery, host pre-dispatch NoGo sınıfına da repair doğuruyor (\"repair settlement\" pause-mesajı) ve doğan repair-task orijinalin forceSkills kısıtını TAŞIMADAN koşup DONE üretebiliyor (yetki-düşmesi bulgusu — explicit operator kısıtı sessizce kayboluyor); failure-disposition-policy tüketimi repair-admission katmanına da kablolanmalı — 3301 tam-sertifikası bu tüketiciye bağlı sprint-700 dilimi landed (do-yüzeyinden; admission-gate + scheduler-enforcement + forceSkills/model-inheritance + 4 hermetik suite); canlı r8-kanıtı: repair-mint policy-guard'ı LOUD çalışıyor; scope-eki: karışık-sonuç COMPLETE-yayın sözleşmesi (cleanup-eligibility reasons) bu satırın terminal-kontrat alanına bağlandı",
       "updated": "2026-08-27"
     },
     {
@@ -18588,7 +18588,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "A bounded isolated run creates one host-proven zero-work NOT_DISPATCHED attempt and one causally dependent SKIPPED projection, emits no worker evidence for the former, never blames either as product NO_GO and reaches the exact receipt-backed terminal outcome required by policy",
-      "evidence": "EK-3 open replay basamak; must run alone so the intentional dispatch absence cannot contaminate normal implementation or multi-provider success denominators; 2026-08-26 ilk bounded-replay denemesi (izole tmp-proje, ollama-unmetered tetiği): hedef per-task NOT_DISPATCHED yerine iki farklı typed fail-closed gate'e çarptı — docker-modda DECKENT_E078 landing-policy spawn-bloku, subprocess-modda RETRO'da TERMINAL_PUBLICATION_ZERO_TASK_HOLD finalizer-hatası; sertifikasyon OLMADI (finalizer-hatası receipt'li-terminal değildir), per-task budget-hold yolunu süren tasarımlı replay-harness dilimi gerekiyor — flip yok, dürüst kanıt kaydı 2026-08-27 ikinci tasarımlı bounded-replay turu (izole tmp-proje /tmp/deckent-replay-3301-20260827, gerçek binary, 3-task DAG: 1 gerçek-koşan + 1 admission-reddi-hedefli + 1 bağımlı): ÜÇ tetik-sınıfı da hedef-zincire ULAŞMADI ve her biri typed duvar verdi — (a) subprocess-backend: live-budget tavanları executor measured-stream beyanı ister → run-düzeyi DECKENT_E078 spawn-reddi (per-task değil); (b) gemini-pin: adapter MEVCUT (auth'suz) → worker gerçekten doğdu → dürüst NO_GO + FIX-tüketimi + typed-PAUSE (zero-work değil); (c) forced-skill-reddi: host BY-DESIGN sentetik NO_GO yazar (sprint-spawner.ts:618 FORCED_SKILL_UNAVAILABLE, 487-023 kontratı) → FIX yine devreye girip bütçe yakıyor ve bağımlı SKIPPED yerine blocked-PAUSE kalıyor. NET BULGU: kabulün istediği \"zero-work NOT_DISPATCHED + dependent SKIPPED + FIX-suçlamasız terminal\" zinciri için tek aday classifier-yolu result-ABSENT sınıfı (result-evaluator.ts:3507 + result-collector.ts:2447 deadline-yolu); host pre-dispatch NoGo sınıfına FIX-bastırma + bağımlıya SKIPPED-projeksiyonu ürün-dilimi gerektiriyor — sertifikasyon flip YOK, dürüst kayıt; iki fixture-koşusu ABORTED-finalize ile mühürlü (sprint-002/003) 2026-08-27 sprint-699 dilimi landed (owner \"Öneri kabul\"): src/core/failure-disposition-policy.ts (typed tablo + config-override) + evaluator/collector kablolama + owner-outbox disposition-olayı + zincir-mühürü (T4 test-guardian dürüst-NO_GO'su gerçek boşluk buldu: classifyFixPhaseTasks fixEligible-yönlendirmesi — el-seam ile kapandı; ayrıca T1 kablosu deprecated evaluateResult'a inmişti → canlı sınır prepareResultEvaluationAttempt'e el-seam ile bağlandı). Bounded-replay r5 KISMİ-YEŞİL: preDispatchSettlement typed ✓, bağımlı cascadeSkipped=true ✓ (önceden blocked-pause), ANCAK repair-machinery (3284 alanı) FIX doğurmayı sürdürüyor → tam sertifika 3284-consumer kablosuna bağlı; fixture sprint-004/005 ABORTED-mühürlü",
+      "evidence": "EK-3 open replay basamak; must run alone so the intentional dispatch absence cannot contaminate normal implementation or multi-provider success denominators; 2026-08-26 ilk bounded-replay denemesi (izole tmp-proje, ollama-unmetered tetiği): hedef per-task NOT_DISPATCHED yerine iki farklı typed fail-closed gate'e çarptı — docker-modda DECKENT_E078 landing-policy spawn-bloku, subprocess-modda RETRO'da TERMINAL_PUBLICATION_ZERO_TASK_HOLD finalizer-hatası; sertifikasyon OLMADI (finalizer-hatası receipt'li-terminal değildir), per-task budget-hold yolunu süren tasarımlı replay-harness dilimi gerekiyor — flip yok, dürüst kanıt kaydı 2026-08-27 ikinci tasarımlı bounded-replay turu (izole tmp-proje /tmp/deckent-replay-3301-20260827, gerçek binary, 3-task DAG: 1 gerçek-koşan + 1 admission-reddi-hedefli + 1 bağımlı): ÜÇ tetik-sınıfı da hedef-zincire ULAŞMADI ve her biri typed duvar verdi — (a) subprocess-backend: live-budget tavanları executor measured-stream beyanı ister → run-düzeyi DECKENT_E078 spawn-reddi (per-task değil); (b) gemini-pin: adapter MEVCUT (auth'suz) → worker gerçekten doğdu → dürüst NO_GO + FIX-tüketimi + typed-PAUSE (zero-work değil); (c) forced-skill-reddi: host BY-DESIGN sentetik NO_GO yazar (sprint-spawner.ts:618 FORCED_SKILL_UNAVAILABLE, 487-023 kontratı) → FIX yine devreye girip bütçe yakıyor ve bağımlı SKIPPED yerine blocked-PAUSE kalıyor. NET BULGU: kabulün istediği \"zero-work NOT_DISPATCHED + dependent SKIPPED + FIX-suçlamasız terminal\" zinciri için tek aday classifier-yolu result-ABSENT sınıfı (result-evaluator.ts:3507 + result-collector.ts:2447 deadline-yolu); host pre-dispatch NoGo sınıfına FIX-bastırma + bağımlıya SKIPPED-projeksiyonu ürün-dilimi gerektiriyor — sertifikasyon flip YOK, dürüst kayıt; iki fixture-koşusu ABORTED-finalize ile mühürlü (sprint-002/003) 2026-08-27 sprint-699 dilimi landed (owner \"Öneri kabul\"): src/core/failure-disposition-policy.ts (typed tablo + config-override) + evaluator/collector kablolama + owner-outbox disposition-olayı + zincir-mühürü (T4 test-guardian dürüst-NO_GO'su gerçek boşluk buldu: classifyFixPhaseTasks fixEligible-yönlendirmesi — el-seam ile kapandı; ayrıca T1 kablosu deprecated evaluateResult'a inmişti → canlı sınır prepareResultEvaluationAttempt'e el-seam ile bağlandı). Bounded-replay r5 KISMİ-YEŞİL: preDispatchSettlement typed ✓, bağımlı cascadeSkipped=true ✓ (önceden blocked-pause), ANCAK repair-machinery (3284 alanı) FIX doğurmayı sürdürüyor → tam sertifika 3284-consumer kablosuna bağlı; fixture sprint-004/005 ABORTED-mühürlü 2026-08-27 akşam: sprint-700 (do-kaynaklı, 4/4 DONE) + ana-şerit 6-seam zinciri (r6→r11 bounded-replay iterasyonları): FIX-mint artık BASILIYOR (loud PRE_DISPATCH_FIX_INELIGIBLE log-kanıtı r8), bağımlı cascadeSkipped ✓, unresolved-pause gate'leri GEÇİLDİ (truth-normalizasyonu), INVALID_IDENTITY kapandı (host:cascade-skip kimliği), honesty-boundary muafiyeti + lineage POLICY_FIX_EXEMPT varyantı landed; kalan TEK engel: karışık-sonuçlu run'ın COMPLETE-yayın sözleşmesi (cleanup-eligibility BLOCKED — reasons-envanteri açık) — sertifika bu publication-contract dilimine bağlı; fixture sprint-004..011 ABORTED-mühürlü",
       "updated": "2026-08-27"
     },
     {
@@ -27394,6 +27394,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "75115315110e753277a49ebf06e34781b4edcd12cbb39923c1ad83968af671ea"
+    "value": "361572422ab67a984f409fa97a8e1fdce8cc249f5bbfdb785b0c74ec446dcc70"
   }
 }

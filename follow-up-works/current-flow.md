@@ -57,6 +57,11 @@ sonrası hemen · CI-watch ADMIT (MASTER 6181, kuyruk-sonu). `post-product.md` o
 repo'ya girdi (VISION_ONLY; MASTER-mutasyonu yasak kendi bloğunda). Ayrıca canlı routing-bulgusu:
 "aynı-üçlü" skill-seçim patolojisi yaşıyor (MASTER 9034 evidence).
 
+**OTONOM-KOŞU GÜNCELLEMESİ (akşam-2):** Owner "hepsini planla-tamamla + do/mission-v2 yüzeyini dene" emri yürürlükte.
+(1) **Yüzey-kararları:** mission-v2 bugün yalnız `task`-kind kabul ediyor (fence dürüst; sprint-sınıfına uygun değil) · **`do` = kazanan** — tek NL-hedeften kriterli 4-task plan üretti, sprint-700 bu yoldan 4/4 DONE koştu; 16-task fan-out talimatını 5 tutarlı task'a SIKIŞTIRDI (bulgu: max-üst-sınırı sayı-hedefi olarak kullanmıyor; kalite-öncelikli) · do dry-run scope-gate'i yeni-dosya ağaçlarını typo sanıyor (--force-scope gerekir; bulgu).
+(2) **3301 son-metre zinciri (r6→r11):** FIX-mint bastırma canlı-kanıtlı · cascadeSkipped ✓ · unresolved-pause'lar geçildi (truth-normalizasyonu: policy-terminal NO_GO→NOT_DISPATCHED) · INVALID_IDENTITY kapandı (host:cascade-skip kimliği) · honesty-boundary muafiyeti · lineage POLICY_FIX_EXEMPT. **Kalan tek engel:** karışık-sonuç COMPLETE-yayını (cleanup-eligibility BLOCKED reasons-envanteri) — 3284 terminal-kontrat alanına bağlandı; sertifika oradan.
+(3) Bekleyen büyük-do önerisi: sprint-701 adayı `d3127454` (CLI dilim-1a, 5-task/3-dalga) — onay+start sırada. Eski bayat öneri `c52100fe` retire-edilecek.
+
 ## SIRADAKİ (bu sıra ile)
 
 1. ~~Sprint-699~~ ✅ landed (bu commit); replay r5 kısmi-yeşil — tam sertifika 3284'e bağlı.

@@ -111,6 +111,7 @@ import {
   evaluateFixCircuitBreaker,
   projectNotDispatchedSettlements,
 } from '../core/task-lineage.js';
+import { isPolicyTerminalPreDispatchResult } from '../core/failure-disposition-policy.js';
 import type { RepairDescendantCancellationDecision } from '../core/types.js';
 
 // ─── Pre-Start Guards (born-672a/672b — snapshot-start guard wiring) ─
@@ -1368,10 +1369,25 @@ export function applyCascadeCircuitBreaker(
       .filter(task => existsSync(join(projectRoot, TASKS_DIR, `task-${task.id}.redispatch-attempted`)))
       .map(task => task.id),
   );
+  const policyTerminalIds = new Set(
+    eligibleRootTasks
+      .filter(task => isPolicyTerminalPreDispatchResult(readJsonSafe<TaskResult>(
+        join(projectRoot, TASKS_DIR, `task-${task.id}.result`),
+      ) ?? undefined))
+      .map(task => task.id),
+  );
+  // Truth-normalizasyonu (3301): policy-terminal pre-dispatch sonucun tek dürüst
+  // verdikti NOT_DISPATCHED'tır — hangi evaluate-dalı NO_GO yazmış olursa olsun.
+  for (const policyTerminalId of policyTerminalIds) {
+    if (evaluations.get(policyTerminalId) === TaskEvaluation.NO_GO) {
+      evaluations.set(policyTerminalId, TaskEvaluation.NOT_DISPATCHED);
+    }
+  }
   const notDispatchedSettlements = projectNotDispatchedSettlements(
     eligibleRootTasks,
     evaluations,
     redispatchAttemptedIds,
+    policyTerminalIds,
   );
   const decision = evaluateFixCircuitBreaker(
     eligibleRootTasks,
@@ -1442,11 +1458,25 @@ export function applyUnresolvedLineageOperatorHold(
       .filter(task => existsSync(join(projectRoot, TASKS_DIR, `task-${task.id}.redispatch-attempted`)))
       .map(task => task.id),
   );
+  const policyTerminalIds = new Set(
+    eligibleRootTasks
+      .filter(task => isPolicyTerminalPreDispatchResult(readJsonSafe<TaskResult>(
+        join(projectRoot, TASKS_DIR, `task-${task.id}.result`),
+      ) ?? undefined))
+      .map(task => task.id),
+  );
+  // Truth-normalizasyonu (3301): policy-terminal pre-dispatch sonucun tek dürüst
+  // verdikti NOT_DISPATCHED'tır — hangi evaluate-dalı NO_GO yazmış olursa olsun.
+  for (const policyTerminalId of policyTerminalIds) {
+    if (evaluations.get(policyTerminalId) === TaskEvaluation.NO_GO) {
+      evaluations.set(policyTerminalId, TaskEvaluation.NOT_DISPATCHED);
+    }
+  }
   const decision = evaluateFixCircuitBreaker(
     eligibleRootTasks,
     evaluations,
     policy,
-    projectNotDispatchedSettlements(eligibleRootTasks, evaluations, redispatchAttemptedIds),
+    projectNotDispatchedSettlements(eligibleRootTasks, evaluations, redispatchAttemptedIds, policyTerminalIds),
   );
   if (decision.shouldPause || decision.unresolvedTaskIds.length === 0) return false;
 

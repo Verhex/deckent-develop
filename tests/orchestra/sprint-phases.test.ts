@@ -13,6 +13,7 @@ import type { EvaluationResult, Task, TaskResult } from '../../src/core/types.js
 import { TaskEvaluation, TaskStatus } from '../../src/core/types.js';
 import {
   enforceRecoveryBornEvaluationHonesty,
+  partitionFixTasksByFailureDisposition,
   safeRubricReconcile,
 } from '../../src/orchestra/sprint-phases.js';
 import {
@@ -263,5 +264,24 @@ describe('652-004 FIX audit projection fan-in', () => {
     } finally {
       await rm(root, { recursive: true, force: true });
     }
+  });
+});
+
+describe('700-002 FIX entry failure-disposition gate', () => {
+  it('rejects a repair candidate for a fix-ineligible host settlement', () => {
+    const original = task({ id: 'root' });
+    const fix = task({ id: 'root-fix', fixForTaskId: 'root', isPriorityFix: true });
+    const settled = result({
+      taskId: 'root',
+      preDispatchSettlement: {
+        state: 'NOT_DISPATCHED', reasonCode: 'PROVIDER_ADAPTER_UNAVAILABLE',
+        attemptId: 'attempt-root', evidenceRef: 'host:provider',
+      },
+    } as Partial<TaskResult>);
+
+    const partition = partitionFixTasksByFailureDisposition([fix], [settled], undefined);
+    expect(partition.eligible).toEqual([]);
+    expect(partition.noMint).toHaveLength(1);
+    expect(partition.noMint[0]).toMatchObject({ failedTaskId: original.id, reasonCode: 'PROVIDER_ADAPTER_UNAVAILABLE' });
   });
 });

@@ -17359,3 +17359,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 699-004: Zincir-mühürü — uçtan-uca hermetik disposition regresyon-testi (NO_GO)
 
 ---
+## Sprint 700 — sprint-700
+
+**Status:** COMPLETE
+**Date:** 2026-08-27
+**Duration:** 566s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 566138ms |
+
+### Tasks
+
+- 700-001: Failure-disposition admission gate at the evaluator FIX-birth path (DONE)
+- 700-002: Failure-disposition enforcement at scheduler and phase repair-mint sites (DONE)
+- 700-003: Repair-task constraint inheritance for forceSkills and model (DONE)
+- 700-004: Integration tests for disposition-gated repair minting and constraint inheritance (DONE)
+
+---

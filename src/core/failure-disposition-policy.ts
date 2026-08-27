@@ -66,3 +66,25 @@ export function resolveHostPreDispatchFailureDisposition(
     evaluation: TaskEvaluation.NOT_DISPATCHED,
   });
 }
+
+/**
+ * True when a task result is a host pre-dispatch settlement whose disposition
+ * is policy-terminal: neither FIX-eligible nor re-dispatch-eligible. Such a
+ * lineage settles as a policy skip (`POLICY_FIX_EXEMPT`), never as an
+ * unresolved failure awaiting an operator decision (3301 truthful-terminal
+ * chain — sprint-700 tamamlayıcı kablosu, 2026-08-27).
+ */
+export function isPolicyTerminalPreDispatchResult(
+  result: {
+    readonly preDispatchSettlement?: { readonly reasonCode: string } | undefined;
+  } | undefined,
+  config?: FailureDispositionPolicyConfig,
+): boolean {
+  const settlement = result?.preDispatchSettlement;
+  if (!settlement) return false;
+  const reasonCode = isHostPreDispatchReasonCode(settlement.reasonCode)
+    ? settlement.reasonCode
+    : 'LEGACY_HOST_PRE_DISPATCH_REJECTION';
+  const disposition = resolveHostPreDispatchFailureDisposition(reasonCode, config);
+  return !disposition.fixEligible && !disposition.redispatchEligible;
+}

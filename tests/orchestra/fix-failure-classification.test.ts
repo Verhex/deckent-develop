@@ -29,6 +29,50 @@ function makeResult(over: Partial<TaskResult> = {}): TaskResult {
 }
 
 describe('classifyFixFailure', () => {
+  it('turns a fix-ineligible pre-dispatch settlement into a referenced cascade skip', () => {
+    const c = classifyFixFailure({
+      result: makeResult({
+        preDispatchSettlement: {
+          version: 1,
+          state: 'NOT_DISPATCHED',
+          attemptId: 'host-pre-dispatch:t-1:attempt',
+          reasonCode: 'SCOPE_COMPILE_FAILED',
+          evidenceRef: `host-pre-dispatch-settlement:sha256:${'a'.repeat(64)}`,
+        },
+      }),
+    });
+    expect(c).toMatchObject({
+      disposition: 'cascadeSkip',
+      code: 'PRE_DISPATCH_FIX_INELIGIBLE',
+      allowsFixTask: false,
+      settlementRef: `host-pre-dispatch-settlement:sha256:${'a'.repeat(64)}`,
+    });
+  });
+
+  it('admits a pre-dispatch settlement only when canonical policy opts it in', () => {
+    const c = classifyFixFailure({
+      result: makeResult({
+        preDispatchSettlement: {
+          version: 1,
+          state: 'NOT_DISPATCHED',
+          attemptId: 'host-pre-dispatch:t-1:attempt',
+          reasonCode: 'SCOPE_COMPILE_FAILED',
+          evidenceRef: `host-pre-dispatch-settlement:sha256:${'b'.repeat(64)}`,
+        },
+      }),
+      policyConfig: {
+        failure_disposition: {
+          pre_dispatch: { SCOPE_COMPILE_FAILED: { fixEligible: true } },
+        },
+      },
+    });
+    expect(c).toMatchObject({
+      disposition: 'retrySame',
+      code: 'PRE_DISPATCH_FIX_ELIGIBLE',
+      allowsFixTask: true,
+    });
+  });
+
   it('fingerprints normalized typed provenance stably', () => {
     const first = buildAcceptanceFailureFingerprint([
       { criterionId: 'artifact', evidenceKind: 'file', subject: './src\\output.ts', observedState: 'absent' },

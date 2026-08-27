@@ -204,6 +204,8 @@ describe('failure disposition chain', () => {
     )).toEqual({
       fixCandidateTaskIds: [settled.id],
       reDispatchCandidateTaskIds: [],
+      // sprint-700 T2: classify artık suppress-disposition kayıtlarını da döndürür.
+      cascadeSkipDispositions: [],
     });
   });
 });

@@ -2128,6 +2128,7 @@ export function plannerTaskToParams(
     goNogo: pt.goNogo,
     sprintId,
     initialStatus,
+    forceModel: pt.forceModel,
     forceAgent: pt.forceAgent,
     forceSkills: pt.forceSkills,
     excludeAgent: pt.excludeAgent,

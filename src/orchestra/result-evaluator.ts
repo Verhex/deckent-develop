@@ -37,7 +37,9 @@ import { verifyDiskAgainstClaim } from './disk-verify.js';
 import { evaluateGoNogoCriteria, hasUnsalvageableContractFailure } from './criterion-evaluation.js';
 import {
   buildAcceptanceFailureFingerprint,
+  classifyFixFailure,
   type AcceptanceFailureEvidence,
+  type FixClassification,
 } from './fix-failure-classification.js';
 import {
   detectDishonestResult,
@@ -3550,6 +3552,8 @@ export interface FixPhaseTaskClassification {
    * blame. These are re-dispatch candidates, not fix candidates.
    */
   reDispatchCandidateTaskIds: string[];
+  /** Policy-denied pre-dispatch failures retained as typed audit records. */
+  cascadeSkipDispositions: Array<FixClassification & { readonly taskId: string }>;
 }
 
 /**
@@ -3566,6 +3570,7 @@ export function classifyFixPhaseTasks(
 ): FixPhaseTaskClassification {
   const fixCandidateTaskIds: string[] = [];
   const reDispatchCandidateTaskIds: string[] = [];
+  const cascadeSkipDispositions: Array<FixClassification & { readonly taskId: string }> = [];
   for (const [taskId, evaluation] of evaluations) {
     if (evaluation === TaskEvaluation.NOT_DISPATCHED) {
       const settlement = results?.get(taskId)?.preDispatchSettlement;
@@ -3584,6 +3589,11 @@ export function classifyFixPhaseTasks(
           fixCandidateTaskIds.push(taskId);
           continue;
         }
+        const nonRepairDisposition = classifyFixFailure({
+          result: results?.get(taskId),
+          policyConfig,
+        });
+        cascadeSkipDispositions.push({ taskId, ...nonRepairDisposition });
         if (!disposition.redispatchEligible) continue;
       }
       reDispatchCandidateTaskIds.push(taskId);
@@ -3591,7 +3601,7 @@ export function classifyFixPhaseTasks(
       fixCandidateTaskIds.push(taskId);
     }
   }
-  return { fixCandidateTaskIds, reDispatchCandidateTaskIds };
+  return { fixCandidateTaskIds, reDispatchCandidateTaskIds, cascadeSkipDispositions };
 }
 
 /** Aggregated NOT_DISPATCHED count derived from the per-task evaluation map. */

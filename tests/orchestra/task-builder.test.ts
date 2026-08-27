@@ -1844,6 +1844,13 @@ describe('plannerTaskToParams — override fields pass-through', () => {
     expect(params.forceSkills).toEqual(['typescript-expert', 'testing-expert']);
   });
 
+  it('passes forceModel from PlannerTask to CreateTaskParams', () => {
+    const pt = makePlannerTask();
+    pt.forceModel = pt.model;
+    const params = plannerTaskToParams(pt, 'sprint-066', pt.model);
+    expect(params.forceModel).toBe(pt.forceModel);
+  });
+
   it('passes excludeAgent from PlannerTask to CreateTaskParams', () => {
     const pt = makePlannerTask({ excludeAgent: ['doc-writer', 'refactorer'] });
     const params = plannerTaskToParams(pt, 'sprint-066', 'claude-sonnet-5');

@@ -1206,6 +1206,8 @@ export interface PlannerTask {
   scope: TaskScope;
   dependencies: string[];
   goNogo: GoNoGoCriteria;
+  /** User-specified model constraint from planner/directive output. */
+  forceModel?: ModelType;
   /** User-specified agent override from AI planner output */
   forceAgent?: string;
   /** User-specified skill overrides from AI planner output */

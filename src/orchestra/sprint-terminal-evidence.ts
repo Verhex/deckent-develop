@@ -32,6 +32,8 @@ export type AttemptTerminalAuthority =
       readonly verdict: TerminalVerdict;
       readonly evidenceRef: string;
       readonly reasonCode?: string;
+      /** Host-terminal NOT_DISPATCHED/cascade-skip class — policy-settled, worker never ran (3301). */
+      readonly hostTerminalNotDispatched?: boolean;
     }
   | {
       readonly state: 'UNKNOWN';
@@ -217,6 +219,8 @@ export type LogicalTaskTerminalState =
 export interface LogicalTaskTerminalEvidence {
   readonly logicalTaskId: string;
   readonly state: LogicalTaskTerminalState;
+  /** FAILED-görünümlü ama policy-settled host-skip lineage (3301) — cleanup'ı bloklamaz. */
+  readonly policySettledSkip?: boolean;
   readonly attemptCount: number;
   readonly attempts: readonly ExactAttemptIdentity[];
   readonly resolvingAttempt: ExactAttemptIdentity | null;
@@ -661,6 +665,7 @@ export function assembleSprintTerminalEvidence<TResult = unknown>(
     const lineCodes = [...new Set(lineHolds.map(item => item.code))].sort();
     const tip = tips.length === 1 ? tips[0]! : null;
     let state: LogicalTaskTerminalState = 'UNSETTLED';
+    let policySettledSkip = false;
     let resolvingAttempt: ExactAttemptIdentity | null = null;
 
     if (lineHolds.length > 0) {
@@ -674,6 +679,7 @@ export function assembleSprintTerminalEvidence<TResult = unknown>(
       resolvingAttempt = { ...tip.identity };
       if (tip.authority.verdict === 'NO_GO') {
         state = 'FAILED';
+        if (tip.authority.hostTerminalNotDispatched === true) policySettledSkip = true;
       } else if (tip.result.state === 'COMPLETE') {
         state = 'COMPLETED';
         const verifiedAttribution = lineage.flatMap(attempt => {
@@ -703,6 +709,7 @@ export function assembleSprintTerminalEvidence<TResult = unknown>(
     mutable.logicalTasks.push({
       logicalTaskId,
       state,
+      ...(policySettledSkip ? { policySettledSkip: true } : {}),
       attemptCount: lineage.length,
       attempts: lineage.map(attempt => ({ ...attempt.identity })),
       resolvingAttempt,
@@ -771,7 +778,9 @@ export function assembleSprintTerminalEvidence<TResult = unknown>(
 
   const cleanupReasons = new Set<CleanupBlockReason>();
   if (groups.size === 0) cleanupReasons.add('NO_LOGICAL_TASKS');
-  if (mutable.logicalTasks.some(item => item.state !== 'COMPLETED')) {
+  if (mutable.logicalTasks.some(item =>
+    item.state !== 'COMPLETED' && item.policySettledSkip !== true,
+  )) {
     cleanupReasons.add('LINEAGE_NOT_COMPLETED');
   }
   if (mutable.unsettled.length > 0) cleanupReasons.add('ACTIVE_OR_UNSETTLED_ATTEMPT');

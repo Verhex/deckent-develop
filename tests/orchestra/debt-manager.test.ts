@@ -354,6 +354,16 @@ describe('handleEvaluation', () => {
     expect(writtenContent.verification).toEqual(task.verification);
   });
 
+  it('NO_GO: fix task preserves model and skill constraints verbatim', () => {
+    const task = makeTask({ forceSkills: [] });
+    task.forceModel = task.model;
+    handleEvaluation('/root', task, TaskEvaluation.NO_GO, makeTaskResult({ selfAssessment: 'NO_GO' }));
+
+    const writtenContent = JSON.parse(vi.mocked(writeFileSync).mock.calls[0]![1] as string);
+    expect(writtenContent.forceModel).toBe(task.forceModel);
+    expect(writtenContent.forceSkills).toEqual(task.forceSkills);
+  });
+
   it('NO_GO: does not release locks', () => {
     const task = makeTask();
     const result = makeTaskResult({ selfAssessment: 'NO_GO', notes: 'failed' });
@@ -443,6 +453,27 @@ describe('handleCrossDependencies', () => {
     expect(result[0]!.priority).toBe('CRITICAL');
     expect(result[0]!.type).toBe('code-development');
     expect(result[0]!.promptCostCanary).toEqual(promptCostCanaryAuthority);
+  });
+
+  it('cross-fix preserves model and skill constraints verbatim', () => {
+    const task1 = makeTask({ id: 'task-001', dependencies: [], forceSkills: [] });
+    task1.forceModel = task1.model;
+    const task2 = makeTask({ id: 'task-002', dependencies: ['task-001'] });
+    const sprint: Sprint = {
+      id: 'sprint-001', number: 1, status: 'ACTIVE' as any, phase: 'EXECUTE' as any,
+      tasks: [task1, task2], workers: [],
+    };
+    const evaluations = new Map([
+      ['task-001', TaskEvaluation.DONE],
+      ['task-002', TaskEvaluation.NO_GO],
+    ]);
+
+    const [fixTask] = handleCrossDependencies('/root', sprint, evaluations);
+    expect(fixTask?.forceModel).toBe(task1.forceModel);
+    expect(fixTask?.forceSkills).toEqual(task1.forceSkills);
+    const writtenContent = JSON.parse(vi.mocked(writeFileSync).mock.calls[0]![1] as string);
+    expect(writtenContent.forceModel).toBe(task1.forceModel);
+    expect(writtenContent.forceSkills).toEqual(task1.forceSkills);
   });
 
   it('does not create a concurrent cross-fix while the NO_GO task direct fix is pending', () => {

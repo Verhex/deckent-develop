@@ -20,6 +20,7 @@ import {
   reconstructFromDurableEvidence,
   deriveAcceptanceFailureEvidence,
   deriveAcceptanceFailureFingerprint,
+  classifyFixPhaseTasks,
 } from '../../src/orchestra/result-evaluator.js';
 import type {
   FailureContext,
@@ -92,6 +93,52 @@ describe('typed acceptance-failure provenance', () => {
     const result = makeResult({ filesChanged: ['src/generated.ts'] });
     expect(deriveAcceptanceFailureEvidence(task, result, '/definitely-absent-project')).toEqual([]);
     expect(deriveAcceptanceFailureFingerprint(task, result, '/definitely-absent-project')).toBeNull();
+  });
+});
+
+describe('classifyFixPhaseTasks pre-dispatch admission', () => {
+  const settlementRef = `host-pre-dispatch-settlement:sha256:${'c'.repeat(64)}`;
+  const result = makeResult({
+    selfAssessment: 'NO_GO',
+    testsPassed: false,
+    preDispatchSettlement: {
+      version: 1,
+      state: 'NOT_DISPATCHED',
+      attemptId: 'host-pre-dispatch:001-001:attempt',
+      reasonCode: 'SCOPE_COMPILE_FAILED',
+      evidenceRef: settlementRef,
+    },
+  });
+
+  it('records a typed cascade skip and mints no repair candidate when fixEligible=false', () => {
+    const classification = classifyFixPhaseTasks(
+      new Map([['001-001', TaskEvaluation.NOT_DISPATCHED]]),
+      new Map([['001-001', result]]),
+    );
+    expect(classification.fixCandidateTaskIds).toEqual([]);
+    expect(classification.reDispatchCandidateTaskIds).toEqual([]);
+    expect(classification.cascadeSkipDispositions).toEqual([
+      expect.objectContaining({
+        taskId: '001-001',
+        disposition: 'cascadeSkip',
+        allowsFixTask: false,
+        settlementRef,
+      }),
+    ]);
+  });
+
+  it('mints a repair candidate only when canonical policy sets fixEligible=true', () => {
+    const classification = classifyFixPhaseTasks(
+      new Map([['001-001', TaskEvaluation.NOT_DISPATCHED]]),
+      new Map([['001-001', result]]),
+      {
+        failure_disposition: {
+          pre_dispatch: { SCOPE_COMPILE_FAILED: { fixEligible: true } },
+        },
+      },
+    );
+    expect(classification.fixCandidateTaskIds).toEqual(['001-001']);
+    expect(classification.cascadeSkipDispositions).toEqual([]);
   });
 });
 

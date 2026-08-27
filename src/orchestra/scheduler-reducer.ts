@@ -21,6 +21,11 @@
 
 import type { Task, TaskStatus as TaskStatusType } from '../core/types.js';
 import { TaskStatus } from '../core/types.js';
+import {
+  isHostPreDispatchReasonCode,
+  resolveHostPreDispatchFailureDisposition,
+  type FailureDispositionPolicyConfig,
+} from '../core/failure-disposition-policy.js';
 import type { EffectiveDependencyState } from './scheduler-state.js';
 
 // ─── Snapshot (input) ────────────────────────────────────────────────────
@@ -64,6 +69,7 @@ export interface SchedulerTaskSnapshot {
   readonly dependencies: readonly string[];
   readonly fixForTaskId?: string;
   readonly retryAfter?: number;
+  readonly repairSettlementReasonCode?: string;
 }
 
 export interface SchedulerSnapshot {
@@ -102,6 +108,7 @@ export interface SchedulerSnapshot {
   /** Exact approved synthetic edge for each collision-blocked writer. Optional
    *  for backward-compatible snapshots; the set remains the blocking authority. */
   readonly collisionBlockingIds?: ReadonlyMap<string, string>;
+  readonly failureDispositionPolicy?: FailureDispositionPolicyConfig;
 }
 
 // ─── Decision (output) ───────────────────────────────────────────────────
@@ -112,6 +119,7 @@ export type SchedulerQuiescenceReason = 'continuous-dead-dependency';
 export type SchedulerEffect =
   | { readonly kind: 'SpawnTask'; readonly taskId: string; readonly reason: 'queue-drain' | 'pending-slot-fill' }
   | { readonly kind: 'KillWorker'; readonly taskId: string; readonly reason: 'legacy-fifo-replace' }
+  | { readonly kind: 'NoMintRepair'; readonly taskId: string; readonly failedTaskId: string; readonly reasonCode: string; readonly idempotencyKey: string }
   | {
       readonly kind: 'CascadeSkip';
       readonly taskId: string;
@@ -147,6 +155,7 @@ export type SchedulerDisposition =
   | 'blocked-dependency'
   | 'blocked-collision'
   | 'blocked-retry'
+  | 'no-mint'
   | 'cascade-skip';
 
 export interface SchedulerDecision {
@@ -178,6 +187,18 @@ export interface SchedulerDecision {
 export function reduceSchedulerTick(snapshot: SchedulerSnapshot): SchedulerDecision {
   const orderedEffects: SchedulerEffect[] = [];
   const dispositions = new Map<string, SchedulerDisposition>();
+  const noMintIds = new Set<string>();
+  for (const task of snapshot.tasks) {
+    if (!task.fixForTaskId || !task.repairSettlementReasonCode) continue;
+    const reasonCode = isHostPreDispatchReasonCode(task.repairSettlementReasonCode)
+      ? task.repairSettlementReasonCode
+      : 'LEGACY_HOST_PRE_DISPATCH_REJECTION';
+    const disposition = resolveHostPreDispatchFailureDisposition(reasonCode, snapshot.failureDispositionPolicy);
+    if (disposition.fixEligible) continue;
+    noMintIds.add(task.id);
+    dispositions.set(task.id, 'no-mint');
+    orderedEffects.push({ kind: 'NoMintRepair', taskId: task.id, failedTaskId: task.fixForTaskId, reasonCode, idempotencyKey: `no-mint:${task.id}:${reasonCode}` });
+  }
 
   // ─── ClearBlocked — mirrors maybeRespawn's per-tick DEPENDENCY_BLOCKED
   // dedupe-clear loop (result-collector.ts), gated identically: continuous +
@@ -204,12 +225,15 @@ export function reduceSchedulerTick(snapshot: SchedulerSnapshot): SchedulerDecis
   // RE-decided here, with the same deterministic `idempotencyKey` it would
   // have received pre-crash, so the executor layer can recognize a retry.
   const failedIds = new Set<string>(snapshot.effectiveDependencyState.terminalFailureIds);
+  for (const task of snapshot.tasks) {
+    if (noMintIds.has(task.id) && task.fixForTaskId) failedIds.add(task.fixForTaskId);
+  }
   const cascadeSkippedIds = new Set<string>();
-  let changed = !snapshot.deferTerminalDependencyFailure;
+  let changed = !snapshot.deferTerminalDependencyFailure || noMintIds.size > 0;
   while (changed) {
     changed = false;
     for (const t of snapshot.tasks) {
-      if (snapshot.collectedIds.has(t.id) || cascadeSkippedIds.has(t.id)) continue;
+      if (snapshot.collectedIds.has(t.id) || cascadeSkippedIds.has(t.id) || noMintIds.has(t.id)) continue;
       if (t.status !== TaskStatus.PENDING) continue;
       if (snapshot.assignedTaskIds.has(t.id)) continue;
       const failedDep = t.dependencies.find(d => failedIds.has(d));
@@ -361,7 +385,7 @@ function reduceContinuous(
       queue.splice(i, 1); // already spawned elsewhere — drop, no requeue needed
       continue;
     }
-    if (cascadeSkippedIds.has(candidate.id)) {
+    if (cascadeSkippedIds.has(candidate.id) || dispositions.get(candidate.id) === 'no-mint') {
       queue.splice(i, 1); // just cascade-skipped this tick — never spawn
       continue;
     }
@@ -389,7 +413,7 @@ function reduceContinuous(
       if (snapshot.assignedTaskIds.has(t.id)) continue;
       if (snapshot.collectedIds.has(t.id)) continue;
       if (chosen.has(t.id)) continue;
-      if (cascadeSkippedIds.has(t.id)) continue;
+      if (cascadeSkippedIds.has(t.id) || dispositions.get(t.id) === 'no-mint') continue;
       if (stillQueuedIds.has(t.id)) continue; // already evaluated (and left blocked) in Step 1
       const block = classifyBlock(t, snapshot);
       if (block) {
@@ -429,7 +453,7 @@ function reduceLegacyFifo(
         idx--;
         continue;
       }
-      if (cascadeSkippedIds.has(candidate.id)) {
+    if (cascadeSkippedIds.has(candidate.id) || dispositions.get(candidate.id) === 'no-mint') {
         queue.splice(idx, 1);
         idx--;
         continue;

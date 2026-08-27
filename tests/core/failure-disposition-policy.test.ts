@@ -62,6 +62,7 @@ describe('host pre-dispatch failure disposition policy', () => {
     ]))).toEqual({
       fixCandidateTaskIds: [result.taskId],
       reDispatchCandidateTaskIds: [],
+      cascadeSkipDispositions: [],
     });
   });
 

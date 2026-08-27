@@ -28,6 +28,11 @@ import { createHash } from 'node:crypto';
 import { posix } from 'node:path';
 
 import { PROVIDER_LIMIT_DEATH_ZERO_WRITE, type TaskResult } from '../core/task-types.js';
+import {
+  isHostPreDispatchReasonCode,
+  resolveHostPreDispatchFailureDisposition,
+  type FailureDispositionPolicyConfig,
+} from '../core/failure-disposition-policy.js';
 
 /** Typed, provider-independent evidence for one decisive acceptance failure. */
 export interface AcceptanceFailureEvidence {
@@ -68,6 +73,8 @@ export function buildAcceptanceFailureFingerprint(
  * module cannot positively identify.
  */
 export type FixDisposition =
+  /** Host policy forbids repair-task birth for this pre-dispatch settlement. */
+  | 'cascadeSkip'
   /** Environment failed, the work definition is sound — re-run it unchanged. */
   | 'retrySame'
   /** The worker claimed completion without doing the work — same task, hardened. */
@@ -91,6 +98,8 @@ export interface FixClassification {
   readonly requiredAccess?: 'access:write';
   /** Which lineage node owns the repair. */
   readonly repairTarget: 'current' | 'upstream' | 'replan';
+  /** Originating host settlement when policy, rather than worker outcome, decided routing. */
+  readonly settlementRef?: string;
 }
 
 export interface TypedFailureEvidence {
@@ -181,6 +190,8 @@ export interface ClassifyFixFailureInput {
   readonly priorAcceptanceFailureFingerprint?: string | null;
   /** Single typed evidence envelope used by every routing branch. */
   readonly evidence?: TypedFailureEvidence;
+  /** Layered canonical policy used for host pre-dispatch settlements. */
+  readonly policyConfig?: FailureDispositionPolicyConfig;
 }
 
 /**
@@ -201,6 +212,38 @@ export function classifyFixFailure(input: ClassifyFixFailureInput): FixClassific
   const typedAttribution = input.evidence?.attribution;
   const upstreamTaskId = input.evidence?.dependencyLineage?.failedUpstreamTaskId;
   const current = { repairTarget: 'current' as const };
+
+  // A host pre-dispatch settlement is policy evidence, not a worker failure.
+  // Resolve it before every ordinary failure branch so an ineligible attempt
+  // cannot be reinterpreted from notes and minted into a repair task.
+  if (result?.preDispatchSettlement) {
+    const settlement = result.preDispatchSettlement;
+    const reasonCode = isHostPreDispatchReasonCode(settlement.reasonCode)
+      ? settlement.reasonCode
+      : 'LEGACY_HOST_PRE_DISPATCH_REJECTION';
+    const disposition = resolveHostPreDispatchFailureDisposition(
+      reasonCode,
+      input.policyConfig,
+    );
+    if (!disposition.fixEligible) {
+      return {
+        disposition: 'cascadeSkip',
+        code: 'PRE_DISPATCH_FIX_INELIGIBLE',
+        reason: `host pre-dispatch policy excludes ${reasonCode} from repair-task creation`,
+        allowsFixTask: false,
+        repairTarget: 'current',
+        settlementRef: settlement.evidenceRef,
+      };
+    }
+    return {
+      disposition: 'retrySame',
+      code: 'PRE_DISPATCH_FIX_ELIGIBLE',
+      reason: `host pre-dispatch policy admits ${reasonCode} to repair-task creation`,
+      allowsFixTask: true,
+      repairTarget: 'current',
+      settlementRef: settlement.evidenceRef,
+    };
+  }
 
   // 0. Provider-limit death with a measured zero-write diff (born 3324). This
   //    runs FIRST for two reasons. It is host-minted into `workAttribution` —

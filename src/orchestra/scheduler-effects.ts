@@ -34,7 +34,12 @@ import { join, dirname } from 'node:path';
 
 import type { Task, ResolvedConfig, TaskResult } from '../core/types.js';
 import { TaskStatus } from '../core/types.js';
-import { serializeTaskResultForDisk } from '../core/task-result-schema.js';
+import { normalizeTaskResultShape, serializeTaskResultForDisk } from '../core/task-result-schema.js';
+import {
+  isHostPreDispatchReasonCode,
+  resolveHostPreDispatchFailureDisposition,
+  type FailureDispositionPolicyConfig,
+} from '../core/failure-disposition-policy.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { resolveLiveTraceEnabled } from '../core/config.js';
 import { debugLog } from '../core/utils.js';
@@ -234,7 +239,8 @@ export type SpawnDisposition =
   | { kind: 'spawned'; taskId: string }
   | { kind: 'routing-lineage-missing'; taskId: string; fixForTaskId: string; detail: string }
   | { kind: 'provider-unavailable'; taskId: string; provider: string }
-  | { kind: 'collision-held'; taskId: string; blockerTaskIds: readonly string[] };
+  | { kind: 'collision-held'; taskId: string; blockerTaskIds: readonly string[] }
+  | { kind: 'no-mint'; taskId: string; fixForTaskId: string; reasonCode: string };
 
 // ─── Typed Spawn-Skip Observability (row 3309) ─────────────────────────────
 //
@@ -280,6 +286,7 @@ export type SchedulerSpawnSkipReasonCode =
   | 'spawn-threw'
   /** A deterministic pre-dispatch admission failure was durably settled; no retry is valid. */
   | 'spawn-admission-settled'
+  | 'repair-no-mint'
   | 'spawn-retry-backoff'
   | 'spawn-retry-held'
   /** A SpawnTask effect named an id the live task map does not contain. */
@@ -338,6 +345,34 @@ export function spawnSkipFromDisposition(
       );
     case 'routing-lineage-missing':
       return describeSpawnSkip(task, 'routing-lineage-missing', disposition.detail);
+    case 'no-mint':
+      return describeSpawnSkip(task, 'repair-no-mint', `canonical failure disposition ${disposition.reasonCode} forbids repair`);
+  }
+}
+
+function resolveRepairDispatchDisposition(
+  projectRoot: string,
+  task: Task,
+  config: FailureDispositionPolicyConfig | undefined,
+): { fixEligible: boolean; reasonCode?: string } {
+  if (!task.fixForTaskId) return { fixEligible: true };
+  try {
+    const raw = JSON.parse(readFileSync(
+      join(projectRoot, TASKS_DIR, `task-${task.fixForTaskId}.result`),
+      'utf-8',
+    )) as unknown;
+    const result = normalizeTaskResultShape(raw as TaskResult);
+    const settlement = result?.preDispatchSettlement;
+    if (!settlement) return { fixEligible: true };
+    const reasonCode = isHostPreDispatchReasonCode(settlement.reasonCode)
+      ? settlement.reasonCode
+      : 'LEGACY_HOST_PRE_DISPATCH_REJECTION';
+    return {
+      fixEligible: resolveHostPreDispatchFailureDisposition(reasonCode, config).fixEligible,
+      reasonCode,
+    };
+  } catch {
+    return { fixEligible: true };
   }
 }
 
@@ -566,6 +601,24 @@ export async function executeSpawnTask(
 ): Promise<SpawnDisposition> {
   const { task, taskTimeoutSeconds } = effect;
   const { projectRoot, sprintFallbackId, config, spawnOpts, backend } = deps;
+
+  const repairDisposition = resolveRepairDispatchDisposition(
+    projectRoot,
+    task,
+    config as unknown as FailureDispositionPolicyConfig | undefined,
+  );
+  if (!repairDisposition.fixEligible) {
+    const reasonCode = repairDisposition.reasonCode ?? 'LEGACY_HOST_PRE_DISPATCH_REJECTION';
+    try {
+      writeEvent(projectRoot, getCurrentSprintId(projectRoot) ?? sprintFallbackId, 'brain', 'worker', 'BRAIN→WORKER:REPAIR_NO_MINT', {
+        taskId: task.id,
+        failedTaskId: task.fixForTaskId,
+        reasonCode,
+        source: 'scheduler-effects',
+      });
+    } catch (e) { debugLog('executeSpawnTask:repairNoMint', e); }
+    return { kind: 'no-mint', taskId: task.id, fixForTaskId: task.fixForTaskId!, reasonCode };
+  }
 
   const collisionBlockers = deps.collisionAuthority
     ? findActiveWriteCollisions(
@@ -1105,6 +1158,19 @@ export async function executeSchedulerDecision(
   let terminalPersistenceFailed = false;
 
   for (const effect of decision.orderedEffects) {
+    if (effect.kind === 'NoMintRepair') {
+      try {
+        writeEvent(deps.projectRoot, getCurrentSprintId(deps.projectRoot) ?? deps.sprintFallbackId, 'brain', 'worker', 'BRAIN→WORKER:REPAIR_NO_MINT', {
+          taskId: effect.taskId,
+          failedTaskId: effect.failedTaskId,
+          reasonCode: effect.reasonCode,
+          source: 'scheduler-reducer',
+          idempotencyKey: effect.idempotencyKey,
+        });
+        landedEffects.push(effect);
+      } catch (e) { debugLog('executeSchedulerDecision:repairNoMint', e); }
+      continue;
+    }
     if (effect.kind === 'KillWorker') {
       try {
         deps.killWorker(effect.taskId);
