@@ -31,13 +31,13 @@ _None at this time._
 
 | File | Line | Block | Test/Suite name |
 |------|------|------|------|
-| `tests/scripts/clean-active-execution-guard.test.ts` | 3348 | it | unlinks top-level and nested symlinks without traversing their targets |
-| `tests/scripts/clean-active-execution-guard.test.ts` | 3394 | it | retains the exact maintenance generation after a partial clean mutation fails |
-| `tests/scripts/clean-active-execution-guard.test.ts` | 3508 | it | retains authority when a pre-mutation callback mutates and throws |
-| `tests/scripts/clean-active-execution-guard.test.ts` | 3596 | it | surfaces an uncertain pinned-directory handle close as a typed hold |
-| `tests/scripts/clean-active-execution-guard.test.ts` | 3680 | it | keeps deletion rooted at the pinned dist identity across a parent symlink swap |
-| `tests/scripts/clean-active-execution-guard.test.ts` | 3821 | it | keeps authority on the module-owned project identity across a root replacement |
-| `tests/scripts/clean-active-execution-guard.test.ts` | 3943 | it | rechecks legacy execution evidence at the final pre-mutation boundary |
+| `tests/scripts/clean-active-execution-guard.test.ts` | 3403 | it | unlinks top-level and nested symlinks without traversing their targets |
+| `tests/scripts/clean-active-execution-guard.test.ts` | 3449 | it | retains the exact maintenance generation after a partial clean mutation fails |
+| `tests/scripts/clean-active-execution-guard.test.ts` | 3563 | it | retains authority when a pre-mutation callback mutates and throws |
+| `tests/scripts/clean-active-execution-guard.test.ts` | 3651 | it | surfaces an uncertain pinned-directory handle close as a typed hold |
+| `tests/scripts/clean-active-execution-guard.test.ts` | 3735 | it | keeps deletion rooted at the pinned dist identity across a parent symlink swap |
+| `tests/scripts/clean-active-execution-guard.test.ts` | 3876 | it | keeps authority on the module-owned project identity across a root replacement |
+| `tests/scripts/clean-active-execution-guard.test.ts` | 3998 | it | rechecks legacy execution evidence at the final pre-mutation boundary |
 
 ### `macos`
 
@@ -166,8 +166,8 @@ Non-skip `if (process.platform ...)` branches inside test bodies — the test st
 | `tests/orchestra/docker-backend-fixpack.test.ts` | 58 | `windows-native` | asserts differently OFF windows-native |
 | `tests/orchestra/docker-backend-fixpack.test.ts` | 70 | `windows-native` | asserts differently OFF windows-native |
 | `tests/orchestra/docker-backend-fixpack.test.ts` | 81 | `windows-native` | asserts differently OFF windows-native |
-| `tests/scripts/clean-active-execution-guard.test.ts` | 3320 | `linux` | asserts differently OFF linux |
-| `tests/scripts/clean-active-execution-guard.test.ts` | 4062 | `linux` | asserts differently OFF linux |
+| `tests/scripts/clean-active-execution-guard.test.ts` | 3375 | `linux` | asserts differently OFF linux |
+| `tests/scripts/clean-active-execution-guard.test.ts` | 4126 | `linux` | asserts differently OFF linux |
 | `tests/scripts/test-ci-sim.test.ts` | 188 | `windows-native` | asserts differently OFF windows-native |
 | `tests/scripts/test-ci-sim.test.ts` | 196 | `windows-native` | asserts differently OFF windows-native |
 
@@ -251,7 +251,7 @@ _These `skipIf` conditions matched no rule in `classifyCondition()` — extend t
 
 ### All Other Test Files
 
-2791 of 2862 test files under `tests/` carry no platform-conditional gate detected above and run identically on every supported platform.
+2792 of 2863 test files under `tests/` carry no platform-conditional gate detected above and run identically on every supported platform.
 <!-- AUTOGEN:END id="platform-registry" -->
 
 ## How Platform Conditions Work

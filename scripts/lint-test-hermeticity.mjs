@@ -674,6 +674,8 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // (tmpdir-hermetik, suite-owned) + v2-derivation fixture eklentileri.
   // 2026-08-27 02:0x: 16513→16514 — Dalga-3 (sprint-697) worker-suite'i:
   // tests/cli/sync-workspace.test.ts (tmpdir-hermetik, suite-owned).
+  // 2026-08-27 11:4x: ayni 16579, digest-only — CI-hizalama: race-barrier taban
+  // hizasi + ingress-pin 739 + PLATFORM.md regen (taranan metin kaydi).
   // 2026-08-27 10:5x: 16522→16579 — sprint-698 mekanizma-suite'leri (tmpdir-hermetik,
   // suite-owned): skill-package-sync-proof e2e + sync-skill body/profil pinleri +
   // clean-guard orphan-disposal senaryolari + run-flow truncation testleri; ayrica
@@ -729,7 +731,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // attribution-baseline / finalize-retirement + isCanonicalTaskFilename pinleri.
   // 2026-08-26 11:04: 16504→16506 — Node-6a mekanik supurme (sprint-684 3/3):
   // death-sweep hijyen + worker-identity-hostbound + docker-git-async suiteleri.
-  digest: '737f751c4fb45687e832d0c6da7bb1787055ad41387fcc806d560617513d5737',
+  digest: 'b3ee1eed2c1fd635612f302a5c349815ce30af5bdb5fd00dfec921fb6e1b82d0',
   // 2026-08-27 04:0x: ayni 16514, digest-only — full-suite hizalama batch'i
   // (pin/mock/census guncellemeleri + sync guard).
   // 2026-08-27 03:1x: ayni 16514, digest-only — CI-hizalama paketi

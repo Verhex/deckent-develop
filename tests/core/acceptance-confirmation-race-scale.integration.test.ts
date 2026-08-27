@@ -163,7 +163,11 @@ function racingAppendChild(
   const ready = new Promise<void>((resolve, reject) => {
     const timer = setTimeout(
       () => reject(new Error('acceptance race child barrier timed out')),
-      10_000 * hostClassWallClockMultiplier,
+      // Readiness gate, not a performance claim: a vite-node child cold-start on a
+      // saturated CI runner legitimately exceeds the old 10s base (933b6492c red at
+      // ~31.6s). Align the barrier with the completion budget below — the gate must
+      // never be tighter than the run it guards.
+      30_000 * hostClassWallClockMultiplier,
     );
     child.once('error', error => { clearTimeout(timer); reject(error); });
     child.once('message', () => { clearTimeout(timer); resolve(); });

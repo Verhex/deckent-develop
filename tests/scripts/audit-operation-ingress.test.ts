@@ -43,7 +43,7 @@ describe('audit-operation-ingress — report-only fs-write/delete measurement', 
     //  +9  2026-08-25 A3 event-truth wave atomic/monotonic writers:
     //      core/event-stream +5, core/run-status-read-model +2,
     //      core/multi-ide +1, orchestra/sprint-utils +1.
-    expect(report.total).toBe(737); // 692/697: sync skill+workspace arms — 4 new report-only write sites
+    expect(report.total).toBe(739); // 698: clean.mjs typed orphan-disposal (archive-move + report) — 2 new report-only write sites; prior 737 (692/697 sync arms)
     expect(baseline.digest).not.toBe(report.digest);
     expect(baseline.mediated).toBe(0);
   });
