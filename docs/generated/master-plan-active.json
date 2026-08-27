@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "afbf5be11093505b7ecd18e4cc753e050979ae2fa22a781a3fe8206056d90a1c"
+    "value": "99f2e661ddcc5809984af8bcd5a6096d1eba8ab6fa8fc1ae8019777c6e1367c5"
   },
   "summary": {
-    "total": 540,
-    "active": 456,
+    "total": 541,
+    "active": 457,
     "terminal": 84,
     "receipts": 210,
     "byState": {
-      "OPEN": 345,
+      "OPEN": 346,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
@@ -22,7 +22,7 @@
     },
     "byPriority": {
       "P0": 338,
-      "P1": 153,
+      "P1": 154,
       "P2": 49
     },
     "byProgram": {
@@ -59,7 +59,7 @@
       "SURFACE": 1,
       "TERMINAL": 22,
       "TOOL": 1,
-      "TRUTH": 105,
+      "TRUTH": 106,
       "XPLAT": 3
     }
   },
@@ -1262,6 +1262,17 @@
       "definitionDigest": "8951d1bd117abe531fd835d4eb39a37462f10ce696dcdb4c25928d16392b4978",
       "progressDigest": "d47c546da941fb035ea7f48cd40e62f1b6df004b23fc5b6a5e26ec8efa9aaa2a",
       "terminalClosureDigest": "f6cbc7cc692b948a78f4bcd43f9af720d903dde9763971d1b8f5605e760463e3"
+    },
+    {
+      "order": 545,
+      "id": "CLI-SURFACE-REFORM-001",
+      "program": "TRUTH",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-27",
+      "definitionDigest": "affa73dba942930e93ce15c1da3431ff7b7bf67c31aa14c16443f9dde69c5190",
+      "progressDigest": "97bad6c17469e0272fbb174c589b97fb507845e8904c116df08db0ed24070ec9",
+      "terminalClosureDigest": null
     },
     {
       "order": 1000,
@@ -10405,7 +10416,9 @@
       "priority": "P1",
       "dependsOn": [],
       "dependents": [],
-      "children": [],
+      "children": [
+        "CLI-SURFACE-REFORM-001"
+      ],
       "gates": [
         "G1"
       ],
@@ -10421,7 +10434,9 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [],
+      "closureBlockedBy": [
+        "CLI-SURFACE-REFORM-001"
+      ],
       "evidenceReceipts": [
         "GR-2026-08-04-FAZ4B-B2-01",
         "GR-2026-08-04-EXEC-AUTH-REG-01",
@@ -10599,6 +10614,37 @@
       "acceptance": "Üç test dosyası (audit-operation-ingress, brain/decisions, governance/orphan-deliverables) lokalde ve gece Coverage'da yeşil; baseline mekanik regen digest'li; ADR Context içeriği owner-görünür; orphan pini O-ailesi bilinçli-unwired gerçeğini not eder",
       "evidence": "Açılış 2026-08-10 (post-PR116 sağlık taraması, Alperen 'sen taslakla' onayı): 3 kırık lokal reproduce — audit 673≠674 (ab14d45cd debt-manager +1 write sitesi), 'Provider Authority Key Custody, Rotation & Composition' ADR'sinde Context alanı yok, orphan taraması 91≠90 (operation-catalog O1 2026-08-07 indi, pin güncellenmedi); kökler satır 4030 (O3 typed-residual) · 160 (ADR parity) · 531 (Coverage-only aileler) ile bağlantılı; `receipt=GR-2026-08-10-NIGHTLY-GREEN-01`; 2026-08-10 SETTLEMENT: üç parça kapandı — baseline 674 regen (audit --write), adr-g-039 gerçek Context (MemoryStore.update, audit-chain + entry_history korunur; writeGuardedExports re-export), KNOWN_ORPHANS += operation-catalog/index.ts (tarihli yorum + 92 pin); `proof=nightly-drift-trio-37of37-local`; X kanıtı gece Coverage koşusunda — satır o kanıta ve owner DONE-onayına dek OPEN",
       "updated": "2026-08-10"
+    },
+    {
+      "order": 545,
+      "id": "CLI-SURFACE-REFORM-001",
+      "parent": "CLI-VOCAB-001",
+      "program": "TRUTH",
+      "outcome": "CLI yüzeyinin uçtan-uca reformu — dilim-1 \"profesyonel ayrım\" (owner-admission 2026-08-27)",
+      "priority": "P1",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Dilim-1: help/komut yüzeyi EN-default (i18n katalog korunur); komutlar tema-gruplu (çalıştırma/izleme/yaşam-döngüsü/katalog/sağlayıcılar/ortam/servisler/ileri + autonomous-flow + enterprise/RBAC grupları); gizli-komut sınıfı ölür (limits/bot/mcp/evolve envantere girer); eriyen-çiftler (plan-nl→do · dashboard→status --watch · attach+output→watch · archive-debt→status --debt · analyze alias) alias+typed-deprecation ile birleşir; temel = surface-contract registry (help/docs/completion/MCP-parity tek kaynaktan) + consumer-closure gate (owner: \"doğru ve olması gereken\"). Dilim-2 (ayrı admission): yarım-çalışan komut onarımı — kpi tarihçe/data-log (eskiye dönüş yok), evolve, limits provider-geneli (--claude/--codex/--cursor + tümü). Dilim-3 (ayrı admission): prompt-first native chat (deckent [prompt] — iddiasız).",
+      "evidence": "Owner sohbet-kararları 2026-08-27: ürün/komut deckent SABİT (rename iptal — yayın @verhex/deckent); \"cli ingilizce olmalı\"; \"ilk iş profesyonel ayrım kabul edebiliriz\"; kanıt: limits yalnız-Claude + limits/bot/mcp -h-dışı (gizli) disk-doğrulandı",
+      "updated": "2026-08-27"
     },
     {
       "order": 1000,
@@ -27304,6 +27350,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "ed638f3dff00cfab0be3dde5e320ab3fc66a750809450dd3acc774e2e162fe5a"
+    "value": "0f6c09743164efd3d8fa54ef0264dc27df2b06f416c7e2e31e9363c81edf3f94"
   }
 }
