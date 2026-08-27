@@ -4,8 +4,7 @@ import type { DashboardState, DoctorResult, Sprint, AgentInfo, Task, TaskResult 
 import { AgentStatus, SprintPhase } from '../../core/types.js';
 import { formatHumanSprintComplete } from '../../orchestra/sprint-reporter.js';
 import { MemoryStore } from '../../core/memory-store.js';
-import { getDefaultConfig } from '../../core/config.js';
-import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
+import { BRAIN_DIR, MEMORY_DB_FILE, BRAIN_TOTAL_LINE_BUDGET } from '../../core/constants.js';
 import { ProviderConfigAliasConflictError } from '../../core/provider-config-canonicalizer.js';
 import { isColorSuppressed } from './theme.js';
 import { detectLang, getLanguage } from './i18n.js';
@@ -615,7 +614,9 @@ export function formatHumanStatus(input: HumanStatusInput): string {
   // ─── Budget Check (G) ──────────────────────────
   // Budget authority is config `memory_budget` — the old `const maxBudget = 600`
   // literal silently shadowed the owner's configured value (owner finding 2026-08-27).
-  const maxBudget = input.memoryBudget ?? getDefaultConfig().memory_budget;
+  // Fallback is the canonical constants budget, not getDefaultConfig(): pulling
+  // core/config.js into this formatter broke suites with partial constants mocks.
+  const maxBudget = input.memoryBudget ?? BRAIN_TOTAL_LINE_BUDGET;
   if (input.projectRoot && maxBudget !== undefined) {
     try {
       const brainLines = getMemoryEntryCount(input.projectRoot);

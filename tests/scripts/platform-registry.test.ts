@@ -328,16 +328,20 @@ describe('main', () => {
 // ─── real-repo drift gate (row 90 requirement: fails closed on drift) ─────────
 
 describe('real-repo drift signal', () => {
-  it('reports the currently committed stale AUTOGEN block', () => {
+  // 2026-08-27: the committed AUTOGEN block was regenerated (it had gone stale
+  // through the Faz-B test-slim line shifts); the suite now asserts the in-sync
+  // state, which is the stronger fail-closed gate — any future drift turns this
+  // red and forces `node scripts/gen-platform-registry.mjs --write`.
+  it('reports the committed AUTOGEN block as in sync', () => {
     const code = main(['--check'], { root: REPO_ROOT });
-    expect(code).toBe(1);
+    expect(code).toBe(0);
   });
 
-  it('fresh regeneration differs from the stale committed AUTOGEN block', () => {
+  it('fresh regeneration matches the committed AUTOGEN block byte-for-byte', () => {
     const actual = readFileSync(join(REPO_ROOT, 'tests/PLATFORM.md'), 'utf-8');
     const registry = buildRegistry(REPO_ROOT);
     const body = renderCategoriesMarkdown(registry);
     const expected = regenerateDoc(actual, body);
-    expect(actual).not.toBe(expected);
+    expect(actual).toBe(expected);
   });
 });

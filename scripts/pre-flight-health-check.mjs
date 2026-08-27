@@ -46,8 +46,8 @@ const projectRoot = rootIdx !== -1 && args[rootIdx + 1]
 /**
  * Resolve the effective brain memory budget for `root`.
  * Project config `.deckent/config.json` `memory_budget` wins; the literal below
- * mirrors the canonical product default (`src/core/config.ts` getDefaultConfig
- * `memory_budget: 5000`) for uninitialized checkouts only — keep them in sync.
+ * mirrors the canonical budget constant (`src/core/constants.ts`
+ * `BRAIN_TOTAL_LINE_BUDGET = 5000`) for uninitialized checkouts only — keep in sync.
  * @param {string} root
  * @returns {number}
  */
@@ -337,8 +337,8 @@ export function runPreFlightChecks(opts = {}) {
   // Budget authority is config `memory_budget` — the old `budget = 900` default
   // silently shadowed the owner's configured value (owner finding 2026-08-27).
   // Standalone .mjs cannot import the TS config module; project layer is read
-  // directly, with the canonical product default (config.ts getDefaultConfig
-  // memory_budget) as last resort for uninitialized checkouts.
+  // directly, with the canonical budget constant (constants.ts
+  // BRAIN_TOTAL_LINE_BUDGET) as last resort for uninitialized checkouts.
   const budget = opts.budget ?? resolveMemoryBudget(root);
 
   const checks = [

@@ -57,7 +57,7 @@ import {
   registerOutput,
 } from '../../src/cli/commands/output.js';
 import { getCurrentSprintId } from '../../src/monitor/sprint-state.js';
-import { getDefaultConfig } from '../../src/core/config.js';
+import { BRAIN_TOTAL_LINE_BUDGET } from '../../src/core/constants.js';
 import { print as print__tsm_009, printError, formatProgressBar, formatTable, formatDashboard, formatDoctorResult, formatSprintSummary, formatAgentLabel, formatHumanStatus, isNoColor } from "../../src/cli/helpers/output.js";
 import type { HumanStatusInput } from "../../src/cli/helpers/output.js";
 import { AgentStatus, AlertLevel, SprintPhase, SprintStatus } from "../../src/core/types.js";
@@ -924,11 +924,11 @@ describe('formatHumanStatus — budget check via MemoryStore', () => {
         const result = formatHumanStatus(input);
         expect(result).toContain('Budget: 300/600 lines (OK)');
     });
-    it('resolves the budget from the canonical config default when input.memoryBudget is absent (owner finding 2026-08-27: no 600 literal)', () => {
+    it('resolves the budget from the canonical constants budget when input.memoryBudget is absent (owner finding 2026-08-27: no 600 literal)', () => {
         mockOutputMemStore.totalCount.mockReturnValue(300);
         const input = makeHumanStatusInput({ projectRoot: '/fake/root' });
         const result = formatHumanStatus(input);
-        expect(result).toContain(`Budget: 300/${getDefaultConfig().memory_budget} lines (OK)`);
+        expect(result).toContain(`Budget: 300/${BRAIN_TOTAL_LINE_BUDGET} lines (OK)`);
         expect(result).not.toContain('/600');
     });
     it('shows Budget warning percentage when entries exceed 80% of max', () => {

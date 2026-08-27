@@ -28,21 +28,11 @@ vi.mock('node:child_process', () => ({
   spawnSync: vi.fn(),
 }));
 
-vi.mock('../../src/core/constants.js', () => ({
-  RUNTIME_DIR: '.deckent/runtime',  // sprint-429 (429-011) tool-inventory yolu modül-yüklemede okur
-  DECKENT_DIR: '.deckent',
-  SETTINGS_DIR: '.deckent/settings',  // born-630 allowscope-zinciri modül-yüklemede okur
-  BRAIN_DIR: '.brain',
-  MEMORY_FILE: 'MEMORY.md',
-  DEBT_FILE: 'DEBT.md',
-  DECISIONS_FILE: 'DECISIONS.md',
-  DIRECTIVES_FILE: 'DIRECTIVES.md',
-  LOCKS_DIR: '.locks',
-  LOCK_STALE_THRESHOLD_MS: 300000,
-  DEBT_TABLE_HEADER: '| ID',
-  PROJECT_CONFIG_PATH: '.deckent/config.json',
-  MEMORY_DB_FILE: 'memory.db',
-  MEMORY_EXPORTS_DIR: 'exports',
+// importOriginal-spread (2026-08-27): doctor-checks pulls the constants budget
+// (BRAIN_TOTAL_LINE_BUDGET fallback) — a hand-listed partial mock silently
+// misses new exports and throws on access (CI 3219f3ae2 regression class).
+vi.mock('../../src/core/constants.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/core/constants.js')>()),
 }));
 
 vi.mock('../../src/core/errors.js', () => ({

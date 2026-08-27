@@ -11,10 +11,9 @@ import { runProviderDiagnostics as runProviderDiagnosticsImpl } from '../../core
 import {
   DECKENT_DIR, BRAIN_DIR, DECISIONS_FILE,
   DIRECTIVES_FILE, LOCKS_DIR, MEMORY_DB_FILE,
-  PROJECT_CONFIG_PATH,
+  PROJECT_CONFIG_PATH, BRAIN_TOTAL_LINE_BUDGET,
 } from '../../core/constants.js';
 import { getDebtItems } from '../../core/debt-store.js';
-import { getDefaultConfig } from '../../core/config.js';
 import { readSprintJournal } from '../../core/routing/journal.js';
 
 // Row 450 (508-001): the Node.js runtime floor comes from the manifest's own
@@ -344,11 +343,13 @@ export function getMemoryEntryCount(projectRoot: string): number {
   } catch { return 0; }
 }
 
-// Budget authority is config `memory_budget` (3-layer merge default 5000), never a
-// source literal — the old `= 900` default silently shadowed the owner's configured
-// value (owner finding 2026-08-27). This check runs in sync callers (CLI/MCP/API),
-// so the project layer is read directly (same pattern as readLastSprintId below)
-// with the canonical config default as fallback.
+// Budget authority is config `memory_budget`, never a source literal — the old
+// `= 900` default silently shadowed the owner's configured value (owner finding
+// 2026-08-27). This check runs in sync callers (CLI/MCP/API), so the project layer
+// is read directly (same pattern as readLastSprintId below). Last resort is the
+// canonical constants budget, NOT getDefaultConfig(): pulling core/config.js into
+// this leaf-check path made createDefaultConfig() explode under the suites'
+// partial constants mocks (CI 3219f3ae2 — four shards red).
 function resolveMemoryBudget(root: string): number | undefined {
   try {
     const configPath = join(root, PROJECT_CONFIG_PATH);
@@ -357,7 +358,7 @@ function resolveMemoryBudget(root: string): number | undefined {
       if (typeof config.memory_budget === 'number') return config.memory_budget;
     }
   } catch { /* unreadable project config — fall through to the canonical default */ }
-  return getDefaultConfig().memory_budget;
+  return BRAIN_TOTAL_LINE_BUDGET;
 }
 
 function checkBrainBudget(root: string, memoryBudget?: number): DoctorCheck {

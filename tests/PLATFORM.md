@@ -31,13 +31,13 @@ _None at this time._
 
 | File | Line | Block | Test/Suite name |
 |------|------|------|------|
-| `tests/scripts/clean-active-execution-guard.test.ts` | 3312 | it | unlinks top-level and nested symlinks without traversing their targets |
-| `tests/scripts/clean-active-execution-guard.test.ts` | 3358 | it | retains the exact maintenance generation after a partial clean mutation fails |
-| `tests/scripts/clean-active-execution-guard.test.ts` | 3472 | it | retains authority when a pre-mutation callback mutates and throws |
-| `tests/scripts/clean-active-execution-guard.test.ts` | 3560 | it | surfaces an uncertain pinned-directory handle close as a typed hold |
-| `tests/scripts/clean-active-execution-guard.test.ts` | 3644 | it | keeps deletion rooted at the pinned dist identity across a parent symlink swap |
-| `tests/scripts/clean-active-execution-guard.test.ts` | 3785 | it | keeps authority on the module-owned project identity across a root replacement |
-| `tests/scripts/clean-active-execution-guard.test.ts` | 3907 | it | rechecks legacy execution evidence at the final pre-mutation boundary |
+| `tests/scripts/clean-active-execution-guard.test.ts` | 3348 | it | unlinks top-level and nested symlinks without traversing their targets |
+| `tests/scripts/clean-active-execution-guard.test.ts` | 3394 | it | retains the exact maintenance generation after a partial clean mutation fails |
+| `tests/scripts/clean-active-execution-guard.test.ts` | 3508 | it | retains authority when a pre-mutation callback mutates and throws |
+| `tests/scripts/clean-active-execution-guard.test.ts` | 3596 | it | surfaces an uncertain pinned-directory handle close as a typed hold |
+| `tests/scripts/clean-active-execution-guard.test.ts` | 3680 | it | keeps deletion rooted at the pinned dist identity across a parent symlink swap |
+| `tests/scripts/clean-active-execution-guard.test.ts` | 3821 | it | keeps authority on the module-owned project identity across a root replacement |
+| `tests/scripts/clean-active-execution-guard.test.ts` | 3943 | it | rechecks legacy execution evidence at the final pre-mutation boundary |
 
 ### `macos`
 
@@ -56,10 +56,14 @@ _None at this time._
 | File | Line | Block | Test/Suite name |
 |------|------|------|------|
 | `tests/cli/worktree-binary-authority-live.test.ts` | 130 | it | enforces the same HOLD through an npm-link-shaped executable symlink |
+| `tests/cli/worktree-binary-authority.test.ts` | 368 | it | rejects a symlinked build identity instead of hashing its target |
+| `tests/core/prompt-cost-canary-receipt-store.test.ts` | 75 | it | defends store links, permissions, and bounded discovery |
+| `tests/core/provider-execution-observation-adoption-receipt-store.test.ts` | 270 | it | rejects a group-writable shared project control directory |
+| `tests/core/provider-execution-observation-reconciliation-receipt-store.test.ts` | 27 | it | rejects unsafe links, permissive paths, and over-bounded discovery |
 | `tests/governance/closure-genesis-anchor.test.ts` | 109 | it | --generate: private key mode is exactly 0600 (POSIX) |
 | `tests/governance/closure-genesis-anchor.test.ts` | 149 | it | GUARD: a symlink at --private-out is refused (O_EXCL) and its target is untouched |
 | `tests/hermeticity/global-setup.test.ts` | 74 | it | rejects a symlink anywhere in the dist snapshot |
-| `tests/hermeticity/runtime-write-guard.test.ts` | 303 | it | derives module authority from the physical file behind a symlink |
+| `tests/hermeticity/runtime-write-guard.test.ts` | 322 | it | derives module authority from the physical file behind a symlink |
 | `tests/mcp/server-entrypoint.test.ts` | 35 | it | accepts a POSIX executable symlink that resolves to the module |
 | `tests/mcp/server.test.ts` | 108 | it | recognizes an executable symlink as the module filesystem identity |
 | `tests/orchestra/tmux-edge.test.ts` | 64 | describe | TmuxError |
@@ -140,7 +144,12 @@ Non-skip `if (process.platform ...)` branches inside test bodies — the test st
 | `tests/cli/at-ref.test.ts` | 328 | `windows-native` | asserts differently ON windows-native |
 | `tests/cli/native-agent-scratch-wire.test.ts` | 251 | `windows-native` | asserts differently ON windows-native |
 | `tests/cli/repl/session-ledger.test.ts` | 139 | `windows-native` | asserts differently OFF windows-native |
+| `tests/connectors/gateway/gateway-access-lifecycle.test.ts` | 75 | `windows-native` | asserts differently OFF windows-native |
+| `tests/core/approval-broker-timeout-receipt.test.ts` | 125 | `windows-native` | asserts differently ON windows-native |
 | `tests/core/approval-broker.test.ts` | 87 | `windows-native` | asserts differently OFF windows-native |
+| `tests/core/config-heal-preimage.test.ts` | 69 | `windows-native` | asserts differently OFF windows-native |
+| `tests/core/config-heal-race.test.ts` | 113 | `windows-native` | asserts differently ON windows-native |
+| `tests/core/config-write-authority.test.ts` | 89 | `windows-native` | asserts differently ON windows-native |
 | `tests/core/deck-file-secret-lifecycle.test.ts` | 66 | `windows-native` | asserts differently ON windows-native |
 | `tests/core/deck-file-secret-lifecycle.test.ts` | 76 | `windows-native` | asserts differently ON windows-native |
 | `tests/core/pid-liveness.test.ts` | 44 | `windows-native` | asserts differently ON windows-native |
@@ -157,8 +166,8 @@ Non-skip `if (process.platform ...)` branches inside test bodies — the test st
 | `tests/orchestra/docker-backend-fixpack.test.ts` | 58 | `windows-native` | asserts differently OFF windows-native |
 | `tests/orchestra/docker-backend-fixpack.test.ts` | 70 | `windows-native` | asserts differently OFF windows-native |
 | `tests/orchestra/docker-backend-fixpack.test.ts` | 81 | `windows-native` | asserts differently OFF windows-native |
-| `tests/scripts/clean-active-execution-guard.test.ts` | 3284 | `linux` | asserts differently OFF linux |
-| `tests/scripts/clean-active-execution-guard.test.ts` | 4026 | `linux` | asserts differently OFF linux |
+| `tests/scripts/clean-active-execution-guard.test.ts` | 3320 | `linux` | asserts differently OFF linux |
+| `tests/scripts/clean-active-execution-guard.test.ts` | 4062 | `linux` | asserts differently OFF linux |
 | `tests/scripts/test-ci-sim.test.ts` | 188 | `windows-native` | asserts differently OFF windows-native |
 | `tests/scripts/test-ci-sim.test.ts` | 196 | `windows-native` | asserts differently OFF windows-native |
 
@@ -170,7 +179,6 @@ _These `skipIf` conditions matched no rule in `classifyCondition()` — extend t
 |------|------|------|------|
 | `tests/blueprint/sprint-history.test.ts` | 11 | describe | `!BLUEPRINT_EXISTS` |
 | `tests/cli/cli-bin-invocation.test.ts` | 134 | describe | `!HAS_DIST` |
-| `tests/cli/cli-surface-truth-battery.test.ts` | 315 | describe | `NESTED_FORK_RUNNER` |
 | `tests/cli/gemini-parity-gated.test.ts` | 29 | describe | `!process.env['GEMINI_API_KEY']` |
 | `tests/cli/gemini-parity-gated.test.ts` | 357 | describe | `!process.env['GEMINI_API_KEY']` |
 | `tests/cli/recovery-lifecycle-binary.integration.test.ts` | 85 | describe | `NESTED_FORK_RUNNER` |
@@ -187,8 +195,8 @@ _These `skipIf` conditions matched no rule in `classifyCondition()` — extend t
 | `tests/config/nervous-faz1-smoke.test.ts` | 42 | it | `!nervousEnabled` |
 | `tests/core/builtins/catalog-sync-parity.test.ts` | 93 | it | `!inPool` |
 | `tests/core/builtins/catalog-sync-parity.test.ts` | 122 | it | `!inPool` |
-| `tests/core/cross-verify-evidence-broker.test.ts` | 187 | describe | `!pinnedRuntimeAvailable` |
-| `tests/core/cross-verify-evidence-broker.test.ts` | 598 | describe | `!pinnedRuntimeAvailable` |
+| `tests/core/cross-verify-evidence-broker.test.ts` | 192 | describe | `!pinnedRuntimeAvailable` |
+| `tests/core/cross-verify-evidence-broker.test.ts` | 625 | describe | `!pinnedRuntimeAvailable` |
 | `tests/core/nervous-enabled-integration.test.ts` | 38 | it | `!hasProjectConfig \|\| !projectNervousEnabled` |
 | `tests/dashboard/dashboard-build-smoke.test.ts` | 59 | it | `!BUILD_OUTPUT_PRESENT` |
 | `tests/dashboard/dashboard-build-smoke.test.ts` | 66 | it | `!BUILD_OUTPUT_PRESENT` |
@@ -243,7 +251,7 @@ _These `skipIf` conditions matched no rule in `classifyCondition()` — extend t
 
 ### All Other Test Files
 
-2648 of 2711 test files under `tests/` carry no platform-conditional gate detected above and run identically on every supported platform.
+2791 of 2862 test files under `tests/` carry no platform-conditional gate detected above and run identically on every supported platform.
 <!-- AUTOGEN:END id="platform-registry" -->
 
 ## How Platform Conditions Work
