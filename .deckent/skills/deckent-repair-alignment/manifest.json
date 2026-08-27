@@ -65,45 +65,33 @@
         "proficiency": "primary"
       },
       {
-        "type": "configure",
-        "proficiency": "secondary"
-      },
-      {
         "type": "analyze",
-        "proficiency": "able"
+        "proficiency": "secondary"
       }
     ],
     "domains": [
       {
-        "id": "test/quality",
+        "id": "testing",
         "proficiency": "primary"
+      },
+      {
+        "id": "quality",
+        "proficiency": "secondary"
       }
     ],
     "expertise": [
-      "contract-alignment",
-      "product-bug",
-      "red-test",
-      "red-test repair discipline: reproduce first, distinguish stale pins from product bugs, learn contracts from scoped source, and preserve assertion strength",
-      "repro-before-red",
-      "stale-pin",
       "test-repair",
-      "testing-expert",
-      "typescript-expert",
-      "workflow"
+      "root-cause-analysis"
     ],
     "deliverables": [
-      "code-src",
-      "code-test",
-      "config",
-      "doc",
       "workflow"
     ]
   },
   "profileProvenance": {
-    "origin": "derived-profile",
+    "origin": "manifest-profile",
     "derivationVersion": 2,
-    "persistedAt": "2026-08-26T21:13:42.312Z",
-    "authority": "deckent sync builtin content-hash"
+    "persistedAt": "2026-08-27T05:08:40.407509Z",
+    "authority": "owner el-fix 2026-08-27 (codex-audit LSR-01: authored builtin profile restored)"
   },
-  "builtinContentHash": "sha256:a588d56a044ce4d85e9148b5fc2bcb3076f4d4b321a2b60e1586a69e1701b6a6"
+  "builtinContentHash": "sha256:3a0421017ad6d78b404cf0cc4bcd6a8d824b97321cc8ea9cdbf8cdf489600a0f"
 }

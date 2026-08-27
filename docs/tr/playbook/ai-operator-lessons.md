@@ -430,7 +430,36 @@ attempt harcama gerekçesi değil, host composition defect kanıtıdır.
 
 ---
 
+## 31. Direktif-yazımı iki kural: görev-kapsamlı TEK Test + tükettiği otorite dosyası Reads'te
+
+Sprint-696'nın ~7 NO_GO kaskadının kök-nedeni worker'lar değil, direktif-yazarıydı; sprint-697
+aynı derslerle 2/2 ilk-denemede geçti. İki bağlayıcı kural: (1) **`Test:` satırı görev-kapsamlı
+ve TEK komuttur** — global gate (`lint-manifests` sınıfı) veya `&&` zinciri yazılmaz; komşu
+görevin diskteki yarım-durumu global gate'i kirletir ve suçsuz görevi NO_GO'ya düşürür
+(çapraz-kirlilik). (2) **Doğrulamanın tükettiği HER otorite dosyası (kapalı vocabulary,
+schema, kanonik sabit listesi) `Reads:` satırına yazılır** — worker vocabulary'yi göremeyince
+geçerli-görünen-ama-geçersiz değerlerle mahkûm denemeler üretir (vocabulary-körlüğü).
+Belirti→teşhis: aynı görevde art arda "farklı değerle yeniden dene" NO_GO'ları görülüyorsa
+önce direktifin Reads/Test satırları denetlenir, worker suçlanmaz.
+
+## 32. Katalog-dokunuşlu dalga landing'inde scoped-yeşil yetmez — mini-full-suite şartı
+
+Üç dalga (091338676→d49758cfa→71bb8ec0e) scoped-vitest yeşiliyle landed; her dalga katalog
+sayım/pin borcunu (readme-number-truth, init-builtin-seed, census, agsk sınıfı) sessizce
+büyüttü ve fatura tek seferde 14 dosya/18 kırmızı olarak remote CI'da kesildi. Kural (owner
+onayı 2026-08-27): builtin katalog yüzeyine (skills/agents/manifests/sync kolları) dokunan
+her dalga landing'inden önce, scoped seçime EK olarak katalog-pin bataryası
+(readme-number-truth · init-builtin-seed · agent-catalog-schema · agent-discovery-census ·
+agsk3/4 · sync ailesi) koşulur; tam full-suite kadansı (5-landing kuralı) ayrıca yürür.
+Genel biçim: "sayım/pin testleri, dokunulan yüzeyin scoped-seti değil, yüzeyin TÜM
+projeksiyon-tüketicileridir."
+
 ## Değişiklik günlüğü (her sprint deneyiminden sonra güncelle)
+
+- **2026-08-27 — gece-vardiyası direktif + landing disiplinleri**: Ders 31 (görev-kapsamlı
+  tek Test + otorite dosyaları Reads'te; sprint-696 kaskadı vs sprint-697 2/2 kanıtı) ve
+  Ders 32 (katalog-dokunuşlu dalgalarda mini-full-suite landing şartı; 3-dalga → 18-kırık
+  CI faturası) eklendi.
 
 - **2026-08-23 — sprint-628 mixed-scope recovery**: Ders 30 eklendi (`filesRead`
   ve `filesWrite` bağımsız compiled-prompt authority'leridir; dispatch öncesi temsilî

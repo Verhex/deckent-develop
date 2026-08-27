@@ -1555,6 +1555,7 @@ export function registerStatus(
               verbose: opts.verbose,
               ciBaseline: ci.baseline,
               ciReport: ci.report,
+              memoryBudget: resolvedConfig.memory_budget,
             }));
             const settlementsWatch = formatStatusTaskSettlements(taskSettlements, lang);
             if (settlementsWatch) sections.push(settlementsWatch);
@@ -1708,6 +1709,7 @@ export function registerStatus(
               verbose: opts.verbose,
               ciBaseline: ci.baseline,
               ciReport: ci.report,
+              memoryBudget: resolvedConfig.memory_budget,
             }));
             if (opts.verbose) {
               output(formatAgentAssignments(tasks, true));

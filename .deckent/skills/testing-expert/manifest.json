@@ -128,8 +128,8 @@
   "profileProvenance": {
     "origin": "derived-profile",
     "derivationVersion": 2,
-    "persistedAt": "2026-08-26T20:30:27.588Z",
+    "persistedAt": "2026-08-27T05:08:31.848Z",
     "authority": "deckent sync builtin content-hash"
   },
-  "builtinContentHash": "sha256:6a7dacec25b0513765d65651dce3415f4b4ca53e257a4565f3c6ebb9beb25938"
+  "builtinContentHash": "sha256:c8951012ae7ce221079b1cdb50fc95ec3942bc93997199d3a093ae0fd18fc9db"
 }

@@ -6,7 +6,7 @@
  * Components checked:
  *   1. TypeScript build — `tsc --noEmit` exit code
  *   2. Vitest baseline — npx vitest run (maxThreads=1, bail=1)
- *   3. Brain memory budget — wc -l .brain/*.md < 900
+ *   3. Brain memory budget — wc -l .brain/*.md within config `memory_budget`
  *   4. Stale locks — .locks/ files older than 5min
  *   5. Docker daemon health — docker info
  *   6. MCP server health — deckent-mcp reachable (optional)
@@ -40,6 +40,27 @@ const projectRoot = rootIdx !== -1 && args[rootIdx + 1]
 /**
  * @typedef {{ name: string, passed: boolean, required: boolean, message: string, durationMs?: number }} CheckResult
  */
+
+// ─── Config resolution ──────────────────────────────────────────────────────
+
+/**
+ * Resolve the effective brain memory budget for `root`.
+ * Project config `.deckent/config.json` `memory_budget` wins; the literal below
+ * mirrors the canonical product default (`src/core/config.ts` getDefaultConfig
+ * `memory_budget: 5000`) for uninitialized checkouts only — keep them in sync.
+ * @param {string} root
+ * @returns {number}
+ */
+export function resolveMemoryBudget(root = projectRoot) {
+  try {
+    const configPath = join(root, '.deckent', 'config.json');
+    if (existsSync(configPath)) {
+      const config = JSON.parse(readFileSync(configPath, 'utf-8'));
+      if (typeof config.memory_budget === 'number') return config.memory_budget;
+    }
+  } catch { /* unreadable project config — fall through to the canonical default */ }
+  return 5000;
+}
 
 // ─── Individual checks ──────────────────────────────────────────────────────
 
@@ -116,12 +137,13 @@ export function checkVitestBaseline(skip = false) {
 }
 
 /**
- * Check Brain memory budget (total lines across .brain/*.md < 900).
+ * Check Brain memory budget (total lines across .brain/*.md within the
+ * config-resolved `memory_budget`).
  * @param {string} root
- * @param {number} budget
+ * @param {number} [budget] - explicit override; defaults to resolveMemoryBudget(root)
  * @returns {CheckResult}
  */
-export function checkBrainBudget(root = projectRoot, budget = 900) {
+export function checkBrainBudget(root = projectRoot, budget = resolveMemoryBudget(root)) {
   const brainDir = join(root, '.brain');
   if (!existsSync(brainDir)) {
     return { name: 'Brain Budget', passed: true, required: false, message: '.brain/ not found (uninitialized)' };
@@ -310,9 +332,14 @@ export function runPreFlightChecks(opts = {}) {
   const {
     skipTests = false,
     root = projectRoot,
-    budget = 900,
     staleThresholdMs = 300_000,
   } = opts;
+  // Budget authority is config `memory_budget` — the old `budget = 900` default
+  // silently shadowed the owner's configured value (owner finding 2026-08-27).
+  // Standalone .mjs cannot import the TS config module; project layer is read
+  // directly, with the canonical product default (config.ts getDefaultConfig
+  // memory_budget) as last resort for uninitialized checkouts.
+  const budget = opts.budget ?? resolveMemoryBudget(root);
 
   const checks = [
     checkTypeScript(root),

@@ -4,6 +4,7 @@ import type { DashboardState, DoctorResult, Sprint, AgentInfo, Task, TaskResult 
 import { AgentStatus, SprintPhase } from '../../core/types.js';
 import { formatHumanSprintComplete } from '../../orchestra/sprint-reporter.js';
 import { MemoryStore } from '../../core/memory-store.js';
+import { getDefaultConfig } from '../../core/config.js';
 import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 import { ProviderConfigAliasConflictError } from '../../core/provider-config-canonicalizer.js';
 import { isColorSuppressed } from './theme.js';
@@ -259,6 +260,8 @@ export interface HumanStatusInput {
   verbose?: boolean;
   ciBaseline?: CIBaseline;
   ciReport?: CIReport;
+  /** Effective `memory_budget` from resolved config; falls back to the canonical config default. */
+  memoryBudget?: number;
 }
 
 /**
@@ -610,10 +613,12 @@ export function formatHumanStatus(input: HumanStatusInput): string {
   }
 
   // ─── Budget Check (G) ──────────────────────────
-  if (input.projectRoot) {
+  // Budget authority is config `memory_budget` — the old `const maxBudget = 600`
+  // literal silently shadowed the owner's configured value (owner finding 2026-08-27).
+  const maxBudget = input.memoryBudget ?? getDefaultConfig().memory_budget;
+  if (input.projectRoot && maxBudget !== undefined) {
     try {
       const brainLines = getMemoryEntryCount(input.projectRoot);
-      const maxBudget = 600;
       if (brainLines === null) {
         // DB present but unreadable — surface it rather than faking an OK budget.
         lines.push('');

@@ -14,6 +14,7 @@ import {
   PROJECT_CONFIG_PATH,
 } from '../../core/constants.js';
 import { getDebtItems } from '../../core/debt-store.js';
+import { getDefaultConfig } from '../../core/config.js';
 import { readSprintJournal } from '../../core/routing/journal.js';
 
 // Row 450 (508-001): the Node.js runtime floor comes from the manifest's own
@@ -343,13 +344,38 @@ export function getMemoryEntryCount(projectRoot: string): number {
   } catch { return 0; }
 }
 
-function checkBrainBudget(root: string, memoryBudget = 900): DoctorCheck {
+// Budget authority is config `memory_budget` (3-layer merge default 5000), never a
+// source literal — the old `= 900` default silently shadowed the owner's configured
+// value (owner finding 2026-08-27). This check runs in sync callers (CLI/MCP/API),
+// so the project layer is read directly (same pattern as readLastSprintId below)
+// with the canonical config default as fallback.
+function resolveMemoryBudget(root: string): number | undefined {
+  try {
+    const configPath = join(root, PROJECT_CONFIG_PATH);
+    if (existsSync(configPath)) {
+      const config = JSON.parse(readFileSync(configPath, 'utf-8')) as { memory_budget?: number };
+      if (typeof config.memory_budget === 'number') return config.memory_budget;
+    }
+  } catch { /* unreadable project config — fall through to the canonical default */ }
+  return getDefaultConfig().memory_budget;
+}
+
+function checkBrainBudget(root: string, memoryBudget?: number): DoctorCheck {
+  const budget = memoryBudget ?? resolveMemoryBudget(root);
+  if (budget === undefined) {
+    return {
+      name: 'Brain Budget',
+      passed: true,
+      message: 'memory_budget not configured — budget check skipped',
+      required: false,
+    };
+  }
   const lines = getMemoryEntryCount(root);
-  const passed = lines <= memoryBudget;
+  const passed = lines <= budget;
   return {
     name: 'Brain Budget',
     passed,
-    message: `${lines}/${memoryBudget} lines${passed ? '' : ' — OVER BUDGET, run cleanup --decay'}`,
+    message: `${lines}/${budget} lines${passed ? '' : ' — OVER BUDGET, run cleanup --decay'}`,
     required: false,
   };
 }

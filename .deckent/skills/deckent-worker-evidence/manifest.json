@@ -63,40 +63,35 @@
         "proficiency": "primary"
       },
       {
-        "type": "configure",
+        "type": "analyze",
         "proficiency": "secondary"
       },
       {
-        "type": "analyze",
+        "type": "document",
         "proficiency": "able"
       }
     ],
-    "domains": [],
+    "domains": [
+      {
+        "id": "workers",
+        "proficiency": "primary"
+      }
+    ],
     "expertise": [
-      ".claude/rules/worker-default.md",
-      ".tasks/*.result",
-      "deckent workflow for disk-first result claims, captured verification output, typed honest verdicts, and real-binary proof of user-facing function",
-      "disk-evidence",
-      "no-go",
-      "proof-of-function",
-      "result-file",
-      "self-assessment",
-      "technical-writer",
-      "testing-expert",
-      "worker-evidence",
-      "workflow"
+      "disk-derived worker evidence",
+      "result ingress claims",
+      "typed NO_GO verdicts",
+      "real-binary proof of function"
     ],
     "deliverables": [
-      "config",
-      "doc",
-      "workflow"
+      "doc"
     ]
   },
   "profileProvenance": {
-    "origin": "derived-profile",
+    "origin": "manifest-profile",
     "derivationVersion": 2,
-    "persistedAt": "2026-08-26T21:13:42.313Z",
-    "authority": "deckent sync builtin content-hash"
+    "persistedAt": "2026-08-27T05:08:40.407509Z",
+    "authority": "owner el-fix 2026-08-27 (codex-audit LSR-01: authored builtin profile restored)"
   },
-  "builtinContentHash": "sha256:c40efd742726c58a185688d6d91392cacf5c0c2af1ed3a269a68977e1c41d488"
+  "builtinContentHash": "sha256:20482f63a4ced8290d7f0db0df94e4147b477433ca729069d0e6cc3de126133b"
 }

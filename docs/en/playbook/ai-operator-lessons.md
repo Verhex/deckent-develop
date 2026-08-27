@@ -450,7 +450,37 @@ not a reason to spend another provider attempt on the same prompt.
 
 ---
 
+## 31. Two directive-writing rules: one task-scoped Test + every consumed authority file in Reads
+
+The root cause of sprint-696's ~7-NO_GO cascade was the directive author, not the workers;
+sprint-697 passed 2/2 first-attempt with the same lessons applied. Two binding rules:
+(1) **the `Test:` line is task-scoped and a SINGLE command** — never a global gate
+(`lint-manifests` class) or a `&&` chain; a neighbouring task's half-state on disk
+contaminates the global gate and fails an innocent task (cross-contamination).
+(2) **every authority file the verification consumes (closed vocabulary, schema, canonical
+constant list) goes into `Reads:`** — a worker that cannot see the vocabulary produces doomed
+attempts with plausible-but-invalid values (vocabulary blindness). Symptom→diagnosis: repeated
+"retry with a different value" NO_GOs on one task means audit the directive's Reads/Test lines
+first; do not blame the worker.
+
+## 32. Scoped-green is not enough for catalog-touching wave landings — mini-full-suite rule
+
+Three waves (091338676→d49758cfa→71bb8ec0e) landed on scoped-vitest green; each silently grew
+the catalog count/pin debt (readme-number-truth, init-builtin-seed, census, agsk class) and the
+bill arrived at once as 14 files / 18 reds on remote CI. Rule (owner approval 2026-08-27):
+before landing any wave that touches the builtin catalog surface (skills/agents/manifests/sync
+arms), run the catalog-pin battery (readme-number-truth · init-builtin-seed ·
+agent-catalog-schema · agent-discovery-census · agsk3/4 · sync family) IN ADDITION to the
+scoped selection; the full-suite cadence (5-landing rule) still applies separately. General
+form: "count/pin tests belong to ALL projection consumers of the touched surface, not to the
+surface's scoped set."
+
 ## Changelog (update after every sprint experience)
+
+- **2026-08-27 — night-shift directive + landing disciplines**: Added Lesson 31 (task-scoped
+  single Test + authority files in Reads; sprint-696 cascade vs sprint-697 2/2 proof) and
+  Lesson 32 (mini-full-suite landing requirement for catalog-touching waves; 3 waves → 18-red
+  CI bill).
 
 - **2026-08-23 — sprint-628 mixed-scope recovery**: Lesson 30 added (`filesRead`
   and `filesWrite` are independent compiled-prompt authorities; representative

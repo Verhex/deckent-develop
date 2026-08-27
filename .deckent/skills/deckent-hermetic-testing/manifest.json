@@ -63,55 +63,39 @@
     "profileVersion": 3,
     "workTypes": [
       {
-        "type": "configure",
+        "type": "build",
         "proficiency": "primary"
       },
       {
-        "type": "analyze",
+        "type": "fix",
         "proficiency": "secondary"
       },
       {
-        "type": "build",
+        "type": "review",
         "proficiency": "able"
       }
     ],
     "domains": [
       {
-        "id": "core/runtime",
+        "id": "testing",
         "proficiency": "primary"
-      },
-      {
-        "id": "test/quality",
-        "proficiency": "secondary"
       }
     ],
     "expertise": [
-      "deckent workflow for fresh-checkout-safe tmpdir tests, measured hermeticity ledgers, vitest_max_forks=2, only-shrink fs mocks, and open-flag write guards",
-      "hermetic-testing",
-      "mock-factory",
-      "runtime-write-guard",
-      "test-hermeticity",
-      "testing-expert",
-      "tests/**/*.test.ts",
-      "tmpdir",
-      "typescript-expert",
-      "vitest",
-      "vitest.config.*",
-      "workflow"
+      "fresh-checkout hermetic tests",
+      "suite-owned tmpdir fixtures",
+      "hermeticity ledger ratchets",
+      "runtime open-flag write guards"
     ],
     "deliverables": [
-      "code-src",
-      "code-test",
-      "config",
-      "doc",
-      "workflow"
+      "code-test"
     ]
   },
   "profileProvenance": {
-    "origin": "derived-profile",
+    "origin": "manifest-profile",
     "derivationVersion": 2,
-    "persistedAt": "2026-08-26T21:13:42.312Z",
-    "authority": "deckent sync builtin content-hash"
+    "persistedAt": "2026-08-27T05:08:40.407509Z",
+    "authority": "owner el-fix 2026-08-27 (codex-audit LSR-01: authored builtin profile restored)"
   },
-  "builtinContentHash": "sha256:efc63ecc340cc6be64eeda25c07aac0e65de58def9ee087d8beb88b2dd46bdc4"
+  "builtinContentHash": "sha256:afacc3e80718cb89a67cf1acbc72f5f8726861fc6028a38a63bc9c792c742728"
 }

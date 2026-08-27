@@ -22,7 +22,8 @@ vi.mock('node:fs', () => ({
   constants: { W_OK: 2 },
 }));
 
-vi.mock('node:os', () => ({
+vi.mock('node:os', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('node:os')>()),
   platform: vi.fn().mockReturnValue('linux'),
 }));
 
@@ -98,24 +99,11 @@ vi.mock('../../../src/core/deck-file.js', () => ({
   ],
 }));
 
-vi.mock('../../../src/core/constants.js', () => ({
-  ARCHIVE_DIR: 'archive',
-  ARCHIVE_SPRINTS_SUBDIR: 'sprints',
-  RUNTIME_DIR: '.deckent/runtime',  // sprint-429 (429-011) tool-inventory yolu modül-yüklemede okur
-  DECKENT_DIR: '.deckent',
-  SETTINGS_DIR: '.deckent/settings',  // born-630 allowscope-zinciri modül-yüklemede okur
-  BRAIN_DIR: '.brain',
-  MEMORY_FILE: 'MEMORY.md',
-  DEBT_FILE: 'DEBT.md',
-  DECISIONS_FILE: 'DECISIONS.md',
-  DIRECTIVES_FILE: 'DIRECTIVES.md',
-  LOCKS_DIR: '.locks',
-  TASKS_DIR: '.tasks',  // FAZ4B: spawn-backend-docker.ts import zinciri modül-yüklemede okur
-  LOCK_STALE_THRESHOLD_MS: 300000,
-  DEBT_TABLE_HEADER: '| ID',
-  PROJECT_CONFIG_PATH: '.deckent/config.json',
-  BRAIN_TOTAL_LINE_BUDGET: 600,
-  MEMORY_DB_FILE: 'memory.db',
+// importOriginal-spread (2026-08-27): doctor-checks now pulls core/config.js
+// (config-resolved memory_budget), whose module-load needs the full constants
+// surface — a hand-listed partial mock silently misses new exports (DEFAULT_MODE).
+vi.mock('../../../src/core/constants.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/core/constants.js')>()),
 }));
 
 const mockMemoryStore = {
@@ -619,13 +607,23 @@ describe('error handling', () => {
     expect(check!.message).toMatch(/stale/i);
   });
 
-  it('brain budget over 900 — check passes=false with decay hint', () => {
+  it('brain budget over the config-resolved budget — check passes=false with decay hint', () => {
+    // Budget resolves from config `memory_budget` (default 5000) — never the old
+    // hardcoded 900 (owner finding 2026-08-27).
     vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, PASSING_NODE_VERSION) as ReturnType<typeof spawnSync>);
-    mockMemoryStore.totalCount.mockReturnValue(950);
+    mockMemoryStore.totalCount.mockReturnValue(5050);
     const result = runDoctorChecks('/mock/root');
     const check = result.checks.find(c => c.name === 'Brain Budget');
     expect(check!.passed).toBe(false);
     expect(check!.message).toMatch(/decay/i);
+  });
+
+  it('brain budget between the retired 900 literal and the config default stays green', () => {
+    vi.mocked(spawnSync).mockReturnValue(makeSpawnResult(0, PASSING_NODE_VERSION) as ReturnType<typeof spawnSync>);
+    mockMemoryStore.totalCount.mockReturnValue(950);
+    const result = runDoctorChecks('/mock/root');
+    const check = result.checks.find(c => c.name === 'Brain Budget');
+    expect(check!.passed).toBe(true);
   });
 });
 

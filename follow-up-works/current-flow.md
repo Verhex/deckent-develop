@@ -10,47 +10,55 @@
 > ikinci-göz; sabaha-kadar otonom devam TEYİTLİ. Sınırlar aynen: destructive/publish/memory.db/
 > onaysız kill-cleanup/admission'sız MASTER-satırı YOK.
 
-## 🌅 SABAH-RAPORU (Alperen için — gece-otonom özeti, 2026-08-26 23:00 → 02:30)
+## 📍 İMLEÇ — 2026-08-27 sabah-sonrası durum
 
-**ONAYLI 3-DALGALI SKILL-EVRİMİ PLANI TAMAMLANDI** — üç dalga da landed:
-`091338676` Dalga-1 (profil-v2 + sync skill-kolu + unroutable-gate + stack-detector) ·
-`d49758cfa` Dalga-2 (4 deckent-* builtin skill + test-guardian agent [7094-F1c KAPANDI] +
-2 revizyon + preflight-fix) · `71bb8ec0e` Dalga-3 (WORKER-GUIDE/BOOT motor-gerçekleri +
-sync workspace-kolu). origin/main = `71bb8ec0e`.
+**Sabah karar-turu ALINDI ve UYGULANDI** (owner Q&A, 2026-08-27 ~08:00):
+mini-full-suite kuralı ONAYLI (Ders-32 yazıldı) · audit-kapanış = önce el-fix sonra
+mekanizma-sprint · memory budget kararı: decay DEĞİL, 600 hardcode'u düzelt (bütçe 5000) ·
+flow-envelope elle temizle ONAYLI · clean-guard typed-disposal sprint'e ONAYLI ·
+preflight-pini + directive-dersleri ONAYLI · sıralama: audit-kapanış → ladder + yayın-planı paralel.
 
-**4 sprint koştu:** 692 (4/4+FIX) · 696 (forced-closure 3/4 + 003 bağımsız-doğrulama) ·
-697 (2/2 İLK-DENEMEDE, 0 NO_GO — directive-disiplini kanıtı) · (693/694/695 preflight-kurbanı,
-task'ları arşivlendi). **Dogfood-avı:** preflight clean-deadlock kökü bulunup fix'lendi
-(runTscCheck typecheck-tercihi). **Skill-kataloğu 31→35** (idempotency kanıtlı), agent'lar 21→22.
+**Codex 84-DONE denetimi teslim alındı:** 84/84 yapısal-geçerli; 27 CONFIRMED / 57 PARTIAL /
+0 CONTRADICTED; 2 canlı BLOCKS_CURRENT_DONE bulgusu disk-doğrulandı ve el-fix'le kapatıldı
+(aşağıda). Raporlar: /tmp/deckent-done-audit-20260827/.analysis-independent/.
 
-**NO_GO analizi (sorduğun soru):** 696'daki ~7 NO_GO'nun ~5'i benim Test-komutu tasarımım
-(global-gate çapraz-kirlenmesi), ~2'si Reads-eksiği (vocabulary-körlüğü); düzeltilen
-directive-disiplini 697'de 0 NO_GO verdi. Ayrıntı MASTER 7010 evidence + bu dosyanın
-bulgu-listesi.
+**SABAH EL-FIX PAKETİ (bu landing):**
+1. **Audit-kapanış el-fix (LSR-01/02):** SKILL.md ×5 materialize (4 deckent-* + observability),
+   authored V3 profiller `manifest-profile` provenance ile restore, test-guardian project
+   gölgesi canonical (code-test/config + build/release); effective-path probe 5/5 body-OK +
+   profiller etkin + capabilities sağlam; drift-baseline 78→38; sync-dayanıklılık dry-run
+   35/35 unchanged. Kalıcı üç-yönlü senkron = mekanizma-sprint (7013).
+2. **Budget-otoritesi onarımı (owner bulgusu):** üç yüzeyde bayat literal — output.ts
+   hardcoded 600, doctor-checks default 900, pre-flight script default 900 → hepsi
+   config-resolved `memory_budget` (5000). Gerçek-binary kanıt: doctor
+   `OK Memory: 3064/5000 (61%)` — "Budget OVER" tamamen kalktı, decay gereksizdi.
+3. **Bozuk flow-envelope 23d494c8 temizlendi:** kök-neden RUN_FAILED.error 6311 karakter >
+   validator sınırı 4096 (producer/validator kontrat uyumsuzluğu — producer-truncation
+   mekanizma-sprint'e); dosyalar `.deckent/runtime/archive/run-flow-corrupt-2026-08-27/`
+   README'li arşivde. Clean-guard'da yalnız beklenen bot-reason kaldı → **tam clean-build
+   (`build:all`) yeniden çalışıyor**, bot restart edildi (pid 1314217).
+4. **Preflight typecheck-tercihi regresyon-pini:** yeni
+   tests/core/preflight-typecheck-preference.test.ts (4 test — typecheck>build tercihi,
+   --noEmit yeniden-yazımı, dürüst-skip).
+5. **ai-operator-lessons Ders 31+32** (TR+EN senkron): görev-kapsamlı tek Test +
+   otorite-dosyaları-Reads'te; katalog-dokunuşlu dalgada mini-full-suite şartı.
+6. **MASTER:** 7010/7013/7094/9034 evidence-append (validator yeşil, 540 satır/210 receipt).
 
-**Hijyen-disiplini kuruldu (talimatın):** .tasks süpürüldü (13 öksüz + 5 xv-artefaktı →
-archive/orphaned-2026-08-27), memory'ye kalıcı kural yazıldı, her kapanış-ritüelinin son
-adımı artık .tasks-envanteri.
+**SIRADAKİ (bu sıra ile):**
+1. **Mekanizma-sprint (dogfood):** üç-yönlü skill-paket senkronu (body+manifest+authored-profil)
+   + izole-proje effective-path proof + clean-guard typed disposal (öksüz receipt'siz artefakt)
+   + run-flow producer error-truncation (4096) + secure-coding/observability manifest
+   canonicality. DIRECTIVES Ders-31 disipliniyle yazılacak.
+2. **Ladder yeni-dalga:** 3301/3302/3304/3299 (sıralama-onayı alındı).
+3. **Paralel:** paket-yayın + repo-taşıma (deckent-develop→Verhex/deckent) + verhex-rename
+   BİRLEŞİK GEÇİŞ-PLANI raporu (brief §8 versiyon/changelog + owner repo kararları;
+   execution codex rename-analizi sonrası).
 
-**XVerify:** preflight-fix claim'i verifier-codex UNCLEAR (çürütme yok; formal-criterion
-eşleme sorunu; receipt 78e7d604…) — makine-kanıt esas alındı, kör-retry yapılmadı.
-
-**Remote CI (advisory) — SON DURUM 04:30: REPO TAM-YEŞİL.** 71bb8ec0e koşusu kırmızı çıktı
-(dalga-landing'leri scoped-only doğrulamayla indiği için katalog-pin borcu birikmişti);
-tam lokal full-suite koşuldu (2780 dosya), 18 kırık kök-sınıf kapatıldı ve `b25ac79e7`
-hizalama-batch'i ile CI+E2E+Secret ÜÇÜ DE SUCCESS. Batch'ten İKİ GERÇEK ÜRÜN-ONARIMI çıktı:
-(a) sync workspace-kolu .deckent'siz projede fırlatıyordu → fault-isolated boş-rapor;
-(b) 42 manifest'te legacy avgScore→avgCoverage canonical normalizasyonu (tarihî src-tutarsızlığı)
-+ drift-normalize builtinContentHash istisnası. Mock-ratchet 272→270 (3 factory importOriginal).
-
-**Kararını bekleyen (GÜNCEL):** (0-YENİ) katalog-dokunuşlu dalga landing'lerinde scoped-yerine
-mini-full-suite şartı (bu gecenin dersi: scoped-yeşil 3 landing pin-borcu biriktirdi) +
-sync-arm'a stats-normalizasyon seam'i (data-fix yapıldı, mekanizma-adayı);
-**Kararını bekleyen (önceki):** (1) preflight typecheck-invariant regresyon-pini + directive-dersleri
-MASTER-admission; (2) clean-guard'ın öksüz-artefakt tipli-imha yolu (finding); (3) bozuk
-flow-envelope 23d494c8 (INVALID_EVENT_ENVELOPE — clean'li tam build hâlâ bundan bloklu;
-clean'siz build ile dist=src, işlev-kaybı yok); (4) "Budget OVER" cleanup --decay onayı;
-(5) ladder yeni-dalga işleri (3301/3302/3304/3299) + K-paketi zamanlaması.
+**Açık küçük bulgular (admission'sız, kayıt):** `memory_budget` config-types'ta yanlışlıkla
+V1-deprecated bölümünde ve V2 `memory` bloğunda budget alanı yok (doc/tip temizliği adayı) ·
+runDecay/runBudgetedDecay/cleanup'taki son-çare `?? 900` literalleri getDefaultConfig'e
+bağlanabilir (davranışsal etki yok, config her zaman kazanıyor) · doctor.test.ts IDE-düzeyi
+tip gevşekliği (tsc-gate tests'i dışlıyor; kozmetik).
 
 ## GÜNÜN LANDED ÖZETİ (2026-08-26 → origin/main `091338676`)
 

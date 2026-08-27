@@ -57,6 +57,7 @@ import {
   registerOutput,
 } from '../../src/cli/commands/output.js';
 import { getCurrentSprintId } from '../../src/monitor/sprint-state.js';
+import { getDefaultConfig } from '../../src/core/config.js';
 import { print as print__tsm_009, printError, formatProgressBar, formatTable, formatDashboard, formatDoctorResult, formatSprintSummary, formatAgentLabel, formatHumanStatus, isNoColor } from "../../src/cli/helpers/output.js";
 import type { HumanStatusInput } from "../../src/cli/helpers/output.js";
 import { AgentStatus, AlertLevel, SprintPhase, SprintStatus } from "../../src/core/types.js";
@@ -919,20 +920,27 @@ describe('formatHumanStatus — budget check via MemoryStore', () => {
     });
     it('shows Budget OK when entries are below warning zone', () => {
         mockOutputMemStore.totalCount.mockReturnValue(300);
-        const input = makeHumanStatusInput({ projectRoot: '/fake/root' });
+        const input = makeHumanStatusInput({ projectRoot: '/fake/root', memoryBudget: 600 });
         const result = formatHumanStatus(input);
         expect(result).toContain('Budget: 300/600 lines (OK)');
     });
+    it('resolves the budget from the canonical config default when input.memoryBudget is absent (owner finding 2026-08-27: no 600 literal)', () => {
+        mockOutputMemStore.totalCount.mockReturnValue(300);
+        const input = makeHumanStatusInput({ projectRoot: '/fake/root' });
+        const result = formatHumanStatus(input);
+        expect(result).toContain(`Budget: 300/${getDefaultConfig().memory_budget} lines (OK)`);
+        expect(result).not.toContain('/600');
+    });
     it('shows Budget warning percentage when entries exceed 80% of max', () => {
         mockOutputMemStore.totalCount.mockReturnValue(500); // 500 > 480 (600 * 0.8)
-        const input = makeHumanStatusInput({ projectRoot: '/fake/root' });
+        const input = makeHumanStatusInput({ projectRoot: '/fake/root', memoryBudget: 600 });
         const result = formatHumanStatus(input);
         expect(result).toContain('500/600 lines');
         expect(result).toMatch(/\d+%/);
     });
     it('shows Budget OVER with cleanup hint when entries exceed max', () => {
         mockOutputMemStore.totalCount.mockReturnValue(650); // 650 > 600
-        const input = makeHumanStatusInput({ projectRoot: '/fake/root' });
+        const input = makeHumanStatusInput({ projectRoot: '/fake/root', memoryBudget: 600 });
         const result = formatHumanStatus(input);
         expect(result).toContain('OVER');
         expect(result).toContain('650/600 lines');
