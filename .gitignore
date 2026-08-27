@@ -238,6 +238,9 @@ examples/voice-wrapper/
 # Alperen (2026-07-28): analiz-notlari lokal kalir, repoya girmez
 .analysis/
 
+# Alperen (2026-08-27): accepted post-product vision portfolio local kalir, repoya girmez
+docs/post-product/
+
 # Runtime debris (2026-07-28 temizlik — makine-lokal, asla commit edilmez)
 .deckent-execution-lock-authority.anchor.json
 .deckent/autonomous/autonomous.db-wal

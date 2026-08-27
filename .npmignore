@@ -71,3 +71,6 @@ dist/extensions/vscode/
 *.tgz
 .tmp-script-tests/
 *.tsbuildinfo
+
+# Owner-approved local post-product vision portfolio
+docs/post-product/
