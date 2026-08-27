@@ -446,5 +446,37 @@ describe('RunFlowCoordinator — hermetic scenario family (442-003)', () => {
       expect(readFlowEvents(root, flowId)).toHaveLength(logLengthAfterClosure);
       expect(daemon.getFlow(flowId).state).toBe('FAILED');
     });
+
+    it('bounds an oversized child-crash error before persistence and keeps the log foldable', () => {
+      const flowId = generateFlowId('bounded-failure');
+      const coordinator = createRunFlowCoordinator({ root, now: makeClock() });
+      driveToDetachedRunning(coordinator, flowId);
+
+      coordinator.recordRunFailure({ flowId, error: 'x'.repeat(6_311) });
+
+      const persisted = readFlowEvents(root, flowId).at(-1);
+      expect(persisted?.type).toBe('RUN_FAILED');
+      if (persisted?.type !== 'RUN_FAILED') throw new Error('expected RUN_FAILED event');
+      expect(persisted.error).toHaveLength(4_096);
+      expect(persisted.error).toMatch(/…\[truncated\]$/u);
+
+      const rehydrated = createRunFlowCoordinator({ root, now: makeClock() }).getFlow(flowId);
+      expect(rehydrated.state).toBe('FAILED');
+      expect(rehydrated.failureReason).toBe(persisted.error);
+    });
+
+    it('persists a within-bound child-crash error unchanged', () => {
+      const flowId = generateFlowId('unchanged-failure');
+      const coordinator = createRunFlowCoordinator({ root, now: makeClock() });
+      driveToDetachedRunning(coordinator, flowId);
+      const error = 'child crashed below the envelope ceiling';
+
+      coordinator.recordRunFailure({ flowId, error });
+
+      const persisted = readFlowEvents(root, flowId).at(-1);
+      expect(persisted?.type).toBe('RUN_FAILED');
+      if (persisted?.type !== 'RUN_FAILED') throw new Error('expected RUN_FAILED event');
+      expect(persisted.error).toBe(error);
+    });
   });
 });

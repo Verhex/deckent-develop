@@ -14,6 +14,18 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint698] - 2026-08-27
+
+### Added
+
+- Üç-yönlü builtin skill paket senkronu — body materialize + authored-profil authority
+- İzole-proje effective-path proof — katalogdan prompt'a tam zincir mühürü
+- Clean-guard typed disposal — öksüz receipt'siz plan-artefaktı sınıfı
+- RUN_FAILED producer error-truncation — bozuk-envelope sınıfının kökü
+
+
+_Tasks: 4 total, 4 done, 0 tech debt, 0 no-go_
+
 ## [sprint697] - 2026-08-26
 
 ### Added

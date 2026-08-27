@@ -230,25 +230,77 @@ export function syncBuiltinSkillManifests(
     const contentHash = builtinSkillContentHash(manifestHashInput, skillContent);
     const targetDir = path.join(projectRoot, SKILLS_DIR, skillId);
     const targetPath = path.join(targetDir, MANIFEST_FILENAME);
-    const existing = readJsonSafe<Record<string, unknown>>(targetPath);
-    if (existing && readDeclaredProvenance(existing) !== 'builtin') {
-      report.keptLocal.push(skillId);
+    const declaredEntrypoint = sourceManifest['entrypoint'];
+    const declaredEntrypointPath = declaredEntrypoint
+      && typeof declaredEntrypoint === 'object'
+      && !Array.isArray(declaredEntrypoint)
+      ? (declaredEntrypoint as Record<string, unknown>)['path']
+      : declaredEntrypoint ?? SKILL_MD_FILENAME;
+    const parsedEntrypoint = parseDeclaredSkillPath(declaredEntrypointPath);
+    if (!parsedEntrypoint.ok) {
+      report.issues.push({
+        skillId,
+        reason: `builtin entrypoint cannot be materialized: ${parsedEntrypoint.reason}`,
+      });
       continue;
     }
+
+    const targetSkillPath = path.join(targetDir, parsedEntrypoint.relativePath);
+    let bodyMaterialized = false;
+    if (fs.existsSync(targetSkillPath)) {
+      let localSkillContent: string;
+      try {
+        localSkillContent = fs.readFileSync(targetSkillPath, 'utf8');
+      } catch {
+        report.issues.push({ skillId, reason: 'project skill entrypoint is unreadable' });
+        continue;
+      }
+      if (localSkillContent !== skillContent) report.keptLocal.push(skillId);
+    } else {
+      if (!options.dryRun) {
+        fs.mkdirSync(path.dirname(targetSkillPath), { recursive: true });
+        const temporarySkillPath = `${targetSkillPath}.${randomUUID()}.tmp`;
+        fs.writeFileSync(temporarySkillPath, skillContent, 'utf8');
+        try {
+          fs.renameSync(temporarySkillPath, targetSkillPath);
+        } catch (error) {
+          try { fs.unlinkSync(temporarySkillPath); } catch { /* best-effort cleanup */ }
+          report.issues.push({
+            skillId,
+            reason: error instanceof Error ? error.message : String(error),
+          });
+          continue;
+        }
+      }
+      bodyMaterialized = true;
+    }
+
+    const existing = readJsonSafe<Record<string, unknown>>(targetPath);
+    if (existing && readDeclaredProvenance(existing) !== 'builtin') {
+      if (!report.keptLocal.includes(skillId)) report.keptLocal.push(skillId);
+      continue;
+    }
+    const hasAuthoredProfile = sourceManifest['profile'] !== undefined
+      && sourceManifest['profile'] !== null;
+    const expectedProfileOrigin = hasAuthoredProfile
+      ? 'manifest-profile'
+      : 'derived-profile';
     if (
       existing?.['builtinContentHash'] === contentHash
       && existing.profileProvenance
       && typeof existing.profileProvenance === 'object'
+      && (existing.profileProvenance as Record<string, unknown>)['origin']
+        === expectedProfileOrigin
       && (existing.profileProvenance as Record<string, unknown>)['derivationVersion']
         === SKILL_PROFILE_DERIVATION_VERSION
     ) {
-      report.unchanged.push(skillId);
+      (bodyMaterialized ? report.updated : report.unchanged).push(skillId);
       continue;
     }
 
     const derivationInput = { ...sourceManifest };
-    delete derivationInput['profile'];
     delete derivationInput['profileProvenance'];
+    if (!hasAuthoredProfile) delete derivationInput['profile'];
     normalizeSkillManifest(derivationInput);
     const routing = deriveCanonicalSkillProfile(derivationInput as unknown as SkillDefinition);
     if (routing.status !== 'routable') {
@@ -261,7 +313,7 @@ export function syncBuiltinSkillManifests(
       source: 'builtin',
       profile: routing.profile,
       profileProvenance: {
-        origin: 'derived-profile',
+        origin: expectedProfileOrigin,
         derivationVersion: SKILL_PROFILE_DERIVATION_VERSION,
         persistedAt: new Date().toISOString(),
         authority: 'deckent sync builtin content-hash',

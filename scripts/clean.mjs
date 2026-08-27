@@ -521,6 +521,7 @@ function createAdmissionReport(rootDigest) {
       runFlowFiles: 0,
       missionRows: 0,
     },
+    disposedOrphans: [],
   };
 }
 
@@ -2450,12 +2451,98 @@ function inspectTaskExecutionLocks(
   }
 }
 
-function reconcilePendingTasks(report, projectRoot, rootDigest, pendingTasks) {
+function terminalSprintIds(projectRoot) {
+  const statePath = join(projectRoot, '.deckent', 'sprint-state.json');
+  try {
+    if (!evidenceExists(statePath)) return new Set();
+    const state = readBoundedJson(statePath);
+    if (!isRecord(state)
+      || typeof state.sprintId !== 'string'
+      || !state.sprintId.trim()
+      || typeof state.status !== 'string'
+      || typeof state.phase !== 'string'
+      || !SPRINT_PHASES.has(state.phase)
+      || !TERMINAL_SPRINT_STATUSES.has(state.status)
+      || (state.status === 'COMPLETE' && state.phase !== 'COMPLETE')) {
+      return new Set();
+    }
+    return new Set([state.sprintId]);
+  } catch {
+    return new Set();
+  }
+}
+
+function orphanProof(task, heartbeatTaskIds, resultTaskIds, terminalSprints) {
+  if (heartbeatTaskIds.has(task.id) || resultTaskIds.has(task.id)) return null;
+  if (task.sprintId === undefined) {
+    return {
+      receipt: 'MISSING',
+      result: 'ABSENT',
+      heartbeat: 'ABSENT',
+      sprint: 'UNREGISTERED',
+    };
+  }
+  if (typeof task.sprintId === 'string' && terminalSprints.has(task.sprintId)) {
+    return {
+      receipt: 'MISSING',
+      result: 'ABSENT',
+      heartbeat: 'ABSENT',
+      sprint: 'TERMINAL',
+    };
+  }
+  return null;
+}
+
+function disposeOrphanTasks(
+  report,
+  projectRoot,
+  tasks,
+  heartbeatTaskIds,
+  resultTaskIds,
+  receiptRef,
+) {
+  const terminalSprints = terminalSprintIds(projectRoot);
+  const candidates = tasks
+    .map(task => ({ task, proof: orphanProof(
+      task, heartbeatTaskIds, resultTaskIds, terminalSprints,
+    ) }))
+    .filter(candidate => candidate.proof !== null);
+  if (candidates.length === 0) return new Set();
+
+  const archiveDir = join(
+    projectRoot, '.tasks', 'archive', `orphaned-${new Date().toISOString()}`,
+  );
+  const disposed = new Set();
+  for (const { task, proof } of candidates) {
+    const archivePath = join(archiveDir, task.fileName);
+    try {
+      if (evidenceExists(archivePath)) throw new Error('ARCHIVE_COLLISION');
+      mkdirSync(archiveDir, { recursive: true });
+      renameSync(task.path, archivePath);
+      report.disposedOrphans.push({
+        disposition: 'archive-move',
+        file: task.ref,
+        archivePath: evidencePath(projectRoot, archivePath),
+        proof,
+        evidenceRefs: [task.ref, receiptRef],
+      });
+      disposed.add(task.id);
+    } catch {
+      // Preserve the original receipt-less HOLD when archival cannot complete.
+    }
+  }
+  return disposed;
+}
+
+function reconcilePendingTasks(
+  report, projectRoot, rootDigest, pendingTasks, heartbeatTaskIds, resultTaskIds,
+) {
   if (pendingTasks.length === 0) return;
   const dbPath = join(projectRoot, '.deckent', 'runtime', 'invocations.db');
   const receiptRef = evidencePath(projectRoot, dbPath);
-  const holdAll = (code, detailCode) => {
+  const holdAll = (code, detailCode, excludedTaskIds = new Set()) => {
     for (const task of pendingTasks) {
+      if (excludedTaskIds.has(task.id)) continue;
       addReason(report, {
         code,
         surface: 'task',
@@ -2468,7 +2555,10 @@ function reconcilePendingTasks(report, projectRoot, rootDigest, pendingTasks) {
   };
   try {
     if (!evidenceExists(dbPath)) {
-      holdAll('E_CLEAN_TASK_RECEIPT_MISSING', 'DB_MISSING');
+      const disposed = disposeOrphanTasks(
+        report, projectRoot, pendingTasks, heartbeatTaskIds, resultTaskIds, receiptRef,
+      );
+      holdAll('E_CLEAN_TASK_RECEIPT_MISSING', 'DB_MISSING', disposed);
       return;
     }
   } catch (error) {
@@ -2567,6 +2657,7 @@ function reconcilePendingTasks(report, projectRoot, rootDigest, pendingTasks) {
       return;
     }
 
+    const receiptlessTasks = [];
     for (const task of pendingTasks) {
       // Mirrors TaskSettlementAuthority.resolveViews(): only worker-execution
       // receipts participate. Build admission is intentionally stricter than
@@ -2576,14 +2667,7 @@ function reconcilePendingTasks(report, projectRoot, rootDigest, pendingTasks) {
         .filter(receipt =>
           receipt.taskId === task.id && receipt.purpose === 'worker-execution');
       if (matches.length === 0) {
-        addReason(report, {
-          code: 'E_CLEAN_TASK_RECEIPT_MISSING',
-          surface: 'task',
-          subject: task.id,
-          observedStatus: 'PENDING',
-          detailCode: 'NO_TASK_RECEIPT',
-          evidenceRefs: [task.ref, receiptRef],
-        });
+        receiptlessTasks.push(task);
         continue;
       }
       if (matches.length > 1) {
@@ -2707,6 +2791,20 @@ function reconcilePendingTasks(report, projectRoot, rootDigest, pendingTasks) {
         ],
       });
     }
+    const disposed = disposeOrphanTasks(
+      report, projectRoot, receiptlessTasks, heartbeatTaskIds, resultTaskIds, receiptRef,
+    );
+    for (const task of receiptlessTasks) {
+      if (disposed.has(task.id)) continue;
+      addReason(report, {
+        code: 'E_CLEAN_TASK_RECEIPT_MISSING',
+        surface: 'task',
+        subject: task.id,
+        observedStatus: 'PENDING',
+        detailCode: 'NO_TASK_RECEIPT',
+        evidenceRefs: [task.ref, receiptRef],
+      });
+    }
   } catch {
     holdAll('E_CLEAN_RECEIPT_SCHEMA_UNSUPPORTED', 'QUERY_FAILED');
   } finally {
@@ -2749,6 +2847,8 @@ function inspectTasksAndWorkers(
     /^task-[\w-]+\.json$/u.test(entry.name));
   const heartbeatEntries = entries.filter(entry =>
     entry.name.startsWith('task-') && entry.name.endsWith('.hb'));
+  const resultEntries = entries.filter(entry =>
+    /^task-[\w-]+\.result$/u.test(entry.name));
   const pidEntries = entries.filter(entry => /^_.*\.pid$/.test(entry.name));
   report.inspected.taskFiles = taskEntries.length;
   report.inspected.heartbeatFiles = heartbeatEntries.length;
@@ -2794,6 +2894,9 @@ function inspectTasksAndWorkers(
           ref: evidencePath(projectRoot, path),
           contentDigest: sha256(taskBytes),
           createdAt: task.createdAt,
+          path,
+          fileName: entry.name,
+          sprintId: task.sprintId,
         });
       } else if (ACTIVE_TASK_STATUSES.has(task.status)) {
         addReason(report, {
@@ -2832,11 +2935,15 @@ function inspectTasksAndWorkers(
     processProbeIsAuthoritative,
   );
 
-  const heartbeatTaskIds = new Set();
+  const heartbeatTaskIds = new Set(
+    heartbeatEntries.map(entry => entry.name.slice('task-'.length, -'.hb'.length)),
+  );
+  const resultTaskIds = new Set(
+    resultEntries.map(entry => entry.name.slice('task-'.length, -'.result'.length)),
+  );
   for (const entry of heartbeatEntries) {
     const path = join(tasksDir, entry.name);
     const fileTaskId = entry.name.slice('task-'.length, -'.hb'.length);
-    heartbeatTaskIds.add(fileTaskId);
     try {
       const heartbeat = readBoundedJson(path);
       if (!isRecord(heartbeat)
@@ -2949,7 +3056,9 @@ function inspectTasksAndWorkers(
     );
   }
 
-  reconcilePendingTasks(report, projectRoot, rootDigest, pendingTasks);
+  reconcilePendingTasks(
+    report, projectRoot, rootDigest, pendingTasks, heartbeatTaskIds, resultTaskIds,
+  );
   const notDispatchedIds = new Set(
     report.projections
       .filter(projection => projection.effectiveStatus === 'NOT_DISPATCHED')

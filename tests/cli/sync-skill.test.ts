@@ -26,7 +26,7 @@ afterEach(() => {
 });
 
 describe('deckent sync builtin skill branch', () => {
-  it('materializes every builtin with a content hash and v2-derived profile, then is idempotent', () => {
+  it('materializes builtin manifests and bodies, then is idempotent', () => {
     const root = initializedRoot();
 
     const first = syncBuiltinSkillManifests(root);
@@ -45,6 +45,13 @@ describe('deckent sync builtin skill branch', () => {
       derivationVersion: 2,
     });
     expect(observability.profile).toMatchObject({ profileVersion: 3 });
+    expect(readFileSync(
+      join(root, '.deckent', 'skills', 'observability', 'SKILL.md'),
+      'utf8',
+    )).toBe(readFileSync(
+      join('src', 'core', 'builtins', 'skills', 'observability', 'SKILL.md'),
+      'utf8',
+    ));
 
     const beforeSecondRun = readFileSync(
       join(root, '.deckent', 'skills', 'observability', 'manifest.json'),
@@ -57,6 +64,47 @@ describe('deckent sync builtin skill branch', () => {
       join(root, '.deckent', 'skills', 'observability', 'manifest.json'),
       'utf8',
     )).toBe(beforeSecondRun);
+  });
+
+  it('preserves a user-edited builtin body and reports it as kept local', () => {
+    const root = initializedRoot();
+    syncBuiltinSkillManifests(root);
+    const targetPath = join(root, '.deckent', 'skills', 'observability', 'SKILL.md');
+    const localBody = '# Locally tailored observability\n';
+    writeFileSync(targetPath, localBody, 'utf8');
+
+    const report = syncBuiltinSkillManifests(root);
+
+    expect(report.keptLocal).toContain('observability');
+    expect(readFileSync(targetPath, 'utf8')).toBe(localBody);
+  });
+
+  it('persists and preserves an authored builtin profile with manifest provenance', () => {
+    const root = initializedRoot();
+
+    const first = syncBuiltinSkillManifests(root);
+    expect(first.created).toContain('deckent-hermetic-testing');
+    const targetPath = join(
+      root,
+      '.deckent',
+      'skills',
+      'deckent-hermetic-testing',
+      'manifest.json',
+    );
+    const firstBytes = readFileSync(targetPath, 'utf8');
+    const persisted = JSON.parse(firstBytes) as Record<string, unknown>;
+    expect(persisted.profile).toMatchObject({
+      profileVersion: 3,
+      domains: [{ id: 'testing', proficiency: 'primary' }],
+    });
+    expect(persisted.profileProvenance).toMatchObject({
+      origin: 'manifest-profile',
+      derivationVersion: 2,
+    });
+
+    const second = syncBuiltinSkillManifests(root);
+    expect(second.unchanged).toContain('deckent-hermetic-testing');
+    expect(readFileSync(targetPath, 'utf8')).toBe(firstBytes);
   });
 
   it('does not overwrite a project-authored manifest with a builtin of the same id', () => {
@@ -106,6 +154,10 @@ describe('deckent sync builtin skill branch', () => {
       derivationVersion: 2,
     });
     expect(repaired.profile).toMatchObject({ profileVersion: 3 });
+    expect(readFileSync(join(targetDir, 'SKILL.md'), 'utf8')).toBe(readFileSync(
+      join('src', 'core', 'builtins', 'skills', 'observability', 'SKILL.md'),
+      'utf8',
+    ));
 
     const repairedBytes = readFileSync(join(targetDir, 'manifest.json'), 'utf8');
     const second = syncBuiltinSkillManifests(root);

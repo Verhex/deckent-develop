@@ -91,6 +91,21 @@ import {
 } from '../core/run-flow-store.js';
 import { updateLastSprintId } from '../core/utils.js';
 
+// Mirrors the store's default assertNonEmptyBounded ceiling. The event append
+// path stores generic RunFlowEvent payloads and therefore does not call that
+// start-attempt-specific assertion; producer-owned narrative fields must fit
+// the clean/reducer envelope before append.
+const RUN_FLOW_EVENT_TEXT_MAX_LENGTH = 1 << 12;
+const TRUNCATED_SUFFIX = '…[truncated]';
+
+function truncateRunFlowEventText(value: string): string {
+  if (value.length <= RUN_FLOW_EVENT_TEXT_MAX_LENGTH) return value;
+  return `${value.slice(
+    0,
+    RUN_FLOW_EVENT_TEXT_MAX_LENGTH - TRUNCATED_SUFFIX.length,
+  )}${TRUNCATED_SUFFIX}`;
+}
+
 // ═══ Typed error taxonomy ══════════════════════════════════════════════════
 
 /** Base for every coordinator failure — lets a caller `catch`/`instanceof` the
@@ -726,7 +741,10 @@ export function createRunFlowCoordinator(deps: RunFlowCoordinatorDeps): RunFlowC
     recordRunFailure(cmd) {
       const { flowId, error, commandId } = cmd;
       return runCommand(flowId, commandId, () => [
-        buildEvent(flowId, commandId, { type: 'RUN_FAILED', error }),
+        buildEvent(flowId, commandId, {
+          type: 'RUN_FAILED',
+          error: truncateRunFlowEventText(error),
+        }),
       ]);
     },
 

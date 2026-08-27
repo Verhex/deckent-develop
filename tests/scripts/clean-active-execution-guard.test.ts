@@ -75,13 +75,19 @@ function writeJson(path: string, value: unknown): void {
   writeFileSync(path, JSON.stringify(value, null, 2), 'utf-8');
 }
 
-function writeTask(root: string, id: string, status: string): void {
+function writeTask(
+  root: string,
+  id: string,
+  status: string,
+  options: { sprintId?: string } = {},
+): void {
   writeJson(join(root, '.tasks', `task-${id}.json`), {
     id,
     title: id,
     description: id,
     status,
     createdAt: '2026-07-27T00:00:00.000Z',
+    ...options,
   });
 }
 
@@ -1887,7 +1893,15 @@ describe('clean active-execution admission', () => {
         'blocked-by-clean',
         'dispatch',
       )).toThrowError(expect.objectContaining({
-        reason: 'maintenance-held',
+        // The invariant under test is that a live maintenance owner in another
+        // process BLOCKS execution. The typed reason depends on how the runtime
+        // host identity derives: with a machine-scoped hostInstanceId the owner
+        // is same-host + alive → 'maintenance-held'; with the 'process-local:'
+        // fallback (containerized runners) a sibling process classifies as
+        // 'foreign-host'. Both are correct production blockings — pinning one
+        // made the suite environment-dependent (sprint-698-003-fix regression,
+        // caught by the main-lane verification pass 2026-08-27).
+        reason: expect.stringMatching(/^(maintenance-held|foreign-host)$/),
       }));
     } finally {
       const closed = new Promise<number | null>((resolvePromise) => {
@@ -1929,15 +1943,56 @@ describe('clean active-execution admission', () => {
     retainedDb.close();
   });
 
-  it('fails closed for a receipt-less raw PENDING task', () => {
+  it('archives an unregistered receipt-less plan artifact with no worker evidence', () => {
     const root = fixtureRoot();
-    writeTask(root, 'pending-without-receipt', 'PENDING');
+    writeTask(root, 'orphaned-plan', 'PENDING');
+
+    const report = inspectActiveExecutions(root);
+
+    expect(report.decision).toBe('ALLOW');
+    expect(report.disposedOrphans).toEqual([
+      expect.objectContaining({
+        disposition: 'archive-move',
+        file: '.tasks/task-orphaned-plan.json',
+        proof: {
+          receipt: 'MISSING', result: 'ABSENT', heartbeat: 'ABSENT', sprint: 'UNREGISTERED',
+        },
+      }),
+    ]);
+    expect(existsSync(join(root, '.tasks', 'task-orphaned-plan.json'))).toBe(false);
+    expect(readdirSync(join(root, '.tasks', 'archive'))).toHaveLength(1);
+  });
+
+  it('fails closed for a receipt-less PENDING task with a heartbeat', () => {
+    const root = fixtureRoot();
+    writeTask(root, 'pending-with-heartbeat', 'PENDING');
+    writeJson(join(root, '.tasks', 'task-pending-with-heartbeat.hb'), {
+      taskId: 'pending-with-heartbeat', status: 'RUNNING',
+    });
 
     const report = inspectActiveExecutions(root);
 
     expect(report.decision).toBe('HOLD');
     expect(reasonCodes(report)).toContain('E_CLEAN_TASK_RECEIPT_MISSING');
-    expect(report.projections).toEqual([]);
+    expect(report.disposedOrphans).toEqual([]);
+    expect(existsSync(join(root, '.tasks', 'task-pending-with-heartbeat.json'))).toBe(true);
+  });
+
+  it('fails closed for a receipt-less PENDING task in a live sprint', () => {
+    const root = fixtureRoot();
+    writeTask(root, 'pending-live-sprint', 'PENDING', { sprintId: 'sprint-live' });
+    writeJson(join(root, '.deckent', 'sprint-state.json'), {
+      sprintId: 'sprint-live', status: 'ACTIVE', phase: 'EXECUTE', pid: 42,
+    });
+
+    const report = inspectActiveExecutions(root, { processProbe: () => 'alive' });
+
+    expect(report.decision).toBe('HOLD');
+    expect(reasonCodes(report)).toEqual(expect.arrayContaining([
+      'E_CLEAN_TASK_RECEIPT_MISSING', 'E_CLEAN_SPRINT_ACTIVE',
+    ]));
+    expect(report.disposedOrphans).toEqual([]);
+    expect(existsSync(join(root, '.tasks', 'task-pending-live-sprint.json'))).toBe(true);
   });
 
   it('projects an exact receipt-backed rejection settlement to NOT_DISPATCHED', () => {
@@ -3977,6 +4032,11 @@ describe('clean active-execution admission', () => {
                 }),
                 'utf8'
               );
+              writeFileSync(
+                ${JSON.stringify(join(root, '.tasks', 'task-late-writer.hb'))},
+                JSON.stringify({ taskId: 'late-writer', status: 'RUNNING' }),
+                'utf8'
+              );
             }
           });
           writeFileSync(
@@ -4049,6 +4109,10 @@ describe('clean active-execution admission', () => {
     copyFileSync(join(REPO_ROOT, 'scripts', 'clean.mjs'), scriptPath);
     writeFileSync(sentinel, 'must-survive', 'utf-8');
     writeTask(root, 'pending-direct-clean', 'PENDING');
+    writeJson(join(root, '.tasks', 'task-pending-direct-clean.hb'), {
+      taskId: 'pending-direct-clean',
+      status: 'RUNNING',
+    });
 
     const result = await runNode(scriptPath, root);
     const envelope = JSON.parse(result.output.trim()) as {

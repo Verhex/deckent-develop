@@ -44,11 +44,20 @@ preflight-pini + directive-dersleri ONAYLI · sıralama: audit-kapanış → lad
    otorite-dosyaları-Reads'te; katalog-dokunuşlu dalgada mini-full-suite şartı.
 6. **MASTER:** 7010/7013/7094/9034 evidence-append (validator yeşil, 540 satır/210 receipt).
 
+**GÜNCELLEME (kesinti-sonrası, ~11:00):** Elektrik kesintisi atlatıldı. (a) Sabah paketinin
+CI kırmızısı kök-sınıf onarıldı ve landed (`22f056974`: budget-fallback leaf-sabite +
+2 partial-mock spread + PLATFORM.md regen&fail-closed gate). (b) **Mekanizma-sprint-698
+KOŞTU ve 4/4 DONE** (~10dk; test-guardian ilk görev %100): üç-yönlü skill-paket senkronu +
+izole-proje e2e proof + clean-guard typed orphan-disposal + RUN_FAILED truncation. Ana-şerit
+doğrulama pasosu 1 gerçek regresyon yakaladı (698-003-fix cross-process testi environment-
+bağımlı foreign-host pini) → çift-sınıf kabullü hermetik onarım, 62/62. Gerçek-binary
+kanıtlar: **tam clean-build (`build:all`) yeniden ÇALIŞIYOR** (bozuk-envelope arşivi +
+sprint-settlement sonrası guard temiz), sync idempotent + authored-profil mekanizmadan sağ
+çıkıyor + 20 diverged-body dürüst keptLocal (7013 kalan iş: yakınsama-politikası).
+MASTER 7013/7010/9034 evidence-append. Bot pid 40722.
+
 **SIRADAKİ (bu sıra ile):**
-1. **Mekanizma-sprint (dogfood):** üç-yönlü skill-paket senkronu (body+manifest+authored-profil)
-   + izole-proje effective-path proof + clean-guard typed disposal (öksüz receipt'siz artefakt)
-   + run-flow producer error-truncation (4096) + secure-coding/observability manifest
-   canonicality. DIRECTIVES Ders-31 disipliniyle yazılacak.
+1. ~~Mekanizma-sprint~~ ✅ sprint-698 4/4 DONE (yukarıdaki güncelleme).
 2. **Ladder yeni-dalga:** 3301/3302/3304/3299 (sıralama-onayı alındı).
 3. **Paralel:** paket-yayın + repo-taşıma (deckent-develop→Verhex/deckent) + verhex-rename
    BİRLEŞİK GEÇİŞ-PLANI raporu (brief §8 versiyon/changelog + owner repo kararları;
