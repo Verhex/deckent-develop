@@ -1,4 +1,11 @@
-# VERHEX GEÇİŞ-PLANI — paket-yayın + repo-taşıma + rename (owner-karar dokümanı)
+# VERHEX GEÇİŞ-PLANI — paket-yayın + repo-taşıma (owner-karar dokümanı)
+
+> **REVİZYON 2026-08-27 (öğleden sonra):** Owner kararı — **rename İPTAL**. Ürün ve tüm
+> komutlar **deckent SABİT**; npm yayın adı **`@verhex/deckent`** (scoped), bin yine
+> `deckent` (@angular/cli→ng deseni). Kurulum: `npm install @verhex/deckent`. Eski F1
+> rename-kapsamı (bin/MCP-prefix/.deckent-dizin geçişi) GEÇERSİZ; KARAR-3 ve KARAR-4
+> kapanmıştır. CLI-yüzey reformu (prompt-first + sadeleşme + consumer-closure gate)
+> AYRI bir iş olarak owner-yönlendirmesiyle tasarlanacak — bu dokümanın konusu değil.
 
 > **Silinme-tetiği (delete-on-consume):** Alperen aşağıdaki karar-listesini karara bağlayıp
 > execution MASTER-satırlarına admission verdiğinde bu doküman SİLİNİR — kalıcı kayıt
@@ -35,15 +42,11 @@ onaylı ladder dalgası (3301→3302→3304→3299) kapanmadan başlayamaz. Bu p
 mühürlenir. Not: scope'lu publish için npm'de `verhex` org'unun var olması gerekir
 (username `verhex` ise scope otomatik onundur). Riski yok; 0.0.1 placeholder.
 
-### F1 — Rename execution (codex-analizi + owner-admission SONRASI, ana-şerit işi)
-Kapsam-sınıfları (codex analizi netleştirecek; benim ön-envanterim):
-- `package.json` name (`deckent`→`verhex`) + `bin` girdisi (komut adı KARAR-3).
-- CLI görünür-adlar: i18n kataloğu üzerinden (mekanizma hazır — hardcode yok, düşük-risk).
-- MCP server adı + tool-önekleri (`deckent_*`) — mevcut kullanıcı-config'leri kıran sınıf;
-  alias-dönemi (eski ad → typed deprecation) tasarlanmalı (NEVER-MVP: sessiz kırılma yok).
-- Docs/README/IDENTITY + repo-içi ürün-adı geçişleri (docs:stats/managed-doc regen'leri).
-- `.deckent/` dizin-adı ve config-yolları: **büyük karar (KARAR-4)** — geçiş-dönemi çift-okuma
-  (verhex-öncelikli, deckent-fallback + typed migration) gerektirir; codex analizinin ana konusu.
+### F1 — Paket-adı geçişi (İPTAL EDİLEN rename yerine — küçük kapsam)
+REVİZYON: rename yok. Kalan iş yalnız: `package.json` name → `@verhex/deckent`
+(bin `deckent` DEĞİŞMEZ; MCP/dizin/komut adları DEĞİŞMEZ) + README kurulum-satırı +
+`validate:publish`/pack zincirinin scoped-ad ile doğrulanması. Codex rename-analizi
+yalnız arşiv-değeri taşır; execution-kapsamı bu üç kaleme iner.
 
 ### F2 — Temiz ürün-repo (`Verhex/deckent`) hazırlığı
 - Repo oluşturma (owner) + branch-protection + Actions secret'ları.
@@ -57,8 +60,8 @@ Kapsam-sınıfları (codex analizi netleştirecek; benim ön-envanterim):
 ### F3 — Publish zinciri (owner-manuel tetik; brief §8 kontratı)
 1. CHANGELOG: `Unreleased` → version-section promotion (gerçek shipped-delta; boş/task-listesi yasak).
 2. `npm run validate:publish` (verify-only) + pack-baseline + 20-gate + mini-full-suite.
-3. Version-KARAR-2: ilk public sürüm `0.100.x` mi devam, yoksa rename ile `0.101.0` mı
-   (Changed+Breaking: ürün-adı) — önerim 0.101.0 (rename = kullanıcıya görünür delta).
+3. Version-KARAR-2: ilk public sürüm `0.100.x` devamı mı, `0.101.0` mı — rename
+   iptaliyle Breaking kalmadı; önerim mevcut hat 0.100.x'ten devam.
 4. `npm publish` — HER ZAMAN Alperen elle (CLAUDE.md komut-kuralı); tag/GitHub-Release
    politikası owner-approved release policy'ye göre (şu an tagless).
 
@@ -71,11 +74,9 @@ geliştirme deckent-develop'ta sürdüğü sürece authority orada kalır; tam-t
 
 1. **History-politikası:** fresh-start mı filtered-history mi? (Önerim: fresh-start —
    closure-ledger public-anchor zaten owner-verified; dev-tarihçesi deckent-develop'ta yaşamaya devam eder.)
-2. **İlk public version:** 0.100.x devam mı, rename ile 0.101.0 mı? (Önerim: 0.101.0.)
-3. **Bin/komut adı:** `verhex` mi, `deckent` alias'ıyla mı, ikisi mi? (Önerim: `verhex`
-   birincil + bir major boyunca `deckent` alias + typed deprecation uyarısı.)
-4. **`.deckent/` dizin geçişi:** çift-okuma migration mı, ilk-public'te tek-isim mi?
-   (Codex analizi gelince netleşir — şimdilik açık.)
+2. **İlk public version:** 0.100.x devamı mı? (Rename iptaliyle önerim: evet, 0.100.x hattı.)
+3. ~~Bin/komut adı~~ — KAPANDI (2026-08-27): `deckent` sabit.
+4. ~~`.deckent/` dizin geçişi~~ — KAPANDI (2026-08-27): geçiş yok.
 5. **MASTER/ledger authority repo'su:** taşınma zamanı/koşulu.
 6. **F0 tetiği:** `@verhex/deckent` stub publish'ini ne zaman koşacaksın?
 
@@ -83,5 +84,5 @@ geliştirme deckent-develop'ta sürdüğü sürece authority orada kalır; tam-t
 - Ladder-önkoşulu (§2) atlanamaz — publish-execution admission'ı 3299 kapanışına bağlı.
 - npm `verhex`~`vertex` benzerlik-riski publish'te AŞILDI (0.0.1 canlı) — isim güvende.
 - GitHub redirect'leri: VerhexIO placeholder korunduğu sürece eski linkler kırılmaz.
-- MCP tool-adı geçişi mevcut entegrasyonları (host-config'ler) kırar — alias-dönemi şart.
-- Rename-execution sprint'leri DOGFOOD döngüsünden geçer (mode ON) — kendi ürünümüzle taşınırız.
+- ~~MCP tool-adı geçişi~~ — rename iptaliyle risk kalktı (tool-adları deckent_* sabit).
+- Publish-execution sprint'leri DOGFOOD döngüsünden geçer (mode ON).
