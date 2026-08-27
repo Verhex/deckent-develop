@@ -14,6 +14,21 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint703] - 2026-08-27
+
+### Added
+
+- Classify host-terminal NOT_DISPATCHED and cascade-skip attempts as settled evidence rows
+- Publish the mixed-outcome COMPLETE receipt with separated terminal truth counts
+- Regression-test seal for mixed-outcome terminal publication and dishonest-COMPLETE guards
+
+### Fixed
+
+- Trace and record the remaining cleanup block reasons for the mixed-outcome fixture
+
+
+_Tasks: 4 total, 4 done, 0 tech debt, 0 no-go_
+
 ## [sprint700] - 2026-08-27
 
 ### Added

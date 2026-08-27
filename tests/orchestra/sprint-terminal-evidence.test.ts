@@ -121,6 +121,7 @@ describe('assembleSprintTerminalEvidence', () => {
       logicalTaskCount: 1,
       observedAttemptCount: 2,
       completedLogicalTaskCount: 1,
+      settledAttemptCount: 0,
       activeOrUnsettledAttemptCount: 0,
       partialResultCount: 0,
       attributionExclusionCount: 0,
@@ -147,6 +148,90 @@ describe('assembleSprintTerminalEvidence', () => {
       candidate: true,
       reasons: [],
     });
+  });
+
+  it('classifies host NOT_DISPATCHED and cascade skips as distinct settled evidence', () => {
+    const completed = completedAttempt({
+      identity: { taskId: '703-901', attemptId: 'attempt:703-901' },
+      verdict: 'DONE', marker: 'completed', logicalTaskId: 'logical-completed',
+    });
+    const hostNotDispatched: ExactAttemptEvidence<ResultPayload> = {
+      logicalTaskId: 'logical-host-skip',
+      identity: { taskId: '703-902', attemptId: 'host-pre-dispatch:703-902:forced-skill' },
+      authority: {
+        state: 'TERMINAL', verdict: 'NO_GO', evidenceRef: 'host:forced-skill',
+        reasonCode: 'FORCED_SKILL_UNAVAILABLE', hostTerminalNotDispatched: true,
+      },
+      result: {
+        state: 'NOT_APPLICABLE', evidenceRef: 'host:forced-skill',
+        reasonCode: 'FORCED_SKILL_UNAVAILABLE',
+      },
+      attribution: verifiedAttribution('host:zero-work'),
+    };
+    const cascadeSkip: ExactAttemptEvidence<ResultPayload> = {
+      logicalTaskId: 'logical-cascade-skip',
+      identity: { taskId: '703-903', attemptId: 'host:cascade-skip:703-903' },
+      authority: { state: 'TERMINAL', verdict: 'NO_GO', evidenceRef: 'host:cascade-skip' },
+      result: {
+        state: 'COMPLETE', verdict: 'NO_GO', evidenceRef: 'result:cascade-skip',
+        payload: { marker: 'cascade-skipped' },
+      },
+      attribution: { state: 'UNAVAILABLE', reasonCode: 'ATTRIBUTION_AUTHORITY_UNAVAILABLE' },
+    };
+
+    const evidence = assembleSprintTerminalEvidence({
+      attempts: [cascadeSkip, hostNotDispatched, completed], coordinatorEvidence: [],
+    });
+
+    expect(evidence.settledAttempts).toEqual([
+      expect.objectContaining({
+        identity: cascadeSkip.identity, evidenceState: 'CASCADE_SKIP',
+      }),
+      expect.objectContaining({
+        identity: hostNotDispatched.identity,
+        evidenceState: 'HOST_TERMINAL_NOT_DISPATCHED',
+      }),
+    ]);
+    expect(evidence.summary.settledAttemptCount).toBe(2);
+    expect(evidence.logicalTasks).toEqual([
+      expect.objectContaining({ logicalTaskId: 'logical-cascade-skip', policySettledSkip: true }),
+      expect.objectContaining({ logicalTaskId: 'logical-completed', state: 'COMPLETED' }),
+      expect.objectContaining({ logicalTaskId: 'logical-host-skip', policySettledSkip: true }),
+    ]);
+    expect(evidence.activeOrUnsettledAttempts).toEqual([]);
+    expect(evidence.partialResults).toEqual([]);
+    expect(evidence.attributionExclusions).toEqual([]);
+    expect(evidence.cleanupEligibility).toEqual({ state: 'CANDIDATE', candidate: true, reasons: [] });
+  });
+
+  it('keeps an ordinary worker NO_GO and fail-closed publication guards blocking', () => {
+    const workerNoGo = completedAttempt({
+      identity: { taskId: '703-904', attemptId: 'attempt:703-904' },
+      verdict: 'NO_GO', marker: 'unrepaired', logicalTaskId: 'logical-worker-no-go',
+    });
+    const noGoEvidence = assembleSprintTerminalEvidence({
+      attempts: [workerNoGo], coordinatorEvidence: [],
+    });
+    expect(noGoEvidence.settledAttempts).toEqual([]);
+    expect(noGoEvidence.cleanupEligibility.reasons).toEqual(['LINEAGE_NOT_COMPLETED']);
+
+    const zeroTaskEvidence = assembleSprintTerminalEvidence({ attempts: [], coordinatorEvidence: [] });
+    expect(zeroTaskEvidence.cleanupEligibility.reasons).toEqual(['NO_LOGICAL_TASKS']);
+
+    const heldEvidence = assembleSprintTerminalEvidence({
+      attempts: [completedAttempt({
+        identity: { taskId: '703-905', attemptId: 'attempt:703-905' },
+        verdict: 'DONE', marker: 'done', logicalTaskId: 'logical-held-coordinator',
+      })],
+      coordinatorEvidence: [coordinator({
+        evidenceId: 'held-publication', state: 'HOLD', evidenceRef: null,
+        reasonCode: 'EVIDENCE_HELD', requiredForCleanup: true,
+      })],
+    });
+    expect(heldEvidence.cleanupEligibility).toMatchObject({ state: 'HOLD', candidate: false });
+    expect(heldEvidence.cleanupEligibility.reasons).toEqual([
+      'COORDINATOR_EVIDENCE_INCOMPLETE', 'TYPED_HOLD_PRESENT',
+    ]);
   });
 
   it('keeps active attempts and partial result payloads visible without manufacturing a HOLD', () => {

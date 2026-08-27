@@ -164,6 +164,19 @@ export interface ExactAttemptProjection {
   readonly reasonCodes: readonly SprintTerminalHoldCode[];
 }
 
+export type SettledAttemptEvidenceState =
+  | 'HOST_TERMINAL_NOT_DISPATCHED'
+  | 'CASCADE_SKIP';
+
+/** Host-authored terminal outcomes where no worker repair can or should run. */
+export interface SettledAttemptProjection {
+  readonly logicalTaskId: string;
+  readonly identity: ExactAttemptIdentity;
+  readonly evidenceState: SettledAttemptEvidenceState;
+  readonly authorityEvidenceRef: string;
+  readonly resultEvidenceRef: string;
+}
+
 export interface PartialResultProjection<TResult> {
   readonly logicalTaskId: string;
   readonly identity: ExactAttemptIdentity;
@@ -250,6 +263,7 @@ export interface SprintTerminalEvidence<TResult = unknown> {
     readonly logicalTaskCount: number | null;
     readonly observedAttemptCount: number;
     readonly completedLogicalTaskCount: number;
+    readonly settledAttemptCount: number;
     readonly activeOrUnsettledAttemptCount: number;
     readonly partialResultCount: number;
     readonly attributionExclusionCount: number;
@@ -257,6 +271,7 @@ export interface SprintTerminalEvidence<TResult = unknown> {
   };
   readonly logicalTasks: readonly LogicalTaskTerminalEvidence[];
   readonly completed: readonly CompletedLogicalTask<TResult>[];
+  readonly settledAttempts: readonly SettledAttemptProjection[];
   readonly activeOrUnsettledAttempts: readonly ExactAttemptProjection[];
   readonly partialResults: readonly PartialResultProjection<TResult>[];
   readonly attributionExclusions: readonly AttributionExclusion[];
@@ -268,6 +283,7 @@ export interface SprintTerminalEvidence<TResult = unknown> {
 interface MutableAssembly<TResult> {
   completed: CompletedLogicalTask<TResult>[];
   logicalTasks: LogicalTaskTerminalEvidence[];
+  settled: SettledAttemptProjection[];
   unsettled: ExactAttemptProjection[];
   partial: PartialResultProjection<TResult>[];
   exclusions: AttributionExclusion[];
@@ -334,6 +350,7 @@ function overflowResult<TResult>(
       logicalTaskCount: null,
       observedAttemptCount: input.attempts.length,
       completedLogicalTaskCount: 0,
+      settledAttemptCount: 0,
       activeOrUnsettledAttemptCount: 0,
       partialResultCount: 0,
       attributionExclusionCount: 0,
@@ -341,6 +358,7 @@ function overflowResult<TResult>(
     },
     logicalTasks: [],
     completed: [],
+    settledAttempts: [],
     activeOrUnsettledAttempts: [],
     partialResults: [],
     attributionExclusions: [],
@@ -439,6 +457,39 @@ function partialProjection<TResult>(
   };
 }
 
+function settledAttemptProjection<TResult>(
+  attempt: ExactAttemptEvidence<TResult>,
+  codes: readonly SprintTerminalHoldCode[],
+): SettledAttemptProjection | null {
+  if (codes.length > 0
+    || attempt.authority.state !== 'TERMINAL'
+    || attempt.authority.verdict !== 'NO_GO') {
+    return null;
+  }
+  if (attempt.authority.hostTerminalNotDispatched === true
+    && attempt.result.state === 'NOT_APPLICABLE') {
+    return {
+      logicalTaskId: attempt.logicalTaskId,
+      identity: { ...attempt.identity },
+      evidenceState: 'HOST_TERMINAL_NOT_DISPATCHED',
+      authorityEvidenceRef: attempt.authority.evidenceRef,
+      resultEvidenceRef: attempt.result.evidenceRef,
+    };
+  }
+  if (attempt.identity.attemptId === `host:cascade-skip:${attempt.identity.taskId}`
+    && attempt.result.state === 'COMPLETE'
+    && attempt.result.verdict === 'NO_GO') {
+    return {
+      logicalTaskId: attempt.logicalTaskId,
+      identity: { ...attempt.identity },
+      evidenceState: 'CASCADE_SKIP',
+      authorityEvidenceRef: attempt.authority.evidenceRef,
+      resultEvidenceRef: attempt.result.evidenceRef,
+    };
+  }
+  return null;
+}
+
 function lineageHasCycle<TResult>(attempts: readonly ExactAttemptEvidence<TResult>[]): boolean {
   const byKey = new Map(attempts.map(attempt => [identityKey(attempt.identity), attempt]));
   for (const start of attempts) {
@@ -525,7 +576,7 @@ export function assembleSprintTerminalEvidence<TResult = unknown>(
     left.logicalTaskId.localeCompare(right.logicalTaskId)
       || compareIdentity(left.identity, right.identity));
   const mutable: MutableAssembly<TResult> = {
-    completed: [], logicalTasks: [], unsettled: [], partial: [], exclusions: [], holds: [],
+    completed: [], logicalTasks: [], settled: [], unsettled: [], partial: [], exclusions: [], holds: [],
   };
   const identityCounts = new Map<string, number>();
   for (const attempt of attempts) {
@@ -570,6 +621,12 @@ export function assembleSprintTerminalEvidence<TResult = unknown>(
         ));
       } else {
         byKey.set(key, attempt);
+      }
+
+      const settledProjection = settledAttemptProjection(attempt, codes);
+      if (settledProjection !== null) {
+        mutable.settled.push(settledProjection);
+        continue;
       }
 
       const malformedVerifiedAttribution = attempt.attribution.state === 'VERIFIED'
@@ -653,11 +710,12 @@ export function assembleSprintTerminalEvidence<TResult = unknown>(
 
     for (const attempt of lineage) {
       const codes = codesByAttempt.get(identityKey(attempt.identity)) ?? [];
-      const unresolved = attempt.authority.state !== 'TERMINAL'
+      const settledProjection = settledAttemptProjection(attempt, codes);
+      const unresolved = settledProjection === null && (attempt.authority.state !== 'TERMINAL'
         || codes.length > 0
-        || (attempt.result.state !== 'COMPLETE' && attempt.result.state !== 'NOT_APPLICABLE');
+        || (attempt.result.state !== 'COMPLETE' && attempt.result.state !== 'NOT_APPLICABLE'));
       if (unresolved) mutable.unsettled.push(attemptProjection(attempt, codes));
-      const partial = partialProjection(attempt, codes);
+      const partial = settledProjection === null ? partialProjection(attempt, codes) : null;
       if (partial) mutable.partial.push(partial);
     }
 
@@ -679,7 +737,10 @@ export function assembleSprintTerminalEvidence<TResult = unknown>(
       resolvingAttempt = { ...tip.identity };
       if (tip.authority.verdict === 'NO_GO') {
         state = 'FAILED';
-        if (tip.authority.hostTerminalNotDispatched === true) policySettledSkip = true;
+        if (settledAttemptProjection(
+          tip,
+          codesByAttempt.get(identityKey(tip.identity)) ?? [],
+        ) !== null) policySettledSkip = true;
       } else if (tip.result.state === 'COMPLETE') {
         state = 'COMPLETED';
         const verifiedAttribution = lineage.flatMap(attempt => {
@@ -720,6 +781,8 @@ export function assembleSprintTerminalEvidence<TResult = unknown>(
   mutable.unsettled.sort((left, right) =>
     left.logicalTaskId.localeCompare(right.logicalTaskId) || compareIdentity(left.identity, right.identity));
   mutable.partial.sort((left, right) =>
+    left.logicalTaskId.localeCompare(right.logicalTaskId) || compareIdentity(left.identity, right.identity));
+  mutable.settled.sort((left, right) =>
     left.logicalTaskId.localeCompare(right.logicalTaskId) || compareIdentity(left.identity, right.identity));
   mutable.exclusions.sort((left, right) =>
     left.logicalTaskId.localeCompare(right.logicalTaskId) || compareIdentity(left.identity, right.identity));
@@ -801,6 +864,7 @@ export function assembleSprintTerminalEvidence<TResult = unknown>(
       logicalTaskCount: groups.size,
       observedAttemptCount: attempts.length,
       completedLogicalTaskCount: mutable.completed.length,
+      settledAttemptCount: mutable.settled.length,
       activeOrUnsettledAttemptCount: mutable.unsettled.length,
       partialResultCount: mutable.partial.length,
       attributionExclusionCount: mutable.exclusions.length,
@@ -808,6 +872,7 @@ export function assembleSprintTerminalEvidence<TResult = unknown>(
     },
     logicalTasks: mutable.logicalTasks,
     completed: mutable.completed,
+    settledAttempts: mutable.settled,
     activeOrUnsettledAttempts: mutable.unsettled,
     partialResults: mutable.partial,
     attributionExclusions: mutable.exclusions,

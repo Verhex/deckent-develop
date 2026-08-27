@@ -213,6 +213,8 @@ import {
   applyGateStatus,
   finalizeSprint,
   runBudgetedDecay,
+  buildFinalizerTerminalTruth,
+  publishFencedSprintTerminalReceipt,
 } from '../../src/orchestra/sprint-finalizer.js';
 import type { FinalizeSprintOptions, SelfAuditResult } from '../../src/orchestra/sprint-finalizer.js';
 import { GO_WITH_GATE_FAILURE } from '../../src/orchestra/result-evaluator.js';
@@ -469,6 +471,88 @@ function settledFixture(sprint: Sprint): {
   }
   return { evaluations, results };
 }
+
+describe('sprint-finalizer — mixed terminal receipt truth', () => {
+  it('publishes COMPLETE with distinct completed, policy-skip, and cascade-skip counts', () => {
+    const sprint = makeSprint('sprint-703');
+    sprint.tasks = [
+      makeSettledTask('703-901'),
+      makeSettledTask('703-902'),
+      makeSettledTask('703-903'),
+    ];
+    sprint.tasks[2]!.dependencies = ['703-902'];
+    const { results: completedResults } = settledFixture({
+      ...sprint,
+      tasks: [sprint.tasks[0]!],
+    } as Sprint);
+    const results: TaskResult[] = [
+      ...completedResults,
+      {
+        taskId: '703-902', workerId: 'host-703-902', filesChanged: [],
+        linesAdded: 0, linesRemoved: 0, testsPassed: false, coverage: 0,
+        selfAssessment: 'NO_GO', notes: 'host settlement fixture',
+        preDispatchSettlement: {
+          version: 1, state: 'NOT_DISPATCHED',
+          attemptId: 'host-pre-dispatch:703-902:forced-skill',
+          reasonCode: 'FORCED_SKILL_UNAVAILABLE',
+          evidenceRef: `host-pre-dispatch-settlement:sha256:${'c'.repeat(64)}`,
+        },
+      } as TaskResult,
+      {
+        taskId: '703-903', workerId: 'cascade-skip-703-903', filesChanged: [],
+        linesAdded: 0, linesRemoved: 0, testsPassed: false, coverage: 0,
+        selfAssessment: 'NO_GO', evaluationDecision: 'NO_GO',
+        cascadeSkipped: true, notes: 'cascade fixture',
+      } as TaskResult,
+    ];
+    for (const task of sprint.tasks.slice(1)) {
+      writeFileSync(join(PROJECT_ROOT, '.tasks', `task-${task.id}.json`),
+        `${JSON.stringify(task, null, 2)}\n`, { mode: 0o600 });
+    }
+    const truth = buildFinalizerTerminalTruth({
+      tasks: sprint.tasks,
+      results,
+      evaluations: new Map([
+        ['703-901', TaskEvaluation.DONE],
+        ['703-902', TaskEvaluation.NOT_DISPATCHED],
+        ['703-903', TaskEvaluation.NO_GO],
+      ]),
+    });
+
+    expect(truth.terminalEvidence.cleanupEligibility).toEqual({
+      state: 'CANDIDATE', candidate: true, reasons: [],
+    });
+    expect(truth.terminalTruth).toEqual({
+      completedLineages: 1,
+      policySkippedLineages: 1,
+      cascadeSkippedLineages: 1,
+    });
+    const publication = publishFencedSprintTerminalReceipt({
+      projectRoot: PROJECT_ROOT, sprint, truth,
+    });
+    const artifact = JSON.parse(readFileSync(publication.artifactPath, 'utf8')) as {
+      terminalOutcome: string;
+      terminalTruth: typeof truth.terminalTruth;
+    };
+    expect(artifact.terminalOutcome).toBe('COMPLETE');
+    expect(artifact.terminalTruth).toEqual(truth.terminalTruth);
+  });
+
+  it('still refuses COMPLETE for an unrepaired worker NO_GO', () => {
+    const sprint = makeSprint('sprint-703-failed');
+    const task = sprint.tasks[0]!;
+    const { results } = settledFixture(sprint);
+    results[0] = { ...results[0]!, selfAssessment: 'NO_GO', evaluationDecision: 'NO_GO' };
+    const truth = buildFinalizerTerminalTruth({
+      tasks: sprint.tasks,
+      results,
+      evaluations: new Map([[task.id, TaskEvaluation.NO_GO]]),
+    });
+    expect(() => publishFencedSprintTerminalReceipt({
+      projectRoot: PROJECT_ROOT, sprint, truth,
+    })).toThrow(/TERMINAL_PUBLICATION_NOT_CLEANUP_CANDIDATE_BLOCKED/);
+  });
+});
 
 describe('sprint-finalizer — finalizeSprint gate.json integration', () => {
   beforeEach(() => {

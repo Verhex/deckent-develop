@@ -1659,11 +1659,19 @@ export interface FinalizerLogicalMetrics {
   readonly coveragePercent: number;
 }
 
+/** Receipt-facing lineage counts derived only from classified terminal evidence. */
+export interface FinalizerTerminalTruthCounts {
+  readonly completedLineages: number;
+  readonly policySkippedLineages: number;
+  readonly cascadeSkippedLineages: number;
+}
+
 export interface FinalizerTerminalTruth {
   readonly attempts: readonly ExactAttemptEvidence<TaskResult>[];
   readonly terminalEvidence: SprintTerminalEvidence<TaskResult>;
   readonly logicalProgress: LogicalProgressProjection;
   readonly logicalMetrics: FinalizerLogicalMetrics;
+  readonly terminalTruth: FinalizerTerminalTruthCounts;
   readonly logicalEvaluations: ReadonlyMap<string, TaskEvaluation>;
   readonly lineageUsage: readonly LineageUsageAuthorityAggregate[];
   readonly usageTotals: UsageTotals;
@@ -2185,6 +2193,7 @@ interface PersistedSprintTerminalReceipt {
     | 'coordinatorEvidence'
   >;
   readonly logicalProgress: LogicalProgressProjection;
+  readonly terminalTruth: FinalizerTerminalTruthCounts;
   readonly lineageUsage: readonly LineageUsageAuthorityAggregate[];
   readonly writtenAt: string;
 }
@@ -2901,6 +2910,18 @@ export function buildFinalizerTerminalTruth(input: {
     unevaluatedTasks: progressResult.projection.active,
     coveragePercent: Number.isFinite(coveragePercent) ? coveragePercent : 0,
   };
+  const lineageIdsFor = (
+    evidenceState: SprintTerminalEvidence<TaskResult>['settledAttempts'][number]['evidenceState'],
+  ): Set<string> => new Set(terminalEvidence.settledAttempts
+    .filter(attempt => attempt.evidenceState === evidenceState)
+    .map(attempt => attempt.logicalTaskId));
+  const terminalTruth: FinalizerTerminalTruthCounts = {
+    completedLineages: new Set(
+      terminalEvidence.completed.map(lineage => lineage.logicalTaskId),
+    ).size,
+    policySkippedLineages: lineageIdsFor('HOST_TERMINAL_NOT_DISPATCHED').size,
+    cascadeSkippedLineages: lineageIdsFor('CASCADE_SKIP').size,
+  };
   const logicalSettlementDigest = createHash('sha256').update(canonicalJson({
     terminalEvidence,
     logicalProgress: progressResult.projection,
@@ -2911,6 +2932,7 @@ export function buildFinalizerTerminalTruth(input: {
     terminalEvidence,
     logicalProgress: progressResult.projection,
     logicalMetrics,
+    terminalTruth,
     logicalEvaluations,
     lineageUsage,
     usageTotals,
@@ -3074,6 +3096,7 @@ function publishFencedTerminalReceipt(
       attributionExclusions: terminalEvidence.attributionExclusions.slice(0, RECEIPT_EXCLUSION_DETAIL_LIMIT),
     },
     logicalProgress: input.truth.logicalProgress,
+    terminalTruth: input.truth.terminalTruth,
     lineageUsage: input.truth.lineageUsage,
     writtenAt: input.now?.() ?? new Date().toISOString(),
   };

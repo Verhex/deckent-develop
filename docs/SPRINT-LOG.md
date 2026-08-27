@@ -17443,3 +17443,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 702-005: Reform batch integration verification with real-binary gates (NO_GO)
 
 ---
+## Sprint 703 — sprint-703
+
+**Status:** COMPLETE
+**Date:** 2026-08-27
+**Duration:** 932s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 932218ms |
+
+### Tasks
+
+- 703-001: Trace and record the remaining cleanup block reasons for the mixed-outcome fixture (DONE)
+- 703-002: Classify host-terminal NOT_DISPATCHED and cascade-skip attempts as settled evidence rows (DONE)
+- 703-003: Publish the mixed-outcome COMPLETE receipt with separated terminal truth counts (DONE)
+- 703-004: Regression-test seal for mixed-outcome terminal publication and dishonest-COMPLETE guards (DONE)
+
+---
