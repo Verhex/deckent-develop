@@ -62,6 +62,15 @@ repo'ya girdi (VISION_ONLY; MASTER-mutasyonu yasak kendi bloğunda). Ayrıca can
 (2) **3301 son-metre zinciri (r6→r11):** FIX-mint bastırma canlı-kanıtlı · cascadeSkipped ✓ · unresolved-pause'lar geçildi (truth-normalizasyonu: policy-terminal NO_GO→NOT_DISPATCHED) · INVALID_IDENTITY kapandı (host:cascade-skip kimliği) · honesty-boundary muafiyeti · lineage POLICY_FIX_EXEMPT. **Kalan tek engel:** karışık-sonuç COMPLETE-yayını (cleanup-eligibility BLOCKED reasons-envanteri) — 3284 terminal-kontrat alanına bağlandı; sertifika oradan.
 (3) Bekleyen büyük-do önerisi: sprint-701 adayı `d3127454` (CLI dilim-1a, 5-task/3-dalga) — onay+start sırada. Eski bayat öneri `c52100fe` retire-edilecek.
 
+**OWNER-YÖNERGELERİ (akşam-3):** (1) **CI-askısı:** Actions aylık-limiti doldu → Eylül'e
+kadar remote-CI takibi YOK; kırmızı/iptal beklenen, fix-chasing yapılmaz (advisory zaten,
+şimdi askıda). (2) **docs/post-product/ portföyü owner-malı ve local-only** (6 program +
+README, 91 VISION_ONLY outcome; gitignore/npmignore owner-elinde, commit owner'ın) — benim
+stage-listelerim `docs/post-product*`'ı açıkça DIŞLAR. Şeffaflık-kaydı: eski
+docs/POST-PRODUCT.md silinmesi docs/-süpürmesiyle 5b88f4539'a istemeden girdi (tip temiz);
+içerik c204e09fe'de public-history'de duruyor — tam-gizlilik istenirse history-rewrite ayrı
+owner-kararı (Eylül adayı).
+
 ## SIRADAKİ (bu sıra ile)
 
 1. ~~Sprint-699~~ ✅ landed (bu commit); replay r5 kısmi-yeşil — tam sertifika 3284'e bağlı.
