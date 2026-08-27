@@ -1306,6 +1306,8 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // uretim moduli + dalga src kaymalari (config/mcp/cli/orchestra kablolama).
   // 2026-08-26 08:36: 1338→1339 — Node-2: evaluation.tsc_settlement_gate zinciri
   // (finalizer runner-seam) + ERRORS-critical kanal + selfchange-WARN kaymalari.
+  // 2026-08-27 15:1x: ayni 1340, digest-only — ayni ritüel-ihlali duzeltmesi
+  // (pin-sonrasi sprint-phases/evaluator/collector src kaymalari).
   // 2026-08-27 14:3x: 1339→1340 — sprint-699: yeni uretim modulu
   // src/core/failure-disposition-policy.ts + collector/evaluator kaymalari.
   // 2026-08-27 10:5x: ayni 1339, digest-only — sprint-698 src kaymalari
@@ -1323,7 +1325,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // finalizer + sidecar-loader hotfix).
   // 2026-08-26 11:05: ayni 1339, digest-only — Node-6a src kaymalari
   // (death-sweep / prompt-template kimlik-esigi / docker async-git).
-  digest: '05c837df5c8dc25f092c5ce41daa5a5fc4833f5499cc6c7cfbb9e7cc40a4bdaf',
+  digest: '918a7173b77e816f2ee1ca3a1273079a75f5a0f66d140d29a9eb45ace18c1156',
   // 2026-08-27 04:0x: ayni 1339, digest-only — sync workspace-guard + drift-normalize.
   // 2026-08-27 03:1x: ayni 1339, digest-only — skill-pool readJsonSafe donusumu.
   // 2026-08-27 02:0x: ayni 1339, digest-only — Dalga-3 src kaymalari
