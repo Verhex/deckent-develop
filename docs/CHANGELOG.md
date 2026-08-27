@@ -14,6 +14,20 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint699] - 2026-08-27
+
+### Added
+
+- Bağımlılara cascade-skip + run'ın karışık-sonuçla tamamlanması
+- Disposition-olayı — owner-kanalı yayını (Nervous'tan bağımsız çekirdek, Nervous'a köprü)
+
+### Fixed
+
+- Typed failure-disposition policy — pre-dispatch sınıfı NOT_DISPATCHED-terminal + FIX-muaf
+
+
+_Tasks: 4 total, 3 done, 0 tech debt, 1 no-go_
+
 ## [sprint698] - 2026-08-27
 
 ### Added

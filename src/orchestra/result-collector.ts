@@ -21,12 +21,21 @@ import { applyTerminalTaskOutcome } from '../core/task-terminal-outcome.js';
 import { classifyPersonaIntegrity, type PersonaIntegrityVerdict } from '../core/agent-pool.js';
 import { DEFAULT_PERSONA_INTEGRITY_MIN_BYTES } from '../core/config.js';
 import { resolveSkillPromptBodies } from '../core/skill-loading.js';
+import {
+  isHostPreDispatchReasonCode,
+  resolveHostPreDispatchFailureDisposition,
+  type FailureDispositionPolicyConfig,
+} from '../core/failure-disposition-policy.js';
 
 import { TASKS_DIR } from '../core/constants.js';
 import { resolveTaskProvider } from './sprint-utils.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
 import { debugLog } from '../core/utils.js';
+import { getMessage, resolveLanguage } from '../cli/helpers/messages.js';
+import { enqueueOwnerNotification } from '../connectors/notification-delivery.js';
+import { NervousDispatcher } from '../nervous/dispatcher.js';
+import type { NervousNotification, NervousSystemConfigV1 } from '../core/nervous-types.js';
 import { createResultJsonParseFailure, parseTaskResultJsonTolerantly } from './result-evaluator.js';
 
 // ─── Result watcher (fs.watch-based) ──────────────────────────────
@@ -270,6 +279,52 @@ export function providerDispatchHoldShouldComplete(
 ): boolean {
   return providerHeldPendingCount > 0
     && collectedCount >= totalCount - providerHeldPendingCount;
+}
+
+export interface DispositionEvent {
+  readonly id: string;
+  readonly reasonCode: string;
+  readonly taskId: string;
+  readonly disposition: string;
+  readonly remediationHint: string;
+}
+
+function remediationMessageKey(reasonCode: string): string {
+  if (reasonCode === 'FORCED_SKILL_UNAVAILABLE') return 'disposition.remediation.forced_skill_unavailable';
+  if (reasonCode === 'PROVIDER_ADAPTER_UNAVAILABLE') return 'disposition.remediation.provider_adapter_unavailable';
+  return 'disposition.remediation.default';
+}
+
+/** Publish a non-FIX disposition to owner delivery and, when enabled, Nervous. */
+export async function publishDispositionEvent(
+  projectRoot: string,
+  sprintId: string,
+  taskId: string,
+  reasonCode: string,
+  disposition: string,
+  nervousConfig?: ResolvedConfig['nervous_system'],
+): Promise<DispositionEvent> {
+  const lang = resolveLanguage();
+  const remediationHint = getMessage(remediationMessageKey(reasonCode), lang);
+  const event: DispositionEvent = {
+    id: `disposition:${sprintId}:${taskId}:${reasonCode}:${disposition}`,
+    reasonCode,
+    taskId,
+    disposition,
+    remediationHint,
+  };
+  const title = getMessage('disposition.notification.title', lang, { taskId });
+  const message = getMessage('disposition.notification.message', lang, { reasonCode, disposition, remediationHint });
+  enqueueOwnerNotification(projectRoot, { id: event.id, kind: 'no-go', sprintId, title, message, lang });
+  if (nervousConfig?.enabled === true) {
+    const notification: NervousNotification = { id: event.id, type: 'DISPOSITION_EVENT', title, message, severity: 'warning', createdAt: new Date().toISOString(), detectorId: 'failure-disposition-policy', actions: [], timeoutMs: null, sprintId, taskId, groupKey: event.id };
+    try {
+      await new NervousDispatcher(nervousConfig as NervousSystemConfigV1, projectRoot).dispatch(notification);
+    } catch (error: unknown) {
+      debugLog('publishDispositionEvent:nervousBridge', error);
+    }
+  }
+  return event;
 }
 
 function hasMalformedRawResult(path: string): boolean {
@@ -1506,6 +1561,20 @@ export async function waitForResults(
           if (!collectorRead.corruptEvidence) persistEnrichedResult(projectRoot, result);
           reportResultContractDrift(projectRoot, sprint.id, taskId, result, config);
           await syncTaskStatusFromResult(taskId, result);
+          if (result.preDispatchSettlement) {
+            const reasonCode = result.preDispatchSettlement.reasonCode;
+            const disposition = isHostPreDispatchReasonCode(reasonCode)
+              ? resolveHostPreDispatchFailureDisposition(
+                reasonCode,
+                config as FailureDispositionPolicyConfig | undefined,
+              ).evaluation
+              : 'NOT_DISPATCHED';
+            try {
+              await publishDispositionEvent(projectRoot, sprint.id, taskId, reasonCode, disposition, config?.nervous_system);
+            } catch (error: unknown) {
+              debugLog('collectResults:dispositionEvent', error);
+            }
+          }
           // Transactional commit boundary: a result is not collected until its
           // host-owned evaluation has synchronized the aggregate task state.
           // If evaluation throws, the next tick must retry this exact result
@@ -2086,23 +2155,53 @@ export async function waitForResults(
     let totalSkipped = 0;
     let changed = true;
     const blockedLineageIds = new Set<string>();
+    const dispositionTerminalIds = new Set<string>();
+    const dispositionCascades = (taskId: string): boolean => {
+      let result = results.find(candidate => candidate.taskId === taskId);
+      if (!result) {
+        try {
+          result = readCollectorResult(
+            readAuthoritativeTaskResult<TaskResult>(projectRoot, taskId),
+            taskId,
+          ).result ?? undefined;
+        } catch (e) {
+          debugLog('cascadeSkipDeadBlocked:dispositionRead', e);
+        }
+      }
+      const settlement = result?.preDispatchSettlement;
+      if (!settlement) return false;
+      const reasonCode = isHostPreDispatchReasonCode(settlement.reasonCode)
+        ? settlement.reasonCode
+        : 'LEGACY_HOST_PRE_DISPATCH_REJECTION';
+      return resolveHostPreDispatchFailureDisposition(
+        reasonCode,
+        config as FailureDispositionPolicyConfig | undefined,
+      ).cascadeDependents;
+    };
+    for (const result of results) {
+      if (dispositionCascades(result.taskId)) dispositionTerminalIds.add(result.taskId);
+    }
     while (changed) {
       changed = false;
       const failedIds = new Set<string>();
       for (const t of sprint.tasks) {
         if (isSchedulingTerminalFailure(t.status)) { // born-610 single truth
           failedIds.add(t.id);
+          if (dispositionCascades(t.id)) dispositionTerminalIds.add(t.id);
         }
       }
       for (const id of blockedLineageIds) failedIds.add(id);
       if (failedIds.size === 0) break;
       for (const t of sprint.tasks) {
         if (collected.has(t.id)) continue;
-        if (t.status !== TaskStatus.PENDING) continue;   // only un-dispatched
-        if (assignedTaskIds.has(t.id)) continue;          // not actively running
         const failedDep = (t.dependencies ?? []).find(d => failedIds.has(d));
         if (!failedDep) continue;
-        if (deferRepairableDependencyFailures) {
+        if (
+          t.status !== TaskStatus.PENDING
+          && !(t.status === TaskStatus.PAUSED && dispositionTerminalIds.has(failedDep))
+        ) continue; // only un-dispatched, including a replay parked before disposition landed
+        if (assignedTaskIds.has(t.id)) continue;          // not actively running
+        if (deferRepairableDependencyFailures && !dispositionTerminalIds.has(failedDep)) {
           t.status = TaskStatus.PAUSED;
           blockedLineageIds.add(t.id);
           const taskPath = join(projectRoot, TASKS_DIR, `task-${t.id}.json`);
@@ -2167,6 +2266,7 @@ export async function waitForResults(
         await syncTaskStatusFromResult(t.id, skip);
         results.push(skip);
         collected.add(t.id);
+        dispositionTerminalIds.add(t.id);
         totalSkipped++;
         changed = true;
         debugLog('cascadeSkipDeadBlocked', `task ${t.id} skipped (dep ${failedDep} failed)`);

@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):3970b36a6f31f8fa6cc3d63b6553bab5435bd0624ca2d11d74922e790a05f304`
+**Source digest:** `sha256(normalized-lf-utf8):67869eef59fa67dcbced199b819369760a3e2837e69a14dbddbe578de30fa2af`
 
-**Rows:** 541 total · 457 active · 84 terminal
+**Rows:** 542 total · 458 active · 84 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 346 |
+| OPEN | 347 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 69 |
@@ -374,6 +374,7 @@
 | 6170 | `DESIGN-SYSTEM-001` | OPEN | P1 | PRODUCT | — | — | Three-surface Deckent Design System (terminal, dashboard, desktop) with NOVA-core identity |
 | 6171 | `DESIGN-PRECISION-INSTRUMENT-001` | OPEN | P1 | PRODUCT | `DESKTOP-REBORN-001` | — | Precision Instrument becomes the calm, formal and enterprise-grade default across Desktop and Terminal; NOVA remains only an explicit operator visualization preset |
 | 6180 | `ERP-AGENT-CONTRACT-001` | OPEN | P2 | CONNECTOR | — | — | Enterprise Application Agent Contract: ERP/iş-uygulaması agent'larına (Oracle AI Agent Studio, Fusion/NetSuite sınıfı) karşı discover_capabilities / invoke / stream_status / request_approval / commit_transaction / cancel / compensate_or_rollback / collect_audit sözleşmesi |
+| 6181 | `COMPETITIVE-INTELLIGENCE-WATCH-001` | OPEN | P2 | CONNECTOR | — | — | Competitive Intelligence Watch — kanıt-bağlı baseline + resmi-kaynak sinyal + Memory V2 dedup + günlük Europe/Istanbul otomasyonu |
 | 7000 | `ECOSYSTEM-001` | OPEN | P0 | ECOSYSTEM | `P02-647`, `SURFACE-CUTOVER-001`, `CAPABILITY-001`, `AUDIT-001` | — | Governed agent, skill, plugin, tool, MCP and extension ecosystem |
 | 7010 | `AGENT-SKILL-001` | OPEN | P1 | ECOSYSTEM | `CAPABILITY-001` | — | Role/capability-complete agent and skill catalog |
 | 7011 | `AGENT-CATALOG-AUTHORITY-001` | OPEN | P0 | ECOSYSTEM | — | — | Shipped built-in, project override, learned/runtime ve archive katmanları için tek effective agent catalog authority |

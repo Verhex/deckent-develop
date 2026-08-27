@@ -8439,6 +8439,26 @@ const BASE_MESSAGES: MessageMap = {
   // Human-readable sentences for src/core/scope-gate.ts. Typed codes
   // (SCOPE_GATE_SUSPECT, ScopePathClass values, etc.) stay as-is — only the
   // prose `reason`/`message`/`greenfieldNotice` fields resolve through this family.
+  'disposition.remediation.forced_skill_unavailable': {
+    en: 'Create or activate the required skill before retrying this task.',
+    tr: 'Bu görevi yeniden denemeden önce gerekli skill’i oluşturun veya etkinleştirin.',
+  },
+  'disposition.remediation.provider_adapter_unavailable': {
+    en: 'Restore provider authentication or access before retrying this task.',
+    tr: 'Bu görevi yeniden denemeden önce provider kimlik doğrulamasını veya erişimini geri yükleyin.',
+  },
+  'disposition.remediation.default': {
+    en: 'Resolve the host-side admission issue before retrying this task.',
+    tr: 'Bu görevi yeniden denemeden önce host tarafındaki kabul sorununu çözün.',
+  },
+  'disposition.notification.title': {
+    en: 'Task {taskId} was not dispatched',
+    tr: 'Görev {taskId} dispatch edilmedi',
+  },
+  'disposition.notification.message': {
+    en: 'Reason: {reasonCode}. Disposition: {disposition}. Next step: {remediationHint}',
+    tr: 'Neden: {reasonCode}. Disposition: {disposition}. Sonraki adım: {remediationHint}',
+  },
   'scope_gate.reason.confirmed': {
     en: 'exists in the repo',
     tr: 'repoda mevcut',

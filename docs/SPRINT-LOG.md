@@ -17307,3 +17307,55 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 697-002: deckent sync workspace-kolu — mevcut projede canonical regen yolu (DONE)
 
 ---
+## Sprint 698 — sprint-698
+
+**Status:** COMPLETE
+**Date:** 2026-08-27
+**Duration:** 556s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 556050ms |
+
+### Tasks
+
+- 698-001: Üç-yönlü builtin skill paket senkronu — body materialize + authored-profil authority (DONE)
+- 698-002: İzole-proje effective-path proof — katalogdan prompt'a tam zincir mühürü (DONE)
+- 698-003: Clean-guard typed disposal — öksüz receipt'siz plan-artefaktı sınıfı (DONE)
+- 698-004: RUN_FAILED producer error-truncation — bozuk-envelope sınıfının kökü (DONE)
+
+---
+## Sprint 699 — sprint-699
+
+**Status:** ABORTED
+**Date:** 2026-08-27
+**Duration:** 1630s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 1629782ms |
+
+### Tasks
+
+- 699-001: Typed failure-disposition policy — pre-dispatch sınıfı NOT_DISPATCHED-terminal + FIX-muaf (DONE)
+- 699-002: Bağımlılara cascade-skip + run'ın karışık-sonuçla tamamlanması (DONE)
+- 699-003: Disposition-olayı — owner-kanalı yayını (Nervous'tan bağımsız çekirdek, Nervous'a köprü) (DONE)
+- 699-004-fix-fix: Fix: Fix: Zincir-mühürü — uçtan-uca hermetik disposition regresyon-testi (PAUSED)
+- 699-004-fix: Fix: Zincir-mühürü — uçtan-uca hermetik disposition regresyon-testi (NO_GO)
+- 699-004: Zincir-mühürü — uçtan-uca hermetik disposition regresyon-testi (NO_GO)
+
+---

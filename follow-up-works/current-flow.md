@@ -45,15 +45,25 @@ gemini-pin worker-doğurup NO_GO; forced-skill sentetik-NO_GO+FIX-yakımı) → 
 **3302 → `3284 REPAIR-DISPATCH-001`'e (KERNEL, OPEN) bağlı** — ladder'ın tam kapanışı ve
 publish-planning 3284'ü de ister (ayrı mühendislik işi, admission bekliyor).
 
+**GÜNCELLEME (akşam, sprint-699 kapanışı):** Sprint-699 3/4 DONE + 004 dürüst-NO_GO'su
+gerçek boşluk buldu (test-guardian: classifyFixPhaseTasks fixEligible-yönlendirmesi yok) —
+el-seam ×2 ile kapandı (classify-yönlendirme + canlı-sınır prepareResultEvaluationAttempt
+kablosu; T1 deprecated evaluateResult'a bağlamıştı). Bounded-replay r5 KISMİ-YEŞİL:
+preDispatchSettlement typed ✓ + bağımlı cascadeSkipped ✓ (önceden blocked-pause!), ama
+repair-machinery (3284 alanı) FIX doğurmayı sürdürüyor + doğan repair forceSkills kısıtını
+düşürüyor (yetki-notu MASTER 3284'te) → **3301 tam-sertifikası 3284-consumer kablosuna bağlı**.
+Owner Q&A-3 kararları mühürlendi: 3284 ADMIT (keşif+sprint) · CLI dilim-1 = sertifika-adımı
+sonrası hemen · CI-watch ADMIT (MASTER 6181, kuyruk-sonu). `post-product.md` owner-kararıyla
+repo'ya girdi (VISION_ONLY; MASTER-mutasyonu yasak kendi bloğunda). Ayrıca canlı routing-bulgusu:
+"aynı-üçlü" skill-seçim patolojisi yaşıyor (MASTER 9034 evidence).
+
 ## SIRADAKİ (bu sıra ile)
 
-1. **Sprint-699 kapanışı** → doğrulama-pasosu → landing-ritüeli (scoped+katalog-pin +
-   20-gate + build:all + bot-cycle) → fixture'da bounded-replay YENİDEN → 3301
-   sertifika-kanıtı + MASTER evidence.
-2. **Owner'ın ilan ettiği yeni kritik iş + doğrulama süreci** (içerik owner'dan gelecek —
-   bu dosya güncellenerek imleç oraya döner).
-3. Kuyrukta (owner-sıralamasıyla): 3284 admission/plan → 3302/3304/3299 flip-merdiveni →
-   CLI-reform dilim-1 DIRECTIVES → yayın-zinciri (3299-sonrası).
+1. ~~Sprint-699~~ ✅ landed (bu commit); replay r5 kısmi-yeşil — tam sertifika 3284'e bağlı.
+2. **Owner'ın ilan ettiği yeni kritik iş + doğrulama süreci** (içerik owner'dan gelecek).
+3. Kuyruk (owner-Q&A sıralaması): 3284 keşif+sprint (ADMIT) → 3301 sertifika-tamamlama →
+   CLI-reform dilim-1 (sertifika-adımı sonrası HEMEN) → 3302/3304/3299 flip-merdiveni →
+   yayın-zinciri → kuyruk-sonu: CI-watch 6181.
 
 ## Açık küçük bulgular (admission'sız, kayıt)
 

@@ -46,6 +46,11 @@ import {
   type GitNumstatProvider,
   type DishonestEventSink,
 } from './honest-gate.js';
+import {
+  isHostPreDispatchReasonCode,
+  resolveHostPreDispatchFailureDisposition,
+  type FailureDispositionPolicyConfig,
+} from '../core/failure-disposition-policy.js';
 
 export type TolerantResultJsonParse =
   | { state: 'parsed'; result: TaskResult; sanitized: boolean }
@@ -307,6 +312,16 @@ export function isDocTask(task: Task): boolean {
  * for backward compatibility with CLI finalize command.
  */
 export async function evaluateResult(result: TaskResult, task: Task, vitestJsonOutput?: string, coverageThreshold = 90, projectRoot?: string): Promise<TaskEvaluation> {
+  if (result.preDispatchSettlement) {
+    const reasonCode = isHostPreDispatchReasonCode(
+      result.preDispatchSettlement.reasonCode,
+    )
+      ? result.preDispatchSettlement.reasonCode
+      : 'LEGACY_HOST_PRE_DISPATCH_REJECTION';
+    return resolveHostPreDispatchFailureDisposition(
+      reasonCode,
+    ).evaluation;
+  }
   // Step 1a: Sprint 145 — TIMEOUT_WITH_WORK: worker was killed but has partial work
   // Attempt reconciliation via Spurious NO_GO helper if projectRoot available
   if ((result.selfAssessment as string) === 'TIMEOUT_WITH_WORK') {
@@ -3546,11 +3561,31 @@ export interface FixPhaseTaskClassification {
  */
 export function classifyFixPhaseTasks(
   evaluations: ReadonlyMap<string, TaskEvaluation>,
+  results?: ReadonlyMap<string, TaskResult>,
+  policyConfig?: FailureDispositionPolicyConfig,
 ): FixPhaseTaskClassification {
   const fixCandidateTaskIds: string[] = [];
   const reDispatchCandidateTaskIds: string[] = [];
   for (const [taskId, evaluation] of evaluations) {
     if (evaluation === TaskEvaluation.NOT_DISPATCHED) {
+      const settlement = results?.get(taskId)?.preDispatchSettlement;
+      if (settlement) {
+        const reasonCode = isHostPreDispatchReasonCode(settlement.reasonCode)
+          ? settlement.reasonCode
+          : 'LEGACY_HOST_PRE_DISPATCH_REJECTION';
+        const disposition = resolveHostPreDispatchFailureDisposition(
+          reasonCode,
+          policyConfig,
+        );
+        // A config override may open a pre-dispatch reason class back to the
+        // FIX pipeline (fixEligible:true) — route it there, never silently
+        // drop it (sprint-699-004 composition-seal finding, 2026-08-27).
+        if (disposition.fixEligible) {
+          fixCandidateTaskIds.push(taskId);
+          continue;
+        }
+        if (!disposition.redispatchEligible) continue;
+      }
       reDispatchCandidateTaskIds.push(taskId);
     } else if (evaluation === TaskEvaluation.NO_GO) {
       fixCandidateTaskIds.push(taskId);

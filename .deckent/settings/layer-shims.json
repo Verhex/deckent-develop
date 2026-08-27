@@ -86,6 +86,7 @@
       "src/orchestra/codex-spawn-readiness.ts|import|src/providers/cross-provider-keys.ts|resolveCrossProviderCredentialKeys",
       "src/orchestra/cross-verify-runner.ts|dynamic-import|src/cli/commands/spawn.ts|*",
       "src/orchestra/prompt-gate.ts|import|src/cli/helpers/messages.ts|getMessage",
+      "src/orchestra/result-collector.ts|import|src/cli/helpers/messages.ts|getMessage,resolveLanguage",
       "src/orchestra/scheduler-effects.ts|import|src/orchestra/tmux.ts|spawnWorker",
       "src/orchestra/spawn-backend-docker.ts|import|src/providers/claude.ts|createClaudeAdapter",
       "src/orchestra/spawn-backend-docker.ts|import|src/providers/codex.ts|createCodexAdapter",

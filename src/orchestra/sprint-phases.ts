@@ -141,6 +141,11 @@ import {
   classifyFixPhaseTasks,
   archivedResultExists,
 } from './result-evaluator.js';
+import {
+  isHostPreDispatchReasonCode,
+  resolveHostPreDispatchFailureDisposition,
+  type FailureDispositionPolicyConfig,
+} from '../core/failure-disposition-policy.js';
 
 // ─── Verify-and-Complete FIX Signal (Sprint 272 — Task 272-004) ──────
 // Consumes the Task-272-003 EXIT_WITHOUT_RESULT marker: when work is present
@@ -1085,6 +1090,31 @@ export async function prepareResultEvaluationAttempt(input: {
   readonly config?: ResolvedConfig;
   readonly branch: ResultEvaluationBranch;
 }): Promise<PreparedResultEvaluationAttempt> {
+  // Host pre-dispatch settlement (admission denial — the worker never ran):
+  // the failure-disposition policy, not the rubric, owns this verdict
+  // (sprint-699 kapanışı, 2026-08-27: the T1 wire landed on the deprecated
+  // evaluateResult path; this boundary is the live consumer). A fixEligible
+  // config override deliberately re-enters the ordinary pipeline below.
+  const preDispatchSettlement = input.result.preDispatchSettlement;
+  if (preDispatchSettlement) {
+    const preDispatchReason = isHostPreDispatchReasonCode(preDispatchSettlement.reasonCode)
+      ? preDispatchSettlement.reasonCode
+      : 'LEGACY_HOST_PRE_DISPATCH_REJECTION';
+    const disposition = resolveHostPreDispatchFailureDisposition(
+      preDispatchReason,
+      input.config as unknown as FailureDispositionPolicyConfig | undefined,
+    );
+    if (!disposition.fixEligible) {
+      return {
+        rubric: evaluateWithRubric(input.result, input.task, undefined, input.projectRoot),
+        evaluation: disposition.evaluation,
+        postRubricCauses: [
+          `path:${input.branch}`,
+          `pre-dispatch-disposition:${preDispatchReason}`,
+        ],
+      };
+    }
+  }
   const runtimeBudgetAuthority = readRuntimeBudgetEvaluationAuthority(
     input.projectRoot, input.task.id,
   );

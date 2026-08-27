@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "3970b36a6f31f8fa6cc3d63b6553bab5435bd0624ca2d11d74922e790a05f304"
+    "value": "67869eef59fa67dcbced199b819369760a3e2837e69a14dbddbe578de30fa2af"
   },
   "summary": {
-    "total": 541,
-    "active": 457,
+    "total": 542,
+    "active": 458,
     "terminal": 84,
     "receipts": 210,
     "byState": {
-      "OPEN": 346,
+      "OPEN": 347,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
@@ -23,14 +23,14 @@
     "byPriority": {
       "P0": 338,
       "P1": 154,
-      "P2": 49
+      "P2": 50
     },
     "byProgram": {
       "API": 5,
       "ASSURANCE": 16,
       "AUTHORITY": 49,
       "CODEX": 44,
-      "CONNECTOR": 2,
+      "CONNECTOR": 3,
       "COST": 5,
       "DASHBOARD": 2,
       "DATA": 3,
@@ -1271,7 +1271,7 @@
       "state": "OPEN",
       "updated": "2026-08-27",
       "definitionDigest": "affa73dba942930e93ce15c1da3431ff7b7bf67c31aa14c16443f9dde69c5190",
-      "progressDigest": "1321c96adfb652a7e233ce0f92003cf25e8006cab23b188a7b0a122467bb1a2b",
+      "progressDigest": "7acc9d5aced9e1550166b23687ae96fc3b6625d8e6030b4be313218766495d50",
       "terminalClosureDigest": null
     },
     {
@@ -3150,9 +3150,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-01",
+      "updated": "2026-08-27",
       "definitionDigest": "32baf34f5fc318f1b0e51a375792836ad99a014cdb5ede4718377f895f8cabfd",
-      "progressDigest": "b15ada45ece82455fe4fd4d2a7d711520ab8431a389302c11fd9171b401383e7",
+      "progressDigest": "a8424ee3c6bb01a2376eaac781f1cd263ce817d15e3eb63886c62148eccf21c2",
       "terminalClosureDigest": null
     },
     {
@@ -3339,7 +3339,7 @@
       "state": "OPEN",
       "updated": "2026-08-27",
       "definitionDigest": "21332cbf64fef9a8298226f34c06a830d8dd30f23509078ffaf7116993574934",
-      "progressDigest": "6d69f1a6d0c59b957c32b8518e91edf96227c93e28b5a4206686ca28f0d29312",
+      "progressDigest": "f4edf76561fd705db4999a8a9b9185b247a2798acb308e5da5ca7af90e188122",
       "terminalClosureDigest": null
     },
     {
@@ -4707,6 +4707,17 @@
       "terminalClosureDigest": null
     },
     {
+      "order": 6181,
+      "id": "COMPETITIVE-INTELLIGENCE-WATCH-001",
+      "program": "CONNECTOR",
+      "priority": "P2",
+      "state": "OPEN",
+      "updated": "2026-08-27",
+      "definitionDigest": "bd0724385c4588a35b7a6818c7c8d2b0f90ccb0f23ea1a40394706499aea97eb",
+      "progressDigest": "f58beb0c88e2925fc047b9a671eb1cf668fc8cd5b69dd181e2b7a1a7d3d7777b",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 7000,
       "id": "ECOSYSTEM-001",
       "program": "ECOSYSTEM",
@@ -5693,7 +5704,7 @@
       "state": "OPEN",
       "updated": "2026-08-27",
       "definitionDigest": "640d932c23638bb0a1aa51ce7dbc1255e50c0ea9f93f2bfff6b5e87bc7d45a5b",
-      "progressDigest": "bead3c47a653473d052786833437de5c9df29de043d4beb74b94846785f07f1a",
+      "progressDigest": "793d7f5dc6e550b89686007710a11febf813b4000ffc27076f67c463f7dcc759",
       "terminalClosureDigest": null
     },
     {
@@ -10643,7 +10654,7 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Dilim-1: help/komut yüzeyi EN-default (i18n katalog korunur); komutlar tema-gruplu (çalıştırma/izleme/yaşam-döngüsü/katalog/sağlayıcılar/ortam/servisler/ileri + autonomous-flow + enterprise/RBAC grupları); gizli-komut sınıfı ölür (limits/bot/mcp/evolve envantere girer); eriyen-çiftler (plan-nl→do · dashboard→status --watch · attach+output→watch · archive-debt→status --debt · analyze alias) alias+typed-deprecation ile birleşir; temel = surface-contract registry (help/docs/completion/MCP-parity tek kaynaktan) + consumer-closure gate (owner: \"doğru ve olması gereken\"). Dilim-2 (ayrı admission): yarım-çalışan komut onarımı — kpi tarihçe/data-log (eskiye dönüş yok), evolve, limits provider-geneli (--claude/--codex/--cursor + tümü). Dilim-3 (ayrı admission): prompt-first native chat (deckent [prompt] — iddiasız).",
-      "evidence": "Owner sohbet-kararları 2026-08-27: ürün/komut deckent SABİT (rename iptal — yayın @verhex/deckent); \"cli ingilizce olmalı\"; \"ilk iş profesyonel ayrım kabul edebiliriz\"; kanıt: limits yalnız-Claude + limits/bot/mcp -h-dışı (gizli) disk-doğrulandı v2 owner-yönlendirmeleri (2026-08-27 sohbet-2): TEK onay-yüzeyi (approvals ← confirmations+checkpoint+autonomous-pending+nervous-decide+runs-decide; backend federasyonu approval-inbox-federation.ts MEVCUT); audit-verify → `audit verify`; autonomous-mission → `autonomous mission`; recall/remember → `memory` altına; paralel komutlar alias DEĞİL pencere-sonrası KALDIRILIR (12 kaldırma-listesi); explain → `retro --explain`; grup-şeması v2 (12 grup, Control adı, retro İZLEME'ye); bar: claude/codex profesyonelliği; derin-çalışma + tasarım: follow-up-works/cli-surface-reform-karar.md v2 v2.1 ONAYLANDI (owner 2026-08-27: \"onaylandı belki ileride tekrar revize ederim\") — final şema: 4 grup (Run/Observe/Control/System) + Advanced, ~32 görünür komut, 12 paralel-komut kaldırma-listesi, tek onay-yüzeyi (federated approvals), audit verify + autonomous mission + memory recall/remember alt-komutlaşması, retro İZLEME + explain→retro --explain, EN-default; execution ladder-dalga (3301/3302/3304→3299) sonrası dilim-1 DIRECTIVES olarak koşulacak",
+      "evidence": "Owner sohbet-kararları 2026-08-27: ürün/komut deckent SABİT (rename iptal — yayın @verhex/deckent); \"cli ingilizce olmalı\"; \"ilk iş profesyonel ayrım kabul edebiliriz\"; kanıt: limits yalnız-Claude + limits/bot/mcp -h-dışı (gizli) disk-doğrulandı v2 owner-yönlendirmeleri (2026-08-27 sohbet-2): TEK onay-yüzeyi (approvals ← confirmations+checkpoint+autonomous-pending+nervous-decide+runs-decide; backend federasyonu approval-inbox-federation.ts MEVCUT); audit-verify → `audit verify`; autonomous-mission → `autonomous mission`; recall/remember → `memory` altına; paralel komutlar alias DEĞİL pencere-sonrası KALDIRILIR (12 kaldırma-listesi); explain → `retro --explain`; grup-şeması v2 (12 grup, Control adı, retro İZLEME'ye); bar: claude/codex profesyonelliği; derin-çalışma + tasarım: follow-up-works/cli-surface-reform-karar.md v2 v2.1 ONAYLANDI (owner 2026-08-27: \"onaylandı belki ileride tekrar revize ederim\") — final şema: 4 grup (Run/Observe/Control/System) + Advanced, ~32 görünür komut, 12 paralel-komut kaldırma-listesi, tek onay-yüzeyi (federated approvals), audit verify + autonomous mission + memory recall/remember alt-komutlaşması, retro İZLEME + explain→retro --explain, EN-default; execution ladder-dalga (3301/3302/3304→3299) sonrası dilim-1 DIRECTIVES olarak koşulacak Zamanlama (owner Q&A 2026-08-27): dilim-1, 3301-sertifika-adımı sonrası HEMEN başlar (3284 paralel/sonrasında yürür)",
       "updated": "2026-08-27"
     },
     {
@@ -18025,8 +18036,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Original, FIX, FIX-FIX and cross-dependency repair births publish the same durable queue identity; per-result settlement immediately reevaluates ready work; phase transitions cannot hide a newly written task; PAUSE is legal only after the queue, active attempts and authorized repair decisions reach a fenced quiescent snapshot",
-      "evidence": "Sprint-488 POSTFIX evaluated 003, 005, 006 and 015, wrote four `-fix.json` artifacts, but those tasks were absent from the in-memory sprint subset and no fix worker spawned before circuit-breaker PAUSE. Manual recovery now routes local, reducer and dependency-respawn triggers through canonical spawn-time collision admission and reports only actual dispatches; fresh live replay remains required",
-      "updated": "2026-08-01"
+      "evidence": "Sprint-488 POSTFIX evaluated 003, 005, 006 and 015, wrote four `-fix.json` artifacts, but those tasks were absent from the in-memory sprint subset and no fix worker spawned before circuit-breaker PAUSE. Manual recovery now routes local, reducer and dependency-respawn triggers through canonical spawn-time collision admission and reports only actual dispatches; fresh live replay remains required 2026-08-27 owner-ADMISSION (Q&A): keşif+sprint onaylandı (3301-deseni). Aynı gün canlı kanıt (bounded-replay sprint-004/005, izole fixture): repair-machinery, host pre-dispatch NoGo sınıfına da repair doğuruyor (\"repair settlement\" pause-mesajı) ve doğan repair-task orijinalin forceSkills kısıtını TAŞIMADAN koşup DONE üretebiliyor (yetki-düşmesi bulgusu — explicit operator kısıtı sessizce kayboluyor); failure-disposition-policy tüketimi repair-admission katmanına da kablolanmalı — 3301 tam-sertifikası bu tüketiciye bağlı",
+      "updated": "2026-08-27"
     },
     {
       "order": 3285,
@@ -18577,7 +18588,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "A bounded isolated run creates one host-proven zero-work NOT_DISPATCHED attempt and one causally dependent SKIPPED projection, emits no worker evidence for the former, never blames either as product NO_GO and reaches the exact receipt-backed terminal outcome required by policy",
-      "evidence": "EK-3 open replay basamak; must run alone so the intentional dispatch absence cannot contaminate normal implementation or multi-provider success denominators; 2026-08-26 ilk bounded-replay denemesi (izole tmp-proje, ollama-unmetered tetiği): hedef per-task NOT_DISPATCHED yerine iki farklı typed fail-closed gate'e çarptı — docker-modda DECKENT_E078 landing-policy spawn-bloku, subprocess-modda RETRO'da TERMINAL_PUBLICATION_ZERO_TASK_HOLD finalizer-hatası; sertifikasyon OLMADI (finalizer-hatası receipt'li-terminal değildir), per-task budget-hold yolunu süren tasarımlı replay-harness dilimi gerekiyor — flip yok, dürüst kanıt kaydı 2026-08-27 ikinci tasarımlı bounded-replay turu (izole tmp-proje /tmp/deckent-replay-3301-20260827, gerçek binary, 3-task DAG: 1 gerçek-koşan + 1 admission-reddi-hedefli + 1 bağımlı): ÜÇ tetik-sınıfı da hedef-zincire ULAŞMADI ve her biri typed duvar verdi — (a) subprocess-backend: live-budget tavanları executor measured-stream beyanı ister → run-düzeyi DECKENT_E078 spawn-reddi (per-task değil); (b) gemini-pin: adapter MEVCUT (auth'suz) → worker gerçekten doğdu → dürüst NO_GO + FIX-tüketimi + typed-PAUSE (zero-work değil); (c) forced-skill-reddi: host BY-DESIGN sentetik NO_GO yazar (sprint-spawner.ts:618 FORCED_SKILL_UNAVAILABLE, 487-023 kontratı) → FIX yine devreye girip bütçe yakıyor ve bağımlı SKIPPED yerine blocked-PAUSE kalıyor. NET BULGU: kabulün istediği \"zero-work NOT_DISPATCHED + dependent SKIPPED + FIX-suçlamasız terminal\" zinciri için tek aday classifier-yolu result-ABSENT sınıfı (result-evaluator.ts:3507 + result-collector.ts:2447 deadline-yolu); host pre-dispatch NoGo sınıfına FIX-bastırma + bağımlıya SKIPPED-projeksiyonu ürün-dilimi gerektiriyor — sertifikasyon flip YOK, dürüst kayıt; iki fixture-koşusu ABORTED-finalize ile mühürlü (sprint-002/003)",
+      "evidence": "EK-3 open replay basamak; must run alone so the intentional dispatch absence cannot contaminate normal implementation or multi-provider success denominators; 2026-08-26 ilk bounded-replay denemesi (izole tmp-proje, ollama-unmetered tetiği): hedef per-task NOT_DISPATCHED yerine iki farklı typed fail-closed gate'e çarptı — docker-modda DECKENT_E078 landing-policy spawn-bloku, subprocess-modda RETRO'da TERMINAL_PUBLICATION_ZERO_TASK_HOLD finalizer-hatası; sertifikasyon OLMADI (finalizer-hatası receipt'li-terminal değildir), per-task budget-hold yolunu süren tasarımlı replay-harness dilimi gerekiyor — flip yok, dürüst kanıt kaydı 2026-08-27 ikinci tasarımlı bounded-replay turu (izole tmp-proje /tmp/deckent-replay-3301-20260827, gerçek binary, 3-task DAG: 1 gerçek-koşan + 1 admission-reddi-hedefli + 1 bağımlı): ÜÇ tetik-sınıfı da hedef-zincire ULAŞMADI ve her biri typed duvar verdi — (a) subprocess-backend: live-budget tavanları executor measured-stream beyanı ister → run-düzeyi DECKENT_E078 spawn-reddi (per-task değil); (b) gemini-pin: adapter MEVCUT (auth'suz) → worker gerçekten doğdu → dürüst NO_GO + FIX-tüketimi + typed-PAUSE (zero-work değil); (c) forced-skill-reddi: host BY-DESIGN sentetik NO_GO yazar (sprint-spawner.ts:618 FORCED_SKILL_UNAVAILABLE, 487-023 kontratı) → FIX yine devreye girip bütçe yakıyor ve bağımlı SKIPPED yerine blocked-PAUSE kalıyor. NET BULGU: kabulün istediği \"zero-work NOT_DISPATCHED + dependent SKIPPED + FIX-suçlamasız terminal\" zinciri için tek aday classifier-yolu result-ABSENT sınıfı (result-evaluator.ts:3507 + result-collector.ts:2447 deadline-yolu); host pre-dispatch NoGo sınıfına FIX-bastırma + bağımlıya SKIPPED-projeksiyonu ürün-dilimi gerektiriyor — sertifikasyon flip YOK, dürüst kayıt; iki fixture-koşusu ABORTED-finalize ile mühürlü (sprint-002/003) 2026-08-27 sprint-699 dilimi landed (owner \"Öneri kabul\"): src/core/failure-disposition-policy.ts (typed tablo + config-override) + evaluator/collector kablolama + owner-outbox disposition-olayı + zincir-mühürü (T4 test-guardian dürüst-NO_GO'su gerçek boşluk buldu: classifyFixPhaseTasks fixEligible-yönlendirmesi — el-seam ile kapandı; ayrıca T1 kablosu deprecated evaluateResult'a inmişti → canlı sınır prepareResultEvaluationAttempt'e el-seam ile bağlandı). Bounded-replay r5 KISMİ-YEŞİL: preDispatchSettlement typed ✓, bağımlı cascadeSkipped=true ✓ (önceden blocked-pause), ANCAK repair-machinery (3284 alanı) FIX doğurmayı sürdürüyor → tam sertifika 3284-consumer kablosuna bağlı; fixture sprint-004/005 ABORTED-mühürlü",
       "updated": "2026-08-27"
     },
     {
@@ -22633,7 +22644,8 @@
       ],
       "dependents": [],
       "children": [
-        "ERP-AGENT-CONTRACT-001"
+        "ERP-AGENT-CONTRACT-001",
+        "COMPETITIVE-INTELLIGENCE-WATCH-001"
       ],
       "gates": [
         "G2",
@@ -22655,7 +22667,8 @@
         "APP-SERVICE-001",
         "SURFACE-CONTRACT-001",
         "CAPABILITY-001",
-        "ERP-AGENT-CONTRACT-001"
+        "ERP-AGENT-CONTRACT-001",
+        "COMPETITIVE-INTELLIGENCE-WATCH-001"
       ],
       "evidenceReceipts": [],
       "acceptance": "Each adapter is capability-declared, identity-bound, accessible and contains no alternate core",
@@ -22841,6 +22854,37 @@
       "acceptance": "Owner G2 değerlendirmesi: transaction-ID korelasyonu, enterprise-user effective authority ve result digest dahil kontrat tiplenir; deckent tek-ERP süreçlerini değil ERP + coding-runtime + custom sistemler arası uçtan uca süreci yönetir; karar redde de çıkabilir",
       "evidence": "Açılış: Alperen 2026-08-04 reconciliation onayı. Tetikleyici: 2026-08-03 Oracle+Gemini sinyali — agent orchestration doğrudan ERP işlem bağlamına iniyor; SURFACE-ADAPTER-001 ERP'yi thin-adapter olarak sayıyor, işlem-seviyesi (commit/compensate/audit) kontrat karşılığı ledger'da yok",
       "updated": "2026-08-04"
+    },
+    {
+      "order": 6181,
+      "id": "COMPETITIVE-INTELLIGENCE-WATCH-001",
+      "parent": "SURFACE-ADAPTER-001",
+      "program": "CONNECTOR",
+      "outcome": "Competitive Intelligence Watch — kanıt-bağlı baseline + resmi-kaynak sinyal + Memory V2 dedup + günlük Europe/Istanbul otomasyonu",
+      "priority": "P2",
+      "dependsOn": [],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "1",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "3-task paket (owner-ADMIT 2026-08-27 Q&A): (T1) current-truth baseline + karşılaştırma kernel + significance gate; (T2) resmi-kaynak retrieval + MemoryStore custom-type dedup + durable TR-alarm outbox; (T3) ScheduledFlow/Goal-v2 günlük 09:00 Istanbul + `deckent intelligence` CLI + docs EN/TR; taslak-DIRECTIVES follow-up-works/competitive-intelligence-watch-draft.md (DIRECTIVES'e dönüşünce silinir); execution-sırası kuyruk-sonu — owner ayrıca sıralar",
+      "evidence": "Köken: 2026-08-26 yanlış-scope codex DIRECTIVES (sprint-685 fenced-ABORTED, sıfır kod-etkisi) + ana-şerit 4 düzeltme; KANUN-4 gereği admission'la satırlaştı",
+      "updated": "2026-08-27"
     },
     {
       "order": 7000,
@@ -26164,7 +26208,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Shipped builtin ve supported custom/imported skill'ler canonical valid V3 profile taşır; test-local profile reimplementation kalmaz; enabled=false, retired, quarantined, invalid, profile-less, contentless veya policy/tenant/scope-uyumsuz skill seçilmez; explicit force/exclude owner authority CLI, MCP, Terminal, sprint, FIX/XFIX ve single-task yollarında aynı sonucu verir; rejection typed reason taşır; manifest entrypoint ve referenced content gerçekten worker prompt'una ulaşmadan stats credit verilmez; honest-empty ve unavailable HOLD ayrışır; representative real-binary routing/prompt ve 1000-skill scale kanıtı vardır",
-      "evidence": "2026-08-10 code-truth: 31 effective skill'in valid profile sayısı 0 ve adapter profile olmayanların hepsini sessizce atlıyor; 81 yeşil test profile'ları yalnız test-local sabitte tutuyor; representative API+test runtime probe `api-builder` agentını seçerken skillIds boş döndü; direct V3 forceSkills `[testing-expert]` değerini boş listeyle overwrite ederken sprint-spawner sonradan union ediyor; V3 adapter enabled filtresi uygulamıyor. ÖNE-ALMA (Alperen 2026-08-18): \"görevlere skill injection yok — kaybımız devam ediyor\" — canlı kanıt sprint-558: task-558-001 assignedSkills=[] iken agent ataması çalışıyor; disk 30/30 skill'de profile alanı null (manifest yalnız V2 activation taşıyor), routing-plan-adapter yalnız valid profile kabul ettiğinden TÜM katalog her sprint'te görünmez; enjeksiyon tarafı canlı (sprint-spawner resolveSkillPrompts + typed HOLD) fakat seçim tarafı boş besliyor. Sıra: 7085 landing sonrası ilk paket = 9034+7121 çekirdeği (builtin 30 skill için canonical V3 profile üretimi + eligibility/typed-rejection + delivery-proof); owner eski analizleri getirecek, sprint planı onlarla birleşince yazılır. ÇEKİRDEK LANDED (sprint-561, 2026-08-18): (1) `skill-profile-derivation.ts` — manifest source metadata'sından deterministik/versioned canonical V3 profile, alan-provenance'lı; authored profile authoritative kalır; legacy activation ASLA routability'ye terfi etmez (7121 kararı); üretilemeyen → typed unroutable/HOLD; **30/30 builtin manifest'e profile PERSIST edildi** (ADR-D-007 el-persist — worker scope-gate'i .deckent/skills yazımını düşürmüştü; idempotens kanıtlı: 2. koşu 0-yeni/30-korunan; lint-manifests exit 0); (2) sessiz-atlama ÖLDÜ — evaluateSkillRoutingEligibility/selectRoutableSkills typed reason'larla (profile-missing/disabled/retired/quarantined/invalid-profile), enabled filtresi uygulanır, D10 lint'i `lint-skill-routing-eligibility.mjs` gerçek repo'da 222 dosya CLEAN (registry girişi el-kapama); (3) forceSkills-ezme bug'u öldü — applySkillDirectiveAuthority tek yetkili (boş-routing+force→force yaşar; exclude budar; force>exclude; idempotent; AUTO-skill force'a terfi etmez); delivery-proof: buildSkillDeliveryEvidence prompt'a GERÇEKTEN giren id'leri + teslim edilmeyen forced id'leri kaydeder; (4) battery 5/5 gerçek üretim zinciriyle (el-tamamlama — 004 worker'ı claude AUTH kesintisine düştü, fix task'ı budget'sız doğdu [bulgu]); assignedSkills DOLU kanıtı canlı. Run-defteri: ABORTED (001 lineage NO_GO — persist yetki boşluğu el-kapamayla kapandı; 004 AUTH_FAILED). 002/003 dürüst GO_WITH_TECH_DEBT. Landed-verify Sol kompozisyonu (commit f74ec9b06): A derivation-authority CONFIRMED `cross-verify-verdict:sha256:5c686bc1…`, B1 eligibility-tiplemesi CONFIRMED `…a51974fd…`; B2 force-authority noktası 2 koşuda dürüst UNCLEAR (`…41fbdc3b`, `…946dc7a1` — 'inaccurate missing-evidence map', 7081-residual evidence-read sınıfı; retry fırtınası yok) — aynı iddia hermetik çift kanıtla yeşil: skill-force-delivery force-preserve testleri + unlock-battery (c) gerçek modül koşusu. Native-probe teslimi aynı commit'te: şartsız router-aware probe + /v1 kök-soyma + local_llm.contextSize per-turn authority + derivation description-güvenliği; canlı kanıt config'li VE config'siz temiz. **2026-08-24 DELIVERY/SETTLEMENT LIVE SLICE:** shared PromptCompilePlan boundary v2 receipt'i rendered skill segmentini digest-bound kaydediyor; Docker result settlement ve finalizer yalnız delivered receipt identitysine credit veriyor, worker `skillIds` claim'i authority değil; malformed fresh receipt fail-closed HOLD/no-credit. Sprint-657'nin üç initial/dependent taskında non-empty delivered skill seti current receipt ve canonical result/archive boyunca canlı görüldü. Satır all-ingress force/exclude/fallback parity, supported custom/imported catalog ve 1000-skill scale kapıları nedeniyle OPEN 2026-08-27: 4 deckent-* skill'in authored V3 profilleri artık effective katalogda (manifest-profile origin, el-fix); routing-eligibility bu profillerle gerçek veriye kavuştu — kalıcı authored-profil-authority mekanizması 7013 kapanışına bağlı sprint-698 (2026-08-27): authored-profil authority artık sync-mekanizmasında — routing eligibility kalıcı olarak authored V3 profilleri görür",
+      "evidence": "2026-08-10 code-truth: 31 effective skill'in valid profile sayısı 0 ve adapter profile olmayanların hepsini sessizce atlıyor; 81 yeşil test profile'ları yalnız test-local sabitte tutuyor; representative API+test runtime probe `api-builder` agentını seçerken skillIds boş döndü; direct V3 forceSkills `[testing-expert]` değerini boş listeyle overwrite ederken sprint-spawner sonradan union ediyor; V3 adapter enabled filtresi uygulamıyor. ÖNE-ALMA (Alperen 2026-08-18): \"görevlere skill injection yok — kaybımız devam ediyor\" — canlı kanıt sprint-558: task-558-001 assignedSkills=[] iken agent ataması çalışıyor; disk 30/30 skill'de profile alanı null (manifest yalnız V2 activation taşıyor), routing-plan-adapter yalnız valid profile kabul ettiğinden TÜM katalog her sprint'te görünmez; enjeksiyon tarafı canlı (sprint-spawner resolveSkillPrompts + typed HOLD) fakat seçim tarafı boş besliyor. Sıra: 7085 landing sonrası ilk paket = 9034+7121 çekirdeği (builtin 30 skill için canonical V3 profile üretimi + eligibility/typed-rejection + delivery-proof); owner eski analizleri getirecek, sprint planı onlarla birleşince yazılır. ÇEKİRDEK LANDED (sprint-561, 2026-08-18): (1) `skill-profile-derivation.ts` — manifest source metadata'sından deterministik/versioned canonical V3 profile, alan-provenance'lı; authored profile authoritative kalır; legacy activation ASLA routability'ye terfi etmez (7121 kararı); üretilemeyen → typed unroutable/HOLD; **30/30 builtin manifest'e profile PERSIST edildi** (ADR-D-007 el-persist — worker scope-gate'i .deckent/skills yazımını düşürmüştü; idempotens kanıtlı: 2. koşu 0-yeni/30-korunan; lint-manifests exit 0); (2) sessiz-atlama ÖLDÜ — evaluateSkillRoutingEligibility/selectRoutableSkills typed reason'larla (profile-missing/disabled/retired/quarantined/invalid-profile), enabled filtresi uygulanır, D10 lint'i `lint-skill-routing-eligibility.mjs` gerçek repo'da 222 dosya CLEAN (registry girişi el-kapama); (3) forceSkills-ezme bug'u öldü — applySkillDirectiveAuthority tek yetkili (boş-routing+force→force yaşar; exclude budar; force>exclude; idempotent; AUTO-skill force'a terfi etmez); delivery-proof: buildSkillDeliveryEvidence prompt'a GERÇEKTEN giren id'leri + teslim edilmeyen forced id'leri kaydeder; (4) battery 5/5 gerçek üretim zinciriyle (el-tamamlama — 004 worker'ı claude AUTH kesintisine düştü, fix task'ı budget'sız doğdu [bulgu]); assignedSkills DOLU kanıtı canlı. Run-defteri: ABORTED (001 lineage NO_GO — persist yetki boşluğu el-kapamayla kapandı; 004 AUTH_FAILED). 002/003 dürüst GO_WITH_TECH_DEBT. Landed-verify Sol kompozisyonu (commit f74ec9b06): A derivation-authority CONFIRMED `cross-verify-verdict:sha256:5c686bc1…`, B1 eligibility-tiplemesi CONFIRMED `…a51974fd…`; B2 force-authority noktası 2 koşuda dürüst UNCLEAR (`…41fbdc3b`, `…946dc7a1` — 'inaccurate missing-evidence map', 7081-residual evidence-read sınıfı; retry fırtınası yok) — aynı iddia hermetik çift kanıtla yeşil: skill-force-delivery force-preserve testleri + unlock-battery (c) gerçek modül koşusu. Native-probe teslimi aynı commit'te: şartsız router-aware probe + /v1 kök-soyma + local_llm.contextSize per-turn authority + derivation description-güvenliği; canlı kanıt config'li VE config'siz temiz. **2026-08-24 DELIVERY/SETTLEMENT LIVE SLICE:** shared PromptCompilePlan boundary v2 receipt'i rendered skill segmentini digest-bound kaydediyor; Docker result settlement ve finalizer yalnız delivered receipt identitysine credit veriyor, worker `skillIds` claim'i authority değil; malformed fresh receipt fail-closed HOLD/no-credit. Sprint-657'nin üç initial/dependent taskında non-empty delivered skill seti current receipt ve canonical result/archive boyunca canlı görüldü. Satır all-ingress force/exclude/fallback parity, supported custom/imported catalog ve 1000-skill scale kapıları nedeniyle OPEN 2026-08-27: 4 deckent-* skill'in authored V3 profilleri artık effective katalogda (manifest-profile origin, el-fix); routing-eligibility bu profillerle gerçek veriye kavuştu — kalıcı authored-profil-authority mekanizması 7013 kapanışına bağlı sprint-698 (2026-08-27): authored-profil authority artık sync-mekanizmasında — routing eligibility kalıcı olarak authored V3 profilleri görür 2026-08-27 canlı bulgu (owner yakaladı): sprint-699-002 prompt'una routing python-expert+rpc-protocol atadı (TS-orchestra task'ında PEP8/pytest gövdesi) — \"aynı-üçlü\" seçim-patolojisi authored-profil restorasyonundan sonra da yaşıyor; prompt-şişkinliği + odak-kirliliği; bu satırın kapanış-kapsamında seçim-kalitesi kanıtı zorunlu",
       "updated": "2026-08-27"
     },
     {
@@ -27350,6 +27394,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "127297c77457b539f26a093dd71de09221b57fe990dba8fe23c686142459eac0"
+    "value": "75115315110e753277a49ebf06e34781b4edcd12cbb39923c1ad83968af671ea"
   }
 }
