@@ -676,6 +676,8 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // tests/cli/sync-workspace.test.ts (tmpdir-hermetik, suite-owned).
   // 2026-08-27 11:4x: ayni 16579, digest-only — CI-hizalama: race-barrier taban
   // hizasi + ingress-pin 739 + PLATFORM.md regen (taranan metin kaydi).
+  // 2026-08-27 17:2x: help-revizyonu (owner): dikey liste + deprecated-blok kaldirildi;
+  // pin-hizalari. digest-only ya da kucuk sayim.
   // 2026-08-27 17:0x: 16592→16604 — sprint-701 (CLI dilim-1a) suite'leri:
   // surface-registry + root-help + lint-cli-surface + parity-registry testleri
   // (tmpdir-hermetik) + ana-serit el-kapanis pin/fixture hizalari.
@@ -702,7 +704,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // tests/core/preflight-typecheck-preference.test.ts (tmpdir-hermetik, suite-owned,
   // child_process spawnSync mock'lu — gerçek komut koşmaz) + budget-fix test ekleri
   // (output.test.ts config-default pini, doctor.test.ts iki budget senaryosu).
-  count: 16604,
+  count: 1341,
   // 2026-08-25 B-sweep: digest moved — --fix roundtrip pin, multi-label
   // parser pin, same-line rule downgraded to WARN (all suite-owned).
   // 2026-08-25 7141 wave: count unchanged, digest moved — the src-side
@@ -746,7 +748,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // attribution-baseline / finalize-retirement + isCanonicalTaskFilename pinleri.
   // 2026-08-26 11:04: 16504→16506 — Node-6a mekanik supurme (sprint-684 3/3):
   // death-sweep hijyen + worker-identity-hostbound + docker-git-async suiteleri.
-  digest: 'bb0a4ad811af8149ab945a511b2e07d26ca5d5be8b3d703ab6398a4b052002be',
+  digest: '2330774d3becfacad301a304d471a155eb05c76efcd66a62f9b8802fb9468d5c',
   // 2026-08-27 04:0x: ayni 16514, digest-only — full-suite hizalama batch'i
   // (pin/mock/census guncellemeleri + sync guard).
   // 2026-08-27 03:1x: ayni 16514, digest-only — CI-hizalama paketi

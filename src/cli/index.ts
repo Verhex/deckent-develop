@@ -90,7 +90,7 @@ import {
   openTaskSettlementProjection,
 } from '../core/task-settlement-authority.js';
 import { getLanguage, getMessage } from './helpers/messages.js';
-import { SURFACE_REGISTRY, listByGroup, type SurfaceCommand } from './surface-registry.js';
+import { SURFACE_REGISTRY, listByGroup } from './surface-registry.js';
 import {
   applyLocalizedHelp,
   attachRootHelpFooter,
@@ -103,12 +103,6 @@ export interface CliProgramRuntime {
 
 const ROOT_HELP_GROUPS = ['run', 'observe', 'control', 'system'] as const;
 
-function formatDeprecatedRow(command: SurfaceCommand, lang: string): string {
-  return getMessage('cli.root_help.deprecated_row', lang, {
-    name: command.name,
-    replacement: command.deprecation?.replacement ?? '',
-  });
-}
 
 /** Render the compact v2.1 root surface directly from the canonical registry. */
 export function formatGeneratedRootHelp(lang: string): string {
@@ -120,18 +114,21 @@ export function formatGeneratedRootHelp(lang: string): string {
     '',
   ];
 
+  // Owner-yönergesi (2026-08-27 akşam): her komut kendi satırında, ne-işe-
+  // yaradığı açıklamasıyla; deprecated-bloğu kök-help'te YOK (help advanced'te).
+  const visible = SURFACE_REGISTRY.filter(({ status }) => status === 'visible');
+  const width = Math.max(...visible.map(({ name }) => name.length));
   for (const group of ROOT_HELP_GROUPS) {
-    const names = listByGroup(group).map((command) => command.name).join(' · ');
-    lines.push(`${getMessage(`cli.root_help.group.${group}`, lang).padEnd(10)} ${names}`);
+    lines.push(getMessage(`cli.root_help.group.${group}`, lang));
+    for (const command of listByGroup(group)) {
+      lines.push(`  ${command.name.padEnd(width)}  ${getMessage(command.summaryKey, lang)}`);
+    }
+    lines.push('');
   }
   lines.push(
-    `${getMessage('cli.root_help.group.advanced', lang).padEnd(10)} ${getMessage('cli.root_help.advanced_link', lang)}`,
-    '',
-    getMessage('cli.root_help.deprecated_heading', lang),
+    getMessage('cli.root_help.group.advanced', lang),
+    `  ${getMessage('cli.root_help.advanced_link', lang)}`,
   );
-  for (const command of SURFACE_REGISTRY.filter(({ status }) => status === 'deprecated')) {
-    lines.push(`  ${formatDeprecatedRow(command, lang)}`);
-  }
   return `${lines.join('\n')}\n`;
 }
 

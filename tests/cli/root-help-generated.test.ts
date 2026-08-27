@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { buildProgram } from '../../src/cli/index.js';
+import { getMessage } from '../../src/cli/helpers/messages.js';
 import { SURFACE_REGISTRY } from '../../src/cli/surface-registry.js';
 
 describe('registry-generated root help', () => {
@@ -30,12 +31,14 @@ describe('registry-generated root help', () => {
     expect(help).not.toContain('help-info');
   });
 
-  it('renders every deprecated command with its registry replacement', () => {
+  it('keeps the deprecated block OUT of root help and lists every visible command with its summary', () => {
+    // Owner-yönergesi (2026-08-27 akşam): kök-help'te deprecated-bloğu YOK;
+    // her görünür komut kendi satırında açıklamasıyla listelenir.
     const help = buildProgram().helpInformation();
-    const deprecated = SURFACE_REGISTRY.filter(({ status }) => status === 'deprecated');
-
-    for (const command of deprecated) {
-      expect(help).toContain(`${command.name} → ${command.deprecation?.replacement}`);
+    expect(help).not.toContain('→');
+    for (const command of SURFACE_REGISTRY.filter(({ status }) => status === 'visible')) {
+      expect(help).toContain(`  ${command.name}`);
+      expect(help).toContain(getMessage(command.summaryKey, 'en'));
     }
   });
 
@@ -69,7 +72,6 @@ describe('registry-generated root help', () => {
     const help = buildProgram().helpInformation();
 
     expect(help).toContain('Kullanım: deckent [seçenekler] [prompt]');
-    expect(help).toContain('Kullanımdan kaldırılacak komutlar');
     expect(help).not.toContain('cli.root_help.');
   });
 });
