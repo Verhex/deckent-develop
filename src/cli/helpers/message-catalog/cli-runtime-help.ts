@@ -111,6 +111,14 @@ export const CLI_RUNTIME_HELP_MESSAGES: MessageFamily = Object.freeze({
     en: 'Render the active run dependency graph as Mermaid text.',
     tr: 'Etkin run dependency graph’ını Mermaid metni olarak render eder.',
   },
+  'cli.runtime.status.opt.debt': {
+    en: 'Show the DB-first tech-debt summary and exit',
+    tr: 'DB-öncelikli teknik-borç özetini gösterip çık',
+  },
+  'cli.runtime.status.debt_summary': {
+    en: 'Tech debt (memory.db): {open} open, {resolved} resolved. Resolved debt is retained and pruned by sprint decay — no manual archival step is needed.',
+    tr: 'Teknik borç (memory.db): {open} açık, {resolved} çözülmüş. Çözülen borç saklanır ve sprint decay ile budanır — elle arşivleme gerekmez.',
+  },
   'cli.runtime.status.opt.mode': {
     en: 'Select a render identifier currently accepted by the handler: explainatory (explanatory view), standart (standard view), verbose, or json.',
     tr: 'Handler’ın şu anda kabul ettiği render identifier’ını seçer: explainatory (açıklamalı görünüm), standart (standard görünüm), verbose veya json.',

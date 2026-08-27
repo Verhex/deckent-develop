@@ -1,101 +1,66 @@
-// archive-debt command — Task #4f: the command is now a DB-first reporter.
-// Tech debt lives in memory.db; the legacy .brain/DEBT.md + DEBT-ARCHIVE.md
-// file-archiving behavior was removed. These tests exercise the reporter
-// against a real tmpdir-backed SQLite DB (the MemoryStore harness the old
-// suite's TODO comment asked for).
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Command } from 'commander';
-import * as fs from 'node:fs';
-import { join } from 'node:path';
-import { MemoryStore } from '../../../src/core/memory-store.js';
+import { getLanguage, getMessage } from '../../../src/cli/helpers/messages.js';
 import { registerArchiveDebt } from '../../../src/cli/commands/archive-debt.js';
+import { registerAttach } from '../../../src/cli/commands/attach.js';
+import { registerCheckpoint } from '../../../src/cli/commands/checkpoint.js';
+import { registerConfirmationsCommand } from '../../../src/cli/commands/confirmations.js';
+import { registerDashboard } from '../../../src/cli/commands/dashboard.js';
+import { registerOutput } from '../../../src/cli/commands/output.js';
+import { registerPlanNl } from '../../../src/cli/commands/plan-nl.js';
+import { registerAuditVerify } from '../../../src/cli/commands/audit-verify.js';
+import { registerAutonomousMission } from '../../../src/cli/commands/autonomous-mission.js';
+import { registerExplain } from '../../../src/cli/commands/explain.js';
+import { registerRecall } from '../../../src/cli/commands/recall.js';
+import { registerRemember } from '../../../src/cli/commands/remember.js';
 
-const ROOT = join(process.cwd(), '.test-archive-debt-' + process.pid);
-const ORIG_CWD = process.cwd();
+const aliases = [
+  [registerArchiveDebt, 'archive-debt', 'status', ['--debt'], 'cli.batch.deprecated.archive_debt'],
+  [registerAttach, 'attach', 'watch', [], 'cli.batch.deprecated.attach'],
+  [registerCheckpoint, 'checkpoint', 'approvals', [], 'cli.batch.deprecated.checkpoint'],
+  [registerConfirmationsCommand, 'confirmations', 'approvals', [], 'cli.batch.deprecated.confirmations'],
+  [registerDashboard, 'dashboard', 'status', ['--watch'], 'cli.batch.deprecated.dashboard'],
+  [registerOutput, 'output', 'watch', ['--logs'], 'cli.batch.deprecated.output'],
+  [registerPlanNl, 'plan-nl', 'do', [], 'cli.batch.deprecated.plan_nl'],
+  [registerAuditVerify, 'audit-verify', 'audit', [], 'cli.batch.deprecated.audit_verify'],
+  [registerAutonomousMission, 'autonomous-mission', 'autonomous', [], 'cli.batch.deprecated.autonomous_mission'],
+  [registerExplain, 'explain', 'retro', ['--explain'], 'cli.batch.deprecated.explain'],
+  [registerRecall, 'recall', 'memory', [], 'cli.batch.deprecated.recall'],
+  [registerRemember, 'remember', 'memory', [], 'cli.batch.deprecated.remember'],
+] as const;
 
-let stdout: string[];
-let stdoutSpy: ReturnType<typeof vi.spyOn>;
+afterEach(() => vi.restoreAllMocks());
 
-function seedDebt(items: Array<{ id: string; status: 'active' | 'resolved'; sprint: string }>): void {
-  const store = new MemoryStore(join(ROOT, '.brain', 'memory.db'));
-  for (const it of items) {
-    store.insert({
-      id: it.id, type: 'debt', title: `debt ${it.id}`, content: '',
-      source: 'brain', status: it.status, priority: 'normal',
-      sprint_id: it.sprint, sprint_num: parseInt(it.sprint.replace(/\D/g, ''), 10) || 0,
-      tags: ['debt'],
-      metadata: { originTaskId: it.id, originSprintId: it.sprint, sprintsOpen: 0 },
-    });
-  }
-  store.close();
-}
-
-async function run(args: string[] = []): Promise<string> {
-  const program = new Command();
-  program.exitOverride();
-  registerArchiveDebt(program);
-  try {
-    await program.parseAsync(['node', 'test', 'archive-debt', ...args]);
-  } catch (err) {
-    if (!(err instanceof Error && err.message.includes('commander.'))) throw err;
-  }
-  return stdout.join('');
-}
-
-describe('archive-debt command (DB-first)', () => {
-  beforeEach(() => {
-    if (fs.existsSync(ROOT)) fs.rmSync(ROOT, { recursive: true, force: true });
-    fs.mkdirSync(join(ROOT, '.brain'), { recursive: true });
-    fs.mkdirSync(join(ROOT, '.deckent'), { recursive: true });
-    process.chdir(ROOT);
-    stdout = [];
-    stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((d) => {
-      stdout.push(String(d));
-      return true;
-    });
-  });
-
-  afterEach(() => {
-    stdoutSpy?.mockRestore();
-    process.chdir(ORIG_CWD);
-    if (fs.existsSync(ROOT)) fs.rmSync(ROOT, { recursive: true, force: true });
-  });
-
-  it('registers the archive-debt command on the program', () => {
+describe('deprecated aliases', () => {
+  it.each(aliases)('%s emits one catalog warning and forwards every argument', async (
+    register,
+    alias,
+    target,
+    injected,
+    warningKey,
+  ) => {
     const program = new Command();
-    registerArchiveDebt(program);
-    expect(program.commands.some(c => c.name() === 'archive-debt')).toBe(true);
-  });
+    const received = vi.fn();
+    const write = vi.spyOn(process.stdout, 'write').mockReturnValue(true);
+    const root = program.command(`${target} [args...]`).allowUnknownOption(true)
+      .action((args: string[]) => received(args));
+    const nested = alias === 'audit-verify' ? 'verify'
+      : alias === 'autonomous-mission' ? 'mission'
+      : alias === 'recall' ? 'recall'
+      : alias === 'remember' ? 'remember'
+      : undefined;
+    if (nested) {
+      root.command(`${nested} [args...]`).allowUnknownOption(true)
+        .action((args: string[]) => received(args));
+    }
+    register(program);
 
-  it('reports zero debt when the DB is empty', async () => {
-    seedDebt([]);
-    const out = await run();
-    expect(out).toContain('0 open, 0 resolved');
-  });
+    await program.parseAsync(['node', 'test', alias, 'value', '--extra', 'flag'], { from: 'node' });
 
-  it('reports open and resolved debt counts from the DB', async () => {
-    seedDebt([
-      { id: 'debt-a', status: 'active', sprint: 'sprint-200' },
-      { id: 'debt-b', status: 'active', sprint: 'sprint-201' },
-      { id: 'debt-c', status: 'resolved', sprint: 'sprint-200' },
+    expect(received).toHaveBeenCalledTimes(1);
+    expect(received).toHaveBeenCalledWith([...injected, 'value', '--extra', 'flag']);
+    expect(write.mock.calls.map(([line]) => String(line))).toEqual([
+      `${getMessage(warningKey, getLanguage(undefined))}\n`,
     ]);
-    const out = await run();
-    expect(out).toContain('2 open, 1 resolved');
-  });
-
-  it('--before counts resolved items originating before a sprint', async () => {
-    seedDebt([
-      { id: 'debt-old', status: 'resolved', sprint: 'sprint-100' },
-      { id: 'debt-new', status: 'resolved', sprint: 'sprint-300' },
-    ]);
-    const out = await run(['--before', 'sprint-200']);
-    expect(out).toContain('1 resolved item(s) originate before sprint-200');
-  });
-
-  it('--count suppresses the explanatory footer', async () => {
-    seedDebt([{ id: 'debt-a', status: 'active', sprint: 'sprint-200' }]);
-    const out = await run(['--count']);
-    expect(out).toContain('1 open, 0 resolved');
-    expect(out).not.toContain('no manual archival step');
   });
 });

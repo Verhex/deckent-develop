@@ -11,7 +11,10 @@
 // envelope, and adds no second decision protocol.
 
 import { createInterface } from 'node:readline/promises';
-import { listFederatedPendingItems } from '../../core/approval-inbox-federation.js';
+import {
+  listFederatedPendingItems,
+  type FederatedOrigin,
+} from '../../core/approval-inbox-federation.js';
 import { looksLikeShortCode, normalizeShortCode, resolveShortCode, shortCodeFor } from '../../core/approval-short-code.js';
 import { loadApprovalRules, matchApprovalRule, promoteRuleFromDecision, saveApprovalRules } from '../../core/approval-rules.js';
 import { liveRuleFor } from '../../core/approval-rules-engine.js';
@@ -55,6 +58,10 @@ interface ApprovalsDecideOpts {
   deny?: boolean;
   reason?: string;
   always?: boolean;
+}
+
+interface ApprovalsListOpts {
+  class?: string;
 }
 
 function lifecycleAuditView(
@@ -129,8 +136,9 @@ export function registerApprovalsCommand(program: Command): void {
   approvals
     .command('list')
     .description(getMessage('approvals.list_desc', lang))
+    .option('--class <name>', getMessage('approvals.opt_class', lang))
     .addHelpText('after', `\n${getGovernanceMessage('cli.governance.approvals.list.note', lang)}\n`)
-    .action(async () => {
+    .action(async (opts: ApprovalsListOpts) => {
       const root = resolveProjectRoot();
       const config = await loadConfig(root);
       const language = getLanguage(config.language);
@@ -140,6 +148,23 @@ export function registerApprovalsCommand(program: Command): void {
         process.exitCode = 1;
         return;
       }
+      const federatedInbox = listFederatedPendingItems(root, {
+        gatewayHomeDir: gatewayHome(),
+      }).filter(item => item.tenantId === undefined || item.tenantId === authority.tenant_id);
+      const federatedClasses = [...new Set<FederatedOrigin>(
+        federatedInbox.map(item => item.origin),
+      )];
+      if (opts.class !== undefined && !federatedClasses.some(name => name === opts.class)) {
+        printError(new Error(getMessage('approvals.class_invalid', language, {
+          class: opts.class,
+          valid: federatedClasses.join(', '),
+        })));
+        process.exitCode = 1;
+        return;
+      }
+      const federated = opts.class === undefined
+        ? federatedInbox
+        : federatedInbox.filter(item => item.origin === opts.class);
       // A list is a strictly read-only projection. ApprovalStore's index applies
       // the current lifecycle policy to the durable bytes without writing the
       // expiry decision/receipt; the scheduled driver or an authenticated
@@ -186,9 +211,6 @@ export function registerApprovalsCommand(program: Command): void {
       // OTHER surface's pending decisions here too — read-only, origin-tagged,
       // with each surface's CURRENT decision command. Decision paths are
       // untouched (migration is D2).
-      const federated = listFederatedPendingItems(root, {
-        gatewayHomeDir: gatewayHome(),
-      }).filter(item => item.tenantId === undefined || item.tenantId === authority.tenant_id);
       for (const item of store.load().quarantined) {
         print(getMessage('approvals.federated.row_quarantined', language, {
           origin: 'broker-native',

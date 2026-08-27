@@ -221,13 +221,19 @@ export function renderTruthTable(run: TruthRun, lang: string): string {
     truthMessage('truth.col_enabled', lang),
     truthMessage('truth.col_proof', lang),
   ];
+  const noProof = getMessage('cli.batch.truth.no_proof', lang);
+  const safeCell = (value: unknown): string => {
+    if (value === undefined || value === null) return noProof;
+    const rendered = String(value);
+    return rendered === 'undefined' || rendered === 'null' ? noProof : rendered;
+  };
   const rows = run.results.map((r) => [
     truncate(run.labels[r.id] ?? r.id, 44),
     r.code,
     r.wired,
     r.enabled,
-    r.proof,
-  ]);
+    r.proof ?? noProof,
+  ].map(safeCell));
 
   const widths = headers.map((h, i) =>
     Math.max(h.length, ...rows.map((row) => (row[i] ?? '').length)),

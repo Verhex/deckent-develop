@@ -676,6 +676,8 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // tests/cli/sync-workspace.test.ts (tmpdir-hermetik, suite-owned).
   // 2026-08-27 11:4x: ayni 16579, digest-only — CI-hizalama: race-barrier taban
   // hizasi + ingress-pin 739 + PLATFORM.md regen (taranan metin kaydi).
+  // 2026-08-27 19:2x: 16604→16611 — sprint-702 (do-kaynakli reform-batch) suite'leri
+  // (alias-forwarding/folds/federation/limits/truth/catalog) + el-kapanis kaymalari.
   // 2026-08-27 17:2x: help-revizyonu (owner): dikey liste + deprecated-blok kaldirildi;
   // pin-hizalari. digest-only ya da kucuk sayim.
   // 2026-08-27 17:0x: 16592→16604 — sprint-701 (CLI dilim-1a) suite'leri:
@@ -704,7 +706,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // tests/core/preflight-typecheck-preference.test.ts (tmpdir-hermetik, suite-owned,
   // child_process spawnSync mock'lu — gerçek komut koşmaz) + budget-fix test ekleri
   // (output.test.ts config-default pini, doctor.test.ts iki budget senaryosu).
-  count: 16604,
+  count: 16611,
   // 2026-08-25 B-sweep: digest moved — --fix roundtrip pin, multi-label
   // parser pin, same-line rule downgraded to WARN (all suite-owned).
   // 2026-08-25 7141 wave: count unchanged, digest moved — the src-side
@@ -748,7 +750,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // attribution-baseline / finalize-retirement + isCanonicalTaskFilename pinleri.
   // 2026-08-26 11:04: 16504→16506 — Node-6a mekanik supurme (sprint-684 3/3):
   // death-sweep hijyen + worker-identity-hostbound + docker-git-async suiteleri.
-  digest: 'bb0a4ad811af8149ab945a511b2e07d26ca5d5be8b3d703ab6398a4b052002be',
+  digest: 'b7bd03ac81bbcac7435e3432255689d7e62191118e3d28dc7d77e625e5055598',
   // 2026-08-27 04:0x: ayni 16514, digest-only — full-suite hizalama batch'i
   // (pin/mock/census guncellemeleri + sync guard).
   // 2026-08-27 03:1x: ayni 16514, digest-only — CI-hizalama paketi
@@ -1286,7 +1288,8 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // (cli-command-contract SSOT, governance catalog, generators).
   // 2026-08-25 exploration-bonus wave: +1 — the route-task-v3 exploration
   // bonus derivation adds one production effect site (cells ledger read).
-  count: 1341,
+  // 2026-08-27 19:2x: 1341→1342 — sprint-702 src (alias/fold/federation/limits/truth + status --debt).
+  count: 1342,
   // 2026-08-25 config-loss incident hardening: digest moved — atomic
   // last_sprint_id writer (refuse-mint + tmp+rename) and loadConfig
   // self-heal re-read-once + atomic fresh-default.
@@ -1341,7 +1344,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // finalizer + sidecar-loader hotfix).
   // 2026-08-26 11:05: ayni 1339, digest-only — Node-6a src kaymalari
   // (death-sweep / prompt-template kimlik-esigi / docker async-git).
-  digest: '2330774d3becfacad301a304d471a155eb05c76efcd66a62f9b8802fb9468d5c',
+  digest: '95107f61a3948dfc21fc10c8d6a333727a2b0b4bf6ab6180d42f5e4e24968891',
   // 2026-08-27 04:0x: ayni 1339, digest-only — sync workspace-guard + drift-normalize.
   // 2026-08-27 03:1x: ayni 1339, digest-only — skill-pool readJsonSafe donusumu.
   // 2026-08-27 02:0x: ayni 1339, digest-only — Dalga-3 src kaymalari

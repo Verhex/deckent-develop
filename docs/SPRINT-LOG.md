@@ -17415,3 +17415,31 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 701-004: MCP-parity gate'inin registry-tüketimi (NO_GO)
 
 ---
+## Sprint 702 — sprint-702
+
+**Status:** ABORTED
+**Date:** 2026-08-27
+**Duration:** 1393s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 4 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 1393368ms |
+
+### Tasks
+
+- 702-001: Reform batch surface contract and i18n catalog foundation (DONE)
+- 702-002: Approvals federated inbox listing with class filter (DONE)
+- 702-003: Provider-general limits reporting and truth proof-cell fix (DONE)
+- 702-004-fix: Fix: Subcommand folds and deprecated-command forwarding aliases (DONE)
+- 702-004: Subcommand folds and deprecated-command forwarding aliases (DONE)
+- 702-005-fix: Fix: Reform batch integration verification with real-binary gates (PENDING)
+- 702-005: Reform batch integration verification with real-binary gates (NO_GO)
+
+---

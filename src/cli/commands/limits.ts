@@ -33,6 +33,10 @@ import { formatTable } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLangFromConfig } from '../helpers/config-reader.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
+import { loadConfig } from '../../core/config.js';
+import { probeProviderAuth, type AuthProbeResult } from '../../core/provider-auth-probe.js';
+import type { ResolvedConfig } from '../../core/types.js';
+import { LIMITS_PROVIDER_FILTERS } from '../surface-contract.js';
 
 // ─── Config (raw-read, config.ts/config-types.ts out of scope — see header) ──
 
@@ -270,16 +274,102 @@ export async function checkStartLimitGate(
 
 export interface LimitsCommandOpts {
   json?: boolean;
+  readonly [providerFilter: string]: boolean | undefined;
+}
+
+type ProviderUsageProbe = () => Promise<SubscriptionLimitResult>;
+
+export interface LimitsCommandDependencies {
+  readonly loadEffectiveConfig?: (root: string) => Promise<ResolvedConfig>;
+  readonly probeAuth?: (provider: string) => Promise<AuthProbeResult>;
+  readonly usageProbes?: ReadonlyMap<string, ProviderUsageProbe>;
+}
+
+/** Provider identities are derived exclusively from the resolved config. */
+export function configuredProviders(config: ResolvedConfig): string[] {
+  const values: unknown[] = [
+    config.brain_provider,
+    config.worker_provider,
+    config.fallback_provider,
+    ...Object.values(config.provider_overrides ?? {}),
+    ...Object.values(config.providers?.overrides ?? {}),
+    config.providers?.brain,
+    config.providers?.worker,
+    config.providers?.fallback,
+    ...(config.providers?.registry ?? []).map((definition) => definition.name),
+  ];
+  return [...new Set(values.filter(
+    (value): value is string => typeof value === 'string' && value.trim().length > 0,
+  ))];
+}
+
+function requestedProviderFilters(opts: LimitsCommandOpts): Set<string> {
+  return new Set(LIMITS_PROVIDER_FILTERS
+    .map(({ option }) => option.slice(2))
+    .filter((provider) => opts[provider as keyof LimitsCommandOpts] === true));
+}
+
+export async function resolveConfiguredAuthenticatedProviders(
+  config: ResolvedConfig,
+  opts: LimitsCommandOpts,
+  authProbe: (provider: string) => Promise<AuthProbeResult>,
+): Promise<string[]> {
+  const requested = requestedProviderFilters(opts);
+  const configured = configuredProviders(config)
+    .filter((provider) => requested.size === 0 || requested.has(provider));
+  const states = await Promise.all(configured.map(async (provider) => ({
+    provider,
+    auth: await authProbe(provider),
+  })));
+  return states
+    .filter(({ auth }) => auth.authenticated === true || auth.state === 'logged-in')
+    .map(({ provider }) => provider);
+}
+
+interface ProviderLimitReport {
+  readonly provider: string;
+  readonly result: SubscriptionLimitResult | null;
+}
+
+function providerRows(report: ProviderLimitReport, lang: string): string[][] {
+  if (report.result === null || report.result.unavailable) {
+    return [[report.provider, getMessage('cli.batch.limits.unavailable', lang), getMessage('limits.no_reset', lang)]];
+  }
+  const result = report.result;
+  const rows = [
+    [report.provider, `${windowLabel('session', lang)}: ${result.sessionPct}%`, formatResetAt(result.sessionResetAt, lang)],
+    [report.provider, `${windowLabel('week (all models)', lang)}: ${result.weekAllPct}%`, formatResetAt(result.weekAllResetAt, lang)],
+  ];
+  if (result.weekFablePct !== undefined) {
+    rows.push([report.provider, `${windowLabel('week (Fable)', lang)}: ${result.weekFablePct}%`, formatResetAt(result.weekAllResetAt, lang)]);
+  }
+  return rows;
 }
 
 export async function runLimitsCommand(
   opts: LimitsCommandOpts,
   probeOpts: ProbeSubscriptionLimitsOptions = {},
+  dependencies: LimitsCommandDependencies = {},
 ): Promise<void> {
   const root = resolveProjectRoot();
   const lang = getLangFromConfig(root);
   const gateConfig = readLimitGateConfig(root);
-  const probe = await probeSubscriptionLimits(probeOpts);
+  const loadEffectiveConfig = dependencies.loadEffectiveConfig ?? ((projectRoot) => loadConfig(projectRoot));
+  const authProbe = dependencies.probeAuth ?? ((provider) => probeProviderAuth(provider));
+  const effectiveConfig = await loadEffectiveConfig(root);
+  const providers = await resolveConfiguredAuthenticatedProviders(effectiveConfig, opts, authProbe);
+  const defaultUsageProvider = LIMITS_PROVIDER_FILTERS[0]?.option.slice(2);
+  const usageProbes = dependencies.usageProbes ?? new Map<string, ProviderUsageProbe>(
+    defaultUsageProvider === undefined
+      ? []
+      : [[defaultUsageProvider, () => probeSubscriptionLimits(probeOpts)]],
+  );
+  const reports = await Promise.all(providers.map(async (provider): Promise<ProviderLimitReport> => {
+    const usageProbe = usageProbes.get(provider);
+    return { provider, result: usageProbe === undefined ? null : await usageProbe() };
+  }));
+  const primaryReport = reports.find((report) => report.result !== null);
+  const probe = primaryReport?.result ?? { unavailable: true, reason: 'usage authority unavailable', raw: '' };
   const gateResult = evaluateWindowedLimitGate(probe, gateConfig);
 
   if (opts.json) {
@@ -293,6 +383,12 @@ export async function runLimitsCommand(
         weekAllResetAt: probe.weekAllResetAt,
         ...(probe.weekFablePct !== undefined ? { weekFablePct: probe.weekFablePct } : {}),
       };
+    jsonOut['providers'] = reports.map((report) => ({
+      provider: report.provider,
+      ...(report.result === null
+        ? { unavailable: true, status: getMessage('cli.batch.limits.unavailable', lang) }
+        : report.result),
+    }));
     jsonOut['verdict'] = gateResult.verdict;
     jsonOut['gate'] = {
       enabled: gateConfig.enabled ?? false,
@@ -305,6 +401,15 @@ export async function runLimitsCommand(
   }
 
   print(getMessage('limits.header', lang));
+
+  if (reports.length > 0) {
+    const headers = [
+      'Provider',
+      getMessage('limits.col_usage', lang),
+      getMessage('limits.col_resets', lang),
+    ];
+    print(formatTable(headers, reports.flatMap((report) => providerRows(report, lang))));
+  }
 
   if (probe.unavailable) {
     print(getMessage('limits.unavailable', lang, { reason: probe.reason }));
@@ -347,10 +452,14 @@ export async function runLimitsCommand(
 }
 
 export function registerLimits(program: Command): void {
-  program
+  const command = program
     .command('limits')
     .description(getMessage('cli.limits.desc', getLanguage(undefined)))
-    .option('--json', getMessage('cli.governance.opt.json', getLanguage(undefined)))
+    .option('--json', getMessage('cli.governance.opt.json', getLanguage(undefined)));
+  for (const filter of LIMITS_PROVIDER_FILTERS) {
+    command.option(filter.option, getMessage(filter.helpKey, getLanguage(undefined)));
+  }
+  command
     .action(async (opts: LimitsCommandOpts) => {
       await runLimitsCommand(opts);
     });

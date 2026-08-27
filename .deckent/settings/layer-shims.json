@@ -37,7 +37,7 @@
       "src/api/server.ts|import|src/cli/commands/doctor.ts|runDoctorChecks",
       "src/api/server.ts|import|src/cli/commands/history.ts|parseSprintLog",
       "src/api/server.ts|import|src/cli/helpers/messages.ts|getLanguage,getMessage",
-      "src/cli/commands/audit-verify.ts|import|src/api/terminal/audit-integrity.ts|loadOrCreateAuditKey,verifyAuditChain",
+      "src/cli/commands/audit.ts|import|src/api/terminal/audit-integrity.ts|loadOrCreateAuditKey,verifyAuditChain",
       "src/cli/commands/serve.ts|import|src/api/serve-daemon-meta.ts|clearServeDaemonMeta,writeServeDaemonMeta",
       "src/cli/commands/serve.ts|import|src/api/server.ts|AcceptanceConfirmationRuntimeAuditEvent,AcceptanceConfirmationRuntimeOptions,createHttpServer",
       "src/cli/commands/serve.ts|import|src/api/terminal/session-backend.ts|LocalPtyBackend",

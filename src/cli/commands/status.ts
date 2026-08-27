@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import type { Command } from 'commander';
 import { AgentStatus, SprintPhase, SprintStatus } from '../../core/types.js';
 import type { AgentInfo, DashboardState, Task } from '../../core/types.js';
+import { getDebtItems } from '../../core/debt-store.js';
 import { DASHBOARD_FILE, DECKENT_DIR } from '../../core/constants.js';
 import {
   checkWorkerLiveness,
@@ -49,6 +50,7 @@ import {
 } from '../../orchestra/run-flow-death-sweep.js';
 
 interface StatusOpts {
+  debt?: boolean;
   watch?: boolean;
   follow?: boolean;
   json?: boolean;
@@ -1165,8 +1167,19 @@ export function registerStatus(
     .option('--no-color', getMessage('cli.runtime.status.opt.no_color', registerLang))
     .option('--graph', getMessage('cli.runtime.status.opt.graph', registerLang))
     .option('--mode <mode>', getMessage('cli.runtime.status.opt.mode', registerLang))
+    .option('--debt', getMessage('cli.runtime.status.opt.debt', registerLang))
     .action(async (opts: StatusOpts) => {
       const root = resolveProjectRoot();
+      if (opts.debt) {
+        // archive-debt alias'ının hedef-yüzeyi (702 el-kapanışı): DB-first debt raporu.
+        const debtItems = getDebtItems(root);
+        const openDebt = debtItems.filter(item => !item.resolved);
+        output(getMessage('cli.runtime.status.debt_summary', getLangFromRoot(root), {
+          open: String(openDebt.length),
+          resolved: String(debtItems.length - openDebt.length),
+        }));
+        return;
+      }
       const dashPath = join(root, DASHBOARD_FILE);
       const lang = getLangFromRoot(root);
       let deathSweepReport: DeathSweepReport | undefined;
