@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "99f2e661ddcc5809984af8bcd5a6096d1eba8ab6fa8fc1ae8019777c6e1367c5"
+    "value": "15650c22b41f7ad82afa54d2b7a09e2a682030be9d01a1da7c4b9109a671993b"
   },
   "summary": {
     "total": 541,
@@ -1271,7 +1271,7 @@
       "state": "OPEN",
       "updated": "2026-08-27",
       "definitionDigest": "affa73dba942930e93ce15c1da3431ff7b7bf67c31aa14c16443f9dde69c5190",
-      "progressDigest": "97bad6c17469e0272fbb174c589b97fb507845e8904c116df08db0ed24070ec9",
+      "progressDigest": "89029e0be4832f7f65913458be4cb9b263baf59fb6822911e03c138a6e9a3a88",
       "terminalClosureDigest": null
     },
     {
@@ -10643,7 +10643,7 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Dilim-1: help/komut yüzeyi EN-default (i18n katalog korunur); komutlar tema-gruplu (çalıştırma/izleme/yaşam-döngüsü/katalog/sağlayıcılar/ortam/servisler/ileri + autonomous-flow + enterprise/RBAC grupları); gizli-komut sınıfı ölür (limits/bot/mcp/evolve envantere girer); eriyen-çiftler (plan-nl→do · dashboard→status --watch · attach+output→watch · archive-debt→status --debt · analyze alias) alias+typed-deprecation ile birleşir; temel = surface-contract registry (help/docs/completion/MCP-parity tek kaynaktan) + consumer-closure gate (owner: \"doğru ve olması gereken\"). Dilim-2 (ayrı admission): yarım-çalışan komut onarımı — kpi tarihçe/data-log (eskiye dönüş yok), evolve, limits provider-geneli (--claude/--codex/--cursor + tümü). Dilim-3 (ayrı admission): prompt-first native chat (deckent [prompt] — iddiasız).",
-      "evidence": "Owner sohbet-kararları 2026-08-27: ürün/komut deckent SABİT (rename iptal — yayın @verhex/deckent); \"cli ingilizce olmalı\"; \"ilk iş profesyonel ayrım kabul edebiliriz\"; kanıt: limits yalnız-Claude + limits/bot/mcp -h-dışı (gizli) disk-doğrulandı",
+      "evidence": "Owner sohbet-kararları 2026-08-27: ürün/komut deckent SABİT (rename iptal — yayın @verhex/deckent); \"cli ingilizce olmalı\"; \"ilk iş profesyonel ayrım kabul edebiliriz\"; kanıt: limits yalnız-Claude + limits/bot/mcp -h-dışı (gizli) disk-doğrulandı v2 owner-yönlendirmeleri (2026-08-27 sohbet-2): TEK onay-yüzeyi (approvals ← confirmations+checkpoint+autonomous-pending+nervous-decide+runs-decide; backend federasyonu approval-inbox-federation.ts MEVCUT); audit-verify → `audit verify`; autonomous-mission → `autonomous mission`; recall/remember → `memory` altına; paralel komutlar alias DEĞİL pencere-sonrası KALDIRILIR (12 kaldırma-listesi); explain → `retro --explain`; grup-şeması v2 (12 grup, Control adı, retro İZLEME'ye); bar: claude/codex profesyonelliği; derin-çalışma + tasarım: follow-up-works/cli-surface-reform-karar.md v2",
       "updated": "2026-08-27"
     },
     {
@@ -27350,6 +27350,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "0f6c09743164efd3d8fa54ef0264dc27df2b06f416c7e2e31e9363c81edf3f94"
+    "value": "8c603f7c952b32ae26cc2c0254b90786a4ab4f323cde8c7eb5cabfb7eb617cc3"
   }
 }

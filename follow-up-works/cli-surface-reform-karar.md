@@ -1,134 +1,113 @@
-# CLI-SURFACE-REFORM — Dilim-1 Karar-Dokümanı (önce/sonra `-h` + tam envanter)
+# CLI-SURFACE-REFORM — Karar-Dokümanı **v2** (owner yönlendirmeleri işlendi, 2026-08-27)
 
-> **Silinme-tetiği (delete-on-consume):** Alperen §6 karar-noktalarını karara bağlayıp
-> dilim-1 DIRECTIVES'ine onay verdiğinde bu doküman SİLİNİR — kalıcı kayıt MASTER 545
-> `CLI-SURFACE-REFORM-001` satır-kanıtı olur.
-> Kaynak: owner sohbet-kararları 2026-08-27 ("cli ingilizce olmalı" · "ilk iş profesyonel
-> ayrım" · autonomous+enterprise grupları · kpi/evolve yarım-sınıfı). Envanter yöntemi:
-> 78 komut × gerçek-binary `-h` probe (78/78 exit-0) + 13 şüpheli × fonksiyonel probe.
+> **Silinme-tetiği (delete-on-consume):** Alperen v2 gruplamayı + §4 kalan-soruları
+> onaylayınca dilim-1 DIRECTIVES'ine dönüşür ve bu doküman SİLİNİR (kalıcı kayıt MASTER 545).
+> **v2 değişiklikleri (owner, 2026-08-27):** approvals+confirmations TEK onay-yüzeyi ·
+> audit+audit-verify birleşir · otonom grubu yeniden düzenlendi · paralel komutlar alias
+> değil KALDIRILIR (pencere-sonrası) · yaşam-döngüsü derin-çalışıldı · bar: claude/codex.
 
-## 1. Yönetici özeti — sorunun ölçüsü
+## 1. Konsolidasyon politikası (v2 — sertleşti)
 
-- `deckent -h` bugün **80 komutu tek düz listede** basıyor (164 satır, 0 grup).
-- Açıklamalar **TR/EN karışık** (örn. "Initialize a new Deckent project" ↔ "Güncel run
-  dashboard'ını göster").
-- **Çift-yüzeyler:** hedeften-plana 4 kapı (do/plan-nl/set-directives/plan), gözlem 3 kapı
-  (attach/watch/output), dashboard↔status --watch, analyze↔analyze-project alias.
-- **Yarım-işlev sınıfı (dilim-2 onarım-backlog'u, §5):** kpi tek-sprint (tarihçe yok),
-  limits YALNIZ Claude, usage YALNIZ Claude-modelleri, truth çıktısında ham `undefined`
-  hücre, evolve (owner-işaretli).
-- Gerçek gizli komut tek: `gateway-runtime` (bilinçli, hidden:true). Sabahki "limits/bot/mcp
-  gizli" tespitim yanlıştı — help'i `head -80` ile kesmişim; onlar sayfa-altındaydı.
-  Sorun gizlilik değil, **80-satırlık düz enkaz**.
+Aynı işlevin paralel komutu YAŞAMAZ: tek kanonik komut + flag/alt-komut. Eskiler bir
+sürüm-penceresi typed-deprecation uyarısı verir, sonra **KALDIRILIR** (kalıcı alias yok).
 
-## 2. Envanter + hedef-grup + disposition (80 komut)
+## 2. TEK ONAY-YÜZEYİ tasarımı (owner-talimatı; en büyük birleşim)
 
-Durum: ✅ çalışıyor · 🟡 yarım-işlev · 📦 alt-komut konteyneri (-h sağlıklı) · ⚪ derin-doğrulama dilim-1'de
-
-| Hedef grup | Komut(lar) | Durum | Disposition |
-|---|---|---|---|
-| **ÇALIŞTIRMA** | `do` | ✅ | kalır; `plan-nl`'i YUTAR |
-| | `run` · `plan` · `start` · `runs` | ✅ | kalır |
-| | `plan-nl` | ✅ | → `do` (alias+deprecation) |
-| | `set-directives` | ✅ | → ileri |
-| **İZLEME** | `status` | ✅ | kalır; `dashboard`'ı yutar (`--watch`) |
-| | `watch` | ✅ | kalır; `attach`+`output`'u yutar |
-| | `inspect` · `history` · `explain` | ✅ | kalır |
-| | `dashboard` · `attach` · `output` | ✅ | → alias+deprecation |
-| | `resources` · `cu-status` | ✅ | kalır (İZLEME altı) |
-| **YAŞAM-DÖNGÜSÜ** | `review` · `retro` · `cleanup` · `kill` · `checkpoint` · `recover` | ✅/⚪ | kalır |
-| | `finalize` | ✅ | → ileri (normalde lifecycle otomatiği) |
-| **ONAY & GÜVEN** | `approvals` · `confirmations` · `xverify` · `audit` · `audit-verify` | ✅/📦 | kalır |
-| | `truth` | 🟡 | kalır; `undefined`-hücre onarımı dilim-2 |
-| **OTONOM** | `autonomous` · `autonomous-mission` · `nervous` · `heartbeat` | 📦/✅ | kalır (owner: ayrı grup) |
-| **ENTERPRISE** | `rbac` · `gateway` · `execution-authority` · `provider-authority` | 📦/⚪ | kalır (owner: ayrı grup) |
-| **KATALOG & BİLGİ** | `agent` · `skill` · `docs` · `models` · `memory` · `recall` · `remember` | ✅/📦 | kalır |
-| | `kpi` | 🟡 | KARAR-3: `evolve` ile tek analitik-yüzeye birleşim |
-| | `evolve` | 🟡📦 | KARAR-3 (tanımı "cross-sprint trends" — kpi-tarihçesiyle çakışıyor) |
-| | `image` · `trace` | ⚪/📦 | → ileri (training/tooling) |
-| **SAĞLAYICILAR** | `connect` · `limits` · `usage` · `cost` · `local-llm` | 🟡/📦 | kalır; limits+usage provider-geneli dilim-2 |
-| | `openrouter-probe` · `provider-observations` | ⚪ | → ileri |
-| **ORTAM** | `init` · `onboard` · `config` · `doctor` · `sync` · `upgrade` · `plugin` · `analyze` · `features` | ✅ | kalır; `analyze-project` alias düşer |
-| | `archive-debt` | ✅ | → `status --debt` (alias+deprecation) |
-| **SERVİSLER** | `serve` · `bot` · `mcp` | ✅/📦 | kalır |
-| **CHAT** | `chat` | ✅ | dilim-3: prompt-first native (`deckent [prompt]`) |
-| **İLERİ (advanced grubu — görünür ama ayrı başlık)** | `spawn` · `test` · `process` · `mode` · `flow` · `task` · `archive` · `config-nervous`(alt) · `trace` · `image` · `set-directives` · `finalize` · `openrouter-probe` · `provider-observations` | ✅/📦/⚪ | kalır (İLERİ) |
-
-⚪ olanlar dilim-1 uygulamasının ilk adımında (yüzey-envanter denetimi) fonksiyonel probe'dan geçirilir; yarım çıkan dilim-2 backlog'una satır olarak eklenir.
-
-## 3. ÖNCE — bugünkü `-h` (gerçek çıktı, temsilî kesit)
+**Bulgu:** bugün ALTI ayrı onay-kapısı var: `approvals` · `confirmations` · `checkpoint
+approve/reject` · `autonomous pending/approve/reject` · `nervous accept/reject` ·
+`runs --approve/--reject`. **Backend federasyonu ZATEN mevcut**
+(`approval-inbox-federation.ts`: confirmation/checkpoint/autonomous-trigger/nervous/
+panic-guard/bot-action/gateway-pairing origin'leri) — iş, CLI'ı tek kapıya bağlamak:
 
 ```
-Usage: deckent [options] [command]
-Commands:                       ← 80 komut, tek düz liste, 164 satır
-  init [options]                     Initialize a new Deckent project        ← EN
-  status [options]                   Güncel run dashboard'ını göster         ← TR
-  dashboard [options]                ... (see also: deckent status --watch)  ← çift
-  plan-nl [options] <goal>           ... DIRECTIVES.md scaffold              ← do'nun kopyası
-  attach / watch / output            ← üç gözlem kapısı
-  ... (+72 komut daha, gruspuz, karışık dilde)
+deckent approvals                       # federated inbox (tüm sınıflar, tek liste)
+deckent approvals list [--class checkpoint|confirmation|autonomous|nervous|plan]
+deckent approvals decide <id>           # tek karar-verbi (interaktif TTY re-auth — §12.2 korunur)
+deckent approvals rules                 # kalıcı kurallar (mevcut)
+deckent approvals run-llm               # confirmations'ın LLM-adapter koşusu (xverify runtime)
 ```
 
-## 4. SONRA — hedef `-h` (EN-default; TR = config lang opt-in)
+Emilen komutlar (pencere-sonrası kaldırılır): `confirmations` (list/decide/run) ·
+`checkpoint` (list/approve/reject) · `autonomous pending/approve/reject` ·
+`nervous accept/reject/accept-panic` (nervous'un edit/undo/history'si kalır — onlar
+onay değil, öneri-yönetimi). `runs --approve/--reject` de inbox'a `plan` sınıfı olarak
+düşer (runs listesi kalır; karar-verbi approvals'a taşınır).
+Kural korunur: **MCP read-only inbox; decide YALNIZ CLI live-auth** (CLOSURE-brief §12.2).
+
+## 3. Yaşam-döngüsü DERİN-ÇALIŞMASI (owner-talebi: "ne işe yaradıkları, gerçek birleşme")
+
+| Komut | Gerçekte ne yapıyor (probe-kanıtlı) | Hüküm |
+|---|---|---|
+| `review` | Sprint task'larını değerlendirmeyle listeler; `--approve-all/--reject-all` insan-kararı içerir | KALIR (Run-sonrası değerlendirme); onay-verbleri §2 inbox'ına devrolur |
+| `retro` | SALT-OKUR retrospektif projeksiyonu (--compare/--perf/--trend) | **İZLEME grubuna taşınır** (aksiyon değil rapor) |
+| `explain` | Son sprint'in NL özeti + task routing-log projeksiyonu | **`retro`'ya emilir** → `retro --explain [--task id]` (aynı okuma-ailesi; paralel-komut kuralı) |
+| `cleanup` | Sprint-sonrası artifact süpürme + `--decay` + runtime-history planı | KALIR |
+| `finalize` | Terminal settlement projeksiyonu (DB-first; normalde lifecycle otomatiği) | İLERİ (elle-seam; recover ile aynı aile) |
+| `kill` | Worker sonlandırma (panic-guard'lı) | KALIR |
+| `recover` | Çökmüş/takılı sprint kanonik kurtarma (--resume dahil) | KALIR |
+| `checkpoint` | Faz-bazlı insan onayı list/approve/reject | **§2 inbox'ına emilir** |
+
+Grup adı önerisi: "Yaşam-döngüsü" yerine **Control** (kill · recover · cleanup) — review
+Run-ailesine yaslanır, retro/explain İZLEME'ye gider. (claude/codex'te de lifecycle diye
+ayrı başlık yok; az-grup = profesyonel.)
+
+## 4. Diğer birleşimler (owner-talimatları uygulandı)
+
+- **`audit verify`**: `audit-verify` ayrı komut olmaktan çıkar → `deckent audit verify`
+  alt-komutu (HMAC-zincir doğrulaması; tek verb'lük ayrı komut gereksizdi). ✔ birleşebilir.
+- **`autonomous mission ...`**: `autonomous-mission` ayrı komut olmaktan çıkar →
+  `deckent autonomous mission create-list|create-goal|list`.
+- **`memory recall|remember`**: `recall` ve `remember` bağımsız komutları `memory`
+  altına iner (`deckent memory recall "<q>"` · `memory remember "<not>"`) — paralel-komut
+  kuralının aynısı.
+- **`status --watch` / `watch <task>`**: `dashboard` ve `attach` KALDIRILIR (pencere
+  sonrası); `output <taskId>` → `watch --logs <taskId>`. Tek canlı-izleme çifti kalır:
+  genel = `status --watch`, tekil-worker = `watch`.
+- `analyze-project` alias'ı, `plan-nl`, `archive-debt` → kaldırma-listesi (do /
+  status --debt emer).
+
+## 5. v2 hedef `-h` (EN-default; TR = config lang)
 
 ```
 Usage: deckent [options] [prompt]
 
-  deckent "<prompt>"        start a native chat session          (dilim-3)
-  deckent do "<goal>"       plan a run from a goal (dry-run first)
+  deckent "<prompt>"     start a native chat session            (dilim-3)
+  deckent do "<goal>"    plan a run from a goal (dry-run first)
 
-Run          do · run · plan · start · runs
-Observe      status · watch · inspect · history · explain · resources
-Lifecycle    review · retro · cleanup · kill · checkpoint · recover
-Trust        approvals · confirmations · xverify · audit · truth
-Autonomous   autonomous · autonomous-mission · nervous · heartbeat
-Enterprise   rbac · gateway · execution-authority · provider-authority
-Catalog      agent · skill · docs · models · memory
-Providers    connect · limits · usage · cost · local-llm
-Environment  init · onboard · config · doctor · sync · upgrade · plugin · analyze
-Services     serve · bot · mcp
-Advanced     run `deckent help advanced` for the full expert surface
+Run           do · run · plan · start · runs · review
+Observe       status · watch · inspect · history · retro · resources
+Control       kill · recover · cleanup
+Approvals     approvals                       ← TEK onay-kapısı (federated inbox)
+Verify        xverify · audit · truth
+Autonomy      autonomous · nervous · heartbeat
+Enterprise    rbac · gateway · execution-authority · provider-authority
+Catalog       agent · skill · docs · models · memory
+Providers     connect · limits · usage · cost · local-llm
+Environment   init · onboard · config · doctor · sync · upgrade · plugin · analyze
+Services      serve · bot · mcp
+Advanced      deckent help advanced           ← spawn·test·process·mode·flow·task·archive·trace·image·set-directives·finalize·features·openrouter-probe·provider-observations
 
-Deprecated aliases (one release window, typed warning):
-  dashboard→status --watch · attach|output→watch · plan-nl→do · archive-debt→status --debt
+Removals after one deprecation window:
+  confirmations · checkpoint · audit-verify · autonomous-mission · dashboard ·
+  attach · output · explain · recall · remember · plan-nl · archive-debt
 ```
 
-~80 → **görünür ~45 komut, 11 grup**; hiçbir işlev silinmez — İLERİ grubu + alias'lar taşır.
+80 düz komut → **12 grup / ~44 görünür komut / 12 kaldırma**. İşlev kaybı yok — hepsi
+kanonik komutların altına taşınıyor.
 
-## 5. Dilim-2 onarım-backlog'u (bu dokümanla kanıtlandı; ayrı admission)
+## 6. Kalan owner-soruları (v2 tüketim-koşulu)
 
-1. `kpi` — yalnız son sprint; tarihçe/data-log yok, `--sprint N`/trend yok (owner-bulgusu;
-   probe: "KPI Karnesi — sprint-698" tek tablo). KARAR-3'e bağlı: `evolve` ile birleşim.
-2. `limits` — yalnız Claude aboneliği; hedef: bağlı TÜM provider'lar + `--claude/--codex/--cursor`.
-3. `usage` — tablo yalnız Claude-modelleri (probe: fable/opus satırları; codex/cursor yok) —
-   limits ile aynı provider-genelleme sınıfı.
-4. `truth` — proof sütununda ham `undefined` render (probe-kanıtı) — projection bug'ı.
-5. Çıktı-dili: runtime çıktıları da EN-default'a çekilir (TR config-lang ile).
+1. **Autonomy grubu v2:** `autonomous` (mission'lı) · `nervous` · `heartbeat` üçlüsü —
+   şimdi doğru mu, yoksa nervous/heartbeat'i başka başlık altında mı istersin?
+2. **`review`nin yeri:** Run-ailesinde mi (önerim), Control'de mi?
+3. **`explain`→`retro --explain` emilimi:** onay?
+4. **Kaldırma-penceresi:** bir minör sürüm mü, ilk public release'e kadar mı?
+5. **`runs --approve/--reject`'in inbox'a devri:** onay? (runs listesi kalıyor, yalnız
+   karar-verbi taşınıyor.)
 
-## 6. Owner karar-noktaları (tüketim-koşulu)
+## 7. Mekanizma + dilim-2/3 (değişmedi)
 
-1. **Gruplama (§2/§4):** onay? İtiraz ettiğin yerleşim var mı (özellikle: `finalize`/
-   `set-directives`/`process` İLERİ'de; `runs` ÇALIŞTIRMA'da + `history` İZLEME'de ayrı)?
-2. **İLERİ grubunun görünürlüğü:** ana `-h`'de tek satır özet + `deckent help advanced`
-   (önerim) mi, yoksa ana listede ayrı başlık altında tam liste mi?
-3. **kpi+evolve birleşimi:** tek analitik-yüzey (`deckent kpi` altında trend/tarihçe;
-   evolve alias) — onay?
-4. **Alias-penceresi:** deprecated alias'lar kaç sürüm yaşasın? (Önerim: ilk public
-   release'e kadar + bir minör.)
-5. **Runtime çıktı-dili:** help ile birlikte çıktılar da EN-default (TR = `config lang`) — onay?
-
-## 7. Mekanizma (dilim-1'in temeli — owner-onaylı yön)
-
-- **Surface-contract registry:** komut ağacı + grup + açıklama-i18n-key + flag'ler tek
-  makine-okunur kaynakta; `-h`, docs komut-referansı, shell-completion ve MCP-parity
-  (`cli-mcp-parity-baseline.json` gate'i) buradan ÜRETİLİR → "unutulan bağlantılı yüzey"
-  sınıfı build-hatasına döner.
-- **Consumer-closure gate** (owner: "doğru ve olması gereken"): yüzey değişince etkilenen
-  tüketici-testleri registry/import-grafiğinden türetilir, elle seçilmez.
-- Alias/deprecation: typed uyarı, sessiz kırılma yok (NEVER-MVP).
-
-## 8. Uygulama şekli
-Dogfood sprint dilimleri (Ders-31 disipliniyle): (a) registry + üretim zinciri,
-(b) gruplama + alias'lar + EN-help, (c) envanter-denetimi otomasyonu + consumer-closure
-gate. Dilim-2 (onarımlar) ve dilim-3 (prompt-first chat) ayrı admission. Sıra: ladder
-dalgası (3301/3302/3304→3299) bittikten sonra.
+Surface-contract registry (help/docs/completion/MCP-parity tek kaynaktan) + consumer-closure
+gate + EN-default. Dilim-2 onarımlar: kpi+evolve tek analitik-yüzey (tarihçe/trend),
+limits+usage provider-geneli, truth `undefined`-hücre, runtime-çıktı dili. Dilim-3:
+prompt-first native chat. Uygulama: ladder-dalga sonrası, dogfood sprint dilimleriyle.
