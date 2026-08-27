@@ -90,6 +90,7 @@ import {
   openTaskSettlementProjection,
 } from '../core/task-settlement-authority.js';
 import { getLanguage, getMessage } from './helpers/messages.js';
+import { SURFACE_REGISTRY, listByGroup, type SurfaceCommand } from './surface-registry.js';
 import {
   applyLocalizedHelp,
   attachRootHelpFooter,
@@ -98,6 +99,62 @@ import {
 
 export interface CliProgramRuntime {
   readonly providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+}
+
+const ROOT_HELP_GROUPS = ['run', 'observe', 'control', 'system'] as const;
+
+function formatDeprecatedRow(command: SurfaceCommand, lang: string): string {
+  return getMessage('cli.root_help.deprecated_row', lang, {
+    name: command.name,
+    replacement: command.deprecation?.replacement ?? '',
+  });
+}
+
+/** Render the compact v2.1 root surface directly from the canonical registry. */
+export function formatGeneratedRootHelp(lang: string): string {
+  const lines = [
+    getMessage('cli.root_help.usage', lang),
+    '',
+    `  ${getMessage('cli.root_help.prompt_chat', lang)}`,
+    `  ${getMessage('cli.root_help.prompt_do', lang)}`,
+    '',
+  ];
+
+  for (const group of ROOT_HELP_GROUPS) {
+    const names = listByGroup(group).map((command) => command.name).join(' · ');
+    lines.push(`${getMessage(`cli.root_help.group.${group}`, lang).padEnd(10)} ${names}`);
+  }
+  lines.push(
+    `${getMessage('cli.root_help.group.advanced', lang).padEnd(10)} ${getMessage('cli.root_help.advanced_link', lang)}`,
+    '',
+    getMessage('cli.root_help.deprecated_heading', lang),
+  );
+  for (const command of SURFACE_REGISTRY.filter(({ status }) => status === 'deprecated')) {
+    lines.push(`  ${formatDeprecatedRow(command, lang)}`);
+  }
+  return `${lines.join('\n')}\n`;
+}
+
+/** Render every advanced and deprecated registry row in canonical order. */
+export function formatGeneratedAdvancedHelp(lang: string): string {
+  const commands = SURFACE_REGISTRY.filter(({ status }) => status !== 'visible');
+  const width = Math.max(...commands.map(({ name }) => name.length));
+  const lines = [
+    getMessage('cli.root_help.advanced_usage', lang),
+    '',
+    getMessage('cli.root_help.advanced_heading', lang),
+    '',
+  ];
+  for (const command of commands) {
+    const summary = getMessage(command.summaryKey, lang);
+    const suffix = command.status === 'deprecated'
+      ? ` (${getMessage('cli.root_help.deprecated_label', lang, {
+        replacement: command.deprecation?.replacement ?? '',
+      })})`
+      : '';
+    lines.push(`  ${command.name.padEnd(width)}  ${summary}${suffix}`);
+  }
+  return `${lines.join('\n')}\n`;
 }
 
 /**
@@ -244,11 +301,25 @@ export function buildProgram(runtime: CliProgramRuntime = {}): Command {
   registerLocalLlm(program);
   registerHelp(program);
 
+  program
+    .command('help [topic]', { hidden: true })
+    .description(getMessage('cli.root_help.help_command_desc', getLanguage(undefined)))
+    .action((topic?: string) => {
+      const lang = getLanguage(undefined);
+      process.stdout.write(topic === 'advanced'
+        ? formatGeneratedAdvancedHelp(lang)
+        : formatGeneratedRootHelp(lang));
+    });
+
   // Applied AFTER every registration so the localized help configuration
   // reaches the whole tree (Commander only copies inherited settings at
   // subcommand-creation time). The root footer belongs to the root only.
   attachRootHelpFooter(program, helpLabels);
   applyLocalizedHelp(program, helpLabels);
+  program.configureHelp({
+    ...program.configureHelp(),
+    formatHelp: () => formatGeneratedRootHelp(getLanguage(undefined)),
+  });
 
   return program;
 }

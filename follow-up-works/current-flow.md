@@ -71,6 +71,14 @@ docs/POST-PRODUCT.md silinmesi docs/-süpürmesiyle 5b88f4539'a istemeden girdi 
 içerik c204e09fe'de public-history'de duruyor — tam-gizlilik istenirse history-rewrite ayrı
 owner-kararı (Eylül adayı).
 
+**KAPANIŞ (akşam-4):** **CLI dilim-1a LANDED** — sprint-701 (2/4 worker; 003 FIX-sarmalı =
+Ders-31 çapraz-kirlilik, direktif-hatam) + el-kapanış: 31/31 yeşil, tsc-0, 20-gate yeşil,
+GERÇEK-BINARY yeni `-h` (164→24 satır, 4 grup + Advanced + deprecated-bloğu). Registry
+canlı-evren gerçeğini de kanıtladı (eski tarayıcı local-llm'i görmüyordu). CI Eylül-askısında
+— doğrulama tamamen lokal-ritüel. **DURUM: kısa-vade kapanış tamam; owner'ın ara-işi bekleniyor.**
+Kuyruk-artığı (owner dönünce): dilim-1b (kaldırmalar+onay-federasyonu) · 3284/publication-
+contract · CI-watch 6181 · flip-merdiveni.
+
 ## SIRADAKİ (bu sıra ile)
 
 1. ~~Sprint-699~~ ✅ landed (bu commit); replay r5 kısmi-yeşil — tam sertifika 3284'e bağlı.

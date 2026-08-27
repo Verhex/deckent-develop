@@ -17,6 +17,53 @@ type MessageMap = Record<string, Record<string, string>>;
  * `getMessage()`.
  */
 const BASE_MESSAGES: MessageMap = {
+  // ─── Generated root/advanced help (CLI surface reform v2.1) ───────
+  'cli.root_help.usage': {
+    en: 'Usage: deckent [options] [prompt]',
+    tr: 'Kullanım: deckent [seçenekler] [prompt]',
+  },
+  'cli.root_help.prompt_chat': {
+    en: 'deckent "<prompt>"     start a native chat session',
+    tr: 'deckent "<prompt>"     yerel bir sohbet oturumu başlat',
+  },
+  'cli.root_help.prompt_do': {
+    en: 'deckent do "<goal>"    plan a run from a goal (dry-run first)',
+    tr: 'deckent do "<hedef>"   bir hedeften run planla (önce dry-run)',
+  },
+  'cli.root_help.group.run': { en: 'Run', tr: 'Run' },
+  'cli.root_help.group.observe': { en: 'Observe', tr: 'Observe' },
+  'cli.root_help.group.control': { en: 'Control', tr: 'Control' },
+  'cli.root_help.group.system': { en: 'System', tr: 'System' },
+  'cli.root_help.group.advanced': { en: 'Advanced', tr: 'Advanced' },
+  'cli.root_help.advanced_link': {
+    en: 'deckent help advanced',
+    tr: 'deckent help advanced',
+  },
+  'cli.root_help.deprecated_heading': {
+    en: 'Deprecated commands (use the replacement shown):',
+    tr: 'Kullanımdan kaldırılacak komutlar (gösterilen karşılığı kullanın):',
+  },
+  'cli.root_help.deprecated_row': {
+    en: '{name} → {replacement}',
+    tr: '{name} → {replacement}',
+  },
+  'cli.root_help.advanced_usage': {
+    en: 'Usage: deckent help advanced',
+    tr: 'Kullanım: deckent help advanced',
+  },
+  'cli.root_help.advanced_heading': {
+    en: 'Advanced commands',
+    tr: 'İleri düzey komutlar',
+  },
+  'cli.root_help.deprecated_label': {
+    en: 'deprecated; use {replacement}',
+    tr: 'kullanımdan kaldırılıyor; {replacement} kullanın',
+  },
+  'cli.root_help.help_command_desc': {
+    en: 'Display curated help topics',
+    tr: 'Seçilmiş yardım konularını göster',
+  },
+
   // ─── runtime hygiene operator vocabulary (RH14-I18N) ────────────────
   // Only bounded aggregate fields cross this presentation boundary. In
   // particular, paths, authority identities, digests, and secrets are never
@@ -7631,6 +7678,10 @@ const BASE_MESSAGES: MessageMap = {
   'cli.docs.sync.desc': {
     en: 'Update memory.db only (no front-matter writes)',
     tr: 'Yalnız memory.db\'yi güncelleyin (front-matter yazılmaz)',
+  },
+  'cli.help_command.desc': {
+    en: 'Print help for deckent or a specific command',
+    tr: 'Deckent veya belirli bir komut için yardımı yazdır',
   },
   'cli.doctor.desc': {
     en: 'Check system dependencies and health',

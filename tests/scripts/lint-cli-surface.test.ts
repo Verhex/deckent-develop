@@ -70,8 +70,11 @@ function writeCliIndex(tmpRoot: string): void {
     path,
     [
       "import { getMessage, getLanguage } from './helpers/messages.js';",
+      "import { registerFoo } from './commands/foo.js';",
       'export function buildProgram(program) {',
       "  program.description(getMessage('cli.program.desc', getLanguage(undefined)));",
+      "  program.command('foo').description(getMessage('cli.foo.desc', getLanguage(undefined)));",
+      '  registerFoo(program);',
       '}',
       '',
     ].join('\n'),
@@ -147,6 +150,8 @@ function buildFullCleanTree(tmpRoot: string): void {
   writeCliIndex(tmpRoot);
   writeMcpFoo(tmpRoot, 'description: mcpToolDescription(\'deckent_foo\'),');
   writeDescriptionCatalog(tmpRoot, 'cli.foo.desc');
+  // The parity gate now reads the CLI surface registry as a second authority.
+  writeCliSurfaceRegistry(tmpRoot, ['foo']);
   writeBaseline(tmpRoot);
 }
 
@@ -331,5 +336,114 @@ describe('lint-i18n-hardcode.mjs — commander help-surface scan (CLI-CONTRACT-0
 
     const result = await runScript(join(tmpRoot, 'scripts', 'lint-i18n-hardcode.mjs'), ['--surface-gate']);
     expect(result.code).toBe(0);
+  });
+});
+
+// ─── 701-003 — registration ↔ surface-registry drift gate ───────────────────
+
+const CLI_SURFACE_GATE_SRC = fileURLToPath(new URL('../../scripts/lint-cli-surface.mjs', import.meta.url));
+
+function installCliSurfaceGate(tmpRoot: string): void {
+  writeFileEnsuringDir(
+    join(tmpRoot, 'scripts', 'lint-cli-surface.mjs'),
+    readFileSync(CLI_SURFACE_GATE_SRC, 'utf8'),
+  );
+}
+
+function writeCliSurfaceIndex(tmpRoot: string, registrations: string[]): void {
+  writeFileEnsuringDir(
+    join(tmpRoot, 'src', 'cli', 'index.ts'),
+    [
+      ...registrations.map((name) => `import { register${name} } from './commands/${name.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase()}.js';`),
+      'const program = {};',
+      ...registrations.map((name) => `register${name}(program);`),
+      '',
+    ].join('\n'),
+  );
+}
+
+function writeCliSurfaceRegistry(tmpRoot: string, visible: string[], deprecated: [string, string][] = []): void {
+  writeFileEnsuringDir(
+    join(tmpRoot, 'src', 'cli', 'surface-registry.ts'),
+    [
+      // Satır-başına-bir-row biçimi gerçek registry ile hizalı — parity-script'in
+      // satır-çapası (^\\s*\\[') ancak bu biçimde eşleşir (701 el-kapanışı).
+      'const VISIBLE_ROWS = [',
+      ...visible.map((name) => `  ['${name}', 'system', 'x'],`),
+      '] as const;',
+      'const ADVANCED_ROWS = [] as const;',
+      'const DEPRECATED_ROWS = [',
+      ...deprecated.map(([name, replacement]) => `  ['${name}', 'x', '${replacement}'],`),
+      '] as const;',
+      `export const SURFACE_REGISTRY = [${[...visible, ...deprecated.map(([name]) => name)].map((name) => `{ name: '${name}' }`).join(', ')}] as const;`,
+      '',
+    ].join('\n'),
+  );
+}
+
+function buildCliSurfaceTree(tmpRoot: string): void {
+  installCliSurfaceGate(tmpRoot);
+  writeCliSurfaceIndex(tmpRoot, ['Foo']);
+  writeCliSurfaceRegistry(tmpRoot, ['foo']);
+}
+
+describe('lint-cli-surface.mjs — fail-closed registration drift (701-003)', () => {
+  let tmpRoot: string | undefined;
+  afterEach(() => {
+    if (tmpRoot) rmSync(tmpRoot, { recursive: true, force: true });
+    tmpRoot = undefined;
+  });
+
+  it('fails when an invoked register* command lacks a registry row', async () => {
+    tmpRoot = mkdtempSync(join(tmpdir(), 'lint-cli-surface-'));
+    buildCliSurfaceTree(tmpRoot);
+    writeCliSurfaceRegistry(tmpRoot, []);
+
+    const result = await runScript(join(tmpRoot, 'scripts', 'lint-cli-surface.mjs'), ['--root', tmpRoot]);
+    expect(result.code).toBe(1);
+    expect(result.stdout).toContain('REGISTERED_WITHOUT_REGISTRY: foo');
+  });
+
+  it('fails when a registry row has no invoked register* command', async () => {
+    tmpRoot = mkdtempSync(join(tmpdir(), 'lint-cli-surface-'));
+    buildCliSurfaceTree(tmpRoot);
+    writeCliSurfaceRegistry(tmpRoot, ['foo', 'dead']);
+
+    const result = await runScript(join(tmpRoot, 'scripts', 'lint-cli-surface.mjs'), ['--root', tmpRoot]);
+    expect(result.code).toBe(1);
+    expect(result.stdout).toContain('REGISTRY_WITHOUT_REGISTRATION: dead');
+  });
+
+  it('fails when a deprecated replacement has no registry command', async () => {
+    tmpRoot = mkdtempSync(join(tmpdir(), 'lint-cli-surface-'));
+    buildCliSurfaceTree(tmpRoot);
+    writeCliSurfaceRegistry(tmpRoot, ['foo'], [['old-foo', 'missing --flag']]);
+    writeCliSurfaceIndex(tmpRoot, ['Foo', 'OldFoo']);
+
+    const result = await runScript(join(tmpRoot, 'scripts', 'lint-cli-surface.mjs'), ['--root', tmpRoot]);
+    expect(result.code).toBe(1);
+    expect(result.stdout).toContain('DEPRECATED_REPLACEMENT_MISSING: missing');
+  });
+
+  it('ignores nested alias metadata when reading registry rows', async () => {
+    tmpRoot = mkdtempSync(join(tmpdir(), 'lint-cli-surface-'));
+    installCliSurfaceGate(tmpRoot);
+    writeCliSurfaceIndex(tmpRoot, ['Foo']);
+    writeFileEnsuringDir(
+      join(tmpRoot, 'src', 'cli', 'surface-registry.ts'),
+      "const VISIBLE_ROWS = [['foo', 'system', 'x', ['foo-alias']]] as const;\n"
+      + 'const ADVANCED_ROWS = [] as const;\n'
+      + 'const DEPRECATED_ROWS = [] as const;\n',
+    );
+
+    const result = await runScript(join(tmpRoot, 'scripts', 'lint-cli-surface.mjs'), ['--root', tmpRoot]);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('CLI surface gate clean');
+  });
+
+  it('is green against the real repository', async () => {
+    const result = await runScript(CLI_SURFACE_GATE_SRC);
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('CLI surface gate clean');
   });
 });

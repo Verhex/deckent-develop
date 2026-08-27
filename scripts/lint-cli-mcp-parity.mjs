@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // scripts/lint-cli-mcp-parity.mjs
 //
-// Gate (baseline-ratchet): scans src/cli/commands/*.ts for CLI command names
-// and src/mcp/tools/*.ts for MCP tool registrations, then compares the parity
+// Gate (baseline-ratchet): reads the CLI command names from the canonical
+// surface registry and scans src/mcp/tools/*.ts for MCP tool registrations,
+// then compares the parity
 // gaps against scripts/cli-mcp-parity-baseline.json.
 //
 // Exit 1 only on NEW gaps (a CLI command or MCP tool added without its
@@ -29,45 +30,31 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
 
-// ── 1. Scan CLI commands ──────────────────────────────────────────────────────
+// ── 1. Read CLI commands from the canonical surface registry ──────────────────
 
+const surfaceRegistryPath = join(root, 'src', 'cli', 'surface-registry.ts');
+const surfaceRegistryContent = readFileSync(surfaceRegistryPath, 'utf8');
+
+/** @type {Map<string, string>} commandName → registry source */
+const cliCommands = new Map();
+{
+  // Registry rows are intentionally the only CLI-name source consumed by this
+  // gate.  All three status groups use the same tuple form; the anchored row
+  // pattern avoids aliases and replacement text.
+  const re = /^\s*\['([^']+)',/gm;
+  let m;
+  while ((m = re.exec(surfaceRegistryContent)) !== null) {
+    cliCommands.set(m[1], 'surface-registry.ts');
+  }
+  // Commander'ın örtük built-in `help`'i MCP-parity evreninin dışıdır (MCP'nin
+  // kendi help yüzeyi vardır; framework-builtin'e araç-eşleniği aranmaz — 701).
+  cliCommands.delete('help');
+}
+
+// Description-key parity remains an implementation-level check: it verifies
+// that a shared MCP description is read by an actual CLI command definition.
 const cliDir = join(root, 'src', 'cli', 'commands');
 const cliFiles = readdirSync(cliDir).filter((f) => f.endsWith('.ts'));
-
-/** @type {Map<string, string>} commandName → filename */
-const cliCommands = new Map();
-
-for (const file of cliFiles) {
-  const content = readFileSync(join(cliDir, file), 'utf8');
-
-  // Match `program` (the register-function parameter) followed immediately or
-  // on the next line by `.command('name ...')`.  Uses \s* so both
-  //   program.command('foo')          and
-  //   program\n    .command('foo')    are captured.
-  // We do NOT match sub-commands like `agentCmd.command(...)`.
-  const re = /\bprogram\s*\.command\(\s*['"]([^'"]+)['"]/g;
-  let m;
-  while ((m = re.exec(content)) !== null) {
-    // Strip argument/option specs: 'command <arg> [opt]' → 'command'
-    const baseName = m[1].split(/\s+/)[0];
-    if (!cliCommands.has(baseName)) {
-      cliCommands.set(baseName, file);
-    }
-  }
-}
-
-// Also capture the multi-line pattern: `program\n  .command('foo')`
-for (const file of cliFiles) {
-  const content = readFileSync(join(cliDir, file), 'utf8');
-  const re = /\bprogram\s*\n\s*\.command\(\s*['"]([^'"]+)['"]/g;
-  let m;
-  while ((m = re.exec(content)) !== null) {
-    const baseName = m[1].split(/\s+/)[0];
-    if (!cliCommands.has(baseName)) {
-      cliCommands.set(baseName, file);
-    }
-  }
-}
 
 // ── 2. Scan MCP tools ─────────────────────────────────────────────────────────
 

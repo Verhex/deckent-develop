@@ -676,6 +676,9 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // tests/cli/sync-workspace.test.ts (tmpdir-hermetik, suite-owned).
   // 2026-08-27 11:4x: ayni 16579, digest-only — CI-hizalama: race-barrier taban
   // hizasi + ingress-pin 739 + PLATFORM.md regen (taranan metin kaydi).
+  // 2026-08-27 17:0x: 16592→16604 — sprint-701 (CLI dilim-1a) suite'leri:
+  // surface-registry + root-help + lint-cli-surface + parity-registry testleri
+  // (tmpdir-hermetik) + ana-serit el-kapanis pin/fixture hizalari.
   // 2026-08-27 16:2x: digest-only — 3301 son-metre seam zinciri src kaymalari
   // (policy-terminal helper + lineage POLICY_FIX_EXEMPT + controller/finalizer
   // normalizasyon + honesty-muafiyet + cascade-skip host-kimlik + cleanup-filter).
@@ -699,7 +702,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // tests/core/preflight-typecheck-preference.test.ts (tmpdir-hermetik, suite-owned,
   // child_process spawnSync mock'lu — gerçek komut koşmaz) + budget-fix test ekleri
   // (output.test.ts config-default pini, doctor.test.ts iki budget senaryosu).
-  count: 16592,
+  count: 16604,
   // 2026-08-25 B-sweep: digest moved — --fix roundtrip pin, multi-label
   // parser pin, same-line rule downgraded to WARN (all suite-owned).
   // 2026-08-25 7141 wave: count unchanged, digest moved — the src-side
@@ -743,7 +746,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // attribution-baseline / finalize-retirement + isCanonicalTaskFilename pinleri.
   // 2026-08-26 11:04: 16504→16506 — Node-6a mekanik supurme (sprint-684 3/3):
   // death-sweep hijyen + worker-identity-hostbound + docker-git-async suiteleri.
-  digest: '73878d63b4e6351d3f5079391ece9a47ddfaf50536696c5482981e9f1f418b79',
+  digest: 'bb0a4ad811af8149ab945a511b2e07d26ca5d5be8b3d703ab6398a4b052002be',
   // 2026-08-27 04:0x: ayni 16514, digest-only — full-suite hizalama batch'i
   // (pin/mock/census guncellemeleri + sync guard).
   // 2026-08-27 03:1x: ayni 16514, digest-only — CI-hizalama paketi
@@ -1281,7 +1284,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // (cli-command-contract SSOT, governance catalog, generators).
   // 2026-08-25 exploration-bonus wave: +1 — the route-task-v3 exploration
   // bonus derivation adds one production effect site (cells ledger read).
-  count: 1340,
+  count: 1341,
   // 2026-08-25 config-loss incident hardening: digest moved — atomic
   // last_sprint_id writer (refuse-mint + tmp+rename) and loadConfig
   // self-heal re-read-once + atomic fresh-default.
@@ -1312,6 +1315,8 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // uretim moduli + dalga src kaymalari (config/mcp/cli/orchestra kablolama).
   // 2026-08-26 08:36: 1338→1339 — Node-2: evaluation.tsc_settlement_gate zinciri
   // (finalizer runner-seam) + ERRORS-critical kanal + selfchange-WARN kaymalari.
+  // 2026-08-27 17:0x: 1340→1341 — sprint-701 src: surface-registry + help
+  // renderer modulleri + messages katalog-eki + parity/gate script degisimleri.
   // 2026-08-27 16:2x: ayni 1340, digest-only — 3301 son-metre seam zinciri.
   // 2026-08-27 15:5x: ayni 1340, digest-only — sprint-700 src kaymalari
   // (scheduler-reducer/effects + task-builder inheritance + phases/evaluator).
@@ -1334,7 +1339,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // finalizer + sidecar-loader hotfix).
   // 2026-08-26 11:05: ayni 1339, digest-only — Node-6a src kaymalari
   // (death-sweep / prompt-template kimlik-esigi / docker async-git).
-  digest: '6337a13aef08bc52ab9850f823adb700e0b950791cd8f6b4ece0258e6b279ca4',
+  digest: 'deada76aceb350decf21b4ce7bc64127417722ddc2d21cd259a581b91d0f0b61',
   // 2026-08-27 04:0x: ayni 1339, digest-only — sync workspace-guard + drift-normalize.
   // 2026-08-27 03:1x: ayni 1339, digest-only — skill-pool readJsonSafe donusumu.
   // 2026-08-27 02:0x: ayni 1339, digest-only — Dalga-3 src kaymalari

@@ -17384,3 +17384,34 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 700-004: Integration tests for disposition-gated repair minting and constraint inheritance (DONE)
 
 ---
+## Sprint 701 — sprint-701
+
+**Status:** ABORTED
+**Date:** 2026-08-27
+**Duration:** 1042s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 1 |
+| Coverage | 0.0% |
+| Duration | 1041503ms |
+
+### Tasks
+
+- 701-001: Surface-contract registry — tek makine-okunur komut-kaynağı (DONE)
+- 701-002: Üretilen kök-help — 4 grup + Advanced, EN-default (DONE)
+- 701-003-fix-fix-fix-fix: Fix: Fix: Fix: Fix: Registry↔kayıt uyum-gate'i — fail-closed drift (PENDING)
+- 701-003-fix-fix-fix: Fix: Fix: Fix: Registry↔kayıt uyum-gate'i — fail-closed drift (NO_GO)
+- 701-003-fix-fix: Fix: Fix: Registry↔kayıt uyum-gate'i — fail-closed drift (NO_GO)
+- 701-003-fix: Fix: Registry↔kayıt uyum-gate'i — fail-closed drift (NO_GO)
+- 701-003: Registry↔kayıt uyum-gate'i — fail-closed drift (NO_GO)
+- 701-004-fix-fix: Fix: Fix: MCP-parity gate'inin registry-tüketimi (PAUSED)
+- 701-004-fix: Fix: MCP-parity gate'inin registry-tüketimi (NO_GO)
+- 701-004: MCP-parity gate'inin registry-tüketimi (NO_GO)
+
+---

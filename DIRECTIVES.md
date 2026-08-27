@@ -1,102 +1,93 @@
-# FAILURE-DISPOSITION POLICY — 3301 truthful-terminal dilimi (owner "Öneri kabul", 2026-08-27)
+# CLI-SURFACE-REFORM DİLİM-1a: SURFACE-CONTRACT REGISTRY + ÜRETİLEN HELP (MASTER 545; owner v2.1 onayı)
 
 ## Goal
 
-Admission-reddi sınıfı (host pre-dispatch settlement) FIX-döngüsüne girmeden gerçeğe-uygun
-terminal'e ulaşır: typed, config-resolved failure-disposition policy (T1) bu sınıfı
-NOT_DISPATCHED-terminal yapar ve FIX/re-dispatch'ten muaf tutar; bağımlıları mevcut
-cascade-skip rayına düşer ve run karışık-sonuçla tamamlanır (T2); her policy-uygulaması
-typed disposition-olayı olarak owner-kanalına yazılır — Nervous kapalıyken de çekirdek
-doğru çalışır, açıkken olayı anlatır (T3); zincir hermetik regresyon-mühürüyle korunur (T4).
-Ürün karşılığı: "skill yok / provider yok" sınıfı hatalar FIX-bütçesi yakmaz, run'ı
-rehin almaz, dürüst NOT_DISPATCHED+SKIPPED olarak raporlanır (MASTER 3301 kabulü).
+CLI komut-yüzeyi tek makine-okunur kaynaktan yönetilir hale gelir: surface-contract
+registry (T1) komut-ağacını, grupları, EN-açıklama-anahtarlarını ve durumu (visible /
+advanced / deprecated→removal) taşır; kök `-h` çıktısı bu registry'den ÜRETİLİR (T2 —
+4 grup + Advanced, owner v2.1 şeması, EN-default); registry↔gerçek-kayıt uyum-gate'i
+drift'i fail-closed yakalar (T3); mevcut `cli-mcp-parity` gate'i registry'yi tek-kaynak
+olarak tüketir (T4). Ürün karşılığı: "80 düz komut" enkazı biter; help/docs/parity tek
+kaynaktan; unutulan-bağlantılı-yüzey sınıfı build-hatasına döner.
 
 ## Execution contract
 
-- Kalite barı aynen: i18n-FIRST (user-facing CLI string'i yalnız getMessage en+tr),
-  0-hardcode (reason-kodları/eşikler tek-kaynak sabit veya config'ten), hermetik test
-  (tmpdir; VITEST_MAX_FORKS=2), mevcut-pattern (yeniden icat yok), assertion zayıflatma yasak.
-- Test komutların TASK-SCOPED ve TEKİLDİR (global gate yok, `&&` zinciri yok).
-- Doğrulamanın tükettiği her authority dosyası Reads listendedir; Reads dışına yazma.
-- Nervous default-OFF gerçeği KORUNUR: çekirdek disposition-davranışı Nervous'tan bağımsızdır.
-- Gerçek-binary bounded-replay sertifikası landing-adımıdır (sprint-DIŞI, ana-şerit koşar).
+- Kalite barı aynen (i18n-FIRST · 0-hardcode · hermetik test · mevcut-pattern · assertion
+  zayıflatma yasak). Test komutları TASK-SCOPED ve TEKİL. Authority dosyaları Reads'te.
+- Bu dilim DAVRANIŞ değiştirmez: komutlar çalışmaya devam eder; yalnız help-yüzeyi ve
+  gate'ler değişir. Kaldırma/birleştirme (12'lik liste, approvals-federasyonu, audit verify)
+  DİLİM-1b'nin işidir — burada YAZILMAZ.
+- Kök `-h` EN-default; TR config-lang ile (mevcut i18n mekanizması).
 
-## Task 1: Typed failure-disposition policy — pre-dispatch sınıfı NOT_DISPATCHED-terminal + FIX-muaf
-- Files: src/core/failure-disposition-policy.ts, src/orchestra/result-evaluator.ts, tests/core/failure-disposition-policy.test.ts
-- Reads: src/core/pre-dispatch-settlement.ts, src/core/task-types.ts, src/orchestra/sprint-phases.ts, src/orchestra/sprint-spawner.ts, src/core/config-types.ts
+## Task 1: Surface-contract registry — tek makine-okunur komut-kaynağı
+- Files: src/cli/surface-registry.ts, tests/cli/surface-registry.test.ts
+- Reads: src/cli/index.ts, src/cli/commands/gateway.ts, scripts/cli-mcp-parity-baseline.json, follow-up-works/cli-surface-reform-karar.md
 - Priority: HIGH
 - Agent: implementer
 - Model: gpt-5.6-sol
-- Test: VITEST_MAX_FORKS=2 npx vitest run tests/core/failure-disposition-policy.test.ts
+- Test: VITEST_MAX_FORKS=2 npx vitest run tests/cli/surface-registry.test.ts
 ### Description
-Yeni modül src/core/failure-disposition-policy.ts: HostPreDispatchReasonCode evreni
-(Reads'teki src/core/pre-dispatch-settlement.ts enum'u authority) üzerinden typed karar-tablosu
-— her reason-kodu için disposition {evaluation: NOT_DISPATCHED, fixEligible: false,
-redispatchEligible: false, cascadeDependents: true} canonical DEFAULT'u; effective config
-override-seam'i (config-types'a dar, opsiyonel blok — yeni zorunlu alan yok, mevcut
-3-layer merge deseni). Kablolama: result-evaluator, `preDispatchSettlement` alanı taşıyan
-bir TaskResult'ı (src/core/task-types.ts:1101) değerlendirirken policy'yi çözer ve
-TaskEvaluation.NOT_DISPATCHED döndürür (bugünkü davranış: alan okunmuyor, sonuç NO_GO
-sayılıyor — 2026-08-27 bounded-replay kanıtı, MASTER 3301). NOT_DISPATCHED için mevcut
-FIX/cross-fix muafiyet emsalleri (task-types cascadeSkipped sözleşme-yorumu; 351-008
-re-dispatch notu) korunur; policy `redispatchEligible:false` dediğinde EVALUATE'in
-re-dispatch aday listesine de girmez. Sınır: sprint-phases'e yalnız policy-çözümü
-enjekte edilir; FIX-seçim mekanizması yeniden yazılmaz. Test: reason-kodu başına
-disposition çözümü; preDispatchSettlement'lı sonuç → NOT_DISPATCHED; sıradan worker
-NO_GO'su → FIX-uygunluğu DEĞİŞMEZ; config-override yolu.
+Yeni modül src/cli/surface-registry.ts: her top-level komut için typed kayıt —
+{name, group: 'run'|'observe'|'control'|'system'|'advanced', summaryKey (i18n anahtarı,
+EN metin messages kataloğunda), aliases, status: 'visible'|'advanced'|'deprecated',
+deprecation?: {replacement, removalNote}} — owner-onaylı v2.1 şeması Reads'teki
+karar-dokümanının §5'inde (Run: do·run·plan·start·runs·review / Observe:
+status·watch·inspect·history·retro / Control: approvals·kill·recover·cleanup·autonomous·
+nervous·xverify / System: init·config·doctor·sync·upgrade·connect·limits·usage·agent·
+skill·models·memory·serve·bot·mcp / geri kalan HER kayıtlı komut: advanced;
+dashboard·attach·output·plan-nl·archive-debt·confirmations·checkpoint·audit-verify·
+autonomous-mission·explain·recall·remember: status deprecated + replacement). Kayıt-evreni
+src/cli/index.ts'teki register* çağrılarının TAMAMIDIR (gizli gateway-runtime dahil,
+status advanced+hidden-notu). Registry pure-data + tip-güvenli erişim fonksiyonları
+(listByGroup, findCommand, deprecatedSet) sunar; komut-davranışına DOKUNMAZ. Test:
+şema-doğruluğu, grup-kapsayışı (register-evreni ⊆ registry), deprecated-replacement
+bütünlüğü, i18n-anahtarlarının EN kataloğunda varlığı.
 
-## Task 2: Bağımlılara cascade-skip + run'ın karışık-sonuçla tamamlanması
-- Files: src/orchestra/result-collector.ts, tests/orchestra/result-collector-disposition.test.ts
-- Reads: src/core/failure-disposition-policy.ts, src/core/task-types.ts, src/orchestra/scheduler-effects.ts, src/orchestra/scheduler-truth.ts
+## Task 2: Üretilen kök-help — 4 grup + Advanced, EN-default
+- Files: src/cli/index.ts, src/cli/helpers/messages.ts, tests/cli/root-help-generated.test.ts
+- Reads: src/cli/surface-registry.ts, follow-up-works/cli-surface-reform-karar.md, src/cli/helpers/i18n.ts
 - Priority: HIGH
 - Agent: implementer
 - Model: gpt-5.6-sol
 - Dependencies: Task 1
-- Test: VITEST_MAX_FORKS=2 npx vitest run tests/orchestra/result-collector-disposition.test.ts
+- Test: VITEST_MAX_FORKS=2 npx vitest run tests/cli/root-help-generated.test.ts
 ### Description
-Bugün admission-reddi FIX'e eskalasyon yüzünden bağımlılar blocked-PAUSE'da kalıyor
-(2026-08-27 replay: 003-003←003-002). Mevcut `cascadeSkipDeadBlocked` kapanışı
-(src/orchestra/result-collector.ts:~2085, born-610) dead-upstream'i sentetik-skip'liyor;
-bu task, disposition-policy'nin NOT_DISPATCHED-terminal dediği upstream'i de AYNI rayın
-girişine bağlar: bağımlı sonuçlar `cascadeSkipped:true` + mevcut sözleşme-alanlarıyla
-üretilir, FIX/cross-fix muafiyeti (task-types sözleşme-yorumu) aynen işler, run zero-task
-finalizer-hold'una çarpmadan karışık-sonuçla (DONE + NOT_DISPATCHED + cascadeSkipped)
-terminal'e ulaşır. scheduler-effects'teki DEPENDENCY_BLOCKED ayna-mekanizması (Reads)
-ile çelişki yaratma — tek-kaynak davranış korunur. Test: tmpdir-hermetik simüle sonuç-seti
-(1 DONE + 1 preDispatch-NOT_DISPATCHED + 1 bağımlı) → bağımlı cascadeSkipped, FIX task'ı
-DOĞMAZ, collector çıkışı terminal-uyumlu.
+Kök `deckent -h` artık commander'ın 80-satır düz listesini basmaz: registry'den üretilen
+gruplu özet basar — v2.1 şablonu (karar-dokümanı §5): usage satırı + prompt-ipucu satırları
++ 4 grup-satırı (grup-adı EN + komut-adları) + `Advanced   deckent help advanced` satırı +
+deprecated-uyarı bloğu. commander configureHelp/addHelpText mevcut-pattern'iyle yapılır
+(komut kayıtları SİLİNMEZ — davranış aynen; yalnız görüntü). `deckent help advanced`
+registry'nin advanced+deprecated tam listesini basar. Tüm görünür metinler getMessage
+en+tr (EN-default; mevcut dil-çözümü). Test: gerçek commander-instance ile üretilen help
+string'i — 5 başlık var, 80-düz-liste yok, deprecated-blok replacement'ları doğru,
+advanced-listesi registry ile birebir.
 
-## Task 3: Disposition-olayı — owner-kanalı yayını (Nervous'tan bağımsız çekirdek, Nervous'a köprü)
-- Files: src/orchestra/result-collector.ts, src/cli/helpers/messages.ts, tests/orchestra/disposition-event.test.ts
-- Reads: src/core/failure-disposition-policy.ts, src/connectors/notification-delivery.ts, src/nervous/detector-registry.ts, .deckent/runtime/owner-notifications.jsonl
+## Task 3: Registry↔kayıt uyum-gate'i — fail-closed drift
+- Files: scripts/lint-cli-surface.mjs, tests/scripts/lint-cli-surface.test.ts, package.json
+- Reads: src/cli/surface-registry.ts, src/cli/index.ts, scripts/lint-layer-shims.mjs
+- Priority: HIGH
+- Agent: implementer
+- Dependencies: Task 1
+- Test: VITEST_MAX_FORKS=2 npx vitest run tests/scripts/lint-cli-surface.test.ts
+### Description
+Yeni gate scripts/lint-cli-surface.mjs: (a) src/cli/index.ts register-evrenini statik
+çıkarır (register* çağrıları), (b) registry kayıt-setiyle iki-yönlü karşılaştırır —
+kayıtlı-ama-registry'siz komut = FAIL (yeni-komut registry'siz giremez), registry'de-olup-
+kayıtsız = FAIL (ölü kayıt); (c) deprecated-set'in replacement'ları registry'de var-olan
+komutlar olmalı. package.json lint:gates zincirine eklenir (mevcut gate-ekleme deseni).
+Test: tmpdir-fixture ile üç FAIL sınıfı + gerçek-repo yeşil koşusu.
+
+## Task 4: MCP-parity gate'inin registry-tüketimi
+- Files: scripts/lint-cli-mcp-parity.mjs, tests/scripts/cli-mcp-parity-registry.test.ts
+- Reads: src/cli/surface-registry.ts, scripts/cli-mcp-parity-baseline.json
 - Priority: NORMAL
 - Agent: implementer
-- Dependencies: Task 1, Task 2
-- Test: VITEST_MAX_FORKS=2 npx vitest run tests/orchestra/disposition-event.test.ts
+- Dependencies: Task 1
+- Test: VITEST_MAX_FORKS=2 npx vitest run tests/scripts/cli-mcp-parity-registry.test.ts
 ### Description
-Policy bir non-FIX disposition uyguladığında typed olay üretilir: durable
-owner-notification outbox'a (mevcut append-deseni — Reads'teki
-.deckent/runtime/owner-notifications.jsonl şekli ve notification-delivery kontratı)
-stable-id'li kayıt: {reasonCode, taskId, disposition, remediation-hint}. Remediation-hint
-metinleri getMessage kataloğundan (en+tr) — örn. forced-skill için "skill'i oluştur/aktive
-et", provider için "auth/erişim". Nervous AÇIKSA aynı olay nervous-log/detector yüzeyine
-de köprülenir (Reads'teki detector-registry deseni; yalnız yayın — öneri-üretimi AYRI
-outcome, bu task'ta YAZILMAZ). Nervous KAPALIYKEN çekirdek yol tam çalışır — test bunu
-pinler. Test: tmpdir-hermetik — disposition-olayı outbox'a stable-id ile yazılır (crash-
-replay dedup), nervous-off'ta köprü sessiz ve hatasız, i18n anahtarları en+tr mevcut.
-
-## Task 4: Zincir-mühürü — uçtan-uca hermetik disposition regresyon-testi
-- Files: tests/orchestra/failure-disposition-chain.test.ts
-- Reads: src/core/failure-disposition-policy.ts, src/orchestra/result-collector.ts, src/orchestra/result-evaluator.ts, tests/orchestra/result-collector-disposition.test.ts
-- Priority: HIGH
-- Agent: test-guardian
-- Dependencies: Task 2, Task 3
-- Test: VITEST_MAX_FORKS=2 npx vitest run tests/orchestra/failure-disposition-chain.test.ts
-### Description
-Tek hermetik dosyada zincirin bütünü mühürlenir (mock-değil, gerçek modül-kompozisyonu;
-tmpdir): (1) preDispatchSettlement'lı sonuç → NOT_DISPATCHED evaluation + FIX-task
-doğmadığının kanıtı; (2) bağımlı → cascadeSkipped + muafiyet; (3) disposition-olayı
-outbox'ta tam-şekilli; (4) sıradan worker-NO_GO kontrol-grubu → FIX-yolu DEĞİŞMEDEN
-çalışıyor (davranış-koruma pini); (5) policy config-override'ı zinciri değiştirir
-(örn. bir reason-kodu FIX'e açılırsa FIX doğar). Assertion'lar Reads'teki iki task-test
-dosyasının pinleriyle çakışmaz — bu dosya kompozisyon-katmanını mühürler.
+Mevcut cli-mcp-parity gate'i CLI-komut listesini kendi taramasıyla çıkarıyor; registry
+tek-kaynak olunca gate CLI-tarafını registry'den okur (MCP-tarafı mevcut kalır);
+baseline-ratchet semantiği ve mevcut baseline dosyası AYNEN korunur — yalnız kaynak
+değişir, sayılar oynamaz (oynarsa dürüst FAIL). Test: registry-kaynaklı liste ile
+eski-tarama listesinin bugünkü repo'da birebir eşitliği (geçiş-güvence pini) + gate'in
+gerçek-repo yeşil koşusu.
