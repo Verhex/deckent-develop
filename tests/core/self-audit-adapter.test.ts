@@ -162,3 +162,78 @@ describe('SelfAuditAdapterRegistry', () => {
     expect(registry.list().map(({ id }) => id)).toEqual(['preferred', 'fallback']);
   });
 });
+
+// MASTER 3356 P5 — a hold must still say what the process did.
+//
+// A self-audit that timed out or produced no usable evidence used to return a
+// reason and a sentence, leaving nothing to compare against the next attempt.
+// The run itself is the diagnostic, so it is now described — byte counts and a
+// framed digest — without reproducing output that routinely carries paths and
+// can carry credentials.
+describe('self-audit hold process evidence', () => {
+  const request = {
+    ecosystem: 'node', projectRoot: '/tmp/p',
+    scope: { kind: 'scoped' as const, testFiles: ['a.test.ts'] },
+    timeoutMs: 1000,
+  };
+
+  function registryWith(decision: 'evidence' | 'hold') {
+    const registry = new SelfAuditAdapterRegistry();
+    registry.register({
+      id: 'probe',
+      supports: () => true,
+      isAvailable: () => true,
+      prepare: () => ({
+        kind: 'ready',
+        invocation: { executable: 'node', argv: ['x'], cwd: '/tmp/p', timeoutMs: 1000 },
+      }),
+      collectEvidence: () => decision === 'evidence'
+        ? { kind: 'evidence', executedUnits: [], outputDigest: 'sha256:x' }
+        : { kind: 'hold', reason: 'execution-failed', detail: 'parser gave up' },
+    });
+    return registry;
+  }
+
+  it('describes a timed-out run instead of dropping it', async () => {
+    const result = await registryWith('evidence').run(request, async () => ({
+      exitCode: null, stdout: 'partial', stderr: '', timedOut: true,
+    }));
+    expect(result.kind).toBe('hold');
+    if (result.kind !== 'hold') return;
+    expect(result.reason).toBe('execution-timeout');
+    expect(result.processEvidence).toMatchObject({
+      timedOut: true, exitCode: null, stdoutBytes: 7, stderrBytes: 0,
+    });
+    expect(result.processEvidence?.outputDigest).toMatch(/^sha256:[a-f0-9]{64}$/);
+  });
+
+  it('describes the run behind an adapter-reported hold', async () => {
+    const result = await registryWith('hold').run(request, async () => ({
+      exitCode: 1, stdout: '', stderr: 'boom', timedOut: false,
+    }));
+    expect(result.kind).toBe('hold');
+    if (result.kind !== 'hold') return;
+    expect(result.processEvidence).toMatchObject({ exitCode: 1, stderrBytes: 4 });
+  });
+
+  // The whole point of describing rather than quoting: nothing in the hold may
+  // reproduce what the process printed.
+  it('never carries the output itself', async () => {
+    const secret = 'ghp_exampletokenvalue';
+    const result = await registryWith('hold').run(request, async () => ({
+      exitCode: 1, stdout: secret, stderr: secret, timedOut: false,
+    }));
+    expect(JSON.stringify(result)).not.toContain(secret);
+  });
+
+  it('distinguishes two runs whose streams differ only by boundary', async () => {
+    const left = await registryWith('hold').run(request, async () => ({
+      exitCode: 1, stdout: 'a', stderr: 'b\nc', timedOut: false,
+    }));
+    const right = await registryWith('hold').run(request, async () => ({
+      exitCode: 1, stdout: 'a\nb', stderr: 'c', timedOut: false,
+    }));
+    const digest = (r: typeof left) => r.kind === 'hold' ? r.processEvidence?.outputDigest : undefined;
+    expect(digest(left)).not.toBe(digest(right));
+  });
+});

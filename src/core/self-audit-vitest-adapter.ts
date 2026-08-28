@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { framedOutputDigest } from './output-digest.js';
 import { createRequire } from 'node:module';
 
 import type {
@@ -66,6 +66,10 @@ export class VitestSelfAuditAdapter implements SelfAuditAdapter {
     _request: SelfAuditRequest,
     result: SelfAuditProcessResult,
   ): SelfAuditEvidenceDecision {
+    // Framed, not joined: a newline-joined `stdout + stderr` gives two
+    // different runs the same digest whenever a line moves across the stream
+    // boundary, which is exactly when the evidence matters most.
+    const outputDigest = framedOutputDigest([result.stdout, result.stderr]);
     const output = `${result.stdout}\n${result.stderr}`;
     const testFiles = parseSummary(output, 'Test Files');
     const assertions = parseSummary(output, 'Tests');
@@ -83,7 +87,7 @@ export class VitestSelfAuditAdapter implements SelfAuditAdapter {
     return {
       kind: 'evidence',
       executedUnits: toExecutedUnits(testFiles, assertions),
-      outputDigest: `sha256:${createHash('sha256').update(output).digest('hex')}`,
+      outputDigest,
     };
   }
 }

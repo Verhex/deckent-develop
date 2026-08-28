@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { framedOutputDigest } from './output-digest.js';
 
 import {
   partitionVerificationObservations,
@@ -124,7 +124,10 @@ export class TypeScriptScopedVerificationAdapter {
       return hold('execution-failed', 'TypeScript verification ended without an exit code', foreignErrorDiagnostics);
     }
 
-    const output = `${processResult.stdout}\n${processResult.stderr}`;
+    // See self-audit-vitest-adapter: the digest is framed per stream so a line
+    // crossing the stdout/stderr boundary cannot collapse two outcomes into one
+    // identity.
+    const outputDigest = framedOutputDigest([processResult.stdout, processResult.stderr]);
     return {
       kind: 'completed',
       outcome: processResult.exitCode === 0 ? 'passed' : 'failed',
@@ -134,7 +137,7 @@ export class TypeScriptScopedVerificationAdapter {
         invocation,
         executedFiles: Object.freeze([...request.config.filePaths]),
         exitCode: processResult.exitCode,
-        outputDigest: `sha256:${createHash('sha256').update(output).digest('hex')}`,
+        outputDigest,
       },
       foreignErrorDiagnostics,
     };

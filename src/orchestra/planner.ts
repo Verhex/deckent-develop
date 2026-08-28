@@ -1,6 +1,8 @@
 // ─── Node Builtins ─────────────────────────────────────────────────
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
+
+import { framedOutputDigest } from '../core/output-digest.js';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -654,6 +656,8 @@ export function resolveAdapter(
  * - `validation_failed`: parsed JSON failed Zod schema validation (PlannerResultSchema)
  * - `no_providers`: ProviderRegistry empty or requested provider missing
  */
+export { framedOutputDigest };
+
 export type PlannerFailureReason =
   | 'spawn_failed'
   | 'timeout'
@@ -707,22 +711,6 @@ export type PlannerCallResult =
       evidence?: PlannerFailureEvidence;
     };
 
-/**
- * Digest provider output without ever revealing it.
- *
- * Each part is framed with its own byte length before hashing, so
- * (`ab`, `c`) and (`a`, `bc`) produce different digests — a plain concatenation
- * would collapse them and make the digest useless for telling failures apart.
- */
-export function framedOutputDigest(parts: readonly (string | undefined)[]): string {
-  const hash = createHash('sha256');
-  for (const part of parts) {
-    const bytes = Buffer.from(part ?? '', 'utf8');
-    hash.update(`${bytes.length}:`);
-    hash.update(bytes);
-  }
-  return `sha256:${hash.digest('hex')}`;
-}
 
 export interface PlannerReceiptContext {
   readonly tenantId: string;

@@ -4,6 +4,8 @@
  * module owns capability resolution, authority checks, and fail-closed evidence.
  */
 
+import { framedOutputDigest } from './output-digest.js';
+
 export type SelfAuditScope =
   | {
       readonly kind: 'scoped';
@@ -76,6 +78,21 @@ export type SelfAuditHoldReason =
   | 'execution-timeout'
   | 'missing-executed-evidence';
 
+/**
+ * Secret-safe description of a self-audit process run that ended in a hold.
+ *
+ * Byte counts and a framed digest, never the output itself: a verification
+ * command's stdout/stderr carries file paths and can carry credentials pasted
+ * into the environment, and this record is written where humans and logs read it.
+ */
+export interface SelfAuditProcessEvidence {
+  readonly exitCode: number | null;
+  readonly timedOut: boolean;
+  readonly stdoutBytes: number;
+  readonly stderrBytes: number;
+  readonly outputDigest: string;
+}
+
 export type SelfAuditResult =
   | {
       readonly kind: 'completed';
@@ -92,6 +109,14 @@ export type SelfAuditResult =
       readonly reason: Exclude<SelfAuditHoldReason, 'unsupported-ecosystem'>;
       readonly detail: string;
       readonly adapterId?: string;
+      /**
+       * What the process did before the hold, when it ran at all.
+       *
+       * A hold used to carry only a reason and a sentence, so a self-audit that
+       * timed out or exited non-zero left nothing to compare against the next
+       * attempt. These fields describe the run without reproducing its output.
+       */
+      readonly processEvidence?: SelfAuditProcessEvidence;
     };
 
 export type SelfAuditPreparation =
@@ -204,7 +229,10 @@ export class SelfAuditAdapterRegistry {
       return hold('execution-failed', errorDetail(error), adapter.id);
     }
     if (processResult.timedOut) {
-      return hold('execution-timeout', 'Self-audit execution exceeded its deadline', adapter.id);
+      return hold(
+        'execution-timeout', 'Self-audit execution exceeded its deadline', adapter.id,
+        processEvidenceOf(processResult),
+      );
     }
 
     let decision: SelfAuditEvidenceDecision;
@@ -213,12 +241,20 @@ export class SelfAuditAdapterRegistry {
     } catch (error: unknown) {
       return hold('execution-failed', errorDetail(error), adapter.id);
     }
-    if (decision.kind === 'hold') return hold(decision.reason, decision.detail, adapter.id);
+    if (decision.kind === 'hold') {
+      return hold(decision.reason, decision.detail, adapter.id, processEvidenceOf(processResult));
+    }
     if (!hasExecutedEvidence(decision.executedUnits)) {
-      return hold('missing-executed-evidence', 'Adapter reported no positive executed unit', adapter.id);
+      return hold(
+        'missing-executed-evidence', 'Adapter reported no positive executed unit', adapter.id,
+        processEvidenceOf(processResult),
+      );
     }
     if (processResult.exitCode === null) {
-      return hold('execution-failed', 'Self-audit process ended without an exit code', adapter.id);
+      return hold(
+        'execution-failed', 'Self-audit process ended without an exit code', adapter.id,
+        processEvidenceOf(processResult),
+      );
     }
 
     return {
@@ -277,10 +313,26 @@ function hold(
   reason: Exclude<SelfAuditHoldReason, 'unsupported-ecosystem'>,
   detail: string,
   adapterId?: string,
+  processEvidence?: SelfAuditProcessEvidence,
 ): Extract<SelfAuditResult, { kind: 'hold' }> {
-  return adapterId === undefined
-    ? { kind: 'hold', reason, detail }
-    : { kind: 'hold', reason, detail, adapterId };
+  return {
+    kind: 'hold',
+    reason,
+    detail,
+    ...(adapterId === undefined ? {} : { adapterId }),
+    ...(processEvidence === undefined ? {} : { processEvidence }),
+  };
+}
+
+/** Describe a finished process run without reproducing any of its output. */
+function processEvidenceOf(result: SelfAuditProcessResult): SelfAuditProcessEvidence {
+  return {
+    exitCode: result.exitCode,
+    timedOut: result.timedOut,
+    stdoutBytes: Buffer.byteLength(result.stdout, 'utf8'),
+    stderrBytes: Buffer.byteLength(result.stderr, 'utf8'),
+    outputDigest: framedOutputDigest([result.stdout, result.stderr]),
+  };
 }
 
 function errorDetail(error: unknown): string {
