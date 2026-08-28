@@ -1369,6 +1369,8 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // (death-sweep / prompt-template kimlik-esigi / docker async-git).
   // 2026-08-28 09:0x: digest 120cadc2→873b946d — repair-queue-authority modülü +
   // sprint-phases/sprint-controller kablolaması.
+  // 2026-08-28 10:4x: aynı 1353, digest-only 50e7a4e8→25266de8 — 3356 P3: dizin-niyeti
+  // typed HOLD'u (DIRECTORY_INTENT_REQUIRES_DIRECTORIES); yeni üretim modülü yok.
   // 2026-08-28 10:3x: aynı 1353, digest-only 38422e58→50e7a4e8 — 3356 typed planner-failure
   // kanıt zarfı (framedOutputDigest + PlannerFailureEvidence); ham stderr/stdout
   // interpolasyonu kaldırıldı, yeni üretim modülü eklenmedi.
@@ -1378,7 +1380,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // worker-core backend-yetenek kapısı (task-builder/spawn-backend) + MCP karar-disposition
   // kapısı; yeni üretim modülü eklenmedi, taranan metin değişti.
   // 2026-08-28 09:4x: digest 873b946d→b127e8b9 — src/intelligence/ katmanı.
-  digest: '50e7a4e8137d547c8170e7f601e2310fa5b9438886308fe56ac1b02da33c4d63',
+  digest: '25266de82dbce6b4b5f50f85073f289a46489d76c70707936b95122a25571117',
   // 2026-08-27 04:0x: ayni 1339, digest-only — sync workspace-guard + drift-normalize.
   // 2026-08-27 03:1x: ayni 1339, digest-only — skill-pool readJsonSafe donusumu.
   // 2026-08-27 02:0x: ayni 1339, digest-only — Dalga-3 src kaymalari

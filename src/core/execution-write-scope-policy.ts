@@ -15,6 +15,7 @@ type PathScopeSelector = Extract<ScopeSelector, { readonly path: string }>;
 
 export type CanonicalScopeHoldCode =
   | 'INVALID_PATH'
+  | 'DIRECTORY_INTENT_REQUIRES_DIRECTORIES'
   | 'LEGACY_WILDCARD_REQUIRES_SELECTOR'
   | 'UNSUPPORTED_GLOB'
   | 'PORTABLE_PATH_COLLISION'
@@ -142,6 +143,17 @@ export function compileCanonicalScope(input: CompileCanonicalScopeInput): Canoni
   ): PathScopeSelector[] => values.flatMap(raw => {
     if (containsWildcard(raw)) {
       holds.push({ code: 'LEGACY_WILDCARD_REQUIRES_SELECTOR', field, value: raw });
+      return [];
+    }
+    // A trailing slash is unambiguous directory intent. Compiling it under a
+    // file-selector kind would normalize the slash away and silently produce
+    // `exact-file`, which matches only a file literally named `src` — so a task
+    // authored with `filesWrite: ['src/']` would end up with an effectively
+    // empty write scope while appearing to have declared one. This module
+    // already refuses ambiguous authored input (`src/**` holds); the same
+    // refusal belongs here, pointing at the field that does express a tree.
+    if (kind !== 'directory-tree' && /\/\s*$/.test(raw)) {
+      holds.push({ code: 'DIRECTORY_INTENT_REQUIRES_DIRECTORIES', field, value: raw });
       return [];
     }
     const normalized = normalizePortablePath(raw);
