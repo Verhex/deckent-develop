@@ -3,6 +3,26 @@ import { mkdirSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { makeExecuteDispatcher } from '../../../src/orchestra/autonomous/execute-dispatcher.js';
+
+// Hermeticity guard (MASTER 3356).
+//
+// A dispatch that reaches the production defaults calls
+// `crossVerifyBacklogResult` → `runCrossVerify`, i.e. the real cross-verification
+// path that resolves a provider. This suite stayed offline only because its
+// fixture config happens to resolve as "unavailable" — an accident, not a
+// contract: a config default change or an ambient credential would turn a unit
+// test into a live provider call. Failing loudly here keeps that impossible for
+// every test in this file, present and future, without changing what any of them
+// asserts. A test that genuinely wants the path must inject its own seam.
+vi.mock('../../../src/orchestra/cross-verify-runner.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/orchestra/cross-verify-runner.js')>()),
+  runCrossVerify: vi.fn(() => {
+    throw new Error(
+      'HERMETICITY_GUARD: this suite reached the live cross-verify path. '
+      + 'Inject a deterministic `crossVerify` seam into makeExecuteDispatcher instead.',
+    );
+  }),
+}));
 import { createDefaultRegistry } from '../../../src/core/capability-broker.js';
 import { makeBoundedPool } from '../../../src/orchestra/autonomous/execution-pool.js';
 import { loadBacklog } from '../../../src/orchestra/autonomous/backlog.js';
@@ -78,6 +98,23 @@ afterEach(() => {
 });
 
 // ─── Tests ───────────────────────────────────────────────────────────
+
+describe('hermeticity guard', () => {
+  // Proves the guard is wired: without it, a dispatch that falls through to the
+  // production defaults would call the real cross-verification path instead of
+  // failing the test. The guard is only worth having if it actually fires.
+  it('fails loudly when the live cross-verify path is reached', async () => {
+    const { crossVerifyBacklogResult } = await import(
+      '../../../src/orchestra/autonomous/backlog-eval.js'
+    );
+    await expect(
+      crossVerifyBacklogResult(
+        taskEntry, { taskId: 't' } as never, tmpDir, undefined,
+        { decision: 'NO_GO', quality: 0, reconciled: false, reason: 'x' } as never,
+      ),
+    ).rejects.toThrow('HERMETICITY_GUARD');
+  });
+});
 
 describe('execute-dispatcher — provider authority admission', () => {
   it.each([
