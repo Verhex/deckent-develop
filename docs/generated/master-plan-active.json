@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "9e2c7a4529e9dc60348637f0b81f3465811eeaf43fd52deb6bf06b2771f676dc"
+    "value": "97399c1d635645df708eb83608d50719093a542ca8fd1a4da1915b0064ef45f8"
   },
   "summary": {
     "total": 543,
@@ -3051,9 +3051,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-07-31",
+      "updated": "2026-08-28",
       "definitionDigest": "db0d8c55eac878ec4e6d7ced446373c893c46840e4f98f672699df4f6e7eef12",
-      "progressDigest": "4839f5a7ad731f973768a4f7f3dd428bd83e5d6db08437d99fd9bad50bf9c036",
+      "progressDigest": "46595bebd17775f49cab9fb63383c8d8092e2828c6632487c7138cbed373660e",
       "terminalClosureDigest": null
     },
     {
@@ -17718,9 +17718,9 @@
       ],
       "state": "OPEN",
       "truth": {
-        "C": "0",
+        "C": "~",
         "W": "0",
-        "E": "1",
+        "E": "~",
         "H": "1",
         "L": "0",
         "X": "0",
@@ -17733,8 +17733,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Planner represents source verification and post-settlement build/binary proof as separate authority stages; a sprint that forbids build while active never creates an impossible built-CLI dependency or spends FIX retries on stale `dist/`",
-      "evidence": "Sprint-487 task 006 and its FIX failed because tasks 001–005 changed source while active-sprint policy correctly prohibited build. Supervisor proved the required typed seam by compiling after containment and passing the real binary contract, then settled the lineage with explicit manual-recovery evidence. Automatic planning/stage transition remains open; no in-sprint build bypass is accepted",
-      "updated": "2026-07-31"
+      "evidence": "Sprint-487 task 006 and its FIX failed because tasks 001–005 changed source while active-sprint policy correctly prohibited build. Supervisor proved the required typed seam by compiling after containment and passing the real binary contract, then settled the lineage with explicit manual-recovery evidence. Automatic planning/stage transition remains open; no in-sprint build bypass is accepted; 2026-08-28 ÖLÇÜM DÜZELTMESİ (state flip YOK, yalnız bayat kanıt gerçeğe hizalandı): bu hücre 2026-07-31'de yazıldı ve satırın kendi alanındaki üretim kodunun 2026-08-11'de landed olduğunu hiç anmıyordu — `src/core/post-settlement-verification.ts` (provider-neutral post-settlement binary-verification kontratı), `src/orchestra/planner.ts` içindeki \"Proof-Staging Validation Stage (519-004, row 3275)\" bloğu ve `src/orchestra/task-builder.ts` içindeki `classifyBuiltBinaryProofDemand` / `stageBuiltBinaryProofObligation` / `stageDirectiveProofObligations` seti sprint-519 dalgasıyla (`dffb6df25`, 2026-08-11) geldi; yani C hücresinin `0` olması artık gerçeği yansıtmıyor ve Truth `~/0/...` olarak düzeltildi. Kapanış için gereken gerçek iş bu düzeltmeyle daralıyor ve tam olarak üç kalemdir: (1) `lintProofStaging` bugün yalnız test tarafından çağrılıyor, üretim çağıranı yok — bağlanmadan W kapanmaz; (2) `stageDirectiveProofObligations` üretim yolunda `enforce` argümanı geçilmeden çağrıldığı için varsayılan `enforced:false` ile çalışır, yani in-sprint imkânsız built-CLI bağımlılığı bugün reddedilmez, yalnız uyarılır — E bu yüzden kısmi; (3) iki fixture (`tests/orchestra/planner-smoke-e2e.test.ts` içindeki `dist/cli/entry.js` smoke beyanı) enforce açılınca kırılacak şekilde duruyor ve migrate edilmedi. L için stale-`dist` senaryosunun canlı kanıtı hâlâ üretilmedi. Kaynak: 2026-08-28 iki paralel read-only denetim + ana-şerit disk doğrulaması (`git log -S` ile landing commit'i teyit edildi)",
+      "updated": "2026-08-28"
     },
     {
       "order": 3276,
@@ -27418,6 +27418,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "e7677eb32743b191bd74d6a8ca671ffb7b098c8ce4f8fa305483a90e9cb474fa"
+    "value": "35704ffe5c8126494bc1064942801fdb58bdcd555fd80a7cb3a53a7482ca8506"
   }
 }
