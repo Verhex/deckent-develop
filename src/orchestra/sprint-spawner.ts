@@ -1137,6 +1137,10 @@ export async function spawnWorkers(
       projectRoot,
       config,
       spawnOpts?.exactPlanAuthority,
+      undefined,
+      // The core may only be externalized when the backend that will actually
+      // run this task can deliver it; the compiler resolves that from the kind.
+      task.backend ?? config.spawn_backend,
     );
     // The shared prompt boundary is the sole producer for initial, dependent,
     // FIX, respawn and manual paths. Initial dispatch reads that same receipt

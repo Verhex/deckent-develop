@@ -4,7 +4,7 @@
 - If you need to query project memory: relevant ADRs and past learnings are provided by Brain via MemoryStore
 - If your implementation would violate an accepted ADR → stop, write NO_GO, propose ADR amendment
 - Plan silently before coding — no plan file (7094-F1d: the host never reads one; the write only burned a cached-context turn)
-- Check `.locks/` before writing any file
+- Do not read or interpret `.locks/` — claims are host-owned and attempt-bound, and the host has already guaranteed your scope is collision-free before spawning you. A read-then-write check here is neither atomic nor authoritative
 - Write heartbeat (`.tasks/task-XXX.hb`) ONCE at start (7094-F1d: the host only checks its existence, never its mtime)
 - Stay within your assigned scope — do not touch files outside it
 - Run the exact scoped verification declared by the task and effective policy; do not launch a full build or full suite unless the run explicitly permits and requires it

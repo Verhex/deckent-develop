@@ -42,6 +42,33 @@ function fail(message: string) {
   };
 }
 
+/**
+ * Memory types whose `accepted` status is a governance disposition rather than
+ * a content field: accepting one settles a decision for the whole project.
+ */
+const DECISION_BEARING_MEMORY_TYPES: ReadonlySet<string> = new Set(['adr']);
+
+/**
+ * Guard the one field on this surface that carries decision authority.
+ *
+ * An agent driving MCP can otherwise write `type: 'adr', status: 'accepted'` and
+ * thereby accept its own architectural decision — the surface would be handing
+ * out an authority it was never meant to hold. Proposing stays open; the
+ * accepted disposition belongs to the owner decision chain (seeded ADRs come
+ * from `deckent init`, later ones from an owner-approved settlement).
+ *
+ * @returns a typed hold message, or `null` when the write is admissible.
+ */
+function decisionDispositionHold(
+  type: string | undefined,
+  status: string | undefined,
+): string | null {
+  if (status !== 'accepted') return null;
+  if (type === undefined || !DECISION_BEARING_MEMORY_TYPES.has(type)) return null;
+  return `DECISION_DISPOSITION_HOLD: this surface cannot set status="accepted" on a "${type}" entry. `
+    + 'Record it as "proposed" and settle the accepted disposition through the owner decision chain.';
+}
+
 // ─── deckent_agent_manage ─────────────────────────────────────────────────────
 
 export function registerAgentManageTool(server: McpServer): void {
@@ -264,6 +291,8 @@ export function registerMemoryManageTool(server: McpServer): void {
           if (store.getById(id)) {
             return fail(`Entry "${id}" already exists — use action=update.`);
           }
+          const dispositionHold = decisionDispositionHold(type, status);
+          if (dispositionHold) return fail(dispositionHold);
           store.insert({
             id, type, title, content, summary, tags, status, priority,
             sprint_id, sprint_num, lang, decay_exempt, metadata,
@@ -275,9 +304,12 @@ export function registerMemoryManageTool(server: McpServer): void {
           if (!id) {
             return fail('id is required for action=update.');
           }
-          if (!store.getById(id)) {
+          const existing = store.getById(id);
+          if (!existing) {
             return fail(`Entry "${id}" not found.`);
           }
+          const dispositionHold = decisionDispositionHold(existing.type, status);
+          if (dispositionHold) return fail(dispositionHold);
           store.update(
             id,
             {

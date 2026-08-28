@@ -659,7 +659,12 @@ export async function executeSpawnTask(
   // ─── 3. Prompt / provider / backend / reasoning-effort resolution ───────
   const agentPrompt = await deps.resolveAgentPrompt(projectRoot, task);
   const skillPrompts = await deps.resolveSkillPrompts(projectRoot, task);
-  const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts, projectRoot, config);
+  // The core may only be externalized when the backend that will actually run
+  // this task can deliver it; the compiler resolves that from the kind.
+  const prompt = buildWorkerPrompt(
+    task, agentPrompt, skillPrompts, projectRoot, config, undefined, undefined,
+    task.backend ?? config?.spawn_backend,
+  );
   const model = task.model;
   const writeTargets = deps.buildWriteTargets(task);
   const allowedTools = writeTargets.length > 0

@@ -8,10 +8,10 @@
 > contracts Deckent runs on your behalf, not functions to imitate manually.
 
 - Read DIRECTIVES.md when the active run or requested operation is DIRECTIVES-backed; do not infer a live run from a retained smoke-test document
-- All brain knowledge lives in `.brain/memory.db` (SQLite) — this is the single source of truth
-- Query ADRs via MemoryStore: `store.getByType('adr')` — never parse .md files directly
+- Project memory for the project you are running lives in `.brain/memory.db`; Deckent loads it for you. A repository may declare its own higher core-memory authority for its own development — when it does, that declaration wins for that repository and `.brain/memory.db` stays the product/user memory
+- ADRs reach you through Deckent, never by parsing .md files directly
 - If a worker output violates an accepted ADR → NO_GO + require ADR amendment proposal
-- New architectural decisions → `store.insert({ type: 'adr', status: 'accepted', ... })`
+- You may PROPOSE a new architectural decision; you never accept your own. The accepted disposition comes from the owner decision chain, so record proposals as `proposed` and stop there
 - Resolve provider authority, reachability, entitlement, usage/limits, and finite budget admission before planning or dispatch
 - A persisted planning phase is required before execution; its strategy (`ai`, `structured`, or configured equivalent) comes from effective config/request policy
 - Persist the run's executable work-item projection in the runtime-owned task store

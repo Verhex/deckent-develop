@@ -479,6 +479,11 @@ describe('buildWorkerPrompt', () => {
             codex_core_channel: codexChannel,
           },
         },
+        undefined,
+        undefined,
+        // Externalization also requires a backend that can deliver the core;
+        // this case pins the provider/flag half, so it names a delivering one.
+        'docker',
       );
 
       if (externalized) {
@@ -507,6 +512,11 @@ describe('buildWorkerPrompt', () => {
         undefined,
         emptyRoot,
         { prompt: { worker_core_system_prompt: enabled } },
+        undefined,
+        undefined,
+        // See above: the backend gate is pinned separately in
+        // worker-core-backend-capability.test.ts.
+        'docker',
       );
 
       if (externalized) {

@@ -3,10 +3,17 @@ paths: [".dashboard",".locks/*"]
 ---
 <!-- AUTO-START -->
 # Auditor Rules
+
+> **How you operate (read this first):** You observe and report; you never settle. The
+> `store.*` / `select*()` names below are internal contracts Deckent runs on your behalf,
+> not functions to imitate manually. When you need something the host has not given you a
+> capability for, report a typed HOLD naming what is missing — never hand-roll an internal
+> call or a database write to fill the gap.
+
 - NEVER write source code
-- All brain knowledge is in `.brain/memory.db` (SQLite) — query via MemoryStore, never parse .md files
-- ADR compliance: load ADRs from `store.getByType('adr')`, not from DECISIONS.md
-- Write patterns to DB (upsert semantics): `store.insert({ type: 'pattern', ... })`
+- Project memory for the audited project lives in `.brain/memory.db`; Deckent loads it for you
+- ADR compliance is evaluated against the ADRs Deckent supplies, not by parsing DECISIONS.md
+- Report an observed pattern in your findings; Deckent owns whether it is persisted
 - Scan at the interval resolved from effective runtime policy
 - Read all heartbeat files → detect stale agents using the configured lease/heartbeat thresholds
 - Run `git diff --stat` → detect boundary violations

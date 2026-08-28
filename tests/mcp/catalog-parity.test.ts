@@ -334,6 +334,68 @@ describe('deckent_memory_manage', () => {
     store.close();
   });
 
+  // Accepting an ADR settles a decision for the whole project. Without this
+  // gate an agent driving MCP could write `type:'adr', status:'accepted'` and
+  // accept its own architectural decision — the surface would hand out an
+  // authority it never held. Proposing stays open; accepting does not.
+  it('refuses to accept an ADR through this surface', async () => {
+    setupBrainDb(tmpDir);
+    const tool = getTool();
+    const result = await tool.handler({
+      action: 'insert', id: 'adr-self', type: 'adr', title: 'Self accepted',
+      content: 'Body', status: 'accepted', root: tmpDir,
+    });
+    expect(result.isError).toBe(true);
+    expect(parseResult(result).message).toContain('DECISION_DISPOSITION_HOLD');
+
+    const store = new MemoryStore(dbPathFor(tmpDir));
+    expect(store.getById('adr-self')).toBeNull();
+    store.close();
+  });
+
+  it('still admits a proposed ADR', async () => {
+    setupBrainDb(tmpDir);
+    const tool = getTool();
+    const result = await tool.handler({
+      action: 'insert', id: 'adr-proposed', type: 'adr', title: 'Proposal',
+      content: 'Body', status: 'proposed', root: tmpDir,
+    });
+    expect(parseResult(result).success).toBe(true);
+
+    const store = new MemoryStore(dbPathFor(tmpDir));
+    expect(store.getById('adr-proposed')?.status).toBe('proposed');
+    store.close();
+  });
+
+  it('refuses to promote an existing ADR to accepted through update', async () => {
+    setupBrainDb(tmpDir);
+    const tool = getTool();
+    await tool.handler({
+      action: 'insert', id: 'adr-later', type: 'adr', title: 'Proposal',
+      content: 'Body', status: 'proposed', root: tmpDir,
+    });
+    const result = await tool.handler({
+      action: 'update', id: 'adr-later', status: 'accepted', root: tmpDir,
+    });
+    expect(result.isError).toBe(true);
+    expect(parseResult(result).message).toContain('DECISION_DISPOSITION_HOLD');
+
+    const store = new MemoryStore(dbPathFor(tmpDir));
+    expect(store.getById('adr-later')?.status).toBe('proposed');
+    store.close();
+  });
+
+  // The gate is scoped to decision-bearing types; ordinary memory keeps working.
+  it('leaves non-decision entries untouched by the gate', async () => {
+    setupBrainDb(tmpDir);
+    const tool = getTool();
+    const result = await tool.handler({
+      action: 'insert', id: 'pattern-1', type: 'pattern', title: 'P',
+      content: 'Body', status: 'accepted', root: tmpDir,
+    });
+    expect(parseResult(result).success).toBe(true);
+  });
+
   it('insert fails when required fields are missing', async () => {
     setupBrainDb(tmpDir);
     const tool = getTool();

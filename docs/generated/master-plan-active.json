@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "1015c2416d62e0c8b0f87c20a87748955adf5818ab7b3e2292fad759343114f8"
+    "value": "7719a7183a9c5aa40c322bf13f12dd54d80eefd375934cb3d530ec32067397e0"
   },
   "summary": {
     "total": 543,
@@ -3757,7 +3757,7 @@
       "state": "OPEN",
       "updated": "2026-08-28",
       "definitionDigest": "dd07c5a80103e143720c01bb26ee979b1c926dc0a1663f5aa500e1f4d3fd2bbf",
-      "progressDigest": "996237d94c73211c8e463fc07c607212c2f9890829be50cf046a65d7d0227b82",
+      "progressDigest": "b6cff86e5ef835fe416607d3c9fe0ed67682c5cd7c1dcf3114b586bdc6c90612",
       "terminalClosureDigest": null
     },
     {
@@ -19297,12 +19297,12 @@
       ],
       "state": "OPEN",
       "truth": {
-        "C": "0",
-        "W": "0",
-        "E": "0",
-        "H": "?",
+        "C": "~",
+        "W": "~",
+        "E": "~",
+        "H": "1",
         "L": "0",
-        "X": "?",
+        "X": "0",
         "S": "?"
       },
       "blockerCode": null,
@@ -19310,7 +19310,7 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Her paket güncel main üzerinde ayrı implementation + bağımsız verification pass ile yeniden uygulanır (wholesale merge/cherry-pick YASAK); her pakette scoped vitest + tsc-0 + gate-bataryası + production-wiring zinciri kanıtlanır; user-surface değişiklikte gerçek-binary proof; autonomous cleanup/status ve terminal/finalizer snapshot paketleri KAPSAM DIŞI (ayrı owner-admitted outcome ister)",
-      "evidence": "Owner admission 2026-08-28 (soru-cevap kaydı \"ADMIT — kuyruk sonuna\": sıra 3284-kalanı → 3302/3304/3299 ladder → 6181 → bu satır); devir-paketi ana-şeritte 3 bütünlük-kontrolüyle doğrulandı: receipt digest `sha256:7bfc410f…` canonical-JSON yeniden-hesapla DIGEST-MATCH, base `417f4955b`→main `a4913b140` farkı tam 23 commit, blocking-gate (Work 480 ACTIVE/OPEN) disk-doğrulu; kanıt-korpusu `/tmp` volatilitesine karşı kalıcılaştırıldı: docs/audits/tmp-dogfood-main-sync-2026-08-27/ (11 devir-dokümanı + source-only patch 7240 satır + 5 untracked source kopyası + README silinme-tetiğiyle); kanıtlamadığı: hiçbir paket main'de uygulanmadı — tmp PASS'ları güncel-main kanıtı değildir, uygulama-önü fresh three-way + baseline zorunlu",
+      "evidence": "Owner admission 2026-08-28 (soru-cevap kaydı \"ADMIT — kuyruk sonuna\": sıra 3284-kalanı → 3302/3304/3299 ladder → 6181 → bu satır); devir-paketi ana-şeritte 3 bütünlük-kontrolüyle doğrulandı: receipt digest `sha256:7bfc410f…` canonical-JSON yeniden-hesapla DIGEST-MATCH, base `417f4955b`→main `a4913b140` farkı tam 23 commit, blocking-gate (Work 480 ACTIVE/OPEN) disk-doğrulu; kanıt-korpusu `/tmp` volatilitesine karşı kalıcılaştırıldı: docs/audits/tmp-dogfood-main-sync-2026-08-27/ (11 devir-dokümanı + source-only patch 7240 satır + 5 untracked source kopyası + README silinme-tetiğiyle); kanıtlamadığı: hiçbir paket main'de uygulanmadı — tmp PASS'ları güncel-main kanıtı değildir, uygulama-önü fresh three-way + baseline zorunlu; 2026-08-28 KAPI AÇILDI + P0 PAKETİ LANDED: bağımlılık `PROVIDER-OBS-MIGRATION-001` aynı gün `DONE` oldu (owner Closure + different-provider XVerify mührü), yani satırın tek admission engeli kalktı. Owner bu işi kuyruğun önüne aldı ve yan-oturum denetimi teslim etti; ana-şerit denetimin BEŞ iddiasını diske karşı tek tek test etti (varsayımla uygulama yapılmadı): (a) worker-core non-Docker teslimatı CONFIRMED — ve denetimden AĞIR: `shouldExternalizeWorkerCore` kararını yalnız provider+bayraklardan veriyordu, `coreExternalized` inline çekirdek bloklarını siliyordu ve teslimat argv'si YALNIZ docker backend'inde vardı; `spawn_backend:'auto'` ise Windows'ta koşulsuz, Docker daemon erişilemezken de `subprocess`'e düşüyor — yani kusur gelecekteki bir risk değil, Windows-native ve Docker'sız her host'ta BUGÜN canlıydı (Yasa-2 \"sessizce değil dürüstçe patla\" ihlali). ONARIM: `SpawnBackend.canDeliverWorkerCore` yetenek-beyanı (docker `true`, subprocess/tmux `false`), compile-time ikizi `spawnBackendKindDeliversWorkerCore` (`auto`'yu spawner'la aynı probe'dan çözer), karar artık provider ∩ bayrak ∩ backend kesişimi ve bilinmeyen backend fail-closed inline kalır; ana spawn yolları (sprint-spawner, scheduler-effects) backend kind'ını prompt derlemesine geçirir. (b) WORKER-GUIDE protokol çelişkisi CONTRADICTED — worker'ın gördüğü `.result` şeması tek kaynaktan (compiled prompt T2) gelir, guide generated+digest-bound'dur ve digest uyuşmazlığında sistem worker'a zaten \"guide'ı otorite sayma\" der; \"eksik\" denen dört alan Zod'da optional olduğu için guide'ın dinamik listesinde yer almaması doğru davranıştır; heartbeat modeli üç kaynakta ve host kodunda tutarlıdır. Kalan yalnız dar bir nesir-eksikliğidir, kod işi değildir. (c) Brain self-accept PARTIAL — ama içinden GERÇEK bir runtime açığı çıktı: MCP `deckent_memory_manage` `insert`/`update` yollarında `status` çağırandan kapısız geçiyordu, yani MCP süren bir ajan `type:'adr', status:'accepted'` yazıp kendi mimari kararını kabul edebiliyordu; CLI'da bu yol yok ve meşru accepted-ADR'ler yalnız `deckent init` tohumlamasından gelir. ONARIM: karar-taşıyan tipler için typed `DECISION_DISPOSITION_HOLD` — önerme açık, kabul kapalı. (d) `.plan` CUSTOM drift'i CONFIRMED: AUTO bloğu dört host'ta doğruyken CUSTOM'da codex/gemini/cursor hâlâ \"write .plan file\" diyordu ve generator CUSTOM'ı kasten senkronize etmediği için regen ile kendiliğinden düzelmezdi → tek-seferlik migrasyon uygulandı, drift sıfır. (e) locks authority CONFIRMED: worker'a \"yazmadan önce `.locks/` kontrol et\" deniyordu; gerçekte kilit tamamen host-sahipli, per-file `acquireLock`'ın orchestra'da hiç çağıranı yok ve gerçek güvenlik plan-time scope-collision'da — talimat hem gereksiz hem TOCTOU telkin ediyordu, canonical template'ten kaldırıldı. Ayrıca auditor template'i brain'in taşıdığı \"bunlar taklit edilecek fonksiyon değil\" çekincesinden yoksundu ve çıplak `store.insert` emrediyordu; çekince eklendi, karar-dili public-capability + typed HOLD diline çevrildi, brain'de de dogfood/ürün bellek ayrımı ve \"kendi kararını kabul etme\" kuralı yazıldı. Doğrulama: 4 host projection'ı canonical template'lerden regen edildi (bot-stop→build:all→bot-start ritüeli; ilk regen bayat dist template'lerini okuduğu için tekrarlandı), 79+10 test yeşil (worker-core-backend-capability 6 yeni · catalog-parity 34 · rule-generator/regen süitleri), `tsc --noEmit` 0, 20-gate yeşil. Kanıtlamadığı: gerçek-binary Windows/subprocess koşusu yapılmadı (Linux-local; X boyutu açık) ve P1-P5 kaynak paketleri (typed planner failure, canonical project-root, Docker attempt-identity, route-aware worker-core delivery'nin kalan yarısı, dar self-audit adapter, docs/rules onarım-sonrası-regen) hâlâ uygulanmadı",
       "updated": "2026-08-28"
     },
     {
@@ -27418,6 +27418,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "a2650bcf44dc4d4961fed4ccbee6d8548029036ae3486b868f6e59d3072df895"
+    "value": "87b27d3ebd189242bf90190d22c91304dd25075e890a29765a591e9ec7886fd8"
   }
 }

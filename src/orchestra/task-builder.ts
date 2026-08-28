@@ -113,6 +113,7 @@ import type { ResolvedVerifyCommands } from './worker-verify-tool.js';
 import { computeToolAllowlist } from '../core/tool-allowlist.js';
 import type { ToolAllowlistResult } from '../core/tool-allowlist.js';
 import { getProviderCommandSpec } from '../core/provider-command-spec.js';
+import { spawnBackendKindDeliversWorkerCore } from './spawn-backend.js';
 
 type CoreExternalizationPolicy = {
   /** Claude's established system-prompt-file seam predates the capability field. */
@@ -130,10 +131,26 @@ const providerCoreExternalizationPolicies: Partial<Record<ProviderName, CoreExte
   },
 };
 
+/**
+ * Externalizing the core removes it from the compiled prompt, so it is only
+ * honest when something will actually deliver it. The decision is therefore the
+ * intersection of three authorities, and any missing one keeps the core inline:
+ *
+ * 1. the provider exposes a system-prompt core channel,
+ * 2. every provider-specific rollout flag for that channel is enabled,
+ * 3. **the selected backend can deliver that channel**.
+ *
+ * (3) is not optional detail: only the docker backend builds the core argv.
+ * `spawn_backend: 'auto'` resolves to `subprocess` on Windows and on any host
+ * whose docker daemon is unreachable, so deciding without the backend silently
+ * strips the worker's execution contract on exactly those hosts.
+ */
 function shouldExternalizeWorkerCore(
   provider: ProviderName | undefined,
   flags: ResolvedConfig['prompt'] | undefined,
+  backendDeliversCore: boolean,
 ): boolean {
+  if (!backendDeliversCore) return false;
   const policy = provider ? providerCoreExternalizationPolicies[provider] : undefined;
   const commandSpec = provider ? getProviderCommandSpec(provider) : undefined;
   const hasCoreChannel = commandSpec != null
@@ -2686,6 +2703,12 @@ export function buildWorkerPrompt(
     readonly sourceAuthority?: RunFlowPlanSourceAuthority;
   },
   deliveryProbe?: SkillDeliveryProbe,
+  /**
+   * Backend kind that will run this task (`docker` | `tmux` | `subprocess` |
+   * `auto`). Omitted means "unknown" and resolves fail-closed: the worker core
+   * stays inline rather than being suppressed with no channel to carry it.
+   */
+  spawnBackendKind?: string,
 ): string {
   const publishDeliveryReceipt = projectRoot !== undefined;
   projectRoot ??= process.cwd();
@@ -2926,9 +2949,14 @@ export function buildWorkerPrompt(
     verifyCommands,
     toolAllowlist,
     personaRenderMode: effectiveConfig?.prompt?.persona_render,
-    // Suppress inline T0 only when the provider spec exposes a core channel and
-    // every provider-specific rollout flag for that channel is enabled.
-    coreExternalized: shouldExternalizeWorkerCore(task.provider, effectiveConfig?.prompt),
+    // Suppress inline T0 only when the provider spec exposes a core channel,
+    // every provider-specific rollout flag for that channel is enabled AND the
+    // selected backend can actually deliver it.
+    coreExternalized: shouldExternalizeWorkerCore(
+      task.provider,
+      effectiveConfig?.prompt,
+      spawnBackendKindDeliversWorkerCore(spawnBackendKind),
+    ),
     exactExecutionAuthority,
   };
   const artifact = buildTaskPromptSegmented(task, ctx);

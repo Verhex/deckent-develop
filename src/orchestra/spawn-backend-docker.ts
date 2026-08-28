@@ -4936,6 +4936,8 @@ export function captureDockerLogs(
 export class DockerSpawnBackend implements SpawnBackend {
   readonly name = 'docker';
   readonly liveUsageBudgetSupport = 'measured-stream' as const;
+  /** Builds the provider system-prompt core argv, so an externalized core is delivered. */
+  readonly canDeliverWorkerCore = true as const;
   /** ADR-G-037: host-stamped semantic checkpoint followed by exact-container stop. */
   readonly executionLandingCapability = 'checkpoint-stop' as const;
 

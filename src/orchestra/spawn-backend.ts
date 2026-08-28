@@ -71,6 +71,17 @@ export interface SpawnBackend {
   readonly name: string;
   readonly liveUsageBudgetSupport?: LiveUsageBudgetSupport;
   readonly executionLandingCapability?: ExecutionLandingCapability;
+  /**
+   * Whether this backend can actually hand the task-invariant worker core to
+   * the provider through its system-prompt channel (`opts.systemPromptCore`).
+   *
+   * The prompt compiler suppresses the inline core blocks only when a backend
+   * declares this, because suppressing them without delivery would silently
+   * strip the worker's execution contract. Omitting the field means "cannot
+   * deliver" — fail-closed, so a new backend keeps the core inline until it
+   * proves the channel.
+   */
+  readonly canDeliverWorkerCore?: boolean;
 
   /**
    * Spawn a worker process for the given task.
@@ -240,6 +251,8 @@ export function preflightClaudeAuthForLocalBackend(
 export class TmuxBackend implements SpawnBackend {
   readonly name = 'tmux';
   readonly liveUsageBudgetSupport = undefined;
+  /** No system-prompt core channel: `opts.systemPromptCore` is ignored here. */
+  readonly canDeliverWorkerCore = false as const;
 
   private readonly projectDir: string;
 
@@ -402,6 +415,8 @@ function resolveSubprocessProviderConfig(provider: string): SubprocessProviderCo
 export class SubprocessBackend implements SpawnBackend {
   readonly name = 'subprocess';
   readonly liveUsageBudgetSupport = undefined;
+  /** No system-prompt core channel: `opts.systemPromptCore` is ignored here. */
+  readonly canDeliverWorkerCore = false as const;
 
   private readonly projectDir: string;
   private readonly timeoutMs: number;
@@ -629,6 +644,29 @@ export function isDockerDaemonReachable(): boolean {
 export function _resetDockerProbeForTests(value?: boolean | null): void {
   _dockerProbe = value ?? null;
   _autoFallbackWarned = false;
+}
+
+/**
+ * Backend kinds that can carry an externalized worker core.
+ *
+ * Only the docker backend builds the provider system-prompt argv for it
+ * (`--system-prompt-file` for claude, `model_instructions_file=` for codex).
+ * Every other kind ignores `opts.systemPromptCore`, so the core must stay
+ * inline in the compiled prompt or the worker loses it entirely.
+ */
+const WORKER_CORE_DELIVERING_BACKENDS: ReadonlySet<string> = new Set(['docker']);
+
+/**
+ * Compile-time twin of {@link SpawnBackend.canDeliverWorkerCore}.
+ *
+ * The prompt is compiled before the per-task backend instance exists, so the
+ * decision resolves from the backend kind. Unknown or absent kind resolves to
+ * `false` (fail-closed): the core stays inline rather than being suppressed
+ * with nothing delivering it.
+ */
+export function spawnBackendKindDeliversWorkerCore(backend: string | undefined): boolean {
+  if (backend === undefined) return false;
+  return WORKER_CORE_DELIVERING_BACKENDS.has(resolveBackend(backend));
 }
 
 export function resolveBackend(backend: string): string {
