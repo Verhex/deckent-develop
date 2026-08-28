@@ -17542,3 +17542,31 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 706-004: Watch servisi — dry-run saflığı ve çökme-güvenli sıra (DONE)
 
 ---
+## Sprint 707 — sprint-707
+
+**Status:** COMPLETE
+**Date:** 2026-08-28
+**Duration:** 816s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 5 |
+| Completed | 5 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 815675ms |
+
+### Tasks
+
+- 707-001: Capability registration for intelligence watch handler (DONE)
+- 707-002: IANA timezone support in flow scheduling core (NO_GO)
+- 707-003: Daily watch flow wiring with idempotent mission ingest (DONE)
+- 707-004: CLI surface deckent intelligence with i18n (NO_GO)
+- 707-005: EN-TR feature docs and integration gate closure seal (DONE)
+- 707-002-fix: Fix: IANA timezone support in flow scheduling core (DONE)
+- 707-004-fix: Fix: CLI surface deckent intelligence with i18n (DONE)
+
+---

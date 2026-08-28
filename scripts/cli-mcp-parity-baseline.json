@@ -19,6 +19,7 @@
     "gateway-runtime",
     "heartbeat",
     "image",
+    "intelligence",
     "limits",
     "local-llm",
     "mcp",

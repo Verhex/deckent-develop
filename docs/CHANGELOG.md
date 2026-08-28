@@ -14,6 +14,25 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint707] - 2026-08-28
+
+### Added
+
+- Capability registration for intelligence watch handler
+- Daily watch flow wiring with idempotent mission ingest
+
+### Changed
+
+- EN-TR feature docs and integration gate closure seal (completed with tech debt)
+
+### Fixed
+
+- Fix: IANA timezone support in flow scheduling core
+- Fix: CLI surface deckent intelligence with i18n
+
+
+_Tasks: 5 total, 5 done, 1 tech debt, 0 no-go_
+
 ## [sprint706] - 2026-08-28
 
 ### Added

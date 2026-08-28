@@ -38,6 +38,7 @@ const VISIBLE_ROWS = [
   ['watch', 'observe', 'cli.watch.desc'],
   ['inspect', 'observe', 'inspect.description'],
   ['history', 'observe', 'history.desc'],
+  ['intelligence', 'observe', 'cli.intelligence.desc'],
   ['retro', 'observe', 'cli.retro.desc'],
   ['approvals', 'control', 'approvals.cmd_desc'],
   ['kill', 'control', 'cli.kill.desc'],

@@ -34,7 +34,7 @@ export class FlowScheduler {
       if (!flow.enabled) continue;
 
       const last = this.lastRunAt.get(flow.id) ?? new Date(0);
-      const next = nextRun(flow.cronExpr, last);
+      const next = nextRun(flow.cronExpr, last, flow.timezone);
 
       if (next <= now) {
         due.push({ flow, nextRun: next });
@@ -43,6 +43,41 @@ export class FlowScheduler {
     }
 
     return due.sort((a, b) => a.nextRun.getTime() - b.nextRun.getTime());
+  }
+
+  /**
+   * Return every scheduled occurrence strictly after `after` and no later than
+   * `now`. This is the catch-up seam for durable consumers: the caller performs
+   * its side effects and only then persists the returned occurrence as its
+   * cursor. The scheduler deliberately performs no cursor I/O here.
+   */
+  missedOccurrences(
+    flow: ScheduledFlow,
+    after: Date,
+    now: Date,
+    maxOccurrences = 10_000,
+  ): DueFlow[] {
+    if (!flow.enabled) return [];
+    if (!Number.isInteger(maxOccurrences) || maxOccurrences < 1) {
+      throw new RangeError('maxOccurrences must be a positive integer');
+    }
+
+    const due: DueFlow[] = [];
+    let cursor = new Date(after);
+    while (due.length < maxOccurrences) {
+      const occurrence = nextRun(flow.cronExpr, cursor, flow.timezone);
+      if (occurrence > now) return due;
+      due.push({ flow, nextRun: occurrence });
+      cursor = occurrence;
+    }
+
+    const next = nextRun(flow.cronExpr, cursor, flow.timezone);
+    if (next <= now) {
+      throw new RangeError(
+        `Flow ${flow.id} exceeded catch-up limit ${maxOccurrences}`,
+      );
+    }
+    return due;
   }
 
   /**

@@ -20,6 +20,8 @@ export interface ScheduledFlow {
   action: string;
   tenantId: string;
   enabled: boolean;
+  /** IANA timezone for cron fields. Omitted schedules retain UTC semantics. */
+  timezone?: string;
   createdAt?: string;
 }
 
@@ -143,8 +145,12 @@ function matchesDayOfWeek(field: string, jsDay: number): boolean {
  *
  * @throws if no match is found within one calendar year (pathological guard).
  */
-export function nextRun(cronExpr: string, from: Date = new Date()): Date {
+export function nextRun(cronExpr: string, from: Date = new Date(), timezone?: string): Date {
   const parsed = parseCronExpr(cronExpr);
+
+  if (timezone !== undefined) {
+    return nextRunInTimezone(parsed, cronExpr, from, timezone);
+  }
 
   // Advance to the next whole minute after `from`.
   const t = new Date(from);
@@ -205,4 +211,86 @@ export function nextRun(cronExpr: string, from: Date = new Date()): Date {
   }
 
   throw scheduledFlowError(`nextRun: no match found within 1 year for cron expression "${cronExpr}"`);
+}
+
+interface LocalDateTime {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+}
+
+function nextRunInTimezone(
+  parsed: ParsedCronExpr,
+  cronExpr: string,
+  from: Date,
+  timezone: string,
+): Date {
+  let formatter: Intl.DateTimeFormat;
+  try {
+    formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      calendar: 'gregory',
+      numberingSystem: 'latn',
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch (error: unknown) {
+    throw scheduledFlowError(
+      `Invalid timezone "${timezone}": ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
+  const candidate = new Date(from);
+  candidate.setUTCSeconds(0, 0);
+  candidate.setUTCMinutes(candidate.getUTCMinutes() + 1);
+  const maxIterations = 366 * 24 * 60;
+
+  for (let i = 0; i < maxIterations; i++) {
+    const local = localDateTime(formatter, candidate);
+    const dow = new Date(Date.UTC(local.year, local.month - 1, local.day)).getUTCDay();
+    const domWild = parsed.dayOfMonth === '*';
+    const dowWild = parsed.dayOfWeek === '*';
+    const dayMatches = domWild && dowWild
+      ? true
+      : domWild
+        ? matchesDayOfWeek(parsed.dayOfWeek, dow)
+        : dowWild
+          ? matchesField(parsed.dayOfMonth, local.day, 1)
+          : matchesField(parsed.dayOfMonth, local.day, 1)
+            || matchesDayOfWeek(parsed.dayOfWeek, dow);
+
+    if (
+      matchesField(parsed.month, local.month, 1)
+      && dayMatches
+      && matchesField(parsed.hour, local.hour, 0)
+      && matchesField(parsed.minute, local.minute, 0)
+    ) {
+      return new Date(candidate);
+    }
+    candidate.setUTCMinutes(candidate.getUTCMinutes() + 1);
+  }
+
+  throw scheduledFlowError(
+    `nextRun: no match found within 1 year for cron expression "${cronExpr}" in timezone "${timezone}"`,
+  );
+}
+
+function localDateTime(formatter: Intl.DateTimeFormat, date: Date): LocalDateTime {
+  const values: Record<string, number> = {};
+  for (const part of formatter.formatToParts(date)) {
+    if (part.type !== 'literal') values[part.type] = Number(part.value);
+  }
+  return {
+    year: values.year!,
+    month: values.month!,
+    day: values.day!,
+    hour: values.hour!,
+    minute: values.minute!,
+  };
 }

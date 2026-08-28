@@ -5930,9 +5930,12 @@ const BASE_MESSAGES: MessageMap = {
   // with different placeholders ({session} vs {arg}); Task 387-001) ────────────
   // SURF-3 multi-flow-inbox — read-only `/runs` list of concurrent run-flows.
   'tui.inbox_header': { en: 'Active runs', tr: 'Aktif koşular' },
+  // `status` takes no argument — it reports the active run. The per-run
+  // drill-down surface is `inspect`, so the hint pointed operators at a command
+  // that answers with "too many arguments".
   'tui.inbox_hint': {
-    en: 'Tip: `deckent status <id>` follows one',
-    tr: 'İpucu: birini izlemek için `deckent status <id>`',
+    en: 'Tip: `deckent inspect <id>` opens one',
+    tr: 'İpucu: birini açmak için `deckent inspect <id>`',
   },
   'tui.inbox_empty': {
     en: 'No runs yet — start one with `deckent do "<goal>"`',
@@ -8621,6 +8624,63 @@ const BASE_MESSAGES: MessageMap = {
   'cli.autonomous.mission.desc': { en: 'Manage an autonomous mission', tr: 'Otonom bir misyonu yönetin' },
   'cli.memory.recall.desc': { en: 'Recall matching memories', tr: 'Eşleşen anıları geri çağırın' },
   'cli.memory.remember.desc': { en: 'Remember a durable note', tr: 'Kalıcı bir notu hatırlayın' },
+  // ─── Intelligence command (707-004) ───────────────────────────────
+  'cli.intelligence.desc': {
+    en: 'Inspect and run competitor intelligence',
+    tr: 'Rakip istihbaratını inceleyin ve çalıştırın',
+  },
+  'cli.intelligence.watch.desc': {
+    en: 'Manage competitor-watch execution',
+    tr: 'Rakip izleme çalıştırmasını yönetin',
+  },
+  'cli.intelligence.watch.run.desc': {
+    en: 'Run the canonical competitor-watch capability',
+    tr: 'Kanonik rakip izleme yeteneğini çalıştırın',
+  },
+  'cli.intelligence.watch.run.opt.dry_run': {
+    en: 'Preview without persisting events, cursors, or notifications',
+    tr: 'Olayları, imleçleri veya bildirimleri kaydetmeden önizleyin',
+  },
+  'cli.intelligence.watch.run.opt.input': {
+    en: 'Read source definitions from a JSON fixture',
+    tr: 'Kaynak tanımlarını bir JSON fikstüründen okuyun',
+  },
+  'cli.intelligence.schedule.desc': {
+    en: 'Ensure and report the canonical daily watch flow',
+    tr: 'Kanonik günlük izleme akışını sağlayın ve raporlayın',
+  },
+  'cli.intelligence.status.desc': {
+    en: 'Show watch event history and last-run state',
+    tr: 'İzleme olay geçmişini ve son çalıştırma durumunu gösterin',
+  },
+  'cli.intelligence.watch.run.completed': {
+    en: 'Watch completed: {alertCount} alerts, {issueCount} issues (dry-run: {dryRun}).',
+    tr: 'İzleme tamamlandı: {alertCount} uyarı, {issueCount} sorun (deneme: {dryRun}).',
+  },
+  'cli.intelligence.watch.run.not_completed': {
+    en: 'Watch did not complete: {kind}.',
+    tr: 'İzleme tamamlanmadı: {kind}.',
+  },
+  'cli.intelligence.schedule.registered': {
+    en: 'Watch flow registered: {id} ({cron}, {timezone}).',
+    tr: 'İzleme akışı kaydedildi: {id} ({cron}, {timezone}).',
+  },
+  'cli.intelligence.schedule.existing': {
+    en: 'Watch flow already registered: {id} ({cron}, {timezone}).',
+    tr: 'İzleme akışı zaten kayıtlı: {id} ({cron}, {timezone}).',
+  },
+  'cli.intelligence.status.summary': {
+    en: 'Watch status: {eventCount} events; last run: {lastRun}.',
+    tr: 'İzleme durumu: {eventCount} olay; son çalışma: {lastRun}.',
+  },
+  'cli.intelligence.status.never': {
+    en: 'never',
+    tr: 'hiç',
+  },
+  'cli.intelligence.error': {
+    en: 'Intelligence command failed: {message}.',
+    tr: 'İstihbarat komutu başarısız oldu: {message}.',
+  },
   'cli.retro.opt.explain': { en: 'Explain the retrospective task evidence', tr: 'Retrospektif görev kanıtını açıklayın' },
   'cli.retro.opt.task': { en: 'Explain one specific task', tr: 'Belirli bir görevi açıklayın' },
 };

@@ -82,6 +82,17 @@ describe('FlowScheduler.tick', () => {
     const result = scheduler.tick([flow], oneMinuteLater);
     expect(result).toHaveLength(1);
   });
+
+  it('uses a flow timezone when computing the next run', () => {
+    const flow = makeFlow({
+      id: 'istanbul', cronExpr: '0 9 * * *', timezone: 'Europe/Istanbul',
+    });
+    const firstDay = new Date('2026-01-01T06:00:00.000Z');
+    scheduler.tick([flow], firstDay);
+    const nextDay = new Date('2026-01-02T06:00:00.000Z');
+    expect(scheduler.tick([flow], nextDay)[0]!.nextRun.toISOString())
+      .toBe('2026-01-02T06:00:00.000Z');
+  });
 });
 
 describe('FlowScheduler.reset', () => {
@@ -95,5 +106,40 @@ describe('FlowScheduler.reset', () => {
     // After reset, the flow fires again
     scheduler.reset('reset-flow');
     expect(scheduler.tick([flow], now)).toHaveLength(1);
+  });
+});
+
+describe('FlowScheduler.missedOccurrences', () => {
+  it('returns every missed timezone-aware slot without mutating scheduler state', () => {
+    const scheduler = new FlowScheduler();
+    const flow = makeFlow({
+      id: 'daily-watch',
+      cronExpr: '0 9 * * *',
+      timezone: 'Europe/Istanbul',
+    });
+
+    const after = new Date('2026-08-24T06:00:00.000Z');
+    const now = new Date('2026-08-27T06:00:00.000Z');
+    const expected = [
+      '2026-08-25T06:00:00.000Z',
+      '2026-08-26T06:00:00.000Z',
+      '2026-08-27T06:00:00.000Z',
+    ];
+
+    expect(scheduler.missedOccurrences(flow, after, now)
+      .map(({ nextRun: occurrence }) => occurrence.toISOString())).toEqual(expected);
+    expect(scheduler.missedOccurrences(flow, after, now)
+      .map(({ nextRun: occurrence }) => occurrence.toISOString())).toEqual(expected);
+  });
+
+  it('fails closed instead of silently dropping occurrences at its bound', () => {
+    const scheduler = new FlowScheduler();
+    const flow = makeFlow({ id: 'bounded' });
+    expect(() => scheduler.missedOccurrences(
+      flow,
+      new Date('2026-08-28T09:00:00.000Z'),
+      new Date('2026-08-28T09:03:00.000Z'),
+      2,
+    )).toThrow('exceeded catch-up limit');
   });
 });

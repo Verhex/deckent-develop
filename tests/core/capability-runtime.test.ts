@@ -17,6 +17,7 @@ import { debugLog } from '../../src/core/utils.js';
 import type { CapabilityAuditRecord } from '../../src/core/capability-audit-bridge.js';
 import { createInMemoryErpDriver } from '../../src/core/erp/handler.js';
 import { createErpConnector, type ErpConnector, type ErpResultSet } from '../../src/core/erp/connector.js';
+import { WATCH_CAPABILITY_ID } from '../../src/intelligence/watch-capability.js';
 
 describe('createAuditedCapabilityRegistry', () => {
   it('preinstalls the full handler set (reference + extended + data)', () => {
@@ -65,6 +66,13 @@ describe('createAuditedCapabilityRegistry', () => {
     const reg = createAuditedCapabilityRegistry();
     const res = await reg.invoke({ capability: 'echo', args: {} });
     expect(res.ok).toBe(true);
+  });
+});
+
+describe('createAuditedCapabilityRegistry — intelligence watch binding', () => {
+  it('does not admit the capability by name alone', () => {
+    const reg = createAuditedCapabilityRegistry();
+    expect(reg.has(WATCH_CAPABILITY_ID)).toBe(false);
   });
 });
 

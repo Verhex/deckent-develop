@@ -180,4 +180,12 @@ describe('ScheduledFlow type', () => {
     };
     expect(flow.createdAt).toBeDefined();
   });
+
+  it('allows an optional IANA timezone', () => {
+    const flow: ScheduledFlow = {
+      id: 'flow-tz', cronExpr: '0 9 * * *', action: 'run',
+      tenantId: 'local', enabled: true, timezone: 'Europe/Istanbul',
+    };
+    expect(flow.timezone).toBe('Europe/Istanbul');
+  });
 });

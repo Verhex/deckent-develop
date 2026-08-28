@@ -56,6 +56,17 @@ import { registerConfigNervous } from './commands/config-nervous.js';
 import { registerMode } from './commands/mode.js';
 import { registerFeatures } from './commands/features.js';
 import { registerTruth } from './commands/truth.js';
+import { registerIntelligence } from './commands/intelligence.js';
+import type { IntelligenceCommandDependencies } from './commands/intelligence.js';
+import { readFile } from 'node:fs/promises';
+import { print } from './helpers/output.js';
+import { join, resolve } from 'node:path';
+import { createAuditedCapabilityRegistry } from '../core/capability-runtime.js';
+import { FlowRegistry } from '../core/flow-registry.js';
+import { MemoryStore } from '../core/memory-store.js';
+import { BRAIN_DIR, MEMORY_DB_FILE } from '../core/constants.js';
+import type { SourceDefinition } from '../intelligence/source-retrieval.js';
+import type { CompetitorEvent } from '../intelligence/event-history.js';
 import { registerAudit } from './commands/audit.js';
 import { registerAuditVerify } from './commands/audit-verify.js';
 import { registerRecover } from './commands/recover.js';
@@ -161,6 +172,46 @@ export function formatGeneratedAdvancedHelp(lang: string): string {
  * Also installs top-level uncaughtException / unhandledRejection
  * handlers on first call (idempotent; skipped under vitest).
  */
+/**
+ * Production composition for `deckent intelligence`.
+ *
+ * The watch capability is registered ONLY when a live binding is supplied, and
+ * this composition deliberately supplies none: the chain still lacks a
+ * production `interpretSource` — the semantic step that turns a retrieved
+ * source into comparable signals — so no honest binding can be built yet.
+ * Without it `capabilityRegistry.invoke` returns a typed failure and the command
+ * reports that instead of pretending to have run a watch. When the interpreter
+ * lands, this function gains the binding and the command starts working with no
+ * change to the command module itself.
+ */
+function buildIntelligenceDependencies(): IntelligenceCommandDependencies {
+  return {
+    capabilityRegistry: createAuditedCapabilityRegistry(),
+    flowRegistry: new FlowRegistry(),
+    loadSources: async (fixture: string | undefined) => {
+      if (fixture === undefined) return [];
+      const raw = await readFile(resolve(fixture), 'utf-8');
+      return JSON.parse(raw) as SourceDefinition[];
+    },
+    readStatus: () => {
+      const store = new MemoryStore(join(process.cwd(), BRAIN_DIR, MEMORY_DB_FILE));
+      try {
+        const events = store.getByType('custom')
+          .filter(entry => (entry.tag_text ?? '').includes('competitor-event'))
+          .map(entry => JSON.parse(entry.metadata) as CompetitorEvent);
+        const lastRun = events
+          .map(event => Date.parse(event.detectionDate))
+          .filter(value => Number.isFinite(value))
+          .sort((left, right) => right - left)[0];
+        return { events, lastRun: lastRun === undefined ? undefined : new Date(lastRun) };
+      } finally {
+        store.close();
+      }
+    },
+    write: (message) => print(message),
+  };
+}
+
 export function buildProgram(runtime: CliProgramRuntime = {}): Command {
   installFatalHandlers();
 
@@ -266,6 +317,7 @@ export function buildProgram(runtime: CliProgramRuntime = {}): Command {
   registerMode(program);
   registerFeatures(program);
   registerTruth(program);
+  registerIntelligence(program, buildIntelligenceDependencies());
   registerAudit(program);
   registerAuditVerify(program);
   registerRecover(program);

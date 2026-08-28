@@ -12,7 +12,7 @@ import {
 
 const VISIBLE_BY_GROUP = {
   run: ['do', 'run', 'plan', 'start', 'runs', 'review'],
-  observe: ['status', 'watch', 'inspect', 'history', 'retro'],
+  observe: ['status', 'watch', 'inspect', 'history', 'intelligence', 'retro'],
   control: ['approvals', 'kill', 'recover', 'cleanup', 'autonomous', 'nervous', 'xverify'],
   system: [
     'init', 'config', 'doctor',

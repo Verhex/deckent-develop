@@ -717,7 +717,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // repair-overflow-dispatch / repair-queue-authority / repair-quiescence-gate /
   // repair-dispatch-chain-seal suite'leri (hepsi tmpdir-hermetik, spawnWorkers ve
   // waitForResults seam'leri inject edilir; gerçek process doğmaz).
-  count: 16692,
+  count: 16696,
   // 2026-08-25 B-sweep: digest moved — --fix roundtrip pin, multi-label
   // parser pin, same-line rule downgraded to WARN (all suite-owned).
   // 2026-08-25 7141 wave: count unchanged, digest moved — the src-side
@@ -761,6 +761,9 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // attribution-baseline / finalize-retirement + isCanonicalTaskFilename pinleri.
   // 2026-08-26 11:04: 16504→16506 — Node-6a mekanik supurme (sprint-684 3/3):
   // death-sweep hijyen + worker-identity-hostbound + docker-git-async suiteleri.
+  // 2026-08-28 12:1x: 16692→16696 — MASTER 6181 dilim-3 (sprint-707): watch-capability ·
+  // watch-flow · flow-scheduler-timezone · intelligence CLI · watch-closure-integration
+  // süitleri; gerçek-binary vakası authored ve build-ritüeli gerekçesiyle açıkça skip.
   // 2026-08-28 11:2x: 16689→16692 — MASTER 6181 dilim-2 (sprint-706): source-retrieval ·
   // event-history · alert-formatter · watch-service süitleri; hepsi enjekte fetch/store/saat
   // ile koşar, gerçek ağ ve gerçek DB yok.
@@ -771,7 +774,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // externalization pininin backend-argümanıyla güncellenmesi.
   // 2026-08-28 09:0x: digest 6820cbff→10164164 — sprint-704 repair-queue suite'leri
   // + sprintId/settle el-kapanışının test-metni etkisi.
-  digest: '9afbf22b16e484387f92493f3e5ae5e2879a1331bc5967180d074476cc7f65fc',
+  digest: '248cfaf8d06c83fed0b49a0ac83ca5e4b75c87a21ca082b291e3f698b44be80d',
   // 2026-08-27 04:0x: ayni 16514, digest-only — full-suite hizalama batch'i
   // (pin/mock/census guncellemeleri + sync guard).
   // 2026-08-27 03:1x: ayni 16514, digest-only — CI-hizalama paketi
@@ -1317,7 +1320,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // src/intelligence/ katmanı (types · baseline-catalog · baseline ·
   // competitor-universe · terminology · comparison · significance-gate ·
   // alarm-prompt); ağ/IO yok, tamamı enjekte edilebilir okuyucuyla çalışır.
-  count: 1358,
+  count: 1361,
   // 2026-08-25 config-loss incident hardening: digest moved — atomic
   // last_sprint_id writer (refuse-mint + tmp+rename) and loadConfig
   // self-heal re-read-once + atomic fresh-default.
@@ -1374,6 +1377,9 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // (death-sweep / prompt-template kimlik-esigi / docker async-git).
   // 2026-08-28 09:0x: digest 120cadc2→873b946d — repair-queue-authority modülü +
   // sprint-phases/sprint-controller kablolaması.
+  // 2026-08-28 12:1x: 1358→1361 — MASTER 6181 dilim-3: watch-capability · watch-flow ·
+  // CLI intelligence komutu; entrypoint composition capability'yi bilerek bağlamaz
+  // (üretim interpretSource seam'i yok), komut tipli hata bildirir.
   // 2026-08-28 11:2x: 1354→1358 — MASTER 6181 dilim-2: src/intelligence/ servis katmanı
   // (source-retrieval · event-history · alert-formatter · watch-service) + index barrel;
   // ağ yalnız enjekte edilmiş fetch üzerinden, ham gövde saklanmaz.
@@ -1390,7 +1396,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // worker-core backend-yetenek kapısı (task-builder/spawn-backend) + MCP karar-disposition
   // kapısı; yeni üretim modülü eklenmedi, taranan metin değişti.
   // 2026-08-28 09:4x: digest 873b946d→b127e8b9 — src/intelligence/ katmanı.
-  digest: '934c92634f95b857d9b6127b6fa854f9e15a297710a36f5301b648c1804c643e',
+  digest: '6fe48913d0e79a5daa410caabc800fef33aa5008004fcd59ff6e8ef9f8b76007',
   // 2026-08-27 04:0x: ayni 1339, digest-only — sync workspace-guard + drift-normalize.
   // 2026-08-27 03:1x: ayni 1339, digest-only — skill-pool readJsonSafe donusumu.
   // 2026-08-27 02:0x: ayni 1339, digest-only — Dalga-3 src kaymalari

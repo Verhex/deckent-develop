@@ -42,10 +42,16 @@ import {
 } from './capability-audit-bridge.js';
 import { writeAuditEvent } from './audit-writer.js';
 import { debugLog } from './utils.js';
+import {
+  registerWatchCapability,
+  type WatchCapabilityBinding,
+} from '../intelligence/watch-capability.js';
 
 /** Handler options forwarded to the underlying install* functions. */
 export interface CapabilityRuntimeOptions extends ExtendedHandlerOptions {
   data?: DataHandlerOptions;
+  /** Opt-in live binding for the intelligence competitor-watch capability. */
+  intelligenceWatch?: WatchCapabilityBinding;
   /** Opt-in ERP read access (Sprint 265) — absent ⇒ no 'erp.read' handler
    *  is registered and the registry behaves exactly as before (backward-safe).
    *  `approvalGate` is optional: when provided every invocation is pre-checked
@@ -147,6 +153,9 @@ export function createAuditedCapabilityRegistry(
   const registry = createDefaultRegistry();
   installExtendedHandlers(registry, options);
   installDataHandlers(registry, { db: options.data?.db, mail: options.data?.mail });
+  if (options.intelligenceWatch !== undefined) {
+    registerWatchCapability(registry, options.intelligenceWatch);
+  }
   // Opt-in ERP wake (E12) — installed before the audit wrap below so erp.read
   // invocations emit audit records through the same loop as every other handler.
   if (options.erp) {

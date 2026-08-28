@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { getMessage, getLanguage } from '../../../src/cli/helpers/messages.js';
+import { getMessage, getLanguage, getMessageLanguages } from '../../../src/cli/helpers/messages.js';
 import { getMessage as getMessage__tsm_006, getLanguage as getLanguage__tsm_006 } from "../../../src/cli/helpers/messages.js";
 
 // All keys defined in messages.ts
@@ -721,6 +721,46 @@ describe('history command messages', () => {
   it('history.trend_header interpolates {n} in both languages', () => {
     expect(getMessage('history.trend_header', 'en', { n: '5' })).toBe('--- Trend (last 5 runs) ---');
     expect(getMessage('history.trend_header', 'tr', { n: '5' })).toContain('5 run');
+  });
+});
+
+describe('intelligence command messages', () => {
+  it('provides complete and distinct English and Turkish rows', () => {
+    const keys = [
+      'cli.intelligence.desc',
+      'cli.intelligence.watch.desc',
+      'cli.intelligence.watch.run.desc',
+      'cli.intelligence.watch.run.opt.dry_run',
+      'cli.intelligence.watch.run.opt.input',
+      'cli.intelligence.schedule.desc',
+      'cli.intelligence.status.desc',
+      'cli.intelligence.watch.run.completed',
+      'cli.intelligence.watch.run.not_completed',
+      'cli.intelligence.schedule.registered',
+      'cli.intelligence.schedule.existing',
+      'cli.intelligence.status.summary',
+      'cli.intelligence.status.never',
+      'cli.intelligence.error',
+    ];
+
+    for (const key of keys) {
+      expect(getMessageLanguages(key)).toEqual(expect.arrayContaining(['en', 'tr']));
+      expect(getMessage(key, 'en')).not.toBe(key);
+      expect(getMessage(key, 'tr')).not.toBe(key);
+      expect(getMessage(key, 'en')).not.toBe(getMessage(key, 'tr'));
+    }
+  });
+
+  it('uses matching placeholders in both locales', () => {
+    const vars = {
+      alertCount: '2',
+      issueCount: '0',
+      dryRun: 'true',
+    };
+    expect(getMessage('cli.intelligence.watch.run.completed', 'en', vars))
+      .toContain('2 alerts');
+    expect(getMessage('cli.intelligence.watch.run.completed', 'tr', vars))
+      .toContain('2 uyarı');
   });
 });
 

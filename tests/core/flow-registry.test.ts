@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
@@ -89,6 +89,23 @@ describe('FlowRegistry', () => {
   });
 
   describe('persist roundtrip', () => {
+    it('round-trips timezone and leaves a legacy record without the field untouched', () => {
+      const dir = tmpDir();
+      const legacyDir = join(dir, 'tenant-old');
+      mkdirSync(legacyDir, { recursive: true });
+      const legacy = makeFlow({ id: 'legacy', tenantId: 'tenant-old' });
+      writeFileSync(join(legacyDir, 'legacy.json'), JSON.stringify(legacy, null, 2));
+
+      const registry = new FlowRegistry(dir);
+      expect(registry.getFlow('legacy')).toEqual(legacy);
+      expect(registry.getFlow('legacy')).not.toHaveProperty('timezone');
+
+      const zoned = makeFlow({ id: 'zoned', timezone: 'Europe/Istanbul' });
+      registry.addFlow(zoned);
+      expect(new FlowRegistry(dir).getFlow('zoned')).toEqual(zoned);
+      rmSync(dir, { recursive: true });
+    });
+
     it('persists flow to disk as JSON', () => {
       const dir = tmpDir();
       const registry = new FlowRegistry(dir);
