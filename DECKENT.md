@@ -27,7 +27,7 @@ Canonical ürün kimliği ve execution-authority tanımı: `.deckent/workspace/I
 - Planning mode: brain_planning = 'ai' | 'structured' | 'auto'
 
 ## Agents & Skills
-- Canlı agent listesi `docs/reference/agents.md` ve `deckent agents`; canlı skill listesi registry/`deckent skills` yüzeyidir. Bu belgede sayı tutulmaz
+- Canlı agent listesi `docs/en/reference/agents.md` (TR: `docs/tr/reference/agents.md`) ve `deckent agent list`; canlı skill listesi registry/`deckent skill list` yüzeyidir. Bu belgede sayı tutulmaz
 - Agent pool: `.deckent/agents/*/agent.json`; retention/eviction effective config ve policy'den çözülür
 - Skill registry: .deckent/skills/*/skill.json — AST sandbox validation
 - Task routing: task-router.ts assigns agent + skills + provider per task
@@ -504,7 +504,7 @@ tsc
 
 ---
 
-## Built-in Agents (temsili alt-küme; canlı liste: `docs/reference/agents.md`)
+## Built-in Agents (temsili alt-küme; canlı liste: `docs/en/reference/agents.md`)
 
 > ADR-G-023: Agent/skill taxonomy; test görevi task-bazlı yönetilir.
 

@@ -708,6 +708,8 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // tests/core/preflight-typecheck-preference.test.ts (tmpdir-hermetik, suite-owned,
   // child_process spawnSync mock'lu — gerçek komut koşmaz) + budget-fix test ekleri
   // (output.test.ts config-default pini, doctor.test.ts iki budget senaryosu).
+  // 2026-08-28 10:1x: 16627→16689 — MASTER 3356 P1: doc↔CLI-surface truth gate'inin
+  // hermetik süiti (fixture repo tmpdir'de kurulur; gerçek repo okunmaz).
   // 2026-08-28 10:0x: 16621→16627 — MASTER 3356 P0 paketi: worker-core teslimatının
   // backend-yetenek kapısı (worker-core-backend-capability suite'i) + MCP karar-disposition
   // kapısının catalog-parity pinleri; ikisi de tmpdir-hermetik, gerçek process/DB yok.
@@ -715,7 +717,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // repair-overflow-dispatch / repair-queue-authority / repair-quiescence-gate /
   // repair-dispatch-chain-seal suite'leri (hepsi tmpdir-hermetik, spawnWorkers ve
   // waitForResults seam'leri inject edilir; gerçek process doğmaz).
-  count: 16627,
+  count: 16689,
   // 2026-08-25 B-sweep: digest moved — --fix roundtrip pin, multi-label
   // parser pin, same-line rule downgraded to WARN (all suite-owned).
   // 2026-08-25 7141 wave: count unchanged, digest moved — the src-side
@@ -759,11 +761,12 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // attribution-baseline / finalize-retirement + isCanonicalTaskFilename pinleri.
   // 2026-08-26 11:04: 16504→16506 — Node-6a mekanik supurme (sprint-684 3/3):
   // death-sweep hijyen + worker-identity-hostbound + docker-git-async suiteleri.
+  // 2026-08-28 10:1x: digest 3f71a5e1→4c78772b — doc-command-truth süiti.
   // 2026-08-28 10:0x: digest 10164164→3f71a5e1 — 3356 P0 paketi suite'leri + iki eski
   // externalization pininin backend-argümanıyla güncellenmesi.
   // 2026-08-28 09:0x: digest 6820cbff→10164164 — sprint-704 repair-queue suite'leri
   // + sprintId/settle el-kapanışının test-metni etkisi.
-  digest: '3f71a5e1ef7f6c0e8428c7474d6324b339e701d67b04b8e64ce7608a14c48d70',
+  digest: '4c78772b8d0f72227d0c4aa7f215f60d5741e8d082301df0445a9736687380d0',
   // 2026-08-27 04:0x: ayni 16514, digest-only — full-suite hizalama batch'i
   // (pin/mock/census guncellemeleri + sync guard).
   // 2026-08-27 03:1x: ayni 16514, digest-only — CI-hizalama paketi
@@ -1309,7 +1312,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // src/intelligence/ katmanı (types · baseline-catalog · baseline ·
   // competitor-universe · terminology · comparison · significance-gate ·
   // alarm-prompt); ağ/IO yok, tamamı enjekte edilebilir okuyucuyla çalışır.
-  count: 1351,
+  count: 1353,
   // 2026-08-25 config-loss incident hardening: digest moved — atomic
   // last_sprint_id writer (refuse-mint + tmp+rename) and loadConfig
   // self-heal re-read-once + atomic fresh-default.
@@ -1366,11 +1369,13 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // (death-sweep / prompt-template kimlik-esigi / docker async-git).
   // 2026-08-28 09:0x: digest 120cadc2→873b946d — repair-queue-authority modülü +
   // sprint-phases/sprint-controller kablolaması.
+  // 2026-08-28 10:1x: 1351→1353 — 3356 P1: scripts/lint-doc-command-truth.mjs gate'i
+  // (+ package.json lint:gates zinciri) taranan üretim envanterine girdi.
   // 2026-08-28 10:0x: aynı 1351, digest-only b127e8b9→85eddc38 — 3356 P0 paketi:
   // worker-core backend-yetenek kapısı (task-builder/spawn-backend) + MCP karar-disposition
   // kapısı; yeni üretim modülü eklenmedi, taranan metin değişti.
   // 2026-08-28 09:4x: digest 873b946d→b127e8b9 — src/intelligence/ katmanı.
-  digest: '85eddc38764093e7769a24d24f718cddad55d34bcd48096c5da2848af8e18129',
+  digest: '38422e58bf85dd5bbf2c6f6ad06bd7360ca00013e817e5e1d65e8834cdee22d6',
   // 2026-08-27 04:0x: ayni 1339, digest-only — sync workspace-guard + drift-normalize.
   // 2026-08-27 03:1x: ayni 1339, digest-only — skill-pool readJsonSafe donusumu.
   // 2026-08-27 02:0x: ayni 1339, digest-only — Dalga-3 src kaymalari
