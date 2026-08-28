@@ -14,6 +14,18 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint704] - 2026-08-28
+
+### Added
+
+- Overflow kuyruğunun gerçek dispatch mekanizmasına bağlanması
+- Admitted-repair kuyruğunun durable kimliği
+- Quiescence kapısı — PAUSE ancak fenced snapshot'tan sonra
+- Zincir-mühürü — uçtan uca hermetik regresyon
+
+
+_Tasks: 4 total, 4 done, 0 tech debt, 0 no-go_
+
 ## [sprint703] - 2026-08-27
 
 ### Added

@@ -101,12 +101,30 @@ validator formal DONE'u 3-typed-sebeple blokladı** (3300 VERIFY-dependency + ev
 GR-receipt yok) — sessiz bypass yok, OPEN'da mühür-onayı kayıtlı; formal yükseliş owner-katılımlı
 receipt-töreni ister (3300+3301 birlikte). Ayrıca 6181 taslağı silinme-tetiğiyle lane-brief'e taşındı.
 
+**2026-08-28 SABAH — FAZ-0 + FAZ-1 LANDED, FAZ-2 HARİTASI OWNER'DA.** Owner "kuyruğu planla
+ve yürüt" emriyle plan-modu turu koşuldu (4 owner-kararı: kernel-ağacını-kapat-sonra-yayın ·
+VERIFY toplu-yükseliş · 480 Closure ver · CLI dilim-2 sıraya). **Faz-0** (`92a5c154a`):
+Work 480 `DONE` + kapsül arşive, 3301/3296 `OPEN→VERIFY`, `GR-2026-08-28-LADDER-01`.
+**Faz-1** (bu commit): MASTER 3284 çekirdek dilimi — sprint-704 (do-kaynaklı 4 task, 4/4 DONE,
+biri dürüst NO_GO→FIX) + ana-şerit el-kapanışı (sprintId kapsamı · try/finally settle ·
+DRAIN_REQUIRED daraltması). 16 yeni test + komşu 60 test yeşil, tsc-0, 20-gate yeşil, taze
+build. **Canlı kanıt (L=1):** izole fixture'da overflow onarımı GERÇEKTEN dispatch edildi ve
+run ancak kuyruk boşalınca dürüst resumable PAUSE'a gitti (`.analysis/replay-3284-20260828/`).
+**Faz-2:** yayın kapısının gerçek boyutu ölçüldü — 10 satır / 4 katman gerçek `DependsOn`
+ağacı (dipte KERNEL-STATE · AUTHORITY · RECEIPT · REACHABILITY). Harita + 3 seçenek:
+`follow-up-works/kernel-tree-closure-map.md` (owner-kararı bekliyor). Ucuz kazanç bulundu:
+X hücresi için 7 satırlık emsal var → CI olmadan `-` çevrimi mümkün; 3275'in MASTER metni
+17 gündür landed işi anmıyor.
+
 ## SIRADAKİ (bu sıra ile)
 
-1. **3284-kalanı** (keşif+sprint; ADMIT'li) — 3301/3302 tam-kapanışının anahtarı.
-2. **3302/3304/3299 flip-merdiveni** + owner receipt-töreni (3300+3301 DONE-yükselişi).
-3. Yayın-zinciri (verhex-transition-plan owner-kararları) → CI-watch 6181 →
-   kuyruk-sonu: **3356 sync-paketi** (gate: 480 owner-Closure ✓XVerify-mühürlü).
+1. ~~3284-kalanı~~ ✅ çekirdek dilim landed + L=1 canlı kanıt (bu commit). Kalan: 3302'nin
+   VERIFY-flip'i artık açık (kendi metni "3284 kapanınca" diyordu — kapanış kod+kanıt tarafında
+   tamam; formal flip receipt-turu ister).
+2. **Owner-kararı bekleyen:** Faz-2 dalga-şekli (`kernel-tree-closure-map.md` §6, üç seçenek).
+3. **CI-watch 6181** (ADMIT'li, lane-brief hazır) — Faz-2 kararı gelene kadar koşulabilir iş.
+4. 3302/3304/3299 flip-merdiveni + receipt-töreni → yayın-zinciri →
+   kuyruk-sonu: **3356 sync-paketi** (gate: 480 ✓ kapandı).
 
 ## Açık küçük bulgular (admission'sız, kayıt)
 

@@ -166,6 +166,13 @@ import {
   readVerificationIsolationEvaluationAuthority,
 } from './task-result-authority.js';
 import { decideFixRepairAuthority } from './fix-repair-authority.js';
+import {
+  admitRepairQueueRecord,
+  createRepairQueueId,
+  readRepairQueueAuthority,
+  transitionRepairQueueRecord,
+  type RepairBirthClass,
+} from './repair-queue-authority.js';
 import { resolvePromptDeliveryAttribution } from '../core/prompt-delivery-receipt.js';
 
 // ─── Overlap Detection (Sprint 324 — Task 324-004) ───────────────
@@ -3493,11 +3500,47 @@ export async function runFixPhase(
     // the verdict cache spans them so each attempt is scored exactly once (the
     // post-wave loops reuse it instead of re-running the rubric).
     const fixVerdicts = new Map<string, { evaluation: TaskEvaluation; rubric: EvaluationResult; prepared: PreparedResultEvaluationAttempt }>();
+    const repairQueueIds = new Map<string, string>();
+    const admitRepair = (
+      task: Task,
+      birthClass: RepairBirthClass,
+      ordinal: number,
+    ): string => {
+      const input = {
+        taskId: task.id,
+        sprintId: getCurrentSprintId(projectRoot) ?? sprint.id,
+        birthClass,
+        admittedAt: task.createdAt ?? new Date().toISOString(),
+        attempt: {
+          attemptId: task.id,
+          ordinal,
+          ...(task.fixForTaskId ? { parentTaskId: task.fixForTaskId } : {}),
+        },
+      } as const;
+      const queueId = createRepairQueueId(input);
+      admitRepairQueueRecord(projectRoot, { ...input, queueId });
+      repairQueueIds.set(task.id, queueId);
+      return queueId;
+    };
+    const markRepairDispatched = (taskId: string): void => {
+      const queueId = repairQueueIds.get(taskId);
+      if (!queueId) return;
+      transitionRepairQueueRecord(projectRoot, queueId, 'dispatched');
+    };
+    const markRepairSettled = (taskId: string): void => {
+      const queueId = repairQueueIds.get(taskId);
+      if (!queueId) return;
+      const current = readRepairQueueAuthority(projectRoot).records
+        .find(record => record.queueId === queueId);
+      if (current?.dispatchStatus === 'queued') markRepairDispatched(taskId);
+      transitionRepairQueueRecord(projectRoot, queueId, 'settled');
+    };
     const evaluateFixIngest = async (
       ingestTask: Task,
       ingestResult: TaskResult,
     ): Promise<TaskEvaluation> => {
       try {
+        markRepairDispatched(ingestTask.id);
         const branch: ResultEvaluationBranch = ingestTask.fixForTaskId
           ? 'fix-ingest'
           : evaluations.get(ingestTask.id) === TaskEvaluation.NOT_DISPATCHED
@@ -3521,6 +3564,11 @@ export async function runFixPhase(
         // release and never a fabricated blame verdict.
         debugLog('runFixPhase:fixIngestEvaluation', e);
         return TaskEvaluation.DEFERRED;
+      } finally {
+        // The attempt reached the host either way. Leaving it queued/dispatched
+        // on the unscoreable path would fence every later quiescence check of
+        // this run behind a repair that can no longer make progress.
+        markRepairSettled(ingestTask.id);
       }
     };
 
@@ -3684,6 +3732,16 @@ export async function runFixPhase(
       if (fixTasks.length === 0) break;
       for (const task of fixTasks) attemptedFixIds.add(task.id);
 
+      for (const task of fixTasks) {
+        const parent = task.fixForTaskId ? taskIndex.get(task.fixForTaskId) : undefined;
+        const birthClass: RepairBirthClass = task.id.endsWith('-xfix')
+          ? 'CROSS_DEPENDENCY'
+          : parent?.fixForTaskId
+            ? 'FIX_FIX'
+            : 'FIX';
+        admitRepair(task, birthClass, resolveFixAttemptDepth(task, taskIndex) + 1);
+      }
+
       // Dynamic FIX tasks are born after plan approval. Re-evaluate every one
       // against the same owner-authored worker policy before prompt creation or
       // provider dispatch, then persist that exact policy snapshot.
@@ -3765,12 +3823,12 @@ export async function runFixPhase(
         attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,
         providerAuthority: opts?.providerAuthority,
       });
-      // Row 3309: this phase has always DISCARDED the wave's overflow queue.
-      // A FIX task left in it has no worker, no heartbeat and no pid, and its
-      // only remaining chance of running is a later watcher pass inside
-      // waitForResults below — which is precisely the state 507-002-fix sat in
-      // for five minutes with nothing on disk saying so. Publishing the queue
-      // does not dispatch it (admission is untouched); it makes the wait honest.
+      for (const task of fixTasks) {
+        if (task.status === TaskStatus.EXECUTING) markRepairDispatched(task.id);
+      }
+      // The collector owns the FIX wave's overflow queue after the initial
+      // spawn pass. It keeps FIFO order while planDispatch admits queued tasks
+      // as worker slots open and their dependencies become satisfying.
       publishSchedulerSpawnSkips(
         projectRoot,
         getCurrentSprintId(projectRoot) ?? sprint.id,
@@ -3779,7 +3837,7 @@ export async function runFixPhase(
         fixWaveQueue.map(queued => describeSpawnSkip(
           queued,
           'queued-not-dispatched',
-          'left in the FIX wave overflow queue: this phase does not dispatch it, so it runs only if a later watcher pass picks it up',
+          'queued by the FIX wave: waiting for collector dispatch when a worker slot opens and dependencies are satisfied',
         )),
       );
       // Sprint 154 audit A4.F2: 600s yetersiz (Sprint 152 opus FIX worker timeout cascade kanıt) → 1800s.
@@ -3792,7 +3850,7 @@ export async function runFixPhase(
         projectRoot,
         fixSprint,
         fixPhaseTimeout,
-        undefined,
+        fixWaveQueue,
         {
           spawnBackend,
           attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,
@@ -4015,6 +4073,19 @@ export async function runFixPhase(
 
         if (eligible.length > 0) {
           for (const t of eligible) {
+            const reDispatchInput = {
+              taskId: t.id,
+              sprintId: getCurrentSprintId(projectRoot) ?? sprint.id,
+              birthClass: 'NOT_DISPATCHED_REDISPATCH' as const,
+              attempt: { attemptId: t.id, ordinal: 2 },
+            };
+            const reDispatchQueueId = createRepairQueueId(reDispatchInput);
+            admitRepairQueueRecord(projectRoot, {
+              ...reDispatchInput,
+              queueId: reDispatchQueueId,
+              admittedAt: new Date().toISOString(),
+            });
+            repairQueueIds.set(t.id, reDispatchQueueId);
             try {
               writeFileSync(
                 join(tasksPath, `task-${t.id}.redispatch-attempted`),
@@ -4040,7 +4111,11 @@ export async function runFixPhase(
             attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,
             providerAuthority: opts?.providerAuthority,
           });
-          // Same discarded-queue hole as the FIX wave above (row 3309).
+          for (const task of eligible) {
+            if (task.status === TaskStatus.EXECUTING) markRepairDispatched(task.id);
+          }
+          // Hand this wave's overflow to the same slot- and dependency-aware
+          // collector dispatcher used by the main FIX wave.
           publishSchedulerSpawnSkips(
             projectRoot,
             getCurrentSprintId(projectRoot) ?? sprint.id,
@@ -4049,14 +4124,14 @@ export async function runFixPhase(
             reDispatchQueue.map(queued => describeSpawnSkip(
               queued,
               'queued-not-dispatched',
-              'left in the NOT_DISPATCHED re-dispatch wave overflow queue: this phase does not dispatch it, so it runs only if a later watcher pass picks it up',
+              'queued by the NOT_DISPATCHED re-dispatch wave: waiting for collector dispatch when a worker slot opens and dependencies are satisfied',
             )),
           );
           const reDispatchResults = await waitForResults(
             projectRoot,
             reDispatchSprint,
             reDispatchTimeout,
-            undefined,
+            reDispatchQueue,
             {
               spawnBackend,
               attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,

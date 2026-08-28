@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "40dbede28f78b5f800835f7fc93b36faa1a0782ebcc4783290ea949c6a299c73"
+    "value": "9e2c7a4529e9dc60348637f0b81f3465811eeaf43fd52deb6bf06b2771f676dc"
   },
   "summary": {
     "total": 543,
@@ -3150,9 +3150,9 @@
       "program": "KERNEL",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-27",
+      "updated": "2026-08-28",
       "definitionDigest": "32baf34f5fc318f1b0e51a375792836ad99a014cdb5ede4718377f895f8cabfd",
-      "progressDigest": "b10b49b73b5a1ae5fe144669a177d2595d572fa510fec763fc14acee47cd2a46",
+      "progressDigest": "50f97d7695bd0cb2f4e738fecbbcc988932f645235bef931e205acef9abb1ab6",
       "terminalClosureDigest": null
     },
     {
@@ -18007,11 +18007,11 @@
       ],
       "state": "OPEN",
       "truth": {
-        "C": "~",
-        "W": "0",
+        "C": "1",
+        "W": "1",
         "E": "1",
         "H": "1",
-        "L": "0",
+        "L": "1",
         "X": "0",
         "S": "?"
       },
@@ -18024,8 +18024,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Original, FIX, FIX-FIX and cross-dependency repair births publish the same durable queue identity; per-result settlement immediately reevaluates ready work; phase transitions cannot hide a newly written task; PAUSE is legal only after the queue, active attempts and authorized repair decisions reach a fenced quiescent snapshot",
-      "evidence": "Sprint-488 POSTFIX evaluated 003, 005, 006 and 015, wrote four `-fix.json` artifacts, but those tasks were absent from the in-memory sprint subset and no fix worker spawned before circuit-breaker PAUSE. Manual recovery now routes local, reducer and dependency-respawn triggers through canonical spawn-time collision admission and reports only actual dispatches; fresh live replay remains required 2026-08-27 owner-ADMISSION (Q&A): keşif+sprint onaylandı (3301-deseni). Aynı gün canlı kanıt (bounded-replay sprint-004/005, izole fixture): repair-machinery, host pre-dispatch NoGo sınıfına da repair doğuruyor (\"repair settlement\" pause-mesajı) ve doğan repair-task orijinalin forceSkills kısıtını TAŞIMADAN koşup DONE üretebiliyor (yetki-düşmesi bulgusu — explicit operator kısıtı sessizce kayboluyor); failure-disposition-policy tüketimi repair-admission katmanına da kablolanmalı — 3301 tam-sertifikası bu tüketiciye bağlı sprint-700 dilimi landed (do-yüzeyinden; admission-gate + scheduler-enforcement + forceSkills/model-inheritance + 4 hermetik suite); canlı r8-kanıtı: repair-mint policy-guard'ı LOUD çalışıyor; scope-eki: karışık-sonuç COMPLETE-yayın sözleşmesi (cleanup-eligibility reasons) bu satırın terminal-kontrat alanına bağlandı publication-contract dilimi (sprint-703) bu satırın terminal-kontrat kapsamından LANDED — karışık-sonuç COMPLETE-yayını + ayrık lineage-sayaçları canlı",
-      "updated": "2026-08-27"
+      "evidence": "Sprint-488 POSTFIX evaluated 003, 005, 006 and 015, wrote four `-fix.json` artifacts, but those tasks were absent from the in-memory sprint subset and no fix worker spawned before circuit-breaker PAUSE. Manual recovery now routes local, reducer and dependency-respawn triggers through canonical spawn-time collision admission and reports only actual dispatches; fresh live replay remains required 2026-08-27 owner-ADMISSION (Q&A): keşif+sprint onaylandı (3301-deseni). Aynı gün canlı kanıt (bounded-replay sprint-004/005, izole fixture): repair-machinery, host pre-dispatch NoGo sınıfına da repair doğuruyor (\"repair settlement\" pause-mesajı) ve doğan repair-task orijinalin forceSkills kısıtını TAŞIMADAN koşup DONE üretebiliyor (yetki-düşmesi bulgusu — explicit operator kısıtı sessizce kayboluyor); failure-disposition-policy tüketimi repair-admission katmanına da kablolanmalı — 3301 tam-sertifikası bu tüketiciye bağlı sprint-700 dilimi landed (do-yüzeyinden; admission-gate + scheduler-enforcement + forceSkills/model-inheritance + 4 hermetik suite); canlı r8-kanıtı: repair-mint policy-guard'ı LOUD çalışıyor; scope-eki: karışık-sonuç COMPLETE-yayın sözleşmesi (cleanup-eligibility reasons) bu satırın terminal-kontrat alanına bağlandı publication-contract dilimi (sprint-703) bu satırın terminal-kontrat kapsamından LANDED — karışık-sonuç COMPLETE-yayını + ayrık lineage-sayaçları canlı; 2026-08-28 ÇEKİRDEK DİLİM LANDED (sprint-704, do-kaynaklı 4 task + ana-şerit el-kapanışı): acceptance'ın iki yarısı da kod-karşılığına kavuştu. (a) Overflow-dispatch: repair dalgalarının `spawnWorkers` overflow dönüşü artık `waitForResults`'ın 4. argümanına geçiyor (`src/orchestra/sprint-phases.ts` FIX + NOT_DISPATCHED re-dispatch dalgaları; EXECUTE emsali `sprint-controller.ts` taskQueue); tüketici zaten hazırdı (`result-collector.ts` remainingQueue → planDispatch FIFO, slot+dependency farkında). Önceki davranış kodun kendi yorumunda \"this phase has always DISCARDED the wave's overflow queue\" olarak belgeliydi. (b) Durable kuyruk: yeni `src/orchestra/repair-queue-authority.ts` (schema-versioned, typed hata, atomik temp+rename) `.tasks/repair-queue-authority.json` altında tek authority yazar; admission→dispatched→settled yaşam-döngüsü sprint-phases'e bağlı. (c) Quiescence kapısı: `resolveRepairQuiescence` canlı PAUSE karar-noktasında iki gate'in ÖNÜNDE çalışır ve snapshot'ı ikisine de geçirir; kapı yalnız hiç-dispatch-edilmemiş admission'larda kilitler — dispatch edilip sonuçlanmayan deneme mevcut resumable PAUSE yoluna gider (run strand edilmez). Ana-şerit el-kapanışı üç kusuru düzeltti: kayıtlara `sprintId` + quiescence'ta sprint-filtresi (bir run'ın artığı sonraki run'ları kilitliyordu), `try/finally` ile skorlanamayan ingest yolunda da settle, ve DRAIN_REQUIRED'ın kapsam daraltması. 704-004 dürüst NO_GO verdi (fixture-authority hatası: `max_fix_retries=1` ikinci mantıksal denemeyi dışlıyordu) ve FIX turunda kök-nedeni doğru teşhis ederek kapandı. Doğrulama: 16 yeni test (overflow-dispatch 4 · queue-authority 5 · quiescence 6 · zincir-mührü 1) + komşu 8 süit 60/60 regresyonsuz; `tsc --noEmit` 0; bot-stop→`build:all`→bot-start ritüeli sonrası taze dist. CANLI KANIT (L): izole fixture `/tmp/deckent-replay-3284-20260828`, gerçek binary, max_workers=1 — iki dürüst NO_GO iki FIX doğurdu, biri slotu aldı, ikincisi overflow kuyruğuna düştü ve collector tarafından GERÇEKTEN dispatch edildi (canlı worker: prompt-delivery 08:59:55 + heartbeat 09:00:20); iki kayıt da `settled` oldu ve run ancak ondan SONRA dürüst resumable PAUSE'a gitti (`deckent recover sprint-014 --resume` önerisiyle). Kanıt korpusu: `.analysis/replay-3284-20260828/` (3 kuyruk anlık-görüntüsü + README). Kanıtlamadığı: X/S ölçülmedi (Linux-local); `dispatchStatus` damgası spawn'da değil ingest'te vurulduğu için collector-dispatch edilen kayıt koşarken defterde `queued` görünür — kapıyı muhafazakâr yapan gecikme, ayrı iyileştirme adayı",
+      "updated": "2026-08-28"
     },
     {
       "order": 3285,
@@ -27418,6 +27418,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "1af35319d53ff42691542055c7bbaddeefb57efb29d0ba524f27237ec1115da1"
+    "value": "e7677eb32743b191bd74d6a8ca671ffb7b098c8ce4f8fa305483a90e9cb474fa"
   }
 }

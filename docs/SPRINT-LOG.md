@@ -17468,3 +17468,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 703-004: Regression-test seal for mixed-outcome terminal publication and dishonest-COMPLETE guards (DONE)
 
 ---
+## Sprint 704 — sprint-704
+
+**Status:** COMPLETE
+**Date:** 2026-08-28
+**Duration:** 1232s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 1232070ms |
+
+### Tasks
+
+- 704-001: Overflow kuyruğunun gerçek dispatch mekanizmasına bağlanması (DONE)
+- 704-002: Admitted-repair kuyruğunun durable kimliği (DONE)
+- 704-003: Quiescence kapısı — PAUSE ancak fenced snapshot'tan sonra (DONE)
+- 704-004: Zincir-mühürü — uçtan uca hermetik regresyon (DONE)
+
+---

@@ -4,6 +4,10 @@
 import type { MessageFamily } from './cli-common.js';
 
 export const CLI_RUNTIME_HELP_MESSAGES: MessageFamily = Object.freeze({
+  'repair.quiescence_drain_blocked': {
+    en: 'Repair queue drain is blocked: {count} authorized repair decision(s) remain ({pending} admitted, {active} active). PAUSE is not legal until the fenced queue snapshot is empty.',
+    tr: 'Repair kuyruğu drenajı bloke: {count} yetkili repair kararı bekliyor ({pending} admitted, {active} active). Fenced kuyruk snapshot’ı boşalmadan PAUSE geçerli değildir.',
+  },
   'cli.runtime.cleanup.opt.decay': {
     en: 'Force the configured memory and debt decay pass during cleanup; managed Brain projections may be rewritten.',
     tr: 'Cleanup sırasında yapılandırılmış bellek ve debt decay geçişini zorlar; yönetilen Brain projeksiyonları yeniden yazılabilir.',

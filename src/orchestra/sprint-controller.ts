@@ -112,6 +112,7 @@ import {
   projectNotDispatchedSettlements,
 } from '../core/task-lineage.js';
 import { isPolicyTerminalPreDispatchResult } from '../core/failure-disposition-policy.js';
+import { readRepairQueueAuthority } from './repair-queue-authority.js';
 import type { RepairDescendantCancellationDecision } from '../core/types.js';
 
 // ─── Pre-Start Guards (born-672a/672b — snapshot-start guard wiring) ─
@@ -257,6 +258,77 @@ export { DependencyCycleError } from './parallel-pipeline.js';
 //
 // Fail-safe: each removal is independently try/catched so a missing or
 // permission-locked file never aborts the cascade.
+export interface RepairQuiescenceSnapshot {
+  readonly pendingAdmittedRepairs: number;
+  readonly activeAttempts: number;
+  readonly authorizedRepairDecisions: number;
+}
+
+export type RepairQuiescenceOutcome =
+  | { readonly kind: 'QUIESCENT'; readonly snapshot: RepairQuiescenceSnapshot }
+  | {
+      readonly kind: 'DRAIN_REQUIRED';
+      readonly reason: 'ADMITTED_REPAIR_QUEUE_NOT_DRAINED';
+      readonly pendingQueueCount: number;
+      readonly snapshot: RepairQuiescenceSnapshot;
+      readonly message: string;
+    };
+
+/** Derive one fenced view of the durable repair queue for post-FIX pause gates. */
+export function resolveRepairQuiescence(
+  projectRoot: string,
+  lang = 'en',
+  sprintId?: string,
+): RepairQuiescenceOutcome {
+  // A record fences only the run that admitted it. Without this scope a repair
+  // left unsettled by an aborted or paused run would block every later run's
+  // quiescence gate for as long as `.tasks/` keeps the authority file.
+  const owningSprintId = sprintId ?? getCurrentSprintId(projectRoot);
+  const openRecords = readRepairQueueAuthority(projectRoot).records.filter(record => {
+    if (owningSprintId !== null && record.sprintId !== owningSprintId) return false;
+    if (record.dispatchStatus === 'settled') return false;
+    const result = readJsonSafe<TaskResult>(
+      join(projectRoot, TASKS_DIR, `task-${record.taskId}.result`),
+    );
+    return !isPolicyTerminalPreDispatchResult(result ?? undefined);
+  });
+  const snapshot: RepairQuiescenceSnapshot = Object.freeze({
+    pendingAdmittedRepairs: openRecords.filter(
+      record => record.dispatchStatus === 'queued',
+    ).length,
+    activeAttempts: openRecords.filter(
+      record => record.dispatchStatus === 'dispatched',
+    ).length,
+    authorizedRepairDecisions: openRecords.length,
+  });
+  // Only never-dispatched admissions block here: they are the acceptance's exact
+  // concern ("dispatched before quiescence") and they are still drainable. An
+  // attempt that was dispatched but never settled cannot make progress by
+  // draining; it belongs to the existing lineage/circuit-breaker gates, which
+  // receive this snapshot and settle it into a resumable typed PAUSE instead of
+  // stranding the run outside the recovery path.
+  if (snapshot.pendingAdmittedRepairs === 0) {
+    return { kind: 'QUIESCENT', snapshot };
+  }
+  return {
+    kind: 'DRAIN_REQUIRED',
+    reason: 'ADMITTED_REPAIR_QUEUE_NOT_DRAINED',
+    pendingQueueCount: snapshot.pendingAdmittedRepairs,
+    snapshot,
+    message: getMessage('repair.quiescence_drain_blocked', lang, {
+      count: String(snapshot.authorizedRepairDecisions),
+      pending: String(snapshot.pendingAdmittedRepairs),
+      active: String(snapshot.activeAttempts),
+    }),
+  };
+}
+
+function pauseAllowedByRepairQuiescence(
+  outcome: RepairQuiescenceOutcome | undefined,
+): boolean {
+  return outcome === undefined || outcome.kind === 'QUIESCENT';
+}
+
 /**
  * Remove all on-disk metadata produced by a sprint's lifecycle.
  *
@@ -1357,7 +1429,9 @@ export function applyCascadeCircuitBreaker(
   evaluations: Map<string, TaskEvaluation>,
   policy: FixCircuitBreakerConfig = DEFAULT_FIX_CIRCUIT_BREAKER_CONFIG,
   lang = 'en',
+  quiescence?: RepairQuiescenceOutcome,
 ): boolean {
+  if (!pauseAllowedByRepairQuiescence(quiescence)) return false;
   const eligibleRootTasks = sprint.tasks.filter(task => {
     const result = readJsonSafe<TaskResult>(
       join(projectRoot, TASKS_DIR, `task-${task.id}.result`),
@@ -1446,7 +1520,9 @@ export function applyUnresolvedLineageOperatorHold(
   evaluations: Map<string, TaskEvaluation>,
   policy: FixCircuitBreakerConfig = DEFAULT_FIX_CIRCUIT_BREAKER_CONFIG,
   lang = 'en',
+  quiescence?: RepairQuiescenceOutcome,
 ): boolean {
+  if (!pauseAllowedByRepairQuiescence(quiescence)) return false;
   const eligibleRootTasks = sprint.tasks.filter(task => {
     const result = readJsonSafe<TaskResult>(
       join(projectRoot, TASKS_DIR, `task-${task.id}.result`),
@@ -3092,18 +3168,51 @@ export async function runSprint(
   // the effective config's count + ratio thresholds, so small and large runs
   // share one scale-aware contract.
   const fixCircuitPolicy = config.fix_circuit_breaker ?? DEFAULT_FIX_CIRCUIT_BREAKER_CONFIG;
+  const repairQuiescence = resolveRepairQuiescence(
+    projectRoot,
+    config.language,
+    getCurrentSprintId(projectRoot) ?? sprint.id,
+  );
+  if (repairQuiescence.kind === 'DRAIN_REQUIRED') {
+    sprint.phase = SprintPhase.FIX;
+    (sprint as Sprint & { repairQuiescence: RepairQuiescenceOutcome }).repairQuiescence =
+      repairQuiescence;
+    debugLog('runSprint:repair-quiescence', repairQuiescence.message);
+    emitSprintEvent('REPAIR_QUIESCENCE_DRAIN_BLOCKED', {
+      sprintId: sprint.id,
+      ...repairQuiescence,
+    });
+    if (heartbeatDaemon) {
+      try { heartbeatDaemon.stop(); } catch (e) { debugLog('runSprint:repair-quiescence:hb-stop', e); }
+      heartbeatDaemon = null;
+    }
+    await stopResourceMonitor(resourceMonitor);
+    resourceMonitor = null;
+    if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+    if (snapshotInterval) { clearInterval(snapshotInterval); snapshotInterval = null; }
+    if (beforeExitHandler) {
+      process.removeListener('beforeExit', beforeExitHandler);
+      beforeExitHandler = null;
+    }
+    releaseSprintLock(projectRoot);
+    clearActiveSprint();
+    try { clearPid(projectRoot, sprint.id); } catch (e) { debugLog('runSprint:repair-quiescence:clearPid', e); }
+    return sprint;
+  }
   if (applyCascadeCircuitBreaker(
     projectRoot,
     sprint,
     evaluations,
     fixCircuitPolicy,
     config.language,
+    repairQuiescence,
   ) || applyUnresolvedLineageOperatorHold(
     projectRoot,
     sprint,
     evaluations,
     fixCircuitPolicy,
     config.language,
+    repairQuiescence,
   )) {
     if (heartbeatDaemon) {
       try { heartbeatDaemon.stop(); } catch (e) { debugLog('runSprint:post-fix-pause:hb-stop', e); }

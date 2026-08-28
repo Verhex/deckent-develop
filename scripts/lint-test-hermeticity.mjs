@@ -708,7 +708,11 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // tests/core/preflight-typecheck-preference.test.ts (tmpdir-hermetik, suite-owned,
   // child_process spawnSync mock'lu — gerçek komut koşmaz) + budget-fix test ekleri
   // (output.test.ts config-default pini, doctor.test.ts iki budget senaryosu).
-  count: 16613,
+  // 2026-08-28 09:0x: 16613→16621 — MASTER 3284 çekirdek dilimi (sprint-704):
+  // repair-overflow-dispatch / repair-queue-authority / repair-quiescence-gate /
+  // repair-dispatch-chain-seal suite'leri (hepsi tmpdir-hermetik, spawnWorkers ve
+  // waitForResults seam'leri inject edilir; gerçek process doğmaz).
+  count: 16621,
   // 2026-08-25 B-sweep: digest moved — --fix roundtrip pin, multi-label
   // parser pin, same-line rule downgraded to WARN (all suite-owned).
   // 2026-08-25 7141 wave: count unchanged, digest moved — the src-side
@@ -752,7 +756,9 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // attribution-baseline / finalize-retirement + isCanonicalTaskFilename pinleri.
   // 2026-08-26 11:04: 16504→16506 — Node-6a mekanik supurme (sprint-684 3/3):
   // death-sweep hijyen + worker-identity-hostbound + docker-git-async suiteleri.
-  digest: '6820cbff6c66faf75d0e953b149c1fe785570807de81182110bc30f023e36a90',
+  // 2026-08-28 09:0x: digest 6820cbff→10164164 — sprint-704 repair-queue suite'leri
+  // + sprintId/settle el-kapanışının test-metni etkisi.
+  digest: '10164164c662ebd7d64463fde4e46072bfd330a797691d39847c354278e49e66',
   // 2026-08-27 04:0x: ayni 16514, digest-only — full-suite hizalama batch'i
   // (pin/mock/census guncellemeleri + sync guard).
   // 2026-08-27 03:1x: ayni 16514, digest-only — CI-hizalama paketi
@@ -1292,7 +1298,9 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // bonus derivation adds one production effect site (cells ledger read).
   // 2026-08-27 19:2x: 1341→1342 — sprint-702 src (alias/fold/federation/limits/truth + status --debt).
   // 2026-08-27 20:5x: sprint-703 src (evidence settled-states + finalizer terminalTruth).
-  count: 1342,
+  // 2026-08-28 09:0x: 1342→1343 — sprint-704 src: yeni üretim modülü
+  // src/orchestra/repair-queue-authority.ts (durable admitted-repair kuyruğu).
+  count: 1343,
   // 2026-08-25 config-loss incident hardening: digest moved — atomic
   // last_sprint_id writer (refuse-mint + tmp+rename) and loadConfig
   // self-heal re-read-once + atomic fresh-default.
@@ -1347,7 +1355,9 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // finalizer + sidecar-loader hotfix).
   // 2026-08-26 11:05: ayni 1339, digest-only — Node-6a src kaymalari
   // (death-sweep / prompt-template kimlik-esigi / docker async-git).
-  digest: '120cadc27588e1c512f06292e5f1eb63e658ad1d0e46aa326b1319c1c15f9c29',
+  // 2026-08-28 09:0x: digest 120cadc2→873b946d — repair-queue-authority modülü +
+  // sprint-phases/sprint-controller kablolaması.
+  digest: '873b946dbf5da635a7b2f0b656f4452113f771429aeabaaae4b97d7bb2fbd599',
   // 2026-08-27 04:0x: ayni 1339, digest-only — sync workspace-guard + drift-normalize.
   // 2026-08-27 03:1x: ayni 1339, digest-only — skill-pool readJsonSafe donusumu.
   // 2026-08-27 02:0x: ayni 1339, digest-only — Dalga-3 src kaymalari
