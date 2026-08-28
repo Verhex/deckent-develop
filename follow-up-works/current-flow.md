@@ -116,15 +116,36 @@ ağacı (dipte KERNEL-STATE · AUTHORITY · RECEIPT · REACHABILITY). Harita + 3
 X hücresi için 7 satırlık emsal var → CI olmadan `-` çevrimi mümkün; 3275'in MASTER metni
 17 gündür landed işi anmıyor.
 
+## 📌 KERNEL-TREE DEVRİ — yeni session buradan başlasın
+
+> Owner kararı: kernel-tree işine **yeni bir session'da temiz ve detaylı** başlanacak.
+> Bu blok o session'ın ilk dakikada tam resmi görmesi için yazıldı; başka yere bakmadan
+> aşağıdaki üç dosya yeter.
+
+**Oku (sırayla):** `follow-up-works/kernel-tree-closure-map.md` (ölçülmüş ağaç + 3 seçenek) →
+`docs/governance/deckent-dev-operating-policy.md` (mod/yetki) → `docs/MASTER-PLAN.md` ilgili satırlar.
+
+**Karar noktası (owner'a ait, henüz verilmedi):** haritanın §6'sındaki üç seçenek. Ana-şerit
+önerisi 2 numaraydı: önce ucuz formal kazançlar (X hücresi `-` çevrimi — repoda 7 satırlık emsal
+var, CI'sız yapılabilir; 3275 metninin gerçeğe hizalanması ✅ yapıldı; 3274'e taze receipt),
+sonra kalan gerçek işi yeniden ölç.
+
+**Ölçülmüş ağaç (her kenar `DependsOn` hücresinden okundu):** yayın kapısı 3299 →
+{3295 → SCHEDULER-001(3140) → KERNEL-ATTEMPT-001(3030) → KERNEL-STATE-001(3020)+AUTHORITY-001(4000)} ·
+{3296 → PROVIDER-HOLD-001(4101) → LIMIT-001(4090) → RECEIPT-001(4070)+REACHABILITY-001(4080)} ·
+{3298 → 3290 → PAUSED-FINALIZE-001 + LINEAGE-SETTLEMENT(3282)}. Yani "yayından önce ürün
+çekirdeğini bitir" demek — 10 satır, 4 katman.
+
+**Dürüst sınır:** CI Eylül'e askıda; X=0 taşıyan satırların formal DONE'u cross-platform kanıt
+ister. Emsal-gerekçeli `-` çevrimi bu kilidin bir kısmını CI'sız açar, hepsini değil.
+
 ## SIRADAKİ (bu sıra ile)
 
-1. ~~3284-kalanı~~ ✅ çekirdek dilim landed + L=1 canlı kanıt (bu commit). Kalan: 3302'nin
-   VERIFY-flip'i artık açık (kendi metni "3284 kapanınca" diyordu — kapanış kod+kanıt tarafında
-   tamam; formal flip receipt-turu ister).
-2. **Owner-kararı bekleyen:** Faz-2 dalga-şekli (`kernel-tree-closure-map.md` §6, üç seçenek).
-3. **CI-watch 6181** (ADMIT'li, lane-brief hazır) — Faz-2 kararı gelene kadar koşulabilir iş.
-4. 3302/3304/3299 flip-merdiveni + receipt-töreni → yayın-zinciri →
-   kuyruk-sonu: **3356 sync-paketi** (gate: 480 ✓ kapandı).
+1. **Kernel-tree** — yeni session, yukarıdaki devir bloğuyla başlar (owner kararı bekliyor).
+2. **6181 dilim-3** — capability kaydı + Goal-v2 günlük 09:00 Europe/Istanbul zamanlama +
+   `deckent intelligence` CLI + EN/TR docs + gerçek-binary kapanış. (Dilim-1 ve dilim-2 landed.)
+3. 3302/3304/3299 flip-merdiveni + owner receipt-töreni (3300+3301) → yayın-zinciri →
+   kuyruk-sonu: 3356'nın HOLD'daki P6/P7 paketleri (ayrı owner-outcome ister).
 
 ## Açık küçük bulgular (admission'sız, kayıt)
 
@@ -137,13 +158,20 @@ X hücresi için 7 satırlık emsal var → CI olmadan `-` çevrimi mümkün; 32
 
 ## Canlı truth (kompakt)
 
-- `DOGFOOD_MODE=ON` · aktif sprint YOK · bot canlı (taze-dist) · MASTER 543 satır/210 receipt
-  validator-yeşil · **CI Eylül'e kadar ASKIDA** (Actions aylık limit doldu — owner direktifi;
-  doğrulama local-only ritüel) · full-suite kadansı: 5-landing'de-1; katalog-dokunuşlu
-  landing'lerde Ders-32 mini-batarya zorunlu.
-- follow-up-works envanteri: bu dosya (imleç) · cli-surface-reform-karar.md (ONAYLI-tasarım,
-  dilim-1a+1b LANDED; kaldırma-penceresi enforcement'ı ileride) · verhex-transition-plan.md
-  (4 açık owner-kararı). Competitive-watch taslağı lane-brief'e taşındı (ADMIT-tüketimi).
+- `DOGFOOD_MODE=ON` · aktif sprint YOK · bot canlı (taze-dist) · MASTER 543 satır validator-yeşil ·
+  **CI Eylül'e kadar ASKIDA** (Actions aylık limit — owner direktifi; doğrulama local-only ritüel) ·
+  gate zinciri artık **21** (yeni: `lint-doc-command-truth.mjs`).
+- 2026-08-28 landed zinciri: `92a5c154a` Faz-0 töreni → `0507eba8b` 3284 çekirdek (L=1 canlı kanıt)
+  → `c57370501` 3275 ölçüm düzeltmesi → `73dacaaeb` 6181 dilim-1 → `f38595061` 3356 P0
+  (worker-core kapısı + MCP karar-disposition) → `2f65bf1c6` P1 doc-truth gate → `862335638` P2
+  hermetiklik muhafızı → `8aaa44287` planner-failure gizlilik onarımı → `f25ee3799` P3 scope-hold →
+  `eda5da8a2` P3 attribution pini → `fad788f06` hücre sıkıştırma → `0e9c889b4` P5 çerçeveli digest
+  → `f6e71c8c6` 6181 dilim-2.
+- XVerify mühürleri (hepsi CONFIRMED/ALLOW): Work 480 `c7d508bd…` · 3356 worker-core `301feacc…` ·
+  6181 dilim-2 `2a07b7d9…`.
+- follow-up-works envanteri: bu dosya (imleç) · **kernel-tree-closure-map.md (owner-kararı bekliyor)** ·
+  cli-surface-reform-karar.md (dilim-1a+1b landed; dilim-2/3 ve 5 tasarım-sorusu açık) ·
+  verhex-transition-plan.md (4 açık owner-kararı).
 
 ## Sabit yürütme contractı
 
