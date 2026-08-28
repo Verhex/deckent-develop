@@ -5,20 +5,20 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):413056c64c05ec372837b264065bcbd82e351549ab87bdff7fce2269883b4666`
+**Source digest:** `sha256(normalized-lf-utf8):40dbede28f78b5f800835f7fc93b36faa1a0782ebcc4783290ea949c6a299c73`
 
-**Rows:** 543 total · 459 active · 84 terminal
+**Rows:** 543 total · 458 active · 85 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 348 |
+| OPEN | 346 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 69 |
-| VERIFY | 42 |
-| DONE | 84 |
+| VERIFY | 43 |
+| DONE | 85 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
 
@@ -83,7 +83,6 @@
 | 471 | `CONFIG-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `KERNEL-STATE-001` | — | Authored/effective config, secret resolution ve concurrent mutation için tek versioned authority |
 | 472 | `LAYER-BOUNDARY-GATE-001` | OPEN | P1 | TRUTH | `SSOT-003` | — | Architecture layer boundary gate'i source graphından tüm yeni crossing'leri discover edip exception authority'sini fail-closed enforce eder |
 | 475 | `NERVOUS-CONFIG-EXECUTION-TRUTH-001` | OPEN | P0 | TRUTH | `APPROVAL-001`, `AUDIT-001` | — | Nervous config, detector/action capability registry, host ownership ve status/docs projectionı tek execution truth üretir |
-| 480 | `PROVIDER-OBS-MIGRATION-001` | VERIFY | P1 | TRUTH | — | — | Provider-execution-observation DB'sinin owner-controlled v1→v2 migration'ı: backup, migrate, adoption proof |
 | 490 | `MCP-ANNOTATION-SAFETY-001` | OPEN | P1 | TRUTH | — | — | MCP tool annotation'ları gerçek side-effect sınıfını söyler: destructive/RW path'ler RO ilan edilemez |
 | 500 | `I18N-SURFACE-001` | OPEN | P1 | TRUTH | — | — | Ürün-yüzeyi runtime i18n/a11y enforcement: user-facing string'ler catalog'dan, lint tüm yüzeyleri kapsar |
 | 505 | `I18N-CATALOG-AUTHORITY-001` | OPEN | P1 | TRUTH | `PACKAGING-001`, `DOCS-RELEASE-TRUTH-001` | — | Runtime locale catalog, typed key projection, init/package dağıtımı ve project override için tek versioned authority |
@@ -265,11 +264,11 @@
 | 3290 | `RECOVERY-BORN-488-RECOVERY-TERMINAL-001` | VERIFY | P0 | KERNEL | `PAUSED-FINALIZE-001`, `RECOVERY-BORN-487-FINALIZER-RECEIPT-HOLD-001`, `RUN-STATUS-AUTHORITY-001`, `RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001` | — | Resume and force-finalize publish truthful terminal or resumable operator outcomes |
 | 3291 | `RECOVERY-BORN-488-STATUS-PROJECTION-001` | VERIFY | P0 | KERNEL | `RUN-STATUS-AUTHORITY-001`, `RECOVERY-BORN-488-LINEAGE-SETTLEMENT-001`, `RECOVERY-BORN-488-RECOVERY-TERMINAL-001`, `RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001` | — | Every surface and metric projects one persisted logical run read model |
 | 3295 | `RECOVERY-BORN-490-DESCENDANT-CANCELLATION-001` | VERIFY | P0 | KERNEL | `SCHEDULER-001` | — | Successful lineage settlement cancels every not-yet-started redundant repair descendant |
-| 3296 | `RECOVERY-BORN-490-PROVIDER-OBSERVATION-001` | OPEN | P1 | KERNEL | `PROVIDER-HOLD-001`, `RUN-STATUS-AUTHORITY-001` | — | Terminal retirement closes or scopes historical provider execution intervals |
+| 3296 | `RECOVERY-BORN-490-PROVIDER-OBSERVATION-001` | VERIFY | P1 | KERNEL | `PROVIDER-HOLD-001`, `RUN-STATUS-AUTHORITY-001` | — | Terminal retirement closes or scopes historical provider execution intervals |
 | 3298 | `RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001` | OPEN | P1 | OBS | `RECOVERY-BORN-488-RECOVERY-TERMINAL-001`, `RECOVERY-BORN-490-TERMINALIZATION-EVENTS-001` | — | Human sprint log projects receipt-backed terminal COMPLETE and ABORTED truth exactly once |
 | 3299 | `RECOVERY-BORN-490-REPLAY-CERTIFICATION-001` | OPEN | P0 | ASSURANCE | `RECOVERY-BORN-490-DESCENDANT-CANCELLATION-001`, `RECOVERY-BORN-490-PROVIDER-OBSERVATION-001`, `RECOVERY-BORN-490-CONTROLLER-TEST-CONTRACT-001`, `RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001` | — | Recovery replay ladder certifies isolated failure classes before publish planning resumes |
 | 3300 | `RECOVERY-BORN-490-BUILD-DIGEST-GATE-001` | VERIFY | P0 | ASSURANCE | `RECOVERY-BORN-487-POST-SETTLEMENT-BINARY-001`, `RECOVERY-BORN-490-SPRINT-LOG-PROJECTION-001` | — | Settled source is built once and source/dist identity is proven before binary replay |
-| 3301 | `RECOVERY-BORN-490-NOT-DISPATCHED-SKIPPED-REPLAY-001` | OPEN | P0 | ASSURANCE | `RECOVERY-BORN-490-BUILD-DIGEST-GATE-001`, `RECOVERY-BORN-490-PRE-DISPATCH-SETTLEMENT-001` | — | Synthetic NOT_DISPATCHED and dependency SKIPPED states reach truthful terminal settlement |
+| 3301 | `RECOVERY-BORN-490-NOT-DISPATCHED-SKIPPED-REPLAY-001` | VERIFY | P0 | ASSURANCE | `RECOVERY-BORN-490-BUILD-DIGEST-GATE-001`, `RECOVERY-BORN-490-PRE-DISPATCH-SETTLEMENT-001` | — | Synthetic NOT_DISPATCHED and dependency SKIPPED states reach truthful terminal settlement |
 | 3302 | `RECOVERY-BORN-490-LANDING-CHECKPOINT-REPLAY-001` | OPEN | P0 | ASSURANCE | `RECOVERY-BORN-490-BUILD-DIGEST-GATE-001`, `RECOVERY-BORN-488-LANDING-CHECKPOINT-001`, `RECOVERY-BORN-488-REPAIR-DISPATCH-001` | — | Sprint-488 landing and checkpoint defect classes recover through production authority |
 | 3303 | `RECOVERY-BORN-490-MULTI-PROVIDER-REPLAY-001` | VERIFY | P0 | ASSURANCE | `RECOVERY-BORN-490-BUILD-DIGEST-GATE-001`, `RECOVERY-BORN-490-PROVIDER-OBSERVATION-001` | — | Multi-provider smoke proves config-resolved routing, auth isolation and provider observation retirement |
 | 3304 | `RECOVERY-BORN-490-FULL-SUITE-CERTIFICATION-001` | OPEN | P0 | ASSURANCE | `RECOVERY-BORN-490-NOT-DISPATCHED-SKIPPED-REPLAY-001`, `RECOVERY-BORN-490-LANDING-CHECKPOINT-REPLAY-001`, `RECOVERY-BORN-490-MULTI-PROVIDER-REPLAY-001` | — | One explicit full-suite run certifies the completed recovery train after all narrower gates |

@@ -1,4 +1,12 @@
-# PROVIDER-OBS-MIGRATION-001 — active closure capsule
+# PROVIDER-OBS-MIGRATION-001 — CONSUMED closure capsule (archived 2026-08-28)
+
+> **Consumed 2026-08-28.** Both gates of the consume rule were satisfied: the required
+> different-provider XVerify returned `CONFIRMED / ALLOW` with durable receipt
+> `cross-verify-verdict:sha256:c7d508bd4f5584618928393a22ce93de396bcc401bf31973d0e9cba12318c53f`,
+> and the canonical owner Closure disposition recorded Work 480 as `DONE`
+> (`receipt=GR-2026-08-28-LADDER-01`). This file is retained as historical evidence only; it is
+> no longer an active authority. The `ACTIVE` / `OPEN` statements below describe the state at
+> the time of writing and are preserved unedited beneath this stamp.
 
 OUTCOME_ID: PROVIDER-OBS-MIGRATION-001
 DOGFOOD_MODE: ON
