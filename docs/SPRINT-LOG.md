@@ -17517,3 +17517,28 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 705-003: Karşılaştırma kernel'i ve material-signal kapısı (DONE)
 
 ---
+## Sprint 706 — sprint-706
+
+**Status:** COMPLETE
+**Date:** 2026-08-28
+**Duration:** 667s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 4 |
+| Tech Debt | 1 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 667353ms |
+
+### Tasks
+
+- 706-001: Resmi-kaynak çekme — typed kalite sözleşmesi ve sınırlı yeniden-deneme (DONE)
+- 706-002: Olay geçmişi — deterministik parmak-izi ve dedup (DONE)
+- 706-003: Türkçe kompakt alarm biçimlendirici (DONE)
+- 706-004: Watch servisi — dry-run saflığı ve çökme-güvenli sıra (DONE)
+
+---

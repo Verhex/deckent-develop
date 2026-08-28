@@ -19,7 +19,14 @@ export type OwnerNotificationKind =
   | 'fix-started'
   | 'paused'
   | 'terminal'
-  | 'approval-requested';
+  | 'approval-requested'
+  /**
+   * A competitive-intelligence alert. It shares the durable outbox with run
+   * notifications but is not a run event and asks the owner for nothing, so it
+   * must not be filed under `approval-requested` where an approval inbox would
+   * pick it up as a pending decision.
+   */
+  | 'intelligence-alert';
 
 export interface OwnerNotification {
   readonly version: 1;
