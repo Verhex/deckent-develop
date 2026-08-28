@@ -17493,3 +17493,27 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 704-004: Zincir-mühürü — uçtan uca hermetik regresyon (DONE)
 
 ---
+## Sprint 705 — sprint-705
+
+**Status:** COMPLETE
+**Date:** 2026-08-28
+**Duration:** 939s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 3 |
+| Completed | 3 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 939030ms |
+
+### Tasks
+
+- 705-001: Baseline tipleri ve kanıt-bağlı yetenek cetveli (DONE)
+- 705-002: Baseline türetici — digest invalidation (DONE)
+- 705-003: Karşılaştırma kernel'i ve material-signal kapısı (DONE)
+
+---

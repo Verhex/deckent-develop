@@ -3,7 +3,7 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "97399c1d635645df708eb83608d50719093a542ca8fd1a4da1915b0064ef45f8"
+    "value": "1015c2416d62e0c8b0f87c20a87748955adf5818ab7b3e2292fad759343114f8"
   },
   "summary": {
     "total": 543,
@@ -4725,7 +4725,7 @@
       "state": "OPEN",
       "updated": "2026-08-28",
       "definitionDigest": "bd0724385c4588a35b7a6818c7c8d2b0f90ccb0f23ea1a40394706499aea97eb",
-      "progressDigest": "655b860422a467fda0a6bf2b361ee0af092ad12195e4473f004ef37cbd5bd163",
+      "progressDigest": "5983ee8daaa4aab723511cbdd4f1440d79fa655219cc4fa72f2caadbccbcf5f9",
       "terminalClosureDigest": null
     },
     {
@@ -22907,7 +22907,7 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "3-task paket (owner-ADMIT 2026-08-27 Q&A): (T1) current-truth baseline + karşılaştırma kernel + significance gate; (T2) resmi-kaynak retrieval + MemoryStore custom-type dedup + durable TR-alarm outbox; (T3) ScheduledFlow/Goal-v2 günlük 09:00 Istanbul + `deckent intelligence` CLI + docs EN/TR; taslak-DIRECTIVES follow-up-works/competitive-intelligence-watch-draft.md (DIRECTIVES'e dönüşünce silinir); execution-sırası kuyruk-sonu — owner ayrıca sıralar",
-      "evidence": "Köken: 2026-08-26 yanlış-scope codex DIRECTIVES (sprint-685 fenced-ABORTED, sıfır kod-etkisi) + ana-şerit 4 düzeltme; KANUN-4 gereği admission'la satırlaştı; 2026-08-28: taslak-direktifler silinme-tetiği gereği follow-up-works'ten docs/governance/lane-briefs/competitive-intelligence-watch-2026-08-27.md'ye taşındı (tüketim: execution açılıp DIRECTIVES yazılınca silinir)",
+      "evidence": "Köken: 2026-08-26 yanlış-scope codex DIRECTIVES (sprint-685 fenced-ABORTED, sıfır kod-etkisi) + ana-şerit 4 düzeltme; KANUN-4 gereği admission'la satırlaştı; 2026-08-28: taslak-direktifler silinme-tetiği gereği follow-up-works'ten docs/governance/lane-briefs/competitive-intelligence-watch-2026-08-27.md'ye taşındı (tüketim: execution açılıp DIRECTIVES yazılınca silinir); 2026-08-28 DİLİM-1 LANDED (sprint-705, 3/3 DONE): lane-brief'in üç \"high effort\" task'ı mikro-task disiplinine bölündü (task başına tek scoped test) ve yalnız baseline karşılaştırma çekirdeği koşuldu — ağ, zamanlama, bildirim ve kalıcı depolama bilinçli olarak DIŞARIDA (dilim-2/3 işi). Üretilen saf çekirdek: `src/intelligence/types.ts` (kapalı yedi-değerli `CapabilityStatus` sözlüğü + derleme-zamanı boş-olmayan `EvidenceRefs` tuple'ı + `sha256:` template-literal digest tipi), `baseline-catalog.ts` (26 yetenek alanı), `baseline.ts` (enjekte edilebilir okuyucuyla içerik-adresli türetme; okunamayan kanıt typed HOLD), `competitor-universe.ts` (unknown-entrant seam'i), `terminology.ts` (unmapped seam'i), `comparison.ts` (beş kapalı göreli sınıf + sekiz ayrık boşluk boyutu), `significance-gate.ts` (LIVE_PROVEN DAG catch-up bastırma), `alarm-prompt.ts` (İngilizce, skorsuz). Ana-şerit el-kapanışı iki gerçek kusuru düzeltti: (1) 705-001 teknik olarak yeşildi ama ÖZÜNDE BOŞTU — 26 girdinin hepsi `HOLD` statüsü ve kanıt olarak tek lane-brief dokümanını taşıyordu, yani \"koddan türetilmiş sınıflandırma\" hiç yapılmamıştı; katalog gerçek implementasyon yollarıyla (26 alan × doğrulanmış `src/` yolu) ve dürüst statülerle yeniden yazıldı — canlı gözlem taşıyan alanlar `LIVE_PROVEN`/`LIVE_PARTIAL` ve notunda neyin gözlendiğini söyler, kalanlar `WIRED_UNPROVEN`. Elle yazılan digest kaldırıldı: authored digest kodun taşınmasıyla sessizce bayatlar, bu da alt-sistemin tam olarak yakalamak için var olduğu drift'tir — digest artık yalnız türetme-zamanı özelliğidir ve katalog `UNDERIVED_DIGEST` sentinel'i taşır. Bunlara üç yeni pin eklendi: kanıt yolu `src/` olmak zorunda (brief/plan dokümanı kanıt sayılmaz), canlı-iddia notunda gözlem beyanı zorunlu, tek-tip statü çöküşü yasak. (2) 705-002 digest sözleşmesinin yalnız pozitif yarısını pinliyordu; \"alakasız içerik değişince digest DEĞİŞMEZ\" negatif yarısı eklendi — HEAD tek başına tetikleyici değildir, aksi hâlde baseline alakasız her commit'te çalkalanır ve invalidation sinyali bilgi taşımaz. Doğrulama: 17 test yeşil (katalog 7 · türetme 4 · karşılaştırma 6), `tsc --noEmit` 0. Kanıtlamadığı: hiçbir alan canlı ölçümle yeniden doğrulanmadı — statüler bu oturumda fiilen gözlenen koşulara veya \"kod mevcut+erişilebilir\" olgusuna dayanır; retrieval/dedup/notification (dilim-2) ve Goal-v2 zamanlama/CLI/docs (dilim-3) açıktır",
       "updated": "2026-08-28"
     },
     {
@@ -27418,6 +27418,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "35704ffe5c8126494bc1064942801fdb58bdcd555fd80a7cb3a53a7482ca8506"
+    "value": "a2650bcf44dc4d4961fed4ccbee6d8548029036ae3486b868f6e59d3072df895"
   }
 }

@@ -1300,7 +1300,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-27 20:5x: sprint-703 src (evidence settled-states + finalizer terminalTruth).
   // 2026-08-28 09:0x: 1342→1343 — sprint-704 src: yeni üretim modülü
   // src/orchestra/repair-queue-authority.ts (durable admitted-repair kuyruğu).
-  count: 1343,
+  // 2026-08-28 09:4x: 1343→1351 — sprint-705 (MASTER 6181 dilim-1): yeni saf
+  // src/intelligence/ katmanı (types · baseline-catalog · baseline ·
+  // competitor-universe · terminology · comparison · significance-gate ·
+  // alarm-prompt); ağ/IO yok, tamamı enjekte edilebilir okuyucuyla çalışır.
+  count: 1351,
   // 2026-08-25 config-loss incident hardening: digest moved — atomic
   // last_sprint_id writer (refuse-mint + tmp+rename) and loadConfig
   // self-heal re-read-once + atomic fresh-default.
@@ -1357,7 +1361,8 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // (death-sweep / prompt-template kimlik-esigi / docker async-git).
   // 2026-08-28 09:0x: digest 120cadc2→873b946d — repair-queue-authority modülü +
   // sprint-phases/sprint-controller kablolaması.
-  digest: '873b946dbf5da635a7b2f0b656f4452113f771429aeabaaae4b97d7bb2fbd599',
+  // 2026-08-28 09:4x: digest 873b946d→b127e8b9 — src/intelligence/ katmanı.
+  digest: 'b127e8b9dbc61876958d3c793243e943082ff950975ecd9f183c59a6b79c6ac2',
   // 2026-08-27 04:0x: ayni 1339, digest-only — sync workspace-guard + drift-normalize.
   // 2026-08-27 03:1x: ayni 1339, digest-only — skill-pool readJsonSafe donusumu.
   // 2026-08-27 02:0x: ayni 1339, digest-only — Dalga-3 src kaymalari

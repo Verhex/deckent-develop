@@ -823,6 +823,51 @@
       "targetOwner": "deckent-community-distribution"
     },
     {
+      "currentOwner": "intelligence-runtime",
+      "manifest": {
+        "capabilities": [
+          "intelligence.baseline",
+          "intelligence.comparison"
+        ],
+        "compatibility": {
+          "deckent": ">=0.100.0 <0.101.0",
+          "node": ">=24"
+        },
+        "dependencies": [],
+        "entrypoints": [
+          {
+            "kind": "internal-barrel",
+            "publishedAs": null,
+            "source": "src/intelligence/types.ts"
+          }
+        ],
+        "license": {
+          "kind": "MIT",
+          "reference": "package.json#license"
+        },
+        "manifestVersion": 1,
+        "permissions": [],
+        "publicImportPolicy": {
+          "deepImports": "legacy-only-until-package-extraction",
+          "exports": [
+            "src/intelligence/types.ts"
+          ],
+          "public": false
+        },
+        "stateMigrationOwnership": {
+          "namespace": null,
+          "owner": "none",
+          "runner": null
+        }
+      },
+      "moduleId": "deckent.intelligence",
+      "selector": {
+        "kind": "subtree",
+        "path": "src/intelligence"
+      },
+      "targetOwner": "deckent-runtime"
+    },
+    {
       "currentOwner": "mcp-surface",
       "manifest": {
         "capabilities": [

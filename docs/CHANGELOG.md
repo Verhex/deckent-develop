@@ -14,6 +14,17 @@
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [sprint705] - 2026-08-28
+
+### Added
+
+- Baseline tipleri ve kanıt-bağlı yetenek cetveli
+- Baseline türetici — digest invalidation
+- Karşılaştırma kernel'i ve material-signal kapısı
+
+
+_Tasks: 3 total, 3 done, 0 tech debt, 0 no-go_
+
 ## [sprint704] - 2026-08-28
 
 ### Added
