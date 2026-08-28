@@ -670,9 +670,59 @@ export type PlannerFailureReason =
  *
  * See [[feedback_ai_planner_silent_fallback]].
  */
+/**
+ * Secret-safe diagnostic envelope for a planner failure.
+ *
+ * A failure message is read by a human and may be logged, so it must never carry
+ * provider output verbatim: stderr routinely contains tokens, auth URLs and
+ * absolute paths. These fields describe the output instead of reproducing it —
+ * enough to tell one failure apart from another and to correlate with the
+ * invocation receipt, with nothing to leak.
+ */
+export interface PlannerFailureEvidence {
+  readonly provider: string;
+  readonly model?: string;
+  readonly durationMs?: number;
+  readonly exitCode?: number | null;
+  readonly signal?: string | null;
+  readonly stdoutBytes?: number;
+  readonly stderrBytes?: number;
+  /**
+   * Algorithm-prefixed digest of the provider output, computed over a
+   * byte-length-framed encoding so `stdout`/`stderr` cannot be confused for one
+   * another by concatenation (`sha256:<hex>`).
+   */
+  readonly outputDigest?: string;
+  /** Where a parse gave up, when the reason is `parse_failed`. */
+  readonly parserStage?: string;
+}
+
 export type PlannerCallResult =
   | { ok: true; data: PlannerResult; receiptRef?: InvocationReceiptRef }
-  | { ok: false; reason: PlannerFailureReason; message: string; receiptRef?: InvocationReceiptRef };
+  | {
+      ok: false;
+      reason: PlannerFailureReason;
+      message: string;
+      receiptRef?: InvocationReceiptRef;
+      evidence?: PlannerFailureEvidence;
+    };
+
+/**
+ * Digest provider output without ever revealing it.
+ *
+ * Each part is framed with its own byte length before hashing, so
+ * (`ab`, `c`) and (`a`, `bc`) produce different digests — a plain concatenation
+ * would collapse them and make the digest useless for telling failures apart.
+ */
+export function framedOutputDigest(parts: readonly (string | undefined)[]): string {
+  const hash = createHash('sha256');
+  for (const part of parts) {
+    const bytes = Buffer.from(part ?? '', 'utf8');
+    hash.update(`${bytes.length}:`);
+    hash.update(bytes);
+  }
+  return `sha256:${hash.digest('hex')}`;
+}
 
 export interface PlannerReceiptContext {
   readonly tenantId: string;
@@ -1106,6 +1156,7 @@ export async function callBrainPlannerWithReason(
         message:
         `Subscription spawn timed out after ${effectiveTimeout}ms (provider=${resolved.name}). ` +
         `Consider raising brain_plan_timeout_ms in config or passing a larger timeout.`,
+        evidence: { provider: resolved.name, durationMs: effectiveTimeout },
       },
     );
   }
@@ -1123,12 +1174,26 @@ export async function callBrainPlannerWithReason(
         ok: false,
         reason: 'spawn_failed',
         message: `spawn error for provider=${resolved.name}: ${result.error.message}`,
+        evidence: {
+          provider: resolved.name,
+          durationMs,
+          exitCode: null,
+          signal: null,
+        },
       },
     );
   }
 
   if (result.status !== 0 || !result.stdout) {
-    const stderr = (result.stderr ?? '').toString().slice(0, 500);
+    // The provider's stderr is NOT rendered: it routinely carries tokens, auth
+    // URLs and absolute paths, and this message reaches logs and the operator's
+    // screen. Byte counts plus a framed digest identify the failure without
+    // reproducing any of it; the receipt carries the correlatable identity.
+    const stdoutText = (result.stdout ?? '').toString();
+    const stderrText = (result.stderr ?? '').toString();
+    const stdoutBytes = Buffer.byteLength(stdoutText, 'utf8');
+    const stderrBytes = Buffer.byteLength(stderrText, 'utf8');
+    const outputDigest = framedOutputDigest([stdoutText, stderrText]);
     const reasonCode: InvocationReasonCode = result.status !== 0 ? 'nonzero_exit' : 'empty_output';
     return finish(
       [
@@ -1142,15 +1207,29 @@ export async function callBrainPlannerWithReason(
         ok: false,
         reason: 'spawn_failed',
         message:
-        `provider=${resolved.name} exited with status=${result.status ?? 'null'}, ` +
-        `stdout=${result.stdout ? `${result.stdout.length} bytes` : 'empty'}, stderr=${stderr}`,
+        `provider=${resolved.name} exited with status=${result.status ?? 'null'}, `
+        + `stdout=${stdoutBytes} bytes, stderr=${stderrBytes} bytes, output=${outputDigest}`,
+        evidence: {
+          provider: resolved.name,
+          exitCode: result.status ?? null,
+          signal: result.signal ?? null,
+          durationMs,
+          stdoutBytes,
+          stderrBytes,
+          outputDigest,
+        },
       },
     );
   }
 
   const parsed = parsePlannerResponse(result.stdout, resolved);
   if (!parsed) {
-    const snippet = result.stdout.slice(0, 200).replace(/\n/g, ' ');
+    // Same rule as the nonzero-exit branch: the model's own output can echo
+    // prompt context (paths, project content, credentials pasted into it), so a
+    // raw snippet is not a safe diagnostic. The digest identifies the exact
+    // output for correlation without reproducing a byte of it.
+    const stdoutBytes = Buffer.byteLength(result.stdout, 'utf8');
+    const outputDigest = framedOutputDigest([result.stdout]);
     return finish(
       [
         {
@@ -1163,7 +1242,17 @@ export async function callBrainPlannerWithReason(
         ok: false,
         reason: 'parse_failed',
         message:
-        `provider=${resolved.name} returned unparseable output (length=${result.stdout.length}): ${snippet}`,
+        `provider=${resolved.name} returned unparseable output `
+        + `(${stdoutBytes} bytes, output=${outputDigest})`,
+        evidence: {
+          provider: resolved.name,
+          durationMs,
+          exitCode: 0,
+          signal: null,
+          stdoutBytes,
+          outputDigest,
+          parserStage: 'planner-response',
+        },
       },
     );
   }

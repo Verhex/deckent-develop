@@ -1369,13 +1369,16 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // (death-sweep / prompt-template kimlik-esigi / docker async-git).
   // 2026-08-28 09:0x: digest 120cadc2→873b946d — repair-queue-authority modülü +
   // sprint-phases/sprint-controller kablolaması.
+  // 2026-08-28 10:3x: aynı 1353, digest-only 38422e58→50e7a4e8 — 3356 typed planner-failure
+  // kanıt zarfı (framedOutputDigest + PlannerFailureEvidence); ham stderr/stdout
+  // interpolasyonu kaldırıldı, yeni üretim modülü eklenmedi.
   // 2026-08-28 10:1x: 1351→1353 — 3356 P1: scripts/lint-doc-command-truth.mjs gate'i
   // (+ package.json lint:gates zinciri) taranan üretim envanterine girdi.
   // 2026-08-28 10:0x: aynı 1351, digest-only b127e8b9→85eddc38 — 3356 P0 paketi:
   // worker-core backend-yetenek kapısı (task-builder/spawn-backend) + MCP karar-disposition
   // kapısı; yeni üretim modülü eklenmedi, taranan metin değişti.
   // 2026-08-28 09:4x: digest 873b946d→b127e8b9 — src/intelligence/ katmanı.
-  digest: '38422e58bf85dd5bbf2c6f6ad06bd7360ca00013e817e5e1d65e8834cdee22d6',
+  digest: '50e7a4e8137d547c8170e7f601e2310fa5b9438886308fe56ac1b02da33c4d63',
   // 2026-08-27 04:0x: ayni 1339, digest-only — sync workspace-guard + drift-normalize.
   // 2026-08-27 03:1x: ayni 1339, digest-only — skill-pool readJsonSafe donusumu.
   // 2026-08-27 02:0x: ayni 1339, digest-only — Dalga-3 src kaymalari
