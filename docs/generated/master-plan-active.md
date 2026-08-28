@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):2a9eaacc590542bf7e7c666d3edad5a2fe157e04a6f258bd4132ce28bcbeee62`
+**Source digest:** `sha256(normalized-lf-utf8):413056c64c05ec372837b264065bcbd82e351549ab87bdff7fce2269883b4666`
 
-**Rows:** 542 total · 458 active · 84 terminal
+**Rows:** 543 total · 459 active · 84 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 347 |
+| OPEN | 348 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 69 |
@@ -290,6 +290,7 @@
 | 3350 | `PLAN-PURE-PREVIEW-001` | VERIFY | P1 | KERNEL | `PLANNER-001` | — | `plan --dry-run` gerçek-planning'i temsil eder ve yan-etkisizdir: bootstrap'sız katalog-farkı (21-vs-14 agent, farklı seçim/digest) ve temp-agent üretimi kapanır |
 | 3354 | `FIX-SPAWN-DEPENDENCY-FRESHNESS-001` | VERIFY | P1 | KERNEL | `ORCHESTRA-RELIABILITY-001` | — | FIX-spawn dependency-settlement tazeliği: FIX dalgası spawn edilirken dependency lineage'ı result-ingest SONRASI taze snapshot'tan okunur; bayat 'Pending' penceresi kapanır |
 | 3355 | `EXECUTION-RESOURCE-REALM-001` | OPEN | P1 | KERNEL | — | — | Docker worker resource-policy + Firecracker execution-realm karar-paketi: kind-attribution telemetri dilimi, bounded light-kind memory-canary, typed ExecutionResourceEnvelope ile aggregate admission, renewable-lease ADR yönü ve KVM capability-probe tek owner-sıralı pakette (gündem-dışı park; owner 2026-08-26: uygun zamanda) |
+| 3356 | `TMP-DOGFOOD-MAIN-CONTROLLED-SYNC-001` | OPEN | P1 | KERNEL | `PROVIDER-OBS-MIGRATION-001` | — | Tmp-dogfood worktree'sinin doğrulanmış source-only işlerinin güncel main'e paket-paket kontrollü yeniden-uygulanması (P1–P5: typed planner-failure evidence, canonical project-root + Docker attempt-identity + route-aware worker-core, hermetik dispatcher-fixture, dar self-audit evidence adapter'ı, docs/rules onarım-sonrası-regen) |
 | 4000 | `AUTHORITY-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | Unified runtime authority parent |
 | 4020 | `TENANT-001` | VERIFY | P0 | AUTHORITY | `PRINCIPAL-001` | — | Canonical tenant/project/session scope enforcement |
 | 4021 | `AUTONOMOUS-TENANT-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001` | — | Autonomous read, mutation, approval ve reactive ingress için fail-closed tenant authority |

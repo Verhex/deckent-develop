@@ -1,5 +1,8 @@
-# [OWNER-KARAR BEKLİYOR] Competitive Intelligence Watch — taslak direktifler
-> Silinme-tetiği: Alperen karar verince — ADMIT ise MASTER'a owner-admission satırı + lane-brief'e/DIRECTIVES'e taşınır ve bu dosya SİLİNİR; RED ise doğrudan SİLİNİR.
+# [ADMITTED — MASTER 6181] Competitive Intelligence Watch — taslak direktifler
+> Owner-admission 2026-08-27 (soru-cevap: "ADMIT — backlog'a al") → MASTER satır 6181
+> COMPETITIVE-INTELLIGENCE-WATCH-001. follow-up-works kopyası silinme-tetiği gereği bu
+> lane-brief'e taşındı (2026-08-28). Tüketim-tetiği: 6181 execution açılıp DIRECTIVES
+> yazıldığında bu dosya SİLİNİR; kalıcı kayıt MASTER satır-kanıtıdır.
 > Köken: 2026-08-26 hatalı-scope codex session'ının yazdığı DIRECTIVES (sprint-685 fenced-ABORTED, sıfır kod-etkisi) + ana-şeridin 4 küçük düzeltmesi (Test-satırları + landing-notu). Fikir ürün-değeri taşıyor; admission'sız işe dönüşmez (KANUN 4).
 
 # DIRECTIVES — Deckent Competitive Intelligence Watch

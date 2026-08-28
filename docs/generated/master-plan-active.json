@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "2a9eaacc590542bf7e7c666d3edad5a2fe157e04a6f258bd4132ce28bcbeee62"
+    "value": "413056c64c05ec372837b264065bcbd82e351549ab87bdff7fce2269883b4666"
   },
   "summary": {
-    "total": 542,
-    "active": 458,
+    "total": 543,
+    "active": 459,
     "terminal": 84,
     "receipts": 210,
     "byState": {
-      "OPEN": 347,
+      "OPEN": 348,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
@@ -22,7 +22,7 @@
     },
     "byPriority": {
       "P0": 338,
-      "P1": 154,
+      "P1": 155,
       "P2": 50
     },
     "byProgram": {
@@ -41,7 +41,7 @@
       "ENTERPRISE": 4,
       "EVAL": 5,
       "EVOLUTION": 4,
-      "KERNEL": 126,
+      "KERNEL": 127,
       "LEARNING": 9,
       "OBS": 9,
       "ONBOARDING": 1,
@@ -906,9 +906,9 @@
       "program": "TRUTH",
       "priority": "P1",
       "state": "VERIFY",
-      "updated": "2026-08-25",
+      "updated": "2026-08-28",
       "definitionDigest": "c1b29d46382ed5792e70d1736b574c0805ce3a2207963578f1c8aeb0acc65982",
-      "progressDigest": "3d4ae8ca4d4ee0bb50500f3fdc870b9809532831667bb3145d68750f1476f068",
+      "progressDigest": "68602c93399bad7fd6844f307dd4e0da6897206bb83b1d2d1bb46fdc9e81fab0",
       "terminalClosureDigest": null
     },
     {
@@ -3337,9 +3337,9 @@
       "program": "ASSURANCE",
       "priority": "P0",
       "state": "OPEN",
-      "updated": "2026-08-27",
+      "updated": "2026-08-28",
       "definitionDigest": "21332cbf64fef9a8298226f34c06a830d8dd30f23509078ffaf7116993574934",
-      "progressDigest": "7eceb97f93a7772a38d57c54cb90737afd43430d2be5bf85384fe0731fc0ffd1",
+      "progressDigest": "aee98e3260ec33c446432abd7e25838caafeda433968cb1fa879658068704a6a",
       "terminalClosureDigest": null
     },
     {
@@ -3747,6 +3747,17 @@
       "updated": "2026-08-26",
       "definitionDigest": "c1c04e5ff6880df6bfcb6a62d3169e5edb5048d46269f1d5de994887174433f1",
       "progressDigest": "45b9902b4e46a24c7211fba5b0ba341cb3742429d143027fdfec84711848b886",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3356,
+      "id": "TMP-DOGFOOD-MAIN-CONTROLLED-SYNC-001",
+      "program": "KERNEL",
+      "priority": "P1",
+      "state": "OPEN",
+      "updated": "2026-08-28",
+      "definitionDigest": "dd07c5a80103e143720c01bb26ee979b1c926dc0a1663f5aa500e1f4d3fd2bbf",
+      "progressDigest": "996237d94c73211c8e463fc07c607212c2f9890829be50cf046a65d7d0227b82",
       "terminalClosureDigest": null
     },
     {
@@ -4712,9 +4723,9 @@
       "program": "CONNECTOR",
       "priority": "P2",
       "state": "OPEN",
-      "updated": "2026-08-27",
+      "updated": "2026-08-28",
       "definitionDigest": "bd0724385c4588a35b7a6818c7c8d2b0f90ccb0f23ea1a40394706499aea97eb",
-      "progressDigest": "f58beb0c88e2925fc047b9a671eb1cf668fc8cd5b69dd181e2b7a1a7d3d7777b",
+      "progressDigest": "655b860422a467fda0a6bf2b361ee0af092ad12195e4473f004ef37cbd5bd163",
       "terminalClosureDigest": null
     },
     {
@@ -10286,7 +10297,9 @@
       "outcome": "Provider-execution-observation DB'sinin owner-controlled v1→v2 migration'ı: backup, migrate, adoption proof",
       "priority": "P1",
       "dependsOn": [],
-      "dependents": [],
+      "dependents": [
+        "TMP-DOGFOOD-MAIN-CONTROLLED-SYNC-001"
+      ],
       "children": [],
       "gates": [
         "G1"
@@ -10308,8 +10321,8 @@
         "GR-2026-08-26-CLOSURE-BATCH-480-01"
       ],
       "acceptance": "Canlı DB `user_version=2`, `run_id`/`retired` kolonları ve indexler mevcut; 53 legacy interval korunur ve legacy-unowned kalır (sahiplik uydurulmaz); yeni gözlem run-bound yazılır; backup + before/after şema hash + read/write smoke kanıtı kayıtlı",
-      "evidence": "2026-08-22 final technical cut: compiled inspect + digest-bound apply + ayrı-process replay 43 legacy + 946 run-owned = 989 satırı doğruladı. Receipt `sha256:5b4c3e75abb9d43a5f5e3d8490592100fbfbf761165ac5d53037f2bc0a8eb847`, `databaseMutation=none`; source/target/WAL/SHM digest'leri değişmedi. Sprint-1558 `COMPLETE`, 294 artifact / 13.046.491 byte, zero conflict/missing/mismatch/untracked. Predecessor sprint-1557 `ABORTED` korunur. Different-provider XVerify `HOLD / NO SEAL`; owner Closure pending olduğundan Work 480 `OPEN` kalır ve manual settlement yapılmaz. Historical 53 ve timestamped 976 değerleri yalnız eski bounded kesitlerdir. `proof=docs/archive/evidence-2026-08/PROVIDER-OBS-MIGRATION-001-result-2026-08-22.md`; `receipt=GR-2026-08-26-CLOSURE-BATCH-480-01`; 2026-08-25-gece-sabah owner-katilimli imza-toreni: authenticated batch seq-4 append (evt-...-480-...-settlement-01), closure-gate 4-event zincir-dogrulamasi; canli DB kabulu disk-kanitli (v2, run_id+retired, 2 index, 1342 interval)",
-      "updated": "2026-08-25"
+      "evidence": "2026-08-22 final technical cut: compiled inspect + digest-bound apply + ayrı-process replay 43 legacy + 946 run-owned = 989 satırı doğruladı. Receipt `sha256:5b4c3e75abb9d43a5f5e3d8490592100fbfbf761165ac5d53037f2bc0a8eb847`, `databaseMutation=none`; source/target/WAL/SHM digest'leri değişmedi. Sprint-1558 `COMPLETE`, 294 artifact / 13.046.491 byte, zero conflict/missing/mismatch/untracked. Predecessor sprint-1557 `ABORTED` korunur. Different-provider XVerify `HOLD / NO SEAL`; owner Closure pending olduğundan Work 480 `OPEN` kalır ve manual settlement yapılmaz. Historical 53 ve timestamped 976 değerleri yalnız eski bounded kesitlerdir. `proof=docs/archive/evidence-2026-08/PROVIDER-OBS-MIGRATION-001-result-2026-08-22.md`; `receipt=GR-2026-08-26-CLOSURE-BATCH-480-01`; 2026-08-25-gece-sabah owner-katilimli imza-toreni: authenticated batch seq-4 append (evt-...-480-...-settlement-01), closure-gate 4-event zincir-dogrulamasi; canli DB kabulu disk-kanitli (v2, run_id+retired, 2 index, 1342 interval); 2026-08-28 XVERIFY MÜHRÜ ALINDI (owner \"XVerify denemesi şimdi\" kararı): different-provider zinciri tam — author codex/gpt-5.6-sol → verifier claude-opus-5 (tier-admission owner-live-2026-08-24-opus5-xverify-accepted), verdict CONFIRMED/ALLOW (\"every authored GO criterion is supported and every NO-GO criterion is contradicted\"), gerçek-çağrı 11 turn / 297.970 token provider-reported usage, settlement `settled/terminal` digest `sha256:ff28eea1…`, durable receipt `cross-verify-verdict:sha256:c7d508bd4f5584618928393a22ce93de396bcc401bf31973d0e9cba12318c53f`; iddia belgelenmiş 2026-08-22 kesitiyle sınırlıydı (owner-Closure/canlı-DB iddiası YOK); ilk iki deneme dürüst HOLD (1: canlı-DB conjunct'ı mounted-kanıt dışı; 2: evidence-mount render-kırpılması ~2KB — nondeterministik altyapı bulgusu, rapor .analysis/xverify/); kalan TEK authority: canonical owner Closure disposition (Work 480 OPEN kalır, manual settlement yapılmaz)",
+      "updated": "2026-08-28"
     },
     {
       "order": 490,
@@ -18573,13 +18586,13 @@
       ],
       "state": "OPEN",
       "truth": {
-        "C": "0",
-        "W": "0",
+        "C": "1",
+        "W": "1",
         "E": "1",
         "H": "1",
-        "L": "0",
-        "X": "0",
-        "S": "?"
+        "L": "1",
+        "X": "-",
+        "S": "-"
       },
       "blockerCode": null,
       "blockerRemedy": null,
@@ -18588,8 +18601,8 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "A bounded isolated run creates one host-proven zero-work NOT_DISPATCHED attempt and one causally dependent SKIPPED projection, emits no worker evidence for the former, never blames either as product NO_GO and reaches the exact receipt-backed terminal outcome required by policy",
-      "evidence": "EK-3 open replay basamak; must run alone so the intentional dispatch absence cannot contaminate normal implementation or multi-provider success denominators; 2026-08-26 ilk bounded-replay denemesi (izole tmp-proje, ollama-unmetered tetiği): hedef per-task NOT_DISPATCHED yerine iki farklı typed fail-closed gate'e çarptı — docker-modda DECKENT_E078 landing-policy spawn-bloku, subprocess-modda RETRO'da TERMINAL_PUBLICATION_ZERO_TASK_HOLD finalizer-hatası; sertifikasyon OLMADI (finalizer-hatası receipt'li-terminal değildir), per-task budget-hold yolunu süren tasarımlı replay-harness dilimi gerekiyor — flip yok, dürüst kanıt kaydı 2026-08-27 ikinci tasarımlı bounded-replay turu (izole tmp-proje /tmp/deckent-replay-3301-20260827, gerçek binary, 3-task DAG: 1 gerçek-koşan + 1 admission-reddi-hedefli + 1 bağımlı): ÜÇ tetik-sınıfı da hedef-zincire ULAŞMADI ve her biri typed duvar verdi — (a) subprocess-backend: live-budget tavanları executor measured-stream beyanı ister → run-düzeyi DECKENT_E078 spawn-reddi (per-task değil); (b) gemini-pin: adapter MEVCUT (auth'suz) → worker gerçekten doğdu → dürüst NO_GO + FIX-tüketimi + typed-PAUSE (zero-work değil); (c) forced-skill-reddi: host BY-DESIGN sentetik NO_GO yazar (sprint-spawner.ts:618 FORCED_SKILL_UNAVAILABLE, 487-023 kontratı) → FIX yine devreye girip bütçe yakıyor ve bağımlı SKIPPED yerine blocked-PAUSE kalıyor. NET BULGU: kabulün istediği \"zero-work NOT_DISPATCHED + dependent SKIPPED + FIX-suçlamasız terminal\" zinciri için tek aday classifier-yolu result-ABSENT sınıfı (result-evaluator.ts:3507 + result-collector.ts:2447 deadline-yolu); host pre-dispatch NoGo sınıfına FIX-bastırma + bağımlıya SKIPPED-projeksiyonu ürün-dilimi gerektiriyor — sertifikasyon flip YOK, dürüst kayıt; iki fixture-koşusu ABORTED-finalize ile mühürlü (sprint-002/003) 2026-08-27 sprint-699 dilimi landed (owner \"Öneri kabul\"): src/core/failure-disposition-policy.ts (typed tablo + config-override) + evaluator/collector kablolama + owner-outbox disposition-olayı + zincir-mühürü (T4 test-guardian dürüst-NO_GO'su gerçek boşluk buldu: classifyFixPhaseTasks fixEligible-yönlendirmesi — el-seam ile kapandı; ayrıca T1 kablosu deprecated evaluateResult'a inmişti → canlı sınır prepareResultEvaluationAttempt'e el-seam ile bağlandı). Bounded-replay r5 KISMİ-YEŞİL: preDispatchSettlement typed ✓, bağımlı cascadeSkipped=true ✓ (önceden blocked-pause), ANCAK repair-machinery (3284 alanı) FIX doğurmayı sürdürüyor → tam sertifika 3284-consumer kablosuna bağlı; fixture sprint-004/005 ABORTED-mühürlü 2026-08-27 akşam: sprint-700 (do-kaynaklı, 4/4 DONE) + ana-şerit 6-seam zinciri (r6→r11 bounded-replay iterasyonları): FIX-mint artık BASILIYOR (loud PRE_DISPATCH_FIX_INELIGIBLE log-kanıtı r8), bağımlı cascadeSkipped ✓, unresolved-pause gate'leri GEÇİLDİ (truth-normalizasyonu), INVALID_IDENTITY kapandı (host:cascade-skip kimliği), honesty-boundary muafiyeti + lineage POLICY_FIX_EXEMPT varyantı landed; kalan TEK engel: karışık-sonuçlu run'ın COMPLETE-yayın sözleşmesi (cleanup-eligibility BLOCKED — reasons-envanteri açık) — sertifika bu publication-contract dilimine bağlı; fixture sprint-004..011 ABORTED-mühürlü 🏁 SERTİFİKA (2026-08-27 20:5x, r13): sprint-703 (do-kaynaklı publication-contract dilimi: trace→settled-classifier→COMPLETE-yayın→regresyon-mühür; SettledAttemptEvidenceState HOST_TERMINAL_NOT_DISPATCHED/CASCADE_SKIP + terminalTruth ayrık-sayaçları) + ana-şerit stale-dist teşhisi sonrası bounded-replay r13 KENDİ KENDİNE COMPLETE kapandı (pause/force YOK, 1dk41sn): terminal-receipt sprint-013 → terminalOutcome=COMPLETE, terminalTruth {completed:1, policySkipped:1, cascadeSkipped:1}, FIX-mint 0, yaşam-döngüsü arşivi çalıştı — kabulün tüm kalemleri receipt-backed karşılandı. Not: 703-testinin fixture-status kolaycılığı (hepsi DONE) ana-şeritçe yakalandı; kök-gizem stale-dist çıktı (build-ritüel dersi). Kanıt: /tmp/deckent-replay-3301-20260827 sprint-013 receipt + .analysis/audits/terminal-publication-mixed-outcome-block-trace-2026-08-27.md",
-      "updated": "2026-08-27"
+      "evidence": "EK-3 open replay basamak; must run alone so the intentional dispatch absence cannot contaminate normal implementation or multi-provider success denominators; 2026-08-26 ilk bounded-replay denemesi (izole tmp-proje, ollama-unmetered tetiği): hedef per-task NOT_DISPATCHED yerine iki farklı typed fail-closed gate'e çarptı — docker-modda DECKENT_E078 landing-policy spawn-bloku, subprocess-modda RETRO'da TERMINAL_PUBLICATION_ZERO_TASK_HOLD finalizer-hatası; sertifikasyon OLMADI (finalizer-hatası receipt'li-terminal değildir), per-task budget-hold yolunu süren tasarımlı replay-harness dilimi gerekiyor — flip yok, dürüst kanıt kaydı 2026-08-27 ikinci tasarımlı bounded-replay turu (izole tmp-proje /tmp/deckent-replay-3301-20260827, gerçek binary, 3-task DAG: 1 gerçek-koşan + 1 admission-reddi-hedefli + 1 bağımlı): ÜÇ tetik-sınıfı da hedef-zincire ULAŞMADI ve her biri typed duvar verdi — (a) subprocess-backend: live-budget tavanları executor measured-stream beyanı ister → run-düzeyi DECKENT_E078 spawn-reddi (per-task değil); (b) gemini-pin: adapter MEVCUT (auth'suz) → worker gerçekten doğdu → dürüst NO_GO + FIX-tüketimi + typed-PAUSE (zero-work değil); (c) forced-skill-reddi: host BY-DESIGN sentetik NO_GO yazar (sprint-spawner.ts:618 FORCED_SKILL_UNAVAILABLE, 487-023 kontratı) → FIX yine devreye girip bütçe yakıyor ve bağımlı SKIPPED yerine blocked-PAUSE kalıyor. NET BULGU: kabulün istediği \"zero-work NOT_DISPATCHED + dependent SKIPPED + FIX-suçlamasız terminal\" zinciri için tek aday classifier-yolu result-ABSENT sınıfı (result-evaluator.ts:3507 + result-collector.ts:2447 deadline-yolu); host pre-dispatch NoGo sınıfına FIX-bastırma + bağımlıya SKIPPED-projeksiyonu ürün-dilimi gerektiriyor — sertifikasyon flip YOK, dürüst kayıt; iki fixture-koşusu ABORTED-finalize ile mühürlü (sprint-002/003) 2026-08-27 sprint-699 dilimi landed (owner \"Öneri kabul\"): src/core/failure-disposition-policy.ts (typed tablo + config-override) + evaluator/collector kablolama + owner-outbox disposition-olayı + zincir-mühürü (T4 test-guardian dürüst-NO_GO'su gerçek boşluk buldu: classifyFixPhaseTasks fixEligible-yönlendirmesi — el-seam ile kapandı; ayrıca T1 kablosu deprecated evaluateResult'a inmişti → canlı sınır prepareResultEvaluationAttempt'e el-seam ile bağlandı). Bounded-replay r5 KISMİ-YEŞİL: preDispatchSettlement typed ✓, bağımlı cascadeSkipped=true ✓ (önceden blocked-pause), ANCAK repair-machinery (3284 alanı) FIX doğurmayı sürdürüyor → tam sertifika 3284-consumer kablosuna bağlı; fixture sprint-004/005 ABORTED-mühürlü 2026-08-27 akşam: sprint-700 (do-kaynaklı, 4/4 DONE) + ana-şerit 6-seam zinciri (r6→r11 bounded-replay iterasyonları): FIX-mint artık BASILIYOR (loud PRE_DISPATCH_FIX_INELIGIBLE log-kanıtı r8), bağımlı cascadeSkipped ✓, unresolved-pause gate'leri GEÇİLDİ (truth-normalizasyonu), INVALID_IDENTITY kapandı (host:cascade-skip kimliği), honesty-boundary muafiyeti + lineage POLICY_FIX_EXEMPT varyantı landed; kalan TEK engel: karışık-sonuçlu run'ın COMPLETE-yayın sözleşmesi (cleanup-eligibility BLOCKED — reasons-envanteri açık) — sertifika bu publication-contract dilimine bağlı; fixture sprint-004..011 ABORTED-mühürlü 🏁 SERTİFİKA (2026-08-27 20:5x, r13): sprint-703 (do-kaynaklı publication-contract dilimi: trace→settled-classifier→COMPLETE-yayın→regresyon-mühür; SettledAttemptEvidenceState HOST_TERMINAL_NOT_DISPATCHED/CASCADE_SKIP + terminalTruth ayrık-sayaçları) + ana-şerit stale-dist teşhisi sonrası bounded-replay r13 KENDİ KENDİNE COMPLETE kapandı (pause/force YOK, 1dk41sn): terminal-receipt sprint-013 → terminalOutcome=COMPLETE, terminalTruth {completed:1, policySkipped:1, cascadeSkipped:1}, FIX-mint 0, yaşam-döngüsü arşivi çalıştı — kabulün tüm kalemleri receipt-backed karşılandı. Not: 703-testinin fixture-status kolaycılığı (hepsi DONE) ana-şeritçe yakalandı; kök-gizem stale-dist çıktı (build-ritüel dersi). Kanıt: /tmp/deckent-replay-3301-20260827 sprint-013 receipt + .analysis/audits/terminal-publication-mixed-outcome-block-trace-2026-08-27.md; `proof=replay-3301-r13-sprint-013-terminal-receipt-complete`; 2026-08-28 MÜHÜR-ONAYI KAYDI: Alperen soru-cevap kaydında DONE-flip'i açıkça onayladı, ANCAK validator formal DONE'u üç typed sebeple bloke etti (DEPENDENCY_STATE_UNSATISFIED: 3300 VERIFY; DONE_EVIDENCE_PENDING: tarihsel anlatı dili; DONE_PROVENANCE: consumed `GR` receipt yok) — sessiz bypass yapılmadı; VERIFY-yükselişi de scoped-receipt istediğinden (VERIFY_PROVENANCE) state OPEN'da bırakıldı — formal yükseliş için sıra: owner-katılımlı grant-receipt töreni (3300+3301 birlikte) + 3300 DONE-kapanışı + evidence-dil temizliği; kanıtlamadığı: X/S boyutları — bounded-replay Linux-local'dir ve acceptance platform-matrisi/scale deklarasyonu taşımaz (uygulanamaz)",
+      "updated": "2026-08-28"
     },
     {
       "order": 3302,
@@ -19288,6 +19301,41 @@
       "acceptance": "(K2) resource-log satırları TaskKind ve logical-attempt kimliği ile OOMKilled-kanıtı taşır; audit/documentation/config/design kind'ları 3g/4.5g bounded-canary'de en az bir hafta OOM-sıfır kanıtıyla değerlendirilip ancak ondan sonra default-terfi teklif edilir. (K3) typed ExecutionResourceEnvelope (hard/soft memory, memory+swap, CPU weight-önce quota-sonra, PID, disk/IO, network, GPU-claim, survivability/lease, progress/PSI kanıt alanları) Attempt-authority'de effective config + task requirements + risk + platform capabilities + tenant policy + aggregate capacity kesişiminden çözülür; aggregate admission flag-gated (advisory→enforce) devreye alınır. (K4) renewable execution lease elapsed-timeout'tan ayrı kavram olarak ADR-taslağıyla karara bağlanır. (K5) Firecracker yalnız microVM-realm capability-probe canary'siyle typed capability-matrisi üretir (linux/wsl/mac/win); BackendType genişletmesi ayrı owner-karardır. Hiçbir dilim docker_timeout 86400 survivability-invariant'ını düşürmez; sessiz fallback yok",
       "evidence": "Analiz-korpusu: .deckent/artifacts/docker-firecracker-decision-2026-08-26/ (report.html + decision-evidence.md + decision-evidence.sqlite + analyze-resource-kind-join.mjs, paralel-session üretimi). Ana-şerit bağımsız doğrulama 2026-08-26: /dev/kvm ARTIK MEVCUT (crw-rw---- root:kvm; snapshot'taki 'absent' drift'lendi) fakat R/W open EACCES — tek engel kvm grup-üyeliği (owner tek-satır usermod); telemetri pencere-drifti kanıtlı (taze son-1000: peak-indiv 1462 MiB, peak-concurrent 4509 MiB ve yüzde-781 CPU, bireysel CPU tepesi yüzde-302 → CPU-quota hipotezi ölçülen yükü kırpardı, weight-önce düzeltmesi acceptance'a işlendi; 3 GiB üstü örnek 0/1000); spawn zaten attemptIdentity label'larını container'a basıyor (spawn-backend-docker.ts:6890) ve readTaskKind canlı (7570) → attribution açığı yalnız resource-log yazıcısında; worker_memory_limit_by_kind şema-destekli fakat canlı config'te UNSET; BackendType bugün tmux/subprocess/docker/auto/sandbox (spawn-backend.ts:671), firecracker yok; ADR-G-014 'tomorrow=firecracker' yönü ve North-Star:304 + Reconciliation:248 no-silent-fallback kanunuyla hizalı; docker_timeout 86400 invariant'ı CFG-011 karar-turunda owner-mühürlü (kaynak: CONFIG-TRUTH-001 satırının 2026-08-26 karar-receipt'i); Sıra-önerisi: skill-evrimi sonrası K2 (attribution+canary tek outcome) → K3 (K6 GPU-claim alanı içinde) → K4 ADR; K5 yan-şerit adayı",
       "updated": "2026-08-26"
+    },
+    {
+      "order": 3356,
+      "id": "TMP-DOGFOOD-MAIN-CONTROLLED-SYNC-001",
+      "parent": "P03",
+      "program": "KERNEL",
+      "outcome": "Tmp-dogfood worktree'sinin doğrulanmış source-only işlerinin güncel main'e paket-paket kontrollü yeniden-uygulanması (P1–P5: typed planner-failure evidence, canonical project-root + Docker attempt-identity + route-aware worker-core, hermetik dispatcher-fixture, dar self-audit evidence adapter'ı, docs/rules onarım-sonrası-regen)",
+      "priority": "P1",
+      "dependsOn": [
+        "PROVIDER-OBS-MIGRATION-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "PROVIDER-OBS-MIGRATION-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Her paket güncel main üzerinde ayrı implementation + bağımsız verification pass ile yeniden uygulanır (wholesale merge/cherry-pick YASAK); her pakette scoped vitest + tsc-0 + gate-bataryası + production-wiring zinciri kanıtlanır; user-surface değişiklikte gerçek-binary proof; autonomous cleanup/status ve terminal/finalizer snapshot paketleri KAPSAM DIŞI (ayrı owner-admitted outcome ister)",
+      "evidence": "Owner admission 2026-08-28 (soru-cevap kaydı \"ADMIT — kuyruk sonuna\": sıra 3284-kalanı → 3302/3304/3299 ladder → 6181 → bu satır); devir-paketi ana-şeritte 3 bütünlük-kontrolüyle doğrulandı: receipt digest `sha256:7bfc410f…` canonical-JSON yeniden-hesapla DIGEST-MATCH, base `417f4955b`→main `a4913b140` farkı tam 23 commit, blocking-gate (Work 480 ACTIVE/OPEN) disk-doğrulu; kanıt-korpusu `/tmp` volatilitesine karşı kalıcılaştırıldı: docs/audits/tmp-dogfood-main-sync-2026-08-27/ (11 devir-dokümanı + source-only patch 7240 satır + 5 untracked source kopyası + README silinme-tetiğiyle); kanıtlamadığı: hiçbir paket main'de uygulanmadı — tmp PASS'ları güncel-main kanıtı değildir, uygulama-önü fresh three-way + baseline zorunlu",
+      "updated": "2026-08-28"
     },
     {
       "order": 4000,
@@ -22883,8 +22931,8 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "3-task paket (owner-ADMIT 2026-08-27 Q&A): (T1) current-truth baseline + karşılaştırma kernel + significance gate; (T2) resmi-kaynak retrieval + MemoryStore custom-type dedup + durable TR-alarm outbox; (T3) ScheduledFlow/Goal-v2 günlük 09:00 Istanbul + `deckent intelligence` CLI + docs EN/TR; taslak-DIRECTIVES follow-up-works/competitive-intelligence-watch-draft.md (DIRECTIVES'e dönüşünce silinir); execution-sırası kuyruk-sonu — owner ayrıca sıralar",
-      "evidence": "Köken: 2026-08-26 yanlış-scope codex DIRECTIVES (sprint-685 fenced-ABORTED, sıfır kod-etkisi) + ana-şerit 4 düzeltme; KANUN-4 gereği admission'la satırlaştı",
-      "updated": "2026-08-27"
+      "evidence": "Köken: 2026-08-26 yanlış-scope codex DIRECTIVES (sprint-685 fenced-ABORTED, sıfır kod-etkisi) + ana-şerit 4 düzeltme; KANUN-4 gereği admission'la satırlaştı; 2026-08-28: taslak-direktifler silinme-tetiği gereği follow-up-works'ten docs/governance/lane-briefs/competitive-intelligence-watch-2026-08-27.md'ye taşındı (tüketim: execution açılıp DIRECTIVES yazılınca silinir)",
+      "updated": "2026-08-28"
     },
     {
       "order": 7000,
@@ -27394,6 +27442,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "89a0cdf8daf0ff8769284b16e46aaff95ef89a53cec3ee1ffbe946d3a0beb552"
+    "value": "c9693072aa4bc713460d303e5639651c7bade4e31d68c475090ef7604dfbe90d"
   }
 }

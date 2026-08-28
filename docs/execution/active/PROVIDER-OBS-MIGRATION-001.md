@@ -18,7 +18,10 @@ BASE_SHA: eaba99b3167c72b8d74d1f3af9954ff63778eb43
   create-only `0600` bytes under a `0700` scoped store, freshly reread, `databaseMutation=none`.
 - **Post-finalizer archive verification:** `PASS`; sprint 1558 is `COMPLETE`, 294 artifacts,
   13,046,491 bytes, content digest `f2794adf…af5a`, zero conflict/missing/mismatch/untracked.
-- **Independent XVerify:** different-provider unavailability remains `HOLD / NO SEAL`.
+- **Independent XVerify:** `CONFIRMED / ALLOW` seal obtained 2026-08-28 — author codex/gpt-5.6-sol,
+  verifier claude-opus-5, terminally-settled real call with provider-reported usage, durable
+  receipt `cross-verify-verdict:sha256:c7d508bd4f5584618928393a22ce93de396bcc401bf31973d0e9cba12318c53f`
+  (claim bounded to the documented 2026-08-22 cut; two earlier attempts remained honest `HOLD`).
 - **Owner Closure:** `OPEN`; only the canonical owner Closure authority may dispose Work 480.
 
 Keep this capsule active. This is the single product outcome represented here. Local
@@ -55,10 +58,13 @@ provider, target, tenant, project, execution, receipt, secret, or filesystem ide
 
 Brain must keep the capsule `ACTIVE` and Work 480 `OPEN` until both remaining authorities act:
 
-1. **Independent XVerify:** obtain the required different-provider result. Provider
-   unavailability remains `HOLD / NO SEAL`; same-provider review cannot substitute for a seal.
+1. **Independent XVerify:** SATISFIED 2026-08-28 — different-provider result obtained
+   (codex-authored work verified by claude-opus-5; `CONFIRMED / ALLOW`; durable receipt
+   `cross-verify-verdict:sha256:c7d508bd4f5584618928393a22ce93de396bcc401bf31973d0e9cba12318c53f`).
+   Same-provider review did not substitute for this seal.
 2. **Owner Closure:** after the preceding evidence is admitted, the canonical owner Closure
-   authority must explicitly record the disposition of Work 480.
+   authority must explicitly record the disposition of Work 480. This is now the ONLY
+   remaining gate.
 
 ## DONE
 

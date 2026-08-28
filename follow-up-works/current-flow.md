@@ -88,13 +88,25 @@ terminalTruth {1/1/1}, FIX-mint 0; kök-gizem stale-dist çıktı → build-rit�
 (3) CI-watch 6181 pencereye sığmadı — kuyruğun başında. Ladder-durumu: 3301 kapanmaya hazır
 (DONE-flip owner-mühürüyle); 3302→3284-kalanı; 3304/3299 merdiven-sıralı.
 
+**2026-08-28 GECE — ARA-İŞ: TMP-DOGFOOD DEVİR-PAKETİ + 3 OWNER-KARARI.** Owner'ın beklettiği
+ara-iş geldi: tmp-dogfood session'ın kontrollü main-eşitleme devir-paketi. Ana-şerit 3 bütünlük
+kontrolüyle doğruladı (receipt DIGEST-MATCH `7bfc410f…`, base→main tam 23 commit, Work-480-gate
+diskte gerçek). Owner Q&A kararları: (1) **480 XVerify şimdi** → 3. denemede **CONFIRMED/ALLOW
+mühür** (codex→claude-opus-5, 297.970 token gerçek-çağrı, receipt `c7d508bd…`; deneme-1 canlı-DB
+conjunct'ı, deneme-2 evidence-mount ~2KB render-kırpılması — altyapı bulgusu); kalan TEK gate =
+owner Closure disposition. (2) **Sync-paketi ADMIT kuyruk-sonuna** → MASTER 3356
+TMP-DOGFOOD-MAIN-CONTROLLED-SYNC-001 (P03, dep: PROVIDER-OBS-MIGRATION-001); kanıt-korpusu
+kalıcı: docs/audits/tmp-dogfood-main-sync-2026-08-27/. (3) **3301 mühür onayı verildi ANCAK
+validator formal DONE'u 3-typed-sebeple blokladı** (3300 VERIFY-dependency + evidence-dil +
+GR-receipt yok) — sessiz bypass yok, OPEN'da mühür-onayı kayıtlı; formal yükseliş owner-katılımlı
+receipt-töreni ister (3300+3301 birlikte). Ayrıca 6181 taslağı silinme-tetiğiyle lane-brief'e taşındı.
+
 ## SIRADAKİ (bu sıra ile)
 
-1. ~~Sprint-699~~ ✅ landed (bu commit); replay r5 kısmi-yeşil — tam sertifika 3284'e bağlı.
-2. **Owner'ın ilan ettiği yeni kritik iş + doğrulama süreci** (içerik owner'dan gelecek).
-3. Kuyruk (owner-Q&A sıralaması): 3284 keşif+sprint (ADMIT) → 3301 sertifika-tamamlama →
-   CLI-reform dilim-1 (sertifika-adımı sonrası HEMEN) → 3302/3304/3299 flip-merdiveni →
-   yayın-zinciri → kuyruk-sonu: CI-watch 6181.
+1. **3284-kalanı** (keşif+sprint; ADMIT'li) — 3301/3302 tam-kapanışının anahtarı.
+2. **3302/3304/3299 flip-merdiveni** + owner receipt-töreni (3300+3301 DONE-yükselişi).
+3. Yayın-zinciri (verhex-transition-plan owner-kararları) → CI-watch 6181 →
+   kuyruk-sonu: **3356 sync-paketi** (gate: 480 owner-Closure ✓XVerify-mühürlü).
 
 ## Açık küçük bulgular (admission'sız, kayıt)
 
@@ -107,13 +119,13 @@ terminalTruth {1/1/1}, FIX-mint 0; kök-gizem stale-dist çıktı → build-rit�
 
 ## Canlı truth (kompakt)
 
-- `DOGFOOD_MODE=ON` · origin/main `0e55cb969` · **sprint-699 CANLI** (build-yasağı aktif) ·
-  bot canlı · MASTER 541 satır/210 receipt validator-yeşil · repo CI-yeşili `f20e32e45`'te
-  3/3 kanıtlı (sonraki docs-only commit'ler advisory) · full-suite kadans-sayacı: dün 1 tam
-  koşu (3304 sertifikası); katalog-dokunuşlu landing'lerde Ders-32 mini-batarya zorunlu.
+- `DOGFOOD_MODE=ON` · aktif sprint YOK · bot canlı (taze-dist) · MASTER 543 satır/210 receipt
+  validator-yeşil · **CI Eylül'e kadar ASKIDA** (Actions aylık limit doldu — owner direktifi;
+  doğrulama local-only ritüel) · full-suite kadansı: 5-landing'de-1; katalog-dokunuşlu
+  landing'lerde Ders-32 mini-batarya zorunlu.
 - follow-up-works envanteri: bu dosya (imleç) · cli-surface-reform-karar.md (ONAYLI-tasarım,
-  dilim-1'de DIRECTIVES'e dönüşüp silinir) · verhex-transition-plan.md (4 açık owner-kararı) ·
-  competitive-intelligence-watch-draft.md (owner-karar: park önerildi, henüz hükümsüz).
+  dilim-1a+1b LANDED; kaldırma-penceresi enforcement'ı ileride) · verhex-transition-plan.md
+  (4 açık owner-kararı). Competitive-watch taslağı lane-brief'e taşındı (ADMIT-tüketimi).
 
 ## Sabit yürütme contractı
 
