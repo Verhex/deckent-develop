@@ -1,0 +1,144 @@
+{
+  "schemaVersion": 1,
+  "outcomeId": "dogfood-continuation-epoch-supervision",
+  "role": "supervisor",
+  "baseSha": "871b204756f2b80f8a586d3286b2ec7003a8b3e3",
+  "headSha": "871b204756f2b80f8a586d3286b2ec7003a8b3e3",
+  "branch": "main",
+  "policyDigest": "sha256:c4c96a971833ee892174b7d361e08c7f0eb53c629873381235deaa573594d863",
+  "scopeDigest": "sha256:c1857f3c355fe7363d1b49b22e78d5a0dc058392e5db1ca2573442e0dbd296cb",
+  "filesChanged": [],
+  "verification": [
+    {
+      "kind": "typecheck",
+      "command": "npx tsc --noEmit",
+      "result": "PASS",
+      "class": "LOCAL_VERIFIED"
+    },
+    {
+      "kind": "gate-battery",
+      "command": "npm run lint:gates",
+      "result": "PASS",
+      "evidence": "21 gates green including the doc-command-truth gate added today",
+      "class": "LOCAL_VERIFIED"
+    },
+    {
+      "kind": "master-plan",
+      "command": "node scripts/lint-master-plan.mjs --check",
+      "result": "PASS",
+      "evidence": "543 rows, 458 active, 211 receipts; projections in sync"
+    },
+    {
+      "kind": "real-binary",
+      "command": "node dist/cli/entry.js intelligence watch run --dry-run",
+      "result": "PASS",
+      "evidence": "honest typed failure naming the unbound capability; schedule surface registered the Europe/Istanbul flow"
+    },
+    {
+      "kind": "cross-provider-xverify",
+      "result": "CONFIRMED",
+      "evidence": "three CONFIRMED/ALLOW receipts today: c7d508bd (Work 480), 301feacc (3356 worker-core), 2a07b7d9 (6181 slice-2)"
+    },
+    {
+      "kind": "remote-ci",
+      "result": "NOT_RUN",
+      "class": "REMOTE_ADVISORY",
+      "evidence": "owner directive: Actions monthly limit exhausted, CI suspended until September"
+    }
+  ],
+  "findings": [
+    {
+      "class": "BLOCKS_CURRENT_DONE",
+      "reasonCode": "PUBLISH_GATE_KERNEL_TREE_OPEN",
+      "detail": "Publish is gated on MASTER 3299, whose DependsOn tree transitively requires SCHEDULER-001, KERNEL-ATTEMPT-001, KERNEL-STATE-001, AUTHORITY-001, LIMIT-001, RECEIPT-001, REACHABILITY-001 and PROVIDER-HOLD-001. Measured, not assumed: every edge was read from the DependsOn cells."
+    },
+    {
+      "class": "BLOCKS_CURRENT_DONE",
+      "reasonCode": "X_DIMENSION_NEEDS_CI_OR_PRECEDENT",
+      "detail": "Rows carrying X=0 cannot reach DONE without cross-platform proof while CI is suspended. A precedent exists: seven sibling rows converted X to '-' with a reasoned owner round, which can unlock part of this without CI."
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "INTELLIGENCE_INTERPRETER_MISSING",
+      "detail": "MASTER 6181 slices 1-3 are landed, but the watch chain has no production interpretSource, so the CLI honestly reports an unbound capability. That interpreter is a separate slice and 6181 cannot be DONE without it."
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "TYPE_LEVEL_COUPLING_NOT_IN_COLLISION_ANALYSIS",
+      "detail": "Wave-1 of sprint-707 had no file-write collision yet failed typecheck across tasks: collision analysis covers file writes, not type-level coupling. A task can be unit-green while the package does not compile."
+    },
+    {
+      "class": "RELATED_BUT_NONBLOCKING",
+      "reasonCode": "MEMORYSTORE_METADATA_INDEX_SIGNATURE_FRICTION",
+      "detail": "MemoryStore.insert's metadata parameter rejects domain interfaces (missing index signature); hand-fixed twice today in different files."
+    }
+  ],
+  "openActions": [
+    "Read follow-up-works/kernel-tree-closure-map.md, then docs/governance/deckent-dev-operating-policy.md, then the named MASTER rows — in that order.",
+    "Obtain the owner decision on the map's §6 (three options; the outgoing supervisor recommended option 2: take the cheap formal wins first, then re-measure).",
+    "If option 2 is chosen, run the formal wave: emsal-reasoned X-cell conversion, a fresh receipt round for 3274, and re-measure the remaining tree.",
+    "Do not open any new MASTER row without owner admission; report findings instead.",
+    "Keep CI expectations honest: remote CI is suspended until September, so verification stays local-only."
+  ],
+  "recommendedNextAction": "Take the owner decision on kernel-tree-closure-map.md §6 before writing any kernel code.",
+  "authorityHandoff": {
+    "protocolVersion": 1,
+    "handoffId": "ah-2026-08-28-opus-kernel",
+    "sequence": 2,
+    "transition": "VERIFIED",
+    "transitionActor": "transferee",
+    "currentAuthorityEpoch": 2,
+    "proposedAuthorityEpoch": 3,
+    "previousReceiptDigest": "sha256:5da6aaffd66e9b8cbf91b734f2c0e37fa13d80d25994f7773e640b661cf648d0",
+    "from": {
+      "hostId": "claude-code-cli",
+      "providerId": "claude",
+      "modelApiId": "claude-opus-5",
+      "role": "supervisor",
+      "principalDigest": "sha256:1d1549ebd7282b91e0c19f892a1d68c3092d2c2f7fc05d3096b405c151d47bca",
+      "sessionDigest": "sha256:c0e2c2c48bba1d84f23f594d8b9de7e90c68e7de80fe278c8f136ef7ba64c8df"
+    },
+    "to": {
+      "hostId": "claude-code-cli",
+      "providerId": "claude",
+      "modelApiId": "claude-opus-5",
+      "role": "supervisor",
+      "principalDigest": "sha256:1d1549ebd7282b91e0c19f892a1d68c3092d2c2f7fc05d3096b405c151d47bca"
+    },
+    "trigger": {
+      "reasonCode": "OWNER_DIRECTIVE",
+      "authorityRef": "owner-live-2026-08-28: kernel work starts clean in a new session; hand off via this protocol, not via the current-flow cursor"
+    },
+    "authorityScope": {
+      "goalId": "deckent-dev-dogfood-continuation",
+      "missionId": "kernel-tree-closure-program",
+      "flowId": null,
+      "runId": null,
+      "roles": [
+        "supervisor"
+      ],
+      "includes": [
+        "MASTER 3299 kernel-tree closure program: measure and close the 10-row/4-layer DependsOn tree that gates publish",
+        "follow-up-works/kernel-tree-closure-map.md open owner decision (three options in §6)",
+        "the cheap formal wins named in that map: emsal-based X-cell conversion and 3274 fresh receipt"
+      ],
+      "excludes": [
+        "owner-only decisions: publish gate re-scoping, DONE-flip receipts, npm publish",
+        "unadmitted outcomes and any new MASTER row without owner admission",
+        "MASTER 3356 P6/P7 packages, which remain HOLD by their own analysis"
+      ],
+      "currentAuthorityEpoch": 2,
+      "proposedAuthorityEpoch": 3
+    },
+    "evidenceSnapshot": {
+      "observedAt": "2026-08-28T10:05:48.826Z",
+      "repoStateRef": "git:b01a2306a4287943ab39f1634e9451eaf6a8af27:dirty=11",
+      "runtimeStateRef": "no active sprint or recover process; bot daemon live; approvals inbox empty",
+      "approvalStateRef": "deckent approvals list → no pending requests",
+      "verificationStateRef": "tsc 0 · 21 gates green · master-plan validator green · real-binary probe recorded above",
+      "buildStateRef": "bot-stop → npm run build:all (exit 0) → bot-start; dist matches source",
+      "ssotStateRef": "docs/MASTER-PLAN.md 543 rows; previous authority receipt sha256:9cb638e4a58904a0514b341dac3509e6afa6bea763791602734d821012b4c5b7"
+    }
+  },
+  "receiptDigest": "sha256:baf93a309c6ffb4ce5030320166400402435a235440bd1b041d3eae5e6d08eb6"
+}
