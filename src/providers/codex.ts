@@ -29,6 +29,7 @@ import {
   classifyCodexAuthStatus,
   CODEX_AUTH_STATUS_ARGS,
 } from '../core/provider-auth-probe.js';
+import { getProviderCommandSpec } from '../core/provider-command-spec.js';
 
 // Side-effect: register the Codex parity catalog (gpt-5.5 + gpt-5.6 family)
 // into the singleton registry the first time this module is imported —
@@ -535,16 +536,28 @@ export class CodexAdapter implements ProviderAdapter {
   /**
    * Build CLI command + args for planner invocations using Codex.
    *
-   * Rust rewrite: `codex exec "prompt" --model <model>` (exec is non-interactive)
-   * Legacy Node: `codex exec --full-auto "prompt" --model <model>`
-   *
-   * We keep `--full-auto` for backward compat — Rust CLI ignores it harmlessly.
+   * Planner transport, isolation, output and model selection come from the
+   * canonical provider command spec. The prompt rides stdin so large plans do
+   * not encounter platform argv ceilings.
    */
   buildPlannerCommand(prompt: string, model: ModelType): import('../core/provider.js').ProviderPlannerCommand {
+    const spec = getProviderCommandSpec('codex');
+    if (
+      !spec?.planner
+      || spec.planner.promptFeed !== 'stdin'
+      || spec.planner.outputFormat !== 'plain-text'
+    ) {
+      throw new ProviderError('No stdin planner profile registered for Codex execution', this.name);
+    }
     const calledModel = modelRegistry.get(model)?.apiId ?? model;
     return {
-      command: 'codex',
-      args: ['exec', '--full-auto', prompt, '--model', calledModel],
+      command: spec.binary,
+      args: [
+        ...spec.planner.baseArgs,
+        ...spec.planner.isolationArgs,
+        spec.modelFlag, calledModel,
+      ],
+      stdin: prompt,
       calledProvider: 'codex',
       calledModel,
       transport: 'cli',

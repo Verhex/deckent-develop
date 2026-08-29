@@ -726,7 +726,12 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // hermeticity without weakening its fail-closed authority assertion.
   // All test writes are confined to suite-owned tmpdirs;
   // the real-binary migration fixture is operator-run evidence, not a test write.
-  count: 16783,
+  // 2026-08-29 OPERATION-COVERAGE-MODEL-001 bounded ADR-D-007 recovery:
+  // 16783→16801 — canonical-catalog provenance, exact unbound-attribution,
+  // unknown-effect refusal, comparative baseline migration and POSIX/Windows/WSL
+  // identity cases. Async child execution remains tmpdir-owned with real-fd
+  // capture; the source-derived scan reports zero confirmed violations.
+  count: 16801,
   // 2026-08-28 OPERATION-001 O3 ratchet: count unchanged, digest-only —
   // operation-ingress audit moved from report-only proof to a fail-closed
   // lint:gates member with hermetic regression coverage.
@@ -792,7 +797,9 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // externalization pininin backend-argümanıyla güncellenmesi.
   // 2026-08-28 09:0x: digest 6820cbff→10164164 — sprint-704 repair-queue suite'leri
   // + sprintId/settle el-kapanışının test-metni etkisi.
-  digest: '4ed1ee91784ccba61c48455cb4e14b455ba0dad8255c72ed38a592477fb232bf',
+  // 2026-08-29 ADR-D-007 planner recovery: count unchanged; digest-only update
+  // after planner prompt delivery moved from argv to the owned child stdin.
+  digest: 'd8d6e0ee7d29f5d7d12e1e8e0209dd8ab2b3b69a9a2e283a8268a7492d58e7ac',
   // 2026-08-27 04:0x: ayni 16514, digest-only — full-suite hizalama batch'i
   // (pin/mock/census guncellemeleri + sync guard).
   // 2026-08-27 03:1x: ayni 16514, digest-only — CI-hizalama paketi
@@ -1345,6 +1352,9 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // catalog assertion is lazy at import and fail-closed at first mutation;
   // production inventory count is unchanged and the digest records that move.
   count: 1366,
+  // 2026-08-29 OPERATION-COVERAGE-MODEL-001 bounded ADR-D-007 recovery:
+  // count unchanged; digest records the canonical catalog-backed semantic
+  // inventory and comparative schema-3 baseline authority.
   // 2026-08-28 OPERATION-001 O3 ratchet: count unchanged, digest-only —
   // audit-operation-ingress production text now implements the fail-closed
   // baseline comparison used by lint:gates.
@@ -1431,7 +1441,11 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // 2026-08-28 09:4x: digest 873b946d→b127e8b9 — src/intelligence/ katmanı.
   // 2026-08-29: same 1366, digest-only — run-policy DIRECTIVES heading is
   // case-normalized at the consumer so a declared contract cannot disappear.
-  digest: '171ce002625d439aaa7997cc2cd74203bcdca53a6a7958d92952ff846df1dd8c',
+  // 2026-08-29 ADR-D-007 planner recovery: count unchanged; digest-only update
+  // after the canonical Codex planner profile gained isolated stdin transport,
+  // cross-platform wrapper dispatch and timeout-preserving single-settlement
+  // EPIPE handling.
+  digest: 'c758eef4942ffdf099c4eba0f9f261c058708fb568eb48d329986371d4bd7d26',
   // 2026-08-27 04:0x: ayni 1339, digest-only — sync workspace-guard + drift-normalize.
   // 2026-08-27 03:1x: ayni 1339, digest-only — skill-pool readJsonSafe donusumu.
   // 2026-08-27 02:0x: ayni 1339, digest-only — Dalga-3 src kaymalari

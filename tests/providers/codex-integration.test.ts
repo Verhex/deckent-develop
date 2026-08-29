@@ -56,7 +56,13 @@ describe.skipIf(!codexAvailable)('CodexAdapter Integration (real CLI)', () => {
     const result = adapter.buildPlannerCommand('test prompt', 'gpt-4.1');
     expect(result.command).toBe('codex');
     expect(result.args[0]).toBe('exec');
-    expect(result.args).toContain('--full-auto');
+    expect(result.args).toContain('--skip-git-repo-check');
+    expect(result.args).toContain('--ephemeral');
+    expect(result.args).toContain('--ignore-user-config');
+    expect(result.args).toEqual(expect.arrayContaining(['--sandbox', 'read-only']));
+    expect(result.args).not.toContain('--full-auto');
+    expect(result.args).not.toContain('test prompt');
+    expect(result.stdin).toBe('test prompt');
   });
 
   it('should return correct tier models', () => {

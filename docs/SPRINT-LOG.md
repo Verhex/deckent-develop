@@ -17286,9 +17286,9 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 ---
 ## Sprint 697 — sprint-697
 
-**Status:** COMPLETE
-**Date:** 2026-08-26
-**Duration:** 204s
+**Status:** ABORTED
+**Date:** 2026-08-29
+**Duration:** 0s
 
 ### Results
 
@@ -17299,7 +17299,7 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 | Tech Debt | 0 |
 | No-Go | 0 |
 | Coverage | 0.0% |
-| Duration | 203926ms |
+| Duration | 0ms |
 
 ### Tasks
 
@@ -17568,5 +17568,59 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 707-005: EN-TR feature docs and integration gate closure seal (DONE)
 - 707-002-fix: Fix: IANA timezone support in flow scheduling core (DONE)
 - 707-004-fix: Fix: CLI surface deckent intelligence with i18n (DONE)
+
+---
+## Sprint 708 — sprint-708
+
+**Status:** ABORTED
+**Date:** 2026-08-28
+**Duration:** 3370s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 4 |
+| Completed | 2 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 3370277ms |
+
+### Tasks
+
+- 708-001-fix: Fix: Add fail-closed --check mode to the operation-ingress audit script (DONE)
+- 708-001: Add fail-closed --check mode to the operation-ingress audit script (DONE)
+- 708-002-fix: Fix: Refresh the operation-ingress baseline to the current live surface (DONE)
+- 708-002: Refresh the operation-ingress baseline to the current live surface (DONE)
+- 708-003-fix: Fix: Wire the ratchet into lint:gates and promote its script-registry entry to gate (PENDING)
+- 708-003: Wire the ratchet into lint:gates and promote its script-registry entry to gate (NO_GO)
+- 708-004: Ratchet integration verification and hermetic test coverage (PAUSED)
+
+---
+## Sprint 711 — sprint-711
+
+**Status:** ABORTED
+**Date:** 2026-08-29
+**Duration:** 2812s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 2812136ms |
+
+### Tasks
+
+- 711-001-fix-fix-fix-fix: Fix: Fix: Fix: Fix: Semantic operation coverage model, baseline contract, and hermetic proof (PENDING)
+- 711-001-fix-fix-fix: Fix: Fix: Fix: Semantic operation coverage model, baseline contract, and hermetic proof (NO_GO)
+- 711-001-fix-fix: Fix: Fix: Semantic operation coverage model, baseline contract, and hermetic proof (NO_GO)
+- 711-001-fix: Fix: Semantic operation coverage model, baseline contract, and hermetic proof (NO_GO)
+- 711-001: Semantic operation coverage model, baseline contract, and hermetic proof (NO_GO)
 
 ---

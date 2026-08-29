@@ -177,6 +177,8 @@ export interface ProviderAvailabilityDetail {
 export interface ProviderPlannerCommand {
   command: string;
   args: string[];
+  /** Optional exact planner prompt supplied through child stdin, never argv. */
+  stdin?: string;
   calledProvider?: string;
   calledModel?: string;
   transport?: 'cli' | 'api' | 'http' | 'local-runtime';

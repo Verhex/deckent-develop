@@ -18,7 +18,7 @@ import type {
   ProviderPlannerCommand,
   ProviderPlannerInvocation,
 } from '../core/provider.js';
-import { providerRegistry, ProviderError } from '../core/provider.js';
+import { buildCliInvocation, providerRegistry, ProviderError } from '../core/provider.js';
 import {
   getLegacyModelMigration,
   inferProviderFromId,
@@ -480,6 +480,7 @@ export function parsePlannerResponse(raw: string, adapter?: ProviderAdapter): Pl
 export interface PlannerSpawnSpec {
   readonly command: string;
   readonly args: string[];
+  readonly stdin?: string;
   readonly calledProvider: string;
   readonly calledModel: string;
   readonly transport: InvocationTransport;
@@ -550,6 +551,7 @@ function normalizePlannerCommand(
   return {
     command: command.command,
     args: command.args,
+    ...(command.stdin === undefined ? {} : { stdin: command.stdin }),
     calledProvider,
     calledModel: wireModel,
     transport: command.transport ?? 'cli',
@@ -906,26 +908,44 @@ export interface PlannerSpawnOutcome {
 export type PlannerSpawnFn = (
   command: string,
   args: readonly string[],
-  opts: { timeoutMs: number },
+  opts: { timeoutMs: number; stdin?: string },
 ) => Promise<PlannerSpawnOutcome>;
 
-/** Default planner spawn: async child_process.spawn + SIGTERM at `timeoutMs`
- *  (mirrors spawnSync's timeout contract — a timed-out run resolves with
- *  `signal: 'SIGTERM'`). Never rejects; spawn-level failures surface as
- *  `error` so callers keep their single mapping path. */
-export const defaultPlannerSpawn: PlannerSpawnFn = (command, args, opts) =>
-  new Promise((resolve) => {
+export interface PlannerSpawnDependencies {
+  readonly platform?: NodeJS.Platform;
+  readonly spawnImpl?: typeof spawn;
+}
+
+/** Build the planner subprocess seam with injectable platform/process dependencies. */
+export function createPlannerSpawn(
+  dependencies: PlannerSpawnDependencies = {},
+): PlannerSpawnFn {
+  const platform = dependencies.platform ?? process.platform;
+  const spawnImpl = dependencies.spawnImpl ?? spawn;
+  return (command, args, opts) => new Promise((resolve) => {
     let stdout = '';
     let stderr = '';
     let timedOut = false;
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     let child;
+    const settle = (outcome: PlannerSpawnOutcome): void => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      resolve(outcome);
+    };
     try {
-      child = spawn(command, [...args], { stdio: ['ignore', 'pipe', 'pipe'] });
+      const invocation = buildCliInvocation(command, [...args], platform);
+      child = spawnImpl(invocation.command, invocation.args, {
+        stdio: [opts.stdin === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
+        shell: invocation.shell,
+      });
     } catch (e) {
-      resolve({ status: null, signal: null, stdout, stderr, error: e as Error });
+      settle({ status: null, signal: null, stdout, stderr, error: e as Error });
       return;
     }
-    const timer = setTimeout(() => {
+    timer = setTimeout(() => {
       timedOut = true;
       try {
         child.kill('SIGTERM');
@@ -939,16 +959,43 @@ export const defaultPlannerSpawn: PlannerSpawnFn = (command, args, opts) =>
     child.stdout?.on('data', (d: string) => { stdout += d; });
     child.stderr?.on('data', (d: string) => { stderr += d; });
     child.on('error', (err) => {
-      clearTimeout(timer);
-      resolve({ status: null, signal: null, stdout, stderr, error: err });
+      settle({ status: null, signal: null, stdout, stderr, error: err });
     });
     child.on('close', (code, signal) => {
-      clearTimeout(timer);
       // A kill we issued at the deadline is a timeout even if the OS reports
       // the signal differently — keep spawnSync's SIGTERM contract.
-      resolve({ status: code, signal: timedOut ? 'SIGTERM' : signal, stdout, stderr });
+      settle({ status: code, signal: timedOut ? 'SIGTERM' : signal, stdout, stderr });
     });
+    if (opts.stdin !== undefined) {
+      const onStdinError = (error: Error): void => {
+        if (settled) return;
+        // The deadline path owns settlement once it has sent SIGTERM. A large
+        // in-flight stdin write can then report EPIPE; consuming that stream
+        // error must not reclassify the canonical timeout as spawn_error.
+        if (timedOut) return;
+        try { child.kill('SIGTERM'); } catch { /* already gone */ }
+        settle({ status: null, signal: null, stdout, stderr, error });
+      };
+      if (!child.stdin) {
+        onStdinError(new Error('Planner stdin transport is unavailable'));
+        return;
+      }
+      child.stdin.on('error', onStdinError);
+      try {
+        child.stdin.end(opts.stdin);
+      } catch (error) {
+        onStdinError(error instanceof Error ? error : new Error(String(error)));
+      }
+    }
   });
+}
+
+/** Default planner spawn: async child_process.spawn + SIGTERM at `timeoutMs`
+ *  (mirrors spawnSync's timeout contract — a timed-out run resolves with
+ *  `signal: 'SIGTERM'`). Never rejects; spawn-level failures surface as
+ *  `error` so callers keep their single mapping path. */
+export const defaultPlannerSpawn: PlannerSpawnFn = (command, args, opts) =>
+  createPlannerSpawn()(command, args, opts);
 
 /** ONE source for the effective planner timeout: config `brain_plan_timeout_ms`
  *  (Sprint 224 contract) → legacy `ai_planner_timeout` → BRAIN_PLAN_TIMEOUT_MS.
@@ -1115,7 +1162,10 @@ export async function callBrainPlannerWithReason(
   try {
     result = nativeInvocation
       ? await nativeInvocation.execute({ timeoutMs: effectiveTimeout })
-      : await spawnFn(cmdInfo.command, cmdInfo.args, { timeoutMs: effectiveTimeout });
+      : await spawnFn(cmdInfo.command, cmdInfo.args, {
+          timeoutMs: effectiveTimeout,
+          ...(cmdInfo.stdin === undefined ? {} : { stdin: cmdInfo.stdin }),
+        });
   } catch (error) {
     result = {
       status: null,
@@ -1533,7 +1583,10 @@ export async function callZeroConfigPlanner(
     try {
       const outcome = nativeInvocation
         ? await nativeInvocation.execute({ timeoutMs })
-        : await spawnFn(spec.command, spec.args, { timeoutMs });
+        : await spawnFn(spec.command, spec.args, {
+            timeoutMs,
+            ...(spec.stdin === undefined ? {} : { stdin: spec.stdin }),
+          });
       return {
         outcome, receipt, durationMs: Math.max(0, Date.now() - startedAt),
       };

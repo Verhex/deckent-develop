@@ -533,15 +533,29 @@ describe('CodexAdapter', () => {
   // ─── buildPlannerCommand() ─────────────────────────────────────────
 
   describe('buildPlannerCommand()', () => {
-    it('should return command "codex" with exec --full-auto args', () => {
+    it('should return a read-only ephemeral command from the canonical Codex spec', () => {
       const result = adapter.buildPlannerCommand('plan this', 'gpt-4.1');
       expect(result.command).toBe('codex');
-      expect(result.args).toEqual(['exec', '--full-auto', 'plan this', '--model', 'gpt-4.1']);
+      expect(result.args).toEqual([
+        'exec', '--skip-git-repo-check',
+        '--sandbox', 'read-only',
+        '--ephemeral',
+        '--ignore-user-config',
+        '--ignore-rules',
+        '-c', 'mcp_servers={}',
+        '--model', 'gpt-4.1',
+      ]);
+      expect(result.stdin).toBe('plan this');
+      expect(result.args).not.toContain('--full-auto');
+      expect(result.args).not.toContain('--json');
+      expect(result.args).not.toContain('plan this');
     });
 
-    it('should include the prompt as positional arg', () => {
-      const result = adapter.buildPlannerCommand('my prompt here', 'o3');
-      expect(result.args[2]).toBe('my prompt here');
+    it('should carry dash-prefixed and shell-metacharacter prompts only through stdin', () => {
+      const prompt = '--help $(touch should-not-run) & echo nope';
+      const result = adapter.buildPlannerCommand(prompt, 'o3');
+      expect(result.stdin).toBe(prompt);
+      expect(result.args).not.toContain(prompt);
     });
 
     it('should include the model', () => {

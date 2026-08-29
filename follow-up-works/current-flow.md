@@ -30,6 +30,49 @@ sınırı yapmaz. Canonical ve retained lowercase biçim aynı policy digest'ine
   README/README.tr/IDENTITY stats drift'inde durdu. Çalışmayan tail kapıları ayrı koşuldu ve
   yeşil. Recovery sonrasında `DOGFOOD_HEALTH=READY_IDLE`.
 
+## Ayrı ADR-D-007 recovery kaydı — sprint-711 / MASTER 4031
+
+**Observed at:** `2026-08-29T15:35:49+03:00`
+**Authority:** Alperen'in canlı force-finalize + elle tamamlama talimatı; ardından
+`scripts/lint-test-hermeticity.mjs` fingerprint projectionı, bu ayrı kayıt ve generated-stats
+projectionları (`README.md`, `README.tr.md`, `.deckent/workspace/IDENTITY.md`) için verdiği exact
+ek write authority. Bu kayıt `sprint-711` geçmişini veya MASTER dispositionını değiştirmez.
+
+- Canonical run truth aynen korunur: `sprint-711 = ABORTED`, generation `6`, logical settlement
+  digest `4f10272e5ddaedf889ccf315e743f91f3ac0f8aa3c673278c8ec977e55567b48`;
+  `0 COMPLETE / 1 unresolved`. Run hiçbir yerde başarılı gösterilmez.
+- Elle ürün kurtarması yalnız 4031'in üç product path'inde yürüdü:
+  `scripts/audit-operation-ingress.mjs`, `scripts/operation-ingress-baseline.json`,
+  `tests/scripts/audit-operation-ingress.test.ts`. Hermetic source-derived fingerprint değişimi,
+  owner'ın ayrı yetkisiyle yalnız `scripts/lint-test-hermeticity.mjs` projectionında rebaseline
+  edildi; enforcement/policy gevşetilmedi.
+- Güncel ürün kanıtı: 17/17 targeted test; gerçek `--check` PASS; 5.205 semantic site,
+  `covered=0`, `unmatched=5205`, `unclassified=0`, diagnostics `0`, digest `59f62753c2a2…`;
+  canonical catalog digest `bc6072457740587658d8c17ff3d3ae4dec721ac911cb9599070327afddd7c8db`.
+  Schema-2→3 migration comparative gate'i önceki her unmatched siteyi bire bir korudu; iki
+  local-interface `callTool` false-positive'ı silinmeyip `UNVERIFIED_TOOL_ORIGIN` dispositionı
+  ile ayrı excluded inventoryde taşındı.
+- TypeScript (root + Dashboard) PASS; build exit `0`; hermeticity scan 2.972 dosya / 0 confirmed
+  violation. Owner-authorized `npm run docs:stats` yalnız üç generated projectionı yeniledi;
+  ardından tam `npm run lint` bütün gate'lerle exit `0` verdi. Ürün kontratı
+  `LOCAL_VERIFIED`; canonical run truth hâlâ `ABORTED` ve authenticated MASTER dispositionı
+  uygulanmadı.
+- Runtime quiescent: active sprint/coordinator/worker/container yok; `/tmp/operation-ingress-*`
+  fixture kalıntısı yok. `sprint-711` cleanup uygulanmadı ve arşiv/terminal receipt korundu.
+
+4031'e karıştırılmayan, ayrı admission bekleyen engine defect kayıtları:
+
+1. Worker `.result` kanıtı result-acceptance katmanında kayboldu; dört gerçek attempt'ın doğru
+   product claim'i terminal settlement'a taşınmadı.
+2. Brain/process liveness kararı canlı/bitmiş iş ayrımını yanlış kurarak false-death/NO_GO üretti.
+3. Repair zinciri bounded attempt ceiling olmadan dört gerçek FIX'ten sonra geçersiz beşinci
+   task kimliği üretti; beşinci attempt hiç dispatch edilmedi ve result taşımıyor.
+4. Scope/work-attribution ölçümü gerçek üç-file diff mevcutken `filesChanged=[]`/mismatch benzeri
+   çelişkili projectionlar üretti; sentetik ölçüm disk truth'ün yerine kullanılamaz.
+
+Bu dört finding otomatik MASTER admissionı, yeni ürün işi veya 4031 acceptance parçası değildir.
+Commit/push, XVerify, cleanup ve authenticated MASTER/Closure OS disposition yapılmadı.
+
 ## Kapanan outcome — SKILL_ROUTING_CONTROL_PLANE_P0
 
 **Disposition:** product contract `CLOSED / LOCAL_VERIFIED`; global provider runtime finding'i
@@ -89,20 +132,33 @@ yaklaşık 16 non-DONE düğümlü derin DAG kaldığını gösterdi. Owner 2026
 ürünü tamamlayarak ilerle; release-only daraltma yapılmaz. Faz isimleri dependency authority
 değildir: 3010 doğrudan 4030'u, 3030 ise 3020 ve aggregate 4000'i bekler. Yürütme sırası:
 
-1. `4030 OPERATION-001` kapanış-adayı DEĞİLDİR: güncel ratchet 742 effect site / 2 mediated /
-   740 unmediated gösterir. Önce gerçek user action'ları ile onları izleyen internal write/tool
-   effect'leri code-truth üzerinden ayrıştır; ortak operation/permission ingress'ine bağlanacak
-   parçaları bağımsız owner-admitted child outcome'lara böl ve DAG'ı yetkili biçimde güncelle.
-2. Bu child outcome'ları tek tek gerçek product wiring + live proof ile kapat; 4030 ancak bütün
-   kabul yüzeyi gerçekten mediated olduğunda authenticated disposition alabilir.
-3. `4030` gerçekten terminal olduktan sonra `3010 KERNEL-ONTOLOGY-001`, ardından
+1. `4030 OPERATION-001` owner-admitted child DAG'a ayrıldı (Alperen, 2026-08-29). Canlı audit
+   742 effect site / 2 syntactically-mediated / 740 unmediated gösterir; iki mediated işaret gerçek
+   transaction/permission kanıtı değil, file-level false-positive'dir. 4030 yalnız stable operation
+   identity, fail-closed resolution, invocation/transaction context ve causal effect attribution
+   üretir. Allow/deny + enforcement `4040 CAPABILITY-001`; approval authority
+   `4050 APPROVAL-001` kapsamıdır ve dependency yönü tersine çevrilmez.
+2. Foundation sırası: `4031 COVERAGE-MODEL` → `4032 CATALOG-CONVERGENCE` →
+   `4033 INVOCATION-CONTEXT` → `4034 EFFECT-CONTEXT`. Registry binding child'ları 4035–4038,
+   ilgili ingress propagation child'ları 4039 ve 4041–4045'tir. Runtime/governance/catalog-support
+   effect migrationı file-collision nedeniyle 4046→4047→4048→4049 sırasıyla tek yazıcı yürür.
+   `4057 CLOSURE-CONFORMANCE` bütün children terminal olmadan başlayamaz; parent 4030 ancak
+   4057 gerçek cross-surface proof ürettikten sonra authenticated disposition adayıdır.
+3. Her child: exact capsule/file authority → Goal/Mission/Flow/Run/Do → terminal settlement →
+   local scoped + gerekli real-binary proof → tek bağımsız read-only analysis checkpoint →
+   authenticated MASTER projection. Remote CI advisory'dir; aynı kanıtla audit tekrarlanmaz.
+4. **Owner-approved transition cleanup (2026-08-29):** her terminal child ile sıradaki child
+   arasında önce active sprint/worker/settlement olmadığı disk + CLI ground truth ile doğrulanır;
+   sonra yalnız resmi `deckent cleanup` yüzeyiyle terminal ve cleanup-eligible `.tasks` state'i
+   temizlenir. `rm .tasks/*` kullanılmaz; canlı/belirsiz state, durable receipt/evidence,
+   handoff artefaktı ve `.brain/memory.db` korunur. Cleanup sonrası readiness yeniden ölçülür;
+   herhangi bir authority/evidence kaybı veya canlı state varsa typed HOLD ile durulur.
+5. `4030` gerçekten terminal olduktan sonra `3010 KERNEL-ONTOLOGY-001`, ardından
    `3020 KERNEL-STATE-001` ayrı dependency-valid dogfood outcome'larıdır.
-4. `3030` öncesi `4000 AUTHORITY-001` aggregate kenarını code-truth ile çöz: minimum attempt
+6. `3030` öncesi `4000 AUTHORITY-001` aggregate kenarını code-truth ile çöz: minimum attempt
    authority ayrı canonical leaf ise authenticated DAG amendment; değilse 4000'in gerçekten
    zorunlu dependency zinciri önce kapanır. Aggregate parent sahte DONE yapılmaz.
-5. `3030 KERNEL-ATTEMPT-001`; ardından ölçülmüş Dalga 2 ve Dalga 3 sırası.
-6. Her outcome: exact capsule/file authority → Goal/Mission/Flow/Run/Do → terminal settlement →
-   local scoped + real-binary proof → authenticated MASTER projection. Remote CI advisory'dir.
+7. `3030 KERNEL-ATTEMPT-001`; ardından ölçülmüş Dalga 2 ve Dalga 3 sırası.
 
 ### 2. MASTER 6181 closure residual
 

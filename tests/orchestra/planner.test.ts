@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { EventEmitter } from 'node:events';
 import type { BrainContext, SprintSizeRecommendation, DebtItem, Task, ModelType } from '../../src/core/types.js';
 import type { ProviderAdapter } from '../../src/core/provider.js';
 
@@ -21,6 +22,7 @@ import {
   buildPlannerSpawnArgs,
   buildZeroConfigPlanPrompt,
   createPlannerTaskModelPolicy,
+  createPlannerSpawn,
   resolveAdapter,
   normalizePlannerDependencies,
   type PlannerSpawnFn,
@@ -33,10 +35,15 @@ import { buildParametricModel, modelRegistry } from '../../src/core/model-regist
 /** Hermetic PlannerSpawnFn fake: records every call, returns the canned
  *  outcome (per-call overrides supported for the retry path). */
 function makeSpawnFn(outcome: Partial<PlannerSpawnOutcome> = {}, perCall?: Array<Partial<PlannerSpawnOutcome>>) {
-  const calls: Array<{ command: string; args: string[]; timeoutMs: number }> = [];
+  const calls: Array<{ command: string; args: string[]; timeoutMs: number; stdin?: string }> = [];
   const fn: PlannerSpawnFn = async (command, args, opts) => {
     const idx = calls.length;
-    calls.push({ command, args: [...args], timeoutMs: opts.timeoutMs });
+    calls.push({
+      command,
+      args: [...args],
+      timeoutMs: opts.timeoutMs,
+      ...(opts.stdin === undefined ? {} : { stdin: opts.stdin }),
+    });
     return { status: 0, signal: null, stdout: validPlannerJSON, stderr: '', ...(perCall?.[idx] ?? outcome) };
   };
   return { fn, calls };
@@ -399,6 +406,20 @@ describe('buildPlannerSpawnArgs', () => {
     expect(result.args).not.toContain('--output-format');
   });
 
+  it('preserves provider-owned stdin without placing the prompt on argv', () => {
+    const prompt = `large-plan-${'x'.repeat(128 * 1024)}`;
+    const codexAdapter = makeCodexAdapter({
+      buildPlannerCommand: () => ({
+        command: 'codex',
+        args: ['exec', '--model', 'gpt-5.5'],
+        stdin: prompt,
+      }),
+    });
+    const result = buildPlannerSpawnArgs(codexAdapter, prompt, 'gpt-5.5');
+    expect(result.stdin).toBe(prompt);
+    expect(result.args).not.toContain(prompt);
+  });
+
   it('prefers a provider-native planner invocation over subprocess command construction', async () => {
     const execute = vi.fn().mockResolvedValue({
       status: 0,
@@ -481,6 +502,115 @@ describe('buildPlannerSpawnArgs', () => {
       buildCommand: vi.fn().mockReturnValue(''),
     });
     expect(() => buildPlannerSpawnArgs(adapter, 'test', 'claude-opus-4-8')).toThrow(/empty buildCommand/);
+  });
+});
+
+describe('createPlannerSpawn', () => {
+  function fakeChild() {
+    const child = new EventEmitter() as EventEmitter & {
+      stdout: EventEmitter & { setEncoding: ReturnType<typeof vi.fn> };
+      stderr: EventEmitter & { setEncoding: ReturnType<typeof vi.fn> };
+      stdin: EventEmitter & { end: ReturnType<typeof vi.fn> };
+      kill: ReturnType<typeof vi.fn>;
+    };
+    child.stdout = Object.assign(new EventEmitter(), { setEncoding: vi.fn() });
+    child.stderr = Object.assign(new EventEmitter(), { setEncoding: vi.fn() });
+    child.stdin = Object.assign(new EventEmitter(), { end: vi.fn() });
+    child.kill = vi.fn();
+    return child;
+  }
+
+  it('uses the canonical win32 wrapper and carries large/metacharacter prompts only on stdin', async () => {
+    const child = fakeChild();
+    const spawnImpl = vi.fn(() => child) as never;
+    const plannerSpawn = createPlannerSpawn({ platform: 'win32', spawnImpl });
+    const prompt = `--plan $(not-a-command) & ${'x'.repeat(128 * 1024)}`;
+
+    const outcomePromise = plannerSpawn('codex', ['exec', '--model', 'gpt-5.5'], {
+      timeoutMs: 5_000,
+      stdin: prompt,
+    });
+    child.stdout.emit('data', '{"tasks":[]}');
+    child.emit('close', 0, null);
+
+    await expect(outcomePromise).resolves.toMatchObject({ status: 0, stdout: '{"tasks":[]}' });
+    expect(spawnImpl).toHaveBeenCalledWith(
+      'cmd.exe',
+      ['/c', 'codex', 'exec', '--model', 'gpt-5.5'],
+      { stdio: ['pipe', 'pipe', 'pipe'], shell: false },
+    );
+    expect(child.stdin.end).toHaveBeenCalledWith(prompt);
+    expect(spawnImpl.mock.calls[0]?.[1]).not.toContain(prompt);
+  });
+
+  it('spawns POSIX binaries directly and ignores stdin when no input is declared', async () => {
+    const child = fakeChild();
+    const spawnImpl = vi.fn(() => child) as never;
+    const plannerSpawn = createPlannerSpawn({ platform: 'linux', spawnImpl });
+
+    const outcomePromise = plannerSpawn('claude', ['-p', 'inline'], { timeoutMs: 5_000 });
+    child.emit('close', 0, null);
+
+    await expect(outcomePromise).resolves.toMatchObject({ status: 0 });
+    expect(spawnImpl).toHaveBeenCalledWith(
+      'claude',
+      ['-p', 'inline'],
+      { stdio: ['ignore', 'pipe', 'pipe'], shell: false },
+    );
+    expect(child.stdin.end).not.toHaveBeenCalled();
+  });
+
+  it('settles an early-exit stdin EPIPE once as a typed spawn error without crashing', async () => {
+    const child = fakeChild();
+    const spawnImpl = vi.fn(() => child) as never;
+    const plannerSpawn = createPlannerSpawn({ platform: 'linux', spawnImpl });
+    const prompt = 'x'.repeat(4 * 1024 * 1024);
+    const epipe = Object.assign(new Error('write EPIPE'), { code: 'EPIPE' });
+
+    const outcomePromise = plannerSpawn('codex', ['exec', '--model', 'gpt-5.5'], {
+      timeoutMs: 5_000,
+      stdin: prompt,
+    });
+    child.stdin.emit('error', epipe);
+    child.emit('close', 1, null);
+
+    await expect(outcomePromise).resolves.toMatchObject({
+      status: null,
+      signal: null,
+      error: expect.objectContaining({ code: 'EPIPE' }),
+    });
+    expect(child.kill).toHaveBeenCalledTimes(1);
+    expect(child.kill).toHaveBeenCalledWith('SIGTERM');
+    expect(child.stdin.end).toHaveBeenCalledTimes(1);
+    expect(child.stdin.end).toHaveBeenCalledWith(prompt);
+  });
+
+  it('preserves timeout classification when SIGTERM causes a later stdin EPIPE', async () => {
+    vi.useFakeTimers();
+    try {
+      const child = fakeChild();
+      const spawnImpl = vi.fn(() => child) as never;
+      const plannerSpawn = createPlannerSpawn({ platform: 'linux', spawnImpl });
+      const outcomePromise = plannerSpawn('codex', ['exec', '--model', 'gpt-5.5'], {
+        timeoutMs: 5_000,
+        stdin: 'x'.repeat(4 * 1024 * 1024),
+      });
+
+      await vi.advanceTimersByTimeAsync(5_000);
+      child.stdin.emit('error', Object.assign(new Error('write EPIPE'), { code: 'EPIPE' }));
+      child.emit('close', null, 'SIGTERM');
+
+      await expect(outcomePromise).resolves.toEqual({
+        status: null,
+        signal: 'SIGTERM',
+        stdout: '',
+        stderr: '',
+      });
+      expect(child.kill).toHaveBeenCalledTimes(1);
+      expect(child.kill).toHaveBeenCalledWith('SIGTERM');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -616,6 +746,22 @@ describe('callZeroConfigPlanner', () => {
 
     expect(calls[0]!.command).toBe('codex');
     expect(calls[0]!.args).toEqual(expect.arrayContaining(['--model', modelRegistry.resolveApiId('gpt-5.5')]));
+  });
+
+  it('forwards provider-owned stdin through the zero-config planner dispatch', async () => {
+    const adapter = makeCodexAdapter({
+      buildPlannerCommand: (prompt, model) => ({
+        command: 'codex',
+        args: ['exec', '--model', model],
+        stdin: prompt,
+      }),
+    });
+    const { fn, calls } = makeSpawnFn();
+
+    await callZeroConfigPlanner('Exact stdin plan', 'gpt-5.5', 'test-project', [], adapter, undefined, fn);
+
+    expect(calls[0]!.stdin).toContain('Exact stdin plan');
+    expect(calls[0]!.args.join(' ')).not.toContain('Exact stdin plan');
   });
 
   it('resolves the registered model-owning adapter when no adapter is passed', async () => {

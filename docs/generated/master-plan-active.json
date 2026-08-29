@@ -3,15 +3,15 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "a607476660334739b4769445cb2b9e6104e761963f49169699c87a0cc25aabc4"
+    "value": "3bfae494edde79d4c6de9a4315392498a6f53534bb0ba14c8005c1b3a6b5e1e8"
   },
   "summary": {
-    "total": 543,
-    "active": 458,
+    "total": 562,
+    "active": 477,
     "terminal": 85,
     "receipts": 211,
     "byState": {
-      "OPEN": 346,
+      "OPEN": 365,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
@@ -21,14 +21,14 @@
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 338,
+      "P0": 357,
       "P1": 155,
       "P2": 50
     },
     "byProgram": {
       "API": 5,
-      "ASSURANCE": 16,
-      "AUTHORITY": 49,
+      "ASSURANCE": 17,
+      "AUTHORITY": 67,
       "CODEX": 44,
       "CONNECTOR": 3,
       "COST": 5,
@@ -3053,7 +3053,7 @@
       "state": "OPEN",
       "updated": "2026-08-28",
       "definitionDigest": "db0d8c55eac878ec4e6d7ced446373c893c46840e4f98f672699df4f6e7eef12",
-      "progressDigest": "46595bebd17775f49cab9fb63383c8d8092e2828c6632487c7138cbed373660e",
+      "progressDigest": "6e325fbf70bda1bbd0cc6c62bc51dbaa1f930a1e1068b0967dedb3b3f2efd768",
       "terminalClosureDigest": null
     },
     {
@@ -3810,9 +3810,108 @@
       "program": "AUTHORITY",
       "priority": "P0",
       "state": "VERIFY",
-      "updated": "2026-08-12",
+      "updated": "2026-08-29",
       "definitionDigest": "80cb5e3f81853ae422cae53f38582ab95f0be6ba938af204223f2a8e20124913",
-      "progressDigest": "cfe75388bd052608fd47d4aee500d429275afd07b6227daeec1dfe83bf3f4323",
+      "progressDigest": "6e0ecb2d151014750aae63b6e2cc166150a1795ba51c9d1b4eb093ac9c469052",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4031,
+      "id": "OPERATION-COVERAGE-MODEL-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-29",
+      "definitionDigest": "57c93f57fbc055a60cc582049c1ee99e14362814194d5446e4f85fa0ee991b24",
+      "progressDigest": "bc4def68120759c681f79e510c57e154ae13e8e639cc12359b8cab01380a9f94",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4032,
+      "id": "OPERATION-CATALOG-CONVERGENCE-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-29",
+      "definitionDigest": "3bdc50b6fef3c278a352b48db8eafdeeb9bc6249e4ae40878f8565c3629b0178",
+      "progressDigest": "03c161357a402282fedcdddc62a1147684ccd1c2897f94381b631cb9a6b881ac",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4033,
+      "id": "OPERATION-INVOCATION-CONTEXT-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-29",
+      "definitionDigest": "695b3187262d4b5ef002698c0645f79e4ef117e005d0a8d81cc14199f3e75b9d",
+      "progressDigest": "64e76d3435224c0e92be29d67cb928b127d9e1ab879f83f815172e8001c7c661",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4034,
+      "id": "OPERATION-EFFECT-CONTEXT-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-29",
+      "definitionDigest": "142d669a0399ea90509d921d50a6ca145a4483597c14e345e662caa306ade4aa",
+      "progressDigest": "7953d21ab73a26eabf2c4793cf1bc74345ca1a7f7747c9c2449120dc1cec30a2",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4035,
+      "id": "OPERATION-CLI-REGISTRY-BINDING-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-29",
+      "definitionDigest": "e41f58fb8650383c3306787135eae5b0a3b5e5546b9bba7e4619b0b96f6d4161",
+      "progressDigest": "ecf3b1538dcbe64db4f0cbe234af862d1d8859e0e9c963b92c74f29e73817ec9",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4036,
+      "id": "OPERATION-MCP-REGISTRY-BINDING-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-29",
+      "definitionDigest": "eecf7b3cca4af0d6fd3d2b7dba30739dbe0e37a1e9b55473e93e22befdd90b72",
+      "progressDigest": "081ebd5e61d24ef97e561bbc821ff35870646adf7786efc36fe060802d00e183",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4037,
+      "id": "OPERATION-TERM-RPC-REGISTRY-BINDING-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-29",
+      "definitionDigest": "de3a63883fb063aee0a472d90886dbb0497543e40a27d3255ebfe2ff8d3d5099",
+      "progressDigest": "c18af64eb1be9ca7377243a40fc0404a2e91dd8d5670585edc020093a2a8d762",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4038,
+      "id": "OPERATION-AGENT-TOOL-REGISTRY-BINDING-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-29",
+      "definitionDigest": "c3adf4aa46dfd4abad195f3f99e8eac718e39d36ceedf773e0904f4c86c269d1",
+      "progressDigest": "ca2466a3a1e31981d8c1f73b99b3ec9d70238561288b2b86c2258674db1214e6",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4039,
+      "id": "OPERATION-CLI-INVOCATION-WIRE-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-29",
+      "definitionDigest": "63c84d5aca7a16353bac65aaeac23d8345f557fcc5981fed12ec576a1ca2ed52",
+      "progressDigest": "61644d3369b5ddee8e7f23ce05790277b813c4a682830cceb5ac941537839c0e",
       "terminalClosureDigest": null
     },
     {
@@ -3824,6 +3923,105 @@
       "updated": "2026-08-09",
       "definitionDigest": "0867ff7c16856c6db497929e25eee6926cca597f5b8f3136bf4b25b1699d8759",
       "progressDigest": "b1185112edc40170efda382e657a42d88923a4fe21dfb3f130a89f9893bc2e27",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4041,
+      "id": "OPERATION-DESKTOP-TERMINAL-INVOCATION-WIRE-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-29",
+      "definitionDigest": "d70f3584fe14a63191a44d39528a4079a85ef1f33f9a69b0a248e24ecc4c3bea",
+      "progressDigest": "98ebe802ab60696b5956623df02e60855f6e4777789f618cc476602be9f6d84e",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4042,
+      "id": "OPERATION-MCP-INVOCATION-WIRE-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-29",
+      "definitionDigest": "aef180d70d90129b1cf7fe88a6b75d773c5da82b72bb30c8a7fe2b6b249af551",
+      "progressDigest": "64cd6f0577a4f963b05a8fd5b693a11b8c799b84ff4d1d9a2efa1e7fce662994",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4043,
+      "id": "OPERATION-REMOTE-INVOCATION-WIRE-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-29",
+      "definitionDigest": "3b8c3ab100cf17e446e1263cf26939b3e77f1a78d1118c0c0eaf4c85fe42b966",
+      "progressDigest": "b6b17a8b99d1fb9a718b649491131d18de216d9dc4a4f7865cfded3dffeb8ac0",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4044,
+      "id": "OPERATION-AGENT-TOOL-INVOCATION-WIRE-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-29",
+      "definitionDigest": "57f769ba1c718a655b882bdccebddd0f760b009841e00110fcb6b4461e8f3cc2",
+      "progressDigest": "1c08cd86e2318e888e44f249cb1b326ac8cf0e774920e6f916b1e5488006e733",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4045,
+      "id": "OPERATION-SYSTEM-TRIGGER-IDENTITY-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-29",
+      "definitionDigest": "fb6dbcece7ba6a97acaefd524ebd69dd4a9f4c99fec2274718920bf08ae360fd",
+      "progressDigest": "350cfbef2da4a13eaa9e97bc0ab72503583cff6ba8aac948f93efd5293f48a64",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4046,
+      "id": "OPERATION-RUNTIME-EFFECT-MIGRATION-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-29",
+      "definitionDigest": "2d93aebb6edd31c07385ba68d3981adc5a392f8d056a1823caca4517d05be918",
+      "progressDigest": "73ac0eb5a04274fae9a15b8e74996c67a24971c53cbc2c2a4c9a5f1efb6aefbf",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4047,
+      "id": "OPERATION-GOVERNANCE-EFFECT-MIGRATION-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-29",
+      "definitionDigest": "c4b79da63e035374dc55f3385d708e612913b46838e3f52c84b4d1fd0f8ed024",
+      "progressDigest": "874f4da78eced0787740edece2521706340334cfdb43d1a374c1f404416b23c0",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4048,
+      "id": "OPERATION-CATALOG-CONFIG-EFFECT-MIGRATION-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-29",
+      "definitionDigest": "97961ea6fea2d64f5d2e1f207adf26d8b12e9201ed5a1a7d22ec2029116b8b73",
+      "progressDigest": "1e387a9db0c0b08281dbda265b90e87cfa6ad0f668a3b9881884b4cb8c200543",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4049,
+      "id": "OPERATION-SUPPORT-EFFECT-MIGRATION-001",
+      "program": "AUTHORITY",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-29",
+      "definitionDigest": "d3b8abf3488afff5c0aefc6cc9c3db364eae7a6a6bf4fd62252bf002f1719886",
+      "progressDigest": "90591c6792b992a19a4c6000bf672b76100517687938ab6fd587b5ab61cf5fad",
       "terminalClosureDigest": null
     },
     {
@@ -3865,9 +4063,9 @@
       "program": "AUTHORITY",
       "priority": "P0",
       "state": "VERIFY",
-      "updated": "2026-08-24",
+      "updated": "2026-08-28",
       "definitionDigest": "9f1889561d84a710a34806cc3eaaab84a54f9817a594ad749c948c9fb04a7494",
-      "progressDigest": "8718eb979cf00b3801e1139141b4fc23a6f35bd1ac51ab02985ec02905afb380",
+      "progressDigest": "fe6086dca7863fb122a9adae7401367882632907254c762ba498682a3cbe9cb7",
       "terminalClosureDigest": null
     },
     {
@@ -3901,6 +4099,17 @@
       "updated": "2026-08-26",
       "definitionDigest": "0ba1e6d63b6ff3abadcae7bd8b826ddaf101d318664313d9590cef3e0cb93208",
       "progressDigest": "2dd48eb335c055ffe45d169d0eb5af7b1526abf660fbc0208522f1c7f8d4a57b",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 4057,
+      "id": "OPERATION-CLOSURE-CONFORMANCE-001",
+      "program": "ASSURANCE",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-29",
+      "definitionDigest": "af1efc7b00d4d88189d9274d61348284e24479eb89a0f8313858a0633ae74718",
+      "progressDigest": "8e671a7ffa9bb452a71a1d15b5613d04e3ff55c6370a81ba9c1ad680eecc45ee",
       "terminalClosureDigest": null
     },
     {
@@ -17733,7 +17942,7 @@
       ],
       "evidenceReceipts": [],
       "acceptance": "Planner represents source verification and post-settlement build/binary proof as separate authority stages; a sprint that forbids build while active never creates an impossible built-CLI dependency or spends FIX retries on stale `dist/`",
-      "evidence": "Sprint-487 task 006 and its FIX failed because tasks 001–005 changed source while active-sprint policy correctly prohibited build. Supervisor proved the required typed seam by compiling after containment and passing the real binary contract, then settled the lineage with explicit manual-recovery evidence. Automatic planning/stage transition remains open; no in-sprint build bypass is accepted; 2026-08-28 ÖLÇÜM DÜZELTMESİ (state flip YOK, yalnız bayat kanıt gerçeğe hizalandı): bu hücre 2026-07-31'de yazıldı ve satırın kendi alanındaki üretim kodunun 2026-08-11'de landed olduğunu hiç anmıyordu — `src/core/post-settlement-verification.ts` (provider-neutral post-settlement binary-verification kontratı), `src/orchestra/planner.ts` içindeki \"Proof-Staging Validation Stage (519-004, row 3275)\" bloğu ve `src/orchestra/task-builder.ts` içindeki `classifyBuiltBinaryProofDemand` / `stageBuiltBinaryProofObligation` / `stageDirectiveProofObligations` seti sprint-519 dalgasıyla (`dffb6df25`, 2026-08-11) geldi; yani C hücresinin `0` olması artık gerçeği yansıtmıyor ve Truth `~/0/...` olarak düzeltildi. Kapanış için gereken gerçek iş bu düzeltmeyle daralıyor ve tam olarak üç kalemdir: (1) `lintProofStaging` bugün yalnız test tarafından çağrılıyor, üretim çağıranı yok — bağlanmadan W kapanmaz; (2) `stageDirectiveProofObligations` üretim yolunda `enforce` argümanı geçilmeden çağrıldığı için varsayılan `enforced:false` ile çalışır, yani in-sprint imkânsız built-CLI bağımlılığı bugün reddedilmez, yalnız uyarılır — E bu yüzden kısmi; (3) iki fixture (`tests/orchestra/planner-smoke-e2e.test.ts` içindeki `dist/cli/entry.js` smoke beyanı) enforce açılınca kırılacak şekilde duruyor ve migrate edilmedi. L için stale-`dist` senaryosunun canlı kanıtı hâlâ üretilmedi. Kaynak: 2026-08-28 iki paralel read-only denetim + ana-şerit disk doğrulaması (`git log -S` ile landing commit'i teyit edildi)",
+      "evidence": "Sprint-487 task 006 and its FIX failed because tasks 001–005 changed source while active-sprint policy correctly prohibited build. Supervisor proved the required typed seam by compiling after containment and passing the real binary contract, then settled the lineage with explicit manual-recovery evidence. Automatic planning/stage transition remains open; no in-sprint build bypass is accepted; 2026-08-28 ÖLÇÜM DÜZELTMESİ (state flip YOK, yalnız bayat kanıt gerçeğe hizalandı): bu hücre 2026-07-31'de yazıldı ve satırın kendi alanındaki üretim kodunun 2026-08-11'de landed olduğunu hiç anmıyordu — `src/core/post-settlement-verification.ts` (provider-neutral post-settlement binary-verification kontratı), `src/orchestra/planner.ts` içindeki \"Proof-Staging Validation Stage (519-004, row 3275)\" bloğu ve `src/orchestra/task-builder.ts` içindeki `classifyBuiltBinaryProofDemand` / `stageBuiltBinaryProofObligation` / `stageDirectiveProofObligations` seti sprint-519 dalgasıyla (`dffb6df25`, 2026-08-11) geldi; yani C hücresinin `0` olması artık gerçeği yansıtmıyor ve Truth `~/0/...` olarak düzeltildi. Kapanış için gereken gerçek iş bu düzeltmeyle daralıyor ve tam olarak üç kalemdir: (1) `lintProofStaging` bugün yalnız test tarafından çağrılıyor, üretim çağıranı yok — bağlanmadan W kapanmaz; (2) `stageDirectiveProofObligations` üretim yolunda `enforce` argümanı geçilmeden çağrıldığı için varsayılan `enforced:false` ile çalışır, yani in-sprint imkânsız built-CLI bağımlılığı bugün reddedilmez, yalnız uyarılır — E bu yüzden kısmi; (3) enforce açılınca kırılacak fixture bugün TEK: `tests/orchestra/planner-smoke-e2e.test.ts` (satır 196/233/245, in-sprint `dist/cli/entry.js` smoke beyanı) migrate edilmedi — `ProofStagingOptions.enforce` docstring'inin ikinci engelleyici olarak saydığı `tests/orchestra/planner-smoke-wire.test.ts` 2026-08-26'da `d25b2ddb1` (approved phase-b suite consolidation) ile SİLİNMİŞ; dolayısıyla hem bu hücrenin hem kaynak docstring'in \"iki fixture\" ifadesi bayattır ve enforce-engeli ölçülmüş olarak yarıya inmiştir (2026-08-28 epoch-3 ölçümü; docstring düzeltmesi kaynak-kodu işidir, Dalga 0 kapsamı dışında bırakıldı). L için stale-`dist` senaryosunun canlı kanıtı hâlâ üretilmedi. Kaynak: 2026-08-28 iki paralel read-only denetim + ana-şerit disk doğrulaması (`git log -S` ile landing commit'i teyit edildi)",
       "updated": "2026-08-28"
     },
     {
@@ -19515,7 +19724,27 @@
         "NAIVE-COOPETITION-001",
         "P02-639"
       ],
-      "children": [],
+      "children": [
+        "OPERATION-COVERAGE-MODEL-001",
+        "OPERATION-CATALOG-CONVERGENCE-001",
+        "OPERATION-INVOCATION-CONTEXT-001",
+        "OPERATION-EFFECT-CONTEXT-001",
+        "OPERATION-CLI-REGISTRY-BINDING-001",
+        "OPERATION-MCP-REGISTRY-BINDING-001",
+        "OPERATION-TERM-RPC-REGISTRY-BINDING-001",
+        "OPERATION-AGENT-TOOL-REGISTRY-BINDING-001",
+        "OPERATION-CLI-INVOCATION-WIRE-001",
+        "OPERATION-DESKTOP-TERMINAL-INVOCATION-WIRE-001",
+        "OPERATION-MCP-INVOCATION-WIRE-001",
+        "OPERATION-REMOTE-INVOCATION-WIRE-001",
+        "OPERATION-AGENT-TOOL-INVOCATION-WIRE-001",
+        "OPERATION-SYSTEM-TRIGGER-IDENTITY-001",
+        "OPERATION-RUNTIME-EFFECT-MIGRATION-001",
+        "OPERATION-GOVERNANCE-EFFECT-MIGRATION-001",
+        "OPERATION-CATALOG-CONFIG-EFFECT-MIGRATION-001",
+        "OPERATION-SUPPORT-EFFECT-MIGRATION-001",
+        "OPERATION-CLOSURE-CONFORMANCE-001"
+      ],
       "gates": [
         "G2",
         "G1"
@@ -19532,15 +19761,407 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [],
+      "closureBlockedBy": [
+        "OPERATION-COVERAGE-MODEL-001",
+        "OPERATION-CATALOG-CONVERGENCE-001",
+        "OPERATION-INVOCATION-CONTEXT-001",
+        "OPERATION-EFFECT-CONTEXT-001",
+        "OPERATION-CLI-REGISTRY-BINDING-001",
+        "OPERATION-MCP-REGISTRY-BINDING-001",
+        "OPERATION-TERM-RPC-REGISTRY-BINDING-001",
+        "OPERATION-AGENT-TOOL-REGISTRY-BINDING-001",
+        "OPERATION-CLI-INVOCATION-WIRE-001",
+        "OPERATION-DESKTOP-TERMINAL-INVOCATION-WIRE-001",
+        "OPERATION-MCP-INVOCATION-WIRE-001",
+        "OPERATION-REMOTE-INVOCATION-WIRE-001",
+        "OPERATION-AGENT-TOOL-INVOCATION-WIRE-001",
+        "OPERATION-SYSTEM-TRIGGER-IDENTITY-001",
+        "OPERATION-RUNTIME-EFFECT-MIGRATION-001",
+        "OPERATION-GOVERNANCE-EFFECT-MIGRATION-001",
+        "OPERATION-CATALOG-CONFIG-EFFECT-MIGRATION-001",
+        "OPERATION-SUPPORT-EFFECT-MIGRATION-001",
+        "OPERATION-CLOSURE-CONFORMANCE-001"
+      ],
       "evidenceReceipts": [
         "GR-2026-08-06-DESIGN-DOCS-01",
         "GR-2026-08-07-OPERATION-O1-01",
         "GR-2026-08-08-OPERATION-O3-01"
       ],
       "acceptance": "Every mutation/read/tool action maps to stable operation ID, risk and effect class",
-      "evidence": "Code-truth audit found no canonical catalog; 2026-08-06 TASARIM-ARTIFACT'I (Dalga-1 paralel, Alperen karar-turu): docs/analysis/operation-catalog-authority-design-2026-08-06.md — şema v1 + zorunlu tüketim zinciri + O1-O5 dilimleme + D1-D3 owner karar noktaları; `receipt=GR-2026-08-06-DESIGN-DOCS-01`; 2026-08-06 MAKİNE-BULGUSU-4: O1 admission'ı dependency-vetolu — DependsOn PRINCIPAL-001 DONE değil (P1a advisory teslim edildi, DONE için E=1 enforce + L=1 gerçek-binary şart). Dalga-3'ün gerçek kapısı P1b'dir; D1-D3 kararları (Tam-8 şema, sayaç-ratchet, JSON+üretilen-tip) kayıtlı ve P1b kapanınca O1 aynen kesilir; `receipt=GR-2026-08-07-OPERATION-O1-01`; O1 admission 2026-08-07 (Dalga-3 başlangıcı — PRINCIPAL DONE ile dependency-veto düştü); 2026-08-07 O1 SETTLEMENT: kanonik katalog kuruldu — sekiz alanlı şema izlenen catalog.v1.json'da (ilk aile fs+memory, 6 operasyon), typed okuyucu + Op.* üretilen sabitleri (0-hardcode), yeni lint-operation-catalog fail-closed doğrular (benzersiz dot-hiyerarşik id, enum üyelikleri, effect→gate MİNİMUM matrisi, capabilities'in work-model sözlüğünde varlığı, i18n tamlığı, sabit-katalog birebir örtüşmesi) ve lint:gates zincirine eklendi; bilinmeyen op id'si typed UnknownOperationError ile fail-closed; `proof=operation-catalog-suite-9of9-and-lint-green`; katalog suite 9/9, lint yeşil, tsc temiz; ingress-kapsam zorlaması (sayaç-ratchet) O3, capability/tool-scope tüketimi O4 dilimidir; `receipt=GR-2026-08-08-OPERATION-O3-01`; O3 SETTLEMENT 2026-08-08 (owner Q&A: report-only baseline, fs-write/delete tanımı): ingress-açığı ÖLÇÜLDÜ — 673 fs-write/delete site / 233 dosya / 0 katalog-aracılı (resolveOperation'ın hiç üretim tüketicisi yoktu); scripts/audit-operation-ingress report-only (lint:gates'e EKLENMEDİ), operation-ingress-baseline.json frozen zemin, npm audit script'i; `proof=operation-o3-673sites-0mediated-4pins-report-only`; AÇIK typed-residual (satır VERIFY): CI-blocking ratchet enablement, op.memory + op.fs.read aileleri, gerçek resolveOperation ingress-tüketimi = real grant 2026-08-12 owner kararı (agresif eritme): bu satırın atıf verdiği analiz dosyası operation-catalog-authority-design-2026-08-06.md delete-on-consume ile silindi; içeriğin özü bu satırın kendi kanıt zincirinde yaşıyor, tam metin git-history'de (follow-up-works/operation-catalog-authority-design-2026-08-06.md)",
-      "updated": "2026-08-12"
+      "evidence": "Code-truth audit found no canonical catalog; 2026-08-06 TASARIM-ARTIFACT'I (Dalga-1 paralel, Alperen karar-turu): docs/analysis/operation-catalog-authority-design-2026-08-06.md — şema v1 + zorunlu tüketim zinciri + O1-O5 dilimleme + D1-D3 owner karar noktaları; `receipt=GR-2026-08-06-DESIGN-DOCS-01`; 2026-08-06 MAKİNE-BULGUSU-4: O1 admission'ı dependency-vetolu — DependsOn PRINCIPAL-001 DONE değil (P1a advisory teslim edildi, DONE için E=1 enforce + L=1 gerçek-binary şart). Dalga-3'ün gerçek kapısı P1b'dir; D1-D3 kararları (Tam-8 şema, sayaç-ratchet, JSON+üretilen-tip) kayıtlı ve P1b kapanınca O1 aynen kesilir; `receipt=GR-2026-08-07-OPERATION-O1-01`; O1 admission 2026-08-07 (Dalga-3 başlangıcı — PRINCIPAL DONE ile dependency-veto düştü); 2026-08-07 O1 SETTLEMENT: kanonik katalog kuruldu — sekiz alanlı şema izlenen catalog.v1.json'da (ilk aile fs+memory, 6 operasyon), typed okuyucu + Op.* üretilen sabitleri (0-hardcode), yeni lint-operation-catalog fail-closed doğrular (benzersiz dot-hiyerarşik id, enum üyelikleri, effect→gate MİNİMUM matrisi, capabilities'in work-model sözlüğünde varlığı, i18n tamlığı, sabit-katalog birebir örtüşmesi) ve lint:gates zincirine eklendi; bilinmeyen op id'si typed UnknownOperationError ile fail-closed; `proof=operation-catalog-suite-9of9-and-lint-green`; katalog suite 9/9, lint yeşil, tsc temiz; ingress-kapsam zorlaması (sayaç-ratchet) O3, capability/tool-scope tüketimi O4 dilimidir; `receipt=GR-2026-08-08-OPERATION-O3-01`; O3 SETTLEMENT 2026-08-08 (owner Q&A: report-only baseline, fs-write/delete tanımı): ingress-açığı ÖLÇÜLDÜ — 673 fs-write/delete site / 233 dosya / 0 katalog-aracılı (resolveOperation'ın hiç üretim tüketicisi yoktu); scripts/audit-operation-ingress report-only (lint:gates'e EKLENMEDİ), operation-ingress-baseline.json frozen zemin, npm audit script'i; `proof=operation-o3-673sites-0mediated-4pins-report-only`; AÇIK typed-residual (satır VERIFY): CI-blocking ratchet enablement, op.memory + op.fs.read aileleri, gerçek resolveOperation ingress-tüketimi = real grant 2026-08-12 owner kararı (agresif eritme): bu satırın atıf verdiği analiz dosyası operation-catalog-authority-design-2026-08-06.md delete-on-consume ile silindi; içeriğin özü bu satırın kendi kanıt zincirinde yaşıyor, tam metin git-history'de (follow-up-works/operation-catalog-authority-design-2026-08-06.md); **2026-08-29 OWNER-ADMITTED CHILD DAG:** canlı audit `742 total / 2 syntactically-mediated / 740 unmediated` üretir; iki mediated işaret file-level false-positive olup principal/tenant/resource/environment, invocation veya permission receipt taşımaz. 4030 yalnız stable `operationId@version`, fail-closed resolution, nötr invocation/transaction/correlation/causation context'i ve durable effect causal attributionını kapatır; allow/deny ve enforcement 4040 CAPABILITY-001'e, approval authority 4050 APPROVAL-001'e aittir. Child closure 4031-4039, 4041-4049 ve 4057 satırlarına ayrıldı; bütün children terminal olmadan 4030 disposition adayı değildir. Owner authority: 2026-08-29 canlı kabul; read-only Checkpoint A/B: `GO child DAG / NO-GO mega-patch`",
+      "updated": "2026-08-29"
+    },
+    {
+      "order": 4031,
+      "id": "OPERATION-COVERAGE-MODEL-001",
+      "parent": "OPERATION-001",
+      "program": "AUTHORITY",
+      "outcome": "Semantic action/effect coverage model and fail-closed ratchet",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [
+        "OPERATION-CATALOG-CONVERGENCE-001",
+        "OPERATION-CLOSURE-CONFORMANCE-001"
+      ],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Action registry ve internal effect envanterleri AST binding-provenance + stable call-site ID taşır; file-level promotion, dead resolve, aggregate compensation ve site substitution PASS edemez; read/write/delete, DB/memory, process, provider/network ve tool effect taxonomy ayrı ölçülür",
+      "evidence": "Owner admission 2026-08-29; canlı zemin 742/2/740 fakat semantic mediated kanıtı 0; landed test 740/0 beklentisiyle stale",
+      "updated": "2026-08-29"
+    },
+    {
+      "order": 4032,
+      "id": "OPERATION-CATALOG-CONVERGENCE-001",
+      "parent": "OPERATION-001",
+      "program": "AUTHORITY",
+      "outcome": "Versioned operation catalog convergence across action registries",
+      "priority": "P0",
+      "dependsOn": [
+        "OPERATION-COVERAGE-MODEL-001"
+      ],
+      "dependents": [
+        "OPERATION-AGENT-TOOL-REGISTRY-BINDING-001",
+        "OPERATION-CLI-REGISTRY-BINDING-001",
+        "OPERATION-CLOSURE-CONFORMANCE-001",
+        "OPERATION-INVOCATION-CONTEXT-001",
+        "OPERATION-MCP-REGISTRY-BINDING-001",
+        "OPERATION-SYSTEM-TRIGGER-IDENTITY-001",
+        "OPERATION-TERM-RPC-REGISTRY-BINDING-001"
+      ],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "OPERATION-COVERAGE-MODEL-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Her registered action stable operationId ve version taşır; cross-surface eşdeğerleri aynı canonical kimliğe iner; unknown, ambiguous veya version-mismatch registration fail-closed olur; generated types ve i18n catalog parity korunur",
+      "evidence": "Owner admission 2026-08-29; mevcut catalog altı operation, CLI/MCP/TERM-RPC/agent registryleri ayrı truth yüzeyleri",
+      "updated": "2026-08-29"
+    },
+    {
+      "order": 4033,
+      "id": "OPERATION-INVOCATION-CONTEXT-001",
+      "parent": "OPERATION-001",
+      "program": "AUTHORITY",
+      "outcome": "Canonical operation invocation and transaction identity context",
+      "priority": "P0",
+      "dependsOn": [
+        "OPERATION-CATALOG-CONVERGENCE-001"
+      ],
+      "dependents": [
+        "OPERATION-AGENT-TOOL-INVOCATION-WIRE-001",
+        "OPERATION-CLI-INVOCATION-WIRE-001",
+        "OPERATION-CLOSURE-CONFORMANCE-001",
+        "OPERATION-DESKTOP-TERMINAL-INVOCATION-WIRE-001",
+        "OPERATION-EFFECT-CONTEXT-001",
+        "OPERATION-MCP-INVOCATION-WIRE-001",
+        "OPERATION-REMOTE-INVOCATION-WIRE-001",
+        "OPERATION-SYSTEM-TRIGGER-IDENTITY-001"
+      ],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "OPERATION-CATALOG-CONVERGENCE-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Invocation, transaction, attempt, correlation ve causation kimlikleri principal, tenant, resource, environment, idempotency ve operationId@version referanslarıyla tek typed envelope taşır; context allow/deny üretmez ve 4040/4050 için nötr policy input olur",
+      "evidence": "Owner admission 2026-08-29; 4030 permission veya approval authority üstlenmez",
+      "updated": "2026-08-29"
+    },
+    {
+      "order": 4034,
+      "id": "OPERATION-EFFECT-CONTEXT-001",
+      "parent": "OPERATION-001",
+      "program": "AUTHORITY",
+      "outcome": "Platform-neutral durable-effect causal attribution substrate",
+      "priority": "P0",
+      "dependsOn": [
+        "OPERATION-INVOCATION-CONTEXT-001"
+      ],
+      "dependents": [
+        "OPERATION-AGENT-TOOL-INVOCATION-WIRE-001",
+        "OPERATION-CATALOG-CONFIG-EFFECT-MIGRATION-001",
+        "OPERATION-CLI-INVOCATION-WIRE-001",
+        "OPERATION-CLOSURE-CONFORMANCE-001",
+        "OPERATION-DESKTOP-TERMINAL-INVOCATION-WIRE-001",
+        "OPERATION-GOVERNANCE-EFFECT-MIGRATION-001",
+        "OPERATION-MCP-INVOCATION-WIRE-001",
+        "OPERATION-REMOTE-INVOCATION-WIRE-001",
+        "OPERATION-RUNTIME-EFFECT-MIGRATION-001",
+        "OPERATION-SUPPORT-EFFECT-MIGRATION-001",
+        "OPERATION-SYSTEM-TRIGGER-IDENTITY-001"
+      ],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "OPERATION-INVOCATION-CONTEXT-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Her durable effect parent invocation veya doğrulanmış typed system invocation taşır; raw adapter dışından context-less effect reddedilir; Linux, macOS, Windows-native ve WSL adapterları aynı contractı uygular; catalog lookup authorization sayılmaz",
+      "evidence": "Owner admission 2026-08-29; operation-file-authority bugün yalnız atomic mechanics + process-once catalog assertion taşır",
+      "updated": "2026-08-29"
+    },
+    {
+      "order": 4035,
+      "id": "OPERATION-CLI-REGISTRY-BINDING-001",
+      "parent": "OPERATION-001",
+      "program": "AUTHORITY",
+      "outcome": "CLI command registry operation binding",
+      "priority": "P0",
+      "dependsOn": [
+        "OPERATION-CATALOG-CONVERGENCE-001"
+      ],
+      "dependents": [
+        "OPERATION-CLI-INVOCATION-WIRE-001",
+        "OPERATION-CLOSURE-CONFORMANCE-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "OPERATION-CATALOG-CONVERGENCE-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Her executable CLI command, alias ve action-specific flag canonical operationId@version ve resource resolver taşır; group/read/mixed/mutating ayrımı command-contract parity gate'inde fail-closed doğrulanır",
+      "evidence": "Owner admission 2026-08-29; mevcut 269-row CLI contract yeniden icat edilmeden genişletilir",
+      "updated": "2026-08-29"
+    },
+    {
+      "order": 4036,
+      "id": "OPERATION-MCP-REGISTRY-BINDING-001",
+      "parent": "OPERATION-001",
+      "program": "AUTHORITY",
+      "outcome": "MCP tool registry operation binding",
+      "priority": "P0",
+      "dependsOn": [
+        "OPERATION-CATALOG-CONVERGENCE-001"
+      ],
+      "dependents": [
+        "OPERATION-CLOSURE-CONFORMANCE-001",
+        "OPERATION-MCP-INVOCATION-WIRE-001",
+        "OPERATION-REMOTE-INVOCATION-WIRE-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "OPERATION-CATALOG-CONVERGENCE-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Her registered MCP tool operationId@version, resource resolver ve mevcut side-effect/idempotency annotations paritysi taşır; unmapped registration fail-closed olur",
+      "evidence": "Owner admission 2026-08-29; mevcut 51-tool canonical catalog authority olarak genişletilir",
+      "updated": "2026-08-29"
+    },
+    {
+      "order": 4037,
+      "id": "OPERATION-TERM-RPC-REGISTRY-BINDING-001",
+      "parent": "OPERATION-001",
+      "program": "AUTHORITY",
+      "outcome": "Terminal RPC method registry operation binding",
+      "priority": "P0",
+      "dependsOn": [
+        "OPERATION-CATALOG-CONVERGENCE-001"
+      ],
+      "dependents": [
+        "OPERATION-CLOSURE-CONFORMANCE-001",
+        "OPERATION-DESKTOP-TERMINAL-INVOCATION-WIRE-001",
+        "OPERATION-REMOTE-INVOCATION-WIRE-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "OPERATION-CATALOG-CONVERGENCE-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Her TERM-RPC method stable operationId@version, resource resolution ve risk/effect paritysi taşır; transport method adı authority üretmez",
+      "evidence": "Owner admission 2026-08-29; mevcut yedi method independent registry surface'tir",
+      "updated": "2026-08-29"
+    },
+    {
+      "order": 4038,
+      "id": "OPERATION-AGENT-TOOL-REGISTRY-BINDING-001",
+      "parent": "OPERATION-001",
+      "program": "AUTHORITY",
+      "outcome": "Agent tool-definition operation binding",
+      "priority": "P0",
+      "dependsOn": [
+        "OPERATION-CATALOG-CONVERGENCE-001"
+      ],
+      "dependents": [
+        "OPERATION-AGENT-TOOL-INVOCATION-WIRE-001",
+        "OPERATION-CLOSURE-CONFORMANCE-001"
+      ],
+      "children": [],
+      "gates": [
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "OPERATION-CATALOG-CONVERGENCE-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "ToolDefinition ve bütün native/provider adapters operation ref, version ve resource resolver taşır; missing mapping dispatch öncesi typed HOLD olur; tool capability kararı 4040'a bırakılır",
+      "evidence": "Owner admission 2026-08-29; native loop ve chat dispatcher bugün operation catalogdan bağımsızdır",
+      "updated": "2026-08-29"
+    },
+    {
+      "order": 4039,
+      "id": "OPERATION-CLI-INVOCATION-WIRE-001",
+      "parent": "OPERATION-001",
+      "program": "AUTHORITY",
+      "outcome": "CLI and REPL invocation-context propagation",
+      "priority": "P0",
+      "dependsOn": [
+        "OPERATION-INVOCATION-CONTEXT-001",
+        "OPERATION-EFFECT-CONTEXT-001",
+        "OPERATION-CLI-REGISTRY-BINDING-001"
+      ],
+      "dependents": [
+        "OPERATION-CATALOG-CONFIG-EFFECT-MIGRATION-001",
+        "OPERATION-CLOSURE-CONFORMANCE-001",
+        "OPERATION-GOVERNANCE-EFFECT-MIGRATION-001",
+        "OPERATION-RUNTIME-EFFECT-MIGRATION-001",
+        "OPERATION-SUPPORT-EFFECT-MIGRATION-001"
+      ],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "OPERATION-INVOCATION-CONTEXT-001",
+        "OPERATION-EFFECT-CONTEXT-001",
+        "OPERATION-CLI-REGISTRY-BINDING-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Merkezi CLI/REPL dispatch her gerçek action için tek invocation context üretip downstream effectlere taşır; alias, subcommand, dry-run ve apply aynı semantic action kimliğini doğru varyantla çözer; permission mantığı değişmez",
+      "evidence": "Owner admission 2026-08-29; ingress propagation downstream writer migrationından ayrı outcome'dur",
+      "updated": "2026-08-29"
     },
     {
       "order": 4040,
@@ -19593,6 +20214,438 @@
       "acceptance": "Principal, tenant, operation, resource and environment resolve one scoped capability decision",
       "evidence": "Existing catalogs are fragmented; `receipt=GR-2026-08-08-CAPABILITY-DESIGN-G1-01`; `receipt=GR-2026-08-09-CAPABILITY-DESIGN-G1-SUPP-01`; DESIGN+G1 DİLİMİ 2026-08-09 (satır OPEN kalır — acceptance'ın kendisi residual): kod-truth capability broker dispatch için wired ama authority için DEAD-BY-DEFAULT — tek least-privilege gate yalnız enforce_least_privilege veya denialAudit geçilince armed olur, iki üretim callsite'ı (runtime-loop, process-runtime) hiçbirini geçmez ve dispatch grantedCapabilities de geçmez, yani verb-handler çözülüp çağrılır ve hiçbir şey gate'lenmez. Beş girdiden (principal tenant operation resource environment) yalnız principal-role artı tenant kısmi (gate kapalı olduğu için atıl), operation resource environment hiç girmez; ~10 parçalı decider, 4 rol seti, 3 permission sözlüğü (broker developer ile worker-matrix engineer somut çelişkisi). G2 artifact birleşik beş-girdi karar kontratını, KARAR-verici rol reconciliation'ı (kanonik viewer-developer-operator-admin; engineer eşittir developer alias; RBAC'a developer satırı çünkü can() tanınmayan rolü DENY eder; unknown rol deny) ve advisory-first'ten fail-closed'a migration merdivenini (önce rol sözlüğü çöker, sonra operation-capability köprüsü, sonra tenant-resource-environment threading, en son enforce_least_privilege default-off'tan default-on'a) tanımlar. G1 resolveCapabilityEnforcement predicate gate posture'ını tipler ve dead-gate gerçeğini process-başına-bir advisory ile surface eder (debugLog ERRORS.md 600-satır penceresine yazdığından steady-state uyarı her construction'da basılmaz). `proof=capability-design-artifact-plus-dead-gate-advisory-80-green`; 3 pin artı 1 mekanik-baseline-supp. AÇIK typed-residual: beş girdinin uçtan uca tek resolveCapability kararına çözümü, rol-unification implementasyonu, grantedCapabilities'in dispatch'e threading'i, gerçek fail-closed grant artı default-on flip — her biri ayrı owner-onaylı dilim",
       "updated": "2026-08-09"
+    },
+    {
+      "order": 4041,
+      "id": "OPERATION-DESKTOP-TERMINAL-INVOCATION-WIRE-001",
+      "parent": "OPERATION-001",
+      "program": "AUTHORITY",
+      "outcome": "Desktop and Terminal invocation-context propagation",
+      "priority": "P0",
+      "dependsOn": [
+        "OPERATION-INVOCATION-CONTEXT-001",
+        "OPERATION-EFFECT-CONTEXT-001",
+        "OPERATION-TERM-RPC-REGISTRY-BINDING-001"
+      ],
+      "dependents": [
+        "OPERATION-CATALOG-CONFIG-EFFECT-MIGRATION-001",
+        "OPERATION-CLOSURE-CONFORMANCE-001",
+        "OPERATION-GOVERNANCE-EFFECT-MIGRATION-001",
+        "OPERATION-RUNTIME-EFFECT-MIGRATION-001",
+        "OPERATION-SUPPORT-EFFECT-MIGRATION-001"
+      ],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "OPERATION-INVOCATION-CONTEXT-001",
+        "OPERATION-EFFECT-CONTEXT-001",
+        "OPERATION-TERM-RPC-REGISTRY-BINDING-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Desktop IPC ve Terminal RPC central dispatch aynı operation context contractını taşır; window/channel adı authority değildir; focus, preference ve execution effectleri semantic action ile causal bağlıdır",
+      "evidence": "Owner admission 2026-08-29; transport wiring policy decisiondan ayrı tutulur",
+      "updated": "2026-08-29"
+    },
+    {
+      "order": 4042,
+      "id": "OPERATION-MCP-INVOCATION-WIRE-001",
+      "parent": "OPERATION-001",
+      "program": "AUTHORITY",
+      "outcome": "MCP invocation-context propagation",
+      "priority": "P0",
+      "dependsOn": [
+        "OPERATION-INVOCATION-CONTEXT-001",
+        "OPERATION-EFFECT-CONTEXT-001",
+        "OPERATION-MCP-REGISTRY-BINDING-001"
+      ],
+      "dependents": [
+        "OPERATION-CATALOG-CONFIG-EFFECT-MIGRATION-001",
+        "OPERATION-CLOSURE-CONFORMANCE-001",
+        "OPERATION-GOVERNANCE-EFFECT-MIGRATION-001",
+        "OPERATION-RUNTIME-EFFECT-MIGRATION-001",
+        "OPERATION-SUPPORT-EFFECT-MIGRATION-001"
+      ],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "OPERATION-INVOCATION-CONTEXT-001",
+        "OPERATION-EFFECT-CONTEXT-001",
+        "OPERATION-MCP-REGISTRY-BINDING-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "MCP central dispatcher authenticated ingress contextini catalog operation ve resource resolution ile birleştirir; tool handler context olmadan çalışmaz; capability/approval verdictlerini değiştirmez",
+      "evidence": "Owner admission 2026-08-29; MCP registry ve runtime propagation ayrı closure'dur",
+      "updated": "2026-08-29"
+    },
+    {
+      "order": 4043,
+      "id": "OPERATION-REMOTE-INVOCATION-WIRE-001",
+      "parent": "OPERATION-001",
+      "program": "AUTHORITY",
+      "outcome": "API, RPC and connector invocation-context propagation",
+      "priority": "P0",
+      "dependsOn": [
+        "OPERATION-INVOCATION-CONTEXT-001",
+        "OPERATION-EFFECT-CONTEXT-001",
+        "OPERATION-MCP-REGISTRY-BINDING-001",
+        "OPERATION-TERM-RPC-REGISTRY-BINDING-001"
+      ],
+      "dependents": [
+        "OPERATION-CATALOG-CONFIG-EFFECT-MIGRATION-001",
+        "OPERATION-CLOSURE-CONFORMANCE-001",
+        "OPERATION-GOVERNANCE-EFFECT-MIGRATION-001",
+        "OPERATION-RUNTIME-EFFECT-MIGRATION-001",
+        "OPERATION-SUPPORT-EFFECT-MIGRATION-001"
+      ],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "OPERATION-INVOCATION-CONTEXT-001",
+        "OPERATION-EFFECT-CONTEXT-001",
+        "OPERATION-MCP-REGISTRY-BINDING-001",
+        "OPERATION-TERM-RPC-REGISTRY-BINDING-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "API/RPC/connector ingress verified principal, tenant ve resource referansını canonical operation contextine bağlar; transport header/channel/session kendi başına operation veya authority üretemez; cross-tenant confused-deputy negatifleri pass olur",
+      "evidence": "Owner admission 2026-08-29; remote surfaces one-context parity ile kapanır",
+      "updated": "2026-08-29"
+    },
+    {
+      "order": 4044,
+      "id": "OPERATION-AGENT-TOOL-INVOCATION-WIRE-001",
+      "parent": "OPERATION-001",
+      "program": "AUTHORITY",
+      "outcome": "Agent and tool runtime invocation-context propagation",
+      "priority": "P0",
+      "dependsOn": [
+        "OPERATION-INVOCATION-CONTEXT-001",
+        "OPERATION-EFFECT-CONTEXT-001",
+        "OPERATION-AGENT-TOOL-REGISTRY-BINDING-001"
+      ],
+      "dependents": [
+        "OPERATION-CATALOG-CONFIG-EFFECT-MIGRATION-001",
+        "OPERATION-CLOSURE-CONFORMANCE-001",
+        "OPERATION-GOVERNANCE-EFFECT-MIGRATION-001",
+        "OPERATION-RUNTIME-EFFECT-MIGRATION-001",
+        "OPERATION-SUPPORT-EFFECT-MIGRATION-001"
+      ],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "OPERATION-INVOCATION-CONTEXT-001",
+        "OPERATION-EFFECT-CONTEXT-001",
+        "OPERATION-AGENT-TOOL-REGISTRY-BINDING-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Native loop, worker/provider adapters ve chat dispatcher her tool callı operation ref + resource + parent attempt contextiyle taşır; read/write/edit/bash/git/MCP aileleri mapping bypass edemez; permission enforcement 4040'a aittir",
+      "evidence": "Owner admission 2026-08-29; operation resolution yetki verilmiş olduğu anlamına gelmez",
+      "updated": "2026-08-29"
+    },
+    {
+      "order": 4045,
+      "id": "OPERATION-SYSTEM-TRIGGER-IDENTITY-001",
+      "parent": "OPERATION-001",
+      "program": "AUTHORITY",
+      "outcome": "Autonomous and daemon system-trigger operation identity",
+      "priority": "P0",
+      "dependsOn": [
+        "OPERATION-CATALOG-CONVERGENCE-001",
+        "OPERATION-INVOCATION-CONTEXT-001",
+        "OPERATION-EFFECT-CONTEXT-001"
+      ],
+      "dependents": [
+        "OPERATION-CATALOG-CONFIG-EFFECT-MIGRATION-001",
+        "OPERATION-CLOSURE-CONFORMANCE-001",
+        "OPERATION-GOVERNANCE-EFFECT-MIGRATION-001",
+        "OPERATION-RUNTIME-EFFECT-MIGRATION-001",
+        "OPERATION-SUPPORT-EFFECT-MIGRATION-001"
+      ],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "OPERATION-CATALOG-CONVERGENCE-001",
+        "OPERATION-INVOCATION-CONTEXT-001",
+        "OPERATION-EFFECT-CONTEXT-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Autonomous, Nervous, recovery, scheduler, daemon ve monitor triggerları uydurma user yerine doğrulanmış system principal + stable system operation taşır; causal parent yoksa typed root-trigger policy ile açıkça doğar",
+      "evidence": "Owner admission 2026-08-29; silent synthetic-user fallback yasaktır",
+      "updated": "2026-08-29"
+    },
+    {
+      "order": 4046,
+      "id": "OPERATION-RUNTIME-EFFECT-MIGRATION-001",
+      "parent": "OPERATION-001",
+      "program": "AUTHORITY",
+      "outcome": "Runtime lifecycle durable-effect migration",
+      "priority": "P0",
+      "dependsOn": [
+        "OPERATION-EFFECT-CONTEXT-001",
+        "OPERATION-CLI-INVOCATION-WIRE-001",
+        "OPERATION-DESKTOP-TERMINAL-INVOCATION-WIRE-001",
+        "OPERATION-MCP-INVOCATION-WIRE-001",
+        "OPERATION-REMOTE-INVOCATION-WIRE-001",
+        "OPERATION-AGENT-TOOL-INVOCATION-WIRE-001",
+        "OPERATION-SYSTEM-TRIGGER-IDENTITY-001"
+      ],
+      "dependents": [
+        "OPERATION-CLOSURE-CONFORMANCE-001"
+      ],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "OPERATION-EFFECT-CONTEXT-001",
+        "OPERATION-CLI-INVOCATION-WIRE-001",
+        "OPERATION-DESKTOP-TERMINAL-INVOCATION-WIRE-001",
+        "OPERATION-MCP-INVOCATION-WIRE-001",
+        "OPERATION-REMOTE-INVOCATION-WIRE-001",
+        "OPERATION-AGENT-TOOL-INVOCATION-WIRE-001",
+        "OPERATION-SYSTEM-TRIGGER-IDENTITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Run/task/sprint/worker/lock/checkpoint/heartbeat/spawn effectleri causal invocation ve attempt identity taşır; retry/crash idempotency duplicate effect üretmez; lifecycle writerlar direct bypass yapamaz",
+      "evidence": "Owner admission 2026-08-29; K-family exact file manifests admission sırasında dondurulur ve sırayla yürür",
+      "updated": "2026-08-29"
+    },
+    {
+      "order": 4047,
+      "id": "OPERATION-GOVERNANCE-EFFECT-MIGRATION-001",
+      "parent": "OPERATION-001",
+      "program": "AUTHORITY",
+      "outcome": "Governance and security durable-effect migration",
+      "priority": "P0",
+      "dependsOn": [
+        "OPERATION-EFFECT-CONTEXT-001",
+        "OPERATION-CLI-INVOCATION-WIRE-001",
+        "OPERATION-DESKTOP-TERMINAL-INVOCATION-WIRE-001",
+        "OPERATION-MCP-INVOCATION-WIRE-001",
+        "OPERATION-REMOTE-INVOCATION-WIRE-001",
+        "OPERATION-AGENT-TOOL-INVOCATION-WIRE-001",
+        "OPERATION-SYSTEM-TRIGGER-IDENTITY-001"
+      ],
+      "dependents": [
+        "OPERATION-CLOSURE-CONFORMANCE-001"
+      ],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "OPERATION-EFFECT-CONTEXT-001",
+        "OPERATION-CLI-INVOCATION-WIRE-001",
+        "OPERATION-DESKTOP-TERMINAL-INVOCATION-WIRE-001",
+        "OPERATION-MCP-INVOCATION-WIRE-001",
+        "OPERATION-REMOTE-INVOCATION-WIRE-001",
+        "OPERATION-AGENT-TOOL-INVOCATION-WIRE-001",
+        "OPERATION-SYSTEM-TRIGGER-IDENTITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Principal, authority, approval, audit, receipt ve credential-store effectleri invocation/effect context taşır; bu child yalnız attribution wiring yapar, approval transition 4050 ve capability enforcement 4040 kapsamını değiştiremez",
+      "evidence": "Owner admission 2026-08-29; security stores için cross-tenant ve missing-context negative proof zorunlu",
+      "updated": "2026-08-29"
+    },
+    {
+      "order": 4048,
+      "id": "OPERATION-CATALOG-CONFIG-EFFECT-MIGRATION-001",
+      "parent": "OPERATION-001",
+      "program": "AUTHORITY",
+      "outcome": "Catalog, config, routing, training and provider effect migration",
+      "priority": "P0",
+      "dependsOn": [
+        "OPERATION-EFFECT-CONTEXT-001",
+        "OPERATION-CLI-INVOCATION-WIRE-001",
+        "OPERATION-DESKTOP-TERMINAL-INVOCATION-WIRE-001",
+        "OPERATION-MCP-INVOCATION-WIRE-001",
+        "OPERATION-REMOTE-INVOCATION-WIRE-001",
+        "OPERATION-AGENT-TOOL-INVOCATION-WIRE-001",
+        "OPERATION-SYSTEM-TRIGGER-IDENTITY-001"
+      ],
+      "dependents": [
+        "OPERATION-CLOSURE-CONFORMANCE-001"
+      ],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "OPERATION-EFFECT-CONTEXT-001",
+        "OPERATION-CLI-INVOCATION-WIRE-001",
+        "OPERATION-DESKTOP-TERMINAL-INVOCATION-WIRE-001",
+        "OPERATION-MCP-INVOCATION-WIRE-001",
+        "OPERATION-REMOTE-INVOCATION-WIRE-001",
+        "OPERATION-AGENT-TOOL-INVOCATION-WIRE-001",
+        "OPERATION-SYSTEM-TRIGGER-IDENTITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Config, skill, agent, routing, learning, training ve provider-state effectleri causal veya typed system context taşır; tenant/purpose boundaries korunur; cache/projection write success authority claimine dönüşmez",
+      "evidence": "Owner admission 2026-08-29; runtime/governance/support writers ile file ownership çakışması yasaktır",
+      "updated": "2026-08-29"
+    },
+    {
+      "order": 4049,
+      "id": "OPERATION-SUPPORT-EFFECT-MIGRATION-001",
+      "parent": "OPERATION-001",
+      "program": "AUTHORITY",
+      "outcome": "Support, monitor, connector and Desktop projection effect migration",
+      "priority": "P0",
+      "dependsOn": [
+        "OPERATION-EFFECT-CONTEXT-001",
+        "OPERATION-CLI-INVOCATION-WIRE-001",
+        "OPERATION-DESKTOP-TERMINAL-INVOCATION-WIRE-001",
+        "OPERATION-MCP-INVOCATION-WIRE-001",
+        "OPERATION-REMOTE-INVOCATION-WIRE-001",
+        "OPERATION-AGENT-TOOL-INVOCATION-WIRE-001",
+        "OPERATION-SYSTEM-TRIGGER-IDENTITY-001"
+      ],
+      "dependents": [
+        "OPERATION-CLOSURE-CONFORMANCE-001"
+      ],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "OPERATION-EFFECT-CONTEXT-001",
+        "OPERATION-CLI-INVOCATION-WIRE-001",
+        "OPERATION-DESKTOP-TERMINAL-INVOCATION-WIRE-001",
+        "OPERATION-MCP-INVOCATION-WIRE-001",
+        "OPERATION-REMOTE-INVOCATION-WIRE-001",
+        "OPERATION-AGENT-TOOL-INVOCATION-WIRE-001",
+        "OPERATION-SYSTEM-TRIGGER-IDENTITY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Monitor, connector, Desktop preference/cache, notification ve projection effectleri causal veya açık typed maintenance context taşır; internal maintenance user action gibi gösterilmez ve unexplained bypass kalmaz",
+      "evidence": "Owner admission 2026-08-29; K-family sequential file-authority closure",
+      "updated": "2026-08-29"
     },
     {
       "order": 4050,
@@ -19720,7 +20773,7 @@
         "C": "1",
         "W": "1",
         "E": "1",
-        "H": "?",
+        "H": "1",
         "L": "0",
         "X": "0",
         "S": "-"
@@ -19730,8 +20783,8 @@
       "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "An approval id absent from the durable pending queue is refused fail-closed at BOTH the API and MCP ingress — no decision is persisted, a typed APR_UNKNOWN_REQUEST is returned and the refusal is written to the durable audit trail; the loop park path and every read surface resolve one canonical pending-queue path",
-      "evidence": "`historical-authority=commit-b98c526b7;historical-gates=G1;proof=approval-t1-guard-typed403-parkread-pin-97-green`; APPROVAL-001'in API+MCP unknown-ID ingress dilimi burada VERIFY-able olarak carve edildi (owner 2026-08-08 kararı) — parent broker satırı G2-design + 7-yüzey kapsamıyla OPEN kalır, bu child yalnız G1 ingress'i kapsar. T1 dilimi PR 108 ile main'e girdi (merge commit b98c526b7 yukarıda pinlendi). Kapsam autonomous approval-adapter accept/reject fail-closed guard (taze disk pending.json artı in-memory yoksa karar YAZILMAZ, typed hata, red durable audit'e writeAuditEvent ile yazılır), API tipli 403, MCP tipli fail; advisor-hardening ile yedi ingress tek canonical autonomousPendingPath resolver'a indirildi ve park-read producer-consumer pin eklendi. `proof=approval-t1-97-tests-green-plus-lint-gates`. **LOCAL_VERIFIED + LIVE_PROVEN 2026-08-24:** canonical sprint-659 iki paralel acceptance taskı + fan-in ile 3/3 DONE ve terminal COMPLETE; API real compiled `serve` (control mutation policy explicit temp enablement) forged approve/reject çağrılarını HTTP 403 + typed `APR_UNKNOWN_REQUEST` ile reddetti, MCP real compiled stdio server iki tool çağrısını typed aynı kodla reddetti; iki yüzeyde decision dosyası oluşmadı ve durable `approval.unknown_request_rejected` audit kayıtları yazıldı. Birleşik scoped batarya 50/50, full lint ve `build:all` yeşil; canonical archive/terminal verify temiz (`manifestDigest=7c0fdf7edb20da0c1c0a766088d669cc4e3dda9cb61cc204f4f9519f6b370d76`). Child'ın real-binary residualı kapandı; decision-overwrite, CLI audit ve dashboard recentAudit parent `APPROVAL-001` kapsamındadır. Status Closure OS authenticated disposition beklediği için `VERIFY` korunur",
-      "updated": "2026-08-24"
+      "evidence": "`historical-authority=commit-b98c526b7;historical-gates=G1;proof=approval-t1-guard-typed403-parkread-pin-97-green`; APPROVAL-001'in API+MCP unknown-ID ingress dilimi burada VERIFY-able olarak carve edildi (owner 2026-08-08 kararı) — parent broker satırı G2-design + 7-yüzey kapsamıyla OPEN kalır, bu child yalnız G1 ingress'i kapsar. T1 dilimi PR 108 ile main'e girdi (merge commit b98c526b7 yukarıda pinlendi). Kapsam autonomous approval-adapter accept/reject fail-closed guard (taze disk pending.json artı in-memory yoksa karar YAZILMAZ, typed hata, red durable audit'e writeAuditEvent ile yazılır), API tipli 403, MCP tipli fail; advisor-hardening ile yedi ingress tek canonical autonomousPendingPath resolver'a indirildi ve park-read producer-consumer pin eklendi. `proof=approval-t1-97-tests-green-plus-lint-gates`. **LOCAL_VERIFIED + LIVE_PROVEN 2026-08-24:** canonical sprint-659 iki paralel acceptance taskı + fan-in ile 3/3 DONE ve terminal COMPLETE; API real compiled `serve` (control mutation policy explicit temp enablement) forged approve/reject çağrılarını HTTP 403 + typed `APR_UNKNOWN_REQUEST` ile reddetti, MCP real compiled stdio server iki tool çağrısını typed aynı kodla reddetti; iki yüzeyde decision dosyası oluşmadı ve durable `approval.unknown_request_rejected` audit kayıtları yazıldı. Birleşik scoped batarya 50/50, full lint ve `build:all` yeşil; canonical archive/terminal verify temiz (`manifestDigest=7c0fdf7edb20da0c1c0a766088d669cc4e3dda9cb61cc204f4f9519f6b370d76`). Child'ın real-binary residualı kapandı; decision-overwrite, CLI audit ve dashboard recentAudit parent `APPROVAL-001` kapsamındadır. Status Closure OS authenticated disposition beklediği için `VERIFY` korunur; **2026-08-28 H-ÖLÇÜMÜ (epoch-3 supervisor; state flip YOK, yalnız ölçülmemiş hücre ölçüldü):** H `?` (ölçülmedi) idi ve satırın kendi LOCAL_VERIFIED metniyle çelişiyordu. Yedi-ingress bataryası bugün bağımsız koşuldu — `tests/core/approval-broker.test.ts`, `tests/orchestra/autonomous-approval-adapter.test.ts`, `tests/orchestra/approval-decision-federation.test.ts`, `tests/orchestra/autonomous/approval-redrive.test.ts`, `tests/orchestra/autonomous/approval-lifecycle.test.ts`, `tests/mcp/autonomous-approval.test.ts`, `tests/api/autonomous-endpoint.test.ts` → 7 dosya / 78 test yeşil, exit 0, hermetik ve provider-free (`VITEST_MAX_FORKS=2`) → H=`?`→`1`; `proof=approval-4053-ingress-battery-78of78-hermetic-2026-08-28`. AÇIK ÇELİŞKİ (owner kararına bırakıldı, bu turda ÇÖZÜLMEDİ): hücre `LIVE_PROVEN` ve \"child'ın real-binary residualı kapandı\" diyor; sprint-659 arşivi diskte doğrulandı (terminal `COMPLETE` 2026-08-24T15:29:37Z, seal state `applied`, `manifestDigest` hücredeki değerle birebir) — buna rağmen L=`0` duruyor. L bu turda DEĞİŞTİRİLMEDİ: taze gerçek-binary koşusu bu oturumda yapılmadı ve geçmiş receipt'e dayanarak L yükseltmek kalite barına aykırıdır",
+      "updated": "2026-08-28"
     },
     {
       "order": 4054,
@@ -19861,6 +20914,76 @@
       "acceptance": "Kabul: D1 federated-inbox (tek list TUM pending'i origin'li gosterir, davranis-degisimi sifir) → D2a/b karar-federasyonu (parity-pinli, legacy decide delege) → D3 kanal-tamamlama (Telegram/Slack/Teams relay CANLI + VSCode decide wired + gercek-cihaz kaniti) → D4 TTL/SLA normalizasyonu (suresiz-pending sinifi kalmaz) → D5 legacy-emeklilik + i18n-borc kapanisi; her dilim xverify-muhurlu (owner sarti: tasarim+uygulama+sonuc)",
       "evidence": "ERKEN-DILIM KANITLARI ARSIVDE: docs/archive/evidence-2026-08/APPROVAL-SURFACE-UNIFICATION-001-evidence-archive-2026-08-21.md (receipt'ler ve dilim-ayrintilari orada; bu hucre yalniz aktif/son dilimleri tasir). **D2b-1 UYGULANDI (ABSORBE; tam dilim-kanıtı arşiv-dosyasında — 2026-08-26 kapasite-taşıması).** **D5-GENISLEME (sprint-591 DOGFOOD-FABRIKA 6-gorevlik BUYUK-paket, 2026-08-20):** gate/MCP/API yuzeylerindeki kalan Ingilizce insan-okur metinler kataloga tasindi — src/core/cost-gate.ts (cost_gate.*) · src/orchestra/prompt-gate.ts (prompt_gate.*) · src/core/scope-gate.ts (scope_gate.*) · src/mcp/tools/autonomous.ts (autonomous.*) · src/mcp/tools/start.ts (mcp.start.*) · src/api/server.ts approvals-route hatalari (api.approvals.*; YENI hermetik tests/api/approvals-endpoint.test.ts katalog-kaynagini pinler); typed kodlar/payload alan-adlari literal kaldi; messages.ts YALNIZ ek (mevcut anahtar degismedi). Fabrika: 6/6 DONE, 0 debt, 0 NO_GO, 0 fix-turu, 29dk56sn; messages.ts collision-serilesmesi + nervous SCOPE_COLLISION_REORDER onayi tasarlandigi gibi. Brain-dogrulama: tsc 0 · 12 test-dosyasi 181 passed/1 skip · 5 dosyada insan-okur hardcode-grep 0 · server.ts diff'i yalniz approvals-bolgesi (15 satir). Sonuc-muhru: codex CONFIRMED `cross-verify-verdict:sha256:7337ea0e211df6f27dda125184ab5a538d5af1ff81e80f66d61fe1c042ccf541` (muhur-notu: 2 hakem-bos-yanit + 2 truncation-UNCLEAR — kanit diff+7-tam-dosyadan dar-dilim-iddiaya daraltilarak asildi; buyuk-diff paketlerinde dilim-kaniti varsayilandir). **DE2b/D2b-2a UYGULANDI 2026-08-20 (RULES-ENGINE OTOMATIK-KARAR — ABSORBE, staged authorityRef-ayrimi):** src/core/approval-rules-engine.ts — REQUEST_KIND_TIERS frozen otomasyon-allowlist'i (YALNIZ provider-evidence-probe→routine; mirror/bilinmeyen kind ASLA), liveRuleFor her cagirida fresh-load + fault→hic-otomasyon, RuleEngineApprovalAuthenticator rule:<id> aktorunu approval-rules-engine:v1 authorityRef'iyle mint eder (sessionRef=rules-dosyasi sha256; isSessionActive canli-kural+digest yeniden-turetir → disable/sil/edit in-flight karari ANINDA oldurur — sokulebilirlik karar-aninda). Karar AYNI ApprovalDecisionIngress+MAC-zarfindan (kanal 'rules-engine', decidedBy rule:<id> gorunur-otomasyon); runtime.decideByRules + CLI `approvals rules apply` (idempotencyKey rules-engine:<id>:<action>). Ingress'te cifte-ayrimli (rule:-onek + engine-authorityRef) dar istisna YALNIZ userId-esitligini atlar; tenant/MAC/expiry/digest-session AYNEN. CANLI-KANIT IKI GERCEK BUTUNLESME-DEFEKTI YAKALADI (testler yesilken): (a) decide() on-kontrolu actorId===userId'yi TUM aktorlere zorluyordu → rule-dali eklendi; (b) tuketici-tarafi (probe-claim validation) rule-zarfini tanimiyordu (approval_untrusted HOLD) → ApprovalDecisionAuthority opsiyonel ruleSessions authenticator'i + authorityRef-yonlendirmeli validate (verilmemisse rule-zarfi fail-closed) + runtime wiring. Yeni END-TO-END pinler: gercek broker+ingress'ten decided rule-zarfi + tuketici-uclusu (wired-guvenir/unwired-fail-closed/kural-silinince-guven-olur); batarya 23/23, tsc 0, hermetic digest-only x2. GERCEK-BINARY UCTAN-UCA KANIT (.analysis/xverify/d2b2a-result-proof.txt): pending aprp #HQGQ0 `deckent approvals rules apply` ile KURALLA karara baglandi — diskteki zarf decidedBy rule:rule-xv-probe-allow / channel rules-engine / authorityRef approval-rules-engine:v1 / gercek integrityMac (approval-key-0001); bayat isteklere typed expired (karar YOK); sonuc-muhru kosusunun KENDISI kural-onayli probe zincirinden CONFIRMED gecti. Ayrica 9+1 zombi pseudo-TTY auto-approve watcher'i (onceki pencere artiklari, suresiz her-aprp-onayi) tespit edilip olduruldu — motorun cozdugu problemin canli ornegi: watcher yerine izlenebilir-sokulebilir kural. MUHURLER — uygulama: codex CONFIRMED `cross-verify-verdict:sha256:22014611bf365d40ef8af2112350161a18ee5d0acf0904fa003262e8fc6e4417`; sonuc: codex CONFIRMED `cross-verify-verdict:sha256:ea7e826cd5c83b1cc924ff2c4d3a6342dcc447d59c938082da96e52a0baeac92`. **D2b-2a MIKRO-WIRING KAPANDI + D2b-2b IPTAL 2026-08-21 (owner: 'kuyrugu D3+DE3'e kadar hallet'):** xverify onay-poll'u artik her tick'te rules-engine'i DENER — cross-verify-evidence-preparation DECISION_NOT_FOUND dalinda liveRuleFor+decideByRules (fail-soft: kural yoksa/red olursa insan-yolu AYNEN; motor yalniz ayni MAC'li ingress'ten karar EKLEYEBILIR, asla bloklayamaz; yeni pin 9/9, tsc 0) — pseudo-TTY onay-watcher'larinin urunlesmis emekliligi. D2b-2b tam `kind:'rule'` union'u IPTAL: staged authorityRef-ayrimi uc canli yuzeyde (CLI rules apply + tuketici-dogrulama + poll-wiring) yeterli kanitlandi; ayri union ikinci-mekanizma olurdu (KANUN 10 absorbe-ilkesi). **D3+DE3 UYGULANDI 2026-08-21 (5 fabrika-dalgasi sprint-599..603 + canli-defekt el-fix'leri; GERCEK-CIHAZ KANITLI):** (a) callback-sozlesmesi dk1:<ns>:<action>:<kisakod>:<nonce> (64B-alti; ham-id payload'a binmez; legacy-parse geriye-uyum; bot/brk ad-uzayi ayrimi olculmus yanlis-gate dogruluk-hatasini kapatti); (b) ChannelLiveApprovalAuthenticator (risk 5→3 tier: critical mint-etmez/view-only, high/medium elevated, low/none routine; oda-yetkisi mint+validate'te canli; tek-kullanimlik nonce) + ingress 4. slot + decideChannel; (c) uc relay-karti (telegram/slack/teams) kart-uclusu kaynak·neden·#kod + critical deep-link; (d) bot-surecinde broker-relay CANLI (relay_enabled tuketicisi; pending-push) + brk-karar zinciri; (e) y/n grameri + DE1 resolveShortCode absorbe; (f) VS Code decide iki-uc (sunucu ingress-yollu — dogrudan broker.decide 0-isabet; istemci decideApproval + panel-aksiyonlari, critical-aksiyonsuz); (g) orphan-delisting (approval-clients-wire + approval-telegram) + kanal-i18n en+tr. GERCEK-CIHAZ: owner Telegram-basisi disk-zarfina dustu — decidedBy channel:telegram:7374744018 / authorityRef approval-channel:v1 (.analysis/xverify/d3-de3-result-proof.txt); canli-dongu IKI defekt yakalatti (principal-vs-request userId esitligi [kaldirildi + LIVE-DEFECT pin]; eksik chat-binding + yaniltici unauthorized-metni [binding guest-operator dogru-siniflandirildi + i18n nedene-gore ikiye ayrildi + bot tier-onkontrolu]). Bataryalar kumulatif 826/826 (90 dosya), tsc 0; MAC'siz karar-yolu kalmadi. Fabrika-dersi: gorev-Test'inde repo-global tsc paralel-yarista yanlis-NO_GO uretir — sablon dalga-sonu-Brain'e tasindi. Sonuc-muhru: codex CONFIRMED `cross-verify-verdict:sha256:ff305ff28aec6e35a33d0a8b276249e30688d882e1e2ab691dcec7b6b1d04afc` (muhur-kosusunun KENDI aprp'leri kural-motoruyla otomatik-decided — D2b-2a mikro-wiring canli-urun kaniti). ACIK-RESIDUAL (durust): Slack/Teams kod-tam fakat gercek app-provizyonu owner-isi (transport-secret'lari .deck'e owner yazar; gercek-cihaz kaniti kanal-basina D3-exit sarti yalniz Telegram'da alindi); OTP/verify-bind tam-kimliklendirme ayri-dilim; riskTier-zarf dilimi (§3.1) D4 kapsaminda **D4 UYGULAMA + LOCAL_VERIFIED 2026-08-21:** origin-bazli config-resolved TTL/SLA, versioned v1/v2 contract, expiry-aware FWW CAS, durable SLA/outbox, confirmation UNDECIDABLE park, autonomous no-replay, pairing no-grant, broker timeout receipt parity, shared riskTier ve read-only MCP projection production zincirinde kapandi. Root kaniti: tsc 0; D4 battery 65 dosya 298/298; 10k pairing 290.3ms ve ikinci sweep no-op; authority-ratchet+diff-check; build:all; dist CLI/API; bot stop-build-start running. Startup smoke mevcut receipt'lerde tekrar-fsync amplification'ini yakaladi; valid receipt read-only restart authority yapildi ve read-only-dir regresyonuyla pinlendi. Ayrinti ve exact komutlar: docs/archive/evidence-2026-08/APPROVAL-SURFACE-UNIFICATION-001-evidence-archive-2026-08-21.md D4 bolumu. Formal Opus xverify `xv-1787330284838-fe68ecaf-d8fb-46f3-87fc-872ab5fe0a15` provider-tier admission'da typed HOLD oldu; seal SAYILMADI, owner karariyla toplu analize ertelendi. **D4 DISCOVERY-PURITY IKINCI-KATMAN + FORMAL MUHUR 2026-08-25 (epoch-3):** pending-approvals read-yolu saf-projection oldu (EXPIRE-SWEEP read-hook emekli; status/bot-poll approval-state'e YAZAMAZ) ve uc orphan authority-gate (acceptance-confirmation, approval-lifecycle, recovery-truth) lint:gates+script-registry'ye kayitli-yesil; formal muhur CONFIRMED `cross-verify-verdict:sha256:cfeaae188a83736857e829247eb23560dc06ef7732f12fa3fa4466a0a633e028` (verifier claude-opus-5, bounded --target kaniti; xverify-boru-hatti onarimi hostTerminalProjection cutover-fix'iyle). Parent 4056 D4-lifecycle enabled staged-rollout owner-karari ve D5 nedeniyle OPEN kalir. 2026-08-25 config-audit: CFG-004 CRITICAL — CLI/MCP checkpoint approve/reject broker-bypass direct-JSON-mutation (exact detay memo config-completion-audit-2026-08-26.md §4); MCP read-only korunur; CFG-017 consent-vocabulary D-serisinde 2026-08-26 APPROVAL-SURFACE AUDIT ADMISSION (lane/approval-audit-20260826 @9425719e8, frozen-base 9a05b96b6, validator 227/227 bağımsız yeniden-koşum, allowlist-diff %100): APR-001..009 (3 CRITICAL) bu satırın D-serisine bağlandı — D4 discovery-purity API-GET/watcher/nervous-list/gateway-list'i kapsamıyor (APR-001), checkpoint direct-JSON sürüyor (APR-002), MCP negative-space isim-değiştirmiş karar-araçlarıyla delik (APR-003), federation additive/legacy-side-entrance'lar authoritative (APR-004), inbox 7-origin evreni eksik (APR-005), süresiz-pending sınıfları (APR-006), kanal-consumer wiring REVISE (APR-007), VSCode idempotency-eksik (APR-008), consent-vocabulary drift'i (APR-009); exact-diff'ler branch DRIFT-REGISTER'ında — D5 uygulama-dalgalarının girdisi",
       "updated": "2026-08-26"
+    },
+    {
+      "order": 4057,
+      "id": "OPERATION-CLOSURE-CONFORMANCE-001",
+      "parent": "OPERATION-001",
+      "program": "ASSURANCE",
+      "outcome": "Operation catalog, ingress and causal-effect closure conformance",
+      "priority": "P0",
+      "dependsOn": [
+        "OPERATION-COVERAGE-MODEL-001",
+        "OPERATION-CATALOG-CONVERGENCE-001",
+        "OPERATION-INVOCATION-CONTEXT-001",
+        "OPERATION-EFFECT-CONTEXT-001",
+        "OPERATION-CLI-REGISTRY-BINDING-001",
+        "OPERATION-MCP-REGISTRY-BINDING-001",
+        "OPERATION-TERM-RPC-REGISTRY-BINDING-001",
+        "OPERATION-AGENT-TOOL-REGISTRY-BINDING-001",
+        "OPERATION-CLI-INVOCATION-WIRE-001",
+        "OPERATION-DESKTOP-TERMINAL-INVOCATION-WIRE-001",
+        "OPERATION-MCP-INVOCATION-WIRE-001",
+        "OPERATION-REMOTE-INVOCATION-WIRE-001",
+        "OPERATION-AGENT-TOOL-INVOCATION-WIRE-001",
+        "OPERATION-SYSTEM-TRIGGER-IDENTITY-001",
+        "OPERATION-RUNTIME-EFFECT-MIGRATION-001",
+        "OPERATION-GOVERNANCE-EFFECT-MIGRATION-001",
+        "OPERATION-CATALOG-CONFIG-EFFECT-MIGRATION-001",
+        "OPERATION-SUPPORT-EFFECT-MIGRATION-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "OPERATION-COVERAGE-MODEL-001",
+        "OPERATION-CATALOG-CONVERGENCE-001",
+        "OPERATION-INVOCATION-CONTEXT-001",
+        "OPERATION-EFFECT-CONTEXT-001",
+        "OPERATION-CLI-REGISTRY-BINDING-001",
+        "OPERATION-MCP-REGISTRY-BINDING-001",
+        "OPERATION-TERM-RPC-REGISTRY-BINDING-001",
+        "OPERATION-AGENT-TOOL-REGISTRY-BINDING-001",
+        "OPERATION-CLI-INVOCATION-WIRE-001",
+        "OPERATION-DESKTOP-TERMINAL-INVOCATION-WIRE-001",
+        "OPERATION-MCP-INVOCATION-WIRE-001",
+        "OPERATION-REMOTE-INVOCATION-WIRE-001",
+        "OPERATION-AGENT-TOOL-INVOCATION-WIRE-001",
+        "OPERATION-SYSTEM-TRIGGER-IDENTITY-001",
+        "OPERATION-RUNTIME-EFFECT-MIGRATION-001",
+        "OPERATION-GOVERNANCE-EFFECT-MIGRATION-001",
+        "OPERATION-CATALOG-CONFIG-EFFECT-MIGRATION-001",
+        "OPERATION-SUPPORT-EFFECT-MIGRATION-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Semantic action coverage sıfır unmapped, effect coverage sıfır unexplained olur; per-site ratchet, replay/causality, every-environment ve gerçek CLI/MCP/API/Desktop/Terminal/agent/system binary kanıtları pass olur; ancak bundan sonra 4030 authenticated disposition adayıdır, 4040/4050 closureı iddia edilmez",
+      "evidence": "Owner admission 2026-08-29; Checkpoint A/B bağımsız hükmü child DAG GO, 740-site mega-patch NO-GO",
+      "updated": "2026-08-29"
     },
     {
       "order": 4060,
@@ -27418,6 +28541,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "252a630d91afbb9b2caa9cb8e02a8a4119a09fd78fa30b96f56a5f11a4cbc2ac"
+    "value": "2c326a6a0be5f2944e257640fdb6fa75267e84ab18dc46424199045bbd2e7214"
   }
 }

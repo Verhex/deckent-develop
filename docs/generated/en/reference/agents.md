@@ -5,7 +5,7 @@
 Agents are domain specialists that Brain assigns per task. Built-in agents live under `.deckent/agents/`; `temp-*` agents are runtime-generated and auto-promoted/demoted by the Evolution Pipeline.
 
 <!-- AUTOGEN:START id="agents-en" -->
-> 23 agents (21 built-in, 2 custom). Generated from `.deckent/agents/*/agent.json`.
+> 24 agents (22 built-in, 2 custom). Generated from `.deckent/agents/*/agent.json`.
 
 | Agent | Name | Expertise | Description |
 |-------|------|-----------|-------------|
@@ -32,4 +32,5 @@ Agents are domain specialists that Brain assigns per task. Built-in agents live 
 | `temp-react-specialist` | React Specialist | react, hooks, vite, component-architecture, css-modules | Expert in React component architecture, hooks, and state management. |
 | `temp-react-ts-specialist` | React TypeScript Specialist | react, typescript, hooks, vite, component-architecture | Expert in React + TypeScript component architecture, hooks, and testing with Vitest/RTL. |
 | `terminal-ux-engineer` | Terminal UX Engineer | ink-tui, terminal-rendering, raw-mode-input, cli-ux, i18n-strings | Ink/React-CLI terminal UI specialist. Static/anchor/input-pinned layout, raw-mode + NO_COLOR guards, string-free i18n-clean rendering, render-without-mounting Ink tests. |
+| `test-guardian` | Test Guardian | testing, hermetic-testing, test-repair, quality-ratchets, test-ledgers, coverage-integrity, build-verification, vitest | Build and test quality guardian for hermetic tests, aligned repairs, ratchets, ledgers, and honest coverage |
 <!-- AUTOGEN:END id="agents-en" -->

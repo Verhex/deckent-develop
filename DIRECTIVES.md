@@ -1,113 +1,60 @@
-# MASTER 6181 DİLİM-2: KAYNAK-ÇEKME · OLAY-GEÇMİŞİ · TÜRKÇE ALARM · WATCH SERVİSİ
+# MASTER 4031: OPERATION-COVERAGE-MODEL-001
 
-> Kaynak: `docs/governance/lane-briefs/competitive-intelligence-watch-2026-08-27.md` (owner-ADMIT
-> 2026-08-27), lane-brief Task 2. Dilim-1 (baseline karşılaştırma çekirdeği) landed — `types.ts`,
-> `baseline-catalog.ts`, `baseline.ts`, `competitor-universe.ts`, `terminology.ts`, `comparison.ts`,
-> `significance-gate.ts`, `alarm-prompt.ts` mevcut ve bu dilim onların üstüne kurulur.
-> Goal-v2 zamanlama, `deckent intelligence` CLI ve EN/TR docs DİLİM-3'tür; burada YAZILMAZ.
+> Owner-admitted 2026-08-29 child of `4030 OPERATION-001`. Exact outcome capsule:
+> `docs/execution/active/OPERATION-COVERAGE-MODEL-001.md`. This run has one product outcome,
+> one atomic implementation task, and exactly three product write paths.
 
 ## Goal
 
-Rakip sinyalini resmi kaynaklardan çeken, tarihsel olarak dedup eden, Türkçe kompakt alarm
-üreten ve bunu dayanıklı bir kutuya yazan servis katmanını kur. Ağ erişimi enjekte edilebilir
-bir `fetch` üzerinden olur; hiçbir test gerçek ağa çıkmaz.
+Upgrade the existing operation-ingress audit from file/count heuristics to a deterministic,
+site-granular semantic action/effect coverage model. Every coverage claim must carry AST binding
+provenance and a stable call-site identity. The audit must fail closed against file-level
+promotion, dead resolves, aggregate compensation, call-site substitution, unknown taxonomy, and
+ambiguous attribution. This child measures coverage; it does not grant permission or migrate
+runtime effects.
 
-Ürün karşılığı: bugün "rakip X şunu duyurdu" haberi geldiğinde onu Deckent'in kendi kanıt-bağlı
-cetveline karşı tartan, aynı olayı ikinci kez alarma dönüştürmeyen ve çökme sonrası tekrar
-göndermeyen bir yol yok. Bu dilim o yolu kurar.
+## Execution Contract
 
-## Execution contract
+- One task only. Do not split, parallelize, or create follow-up/FIX work outside this task's
+  exact three-file authority.
+- No new file or dependency. Preserve all unrelated worktree changes.
+- Hermetic test: isolated temp roots, asynchronous child process, no `spawnSync`, network,
+  external service, shared mutable fixture, or repository-source mutation.
+- Scope exclusions are binding: no permission/capability (`4040`), approval (`4050`), catalog
+  convergence (`4032`), invocation/effect context (`4033`/`4034`), registry/ingress wiring, or
+  durable-effect migrations.
+- Do not treat an operation lookup as authorization. Do not lower, reset, aggregate, or hide
+  the current unmatched baseline to make the gate pass.
+- Any required write outside the exact files, new dependency, live second writer, or excluded
+  semantic is `NO_GO/HOLD`; do not self-expand scope.
 
-- Kalite barı aynen: i18n-FIRST · 0-hardcode (eşik/timeout/retry sayıları named export sabit veya
-  parametre; kod-yolunda çıplak literal yok) · hermetik test (tmpdir, enjekte edilmiş fetch/saat,
-  gerçek ağ ve gerçek `spawnSync` YOK) · mevcut-pattern.
-- **Mevcut yüzeyleri yeniden İCAT ETME:** dayanıklı kutu `enqueueOwnerNotification`
-  (`src/connectors/notification-delivery.ts`, stable-id parametresi `input.id` ile destekleniyor,
-  `.deckent/runtime/owner-notifications.jsonl`); olay geçmişi `MemoryStore`'un `'custom'` entry
-  tipi (`src/core/memory-types.ts`) — YENİ DB veya yeni dosya-formatı açılmaz.
-- Test komutları TASK-SCOPED ve TEKİL.
-- `src/intelligence/` dışına yalnız Task 4 dokunur ve orada da yalnız mevcut outbox fonksiyonunu
-  çağırır; `notification-delivery.ts` DEĞİŞTİRİLMEZ.
-- Gizlilik: hiçbir kayıt ham HTTP gövdesi, header veya credential taşımaz — bayt-sayısı ve
-  `framedOutputDigest` (`src/core/output-digest.ts`) ile tarif edilir.
-
-## Task 1: Resmi-kaynak çekme — typed kalite sözleşmesi ve sınırlı yeniden-deneme
-- Files: src/intelligence/source-retrieval.ts, tests/intelligence/source-retrieval.test.ts
-- Reads: src/intelligence/types.ts, src/core/output-digest.ts
-- Priority: HIGH
+## Task 1: Semantic operation coverage model, baseline contract, and hermetic proof
+- Files: scripts/audit-operation-ingress.mjs, scripts/operation-ingress-baseline.json, tests/scripts/audit-operation-ingress.test.ts
+- Reads: package.json, scripts/script-registry.json, scripts/lint-operation-catalog.mjs, src/core/operation-catalog.ts, src/core/operation-catalog.v1.json, src/core/operation-catalog.generated.ts
+- Priority: CRITICAL
 - Agent: implementer
 - Model: gpt-5.6-sol
-- Test: VITEST_MAX_FORKS=2 npx vitest run tests/intelligence/source-retrieval.test.ts
+- Test: VITEST_MAX_FORKS=2 npx vitest run tests/scripts/audit-operation-ingress.test.ts --reporter=dot
 ### Description
-Kaynak önceliğini typed bir sözleşmeye çevir: `official-repo` · `official-release` ·
-`official-docs` · `official-announcement` · `benchmark` — kapalı sözlük, sıralama veri olarak
-tanımlı, koda gömülü sihirli sayı yok. Çekme yalnız ENJEKTE EDİLMİŞ bir `fetch` üzerinden olur
-(imza parametre; üretimde `globalThis.fetch`, testte sahte). Sınırlı timeout + sınırlı
-yeniden-deneme (sayılar named sabit); koşullu çekim durumu (ETag/Last-Modified) taşınır ve
-değişmemiş kaynak `unchanged` döner. Ayrıştırma: GitHub release JSON, genel JSON feed ve Atom;
-HTML'den yalnız güvenli metadata (başlık/tarih/kanonik link) — HTML gövdesi asla saklanmaz.
-**Kısmi başarısızlık bütün koşuyu düşürmez:** her kaynak kendi typed sonucunu taşır
-(`ok` | `unchanged` | `hold`), ama kanıt yetersizse sonuç typed `hold`'dur — uydurma boşluk yok.
-Her sonuç bayt-sayısı ve `framedOutputDigest` ile tarif edilir; ham gövde tutulmaz.
-Test: kaynak-önceliği sıralaması, sahte-fetch ile başarı/unchanged/hold yolları, timeout ve
-yeniden-deneme sınırının aşılmaması, bozuk feed'in typed hold vermesi, HTML'den yalnız
-metadata alınması, ham gövdenin hiçbir çıktıda geçmemesi.
+Use the existing audit and repository compiler dependencies to build one canonical semantic
+inventory. Each counted site has a deterministic stable identity derived from normalized
+repository-relative location plus semantic call/binding identity, not a file-level credit.
+Binding provenance distinguishes direct imports, namespace/member access, aliases and shadowed
+locals. A dead `resolveOperation` call cannot cover an unrelated effect. One covered site cannot
+compensate for or substitute another.
 
-## Task 2: Olay geçmişi — deterministik parmak-izi ve dedup
-- Files: src/intelligence/event-history.ts, tests/intelligence/event-history.test.ts
-- Reads: src/core/memory-store.ts, src/core/memory-types.ts, src/intelligence/types.ts
-- Priority: HIGH
-- Agent: implementer
-- Model: gpt-5.6-sol
-- Dependencies: Task 1
-- Test: VITEST_MAX_FORKS=2 npx vitest run tests/intelligence/event-history.test.ts
-### Description
-Rakip olay geçmişini KANONİK `.brain/memory.db` MemoryStore'un `'custom'` entry tipiyle sakla —
-yeni DB açma. Her kayıt şu alanları ZORUNLU taşır: competitor, eventType, fingerprint, source,
-publicationDate, detectionDate, reportedDate (başlangıçta boş olabilir), affectedCapability,
-previousClassification, confidence. Parmak-izi deterministiktir ve aynı olayın mirror/rewrite
-kopyalarını AYNI parmak-izine indirger (normalize edilmiş competitor + eventType + yetenek +
-yayın-tarihi çekirdeğinden türetilir; başlık kelimesi kelimesine kullanılmaz). Buna karşılık
-**material evolution** yeni parmak-izidir: sınıflandırma veya etkilenen yetenek değiştiyse yeni
-olaydır, dedup edilmez. Yazım idempotenttir; aynı parmak-izi ikinci kez yazılmaz.
-Test: mirror/rewrite dedup, material-evolution'ın yeni kayıt üretmesi, zorunlu alan eksikse typed
-hata, idempotent yazım, tarih alanlarının ISO-8601 doğrulaması.
+Expose separate, closed taxonomies for `fs-read`, `fs-write`, `fs-delete`, `db-memory`,
+`process`, `provider-network`, and `tool`; ambiguous or unknown sites fail closed with exact site
+diagnostics. Evolve the tracked baseline to site-granular expectations while preserving live
+unmatched debt honestly and deterministically.
 
-## Task 3: Türkçe kompakt alarm biçimlendirici
-- Files: src/intelligence/alert-formatter.ts, tests/intelligence/alert-formatter.test.ts
-- Reads: src/intelligence/types.ts, src/intelligence/comparison.ts, src/intelligence/baseline-catalog.ts
-- Priority: HIGH
-- Agent: implementer
-- Model: gpt-5.6-sol
-- Dependencies: Task 2
-- Test: VITEST_MAX_FORKS=2 npx vitest run tests/intelligence/alert-formatter.test.ts
-### Description
-Alarm metni TÜRKÇE ve kompakttır; zorunlu bölümleri taşır: ne oldu · hangi rakip · hangi yetenek
-alanı · Deckent'in o alandaki mevcut statüsü · göreli sınıf · hangi boşluk boyutu · ne yapılabilir.
-Her alarm, ilgili baseline girdisinin EXACT kod referanslarını (`evidenceRefs`) taşır — okuyucu
-iddiayı koddan doğrulayabilsin. Uydurma yüzde/skor YASAK; yalnız typed sınıf ve kanıt referansı.
-Biçimlendirici SAF fonksiyondur (I/O yok, saat enjekte edilir). Metin Türkçe olmakla birlikte
-teknik terimler İngilizce kalır (repo üslubu).
-Test: zorunlu bölümlerin tamlığı, baseline kod-referanslarının aynen geçmesi, skor-benzeri sayı
-bulunmaması, aynı girdi→aynı metin (determinizm), eksik baseline girdisinde typed hata.
+Tests must cover every taxonomy and positive binding form, repeated-run identity stability,
+shadowing, moved/substituted sites, file-level promotion, dead resolve, aggregate compensation,
+unknown taxonomy and per-site failure diagnostics. Verify the real script entrypoint with
+`node scripts/audit-operation-ingress.mjs --check`. Final integrated proof also requires
+`npm run lint` after the sprint is terminal; build is not run while the sprint is active.
 
-## Task 4: Watch servisi — dry-run saflığı ve çökme-güvenli sıra
-- Files: src/intelligence/watch-service.ts, src/intelligence/index.ts, tests/intelligence/watch-service.test.ts
-- Reads: src/intelligence/baseline.ts, src/intelligence/comparison.ts, src/intelligence/significance-gate.ts, src/intelligence/source-retrieval.ts, src/intelligence/event-history.ts, src/intelligence/alert-formatter.ts, src/connectors/notification-delivery.ts
-- Priority: HIGH
-- Agent: implementer
-- Model: gpt-5.6-sol
-- Dependencies: Task 3
-- Test: VITEST_MAX_FORKS=2 npx vitest run tests/intelligence/watch-service.test.ts
-### Description
-Zinciri tek serviste birleştir: baseline türet → kaynakları çek → sinyalleri karşılaştır →
-significance gate → yeni olayları geçmişe yaz → alarm üret → dayanıklı kutuya yaz.
-**Sıra çökme-güvenlidir:** alarm ÖNCE stable-id ile `enqueueOwnerNotification` çağrısıyla kutuya
-yazılır, SONRA geçmişin `reportedDate` alanı güncellenir. Böylece çökme/replay durumunda aynı
-stable-id ikinci kez yazılmaz (idempotent) ve hiçbir alarm sessizce kaybolmaz.
-**Dry-run KESİNLİKLE mutasyon yapmaz:** olay geçmişi, bildirim kutusu ve kaynak-imleci
-değişmez; dry-run yalnız ne olacağını döndürür. Servis tüm I/O'yu enjekte edilmiş seam'lerden
-alır (fetch, store, outbox, saat) — testte gerçek ağ/DB yok.
-Test: uçtan uca tek alarm üretimi, dry-run'da üç yüzeyin de değişmediği (geçmiş · kutu · imleç),
-aynı olayın ikinci koşuda alarm üretmemesi, çökme-simülasyonunda (kutuya yazıldı ama reportedDate
-güncellenmedi) replay'in ikinci bildirim üretmemesi, kısmi kaynak hatasının koşuyu düşürmemesi.
+### goNogo
+- goCriteria: The audit emits one deterministic site-granular semantic inventory whose stable identities bind normalized repository-relative locations to semantic call and binding provenance across direct imports, namespace/member access, aliases, and shadowed locals; Coverage is attributed independently per action/effect site so file presence, dead resolves, aggregate counts, and other call sites cannot promote, compensate for, or substitute the covered site; The closed taxonomy contains fs-read, fs-write, fs-delete, db-memory, process, provider-network, and tool, while ambiguous or unknown attribution fails closed with the exact site identity and diagnostic; The tracked site-granular baseline preserves current live unmatched debt without lowering, resetting, aggregating, or hiding it, and the hermetic suite proves every required positive and adversarial case plus repeated-run identity stability through the real script entrypoint
+- nogo: Any file-level credit, dead resolve, aggregate compensation, moved-site substitution, shadowed-local misbinding, ambiguous attribution, or unknown taxonomy is accepted as covered; Any unmatched debt is lowered, reset, aggregated, suppressed, or hidden merely to make the gate pass; The implementation grants permission or approval, changes runtime effects, expands into 4032, 4033, 4034, 4040, or 4050 semantics, adds a dependency or file, or writes outside the exact three-file scope
+- techDebtAcceptable: None; no placeholder taxonomy, heuristic fallback, nondeterministic identity, silent ambiguity, fixture-local reimplementation, skipped adversarial case, or deferred production wiring is acceptable

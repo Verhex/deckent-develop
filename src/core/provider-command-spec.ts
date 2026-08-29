@@ -22,6 +22,17 @@
 /** Placeholder in `baseArgs` replaced by `"$(cat <promptPath>)"` for inline prompts. */
 export const PROMPT_CAT_TOKEN = '{PROMPT_CAT}';
 
+export interface ProviderPlannerCommandProfile {
+  /** Planner-only arguments before isolation and model selection. */
+  readonly baseArgs: readonly string[];
+  /** Provider-native isolation arguments for a read-only planning call. */
+  readonly isolationArgs: readonly string[];
+  /** Planner prompt transport; stdin avoids platform argv-size ceilings. */
+  readonly promptFeed: 'stdin' | 'argument';
+  /** Output contract consumed by the provider-specific planner parser. */
+  readonly outputFormat: 'plain-text' | 'json-envelope';
+}
+
 export interface ProviderCommandSpec {
   /** CLI binary (in the container / on host), e.g. 'claude' | 'codex' | 'gemini'. */
   binary: string;
@@ -93,6 +104,8 @@ export interface ProviderCommandSpec {
   excludeDynamicPromptSectionsFlag: string | null;
   /** Whether stdout exposes per-call measured usage before the final response. */
   liveUsage: 'incremental' | 'final-only' | 'none';
+  /** Optional provider-owned command profile for isolated planner execution. */
+  planner?: ProviderPlannerCommandProfile;
 }
 
 /**
@@ -149,6 +162,18 @@ export const PROVIDER_COMMAND_SPECS: Readonly<Record<string, ProviderCommandSpec
     contextSuppressionArgs: ['-c', 'project_doc_max_bytes=0'],
     excludeDynamicPromptSectionsFlag: null, // codex CLI has no equivalent flag
     liveUsage: 'final-only',
+    planner: {
+      baseArgs: ['exec', '--skip-git-repo-check'],
+      isolationArgs: [
+        '--sandbox', 'read-only',
+        '--ephemeral',
+        '--ignore-user-config',
+        '--ignore-rules',
+        '-c', 'mcp_servers={}',
+      ],
+      promptFeed: 'stdin',
+      outputFormat: 'plain-text',
+    },
   },
   gemini: {
     binary: 'gemini',

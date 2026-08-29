@@ -26,6 +26,29 @@ describe('ProviderCommandSpec prefix fields', () => {
   });
 });
 
+describe('ProviderCommandSpec planner profiles', () => {
+  it('declares a stdin, plain-text, read-only isolated Codex planner profile', () => {
+    expect(PROVIDER_COMMAND_SPECS.codex.planner).toEqual({
+      baseArgs: ['exec', '--skip-git-repo-check'],
+      isolationArgs: [
+        '--sandbox', 'read-only',
+        '--ephemeral',
+        '--ignore-user-config',
+        '--ignore-rules',
+        '-c', 'mcp_servers={}',
+      ],
+      promptFeed: 'stdin',
+      outputFormat: 'plain-text',
+    });
+  });
+
+  it('does not invent planner profiles for providers without measured contracts', () => {
+    for (const provider of ['claude', 'gemini', 'cursor']) {
+      expect(PROVIDER_COMMAND_SPECS[provider].planner).toBeUndefined();
+    }
+  });
+});
+
 describe('buildProviderCommand', () => {
   const P = '/workspace/.tasks/task-x.prompt.txt';
 
