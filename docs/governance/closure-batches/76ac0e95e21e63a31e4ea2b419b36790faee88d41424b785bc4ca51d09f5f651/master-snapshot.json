@@ -3,13 +3,13 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "918f14038a04af7cda4a580f046ac7857ac975d26f3045f2e703d36dcb8ca2fd"
+    "value": "19fca43a12b11986d4e742a3bf18e717c76d0ac6c373e6b1534de521b3d338d3"
   },
   "summary": {
     "total": 562,
     "active": 475,
     "terminal": 87,
-    "receipts": 214,
+    "receipts": 213,
     "byState": {
       "OPEN": 362,
       "READY": 0,
@@ -3845,7 +3845,7 @@
       "state": "VERIFY",
       "updated": "2026-08-29",
       "definitionDigest": "695b3187262d4b5ef002698c0645f79e4ef117e005d0a8d81cc14199f3e75b9d",
-      "progressDigest": "a1e0c8d660ba41c34cb84cefa79ae520b04b5196a97ea07cffeff5010173a9ca",
+      "progressDigest": "fbdae0ebede2b30299be89a82b4a0222564a731e503bfe7760019ed6f20d81c8",
       "terminalClosureDigest": null
     },
     {
@@ -8375,16 +8375,6 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-29T14:53:15Z"
-      },
-      "g7AttemptIdentity": null
-    },
-    {
-      "id": "GR-2026-08-29-CLOSURE-BATCH-4033-01",
-      "authorityDigest": "b04a6056f18fe6b66252d98ab78b659c49e0cab23363c950815eda6e3ec1e65a",
-      "lifecycle": {
-        "mode": "ONE_SHOT",
-        "status": "consumed",
-        "transitionAt": "2026-08-29T18:15:58Z"
       },
       "g7AttemptIdentity": null
     }
@@ -19857,11 +19847,9 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-29-CLOSURE-BATCH-4033-01"
-      ],
+      "evidenceReceipts": [],
       "acceptance": "Invocation, transaction, attempt, correlation ve causation kimlikleri principal, tenant, resource, environment, idempotency ve operationId@version referanslarıyla tek typed envelope taşır; context allow/deny üretmez ve 4040/4050 için nötr policy input olur",
-      "evidence": "2026-08-29 authenticated ADR-D-007 recovery settlement: sprint-713 `ABORTED` geçmişi değiştirilmedi; product ve blocking 4031↔4032 canonical generated-catalog provenance repair commit `491ce623f`, generated stats commit `416e63eb9`. Exact catalog-bound identity/idempotency, lossless principal ve explicit tenant/project/resource/environment, deep-copy/freeze exact context, bounded canonical SHA-256 transport, lifetime-bounded AsyncLocalStorage, child-process/thread isolation ve policy/approval/effect negative-space kapandı; foundation 4034+ consumer/effect children'ına dependency-bound kaldı; `receipt=GR-2026-08-29-CLOSURE-BATCH-4033-01`; `proof=operation-invocation-context-v1-109of109-fanin-26of26-catalog-ingress`; LOCAL_VERIFIED: combined 135/135, hermetic scanner zero confirmed violation, real ingress audit 5205/0/5205 digest 59f62753c2a2, npm lint exit 0, build exit 0, compiled WSL2/Linux ve Windows-native Node v24.15.0 public-contract proof PASS; darwin native bu hostta unreachable/HOLD ve simulation native diye sunulmadı. Current-dist bot PID 2964974 ile yeniden başladı; independent read-only verdict PASS. Closure OS seq7 event 080e2fab, owner-signed receipt aprcdb-76ac0e95e21e63a31e4ea2b419b36790 ve 7-event gate PASS state ratchet'ini yetkilendirir; XVerify owner kararıyla deferred",
+      "evidence": "2026-08-29 ADR-D-007 manual recovery implementation: sprint-713 `ABORTED` geçmişi değiştirilmedi; product ve blocking 4031↔4032 canonical generated-catalog provenance repair commit `491ce623f`, generated stats commit `416e63eb9`. Exact catalog-bound identity/idempotency, lossless principal ve explicit tenant/project/resource/environment, deep-copy/freeze exact context, bounded canonical SHA-256 transport, lifetime-bounded AsyncLocalStorage, child-process/thread isolation ve policy/approval/effect negative-space kapandı; foundation 4034+ consumer/effect children'ına dependency-bound kaldı; `historical-authority=owner-live-2026-08-29-4033-manual-recovery;historical-gates=G2,G1;proof=operation-invocation-context-v1-109of109-fanin-26of26-catalog-ingress`; LOCAL_VERIFIED: combined 135/135, hermetic scanner zero confirmed violation, real ingress audit 5205/0/5205 digest 59f62753c2a2, npm lint exit 0, build exit 0, compiled WSL2/Linux ve Windows-native Node v24.15.0 public-contract proof PASS; darwin native bu hostta unreachable/HOLD ve simulation native diye sunulmadı. Current-dist bot PID 2964974 ile yeniden başladı; independent read-only verdict PASS; XVerify owner kararıyla deferred. Authenticated Closure OS settlement bekleniyor",
       "updated": "2026-08-29"
     },
     {
@@ -28479,6 +28467,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "388a3fe3110859082f914563a5b17b3740ad47f49f80c6cfa5c539bac907052e"
+    "value": "9d1e79b612f4004787693c871342fa062cd4525ff76204a845006129c400d862"
   }
 }
