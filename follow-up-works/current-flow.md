@@ -51,8 +51,9 @@ Kapanış kanıtı:
   `typescript-expert` assigned+delivered; `python-expert` durable journal'da
   `required-evidence-missing`. Mixed dizindeki sibling `.py`, explicit `.ts` task evidence'ını
   genişletmedi. İki invocation canonical `already-settled / NOT_DISPATCHED`.
-- MASTER 9034/9035/9036/9037/9053 zaten outcome kimliğini taşır. Owner-authenticated
-  projection/settlement töreni dışında elle state/evidence mutation yapılmaz.
+- MASTER 9034/9035/9036/9037/9053 zaten outcome kimliğini taşır. Owner'ın 2026-08-29
+  canlı yetkisiyle yalnız landed evidence aktarılmıştır; state/truth/priority/dependency
+  değiştirilmemiş ve Closure OS disposition/sidecar ledger yüzeyine dokunulmamıştır.
 
 Kapsam-dışı kayıtlar — otomatik implement edilmez:
 
@@ -70,13 +71,15 @@ Kapsam-dışı kayıtlar — otomatik implement edilmez:
 
 ## Sıradaki outcome sırası — aynı anda yalnız biri admit edilir
 
-### 0. Skill closure canonical projection
+### 0. Skill closure canonical projection — tamamlandı
 
 MASTER validator temizdir: 543 satır, 458 aktif, 85 DONE, 13 blocker class; projectionlar
-in-sync. Ancak 9034/9035/9036/9037/9053 skill satırları dependency'leri nedeniyle OPEN ve
-landed kanıt henüz owner-authenticated projection'a geçirilmedi. Yeni ürün run'ından önce
-false DONE üretmeden exact receipt/evidence/truth projection hazırlanır; state yalnız Closure
-OS authenticated owner authority ile değişir.
+in-sync. Owner'ın 2026-08-29 canlı yetkisiyle landed skill kanıtı exact
+9034/9035/9036/9037/9053 satırlarına evidence-only aktarılmıştır. Beş satır dependency'leri
+nedeniyle OPEN kalır; state, truth, priority ve `Depends On` alanlarında değişiklik yoktur.
+Projection source digest'i
+`a607476660334739b4769445cb2b9e6104e761963f49169699c87a0cc25aabc4`'tür. Bu aktarım
+terminal disposition, GR receipt veya Closure OS sidecar-ledger mutasyonu değildir.
 
 ### 1. Kernel-tree closure — full-product yönü
 
@@ -86,15 +89,19 @@ yaklaşık 16 non-DONE düğümlü derin DAG kaldığını gösterdi. Owner 2026
 ürünü tamamlayarak ilerle; release-only daraltma yapılmaz. Faz isimleri dependency authority
 değildir: 3010 doğrudan 4030'u, 3030 ise 3020 ve aggregate 4000'i bekler. Yürütme sırası:
 
-1. `4030 OPERATION-001`: mevcut VERIFY kanıtını fresh live ingress proof + authenticated
-   disposition ile terminalleştir; başka authority programını pakete alma.
-2. `3010 KERNEL-ONTOLOGY-001`, sonra `3020 KERNEL-STATE-001`: ayrı, dependency-valid dogfood
-   outcome'ları.
-3. `3030` öncesi `4000 AUTHORITY-001` aggregate kenarını code-truth ile çöz: minimum attempt
+1. `4030 OPERATION-001` kapanış-adayı DEĞİLDİR: güncel ratchet 742 effect site / 2 mediated /
+   740 unmediated gösterir. Önce gerçek user action'ları ile onları izleyen internal write/tool
+   effect'leri code-truth üzerinden ayrıştır; ortak operation/permission ingress'ine bağlanacak
+   parçaları bağımsız owner-admitted child outcome'lara böl ve DAG'ı yetkili biçimde güncelle.
+2. Bu child outcome'ları tek tek gerçek product wiring + live proof ile kapat; 4030 ancak bütün
+   kabul yüzeyi gerçekten mediated olduğunda authenticated disposition alabilir.
+3. `4030` gerçekten terminal olduktan sonra `3010 KERNEL-ONTOLOGY-001`, ardından
+   `3020 KERNEL-STATE-001` ayrı dependency-valid dogfood outcome'larıdır.
+4. `3030` öncesi `4000 AUTHORITY-001` aggregate kenarını code-truth ile çöz: minimum attempt
    authority ayrı canonical leaf ise authenticated DAG amendment; değilse 4000'in gerçekten
    zorunlu dependency zinciri önce kapanır. Aggregate parent sahte DONE yapılmaz.
-4. `3030 KERNEL-ATTEMPT-001`; ardından ölçülmüş Dalga 2 ve Dalga 3 sırası.
-5. Her outcome: exact capsule/file authority → Goal/Mission/Flow/Run/Do → terminal settlement →
+5. `3030 KERNEL-ATTEMPT-001`; ardından ölçülmüş Dalga 2 ve Dalga 3 sırası.
+6. Her outcome: exact capsule/file authority → Goal/Mission/Flow/Run/Do → terminal settlement →
    local scoped + real-binary proof → authenticated MASTER projection. Remote CI advisory'dir.
 
 ### 2. MASTER 6181 closure residual
