@@ -4,8 +4,8 @@
 # Closure OS — Level × Lane classification & re-triage: owner disposition proposal **v2.1**
 
 > Read-only, non-authoritative. Codex final disposition (2026-08-14): owner-declared semantics outrank topology; ID-regex is not a classification authority; `check-proof ⇒ proof`; priority changes this phase = 0.
-> Source: `master-plan-active.json` @ sourceDigest `8f2ec5b75cab56d3…` · registryIntegrity `d1c6c81e68c5d5d1…`
-> Enum + override SSOT: `src/core/closure-classification-schema.json` (schemaVersion 1). Rows scanned: 476 active.
+> Source: `master-plan-active.json` @ sourceDigest `1b9ca16da70fc8ec…` · registryIntegrity `1cee7120dcb974c7…`
+> Enum + override SSOT: `src/core/closure-classification-schema.json` (schemaVersion 1). Rows scanned: 475 active.
 > check-proof⇒proof invariant on this output: **HOLDS**. Override-vs-invariant conflicts: 0.
 
 ## 1. Level × Lane matrix (generated — never hand-written)
@@ -14,20 +14,20 @@
 |---|---:|---:|---:|---:|---:|---:|---:|
 | **outcome** | 50 | 9 | · | 1 | 1 | · | 61 |
 | **package** | 29 | 25 | 3 | 2 | 1 | 1 | 61 |
-| **task** | 140 | 160 | 6 | 21 | 4 | 2 | 333 |
+| **task** | 139 | 160 | 6 | 21 | 4 | 2 | 332 |
 | **check-proof** | · | · | · | · | 21 | · | 21 |
 | **finding** | · | · | · | · | · | · | 0 |
-| **total** | 219 | 194 | 9 | 24 | 27 | 3 | 476 |
+| **total** | 218 | 194 | 9 | 24 | 27 | 3 | 475 |
 
 `check-proof` rows are all in `proof` (invariant). `hold-unassigned` = typed-HOLD lane state.
 
 ## 2. Priority — 3 honest categories (0 changes this phase)
 
-Current: 322 P0 · 117 P1 · 37 P2. **No priority is changed in this phase.** Dependency-gating, BLOCKED state and fan-out were rejected as priority signals.
+Current: 321 P0 · 117 P1 · 37 P2. **No priority is changed in this phase.** Dependency-gating, BLOCKED state and fan-out were rejected as priority signals.
 
 | category | P0 rows | meaning |
 |---|--:|---|
-| explicit closure reference | 309 | appears in a closureBlockedBy or is depended-on by an outcome/package |
+| explicit closure reference | 308 | appears in a closureBlockedBy or is depended-on by an outcome/package |
 | proposed-Level only | 11 | critical only because its proposed Level is outcome/package (no explicit closure ref) |
 | semantic owner-preserved | 2 | kept P0 by owner decision: `TEST-CONTAINMENT-001`, `XVERIFY-TRUTH-001` |
 
@@ -45,14 +45,14 @@ Owner lane overrides applied (7). 3 rows remain `hold-unassigned` (never guess-f
 
 ## 4. Findings
 
-- **F-P0-INFLATION** _(acknowledged / open measurement)_ — 322/476 active rows are P0. Priority changes this phase = 0. Category split: 309 carry an explicit closure reference (closureBlockedBy / outcome-dependency); 11 are critical only by their proposed outcome/package Level; 2 are preserved at P0 by semantic owner decision (TEST-CONTAINMENT-001, XVERIFY-TRUTH-001); 0 carry none of these. This stays an OPEN measurement finding — NOT a demotion.
-- **F-DANGLING-REF** _(resolved)_ — Full 491-registry reconciliation: terminal-DONE=24 (valid); superseded/archived=0; not-in-registry (typo/missing)=0. No missing references.
+- **F-P0-INFLATION** _(acknowledged / open measurement)_ — 321/475 active rows are P0. Priority changes this phase = 0. Category split: 308 carry an explicit closure reference (closureBlockedBy / outcome-dependency); 11 are critical only by their proposed outcome/package Level; 2 are preserved at P0 by semantic owner decision (TEST-CONTAINMENT-001, XVERIFY-TRUTH-001); 0 carry none of these. This stays an OPEN measurement finding — NOT a demotion.
+- **F-DANGLING-REF** _(resolved)_ — Full 491-registry reconciliation: terminal-DONE=25 (valid); superseded/archived=0; not-in-registry (typo/missing)=0. No missing references.
 
 ## 5. ruleId / confidence distribution
 
-**Level** — conf: high:17 · medium:459. Rules: LVL-owner-override:17 · LVL-top-bucket:54 · LVL-child-leaf:329 · LVL-child-with-children:61 · LVL-assurance-program:15
+**Level** — conf: high:17 · medium:458. Rules: LVL-owner-override:17 · LVL-top-bucket:54 · LVL-child-leaf:328 · LVL-child-with-children:61 · LVL-assurance-program:15
 
-**Lane** — conf: medium:467 · high:7 · low:2. Rules: LANE-checkproof-invariant:21 · LANE-program-map:417 · LANE-owner-override:7 · LANE-prod-runtime:5 · LANE-prod-contract:3 · LANE-prod-proof:1 · LANE-eco-catalog-contract:4 · LANE-eco-runtime-integration:7 · LANE-crosscut-unresolved:2 · LANE-rel-publish:2 · LANE-docs-truth:4 · LANE-rel-validation:2 · LANE-repo-migration-exec:1
+**Lane** — conf: medium:466 · high:7 · low:2. Rules: LANE-checkproof-invariant:21 · LANE-program-map:416 · LANE-owner-override:7 · LANE-prod-runtime:5 · LANE-prod-contract:3 · LANE-prod-proof:1 · LANE-eco-catalog-contract:4 · LANE-eco-runtime-integration:7 · LANE-crosscut-unresolved:2 · LANE-rel-publish:2 · LANE-docs-truth:4 · LANE-rel-validation:2 · LANE-repo-migration-exec:1
 
 HIGH is reserved for owner-declared per-row overrides (Codex §6). Program→lane and structural rules are MEDIUM; unresolved → LOW/HOLD. HIGH share: Level 4%, Lane 1%.
 
@@ -103,7 +103,7 @@ ID-regex is retired as a classification authority. The structural defaults are r
 
 ```jsonc
 { "schemaVersion":1, "seq":<n>, "eventId":"…", "recordedAt":"<owner-batch-ts>",
-  "rowRef":{ "workId":"<id>", "rowDefinitionDigest":"<identityRegistry.definitionDigest>", "masterSourceDigest":"8f2ec5b75cab…" },
+  "rowRef":{ "workId":"<id>", "rowDefinitionDigest":"<identityRegistry.definitionDigest>", "masterSourceDigest":"1b9ca16da70f…" },
   "decision":{ "kind":"level-lane-disposition", "level":"<enum>", "lane":"<enum>", "ruleId":"<rule>", "confidence":"<h|m|l>" },
   "authorityProof":{ "ownerReceipt":"<authenticated durable receipt ref>" }, "previousEventDigest":"…", "eventDigest":"…" }
 // priority-retriage events this phase: 0 (priority unchanged). lane-resolution candidates: 3 HOLD rows if owner assigns.
@@ -114,7 +114,7 @@ ID-regex is retired as a classification authority. The structural defaults are r
 
 ## 9. Appendix — full per-row proposal
 
-<details><summary>All 476 rows (Level · Lane · confidence · P0 category)</summary>
+<details><summary>All 475 rows (Level · Lane · confidence · P0 category)</summary>
 
 | Work ID | program | state | pri | level (conf) | lane (conf) | ov |
 |---|---|---|---|---|---|---|
@@ -386,7 +386,6 @@ ID-regex is retired as a classification authority. The structural defaults are r
 | `TENANT-001` | AUTHORITY | VERIFY | P0 | package (m) | contract (m) |  |
 | `AUTONOMOUS-TENANT-AUTHORITY-001` | AUTHORITY | OPEN | P0 | task (m) | contract (m) |  |
 | `OPERATION-001` | AUTHORITY | VERIFY | P0 | package (m) | contract (m) |  |
-| `OPERATION-CATALOG-CONVERGENCE-001` | AUTHORITY | VERIFY | P0 | task (m) | contract (m) |  |
 | `OPERATION-INVOCATION-CONTEXT-001` | AUTHORITY | OPEN | P0 | task (m) | contract (m) |  |
 | `OPERATION-EFFECT-CONTEXT-001` | AUTHORITY | OPEN | P0 | task (m) | contract (m) |  |
 | `OPERATION-CLI-REGISTRY-BINDING-001` | AUTHORITY | OPEN | P0 | task (m) | contract (m) |  |
