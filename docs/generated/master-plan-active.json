@@ -3,20 +3,20 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "770e0e7cb5dff0c5bd633d2750f008c6f82bbf4d84533dc2c156e41a71233e58"
+    "value": "d69adc657297e5b4d1a79d007b853399da3f1a22eaa3bf7b6b53963c48969767"
   },
   "summary": {
     "total": 562,
-    "active": 477,
-    "terminal": 85,
+    "active": 476,
+    "terminal": 86,
     "receipts": 212,
     "byState": {
       "OPEN": 364,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
-      "VERIFY": 44,
-      "DONE": 85,
+      "VERIFY": 43,
+      "DONE": 86,
       "DEFERRED": 0,
       "DISPOSED": 0
     },
@@ -3820,11 +3820,11 @@
       "id": "OPERATION-COVERAGE-MODEL-001",
       "program": "AUTHORITY",
       "priority": "P0",
-      "state": "VERIFY",
+      "state": "DONE",
       "updated": "2026-08-29",
       "definitionDigest": "57c93f57fbc055a60cc582049c1ee99e14362814194d5446e4f85fa0ee991b24",
-      "progressDigest": "eaffda20a7e52ce50b2d5cd8b75ef5bd764f1b0634804054ceb94911bb6c9668",
-      "terminalClosureDigest": null
+      "progressDigest": "44e9c3e0aade04e49a31fd6f06d0ba956cccc7cb6a848f3f492065ab66492e06",
+      "terminalClosureDigest": "05e8a91d6497b25484e531c731ce98b5db8475e5adb434189a550c0bd0069e4a"
     },
     {
       "order": 4032,
@@ -19772,7 +19772,6 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "OPERATION-COVERAGE-MODEL-001",
         "OPERATION-CATALOG-CONVERGENCE-001",
         "OPERATION-INVOCATION-CONTEXT-001",
         "OPERATION-EFFECT-CONTEXT-001",
@@ -19799,43 +19798,6 @@
       ],
       "acceptance": "Every mutation/read/tool action maps to stable operation ID, risk and effect class",
       "evidence": "Code-truth audit found no canonical catalog; 2026-08-06 TASARIM-ARTIFACT'I (Dalga-1 paralel, Alperen karar-turu): docs/analysis/operation-catalog-authority-design-2026-08-06.md — şema v1 + zorunlu tüketim zinciri + O1-O5 dilimleme + D1-D3 owner karar noktaları; `receipt=GR-2026-08-06-DESIGN-DOCS-01`; 2026-08-06 MAKİNE-BULGUSU-4: O1 admission'ı dependency-vetolu — DependsOn PRINCIPAL-001 DONE değil (P1a advisory teslim edildi, DONE için E=1 enforce + L=1 gerçek-binary şart). Dalga-3'ün gerçek kapısı P1b'dir; D1-D3 kararları (Tam-8 şema, sayaç-ratchet, JSON+üretilen-tip) kayıtlı ve P1b kapanınca O1 aynen kesilir; `receipt=GR-2026-08-07-OPERATION-O1-01`; O1 admission 2026-08-07 (Dalga-3 başlangıcı — PRINCIPAL DONE ile dependency-veto düştü); 2026-08-07 O1 SETTLEMENT: kanonik katalog kuruldu — sekiz alanlı şema izlenen catalog.v1.json'da (ilk aile fs+memory, 6 operasyon), typed okuyucu + Op.* üretilen sabitleri (0-hardcode), yeni lint-operation-catalog fail-closed doğrular (benzersiz dot-hiyerarşik id, enum üyelikleri, effect→gate MİNİMUM matrisi, capabilities'in work-model sözlüğünde varlığı, i18n tamlığı, sabit-katalog birebir örtüşmesi) ve lint:gates zincirine eklendi; bilinmeyen op id'si typed UnknownOperationError ile fail-closed; `proof=operation-catalog-suite-9of9-and-lint-green`; katalog suite 9/9, lint yeşil, tsc temiz; ingress-kapsam zorlaması (sayaç-ratchet) O3, capability/tool-scope tüketimi O4 dilimidir; `receipt=GR-2026-08-08-OPERATION-O3-01`; O3 SETTLEMENT 2026-08-08 (owner Q&A: report-only baseline, fs-write/delete tanımı): ingress-açığı ÖLÇÜLDÜ — 673 fs-write/delete site / 233 dosya / 0 katalog-aracılı (resolveOperation'ın hiç üretim tüketicisi yoktu); scripts/audit-operation-ingress report-only (lint:gates'e EKLENMEDİ), operation-ingress-baseline.json frozen zemin, npm audit script'i; `proof=operation-o3-673sites-0mediated-4pins-report-only`; AÇIK typed-residual (satır VERIFY): CI-blocking ratchet enablement, op.memory + op.fs.read aileleri, gerçek resolveOperation ingress-tüketimi = real grant 2026-08-12 owner kararı (agresif eritme): bu satırın atıf verdiği analiz dosyası operation-catalog-authority-design-2026-08-06.md delete-on-consume ile silindi; içeriğin özü bu satırın kendi kanıt zincirinde yaşıyor, tam metin git-history'de (follow-up-works/operation-catalog-authority-design-2026-08-06.md); **2026-08-29 OWNER-ADMITTED CHILD DAG:** canlı audit `742 total / 2 syntactically-mediated / 740 unmediated` üretir; iki mediated işaret file-level false-positive olup principal/tenant/resource/environment, invocation veya permission receipt taşımaz. 4030 yalnız stable `operationId@version`, fail-closed resolution, nötr invocation/transaction/correlation/causation context'i ve durable effect causal attributionını kapatır; allow/deny ve enforcement 4040 CAPABILITY-001'e, approval authority 4050 APPROVAL-001'e aittir. Child closure 4031-4039, 4041-4049 ve 4057 satırlarına ayrıldı; bütün children terminal olmadan 4030 disposition adayı değildir. Owner authority: 2026-08-29 canlı kabul; read-only Checkpoint A/B: `GO child DAG / NO-GO mega-patch`",
-      "updated": "2026-08-29"
-    },
-    {
-      "order": 4031,
-      "id": "OPERATION-COVERAGE-MODEL-001",
-      "parent": "OPERATION-001",
-      "program": "AUTHORITY",
-      "outcome": "Semantic action/effect coverage model and fail-closed ratchet",
-      "priority": "P0",
-      "dependsOn": [],
-      "dependents": [
-        "OPERATION-CATALOG-CONVERGENCE-001",
-        "OPERATION-CLOSURE-CONFORMANCE-001"
-      ],
-      "children": [],
-      "gates": [
-        "G2",
-        "G1"
-      ],
-      "state": "VERIFY",
-      "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "1",
-        "X": "1",
-        "S": "-"
-      },
-      "blockerCode": null,
-      "blockerRemedy": null,
-      "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-29-CLOSURE-BATCH-4031-01"
-      ],
-      "acceptance": "Action registry ve internal effect envanterleri AST binding-provenance + stable call-site ID taşır; file-level promotion, dead resolve, aggregate compensation ve site substitution PASS edemez; read/write/delete, DB/memory, process, provider/network ve tool effect taxonomy ayrı ölçülür",
-      "evidence": "2026-08-29 authenticated recovery settlement: sprint-711 `ABORTED` geçmişi değiştirilmedi; exact üç product path'i commit f6c880fc5bde064688e26fa5a95d3e91e7ecbc75 ile landed. Audit canonical catalog'u doğrudan tüketir ve registry dışı/sahte catalog'u reddeder; AST symbol-origin doğrulaması shadow/local nesne ile dead/ilgisiz resolve kredisini, per-site identity ise file-level promotion, aggregate compensation ve substitution'ı fail-closed engeller. Closed taxonomy yedi effect sınıfını ayrı sayar; unknown/ambiguous attribution unclassified diagnostic üretir ve baseline write karşılaştırmalı debt ratchet'inden geçer; `receipt=GR-2026-08-29-CLOSURE-BATCH-4031-01`; `proof=operation-ingress-semantic-coverage-v3-17of17-5205sites`; LOCAL_VERIFIED: targeted 17/17, npm lint exit 0, build exit 0, gerçek `node scripts/audit-operation-ingress.mjs --check` PASS = 5205 total / 0 covered / 5205 unmatched / 0 unclassified / digest 59f62753c2a2d21361e9dbdf71bb047b2759e01d78c7e118c12eb4d6efbafd28. POSIX, Windows-native ve WSL-style path determinism pinli; 5205 unmatched borç downstream catalog/binding/migration children'ına görünür bırakılır ve bu measurement child'ında kapsam kapatma iddiası değildir. Closure OS seq5 event 210a3765, owner-signed receipt aprcdb-559bbd1e3315febe20be0bb00632b886 ve 5-event gate PASS state ratchet'ini yetkilendirir; XVerify owner kararıyla bu outcome için uygulanmadı",
       "updated": "2026-08-29"
     },
     {
@@ -19874,9 +19836,7 @@
       },
       "blockerCode": null,
       "blockerRemedy": null,
-      "closureBlockedBy": [
-        "OPERATION-COVERAGE-MODEL-001"
-      ],
+      "closureBlockedBy": [],
       "evidenceReceipts": [],
       "acceptance": "Her registered action stable operationId ve version taşır; cross-surface eşdeğerleri aynı canonical kimliğe iner; unknown, ambiguous veya version-mismatch registration fail-closed olur; generated types ve i18n catalog parity korunur",
       "evidence": "Owner admission 2026-08-29; mevcut catalog altı operation, CLI/MCP/TERM-RPC/agent registryleri ayrı truth yüzeyleri",
@@ -20973,7 +20933,6 @@
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [
-        "OPERATION-COVERAGE-MODEL-001",
         "OPERATION-CATALOG-CONVERGENCE-001",
         "OPERATION-INVOCATION-CONTEXT-001",
         "OPERATION-EFFECT-CONTEXT-001",
@@ -28553,6 +28512,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "95c5b2dd00f74debda7f299213505abb1e0f399db6b1ae539917f00e1636d3d3"
+    "value": "2d6efb69fd6c93c0b1665da8857ee91981ee3f3ef871e4ebba49be621f05f66d"
   }
 }
