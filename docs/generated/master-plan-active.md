@@ -5,9 +5,9 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):918f14038a04af7cda4a580f046ac7857ac975d26f3045f2e703d36dcb8ca2fd`
+**Source digest:** `sha256(normalized-lf-utf8):724e71702142dca454e1a2398826af27d32cf2dde998e7343bb88c4efa913346`
 
-**Rows:** 562 total · 475 active · 87 terminal
+**Rows:** 562 total · 474 active · 88 terminal
 
 ## State summary
 
@@ -17,8 +17,8 @@
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 69 |
-| VERIFY | 44 |
-| DONE | 87 |
+| VERIFY | 43 |
+| DONE | 88 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
 
@@ -294,7 +294,6 @@
 | 4020 | `TENANT-001` | VERIFY | P0 | AUTHORITY | `PRINCIPAL-001` | — | Canonical tenant/project/session scope enforcement |
 | 4021 | `AUTONOMOUS-TENANT-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001` | — | Autonomous read, mutation, approval ve reactive ingress için fail-closed tenant authority |
 | 4030 | `OPERATION-001` | VERIFY | P0 | AUTHORITY | `PRINCIPAL-001` | — | Versioned canonical operation catalog |
-| 4033 | `OPERATION-INVOCATION-CONTEXT-001` | VERIFY | P0 | AUTHORITY | `OPERATION-CATALOG-CONVERGENCE-001` | — | Canonical operation invocation and transaction identity context |
 | 4034 | `OPERATION-EFFECT-CONTEXT-001` | OPEN | P0 | AUTHORITY | `OPERATION-INVOCATION-CONTEXT-001` | — | Platform-neutral durable-effect causal attribution substrate |
 | 4035 | `OPERATION-CLI-REGISTRY-BINDING-001` | OPEN | P0 | AUTHORITY | `OPERATION-CATALOG-CONVERGENCE-001` | — | CLI command registry operation binding |
 | 4036 | `OPERATION-MCP-REGISTRY-BINDING-001` | OPEN | P0 | AUTHORITY | `OPERATION-CATALOG-CONVERGENCE-001` | — | MCP tool registry operation binding |
