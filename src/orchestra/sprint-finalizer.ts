@@ -33,6 +33,14 @@ import {
 } from '../core/sprint-work-attribution.js';
 import { resolveHostPreDispatchSettlement } from '../core/pre-dispatch-settlement.js';
 import { resolvePromptDeliveryAttribution } from '../core/prompt-delivery-receipt.js';
+import type { PromptDeliveryAttribution } from '../core/prompt-delivery-receipt.js';
+import {
+  buildSkillAttributionReceipt,
+  readSkillAttributionBatch,
+  SkillAttributionConflictError,
+  writeSkillAttributionBatch,
+} from '../core/routing/skill-attribution.js';
+import type { SkillAttributionReceipt } from '../core/routing/skill-attribution.js';
 import {
   createTaskTerminalProjection,
   reduceTaskTerminalProjection,
@@ -42,6 +50,7 @@ import type {
   TaskTerminalProjection,
 } from '../core/task-terminal-projection.js';
 
+import { ALL_INTENT_TYPES } from '../core/routing-types.js';
 import type { TaskDNA } from '../core/routing-types.js';
 import {
   createSprintFinalizerGateAuthority,
@@ -61,11 +70,31 @@ type CatalogStatsEntry = Record<string, unknown> & {
   successRate?: number;
   avgCoverage?: number;
   lastUsedInSprint?: string;
+  coverageSampleCount?: number;
 };
+
+interface CatalogSkillExposureEntry extends Record<string, unknown> {
+  selected?: number;
+  delivered?: number;
+  credited?: number;
+  terminalOutcomes?: number;
+  lastObservedInSprint?: string;
+}
 
 interface CatalogStatsSidecar extends Record<string, unknown> {
   agents?: Record<string, CatalogStatsEntry>;
   skills?: Record<string, CatalogStatsEntry>;
+  skillExposure?: Record<string, CatalogSkillExposureEntry>;
+  skillAttribution?: {
+    authority: 'causal-receipt-v1';
+    cutoverSprint: string;
+    legacyQuarantineDigest: string | null;
+  };
+  legacySkillStatsQuarantine?: {
+    sourceDigest: string;
+    cutoverSprint: string;
+    skills: Record<string, CatalogStatsEntry>;
+  };
   commsUsage?: Record<string, CatalogStatsCommsUsage>;
 }
 
@@ -80,6 +109,11 @@ export interface CatalogStatsTerminalOutcome {
   readonly taskId: string;
   readonly agentId: string | null;
   readonly skillIds: readonly string[];
+  readonly selectedSkillIds: readonly string[];
+  readonly deliveredSkillIds: readonly string[];
+  readonly creditedSkillIds: readonly string[];
+  readonly skillAttributionState: import('../core/routing/skill-attribution.js').SkillAttributionState;
+  readonly skillAttributionReceiptDigest?: string;
   readonly evaluation: TaskEvaluation.DONE | TaskEvaluation.GO_WITH_TECH_DEBT | TaskEvaluation.NO_GO;
   readonly coverage?: number;
   readonly commsUsage?: CatalogStatsCommsUsage;
@@ -90,6 +124,44 @@ const ZERO_COMMS_USAGE: CatalogStatsCommsUsage = {
   handoffNotesWritten: 0,
   handoffsReceived: false,
 };
+
+function sameIds(left: readonly string[], right: readonly string[]): boolean {
+  return JSON.stringify([...left]) === JSON.stringify([...right]);
+}
+
+/**
+ * Mutable stats are a projection, never attribution authority. Any row that
+ * carries skill exposure or credit must be byte-bound to the immutable batch
+ * written earlier in finalization. This also prevents direct helper callers
+ * from minting CREDITED by setting a boolean/string field themselves.
+ */
+function assertCatalogSkillAttributionAuthority(
+  projectRoot: string,
+  sprintId: string,
+  outcomes: readonly CatalogStatsTerminalOutcome[],
+): void {
+  const attributed = outcomes.filter(outcome =>
+    outcome.selectedSkillIds.length > 0
+    || outcome.deliveredSkillIds.length > 0
+    || outcome.creditedSkillIds.length > 0
+    || outcome.skillAttributionState === 'HOLD');
+  if (attributed.length === 0) return;
+  const batch = readSkillAttributionBatch(projectRoot, sprintId);
+  if (!batch) throw new SkillAttributionConflictError(sprintId);
+  const receipts = new Map(batch.receipts.map(receipt => [receipt.logicalTaskId, receipt] as const));
+  for (const outcome of attributed) {
+    const receipt = receipts.get(outcome.taskId);
+    if (
+      !receipt
+      || receipt.receiptDigest !== outcome.skillAttributionReceiptDigest
+      || receipt.state !== outcome.skillAttributionState
+      || !sameIds(receipt.selectedSkillIds, outcome.selectedSkillIds)
+      || !sameIds(receipt.deliveredSkillIds, outcome.deliveredSkillIds)
+      || !sameIds(receipt.creditedSkillIds, outcome.creditedSkillIds)
+      || !sameIds(receipt.creditedSkillIds, outcome.skillIds)
+    ) throw new SkillAttributionConflictError(sprintId);
+  }
+}
 
 /**
  * Tolerant comms-usage extraction from a worker's `.result` (Sprint 551 551-002).
@@ -114,6 +186,8 @@ export function collectCatalogStatsTerminalOutcomes(
   tasks: readonly Task[],
   evaluations: ReadonlyMap<string, TaskEvaluation>,
   results: ReadonlyMap<string, TaskResult>,
+  attributionByTask?: ReadonlyMap<string, SkillAttributionReceipt>,
+  deliveryByTask?: ReadonlyMap<string, PromptDeliveryAttribution>,
 ): CatalogStatsTerminalOutcome[] {
   const outcomes: CatalogStatsTerminalOutcome[] = [];
   for (const task of tasks) {
@@ -128,23 +202,179 @@ export function collectCatalogStatsTerminalOutcomes(
         && evaluation !== TaskEvaluation.NO_GO
       )
     ) continue;
-    const delivery = resolvePromptDeliveryAttribution({
+    const delivery = deliveryByTask?.get(task.id) ?? resolvePromptDeliveryAttribution({
       projectRoot,
       taskId: task.id,
       requireCurrentReceipt: typeof task.promptCompilePlanId === 'string',
       legacyAgentId: result.agentId ?? task.assignedAgent ?? null,
       legacySkillIds: result.skillIds ?? task.assignedSkills,
     });
+    const attribution = attributionByTask?.get(task.id);
+    const selectedSkillIds = attribution?.selectedSkillIds ?? delivery.skillIds;
+    const deliveredSkillIds = attribution?.deliveredSkillIds ?? delivery.skillIds;
+    // Delivery is exposure evidence, never causal efficacy evidence. Callers
+    // without a host-validated attribution receipt fail closed to exposure-only.
+    const creditedSkillIds = attribution?.creditedSkillIds ?? [];
+    const skillAttributionState = attribution?.state
+      ?? (selectedSkillIds.length > 0 || deliveredSkillIds.length > 0
+        ? 'EXPOSURE_ONLY'
+        : 'NO_SKILLS');
     outcomes.push({
       taskId: task.id,
       agentId: delivery.agentId,
-      skillIds: [...delivery.skillIds],
+      skillIds: [...creditedSkillIds],
+      selectedSkillIds: [...selectedSkillIds],
+      deliveredSkillIds: [...deliveredSkillIds],
+      creditedSkillIds: [...creditedSkillIds],
+      skillAttributionState,
+      ...(attribution ? { skillAttributionReceiptDigest: attribution.receiptDigest } : {}),
       evaluation,
       ...(typeof result.coverage === 'number' ? { coverage: result.coverage } : {}),
       commsUsage: parseCommsUsageFromResult(result),
     });
   }
   return outcomes;
+}
+
+const WORK_TYPE_INTENT: Readonly<Record<string, TaskDNA['intent']['primary']>> = Object.freeze({
+  build: 'implementation',
+  fix: 'bugfix',
+  refactor: 'refactor',
+  document: 'documentation',
+  review: 'architecture',
+  configure: 'config',
+  migrate: 'migration',
+  analyze: 'architecture',
+});
+
+const WORK_TYPE_OPERATIONS: Readonly<Record<string, TaskDNA['operations']>> = Object.freeze({
+  build: [{ type: 'create', weight: 0.6 }, { type: 'modify', weight: 0.4 }],
+  fix: [{ type: 'modify', weight: 1 }],
+  refactor: [{ type: 'modify', weight: 1 }],
+  document: [{ type: 'document', weight: 1 }],
+  review: [{ type: 'test', weight: 1 }],
+  configure: [{ type: 'configure', weight: 1 }],
+  migrate: [{ type: 'modify', weight: 0.7 }, { type: 'create', weight: 0.3 }],
+  analyze: [{ type: 'test', weight: 1 }],
+});
+
+function isTaskDNA(value: unknown): value is TaskDNA {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Partial<TaskDNA>;
+  const primary = record.intent?.primary;
+  return typeof primary === 'string'
+    && ALL_INTENT_TYPES.includes(primary as TaskDNA['intent']['primary'])
+    && Array.isArray(record.intent?.secondary)
+    && typeof record.intent?.confidence === 'number'
+    && Array.isArray(record.tags)
+    && Array.isArray(record.domains)
+    && Array.isArray(record.operations)
+    && !!record.complexity
+    && !!record.scope;
+}
+
+function normalizeFinalizerPath(value: string): string {
+  return value.replace(/\\/gu, '/').replace(/^\.\//u, '').replace(/\/{2,}/gu, '/');
+}
+
+function routingConfidence(value: string | number | undefined): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.max(0, Math.min(1, value));
+  }
+  switch (value) {
+    case 'high': return 0.9;
+    case 'medium': return 0.7;
+    case 'low': return 0.4;
+    case 'uncertain': return 0.2;
+    default: return 0;
+  }
+}
+
+/**
+ * Produce the learning projection from route-time structural facts. V3 never
+ * falls back to the old all-unknown DNA merely because it uses a different
+ * decision vocabulary; an already validated V2 DNA remains authoritative.
+ */
+export function deriveFinalizerTaskDNA(task: Pick<Task, 'scope' | 'routingMeta'>): TaskDNA {
+  if (isTaskDNA(task.routingMeta?.taskDNA)) return task.routingMeta.taskDNA;
+
+  const writePaths = [...new Set(task.scope.filesWrite.map(normalizeFinalizerPath).filter(Boolean))].sort();
+  const directoryClaims = [...new Set(task.scope.directories.map(normalizeFinalizerPath).filter(Boolean))].sort();
+  const moduleIds = new Set(
+    (writePaths.length > 0 ? writePaths : directoryClaims)
+      .map(path => path.split('/').slice(0, -1).join('/') || path.split('/')[0] || '')
+      .filter(Boolean),
+  );
+  const prefixCounts = new Map<string, number>();
+  for (const path of writePaths) {
+    const prefix = path.split('/')[0] ?? path;
+    prefixCounts.set(prefix, (prefixCounts.get(prefix) ?? 0) + 1);
+  }
+  const writeRatio = Object.fromEntries(
+    [...prefixCounts.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([prefix, count]) => [prefix, writePaths.length > 0 ? count / writePaths.length : 0]),
+  );
+  const primaryWriteTarget = [...prefixCounts.entries()]
+    .sort(([leftPrefix, leftCount], [rightPrefix, rightCount]) =>
+      rightCount - leftCount || leftPrefix.localeCompare(rightPrefix))[0]?.[0] ?? '';
+  const workType = task.routingMeta?.workType?.toLowerCase() ?? '';
+  const dominantDomain = task.routingMeta?.dominantDomain?.trim();
+  const fileCount = writePaths.length;
+  const estimatedSize: TaskDNA['complexity']['estimatedSize'] = fileCount === 0
+    ? 'trivial'
+    : fileCount <= 2
+      ? 'small'
+      : fileCount <= 5
+        ? 'medium'
+        : fileCount <= 10
+          ? 'large'
+          : 'epic';
+  const primaryIntent = dominantDomain === 'security' && (workType === 'review' || workType === 'analyze')
+    ? 'security'
+    : WORK_TYPE_INTENT[workType] ?? 'unknown';
+
+  return {
+    intent: {
+      primary: primaryIntent,
+      secondary: [],
+      confidence: routingConfidence(task.routingMeta?.confidence),
+    },
+    tags: [...new Set(task.routingMeta?.policyTags ?? [])].sort(),
+    domains: dominantDomain ? [{ name: dominantDomain, weight: 1 }] : [],
+    operations: [...(WORK_TYPE_OPERATIONS[workType] ?? [])],
+    complexity: {
+      fileCount,
+      moduleCount: moduleIds.size,
+      crossCutting: moduleIds.size > 1,
+      estimatedSize,
+    },
+    scope: {
+      writeRatio,
+      primaryWriteTarget,
+      testWriteRatio: fileCount > 0
+        ? writePaths.filter(path => /(^|\/)(test|tests|__tests__)(\/|$)|\.(?:test|spec)\.[^/]+$/iu.test(path)).length / fileCount
+        : 0,
+    },
+  };
+}
+
+/**
+ * Collapse each FIX/retry lineage to its resolving attempt while preserving the
+ * logical root id. Downstream learning/stat consumers therefore see one task
+ * with the routing and prompt authority that actually settled the lineage.
+ */
+export function projectFinalizerLogicalTasks(
+  terminalEvidence: Pick<SprintTerminalEvidence, 'logicalTasks'>,
+  attemptTasks: readonly Task[],
+): Task[] {
+  const tasksById = new Map(attemptTasks.map(task => [task.id, task]));
+  return terminalEvidence.logicalTasks.flatMap(logicalTask => {
+    const resolvingTaskId = logicalTask.resolvingAttempt?.taskId
+      ?? logicalTask.attempts.at(-1)?.taskId;
+    const resolvingTask = resolvingTaskId ? tasksById.get(resolvingTaskId) : undefined;
+    return resolvingTask ? [{ ...resolvingTask, id: logicalTask.logicalTaskId }] : [];
+  });
 }
 
 export interface CatalogStatsFileSystem {
@@ -179,12 +409,16 @@ function mergeCatalogStatsEntry(
   const measuredCoverage = outcomes
     .map(outcome => outcome.coverage)
     .filter((coverage): coverage is number => typeof coverage === 'number');
+  const previousCoverageSampleCount = typeof prior.coverageSampleCount === 'number'
+    ? prior.coverageSampleCount
+    : typeof prior.avgCoverage === 'number' ? previousUses : 0;
+  const coverageSampleCount = previousCoverageSampleCount + measuredCoverage.length;
   const avgCoverage = measuredCoverage.length === 0
     ? prior.avgCoverage
-    : previousUses > 0
-      ? (((typeof prior.avgCoverage === 'number' ? prior.avgCoverage : 0) * previousUses)
+    : previousCoverageSampleCount > 0
+      ? (((typeof prior.avgCoverage === 'number' ? prior.avgCoverage : 0) * previousCoverageSampleCount)
         + measuredCoverage.reduce((sum, coverage) => sum + coverage, 0))
-        / (previousUses + measuredCoverage.length)
+        / coverageSampleCount
       : measuredCoverage.reduce((sum, coverage) => sum + coverage, 0) / measuredCoverage.length;
 
   return {
@@ -193,6 +427,7 @@ function mergeCatalogStatsEntry(
     successCount,
     successRate: totalUses > 0 ? successCount / totalUses : 0,
     ...(avgCoverage === undefined ? {} : { avgCoverage }),
+    coverageSampleCount,
     lastUsedInSprint: sprintId,
   };
 }
@@ -203,7 +438,9 @@ export function writeCatalogStatsTerminalOutcomes(
   sprintId: string,
   outcomes: readonly CatalogStatsTerminalOutcome[],
   fileSystem: CatalogStatsFileSystem = catalogStatsFileSystem,
+  forceSkillAttributionCutover = false,
 ): void {
+  assertCatalogSkillAttributionAuthority(projectRoot, sprintId, outcomes);
   const agentOutcomes = new Map<string, CatalogStatsTerminalOutcome[]>();
   const skillOutcomes = new Map<string, CatalogStatsTerminalOutcome[]>();
   for (const outcome of outcomes) {
@@ -212,26 +449,68 @@ export function writeCatalogStatsTerminalOutcomes(
       entries.push(outcome);
       agentOutcomes.set(outcome.agentId, entries);
     }
-    for (const skillId of new Set(outcome.skillIds)) {
+    const causallyCredited = outcome.skillAttributionState === 'CREDITED'
+      ? outcome.creditedSkillIds
+      : [];
+    for (const skillId of new Set(causallyCredited)) {
       const entries = skillOutcomes.get(skillId) ?? [];
       entries.push(outcome);
       skillOutcomes.set(skillId, entries);
     }
   }
-  if (agentOutcomes.size === 0 && skillOutcomes.size === 0) return;
-
+  const hasSkillExposure = outcomes.some(outcome =>
+    outcome.selectedSkillIds.length > 0
+    || outcome.deliveredSkillIds.length > 0
+    || outcome.creditedSkillIds.length > 0);
   const statsDir = join(projectRoot, '.deckent', 'stats');
   const statsPath = join(statsDir, 'catalog-stats.json');
   const current = fileSystem.exists(statsPath)
     ? JSON.parse(fileSystem.read(statsPath)) as CatalogStatsSidecar
     : {};
   const agents = { ...(current.agents ?? {}) };
-  const skills = { ...(current.skills ?? {}) };
+  const hasCausalSkillAuthority = current.skillAttribution?.authority === 'causal-receipt-v1';
+  if (
+    agentOutcomes.size === 0
+    && skillOutcomes.size === 0
+    && !hasSkillExposure
+    && !forceSkillAttributionCutover
+    && hasCausalSkillAuthority
+  ) return;
+  const legacySkills = hasCausalSkillAuthority ? {} : { ...(current.skills ?? {}) };
+  const legacyQuarantineDigest = hasCausalSkillAuthority
+    ? current.skillAttribution?.legacyQuarantineDigest ?? null
+    : Object.keys(legacySkills).length > 0
+      ? `sha256:${createHash('sha256').update(canonicalJson(legacySkills)).digest('hex')}`
+      : null;
+  const skills = hasCausalSkillAuthority ? { ...(current.skills ?? {}) } : {};
   for (const [agentId, entityOutcomes] of agentOutcomes) {
     agents[agentId] = mergeCatalogStatsEntry(agents[agentId], entityOutcomes, sprintId);
   }
   for (const [skillId, entityOutcomes] of skillOutcomes) {
     skills[skillId] = mergeCatalogStatsEntry(skills[skillId], entityOutcomes, sprintId);
+  }
+
+  const skillExposure: Record<string, CatalogSkillExposureEntry> = {
+    ...(current.skillExposure ?? {}),
+  };
+  for (const outcome of outcomes) {
+    const selected = new Set(outcome.selectedSkillIds);
+    const delivered = new Set(outcome.deliveredSkillIds);
+    const credited = new Set(
+      outcome.skillAttributionState === 'CREDITED' ? outcome.creditedSkillIds : [],
+    );
+    const observed = new Set([...selected, ...delivered, ...credited]);
+    for (const skillId of observed) {
+      const prior = skillExposure[skillId] ?? {};
+      skillExposure[skillId] = {
+        ...prior,
+        selected: (typeof prior.selected === 'number' ? prior.selected : 0) + (selected.has(skillId) ? 1 : 0),
+        delivered: (typeof prior.delivered === 'number' ? prior.delivered : 0) + (delivered.has(skillId) ? 1 : 0),
+        credited: (typeof prior.credited === 'number' ? prior.credited : 0) + (credited.has(skillId) ? 1 : 0),
+        terminalOutcomes: (typeof prior.terminalOutcomes === 'number' ? prior.terminalOutcomes : 0) + 1,
+        lastObservedInSprint: sprintId,
+      };
+    }
   }
 
   // Comms usage is recorded once per attempt (taskId), not aggregated like the
@@ -245,8 +524,41 @@ export function writeCatalogStatsTerminalOutcomes(
 
   fileSystem.mkdir(statsDir);
   const tempPath = `${statsPath}.${process.pid}.${randomUUID()}.tmp`;
-  fileSystem.write(tempPath, `${JSON.stringify({ ...current, agents, skills, commsUsage }, null, 2)}\n`);
+  fileSystem.write(tempPath, `${JSON.stringify({
+    ...current,
+    schemaVersion: 2,
+    agents,
+    skills,
+    skillExposure,
+    skillAttribution: {
+      authority: 'causal-receipt-v1',
+      cutoverSprint: current.skillAttribution?.cutoverSprint ?? sprintId,
+      legacyQuarantineDigest,
+    },
+    ...(!hasCausalSkillAuthority && Object.keys(legacySkills).length > 0 ? {
+      legacySkillStatsQuarantine: {
+        sourceDigest: legacyQuarantineDigest!,
+        cutoverSprint: sprintId,
+        skills: legacySkills,
+      },
+    } : {}),
+    commsUsage,
+  }, null, 2)}\n`);
   fileSystem.rename(tempPath, statsPath);
+}
+
+/** Explicit pre-dogfood cutover entrypoint; empty outcome lists never mint efficacy. */
+export function persistCatalogStatsSkillAttributionCutover(
+  projectRoot: string,
+  cutoverId: string,
+): void {
+  writeCatalogStatsTerminalOutcomes(
+    projectRoot,
+    cutoverId,
+    [],
+    catalogStatsFileSystem,
+    true,
+  );
 }
 
 import {
@@ -3930,10 +4242,7 @@ export async function finalizeSprint(
   });
   const tasksById = new Map(attemptTasks.map(task => [task.id, task]));
   const resultsById = new Map(results.map(result => [result.taskId, result]));
-  const logicalTasks = terminalTruth.terminalEvidence.logicalTasks.flatMap(logicalTask => {
-    const rootTask = tasksById.get(logicalTask.logicalTaskId);
-    return rootTask ? [rootTask] : [];
-  });
+  const logicalTasks = projectFinalizerLogicalTasks(terminalTruth.terminalEvidence, attemptTasks);
   const logicalResults = terminalTruth.terminalEvidence.logicalTasks.flatMap(logicalTask => {
     const resolvingTaskId = logicalTask.resolvingAttempt?.taskId
       ?? logicalTask.attempts.at(-1)?.taskId;
@@ -3947,6 +4256,33 @@ export async function finalizeSprint(
     const delivery = resolvingTaskId ? deliveryByAttempt.get(resolvingTaskId) : undefined;
     return delivery ? [[logicalTask.logicalTaskId, delivery] as const] : [];
   }));
+  const skillAttributionReceipts = terminalTruth.terminalEvidence.logicalTasks.flatMap(logicalTask => {
+    const resolvingAttemptId = logicalTask.resolvingAttempt?.taskId
+      ?? logicalTask.attempts.at(-1)?.taskId;
+    if (!resolvingAttemptId) return [];
+    const resolvingTask = tasksById.get(resolvingAttemptId);
+    const delivery = deliveryByAttempt.get(resolvingAttemptId);
+    if (!resolvingTask || !delivery) return [];
+    const selectedSkillIds = delivery.state === 'CURRENT'
+      ? delivery.receipt.assignedSkillIds
+      : resolvingTask.assignedSkills ?? [];
+    return [buildSkillAttributionReceipt({
+      sprintId: sprint.id,
+      logicalTaskId: logicalTask.logicalTaskId,
+      resolvingAttemptId,
+      routingDecisionDigest: resolvingTask.routingMeta?.skillDecisionDigest ?? null,
+      skillEvidenceDigest: resolvingTask.routingMeta?.skillEvidenceDigest ?? null,
+      logicalSettlementDigest: terminalTruth.logicalSettlementDigest,
+      promptDeliveryState: delivery.state,
+      selectedSkillIds,
+      deliveredSkillIds: delivery.skillIds,
+      // No worker/task verdict can populate `appliedEvidence`. A future host
+      // validator may supply it; until then the durable state is exposure-only.
+    })];
+  });
+  const skillAttributionByLogicalTask = new Map(
+    skillAttributionReceipts.map(receipt => [receipt.logicalTaskId, receipt] as const),
+  );
   const logicalSprint: Sprint = { ...sprint, tasks: logicalTasks };
   const logicalEvaluations = new Map(terminalTruth.logicalEvaluations);
 
@@ -3966,6 +4302,10 @@ export async function finalizeSprint(
     }
     throw new FinalizerTerminalEvidenceError('SPRINT_ARCHIVE_EXISTING_SEAL_IDENTITY_MISMATCH');
   }
+
+  // Immutable, logical-task-grain skill attribution is published before any
+  // mutable learning/stat projection. A conflicting replay blocks projection.
+  writeSkillAttributionBatch(projectRoot, sprint.id, skillAttributionReceipts);
 
   // 0. Legacy ambient code observation (diagnostic-only). It deliberately runs
   // after the immutable replay branch so sealed re-entry remains observational.
@@ -4301,6 +4641,14 @@ export async function finalizeSprint(
     const { OutcomeTracker } = await import('./outcome-tracker.js');
     const { assessQuality } = await import('./quality-assessor.js');
     const tracker = new OutcomeTracker(projectRoot);
+    const catalogOutcomes = collectCatalogStatsTerminalOutcomes(
+      projectRoot,
+      logicalTasks,
+      logicalEvaluations,
+      logicalResultsMap,
+      skillAttributionByLogicalTask,
+      logicalDelivery,
+    );
 
     // FINALIZE-RECOUNT guard (Sprint 268, 1b): recordOutcome appends
     // sprint.id to learnings.recentSprints on the first record and that
@@ -4318,13 +4666,12 @@ export async function finalizeSprint(
       debugLog('finalizeSprint:routing-outcomes',
         `Stats already recorded for ${sprint.id} — skipping re-record (idempotent re-finalize)`);
     } else {
-      const catalogOutcomes = collectCatalogStatsTerminalOutcomes(projectRoot, attemptTasks, evaluations, resultsMap);
       const catalogOutcomesByTask = new Map(catalogOutcomes.map(outcome => [outcome.taskId, outcome]));
-      for (const task of attemptTasks) {
+      for (const task of logicalTasks) {
         const terminalOutcome = catalogOutcomesByTask.get(task.id);
         if (!terminalOutcome) continue;
         const evaluation = terminalOutcome.evaluation;
-        const taskResult = resultsMap.get(task.id);
+        const taskResult = logicalResultsMap.get(task.id);
         if (!taskResult) continue;
         // F5: record use against the agent's current prompt version (V2 path).
         if (terminalOutcome.agentId) {
@@ -4343,18 +4690,23 @@ export async function finalizeSprint(
         tracker.recordOutcome({
           taskId: task.id,
           sprintId: sprint.id,
-          taskDNA: (task.routingMeta?.taskDNA ?? { intent: { primary: 'unknown', secondary: [], confidence: 0 }, domains: [], operations: [], complexity: { fileCount: 0, moduleCount: 0, crossCutting: false, estimatedSize: 'small' }, scope: { writeRatio: {}, primaryWriteTarget: '', testWriteRatio: 0 } }) as TaskDNA,
+          taskDNA: deriveFinalizerTaskDNA(task),
           agentId: terminalOutcome.agentId,
-          skillIds: [...terminalOutcome.skillIds],
+          skillIds: [...(terminalOutcome.creditedSkillIds ?? terminalOutcome.skillIds)],
+          skillExposureIds: [...new Set([
+            ...(terminalOutcome.selectedSkillIds ?? []),
+            ...(terminalOutcome.deliveredSkillIds ?? []),
+          ])].sort(),
+          skillAttributionState: terminalOutcome.skillAttributionState ?? 'HOLD',
           evaluation: evaluation as unknown as 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO',
           coverage: taskResult.coverage ?? 0,
           qualityScore,
-          routingVersion: 'v2',
+          routingVersion: task.routingMeta?.routingVersion ?? 'v2',
         });
 
       }
       writeCatalogStatsTerminalOutcomes(projectRoot, sprint.id, catalogOutcomes);
-      debugLog('finalizeSprint:routing-outcomes', `Recorded ${sprint.tasks.length} routing outcomes to learnings.json`);
+      debugLog('finalizeSprint:routing-outcomes', `Recorded ${logicalTasks.length} logical routing outcomes to learnings.json`);
     }
 
     // ROUTING-V3 learning cells (673-002 closure). Deliberately OUTSIDE the V2
@@ -4370,14 +4722,13 @@ export async function finalizeSprint(
     // signal in an OOM/SIGKILL).
     try {
       const { recordOutcome: recordCell } = await import('../core/routing/learning-cells.js');
-      const v3Outcomes = collectCatalogStatsTerminalOutcomes(projectRoot, attemptTasks, evaluations, resultsMap);
-      for (const outcome of v3Outcomes) {
-        const task = attemptTasks.find(t => t.id === outcome.taskId);
+      for (const outcome of catalogOutcomes) {
+        const task = logicalTasks.find(t => t.id === outcome.taskId);
         const v3Meta = task?.routingMeta;
         if (!task || v3Meta?.routingVersion !== 'v3' || !outcome.agentId) continue;
         const dominantDomain = v3Meta.dominantDomain;
         if (!dominantDomain) continue;
-        const taskResult = resultsMap.get(task.id);
+        const taskResult = logicalResultsMap.get(task.id);
         let qualityScore: number | undefined;
         if (taskResult) {
           try {
@@ -4399,20 +4750,11 @@ export async function finalizeSprint(
       debugLog('finalizeSprint:routing-cells', e);
     }
 
-    // 8d. Evolve routing rules from accumulated data
-    try {
-      const { RuleEvolver } = await import('./rule-evolver.js');
-      const evolver = new RuleEvolver(tracker, projectRoot);
-      const evolution = evolver.evolveRules();
-      if (evolution.newRules.length > 0) {
-        debugLog('finalizeSprint:rule-evolution', `${evolution.newRules.length} new rules evolved`);
-        // Persist evolved rules in learnings AND standalone file
-        tracker.saveEvolvedRules(evolution.newRules);
-        evolver.saveRules(evolution.newRules);
-      }
-    } catch (e) { debugLog('finalizeSprint:ruleEvolution', e); }
+    // 8d. Legacy RuleEvolver production writes are retired. V3 never consumed
+    // those activation rules, so continuing to mint them would be a semantic
+    // dead producer and an unjournaled future feedback risk.
 
-    // 8e. Evaluate promotions/demotions
+    // 8e. Evaluate promotions/demotions from causal receipt-backed stats only.
     try {
       const { PromotionPipeline } = await import('./promotion-pipeline.js');
       const pipeline = new PromotionPipeline(projectRoot);
@@ -4436,7 +4778,11 @@ export async function finalizeSprint(
       }
     } catch (e) { debugLog('finalizeSprint:promotionDemotion', e); }
   } catch (err) {
-    debugLog('finalizeSprint:v2-learning', `V2 learning pipeline failed: ${err}`);
+    debugLog('finalizeSprint:skill-attribution-projection', err);
+    // Selection/delivery/credit truth is a settlement invariant after the P0
+    // cutover. Silently completing while its durable projections failed would
+    // recreate attribution poisoning on the next run.
+    throw new FinalizerTerminalEvidenceError('SKILL_ATTRIBUTION_PROJECTION_HOLD');
   }
 
   // 9. Update project docs

@@ -1,7 +1,11 @@
 import { snapshotSkillCatalog } from '../../core/skill-pool.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { readCatalogStats } from '../../core/catalog-stats-read-model.js';
-import type { CatalogEntityStats } from '../../core/catalog-stats-read-model.js';
+import type {
+  CatalogEntityStats,
+  CatalogStatsReadModel,
+  CatalogSkillExposureStats,
+} from '../../core/catalog-stats-read-model.js';
 import { mcpToolDescription } from './description-catalog.js';
 
 interface SkillManifest {
@@ -21,12 +25,12 @@ interface SkillEntry {
   category: string;
   triggers: string[];
   stats: CatalogEntityStats | null;
+  exposure: CatalogSkillExposureStats | null;
 }
 
 // S5 (sprint-523 task 7): the raw directory scan is deleted — this surface
 // consumes the canonical catalog snapshot, identical to CLI and the S8 gate.
-function readSkills(root: string): SkillEntry[] {
-  const catalogStats = readCatalogStats(root);
+function readSkills(root: string, catalogStats: CatalogStatsReadModel): SkillEntry[] {
   return snapshotSkillCatalog(root).entries.map((entry) => {
     const manifest = entry.definition as SkillManifest & {
       routing?: { profileState?: string };
@@ -41,6 +45,7 @@ function readSkills(root: string): SkillEntry[] {
       masked: entry.masked,
       profileState: manifest.routing?.profileState ?? null,
       stats: catalogStats.skills[entry.id] ?? null,
+      exposure: catalogStats.skillExposure[entry.id] ?? null,
     };
   });
 }
@@ -61,7 +66,8 @@ export function registerSkillListTool(server: McpServer): void {
       const root = process.cwd();
 
       try {
-        const skills = readSkills(root);
+        const catalogStats = readCatalogStats(root);
+        const skills = readSkills(root, catalogStats);
 
         const byCategory: Record<string, number> = {};
         for (const skill of skills) {
@@ -72,6 +78,7 @@ export function registerSkillListTool(server: McpServer): void {
           skills,
           total: skills.length,
           byCategory,
+          skillAttribution: catalogStats.skillAttribution,
         };
 
         return {

@@ -51,6 +51,8 @@ function makeOutcome(overrides: Partial<RoutingOutcome> = {}): RoutingOutcome {
     taskDNA: makeTaskDNA(),
     agentId: 'bug-fixer',
     skillIds: ['typescript-expert'],
+    skillExposureIds: ['typescript-expert'],
+    skillAttributionState: 'CREDITED',
     evaluation: 'DONE',
     coverage: 90,
     routingVersion: 'v2',
@@ -116,9 +118,9 @@ describe('recordCrossVerifyVerdict — REFUTED', () => {
     expect(after.totalTasks).toBeGreaterThan(beforeTotal);
   });
 
-  it('REFUTED → failCount incremented for skill performance', () => {
+  it('REFUTED leaves skill efficacy unchanged without skill-specific causal evidence', () => {
     tracker.recordOutcome(makeOutcome());
-    const { failCount: beforeFail } = tracker.getLearnings().skillPerformance['typescript-expert']!;
+    const before = { ...tracker.getLearnings().skillPerformance['typescript-expert']! };
 
     tracker.recordValidatedCrossVerifyVerdict(
       'bug-fixer',
@@ -127,14 +129,13 @@ describe('recordCrossVerifyVerdict — REFUTED', () => {
       'implementation',
     );
 
-    const after = tracker.getLearnings().skillPerformance['typescript-expert']!;
-    expect(after.failCount).toBeGreaterThan(beforeFail);
+    expect(tracker.getLearnings().skillPerformance['typescript-expert']).toEqual(before);
   });
 
-  it('REFUTED → synergy entry for agent+skill pair gets isSuccess=false signal', () => {
+  it('REFUTED leaves agent+skill synergy unchanged without skill-specific causal evidence', () => {
     tracker.recordOutcome(makeOutcome());
-    // After one DONE outcome the synergy entry exists with successRate=1.0.
     const pairKey = 'bug-fixer+typescript-expert';
+    const before = { ...tracker.getSynergyMatrix().find(e => e.pair === pairKey)! };
 
     tracker.recordValidatedCrossVerifyVerdict(
       'bug-fixer',
@@ -143,10 +144,7 @@ describe('recordCrossVerifyVerdict — REFUTED', () => {
       'implementation',
     );
 
-    const synergy = tracker.getSynergyMatrix().find(e => e.pair === pairKey);
-    expect(synergy).toBeDefined();
-    // With 1 success + 1 refuted signal: tasks=2, successRate=0.5 → no longer 1.0.
-    expect(synergy!.successRate).toBeLessThan(1);
+    expect(tracker.getSynergyMatrix().find(e => e.pair === pairKey)).toEqual(before);
   });
 });
 
@@ -171,9 +169,9 @@ describe('recordCrossVerifyVerdict — CONFIRMED', () => {
     expect(after.successRate).toBeGreaterThanOrEqual(beforeRate);
   });
 
-  it('CONFIRMED → successCount incremented for skill performance', () => {
+  it('CONFIRMED leaves skill efficacy unchanged without skill-specific causal evidence', () => {
     tracker.recordOutcome(makeOutcome());
-    const { successCount: beforeSuccess } = tracker.getLearnings().skillPerformance['typescript-expert']!;
+    const before = { ...tracker.getLearnings().skillPerformance['typescript-expert']! };
 
     tracker.recordValidatedCrossVerifyVerdict(
       'bug-fixer',
@@ -182,8 +180,7 @@ describe('recordCrossVerifyVerdict — CONFIRMED', () => {
       'implementation',
     );
 
-    const after = tracker.getLearnings().skillPerformance['typescript-expert']!;
-    expect(after.successCount).toBeGreaterThan(beforeSuccess);
+    expect(tracker.getLearnings().skillPerformance['typescript-expert']).toEqual(before);
   });
 });
 
@@ -244,10 +241,11 @@ describe('recordCrossVerifyVerdict — xverify disabled / not called', () => {
 // ─── Tests: null agentId ─────────────────────────────────────────────────────
 
 describe('recordCrossVerifyVerdict — null agentId', () => {
-  it('null agentId → only skillPerformance updated, agentPerformance untouched', () => {
+  it('null agentId → no efficacy projection changes', () => {
     // Record an outcome with a named agent first.
     tracker.recordOutcome(makeOutcome());
     const agentBefore = { ...tracker.getLearnings().agentPerformance['bug-fixer']! };
+    const skillBefore = { ...tracker.getLearnings().skillPerformance['typescript-expert']! };
 
     tracker.recordValidatedCrossVerifyVerdict(
       null,
@@ -258,8 +256,6 @@ describe('recordCrossVerifyVerdict — null agentId', () => {
 
     // Agent performance must be unchanged.
     expect(tracker.getLearnings().agentPerformance['bug-fixer']).toEqual(agentBefore);
-    // Skill must have received the refuted signal.
-    const skill = tracker.getLearnings().skillPerformance['typescript-expert']!;
-    expect(skill.failCount).toBeGreaterThan(0);
+    expect(tracker.getLearnings().skillPerformance['typescript-expert']).toEqual(skillBefore);
   });
 });

@@ -245,6 +245,7 @@ const INVOCATION_REASON_CODES = new Set([
   'no_provider',
   'budget_capability_unsupported',
   'provider_authority_rejected',
+  'routing_authority_rejected',
   'execution_admission_rejected',
   'legacy_operator_attestation',
   'not_dispatched_settled',
@@ -259,6 +260,10 @@ const INVOCATION_REASON_CODES = new Set([
   'fallback_limit_hold',
   'fallback_exhausted',
   'provider_resolution_fallback',
+  // 2026-08-28 (F5): abandoned-dispatch reconciliation. This vocabulary is a SECOND
+  // copy of src/core/invocation-receipt-store.ts's INVOCATION_REASON_CODES; nothing keeps
+  // the two in sync, so a code added there is silently rejected here as EVENT_SEMANTICS.
+  'abandoned_dispatch_reconciled',
   'coordinator_restart_orphan',
   'duplicate_invocation',
 ]);
@@ -266,6 +271,7 @@ const INVOCATION_PRE_DISPATCH_REASON_CODES = new Set([
   'no_provider',
   'budget_capability_unsupported',
   'provider_authority_rejected',
+  'routing_authority_rejected',
   'execution_admission_rejected',
   'legacy_operator_attestation',
   'command_build_failed',
@@ -1380,6 +1386,27 @@ function exactNotDispatchedSettlement(events) {
     && consumerSettled.payload.outcome === 'accepted'
     && consumerSettled.payload.taskDisposition === 'not_dispatched';
 }
+
+/**
+ * A dispatched invocation that reached a complete terminal chain.
+ *
+ * 2026-08-28 (F5): the gate previously accepted ONLY exactNotDispatchedSettlement, so a
+ * fully settled dispatched receipt — dispatch_started → transport_settled → consumer_settled —
+ * was still reported as DISPATCH_STARTED (the detail code tests `some(dispatch_started)`,
+ * which stays true after settlement). That made a one-shot run whose worker died
+ * impossible to clean even once it HAD been reconciled through the settlement authority.
+ */
+function exactDispatchedSettlement(events) {
+  if (events.length !== 3) return false;
+  const [dispatchStarted, transportSettled, consumerSettled] = events;
+  return dispatchStarted?.type === 'dispatch_started'
+    && transportSettled?.type === 'transport_settled'
+    && consumerSettled?.type === 'consumer_settled'
+    && consumerSettled.payload.taskDisposition !== 'not_dispatched'
+    && TERMINAL_TASK_DISPOSITIONS.has(consumerSettled.payload.taskDisposition);
+}
+
+const TERMINAL_TASK_DISPOSITIONS = new Set(['done', 'no_go', 'manual_review_required']);
 
 function inspectTaskExecutionFences(
   report,
@@ -2756,7 +2783,13 @@ function reconcilePendingTasks(
         });
         continue;
       }
-      if (!soleView || !exactNotDispatchedSettlement(soleView.events)) {
+      const notDispatchedTerminal = soleView
+        ? exactNotDispatchedSettlement(soleView.events)
+        : false;
+      const dispatchedTerminal = soleView
+        ? exactDispatchedSettlement(soleView.events)
+        : false;
+      if (!soleView || (!notDispatchedTerminal && !dispatchedTerminal)) {
         const detailCode = soleView?.events.some(event => event.type === 'dispatch_started')
           ? 'DISPATCH_STARTED'
           : soleView?.events.some(event => event.type === 'transport_settled')
@@ -2776,12 +2809,14 @@ function reconcilePendingTasks(
         });
         continue;
       }
-      const consumerSettled = soleView.events[1];
+      const consumerSettled = soleView.events.at(-1);
       report.projections.push({
         surface: 'task',
         id: task.id,
         rawStatus: 'PENDING',
-        effectiveStatus: 'NOT_DISPATCHED',
+        effectiveStatus: notDispatchedTerminal
+          ? 'NOT_DISPATCHED'
+          : String(consumerSettled.payload.taskDisposition).toUpperCase(),
         authority: 'invocation-receipt',
         evidenceRefs: [
           task.ref,

@@ -31,9 +31,9 @@ import {
   JournalReplayMismatchError,
 } from '../../../src/core/routing/journal.js';
 import { routeTaskV3 } from '../../../src/core/routing/route-task-v3.js';
-import type { RouteCatalog, RoutableTask } from '../../../src/core/routing/route-task-v3.js';
+import type { RouteCatalog, RoutableTask, SkillCandidate } from '../../../src/core/routing/route-task-v3.js';
 import { matchSpace } from '../../../src/core/routing/capability-vector.js';
-import type { CapabilityVector } from '../../../src/core/routing/capability-vector.js';
+import type { CapabilityVector, SkillProfile } from '../../../src/core/routing/capability-vector.js';
 import type { RequirementVector } from '../../../src/core/routing/requirement-vector.js';
 import { DEFAULT_ROUTING_V3_CONFIG } from '../../../src/core/routing/config.js';
 import { BUILTIN_DOMAINS } from '../../../src/core/routing/vocabulary-builtin.js';
@@ -142,6 +142,18 @@ function catalogOf(...agents: AgentCandidate[]): RouteCatalog {
     agents,
     skills: [],
     vocabulary: { domains: BUILTIN_DOMAINS, knownDomainIds: KNOWN_DOMAINS },
+  };
+}
+
+function admittedSkill(skillId: string, profile: SkillProfile): SkillCandidate {
+  return {
+    skillId,
+    profile,
+    applicability: {
+      admitted: true,
+      matchedEvidence: ['project:test-fixture:explicit'],
+      profileDigest: `sha256:${'a'.repeat(64)}`,
+    },
   };
 }
 
@@ -513,8 +525,8 @@ describe('routeTaskV3 — deterministic end-to-end', () => {
     const catalog: RouteCatalog = {
       ...catalogOf(builder),
       skills: [
-        { skillId: 'irrelevant-skill', profile: { profileVersion: 3, workTypes: [{ type: 'migrate', proficiency: 'primary' }], domains: [{ id: 'docs', proficiency: 'primary' }], expertise: [], deliverables: [] } },
-        { skillId: 'core-build-skill', profile: { profileVersion: 3, workTypes: [{ type: 'build', proficiency: 'primary' }], domains: [{ id: 'core-runtime', proficiency: 'primary' }], expertise: [], deliverables: [] } },
+        admittedSkill('irrelevant-skill', { profileVersion: 3, workTypes: [{ type: 'migrate', proficiency: 'primary' }], domains: [{ id: 'docs', proficiency: 'primary' }], expertise: [], deliverables: [] }),
+        admittedSkill('core-build-skill', { profileVersion: 3, workTypes: [{ type: 'build', proficiency: 'primary' }], domains: [{ id: 'core-runtime', proficiency: 'primary' }], expertise: [], deliverables: [] }),
       ],
     };
     const decision = await routeTaskV3(BUILD_TASK, catalog, { config: CONFIG, requirement: req({}) });
@@ -530,8 +542,8 @@ describe('routeTaskV3 — deterministic end-to-end', () => {
     const catalog: RouteCatalog = {
       ...catalogOf(builder),
       skills: [
-        { skillId: 'aaa-generic-skill', profile: { profileVersion: 3, workTypes: [{ type: 'build', proficiency: 'primary' }], domains: [{ id: 'docs', proficiency: 'primary' }], expertise: [], deliverables: [] } },
-        { skillId: 'bbb-generic-skill', profile: { profileVersion: 3, workTypes: [{ type: 'build', proficiency: 'primary' }], domains: [{ id: 'security', proficiency: 'primary' }], expertise: [], deliverables: [] } },
+        admittedSkill('aaa-generic-skill', { profileVersion: 3, workTypes: [{ type: 'build', proficiency: 'primary' }], domains: [{ id: 'docs', proficiency: 'primary' }], expertise: [], deliverables: [] }),
+        admittedSkill('bbb-generic-skill', { profileVersion: 3, workTypes: [{ type: 'build', proficiency: 'primary' }], domains: [{ id: 'security', proficiency: 'primary' }], expertise: [], deliverables: [] }),
       ],
     };
     // requirement domain is core-runtime — neither skill overlaps → NO skills,
@@ -557,8 +569,8 @@ describe('routeTaskV3 — deterministic end-to-end', () => {
     const catalog: RouteCatalog = {
       ...catalogOf(builder),
       skills: [
-        { skillId: 'generic-builder', profile: generic.profile },
-        { skillId: 'testing-expert', profile: testing.profile },
+        admittedSkill('generic-builder', generic.profile),
+        admittedSkill('testing-expert', testing.profile),
       ],
     };
 
@@ -570,7 +582,7 @@ describe('routeTaskV3 — deterministic end-to-end', () => {
     const catalog: RouteCatalog = {
       ...catalogOf(builder),
       skills: [
-        { skillId: 'everywhere-skill', profile: { profileVersion: 3, workTypes: [{ type: 'build', proficiency: 'primary' }], domains: [{ id: '*', proficiency: 'secondary' }], expertise: [], deliverables: [] } },
+        admittedSkill('everywhere-skill', { profileVersion: 3, workTypes: [{ type: 'build', proficiency: 'primary' }], domains: [{ id: '*', proficiency: 'secondary' }], expertise: [], deliverables: [] }),
       ],
     };
     const decision = await routeTaskV3(BUILD_TASK, catalog, { config: CONFIG, requirement: req({}) });
@@ -588,13 +600,17 @@ describe('journal v3 + replay', () => {
       const requirement = req({});
       const decision = await routeTaskV3(BUILD_TASK, catalog, { config: CONFIG, requirement });
       const entry: JournalEntryV3 = {
-        schemaVersion: 1,
+        schemaVersion: 2,
         taskId: 't-1',
         sprintId: 'sprint-test',
         recordedAt: '2026-07-14T00:00:00.000Z',
         requirement,
         configHash: hashConfig(CONFIG),
         catalog: { builder: builder.capabilities, refactorer: refactorer.capabilities },
+        skillCatalog: [],
+        skillCatalogDigest: decision.skillSelection.catalogDigest,
+        skillEvidence: {},
+        skillEvidenceDigest: decision.skillSelection.evidenceDigest,
         decision: decision as RoutingDecisionV3,
       };
       appendDecision(root, entry);
@@ -612,16 +628,61 @@ describe('journal v3 + replay', () => {
         agentId: decision.agentId,
         finalScore: decision.finalScore,
         ranked: decision.ranked,
+        skillIds: decision.skillIds,
+        skillSelection: decision.skillSelection,
       });
       expect(() => replayDecision(read.entries[0]!, hashConfig(CONFIG), derive)).not.toThrow();
 
       // …winner drift and config drift both throw typed errors
       expect(() =>
-        replayDecision(read.entries[0]!, hashConfig(CONFIG), () => ({ agentId: 'other', finalScore: 0, ranked: [] })),
+        replayDecision(read.entries[0]!, hashConfig(CONFIG), () => ({
+          agentId: 'other', finalScore: 0, ranked: [], skillIds: [], skillSelection: {},
+        })),
+      ).toThrow(JournalReplayMismatchError);
+      expect(() =>
+        replayDecision(read.entries[0]!, hashConfig(CONFIG), () => ({
+          ...derive(), skillIds: ['drifted-skill'],
+        })),
       ).toThrow(JournalReplayMismatchError);
       expect(() =>
         replayDecision(read.entries[0]!, hashConfig({ ...CONFIG, topK: 99 }), derive),
       ).toThrow(JournalReplayMismatchError);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps legacy v1 journals readable while making their missing skill replay proof explicit', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'r3-journal-v1-'));
+    try {
+      const catalog = catalogOf(builder, refactorer);
+      const requirement = req({});
+      const decision = await routeTaskV3(BUILD_TASK, catalog, { config: CONFIG, requirement });
+      const { skillSelection: legacyMissingSkillProof, ...legacyDecision } = decision;
+      void legacyMissingSkillProof;
+      const entry: JournalEntryV3 = {
+        schemaVersion: 1,
+        taskId: 'legacy-task',
+        sprintId: 'sprint-legacy',
+        recordedAt: '2026-07-14T00:00:00.000Z',
+        requirement,
+        configHash: hashConfig(CONFIG),
+        catalog: { builder: builder.capabilities, refactorer: refactorer.capabilities },
+        decision: legacyDecision,
+      };
+      appendDecision(root, entry);
+      const read = readSprintJournal(root, 'sprint-legacy');
+
+      expect(read.entries).toHaveLength(1);
+      expect(read.entries[0]?.schemaVersion).toBe(1);
+      expect(() => replayDecision(read.entries[0]!, hashConfig(CONFIG), () => ({
+        agentId: decision.agentId,
+        finalScore: decision.finalScore,
+        ranked: decision.ranked,
+        // V1 never claimed skill replay integrity; a drift here is deliberately
+        // ignored for backward read compatibility, not misreported as proof.
+        skillIds: ['unproven-legacy-skill'],
+      }))).not.toThrow();
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

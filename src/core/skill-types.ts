@@ -63,6 +63,12 @@ export interface SkillDefinition {
   /** ROUTING-V3 skill matching profile (capability-vector.ts SkillProfile shape);
    *  optional — profile-less skills are simply not V3 candidates. */
   profile?: unknown;
+  /**
+   * Hard task-applicability contract. Unlike `profile`, this is an eligibility
+   * gate, not a semantic score. It is intentionally `unknown` at the manifest
+   * boundary and validated by `routing/skill-applicability.ts` before use.
+   */
+  applicability?: unknown;
   /** Provenance for a persisted generated profile. Absence means the profile is authored. */
   profileProvenance?: PersistedSkillProfileProvenance;
   id: string;
@@ -97,7 +103,7 @@ export interface PersistedSkillProfileProvenance {
 }
 
 export interface SkillProfileFieldProvenance {
-  derivationVersion: 2;
+  derivationVersion: 3;
   fields: {
     workTypes: SkillProfileProvenanceNote;
     domains: SkillProfileProvenanceNote;

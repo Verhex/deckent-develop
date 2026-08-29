@@ -17,6 +17,10 @@ type MessageMap = Record<string, Record<string, string>>;
  * `getMessage()`.
  */
 const BASE_MESSAGES: MessageMap = {
+  'common.never': {
+    en: 'never',
+    tr: 'hiç',
+  },
   // ─── Generated root/advanced help (CLI surface reform v2.1) ───────
   'cli.root_help.usage': {
     en: 'Usage: deckent [options] [prompt]',
@@ -420,6 +424,12 @@ const BASE_MESSAGES: MessageMap = {
     tr: 'Run, görev oluşturulmadan beklemeye alındı: provider execution authority hazır değil '
       + '(neden: {reason}, kanıt: {evidence}). Görev, provider veya backend başlatılmadı.',
   },
+  'run.routing_authority_hold': {
+    en: 'Run held before dispatch: routing authority could not produce a valid agent/skill decision '
+      + '(reason: {reason}). No provider or backend was started.',
+    tr: 'Run dispatch öncesinde beklemeye alındı: routing authority geçerli bir agent/skill '
+      + 'kararı üretemedi (neden: {reason}). Provider veya backend başlatılmadı.',
+  },
   /** Actionable remedy appended to a hold the operator can actually resolve. */
   'run.provider_authority_hold.remedy_keyring': {
     en: 'Remedy: the provider authority keyring is not provisioned. Inspect it with '
@@ -545,6 +555,26 @@ const BASE_MESSAGES: MessageMap = {
   'task.settle.reason.receipt-ambiguous': {
     en: 'multiple or conflicting receipts prevent a unique decision',
     tr: 'birden çok veya çelişkili receipt tekil kararı engelliyor',
+  },
+  'task.settle.opt_reproject_status': {
+    en: 'Make the task file\'s status agree with its own TERMINAL receipt. Writes nothing new — the receipt is the authority; this only resolves a task surface left behind by a caller that stopped waiting.',
+    tr: 'Görev dosyasının status alanını kendi TERMİNAL receipt\'iyle uyumlu hâle getirir. Yeni bir şey yazmaz — authority receipt\'tir; bu yalnız beklemeyi bırakmış bir çağıranın geride bıraktığı görev yüzeyini uzlaştırır.',
+  },
+  'task.settle.opt_from_result': {
+    en: 'Terminalize a dispatch whose worker DID finish and persist a result while the caller stopped waiting. The disposition is read from the worker\'s own selfAssessment, never chosen.',
+    tr: 'Worker\'ı BİTİRİP sonucunu yazdığı hâlde çağıran beklemeyi bıraktığı için takılı kalan dispatch\'i terminal yapar. Disposition seçilmez, worker\'ın kendi selfAssessment\'ından okunur.',
+  },
+  'task.settle.opt_abandon_dispatch': {
+    en: 'Terminalize a dispatch that started and then died without a result. The disposition is derived from the absence probe, never chosen: it settles as manual_review_required and refuses while any liveness evidence remains.',
+    tr: 'Başlayıp sonuç üretmeden ölen bir dispatch\'i terminal yapar. Disposition seçilmez, yokluk-probe\'undan türetilir: manual_review_required olarak kapanır ve herhangi bir canlılık kanıtı varken reddeder.',
+  },
+  'task.settle.reason.dispatch-abandoned': {
+    en: 'dispatch started and the worker is provably gone; eligible for an abandoned-dispatch settlement',
+    tr: 'dispatch başlamış ve worker kanıtlanabilir şekilde yok; terkedilmiş-dispatch kapanışına uygun',
+  },
+  'task.settle.reason.dispatch-still-live': {
+    en: 'liveness evidence remains for this dispatch; it cannot be settled as abandoned',
+    tr: 'bu dispatch için canlılık kanıtı duruyor; terkedilmiş olarak kapatılamaz',
   },
   'task.settle.reason.dispatch-started': {
     en: 'dispatch-started evidence exists; NOT_DISPATCHED cannot be asserted',
@@ -5418,6 +5448,14 @@ const BASE_MESSAGES: MessageMap = {
     en: 'Use a repo-relative path without ".." segments.',
     tr: '".." segmenti içermeyen repo-relative bir yol kullanın.',
   },
+  'prompt_gate.scope_silent_drop_unreported_message': {
+    en: 'Write authority silently shrinks at render time: "{path}" is dropped by the scope sanitizer without any warning or rejection, so the worker never sees it in its WRITE list.',
+    tr: 'Write authority render zamanında sessizce küçülüyor: "{path}" scope sanitizer tarafından hiçbir uyarı veya red üretmeden düşürülüyor; worker bu dosyayı WRITE listesinde asla göremez.',
+  },
+  'prompt_gate.scope_silent_drop_unreported_fix': {
+    en: 'Remove the path from filesWrite and re-scope the task, or use a path the sanitizer preserves. Globally protected roots (package.json, tsconfig.json, lockfiles) are never writable by a worker — that wiring needs a separate authorized change.',
+    tr: 'Yolu filesWrite\'tan çıkarıp görevi yeniden kapsamlandırın veya sanitizer\'ın koruduğu bir yol kullanın. Global korumalı kök dosyalar (package.json, tsconfig.json, lockfile\'lar) worker tarafından ASLA yazılamaz — o wiring ayrı ve yetkili bir değişiklik ister.',
+  },
   'prompt_gate.satisfiability_message': {
     en: '[{code}] {message}',
     tr: '[{code}] {message}',
@@ -8106,6 +8144,30 @@ const BASE_MESSAGES: MessageMap = {
     en: 'List all skills',
     tr: 'Tüm skill\'leri listeleyin',
   },
+  'cli.skill.attribution.desc': {
+    en: 'Inspect or apply the causal skill-attribution cutover',
+    tr: 'Nedensel skill-atıf geçişini inceleyin veya uygulayın',
+  },
+  'cli.skill.attribution.opt.apply': {
+    en: 'Apply the lossless cutover and write its immutable receipt',
+    tr: 'Kayıpsız geçişi uygulayın ve immutable receipt yazın',
+  },
+  'cli.skill.attribution.state': {
+    en: 'Skill attribution cutover: {state}',
+    tr: 'Skill atıf geçişi: {state}',
+  },
+  'cli.skill.attribution.inventory': {
+    en: 'Legacy inventory — learnings: {learnings}, history: {history}, synergy: {synergy}, evolved rules: {rules}, sidecar: {sidecar}',
+    tr: 'Legacy envanter — learnings: {learnings}, geçmiş: {history}, synergy: {synergy}, evolved rule: {rules}, sidecar: {sidecar}',
+  },
+  'cli.skill.attribution.dry_run': {
+    en: 'Nothing changed. Re-run with --apply to commit the lossless cutover.',
+    tr: 'Hiçbir şey değişmedi. Kayıpsız geçişi commit etmek için --apply ile yeniden çalıştırın.',
+  },
+  'cli.skill.attribution.committed': {
+    en: 'Causal skill-attribution cutover committed ({receiptDigest}).',
+    tr: 'Nedensel skill-atıf geçişi commit edildi ({receiptDigest}).',
+  },
   'cli.skill.create.desc': {
     en: 'Create a custom skill',
     tr: 'Özel bir skill oluşturun',
@@ -8137,6 +8199,34 @@ const BASE_MESSAGES: MessageMap = {
   'cli.skill.info.desc': {
     en: 'Show skill details',
     tr: 'Skill ayrıntılarını gösterin',
+  },
+  'cli.skill.stats.heading': {
+    en: '  Skill attribution statistics:',
+    tr: '  Skill atıf istatistikleri:',
+  },
+  'cli.skill.stats.credited_uses': {
+    en: '    Credited uses:    {count}',
+    tr: '    Kredili kullanım: {count}',
+  },
+  'cli.skill.stats.success_rate': {
+    en: '    Success rate:     {value}',
+    tr: '    Başarı oranı:     {value}',
+  },
+  'cli.skill.stats.selected': {
+    en: '    Selected:         {count}',
+    tr: '    Seçildi:          {count}',
+  },
+  'cli.skill.stats.delivered': {
+    en: '    Prompt-delivered: {count}',
+    tr: '    Prompta ulaştı:   {count}',
+  },
+  'cli.skill.stats.credited': {
+    en: '    Causally credited:{count}',
+    tr: '    Nedensel kredi:   {count}',
+  },
+  'cli.skill.stats.last_sprint': {
+    en: '    Last sprint:      {value}',
+    tr: '    Son sprint:       {value}',
   },
   'cli.spawn.desc': {
     en: 'Manually spawn a worker for a task (BLOCKS until the worker exits on the docker backend; fire-and-forget on tmux/subprocess)',

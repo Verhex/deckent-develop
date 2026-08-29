@@ -84,6 +84,7 @@ const INVOCATION_REASON_CODES: ReadonlySet<string> = new Set([
   'no_provider',
   'budget_capability_unsupported',
   'provider_authority_rejected',
+  'routing_authority_rejected',
   'execution_admission_rejected',
   'legacy_operator_attestation',
   'not_dispatched_settled',
@@ -98,13 +99,14 @@ const INVOCATION_REASON_CODES: ReadonlySet<string> = new Set([
   'fallback_limit_hold',
   'fallback_exhausted',
   'provider_resolution_fallback',
-  'coordinator_restart_orphan',
+  'abandoned_dispatch_reconciled', 'coordinator_restart_orphan',
   'duplicate_invocation',
 ] as const);
 const PRE_DISPATCH_REASON_CODES: ReadonlySet<string> = new Set([
   'no_provider',
   'budget_capability_unsupported',
   'provider_authority_rejected',
+  'routing_authority_rejected',
   'execution_admission_rejected',
   'legacy_operator_attestation',
   'command_build_failed',

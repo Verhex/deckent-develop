@@ -765,8 +765,15 @@ export interface Task {
     personaSlices?: string[];
     /** Human-readable compact decision story for status/audit surfaces. */
     storySummary?: string;
+    /** Content-addressed hard-applicability inputs/decision for replay + attribution. */
+    skillEvidenceDigest?: string;
+    skillCatalogDigest?: string;
+    skillDecisionDigest?: string;
     /** Typed escalation reason when v3 cannot make an unambiguous selection. */
     escalation?: string;
+    /** Tenant/project policy labels admitted by the plan authority. Skill
+     * applicability may inspect these as task evidence; prose never creates a tag. */
+    policyTags?: string[];
     /** Number of mid-sprint reroute attempts applied to this task */
     rerouteCount?: number;
     /**

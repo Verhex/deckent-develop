@@ -28,6 +28,10 @@ vi.mock('fs', () => ({
       fsStore.delete(from);
     }
   }),
+  openSync: vi.fn().mockReturnValue(1),
+  fsyncSync: vi.fn(),
+  closeSync: vi.fn(),
+  unlinkSync: vi.fn().mockImplementation((p: string) => { fsStore.delete(p); }),
   mkdirSync: vi.fn(),
   cpSync: vi.fn(),
   readdirSync: vi.fn().mockReturnValue([]),
@@ -49,6 +53,8 @@ function makeOutcome(overrides?: Partial<RoutingOutcome>): RoutingOutcome {
     taskDNA: makeDNA(),
     agentId: 'bug-fixer',
     skillIds: ['typescript-expert'],
+    skillExposureIds: ['typescript-expert'],
+    skillAttributionState: 'CREDITED',
     evaluation: 'DONE',
     coverage: 90,
     routingVersion: 'v2',

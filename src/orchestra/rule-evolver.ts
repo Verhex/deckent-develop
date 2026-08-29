@@ -1,6 +1,7 @@
 // ─── Rule Evolver ───────────────────────────────────────────────────────────
-// Generates new activation rules from historical outcome data.
-// Rules with confidence >= 0.85 are auto-applied, >= 0.65 are suggested.
+// Legacy/offline analyzer for historical activation-rule experiments.
+// Production V3 neither calls nor injects these rules; replayable applicability,
+// composition, and learning cells own the live control plane.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';

@@ -147,7 +147,7 @@ describe('deckent_run MCP — WM-1b routing', () => {
     expect(typeof callArgs[1]).toBe('string');
   });
 
-  it('falls back to generic when routeSingleTaskV3 throws (fail-safe)', async () => {
+  it('fails closed before task publication when routeSingleTaskV3 holds', async () => {
     vi.mocked(loadConfig).mockResolvedValue({
       routing_engine: 'v3',
       spawn_backend: 'subprocess',
@@ -163,15 +163,15 @@ describe('deckent_run MCP — WM-1b routing', () => {
     registerRunTool(server);
 
     const handler = server.tools.get('deckent_run')!.handler;
-    // Should NOT propagate routing error — fail-safe catch swallows it
     const result = await handler({ description: 'do work', model: 'claude-sonnet-5', autoApprove: true });
-    expect(result.isError).not.toBe(true);
+    expect(result.isError).toBe(true);
+    expect(result.content[0]?.text).toContain('routing authority');
 
-    // Task should still be written (with generic fallback from resolveToTask)
+    // A typed routing HOLD cannot be converted into a generic dispatch.
     const writtenCall = vi.mocked(writeFileSync).mock.calls.find(
       (c) => typeof c[0] === 'string' && (c[0] as string).endsWith('.json'),
     );
-    expect(writtenCall).toBeDefined();
+    expect(writtenCall).toBeUndefined();
   });
 
   it('always routes via routeSingleTaskV3 (V1 purged — ROUTE-V1-PURGE / ADR-G-006)', async () => {

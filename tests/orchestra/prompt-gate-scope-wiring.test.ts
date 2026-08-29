@@ -137,6 +137,136 @@ describe('SAN-1 wiring — render keeps tracked root files (397-011/012 failure 
   });
 });
 
+describe('Scope render — sanitization must never WIDEN declared write authority (2026-08-28 review blocker)', () => {
+  const TRACKED = ['package.json', 'src/a.ts'];
+
+  it('refuses the directory grant when every declared write target was sanitized away', () => {
+    // Measured before the fix: filesWrite=['package.json'] + directories=['src'] rendered
+    // "You may ONLY write to these files: - (… you may write to any file within src)" with
+    // NO warning, because Rule 6 (GLOBAL_PROTECTED) drops silently. A request for one file
+    // became authority over a whole tree, under an "ONLY" header.
+    const warnings: string[] = [];
+    const block = buildScopeBlock(
+      { directories: ['src'], filesRead: [], filesWrite: ['package.json'] },
+      warnings,
+      TRACKED,
+    );
+    expect(block).not.toContain('you may write to any file within');
+    expect(block).toContain('every declared write target was rejected');
+    expect(warnings.some(w => w.includes('refusing to widen'))).toBe(true);
+  });
+
+  it('keeps the legitimate PQ-4 F5 directory fallback when NO write list was declared', () => {
+    const warnings: string[] = [];
+    const block = buildScopeBlock(
+      { directories: ['src'], filesRead: [], filesWrite: [] },
+      warnings,
+      TRACKED,
+    );
+    expect(block).toContain('you may write to any file within');
+    expect(warnings).toHaveLength(0);
+  });
+
+  it('renders the surviving subset when only SOME declared targets are dropped', () => {
+    const warnings: string[] = [];
+    const block = buildScopeBlock(
+      { directories: ['src'], filesRead: [], filesWrite: ['package.json', 'src/a.ts'] },
+      warnings,
+      TRACKED,
+    );
+    expect(block).toContain('src/a.ts');
+    expect(block).not.toContain('you may write to any file within');
+  });
+});
+
+describe('SAN-1 membership diff — the five SILENT sanitizer rules now BLOCK (sprint-708 root cause)', () => {
+  // Before this fix lintScopeSilentDrop only consumed sanitizeScope's own
+  // warnings/rejected arrays. Five rules drop a declared write path with a bare
+  // `continue` and report nothing, so the "silent drop" detector was blind to
+  // silent drops. Task 708-003 declared `package.json` (Rule 6, GLOBAL_PROTECTED),
+  // the render removed it, no BLOCK fired, and the worker was handed a task it
+  // could not satisfy — honest NO_GO, burnt FIX budget, paused run.
+  const KEEP = 'src/core/keep.ts';
+  const TRACKED = [KEEP, 'package.json', 'tsconfig.json', 'config.json', 'package-lock.json'];
+
+  function dropsFor(id: string, filesWrite: string[]) {
+    const res = evaluatePromptGate({
+      tasks: [task({ id, scope: { directories: [], filesRead: [], filesWrite } })],
+      agentPool: EMPTY_POOL,
+      trackedFiles: TRACKED,
+    });
+    // Both codes are the same SAN-1 family: 'scope-silent-drop' is a sanitizer-reported
+    // drop, 'scope-silent-drop-unreported' is one found only by the membership diff.
+    return { res, drops: res.findings.filter(f => f.lint === 'scope-silent-drop' || f.lint === 'scope-silent-drop-unreported') };
+  }
+
+  it.each([
+    ['Rule 6 — GLOBAL_PROTECTED package.json (the 708-003 case)', 'package.json'],
+    ['Rule 6 — GLOBAL_PROTECTED tsconfig.json', 'tsconfig.json'],
+    ['Rule 6 — GLOBAL_PROTECTED lockfile', 'package-lock.json'],
+    ['Rule 3 — dist/ prefix', 'dist/core/x.js'],
+    ['Rule 4 — extension-only token', '.ts'],
+    ['Rule 9 — JS property-access pattern', '.directories'],
+    ['Rule 10 — placeholder filename', 'src/foo.ts'],
+  ])('BLOCKs a silently dropped write path: %s', (_label, dropped) => {
+    const { res, drops } = dropsFor('t-silent', [dropped, KEEP]);
+    expect(drops.length).toBeGreaterThanOrEqual(1);
+    expect(drops.every(d => d.level === 'block')).toBe(true);
+    expect(drops.some(d => d.message.includes(dropped))).toBe(true);
+    expect(res.ok).toBe(false);
+  });
+
+  it('names the surviving path in NO finding — only the dropped one blocks', () => {
+    const { drops } = dropsFor('t-only-dropped', ['package.json', KEEP]);
+    expect(drops).toHaveLength(1);
+    expect(drops[0]?.message).toContain('package.json');
+    expect(drops[0]?.message).not.toContain(KEEP);
+  });
+
+  it('stays silent when every declared write path survives sanitization', () => {
+    const { res, drops } = dropsFor('t-clean', [KEEP, 'src/core/other.ts']);
+    expect(drops).toHaveLength(0);
+    expect(res.ok).toBe(true);
+  });
+
+  // ─── False-positive guards: the sanitizer's LEGITIMATE normalizations ──────
+  it('does NOT block Rule 7 normalization — a trailing "(yeni)" suffix is stripped, not dropped', () => {
+    const { drops } = dropsFor('t-rule7', [KEEP + ' (yeni)']);
+    expect(drops).toHaveLength(0);
+  });
+
+  it('does NOT block Rule 8 dedupe — a case-variant duplicate is collapsed, not dropped', () => {
+    const { drops } = dropsFor('t-rule8', [KEEP, KEEP.toUpperCase()]);
+    expect(drops).toHaveLength(0);
+  });
+
+  it('does NOT double-report a WHITESPACE-PADDED path the sanitizer already warned about', () => {
+    // The sanitizer trims before reporting, so a padded declaration is named trimmed in the
+    // warning; comparing the raw string double-reported it (2026-08-28 review finding).
+    const { drops } = dropsFor('t-padded', ['  UNTRACKED-NOTES.md  ']);
+    expect(drops).toHaveLength(1);
+  });
+
+  it('does NOT double-report a path the sanitizer already warned about (Rule 5)', () => {
+    // 'UNTRACKED-NOTES.md' is an unqualified untracked root file: Rule 5 pushes a
+    // warning, so the membership diff must not raise a second finding for it.
+    const { drops } = dropsFor('t-nodup', ['UNTRACKED-NOTES.md']);
+    expect(drops).toHaveLength(1);
+  });
+
+  it('leaves empty/whitespace entries to the pre-existing canonical guard, adding no duplicate', () => {
+    // Measured 2026-08-28: an empty or whitespace-only filesWrite entry never
+    // reaches the sanitizer's silent path — a canonical scope validator already
+    // fail-closes it as CANONICAL_SCOPE_HOLD:INVALID_PATH under this same lint.
+    // The membership diff must therefore stay quiet about them rather than
+    // raising a second finding for a path that is already blocked.
+    const { drops } = dropsFor('t-empty', ['', '   ', KEEP]);
+    expect(drops).toHaveLength(2);
+    expect(drops.every(d => d.message.includes('CANONICAL_SCOPE_HOLD:INVALID_PATH'))).toBe(true);
+    expect(drops.some(d => d.message.includes('silently shrinks'))).toBe(false);
+  });
+});
+
 describe('G1b wiring — satisfiability findings surface through evaluatePromptGate', () => {
   it('passes task.scope.filesRead into the read-satisfiability gate', () => {
     const t = task({

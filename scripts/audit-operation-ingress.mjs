@@ -1,24 +1,19 @@
 #!/usr/bin/env node
-// ═══ audit-operation-ingress — OPERATION-001 O3 (report-only baseline) ══════
+// ═══ audit-operation-ingress — OPERATION-001 O3 ratchet gate ════════
 //
 // The operation catalog (O1) declares canonical operations — op.fs.write,
-// op.fs.delete, … — with a gate, risk and capability each. But NOTHING in
-// production resolves an actual effect through `resolveOperation`: the catalog
-// exists, ingress enforcement does not (catalog presence ≠ enforcement).
+// op.fs.delete, … — with a gate, risk and capability each. OPERATION-001 O3
+// incrementally closes the gap between that catalog and production effects.
 //
-// This audit MEASURES that gap for the fs-write+delete family (the owner-
-// approved first scope, 2026-08-08 Q&A). It is deliberately REPORT-ONLY —
-// it is NOT wired into `lint:gates` and never fails the build. Its jobs:
-//   1. Turn "108-ish?" into an exact, tracked count of fs-write/delete call
-//      sites in src/ production code.
-//   2. Separate catalog-MEDIATED sites (a file that imports and calls
-//      resolveOperation) from UNMEDIATED ones — today mediated is 0.
-//   3. Write a stable baseline the successor CI-ratchet slice inherits.
+// This fail-closed gate covers the owner-approved fs-write+delete family. Its
+// default and --write modes retain the historical report/baseline behavior;
+// --check compares the live src/ surface with the committed schema-v1 baseline.
+// The ratchet rejects either new unmediated sites or lost mediated coverage and
+// identifies per-file unmediated growth so the drift can be fixed directly.
 //
 // The effect-site definition is owner-approved and frozen into the baseline:
 // the fs-write+delete verbs below. op.memory.* and op.fs.read are later slices;
-// turning this into a CI-blocking ratchet is an explicit typed-residual on
-// OPERATION-001, not this slice.
+// changing that definition is outside this OPERATION-001 ratchet slice.
 
 import { readFileSync, readdirSync, statSync, writeFileSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -103,34 +98,136 @@ export function auditOperationIngress() {
   };
 }
 
+export function loadOperationIngressBaseline(path = BASELINE) {
+  const baseline = JSON.parse(readFileSync(path, 'utf-8'));
+  if (
+    baseline === null
+    || typeof baseline !== 'object'
+    || baseline.schemaVersion !== 1
+    || !Number.isInteger(baseline.mediated)
+    || baseline.mediated < 0
+    || !Number.isInteger(baseline.unmediated)
+    || baseline.unmediated < 0
+    || baseline.byFile === null
+    || typeof baseline.byFile !== 'object'
+    || Array.isArray(baseline.byFile)
+  ) {
+    throw new Error('expected schemaVersion 1 with non-negative mediated/unmediated counts and byFile');
+  }
+  return baseline;
+}
+
+function gainedUnmediatedSites(report, baseline) {
+  const gains = [];
+  for (const [file, current] of Object.entries(report.byFile)) {
+    if (current.mediated) continue;
+    const prior = baseline.byFile[file];
+    const priorUnmediated = prior
+      && typeof prior === 'object'
+      && prior.mediated === false
+      && Number.isInteger(prior.count)
+      && prior.count >= 0
+      ? prior.count
+      : 0;
+    if (current.count > priorUnmediated) {
+      gains.push({
+        file,
+        gained: current.count - priorUnmediated,
+        baseline: priorUnmediated,
+        live: current.count,
+      });
+    }
+  }
+  return gains;
+}
+
+export function evaluateOperationIngressRatchet(report, baseline) {
+  return {
+    unmediatedRegression: report.unmediated > baseline.unmediated,
+    mediatedRegression: report.mediated < baseline.mediated,
+    unmediatedGains: gainedUnmediatedSites(report, baseline),
+  };
+}
+
+function runCheck(report) {
+  let baseline;
+  try {
+    baseline = loadOperationIngressBaseline();
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    process.stderr.write(
+      `[operation-ingress] FAIL BASELINE_INVALID: unable to load schema-v1 baseline: ${detail}\n`,
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  const { unmediatedRegression, mediatedRegression, unmediatedGains } =
+    evaluateOperationIngressRatchet(report, baseline);
+  if (!unmediatedRegression && !mediatedRegression) {
+    process.stdout.write(
+      `[operation-ingress] PASS OPERATION-001 ratchet: unmediated=${report.unmediated} `
+      + `(baseline=${baseline.unmediated}) mediated=${report.mediated} `
+      + `(baseline=${baseline.mediated})\n`,
+    );
+    return;
+  }
+
+  process.stderr.write(
+    `[operation-ingress] FAIL OPERATION_INGRESS_RATCHET_VIOLATION: `
+    + `unmediated=${report.unmediated} (baseline=${baseline.unmediated}); `
+    + `mediated=${report.mediated} (baseline=${baseline.mediated})\n`,
+  );
+  if (unmediatedRegression) {
+    for (const gain of unmediatedGains) {
+      process.stderr.write(
+        `[operation-ingress] UNMEDIATED_DRIFT ${gain.file}: +${gain.gained} `
+        + `(baseline=${gain.baseline}, live=${gain.live})\n`,
+      );
+    }
+  }
+  if (mediatedRegression) {
+    process.stderr.write(
+      `[operation-ingress] MEDIATED_COVERAGE_REGRESSION: -${baseline.mediated - report.mediated} `
+      + `(baseline=${baseline.mediated}, live=${report.mediated})\n`,
+    );
+  }
+  process.exitCode = 1;
+}
+
 const invokedDirectly = (() => {
   try { return fileURLToPath(import.meta.url) === (process.argv[1] ?? ''); } catch { return false; }
 })();
 
 if (invokedDirectly) {
   const report = auditOperationIngress();
+  const checkMode = process.argv.includes('--check');
   const writeMode = process.argv.includes('--write');
-  process.stdout.write(
-    `[operation-ingress] fs-write+delete effect sites in src/: total=${report.total} `
-    + `mediated=${report.mediated} unmediated=${report.unmediated} `
-    + `across ${report.fileCount} file(s) · digest=${report.digest.slice(0, 12)}\n`,
-  );
-  process.stdout.write(
-    `[operation-ingress] REPORT-ONLY — this audit never fails the build. `
-    + `${report.mediated} of ${report.total} sites route through the operation catalog `
-    + `(resolveOperation); the rest are unmediated (OPERATION-001 O3 residual: wire ingress + a CI ratchet).\n`,
-  );
-  if (writeMode) {
-    writeFileSync(BASELINE, JSON.stringify(report, null, 2) + '\n', 'utf-8');
-    process.stdout.write(`[operation-ingress] baseline written → ${relative(ROOT, BASELINE)}\n`);
-  } else if (existsSync(BASELINE)) {
-    const prior = JSON.parse(readFileSync(BASELINE, 'utf-8'));
-    if (prior.digest !== report.digest) {
-      process.stdout.write(
-        `[operation-ingress] NOTE: live surface drifted from the baseline `
-        + `(baseline total=${prior.total}/digest=${String(prior.digest).slice(0, 12)}). `
-        + `This is advisory only — refresh with \`node scripts/audit-operation-ingress.mjs --write\`.\n`,
-      );
+  if (checkMode) {
+    runCheck(report);
+  } else {
+    process.stdout.write(
+      `[operation-ingress] fs-write+delete effect sites in src/: total=${report.total} `
+      + `mediated=${report.mediated} unmediated=${report.unmediated} `
+      + `across ${report.fileCount} file(s) · digest=${report.digest.slice(0, 12)}\n`,
+    );
+    process.stdout.write(
+      `[operation-ingress] REPORT-ONLY — this audit never fails the build. `
+      + `${report.mediated} of ${report.total} sites route through the operation catalog `
+      + `(resolveOperation); the rest are unmediated (OPERATION-001 O3 residual: wire ingress + a CI ratchet).\n`,
+    );
+    if (writeMode) {
+      writeFileSync(BASELINE, JSON.stringify(report, null, 2) + '\n', 'utf-8');
+      process.stdout.write(`[operation-ingress] baseline written → ${relative(ROOT, BASELINE)}\n`);
+    } else if (existsSync(BASELINE)) {
+      const prior = JSON.parse(readFileSync(BASELINE, 'utf-8'));
+      if (prior.digest !== report.digest) {
+        process.stdout.write(
+          `[operation-ingress] NOTE: live surface drifted from the baseline `
+          + `(baseline total=${prior.total}/digest=${String(prior.digest).slice(0, 12)}). `
+          + `This is advisory only — refresh with \`node scripts/audit-operation-ingress.mjs --write\`.\n`,
+        );
+      }
     }
   }
 }

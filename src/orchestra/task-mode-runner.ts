@@ -304,7 +304,8 @@ export async function runTaskMode(
     }
   }
 
-  // WM-1b: V2 routing — assign the right agent + skills (fail-safe: any error keeps 'generic')
+  // Routing authority is fail-closed. A skill/agent HOLD is an execution HOLD,
+  // not permission to dispatch an unqualified generic worker.
   try {
     const routingVersion = config.routing_engine ?? 'v3';
     if (routingVersion === 'v3') {
@@ -324,7 +325,8 @@ export async function runTaskMode(
       task.assignedSkills = mergeForcePreservingSkillIds(task, v3.skillIds);
     }
   } catch (routingErr) {
-    debugLog('task-mode:routing', `V2 routing failed, using generic fallback: ${routingErr}`);
+    debugLog('task-mode:routing', routingErr);
+    throw routingErr;
   }
 
   // Gap E: write task JSON so agentic-worker-entry can read its spec (mirrors run.ts:261-263)

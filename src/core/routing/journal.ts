@@ -86,7 +86,13 @@ export function readSprintJournal(projectRoot: string, sprintId: string | null):
 export function replayDecision(
   entry: JournalEntryV3,
   currentConfigHash: string,
-  derive: (entry: JournalEntryV3) => { agentId: string; finalScore: number; ranked: ReadonlyArray<{ agentId: string; finalScore: number }> },
+  derive: (entry: JournalEntryV3) => {
+    agentId: string;
+    finalScore: number;
+    ranked: ReadonlyArray<{ agentId: string; finalScore: number }>;
+    skillIds?: readonly string[];
+    skillSelection?: unknown;
+  },
 ): void {
   if (entry.configHash !== currentConfigHash) {
     throw new JournalReplayMismatchError(
@@ -114,5 +120,24 @@ export function replayDecision(
       entry.taskId,
       `ranking drift: recorded [${recordedOrder}], replayed [${replayedOrder}]`,
     );
+  }
+  if (entry.schemaVersion === 2) {
+    if (!replayed.skillIds) {
+      throw new JournalReplayMismatchError(entry.taskId, 'skill replay output missing');
+    }
+    const recordedSkills = entry.decision.skillIds.join(',');
+    const replayedSkills = replayed.skillIds.join(',');
+    if (recordedSkills !== replayedSkills) {
+      throw new JournalReplayMismatchError(
+        entry.taskId,
+        `skill-set drift: recorded [${recordedSkills}], replayed [${replayedSkills}]`,
+      );
+    }
+    if (replayed.skillSelection === undefined) {
+      throw new JournalReplayMismatchError(entry.taskId, 'skill selection trace missing');
+    }
+    if (JSON.stringify(replayed.skillSelection) !== JSON.stringify(entry.decision.skillSelection)) {
+      throw new JournalReplayMismatchError(entry.taskId, 'skill candidate/score trace drift');
+    }
   }
 }

@@ -147,7 +147,8 @@ export function registerRunTool(
           ));
         }
 
-        // WM-1b: V3 routing — assign the right agent + skills (fail-safe: any error keeps 'generic')
+        // Routing authority is fail-closed; MCP cannot turn a typed HOLD into
+        // an unqualified generic dispatch.
         try {
           const routingVersion = cfg?.routing_engine ?? 'v3';
           if (routingVersion === 'v3') {
@@ -171,7 +172,12 @@ export function registerRunTool(
             task.assignedSkills = v3.skillIds;
           }
         } catch (routingErr) {
-          debugLog('run:mcp:routing', `V3 routing failed, using generic fallback: ${routingErr}`);
+          const reason = routingErr instanceof Error ? routingErr.message : String(routingErr);
+          throw new Error(getMessage(
+            'run.routing_authority_hold',
+            getLanguage(cfg.language),
+            { reason },
+          ));
         }
 
         mkdirSync(tasksDir, { recursive: true });

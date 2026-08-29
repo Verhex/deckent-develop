@@ -21,6 +21,7 @@ import {
 } from '../../src/orchestra/routing-plan-adapter.js';
 import type { SkillRoutingRejectionReason } from '../../src/orchestra/routing-plan-adapter.js';
 import { deriveCanonicalSkillProfile } from '../../src/core/skill-profile-derivation.js';
+import { deriveCanonicalSkillApplicability } from '../../src/core/routing/skill-applicability.js';
 import { createSkillDefinition } from '../../src/core/skill-types.js';
 import type { SkillDefinition } from '../../src/core/skill-types.js';
 import type { EffectiveSkill, SkillDispositionState } from '../../src/core/skill-pool.js';
@@ -71,6 +72,7 @@ function catalogEntry(
     overrides: [],
     statsSource: 'defaults',
     routing: deriveCanonicalSkillProfile(definition),
+    applicability: deriveCanonicalSkillApplicability(definition),
   };
 }
 

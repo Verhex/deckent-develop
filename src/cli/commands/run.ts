@@ -54,6 +54,12 @@ export interface RunCommandOpts {
   /** F1-RE (268-003): native model reasoning-effort level (`--model-effort`). */
   modelEffort?: string;
   scope?: string;
+  /** 2026-08-28 (F2): exact repo-relative write/read targets. A `--scope` directory
+   *  alone produces an empty landing scope, which `normalizeScope` rejects with
+   *  'Execution landing scope must contain at least one path' — so any run that
+   *  reaches a landing checkpoint needs these. Absent → today's behaviour, byte-identical. */
+  filesWrite?: string[];
+  filesRead?: string[];
   timeout?: string;
   keep?: boolean;
   autoApprove?: boolean;
@@ -106,7 +112,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-import { readJsonSafe, debugLog } from '../../core/utils.js';
+import { readJsonSafe } from '../../core/utils.js';
 import type { UserOverride } from '../../core/routing-types.js';
 import { normalizeTaskResultShape } from '../../core/task-result-schema.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
@@ -463,6 +469,8 @@ export function registerRun(
     .option('--provider <name>', getMessage('run.opt_provider', helpLang, { providers: ALL_PROVIDER_NAMES.join('|') }))
     .option('--model-effort <level>', cliContractMessage('cliContract.run.opt.model_effort', helpLang))
     .option('--scope <dir>', cliContractMessage('cliContract.run.opt.scope', helpLang), './')
+    .option('--files-write <paths...>', cliContractMessage('cliContract.run.opt.files_write', helpLang))
+    .option('--files-read <paths...>', cliContractMessage('cliContract.run.opt.files_read', helpLang))
     .option('--timeout <ms>', cliContractMessage('cliContract.run.opt.timeout', helpLang), '300000')
     .option('--keep', cliContractMessage('cliContract.run.opt.keep', helpLang))
     .option('--auto-approve', cliContractMessage('cliContract.run.opt.auto_approve', helpLang))
@@ -470,6 +478,8 @@ export function registerRun(
     .action(async (description: string, opts: RunCommandOpts) => {
       const root = resolveProjectRoot();
       const scopeDir = opts.scope ?? './';
+      const filesWriteOpt = (opts.filesWrite ?? []).map(p => p.trim()).filter(p => p.length > 0);
+      const filesReadOpt = (opts.filesRead ?? []).map(p => p.trim()).filter(p => p.length > 0);
       const timeoutMs = opts.timeout ? parseInt(opts.timeout, 10) : 300_000;
       const keepFiles = opts.keep ?? false;
       // CLI/MCP parity (ADR-022-V2, born-561): honor the --auto-approve flag —
@@ -524,7 +534,13 @@ export function registerRun(
         // F1-RE (268-003): forward --model-effort into the canonical request so
         // task.modelEffort is set (resolveToTask) and spawn emits the flag.
         modelEffort: opts.modelEffort,
-        scope: { directories: [scopeDir] },
+        // F2: forward the declared file authority so the execution landing scope is
+        // non-empty; omitted keys keep the pre-2026-08-28 shape byte-identical.
+        scope: {
+          directories: [scopeDir],
+          ...(filesWriteOpt.length > 0 ? { filesWrite: filesWriteOpt } : {}),
+          ...(filesReadOpt.length > 0 ? { filesRead: filesReadOpt } : {}),
+        },
         projectRoot: root,
         config: cfg,
         autoApprove,
@@ -674,7 +690,8 @@ export function registerRun(
           return;
         }
 
-        // WM-1b: V2 routing — assign the right agent + skills (fail-safe: any error keeps 'generic')
+        // Routing authority is fail-closed: a catalog/applicability HOLD must
+        // settle before dispatch, never silently become a generic worker.
         try {
           const routingVersion = cfg?.routing_engine ?? 'v3';
           if (routingVersion === 'v3') {
@@ -698,7 +715,12 @@ export function registerRun(
             task.assignedSkills = v3.skillIds;
           }
         } catch (routingErr) {
-          debugLog('run:routing', `V2 routing failed, using generic fallback: ${routingErr}`);
+          const reason = routingErr instanceof Error ? routingErr.message : String(routingErr);
+          preDispatchReason = 'routing_authority_rejected';
+          await rejectBeforeDispatch(preDispatchReason);
+          printError(new Error(getMessage('run.routing_authority_hold', lang, { reason })));
+          process.exitCode = 1;
+          return;
         }
 
         preDispatchReason = 'execution_admission_rejected';

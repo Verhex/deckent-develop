@@ -437,6 +437,14 @@ export const CLI_RUN_MESSAGES: MessageFamily = Object.freeze({
     en: 'Worker scope directory (default: ./)',
     tr: 'Worker kapsam dizini (varsayılan: ./)',
   },
+  'cliContract.run.opt.files_write': {
+    en: 'Exact repo-relative files this task may WRITE (repeat paths after the option). A directory scope alone carries no file authority, so a run that needs a landing checkpoint requires this.',
+    tr: 'Bu görevin YAZABİLECEĞİ tam repo-relative dosyalar (yolları seçenekten sonra sıralayın). Tek başına dizin kapsamı dosya yetkisi taşımaz; landing checkpoint gerektiren koşumlar bunu ister.',
+  },
+  'cliContract.run.opt.files_read': {
+    en: 'Exact repo-relative files this task may READ as context (repeat paths after the option).',
+    tr: 'Bu görevin bağlam olarak OKUYABİLECEĞİ tam repo-relative dosyalar (yolları seçenekten sonra sıralayın).',
+  },
   'cliContract.run.opt.timeout': {
     en: 'Maximum wait time in milliseconds (default: 300000)',
     tr: 'Milisaniye cinsinden azami bekleme süresi (varsayılan: 300000)',
@@ -1686,6 +1694,8 @@ export const CLI_RUN_FAMILY_CONTRACTS: readonly CliContractRow[] = Object.freeze
       { flags: '--provider <name>', descriptionKey: 'run.opt_provider', templated: true },
       { flags: '--model-effort <level>', descriptionKey: 'cliContract.run.opt.model_effort' },
       { flags: '--scope <dir>', descriptionKey: 'cliContract.run.opt.scope' },
+      { flags: '--files-write <paths...>', descriptionKey: 'cliContract.run.opt.files_write' },
+      { flags: '--files-read <paths...>', descriptionKey: 'cliContract.run.opt.files_read' },
       { flags: '--timeout <ms>', descriptionKey: 'cliContract.run.opt.timeout' },
       { flags: '--keep', descriptionKey: 'cliContract.run.opt.keep' },
       { flags: '--auto-approve', descriptionKey: 'cliContract.run.opt.auto_approve' },
@@ -1899,6 +1909,9 @@ export const CLI_RUN_FAMILY_CONTRACTS: readonly CliContractRow[] = Object.freeze
       { flags: '--attestation-reason <text>', descriptionKey: 'task.settle.opt_attestation_reason' },
       { flags: '--operator <id>', descriptionKey: 'task.settle.opt_operator' },
       { flags: '--reason-code <code>', descriptionKey: 'task.settle.opt_reason_code', templated: true },
+      { flags: '--abandon-dispatch', descriptionKey: 'task.settle.opt_abandon_dispatch' },
+      { flags: '--from-result', descriptionKey: 'task.settle.opt_from_result' },
+      { flags: '--reproject-status', descriptionKey: 'task.settle.opt_reproject_status' },
       { flags: '--json', descriptionKey: 'task.settle.opt_json' },
     ],
     arguments: [

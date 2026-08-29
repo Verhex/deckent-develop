@@ -1,0 +1,899 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "name": "deckent-skill-analysis-2026-08-28",
+    "sha256": "d58f101a94694e73be6fea223834d5cabca1a082d180107e1466e5337b982039",
+    "sprints": [
+      690,
+      691,
+      697,
+      698,
+      700,
+      703,
+      704,
+      705,
+      706,
+      707
+    ]
+  },
+  "tasks": [
+    {
+      "sprint": 690,
+      "id": "690-001",
+      "workType": "build",
+      "domain": "test/quality",
+      "filesWrite": [
+        "tests/orchestra/cross-verify-docker-strict-launcher.test.ts",
+        "tests/orchestra/docker-provider-auth.test.ts",
+        "tests/orchestra/docker-provider-cli.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "testing-expert",
+        "ci-testing"
+      ],
+      "historicalDeliveredSkills": [
+        "ci-testing",
+        "python-expert",
+        "testing-expert"
+      ]
+    },
+    {
+      "sprint": 690,
+      "id": "690-002",
+      "workType": "build",
+      "domain": "test/quality",
+      "filesWrite": [
+        "tests/orchestra/f1014-auth-isolation.test.ts",
+        "tests/orchestra/spawn-backend-docker.test.ts",
+        "tests/orchestra/wm5-auth-guard.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "testing-expert",
+        "ci-testing"
+      ],
+      "historicalDeliveredSkills": [
+        "ci-testing",
+        "python-expert",
+        "testing-expert"
+      ]
+    },
+    {
+      "sprint": 690,
+      "id": "690-003",
+      "workType": "build",
+      "domain": "test/quality",
+      "filesWrite": [
+        "tests/orchestra/worker-auth-isolation.test.ts",
+        "tests/unit/spawn-backend-docker.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "testing-expert",
+        "ci-testing"
+      ],
+      "historicalDeliveredSkills": [
+        "ci-testing",
+        "python-expert",
+        "testing-expert"
+      ]
+    },
+    {
+      "sprint": 691,
+      "id": "691-001",
+      "workType": "build",
+      "domain": "test/quality",
+      "filesWrite": [
+        "tests/api/config-editor.test.ts",
+        "tests/api/server-security.test.ts",
+        "tests/api/server.test.ts",
+        "tests/cli/commands.test.ts",
+        "tests/cli/commands/config-export.test.ts",
+        "tests/cli/commands/config-overhaul.test.ts",
+        "tests/cli/commands/config.test.ts",
+        "tests/cli/commands/finalize.test.ts",
+        "tests/cli/commands/init.test.ts",
+        "tests/cli/commands/review-finalize-overhaul.test.ts",
+        "tests/cli/commands/status.test.ts",
+        "tests/cli/config-global.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "testing-expert",
+        "ci-testing"
+      ],
+      "historicalDeliveredSkills": [
+        "ci-testing",
+        "python-expert",
+        "testing-expert"
+      ]
+    },
+    {
+      "sprint": 691,
+      "id": "691-002",
+      "workType": "build",
+      "domain": "test/quality",
+      "filesWrite": [
+        "tests/cli/finalize-orphan-normal.test.ts",
+        "tests/cli/finalize-refinalize.test.ts",
+        "tests/cli/init-noninteractive.test.ts",
+        "tests/cli/init-outcome-honesty.test.ts",
+        "tests/cli/init-repair-failedsteps.test.ts",
+        "tests/cli/mode-command.test.ts",
+        "tests/cli/mode-run-alias.test.ts",
+        "tests/core/global-config.test.ts",
+        "tests/core/sprint-work-attribution.test.ts",
+        "tests/governance/closure-ledger.test.ts",
+        "tests/governance/orphan-deliverables.test.ts",
+        "tests/mcp/branch-coverage.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "testing-expert",
+        "ci-testing"
+      ],
+      "historicalDeliveredSkills": [
+        "ci-testing",
+        "python-expert",
+        "testing-expert"
+      ]
+    },
+    {
+      "sprint": 691,
+      "id": "691-003",
+      "workType": "build",
+      "domain": "test/quality",
+      "filesWrite": [
+        "tests/mcp/nervous-tools-e2e.test.ts",
+        "tests/mcp/nervous-tools.test.ts",
+        "tests/mcp/tools-enrichment.test.ts",
+        "tests/mcp/tools.test.ts",
+        "tests/orchestra/attribution-limit-death.test.ts",
+        "tests/orchestra/attribution-unmeasurable-rca.test.ts",
+        "tests/orchestra/avgcoverage-repair.test.ts",
+        "tests/orchestra/brain-rollback.test.ts",
+        "tests/orchestra/brain.test.ts",
+        "tests/orchestra/budget-landing-checkpoint-quote-safety.test.ts",
+        "tests/orchestra/canonical-wiring-closure.integration.test.ts",
+        "tests/orchestra/decay-config-wire.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "testing-expert",
+        "ci-testing"
+      ],
+      "historicalDeliveredSkills": [
+        "ci-testing",
+        "python-expert",
+        "testing-expert"
+      ]
+    },
+    {
+      "sprint": 691,
+      "id": "691-004",
+      "workType": "build",
+      "domain": "test/quality",
+      "filesWrite": [
+        "tests/orchestra/docker-auth-precedence.test.ts",
+        "tests/orchestra/docker-backend-owned-settlement.test.ts",
+        "tests/orchestra/docker-container-start-failed.test.ts",
+        "tests/orchestra/docker-dist-guard.test.ts",
+        "tests/orchestra/docker-final-only-containment.test.ts",
+        "tests/orchestra/docker-multicli-buildarg.test.ts",
+        "tests/orchestra/docker-provider-execution-observation.test.ts",
+        "tests/orchestra/finalize-sprint.test.ts",
+        "tests/orchestra/fix-phase-map.test.ts",
+        "tests/orchestra/idempotency-key-inject.test.ts",
+        "tests/orchestra/memory-limit-by-kind.test.ts",
+        "tests/orchestra/moat3-fixphase.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "testing-expert",
+        "ci-testing"
+      ],
+      "historicalDeliveredSkills": [
+        "ci-testing",
+        "python-expert",
+        "testing-expert"
+      ]
+    },
+    {
+      "sprint": 691,
+      "id": "691-005",
+      "workType": "build",
+      "domain": "test/quality",
+      "filesWrite": [
+        "tests/orchestra/runsprint-debt-integration.test.ts",
+        "tests/orchestra/rvdc-deadbranch.test.ts",
+        "tests/orchestra/scheduler-effective-dependencies.test.ts",
+        "tests/orchestra/scheduler-shadow-retention-finalize.test.ts",
+        "tests/orchestra/spawn-backend-docker-mounts.test.ts",
+        "tests/orchestra/spawn-git-async.test.ts",
+        "tests/orchestra/sprint-controller.test.ts",
+        "tests/orchestra/sprint-finalizer-runflow.test.ts",
+        "tests/orchestra/sprint-finalizer-task-projection.test.ts",
+        "tests/orchestra/sprint-finalizer-terminal-wire.test.ts",
+        "tests/orchestra/sprint-finalizer.test.ts",
+        "tests/orchestra/sprint-reporter-lineage-summary.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "testing-expert",
+        "ci-testing"
+      ],
+      "historicalDeliveredSkills": [
+        "ci-testing",
+        "python-expert",
+        "testing-expert"
+      ]
+    },
+    {
+      "sprint": 691,
+      "id": "691-006",
+      "workType": "build",
+      "domain": "test/quality",
+      "filesWrite": [
+        "tests/orchestra/sprint-terminal-controller-wire.test.ts",
+        "tests/orchestra/sprint-terminal-receipt-order.test.ts",
+        "tests/orchestra/terminal-publication-zero-task.test.ts",
+        "tests/orchestra/timeout-placeholder-scope-diff.test.ts",
+        "tests/orchestra/wrapper-hb-allowlist.test.ts",
+        "tests/scripts/audit-operation-ingress.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "testing-expert",
+        "ci-testing"
+      ],
+      "historicalDeliveredSkills": [
+        "ci-testing",
+        "python-expert",
+        "testing-expert"
+      ]
+    },
+    {
+      "sprint": 697,
+      "id": "697-001",
+      "workType": "build",
+      "domain": "orchestration",
+      "filesWrite": [
+        "src/orchestra/workspace-artifacts.ts",
+        "tests/orchestra/workspace-artifacts.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "typescript-expert"
+      ],
+      "historicalDeliveredSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "typescript-expert"
+      ]
+    },
+    {
+      "sprint": 697,
+      "id": "697-002",
+      "workType": "build",
+      "domain": "cli/terminal",
+      "filesWrite": [
+        "src/cli/commands/sync.ts",
+        "src/cli/helpers/messages.ts",
+        "tests/cli/sync-workspace.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "provider-cli-matrix",
+        "i18n-quality"
+      ],
+      "historicalDeliveredSkills": [
+        "i18n-quality",
+        "provider-cli-matrix",
+        "python-expert"
+      ]
+    },
+    {
+      "sprint": 698,
+      "id": "698-001",
+      "workType": "build",
+      "domain": "core/runtime",
+      "filesWrite": [
+        "src/core/skill-pool.ts",
+        "tests/cli/sync-skill.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "typescript-expert"
+      ],
+      "historicalDeliveredSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "typescript-expert"
+      ]
+    },
+    {
+      "sprint": 698,
+      "id": "698-002",
+      "workType": "build",
+      "domain": "test/quality",
+      "filesWrite": [
+        "tests/e2e/skill-package-sync-proof.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "ci-testing"
+      ],
+      "historicalDeliveredSkills": [
+        "ci-testing",
+        "python-expert",
+        "rpc-protocol"
+      ]
+    },
+    {
+      "sprint": 698,
+      "id": "698-003",
+      "workType": "build",
+      "domain": "build/release",
+      "filesWrite": [
+        "scripts/clean.mjs",
+        "tests/scripts/clean-active-execution-guard.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "typescript-expert"
+      ],
+      "historicalDeliveredSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "typescript-expert"
+      ]
+    },
+    {
+      "sprint": 698,
+      "id": "698-004",
+      "workType": "build",
+      "domain": "orchestration",
+      "filesWrite": [
+        "src/orchestra/run-flow-coordinator.ts",
+        "tests/orchestra/run-flow-coordinator.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "typescript-expert"
+      ],
+      "historicalDeliveredSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "typescript-expert"
+      ]
+    },
+    {
+      "sprint": 700,
+      "id": "700-001",
+      "workType": "build",
+      "domain": "test/quality",
+      "filesWrite": [
+        "src/core/failure-disposition-policy.ts",
+        "src/orchestra/fix-failure-classification.ts",
+        "src/orchestra/result-evaluator.ts",
+        "tests/core/failure-disposition-policy.test.ts",
+        "tests/orchestra/fix-failure-classification.test.ts",
+        "tests/orchestra/result-evaluator.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "typescript-expert"
+      ],
+      "historicalDeliveredSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "typescript-expert"
+      ]
+    },
+    {
+      "sprint": 700,
+      "id": "700-002",
+      "workType": "build",
+      "domain": "orchestration",
+      "filesWrite": [
+        "src/orchestra/scheduler-effects.ts",
+        "src/orchestra/scheduler-reducer.ts",
+        "src/orchestra/sprint-phases.ts",
+        "tests/orchestra/scheduler-effects.test.ts",
+        "tests/orchestra/scheduler-reducer.test.ts",
+        "tests/orchestra/sprint-phases.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "typescript-expert"
+      ],
+      "historicalDeliveredSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "typescript-expert"
+      ]
+    },
+    {
+      "sprint": 700,
+      "id": "700-003",
+      "workType": "build",
+      "domain": "test/quality",
+      "filesWrite": [
+        "src/core/task-types.ts",
+        "src/orchestra/debt-manager.ts",
+        "src/orchestra/task-builder.ts",
+        "tests/core/task-types.test.ts",
+        "tests/orchestra/debt-manager.test.ts",
+        "tests/orchestra/task-builder.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "typescript-expert"
+      ],
+      "historicalDeliveredSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "typescript-expert"
+      ]
+    },
+    {
+      "sprint": 700,
+      "id": "700-004",
+      "workType": "build",
+      "domain": "test/quality",
+      "filesWrite": [
+        "tests/orchestra/failure-disposition-fix-gate.test.ts",
+        "tests/orchestra/repair-task-constraint-inheritance.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "ci-testing"
+      ],
+      "historicalDeliveredSkills": [
+        "ci-testing",
+        "python-expert",
+        "rpc-protocol"
+      ]
+    },
+    {
+      "sprint": 703,
+      "id": "703-001",
+      "workType": "build",
+      "domain": "test/quality",
+      "filesWrite": [
+        ".analysis/audits/terminal-publication-mixed-outcome-block-trace-2026-08-27.md",
+        "tests/orchestra/terminal-publication-block-trace.probe.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "ci-testing"
+      ],
+      "historicalDeliveredSkills": [
+        "ci-testing",
+        "python-expert",
+        "rpc-protocol"
+      ]
+    },
+    {
+      "sprint": 703,
+      "id": "703-002",
+      "workType": "build",
+      "domain": "test/quality",
+      "filesWrite": [
+        "src/cli/helpers/messages.ts",
+        "src/orchestra/sprint-terminal-evidence.ts",
+        "tests/cli/helpers/messages.test.ts",
+        "tests/orchestra/sprint-terminal-evidence.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "i18n-quality",
+        "react-specialist"
+      ],
+      "historicalDeliveredSkills": [
+        "i18n-quality",
+        "python-expert",
+        "react-specialist"
+      ]
+    },
+    {
+      "sprint": 703,
+      "id": "703-003",
+      "workType": "build",
+      "domain": "test/quality",
+      "filesWrite": [
+        "src/cli/helpers/messages.ts",
+        "src/orchestra/sprint-finalizer.ts",
+        "tests/cli/helpers/messages.test.ts",
+        "tests/orchestra/sprint-finalizer.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "i18n-quality",
+        "react-specialist"
+      ],
+      "historicalDeliveredSkills": [
+        "i18n-quality",
+        "python-expert",
+        "react-specialist"
+      ]
+    },
+    {
+      "sprint": 703,
+      "id": "703-004",
+      "workType": "build",
+      "domain": "test/quality",
+      "filesWrite": [
+        "tests/orchestra/sprint-finalizer-terminal-publication.test.ts",
+        "tests/orchestra/sprint-terminal-evidence-classifier.mixed-outcome.test.ts",
+        "tests/orchestra/terminal-publication-block-trace.probe.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "ci-testing"
+      ],
+      "historicalDeliveredSkills": [
+        "ci-testing",
+        "python-expert",
+        "rpc-protocol"
+      ]
+    },
+    {
+      "sprint": 704,
+      "id": "704-001",
+      "workType": "build",
+      "domain": "orchestration",
+      "filesWrite": [
+        "src/orchestra/sprint-phases.ts",
+        "tests/orchestra/repair-overflow-dispatch.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "typescript-expert"
+      ],
+      "historicalDeliveredSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "typescript-expert"
+      ]
+    },
+    {
+      "sprint": 704,
+      "id": "704-002",
+      "workType": "build",
+      "domain": "orchestration",
+      "filesWrite": [
+        "src/orchestra/repair-queue-authority.ts",
+        "src/orchestra/sprint-phases.ts",
+        "tests/orchestra/repair-queue-authority.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "typescript-expert",
+        "rpc-protocol"
+      ],
+      "historicalDeliveredSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "typescript-expert"
+      ]
+    },
+    {
+      "sprint": 704,
+      "id": "704-003",
+      "workType": "build",
+      "domain": "cli/terminal",
+      "filesWrite": [
+        "src/cli/helpers/message-catalog/cli-runtime-help.ts",
+        "src/orchestra/sprint-controller.ts",
+        "tests/orchestra/repair-quiescence-gate.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "typescript-expert",
+        "provider-cli-matrix"
+      ],
+      "historicalDeliveredSkills": [
+        "provider-cli-matrix",
+        "python-expert",
+        "typescript-expert"
+      ]
+    },
+    {
+      "sprint": 704,
+      "id": "704-004",
+      "workType": "build",
+      "domain": "test/quality",
+      "filesWrite": [
+        "tests/orchestra/repair-dispatch-chain-seal.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "ci-testing"
+      ],
+      "historicalDeliveredSkills": [
+        "ci-testing",
+        "python-expert",
+        "rpc-protocol"
+      ]
+    },
+    {
+      "sprint": 705,
+      "id": "705-001",
+      "workType": "build",
+      "domain": "test/quality",
+      "filesWrite": [
+        "src/intelligence/baseline-catalog.ts",
+        "src/intelligence/types.ts",
+        "tests/intelligence/baseline-catalog.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "ci-testing"
+      ],
+      "historicalDeliveredSkills": [
+        "ci-testing",
+        "python-expert",
+        "rpc-protocol"
+      ]
+    },
+    {
+      "sprint": 705,
+      "id": "705-002",
+      "workType": "build",
+      "domain": "test/quality",
+      "filesWrite": [
+        "src/intelligence/baseline.ts",
+        "tests/intelligence/baseline.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "ci-testing"
+      ],
+      "historicalDeliveredSkills": [
+        "ci-testing",
+        "python-expert",
+        "rpc-protocol"
+      ]
+    },
+    {
+      "sprint": 705,
+      "id": "705-003",
+      "workType": "build",
+      "domain": "test/quality",
+      "filesWrite": [
+        "src/intelligence/alarm-prompt.ts",
+        "src/intelligence/comparison.ts",
+        "src/intelligence/competitor-universe.ts",
+        "src/intelligence/significance-gate.ts",
+        "src/intelligence/terminology.ts",
+        "tests/intelligence/comparison.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "ci-testing"
+      ],
+      "historicalDeliveredSkills": [
+        "ci-testing",
+        "python-expert",
+        "rpc-protocol"
+      ]
+    },
+    {
+      "sprint": 706,
+      "id": "706-001",
+      "workType": "build",
+      "domain": "test/quality",
+      "filesWrite": [
+        "src/intelligence/source-retrieval.ts",
+        "tests/intelligence/source-retrieval.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "ci-testing"
+      ],
+      "historicalDeliveredSkills": [
+        "ci-testing",
+        "python-expert",
+        "rpc-protocol"
+      ]
+    },
+    {
+      "sprint": 706,
+      "id": "706-002",
+      "workType": "build",
+      "domain": "test/quality",
+      "filesWrite": [
+        "src/intelligence/event-history.ts",
+        "tests/intelligence/event-history.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "ci-testing"
+      ],
+      "historicalDeliveredSkills": [
+        "ci-testing",
+        "python-expert",
+        "rpc-protocol"
+      ]
+    },
+    {
+      "sprint": 706,
+      "id": "706-003",
+      "workType": "build",
+      "domain": "test/quality",
+      "filesWrite": [
+        "src/intelligence/alert-formatter.ts",
+        "tests/intelligence/alert-formatter.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "ci-testing"
+      ],
+      "historicalDeliveredSkills": [
+        "ci-testing",
+        "python-expert",
+        "rpc-protocol"
+      ]
+    },
+    {
+      "sprint": 706,
+      "id": "706-004",
+      "workType": "build",
+      "domain": "test/quality",
+      "filesWrite": [
+        "src/intelligence/index.ts",
+        "src/intelligence/watch-service.ts",
+        "tests/intelligence/watch-service.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "ci-testing"
+      ],
+      "historicalDeliveredSkills": [
+        "ci-testing",
+        "python-expert",
+        "rpc-protocol"
+      ]
+    },
+    {
+      "sprint": 707,
+      "id": "707-001",
+      "workType": "build",
+      "domain": "core/runtime",
+      "filesWrite": [
+        "src/core/capability-runtime.ts",
+        "src/intelligence/watch-capability.ts",
+        "tests/core/capability-runtime.test.ts",
+        "tests/intelligence/watch-capability.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "typescript-expert"
+      ],
+      "historicalDeliveredSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "typescript-expert"
+      ]
+    },
+    {
+      "sprint": 707,
+      "id": "707-002",
+      "workType": "build",
+      "domain": "core/runtime",
+      "filesWrite": [
+        "src/core/flow-registry.ts",
+        "src/core/flow-scheduler.ts",
+        "src/core/scheduled-flow.ts",
+        "tests/core/flow-registry.test.ts",
+        "tests/core/flow-scheduler-timezone.test.ts",
+        "tests/core/flow-scheduler.test.ts",
+        "tests/core/scheduled-flow.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "typescript-expert",
+        "rpc-protocol"
+      ],
+      "historicalDeliveredSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "typescript-expert"
+      ]
+    },
+    {
+      "sprint": 707,
+      "id": "707-003",
+      "workType": "build",
+      "domain": "core/runtime",
+      "filesWrite": [
+        "src/core/flow-scheduler.ts",
+        "src/intelligence/watch-flow.ts",
+        "tests/core/flow-scheduler.test.ts",
+        "tests/intelligence/watch-flow.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "typescript-expert"
+      ],
+      "historicalDeliveredSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "typescript-expert"
+      ]
+    },
+    {
+      "sprint": 707,
+      "id": "707-004",
+      "workType": "build",
+      "domain": "test/quality",
+      "filesWrite": [
+        "src/cli/commands/intelligence.ts",
+        "src/cli/helpers/messages.ts",
+        "src/cli/surface-registry.ts",
+        "src/core/cli-command-contract.ts",
+        "tests/cli/commands/intelligence.test.ts",
+        "tests/cli/helpers/messages.test.ts",
+        "tests/cli/intelligence-command.test.ts",
+        "tests/cli/surface-registry.test.ts",
+        "tests/core/cli-command-contract.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "rpc-protocol",
+        "i18n-quality"
+      ],
+      "historicalDeliveredSkills": [
+        "i18n-quality",
+        "python-expert",
+        "rpc-protocol"
+      ]
+    },
+    {
+      "sprint": 707,
+      "id": "707-005",
+      "workType": "document",
+      "domain": "docs",
+      "filesWrite": [
+        "docs/MASTER-PLAN.md",
+        "docs/en/features/competitive-intelligence-watch.md",
+        "docs/tr/features/competitive-intelligence-watch.md",
+        "tests/intelligence/watch-closure-integration.test.ts"
+      ],
+      "historicalAssignedSkills": [
+        "python-expert",
+        "documentation-writer",
+        "api-design"
+      ],
+      "historicalDeliveredSkills": [
+        "api-design",
+        "documentation-writer",
+        "python-expert"
+      ]
+    }
+  ]
+}

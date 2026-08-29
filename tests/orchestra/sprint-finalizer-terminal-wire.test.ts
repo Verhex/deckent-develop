@@ -8,6 +8,7 @@ import type { Task, TaskResult } from '../../src/core/types.js';
 import {
   buildFinalizerTerminalTruth,
   loadFinalizerAttemptTasks,
+  projectFinalizerLogicalTasks,
 } from '../../src/orchestra/sprint-finalizer.js';
 import { createHostPreDispatchNoGoResult } from '../../src/core/pre-dispatch-settlement.js';
 import { dirname } from "node:path";
@@ -100,6 +101,14 @@ describe('finalizeSprint terminal truth wiring', () => {
 
   it('folds original and FIX attempts into one finite logical denominator while retaining attempt evidence and lineage usage', () => {
     const tasks = [task('487-001'), task('487-001-fix', '487-001')];
+    tasks[0]!.assignedAgent = 'original-agent';
+    tasks[0]!.assignedSkills = ['original-skill'];
+    tasks[0]!.routingMeta = { routingVersion: 'v2' };
+    tasks[1]!.assignedAgent = 'resolving-agent';
+    tasks[1]!.assignedSkills = ['resolving-skill'];
+    tasks[1]!.routingMeta = {
+      routingVersion: 'v3', workType: 'fix', dominantDomain: 'core-runtime', confidence: 'high',
+    };
     const evaluations = new Map<string, TaskEvaluation>([
       ['487-001', TaskEvaluation.NO_GO],
       ['487-001-fix', TaskEvaluation.DONE],
@@ -130,6 +139,15 @@ describe('finalizeSprint terminal truth wiring', () => {
     expect(truth.lineageUsage).toHaveLength(1);
     expect(truth.usageTotals).toMatchObject({ inputTokens: 40, outputTokens: 4, cacheRead: 6 });
     expect(Object.values(truth.logicalMetrics).every(Number.isFinite)).toBe(true);
+
+    const logicalRoutingTasks = projectFinalizerLogicalTasks(truth.terminalEvidence, tasks);
+    expect(logicalRoutingTasks).toHaveLength(1);
+    expect(logicalRoutingTasks[0]).toMatchObject({
+      id: '487-001',
+      assignedAgent: 'resolving-agent',
+      assignedSkills: ['resolving-skill'],
+      routingMeta: { routingVersion: 'v3', workType: 'fix', dominantDomain: 'core-runtime' },
+    });
 
     // 488-002: the canonical root task id must be exposed on its own, and the exact
     // per-attempt identities must be retained — never merged into a single

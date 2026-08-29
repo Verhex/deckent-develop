@@ -11,10 +11,26 @@ export interface CatalogEntityStats {
   lastUsedInSprint: string | null;
 }
 
+export interface CatalogSkillExposureStats {
+  selected: number;
+  delivered: number;
+  credited: number;
+  terminalOutcomes: number;
+  lastObservedInSprint: string | null;
+}
+
+export interface CatalogSkillAttributionReadModel {
+  authority: 'causal-receipt-v1';
+  cutoverSprint: string;
+  legacyQuarantineDigest: string | null;
+}
+
 export interface CatalogStatsReadModel {
   source: 'sidecar' | 'absent';
   agents: Record<string, CatalogEntityStats>;
   skills: Record<string, CatalogEntityStats>;
+  skillExposure: Record<string, CatalogSkillExposureStats>;
+  skillAttribution: CatalogSkillAttributionReadModel | null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -74,8 +90,47 @@ function projectEntities(value: Record<string, unknown>): Record<string, Catalog
   return projected;
 }
 
+function projectSkillExposure(value: unknown): Record<string, CatalogSkillExposureStats> {
+  if (!isRecord(value)) return {};
+  const projected: Record<string, CatalogSkillExposureStats> = {};
+  for (const [id, raw] of Object.entries(value)) {
+    if (!isRecord(raw)) continue;
+    const selected = readNonNegativeNumber(raw, 'selected');
+    const delivered = readNonNegativeNumber(raw, 'delivered');
+    const credited = readNonNegativeNumber(raw, 'credited');
+    const terminalOutcomes = readNonNegativeNumber(raw, 'terminalOutcomes');
+    if (selected === null || delivered === null || credited === null || terminalOutcomes === null) continue;
+    const lastObserved = raw['lastObservedInSprint'];
+    projected[id] = {
+      selected: Math.floor(selected),
+      delivered: Math.floor(delivered),
+      credited: Math.floor(credited),
+      terminalOutcomes: Math.floor(terminalOutcomes),
+      lastObservedInSprint: typeof lastObserved === 'string' && lastObserved.length > 0
+        ? lastObserved
+        : null,
+    };
+  }
+  return projected;
+}
+
+function projectSkillAttribution(value: unknown): CatalogSkillAttributionReadModel | null {
+  if (!isRecord(value) || value['authority'] !== 'causal-receipt-v1') return null;
+  const cutoverSprint = value['cutoverSprint'];
+  const legacyQuarantineDigest = value['legacyQuarantineDigest'];
+  if (
+    typeof cutoverSprint !== 'string' || cutoverSprint.length === 0
+    || (legacyQuarantineDigest !== null
+      && (typeof legacyQuarantineDigest !== 'string'
+        || !/^sha256:[a-f0-9]{64}$/u.test(legacyQuarantineDigest)))
+  ) return null;
+  return { authority: 'causal-receipt-v1', cutoverSprint, legacyQuarantineDigest };
+}
+
 function absentCatalogStats(): CatalogStatsReadModel {
-  return { source: 'absent', agents: {}, skills: {} };
+  return {
+    source: 'absent', agents: {}, skills: {}, skillExposure: {}, skillAttribution: null,
+  };
 }
 
 /**
@@ -92,6 +147,8 @@ export function readCatalogStats(projectRoot: string): CatalogStatsReadModel {
       source: 'sidecar',
       agents: projectEntities(parsed['agents']),
       skills: projectEntities(parsed['skills']),
+      skillExposure: projectSkillExposure(parsed['skillExposure']),
+      skillAttribution: projectSkillAttribution(parsed['skillAttribution']),
     };
   } catch {
     return absentCatalogStats();

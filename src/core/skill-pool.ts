@@ -16,6 +16,10 @@ import {
   deriveCanonicalSkillProfile,
   SKILL_PROFILE_DERIVATION_VERSION,
 } from './skill-profile-derivation.js';
+import {
+  deriveCanonicalSkillApplicability,
+  type SkillApplicabilityDerivation,
+} from './routing/skill-applicability.js';
 import { createDefaultActivationConfig } from './routing-types.js';
 import { readJsonSafe, debugLog } from './utils.js';
 
@@ -548,6 +552,8 @@ export interface EffectiveSkill {
   statsSource: 'sidecar' | 'manifest' | 'defaults';
   /** Canonical D5 routing projection; unroutable entries remain visible with a typed HOLD. */
   routing: SkillProfileDerivation;
+  /** Hard task-applicability authority, distinct from the soft semantic profile. */
+  applicability: SkillApplicabilityDerivation;
 }
 
 /**
@@ -578,6 +584,11 @@ function snapshotEntryKey(entry: EffectiveSkill): string {
     masked: entry.masked,
     version: (entry.definition as { version?: unknown }).version ?? null,
     routing: entry.routing,
+    applicability: entry.applicability,
+    stackDetection: entry.definition.stackDetection,
+    promptInjection: entry.definition.promptInjection,
+    entrypoint: entry.definition.entrypoint,
+    referencedFiles: entry.definition.referencedFiles ?? [],
     sourcePath: entry.sourcePath,
     // Sidecar-affected fields (S8): omitting these made the with-sidecar
     // digest identical to the catalog-only one regardless of machine-local
@@ -824,6 +835,7 @@ export function resolveSkillCatalog(
     normalizeSkillManifest(raw);
     const definition = raw as unknown as SkillDefinition;
     const routing = deriveCanonicalSkillProfile(definition);
+    const applicability = deriveCanonicalSkillApplicability(definition);
     if (routing.status === 'routable') definition.profile = routing.profile;
     const record: EffectiveSkill = {
       id: parsedId.id,
@@ -841,6 +853,7 @@ export function resolveSkillCatalog(
       overrides: [],
       statsSource: raw['stats'] !== undefined ? 'manifest' : 'defaults',
       routing,
+      applicability,
     };
     const group = candidates.get(record.id);
     if (group) group.push(record);

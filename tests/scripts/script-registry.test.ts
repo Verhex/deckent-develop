@@ -34,19 +34,43 @@ function baseEntry(overrides: Record<string, unknown> = {}) {
 }
 
 async function runLint(args: string[]): Promise<{ code: number | null; stdout: string; stderr: string }> {
-  return new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(process.execPath, [LINT_SCRIPT_PATH, ...args], {
-      cwd: PROJECT_ROOT,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      shell: false,
-    });
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
-    child.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
-    child.once('error', rejectPromise);
-    child.once('close', (code) => resolvePromise({ code, stdout, stderr }));
-  });
+  const captureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'lint-script-registry-capture-'));
+  const stdoutPath = path.join(captureRoot, 'stdout.log');
+  const stderrPath = path.join(captureRoot, 'stderr.log');
+
+  try {
+    let code: number | null;
+    const stdoutFd = fs.openSync(stdoutPath, 'w', 0o600);
+    try {
+      const stderrFd = fs.openSync(stderrPath, 'w', 0o600);
+      try {
+        code = await new Promise<number | null>((resolvePromise, rejectPromise) => {
+          // Some sandbox adapters preserve a grandchild's exit code but do not
+          // forward pipe bytes from a hermetic Vitest worker. File descriptors
+          // keep the real async CLI boundary while making capture host-neutral.
+          const child = spawn(process.execPath, [LINT_SCRIPT_PATH, ...args], {
+            cwd: PROJECT_ROOT,
+            stdio: ['ignore', stdoutFd, stderrFd],
+            shell: false,
+          });
+          child.once('error', rejectPromise);
+          child.once('close', resolvePromise);
+        });
+      } finally {
+        fs.closeSync(stderrFd);
+      }
+    } finally {
+      fs.closeSync(stdoutFd);
+    }
+
+    return {
+      code,
+      stdout: fs.readFileSync(stdoutPath, 'utf8'),
+      stderr: fs.readFileSync(stderrPath, 'utf8'),
+    };
+  } finally {
+    fs.rmSync(captureRoot, { recursive: true, force: true });
+  }
 }
 
 // ─── listRealTopLevelScripts ─────────────────────────────────────────────
@@ -210,30 +234,34 @@ describe('validateRegistry', () => {
 // ─── Real repo: the registry covers exactly the live scripts/ directory ──
 
 describe('real repo: registry vs live directory', () => {
-  it('reports the exact currently landed registry debt', () => {
+  it('reports ZERO registry debt — the real directory is covered exactly', () => {
+    // 2026-08-28 (F3): this case used to PIN THE DEBT — it asserted the exact list
+    // of violations the repo was carrying (three gate entries with no `expiry`, and
+    // scripts/authority-handoff.mjs never registered). Pinning a defect makes the
+    // suite go red the moment someone repairs it, which is backwards. The debt was
+    // repaired and scripts/lint-script-registry.mjs became a lint:gates member the
+    // same day, so the invariant now asserted is the one worth keeping: the registry
+    // covers the real directory exactly, and any future drift fails the chain.
     const realFiles = listRealTopLevelScripts(PROJECT_ROOT);
     const { registry, error } = readRegistry(REGISTRY_PATH);
     expect(error).toBeNull();
     const { ok, violations } = validateRegistry(registry, realFiles);
-    expect(violations).toEqual([
-      'E_ENTRY_FIELD_MISSING: entries[69].expiry must be a non-empty string',
-      'E_ENTRY_FIELD_MISSING: entries[70].expiry must be a non-empty string',
-      'E_ENTRY_FIELD_MISSING: entries[71].expiry must be a non-empty string',
-      'E_REAL_FILE_UNREGISTERED: "scripts/authority-handoff.mjs" exists in scripts/ but has no registry entry',
-    ]);
-    expect(ok).toBe(false);
+    expect(violations).toEqual([]);
+    expect(ok).toBe(true);
   });
 });
 
 // ─── CLI integration (async spawn, hermetic tmpdir) ───────────────────────
 
 describe('lint-script-registry.mjs CLI (async spawn)', () => {
-  it('exits 1 against the currently inconsistent real repo root', async () => {
+  it('exits 0 against the repaired real repo root', async () => {
+    // 2026-08-28 (F3): flipped with the case above — the real root is consistent now
+    // and the gate is chained into lint:gates, so a red run here means real drift.
     const { code, stdout, stderr } = await runLint(['--root', PROJECT_ROOT]);
-    expect(stdout).toBe('');
-    expect(stderr).toContain('FAIL: 4 violation(s)');
-    expect(stderr).toContain('scripts/authority-handoff.mjs');
-    expect(code).toBe(1);
+    expect(stderr).toBe('');
+    expect(stdout).toContain('OK:');
+    expect(stdout).toContain('covered exactly');
+    expect(code).toBe(0);
   });
 
   describe('fixture repo (tmpdir)', () => {

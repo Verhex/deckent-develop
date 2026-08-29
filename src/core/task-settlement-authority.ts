@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { existsSync, lstatSync, readFileSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, writeFileSync } from 'node:fs';
 import { lstat, readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -54,6 +54,8 @@ export type TaskSettlementAuthorityReasonCode =
   | 'receipt-missing'
   | 'receipt-ambiguous'
   | 'dispatch-started'
+  | 'dispatch-abandoned'
+  | 'dispatch-still-live'
   | 'terminal-conflict'
   | 'scope-mismatch'
   | 'unsupported-task-domain'
@@ -196,8 +198,15 @@ export interface SettleDispatchedTaskInput extends InvocationScope {
     | 'timeout'
     | 'empty_output'
     | 'parse_failed'
-    | 'validation_failed';
+    | 'validation_failed'
+    | 'abandoned_dispatch_reconciled';
   readonly durationMs: number;
+  /**
+   * 2026-08-28 (F5): exact dispatch-head hash the caller planned against. When set,
+   * the atomic write is refused unless that event is still the receipt head INSIDE the
+   * same transaction — closing the plan→apply TOCTOU window for recovery paths.
+   */
+  readonly requireDispatchHeadHash?: string;
   readonly consumerOutcome: 'accepted' | 'rejected' | 'unknown';
   readonly taskDisposition: Exclude<InvocationTaskDisposition, 'not_dispatched'>;
   readonly evidenceRefs?: readonly string[];
@@ -236,10 +245,24 @@ export interface SettleNotDispatchedInput extends InspectTaskSettlementInput {
   readonly occurredAt?: string;
 }
 
+/** 2026-08-28 (F5): a one-shot dispatch whose worker died without writing a result.
+ *  `settleNotDispatched` correctly refuses these — dispatch DID start, so NOT_DISPATCHED
+ *  would be a false disposition — and no operator surface could terminalize them, which
+ *  left the receipt non-terminal and blocked the canonical `clean` → `build` path. */
+export interface SettleAbandonedDispatchInput extends InspectTaskSettlementInput {
+  readonly apply?: boolean;
+  readonly occurredAt?: string;
+}
+
 interface TaskSettlementAuthorityAssemblyOptions {
   readonly ledger: InvocationReceiptReconciliationLedger;
   readonly probe: TaskSettlementEvidenceProbe;
   readonly taskSnapshotVerifier?: TaskSettlementSnapshotVerifier;
+  /** Recovery paths need the real backend adapter, which is filesystem/daemon bound. */
+  readonly projectRoot?: string;
+  /** Recovery-only RUNTIME liveness probe. Injectable so the recovery path is testable
+   *  and honours the same adapter override the ordinary probes accept. */
+  readonly runtimeLivenessProbe?: TaskSettlementExternalProbe;
   readonly now?: () => string;
 }
 
@@ -262,6 +285,9 @@ export interface TaskSettlementAuthority {
   inspectTaskSettlement(input: InspectTaskSettlementInput): Promise<TaskSettlementInspection>;
   plan(input: InspectTaskSettlementInput): Promise<TaskSettlementInspection>;
   settleNotDispatched(input: SettleNotDispatchedInput): Promise<TaskSettlementInspection>;
+  settleAbandonedDispatch(input: SettleAbandonedDispatchInput): Promise<TaskSettlementInspection>;
+  settleDispatchedFromResult(input: SettleAbandonedDispatchInput): Promise<TaskSettlementInspection>;
+  reprojectTaskStatusFromReceipt(input: SettleAbandonedDispatchInput): Promise<TaskSettlementInspection>;
   projectTaskExecutionState(
     taskId: string,
     rawStatus: string,
@@ -495,12 +521,16 @@ class TaskSettlementAuthorityService implements TaskSettlementAuthority {
   private readonly ledger: InvocationReceiptReconciliationLedger;
   private readonly probe: TaskSettlementEvidenceProbe;
   private readonly taskSnapshotVerifier?: TaskSettlementSnapshotVerifier;
+  private readonly projectRoot?: string;
+  private readonly runtimeLivenessProbe?: TaskSettlementExternalProbe;
   private readonly now: () => string;
 
   constructor(options: TaskSettlementAuthorityAssemblyOptions) {
     this.ledger = options.ledger;
     this.probe = options.probe;
     this.taskSnapshotVerifier = options.taskSnapshotVerifier;
+    this.projectRoot = options.projectRoot;
+    this.runtimeLivenessProbe = options.runtimeLivenessProbe;
     this.now = options.now ?? (() => new Date().toISOString());
   }
 
@@ -679,7 +709,19 @@ class TaskSettlementAuthorityService implements TaskSettlementAuthority {
     const events: readonly InvocationEvent[] = head.type === 'transport_settled'
       ? [consumerEvent]
       : [transportEvent, consumerEvent];
-    const result = this.ledger.writeAtomic({ receipt: view.receipt, events });
+    const expectedHead = input.requireDispatchHeadHash;
+    const result = this.ledger.writeAtomic({
+      receipt: view.receipt,
+      events,
+      ...(expectedHead
+        ? {
+            requireSynchronousPrecondition: (): boolean => {
+              const fresh = this.ledger.get(input, input.invocationId);
+              return fresh?.events.at(-1)?.hash === expectedHead;
+            },
+          }
+        : {}),
+    });
     return this.inspectionFromView(result.view, 'PENDING', evidenceRefs);
   }
 
@@ -792,6 +834,297 @@ class TaskSettlementAuthorityService implements TaskSettlementAuthority {
 
   plan(input: InspectTaskSettlementInput): Promise<TaskSettlementInspection> {
     return this.inspectTaskSettlement(input);
+  }
+
+  /**
+   * Terminalize a dispatch that started and then died without a result.
+   *
+   * The disposition is NOT chosen by the caller: it is derived from the same absence
+   * probe `settleNotDispatched` uses. Only when every required liveness signal is
+   * provably absent does this settle, and it settles as `manual_review_required` —
+   * never `done` or `no_go`, because an abandoned dispatch produced no verdict to
+   * report. If any liveness evidence remains, it returns a typed hold instead: an
+   * append-only ledger cannot be corrected later, so a false cause must never be written.
+   */
+  async settleAbandonedDispatch(
+    input: SettleAbandonedDispatchInput,
+  ): Promise<TaskSettlementInspection> {
+    if (input.occurredAt !== undefined && !validTimestamp(input.occurredAt)) {
+      throw new TypeError('TASK_SETTLEMENT_INVALID_TIMESTAMP');
+    }
+    if (!this.projectRoot) return this.hold(input.rawStatus, 'probe-unsupported');
+    const views = this.resolveViews(input);
+    if (views.length === 0) return this.hold(input.rawStatus, 'receipt-missing');
+    if (views.length > 1) return this.hold(input.rawStatus, 'receipt-ambiguous');
+    const view = views[0]!;
+    if (!this.viewMatchesSettlementInput(view, input)) {
+      return this.hold(input.rawStatus, 'scope-mismatch');
+    }
+    const head = view.events.at(-1);
+    // Idempotent replay: an already-reconciled receipt returns its terminal inspection
+    // instead of attempting a second append.
+    if (head?.type === 'consumer_settled') {
+      return this.inspectionFromView(view, input.rawStatus, this.viewEvidenceRefs(view));
+    }
+    if (head?.type !== 'dispatch_started') {
+      return this.hold(input.rawStatus, 'terminal-conflict');
+    }
+
+    // ONE recovery evidence snapshot; dry-run and apply bind to exactly this.
+    const snapshot = await this.probe.inspect(input);
+    const byKind = new Map<TaskSettlementEvidenceKind, TaskSettlementEvidenceObservation>();
+    for (const observation of snapshot.observations) byKind.set(observation.kind, observation);
+    const ordinary = ['heartbeat', 'log', 'result', 'worker-process'] as const;
+    const ordinaryObservations = ordinary.map(kind => byKind.get(kind));
+    if (ordinaryObservations.some(observation => !observation)) {
+      return this.hold(input.rawStatus, 'absence-evidence-incomplete');
+    }
+    // Control-plane attempt authority. A pending/prepared/dispatched record attests that
+    // THIS exact dispatch attempt was minted — it is self-referential evidence about the
+    // very receipt being reconciled, never proof that a process is running. 'corrupt'
+    // is not interpretable and holds.
+    const controlAttempt = inspectTaskResultSettlementAuthority(this.projectRoot, input.taskId);
+    if (controlAttempt.state === 'corrupt') {
+      return this.hold(input.rawStatus, 'absence-evidence-incomplete');
+    }
+    // Real backend RUNTIME liveness, asked independently and required to be absent.
+    const runtime = this.runtimeLivenessProbe
+      ? await this.runtimeLivenessProbe.inspect(input)
+      : await inspectAbandonedDispatchRuntimeLiveness(this.projectRoot, input);
+    const evidenceRefs = boundedEvidenceRefs([
+      ...ordinaryObservations.map(observation => observation!.evidenceRef),
+      `control-attempt:${controlAttempt.state}:${sha256(controlAttempt.evidenceRef)}`,
+      `backend-runtime:${runtime.state}:${sha256(runtime.evidenceRef)}`,
+      `invocation-event:${head.hash}`,
+    ]);
+    if (!evidenceRefs) return this.hold(input.rawStatus, 'absence-evidence-incomplete');
+    if (ordinaryObservations.some(observation => observation!.state === 'present')
+      || runtime.state === 'present') {
+      return this.hold(input.rawStatus, 'dispatch-still-live', evidenceRefs);
+    }
+    if (runtime.state === 'unsupported'
+      || ordinaryObservations.some(observation => observation!.state === 'unsupported')) {
+      return this.hold(input.rawStatus, 'probe-unsupported', evidenceRefs);
+    }
+    if (runtime.state !== 'absent'
+      || ordinaryObservations.some(observation => observation!.state !== 'absent')) {
+      return this.hold(input.rawStatus, 'absence-evidence-incomplete', evidenceRefs);
+    }
+    if (!input.operatorAttestation) {
+      return this.hold(input.rawStatus, 'attestation-required', evidenceRefs);
+    }
+    if (!this.validAttestation(input.operatorAttestation, input)) {
+      return this.hold(input.rawStatus, 'task-content-mismatch', evidenceRefs);
+    }
+    const eligible: TaskSettlementInspection = {
+      decision: 'eligible',
+      rawStatus: input.rawStatus,
+      effectiveStatus: canonicalRawStatus(input.rawStatus),
+      evidenceRefs,
+      reasonCode: 'dispatch-abandoned',
+      receiptRef: receiptRef(view),
+    };
+    if (input.apply !== true) return eligible;
+    if (!this.verifyCurrentTaskSnapshot(input)) {
+      return this.hold(input.rawStatus, 'task-content-mismatch', evidenceRefs);
+    }
+    return this.settleDispatched({
+      tenantId: input.tenantId,
+      projectId: input.projectId,
+      invocationId: view.receipt.invocationId,
+      outcome: 'unknown',
+      exitCode: null,
+      signal: null,
+      reasonCode: 'abandoned_dispatch_reconciled',
+      durationMs: Math.max(0, Date.parse(snapshot.observedAt) - Date.parse(head.occurredAt)),
+      consumerOutcome: 'unknown',
+      taskDisposition: 'manual_review_required',
+      evidenceRefs,
+      requireDispatchHeadHash: head.hash,
+      ...(input.occurredAt ? { occurredAt: input.occurredAt } : {}),
+    });
+  }
+
+  /**
+   * Terminalize a dispatch whose worker DID finish and persist a result, but whose caller
+   * stopped waiting (the CLI timeout window closed first). The receipt is then stuck on a
+   * dispatch_started head with a real `.result` on disk.
+   *
+   * This is deliberately NOT the abandoned path: abandonment asserts "no verdict exists",
+   * while here a verdict exists and must be reported as authored. The disposition is read
+   * from the worker's own selfAssessment using the same rule the live run path applies —
+   * it is never chosen by the operator.
+   */
+  async settleDispatchedFromResult(
+    input: SettleAbandonedDispatchInput,
+  ): Promise<TaskSettlementInspection> {
+    if (!this.projectRoot) return this.hold(input.rawStatus, 'probe-unsupported');
+    const views = this.resolveViews(input);
+    if (views.length === 0) return this.hold(input.rawStatus, 'receipt-missing');
+    if (views.length > 1) return this.hold(input.rawStatus, 'receipt-ambiguous');
+    const view = views[0]!;
+    if (!this.viewMatchesSettlementInput(view, input)) {
+      return this.hold(input.rawStatus, 'scope-mismatch');
+    }
+    const head = view.events.at(-1);
+    if (head?.type === 'consumer_settled') {
+      return this.inspectionFromView(view, input.rawStatus, this.viewEvidenceRefs(view));
+    }
+    if (head?.type !== 'dispatch_started') {
+      return this.hold(input.rawStatus, 'terminal-conflict');
+    }
+    let selfAssessment: string;
+    let resultBytes: string;
+    try {
+      resultBytes = readFileSync(
+        join(this.projectRoot, TASKS_DIR, `task-${input.taskId}.result`),
+        'utf-8',
+      );
+      const parsed = JSON.parse(resultBytes) as { selfAssessment?: unknown };
+      if (typeof parsed.selfAssessment !== 'string') {
+        return this.hold(input.rawStatus, 'absence-evidence-incomplete');
+      }
+      selfAssessment = parsed.selfAssessment;
+    } catch {
+      // No parsable result: this receipt is not the shape this path settles.
+      return this.hold(input.rawStatus, 'absence-evidence-incomplete');
+    }
+    const accepted = selfAssessment === 'DONE' || selfAssessment === 'GO_WITH_TECH_DEBT';
+    const evidenceRefs = boundedEvidenceRefs([
+      `task-artifact:result:present:${sha256(resultBytes)}`,
+      `worker-self-assessment:${selfAssessment}`,
+      `invocation-event:${head.hash}`,
+    ]);
+    if (!evidenceRefs) return this.hold(input.rawStatus, 'absence-evidence-incomplete');
+    if (!input.operatorAttestation) {
+      return this.hold(input.rawStatus, 'attestation-required', evidenceRefs);
+    }
+    if (!this.validAttestation(input.operatorAttestation, input)) {
+      return this.hold(input.rawStatus, 'task-content-mismatch', evidenceRefs);
+    }
+    const eligible: TaskSettlementInspection = {
+      decision: 'eligible',
+      rawStatus: input.rawStatus,
+      effectiveStatus: canonicalRawStatus(input.rawStatus),
+      evidenceRefs,
+      reasonCode: 'dispatch-abandoned',
+      receiptRef: receiptRef(view),
+    };
+    if (input.apply !== true) return eligible;
+    if (!this.verifyCurrentTaskSnapshot(input)) {
+      return this.hold(input.rawStatus, 'task-content-mismatch', evidenceRefs);
+    }
+    return this.settleDispatched({
+      tenantId: input.tenantId,
+      projectId: input.projectId,
+      invocationId: view.receipt.invocationId,
+      outcome: 'succeeded',
+      exitCode: null,
+      signal: null,
+      reasonCode: accepted ? 'none' : 'validation_failed',
+      durationMs: 0,
+      consumerOutcome: accepted ? 'accepted' : 'rejected',
+      taskDisposition: accepted ? 'done' : 'no_go',
+      evidenceRefs,
+      requireDispatchHeadHash: head.hash,
+      ...(input.occurredAt ? { occurredAt: input.occurredAt } : {}),
+    });
+  }
+
+  /**
+   * Re-project a task file's `status` from its own TERMINAL invocation receipt.
+   *
+   * The receipt is the authority; this writes nothing new, it only makes the task
+   * surface agree with a settlement that already happened. It exists because a run
+   * whose caller stopped waiting leaves the receipt terminal while the task JSON is
+   * still PENDING — a disagreement the clean gate reports as WORKER_TASK_CONFLICT,
+   * with no surface able to resolve it.
+   *
+   * Only a terminal disposition that HAS a task-status counterpart is projected.
+   * `not_dispatched` has none (the task never ran) and holds instead of inventing one.
+   */
+  async reprojectTaskStatusFromReceipt(
+    input: SettleAbandonedDispatchInput,
+  ): Promise<TaskSettlementInspection> {
+    if (!this.projectRoot) return this.hold(input.rawStatus, 'probe-unsupported');
+    const views = this.resolveViews(input);
+    if (views.length === 0) return this.hold(input.rawStatus, 'receipt-missing');
+    if (views.length > 1) return this.hold(input.rawStatus, 'receipt-ambiguous');
+    const view = views[0]!;
+    if (!this.viewMatchesSettlementInput(view, input)) {
+      return this.hold(input.rawStatus, 'scope-mismatch');
+    }
+    const head = view.events.at(-1);
+    if (head?.type !== 'consumer_settled') {
+      // Nothing settled yet — there is no authority to project from.
+      return this.hold(input.rawStatus, 'dispatch-started');
+    }
+    // head.type is narrowed to 'consumer_settled' above; the payload union still needs
+    // the explicit extract for TypeScript to see taskDisposition.
+    const settledPayload = head.payload as Extract<
+      InvocationEvent,
+      { type: 'consumer_settled' }
+    >['payload'];
+    const disposition = String(settledPayload.taskDisposition);
+    const projected = disposition === 'done'
+      ? 'DONE'
+      : disposition === 'no_go'
+        ? 'NO_GO'
+        : disposition === 'manual_review_required'
+          ? 'MANUAL_REVIEW_REQUIRED'
+          : null;
+    if (!projected) return this.hold(input.rawStatus, 'terminal-conflict');
+    const taskPath = join(this.projectRoot, TASKS_DIR, `task-${input.taskId}.json`);
+    let parsed: Record<string, unknown>;
+    let bytes: string;
+    try {
+      bytes = readFileSync(taskPath, 'utf-8');
+      parsed = JSON.parse(bytes) as Record<string, unknown>;
+    } catch {
+      return this.hold(input.rawStatus, 'absence-evidence-incomplete');
+    }
+    const evidenceRefs = boundedEvidenceRefs([
+      `invocation-event:${head.hash}`,
+      `task-disposition:${disposition}`,
+      `task-artifact:json:present:${sha256(bytes)}`,
+    ]);
+    if (!evidenceRefs) return this.hold(input.rawStatus, 'absence-evidence-incomplete');
+    // Idempotent: an already-agreeing task surface is a no-op, not a rewrite.
+    if (parsed['status'] === projected) {
+      return {
+        decision: 'already-settled',
+        rawStatus: input.rawStatus,
+        effectiveStatus: projected,
+        evidenceRefs,
+        reasonCode: 'already-settled',
+        receiptRef: receiptRef(view),
+      };
+    }
+    if (!input.operatorAttestation) {
+      return this.hold(input.rawStatus, 'attestation-required', evidenceRefs);
+    }
+    if (!this.validAttestation(input.operatorAttestation, input)) {
+      return this.hold(input.rawStatus, 'task-content-mismatch', evidenceRefs);
+    }
+    const eligible: TaskSettlementInspection = {
+      decision: 'eligible',
+      rawStatus: input.rawStatus,
+      effectiveStatus: projected,
+      evidenceRefs,
+      reasonCode: 'dispatch-abandoned',
+      receiptRef: receiptRef(view),
+    };
+    if (input.apply !== true) return eligible;
+    parsed['status'] = projected;
+    writeFileSync(taskPath, `${JSON.stringify(parsed, null, 2)}\n`, 'utf-8');
+    return {
+      decision: 'already-settled',
+      rawStatus: input.rawStatus,
+      effectiveStatus: projected,
+      evidenceRefs,
+      reasonCode: 'already-settled',
+      receiptRef: receiptRef(view),
+    };
   }
 
   async settleNotDispatched(input: SettleNotDispatchedInput): Promise<TaskSettlementInspection> {
@@ -1777,6 +2110,55 @@ export function createTaskSettlementProbe(
   };
 }
 
+/**
+ * Recovery-only backend RUNTIME liveness probe (owner decision, 2026-08-28).
+ *
+ * `inspectNativeBackend` deliberately short-circuits to `present` whenever the host
+ * result-settlement authority is non-absent, and that is correct for the NOT_DISPATCHED
+ * path: you cannot claim a task never dispatched while an attempt record is open.
+ *
+ * For an ABANDONED dispatch the same short-circuit is self-referential — the pending
+ * settlement being reconciled is exactly the record that makes the probe ineligible, so
+ * the reconciliation can never run. The separation the owner mandated: a pending
+ * settlement is CONTROL-PLANE attempt authority (it attests that this exact dispatch
+ * attempt was minted), never evidence that a backend process is running. This probe
+ * therefore asks the real backend adapter directly, with no short-circuit, and its
+ * result is required to be `absent` on top of the ordinary absence set.
+ *
+ * Neither the global probe nor the settlement inspection semantics are changed.
+ */
+export async function inspectAbandonedDispatchRuntimeLiveness(
+  projectRoot: string,
+  input: TaskSettlementProbeInput,
+): Promise<TaskSettlementEvidenceObservation> {
+  const processObservation = await inspectNativeWorkerProcess(input);
+  if (input.executionBackend === 'docker') {
+    // Ask docker itself; pass an 'absent' control state so the host-authority
+    // short-circuit inside inspectDockerBackend cannot pre-empt the real probe.
+    return inspectDockerBackend(projectRoot, input, {
+      state: 'absent',
+      evidenceRef: 'control-attempt:excluded-from-runtime-liveness',
+    });
+  }
+  if (input.executionBackend === 'tmux') {
+    return inspectTmuxBackend(input, processObservation);
+  }
+  if (input.executionBackend === 'host-subprocess') {
+    return {
+      kind: 'backend-attempt',
+      state: processObservation.state,
+      evidenceRef: `host-subprocess:${processObservation.state}:sha256:${sha256(
+        processObservation.evidenceRef,
+      )}`,
+    };
+  }
+  return {
+    kind: 'backend-attempt',
+    state: 'unsupported',
+    evidenceRef: `backend-probe:unsupported:${input.executionBackend}`,
+  };
+}
+
 function createTaskSettlementSnapshotVerifier(
   projectRoot: string,
 ): TaskSettlementSnapshotVerifier {
@@ -1825,6 +2207,9 @@ function taskSettlementAuthorityFacade(
     inspectTaskSettlement: input => service.inspectTaskSettlement(input),
     plan: input => service.plan(input),
     settleNotDispatched: input => service.settleNotDispatched(input),
+    settleAbandonedDispatch: input => service.settleAbandonedDispatch(input),
+    settleDispatchedFromResult: input => service.settleDispatchedFromResult(input),
+    reprojectTaskStatusFromReceipt: input => service.reprojectTaskStatusFromReceipt(input),
     projectTaskExecutionState: (taskId, rawStatus, scope) => (
       service.projectTaskExecutionState(taskId, rawStatus, scope)
     ),
@@ -1848,6 +2233,10 @@ export function openTaskSettlementAuthority(
       ...(options.now ? { now: options.now } : {}),
     }),
     taskSnapshotVerifier: createTaskSettlementSnapshotVerifier(projectRoot),
+    projectRoot,
+    // The recovery path asks the backend adapter directly; an injected backendProbe is the
+    // caller's adapter override and must govern it too, or tests and hosts diverge.
+    ...(options.backendProbe ? { runtimeLivenessProbe: options.backendProbe } : {}),
     ...(options.now ? { now: options.now } : {}),
   });
   const authority = taskSettlementAuthorityFacade(service);

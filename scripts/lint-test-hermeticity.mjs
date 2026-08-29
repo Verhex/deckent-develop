@@ -717,7 +717,25 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // repair-overflow-dispatch / repair-queue-authority / repair-quiescence-gate /
   // repair-dispatch-chain-seal suite'leri (hepsi tmpdir-hermetik, spawnWorkers ve
   // waitForResults seam'leri inject edilir; gerçek process doğmaz).
-  count: 16696,
+  // 2026-08-29 SKILL_ROUTING_CONTROL_PLANE_P0: 16708→16783 — applicability,
+  // 1000-skill/concurrent selection, journal replay, causal attribution,
+  // logical-outcome projection, crash-resumable migration and measured 39-task
+  // archive replay suites, plus the catalog-mediated atomic writer boundary.
+  // The writer resolves its operation catalog on first mutation instead of at
+  // module load, retiring six eager unresolved edges and preserving import
+  // hermeticity without weakening its fail-closed authority assertion.
+  // All test writes are confined to suite-owned tmpdirs;
+  // the real-binary migration fixture is operator-run evidence, not a test write.
+  count: 16783,
+  // 2026-08-28 OPERATION-001 O3 ratchet: count unchanged, digest-only —
+  // operation-ingress audit moved from report-only proof to a fail-closed
+  // lint:gates member with hermetic regression coverage.
+  // 2026-08-29 dogfood-surface F1/F2/F3 closure: count unchanged, digest-only —
+  // prompt-gate authority pins, exact run file-scope contracts and the
+  // file-backed async script-registry CLI harness update scanned source text.
+  // 2026-08-29 settlement-recovery O4: 16696→16708 — dispatched-result,
+  // abandoned-dispatch and receipt-reprojection authority cases plus clean's
+  // exact terminal-recognition assertions remain suite-owned and hermetic.
   // 2026-08-25 B-sweep: digest moved — --fix roundtrip pin, multi-label
   // parser pin, same-line rule downgraded to WARN (all suite-owned).
   // 2026-08-25 7141 wave: count unchanged, digest moved — the src-side
@@ -774,7 +792,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // externalization pininin backend-argümanıyla güncellenmesi.
   // 2026-08-28 09:0x: digest 6820cbff→10164164 — sprint-704 repair-queue suite'leri
   // + sprintId/settle el-kapanışının test-metni etkisi.
-  digest: '248cfaf8d06c83fed0b49a0ac83ca5e4b75c87a21ca082b291e3f698b44be80d',
+  digest: '4ed1ee91784ccba61c48455cb4e14b455ba0dad8255c72ed38a592477fb232bf',
   // 2026-08-27 04:0x: ayni 16514, digest-only — full-suite hizalama batch'i
   // (pin/mock/census guncellemeleri + sync guard).
   // 2026-08-27 03:1x: ayni 16514, digest-only — CI-hizalama paketi
@@ -1320,7 +1338,22 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // src/intelligence/ katmanı (types · baseline-catalog · baseline ·
   // competitor-universe · terminology · comparison · significance-gate ·
   // alarm-prompt); ağ/IO yok, tamamı enjekte edilebilir okuyucuyla çalışır.
-  count: 1361,
+  // 2026-08-29 SKILL_ROUTING_CONTROL_PLANE_P0: 1361→1366 — four production
+  // authorities enter the inventory: hard applicability, task-local evidence,
+  // causal attribution receipts and crash-resumable attribution migration;
+  // the fifth is their catalog-mediated atomic file-operation authority. Its
+  // catalog assertion is lazy at import and fail-closed at first mutation;
+  // production inventory count is unchanged and the digest records that move.
+  count: 1366,
+  // 2026-08-28 OPERATION-001 O3 ratchet: count unchanged, digest-only —
+  // audit-operation-ingress production text now implements the fail-closed
+  // baseline comparison used by lint:gates.
+  // 2026-08-29 dogfood-surface F1/F2/F3 closure: count unchanged, digest-only —
+  // prompt-gate authority semantics and exact run scope contracts move the
+  // scanned production inventory without adding a production module.
+  // 2026-08-29 settlement-recovery O4: count unchanged, digest-only — receipt,
+  // settlement authority, CLI and clean terminal-recognition production text
+  // is rewired without introducing a new scanned module.
   // 2026-08-25 config-loss incident hardening: digest moved — atomic
   // last_sprint_id writer (refuse-mint + tmp+rename) and loadConfig
   // self-heal re-read-once + atomic fresh-default.
@@ -1396,7 +1429,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // worker-core backend-yetenek kapısı (task-builder/spawn-backend) + MCP karar-disposition
   // kapısı; yeni üretim modülü eklenmedi, taranan metin değişti.
   // 2026-08-28 09:4x: digest 873b946d→b127e8b9 — src/intelligence/ katmanı.
-  digest: '6fe48913d0e79a5daa410caabc800fef33aa5008004fcd59ff6e8ef9f8b76007',
+  digest: 'c7a64a3a18815fa7eb5eeb360173a91d8e19fb8e0129fefa9176bc132b5b906e',
   // 2026-08-27 04:0x: ayni 1339, digest-only — sync workspace-guard + drift-normalize.
   // 2026-08-27 03:1x: ayni 1339, digest-only — skill-pool readJsonSafe donusumu.
   // 2026-08-27 02:0x: ayni 1339, digest-only — Dalga-3 src kaymalari

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { RuleEvolver, isUnconditionalRule } from '../../src/orchestra/rule-evolver.js';
-import { OutcomeTracker } from '../../src/orchestra/outcome-tracker.js';
+import { OutcomeTracker, type RoutingOutcome } from '../../src/orchestra/outcome-tracker.js';
 import { createDefaultTaskDNA } from '../../src/core/routing-types.js';
 
 vi.mock('fs', () => ({
@@ -8,7 +8,22 @@ vi.mock('fs', () => ({
   readFileSync: vi.fn().mockReturnValue('{}'),
   writeFileSync: vi.fn(),
   mkdirSync: vi.fn(),
+  openSync: vi.fn().mockReturnValue(1),
+  fsyncSync: vi.fn(),
+  closeSync: vi.fn(),
+  renameSync: vi.fn(),
+  unlinkSync: vi.fn(),
 }));
+
+type CreditedOutcomeInput = Omit<RoutingOutcome, 'skillExposureIds' | 'skillAttributionState'>;
+
+function recordCreditedOutcome(tracker: OutcomeTracker, outcome: CreditedOutcomeInput): void {
+  tracker.recordOutcome({
+    ...outcome,
+    skillExposureIds: [...outcome.skillIds],
+    skillAttributionState: outcome.skillIds.length > 0 ? 'CREDITED' : 'NO_SKILLS',
+  });
+}
 
 describe('RuleEvolver', () => {
   let tracker: OutcomeTracker;
@@ -31,7 +46,7 @@ describe('RuleEvolver', () => {
 
     // Record 6 successful security tasks
     for (let i = 0; i < 6; i++) {
-      tracker.recordOutcome({
+      recordCreditedOutcome(tracker, {
         taskId: `task-${i}`, sprintId: 'sprint-001', taskDNA: dna,
         agentId: 'security-auditor', skillIds: [], evaluation: 'DONE',
         coverage: 90, routingVersion: 'v2',
@@ -42,7 +57,7 @@ describe('RuleEvolver', () => {
     const implDna = createDefaultTaskDNA();
     implDna.intent.primary = 'implementation';
     for (let i = 0; i < 5; i++) {
-      tracker.recordOutcome({
+      recordCreditedOutcome(tracker, {
         taskId: `task-fail-${i}`, sprintId: 'sprint-001', taskDNA: implDna,
         agentId: 'security-auditor', skillIds: [], evaluation: 'NO_GO',
         coverage: 0, routingVersion: 'v2',
@@ -65,7 +80,7 @@ describe('RuleEvolver', () => {
     const secDna = createDefaultTaskDNA();
     secDna.intent.primary = 'security';
     for (let i = 0; i < 6; i++) {
-      tracker.recordOutcome({
+      recordCreditedOutcome(tracker, {
         taskId: `sec-${i}`, sprintId: 'sprint-001', taskDNA: secDna,
         agentId: 'ci-testing-skill', skillIds: [], evaluation: 'DONE',
         coverage: 90, routingVersion: 'v2',
@@ -74,7 +89,7 @@ describe('RuleEvolver', () => {
 
     // Record 6 failed implementation tasks
     for (let i = 0; i < 6; i++) {
-      tracker.recordOutcome({
+      recordCreditedOutcome(tracker, {
         taskId: `impl-${i}`, sprintId: 'sprint-001', taskDNA: implDna,
         agentId: 'ci-testing-skill', skillIds: [], evaluation: 'NO_GO',
         coverage: 0, routingVersion: 'v2',
@@ -94,7 +109,7 @@ describe('RuleEvolver', () => {
 
     // Only 2 tasks — below minimum (5)
     for (let i = 0; i < 2; i++) {
-      tracker.recordOutcome({
+      recordCreditedOutcome(tracker, {
         taskId: `task-${i}`, sprintId: 'sprint-001', taskDNA: dna,
         agentId: 'agent-x', skillIds: [], evaluation: 'DONE',
         coverage: 90, routingVersion: 'v2',
@@ -108,7 +123,7 @@ describe('RuleEvolver', () => {
   it('detects synergy in reasoning', () => {
     const dna = createDefaultTaskDNA();
     for (let i = 0; i < 5; i++) {
-      tracker.recordOutcome({
+      recordCreditedOutcome(tracker, {
         taskId: `task-${i}`, sprintId: 'sprint-001', taskDNA: dna,
         agentId: 'agent-a', skillIds: ['skill-b'], evaluation: 'DONE',
         coverage: 95, routingVersion: 'v2',
@@ -124,7 +139,7 @@ describe('RuleEvolver', () => {
       const dna = createDefaultTaskDNA();
       // 5 tasks where skill-a and skill-b always succeed together
       for (let i = 0; i < 5; i++) {
-        tracker.recordOutcome({
+        recordCreditedOutcome(tracker, {
           taskId: `task-${i}`, sprintId: 'sprint-001', taskDNA: dna,
           agentId: null, skillIds: ['skill-a', 'skill-b'], evaluation: 'DONE',
           coverage: 95, routingVersion: 'v2',
@@ -145,7 +160,7 @@ describe('RuleEvolver', () => {
       const dna = createDefaultTaskDNA();
       // 5 tasks where skill-x and skill-y always fail together
       for (let i = 0; i < 5; i++) {
-        tracker.recordOutcome({
+        recordCreditedOutcome(tracker, {
           taskId: `task-${i}`, sprintId: 'sprint-001', taskDNA: dna,
           agentId: null, skillIds: ['skill-x', 'skill-y'], evaluation: 'NO_GO',
           coverage: 0, routingVersion: 'v2',
@@ -166,7 +181,7 @@ describe('RuleEvolver', () => {
       const dna = createDefaultTaskDNA();
       // Agent + skill synergy — should NOT create a skill EvolvedRule
       for (let i = 0; i < 5; i++) {
-        tracker.recordOutcome({
+        recordCreditedOutcome(tracker, {
           taskId: `task-${i}`, sprintId: 'sprint-001', taskDNA: dna,
           agentId: 'test-agent', skillIds: ['skill-a'], evaluation: 'DONE',
           coverage: 90, routingVersion: 'v2',
@@ -186,7 +201,7 @@ describe('RuleEvolver', () => {
       const dna = createDefaultTaskDNA();
       // 10 tasks → previously higher confidence; now still no rule emitted
       for (let i = 0; i < 10; i++) {
-        tracker.recordOutcome({
+        recordCreditedOutcome(tracker, {
           taskId: `task-${i}`, sprintId: 'sprint-001', taskDNA: dna,
           agentId: null, skillIds: ['skill-p', 'skill-q'], evaluation: 'DONE',
           coverage: 90, routingVersion: 'v2',
@@ -203,7 +218,7 @@ describe('RuleEvolver', () => {
     it('detects conflict in reasoning for failing pairs', () => {
       const dna = createDefaultTaskDNA();
       for (let i = 0; i < 5; i++) {
-        tracker.recordOutcome({
+        recordCreditedOutcome(tracker, {
           taskId: `task-${i}`, sprintId: 'sprint-001', taskDNA: dna,
           agentId: null, skillIds: ['skill-m', 'skill-n'], evaluation: 'NO_GO',
           coverage: 0, routingVersion: 'v2',
@@ -224,7 +239,7 @@ describe('RuleEvolver', () => {
 
       // 6 successful security tasks for the skill
       for (let i = 0; i < 6; i++) {
-        tracker.recordOutcome({
+        recordCreditedOutcome(tracker, {
           taskId: `sec-${i}`, sprintId: 'sprint-001', taskDNA: secDna,
           agentId: null, skillIds: ['security-expert'], evaluation: 'DONE',
           coverage: 90, routingVersion: 'v2',
@@ -232,7 +247,7 @@ describe('RuleEvolver', () => {
       }
       // 5 failed implementation tasks
       for (let i = 0; i < 5; i++) {
-        tracker.recordOutcome({
+        recordCreditedOutcome(tracker, {
           taskId: `impl-${i}`, sprintId: 'sprint-001', taskDNA: implDna,
           agentId: null, skillIds: ['security-expert'], evaluation: 'NO_GO',
           coverage: 0, routingVersion: 'v2',
@@ -254,7 +269,7 @@ describe('RuleEvolver', () => {
 
       // 6 successful testing tasks
       for (let i = 0; i < 6; i++) {
-        tracker.recordOutcome({
+        recordCreditedOutcome(tracker, {
           taskId: `test-${i}`, sprintId: 'sprint-001', taskDNA: testDna,
           agentId: null, skillIds: ['doc-writer'], evaluation: 'DONE',
           coverage: 80, routingVersion: 'v2',
@@ -262,7 +277,7 @@ describe('RuleEvolver', () => {
       }
       // 6 failed implementation tasks
       for (let i = 0; i < 6; i++) {
-        tracker.recordOutcome({
+        recordCreditedOutcome(tracker, {
           taskId: `impl-${i}`, sprintId: 'sprint-001', taskDNA: implDna,
           agentId: null, skillIds: ['doc-writer'], evaluation: 'NO_GO',
           coverage: 0, routingVersion: 'v2',
@@ -294,7 +309,7 @@ describe('Lean-A — synergy/conflict no longer emit unconditional rules', () =>
       const evaluation = p.verdict === 'synergy' ? 'DONE' : 'NO_GO';
       const coverage = p.verdict === 'synergy' ? 95 : 0;
       for (let i = 0; i < p.tasks; i++) {
-        tracker.recordOutcome({
+        recordCreditedOutcome(tracker, {
           taskId: `${p.pair}-${i}`, sprintId: 'sprint-001', taskDNA: dna,
           agentId: null, skillIds: [skillA, skillB], evaluation,
           coverage, routingVersion: 'v2',

@@ -322,6 +322,171 @@ describe('TaskSettlementAuthority', () => {
     store.close();
   });
 
+  // ─── F5: abandoned-dispatch reconciliation (owner design, 2026-08-28) ──────
+  //
+  // A one-shot dispatch whose worker dies leaves a dispatch_started head. settleNotDispatched
+  // must refuse it (NOT_DISPATCHED would be false), and before this path existed no operator
+  // surface could terminalize it — the receipt stayed non-terminal and blocked canonical clean.
+  //
+  // The separation these cases pin: a pending result-settlement is CONTROL-PLANE attempt
+  // authority about this exact receipt, never runtime liveness; the real backend adapter is
+  // asked independently and must be absent on top of the ordinary absence set.
+  function dispatchStarted(
+    authority: ReturnType<typeof productionAuthority>['authority'],
+    store: InvocationReceiptStore,
+  ) {
+    const declaration = authority.declareTaskExecution({
+      tenantId: 'tenant-a',
+      projectId: store.projectId,
+      taskId: 'run-100-0',
+      runId: 'run-100',
+      provider: 'codex',
+      model: 'gpt-5.6-sol',
+      executionBackend: 'host-subprocess',
+      createdAt,
+    });
+    authority.markDispatchStarted({
+      tenantId: 'tenant-a',
+      projectId: store.projectId,
+      invocationId: declaration.receiptRef.invocationId,
+      attempt: 1,
+      executionEvidenceRef: 'evidence:dispatch:1',
+      calledProvider: 'codex',
+      calledModel: 'gpt-5.6-sol',
+      occurredAt: '2026-07-27T12:00:00.000Z',
+    });
+    return declaration;
+  }
+
+  const attestation = {
+    operatorId: 'operator-1',
+    reason: 'worker died without a result',
+    attestedAt: '2026-07-27T12:10:00.000Z',
+  };
+
+  it('settles an abandoned dispatch as manual_review_required and replays idempotently', async () => {
+    const projectRoot = root();
+    const store = new InvocationReceiptStore(projectRoot, { idFactory: () => 'project-a' });
+    writeCanonicalTask(projectRoot);
+    const authority = productionAuthority(projectRoot).authority;
+    const declaration = dispatchStarted(authority, store);
+    const base = { ...input(store, { executionBackend: 'host-subprocess' }), receiptRef: declaration.receiptRef };
+
+    const held = await authority.settleAbandonedDispatch(base);
+    expect(held.decision).toBe('hold');
+    expect(held.reasonCode).toBe('attestation-required');
+
+    const attested = {
+      ...base,
+      operatorAttestation: { ...attestation, evidenceRefs: held.evidenceRefs },
+    };
+    const preview = await authority.settleAbandonedDispatch(attested);
+    expect(preview).toMatchObject({ decision: 'eligible', reasonCode: 'dispatch-abandoned' });
+    // Dry-run mutates nothing.
+    expect(store.get(declaration.receiptRef, declaration.receiptRef.invocationId)?.events)
+      .toHaveLength(1);
+
+    const applied = await authority.settleAbandonedDispatch({ ...attested, apply: true });
+    expect(applied.effectiveStatus).toBe('MANUAL_REVIEW_REQUIRED');
+    const view = store.get(declaration.receiptRef, declaration.receiptRef.invocationId);
+    expect(view?.events.map(event => event.type))
+      .toEqual(['dispatch_started', 'transport_settled', 'consumer_settled']);
+    expect(view?.taskDisposition).toBe('manual_review_required');
+    expect(view?.events.at(-1)?.payload).toMatchObject({
+      reasonCode: 'abandoned_dispatch_reconciled',
+      outcome: 'unknown',
+    });
+
+    const replay = await authority.settleAbandonedDispatch({ ...attested, apply: true });
+    expect(replay.effectiveStatus).toBe('MANUAL_REVIEW_REQUIRED');
+    expect(store.get(declaration.receiptRef, declaration.receiptRef.invocationId)?.events)
+      .toHaveLength(3);
+    store.close();
+  });
+
+  it('refuses while the real backend adapter still reports runtime liveness', async () => {
+    const projectRoot = root();
+    const store = new InvocationReceiptStore(projectRoot, { idFactory: () => 'project-a' });
+    writeCanonicalTask(projectRoot);
+    const authority = productionAuthority(projectRoot, { backendState: 'present' }).authority;
+    const declaration = dispatchStarted(authority, store);
+    const held = await authority.settleAbandonedDispatch({
+      ...input(store, { executionBackend: 'host-subprocess' }),
+      receiptRef: declaration.receiptRef,
+    });
+    expect(held.decision).toBe('hold');
+    expect(held.reasonCode).toBe('dispatch-still-live');
+    expect(store.get(declaration.receiptRef, declaration.receiptRef.invocationId)?.events)
+      .toHaveLength(1);
+    store.close();
+  });
+
+  it.each([['unknown'], ['unsupported']] as const)(
+    'holds instead of settling when the backend probe is %s',
+    async state => {
+      const projectRoot = root();
+      const store = new InvocationReceiptStore(projectRoot, { idFactory: () => 'project-a' });
+      writeCanonicalTask(projectRoot);
+      const authority = productionAuthority(projectRoot, { backendState: state }).authority;
+      const declaration = dispatchStarted(authority, store);
+      const held = await authority.settleAbandonedDispatch({
+        ...input(store),
+        receiptRef: declaration.receiptRef,
+        apply: true,
+        operatorAttestation: { ...attestation, evidenceRefs: ['evidence:x'] },
+      });
+      expect(held.decision).toBe('hold');
+      expect(store.get(declaration.receiptRef, declaration.receiptRef.invocationId)?.events)
+        .toHaveLength(1);
+      store.close();
+    },
+  );
+
+  it('refuses an eventless receipt — that shape belongs to settleNotDispatched', async () => {
+    const projectRoot = root();
+    const store = new InvocationReceiptStore(projectRoot, { idFactory: () => 'project-a' });
+    writeCanonicalTask(projectRoot);
+    const authority = productionAuthority(projectRoot).authority;
+    const declaration = authority.declareTaskExecution({
+      tenantId: 'tenant-a',
+      projectId: store.projectId,
+      taskId: 'run-100-0',
+      runId: 'run-100',
+      provider: 'codex',
+      model: 'gpt-5.6-sol',
+      executionBackend: 'host-subprocess',
+      createdAt,
+    });
+    const held = await authority.settleAbandonedDispatch({
+      ...input(store, { executionBackend: 'host-subprocess' }),
+      receiptRef: declaration.receiptRef,
+    });
+    expect(held.decision).toBe('hold');
+    expect(held.reasonCode).toBe('terminal-conflict');
+    store.close();
+  });
+
+  it('refuses when the operator attestation does not bind this evidence snapshot', async () => {
+    const projectRoot = root();
+    const store = new InvocationReceiptStore(projectRoot, { idFactory: () => 'project-a' });
+    writeCanonicalTask(projectRoot);
+    const authority = productionAuthority(projectRoot).authority;
+    const declaration = dispatchStarted(authority, store);
+    const held = await authority.settleAbandonedDispatch({
+      ...input(store),
+      receiptRef: declaration.receiptRef,
+      apply: true,
+      operatorAttestation: {
+        ...attestation,
+        evidenceRefs: ['evidence:some-other-snapshot'],
+      },
+    });
+    expect(held.decision).toBe('hold');
+    expect(store.get(declaration.receiptRef, declaration.receiptRef.invocationId)?.events)
+      .toHaveLength(1);
+    store.close();
+  });
+
   it('captures the default settlement timestamp once for both atomic events', async () => {
     const projectRoot = root();
     const store = new InvocationReceiptStore(projectRoot, { idFactory: () => 'project-a' });

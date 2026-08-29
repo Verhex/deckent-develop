@@ -346,6 +346,54 @@ function lintScopeSilentDrop(task: Task, trackedRootFiles: ReadonlySet<string>, 
       suggestion: getMessage('prompt_gate.scope_silent_drop_rejected_fix', lang),
     });
   }
+
+  // ─── Membership diff (2026-08-28, sprint-708 root cause) ───────────────────
+  // The two loops above can only see drops the sanitizer REPORTS. Five rules in
+  // scope-sanitizer.ts remove a declared write path with a bare `continue` and
+  // report nothing: Rule 3 (dist/ prefix), Rule 4 (extension-only token),
+  // Rule 6 (GLOBAL_PROTECTED root files — package.json, tsconfig.json, config.json,
+  // the lockfiles), Rule 9 (JS property-access pattern) and Rule 10 (placeholder
+  // filename). So the "silent drop" detector was blind to silent drops: task
+  // 708-003 declared `package.json` in filesWrite, Rule 6 removed it from the
+  // rendered WRITE authority, no BLOCK fired, and the worker was handed a task it
+  // could not satisfy by construction (honest NO_GO → FIX budget burn → paused run).
+  //
+  // Comparing input↔output membership is rule-agnostic: it covers those five and
+  // any rule added later, without the detector having to know they exist. The
+  // comparison key mirrors the sanitizer's own legitimate normalizations so they
+  // are never mistaken for drops — Rule 7 strips a trailing "(yeni)" suffix and
+  // Rule 8 dedupes case-insensitively.
+  const compareKey = (raw: string): string =>
+    raw.trim().replace(/\s*\(yeni\)\s*$/iu, '').trim().toLowerCase();
+  const survived = new Set(sanitized.filesWrite.map(compareKey));
+  // A path already named by a warning/rejected finding above is not re-reported.
+  // The sanitizer trims before it reports, so a padded declaration ("  x.md  ") is named
+  // as "x.md" in the warning text. Comparing the RAW string missed that and double-reported
+  // the same path (measured 2026-08-28 review). Match on the trimmed form, which is what
+  // both sanitizeScope's warnings and its rejected entries actually carry.
+  const alreadyReported = (raw: string): boolean => {
+    const trimmed = raw.trim();
+    return sanitized.rejected.includes(raw)
+      || sanitized.rejected.includes(trimmed)
+      || sanitized.warnings.some(w => w.includes(`"${trimmed}"`));
+  };
+  const seenVanished = new Set<string>();
+  for (const raw of filesWrite) {
+    // An empty/whitespace entry is not a declared path; the sanitizer skips it
+    // before any rule runs and there is nothing for a worker to lose.
+    if (typeof raw !== 'string' || raw.trim().length === 0) continue;
+    const key = compareKey(raw);
+    if (survived.has(key) || alreadyReported(raw) || seenVanished.has(key)) continue;
+    seenVanished.add(key);
+    out.push({
+      taskId: task.id,
+      lint: 'scope-silent-drop-unreported',
+      level: 'block',
+      agentId,
+      message: getMessage('prompt_gate.scope_silent_drop_unreported_message', lang, { path: raw }),
+      suggestion: getMessage('prompt_gate.scope_silent_drop_unreported_fix', lang),
+    });
+  }
   return out;
 }
 

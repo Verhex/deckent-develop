@@ -2,9 +2,19 @@
 // Tracks routing outcomes (agent/skill → GO/NO_GO) and generates learning bonuses.
 // Data stored in .deckent/routing/ for cross-sprint learning.
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
+import {
+  closeSync,
+  existsSync,
+  fsyncSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from 'fs';
 import { join } from 'path';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import type { TaskDNA, LearningBonus, IntentType } from '../core/routing-types.js';
 import { LEARNING_BONUS_CAP } from '../core/routing-types.js';
 import { canonicalJson } from '../core/audit-writer.js';
@@ -15,6 +25,7 @@ import { debugLog } from '../core/utils.js';
 import type { LearningConfig } from '../core/decision-config.js';
 import { ErrorRegistry } from '../core/errors.js';
 import { adaptAgentRuntime, type ResultEntry, type SkillAdaptation } from '../agents/adaptive-agent.js';
+import type { SkillAttributionState } from '../core/routing/skill-attribution.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -24,10 +35,13 @@ export interface RoutingOutcome {
   taskDNA: TaskDNA;
   agentId: string | null;
   skillIds: string[];
+  /** Selected/delivered exposure identities; never efficacy credit by itself. */
+  skillExposureIds: string[];
+  skillAttributionState: SkillAttributionState;
   evaluation: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO';
   coverage: number;
   qualityScore?: number; // 0-100 from QualityAssessor
-  routingVersion: 'v2';
+  routingVersion: 'v2' | 'v3';
   /**
    * Advisory skill add/remove suggestion produced by adaptAgentRuntime
    * over recent ResultEntry history. Never auto-applied — Brain reviews.
@@ -72,6 +86,47 @@ export interface LearningsData {
   recentSprints: string[];
   /** skill ID → sprint ID → per-sprint record */
   skillSprintHistory: Record<string, Record<string, SkillSprintRecord>>;
+  skillAttributionAuthority: {
+    mode: 'causal-receipt-v1';
+    legacyQuarantineDigest: string | null;
+  };
+  legacySkillQuarantine?: {
+    digest: string;
+    sourceVersion: number;
+    sourceUpdatedAt: string;
+    skillPerformance: Record<string, EntityPerformance>;
+    skillSprintHistory: Record<string, Record<string, SkillSprintRecord>>;
+    synergyMatrix: SynergyEntry[];
+    evolvedSkillRules: unknown[];
+  };
+}
+
+export type LegacySkillQuarantineSnapshot = Pick<
+  NonNullable<LearningsData['legacySkillQuarantine']>,
+  'skillPerformance' | 'skillSprintHistory' | 'synergyMatrix' | 'evolvedSkillRules'
+>;
+
+/** One canonical normalization shared by cutover preparation and projection. */
+export function deriveLegacySkillQuarantineSnapshot(
+  parsed: Partial<LearningsData>,
+): LegacySkillQuarantineSnapshot {
+  const skillPerformance = parsed.skillPerformance ?? {};
+  for (const perf of Object.values(skillPerformance)) {
+    if (perf.avgQualityScore === undefined) perf.avgQualityScore = 0;
+    if (perf.qualityTaskCount === undefined) {
+      perf.qualityTaskCount = perf.avgQualityScore > 0 ? perf.totalTasks : 0;
+    }
+  }
+  const evolvedRules = Array.isArray(parsed.evolvedRules) ? parsed.evolvedRules : [];
+  const isSkillRule = (value: unknown): boolean =>
+    !!value && typeof value === 'object'
+    && (value as { entityType?: unknown }).entityType === 'skill';
+  return {
+    skillPerformance,
+    skillSprintHistory: parsed.skillSprintHistory ?? {},
+    synergyMatrix: parsed.synergyMatrix ?? [],
+    evolvedSkillRules: evolvedRules.filter(isSkillRule),
+  };
 }
 
 // ─── Reclassify Types ───────────────────────────────────────────────────────
@@ -138,6 +193,12 @@ export class OutcomeTracker {
    * Record a routing outcome after task evaluation.
    */
   recordOutcome(outcome: RoutingOutcome): void {
+    const exposureIds = [...new Set(outcome.skillExposureIds ?? outcome.skillIds)].sort();
+    const creditedIds = outcome.skillAttributionState === 'CREDITED'
+      ? [...new Set(outcome.skillIds)].sort()
+      : [];
+    outcome.skillExposureIds = exposureIds;
+    outcome.skillIds = creditedIds;
     const isSuccess = outcome.evaluation !== 'NO_GO';
 
     // Update agent performance
@@ -152,7 +213,7 @@ export class OutcomeTracker {
     }
 
     // Update skill performance and per-sprint history
-    for (const skillId of outcome.skillIds) {
+    for (const skillId of creditedIds) {
       this.updateEntityPerformance(
         this.learnings.skillPerformance,
         skillId,
@@ -170,15 +231,15 @@ export class OutcomeTracker {
 
     // Update synergy matrix (agent+skill pairs)
     if (outcome.agentId && outcome.agentId !== 'generic') {
-      for (const skillId of outcome.skillIds) {
+      for (const skillId of creditedIds) {
         this.updateSynergy(`${outcome.agentId}+${skillId}`, isSuccess);
       }
     }
 
     // Update synergy for skill+skill pairs
-    for (let i = 0; i < outcome.skillIds.length; i++) {
-      for (let j = i + 1; j < outcome.skillIds.length; j++) {
-        const pair = [outcome.skillIds[i], outcome.skillIds[j]].sort().join('+');
+    for (let i = 0; i < creditedIds.length; i++) {
+      for (let j = i + 1; j < creditedIds.length; j++) {
+        const pair = [creditedIds[i], creditedIds[j]].sort().join('+');
         this.updateSynergy(pair, isSuccess);
       }
     }
@@ -241,8 +302,8 @@ export class OutcomeTracker {
    *
    * This does NOT change the official evaluation, does NOT bump totalOutcomes (the task
    * was already counted by recordOutcome), and does NOT write a sprint outcome file entry.
-   * REFUTED  → negative signal (isSuccess=false) to agent + skill performance + synergy.
-   * CONFIRMED → positive signal (isSuccess=true) to agent + skill performance + synergy.
+   * REFUTED/CONFIRMED update the agent only. A whole-task verifier verdict is
+   * not causal evidence that any co-delivered skill was applied.
    * unclear  → no-op (honest non-result — no signal injected).
    *
    * Raw provider prose and legacy free-form verdicts cannot enter this path.
@@ -280,15 +341,7 @@ export class OutcomeTracker {
     if (agentId && agentId !== 'generic') {
       this.updateEntityPerformance(this.learnings.agentPerformance, agentId, intent, isSuccess);
     }
-    for (const skillId of skillIds) {
-      this.updateEntityPerformance(this.learnings.skillPerformance, skillId, intent, isSuccess);
-    }
-    // Update synergy for agent+skill pairs (mirrors recordOutcome pattern).
-    if (agentId && agentId !== 'generic') {
-      for (const skillId of skillIds) {
-        this.updateSynergy(`${agentId}+${skillId}`, isSuccess);
-      }
-    }
+    void skillIds;
 
     this.learnings.updatedAt = new Date().toISOString();
     this.saveLearnings();
@@ -547,6 +600,14 @@ export class OutcomeTracker {
   }
 
   /**
+   * Persist the lossless causal-attribution cutover before the first dogfood
+   * run. This is explicit so read-only construction never mutates a project.
+   */
+  persistSkillAttributionCutover(): void {
+    this.saveLearnings();
+  }
+
+  /**
    * Return the worst-performing agent+skill combinations from the last 5 sprints.
    * Reads sprint outcome files from .deckent/routing/outcomes/ and aggregates
    * success/fail rates per (agentId, skillId) pair.
@@ -578,6 +639,9 @@ export class OutcomeTracker {
 
       for (const outcome of outcomes) {
         if (!outcome.agentId || outcome.agentId === 'generic') continue;
+        // Legacy rows predate causal attribution and their skillIds describe
+        // co-exposure, not efficacy. They must never influence planner input.
+        if (outcome.skillAttributionState !== 'CREDITED') continue;
         const isSuccess = outcome.evaluation !== 'NO_GO';
 
         for (const skillId of outcome.skillIds) {
@@ -796,23 +860,47 @@ export class OutcomeTracker {
         const parsed = JSON.parse(raw) as Partial<LearningsData>;
         // Backfill fields added in later versions (backward compatibility)
         const agentPerf = parsed.agentPerformance ?? {};
-        const skillPerf = parsed.skillPerformance ?? {};
+        const legacySnapshot = deriveLegacySkillQuarantineSnapshot(parsed);
+        const legacySkillPerf = legacySnapshot.skillPerformance;
         // Backfill avgQualityScore and qualityTaskCount for entities loaded from older learnings data
         for (const perf of Object.values(agentPerf)) {
           if (perf.avgQualityScore === undefined) perf.avgQualityScore = 0;
           if (perf.qualityTaskCount === undefined) perf.qualityTaskCount = perf.avgQualityScore > 0 ? perf.totalTasks : 0;
         }
-        for (const perf of Object.values(skillPerf)) {
-          if (perf.avgQualityScore === undefined) perf.avgQualityScore = 0;
-          if (perf.qualityTaskCount === undefined) perf.qualityTaskCount = perf.avgQualityScore > 0 ? perf.totalTasks : 0;
-        }
+        const hasCausalAuthority = parsed.skillAttributionAuthority?.mode === 'causal-receipt-v1';
+        const evolvedRules = Array.isArray(parsed.evolvedRules) ? parsed.evolvedRules : [];
+        const isSkillRule = (value: unknown): boolean =>
+          !!value && typeof value === 'object'
+          && (value as { entityType?: unknown }).entityType === 'skill';
+        const legacyDigest = hasCausalAuthority
+          ? parsed.skillAttributionAuthority?.legacyQuarantineDigest ?? null
+          : `sha256:${createHash('sha256').update(canonicalJson(legacySnapshot as never)).digest('hex')}`;
         return {
           recentSprints: [],
-          skillSprintHistory: {},
           ...parsed,
+          version: Math.max(parsed.version ?? 1, 2),
           agentPerformance: agentPerf,
-          skillPerformance: skillPerf,
-          synergyMatrix: parsed.synergyMatrix ?? [],
+          skillPerformance: hasCausalAuthority ? legacySkillPerf : {},
+          skillSprintHistory: hasCausalAuthority ? parsed.skillSprintHistory ?? {} : {},
+          synergyMatrix: hasCausalAuthority ? parsed.synergyMatrix ?? [] : [],
+          evolvedRules: hasCausalAuthority ? evolvedRules : evolvedRules.filter(rule => !isSkillRule(rule)),
+          skillAttributionAuthority: {
+            mode: 'causal-receipt-v1',
+            legacyQuarantineDigest: legacyDigest,
+          },
+          ...(!hasCausalAuthority && (
+            Object.keys(legacySkillPerf).length > 0
+            || Object.keys(parsed.skillSprintHistory ?? {}).length > 0
+            || (parsed.synergyMatrix?.length ?? 0) > 0
+            || legacySnapshot.evolvedSkillRules.length > 0
+          ) ? {
+            legacySkillQuarantine: {
+              digest: legacyDigest!,
+              sourceVersion: parsed.version ?? 1,
+              sourceUpdatedAt: parsed.updatedAt ?? '',
+              ...legacySnapshot,
+            },
+          } : {}),
         } as LearningsData;
       }
     } catch (err) {
@@ -820,7 +908,7 @@ export class OutcomeTracker {
     }
 
     return {
-      version: 1,
+      version: 2,
       updatedAt: new Date().toISOString(),
       totalOutcomes: 0,
       agentPerformance: {},
@@ -828,32 +916,46 @@ export class OutcomeTracker {
       synergyMatrix: [],
       recentSprints: [],
       skillSprintHistory: {},
+      skillAttributionAuthority: {
+        mode: 'causal-receipt-v1',
+        legacyQuarantineDigest: null,
+      },
     };
   }
 
   private saveLearnings(): void {
     const dir = join(this.projectRoot, ROUTING_DIR);
-    try {
-      mkdirSync(dir, { recursive: true });
-      writeFileSync(join(this.projectRoot, LEARNINGS_FILE), JSON.stringify(this.learnings, null, 2), 'utf-8');
-    } catch (err) {
-      debugLog('outcome-tracker:save', err);
-    }
+    mkdirSync(dir, { recursive: true });
+    this.writeJsonAtomic(join(this.projectRoot, LEARNINGS_FILE), this.learnings);
   }
 
   private saveSprintOutcome(outcome: RoutingOutcome): void {
     const dir = join(this.projectRoot, OUTCOMES_DIR);
+    mkdirSync(dir, { recursive: true });
+    const filePath = join(dir, `${outcome.sprintId}.json`);
+    let outcomes: RoutingOutcome[] = [];
+    if (existsSync(filePath)) {
+      outcomes = JSON.parse(readFileSync(filePath, 'utf-8')) as RoutingOutcome[];
+    }
+    outcomes.push(outcome);
+    this.writeJsonAtomic(filePath, outcomes);
+  }
+
+  private writeJsonAtomic(path: string, value: unknown): void {
+    const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`;
+    let descriptor: number | null = null;
     try {
-      mkdirSync(dir, { recursive: true });
-      const filePath = join(dir, `${outcome.sprintId}.json`);
-      let outcomes: RoutingOutcome[] = [];
-      if (existsSync(filePath)) {
-        outcomes = JSON.parse(readFileSync(filePath, 'utf-8'));
+      writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, 'utf-8');
+      descriptor = openSync(temporary, 'r');
+      fsyncSync(descriptor);
+      closeSync(descriptor);
+      descriptor = null;
+      renameSync(temporary, path);
+    } finally {
+      if (descriptor !== null) {
+        try { closeSync(descriptor); } catch { /* preserve the primary failure */ }
       }
-      outcomes.push(outcome);
-      writeFileSync(filePath, JSON.stringify(outcomes, null, 2), 'utf-8');
-    } catch (err) {
-      debugLog('outcome-tracker:save-sprint', err);
+      try { unlinkSync(temporary); } catch { /* absent after successful rename */ }
     }
   }
 }

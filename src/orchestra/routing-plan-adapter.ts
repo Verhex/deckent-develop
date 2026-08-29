@@ -7,9 +7,15 @@
 // and the plan preview in front of Alperen — decides; nothing silent).
 
 import { AgentPoolManager } from '../core/agent-pool.js';
-import { snapshotSkillCatalog } from '../core/skill-pool.js';
+import { snapshotSkillCatalog, resolveSkillBody } from '../core/skill-pool.js';
 import type { EffectiveSkill, SkillDispositionState } from '../core/skill-pool.js';
 import { deriveCanonicalSkillProfile } from '../core/skill-profile-derivation.js';
+import {
+  deriveCanonicalSkillApplicability,
+  evaluateSkillApplicability,
+} from '../core/routing/skill-applicability.js';
+import type { SkillApplicabilityDerivation } from '../core/routing/skill-applicability.js';
+import { collectSkillTaskEvidence } from '../core/routing/skill-task-evidence.js';
 import type { SkillDefinition, SkillProfileDerivation } from '../core/skill-types.js';
 import { validateCapabilities } from '../core/routing/capability-vector.js';
 import type { SkillProfile } from '../core/routing/capability-vector.js';
@@ -17,17 +23,18 @@ import { loadVocabulary } from '../core/routing/vocabulary.js';
 import { loadPolicyPacks } from '../core/routing/policy-pack.js';
 import { readCellsSnapshot } from '../core/routing/learning-cells.js';
 import type { CellStat } from '../core/routing/axis-numerical.js';
-import { producePositional, produceNumerical } from '../core/routing/requirement-vector.js';
+import { producePositional, produceNumerical, produceContentStructural } from '../core/routing/requirement-vector.js';
 import { produceContentBatchLLM } from '../core/routing/content-llm.js';
 import type { CompleteFn } from '../core/routing/content-llm.js';
 import { makeCompleteTieJudge } from '../core/routing/tie-judge.js';
-import { routeTaskV3 } from '../core/routing/route-task-v3.js';
+import { routeTaskV3, SkillSelectionHoldError } from '../core/routing/route-task-v3.js';
 import type { RouteCatalog } from '../core/routing/route-task-v3.js';
 import { CatalogGapError } from '../core/routing/verifier.js';
 import { appendDecision, hashConfig } from '../core/routing/journal.js';
 import type { RoutingV3Config } from '../core/config-types.js';
 import type { Task } from '../core/task-types.js';
 import { debugLog } from '../core/utils.js';
+import { createHash } from 'node:crypto';
 
 export interface RouteTasksV3Options {
   /** Injected LLM completion (provider resolved by the planner). Absent = structural content. */
@@ -60,7 +67,13 @@ export type SkillRoutingRejectionReason =
   | 'disabled'
   | 'retired'
   | 'quarantined'
-  | 'invalid-profile';
+  | 'invalid-profile'
+  | 'invalid-applicability'
+  | 'package-unresolved'
+  | 'required-evidence-missing'
+  | 'forbidden-evidence-present'
+  | 'partial-evidence'
+  | 'platform-mismatch';
 
 export interface RouteTasksV3SkillRejection {
   skillId: string;
@@ -69,6 +82,8 @@ export interface RouteTasksV3SkillRejection {
   detail: string;
   /** Which candidate source the row came from — catalog projection or in-memory pool. */
   source: 'catalog' | 'pool';
+  /** Present for task-local applicability rejections; absent for catalog-global rows. */
+  taskId?: string;
 }
 
 /** One skill as the eligibility rule sees it, independent of where it came from. */
@@ -77,6 +92,7 @@ interface SkillEligibilityCandidate {
   dispositionState: SkillDispositionState;
   masked: boolean;
   routing: SkillProfileDerivation;
+  applicability?: SkillApplicabilityDerivation;
 }
 
 export type SkillEligibilityVerdict =
@@ -123,6 +139,14 @@ export function evaluateSkillRoutingEligibility(
       detail: `${reasonCode}: ${message}`,
     };
   }
+  if (candidate.applicability?.status === 'unroutable') {
+    return {
+      admitted: false,
+      skillId,
+      reason: 'invalid-applicability',
+      detail: `${candidate.applicability.diagnostic.reasonCode}: ${candidate.applicability.diagnostic.message}`,
+    };
+  }
   return { admitted: true, skillId, profile: candidate.routing.profile };
 }
 
@@ -131,7 +155,14 @@ export type SkillRoutingCandidateSource =
   | { source: 'pool'; definitions: Iterable<SkillDefinition> };
 
 export interface SkillRoutingSelection {
-  skills: Array<{ skillId: string; profile: SkillProfile }>;
+  skills: Array<{
+    skillId: string;
+    profile: SkillProfile;
+    applicability: Extract<SkillApplicabilityDerivation, { status: 'applicable-profile' }>;
+    definition: SkillDefinition;
+    provenance: EffectiveSkill['provenance']['kind'] | 'pool';
+    entry?: EffectiveSkill;
+  }>;
   rejections: RouteTasksV3SkillRejection[];
 }
 
@@ -141,6 +172,11 @@ export interface SkillRoutingSelection {
  * invariant the routing surface is judged on.
  */
 export function selectRoutableSkills(input: SkillRoutingCandidateSource): SkillRoutingSelection {
+  const poolDefinitions = input.source === 'pool' ? [...input.definitions] : [];
+  const definitionsById = new Map(poolDefinitions.map(definition => [definition.id, definition]));
+  const catalogById = new Map(
+    input.source === 'catalog' ? input.entries.map(entry => [entry.id, entry] as const) : [],
+  );
   const candidates: SkillEligibilityCandidate[] =
     input.source === 'catalog'
       ? input.entries.map((entry) => ({
@@ -148,21 +184,46 @@ export function selectRoutableSkills(input: SkillRoutingCandidateSource): SkillR
           dispositionState: entry.disposition.state,
           masked: entry.masked,
           routing: entry.routing,
+          applicability: entry.applicability,
         }))
-      : [...input.definitions].map((definition) => ({
+      : poolDefinitions.map((definition) => ({
           skillId: definition.id,
           // An in-memory pool row has no disposition ledger behind it, so the
           // same rule `resolveSkillCatalog` applies to a manifest applies here.
           dispositionState: definition.enabled === false ? 'disabled' : 'active',
           masked: false,
           routing: deriveCanonicalSkillProfile(definition),
+          applicability: deriveCanonicalSkillApplicability(definition),
         }));
 
   const selection: SkillRoutingSelection = { skills: [], rejections: [] };
   for (const candidate of candidates) {
     const verdict = evaluateSkillRoutingEligibility(candidate);
     if (verdict.admitted) {
-      selection.skills.push({ skillId: verdict.skillId, profile: verdict.profile });
+      const definition = input.source === 'catalog'
+        ? catalogById.get(verdict.skillId)?.definition
+        : definitionsById.get(verdict.skillId);
+      const entry = input.source === 'catalog'
+        ? catalogById.get(verdict.skillId)
+        : undefined;
+      const applicability = candidate.applicability;
+      if (!definition || applicability?.status !== 'applicable-profile') {
+        selection.rejections.push({
+          skillId: verdict.skillId,
+          reason: 'invalid-applicability',
+          detail: 'canonical applicability profile unavailable',
+          source: input.source,
+        });
+        continue;
+      }
+      selection.skills.push({
+        skillId: verdict.skillId,
+        profile: verdict.profile,
+        applicability,
+        definition,
+        provenance: entry?.provenance.kind ?? 'pool',
+        ...(entry ? { entry } : {}),
+      });
       continue;
     }
     selection.rejections.push({
@@ -173,6 +234,33 @@ export function selectRoutableSkills(input: SkillRoutingCandidateSource): SkillR
     });
   }
   return selection;
+}
+
+function digestJson(value: unknown): string {
+  return `sha256:${createHash('sha256').update(JSON.stringify(value)).digest('hex')}`;
+}
+
+function packageDigest(skill: SkillRoutingSelection['skills'][number]):
+  | { ok: true; digest: string }
+  | { ok: false; detail: string } {
+  if (!skill.entry) {
+    // Planner-generated in-memory packages have not entered the catalog yet;
+    // bind the complete definition (including applicability/profile) instead
+    // of inventing a filesystem identity they do not possess.
+    return { ok: true, digest: digestJson({ source: 'pool', definition: skill.definition }) };
+  }
+  const body = resolveSkillBody(skill.entry);
+  if (!body.ok) return { ok: false, detail: `${body.reasonCode}: ${body.detail}` };
+  return {
+    ok: true,
+    digest: digestJson({
+      skillId: body.skillId,
+      entrypoint: { path: body.entrypoint.declaredPath, digest: body.entrypoint.digest },
+      referencedFiles: body.referencedFiles
+        .map(file => ({ path: file.declaredPath, digest: file.digest }))
+        .sort((a, b) => a.path.localeCompare(b.path)),
+    }),
+  };
 }
 
 export interface RouteTasksV3Escalation {
@@ -229,10 +317,12 @@ export async function routeTasksV3ForPlan(
   // Skills: the canonical S5 projection on disk, or the planner's in-memory pool
   // (generated temp skills never exist on disk at plan time). Both go through the
   // one eligibility rule; nothing is dropped without a typed reason.
+  const skillSnapshot = options.pools?.skills
+    ? null
+    : snapshotSkillCatalog(projectRoot, { excludeSidecarStats: true });
   const selection = options.pools?.skills
     ? selectRoutableSkills({ source: 'pool', definitions: options.pools.skills.values() })
-    : selectRoutableSkills({ source: 'catalog', entries: snapshotSkillCatalog(projectRoot).entries });
-  const skills: RouteCatalog['skills'][number][] = selection.skills;
+    : selectRoutableSkills({ source: 'catalog', entries: skillSnapshot!.entries });
   result.skillRejections = selection.rejections;
   for (const rejection of selection.rejections) {
     debugLog(
@@ -241,10 +331,41 @@ export async function routeTasksV3ForPlan(
     );
   }
 
+  const resolvedSkills = selection.skills.flatMap(skill => {
+    const packageResolution = packageDigest(skill);
+    if (!packageResolution.ok) {
+      result.skillRejections.push({
+        skillId: skill.skillId,
+        reason: 'package-unresolved',
+        detail: packageResolution.detail,
+        source: skill.entry ? 'catalog' : 'pool',
+      });
+      return [];
+    }
+    return [{
+      ...skill,
+      profileDigest: digestJson(skill.profile),
+      packageDigest: packageResolution.digest,
+      tokenCost: skill.definition.promptInjection.maxTokens,
+    }];
+  });
+  const skillCatalogDigest = digestJson({
+    snapshotDigest: skillSnapshot?.digest ?? null,
+    candidates: resolvedSkills.map(skill => ({
+      skillId: skill.skillId,
+      profileDigest: skill.profileDigest,
+      applicabilityDigest: skill.applicability.digest,
+      packageDigest: skill.packageDigest,
+      provenance: skill.provenance,
+      tokenCost: skill.tokenCost,
+    })).sort((a, b) => a.skillId.localeCompare(b.skillId)),
+  });
+
   const vocabulary = await loadVocabulary(projectRoot);
   const catalog: RouteCatalog = {
     agents,
-    skills,
+    // Skill applicability is task-local and is attached in the route loop.
+    skills: [],
     vocabulary: {
       domains: vocabulary.domains,
       knownDomainIds: new Set(vocabulary.domains.map((d) => d.id)),
@@ -277,26 +398,60 @@ export async function routeTasksV3ForPlan(
   const configHash = hashConfig(config);
   for (const { task, positional } of positionals) {
     const numerical = produceNumerical(task, catalog.vocabulary);
-    const content = contents.get(task.id);
-    const requirement = content ? { content, positional, numerical } : undefined;
+    const content = contents.get(task.id)
+      ?? produceContentStructural(task, positional, config.structuralConfidence);
+    const requirement = { content, positional, numerical };
+    const evidence = collectSkillTaskEvidence(projectRoot, {
+      ...task,
+      routingMeta: { ...task.routingMeta, workType: content.workType },
+    });
+    const taskSkills: RouteCatalog['skills'][number][] = resolvedSkills.map(skill => {
+      const applicability = evaluateSkillApplicability(skill.applicability.profile, evidence);
+      if (!applicability.admitted) {
+        result.skillRejections.push({
+          taskId: task.id,
+          skillId: skill.skillId,
+          reason: applicability.reason,
+          detail: applicability.detail,
+          source: skill.entry ? 'catalog' : 'pool',
+        });
+      }
+      return {
+        skillId: skill.skillId,
+        profile: skill.profile,
+        applicability,
+        profileDigest: skill.profileDigest,
+        packageDigest: skill.packageDigest,
+        applicabilityDigest: skill.applicability.digest,
+        provenance: skill.provenance,
+        tokenCost: skill.tokenCost,
+      };
+    });
+    const taskCatalog: RouteCatalog = { ...catalog, skills: taskSkills };
 
     try {
-      const decision = await routeTaskV3(task, catalog, {
+      const decision = await routeTaskV3(task, taskCatalog, {
         config,
         policies,
         cells,
-        ...(requirement ? { requirement } : {}),
+        requirement,
         ...(task.forceAgent ? { forceAgentId: task.forceAgent } : {}),
         ...(options.excludeAgentIds ? { excludeAgentIds: options.excludeAgentIds } : {}),
+        skillContext: {
+          evidenceDigest: evidence.digest,
+          catalogDigest: skillCatalogDigest,
+          ...(task.forceSkills ? { forceSkillIds: task.forceSkills } : {}),
+          ...(task.excludeSkills ? { excludeSkillIds: task.excludeSkills } : {}),
+        },
         // K3 (581): ε-tie yargıcı — content-LLM'in aynı complete-seam'i üzerinden;
         // seam yoksa (deterministik/test ortamı) engine fail-open top-1 kalır.
         ...(options.complete ? { tieJudge: makeCompleteTieJudge(options.complete) } : {}),
       });
 
       task.assignedAgent = decision.agentId;
-      // 587-001: never a wholesale overwrite — an operator's forceSkills
-      // directive outlives whatever V3 picked (see mergeForcePreservingSkillIds).
-      task.assignedSkills = mergeForcePreservingSkillIds(task, decision.skillIds);
+      // Force/exclude directives were already resolved inside the hard-gated
+      // composition receipt. A post-decision union would bypass applicability.
+      task.assignedSkills = [...decision.skillIds];
       const storyWorkType = decision.story.steps[0]?.detail['workType'];
       const dominantDomain = positional.domains.reduce<
         (typeof positional.domains)[number] | undefined
@@ -313,6 +468,9 @@ export async function routeTasksV3ForPlan(
         provenance: decision.provenance,
         personaSlices: decision.personaSlices,
         storySummary: decision.story.summary,
+        skillEvidenceDigest: evidence.digest,
+        skillCatalogDigest,
+        skillDecisionDigest: digestJson(decision),
         ...(dominantDomain ? { dominantDomain } : {}),
         ...(decision.escalation ? { escalation: decision.escalation.reason } : {}),
       };
@@ -333,24 +491,26 @@ export async function routeTasksV3ForPlan(
       if (options.journal !== false) {
         try {
           appendDecision(projectRoot, {
-            schemaVersion: 1,
+            schemaVersion: 2,
             taskId: task.id,
             sprintId: options.sprintId ?? null,
             recordedAt: new Date().toISOString(),
-            requirement: requirement ?? {
-              content: {
-                workType: 'build',
-                subtype: null,
-                summary: null,
-                semanticTags: null,
-                provenance: 'structural',
-                calibratedConfidence: config.structuralConfidence,
-              },
-              positional,
-              numerical,
-            },
+            requirement,
             configHash,
             catalog: Object.fromEntries(agents.map((a) => [a.agentId, a.capabilities])),
+            skillCatalog: taskSkills.map(skill => ({
+              skillId: skill.skillId,
+              profile: skill.profile,
+              applicability: skill.applicability,
+              profileDigest: skill.profileDigest,
+              packageDigest: skill.packageDigest,
+              applicabilityDigest: skill.applicabilityDigest,
+              provenance: skill.provenance,
+              tokenCost: skill.tokenCost,
+            })),
+            skillCatalogDigest,
+            skillEvidence: { ...evidence },
+            skillEvidenceDigest: evidence.digest,
             decision,
           });
         } catch (err) {
@@ -359,6 +519,15 @@ export async function routeTasksV3ForPlan(
         }
       }
     } catch (err) {
+      if (err instanceof SkillSelectionHoldError) {
+        result.escalations.push({
+          taskId: task.id,
+          reason: 'skill-selection-hold',
+          detail: err.message,
+          candidates: [],
+        });
+        continue;
+      }
       if (err instanceof CatalogGapError) {
         // Honest gap: task stays UNASSIGNED; the plan gate blocks with this
         // escalation in front of the Brain/Alperen (decision-5).

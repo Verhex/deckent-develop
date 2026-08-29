@@ -90,13 +90,13 @@
   },
   {
    "file": "scripts/audit-operation-ingress.mjs",
-   "class": "recurring-proof",
+   "class": "gate",
    "owner": "operation-ingress-audit",
-   "npmScript": "audit:operation-ingress",
+   "npmScript": "audit:operation-ingress; lint:gates",
    "input": "src/ production fs-write/delete call sites",
-   "output": "report distinguishing catalog-mediated vs raw call sites (report-only, does not fail build)",
-   "expiry": "none — rerun on demand; deliberately excluded from lint:gates by design",
-   "notes": "OPERATION-001 O3 measurement baseline; header explicitly states it never fails the build."
+   "output": "fail-closed --check ratchet that rejects unmediated ingress growth or lost mediated coverage",
+   "expiry": "none — enforced on every lint:gates run via --check against the committed schema-v1 baseline",
+   "notes": "OPERATION-001 O3 fail-closed ingress ratchet; audit:operation-ingress remains available for reporting, and lint:gates runs node scripts/audit-operation-ingress.mjs --check."
   },
   {
    "file": "scripts/audit-user-surfaces.mjs",
@@ -692,11 +692,11 @@
    "file": "scripts/lint-script-registry.mjs",
    "class": "gate",
    "owner": "script-lifecycle-registry-governance",
-   "npmScript": null,
+   "npmScript": "lint:gates member (unaliased)",
    "input": "scripts/script-registry.json + the real top-level scripts/*.mjs directory listing",
    "output": "exit 0 registry covers exactly the real directory + every entry well-formed / 1 coverage-or-shape violation / 2 missing-or-unparsable registry",
    "expiry": "none — permanent coverage+shape gate for this very registry",
-   "notes": "Task 517-006 (row 270); deliberately NOT wired into any npm script or lint:gates in this slice — that is a follow-up owner decision recorded in the task result notes. Self-registers (this file is itself scripts/*.mjs and required its own entry)."
+   "notes": "Task 517-006 (row 270). Self-registers (this file is itself scripts/*.mjs and required its own entry). 2026-08-28: the follow-up owner decision its notes reserved was taken — the gate is now a lint:gates member, so the registry can no longer rot unnoticed (it had been red at HEAD with 6 violations, three of them gate scripts missing an entry)."
   },
   {
    "file": "scripts/lint-skill-catalog-determinism.mjs",
@@ -725,7 +725,8 @@
    "npmScript": "lint:gates member (unaliased)",
    "input": "production src/** acceptance-confirmation read/settle call sites and their authority annotations",
    "output": "exit 0 when confirmation discovery stays side-effect-free and settlement stays driver/service-owned; exit 2 on violation",
-   "notes": "Sprint-661 closure follow-up 2026-08-24: gate was authored in 4a77f5704 but never registered; registration closes the UNWIRED gap (owner finding HIGH-1)."
+   "notes": "Sprint-661 closure follow-up 2026-08-24: gate was authored in 4a77f5704 but never registered; registration closes the UNWIRED gap (owner finding HIGH-1).",
+   "expiry": "none — permanent lint:gates member"
   },
   {
    "file": "scripts/lint-approval-lifecycle-authority.mjs",
@@ -734,7 +735,8 @@
    "npmScript": "lint:gates member (unaliased)",
    "input": "production src/** approval lifecycle policy/SLA/CAS writer call sites",
    "output": "exit 0 when lifecycle mutations flow through the D4 policy chain only; exit 2 on violation",
-   "notes": "Sprint-661 closure follow-up 2026-08-24: gate was authored in e9bc6c83a but never registered; registration closes the UNWIRED gap (owner finding HIGH-1)."
+   "notes": "Sprint-661 closure follow-up 2026-08-24: gate was authored in e9bc6c83a but never registered; registration closes the UNWIRED gap (owner finding HIGH-1).",
+   "expiry": "none — permanent lint:gates member"
   },
   {
    "file": "scripts/lint-recovery-truth-authority.mjs",
@@ -743,7 +745,8 @@
    "npmScript": "lint:gates member (unaliased)",
    "input": "production src/** recovery artifact/finalizer/status authority call sites",
    "output": "exit 0 when recovery truth writes stay inside the RECOVERY-TRUTH-001 authority modules; exit 2 on violation",
-   "notes": "Sprint-661 closure follow-up 2026-08-24: gate was authored in eaba99b31 but never registered; registration closes the UNWIRED gap (owner finding HIGH-1)."
+   "notes": "Sprint-661 closure follow-up 2026-08-24: gate was authored in eaba99b31 but never registered; registration closes the UNWIRED gap (owner finding HIGH-1).",
+   "expiry": "none — permanent lint:gates member"
   },
   {
    "file": "scripts/lint-test-hermeticity.mjs",
@@ -1164,6 +1167,36 @@
    "output": "deterministic repair-wave DIRECTIVES (stdout or --out) with generated Reads: lists; exit 2 on bad input",
    "expiry": "none — reusable for every full-suite repair wave (owner decision 2026-08-25)",
    "notes": "Zero LLM free-text: clustering is sorted+chunked, Reads derived from import scanning shared with the lint gate. Output must still pass lint-directives + `deckent plan --dry-run` before start (current-flow contract)."
+  },
+  {
+   "file": "scripts/authority-handoff.mjs",
+   "class": "one-shot",
+   "owner": "execution-authority-handoff",
+   "npmScript": "none — invoked directly by an operator",
+   "input": "a handoff id plus the transition arguments (prepare/verify/commit/abort/recovery-commit/status)",
+   "output": "an immutable create-only receipt under docs/execution/handoffs/<handoffId>/ with a machine-computed digest",
+   "expiry": "none — permanent operator tooling for fallback-rules/authority-handoff.md",
+   "notes": "Registered 2026-08-28 (F3): the file existed since 2026-08-21 with no registry entry. Grants no authority — it only enforces the protocol’s mechanical parts (create-only files, sequence/epoch monotony, digest chaining)."
+  },
+  {
+   "file": "scripts/lint-cli-surface.mjs",
+   "class": "gate",
+   "owner": "cli-surface-registry",
+   "npmScript": "none — not a lint:gates member; its extractRegistryCommands is imported by lint-doc-command-truth.mjs",
+   "input": "CLI command registrations and the surface-registry declarations",
+   "output": "exit non-zero on registration ↔ surface-registry drift when invoked directly",
+   "expiry": "open typed-residual — the module reaches production only as a library consumed by the chained doc-command-truth gate; its own standalone fail-closed check is NOT wired into lint:gates",
+   "notes": "Registered 2026-08-28 (F3): the file existed with no registry entry. Honest state recorded rather than implied: chaining its standalone check is a separate owner-admitted decision, not part of this registration."
+  },
+  {
+   "file": "scripts/lint-doc-command-truth.mjs",
+   "class": "gate",
+   "owner": "doc-command-truth",
+   "npmScript": "lint:gates member (unaliased)",
+   "input": "onboarding documents and the CLI surface registry",
+   "output": "exit non-zero when a documented command no longer matches the CLI surface registry",
+   "expiry": "none — permanent lint:gates member",
+   "notes": "Registered 2026-08-28 (F3): authored 2026-08-28 and chained into lint:gates the same day, but never added to the registry — the same UNWIRED-registration gap the sprint-661 gates hit."
   }
  ]
 }

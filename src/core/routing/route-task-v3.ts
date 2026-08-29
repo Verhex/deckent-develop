@@ -41,6 +41,14 @@ import type {
 import { matchSpace, type MatchSpace } from './capability-vector.js';
 import type { SkillProfile } from './capability-vector.js';
 import { parseSubtype } from './vocabulary-builtin.js';
+import type { SkillApplicabilityVerdict } from './skill-applicability.js';
+import type { SkillProvenanceKind } from '../skill-pool.js';
+import { DeckentError } from '../errors.js';
+import type {
+  SkillSelectionCandidateTrace,
+  SkillSelectionRejectionReason,
+  SkillSelectionTrace,
+} from './decision-types.js';
 
 // ─── Inputs ──────────────────────────────────────────────────────────────────
 
@@ -55,6 +63,14 @@ export type RoutableTask = Pick<Task, 'title' | 'description' | 'scope'> &
 export interface SkillCandidate {
   skillId: string;
   profile: SkillProfile;
+  /** Missing authority is fail-closed; optional only for source compatibility
+   * with older journal fixtures, never admitted by the selector. */
+  applicability?: SkillApplicabilityVerdict;
+  profileDigest?: string;
+  packageDigest?: string;
+  applicabilityDigest?: string;
+  provenance?: SkillProvenanceKind | 'pool';
+  tokenCost?: number;
 }
 
 export interface RouteCatalog {
@@ -74,8 +90,15 @@ export interface RouteOptions {
   forceAgentId?: string;
   /** Fresh-eyes exclusion (FIX-path reroute): these agents are not candidates. */
   excludeAgentIds?: readonly string[];
-  /** Max skills attached to the decision (V2 convention: 3). */
+  /** Optional stricter safety ceiling. It never requests this cardinality. */
   maxSkills?: number;
+  /** Content-addressed task/catalog authority plus operator skill directives. */
+  skillContext?: {
+    evidenceDigest: string;
+    catalogDigest: string;
+    forceSkillIds?: readonly string[];
+    excludeSkillIds?: readonly string[];
+  };
   /** K3 (581): ε-tie yargıç-seam'i — yalnız governanceMode 'ai' + gerçek tie'da
    *  çağrılır; null/eksik/hatalı her durumda deterministik top-1 kalır. */
   tieJudge?: TieJudgeFn;
@@ -85,6 +108,21 @@ export interface RouteOptions {
 
 /** Skill fit at/over this level attaches the skill ('able'-grade fit). */
 export const SKILL_FIT_FLOOR = PROFICIENCY_SCORE.able;
+
+const UNBOUND_DIGEST = `sha256:${'0'.repeat(64)}`;
+
+export class SkillSelectionHoldError extends DeckentError {
+  readonly skillIds: readonly string[];
+  constructor(skillIds: readonly string[], detail: string) {
+    super(
+      'ROUTING3_SKILL_SELECTION_HOLD',
+      `Skill selection HOLD for [${skillIds.join(',')}]: ${detail}`,
+      'Forced skills must pass the same hard applicability, package, platform, tenant, and policy gates as automatic candidates.',
+    );
+    this.name = 'SkillSelectionHoldError';
+    this.skillIds = [...skillIds];
+  }
+}
 
 /**
  * Persona-slice bridge: guidance markers in current PROMPT.md files still use
@@ -329,7 +367,8 @@ export async function routeTaskV3(
   }
 
   // 8 · Skills + persona-slice in the same run.
-  const skillIds = selectSkills(requirement, catalog, options.maxSkills ?? 3);
+  const skillSelection = selectSkills(requirement, catalog, options);
+  const skillIds = skillSelection.selectedSkillIds;
   const personaSlices = selectPersonaSlices(workType, judgedTop.agentId, catalog);
 
   // 9 · Story + final decision.
@@ -359,6 +398,7 @@ export async function routeTaskV3(
   return finalizeDecision({
     agentId: judgedTop.agentId,
     skillIds,
+    skillSelection,
     personaSlices,
     modelPreference: winnerCapability.numerical.preferredModel ?? null,
     effortClass: requirement.numerical.effortClass,
@@ -454,31 +494,203 @@ function skillDomainOverlap(requirement: RequirementVector, space: MatchSpace): 
   return overlap;
 }
 
+function candidateDomains(skill: SkillCandidate): Set<string> {
+  return new Set(skill.profile.domains
+    .filter(domain => domain.proficiency !== 'never')
+    .map(domain => domain.id));
+}
+
+function domainSimilarity(left: SkillCandidate, right: SkillCandidate): number {
+  const a = candidateDomains(left);
+  const b = candidateDomains(right);
+  if (a.size === 0 || b.size === 0) return 0;
+  let intersection = 0;
+  for (const value of a) if (b.has(value)) intersection++;
+  return intersection / new Set([...a, ...b]).size;
+}
+
+function uncoveredRequirementWeight(
+  requirement: RequirementVector,
+  skill: SkillCandidate,
+  covered: ReadonlySet<string>,
+): number {
+  const domains = candidateDomains(skill);
+  const wildcard = domains.has('*');
+  return requirement.positional.domains.reduce((sum, domain) =>
+    covered.has(domain.id) || (!wildcard && !domains.has(domain.id))
+      ? sum
+      : sum + (domain.weight > 0 ? domain.weight : 1), 0);
+}
+
+function hasTaskStructuralApplicability(skill: SkillCandidate): boolean {
+  if (!skill.applicability?.admitted) return false;
+  return skill.applicability.matchedEvidence.some(value =>
+    value.startsWith('task:language:')
+    || value.startsWith('task:runtime:')
+    || value.startsWith('task:framework:')
+    || value.startsWith('task:file:'));
+}
+
 function selectSkills(
   requirement: RequirementVector,
   catalog: RouteCatalog,
-  maxSkills: number,
-): string[] {
-  const scored = catalog.skills
-    .map((skill) => {
+  options: RouteOptions,
+): SkillSelectionTrace {
+  const policy = options.config.skillComposition;
+  const hardMaxSkills = Math.min(options.maxSkills ?? policy.hardMaxSkills, policy.hardMaxSkills);
+  const forcedIds = [...new Set(options.skillContext?.forceSkillIds ?? [])];
+  const forcedSet = new Set(forcedIds);
+  const excluded = new Set((options.skillContext?.excludeSkillIds ?? []).filter(id => !forcedSet.has(id)));
+  const byId = new Map(catalog.skills.map(skill => [skill.skillId, skill]));
+  const scored = catalog.skills.map((skill) => {
       const space = matchSpace(skill.profile);
       const content = scoreContentDeterministic(requirement, space);
       const positional = scorePositional(requirement, space, {
         knownDomainIds: catalog.vocabulary.knownDomainIds,
       });
+      const fit = (content.score + positional.score) / 2;
+      const overlap = skillDomainOverlap(requirement, space);
       return {
+        skill,
         skillId: skill.skillId,
-        fit: (content.score + positional.score) / 2,
-        overlap: skillDomainOverlap(requirement, space),
+        fit,
+        overlap,
+        baseUtility: fit * (0.7 + 0.3 * Math.min(1, overlap)),
+        tokenCost: Math.max(0, Math.floor(skill.tokenCost ?? skill.profile.tokenCost ?? 1500)),
       };
-    })
-    // 7094-F1c: the fit floor alone let generically-declared skills through on
-    // every task; a skill now also needs REAL domain overlap with this task.
-    // No requirement domains, or no overlapping skill → honest-empty.
-    .filter((s) => s.fit >= SKILL_FIT_FLOOR && s.overlap > 0)
-    .sort((a, b) => b.fit - a.fit || b.overlap - a.overlap || a.skillId.localeCompare(b.skillId));
-  // Honest-empty (sprint-441 contract): nothing above the floor → NO skills.
-  return scored.slice(0, maxSkills).map((s) => s.skillId);
+    }).sort((a, b) => a.skillId.localeCompare(b.skillId));
+
+  const traces = new Map<string, SkillSelectionCandidateTrace>();
+  const eligible = new Map<string, typeof scored[number]>();
+  for (const candidate of scored) {
+    const applicability = candidate.skill.applicability;
+    let rejectionReason: SkillSelectionRejectionReason | null = null;
+    if (!applicability) rejectionReason = 'applicability-evidence-missing';
+    else if (!applicability.admitted) rejectionReason = applicability.reason;
+    else if (excluded.has(candidate.skillId)) rejectionReason = 'excluded';
+    else if (!forcedSet.has(candidate.skillId) && candidate.fit < SKILL_FIT_FLOOR) rejectionReason = 'semantic-fit';
+    else if (
+      !forcedSet.has(candidate.skillId)
+      && candidate.overlap <= 0
+      && !hasTaskStructuralApplicability(candidate.skill)
+    ) rejectionReason = 'no-domain-overlap';
+    if (rejectionReason === null) eligible.set(candidate.skillId, candidate);
+    traces.set(candidate.skillId, {
+      skillId: candidate.skillId,
+      profileDigest: candidate.skill.profileDigest ?? UNBOUND_DIGEST,
+      packageDigest: candidate.skill.packageDigest ?? UNBOUND_DIGEST,
+      applicabilityDigest: candidate.skill.applicabilityDigest
+        ?? candidate.skill.applicability?.profileDigest
+        ?? UNBOUND_DIGEST,
+      provenance: candidate.skill.provenance ?? 'pool',
+      matchedEvidence: candidate.skill.applicability?.matchedEvidence
+        ? [...candidate.skill.applicability.matchedEvidence]
+        : [],
+      fit: candidate.fit,
+      overlap: candidate.overlap,
+      baseUtility: candidate.baseUtility,
+      marginalUtility: null,
+      tokenCost: candidate.tokenCost,
+      selected: false,
+      forced: forcedSet.has(candidate.skillId),
+      rejectionReason,
+    });
+  }
+
+  const missingForced = forcedIds.filter(id => !byId.has(id));
+  const rejectedForced = forcedIds.filter(id => !eligible.has(id));
+  if (missingForced.length > 0 || rejectedForced.length > 0) {
+    const held = [...new Set([...missingForced, ...rejectedForced])];
+    throw new SkillSelectionHoldError(
+      held,
+      held.map(id => `${id}:${traces.get(id)?.rejectionReason ?? 'catalog-missing'}`).join(','),
+    );
+  }
+  if (forcedIds.length > hardMaxSkills) {
+    throw new SkillSelectionHoldError(forcedIds, `forced cardinality exceeds hardMaxSkills=${hardMaxSkills}`);
+  }
+
+  const selected: string[] = [];
+  const covered = new Set<string>();
+  let totalTokenCost = 0;
+  const select = (candidate: typeof scored[number], marginalUtility: number): void => {
+    selected.push(candidate.skillId);
+    totalTokenCost += candidate.tokenCost;
+    for (const domain of candidateDomains(candidate.skill)) {
+      if (domain !== '*') covered.add(domain);
+    }
+    const trace = traces.get(candidate.skillId)!;
+    traces.set(candidate.skillId, {
+      ...trace, selected: true, marginalUtility, rejectionReason: null,
+    });
+    eligible.delete(candidate.skillId);
+  };
+
+  for (const id of forcedIds) {
+    const candidate = eligible.get(id)!;
+    if (totalTokenCost + candidate.tokenCost > policy.promptTokenBudget) {
+      throw new SkillSelectionHoldError(forcedIds, `forced prompt tokens exceed budget=${policy.promptTokenBudget}`);
+    }
+    select(candidate, candidate.baseUtility);
+  }
+
+  while (eligible.size > 0 && selected.length < hardMaxSkills) {
+    const ranked = [...eligible.values()].map(candidate => {
+      const uncovered = uncoveredRequirementWeight(requirement, candidate.skill, covered);
+      const redundancy = selected.reduce((max, id) =>
+        Math.max(max, domainSimilarity(candidate.skill, byId.get(id)!)), 0);
+      const marginalUtility = candidate.baseUtility
+        + policy.uncoveredCoverageBonus * uncovered
+        - policy.redundancyPenalty * redundancy;
+      return { candidate, marginalUtility };
+    }).sort((a, b) =>
+      b.marginalUtility - a.marginalUtility
+      || b.candidate.baseUtility - a.candidate.baseUtility
+      || a.candidate.skillId.localeCompare(b.candidate.skillId));
+    const best = ranked[0]!;
+    if (best.marginalUtility < policy.marginalUtilityFloor) {
+      for (const { candidate, marginalUtility } of ranked) {
+        const trace = traces.get(candidate.skillId)!;
+        traces.set(candidate.skillId, {
+          ...trace, marginalUtility, rejectionReason: 'marginal-utility',
+        });
+      }
+      break;
+    }
+    if (totalTokenCost + best.candidate.tokenCost > policy.promptTokenBudget) {
+      const trace = traces.get(best.candidate.skillId)!;
+      traces.set(best.candidate.skillId, {
+        ...trace, marginalUtility: best.marginalUtility, rejectionReason: 'prompt-token-budget',
+      });
+      eligible.delete(best.candidate.skillId);
+      continue;
+    }
+    select(best.candidate, best.marginalUtility);
+  }
+
+  if (selected.length >= hardMaxSkills) {
+    for (const candidate of eligible.values()) {
+      const trace = traces.get(candidate.skillId)!;
+      if (trace.rejectionReason === null) {
+        traces.set(candidate.skillId, { ...trace, rejectionReason: 'hard-max-skills' });
+      }
+    }
+  }
+
+  return {
+    evidenceDigest: options.skillContext?.evidenceDigest ?? UNBOUND_DIGEST,
+    catalogDigest: options.skillContext?.catalogDigest ?? UNBOUND_DIGEST,
+    selectedSkillIds: selected,
+    candidates: [...traces.values()].sort((a, b) => a.skillId.localeCompare(b.skillId)),
+    composition: {
+      promptTokenBudget: policy.promptTokenBudget,
+      hardMaxSkills,
+      marginalUtilityFloor: policy.marginalUtilityFloor,
+      redundancyPenalty: policy.redundancyPenalty,
+      uncoveredCoverageBonus: policy.uncoveredCoverageBonus,
+      totalTokenCost,
+    },
+  };
 }
 
 function selectPersonaSlices(

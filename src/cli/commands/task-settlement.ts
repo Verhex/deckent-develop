@@ -30,6 +30,7 @@ export const TASK_SETTLEMENT_PRE_DISPATCH_REASON_CODES = Object.freeze([
   'no_provider',
   'budget_capability_unsupported',
   'provider_authority_rejected',
+  'routing_authority_rejected',
   'execution_admission_rejected',
   'command_build_failed',
   'fallback_unreachable',
@@ -42,6 +43,9 @@ interface TaskSettleOptions {
   readonly attestationReason?: string;
   readonly operator?: string;
   readonly reasonCode?: string;
+  readonly abandonDispatch?: boolean;
+  readonly fromResult?: boolean;
+  readonly reprojectStatus?: boolean;
   readonly json?: boolean;
 }
 
@@ -285,6 +289,9 @@ export function registerTaskSettlement(
         codes: TASK_SETTLEMENT_PRE_DISPATCH_REASON_CODES.join('|'),
       }),
     )
+    .option('--abandon-dispatch', getMessage('task.settle.opt_abandon_dispatch', registerLang))
+    .option('--from-result', getMessage('task.settle.opt_from_result', registerLang))
+    .option('--reproject-status', getMessage('task.settle.opt_reproject_status', registerLang))
     .option('--json', getMessage('task.settle.opt_json', registerLang))
     .action(async (taskId: string, opts: TaskSettleOptions) => {
       const root = (deps.resolveProjectRootFn ?? resolveProjectRoot)();
@@ -349,7 +356,22 @@ export function registerTaskSettlement(
           taskCreatedAt: target.task.createdAt!,
         };
 
-        const initial = await opened.authority.plan(baseInput);
+        // F5 (2026-08-28): --abandon-dispatch must bind its operator attestation to the
+        // RECOVERY evidence snapshot, not the NOT_DISPATCHED one. The two paths observe
+        // different evidence sets (the recovery path additionally carries the independent
+        // backend-runtime probe and the control-attempt reference), so attesting against
+        // the generic plan produced a task-content mismatch at apply time — dry-run and
+        // apply have to agree on exactly one snapshot.
+        const recoveryMode = opts.abandonDispatch === true
+          || opts.fromResult === true
+          || opts.reprojectStatus === true;
+        const initial = opts.reprojectStatus
+          ? await opened.authority.reprojectTaskStatusFromReceipt(baseInput)
+          : opts.fromResult
+            ? await opened.authority.settleDispatchedFromResult(baseInput)
+          : opts.abandonDispatch
+            ? await opened.authority.settleAbandonedDispatch(baseInput)
+            : await opened.authority.plan(baseInput);
         const requiresPreDispatchReason =
           initial.reasonCode === 'pre-dispatch-reason-required';
         if (opts.apply && requiresPreDispatchReason && !preDispatchReasonCode) {
@@ -395,18 +417,42 @@ export function registerTaskSettlement(
         // the operator attestation, then one authoritative re-check inside the
         // atomic settlement call. A third pre-apply probe created a needless
         // TOCTOU window where process-count evidence could drift between checks.
+        // F5 (2026-08-28): --abandon-dispatch routes to the dispatch-started authority.
+        // It is a distinct path, not a flag on the NOT_DISPATCHED one, because the two
+        // assert different facts: one says the worker never started, the other says it
+        // started and is provably gone. The authority still derives the disposition.
+        const settleFn = opts.reprojectStatus
+          ? (i: typeof input) => opened.authority.reprojectTaskStatusFromReceipt({ ...i, apply: true })
+          : opts.fromResult
+          ? (i: typeof input) => opened.authority.settleDispatchedFromResult({ ...i, apply: true })
+          : opts.abandonDispatch
+            ? (i: typeof input) => opened.authority.settleAbandonedDispatch({ ...i, apply: true })
+            : (i: typeof input) => opened.authority.settleNotDispatched({ ...i, apply: true });
+        const planFn = opts.reprojectStatus
+          ? (i: typeof input) => opened.authority.reprojectTaskStatusFromReceipt(i)
+          : opts.fromResult
+          ? (i: typeof input) => opened.authority.settleDispatchedFromResult(i)
+          : opts.abandonDispatch
+            ? (i: typeof input) => opened.authority.settleAbandonedDispatch(i)
+            : (i: typeof input) => opened.authority.plan(i);
         const inspection = opts.apply
-          ? await withTaskExecutionFence(root, taskId, 'settlement', () =>
-              opened.authority.settleNotDispatched({ ...input, apply: true }))
+          ? await withTaskExecutionFence(root, taskId, 'settlement', () => settleFn(input))
           : hasAttestation
-            ? await opened.authority.plan(input)
-            : initial;
+            ? await planFn(input)
+            : recoveryMode
+              ? await planFn(input)
+              : initial;
         const initiallyEvidenceEligible = initial.decision === 'eligible'
           || initial.reasonCode === 'attestation-required'
-          || initial.reasonCode === 'pre-dispatch-reason-required';
+          || initial.reasonCode === 'pre-dispatch-reason-required'
+          || initial.reasonCode === 'dispatch-abandoned';
+        // The abandoned path terminalizes through settleDispatched, whose success shows up
+        // as an 'eligible' inspection over the freshly written terminal head rather than
+        // the NOT_DISPATCHED path's 'already-settled'.
         const applied = opts.apply === true
           && initiallyEvidenceEligible
-          && inspection.decision === 'already-settled';
+          && (inspection.decision === 'already-settled'
+            || (recoveryMode && inspection.decision === 'eligible'));
         const dto = commandDto(
           taskId,
           opts.apply ? 'apply' : 'dry-run',

@@ -14,6 +14,10 @@ import { registerSkillMarketplace } from './skill-marketplace.js';
 import { DeckentError, ErrorRegistry } from '../../core/errors.js';
 import { readCatalogStats } from '../../core/catalog-stats-read-model.js';
 import { analyzeNewSkill, persistSkillActivation } from '../../orchestra/ecosystem-intelligence.js';
+import {
+  applySkillAttributionMigration,
+  inspectSkillAttributionMigration,
+} from '../../orchestra/skill-attribution-migration.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
 import { memoryCatalogMessage } from '../helpers/message-catalog/cli-memory-catalog.js';
 // Note: `skill publish` is registered by registerSkillMarketplace() below —
@@ -254,6 +258,55 @@ function loadSourceMeta(skillDir: string): SkillSourceMeta | null {
 export function registerSkill(program: Command): void {
   const skillCmd = program.command('skill').description(getMessage('cli.skill.desc', getLanguage(undefined)));
 
+  // ─── causal attribution cutover ───────────────────────────────
+  skillCmd
+    .command('attribution')
+    .description(getMessage('cli.skill.attribution.desc', getLanguage(undefined)))
+    .option('--apply', getMessage('cli.skill.attribution.opt.apply', getLanguage(undefined)))
+    .option('--json', memoryCatalogMessage('cli.memcat.shared.opt.json', getLanguage(undefined)))
+    .action(async (opts: { apply?: boolean; json?: boolean }) => {
+      const lang = getLanguage(undefined);
+      try {
+        const root = resolveProjectRoot();
+        const inspection = inspectSkillAttributionMigration(root);
+        if (!opts.apply) {
+          if (opts.json) {
+            print(JSON.stringify({ applied: false, inspection }, null, 2));
+            return;
+          }
+          print(getMessage('cli.skill.attribution.state', lang, { state: inspection.state }));
+          print(getMessage('cli.skill.attribution.inventory', lang, {
+            learnings: String(inspection.inventory.learningsSkillIds),
+            history: String(inspection.inventory.learningsHistoryIds),
+            synergy: String(inspection.inventory.learningsSynergyRows),
+            rules: String(inspection.inventory.learningsEvolvedSkillRules),
+            sidecar: String(inspection.inventory.sidecarSkillIds),
+          }));
+          print(getMessage('cli.skill.attribution.dry_run', lang));
+          return;
+        }
+
+        const receipt = applySkillAttributionMigration(root);
+        if (opts.json) {
+          print(JSON.stringify({ applied: true, inspection, receipt }, null, 2));
+          return;
+        }
+        print(getMessage('cli.skill.attribution.committed', lang, {
+          receiptDigest: receipt.receiptDigest,
+        }));
+      } catch (error) {
+        if (opts.json) {
+          print(JSON.stringify({
+            error: true,
+            message: error instanceof Error ? error.message : String(error),
+          }));
+        } else {
+          printError(error);
+        }
+        process.exitCode = 1;
+      }
+    });
+
   // ─── skill list ─────────────────────────────────────────────────
   skillCmd
     .command('list')
@@ -284,6 +337,7 @@ export function registerSkill(program: Command): void {
           masked: entry.masked,
           profileState: (entry.definition as { routing?: { profileState?: string } }).routing?.profileState ?? null,
           stats: catalogStats.skills[entry.id] ?? null,
+          exposure: catalogStats.skillExposure[entry.id] ?? null,
         };});
 
         if (opts.category) {
@@ -718,12 +772,22 @@ export function registerSkill(program: Command): void {
         }
 
         if (opts.stats) {
-          const stats = readCatalogStats(root).skills[manifest.id];
+          const catalogStats = readCatalogStats(root);
+          const stats = catalogStats.skills[manifest.id];
+          const exposure = catalogStats.skillExposure[manifest.id];
+          const lang = getLanguage(undefined);
           print('');
-          print('  Usage Statistics:');
-          print(`    Total uses:      ${stats?.uses ?? 0}`);
-          print(`    Success rate:    ${stats?.successPercent === null || stats === undefined ? 'never' : `${stats.successPercent}%`}`);
-          print(`    Last sprint:     ${stats?.lastUsedInSprint ?? 'never'}`);
+          print(getMessage('cli.skill.stats.heading', lang));
+          print(getMessage('cli.skill.stats.credited_uses', lang, { count: String(stats?.uses ?? 0) }));
+          print(getMessage('cli.skill.stats.success_rate', lang, {
+            value: stats?.successPercent === null || stats === undefined ? getMessage('common.never', lang) : `${stats.successPercent}%`,
+          }));
+          print(getMessage('cli.skill.stats.selected', lang, { count: String(exposure?.selected ?? 0) }));
+          print(getMessage('cli.skill.stats.delivered', lang, { count: String(exposure?.delivered ?? 0) }));
+          print(getMessage('cli.skill.stats.credited', lang, { count: String(exposure?.credited ?? 0) }));
+          print(getMessage('cli.skill.stats.last_sprint', lang, {
+            value: stats?.lastUsedInSprint ?? exposure?.lastObservedInSprint ?? getMessage('common.never', lang),
+          }));
         }
 
         const meta = loadSourceMeta(skillDir);

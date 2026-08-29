@@ -18,6 +18,8 @@ function makeOutcome(overrides: Partial<RoutingOutcome> = {}): RoutingOutcome {
     taskDNA: dna,
     agentId: 'wire-agent',
     skillIds: ['typescript-expert'],
+    skillExposureIds: ['typescript-expert'],
+    skillAttributionState: 'CREDITED',
     evaluation: 'DONE',
     coverage: 90,
     routingVersion: 'v2',

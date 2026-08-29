@@ -1324,9 +1324,29 @@ export function buildScopeBlock(
   // fall back to an inferred formulation that names the assigned directories
   // instead of the vague "(determined by your task scope)" sentinel. The
   // worker now knows it may write anywhere within those directories.
+  // 2026-08-28 review BLOCKER: the directory fallback below is correct ONLY when the
+  // plan declared no exact write list at all (the PQ-4 F5 case). When a task DID declare
+  // exact write targets and sanitization emptied the list, falling back to the directory
+  // grant turns a request for one file into "any file in these directories" — an authority
+  // EXPANSION rendered under a "You may ONLY write to these files" header. Measured:
+  // filesWrite=['package.json'] + directories=['src'] produced exactly that, with no warning,
+  // because Rule 6 (GLOBAL_PROTECTED) drops silently. Fail closed instead, and report it so
+  // the plan-time gate blocks rather than a worker receiving a widened authority.
+  const declaredWrite = scope.filesWrite.filter(p => typeof p === 'string' && p.trim().length > 0);
+  const declaredButEmptied = declaredWrite.length > 0 && sanitized.filesWrite.length === 0;
+  if (declaredButEmptied) {
+    outWarnings.push(
+      'Declared write authority was emptied by scope sanitization — refusing to widen to the '
+      + `directory grant. Declared: ${declaredWrite.join(', ')}`,
+    );
+  }
+
   let scopeFiles: string;
   if (sanitized.filesWrite.length > 0) {
     scopeFiles = sanitized.filesWrite.map(f => `  - ${f}`).join('\n');
+  } else if (declaredButEmptied) {
+    scopeFiles = '  - (none — every declared write target was rejected by scope sanitization; '
+      + 'STOP and report NO_GO. A directory in the read scope grants NO write authority.)';
   } else if (scope.directories.length > 0) {
     const dirList = scope.directories.join(', ');
     scopeFiles = `  - (no explicit Files list — you may write to any file within the directories above: ${dirList})`;

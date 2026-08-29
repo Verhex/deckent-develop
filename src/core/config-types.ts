@@ -550,6 +550,21 @@ export interface RoutingV3Weights {
 /** Governance strategy for ambiguous/low-confidence RoutingEngineV3 decisions. */
 export type RoutingV3GovernanceMode = 'ai' | 'deterministic';
 
+/** Variable skill-composition policy. Selection is 0..N by marginal utility;
+ * `hardMaxSkills` is a safety ceiling, never a target cardinality. */
+export interface RoutingV3SkillCompositionConfig {
+  /** Maximum aggregate prompt tokens reserved for skill packages. */
+  promptTokenBudget: number;
+  /** Absolute safety ceiling after hard applicability and budget gates. */
+  hardMaxSkills: number;
+  /** Stop when the best remaining candidate adds less utility than this. */
+  marginalUtilityFloor: number;
+  /** Penalty applied to overlap with already selected domain coverage. */
+  redundancyPenalty: number;
+  /** Reward for requirement-domain weight not yet covered. */
+  uncoveredCoverageBonus: number;
+}
+
 /**
  * Full RoutingEngineV3 configuration schema (Sprint 445 Slice-0 foundation, Task 445-010) — the
  * **single source of truth** for the `routing_v3` block's shape, referenced by both
@@ -595,6 +610,8 @@ export interface RoutingV3Config {
   /** Exploration share (0-1). Default: 0 (OFF); exploration activates only
    *  when explicitly configured. Rollback: `explorationBonus: 0`. */
   explorationBonus: number;
+  /** Variable, budgeted skill composition; never a fixed top-three slice. */
+  skillComposition: RoutingV3SkillCompositionConfig;
 }
 
 // ─── Cost Guard Config ───────────────────────────────────────────────

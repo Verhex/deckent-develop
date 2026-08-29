@@ -9,6 +9,11 @@ vi.mock('fs', () => ({
   readFileSync: vi.fn().mockReturnValue('{}'),
   writeFileSync: vi.fn(),
   mkdirSync: vi.fn(),
+  openSync: vi.fn().mockReturnValue(1),
+  fsyncSync: vi.fn(),
+  closeSync: vi.fn(),
+  renameSync: vi.fn(),
+  unlinkSync: vi.fn(),
 }));
 
 function makeOutcome(overrides?: Partial<RoutingOutcome>): RoutingOutcome {
@@ -20,6 +25,8 @@ function makeOutcome(overrides?: Partial<RoutingOutcome>): RoutingOutcome {
     taskDNA: dna,
     agentId: 'test-agent',
     skillIds: ['typescript-expert'],
+    skillExposureIds: ['typescript-expert'],
+    skillAttributionState: 'CREDITED',
     evaluation: 'DONE',
     coverage: 90,
     routingVersion: 'v2',

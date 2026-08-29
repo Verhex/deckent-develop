@@ -28,11 +28,11 @@ describe('audit-operation-ingress — report-only fs-write/delete measurement', 
     expect(report.unmediated).toBe(report.total);
   });
 
-  it('pins the exact currently landed baseline drift', () => {
+  it('pins the refreshed baseline as IN-SYNC with the live surface', () => {
     const baseline = JSON.parse(
       readFileSync(join(process.cwd(), 'scripts/operation-ingress-baseline.json'), 'utf-8'),
     ) as { total: number; digest: string; mediated: number };
-    expect(baseline.total).toBe(709);
+    expect(baseline.total).toBe(740);
     // 733 is the exact landed report-only surface after the kernel-wave
     // config-write authority migration consolidated legacy direct writes.
     //  −7  675-001 heartbeat-primitive rewire — per-callsite writeFileSync hb
@@ -43,8 +43,18 @@ describe('audit-operation-ingress — report-only fs-write/delete measurement', 
     //  +9  2026-08-25 A3 event-truth wave atomic/monotonic writers:
     //      core/event-stream +5, core/run-status-read-model +2,
     //      core/multi-ide +1, orchestra/sprint-utils +1.
-    expect(report.total).toBe(739); // 698: clean.mjs typed orphan-disposal (archive-move + report) — 2 new report-only write sites; prior 737 (692/697 sync arms)
-    expect(baseline.digest).not.toBe(report.digest);
+    // 740: +1 from reprojectTaskStatusFromReceipt (F5), the one deliberate new
+    // unmediated fs-write site in this package — the ratchet caught it and the baseline
+    // was refreshed through the official --write flow rather than silently absorbed.
+    expect(report.total).toBe(740); // 698: clean.mjs typed orphan-disposal (archive-move + report) — 2 new report-only write sites; prior 737 (692/697 sync arms)
+    // 2026-08-28 (OPERATION-001 O3 ratchet, sprint-708 task 002): the baseline was
+    // deliberately refreshed to the live surface so the new fail-closed `--check`
+    // mode has a truthful starting line. This case therefore inverts: it used to
+    // pin the DRIFT (baseline 709 behind a live 739); it now pins the absence of
+    // drift, which is the ratchet's precondition. A future intentional refresh
+    // updates the number here; an UNintentional surface growth is caught by
+    // `node scripts/audit-operation-ingress.mjs --check` inside lint:gates.
+    expect(baseline.digest).toBe(report.digest);
     expect(baseline.mediated).toBe(0);
   });
 

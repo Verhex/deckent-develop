@@ -18,10 +18,15 @@ import {
   writePromptDeliveryReceipt,
 } from '../../src/core/prompt-delivery-receipt.js';
 import {
+  buildSkillAttributionReceipt,
+  writeSkillAttributionBatch,
+} from '../../src/core/routing/skill-attribution.js';
+import {
   collectCatalogStatsTerminalOutcomes,
   writeCatalogStatsTerminalOutcomes,
   parseCommsUsageFromResult,
   type CatalogStatsFileSystem,
+  type CatalogStatsTerminalOutcome,
 } from '../../src/orchestra/sprint-finalizer.js';
 
 const roots: string[] = [];
@@ -69,6 +74,57 @@ function statsPath(root: string): string {
   return join(root, '.deckent', 'stats', 'catalog-stats.json');
 }
 
+const ATTRIBUTION_DIGEST = `sha256:${'a'.repeat(64)}`;
+
+function attributedOutcomes(
+  root: string,
+  sprintId: string,
+  rows: ReadonlyArray<{
+    taskId: string;
+    agentId: string | null;
+    skillIds?: readonly string[];
+    evaluation: TaskEvaluation.DONE | TaskEvaluation.GO_WITH_TECH_DEBT | TaskEvaluation.NO_GO;
+    coverage?: number;
+    commsUsage?: CatalogStatsTerminalOutcome['commsUsage'];
+  }>,
+): CatalogStatsTerminalOutcome[] {
+  const receipts = rows.map(row => buildSkillAttributionReceipt({
+    sprintId,
+    logicalTaskId: row.taskId,
+    resolvingAttemptId: row.taskId,
+    routingDecisionDigest: ATTRIBUTION_DIGEST,
+    skillEvidenceDigest: ATTRIBUTION_DIGEST,
+    logicalSettlementDigest: ATTRIBUTION_DIGEST,
+    promptDeliveryState: 'CURRENT',
+    selectedSkillIds: row.skillIds ?? [],
+    deliveredSkillIds: row.skillIds ?? [],
+    ...((row.skillIds?.length ?? 0) > 0 ? {
+      appliedEvidence: {
+        authority: 'host-validated' as const,
+        evidenceDigest: ATTRIBUTION_DIGEST,
+        skillIds: row.skillIds ?? [],
+      },
+    } : {}),
+  }));
+  writeSkillAttributionBatch(root, sprintId, receipts);
+  return rows.map((row, index) => {
+    const receipt = receipts[index]!;
+    return {
+      taskId: row.taskId,
+      agentId: row.agentId,
+      skillIds: [...receipt.creditedSkillIds],
+      selectedSkillIds: [...receipt.selectedSkillIds],
+      deliveredSkillIds: [...receipt.deliveredSkillIds],
+      creditedSkillIds: [...receipt.creditedSkillIds],
+      skillAttributionState: receipt.state,
+      skillAttributionReceiptDigest: receipt.receiptDigest,
+      evaluation: row.evaluation,
+      ...(row.coverage === undefined ? {} : { coverage: row.coverage }),
+      ...(row.commsUsage === undefined ? {} : { commsUsage: row.commsUsage }),
+    };
+  });
+}
+
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
@@ -95,8 +151,16 @@ describe('catalog stats terminal outcome truth', () => {
 
     expect(outcomes.map(outcome => outcome.taskId)).toEqual([v3.id, fix.id]);
     expect(outcomes).toMatchObject([
-      { agentId: 'v3-agent', skillIds: ['v3-skill'], evaluation: TaskEvaluation.NO_GO },
-      { agentId: 'fix-agent', skillIds: ['fix-skill'], evaluation: TaskEvaluation.DONE },
+      {
+        agentId: 'v3-agent', skillIds: [], selectedSkillIds: ['v3-skill'],
+        deliveredSkillIds: ['v3-skill'], skillAttributionState: 'EXPOSURE_ONLY',
+        evaluation: TaskEvaluation.NO_GO,
+      },
+      {
+        agentId: 'fix-agent', skillIds: [], selectedSkillIds: ['fix-skill'],
+        deliveredSkillIds: ['fix-skill'], skillAttributionState: 'EXPOSURE_ONLY',
+        evaluation: TaskEvaluation.DONE,
+      },
     ]);
   });
 
@@ -126,7 +190,11 @@ describe('catalog stats terminal outcome truth', () => {
       new Map([[currentTask.id, TaskEvaluation.DONE]]),
       new Map([[currentTask.id, result(currentTask.id, { agentId: 'claim-agent', skillIds: ['claim-skill'] })]]),
     );
-    expect(current).toMatchObject([{ agentId: 'delivered-agent', skillIds: ['delivered-skill'] }]);
+    expect(current).toMatchObject([{
+      agentId: 'delivered-agent', skillIds: [],
+      selectedSkillIds: ['delivered-skill'], deliveredSkillIds: ['delivered-skill'],
+      skillAttributionState: 'EXPOSURE_ONLY',
+    }]);
 
     writeFileSync(promptDeliveryReceiptPath(root, currentTask.id), '{malformed', 'utf8');
     const malformed = collectCatalogStatsTerminalOutcomes(
@@ -140,10 +208,10 @@ describe('catalog stats terminal outcome truth', () => {
 
   it('counts every V3/FIX terminal attempt exactly once in the sidecar', () => {
     const root = projectRoot();
-    writeCatalogStatsTerminalOutcomes(root, 'sprint-545', [
+    writeCatalogStatsTerminalOutcomes(root, 'sprint-545', attributedOutcomes(root, 'sprint-545', [
       { taskId: 'v3', agentId: 'shared-agent', skillIds: ['shared-skill'], evaluation: TaskEvaluation.NO_GO },
       { taskId: 'fix', agentId: 'shared-agent', skillIds: ['shared-skill'], evaluation: TaskEvaluation.DONE },
-    ]);
+    ]));
 
     const stats = JSON.parse(readFileSync(statsPath(root), 'utf-8')) as {
       agents: Record<string, { totalUses: number; successCount: number; successRate: number }>;
@@ -172,9 +240,9 @@ describe('catalog stats terminal outcome truth', () => {
     }, null, 4));
     const beforeBytes = JSON.stringify(untouched);
 
-    writeCatalogStatsTerminalOutcomes(root, 'sprint-545', [
+    writeCatalogStatsTerminalOutcomes(root, 'sprint-545', attributedOutcomes(root, 'sprint-545', [
       { taskId: 'used', agentId: 'used', skillIds: [], evaluation: TaskEvaluation.DONE, coverage: 80 },
-    ]);
+    ]));
 
     const stats = JSON.parse(readFileSync(statsPath(root), 'utf-8')) as {
       version: number;
@@ -209,10 +277,11 @@ describe('catalog stats terminal outcome truth', () => {
       },
     };
 
-    writeCatalogStatsTerminalOutcomes(root, 'sprint-545', [
+    const projected = attributedOutcomes(root, 'sprint-545', [
       { taskId: 'one', agentId: 'agent-a', skillIds: ['skill-a'], evaluation: TaskEvaluation.DONE },
       { taskId: 'two', agentId: 'agent-b', skillIds: ['skill-b'], evaluation: TaskEvaluation.NO_GO },
-    ], fileSystem);
+    ]);
+    writeCatalogStatsTerminalOutcomes(root, 'sprint-545', projected, fileSystem);
 
     expect({ writes, renames, destinationWasAbsentBeforeRename }).toEqual({
       writes: 1,
@@ -305,7 +374,7 @@ describe('catalog stats terminal outcome truth', () => {
         },
       };
 
-      writeCatalogStatsTerminalOutcomes(root, 'sprint-551', [
+      const projected = attributedOutcomes(root, 'sprint-551', [
         {
           taskId: 'attempt-one',
           agentId: 'agent-a',
@@ -319,7 +388,8 @@ describe('catalog stats terminal outcome truth', () => {
           skillIds: ['skill-b'],
           evaluation: TaskEvaluation.NO_GO,
         },
-      ], fileSystem);
+      ]);
+      writeCatalogStatsTerminalOutcomes(root, 'sprint-551', projected, fileSystem);
 
       expect({ writes, renames }).toEqual({ writes: 1, renames: 1 });
       const stats = JSON.parse(readFileSync(destination, 'utf-8')) as {
@@ -340,9 +410,9 @@ describe('catalog stats terminal outcome truth', () => {
         skills: {},
       }, null, 2));
 
-      writeCatalogStatsTerminalOutcomes(root, 'sprint-551', [
+      writeCatalogStatsTerminalOutcomes(root, 'sprint-551', attributedOutcomes(root, 'sprint-551', [
         { taskId: 'fresh', agentId: 'agent-c', skillIds: [], evaluation: TaskEvaluation.DONE },
-      ]);
+      ]));
 
       const stats = JSON.parse(readFileSync(statsPath(root), 'utf-8')) as {
         version: number;

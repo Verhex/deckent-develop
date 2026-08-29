@@ -30,6 +30,12 @@ describe('readCatalogStats', () => {
       skills: {
         testing: { totalUses: 3, successCount: 2, lastUsedInSprint: 'sprint-544' },
       },
+      skillExposure: {
+        testing: { selected: 7, delivered: 6, credited: 3, terminalOutcomes: 7, lastObservedInSprint: 'sprint-545' },
+      },
+      skillAttribution: {
+        authority: 'causal-receipt-v1', cutoverSprint: 'sprint-544', legacyQuarantineDigest: null,
+      },
     });
 
     const result = readCatalogStats(root);
@@ -48,6 +54,13 @@ describe('readCatalogStats', () => {
       successRatio: 2 / 3,
       successPercent: 67,
       lastUsedInSprint: 'sprint-544',
+    });
+    expect(result.skillExposure.testing).toEqual({
+      selected: 7, delivered: 6, credited: 3, terminalOutcomes: 7,
+      lastObservedInSprint: 'sprint-545',
+    });
+    expect(result.skillAttribution).toEqual({
+      authority: 'causal-receipt-v1', cutoverSprint: 'sprint-544', legacyQuarantineDigest: null,
     });
   });
 
@@ -78,7 +91,9 @@ describe('readCatalogStats', () => {
       writeFileSync(join(statsDir, 'catalog-stats.json'), bytes, 'utf8');
     }
 
-    expect(readCatalogStats(root)).toEqual({ source: 'absent', agents: {}, skills: {} });
+    expect(readCatalogStats(root)).toEqual({
+      source: 'absent', agents: {}, skills: {}, skillExposure: {}, skillAttribution: null,
+    });
   });
 
   it('skips malformed entity records without rejecting valid siblings', () => {
@@ -102,6 +117,29 @@ describe('readCatalogStats', () => {
         },
       },
       skills: {},
+      skillExposure: {},
+      skillAttribution: null,
     });
+  });
+
+  it('skips malformed exposure rows and rejects malformed attribution authority without hiding valid efficacy stats', () => {
+    writeSidecar({
+      agents: {},
+      skills: { valid: { totalUses: 1, successCount: 1 } },
+      skillExposure: {
+        valid: { selected: 2, delivered: 2, credited: 1, terminalOutcomes: 2 },
+        broken: { selected: 'many', delivered: 1, credited: 1, terminalOutcomes: 1 },
+      },
+      skillAttribution: {
+        authority: 'causal-receipt-v1', cutoverSprint: '', legacyQuarantineDigest: 'not-a-digest',
+      },
+    });
+
+    const result = readCatalogStats(root);
+    expect(result.skills.valid?.uses).toBe(1);
+    expect(result.skillExposure).toEqual({
+      valid: { selected: 2, delivered: 2, credited: 1, terminalOutcomes: 2, lastObservedInSprint: null },
+    });
+    expect(result.skillAttribution).toBeNull();
   });
 });

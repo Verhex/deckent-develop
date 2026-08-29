@@ -46,7 +46,6 @@ import {
   deriveRequestedExecutionBudget,
 } from '../core/execution-budget-derivation.js';
 import { createGoNoGoCriterionItem } from '../core/task-types.js';
-import { isUnconditionalRule } from './rule-evolver.js';
 import { resolveDebt, isSuccessOnlyDebtNote } from './debt-manager.js';
 import { preflightCriticalDebt } from './debt-preflight.js';
 
@@ -801,76 +800,10 @@ export async function planSprint(
       }
     } catch (e) { debugLog('planSprint:generateTempAgents', e); }
 
-    // Inject evolved rules into agent/skill activation configs (in-memory only)
-    try {
-      const { OutcomeTracker: OT } = await import('./outcome-tracker.js');
-      const ot = new OT(projectRoot);
-      const allLearnings = ot.getLearnings();
-      const evolvedRules = (allLearnings.evolvedRules ?? []) as import('./rule-evolver.js').EvolvedRule[];
-      const autoApplied = evolvedRules.filter(r => r.status === 'auto-applied');
-      let injectedCount = 0;
-
-      for (const evolved of autoApplied) {
-        // Lean-A: never inject a legacy/stale unconditional (`when: {}`) rule — it
-        // matches every task and reintroduces the synergy/conflict runaway.
-        if (isUnconditionalRule(evolved.rule as { when?: Record<string, unknown> })) {
-          debugLog(
-            'planSprint:evolved-rules',
-            `Skipped unconditional (empty-when) rule '${(evolved.rule as { name?: string }).name ?? evolved.entityId}'`,
-          );
-          continue;
-        }
-        if (evolved.entityType === 'agent') {
-          const agent = pool.get(evolved.entityId);
-          if (!agent) continue;
-          if (!agent.activation) {
-            agent.activation = { rules: [], exclude: [], minScore: 0 };
-          }
-          if (evolved.type === 'activation') {
-            const rule = evolved.rule as import('../core/routing-types.js').ActivationRule;
-            const hasDuplicate = agent.activation.rules.some(r => r.name && rule.name && r.name === rule.name);
-            if (!hasDuplicate) {
-              agent.activation.rules.push(rule);
-              injectedCount++;
-            }
-          } else if (evolved.type === 'exclusion') {
-            const rule = evolved.rule as import('../core/routing-types.js').ExclusionRule;
-            const hasDuplicate = agent.activation.exclude.some(r => r.name && rule.name && r.name === rule.name);
-            if (!hasDuplicate) {
-              agent.activation.exclude.push(rule);
-              injectedCount++;
-            }
-          }
-        } else if (evolved.entityType === 'skill') {
-          const skill = skillsV2.get(evolved.entityId);
-          if (!skill) continue;
-          if (!skill.activation) {
-            skill.activation = { rules: [], exclude: [], minScore: 0 };
-          }
-          if (evolved.type === 'activation') {
-            const rule = evolved.rule as import('../core/routing-types.js').ActivationRule;
-            const hasDuplicate = skill.activation.rules.some(r => r.name && rule.name && r.name === rule.name);
-            if (!hasDuplicate) {
-              skill.activation.rules.push(rule);
-              injectedCount++;
-            }
-          } else if (evolved.type === 'exclusion') {
-            const rule = evolved.rule as import('../core/routing-types.js').ExclusionRule;
-            const hasDuplicate = skill.activation.exclude.some(r => r.name && rule.name && r.name === rule.name);
-            if (!hasDuplicate) {
-              skill.activation.exclude.push(rule);
-              injectedCount++;
-            }
-          }
-        }
-      }
-
-      if (injectedCount > 0) {
-        debugLog('planSprint:evolved-rules', `Injected ${injectedCount} auto-applied evolved rules into activation configs`);
-      }
-    } catch (e) {
-      debugLog('planSprint:evolved-rules', e);
-    }
+    // Legacy evolved activation rules are intentionally not injected. V3
+    // applicability + deterministic composition own skill selection; agent
+    // adaptation flows through replayable learning cells. Keeping this retired
+    // writer/consumer pair disconnected avoids an unjournaled feedback plane.
 
     // ADR-075 routing-balance gate (343-007): accumulate per-task agent
     // selections so the affinity distribution can be measured BEFORE the flag

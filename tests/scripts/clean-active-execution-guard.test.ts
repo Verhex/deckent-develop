@@ -2452,8 +2452,17 @@ describe('clean active-execution admission', () => {
     const dispatchedReport = inspectActiveExecutions(dispatchedRoot);
     expect(attestationReport.decision).toBe('ALLOW');
     expect(attestationReport.projections).toHaveLength(1);
-    expect(reasonCodes(dispatchedReport)).toContain('E_CLEAN_TASK_RECEIPT_NONTERMINAL');
+    // 2026-08-28 (F5): this case builds a COMPLETE, semantically valid dispatched chain
+    // (dispatch_started -> transport_settled -> consumer_settled, disposition 'done'). It used
+    // to assert NONTERMINAL, which pinned the defect rather than the contract: the gate's
+    // detail-code test is `some(dispatch_started)`, which stays true after settlement, so a
+    // fully reconciled receipt could never be cleaned. A settled chain is terminal, and the
+    // projection carries its real disposition.
+    expect(reasonCodes(dispatchedReport)).not.toContain('E_CLEAN_TASK_RECEIPT_NONTERMINAL');
     expect(reasonCodes(dispatchedReport)).not.toContain('E_CLEAN_RECEIPT_INTEGRITY');
+    expect(dispatchedReport.projections).toContainEqual(
+      expect.objectContaining({ surface: 'task', effectiveStatus: 'DONE' }),
+    );
   });
 
   it('rejects rehashed semantic forgeries for every InvocationEvent member', () => {

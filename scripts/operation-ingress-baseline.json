@@ -13,10 +13,10 @@
     "rmdir",
     "rmdirSync"
   ],
-  "total": 709,
+  "total": 740,
   "mediated": 0,
-  "unmediated": 709,
-  "fileCount": 243,
+  "unmediated": 740,
+  "fileCount": 257,
   "byFile": {
     "src/agent/permission-store.ts": {
       "count": 1,
@@ -43,7 +43,7 @@
       "mediated": false
     },
     "src/agents/agentic-worker-entry.ts": {
-      "count": 2,
+      "count": 1,
       "mediated": false
     },
     "src/agents/agentic-worker-runner.ts": {
@@ -51,7 +51,7 @@
       "mediated": false
     },
     "src/agents/http-agentic-worker.ts": {
-      "count": 2,
+      "count": 1,
       "mediated": false
     },
     "src/agents/permission-guard.ts": {
@@ -91,7 +91,7 @@
       "mediated": false
     },
     "src/agents/worker.ts": {
-      "count": 5,
+      "count": 4,
       "mediated": false
     },
     "src/api/enterprise-endpoint.ts": {
@@ -107,7 +107,7 @@
       "mediated": false
     },
     "src/api/server.ts": {
-      "count": 3,
+      "count": 2,
       "mediated": false
     },
     "src/api/terminal/audit-integrity.ts": {
@@ -123,7 +123,7 @@
       "mediated": false
     },
     "src/cli/commands/autonomous.ts": {
-      "count": 4,
+      "count": 3,
       "mediated": false
     },
     "src/cli/commands/chat-nervous-bridge.ts": {
@@ -138,10 +138,6 @@
       "count": 2,
       "mediated": false
     },
-    "src/cli/commands/checkpoint.ts": {
-      "count": 1,
-      "mediated": false
-    },
     "src/cli/commands/cleanup.ts": {
       "count": 3,
       "mediated": false
@@ -151,7 +147,7 @@
       "mediated": false
     },
     "src/cli/commands/config.ts": {
-      "count": 3,
+      "count": 1,
       "mediated": false
     },
     "src/cli/commands/cost.ts": {
@@ -175,11 +171,7 @@
       "mediated": false
     },
     "src/cli/commands/init-steps.ts": {
-      "count": 12,
-      "mediated": false
-    },
-    "src/cli/commands/init.ts": {
-      "count": 1,
+      "count": 5,
       "mediated": false
     },
     "src/cli/commands/kill.ts": {
@@ -194,16 +186,8 @@
       "count": 1,
       "mediated": false
     },
-    "src/cli/commands/mode.ts": {
-      "count": 1,
-      "mediated": false
-    },
     "src/cli/commands/nervous.ts": {
       "count": 3,
-      "mediated": false
-    },
-    "src/cli/commands/plan-nl.ts": {
-      "count": 1,
       "mediated": false
     },
     "src/cli/commands/plan.ts": {
@@ -239,7 +223,7 @@
       "mediated": false
     },
     "src/cli/commands/spawn.ts": {
-      "count": 2,
+      "count": 1,
       "mediated": false
     },
     "src/cli/commands/start.ts": {
@@ -247,7 +231,7 @@
       "mediated": false
     },
     "src/cli/commands/sync.ts": {
-      "count": 1,
+      "count": 3,
       "mediated": false
     },
     "src/cli/commands/test-run.ts": {
@@ -330,6 +314,14 @@
       "count": 1,
       "mediated": false
     },
+    "src/connectors/notification-delivery.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/acceptance-decision-authority.ts": {
+      "count": 2,
+      "mediated": false
+    },
     "src/core/agent-manifest-sync.ts": {
       "count": 4,
       "mediated": false
@@ -355,7 +347,7 @@
       "mediated": false
     },
     "src/core/approval-file-cas.ts": {
-      "count": 2,
+      "count": 9,
       "mediated": false
     },
     "src/core/approval-masking.ts": {
@@ -383,11 +375,15 @@
       "mediated": false
     },
     "src/core/config-migration.ts": {
-      "count": 2,
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/config-write-authority.ts": {
+      "count": 6,
       "mediated": false
     },
     "src/core/config.ts": {
-      "count": 4,
+      "count": 1,
       "mediated": false
     },
     "src/core/confirmation-store.ts": {
@@ -423,7 +419,7 @@
       "mediated": false
     },
     "src/core/event-stream.ts": {
-      "count": 2,
+      "count": 7,
       "mediated": false
     },
     "src/core/event-trigger.ts": {
@@ -450,10 +446,6 @@
       "count": 2,
       "mediated": false
     },
-    "src/core/global-config.ts": {
-      "count": 1,
-      "mediated": false
-    },
     "src/core/global-store.ts": {
       "count": 2,
       "mediated": false
@@ -464,6 +456,10 @@
     },
     "src/core/log-event.ts": {
       "count": 1,
+      "mediated": false
+    },
+    "src/core/maintenance-archive.ts": {
+      "count": 5,
       "mediated": false
     },
     "src/core/marketplace/marketplace-auth.ts": {
@@ -487,7 +483,7 @@
       "mediated": false
     },
     "src/core/multi-ide.ts": {
-      "count": 8,
+      "count": 10,
       "mediated": false
     },
     "src/core/notification-providers/webhook.ts": {
@@ -515,7 +511,7 @@
       "mediated": false
     },
     "src/core/orphan-cleaner.ts": {
-      "count": 5,
+      "count": 3,
       "mediated": false
     },
     "src/core/output-collector.ts": {
@@ -540,6 +536,38 @@
     },
     "src/core/pricing-updater.ts": {
       "count": 2,
+      "mediated": false
+    },
+    "src/core/prompt-cost-canary-receipt-store.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/prompt-delivery-receipt.ts": {
+      "count": 5,
+      "mediated": false
+    },
+    "src/core/provider-execution-observation-adoption-receipt-store.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/provider-execution-observation-adoption.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/provider-execution-observation-migration.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/provider-execution-observation-reconciliation-receipt-store.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/provider-limit-authoring.ts": {
+      "count": 5,
+      "mediated": false
+    },
+    "src/core/recent-work-retention.ts": {
+      "count": 1,
       "mediated": false
     },
     "src/core/recovery-resume-outcome.ts": {
@@ -567,10 +595,22 @@
       "mediated": false
     },
     "src/core/run-status-read-model.ts": {
+      "count": 4,
+      "mediated": false
+    },
+    "src/core/runtime-adoption-receipt-store.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/runtime-evaluation-retention.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/runtime-hygiene.ts": {
       "count": 2,
       "mediated": false
     },
-    "src/core/scheduler-shadow-retention.ts": {
+    "src/core/runtime-log-retention.ts": {
       "count": 2,
       "mediated": false
     },
@@ -579,27 +619,35 @@
       "mediated": false
     },
     "src/core/skill-pool.ts": {
-      "count": 6,
+      "count": 10,
       "mediated": false
     },
     "src/core/skill-registry.ts": {
       "count": 1,
       "mediated": false
     },
+    "src/core/sprint-archive.ts": {
+      "count": 15,
+      "mediated": false
+    },
     "src/core/sprint-file-retention.ts": {
-      "count": 5,
+      "count": 1,
       "mediated": false
     },
     "src/core/stack-detector.ts": {
       "count": 2,
       "mediated": false
     },
-    "src/core/subscription.ts": {
-      "count": 1,
-      "mediated": false
-    },
     "src/core/task-result-settlement.ts": {
       "count": 4,
+      "mediated": false
+    },
+    "src/core/task-result-write-authority.ts": {
+      "count": 3,
+      "mediated": false
+    },
+    "src/core/task-settlement-authority.ts": {
+      "count": 1,
       "mediated": false
     },
     "src/core/tool-availability.ts": {
@@ -615,6 +663,10 @@
       "mediated": false
     },
     "src/core/verifier-entitlement-memory.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/core/worker-activity-heartbeat.ts": {
       "count": 1,
       "mediated": false
     },
@@ -646,16 +698,12 @@
       "count": 2,
       "mediated": false
     },
-    "src/mcp/tools/config.ts": {
-      "count": 1,
-      "mediated": false
-    },
     "src/mcp/tools/directives.ts": {
       "count": 1,
       "mediated": false
     },
     "src/mcp/tools/init.ts": {
-      "count": 8,
+      "count": 5,
       "mediated": false
     },
     "src/mcp/tools/job-runner.ts": {
@@ -667,7 +715,7 @@
       "mediated": false
     },
     "src/mcp/tools/nervous.ts": {
-      "count": 2,
+      "count": 1,
       "mediated": false
     },
     "src/mcp/tools/run.ts": {
@@ -707,6 +755,10 @@
       "mediated": false
     },
     "src/nervous/dispatcher.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/nervous/executor.ts": {
       "count": 1,
       "mediated": false
     },
@@ -822,10 +874,6 @@
       "count": 2,
       "mediated": false
     },
-    "src/orchestra/managed-docs/docs-config.ts": {
-      "count": 1,
-      "mediated": false
-    },
     "src/orchestra/managed-docs/managed-doc-runner.ts": {
       "count": 1,
       "mediated": false
@@ -840,6 +888,10 @@
     },
     "src/orchestra/promotion-pipeline.ts": {
       "count": 4,
+      "mediated": false
+    },
+    "src/orchestra/repair-queue-authority.ts": {
+      "count": 2,
       "mediated": false
     },
     "src/orchestra/resource-monitor.ts": {
@@ -859,6 +911,10 @@
       "mediated": false
     },
     "src/orchestra/rule-evolver.ts": {
+      "count": 1,
+      "mediated": false
+    },
+    "src/orchestra/run-flow-death-sweep.ts": {
       "count": 1,
       "mediated": false
     },
@@ -887,19 +943,19 @@
       "mediated": false
     },
     "src/orchestra/sprint-checkpoint.ts": {
-      "count": 16,
+      "count": 15,
       "mediated": false
     },
     "src/orchestra/sprint-controller.ts": {
-      "count": 6,
+      "count": 7,
       "mediated": false
     },
     "src/orchestra/sprint-docs-updater.ts": {
-      "count": 8,
+      "count": 5,
       "mediated": false
     },
     "src/orchestra/sprint-finalizer.ts": {
-      "count": 15,
+      "count": 12,
       "mediated": false
     },
     "src/orchestra/sprint-lifecycle.ts": {
@@ -911,11 +967,15 @@
       "mediated": false
     },
     "src/orchestra/sprint-pid-manager.ts": {
-      "count": 9,
+      "count": 3,
       "mediated": false
     },
     "src/orchestra/sprint-planner.ts": {
       "count": 4,
+      "mediated": false
+    },
+    "src/orchestra/sprint-recovery-operation.ts": {
+      "count": 3,
       "mediated": false
     },
     "src/orchestra/sprint-runner-entry.ts": {
@@ -927,7 +987,7 @@
       "mediated": false
     },
     "src/orchestra/sprint-utils.ts": {
-      "count": 2,
+      "count": 3,
       "mediated": false
     },
     "src/orchestra/task-artifact-projection.ts": {
@@ -951,7 +1011,7 @@
       "mediated": false
     },
     "src/orchestra/tmux.ts": {
-      "count": 4,
+      "count": 3,
       "mediated": false
     },
     "src/orchestra/workspace-artifacts.ts": {
@@ -963,10 +1023,6 @@
       "mediated": false
     },
     "src/providers/gemini.ts": {
-      "count": 2,
-      "mediated": false
-    },
-    "src/providers/ollama.ts": {
       "count": 1,
       "mediated": false
     },
@@ -979,7 +1035,7 @@
       "mediated": false
     },
     "src/providers/subprocess.ts": {
-      "count": 2,
+      "count": 1,
       "mediated": false
     },
     "src/training/historical-trace-migration.ts": {
@@ -991,5 +1047,5 @@
       "mediated": false
     }
   },
-  "digest": "119d210f5c26c29b9c7db1fc89d1e88e8f6fcb62f74fccfc6f1d5da48df119f8"
+  "digest": "0bb0824264568ebee91554e0f8d195c3f8e699c1ad040906bc2cea933a08dacf"
 }

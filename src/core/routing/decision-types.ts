@@ -127,7 +127,56 @@ export const scoredCandidateSchema = z
 
 export type ScoredCandidate = z.infer<typeof scoredCandidateSchema>;
 
-export const routingDecisionV3Schema = z
+export const skillSelectionRejectionReasonSchema = z.enum([
+  'applicability-evidence-missing',
+  'required-evidence-missing',
+  'forbidden-evidence-present',
+  'partial-evidence',
+  'platform-mismatch',
+  'excluded',
+  'semantic-fit',
+  'no-domain-overlap',
+  'prompt-token-budget',
+  'hard-max-skills',
+  'marginal-utility',
+]);
+export type SkillSelectionRejectionReason = z.infer<typeof skillSelectionRejectionReasonSchema>;
+
+export const skillSelectionCandidateTraceSchema = z.object({
+  skillId: z.string().min(1),
+  profileDigest: z.string().min(1),
+  packageDigest: z.string().min(1),
+  applicabilityDigest: z.string().min(1),
+  provenance: z.string().min(1),
+  matchedEvidence: z.array(z.string()),
+  fit: z.number().min(0).max(1),
+  overlap: z.number().min(0),
+  baseUtility: z.number(),
+  marginalUtility: z.number().nullable(),
+  tokenCost: z.number().int().nonnegative(),
+  selected: z.boolean(),
+  forced: z.boolean(),
+  rejectionReason: skillSelectionRejectionReasonSchema.nullable(),
+}).strict();
+export type SkillSelectionCandidateTrace = z.infer<typeof skillSelectionCandidateTraceSchema>;
+
+export const skillSelectionTraceSchema = z.object({
+  evidenceDigest: z.string().min(1),
+  catalogDigest: z.string().min(1),
+  selectedSkillIds: z.array(z.string().min(1)),
+  candidates: z.array(skillSelectionCandidateTraceSchema),
+  composition: z.object({
+    promptTokenBudget: z.number().int().positive(),
+    hardMaxSkills: z.number().int().positive(),
+    marginalUtilityFloor: z.number().min(0).max(1),
+    redundancyPenalty: z.number().min(0).max(1),
+    uncoveredCoverageBonus: z.number().min(0).max(1),
+    totalTokenCost: z.number().int().nonnegative(),
+  }).strict(),
+}).strict();
+export type SkillSelectionTrace = z.infer<typeof skillSelectionTraceSchema>;
+
+export const legacyRoutingDecisionV3Schema = z
   .object({
     agentId: z.string().min(1),
     skillIds: z.array(z.string()),
@@ -147,15 +196,43 @@ export const routingDecisionV3Schema = z
   })
   .strict();
 
+export const routingDecisionV3Schema = legacyRoutingDecisionV3Schema
+  .extend({
+    /** Full hard-eligibility + score + composition receipt for skill replay. */
+    skillSelection: skillSelectionTraceSchema,
+  })
+  .strict()
+  .superRefine((decision, ctx) => {
+    if (JSON.stringify(decision.skillIds) !== JSON.stringify(decision.skillSelection.selectedSkillIds)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['skillSelection', 'selectedSkillIds'],
+        message: 'selectedSkillIds must exactly equal decision.skillIds',
+      });
+    }
+    const selectedFromCandidates = new Set(
+      decision.skillSelection.candidates.filter(candidate => candidate.selected).map(candidate => candidate.skillId),
+    );
+    for (const id of decision.skillIds) {
+      if (!selectedFromCandidates.has(id)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['skillSelection', 'candidates'],
+          message: `selected skill ${id} has no selected candidate trace`,
+        });
+      }
+    }
+  });
+
 export type RoutingDecisionV3 = z.infer<typeof routingDecisionV3Schema>;
 
 // ─── Journal entry (replayable — spec §5) ────────────────────────────────────
 
-export const JOURNAL_SCHEMA_VERSION = 1 as const;
+export const JOURNAL_SCHEMA_VERSION = 2 as const;
 
-export const journalEntryV3Schema = z
+export const journalEntryV1Schema = z
   .object({
-    schemaVersion: z.literal(JOURNAL_SCHEMA_VERSION),
+    schemaVersion: z.literal(1),
     taskId: z.string().min(1),
     sprintId: z.string().nullable(),
     /** Caller-supplied ISO timestamp (never produced in decision math). */
@@ -165,9 +242,45 @@ export const journalEntryV3Schema = z
     configHash: z.string().min(1),
     /** Frozen candidate capability snapshot the pipeline saw (id → capability). */
     catalog: z.record(z.string(), z.unknown()),
-    decision: routingDecisionV3Schema,
+    decision: legacyRoutingDecisionV3Schema,
   })
   .strict();
+
+export const journalEntryV2Schema = z
+  .object({
+    schemaVersion: z.literal(JOURNAL_SCHEMA_VERSION),
+    taskId: z.string().min(1),
+    sprintId: z.string().nullable(),
+    recordedAt: z.string().min(1),
+    requirement: requirementVectorSchema,
+    configHash: z.string().min(1),
+    catalog: z.record(z.string(), z.unknown()),
+    /** Complete task-local skill inputs, not merely the selected ids. */
+    skillCatalog: z.array(z.unknown()),
+    skillCatalogDigest: z.string().min(1),
+    skillEvidence: z.record(z.string(), z.unknown()),
+    skillEvidenceDigest: z.string().min(1),
+    decision: routingDecisionV3Schema,
+  })
+  .strict()
+  .superRefine((entry, ctx) => {
+    if (entry.skillCatalogDigest !== entry.decision.skillSelection.catalogDigest) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['skillCatalogDigest'],
+        message: 'skillCatalogDigest must match decision.skillSelection.catalogDigest',
+      });
+    }
+    if (entry.skillEvidenceDigest !== entry.decision.skillSelection.evidenceDigest) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['skillEvidenceDigest'],
+        message: 'skillEvidenceDigest must match decision.skillSelection.evidenceDigest',
+      });
+    }
+  });
+
+export const journalEntryV3Schema = z.union([journalEntryV2Schema, journalEntryV1Schema]);
 
 export type JournalEntryV3 = z.infer<typeof journalEntryV3Schema>;
 

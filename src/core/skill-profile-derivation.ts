@@ -8,7 +8,7 @@ import type {
 } from './skill-types.js';
 import { BUILTIN_DOMAINS } from './routing/vocabulary-builtin.js';
 
-export const SKILL_PROFILE_DERIVATION_VERSION = 2 as const;
+export const SKILL_PROFILE_DERIVATION_VERSION = 3 as const;
 
 type WorkType = WorkTypeEntry['type'];
 type Proficiency = WorkTypeEntry['proficiency'];
@@ -125,10 +125,6 @@ function deriveDomains(skill: SkillDefinition): SkillProfile['domains'] {
     proficiency: index === 0 ? 'primary' : 'secondary',
   }));
 
-  // Language expertise is intentionally cross-cutting. Its wildcard is an
-  // explicit, narrow derivation policy and is always the lowest proficiency;
-  // no other generic category receives one.
-  if (skill.category === 'language') domains.push({ id: '*', proficiency: 'able' });
   return domains;
 }
 

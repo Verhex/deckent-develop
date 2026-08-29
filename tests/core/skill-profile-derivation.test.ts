@@ -65,7 +65,6 @@ describe('deriveCanonicalSkillProfile', () => {
     expect(first.profile.domains).toEqual([
       { id: 'api', proficiency: 'primary' },
       { id: 'test/quality', proficiency: 'secondary' },
-      { id: '*', proficiency: 'able' },
     ]);
   });
 

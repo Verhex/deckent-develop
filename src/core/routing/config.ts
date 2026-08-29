@@ -44,6 +44,13 @@ export const ROUTING_V3_SCHEMA = z
     structuralConfidence: z.number().min(0).max(1),
     signalGatedNumerical: z.boolean(),
     explorationBonus: z.number().min(0).max(1),
+    skillComposition: z.object({
+      promptTokenBudget: z.number().int().positive().max(1_000_000),
+      hardMaxSkills: z.number().int().positive().max(64),
+      marginalUtilityFloor: z.number().min(0).max(1),
+      redundancyPenalty: z.number().min(0).max(1),
+      uncoveredCoverageBonus: z.number().min(0).max(1),
+    }).strict(),
   })
   .strict();
 
@@ -75,6 +82,13 @@ export const DEFAULT_ROUTING_V3_CONFIG: RoutingV3Config = {
   // 0 = OFF; exploration share activates only when explicitly configured.
   // Rollback: `explorationBonus: 0`.
   explorationBonus: 0,
+  skillComposition: {
+    promptTokenBudget: 6_000,
+    hardMaxSkills: 8,
+    marginalUtilityFloor: 0.08,
+    redundancyPenalty: 0.2,
+    uncoveredCoverageBonus: 0.25,
+  },
 };
 
 const WEIGHTS_SUM_EPSILON = 1e-9;

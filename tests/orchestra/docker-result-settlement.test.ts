@@ -184,7 +184,10 @@ describe('persistDockerTaskResultSettlement', () => {
     expect(outcomes).toMatchObject([{
       taskId,
       agentId,
-      skillIds: [skillId],
+      skillIds: [],
+      selectedSkillIds: [skillId],
+      deliveredSkillIds: [skillId],
+      skillAttributionState: 'EXPOSURE_ONLY',
       evaluation: TaskEvaluation.DONE,
     }]);
   });
