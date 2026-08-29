@@ -9,10 +9,26 @@
 - Execution authority: Codex epoch 4; handoff `ah-2026-08-29-codex-takeover-3` COMMITTED.
 - Mode: `DOGFOOD_MODE=ON`, `WORKSPACE_MODE=MAIN`, `DELIVERY_MODE=DIRECT_MAIN`.
 - Skill landing commit: `b38b5c3a1b2c407d7daeb2780315a8626c4e36d8`
-  (`fix(orchestration): close dogfood re-entry control-plane blockers`). Akış sadeleştirmesi
-  ayrı bir dokümantasyon commit'idir.
-- Local `main`, `origin/main`den iki commit ileride; push owner talimatı olmadan yapılmaz.
-- Aktif sprint/run yok. Kullanıcının MASTER/runtime/generated-doc değişiklikleri unstaged korunur.
+  (`fix(orchestration): close dogfood re-entry control-plane blockers`); akış sadeleştirmesi
+  `2389c2e97`; run-policy recovery `bd65aa340`.
+- Local `main`, `origin/main`den ileride; exact ahead sayısı `git branch -vv` ile ölçülür.
+  Push owner talimatı olmadan yapılmaz.
+- Aktif sprint/run yok; son authority `sprint-708 / ABORTED`, admission readiness `READY`.
+  Kullanıcının MASTER/runtime/generated-doc değişiklikleri unstaged korunur.
+
+## Kapanan recovery — RUN-POLICY-HEADER-PARITY
+
+`DOGFOOD_HEALTH=DEGRADED` ilan edilerek ADR-D-007 bounded recovery seam'inde kapatıldı; yeni
+ürün outcome'u açılmadı. Deterministik DIRECTIVES generator canonical
+`## Execution Contract` başlığını üretir; production resolver heading case'ini authority
+sınırı yapmaz. Canonical ve retained lowercase biçim aynı policy digest'ine çözülür.
+
+- Commit: `bd65aa340` (`fix(policy): preserve directives execution contract authority`).
+- Scoped proof: 4 suite / 43 test; hermetic gate 157/157; TypeScript 0; build exit 0;
+  `lint:directives` 4 task temiz; gerçek compiled producer→consumer authority 4 constraint.
+- `lint:gates` recovery alanını geçti; zincir yalnız mevcut unstaged MASTER/SPRINT kaynaklı
+  README/README.tr/IDENTITY stats drift'inde durdu. Çalışmayan tail kapıları ayrı koşuldu ve
+  yeşil. Recovery sonrasında `DOGFOOD_HEALTH=READY_IDLE`.
 
 ## Kapanan outcome — SKILL_ROUTING_CONTROL_PLANE_P0
 
@@ -52,28 +68,42 @@ Kapsam-dışı kayıtlar — otomatik implement edilmez:
 - O5 CLI-contract/alias dilimi karantinadadır: contract 64->0 ölçümü gerçek, scoped battery
   terminal yeşil değildir. Ayrı owner-admitted outcome olmadan uygulanmaz.
 
-## Sıradaki outcome adayları — aynı anda yalnız biri admit edilir
+## Sıradaki outcome sırası — aynı anda yalnız biri admit edilir
 
-### 1. Kernel-tree closure — Dalga 0 sonrası owner karar noktası
+### 0. Skill closure canonical projection
+
+MASTER validator temizdir: 543 satır, 458 aktif, 85 DONE, 13 blocker class; projectionlar
+in-sync. Ancak 9034/9035/9036/9037/9053 skill satırları dependency'leri nedeniyle OPEN ve
+landed kanıt henüz owner-authenticated projection'a geçirilmedi. Yeni ürün run'ından önce
+false DONE üretmeden exact receipt/evidence/truth projection hazırlanır; state yalnız Closure
+OS authenticated owner authority ile değişir.
+
+### 1. Kernel-tree closure — full-product yönü
 
 Aktif karar taşıyıcısı: `follow-up-works/kernel-tree-closure-map.md`. Owner 2026-08-28'de
 Seçenek 2'yi seçti ve Dalga 0 tamamlandı; fresh ölçüm formal turun ağacı küçültmediğini,
-yaklaşık 16 non-DONE düğümlü derin DAG kaldığını gösterdi. Sıradaki material seçim: tam kernel
-programını Dalga 1-3 ile yayın öncesi sürdürmek veya yayın kapısını replay-kanıt hattına
-daraltmak. Owner bu post-Dalga-0 seçimi yapmadan source/run mutation yok. Seçim sonrası sıra:
+yaklaşık 16 non-DONE düğümlü derin DAG kaldığını gösterdi. Owner 2026-08-29 canlı yönü:
+ürünü tamamlayarak ilerle; release-only daraltma yapılmaz. Faz isimleri dependency authority
+değildir: 3010 doğrudan 4030'u, 3030 ise 3020 ve aggregate 4000'i bekler. Yürütme sırası:
 
-1. MASTER `DependsOn` ağını fresh disk ölçümüyle yeniden sabitle.
-2. Seçilen dalganın exact outcome/capsule, file authority ve verification manifestini yaz.
-3. Dependency sırasıyla tek outcome dogfood run'ları yürüt; her dalgayı terminal settle et.
-4. Local scoped proof + real-binary proof üret; remote CI advisory/askıda olarak ayrı raporla.
-5. Canonical projection/owner receipt töreniyle VERIFY/DONE geçişlerini uygula.
-6. Kernel kapısı kapanınca yayın zincirini yeniden ölç; varsayımla flip yapma.
+1. `4030 OPERATION-001`: mevcut VERIFY kanıtını fresh live ingress proof + authenticated
+   disposition ile terminalleştir; başka authority programını pakete alma.
+2. `3010 KERNEL-ONTOLOGY-001`, sonra `3020 KERNEL-STATE-001`: ayrı, dependency-valid dogfood
+   outcome'ları.
+3. `3030` öncesi `4000 AUTHORITY-001` aggregate kenarını code-truth ile çöz: minimum attempt
+   authority ayrı canonical leaf ise authenticated DAG amendment; değilse 4000'in gerçekten
+   zorunlu dependency zinciri önce kapanır. Aggregate parent sahte DONE yapılmaz.
+4. `3030 KERNEL-ATTEMPT-001`; ardından ölçülmüş Dalga 2 ve Dalga 3 sırası.
+5. Her outcome: exact capsule/file authority → Goal/Mission/Flow/Run/Do → terminal settlement →
+   local scoped + real-binary proof → authenticated MASTER projection. Remote CI advisory'dir.
 
-### 2. MASTER 6181 dilim-3
+### 2. MASTER 6181 closure residual
 
-Kernel owner sırasına göre: capability kaydı, Goal-v2 günlük 09:00 Europe/Istanbul schedule,
-`deckent intelligence` CLI, EN/TR docs ve gerçek-binary kapanış. Dilim-1/2 landed; retained
-`DIRECTIVES.md` dilim-2 metnidir ve yeni run authority'si olarak yeniden kullanılmaz.
+Dilim-1/2 ve sprint-707 dilim-3 landed/HOLD: Goal-v2 schedule, `deckent intelligence` CLI,
+EN/TR docs ve fail-closed gerçek-binary yüzey mevcut. Açık tek üretim zinciri,
+`interpretSource` seam'inin canonical implementation + capability binding + uçtan uca watch
+run kanıtıdır; bu olmadan 6181 DONE olmaz. Retained `DIRECTIVES.md` dilim-2 metnidir ve yeni
+run authority'si olarak yeniden kullanılmaz.
 
 ### 3. Flip-merdiveni ve yayın zinciri
 
