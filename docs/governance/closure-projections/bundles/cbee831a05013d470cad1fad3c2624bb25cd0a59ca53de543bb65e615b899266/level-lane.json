@@ -1,0 +1,61 @@
+{
+  "classified": 6,
+  "holds": [],
+  "matrix": {
+    "check-proof": {
+      "contract": 0,
+      "desktop": 0,
+      "hold-unassigned": 0,
+      "proof": 0,
+      "runtime": 0,
+      "terminal": 0,
+      "unclassified": 0
+    },
+    "finding": {
+      "contract": 0,
+      "desktop": 0,
+      "hold-unassigned": 0,
+      "proof": 0,
+      "runtime": 0,
+      "terminal": 0,
+      "unclassified": 0
+    },
+    "outcome": {
+      "contract": 0,
+      "desktop": 0,
+      "hold-unassigned": 0,
+      "proof": 0,
+      "runtime": 0,
+      "terminal": 0,
+      "unclassified": 0
+    },
+    "package": {
+      "contract": 0,
+      "desktop": 0,
+      "hold-unassigned": 0,
+      "proof": 0,
+      "runtime": 0,
+      "terminal": 0,
+      "unclassified": 0
+    },
+    "task": {
+      "contract": 1,
+      "desktop": 0,
+      "hold-unassigned": 0,
+      "proof": 0,
+      "runtime": 0,
+      "terminal": 0,
+      "unclassified": 0
+    },
+    "unclassified": {
+      "contract": 0,
+      "desktop": 0,
+      "hold-unassigned": 0,
+      "proof": 0,
+      "runtime": 0,
+      "terminal": 0,
+      "unclassified": 475
+    }
+  },
+  "total": 476
+}

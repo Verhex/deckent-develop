@@ -4,7 +4,7 @@
 # Closure OS — Level × Lane classification & re-triage: owner disposition proposal **v2.1**
 
 > Read-only, non-authoritative. Codex final disposition (2026-08-14): owner-declared semantics outrank topology; ID-regex is not a classification authority; `check-proof ⇒ proof`; priority changes this phase = 0.
-> Source: `master-plan-active.json` @ sourceDigest `8f2ec5b75cab56d3…` · registryIntegrity `d1c6c81e68c5d5d1…`
+> Source: `master-plan-active.json` @ sourceDigest `d69adc657297e5b4…` · registryIntegrity `2d6efb69fd6c93c0…`
 > Enum + override SSOT: `src/core/closure-classification-schema.json` (schemaVersion 1). Rows scanned: 476 active.
 > check-proof⇒proof invariant on this output: **HOLDS**. Override-vs-invariant conflicts: 0.
 
@@ -103,7 +103,7 @@ ID-regex is retired as a classification authority. The structural defaults are r
 
 ```jsonc
 { "schemaVersion":1, "seq":<n>, "eventId":"…", "recordedAt":"<owner-batch-ts>",
-  "rowRef":{ "workId":"<id>", "rowDefinitionDigest":"<identityRegistry.definitionDigest>", "masterSourceDigest":"8f2ec5b75cab…" },
+  "rowRef":{ "workId":"<id>", "rowDefinitionDigest":"<identityRegistry.definitionDigest>", "masterSourceDigest":"d69adc657297…" },
   "decision":{ "kind":"level-lane-disposition", "level":"<enum>", "lane":"<enum>", "ruleId":"<rule>", "confidence":"<h|m|l>" },
   "authorityProof":{ "ownerReceipt":"<authenticated durable receipt ref>" }, "previousEventDigest":"…", "eventDigest":"…" }
 // priority-retriage events this phase: 0 (priority unchanged). lane-resolution candidates: 3 HOLD rows if owner assigns.
@@ -386,7 +386,7 @@ ID-regex is retired as a classification authority. The structural defaults are r
 | `TENANT-001` | AUTHORITY | VERIFY | P0 | package (m) | contract (m) |  |
 | `AUTONOMOUS-TENANT-AUTHORITY-001` | AUTHORITY | OPEN | P0 | task (m) | contract (m) |  |
 | `OPERATION-001` | AUTHORITY | VERIFY | P0 | package (m) | contract (m) |  |
-| `OPERATION-CATALOG-CONVERGENCE-001` | AUTHORITY | VERIFY | P0 | task (m) | contract (m) |  |
+| `OPERATION-CATALOG-CONVERGENCE-001` | AUTHORITY | OPEN | P0 | task (m) | contract (m) |  |
 | `OPERATION-INVOCATION-CONTEXT-001` | AUTHORITY | OPEN | P0 | task (m) | contract (m) |  |
 | `OPERATION-EFFECT-CONTEXT-001` | AUTHORITY | OPEN | P0 | task (m) | contract (m) |  |
 | `OPERATION-CLI-REGISTRY-BINDING-001` | AUTHORITY | OPEN | P0 | task (m) | contract (m) |  |

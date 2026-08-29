@@ -3,19 +3,19 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "8f2ec5b75cab56d3c7dadead8d8c5036cf4348add946cd1c28fb2577740df07c"
+    "value": "d69adc657297e5b4d1a79d007b853399da3f1a22eaa3bf7b6b53963c48969767"
   },
   "summary": {
     "total": 562,
     "active": 476,
     "terminal": 86,
-    "receipts": 213,
+    "receipts": 212,
     "byState": {
-      "OPEN": 363,
+      "OPEN": 364,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
-      "VERIFY": 44,
+      "VERIFY": 43,
       "DONE": 86,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -3831,10 +3831,10 @@
       "id": "OPERATION-CATALOG-CONVERGENCE-001",
       "program": "AUTHORITY",
       "priority": "P0",
-      "state": "VERIFY",
+      "state": "OPEN",
       "updated": "2026-08-29",
       "definitionDigest": "3bdc50b6fef3c278a352b48db8eafdeeb9bc6249e4ae40878f8565c3629b0178",
-      "progressDigest": "fbf555eaa4d8ae40cfcb8fc08a1e90886fc8a84d82b228e8c8ebc3399b8499f2",
+      "progressDigest": "03c161357a402282fedcdddc62a1147684ccd1c2897f94381b631cb9a6b881ac",
       "terminalClosureDigest": null
     },
     {
@@ -8365,16 +8365,6 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-29T13:34:54Z"
-      },
-      "g7AttemptIdentity": null
-    },
-    {
-      "id": "GR-2026-08-29-CLOSURE-BATCH-4032-01",
-      "authorityDigest": "97847544b2c757878f6e177efded3f4c7002d8335092eaa60c9e40965a7ac25b",
-      "lifecycle": {
-        "mode": "ONE_SHOT",
-        "status": "consumed",
-        "transitionAt": "2026-08-29T14:53:15Z"
       },
       "g7AttemptIdentity": null
     }
@@ -19834,24 +19824,22 @@
         "G2",
         "G1"
       ],
-      "state": "VERIFY",
+      "state": "OPEN",
       "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "1",
-        "X": "1",
-        "S": "-"
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
       },
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-29-CLOSURE-BATCH-4032-01"
-      ],
+      "evidenceReceipts": [],
       "acceptance": "Her registered action stable operationId ve version taşır; cross-surface eşdeğerleri aynı canonical kimliğe iner; unknown, ambiguous veya version-mismatch registration fail-closed olur; generated types ve i18n catalog parity korunur",
-      "evidence": "2026-08-29 authenticated ADR-D-007 recovery settlement: sprint-712 `ABORTED` geçmişi değiştirilmedi; exact beş product path commit fa5bcd3195aa1a213309277219bef3aeb349ae89 ile landed, stats projection commit 6501ca457a38800381bc4a2d523b96f4f8480553 ayrı tutuldu. Altı-entry canonical JSON byte-identical kalırken checked-in generated `Op`/exact reference types üretildi; unknown ID ve supplied version mismatch ayrı typed failure, registry-neutral convergence input-order-independent ve duplicate/malformed/ambiguous declarations fail-closed. Generator yalnız explicit `--write` ile atomic yazar; default/check read-only drift gate'idir; numeric-leading invalid symbol, symbol/key collision, audit-version, positive version ve EN/TR parity kusurları artefakt üretmeden reddedilir; `receipt=GR-2026-08-29-CLOSURE-BATCH-4032-01`; `proof=operation-catalog-convergence-v1-8of8-compiled`; LOCAL_VERIFIED: targeted 8/8, npm lint exit 0, build exit 0, compiled real-entrypoint PASS; Windows-native iki atomic write byte-identical/check PASS/temp leak 0, gerçek WSL2/POSIX fixture PASS; catalog ve 4031 ingress baseline hash'leri byte-identical, ingress audit 5205 total / 0 covered / 5205 unmatched / digest 59f62753c2a2. Closure OS seq6 event 03a9c9ef, owner-signed receipt aprcdb-b84d9e1dac20f957e2f3d5f116534b32 ve 6-event gate PASS state ratchet'ini yetkilendirir; XVerify owner kararıyla bu outcome için uygulanmadı",
+      "evidence": "Owner admission 2026-08-29; mevcut catalog altı operation, CLI/MCP/TERM-RPC/agent registryleri ayrı truth yüzeyleri",
       "updated": "2026-08-29"
     },
     {
@@ -28524,6 +28512,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "d1c6c81e68c5d5d1407087038e5562dc1636479264cc9d0497f299c118178096"
+    "value": "2d6efb69fd6c93c0b1665da8857ee91981ee3f3ef871e4ebba49be621f05f66d"
   }
 }

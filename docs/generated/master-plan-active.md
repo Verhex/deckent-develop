@@ -5,7 +5,7 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):d69adc657297e5b4d1a79d007b853399da3f1a22eaa3bf7b6b53963c48969767`
+**Source digest:** `sha256(normalized-lf-utf8):8f2ec5b75cab56d3c7dadead8d8c5036cf4348add946cd1c28fb2577740df07c`
 
 **Rows:** 562 total · 476 active · 86 terminal
 
@@ -13,11 +13,11 @@
 
 | State | Count |
 |---|---:|
-| OPEN | 364 |
+| OPEN | 363 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 69 |
-| VERIFY | 43 |
+| VERIFY | 44 |
 | DONE | 86 |
 | DEFERRED | 0 |
 | DISPOSED | 0 |
@@ -294,7 +294,7 @@
 | 4020 | `TENANT-001` | VERIFY | P0 | AUTHORITY | `PRINCIPAL-001` | — | Canonical tenant/project/session scope enforcement |
 | 4021 | `AUTONOMOUS-TENANT-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001` | — | Autonomous read, mutation, approval ve reactive ingress için fail-closed tenant authority |
 | 4030 | `OPERATION-001` | VERIFY | P0 | AUTHORITY | `PRINCIPAL-001` | — | Versioned canonical operation catalog |
-| 4032 | `OPERATION-CATALOG-CONVERGENCE-001` | OPEN | P0 | AUTHORITY | `OPERATION-COVERAGE-MODEL-001` | — | Versioned operation catalog convergence across action registries |
+| 4032 | `OPERATION-CATALOG-CONVERGENCE-001` | VERIFY | P0 | AUTHORITY | `OPERATION-COVERAGE-MODEL-001` | — | Versioned operation catalog convergence across action registries |
 | 4033 | `OPERATION-INVOCATION-CONTEXT-001` | OPEN | P0 | AUTHORITY | `OPERATION-CATALOG-CONVERGENCE-001` | — | Canonical operation invocation and transaction identity context |
 | 4034 | `OPERATION-EFFECT-CONTEXT-001` | OPEN | P0 | AUTHORITY | `OPERATION-INVOCATION-CONTEXT-001` | — | Platform-neutral durable-effect causal attribution substrate |
 | 4035 | `OPERATION-CLI-REGISTRY-BINDING-001` | OPEN | P0 | AUTHORITY | `OPERATION-CATALOG-CONVERGENCE-001` | — | CLI command registry operation binding |
