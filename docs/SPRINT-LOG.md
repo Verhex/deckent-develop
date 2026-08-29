@@ -17624,3 +17624,63 @@ Sprint 080: Dashboard zenginleştirildi. SSE bağlantı durumu göstergesi eklen
 - 711-001: Semantic operation coverage model, baseline contract, and hermetic proof (NO_GO)
 
 ---
+## Sprint 712 — sprint-712
+
+**Status:** ABORTED
+**Date:** 2026-08-29
+**Duration:** 1109s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 1 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 0 |
+| Coverage | 0.0% |
+| Duration | 1108696ms |
+
+### Tasks
+
+- 712-001-fix-fix-fix-fix: Fix: Fix: Fix: Fix: Versioned catalog references, convergence validator, generated types, and hermetic gate (PENDING)
+- 712-001-fix-fix-fix: Fix: Fix: Fix: Versioned catalog references, convergence validator, generated types, and hermetic gate (NO_GO)
+- 712-001-fix-fix: Fix: Fix: Versioned catalog references, convergence validator, generated types, and hermetic gate (NO_GO)
+- 712-001-fix: Fix: Versioned catalog references, convergence validator, generated types, and hermetic gate (NO_GO)
+- 712-001: Versioned catalog references, convergence validator, generated types, and hermetic gate (NO_GO)
+
+---
+## Sprint 713 — sprint-713
+
+**Status:** ABORTED
+**Date:** 2026-08-29
+**Duration:** 811s
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Total Tasks | 10 |
+| Completed | 0 |
+| Tech Debt | 0 |
+| No-Go | 3 |
+| Coverage | 0.0% |
+| Duration | 810567ms |
+
+### Tasks
+
+- 713-001-fix: Fix: 4033-CTX-IDENTITY — Operation identity and causal transition algebra (EXECUTING)
+- 713-001: 4033-CTX-IDENTITY — Operation identity and causal transition algebra (NO_GO)
+- 713-002-fix: Fix: 4033-CTX-SUBJECT — Lossless principal and explicit neutral scope (EXECUTING)
+- 713-002: 4033-CTX-SUBJECT — Lossless principal and explicit neutral scope (NO_GO)
+- 713-003-fix: Fix: 4033-CTX-IDEMPOTENCY — Exact catalog-bound idempotency contract (EXECUTING)
+- 713-003: 4033-CTX-IDEMPOTENCY — Exact catalog-bound idempotency contract (NO_GO)
+- 713-004: 4033-CTX-ENVELOPE — Canonical immutable context schema v1 (PAUSED)
+- 713-005: 4033-CTX-ASYNC — Lifetime-bounded in-process async scope (PAUSED)
+- 713-006: 4033-CTX-TRANSPORT — Bounded canonical cross-boundary envelope (PAUSED)
+- 713-007: 4033-PROOF-CHILD-PROCESS — Async process-boundary transport proof (PAUSED)
+- 713-008: 4033-PROOF-WORKER-THREAD — Worker-thread transport and isolation proof (PAUSED)
+- 713-009: 4033-PROOF-PLATFORM — Every-environment deterministic contract matrix (PAUSED)
+- 713-010: 4033-VERIFY-FANIN — Full conformance and hermetic integration seal (PAUSED)
+
+---
