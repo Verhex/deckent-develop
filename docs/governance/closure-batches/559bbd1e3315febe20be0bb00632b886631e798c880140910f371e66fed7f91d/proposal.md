@@ -4,7 +4,7 @@
 # Closure OS — Level × Lane classification & re-triage: owner disposition proposal **v2.1**
 
 > Read-only, non-authoritative. Codex final disposition (2026-08-14): owner-declared semantics outrank topology; ID-regex is not a classification authority; `check-proof ⇒ proof`; priority changes this phase = 0.
-> Source: `master-plan-active.json` @ sourceDigest `770e0e7cb5dff0c5…` · registryIntegrity `95c5b2dd00f74deb…`
+> Source: `master-plan-active.json` @ sourceDigest `3bfae494edde79d4…` · registryIntegrity `2c326a6a0be5f294…`
 > Enum + override SSOT: `src/core/closure-classification-schema.json` (schemaVersion 1). Rows scanned: 477 active.
 > check-proof⇒proof invariant on this output: **HOLDS**. Override-vs-invariant conflicts: 0.
 
@@ -103,7 +103,7 @@ ID-regex is retired as a classification authority. The structural defaults are r
 
 ```jsonc
 { "schemaVersion":1, "seq":<n>, "eventId":"…", "recordedAt":"<owner-batch-ts>",
-  "rowRef":{ "workId":"<id>", "rowDefinitionDigest":"<identityRegistry.definitionDigest>", "masterSourceDigest":"770e0e7cb5df…" },
+  "rowRef":{ "workId":"<id>", "rowDefinitionDigest":"<identityRegistry.definitionDigest>", "masterSourceDigest":"3bfae494edde…" },
   "decision":{ "kind":"level-lane-disposition", "level":"<enum>", "lane":"<enum>", "ruleId":"<rule>", "confidence":"<h|m|l>" },
   "authorityProof":{ "ownerReceipt":"<authenticated durable receipt ref>" }, "previousEventDigest":"…", "eventDigest":"…" }
 // priority-retriage events this phase: 0 (priority unchanged). lane-resolution candidates: 3 HOLD rows if owner assigns.
@@ -386,7 +386,7 @@ ID-regex is retired as a classification authority. The structural defaults are r
 | `TENANT-001` | AUTHORITY | VERIFY | P0 | package (m) | contract (m) |  |
 | `AUTONOMOUS-TENANT-AUTHORITY-001` | AUTHORITY | OPEN | P0 | task (m) | contract (m) |  |
 | `OPERATION-001` | AUTHORITY | VERIFY | P0 | package (m) | contract (m) |  |
-| `OPERATION-COVERAGE-MODEL-001` | AUTHORITY | VERIFY | P0 | task (m) | contract (m) |  |
+| `OPERATION-COVERAGE-MODEL-001` | AUTHORITY | OPEN | P0 | task (m) | contract (m) |  |
 | `OPERATION-CATALOG-CONVERGENCE-001` | AUTHORITY | OPEN | P0 | task (m) | contract (m) |  |
 | `OPERATION-INVOCATION-CONTEXT-001` | AUTHORITY | OPEN | P0 | task (m) | contract (m) |  |
 | `OPERATION-EFFECT-CONTEXT-001` | AUTHORITY | OPEN | P0 | task (m) | contract (m) |  |

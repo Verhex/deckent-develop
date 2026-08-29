@@ -3,19 +3,19 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "770e0e7cb5dff0c5bd633d2750f008c6f82bbf4d84533dc2c156e41a71233e58"
+    "value": "3bfae494edde79d4c6de9a4315392498a6f53534bb0ba14c8005c1b3a6b5e1e8"
   },
   "summary": {
     "total": 562,
     "active": 477,
     "terminal": 85,
-    "receipts": 212,
+    "receipts": 211,
     "byState": {
-      "OPEN": 364,
+      "OPEN": 365,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
-      "VERIFY": 44,
+      "VERIFY": 43,
       "DONE": 85,
       "DEFERRED": 0,
       "DISPOSED": 0
@@ -3820,10 +3820,10 @@
       "id": "OPERATION-COVERAGE-MODEL-001",
       "program": "AUTHORITY",
       "priority": "P0",
-      "state": "VERIFY",
+      "state": "OPEN",
       "updated": "2026-08-29",
       "definitionDigest": "57c93f57fbc055a60cc582049c1ee99e14362814194d5446e4f85fa0ee991b24",
-      "progressDigest": "eaffda20a7e52ce50b2d5cd8b75ef5bd764f1b0634804054ceb94911bb6c9668",
+      "progressDigest": "bc4def68120759c681f79e510c57e154ae13e8e639cc12359b8cab01380a9f94",
       "terminalClosureDigest": null
     },
     {
@@ -8355,16 +8355,6 @@
         "mode": "ONE_SHOT",
         "status": "consumed",
         "transitionAt": "2026-08-28T08:17:04+03:00"
-      },
-      "g7AttemptIdentity": null
-    },
-    {
-      "id": "GR-2026-08-29-CLOSURE-BATCH-4031-01",
-      "authorityDigest": "d21aef868e479448ae35d7baffdf3a02a4bfdf84793e11e7694470880452147a",
-      "lifecycle": {
-        "mode": "ONE_SHOT",
-        "status": "consumed",
-        "transitionAt": "2026-08-29T13:34:54Z"
       },
       "g7AttemptIdentity": null
     }
@@ -19818,24 +19808,22 @@
         "G2",
         "G1"
       ],
-      "state": "VERIFY",
+      "state": "OPEN",
       "truth": {
-        "C": "1",
-        "W": "1",
-        "E": "1",
-        "H": "1",
-        "L": "1",
-        "X": "1",
-        "S": "-"
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
       },
       "blockerCode": null,
       "blockerRemedy": null,
       "closureBlockedBy": [],
-      "evidenceReceipts": [
-        "GR-2026-08-29-CLOSURE-BATCH-4031-01"
-      ],
+      "evidenceReceipts": [],
       "acceptance": "Action registry ve internal effect envanterleri AST binding-provenance + stable call-site ID taşır; file-level promotion, dead resolve, aggregate compensation ve site substitution PASS edemez; read/write/delete, DB/memory, process, provider/network ve tool effect taxonomy ayrı ölçülür",
-      "evidence": "2026-08-29 authenticated recovery settlement: sprint-711 `ABORTED` geçmişi değiştirilmedi; exact üç product path'i commit f6c880fc5bde064688e26fa5a95d3e91e7ecbc75 ile landed. Audit canonical catalog'u doğrudan tüketir ve registry dışı/sahte catalog'u reddeder; AST symbol-origin doğrulaması shadow/local nesne ile dead/ilgisiz resolve kredisini, per-site identity ise file-level promotion, aggregate compensation ve substitution'ı fail-closed engeller. Closed taxonomy yedi effect sınıfını ayrı sayar; unknown/ambiguous attribution unclassified diagnostic üretir ve baseline write karşılaştırmalı debt ratchet'inden geçer; `receipt=GR-2026-08-29-CLOSURE-BATCH-4031-01`; `proof=operation-ingress-semantic-coverage-v3-17of17-5205sites`; LOCAL_VERIFIED: targeted 17/17, npm lint exit 0, build exit 0, gerçek `node scripts/audit-operation-ingress.mjs --check` PASS = 5205 total / 0 covered / 5205 unmatched / 0 unclassified / digest 59f62753c2a2d21361e9dbdf71bb047b2759e01d78c7e118c12eb4d6efbafd28. POSIX, Windows-native ve WSL-style path determinism pinli; 5205 unmatched borç downstream catalog/binding/migration children'ına görünür bırakılır ve bu measurement child'ında kapsam kapatma iddiası değildir. Closure OS seq5 event 210a3765, owner-signed receipt aprcdb-559bbd1e3315febe20be0bb00632b886 ve 5-event gate PASS state ratchet'ini yetkilendirir; XVerify owner kararıyla bu outcome için uygulanmadı",
+      "evidence": "Owner admission 2026-08-29; canlı zemin 742/2/740 fakat semantic mediated kanıtı 0; landed test 740/0 beklentisiyle stale",
       "updated": "2026-08-29"
     },
     {
@@ -28553,6 +28541,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "95c5b2dd00f74debda7f299213505abb1e0f399db6b1ae539917f00e1636d3d3"
+    "value": "2c326a6a0be5f2944e257640fdb6fa75267e84ab18dc46424199045bbd2e7214"
   }
 }
