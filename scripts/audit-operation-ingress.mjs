@@ -19,6 +19,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CATALOG_DIRECTORY = join(ROOT, 'src/core/operation-catalog');
 const CATALOG_PATH = join(CATALOG_DIRECTORY, 'catalog.v1.json');
 const CATALOG_MODULE_PATH = join(CATALOG_DIRECTORY, 'index.ts');
+const CATALOG_GENERATED_MODULE_PATH = join(CATALOG_DIRECTORY, 'generated.ts');
 const MCP_BROKER_MODULE_PATH = join(ROOT, 'src/mcp-client/broker.ts');
 
 export const TAXONOMIES = Object.freeze([
@@ -244,6 +245,9 @@ function canonicalAbsolutePath(path) {
 }
 
 const CANONICAL_CATALOG_MODULE_ID = canonicalAbsolutePath(CATALOG_MODULE_PATH);
+const CANONICAL_CATALOG_GENERATED_MODULE_ID = canonicalAbsolutePath(
+  CATALOG_GENERATED_MODULE_PATH,
+);
 const CANONICAL_MCP_BROKER_MODULE_ID = canonicalAbsolutePath(MCP_BROKER_MODULE_PATH);
 
 function taxonomyFromCatalogDefinition(operation) {
@@ -894,6 +898,14 @@ function canonicalCatalogDeclarations(checker, node) {
   ));
 }
 
+function canonicalOperationIdDeclarations(checker, node) {
+  return (resolvedSymbol(checker, node)?.declarations ?? []).filter(declaration => {
+    const moduleId = canonicalAbsolutePath(declaration.getSourceFile().fileName);
+    return moduleId === CANONICAL_CATALOG_MODULE_ID
+      || moduleId === CANONICAL_CATALOG_GENERATED_MODULE_ID;
+  });
+}
+
 function isCanonicalCatalogExport(checker, node, exportName) {
   return canonicalCatalogDeclarations(checker, node).some(declaration => {
     const name = declaration.name;
@@ -905,7 +917,7 @@ function operationIdFromNode(checker, rawNode) {
   const node = unwrapExpression(rawNode);
   if (ts.isStringLiteralLike(node)) return node.text;
   if (!ts.isPropertyAccessExpression(node)) return null;
-  for (const declaration of canonicalCatalogDeclarations(checker, node)) {
+  for (const declaration of canonicalOperationIdDeclarations(checker, node)) {
     if (ts.isPropertyAssignment(declaration)
       && ts.isStringLiteralLike(declaration.initializer)) {
       return declaration.initializer.text;

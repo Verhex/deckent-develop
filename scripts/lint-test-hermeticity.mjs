@@ -733,7 +733,11 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // capture; the source-derived scan reports zero confirmed violations.
   // 2026-08-29 OPERATION-001 ADR-D-007 recovery: source-derived rescan after
   // the fixture mutation loop and bounded child timeout were corrected.
-  count: 16807,
+  // 2026-08-29 OPERATION-INVOCATION-CONTEXT-001 Task1-10 plus the blocking
+  // 4031↔4032 canonical generated-catalog provenance repair: source-derived
+  // final-tree rescan; 0 confirmed violations; unresolved 16817/56d4ae65,
+  // production 1372/7a0322c7.
+  count: 16817,
   // 2026-08-28 OPERATION-001 O3 ratchet: count unchanged, digest-only —
   // operation-ingress audit moved from report-only proof to a fail-closed
   // lint:gates member with hermetic regression coverage.
@@ -801,7 +805,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // + sprintId/settle el-kapanışının test-metni etkisi.
   // 2026-08-29 ADR-D-007 planner recovery: count unchanged; digest-only update
   // after planner prompt delivery moved from argv to the owned child stdin.
-  digest: '69e0d5e5c06e6277e993fb32b236f1b0eda42d5154016ea3a906b68a91b28b1b',
+  digest: '56d4ae650780b4a89cf126af81f0a2ce8f76aefaaa90aa565a976282390f05b9',
   // 2026-08-27 04:0x: ayni 16514, digest-only — full-suite hizalama batch'i
   // (pin/mock/census guncellemeleri + sync guard).
   // 2026-08-27 03:1x: ayni 16514, digest-only — CI-hizalama paketi
@@ -1355,7 +1359,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // production inventory count is unchanged and the digest records that move.
   // 2026-08-29 OPERATION-001 ADR-D-007 recovery: compile-clean catalog
   // convergence implementation, source-derived with no policy relaxation.
-  count: 1366,
+  count: 1372,
   // 2026-08-29 OPERATION-COVERAGE-MODEL-001 bounded ADR-D-007 recovery:
   // count unchanged; digest records the canonical catalog-backed semantic
   // inventory and comparative schema-3 baseline authority.
@@ -1449,7 +1453,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // after the canonical Codex planner profile gained isolated stdin transport,
   // cross-platform wrapper dispatch and timeout-preserving single-settlement
   // EPIPE handling.
-  digest: '2d7d8137517451b913ab57df45d0f879031364c103158cd4105dd38b1a3678f5',
+  digest: '7a0322c7f4f5935a3f211ae96dce10a66c5ee85e326c503c1b428c1938547e37',
   // 2026-08-27 04:0x: ayni 1339, digest-only — sync workspace-guard + drift-normalize.
   // 2026-08-27 03:1x: ayni 1339, digest-only — skill-pool readJsonSafe donusumu.
   // 2026-08-27 02:0x: ayni 1339, digest-only — Dalga-3 src kaymalari

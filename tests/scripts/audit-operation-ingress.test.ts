@@ -205,6 +205,27 @@ describe('audit-operation-ingress semantic inventory', () => {
     ]);
   });
 
+  it('rejects generated catalog lookalikes outside the exact canonical projection', async () => {
+    const root = await createFixture(({ catalog }) => `
+      import { writeFileSync } from 'node:fs';
+      import { resolveOperation } from '${catalog}';
+      import { Op as lookalikeOp } from './generated-lookalike.js';
+      writeFileSync('lookalike', 'value', resolveOperation(lookalikeOp.FsWrite));
+    `);
+    await writeFile(join(root, 'src/generated-lookalike.ts'), `
+      export const Op = Object.freeze({ FsWrite: 'op.fs.write' } as const);
+    `, 'utf8');
+
+    const report = auditOperationIngress({ root });
+    expect(report).toMatchObject({ covered: 0, total: 1 });
+    expect(report.diagnostics).toEqual([
+      expect.objectContaining({
+        code: 'UNKNOWN_TAXONOMY',
+        message: "operation '<dynamic>' has no closed-taxonomy attribution",
+      }),
+    ]);
+  });
+
   it('tracks promise namespaces, static flags, dynamic flags, and FileHandle effects', async () => {
     const root = await createFixture(`
       import { open, readFile } from 'node:fs/promises';
