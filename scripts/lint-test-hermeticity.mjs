@@ -1429,7 +1429,9 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // worker-core backend-yetenek kapısı (task-builder/spawn-backend) + MCP karar-disposition
   // kapısı; yeni üretim modülü eklenmedi, taranan metin değişti.
   // 2026-08-28 09:4x: digest 873b946d→b127e8b9 — src/intelligence/ katmanı.
-  digest: 'c7a64a3a18815fa7eb5eeb360173a91d8e19fb8e0129fefa9176bc132b5b906e',
+  // 2026-08-29: same 1366, digest-only — run-policy DIRECTIVES heading is
+  // case-normalized at the consumer so a declared contract cannot disappear.
+  digest: '171ce002625d439aaa7997cc2cd74203bcdca53a6a7958d92952ff846df1dd8c',
   // 2026-08-27 04:0x: ayni 1339, digest-only — sync workspace-guard + drift-normalize.
   // 2026-08-27 03:1x: ayni 1339, digest-only — skill-pool readJsonSafe donusumu.
   // 2026-08-27 02:0x: ayni 1339, digest-only — Dalga-3 src kaymalari

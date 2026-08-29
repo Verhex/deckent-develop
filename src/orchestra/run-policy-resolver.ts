@@ -32,8 +32,20 @@ import {
 
 /** Exact DIRECTIVES heading that declares a run's binding execution policy. */
 export const RUN_POLICY_DIRECTIVES_SECTION = '## Execution Contract';
+const RUN_POLICY_DIRECTIVES_SECTION_NAME = 'execution contract';
 /** Digest source pointer rendered to workers — never the source content itself. */
 export const RUN_POLICY_DIRECTIVES_SOURCE_REF = 'DIRECTIVES.md#execution-contract';
+
+/**
+ * Match the semantic H2 contract heading without making Markdown title casing
+ * an authority boundary. Writers still emit {@link RUN_POLICY_DIRECTIVES_SECTION};
+ * retained or externally-authored DIRECTIVES using another case can never make
+ * a declared policy disappear silently.
+ */
+export function isRunPolicyDirectivesSectionHeading(line: string): boolean {
+  const heading = /^##\s+(.+?)\s*$/u.exec(line.trim())?.[1];
+  return heading?.toLocaleLowerCase('en-US') === RUN_POLICY_DIRECTIVES_SECTION_NAME;
+}
 
 /**
  * Resolve the run-wide policy authority from raw DIRECTIVES content.
@@ -47,7 +59,7 @@ export function resolveRunPolicyFromDirectives(
   if (!directivesContent || directivesContent.trim().length === 0) return undefined;
 
   const lines = directivesContent.split(/\r?\n/);
-  const start = lines.findIndex(line => line.trim() === RUN_POLICY_DIRECTIVES_SECTION);
+  const start = lines.findIndex(isRunPolicyDirectivesSectionHeading);
   if (start === -1) return undefined;
 
   const constraints: string[] = [];

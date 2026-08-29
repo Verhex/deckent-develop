@@ -10,6 +10,10 @@ import {
   findSameLineReadsFiles,
 } from '../../scripts/lint-directives.mjs';
 import { buildRepairDirectives } from '../../scripts/gen-repair-directives.mjs';
+import {
+  resolveRunPolicyFromDirectives,
+  RUN_POLICY_DIRECTIVES_SECTION,
+} from '../../src/orchestra/run-policy-resolver.js';
 
 type Scope = { directories: string[]; filesRead: string[]; filesWrite: string[] };
 const task = (title: string, scope: Scope, testTarget?: string, dependencies: string[] = []) =>
@@ -57,6 +61,8 @@ describe('directives start-öncesi lint', () => {
     // Aynı açığı generator deterministik kapatır: Reads import-taramasından gelir.
     const generated = buildRepairDirectives({ repoRoot: root, files: ['tests/core/thing.test.ts'], chunkSize: 14 });
     expect(generated.content).toContain('- Reads: src/core/thing.ts');
+    expect(generated.content).toContain(RUN_POLICY_DIRECTIVES_SECTION);
+    expect(resolveRunPolicyFromDirectives(generated.content)?.constraints).toHaveLength(4);
     const repaired = checkDirectives({ repoRoot: root, content: generated.content,
       tasks: [task('tam', { directories: [], filesRead: ['src/core/thing.ts'], filesWrite: ['tests/core/thing.test.ts'] }, 'npx vitest run tests/core/thing.test.ts')] });
     expect(repaired.ok).toBe(true);

@@ -92,6 +92,20 @@ describe('resolveRunPolicyFromDirectives — plan-time producer', () => {
     );
   });
 
+  it.each([
+    '## Execution contract',
+    '## execution contract',
+    '## EXECUTION CONTRACT',
+  ])('does not silently drop a declared policy because of heading case: %s', heading => {
+    const directives = DIRECTIVES_WITH_CONTRACT.replace(RUN_POLICY_DIRECTIVES_SECTION, heading);
+    const authority = resolveRunPolicyFromDirectives(directives);
+
+    expect(authority?.constraints).toEqual([
+      'No build or repository-wide test run during the sprint.',
+      'Effective concurrency is one; no parallel writer or parallel full-tree verification.',
+    ]);
+  });
+
   it('returns undefined when no DIRECTIVES or no contract section exists (explicit absence)', () => {
     expect(resolveRunPolicyFromDirectives(undefined)).toBeUndefined();
     expect(resolveRunPolicyFromDirectives('')).toBeUndefined();

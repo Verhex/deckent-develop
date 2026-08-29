@@ -35,7 +35,7 @@ Listedeki kirmizi test dosyalarini BUGUNKU landed src kontratina hizala. Kirmizi
 bayat pin / eski kontrat sinifidir; urun regresyonu kanitlanirsa dosyaya dokunmadan
 NO_GO + exact kanit yazilir.
 
-## Execution contract
+## Execution Contract
 
 - Otorite: main'deki src davranisi. Assertion ZAYIFLATILMAZ, test silinmez/skip'lenmez.
 - Yalnizca kendi Files listendeki test dosyalarina yaz; Reads listendeki src
