@@ -9,29 +9,19 @@
 //   D3 — JSON source of truth + generated constants (governance artifact:
 //        diffable, lintable, receipt-pinnable, runtime-independent)
 // D2 (counter-ratchet ingress enforcement) is the O3 slice, not this one.
+// 4032 adds exact version references and registry-neutral identity convergence.
 
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Capability } from '../work-model.js';
 
-/** What the operation does to the world. Ordering is increasing blast radius. */
-export type OperationEffect =
-  | 'READ'
-  | 'MUTATE_LOCAL'
-  | 'MUTATE_EXTERNAL'
-  | 'SPAWN_EXECUTION'
-  | 'DESTRUCTIVE'
-  | 'DB'
-  | 'MEMORY_LAW'
-  | 'PROVIDER_CALL';
+export { Op, OperationRef } from './generated.js';
+export type { ExactOperationReference, GeneratedOperationReference, OpId } from './generated.js';
 
-/** Owner-approval class (MASTER §2 gate ladder), carried per operation. */
+export type OperationEffect = 'READ' | 'MUTATE_LOCAL' | 'MUTATE_EXTERNAL' | 'SPAWN_EXECUTION' | 'DESTRUCTIVE' | 'DB' | 'MEMORY_LAW' | 'PROVIDER_CALL';
 export type OperationGate = 'G0' | 'G1' | 'G2' | 'G3' | 'G4' | 'G5' | 'G6' | 'G7';
-
 export type OperationRisk = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-
-/** Retry/replay contract — Attempt-level idempotency semantics. */
 export type OperationIdempotency = 'NONE' | 'KEYED' | 'NATURAL';
 
 export interface OperationDefinition {
@@ -51,50 +41,59 @@ interface CatalogFile {
   readonly operations: readonly OperationDefinition[];
 }
 
-const CATALOG_PATH = join(
-  dirname(fileURLToPath(import.meta.url)),
-  'catalog.v1.json',
-);
+export interface OperationReference {
+  readonly operationId: string;
+  readonly version: number;
+  readonly key: string;
+}
 
-/**
- * effect → the MINIMUM gate that effect may carry. An entry may declare a
- * stricter gate (a read behind G2 is a policy choice), but never a weaker one —
- * this is the structural half of "no silent authority downgrade", enforced by
- * scripts/lint-operation-catalog.mjs at lint time and asserted here at load.
- */
-export const EFFECT_MIN_GATE: Readonly<Record<OperationEffect, OperationGate>> = Object.freeze({
-  READ: 'G0',
-  MUTATE_LOCAL: 'G1',
-  MUTATE_EXTERNAL: 'G1',
-  SPAWN_EXECUTION: 'G1',
-  DESTRUCTIVE: 'G3',
-  DB: 'G4',
-  MEMORY_LAW: 'G6',
-  PROVIDER_CALL: 'G7',
-});
+export interface OperationReferenceInput {
+  readonly operationId: string;
+  readonly version: number;
+}
 
+export interface OperationDeclaration {
+  readonly registry: string;
+  readonly action: string;
+  readonly semanticEquivalenceKey: string;
+  readonly operation: OperationReferenceInput;
+}
+
+export interface ConvergedOperationEvidence {
+  readonly semanticEquivalenceKey: string;
+  readonly operation: OperationReference;
+  readonly declarations: readonly Readonly<Pick<OperationDeclaration, 'registry' | 'action'>>[];
+}
+
+export type ConvergenceValidationResult =
+  | { readonly ok: true; readonly evidence: readonly ConvergedOperationEvidence[] }
+  | { readonly ok: false; readonly diagnostics: readonly string[] };
+
+const CATALOG_PATH = join(dirname(fileURLToPath(import.meta.url)), 'catalog.v1.json');
 const GATE_ORDER: readonly OperationGate[] = ['G0', 'G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7'];
 
-/** True when `gate` is at least as strict as the effect's minimum. */
+export const EFFECT_MIN_GATE: Readonly<Record<OperationEffect, OperationGate>> = Object.freeze({
+  READ: 'G0', MUTATE_LOCAL: 'G1', MUTATE_EXTERNAL: 'G1', SPAWN_EXECUTION: 'G1',
+  DESTRUCTIVE: 'G3', DB: 'G4', MEMORY_LAW: 'G6', PROVIDER_CALL: 'G7',
+});
+
 export function gateSatisfiesEffect(effect: OperationEffect, gate: OperationGate): boolean {
   return GATE_ORDER.indexOf(gate) >= GATE_ORDER.indexOf(EFFECT_MIN_GATE[effect]);
 }
 
-let cached: readonly OperationDefinition[] | null = null;
+let cachedCatalog: readonly OperationDefinition[] | null = null;
 
-/** Load the catalog (memoized). The JSON file is the single source of truth. */
 export function loadOperationCatalog(): readonly OperationDefinition[] {
-  if (cached !== null) return cached;
+  if (cachedCatalog !== null) return cachedCatalog;
   const parsed = JSON.parse(readFileSync(CATALOG_PATH, 'utf-8')) as CatalogFile;
-  cached = Object.freeze(parsed.operations.map((op) => Object.freeze(op)));
-  return cached;
+  cachedCatalog = Object.freeze(parsed.operations.map(operation => Object.freeze({
+    ...operation,
+    title: Object.freeze({ ...operation.title }),
+    capabilities: Object.freeze([...operation.capabilities]),
+  })));
+  return cachedCatalog;
 }
 
-/**
- * Resolve one operation by id. Absence is a typed error, never a permissive
- * default: an unknown operation id must fail closed rather than proceed with
- * no gate, no risk class and no capability requirement.
- */
 export class UnknownOperationError extends Error {
   constructor(public readonly operationId: string) {
     super(`Unknown operation id '${operationId}' — not present in the canonical catalog`);
@@ -102,24 +101,130 @@ export class UnknownOperationError extends Error {
   }
 }
 
-export function resolveOperation(id: string): OperationDefinition {
-  const found = loadOperationCatalog().find((op) => op.id === id);
-  if (!found) throw new UnknownOperationError(id);
-  return found;
+export class OperationVersionMismatchError extends Error {
+  constructor(
+    public readonly operationId: string,
+    public readonly requestedVersion: number,
+    public readonly currentVersion: number,
+  ) {
+    super(`Operation '${operationId}' requested version ${requestedVersion}, canonical version is ${currentVersion}`);
+    this.name = 'OperationVersionMismatchError';
+  }
 }
 
-/**
- * Generated constants — call sites use these instead of raw strings so the
- * 0-hardcode rule holds and a renamed/retired id becomes a compile error
- * rather than a silent runtime miss.
- */
-export const Op = Object.freeze({
-  FsRead: 'op.fs.read',
-  FsWrite: 'op.fs.write',
-  FsDelete: 'op.fs.delete',
-  MemoryRead: 'op.memory.read',
-  MemoryWrite: 'op.memory.write',
-  MemoryExport: 'op.memory.export',
-} as const);
+export function resolveOperation(operationId: string): OperationDefinition {
+  const operation = loadOperationCatalog().find(candidate => candidate.id === operationId);
+  if (!operation) throw new UnknownOperationError(operationId);
+  return operation;
+}
 
-export type OpId = (typeof Op)[keyof typeof Op];
+export function operationReference(operationId: string, version: number): OperationReference {
+  const operation = resolveOperationReference({ operationId, version });
+  return Object.freeze({
+    operationId: operation.id,
+    version: operation.version,
+    key: `${operation.id}@${operation.version}`,
+  });
+}
+
+export function resolveOperationReference(reference: OperationReferenceInput): OperationDefinition {
+  const operation = resolveOperation(reference.operationId);
+  if (!Number.isInteger(reference.version) || reference.version < 1 || reference.version !== operation.version) {
+    throw new OperationVersionMismatchError(reference.operationId, reference.version, operation.version);
+  }
+  return operation;
+}
+
+function validText(value: unknown): value is string {
+  return typeof value === 'string'
+    && value.length > 0
+    && value === value.trim()
+    && !/[\u0000-\u001f\u007f]/u.test(value);
+}
+
+function compareText(left: string, right: string): number {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
+}
+
+export function validateOperationConvergence(declarations: readonly unknown[]): ConvergenceValidationResult {
+  const diagnostics: string[] = [];
+  const normalized: OperationDeclaration[] = [];
+  const resolved: Array<{ declaration: OperationDeclaration; operation: OperationReference }> = [];
+
+  for (const candidate of declarations) {
+    if (!candidate || typeof candidate !== 'object') {
+      diagnostics.push('malformed declaration: expected object');
+      continue;
+    }
+    const declaration = candidate as Partial<OperationDeclaration>;
+    if (!validText(declaration.registry) || !validText(declaration.action) || !validText(declaration.semanticEquivalenceKey)
+      || !declaration.operation || typeof declaration.operation !== 'object'
+      || !validText(declaration.operation.operationId) || !Number.isInteger(declaration.operation.version)
+      || declaration.operation.version < 1) {
+      diagnostics.push('malformed declaration: registry, action, semanticEquivalenceKey, and positive operation version are required');
+      continue;
+    }
+    normalized.push(declaration as OperationDeclaration);
+  }
+
+  const identityCounts = new Map<string, { count: number; registry: string; action: string }>();
+  for (const declaration of normalized) {
+    const identity = `${declaration.registry}\u0000${declaration.action}`;
+    const current = identityCounts.get(identity);
+    identityCounts.set(identity, current
+      ? { ...current, count: current.count + 1 }
+      : { count: 1, registry: declaration.registry, action: declaration.action });
+  }
+  for (const duplicate of [...identityCounts.values()]
+    .filter(identity => identity.count > 1)
+    .sort((left, right) => compareText(`${left.registry}\u0000${left.action}`, `${right.registry}\u0000${right.action}`))) {
+    diagnostics.push(`duplicate declaration identity '${duplicate.registry}/${duplicate.action}'`);
+  }
+
+  for (const declaration of normalized) {
+    try {
+      const operation = resolveOperationReference(declaration.operation);
+      resolved.push({
+        declaration,
+        operation: operationReference(operation.id, operation.version),
+      });
+    } catch (error: unknown) {
+      diagnostics.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  const groups = new Map<string, typeof resolved>();
+  for (const item of resolved) {
+    const group = groups.get(item.declaration.semanticEquivalenceKey) ?? [];
+    group.push(item);
+    groups.set(item.declaration.semanticEquivalenceKey, group);
+  }
+
+  const evidence: ConvergedOperationEvidence[] = [];
+  for (const semanticEquivalenceKey of [...groups.keys()].sort(compareText)) {
+    const group = groups.get(semanticEquivalenceKey)!;
+    const referenceKeys = [...new Set(group.map(item => item.operation.key))].sort(compareText);
+    if (referenceKeys.length !== 1) {
+      diagnostics.push(`ambiguous semantic-equivalence key '${semanticEquivalenceKey}': ${referenceKeys.join(', ')}`);
+      continue;
+    }
+    const first = group[0];
+    if (!first) {
+      diagnostics.push(`empty semantic-equivalence group '${semanticEquivalenceKey}'`);
+      continue;
+    }
+    evidence.push(Object.freeze({
+      semanticEquivalenceKey,
+      operation: first.operation,
+      declarations: Object.freeze(group.map(item => Object.freeze({
+        registry: item.declaration.registry,
+        action: item.declaration.action,
+      })).sort((left, right) => compareText(`${left.registry}\u0000${left.action}`, `${right.registry}\u0000${right.action}`))),
+    }));
+  }
+
+  return Object.freeze(diagnostics.length > 0
+    ? { ok: false as const, diagnostics: Object.freeze(diagnostics.sort(compareText)) }
+    : { ok: true as const, evidence: Object.freeze(evidence) });
+}

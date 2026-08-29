@@ -731,7 +731,9 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // unknown-effect refusal, comparative baseline migration and POSIX/Windows/WSL
   // identity cases. Async child execution remains tmpdir-owned with real-fd
   // capture; the source-derived scan reports zero confirmed violations.
-  count: 16801,
+  // 2026-08-29 OPERATION-001 ADR-D-007 recovery: source-derived rescan after
+  // the fixture mutation loop and bounded child timeout were corrected.
+  count: 16807,
   // 2026-08-28 OPERATION-001 O3 ratchet: count unchanged, digest-only —
   // operation-ingress audit moved from report-only proof to a fail-closed
   // lint:gates member with hermetic regression coverage.
@@ -799,7 +801,7 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // + sprintId/settle el-kapanışının test-metni etkisi.
   // 2026-08-29 ADR-D-007 planner recovery: count unchanged; digest-only update
   // after planner prompt delivery moved from argv to the owned child stdin.
-  digest: 'd8d6e0ee7d29f5d7d12e1e8e0209dd8ab2b3b69a9a2e283a8268a7492d58e7ac',
+  digest: '69e0d5e5c06e6277e993fb32b236f1b0eda42d5154016ea3a906b68a91b28b1b',
   // 2026-08-27 04:0x: ayni 16514, digest-only — full-suite hizalama batch'i
   // (pin/mock/census guncellemeleri + sync guard).
   // 2026-08-27 03:1x: ayni 16514, digest-only — CI-hizalama paketi
@@ -1351,6 +1353,8 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // the fifth is their catalog-mediated atomic file-operation authority. Its
   // catalog assertion is lazy at import and fail-closed at first mutation;
   // production inventory count is unchanged and the digest records that move.
+  // 2026-08-29 OPERATION-001 ADR-D-007 recovery: compile-clean catalog
+  // convergence implementation, source-derived with no policy relaxation.
   count: 1366,
   // 2026-08-29 OPERATION-COVERAGE-MODEL-001 bounded ADR-D-007 recovery:
   // count unchanged; digest records the canonical catalog-backed semantic
@@ -1445,7 +1449,7 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // after the canonical Codex planner profile gained isolated stdin transport,
   // cross-platform wrapper dispatch and timeout-preserving single-settlement
   // EPIPE handling.
-  digest: 'c758eef4942ffdf099c4eba0f9f261c058708fb568eb48d329986371d4bd7d26',
+  digest: '2d7d8137517451b913ab57df45d0f879031364c103158cd4105dd38b1a3678f5',
   // 2026-08-27 04:0x: ayni 1339, digest-only — sync workspace-guard + drift-normalize.
   // 2026-08-27 03:1x: ayni 1339, digest-only — skill-pool readJsonSafe donusumu.
   // 2026-08-27 02:0x: ayni 1339, digest-only — Dalga-3 src kaymalari
