@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "realm": "deckent-dev-host-operator",
+  "source": "docs/operations/skills",
+  "targets": [
+    ".claude/skills",
+    ".codex/skills"
+  ],
+  "skills": [
+    "deckent-authority-bootstrap",
+    "deckent-readonly-audit",
+    "deckent-outcome-ordering",
+    "deckent-outcome-plan",
+    "deckent-parallel-execution",
+    "deckent-observe",
+    "deckent-recovery",
+    "deckent-closure",
+    "deckent-versioned-handoff"
+  ]
+}
