@@ -4,6 +4,26 @@
 > `docs/MASTER-PLAN.md`; authority receipt'leri `docs/execution/handoffs/` altındadır.
 > Tüketilen plan bu dosyadan çıkarılır; ayrı tamamlanmış follow-up belgesi tutulmaz.
 
+## Güncel imleç — 2026-08-30
+
+- **Phase:** owner review öncesi read-only bootstrap tamamlandı; Goal/Run henüz oluşturulmadı.
+- **Active outcome adayı:**
+  `RECOVERY-BORN-711-NORMAL-DOCKER-EXACT-ATTEMPT-CUSTODY-001`.
+- **Owner admission:** Motor A → operational skill ailesi → 4030 DAG → trust/enforcement →
+  post-product sırası ve main-only yürütme 2026-08-30 canlı talimatıyla kabul edildi.
+- **Base:** `main@014d4c13a`, `origin/main`den 17 commit ileride; dirty runtime/user paths korunur.
+- **MASTER:** 562 total / 474 active / 214 receipt / 13 blocker; 4030 VERIFY, 4031–4033 DONE,
+  4034+ operation children OPEN; Closure OS 7 event, head 4033.
+- **Runtime:** active lock/worker/coordinator/container yok. Terminal receipt'ler 711–713
+  `ABORTED`; RunFlow head'leri sırasıyla `RUN_FAILED / RUN_PAUSED / RUN_FAILED` — Motor A
+  projection-truth HOLD'u.
+- **Bot HOLD:** beklenen PID `2964974` taze root ölçümünde yok; kendiliğinden restart edilmedi.
+- **Exact next action:** owner'ın bu bootstrap ve Goal taslağını kabulünden sonra operasyon skill
+  ailesini oluştur; fresh snapshot al; aynı gün canonical MASTER child + exact capsule/DIRECTIVES
+  admissionını hazırla; gerçek Deckent dry-run planını doğrula.
+- **Şimdi çalıştırılmayacak:** test/build/run/start/do/autonomous/cleanup/kill/XVerify/commit/push.
+- **Yöntem sözleşmesi:** `follow-up-works/deckent-dogfood-cto-execution-contract.md`.
+
 ## Authority ve repository durumu — 2026-08-29
 
 - Execution authority: Codex epoch 4; handoff `ah-2026-08-29-codex-takeover-3` COMMITTED.
