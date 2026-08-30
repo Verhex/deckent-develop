@@ -36,6 +36,9 @@
 | debt-1780659451542-018 | Tech debt from 1780659451542-018: Declared verification passed: 3 files, 16 test | normal | sprint-1780659451542 | resolved |
 | debt-1780659451542-020 | Tech debt from 1780659451542-020: Evidence record cites bounded persisted source | normal | sprint-1780659451542 | resolved |
 | debt-1780659451542-019 | Tech debt from 1780659451542-019: npm run lint:master-plan reports docs/generate | normal | sprint-1780659451542 | resolved |
+| rollback-sprint-712 | Sprint sprint-712 rollback SUCCESS | normal | sprint-712 | resolved |
+| rollback-sprint-711 | Sprint sprint-711 rollback SUCCESS | normal | sprint-711 | resolved |
+| debt-707-005 | Tech debt from 707-005: Verification passed: npx tsc --noEmit; npm run test test | critical | sprint-707 | resolved |
 | debt-700-003 | Tech debt from 700-003: Implemented planner-to-builder forceModel propagation an | normal | sprint-700 | resolved |
 | rollback-sprint-672 | Sprint sprint-672 rollback SUCCESS | normal | sprint-672 | resolved |
 | debt-661-004 | Tech debt from 661-004: Production registry now carries the generated exact base | normal | sprint-661 | resolved |

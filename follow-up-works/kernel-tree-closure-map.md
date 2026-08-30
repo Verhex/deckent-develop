@@ -85,3 +85,108 @@ Karar-turunda "kernel ağacını kapat, sonra yayın" dedin ve o karar geçerli.
    yeterli sayılır, kernel programı yayın-sonrası kendi takviminde sürer.
 
 Önerim **2**: karara sadık kalır, hiçbir şeyi atlamaz, ama ölçümü ucuz bir turla keskinleştirir.
+
+---
+
+## 7. Dalga 0 sonucu — ölçüm (2026-08-28, epoch-3 supervisor)
+
+> Owner 2026-08-28'de **Seçenek 2**'yi seçti. Dalga 0 koşuldu. Sonuç, §5'in beklentisini
+> doğrulamadı: formal kazançlar kayıt-doğruluğu getirdi, **ağaç küçülmedi**.
+
+### 7.1 Üç kalemin gerçekleşmesi
+
+| Kalem | Sonuç |
+|---|---|
+| 3275 yeniden yazımı | **Zaten yapılmıştı** (`c57370501`, aynı gün). Geriye tek olgusal hata kalmıştı: hücre "iki fixture" diyor ama biri (`tests/orchestra/planner-smoke-wire.test.ts`) **2026-08-26'da `d25b2ddb1`** ile silinmiş. Düzeltildi; `enforce` engeli ölçülmüş olarak yarıya indi. Kaynak docstring hâlâ bayat (Dalga 3 işi). |
+| 3274 taze receipt | **Typed HOLD.** Satır-invariantı: *"Dependency satisfaction yalnız DONE ile oluşur."* 3274 → 3241 PRODUCTION-WIRING-AUTHORITY-001 = **VERIFY**. Receipt kapanış üretmez. |
+| X/S emsal çevrimi | **Sıfır DONE açıyor.** 3274/3290/3296/3298 dördü de C/W/E/H/L=`1/1/1/1/1` ama hepsinin bağımlılık zinciri açık. Bağlayıcı kısıt X hücresi değil, **dependency DAG**. CI Eylül-askısı bu satırların gerçek engeli değildi. |
+
+### 7.2 Haritanın kaçırdığı satırlar (DependsOn hücrelerinden ölçüldü)
+
+§2 diyagramı yalnız 3299'un ağacını izlemiş; 3274/3275 kolu ve dip katman izlenmemiş:
+
+```
+3275 → 3274(VERIFY) → 3241 PRODUCTION-WIRING-AUTHORITY(VERIFY)
+                        ├─ 3220 PLANNER-001      ← BLOCKED  (haritada yok)
+                        ├─ 9040 EVALUATION-001   (OPEN)     (haritada yok)
+                        └─ 3251 TEST-DISCOVERY   (DONE)
+3020 → 3010 KERNEL-ONTOLOGY(OPEN) → 30 SSOT-003(DONE) + 4030 OPERATION-001(VERIFY)
+4070 → 4010 PRINCIPAL(DONE) + 4020 TENANT-001(VERIFY)
+```
+
+"10 satır / 4 katman" → ölçülen **~16 non-DONE satır**, biri `BLOCKED`.
+
+### 7.3 VERIFY-hasadı taraması (owner talebi, repo geneli)
+
+Emsal ölçütü (2026-08-06 kaskad-hasadı): *VERIFY + dependency-OK + çocuksuz + C/W/E/H=1* +
+closure-geçerli `proof=` token. Historical token invariant gereği DONE closure ÜRETMEZ.
+
+**43 VERIFY satırı tarandı → hasada uygun: 0.** İlk elenme sebebine göre dağılım (kategoriler
+bağımsız DEĞİLDİR; bir satır birden çok ölçütte düşebilir): 23 dependency, 16 C/W/E/H,
+3 residual, 1 proof-token.
+
+### 7.4 Bugün bağımlılığı AÇIK olan 7 VERIFY satırı — her birinin tek tek eksiği
+
+Bunlar dependency'den değil **kendi kanıtlarından** düşüyor:
+
+| Satır | Truth | Eksik |
+|---|---|---|
+| **4053** APPROVAL-INGRESS-UNKNOWN-ID-001 | `1/1/1/?/0/0/-` | yalnız **H ölçülmemiş** (`?`) — iş değil, ölçüm |
+| **7092** RECOVERY-TRUTH-001 | `1/1/1/1/1/?/1` | yalnız historical-token → taze `proof=` gerek |
+| **8100** CI-POSTMERGE-127-TRUTH-001 | `1/1/1/1/-/-/-` | yalnız historical-token → taze `proof=` gerek |
+| 7075 MODEL-ACTIVATION-001 | `1/1/1/1/1/0/0` | açık residual (tier-projection) |
+| 4030 OPERATION-001 | `1/1/1/1/0/?/?` | açık residual (ratchet + resolveOperation ingress) |
+| 4020 TENANT-001 | `1/1/1/1/0/?/?` | açık residual (T4b/T4c) + açık child 4021 |
+| 3169 RECOVERY-DOGFOOD-BORN-001 | `1/0/1/1/0/-/-` | program parent, 47 açık child — invariant gereği child'ların yerine kapanmaz |
+
+**Üstteki üçü iş değil ÖLÇÜM BORCUDUR** — koşup taze kanıt yazmak yeter.
+
+### 7.5 Asıl bulgu — DAG sığ değil, DERİN
+
+İlk sayımım her VERIFY satırının transitive kapanışındaki HER düğüme kredi veriyordu; bu şişik bir
+metrikti (43 satır için 106 atıf) ve yanıltıcı olurdu. Karşı-olgusal doğru sayı — *kökü tek başına
+DONE yapsak kaç VERIFY satırı dependency-OK olur*:
+
+| Kök | Durum | ham atıf (şişik) | **tek başına açtığı** |
+|---|---|---:|---:|
+| 4030 OPERATION-001 | VERIFY | 29 | **1** |
+| 4020 TENANT-001 | VERIFY | 28 | **0** |
+| 4000 AUTHORITY-001 | OPEN | 26 | **0** |
+| 1010 CM-01 | BLOCKED | 14 | **1** |
+| 3162 PAUSED-FINALIZE-001 | OPEN | 9 | **0** |
+
+**Beşi birden DONE olsa bile açılan satır sayısı: 2.** 4020+4030 çifti: 1 (örtüşme yok).
+
+Yani darboğaz "iki satır" DEĞİL. Bağımlılık zincirleri **çok katmanlı**: satırların çoğu aynı anda
+birden fazla katmandan bloklu, dolayısıyla tek bir kökü kapatmak kuyruğu akıtmıyor. Bu, "ucuz
+formal tur ağacı küçültür" beklentisinin neden tutmadığının cevabıdır.
+
+### 7.6 (a) turu — "ölçüm borcu" sınıflandırmam iki satırda YANLIŞTI
+
+§7.4'te üç satırı "iş değil ölçüm borcu" diye işaretlemiştim. Bunu token-şekline bakarak
+yapmıştım; Evidence'ların tamamını okuyunca **ikisi yanlış çıktı.** Düzeltilmiş hâli:
+
+| Satır | §7.4 iddiası | Ölçülmüş gerçek |
+|---|---|---|
+| **4053** APPROVAL-INGRESS-UNKNOWN-ID | ölçüm borcu | ✅ **DOĞRUYDU — kapatıldı** (aşağıda) |
+| **7092** RECOVERY-TRUTH-001 | ölçüm borcu | ❌ **YANLIŞ.** Hücre `DÜRÜSTLÜK-DÜZELTMESİ 2026-08-25` taşıyor: Sprint-595 canlı-vakası `RT-IMPL-08` açık-kalemi ve *"VERIFY→DONE geçişinin ön-şartıdır"*; Sprint-622'nin iki tech-debt kalemi de aynı listede. Ayrıca cross-provider XVerify yok (typed `unavailable/HOLD` — KANUN 14 gereği kapanış değil). **Gerçek iş, ölçüm değil.** |
+| **8100** CI-POSTMERGE-127-TRUTH | ölçüm borcu | ❌ **YANLIŞ — ve daha iyisi.** Acceptance'ı *"satır DONE'a yalnız MAIN_POSTMERGE_GREEN kanıtıyla geçer"* diyor ve o kanıt GELMİŞ: `#129` main-push CI workflow SUCCESS (run `31979500135`, 11m16s, 2026-08-16T23:34Z). Truth zaten DONE-şeklinde (`1/1/1/1/-/-/-`), dependency yok, çocuk yok, residual yok. Tek eksik: **owner DONE-flip receipt'i** + prose'daki kanıtın standalone `proof=` token'ına çevrilmesi. Repodaki DONE'a en yakın satır budur ve engeli benim yetkim dışında. |
+
+### 7.7 4053 — kapatılan tek gerçek ölçüm borcu
+
+`H` hücresi `?` (ölçülmedi) idi ve satırın kendi `LOCAL_VERIFIED` metniyle çelişiyordu.
+Yedi-ingress bataryası bugün bağımsız koşuldu: **7 dosya / 78 test yeşil, exit 0**, hermetik ve
+provider-free (`VITEST_MAX_FORKS=2`). → `H=?→1`, Truth `1/1/1/?/0/0/-` → `1/1/1/1/0/0/-`,
+`proof=approval-4053-ingress-battery-78of78-hermetic-2026-08-28`, `Updated` 2026-08-28.
+
+**L'ye DOKUNULMADI — açık çelişki owner'a bırakıldı.** Hücre `LIVE_PROVEN` ve *"real-binary
+residualı kapandı"* diyor; sprint-659 arşivini diskte doğruladım (terminal `COMPLETE`
+2026-08-24T15:29:37Z, seal state `applied`, `manifestDigest` hücredeki değerle birebir) — buna
+rağmen `L=0`. Geçmiş receipt'e dayanarak L yükseltmek kalite barına aykırı olurdu; taze
+gerçek-binary koşusu bu oturumda yapılmadı.
+
+### 7.8 (a) turunun net sonucu
+
+Üç "ucuz kazanç" beklemiştik; **bir tanesi gerçekti ve kapandı.** Diğer ikisinden biri gerçek iş
+(7092), diğeri owner-kararı (8100). Yani ölçüm borcu sanılan yığın da ölçünce eridi — bu, §7.5'teki
+"DAG derin" bulgusunun ölçüm tarafındaki karşılığıdır.

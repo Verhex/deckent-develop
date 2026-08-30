@@ -118,6 +118,18 @@ Ev
 - 1780659451539-009 — Health and ETA readiness — Created a source-backed Closure Health and ETA readiness assessment.
 - …and 9 more delivered
 
+## Sprint sprint-707 Learnings
+- Sprint sprint-707 Learnings: ## Sprint sprint-707 Learnings
+- IANA timezone support in flow scheduling core: NO_GO — Targeted verification: 4 files, 52 tests passed. Typecheck attempted twice and failed only at src/core/capability-runtim
+- CLI surface deckent intelligence with i18n: NO_GO — TypeScript passed on every attempt. The command, bilingual catalog, surface registry, contracts, hermetic tests, and exp
+- EN-TR feature docs and integration gate closure seal: GO_WITH_TECH_DEBT — Verification passed: npx tsc --noEmit; npm run test tests/intelligence/watch-closure-integration.test.ts; VITEST_MAX_FOR
+
+## Gains
+- 707-001 — Capability registration for intelligence watch handler — Stable audited capability registration, live-binding rejection, honest network authority, bounded...
+- 707-003 — Daily watch flow wiring with idempotent mission ingest — Implemented bounded catch-up without changing legacy tick semantics.
+- 707-002-fix — Fix: IANA timezone support in flow scheduling core — Root cause: canonical nextRun interpreted every cron field through UTC and FlowScheduler did not ...
+- 707-004-fix — Fix: CLI surface deckent intelligence with i18n — Root cause fixed: the prior skipped real-binary case had an empty callback, so it was not an auth...
+
 ## Sprint sprint-697 Learnings
 - Sprint sprint-697 Learnings: ## Sprint sprint-697 Learnings
 

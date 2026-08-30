@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "outcomeId": "dogfood-continuation-epoch-supervision",
+  "role": "supervisor",
+  "baseSha": "ad1e08bdafde884418f7a3666e5f464712b76bca",
+  "headSha": "ad1e08bdafde884418f7a3666e5f464712b76bca",
+  "branch": "main",
+  "policyDigest": "sha256:c4c96a971833ee892174b7d361e08c7f0eb53c629873381235deaa573594d863",
+  "scopeDigest": "sha256:60014ac757e35a469e10808606c40463ecf80494b9047271fe1c2f41efdcc4dc",
+  "filesChanged": [],
+  "verification": [],
+  "findings": [],
+  "openActions": [
+    "Read follow-up-works/worktree-attribution-2026-08-28.md — the hunk-level map; file-level rollback is UNSAFE, three files interleave O2/O4/O5 hunks",
+    "Resolve the F3 contradiction independently: Codex measured 6 failing hermetic script-registry tests, this session measured 28/28 pass — one of the two is wrong",
+    "Extract the O5 CLI slice as a separate patch (do not discard: measured 184 to 157 net failure reduction, 27 closed, 0 introduced)",
+    "If O1 ratchet lands alone, regenerate its baseline at 739 without the +1 that belongs to O4",
+    "Verify with a DIFFERENT provider: this session was claude, so XVerify on codex-authored work must come from claude"
+  ],
+  "recommendedNextAction": "Read the hunk-level attribution map before touching any file, then re-measure the F3 contradiction on your own evidence",
+  "authorityHandoff": {
+    "protocolVersion": 1,
+    "handoffId": "ah-2026-08-28-codex-takeover",
+    "sequence": 2,
+    "transition": "ABORTED",
+    "transitionActor": "transferor",
+    "currentAuthorityEpoch": 3,
+    "proposedAuthorityEpoch": 4,
+    "previousReceiptDigest": "sha256:4b7cb80d4d9fb4e7853fdaa062dfd0eae1fb70eb79c57dd2fadb9b3335d9cc04",
+    "from": {
+      "hostId": "claude-code-cli",
+      "providerId": "claude",
+      "modelApiId": "claude-opus-5",
+      "role": "supervisor",
+      "principalDigest": "sha256:1d1549ebd7282b91e0c19f892a1d68c3092d2c2f7fc05d3096b405c151d47bca",
+      "sessionDigest": "sha256:5b82a6e4fb200ef2e6dd7e3f17ab8d123abd879fa47e1bd3324d9c368c4474bd"
+    },
+    "to": {
+      "hostId": "claude-code-cli",
+      "providerId": "codex",
+      "modelApiId": "gpt-5.6-sol",
+      "role": "supervisor",
+      "principalDigest": "sha256:1d1549ebd7282b91e0c19f892a1d68c3092d2c2f7fc05d3096b405c151d47bca",
+      "sessionDigest": "sha256:5b82a6e4fb200ef2e6dd7e3f17ab8d123abd879fa47e1bd3324d9c368c4474bd"
+    },
+    "trigger": {
+      "reasonCode": "OWNER_DIRECTIVE",
+      "authorityRef": "owner-live-2026-08-28: cok fazla yanildin, devir sart oldu; codex sessiona devrediyoruz, isten alindin"
+    },
+    "authorityScope": {
+      "goalId": "deckent-dev-dogfood-continuation",
+      "missionId": "worktree-separation-and-landing-train",
+      "flowId": "n/a",
+      "runId": "n/a",
+      "roles": [
+        "supervisor"
+      ],
+      "includes": [
+        "Separate the 52-file mixed worktree into independently verifiable units per follow-up-works/worktree-attribution-2026-08-28.md (O1 ratchet, O2 F1/F2/F3, O4 C/F5 settlement recovery, O5 CLI contract slice), then land them in the owner-approved order"
+      ],
+      "excludes": [
+        "owner-only decisions: commit/push, npm publish, MASTER admission, publish-gate rescoping; and every deferred outcome (skill routing, kernel tree 3299, deckent output deprecation, the 157 pre-existing CLI-reform failures)"
+      ]
+    },
+    "evidenceSnapshot": {
+      "observedAt": "2026-08-28T20:59:09.790Z",
+      "repoStateRef": "git:ad1e08bdafde884418f7a3666e5f464712b76bca:dirty=66",
+      "runtimeStateRef": "no active sprint or recover process; sprint-708 terminally ABORTED (2/4, honest); bot daemon live pid 2019986; approvals inbox empty",
+      "approvalStateRef": "deckent approvals list -> no pending requests",
+      "verificationStateRef": "tsc 0; lint:gates 24/24 exit 0; build:all exit 0 with clean; docs:ref:check 7/7 in sync; tests/cli+tests/scripts 157 failures vs 184 at HEAD, 0 introduced by this session",
+      "buildStateRef": "bot-stop -> build:all (exit 0) -> bot-start; dist matches source, no DECKENT_BINARY_IDENTITY_WARN",
+      "ssotStateRef": "docs/MASTER-PLAN.md + follow-up-works/current-flow.md"
+    }
+  },
+  "receiptDigest": "sha256:85ca533a0b8c125427ab9412fcdf895ca36fbdb9536cf0453a77cef900f1a0b2"
+}

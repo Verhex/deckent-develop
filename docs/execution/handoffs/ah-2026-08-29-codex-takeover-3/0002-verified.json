@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "outcomeId": "dogfood-continuation-epoch-supervision",
+  "role": "supervisor",
+  "baseSha": "ad1e08bdafde884418f7a3666e5f464712b76bca",
+  "headSha": "ad1e08bdafde884418f7a3666e5f464712b76bca",
+  "branch": "main",
+  "policyDigest": "sha256:c4c96a971833ee892174b7d361e08c7f0eb53c629873381235deaa573594d863",
+  "scopeDigest": "sha256:8c8358311c37a745cd55de6b01635e447de827d10638e8601326588385f48e77",
+  "filesChanged": [],
+  "verification": [],
+  "findings": [],
+  "openActions": [
+    "PROTOCOL GAP found during this handoff: section 7.4 requires disk evidence for every liveness claim, but a sandboxed transferee cannot observe host processes at all — kill -0 and ps return nothing for a genuinely running daemon. Liveness of a host process is therefore NOT transferee-verifiable under the current protocol. Record it as a finding; do not treat a transferor process claim as evidence",
+    "F3 IS NOT GREEN AND IS NOT SETTLED: tests/scripts/script-registry.test.ts gives 28/28 for claude and 22 pass/6 fail for codex, with empty async child stdout/stderr on every failure. It is a flaky hermeticity defect, BLOCKS_CURRENT_DONE — not a disagreement to adjudicate",
+    "Read follow-up-works/worktree-attribution-2026-08-28.md — hunk-level; file-level rollback is UNSAFE because cli-command-contract.ts, cli-run.ts and messages.ts interleave O2/O4/O5 hunks",
+    "Do not discard the O5 CLI slice: measured 184 to 157 net failure reduction, 27 closed, 0 introduced",
+    "If O1 lands alone, regenerate its baseline at 739 without the +1 that belongs to O4",
+    "XVerify must come from a provider other than codex; this session was claude"
+  ],
+  "recommendedNextAction": "Re-measure tests/scripts/script-registry.test.ts on your own environment and record the flakiness as a typed finding before touching any file",
+  "authorityHandoff": {
+    "protocolVersion": 1,
+    "handoffId": "ah-2026-08-29-codex-takeover-3",
+    "sequence": 2,
+    "transition": "VERIFIED",
+    "transitionActor": "transferee",
+    "currentAuthorityEpoch": 3,
+    "proposedAuthorityEpoch": 4,
+    "previousReceiptDigest": "sha256:0326e247e9fdff82228f7e405a800672c1402d29d9e9c57646736f45cf9f2fb8",
+    "from": {
+      "hostId": "claude-code-cli",
+      "providerId": "claude",
+      "modelApiId": "claude-opus-5",
+      "role": "supervisor",
+      "principalDigest": "sha256:1d1549ebd7282b91e0c19f892a1d68c3092d2c2f7fc05d3096b405c151d47bca",
+      "sessionDigest": "sha256:f6c04f356e9268b923ad8526f57d3ea82fa4986258df20fc05a300971574db2a"
+    },
+    "to": {
+      "hostId": "codex-cli",
+      "providerId": "codex",
+      "modelApiId": "gpt-5.6-sol",
+      "role": "supervisor",
+      "principalDigest": "sha256:1d1549ebd7282b91e0c19f892a1d68c3092d2c2f7fc05d3096b405c151d47bca",
+      "sessionDigest": "sha256:f6c04f356e9268b923ad8526f57d3ea82fa4986258df20fc05a300971574db2a"
+    },
+    "trigger": {
+      "reasonCode": "OWNER_DIRECTIVE",
+      "authorityRef": "owner-live-2026-08-28: opus-5 main/brain rollerinden alindi, codex sessiona devrediliyor"
+    },
+    "authorityScope": {
+      "goalId": "deckent-dev-dogfood-continuation",
+      "missionId": "worktree-separation-and-landing-train",
+      "flowId": "n/a",
+      "runId": "n/a",
+      "roles": [
+        "supervisor"
+      ],
+      "includes": [
+        "Separate the 52-file mixed worktree into independently verifiable units per follow-up-works/worktree-attribution-2026-08-28.md (O1 ratchet, O2 F1/F2/F3, O4 C/F5 settlement recovery, O5 CLI contract slice), then land them in the owner-approved order"
+      ],
+      "excludes": [
+        "owner-only: commit/push, npm publish, MASTER admission, publish-gate rescoping; deferred: skill routing, kernel tree 3299, deckent output deprecation, the 157 pre-existing CLI-reform failures, the pending nervous item JNTQJ, and any bot lifecycle action"
+      ]
+    },
+    "evidenceSnapshot": {
+      "observedAt": "2026-08-28T21:15:13.805Z",
+      "repoStateRef": "git:ad1e08bdafde884418f7a3666e5f464712b76bca:dirty=68",
+      "runtimeStateRef": "No active sprint, no recover process, sprint-708 terminally ABORTED (2/4, honest). BOT: transferor-observed running (pid 2019986) but NOT transferee-verifiable — a sandboxed session cannot see host processes. Receiver-verifiable disk artifact only: .deckent/bot.pid schemaVersion 2, pid 2019986, startToken s14100075, recordedAt 2026-08-28T20:43:12.771Z, buildIdentityDigest 311be99b, mtime matching recordedAt; a stale pid file would look identical, so treat this as attempt evidence, not liveness. The bot is NOT required by this outcome and no bot action is in scope",
+      "approvalStateRef": "NOT empty: 1 pending federated nervous item #JNTQJ (8c7ee92b-92fc-4fb8-8fb9-97b3c7206fd7, Dead event stream silent 62min) in approvals list and status --json pendingApprovals; no human approval request pending; owner-only and excluded from this scope",
+      "verificationStateRef": "tsc 0; lint:gates 24/24 exit 0; build:all exit 0 with clean; docs:ref:check 7/7 in sync; tests/cli+tests/scripts 157 failures vs 184 at HEAD with 0 introduced by this session; script-registry suite FLAKY across environments and NOT a closed proof",
+      "buildStateRef": "bot-stop -> build:all (exit 0) -> bot-start; dist matches source, no DECKENT_BINARY_IDENTITY_WARN",
+      "ssotStateRef": "docs/MASTER-PLAN.md + follow-up-works/current-flow.md"
+    }
+  },
+  "receiptDigest": "sha256:4428132fa8396517bc7f596382d1b45938cb667b53cf34a554075ad59b298031"
+}
