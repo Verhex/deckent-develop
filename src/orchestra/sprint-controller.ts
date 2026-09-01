@@ -61,7 +61,7 @@ import { providerRegistry } from '../core/provider.js';
 
 // ─── Spawn backend abstraction ───────────────────────────────────
 import type { SpawnBackend } from './spawn-backend.js';
-import { SpawnBackendFactory } from './spawn-backend.js';
+import { SpawnBackendFactory, SpawnBackendRecoveryHoldError } from './spawn-backend.js';
 import { DockerSpawnBackend } from './spawn-backend-docker.js';
 
 // ─── Connector (provider lifecycle) ─────────────────────────────
@@ -200,6 +200,11 @@ import {
   routeSprintTasksForExecution as routeSprintTasksImpl,
 } from './sprint-spawner.js';
 import { retireFailedSpawnAuthority } from './spawn-failure-authority.js';
+import {
+  createExactNormalDockerExecutionRegistry,
+  type ExactNormalDockerExecutionRegistryV2,
+  type ExactTaskProjectionAdmissionV2,
+} from './scheduler-effects.js';
 
 // ─── Task Mode Runner ─────────────────────────────────────────────
 export { runTaskMode } from './task-mode-runner.js';
@@ -814,7 +819,10 @@ export async function reconcileSpawnBackendBeforeRestore(
   spawnBackend: SpawnBackend | undefined,
 ): Promise<void> {
   if (!spawnBackend?.reconcilePendingAttempts) return;
-  await spawnBackend.reconcilePendingAttempts();
+  const report = await spawnBackend.reconcilePendingAttempts();
+  if (report.held && report.held.length > 0) {
+    throw new SpawnBackendRecoveryHoldError(report.held);
+  }
 }
 
 // ═══ RunSprintOptions ═════════════════════════════════════════════
@@ -901,7 +909,11 @@ export interface RunSprintOptions {
    * held and after every start gate has passed. It runs before admission is
    * published, so an uncertain write cannot produce a false RUN_STARTED.
    */
-  onExactPlanMaterialize?: (sprint: Sprint) => void | Promise<void>;
+  onExactPlanMaterialize?: (
+    sprint: Sprint,
+    options?: { readonly publicationMode: 'publish' | 'defer' },
+  ) => ExactPlanMaterializationHookResult | void
+    | Promise<ExactPlanMaterializationHookResult | void>;
   /**
    * Called exactly once after project leadership, all pre-start/scope/prompt
    * gates and any configured human checkpoint have succeeded, but before the
@@ -923,16 +935,23 @@ export interface RunSprintOptions {
   commandId?: string;
 }
 
+export interface ExactPlanMaterializationHookResult {
+  readonly taskIds: readonly string[];
+  readonly existingContentDigests?: Readonly<Record<string, string>>;
+}
+
 export async function runExactPlanAdmissionHooks(
   sprint: Sprint,
   opts: Pick<
     RunSprintOptions,
     'exactPlanAuthority' | 'onExactPlanMaterialize' | 'onExecutionAdmitted'
   > | undefined,
-): Promise<void> {
-  if (!opts?.exactPlanAuthority) return;
-  await opts.onExactPlanMaterialize!(sprint);
+  publicationMode: 'publish' | 'defer' = 'publish',
+): Promise<ExactPlanMaterializationHookResult | undefined> {
+  if (!opts?.exactPlanAuthority) return undefined;
+  const materialized = await opts.onExactPlanMaterialize!(sprint, { publicationMode });
   await opts.onExecutionAdmitted!(sprint);
+  return materialized === undefined ? undefined : materialized;
 }
 
 /**
@@ -965,9 +984,17 @@ export async function resolvePlanPhaseResult(
   opts: RunSprintOptions | undefined,
   activeProvider: ProviderAdapter | null,
   rollbackEnabled: boolean,
+  deferTaskArtifactProjection = false,
 ): Promise<PlanPhaseResult> {
   if (!opts?.preplannedSprint) {
-    return runPlanPhase(projectRoot, config, opts, activeProvider, rollbackEnabled);
+    return runPlanPhase(
+      projectRoot,
+      config,
+      opts,
+      activeProvider,
+      rollbackEnabled,
+      deferTaskArtifactProjection,
+    );
   }
 
   const sprint = opts.preplannedSprint;
@@ -1194,11 +1221,31 @@ export async function waitForResults(
       task: Task,
       result: TaskResult,
     ) => Promise<TaskEvaluation>;
+    exactDockerRegistry?: ExactNormalDockerExecutionRegistryV2;
+    exactTaskProjectionAdmission?: ExactTaskProjectionAdmissionV2;
   },
   config?: ResolvedConfig,
 ): Promise<TaskResult[]> {
+  const collectorSpawnOpts = spawnOpts?.exactDockerRegistry
+    ? {
+        ...spawnOpts,
+        readTaskResultAuthority: (taskId: string) =>
+          spawnOpts.exactDockerRegistry!.readTaskResultAuthority(taskId),
+        ipcExecutionMode: 'normal-docker' as const,
+        isExactTaskAuthority: (taskId: string) =>
+          spawnOpts.exactDockerRegistry!.isExactTask(taskId),
+      }
+    : spawnOpts;
   return trace('wait_results', () =>
-    waitForResultsImpl(projectRoot, sprint, timeoutMs, queue, spawnOpts, getChannelRegistry(), config),
+    waitForResultsImpl(
+      projectRoot,
+      sprint,
+      timeoutMs,
+      queue,
+      collectorSpawnOpts,
+      getChannelRegistry(),
+      config,
+    ),
   );
 }
 
@@ -1911,6 +1958,17 @@ export async function runSprint(
           dockerKindMemoryLimits: config.worker_memory_limit_by_kind,
         })
       : undefined);
+  const defaultBackendUsesExactDockerCustody = Boolean(
+    spawnBackend?.name === 'docker'
+    && spawnBackend.prepareExactDockerCustody
+    && spawnBackend.dispatchExactDockerCustody
+    && spawnBackend.awaitExactDockerAcceptedResult,
+  );
+  // The registry is intentionally run-scoped even when the initial plan has
+  // no Docker task. A later FIX/XFIX may be the first task whose effective
+  // backend is Docker; creating this bridge only from the initial plan would
+  // silently route that task through the retired legacy Docker path.
+  const exactDockerRegistry = createExactNormalDockerExecutionRegistry(projectRoot);
 
   const activeProvider: ProviderAdapter | null = opts?.provider ?? getDefaultProvider();
   const rollbackEnabled = opts?.rollback !== false;
@@ -2077,6 +2135,7 @@ export async function runSprint(
   let sprint: Sprint;
   let safetyPoint: SafetyPoint | null = null;
   let results: TaskResult[] = [];
+  let exactTaskProjectionAdmission: ExactTaskProjectionAdmissionV2 | undefined;
   const evaluations = new Map<string, TaskEvaluation>();
   const evaluationRuntimeState = { verificationsDispatched: 0 };
   let crossVerifyInvocationFactory = opts?.crossVerifyInvocationFactory;
@@ -2197,7 +2256,12 @@ export async function runSprint(
     // Phase 1: PLAN — see RunSprintOptions.preplannedSprint + born-672b
     // resolvePlanPhaseResult doc comments for the preplanned-vs-fresh split.
     const planResult: PlanPhaseResult = await resolvePlanPhaseResult(
-      projectRoot, config, opts, activeProvider, rollbackEnabled,
+      projectRoot,
+      config,
+      opts,
+      activeProvider,
+      rollbackEnabled,
+      defaultBackendUsesExactDockerCustody,
     );
     sprint = planResult.sprint;
     sprint.executionMode = opts?.testMode ? 'test' : 'standard';
@@ -2338,7 +2402,37 @@ export async function runSprint(
     sprint.startedAt ??= now();
     coordinatorPidRecord = establishCoordinatorPidAuthority(sprint);
     try {
-      await runExactPlanAdmissionHooks(sprint, opts);
+      const materialized = await runExactPlanAdmissionHooks(
+        sprint,
+        opts,
+        defaultBackendUsesExactDockerCustody ? 'defer' : 'publish',
+      );
+      if (defaultBackendUsesExactDockerCustody) {
+        if (!materialized) {
+          throw new BrainError(
+            'EXACT_DOCKER_TASK_PROJECTION_ADMISSION_REQUIRED',
+            SprintPhase.PLAN,
+          );
+        }
+        const expectedTaskIds = sprint.tasks.map(task => task.id);
+        if (
+          JSON.stringify(materialized.taskIds) !== JSON.stringify(expectedTaskIds)
+          || Object.entries(materialized.existingContentDigests ?? {}).some(
+            ([taskId, digest]) => !expectedTaskIds.includes(taskId) || !/^[a-f0-9]{64}$/.test(digest),
+          )
+        ) {
+          throw new BrainError(
+            'EXACT_DOCKER_TASK_PROJECTION_ADMISSION_DRIFT',
+            SprintPhase.PLAN,
+          );
+        }
+        exactTaskProjectionAdmission = Object.freeze({
+          taskIds: Object.freeze([...expectedTaskIds]),
+          existingContentDigests: Object.freeze({
+            ...(materialized.existingContentDigests ?? {}),
+          }),
+        });
+      }
     } catch (error) {
       // Exact admission is still pre-execution. A failed materialization/CAS
       // must release every leadership projection created above or a safe retry
@@ -2441,7 +2535,13 @@ export async function runSprint(
     let spawnPhaseResult: Awaited<ReturnType<typeof runSpawnPhase>>;
     try {
       spawnPhaseResult = await runSpawnPhase(
-        projectRoot, sprint, config, opts, spawnBackend,
+        projectRoot,
+        sprint,
+        config,
+        opts,
+        spawnBackend,
+        exactDockerRegistry,
+        exactTaskProjectionAdmission,
       );
     } catch (error) {
       // runSpawnPhase exhausts its retry budget only after `cleanup(...,
@@ -2620,6 +2720,8 @@ export async function runSprint(
           attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,
           providerAuthority: opts?.providerAuthority,
           evaluateCollectedResult: evaluateAndConsumeCollectedAttempt,
+          ...(exactDockerRegistry ? { exactDockerRegistry } : {}),
+          ...(exactTaskProjectionAdmission ? { exactTaskProjectionAdmission } : {}),
         },
         config,
       );
@@ -2800,7 +2902,9 @@ export async function runSprint(
               }
             } else {
               try {
-                if (spawnBackend) spawnBackend.kill(task.id);
+                const lifecycleOwner = exactDockerRegistry.resolveLifecycleOwner(task.id)
+                  ?? spawnBackend;
+                if (lifecycleOwner) lifecycleOwner.kill(task.id);
                 else {
                   const { killWorker: kw } = await import('./tmux.js');
                   kw(task.id);

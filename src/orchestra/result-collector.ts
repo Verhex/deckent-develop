@@ -6,6 +6,7 @@
 // ─── Node Builtins ─────────────────────────────────────────────────
 import { stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { types as nodeTypes } from 'node:util';
 
 // ─── Observability (Sprint 134) ───────────────────────────────────
 import { metric } from '../core/observability.js';
@@ -46,7 +47,10 @@ import type { ChannelRegistry } from '../agents/worker-ipc.js';
 import {
   writeAnswerFile,
   checkWorkerQuestions,
+  checkExactAttemptWorkerQuestions,
+  createExactAttemptIpcTransientRegistry,
   type HandleWorkerQuestionOptions,
+  type ResolveExactAttemptIpcAuthority,
 } from './ipc-registry.js';
 import { bridgeQuestionToApproval } from './question-approval-bridge.js';
 import { isDependencySatisfying, isSchedulingTerminalFailure } from './scheduler-truth.js';
@@ -87,12 +91,17 @@ import {
 import { hasLiveUsageCeiling } from '../core/live-execution-budget.js';
 import {
   readAuthoritativeTaskResult,
+  type ExactAcceptedTaskResultAuthorityMetadata,
+  type ExactTaskResultAuthorityMetadata,
   type TaskResultAuthorityRead,
 } from './task-result-authority.js';
+import type { ExactTaskTerminalDecisionAuthorityV2 } from './task-settlement-projection.js';
 
 // born-611 B-katmanı: soru-köprüsü timeout'u gate'in 5dk insan-penceresiyle hizalı
 // (bridge'in kendi default'u 60sn — insan-karar için kısa; advisor S3).
 const QUESTION_BRIDGE_TIMEOUT_MS = 5 * 60_000;
+export const EXACT_IPC_PROJECTION_HOLD_EVENT_CHANNEL =
+  'BRAIN→AUDITOR:EXACT_IPC_PROJECTION_HOLD';
 
 // ─── Spawn backend abstraction ───────────────────────────────────
 import type { SpawnBackend } from './spawn-backend.js';
@@ -130,7 +139,13 @@ import {
 } from '../nervous/respawn-request.js';
 
 // ─── Canonical Spawn Executor (SCHED3, born-634/635) ─────────────
-import { executeSpawnTask, findActiveWriteCollisions } from './scheduler-effects.js';
+import {
+  executeSpawnTask,
+  findActiveWriteCollisions,
+  type ExactNormalDockerExecutionRegistryV2,
+  type ExactTaskProjectionAdmissionV2,
+  type TaskExecutionLifecycleOwnerV2,
+} from './scheduler-effects.js';
 
 // ─── Token Counter (Sprint 196 — Task 196-005 / WP-4) ────────────
 // Orchestrator-side token-usage fill. `mergeWithWorkerClaim` /
@@ -169,7 +184,7 @@ export {
   extractTokenUsageFromClaudeCli,
   extractTokenUsageFromAnthropicResponse,
 } from './token-counter.js';
-import { DeckentError } from '../core/errors.js';
+import { DeckentError, createExecutionAuthorityError } from '../core/errors.js';
 let cachedRespawn: typeof RespawnFn | undefined;
 async function loadRespawn(): Promise<typeof RespawnFn> {
   if (!cachedRespawn) {
@@ -517,6 +532,7 @@ export function normalizeIngestedTaskId(
 interface CollectorResultRead {
   readonly result: TaskResult | null;
   readonly corruptEvidence: boolean;
+  readonly exactAcceptedAuthority: ExactAcceptedTaskResultAuthorityMetadata | null;
 }
 
 /** Single parse/identity authority for the live, timeout-race, and final sweeps. */
@@ -524,26 +540,49 @@ function readCollectorResult(
   authority: TaskResultAuthorityRead<TaskResult>,
   expectedTaskId: string,
 ): CollectorResultRead {
+  if (authority.state === 'authority-hold') {
+    throw createExecutionAuthorityError(
+      `Task ${expectedTaskId} exact result authority HOLD: ${authority.holdReason ?? 'unknown'}`,
+    );
+  }
+  if (authority.state === 'exact-settled') {
+    throw createExecutionAuthorityError(
+      `Task ${expectedTaskId} collector HOLD: terminal settlement is not accepted-result ingress`,
+    );
+  }
+  if (authority.state === 'exact-accepted' && existsSync(authority.rawResultPath)) {
+    throw createExecutionAuthorityError(
+      `Task ${expectedTaskId} exact accepted-result HOLD: unfenced public result bytes`,
+    );
+  }
   if (authority.state === 'pending-settlement') {
-    return { result: null, corruptEvidence: false };
+    return { result: null, corruptEvidence: false, exactAcceptedAuthority: null };
+  }
+  if (authority.state === 'not-dispatched') {
+    return { result: null, corruptEvidence: false, exactAcceptedAuthority: null };
   }
   let candidate: TaskResult | null = null;
-  if (authority.state === 'settled') {
+  if (authority.state === 'settled' || authority.state === 'exact-accepted') {
     candidate = normalizeAuthoritativeTaskResult(authority, expectedTaskId);
   } else if (existsSync(authority.rawResultPath)) {
     const parsed = parseTaskResultJsonTolerantly(readFileSync(authority.rawResultPath, 'utf-8'));
     if (parsed.state === 'parse-failure') {
-      return { result: createResultJsonParseFailure(expectedTaskId, parsed.reason), corruptEvidence: true };
+      return {
+        result: createResultJsonParseFailure(expectedTaskId, parsed.reason),
+        corruptEvidence: true,
+        exactAcceptedAuthority: null,
+      };
     }
     candidate = normalizeTaskResultShape(parsed.result);
     if (!candidate) {
       return {
         result: createResultJsonParseFailure(expectedTaskId, 'parsed JSON is not a TaskResult object'),
         corruptEvidence: true,
+        exactAcceptedAuthority: null,
       };
     }
   }
-  if (!candidate) return { result: null, corruptEvidence: false };
+  if (!candidate) return { result: null, corruptEvidence: false, exactAcceptedAuthority: null };
   if (candidate.taskId !== expectedTaskId) {
     return {
       result: {
@@ -554,9 +593,16 @@ function readCollectorResult(
         workerId: 'brain-result-identity-authority',
       },
       corruptEvidence: true,
+      exactAcceptedAuthority: null,
     };
   }
-  return { result: candidate, corruptEvidence: false };
+  return {
+    result: candidate,
+    corruptEvidence: false,
+    exactAcceptedAuthority: authority.state === 'exact-accepted'
+      ? authority.exactAcceptedAuthority ?? null
+      : null,
+  };
 }
 
 function normalizeAuthoritativeTaskResult(
@@ -564,8 +610,24 @@ function normalizeAuthoritativeTaskResult(
   taskId: string,
 ): TaskResult | null {
   const result = normalizeTaskResultShape(authority.result);
-  if (authority.state === 'settled' && !result) {
+  if ((authority.state === 'settled' || authority.state === 'exact-accepted') && !result) {
     throw new Error(`Invalid host-owned Docker result settlement payload for task ${taskId}`);
+  }
+  if (result && authority.state === 'exact-accepted') {
+    if (!authority.exactAcceptedAuthority) {
+      throw createExecutionAuthorityError(
+        `Task ${taskId} exact accepted result is missing authority metadata`,
+      );
+    }
+    (result as TaskResult & {
+      exactAcceptedResultAuthority?: ExactAcceptedTaskResultAuthorityMetadata;
+    }).exactAcceptedResultAuthority = authority.exactAcceptedAuthority;
+  } else if (result) {
+    // A worker/public legacy result cannot self-promote by naming this field.
+    delete (result as TaskResult & { exactAcceptedResultAuthority?: unknown })
+      .exactAcceptedResultAuthority;
+    delete (result as TaskResult & { exactSettlementAuthority?: unknown })
+      .exactSettlementAuthority;
   }
   return result;
 }
@@ -1250,6 +1312,374 @@ export function buildSpawnWriteTargets(task: Pick<Task, 'scope'>): string[] {
   return ['.tasks/', ...directories, ...filesWrite].filter(Boolean);
 }
 
+/** T11-owned terminal settlement authority over one exact accepted result. */
+export interface ExactAcceptedResultTerminalAuthorityV2 {
+  readonly schemaVersion: 2;
+  readonly kind: 'exact-accepted-result-terminal-authority-v2';
+  readonly acceptedAuthority: ExactAcceptedTaskResultAuthorityMetadata;
+  /** Must originate from readExactSettledTaskResult/core custody inspection. */
+  readonly terminalResultAuthority: ExactTaskResultAuthorityMetadata;
+  /** Must originate from the T11 receipt parser over that exact artifact. */
+  readonly terminalDecisionAuthority: ExactTaskTerminalDecisionAuthorityV2;
+}
+
+export type SettleExactAcceptedResult = (input: {
+  readonly task: Task;
+  readonly result: TaskResult;
+  readonly acceptedAuthority: ExactAcceptedTaskResultAuthorityMetadata;
+}) => ExactAcceptedResultTerminalAuthorityV2
+  | Promise<ExactAcceptedResultTerminalAuthorityV2>;
+
+export type RevalidateExactAcceptedResultTerminalAuthority = (input: {
+  readonly taskId: string;
+  readonly expectedAcceptedAuthority: ExactAcceptedTaskResultAuthorityMetadata;
+  readonly expectedTerminalAuthority: ExactAcceptedResultTerminalAuthorityV2;
+}) =>
+  | {
+      readonly state: 'current';
+      readonly terminalAuthority: ExactAcceptedResultTerminalAuthorityV2;
+    }
+  | { readonly state: 'hold'; readonly reasonCode: string }
+  | Promise<
+      | {
+          readonly state: 'current';
+          readonly terminalAuthority: ExactAcceptedResultTerminalAuthorityV2;
+        }
+      | { readonly state: 'hold'; readonly reasonCode: string }
+    >;
+
+function isSha256Digest(value: unknown): value is `sha256:${string}` {
+  return typeof value === 'string' && /^sha256:[a-f0-9]{64}$/u.test(value);
+}
+
+const EXACT_AUTHORITY_MAX_DEPTH = 12;
+const EXACT_AUTHORITY_MAX_NODES = 4096;
+const EXACT_AUTHORITY_MAX_KEYS_PER_OBJECT = 64;
+const EXACT_AUTHORITY_MAX_TOTAL_KEYS = 512;
+const EXACT_AUTHORITY_MAX_STRING_BYTES = 32 * 1024;
+const EXACT_AUTHORITY_MAX_TOTAL_STRING_BYTES = 256 * 1024;
+
+interface ExactAuthorityPlainDataBudget {
+  nodes: number;
+  keys: number;
+  stringBytes: number;
+  active: WeakSet<object>;
+}
+
+function consumeExactAuthorityString(
+  value: string,
+  budget: ExactAuthorityPlainDataBudget,
+): boolean {
+  if (value.length > EXACT_AUTHORITY_MAX_STRING_BYTES) return false;
+  const bytes = Buffer.byteLength(value, 'utf8');
+  if (bytes > EXACT_AUTHORITY_MAX_STRING_BYTES) return false;
+  budget.stringBytes += bytes;
+  return budget.stringBytes <= EXACT_AUTHORITY_MAX_TOTAL_STRING_BYTES;
+}
+
+function isPlainData(
+  value: unknown,
+  depth = 0,
+  budget: ExactAuthorityPlainDataBudget = {
+    nodes: 0,
+    keys: 0,
+    stringBytes: 0,
+    active: new WeakSet<object>(),
+  },
+): boolean {
+  budget.nodes += 1;
+  if (budget.nodes > EXACT_AUTHORITY_MAX_NODES || depth > EXACT_AUTHORITY_MAX_DEPTH) {
+    return false;
+  }
+  if (value === null) return true;
+  if (typeof value === 'string') return consumeExactAuthorityString(value, budget);
+  if (typeof value === 'boolean') return true;
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (typeof value !== 'object' || Array.isArray(value) || nodeTypes.isProxy(value)) return false;
+  if (budget.active.has(value)) return false;
+  budget.active.add(value);
+  try {
+    let keys: readonly PropertyKey[];
+    try {
+      keys = Reflect.ownKeys(value);
+    } catch {
+      return false;
+    }
+    if (keys.length > EXACT_AUTHORITY_MAX_KEYS_PER_OBJECT) return false;
+    budget.keys += keys.length;
+    if (budget.keys > EXACT_AUTHORITY_MAX_TOTAL_KEYS) return false;
+    for (const key of keys) {
+      if (typeof key !== 'string' || !consumeExactAuthorityString(key, budget)) return false;
+    }
+
+    let prototype: object | null;
+    let descriptors: Record<string, PropertyDescriptor>;
+    try {
+      prototype = Object.getPrototypeOf(value);
+      if (prototype !== Object.prototype && prototype !== null) return false;
+      descriptors = Object.getOwnPropertyDescriptors(value);
+    } catch {
+      return false;
+    }
+    return keys.every(key => {
+      const descriptor = descriptors[key as string];
+      return descriptor !== undefined
+        && descriptor.get === undefined
+        && descriptor.set === undefined
+        && descriptor.enumerable === true
+        && 'value' in descriptor
+        && isPlainData(descriptor.value, depth + 1, budget);
+    });
+  } finally {
+    budget.active.delete(value);
+  }
+}
+
+function exactKeys(value: object, expected: readonly string[]): boolean {
+  if (nodeTypes.isProxy(value)) return false;
+  let keys: readonly PropertyKey[];
+  try {
+    keys = Reflect.ownKeys(value);
+  } catch {
+    return false;
+  }
+  if (keys.length !== expected.length) return false;
+  const expectedKeys = new Set(expected);
+  return keys.every(key => typeof key === 'string' && expectedKeys.has(key));
+}
+
+function isPositiveByteLength(value: unknown): value is number {
+  return Number.isSafeInteger(value) && Number(value) > 0;
+}
+
+function isExactCustodyIdentity(value: unknown): boolean {
+  if (
+    value === null
+    || typeof value !== 'object'
+    || Array.isArray(value)
+    || !exactKeys(value, [
+      'schemaVersion',
+      'backend',
+      'projectRootSha256',
+      'projectId',
+      'taskId',
+      'attemptId',
+      'generation',
+    ])
+    || !isPlainData(value)
+  ) return false;
+  const identity = value as Record<string, unknown>;
+  return identity.schemaVersion === 2
+    && identity.backend === 'docker'
+    && typeof identity.projectRootSha256 === 'string'
+    && /^[a-f0-9]{64}$/u.test(identity.projectRootSha256)
+    && typeof identity.projectId === 'string'
+    && identity.projectId.length > 0
+    && typeof identity.taskId === 'string'
+    && identity.taskId.length > 0
+    && typeof identity.attemptId === 'string'
+    && identity.attemptId.length > 0
+    && Number.isSafeInteger(identity.generation)
+    && Number(identity.generation) > 0;
+}
+
+function isExactAuthorityArtifact(value: unknown): boolean {
+  if (
+    value === null
+    || typeof value !== 'object'
+    || Array.isArray(value)
+    || !exactKeys(value, [
+      'artifactReceiptDigest',
+      'chainDigest',
+      'artifactSha256',
+      'byteLength',
+    ])
+    || !isPlainData(value)
+  ) return false;
+  const artifact = value as Record<string, unknown>;
+  return isSha256Digest(artifact.artifactReceiptDigest)
+    && isSha256Digest(artifact.chainDigest)
+    && isSha256Digest(artifact.artifactSha256)
+    && isPositiveByteLength(artifact.byteLength);
+}
+
+function isExactAcceptedAuthorityMetadata(
+  value: unknown,
+): value is ExactAcceptedTaskResultAuthorityMetadata {
+  if (
+    value === null
+    || typeof value !== 'object'
+    || Array.isArray(value)
+    || !exactKeys(value, [
+      'executionMode',
+      'identity',
+      'admissionReceiptDigest',
+      'acceptedResultRef',
+      'acceptedResultChainDigest',
+      'resultDigest',
+    ])
+    || !isPlainData(value)
+  ) return false;
+  const accepted = value as Record<string, unknown>;
+  const ref = accepted.acceptedResultRef;
+  if (
+    !isExactCustodyIdentity(accepted.identity)
+    || ref === null
+    || typeof ref !== 'object'
+    || Array.isArray(ref)
+    || !exactKeys(ref, [
+      'schemaVersion',
+      'kind',
+      'identity',
+      'artifactKey',
+      'artifactReceiptDigest',
+    ])
+    || !isPlainData(ref)
+  ) return false;
+  const acceptedRef = ref as Record<string, unknown>;
+  return accepted.executionMode === 'normal-docker'
+    && isSha256Digest(accepted.admissionReceiptDigest)
+    && acceptedRef.schemaVersion === 2
+    && acceptedRef.kind === 'task-accepted-result-v2-ref'
+    && isExactCustodyIdentity(acceptedRef.identity)
+    && JSON.stringify(acceptedRef.identity) === JSON.stringify(accepted.identity)
+    && typeof acceptedRef.artifactKey === 'string'
+    && acceptedRef.artifactKey.length > 0
+    && isSha256Digest(acceptedRef.artifactReceiptDigest)
+    && isSha256Digest(accepted.acceptedResultChainDigest)
+    && isSha256Digest(accepted.resultDigest);
+}
+
+function isExactTerminalAuthorityMetadata(
+  value: unknown,
+): value is ExactTaskResultAuthorityMetadata {
+  if (
+    value === null
+    || typeof value !== 'object'
+    || Array.isArray(value)
+    || !exactKeys(value, [
+      'executionMode',
+      'identity',
+      'admissionReceiptDigest',
+      'settlementRef',
+      'settlementDigest',
+      'resultDigest',
+      'acceptedResultChainDigest',
+      'evaluationChainDigest',
+      'finalizerChainDigest',
+      'evaluationArtifact',
+      'finalizerArtifact',
+    ])
+    || !isPlainData(value)
+  ) return false;
+  const terminal = value as Record<string, unknown>;
+  const ref = terminal.settlementRef;
+  if (
+    !isExactCustodyIdentity(terminal.identity)
+    || ref === null
+    || typeof ref !== 'object'
+    || Array.isArray(ref)
+    || !exactKeys(ref, [
+      'schemaVersion',
+      'kind',
+      'identity',
+      'artifactKey',
+      'artifactReceiptDigest',
+    ])
+    || !isPlainData(ref)
+  ) return false;
+  const settlementRef = ref as Record<string, unknown>;
+  return terminal.executionMode === 'normal-docker'
+    && isSha256Digest(terminal.admissionReceiptDigest)
+    && settlementRef.schemaVersion === 2
+    && settlementRef.kind === 'task-result-settlement-v2-ref'
+    && isExactCustodyIdentity(settlementRef.identity)
+    && JSON.stringify(settlementRef.identity) === JSON.stringify(terminal.identity)
+    && typeof settlementRef.artifactKey === 'string'
+    && settlementRef.artifactKey.length > 0
+    && isSha256Digest(settlementRef.artifactReceiptDigest)
+    && isSha256Digest(terminal.settlementDigest)
+    && isSha256Digest(terminal.resultDigest)
+    && isSha256Digest(terminal.acceptedResultChainDigest)
+    && isSha256Digest(terminal.evaluationChainDigest)
+    && isSha256Digest(terminal.finalizerChainDigest)
+    && isExactAuthorityArtifact(terminal.evaluationArtifact)
+    && isExactAuthorityArtifact(terminal.finalizerArtifact);
+}
+
+function isExactAcceptedResultTerminalAuthority(
+  value: unknown,
+  expected: ExactAcceptedTaskResultAuthorityMetadata,
+): value is ExactAcceptedResultTerminalAuthorityV2 {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+  if (!exactKeys(value, [
+    'schemaVersion',
+    'kind',
+    'acceptedAuthority',
+    'terminalResultAuthority',
+    'terminalDecisionAuthority',
+  ]) || !isPlainData(value)) return false;
+  const candidate = value as Partial<ExactAcceptedResultTerminalAuthorityV2>;
+  const terminal = candidate.terminalResultAuthority;
+  const decision = candidate.terminalDecisionAuthority;
+  return candidate.schemaVersion === 2
+    && candidate.kind === 'exact-accepted-result-terminal-authority-v2'
+    && isExactAcceptedAuthorityMetadata(candidate.acceptedAuthority)
+    && JSON.stringify(candidate.acceptedAuthority) === JSON.stringify(expected)
+    && isExactTerminalAuthorityMetadata(terminal)
+    && decision !== undefined
+    && exactKeys(decision, [
+      'schemaVersion',
+      'kind',
+      'identity',
+      'evaluationReceipt',
+      'finalizerReceipt',
+    ])
+    && exactKeys(decision.evaluationReceipt, [
+      'verdict',
+      'artifactReceiptDigest',
+      'artifactSha256',
+      'byteLength',
+      'chainDigest',
+    ])
+    && exactKeys(decision.finalizerReceipt, [
+      'state',
+      'artifactReceiptDigest',
+      'artifactSha256',
+      'byteLength',
+      'chainDigest',
+    ])
+    && isExactCustodyIdentity(decision.identity)
+    && JSON.stringify(terminal.identity) === JSON.stringify(expected.identity)
+    && terminal.admissionReceiptDigest === expected.admissionReceiptDigest
+    && terminal.acceptedResultChainDigest === expected.acceptedResultChainDigest
+    && terminal.resultDigest === expected.resultDigest
+    && isSha256Digest(terminal.settlementDigest)
+    && JSON.stringify(terminal.settlementRef.identity) === JSON.stringify(expected.identity)
+    && JSON.stringify(decision.identity) === JSON.stringify(expected.identity)
+    && (
+      decision.evaluationReceipt.verdict === 'DONE'
+      || decision.evaluationReceipt.verdict === 'GO_WITH_TECH_DEBT'
+      || decision.evaluationReceipt.verdict === 'NO_GO'
+    )
+    && decision.evaluationReceipt.artifactReceiptDigest
+      === terminal.evaluationArtifact.artifactReceiptDigest
+    && decision.evaluationReceipt.artifactSha256
+      === terminal.evaluationArtifact.artifactSha256
+    && decision.evaluationReceipt.byteLength === terminal.evaluationArtifact.byteLength
+    && decision.evaluationReceipt.chainDigest === terminal.evaluationChainDigest
+    && decision.evaluationReceipt.chainDigest === terminal.evaluationArtifact.chainDigest
+    && decision.finalizerReceipt.state === 'terminal-ready'
+    && decision.finalizerReceipt.artifactReceiptDigest
+      === terminal.finalizerArtifact.artifactReceiptDigest
+    && decision.finalizerReceipt.artifactSha256 === terminal.finalizerArtifact.artifactSha256
+    && decision.finalizerReceipt.byteLength === terminal.finalizerArtifact.byteLength
+    && decision.finalizerReceipt.chainDigest === terminal.finalizerChainDigest
+    && decision.finalizerReceipt.chainDigest === terminal.finalizerArtifact.chainDigest;
+}
+
 /**
  * Wait for task result files to appear on disk using fs.watch with fallback polling.
  * Supports queued task execution: as workers finish, queued tasks are spawned.
@@ -1284,6 +1714,23 @@ export async function waitForResults(
       task: Task,
       result: TaskResult,
     ) => Promise<TaskEvaluation>;
+    /** T11 injection port. Exact accepted results cannot use the raw evaluator above. */
+    settleExactAcceptedResult?: SettleExactAcceptedResult;
+    /** T11 canonical Store/receipt revalidation before and after status mutation. */
+    revalidateExactAcceptedResultTerminalAuthority?:
+      RevalidateExactAcceptedResultTerminalAuthority;
+    /** Exact-attempt result authority injected by the normal Docker producer. */
+    readTaskResultAuthority?: (taskId: string) => TaskResultAuthorityRead<TaskResult>;
+    /** Explicit IPC migration boundary; normal Docker never reads public question bytes. */
+    ipcExecutionMode?: 'normal-docker' | 'legacy-non-docker';
+    /** Per-task ownership for mixed backend runs; absent keeps legacy all-exact behavior. */
+    isExactTaskAuthority?: (taskId: string) => boolean;
+    /** Process-local exact-attempt question/answer authority from the producer. */
+    resolveExactAttemptIpcAuthority?: ResolveExactAttemptIpcAuthority;
+    /** Run-scoped normal-Docker accepted-result and dependency bridge. */
+    exactDockerRegistry?: ExactNormalDockerExecutionRegistryV2;
+    /** Exact-plan public task state captured before per-task admission. */
+    exactTaskProjectionAdmission?: ExactTaskProjectionAdmissionV2;
   },
   channelRegistry?: ChannelRegistry,
   config?: ResolvedConfig,
@@ -1311,6 +1758,20 @@ export async function waitForResults(
     kind: 'auth' | 'usage-limit';
     sourceTaskId: string;
   }>();
+  const emittedExactIpcProjectionHolds = new Set<string>();
+  const exactAttemptIpcTransientRegistry = spawnOpts?.ipcExecutionMode === 'normal-docker'
+    ? createExactAttemptIpcTransientRegistry(projectRoot)
+    : null;
+  const readResultAuthority = (taskId: string): TaskResultAuthorityRead<TaskResult> => {
+    const exactReader = spawnOpts?.readTaskResultAuthority;
+    if (exactReader) return exactReader(taskId);
+    if (spawnOpts?.ipcExecutionMode === 'normal-docker') {
+      throw createExecutionAuthorityError(
+        `Task ${taskId} exact result authority HOLD: PRIVATE_RESULT_AUTHORITY_UNAVAILABLE`,
+      );
+    }
+    return readAuthoritativeTaskResult<TaskResult>(projectRoot, taskId);
+  };
   const recordProviderDispatchHold = (
     task: Task | undefined,
     taskId: string,
@@ -1396,16 +1857,124 @@ export async function waitForResults(
   const FORCE_RESCAN_IDLE_MS = 5 * 60 * 1000; // 5 minutes
 
   // ─── In-memory aggregate settlement sync ─────────────────────────
-  // Dependency scheduling is authorized by Brain's host-owned evaluation,
-  // never by the worker's mutable selfAssessment. Production injects the
-  // evaluator above; the fallback exists only for backwards-compatible,
-  // isolated collector callers that do not own the sprint lifecycle.
+  // Exact accepted results remain non-terminal until T11 supplies durable
+  // evaluation receipt authority. The callback and selfAssessment fallback
+  // below are legacy-only compatibility paths and cannot release dependents
+  // for an exact normal-Docker attempt.
   const syncTaskStatusFromResult = async (
     taskId: string,
     result: TaskResult,
+    exactAcceptedAuthority: ExactAcceptedTaskResultAuthorityMetadata | null,
   ): Promise<void> => {
     const taskRef = taskMap.get(taskId);
     if (!taskRef) return;
+    if (exactAcceptedAuthority) {
+      if (
+        !spawnOpts?.settleExactAcceptedResult
+        || !spawnOpts.revalidateExactAcceptedResultTerminalAuthority
+      ) {
+        throw createExecutionAuthorityError(
+          `Task ${taskId} exact accepted-result HOLD: terminal settlement authority is required`,
+        );
+      }
+      let evaluated: ExactAcceptedResultTerminalAuthorityV2;
+      try {
+        evaluated = await spawnOpts.settleExactAcceptedResult({
+          task: taskRef,
+          result,
+          acceptedAuthority: exactAcceptedAuthority,
+        });
+      } catch (error) {
+        throw createExecutionAuthorityError(
+          `Task ${taskId} exact accepted-result terminal HOLD: `
+          + `${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+      if (!isExactAcceptedResultTerminalAuthority(evaluated, exactAcceptedAuthority)) {
+        throw createExecutionAuthorityError(
+          `Task ${taskId} exact accepted-result terminal HOLD: foreign or invalid settlement authority`,
+        );
+      }
+      const revalidate = async (): Promise<void> => {
+        let validation;
+        try {
+          validation = await spawnOpts.revalidateExactAcceptedResultTerminalAuthority!({
+            taskId,
+            expectedAcceptedAuthority: exactAcceptedAuthority,
+            expectedTerminalAuthority: evaluated,
+          });
+        } catch (error) {
+          throw createExecutionAuthorityError(
+            `Task ${taskId} exact accepted-result terminal revalidation HOLD: `
+            + `${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+        if (validation === null || typeof validation !== 'object' || Array.isArray(validation)) {
+          throw createExecutionAuthorityError(
+            `Task ${taskId} exact accepted-result terminal revalidation HOLD: invalid-authority`,
+          );
+        }
+        const holdShape = exactKeys(validation, ['state', 'reasonCode']);
+        const currentShape = exactKeys(validation, ['state', 'terminalAuthority']);
+        if ((!holdShape && !currentShape) || !isPlainData(validation)) {
+          throw createExecutionAuthorityError(
+            `Task ${taskId} exact accepted-result terminal revalidation HOLD: invalid-authority`,
+          );
+        }
+        if (validation.state === 'hold') {
+          if (
+            !holdShape
+            || typeof validation.reasonCode !== 'string'
+            || validation.reasonCode.length === 0
+          ) {
+            throw createExecutionAuthorityError(
+              `Task ${taskId} exact accepted-result terminal revalidation HOLD: invalid-authority`,
+            );
+          }
+          throw createExecutionAuthorityError(
+            `Task ${taskId} exact accepted-result terminal revalidation HOLD: `
+            + validation.reasonCode,
+          );
+        }
+        if (
+          validation.state !== 'current'
+          || !currentShape
+          || !isExactAcceptedResultTerminalAuthority(
+            validation.terminalAuthority,
+            exactAcceptedAuthority,
+          )
+          || JSON.stringify(validation.terminalAuthority) !== JSON.stringify(evaluated)
+        ) {
+          throw createExecutionAuthorityError(
+            `Task ${taskId} exact accepted-result terminal revalidation HOLD: authority-changed`,
+          );
+        }
+      };
+      await revalidate();
+      const previousStatus = taskRef.status;
+      taskRef.status = evaluated.terminalDecisionAuthority.evaluationReceipt.verdict === 'NO_GO'
+        ? TaskStatus.NO_GO
+        : TaskStatus.DONE;
+      try {
+        await revalidate();
+      } catch (error) {
+        taskRef.status = previousStatus;
+        throw error;
+      }
+      try {
+        spawnOpts.exactDockerRegistry?.recordTerminalDecision(
+          taskId,
+          evaluated.terminalDecisionAuthority.evaluationReceipt.verdict,
+        );
+      } catch (error) {
+        taskRef.status = previousStatus;
+        throw createExecutionAuthorityError(
+          `Task ${taskId} exact terminal decision registry HOLD: `
+          + `${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+      return;
+    }
     if (spawnOpts?.evaluateCollectedResult) {
       const evaluation = await spawnOpts.evaluateCollectedResult(taskRef, result);
       taskRef.status =
@@ -1425,20 +1994,30 @@ export async function waitForResults(
     let terminalRecoveryAttempted = false;
     for (const taskId of taskIds) {
       if (collected.has(taskId)) continue;
-      let authority = readAuthoritativeTaskResult<TaskResult>(projectRoot, taskId);
+      let authority = readResultAuthority(taskId);
       if (
         !terminalRecoveryAttempted
         && authority.state === 'pending-settlement'
         && hasMalformedRawResult(authority.rawResultPath)
-        && spawnOpts?.spawnBackend?.reconcilePendingAttempts
+        && resolveTaskLifecycleOwner(taskId)?.reconcilePendingAttempts
       ) {
         terminalRecoveryAttempted = true;
         try {
-          await spawnOpts.spawnBackend.reconcilePendingAttempts({ mode: 'terminal-only' });
-          authority = readAuthoritativeTaskResult<TaskResult>(projectRoot, taskId);
+          await resolveTaskLifecycleOwner(taskId)!.reconcilePendingAttempts!({ mode: 'terminal-only' });
+          authority = readResultAuthority(taskId);
         } catch (e) {
           debugLog('collectResults:liveTerminalRecovery', e);
         }
+      }
+      if (authority.state === 'not-dispatched') {
+        if (authority.attemptCount !== 0) {
+          throw createExecutionAuthorityError(
+            `Task ${taskId} not-dispatched authority attempted to mint execution`,
+          );
+        }
+        collected.add(taskId);
+        newlyCollected.push(taskId);
+        continue;
       }
       const collectorRead = readCollectorResult(authority, taskId);
       if (collectorRead.result) {
@@ -1525,13 +2104,18 @@ export async function waitForResults(
           const enrichTask = taskMap.get(taskId);
           const backendName = spawnOpts?.spawnBackend?.name ?? config?.spawn_backend;
           const postExitLogBackend = backendName === 'docker' || backendName === 'tmux';
-          if (enrichTask && postExitLogBackend && CLI_USAGE_LOG_PROVIDERS.has(enrichTask.provider as string)) {
+          if (
+            !collectorRead.exactAcceptedAuthority
+            && enrichTask
+            && postExitLogBackend
+            && CLI_USAGE_LOG_PROVIDERS.has(enrichTask.provider as string)
+          ) {
             // The .log is dumped only after the container exits, which can lag the
             // agent-written .result by 20-30s on a multi-turn task — wait generously
             // (returns the instant the .log appears, so prompt dumps cost nothing).
             await waitForCliLog(projectRoot, taskId, 45000);
           }
-          if (!collectorRead.corruptEvidence) {
+          if (!collectorRead.corruptEvidence && !collectorRead.exactAcceptedAuthority) {
             await waitForBudgetTerminal(enrichTask, taskId, result);
             enrichResultTokenUsage(result, enrichTask, projectRoot);
             enrichResultCost(result, enrichTask, projectRoot, config?.auth_mode);
@@ -1554,13 +2138,17 @@ export async function waitForResults(
           // supplies VERIFIED/HOLD evidence; legacy/unattributed results retain
           // their own non-authoritative counters and cannot gain verdict/KPI
           // weight from neighboring attempts.
-          sanitizeResultHostFacingFiles(projectRoot, sprint.id, taskId, result.filesChanged);
+          if (!collectorRead.exactAcceptedAuthority) {
+            sanitizeResultHostFacingFiles(projectRoot, sprint.id, taskId, result.filesChanged);
+          }
           // Persist the orchestrator-enriched tokenUsage + cost back to the .result FILE.
           // enrichResultTokenUsage/enrichResultCost mutate the in-memory result only;
           // without this write the on-disk .result keeps the worker's 0/0 placeholder.
-          if (!collectorRead.corruptEvidence) persistEnrichedResult(projectRoot, result);
+          if (!collectorRead.corruptEvidence && !collectorRead.exactAcceptedAuthority) {
+            persistEnrichedResult(projectRoot, result);
+          }
           reportResultContractDrift(projectRoot, sprint.id, taskId, result, config);
-          await syncTaskStatusFromResult(taskId, result);
+          await syncTaskStatusFromResult(taskId, result, collectorRead.exactAcceptedAuthority);
           if (result.preDispatchSettlement) {
             const reasonCode = result.preDispatchSettlement.reasonCode;
             const disposition = isHostPreDispatchReasonCode(reasonCode)
@@ -1615,21 +2203,25 @@ export async function waitForResults(
         // Sprint 145: Check if EXIT trap already wrote a .result (e.g. TIMEOUT_WITH_WORK)
         // before overwriting with synthetic NO_GO. The EXIT trap runs between timeout kill
         // and result collection, so .result may appear after the first resultExists check.
-        const lateAuthority = readAuthoritativeTaskResult<TaskResult>(projectRoot, taskId);
+        const lateAuthority = readResultAuthority(taskId);
         const lateRead = readCollectorResult(lateAuthority, taskId);
         const lateResult = lateRead.result;
         if (lateResult) {
-          if (!lateRead.corruptEvidence) {
+          if (!lateRead.corruptEvidence && !lateRead.exactAcceptedAuthority) {
             await waitForBudgetTerminal(taskMap.get(taskId), taskId, lateResult);
             enrichResultTokenUsage(lateResult, taskMap.get(taskId), projectRoot);
             enrichResultCost(lateResult, taskMap.get(taskId), projectRoot, config?.auth_mode);
             applyBudgetEvidence(taskMap.get(taskId), lateResult, taskId);
           }
-          sanitizeResultHostFacingFiles(projectRoot, sprint.id, taskId, lateResult.filesChanged);
+          if (!lateRead.exactAcceptedAuthority) {
+            sanitizeResultHostFacingFiles(projectRoot, sprint.id, taskId, lateResult.filesChanged);
+          }
           // Persist enriched tokenUsage + cost to the .result FILE (see above).
-          if (!lateRead.corruptEvidence) persistEnrichedResult(projectRoot, lateResult);
+          if (!lateRead.corruptEvidence && !lateRead.exactAcceptedAuthority) {
+            persistEnrichedResult(projectRoot, lateResult);
+          }
           reportResultContractDrift(projectRoot, sprint.id, taskId, lateResult, config);
-          await syncTaskStatusFromResult(taskId, lateResult);
+          await syncTaskStatusFromResult(taskId, lateResult, lateRead.exactAcceptedAuthority);
           results.push(lateResult);
           collected.add(taskId);
           newlyCollected.push(taskId);
@@ -1702,7 +2294,7 @@ export async function waitForResults(
             'utf-8',
           );
         } catch (e) { debugLog('collectResults:writeTimeoutResult', e); }
-        await syncTaskStatusFromResult(taskId, syntheticResult);
+        await syncTaskStatusFromResult(taskId, syntheticResult, null);
         results.push(syntheticResult);
         collected.add(taskId);
         newlyCollected.push(taskId);
@@ -1788,6 +2380,10 @@ export async function waitForResults(
   };
 
   const queueBackend = spawnOpts?.spawnBackend;
+  const resolveTaskLifecycleOwner = (
+    taskId: string,
+  ): TaskExecutionLifecycleOwnerV2 | undefined =>
+    spawnOpts?.exactDockerRegistry?.resolveLifecycleOwner(taskId) ?? queueBackend;
   const vanishedWorkerSince = new Map<string, number>();
   const configuredHeartbeatSeconds = (config as (ResolvedConfig & { heartbeat_timeout?: number }) | undefined)
     ?.heartbeat_timeout;
@@ -1802,18 +2398,28 @@ export async function waitForResults(
    * Docker gets one terminal reconciliation before a legacy timeout marker is
    * authored. A still-pending settlement is surfaced as an authority fault,
    * never waited forever.
-   */
+  */
   const reapVanishedWorkers = async (): Promise<void> => {
-    if (!queueBackend) return;
-    let active: ReadonlySet<string>;
-    try {
-      active = new Set(queueBackend.list());
-    } catch (error) {
-      debugLog('reapVanishedWorkers:list', error);
-      return;
-    }
+    if (!queueBackend && !spawnOpts?.exactDockerRegistry) return;
+    const activeByOwner = new Map<
+      TaskExecutionLifecycleOwnerV2,
+      ReadonlySet<string> | null
+    >();
     const nowMs = Date.now();
     for (const task of sprint.tasks) {
+      const lifecycleOwner = resolveTaskLifecycleOwner(task.id);
+      if (!lifecycleOwner) continue;
+      let active = activeByOwner.get(lifecycleOwner);
+      if (active === undefined) {
+        try {
+          active = new Set(lifecycleOwner.list());
+        } catch (error) {
+          debugLog('reapVanishedWorkers:list', error);
+          active = null;
+        }
+        activeByOwner.set(lifecycleOwner, active);
+      }
+      if (active === null) continue;
       const inFlight = task.status === TaskStatus.EXECUTING
         || task.status === TaskStatus.CLAIMED
         || task.status === TaskStatus.TESTING
@@ -1822,7 +2428,7 @@ export async function waitForResults(
         vanishedWorkerSince.delete(task.id);
         continue;
       }
-      const inventoryState = queueBackend.workerInventoryState?.(task.id) ?? 'absent';
+      const inventoryState = lifecycleOwner.workerInventoryState?.(task.id) ?? 'absent';
       if (inventoryState === 'unknown') {
         // A restarted process-local backend has no durable inventory of children
         // born under the previous coordinator. Absence from its empty map is not
@@ -1838,10 +2444,10 @@ export async function waitForResults(
       }
       if (nowMs - absentSince < vanishedWorkerGraceMs) continue;
 
-      if (queueBackend.reconcilePendingAttempts) {
-        await queueBackend.reconcilePendingAttempts({ mode: 'terminal-only' });
+      if (lifecycleOwner.reconcilePendingAttempts) {
+        await lifecycleOwner.reconcilePendingAttempts({ mode: 'terminal-only' });
       }
-      const authority = readAuthoritativeTaskResult<TaskResult>(projectRoot, task.id);
+      const authority = readResultAuthority(task.id);
       if (authority.result) {
         vanishedWorkerSince.delete(task.id);
         continue;
@@ -1855,11 +2461,11 @@ export async function waitForResults(
         taskId: task.id,
         reasonCode: 'BACKEND_WORKER_VANISHED',
         observedAt: new Date(nowMs).toISOString(),
-        backend: queueBackend.name,
+        backend: lifecycleOwner.name,
       }, null, 2), 'utf-8');
       renameSync(tmpPath, timeoutPath);
       vanishedWorkerSince.delete(task.id);
-      metric('worker.vanished_reaped', 1, { taskId: task.id, backend: queueBackend.name });
+      metric('worker.vanished_reaped', 1, { taskId: task.id, backend: lifecycleOwner.name });
     }
   };
 
@@ -1914,6 +2520,10 @@ export async function waitForResults(
           resolveSkillPrompts,
           buildWriteTargets: buildSpawnWriteTargets,
           collisionAuthority: { tasks: sprint.tasks, collectedIds: collected },
+          exactDockerRegistry: spawnOpts?.exactDockerRegistry,
+          ...(spawnOpts?.exactTaskProjectionAdmission
+            ? { exactTaskProjectionAdmission: spawnOpts.exactTaskProjectionAdmission }
+            : {}),
         },
       );
 
@@ -2027,7 +2637,8 @@ export async function waitForResults(
         && task.status !== TaskStatus.TESTING
       ) continue;
       try {
-        if (queueBackend) queueBackend.kill(reqTaskId);
+        const lifecycleOwner = resolveTaskLifecycleOwner(reqTaskId);
+        if (lifecycleOwner) lifecycleOwner.kill(reqTaskId);
         else killWorker(reqTaskId);
       } catch (e) {
         debugLog('drainNervousRespawns:kill', e);
@@ -2063,7 +2674,8 @@ export async function waitForResults(
       const nextTask = pickFromQueue(remainingQueue, assignedTaskIds);
       if (!nextTask) break; // queue exhausted — preserve "no kill when no work" contract
       try {
-        if (queueBackend) queueBackend.kill(taskId);
+        const lifecycleOwner = resolveTaskLifecycleOwner(taskId);
+        if (lifecycleOwner) lifecycleOwner.kill(taskId);
         else killWorker(taskId);
       } catch (e) { debugLog('processQueue:killWorker', e); }
       await spawnIfNotAssigned(nextTask);
@@ -2161,7 +2773,7 @@ export async function waitForResults(
       if (!result) {
         try {
           result = readCollectorResult(
-            readAuthoritativeTaskResult<TaskResult>(projectRoot, taskId),
+            readResultAuthority(taskId),
             taskId,
           ).result ?? undefined;
         } catch (e) {
@@ -2263,7 +2875,7 @@ export async function waitForResults(
             'utf-8',
           );
         } catch (e) { debugLog('cascadeSkipDeadBlocked:write', e); }
-        await syncTaskStatusFromResult(t.id, skip);
+        await syncTaskStatusFromResult(t.id, skip, null);
         results.push(skip);
         collected.add(t.id);
         dispositionTerminalIds.add(t.id);
@@ -2389,9 +3001,14 @@ export async function waitForResults(
       resolveSkillPrompts,
       buildWriteTargets: buildSpawnWriteTargets,
       collisionAuthority: { tasks: sprint.tasks, collectedIds: collected },
+      exactDockerRegistry: spawnOpts?.exactDockerRegistry,
+      ...(spawnOpts?.exactTaskProjectionAdmission
+        ? { exactTaskProjectionAdmission: spawnOpts.exactTaskProjectionAdmission }
+        : {}),
     },
     killWorker: (taskId: string) => {
-      if (queueBackend) queueBackend.kill(taskId);
+      const lifecycleOwner = resolveTaskLifecycleOwner(taskId);
+      if (lifecycleOwner) lifecycleOwner.kill(taskId);
       else killWorker(taskId);
     },
   });
@@ -2581,6 +3198,9 @@ export async function waitForResults(
         // scheduler fault. Generic tick armor must never turn its typed HOLD
         // into a retry, a timeout, or a successful partial collection.
         if (isProviderExecutionIngressHoldError(tickErr)) throw tickErr;
+        if (tickErr instanceof DeckentError && tickErr.code === 'DECKENT_E077') {
+          throw tickErr;
+        }
         const signature = tickErr instanceof Error
           ? `${tickErr.name}:${tickErr.message}`
           : String(tickErr);
@@ -2628,10 +3248,85 @@ export async function waitForResults(
       )) break;
       // Check for pending worker questions and auto-answer them
       // (sprintId → NPM-ADVISORY questions surface a human notification)
-      checkWorkerQuestions(projectRoot, taskIds, collected, {
-        sprintId: sprint.id,
-        ...(questionBridgeWire?.options ?? {}),
-      });
+      if (spawnOpts?.ipcExecutionMode === 'normal-docker') {
+        const exactTaskIds = spawnOpts.isExactTaskAuthority
+          ? new Set([...taskIds].filter(taskId => spawnOpts.isExactTaskAuthority!(taskId)))
+          : taskIds;
+        const legacyTaskIds = spawnOpts.isExactTaskAuthority
+          ? new Set([...taskIds].filter(taskId => !spawnOpts.isExactTaskAuthority!(taskId)))
+          : new Set<string>();
+        const exactCollected = new Set(
+          [...collected].filter(taskId => exactTaskIds.has(taskId)),
+        );
+        if (exactTaskIds.size > 0 && !spawnOpts.resolveExactAttemptIpcAuthority) {
+          throw createExecutionAuthorityError(
+            'Normal Docker IPC HOLD: PRIVATE_IPC_AUTHORITY_UNAVAILABLE',
+          );
+        }
+        const report = exactTaskIds.size > 0
+          ? await checkExactAttemptWorkerQuestions(
+              projectRoot,
+              exactTaskIds,
+              exactCollected,
+              {
+                resolveAuthority: spawnOpts.resolveExactAttemptIpcAuthority!,
+                transientRegistry: exactAttemptIpcTransientRegistry!,
+                sprintId: sprint.id,
+                ...(questionBridgeWire?.options ?? {}),
+              },
+            )
+          : {
+              answered: [], pending: [], notDispatched: [], holds: [], projectionHolds: [],
+            };
+        for (const projectionHold of report.projectionHolds) {
+          const dedupeKey = [
+            projectionHold.taskId,
+            projectionHold.direction,
+            projectionHold.reasonCode,
+          ].join('\0');
+          if (emittedExactIpcProjectionHolds.has(dedupeKey)) continue;
+          try {
+            const event = writeEvent(
+              projectRoot,
+              sprint.id,
+              'brain',
+              'auditor',
+              EXACT_IPC_PROJECTION_HOLD_EVENT_CHANNEL,
+              {
+                schemaVersion: 1,
+                kind: 'exact-ipc-compatibility-projection-hold',
+                taskId: projectionHold.taskId,
+                direction: projectionHold.direction,
+                reasonCode: projectionHold.reasonCode,
+              },
+            );
+            if (event) emittedExactIpcProjectionHolds.add(dedupeKey);
+          } catch (error) {
+            debugLog('waitForResults:exactIpcProjectionHoldEvent', error);
+          }
+        }
+        if (report.holds.length > 0) {
+          const hold = report.holds[0]!;
+          throw createExecutionAuthorityError(
+            `Task ${hold.taskId} exact IPC HOLD: ${hold.reasonCode}`,
+          );
+        }
+        if (legacyTaskIds.size > 0) {
+          checkWorkerQuestions(projectRoot, legacyTaskIds, collected, {
+            sprintId: sprint.id,
+            ...(questionBridgeWire?.options ?? {}),
+          });
+        }
+      } else if (spawnOpts?.ipcExecutionMode === 'legacy-non-docker') {
+        checkWorkerQuestions(projectRoot, taskIds, collected, {
+          sprintId: sprint.id,
+          ...(questionBridgeWire?.options ?? {}),
+        });
+      } else {
+        throw createExecutionAuthorityError(
+          'Result collector IPC HOLD: IPC_EXECUTION_MODE_UNAVAILABLE',
+        );
+      }
       // Periodic progress log (every 5 minutes)
       const now = Date.now();
       if (now - lastProgressLog >= PROGRESS_LOG_INTERVAL_MS) {
@@ -2656,12 +3351,21 @@ export async function waitForResults(
   // Note: Only read .result files here (not .timeout) to avoid side effects in edge cases
   for (const taskId of taskIds) {
     if (collected.has(taskId)) continue;
-    const finalAuthority = readAuthoritativeTaskResult<TaskResult>(projectRoot, taskId);
+    const finalAuthority = readResultAuthority(taskId);
+    if (finalAuthority.state === 'not-dispatched') {
+      if (finalAuthority.attemptCount !== 0) {
+        throw createExecutionAuthorityError(
+          `Task ${taskId} not-dispatched authority attempted to mint execution`,
+        );
+      }
+      collected.add(taskId);
+      continue;
+    }
     const finalRead = readCollectorResult(finalAuthority, taskId);
     if (finalRead.result) {
       const result = finalRead.result;
       if (result) {
-        if (!finalRead.corruptEvidence) {
+        if (!finalRead.corruptEvidence && !finalRead.exactAcceptedAuthority) {
           await waitForBudgetTerminal(taskMap.get(taskId), taskId, result);
           enrichResultTokenUsage(result, taskMap.get(taskId), projectRoot);
           enrichResultCost(result, taskMap.get(taskId), projectRoot, config?.auth_mode);
@@ -2671,10 +3375,14 @@ export async function waitForResults(
         // worker whose real .result lands only after the watcher closed is a
         // genuine worker-sourced filesChanged, same source as branches (a)/(b).
         // The helper is idempotent + guarded, so this is harmless if already swept.
-        sanitizeResultHostFacingFiles(projectRoot, sprint.id, taskId, result.filesChanged);
+        if (!finalRead.exactAcceptedAuthority) {
+          sanitizeResultHostFacingFiles(projectRoot, sprint.id, taskId, result.filesChanged);
+        }
         // Persist enriched tokenUsage + cost to the .result FILE (see above).
-        if (!finalRead.corruptEvidence) persistEnrichedResult(projectRoot, result);
-        await syncTaskStatusFromResult(taskId, result);
+        if (!finalRead.corruptEvidence && !finalRead.exactAcceptedAuthority) {
+          persistEnrichedResult(projectRoot, result);
+        }
+        await syncTaskStatusFromResult(taskId, result, finalRead.exactAcceptedAuthority);
         results.push(result);
         collected.add(taskId);
       }
@@ -2685,4 +3393,8 @@ export async function waitForResults(
 
 // ═══ Worker Question Handling ════════════════════════════════════════
 // Sprint 135 T-004: Moved to ipc-registry.ts. Re-exported here for backward compat.
-export { handleWorkerQuestion, checkWorkerQuestions } from './ipc-registry.js';
+export {
+  handleWorkerQuestion,
+  checkWorkerQuestions,
+  checkExactAttemptWorkerQuestions,
+} from './ipc-registry.js';

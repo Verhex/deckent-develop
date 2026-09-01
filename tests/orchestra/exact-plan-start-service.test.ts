@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -156,6 +156,34 @@ describe('exact-plan start attempt lifecycle', () => {
       identityDeps,
     });
     expect(terminal.attempt.state).toBe('COMPLETED');
+  });
+
+  it('defers a fresh exact-Docker task projection until per-task release', () => {
+    const root = mkdtempSync(join(tmpdir(), 'exact-start-deferred-task-'));
+    const approved = snapshot(root);
+    const prepared = prepareAndSpawnExactRun({
+      root,
+      exactRef: { schemaVersion: 1, flowId: 'flow-1', revision: 1, planDigest: 'digest-1' },
+      approvedSnapshot: approved,
+      lineage: lineage(),
+      preparerProcess: { pid: 100, startToken: 's100', evidence: 'verified' },
+      identityDeps,
+      spawnProcess: () => ({ pid: 200, startToken: 's200' }),
+    });
+    if (prepared.status !== 'process-spawned') throw new Error('unexpected fixture result');
+
+    expect(materializeExactPlanTaskArtifacts(root, {
+      capability: prepared.capability,
+      approvedSnapshot: approved,
+      publicationMode: 'defer',
+    })).toEqual({
+      taskIds: ['1-001'],
+      created: [],
+      idempotent: [],
+      deferred: ['1-001'],
+      existingContentDigests: {},
+    });
+    expect(existsSync(join(root, '.tasks', 'task-1-001.json'))).toBe(false);
   });
 
   it('commits a canonical recovery manifest before a retry process can be born', () => {

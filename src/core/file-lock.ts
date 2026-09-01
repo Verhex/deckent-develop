@@ -18,10 +18,12 @@ import {
   statSync, constants as fsConstants,
 } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
-import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { LOCKS_DIR } from './constants.js';
+import {
+  loadExecAuthorityNative,
+  type ExecAuthorityNativeLegacyFacade,
+} from './exec-authority-native.js';
 import { trace } from './observability.js';
 import { debugLog } from './utils.js';
 import type { LockInfo } from './types.js';
@@ -758,9 +760,11 @@ export function releaseInspectedSpawnLock(candidate: StaleSpawnLockCandidate): b
 // the legacy `.lock` and `.spawnlock` cleanup lifecycles.
 
 export const EXECUTION_LOCK_SCHEMA_VERSION = 3 as const;
-export const EXECUTION_LOCK_DB_META_VERSION = 3 as const;
+export const EXECUTION_LOCK_DB_META_VERSION = 4 as const;
 export const EXECUTION_LOCK_QUARANTINE_SCHEMA_VERSION = 1 as const;
 export const EXECUTION_LOCK_BOUNDARY_COMPLETION_SCHEMA_VERSION = 1 as const;
+export const EXECUTION_LOCK_BOUNDARY_RESUME_SCHEMA_VERSION = 1 as const;
+export const EXECUTION_LOCK_ACTIVE_ADOPTION_SCHEMA_VERSION = 1 as const;
 export const EXECUTION_LOCK_RECOVERY_ATTESTATION_SCHEMA_VERSION = 1 as const;
 export const EXECUTION_LOCK_QUARANTINE_AUDIT_SCHEMA_VERSION = 1 as const;
 export const EXECUTION_LOCK_AUTHORITY_SENTINEL_SCHEMA_VERSION = 1 as const;
@@ -816,6 +820,8 @@ const MAX_EXECUTION_LOCK_RECOVERY_JUSTIFICATION_BYTES = 2_048;
 const MAX_EXECUTION_LOCK_EVIDENCE_REFS = 16;
 const MAX_EXECUTION_LOCK_EVIDENCE_REF_BYTES = 1_024;
 const MAX_EXECUTION_LOCK_EVIDENCE_TOTAL_BYTES = 8_192;
+const MAX_EXECUTION_LOCK_BOUNDARY_RESUMES = 1_024;
+const MAX_EXECUTION_LOCK_ACTIVE_ADOPTIONS = 1_024;
 const MAX_EXECUTION_LOCK_RECOVERY_ATTESTATION_AGE_MS = 15 * 60 * 1_000;
 const MAX_EXECUTION_LOCK_RECOVERY_FUTURE_SKEW_MS = 60 * 1_000;
 
@@ -883,11 +889,32 @@ export interface ExecutionLockQuarantineRequest {
 
 export interface ExecutionLockIrreversibleBoundaryRequest {
   readonly evidenceRefs?: readonly string[];
+  /**
+   * Optional caller-derived idempotency identity for a durable boundary.
+   * Callers must derive this from immutable transaction authority, never from
+   * a mutable path or process-local counter. The default remains a fresh UUID
+   * for existing admission callers.
+   */
+  readonly quarantineId?: string;
 }
 
 export interface ExecutionLockBoundaryCompletionRequest {
   readonly quarantineId: string;
   readonly evidenceRefs: readonly string[];
+}
+
+export interface ExecutionLockBoundaryResumeRequest {
+  readonly evidenceRefs: readonly string[];
+}
+
+export interface ExecutionLockActiveAdoptionRequest {
+  readonly evidenceRefs: readonly string[];
+}
+
+export interface ExecutionLockNoChangeCompletionRequest {
+  readonly quarantineId: string;
+  readonly boundaryEvidenceRefs: readonly string[];
+  readonly completionEvidenceRefs: readonly string[];
 }
 
 export interface ExecutionLockBoundaryCompletion {
@@ -897,6 +924,25 @@ export interface ExecutionLockBoundaryCompletion {
   readonly fencingToken: ExecutionLockFencingToken;
   readonly evidenceRefs: readonly string[];
   readonly completedAt: string;
+}
+
+export interface ExecutionLockBoundaryResumeAttestation {
+  readonly schemaVersion:
+    typeof EXECUTION_LOCK_BOUNDARY_RESUME_SCHEMA_VERSION;
+  readonly quarantineId: string;
+  readonly previousLock: ExecutionLockInfo;
+  readonly resumedLock: ExecutionLockInfo;
+  readonly evidenceRefs: readonly string[];
+  readonly resumedAt: string;
+}
+
+export interface ExecutionLockActiveAdoptionAudit {
+  readonly schemaVersion: typeof EXECUTION_LOCK_ACTIVE_ADOPTION_SCHEMA_VERSION;
+  readonly eventId: string;
+  readonly previousLock: ExecutionLockInfo;
+  readonly adoptedLock: ExecutionLockInfo;
+  readonly evidenceRefs: readonly string[];
+  readonly adoptedAt: string;
 }
 
 export interface ExecutionLockRecoveryAttestation {
@@ -916,6 +962,7 @@ export interface ExecutionLockQuarantineAuditEvent {
   readonly eventId: string;
   readonly action:
     | 'boundary-entered'
+    | 'resumed'
     | 'quarantined'
     | 'completed'
     | 'recovered';
@@ -926,6 +973,7 @@ export interface ExecutionLockQuarantineAuditEvent {
   readonly occurredAt: string;
   readonly payload:
     | ExecutionLockQuarantineInfo
+    | ExecutionLockBoundaryResumeAttestation
     | ExecutionLockBoundaryCompletion
     | ExecutionLockRecoveryAttestation;
 }
@@ -934,6 +982,34 @@ export interface ExecutionLockBoundaryCompletionResult {
   readonly completed: ExecutionLockQuarantineInfo;
   readonly audit: ExecutionLockQuarantineAuditEvent;
   readonly projectionCleanup: 'completed' | 'uncertain';
+}
+
+export interface ExecutionLockBoundaryResumeResult {
+  readonly previous: ExecutionLockQuarantineInfo;
+  readonly resumed: ExecutionLockQuarantineInfo;
+  readonly audit: ExecutionLockQuarantineAuditEvent;
+  readonly projectionPublication: 'completed' | 'uncertain';
+}
+
+export interface ExecutionLockActiveAdoptionResult {
+  readonly previous: ExecutionLockInfo;
+  readonly adopted: ExecutionLockInfo;
+  readonly audit: ExecutionLockActiveAdoptionAudit;
+  readonly projectionPublication: 'completed' | 'uncertain';
+}
+
+export interface ExecutionLockActiveAdoptionResolution {
+  readonly previous: ExecutionLockInfo;
+  readonly adopted: ExecutionLockInfo;
+  readonly audit: ExecutionLockActiveAdoptionAudit;
+  readonly lineage: readonly ExecutionLockActiveAdoptionAudit[];
+}
+
+export interface ExecutionLockBoundaryResumeResolution {
+  readonly previous: ExecutionLockQuarantineInfo;
+  readonly resumed: ExecutionLockQuarantineInfo;
+  readonly audit: ExecutionLockQuarantineAuditEvent;
+  readonly lineage: readonly ExecutionLockQuarantineAuditEvent[];
 }
 
 export interface ExecutionLockRecoveryResult {
@@ -1140,6 +1216,21 @@ interface ExecutionLockActiveRow {
   fencing_epoch: string;
   fencing_counter: number;
   fencing_nonce: string;
+  payload_json: string;
+}
+
+interface ExecutionLockActiveAdoptionAuditRow {
+  event_id: string;
+  task_id: string;
+  previous_owner_id: string;
+  previous_fencing_epoch: string;
+  previous_fencing_counter: number;
+  previous_fencing_nonce: string;
+  adopted_owner_id: string;
+  adopted_fencing_epoch: string;
+  adopted_fencing_counter: number;
+  adopted_fencing_nonce: string;
+  occurred_at: string;
   payload_json: string;
 }
 
@@ -1734,56 +1825,15 @@ export const linuxProcExecutionAuthorityOpsV2: ExecutionAuthorityOpsV2 =
  * Consumer wiring (pinExecutionLockDirectories, clean.mjs twin) and the
  * real-Mac real-binary closure proof are slice-3 scope.
  */
-interface ExecAuthorityNativeBinding {
-  openDirAt(parentFd: number | null, name: string): number;
-  closeFd(fd: number): void;
-  fstatIdentity(fd: number): { dev: string; ino: string; isDirectory: boolean };
-  readdirFd(fd: number): string[];
-  unlinkAt(fd: number, name: string, removeDir: boolean): void;
-  renameAt(fromFd: number, fromName: string, toFd: number, toName: string): void;
-  mountIdentity(fd: number): { available: boolean; fsid?: string };
-  fdPath(fd: number): string;
-}
-
-// Loaded lazily and memoized: module-eval stays side-effect-free (the same
-// contract that keeps fsConstants access lazy above), and repeated calls
-// never re-probe the filesystem. Resolution is module-relative so the same
-// candidates work from src/ (vitest) and dist/ (production build).
-let execAuthorityNativeState:
-  | { readonly available: true; readonly binding: ExecAuthorityNativeBinding }
-  | { readonly available: false; readonly reason: string }
-  | null = null;
-
-function loadExecAuthorityNativeBinding():
-  | { readonly available: true; readonly binding: ExecAuthorityNativeBinding }
-  | { readonly available: false; readonly reason: string } {
-  if (execAuthorityNativeState !== null) return execAuthorityNativeState;
-  const req = createRequire(import.meta.url);
-  const moduleDir = dirname(fileURLToPath(import.meta.url));
-  const candidates = [
-    join(moduleDir, '../../native/exec-authority/build/Release/exec_authority.node'),
-    join(moduleDir, '../../native/exec-authority/build/Debug/exec_authority.node'),
-  ];
-  for (const candidate of candidates) {
-    try {
-      const binding = req(candidate) as ExecAuthorityNativeBinding;
-      execAuthorityNativeState = { available: true, binding };
-      return execAuthorityNativeState;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'MODULE_NOT_FOUND') continue;
-      execAuthorityNativeState = {
-        available: false,
-        reason: `binding-load-failed:${error instanceof Error ? error.message : String(error)}`,
-      };
-      return execAuthorityNativeState;
-    }
+function requireDarwinExecAuthorityNative(): ExecAuthorityNativeLegacyFacade {
+  if (process.platform !== 'darwin') {
+    throw new ExecutionLockError(
+      `Darwin execution authority is unsupported on ${process.platform}`,
+      'unknown',
+      'secure-open-unsupported',
+    );
   }
-  execAuthorityNativeState = { available: false, reason: 'binding-not-built' };
-  return execAuthorityNativeState;
-}
-
-function requireExecAuthorityNative(): ExecAuthorityNativeBinding {
-  const state = loadExecAuthorityNativeBinding();
+  const state = loadExecAuthorityNative();
   if (!state.available) {
     throw new ExecutionLockError(
       `Execution authority native capability is unavailable (${state.reason})`,
@@ -1791,35 +1841,35 @@ function requireExecAuthorityNative(): ExecAuthorityNativeBinding {
       'secure-open-unsupported',
     );
   }
-  return state.binding;
+  if (!state.manifest.features.includes('legacy-posix-fd-v1')) {
+    throw new ExecutionLockError(
+      'Darwin execution authority native capability is unavailable',
+      'unknown',
+      'secure-open-unsupported',
+    );
+  }
+  return state.legacy;
 }
 
 export const darwinNativeExecutionAuthorityOpsV2: ExecutionAuthorityOpsV2 =
   Object.freeze({
     classify: (): 'darwin' => {
-      if (process.platform !== 'darwin') {
-        throw new ExecutionLockError(
-          `Darwin execution authority is unsupported on ${process.platform}`,
-          'unknown',
-          'secure-open-unsupported',
-        );
-      }
-      requireExecAuthorityNative();
+      requireDarwinExecAuthorityNative();
       return 'darwin';
     },
     openDirAt: (parentFd: number | null, name: string): number =>
-      requireExecAuthorityNative().openDirAt(parentFd, name),
-    closeFd: (fd: number): void => requireExecAuthorityNative().closeFd(fd),
+      requireDarwinExecAuthorityNative().openDirAt(parentFd, name),
+    closeFd: (fd: number): void => requireDarwinExecAuthorityNative().closeFd(fd),
     // The C primitive returns directory order; the op contract (twin parity)
     // is sorted output.
     readdirOf: (fd: number): string[] =>
-      [...requireExecAuthorityNative().readdirFd(fd)].sort(),
+      [...requireDarwinExecAuthorityNative().readdirFd(fd)].sort(),
     unlinkAt: (fd: number, name: string, removeDir: boolean): void =>
-      requireExecAuthorityNative().unlinkAt(fd, name, removeDir),
+      requireDarwinExecAuthorityNative().unlinkAt(fd, name, removeDir),
     renameAt: (fromFd: number, fromName: string, toFd: number, toName: string): void =>
-      requireExecAuthorityNative().renameAt(fromFd, fromName, toFd, toName),
+      requireDarwinExecAuthorityNative().renameAt(fromFd, fromName, toFd, toName),
     identityOf: (fd: number): ExecutionLockDirectoryIdentity => {
-      const native = requireExecAuthorityNative();
+      const native = requireDarwinExecAuthorityNative();
       const identity = native.fstatIdentity(fd);
       if (!identity.isDirectory) {
         throw new ExecutionLockError(
@@ -1838,7 +1888,7 @@ export const darwinNativeExecutionAuthorityOpsV2: ExecutionAuthorityOpsV2 =
       }
       return { dev: identity.dev, ino: identity.ino, mountId: mount.fsid };
     },
-    realPathOf: (fd: number): string => requireExecAuthorityNative().fdPath(fd),
+    realPathOf: (fd: number): string => requireDarwinExecAuthorityNative().fdPath(fd),
   });
 
 /**
@@ -2708,45 +2758,134 @@ function validateExecutionLockDatabaseReportedPath(
   }
 }
 
-function createExecutionLockQuarantineSchema(db: DatabaseType): void {
+function createExecutionLockActiveAdoptionSchema(db: DatabaseType): void {
   db.exec(`
-    CREATE TABLE execution_lock_quarantine (
-      task_id TEXT NOT NULL PRIMARY KEY,
-      quarantine_id TEXT NOT NULL UNIQUE CHECK(length(quarantine_id) = 36),
-      owner_id TEXT NOT NULL UNIQUE CHECK(length(owner_id) = 36),
-      fencing_epoch TEXT NOT NULL CHECK(length(fencing_epoch) = 36),
-      fencing_counter INTEGER NOT NULL CHECK(fencing_counter > 0),
-      fencing_nonce TEXT NOT NULL CHECK(
-        length(fencing_nonce) = 32
-        AND fencing_nonce NOT GLOB '*[^0-9a-f]*'
+    CREATE TABLE execution_lock_active_adoption_audit (
+      event_id TEXT NOT NULL PRIMARY KEY CHECK(length(event_id) = 36),
+      task_id TEXT NOT NULL,
+      previous_owner_id TEXT NOT NULL CHECK(length(previous_owner_id) = 36),
+      previous_fencing_epoch TEXT NOT NULL CHECK(length(previous_fencing_epoch) = 36),
+      previous_fencing_counter INTEGER NOT NULL CHECK(previous_fencing_counter > 0),
+      previous_fencing_nonce TEXT NOT NULL CHECK(
+        length(previous_fencing_nonce) = 32
+        AND previous_fencing_nonce NOT GLOB '*[^0-9a-f]*'
       ),
-      state TEXT NOT NULL CHECK(state IN ('in-flight', 'quarantined')),
-      reason TEXT NOT NULL CHECK(reason IN (
-        'irreversible-boundary',
-        'partial-mutation',
-        'heartbeat-fault',
-        'release-fault',
-        'authority-uncertain',
-        'legacy-v2-active'
-      )),
-      entered_at TEXT NOT NULL,
-      quarantined_at TEXT,
+      adopted_owner_id TEXT NOT NULL CHECK(length(adopted_owner_id) = 36),
+      adopted_fencing_epoch TEXT NOT NULL CHECK(length(adopted_fencing_epoch) = 36),
+      adopted_fencing_counter INTEGER NOT NULL CHECK(adopted_fencing_counter > 0),
+      adopted_fencing_nonce TEXT NOT NULL CHECK(
+        length(adopted_fencing_nonce) = 32
+        AND adopted_fencing_nonce NOT GLOB '*[^0-9a-f]*'
+      ),
+      occurred_at TEXT NOT NULL,
       payload_json TEXT NOT NULL,
-      CHECK(
-        (state = 'in-flight'
-          AND reason = 'irreversible-boundary'
-          AND quarantined_at IS NULL)
-        OR
-        (state = 'quarantined'
-          AND reason <> 'irreversible-boundary'
-          AND quarantined_at IS NOT NULL)
+      CHECK(previous_owner_id <> adopted_owner_id),
+      CHECK(previous_fencing_epoch = adopted_fencing_epoch),
+      CHECK(previous_fencing_counter < adopted_fencing_counter),
+      CHECK(previous_fencing_nonce <> adopted_fencing_nonce),
+      UNIQUE(
+        task_id, previous_owner_id, previous_fencing_epoch,
+        previous_fencing_counter, previous_fencing_nonce
       ),
-      UNIQUE(fencing_epoch, fencing_counter, fencing_nonce)
+      UNIQUE(
+        task_id, adopted_owner_id, adopted_fencing_epoch,
+        adopted_fencing_counter, adopted_fencing_nonce
+      )
     ) STRICT, WITHOUT ROWID;
+    CREATE TRIGGER execution_lock_active_adoption_requires_previous
+    BEFORE INSERT ON execution_lock_active_adoption_audit
+    WHEN NOT EXISTS (
+      SELECT 1
+        FROM execution_lock_active
+       WHERE task_id = NEW.task_id
+         AND owner_id = NEW.previous_owner_id
+         AND fencing_epoch = NEW.previous_fencing_epoch
+         AND fencing_counter = NEW.previous_fencing_counter
+         AND fencing_nonce = NEW.previous_fencing_nonce
+    ) OR EXISTS (
+      SELECT 1
+        FROM execution_lock_quarantine
+       WHERE task_id = NEW.task_id
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'execution lock active adoption requires exact unquarantined authority');
+    END;
+    CREATE TRIGGER execution_lock_active_monotonic_update
+    BEFORE UPDATE ON execution_lock_active
+    WHEN NOT (
+      NEW.task_id = OLD.task_id
+      AND (
+        (
+          NEW.owner_id = OLD.owner_id
+          AND NEW.fencing_epoch = OLD.fencing_epoch
+          AND NEW.fencing_counter = OLD.fencing_counter
+          AND NEW.fencing_nonce = OLD.fencing_nonce
+        )
+        OR
+        (
+          NEW.owner_id <> OLD.owner_id
+          AND NEW.fencing_epoch = OLD.fencing_epoch
+          AND NEW.fencing_counter > OLD.fencing_counter
+          AND NEW.fencing_nonce <> OLD.fencing_nonce
+          AND (
+            EXISTS (
+              SELECT 1
+                FROM execution_lock_active_adoption_audit
+               WHERE task_id = NEW.task_id
+                 AND previous_owner_id = OLD.owner_id
+                 AND previous_fencing_epoch = OLD.fencing_epoch
+                 AND previous_fencing_counter = OLD.fencing_counter
+                 AND previous_fencing_nonce = OLD.fencing_nonce
+                 AND adopted_owner_id = NEW.owner_id
+                 AND adopted_fencing_epoch = NEW.fencing_epoch
+                 AND adopted_fencing_counter = NEW.fencing_counter
+                 AND adopted_fencing_nonce = NEW.fencing_nonce
+            )
+            OR EXISTS (
+              SELECT 1
+                FROM execution_lock_quarantine AS quarantine
+                JOIN execution_lock_quarantine_audit AS audit
+                  ON audit.quarantine_id = quarantine.quarantine_id
+               WHERE quarantine.task_id = OLD.task_id
+                 AND quarantine.owner_id = OLD.owner_id
+                 AND quarantine.fencing_epoch = OLD.fencing_epoch
+                 AND quarantine.fencing_counter = OLD.fencing_counter
+                 AND quarantine.fencing_nonce = OLD.fencing_nonce
+                 AND quarantine.state = 'in-flight'
+                 AND audit.action = 'resumed'
+                 AND audit.task_id = NEW.task_id
+                 AND audit.owner_id = NEW.owner_id
+                 AND audit.fencing_epoch = NEW.fencing_epoch
+                 AND audit.fencing_counter = NEW.fencing_counter
+                 AND audit.fencing_nonce = NEW.fencing_nonce
+            )
+          )
+        )
+      )
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'execution lock active transition is not monotonic');
+    END;
+    CREATE TRIGGER execution_lock_active_adoption_audit_no_update
+    BEFORE UPDATE ON execution_lock_active_adoption_audit
+    BEGIN
+      SELECT RAISE(ABORT, 'execution lock active adoption audit is append-only');
+    END;
+    CREATE TRIGGER execution_lock_active_adoption_audit_no_delete
+    BEFORE DELETE ON execution_lock_active_adoption_audit
+    BEGIN
+      SELECT RAISE(ABORT, 'execution lock active adoption audit is append-only');
+    END;
+  `);
+}
+
+function createExecutionLockQuarantineAuditSchema(db: DatabaseType): void {
+  db.exec(`
     CREATE TABLE execution_lock_quarantine_audit (
       event_id TEXT NOT NULL PRIMARY KEY CHECK(length(event_id) = 36),
       action TEXT NOT NULL CHECK(action IN (
         'boundary-entered',
+        'resumed',
         'quarantined',
         'completed',
         'recovered'
@@ -2761,9 +2900,18 @@ function createExecutionLockQuarantineSchema(db: DatabaseType): void {
         AND fencing_nonce NOT GLOB '*[^0-9a-f]*'
       ),
       occurred_at TEXT NOT NULL,
-      payload_json TEXT NOT NULL,
-      UNIQUE(quarantine_id, action)
+      payload_json TEXT NOT NULL
     ) STRICT, WITHOUT ROWID;
+    CREATE UNIQUE INDEX execution_lock_quarantine_one_boundary
+      ON execution_lock_quarantine_audit(quarantine_id)
+      WHERE action = 'boundary-entered';
+    CREATE UNIQUE INDEX execution_lock_quarantine_one_quarantined
+      ON execution_lock_quarantine_audit(quarantine_id)
+      WHERE action = 'quarantined';
+    CREATE UNIQUE INDEX execution_lock_quarantine_one_resume_generation
+      ON execution_lock_quarantine_audit(
+        quarantine_id, fencing_epoch, fencing_counter, fencing_nonce
+      ) WHERE action = 'resumed';
     CREATE UNIQUE INDEX execution_lock_quarantine_one_terminal
       ON execution_lock_quarantine_audit(quarantine_id)
       WHERE action IN ('completed', 'recovered');
@@ -2772,25 +2920,52 @@ function createExecutionLockQuarantineSchema(db: DatabaseType): void {
     WHEN NOT (
       NEW.task_id = OLD.task_id
       AND NEW.quarantine_id = OLD.quarantine_id
-      AND NEW.owner_id = OLD.owner_id
-      AND NEW.fencing_epoch = OLD.fencing_epoch
-      AND NEW.fencing_counter = OLD.fencing_counter
-      AND NEW.fencing_nonce = OLD.fencing_nonce
       AND NEW.entered_at = OLD.entered_at
       AND (
+        (
+          NEW.owner_id = OLD.owner_id
+          AND NEW.fencing_epoch = OLD.fencing_epoch
+          AND NEW.fencing_counter = OLD.fencing_counter
+          AND NEW.fencing_nonce = OLD.fencing_nonce
+          AND (
+            (
+              OLD.state = 'in-flight'
+              AND NEW.state = 'in-flight'
+              AND NEW.reason = OLD.reason
+              AND OLD.quarantined_at IS NULL
+              AND NEW.quarantined_at IS NULL
+            )
+            OR
+            (
+              OLD.state = 'in-flight'
+              AND NEW.state = 'quarantined'
+              AND OLD.quarantined_at IS NULL
+              AND NEW.quarantined_at IS NOT NULL
+            )
+          )
+        )
+        OR
         (
           OLD.state = 'in-flight'
           AND NEW.state = 'in-flight'
           AND NEW.reason = OLD.reason
           AND OLD.quarantined_at IS NULL
           AND NEW.quarantined_at IS NULL
-        )
-        OR
-        (
-          OLD.state = 'in-flight'
-          AND NEW.state = 'quarantined'
-          AND OLD.quarantined_at IS NULL
-          AND NEW.quarantined_at IS NOT NULL
+          AND NEW.owner_id <> OLD.owner_id
+          AND NEW.fencing_epoch = OLD.fencing_epoch
+          AND NEW.fencing_counter > OLD.fencing_counter
+          AND NEW.fencing_nonce <> OLD.fencing_nonce
+          AND EXISTS (
+            SELECT 1
+              FROM execution_lock_quarantine_audit
+             WHERE quarantine_id = NEW.quarantine_id
+               AND action = 'resumed'
+               AND task_id = NEW.task_id
+               AND owner_id = NEW.owner_id
+               AND fencing_epoch = NEW.fencing_epoch
+               AND fencing_counter = NEW.fencing_counter
+               AND fencing_nonce = NEW.fencing_nonce
+          )
         )
       )
     )
@@ -2826,6 +3001,45 @@ function createExecutionLockQuarantineSchema(db: DatabaseType): void {
   `);
 }
 
+function createExecutionLockQuarantineSchema(db: DatabaseType): void {
+  db.exec(`
+    CREATE TABLE execution_lock_quarantine (
+      task_id TEXT NOT NULL PRIMARY KEY,
+      quarantine_id TEXT NOT NULL UNIQUE CHECK(length(quarantine_id) = 36),
+      owner_id TEXT NOT NULL UNIQUE CHECK(length(owner_id) = 36),
+      fencing_epoch TEXT NOT NULL CHECK(length(fencing_epoch) = 36),
+      fencing_counter INTEGER NOT NULL CHECK(fencing_counter > 0),
+      fencing_nonce TEXT NOT NULL CHECK(
+        length(fencing_nonce) = 32
+        AND fencing_nonce NOT GLOB '*[^0-9a-f]*'
+      ),
+      state TEXT NOT NULL CHECK(state IN ('in-flight', 'quarantined')),
+      reason TEXT NOT NULL CHECK(reason IN (
+        'irreversible-boundary',
+        'partial-mutation',
+        'heartbeat-fault',
+        'release-fault',
+        'authority-uncertain',
+        'legacy-v2-active'
+      )),
+      entered_at TEXT NOT NULL,
+      quarantined_at TEXT,
+      payload_json TEXT NOT NULL,
+      CHECK(
+        (state = 'in-flight'
+          AND reason = 'irreversible-boundary'
+          AND quarantined_at IS NULL)
+        OR
+        (state = 'quarantined'
+          AND reason <> 'irreversible-boundary'
+          AND quarantined_at IS NOT NULL)
+      ),
+      UNIQUE(fencing_epoch, fencing_counter, fencing_nonce)
+    ) STRICT, WITHOUT ROWID;
+  `);
+  createExecutionLockQuarantineAuditSchema(db);
+}
+
 function validateExecutionLockDatabaseSchema(db: DatabaseType): void {
   const required = new Map<string, {
     readonly type: string;
@@ -2835,7 +3049,7 @@ function validateExecutionLockDatabaseSchema(db: DatabaseType): void {
       type: 'table',
       fragments: [
         'check(singleton = 1)',
-        'check(meta_version = 3)',
+        'check(meta_version = 4)',
         'check(fencing_counter >= 0)',
         ') strict',
       ],
@@ -2847,6 +3061,47 @@ function validateExecutionLockDatabaseSchema(db: DatabaseType): void {
         'owner_id text not null unique',
         'unique(fencing_epoch, fencing_counter, fencing_nonce)',
         ') strict, without rowid',
+      ],
+    }],
+    ['execution_lock_active_adoption_audit', {
+      type: 'table',
+      fragments: [
+        'check(previous_owner_id <> adopted_owner_id)',
+        'check(previous_fencing_epoch = adopted_fencing_epoch)',
+        'check(previous_fencing_counter < adopted_fencing_counter)',
+        ') strict, without rowid',
+      ],
+    }],
+    ['execution_lock_active_adoption_requires_previous', {
+      type: 'trigger',
+      fragments: [
+        'before insert on execution_lock_active_adoption_audit',
+        'from execution_lock_active',
+        'from execution_lock_quarantine',
+        "raise(abort, 'execution lock active adoption requires exact unquarantined authority')",
+      ],
+    }],
+    ['execution_lock_active_monotonic_update', {
+      type: 'trigger',
+      fragments: [
+        'before update on execution_lock_active',
+        'new.fencing_counter > old.fencing_counter',
+        'from execution_lock_active_adoption_audit',
+        "raise(abort, 'execution lock active transition is not monotonic')",
+      ],
+    }],
+    ['execution_lock_active_adoption_audit_no_update', {
+      type: 'trigger',
+      fragments: [
+        'before update on execution_lock_active_adoption_audit',
+        "raise(abort, 'execution lock active adoption audit is append-only')",
+      ],
+    }],
+    ['execution_lock_active_adoption_audit_no_delete', {
+      type: 'trigger',
+      fragments: [
+        'before delete on execution_lock_active_adoption_audit',
+        "raise(abort, 'execution lock active adoption audit is append-only')",
       ],
     }],
     ['execution_lock_quarantine', {
@@ -2864,8 +3119,29 @@ function validateExecutionLockDatabaseSchema(db: DatabaseType): void {
       type: 'table',
       fragments: [
         "action text not null check(action in ( 'boundary-entered'",
-        'unique(quarantine_id, action)',
+        "'resumed'",
         ') strict, without rowid',
+      ],
+    }],
+    ['execution_lock_quarantine_one_boundary', {
+      type: 'index',
+      fragments: [
+        'on execution_lock_quarantine_audit(quarantine_id)',
+        "where action = 'boundary-entered'",
+      ],
+    }],
+    ['execution_lock_quarantine_one_quarantined', {
+      type: 'index',
+      fragments: [
+        'on execution_lock_quarantine_audit(quarantine_id)',
+        "where action = 'quarantined'",
+      ],
+    }],
+    ['execution_lock_quarantine_one_resume_generation', {
+      type: 'index',
+      fragments: [
+        'on execution_lock_quarantine_audit( quarantine_id, fencing_epoch, fencing_counter, fencing_nonce )',
+        "where action = 'resumed'",
       ],
     }],
     ['execution_lock_quarantine_one_terminal', {
@@ -2881,6 +3157,8 @@ function validateExecutionLockDatabaseSchema(db: DatabaseType): void {
         'before update on execution_lock_quarantine',
         "old.state = 'in-flight'",
         "new.state = 'quarantined'",
+        "action = 'resumed'",
+        'new.fencing_counter > old.fencing_counter',
         "raise(abort, 'execution lock quarantine transition is not monotonic')",
       ],
     }],
@@ -3004,6 +3282,90 @@ function deterministicExecutionLockUuid(
   ].join('-');
 }
 
+function migrateExecutionLockDatabaseV3ToV4(
+  db: DatabaseType,
+  sentinel: ExecutionLockAuthoritySentinel,
+): void {
+  readExecutionLockMeta(db, sentinel, 3);
+  const auditSchema = db.prepare(`
+    SELECT sql
+      FROM sqlite_master
+     WHERE type = 'table'
+       AND name = 'execution_lock_quarantine_audit'
+  `).get() as { readonly sql?: unknown } | undefined;
+  const normalizedAuditSchema = typeof auditSchema?.sql === 'string'
+    ? auditSchema.sql.replace(/\s+/gu, ' ').trim().toLowerCase()
+    : '';
+  if (!normalizedAuditSchema.includes(
+    "action text not null check(action in ( 'boundary-entered'",
+  )
+    || !normalizedAuditSchema.includes('unique(quarantine_id, action)')
+    || normalizedAuditSchema.includes("'resumed'")) {
+    throw new ExecutionLockError(
+      'Execution lock v3 audit schema is invalid',
+      'unknown',
+      'malformed',
+    );
+  }
+  const rows = db.prepare(`
+    SELECT event_id, action, quarantine_id, task_id, owner_id,
+           fencing_epoch, fencing_counter, fencing_nonce, occurred_at,
+           payload_json
+      FROM execution_lock_quarantine_audit
+     ORDER BY event_id
+  `).all() as ExecutionLockQuarantineAuditRow[];
+  rows.forEach(parseExecutionLockQuarantineAuditRow);
+
+  db.exec(`
+    DROP TRIGGER execution_lock_quarantine_monotonic_update;
+    DROP TRIGGER execution_lock_quarantine_terminal_delete;
+    DROP TRIGGER execution_lock_quarantine_audit_no_update;
+    DROP TRIGGER execution_lock_quarantine_audit_no_delete;
+    DROP INDEX execution_lock_quarantine_one_terminal;
+    ALTER TABLE execution_lock_quarantine_audit
+      RENAME TO execution_lock_quarantine_audit_v3;
+  `);
+  createExecutionLockQuarantineAuditSchema(db);
+  db.exec(`
+    INSERT INTO execution_lock_quarantine_audit(
+      event_id, action, quarantine_id, task_id, owner_id, fencing_epoch,
+      fencing_counter, fencing_nonce, occurred_at, payload_json
+    )
+    SELECT event_id, action, quarantine_id, task_id, owner_id, fencing_epoch,
+           fencing_counter, fencing_nonce, occurred_at, payload_json
+      FROM execution_lock_quarantine_audit_v3;
+    DROP TABLE execution_lock_quarantine_audit_v3;
+
+    ALTER TABLE execution_lock_meta
+      RENAME TO execution_lock_meta_v3;
+    CREATE TABLE execution_lock_meta (
+      singleton INTEGER NOT NULL PRIMARY KEY CHECK(singleton = 1),
+      meta_version INTEGER NOT NULL CHECK(meta_version = 4),
+      authority_epoch TEXT NOT NULL CHECK(length(authority_epoch) = 36),
+      fencing_counter INTEGER NOT NULL CHECK(fencing_counter >= 0)
+    ) STRICT;
+    INSERT INTO execution_lock_meta(
+      singleton, meta_version, authority_epoch, fencing_counter
+    )
+    SELECT singleton, 4, authority_epoch, fencing_counter
+      FROM execution_lock_meta_v3;
+    DROP TABLE execution_lock_meta_v3;
+  `);
+  createExecutionLockActiveAdoptionSchema(db);
+  const migratedCount = db.prepare(`
+    SELECT COUNT(*) AS count
+      FROM execution_lock_quarantine_audit
+  `).get() as { readonly count?: unknown };
+  if (migratedCount.count !== rows.length) {
+    throw new ExecutionLockError(
+      'Execution lock v3 audit migration lost rows',
+      'unknown',
+      'mutation-conflict',
+    );
+  }
+  db.pragma(`user_version = ${EXECUTION_LOCK_DB_META_VERSION}`);
+}
+
 function initializeExecutionLockDatabase(
   db: DatabaseType,
   sentinel: ExecutionLockAuthoritySentinel,
@@ -3019,6 +3381,7 @@ function initializeExecutionLockDatabase(
   }
   if (userVersion !== 0
     && userVersion !== 2
+    && userVersion !== 3
     && userVersion !== EXECUTION_LOCK_DB_META_VERSION) {
     throw new ExecutionLockError(
       `Unsupported execution lock database version: ${userVersion}`,
@@ -3030,7 +3393,7 @@ function initializeExecutionLockDatabase(
     db.exec(`
       CREATE TABLE execution_lock_meta (
         singleton INTEGER NOT NULL PRIMARY KEY CHECK(singleton = 1),
-        meta_version INTEGER NOT NULL CHECK(meta_version = 3),
+        meta_version INTEGER NOT NULL CHECK(meta_version = 4),
         authority_epoch TEXT NOT NULL CHECK(length(authority_epoch) = 36),
         fencing_counter INTEGER NOT NULL CHECK(fencing_counter >= 0)
       ) STRICT;
@@ -3048,10 +3411,11 @@ function initializeExecutionLockDatabase(
       ) STRICT, WITHOUT ROWID;
     `);
     createExecutionLockQuarantineSchema(db);
+    createExecutionLockActiveAdoptionSchema(db);
     db.prepare(`
       INSERT INTO execution_lock_meta(
         singleton, meta_version, authority_epoch, fencing_counter
-      ) VALUES (1, 3, ?, 0)
+      ) VALUES (1, 4, ?, 0)
     `).run(sentinel.authorityEpoch);
     db.pragma(`user_version = ${EXECUTION_LOCK_DB_META_VERSION}`);
   }
@@ -3064,18 +3428,19 @@ function initializeExecutionLockDatabase(
         RENAME TO execution_lock_meta_v2;
       CREATE TABLE execution_lock_meta (
         singleton INTEGER NOT NULL PRIMARY KEY CHECK(singleton = 1),
-        meta_version INTEGER NOT NULL CHECK(meta_version = 3),
+        meta_version INTEGER NOT NULL CHECK(meta_version = 4),
         authority_epoch TEXT NOT NULL CHECK(length(authority_epoch) = 36),
         fencing_counter INTEGER NOT NULL CHECK(fencing_counter >= 0)
       ) STRICT;
       INSERT INTO execution_lock_meta(
         singleton, meta_version, authority_epoch, fencing_counter
       )
-      SELECT singleton, 3, authority_epoch, fencing_counter
+      SELECT singleton, 4, authority_epoch, fencing_counter
         FROM execution_lock_meta_v2;
       DROP TABLE execution_lock_meta_v2;
     `);
     createExecutionLockQuarantineSchema(db);
+    createExecutionLockActiveAdoptionSchema(db);
     for (const legacy of legacyActive) {
       const { lock, originalPayload } = legacy;
       const normalizedPayload = JSON.stringify(lock);
@@ -3140,13 +3505,17 @@ function initializeExecutionLockDatabase(
     db.pragma(`user_version = ${EXECUTION_LOCK_DB_META_VERSION}`);
   }
 
+  if (userVersion === 3) {
+    migrateExecutionLockDatabaseV3ToV4(db, sentinel);
+  }
+
   readExecutionLockMeta(
     db,
     sentinel,
     EXECUTION_LOCK_DB_META_VERSION,
   );
   validateExecutionLockDatabaseSchema(db);
-  return userVersion === 2;
+  return userVersion === 2 || userVersion === 3;
 }
 
 function withExecutionLockMutation<T>(
@@ -4198,8 +4567,11 @@ function parseExecutionLockQuarantine(
     const quarantinedMs = record.quarantinedAt === null
       ? null
       : Date.parse(record.quarantinedAt as string);
-    if (enteredMs < Date.parse(lock.acquiredAt)
-      || (quarantinedMs !== null && quarantinedMs < enteredMs)) {
+    // A fenced resume intentionally preserves the original boundary time
+    // while its successor generation has a later acquiredAt. Cross-record
+    // audit lineage validates that exception; this structural parser only
+    // enforces the quarantine's own monotonic timestamps.
+    if (quarantinedMs !== null && quarantinedMs < enteredMs) {
       return null;
     }
     return {
@@ -4332,6 +4704,106 @@ function parseExecutionLockBoundaryCompletion(
   };
 }
 
+function parseExecutionLockBoundaryResumeAttestation(
+  value: unknown,
+): ExecutionLockBoundaryResumeAttestation | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  if (!exactKeys(record, [
+    'schemaVersion',
+    'quarantineId',
+    'previousLock',
+    'resumedLock',
+    'evidenceRefs',
+    'resumedAt',
+  ])
+    || record.schemaVersion !== EXECUTION_LOCK_BOUNDARY_RESUME_SCHEMA_VERSION
+    || typeof record.quarantineId !== 'string'
+    || !EXECUTION_LOCK_UUID_PATTERN.test(record.quarantineId)
+    || !canonicalExecutionLockTimestamp(record.resumedAt)) {
+    return null;
+  }
+  const previousLock = parseExecutionLock(JSON.stringify(record.previousLock));
+  const resumedLock = parseExecutionLock(JSON.stringify(record.resumedLock));
+  const evidenceRefs = parseExecutionLockEvidenceRefs(record.evidenceRefs);
+  if (!previousLock
+    || !resumedLock
+    || !evidenceRefs
+    || evidenceRefs.length === 0
+    || previousLock.taskId !== resumedLock.taskId
+    || previousLock.actor !== resumedLock.actor
+    || previousLock.ownerId === resumedLock.ownerId
+    || previousLock.fencingToken.epoch !== resumedLock.fencingToken.epoch
+    || resumedLock.fencingToken.counter
+      <= previousLock.fencingToken.counter
+    || previousLock.fencingToken.nonce === resumedLock.fencingToken.nonce
+    || resumedLock.acquiredAt !== record.resumedAt
+    || resumedLock.renewedAt !== record.resumedAt
+    || Date.parse(record.resumedAt) < Date.parse(previousLock.renewedAt)) {
+    return null;
+  }
+  return {
+    schemaVersion: EXECUTION_LOCK_BOUNDARY_RESUME_SCHEMA_VERSION,
+    quarantineId: record.quarantineId,
+    previousLock,
+    resumedLock,
+    evidenceRefs,
+    resumedAt: record.resumedAt,
+  };
+}
+
+function parseExecutionLockActiveAdoptionAudit(
+  value: unknown,
+): ExecutionLockActiveAdoptionAudit | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  if (!exactKeys(record, [
+    'schemaVersion',
+    'eventId',
+    'previousLock',
+    'adoptedLock',
+    'evidenceRefs',
+    'adoptedAt',
+  ])
+    || record.schemaVersion !== EXECUTION_LOCK_ACTIVE_ADOPTION_SCHEMA_VERSION
+    || typeof record.eventId !== 'string'
+    || !EXECUTION_LOCK_UUID_PATTERN.test(record.eventId)
+    || !canonicalExecutionLockTimestamp(record.adoptedAt)) {
+    return null;
+  }
+  const previousLock = parseExecutionLock(JSON.stringify(record.previousLock));
+  const adoptedLock = parseExecutionLock(JSON.stringify(record.adoptedLock));
+  const evidenceRefs = parseExecutionLockEvidenceRefs(record.evidenceRefs);
+  if (!previousLock
+    || !adoptedLock
+    || !evidenceRefs
+    || evidenceRefs.length === 0
+    || previousLock.taskId !== adoptedLock.taskId
+    || previousLock.actor !== adoptedLock.actor
+    || previousLock.ownerId === adoptedLock.ownerId
+    || previousLock.fencingToken.epoch !== adoptedLock.fencingToken.epoch
+    || adoptedLock.fencingToken.counter
+      <= previousLock.fencingToken.counter
+    || previousLock.fencingToken.nonce === adoptedLock.fencingToken.nonce
+    || adoptedLock.acquiredAt !== record.adoptedAt
+    || adoptedLock.renewedAt !== record.adoptedAt
+    || Date.parse(record.adoptedAt) < Date.parse(previousLock.renewedAt)) {
+    return null;
+  }
+  return {
+    schemaVersion: EXECUTION_LOCK_ACTIVE_ADOPTION_SCHEMA_VERSION,
+    eventId: record.eventId,
+    previousLock,
+    adoptedLock,
+    evidenceRefs,
+    adoptedAt: record.adoptedAt,
+  };
+}
+
 function parseExecutionLockRecoveryAttestationPayload(
   value: unknown,
 ): ExecutionLockRecoveryAttestation | null {
@@ -4404,6 +4876,7 @@ function parseExecutionLockQuarantineAudit(
       || typeof record.eventId !== 'string'
       || !EXECUTION_LOCK_UUID_PATTERN.test(record.eventId)
       || (record.action !== 'boundary-entered'
+        && record.action !== 'resumed'
         && record.action !== 'quarantined'
         && record.action !== 'completed'
         && record.action !== 'recovered')
@@ -4424,6 +4897,7 @@ function parseExecutionLockQuarantineAudit(
 
     let payload:
       | ExecutionLockQuarantineInfo
+      | ExecutionLockBoundaryResumeAttestation
       | ExecutionLockBoundaryCompletion
       | ExecutionLockRecoveryAttestation
       | null;
@@ -4443,6 +4917,21 @@ function parseExecutionLockQuarantineAudit(
         || (record.action === 'boundary-entered'
           ? payload.state !== 'in-flight'
           : payload.state !== 'quarantined')) {
+        return null;
+      }
+      if (record.action === 'boundary-entered'
+        && Date.parse(payload.enteredAt)
+          < Date.parse(payload.lock.acquiredAt)) return null;
+    } else if (record.action === 'resumed') {
+      payload = parseExecutionLockBoundaryResumeAttestation(record.payload);
+      if (!payload
+        || payload.quarantineId !== record.quarantineId
+        || payload.resumedLock.taskId !== record.taskId
+        || payload.resumedLock.ownerId !== record.ownerId
+        || !executionLockFencingTokenEquals(
+          payload.resumedLock.fencingToken,
+          fencingToken,
+        )) {
         return null;
       }
     } else if (record.action === 'completed') {
@@ -4785,6 +5274,119 @@ function loadExecutionLockActiveRow(
   return row ? parseExecutionLockActiveRow(row) : undefined;
 }
 
+function parseExecutionLockActiveAdoptionAuditRow(
+  row: ExecutionLockActiveAdoptionAuditRow,
+): ExecutionLockActiveAdoptionAudit {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(row.payload_json) as unknown;
+  } catch {
+    raw = null;
+  }
+  const audit = parseExecutionLockActiveAdoptionAudit(raw);
+  if (!audit
+    || audit.eventId !== row.event_id
+    || audit.previousLock.taskId !== row.task_id
+    || audit.previousLock.ownerId !== row.previous_owner_id
+    || audit.previousLock.fencingToken.epoch !== row.previous_fencing_epoch
+    || audit.previousLock.fencingToken.counter !== row.previous_fencing_counter
+    || audit.previousLock.fencingToken.nonce !== row.previous_fencing_nonce
+    || audit.adoptedLock.ownerId !== row.adopted_owner_id
+    || audit.adoptedLock.fencingToken.epoch !== row.adopted_fencing_epoch
+    || audit.adoptedLock.fencingToken.counter !== row.adopted_fencing_counter
+    || audit.adoptedLock.fencingToken.nonce !== row.adopted_fencing_nonce
+    || audit.adoptedAt !== row.occurred_at
+    || JSON.stringify(audit) !== row.payload_json) {
+    throw new ExecutionLockError(
+      `Execution active adoption audit row is invalid: ${row.event_id}`,
+      typeof row.task_id === 'string' ? row.task_id : 'unknown',
+      'malformed',
+    );
+  }
+  return audit;
+}
+
+function loadExecutionLockActiveAdoptionForPrevious(
+  db: DatabaseType,
+  previous: ExecutionLockInfo,
+): ExecutionLockActiveAdoptionAudit | undefined {
+  const row = db.prepare(`
+    SELECT event_id, task_id, previous_owner_id, previous_fencing_epoch,
+           previous_fencing_counter, previous_fencing_nonce,
+           adopted_owner_id, adopted_fencing_epoch,
+           adopted_fencing_counter, adopted_fencing_nonce, occurred_at,
+           payload_json
+      FROM execution_lock_active_adoption_audit
+     WHERE task_id = ?
+       AND previous_owner_id = ?
+       AND previous_fencing_epoch = ?
+       AND previous_fencing_counter = ?
+       AND previous_fencing_nonce = ?
+  `).get(
+    previous.taskId,
+    previous.ownerId,
+    previous.fencingToken.epoch,
+    previous.fencingToken.counter,
+    previous.fencingToken.nonce,
+  ) as ExecutionLockActiveAdoptionAuditRow | undefined;
+  return row ? parseExecutionLockActiveAdoptionAuditRow(row) : undefined;
+}
+
+function loadExecutionLockActiveAdoptionForAdopted(
+  db: DatabaseType,
+  adopted: ExecutionLockInfo,
+): ExecutionLockActiveAdoptionAudit | undefined {
+  const row = db.prepare(`
+    SELECT event_id, task_id, previous_owner_id, previous_fencing_epoch,
+           previous_fencing_counter, previous_fencing_nonce,
+           adopted_owner_id, adopted_fencing_epoch,
+           adopted_fencing_counter, adopted_fencing_nonce, occurred_at,
+           payload_json
+      FROM execution_lock_active_adoption_audit
+     WHERE task_id = ?
+       AND adopted_owner_id = ?
+       AND adopted_fencing_epoch = ?
+       AND adopted_fencing_counter = ?
+       AND adopted_fencing_nonce = ?
+  `).get(
+    adopted.taskId,
+    adopted.ownerId,
+    adopted.fencingToken.epoch,
+    adopted.fencingToken.counter,
+    adopted.fencingToken.nonce,
+  ) as ExecutionLockActiveAdoptionAuditRow | undefined;
+  return row ? parseExecutionLockActiveAdoptionAuditRow(row) : undefined;
+}
+
+function loadExecutionLockActiveAdoptionLineage(
+  db: DatabaseType,
+  current: ExecutionLockInfo,
+): ExecutionLockActiveAdoptionAudit[] {
+  const reversed: ExecutionLockActiveAdoptionAudit[] = [];
+  let cursor = current;
+  while (true) {
+    const audit = loadExecutionLockActiveAdoptionForAdopted(db, cursor);
+    if (!audit) break;
+    if (JSON.stringify(audit.adoptedLock) !== JSON.stringify(cursor)) {
+      throw new ExecutionLockError(
+        `Execution active adoption lineage is invalid for task ${current.taskId}`,
+        current.taskId,
+        'malformed',
+      );
+    }
+    reversed.push(audit);
+    if (reversed.length > MAX_EXECUTION_LOCK_ACTIVE_ADOPTIONS) {
+      throw new ExecutionLockError(
+        `Execution active adoption lineage exceeds its durable limit for task ${current.taskId}`,
+        current.taskId,
+        'malformed',
+      );
+    }
+    cursor = audit.previousLock;
+  }
+  return reversed.reverse();
+}
+
 function loadLegacyV2ExecutionLockActivePage(
   db: DatabaseType,
   afterTaskId: string,
@@ -4852,6 +5454,27 @@ function executionLockGenerationEquals(
     );
 }
 
+function executionLockIsExactRenewalOf(
+  previous: ExecutionLockInfo,
+  candidate: ExecutionLockInfo,
+): boolean {
+  return previous.schemaVersion === candidate.schemaVersion
+    && previous.taskId === candidate.taskId
+    && previous.actor === candidate.actor
+    && previous.ownerId === candidate.ownerId
+    && previous.pid === candidate.pid
+    && previous.hostInstanceId === candidate.hostInstanceId
+    && previous.bootSessionId === candidate.bootSessionId
+    && previous.processSessionId === candidate.processSessionId
+    && executionLockFencingTokenEquals(
+      previous.fencingToken,
+      candidate.fencingToken,
+    )
+    && previous.acquiredAt === candidate.acquiredAt
+    && previous.leaseDurationMs === candidate.leaseDurationMs
+    && Date.parse(candidate.renewedAt) >= Date.parse(previous.renewedAt);
+}
+
 function parseExecutionLockQuarantineAuditRow(
   row: ExecutionLockQuarantineAuditRow,
 ): ExecutionLockQuarantineAuditEvent {
@@ -4876,6 +5499,131 @@ function parseExecutionLockQuarantineAuditRow(
   return event;
 }
 
+interface ExecutionLockBoundaryAuditLineage {
+  readonly boundary: ExecutionLockQuarantineAuditEvent;
+  readonly resumes: readonly ExecutionLockQuarantineAuditEvent[];
+  readonly currentLock: ExecutionLockInfo;
+}
+
+function loadExecutionLockQuarantineAuditChain(
+  db: DatabaseType,
+  quarantineId: string,
+): ExecutionLockQuarantineAuditEvent[] {
+  const rows = db.prepare(`
+    SELECT event_id, action, quarantine_id, task_id, owner_id,
+           fencing_epoch, fencing_counter, fencing_nonce, occurred_at,
+           payload_json
+      FROM execution_lock_quarantine_audit
+     WHERE quarantine_id = ?
+     ORDER BY fencing_counter, occurred_at, event_id
+     LIMIT ?
+  `).all(
+    quarantineId,
+    MAX_EXECUTION_LOCK_BOUNDARY_RESUMES + 4,
+  ) as ExecutionLockQuarantineAuditRow[];
+  if (rows.length > MAX_EXECUTION_LOCK_BOUNDARY_RESUMES + 3) {
+    throw new ExecutionLockError(
+      'Execution boundary resume chain exceeds its durable limit',
+      typeof rows[0]?.task_id === 'string' ? rows[0].task_id : 'unknown',
+      'malformed',
+    );
+  }
+  return rows.map(parseExecutionLockQuarantineAuditRow);
+}
+
+function executionLockBoundaryAuditLineage(
+  events: readonly ExecutionLockQuarantineAuditEvent[],
+  quarantineId: string,
+): ExecutionLockBoundaryAuditLineage | null {
+  const boundaries = events.filter(event => event.action === 'boundary-entered');
+  const resumes = events.filter(event => event.action === 'resumed');
+  if (boundaries.length !== 1
+    || resumes.length > MAX_EXECUTION_LOCK_BOUNDARY_RESUMES) return null;
+  const boundary = boundaries[0]!;
+  if (!('lock' in boundary.payload)
+    || boundary.payload.quarantineId !== quarantineId
+    || boundary.payload.state !== 'in-flight'
+    || boundary.payload.reason !== 'irreversible-boundary') return null;
+  let currentLock = boundary.payload.lock;
+  let previousAt = boundary.occurredAt;
+  const orderedResumes = [...resumes].sort((left, right) => (
+    left.fencingToken.counter - right.fencingToken.counter
+      || (left.eventId < right.eventId
+        ? -1
+        : left.eventId > right.eventId ? 1 : 0)
+  ));
+  for (const event of orderedResumes) {
+    if (!('previousLock' in event.payload)
+      || event.quarantineId !== quarantineId
+      || event.taskId !== boundary.taskId
+      || !executionLockIsExactRenewalOf(
+        currentLock,
+        event.payload.previousLock,
+      )
+      || event.payload.resumedAt < previousAt
+      || event.occurredAt !== event.payload.resumedAt
+      || event.ownerId !== event.payload.resumedLock.ownerId
+      || !executionLockFencingTokenEquals(
+        event.fencingToken,
+        event.payload.resumedLock.fencingToken,
+      )) return null;
+    currentLock = event.payload.resumedLock;
+    previousAt = event.occurredAt;
+  }
+  return { boundary, resumes: orderedResumes, currentLock };
+}
+
+function assertExecutionLockActiveQuarantineAuditChain(
+  db: DatabaseType,
+  quarantine: ExecutionLockQuarantineInfo,
+): void {
+  const events = loadExecutionLockQuarantineAuditChain(
+    db,
+    quarantine.quarantineId,
+  );
+  const lineage = executionLockBoundaryAuditLineage(
+    events,
+    quarantine.quarantineId,
+  );
+  if (!lineage) {
+    const only = events[0];
+    if (quarantine.state === 'quarantined'
+      && events.length === 1
+      && only?.action === 'quarantined'
+      && 'lock' in only.payload
+      && Date.parse(quarantine.enteredAt)
+        >= Date.parse(quarantine.lock.acquiredAt)
+      && JSON.stringify(only.payload) === JSON.stringify(quarantine)) return;
+    throw new ExecutionLockError(
+      `Execution quarantine audit chain is invalid for task ${quarantine.lock.taskId}`,
+      quarantine.lock.taskId,
+      'malformed',
+    );
+  }
+  const nonLineage = events.filter(event => (
+    event.action !== 'boundary-entered' && event.action !== 'resumed'
+  ));
+  const currentMatches =
+    executionLockIsExactRenewalOf(lineage.currentLock, quarantine.lock);
+  const quarantineAudit = nonLineage[0];
+  const terminallyQuarantined = quarantine.state === 'quarantined'
+    && nonLineage.length === 1
+    && quarantineAudit?.action === 'quarantined'
+    && 'lock' in quarantineAudit.payload
+    && JSON.stringify(quarantineAudit.payload) === JSON.stringify(quarantine)
+    && quarantineAudit.occurredAt >= lineage.boundary.occurredAt;
+  if (!currentMatches
+    || (quarantine.state === 'in-flight'
+      ? nonLineage.length !== 0
+      : !terminallyQuarantined)) {
+    throw new ExecutionLockError(
+      `Execution quarantine audit chain does not end at current authority for task ${quarantine.lock.taskId}`,
+      quarantine.lock.taskId,
+      'malformed',
+    );
+  }
+}
+
 function loadExecutionLockQuarantineAuditPage(
   db: DatabaseType,
   afterTaskId: string,
@@ -4891,12 +5639,16 @@ function loadExecutionLockQuarantineAuditPage(
        AND (
          (
            quarantine.state = 'in-flight'
-           AND audit.action = 'boundary-entered'
+           AND audit.action IN ('boundary-entered', 'resumed')
          ) OR (
            quarantine.state = 'quarantined'
            AND audit.action = 'quarantined'
          )
        )
+       AND audit.owner_id = quarantine.owner_id
+       AND audit.fencing_epoch = quarantine.fencing_epoch
+       AND audit.fencing_counter = quarantine.fencing_counter
+       AND audit.fencing_nonce = quarantine.fencing_nonce
      ORDER BY quarantine.task_id
      LIMIT ?
   `).all(
@@ -4981,11 +5733,12 @@ function loadExecutionLockQuarantineRows(
     audits.map(audit => [audit.quarantineId, audit]),
   );
   for (const quarantine of quarantines) {
-    const requiredAction =
-      quarantine.state === 'in-flight' ? 'boundary-entered' : 'quarantined';
     const audit = auditsByQuarantineId.get(quarantine.quarantineId);
+    const actionMatches = quarantine.state === 'in-flight'
+      ? audit?.action === 'boundary-entered' || audit?.action === 'resumed'
+      : audit?.action === 'quarantined';
     if (!audit
-      || audit.action !== requiredAction
+      || !actionMatches
       || audit.taskId !== quarantine.lock.taskId
       || audit.ownerId !== quarantine.lock.ownerId
       || !executionLockFencingTokenEquals(
@@ -4993,11 +5746,12 @@ function loadExecutionLockQuarantineRows(
         quarantine.lock.fencingToken,
       )) {
       throw new ExecutionLockError(
-        `Execution quarantine has no durable ${requiredAction} audit for task ${quarantine.lock.taskId}`,
+        `Execution quarantine has no durable current-generation audit for task ${quarantine.lock.taskId}`,
         quarantine.lock.taskId,
         'malformed',
       );
     }
+    assertExecutionLockActiveQuarantineAuditChain(db, quarantine);
   }
   return quarantines;
 }
@@ -5035,15 +5789,27 @@ function loadExecutionLockQuarantineForLock(
       'malformed',
     );
   }
-  const action =
-    quarantine.state === 'in-flight' ? 'boundary-entered' : 'quarantined';
+  const actions = quarantine.state === 'in-flight'
+    ? ['boundary-entered', 'resumed'] as const
+    : ['quarantined'] as const;
   const auditRow = db.prepare(`
     SELECT event_id, action, quarantine_id, task_id, owner_id, fencing_epoch,
            fencing_counter, fencing_nonce, occurred_at, payload_json
       FROM execution_lock_quarantine_audit
      WHERE quarantine_id = ?
-       AND action = ?
-  `).get(quarantine.quarantineId, action) as
+       AND action IN (${actions.map(() => '?').join(', ')})
+       AND owner_id = ?
+       AND fencing_epoch = ?
+       AND fencing_counter = ?
+       AND fencing_nonce = ?
+  `).get(
+    quarantine.quarantineId,
+    ...actions,
+    quarantine.lock.ownerId,
+    quarantine.lock.fencingToken.epoch,
+    quarantine.lock.fencingToken.counter,
+    quarantine.lock.fencingToken.nonce,
+  ) as
     | ExecutionLockQuarantineAuditRow
     | undefined;
   const audit = auditRow
@@ -5062,11 +5828,12 @@ function loadExecutionLockQuarantineForLock(
     || audit.occurredAt !== auditRow.occurred_at
     || JSON.stringify(audit) !== auditRow.payload_json) {
     throw new ExecutionLockError(
-      `Execution quarantine has no durable ${action} audit for task ${lock.taskId}`,
+        `Execution quarantine has no durable current-generation audit for task ${lock.taskId}`,
       lock.taskId,
       'malformed',
     );
   }
+  assertExecutionLockActiveQuarantineAuditChain(db, quarantine);
   return quarantine;
 }
 
@@ -5333,6 +6100,80 @@ function updateExecutionLockActiveRow(
   }
 }
 
+function transferExecutionLockActiveRow(
+  db: DatabaseType,
+  previous: ExecutionLockInfo,
+  candidate: ExecutionLockInfo,
+): void {
+  const result = db.prepare(`
+    UPDATE execution_lock_active
+       SET owner_id = ?,
+           fencing_epoch = ?,
+           fencing_counter = ?,
+           fencing_nonce = ?,
+           payload_json = ?
+     WHERE task_id = ?
+       AND owner_id = ?
+       AND fencing_epoch = ?
+       AND fencing_counter = ?
+       AND fencing_nonce = ?
+       AND payload_json = ?
+  `).run(
+    candidate.ownerId,
+    candidate.fencingToken.epoch,
+    candidate.fencingToken.counter,
+    candidate.fencingToken.nonce,
+    JSON.stringify(candidate),
+    previous.taskId,
+    previous.ownerId,
+    previous.fencingToken.epoch,
+    previous.fencingToken.counter,
+    previous.fencingToken.nonce,
+    JSON.stringify(previous),
+  );
+  if (result.changes !== 1) {
+    throw new ExecutionLockError(
+      `Canonical execution authority transfer lost exact ownership for task ${previous.taskId}`,
+      previous.taskId,
+      'ownership-lost',
+    );
+  }
+}
+
+function appendExecutionLockActiveAdoptionAudit(
+  db: DatabaseType,
+  audit: ExecutionLockActiveAdoptionAudit,
+): void {
+  const result = db.prepare(`
+    INSERT INTO execution_lock_active_adoption_audit(
+      event_id, task_id, previous_owner_id, previous_fencing_epoch,
+      previous_fencing_counter, previous_fencing_nonce, adopted_owner_id,
+      adopted_fencing_epoch, adopted_fencing_counter, adopted_fencing_nonce,
+      occurred_at, payload_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    audit.eventId,
+    audit.previousLock.taskId,
+    audit.previousLock.ownerId,
+    audit.previousLock.fencingToken.epoch,
+    audit.previousLock.fencingToken.counter,
+    audit.previousLock.fencingToken.nonce,
+    audit.adoptedLock.ownerId,
+    audit.adoptedLock.fencingToken.epoch,
+    audit.adoptedLock.fencingToken.counter,
+    audit.adoptedLock.fencingToken.nonce,
+    audit.adoptedAt,
+    JSON.stringify(audit),
+  );
+  if (result.changes !== 1) {
+    throw new ExecutionLockError(
+      `Execution active adoption audit append failed for task ${audit.previousLock.taskId}`,
+      audit.previousLock.taskId,
+      'mutation-conflict',
+    );
+  }
+}
+
 function deleteExecutionLockActiveRow(
   db: DatabaseType,
   lock: Pick<ExecutionLockInfo, 'taskId' | 'ownerId' | 'fencingToken'>,
@@ -5434,6 +6275,50 @@ function transitionExecutionLockQuarantineRow(
   }
 }
 
+function resumeExecutionLockQuarantineRow(
+  db: DatabaseType,
+  previous: ExecutionLockQuarantineInfo,
+  candidate: ExecutionLockQuarantineInfo,
+): void {
+  const result = db.prepare(`
+    UPDATE execution_lock_quarantine
+       SET owner_id = ?,
+           fencing_epoch = ?,
+           fencing_counter = ?,
+           fencing_nonce = ?,
+           payload_json = ?
+     WHERE task_id = ?
+       AND quarantine_id = ?
+       AND owner_id = ?
+       AND fencing_epoch = ?
+       AND fencing_counter = ?
+       AND fencing_nonce = ?
+       AND state = 'in-flight'
+       AND reason = 'irreversible-boundary'
+       AND payload_json = ?
+  `).run(
+    candidate.lock.ownerId,
+    candidate.lock.fencingToken.epoch,
+    candidate.lock.fencingToken.counter,
+    candidate.lock.fencingToken.nonce,
+    JSON.stringify(candidate),
+    previous.lock.taskId,
+    previous.quarantineId,
+    previous.lock.ownerId,
+    previous.lock.fencingToken.epoch,
+    previous.lock.fencingToken.counter,
+    previous.lock.fencingToken.nonce,
+    JSON.stringify(previous),
+  );
+  if (result.changes !== 1) {
+    throw new ExecutionLockError(
+      `Execution boundary resume lost exact authority for task ${previous.lock.taskId}`,
+      previous.lock.taskId,
+      'ownership-lost',
+    );
+  }
+}
+
 function executionLockForExactGeneration(
   active: readonly ExecutionLockInfo[],
   expected: ExecutionLockInfo,
@@ -5523,6 +6408,23 @@ function normalizeExecutionLockHandle(
   return parsed;
 }
 
+function normalizeExecutionLockQuarantineHandle(
+  value: ExecutionLockQuarantineInfo,
+): ExecutionLockQuarantineInfo {
+  const parsed = parseExecutionLockQuarantine(
+    JSON.stringify(value),
+    value.lock.taskId,
+  );
+  if (!parsed || JSON.stringify(parsed) !== JSON.stringify(value)) {
+    throw new ExecutionLockError(
+      'Execution quarantine exact-generation handle is invalid',
+      typeof value.lock?.taskId === 'string' ? value.lock.taskId : 'unknown',
+      'invalid-input',
+    );
+  }
+  return parsed;
+}
+
 function readCommittedExecutionLockQuarantine(
   projectRoot: string,
   expected: ExecutionLockQuarantineInfo,
@@ -5596,6 +6498,14 @@ export function beginExecutionLockIrreversibleBoundary(
   options: ExecutionLockOptions = {},
 ): ExecutionLockQuarantineInfo {
   const expected = normalizeExecutionLockHandle(exactLock);
+  if (request.quarantineId !== undefined
+    && !EXECUTION_LOCK_UUID_PATTERN.test(request.quarantineId)) {
+    throw new ExecutionLockError(
+      `Execution boundary id is invalid for task ${expected.taskId}`,
+      expected.taskId,
+      'invalid-input',
+    );
+  }
   const evidenceRefs =
     normalizeExecutionLockEvidenceRefs(request.evidenceRefs, expected.taskId);
   const nowMs = executionLockNow(options);
@@ -5618,11 +6528,19 @@ export function beginExecutionLockIrreversibleBoundary(
     const existing = current.quarantine;
     assertExactLiveExecutionLockOwner(canonical, options);
     if (existing) {
-      if (existing.state === 'in-flight') return existing;
+      if (existing.state === 'in-flight'
+        && (request.quarantineId === undefined
+          || existing.quarantineId === request.quarantineId)
+        && JSON.stringify(existing.evidenceRefs)
+          === JSON.stringify(evidenceRefs)) {
+        return existing;
+      }
       throw new ExecutionLockError(
-        `Execution generation is already quarantined for task ${expected.taskId}`,
+        existing.state === 'in-flight'
+          ? `Execution boundary replay conflicts for task ${expected.taskId}`
+          : `Execution generation is already quarantined for task ${expected.taskId}`,
         expected.taskId,
-        'quarantined',
+        existing.state === 'in-flight' ? 'mutation-conflict' : 'quarantined',
         canonical.ownerId,
         canonical,
       );
@@ -5632,7 +6550,7 @@ export function beginExecutionLockIrreversibleBoundary(
     );
     const candidate: ExecutionLockQuarantineInfo = {
       schemaVersion: EXECUTION_LOCK_QUARANTINE_SCHEMA_VERSION,
-      quarantineId: randomUUID(),
+      quarantineId: request.quarantineId ?? randomUUID(),
       lock: canonical,
       state: 'in-flight',
       reason: 'irreversible-boundary',
@@ -5653,6 +6571,723 @@ export function beginExecutionLockIrreversibleBoundary(
     return candidate;
   });
   return readCommittedExecutionLockQuarantine(projectRoot, quarantine);
+}
+
+function readCompletedExecutionLockBoundaryFromDb(
+  db: DatabaseType,
+  quarantineId: string,
+): ExecutionLockQuarantineAuditEvent | null {
+  const events = loadExecutionLockQuarantineAuditChain(db, quarantineId);
+  if (events.length === 0) return null;
+  const lineage = executionLockBoundaryAuditLineage(events, quarantineId);
+  const completed = events.filter(event => event.action === 'completed');
+  const allowedCount = 2 + (lineage?.resumes.length ?? 0);
+  const event = completed[0];
+  const latestBoundaryAt = lineage
+    ? [lineage.boundary, ...lineage.resumes]
+      .reduce((latest, candidate) => (
+        candidate.occurredAt > latest ? candidate.occurredAt : latest
+      ), lineage.boundary.occurredAt)
+    : '';
+  if (!lineage
+    || events.length !== allowedCount
+    || completed.length !== 1
+    || !event
+    || event.taskId !== lineage.boundary.taskId
+    || event.ownerId !== lineage.currentLock.ownerId
+    || !executionLockFencingTokenEquals(
+      event.fencingToken,
+      lineage.currentLock.fencingToken,
+    )
+    || !('completedAt' in event.payload)
+    || event.payload.quarantineId !== quarantineId
+    || event.occurredAt !== event.payload.completedAt
+    || event.occurredAt < latestBoundaryAt) {
+    throw new ExecutionLockError(
+      `Execution boundary terminal audit chain is invalid for task ${event?.taskId ?? lineage?.boundary.taskId ?? 'unknown'}`,
+      event?.taskId ?? lineage?.boundary.taskId ?? 'unknown',
+      'malformed',
+    );
+  }
+  const quarantine = db.prepare(`
+    SELECT quarantine_id
+      FROM execution_lock_quarantine
+     WHERE quarantine_id = ?
+  `).get(quarantineId) as { readonly quarantine_id?: unknown } | undefined;
+  if (quarantine !== undefined) {
+    throw new ExecutionLockError(
+      `Completed execution boundary remains active for task ${event.taskId}`,
+      event.taskId,
+      'malformed',
+    );
+  }
+  const active = loadExecutionLockActiveRow(db, event.taskId);
+  if (active
+    && active.ownerId === event.ownerId
+    && executionLockFencingTokenEquals(active.fencingToken, event.fencingToken)) {
+    throw new ExecutionLockError(
+      `Completed execution boundary retains its fencing generation for task ${event.taskId}`,
+      event.taskId,
+      'malformed',
+    );
+  }
+  return event;
+}
+
+/**
+ * Reread one exact completed irreversible-boundary audit from canonical lock
+ * storage. This is intentionally keyed by the durable boundary UUID rather
+ * than task projection state: terminal completion removes the active and
+ * quarantine rows, while the append-only audit remains the restart authority.
+ */
+export function readCompletedExecutionLockBoundary(
+  projectRoot: string,
+  quarantineId: string,
+): ExecutionLockQuarantineAuditEvent | null {
+  if (!EXECUTION_LOCK_UUID_PATTERN.test(quarantineId)) {
+    throw new ExecutionLockError(
+      'Execution boundary id is invalid',
+      'unknown',
+      'invalid-input',
+    );
+  }
+  return withExecutionLockMutation(
+    projectRoot,
+    db => readCompletedExecutionLockBoundaryFromDb(db, quarantineId),
+  );
+}
+
+function completedExecutionLockBoundaryResultFromDb(
+  db: DatabaseType,
+  quarantineId: string,
+): Omit<ExecutionLockBoundaryCompletionResult, 'projectionCleanup'> | null {
+  const audit = readCompletedExecutionLockBoundaryFromDb(db, quarantineId);
+  if (!audit) return null;
+  const lineage = executionLockBoundaryAuditLineage(
+    loadExecutionLockQuarantineAuditChain(db, quarantineId),
+    quarantineId,
+  );
+  const completed = lineage?.boundary.payload;
+  if (!lineage
+    || lineage.resumes.length !== 0
+    || !completed
+    || !('lock' in completed)
+    || completed.state !== 'in-flight'
+    || completed.reason !== 'irreversible-boundary') {
+    throw new ExecutionLockError(
+      `Execution boundary terminal payload is invalid for task ${audit.taskId}`,
+      audit.taskId,
+      'malformed',
+    );
+  }
+  return { completed, audit };
+}
+
+/**
+ * Resolve a committed active-generation adoption from the exact canonical
+ * successor. This never searches by transaction text: callers must already
+ * possess the current fenced handle and the exact evidence identity, then may
+ * derive their higher-level prior-lease digest from the validated previousLock.
+ */
+export function readExecutionLockActiveAdoption(
+  projectRoot: string,
+  exactAdoptedLock: ExecutionLockInfo,
+  request: ExecutionLockActiveAdoptionRequest,
+): ExecutionLockActiveAdoptionResolution | null {
+  const expected = normalizeExecutionLockHandle(exactAdoptedLock);
+  const evidenceRefs = normalizeExecutionLockEvidenceRefs(
+    request.evidenceRefs,
+    expected.taskId,
+  );
+  if (evidenceRefs.length === 0) {
+    throw new ExecutionLockError(
+      `Execution active adoption evidence is required for task ${expected.taskId}`,
+      expected.taskId,
+      'invalid-input',
+    );
+  }
+  return withExecutionLockMutation(projectRoot, db => {
+    const current = loadExecutionLockActiveRow(db, expected.taskId);
+    const canonical = current
+      && executionLockForExactGeneration([current], expected);
+    if (!canonical) {
+      throw new ExecutionLockError(
+        `Exact adopted execution generation is not canonical for task ${expected.taskId}`,
+        expected.taskId,
+        'ownership-lost',
+        current?.ownerId,
+        current,
+      );
+    }
+    if (loadExecutionLockQuarantineForLock(db, canonical)) {
+      throw new ExecutionLockError(
+        `Quarantined execution generation is not an active adoption for task ${expected.taskId}`,
+        expected.taskId,
+        'quarantined',
+        canonical.ownerId,
+        canonical,
+      );
+    }
+    const lineage = loadExecutionLockActiveAdoptionLineage(db, canonical);
+    const audit = lineage[lineage.length - 1];
+    if (!audit) return null;
+    if (JSON.stringify(audit.adoptedLock) !== JSON.stringify(canonical)
+      || lineage.some(candidate => (
+        JSON.stringify(candidate.evidenceRefs)
+          !== JSON.stringify(evidenceRefs)
+      ))) {
+      throw new ExecutionLockError(
+        `Execution active adoption evidence conflicts for task ${expected.taskId}`,
+        expected.taskId,
+        'mutation-conflict',
+        canonical.ownerId,
+        canonical,
+      );
+    }
+    return {
+      previous: audit.previousLock,
+      adopted: canonical,
+      audit,
+      lineage,
+    };
+  });
+}
+
+/**
+ * Resolve the final durable resume hop from the exact current in-flight
+ * quarantine. The complete boundary lineage is validated before exposing the
+ * previous lock, so restart logic cannot manufacture a predecessor from a
+ * weak transaction identifier or stale projection.
+ */
+export function readExecutionLockBoundaryResume(
+  projectRoot: string,
+  exactResumedQuarantine: ExecutionLockQuarantineInfo,
+  request: ExecutionLockBoundaryResumeRequest,
+): ExecutionLockBoundaryResumeResolution | null {
+  const expected = normalizeExecutionLockQuarantineHandle(
+    exactResumedQuarantine,
+  );
+  const evidenceRefs = normalizeExecutionLockEvidenceRefs(
+    request.evidenceRefs,
+    expected.lock.taskId,
+  );
+  if (evidenceRefs.length === 0) {
+    throw new ExecutionLockError(
+      `Execution boundary resume evidence is required for task ${expected.lock.taskId}`,
+      expected.lock.taskId,
+      'invalid-input',
+    );
+  }
+  return withExecutionLockMutation(projectRoot, db => {
+    const current = loadExecutionLockActiveRow(db, expected.lock.taskId);
+    const canonical = current
+      && executionLockForExactGeneration([current], expected.lock);
+    const quarantine = canonical
+      ? loadExecutionLockQuarantineForLock(db, canonical)
+      : undefined;
+    if (!canonical
+      || !quarantine
+      || JSON.stringify(quarantine) !== JSON.stringify(expected)) {
+      throw new ExecutionLockError(
+        `Exact resumed execution boundary is not canonical for task ${expected.lock.taskId}`,
+        expected.lock.taskId,
+        quarantine?.state === 'quarantined'
+          ? 'quarantined'
+          : 'ownership-lost',
+        current?.ownerId,
+        current,
+      );
+    }
+    if (quarantine.state !== 'in-flight') {
+      throw new ExecutionLockError(
+        `Terminal execution quarantine has no resumable lineage for task ${expected.lock.taskId}`,
+        expected.lock.taskId,
+        'quarantined',
+        canonical.ownerId,
+        canonical,
+      );
+    }
+    const lineage = executionLockBoundaryAuditLineage(
+      loadExecutionLockQuarantineAuditChain(db, quarantine.quarantineId),
+      quarantine.quarantineId,
+    );
+    if (!lineage
+      || !executionLockIsExactRenewalOf(lineage.currentLock, canonical)) {
+      throw new ExecutionLockError(
+        `Execution boundary resume lineage is malformed for task ${expected.lock.taskId}`,
+        expected.lock.taskId,
+        'malformed',
+      );
+    }
+    const audit = lineage.resumes[lineage.resumes.length - 1];
+    if (!audit) return null;
+    if (!('previousLock' in audit.payload)
+      || lineage.resumes.some(candidate => (
+        !('previousLock' in candidate.payload)
+        || JSON.stringify(candidate.payload.evidenceRefs)
+          !== JSON.stringify(evidenceRefs)
+      ))) {
+      throw new ExecutionLockError(
+        `Execution boundary resume evidence conflicts for task ${expected.lock.taskId}`,
+        expected.lock.taskId,
+        'mutation-conflict',
+        canonical.ownerId,
+        canonical,
+      );
+    }
+    const previous = normalizeExecutionLockQuarantineHandle({
+      ...quarantine,
+      lock: audit.payload.previousLock,
+    });
+    return {
+      previous,
+      resumed: quarantine,
+      audit,
+      lineage: lineage.resumes,
+    };
+  });
+}
+
+/**
+ * Adopt one exact expired unquarantined generation after positive owner-death
+ * proof. The append-only previous-to-successor audit is written before the
+ * SQL-triggered fence transfer in the same transaction, and also supplies the
+ * exact crash/restart replay identity for callers retaining the old handle.
+ */
+export function adoptExecutionLockActiveGeneration(
+  projectRoot: string,
+  exactLock: ExecutionLockInfo,
+  request: ExecutionLockActiveAdoptionRequest,
+  options: ExecutionLockOptions = {},
+): ExecutionLockActiveAdoptionResult {
+  const expected = normalizeExecutionLockHandle(exactLock);
+  const evidenceRefs = normalizeExecutionLockEvidenceRefs(
+    request.evidenceRefs,
+    expected.taskId,
+  );
+  if (evidenceRefs.length === 0) {
+    throw new ExecutionLockError(
+      `Execution active adoption evidence is required for task ${expected.taskId}`,
+      expected.taskId,
+      'invalid-input',
+    );
+  }
+  const validated = validateExecutionLockAcquireInput(
+    expected.taskId,
+    expected.actor,
+    options,
+  );
+  let candidateResult: Omit<
+    ExecutionLockActiveAdoptionResult,
+    'projectionPublication'
+  > | undefined;
+  let committed: Omit<
+    ExecutionLockActiveAdoptionResult,
+    'projectionPublication'
+  >;
+  const reconcileCandidate = (
+    db: DatabaseType,
+    authorityRoot: string,
+  ): Omit<ExecutionLockActiveAdoptionResult, 'projectionPublication'> | null => {
+    const current = reconcileExecutionLockProjectionForTask(
+      authorityRoot,
+      db,
+      expected.taskId,
+      options,
+    );
+    const existingAudit = loadExecutionLockActiveAdoptionForPrevious(
+      db,
+      expected,
+    );
+    if (!existingAudit) return null;
+    if (JSON.stringify(existingAudit.previousLock) !== JSON.stringify(expected)
+      || JSON.stringify(existingAudit.evidenceRefs)
+        !== JSON.stringify(evidenceRefs)
+      || !current.lock
+      || current.quarantine
+      || JSON.stringify(current.lock)
+        !== JSON.stringify(existingAudit.adoptedLock)) {
+      throw new ExecutionLockError(
+        `Execution active adoption replay conflicts for task ${expected.taskId}`,
+        expected.taskId,
+        current.quarantine ? 'quarantined' : 'mutation-conflict',
+        current.lock?.ownerId,
+        current.lock,
+      );
+    }
+    return {
+      previous: expected,
+      adopted: existingAudit.adoptedLock,
+      audit: existingAudit,
+    };
+  };
+  try {
+    committed = withExecutionLockMutation(
+      projectRoot,
+      (db, authorityRoot) => {
+        const replay = reconcileCandidate(db, authorityRoot);
+        if (replay) {
+          candidateResult = replay;
+          return replay;
+        }
+        const current = reconcileExecutionLockProjectionForTask(
+          authorityRoot,
+          db,
+          expected.taskId,
+          options,
+        );
+        const previous = current.lock
+          && executionLockForExactGeneration([current.lock], expected);
+        if (!previous || current.quarantine) {
+          throw new ExecutionLockError(
+            `Exact unquarantined execution generation is unavailable for adoption of task ${expected.taskId}`,
+            expected.taskId,
+            current.quarantine ? 'quarantined' : 'ownership-lost',
+            current.lock?.ownerId,
+            current.lock,
+          );
+        }
+        const priorLineage = loadExecutionLockActiveAdoptionLineage(
+          db,
+          previous,
+        );
+        if (priorLineage.length >= MAX_EXECUTION_LOCK_ACTIVE_ADOPTIONS) {
+          throw new ExecutionLockError(
+            `Execution active adoption limit is exhausted for task ${expected.taskId}`,
+            expected.taskId,
+            'mutation-conflict',
+          );
+        }
+        if (priorLineage.some(candidate => (
+          JSON.stringify(candidate.evidenceRefs)
+            !== JSON.stringify(evidenceRefs)
+        ))) {
+          throw new ExecutionLockError(
+            `Execution active adoption evidence lineage conflicts for task ${expected.taskId}`,
+            expected.taskId,
+            'mutation-conflict',
+            previous.ownerId,
+            previous,
+          );
+        }
+        if (!staleExecutionLockCanRetire(
+          previous,
+          validated.nowMs,
+          options,
+        )) {
+          throw new ExecutionLockError(
+            `Execution active owner lease is still held for task ${expected.taskId}`,
+            expected.taskId,
+            'held',
+            previous.ownerId,
+            previous,
+          );
+        }
+        const adoptedAt = executionLockTimestamp(Math.max(
+          validated.nowMs,
+          Date.parse(previous.renewedAt),
+        ));
+        const adopted: ExecutionLockInfo = {
+          schemaVersion: EXECUTION_LOCK_SCHEMA_VERSION,
+          taskId: previous.taskId,
+          actor: previous.actor,
+          ownerId: randomUUID(),
+          pid: validated.ownerPid,
+          hostInstanceId: validated.identity.hostInstanceId,
+          bootSessionId: validated.identity.bootSessionId,
+          processSessionId: validated.identity.processSessionId,
+          fencingToken: allocateExecutionLockFencingToken(db),
+          acquiredAt: adoptedAt,
+          renewedAt: adoptedAt,
+          leaseDurationMs: validated.leaseDurationMs,
+        };
+        assertExecutionLockFencingProgression(
+          previous.fencingToken,
+          adopted.fencingToken,
+          previous.taskId,
+        );
+        const audit: ExecutionLockActiveAdoptionAudit = {
+          schemaVersion: EXECUTION_LOCK_ACTIVE_ADOPTION_SCHEMA_VERSION,
+          eventId: randomUUID(),
+          previousLock: previous,
+          adoptedLock: adopted,
+          evidenceRefs,
+          adoptedAt,
+        };
+        appendExecutionLockActiveAdoptionAudit(db, audit);
+        transferExecutionLockActiveRow(db, previous, adopted);
+        candidateResult = { previous, adopted, audit };
+        return candidateResult;
+      },
+    );
+  } catch (error) {
+    if (error instanceof ExecutionLockError
+      && error.canonicalCommitState
+      && candidateResult) {
+      committed = withExecutionLockMutation(
+        projectRoot,
+        (db, authorityRoot) => {
+          const reconciled = reconcileCandidate(db, authorityRoot);
+          if (!reconciled) {
+            throw new ExecutionLockError(
+              `Execution active adoption commit requires exact reconciliation for task ${expected.taskId}`,
+              expected.taskId,
+              error.reason,
+              candidateResult!.adopted.ownerId,
+              candidateResult!.adopted,
+              error.canonicalCommitState,
+            );
+          }
+          return reconciled;
+        },
+      );
+    } else {
+      throw error;
+    }
+  }
+  let projectionPublication: 'completed' | 'uncertain' = 'completed';
+  try {
+    withExecutionLockPinnedAuthorityRoot(projectRoot, authorityRoot => {
+      publishExecutionLockProjection(
+        authorityRoot,
+        committed.adopted,
+        true,
+        options,
+      );
+    });
+    const inspected = checkExecutionLock(projectRoot, expected.taskId);
+    if (inspected.state !== 'held'
+      || JSON.stringify(inspected.lock)
+        !== JSON.stringify(committed.adopted)) {
+      projectionPublication = 'uncertain';
+    }
+  } catch {
+    projectionPublication = 'uncertain';
+  }
+  return { ...committed, projectionPublication };
+}
+
+/**
+ * Transfer an abandoned in-flight irreversible boundary to a fresh fenced
+ * generation. Only an expired owner whose death is positively established is
+ * adoptable; alive, unknown, foreign-host and terminal quarantine states stay
+ * fail-closed for typed operator recovery.
+ */
+export function resumeExecutionLockIrreversibleBoundary(
+  projectRoot: string,
+  exactQuarantine: ExecutionLockQuarantineInfo,
+  request: ExecutionLockBoundaryResumeRequest,
+  options: ExecutionLockOptions = {},
+): ExecutionLockBoundaryResumeResult {
+  const expected = normalizeExecutionLockQuarantineHandle(exactQuarantine);
+  if (expected.state !== 'in-flight'
+    || expected.reason !== 'irreversible-boundary') {
+    throw new ExecutionLockError(
+      `Only an in-flight execution boundary can resume for task ${expected.lock.taskId}`,
+      expected.lock.taskId,
+      'quarantined',
+      expected.lock.ownerId,
+      expected.lock,
+    );
+  }
+  const evidenceRefs = normalizeExecutionLockEvidenceRefs(
+    request.evidenceRefs,
+    expected.lock.taskId,
+  );
+  if (evidenceRefs.length === 0) {
+    throw new ExecutionLockError(
+      `Execution boundary resume evidence is required for task ${expected.lock.taskId}`,
+      expected.lock.taskId,
+      'invalid-input',
+    );
+  }
+  const validated = validateExecutionLockAcquireInput(
+    expected.lock.taskId,
+    expected.lock.actor,
+    options,
+  );
+  let candidateResult: Omit<
+    ExecutionLockBoundaryResumeResult,
+    'projectionPublication'
+  > | undefined;
+  let committed: Omit<
+    ExecutionLockBoundaryResumeResult,
+    'projectionPublication'
+  >;
+  try {
+    committed = withExecutionLockMutation(
+      projectRoot,
+      (db, authorityRoot) => {
+        const current = reconcileExecutionLockProjectionForTask(
+          authorityRoot,
+          db,
+          expected.lock.taskId,
+          options,
+        );
+        const previousLock = current.lock
+          && executionLockForExactGeneration([current.lock], expected.lock);
+        const previous = previousLock ? current.quarantine : undefined;
+        if (!previousLock
+          || !previous
+          || JSON.stringify(previous) !== JSON.stringify(expected)) {
+          throw new ExecutionLockError(
+            `Exact in-flight execution boundary is unavailable for resume of task ${expected.lock.taskId}`,
+            expected.lock.taskId,
+            previous?.state === 'quarantined'
+              ? 'quarantined'
+              : 'ownership-lost',
+            current.lock?.ownerId,
+            current.lock,
+          );
+        }
+        if (previous.state !== 'in-flight') {
+          throw new ExecutionLockError(
+            `Terminal execution quarantine cannot resume for task ${expected.lock.taskId}`,
+            expected.lock.taskId,
+            'quarantined',
+            previousLock.ownerId,
+            previousLock,
+          );
+        }
+        if (!staleExecutionLockCanRetire(
+          previousLock,
+          validated.nowMs,
+          options,
+        )) {
+          throw new ExecutionLockError(
+            `Execution boundary owner lease is still active for task ${expected.lock.taskId}`,
+            expected.lock.taskId,
+            'held',
+            previousLock.ownerId,
+            previousLock,
+          );
+        }
+        const lineage = executionLockBoundaryAuditLineage(
+          loadExecutionLockQuarantineAuditChain(db, previous.quarantineId),
+          previous.quarantineId,
+        );
+        if (!lineage
+          || !executionLockIsExactRenewalOf(
+            lineage.currentLock,
+            previousLock,
+          )) {
+          throw new ExecutionLockError(
+            `Execution boundary resume lineage is invalid for task ${expected.lock.taskId}`,
+            expected.lock.taskId,
+            'malformed',
+          );
+        }
+        if (lineage.resumes.some(candidate => (
+          !('previousLock' in candidate.payload)
+          || JSON.stringify(candidate.payload.evidenceRefs)
+            !== JSON.stringify(evidenceRefs)
+        ))) {
+          throw new ExecutionLockError(
+            `Execution boundary resume evidence lineage conflicts for task ${expected.lock.taskId}`,
+            expected.lock.taskId,
+            'mutation-conflict',
+            previousLock.ownerId,
+            previousLock,
+          );
+        }
+        if (lineage.resumes.length >= MAX_EXECUTION_LOCK_BOUNDARY_RESUMES) {
+          throw new ExecutionLockError(
+            `Execution boundary resume limit is exhausted for task ${expected.lock.taskId}`,
+            expected.lock.taskId,
+            'mutation-conflict',
+          );
+        }
+        const resumedAt = executionLockTimestamp(Math.max(
+          validated.nowMs,
+          Date.parse(previousLock.renewedAt),
+          Date.parse(previous.enteredAt),
+        ));
+        const resumedLock: ExecutionLockInfo = {
+          schemaVersion: EXECUTION_LOCK_SCHEMA_VERSION,
+          taskId: previousLock.taskId,
+          actor: previousLock.actor,
+          ownerId: randomUUID(),
+          pid: validated.ownerPid,
+          hostInstanceId: validated.identity.hostInstanceId,
+          bootSessionId: validated.identity.bootSessionId,
+          processSessionId: validated.identity.processSessionId,
+          fencingToken: allocateExecutionLockFencingToken(db),
+          acquiredAt: resumedAt,
+          renewedAt: resumedAt,
+          leaseDurationMs: validated.leaseDurationMs,
+        };
+        assertExecutionLockFencingProgression(
+          previousLock.fencingToken,
+          resumedLock.fencingToken,
+          previousLock.taskId,
+        );
+        const resumed: ExecutionLockQuarantineInfo = {
+          ...previous,
+          lock: resumedLock,
+        };
+        const attestation: ExecutionLockBoundaryResumeAttestation = {
+          schemaVersion: EXECUTION_LOCK_BOUNDARY_RESUME_SCHEMA_VERSION,
+          quarantineId: previous.quarantineId,
+          previousLock,
+          resumedLock,
+          evidenceRefs,
+          resumedAt,
+        };
+        const audit = createExecutionLockQuarantineAudit(
+          'resumed',
+          resumed,
+          attestation,
+          resumedAt,
+        );
+        // The trigger requires this exact successor audit before the
+        // quarantine generation can advance. All three writes share one
+        // BEGIN IMMEDIATE transaction, so partial transfer cannot commit.
+        appendExecutionLockQuarantineAudit(db, audit);
+        transferExecutionLockActiveRow(db, previousLock, resumedLock);
+        resumeExecutionLockQuarantineRow(db, previous, resumed);
+        candidateResult = { previous, resumed, audit };
+        return candidateResult;
+      },
+    );
+  } catch (error) {
+    if (error instanceof ExecutionLockError
+      && error.canonicalCommitState
+      && candidateResult) {
+      const reconciled = readCommittedExecutionLockQuarantine(
+        projectRoot,
+        candidateResult.resumed,
+      );
+      if (JSON.stringify(reconciled)
+        !== JSON.stringify(candidateResult.resumed)) {
+        throw new ExecutionLockError(
+          `Execution boundary resume commit requires exact reconciliation for task ${expected.lock.taskId}`,
+          expected.lock.taskId,
+          error.reason,
+          candidateResult.resumed.lock.ownerId,
+          candidateResult.resumed.lock,
+          error.canonicalCommitState,
+        );
+      }
+      committed = candidateResult;
+    } else {
+      throw error;
+    }
+  }
+  let projectionPublication: 'completed' | 'uncertain' = 'completed';
+  try {
+    withExecutionLockPinnedAuthorityRoot(projectRoot, authorityRoot => {
+      publishExecutionLockProjection(
+        authorityRoot,
+        committed.resumed.lock,
+        true,
+        options,
+      );
+    });
+    readCommittedExecutionLockQuarantine(projectRoot, committed.resumed);
+  } catch {
+    projectionPublication = 'uncertain';
+  }
+  return { ...committed, projectionPublication };
 }
 
 export function quarantineExecutionLock(
@@ -5731,6 +7366,193 @@ export function quarantineExecutionLock(
     return candidate;
   });
   return readCommittedExecutionLockQuarantine(projectRoot, quarantine);
+}
+
+/**
+ * Atomically records an irreversible boundary and its no-change completion.
+ * This avoids the crash window of two public calls for transactions that have
+ * conclusively proved there is no durable effect to land. The append-only
+ * boundary/completion pair and both canonical-row removals commit together.
+ */
+export function completeExecutionLockNoChangeBoundary(
+  projectRoot: string,
+  exactLock: ExecutionLockInfo,
+  request: ExecutionLockNoChangeCompletionRequest,
+  options: ExecutionLockOptions = {},
+): ExecutionLockBoundaryCompletionResult {
+  const expected = normalizeExecutionLockHandle(exactLock);
+  if (!EXECUTION_LOCK_UUID_PATTERN.test(request.quarantineId)) {
+    throw new ExecutionLockError(
+      `Execution no-change boundary id is invalid for task ${expected.taskId}`,
+      expected.taskId,
+      'invalid-input',
+    );
+  }
+  const boundaryEvidenceRefs = normalizeExecutionLockEvidenceRefs(
+    request.boundaryEvidenceRefs,
+    expected.taskId,
+  );
+  const completionEvidenceRefs = normalizeExecutionLockEvidenceRefs(
+    request.completionEvidenceRefs,
+    expected.taskId,
+  );
+  if (boundaryEvidenceRefs.length === 0
+    || completionEvidenceRefs.length === 0) {
+    throw new ExecutionLockError(
+      `Execution no-change boundary requires durable evidence for task ${expected.taskId}`,
+      expected.taskId,
+      'invalid-input',
+    );
+  }
+  const nowMs = executionLockNow(options);
+  let candidateResult: Omit<
+    ExecutionLockBoundaryCompletionResult,
+    'projectionCleanup'
+  > | undefined;
+  let wasReplay = false;
+  let committed: Omit<
+    ExecutionLockBoundaryCompletionResult,
+    'projectionCleanup'
+  >;
+
+  const assertExactReplay = (
+    result: Omit<ExecutionLockBoundaryCompletionResult, 'projectionCleanup'>,
+  ): void => {
+    const payload = result.audit.payload;
+    if (JSON.stringify(result.completed.lock) !== JSON.stringify(expected)
+      || JSON.stringify(result.completed.evidenceRefs)
+        !== JSON.stringify(boundaryEvidenceRefs)
+      || !('completedAt' in payload)
+      || JSON.stringify(payload.evidenceRefs)
+        !== JSON.stringify(completionEvidenceRefs)) {
+      throw new ExecutionLockError(
+        `Execution no-change boundary replay conflicts for task ${expected.taskId}`,
+        expected.taskId,
+        'mutation-conflict',
+      );
+    }
+  };
+
+  try {
+    committed = withExecutionLockMutation(
+      projectRoot,
+      (db, authorityRoot) => {
+        const existing = completedExecutionLockBoundaryResultFromDb(
+          db,
+          request.quarantineId,
+        );
+        if (existing) {
+          assertExactReplay(existing);
+          wasReplay = true;
+          candidateResult = existing;
+          return existing;
+        }
+        const current = reconcileExecutionLockProjectionForTask(
+          authorityRoot,
+          db,
+          expected.taskId,
+          options,
+        );
+        const canonical = current.lock
+          && executionLockForExactGeneration([current.lock], expected);
+        if (!canonical || current.quarantine) {
+          throw new ExecutionLockError(
+            `Exact unbounded execution generation is unavailable for no-change completion of task ${expected.taskId}`,
+            expected.taskId,
+            current.quarantine ? 'quarantined' : 'ownership-lost',
+            current.lock?.ownerId,
+            current.lock,
+          );
+        }
+        assertExactLiveExecutionLockOwner(canonical, options);
+        const terminalAt = executionLockTimestamp(Math.max(
+          nowMs,
+          Date.parse(canonical.renewedAt),
+        ));
+        const boundary: ExecutionLockQuarantineInfo = {
+          schemaVersion: EXECUTION_LOCK_QUARANTINE_SCHEMA_VERSION,
+          quarantineId: request.quarantineId,
+          lock: canonical,
+          state: 'in-flight',
+          reason: 'irreversible-boundary',
+          evidenceRefs: boundaryEvidenceRefs,
+          enteredAt: terminalAt,
+          quarantinedAt: null,
+        };
+        const boundaryAudit = createExecutionLockQuarantineAudit(
+          'boundary-entered',
+          boundary,
+          boundary,
+          terminalAt,
+        );
+        const completion: ExecutionLockBoundaryCompletion = {
+          schemaVersion: EXECUTION_LOCK_BOUNDARY_COMPLETION_SCHEMA_VERSION,
+          quarantineId: boundary.quarantineId,
+          fencingToken: canonical.fencingToken,
+          evidenceRefs: completionEvidenceRefs,
+          completedAt: terminalAt,
+        };
+        const completionAudit = createExecutionLockQuarantineAudit(
+          'completed',
+          boundary,
+          completion,
+          terminalAt,
+        );
+        insertExecutionLockQuarantineRow(db, boundary);
+        appendExecutionLockQuarantineAudit(db, boundaryAudit);
+        appendExecutionLockQuarantineAudit(db, completionAudit);
+        deleteExecutionLockQuarantineRow(db, boundary);
+        deleteExecutionLockActiveRow(db, canonical);
+        candidateResult = { completed: boundary, audit: completionAudit };
+        return candidateResult;
+      },
+    );
+  } catch (error) {
+    if (error instanceof ExecutionLockError
+      && error.canonicalCommitState
+      && candidateResult) {
+      const reconciled = withExecutionLockMutation(
+        projectRoot,
+        db => completedExecutionLockBoundaryResultFromDb(
+          db,
+          request.quarantineId,
+        ),
+      );
+      if (!reconciled) {
+        throw new ExecutionLockError(
+          `Execution no-change completion commit requires exact reconciliation for task ${expected.taskId}`,
+          expected.taskId,
+          error.reason,
+          expected.ownerId,
+          expected,
+          error.canonicalCommitState,
+        );
+      }
+      assertExactReplay(reconciled);
+      committed = reconciled;
+    } else {
+      throw error;
+    }
+  }
+  if (!wasReplay) {
+    try {
+      options.terminalCommitObserver?.({
+        kind: 'completed',
+        lock: committed.completed.lock,
+        quarantine: committed.completed,
+        audit: committed.audit,
+      });
+    } catch {
+      // Observability cannot change the committed terminal decision.
+    }
+  }
+  let projectionCleanup: 'completed' | 'uncertain' = 'completed';
+  try {
+    removeReleasedExecutionLockProjection(projectRoot, committed.completed.lock);
+  } catch {
+    projectionCleanup = 'uncertain';
+  }
+  return { ...committed, projectionCleanup };
 }
 
 export function completeExecutionLockIrreversibleBoundary(

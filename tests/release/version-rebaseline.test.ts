@@ -34,9 +34,10 @@ describe('0.100.0 version rebaseline', () => {
   it('canonical package version is 0.100.0 (#1)', () => {
     const pkg = JSON.parse(read('package.json')) as { version: string };
     expect(pkg.version).toBe('0.100.0');
-    const lock = JSON.parse(read('package-lock.json')) as { version: string; packages: Record<string, { version?: string }> };
-    expect(lock.version).toBe('0.100.0');
-    expect(lock.packages['']?.version).toBe('0.100.0');
+    const shrinkwrap = JSON.parse(read('npm-shrinkwrap.json')) as { version: string; packages: Record<string, { version?: string }> };
+    expect(shrinkwrap.version).toBe('0.100.0');
+    expect(shrinkwrap.packages['']?.version).toBe('0.100.0');
+    expect(existsSync(join(ROOT, 'package-lock.json'))).toBe(false);
   });
 
   it('runtime DECKENT_VERSION (CLI --version source) resolves to 0.100.0 (#2)', () => {

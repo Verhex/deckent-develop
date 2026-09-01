@@ -27,9 +27,13 @@ describe('.github/workflows/publish.yml', () => {
     expect(workflowContent).toContain("- 'v*'");
   });
 
-  it('should have OIDC permissions set correctly for provenance', () => {
-    expect(workflowContent).toContain('contents: read');
-    expect(workflowContent).toContain('id-token: write');
+  it('is validation-only with read-only permissions and no OIDC publish grant', () => {
+    const permissions = workflowContent.slice(
+      workflowContent.indexOf('permissions:'),
+      workflowContent.indexOf('\njobs:'),
+    );
+    expect(permissions).toContain('contents: read');
+    expect(permissions).not.toContain('id-token: write');
   });
 
   it('should use Node.js 24.x', () => {
@@ -91,6 +95,12 @@ describe('.github/workflows/publish.yml', () => {
 
   it('should have cache enabled for npm', () => {
     expect(workflowContent).toContain('cache: npm');
+  });
+
+  it('should key the npm cache explicitly from the canonical root shrinkwrap', () => {
+    expect(workflowContent).toMatch(
+      /cache: npm\s*\n\s*cache-dependency-path: npm-shrinkwrap\.json/u,
+    );
   });
 
   it('should have type check step', () => {

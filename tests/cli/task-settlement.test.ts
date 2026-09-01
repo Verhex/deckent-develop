@@ -557,4 +557,47 @@ describe('task settle CLI authority', () => {
     expect(print).not.toHaveBeenCalled();
     expect(process.exitCode).toBe(1);
   });
+
+  it('never settles a normal Docker dispatch from a public result projection', async () => {
+    const root = fixture();
+    const opened = productionOpener(root);
+    const declaration = opened.authority.declareTaskExecution({
+      tenantId: 'local',
+      projectId: opened.projectId,
+      taskId: 'run-1',
+      runId: 'run-1',
+      provider: 'claude',
+      model: 'claude-sonnet-5',
+      executionBackend: 'docker',
+      createdAt: '2026-07-27T10:00:00.000Z',
+    });
+    opened.authority.markDispatchStarted({
+      tenantId: 'local',
+      projectId: opened.projectId,
+      invocationId: declaration.receiptRef.invocationId,
+      attempt: 1,
+      executionEvidenceRef: 'public-result-must-not-authorize',
+      calledProvider: 'claude',
+      calledModel: 'claude-sonnet-5',
+      occurredAt: '2026-07-27T10:01:00.000Z',
+    });
+    opened.close();
+    writeFileSync(join(root, '.tasks', 'task-run-1.result'), JSON.stringify({
+      taskId: 'run-1',
+      selfAssessment: 'DONE',
+    }));
+
+    await run(root, ['task', 'settle', 'run-1', '--from-result', '--json']);
+
+    expect(lastJson()).toMatchObject({
+      applied: false,
+      decision: 'hold',
+      reasonCode: 'unsupported-task-domain',
+      effectiveStatus: 'PENDING',
+    });
+    const ledger = new InvocationReceiptStore(root);
+    const view = ledger.get(declaration.receiptRef, declaration.receiptRef.invocationId);
+    expect(view?.events.map(event => event.type)).toEqual(['dispatch_started']);
+    ledger.close();
+  });
 });

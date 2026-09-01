@@ -30,12 +30,12 @@ const CLOSED_ADVISORY_IDS = [
 ];
 
 describe('DEP669A — dependency-bump slice (offline-safe lockfile/manifest pins)', () => {
-  const lockfile = readJson('package-lock.json');
+  const lockfile = readJson('npm-shrinkwrap.json');
   const pkg = readJson('package.json');
 
   function lockedVersion(name: string): string {
     const entry = lockfile.packages[`node_modules/${name}`];
-    expect(entry, `node_modules/${name} missing from package-lock.json`).toBeDefined();
+    expect(entry, `node_modules/${name} missing from npm-shrinkwrap.json`).toBeDefined();
     return entry.version;
   }
 

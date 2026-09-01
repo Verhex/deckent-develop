@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import {
   ProductionWiringTaskHoldError,
+  buildWorkerPrompt,
   createTask,
   plannerTaskToParams,
   type CreateTaskParams,
+  type WorkerPromptCompilationSinkV2,
 } from '../../src/orchestra/task-builder.js';
 import {
   createProductionWiringPlanEvidence,
@@ -184,5 +189,47 @@ describe('production wiring task-builder authority', () => {
     const task = createTask(params(), 30);
 
     expect(task).not.toHaveProperty('productionWiring', expect.anything());
+  });
+
+  it('compiles the exact prompt entirely in memory before public admission', () => {
+    const root = mkdtempSync(join(tmpdir(), 'task-builder-exact-'));
+    try {
+      mkdirSync(join(root, '.tasks'), { recursive: true });
+      const sourceTask = createTask(params(), 31);
+      const compileTask = structuredClone(sourceTask);
+      const sink: WorkerPromptCompilationSinkV2 = {};
+
+      const prompt = buildWorkerPrompt(
+        compileTask,
+        undefined,
+        [],
+        root,
+        undefined,
+        undefined,
+        undefined,
+        'docker',
+        {
+          publicationMode: 'deferred',
+          dependencyIds: [],
+          dependencyResults: new Map(),
+          sink,
+        },
+      );
+
+      expect(sink.artifact).toMatchObject({ prompt });
+      expect(sink.artifact?.segments.length).toBeGreaterThan(0);
+      expect(sink.receipt).toMatchObject({
+        taskId: sourceTask.id,
+        promptCompilePlanId: sink.artifact?.planId,
+      });
+      expect(sourceTask).not.toHaveProperty('promptCompilePlanId');
+      expect(compileTask.promptCompilePlanId).toBe(sink.artifact?.planId);
+      expect(existsSync(join(root, '.tasks', `task-${sourceTask.id}.skill-delivery.json`)))
+        .toBe(false);
+      expect(existsSync(join(root, '.deckent', 'runtime', 'prompt-lint.jsonl')))
+        .toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });

@@ -13,7 +13,8 @@
 //
 // Fallback: if the sandbox's hermeticity policy refuses even that local child process,
 // this suite derives the identical file list in-process — package.json `files` field
-// walked on disk, plus npm's always-included package.json/README*/LICENSE* — with no
+// walked on disk, plus npm's always-included package.json/npm-shrinkwrap.json/
+// README*/LICENSE* — with no
 // npm invocation and no network at all. Which path ran is recorded in `derivation.via`
 // and asserted below.
 //
@@ -48,6 +49,10 @@ interface PackageManifest {
   name: string;
   files?: string[];
   bin?: Record<string, string>;
+}
+
+function manifestTopLevelAllowlist(files: readonly string[]): ReadonlySet<string> {
+  return new Set(files.map((entry) => entry.replace(/^\.\//u, '').split('/')[0]));
 }
 
 // Async subprocess — no spawnSync (project hermeticity rule: scripts/lint-no-spawnsync.mjs).
@@ -93,6 +98,11 @@ function deriveFromManifestInProcess(pkg: PackageManifest): PackedFile[] {
   const files: PackedFile[] = [];
   const pkgJsonPath = join(PROJECT_ROOT, 'package.json');
   files.push({ path: 'package.json', size: statSync(pkgJsonPath).size });
+  const shrinkwrapPath = join(PROJECT_ROOT, 'npm-shrinkwrap.json');
+  if (!existsSync(shrinkwrapPath) || !statSync(shrinkwrapPath).isFile()) {
+    throw new Error('canonical npm-shrinkwrap.json is absent from the package root');
+  }
+  files.push({ path: 'npm-shrinkwrap.json', size: statSync(shrinkwrapPath).size });
 
   for (const entry of readdirSync(PROJECT_ROOT)) {
     if (/^README/i.test(entry) || /^LICEN[SC]E/i.test(entry)) {
@@ -115,7 +125,7 @@ function deriveFromManifestInProcess(pkg: PackageManifest): PackedFile[] {
       files.push({ path: declared, size: st.size });
     }
   }
-  return files;
+  return [...new Map(files.map(file => [file.path, file])).values()];
 }
 
 let derivation: DerivationResult;
@@ -123,6 +133,14 @@ let pkg: PackageManifest;
 
 beforeAll(async () => {
   pkg = JSON.parse(readFileSync(join(PROJECT_ROOT, 'package.json'), 'utf-8')) as PackageManifest;
+
+  // The scoped T20 source suite can explicitly exercise the deterministic
+  // fallback without invoking npm. This is not a test skip: every whitelist
+  // assertion below still runs against the manifest-derived file inventory.
+  if (process.env.DECKENT_SKIP_PACK_TESTS === '1') {
+    derivation = { via: 'manifest-fallback', files: deriveFromManifestInProcess(pkg) };
+    return;
+  }
 
   const env: NodeJS.ProcessEnv = { ...process.env, NO_UPDATE_NOTIFIER: '1' };
   try {
@@ -157,10 +175,13 @@ describe('npm pack whitelist (row 8091) — hermetic, no publish, no network', (
     expect(derivation.files.length).toBeGreaterThan(0);
   });
 
-  it('every packed top-level entry is in the manifest-declared whitelist (dist, bin, assets, README*, LICENSE*, package.json)', () => {
-    const declaredDirs = new Set((pkg.files ?? []).filter((f) => !/^(README|LICEN[SC]E)/i.test(f)));
+  it('every packed top-level entry is in the manifest-declared whitelist plus npm package metadata', () => {
+    const declaredDirs = manifestTopLevelAllowlist(
+      (pkg.files ?? []).filter((f) => !/^(README|LICEN[SC]E)/i.test(f)),
+    );
     const isAllowed = (topSegment: string) =>
       topSegment === 'package.json' ||
+      topSegment === 'npm-shrinkwrap.json' ||
       /^README/i.test(topSegment) ||
       /^LICEN[SC]E/i.test(topSegment) ||
       declaredDirs.has(topSegment);
@@ -168,8 +189,48 @@ describe('npm pack whitelist (row 8091) — hermetic, no publish, no network', (
     const offenders = derivation.files.filter((f) => !isAllowed(f.path.split('/')[0]));
     expect(
       offenders.map((f) => f.path),
-      `unexpected top-level entries outside the manifest whitelist (${[...declaredDirs].join(', ')}, README*, LICENSE*, package.json)`,
+      `unexpected top-level entries outside the manifest whitelist (${[...declaredDirs].join(', ')}, README*, LICENSE*, package.json, npm-shrinkwrap.json)`,
     ).toEqual([]);
+  });
+
+  it('normalizes nested manifest entries to their top-level package path', () => {
+    expect(manifestTopLevelAllowlist([
+      'native/exec-authority/index.mjs',
+      'native/exec-authority/src',
+      './dist',
+    ])).toEqual(new Set(['native', 'dist']));
+  });
+
+  it('ships npm-shrinkwrap.json as the sole root dependency lock authority', () => {
+    const paths = derivation.files.map(file => file.path);
+    expect(paths.filter(path => path === 'npm-shrinkwrap.json')).toHaveLength(1);
+    for (const forbiddenLock of [
+      'package-lock.json',
+      'pnpm-lock.yaml',
+      'yarn.lock',
+      'bun.lock',
+      'bun.lockb',
+    ]) {
+      expect(paths).not.toContain(forbiddenLock);
+    }
+  });
+
+  it('ships the exact native loader and source payload required for source identity', () => {
+    const shipped = new Set(derivation.files.map((file) => file.path));
+    expect([...shipped].filter((path) => path.startsWith('native/exec-authority/src/')).sort())
+      .toEqual([
+        'native/exec-authority/src/custody_common.h',
+        'native/exec-authority/src/custody_posix.c',
+        'native/exec-authority/src/custody_win32.c',
+        'native/exec-authority/src/exec_authority.c',
+      ]);
+    for (const path of [
+      'native/exec-authority/binding.gyp',
+      'native/exec-authority/index.mjs',
+      'native/exec-authority/package.json',
+    ]) {
+      expect(shipped.has(path), `${path} missing from the packed whitelist`).toBe(true);
+    }
   });
 
   it('no internal/dev state leaks in (.deckent, .brain, .tasks, .locks, .dashboard, .claude, .git, node_modules, docs, examples, deckent-hub, .contracts)', () => {

@@ -74,7 +74,10 @@ vi.mock('../../src/orchestra/result-watcher.js', () => ({
 import { TaskStatus, SprintPhase, SprintStatus } from '../../src/core/types.js';
 import type { Task, Sprint, ResolvedConfig } from '../../src/core/types.js';
 import type { SpawnBackend, SpawnBackendOptions } from '../../src/orchestra/spawn-backend.js';
-import type { SpawnTaskDeps } from '../../src/orchestra/scheduler-effects.js';
+import {
+  createExactNormalDockerExecutionRegistry,
+  type SpawnTaskDeps,
+} from '../../src/orchestra/scheduler-effects.js';
 import { planDispatch } from '../../src/orchestra/result-collector.js';
 import type { DispatchState } from '../../src/orchestra/result-collector.js';
 import {
@@ -473,7 +476,15 @@ describe('waitForResults — SCHED5 live wiring: initial tick spawns via the inj
       activeModeConfig: { max_workers: 3, brain_model: 'claude-opus-4-8', default_model: 'claude-sonnet-5', haiku_allowed: true },
     } as unknown as ResolvedConfig;
 
-    await waitForResults(root, sprint, 300, undefined, { spawnBackend: backend }, undefined, config);
+    await waitForResults(
+      root,
+      sprint,
+      300,
+      undefined,
+      { spawnBackend: backend, ipcExecutionMode: 'legacy-non-docker' },
+      undefined,
+      config,
+    );
 
     expect(backend.calls.map(call => call.taskId)).toContain('705-001');
     expect(vi.mocked(spawnWorker)).not.toHaveBeenCalled();
@@ -483,15 +494,29 @@ describe('waitForResults — SCHED5 live wiring: initial tick spawns via the inj
   it('reducer engine (config.scheduler.engine="reducer"): the injected driver spawns through the same canonical executor', async () => {
     const { sprint, readyTask } = buildFixture();
     const backend = makeMockBackend();
+    const registry = createExactNormalDockerExecutionRegistry(root);
     const config = {
       dependency_pipeline_enabled: true,
       scheduler: { engine: 'reducer' },
       activeModeConfig: { max_workers: 3, brain_model: 'claude-opus-4-8', default_model: 'claude-sonnet-5', haiku_allowed: true },
     } as unknown as ResolvedConfig;
 
-    await waitForResults(root, sprint, 300, undefined, { spawnBackend: backend }, undefined, config);
+    await waitForResults(
+      root,
+      sprint,
+      300,
+      undefined,
+      {
+        spawnBackend: backend,
+        exactDockerRegistry: registry,
+        ipcExecutionMode: 'legacy-non-docker',
+      },
+      undefined,
+      config,
+    );
 
     expect(backend.calls.map(call => call.taskId)).toContain('705-001');
+    expect(registry.resolveLifecycleOwner(readyTask.id)).toBe(backend);
     expect(vi.mocked(spawnWorker)).not.toHaveBeenCalled();
     expect(readyTask.status).toBe(TaskStatus.EXECUTING);
   });
@@ -505,7 +530,15 @@ describe('waitForResults — SCHED5 live wiring: initial tick spawns via the inj
     } as unknown as ResolvedConfig;
     expect((config as { scheduler?: unknown }).scheduler).toBeUndefined();
 
-    await waitForResults(root, sprint, 300, undefined, { spawnBackend: backend }, undefined, config);
+    await waitForResults(
+      root,
+      sprint,
+      300,
+      undefined,
+      { spawnBackend: backend, ipcExecutionMode: 'legacy-non-docker' },
+      undefined,
+      config,
+    );
 
     expect(backend.calls.map(call => call.taskId)).toContain('705-001');
     expect(vi.mocked(spawnWorker)).not.toHaveBeenCalled();

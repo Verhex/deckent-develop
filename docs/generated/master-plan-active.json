@@ -3,31 +3,31 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "724e71702142dca454e1a2398826af27d32cf2dde998e7343bb88c4efa913346"
+    "value": "aa8b0d46ae96bdc65e1b9dcd7042fd82e1cb88318f589ac52ff82d021bd51c5a"
   },
   "summary": {
-    "total": 562,
-    "active": 474,
+    "total": 568,
+    "active": 480,
     "terminal": 88,
     "receipts": 214,
     "byState": {
-      "OPEN": 362,
+      "OPEN": 366,
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
       "VERIFY": 43,
       "DONE": 88,
-      "DEFERRED": 0,
+      "DEFERRED": 2,
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 357,
-      "P1": 155,
+      "P0": 361,
+      "P1": 157,
       "P2": 50
     },
     "byProgram": {
       "API": 5,
-      "ASSURANCE": 17,
+      "ASSURANCE": 18,
       "AUTHORITY": 67,
       "CODEX": 44,
       "CONNECTOR": 3,
@@ -41,7 +41,7 @@
       "ENTERPRISE": 4,
       "EVAL": 5,
       "EVOLUTION": 4,
-      "KERNEL": 127,
+      "KERNEL": 128,
       "LEARNING": 9,
       "OBS": 9,
       "ONBOARDING": 1,
@@ -60,7 +60,7 @@
       "TERMINAL": 22,
       "TOOL": 1,
       "TRUTH": 106,
-      "XPLAT": 3
+      "XPLAT": 7
     }
   },
   "identityRegistry": [
@@ -3563,6 +3563,50 @@
       "terminalClosureDigest": "d916cbda04301939531f83b7568f9d4de13f7caabfdd4b7028d179fcb29f6439"
     },
     {
+      "order": 3326,
+      "id": "RECOVERY-BORN-711-NORMAL-DOCKER-EXACT-ATTEMPT-CUSTODY-001",
+      "program": "KERNEL",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-09-01",
+      "definitionDigest": "053c857d5a26ea6cdae01900b02984b71af7811fb5ec7d7333da1322079ece73",
+      "progressDigest": "e4b11d462dd56c5be1cb571811b9eaba78f40bf0b17c97cb008723ad341a10b2",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3327,
+      "id": "RECOVERY-BORN-711-LINUX-INSTALLED-CUSTODY-PROOF-001",
+      "program": "XPLAT",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-31",
+      "definitionDigest": "64aa349af403585b7008a5937bba56d04d9b6517a08bf98a5c79c5aed8a583d5",
+      "progressDigest": "3588f3c594c8e671b1105d8894b692252eb0bb193255e68b3dbcbadb657e19d4",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3328,
+      "id": "RECOVERY-BORN-711-WSL2-NATIVE-CUSTODY-PROOF-001",
+      "program": "XPLAT",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-31",
+      "definitionDigest": "48964363fccaa7e3ef6b823371e85f335b5d736bb59c61097933879c32a9bf8a",
+      "progressDigest": "b63c8fbbf8883c5b26ca64ef5092333f687a54faa7e01a6bc8566e67cf20d00f",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 3329,
+      "id": "RECOVERY-BORN-711-WSL2-DOCKER-CUSTODY-CANARY-001",
+      "program": "ASSURANCE",
+      "priority": "P0",
+      "state": "OPEN",
+      "updated": "2026-08-31",
+      "definitionDigest": "e2b082d4f28a8716c5a93e231bca22de75c284a97169d3ddbf2663ad5ecd9e4d",
+      "progressDigest": "271a50b577442512029fd4794aa16fa898334051295c28157948be17d6014160",
+      "terminalClosureDigest": null
+    },
+    {
       "order": 3330,
       "id": "PROD-SPRINT-PREFIX-PAD-001",
       "program": "KERNEL",
@@ -5496,6 +5540,28 @@
       "updated": "2026-07-26",
       "definitionDigest": "0bc64e8767239bca0c42e480ade3f30b9381bc77d39cbf52dea19e8bf48d9676",
       "progressDigest": "8b7d6665ef4b0b2a647bf409b2a4b1f11683c5668fb207f5f5a2b71ead9bbe93",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 8031,
+      "id": "RECOVERY-BORN-711-MACOS-NATIVE-CUSTODY-PROOF-001",
+      "program": "XPLAT",
+      "priority": "P1",
+      "state": "DEFERRED",
+      "updated": "2026-08-31",
+      "definitionDigest": "016fc9642083b0f60f9306f98c115122b06d20d82e9c5d13e601bfeee92a7b71",
+      "progressDigest": "802095f9d1f7f0ce67b8a694c601ee2c3d1684afff4a87d2ddf6366539796dbf",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 8032,
+      "id": "RECOVERY-BORN-711-WINDOWS-NATIVE-CUSTODY-PROOF-001",
+      "program": "XPLAT",
+      "priority": "P1",
+      "state": "DEFERRED",
+      "updated": "2026-08-31",
+      "definitionDigest": "cab5ff87fbe7716a824f3c7f8d7699e08d71832096e7dc7b93940ad20e1dabc1",
+      "progressDigest": "49f7cfe8b0ced55b4b0644ec4cb49abca1ec9499bad90022ea75a34a11fd0f45",
       "terminalClosureDigest": null
     },
     {
@@ -16000,7 +16066,8 @@
         "RECOVERY-BORN-522-DOCTOR-AUTHORITY-COVERAGE-001",
         "RECOVERY-BORN-523-XVERIFY-PRODUCER-MISMATCH-001",
         "RECOVERY-BORN-523-ATTRIBUTION-UNMEASURABLE-001",
-        "CLEAN-DASHBOARD-POLICY-001"
+        "CLEAN-DASHBOARD-POLICY-001",
+        "RECOVERY-BORN-711-NORMAL-DOCKER-EXACT-ATTEMPT-CUSTODY-001"
       ],
       "gates": [
         "G1"
@@ -16064,7 +16131,8 @@
         "RECOVERY-BORN-515-TERMINAL-SUPERSESSION-001",
         "RECOVERY-BORN-522-DOCTOR-AUTHORITY-COVERAGE-001",
         "RECOVERY-BORN-523-XVERIFY-PRODUCER-MISMATCH-001",
-        "RECOVERY-BORN-523-ATTRIBUTION-UNMEASURABLE-001"
+        "RECOVERY-BORN-523-ATTRIBUTION-UNMEASURABLE-001",
+        "RECOVERY-BORN-711-NORMAL-DOCKER-EXACT-ATTEMPT-CUSTODY-001"
       ],
       "evidenceReceipts": [
         "GR-2026-07-30-RECOVERY-DOGFOOD-BOOTSTRAP-01",
@@ -19229,6 +19297,160 @@
       "acceptance": "Sıfır-yazım+limit-ölümü attempt'i typed provider-limit-death sınıfına ayrışır (ölçülemedi ≠ hiç-iş-yapmadı); FIX bu sınıfta temiz yeniden-doğum bilgisiyle doğar; hermetik test iki sınıfı pinler; honest-gate fail-closed korunur",
       "evidence": "Açılış: 2026-08-12 sprint-523 canlı — 523-001 provider-limit tükenmesiyle sıfır dosya yazıp öldü; workAttribution HOLD reasonCode=ATTRIBUTION_DIFF_UNMEASURABLE (attempt 85cef2f7, baseline a85a8995…), honest-gate NO_GO; FIX json yazıldı fakat aynı limitte spawn edilemedi, runner typed self-pause + 6 bağımlı task park (runner log recover --resume tarifi); intake 11/11 geçti",
       "updated": "2026-08-12"
+    },
+    {
+      "order": 3326,
+      "id": "RECOVERY-BORN-711-NORMAL-DOCKER-EXACT-ATTEMPT-CUSTODY-001",
+      "parent": "RECOVERY-DOGFOOD-BORN-001",
+      "program": "KERNEL",
+      "outcome": "Normal Docker task, attempt, worker output, provider capture, result, evaluation, finalizer, settlement ve restart tek host-private exact-attempt custody zincirinde kapanır",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [
+        "RECOVERY-BORN-711-MACOS-NATIVE-CUSTODY-PROOF-001",
+        "RECOVERY-BORN-711-WINDOWS-NATIVE-CUSTODY-PROOF-001"
+      ],
+      "children": [
+        "RECOVERY-BORN-711-LINUX-INSTALLED-CUSTODY-PROOF-001",
+        "RECOVERY-BORN-711-WSL2-NATIVE-CUSTODY-PROOF-001",
+        "RECOVERY-BORN-711-WSL2-DOCKER-CUSTODY-CANARY-001"
+      ],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-BORN-711-LINUX-INSTALLED-CUSTODY-PROOF-001",
+        "RECOVERY-BORN-711-WSL2-NATIVE-CUSTODY-PROOF-001",
+        "RECOVERY-BORN-711-WSL2-DOCKER-CUSTODY-CANARY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Project `.tasks` yalnız compatibility/observability projection'ıdır; immutable task admission claim'den önce doğar; attempt-private Docker output ve pristine provider capture bounded first-writer'dır; accepted attempt result/evaluation/finalizer/archive/restart digestleri exact zincirlenir; unrun veya stale sibling başarı üretemez; unchanged failure sınırsız FIX doğuramaz; POSIX ve Windows-native adapterları capability'yi uygular veya typed HOLD verir; kapanış source checks değil quiescent build, source/dist parity, compiled CLI, gerçek ağsız Docker canary ve bağımsız disk verification ister",
+      "evidence": "`owner-admission=owner-live-2026-08-30-motor-a-sequence-and-execution`; `scope-expansion=owner-live-2026-08-31-option-a-shared-native-foundation`; `platform-proof-split=owner-live-2026-08-31-wsl-linux-first`; `landing-scope=owner-live-2026-09-01-continue-t5-exact-landing-custody`; `effect-containment-scope=owner-live-2026-09-01-scope-revision-009-t5-exact-effect-containment`; trigger=Sprint-711/712/713 ABORTED orchestration truth; exact scope=57 production + 191 conditional test/script path; shared-native-foundation=one-versioned-ABI+platform-separated-source+opaque-lease+installed-package-proof; active-proof=Linux-installed-package+WSL2-native+WSL2-Docker; deferred-proof=macOS+Windows-native; Docker-daemon-consumption=T5+T5E; manifest-digest=`5edb2406854ca95e0550d0d627f7cee5959ffd8096e394137b5b62c8bb03e482`; scope-revised=2026-09-01; capsule=`docs/execution/active/RECOVERY-BORN-711-NORMAL-DOCKER-EXACT-ATTEMPT-CUSTODY-001.md`; manifest=`docs/execution/active/RECOVERY-BORN-711-NORMAL-DOCKER-EXACT-ATTEMPT-CUSTODY-001.expected-red.json`; exclusions=general-permission-RBAC,approval,routing,non-Docker,multi-hop,retention,manual-.tasks,memory.db,commit,push,Closure-signing,macOS-native-proof,Windows-native-proof; admission OPEN'dır ve implementation/closure kanıtı değildir",
+      "updated": "2026-09-01"
+    },
+    {
+      "order": 3327,
+      "id": "RECOVERY-BORN-711-LINUX-INSTALLED-CUSTODY-PROOF-001",
+      "parent": "RECOVERY-BORN-711-NORMAL-DOCKER-EXACT-ATTEMPT-CUSTODY-001",
+      "program": "XPLAT",
+      "outcome": "Linux installed-package native custody zinciri gerçek Linux userspace ve filesystem üzerinde kapanır",
+      "priority": "P0",
+      "dependsOn": [],
+      "dependents": [
+        "RECOVERY-BORN-711-WSL2-DOCKER-CUSTODY-CANARY-001",
+        "RECOVERY-BORN-711-WSL2-NATIVE-CUSTODY-PROOF-001"
+      ],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "~",
+        "W": "~",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [],
+      "evidenceReceipts": [],
+      "acceptance": "Versioned native ABI, POSIX descriptor-bound capture/publication, opaque lease ve root npm tarball wiring'i ağsız gerçek Linux containerında build/install/load edilir; binding yokluğu, ABI/artifact/digest drift'i veya unsupported filesystem typed HOLD verir; bu satır WSL2 host ya da bare-metal service parity iddiası değildir",
+      "evidence": "`owner-admission=owner-live-2026-08-31-wsl-linux-first`; current evidence source/static candidate and package preflight only; real installed tarball and native lifecycle proof pending; classification=BLOCKS_CURRENT_DONE",
+      "updated": "2026-08-31"
+    },
+    {
+      "order": 3328,
+      "id": "RECOVERY-BORN-711-WSL2-NATIVE-CUSTODY-PROOF-001",
+      "parent": "RECOVERY-BORN-711-NORMAL-DOCKER-EXACT-ATTEMPT-CUSTODY-001",
+      "program": "XPLAT",
+      "outcome": "WSL2 host native custody ve filesystem capability sonucu gerçek compiled binary ile kanıtlanır",
+      "priority": "P0",
+      "dependsOn": [
+        "RECOVERY-BORN-711-LINUX-INSTALLED-CUSTODY-PROOF-001"
+      ],
+      "dependents": [
+        "RECOVERY-BORN-711-WSL2-DOCKER-CUSTODY-CANARY-001"
+      ],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "~",
+        "W": "~",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-BORN-711-LINUX-INSTALLED-CUSTODY-PROOF-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Current WSL2 hostta canonical loader, POSIX adapter, owner-private root, no-follow capture, atomic no-replace publication, cleanup/reconciliation ve installed-package identity gerçek binary ile çalışır; DrvFS, unsupported mount veya capability belirsizliği success'e çevrilmeden exact typed HOLD olur",
+      "evidence": "`owner-admission=owner-live-2026-08-31-wsl-linux-first`; read-only disk snapshot kernel=`6.18.33.2-microsoft-standard-WSL2`, repo-fs=`ext4`, Node=`v24.15.0`, N-API=`10`, arch=`linux-x64`, GCC=`13.3.0`; global/local node-gyp absent and T19 pinned toolchain wiring pending; implementation, build and live proof pending; classification=BLOCKS_CURRENT_DONE",
+      "updated": "2026-08-31"
+    },
+    {
+      "order": 3329,
+      "id": "RECOVERY-BORN-711-WSL2-DOCKER-CUSTODY-CANARY-001",
+      "parent": "RECOVERY-BORN-711-NORMAL-DOCKER-EXACT-ATTEMPT-CUSTODY-001",
+      "program": "ASSURANCE",
+      "outcome": "WSL2 üzerindeki gerçek Docker Engine normal task custody zincirini ağsız compiled canary ile uçtan uca kanıtlar",
+      "priority": "P0",
+      "dependsOn": [
+        "RECOVERY-BORN-711-LINUX-INSTALLED-CUSTODY-PROOF-001",
+        "RECOVERY-BORN-711-WSL2-NATIVE-CUSTODY-PROOF-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "OPEN",
+      "truth": {
+        "C": "0",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "-",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-BORN-711-LINUX-INSTALLED-CUSTODY-PROOF-001",
+        "RECOVERY-BORN-711-WSL2-NATIVE-CUSTODY-PROOF-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Quiescent build sonrası compiled CLI gerçek Docker container doğurur; immutable task admission, attempt-private mount, pristine provider-free output, exact result/evaluation/finalizer/settlement/archive-restart chain ve finite repair truth diskte yeniden okunur; public `.tasks`, stale sibling veya test fixture başarı authority'si olamaz",
+      "evidence": "`owner-admission=owner-live-2026-08-31-wsl-linux-first`; read-only Docker snapshot active container 0; T5-T14 production fan-in and networkless canary pending; classification=BLOCKS_CURRENT_DONE",
+      "updated": "2026-08-31"
     },
     {
       "order": 3343,
@@ -25631,6 +25853,8 @@
         "ENV-ADAPTER-001",
         "INSTALL-SCOPE-001",
         "PLATFORM-PROOF-001",
+        "RECOVERY-BORN-711-MACOS-NATIVE-CUSTODY-PROOF-001",
+        "RECOVERY-BORN-711-WINDOWS-NATIVE-CUSTODY-PROOF-001",
         "PACKAGING-001",
         "DOCS-PRODUCT-001",
         "RELEASE-001",
@@ -25665,6 +25889,8 @@
         "ENV-ADAPTER-001",
         "INSTALL-SCOPE-001",
         "PLATFORM-PROOF-001",
+        "RECOVERY-BORN-711-MACOS-NATIVE-CUSTODY-PROOF-001",
+        "RECOVERY-BORN-711-WINDOWS-NATIVE-CUSTODY-PROOF-001",
         "PACKAGING-001",
         "DOCS-PRODUCT-001",
         "RELEASE-001",
@@ -25806,6 +26032,78 @@
       "acceptance": "Linux, macOS, Windows native, WSL, Docker and declared remote matrix with artifacts",
       "evidence": "No single-host inference",
       "updated": "2026-07-26"
+    },
+    {
+      "order": 8031,
+      "id": "RECOVERY-BORN-711-MACOS-NATIVE-CUSTODY-PROOF-001",
+      "parent": "EVERY-ENV-001",
+      "program": "XPLAT",
+      "outcome": "macOS native custody adapterı ve installed-package yaşam döngüsü gerçek Apple hostta kanıtlanır",
+      "priority": "P1",
+      "dependsOn": [
+        "RECOVERY-BORN-711-NORMAL-DOCKER-EXACT-ATTEMPT-CUSTODY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "DEFERRED",
+      "truth": {
+        "C": "~",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-BORN-711-NORMAL-DOCKER-EXACT-ATTEMPT-CUSTODY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Darwin native compile/load, APFS ve desteklenen filesystem capability probing, descriptor-bound capture/publication, file+directory durability, cleanup/reconciliation, signed/package identity ve compiled CLI lifecycle gerçek macOS hostta doğrulanır; Linux POSIX sonucu macOS success sayılmaz; RELATED_BUT_NONBLOCKING",
+      "evidence": "reason=owner prioritized WSL2 Linux and Docker Motor A closure while real macOS hardware authority is unavailable;review-date=2026-09-15",
+      "updated": "2026-08-31"
+    },
+    {
+      "order": 8032,
+      "id": "RECOVERY-BORN-711-WINDOWS-NATIVE-CUSTODY-PROOF-001",
+      "parent": "EVERY-ENV-001",
+      "program": "XPLAT",
+      "outcome": "Windows-native custody trust bootstrap, handle-pinned adapter ve installed-package yaşam döngüsü gerçek Windows hostta kapanır",
+      "priority": "P1",
+      "dependsOn": [
+        "RECOVERY-BORN-711-NORMAL-DOCKER-EXACT-ATTEMPT-CUSTODY-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G2",
+        "G1"
+      ],
+      "state": "DEFERRED",
+      "truth": {
+        "C": "~",
+        "W": "0",
+        "E": "0",
+        "H": "?",
+        "L": "0",
+        "X": "0",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "RECOVERY-BORN-711-NORMAL-DOCKER-EXACT-ATTEMPT-CUSTODY-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Addon yüklenmeden önce trusted installer/service veya broker authority kurulur; canonical operation digest lifecycle, handle-pinned path identity, DACL/reparse/local-volume/no-replace/durability readback, failure abort-cleanup ve canonical path-alias containment gerçek Windows-native build/install/runtime ile doğrulanır; POSIX simulation ve load-sonrası self-attestation success değildir; RELATED_BUT_NONBLOCKING",
+      "evidence": "reason=owner prioritized WSL2 Linux and Docker Motor A closure while Windows trusted-loader and native runtime authority require a separate bounded package;review-date=2026-09-15",
+      "updated": "2026-08-31"
     },
     {
       "order": 8040,
@@ -28424,6 +28722,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "deed82e88e51842520058daeda8ad257f8de342dfc60f3eca2fb07ad6a2baa8b"
+    "value": "5f64283d2d7d92606db0d43faa40b3f6bb2dab2c9a72324b1fa43cebd70e3661"
   }
 }

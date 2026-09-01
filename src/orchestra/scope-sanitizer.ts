@@ -169,6 +169,7 @@ const GLOBAL_PROTECTED = new Set([
   'package.json',
   'tsconfig.json',
   'package-lock.json',
+  'npm-shrinkwrap.json',
   'yarn.lock',
   'pnpm-lock.yaml',
 ]);

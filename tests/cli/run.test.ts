@@ -7,6 +7,7 @@ const hoisted = vi.hoisted(() => ({
   backendSpawn: vi.fn(),
   backendKill: vi.fn(),
   backendList: vi.fn().mockReturnValue([]),
+  executeTaskIngress: vi.fn(),
 }));
 
 // ─── Mocks ──────────────────────────────────────────────────────────
@@ -81,6 +82,11 @@ vi.mock('../../src/cli/commands/spawn.js', () => ({
     hoisted.backendSpawn(taskId, model, prompt, { ...opts, projectDir: root });
     return { backend: 'docker', provider: opts.provider ?? 'claude' };
   }),
+}));
+
+vi.mock('../../src/orchestra/task-mode-runner.js', () => ({
+  executeTaskIngress: hoisted.executeTaskIngress,
+  readTaskIngressErrorAuthority: (error: any) => error?.taskIngressAuthority,
 }));
 
 vi.mock('../../src/core/execution-plan-digest.js', async (importOriginal) => {
@@ -189,6 +195,30 @@ describe('buildRunTask', () => {
 describe('cleanupRunTask', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    hoisted.executeTaskIngress.mockImplementation(async (input: any) => {
+      const { writeFileSync: write } = await import('node:fs');
+      write(`${input.projectRoot}/.tasks/task-${input.task.id}.json`, JSON.stringify(input.task));
+      hoisted.backendSpawn(
+        input.task.id,
+        input.task.model,
+        'You are a worker...',
+        { projectDir: input.projectRoot, reasoningEffort: input.task.modelEffort },
+      );
+      return {
+        disposition: { kind: 'spawned', taskId: input.task.id },
+        executionMode: 'legacy-non-docker',
+        backend: 'docker',
+        provider: input.task.provider,
+        invocation: {
+          receiptRef: { schemaVersion: 1, invocationId: `test:${input.task.id}`, tenantId: 'local', projectId: 'test' },
+          executionBackend: 'docker',
+          transport: 'cli',
+          state: 'dispatch-started',
+          executionEvidenceRef: `test:${input.task.id}`,
+          dispatchStartedAt: new Date().toISOString(),
+        },
+      };
+    });
   });
 
   it('deletes all task file extensions', () => {

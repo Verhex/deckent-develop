@@ -176,6 +176,7 @@ describe('Fresh Install Matrix — Node 24/26', () => {
       const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
       expect(pkg.name).toBe('deckent');
       expect(pkg.type).toBe('module');
+      expect(pkg.files).toContain('npm-shrinkwrap.json');
 
       // Verify engines field requires Node 24+
       const engines = pkg.engines;
@@ -191,9 +192,10 @@ describe('Fresh Install Matrix — Node 24/26', () => {
       // better-sqlite3 requires node-gyp — valid for Node 18+
       expect(deps['better-sqlite3']).toBeDefined();
 
-      // Verify package-lock.json exists (required for npm ci)
-      const lockPath = join(process.cwd(), 'package-lock.json');
+      // Verify the published root dependency authority exists (required for npm ci)
+      const lockPath = join(process.cwd(), 'npm-shrinkwrap.json');
       expect(existsSync(lockPath)).toBe(true);
+      expect(existsSync(join(process.cwd(), 'package-lock.json'))).toBe(false);
     });
   });
 

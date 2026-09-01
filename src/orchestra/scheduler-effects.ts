@@ -29,6 +29,7 @@
 // via `SpawnTaskDeps` instead of imported.
 
 import { buildWorkerCoreSystemPrompt } from './prompt-god-template.js';
+import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync, existsSync, renameSync, appendFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 
@@ -54,7 +55,10 @@ import {
   type AttendedExecutionApprovalAuthority,
   type AttendedExecutionApprovalExpectedDispatch,
 } from '../core/attended-execution-approval.js';
-import { createTaskResultSettlementRefForAttempt } from '../core/task-result-settlement.js';
+import {
+  createTaskResultSettlementRefForAttempt,
+  type TaskResultSettlementRefV1,
+} from '../core/task-result-settlement.js';
 import {
   createHostPreDispatchNoGoResult,
   type HostPreDispatchReasonCode,
@@ -76,12 +80,41 @@ import {
 import type { SpawnBackend } from './spawn-backend.js';
 import { SpawnBackendFactory } from './spawn-backend.js';
 import { resolveReasoningEffort } from '../core/reasoning-effort.js';
-import { bootstrapProviders, orderedRoleProviders } from '../core/provider.js';
+import {
+  bootstrapProviders,
+  orderedRoleProviders,
+  type ProviderAdapter,
+} from '../core/provider.js';
 import { spawnWorker } from './tmux.js';
 import { buildWorkerApprovalGateEnv } from '../agents/worker-approval-env.js';
 import { writeEvent, CHANNELS, getCurrentSprintId } from './event-stream.js';
 import { metric } from '../core/observability.js';
-import { buildWorkerPrompt } from './task-builder.js';
+import {
+  buildWorkerPrompt,
+  type WorkerPromptCompilationSinkV2,
+} from './task-builder.js';
+import { writePromptDeliveryReceipt } from '../core/prompt-delivery-receipt.js';
+import {
+  inspectTaskArtifactsDeferred,
+  publishTaskArtifactsNoClobber,
+  transitionTaskArtifactProjectionCas,
+} from './task-artifact-projection.js';
+import {
+  createExactDockerDispatchTaskMaterial,
+  createExactDockerPromptDeliveryAuthority,
+  exactDockerCustodyMaterialDigest,
+} from './spawn-backend-docker.js';
+import type {
+  ExactDockerAcceptedResultV2,
+  ExactDockerCustodyDispatchOutcomeV2,
+  ExactDockerCustodyTerminalQueryV2,
+} from './spawn-backend.js';
+import type {
+  ExactAcceptedTaskResultAuthorityMetadata,
+  TaskResultAuthorityRead,
+} from './task-result-authority.js';
+import { readAuthoritativeTaskResult } from './task-result-authority.js';
+import type { DependencyResultEntry } from './prompt-god-template.js';
 import type { SchedulerDecision } from './scheduler-reducer.js';
 import { schedulerShadowJournalPath } from './scheduler-journal.js';
 
@@ -199,6 +232,8 @@ function applyFixRoutingLineage(
 
 export interface SpawnTaskEffect {
   task: Task;
+  /** Stable pre-mutation public projection digest captured by the caller. */
+  existingTaskProjectionContentDigest?: string;
   /**
    * Pre-computed adaptive per-task timeout (Sprint 280 emitTimeoutEvents).
    * Computing it is an event/metric-emitting side effect intentionally kept
@@ -208,6 +243,306 @@ export interface SpawnTaskEffect {
    * it (e.g. the local queue path), matching their pre-existing behavior.
    */
   taskTimeoutSeconds?: number;
+}
+
+export interface ExactTaskProjectionAdmissionV2 {
+  readonly taskIds: readonly string[];
+  readonly existingContentDigests: Readonly<Record<string, string>>;
+}
+
+export interface CanonicalTaskDispatchBoundaryV2 {
+  readonly taskId: string;
+  readonly provider: string;
+  readonly model: string;
+  readonly backend: string;
+  readonly executionEvidenceRef: string;
+}
+
+type ExactNormalDockerRegistryEntry =
+  | Readonly<{
+      state: 'pending';
+      query: ExactDockerCustodyTerminalQueryV2;
+      lifecycleOwner: TaskExecutionLifecycleOwnerV2;
+    }>
+  | Readonly<{
+      state: 'accepted';
+      query: ExactDockerCustodyTerminalQueryV2;
+      accepted: ExactDockerAcceptedResultV2;
+      terminalVerdict: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO' | null;
+      lifecycleOwner: TaskExecutionLifecycleOwnerV2;
+    }>
+  | Readonly<{ state: 'legacy'; lifecycleOwner: TaskExecutionLifecycleOwnerV2 | null }>
+  | Readonly<{ state: 'not-dispatched' }>
+  | Readonly<{
+      state: 'hold';
+      reasonCode: string;
+      lifecycleOwner: TaskExecutionLifecycleOwnerV2 | null;
+    }>;
+
+/**
+ * Task-scoped worker lifecycle authority. A mixed-backend run must never use
+ * the run default to list, reconcile, or kill a worker that another backend
+ * actually owns.
+ */
+export type TaskExecutionLifecycleOwnerV2 = Pick<
+  SpawnBackend,
+  'name' | 'kill' | 'list' | 'workerInventoryState' | 'reconcilePendingAttempts'
+>;
+
+function providerAdapterLifecycleOwner(
+  adapter: ProviderAdapter,
+): TaskExecutionLifecycleOwnerV2 {
+  return Object.freeze({
+    name: adapter.name,
+    kill: (taskId: string): void => adapter.kill(taskId),
+    list: (): string[] => adapter.listWorkers(),
+    workerInventoryState: (taskId: string): 'active' | 'absent' =>
+      adapter.listWorkers().includes(taskId) ? 'active' : 'absent',
+  });
+}
+
+export interface ExactNormalDockerDependencyContextV2 {
+  readonly dependencyIds: readonly string[];
+  readonly dependencyResults: ReadonlyMap<string, DependencyResultEntry>;
+  readonly lineageAuthorities: readonly ExactAcceptedTaskResultAuthorityMetadata[];
+}
+
+/**
+ * Run-scoped bridge between the asynchronous exact backend and the synchronous
+ * collector authority port. It stores no paths/capabilities and cannot mint an
+ * accepted result; only the backend-owned reader can populate it.
+ */
+export interface ExactNormalDockerExecutionRegistryV2 {
+  registerReleased(
+    taskId: string,
+    backend: SpawnBackend,
+    query: ExactDockerCustodyTerminalQueryV2,
+  ): void;
+  registerNotDispatched(taskId: string): void;
+  registerHold(
+    taskId: string,
+    reasonCode: string,
+    lifecycleOwner?: TaskExecutionLifecycleOwnerV2,
+  ): void;
+  registerLegacy(
+    taskId: string,
+    lifecycleOwner?: TaskExecutionLifecycleOwnerV2,
+  ): boolean;
+  isExactTask(taskId: string): boolean;
+  resolveLifecycleOwner(taskId: string): TaskExecutionLifecycleOwnerV2 | undefined;
+  recordTerminalDecision(
+    taskId: string,
+    verdict: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO',
+  ): void;
+  readTaskResultAuthority(taskId: string): TaskResultAuthorityRead<TaskResult>;
+  awaitTaskResultAuthority(taskId: string): Promise<TaskResultAuthorityRead<TaskResult>>;
+  dependencyContext(task: Task): ExactNormalDockerDependencyContextV2 | null;
+}
+
+function exactAcceptedAuthority(
+  query: ExactDockerCustodyTerminalQueryV2,
+  accepted: ExactDockerAcceptedResultV2,
+): ExactAcceptedTaskResultAuthorityMetadata {
+  return Object.freeze({
+    executionMode: 'normal-docker' as const,
+    identity: query.custodyRef.identity,
+    admissionReceiptDigest: query.custodyRef.admissionReceiptDigest,
+    acceptedResultRef: accepted.acceptedResultRef,
+    acceptedResultChainDigest: accepted.acceptedResultChainDigest,
+    resultDigest: accepted.resultDigest,
+  });
+}
+
+export function createExactNormalDockerExecutionRegistry(
+  projectRoot: string,
+): ExactNormalDockerExecutionRegistryV2 {
+  const entries = new Map<string, ExactNormalDockerRegistryEntry>();
+  const terminalWaits = new Map<string, Promise<void>>();
+  const readTaskResultAuthority = (
+    taskId: string,
+  ): TaskResultAuthorityRead<TaskResult> => {
+    const rawResultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
+    const entry = entries.get(taskId);
+    if (!entry || entry.state === 'pending') {
+      return { state: 'pending-settlement', result: null, settlementRef: null, rawResultPath };
+    }
+    if (entry.state === 'legacy') {
+      return readAuthoritativeTaskResult<TaskResult>(projectRoot, taskId);
+    }
+    if (entry.state === 'not-dispatched') {
+      return {
+        state: 'not-dispatched',
+        result: null,
+        settlementRef: null,
+        rawResultPath,
+        attemptCount: 0,
+      };
+    }
+    if (entry.state === 'hold') {
+      return {
+        state: 'authority-hold',
+        result: null,
+        settlementRef: null,
+        rawResultPath,
+        holdReason: entry.reasonCode,
+      };
+    }
+    return {
+      state: 'exact-accepted',
+      result: entry.accepted.result as unknown as TaskResult,
+      settlementRef: null,
+      rawResultPath,
+      exactAcceptedAuthority: exactAcceptedAuthority(entry.query, entry.accepted),
+    };
+  };
+  return Object.freeze({
+    registerReleased(
+      taskId: string,
+      backend: SpawnBackend,
+      query: ExactDockerCustodyTerminalQueryV2,
+    ): void {
+      if (!backend.awaitExactDockerAcceptedResult) {
+        entries.set(taskId, Object.freeze({
+          state: 'hold',
+          reasonCode: 'EXACT_ACCEPTED_RESULT_PORT_UNAVAILABLE',
+          lifecycleOwner: backend,
+        }));
+        return;
+      }
+      const current = entries.get(taskId);
+      if (current) {
+        const samePending = current.state === 'pending'
+          && JSON.stringify(current.query) === JSON.stringify(query);
+        if (samePending) return;
+        entries.set(taskId, Object.freeze({
+          state: 'hold',
+          reasonCode: 'EXACT_DISPATCH_REGISTRY_REPLAY_MISMATCH',
+          lifecycleOwner: backend,
+        }));
+        return;
+      }
+      entries.set(taskId, Object.freeze({
+        state: 'pending',
+        query,
+        lifecycleOwner: backend,
+      }));
+      const terminalWait = backend.awaitExactDockerAcceptedResult(query).then(outcome => {
+        if (outcome.kind === 'accepted-result') {
+          entries.set(taskId, Object.freeze({
+            state: 'accepted',
+            query,
+            accepted: outcome,
+            terminalVerdict: null,
+            lifecycleOwner: backend,
+          }));
+          return;
+        }
+        entries.set(taskId, Object.freeze({
+          state: 'hold',
+          reasonCode: outcome.reasonCode,
+          lifecycleOwner: backend,
+        }));
+      }).catch((error: unknown) => {
+        debugLog('exact-normal-docker-registry:acceptance', error);
+        entries.set(taskId, Object.freeze({
+          state: 'hold',
+          reasonCode: 'EXACT_ACCEPTANCE_FAILED',
+          lifecycleOwner: backend,
+        }));
+      });
+      terminalWaits.set(taskId, terminalWait);
+    },
+    registerNotDispatched(taskId: string): void {
+      entries.set(taskId, Object.freeze({ state: 'not-dispatched' }));
+    },
+    registerHold(
+      taskId: string,
+      reasonCode: string,
+      lifecycleOwner?: TaskExecutionLifecycleOwnerV2,
+    ): void {
+      const current = entries.get(taskId);
+      const currentOwner = current && 'lifecycleOwner' in current
+        ? current.lifecycleOwner
+        : null;
+      entries.set(taskId, Object.freeze({
+        state: 'hold',
+        reasonCode,
+        lifecycleOwner: lifecycleOwner ?? currentOwner,
+      }));
+    },
+    registerLegacy(
+      taskId: string,
+      lifecycleOwner?: TaskExecutionLifecycleOwnerV2,
+    ): boolean {
+      const current = entries.get(taskId);
+      if (current && current.state !== 'legacy') {
+        entries.set(taskId, Object.freeze({
+          state: 'hold',
+          reasonCode: 'EXECUTION_MODE_AUTHORITY_CHANGED',
+          lifecycleOwner: 'lifecycleOwner' in current
+            ? current.lifecycleOwner
+            : lifecycleOwner ?? null,
+        }));
+        return false;
+      }
+      entries.set(taskId, Object.freeze({
+        state: 'legacy',
+        lifecycleOwner: lifecycleOwner ?? current?.lifecycleOwner ?? null,
+      }));
+      return true;
+    },
+    isExactTask(taskId: string): boolean {
+      const entry = entries.get(taskId);
+      return entry !== undefined && entry.state !== 'legacy';
+    },
+    resolveLifecycleOwner(taskId: string): TaskExecutionLifecycleOwnerV2 | undefined {
+      const entry = entries.get(taskId);
+      if (!entry || !('lifecycleOwner' in entry)) return undefined;
+      return entry.lifecycleOwner ?? undefined;
+    },
+    recordTerminalDecision(
+      taskId: string,
+      verdict: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO',
+    ): void {
+      const current = entries.get(taskId);
+      if (!current || current.state !== 'accepted') {
+        throw new DeckentError(
+          'DECKENT_E091',
+          `EXACT_TERMINAL_DECISION_WITHOUT_ACCEPTED_RESULT:${taskId}`,
+        );
+      }
+      entries.set(taskId, Object.freeze({ ...current, terminalVerdict: verdict }));
+    },
+    readTaskResultAuthority,
+    async awaitTaskResultAuthority(taskId: string): Promise<TaskResultAuthorityRead<TaskResult>> {
+      await terminalWaits.get(taskId);
+      return readTaskResultAuthority(taskId);
+    },
+    dependencyContext(task: Task): ExactNormalDockerDependencyContextV2 | null {
+      const dependencyIds = [...new Set(
+        (task.dependencies ?? []).filter((value): value is string => typeof value === 'string'),
+      )];
+      const dependencyResults = new Map<string, DependencyResultEntry>();
+      const lineageAuthorities: ExactAcceptedTaskResultAuthorityMetadata[] = [];
+      for (const dependencyId of dependencyIds) {
+        const entry = entries.get(dependencyId);
+        if (!entry || entry.state !== 'accepted' || entry.terminalVerdict === null) return null;
+        dependencyResults.set(dependencyId, {
+          verdict: entry.terminalVerdict,
+          filesChanged: entry.accepted.result.filesChanged.map(change => change.path),
+          linesAdded: entry.accepted.result.totalLinesAdded,
+          linesRemoved: entry.accepted.result.totalLinesRemoved,
+          notes: entry.accepted.result.notes,
+        });
+        lineageAuthorities.push(exactAcceptedAuthority(entry.query, entry.accepted));
+      }
+      return Object.freeze({
+        dependencyIds: Object.freeze(dependencyIds),
+        dependencyResults,
+        lineageAuthorities: Object.freeze(lineageAuthorities),
+      });
+    },
+  }) as ExactNormalDockerExecutionRegistryV2;
 }
 
 export interface SpawnTaskDeps {
@@ -224,6 +559,8 @@ export interface SpawnTaskDeps {
   };
   /** Base backend for this call (e.g. the wave's configured backend, or the queue's spawnOpts.spawnBackend). */
   backend?: SpawnBackend;
+  /** Optional one-shot ingress routing, executed after provider admission. */
+  routeTask?: (task: Task) => void | Promise<void>;
   resolveAgentPrompt: (projectRoot: string, task: Task) => Promise<string | undefined>;
   resolveSkillPrompts: (projectRoot: string, task: Task) => Promise<Array<{ name: string; content: string }>>;
   /** Caller-specific write-target/allowedTools scope builder (each existing caller keeps its own). */
@@ -233,14 +570,61 @@ export interface SpawnTaskDeps {
     tasks: readonly Task[];
     collectedIds: ReadonlySet<string>;
   };
+  /** Present only for the normal-Docker exact producer cutover. */
+  exactDockerRegistry?: ExactNormalDockerExecutionRegistryV2;
+  /** Exact-plan public projection state observed before RUN_STARTED. */
+  exactTaskProjectionAdmission?: ExactTaskProjectionAdmissionV2;
+  /**
+   * Process-local uncertainty fence immediately before the backend dispatch
+   * call. It is not a durable "started" receipt: callers use it only to avoid
+   * falsely settling an unexpected post-boundary throw as zero work.
+   */
+  onDispatchAttemptBoundary?: (input: Readonly<{
+    taskId: string;
+    backend: string;
+  }>) => void;
+  /**
+   * Durable started hook at the backend's truthful boundary: immediately
+   * before a legacy spawn primitive, or after exact RELEASED + provider-start
+   * acceptance. Zero-work exact outcomes never call it.
+   */
+  onDispatchBoundary?: (boundary: CanonicalTaskDispatchBoundaryV2) => void | Promise<void>;
 }
 
-export type SpawnDisposition =
-  | { kind: 'spawned'; taskId: string }
+export type SpawnExecutionMode = 'normal-docker-exact' | 'legacy-non-docker';
+
+interface SpawnDispositionExecutionIdentity {
+  /** Execution truth resolved at the point this disposition was produced. */
+  readonly executionMode: SpawnExecutionMode;
+  readonly executionBackend: string;
+}
+
+export type SpawnDisposition = SpawnDispositionExecutionIdentity & (
+  | {
+      kind: 'spawned';
+      taskId: string;
+      provider?: string;
+      legacySettlementRef?: TaskResultSettlementRefV1;
+      exactDispatchOutcome?: Extract<ExactDockerCustodyDispatchOutcomeV2, { kind: 'released' }>;
+    }
+  | {
+      kind: 'not-dispatched';
+      taskId: string;
+      reasonCode: string;
+      exactDispatchOutcome?: Extract<ExactDockerCustodyDispatchOutcomeV2, { kind: 'not-dispatched' }>;
+    }
+  | {
+      kind: 'ambiguous';
+      taskId: string;
+      reasonCode: string;
+      exactDispatchOutcome?: Extract<ExactDockerCustodyDispatchOutcomeV2, { kind: 'ambiguous' }>;
+    }
+  | { kind: 'exact-dependency-authority-hold'; taskId: string }
   | { kind: 'routing-lineage-missing'; taskId: string; fixForTaskId: string; detail: string }
   | { kind: 'provider-unavailable'; taskId: string; provider: string }
   | { kind: 'collision-held'; taskId: string; blockerTaskIds: readonly string[] }
-  | { kind: 'no-mint'; taskId: string; fixForTaskId: string; reasonCode: string };
+  | { kind: 'no-mint'; taskId: string; fixForTaskId: string; reasonCode: string }
+);
 
 // ─── Typed Spawn-Skip Observability (row 3309) ─────────────────────────────
 //
@@ -286,6 +670,10 @@ export type SchedulerSpawnSkipReasonCode =
   | 'spawn-threw'
   /** A deterministic pre-dispatch admission failure was durably settled; no retry is valid. */
   | 'spawn-admission-settled'
+  /** Exact backend could not prove whether provider work started. */
+  | 'exact-dispatch-ambiguous'
+  /** Dependency status exists but its exact accepted/terminal authority is absent. */
+  | 'exact-dependency-authority-hold'
   | 'repair-no-mint'
   | 'spawn-retry-backoff'
   | 'spawn-retry-held'
@@ -345,6 +733,24 @@ export function spawnSkipFromDisposition(
       );
     case 'routing-lineage-missing':
       return describeSpawnSkip(task, 'routing-lineage-missing', disposition.detail);
+    case 'not-dispatched':
+      return describeSpawnSkip(
+        task,
+        'spawn-admission-settled',
+        `exact backend settled zero provider work: ${disposition.reasonCode}`,
+      );
+    case 'ambiguous':
+      return describeSpawnSkip(
+        task,
+        'exact-dispatch-ambiguous',
+        `exact backend could not prove dispatch state: ${disposition.reasonCode}`,
+      );
+    case 'exact-dependency-authority-hold':
+      return describeSpawnSkip(
+        task,
+        'exact-dependency-authority-hold',
+        'dependency status exists without exact accepted-result plus terminal-decision authority',
+      );
     case 'no-mint':
       return describeSpawnSkip(task, 'repair-no-mint', `canonical failure disposition ${disposition.reasonCode} forbids repair`);
   }
@@ -464,9 +870,33 @@ function intendedWorkerBackend(
   backend: SpawnBackend | undefined,
 ): string {
   if (task.backend) return task.backend;
-  if (isAdapterProvider(provider)) return 'host-adapter';
+  if (isAdapterProvider(provider) && task.budgetPolicy?.finalOnlyUsage === undefined) {
+    return 'host-adapter';
+  }
   if (backend) return backend.name;
+  if (isAdapterProvider(provider)) return 'host-adapter';
   return isTmuxProvider(provider) ? 'tmux' : 'host-adapter';
+}
+
+function dispositionExecutionIdentity(
+  executionBackend: string,
+  executionMode: SpawnExecutionMode,
+): SpawnDispositionExecutionIdentity {
+  return Object.freeze({ executionBackend, executionMode });
+}
+
+function preDispatchExecutionIdentity(
+  task: Task,
+  backend: SpawnBackend | undefined,
+  exactDockerRegistry: ExactNormalDockerExecutionRegistryV2 | undefined,
+): SpawnDispositionExecutionIdentity {
+  const executionBackend = intendedWorkerBackend(task, resolveTaskProvider(task), backend);
+  return dispositionExecutionIdentity(
+    executionBackend,
+    exactDockerRegistry && executionBackend === 'docker'
+      ? 'normal-docker-exact'
+      : 'legacy-non-docker',
+  );
 }
 
 /**
@@ -562,32 +992,6 @@ function persistTask(projectRoot: string, task: Task): void {
 }
 
 /**
- * MF-2 (Sprint 250) parity: an honest host-owned pre-dispatch settlement when
- * a host-only provider has no registered/available adapter. The canonical
- * result contract lives in core so initial-wave and later-wave executors cannot
- * drift while this module remains a leaf.
- */
-function writeProviderUnavailableResult(projectRoot: string, task: Task): void {
-  const reason =
-    `Provider "${task.provider}" requires a host adapter (isAdapterProvider) but none is `
-    + `registered/available at spawn time. Refusing to silently degrade to the claude CLI via the `
-    + `docker backend. Ensure the provider is available at bootstrap (CLI logged in / daemon reachable) `
-    + `so its host adapter is registered.`;
-  const result = createHostPreDispatchNoGoResult(
-    task,
-    'PROVIDER_ADAPTER_UNAVAILABLE',
-    reason,
-  );
-  try {
-    writeFileSync(
-      join(projectRoot, TASKS_DIR, `task-${task.id}.result`),
-      serializeTaskResultForDisk(result),
-      'utf-8',
-    );
-  } catch (e) { debugLog('executeSpawnTask:writeProviderUnavailableResult', e); }
-}
-
-/**
  * Canonical single-truth spawn executor (SCHED3 dilim-3). Every trigger path
  * — queue-completion, idle-rescan, dep-ready dispatch, heavyweight dependency
  * respawn — MUST route a task through this function so its resolved model /
@@ -617,7 +1021,14 @@ export async function executeSpawnTask(
         source: 'scheduler-effects',
       });
     } catch (e) { debugLog('executeSpawnTask:repairNoMint', e); }
-    return { kind: 'no-mint', taskId: task.id, fixForTaskId: task.fixForTaskId!, reasonCode };
+    deps.exactDockerRegistry?.registerNotDispatched(task.id);
+    return {
+      ...preDispatchExecutionIdentity(task, backend, deps.exactDockerRegistry),
+      kind: 'no-mint',
+      taskId: task.id,
+      fixForTaskId: task.fixForTaskId!,
+      reasonCode,
+    };
   }
 
   const collisionBlockers = deps.collisionAuthority
@@ -632,7 +1043,12 @@ export async function executeSpawnTask(
       'executeSpawnTask:collision',
       `task=${task.id} held behind active writer(s): ${collisionBlockers.join(',')}`,
     );
-    return { kind: 'collision-held', taskId: task.id, blockerTaskIds: collisionBlockers };
+    return {
+      ...preDispatchExecutionIdentity(task, backend, deps.exactDockerRegistry),
+      kind: 'collision-held',
+      taskId: task.id,
+      blockerTaskIds: collisionBlockers,
+    };
   }
 
   // ─── 1. Fix-task routing-lineage inheritance — BEFORE resolution ────────
@@ -643,7 +1059,13 @@ export async function executeSpawnTask(
       process.stderr.write(`[scheduler-effects] task ${task.id}: ${detail} — spawn blocked\n`);
     } catch { /* stderr unavailable — non-fatal, debugLog below still records it */ }
     debugLog('executeSpawnTask:routingLineageMissing', `${task.id}: ${detail}`);
-    return { kind: 'routing-lineage-missing', taskId: task.id, fixForTaskId: task.fixForTaskId!, detail };
+    return {
+      ...preDispatchExecutionIdentity(task, backend, deps.exactDockerRegistry),
+      kind: 'routing-lineage-missing',
+      taskId: task.id,
+      fixForTaskId: task.fixForTaskId!,
+      detail,
+    };
   }
 
   // ─── 2. Provider-authority admission — before prompt/bootstrap/spawn ─────
@@ -655,16 +1077,16 @@ export async function executeSpawnTask(
     sprintFallbackId,
     backend,
   });
+  // Capture any compatibility projection before routing/prompt compilation
+  // mutates the in-memory task. Later publication may only advance this exact
+  // generation; a concurrent writer becomes a CAS hold, never an overwrite.
+  const ingressTaskProjectionContentDigest = effect.existingTaskProjectionContentDigest
+    ?? inspectTaskArtifactsDeferred(projectRoot, [task]).contentDigests[task.id];
+  await deps.routeTask?.(task);
 
   // ─── 3. Prompt / provider / backend / reasoning-effort resolution ───────
   const agentPrompt = await deps.resolveAgentPrompt(projectRoot, task);
   const skillPrompts = await deps.resolveSkillPrompts(projectRoot, task);
-  // The core may only be externalized when the backend that will actually run
-  // this task can deliver it; the compiler resolves that from the kind.
-  const prompt = buildWorkerPrompt(
-    task, agentPrompt, skillPrompts, projectRoot, config, undefined, undefined,
-    task.backend ?? config?.spawn_backend,
-  );
   const model = task.model;
   const writeTargets = deps.buildWriteTargets(task);
   const allowedTools = writeTargets.length > 0
@@ -695,13 +1117,90 @@ export async function executeSpawnTask(
     budget: task.budget,
     budgetPolicy: task.budgetPolicy,
   });
-  const wantsHostAdapter = isAdapterProvider(taskProvider) && !task.backend && !finalOnlyUsageContainment;
+  const wantsHostAdapter = isAdapterProvider(taskProvider)
+    && !task.backend
+    && !finalOnlyUsageContainment;
   const reasoningEffort = resolveReasoningEffort(taskProvider, task.modelEffort);
   const excludeDynamicPromptSections = config?.prompt?.exclude_dynamic_system_prompt_sections !== false;
   // 7094-F3 (default true): externalized worker core → --system-prompt-file.
   const systemPromptCore = config?.prompt?.worker_core_system_prompt === true
     ? buildWorkerCoreSystemPrompt(task)
     : undefined;
+  const exactDockerExecution = Boolean(
+    deps.exactDockerRegistry
+    && effectiveBackend?.name === 'docker'
+    && !wantsHostAdapter,
+  );
+  const resolvedExecutionIdentity = dispositionExecutionIdentity(
+    exactDockerExecution
+      ? 'docker'
+      : wantsHostAdapter
+        ? 'host-adapter'
+        : intendedWorkerBackend(task, taskProvider, effectiveBackend),
+    exactDockerExecution ? 'normal-docker-exact' : 'legacy-non-docker',
+  );
+  const dependencyContext = exactDockerExecution
+    ? deps.exactDockerRegistry!.dependencyContext(task)
+    : null;
+  if (exactDockerExecution && dependencyContext === null) {
+    deps.exactDockerRegistry!.registerHold(
+      task.id,
+      'EXACT_DEPENDENCY_TERMINAL_AUTHORITY_UNAVAILABLE',
+      effectiveBackend,
+    );
+    return {
+      ...resolvedExecutionIdentity,
+      kind: 'exact-dependency-authority-hold',
+      taskId: task.id,
+    };
+  }
+  if (!exactDockerExecution && deps.exactDockerRegistry) {
+    const exactDependencyId = (task.dependencies ?? []).find(
+      dependencyId => deps.exactDockerRegistry!.isExactTask(dependencyId),
+    );
+    if (exactDependencyId) {
+      deps.exactDockerRegistry.registerHold(
+        task.id,
+        'MIXED_EXECUTION_DEPENDENCY_AUTHORITY_UNSUPPORTED',
+      );
+      return {
+        ...resolvedExecutionIdentity,
+        kind: 'exact-dependency-authority-hold',
+        taskId: task.id,
+      };
+    }
+    if (!deps.exactDockerRegistry.registerLegacy(task.id)) {
+      return {
+        ...resolvedExecutionIdentity,
+        kind: 'ambiguous',
+        taskId: task.id,
+        reasonCode: 'EXECUTION_MODE_AUTHORITY_CHANGED',
+      };
+    }
+  }
+  const compileTask = exactDockerExecution ? structuredClone(task) : task;
+  const compilationSink: WorkerPromptCompilationSinkV2 | undefined = exactDockerExecution
+    ? {} : undefined;
+  // The core may only be externalized when the backend that will actually run
+  // this task can deliver it; the compiler resolves that from the kind.
+  const prompt = buildWorkerPrompt(
+    compileTask,
+    agentPrompt,
+    skillPrompts,
+    projectRoot,
+    config,
+    undefined,
+    undefined,
+    task.backend ?? config?.spawn_backend,
+    exactDockerExecution
+      ? {
+          publicationMode: 'deferred',
+          dependencyIds: dependencyContext!.dependencyIds,
+          dependencyResults: dependencyContext!.dependencyResults,
+          sink: compilationSink,
+        }
+      : undefined,
+  );
   const approvalExpectedDispatch = (
     backendName: string,
   ): AttendedExecutionApprovalExpectedDispatch | undefined => {
@@ -735,6 +1234,286 @@ export async function executeSpawnTask(
       },
     };
   };
+  const publishDispatchBoundary = async (
+    dispatchBackend: string,
+    executionEvidenceRef?: string,
+  ): Promise<void> => {
+    if (!deps.onDispatchBoundary) return;
+    const evidenceRef = executionEvidenceRef ?? exactDockerCustodyMaterialDigest({
+      schemaVersion: 1,
+      kind: 'canonical-task-dispatch-boundary',
+      taskId: task.id,
+      provider: taskProvider,
+      model,
+      backend: dispatchBackend,
+      promptSha256: createHash('sha256').update(prompt).digest('hex'),
+    });
+    await deps.onDispatchBoundary(Object.freeze({
+      taskId: task.id,
+      provider: taskProvider,
+      model,
+      backend: dispatchBackend,
+      executionEvidenceRef: evidenceRef,
+    }));
+  };
+
+  if (exactDockerExecution) {
+    const exactBackend = effectiveBackend!;
+    const exactRegistry = deps.exactDockerRegistry!;
+    const planProjectionAdmission = deps.exactTaskProjectionAdmission;
+    const isApprovedPlanTask = planProjectionAdmission?.taskIds.includes(task.id) === true;
+    let existingTaskProjectionContentDigest = ingressTaskProjectionContentDigest;
+    if (existingTaskProjectionContentDigest === undefined && isApprovedPlanTask) {
+      existingTaskProjectionContentDigest = planProjectionAdmission
+        ?.existingContentDigests[task.id];
+      if (existingTaskProjectionContentDigest === undefined) {
+        const freshSlot = inspectTaskArtifactsDeferred(projectRoot, [task]);
+        if (freshSlot.missing.length !== 1) {
+          exactRegistry.registerHold(
+            task.id,
+            'EXACT_TASK_PROJECTION_APPEARED_AFTER_PLAN_ADMISSION',
+            exactBackend,
+          );
+          return {
+            ...resolvedExecutionIdentity,
+            kind: 'ambiguous',
+            taskId: task.id,
+            reasonCode: 'EXACT_TASK_PROJECTION_APPEARED_AFTER_PLAN_ADMISSION',
+          };
+        }
+      }
+    } else if (existingTaskProjectionContentDigest === undefined) {
+      const observed = inspectTaskArtifactsDeferred(projectRoot, [task]);
+      existingTaskProjectionContentDigest = observed.contentDigests[task.id];
+    }
+    if (!exactBackend.prepareExactDockerCustody
+      || !exactBackend.dispatchExactDockerCustody
+      || !exactBackend.awaitExactDockerAcceptedResult
+      || !compilationSink?.artifact
+      || !compilationSink.receipt) {
+      exactRegistry.registerHold(task.id, 'EXACT_DOCKER_PORT_SET_UNAVAILABLE', exactBackend);
+      return {
+        ...resolvedExecutionIdentity,
+        kind: 'ambiguous',
+        taskId: task.id,
+        reasonCode: 'EXACT_DOCKER_PORT_SET_UNAVAILABLE',
+      };
+    }
+    const taskTimeout = taskTimeoutSeconds ?? config?.docker_timeout;
+    if (!Number.isSafeInteger(taskTimeout) || Number(taskTimeout) <= 0) {
+      exactRegistry.registerHold(task.id, 'EXACT_TASK_TIMEOUT_AUTHORITY_UNAVAILABLE', exactBackend);
+      return {
+        ...resolvedExecutionIdentity,
+        kind: 'ambiguous',
+        taskId: task.id,
+        reasonCode: 'EXACT_TASK_TIMEOUT_AUTHORITY_UNAVAILABLE',
+      };
+    }
+    const authMode = task.authMode ?? config?.auth_mode;
+    if (authMode !== 'api' && authMode !== 'subscription') {
+      exactRegistry.registerHold(task.id, 'EXACT_AUTH_MODE_UNRESOLVED', exactBackend);
+      return {
+        ...resolvedExecutionIdentity,
+        kind: 'ambiguous',
+        taskId: task.id,
+        reasonCode: 'EXACT_AUTH_MODE_UNRESOLVED',
+      };
+    }
+    const landingPolicy = task.budgetPolicy?.landingPolicy;
+    if (!landingPolicy) {
+      exactRegistry.registerHold(task.id, 'EXACT_LANDING_POLICY_UNAVAILABLE', exactBackend);
+      return {
+        ...resolvedExecutionIdentity,
+        kind: 'ambiguous',
+        taskId: task.id,
+        reasonCode: 'EXACT_LANDING_POLICY_UNAVAILABLE',
+      };
+    }
+    assertExecutionLandingSupport({
+      budget: task.budget,
+      policy: landingPolicy,
+      mode: task.budgetPolicy?.admissionMode,
+      capability: exactBackend.executionLandingCapability,
+      executor: exactBackend.name,
+      approvalEvidenceRef: task.budgetPolicy?.approvalEvidenceRef,
+      approvalAuthority: spawnOpts?.attendedExecutionApprovalAuthority,
+      approvalExpectedDispatch: approvalExpectedDispatch(exactBackend.name),
+    });
+    if (!finalOnlyUsageContainment) {
+      assertLiveUsageBudgetSupport(
+        task.budget,
+        exactBackend.liveUsageBudgetSupport,
+        exactBackend.name,
+      );
+    }
+    const workerId = `w-${task.id}`;
+    const approvedTask = createExactDockerDispatchTaskMaterial(compileTask, workerId);
+    const dispatchTask = createExactDockerDispatchTaskMaterial(compileTask, workerId);
+    const approvedTaskMaterial = Object.freeze({
+      schemaVersion: 2 as const,
+      kind: 'normal-task-approved-material' as const,
+      sprintId: task.sprintId ?? sprintFallbackId,
+      task: approvedTask,
+    });
+    const lineageMaterial = Object.freeze({
+      schemaVersion: 2 as const,
+      kind: 'normal-task-lineage-material' as const,
+      sprintId: task.sprintId ?? sprintFallbackId,
+      taskId: task.id,
+      dependencies: dependencyContext!.lineageAuthorities,
+      predecessor: null,
+    });
+    const approvedTaskMaterialDigest = exactDockerCustodyMaterialDigest(approvedTaskMaterial);
+    const dispatchTaskMaterialDigest = exactDockerCustodyMaterialDigest(dispatchTask);
+    const lineageMaterialDigest = exactDockerCustodyMaterialDigest(lineageMaterial);
+    const promptDeliveryAuthority = createExactDockerPromptDeliveryAuthority({
+      taskId: task.id,
+      prompt,
+      promptCompilePlanId: compilationSink.artifact.planId,
+      rolePolicyIdentity: compilationSink.artifact.compilePlan.rolePolicyIdentity,
+      ...(compileTask.assignedAgent ? { assignedAgentId: compileTask.assignedAgent } : {}),
+      ...(compileTask.assignedSkills ? { assignedSkillIds: compileTask.assignedSkills } : {}),
+      ...(compileTask.forceSkills ? { forcedSkillIds: compileTask.forceSkills } : {}),
+      segments: compilationSink.artifact.segments.map(segment => ({
+        tier: segment.tier,
+        kind: segment.kind,
+        content: segment.content,
+      })),
+    });
+    const dispatchRequestDigest = exactDockerCustodyMaterialDigest({
+      schemaVersion: 2,
+      kind: 'normal-task-dispatch-request-identity',
+      projectId: attendedExecutionProjectId(projectRoot),
+      taskId: task.id,
+      approvedTaskMaterialDigest,
+      dispatchTaskMaterialDigest,
+      lineageMaterialDigest,
+      promptDeliveryAuthorityDigest: promptDeliveryAuthority.authorityDigest,
+    });
+    const dispatchRequestId = `dreq-${dispatchRequestDigest.slice('sha256:'.length)}`;
+    const prepared = await exactBackend.prepareExactDockerCustody({
+      dispatchRequestId,
+      projectId: attendedExecutionProjectId(projectRoot),
+      taskId: task.id,
+      approvedTaskMaterial,
+      approvedTaskMaterialDigest,
+      dispatchTaskMaterial: dispatchTask,
+      dispatchTaskMaterialDigest,
+      lineageMaterial,
+      lineageMaterialDigest,
+      prompt,
+      promptDeliveryAuthority,
+      systemPromptCore: systemPromptCore ?? null,
+      model,
+      execution: Object.freeze({
+        allowedTools,
+        availableTools: null,
+        authMode,
+        isolatedContext: false,
+        reasoningEffort: reasoningEffort ?? null,
+        excludeDynamicPromptSections,
+        taskTimeoutSeconds: Number(taskTimeout),
+        actionId: null,
+        executionBudget: task.budget ?? null,
+        executionLandingPolicy: landingPolicy,
+        executionAdmissionMode: task.budgetPolicy?.admissionMode ?? null,
+        executionApprovalEvidenceRef: task.budgetPolicy?.approvalEvidenceRef ?? null,
+        finalOnlyUsageContainment: finalOnlyUsageContainment ?? null,
+      }),
+      predecessor: null,
+    });
+    deps.onDispatchAttemptBoundary?.({ taskId: task.id, backend: 'docker' });
+    const outcome = await exactBackend.dispatchExactDockerCustody(prepared.dispatchEnvelope);
+    if (outcome.kind === 'not-dispatched') {
+      exactRegistry.registerNotDispatched(task.id);
+      return {
+        ...resolvedExecutionIdentity,
+        kind: 'not-dispatched',
+        taskId: task.id,
+        reasonCode: outcome.reasonCode,
+        exactDispatchOutcome: outcome,
+      };
+    }
+    if (outcome.kind === 'ambiguous') {
+      exactRegistry.registerHold(task.id, outcome.reasonCode, exactBackend);
+      return {
+        ...resolvedExecutionIdentity,
+        kind: 'ambiguous',
+        taskId: task.id,
+        reasonCode: outcome.reasonCode,
+        exactDispatchOutcome: outcome,
+      };
+    }
+    const query: ExactDockerCustodyTerminalQueryV2 = Object.freeze({
+      custodyRef: outcome.custodyRef,
+      releaseReceipt: outcome.releaseReceipt,
+      providerStartReceipt: outcome.providerStartReceipt,
+      projectionFence: outcome.projectionFence,
+    });
+    exactRegistry.registerReleased(task.id, exactBackend, query);
+    // An exact attempt crosses the invocation dispatch boundary only after the
+    // backend has durably proved both RELEASED custody and provider-start
+    // acceptance. Calling this before dispatch made a durable zero-work outcome
+    // look like a started attempt in the invocation ledger.
+    await publishDispatchBoundary(
+      'docker',
+      outcome.providerStartReceipt.ref,
+    );
+
+    Object.assign(task, dispatchTask);
+    task.status = TaskStatus.EXECUTING;
+    if (existingTaskProjectionContentDigest !== undefined) {
+      transitionTaskArtifactProjectionCas(
+        projectRoot,
+        task,
+        existingTaskProjectionContentDigest,
+        `exact-released:${dispatchRequestId}`,
+      );
+    } else {
+      publishTaskArtifactsNoClobber(
+        projectRoot,
+        [task],
+        `exact-released:${dispatchRequestId}`,
+      );
+    }
+    if (!writePromptDeliveryReceipt(projectRoot, compilationSink.receipt)) {
+      throw new DeckentError(
+        'DECKENT_E077',
+        `PROMPT_DELIVERY_RECEIPT_WRITE_HOLD:${task.id}`,
+      );
+    }
+    const sprintIdForAssign = getCurrentSprintId(projectRoot) ?? sprintFallbackId;
+    writeEvent(projectRoot, sprintIdForAssign, 'brain', 'worker', CHANNELS.TASK_ASSIGN, {
+      taskId: task.id,
+      workerId,
+      model: task.model,
+      agent: task.assignedAgent ?? 'generic',
+      skills: [...promptDeliveryAuthority.deliveredSkillIds],
+      scope: {
+        directories: task.scope?.directories ?? [],
+        filesWrite: task.scope?.filesWrite ?? [],
+      },
+      provider: taskProvider,
+      dispatchRequestId,
+      admissionRefDigest: outcome.admissionRef.admissionRefDigest,
+      projectionFence: outcome.projectionFence,
+    });
+    writeEvent(projectRoot, sprintIdForAssign, 'worker', 'brain', CHANNELS.HEARTBEAT, {
+      workerId,
+      taskId: task.id,
+      lifecycleState: 'EXECUTING',
+      backend: 'docker',
+      dispatchRequestId,
+      projectionFence: outcome.projectionFence,
+    });
+    return {
+      ...resolvedExecutionIdentity,
+      kind: 'spawned',
+      taskId: task.id,
+      provider: taskProvider,
+      exactDispatchOutcome: outcome,
+    };
+  }
 
   let adapterRouted = wantsHostAdapter ? getProviderAdapterForTask(taskProvider) : null;
   if (wantsHostAdapter && !adapterRouted && config) {
@@ -744,32 +1523,58 @@ export async function executeSpawnTask(
     } catch (e) { debugLog('executeSpawnTask:lazyAdapterRebootstrap', e); }
   }
 
-  // Later FIX/XFIX/dependency waves enter through this canonical executor,
-  // not the initial-wave spawner. Publish the same pre-dispatch intent so
-  // status, audit and recovery observe every dynamically born worker. The
-  // event precedes the backend call by design: a failed spawn remains visible.
   const sprintIdForAssign = getCurrentSprintId(projectRoot) ?? sprintFallbackId;
-  writeEvent(
-    projectRoot,
-    sprintIdForAssign,
-    'brain',
-    'worker',
-    CHANNELS.TASK_ASSIGN,
-    {
-      taskId: task.id,
-      workerId: `w-${task.id}`,
-      model: task.model,
-      agent: task.assignedAgent ?? 'generic',
-      skills: task.assignedSkills ?? [],
-      scope: {
-        directories: task.scope?.directories ?? [],
-        filesWrite: task.scope?.filesWrite ?? [],
+  let legacyAdmittedProjectionDigest: string | undefined;
+  const publishLegacyDispatchIntent = (dispatchBackend: string): void => {
+    if (ingressTaskProjectionContentDigest !== undefined) {
+      transitionTaskArtifactProjectionCas(
+        projectRoot,
+        task,
+        ingressTaskProjectionContentDigest,
+        `legacy-admitted:${task.sprintId ?? sprintFallbackId}:${dispatchBackend}`,
+      );
+    } else {
+      publishTaskArtifactsNoClobber(
+        projectRoot,
+        [task],
+        `legacy-admitted:${task.sprintId ?? sprintFallbackId}:${dispatchBackend}`,
+      );
+    }
+    legacyAdmittedProjectionDigest = inspectTaskArtifactsDeferred(
+      projectRoot,
+      [task],
+    ).contentDigests[task.id];
+    if (!legacyAdmittedProjectionDigest) {
+      throw new DeckentError(
+        'DECKENT_E077',
+        `LEGACY_TASK_PROJECTION_ADMISSION_HOLD:${task.id}`,
+      );
+    }
+    writeEvent(
+      projectRoot,
+      sprintIdForAssign,
+      'brain',
+      'worker',
+      CHANNELS.TASK_ASSIGN,
+      {
+        taskId: task.id,
+        workerId: `w-${task.id}`,
+        model: task.model,
+        agent: task.assignedAgent ?? 'generic',
+        skills: task.assignedSkills ?? [],
+        scope: {
+          directories: task.scope?.directories ?? [],
+          filesWrite: task.scope?.filesWrite ?? [],
+        },
+        provider: taskProvider,
+        backend: dispatchBackend,
       },
-      provider: taskProvider,
-    },
-  );
+    );
+  };
 
   // ─── 4. Dispatch — single canonical branch set ───────────────────────────
+  let dispatchedBackend = 'unknown';
+  let legacySettlementRef: TaskResultSettlementRefV1 | undefined;
   if (adapterRouted) {
     const refresh = (adapterRouted as { refreshSupportedModels?: () => Promise<void> }).refreshSupportedModels;
     if (typeof refresh === 'function') await refresh.call(adapterRouted);
@@ -790,6 +1595,19 @@ export async function executeSpawnTask(
       approvalExpectedDispatch: approvalExpectedDispatch('host-adapter'),
       executionCostClass: adapterRouted.executionCostClass,
     });
+    const adapterLifecycleOwner = providerAdapterLifecycleOwner(adapterRouted);
+    if (!deps.exactDockerRegistry?.registerLegacy(task.id, adapterLifecycleOwner)
+      && deps.exactDockerRegistry) {
+      return {
+        ...resolvedExecutionIdentity,
+        kind: 'ambiguous',
+        taskId: task.id,
+        reasonCode: 'EXECUTION_MODE_AUTHORITY_CHANGED',
+      };
+    }
+    publishLegacyDispatchIntent('host-adapter');
+    deps.onDispatchAttemptBoundary?.({ taskId: task.id, backend: 'host-adapter' });
+    await publishDispatchBoundary('host-adapter');
     adapterRouted.spawn(task.id, model, prompt, {
       allowedTools,
       autoApprove: spawnOpts?.autoApprove ?? false,
@@ -803,13 +1621,17 @@ export async function executeSpawnTask(
       executionApprovalEvidenceRef: task.budgetPolicy?.approvalEvidenceRef,
       env: buildWorkerApprovalGateEnv(config?.approval?.gate_enabled === true, task.sprintId, task.id),
     });
+    dispatchedBackend = 'host-adapter';
   } else if (wantsHostAdapter) {
     // Host-only provider wanted but no adapter registered — honest NO_GO,
     // never silently degrade to the docker/claude fallback. Spawn blocked.
-    writeProviderUnavailableResult(projectRoot, task);
-    task.status = TaskStatus.NO_GO;
-    persistTask(projectRoot, task);
-    return { kind: 'provider-unavailable', taskId: task.id, provider: String(task.provider) };
+    deps.exactDockerRegistry?.registerNotDispatched(task.id);
+    return {
+      ...resolvedExecutionIdentity,
+      kind: 'provider-unavailable',
+      taskId: task.id,
+      provider: String(task.provider),
+    };
   } else if (effectiveBackend) {
     if (!finalOnlyUsageContainment) {
       assertLiveUsageBudgetSupport(
@@ -835,6 +1657,18 @@ export async function executeSpawnTask(
         approvalGrant.receipt.binding.attemptId,
       )
       : undefined;
+    if (!deps.exactDockerRegistry?.registerLegacy(task.id, effectiveBackend)
+      && deps.exactDockerRegistry) {
+      return {
+        ...resolvedExecutionIdentity,
+        kind: 'ambiguous',
+        taskId: task.id,
+        reasonCode: 'EXECUTION_MODE_AUTHORITY_CHANGED',
+      };
+    }
+    publishLegacyDispatchIntent(effectiveBackend.name);
+    deps.onDispatchAttemptBoundary?.({ taskId: task.id, backend: effectiveBackend.name });
+    await publishDispatchBoundary(effectiveBackend.name);
     effectiveBackend.spawn(task.id, model, prompt, {
       allowedTools,
       autoApprove: spawnOpts?.autoApprove ?? false,
@@ -857,6 +1691,8 @@ export async function executeSpawnTask(
       liveTraceEnabled: resolveLiveTraceEnabled(config),
       sprintId: task.sprintId,
     });
+    dispatchedBackend = effectiveBackend.name;
+    legacySettlementRef = settlementRef;
   } else if (!isTmuxProvider(taskProvider)) {
     const adapter = getProviderAdapterForTask(taskProvider);
     if (adapter) {
@@ -877,6 +1713,19 @@ export async function executeSpawnTask(
         approvalExpectedDispatch: approvalExpectedDispatch('host-adapter'),
         executionCostClass: adapter.executionCostClass,
       });
+      const adapterLifecycleOwner = providerAdapterLifecycleOwner(adapter);
+      if (!deps.exactDockerRegistry?.registerLegacy(task.id, adapterLifecycleOwner)
+        && deps.exactDockerRegistry) {
+        return {
+          ...resolvedExecutionIdentity,
+          kind: 'ambiguous',
+          taskId: task.id,
+          reasonCode: 'EXECUTION_MODE_AUTHORITY_CHANGED',
+        };
+      }
+      publishLegacyDispatchIntent('host-adapter');
+      deps.onDispatchAttemptBoundary?.({ taskId: task.id, backend: 'host-adapter' });
+      await publishDispatchBoundary('host-adapter');
       adapter.spawn(task.id, model, prompt, {
         allowedTools,
         autoApprove: spawnOpts?.autoApprove ?? false,
@@ -887,6 +1736,15 @@ export async function executeSpawnTask(
         executionApprovalEvidenceRef: task.budgetPolicy?.approvalEvidenceRef,
         env: buildWorkerApprovalGateEnv(config?.approval?.gate_enabled === true, task.sprintId, task.id),
       });
+      dispatchedBackend = 'host-adapter';
+    } else {
+      deps.exactDockerRegistry?.registerNotDispatched(task.id);
+      return {
+        ...resolvedExecutionIdentity,
+        kind: 'provider-unavailable',
+        taskId: task.id,
+        provider: String(task.provider),
+      };
     }
   } else {
     assertLiveUsageBudgetSupport(task.budget, undefined, 'tmux');
@@ -900,18 +1758,39 @@ export async function executeSpawnTask(
       approvalAuthority: spawnOpts?.attendedExecutionApprovalAuthority,
       approvalExpectedDispatch: approvalExpectedDispatch('tmux'),
     });
+    publishLegacyDispatchIntent('tmux');
+    deps.onDispatchAttemptBoundary?.({ taskId: task.id, backend: 'tmux' });
+    await publishDispatchBoundary('tmux');
     spawnWorker(task.id, model, prompt, projectRoot, {
       allowedTools,
       autoApprove: spawnOpts?.autoApprove ?? false,
       excludeDynamicPromptSections,
     });
+    dispatchedBackend = 'tmux';
   }
 
   // ─── 4. Persistence — single site ────────────────────────────────────────
   task.status = TaskStatus.EXECUTING;
-  persistTask(projectRoot, task);
+  if (!legacyAdmittedProjectionDigest) {
+    throw new DeckentError(
+      'DECKENT_E077',
+      `LEGACY_TASK_PROJECTION_ADMISSION_HOLD:${task.id}`,
+    );
+  }
+  transitionTaskArtifactProjectionCas(
+    projectRoot,
+    task,
+    legacyAdmittedProjectionDigest,
+    `legacy-dispatched:${task.sprintId ?? sprintFallbackId}:${dispatchedBackend}`,
+  );
 
-  return { kind: 'spawned', taskId: task.id };
+  return {
+    ...dispositionExecutionIdentity(dispatchedBackend, 'legacy-non-docker'),
+    kind: 'spawned',
+    taskId: task.id,
+    provider: taskProvider,
+    ...(legacySettlementRef ? { legacySettlementRef } : {}),
+  };
 }
 
 // ═══ SCHED5 — Reducer-Decision Executor (dilim-5, docs/analysis/ ══════════

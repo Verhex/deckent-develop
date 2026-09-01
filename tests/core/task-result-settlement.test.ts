@@ -22,6 +22,12 @@ import {
   assertTaskResultSettlementRef,
   claimTaskResultSettlementAttemptAtomic,
   createTaskResultSettlement,
+  createTaskResultSettlementV2,
+  parseHistoricalTaskResultSettlementV1,
+  parseTaskResultSettlementV2,
+  taskResultSettlementV2Digest,
+  taskResultSettlementV2EvidenceRef,
+  verifyTaskResultSettlementV2Chain,
   createTaskResultSettlementRef,
   dockerAttemptLabels,
   dockerContainerNameForTask,
@@ -76,6 +82,9 @@ import {
   readTaskResultSettlementLandedRetirement,
   taskResultSettlementLandedRetirementPath,
 } from '../../src/core/task-result-settlement.js';
+import {
+  createTaskResultSettlementV2Fixture,
+} from '../helpers/task-result-settlement-v2-fixture.js';
 import {
   createExecutionLandingCheckpoint,
   executionAttemptRetirementPath,
@@ -1133,5 +1142,177 @@ describe('host-authoritative Docker TaskResult settlement', () => {
     expect(() => listPendingTaskResultSettlementAttempts(root))
       .toThrow(/Corrupt execution attempt retirement/);
     expect(taskResultSettlementLandedRetirementPath(ref)).toContain('landed-retirement.json');
+  });
+});
+
+describe('exact-attempt TaskResult settlement V2', { timeout: 60_000 }, () => {
+  it('creates, parses, digests and independently verifies the full archive chain', () => {
+    const fixtureV2 = createTaskResultSettlementV2Fixture();
+    expect(Buffer.from(fixtureV2.rawWorkerResultBytes).toString('utf8'))
+      .toContain('worker-claimed-provider');
+    expect(fixtureV2.settlement.result.provider).toBe('fixture-provider');
+    const parsed = parseTaskResultSettlementV2(
+      fixtureV2.settlement,
+      fixtureV2.policy.jsonBounds,
+    );
+    expect(parsed).toEqual(fixtureV2.settlement);
+    const digest = taskResultSettlementV2Digest(
+      fixtureV2.settlement,
+      fixtureV2.policy.jsonBounds,
+    );
+    expect(taskResultSettlementV2EvidenceRef(
+      fixtureV2.settlement,
+      fixtureV2.policy.jsonBounds,
+    )).toBe(`task-result-settlement-v2:${digest}`);
+    expect(verifyTaskResultSettlementV2Chain({
+      creation: fixtureV2.creation,
+      settlement: fixtureV2.settlement,
+      settlementArtifact: fixtureV2.settlementArtifact,
+      settlementChain: fixtureV2.settlementChain,
+      archivePayload: fixtureV2.archivePayload,
+      archiveArtifact: fixtureV2.archiveArtifact,
+      archiveChain: fixtureV2.archiveChain,
+    })).toEqual({
+      ok: true,
+      settlementDigest: digest,
+      archiveChainDigest: fixtureV2.archiveChain.receiptDigest,
+    });
+  });
+
+  it('keeps V1 historical parsing separate from V2 normal parsing', () => {
+    const { root } = fixture();
+    const ref = createTaskResultSettlementRef(root, 'historical-v1');
+    const historical = createTaskResultSettlement({
+      ref,
+      exitCode: 0,
+      settledAt: '2026-08-30T20:00:00.000Z',
+      result: { taskId: ref.taskId, selfAssessment: 'DONE' },
+    });
+    expect(parseHistoricalTaskResultSettlementV1(historical)).toEqual(historical);
+    const fixtureV2 = createTaskResultSettlementV2Fixture();
+    expect(parseTaskResultSettlementV2(historical, fixtureV2.policy.jsonBounds)).toBeNull();
+    expect(parseHistoricalTaskResultSettlementV1(fixtureV2.settlement)).toBeNull();
+  });
+
+  it('rejects result tampering, sibling identity replay and unknown fields', () => {
+    const fixtureV2 = createTaskResultSettlementV2Fixture();
+    const tamperedResult = {
+      ...fixtureV2.settlement,
+      result: { ...fixtureV2.settlement.result, taskId: 'sibling-task' },
+    };
+    expect(parseTaskResultSettlementV2(tamperedResult, fixtureV2.policy.jsonBounds)).toBeNull();
+    const siblingIdentity = {
+      ...fixtureV2.settlement,
+      identity: { ...fixtureV2.identity, generation: fixtureV2.identity.generation + 1 },
+    };
+    expect(parseTaskResultSettlementV2(siblingIdentity, fixtureV2.policy.jsonBounds)).toBeNull();
+    expect(parseTaskResultSettlementV2(
+      { ...fixtureV2.settlement, legacyFallback: true },
+      fixtureV2.policy.jsonBounds,
+    )).toBeNull();
+  });
+
+  it('rejects a broken evaluation predecessor instead of selecting another attempt', () => {
+    const fixtureV2 = createTaskResultSettlementV2Fixture();
+    const brokenCreation = {
+      ...fixtureV2.creation,
+      evaluationChain: {
+        ...fixtureV2.creation.evaluationChain,
+        predecessorDigest: `sha256:${'9'.repeat(64)}` as const,
+      },
+    };
+    expect(() => createTaskResultSettlementV2Fixture().settlement).not.toThrow();
+    expect(verifyTaskResultSettlementV2Chain({
+      creation: brokenCreation,
+      settlement: fixtureV2.settlement,
+      settlementArtifact: fixtureV2.settlementArtifact,
+      settlementChain: fixtureV2.settlementChain,
+      archivePayload: fixtureV2.archivePayload,
+      archiveArtifact: fixtureV2.archiveArtifact,
+      archiveChain: fixtureV2.archiveChain,
+    }).ok).toBe(false);
+  });
+
+  it('rejects a fully self-consistent archive tail that was persisted only in another store', () => {
+    const authoritative = createTaskResultSettlementV2Fixture();
+    const foreign = createTaskResultSettlementV2Fixture({
+      tailArtifactKey: 'foreign-tail',
+    });
+    expect(verifyTaskResultSettlementV2Chain({
+      creation: authoritative.creation,
+      settlement: foreign.settlement,
+      settlementArtifact: foreign.settlementArtifact,
+      settlementChain: foreign.settlementChain,
+      archivePayload: foreign.archivePayload,
+      archiveArtifact: foreign.archiveArtifact,
+      archiveChain: foreign.archiveChain,
+    })).toEqual({
+      ok: false,
+      reason: 'unpersisted-or-mismatched-archive-tail',
+    });
+  });
+
+  it('rejects settlement time before the persisted finalizer tail', () => {
+    const fixtureV2 = createTaskResultSettlementV2Fixture();
+    expect(() => createTaskResultSettlementV2({
+      ...fixtureV2.creation,
+      settledAt: '2026-08-30T20:06:59.999Z',
+    })).toThrow(/terminal metadata/);
+  });
+
+  it('refuses to persist an archive artifact captured before the settlement chain event', () => {
+    expect(() => createTaskResultSettlementV2Fixture({
+      archiveCapturedAt: '2026-08-30T20:09:30.000Z',
+    })).toThrow(/CHAIN_PREDECESSOR_MISMATCH/);
+  });
+
+  it('requires exactly one archive authority reference to the exact settlement digest', () => {
+    const fixtureV2 = createTaskResultSettlementV2Fixture();
+    const wrongArchive = {
+      ...fixtureV2.archivePayload,
+      externalAuthorityRefs: [{
+        authorityType: 'task-result-settlement-v2' as const,
+        digest: `sha256:${'f'.repeat(64)}` as const,
+      }],
+    };
+    expect(verifyTaskResultSettlementV2Chain({
+      creation: fixtureV2.creation,
+      settlement: fixtureV2.settlement,
+      settlementArtifact: fixtureV2.settlementArtifact,
+      settlementChain: fixtureV2.settlementChain,
+      archivePayload: wrongArchive,
+      archiveArtifact: fixtureV2.archiveArtifact,
+      archiveChain: fixtureV2.archiveChain,
+    }).ok).toBe(false);
+
+    const multiple = {
+      ...fixtureV2.archivePayload,
+      externalAuthorityRefs: [
+        ...fixtureV2.archivePayload.externalAuthorityRefs,
+        ...fixtureV2.archivePayload.externalAuthorityRefs,
+      ],
+    } as unknown as typeof fixtureV2.archivePayload;
+    expect(verifyTaskResultSettlementV2Chain({
+      creation: fixtureV2.creation,
+      settlement: fixtureV2.settlement,
+      settlementArtifact: fixtureV2.settlementArtifact,
+      settlementChain: fixtureV2.settlementChain,
+      archivePayload: multiple,
+      archiveArtifact: fixtureV2.archiveArtifact,
+      archiveChain: fixtureV2.archiveChain,
+    }).ok).toBe(false);
+  });
+
+  it('keeps settlement digest stable across object key order', () => {
+    const fixtureV2 = createTaskResultSettlementV2Fixture();
+    const reordered = Object.fromEntries(
+      Object.entries(fixtureV2.settlement).reverse(),
+    );
+    const parsed = parseTaskResultSettlementV2(reordered, fixtureV2.policy.jsonBounds);
+    expect(parsed).not.toBeNull();
+    if (!parsed) return;
+    expect(taskResultSettlementV2Digest(parsed, fixtureV2.policy.jsonBounds)).toBe(
+      taskResultSettlementV2Digest(fixtureV2.settlement, fixtureV2.policy.jsonBounds),
+    );
   });
 });

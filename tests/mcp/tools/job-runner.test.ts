@@ -1,294 +1,160 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { writeFileSync, readFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
 
-vi.mock('node:fs', () => ({
-  writeFileSync: vi.fn(),
-  readFileSync: vi.fn(),
-  mkdirSync: vi.fn(),
-  existsSync: vi.fn(),
-  readdirSync: vi.fn(),
-}));
+import { JOBS_DIR, TASKS_DIR } from '../../../src/core/constants.js';
+import {
+  JobStateProjectionError,
+  buildTaskSummaries,
+  createJobId,
+  readJobState,
+  readLatestJobState,
+  writeJobState,
+  type JobState,
+} from '../../../src/mcp/tools/job-runner.js';
 
-vi.mock('../../../src/core/constants.js', () => ({
-  RUNTIME_DIR: '.deckent/runtime',  // sprint-429 (429-011) tool-inventory yolu modül-yüklemede okur
-  SETTINGS_DIR: '.deckent/settings',  // born-630 allowscope-zinciri modül-yüklemede okur
-  JOBS_DIR: '.deckent/jobs',
-  TASKS_DIR: '.tasks',
-}));
+const roots: string[] = [];
 
-import { buildTaskSummaries } from '../../../src/mcp/tools/job-runner.js';
-import type { TaskSummary } from '../../../src/mcp/tools/job-runner.js';
-import { createJobId, writeJobState, readJobState, readLatestJobState } from "../../../src/mcp/tools/job-runner.js";
-import type { JobState } from "../../../src/mcp/tools/job-runner.js";
+function root(): string {
+  const path = mkdtempSync(join(tmpdir(), 'deckent-job-runner-'));
+  roots.push(path);
+  return path;
+}
+
+function writeResult(projectRoot: string, taskId: string, value: unknown): void {
+  const tasksDir = join(projectRoot, TASKS_DIR);
+  mkdirSync(tasksDir, { recursive: true });
+  writeFileSync(join(tasksDir, `task-${taskId}.result`), JSON.stringify(value), 'utf8');
+}
+
+afterEach(() => {
+  while (roots.length > 0) {
+    rmSync(roots.pop()!, { recursive: true, force: true });
+  }
+});
 
 describe('buildTaskSummaries', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+  it('uses only host evaluationDecision as terminal summary truth', () => {
+    const projectRoot = root();
+    writeResult(projectRoot, '067-001', {
+      selfAssessment: 'NO_GO',
+      evaluationDecision: 'DONE',
+      notes: 'Host accepted the exact result.',
+    });
 
-  it('returns task summaries with data from result files', () => {
-    const tasks = [
-      { id: '067-001', title: 'Fix bug', assignedAgent: 'bug-fixer', assignedSkills: ['typescript-expert'] },
-      { id: '067-002', title: 'Write tests', assignedAgent: 'test-writer', assignedSkills: ['testing-expert'] },
-    ];
-
-    vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync)
-      .mockReturnValueOnce(JSON.stringify({ selfAssessment: 'DONE', notes: 'Fixed the null pointer issue in config loader' }))
-      .mockReturnValueOnce(JSON.stringify({ selfAssessment: 'GO_WITH_TECH_DEBT', notes: 'Added 12 tests, coverage 94%' }));
-
-    const summaries = buildTaskSummaries('/project', tasks);
-
-    expect(summaries).toHaveLength(2);
-    expect(summaries[0]).toMatchObject<TaskSummary>({
+    expect(buildTaskSummaries(projectRoot, [{
+      id: '067-001',
+      title: 'Fix bug',
+      assignedAgent: 'bug-fixer',
+      assignedSkills: ['typescript-expert'],
+    }])).toEqual([{
       taskId: '067-001',
       title: 'Fix bug',
       evaluation: 'DONE',
       agent: 'bug-fixer',
       skills: ['typescript-expert'],
-      notes: 'Fixed the null pointer issue in config loader',
+      notes: 'Host accepted the exact result.',
+    }]);
+  });
+
+  it('never turns a missing, malformed, or worker-only result into DONE', () => {
+    const projectRoot = root();
+    writeResult(projectRoot, '067-002', { selfAssessment: 'DONE', notes: 'worker claim' });
+    const tasksDir = join(projectRoot, TASKS_DIR);
+    writeFileSync(join(tasksDir, 'task-067-003.result'), 'not-json', 'utf8');
+
+    const summaries = buildTaskSummaries(projectRoot, [
+      { id: '067-002', title: 'Worker only' },
+      { id: '067-003', title: 'Malformed' },
+      { id: '067-004', title: 'Missing' },
+    ]);
+
+    expect(summaries.map(summary => summary.evaluation)).toEqual([
+      'UNKNOWN',
+      'UNKNOWN',
+      'UNKNOWN',
+    ]);
+  });
+
+  it('bounds observational notes without changing evaluation authority', () => {
+    const projectRoot = root();
+    writeResult(projectRoot, '067-005', {
+      evaluationDecision: 'GO_WITH_TECH_DEBT',
+      notes: 'A'.repeat(500),
     });
-    expect(summaries[1]).toMatchObject<TaskSummary>({
-      taskId: '067-002',
-      title: 'Write tests',
-      evaluation: 'GO_WITH_TECH_DEBT',
-      agent: 'test-writer',
-      skills: ['testing-expert'],
-      notes: 'Added 12 tests, coverage 94%',
-    });
-  });
-
-  it('falls back to DONE evaluation when result file does not exist', () => {
-    const tasks = [{ id: '067-003', title: 'Missing result', assignedAgent: 'generic', assignedSkills: [] }];
-
-    vi.mocked(existsSync).mockReturnValue(false);
-
-    const summaries = buildTaskSummaries('/project', tasks);
-
-    expect(summaries).toHaveLength(1);
-    expect(summaries[0]).toMatchObject<TaskSummary>({
-      taskId: '067-003',
-      title: 'Missing result',
-      evaluation: 'DONE',
-      agent: 'generic',
-      skills: [],
-      notes: '',
-    });
-  });
-
-  it('falls back gracefully on malformed result file', () => {
-    const tasks = [{ id: '067-004', title: 'Bad result file', assignedAgent: 'code-reviewer' }];
-
-    vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockReturnValue('not valid json {{{');
-
-    const summaries = buildTaskSummaries('/project', tasks);
-
-    expect(summaries).toHaveLength(1);
-    expect(summaries[0]!.evaluation).toBe('DONE');
-    expect(summaries[0]!.notes).toBe('');
-    expect(summaries[0]!.agent).toBe('code-reviewer');
-  });
-
-  it('truncates notes to 200 characters', () => {
-    const longNotes = 'A'.repeat(500);
-    const tasks = [{ id: '067-005', title: 'Long notes task' }];
-
-    vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readFileSync).mockReturnValue(
-      JSON.stringify({ selfAssessment: 'DONE', notes: longNotes }),
-    );
-
-    const summaries = buildTaskSummaries('/project', tasks);
-
-    expect(summaries[0]!.notes).toHaveLength(200);
-    expect(summaries[0]!.notes).toBe('A'.repeat(200));
-  });
-
-  it('uses generic as default agent when assignedAgent is not set', () => {
-    const tasks = [{ id: '067-006', title: 'No agent task' }];
-
-    vi.mocked(existsSync).mockReturnValue(false);
-
-    const summaries = buildTaskSummaries('/project', tasks);
-
-    expect(summaries[0]!.agent).toBe('generic');
-    expect(summaries[0]!.skills).toEqual([]);
-  });
-
-  it('returns empty array for empty task list', () => {
-    const summaries = buildTaskSummaries('/project', []);
-    expect(summaries).toEqual([]);
-  });
-
-  it('reads result file from correct path', () => {
-    const tasks = [{ id: '067-007', title: 'Path check' }];
-
-    vi.mocked(existsSync).mockImplementation((p: unknown) => {
-      return String(p).includes('task-067-007.result');
-    });
-    vi.mocked(readFileSync).mockReturnValue(JSON.stringify({ selfAssessment: 'NO_GO', notes: 'Failed tests' }));
-
-    const summaries = buildTaskSummaries('/myproject', tasks);
-
-    expect(vi.mocked(existsSync)).toHaveBeenCalledWith(
-      expect.stringContaining('task-067-007.result'),
-    );
-    expect(summaries[0]!.evaluation).toBe('NO_GO');
+    const [summary] = buildTaskSummaries(projectRoot, [{ id: '067-005', title: 'Bounded' }]);
+    expect(summary?.evaluation).toBe('GO_WITH_TECH_DEBT');
+    expect(summary?.notes).toBe('A'.repeat(200));
+    expect(summary?.agent).toBe('generic');
+    expect(summary?.skills).toEqual([]);
   });
 });
 
-// TSM-016: physically merged from tests/mcp/job-runner.test.ts.
-{
-vi.mock('node:fs', () => ({
-    writeFileSync: vi.fn(),
-    readFileSync: vi.fn(),
-    mkdirSync: vi.fn(),
-    existsSync: vi.fn(),
-    readdirSync: vi.fn(),
-}));
+describe('job state projection', () => {
+  it('creates collision-resistant job identities outside the sprint namespace', () => {
+    const first = createJobId(
+      () => 1780659451558,
+      () => '11111111-1111-4111-8111-111111111111',
+    );
+    const second = createJobId(
+      () => 1780659451558,
+      () => '22222222-2222-4222-8222-222222222222',
+    );
+    expect(first).toBe('job-1780659451558-11111111-1111-4111-8111-111111111111');
+    expect(second).not.toBe(first);
+  });
 
-vi.mock('../../src/core/constants.js', () => ({
-    RUNTIME_DIR: '.deckent/runtime', // sprint-429 (429-011) tool-inventory yolu modül-yüklemede okur
-    SETTINGS_DIR: '.deckent/settings', // born-630 allowscope-zinciri modül-yüklemede okur
-    JOBS_DIR: '.deckent/jobs',
-}));
+  it('writes, advances, and reads one durable job projection', () => {
+    const projectRoot = root();
+    const running: JobState = {
+      jobId: 'job-1780659451558-11111111-1111-4111-8111-111111111111',
+      status: 'RUNNING',
+      startedAt: '2026-03-18T10:00:00.000Z',
+    };
+    writeJobState(projectRoot, running);
+    expect(readJobState(projectRoot, running.jobId)).toEqual(running);
 
-describe('job-runner', () => {
-    it('creates collision-resistant job identities outside the sprint namespace', () => {
-        expect(createJobId(() => 1780659451558, () => '11111111-1111-4111-8111-111111111111'))
-            .toBe('job-1780659451558-11111111-1111-4111-8111-111111111111');
-    });
-    it('does not collide when multiple jobs are admitted in the same millisecond', () => {
-        const first = createJobId(() => 1780659451558, () => '11111111-1111-4111-8111-111111111111');
-        const second = createJobId(() => 1780659451558, () => '22222222-2222-4222-8222-222222222222');
-        expect(first).not.toBe(second);
-        expect(first.startsWith('sprint-')).toBe(false);
-        expect(second.startsWith('sprint-')).toBe(false);
-    });
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-    describe('writeJobState', () => {
-        it('creates jobs directory and writes state file', () => {
-            const state: JobState = {
-                jobId: 'sprint-1234567890',
-                status: 'RUNNING',
-                startedAt: '2026-03-18T10:00:00Z',
-            };
-            writeJobState('/tmp/project', state);
-            expect(vi.mocked(mkdirSync)).toHaveBeenCalledWith(expect.stringContaining('.deckent/jobs'), { recursive: true });
-            expect(vi.mocked(writeFileSync)).toHaveBeenCalledWith(expect.stringContaining('sprint-1234567890.json'), expect.stringContaining('"status": "RUNNING"'));
-        });
-        it('writes complete state with all fields', () => {
-            const state: JobState = {
-                jobId: 'sprint-1234567890',
-                status: 'COMPLETE',
-                startedAt: '2026-03-18T10:00:00Z',
-                completedAt: '2026-03-18T10:05:00Z',
-                sprintId: 'sprint-015',
-            };
-            writeJobState('/tmp/project', state);
-            const written = vi.mocked(writeFileSync).mock.calls[0]![1] as string;
-            const parsed = JSON.parse(written);
-            expect(parsed.status).toBe('COMPLETE');
-            expect(parsed.sprintId).toBe('sprint-015');
-            expect(parsed.completedAt).toBe('2026-03-18T10:05:00Z');
-        });
-        it('writes failed state with error', () => {
-            const state: JobState = {
-                jobId: 'sprint-999',
-                status: 'FAILED',
-                startedAt: '2026-03-18T10:00:00Z',
-                completedAt: '2026-03-18T10:01:00Z',
-                error: 'Plan failed',
-            };
-            writeJobState('/tmp/project', state);
-            const written = vi.mocked(writeFileSync).mock.calls[0]![1] as string;
-            const parsed = JSON.parse(written);
-            expect(parsed.status).toBe('FAILED');
-            expect(parsed.error).toBe('Plan failed');
-        });
-    });
-    describe('readJobState', () => {
-        it('reads existing job file', () => {
-            const state: JobState = {
-                jobId: 'sprint-1234567890',
-                status: 'COMPLETE',
-                startedAt: '2026-03-18T10:00:00Z',
-                completedAt: '2026-03-18T10:05:00Z',
-            };
-            vi.mocked(existsSync).mockReturnValue(true);
-            vi.mocked(readFileSync).mockReturnValue(JSON.stringify(state));
-            const result = readJobState('/tmp/project', 'sprint-1234567890');
-            expect(result).toEqual(state);
-        });
-        it('returns null for missing job file', () => {
-            vi.mocked(existsSync).mockReturnValue(false);
-            const result = readJobState('/tmp/project', 'nonexistent');
-            expect(result).toBeNull();
-        });
-        it('returns null on parse error', () => {
-            vi.mocked(existsSync).mockReturnValue(true);
-            vi.mocked(readFileSync).mockReturnValue('not valid json');
-            const result = readJobState('/tmp/project', 'bad-job');
-            expect(result).toBeNull();
-        });
-    });
-    describe('readLatestJobState', () => {
-        it('returns latest job across current and legacy timestamp namespaces', () => {
-            const state: JobState = {
-                jobId: 'job-1780659451559-11111111-1111-4111-8111-111111111111',
-                status: 'RUNNING',
-                startedAt: '2026-03-18T10:00:00Z',
-            };
-            vi.mocked(existsSync).mockReturnValue(true);
-            vi.mocked(readdirSync).mockReturnValue([
-                'sprint-1780659451558.json',
-                'job-1780659451559-11111111-1111-4111-8111-111111111111.json',
-            ] as unknown as ReturnType<typeof readdirSync>);
-            vi.mocked(readFileSync).mockReturnValue(JSON.stringify(state));
-            const result = readLatestJobState('/tmp/project');
-            expect(result).toEqual(state);
-        });
-        it('returns a newer legacy job when it follows a current job', () => {
-            const state: JobState = {
-                jobId: 'sprint-1780659451560',
-                status: 'COMPLETE',
-                startedAt: '2026-03-18T10:00:00Z',
-            };
-            vi.mocked(existsSync).mockReturnValue(true);
-            vi.mocked(readdirSync).mockReturnValue([
-                'job-1780659451559-11111111-1111-4111-8111-111111111111.json',
-                'sprint-1780659451560.json',
-            ] as unknown as ReturnType<typeof readdirSync>);
-            vi.mocked(readFileSync).mockReturnValue(JSON.stringify(state));
-            expect(readLatestJobState('/tmp/project')).toEqual(state);
-            expect(vi.mocked(readFileSync).mock.calls[0]?.[0]).toEqual(expect.stringContaining('sprint-1780659451560.json'));
-        });
-        it('returns null when jobs dir does not exist', () => {
-            vi.mocked(existsSync).mockReturnValue(false);
-            const result = readLatestJobState('/tmp/project');
-            expect(result).toBeNull();
-        });
-        it('returns null when jobs dir is empty', () => {
-            vi.mocked(existsSync).mockReturnValue(true);
-            vi.mocked(readdirSync).mockReturnValue([] as unknown as ReturnType<typeof readdirSync>);
-            const result = readLatestJobState('/tmp/project');
-            expect(result).toBeNull();
-        });
-        it('ignores non-json files', () => {
-            const state: JobState = {
-                jobId: 'sprint-1000',
-                status: 'COMPLETE',
-                startedAt: '2026-03-18T10:00:00Z',
-            };
-            vi.mocked(existsSync).mockReturnValue(true);
-            vi.mocked(readdirSync).mockReturnValue(['README.md', 'sprint-1000.json', '.gitkeep'] as unknown as ReturnType<typeof readdirSync>);
-            vi.mocked(readFileSync).mockReturnValue(JSON.stringify(state));
-            const result = readLatestJobState('/tmp/project');
-            expect(result).toEqual(state);
-        });
-    });
+    const complete: JobState = {
+      ...running,
+      status: 'COMPLETE',
+      completedAt: '2026-03-18T10:05:00.000Z',
+    };
+    writeJobState(projectRoot, complete);
+    expect(readJobState(projectRoot, running.jobId)).toEqual(complete);
+    expect(readLatestJobState(projectRoot)).toEqual(complete);
+  });
+
+  it('refuses a terminal rewrite', () => {
+    const projectRoot = root();
+    const complete: JobState = {
+      jobId: 'job-1780659451558-11111111-1111-4111-8111-111111111111',
+      status: 'COMPLETE',
+      startedAt: '2026-03-18T10:00:00.000Z',
+      completedAt: '2026-03-18T10:05:00.000Z',
+    };
+    writeJobState(projectRoot, complete);
+    expect(() => writeJobState(projectRoot, { ...complete, status: 'FAILED', error: 'late' }))
+      .toThrowError(expect.objectContaining<JobStateProjectionError>({
+        code: 'JOB_STATE_TERMINAL_CONFLICT',
+      }));
+    expect(readJobState(projectRoot, complete.jobId)).toEqual(complete);
+  });
+
+  it('fails closed while another writer owns the job projection lock', () => {
+    const projectRoot = root();
+    const state: JobState = {
+      jobId: 'job-1780659451558-11111111-1111-4111-8111-111111111111',
+      status: 'RUNNING',
+      startedAt: '2026-03-18T10:00:00.000Z',
+    };
+    const jobsDir = join(projectRoot, JOBS_DIR);
+    mkdirSync(jobsDir, { recursive: true });
+    writeFileSync(join(jobsDir, `.${state.jobId}.projection.lock`), 'other-writer\n', 'utf8');
+
+    expect(() => writeJobState(projectRoot, state)).toThrowError(
+      expect.objectContaining<JobStateProjectionError>({ code: 'JOB_STATE_WRITE_CONFLICT' }),
+    );
+    expect(readJobState(projectRoot, state.jobId)).toBeNull();
+  });
 });
-}

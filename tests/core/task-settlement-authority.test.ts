@@ -11,6 +11,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { InvocationReceiptStore } from '../../src/core/invocation-receipt-store.js';
 import {
+  createExactAcceptedTaskResultRefV2,
+  createExactTaskResultSettlementRefV2,
+  inspectExactAcceptedTaskResultAuthority,
+  inspectExactTaskResultSettlementAuthority,
   createTaskSettlementProbe,
   openTaskSettlementAuthority,
   inspectLinuxProcWorker,
@@ -20,6 +24,8 @@ import {
   type TaskSettlementEvidenceProbe,
   type TaskSettlementProbeInput,
 } from '../../src/core/task-settlement-authority.js';
+import { taskResultSettlementV2Digest } from '../../src/core/task-result-settlement.js';
+import { createTaskResultSettlementV2Fixture } from '../helpers/task-result-settlement-v2-fixture.js';
 
 const roots: string[] = [];
 const authorityHandles: Array<{ close(): void }> = [];
@@ -768,6 +774,84 @@ describe('TaskSettlementAuthority', () => {
     opened.close();
   });
 
+  it('durably retains exact backend zero-work evidence in the invocation settlement', async () => {
+    const projectRoot = root();
+    const opened = openTaskSettlementAuthority(projectRoot, {
+      processProbe: {
+        async inspect() {
+          return {
+            kind: 'worker-process',
+            state: 'absent',
+            evidenceRef: 'process:absent',
+          };
+        },
+      },
+      backendProbe: {
+        async inspect() {
+          return {
+            kind: 'backend-attempt',
+            state: 'absent',
+            evidenceRef: 'backend:absent',
+          };
+        },
+      },
+      now: () => '2026-07-27T12:00:00.000Z',
+    });
+    const declaration = opened.authority.declareTaskExecution({
+      tenantId: 'local',
+      projectId: opened.projectId,
+      taskId: 'run-100-0',
+      runId: 'run-100',
+      provider: 'claude',
+      model: 'claude-sonnet-5',
+      executionBackend: 'docker',
+      createdAt,
+    });
+    const zeroWorkRef = `sha256:${'a'.repeat(64)}`;
+    const zeroWorkDigest = `sha256:${'b'.repeat(64)}`;
+
+    const settled = await opened.authority.settleNotDispatched({
+      tenantId: 'local',
+      projectId: opened.projectId,
+      taskId: 'run-100-0',
+      runId: 'run-100',
+      executionBackend: 'docker',
+      rawStatus: 'PENDING',
+      taskContent: taskContent(),
+      taskCreatedAt: createdAt,
+      taskSnapshotOrigin: 'ephemeral-memory',
+      receiptRef: declaration.receiptRef,
+      reasonCode: 'execution_admission_rejected',
+      authorityEvidenceRefs: [zeroWorkRef, zeroWorkDigest],
+      apply: true,
+    });
+
+    expect(settled).toMatchObject({
+      decision: 'already-settled',
+      effectiveStatus: 'NOT_DISPATCHED',
+    });
+    expect(settled.evidenceRefs).toEqual(expect.arrayContaining([
+      zeroWorkRef,
+      zeroWorkDigest,
+    ]));
+    await expect(opened.authority.settleNotDispatched({
+      tenantId: 'local',
+      projectId: opened.projectId,
+      taskId: 'run-100-0',
+      runId: 'run-100',
+      executionBackend: 'docker',
+      rawStatus: 'PENDING',
+      taskContent: taskContent(),
+      taskCreatedAt: createdAt,
+      taskSnapshotOrigin: 'ephemeral-memory',
+      receiptRef: declaration.receiptRef,
+      reasonCode: 'execution_admission_rejected',
+      authorityEvidenceRefs: [zeroWorkRef, zeroWorkDigest],
+      apply: true,
+    })).resolves.toMatchObject({ effectiveStatus: 'NOT_DISPATCHED' });
+    opened.close();
+  });
+
   it('production authority rejects task bytes changed while the absence probe is pending', async () => {
     const projectRoot = root();
     const tasksDir = join(projectRoot, '.tasks');
@@ -1422,4 +1506,341 @@ describe('TaskSettlementAuthority', () => {
         });
     },
   );
+});
+
+describe('exact TaskResult settlement consumer authority', () => {
+  function exactInput() {
+    const fixtureV2 = createTaskResultSettlementV2Fixture();
+    return {
+      fixtureV2,
+      input: {
+        executionMode: 'normal-docker' as const,
+        authorityKind: 'attempt-settlement' as const,
+        projectRoot: '/fixture/project',
+        taskId: fixtureV2.identity.taskId,
+        custodyStore: fixtureV2.store,
+        policy: fixtureV2.policy,
+        expectedIdentity: fixtureV2.identity,
+        admission: fixtureV2.creation.admission,
+        settlementRef: createExactTaskResultSettlementRefV2(
+          fixtureV2.settlementArtifact,
+        ),
+        expectedSettlementDigest: taskResultSettlementV2Digest(
+          fixtureV2.settlement,
+          fixtureV2.policy.jsonBounds,
+        ),
+      },
+    };
+  }
+
+  it('accepts only the exact persisted attempt, custody ref and settlement digest', () => {
+    const { fixtureV2, input } = exactInput();
+
+    const first = inspectExactTaskResultSettlementAuthority(input);
+    const replay = inspectExactTaskResultSettlementAuthority(input);
+
+    expect(first).toMatchObject({
+      state: 'accepted',
+      executionMode: 'normal-docker',
+      identity: fixtureV2.identity,
+      settlementRef: input.settlementRef,
+      settlementDigest: input.expectedSettlementDigest,
+      result: fixtureV2.result,
+      settlement: fixtureV2.settlement,
+      evaluationArtifact: {
+        artifactReceiptDigest: fixtureV2.creation.evaluationArtifact.receiptDigest,
+        chainDigest: fixtureV2.creation.evaluationChain.receiptDigest,
+        artifactSha256: fixtureV2.creation.evaluationArtifact.artifact.sha256,
+        byteLength: fixtureV2.creation.evaluationArtifact.artifact.byteLength,
+      },
+      finalizerArtifact: {
+        artifactReceiptDigest: fixtureV2.creation.finalizerArtifact.receiptDigest,
+        chainDigest: fixtureV2.creation.finalizerChain.receiptDigest,
+        artifactSha256: fixtureV2.creation.finalizerArtifact.artifact.sha256,
+        byteLength: fixtureV2.creation.finalizerArtifact.artifact.byteLength,
+      },
+    });
+    expect(replay).toEqual(first);
+  }, 30_000);
+
+  it('never reads or enriches normal Docker authority from a public result', () => {
+    const { fixtureV2, input } = exactInput();
+    const projectRoot = root();
+    mkdirSync(join(projectRoot, '.tasks'), { recursive: true });
+    writeFileSync(join(projectRoot, '.tasks', `task-${input.taskId}.result`), JSON.stringify({
+      taskId: input.taskId,
+      selfAssessment: 'NO_GO',
+      provider: 'public-spoof',
+      runPolicyEvidence: { observedPolicyDigest: 'public-spoof' },
+    }));
+
+    const inspected = inspectExactTaskResultSettlementAuthority({
+      ...input,
+      projectRoot,
+    });
+
+    expect(inspected).toMatchObject({
+      state: 'accepted',
+      result: {
+        selfAssessment: fixtureV2.result.selfAssessment,
+        provider: fixtureV2.result.provider,
+      },
+      evaluationArtifact: {
+        artifactReceiptDigest: fixtureV2.creation.evaluationArtifact.receiptDigest,
+      },
+      finalizerArtifact: {
+        artifactReceiptDigest: fixtureV2.creation.finalizerArtifact.receiptDigest,
+      },
+    });
+    expect(JSON.stringify(inspected)).not.toContain('public-spoof');
+  });
+
+  it('returns HOLD when the bound evaluation artifact is malformed', () => {
+    const { fixtureV2, input } = exactInput();
+    const custodyStore = {
+      readAdmission: fixtureV2.store.readAdmission.bind(fixtureV2.store),
+      readChain: fixtureV2.store.readChain.bind(fixtureV2.store),
+      readVerifiedArtifact: (artifactInput: Parameters<
+        typeof fixtureV2.store.readVerifiedArtifact
+      >[0]) => {
+        const artifact = fixtureV2.store.readVerifiedArtifact(artifactInput);
+        return artifactInput.artifactClass === 'evaluation-receipt' && artifact
+          ? { ...artifact, bytes: Buffer.from('{"verdict":"NO_GO","score":"forged"}') }
+          : artifact;
+      },
+    };
+
+    expect(inspectExactTaskResultSettlementAuthority({
+      ...input,
+      custodyStore,
+    } as never)).toMatchObject({
+      state: 'hold',
+      reasonCode: 'evaluation-authority-invalid',
+    });
+  });
+
+  it('returns HOLD when the bound finalizer artifact bytes mismatch their receipt', () => {
+    const { fixtureV2, input } = exactInput();
+    const custodyStore = {
+      readAdmission: fixtureV2.store.readAdmission.bind(fixtureV2.store),
+      readChain: fixtureV2.store.readChain.bind(fixtureV2.store),
+      readVerifiedArtifact: (artifactInput: Parameters<
+        typeof fixtureV2.store.readVerifiedArtifact
+      >[0]) => {
+        const artifact = fixtureV2.store.readVerifiedArtifact(artifactInput);
+        return artifactInput.artifactClass === 'finalizer-receipt' && artifact
+          ? { ...artifact, bytes: Buffer.from('{"state":"worker-claimed-done"}') }
+          : artifact;
+      },
+    };
+
+    expect(inspectExactTaskResultSettlementAuthority({
+      ...input,
+      custodyStore,
+    } as never)).toMatchObject({
+      state: 'hold',
+      reasonCode: 'finalizer-authority-invalid',
+    });
+  });
+
+  it('returns typed HOLD for stale, sibling and digest-spoofed authorities', () => {
+    const { input } = exactInput();
+    const staleRef = {
+      ...input.settlementRef,
+      identity: {
+        ...input.settlementRef.identity,
+        generation: input.settlementRef.identity.generation - 1,
+      },
+    };
+    const siblingRef = {
+      ...input.settlementRef,
+      identity: {
+        ...input.settlementRef.identity,
+        attemptId: '123e4567-e89b-42d3-a456-426614174001',
+      },
+    };
+
+    expect(inspectExactTaskResultSettlementAuthority({
+      ...input,
+      settlementRef: staleRef,
+    })).toMatchObject({ state: 'hold', reasonCode: 'stale-attempt' });
+    expect(inspectExactTaskResultSettlementAuthority({
+      ...input,
+      settlementRef: siblingRef,
+    })).toMatchObject({ state: 'hold', reasonCode: 'sibling-attempt' });
+    expect(inspectExactTaskResultSettlementAuthority({
+      ...input,
+      expectedSettlementDigest: `sha256:${'f'.repeat(64)}`,
+    })).toMatchObject({ state: 'hold', reasonCode: 'spoofed-settlement' });
+    expect(inspectExactTaskResultSettlementAuthority({
+      ...input,
+      settlementRef: {
+        ...input.settlementRef,
+        artifactReceiptDigest: `sha256:${'e'.repeat(64)}`,
+      },
+    })).toMatchObject({ state: 'hold', reasonCode: 'spoofed-settlement' });
+  });
+
+  it('does not fall back to a public result when normal Docker custody is missing', () => {
+    const projectRoot = root();
+    mkdirSync(join(projectRoot, '.tasks'), { recursive: true });
+    writeFileSync(join(projectRoot, '.tasks', 'task-fixture-001.result'), JSON.stringify({
+      taskId: 'fixture-001',
+      selfAssessment: 'DONE',
+    }));
+
+    expect(inspectExactTaskResultSettlementAuthority({
+      executionMode: 'normal-docker',
+      authorityKind: 'attempt-settlement',
+      projectRoot,
+      taskId: 'fixture-001',
+    } as never)).toEqual({
+      state: 'hold',
+      executionMode: 'normal-docker',
+      taskId: 'fixture-001',
+      reasonCode: 'invalid-input',
+    });
+  });
+
+  it('preserves no-dispatch as strict zero-attempt truth', () => {
+    const authority = {
+      schemaVersion: 2 as const,
+      kind: 'task-not-dispatched-v2' as const,
+      state: 'NOT_DISPATCHED' as const,
+      taskId: 'fixture-001',
+      attemptCount: 0 as const,
+      reasonCode: 'execution_admission_rejected',
+      evidenceRef: `host-pre-dispatch-settlement:sha256:${'a'.repeat(64)}`,
+      attemptIdentity: null,
+      settlementRef: null,
+      settlementDigest: null,
+    };
+    const input = {
+      executionMode: 'normal-docker' as const,
+      authorityKind: 'not-dispatched' as const,
+      projectRoot: '/fixture/project',
+      taskId: authority.taskId,
+      authority,
+    };
+
+    expect(inspectExactTaskResultSettlementAuthority(input)).toEqual({
+      state: 'not-dispatched',
+      executionMode: 'normal-docker',
+      taskId: authority.taskId,
+      attemptCount: 0,
+      reasonCode: authority.reasonCode,
+      evidenceRef: authority.evidenceRef,
+    });
+    expect(inspectExactTaskResultSettlementAuthority({
+      ...input,
+      authority: {
+        ...authority,
+        attemptCount: 1,
+        settlementRef: createExactTaskResultSettlementRefV2(
+          createTaskResultSettlementV2Fixture().settlementArtifact,
+        ),
+      },
+    } as never)).toMatchObject({
+      state: 'hold',
+      reasonCode: 'not-dispatched-attempt-conflict',
+    });
+  });
+
+  it('reads public compatibility only behind the explicit legacy non-Docker mode', () => {
+    const projectRoot = root();
+    mkdirSync(join(projectRoot, '.tasks'), { recursive: true });
+    const result = { taskId: 'legacy-001', selfAssessment: 'DONE', notes: 'legacy' };
+    writeFileSync(
+      join(projectRoot, '.tasks', 'task-legacy-001.result'),
+      JSON.stringify(result),
+    );
+
+    expect(inspectExactTaskResultSettlementAuthority({
+      executionMode: 'legacy-non-docker',
+      projectRoot,
+      taskId: 'legacy-001',
+    })).toEqual({
+      state: 'legacy',
+      executionMode: 'legacy-non-docker',
+      result,
+      rawResultPath: join(projectRoot, '.tasks', 'task-legacy-001.result'),
+    });
+  });
+});
+
+describe('exact accepted TaskResult authority', () => {
+  function acceptedInput() {
+    const fixtureV2 = createTaskResultSettlementV2Fixture();
+    return {
+      fixtureV2,
+      input: {
+        executionMode: 'normal-docker' as const,
+        authorityKind: 'accepted-result' as const,
+        projectRoot: '/fixture/project',
+        taskId: fixtureV2.identity.taskId,
+        custodyStore: fixtureV2.store,
+        policy: fixtureV2.policy,
+        expectedIdentity: fixtureV2.identity,
+        admission: fixtureV2.creation.admission,
+        acceptedResultRef: createExactAcceptedTaskResultRefV2(
+          fixtureV2.creation.acceptedResultArtifact,
+        ),
+        expectedAcceptedResultChainDigest:
+          fixtureV2.creation.acceptedResultChain.receiptDigest,
+      },
+    };
+  }
+
+  it('accepts the source-bound TaskResultV2 before evaluation and finalization', () => {
+    const { fixtureV2, input } = acceptedInput();
+
+    expect(inspectExactAcceptedTaskResultAuthority(input)).toMatchObject({
+      state: 'accepted-result',
+      executionMode: 'normal-docker',
+      identity: fixtureV2.identity,
+      admissionReceiptDigest: fixtureV2.creation.admission.receiptDigest,
+      acceptedResultRef: input.acceptedResultRef,
+      acceptedResultChainDigest: input.expectedAcceptedResultChainDigest,
+      result: fixtureV2.result,
+    });
+  });
+
+  it('does not read evaluation or finalizer authority at the collector boundary', () => {
+    const { fixtureV2, input } = acceptedInput();
+    const custodyStore = {
+      readAdmission: fixtureV2.store.readAdmission.bind(fixtureV2.store),
+      readVerifiedArtifact: fixtureV2.store.readVerifiedArtifact.bind(fixtureV2.store),
+      readChain: (
+        identity: Parameters<typeof fixtureV2.store.readChain>[0],
+        policy: Parameters<typeof fixtureV2.store.readChain>[1],
+        stage: Parameters<typeof fixtureV2.store.readChain>[2],
+      ) => {
+        if (stage !== 'accepted-result') throw new Error(`unexpected downstream stage: ${stage}`);
+        return fixtureV2.store.readChain(identity, policy, stage);
+      },
+    };
+
+    expect(inspectExactAcceptedTaskResultAuthority({
+      ...input,
+      custodyStore,
+    } as never)).toMatchObject({
+      state: 'accepted-result',
+      result: fixtureV2.result,
+    });
+  });
+
+  it('returns typed HOLD for a sibling accepted-result ref', () => {
+    const { input } = acceptedInput();
+
+    expect(inspectExactAcceptedTaskResultAuthority({
+      ...input,
+      acceptedResultRef: {
+        ...input.acceptedResultRef,
+        identity: {
+          ...input.acceptedResultRef.identity,
+          attemptId: '123e4567-e89b-42d3-a456-426614174001',
+        },
+      },
+    })).toMatchObject({ state: 'hold', reasonCode: 'sibling-attempt' });
+  });
 });

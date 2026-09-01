@@ -5,6 +5,7 @@ import {
   EXECUTION_LANDING_PROPOSAL_MAX_BYTES,
   LANDING_PROPOSAL_MALFORMED,
   LandingProposalMalformedError,
+  parseExactExecutionLandingProposalJsonV3,
   parseExecutionLandingProposalJson,
   writeExecutionLandingProposal,
 } from '../core/execution-landing-proposal.js';
@@ -26,20 +27,28 @@ export async function runLandingProposalEntry(
   argv: readonly string[],
   projectRoot: string,
 ): Promise<LandingProposalEntryResult> {
-  const [taskId, attemptId] = argv;
+  const exact = argv[0] === '--exact';
+  const [taskId, identity] = exact ? argv.slice(1) : argv;
   try {
-    if (!taskId || !attemptId) {
+    if (!taskId || !identity) {
       throw new LandingProposalMalformedError(
-        'Expected <taskId> <attemptId> and proposal JSON on stdin or as the third argument',
+        exact
+          ? 'Expected --exact <taskId> <dispatchRequestId> and proposal JSON on stdin or as the fourth argument'
+          : 'Expected <taskId> <attemptId> and proposal JSON on stdin or as the third argument',
       );
     }
-    const raw = await readInput(argv);
+    const raw = await readInput(exact ? argv.slice(1) : argv);
     if (Buffer.byteLength(raw) > EXECUTION_LANDING_PROPOSAL_MAX_BYTES) {
       throw new LandingProposalMalformedError(
         'Execution landing proposal input exceeds its byte ceiling',
       );
     }
-    const proposal = parseExecutionLandingProposalJson(raw, { taskId, attemptId });
+    const proposal = exact
+      ? parseExactExecutionLandingProposalJsonV3(raw, {
+          taskId,
+          dispatchRequestId: identity,
+        })
+      : parseExecutionLandingProposalJson(raw, { taskId, attemptId: identity });
     writeExecutionLandingProposal(projectRoot, proposal);
     return { exitCode: 0 };
   } catch (error: unknown) {

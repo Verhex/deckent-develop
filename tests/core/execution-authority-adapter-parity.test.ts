@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { closeSync, mkdtempSync, openSync, rmSync, constants as fsConstants } from 'node:fs';
+import {
+  closeSync,
+  constants as fsConstants,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  rmSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -21,7 +28,50 @@ const ADAPTER_SURFACE = ['classify', 'stableFdPath', 'pinnedMountId', 'directory
 
 const onLinux = process.platform === 'linux';
 const onDarwin = process.platform === 'darwin';
-const nativeAvailable = loadExecAuthorityNative().available;
+const nativeState = loadExecAuthorityNative();
+const nativeAvailable = nativeState.available;
+
+describe('execution-effect v2 facade parity boundary', () => {
+  it('keeps the raw-loader and typed facade surfaces byte-name identical', () => {
+    const rawSource = readFileSync(
+      new URL('../../native/exec-authority/index.mjs', import.meta.url),
+      'utf8',
+    );
+    const typedSource = readFileSync(
+      new URL('../../src/core/exec-authority-native.ts', import.meta.url),
+      'utf8',
+    );
+    const methods = [
+      'appendStage', 'applyOperation', 'beginSourceRead', 'beginStage', 'captureTree',
+      'closeHandle', 'finishSourceRead', 'inspectEntry', 'nextSourceChunk', 'openRoot',
+      'reconcileOperation', 'sealStage', 'verifyPostimages',
+    ];
+    for (const method of methods) {
+      expect(rawSource).toContain(`'${method}'`);
+      expect(typedSource).toContain(`'${method}'`);
+    }
+    expect(rawSource).toContain("trustDomain: 'execution-effect-linux-v1'");
+    expect(typedSource).toContain(
+      "const EXPECTED_EFFECT_TRUST_DOMAIN = 'execution-effect-linux-v1';",
+    );
+  });
+
+  it.runIf(nativeAvailable)('exposes Linux effect-v2 or a typed non-Linux residual', () => {
+    if (!nativeState.available) throw new Error('native binding became unavailable after admission');
+    expect(nativeState.manifest.effectContract.available).toBe(onLinux);
+    if (onLinux) {
+      expect(Object.keys(nativeState.effect).sort()).toEqual([
+        'appendStage', 'applyOperation', 'beginSourceRead', 'beginStage', 'captureTree',
+        'closeHandle', 'finishSourceRead', 'inspectEntry', 'nextSourceChunk', 'openRoot',
+        'reconcileOperation', 'sealStage', 'verifyPostimages',
+      ]);
+      expect(Object.isFrozen(nativeState.effect)).toBe(true);
+    } else {
+      expect(nativeState.effect).toEqual({ available: false, reason: 'platform-unsupported' });
+      expect(Object.isFrozen(nativeState.effect)).toBe(true);
+    }
+  });
+});
 
 describe('PLATFORM-EXEC-AUTH-W1-INTERFACE-001 — twin adapter parity', () => {
   it('exposes the identical frozen four-capability surface on both twins', () => {
@@ -133,38 +183,44 @@ describe('W3-PR-B slice-2 — darwin native ops-v2', () => {
   });
 
   it.runIf(onLinux && nativeAvailable)(
-    'binding-backed ops behave identically to the /proc twin on a real tree',
+    'the real native legacy facade matches the /proc twin on a Linux tree',
     () => {
-      // The exact code path Darwin ships, exercised on Linux CI: every op the
-      // darwin surface fills from the binding must match the /proc facility.
+      // Exercise the platform-neutral native primitives directly. The Darwin
+      // production adapter itself must remain fail-closed off Darwin; calling
+      // it here would weaken that platform authority boundary.
+      if (!nativeState.available) {
+        throw new Error('native binding became unavailable after test admission');
+      }
       const root = mkdtempSync(join(tmpdir(), 'ops-v2-native-parity-'));
       try {
         const procOps = linuxProcExecutionAuthorityOpsV2;
-        const nativeOps = darwinNativeExecutionAuthorityOpsV2;
+        const nativeOps = nativeState.legacy;
         const procFd = procOps.openDirAt(null, root);
         const nativeFd = nativeOps.openDirAt(null, root);
         try {
-          expect(nativeOps.realPathOf(nativeFd)).toBe(procOps.realPathOf(procFd));
+          expect(nativeOps.fdPath(nativeFd)).toBe(procOps.realPathOf(procFd));
           const { mkdirSync: mk, writeFileSync: wf } = require('node:fs') as typeof import('node:fs');
           mk(join(root, 'child'));
           wf(join(root, 'child', 'x.txt'), 'x\n');
           const childFd = nativeOps.openDirAt(nativeFd, 'child');
           const procChildFd = procOps.openDirAt(procFd, 'child');
           try {
-            expect(nativeOps.readdirOf(childFd)).toEqual(procOps.readdirOf(procChildFd));
+            expect([...nativeOps.readdirFd(childFd)].sort())
+              .toEqual(procOps.readdirOf(procChildFd));
             nativeOps.renameAt(childFd, 'x.txt', childFd, 'y.txt');
-            expect(procOps.readdirOf(childFd)).toEqual(['y.txt']);
+            expect(procOps.readdirOf(procChildFd)).toEqual(['y.txt']);
             nativeOps.unlinkAt(childFd, 'y.txt', false);
-            expect(nativeOps.readdirOf(childFd)).toEqual([]);
+            expect(nativeOps.readdirFd(childFd)).toEqual([]);
           } finally {
             nativeOps.closeFd(childFd);
             procOps.closeFd(procChildFd);
           }
           nativeOps.unlinkAt(nativeFd, 'child', true);
-          // identityOf needs a mount-identity source; on Linux the binding's
-          // f_fsid facility is typed-absent, so the darwin surface must fail
-          // CLOSED here rather than inventing a mountId (negative pin).
-          expect(() => nativeOps.identityOf(nativeFd)).toThrowError(/mount identity/iu);
+          const nativeIdentity = nativeOps.fstatIdentity(nativeFd);
+          const procIdentity = procOps.identityOf(procFd);
+          expect(nativeIdentity.dev).toBe(procIdentity.dev);
+          expect(nativeIdentity.ino).toBe(procIdentity.ino);
+          expect(nativeIdentity.isDirectory).toBe(true);
         } finally {
           procOps.closeFd(procFd);
           nativeOps.closeFd(nativeFd);

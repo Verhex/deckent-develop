@@ -5,6 +5,23 @@ import type { TaskScope } from './task-types.js';
 
 export const CANONICAL_SCOPE_MANIFEST_VERSION = 1 as const;
 export const CANONICAL_SCOPE_POLICY_VERSION = 'portable-scope-v1' as const;
+export const EXECUTION_EFFECT_WRITE_POLICY_VERSION = 1 as const;
+
+export const EXECUTION_EFFECT_PORTABLE_PATH_LIMITS = Object.freeze({
+  maxEntries: 100_000,
+  maxPathBytes: 16 * 1024,
+  maxNameBytes: 255,
+  maxTotalPathBytes: 16 * 1024 * 1024,
+});
+
+export const EXECUTION_EFFECT_PROTECTED_TREES = Object.freeze([
+  '.brain',
+  '.deck',
+  '.deckent',
+  '.git',
+  '.locks',
+  '.tasks',
+] as const);
 
 export type ScopeSelector =
   | { readonly kind: 'exact-file'; readonly path: string }
@@ -100,6 +117,305 @@ function normalizePortablePath(value: string): { path: string; key: string } | u
   if (segments.length === 0) return undefined;
   const path = segments.join('/');
   return { path, key: path.toLowerCase() };
+}
+
+export type ExecutionEffectWritePolicyHoldCode =
+  | 'INVALID_EXACT_WRITE_PATH'
+  | 'WRITE_POLICY_ENTRY_LIMIT'
+  | 'WRITE_POLICY_PATH_BYTES_LIMIT'
+  | 'WRITE_POLICY_NAME_BYTES_LIMIT'
+  | 'WRITE_POLICY_TOTAL_PATH_BYTES_LIMIT'
+  | 'PROTECTED_WRITE_PATH'
+  | 'PORTABLE_WRITE_PATH_COLLISION';
+
+export interface ExecutionEffectWritePolicyHold {
+  readonly code: ExecutionEffectWritePolicyHoldCode;
+  readonly path: string;
+}
+
+export interface ExecutionEffectWritePolicy {
+  readonly version: typeof EXECUTION_EFFECT_WRITE_POLICY_VERSION;
+  readonly mode: 'exact-files-write';
+  readonly readOnly: boolean;
+  readonly filesWrite: readonly string[];
+  readonly protectedTrees: typeof EXECUTION_EFFECT_PROTECTED_TREES;
+  readonly digest: string;
+}
+
+export type ExecutionEffectWritePolicyCompileResult =
+  | { readonly ok: true; readonly policy: ExecutionEffectWritePolicy }
+  | { readonly ok: false; readonly holds: readonly ExecutionEffectWritePolicyHold[] };
+
+function exactPolicyRecord(value: unknown, keys: readonly string[]): Record<string, unknown> | null {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) return null;
+  if (Object.getOwnPropertySymbols(value).length !== 0) return null;
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const actual = Object.keys(descriptors).sort(compareCodePoint);
+  const expected = [...keys].sort(compareCodePoint);
+  if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) {
+    return null;
+  }
+  return actual.every(key => {
+    const descriptor = descriptors[key];
+    return descriptor !== undefined && 'value' in descriptor && descriptor.enumerable === true;
+  }) ? value as Record<string, unknown> : null;
+}
+
+function exactStringArray(value: unknown): readonly string[] | null {
+  if (
+    !Array.isArray(value)
+    || value.length > EXECUTION_EFFECT_PORTABLE_PATH_LIMITS.maxEntries
+    || Object.getOwnPropertySymbols(value).length !== 0
+  ) return null;
+  let totalPathBytes = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    const entry = value[index];
+    if (typeof entry !== 'string') return null;
+    totalPathBytes += Buffer.byteLength(entry, 'utf8');
+    if (
+      !Number.isSafeInteger(totalPathBytes)
+      || totalPathBytes > EXECUTION_EFFECT_PORTABLE_PATH_LIMITS.maxTotalPathBytes
+    ) return null;
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const expectedKeys = [...Array.from({ length: value.length }, (_, index) => String(index)), 'length'];
+  const actualKeys = Object.keys(descriptors);
+  if (actualKeys.length !== expectedKeys.length
+    || expectedKeys.some(key => !(key in descriptors))) return null;
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = descriptors[String(index)];
+    if (!descriptor || !('value' in descriptor) || typeof descriptor.value !== 'string') return null;
+  }
+  return Object.freeze([...value] as string[]);
+}
+
+function isWindowsReservedName(segment: string): boolean {
+  const base = segment.split('.')[0]?.toUpperCase() ?? '';
+  return base === 'CON'
+    || base === 'PRN'
+    || base === 'AUX'
+    || base === 'NUL'
+    || base === 'CLOCK$'
+    || base === 'CONIN$'
+    || base === 'CONOUT$'
+    || /^COM[1-9¹²³]$/u.test(base)
+    || /^LPT[1-9¹²³]$/u.test(base);
+}
+
+function portableEffectPathFailure(
+  value: string,
+): 'INVALID' | 'PATH_BYTES_LIMIT' | 'NAME_BYTES_LIMIT' | undefined {
+  if (Buffer.byteLength(value, 'utf8') > EXECUTION_EFFECT_PORTABLE_PATH_LIMITS.maxPathBytes) {
+    return 'PATH_BYTES_LIMIT';
+  }
+  if (
+    value.length === 0
+    || value !== value.normalize('NFC')
+    || value !== value.trim()
+    || value.startsWith('/')
+    || value.startsWith('//')
+    || /^[A-Za-z]:($|\/)/u.test(value)
+    || value.includes('\\')
+    || containsWildcard(value)
+  ) return 'INVALID';
+  const segments = value.split('/');
+  for (const segment of segments) {
+    if (Buffer.byteLength(segment, 'utf8') > EXECUTION_EFFECT_PORTABLE_PATH_LIMITS.maxNameBytes) {
+      return 'NAME_BYTES_LIMIT';
+    }
+    if (
+      segment.length === 0
+      || segment === '.'
+      || segment === '..'
+      || segment !== segment.trim()
+      || /[. ]$/u.test(segment)
+      || /[\u0000-\u001f<>:"|]/u.test(segment)
+      || isWindowsReservedName(segment)
+    ) return 'INVALID';
+  }
+  return undefined;
+}
+
+/**
+ * Strict portable identity for durable effect authority. It rejects aliases
+ * instead of rewriting them; callers must never trim, separator-normalize or
+ * Unicode-normalize an observed filesystem name into an authorized spelling.
+ */
+export function parseExecutionEffectPortablePath(
+  value: string,
+): { readonly path: string; readonly key: string } | undefined {
+  if (portableEffectPathFailure(value) !== undefined) return undefined;
+  return Object.freeze({
+    path: value,
+    // Compatibility folding is deliberately conservative: it catches Unicode
+    // width/compatibility and case aliases in addition to ordinary case-only
+    // collisions while preserving the exact authored path above.
+    key: value.normalize('NFKC').toUpperCase(),
+  });
+}
+
+function normalizeExactEffectPath(value: string): { path: string; key: string } | undefined {
+  if (typeof value !== 'string') return undefined;
+  const input = value;
+  if (
+    portableEffectPathFailure(input) !== undefined
+  ) return undefined;
+  return parseExecutionEffectPortablePath(input);
+}
+
+export function isExecutionEffectProtectedPath(path: string): boolean {
+  const normalized = normalizeExactEffectPath(path);
+  if (!normalized) return true;
+  return EXECUTION_EFFECT_PROTECTED_TREES.some(
+    protectedTree => {
+      const protectedKey = protectedTree.normalize('NFKC').toUpperCase();
+      return normalized.key === protectedKey || normalized.key.startsWith(`${protectedKey}/`);
+    },
+  );
+}
+
+/**
+ * Compile the sole persistent-effect authority for one exact attempt.
+ * `directories` and legacy wildcard semantics intentionally do not participate:
+ * every landed project file must be named exactly. An empty list is an explicit
+ * read-only policy rather than an implicit directory fallback.
+ */
+export function compileExecutionEffectWritePolicy(
+  filesWrite: readonly string[],
+): ExecutionEffectWritePolicyCompileResult {
+  const holds: ExecutionEffectWritePolicyHold[] = [];
+  const byPortableKey = new Map<string, string>();
+  const normalizedPaths: string[] = [];
+
+  if (
+    !Array.isArray(filesWrite)
+    || filesWrite.length > EXECUTION_EFFECT_PORTABLE_PATH_LIMITS.maxEntries
+  ) {
+    return Object.freeze({
+      ok: false,
+      holds: Object.freeze([Object.freeze({
+        code: 'WRITE_POLICY_ENTRY_LIMIT' as const,
+        path: Array.isArray(filesWrite) ? String(filesWrite.length) : '<not-an-array>',
+      })]),
+    });
+  }
+
+  let totalPathBytes = 0;
+  for (const rawPath of filesWrite) {
+    if (typeof rawPath !== 'string') continue;
+    totalPathBytes += Buffer.byteLength(rawPath, 'utf8');
+    if (
+      !Number.isSafeInteger(totalPathBytes)
+      || totalPathBytes > EXECUTION_EFFECT_PORTABLE_PATH_LIMITS.maxTotalPathBytes
+    ) {
+      return Object.freeze({
+        ok: false,
+        holds: Object.freeze([Object.freeze({
+          code: 'WRITE_POLICY_TOTAL_PATH_BYTES_LIMIT' as const,
+          path: String(totalPathBytes),
+        })]),
+      });
+    }
+  }
+
+  for (const rawPath of filesWrite) {
+    const failure = typeof rawPath === 'string' ? portableEffectPathFailure(rawPath) : 'INVALID';
+    const normalized = normalizeExactEffectPath(rawPath);
+    if (!normalized) {
+      holds.push({
+        code: failure === 'PATH_BYTES_LIMIT'
+          ? 'WRITE_POLICY_PATH_BYTES_LIMIT'
+          : failure === 'NAME_BYTES_LIMIT'
+            ? 'WRITE_POLICY_NAME_BYTES_LIMIT'
+            : 'INVALID_EXACT_WRITE_PATH',
+        path: typeof rawPath === 'string' ? rawPath : String(rawPath),
+      });
+      continue;
+    }
+    if (isExecutionEffectProtectedPath(normalized.path)) {
+      holds.push({ code: 'PROTECTED_WRITE_PATH', path: normalized.path });
+      continue;
+    }
+    const previous = byPortableKey.get(normalized.key);
+    if (previous !== undefined && previous !== normalized.path) {
+      holds.push({
+        code: 'PORTABLE_WRITE_PATH_COLLISION',
+        path: [previous, normalized.path].sort(compareCodePoint).join('|'),
+      });
+      continue;
+    }
+    byPortableKey.set(normalized.key, normalized.path);
+    normalizedPaths.push(normalized.path);
+  }
+
+  if (holds.length > 0) {
+    return {
+      ok: false,
+      holds: Object.freeze(holds
+        .sort((left, right) => compareCodePoint(canonicalJson(left), canonicalJson(right)))
+        .map(hold => Object.freeze(hold))),
+    };
+  }
+
+  const canonicalPaths = Object.freeze(
+    [...new Set(normalizedPaths)].sort(compareCodePoint),
+  );
+  const body = Object.freeze({
+    version: EXECUTION_EFFECT_WRITE_POLICY_VERSION,
+    mode: 'exact-files-write' as const,
+    readOnly: canonicalPaths.length === 0,
+    filesWrite: canonicalPaths,
+    protectedTrees: EXECUTION_EFFECT_PROTECTED_TREES,
+  });
+  return {
+    ok: true,
+    policy: Object.freeze({ ...body, digest: sha256(body) }),
+  };
+}
+
+/** Strict durable parser: authority is recomputed from the exact filesWrite list. */
+export function parseExecutionEffectWritePolicy(value: unknown): ExecutionEffectWritePolicy | null {
+  const record = exactPolicyRecord(value, [
+    'version', 'mode', 'readOnly', 'filesWrite', 'protectedTrees', 'digest',
+  ]);
+  if (record === null) return null;
+  const filesWrite = exactStringArray(record.filesWrite);
+  const protectedTrees = exactStringArray(record.protectedTrees);
+  if (
+    record.version !== EXECUTION_EFFECT_WRITE_POLICY_VERSION
+    || record.mode !== 'exact-files-write'
+    || typeof record.readOnly !== 'boolean'
+    || filesWrite === null
+    || protectedTrees === null
+    || canonicalJson(protectedTrees) !== canonicalJson(EXECUTION_EFFECT_PROTECTED_TREES)
+    || typeof record.digest !== 'string'
+  ) return null;
+  const compiled = compileExecutionEffectWritePolicy(filesWrite);
+  if (!compiled.ok || canonicalJson(compiled.policy) !== canonicalJson(record)) return null;
+  return compiled.policy;
+}
+
+export function executionEffectPolicyAllowsPath(
+  policy: ExecutionEffectWritePolicy,
+  path: string,
+): boolean {
+  const normalized = normalizeExactEffectPath(path);
+  if (normalized === undefined || isExecutionEffectProtectedPath(normalized.path)) return false;
+  let low = 0;
+  let high = policy.filesWrite.length - 1;
+  while (low <= high) {
+    const middle = low + Math.floor((high - low) / 2);
+    const candidate = policy.filesWrite[middle];
+    if (candidate === normalized.path) return true;
+    if (candidate === undefined || compareCodePoint(candidate, normalized.path) > 0) {
+      high = middle - 1;
+    } else {
+      low = middle + 1;
+    }
+  }
+  return false;
 }
 
 /**

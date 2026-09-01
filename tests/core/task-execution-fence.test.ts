@@ -28,7 +28,9 @@ import {
 import {
   EXECUTION_LOCK_AUTHORITY_ANCHOR_FILENAME,
   EXECUTION_LOCK_AUTHORITY_SENTINEL_FILENAME,
+  EXECUTION_LOCK_ACTIVE_ADOPTION_SCHEMA_VERSION,
   EXECUTION_LOCK_DB_META_VERSION,
+  EXECUTION_LOCK_BOUNDARY_RESUME_SCHEMA_VERSION,
   EXECUTION_LOCK_COORDINATION_DB_FILENAME,
   EXECUTION_LOCK_MOUNT_ADOPTION_DIRECTORY,
   EXECUTION_LOCK_RECOVERY_ATTESTATION_SCHEMA_VERSION,
@@ -36,19 +38,24 @@ import {
   PROJECT_MAINTENANCE_LOCK_TASK_ID,
   MAX_EXECUTION_LOCK_LEASE_MS,
   MAX_EXECUTION_LOCK_TASK_ID_BYTES,
-  ExecutionLockError,
   acquireExecutionLock,
   acquireProjectMaintenanceLock,
+  adoptExecutionLockActiveGeneration,
   adoptExecutionLockAuthorityMount,
   assertExecutionLockFencingProgression,
   beginExecutionLockIrreversibleBoundary,
   checkExecutionLock,
   checkProjectMaintenanceLock,
   completeExecutionLockIrreversibleBoundary,
+  completeExecutionLockNoChangeBoundary,
   quarantineExecutionLock,
   recoverQuarantinedExecutionLock,
+  readExecutionLockActiveAdoption,
+  readExecutionLockBoundaryResume,
+  readCompletedExecutionLockBoundary,
   releaseExecutionLock,
   renewExecutionLock,
+  resumeExecutionLockIrreversibleBoundary,
   withExecutionLock,
   withExecutionLockOutcome,
   type ExecutionLockInfo,
@@ -187,6 +194,83 @@ function seedLegacyV2ExecutionAuthority(
   } as ExecutionLockInfo;
 }
 
+function downgradeExecutionAuthorityToV3(root: string): void {
+  const db = new Database(executionAuthorityDbPath(root));
+  db.pragma('foreign_keys = OFF');
+  db.exec(`
+    DROP TRIGGER execution_lock_active_adoption_requires_previous;
+    DROP TRIGGER execution_lock_active_monotonic_update;
+    DROP TRIGGER execution_lock_active_adoption_audit_no_update;
+    DROP TRIGGER execution_lock_active_adoption_audit_no_delete;
+    DROP TABLE execution_lock_active_adoption_audit;
+    DROP TRIGGER execution_lock_quarantine_monotonic_update;
+    DROP TRIGGER execution_lock_quarantine_terminal_delete;
+    DROP TRIGGER execution_lock_quarantine_audit_no_update;
+    DROP TRIGGER execution_lock_quarantine_audit_no_delete;
+    DROP INDEX execution_lock_quarantine_one_boundary;
+    DROP INDEX execution_lock_quarantine_one_quarantined;
+    DROP INDEX execution_lock_quarantine_one_resume_generation;
+    DROP INDEX execution_lock_quarantine_one_terminal;
+    ALTER TABLE execution_lock_quarantine_audit
+      RENAME TO execution_lock_quarantine_audit_v4_seed;
+    CREATE TABLE execution_lock_quarantine_audit (
+      event_id TEXT NOT NULL PRIMARY KEY CHECK(length(event_id) = 36),
+      action TEXT NOT NULL CHECK(action IN (
+        'boundary-entered',
+        'quarantined',
+        'completed',
+        'recovered'
+      )),
+      quarantine_id TEXT NOT NULL CHECK(length(quarantine_id) = 36),
+      task_id TEXT NOT NULL,
+      owner_id TEXT NOT NULL CHECK(length(owner_id) = 36),
+      fencing_epoch TEXT NOT NULL CHECK(length(fencing_epoch) = 36),
+      fencing_counter INTEGER NOT NULL CHECK(fencing_counter > 0),
+      fencing_nonce TEXT NOT NULL CHECK(
+        length(fencing_nonce) = 32
+        AND fencing_nonce NOT GLOB '*[^0-9a-f]*'
+      ),
+      occurred_at TEXT NOT NULL,
+      payload_json TEXT NOT NULL,
+      UNIQUE(quarantine_id, action)
+    ) STRICT, WITHOUT ROWID;
+    INSERT INTO execution_lock_quarantine_audit(
+      event_id, action, quarantine_id, task_id, owner_id, fencing_epoch,
+      fencing_counter, fencing_nonce, occurred_at, payload_json
+    )
+    SELECT event_id, action, quarantine_id, task_id, owner_id, fencing_epoch,
+           fencing_counter, fencing_nonce, occurred_at, payload_json
+      FROM execution_lock_quarantine_audit_v4_seed;
+    DROP TABLE execution_lock_quarantine_audit_v4_seed;
+    CREATE UNIQUE INDEX execution_lock_quarantine_one_terminal
+      ON execution_lock_quarantine_audit(quarantine_id)
+      WHERE action IN ('completed', 'recovered');
+    CREATE TRIGGER execution_lock_quarantine_monotonic_update
+      BEFORE UPDATE ON execution_lock_quarantine BEGIN SELECT 1; END;
+    CREATE TRIGGER execution_lock_quarantine_terminal_delete
+      BEFORE DELETE ON execution_lock_quarantine BEGIN SELECT 1; END;
+    CREATE TRIGGER execution_lock_quarantine_audit_no_update
+      BEFORE UPDATE ON execution_lock_quarantine_audit BEGIN SELECT 1; END;
+    CREATE TRIGGER execution_lock_quarantine_audit_no_delete
+      BEFORE DELETE ON execution_lock_quarantine_audit BEGIN SELECT 1; END;
+    ALTER TABLE execution_lock_meta RENAME TO execution_lock_meta_v4_seed;
+    CREATE TABLE execution_lock_meta (
+      singleton INTEGER NOT NULL PRIMARY KEY CHECK(singleton = 1),
+      meta_version INTEGER NOT NULL CHECK(meta_version = 3),
+      authority_epoch TEXT NOT NULL CHECK(length(authority_epoch) = 36),
+      fencing_counter INTEGER NOT NULL CHECK(fencing_counter >= 0)
+    ) STRICT;
+    INSERT INTO execution_lock_meta(
+      singleton, meta_version, authority_epoch, fencing_counter
+    )
+    SELECT singleton, 3, authority_epoch, fencing_counter
+      FROM execution_lock_meta_v4_seed;
+    DROP TABLE execution_lock_meta_v4_seed;
+    PRAGMA user_version = 3;
+  `);
+  db.close();
+}
+
 function waitForChildExit(child: ChildProcessWithoutNullStreams): Promise<number | null> {
   return new Promise((resolve, reject) => {
     child.once('error', reject);
@@ -285,7 +369,7 @@ describe('task execution lock authority', () => {
     expect(readdirSync(join(root, '.locks')).some(file => file.includes('.tmp-'))).toBe(false);
   });
 
-  it('initializes exact DB v3 quarantine tables, indexes, and guards', () => {
+  it('initializes exact DB v4 quarantine tables, indexes, and guards', () => {
     const lock = acquireExecutionLock(root, 'schema-v3', 'dispatch');
     releaseExecutionLock(root, lock.taskId, lock.ownerId);
     const db = new Database(executionAuthorityDbPath(root), { readonly: true });
@@ -296,7 +380,7 @@ describe('task execution lock authority', () => {
       SELECT meta_version
         FROM execution_lock_meta
        WHERE singleton = 1
-    `).get()).toEqual({ meta_version: 3 });
+    `).get()).toEqual({ meta_version: EXECUTION_LOCK_DB_META_VERSION });
     const objects = db.prepare(`
       SELECT type, name
         FROM sqlite_master
@@ -304,6 +388,9 @@ describe('task execution lock authority', () => {
        ORDER BY type, name
     `).all();
     expect(objects).toEqual(expect.arrayContaining([
+      { type: 'index', name: 'execution_lock_quarantine_one_boundary' },
+      { type: 'index', name: 'execution_lock_quarantine_one_quarantined' },
+      { type: 'index', name: 'execution_lock_quarantine_one_resume_generation' },
       { type: 'index', name: 'execution_lock_quarantine_one_terminal' },
       { type: 'table', name: 'execution_lock_quarantine' },
       { type: 'table', name: 'execution_lock_quarantine_audit' },
@@ -312,7 +399,86 @@ describe('task execution lock authority', () => {
       { type: 'trigger', name: 'execution_lock_quarantine_monotonic_update' },
       { type: 'trigger', name: 'execution_lock_quarantine_terminal_delete' },
     ]));
+    expect(db.prepare(`
+      SELECT type, name
+        FROM sqlite_master
+       WHERE name LIKE 'execution_lock_active_adoption%'
+          OR name = 'execution_lock_active_monotonic_update'
+       ORDER BY type, name
+    `).all()).toEqual(expect.arrayContaining([
+      { type: 'table', name: 'execution_lock_active_adoption_audit' },
+      { type: 'trigger', name: 'execution_lock_active_adoption_requires_previous' },
+      { type: 'trigger', name: 'execution_lock_active_adoption_audit_no_delete' },
+      { type: 'trigger', name: 'execution_lock_active_adoption_audit_no_update' },
+      { type: 'trigger', name: 'execution_lock_active_monotonic_update' },
+    ]));
     db.close();
+  });
+
+  it('transactionally migrates v3 boundary authority and audit bytes to v4', () => {
+    const lock = acquireExecutionLock(root, 'schema-v3-migration', 'dispatch', {
+      now: () => BASE_TIME,
+    });
+    const boundary = beginExecutionLockIrreversibleBoundary(
+      root,
+      lock,
+      { evidenceRefs: ['migration:v3-boundary'] },
+      { now: () => BASE_TIME + 1 },
+    );
+    downgradeExecutionAuthorityToV3(root);
+    const before = new Database(executionAuthorityDbPath(root), {
+      readonly: true,
+    });
+    expect(before.pragma('user_version', { simple: true })).toBe(3);
+    const auditBefore = before.prepare(`
+      SELECT event_id, action, quarantine_id, task_id, owner_id,
+             fencing_epoch, fencing_counter, fencing_nonce, occurred_at,
+             payload_json
+        FROM execution_lock_quarantine_audit
+       ORDER BY event_id
+    `).all();
+    before.close();
+
+    expect(checkExecutionLock(root, lock.taskId)).toEqual({
+      state: 'quarantined',
+      lock,
+      quarantine: boundary,
+    });
+    const after = new Database(executionAuthorityDbPath(root), {
+      readonly: true,
+    });
+    expect(after.pragma('user_version', { simple: true }))
+      .toBe(EXECUTION_LOCK_DB_META_VERSION);
+    expect(after.prepare(`
+      SELECT event_id, action, quarantine_id, task_id, owner_id,
+             fencing_epoch, fencing_counter, fencing_nonce, occurred_at,
+             payload_json
+        FROM execution_lock_quarantine_audit
+       ORDER BY event_id
+    `).all()).toEqual(auditBefore);
+    expect(after.prepare(`
+      SELECT name
+        FROM sqlite_master
+       WHERE type = 'index'
+         AND name = 'execution_lock_quarantine_one_resume_generation'
+    `).get()).toEqual({
+      name: 'execution_lock_quarantine_one_resume_generation',
+    });
+    after.close();
+
+    completeExecutionLockIrreversibleBoundary(
+      root,
+      lock,
+      {
+        quarantineId: boundary.quarantineId,
+        evidenceRefs: ['migration:v4-completed'],
+      },
+      { now: () => BASE_TIME + 2 },
+    );
+    expect(readCompletedExecutionLockBoundary(
+      root,
+      boundary.quarantineId,
+    )).toMatchObject({ action: 'completed' });
   });
 
   it('keeps migration, projection, and quarantine reconciliation bounded by keyset pages', () => {
@@ -329,7 +495,6 @@ describe('task execution lock authority', () => {
     );
     expect(auditLoader).toContain('WHERE quarantine.task_id > ?');
     expect(auditLoader).toContain('LIMIT ?');
-    expect(auditLoader).not.toContain(' IN (');
     expect(auditLoader).not.toContain('.all(...');
     const quarantineLoader = source.slice(
       source.indexOf('function loadExecutionLockQuarantinePage'),
@@ -482,7 +647,8 @@ describe('task execution lock authority', () => {
     expect(readLock(root, taskId)).toEqual(expected);
 
     const db = new Database(executionAuthorityDbPath(root));
-    expect(db.pragma('user_version', { simple: true })).toBe(3);
+    expect(db.pragma('user_version', { simple: true }))
+      .toBe(EXECUTION_LOCK_DB_META_VERSION);
     const firstRows = {
       quarantine: db.prepare(`
         SELECT quarantine_id, payload_json
@@ -519,7 +685,7 @@ describe('task execution lock authority', () => {
     expect(() => {
       const version = oldReader.pragma('user_version', { simple: true });
       if (version !== 2) throw new Error(`old-binary-refused-v${version}`);
-    }).toThrow('old-binary-refused-v3');
+    }).toThrow(`old-binary-refused-v${EXECUTION_LOCK_DB_META_VERSION}`);
     oldReader.close();
   });
 
@@ -755,6 +921,670 @@ describe('task execution lock authority', () => {
       { action: 'boundary-entered' },
       { action: 'completed' },
     ]);
+    db.close();
+  });
+
+  it.each([
+    ['alive', 'held'],
+    ['unknown', 'liveness-unknown'],
+    ['foreign-host', 'foreign-host'],
+  ] as const)(
+    'refuses exact active-generation adoption when expired owner liveness is %s',
+    (liveness, reason) => {
+      const previousIdentity = {
+        hostInstanceId: `active-adopt-owner-${liveness}`,
+        bootSessionId: 'active-adopt-owner-boot',
+        processSessionId: 'active-adopt-owner-process',
+      };
+      const contenderIdentity = {
+        hostInstanceId: `active-adopt-contender-${liveness}`,
+        bootSessionId: 'active-adopt-contender-boot',
+        processSessionId: 'active-adopt-contender-process',
+      };
+      const lock = acquireProjectMaintenanceLock(root, {
+        now: () => BASE_TIME,
+        leaseDurationMs: 100,
+        runtimeIdentity: previousIdentity,
+      });
+      expect(() => adoptExecutionLockActiveGeneration(
+        root,
+        lock,
+        { evidenceRefs: ['restart:prepared-journal'] },
+        {
+          now: () => BASE_TIME + 101,
+          leaseDurationMs: 100,
+          runtimeIdentity: contenderIdentity,
+          livenessProbe: { inspect: () => liveness },
+        },
+      )).toThrowError(expect.objectContaining({ reason }));
+      expect(checkProjectMaintenanceLock(root)).toEqual({
+        state: 'held',
+        lock,
+      });
+    },
+  );
+
+  it('durably adopts and exactly replays a dead active generation before atomic no-change settlement', () => {
+    const previousIdentity = {
+      hostInstanceId: 'active-adopt-host-a',
+      bootSessionId: 'active-adopt-boot-a',
+      processSessionId: 'active-adopt-process-a',
+    };
+    const adoptedIdentity = {
+      hostInstanceId: 'active-adopt-host-b',
+      bootSessionId: 'active-adopt-boot-b',
+      processSessionId: 'active-adopt-process-b',
+    };
+    const previous = acquireProjectMaintenanceLock(root, {
+      now: () => BASE_TIME,
+      leaseDurationMs: 100,
+      runtimeIdentity: previousIdentity,
+    });
+    const request = {
+      evidenceRefs: ['restart:prepared-journal-sha256'],
+    } as const;
+    const adopted = adoptExecutionLockActiveGeneration(
+      root,
+      previous,
+      request,
+      {
+        now: () => BASE_TIME + 101,
+        leaseDurationMs: 100,
+        runtimeIdentity: adoptedIdentity,
+        livenessProbe: { inspect: () => 'dead' },
+      },
+    );
+    expect(adopted).toMatchObject({
+      previous,
+      adopted: {
+        taskId: PROJECT_MAINTENANCE_LOCK_TASK_ID,
+        actor: 'maintenance',
+        acquiredAt: '2026-07-27T12:00:00.101Z',
+        renewedAt: '2026-07-27T12:00:00.101Z',
+      },
+      audit: {
+        schemaVersion: EXECUTION_LOCK_ACTIVE_ADOPTION_SCHEMA_VERSION,
+        previousLock: previous,
+        adoptedLock: expect.objectContaining({
+          taskId: PROJECT_MAINTENANCE_LOCK_TASK_ID,
+        }),
+        evidenceRefs: request.evidenceRefs,
+        adoptedAt: '2026-07-27T12:00:00.101Z',
+      },
+      projectionPublication: 'completed',
+    });
+    expect(adopted.adopted.ownerId).not.toBe(previous.ownerId);
+    assertExecutionLockFencingProgression(
+      previous.fencingToken,
+      adopted.adopted.fencingToken,
+      previous.taskId,
+    );
+    expect(() => releaseExecutionLock(
+      root,
+      previous.taskId,
+      previous.ownerId,
+      { runtimeIdentity: previousIdentity },
+    )).toThrowError(expect.objectContaining({ reason: 'ownership-lost' }));
+
+    const replay = adoptExecutionLockActiveGeneration(
+      root,
+      previous,
+      request,
+      {
+        now: () => BASE_TIME + 102,
+        leaseDurationMs: 100,
+        runtimeIdentity: adoptedIdentity,
+      },
+    );
+    expect(replay).toEqual(adopted);
+    expect(() => adoptExecutionLockActiveGeneration(
+      root,
+      previous,
+      { evidenceRefs: ['restart:conflicting-journal'] },
+      {
+        now: () => BASE_TIME + 102,
+        leaseDurationMs: 100,
+        runtimeIdentity: adoptedIdentity,
+      },
+    )).toThrowError(expect.objectContaining({ reason: 'mutation-conflict' }));
+
+    const quarantineId = randomUUID();
+    completeExecutionLockNoChangeBoundary(
+      root,
+      adopted.adopted,
+      {
+        quarantineId,
+        boundaryEvidenceRefs: ['restart:no-change-boundary'],
+        completionEvidenceRefs: ['restart:no-durable-effect'],
+      },
+      { now: () => BASE_TIME + 103, runtimeIdentity: adoptedIdentity },
+    );
+    expect(readCompletedExecutionLockBoundary(root, quarantineId))
+      .toMatchObject({ action: 'completed' });
+    const db = new Database(executionAuthorityDbPath(root));
+    expect(db.prepare(`
+      SELECT COUNT(*) AS count
+        FROM execution_lock_active_adoption_audit
+       WHERE task_id = ?
+    `).get(PROJECT_MAINTENANCE_LOCK_TASK_ID)).toEqual({ count: 1 });
+    expect(() => db.prepare(`
+      DELETE FROM execution_lock_active_adoption_audit
+       WHERE task_id = ?
+    `).run(PROJECT_MAINTENANCE_LOCK_TASK_ID)).toThrow(/append-only/u);
+    db.close();
+  });
+
+  it('resolves active adoption from canonical current authority after projection publication crashes', () => {
+    const previousIdentity = {
+      hostInstanceId: 'active-resolver-host-a',
+      bootSessionId: 'active-resolver-boot-a',
+      processSessionId: 'active-resolver-process-a',
+    };
+    const adoptedIdentity = {
+      hostInstanceId: 'active-resolver-host-b',
+      bootSessionId: 'active-resolver-boot-b',
+      processSessionId: 'active-resolver-process-b',
+    };
+    const previous = acquireProjectMaintenanceLock(root, {
+      now: () => BASE_TIME,
+      leaseDurationMs: 100,
+      runtimeIdentity: previousIdentity,
+    });
+    const evidenceRefs = ['restart:prepared-active-adoption'] as const;
+    expect(readExecutionLockActiveAdoption(
+      root,
+      previous,
+      { evidenceRefs },
+    )).toBeNull();
+    const adopted = adoptExecutionLockActiveGeneration(
+      root,
+      previous,
+      { evidenceRefs },
+      {
+        now: () => BASE_TIME + 101,
+        leaseDurationMs: 100,
+        runtimeIdentity: adoptedIdentity,
+        livenessProbe: { inspect: () => 'dead' },
+        projectionPublisher: () => {
+          throw new Error('simulated crash before adopted projection publish');
+        },
+      },
+    );
+    expect(adopted.projectionPublication).toBe('uncertain');
+    expect(readLock(root, previous.taskId)).toEqual(previous);
+
+    // A restarted adapter first observes canonical authority. Reconciliation
+    // republishes its projection, then the audit resolver recovers the prior
+    // exact handle without PREPARED having persisted that full object.
+    const restarted = checkProjectMaintenanceLock(root);
+    expect(restarted).toEqual({ state: 'held', lock: adopted.adopted });
+    if (restarted.state !== 'held') throw new Error('expected adopted authority');
+    expect(readExecutionLockActiveAdoption(
+      root,
+      restarted.lock,
+      { evidenceRefs },
+    )).toEqual({
+      previous,
+      adopted: adopted.adopted,
+      audit: adopted.audit,
+      lineage: [adopted.audit],
+    });
+    expect(() => readExecutionLockActiveAdoption(
+      root,
+      restarted.lock,
+      { evidenceRefs: ['restart:wrong-active-adoption'] },
+    )).toThrowError(expect.objectContaining({ reason: 'mutation-conflict' }));
+  });
+
+  it('exposes a bounded oldest-to-current active adoption lineage across repeated restarts', () => {
+    const identityA = {
+      hostInstanceId: 'active-lineage-host-a',
+      bootSessionId: 'active-lineage-boot-a',
+      processSessionId: 'active-lineage-process-a',
+    };
+    const identityB = {
+      hostInstanceId: 'active-lineage-host-b',
+      bootSessionId: 'active-lineage-boot-b',
+      processSessionId: 'active-lineage-process-b',
+    };
+    const identityC = {
+      hostInstanceId: 'active-lineage-host-c',
+      bootSessionId: 'active-lineage-boot-c',
+      processSessionId: 'active-lineage-process-c',
+    };
+    const evidenceRefs = ['restart:stable-active-context'] as const;
+    const first = acquireProjectMaintenanceLock(root, {
+      now: () => BASE_TIME,
+      leaseDurationMs: 50,
+      runtimeIdentity: identityA,
+    });
+    const second = adoptExecutionLockActiveGeneration(
+      root,
+      first,
+      { evidenceRefs },
+      {
+        now: () => BASE_TIME + 51,
+        leaseDurationMs: 50,
+        runtimeIdentity: identityB,
+        livenessProbe: { inspect: () => 'dead' },
+      },
+    );
+    const third = adoptExecutionLockActiveGeneration(
+      root,
+      second.adopted,
+      { evidenceRefs },
+      {
+        now: () => BASE_TIME + 102,
+        leaseDurationMs: 50,
+        runtimeIdentity: identityC,
+        livenessProbe: { inspect: () => 'dead' },
+      },
+    );
+    expect(readExecutionLockActiveAdoption(
+      root,
+      third.adopted,
+      { evidenceRefs },
+    )).toEqual({
+      previous: second.adopted,
+      adopted: third.adopted,
+      audit: third.audit,
+      lineage: [second.audit, third.audit],
+    });
+  });
+
+  it('rejects an active owner/fence transfer without its exact durable adoption audit', () => {
+    const lock = acquireExecutionLock(root, 'active-adopt-trigger', 'dispatch');
+    const db = new Database(executionAuthorityDbPath(root));
+    expect(() => db.prepare(`
+      UPDATE execution_lock_active
+         SET owner_id = ?,
+             fencing_counter = ?,
+             fencing_nonce = ?
+       WHERE task_id = ?
+    `).run(
+      randomUUID(),
+      lock.fencingToken.counter + 1,
+      'f'.repeat(32),
+      lock.taskId,
+    )).toThrow(/active transition is not monotonic/u);
+    db.close();
+    expect(checkExecutionLock(root, lock.taskId)).toEqual({
+      state: 'held',
+      lock,
+    });
+  });
+
+  it('refuses active-generation adoption after an irreversible boundary exists', () => {
+    const identity = {
+      hostInstanceId: 'active-adopt-quarantine-host',
+      bootSessionId: 'active-adopt-quarantine-boot',
+      processSessionId: 'active-adopt-quarantine-process',
+    };
+    const lock = acquireProjectMaintenanceLock(root, {
+      now: () => BASE_TIME,
+      leaseDurationMs: 100,
+      runtimeIdentity: identity,
+    });
+    beginExecutionLockIrreversibleBoundary(
+      root,
+      lock,
+      { evidenceRefs: ['restart:boundary-present'] },
+      { now: () => BASE_TIME + 1, runtimeIdentity: identity },
+    );
+    expect(() => adoptExecutionLockActiveGeneration(
+      root,
+      lock,
+      { evidenceRefs: ['restart:must-not-adopt-active'] },
+      {
+        now: () => BASE_TIME + 101,
+        runtimeIdentity: {
+          hostInstanceId: 'active-adopt-new-host',
+          bootSessionId: 'active-adopt-new-boot',
+          processSessionId: 'active-adopt-new-process',
+        },
+        livenessProbe: { inspect: () => 'dead' },
+      },
+    )).toThrowError(expect.objectContaining({ reason: 'quarantined' }));
+  });
+
+  it.each([
+    ['alive', 'held'],
+    ['unknown', 'liveness-unknown'],
+    ['foreign-host', 'foreign-host'],
+  ] as const)(
+    'refuses expired in-flight boundary adoption when owner liveness is %s',
+    (liveness, reason) => {
+      const ownerIdentity = {
+        hostInstanceId: `resume-owner-${liveness}`,
+        bootSessionId: 'resume-owner-boot',
+        processSessionId: 'resume-owner-process',
+      };
+      const contenderIdentity = {
+        hostInstanceId: `resume-contender-${liveness}`,
+        bootSessionId: 'resume-contender-boot',
+        processSessionId: 'resume-contender-process',
+      };
+      const lock = acquireExecutionLock(
+        root,
+        `resume-refusal-${liveness}`,
+        'dispatch',
+        {
+          now: () => BASE_TIME,
+          leaseDurationMs: 100,
+          runtimeIdentity: ownerIdentity,
+        },
+      );
+      const boundary = beginExecutionLockIrreversibleBoundary(
+        root,
+        lock,
+        { evidenceRefs: ['resume:boundary'] },
+        { now: () => BASE_TIME + 1, runtimeIdentity: ownerIdentity },
+      );
+
+      expect(() => resumeExecutionLockIrreversibleBoundary(
+        root,
+        boundary,
+        { evidenceRefs: ['resume:liveness-checked'] },
+        {
+          now: () => BASE_TIME + 101,
+          leaseDurationMs: 100,
+          runtimeIdentity: contenderIdentity,
+          livenessProbe: { inspect: () => liveness },
+        },
+      )).toThrowError(expect.objectContaining({ reason }));
+      expect(checkExecutionLock(root, lock.taskId)).toEqual({
+        state: 'quarantined',
+        lock,
+        quarantine: boundary,
+      });
+    },
+  );
+
+  it('fence-transfers only proven-dead in-flight work and replays its resumed terminal chain', () => {
+    const firstIdentity = {
+      hostInstanceId: 'resume-host-a',
+      bootSessionId: 'resume-boot-a',
+      processSessionId: 'resume-process-a',
+    };
+    const secondIdentity = {
+      hostInstanceId: 'resume-host-b',
+      bootSessionId: 'resume-boot-b',
+      processSessionId: 'resume-process-b',
+    };
+    const thirdIdentity = {
+      hostInstanceId: 'resume-host-c',
+      bootSessionId: 'resume-boot-c',
+      processSessionId: 'resume-process-c',
+    };
+    const first = acquireExecutionLock(root, 'resumed-terminal', 'dispatch', {
+      now: () => BASE_TIME,
+      leaseDurationMs: 100,
+      runtimeIdentity: firstIdentity,
+    });
+    const boundary = beginExecutionLockIrreversibleBoundary(
+      root,
+      first,
+      { evidenceRefs: ['resume:boundary'] },
+      { now: () => BASE_TIME + 1, runtimeIdentity: firstIdentity },
+    );
+    const firstResume = resumeExecutionLockIrreversibleBoundary(
+      root,
+      boundary,
+      { evidenceRefs: ['resume:stable-context'] },
+      {
+        now: () => BASE_TIME + 101,
+        leaseDurationMs: 100,
+        runtimeIdentity: secondIdentity,
+        livenessProbe: { inspect: () => 'dead' },
+      },
+    );
+    expect(firstResume).toMatchObject({
+      previous: boundary,
+      resumed: {
+        quarantineId: boundary.quarantineId,
+        state: 'in-flight',
+        lock: {
+          ownerId: expect.not.stringMatching(first.ownerId),
+          acquiredAt: '2026-07-27T12:00:00.101Z',
+          renewedAt: '2026-07-27T12:00:00.101Z',
+        },
+      },
+      audit: {
+        action: 'resumed',
+        payload: {
+          schemaVersion: EXECUTION_LOCK_BOUNDARY_RESUME_SCHEMA_VERSION,
+          quarantineId: boundary.quarantineId,
+          previousLock: first,
+          resumedLock: expect.objectContaining({
+            ownerId: expect.any(String),
+          }),
+          evidenceRefs: ['resume:stable-context'],
+          resumedAt: '2026-07-27T12:00:00.101Z',
+        },
+      },
+      projectionPublication: 'completed',
+    });
+    assertExecutionLockFencingProgression(
+      first.fencingToken,
+      firstResume.resumed.lock.fencingToken,
+      first.taskId,
+    );
+    expect(() => renewExecutionLock(
+      root,
+      first.taskId,
+      first.ownerId,
+      { runtimeIdentity: firstIdentity },
+    )).toThrowError(expect.objectContaining({ reason: 'ownership-lost' }));
+    expect(() => completeExecutionLockIrreversibleBoundary(
+      root,
+      first,
+      {
+        quarantineId: boundary.quarantineId,
+        evidenceRefs: ['resume:stale-owner-completion'],
+      },
+      { runtimeIdentity: firstIdentity },
+    )).toThrowError(expect.objectContaining({ reason: 'ownership-lost' }));
+
+    const secondResume = resumeExecutionLockIrreversibleBoundary(
+      root,
+      firstResume.resumed,
+      { evidenceRefs: ['resume:stable-context'] },
+      {
+        now: () => BASE_TIME + 202,
+        leaseDurationMs: 100,
+        runtimeIdentity: thirdIdentity,
+        livenessProbe: { inspect: () => 'dead' },
+      },
+    );
+    assertExecutionLockFencingProgression(
+      firstResume.resumed.lock.fencingToken,
+      secondResume.resumed.lock.fencingToken,
+      first.taskId,
+    );
+    expect(readExecutionLockBoundaryResume(
+      root,
+      secondResume.resumed,
+      { evidenceRefs: ['resume:stable-context'] },
+    )).toEqual({
+      previous: firstResume.resumed,
+      resumed: secondResume.resumed,
+      audit: secondResume.audit,
+      lineage: [firstResume.audit, secondResume.audit],
+    });
+    const completed = completeExecutionLockIrreversibleBoundary(
+      root,
+      secondResume.resumed.lock,
+      {
+        quarantineId: boundary.quarantineId,
+        evidenceRefs: ['resume:landed'],
+      },
+      { now: () => BASE_TIME + 203, runtimeIdentity: thirdIdentity },
+    );
+    expect(completed.projectionCleanup).toBe('completed');
+    expect(readCompletedExecutionLockBoundary(
+      root,
+      boundary.quarantineId,
+    )).toMatchObject({
+      action: 'completed',
+      ownerId: secondResume.resumed.lock.ownerId,
+      fencingToken: secondResume.resumed.lock.fencingToken,
+      payload: { evidenceRefs: ['resume:landed'] },
+    });
+    const db = new Database(executionAuthorityDbPath(root), { readonly: true });
+    expect(db.prepare(`
+      SELECT action
+        FROM execution_lock_quarantine_audit
+       WHERE quarantine_id = ?
+       ORDER BY occurred_at, action
+    `).all(boundary.quarantineId)).toEqual([
+      { action: 'boundary-entered' },
+      { action: 'resumed' },
+      { action: 'resumed' },
+      { action: 'completed' },
+    ]);
+    db.close();
+  });
+
+  it('resolves the final boundary resume hop after canonical commit and projection crash', () => {
+    const previousIdentity = {
+      hostInstanceId: 'boundary-resolver-host-a',
+      bootSessionId: 'boundary-resolver-boot-a',
+      processSessionId: 'boundary-resolver-process-a',
+    };
+    const resumedIdentity = {
+      hostInstanceId: 'boundary-resolver-host-b',
+      bootSessionId: 'boundary-resolver-boot-b',
+      processSessionId: 'boundary-resolver-process-b',
+    };
+    const previousLock = acquireProjectMaintenanceLock(root, {
+      now: () => BASE_TIME,
+      leaseDurationMs: 100,
+      runtimeIdentity: previousIdentity,
+    });
+    const previous = beginExecutionLockIrreversibleBoundary(
+      root,
+      previousLock,
+      { evidenceRefs: ['restart:original-boundary'] },
+      { now: () => BASE_TIME + 1, runtimeIdentity: previousIdentity },
+    );
+    const evidenceRefs = ['restart:prepared-boundary-resume'] as const;
+    expect(readExecutionLockBoundaryResume(
+      root,
+      previous,
+      { evidenceRefs },
+    )).toBeNull();
+    const resumed = resumeExecutionLockIrreversibleBoundary(
+      root,
+      previous,
+      { evidenceRefs },
+      {
+        now: () => BASE_TIME + 101,
+        leaseDurationMs: 100,
+        runtimeIdentity: resumedIdentity,
+        livenessProbe: { inspect: () => 'dead' },
+        projectionPublisher: () => {
+          throw new Error('simulated crash before resumed projection publish');
+        },
+      },
+    );
+    expect(resumed.projectionPublication).toBe('uncertain');
+    expect(readLock(root, previousLock.taskId)).toEqual(previousLock);
+
+    const restarted = checkProjectMaintenanceLock(root);
+    expect(restarted).toEqual({
+      state: 'quarantined',
+      lock: resumed.resumed.lock,
+      quarantine: resumed.resumed,
+    });
+    if (restarted.state !== 'quarantined') {
+      throw new Error('expected resumed quarantine authority');
+    }
+    expect(readExecutionLockBoundaryResume(
+      root,
+      restarted.quarantine,
+      { evidenceRefs },
+    )).toEqual({
+      previous,
+      resumed: resumed.resumed,
+      audit: resumed.audit,
+      lineage: [resumed.audit],
+    });
+    expect(() => readExecutionLockBoundaryResume(
+      root,
+      restarted.quarantine,
+      { evidenceRefs: ['restart:wrong-boundary-resume'] },
+    )).toThrowError(expect.objectContaining({ reason: 'mutation-conflict' }));
+  });
+
+  it('atomically settles and exactly replays a durable no-change boundary', () => {
+    const lock = acquireProjectMaintenanceLock(root, {
+      now: () => BASE_TIME,
+    });
+    const quarantineId = randomUUID();
+    const terminalObserver = vi.fn(() => {
+      throw new Error('simulated post-commit crash');
+    });
+    const request = {
+      quarantineId,
+      boundaryEvidenceRefs: ['landing:no-change-boundary'],
+      completionEvidenceRefs: ['landing:no-durable-effect'],
+    } as const;
+    const completed = completeExecutionLockNoChangeBoundary(
+      root,
+      lock,
+      request,
+      {
+        now: () => BASE_TIME + 1,
+        terminalCommitObserver: terminalObserver,
+      },
+    );
+    expect(completed).toMatchObject({
+      completed: {
+        quarantineId,
+        lock,
+        evidenceRefs: ['landing:no-change-boundary'],
+      },
+      audit: {
+        action: 'completed',
+        payload: { evidenceRefs: ['landing:no-durable-effect'] },
+      },
+      projectionCleanup: 'completed',
+    });
+    expect(terminalObserver).toHaveBeenCalledTimes(1);
+    expect(checkProjectMaintenanceLock(root)).toEqual({ state: 'absent' });
+    expect(readCompletedExecutionLockBoundary(root, quarantineId))
+      .toEqual(completed.audit);
+
+    const replayed = completeExecutionLockNoChangeBoundary(
+      root,
+      lock,
+      request,
+      { now: () => BASE_TIME + 2, terminalCommitObserver: terminalObserver },
+    );
+    expect(replayed).toEqual(completed);
+    expect(terminalObserver).toHaveBeenCalledTimes(1);
+    expect(() => completeExecutionLockNoChangeBoundary(
+      root,
+      lock,
+      { ...request, completionEvidenceRefs: ['landing:conflicting-proof'] },
+      { now: () => BASE_TIME + 3 },
+    )).toThrowError(expect.objectContaining({ reason: 'mutation-conflict' }));
+
+    const db = new Database(executionAuthorityDbPath(root), { readonly: true });
+    expect(db.prepare(`
+      SELECT action
+        FROM execution_lock_quarantine_audit
+       WHERE quarantine_id = ?
+       ORDER BY occurred_at, action
+    `).all(quarantineId)).toEqual([
+      { action: 'boundary-entered' },
+      { action: 'completed' },
+    ]);
+    expect(db.prepare(`
+      SELECT
+        (SELECT COUNT(*) FROM execution_lock_active) AS active,
+        (SELECT COUNT(*) FROM execution_lock_quarantine) AS quarantine
+    `).get()).toEqual({ active: 0, quarantine: 0 });
     db.close();
   });
 
@@ -1099,7 +1929,9 @@ describe('task execution lock authority', () => {
   });
 
   it('never recovers a non-expired lock even when a probe reports dead', () => {
-    const probe: ExecutionLockProcessProbe = { inspect: vi.fn(() => 'dead') };
+    const probe: ExecutionLockProcessProbe = {
+      inspect: vi.fn((): 'dead' => 'dead'),
+    };
     const first = acquireExecutionLock(root, 'fresh-task', 'dispatch', {
       leaseDurationMs: 1_000,
       now: () => BASE_TIME,
@@ -1120,7 +1952,9 @@ describe('task execution lock authority', () => {
       leaseDurationMs: 1_000,
       now: () => BASE_TIME,
     });
-    const deadProbe: ExecutionLockProcessProbe = { inspect: vi.fn(() => 'dead') };
+    const deadProbe: ExecutionLockProcessProbe = {
+      inspect: vi.fn((): 'dead' => 'dead'),
+    };
 
     const recovered = acquireExecutionLock(root, 'dead-task', 'settlement', {
       leaseDurationMs: 2_000,

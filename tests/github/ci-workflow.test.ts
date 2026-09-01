@@ -7,12 +7,15 @@ describe('CI Workflow (.github/workflows/ci.yml)', () => {
   // 535 (CI-ACTIONS-ECONOMY-001): the coverage job moved to its own scheduled
   // workflow — coverage pins read coverage.yml, everything else stays on ci.yml.
   const coveragePath = resolve('.github/workflows/coverage.yml');
+  const dashboardBuildPath = resolve('.github/workflows/dashboard-build.yml');
   let content: string;
   let coverageContent: string;
+  let dashboardBuildContent: string;
 
   beforeAll(() => {
     content = readFileSync(ciPath, 'utf-8');
     coverageContent = readFileSync(coveragePath, 'utf-8');
+    dashboardBuildContent = readFileSync(dashboardBuildPath, 'utf-8');
   });
 
   it('should exist', () => {
@@ -36,9 +39,43 @@ describe('CI Workflow (.github/workflows/ci.yml)', () => {
     it('should use setup-node@v4', () => {
       expect(content).toContain('actions/setup-node@v4');
     });
+
+    it('keys every root npm cache explicitly from npm-shrinkwrap.json', () => {
+      const lines = content.split('\n');
+      const cacheLines = lines
+        .map((line, index) => ({ line: line.trim(), index }))
+        .filter(({ line }) => line === 'cache: npm');
+      expect(cacheLines.length).toBeGreaterThan(0);
+      for (const { index } of cacheLines) {
+        const authority = lines[index + 1]?.trim();
+        if (authority === 'cache-dependency-path: npm-shrinkwrap.json') continue;
+        expect(authority).toBe('cache-dependency-path: |');
+        expect(lines[index + 2]?.trim()).toBe('npm-shrinkwrap.json');
+      }
+    });
+
+    it('uses the independent dashboard lock in every CI job that caches dashboard dependencies', () => {
+      const exactDashboardCache = /cache: npm\s*\n\s*cache-dependency-path: \|\s*\n\s*npm-shrinkwrap\.json\s*\n\s*src\/dashboard\/package-lock\.json/gu;
+      expect(content.match(exactDashboardCache)).toHaveLength(3);
+    });
+
+    it('regenerates the npm lock graph but diffs only the canonical root shrinkwrap', () => {
+      const lockSync = content.slice(content.indexOf('lockfile-sync:'), content.indexOf('\n\n  typecheck:'));
+      expect(lockSync).toContain('npm install --package-lock-only --ignore-scripts');
+      expect(lockSync).toContain('if [ -e package-lock.json ]; then');
+      expect(lockSync).toContain('::error file=package-lock.json::Root package-lock.json was generated');
+      expect(lockSync).toMatch(/if \[ -e package-lock\.json \]; then[\s\S]*?exit 1[\s\S]*?fi/u);
+      expect(lockSync).toContain('git diff --quiet -- npm-shrinkwrap.json');
+      expect(lockSync).not.toContain('-- package-lock.json');
+    });
   });
 
   describe('A) Coverage artifact upload', () => {
+    it('keys the coverage cache from root shrinkwrap plus the independent dashboard lock', () => {
+      expect(coverageContent).toMatch(
+        /cache: npm\s*\n\s*cache-dependency-path: \|\s*\n\s*npm-shrinkwrap\.json\s*\n\s*src\/dashboard\/package-lock\.json/u,
+      );
+    });
     it('should have a coverage job', () => {
       expect(coverageContent).toContain('coverage:');
     });
@@ -144,6 +181,14 @@ describe('CI Workflow (.github/workflows/ci.yml)', () => {
   });
 
   describe('D) Dashboard build verification', () => {
+    it('keys both dashboard workflow caches from root shrinkwrap plus the dashboard lock', () => {
+      const exactDashboardCache = /cache: npm\s*\n\s*cache-dependency-path: \|\s*\n\s*npm-shrinkwrap\.json\s*\n\s*src\/dashboard\/package-lock\.json/gu;
+      expect(dashboardBuildContent.match(exactDashboardCache)).toHaveLength(2);
+      expect(dashboardBuildContent).toContain("- 'npm-shrinkwrap.json'");
+      expect(dashboardBuildContent).toContain("- 'src/dashboard/package-lock.json'");
+      expect(dashboardBuildContent).not.toContain("- 'package-lock.json'");
+    });
+
     it('should have a test-dashboard job', () => {
       expect(content).toContain('test-dashboard:');
     });
@@ -166,6 +211,54 @@ describe('CI Workflow (.github/workflows/ci.yml)', () => {
         content.length
       );
       expect(buildSection).toContain('test-dashboard');
+    });
+
+    it('uses the durable runner-temp packed-networkless receipt as proof authority', () => {
+      const proofStart = content.indexOf(
+        '- name: Prove packed Linux native package contract (networkless, fresh private cache)',
+      );
+      const proofEnd = content.indexOf('- name: Upload CI packed-networkless receipt', proofStart);
+      expect(proofStart).toBeGreaterThan(-1);
+      expect(proofEnd).toBeGreaterThan(proofStart);
+      const proof = content.slice(proofStart, proofEnd);
+      expect(proof).toContain(
+        'PACKED_NETWORKLESS_RECEIPT: ${{ runner.temp }}/ci-linux-packed-networkless-receipt.json',
+      );
+      expect(proof).toContain('--receipt-file "$PACKED_NETWORKLESS_RECEIPT"');
+      expect(proof).not.toMatch(/verify-packed-networkless-install\.mjs[^\n]*>/u);
+      const topLevelFields = proof
+        .match(/const expectedTopLevelFields = \[([\s\S]*?)\]\.sort\(\);/u)?.[1]
+        .match(/"([^"]+)"/gu)
+        ?.map((field) => field.slice(1, -1))
+        .sort();
+      expect(topLevelFields).toEqual([
+        'cacheAuthority',
+        'event',
+        'expectedEnvironmentKind',
+        'installNetworkMode',
+        'installedCliReceipt',
+        'installedNpmShrinkwrapSha256',
+        'nativeReceipt',
+        'schemaVersion',
+        'sourceNpmShrinkwrapSha256',
+        'tarballSha256',
+      ].sort());
+      const installedCliFields = proof
+        .match(/const expectedInstalledCliFields = \[([\s\S]*?)\]\.sort\(\);/u)?.[1]
+        .match(/"([^"]+)"/gu)
+        ?.map((field) => field.slice(1, -1))
+        .sort();
+      expect(installedCliFields).toEqual([
+        'event',
+        'outputSha256',
+        'packageVersion',
+        'schemaVersion',
+      ].sort());
+      expect(proof).toContain(
+        'JSON.stringify(Object.keys(installedCliReceipt ?? {}).sort())',
+      );
+      expect(proof).toContain('installedCliReceipt.packageVersion !== sourcePackageVersion');
+      expect(proof).toContain('!sha256.test(installedCliReceipt.outputSha256)');
     });
   });
 

@@ -10,34 +10,50 @@
 //   - `deckent_run` MCP tool (task mode)
 //   - Any future task-mode entrypoint
 
+import { randomBytes, randomUUID } from 'node:crypto';
 import { join } from 'node:path';
-import { existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, renameSync, writeFileSync } from 'node:fs';
 import type { ModelType, Task, TaskResult } from '../core/types.js';
 import type { ResolvedConfig } from '../core/config-types.js';
 import type { ExecutionBudget } from '../core/work-model.js';
 import type { AttendedExecutionApprovalAuthority } from '../core/attended-execution-approval.js';
-import { createAttendedExecutionProposalMaterialFromTask } from '../core/attended-execution-proposal.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../core/provider-authority-composition.js';
-import {
-  preflightProviderExecutionIngress,
-  ProviderExecutionIngressHoldError,
-} from '../core/provider-execution-ingress-authority.js';
 import { resolveDefaultModel } from '../core/config.js';
 import { applyWorkerExecutionBudgetPolicy } from '../core/execution-plan-digest.js';
-import { orderedRoleProviders } from '../core/provider.js';
 import { buildExecutionRequest, resolveExecutionModelIdentity, resolveToTask } from './execution-request-builder.js';
 import { isModelExecutable } from '../core/model-equivalence.js';
 import { DeckentError } from '../core/errors.js';
-import { createRunTaskId } from '../cli/commands/run.js';
-import { spawnWorkerMultiProvider } from '../cli/commands/spawn.js';
-import { buildWorkerPrompt } from './task-builder.js';
 import { enrichResultCost, enrichResultTokenUsage, resolveAgentPrompt, resolveSkillPrompts } from './result-collector.js';
 import { eventBus } from './event-bus.js';
 import { TASKS_DIR } from '../core/constants.js';
 import { debugLog, readJsonSafe } from '../core/utils.js';
 import { normalizeTaskResultShape, serializeTaskResultForDisk } from '../core/task-result-schema.js';
 import type { TaskResultSettlementRefV1 } from '../core/task-result-settlement.js';
-import { writeEvent } from './event-stream.js';
+import {
+  openTaskSettlementAuthority,
+  type OpenTaskSettlementAuthorityResult,
+  type TaskExecutionDeclaration,
+  type TaskSettlementInspection,
+} from '../core/task-settlement-authority.js';
+import type {
+  InvocationExecutionBackend,
+  InvocationPreDispatchReasonCode,
+  InvocationReceiptRef,
+  InvocationTransport,
+} from '../core/invocation-receipt.js';
+import { resolveTenant } from '../core/tenant-context.js';
+import { SpawnBackendFactory } from './spawn-backend.js';
+import { deriveWorkerWriteTargets } from './spawn-backend-docker.js';
+import {
+  createExactNormalDockerExecutionRegistry,
+  executeSpawnTask,
+  type CanonicalTaskDispatchBoundaryV2,
+  type SpawnDisposition,
+} from './scheduler-effects.js';
+import type { TaskResultAuthorityRead } from './task-result-authority.js';
+import { inspectTaskArtifactsDeferred } from './task-artifact-projection.js';
+import { isAdapterProvider } from './sprint-utils.js';
+import { isProviderExecutionIngressHoldError } from '../core/provider-execution-ingress-authority.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -86,6 +102,197 @@ export interface TaskModeResult {
   projectRoot: string;
   /** Exact Docker attempt authority; absent for legacy/non-Docker backends. */
   settlementRef?: TaskResultSettlementRefV1;
+  /** Exact Docker never returns a V1 settlement; this is its Store-backed result state. */
+  resultAuthority?: TaskResultAuthorityRead<TaskResult>;
+  executionMode: 'normal-docker-exact' | 'legacy-non-docker';
+  /** Durable invocation truth shared with CLI/MCP/manual ingress. */
+  invocation: TaskIngressInvocationAuthority;
+}
+
+export interface TaskIngressExecutionInput {
+  readonly projectRoot: string;
+  readonly config: ResolvedConfig;
+  readonly task: Task;
+  readonly timeoutMs: number;
+  readonly autoApprove?: boolean;
+  readonly attendedExecutionApprovalAuthority?: AttendedExecutionApprovalAuthority;
+  readonly providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+  readonly executionRunId?: string;
+  readonly executionTenantId?: string;
+  /** Surface transport is evidence, never a separate execution engine. */
+  readonly transport?: InvocationTransport;
+  /** Injectable only for hermetic composition tests. Production uses the canonical store. */
+  readonly openTaskSettlementAuthority?: (
+    projectRoot: string,
+  ) => OpenTaskSettlementAuthorityResult;
+  /** One invocation call is unique even when manual spawn reuses a task id. */
+  readonly invocationCallId?: string;
+  readonly onDispatchBoundary?: (
+    boundary: CanonicalTaskDispatchBoundaryV2,
+    invocation: TaskIngressInvocationAuthority,
+  ) => void | Promise<void>;
+}
+
+export interface TaskIngressInvocationAuthority {
+  readonly receiptRef: InvocationReceiptRef;
+  readonly executionBackend: InvocationExecutionBackend;
+  readonly transport: InvocationTransport;
+  readonly state: 'not-dispatched' | 'dispatch-started' | 'reconciliation-required';
+  readonly executionMode?: 'normal-docker-exact' | 'legacy-non-docker';
+  readonly executionEvidenceRef?: string;
+  /** Backend-owned exact zero-work/reconciliation evidence, retained verbatim. */
+  readonly authorityEvidenceRefs?: readonly string[];
+  /** Backend reason code; never inferred from a public task projection. */
+  readonly reasonCode?: string;
+  readonly dispatchStartedAt?: string;
+  readonly settlement?: TaskSettlementInspection;
+}
+
+export interface TaskIngressExecutionResult {
+  readonly disposition: SpawnDisposition;
+  readonly executionMode: 'normal-docker-exact' | 'legacy-non-docker';
+  readonly backend: string;
+  readonly provider: string;
+  readonly resultAuthority?: TaskResultAuthorityRead<TaskResult>;
+  readonly invocation: TaskIngressInvocationAuthority;
+}
+
+function createTaskIngressTaskId(): string {
+  return `run-${Date.now()}-${randomBytes(8).readBigUInt64BE().toString(10)}`;
+}
+
+function timestampNotBefore(reference: string): string {
+  const referenceMs = Date.parse(reference);
+  const nowMs = Date.now();
+  return new Date(Number.isFinite(referenceMs) ? Math.max(referenceMs, nowMs) : nowMs)
+    .toISOString();
+}
+
+export class TaskIngressDispositionError extends DeckentError {
+  constructor(readonly execution: TaskIngressExecutionResult) {
+    super(
+      'TASK_INGRESS_NOT_DISPATCHED',
+      `TASK_INGRESS_NOT_DISPATCHED:${execution.disposition.kind}:`
+      + `${execution.disposition.taskId}`,
+    );
+    this.name = 'TaskIngressDispositionError';
+  }
+}
+
+export interface TaskIngressErrorAuthority {
+  readonly schemaVersion: 1;
+  readonly reasonCode: string;
+  readonly invocation: TaskIngressInvocationAuthority;
+  readonly settlementFailure?: string;
+}
+
+type ErrorWithTaskIngressAuthority = Error & {
+  readonly taskIngressAuthority: TaskIngressErrorAuthority;
+};
+
+export function readTaskIngressErrorAuthority(
+  error: unknown,
+): TaskIngressErrorAuthority | undefined {
+  if (!error || typeof error !== 'object') return undefined;
+  const authority = (error as Partial<ErrorWithTaskIngressAuthority>).taskIngressAuthority;
+  if (
+    !authority
+    || authority.schemaVersion !== 1
+    || typeof authority.reasonCode !== 'string'
+    || !authority.invocation
+  ) return undefined;
+  return authority;
+}
+
+function taskIngressCauseCode(error: unknown): string {
+  if (isProviderExecutionIngressHoldError(error)) return error.code;
+  if (error instanceof DeckentError) return error.code;
+  if (
+    error
+    && typeof error === 'object'
+    && 'code' in error
+    && typeof (error as { code?: unknown }).code === 'string'
+  ) return (error as { code: string }).code;
+  if (error instanceof Error && error.name) return error.name;
+  return 'TASK_INGRESS_EXECUTION_FAILED';
+}
+
+function attachTaskIngressErrorAuthority(
+  error: unknown,
+  authority: TaskIngressErrorAuthority,
+): Error {
+  const target = error instanceof Error
+    ? error
+    : new DeckentError('TASK_INGRESS_EXECUTION_FAILED', String(error));
+  try {
+    Object.defineProperty(target, 'taskIngressAuthority', {
+      value: Object.freeze(authority),
+      enumerable: true,
+      configurable: false,
+      writable: false,
+    });
+    return target;
+  } catch {
+    const wrapper = new DeckentError(
+      'TASK_INGRESS_AUTHORITY_HOLD',
+      `TASK_INGRESS_AUTHORITY_HOLD:${authority.reasonCode}:`
+      + authority.invocation.receiptRef.invocationId,
+    ) as unknown as ErrorWithTaskIngressAuthority;
+    Object.defineProperty(wrapper, 'taskIngressAuthority', {
+      value: Object.freeze(authority),
+      enumerable: true,
+      configurable: false,
+      writable: false,
+    });
+    return wrapper;
+  }
+}
+
+function normalizeInvocationBackend(backend: string | undefined): InvocationExecutionBackend {
+  if (backend === 'docker' || backend === 'tmux') return backend;
+  if (backend === 'subprocess' || backend === 'host-adapter') return 'host-subprocess';
+  if (backend === 'api') return 'api';
+  if (backend === 'in-process') return 'in-process';
+  if (backend === 'auto') return process.platform === 'win32' ? 'host-subprocess' : 'docker';
+  return 'unknown';
+}
+
+function declaredInvocationBackend(task: Task, config: ResolvedConfig): InvocationExecutionBackend {
+  if (
+    !task.backend
+    && task.provider !== undefined
+    && isAdapterProvider(task.provider)
+    && task.budgetPolicy?.finalOnlyUsage === undefined
+  ) return 'host-subprocess';
+  const configured = task.backend ?? config.spawn_backend;
+  if (configured) return normalizeInvocationBackend(configured);
+  return task.provider === 'claude' ? 'tmux' : 'host-subprocess';
+}
+
+function preDispatchReason(error: unknown): InvocationPreDispatchReasonCode {
+  const code = error && typeof error === 'object' && 'code' in error
+    ? String((error as { code?: unknown }).code ?? '')
+    : '';
+  if (code.includes('PROVIDER_AUTHORITY')) return 'provider_authority_rejected';
+  if (code.includes('ROUTING')) return 'routing_authority_rejected';
+  if (code.includes('BUDGET')) return 'budget_capability_unsupported';
+  if (code.includes('PROVIDER') || code.includes('MODEL')) return 'no_provider';
+  if (code.includes('PROMPT') || code.includes('COMMAND')) return 'command_build_failed';
+  return 'execution_admission_rejected';
+}
+
+function preDispatchEvidenceRefs(error: unknown): readonly string[] {
+  return isProviderExecutionIngressHoldError(error)
+    ? error.authorityEvidenceRefs
+    : Object.freeze([] as string[]);
+}
+
+function dispositionPreDispatchReason(
+  disposition: Exclude<SpawnDisposition, { readonly kind: 'spawned' }>,
+): InvocationPreDispatchReasonCode {
+  if (disposition.kind === 'provider-unavailable') return 'no_provider';
+  if (disposition.kind === 'routing-lineage-missing') return 'routing_authority_rejected';
+  return 'execution_admission_rejected';
 }
 
 // ─── Guard ──────────────────────────────────────────────────────────
@@ -183,6 +390,344 @@ async function watchAndEnrichTaskModeResult(
   }
 }
 
+/**
+ * Canonical application authority for one task across CLI, MCP, task-mode and
+ * manual spawn. It does not publish task JSON itself: exact Docker publication
+ * belongs to the private admission → RELEASED executor; legacy publication is
+ * the same executor's explicit compatibility branch.
+ */
+export async function executeTaskIngress(
+  input: TaskIngressExecutionInput,
+): Promise<TaskIngressExecutionResult> {
+  const { projectRoot, config, task } = input;
+  const preRoutingProjection = inspectTaskArtifactsDeferred(projectRoot, [task]);
+  const existingTaskProjectionContentDigest = preRoutingProjection.contentDigests[task.id];
+  const executionIdentity = resolveExecutionModelIdentity(task.model, task.provider);
+  if (!isModelExecutable(executionIdentity.model, executionIdentity.provider)) {
+    throw new DeckentError(
+      'MODEL_INACTIVE',
+      `Model '${executionIdentity.model}' is not active for provider `
+      + `'${executionIdentity.provider}' under the owner model policy`,
+    );
+  }
+  task.model = executionIdentity.model;
+  task.provider = executionIdentity.provider;
+  const taskCreatedAt = task.createdAt ?? new Date().toISOString();
+  task.createdAt = taskCreatedAt;
+  const taskContentAtDeclaration = JSON.stringify(task, null, 2);
+  const budgetPolicy = task.budgetPolicy ?? applyWorkerExecutionBudgetPolicy(
+    [task],
+    config.execution_budget,
+    task.provider,
+  )[0];
+  const invocationCreatedAt = new Date().toISOString();
+  const taskSnapshotOrigin = existingTaskProjectionContentDigest === undefined
+    ? 'ephemeral-memory' as const
+    : 'canonical-file' as const;
+  const transport = input.transport ?? 'local-runtime';
+  const executionBackend = declaredInvocationBackend(task, config);
+  const runId = input.executionRunId ?? task.sprintId ?? task.id;
+  const tenantId = input.executionTenantId
+    ?? task.actor?.tenantId
+    ?? resolveTenant(projectRoot).tenantId;
+  const opened = (input.openTaskSettlementAuthority ?? openTaskSettlementAuthority)(projectRoot);
+  let declaration: TaskExecutionDeclaration;
+  try {
+    declaration = opened.authority.declareTaskExecution({
+      tenantId,
+      projectId: opened.projectId,
+      taskId: task.id,
+      runId,
+      provider: executionIdentity.provider,
+      model: executionIdentity.model,
+      executionBackend,
+      transport,
+      callId: input.invocationCallId ?? `task-ingress:${transport}:${randomUUID()}`,
+      createdAt: invocationCreatedAt,
+    });
+  } catch (error) {
+    opened.close();
+    throw error;
+  }
+
+  let dispatchAttemptEntered = false;
+  let dispatchStarted = false;
+  let dispatchEvidenceRef: string | undefined;
+  let dispatchStartedAt: string | undefined;
+  let dispatchInvocation: TaskIngressInvocationAuthority | undefined;
+  const settleKnownZeroWork = async (
+    reasonCode: InvocationPreDispatchReasonCode,
+    authorityEvidenceRefs: readonly string[] = [],
+  ): Promise<TaskSettlementInspection> => opened.authority.settleNotDispatched({
+    tenantId,
+    projectId: opened.projectId,
+    taskId: task.id,
+    runId,
+    executionBackend,
+    rawStatus: String(task.status),
+    taskContent: taskContentAtDeclaration,
+    taskCreatedAt,
+    taskSnapshotOrigin,
+    receiptRef: declaration.receiptRef,
+    reasonCode,
+    ...(authorityEvidenceRefs.length > 0 ? { authorityEvidenceRefs } : {}),
+    occurredAt: timestampNotBefore(invocationCreatedAt),
+    apply: true,
+  });
+
+  try {
+    if (budgetPolicy?.state === 'hold') {
+      throw new DeckentError(
+        'EXECUTION_BUDGET_HOLD',
+        `EXECUTION_BUDGET_HOLD:${budgetPolicy.reasonCode}:${budgetPolicy.profileRef}`,
+      );
+    }
+
+    const backend = config.spawn_backend
+      ? SpawnBackendFactory.create({
+          backend: config.spawn_backend,
+          projectDir: projectRoot,
+          dockerImage: config.docker_image,
+          dockerTimeoutSeconds: config.docker_timeout,
+          dockerMemoryLimit: config.worker_memory_limit,
+          dockerHomeTmpfsSize: config.worker_home_tmpfs_size,
+          dockerMemorySwap: config.worker_memory_swap,
+          dockerKindMemoryLimits: config.worker_memory_limit_by_kind,
+        })
+      : undefined;
+    const registry = createExactNormalDockerExecutionRegistry(projectRoot);
+    const taskTimeoutSeconds = Math.max(1, Math.ceil(input.timeoutMs / 1_000));
+    const disposition = await executeSpawnTask(
+      {
+        task,
+        taskTimeoutSeconds,
+        ...(existingTaskProjectionContentDigest !== undefined
+          ? { existingTaskProjectionContentDigest }
+          : {}),
+      },
+      {
+        projectRoot,
+        sprintFallbackId: runId,
+        config,
+        spawnOpts: {
+          autoApprove: input.autoApprove ?? false,
+          ...(backend ? { spawnBackend: backend } : {}),
+          ...(input.attendedExecutionApprovalAuthority
+            ? { attendedExecutionApprovalAuthority: input.attendedExecutionApprovalAuthority }
+            : {}),
+          ...(input.providerAuthority ? { providerAuthority: input.providerAuthority } : {}),
+        },
+        backend,
+        routeTask: async (candidate) => {
+          if ((config.routing_engine ?? 'v3') !== 'v3') return;
+          const { routeSingleTaskV3, mergeForcePreservingSkillIds } =
+            await import('./routing-plan-adapter.js');
+          const routed = await routeSingleTaskV3(candidate, projectRoot);
+          candidate.assignedAgent = routed.agentId;
+          candidate.assignedSkills = mergeForcePreservingSkillIds(candidate, routed.skillIds);
+        },
+        resolveAgentPrompt,
+        resolveSkillPrompts,
+        buildWriteTargets: candidate => deriveWorkerWriteTargets(candidate.scope),
+        exactDockerRegistry: registry,
+        onDispatchAttemptBoundary: ({ taskId, backend: attemptedBackend }) => {
+          if (taskId !== task.id || dispatchAttemptEntered) {
+            throw new DeckentError(
+              'TASK_INGRESS_DISPATCH_ATTEMPT_BOUNDARY_MISMATCH',
+              `TASK_INGRESS_DISPATCH_ATTEMPT_BOUNDARY_MISMATCH:${task.id}`,
+            );
+          }
+          const actualBackend = normalizeInvocationBackend(attemptedBackend);
+          if (executionBackend !== 'unknown' && actualBackend !== executionBackend) {
+            throw new DeckentError(
+              'TASK_INGRESS_DISPATCH_BACKEND_MISMATCH',
+              `TASK_INGRESS_DISPATCH_BACKEND_MISMATCH:${executionBackend}:${actualBackend}`,
+            );
+          }
+          dispatchAttemptEntered = true;
+        },
+        onDispatchBoundary: async (boundary) => {
+          if (boundary.taskId !== task.id || dispatchStarted || !dispatchAttemptEntered) {
+            throw new DeckentError(
+              'TASK_INGRESS_DISPATCH_BOUNDARY_MISMATCH',
+              `TASK_INGRESS_DISPATCH_BOUNDARY_MISMATCH:${task.id}`,
+            );
+          }
+          const actualBackend = normalizeInvocationBackend(boundary.backend);
+          if (executionBackend !== 'unknown' && actualBackend !== executionBackend) {
+            throw new DeckentError(
+              'TASK_INGRESS_DISPATCH_BACKEND_MISMATCH',
+              `TASK_INGRESS_DISPATCH_BACKEND_MISMATCH:${executionBackend}:${actualBackend}`,
+            );
+          }
+          dispatchStartedAt = timestampNotBefore(invocationCreatedAt);
+          opened.authority.markDispatchStarted({
+            tenantId,
+            projectId: opened.projectId,
+            invocationId: declaration.receiptRef.invocationId,
+            attempt: 1,
+            executionEvidenceRef: boundary.executionEvidenceRef,
+            calledProvider: boundary.provider,
+            calledModel: boundary.model,
+            occurredAt: dispatchStartedAt,
+          });
+          dispatchEvidenceRef = boundary.executionEvidenceRef;
+          dispatchStarted = true;
+          dispatchInvocation = {
+            receiptRef: declaration.receiptRef,
+            executionBackend: actualBackend,
+            transport,
+            state: 'dispatch-started',
+            executionMode: registry.isExactTask(task.id)
+              ? 'normal-docker-exact'
+              : 'legacy-non-docker',
+            executionEvidenceRef: boundary.executionEvidenceRef,
+            dispatchStartedAt,
+          };
+          await input.onDispatchBoundary?.(boundary, dispatchInvocation);
+        },
+      },
+    );
+    if (disposition.kind !== 'spawned') {
+      const exactOutcome = disposition.kind === 'not-dispatched'
+        || disposition.kind === 'ambiguous'
+        ? disposition.exactDispatchOutcome
+        : undefined;
+      const authorityEvidenceRefs = exactOutcome?.kind === 'not-dispatched'
+        ? Object.freeze([
+            exactOutcome.zeroWorkReceipt.ref,
+            exactOutcome.zeroWorkReceipt.digest,
+          ])
+        : exactOutcome?.kind === 'ambiguous'
+          ? Object.freeze([
+              exactOutcome.reconciliationReceipt.ref,
+              exactOutcome.reconciliationReceipt.digest,
+            ])
+          : Object.freeze([] as string[]);
+      const settlement = disposition.kind === 'ambiguous' || dispatchStarted
+        ? undefined
+        : await settleKnownZeroWork(
+            dispositionPreDispatchReason(disposition),
+            authorityEvidenceRefs,
+          );
+      const executionMode = disposition.executionMode;
+      const executionEvidenceRef = exactOutcome?.kind === 'not-dispatched'
+        ? exactOutcome.zeroWorkReceipt.ref
+        : exactOutcome?.kind === 'ambiguous'
+          ? exactOutcome.reconciliationReceipt.ref
+          : undefined;
+      return {
+        disposition,
+        executionMode,
+        backend: disposition.executionBackend,
+        provider: String(task.provider ?? 'unknown'),
+        invocation: {
+          receiptRef: declaration.receiptRef,
+          executionBackend,
+          transport,
+          state: settlement?.effectiveStatus === 'NOT_DISPATCHED'
+            ? 'not-dispatched'
+            : 'reconciliation-required',
+          executionMode,
+          ...(executionEvidenceRef ? { executionEvidenceRef } : {}),
+          ...(authorityEvidenceRefs.length > 0 ? { authorityEvidenceRefs } : {}),
+          ...('reasonCode' in disposition && typeof disposition.reasonCode === 'string'
+            ? { reasonCode: disposition.reasonCode }
+            : {}),
+          ...(settlement ? { settlement } : {}),
+        },
+      };
+    }
+    if (!dispatchStarted || !dispatchEvidenceRef) {
+      throw new DeckentError(
+        'TASK_INGRESS_DISPATCH_BOUNDARY_MISSING',
+        `TASK_INGRESS_DISPATCH_BOUNDARY_MISSING:${task.id}`,
+      );
+    }
+    const executionMode = disposition.executionMode;
+    const invocation = dispatchInvocation ?? {
+      receiptRef: declaration.receiptRef,
+      executionBackend,
+      transport,
+      state: 'dispatch-started' as const,
+      executionMode,
+      executionEvidenceRef: dispatchEvidenceRef,
+      ...(dispatchStartedAt ? { dispatchStartedAt } : {}),
+    };
+    if (executionMode === 'normal-docker-exact') {
+      const resultAuthority = await registry.awaitTaskResultAuthority(task.id);
+      return {
+        disposition,
+        executionMode,
+        backend: disposition.executionBackend,
+        provider: disposition.provider ?? String(task.provider ?? 'unknown'),
+        resultAuthority,
+        invocation,
+      };
+    }
+    return {
+      disposition,
+      executionMode,
+      backend: disposition.executionBackend,
+      provider: disposition.provider ?? String(task.provider ?? 'unknown'),
+      invocation,
+    };
+  } catch (error) {
+    const reasonCode = taskIngressCauseCode(error);
+    let invocation: TaskIngressInvocationAuthority;
+    let settlementFailure: string | undefined;
+    if (!dispatchAttemptEntered && !dispatchStarted) {
+      let settlement: TaskSettlementInspection | undefined;
+      try {
+        settlement = await settleKnownZeroWork(
+          preDispatchReason(error),
+          preDispatchEvidenceRefs(error),
+        );
+      } catch (settlementError) {
+        settlementFailure = taskIngressCauseCode(settlementError);
+        debugLog('task-mode-runner:settleKnownZeroWork', settlementError);
+      }
+      invocation = {
+        receiptRef: declaration.receiptRef,
+        executionBackend,
+        transport,
+        state: settlement?.effectiveStatus === 'NOT_DISPATCHED'
+          ? 'not-dispatched'
+          : 'reconciliation-required',
+        executionMode: executionBackend === 'docker'
+          ? 'normal-docker-exact'
+          : 'legacy-non-docker',
+        ...(preDispatchEvidenceRefs(error).length > 0
+          ? { authorityEvidenceRefs: preDispatchEvidenceRefs(error) }
+          : {}),
+        reasonCode,
+        ...(settlement ? { settlement } : {}),
+      };
+    } else {
+      invocation = {
+        ...(dispatchInvocation ?? {
+          receiptRef: declaration.receiptRef,
+          executionBackend,
+          transport,
+          executionMode: executionBackend === 'docker'
+            ? 'normal-docker-exact' as const
+            : 'legacy-non-docker' as const,
+        }),
+        state: 'reconciliation-required',
+        reasonCode,
+      };
+    }
+    throw attachTaskIngressErrorAuthority(error, {
+      schemaVersion: 1,
+      reasonCode,
+      invocation,
+      ...(settlementFailure ? { settlementFailure } : {}),
+    });
+  } finally {
+    opened.close();
+  }
+}
+
 // ─── Runner ─────────────────────────────────────────────────────────
 
 /**
@@ -230,7 +775,7 @@ export async function runTaskMode(
 
   // Build task — WM-1: unify on the canonical ExecutionRequest contract (sets
   // task.type, resolves provider via config, tags origin='autonomous').
-  const taskId = createRunTaskId();
+  const taskId = createTaskIngressTaskId();
   const execReq = buildExecutionRequest({
     description: ctx.description,
     model,
@@ -244,159 +789,57 @@ export async function runTaskMode(
   });
   const task = resolveToTask(execReq, taskId);
 
-  // BUDGET-PRODUCER: every task-mode caller (Goal-v2/process included) binds the
-  // same owner-authored worker policy as planner and `deckent run`. A request is
-  // evidence only and can narrow, never widen, that authority. HOLD before
-  // routing, Task JSON, prompt construction, or provider/backend side effects.
-  const [budgetPolicy] = applyWorkerExecutionBudgetPolicy(
-    [task],
-    config.execution_budget,
-    execReq.provider,
-  );
-  if (budgetPolicy?.state === 'hold') {
-    throw new Error(`EXECUTION_BUDGET_HOLD:${budgetPolicy.reasonCode}:${budgetPolicy.profileRef}`);
-  }
-
-  if (ctx.providerAuthority) {
-    const providerOrder = orderedRoleProviders('worker', config);
-    const request = Object.freeze({
-      role: 'worker' as const,
-      purpose: 'worker-execution' as const,
-      runId: ctx.executionRunId ?? task.sprintId ?? taskId,
-      taskId,
-      provider: identity.provider,
-      model,
-      configuredBackend: config.spawn_backend ?? 'auto',
-      fallbackProviders: Object.freeze(
-        [providerOrder.primary, ...providerOrder.fallbacks]
-          .filter(candidate => candidate !== identity.provider),
-      ),
-      unattended: task.budgetPolicy?.admissionMode !== 'attended',
-    });
-    const providerAuthority = preflightProviderExecutionIngress(
-      ctx.providerAuthority,
-      request,
-    );
-    if (providerAuthority.decision === 'hold') {
-      let durableEvidenceWritten = false;
-      try {
-        durableEvidenceWritten = Boolean(writeEvent(
-          projectRoot,
-          request.runId,
-          'brain',
-          'auditor',
-          'BRAIN→AUDITOR:PROVIDER_AUTHORITY_HOLD',
-          {
-            ...request,
-            reasonCode: providerAuthority.reasonCode,
-            authorityEvidenceRefs: providerAuthority.authorityEvidenceRefs,
-          },
-        ));
-      } catch (error) {
-        debugLog('task-mode:provider-authority-hold-event', error);
-      }
-      throw new ProviderExecutionIngressHoldError(
-        providerAuthority.reasonCode,
-        providerAuthority.authorityEvidenceRefs,
-        request,
-        durableEvidenceWritten,
-      );
-    }
-  }
-
-  // Routing authority is fail-closed. A skill/agent HOLD is an execution HOLD,
-  // not permission to dispatch an unqualified generic worker.
-  try {
-    const routingVersion = config.routing_engine ?? 'v3';
-    if (routingVersion === 'v3') {
-      // 587-001: the `overrides: UserOverride[]` array that used to be built
-      // here was never passed to routeSingleTaskV3 — dead code that read as if
-      // the directives were honoured. The directives ARE honoured, but through
-      // their real seams: forceAgent rides task.forceAgent into the V3
-      // verifier, and forceSkills/excludeSkills ride the force-preserving
-      // merge below (which replaces the old wholesale `= v3.skillIds` write
-      // that could erase an operator's forced skill).
-
-      // ROUTING-V3 (S3 cut-over): the V2 engine is retired — single-task
-      // routing goes through the vector pipeline (structural content, no LLM).
-      const { routeSingleTaskV3, mergeForcePreservingSkillIds } = await import('./routing-plan-adapter.js');
-      const v3 = await routeSingleTaskV3(task, projectRoot);
-      task.assignedAgent = v3.agentId;
-      task.assignedSkills = mergeForcePreservingSkillIds(task, v3.skillIds);
-    }
-  } catch (routingErr) {
-    debugLog('task-mode:routing', routingErr);
-    throw routingErr;
-  }
-
-  // Gap E: write task JSON so agentic-worker-entry can read its spec (mirrors run.ts:261-263)
-  const tasksDir = join(projectRoot, TASKS_DIR);
-  mkdirSync(tasksDir, { recursive: true });
-  writeFileSync(join(tasksDir, `task-${taskId}.json`), JSON.stringify(task, null, 2), 'utf-8');
-
-  // Resolve agent and skill prompts for domain-expertise parity with sprint tasks.
-  // Both resolve to undefined/[] for 'generic' agent or empty skills — backward-safe fallback.
-  const agentPrompt = await resolveAgentPrompt(projectRoot, task);
-  const skillPrompts = await resolveSkillPrompts(projectRoot, task);
-  const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts, projectRoot, config);
-
-  // Emit event for nervous system / observers
-  try {
-    eventBus.emit('deckent-event', {
-      type: 'TASK_MODE_START',
-      taskId,
-      style: 'task',
-      description: ctx.description,
-      model,
-      timestamp: new Date().toISOString(),
-    });
-  } catch {
-    // Never let event emission break task execution
-  }
-
-  // Spawn worker — forward provider hint so dynamic ollama tags are pre-registered
-  const { backend, provider, settlementRef } = await spawnWorkerMultiProvider(
-    taskId,
-    model,
-    prompt,
+  const execution = await executeTaskIngress({
     projectRoot,
-    {
-      autoApprove: ctx.autoApprove ?? false,
-      spawnBackend: config.spawn_backend,
-      dockerImage: config.docker_image,
-      dockerTimeout: config.docker_timeout,
-      provider: execReq.provider,
-      executionBudget: task.budget,
-      executionLandingPolicy: task.budgetPolicy?.landingPolicy,
-      executionBudgetProfileRef: task.budgetPolicy?.profileRef,
-      executionBudgetPolicyDigest: task.budgetPolicy?.policyDigest,
-      executionAdmissionMode: task.budgetPolicy?.admissionMode,
-      executionApprovalEvidenceRef: task.budgetPolicy?.approvalEvidenceRef,
-      executionApprovalProposal: task.budgetPolicy?.approvalProposal,
-      executionApprovalMaterial: createAttendedExecutionProposalMaterialFromTask(
-        task as unknown as Record<string, unknown>,
-        prompt,
-      ),
-      attendedExecutionApprovalAuthority: ctx.attendedExecutionApprovalAuthority,
-      executionTenantId: ctx.executionTenantId ?? task.actor?.tenantId,
-      executionRunId: ctx.executionRunId ?? task.sprintId ?? taskId,
+    config,
+    task,
+    timeoutMs: ctx.timeoutMs ?? 300_000,
+    autoApprove: ctx.autoApprove ?? false,
+    ...(ctx.attendedExecutionApprovalAuthority
+      ? { attendedExecutionApprovalAuthority: ctx.attendedExecutionApprovalAuthority }
+      : {}),
+    ...(ctx.providerAuthority ? { providerAuthority: ctx.providerAuthority } : {}),
+    ...(ctx.executionRunId ? { executionRunId: ctx.executionRunId } : {}),
+    ...(ctx.executionTenantId ? { executionTenantId: ctx.executionTenantId } : {}),
+    transport: 'local-runtime',
+    onDispatchBoundary: (_boundary, invocation) => {
+      try {
+        eventBus.emit('deckent-event', {
+          type: 'TASK_MODE_START',
+          taskId,
+          style: 'task',
+          description: ctx.description,
+          model,
+          invocationId: invocation.receiptRef.invocationId,
+          timestamp: invocation.dispatchStartedAt ?? new Date().toISOString(),
+        });
+      } catch {
+        // Observation failure cannot rewrite dispatch truth.
+      }
     },
-  );
+  });
+  if (execution.disposition.kind !== 'spawned') {
+    throw new TaskIngressDispositionError(execution);
+  }
 
   // TOK-AUT (357-013): spawn above is fire-and-forget — the worker writes its
   // .result well after this function has already returned. Enrich it in the
   // background (real tokenUsage/cost via result-collector.ts, mirroring the
   // sprint path) so the on-disk .result isn't left at the worker's honest
   // 0/0/0 stub forever. Not awaited — must not delay runTaskMode's return.
-  if (!settlementRef) {
+  const settlementRef = execution.disposition.legacySettlementRef;
+  if (execution.executionMode === 'legacy-non-docker' && !settlementRef) {
     void watchAndEnrichTaskModeResult(projectRoot, task, ctx.timeoutMs ?? 300_000);
   }
 
   return {
     taskId,
-    backend,
-    provider,
+    backend: execution.backend,
+    provider: execution.provider,
     projectRoot,
+    executionMode: execution.executionMode,
+    invocation: execution.invocation,
     ...(settlementRef ? { settlementRef } : {}),
+    ...(execution.resultAuthority ? { resultAuthority: execution.resultAuthority } : {}),
   };
 }

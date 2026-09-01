@@ -2,28 +2,36 @@
  * tests/release/release-prepare.test.ts — Sprint 414 task 414-002 (RC4B, REL-03/04).
  *
  * Covers: (1) the exported pure functions of scripts/release-prepare.mjs, hermetically; (2) a
- * real-binary round-trip against a tmpdir COPY of the actual package.json/package-lock.json/
+ * real-binary round-trip against a tmpdir COPY of the actual package.json/npm-shrinkwrap.json/
  * CHANGELOG.md (never the real repo files — test-hermeticity rule), proving package.json +
- * package-lock.json (both version fields) + CHANGELOG.md stay in sync atomically and prerelease
+ * npm-shrinkwrap.json (both version fields) + CHANGELOG.md are prevalidated together and prerelease
  * metadata survives; (3) that the script never tags/pushes/publishes; (4) the retired
  * scripts/bump-version.sh stub; (5) the two-file changelog-canonicity role-banners + the MRR text
  * fix in the REAL root CHANGELOG.md; (6) a regression pin that validateChangelogSectionFormat
  * accepts the real root CHANGELOG.md's current [0.100.0] section — the exact-anchor contract
  * .github/workflows/release.yml's extractor (and any future parser) relies on.
  *
- * Async spawn only (no spawnSync — would freeze the vitest worker's heartbeat RPC), all mutable
+ * Async child process only (no spawnSync — would freeze the vitest worker's heartbeat RPC), all mutable
  * fixtures under os.tmpdir(), cleaned up in afterEach.
  */
 
 import { describe, it, expect, afterEach } from 'vitest';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync, copyFileSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  closeSync,
+  copyFileSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   parseVersionArg,
   applyVersionToPackageJson,
-  applyVersionToPackageLock,
+  applyVersionToNpmShrinkwrap,
   validateChangelogSectionFormat,
   buildChangelogSectionSkeleton,
   insertChangelogSection,
@@ -42,7 +50,7 @@ function makeTmpFixtureDir(): string {
   const dir = mkdtempSync(join(tmpdir(), 'release-prepare-test-'));
   tmpDirs.push(dir);
   copyFileSync(join(PROJECT_ROOT, 'package.json'), join(dir, 'package.json'));
-  copyFileSync(join(PROJECT_ROOT, 'package-lock.json'), join(dir, 'package-lock.json'));
+  copyFileSync(join(PROJECT_ROOT, 'npm-shrinkwrap.json'), join(dir, 'npm-shrinkwrap.json'));
   copyFileSync(ROOT_CHANGELOG_PATH, join(dir, 'CHANGELOG.md'));
   return dir;
 }
@@ -55,34 +63,63 @@ afterEach(() => {
 });
 
 // ASYNC subprocess runner — never spawnSync (see file header + scripts/scripts.test.ts precedent).
+function runExecutableAsync(
+  executable: string,
+  args: string[],
+  timeoutMs = 15000,
+): Promise<{ code: number | null; stdout: string; stderr: string }> {
+  const releasePrepareEnv = { ...process.env };
+  for (const name of [
+    'DECKENT_TEST_HERMETICITY',
+    'NODE_CHANNEL_FD',
+    'NODE_CHANNEL_SERIALIZATION_MODE',
+    'VITEST',
+    'VITEST_POOL_ID',
+    'VITEST_WORKER_ID',
+  ]) {
+    delete releasePrepareEnv[name];
+  }
+  const captureDir = mkdtempSync(join(tmpdir(), 'release-prepare-output-'));
+  tmpDirs.push(captureDir);
+  const stdoutPath = join(captureDir, 'stdout.txt');
+  const stderrPath = join(captureDir, 'stderr.txt');
+  const stdoutFd = openSync(stdoutPath, 'w');
+  const stderrFd = openSync(stderrPath, 'w');
+  return new Promise((resolvePromise) => {
+    const child = spawn(executable, args, {
+      cwd: PROJECT_ROOT,
+      env: releasePrepareEnv,
+      stdio: ['ignore', stdoutFd, stderrFd],
+    });
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGKILL');
+    }, timeoutMs);
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      closeSync(stdoutFd);
+      closeSync(stderrFd);
+      const stdout = readFileSync(stdoutPath, 'utf8');
+      const stderr = readFileSync(stderrPath, 'utf8');
+      resolvePromise({
+        code: timedOut ? null : code,
+        stdout,
+        stderr: timedOut ? `${stderr}\n[timeout]` : stderr,
+      });
+    });
+  });
+}
+
 function runNodeScriptAsync(
   args: string[],
   timeoutMs = 15000,
 ): Promise<{ code: number | null; stdout: string; stderr: string }> {
-  return new Promise((resolvePromise) => {
-    const child = spawn(process.execPath, [RELEASE_PREPARE_PATH, ...args], {
-      cwd: PROJECT_ROOT,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    let stdout = '';
-    let stderr = '';
-    child.stdout.setEncoding('utf-8');
-    child.stdout.on('data', (d: string) => {
-      stdout += d;
-    });
-    child.stderr.setEncoding('utf-8');
-    child.stderr.on('data', (d: string) => {
-      stderr += d;
-    });
-    const timer = setTimeout(() => {
-      child.kill('SIGKILL');
-      resolvePromise({ code: null, stdout, stderr: `${stderr}\n[timeout]` });
-    }, timeoutMs);
-    child.on('close', (code) => {
-      clearTimeout(timer);
-      resolvePromise({ code, stdout, stderr });
-    });
-  });
+  return runExecutableAsync(
+    process.execPath,
+    [RELEASE_PREPARE_PATH, ...args],
+    timeoutMs,
+  );
 }
 
 function runBashScriptAsync(
@@ -90,30 +127,7 @@ function runBashScriptAsync(
   args: string[],
   timeoutMs = 15000,
 ): Promise<{ code: number | null; stdout: string; stderr: string }> {
-  return new Promise((resolvePromise) => {
-    const child = spawn('bash', [scriptPath, ...args], {
-      cwd: PROJECT_ROOT,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    let stdout = '';
-    let stderr = '';
-    child.stdout.setEncoding('utf-8');
-    child.stdout.on('data', (d: string) => {
-      stdout += d;
-    });
-    child.stderr.setEncoding('utf-8');
-    child.stderr.on('data', (d: string) => {
-      stderr += d;
-    });
-    const timer = setTimeout(() => {
-      child.kill('SIGKILL');
-      resolvePromise({ code: null, stdout, stderr: `${stderr}\n[timeout]` });
-    }, timeoutMs);
-    child.on('close', (code) => {
-      clearTimeout(timer);
-      resolvePromise({ code, stdout, stderr });
-    });
-  });
+  return runExecutableAsync('bash', [scriptPath, ...args], timeoutMs);
 }
 
 // ─── parseVersionArg ─────────────────────────────────────────────────────────
@@ -151,7 +165,7 @@ describe('parseVersionArg', () => {
   });
 });
 
-// ─── applyVersionToPackageJson / applyVersionToPackageLock ──────────────────
+// ─── applyVersionToPackageJson / applyVersionToNpmShrinkwrap ────────────────
 
 describe('applyVersionToPackageJson', () => {
   it('updates only the version field, preserving everything else', () => {
@@ -165,7 +179,7 @@ describe('applyVersionToPackageJson', () => {
   });
 });
 
-describe('applyVersionToPackageLock', () => {
+describe('applyVersionToNpmShrinkwrap', () => {
   it('updates BOTH the top-level version and packages[""].version', () => {
     const original = JSON.stringify(
       {
@@ -180,7 +194,7 @@ describe('applyVersionToPackageLock', () => {
       null,
       2,
     );
-    const updated = applyVersionToPackageLock(`${original}\n`, '2.0.0');
+    const updated = applyVersionToNpmShrinkwrap(`${original}\n`, '2.0.0');
     const parsed = JSON.parse(updated);
     expect(parsed.version).toBe('2.0.0');
     expect(parsed.packages[''].version).toBe('2.0.0');
@@ -188,10 +202,10 @@ describe('applyVersionToPackageLock', () => {
     expect(parsed.packages['node_modules/foo'].version).toBe('1.0.0');
   });
 
-  it('round-trips the REAL package-lock.json touching only the two root version fields', () => {
-    const realLock = readFileSync(join(PROJECT_ROOT, 'package-lock.json'), 'utf-8');
-    const updated = applyVersionToPackageLock(realLock, '9.9.9-diff-check.1');
-    const originalLines = realLock.split('\n');
+  it('round-trips the REAL npm-shrinkwrap.json touching only the two root version fields', () => {
+    const realShrinkwrap = readFileSync(join(PROJECT_ROOT, 'npm-shrinkwrap.json'), 'utf-8');
+    const updated = applyVersionToNpmShrinkwrap(realShrinkwrap, '9.9.9-diff-check.1');
+    const originalLines = realShrinkwrap.split('\n');
     const updatedLines = updated.split('\n');
     const changedLines = updatedLines.filter((line, i) => line !== originalLines[i]);
     expect(changedLines.length).toBe(2);
@@ -288,14 +302,14 @@ describe('prepareRelease', () => {
     const dir = makeTmpFixtureDir();
     const before = {
       pkg: readFileSync(join(dir, 'package.json'), 'utf-8'),
-      lock: readFileSync(join(dir, 'package-lock.json'), 'utf-8'),
+      shrinkwrap: readFileSync(join(dir, 'npm-shrinkwrap.json'), 'utf-8'),
       changelog: readFileSync(join(dir, 'CHANGELOG.md'), 'utf-8'),
     };
     const result = prepareRelease({ version: '9.9.9-dry.1', root: dir, dryRun: true, today: '2026-08-01' });
     expect(result.ok).toBe(true);
     expect(result.dryRun).toBe(true);
     expect(readFileSync(join(dir, 'package.json'), 'utf-8')).toBe(before.pkg);
-    expect(readFileSync(join(dir, 'package-lock.json'), 'utf-8')).toBe(before.lock);
+    expect(readFileSync(join(dir, 'npm-shrinkwrap.json'), 'utf-8')).toBe(before.shrinkwrap);
     expect(readFileSync(join(dir, 'CHANGELOG.md'), 'utf-8')).toBe(before.changelog);
   });
 });
@@ -303,7 +317,7 @@ describe('prepareRelease', () => {
 // ─── Real-binary round-trip (proof-of-function) ──────────────────────────────
 
 describe('release-prepare.mjs CLI — real-binary round-trip on a tmpdir copy-fixture', () => {
-  it('updates package.json + package-lock.json (both version fields) + CHANGELOG.md in sync, prerelease preserved', async () => {
+  it('updates package.json + npm-shrinkwrap.json (both version fields) + CHANGELOG.md in sync, prerelease preserved', async () => {
     const dir = makeTmpFixtureDir();
     const version = '9.9.9-e2e.1';
     const { code, stdout } = await runNodeScriptAsync(['--version', version, '--root', dir]);
@@ -311,12 +325,12 @@ describe('release-prepare.mjs CLI — real-binary round-trip on a tmpdir copy-fi
     expect(stdout).toContain('release-prepare complete');
 
     const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf-8'));
-    const lock = JSON.parse(readFileSync(join(dir, 'package-lock.json'), 'utf-8'));
+    const shrinkwrap = JSON.parse(readFileSync(join(dir, 'npm-shrinkwrap.json'), 'utf-8'));
     const changelog = readFileSync(join(dir, 'CHANGELOG.md'), 'utf-8');
 
     expect(pkg.version).toBe(version);
-    expect(lock.version).toBe(version);
-    expect(lock.packages[''].version).toBe(version);
+    expect(shrinkwrap.version).toBe(version);
+    expect(shrinkwrap.packages[''].version).toBe(version);
     expect(validateChangelogSectionFormat(changelog, version).ok).toBe(true);
     expect(changelog).toContain(`## [${version}]`);
   });

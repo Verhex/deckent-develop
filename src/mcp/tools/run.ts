@@ -1,31 +1,19 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { z } from 'zod/v4';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { TASKS_DIR } from '../../core/constants.js';
-import type { ModelType } from '../../core/types.js';
-import { writeJobState } from './job-runner.js';
+import { createJobId, writeJobState } from './job-runner.js';
 import { enrichResponse } from '../helpers/enrich.js';
 import { loadConfig, resolveDefaultModel } from '../../core/config.js';
-import { spawnWorkerMultiProvider } from '../../cli/commands/spawn.js';
 import { buildExecutionRequest, resolveToTask, resolveExecutionModelIdentity } from '../../orchestra/execution-request-builder.js';
 import { registerOpenRouterModelFromCache } from '../../core/openrouter-models.js';
-import { buildWorkerPrompt } from '../../orchestra/brain.js';
-import { resolveAgentPrompt, resolveSkillPrompts } from '../../orchestra/sprint-controller.js';
-import type { UserOverride } from '../../core/routing-types.js';
 import { debugLog } from '../../core/utils.js';
-import { applyWorkerExecutionBudgetPolicy } from '../../core/execution-plan-digest.js';
-import { getLanguage, getMessage } from '../../cli/helpers/messages.js';
 import type { AttendedExecutionApprovalAuthority } from '../../core/attended-execution-approval.js';
-import { createAttendedExecutionProposalMaterialFromTask } from '../../core/attended-execution-proposal.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provider-authority-composition.js';
-import { preflightProviderExecutionIngress } from '../../core/provider-execution-ingress-authority.js';
-import { orderedRoleProviders } from '../../core/provider.js';
-import { mcpToolDescription } from './description-catalog.js';
-
-function generateJobId(): string {
-  return `run-${Date.now().toString(36)}`;
-}
+import {
+  executeTaskIngress,
+  readTaskIngressErrorAuthority,
+} from '../../orchestra/task-mode-runner.js';
+import { getMcpToolDescriptionLanguage, mcpToolDescription } from './description-catalog.js';
+import { cliContractMessage } from '../../cli/helpers/message-catalog/cli-run.js';
 
 export function registerRunTool(
   server: McpServer,
@@ -34,30 +22,32 @@ export function registerRunTool(
     providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
   } = {},
 ): void {
+  const lang = getMcpToolDescriptionLanguage();
   server.registerTool(
     'deckent_run',
     {
-      title: 'Run Task',
+      title: cliContractMessage('cliContract.run.mcp.title', lang),
       description: mcpToolDescription('deckent_run'),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
       inputSchema: z.object({
-        description: z.string().describe('Clear description of what the worker should do. Be specific: include file paths, expected outcome, and any constraints.'),
-        model: z.string().optional().describe('AI model to use — an exact provider model ID (e.g. claude-sonnet-5, gpt-5.6-sol). Resolved through the canonical registry: known IDs infer their provider; moving/legacy aliases (sonnet/opus/haiku/gpt-5/gpt-5.6) are rejected. Omit to use the configured default-model.'),
-        provider: z.string().optional().describe('Explicit provider ownership (claude|codex|gemini|ollama). Required to register an unseen versioned model ID; for a known model it is validated against the registry and a mismatch fails loudly.'),
-        modelEffort: z.string().optional().describe('Native model reasoning-effort level, mirrors CLI --model-effort (claude: low|medium|high|xhigh|max, codex: minimal|low|medium|high). Opt-in: validated per-provider at spawn time; invalid or unsupported levels are silently ignored and the provider CLI default applies.'),
-        scope: z.string().optional().describe('Comma-separated directory paths the worker may modify (e.g. "src/,tests/"). Defaults to "src/" if omitted.'),
-        timeoutMs: z.number().optional().describe('Maximum wait window in milliseconds for the background result watcher, mirrors CLI --timeout. Default: 300000.'),
-        keep: z.boolean().optional().describe('Keep task files (.json/.hb/.result/.log) after the worker completes, mirrors CLI --keep. MCP default: true (files are preserved so deckent_status can read the result). Set false to opt in to CLI-style cleanup once the result file appears; on timeout without a result, files are always preserved.'),
-        autoApprove: z.boolean().optional().default(true).describe('Auto-approve worker tool calls with --dangerously-skip-permissions. Deckent standard: workers MUST have full write permissions.'),
+        description: z.string().describe(cliContractMessage('cliContract.run.mcp.description', lang)),
+        model: z.string().optional().describe(cliContractMessage('cliContract.run.mcp.model', lang)),
+        provider: z.string().optional().describe(cliContractMessage('cliContract.run.mcp.provider', lang)),
+        modelEffort: z.string().optional().describe(cliContractMessage('cliContract.run.mcp.model_effort', lang)),
+        scope: z.string().optional().describe(cliContractMessage('cliContract.run.mcp.scope', lang)),
+        timeoutMs: z.number().optional().describe(cliContractMessage('cliContract.run.mcp.timeout', lang)),
+        keep: z.boolean().optional().describe(cliContractMessage('cliContract.run.mcp.keep', lang)),
+        autoApprove: z.boolean().optional().default(true).describe(cliContractMessage('cliContract.run.mcp.auto_approve', lang)),
       }),
     },
     async ({ description, model, modelEffort, scope, timeoutMs, keep, autoApprove, provider }) => {
       const root = process.cwd();
 
       try {
-        const jobId = generateJobId();
+        const jobId = createJobId();
         const taskId = `run-${jobId}`;
-        const tasksDir = join(root, TASKS_DIR);
+        const startedAt = new Date().toISOString();
+        let jobProjectionHold: string | undefined;
 
         // C-MCP-parite (269-004): CLI --timeout / --keep counterparts. MCP keep
         // defaults to TRUE (preserve) — the fire-and-forget MCP path never cleaned
@@ -105,122 +95,101 @@ export function registerRunTool(
         });
         const task = resolveToTask(execReq, taskId);
 
-        // BUDGET-PRODUCER parity: bind the same owner-authored immutable worker
-        // policy used by CLI one-shot and task-mode before routing, prompt
-        // construction, Task JSON, or backend/provider side effects.
-        const [budgetPolicy] = applyWorkerExecutionBudgetPolicy(
-          [task],
-          cfg.execution_budget,
-          identity.provider,
-        );
-        if (budgetPolicy?.state === 'hold') {
-          throw new Error(getMessage('run.budget_hold', getLanguage(cfg.language), {
-            reason: budgetPolicy.reasonCode ?? 'unknown',
-            profile: budgetPolicy.profileRef,
-          }));
-        }
-
-        const workerProviderOrder = orderedRoleProviders('worker', cfg);
-        const providerAuthority = preflightProviderExecutionIngress(
-          runtime.providerAuthority,
-          {
-            runId: task.sprintId ?? taskId,
-            taskId,
-            provider: identity.provider,
-            model: identity.model,
-            configuredBackend: cfg.spawn_backend ?? 'auto',
-            fallbackProviders: [
-              workerProviderOrder.primary,
-              ...workerProviderOrder.fallbacks,
-            ].filter(candidate => candidate !== identity.provider),
-            unattended: workerProviderOrder.unattended,
-          },
-        );
-        if (providerAuthority.decision === 'hold') {
-          throw new Error(getMessage(
-            'run.provider_authority_hold',
-            getLanguage(cfg.language),
-            {
-              reason: providerAuthority.reasonCode,
-              evidence: providerAuthority.authorityEvidenceRefs.join(','),
-            },
-          ));
-        }
-
-        // Routing authority is fail-closed; MCP cannot turn a typed HOLD into
-        // an unqualified generic dispatch.
-        try {
-          const routingVersion = cfg?.routing_engine ?? 'v3';
-          if (routingVersion === 'v3') {
-
-            const overrides: UserOverride[] = [];
-            if (task.forceAgent || task.forceSkills || task.excludeSkills || task.excludeAgent) {
-              overrides.push({
-                source: 'task-directive',
-                forceAgent: task.forceAgent,
-                forceSkills: task.forceSkills,
-                excludeSkills: task.excludeSkills,
-                excludeAgents: task.excludeAgent,
-                priority: 3,
-              });
-            }
-
-            // ROUTING-V3 (S3 cut-over): vector pipeline, structural content.
-            const { routeSingleTaskV3 } = await import('../../orchestra/routing-plan-adapter.js');
-            const v3 = await routeSingleTaskV3(task, root);
-            task.assignedAgent = v3.agentId;
-            task.assignedSkills = v3.skillIds;
-          }
-        } catch (routingErr) {
-          const reason = routingErr instanceof Error ? routingErr.message : String(routingErr);
-          throw new Error(getMessage(
-            'run.routing_authority_hold',
-            getLanguage(cfg.language),
-            { reason },
-          ));
-        }
-
-        mkdirSync(tasksDir, { recursive: true });
-        writeFileSync(join(tasksDir, `task-${taskId}.json`), JSON.stringify(task, null, 2) + '\n');
-
-        // Build worker prompt with agent/skill context
-        const agentPrompt = await resolveAgentPrompt(root, task);
-        const skillPrompts = await resolveSkillPrompts(root, task);
-        const prompt = buildWorkerPrompt(task, agentPrompt, skillPrompts, root, cfg);
-        const { backend, settlementRef } = await spawnWorkerMultiProvider(taskId, identity.model as ModelType, prompt, root, {
+        const execution = await executeTaskIngress({
+          projectRoot: root,
+          config: cfg,
+          task,
+          timeoutMs: effectiveTimeoutMs,
           autoApprove,
-          spawnBackend: cfg.spawn_backend,
-          dockerImage: cfg.docker_image,
-          dockerTimeout: cfg.docker_timeout,
-          provider: execReq.provider,
-          // Exact resolved owner ceiling — Task JSON and live spawn carry the
-          // same budget. The spawn seam independently rejects unmetered remotes.
-          executionBudget: task.budget,
-          executionLandingPolicy: task.budgetPolicy?.landingPolicy,
-          executionBudgetProfileRef: task.budgetPolicy?.profileRef,
-          executionBudgetPolicyDigest: task.budgetPolicy?.policyDigest,
-          executionAdmissionMode: task.budgetPolicy?.admissionMode,
-          executionApprovalEvidenceRef: task.budgetPolicy?.approvalEvidenceRef,
-          executionApprovalProposal: task.budgetPolicy?.approvalProposal,
-          executionApprovalMaterial: createAttendedExecutionProposalMaterialFromTask(
-            task as unknown as Record<string, unknown>,
-            prompt,
-          ),
-          attendedExecutionApprovalAuthority: runtime.attendedExecutionApprovalAuthority,
-          executionTenantId: task.actor?.tenantId ?? 'local',
-          executionRunId: task.sprintId ?? taskId,
-          // C-MCP-parite (269-004): task.modelEffort is validated per-provider
-          // inside spawnWorkerMultiProvider via resolveReasoningEffort — an invalid
-          // or unsupported level resolves to undefined (no flag emitted), exactly
-          // like the CLI path (cli/commands/run.ts).
-          modelEffort: task.modelEffort,
+          ...(runtime.attendedExecutionApprovalAuthority
+            ? { attendedExecutionApprovalAuthority: runtime.attendedExecutionApprovalAuthority }
+            : {}),
+          ...(runtime.providerAuthority ? { providerAuthority: runtime.providerAuthority } : {}),
+          transport: 'mcp',
+          onDispatchBoundary: (_boundary, invocation) => {
+            try {
+              writeJobState(root, {
+                jobId,
+                status: 'RUNNING',
+                startedAt,
+                taskId,
+                invocation: {
+                  schemaVersion: 1,
+                  invocationId: invocation.receiptRef.invocationId,
+                  tenantId: invocation.receiptRef.tenantId,
+                  projectId: invocation.receiptRef.projectId,
+                  state: invocation.state,
+                  executionMode: invocation.executionMode ?? 'legacy-non-docker',
+                  executionEvidenceRef: invocation.executionEvidenceRef ?? null,
+                  attemptId: null,
+                },
+              });
+            } catch (projectionError) {
+              jobProjectionHold = projectionError instanceof Error
+                ? projectionError.message
+                : String(projectionError);
+            }
+          },
         });
+        if (execution.disposition.kind !== 'spawned') {
+          return {
+            content: [{
+              type: 'text' as const,
+              text: JSON.stringify({
+                error: true,
+                code: 'TASK_INGRESS_NOT_DISPATCHED',
+                taskId,
+                disposition: execution.disposition.kind,
+                executionMode: execution.executionMode,
+                backend: execution.backend,
+                provider: execution.provider,
+                invocation: execution.invocation,
+              }),
+            }],
+            isError: true,
+          };
+        }
+        if (
+          execution.executionMode === 'normal-docker-exact'
+          && execution.resultAuthority?.state !== 'exact-accepted'
+        ) {
+          throw new Error(
+            `EXACT_RESULT_AUTHORITY_HOLD:${execution.resultAuthority?.state ?? 'missing'}`,
+          );
+        }
+        const backend = execution.backend;
+        const settlementRef = execution.disposition.legacySettlementRef;
+        const publicStatus = execution.executionMode === 'normal-docker-exact'
+          ? 'ACCEPTED_AWAITING_EVALUATION' as const
+          : 'RUNNING' as const;
+        const exactAttemptId = execution.disposition.kind === 'spawned'
+          ? execution.disposition.exactDispatchOutcome
+            ?.providerExecutionAttempt?.providerExecutionAttemptId ?? null
+          : null;
+        const invocationProjection = {
+          schemaVersion: 1 as const,
+          invocationId: execution.invocation.receiptRef.invocationId,
+          tenantId: execution.invocation.receiptRef.tenantId,
+          projectId: execution.invocation.receiptRef.projectId,
+          state: execution.invocation.state,
+          executionMode: execution.executionMode,
+          executionEvidenceRef: execution.invocation.executionEvidenceRef ?? null,
+          attemptId: exactAttemptId,
+        };
 
-        writeJobState(root, {
-          jobId,
-          status: 'RUNNING',
-          startedAt: new Date().toISOString(),
-        });
+        try {
+          writeJobState(root, {
+            jobId,
+            status: publicStatus,
+            startedAt,
+            taskId,
+            invocation: invocationProjection,
+          });
+        } catch (projectionError) {
+          jobProjectionHold = projectionError instanceof Error
+            ? projectionError.message
+            : String(projectionError);
+        }
 
         // C-MCP-parite (269-004): keep=false opts in to CLI-style cleanup — watch
         // for the result in the background (non-blocking; bounded by timeoutMs) and
@@ -228,7 +197,7 @@ export function registerRunTool(
         // timeout WITHOUT a result preserves the files: a fire-and-forget MCP path
         // must never delete files under a possibly-still-running worker.
         // Lazy import keeps the default path free of cli/commands/run.js deps.
-        if (!keepFiles) {
+        if (!keepFiles && execution.executionMode === 'legacy-non-docker') {
           void import('../../cli/commands/run.js')
             .then(async ({ waitForRunResult, cleanupRunTask }) => {
               const result = await waitForRunResult(root, taskId, effectiveTimeoutMs, { settlementRef });
@@ -242,13 +211,16 @@ export function registerRunTool(
         const enriched = enrichResponse('run', {
           jobId,
           taskId,
-          status: 'RUNNING',
+          status: publicStatus,
           model: identity.model,
           modelEffort: task.modelEffort,
           timeoutMs: effectiveTimeoutMs,
           keep: keepFiles,
           scope: execReq.scope.directories,
           backend,
+          invocation: invocationProjection,
+          jobProjection: jobProjectionHold ? 'HOLD' : 'RECORDED',
+          ...(jobProjectionHold ? { jobProjectionReason: jobProjectionHold } : {}),
         });
 
         return {
@@ -256,8 +228,25 @@ export function registerRunTool(
         };
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
+        const ingressAuthority = readTaskIngressErrorAuthority(err);
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ error: true, message }) }],
+          content: [{
+            type: 'text' as const,
+            text: JSON.stringify({
+              error: true,
+              message,
+              ...(ingressAuthority
+                ? {
+                    code: 'TASK_INGRESS_AUTHORITY_HOLD',
+                    reasonCode: ingressAuthority.reasonCode,
+                    invocation: ingressAuthority.invocation,
+                    ...(ingressAuthority.settlementFailure
+                      ? { settlementFailure: ingressAuthority.settlementFailure }
+                      : {}),
+                  }
+                : {}),
+            }),
+          }],
           isError: true,
         };
       }

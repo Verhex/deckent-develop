@@ -1,15 +1,23 @@
 import { createHash, randomUUID } from 'node:crypto';
 
+import { canonicalJson } from '../core/audit-writer.js';
 import { buildExecutionContinuationPrompt } from '../core/execution-continuation-prompt.js';
 import { createExecutionAuthorityError } from '../core/errors.js';
 import {
   claimExecutionContinuationAtomic,
+  claimExecutionContinuationAtomicV2,
+  createExecutionContinuationDispatchRefV2,
   readExecutionAttemptRetirement,
+  readExecutionAttemptRetirementV2,
   readExecutionContinuationClaim,
   readExecutionLandingCheckpoint,
+  readExecutionLandingCheckpointV2,
   type ExecutionContinuationClaimV1,
+  type ExecutionContinuationClaimV2,
   type ExecutionLandingCheckpointV1,
   type ExecutionLandingCheckpointRefV1,
+  type ExecutionLandingCheckpointRefV2,
+  type ExecutionLandingDigestV2,
 } from '../core/execution-landing-checkpoint.js';
 import {
   assertExecutionLandingSupport,
@@ -25,11 +33,19 @@ import {
   type TaskResultSettlementRefV1,
 } from '../core/task-result-settlement.js';
 import type { ModelType } from '../core/types.js';
+import type { CreateExecutionLandingPreparationPayloadV2Input } from '../core/execution-landing-context.js';
 import {
   readRuntimeBudgetObservations,
   type RuntimeBudgetObservationEvidence,
 } from './runtime-budget-monitor.js';
-import type { SpawnBackend, SpawnBackendOptions } from './spawn-backend.js';
+import type {
+  ExactDockerCustodyCompletionV2,
+  ExactDockerCustodyDispatchOutcomeV2,
+  PrepareExactDockerCustodyInputV2,
+  SpawnBackend,
+  SpawnBackendOptions,
+} from './spawn-backend.js';
+import { prepareExactDockerExecutionLandingContextV2 } from './execution-landing-coordinator.js';
 
 export interface DispatchExecutionContinuationInput {
   projectRoot: string;
@@ -45,6 +61,11 @@ export interface DispatchExecutionContinuationInput {
     | 'reasoningEffort'
     | 'excludeDynamicPromptSections'
   >;
+  /**
+   * The V1 public-task continuation is retained only for bounded historical
+   * recovery. Normal Docker execution must use the async exact-custody port.
+   */
+  historicalV1Recovery?: true;
 }
 
 export interface ExecutionContinuationDispatchResult {
@@ -52,6 +73,170 @@ export interface ExecutionContinuationDispatchResult {
   claim: ExecutionContinuationClaimV1;
   settlementRef: TaskResultSettlementRefV1;
   promptSha256: string;
+}
+
+export interface DispatchExactExecutionContinuationInput {
+  readonly backend: SpawnBackend;
+  readonly projectRoot: string;
+  readonly predecessorRef: ExecutionLandingCheckpointRefV2;
+  readonly checkpointDigest: ExecutionLandingDigestV2;
+  readonly retirementReceiptDigest: ExecutionLandingDigestV2;
+  /** T6-owned canonical continuation material; T5 never re-derives its authority. */
+  readonly preparation: PrepareExactDockerCustodyInputV2;
+  readonly landingPreparationInput: CreateExecutionLandingPreparationPayloadV2Input;
+  readonly awaitTerminal: boolean;
+}
+
+export type ExactExecutionContinuationDispatchResult =
+  | Readonly<{
+      state: 'released';
+      dispatch: Extract<ExactDockerCustodyDispatchOutcomeV2, { kind: 'released' }>;
+      claim: ExecutionContinuationClaimV2;
+      terminal: ExactDockerCustodyCompletionV2 | null;
+    }>
+  | Readonly<{
+      state: 'not-dispatched';
+      dispatch: Extract<ExactDockerCustodyDispatchOutcomeV2, { kind: 'not-dispatched' }>;
+    }>
+  | Readonly<{
+      state: 'ambiguous';
+      dispatch: Extract<ExactDockerCustodyDispatchOutcomeV2, { kind: 'ambiguous' }>;
+    }>;
+
+/**
+ * Provider-neutral exact continuation transport. The caller owns canonical
+ * continuation material; this runner owns only the Docker custody sequence.
+ * It never publishes a public claim/attempt and never falls back to `spawn()`.
+ */
+export async function dispatchExactExecutionContinuation(
+  input: DispatchExactExecutionContinuationInput,
+): Promise<ExactExecutionContinuationDispatchResult> {
+  if (input.backend.name !== 'docker'
+    || !input.backend.prepareExactDockerCustody
+    || !input.backend.dispatchExactDockerCustody
+    || (input.awaitTerminal && !input.backend.awaitExactDockerCustodyTerminal)) {
+    throw createExecutionAuthorityError(
+      'Exact execution continuation requires the complete Docker custody port',
+    );
+  }
+  if (input.preparation.predecessor === null) {
+    throw createExecutionAuthorityError(
+      'Exact execution continuation requires a verified predecessor custody reference',
+    );
+  }
+  const checkpoint = readExecutionLandingCheckpointV2(
+    input.projectRoot,
+    input.predecessorRef,
+  );
+  const retirement = readExecutionAttemptRetirementV2(
+    input.projectRoot,
+    input.predecessorRef,
+  );
+  if (!checkpoint
+    || checkpoint.checkpointDigest !== input.checkpointDigest
+    || !retirement
+    || retirement.receiptDigest !== input.retirementReceiptDigest
+    || retirement.resourcesReleased !== true) {
+    throw createExecutionAuthorityError(
+      'Exact execution continuation requires its exact durable retired predecessor',
+    );
+  }
+  const predecessorCustody = checkpoint.checkpoint.custodyRef;
+  const predecessorPreparation = predecessorCustody.preparationRef;
+  const predecessor = input.preparation.predecessor;
+  if (
+    input.preparation.projectId !== predecessorPreparation.privateIdentity.projectId
+    || input.preparation.taskId !== predecessorPreparation.privateIdentity.taskId
+    || predecessor.dispatchRequestId !== predecessorPreparation.dispatchRequestId
+    || canonicalJson(predecessor.identity)
+      !== canonicalJson(predecessorPreparation.privateIdentity)
+    || predecessor.admissionReceiptDigest !== predecessorPreparation.admissionReceiptDigest
+    || predecessor.admissionRefDigest !== predecessorPreparation.admissionRefDigest
+    || predecessor.providerStartReceipt.ref
+      !== predecessorCustody.providerStartReceiptRefDigest
+    || predecessor.providerStartReceipt.digest
+      !== predecessorCustody.providerStartEvidenceDigest
+  ) {
+    throw createExecutionAuthorityError(
+      'Exact execution continuation predecessor custody does not match its checkpoint',
+    );
+  }
+  const prepared = await input.backend.prepareExactDockerCustody(input.preparation);
+  prepareExactDockerExecutionLandingContextV2({
+    projectRoot: input.projectRoot,
+    prepared,
+    preparationInput: input.landingPreparationInput,
+  });
+  const dispatch = await input.backend.dispatchExactDockerCustody(
+    prepared.dispatchEnvelope,
+  );
+  if (dispatch.kind === 'not-dispatched') {
+    return Object.freeze({ state: 'not-dispatched', dispatch });
+  }
+  if (dispatch.kind === 'ambiguous') {
+    return Object.freeze({ state: 'ambiguous', dispatch });
+  }
+  if (
+    dispatch.preparationRef.dispatchRequestId !== dispatch.admissionRef.dispatchRequestId
+    || dispatch.preparationRef.dispatchRequestMaterialDigest
+      !== dispatch.admissionRef.dispatchRequestMaterialDigest
+    || dispatch.preparationRef.admissionRefDigest !== dispatch.admissionRef.admissionRefDigest
+    || canonicalJson(dispatch.preparationRef.privateIdentity)
+      !== canonicalJson(dispatch.custodyRef.identity)
+    || dispatch.preparationRef.admissionReceiptDigest
+      !== dispatch.custodyRef.admissionReceiptDigest
+    || dispatch.preparationRef.admissionRefDigest !== dispatch.custodyRef.admissionRefDigest
+    || canonicalJson(dispatch.providerExecutionAttempt.custodyIdentity)
+      !== canonicalJson(dispatch.custodyRef.identity)
+    || dispatch.providerExecutionAttempt.admissionReceiptDigest
+      !== dispatch.custodyRef.admissionReceiptDigest
+    || canonicalJson(dispatch.providerStartReceipt)
+      !== canonicalJson(dispatch.custodyRef.providerStartReceipt)
+    || dispatch.settlementRef.taskId !== dispatch.custodyRef.identity.taskId
+    || dispatch.settlementRef.attemptId
+      !== dispatch.providerExecutionAttempt.providerExecutionAttemptId
+    || Date.parse(dispatch.releasedAt) < Date.parse(retirement.retiredAt)
+    || Date.parse(dispatch.providerStartAcceptedAt) < Date.parse(retirement.retiredAt)
+  ) {
+    throw createExecutionAuthorityError(
+      'Exact execution continuation released custody bindings are inconsistent',
+    );
+  }
+  const continuationDispatchRef = createExecutionContinuationDispatchRefV2({
+    dispatchState: 'RELEASED',
+    preparationRef: dispatch.preparationRef,
+    providerExecutionAttemptId:
+      dispatch.providerExecutionAttempt.providerExecutionAttemptId,
+    providerExecutionAttemptIdentityDigest:
+      dispatch.providerExecutionAttempt.identityDigest,
+    dispatchAuthorityReceiptDigest: dispatch.dispatchReceipt.digest,
+    releaseReceiptRefDigest: dispatch.releaseReceipt.ref,
+    releaseEvidenceDigest: dispatch.releaseReceipt.digest,
+    releasedAt: dispatch.releasedAt,
+    providerStartReceiptRefDigest: dispatch.providerStartReceipt.ref,
+    providerStartEvidenceDigest: dispatch.providerStartReceipt.digest,
+    providerStartAcceptedAt: dispatch.providerStartAcceptedAt,
+    projectionFence: dispatch.projectionFence,
+  });
+  const claim = claimExecutionContinuationAtomicV2(
+    input.projectRoot,
+    input.predecessorRef,
+    {
+      checkpointDigest: input.checkpointDigest,
+      retirementReceiptDigest: input.retirementReceiptDigest,
+      continuationDispatchRef,
+      claimedAt: dispatch.providerStartAcceptedAt,
+    },
+  );
+  const terminal = input.awaitTerminal
+    ? await input.backend.awaitExactDockerCustodyTerminal!({
+        custodyRef: dispatch.custodyRef,
+        releaseReceipt: dispatch.releaseReceipt,
+        providerStartReceipt: dispatch.providerStartReceipt,
+        projectionFence: dispatch.projectionFence,
+      })
+    : null;
+  return Object.freeze({ state: 'released', dispatch, claim, terminal });
 }
 
 function sha256(value: string): string {
@@ -171,6 +356,16 @@ function assertContinuationStartupReserve(
 export function dispatchExecutionContinuation(
   input: DispatchExecutionContinuationInput,
 ): ExecutionContinuationDispatchResult {
+  if (
+    input.backend.name === 'docker'
+    && input.backend.prepareExactDockerCustody
+    && input.backend.dispatchExactDockerCustody
+    && input.historicalV1Recovery !== true
+  ) {
+    throw createExecutionAuthorityError(
+      'Normal Docker continuation requires the async exact-custody continuation port',
+    );
+  }
   const checkpointEnvelope = readExecutionLandingCheckpoint(
     input.projectRoot,
     input.checkpointRef,

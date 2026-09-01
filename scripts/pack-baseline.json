@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-08-26T13:19:01.807Z",
-  "totalBytes": 22161794,
-  "totalFiles": 2475,
+  "generatedAt": "2026-09-01T00:49:26.944Z",
+  "totalBytes": 24387644,
+  "totalFiles": 2569,
   "categories": {
     ".::asset": {
       "count": 1,
@@ -45,15 +45,15 @@
     },
     "dist::.json": {
       "count": 1,
-      "bytes": 295
+      "bytes": 432
     },
     "dist/cli::.d.ts": {
-      "count": 203,
-      "bytes": 654717
+      "count": 206,
+      "bytes": 658961
     },
     "dist/cli::.js": {
-      "count": 203,
-      "bytes": 3488462
+      "count": 206,
+      "bytes": 3509788
     },
     "dist/cli::asset": {
       "count": 1,
@@ -61,7 +61,7 @@
     },
     "dist/connectors::.d.ts": {
       "count": 63,
-      "bytes": 141428
+      "bytes": 141728
     },
     "dist/connectors::.js": {
       "count": 63,
@@ -72,20 +72,20 @@
       "bytes": 4418
     },
     "dist/core::.d.ts": {
-      "count": 431,
-      "bytes": 2170000
+      "count": 448,
+      "bytes": 2527209
     },
     "dist/core::.js": {
-      "count": 431,
-      "bytes": 4989700
+      "count": 448,
+      "bytes": 5573906
     },
     "dist/core::.json": {
-      "count": 55,
-      "bytes": 163143
+      "count": 60,
+      "bytes": 173421
     },
     "dist/core::.md": {
-      "count": 55,
-      "bytes": 331509
+      "count": 60,
+      "bytes": 355286
     },
     "dist/dashboard::.js": {
       "count": 12,
@@ -111,6 +111,14 @@
       "count": 1,
       "bytes": 142
     },
+    "dist/intelligence::.d.ts": {
+      "count": 15,
+      "bytes": 19581
+    },
+    "dist/intelligence::.js": {
+      "count": 15,
+      "bytes": 45549
+    },
     "dist/mcp-client::.d.ts": {
       "count": 4,
       "bytes": 6785
@@ -125,7 +133,7 @@
     },
     "dist/mcp::.js": {
       "count": 61,
-      "bytes": 400085
+      "bytes": 401947
     },
     "dist/monitor::.d.ts": {
       "count": 6,
@@ -144,20 +152,20 @@
       "bytes": 277499
     },
     "dist/orchestra::.d.ts": {
-      "count": 230,
-      "bytes": 1196666
+      "count": 232,
+      "bytes": 1212357
     },
     "dist/orchestra::.js": {
-      "count": 230,
-      "bytes": 4380200
+      "count": 232,
+      "bytes": 4461798
     },
     "dist/providers::.d.ts": {
       "count": 23,
-      "bytes": 123732
+      "bytes": 123689
     },
     "dist/providers::.js": {
       "count": 23,
-      "bytes": 354928
+      "bytes": 355395
     },
     "dist/sdk::.d.ts": {
       "count": 2,
@@ -175,9 +183,17 @@
       "count": 4,
       "bytes": 83505
     },
+    "native/exec-authority::asset": {
+      "count": 7,
+      "bytes": 773066
+    },
+    "native/exec-authority::.json": {
+      "count": 2,
+      "bytes": 1321
+    },
     ".::.json": {
-      "count": 1,
-      "bytes": 7558
+      "count": 2,
+      "bytes": 292839
     }
   }
 }

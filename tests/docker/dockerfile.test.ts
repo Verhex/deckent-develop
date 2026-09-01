@@ -5,6 +5,12 @@ import { join } from 'node:path';
 const ROOT = join(import.meta.dirname, '..', '..');
 const dockerfilePath = join(ROOT, 'Dockerfile');
 const composePath = join(ROOT, 'docker-compose.yml');
+const packageJson = JSON.parse(
+  readFileSync(join(ROOT, 'package.json'), 'utf-8'),
+) as {
+  bin: { deckent: string };
+  engines: { node: string };
+};
 
 // Helper to read file lines
 function readLines(filePath: string): string[] {
@@ -16,11 +22,12 @@ describe('Dockerfile', () => {
     expect(existsSync(dockerfilePath)).toBe(true);
   });
 
-  it('uses node:22-slim as base image', () => {
+  it('uses a Node 24 slim base matching the package runtime floor', () => {
     const fromLines = readLines(dockerfilePath).filter((l) => /^FROM\s+/i.test(l.trim()));
     expect(fromLines.length).toBeGreaterThanOrEqual(1);
-    const hasSlim = fromLines.some((l) => l.includes('node:22-slim'));
+    const hasSlim = fromLines.some((l) => l.includes('node:24-slim'));
     expect(hasSlim).toBe(true);
+    expect(packageJson.engines.node).toBe('>=24.0.0');
   });
 
   it('is currently a single-stage build', () => {
@@ -35,9 +42,11 @@ describe('Dockerfile', () => {
     expect(content).toContain('git');
   });
 
-  it('copies package files', () => {
+  it('copies the exact root manifest and canonical npm shrinkwrap', () => {
     const content = readFileSync(dockerfilePath, 'utf-8');
-    expect(content).toMatch(/COPY\s+package\*\.json/);
+    expect(content).toContain('COPY package.json npm-shrinkwrap.json ./');
+    expect(content).not.toMatch(/COPY\s+package\*\.json/);
+    expect(content).not.toMatch(/COPY[^\n]*package-lock\.json/);
   });
 
   it('runs npm ci for dependency installation', () => {
@@ -55,9 +64,11 @@ describe('Dockerfile', () => {
     expect(content).toMatch(/WORKDIR\s+\/workspace/);
   });
 
-  it('has an ENTRYPOINT directive', () => {
+  it('enters through the same compiled CLI declared by the npm package', () => {
     const content = readFileSync(dockerfilePath, 'utf-8');
-    expect(content).toMatch(/^ENTRYPOINT\s+/m);
+    expect(packageJson.bin.deckent).toBe('./dist/cli/entry.js');
+    expect(content).toContain('ENTRYPOINT ["node", "/app/dist/cli/entry.js"]');
+    expect(content).not.toContain('/app/dist/cli/index.js');
   });
 });
 

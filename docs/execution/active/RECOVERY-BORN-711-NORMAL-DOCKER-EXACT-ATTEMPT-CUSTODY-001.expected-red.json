@@ -1,0 +1,1326 @@
+{
+  "schemaVersion": 1,
+  "outcomeId": "RECOVERY-BORN-711-NORMAL-DOCKER-EXACT-ATTEMPT-CUSTODY-001",
+  "capturedAt": "2026-08-30T21:44:06+03:00",
+  "scopeRevisedAt": "2026-09-01T23:28:49+03:00",
+  "state": "ADMISSION_ONLY_NOT_EXECUTED",
+  "baselineAuthority": {
+    "kind": "git-tree-plus-explicit-dirty-governance",
+    "baseSha": "33b0f04919ae413e0e3d607a9e8abe265a8eee54",
+    "branch": "main",
+    "originSha": "33b0f04919ae413e0e3d607a9e8abe265a8eee54",
+    "previousManifestAlgorithm": "prior accepted manifestSha256",
+    "scopeRevisionAlgorithm": "sha256(lexicographically-sorted add|lane|kind|path|baselineSha256 + LF and transfer|fromLane|toLane|kind|path|baselineSha256 + LF)",
+    "manifestAlgorithm": "sha256(previous|previousManifestSha256 + LF + revision|scopeRevisionSha256 + LF + production|71 + LF + mutationSupport|213 + LF + duplicate|0 + LF + unassigned|0 + LF)",
+    "previousManifestSha256": "7ced1c26ff55e3bb13651af55cbca6720138fe919c1118eb9489469a492ad252",
+    "scopeRevisionSha256": "0e1887d8471ad9bc221392ac46edacc862b713707bc5261cfb92cc91dd5cad44",
+    "manifestSha256": "7cc6a97771ce506163114b77200525bf92abd2be485c03d44f650d16df39cfc7",
+    "ownerDecisionRef": "owner-live-2026-09-01-harika-devam",
+    "productionCount": 71,
+    "mutationSupportCount": 213,
+    "duplicateCount": 0,
+    "unassignedCount": 0
+  },
+  "plannedAbsent": [
+    "src/core/task-attempt-custody-store.ts",
+    "src/core/task-attempt-custody-posix-adapter.ts",
+    "src/core/task-attempt-custody-win32-adapter.ts",
+    "tests/core/task-attempt-custody-store.test.ts",
+    "tests/core/task-attempt-custody-posix-adapter.test.ts",
+    "tests/core/task-attempt-custody-win32-adapter.test.ts",
+    "tests/helpers/task-result-settlement-v2-fixture.ts",
+    "tests/cli/run-attempt-custody.test.ts",
+    "tests/mcp/run-attempt-custody.test.ts",
+    "tests/cli/finalize-attempt-custody.test.ts",
+    "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+    "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+    "tests/orchestra/debt-manager-attempt-custody.test.ts",
+    "native/exec-authority/src/custody_common.h",
+    "native/exec-authority/src/custody_posix.c",
+    "native/exec-authority/src/custody_win32.c",
+    "src/core/exec-authority-native.ts",
+    "scripts/build-exec-authority-native.mjs",
+    "scripts/verify-exec-authority-native-package.mjs",
+    "npm-shrinkwrap.json",
+    "scripts/npm-shrinkwrap-contract.mjs",
+    "scripts/verify-packed-networkless-install.mjs",
+    "tests/scripts/npm-shrinkwrap-contract.test.ts",
+    "tests/scripts/verify-packed-networkless-install.test.ts",
+    "src/core/execution-effect-containment.ts",
+    "src/orchestra/execution-effect-landing-coordinator.ts",
+    "tests/core/execution-effect-containment.test.ts",
+    "tests/orchestra/execution-effect-landing-coordinator.test.ts",
+    "tests/orchestra/exact-docker-effect-containment.test.ts"
+  ],
+  "productionByLane": {
+    "T1": [],
+    "T2": [],
+    "T3": [],
+    "T4": [
+      "src/core/task-types.ts",
+      "src/orchestra/ipc-registry.ts",
+      "src/orchestra/question-approval-bridge.ts",
+      "src/orchestra/result-assembler.ts",
+      "src/orchestra/task-result-authority.ts",
+      "src/orchestra/task-settlement-projection.ts"
+    ],
+    "T5": [
+      "src/agents/landing-proposal-entry.ts",
+      "src/core/execution-landing-checkpoint.ts",
+      "src/core/execution-landing-context.ts",
+      "src/core/execution-landing-proposal.ts",
+      "src/orchestra/execution-continuation-runner.ts"
+    ],
+    "T5E": [
+      "native/exec-authority/index.mjs",
+      "native/exec-authority/src/custody_common.h",
+      "native/exec-authority/src/custody_posix.c",
+      "native/exec-authority/src/custody_win32.c",
+      "native/exec-authority/src/exec_authority.c",
+      "src/core/exec-authority-native.ts",
+      "src/core/execution-effect-containment.ts",
+      "src/core/execution-effect-persistence-contract.ts",
+      "src/core/execution-write-scope-policy.ts",
+      "src/core/file-lock.ts",
+      "src/core/task-attempt-custody-posix-adapter.ts",
+      "src/core/task-attempt-custody-store.ts",
+      "src/core/task-attempt-custody-win32-adapter.ts",
+      "src/core/task-result-schema.ts",
+      "src/core/task-result-settlement.ts",
+      "src/orchestra/execution-effect-landing-coordinator.ts",
+      "src/orchestra/execution-effect-docker-lifecycle.ts",
+      "src/orchestra/execution-effect-lock-adapter.ts",
+      "src/orchestra/execution-effect-native-adapter.ts",
+      "src/orchestra/execution-effect-store-adapter.ts",
+      "src/orchestra/execution-landing-coordinator.ts",
+      "src/orchestra/result-ingress.ts"
+    ],
+    "T6": [
+      "src/cli/commands/autonomous.ts",
+      "src/cli/commands/start.ts",
+      "src/cli/helpers/process-runtime.ts",
+      "src/orchestra/exact-plan-start-service.ts",
+      "src/orchestra/scheduler-effects.ts",
+      "src/orchestra/result-collector.ts",
+      "src/orchestra/spawn-backend-docker.ts",
+      "src/orchestra/spawn-backend.ts",
+      "src/orchestra/sprint-controller.ts",
+      "src/orchestra/sprint-phases.ts",
+      "src/orchestra/sprint-planner.ts",
+      "src/orchestra/sprint-spawner.ts",
+      "src/orchestra/task-artifact-projection.ts",
+      "src/orchestra/task-builder.ts"
+    ],
+    "T7": [
+      "src/cli/index.ts",
+      "src/cli/commands/run.ts",
+      "src/cli/commands/spawn.ts",
+      "src/cli/helpers/message-catalog/cli-run.ts",
+      "src/core/invocation-receipt.ts",
+      "src/core/provider-truth.ts",
+      "src/core/task-settlement-authority.ts",
+      "src/mcp/tools/run.ts",
+      "src/mcp/tools/job-runner.ts",
+      "src/orchestra/task-mode-runner.ts"
+    ],
+    "T8": [
+      "src/orchestra/cross-verify-docker-runtime-authority.ts",
+      "src/orchestra/cross-verify-production-ingress-authority.ts",
+      "src/orchestra/cross-verify-runner.ts"
+    ],
+    "T9": [
+      "src/orchestra/debt-manager.ts"
+    ],
+    "T10": [
+      "src/cli/commands/finalize.ts",
+      "src/cli/commands/resume.ts",
+      "src/orchestra/completed-checkpoint-terminalizer.ts",
+      "src/orchestra/sprint-checkpoint.ts",
+      "src/orchestra/sprint-finalizer.ts"
+    ],
+    "T11": [
+      "src/orchestra/acceptance-enforcement.ts",
+      "src/orchestra/evaluation-audit-trail.ts"
+    ],
+    "T12": [],
+    "T13": [
+      "src/orchestra/autonomous/execute-dispatcher.ts"
+    ],
+    "T14": [],
+    "T15": [
+      "native/exec-authority/binding.gyp"
+    ],
+    "T16": [],
+    "T17": [],
+    "T18": [],
+    "T19": [
+      "native/exec-authority/package.json"
+    ],
+    "T20": []
+  },
+  "mutationSupportByLane": {
+    "T1": [
+      "tests/core/provider-execution-observation-reconciliation-approval.test.ts",
+      "tests/core/provider-execution-observation-reconciliation-receipt-store.test.ts",
+      "tests/core/provider-execution-observation-reconciliation.test.ts",
+      "tests/helpers/task-result-settlement-stub.ts",
+      "tests/integration/provider-execution-observation-reconciliation.integration.test.ts"
+    ],
+    "T2": [],
+    "T3": [],
+    "T4": [
+      "tests/agents/worker-ipc.test.ts",
+      "tests/cli/task-settlement.test.ts",
+      "tests/orchestra/ipc-question-bridge-wire.test.ts",
+      "tests/orchestra/ipc-registry.test.ts",
+      "tests/orchestra/ipc-worker-question-action.test.ts",
+      "tests/orchestra/question-approval-bridge.test.ts",
+      "tests/orchestra/result-assembler.test.ts",
+      "tests/orchestra/result-collector.test.ts",
+      "tests/orchestra/task-result-authority.test.ts"
+    ],
+    "T5": [
+      "tests/core/execution-landing-checkpoint.test.ts",
+      "tests/core/execution-landing-proposal.test.ts",
+      "tests/orchestra/docker-auth-precedence.test.ts",
+      "tests/orchestra/docker-container-start-failed.test.ts",
+      "tests/orchestra/docker-continuation-lineage.test.ts",
+      "tests/orchestra/docker-dist-guard.test.ts",
+      "tests/orchestra/docker-final-only-containment.test.ts",
+      "tests/orchestra/docker-multicli-buildarg.test.ts",
+      "tests/orchestra/docker-provider-auth.test.ts",
+      "tests/orchestra/docker-provider-cli.test.ts",
+      "tests/orchestra/docker-result-settlement.test.ts",
+      "tests/orchestra/docker-settlement-monitor-wire.test.ts",
+      "tests/orchestra/execution-continuation-runner.test.ts",
+      "tests/orchestra/execution-landing-proposal-consumer.test.ts",
+      "tests/orchestra/f1014-auth-isolation.test.ts",
+      "tests/orchestra/memory-limit-by-kind.test.ts",
+      "tests/orchestra/wm5-auth-guard.test.ts",
+      "tests/orchestra/worker-auth-isolation.test.ts",
+      "tests/unit/spawn-backend-docker.test.ts"
+    ],
+    "T5E": [
+      "scripts/platform-probe/exec-authority-capability-probe.mjs",
+      "scripts/verify-exec-authority-native-package.mjs",
+      "tests/core/execution-authority-adapter-parity.test.ts",
+      "tests/core/execution-effect-containment.test.ts",
+      "tests/core/execution-effect-persistence-contract.test.ts",
+      "tests/core/execution-write-scope-policy.test.ts",
+      "tests/core/task-attempt-custody-posix-adapter.test.ts",
+      "tests/core/task-execution-fence.test.ts",
+      "tests/core/task-attempt-custody-store.test.ts",
+      "tests/core/task-attempt-custody-win32-adapter.test.ts",
+      "tests/core/task-result-schema.test.ts",
+      "tests/core/task-result-settlement.test.ts",
+      "tests/native/exec-authority-native.test.ts",
+      "tests/orchestra/docker-restart-reconcile.test.ts",
+      "tests/orchestra/exact-docker-effect-containment.test.ts",
+      "tests/orchestra/execution-effect-landing-coordinator.test.ts",
+      "tests/orchestra/execution-effect-docker-lifecycle.test.ts",
+      "tests/orchestra/execution-effect-lock-adapter.test.ts",
+      "tests/orchestra/execution-effect-native-adapter.test.ts",
+      "tests/orchestra/execution-effect-store-adapter.test.ts",
+      "tests/orchestra/execution-landing-coordinator.test.ts",
+      "tests/helpers/task-result-settlement-v2-fixture.ts",
+      "tests/orchestra/spawn-backend-docker.test.ts"
+    ],
+    "T6": [
+      "tests/orchestra/dependency-aggregate-fix-aware.test.ts",
+      "tests/orchestra/exact-plan-start-service.test.ts",
+      "tests/orchestra/production-wiring-task-builder.test.ts",
+      "tests/orchestra/scheduler-cascade-composition.test.ts",
+      "tests/orchestra/scheduler-collision-reorder-wire.test.ts",
+      "tests/orchestra/scheduler-driver-composition.test.ts",
+      "tests/orchestra/scheduler-single-truth.test.ts",
+      "tests/orchestra/scheduler-spawn-executor.test.ts",
+      "tests/orchestra/spawn-backend-docker-mounts.test.ts",
+      "tests/orchestra/spawn-spawner-wire.test.ts",
+      "tests/orchestra/result-collector-settlement-authority.test.ts",
+      "tests/orchestra/task-artifact-projection.test.ts",
+      "tests/orchestra/task-projection-parity.test.ts"
+    ],
+    "T7": [
+      "tests/cli/index.test.ts",
+      "tests/cli/run-attempt-custody.test.ts",
+      "tests/cli/run-result-settlement.test.ts",
+      "tests/cli/run.test.ts",
+      "tests/cli/spawn-final-only-parity.test.ts",
+      "tests/cli/spawn-lifecycle.test.ts",
+      "tests/cli/spawn-settlement-attempt.test.ts",
+      "tests/core/provider-truth.test.ts",
+      "tests/mcp/run-attempt-custody.test.ts",
+      "tests/mcp/run-budget-authority.test.ts",
+      "tests/mcp/run-tool-parity.test.ts",
+      "tests/mcp/tools/job-runner.test.ts",
+      "tests/mcp/tools/run.test.ts",
+      "tests/core/task-settlement-authority.test.ts",
+      "tests/orchestra/mode-aware-routing.test.ts",
+      "tests/orchestra/fix-spawn-observability.test.ts",
+      "tests/orchestra/task-mode-agent-inject.test.ts",
+      "tests/orchestra/task-mode-runner.test.ts",
+      "tests/orchestra/task-mode-tokenusage.test.ts"
+    ],
+    "T8": [
+      "tests/core/cross-verify-evidence-broker.test.ts",
+      "tests/integration/xverify-claude-model-limit-window.integration.test.ts",
+      "tests/integration/xverify-owner-tier-authority.integration.test.ts",
+      "tests/orchestra/cross-verify-docker-runtime-authority.test.ts",
+      "tests/orchestra/cross-verify-docker-strict-launcher.test.ts",
+      "tests/orchestra/cross-verify-owner-tier-authority.test.ts",
+      "tests/orchestra/cross-verify-production-ingress-authority.test.ts",
+      "tests/orchestra/cross-verify-provider-observation-retirement.test.ts",
+      "tests/orchestra/cross-verify-wire.test.ts",
+      "tests/orchestra/xverify-producer-fencing.test.ts"
+    ],
+    "T9": [
+      "tests/orchestra/debt-manager-attempt-custody.test.ts",
+      "tests/orchestra/debt-manager-fix-authority-wire.test.ts",
+      "tests/orchestra/debt-manager.test.ts",
+      "tests/orchestra/failure-disposition-chain.test.ts",
+      "tests/orchestra/fix-agent-selection.test.ts",
+      "tests/orchestra/fix-retry-circuit-breaker.test.ts",
+      "tests/orchestra/fix-task-enrichment.test.ts",
+      "tests/orchestra/fix-task-force-skills.test.ts",
+      "tests/orchestra/gwtd-fix-trigger.test.ts",
+      "tests/orchestra/repair-task-constraint-inheritance.test.ts"
+    ],
+    "T10": [
+      "tests/cli/finalize-attempt-custody.test.ts",
+      "tests/cli/finalize-orphan-normal.test.ts",
+      "tests/cli/finalize-refinalize.test.ts",
+      "tests/cli/finalize-termination-truth.test.ts",
+      "tests/cli/force-finalize-contract.test.ts",
+      "tests/core/execution-termination-ledger.test.ts",
+      "tests/orchestra/checkpoint-cascade-restore.test.ts",
+      "tests/orchestra/completed-checkpoint-terminalizer-events.test.ts",
+      "tests/orchestra/finalize-coordinator-retirement.test.ts",
+      "tests/orchestra/finalize-sprint.test.ts",
+      "tests/orchestra/sprint-checkpoint.test.ts",
+      "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+      "tests/orchestra/sprint-finalizer-task-projection.test.ts",
+      "tests/orchestra/sprint-finalizer-terminal-publication.test.ts",
+      "tests/orchestra/sprint-finalizer-terminal-wire.test.ts",
+      "tests/orchestra/sprint-finalizer.test.ts",
+      "tests/orchestra/state-recovery.test.ts"
+    ],
+    "T11": [
+      "tests/orchestra/acceptance-enforcement-canary.test.ts",
+      "tests/orchestra/acceptance-enforcement.test.ts",
+      "tests/orchestra/evaluate-enforcement-gates.test.ts",
+      "tests/orchestra/evaluate-trigger-gate.test.ts",
+      "tests/orchestra/evaluation-audit-trail.test.ts",
+      "tests/orchestra/evaluation-honesty-negative-replay.test.ts"
+    ],
+    "T12": [
+      "tests/backends/docker-corrupt-result-recovery.test.ts",
+      "tests/cli/run-pre-dispatch-settlement.test.ts",
+      "tests/orchestra/acceptance-authority-restart.integration.test.ts",
+      "tests/orchestra/acceptance-controller-settlement.test.ts",
+      "tests/orchestra/cascade-unblock-wire.test.ts",
+      "tests/orchestra/evaluate-phase-idempotency.test.ts",
+      "tests/orchestra/execute-fix-quiescence.integration.test.ts",
+      "tests/orchestra/fix-dispatch-continuation.test.ts",
+      "tests/orchestra/fix-phase-map.test.ts",
+      "tests/orchestra/planner-evaluation-recovery.integration.test.ts",
+      "tests/orchestra/postfix-pending-scan.test.ts",
+      "tests/orchestra/recovery-truth-nine-case.integration.test.ts",
+      "tests/orchestra/repair-dispatch-chain-seal.test.ts",
+      "tests/orchestra/repair-overflow-dispatch.test.ts",
+      "tests/orchestra/repair-quiescence-gate.test.ts",
+      "tests/orchestra/sprint-terminal-settlement-hold.test.ts"
+    ],
+    "T13": [
+      "tests/integration/task-attempt-custody-cutover.integration.test.ts"
+    ],
+    "T14": [
+      "scripts/lint-test-hermeticity.mjs",
+      "scripts/test-binary-contracts.mjs"
+    ],
+    "T15": [],
+    "T16": [],
+    "T17": [],
+    "T18": [],
+    "T19": [
+      ".gitignore",
+      "CLOSURE-OS-PRODUCT-TRANSITION-BRIEF.md",
+      "Dockerfile",
+      "docs/adr/adr-d-005-dependency-policy-inventory.md",
+      "docs/post-product/OPERATIONAL-FABRIC-IFS.md",
+      "package.json",
+      "package-lock.json",
+      "npm-shrinkwrap.json",
+      "scripts/build.mjs",
+      "scripts/script-registry.json",
+      "scripts/bump-version.sh",
+      "scripts/build-exec-authority-native.mjs",
+      "scripts/npm-shrinkwrap-contract.mjs",
+      "scripts/release-prepare.mjs",
+      "scripts/security/secret-baseline.mjs",
+      "scripts/verify-packed-networkless-install.mjs",
+      "scripts/copy-assets.mjs",
+      "scripts/validate-publish.mjs",
+      "scripts/pack-baseline.json",
+      "scripts/xplat-install-smoke.mjs",
+      "src/cli/worktree-binary-authority.ts",
+      "src/orchestra/scope-sanitizer.ts"
+    ],
+    "T20": [
+      ".github/workflows/ci.yml",
+      ".github/workflows/coverage.yml",
+      ".github/workflows/cross-platform-e2e.yml",
+      ".github/workflows/dashboard-build.yml",
+      ".github/workflows/publish.yml",
+      ".github/workflows/release.yml",
+      "tests/docker/dockerfile.test.ts",
+      "tests/e2e/install-matrix/fresh-install.test.ts",
+      "tests/orchestra/prompt-gate-scope-wiring.test.ts",
+      "tests/orchestra/scope-sanitizer-v2.test.ts",
+      "tests/workflows/cross-platform-e2e.test.ts",
+      "tests/github/workflows/release.test.ts",
+      "tests/release/dep-bump-audit.test.ts",
+      "tests/release/release-prepare.test.ts",
+      "tests/release/validate-publish-pack.test.ts",
+      "tests/release/packed-install-contract.test.ts",
+      "tests/release/npm-pack-whitelist.test.ts",
+      "tests/scripts/build-lifecycle.test.ts",
+      "tests/scripts/build-identity.test.ts",
+      "tests/scripts/npm-shrinkwrap-contract.test.ts",
+      "tests/scripts/verify-packed-networkless-install.test.ts",
+      "tests/cli/pack-size-budget.test.ts",
+      "tests/github/workflows/ci.test.ts",
+      "tests/github/ci-workflow.test.ts",
+      "tests/governance/workflow-yaml-pins.test.ts",
+      "tests/scripts/publish-workflow.test.ts",
+      "tests/governance/release-workflow-unify.test.ts",
+      "tests/e2e/npm-pack-smoke.test.ts",
+      "tests/sdk/package-exports.test.ts",
+      "tests/build/npm-pack-dockerfile.test.ts",
+      "tests/docs/validate-publish.test.ts",
+      "tests/release/version-rebaseline.test.ts",
+      "tests/scripts/scripts.test.ts",
+      "tests/scripts/validate-publish-readiness.test.ts",
+      "tests/scripts/validate-publish.test.ts",
+      "tests/scripts/validate-publish-drift-gate.test.ts",
+      "tests/workflows/publish.test.ts",
+      "tests/scripts/exec-bit-guard.test.ts",
+      "tests/scripts/build-staging-tools.test.ts",
+      "tests/scripts/ci-aggregate-gate.test.ts",
+      "tests/security/docker-context-deck.test.ts"
+    ]
+  },
+  "governanceBaselines": {
+    "DIRECTIVES.md": "75401a44917c20819bb950c61ee68fc620b04ec84593644a4c1ce6e82cec6dd0",
+    "docs/MASTER-PLAN.md": "724e71702142dca454e1a2398826af27d32cf2dde998e7343bb88c4efa913346",
+    "docs/generated/master-plan-active.json": "5565caefd10a4fe875301304cc09bd822d9a8439df0d5a36e677817fa3225adc",
+    "docs/generated/master-plan-active.md": "e48aed329867245d097d684606ba868606b3eb4be6427b74dd8f0bd2737220ff",
+    "follow-up-works/current-flow.md": "b0ac57af348a2299c2707bc4641d0f0bc2bd3d678f1707008722bc05a08cc11d",
+    "docs/execution/active/RECOVERY-BORN-711-NORMAL-DOCKER-EXACT-ATTEMPT-CUSTODY-001.md": "ABSENT",
+    "docs/execution/active/RECOVERY-BORN-711-NORMAL-DOCKER-EXACT-ATTEMPT-CUSTODY-001.expected-red.json": "ABSENT"
+  },
+  "scopeRevisions": [
+    {
+      "revisionId": "SCOPE-REVISION-001-SHARED-NATIVE-CUSTODY",
+      "capturedAt": "2026-08-31T01:24:49+03:00",
+      "ownerDecisionRef": "owner-live-2026-08-31-option-a-shared-native-foundation",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "41927acd9f5f045c3df6d7506b787674361961e55ceacad8dc86fbecb5efeaf5",
+      "revisionSha256": "f03635a9b9ae256dafdda2fef1e1c796ce765f577aad81838fbf454514252283",
+      "resultingManifestSha256": "b019b4d4213f8c66f7d0876010e20e8fc87929cd0ea7c3e1ea4a50df73646cae",
+      "resultingCounts": {
+        "production": 48,
+        "mutationSupport": 149,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 43,
+        "productionAbsent": 5,
+        "mutationSupportPresent": 140,
+        "mutationSupportAbsent": 9
+      },
+      "absentAtRevision": [
+        "src/core/task-attempt-custody-win32-adapter.ts",
+        "native/exec-authority/src/custody_common.h",
+        "src/core/exec-authority-native.ts",
+        "native/exec-authority/src/custody_posix.c",
+        "native/exec-authority/src/custody_win32.c",
+        "tests/core/task-attempt-custody-win32-adapter.test.ts",
+        "tests/cli/run-attempt-custody.test.ts",
+        "tests/mcp/run-attempt-custody.test.ts",
+        "tests/orchestra/debt-manager-attempt-custody.test.ts",
+        "tests/cli/finalize-attempt-custody.test.ts",
+        "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+        "scripts/build-exec-authority-native.mjs",
+        "scripts/verify-exec-authority-native-package.mjs"
+      ],
+      "authorityTransfers": [
+        {
+          "path": "src/core/task-attempt-custody-store.ts",
+          "kind": "production",
+          "fromLane": "T1",
+          "toLane": "T18",
+          "baselineSha256": "bda63e7877f996621e3460e15fa4426ae5c4b46abd38d7dcacb700ca085ec244"
+        },
+        {
+          "path": "tests/core/task-attempt-custody-store.test.ts",
+          "kind": "mutationSupport",
+          "fromLane": "T1",
+          "toLane": "T18",
+          "baselineSha256": "eba652daf882f6e41e72397d74b8ccc508a13673ec080d9933d23a49a156f18d"
+        }
+      ],
+      "addedBaselineSha256": {
+        "native/exec-authority/src/exec_authority.c": "155cc1fa76c210c383c5747e5143e9052dc7bf684e6271ec1d817b0bccc9e216",
+        "native/exec-authority/src/custody_common.h": "ABSENT",
+        "native/exec-authority/src/custody_posix.c": "ABSENT",
+        "native/exec-authority/src/custody_win32.c": "ABSENT",
+        "native/exec-authority/binding.gyp": "f477ff8b45a9782f5f501f8f73832ab839bcc896317bfc1c537b69567d57aef1",
+        "native/exec-authority/index.mjs": "141c1f7e7621f921383c6a9d9d98078c0dbcf976a0b8b5982f176e8fdc3121bc",
+        "native/exec-authority/package.json": "b24b22871b6effe9c8ec0f0545f69ec2eca2f5c44e809b6d2b54a30801b2e9eb",
+        "src/core/exec-authority-native.ts": "ABSENT",
+        "src/core/file-lock.ts": "8383e0594759e49846b3f862f38493ec3a0c6cb2d0b85ca5e206db53de9d6dd0",
+        "package.json": "600a54cbf588920b2a324bbd35c6178fb2f391a9f93aa2a82d4553d318e71915",
+        "package-lock.json": "3118f555534fc46132aeb36240e021da85aa408d0b3e95aceb9616081477f6d7",
+        "scripts/build-exec-authority-native.mjs": "ABSENT",
+        "scripts/verify-exec-authority-native-package.mjs": "ABSENT",
+        "scripts/copy-assets.mjs": "92bfcdce643ba69770c8217b98d3d33697fe8a1da44e1108ddf2fa22f42f41ac",
+        "scripts/validate-publish.mjs": "6fba561f50b2d05bef3cd1f889f2d683890230e304db60043647f83cd310df9e",
+        "scripts/pack-baseline.json": "4d7104c5ce5f70faa5c01716fe2312103714ddb677e9f9355a34162425dbdbbe",
+        "scripts/xplat-install-smoke.mjs": "ea999bf13d0245a2aae202b944406026f45195d7838af81d4dc4178d1a91f7ac",
+        "scripts/platform-probe/exec-authority-capability-probe.mjs": "69d15d513eda48ded543defb50f2209218d2ee2d9503922bc426445345261da7",
+        ".github/workflows/ci.yml": "6bcfc024430f6f21db07ece70e2cd4b677d8a68c6ee0ec354538e153851b6a58",
+        ".github/workflows/cross-platform-e2e.yml": "990ddfe1138e523673b157b43d50f54d2df0760c8af1262829875333b386a4a8",
+        ".github/workflows/release.yml": "4a709c50c9162e2f49701274e09e58bb5be22155e09ea70c7f1a8287b9c4c481",
+        "tests/native/exec-authority-native.test.ts": "557bf9d630b801cf893db0876d85c8649a3f93c505b88b82608d47fc8e8a530f",
+        "tests/core/execution-authority-adapter-parity.test.ts": "fae09476c66e200213f8baf9d3698660462198b94c9e570f6e34d05be6c8a18f",
+        "tests/workflows/cross-platform-e2e.test.ts": "a13f10b422537e6d4ab23c60990832d042f2e5790331dc95793a3968cba97b43",
+        "tests/github/workflows/release.test.ts": "500cbe780d6317349310aefe84cc4262f263a832659a89ffd9d29554aebe5687",
+        "tests/release/validate-publish-pack.test.ts": "080cb7a946b1d991b0c84ad9bae3b3810875bd9a871089768d30471359dc2d44",
+        "tests/release/packed-install-contract.test.ts": "654c166b68c05b55c590456f85ddc633ca09abbade965f332c4c689292e37a19",
+        "tests/release/npm-pack-whitelist.test.ts": "edd5b5bb4606fd3fc025f5cd2219e5b745501704e29ff153e718d4cc760d7f70",
+        "tests/scripts/build-identity.test.ts": "ccf2e960bb7da17446cb8cda2b4d01f3f119a5cd87995df06e172f60114c1e10",
+        "tests/cli/pack-size-budget.test.ts": "edd3f765a1f126533a3e477caac1164c7f600bde3a6876df949c26a33b1db887",
+        "tests/github/workflows/ci.test.ts": "a0f1f49a81daa739678a063bc92274e3fb5a4443c6dec8593a34785a86999646",
+        "tests/github/ci-workflow.test.ts": "00f386589689c6ec527f0c60bab5ef1e891c4e8218e44e908fedbdeeb1922b05",
+        "tests/governance/workflow-yaml-pins.test.ts": "6a740b55983698fbc47e3711e74aac00c05726fd3db09c396da4432ea45cf854",
+        "tests/scripts/publish-workflow.test.ts": "9494a55d1d84b90532d1a45e04c2bbbe3e7182c22e37a592323ade0e2f77cadf",
+        "tests/governance/release-workflow-unify.test.ts": "89ef206305eb419e878ddca24cd11f94323772ccda3509b39a15c8921b6af88f",
+        "tests/e2e/npm-pack-smoke.test.ts": "a7577a34c67136344a1a3955db39396f9e7c9e6827a61b04d70610aa96601766",
+        "tests/sdk/package-exports.test.ts": "1411f178ec0ee90b742d1a1ba9b7d8abf2f39661613b31e0c89ffed8837d30a3",
+        "tests/build/npm-pack-dockerfile.test.ts": "68023e8a9dbf10ba69d726a8b022b12e57171a815976a897a2acb8729d9e1322",
+        "tests/docs/validate-publish.test.ts": "2c1194ae186b2b3c16504bc5fdf62d6e03657aea61a796f6d90a2eebeba65775",
+        "tests/release/version-rebaseline.test.ts": "bfd7a1d946bc7c57bacbf7bdfb94c1871869f1e8fc69bc1d67d1423772dae7c6",
+        "tests/scripts/scripts.test.ts": "978b636be682370d87281f7a0f1586ae106666fbe5c07e94b5c5ef5b59fac4e0",
+        "tests/scripts/validate-publish-readiness.test.ts": "4e239e1b98d155df9c53b235c1796516f2c95a103e8b88b9c01a14bf7032a725",
+        "tests/scripts/validate-publish.test.ts": "431d05e7a7114583b065ab5dbeea303391c0a921dc894712233dd83f2d0c3980",
+        "tests/scripts/validate-publish-drift-gate.test.ts": "e499d0326ee7b9a0ffc6e71057a5f61b5f466b2529cd205db82ed5719971dd11",
+        "tests/workflows/publish.test.ts": "250df3ad8fc7a5aaeb3bc2bc405bf810a4f47304981054f533d54c176ebb6132",
+        "tests/scripts/exec-bit-guard.test.ts": "cf8c22eadfb133c10a7a34d96376186f62a626ca28593daf0c683aa71c96c4d8",
+        "tests/scripts/build-staging-tools.test.ts": "3376b34ab5268cff4e1a0d53464b7441635137c5eac697b2cb42c27d78d48da2"
+      }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-002-INSTALLED-NATIVE-PACKAGE-GATES",
+      "capturedAt": "2026-08-31T03:55:33+03:00",
+      "ownerDecisionRef": "owner-live-2026-08-31-option-a-shared-native-foundation",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "b019b4d4213f8c66f7d0876010e20e8fc87929cd0ea7c3e1ea4a50df73646cae",
+      "revisionSha256": "7cd74c3aeed722368b49764e9174839c119f73b05e4f669c12aea994da2e1de4",
+      "resultingManifestSha256": "6e092bb9ff00c1d632a024fa72aa40c86a4999f38c3da2812354becad0137342",
+      "resultingCounts": {
+        "production": 48,
+        "mutationSupport": 151,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 47,
+        "productionAbsent": 1,
+        "mutationSupportPresent": 142,
+        "mutationSupportAbsent": 9
+      },
+      "absentAtRevision": [
+        "src/core/task-attempt-custody-win32-adapter.ts",
+        "tests/core/task-attempt-custody-win32-adapter.test.ts",
+        "tests/cli/run-attempt-custody.test.ts",
+        "tests/mcp/run-attempt-custody.test.ts",
+        "tests/orchestra/debt-manager-attempt-custody.test.ts",
+        "tests/cli/finalize-attempt-custody.test.ts",
+        "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+        "scripts/build-exec-authority-native.mjs",
+        "scripts/verify-exec-authority-native-package.mjs"
+      ],
+      "authorityTransfers": [],
+      "addedBaselineSha256": {
+        ".gitignore": "cae8ffa04e8a4e1b3f003ebd3cd6ab118548e88d082684d0872e11da8a4a1ae0",
+        "scripts/script-registry.json": "09dc3fb295d4d0d9b86b8f03d43545a676dd441a5af83fc8abccd5014f30412f"
+      }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-003-NATIVE-SOURCE-IDENTITY-TWIN",
+      "capturedAt": "2026-08-31T23:15:41+03:00",
+      "ownerDecisionRef": "owner-live-2026-08-31-goal-resume",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "6e092bb9ff00c1d632a024fa72aa40c86a4999f38c3da2812354becad0137342",
+      "revisionSha256": "2fd0966d851c77522265edfe7756980f664706ceced2195aefc209b288e8ee08",
+      "resultingManifestSha256": "65b573f7cf5b5c37b1a934be844153591dd4f5e0f8b7dafd10749bb33d54bb75",
+      "resultingCounts": {
+        "production": 48,
+        "mutationSupport": 152,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 48,
+        "productionAbsent": 0,
+        "mutationSupportPresent": 145,
+        "mutationSupportAbsent": 7
+      },
+      "absentAtRevision": [
+        "tests/cli/run-attempt-custody.test.ts",
+        "tests/mcp/run-attempt-custody.test.ts",
+        "tests/orchestra/debt-manager-attempt-custody.test.ts",
+        "tests/cli/finalize-attempt-custody.test.ts",
+        "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+        "scripts/verify-exec-authority-native-package.mjs"
+      ],
+      "authorityTransfers": [],
+      "addedBaselineSha256": {
+        "src/cli/worktree-binary-authority.ts": "1eb770729f31f300f30f6e41fd390c5bdaebef5361f646f9223f605083518251"
+      }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-004-NATIVE-CI-AGGREGATE-GATE",
+      "capturedAt": "2026-09-01T00:11:51+03:00",
+      "ownerDecisionRef": "owner-live-2026-08-31-goal-resume",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "65b573f7cf5b5c37b1a934be844153591dd4f5e0f8b7dafd10749bb33d54bb75",
+      "revisionSha256": "b1cf3956fcbb13691a5e8e939562c37e9c47c4faac684e87e989442797fc0d84",
+      "resultingManifestSha256": "84dab0adace8c730bcec10de283e28fc3d49c55387e91e914c6c5f88df48b9a4",
+      "resultingCounts": {
+        "production": 48,
+        "mutationSupport": 153,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 48,
+        "productionAbsent": 0,
+        "mutationSupportPresent": 147,
+        "mutationSupportAbsent": 6
+      },
+      "absentAtRevision": [
+        "tests/cli/run-attempt-custody.test.ts",
+        "tests/mcp/run-attempt-custody.test.ts",
+        "tests/orchestra/debt-manager-attempt-custody.test.ts",
+        "tests/cli/finalize-attempt-custody.test.ts",
+        "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts"
+      ],
+      "authorityTransfers": [],
+      "addedBaselineSha256": {
+        "tests/scripts/ci-aggregate-gate.test.ts": "a430150f2d5af7c96c70480c5cdf73135f3c13098d2852c2ee2efa0b531c12b6"
+      }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-005-CANONICAL-PUBLISHED-SHRINKWRAP",
+      "capturedAt": "2026-09-01T02:42:19+03:00",
+      "ownerDecisionRef": "owner-live-2026-09-01-option-a-canonical-shrinkwrap",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "84dab0adace8c730bcec10de283e28fc3d49c55387e91e914c6c5f88df48b9a4",
+      "revisionSha256": "564e005284066b832c229bb7eef67d2c314e40694240878b3571aebda5ed3168",
+      "resultingManifestSha256": "511761d128433c14adb0d3c446a81d24df852c5d9cc012af74cccafd9efbcf66",
+      "resultingCounts": {
+        "production": 48,
+        "mutationSupport": 177,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 48,
+        "productionAbsent": 0,
+        "mutationSupportPresent": 166,
+        "mutationSupportAbsent": 11
+      },
+      "absentAtRevision": [
+        "tests/cli/run-attempt-custody.test.ts",
+        "tests/mcp/run-attempt-custody.test.ts",
+        "tests/orchestra/debt-manager-attempt-custody.test.ts",
+        "tests/cli/finalize-attempt-custody.test.ts",
+        "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+        "npm-shrinkwrap.json",
+        "scripts/npm-shrinkwrap-contract.mjs",
+        "scripts/verify-packed-networkless-install.mjs",
+        "tests/scripts/npm-shrinkwrap-contract.test.ts",
+        "tests/scripts/verify-packed-networkless-install.test.ts"
+      ],
+      "authorityTransfers": [],
+      "addedBaselineSha256": {
+        "CLOSURE-OS-PRODUCT-TRANSITION-BRIEF.md": "9f960e1d6b3de02738f4edb569a284b6757b7fbca7a14a885883139aee6deff0",
+        "Dockerfile": "dc1f0c620fcc159cde36d8672c285cd5d4c85f7678b5239cbe174bb999cf7db2",
+        "docs/adr/adr-d-005-dependency-policy-inventory.md": "712d7af1e2b608dfda0234be70a4ffe1506d4f0610edd104b9b03bd3e84c40f5",
+        "npm-shrinkwrap.json": "ABSENT",
+        "scripts/build.mjs": "2e1e7b9ecdc3b3c2f0cf18813bf5062b69144805d9b1a99919c4814db5e200a7",
+        "scripts/bump-version.sh": "8892afe7542394bb608972af7f24d66ae6024da170f0ef047ee5d602b5cd0d6b",
+        "scripts/npm-shrinkwrap-contract.mjs": "ABSENT",
+        "scripts/release-prepare.mjs": "1b4e0eebe89b6c48d178531f1c8e71186897f967638436238a577762f21db98d",
+        "scripts/security/secret-baseline.mjs": "ac9ed91cda003e954fd63b0f8f7a78846143a6e18da4f68f4392918d55752fe2",
+        "scripts/verify-packed-networkless-install.mjs": "ABSENT",
+        "src/orchestra/scope-sanitizer.ts": "50ba07d7bb87e5faa54ba40c5b8979247c34fef08cb09b086b430bc36c26fa18",
+        ".github/workflows/coverage.yml": "0cf9e154765e23178a4fa68e761d2c649edf9f640f4b164d70bd07ae0d402b9f",
+        ".github/workflows/dashboard-build.yml": "33cf00c90e7ab8fc750f550e70699f00eb5db61e4c217b0fad1ecf218005d30b",
+        ".github/workflows/publish.yml": "b6c2e2578a4c0aef2fda677265b60bf2eaad3f7a7143208a4fff1a8248ab5ae9",
+        "tests/docker/dockerfile.test.ts": "22915448fec040d54d81423a09a84a21db6a09e6aff9be361df2a59723327672",
+        "tests/e2e/install-matrix/fresh-install.test.ts": "1d9e5014c6304c4133df59bf90a5f223f31b462be9f1526c74762428ca46c153",
+        "tests/orchestra/prompt-gate-scope-wiring.test.ts": "d658509bc8a90b0529fd030a1371610fe230ac2f05741c1ebc74c1aa51742a4e",
+        "tests/orchestra/scope-sanitizer-v2.test.ts": "c454a3a99a4da89639f539a1db7a40e3d75fb0f630539234f6c6b09b299062a7",
+        "tests/release/dep-bump-audit.test.ts": "a0c76d84ec5049ff02798ea1d6c09558ec8eca556c35134d9ad0383c101c72a8",
+        "tests/release/release-prepare.test.ts": "9d8b7c7729bcf03e3b01fcc68841cd255015a743d82543aa54b9e70235783af6",
+        "tests/scripts/build-lifecycle.test.ts": "eb242df5c336b19742725f04a5d114f1d52dd02acecf1366207ca6f692245dd1",
+        "tests/scripts/npm-shrinkwrap-contract.test.ts": "ABSENT",
+        "tests/scripts/verify-packed-networkless-install.test.ts": "ABSENT",
+        "tests/security/docker-context-deck.test.ts": "ddcd8217c09a9a5a859d592dae2a517af9235e6330a70d04899a13af86d7b5e0"
+      }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-006-PUBLISH-LINK-ADMISSION",
+      "capturedAt": "2026-09-01T03:08:51+03:00",
+      "ownerDecisionRef": "owner-live-2026-09-01-option-a-canonical-shrinkwrap",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "511761d128433c14adb0d3c446a81d24df852c5d9cc012af74cccafd9efbcf66",
+      "revisionSha256": "7384c3070546281790611f36b338e8acbd0252be575c014e880d434871a63ff4",
+      "resultingManifestSha256": "34428debd7aecb81a8dbba15ec9da6a42fa47ae9a00ef31c8eada09dd5aa7e49",
+      "resultingCounts": {
+        "production": 48,
+        "mutationSupport": 178,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 48,
+        "productionAbsent": 0,
+        "mutationSupportPresent": 172,
+        "mutationSupportAbsent": 6
+      },
+      "absentAtRevision": [
+        "tests/cli/run-attempt-custody.test.ts",
+        "tests/mcp/run-attempt-custody.test.ts",
+        "tests/orchestra/debt-manager-attempt-custody.test.ts",
+        "tests/cli/finalize-attempt-custody.test.ts",
+        "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts"
+      ],
+      "authorityTransfers": [],
+      "addedBaselineSha256": {
+        "docs/post-product/OPERATIONAL-FABRIC-IFS.md": "500ea130f49e374da73f32939341eaf501ebb969e5c516467df931d090bb188a"
+      }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-007-T4-EXACT-ATTEMPT-IPC",
+      "capturedAt": "2026-09-01T03:58:56+03:00",
+      "ownerDecisionRef": "owner-live-2026-09-01-t4-ipc-exact-attempt-scope",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "34428debd7aecb81a8dbba15ec9da6a42fa47ae9a00ef31c8eada09dd5aa7e49",
+      "revisionSha256": "e331d1f0d1dba5a1fdd1737e9d8b2be5c1697e73802f68092f8adeacb6321cad",
+      "resultingManifestSha256": "ba63c5666f77b3fcae27784cdb4446198413641e06999c023d157bd3a02bb7a2",
+      "resultingCounts": {
+        "production": 50,
+        "mutationSupport": 184,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 50,
+        "productionAbsent": 0,
+        "mutationSupportPresent": 178,
+        "mutationSupportAbsent": 6
+      },
+      "absentAtRevision": [
+        "tests/cli/run-attempt-custody.test.ts",
+        "tests/mcp/run-attempt-custody.test.ts",
+        "tests/orchestra/debt-manager-attempt-custody.test.ts",
+        "tests/cli/finalize-attempt-custody.test.ts",
+        "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts"
+      ],
+      "authorityTransfers": [],
+      "addedBaselineSha256": {
+        "src/core/task-types.ts": "6464e2a31dec696a3ac1c59f676f1d28165b5ba4cbed7e7b1b4a7b75a113ea8a",
+        "src/orchestra/question-approval-bridge.ts": "dc326867520837f4cea5dbb23021080a5bba7535447d670fea871ab57daa9e19",
+        "tests/agents/worker-ipc.test.ts": "27b193b50af9f44ff823e5cb1f783089bef70ca2ac2258938b9f60f4a075d574",
+        "tests/orchestra/ipc-question-bridge-wire.test.ts": "6356a9fb390a73c3a6a4db1187aa73a2fa308d3f98973b5484489e7e559e3d37",
+        "tests/orchestra/ipc-registry.test.ts": "3656f904bd01b660ad91c923e53d04a20bc39f82e39c9f2273e33bed4fec7f97",
+        "tests/orchestra/ipc-worker-question-action.test.ts": "c720cdcb8cc861efdda2ce36c9816f6557a4f1181aa184749306b41b22e8de0f",
+        "tests/orchestra/question-approval-bridge.test.ts": "b9b407909159b8b243ee8cfca39a913fb1cc030998118de1375a752a0c72682d",
+        "tests/orchestra/result-collector.test.ts": "887ff3582ad2db6f5c6ed1fb7acf38c0eba644d3ce1d473c88a35ef05afc52bf"
+      }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-008-T5-EXACT-LANDING-CUSTODY",
+      "capturedAt": "2026-09-01T07:11:57+03:00",
+      "ownerDecisionRef": "owner-live-2026-09-01-continue-t5-exact-landing-custody",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "ba63c5666f77b3fcae27784cdb4446198413641e06999c023d157bd3a02bb7a2",
+      "revisionSha256": "1efff3a3f802280da921d57572eb4b27133f7f2c86cc693bc14d35e2d24f9f8d",
+      "resultingManifestSha256": "889d528cc5ab34a06cfe3c43a635e8e92f3e0199b4ddf9884d19bab62c797f7b",
+      "resultingCounts": {
+        "production": 54,
+        "mutationSupport": 187,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 54,
+        "productionAbsent": 0,
+        "mutationSupportPresent": 181,
+        "mutationSupportAbsent": 6
+      },
+      "absentAtRevision": [
+        "tests/cli/run-attempt-custody.test.ts",
+        "tests/mcp/run-attempt-custody.test.ts",
+        "tests/orchestra/debt-manager-attempt-custody.test.ts",
+        "tests/cli/finalize-attempt-custody.test.ts",
+        "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts"
+      ],
+      "authorityTransfers": [],
+      "addedBaselineSha256": {
+        "src/agents/landing-proposal-entry.ts": "932a396a816bfc79ca093698725e0cf310e4563151fdb8d2e39f035694b9c3e6",
+        "src/core/execution-landing-checkpoint.ts": "45214ef543f1ecff28b9d99782ee66afcf1deab0fc85e2a6fe334e168e62903f",
+        "src/core/execution-landing-context.ts": "d1676a543cd7cf223f7128ea90bbe94f67fc4e13b92ffa269e77e6b9c14f7bf4",
+        "src/core/execution-landing-proposal.ts": "f4214b77363046661dfa85c7b6ba604c14058d8a4712e75e02b1ccf0e2e1be14",
+        "tests/core/execution-landing-checkpoint.test.ts": "865b2f566314980bc9a5242c09bf35cf4760655f5c5fa729d20032412416c525",
+        "tests/core/execution-landing-proposal.test.ts": "726e03167353d0dffedb0c9eb2448bf1d262def749beecb6c3fb0dc2d0eeef26",
+        "tests/orchestra/execution-continuation-runner.test.ts": "b1e288cbdd898f4da5a6bfc781e6c838bc1f76cfce28538e0f9ec9ce7e23894d"
+      }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-009-T5-EXACT-EFFECT-CONTAINMENT",
+      "capturedAt": "2026-09-01T11:05:27+03:00",
+      "ownerDecisionRef": "owner-live-2026-09-01-scope-revision-009-t5-exact-effect-containment",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "889d528cc5ab34a06cfe3c43a635e8e92f3e0199b4ddf9884d19bab62c797f7b",
+      "revisionSha256": "74c3c8fc5c8451a059e56cefe81981a7361e8d6426063fa31edf5017cb3d13ac",
+      "resultingManifestSha256": "5edb2406854ca95e0550d0d627f7cee5959ffd8096e394137b5b62c8bb03e482",
+      "resultingCounts": {
+        "production": 57,
+        "mutationSupport": 191,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 55,
+        "productionAbsent": 2,
+        "mutationSupportPresent": 182,
+        "mutationSupportAbsent": 9
+      },
+      "absentAtRevision": [
+        "tests/cli/run-attempt-custody.test.ts",
+        "tests/mcp/run-attempt-custody.test.ts",
+        "tests/orchestra/debt-manager-attempt-custody.test.ts",
+        "tests/cli/finalize-attempt-custody.test.ts",
+        "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+        "src/core/execution-effect-containment.ts",
+        "src/orchestra/execution-effect-landing-coordinator.ts",
+        "tests/core/execution-effect-containment.test.ts",
+        "tests/orchestra/execution-effect-landing-coordinator.test.ts",
+        "tests/orchestra/exact-docker-effect-containment.test.ts"
+      ],
+      "authorityTransfers": [
+        { "path": "src/core/task-result-schema.ts", "kind": "production", "fromLane": "T1", "toLane": "T5E", "baselineSha256": "fb706f6844251060e45361d89100f214ed661057db2b19d539777fc2b3cafe6a" },
+        { "path": "src/core/task-result-settlement.ts", "kind": "production", "fromLane": "T1", "toLane": "T5E", "baselineSha256": "d4475b31b639d8e38f820433725e84b97db33aa5f3c978c8a9b98abd09697329" },
+        { "path": "tests/core/task-result-schema.test.ts", "kind": "mutationSupport", "fromLane": "T1", "toLane": "T5E", "baselineSha256": "a2ab747e5f79034aa39260230d44fb5e8d567ed28ff82df9ae9bf5bde97e3380" },
+        { "path": "tests/core/task-result-settlement.test.ts", "kind": "mutationSupport", "fromLane": "T1", "toLane": "T5E", "baselineSha256": "a11b94491467be409651f66fadbfcf1931fcaa3135d743fe52e219cbe2a2557f" },
+        { "path": "src/orchestra/result-ingress.ts", "kind": "production", "fromLane": "T4", "toLane": "T5E", "baselineSha256": "3bf4978cbf1b9e10c4b2d4b935f79f4bf9e2e36e148b35f8b61b0ad39586e42e" },
+        { "path": "src/orchestra/spawn-backend.ts", "kind": "production", "fromLane": "T5", "toLane": "T5E", "baselineSha256": "c7e52919a852a24b2d65f3048ab272186e3e2787ccce66abed4d3d12c6156ad8" },
+        { "path": "src/orchestra/spawn-backend-docker.ts", "kind": "production", "fromLane": "T5", "toLane": "T5E", "baselineSha256": "e134e590079b6f4e62ea6d4cc3f91b03fc210135908785ad3dc539b81878f181" },
+        { "path": "src/orchestra/execution-landing-coordinator.ts", "kind": "production", "fromLane": "T5", "toLane": "T5E", "baselineSha256": "2f5df57f9a9b418b31352f9acf5a84e574a5872b25cc251bbb7c493539708c9f" },
+        { "path": "tests/orchestra/spawn-backend-docker-mounts.test.ts", "kind": "mutationSupport", "fromLane": "T5", "toLane": "T5E", "baselineSha256": "9fa8fbbe721e68051e6ddb5389b5598e0ae4c41f27bd2adddd6c83c6c2d7fd5e" },
+        { "path": "tests/orchestra/spawn-backend-docker.test.ts", "kind": "mutationSupport", "fromLane": "T5", "toLane": "T5E", "baselineSha256": "5e6506e8b264e32bcee6af53eb2d88eab6934b2e5ae8321ca64e29e1fffb1c66" },
+        { "path": "tests/orchestra/execution-landing-coordinator.test.ts", "kind": "mutationSupport", "fromLane": "T5", "toLane": "T5E", "baselineSha256": "d9983ccfe04b1b1ce8b7daf136fd3ea93c02ff559d2466551db5e04f8ab8ae01" },
+        { "path": "tests/orchestra/docker-restart-reconcile.test.ts", "kind": "mutationSupport", "fromLane": "T10", "toLane": "T5E", "baselineSha256": "297b91e6b410506fb8d64610b947e301bbdcc1d0dfb9cca6524c8d0dbf8fdc00" },
+        { "path": "src/core/file-lock.ts", "kind": "production", "fromLane": "T15", "toLane": "T5E", "baselineSha256": "00d05156e1f10fe4d7994497b275db24e7f24d5fb2f84b84766f16454ed3778b" },
+        { "path": "src/core/exec-authority-native.ts", "kind": "production", "fromLane": "T15", "toLane": "T5E", "baselineSha256": "20e7852481b9ff4b3ac535a97cb9f8e809950b0f815759dd4daeb5ec5307025e" },
+        { "path": "native/exec-authority/index.mjs", "kind": "production", "fromLane": "T15", "toLane": "T5E", "baselineSha256": "a1e8ee656362afa33fc70859c94556d8eaa278907b6d0c4c2c2f5bce1e3edb4b" },
+        { "path": "native/exec-authority/src/exec_authority.c", "kind": "production", "fromLane": "T15", "toLane": "T5E", "baselineSha256": "52a6899c2c337d22558742880bbc5b6e2786eb34d23798221065436783e90677" },
+        { "path": "native/exec-authority/src/custody_common.h", "kind": "production", "fromLane": "T15", "toLane": "T5E", "baselineSha256": "51f46c010013adecacf8db99f12b025c2ab481ead87f3ac56345517ed3ec25d0" },
+        { "path": "native/exec-authority/src/custody_posix.c", "kind": "production", "fromLane": "T16", "toLane": "T5E", "baselineSha256": "78fd5b7e4638a5f60c5dc1e80689bf8ecdc816030cb4eebc8266906fc322e2cf" },
+        { "path": "native/exec-authority/src/custody_win32.c", "kind": "production", "fromLane": "T17", "toLane": "T5E", "baselineSha256": "d85c3d5b5c429d376fe515d6404a0cba7529dd05234801d4d355def7e5390b24" },
+        { "path": "src/core/task-attempt-custody-store.ts", "kind": "production", "fromLane": "T18", "toLane": "T5E", "baselineSha256": "906ed9c7e381d065d9c6280ea7c3bfc247c799f448725a0770dcb4230d7622a8" },
+        { "path": "tests/core/task-attempt-custody-store.test.ts", "kind": "mutationSupport", "fromLane": "T18", "toLane": "T5E", "baselineSha256": "ffcab7bd95bbc24e1727ff93d590f3439dbe35d87a774adbcb118bd53460c5ec" },
+        { "path": "scripts/verify-exec-authority-native-package.mjs", "kind": "mutationSupport", "fromLane": "T19", "toLane": "T5E", "baselineSha256": "8d41fe48e2323dec69ae03b31f2f9cd43560b311cae362c01fff7852e47ce4e7" },
+        { "path": "scripts/platform-probe/exec-authority-capability-probe.mjs", "kind": "mutationSupport", "fromLane": "T20", "toLane": "T5E", "baselineSha256": "2d0744f412d44a0cf666697699a06993c8ccb9d9ed5b8fb23241d0daeeae0989" },
+        { "path": "tests/core/execution-authority-adapter-parity.test.ts", "kind": "mutationSupport", "fromLane": "T20", "toLane": "T5E", "baselineSha256": "49160b8ced670ba7a85f65a547fde94ad0fa7822f8ee10cbd39268a5d5399218" },
+        { "path": "tests/native/exec-authority-native.test.ts", "kind": "mutationSupport", "fromLane": "T20", "toLane": "T5E", "baselineSha256": "285f42929479b717ecefd071fff0e680b869f096e7985a7d7f547ef7253d5f16" }
+      ],
+      "addedBaselineSha256": {
+        "src/core/execution-effect-containment.ts": "ABSENT",
+        "src/orchestra/execution-effect-landing-coordinator.ts": "ABSENT",
+        "src/core/execution-write-scope-policy.ts": "dd1f73f32c9215b297c91801923ae113c2cd01c3d2535d2a5b0ecd3209c65750",
+        "tests/core/execution-effect-containment.test.ts": "ABSENT",
+        "tests/orchestra/execution-effect-landing-coordinator.test.ts": "ABSENT",
+        "tests/orchestra/exact-docker-effect-containment.test.ts": "ABSENT",
+        "tests/core/execution-write-scope-policy.test.ts": "52097a0d2663668c4866eb5382291df59bcf41ed53ca444fa8c6521b7006c905"
+      }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-010-T5-EXACT-EFFECT-FAN-IN",
+      "capturedAt": "2026-09-01T14:28:39+03:00",
+      "ownerDecisionRef": "owner-live-2026-09-01-continue-t5-exact-effect-containment",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "5edb2406854ca95e0550d0d627f7cee5959ffd8096e394137b5b62c8bb03e482",
+      "revisionSha256": "f3c0032c59d5d5047c7c2e49ef76dddfb4eaa3ac61214efd3f4bfdd485c2e201",
+      "resultingManifestSha256": "684573467869cce1fb31c50e2d253c031b87c2fdf5a515b25155c7f9805c6c93",
+      "resultingCounts": {
+        "production": 60,
+        "mutationSupport": 195,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 60,
+        "productionAbsent": 0,
+        "mutationSupportPresent": 188,
+        "mutationSupportAbsent": 7
+      },
+      "absentAtRevision": [
+        "tests/cli/run-attempt-custody.test.ts",
+        "tests/mcp/run-attempt-custody.test.ts",
+        "tests/orchestra/debt-manager-attempt-custody.test.ts",
+        "tests/cli/finalize-attempt-custody.test.ts",
+        "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+        "package-lock.json"
+      ],
+      "authorityTransfers": [
+        { "path": "tests/helpers/task-result-settlement-v2-fixture.ts", "kind": "mutationSupport", "fromLane": "T1", "toLane": "T5E", "baselineSha256": "ABSENT" }
+      ],
+      "addedBaselineSha256": {
+        "src/core/execution-effect-persistence-contract.ts": "ABSENT",
+        "src/orchestra/execution-effect-lock-adapter.ts": "ABSENT",
+        "src/orchestra/execution-effect-native-adapter.ts": "ABSENT",
+        "tests/core/execution-effect-persistence-contract.test.ts": "ABSENT",
+        "tests/core/task-execution-fence.test.ts": "d48f513f2199892808e3cb3d2231c1fce03801a62f2529e6d22065e63d543c0e",
+        "tests/orchestra/execution-effect-lock-adapter.test.ts": "ABSENT",
+        "tests/orchestra/execution-effect-native-adapter.test.ts": "ABSENT"
+      }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-011-T5-EXACT-EFFECT-PRODUCTION-ADAPTERS",
+      "capturedAt": "2026-09-01T14:42:32+03:00",
+      "ownerDecisionRef": "owner-live-2026-09-01-continue-t5-exact-effect-containment",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "684573467869cce1fb31c50e2d253c031b87c2fdf5a515b25155c7f9805c6c93",
+      "revisionSha256": "4849d96c8045129cabac0367f6b1db839f51f44c513f89c6669c011e3e2dc7f4",
+      "resultingManifestSha256": "613e72228db0d3dd216d9b1d72bdf804bec1daaa329e25b3be2ef23ba2891571",
+      "resultingCounts": {
+        "production": 62,
+        "mutationSupport": 197,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 60,
+        "productionAbsent": 2,
+        "mutationSupportPresent": 188,
+        "mutationSupportAbsent": 9
+      },
+      "absentAtRevision": [
+        "tests/cli/run-attempt-custody.test.ts",
+        "tests/mcp/run-attempt-custody.test.ts",
+        "tests/orchestra/debt-manager-attempt-custody.test.ts",
+        "tests/cli/finalize-attempt-custody.test.ts",
+        "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+        "package-lock.json",
+        "src/orchestra/execution-effect-docker-lifecycle.ts",
+        "src/orchestra/execution-effect-store-adapter.ts",
+        "tests/orchestra/execution-effect-docker-lifecycle.test.ts",
+        "tests/orchestra/execution-effect-store-adapter.test.ts"
+      ],
+      "authorityTransfers": [],
+      "addedBaselineSha256": {
+        "src/orchestra/execution-effect-docker-lifecycle.ts": "ABSENT",
+        "src/orchestra/execution-effect-store-adapter.ts": "ABSENT",
+        "tests/orchestra/execution-effect-docker-lifecycle.test.ts": "ABSENT",
+        "tests/orchestra/execution-effect-store-adapter.test.ts": "ABSENT"
+      }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-012-T5-EXACT-RESTART-DISCOVERY",
+      "capturedAt": "2026-09-01T17:48:56+03:00",
+      "ownerDecisionRef": "owner-live-2026-09-01-continue-t5-exact-effect-containment",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "613e72228db0d3dd216d9b1d72bdf804bec1daaa329e25b3be2ef23ba2891571",
+      "revisionSha256": "51856e3f5fc6d562f38759988f18705d98d04eb22dd1e8812142ca4fc62f240a",
+      "resultingManifestSha256": "84b2de98c4c0f11715b95f0baed70f2cfa2e35542054c59802614ba8b0c1f451",
+      "resultingCounts": {
+        "production": 62,
+        "mutationSupport": 197,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 62,
+        "productionAbsent": 0,
+        "mutationSupportPresent": 190,
+        "mutationSupportAbsent": 7
+      },
+      "absentAtRevision": [
+        "tests/cli/run-attempt-custody.test.ts",
+        "tests/mcp/run-attempt-custody.test.ts",
+        "tests/orchestra/debt-manager-attempt-custody.test.ts",
+        "tests/cli/finalize-attempt-custody.test.ts",
+        "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+        "package-lock.json"
+      ],
+      "authorityTransfers": [
+        { "path": "src/core/task-attempt-custody-posix-adapter.ts", "kind": "production", "fromLane": "T2", "toLane": "T5E", "baselineSha256": "bea016e004c2ad6518dae9ce0970dcb30098b1fa7f523c20d0934e962282277a" },
+        { "path": "src/core/task-attempt-custody-win32-adapter.ts", "kind": "production", "fromLane": "T3", "toLane": "T5E", "baselineSha256": "6cee5ba88fb7a6d1e16b6e62880370151100c732438f4d5d42d408c5eacd4567" },
+        { "path": "tests/core/task-attempt-custody-posix-adapter.test.ts", "kind": "mutationSupport", "fromLane": "T2", "toLane": "T5E", "baselineSha256": "6bb501735e79f1e545ec5f3666de035c4fa4a4bb6897e3ff7f2121b89a60f1b3" },
+        { "path": "tests/core/task-attempt-custody-win32-adapter.test.ts", "kind": "mutationSupport", "fromLane": "T3", "toLane": "T5E", "baselineSha256": "ac3caa0901f4b34b0923c8417c4dbac8ddcb29eeb36e7e81db3a1584dbe97177" }
+      ],
+      "addedBaselineSha256": {}
+    },
+    {
+      "revisionId": "SCOPE-REVISION-013-T6-NORMAL-PRODUCER-CUTOVER",
+      "capturedAt": "2026-09-01T20:41:47+03:00",
+      "ownerDecisionRef": "owner-live-2026-09-01-continue-t6-normal-producer-cutover",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "84b2de98c4c0f11715b95f0baed70f2cfa2e35542054c59802614ba8b0c1f451",
+      "revisionSha256": "b21abe8a9c71be62e1168d09d54228a9bf6339a7f25a053a8eabcb25c6cce031",
+      "resultingManifestSha256": "8d6f2e6c113b427b59919f1ab83893ee601e92db7c07375363a2518781a525b3",
+      "resultingCounts": {
+        "production": 62,
+        "mutationSupport": 201,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 62,
+        "productionAbsent": 0,
+        "mutationSupportPresent": 194,
+        "mutationSupportAbsent": 7
+      },
+      "absentAtRevision": [
+        "tests/cli/run-attempt-custody.test.ts",
+        "tests/mcp/run-attempt-custody.test.ts",
+        "tests/orchestra/debt-manager-attempt-custody.test.ts",
+        "tests/cli/finalize-attempt-custody.test.ts",
+        "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+        "package-lock.json"
+      ],
+      "authorityTransfers": [
+        { "path": "src/orchestra/spawn-backend.ts", "kind": "production", "fromLane": "T5E", "toLane": "T6", "baselineSha256": "990167c0193f090b165e6e6405b1757ccedb9aedfa319c8998a872721ffaf633" },
+        { "path": "src/orchestra/spawn-backend-docker.ts", "kind": "production", "fromLane": "T5E", "toLane": "T6", "baselineSha256": "086ac6d6b8d0db6e77fa6b86074a8d111e4fa9a459bf47856c50734e2e79788e" },
+        { "path": "src/orchestra/result-collector.ts", "kind": "production", "fromLane": "T4", "toLane": "T6", "baselineSha256": "1a6aa46a2ca4bb64a2838ba4ff5e7c97dd30a84473eb6a739a7478c9a2ba6633" },
+        { "path": "src/orchestra/sprint-controller.ts", "kind": "production", "fromLane": "T12", "toLane": "T6", "baselineSha256": "7c93505a14a0afd09cfa424f5c30cd2530970417068dc00ad4329d73b8f3ce78" },
+        { "path": "src/orchestra/sprint-phases.ts", "kind": "production", "fromLane": "T11", "toLane": "T6", "baselineSha256": "c05e4c5a171093fd037e2f1062eda2be6dda23876eafae77b60aa96310c0a1eb" },
+        { "path": "tests/orchestra/spawn-backend-docker-mounts.test.ts", "kind": "mutationSupport", "fromLane": "T5E", "toLane": "T6", "baselineSha256": "3f7c2ab0716abf7a2f2e5db10a68d9dcab4e7020f8875a43d42665ff009bbae3" },
+        { "path": "tests/orchestra/result-collector-settlement-authority.test.ts", "kind": "mutationSupport", "fromLane": "T4", "toLane": "T6", "baselineSha256": "23e05437893e1ba2e2068b656a5b799e3f469f2b6a8cc9a964835ae93a3d4f2b" }
+      ],
+      "addedBaselineSha256": {
+        "tests/orchestra/scheduler-collision-reorder-wire.test.ts": "ac0fbad601f2570a4d5cdf5cb39bd5ff194d7917c5d0c1b12d31099dc7040a26",
+        "tests/orchestra/scheduler-spawn-executor.test.ts": "704f957e2165dc603d6ccb87306aee5adeb4c09f3f863c7252f4e65ac9954cee",
+        "tests/orchestra/spawn-spawner-wire.test.ts": "2799c7e887eb0b30c0c9632f4c503acbfe87f9a5af9698fd634d50541995ccdb",
+        "tests/orchestra/task-projection-parity.test.ts": "9eac26949b92df6f7f6560738bb912ff2762f3b7b3872a0510072b87e8a82249"
+      }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-014-T7-TASK-INGRESS-AUTHORITY",
+      "capturedAt": "2026-09-01T21:50:00+03:00",
+      "ownerDecisionRef": "owner-live-2026-09-01-harika-devam",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "8d6f2e6c113b427b59919f1ab83893ee601e92db7c07375363a2518781a525b3",
+      "revisionSha256": "06cbba14bd255c2994b913a7c317bc20d67f9810c732465de986fb312ceae944",
+      "resultingManifestSha256": "632a956ce0dd0f36cb191fc8be842a5a7717bc7b325d71faab44523487d430db",
+      "resultingCounts": {
+        "production": 64,
+        "mutationSupport": 207,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 64,
+        "productionAbsent": 0,
+        "mutationSupportPresent": 200,
+        "mutationSupportAbsent": 7
+      },
+      "absentAtRevision": [
+        "tests/cli/run-attempt-custody.test.ts",
+        "tests/mcp/run-attempt-custody.test.ts",
+        "tests/orchestra/debt-manager-attempt-custody.test.ts",
+        "tests/cli/finalize-attempt-custody.test.ts",
+        "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+        "package-lock.json"
+      ],
+      "authorityTransfers": [
+        { "path": "tests/mcp/tools/run.test.ts", "kind": "mutationSupport", "fromLane": "T12", "toLane": "T7", "baselineSha256": "674a741c13757f8140d636cb5c940ad6a27c0404f43523f11a03925842322e89" },
+        { "path": "tests/mcp/run-tool-parity.test.ts", "kind": "mutationSupport", "fromLane": "T12", "toLane": "T7", "baselineSha256": "3e17fdb400fcb38dba5ac3d08bd3b32024b4a98359c4bd2d58e3f413ce7fe88d" }
+      ],
+      "addedBaselineSha256": {
+        "src/cli/helpers/message-catalog/cli-run.ts": "1d94e4f954b0c88e9ae8e0f4c1e4ea80e869a7a9abc0208ab5bfc10824b5e51a",
+        "src/mcp/tools/job-runner.ts": "0f69652358987ed8df415783a4442f1c9d24150aa5cdb5933db9d47a3a97ce3e",
+        "tests/orchestra/scheduler-driver-composition.test.ts": "5d3774058f502c6c0ec088fb7960853869e0b54e484aade6f0b573daae92673d",
+        "tests/mcp/run-budget-authority.test.ts": "40455fafb83bf0af0615f807d413ed4d9e72c27f0e56839a4f45dac7ff59b7f3",
+        "tests/orchestra/mode-aware-routing.test.ts": "c74866f419d72bb91ecc476d5e7805068ba2b339afd854ceb4455c81e3d21682",
+        "tests/orchestra/task-mode-agent-inject.test.ts": "c6d09f7ade3b2992ddada3c00249294521e95e5e61081923ae1a7a2f67cc10ac",
+        "tests/orchestra/task-mode-runner.test.ts": "54099efdf8d9ca0da5f819863ae4bcba1577e22f26ecbd1c1632ae2b52750461",
+        "tests/orchestra/task-mode-tokenusage.test.ts": "4891691e0b98d727057ebe0e53d327c19917f335edb25054135a190a497a3795"
+      }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-015-T6-EXACT-PLAN-DEFERRED-PROJECTION",
+      "capturedAt": "2026-09-01T21:55:17+03:00",
+      "ownerDecisionRef": "owner-live-2026-09-01-harika-devam",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "632a956ce0dd0f36cb191fc8be842a5a7717bc7b325d71faab44523487d430db",
+      "revisionSha256": "5a9d24862e6ad32388adfa57023b19037956d84943ffa992003429befbf31fd3",
+      "resultingManifestSha256": "33180fcfbd2591a1534794f4ccafaf00a6456eead2e95967f7f2fe78974dbcdc",
+      "resultingCounts": {
+        "production": 65,
+        "mutationSupport": 209,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 65,
+        "productionAbsent": 0,
+        "mutationSupportPresent": 202,
+        "mutationSupportAbsent": 7
+      },
+      "absentAtRevision": [
+        "tests/cli/run-attempt-custody.test.ts",
+        "tests/mcp/run-attempt-custody.test.ts",
+        "tests/orchestra/debt-manager-attempt-custody.test.ts",
+        "tests/cli/finalize-attempt-custody.test.ts",
+        "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+        "package-lock.json"
+      ],
+      "authorityTransfers": [],
+      "addedBaselineSha256": {
+        "src/orchestra/exact-plan-start-service.ts": "be7ab591961507e1d59963041d3bc45a113dfd0b48dc0f4c08d8b1d89928aeda",
+        "tests/orchestra/exact-plan-start-service.test.ts": "06087583cc701d621a9cd98d8b09e3a4fcbe3f7b3b6ec927f6d62b3c553c7dd4",
+        "tests/orchestra/task-artifact-projection.test.ts": "f5e98940595b81396f845643e4737d8ff7a682d4320dd2fab74abd3ee9cf887c"
+      }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-016-T6-EXACT-PLAN-CALLBACK-FANIN",
+      "capturedAt": "2026-09-01T22:04:18+03:00",
+      "ownerDecisionRef": "owner-live-2026-09-01-harika-devam",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "33180fcfbd2591a1534794f4ccafaf00a6456eead2e95967f7f2fe78974dbcdc",
+      "revisionSha256": "e6d66c0985a48ff5e71d4ef5fbade7946974f02d7d2950438e1850379f010d83",
+      "resultingManifestSha256": "8379f7dc0080a3100f9bb842e31deac9f5029b5f7886a2ed3e7ece671b20ecdd",
+      "resultingCounts": {
+        "production": 68,
+        "mutationSupport": 209,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 68,
+        "productionAbsent": 0,
+        "mutationSupportPresent": 202,
+        "mutationSupportAbsent": 7
+      },
+      "absentAtRevision": [
+        "tests/cli/run-attempt-custody.test.ts",
+        "tests/mcp/run-attempt-custody.test.ts",
+        "tests/orchestra/debt-manager-attempt-custody.test.ts",
+        "tests/cli/finalize-attempt-custody.test.ts",
+        "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+        "package-lock.json"
+      ],
+      "authorityTransfers": [],
+      "addedBaselineSha256": {
+        "src/cli/commands/autonomous.ts": "a9ce83d9e78d46734e3ece08ce1ea598da28cf28acb19a1bb576b4e6ffa59ffa",
+        "src/cli/commands/start.ts": "6c5f1eb779dc10fbfbd10fdd4c11779733a0eee5e4ba5ccbab878a01a74bace8",
+        "src/cli/helpers/process-runtime.ts": "9f730343d9178d63ddfd7a444fcc935758bf514c0ea5c86b0d42565078bb1c87"
+      }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-017-T7-INGRESS-AUDIT-CLOSURE",
+      "capturedAt": "2026-09-01T23:10:10+03:00",
+      "ownerDecisionRef": "owner-live-2026-09-01-harika-devam",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "8379f7dc0080a3100f9bb842e31deac9f5029b5f7886a2ed3e7ece671b20ecdd",
+      "revisionSha256": "f027064bee2dcfcd0c102744f4c09b032ed2630c6baafcb6d582c113a6388813",
+      "resultingManifestSha256": "7ced1c26ff55e3bb13651af55cbca6720138fe919c1118eb9489469a492ad252",
+      "resultingCounts": {
+        "production": 70,
+        "mutationSupport": 211,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 70,
+        "productionAbsent": 0,
+        "mutationSupportPresent": 204,
+        "mutationSupportAbsent": 7
+      },
+      "absentAtRevision": [
+        "tests/cli/run-attempt-custody.test.ts",
+        "tests/mcp/run-attempt-custody.test.ts",
+        "tests/orchestra/debt-manager-attempt-custody.test.ts",
+        "tests/cli/finalize-attempt-custody.test.ts",
+        "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+        "package-lock.json"
+      ],
+      "authorityTransfers": [
+        {
+          "path": "src/core/task-settlement-authority.ts",
+          "kind": "production",
+          "fromLane": "T4",
+          "toLane": "T7",
+          "baselineSha256": "eaf4d10c15146f76c2f1784e7ed718383ab597e14e6c018661ebdbf6e060ed1a"
+        },
+        {
+          "path": "tests/core/task-settlement-authority.test.ts",
+          "kind": "mutationSupport",
+          "fromLane": "T4",
+          "toLane": "T7",
+          "baselineSha256": "162fa73a72a738631ec897cb8d1c0dcae0d3d0044486b5bd2b5a3880603d2835"
+        }
+      ],
+      "addedBaselineSha256": {
+        "src/cli/index.ts": "5e4f8a6e8a5868502cd7a5beec54ee6c3810ec10c036ddd47c7db94ab3bf5658",
+        "src/core/invocation-receipt.ts": "7b367fdd024443e65841fe8d618227d0a3b2e263c9bc4993b1904d60a8c414b6",
+        "tests/cli/index.test.ts": "a298e6aede59444ef76e35fd0ffaa7a75aa8493dbf04282607ca8ce1fe0de5a8",
+        "tests/mcp/tools/job-runner.test.ts": "e7a4f7e4f6c6b8e4987e46d5279174c54a4c95f470abc7e75dfec9f8c242f8d8"
+      }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-018-T7-TRANSPORT-METADATA-COMPILE-FANIN",
+      "capturedAt": "2026-09-01T23:28:49+03:00",
+      "ownerDecisionRef": "owner-live-2026-09-01-harika-devam",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "7ced1c26ff55e3bb13651af55cbca6720138fe919c1118eb9489469a492ad252",
+      "revisionSha256": "0e1887d8471ad9bc221392ac46edacc862b713707bc5261cfb92cc91dd5cad44",
+      "resultingManifestSha256": "7cc6a97771ce506163114b77200525bf92abd2be485c03d44f650d16df39cfc7",
+      "resultingCounts": {
+        "production": 71,
+        "mutationSupport": 213,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 71,
+        "productionAbsent": 0,
+        "mutationSupportPresent": 206,
+        "mutationSupportAbsent": 7
+      },
+      "absentAtRevision": [
+        "tests/cli/run-attempt-custody.test.ts",
+        "tests/mcp/run-attempt-custody.test.ts",
+        "tests/orchestra/debt-manager-attempt-custody.test.ts",
+        "tests/cli/finalize-attempt-custody.test.ts",
+        "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+        "package-lock.json"
+      ],
+      "authorityTransfers": [],
+      "addedBaselineSha256": {
+        "src/core/provider-truth.ts": "996a622faf30fbe6063c286f27e62eecbc82e88c63fe990a838813425c2447af",
+        "tests/core/provider-truth.test.ts": "0ff6a22230f99464a37f23a83a27201c7219a1de528a8164c5ee4169547d0588",
+        "tests/orchestra/fix-spawn-observability.test.ts": "41cc0d65e117af89bf3bec065057748a4fef5c92a7536e50a6645950072aba2d"
+      }
+    }
+  ],
+  "preserveExcludedRuntime": [
+    ".brain/memory.db",
+    ".tasks",
+    ".deckent/provider-execution-observations.db",
+    ".deckent/bot.pid"
+  ],
+  "expectedRed": [
+    {
+      "id": "PUBLIC_TASK_SNAPSHOT_REPLAY",
+      "state": "OBSERVED_RED_SOURCE_TRACE",
+      "evidence": "normal Docker paths can reconstruct task authority from project .tasks"
+    },
+    {
+      "id": "PUBLIC_RESULT_OR_LOG_SPOOF",
+      "state": "OBSERVED_RED_SOURCE_TRACE",
+      "evidence": "normal result, billing and finalization consumers still have public fallback paths"
+    },
+    {
+      "id": "CROSS_ATTEMPT_REPLAY",
+      "state": "OBSERVED_RED_SOURCE_TRACE",
+      "evidence": "task-level shared result/log/IPC paths are not universally exact-attempt isolated"
+    },
+    {
+      "id": "UNSAFE_ARTIFACT_KIND_OR_SWAP",
+      "state": "OBSERVED_RED_SOURCE_TRACE",
+      "evidence": "regular-file, no-follow, link-count, inode/device and size checks are not one custody contract"
+    },
+    {
+      "id": "EVALUATION_ATTEMPT_DIVERGENCE",
+      "state": "OBSERVED_RED_SOURCE_TRACE",
+      "evidence": "evaluation-audit-trail identity is sprint/task/numeric-attempt rather than accepted attempt UUID plus digests"
+    },
+    {
+      "id": "CONTROLLER_STALE_EVALUATION_REPLAY",
+      "state": "OBSERVED_RED_SOURCE_TRACE",
+      "evidence": "sprint-controller can consume task/numeric-attempt evaluation receipt without exact accepted-attempt custody"
+    },
+    {
+      "id": "DEPENDENCY_PROMPT_STALE_RESULT",
+      "state": "OBSERVED_RED_SOURCE_TRACE",
+      "evidence": "task-builder selects public dependency result/evaluation artifacts by largest numeric attempt"
+    },
+    {
+      "id": "LANDING_PUBLIC_RESULT_REFERENCE",
+      "state": "OBSERVED_RED_SOURCE_TRACE",
+      "evidence": "execution-landing-coordinator embeds .tasks/task-<id>.result in durable landing state"
+    },
+    {
+      "id": "COMPLETED_CHECKPOINT_SELF_REPORTED_VERDICT",
+      "state": "OBSERVED_RED_SOURCE_TRACE",
+      "evidence": "completed-checkpoint-terminalizer selects brainEvaluation/evaluationDecision/selfAssessment from result before terminal receipt"
+    },
+    {
+      "id": "UNRUN_TASK_ATTEMPT_FICTION",
+      "state": "OBSERVED_RED_INCIDENT_TRACE",
+      "evidence": "Sprint 711-713 history includes attempt/evaluation projection for work not actually dispatched"
+    }
+  ],
+  "xverifyCommunicationCanary": {
+    "countsAsOutcomeVerification": false,
+    "provider": "claude",
+    "model": "claude-opus-5",
+    "outcome": "confirmed",
+    "usageTotalTokens": 12632,
+    "receipt": "cross-verify-verdict:sha256:94a6b1b0d6b651eacd24dcdd252a63219d25250827de3bcd2c3f41c72081f093"
+  }
+}

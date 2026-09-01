@@ -429,6 +429,104 @@ export const CLI_RUN_MESSAGES: MessageFamily = Object.freeze({
     en: 'What the one-shot task should accomplish. The first word must not be start, status, retro or history — those are reserved sub-command names.',
     tr: 'Tek seferlik görevin ne yapması gerektiği. İlk kelime start, status, retro veya history olamaz — bunlar ayrılmış alt-komut adlarıdır.',
   },
+  'cliContract.run.exact_accepted_pending': {
+    en: 'The exact result was accepted; terminal evaluation and settlement are still pending.',
+    tr: 'Kesin sonuç kabul edildi; son değerlendirme ve kapanış kaydı henüz bekleniyor.',
+  },
+  'cliContract.run.ingress_hold': {
+    en: 'The task did not start because the shared execution gate held it ({reason}). No success was recorded.',
+    tr: 'Ortak yürütme kapısı görevi beklettiği için iş başlamadı ({reason}). Başarı kaydı oluşturulmadı.',
+  },
+  'cliContract.run.invalid_timeout': {
+    en: 'Invalid timeout value: {value}',
+    tr: 'Geçersiz zaman aşımı değeri: {value}',
+  },
+  'cliContract.run.started': {
+    en: 'Task {taskId} started (model: {model}, scope: {scope}).',
+    tr: '{taskId} görevi başladı (model: {model}, kapsam: {scope}).',
+  },
+  'cliContract.run.description': {
+    en: 'Description: {description}',
+    tr: 'Açıklama: {description}',
+  },
+  'cliContract.run.timeout': {
+    en: 'Timeout: {timeout} ms',
+    tr: 'Zaman aşımı: {timeout} ms',
+  },
+  'cliContract.run.output_start': {
+    en: '--- Worker output ---',
+    tr: '--- Worker çıktısı ---',
+  },
+  'cliContract.run.output_end': {
+    en: '--- End of worker output ---',
+    tr: '--- Worker çıktısının sonu ---',
+  },
+  'cliContract.run.waiting': {
+    en: 'Waiting for the recorded result…',
+    tr: 'Kayıtlı sonuç bekleniyor…',
+  },
+  'cliContract.run.timed_out': {
+    en: 'The task timed out without a recorded result.',
+    tr: 'Görev, kayıtlı sonuç üretmeden zaman aşımına uğradı.',
+  },
+  'cliContract.run.result': {
+    en: 'Result: {assessment}',
+    tr: 'Sonuç: {assessment}',
+  },
+  'cliContract.run.notes': {
+    en: 'Notes: {notes}',
+    tr: 'Notlar: {notes}',
+  },
+  'cliContract.run.files_changed': {
+    en: 'Files changed: {files}',
+    tr: 'Değişen dosyalar: {files}',
+  },
+  'cliContract.run.tests_passed': {
+    en: 'Tests passed: {value}',
+    tr: 'Testler geçti: {value}',
+  },
+  'cliContract.run.yes': { en: 'yes', tr: 'evet' },
+  'cliContract.run.no': { en: 'no', tr: 'hayır' },
+  'cliContract.run.files_preserved': {
+    en: 'Task files preserved (--keep): task-{taskId}.*',
+    tr: 'Görev dosyaları korundu (--keep): task-{taskId}.*',
+  },
+  'cliContract.run.mcp.title': {
+    en: 'Run task',
+    tr: 'Görevi çalıştır',
+  },
+  'cliContract.run.mcp.description': {
+    en: 'Clear description of the required outcome, including relevant paths and constraints.',
+    tr: 'İlgili yolları ve sınırları içeren açık sonuç tanımı.',
+  },
+  'cliContract.run.mcp.model': {
+    en: 'Exact provider model ID. Omit it to use the effective configured default.',
+    tr: 'Tam provider model kimliği. Etkin yapılandırılmış varsayılanı kullanmak için boş bırakın.',
+  },
+  'cliContract.run.mcp.provider': {
+    en: 'Explicit provider owner for model identity validation.',
+    tr: 'Model kimliği doğrulaması için açık provider sahibi.',
+  },
+  'cliContract.run.mcp.model_effort': {
+    en: 'Provider-supported reasoning effort; effective policy validates it before dispatch.',
+    tr: 'Provider’ın desteklediği muhakeme eforu; dispatch öncesinde etkin policy doğrular.',
+  },
+  'cliContract.run.mcp.scope': {
+    en: 'Comma-separated directories the worker may access.',
+    tr: 'Worker’ın erişebileceği virgülle ayrılmış dizinler.',
+  },
+  'cliContract.run.mcp.timeout': {
+    en: 'Maximum observation window in milliseconds.',
+    tr: 'Milisaniye cinsinden azami gözlem süresi.',
+  },
+  'cliContract.run.mcp.keep': {
+    en: 'Keep compatibility task files after legacy execution completes.',
+    tr: 'Eski tip yürütme tamamlandıktan sonra uyumluluk görev dosyalarını koru.',
+  },
+  'cliContract.run.mcp.auto_approve': {
+    en: 'Request the configured attended or automatic approval mode.',
+    tr: 'Yapılandırılmış katılımlı veya otomatik onay modunu iste.',
+  },
   'cliContract.run.opt.model_effort': {
     en: 'Native model reasoning-effort (claude: low|medium|high|xhigh|max, codex: minimal|low|medium|high). Opt-in; unsupported or invalid levels are ignored',
     tr: 'Yerel model muhakeme-eforu (claude: low|medium|high|xhigh|max, codex: minimal|low|medium|high). Opt-in; desteklenmeyen veya geçersiz seviyeler yok sayılır',
@@ -910,6 +1008,38 @@ export const CLI_RUN_MESSAGES: MessageFamily = Object.freeze({
   'cliContract.spawn.opt.auto_approve': {
     en: 'Enable auto-approve mode for the worker',
     tr: 'Worker için auto-approve modunu etkinleştir',
+  },
+  'cliContract.spawn.already_running': {
+    en: 'Task {taskId} is already running. Stop it through the governed lifecycle before trying again.',
+    tr: '{taskId} görevi zaten çalışıyor. Yeniden denemeden önce yönetilen yaşam döngüsü üzerinden durdurun.',
+  },
+  'cliContract.spawn.already_terminal': {
+    en: 'Task {taskId} is already {status}. Use --force only for a supported generation-bound legacy respawn.',
+    tr: '{taskId} görevi zaten {status}. --force yalnız desteklenen nesil-bağlı eski tip yeniden çalıştırmada kullanılabilir.',
+  },
+  'cliContract.spawn.exact_force_hold': {
+    en: 'Exact task {taskId} cannot be force-respawned without a new generation identity. Nothing started.',
+    tr: 'Kesin görev {taskId}, yeni nesil kimliği olmadan zorla yeniden çalıştırılamaz. Hiçbir iş başlamadı.',
+  },
+  'cliContract.spawn.backend': {
+    en: 'Backend: {backend}',
+    tr: 'Backend: {backend}',
+  },
+  'cliContract.spawn.provider': {
+    en: 'Provider: {provider}',
+    tr: 'Provider: {provider}',
+  },
+  'cliContract.spawn.scope_dirs': {
+    en: 'Scope directories: {paths}',
+    tr: 'Kapsam dizinleri: {paths}',
+  },
+  'cliContract.spawn.write_files': {
+    en: 'Writable files: {paths}',
+    tr: 'Yazılabilir dosyalar: {paths}',
+  },
+  'cliContract.spawn.status_finalized': {
+    en: 'Task status finalized: {status}',
+    tr: 'Görev durumu kapatıldı: {status}',
   },
 
   // ── start ─────────────────────────────────────────────────────────────

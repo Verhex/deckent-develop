@@ -1,12 +1,14 @@
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { createHash, randomUUID } from 'node:crypto';
+import { mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   readExecutionLandingContext,
 } from '../../src/core/execution-landing-context.js';
 import {
+  createExecutionLandingPreparationRefV2,
   readExecutionLandingCheckpoint,
 } from '../../src/core/execution-landing-checkpoint.js';
 import {
@@ -20,8 +22,12 @@ import {
 import { TaskStatus, type Task } from '../../src/core/task-types.js';
 import {
   ExecutionLandingHoldError,
+  assertExactDockerExecutionLandingCaptureV2,
+  prepareExactDockerExecutionLandingContextV2,
   prepareDockerExecutionLanding,
+  stampExactDockerExecutionLandingCheckpointV2,
   stampDockerExecutionLandingCheckpoint,
+  type ExactDockerExecutionLandingCaptureV2,
 } from '../../src/orchestra/execution-landing-coordinator.js';
 import type { RuntimeBudgetUsageEvidence } from '../../src/orchestra/runtime-budget-monitor.js';
 
@@ -107,17 +113,349 @@ function terminalUsage(
   };
 }
 
+function exactLandingCapture(root?: string): ExactDockerExecutionLandingCaptureV2 {
+  const digest = (character: string): `sha256:${string}` =>
+    `sha256:${character.repeat(64)}`;
+  const identity = {
+    schemaVersion: 2 as const,
+    backend: 'docker' as const,
+    projectRootSha256: root
+      ? createHash('sha256').update(realpathSync.native(root)).digest('hex')
+      : '1'.repeat(64),
+    projectId: 'project-a',
+    taskId: 'task-exact-landing',
+    attemptId: randomUUID(),
+    generation: 1,
+  };
+  const preparationRef = createExecutionLandingPreparationRefV2({
+    dispatchRequestId: `dreq-${'2'.repeat(64)}`,
+    dispatchRequestMaterialDigest: digest('3'),
+    privateIdentity: identity,
+    admissionReceiptDigest: digest('4'),
+    admissionRefDigest: digest('5'),
+    admittedAt: '2026-09-01T00:58:00.000Z',
+    policyDigest: digest('6'),
+    taskSnapshotDigest: digest('7'),
+    providerInvocationDigest: digest('8'),
+  });
+  const providerStartReceipt = { ref: digest('a'), digest: digest('b') };
+  const custodyRef = {
+    dispatchRequestId: preparationRef.dispatchRequestId,
+    identity,
+    admissionReceiptDigest: preparationRef.admissionReceiptDigest,
+    admissionRefDigest: preparationRef.admissionRefDigest,
+    providerStartReceipt,
+  };
+  const providerExecutionAttempt = {
+    schemaVersion: 2 as const,
+    kind: 'task-attempt-custody-provider-execution-attempt' as const,
+    providerExecutionAttemptId: randomUUID(),
+    custodyIdentity: identity,
+    admissionReceiptDigest: preparationRef.admissionReceiptDigest,
+    backendExecutionId: 'container-exact-landing',
+    identityDigest: digest('c'),
+  };
+  const releaseReceipt = { ref: digest('d'), digest: digest('e') };
+  const dispatch = {
+    kind: 'released' as const,
+    settlementRef: {
+      schemaVersion: 1 as const,
+      taskId: identity.taskId,
+      backend: 'docker' as const,
+      projectRootSha256: identity.projectRootSha256,
+      attemptId: providerExecutionAttempt.providerExecutionAttemptId,
+    },
+    admissionRef: {
+      dispatchRequestId: preparationRef.dispatchRequestId,
+      dispatchRequestMaterialDigest: preparationRef.dispatchRequestMaterialDigest,
+      admissionRefDigest: preparationRef.admissionRefDigest,
+    },
+    preparationRef,
+    custodyRef,
+    providerExecutionAttempt,
+    backendExecutionId: providerExecutionAttempt.backendExecutionId,
+    mountReceiptDigest: digest('f'),
+    dispatchReceipt: { ref: digest('0'), digest: digest('0') },
+    releaseReceipt,
+    providerStartReceipt,
+    projectionFence: digest('1'),
+    releasedAt: '2026-09-01T01:00:00.000Z',
+    providerStartAcceptedAt: '2026-09-01T01:00:01.000Z',
+  };
+  const resultArtifact = {
+    identity,
+    admissionReceiptDigest: preparationRef.admissionReceiptDigest,
+    policyDigest: preparationRef.policyDigest,
+    artifactClass: 'worker-result' as const,
+    artifactKey: 'result-exact-landing',
+    contentDigest: digest('2'),
+    byteLength: 120,
+    capturedAt: '2026-09-01T01:00:03.000Z',
+    receiptDigest: digest('3'),
+  };
+  const providerStream = {
+    identity,
+    admissionReceiptDigest: preparationRef.admissionReceiptDigest,
+    policyDigest: preparationRef.policyDigest,
+    artifactClass: 'pristine-provider-stream' as const,
+    artifactKey: 'provider-exact-landing',
+    contentDigest: digest('4'),
+    byteLength: 300,
+    capturedAt: '2026-09-01T01:00:02.500Z',
+    receiptDigest: digest('5'),
+  };
+  const landingArtifact = {
+    identity,
+    admissionReceiptDigest: preparationRef.admissionReceiptDigest,
+    policyDigest: preparationRef.policyDigest,
+    artifactClass: 'worker-landing-proposal' as const,
+    artifactKey: 'landing-exact-landing',
+    contentDigest: digest('6'),
+    byteLength: 90,
+    capturedAt: '2026-09-01T01:00:04.000Z',
+    receiptDigest: digest('7'),
+  };
+  const terminal = {
+    kind: 'landing-captured' as const,
+    custodyRef,
+    releaseReceipt,
+    projectionFence: dispatch.projectionFence,
+    providerExit: {
+      containerId: dispatch.backendExecutionId,
+      exitCode: 0,
+      observedAt: '2026-09-01T01:00:02.000Z',
+      waitEvidenceDigest: digest('8'),
+      observationReceiptDigest: digest('9'),
+      observationEvidenceDigest: digest('a'),
+    },
+    providerStream,
+    result: {
+      version: 2 as const,
+      identity,
+      policyDigest: preparationRef.policyDigest,
+      admissionReceiptDigest: preparationRef.admissionReceiptDigest,
+      sourceResult: {
+        artifactClass: 'worker-result' as const,
+        artifactKey: resultArtifact.artifactKey,
+        artifactReceiptDigest: resultArtifact.receiptDigest,
+        artifactSha256: resultArtifact.contentDigest,
+        byteLength: resultArtifact.byteLength,
+      },
+    },
+    resultArtifact,
+    providerBilling: {
+      evidence: {
+        source: 'provider-envelope' as const,
+        provider: 'claude',
+        currency: 'USD' as const,
+        providerReportedUsd: 0,
+        modelUsage: {},
+        capturedAt: providerStream.capturedAt,
+      },
+      evidenceDigest: digest('b'),
+      providerStreamReceiptDigest: providerStream.receiptDigest,
+    },
+    landingProposal: {
+      artifact: landingArtifact,
+      proposal: {
+        version: 3 as const,
+        taskId: identity.taskId,
+        dispatchRequestId: preparationRef.dispatchRequestId,
+        sequence: 2,
+        summary: 'Exact landing is ready.',
+        completedWork: ['captured exact result'],
+        remainingWork: ['continue after checkpoint'],
+        nextAction: 'resume exact continuation',
+        unresolvedRisks: [],
+        updatedAt: '2026-09-01T01:00:03.500Z',
+      },
+      verifiedAt: '2026-09-01T01:00:05.000Z',
+    },
+  };
+  return { dispatch, terminal };
+}
+
 beforeEach(() => {
   for (const value of roots.splice(0)) rmSync(value, { recursive: true, force: true });
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   if (originalDeckentHome === undefined) delete process.env.DECKENT_HOME;
   else process.env.DECKENT_HOME = originalDeckentHome;
   for (const value of roots.splice(0)) rmSync(value, { recursive: true, force: true });
 });
 
 describe('Docker execution landing coordinator', () => {
+  it('accepts only a fully equal released and terminal exact-custody landing', () => {
+    const capture = exactLandingCapture();
+    expect(() => assertExactDockerExecutionLandingCaptureV2(capture)).not.toThrow();
+
+    expect(() => assertExactDockerExecutionLandingCaptureV2({
+      ...capture,
+      terminal: {
+        ...capture.terminal,
+        resultArtifact: {
+          ...capture.terminal.resultArtifact,
+          receiptDigest: `sha256:${'f'.repeat(64)}`,
+        },
+      },
+    })).toThrow(/does not match released custody/);
+    expect(() => assertExactDockerExecutionLandingCaptureV2({
+      ...capture,
+      terminal: {
+        ...capture.terminal,
+        landingProposal: {
+          ...capture.terminal.landingProposal,
+          proposal: {
+            ...capture.terminal.landingProposal.proposal,
+            dispatchRequestId: `dreq-${'f'.repeat(64)}`,
+          },
+        },
+      },
+    })).toThrow(/does not match released custody/);
+    expect(() => assertExactDockerExecutionLandingCaptureV2({
+      ...capture,
+      terminal: {
+        ...capture.terminal,
+        providerStream: {
+          ...capture.terminal.providerStream,
+          capturedAt: '2026-09-01T00:59:59.000Z',
+        },
+      },
+    })).toThrow(/does not match released custody/);
+    expect(() => assertExactDockerExecutionLandingCaptureV2({
+      ...capture,
+      terminal: {
+        ...capture.terminal,
+        landingProposal: {
+          ...capture.terminal.landingProposal,
+          verifiedAt: '2026-09-01T00:59:59.000Z',
+        },
+      },
+    })).toThrow(/does not match released custody/);
+  });
+
+  it('writes the pre-provider baseline then stamps only the path-free terminal custody chain', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime('2026-09-01T00:59:00.000Z');
+    const { root } = fixture();
+    const capture = exactLandingCapture(root);
+    const preparation = capture.dispatch.preparationRef;
+    const identity = {
+      configuredProvider: 'claude',
+      configuredModel: 'claude-fable-5',
+      requestedProvider: 'claude',
+      requestedModel: 'claude-fable-5',
+      resolvedProvider: 'claude',
+      resolvedModel: 'claude-fable-5',
+      calledProvider: 'claude',
+      calledModel: 'claude-fable-5',
+      backend: 'docker' as const,
+      auth: 'subscription',
+      fallbackReason: null,
+    };
+    const preparationInput = {
+      taskId: preparation.privateIdentity.taskId,
+      tenantId: 'tenant-a',
+      originalRequestDigest: '1'.repeat(64),
+      taskDigest: '2'.repeat(64),
+      taskSnapshotDigest: preparation.taskSnapshotDigest,
+      providerInvocationDigest: preparation.providerInvocationDigest,
+      role: 'worker' as const,
+      taskKind: 'code-development' as const,
+      admissionMode: 'unattended' as const,
+      approvalEvidenceRef: null,
+      identity,
+      policyDigest: preparation.policyDigest.slice('sha256:'.length),
+      landingPolicy: { reserve_ratio: 0.25 },
+      hardBudget: { maxTokens: 1_000, maxTurns: 10 },
+      parentAttemptId: null,
+      parentFence: null,
+      parentCheckpointSha256: null,
+      attemptFence: 'exact-attempt-fence',
+      scope: { filesRead: ['source.ts'], filesWrite: ['source.ts'] },
+      acceptanceCriteria: 'Exact custody, disk evidence and landing proposal must agree.',
+    };
+    const prepared = {
+      kind: 'exact-docker-custody-prepared' as const,
+      dispatchEnvelope: Object.freeze({}) as never,
+      admissionRef: capture.dispatch.admissionRef,
+      preparationRef: preparation,
+    };
+    const context = prepareExactDockerExecutionLandingContextV2({
+      projectRoot: root,
+      prepared,
+      preparationInput,
+    });
+    writeFileSync(join(root, 'source.ts'), 'export const value = 2;\n');
+    const terminalOperational = {
+      taskId: preparation.privateIdentity.taskId,
+      tenantId: preparationInput.tenantId,
+      originalRequestDigest: preparationInput.originalRequestDigest,
+      taskDigest: preparationInput.taskDigest,
+      role: preparationInput.role,
+      kind: preparationInput.taskKind,
+      admissionMode: preparationInput.admissionMode,
+      approvalEvidenceRef: preparationInput.approvalEvidenceRef,
+      identity,
+      policyDigest: preparationInput.policyDigest,
+      landingPolicy: preparationInput.landingPolicy,
+      hardBudget: preparationInput.hardBudget,
+      cumulativeUsage: {
+        turns: 2, inputTokens: 100, outputTokens: 50, cacheReadTokens: 10,
+        cacheCreationTokens: 0, totalTokens: 160, maxContextTokens: 150,
+      },
+      parentAttemptId: null,
+      parentFence: null,
+      parentCheckpointSha256: null,
+      attemptFence: preparationInput.attemptFence,
+      providerSequence: {
+        firstSequence: 1, lastSequence: 2, eventCount: 2,
+        eventDigest: '3'.repeat(64),
+      },
+      semanticState: {
+        summary: 'Exact Docker landing captured.',
+        completedWork: ['Captured result and proposal.'],
+        remainingWork: ['Dispatch bounded continuation.'],
+        nextAction: 'Use the V2 checkpoint.',
+        unresolvedRisks: [],
+      },
+      scope: preparationInput.scope,
+      evidenceRefs: [`provider-stream:sha256:${'4'.repeat(64)}`],
+      acceptanceCriteria: preparationInput.acceptanceCriteria,
+      landingRequestedAt: '2026-09-01T01:00:04.500Z',
+    };
+    vi.setSystemTime('2026-09-01T01:00:06.000Z');
+    const stamped = stampExactDockerExecutionLandingCheckpointV2({
+      projectRoot: root,
+      capture,
+      operationalInput: terminalOperational,
+    });
+    expect(context.context.baseline.entries).toContainEqual(expect.objectContaining({
+      path: 'source.ts',
+    }));
+    expect(stamped.checkpoint.checkpoint.operationalPayload.diskEvidenceDigest)
+      .toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(stamped.retirement).toMatchObject({
+      state: 'RETIRED',
+      resourcesReleased: true,
+      runtimeDisposition: 'checkpointed-process-exited',
+    });
+    const durable = JSON.stringify(stamped);
+    expect(durable).not.toContain('.tasks');
+    expect(durable).not.toContain('/workspace');
+    expect(durable).not.toContain(root);
+    expect(() => stampExactDockerExecutionLandingCheckpointV2({
+      projectRoot: root,
+      capture,
+      operationalInput: {
+        ...terminalOperational,
+        identity: { ...identity, calledProvider: 'foreign-provider' },
+      },
+    })).toThrow(/billing identity/);
+  });
+
   it('selects the finite proposal cadence only for the closed xverify protocol', () => {
     const { root, task } = fixture();
     const settlementRef = createTaskResultSettlementRef(root, task.id);

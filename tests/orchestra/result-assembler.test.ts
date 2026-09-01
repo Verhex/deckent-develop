@@ -8,10 +8,13 @@ import { execSync } from 'node:child_process';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { createHash } from 'node:crypto';
+import { canonicalJson } from '../../src/core/audit-writer.js';
 
 import {
   assembleResult,
   assembleCanonicalIngressResult,
+  assembleCanonicalIngressResultV2,
   computeBoundaryViolations,
   makeStaticGitChangeProvider,
   createDefaultGitChangeProvider,
@@ -28,6 +31,11 @@ import {
 import type { TokenUsage } from '../../src/core/token-usage.js';
 import { TaskStatus } from '../../src/core/types.js';
 import type { Task, TaskScope } from '../../src/core/types.js';
+import { createTaskResultSettlementV2TestPolicy } from '../helpers/task-result-settlement-v2-fixture.js';
+import {
+  createExecutionEffectResultProjectionV1,
+  createTaskAttemptEffectLandingBindingV2,
+} from '../../src/core/execution-effect-persistence-contract.js';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -330,6 +338,550 @@ describe('assembleResult — validation', () => {
       isPriorityFix: true,
       fixForTaskId: 'task-0',
     });
+  });
+
+  it('preserves run-policy and production-wiring evidence through canonical ingress', () => {
+    const productionWiringEvidence = {
+      version: 1 as const,
+      contractDigest: 'b'.repeat(64),
+      observedBy: 'worker' as const,
+      evidence: {
+        state: 'presence-only' as const,
+        basis: 'static-reachability' as const,
+        evidenceRefs: ['worker-observation:sha256:fixture'],
+      },
+    };
+    const runPolicyEvidence = {
+      version: 1 as const,
+      observedPolicyDigest: 'c'.repeat(64),
+      observedBy: 'worker' as const,
+    };
+    const result = assembleCanonicalIngressResult({
+      selfAssessment: 'DONE',
+      testsPassed: true,
+      filesChanged: [],
+      productionWiringEvidence,
+      runPolicyEvidence,
+    }, {
+      taskId: 'task-evidence',
+      workerId: 'docker-task-evidence',
+      provider: 'codex',
+      model: 'gpt-test',
+    });
+
+    expect(result.productionWiringEvidence).toEqual(productionWiringEvidence);
+    expect(result.runPolicyEvidence).toEqual(runPolicyEvidence);
+  });
+
+  it('promotes exact custody ingress to V2 without accepting worker-authored custody', () => {
+    const policy = createTaskResultSettlementV2TestPolicy();
+    const identity = {
+      schemaVersion: 2 as const,
+      backend: 'docker' as const,
+      projectRootSha256: '0'.repeat(64),
+      projectId: 'fixture-project',
+      taskId: 'fixture-001',
+      attemptId: '123e4567-e89b-42d3-a456-426614174000',
+      generation: 4,
+    };
+    const admissionReceiptDigest = `sha256:${'d'.repeat(64)}` as const;
+    const sourceBinding = Object.freeze({
+      version: 2 as const,
+      identity,
+      policyDigest: policy.policyDigest,
+      admissionReceiptDigest,
+      sourceResult: Object.freeze({
+        artifactClass: 'worker-result' as const,
+        artifactKey: 'primary',
+        artifactReceiptDigest: `sha256:${'e'.repeat(64)}` as const,
+        artifactSha256: `sha256:${'f'.repeat(64)}` as const,
+        byteLength: 128,
+      }),
+    });
+    const effectProjection = createExecutionEffectResultProjectionV1({
+      disposition: 'COMMITTED_NO_CHANGE',
+      effectDecisionDigest: `sha256:${'1'.repeat(64)}`,
+      transactionDigest: `sha256:${'2'.repeat(64)}`,
+      decisionEffectCount: 0,
+      effects: [],
+    });
+    const effectBinding = createTaskAttemptEffectLandingBindingV2({
+      identity: {
+        projectId: identity.projectId,
+        taskId: identity.taskId,
+        attemptId: identity.attemptId,
+        generation: identity.generation,
+      },
+      admissionReceiptDigest,
+      custodyPolicyDigest: policy.policyDigest,
+      landingArtifactKey: 'primary-landing',
+      landingArtifactReceiptDigest: `sha256:${'3'.repeat(64)}`,
+      landingReceiptDigest: `sha256:${'4'.repeat(64)}`,
+      effectLandingChainDigest: `sha256:${'5'.repeat(64)}`,
+      readyLifecycleAuthorityDigest: `sha256:${'6'.repeat(64)}`,
+      disposition: effectProjection.disposition,
+      effectDecisionDigest: effectProjection.effectDecisionDigest,
+      transactionDigest: effectProjection.transactionDigest,
+    });
+    const hostEffectAuthority = Object.freeze({
+      projection: effectProjection,
+      binding: effectBinding,
+    });
+    const ingress = {
+      selfAssessment: 'DONE',
+      testsPassed: true,
+      filesChanged: [],
+      runPolicyEvidence: {
+        version: 1 as const,
+        observedPolicyDigest: 'd'.repeat(64),
+        observedBy: 'worker' as const,
+      },
+    };
+    const hostBilling = {
+      source: 'provider-envelope' as const,
+      provider: 'fixture-provider',
+      currency: 'USD' as const,
+      providerReportedUsd: 1.25,
+      modelUsage: {
+        'fixture-model': {
+          inputTokens: 10, outputTokens: 5, cacheReadTokens: 2, cacheCreationTokens: 1,
+        },
+      },
+      capturedAt: '2026-09-01T00:00:00.000Z',
+    };
+    const hostTerminalBilling = {
+      evidence: hostBilling,
+      evidenceDigest: `sha256:${createHash('sha256').update(canonicalJson(hostBilling)).digest('hex')}` as const,
+      providerStreamReceiptDigest: `sha256:${'e'.repeat(64)}` as const,
+      billingMode: 'api' as const,
+    };
+    const hostWorkEvidence = {
+      filesChanged: [],
+      totalLinesAdded: 0,
+      totalLinesRemoved: 0,
+      workAttribution: {
+        state: 'VERIFIED' as const,
+        attemptId: identity.attemptId,
+        baselineRef: `provider-exit:${'f'.repeat(64)}#scope-baseline`,
+        baselineSha256: 'a'.repeat(64),
+        scopeDigest: 'b'.repeat(64),
+      },
+      providerExitObservationReceiptDigest: `sha256:${'f'.repeat(64)}` as const,
+    };
+    const hostWorkAuthorityFor = (evidence: Readonly<{
+      filesChanged: readonly FileChange[];
+      totalLinesAdded: number;
+      totalLinesRemoved: number;
+      workAttribution: typeof hostWorkEvidence.workAttribution;
+      providerExitObservationReceiptDigest: `sha256:${string}`;
+    }>) => ({
+      ...evidence,
+      evidenceDigest: `sha256:${createHash('sha256')
+        .update(canonicalJson(evidence)).digest('hex')}` as const,
+    });
+    const hostWorkAuthority = hostWorkAuthorityFor(hostWorkEvidence);
+    const hostWorkArtifact = Object.freeze({
+      artifactClass: 'host-work-attribution' as const,
+      artifactKey: `host-work-${identity.attemptId}`,
+      artifactReceiptDigest: `sha256:${'b'.repeat(64)}` as const,
+      artifactSha256: `sha256:${'c'.repeat(64)}` as const,
+      byteLength: Buffer.byteLength(canonicalJson(hostWorkAuthority), 'utf8'),
+    });
+    const promptCompilePlanId = `prompt-compile-plan:sha256:${'1'.repeat(64)}`;
+    const hostPromptBody = {
+      promptDeliveryAttribution: { state: 'CURRENT' as const },
+      agentId: 'backend-specialist',
+      skillIds: ['z-skill', 'ä-skill'],
+      promptCompilePlanId,
+      receiptIdentity: `prompt-delivery-receipt:sha256:${'2'.repeat(64)}` as const,
+      promptDeliveryAuthorityDigest: `sha256:${'3'.repeat(64)}` as const,
+      basePromptSha256: `sha256:${'4'.repeat(64)}` as const,
+      segmentManifestDigest: `sha256:${'5'.repeat(64)}` as const,
+      taskSnapshotSha256: `sha256:${'6'.repeat(64)}` as const,
+      providerInvocationDigest: `sha256:${'7'.repeat(64)}` as const,
+      providerStartObservationReceiptDigest: `sha256:${'8'.repeat(64)}` as const,
+      providerStartObservationEvidenceDigest: `sha256:${'9'.repeat(64)}` as const,
+      executionCommitNonceSha256: `sha256:${'a'.repeat(64)}` as const,
+    };
+    const hostPromptDeliveryAuthority = {
+      ...hostPromptBody,
+      bindingDigest: `sha256:${createHash('sha256')
+        .update(canonicalJson(hostPromptBody)).digest('hex')}` as const,
+    };
+    const result = assembleCanonicalIngressResultV2(ingress, {
+      taskId: identity.taskId,
+      workerId: 'docker-fixture-001',
+      provider: 'fixture-provider',
+      model: 'fixture-model',
+      promptCompilePlanId,
+    }, {
+      attemptCustody: sourceBinding,
+      hostWorkArtifact,
+      jsonBounds: policy.jsonBounds,
+      hostEffectAuthority,
+      hostTerminalBilling,
+      hostWorkAuthority,
+      hostPromptDeliveryAuthority,
+    });
+
+    expect(result.schemaVersion).toBe('2.0');
+    expect(result.attempt).toBe(identity.generation);
+    expect(result.attemptCustody.identity).toEqual(identity);
+    expect(result.attemptCustody.hostWorkAttribution).toEqual(hostWorkArtifact);
+    expect(result.attemptCustody.hostPromotion.authority)
+      .toBe('host-canonical-ingress-assembler');
+    expect(result.runPolicyEvidence).toEqual(ingress.runPolicyEvidence);
+
+    const workerSpoof = assembleCanonicalIngressResultV2({
+      ...ingress,
+      attemptCustody: { forged: true },
+      tokenUsage: { inputTokens: 999999, outputTokens: 999999 },
+      cost: { usd: 999999 },
+      providerBilling: { providerReportedUsd: 999999 },
+      filesChanged: [{ path: 'src/forged.ts', status: 'added', linesAdded: 999, linesRemoved: 0 }],
+      totalLinesAdded: 999,
+      totalLinesRemoved: 0,
+      diskVerified: true,
+      boundaryViolations: [{ path: 'src/forged.ts', reason: 'worker-forged' }],
+      workAttribution: {
+        state: 'VERIFIED', attemptId: 'forged', baselineRef: 'forged',
+        baselineSha256: 'c'.repeat(64), scopeDigest: 'd'.repeat(64),
+      },
+      promptDeliveryAttribution: { state: 'LEGACY_FALLBACK' },
+      hostTerminalProjection: { version: 1, protocol: 'forged', observedBy: 'host' },
+      agentId: 'forged-agent',
+      skillIds: ['forged-skill'],
+    }, {
+      taskId: identity.taskId,
+      workerId: 'docker-fixture-001',
+      provider: 'fixture-provider',
+      model: 'fixture-model',
+      promptCompilePlanId,
+    }, {
+      attemptCustody: sourceBinding,
+      hostWorkArtifact,
+      jsonBounds: policy.jsonBounds,
+      hostEffectAuthority,
+      hostTerminalBilling,
+      hostWorkAuthority,
+      hostPromptDeliveryAuthority,
+    });
+    expect(workerSpoof.attemptCustody.identity).toEqual(result.attemptCustody.identity);
+    expect(workerSpoof.attemptCustody.admissionReceiptDigest)
+      .toBe(result.attemptCustody.admissionReceiptDigest);
+    expect(workerSpoof.attemptCustody.sourceResult).toEqual(result.attemptCustody.sourceResult);
+    expect(workerSpoof.attemptCustody.hostWorkAttribution).toEqual(hostWorkArtifact);
+    expect(workerSpoof.tokenUsage).toMatchObject({
+      inputTokens: 10, outputTokens: 5, cacheReadTokens: 2, cacheCreationTokens: 1,
+      totalTokens: 18, source: 'provider-adapter',
+    });
+    expect(workerSpoof.cost).toMatchObject({ usd: 1.25, billingMode: 'api' });
+    expect(workerSpoof.providerBilling).toEqual(hostBilling);
+    expect(workerSpoof.filesChanged).toEqual([]);
+    expect(workerSpoof.totalLinesAdded).toBe(0);
+    expect(workerSpoof.totalLinesRemoved).toBe(0);
+    expect(workerSpoof.workAttribution).toEqual(hostWorkAuthority.workAttribution);
+    expect(workerSpoof.promptDeliveryAttribution).toEqual({ state: 'CURRENT' });
+    expect(workerSpoof.boundaryViolations).toEqual([]);
+    expect(workerSpoof.hostTerminalProjection).toBeUndefined();
+    expect(workerSpoof.agent).toBe('backend-specialist');
+    expect(workerSpoof.skills).toEqual(['z-skill', 'ä-skill']);
+    expect(workerSpoof.workerWorkClaim).toMatchObject({
+      filesChanged: ['src/forged.ts'], linesAdded: 999, linesRemoved: 0, mismatch: true,
+    });
+    expect(workerSpoof.attemptCustody.effectLanding).toEqual(hostEffectAuthority.binding);
+
+    const canonicalAuthority = {
+      taskId: identity.taskId,
+      workerId: 'docker-fixture-001',
+      provider: 'fixture-provider',
+      model: 'fixture-model',
+      promptCompilePlanId,
+    };
+    const custodyBase = {
+      attemptCustody: sourceBinding,
+      hostWorkArtifact,
+      jsonBounds: policy.jsonBounds,
+      hostTerminalBilling,
+      hostPromptDeliveryAuthority,
+    };
+    expect(() => assembleCanonicalIngressResultV2(
+      ingress,
+      canonicalAuthority,
+      { ...custodyBase, hostWorkAuthority } as never,
+    )).toThrow(/Host execution effect authority is invalid/u);
+    expect(() => assembleCanonicalIngressResultV2(ingress, canonicalAuthority, {
+      ...custodyBase,
+      hostEffectAuthority: {
+        ...hostEffectAuthority,
+        projection: { ...hostEffectAuthority.projection, effectCount: 1 },
+      },
+      hostWorkAuthority,
+    })).toThrow(/Host execution effect authority is invalid/u);
+    expect(() => assembleCanonicalIngressResultV2(ingress, canonicalAuthority, {
+      ...custodyBase,
+      hostWorkArtifact: {
+        ...hostWorkArtifact,
+        artifactKey: `host-work-foreign-${identity.attemptId}`,
+      },
+      hostEffectAuthority,
+      hostWorkAuthority,
+    })).toThrow(/Host execution effect authority is invalid/u);
+    const foreignBinding = createTaskAttemptEffectLandingBindingV2({
+      identity: { ...hostEffectAuthority.binding.identity, attemptId: 'foreign-attempt' },
+      admissionReceiptDigest: hostEffectAuthority.binding.admissionReceiptDigest,
+      custodyPolicyDigest: hostEffectAuthority.binding.custodyPolicyDigest,
+      landingArtifactKey: hostEffectAuthority.binding.landingArtifactKey,
+      landingArtifactReceiptDigest: hostEffectAuthority.binding.landingArtifactReceiptDigest,
+      landingReceiptDigest: hostEffectAuthority.binding.landingReceiptDigest,
+      effectLandingChainDigest: hostEffectAuthority.binding.effectLandingChainDigest,
+      readyLifecycleAuthorityDigest: hostEffectAuthority.binding.readyLifecycleAuthorityDigest,
+      disposition: hostEffectAuthority.binding.disposition,
+      effectDecisionDigest: hostEffectAuthority.binding.effectDecisionDigest,
+      transactionDigest: hostEffectAuthority.binding.transactionDigest,
+    });
+    expect(() => assembleCanonicalIngressResultV2(ingress, canonicalAuthority, {
+      ...custodyBase,
+      hostEffectAuthority: { projection: effectProjection, binding: foreignBinding },
+      hostWorkAuthority,
+    })).toThrow(/Host execution effect authority is invalid/u);
+    const noChangeWithWork = hostWorkAuthorityFor({
+      ...hostWorkEvidence,
+      filesChanged: [{
+        path: 'src/host.ts', status: 'modified', linesAdded: 3, linesRemoved: 1,
+      }],
+      totalLinesAdded: 3,
+      totalLinesRemoved: 1,
+    });
+    expect(() => assembleCanonicalIngressResultV2(ingress, canonicalAuthority, {
+      ...custodyBase,
+      hostEffectAuthority,
+      hostWorkAuthority: noChangeWithWork,
+    })).toThrow(/Host work attribution authority is invalid/u);
+
+    const committedProjection = createExecutionEffectResultProjectionV1({
+      disposition: 'COMMITTED',
+      effectDecisionDigest: `sha256:${'b'.repeat(64)}`,
+      transactionDigest: `sha256:${'c'.repeat(64)}`,
+      decisionEffectCount: 1,
+      effects: [{
+        operationIndex: 0,
+        path: 'src/host.ts',
+        status: 'modified',
+        operationKind: 'REPLACE',
+        entryKind: 'regular-file',
+        lineMetrics: 'REQUIRED',
+        operationDigest: `sha256:${'d'.repeat(64)}`,
+        effectDigests: [`sha256:${'e'.repeat(64)}`],
+        derivedParentProvenanceDigest: null,
+      }],
+    });
+    const committedBinding = createTaskAttemptEffectLandingBindingV2({
+      identity: hostEffectAuthority.binding.identity,
+      admissionReceiptDigest: hostEffectAuthority.binding.admissionReceiptDigest,
+      custodyPolicyDigest: hostEffectAuthority.binding.custodyPolicyDigest,
+      landingArtifactKey: hostEffectAuthority.binding.landingArtifactKey,
+      landingArtifactReceiptDigest: hostEffectAuthority.binding.landingArtifactReceiptDigest,
+      landingReceiptDigest: hostEffectAuthority.binding.landingReceiptDigest,
+      effectLandingChainDigest: hostEffectAuthority.binding.effectLandingChainDigest,
+      readyLifecycleAuthorityDigest: hostEffectAuthority.binding.readyLifecycleAuthorityDigest,
+      disposition: 'COMMITTED',
+      effectDecisionDigest: committedProjection.effectDecisionDigest,
+      transactionDigest: committedProjection.transactionDigest,
+    });
+    const committedWork = hostWorkAuthorityFor({
+      ...hostWorkEvidence,
+      filesChanged: [{
+        path: 'src/host.ts', status: 'modified', linesAdded: 3, linesRemoved: 1,
+      }],
+      totalLinesAdded: 3,
+      totalLinesRemoved: 1,
+    });
+    const committedResult = assembleCanonicalIngressResultV2(ingress, canonicalAuthority, {
+      ...custodyBase,
+      hostEffectAuthority: { projection: committedProjection, binding: committedBinding },
+      hostWorkAuthority: committedWork,
+    });
+    expect(committedResult.filesChanged).toEqual(committedWork.filesChanged);
+    expect(committedResult.diskVerified).toBe(true);
+    expect(committedResult.attemptCustody.effectLanding).toEqual(committedBinding);
+
+    const reorderedProjection = createExecutionEffectResultProjectionV1({
+      disposition: 'COMMITTED',
+      effectDecisionDigest: `sha256:${'5'.repeat(64)}`,
+      transactionDigest: `sha256:${'6'.repeat(64)}`,
+      decisionEffectCount: 2,
+      effects: [
+        {
+          operationIndex: 0,
+          path: 'src/z.ts',
+          status: 'modified',
+          operationKind: 'REPLACE',
+          entryKind: 'regular-file',
+          lineMetrics: 'REQUIRED',
+          operationDigest: `sha256:${'7'.repeat(64)}`,
+          effectDigests: [`sha256:${'8'.repeat(64)}`],
+          derivedParentProvenanceDigest: null,
+        },
+        {
+          operationIndex: 1,
+          path: 'src/a.ts',
+          status: 'added',
+          operationKind: 'ADD',
+          entryKind: 'regular-file',
+          lineMetrics: 'REQUIRED',
+          operationDigest: `sha256:${'9'.repeat(64)}`,
+          effectDigests: [`sha256:${'a'.repeat(64)}`],
+          derivedParentProvenanceDigest: null,
+        },
+      ],
+    });
+    const reorderedBinding = createTaskAttemptEffectLandingBindingV2({
+      identity: hostEffectAuthority.binding.identity,
+      admissionReceiptDigest: hostEffectAuthority.binding.admissionReceiptDigest,
+      custodyPolicyDigest: hostEffectAuthority.binding.custodyPolicyDigest,
+      landingArtifactKey: hostEffectAuthority.binding.landingArtifactKey,
+      landingArtifactReceiptDigest: hostEffectAuthority.binding.landingArtifactReceiptDigest,
+      landingReceiptDigest: hostEffectAuthority.binding.landingReceiptDigest,
+      effectLandingChainDigest: hostEffectAuthority.binding.effectLandingChainDigest,
+      readyLifecycleAuthorityDigest: hostEffectAuthority.binding.readyLifecycleAuthorityDigest,
+      disposition: 'COMMITTED',
+      effectDecisionDigest: reorderedProjection.effectDecisionDigest,
+      transactionDigest: reorderedProjection.transactionDigest,
+    });
+    const reorderedWork = hostWorkAuthorityFor({
+      ...hostWorkEvidence,
+      filesChanged: [
+        { path: 'src/a.ts', status: 'added', linesAdded: 2, linesRemoved: 0 },
+        { path: 'src/z.ts', status: 'modified', linesAdded: 1, linesRemoved: 1 },
+      ],
+      totalLinesAdded: 3,
+      totalLinesRemoved: 1,
+    });
+    const reorderedResult = assembleCanonicalIngressResultV2(ingress, canonicalAuthority, {
+      ...custodyBase,
+      hostEffectAuthority: { projection: reorderedProjection, binding: reorderedBinding },
+      hostWorkAuthority: reorderedWork,
+    });
+    expect(reorderedResult.filesChanged).toEqual([
+      { path: 'src/z.ts', status: 'modified', linesAdded: 1, linesRemoved: 1 },
+      { path: 'src/a.ts', status: 'added', linesAdded: 2, linesRemoved: 0 },
+    ]);
+
+    const directoryProjection = createExecutionEffectResultProjectionV1({
+      disposition: 'COMMITTED',
+      effectDecisionDigest: `sha256:${'1'.repeat(64)}`,
+      transactionDigest: `sha256:${'2'.repeat(64)}`,
+      decisionEffectCount: 1,
+      effects: [{
+        operationIndex: 0,
+        path: 'src/generated',
+        status: 'added',
+        operationKind: 'ADD_DIRECTORY',
+        entryKind: 'directory',
+        lineMetrics: 'NOT_APPLICABLE_DIRECTORY',
+        operationDigest: `sha256:${'3'.repeat(64)}`,
+        effectDigests: [`sha256:${'4'.repeat(64)}`],
+        derivedParentProvenanceDigest: null,
+      }],
+    });
+    const directoryBinding = createTaskAttemptEffectLandingBindingV2({
+      identity: hostEffectAuthority.binding.identity,
+      admissionReceiptDigest: hostEffectAuthority.binding.admissionReceiptDigest,
+      custodyPolicyDigest: hostEffectAuthority.binding.custodyPolicyDigest,
+      landingArtifactKey: hostEffectAuthority.binding.landingArtifactKey,
+      landingArtifactReceiptDigest: hostEffectAuthority.binding.landingArtifactReceiptDigest,
+      landingReceiptDigest: hostEffectAuthority.binding.landingReceiptDigest,
+      effectLandingChainDigest: hostEffectAuthority.binding.effectLandingChainDigest,
+      readyLifecycleAuthorityDigest: hostEffectAuthority.binding.readyLifecycleAuthorityDigest,
+      disposition: 'COMMITTED',
+      effectDecisionDigest: directoryProjection.effectDecisionDigest,
+      transactionDigest: directoryProjection.transactionDigest,
+    });
+    const directoryResult = assembleCanonicalIngressResultV2(ingress, canonicalAuthority, {
+      ...custodyBase,
+      hostEffectAuthority: { projection: directoryProjection, binding: directoryBinding },
+      hostWorkAuthority,
+    });
+    expect(directoryResult.filesChanged).toEqual([{
+      path: 'src/generated', status: 'added', linesAdded: 0, linesRemoved: 0,
+    }]);
+    expect(directoryResult.totalLinesAdded).toBe(0);
+    expect(directoryResult.totalLinesRemoved).toBe(0);
+
+    const wrongStatusWork = hostWorkAuthorityFor({
+      ...hostWorkEvidence,
+      filesChanged: [{
+        path: 'src/host.ts', status: 'added', linesAdded: 3, linesRemoved: 0,
+      }],
+      totalLinesAdded: 3,
+      totalLinesRemoved: 0,
+    });
+    expect(() => assembleCanonicalIngressResultV2(ingress, canonicalAuthority, {
+      ...custodyBase,
+      hostEffectAuthority: { projection: committedProjection, binding: committedBinding },
+      hostWorkAuthority: wrongStatusWork,
+    })).toThrow(/Host work attribution authority is invalid/u);
+    const wrongLineTotals = hostWorkAuthorityFor({
+      ...hostWorkEvidence,
+      filesChanged: committedWork.filesChanged,
+      totalLinesAdded: 4,
+      totalLinesRemoved: 1,
+    });
+    expect(() => assembleCanonicalIngressResultV2(ingress, canonicalAuthority, {
+      ...custodyBase,
+      hostEffectAuthority: { projection: committedProjection, binding: committedBinding },
+      hostWorkAuthority: wrongLineTotals,
+    })).toThrow(/Host work attribution authority is invalid/u);
+
+    expect(() => assembleCanonicalIngressResultV2(ingress, {
+      taskId: identity.taskId,
+      workerId: 'docker-fixture-001',
+      provider: 'fixture-provider',
+      model: 'fixture-model',
+      promptCompilePlanId,
+    }, {
+      attemptCustody: sourceBinding,
+      hostWorkArtifact,
+      jsonBounds: policy.jsonBounds,
+      hostEffectAuthority,
+      hostTerminalBilling,
+      hostWorkAuthority,
+      hostPromptDeliveryAuthority: {
+        ...hostPromptDeliveryAuthority,
+        providerStartObservationReceiptDigest: `sha256:${'f'.repeat(64)}`,
+      },
+    })).toThrow(/Host prompt delivery authority is invalid/);
+  }, 60_000);
+
+  it('preserves worker-observed policy and wiring evidence in orchestrator assembly', async () => {
+    const productionWiringEvidence = {
+      version: 1 as const,
+      contractDigest: 'e'.repeat(64),
+      observedBy: 'worker' as const,
+      evidence: {
+        state: 'incomplete' as const,
+        reasonCode: 'not-executed' as const,
+        evidenceRefs: ['worker-observation:sha256:fixture'],
+      },
+    };
+    const runPolicyEvidence = {
+      version: 1 as const,
+      observedPolicyDigest: 'f'.repeat(64),
+      observedBy: 'worker' as const,
+    };
+    const input = baseInput();
+    const result = await assembleResult({
+      ...input,
+      workerSubjective: {
+        ...input.workerSubjective,
+        productionWiringEvidence,
+        runPolicyEvidence,
+      },
+    });
+
+    expect(result.productionWiringEvidence).toEqual(productionWiringEvidence);
+    expect(result.runPolicyEvidence).toEqual(runPolicyEvidence);
   });
   it('throws AssemblerError when the assembled result is invalid', async () => {
     await expect(

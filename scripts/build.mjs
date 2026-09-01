@@ -518,7 +518,7 @@ function prepareSourceWorkspace(
   mkdirSync(workspace, { recursive: false, mode: 0o700 });
   for (const relativePath of [
     'package.json',
-    'package-lock.json',
+    'npm-shrinkwrap.json',
     'tsconfig.json',
     'scripts/build.mjs',
     'scripts/build-dashboard.mjs',
@@ -643,12 +643,15 @@ function snapshotBuildInputs(root, scope) {
   };
   for (const file of [
     'package.json',
-    'package-lock.json',
+    'npm-shrinkwrap.json',
     'tsconfig.json',
     'scripts/build.mjs',
     'scripts/build-dashboard.mjs',
     'scripts/copy-assets.mjs',
   ]) {
+    if (file === 'npm-shrinkwrap.json' && !existsSync(join(root, file))) {
+      throw codedError('E_BUILD_INPUT_MISSING', file);
+    }
     if (existsSync(join(root, file))) addFile(file);
   }
   const includeCore = scope === 'core' || scope === 'all';

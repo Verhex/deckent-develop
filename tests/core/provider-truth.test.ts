@@ -167,6 +167,41 @@ describe('provider truth contract', () => {
     expect(providerMismatch.reasonCode).toBe('provider_mismatch');
   });
 
+  it('retains MCP as its own invocation transport instead of relabeling it as API', async () => {
+    const mcpRequest = request({
+      backend: {
+        transport: 'mcp',
+        executionBackend: 'host-subprocess',
+        endpointRefHash: HASH_B,
+        runtimeFingerprint: HASH_C,
+        executionProfileRef: 'execution-profile:00000002',
+      },
+      executionProfile: {
+        profileRef: 'execution-profile:00000002',
+        provider: 'openrouter',
+        allowed: [{
+          authMode: 'api',
+          transport: 'mcp',
+          executionBackend: 'host-subprocess',
+        }],
+      },
+    });
+    const result = await probeExactModelReachability(mcpRequest, {
+      probe: async () => ({
+        outcome: 'succeeded',
+        calledProvider: 'openrouter',
+        calledModel: 'anthropic/claude-fable-5',
+        providerRequestRefHash: HASH_D,
+        latencyMs: 5,
+      }),
+      now: () => T0,
+      idFactory: () => 'reach-mcp',
+    });
+
+    expect(result.backend.transport).toBe('mcp');
+    expect(result).toMatchObject({ state: 'known', reachable: true, liveProven: true });
+  });
+
   it.each([
     ['auth-rejected', 'auth_rejected'],
     ['model-not-found', 'model_not_found'],

@@ -5,10 +5,11 @@
 
 import { spawnSync, spawn as nodeSpawn } from 'node:child_process';
 import type { SpawnOptionsWithoutStdio } from 'node:child_process';
-import { writeFileSync, readFileSync, mkdirSync, existsSync, unlinkSync, openSync, fsyncSync, closeSync, readdirSync, renameSync, chmodSync, statSync, rmdirSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync, existsSync, unlinkSync, openSync, fsyncSync, closeSync, readdirSync, renameSync, chmodSync, statSync, rmdirSync, realpathSync } from 'node:fs';
 import { dirname, isAbsolute, join, posix, relative, resolve, sep, win32 } from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
 import { homedir, tmpdir, totalmem } from 'node:os';
+import { types as nodeTypes } from 'node:util';
 import type { ModelType } from '../core/types.js';
 import { canonicalJson } from '../core/audit-writer.js';
 import {
@@ -24,7 +25,8 @@ import {
   type TaskResult,
 } from '../core/task-types.js';
 import { modelRegistry } from '../core/model-registry.js';
-import { getProviderCommandSpec, buildProviderCommand, type ProviderCommandSpec } from '../core/provider-command-spec.js';
+import { attendedExecutionProjectId } from '../core/attended-execution-approval.js';
+import { getProviderCommandSpec, buildProviderCommand, PROMPT_CAT_TOKEN, type ProviderCommandSpec } from '../core/provider-command-spec.js';
 import type {
   BoundedReachabilityProbeRequest,
   ProviderNativeProbeObservation,
@@ -54,6 +56,7 @@ import {
   assertLiveUsageBudgetSupport,
   hasLiveUsageCeiling,
 } from '../core/live-execution-budget.js';
+import { assertExecutionLandingPolicyConfig } from '../core/execution-budget-policy.js';
 import {
   acquireSpawnLocks,
   releaseAllSpawnLocks,
@@ -67,6 +70,37 @@ import {
 } from '../core/provider-execution-observation.js';
 import { markPending, markActive, clearPending } from '../core/active-workers.js';
 import { authHealthCheck } from '../agents/worker.js';
+import {
+  TASK_ATTEMPT_CUSTODY_ARTIFACT_CLASSES,
+  TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+  TaskAttemptCustodyHold,
+  TaskAttemptCustodyStore,
+  canonicalTaskAttemptCustodyJson,
+  createTaskAttemptCustodyPolicy,
+  type Sha256Digest,
+  type TaskAttemptCustodyAdmissionV2,
+  type TaskAttemptCustodyAmbiguousReasonCode,
+  type TaskAttemptCustodyArtifactClass,
+  type TaskAttemptCustodyArtifactLimit,
+  type TaskAttemptCustodyArtifactReceiptV2,
+  type TaskAttemptCustodyAttemptAccess,
+  type TaskAttemptCustodyBackendMountTransferReceipt,
+  type TaskAttemptCustodyDispatchAdmissionRefV2,
+  type TaskAttemptCustodyDispatchObservationClass,
+  type TaskAttemptCustodyDispatchPredecessorRefV2,
+  type TaskAttemptCustodyIdentityV2,
+  type TaskAttemptCustodyNotDispatchedReasonCode,
+  type TaskAttemptCustodyPolicyV2,
+} from '../core/task-attempt-custody-store.js';
+import {
+  createTaskAttemptCustodyPosixAdapter,
+  type TaskAttemptCustodyPosixDockerMountObservation,
+  type TaskAttemptCustodyPosixMountConsumerInput,
+} from '../core/task-attempt-custody-posix-adapter.js';
+import {
+  normalizeGlobalScopePlatform,
+  resolveGlobalScopePaths,
+} from '../core/global-scope-resolver.js';
 import { atomicWriteFileSync } from '../agents/worker-lifecycle.js';
 import {
   WorkerHeartbeatAuthorityStore,
@@ -76,6 +110,7 @@ import {
   claimTaskResultSettlementAttemptAtomic,
   createTaskResultSettlement,
   createTaskResultSettlementRef,
+  createTaskResultSettlementRefForAttempt,
   DOCKER_ATTEMPT_LABELS,
   dockerAttemptLabels,
   dockerContainerNameForTask,
@@ -116,7 +151,43 @@ import {
 } from '../core/task-result-settlement.js';
 import { projectDockerRecoveryPreDispatchSettlement } from '../core/pre-dispatch-settlement.js';
 import { normalizeTaskResultShape } from '../core/task-result-schema.js';
-import type { CanonicalScopeManifest, ScopeSelector } from '../core/execution-write-scope-policy.js';
+import {
+  taskResultV2Digest,
+  validateProductionTaskResultV2,
+  type TaskResultV2,
+} from '../core/task-result-schema.js';
+import {
+  EXECUTION_EFFECT_CAPTURE_HARD_LIMITS,
+  type ExecutionEffectCaptureLimits,
+  type ExecutionEffectNativeCaptureEntryV1,
+  type ExecutionEffectNativeCaptureTreeV1,
+} from '../core/execution-effect-containment.js';
+import { loadExecAuthorityNative } from '../core/exec-authority-native.js';
+import {
+  EXECUTION_EFFECT_PROTECTED_TREES,
+  EXECUTION_EFFECT_PORTABLE_PATH_LIMITS,
+  isExecutionEffectProtectedPath,
+  parseExecutionEffectPortablePath,
+  type CanonicalScopeManifest,
+  type ScopeSelector,
+} from '../core/execution-write-scope-policy.js';
+import {
+  createExecutionEffectLandingTerminalSealV1,
+  createExecutionEffectLandingNativeReceiptEvidenceV1,
+  createExecutionEffectLandingFinalReceiptEvidenceV1,
+  createExecutionEffectLandingLeaseTerminalReceiptEvidenceV1,
+  createExecutionEffectLandingLeaseResumeContextV1,
+  createExecutionEffectPersistenceOperationV1,
+  executionEffectLandingIntentDigestV1,
+  executionEffectLandingDeterministicBoundaryIdV1,
+  type ExecutionEffectLandingReceiptV1,
+  type ExecutionEffectLandingLeaseResumeContextV1,
+  type ExecutionEffectLandingLeaseV1,
+  type ExecutionEffectLandingBoundaryV1,
+  type ExecutionEffectLandingTerminalSealV1,
+  type ExecutionEffectPersistenceDigest,
+  type ExecutionEffectPersistenceOperationV1,
+} from '../core/execution-effect-persistence-contract.js';
 import {
   finalizePromptDeliveryReceipt,
   publishWorkerCoreArtifact,
@@ -131,11 +202,17 @@ import {
 } from '../core/worker-activity-heartbeat.js';
 import {
   listRetiredExecutionLandings,
+  createExecutionLandingPreparationRefV2,
   readExecutionLandingCheckpointByRef,
   executionLandingCheckpointPath,
   writeExecutionAttemptRetirementAtomic,
   type ExecutionLandingCheckpointRefV1,
 } from '../core/execution-landing-checkpoint.js';
+import {
+  buildExactExecutionLandingProposalPromptSegment,
+  parseExactExecutionLandingProposalJsonV3,
+  type ExactExecutionLandingProposalV3,
+} from '../core/execution-landing-proposal.js';
 import { BASE_PROVIDER_CREDENTIAL_ENV } from '../providers/cross-provider-keys.js';
 import type {
   HostTerminalResultContractV1,
@@ -143,10 +220,41 @@ import type {
   SpawnBackendOptions,
   SpawnBackendRecoveryOptions,
   SpawnBackendRecoveryReport,
+  SpawnBackendRecoveryHold,
+  SpawnBackendRecoveryHoldAuthorityState,
+  SpawnBackendRecoveryHoldReasonCode,
+  ExactDockerCustodyDispatchOutcomeV2,
+  ExactDockerCustodyCompletionV2,
+  ExactDockerCustodyDispatchEnvelopeV2,
+  ExactDockerAcceptedResultReaderV2,
+  ExactDockerAcceptedResultV2,
+  ExactDockerAcceptResultOutcomeV2,
+  AcceptExactDockerCustodyResultInputV2,
+  ExactDockerCustodyIdentityRefV2,
+  ExactDockerCustodyPreparationRefV2,
+  ExactDockerCustodyTerminalQueryV2,
+  ExactDockerCustodyRefV2,
+  ExactDockerLandingProposalArtifactRefV2,
+  ExactDockerHostWorkAttributionV2,
+  ExactDockerProviderExitObservationRefV2,
+  ExactDockerProviderStreamRefV2,
+  ExactDockerPromptDeliveryAuthorityV2,
+  ExactDockerVerifiedArtifactRefV2,
+  PreparedExactDockerCustodyV2,
+  PrepareExactDockerCustodyInputV2,
 } from './spawn-backend.js';
 import { SpawnBackendError, checkLethalGuard } from './spawn-backend.js';
 import { getDefaultProviderName } from './sprint-utils.js';
-import { assembleCanonicalIngressResult } from './result-ingress.js';
+import {
+  assembleCanonicalIngressResult,
+  assembleCanonicalIngressResultV2,
+  type CanonicalIngressAuthority,
+  type CanonicalIngressCustodyAuthority,
+} from './result-ingress.js';
+import {
+  createExactAcceptedTaskResultRefV2,
+  type ExactAcceptedTaskResultRefV2,
+} from '../core/task-settlement-authority.js';
 import { installGitGuard, buildDockerGitGuardArgs, buildGitGuardDir, CONTAINER_GIT_PATH } from './git-worker-guard.js';
 import { captureStreamToLog } from './spawn-backend-subprocess.js';
 import { makeActivityOnEvent, type ActivityTapContext } from '../agents/worker-activity.js';
@@ -173,6 +281,61 @@ import {
   prepareDockerExecutionLanding,
   stampDockerExecutionLandingCheckpoint,
 } from './execution-landing-coordinator.js';
+import {
+  authorizeExecutionEffectDockerProviderStartV1,
+  captureExecutionEffectDockerFinalV1,
+  createExecutionEffectDockerDependencyAuthorityReceiptV1,
+  createExecutionEffectDockerExclusiveAttachmentReceiptV1,
+  createExecutionEffectDockerImageObservationV1,
+  createExecutionEffectDockerLifecycleCaptureReceiptV1,
+  createExecutionEffectDockerPopulationReceiptV1,
+  createExecutionEffectDockerProviderStoppedReceiptV1,
+  createExecutionEffectDockerReconciledAbsenceReceiptV1,
+  createExecutionEffectDockerResourceAbsenceReceiptV1,
+  createExecutionEffectDockerResourceDeletionReceiptV1,
+  createExecutionEffectDockerVolumeCreationReceiptV1,
+  createExecutionEffectDockerVolumeObservationV1,
+  createExecutionEffectDockerWorkspacePlanV1,
+  isExecutionEffectDockerDaemonTimestampV1,
+  allocateExecutionEffectDockerWorkspaceV1,
+  authorizeDurableExecutionEffectDockerAllocationV1,
+  prepareAllocatedExecutionEffectDockerWorkspaceV1,
+  rehydrateExecutionEffectDockerLifecycleV1,
+  executionEffectDockerVolumeIdentityDigestV1,
+  type ExecutionEffectDockerLifecycleAdapterV1,
+  type ExecutionEffectDockerRawCaptureV1,
+  type ExecutionEffectDockerWorkspacePlanV1,
+} from './execution-effect-docker-lifecycle.js';
+import {
+  createExecutionEffectLandingNativeAdapterV1,
+  type ExecutionEffectNativeAdapterClockV1,
+  type ExecutionEffectNativeAdapterLimitsV1,
+  type ExecutionEffectDockerWorkspaceRuntimeV1,
+  type ExecutionEffectNativeSourceAuthorityV1,
+} from './execution-effect-native-adapter.js';
+import {
+  EXECUTION_EFFECT_LANDING_HARD_MAX_OPERATIONS,
+  EXECUTION_EFFECT_LANDING_HARD_MAX_PLAN_ENVELOPE_BYTES,
+  applyExecutionEffectLandingV1,
+  prepareExecutionEffectLandingV1,
+  readExecutionEffectLandingLocatorV1,
+  reconcileExecutionEffectLandingV1,
+  type ExecutionEffectLandingOutcomeV1,
+  type ExecutionEffectLandingFinalVerificationReceiptV1,
+  type ExecutionEffectLandingNativeMutationReceiptV1,
+  type ExecutionEffectLandingOperationV1,
+  type ExecutionEffectLandingTransactionRefV1,
+} from './execution-effect-landing-coordinator.js';
+import { createExecutionEffectLockAdapterV1 } from './execution-effect-lock-adapter.js';
+import {
+  createExecutionEffectLifecycleStoreAdmissionAdapterV1,
+  createExecutionEffectStoreAdapterV1,
+  executionEffectStoreCleanupArtifactKeyV1,
+  type ExecutionEffectStoreAcceptedAuthorityV1,
+  type ExecutionEffectStoreAdapterV1,
+  type ExecutionEffectStorePreparedWorkspaceAuthorityV1,
+} from './execution-effect-store-adapter.js';
+import { readCompletedExecutionLockBoundary } from '../core/file-lock.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────
 
@@ -183,10 +346,3721 @@ const CONTAINER_WORKSPACE = '/workspace';
 const CONTAINER_GIT_COMMON_DIR = '/run/deckent-git/common';
 const CONTAINER_EXACT_XVERIFY_PROMPT = '/run/deckent-xverify-prompt.txt';
 const DEFAULT_GRACEFUL_TIMEOUT_SECONDS = 15;
+const EXACT_DOCKER_TASK_SNAPSHOT_PATH = '/run/deckent/task.json';
+const EXACT_DOCKER_WORKER_OUTPUT_PATH = '/workspace/.tasks';
+const EXACT_DOCKER_RELEASE_INTENT_FILE = '/run/deckent/release-intent';
+const EXACT_DOCKER_RELEASE_COMMIT_FILE = '/run/deckent/release-commit';
+const EXACT_DOCKER_GATE_ACK_FILE = '/run/deckent/gate-ack.json';
+const EXACT_DOCKER_RELEASE_ARMED_ACK_FILE = '/run/deckent/release-armed-ack.json';
+const EXACT_DOCKER_PROVIDER_START_FILE = '/run/deckent/provider-start';
+const EXACT_DOCKER_PROVIDER_START_ACK_FILE = '/run/deckent/provider-start-ack.json';
+const EXACT_DOCKER_EXECUTION_COMMIT_FILE = '/run/deckent/execution-commit';
+const EXACT_DOCKER_PROVIDER_EXECUTION_ACK_FILE = '/run/deckent/provider-execution-ack.json';
+const EXACT_DOCKER_CUSTODY_STATE_DIR = 'task-attempt-custody';
+const EXACT_DOCKER_CUSTODY_METADATA_MAX_BYTES = 1024 * 1024;
+
+export interface ExactDockerProviderStartAuthorizationExpectationV2 {
+  readonly admissionRefDigest: Sha256Digest;
+  readonly taskSnapshotSha256: Sha256Digest;
+  readonly providerInvocationDigest: Sha256Digest;
+  readonly authorityLabelsDigest: Sha256Digest;
+  readonly providerStartNonceSha256: Sha256Digest;
+  readonly executionCommitNonceSha256: Sha256Digest;
+}
+
+/**
+ * Shared strict parser for the one-shot PID1 start authorization. The exact
+ * function body is embedded below, so unit evidence exercises the same parser
+ * that guards provider creation in the container rather than a fixture copy.
+ */
+export function verifyExactDockerProviderStartAuthorization(
+  value: unknown,
+  expected: ExactDockerProviderStartAuthorizationExpectationV2,
+  nonceDigest: (bytes: Uint8Array) => string,
+): boolean {
+  const keys = [
+    'schemaVersion', 'kind', 'nonce', 'admissionRefDigest',
+    'taskSnapshotSha256', 'providerInvocationDigest', 'authorityLabelsDigest',
+    'executionCommitNonceSha256',
+    'providerExecutionAttemptId', 'providerExecutionAttemptIdentityDigest',
+    'dispatchReceiptDigest', 'releaseReceiptRef', 'releaseReceiptDigest',
+    'projectionFence',
+  ];
+  if (!value || typeof value !== 'object') return false;
+  const ownKeys = Reflect.ownKeys(value);
+  if (ownKeys.length !== keys.length
+    || ownKeys.some(key => typeof key !== 'string' || !keys.includes(key))) return false;
+  const record: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
+  for (const key of keys) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !descriptor.enumerable || !('value' in descriptor)) return false;
+    record[key] = descriptor.value;
+  }
+  const isDigest = (candidate: unknown): boolean =>
+    typeof candidate === 'string' && /^sha256:[a-f0-9]{64}$/u.test(candidate);
+  return record.schemaVersion === 2
+    && record.kind === 'exact-docker-provider-start-authorization'
+    && typeof record.nonce === 'string'
+    && /^[a-f0-9]{64}$/u.test(record.nonce)
+    && nonceDigest(Buffer.from(record.nonce, 'hex')) === expected.providerStartNonceSha256
+    && record.admissionRefDigest === expected.admissionRefDigest
+    && record.taskSnapshotSha256 === expected.taskSnapshotSha256
+    && record.providerInvocationDigest === expected.providerInvocationDigest
+    && record.authorityLabelsDigest === expected.authorityLabelsDigest
+    && record.executionCommitNonceSha256 === expected.executionCommitNonceSha256
+    && typeof record.providerExecutionAttemptId === 'string'
+    && record.providerExecutionAttemptId.length > 0
+    && isDigest(record.providerExecutionAttemptIdentityDigest)
+    && isDigest(record.dispatchReceiptDigest)
+    && isDigest(record.releaseReceiptRef)
+    && isDigest(record.releaseReceiptDigest)
+    && isDigest(record.projectionFence);
+}
+
+const EXACT_DOCKER_PID1_SOURCE = String.raw`
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+
+const snapshotPath = '/run/deckent/task.json';
+const releaseIntentPath = '/run/deckent/release-intent';
+const releaseCommitPath = '/run/deckent/release-commit';
+const gateAckPath = '/run/deckent/gate-ack.json';
+const releaseArmedAckPath = '/run/deckent/release-armed-ack.json';
+const providerStartPath = '/run/deckent/provider-start';
+const providerStartAckPath = '/run/deckent/provider-start-ack.json';
+const executionCommitPath = '/run/deckent/execution-commit';
+const providerExecutionAckPath = '/run/deckent/provider-execution-ack.json';
+const promptPath = '/run/deckent/prompt.txt';
+const corePath = '/run/deckent/system-core.md';
+const baselinePath = '/run/deckent/scope-baseline.txt';
+const sha256 = value => 'sha256:' + createHash('sha256').update(value).digest('hex');
+const isDigest = value => typeof value === 'string' && /^sha256:[a-f0-9]{64}$/.test(value);
+const verifyProviderStartAuthorization = ${verifyExactDockerProviderStartAuthorization.toString()};
+const snapshot = JSON.parse(readFileSync(snapshotPath, 'utf8'));
+const dispatch = snapshot?.dispatch;
+if (!dispatch
+  || snapshot?.schemaVersion !== 2
+  || snapshot?.kind !== 'exact-docker-dispatch-snapshot'
+  || sha256(dispatch.prompt) !== dispatch.promptSha256
+  || sha256(dispatch.scopeBaseline) !== dispatch.scopeBaselineSha256
+  || sha256(dispatch.runnerSource) !== dispatch.runnerSourceSha256
+  || (dispatch.systemPromptCore === null
+    ? dispatch.systemPromptCoreSha256 !== null
+    : sha256(dispatch.systemPromptCore) !== dispatch.systemPromptCoreSha256)) process.exit(78);
+writeFileSync(promptPath, dispatch.prompt, { flag: 'wx', mode: 0o400 });
+writeFileSync(baselinePath, dispatch.scopeBaseline, { flag: 'wx', mode: 0o400 });
+if (dispatch.systemPromptCore !== null) {
+  writeFileSync(corePath, dispatch.systemPromptCore, { flag: 'wx', mode: 0o400 });
+}
+writeFileSync('/run/deckent/runner.mjs', dispatch.runnerSource, { flag: 'wx', mode: 0o500 });
+const readNonce = async (path, expected) => {
+  for (;;) {
+    try {
+      const nonce = readFileSync(path);
+      if (nonce.byteLength > 0 && nonce.byteLength <= 256 && sha256(nonce) === expected) {
+        unlinkSync(path);
+        return;
+      }
+    } catch {}
+    await new Promise(resolve => setTimeout(resolve, 25));
+  }
+};
+await readNonce(releaseIntentPath, dispatch.releaseIntentNonceSha256);
+writeFileSync(gateAckPath, JSON.stringify({
+  schemaVersion: 2,
+  kind: 'exact-docker-pid1-gate-ack',
+  admissionRefDigest: process.env.DECKENT_CUSTODY_ADMISSION_REF_DIGEST,
+  releaseIntentNonceSha256: dispatch.releaseIntentNonceSha256,
+  releaseCommitNonceSha256: dispatch.releaseCommitNonceSha256,
+  providerInvocationDigest: dispatch.providerInvocationDigest,
+  pid1Sha256: process.env.DECKENT_CUSTODY_PID1_SHA256,
+  taskSnapshotSha256: process.env.DECKENT_CUSTODY_TASK_SNAPSHOT_SHA256,
+  state: 'GATED_ACKNOWLEDGED',
+  providerState: 'NOT_STARTED',
+}) + '\n', { flag: 'wx', mode: 0o400 });
+await readNonce(releaseCommitPath, dispatch.releaseCommitNonceSha256);
+writeFileSync(releaseArmedAckPath, JSON.stringify({
+  schemaVersion: 2,
+  kind: 'exact-docker-pid1-release-armed-ack',
+  admissionRefDigest: process.env.DECKENT_CUSTODY_ADMISSION_REF_DIGEST,
+  providerInvocationDigest: dispatch.providerInvocationDigest,
+  releaseCommitNonceSha256: dispatch.releaseCommitNonceSha256,
+  state: 'RELEASE_ARMED',
+  providerState: 'NOT_STARTED',
+}) + '\n', { flag: 'wx', mode: 0o400 });
+let acceptedAuthorization = null;
+let providerStartAckBytes = null;
+for (;;) {
+  try {
+    const raw = readFileSync(providerStartPath);
+    if (raw.byteLength <= 4096) {
+      const authorization = JSON.parse(raw.toString('utf8'));
+      if (verifyProviderStartAuthorization(authorization, {
+        admissionRefDigest: process.env.DECKENT_CUSTODY_ADMISSION_REF_DIGEST,
+        taskSnapshotSha256: process.env.DECKENT_CUSTODY_TASK_SNAPSHOT_SHA256,
+        providerInvocationDigest: dispatch.providerInvocationDigest,
+        authorityLabelsDigest: process.env.DECKENT_CUSTODY_LABELS_DIGEST,
+        providerStartNonceSha256: dispatch.providerStartNonceSha256,
+        executionCommitNonceSha256: dispatch.executionCommitNonceSha256,
+      }, sha256)) {
+        unlinkSync(providerStartPath);
+        if (existsSync(executionCommitPath)) process.exit(78);
+        acceptedAuthorization = authorization;
+        const providerStartAck = {
+          schemaVersion: 2,
+          kind: 'exact-docker-pid1-provider-start-ack',
+          admissionRefDigest: authorization.admissionRefDigest,
+          taskSnapshotSha256: authorization.taskSnapshotSha256,
+          providerInvocationDigest: authorization.providerInvocationDigest,
+          authorityLabelsDigest: authorization.authorityLabelsDigest,
+          providerStartNonceSha256: dispatch.providerStartNonceSha256,
+          executionCommitNonceSha256: authorization.executionCommitNonceSha256,
+          providerExecutionAttemptId: authorization.providerExecutionAttemptId,
+          providerExecutionAttemptIdentityDigest: authorization.providerExecutionAttemptIdentityDigest,
+          dispatchReceiptDigest: authorization.dispatchReceiptDigest,
+          releaseReceiptRef: authorization.releaseReceiptRef,
+          releaseReceiptDigest: authorization.releaseReceiptDigest,
+          projectionFence: authorization.projectionFence,
+          startAuthorizationDigest: sha256(raw),
+          state: 'START_AUTHORIZATION_ACCEPTED',
+          providerState: 'NOT_STARTED',
+        };
+        providerStartAckBytes = JSON.stringify(providerStartAck) + '\n';
+        writeFileSync(providerStartAckPath, providerStartAckBytes, { flag: 'wx', mode: 0o400 });
+        break;
+      }
+    }
+  } catch {}
+  await new Promise(resolve => setTimeout(resolve, 25));
+}
+await readNonce(executionCommitPath, dispatch.executionCommitNonceSha256);
+const child = spawn(process.execPath, ['/run/deckent/runner.mjs'], { stdio: 'inherit' });
+await new Promise((resolve, reject) => {
+  const onSpawn = () => { child.off('error', onError); resolve(); };
+  const onError = error => { child.off('spawn', onSpawn); reject(error); };
+  child.once('spawn', onSpawn);
+  child.once('error', onError);
+}).catch(() => process.exit(79));
+if (!acceptedAuthorization || !providerStartAckBytes
+  || !Number.isSafeInteger(child.pid) || child.pid <= 0) process.exit(78);
+writeFileSync(providerExecutionAckPath, JSON.stringify({
+  schemaVersion: 2,
+  kind: 'exact-docker-pid1-provider-execution-ack',
+  admissionRefDigest: acceptedAuthorization.admissionRefDigest,
+  taskSnapshotSha256: acceptedAuthorization.taskSnapshotSha256,
+  providerInvocationDigest: acceptedAuthorization.providerInvocationDigest,
+  authorityLabelsDigest: acceptedAuthorization.authorityLabelsDigest,
+  executionCommitNonceSha256: acceptedAuthorization.executionCommitNonceSha256,
+  providerExecutionAttemptId: acceptedAuthorization.providerExecutionAttemptId,
+  providerExecutionAttemptIdentityDigest: acceptedAuthorization.providerExecutionAttemptIdentityDigest,
+  dispatchReceiptDigest: acceptedAuthorization.dispatchReceiptDigest,
+  releaseReceiptRef: acceptedAuthorization.releaseReceiptRef,
+  releaseReceiptDigest: acceptedAuthorization.releaseReceiptDigest,
+  projectionFence: acceptedAuthorization.projectionFence,
+  startAuthorizationDigest: sha256(Buffer.from(JSON.stringify(acceptedAuthorization))),
+  providerStartAckBytesSha256: sha256(Buffer.from(providerStartAckBytes)),
+  childPid: child.pid,
+  state: 'PROVIDER_PROCESS_SPAWNED',
+  providerState: 'STARTED',
+}) + '\n', { flag: 'wx', mode: 0o400 });
+const forward = signal => { try { child.kill(signal); } catch {} };
+process.on('SIGTERM', () => forward('SIGTERM'));
+process.on('SIGINT', () => forward('SIGINT'));
+child.on('error', () => process.exit(79));
+child.on('exit', (code, signal) => process.exit(signal ? 128 : (code ?? 79)));
+`;
+const EXACT_DOCKER_NATIVE_PROBE_SOURCE = String.raw`
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import { loadExecAuthorityNative } from '/app/dist/core/exec-authority-native.js';
+const loaded = loadExecAuthorityNative();
+if (!loaded.available || loaded.manifest.platform !== 'linux') process.exit(78);
+const custody = loaded.custody;
+const opened = [];
+try {
+  const taskRoot = custody.invoke('open-root', { path: '/run/deckent', disposition: 'OPEN_EXISTING', privacyPolicy: 'OWNER_PRIVATE' });
+  opened.push(taskRoot.handle);
+  const task = custody.invoke('open-file-at', { parent: taskRoot.handle, name: 'task.json', disposition: 'OPEN_EXISTING', privacyPolicy: 'OWNER_PRIVATE' });
+  opened.push(task.handle);
+  const output = custody.invoke('open-root', { path: '/workspace/.tasks', disposition: 'OPEN_EXISTING', privacyPolicy: 'OWNER_PRIVATE' });
+  opened.push(output.handle);
+  const separation = custody.invoke('prove-root-separation', { custodyRoot: output.handle, canonicalProjectRoot: '/workspace' });
+  const candidates = [
+    '/app/native/exec-authority/build/Release',
+    '/app/native/exec-authority/prebuilds/linux-' + process.arch + '/napi-v8',
+  ];
+  const complete = candidates.filter(path => existsSync(path + '/artifact.json') && existsSync(path + '/exec_authority.node'));
+  if (complete.length !== 1) process.exit(78);
+  const artifact = JSON.parse(readFileSync(complete[0] + '/artifact.json', 'utf8'));
+  const binarySha256 = 'sha256:' + createHash('sha256').update(readFileSync(complete[0] + '/exec_authority.node')).digest('hex');
+  if (binarySha256 !== artifact.binarySha256
+    || artifact.abiName !== loaded.manifest.abiName
+    || artifact.abiVersion !== loaded.manifest.abiVersion
+    || artifact.handleAbi !== loaded.manifest.handleAbi
+    || artifact.packageName !== loaded.manifest.packageName
+    || artifact.packageVersion !== loaded.manifest.packageVersion) process.exit(78);
+  process.stdout.write(JSON.stringify({
+    taskIdentity: task.identity,
+    outputIdentity: output.identity,
+    taskContentDigest: 'sha256:' + createHash('sha256').update(readFileSync('/run/deckent/task.json')).digest('hex'),
+    bootstrap: {
+      abiName: loaded.manifest.abiName,
+      abiVersion: loaded.manifest.abiVersion,
+      napiVersion: loaded.manifest.napiVersion,
+      handleAbi: loaded.manifest.handleAbi,
+      packageName: loaded.manifest.packageName,
+      packageVersion: loaded.manifest.packageVersion,
+      platform: loaded.manifest.platform,
+      arch: loaded.manifest.arch,
+      binarySha256,
+      rootSeparationEvidenceBits: separation.featureEvidenceBits,
+    },
+  }) + '\n');
+} finally {
+  for (const handle of opened.reverse()) { try { custody.closeHandle(handle); } catch {} }
+}
+`;
+
+/** Test/audit projection; the provider cannot replace image-owned native bootstrap code. */
+export function exactDockerCustodyNativeProbeSource(): string {
+  return EXACT_DOCKER_NATIVE_PROBE_SOURCE;
+}
+
+/** Verification projection of the immutable PID1 program used by the real launch argv. */
+export function exactDockerCustodyPid1Source(): string {
+  return EXACT_DOCKER_PID1_SOURCE;
+}
 // Exported as the SSOT container-name prefix so the host-liveness probe
 // (heartbeat-monitor.ts) derives `deckent-w-<taskId>` from the SAME constant the
 // backend uses to `docker run --name` / `docker wait` — no drifting duplicate.
 export const CONTAINER_PREFIX = 'deckent-w-';
+
+type ExactDockerCustodyState =
+  | 'PREPARED'
+  | 'MOUNT_CONSUMING'
+  | 'MOUNTED_GATED'
+  | 'RELEASED'
+  | 'HOLD';
+
+type ExactDockerCustodyFailureReasonCode =
+  | 'EXACT_DOCKER_ARTIFACT_CLASS_INVALID'
+  | 'EXACT_DOCKER_ACCEPTED_RESULT_READER_INVALID'
+  | 'EXACT_DOCKER_COMPLETION_IDENTITY_MISMATCH'
+  | 'EXACT_DOCKER_ENVELOPE_CONSUMED'
+  | 'EXACT_DOCKER_EXECUTION_COMMIT_RECONCILIATION_REQUIRED'
+  | 'EXACT_DOCKER_ENVELOPE_INVALID'
+  | 'EXACT_DOCKER_IDEMPOTENCY_REPLAY_MISMATCH'
+  | 'EXACT_DOCKER_INPUT_INVALID'
+  | 'EXACT_DOCKER_MOUNT_RECONCILIATION_REQUIRED'
+  | 'EXACT_DOCKER_OBSERVATION_INVALID'
+  | 'EXACT_DOCKER_OBSERVATION_REREAD_INVALID'
+  | 'EXACT_DOCKER_PREDECESSOR_INVALID'
+  | 'EXACT_DOCKER_PRIVATE_ADMISSION_HOLD'
+  | 'EXACT_DOCKER_PROMPT_DELIVERY_AUTHORITY_HOLD'
+  | 'EXACT_DOCKER_PROVIDER_EXIT_OBSERVATION_INVALID'
+  | 'EXACT_DOCKER_PROVIDER_START_GATE_UNCONFIRMED'
+  | 'EXACT_DOCKER_PROVIDER_START_RECONCILIATION_REQUIRED'
+  | 'EXACT_DOCKER_PROVIDER_UNAVAILABLE'
+  | 'EXACT_DOCKER_RECONCILIATION_REQUIRED'
+  | 'EXACT_DOCKER_RELEASE_AUTHORITY_MISSING'
+  | 'EXACT_DOCKER_RELEASE_REREAD_HOLD'
+  | 'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED';
+
+class ExactDockerCustodyFailure extends Error {
+  constructor(
+    readonly reasonCode: ExactDockerCustodyFailureReasonCode,
+    readonly afterAdmission: boolean,
+  ) {
+    super(reasonCode);
+    this.name = 'ExactDockerCustodyFailure';
+  }
+}
+
+interface ExactDockerCustodyLaunchContext {
+  readonly taskId: string;
+  readonly image: string;
+  /** Contains no Store callback path. Mount args are appended only inside mountConsumer. */
+  readonly dockerBaseArgs: readonly string[];
+  readonly providerInvocationDigest: Sha256Digest;
+  readonly releaseIntentToken: Uint8Array;
+  readonly releaseIntentTokenSha256: Sha256Digest;
+  readonly releaseCommitToken: Uint8Array;
+  readonly releaseCommitTokenSha256: Sha256Digest;
+  readonly providerStartToken: Uint8Array;
+  readonly providerStartTokenSha256: Sha256Digest;
+  readonly executionCommitToken: Uint8Array;
+  readonly executionCommitTokenSha256: Sha256Digest;
+  readonly expectedContainerName: string;
+  readonly workspaceVolumeName: string;
+  readonly dependencyVolumeName: string;
+  readonly workspaceInventory: ExactDockerWorkspaceInventoryV1;
+  readonly effect: ExactDockerEffectLaunchAuthorityV1;
+  authorityLabelsDigest: Sha256Digest | null;
+  spawnOutcome: Readonly<{
+    containerId: string;
+    imageDigest: Sha256Digest | null;
+  }> | null;
+}
+
+type ExactDockerEffectPreparedV1 = Extract<
+  Awaited<ReturnType<typeof prepareAllocatedExecutionEffectDockerWorkspaceV1>>,
+  { state: 'PREPARED' }
+>;
+type ExactDockerEffectAuthorizedV1 = Extract<
+  Awaited<ReturnType<typeof authorizeExecutionEffectDockerProviderStartV1>>,
+  { state: 'PROVIDER_START_AUTHORIZED' }
+>;
+type ExactDockerEffectReadyV1 = Extract<
+  Awaited<ReturnType<typeof captureExecutionEffectDockerFinalV1>>,
+  { state: 'READY_FOR_LANDING' }
+>;
+type ExactDockerEffectReadyAuthorityV1 = Omit<
+  ExactDockerEffectReadyV1,
+  'session'
+> & Readonly<{
+  readonly session: ExactDockerEffectReadyV1['session'] | null;
+}>;
+type ExactDockerEffectPreparedAuthorityV1 = Omit<
+  ExactDockerEffectPreparedV1,
+  'session'
+> & Readonly<{
+  readonly session: ExactDockerEffectPreparedV1['session'] | null;
+}>;
+
+interface ExactDockerEffectLaunchAuthorityV1 {
+  readonly imageAuthority: ExactDockerEffectImageAuthorityV1;
+  readonly captureLimits: ExecutionEffectCaptureLimits;
+  readonly lifecycleAdapter: ExecutionEffectDockerLifecycleAdapterV1;
+  readonly prepared: ExactDockerEffectPreparedAuthorityV1;
+  readonly preparedWorkspace: ExecutionEffectStorePreparedWorkspaceAuthorityV1;
+  readonly storeAdapter: ExecutionEffectStoreAdapterV1;
+  readonly stagingRoot: string;
+  readonly clock: ExecutionEffectNativeAdapterClockV1;
+  readonly limits: ExecutionEffectNativeAdapterLimitsV1;
+  readonly landingCapabilityDigest: Sha256Digest;
+  authorized: ExactDockerEffectAuthorizedV1 | null;
+  ready: ExactDockerEffectReadyAuthorityV1 | null;
+}
+
+interface ExactDockerCommittedEffectLandingV1 {
+  readonly captured: ExactDockerEffectReadyAuthorityV1;
+  readonly receipt: ExecutionEffectLandingReceiptV1;
+  readonly terminalSeal: ExecutionEffectLandingTerminalSealV1;
+  readonly storeAdapter: ExecutionEffectStoreAdapterV1;
+  readonly containerIdentityDigest: Sha256Digest;
+}
+
+interface ExactDockerDispatchSnapshotV2 {
+  readonly schemaVersion: typeof TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION;
+  readonly kind: 'exact-docker-dispatch-snapshot';
+  readonly dispatchRequestId: string;
+  readonly projectId: string;
+  readonly taskId: string;
+  readonly material: Readonly<{
+    readonly approved: unknown;
+    readonly approvedSha256: Sha256Digest;
+    readonly dispatch: Task;
+    readonly dispatchSha256: Sha256Digest;
+    readonly lineage: unknown;
+    readonly lineageSha256: Sha256Digest;
+  }>;
+  readonly dispatch: Readonly<{
+    readonly model: ModelType;
+    readonly provider: ProviderName;
+    readonly execution: PrepareExactDockerCustodyInputV2['execution'];
+    readonly prompt: string;
+    readonly promptSha256: Sha256Digest;
+    readonly promptDeliveryAuthority: ExactDockerPromptDeliveryAuthorityV2;
+    readonly systemPromptCore: string | null;
+    readonly systemPromptCoreSha256: Sha256Digest | null;
+    readonly scopeBaseline: string;
+    readonly scopeBaselineSha256: Sha256Digest;
+    readonly runnerSource: string;
+    readonly runnerSourceSha256: Sha256Digest;
+    readonly providerInvocationDigest: Sha256Digest;
+    readonly releaseIntentNonceSha256: Sha256Digest;
+    readonly releaseCommitNonceSha256: Sha256Digest;
+    readonly providerStartNonceSha256: Sha256Digest;
+    readonly executionCommitNonceSha256: Sha256Digest;
+  }>;
+}
+
+function exactDockerBasePromptFromDispatchedPrompt(
+  dispatchedPrompt: string,
+  executionLandingPolicy: unknown,
+  taskId: string,
+  dispatchRequestId: string,
+): string | null {
+  if (executionLandingPolicy === null) return dispatchedPrompt;
+  const suffix = `\n\n${buildExactExecutionLandingProposalPromptSegment(
+    taskId,
+    dispatchRequestId,
+  )}`;
+  return dispatchedPrompt.endsWith(suffix)
+    ? dispatchedPrompt.slice(0, -suffix.length)
+    : null;
+}
+
+function parseExactDockerDispatchSnapshot(
+  bytes: Uint8Array,
+): ExactDockerDispatchSnapshotV2 | null {
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(Buffer.from(bytes).toString('utf8')) as unknown;
+  } catch {
+    return null;
+  }
+  const snapshot = snapshotExactPlainData(decoded);
+  if (!snapshot.ok) return null;
+  const root = exactOwnDataRecord(snapshot.value, [
+    'schemaVersion', 'kind', 'dispatchRequestId', 'projectId', 'taskId', 'material', 'dispatch',
+  ]);
+  const material = exactOwnDataRecord(root?.material, [
+    'approved', 'approvedSha256', 'dispatch', 'dispatchSha256', 'lineage', 'lineageSha256',
+  ]);
+  const dispatch = exactOwnDataRecord(root?.dispatch, [
+    'model', 'provider', 'execution', 'prompt', 'promptSha256',
+    'promptDeliveryAuthority',
+    'systemPromptCore', 'systemPromptCoreSha256', 'scopeBaseline', 'scopeBaselineSha256',
+    'runnerSource', 'runnerSourceSha256', 'providerInvocationDigest',
+    'releaseIntentNonceSha256', 'releaseCommitNonceSha256', 'providerStartNonceSha256',
+    'executionCommitNonceSha256',
+  ]);
+  const execution = exactOwnDataRecord(dispatch?.execution, [
+    'allowedTools', 'availableTools', 'authMode', 'isolatedContext',
+    'reasoningEffort', 'excludeDynamicPromptSections', 'taskTimeoutSeconds',
+    'actionId', 'executionBudget', 'executionLandingPolicy',
+    'executionAdmissionMode', 'executionApprovalEvidenceRef', 'finalOnlyUsageContainment',
+  ]);
+  const task = material?.dispatch as Task | undefined;
+  const basePrompt = root && dispatch && execution
+    && typeof dispatch.prompt === 'string'
+    && typeof root.taskId === 'string'
+    && typeof root.dispatchRequestId === 'string'
+    ? exactDockerBasePromptFromDispatchedPrompt(
+        dispatch.prompt,
+        execution.executionLandingPolicy,
+        root.taskId,
+        root.dispatchRequestId,
+      )
+    : null;
+  if (!root || !material || !dispatch || !execution || !task
+    || root.schemaVersion !== TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION
+    || root.kind !== 'exact-docker-dispatch-snapshot'
+    || typeof root.dispatchRequestId !== 'string'
+    || typeof root.projectId !== 'string'
+    || typeof root.taskId !== 'string'
+    || !isExactDigest(material.approvedSha256)
+    || !isExactDigest(material.dispatchSha256)
+    || !isExactDigest(material.lineageSha256)
+    || exactCustodyJsonDigest(material.approved) !== material.approvedSha256
+    || exactCustodyJsonDigest(task) !== material.dispatchSha256
+    || exactCustodyJsonDigest(material.lineage) !== material.lineageSha256
+    || !hasOnlyExactOwnKeys(task, EXACT_DOCKER_TASK_KEYS)
+    || !hasExactAcceptedAuthorityTaskFields(task)
+    || task.id !== root.taskId
+    || !hasOnlyExactOwnKeys(task.scope, ['directories', 'filesRead', 'filesWrite'])
+    || !Array.isArray(task.scope.directories)
+    || !Array.isArray(task.scope.filesRead)
+    || !Array.isArray(task.scope.filesWrite)
+    || ![...task.scope.directories, ...task.scope.filesRead, ...task.scope.filesWrite]
+      .every(entry => typeof entry === 'string')
+    || !hasOnlyExactOwnKeys(task.goNogo, [
+      'goCriteria', 'noGoCriteria', 'techDebtAcceptable', 'items',
+    ])
+    || typeof dispatch.model !== 'string'
+    || typeof dispatch.provider !== 'string'
+    || typeof dispatch.prompt !== 'string'
+    || !isExactDigest(dispatch.promptSha256)
+    || exactCustodyDigest(dispatch.prompt) !== dispatch.promptSha256
+    || basePrompt === null
+    || !parseExactDockerPromptDeliveryAuthority(
+      dispatch.promptDeliveryAuthority,
+      basePrompt,
+      task,
+    )
+    || (dispatch.systemPromptCore !== null && typeof dispatch.systemPromptCore !== 'string')
+    || (dispatch.systemPromptCore === null
+      ? dispatch.systemPromptCoreSha256 !== null
+      : !isExactDigest(dispatch.systemPromptCoreSha256)
+        || exactCustodyDigest(dispatch.systemPromptCore) !== dispatch.systemPromptCoreSha256)
+    || typeof dispatch.scopeBaseline !== 'string'
+    || !isExactDigest(dispatch.scopeBaselineSha256)
+    || exactCustodyDigest(dispatch.scopeBaseline) !== dispatch.scopeBaselineSha256
+    || typeof dispatch.runnerSource !== 'string'
+    || !isExactDigest(dispatch.runnerSourceSha256)
+    || exactCustodyDigest(dispatch.runnerSource) !== dispatch.runnerSourceSha256
+    || !isExactDigest(dispatch.providerInvocationDigest)
+    || !isExactDigest(dispatch.releaseIntentNonceSha256)
+    || !isExactDigest(dispatch.releaseCommitNonceSha256)
+    || !isExactDigest(dispatch.providerStartNonceSha256)
+    || !isExactDigest(dispatch.executionCommitNonceSha256)
+    || (execution.allowedTools !== null && typeof execution.allowedTools !== 'string')
+    || (execution.availableTools !== null && typeof execution.availableTools !== 'string')
+    || !['api', 'subscription'].includes(String(execution.authMode))
+    || typeof execution.isolatedContext !== 'boolean'
+    || (execution.reasoningEffort !== null && typeof execution.reasoningEffort !== 'string')
+    || typeof execution.excludeDynamicPromptSections !== 'boolean'
+    || !Number.isSafeInteger(execution.taskTimeoutSeconds)
+    || (execution.taskTimeoutSeconds as number) <= 0) return null;
+  return snapshot.value as ExactDockerDispatchSnapshotV2;
+}
+
+interface PreparedExactDockerCustodyScope {
+  readonly store: TaskAttemptCustodyStore;
+  readonly policy: TaskAttemptCustodyPolicyV2;
+  readonly identity: TaskAttemptCustodyIdentityV2;
+  readonly admission: TaskAttemptCustodyAdmissionV2;
+  readonly admissionRef: TaskAttemptCustodyDispatchAdmissionRefV2;
+  readonly access: TaskAttemptCustodyAttemptAccess;
+  readonly taskSnapshot: ExactDockerDispatchSnapshotV2;
+  readonly model: ModelType;
+  readonly provider: ProviderName;
+  readonly providerSpec: ProviderCommandSpec | null;
+  readonly providerAuth: ProviderAuthIsolation | null;
+  readonly execution: PrepareExactDockerCustodyInputV2['execution'];
+  state: ExactDockerCustodyState;
+  launch: ExactDockerCustodyLaunchContext | null;
+  mountTransferReceipt: TaskAttemptCustodyBackendMountTransferReceipt | null;
+}
+
+type ExactDockerDurableAdmissionV2 = Extract<
+  ReturnType<TaskAttemptCustodyStore['readDispatchAdmission']>,
+  { readonly state: 'admitted' }
+>;
+
+function exactDockerCustodyArtifactLimits(): Record<
+  TaskAttemptCustodyArtifactClass,
+  TaskAttemptCustodyArtifactLimit
+> {
+  const mib = 1024 * 1024;
+  const maxBytes: Record<TaskAttemptCustodyArtifactClass, number> = {
+    'task-admission-snapshot': 8 * mib,
+    'worker-result': 16 * mib,
+    'worker-partial-result': 16 * mib,
+    'worker-landing-proposal': 4 * mib,
+    'worker-provider-observation': 4 * mib,
+    'worker-timeout': mib,
+    'worker-log': 256 * mib,
+    'worker-ipc-question': 2 * mib,
+    'worker-ipc-answer': 2 * mib,
+    'pristine-provider-stream': 256 * mib,
+    'host-work-attribution': 4 * mib,
+    'execution-workspace-snapshot': 64 * mib,
+    'execution-effect-lifecycle-authority': 64 * mib,
+    'execution-effect-manifest': 256 * mib,
+    'execution-effect-staged-content': 64 * mib,
+    'execution-effect-landing-journal': 64 * mib,
+    'execution-effect-landing-receipt-evidence': 8 * mib,
+    'execution-effect-landing-receipt': 8 * mib,
+    'execution-workspace-release': 8 * mib,
+    'canonical-accepted-result': 16 * mib,
+    'evaluation-receipt': 8 * mib,
+    'finalizer-receipt': 8 * mib,
+    'settlement-receipt': 8 * mib,
+    'archive-receipt': 8 * mib,
+  };
+  return Object.fromEntries(TASK_ATTEMPT_CUSTODY_ARTIFACT_CLASSES.map(artifactClass => [
+    artifactClass,
+    Object.freeze({
+      minBytes: artifactClass === 'pristine-provider-stream'
+        || artifactClass === 'execution-effect-staged-content'
+        ? 0
+        : 1,
+      maxBytes: maxBytes[artifactClass],
+      requireSingleLink: true as const,
+    }),
+  ])) as Record<TaskAttemptCustodyArtifactClass, TaskAttemptCustodyArtifactLimit>;
+}
+
+/** T5-owned policy. Producers never duplicate or serialize it. */
+export function createExactDockerCustodyPolicy(): TaskAttemptCustodyPolicyV2 {
+  return createTaskAttemptCustodyPolicy({
+    schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+    metadataMaxBytes: EXACT_DOCKER_CUSTODY_METADATA_MAX_BYTES,
+    jsonBounds: {
+      maxDepth: 64,
+      maxNodes: 100_000,
+      maxStringBytes: 8 * 1024 * 1024,
+      maxArrayLength: 25_000,
+      maxObjectKeys: 4_096,
+      maxCanonicalBytes: 16 * 1024 * 1024,
+    },
+    artifactLimits: exactDockerCustodyArtifactLimits(),
+  });
+}
+
+function canonicalExactDockerProjectRoot(projectRoot: string): string {
+  try { return realpathSync.native(projectRoot); } catch { return resolve(projectRoot); }
+}
+
+function exactCustodyDigest(value: string | Uint8Array): Sha256Digest {
+  return `sha256:${createHash('sha256').update(value).digest('hex')}` as Sha256Digest;
+}
+
+function exactCustodyJsonDigest(value: unknown): Sha256Digest {
+  return exactCustodyDigest(canonicalJson(value));
+}
+
+function exactEffectDomainDigest(domain: string, value: unknown): ExecutionEffectPersistenceDigest {
+  return `sha256:${createHash('sha256')
+    .update(domain, 'utf8')
+    .update('\0', 'utf8')
+    .update(canonicalJson(value), 'utf8')
+    .digest('hex')}`;
+}
+
+function isExactDigest(value: unknown): value is Sha256Digest {
+  return typeof value === 'string' && /^sha256:[a-f0-9]{64}$/u.test(value);
+}
+
+function exactOwnDataRecord(
+  value: unknown,
+  keys: readonly string[],
+): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || nodeTypes.isProxy(value)) return null;
+  const own = Reflect.ownKeys(value);
+  if (own.length !== keys.length || own.some(key => typeof key !== 'string' || !keys.includes(key))) {
+    return null;
+  }
+  const record = Object.create(null) as Record<string, unknown>;
+  for (const key of keys) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !descriptor.enumerable || !('value' in descriptor)) return null;
+    record[key] = descriptor.value;
+  }
+  return record;
+}
+
+type ExactPlainDataSnapshot =
+  | { readonly ok: true; readonly value: unknown }
+  | { readonly ok: false };
+
+/**
+ * Copy an untrusted graph without invoking accessors or Proxy traps. The copy
+ * is the only caller-owned material allowed to reach hashing, Store admission,
+ * provider routing, or a retained dispatch scope.
+ */
+function snapshotExactPlainData(value: unknown): ExactPlainDataSnapshot {
+  const maxBytes = 16 * 1024 * 1024;
+  const maxStringBytes = 8 * 1024 * 1024;
+  const maxNodes = 100_000;
+  const maxArrayLength = 25_000;
+  const maxObjectKeys = 4_096;
+  let byteBudget = maxBytes;
+  let nodes = 0;
+  const visit = (candidate: unknown, depth: number): ExactPlainDataSnapshot => {
+    nodes += 1;
+    if (depth > 64 || nodes > maxNodes) return { ok: false };
+    if (candidate === null || typeof candidate === 'boolean') {
+      byteBudget -= candidate === null ? 4 : candidate ? 4 : 5;
+      return byteBudget >= 0 ? { ok: true, value: candidate } : { ok: false };
+    }
+    if (typeof candidate === 'string') {
+      const stringBytes = Buffer.byteLength(candidate, 'utf8');
+      if (stringBytes > maxStringBytes) return { ok: false };
+      byteBudget -= stringBytes + 2;
+      return byteBudget >= 0 ? { ok: true, value: candidate } : { ok: false };
+    }
+    if (typeof candidate === 'number') {
+      if (!Number.isFinite(candidate)) return { ok: false };
+      byteBudget -= 24;
+      return byteBudget >= 0 ? { ok: true, value: candidate } : { ok: false };
+    }
+    if (!candidate || typeof candidate !== 'object' || nodeTypes.isProxy(candidate)) {
+      return { ok: false };
+    }
+    if (Array.isArray(candidate)) {
+      if (candidate.length > maxArrayLength) return { ok: false };
+      const own = Reflect.ownKeys(candidate);
+      if (own.length !== candidate.length + 1
+        || own.some(key => typeof key === 'symbol'
+          || (key !== 'length' && !/^(?:0|[1-9][0-9]*)$/u.test(key)))) return { ok: false };
+      const result: unknown[] = [];
+      for (let index = 0; index < candidate.length; index += 1) {
+        const descriptor = Object.getOwnPropertyDescriptor(candidate, String(index));
+        if (!descriptor || !descriptor.enumerable || !('value' in descriptor)) return { ok: false };
+        const item = visit(descriptor.value, depth + 1);
+        if (!item.ok) return item;
+        result.push(item.value);
+      }
+      return { ok: true, value: Object.freeze(result) };
+    }
+    const prototype = Object.getPrototypeOf(candidate);
+    if (prototype !== Object.prototype && prototype !== null) return { ok: false };
+    const own = Reflect.ownKeys(candidate);
+    if (own.length > maxObjectKeys || own.some(key => typeof key !== 'string')) return { ok: false };
+    const result = Object.create(null) as Record<string, unknown>;
+    for (const key of own as string[]) {
+      byteBudget -= Buffer.byteLength(key, 'utf8') + 2;
+      if (byteBudget < 0) return { ok: false };
+      const descriptor = Object.getOwnPropertyDescriptor(candidate, key);
+      if (!descriptor || !descriptor.enumerable || !('value' in descriptor)) return { ok: false };
+      const item = visit(descriptor.value, depth + 1);
+      if (!item.ok) return item;
+      result[key] = item.value;
+    }
+    return { ok: true, value: Object.freeze(result) };
+  };
+  return visit(value, 0);
+}
+
+function hasOnlyExactOwnKeys(value: unknown, allowed: readonly string[]): boolean {
+  if (!value || typeof value !== 'object' || nodeTypes.isProxy(value)) return false;
+  return Reflect.ownKeys(value).every(key => typeof key === 'string' && allowed.includes(key));
+}
+
+const EXACT_DOCKER_TASK_KEYS = Object.freeze([
+  'id', 'title', 'description', 'model', 'effort', 'priority', 'reason', 'scope',
+  'dependencies', 'goNogo', 'verification', 'promptCompilePlanId', 'status', 'type',
+  'sprintId', 'assignedWorker', 'isPriorityFix', 'fixForTaskId', 'provider', 'forceModel',
+  'forceEffort', 'forceAgent', 'forceSkills', 'excludeAgent', 'excludeSkills', 'authMode',
+  'backend', 'modelEffort', 'fixMode', 'smoke', 'assignedAgent', 'assignedSkills',
+  'estimatedTokens', 'routingMeta', 'actor', 'budget', 'budgetPolicy', 'productionWiring',
+  'runPolicy', 'promptCostCanary', 'postSettlementProjection', 'createdAt', 'updatedAt',
+] as const);
+
+/**
+ * Produce the one strict task projection accepted by exact Docker custody.
+ * Unknown fields, accessors, proxies and undefined-valued own properties are
+ * rejected/omitted before hashing so scheduler and backend cannot maintain two
+ * independent task schemas.
+ */
+export function createExactDockerDispatchTaskMaterial(
+  task: Task,
+  assignedWorker: string,
+): Task {
+  if (typeof assignedWorker !== 'string' || assignedWorker.trim().length === 0) {
+    throw new ExactDockerCustodyFailure('EXACT_DOCKER_INPUT_INVALID', false);
+  }
+  if (!task || typeof task !== 'object' || nodeTypes.isProxy(task)) {
+    throw new ExactDockerCustodyFailure('EXACT_DOCKER_INPUT_INVALID', false);
+  }
+  const projection = Object.create(null) as Record<string, unknown>;
+  for (const key of EXACT_DOCKER_TASK_KEYS) {
+    if (key === 'assignedWorker') continue;
+    const descriptor = Object.getOwnPropertyDescriptor(task, key);
+    if (!descriptor) continue;
+    if (!descriptor.enumerable || !('value' in descriptor)) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_INPUT_INVALID', false);
+    }
+    if (descriptor.value !== undefined) projection[key] = descriptor.value;
+  }
+  projection.assignedWorker = assignedWorker;
+  const snapshot = snapshotExactPlainData(projection);
+  if (!snapshot.ok) {
+    throw new ExactDockerCustodyFailure('EXACT_DOCKER_INPUT_INVALID', false);
+  }
+  const material = snapshot.value as Task;
+  if (!hasOnlyExactOwnKeys(material, EXACT_DOCKER_TASK_KEYS)
+    || !hasExactAcceptedAuthorityTaskFields(material)
+    || !material.scope
+    || !hasOnlyExactOwnKeys(material.scope, ['directories', 'filesRead', 'filesWrite'])
+    || !material.goNogo
+    || !hasOnlyExactOwnKeys(material.goNogo, [
+      'goCriteria', 'noGoCriteria', 'techDebtAcceptable', 'items',
+    ])) {
+    throw new ExactDockerCustodyFailure('EXACT_DOCKER_INPUT_INVALID', false);
+  }
+  return material;
+}
+
+/** Path-free canonical digest used by the producer's exact prepare envelope. */
+export function exactDockerCustodyMaterialDigest(value: unknown): Sha256Digest {
+  const snapshot = snapshotExactPlainData(value);
+  if (!snapshot.ok) {
+    throw new ExactDockerCustodyFailure('EXACT_DOCKER_INPUT_INVALID', false);
+  }
+  return exactCustodyJsonDigest(snapshot.value);
+}
+
+function hasExactAcceptedAuthorityTaskFields(task: Task): boolean {
+  const verification = task.verification;
+  return typeof task.assignedWorker === 'string'
+    && task.assignedWorker.trim().length > 0
+    && (task.sprintId === undefined || typeof task.sprintId === 'string')
+    && (task.promptCompilePlanId === undefined || typeof task.promptCompilePlanId === 'string')
+    && (task.isPriorityFix === undefined || typeof task.isPriorityFix === 'boolean')
+    && (task.fixForTaskId === undefined || task.fixForTaskId === null
+      || typeof task.fixForTaskId === 'string')
+    && (verification === undefined
+      || (Boolean(exactOwnDataRecord(verification, ['version', 'source', 'commands']))
+        && verification.version === 1
+        && ['directive', 'planner', 'legacy-ingress'].includes(verification.source)
+        && Array.isArray(verification.commands)
+        && verification.commands.length <= 512
+        && verification.commands.every(command => typeof command === 'string'
+          && Buffer.byteLength(command, 'utf8') <= 16 * 1024)));
+}
+
+function canonicalExactIds(values: readonly string[]): string[] {
+  return [...new Set(values)].sort((left, right) => left < right ? -1 : left > right ? 1 : 0);
+}
+
+export interface CreateExactDockerPromptDeliveryAuthorityInputV2 {
+  readonly taskId: string;
+  readonly prompt: string;
+  readonly promptCompilePlanId: string;
+  readonly rolePolicyIdentity: string;
+  readonly assignedAgentId?: string;
+  readonly assignedSkillIds?: readonly string[];
+  readonly forcedSkillIds?: readonly string[];
+  /** Ordered exactly as delivered. Cache tier order is descriptive, not monotonic. */
+  readonly segments: readonly Readonly<{
+    readonly tier: 'T0' | 'T1' | 'T2';
+    readonly kind: string;
+    readonly content: string;
+  }>[];
+}
+
+function exactPromptDeliveryReceiptIdentity(
+  receiptMaterial: unknown,
+): `prompt-delivery-receipt:sha256:${string}` {
+  return `prompt-delivery-receipt:${exactCustodyJsonDigest(receiptMaterial)}`;
+}
+
+function exactRenderedPromptDelivery(
+  segments: readonly Readonly<{ readonly kind: string; readonly content: string }>[],
+): Readonly<{
+  deliveredAgentId: string | null;
+  personaSegmentSha256: Sha256Digest | null;
+  deliveredSkillIds: readonly string[];
+}> | null {
+  const personaSegments = segments.filter(segment => segment.kind === 'persona');
+  let deliveredAgentId: string | null = null;
+  let personaSegmentSha256: Sha256Digest | null = null;
+  if (personaSegments.length === 1) {
+    const persona = personaSegments[0]!;
+    const match = /^=== Agent: ([^=\n]+) ===(?:\n|$)/u.exec(persona.content);
+    if (!match || match[1]!.trim().length === 0
+      || Buffer.byteLength(match[1]!.trim(), 'utf8') > 256) return null;
+    deliveredAgentId = match[1]!.trim();
+    personaSegmentSha256 = exactCustodyDigest(persona.content);
+  } else if (personaSegments.length > 1) return null;
+  const deliveredSkillIds: string[] = [];
+  for (const segment of segments.filter(item => item.kind === 'skills')) {
+    for (const match of segment.content.matchAll(/^--- ([a-z0-9][a-z0-9-]*) ---$/gmu)) {
+      deliveredSkillIds.push(match[1]!);
+    }
+  }
+  return Object.freeze({
+    deliveredAgentId,
+    personaSegmentSha256,
+    deliveredSkillIds: Object.freeze(canonicalExactIds(deliveredSkillIds)),
+  });
+}
+
+/**
+ * Build the path-free prompt authority from the final ordered prompt segments.
+ * No task assignment claim can substitute for rendered persona/skill bytes.
+ */
+export function createExactDockerPromptDeliveryAuthority(
+  input: CreateExactDockerPromptDeliveryAuthorityInputV2,
+): ExactDockerPromptDeliveryAuthorityV2 {
+  const snapshot = snapshotExactPlainData(input);
+  const builderKeys = [
+    'taskId', 'prompt', 'promptCompilePlanId', 'rolePolicyIdentity',
+    'assignedAgentId', 'assignedSkillIds', 'forcedSkillIds', 'segments',
+  ] as const;
+  const record = snapshot.ok && hasOnlyExactOwnKeys(snapshot.value, builderKeys)
+    ? snapshot.value as Record<string, unknown> : null;
+  if (!record
+    || typeof record.taskId !== 'string' || record.taskId.length === 0
+    || typeof record.prompt !== 'string'
+    || typeof record.promptCompilePlanId !== 'string'
+    || !/^prompt-compile-plan:sha256:[a-f0-9]{64}$/u.test(record.promptCompilePlanId)
+    || typeof record.rolePolicyIdentity !== 'string'
+    || Buffer.byteLength(record.rolePolicyIdentity, 'utf8') > 512
+    || (record.assignedAgentId !== undefined
+      && (typeof record.assignedAgentId !== 'string' || record.assignedAgentId.length === 0
+        || Buffer.byteLength(record.assignedAgentId, 'utf8') > 256))
+    || (record.assignedSkillIds !== undefined && !Array.isArray(record.assignedSkillIds))
+    || (record.forcedSkillIds !== undefined && !Array.isArray(record.forcedSkillIds))
+    || !Array.isArray(record.segments)
+    || record.segments.length === 0 || record.segments.length > 4_096) {
+    throw new ExactDockerCustodyFailure('EXACT_DOCKER_INPUT_INVALID', false);
+  }
+  const assignedSkillIds = canonicalExactIds(
+    (record.assignedSkillIds as string[] | undefined) ?? [],
+  );
+  const forcedSkillIds = canonicalExactIds(
+    (record.forcedSkillIds as string[] | undefined) ?? [],
+  );
+  if ([assignedSkillIds, forcedSkillIds].some(values => values.length > 512
+    || values.some(id => typeof id !== 'string' || id.length === 0
+      || Buffer.byteLength(id, 'utf8') > 256))) {
+    throw new ExactDockerCustodyFailure('EXACT_DOCKER_INPUT_INVALID', false);
+  }
+  const segments: Array<Readonly<{
+    tier: 'T0' | 'T1' | 'T2'; kind: string; content: string;
+  }>> = [];
+  const segmentManifest: Array<Readonly<{
+    ordinal: number; tier: 'T0' | 'T1' | 'T2'; kind: string;
+    contentSha256: Sha256Digest; byteLength: number;
+  }>> = [];
+  for (let index = 0; index < record.segments.length; index += 1) {
+    const segment = exactOwnDataRecord(record.segments[index], ['tier', 'kind', 'content']);
+    if (!segment || !['T0', 'T1', 'T2'].includes(String(segment.tier))
+      || typeof segment.kind !== 'string' || segment.kind.length === 0
+      || Buffer.byteLength(segment.kind, 'utf8') > 256
+      || typeof segment.content !== 'string') {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_INPUT_INVALID', false);
+    }
+    const typed = Object.freeze({
+      tier: segment.tier as 'T0' | 'T1' | 'T2',
+      kind: segment.kind,
+      content: segment.content,
+    });
+    segments.push(typed);
+    segmentManifest.push(Object.freeze({
+      ordinal: index,
+      tier: typed.tier,
+      kind: typed.kind,
+      contentSha256: exactCustodyDigest(typed.content),
+      byteLength: Buffer.byteLength(typed.content, 'utf8'),
+    }));
+  }
+  if (segments.map(segment => segment.content).join('\n\n') !== record.prompt) {
+    throw new ExactDockerCustodyFailure('EXACT_DOCKER_INPUT_INVALID', false);
+  }
+  const rendered = exactRenderedPromptDelivery(segments);
+  if (!rendered) throw new ExactDockerCustodyFailure('EXACT_DOCKER_INPUT_INVALID', false);
+  const assignedAgentId = (record.assignedAgentId as string | undefined) ?? null;
+  if (record.rolePolicyIdentity !== `worker:${assignedAgentId ?? 'generic'}`) {
+    throw new ExactDockerCustodyFailure('EXACT_DOCKER_INPUT_INVALID', false);
+  }
+  const undeliveredForcedSkillIds = forcedSkillIds.filter(
+    id => !rendered.deliveredSkillIds.includes(id),
+  );
+  if (undeliveredForcedSkillIds.length > 0) {
+    throw new ExactDockerCustodyFailure(
+      'EXACT_DOCKER_PROMPT_DELIVERY_AUTHORITY_HOLD', false,
+    );
+  }
+  const receiptMaterial = Object.freeze({
+    schemaVersion: 2 as const,
+    kind: 'exact-docker-prompt-delivery-authority' as const,
+    receiptVersion: 2 as const,
+    taskId: record.taskId,
+    basePromptSha256: exactCustodyDigest(record.prompt as string),
+    promptCompilePlanId: record.promptCompilePlanId,
+    rolePolicyIdentity: record.rolePolicyIdentity,
+    assignedAgentId,
+    deliveredAgentId: rendered.deliveredAgentId,
+    personaSegmentSha256: rendered.personaSegmentSha256,
+    assignedSkillIds: Object.freeze(assignedSkillIds),
+    deliveredSkillIds: rendered.deliveredSkillIds,
+    forcedSkillIds: Object.freeze(forcedSkillIds),
+    undeliveredForcedSkillIds: Object.freeze([]) as readonly string[],
+    segmentManifest: Object.freeze(segmentManifest),
+    segmentManifestDigest: exactCustodyJsonDigest(segmentManifest),
+  });
+  const receiptIdentity = exactPromptDeliveryReceiptIdentity(receiptMaterial);
+  const body = Object.freeze({ ...receiptMaterial, receiptIdentity });
+  return Object.freeze({ ...body, authorityDigest: exactCustodyJsonDigest(body) });
+}
+
+function parseExactDockerPromptDeliveryAuthority(
+  value: unknown,
+  basePrompt: string,
+  task: Task,
+): ExactDockerPromptDeliveryAuthorityV2 | null {
+  if (!task || typeof task !== 'object' || nodeTypes.isProxy(task)) return null;
+  const record = exactOwnDataRecord(value, [
+    'schemaVersion', 'kind', 'receiptVersion', 'receiptIdentity', 'taskId', 'basePromptSha256',
+    'promptCompilePlanId', 'rolePolicyIdentity', 'assignedAgentId', 'deliveredAgentId',
+    'personaSegmentSha256', 'assignedSkillIds', 'deliveredSkillIds', 'forcedSkillIds',
+    'undeliveredForcedSkillIds', 'segmentManifest', 'segmentManifestDigest',
+    'authorityDigest',
+  ]);
+  if (!record || record.schemaVersion !== 2
+    || record.kind !== 'exact-docker-prompt-delivery-authority'
+    || record.receiptVersion !== 2
+    || typeof record.receiptIdentity !== 'string'
+    || !/^prompt-delivery-receipt:sha256:[a-f0-9]{64}$/u.test(record.receiptIdentity)
+    || record.taskId !== task.id
+    || !isExactDigest(record.basePromptSha256)
+    || record.basePromptSha256 !== exactCustodyDigest(basePrompt)
+    || typeof record.promptCompilePlanId !== 'string'
+    || record.promptCompilePlanId !== task.promptCompilePlanId
+    || !/^prompt-compile-plan:sha256:[a-f0-9]{64}$/u.test(record.promptCompilePlanId)
+    || typeof record.rolePolicyIdentity !== 'string'
+    || Buffer.byteLength(record.rolePolicyIdentity, 'utf8') > 512
+    || (record.assignedAgentId !== null
+      && (typeof record.assignedAgentId !== 'string' || record.assignedAgentId.length === 0
+        || Buffer.byteLength(record.assignedAgentId, 'utf8') > 256))
+    || (record.deliveredAgentId !== null
+      && (typeof record.deliveredAgentId !== 'string' || record.deliveredAgentId.length === 0
+        || Buffer.byteLength(record.deliveredAgentId, 'utf8') > 256))
+    || (record.personaSegmentSha256 !== null && !isExactDigest(record.personaSegmentSha256))
+    || !Array.isArray(record.assignedSkillIds)
+    || !Array.isArray(record.deliveredSkillIds)
+    || !Array.isArray(record.forcedSkillIds)
+    || !Array.isArray(record.undeliveredForcedSkillIds)
+    || !Array.isArray(record.segmentManifest)
+    || record.segmentManifest.length === 0 || record.segmentManifest.length > 4_096
+    || !isExactDigest(record.segmentManifestDigest)
+    || !isExactDigest(record.authorityDigest)) return null;
+  const idArrays = [
+    record.assignedSkillIds,
+    record.deliveredSkillIds,
+    record.forcedSkillIds,
+    record.undeliveredForcedSkillIds,
+  ] as unknown[][];
+  if (idArrays.some(values => values.length > 512
+    || values.some(id => typeof id !== 'string' || id.length === 0
+      || Buffer.byteLength(id, 'utf8') > 256)
+    || canonicalJson(values) !== canonicalJson(canonicalExactIds(values as string[])))) return null;
+  const manifest: Array<{
+    ordinal: number;
+    tier: 'T0' | 'T1' | 'T2';
+    kind: string;
+    contentSha256: Sha256Digest;
+    byteLength: number;
+  }> = [];
+  for (let index = 0; index < record.segmentManifest.length; index += 1) {
+    const entry = exactOwnDataRecord(record.segmentManifest[index], [
+      'ordinal', 'tier', 'kind', 'contentSha256', 'byteLength',
+    ]);
+    if (!entry || entry.ordinal !== index
+      || !['T0', 'T1', 'T2'].includes(String(entry.tier))
+      || typeof entry.kind !== 'string' || entry.kind.length === 0
+      || Buffer.byteLength(entry.kind, 'utf8') > 256
+      || !isExactDigest(entry.contentSha256)
+      || !Number.isSafeInteger(entry.byteLength) || Number(entry.byteLength) < 0) return null;
+    manifest.push({
+      ordinal: index,
+      tier: entry.tier as 'T0' | 'T1' | 'T2',
+      kind: entry.kind,
+      contentSha256: entry.contentSha256,
+      byteLength: Number(entry.byteLength),
+    });
+  }
+  if (exactCustodyJsonDigest(manifest) !== record.segmentManifestDigest) return null;
+  const promptBytes = Buffer.from(basePrompt, 'utf8');
+  const renderedSegments: Array<{ kind: string; content: string; digest: Sha256Digest }> = [];
+  let cursor = 0;
+  for (let index = 0; index < manifest.length; index += 1) {
+    const entry = manifest[index]!;
+    const end = cursor + entry.byteLength;
+    if (end > promptBytes.byteLength) return null;
+    const bytes = promptBytes.subarray(cursor, end);
+    const content = bytes.toString('utf8');
+    if (!Buffer.from(content, 'utf8').equals(bytes)
+      || exactCustodyDigest(bytes) !== entry.contentSha256) return null;
+    renderedSegments.push({ kind: entry.kind, content, digest: entry.contentSha256 });
+    cursor = end;
+    if (index < manifest.length - 1) {
+      if (promptBytes[cursor] !== 0x0a || promptBytes[cursor + 1] !== 0x0a) return null;
+      cursor += 2;
+    }
+  }
+  if (cursor !== promptBytes.byteLength) return null;
+  const rendered = exactRenderedPromptDelivery(renderedSegments);
+  if (!rendered) return null;
+  if ((task.assignedAgent !== undefined && typeof task.assignedAgent !== 'string')
+    || (task.assignedSkills !== undefined
+      && (!Array.isArray(task.assignedSkills)
+        || task.assignedSkills.some(id => typeof id !== 'string')))
+    || (task.forceSkills !== undefined
+      && (!Array.isArray(task.forceSkills)
+        || task.forceSkills.some(id => typeof id !== 'string')))) return null;
+  const assignedSkillIds = canonicalExactIds((task.assignedSkills ?? []).filter(
+    (id): id is string => typeof id === 'string' && id.length > 0,
+  ));
+  const forcedSkillIds = canonicalExactIds((task.forceSkills ?? []).filter(
+    (id): id is string => typeof id === 'string' && id.length > 0,
+  ));
+  const assignedAgentId = task.assignedAgent ?? null;
+  if (record.assignedAgentId !== assignedAgentId
+    || record.deliveredAgentId !== rendered.deliveredAgentId
+    || record.personaSegmentSha256 !== rendered.personaSegmentSha256
+    || record.rolePolicyIdentity !== `worker:${assignedAgentId ?? 'generic'}`
+    || canonicalJson(record.assignedSkillIds) !== canonicalJson(assignedSkillIds)
+    || canonicalJson(record.deliveredSkillIds) !== canonicalJson(rendered.deliveredSkillIds)
+    || canonicalJson(record.forcedSkillIds) !== canonicalJson(forcedSkillIds)
+    || canonicalJson(record.undeliveredForcedSkillIds)
+      !== canonicalJson(forcedSkillIds.filter(id => !rendered.deliveredSkillIds.includes(id)))
+    || (record.undeliveredForcedSkillIds as unknown[]).length !== 0) return null;
+  const {
+    authorityDigest: _authorityDigest,
+    receiptIdentity: _receiptIdentity,
+    ...receiptMaterial
+  } = record;
+  if (exactPromptDeliveryReceiptIdentity(receiptMaterial) !== record.receiptIdentity) return null;
+  const body = { ...receiptMaterial, receiptIdentity: record.receiptIdentity };
+  if (exactCustodyJsonDigest(body) !== record.authorityDigest) return null;
+  return value as ExactDockerPromptDeliveryAuthorityV2;
+}
+
+/** Strict, getter-free snapshot used by the prepare ingress and adversarial callers. */
+export function parseExactDockerCustodyPrepareInput(
+  value: unknown,
+): PrepareExactDockerCustodyInputV2 | null {
+  const snapshot = snapshotExactPlainData(value);
+  if (!snapshot.ok) return null;
+  const record = exactOwnDataRecord(snapshot.value, [
+    'dispatchRequestId', 'projectId', 'taskId',
+    'approvedTaskMaterial', 'approvedTaskMaterialDigest',
+    'dispatchTaskMaterial', 'dispatchTaskMaterialDigest',
+    'lineageMaterial', 'lineageMaterialDigest',
+    'prompt', 'promptDeliveryAuthority', 'systemPromptCore', 'model', 'execution', 'predecessor',
+  ]);
+  const execution = exactOwnDataRecord(record?.execution, [
+    'allowedTools', 'availableTools', 'authMode', 'isolatedContext',
+    'reasoningEffort', 'excludeDynamicPromptSections', 'taskTimeoutSeconds',
+    'actionId', 'executionBudget', 'executionLandingPolicy',
+    'executionAdmissionMode', 'executionApprovalEvidenceRef',
+    'finalOnlyUsageContainment',
+  ]);
+  const task = record?.dispatchTaskMaterial as Task | undefined;
+  if (!record || !execution || !task
+    || typeof record.dispatchRequestId !== 'string'
+    || typeof record.projectId !== 'string'
+    || typeof record.taskId !== 'string'
+    || typeof record.prompt !== 'string'
+    || (record.systemPromptCore !== null && typeof record.systemPromptCore !== 'string')
+    || typeof record.model !== 'string'
+    || !isExactDigest(record.approvedTaskMaterialDigest)
+    || !isExactDigest(record.dispatchTaskMaterialDigest)
+    || !isExactDigest(record.lineageMaterialDigest)
+    || exactCustodyJsonDigest(record.approvedTaskMaterial) !== record.approvedTaskMaterialDigest
+    || exactCustodyJsonDigest(task) !== record.dispatchTaskMaterialDigest
+    || exactCustodyJsonDigest(record.lineageMaterial) !== record.lineageMaterialDigest
+    || !hasOnlyExactOwnKeys(task, EXACT_DOCKER_TASK_KEYS)
+    || !hasExactAcceptedAuthorityTaskFields(task)
+    || !parseExactDockerPromptDeliveryAuthority(record.promptDeliveryAuthority, record.prompt, task)
+    || task.id !== record.taskId
+    || !hasOnlyExactOwnKeys(task.scope, ['directories', 'filesRead', 'filesWrite'])
+    || !Array.isArray(task.scope.directories)
+    || !Array.isArray(task.scope.filesRead)
+    || !Array.isArray(task.scope.filesWrite)
+    || ![...task.scope.directories, ...task.scope.filesRead, ...task.scope.filesWrite]
+      .every(entry => typeof entry === 'string')
+    || !hasOnlyExactOwnKeys(task.goNogo, [
+      'goCriteria', 'noGoCriteria', 'techDebtAcceptable', 'items',
+    ])
+    || (execution.allowedTools !== null && typeof execution.allowedTools !== 'string')
+    || (execution.availableTools !== null && typeof execution.availableTools !== 'string')
+    || !['api', 'subscription'].includes(String(execution.authMode))
+    || typeof execution.isolatedContext !== 'boolean'
+    || (execution.reasoningEffort !== null && typeof execution.reasoningEffort !== 'string')
+    || typeof execution.excludeDynamicPromptSections !== 'boolean'
+    || !Number.isSafeInteger(execution.taskTimeoutSeconds)
+    || (execution.taskTimeoutSeconds as number) <= 0
+    || (execution.actionId !== null && typeof execution.actionId !== 'string')
+    || (execution.executionBudget !== null
+      && (!execution.executionBudget || typeof execution.executionBudget !== 'object'))
+    || (execution.executionLandingPolicy !== null
+      && !isExactDockerEffectLandingPolicyAdmitted(execution.executionLandingPolicy))
+    || (execution.executionAdmissionMode !== null
+      && typeof execution.executionAdmissionMode !== 'string')
+    || (execution.executionApprovalEvidenceRef !== null
+      && typeof execution.executionApprovalEvidenceRef !== 'string')
+    || (execution.finalOnlyUsageContainment !== null
+      && !exactOwnDataRecord(execution.finalOnlyUsageContainment, [
+        'maxWallClockSeconds', 'profileRef', 'policyDigest',
+      ]))) return null;
+  return snapshot.value as PrepareExactDockerCustodyInputV2;
+}
+
+interface ExactDockerGateAckBundleV2 {
+  readonly schemaVersion: 2;
+  readonly kind: 'exact-docker-gate-ack';
+  readonly admissionRefDigest: Sha256Digest;
+  readonly containerId: string;
+  readonly imageDigest: Sha256Digest;
+  readonly mountTransferReceiptDigest: Sha256Digest;
+  readonly mountTransferEvidenceDigest: Sha256Digest;
+  readonly daemonAuthorityLabelDigest: Sha256Digest;
+  readonly releaseIntentNonceSha256: Sha256Digest;
+  readonly releaseCommitNonceSha256: Sha256Digest;
+  readonly providerInvocationDigest: Sha256Digest;
+  readonly pid1Sha256: Sha256Digest;
+  readonly taskSnapshotSha256: Sha256Digest;
+  readonly nativeBootstrapEvidenceDigest: Sha256Digest;
+  readonly preGateAckDigest: Sha256Digest;
+  readonly releaseArmedAckDigest: Sha256Digest;
+  readonly providerState: 'NOT_STARTED';
+  readonly releaseState: 'ARMED';
+  readonly preGateObservedAt: string;
+  readonly releaseArmedAt: string;
+  readonly observedAt: string;
+}
+
+interface ExactDockerNoEffectBundleV2 {
+  readonly schemaVersion: 2;
+  readonly kind: 'exact-docker-no-effect';
+  readonly admissionRefDigest: Sha256Digest;
+  readonly reasonCode: TaskAttemptCustodyNotDispatchedReasonCode;
+  readonly containerName: string;
+  readonly daemonContainerState: 'ABSENT';
+  readonly providerReleaseState: 'ABSENT';
+  readonly daemonInspectionReceiptDigest: Sha256Digest;
+  readonly providerReleaseProbeEvidenceDigest: Sha256Digest;
+  readonly backendProbeEvidenceDigest: Sha256Digest;
+  readonly containmentEvidenceDigest: Sha256Digest;
+  readonly preMountCompensation: Readonly<{
+    readonly artifactKey: string;
+    readonly artifactReceiptDigest: Sha256Digest;
+    readonly evidenceDigest: Sha256Digest;
+  }> | null;
+  readonly observedAt: string;
+}
+
+interface ExactDockerEffectPreparationCompensationRefV1 {
+  readonly artifactKey: string;
+  readonly artifactReceiptDigest: Sha256Digest;
+  readonly evidenceDigest: Sha256Digest;
+}
+
+interface ExactDockerReconciliationBundleV2 {
+  readonly schemaVersion: 2;
+  readonly kind: 'exact-docker-reconciliation';
+  readonly admissionRefDigest: Sha256Digest;
+  readonly reasonCode: TaskAttemptCustodyAmbiguousReasonCode;
+  readonly containerState: 'ABSENT' | 'PRESENT' | 'UNKNOWN';
+  readonly containerId: string | null;
+  readonly imageDigest: Sha256Digest | null;
+  readonly mountReceiptDigest: Sha256Digest | null;
+  readonly releaseState: 'NOT_ATTEMPTED' | 'UNCONFIRMED' | 'ACKNOWLEDGED' | 'UNKNOWN';
+  readonly releaseNonceDigest: Sha256Digest | null;
+  readonly providerInvocationDigest: Sha256Digest | null;
+  readonly containmentEvidenceDigest: Sha256Digest;
+  readonly backendProbeEvidenceDigest: Sha256Digest;
+  readonly observedAt: string;
+}
+
+interface ExactDockerProviderExitBundleV2 {
+  readonly schemaVersion: 2;
+  readonly kind: 'exact-docker-provider-exit';
+  readonly admissionRefDigest: Sha256Digest;
+  readonly containerId: string;
+  readonly exitCode: number;
+  readonly dockerWaitProcessExitCode: 0;
+  readonly dockerWaitSignal: null;
+  readonly stdoutSha256: Sha256Digest;
+  readonly stderrSha256: Sha256Digest;
+  readonly waitEvidenceDigest: Sha256Digest;
+  readonly observedAt: string;
+}
+
+interface ExactDockerProviderStartBundleV2 {
+  readonly schemaVersion: 2;
+  readonly kind: 'exact-docker-provider-start';
+  readonly admissionRefDigest: Sha256Digest;
+  readonly containerId: string;
+  readonly taskSnapshotSha256: Sha256Digest;
+  readonly providerInvocationDigest: Sha256Digest;
+  readonly authorityLabelsDigest: Sha256Digest;
+  readonly providerStartNonceSha256: Sha256Digest;
+  readonly executionCommitNonceSha256: Sha256Digest;
+  readonly providerExecutionAttemptId: string;
+  readonly providerExecutionAttemptIdentityDigest: Sha256Digest;
+  readonly dispatchReceiptDigest: Sha256Digest;
+  readonly releaseReceiptRef: Sha256Digest;
+  readonly releaseReceiptDigest: Sha256Digest;
+  readonly projectionFence: Sha256Digest;
+  readonly startAuthorizationDigest: Sha256Digest;
+  readonly pid1StartAckDigest: Sha256Digest;
+  readonly state: 'START_AUTHORIZATION_ACCEPTED';
+  readonly providerState: 'NOT_STARTED';
+  readonly observedAt: string;
+}
+
+interface ExactDockerProviderExecutionBundleV2
+  extends ExactDockerProviderExecutionAckV2 {
+  readonly containerId: string;
+  readonly providerExecutionAckBytesSha256: Sha256Digest;
+  readonly observedAt: string;
+}
+
+export interface ExactDockerProviderStartAckExpectationV2 {
+  readonly admissionRefDigest: Sha256Digest;
+  readonly taskSnapshotSha256: Sha256Digest;
+  readonly providerInvocationDigest: Sha256Digest;
+  readonly authorityLabelsDigest: Sha256Digest;
+  readonly providerStartNonceSha256: Sha256Digest;
+  readonly executionCommitNonceSha256: Sha256Digest;
+  readonly providerExecutionAttemptId: string;
+  readonly providerExecutionAttemptIdentityDigest: Sha256Digest;
+  readonly dispatchReceiptDigest: Sha256Digest;
+  readonly releaseReceiptRef: Sha256Digest;
+  readonly releaseReceiptDigest: Sha256Digest;
+  readonly projectionFence: Sha256Digest;
+  readonly startAuthorizationDigest: Sha256Digest;
+}
+
+export interface ExactDockerProviderStartAckV2
+  extends ExactDockerProviderStartAckExpectationV2 {
+  readonly schemaVersion: 2;
+  readonly kind: 'exact-docker-pid1-provider-start-ack';
+  readonly state: 'START_AUTHORIZATION_ACCEPTED';
+  readonly providerState: 'NOT_STARTED';
+}
+
+export interface ExactDockerProviderExecutionAckExpectationV2 {
+  readonly admissionRefDigest: Sha256Digest;
+  readonly taskSnapshotSha256: Sha256Digest;
+  readonly providerInvocationDigest: Sha256Digest;
+  readonly authorityLabelsDigest: Sha256Digest;
+  readonly executionCommitNonceSha256: Sha256Digest;
+  readonly providerExecutionAttemptId: string;
+  readonly providerExecutionAttemptIdentityDigest: Sha256Digest;
+  readonly dispatchReceiptDigest: Sha256Digest;
+  readonly releaseReceiptRef: Sha256Digest;
+  readonly releaseReceiptDigest: Sha256Digest;
+  readonly projectionFence: Sha256Digest;
+  readonly startAuthorizationDigest: Sha256Digest;
+  readonly providerStartAckBytesSha256: Sha256Digest;
+}
+
+export interface ExactDockerProviderExecutionAckV2
+  extends ExactDockerProviderExecutionAckExpectationV2 {
+  readonly schemaVersion: 2;
+  readonly kind: 'exact-docker-pid1-provider-execution-ack';
+  readonly childPid: number;
+  readonly state: 'PROVIDER_PROCESS_SPAWNED';
+  readonly providerState: 'STARTED';
+}
+
+/** Proves that PID1 crossed the actual child-process creation boundary. */
+export function verifyExactDockerProviderExecutionAck(
+  value: unknown,
+  expected: ExactDockerProviderExecutionAckExpectationV2,
+): value is ExactDockerProviderExecutionAckV2 {
+  const record = exactOwnDataRecord(value, [
+    'schemaVersion', 'kind', 'admissionRefDigest', 'taskSnapshotSha256',
+    'providerInvocationDigest', 'authorityLabelsDigest', 'executionCommitNonceSha256',
+    'providerExecutionAttemptId', 'providerExecutionAttemptIdentityDigest',
+    'dispatchReceiptDigest', 'releaseReceiptRef', 'releaseReceiptDigest', 'projectionFence',
+    'startAuthorizationDigest', 'providerStartAckBytesSha256', 'childPid',
+    'state', 'providerState',
+  ]);
+  return Boolean(record
+    && record.schemaVersion === 2
+    && record.kind === 'exact-docker-pid1-provider-execution-ack'
+    && record.admissionRefDigest === expected.admissionRefDigest
+    && record.taskSnapshotSha256 === expected.taskSnapshotSha256
+    && record.providerInvocationDigest === expected.providerInvocationDigest
+    && record.authorityLabelsDigest === expected.authorityLabelsDigest
+    && record.executionCommitNonceSha256 === expected.executionCommitNonceSha256
+    && record.providerExecutionAttemptId === expected.providerExecutionAttemptId
+    && record.providerExecutionAttemptIdentityDigest
+      === expected.providerExecutionAttemptIdentityDigest
+    && record.dispatchReceiptDigest === expected.dispatchReceiptDigest
+    && record.releaseReceiptRef === expected.releaseReceiptRef
+    && record.releaseReceiptDigest === expected.releaseReceiptDigest
+    && record.projectionFence === expected.projectionFence
+    && record.startAuthorizationDigest === expected.startAuthorizationDigest
+    && record.providerStartAckBytesSha256 === expected.providerStartAckBytesSha256
+    && Number.isSafeInteger(record.childPid) && Number(record.childPid) > 0
+    && record.state === 'PROVIDER_PROCESS_SPAWNED'
+    && record.providerState === 'STARTED');
+}
+
+/** Exact host-side acceptance gate for the trusted PID1 start acknowledgement. */
+export function verifyExactDockerProviderStartAck(
+  value: unknown,
+  expected: ExactDockerProviderStartAckExpectationV2,
+): value is ExactDockerProviderStartAckV2 {
+  const record = exactOwnDataRecord(value, [
+    'schemaVersion', 'kind', 'admissionRefDigest', 'taskSnapshotSha256',
+    'providerInvocationDigest', 'authorityLabelsDigest',
+    'providerStartNonceSha256', 'executionCommitNonceSha256',
+    'providerExecutionAttemptId',
+    'providerExecutionAttemptIdentityDigest', 'dispatchReceiptDigest',
+    'releaseReceiptRef', 'releaseReceiptDigest', 'projectionFence',
+    'startAuthorizationDigest', 'state', 'providerState',
+  ]);
+  return Boolean(record
+    && record.schemaVersion === 2
+    && record.kind === 'exact-docker-pid1-provider-start-ack'
+    && record.admissionRefDigest === expected.admissionRefDigest
+    && record.taskSnapshotSha256 === expected.taskSnapshotSha256
+    && record.providerInvocationDigest === expected.providerInvocationDigest
+    && record.authorityLabelsDigest === expected.authorityLabelsDigest
+    && record.providerStartNonceSha256 === expected.providerStartNonceSha256
+    && record.executionCommitNonceSha256 === expected.executionCommitNonceSha256
+    && record.providerExecutionAttemptId === expected.providerExecutionAttemptId
+    && record.providerExecutionAttemptIdentityDigest
+      === expected.providerExecutionAttemptIdentityDigest
+    && record.dispatchReceiptDigest === expected.dispatchReceiptDigest
+    && record.releaseReceiptRef === expected.releaseReceiptRef
+    && record.releaseReceiptDigest === expected.releaseReceiptDigest
+    && record.projectionFence === expected.projectionFence
+    && record.startAuthorizationDigest === expected.startAuthorizationDigest
+    && record.state === 'START_AUTHORIZATION_ACCEPTED'
+    && record.providerState === 'NOT_STARTED');
+}
+
+/** Strict one-shot raw commit check shared by the host evidence and PID1 contract tests. */
+export function verifyExactDockerExecutionCommit(
+  value: unknown,
+  expectedDigest: Sha256Digest,
+): value is Uint8Array {
+  return value instanceof Uint8Array
+    && value.byteLength > 0
+    && value.byteLength <= 256
+    && exactCustodyDigest(value) === expectedDigest;
+}
+
+function strictRoundTrip<T>(value: T): { readonly bytes: Uint8Array; readonly value: T } {
+  const bytes = Buffer.from(canonicalJson(value), 'utf8');
+  const parsed = JSON.parse(Buffer.from(bytes).toString('utf8')) as T;
+  if (canonicalJson(parsed) !== canonicalJson(value)) {
+    throw new ExactDockerCustodyFailure('EXACT_DOCKER_OBSERVATION_INVALID', true);
+  }
+  return Object.freeze({ bytes, value: Object.freeze(parsed as object) as T });
+}
+
+/** A failed inspect is not absence unless the daemon identifies this exact name as absent. */
+export function isExactDockerContainerAbsent(
+  outcome: Readonly<{
+    status: number | null;
+    stdout: string | null | undefined;
+    stderr: string | null | undefined;
+    error?: unknown;
+  }>,
+  containerName: string,
+): boolean {
+  if (outcome.status !== 1 || outcome.error || (outcome.stdout ?? '').trim() !== '') {
+    return false;
+  }
+  const escaped = containerName.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+  return new RegExp(
+    `^(?:Error: No such object:|Error response from daemon: No such container:) ${escaped}$`,
+    'u',
+  ).test((outcome.stderr ?? '').trim());
+}
+
+/** Docker daemon absence is authoritative only when it names the exact volume. */
+export function isExactDockerVolumeAbsent(
+  outcome: Readonly<{
+    status: number | null;
+    stdout: string | null | undefined;
+    stderr: string | null | undefined;
+    error?: unknown;
+  }>,
+  volumeName: string,
+): boolean {
+  if (!/^deckent-x[wd]-[a-f0-9]{48}$/u.test(volumeName)
+    || outcome.status !== 1 || outcome.error || (outcome.stdout ?? '').trim() !== '') {
+    return false;
+  }
+  const escaped = volumeName.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+  return new RegExp(`^Error: No such volume: ${escaped}$`, 'u')
+    .test((outcome.stderr ?? '').trim());
+}
+
+export interface ExactDockerWorkspaceVolumeInspectV1 {
+  readonly name: string;
+  readonly driver: 'local';
+  /** Daemon-issued creation instant; identity-bound so delete/recreate is never the same resource. */
+  readonly createdAt: string;
+  readonly labels: Readonly<Record<string, string>>;
+  readonly scope: 'local';
+  readonly options: Readonly<Record<string, string>>;
+  readonly mountpoint: string;
+}
+
+export interface ExactDockerWorkspaceCommandInputV1 {
+  readonly command: 'git' | 'docker';
+  readonly args: readonly string[];
+  readonly stdin: Uint8Array;
+  readonly timeoutMs: number;
+  readonly stdoutCeiling: number;
+  readonly stderrCeiling: number;
+}
+
+export interface ExactDockerWorkspaceCommandResultV1 {
+  readonly status: number | null;
+  readonly signal: NodeJS.Signals | null;
+  readonly stdout: Uint8Array;
+  readonly stderr: Uint8Array;
+  readonly error: boolean;
+  readonly overflow: boolean;
+}
+
+export type ExactDockerWorkspaceCommandRunnerV1 = (
+  input: ExactDockerWorkspaceCommandInputV1,
+) => Promise<ExactDockerWorkspaceCommandResultV1>;
+
+function exactDockerWorkspaceCommandSucceeded(
+  result: ExactDockerWorkspaceCommandResultV1,
+): boolean {
+  return result.status === 0 && result.signal === null && !result.error && !result.overflow
+    && result.stderr.byteLength === 0;
+}
+
+function exactDockerWorkspaceCommandStdout(
+  result: ExactDockerWorkspaceCommandResultV1,
+): string {
+  return Buffer.from(result.stdout).toString('utf8');
+}
+
+function exactDockerWorkspaceCommandObservation(
+  result: ExactDockerWorkspaceCommandResultV1,
+): Readonly<{
+  status: number | null;
+  stdout: string;
+  stderr: string;
+  error: boolean;
+}> {
+  return Object.freeze({
+    status: result.status,
+    stdout: exactDockerWorkspaceCommandStdout(result),
+    stderr: Buffer.from(result.stderr).toString('utf8'),
+    error: result.error || result.overflow || result.signal !== null,
+  });
+}
+
+export interface ExactDockerWorkspaceInventoryV1 {
+  readonly version: 1;
+  readonly paths: readonly string[];
+  readonly pathCount: number;
+  readonly totalPathBytes: number;
+  readonly inventoryDigest: Sha256Digest;
+  /** Exact NUL-delimited bytes delivered to the trusted population helper. */
+  readonly nulDelimitedPaths: Uint8Array;
+}
+
+const EXACT_DOCKER_WORKSPACE_INVENTORY_BYTES_MAX =
+  EXECUTION_EFFECT_PORTABLE_PATH_LIMITS.maxTotalPathBytes
+  + EXECUTION_EFFECT_PORTABLE_PATH_LIMITS.maxEntries;
+
+function exactDockerWorkspaceInventoryFromPaths(
+  values: readonly string[],
+): ExactDockerWorkspaceInventoryV1 | null {
+  if (values.length > EXECUTION_EFFECT_PORTABLE_PATH_LIMITS.maxEntries) return null;
+  const paths: string[] = [];
+  const keys = new Map<string, string>();
+  let totalPathBytes = 0;
+  for (const value of values) {
+    const portable = parseExecutionEffectPortablePath(value);
+    if (!portable || portable.path !== value || isExecutionEffectProtectedPath(portable.path)
+      || keys.has(portable.key)) return null;
+    totalPathBytes += Buffer.byteLength(portable.path, 'utf8');
+    if (!Number.isSafeInteger(totalPathBytes)
+      || totalPathBytes > EXECUTION_EFFECT_PORTABLE_PATH_LIMITS.maxTotalPathBytes) return null;
+    keys.set(portable.key, portable.path);
+    paths.push(portable.path);
+  }
+  paths.sort((left, right) => left < right ? -1 : left > right ? 1 : 0);
+  const nulDelimitedPaths = paths.length === 0
+    ? Buffer.alloc(0) : Buffer.from(`${paths.join('\0')}\0`, 'utf8');
+  if (nulDelimitedPaths.byteLength > EXACT_DOCKER_WORKSPACE_INVENTORY_BYTES_MAX) return null;
+  const body = Object.freeze({
+    version: 1 as const,
+    paths: Object.freeze(paths),
+    pathCount: paths.length,
+    totalPathBytes,
+  });
+  return Object.freeze({
+    ...body,
+    inventoryDigest: exactCustodyJsonDigest(body),
+    nulDelimitedPaths,
+  });
+}
+
+export function parseExactDockerWorkspaceInventory(
+  bytes: Uint8Array,
+): ExactDockerWorkspaceInventoryV1 | null {
+  if (bytes.byteLength > EXACT_DOCKER_WORKSPACE_INVENTORY_BYTES_MAX) return null;
+  const raw = Buffer.from(bytes);
+  if (raw.byteLength > 0 && raw[raw.byteLength - 1] !== 0) return null;
+  const segments = raw.byteLength === 0
+    ? [] : raw.subarray(0, raw.byteLength - 1).toString('utf8').split('\0');
+  const inventory = exactDockerWorkspaceInventoryFromPaths(segments);
+  return inventory && Buffer.from(inventory.nulDelimitedPaths).equals(raw) ? inventory : null;
+}
+
+export function runExactDockerWorkspaceCommand(
+  input: ExactDockerWorkspaceCommandInputV1,
+): Promise<ExactDockerWorkspaceCommandResultV1> {
+  const valid = (input.command === 'git' || input.command === 'docker')
+    && Array.isArray(input.args) && input.args.length <= 512
+    && input.args.every(value => typeof value === 'string' && !value.includes('\0')
+      && Buffer.byteLength(value, 'utf8') <= 64 * 1024)
+    && input.stdin instanceof Uint8Array
+    && input.stdin.byteLength <= EXECUTION_EFFECT_PORTABLE_PATH_LIMITS.maxTotalPathBytes
+    && Number.isSafeInteger(input.timeoutMs) && input.timeoutMs > 0 && input.timeoutMs <= 3_600_000
+    && Number.isSafeInteger(input.stdoutCeiling) && input.stdoutCeiling >= 0
+    && input.stdoutCeiling <= 32 * 1024 * 1024
+    && Number.isSafeInteger(input.stderrCeiling) && input.stderrCeiling >= 0
+    && input.stderrCeiling <= 16 * 1024 * 1024;
+  if (!valid) {
+    return Promise.resolve(Object.freeze({
+      status: null,
+      signal: null,
+      stdout: Buffer.alloc(0),
+      stderr: Buffer.alloc(0),
+      error: true,
+      overflow: false,
+    }));
+  }
+  return new Promise(resolveCommand => {
+    let child: ReturnType<typeof nodeSpawn>;
+    let stdout: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+    let stderr: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+    let error = false;
+    let overflow = false;
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const finish = (status: number | null, signal: NodeJS.Signals | null): void => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      resolveCommand(Object.freeze({
+        status,
+        signal,
+        stdout,
+        stderr,
+        error,
+        overflow,
+      }));
+    };
+    const append = (
+      current: Buffer<ArrayBufferLike>,
+      value: string | Buffer<ArrayBufferLike>,
+      ceiling: number,
+    ): Buffer<ArrayBufferLike> => {
+      const bytes = Buffer.isBuffer(value) ? value : Buffer.from(value);
+      const remaining = ceiling - current.byteLength;
+      if (bytes.byteLength > remaining) {
+        overflow = true;
+        try { child.kill('SIGKILL'); } catch { /* exact HOLD still follows */ }
+      }
+      return remaining <= 0
+        ? current : Buffer.concat([current, bytes.subarray(0, Math.max(0, remaining))]);
+    };
+    try {
+      child = nodeSpawn(input.command, [...input.args], {
+        shell: false,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: true,
+      });
+    } catch {
+      resolveCommand(Object.freeze({
+        status: null,
+        signal: null,
+        stdout,
+        stderr,
+        error: true,
+        overflow: false,
+      }));
+      return;
+    }
+    child.stdout?.on('data', value => {
+      stdout = append(stdout, value as string | Buffer<ArrayBufferLike>, input.stdoutCeiling);
+    });
+    child.stderr?.on('data', value => {
+      stderr = append(stderr, value as string | Buffer<ArrayBufferLike>, input.stderrCeiling);
+    });
+    child.stdin?.once('error', () => {
+      error = true;
+      try { child.kill('SIGKILL'); } catch { /* close resolves */ }
+    });
+    child.once('error', () => { error = true; });
+    child.once('close', (status, signal) => finish(status, signal));
+    child.stdin?.end(Buffer.from(input.stdin));
+    timer = setTimeout(() => {
+      error = true;
+      try { child.kill('SIGKILL'); } catch { /* close may already be pending */ }
+      finish(null, null);
+    }, input.timeoutMs);
+    timer.unref();
+  });
+}
+
+export async function readExactDockerWorkspaceInventory(
+  canonicalProjectRoot: string,
+  runner: ExactDockerWorkspaceCommandRunnerV1 = runExactDockerWorkspaceCommand,
+): Promise<ExactDockerWorkspaceInventoryV1 | null> {
+  if (!isAbsolute(canonicalProjectRoot) || canonicalProjectRoot.includes('\0')
+    || resolve(canonicalProjectRoot) !== canonicalProjectRoot) return null;
+  const outcome = await runner(Object.freeze({
+    command: 'git' as const,
+    args: Object.freeze([
+      '-C', canonicalProjectRoot, 'ls-files', '-z', '--cached', '--others',
+      '--exclude-standard', '--', '.',
+      ...EXECUTION_EFFECT_PROTECTED_TREES.flatMap(tree => [
+        `:(top,exclude)${tree}`,
+        `:(top,exclude)${tree}/**`,
+      ]),
+    ]),
+    stdin: Buffer.alloc(0),
+    timeoutMs: 60_000,
+    stdoutCeiling: EXACT_DOCKER_WORKSPACE_INVENTORY_BYTES_MAX,
+    stderrCeiling: 64 * 1024,
+  }));
+  if (outcome.status !== 0 || outcome.signal !== null || outcome.error || outcome.overflow
+    || outcome.stderr.byteLength !== 0) return null;
+  const raw = Buffer.from(outcome.stdout);
+  if (raw.byteLength > 0 && raw[raw.byteLength - 1] !== 0) return null;
+  const paths = raw.byteLength === 0
+    ? [] : raw.subarray(0, raw.byteLength - 1).toString('utf8').split('\0');
+  return exactDockerWorkspaceInventoryFromPaths(paths);
+}
+
+/** Strict daemon projection for an attempt-private local volume. */
+export function parseExactDockerWorkspaceVolumeInspect(
+  raw: string,
+): ExactDockerWorkspaceVolumeInspectV1 | null {
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); } catch { return null; }
+  const row = Array.isArray(parsed) && parsed.length === 1 ? parsed[0] : null;
+  if (!row || typeof row !== 'object' || nodeTypes.isProxy(row)) return null;
+  const record = row as Record<string, unknown>;
+  const labels = record.Labels;
+  const options = record.Options === null ? Object.freeze({}) : record.Options;
+  const rawCreatedAt = record.CreatedAt;
+  if (typeof record.Name !== 'string'
+    || !/^deckent-x[wd]-[a-f0-9]{48}$/u.test(record.Name)
+    || record.Driver !== 'local'
+    || record.Scope !== 'local'
+    || !isExecutionEffectDockerDaemonTimestampV1(rawCreatedAt)
+    || typeof record.Mountpoint !== 'string'
+    || !isAbsolute(record.Mountpoint)
+    || record.Mountpoint.includes('\0')
+    || resolve(record.Mountpoint) !== record.Mountpoint
+    || !labels || typeof labels !== 'object' || Array.isArray(labels) || nodeTypes.isProxy(labels)
+    || !options || typeof options !== 'object' || Array.isArray(options) || nodeTypes.isProxy(options)
+    || Object.values(labels as Record<string, unknown>).some(value => typeof value !== 'string')
+    || Object.values(options as Record<string, unknown>).some(value => typeof value !== 'string')) {
+    return null;
+  }
+  return Object.freeze({
+    name: record.Name,
+    driver: 'local',
+    // Preserve the daemon's exact bounded RFC3339 representation. Truncating Docker's
+    // nanoseconds to JavaScript milliseconds would collapse distinct delete/recreate
+    // generations into one resource identity.
+    createdAt: rawCreatedAt,
+    labels: Object.freeze({ ...(labels as Record<string, string>) }),
+    scope: 'local',
+    options: Object.freeze({ ...(options as Record<string, string>) }),
+    mountpoint: record.Mountpoint,
+  });
+}
+
+export function verifyExactDockerWorkspaceVolumeInspect(
+  observed: ExactDockerWorkspaceVolumeInspectV1,
+  expected: Readonly<{
+    readonly name: string;
+    readonly labels: Readonly<Record<string, string>>;
+    readonly canonicalProjectRoot: string;
+  }>,
+): boolean {
+  if (!/^deckent-x[wd]-[a-f0-9]{48}$/u.test(expected.name)
+    || observed.name !== expected.name
+    || canonicalJson(observed.labels) !== canonicalJson(expected.labels)
+    || Object.keys(observed.options).length !== 0
+    || !isAbsolute(expected.canonicalProjectRoot)
+    || resolve(expected.canonicalProjectRoot) !== expected.canonicalProjectRoot) return false;
+  const lexicalRelative = relative(expected.canonicalProjectRoot, observed.mountpoint);
+  if (lexicalRelative === ''
+    || (lexicalRelative !== '..'
+      && !lexicalRelative.startsWith(`..${sep}`)
+      && !isAbsolute(lexicalRelative))) return false;
+  let mountpoint: string;
+  try { mountpoint = realpathSync.native(observed.mountpoint); } catch {
+    // Docker Desktop/remote daemons may expose a daemon-local absolute path
+    // which is not resolvable in the client namespace. Empty local-driver
+    // options plus exact daemon labels/name remain the admission authority.
+    return true;
+  }
+  const relativeMountpoint = relative(expected.canonicalProjectRoot, mountpoint);
+  return relativeMountpoint !== ''
+    && (relativeMountpoint === '..'
+      || relativeMountpoint.startsWith(`..${sep}`)
+      || isAbsolute(relativeMountpoint));
+}
+
+export function buildExactDockerWorkspaceVolumeCreateArgs(
+  volumeName: string,
+  labels: Readonly<Record<string, string>>,
+): readonly string[] {
+  if (!/^deckent-x[wd]-[a-f0-9]{48}$/u.test(volumeName)
+    || Object.keys(labels).length === 0
+    || Object.entries(labels).some(([key, value]) => !/^[a-z0-9][a-z0-9._-]{0,127}$/u.test(key)
+      || typeof value !== 'string' || value.length === 0 || value.includes('\0')
+      || Buffer.byteLength(value, 'utf8') > 1024)) {
+    throw new ExactDockerCustodyFailure('EXACT_DOCKER_INPUT_INVALID', true);
+  }
+  return Object.freeze([
+    'volume', 'create', '--driver', 'local',
+    ...Object.entries(labels).sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
+      .flatMap(([key, value]) => ['--label', `${key}=${value}`]),
+    volumeName,
+  ]);
+}
+
+const EXACT_DOCKER_EFFECT_CAPTURE_TIMEOUT_MS = 60_000;
+const EXACT_DOCKER_EFFECT_RECEIPT_CEILING = 20 * 1024 * 1024;
+
+const EXACT_DOCKER_EFFECT_CAPTURE_HELPER = String.raw`
+import { loadExecAuthorityNative } from '/app/dist/core/exec-authority-native.js';
+const authority = JSON.parse(Buffer.from(process.argv[1], 'base64url').toString('utf8'));
+const native = loadExecAuthorityNative();
+if (!native.available || !native.effect || native.effect.available === false) process.exit(78);
+let root;
+try {
+  root = native.effect.openRoot('WORKSPACE', '/workspace');
+  const rootInspection = native.effect.inspectEntry(root.handle, '.');
+  const nativeCapture = native.effect.captureTree(root.handle, {
+    ...authority.limits,
+    deadlineUnixMs: authority.deadlineUnixMs,
+  }, 'ACTIVE');
+  const rootIdentityDigest = root.identityDigest;
+  native.effect.closeHandle(root.handle); root = undefined;
+  process.stdout.write(JSON.stringify({
+    rootIdentityDigest,
+    rootEntry: rootInspection.entry,
+    nativeCapture,
+  }));
+} finally {
+  if (root) native.effect.closeHandle(root.handle);
+}
+`;
+
+const EXACT_DOCKER_EFFECT_POPULATE_HELPER = String.raw`
+import { createHash } from 'node:crypto';
+import {
+  constants, closeSync, fchmodSync, fstatSync, fsyncSync, lstatSync, mkdirSync,
+  openSync, readFileSync, readSync, writeSync,
+} from 'node:fs';
+import { dirname, join } from 'node:path';
+import { loadExecAuthorityNative } from '/app/dist/core/exec-authority-native.js';
+const authority = JSON.parse(Buffer.from(process.argv[1], 'base64url').toString('utf8'));
+const raw = readFileSync(0);
+if (raw.length !== authority.inventoryByteLength
+  || (raw.length > 0 && raw[raw.length - 1] !== 0)) process.exit(78);
+const paths = raw.length === 0 ? [] : raw.subarray(0, raw.length - 1).toString('utf8').split('\0');
+const {
+  maxEntries: MAX_ENTRIES, maxFileBytes: MAX_FILE_BYTES, maxTotalBytes: MAX_TOTAL_BYTES,
+  maxPathBytes: MAX_PATH_BYTES, maxNameBytes: MAX_NAME_BYTES, maxDepth: MAX_DEPTH,
+} = authority.limits;
+if (paths.length !== authority.pathCount || paths.length > MAX_ENTRIES
+  || !Number.isSafeInteger(authority.deadlineUnixMs)
+  || !/^sha256:[a-f0-9]{64}$/.test(authority.inventoryDigest)
+  || !/^sha256:[a-f0-9]{64}$/.test(authority.inventoryAdmissionReceiptDigest)
+  || ![MAX_ENTRIES, MAX_FILE_BYTES, MAX_TOTAL_BYTES, MAX_PATH_BYTES, MAX_NAME_BYTES, MAX_DEPTH]
+    .every(Number.isSafeInteger)) process.exit(78);
+const checkDeadline = () => { if (Date.now() > authority.deadlineUnixMs) process.exit(78); };
+const same = (a,b) => a.dev === b.dev && a.ino === b.ino && a.mode === b.mode
+  && a.size === b.size && a.mtimeNs === b.mtimeNs && a.nlink === b.nlink;
+let previous = null;
+for (const relative of paths) {
+  if (!relative || relative.startsWith('/') || relative.includes('\\')
+    || Buffer.byteLength(relative, 'utf8') > MAX_PATH_BYTES
+    || relative.split('/').length > MAX_DEPTH
+    || relative.split('/').some(part => !part || part === '.' || part === '..'
+      || Buffer.byteLength(part, 'utf8') > MAX_NAME_BYTES)
+    || (previous !== null && previous >= relative)) process.exit(78);
+  previous = relative;
+}
+const inspectParents = (root, relative) => {
+  const parts = relative.split('/');
+  for (let index = 1; index < parts.length; index += 1) {
+    const parent = lstatSync(join(root, ...parts.slice(0, index)), { bigint: true });
+    if (!parent.isDirectory() || parent.isSymbolicLink()) process.exit(78);
+  }
+};
+const readEntry = (root, relative) => {
+  checkDeadline();
+  inspectParents(root, relative);
+  const absolute = join(root, ...relative.split('/'));
+  const before = lstatSync(absolute, { bigint: true });
+  if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1n) process.exit(78);
+  if (before.size < 0n || before.size > BigInt(MAX_FILE_BYTES)
+    || before.size > BigInt(Number.MAX_SAFE_INTEGER)) process.exit(78);
+  const fd = openSync(absolute, constants.O_RDONLY | constants.O_NOFOLLOW);
+  const content = createHash('sha256');
+  let byteLength = 0;
+  try {
+    const opened = fstatSync(fd, { bigint: true });
+    if (!same(before, opened) || opened.nlink !== 1n) process.exit(78);
+    const buffer = Buffer.allocUnsafe(1024 * 1024);
+    for (;;) {
+      checkDeadline();
+      const count = readSync(fd, buffer, 0, buffer.length, null);
+      if (count === 0) break;
+      byteLength += count;
+      if (!Number.isSafeInteger(byteLength) || byteLength > MAX_FILE_BYTES) process.exit(78);
+      content.update(buffer.subarray(0, count));
+    }
+    const after = fstatSync(fd, { bigint: true });
+    if (!same(opened, after) || BigInt(byteLength) !== opened.size) process.exit(78);
+  } finally { closeSync(fd); }
+  return Object.freeze({
+    mode: Number(before.mode & 0o777n),
+    byteLength,
+    contentDigest: 'sha256:' + content.digest('hex'),
+  });
+};
+const scan = (root, retainEntries) => {
+  const hash = createHash('sha256')
+    .update('execution-effect-population-content-manifest-v1', 'utf8').update('\0', 'utf8')
+    .update(JSON.stringify({
+      inventoryDigest: authority.inventoryDigest,
+      inventoryAdmissionReceiptDigest: authority.inventoryAdmissionReceiptDigest,
+      pathCount: paths.length,
+    }), 'utf8').update('\0', 'utf8');
+  const entries = retainEntries ? new Map() : null;
+  let entryCount = 0;
+  let totalBytes = 0;
+  for (const relative of paths) {
+    const entry = readEntry(root, relative);
+    totalBytes += entry.byteLength;
+    if (!Number.isSafeInteger(totalBytes) || totalBytes > MAX_TOTAL_BYTES) process.exit(78);
+    entryCount += 1;
+    if (entries) entries.set(relative, entry);
+    hash.update(JSON.stringify([
+      'regular-file', relative, entry.mode, entry.byteLength, entry.contentDigest,
+    ]), 'utf8').update('\n', 'utf8');
+  }
+  return Object.freeze({
+    digest: 'sha256:' + hash.digest('hex'),
+    entryCount,
+    totalBytes,
+    entries,
+  });
+};
+const sourcePre = scan('/source', true);
+for (const relative of paths) {
+  checkDeadline();
+  const parts = relative.split('/');
+  inspectParents('/source', relative);
+  const source = join('/source', ...parts);
+  const before = lstatSync(source, { bigint: true });
+  const expected = sourcePre.entries.get(relative);
+  if (!expected || !before.isFile() || before.isSymbolicLink() || before.nlink !== 1n
+    || Number(before.mode & 0o777n) !== expected.mode
+    || before.size !== BigInt(expected.byteLength)) process.exit(78);
+  const destination = join('/workspace', ...parts);
+  mkdirSync(dirname(destination), { recursive: true, mode: 0o755 });
+  const sourceFd = openSync(source, constants.O_RDONLY | constants.O_NOFOLLOW);
+  const destinationFd = openSync(
+    destination,
+    constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
+    Number(before.mode & 0o777n),
+  );
+  try {
+    const opened = fstatSync(sourceFd, { bigint: true });
+    if (!same(before, opened) || opened.nlink !== 1n) process.exit(78);
+    const content = createHash('sha256');
+    let byteLength = 0;
+    const buffer = Buffer.allocUnsafe(1024 * 1024);
+    for (;;) {
+      checkDeadline();
+      const count = readSync(sourceFd, buffer, 0, buffer.length, null);
+      if (count === 0) break;
+      byteLength += count;
+      if (!Number.isSafeInteger(byteLength) || byteLength > MAX_FILE_BYTES) process.exit(78);
+      content.update(buffer.subarray(0, count));
+      let offset = 0;
+      while (offset < count) {
+        checkDeadline();
+        const written = writeSync(destinationFd, buffer, offset, count - offset);
+        if (!Number.isSafeInteger(written) || written <= 0) process.exit(78);
+        offset += written;
+      }
+    }
+    const after = fstatSync(sourceFd, { bigint: true });
+    if (!same(opened, after) || byteLength !== expected.byteLength
+      || 'sha256:' + content.digest('hex') !== expected.contentDigest) process.exit(78);
+    fchmodSync(destinationFd, Number(before.mode & 0o777n));
+    fsyncSync(destinationFd);
+  } finally {
+    closeSync(destinationFd);
+    closeSync(sourceFd);
+  }
+}
+sourcePre.entries.clear();
+const destination = scan('/workspace', false);
+const sourcePost = scan('/source', false);
+if (sourcePre.digest !== destination.digest || destination.digest !== sourcePost.digest
+  || sourcePre.entryCount !== destination.entryCount
+  || destination.entryCount !== sourcePost.entryCount
+  || sourcePre.totalBytes !== destination.totalBytes
+  || destination.totalBytes !== sourcePost.totalBytes) process.exit(78);
+const native = loadExecAuthorityNative();
+if (!native.available || !native.effect || native.effect.available === false) process.exit(78);
+let root;
+try {
+  root = native.effect.openRoot('WORKSPACE', '/workspace');
+  const rootInspection = native.effect.inspectEntry(root.handle, '.');
+  const nativeCapture = native.effect.captureTree(root.handle, {
+    ...authority.limits,
+    deadlineUnixMs: authority.deadlineUnixMs,
+  }, 'ACTIVE');
+  const rootIdentityDigest = root.identityDigest;
+  native.effect.closeHandle(root.handle); root = undefined;
+  process.stdout.write(JSON.stringify({
+    rootIdentityDigest,
+    rootEntry: rootInspection.entry,
+    nativeCapture,
+    sourcePreManifestDigest: sourcePre.digest,
+    destinationManifestDigest: destination.digest,
+    sourcePostManifestDigest: sourcePost.digest,
+    manifestEntryCount: sourcePre.entryCount,
+    manifestTotalBytes: sourcePre.totalBytes,
+  }));
+} finally {
+  if (root) native.effect.closeHandle(root.handle);
+}
+`;
+
+/** Test/audit projection of the immutable, inventory-bound workspace population verifier. */
+export function exactDockerEffectPopulationHelperSource(): string {
+  return EXACT_DOCKER_EFFECT_POPULATE_HELPER;
+}
+
+const EXACT_DOCKER_EFFECT_DEPENDENCY_HELPER = String.raw`
+import { createHash } from 'node:crypto';
+import {
+  closeSync, constants, cpSync, lstatSync, openSync, opendirSync, readSync, readlinkSync,
+} from 'node:fs';
+import { join, relative } from 'node:path';
+const authority = JSON.parse(Buffer.from(process.argv[1], 'base64url').toString('utf8'));
+const source = '/app/node_modules';
+const destination = '/dependencies';
+const {
+  maxEntries: MAX_ENTRIES, maxDepth: MAX_DEPTH, maxFileBytes: MAX_FILE_BYTES,
+  maxTotalBytes: MAX_TOTAL_BYTES, maxPathBytes: MAX_PATH_BYTES,
+  maxNameBytes: MAX_NAME_BYTES,
+} = authority.limits;
+if (![MAX_ENTRIES, MAX_DEPTH, MAX_FILE_BYTES, MAX_TOTAL_BYTES, MAX_PATH_BYTES, MAX_NAME_BYTES]
+  .every(Number.isSafeInteger)) process.exit(78);
+const readNames = absolute => {
+  const names = [];
+  const directory = opendirSync(absolute);
+  try {
+    for (;;) {
+      const entry = directory.readSync();
+      if (!entry) break;
+      names.push(entry.name);
+      if (names.length > MAX_ENTRIES) process.exit(78);
+    }
+  } finally { directory.closeSync(); }
+  return names.sort((a,b) => a < b ? -1 : a > b ? 1 : 0);
+};
+const hashFile = absolute => {
+  const hash = createHash('sha256');
+  const buffer = Buffer.allocUnsafe(1024 * 1024);
+  const fd = openSync(absolute, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    for (;;) {
+      const count = readSync(fd, buffer, 0, buffer.length, null);
+      if (count === 0) break;
+      hash.update(buffer.subarray(0, count));
+    }
+  } finally { closeSync(fd); }
+  return hash.digest('hex');
+};
+const tree = root => {
+  const treeHash = createHash('sha256')
+    .update('execution-effect-dependency-tree-v1', 'utf8').update('\0', 'utf8')
+    .update(JSON.stringify(authority.limits), 'utf8').update('\0', 'utf8');
+  const stack = [{ absolute: root, depth: 0 }];
+  let entryCount = 0;
+  let totalBytes = 0;
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current || current.depth > MAX_DEPTH) process.exit(78);
+    const names = readNames(current.absolute);
+    const directories = [];
+    for (const name of names) {
+      if (!name || Buffer.byteLength(name, 'utf8') > MAX_NAME_BYTES) process.exit(78);
+      const absolute = join(current.absolute, name);
+      const rel = relative(root, absolute).split('\\').join('/');
+      if (!rel || rel.startsWith('../') || Buffer.byteLength(rel, 'utf8') > MAX_PATH_BYTES) process.exit(78);
+      const stat = lstatSync(absolute);
+      entryCount += 1;
+      if (entryCount > MAX_ENTRIES) process.exit(78);
+      let row;
+      if (stat.isDirectory()) {
+        row = ['d', rel, stat.mode & 0o777];
+        directories.push({ absolute, depth: current.depth + 1 });
+      } else if (stat.isFile()) {
+        if (stat.nlink !== 1 || stat.size > MAX_FILE_BYTES) process.exit(78);
+        totalBytes += stat.size;
+        if (!Number.isSafeInteger(totalBytes) || totalBytes > MAX_TOTAL_BYTES) process.exit(78);
+        row = ['f', rel, stat.mode & 0o777, stat.size, hashFile(absolute)];
+      } else if (stat.isSymbolicLink()) {
+        const target = readlinkSync(absolute);
+        if (Buffer.byteLength(target, 'utf8') > MAX_PATH_BYTES) process.exit(78);
+        row = ['l', rel, target];
+      } else process.exit(78);
+      treeHash.update(JSON.stringify(row), 'utf8').update('\n', 'utf8');
+    }
+    for (let index = directories.length - 1; index >= 0; index -= 1) stack.push(directories[index]);
+  }
+  return { entryCount, totalBytes, digest: 'sha256:' + treeHash.digest('hex') };
+};
+const before = tree(source);
+for (const name of readNames(source)) {
+  cpSync(join(source, name), join(destination, name), {
+    recursive: true, dereference: false, errorOnExist: true, force: false,
+  });
+}
+const after = tree(destination);
+if (before.entryCount !== after.entryCount || before.totalBytes !== after.totalBytes
+  || before.digest !== after.digest) process.exit(78);
+process.stdout.write(JSON.stringify({
+  entryCount: after.entryCount,
+  dependencyTreeDigest: after.digest,
+}));
+`;
+
+/** Test/audit projection of the immutable, image-owned dependency copy verifier. */
+export function exactDockerEffectDependencyHelperSource(): string {
+  return EXACT_DOCKER_EFFECT_DEPENDENCY_HELPER;
+}
+
+/** Strict host/image manifest parity; expected is supplied by the validated host native loader. */
+export function verifyExactDockerEffectNativeManifestParity(
+  observed: unknown,
+  expected: unknown,
+): boolean {
+  const observedSnapshot = snapshotExactPlainData(observed);
+  const expectedSnapshot = snapshotExactPlainData(expected);
+  return observedSnapshot.ok && expectedSnapshot.ok
+    && canonicalJson(observedSnapshot.value) === canonicalJson(expectedSnapshot.value);
+}
+
+/** Exact effect custody has no safe provider path without an admitted landing policy. */
+export function isExactDockerEffectLandingPolicyAdmitted(value: unknown): boolean {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)
+    || nodeTypes.isProxy(value)) return false;
+  try {
+    assertExecutionLandingPolicyConfig(value, 'exact Docker execution landing policy');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const EXACT_DOCKER_EFFECT_NATIVE_PROBE_HELPER = String.raw`
+import { loadExecAuthorityNative } from '/app/dist/core/exec-authority-native.js';
+const native = loadExecAuthorityNative();
+if (!native.available || !native.effect || native.effect.available === false) process.exit(78);
+process.stdout.write(JSON.stringify({ manifest: native.manifest }));
+`;
+
+export interface ExactDockerEffectImageAuthorityV1 {
+  readonly imageReference: string;
+  readonly imageDigest: Sha256Digest;
+  readonly imageIdentityDigest: Sha256Digest;
+}
+
+function parseExactDockerEffectImageAuthority(
+  raw: string,
+): ExactDockerEffectImageAuthorityV1 | null {
+  let value: unknown;
+  try { value = JSON.parse(raw); } catch { return null; }
+  const row = Array.isArray(value) && value.length === 1 ? value[0] : null;
+  if (!row || typeof row !== 'object' || nodeTypes.isProxy(row)) return null;
+  const record = row as Record<string, unknown>;
+  const repoDigests = Array.isArray(record.RepoDigests)
+    ? record.RepoDigests.filter((item): item is string => typeof item === 'string').sort()
+    : [];
+  const repoDigestValues = new Set(repoDigests.map(item => item.slice(item.lastIndexOf('@') + 1)));
+  const imageReference = repoDigests.length > 0 && repoDigestValues.size === 1
+    ? repoDigests[0]! : null;
+  const match = imageReference ? /@(?<digest>sha256:[a-f0-9]{64})$/u.exec(imageReference) : null;
+  if (!match?.groups?.digest || typeof record.Id !== 'string'
+    || !/^sha256:[a-f0-9]{64}$/u.test(record.Id)
+    || (record.Os !== 'linux') || typeof record.Architecture !== 'string') return null;
+  return Object.freeze({
+    imageReference: imageReference as string,
+    imageDigest: match.groups.digest as Sha256Digest,
+    imageIdentityDigest: exactEffectDomainDigest('execution-effect-docker-image-identity-v1', {
+      id: record.Id,
+      repoDigests,
+      architecture: record.Architecture,
+      os: record.Os,
+    }) as Sha256Digest,
+  });
+}
+
+export function exactDockerEffectVolumeIdentity(
+  observed: ExactDockerWorkspaceVolumeInspectV1,
+  authority: Readonly<{
+    readonly labelsDigest: Sha256Digest;
+    readonly resourceInstanceDigest: Sha256Digest;
+    readonly mountPlanDigest: Sha256Digest;
+  }>,
+): Sha256Digest {
+  return executionEffectDockerVolumeIdentityDigestV1({
+    volumeName: observed.name,
+    labelsDigest: authority.labelsDigest,
+    resourceInstanceDigest: authority.resourceInstanceDigest,
+    mountPlanDigest: authority.mountPlanDigest,
+    daemonCreatedAt: observed.createdAt,
+  }) as Sha256Digest;
+}
+
+export interface CreateExactDockerEffectLifecycleAdapterV1Input {
+  readonly canonicalProjectRoot: string;
+  readonly imageAuthority: ExactDockerEffectImageAuthorityV1;
+  readonly inventory: ExactDockerWorkspaceInventoryV1;
+  readonly runner: ExactDockerWorkspaceCommandRunnerV1;
+  readonly nowIso: () => string;
+}
+
+function exactDockerEffectTimestamp(nowIso: () => string): string {
+  const value = nowIso();
+  if (!Number.isFinite(Date.parse(value)) || new Date(Date.parse(value)).toISOString() !== value) {
+    throw new ExactDockerCustodyFailure('EXACT_DOCKER_OBSERVATION_INVALID', true);
+  }
+  return value;
+}
+
+function exactDockerEffectCaptureLimitsWithDeadline(
+  limits: ExecutionEffectCaptureLimits,
+  deadlineUnixMs: number,
+): object {
+  return Object.freeze({
+    maxEntries: limits.maxEntries,
+    maxFileBytes: limits.maxFileBytes,
+    maxTotalBytes: limits.maxTotalBytes,
+    maxDepth: limits.maxDepth,
+    maxPathBytes: limits.maxPathBytes,
+    maxNameBytes: limits.maxNameBytes,
+    maxManifestBytes: limits.maxManifestBytes,
+    deadlineUnixMs,
+  });
+}
+
+function parseExactDockerEffectRawCapture(
+  value: unknown,
+  input: Readonly<{
+    operation: Parameters<typeof createExecutionEffectDockerLifecycleCaptureReceiptV1>[0]['operation'];
+    authorityDigest: Sha256Digest;
+    plan: ExecutionEffectDockerWorkspacePlanV1;
+    volumeIdentityDigest: Sha256Digest;
+    limits: ExecutionEffectCaptureLimits;
+    startedAt: string;
+    completedAt: string;
+    deadlineAt: string;
+  }>,
+): ExecutionEffectDockerRawCaptureV1 | null {
+  const record = exactOwnDataRecord(value, ['rootIdentityDigest', 'rootEntry', 'nativeCapture']);
+  const root = exactOwnDataRecord(record?.rootEntry, [
+    'schemaVersion', 'path', 'kind', 'mode', 'size', 'objectIdentityDigest', 'contentDigest',
+  ]);
+  const capture = exactOwnDataRecord(record?.nativeCapture, [
+    'schemaVersion', 'kind', 'state', 'entries', 'entryCount', 'totalBytes', 'manifestDigest',
+  ]);
+  if (!record || !root || !capture || !isExactDigest(record.rootIdentityDigest)
+    || root.schemaVersion !== 1 || root.path !== '.' || root.kind !== 'DIRECTORY'
+    || !isExactDigest(root.objectIdentityDigest) || capture.schemaVersion !== 1
+    || capture.kind !== 'execution-effect-manifest' || capture.state !== 'CAPTURED'
+    || !Array.isArray(capture.entries) || !Number.isSafeInteger(capture.entryCount)
+    || !Number.isSafeInteger(capture.totalBytes) || !isExactDigest(capture.manifestDigest)) {
+    return null;
+  }
+  const workspaceIdentity = Object.freeze({
+    filesystemId: input.volumeIdentityDigest,
+    directoryId: root.objectIdentityDigest as Sha256Digest,
+    rootHandleEvidenceDigest: record.rootIdentityDigest as Sha256Digest,
+  });
+  try {
+    const receipt = createExecutionEffectDockerLifecycleCaptureReceiptV1({
+      operation: input.operation,
+      authorityDigest: input.authorityDigest,
+      phase: input.operation.startsWith('FINAL_QUIESCENCE_') ? 'final' : 'baseline',
+      volumeName: input.plan.volumeName,
+      volumeIdentityDigest: input.volumeIdentityDigest,
+      workspaceIdentity,
+      nativeManifestDigest: capture.manifestDigest as Sha256Digest,
+      rootObjectIdentityDigest: root.objectIdentityDigest as Sha256Digest,
+      entryCount: capture.entryCount as number,
+      totalBytes: capture.totalBytes as number,
+      startedAt: input.startedAt,
+      completedAt: input.completedAt,
+      deadlineAt: input.deadlineAt,
+    });
+    return Object.freeze({
+      workspaceIdentity,
+      rootEntry: Object.freeze({ ...root }) as unknown as ExecutionEffectNativeCaptureEntryV1,
+      nativeCapture: Object.freeze({
+        ...capture,
+        entries: Object.freeze([...(capture.entries as ExecutionEffectNativeCaptureEntryV1[])]),
+      }) as unknown as ExecutionEffectNativeCaptureTreeV1,
+      startedAt: input.startedAt,
+      completedAt: input.completedAt,
+      deadlineAt: input.deadlineAt,
+      receipt,
+    });
+  } catch {
+    return null;
+  }
+}
+
+/** Production lifecycle adapter: every Docker effect crosses the bounded async runner. */
+export function createExactDockerEffectLifecycleAdapterV1(
+  input: CreateExactDockerEffectLifecycleAdapterV1Input,
+): ExecutionEffectDockerLifecycleAdapterV1 {
+  const canonicalProjectRoot = canonicalExactDockerProjectRoot(input.canonicalProjectRoot);
+  if (canonicalProjectRoot !== input.canonicalProjectRoot
+    || input.inventory.inventoryDigest !== exactCustodyJsonDigest({
+      version: input.inventory.version,
+      paths: input.inventory.paths,
+      pathCount: input.inventory.pathCount,
+      totalPathBytes: input.inventory.totalPathBytes,
+    })) {
+    throw new ExactDockerCustodyFailure('EXACT_DOCKER_INPUT_INVALID', true);
+  }
+  const run = input.runner;
+  const now = input.nowIso;
+  const inspectVolume = async (name: string): Promise<ExactDockerWorkspaceVolumeInspectV1 | null> => {
+    const result = await run(Object.freeze({
+      command: 'docker' as const,
+      args: Object.freeze(['volume', 'inspect', name]),
+      stdin: Buffer.alloc(0), timeoutMs: 10_000,
+      stdoutCeiling: 1024 * 1024, stderrCeiling: 64 * 1024,
+    }));
+    return exactDockerWorkspaceCommandSucceeded(result)
+      ? parseExactDockerWorkspaceVolumeInspect(exactDockerWorkspaceCommandStdout(result)) : null;
+  };
+  const inspectExactVolumeGeneration = async (
+    name: string,
+    authority: Readonly<{
+      readonly labels: Readonly<Record<string, string>>;
+      readonly labelsDigest: Sha256Digest;
+      readonly resourceInstanceDigest: Sha256Digest;
+      readonly mountPlanDigest: Sha256Digest;
+      readonly volumeIdentityDigest: Sha256Digest;
+    }>,
+  ): Promise<ExactDockerWorkspaceVolumeInspectV1 | null> => {
+    const inspected = await inspectVolume(name);
+    return inspected && verifyExactDockerWorkspaceVolumeInspect(inspected, {
+      name,
+      labels: authority.labels,
+      canonicalProjectRoot,
+    }) && exactDockerEffectVolumeIdentity(inspected, authority) === authority.volumeIdentityDigest
+      ? inspected : null;
+  };
+  const runCapture = async (
+    captureInput: Parameters<ExecutionEffectDockerLifecycleAdapterV1['captureWorkspace']>[0]
+      | Parameters<ExecutionEffectDockerLifecycleAdapterV1['populateWorkspace']>[0],
+    operation: Parameters<typeof createExecutionEffectDockerLifecycleCaptureReceiptV1>[0]['operation'],
+    populate: boolean,
+  ): Promise<Readonly<{
+    capture: ExecutionEffectDockerRawCaptureV1;
+    populationManifest: Readonly<{
+      sourcePreManifestDigest: Sha256Digest;
+      destinationManifestDigest: Sha256Digest;
+      sourcePostManifestDigest: Sha256Digest;
+      manifestEntryCount: number;
+      manifestTotalBytes: number;
+    }> | null;
+  }>> => {
+    const expectedVolumeIdentityDigest = ('workspaceSnapshot' in captureInput
+      ? captureInput.workspaceSnapshot.workspaceResource.volumeIdentityDigest
+      : captureInput.volumeIdentityDigest) as Sha256Digest;
+    const workspaceAuthority = Object.freeze({
+      labels: captureInput.plan.workspaceLabels,
+      labelsDigest: captureInput.plan.workspaceLabelsDigest as Sha256Digest,
+      resourceInstanceDigest:
+        captureInput.plan.workspaceResourceInstanceDigest as Sha256Digest,
+      mountPlanDigest: captureInput.plan.mountPlanDigest as Sha256Digest,
+      volumeIdentityDigest: expectedVolumeIdentityDigest,
+    });
+    const beforeGeneration = await inspectExactVolumeGeneration(
+      captureInput.plan.volumeName,
+      workspaceAuthority,
+    );
+    if (!beforeGeneration) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_OBSERVATION_INVALID', true);
+    }
+    const startedAt = exactDockerEffectTimestamp(now);
+    const startedMs = Date.parse(startedAt);
+    const deadlineMs = startedMs + EXACT_DOCKER_EFFECT_CAPTURE_TIMEOUT_MS;
+    const deadlineAt = new Date(deadlineMs).toISOString();
+    const encoded = Buffer.from(canonicalJson({
+      limits: exactDockerEffectCaptureLimitsWithDeadline(captureInput.captureLimits, deadlineMs),
+      deadlineUnixMs: deadlineMs,
+      ...(populate ? {
+        inventoryByteLength: input.inventory.nulDelimitedPaths.byteLength,
+        pathCount: input.inventory.pathCount,
+        inventoryDigest: input.inventory.inventoryDigest,
+        inventoryAdmissionReceiptDigest: captureInput.plan.inventoryAdmissionReceiptDigest,
+      } : {}),
+    }), 'utf8').toString('base64url');
+    const args = [
+      'run', '--rm', '--network', 'none', '--read-only', '--cap-drop', 'ALL',
+      '--security-opt', 'no-new-privileges',
+      '--memory', '2g', '--memory-swap', '2g', '--pids-limit', '256',
+      '--tmpfs', '/tmp:size=64m,mode=0700',
+      ...(populate ? [
+        '--mount', `type=bind,src=${canonicalProjectRoot},dst=/source,readonly,bind-propagation=rprivate`,
+      ] : []),
+      '--mount', `type=volume,src=${captureInput.plan.volumeName},dst=/workspace,volume-nocopy`,
+      input.imageAuthority.imageReference,
+      'node', '--input-type=module', '-e',
+      populate ? EXACT_DOCKER_EFFECT_POPULATE_HELPER : EXACT_DOCKER_EFFECT_CAPTURE_HELPER,
+      encoded,
+    ];
+    const result = await run(Object.freeze({
+      command: 'docker' as const,
+      args: Object.freeze(args),
+      stdin: populate ? input.inventory.nulDelimitedPaths : Buffer.alloc(0),
+      timeoutMs: EXACT_DOCKER_EFFECT_CAPTURE_TIMEOUT_MS,
+      stdoutCeiling: EXACT_DOCKER_EFFECT_RECEIPT_CEILING,
+      stderrCeiling: 64 * 1024,
+    }));
+    if (!exactDockerWorkspaceCommandSucceeded(result)) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_OBSERVATION_INVALID', true);
+    }
+    const afterGeneration = await inspectExactVolumeGeneration(
+      captureInput.plan.volumeName,
+      workspaceAuthority,
+    );
+    if (!afterGeneration || beforeGeneration.createdAt !== afterGeneration.createdAt) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_OBSERVATION_INVALID', true);
+    }
+    const completedAt = exactDockerEffectTimestamp(now);
+    if (Date.parse(completedAt) < startedMs || Date.parse(completedAt) > deadlineMs) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_OBSERVATION_INVALID', true);
+    }
+    let decoded: unknown;
+    try { decoded = JSON.parse(exactDockerWorkspaceCommandStdout(result)); } catch { decoded = null; }
+    const captureRecord = exactOwnDataRecord(decoded, populate ? [
+      'rootIdentityDigest', 'rootEntry', 'nativeCapture',
+      'sourcePreManifestDigest', 'destinationManifestDigest', 'sourcePostManifestDigest',
+      'manifestEntryCount', 'manifestTotalBytes',
+    ] : ['rootIdentityDigest', 'rootEntry', 'nativeCapture']);
+    const populationManifest = populate && captureRecord
+      && isExactDigest(captureRecord.sourcePreManifestDigest)
+      && isExactDigest(captureRecord.destinationManifestDigest)
+      && isExactDigest(captureRecord.sourcePostManifestDigest)
+      && captureRecord.sourcePreManifestDigest === captureRecord.destinationManifestDigest
+      && captureRecord.destinationManifestDigest === captureRecord.sourcePostManifestDigest
+      && Number.isSafeInteger(captureRecord.manifestEntryCount)
+      && Number(captureRecord.manifestEntryCount) === input.inventory.pathCount
+      && Number(captureRecord.manifestEntryCount) <= captureInput.captureLimits.maxEntries
+      && Number.isSafeInteger(captureRecord.manifestTotalBytes)
+      && Number(captureRecord.manifestTotalBytes) >= 0
+      && Number(captureRecord.manifestTotalBytes) <= captureInput.captureLimits.maxTotalBytes
+      ? Object.freeze({
+          sourcePreManifestDigest: captureRecord.sourcePreManifestDigest as Sha256Digest,
+          destinationManifestDigest: captureRecord.destinationManifestDigest as Sha256Digest,
+          sourcePostManifestDigest: captureRecord.sourcePostManifestDigest as Sha256Digest,
+          manifestEntryCount: Number(captureRecord.manifestEntryCount),
+          manifestTotalBytes: Number(captureRecord.manifestTotalBytes),
+        })
+      : null;
+    const raw = captureRecord ? parseExactDockerEffectRawCapture({
+      rootIdentityDigest: captureRecord.rootIdentityDigest,
+      rootEntry: captureRecord.rootEntry,
+      nativeCapture: captureRecord.nativeCapture,
+    }, {
+      operation,
+      authorityDigest: captureInput.authorityDigest as Sha256Digest,
+      plan: captureInput.plan,
+      volumeIdentityDigest: expectedVolumeIdentityDigest,
+      limits: captureInput.captureLimits,
+      startedAt,
+      completedAt,
+      deadlineAt,
+    }) : null;
+    if (!raw || (populate && populationManifest === null)) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_OBSERVATION_INVALID', true);
+    }
+    return Object.freeze({ capture: raw, populationManifest });
+  };
+  const adapter: ExecutionEffectDockerLifecycleAdapterV1 = {
+    async inspectImage(authority) {
+      const observed = await run(Object.freeze({
+        command: 'docker' as const,
+        args: Object.freeze(['image', 'inspect', authority.imageReference]),
+        stdin: Buffer.alloc(0), timeoutMs: 10_000,
+        stdoutCeiling: 8 * 1024 * 1024, stderrCeiling: 64 * 1024,
+      }));
+      const image = exactDockerWorkspaceCommandSucceeded(observed)
+        ? parseExactDockerEffectImageAuthority(exactDockerWorkspaceCommandStdout(observed)) : null;
+      if (!image || canonicalJson(image) !== canonicalJson(input.imageAuthority)
+        || image.imageDigest !== authority.expectedImageDigest) return null;
+      return createExecutionEffectDockerImageObservationV1({
+        authorityDigest: authority.authorityDigest,
+        imageReference: image.imageReference,
+        imageDigest: image.imageDigest,
+        imageIdentityDigest: image.imageIdentityDigest,
+        observedAt: exactDockerEffectTimestamp(now),
+      });
+    },
+    async prepareDependencies(authority) {
+      const startedAt = exactDockerEffectTimestamp(now);
+      const absent = await run(Object.freeze({
+        command: 'docker' as const, args: Object.freeze(['volume', 'inspect', authority.dependencyPlan.volumeName]),
+        stdin: Buffer.alloc(0), timeoutMs: 10_000, stdoutCeiling: 1024 * 1024, stderrCeiling: 64 * 1024,
+      }));
+      if (!isExactDockerVolumeAbsent(
+        exactDockerWorkspaceCommandObservation(absent), authority.dependencyPlan.volumeName,
+      )) return null;
+      const absenceDigest = exactEffectDomainDigest('execution-effect-docker-dependency-absence-v1', {
+        name: authority.dependencyPlan.volumeName,
+        observedAt: startedAt,
+      });
+      const created = await run(Object.freeze({
+        command: 'docker' as const,
+        args: buildExactDockerWorkspaceVolumeCreateArgs(
+          authority.dependencyPlan.volumeName,
+          authority.labels,
+        ),
+        stdin: Buffer.alloc(0), timeoutMs: 10_000, stdoutCeiling: 1024, stderrCeiling: 64 * 1024,
+      }));
+      if (!exactDockerWorkspaceCommandSucceeded(created)
+        || exactDockerWorkspaceCommandStdout(created).trim() !== authority.dependencyPlan.volumeName) return null;
+      const inspected = await inspectVolume(authority.dependencyPlan.volumeName);
+      if (!inspected || !verifyExactDockerWorkspaceVolumeInspect(inspected, {
+        name: authority.dependencyPlan.volumeName,
+        labels: authority.labels,
+        canonicalProjectRoot,
+      })) return null;
+      const volumeIdentityDigest = exactDockerEffectVolumeIdentity(inspected, {
+        labelsDigest: authority.labelsDigest as Sha256Digest,
+        resourceInstanceDigest: authority.resourceInstanceDigest as Sha256Digest,
+        mountPlanDigest: authority.dependencyPlanDigest as Sha256Digest,
+      });
+      const dependencyVolumeAuthority = Object.freeze({
+        labels: authority.labels,
+        labelsDigest: authority.labelsDigest as Sha256Digest,
+        resourceInstanceDigest: authority.resourceInstanceDigest as Sha256Digest,
+        mountPlanDigest: authority.dependencyPlanDigest as Sha256Digest,
+        volumeIdentityDigest,
+      });
+      const beforePopulation = await inspectExactVolumeGeneration(
+        authority.dependencyPlan.volumeName,
+        dependencyVolumeAuthority,
+      );
+      if (!beforePopulation || beforePopulation.createdAt !== inspected.createdAt) return null;
+      const dependencyHelperAuthority = Buffer.from(canonicalJson({
+        limits: EXECUTION_EFFECT_CAPTURE_HARD_LIMITS,
+      }), 'utf8').toString('base64url');
+      const population = await run(Object.freeze({
+        command: 'docker' as const,
+        args: Object.freeze([
+          'run', '--rm', '--network', 'none', '--read-only', '--cap-drop', 'ALL',
+          '--security-opt', 'no-new-privileges',
+          '--memory', '2g', '--memory-swap', '2g', '--pids-limit', '256',
+          '--tmpfs', '/tmp:size=64m,mode=0700',
+          '--mount', `type=volume,src=${authority.dependencyPlan.volumeName},dst=/dependencies,volume-nocopy`,
+          authority.imageReference, 'node', '--input-type=module', '-e',
+          EXACT_DOCKER_EFFECT_DEPENDENCY_HELPER, dependencyHelperAuthority,
+        ]),
+        stdin: Buffer.alloc(0), timeoutMs: 120_000,
+        stdoutCeiling: 1024 * 1024, stderrCeiling: 64 * 1024,
+      }));
+      let populationValue: Record<string, unknown> | null = null;
+      try {
+        populationValue = exactOwnDataRecord(
+          JSON.parse(exactDockerWorkspaceCommandStdout(population)),
+          ['entryCount', 'dependencyTreeDigest'],
+        );
+      } catch { populationValue = null; }
+      if (!exactDockerWorkspaceCommandSucceeded(population) || !populationValue
+        || !Number.isSafeInteger(populationValue.entryCount)
+        || !isExactDigest(populationValue.dependencyTreeDigest)) return null;
+      const afterPopulation = await inspectExactVolumeGeneration(
+        authority.dependencyPlan.volumeName,
+        dependencyVolumeAuthority,
+      );
+      if (!afterPopulation || afterPopulation.createdAt !== beforePopulation.createdAt) return null;
+      const completedAt = exactDockerEffectTimestamp(now);
+      const creationReceiptDigest = exactEffectDomainDigest(
+        'execution-effect-docker-dependency-create-v1',
+        {
+          absenceDigest,
+          volumeIdentityDigest,
+          resourceInstanceDigest: authority.resourceInstanceDigest,
+          daemonCreatedAt: beforePopulation.createdAt,
+          completedAt,
+        },
+      );
+      const inspectDigest = exactEffectDomainDigest(
+        'execution-effect-docker-dependency-inspect-v1', beforePopulation,
+      );
+      const populationReceiptDigest = exactEffectDomainDigest(
+        'execution-effect-docker-dependency-population-v1',
+        { volumeIdentityDigest, dependencyTreeDigest: populationValue.dependencyTreeDigest },
+      );
+      return createExecutionEffectDockerDependencyAuthorityReceiptV1({
+        authorityDigest: authority.authorityDigest,
+        imageObservationReceiptDigest: authority.imageObservationReceiptDigest,
+        imageIdentityDigest: authority.imageIdentityDigest,
+        dependencyPlanDigest: authority.dependencyPlanDigest,
+        labelsDigest: authority.labelsDigest,
+        resourceInstanceDigest: authority.resourceInstanceDigest,
+        volumeName: authority.dependencyPlan.volumeName,
+        volumeIdentityDigest,
+        absenceObservationDigest: absenceDigest,
+        creationReceiptDigest,
+        verifiedInspectDigest: inspectDigest,
+        populationReceiptDigest,
+        dependencyTreeDigest: populationValue.dependencyTreeDigest as Sha256Digest,
+        daemonCreatedAt: beforePopulation.createdAt,
+        startedAt,
+        completedAt,
+      });
+    },
+    async verifyExclusiveAttachments(authority) {
+      const workspaceAuthority = Object.freeze({
+        labels: authority.workspacePlan.workspaceLabels,
+        labelsDigest: authority.workspacePlan.workspaceLabelsDigest as Sha256Digest,
+        resourceInstanceDigest:
+          authority.workspacePlan.workspaceResourceInstanceDigest as Sha256Digest,
+        mountPlanDigest: authority.workspacePlan.mountPlanDigest as Sha256Digest,
+        volumeIdentityDigest: authority.workspaceVolumeIdentityDigest as Sha256Digest,
+      });
+      const dependencyAuthority = Object.freeze({
+        labels: authority.workspacePlan.dependencyLabels,
+        labelsDigest: authority.workspacePlan.dependencyLabelsDigest as Sha256Digest,
+        resourceInstanceDigest:
+          authority.workspacePlan.dependencyResourceInstanceDigest as Sha256Digest,
+        mountPlanDigest: authority.workspacePlan.dependencyPlanDigest as Sha256Digest,
+        volumeIdentityDigest: authority.dependencyVolumeIdentityDigest as Sha256Digest,
+      });
+      if (authority.workspaceVolumeName !== authority.workspacePlan.volumeName
+        || authority.dependencyVolumeName !== authority.workspacePlan.dependencyPlan.volumeName
+        || authority.dependencyAuthority.volumeName !== authority.dependencyVolumeName
+        || authority.dependencyAuthority.volumeIdentityDigest
+          !== authority.dependencyVolumeIdentityDigest
+        || authority.dependencyAuthority.resourceInstanceDigest
+          !== authority.workspacePlan.dependencyResourceInstanceDigest) return null;
+      for (const [volumeName, expected] of [
+        [authority.workspaceVolumeName, workspaceAuthority],
+        [authority.dependencyVolumeName, dependencyAuthority],
+      ] as const) {
+        const beforeGeneration = await inspectExactVolumeGeneration(volumeName, expected);
+        if (!beforeGeneration) return null;
+        const observed = await run(Object.freeze({
+          command: 'docker' as const,
+          args: Object.freeze(['ps', '-q', '--filter', `volume=${volumeName}`]),
+          stdin: Buffer.alloc(0), timeoutMs: 10_000,
+          stdoutCeiling: 1024 * 1024, stderrCeiling: 64 * 1024,
+        }));
+        if (!exactDockerWorkspaceCommandSucceeded(observed)
+          || exactDockerWorkspaceCommandStdout(observed).trim() !== '') return null;
+        const afterGeneration = await inspectExactVolumeGeneration(volumeName, expected);
+        if (!afterGeneration || beforeGeneration.createdAt !== afterGeneration.createdAt) {
+          return null;
+        }
+      }
+      return createExecutionEffectDockerExclusiveAttachmentReceiptV1({
+        phase: authority.phase,
+        authorityDigest: authority.authorityDigest,
+        workspaceVolumeName: authority.workspaceVolumeName,
+        workspaceVolumeIdentityDigest: authority.workspaceVolumeIdentityDigest,
+        dependencyVolumeName: authority.dependencyVolumeName,
+        dependencyVolumeIdentityDigest: authority.dependencyVolumeIdentityDigest,
+        observedAt: exactDockerEffectTimestamp(now),
+      });
+    },
+    async inspectVolume(authority) {
+      const observedAt = exactDockerEffectTimestamp(now);
+      const result = await run(Object.freeze({
+        command: 'docker' as const,
+        args: Object.freeze(['volume', 'inspect', authority.plan.volumeName]),
+        stdin: Buffer.alloc(0), timeoutMs: 10_000,
+        stdoutCeiling: 1024 * 1024, stderrCeiling: 64 * 1024,
+      }));
+      if (authority.phase === 'EXPECT_ABSENT') {
+        return isExactDockerVolumeAbsent(
+          exactDockerWorkspaceCommandObservation(result), authority.plan.volumeName,
+        ) ? createExecutionEffectDockerVolumeObservationV1({
+          state: 'ABSENT', authorityDigest: authority.authorityDigest,
+          volumeName: authority.plan.volumeName,
+          resourceInstanceDigest: authority.plan.workspaceResourceInstanceDigest,
+          observedAt,
+        }) : null;
+      }
+      const inspected = exactDockerWorkspaceCommandSucceeded(result)
+        ? parseExactDockerWorkspaceVolumeInspect(exactDockerWorkspaceCommandStdout(result)) : null;
+      if (!inspected || !verifyExactDockerWorkspaceVolumeInspect(inspected, {
+        name: authority.plan.volumeName,
+        labels: authority.plan.workspaceLabels,
+        canonicalProjectRoot,
+      })) return null;
+      const volumeIdentityDigest = exactDockerEffectVolumeIdentity(inspected, {
+        labelsDigest: authority.plan.workspaceLabelsDigest as Sha256Digest,
+        resourceInstanceDigest: authority.plan.workspaceResourceInstanceDigest as Sha256Digest,
+        mountPlanDigest: authority.plan.mountPlanDigest as Sha256Digest,
+      });
+      return createExecutionEffectDockerVolumeObservationV1({
+        state: 'PRESENT', authorityDigest: authority.authorityDigest,
+        volumeName: authority.plan.volumeName, driver: 'local', scope: 'local',
+        labelsDigest: authority.plan.workspaceLabelsDigest,
+        resourceInstanceDigest: authority.plan.workspaceResourceInstanceDigest,
+        mountPlanDigest: authority.plan.mountPlanDigest,
+        volumeIdentityDigest, daemonCreatedAt: inspected.createdAt, observedAt,
+      });
+    },
+    async createVolume(authority) {
+      const createRequestedAt = exactDockerEffectTimestamp(now);
+      const created = await run(Object.freeze({
+        command: 'docker' as const,
+        args: buildExactDockerWorkspaceVolumeCreateArgs(
+          authority.plan.volumeName,
+          authority.plan.workspaceLabels,
+        ),
+        stdin: Buffer.alloc(0), timeoutMs: 10_000,
+        stdoutCeiling: 1024, stderrCeiling: 64 * 1024,
+      }));
+      if (!exactDockerWorkspaceCommandSucceeded(created)
+        || exactDockerWorkspaceCommandStdout(created).trim() !== authority.plan.volumeName) return null;
+      const inspected = await inspectVolume(authority.plan.volumeName);
+      if (!inspected || !verifyExactDockerWorkspaceVolumeInspect(inspected, {
+        name: authority.plan.volumeName,
+        labels: authority.plan.workspaceLabels,
+        canonicalProjectRoot,
+      })) return null;
+      const volumeIdentityDigest = exactDockerEffectVolumeIdentity(inspected, {
+        labelsDigest: authority.plan.workspaceLabelsDigest as Sha256Digest,
+        resourceInstanceDigest: authority.plan.workspaceResourceInstanceDigest as Sha256Digest,
+        mountPlanDigest: authority.plan.mountPlanDigest as Sha256Digest,
+      });
+      const createCompletedAt = exactDockerEffectTimestamp(now);
+      return createExecutionEffectDockerVolumeCreationReceiptV1({
+        authorityDigest: authority.authorityDigest,
+        absenceObservationDigest: authority.absenceObservationDigest,
+        volumeName: authority.plan.volumeName,
+        labelsDigest: authority.plan.workspaceLabelsDigest,
+        resourceInstanceDigest: authority.plan.workspaceResourceInstanceDigest,
+        mountPlanDigest: authority.plan.mountPlanDigest,
+        volumeIdentityDigest,
+        createRequestedAt,
+        createCompletedAt,
+        daemonCreatedAt: inspected.createdAt,
+      });
+    },
+    async populateWorkspace(authority) {
+      const result = await runCapture(authority, 'POPULATION_BASELINE', true);
+      const populationManifest = result.populationManifest;
+      if (!populationManifest) return null;
+      return Object.freeze({
+        populationReceipt: createExecutionEffectDockerPopulationReceiptV1({
+          authorityDigest: authority.authorityDigest,
+          volumeName: authority.plan.volumeName,
+          volumeIdentityDigest: authority.volumeIdentityDigest,
+          inventoryDigest: authority.plan.inventoryDigest,
+          inventoryAdmissionReceiptDigest: authority.plan.inventoryAdmissionReceiptDigest,
+          dependencyPlanDigest: authority.plan.dependencyPlanDigest,
+          dependencyAuthorityReceiptDigest: authority.dependencyAuthorityReceiptDigest,
+          rejectedPathCount: 0,
+          rejectedPathsDigest: authority.plan.inventoryRejectedPathsDigest,
+          captureReceiptDigest: result.capture.receipt.receiptDigest,
+          populatedPathCount: authority.plan.inventoryPathCount,
+          ...populationManifest,
+          completedAt: result.capture.completedAt,
+        }),
+        capture: result.capture,
+      });
+    },
+    async captureWorkspace(authority) {
+      return (await runCapture(authority, authority.operation, false)).capture;
+    },
+  };
+  return Object.freeze(adapter);
+}
+
+interface ExactDockerEffectPreparedJournalV1 {
+  readonly transaction: ExecutionEffectLandingTransactionRefV1;
+  readonly operations: readonly ExecutionEffectLandingOperationV1[];
+  readonly recordDigest: ExecutionEffectPersistenceDigest;
+}
+
+interface ExactDockerEffectStepJournalV1 {
+  readonly index: number;
+  readonly operationDigest: ExecutionEffectPersistenceDigest;
+  readonly nativeReceipt: ExecutionEffectLandingNativeMutationReceiptV1;
+  readonly recordDigest: ExecutionEffectPersistenceDigest;
+}
+
+interface ExactDockerEffectCommittedJournalV1 {
+  readonly disposition: 'COMMITTED' | 'COMMITTED_NO_CHANGE';
+  readonly transaction: ExecutionEffectLandingTransactionRefV1;
+  readonly preparedJournalDigest: ExecutionEffectPersistenceDigest;
+  readonly applyingJournalDigest: ExecutionEffectPersistenceDigest | null;
+  readonly operationReceiptDigests: readonly ExecutionEffectPersistenceDigest[];
+  readonly finalVerificationReceipt: ExecutionEffectLandingFinalVerificationReceiptV1 | null;
+  readonly committedAt: string;
+  readonly recordDigest: ExecutionEffectPersistenceDigest;
+}
+
+function exactDockerEffectJournalKey(
+  transactionDigest: ExecutionEffectPersistenceDigest,
+  phase: 'prepared' | 'applying' | 'committed' | `step-${string}`,
+): string {
+  return `effect-landing/${transactionDigest.slice(7)}/${phase}.json`;
+}
+
+function readExactDockerEffectJournalRecord(
+  adapter: ExecutionEffectStoreAdapterV1,
+  key: string,
+): Readonly<Record<string, unknown>> | null {
+  const artifact = adapter.journal.readImmutable(key);
+  if (!artifact || artifact.key !== key
+    || artifact.byteLength !== artifact.bytes.byteLength
+    || artifact.contentDigest !== exactCustodyDigest(artifact.bytes)) return null;
+  let value: unknown;
+  try { value = JSON.parse(Buffer.from(artifact.bytes).toString('utf8')); } catch { return null; }
+  if (!value || typeof value !== 'object' || Array.isArray(value) || nodeTypes.isProxy(value)
+    || !isExactDigest(Reflect.get(value, 'recordDigest'))) return null;
+  return value as Readonly<Record<string, unknown>>;
+}
+
+function persistenceOperationFromExactDockerJournal(
+  operation: ExecutionEffectLandingOperationV1,
+  receipt: ExecutionEffectLandingNativeMutationReceiptV1,
+): ExecutionEffectPersistenceOperationV1 {
+  if (operation.operationDigest !== receipt.operationDigest) {
+    throw new ExactDockerCustodyFailure('EXACT_DOCKER_OBSERVATION_INVALID', true);
+  }
+  return createExecutionEffectPersistenceOperationV1({
+    index: operation.index,
+    kind: operation.kind,
+    path: operation.path,
+    effectDigests: operation.effectDigests as readonly ExecutionEffectPersistenceDigest[],
+    derivedParent: operation.derivedParent,
+    stagedSource: operation.stagedSource as ExecutionEffectPersistenceOperationV1['stagedSource'],
+    entryPreimages:
+      operation.entryPreimages as ExecutionEffectPersistenceOperationV1['entryPreimages'],
+    entryPostimages:
+      operation.entryPostimages as ExecutionEffectPersistenceOperationV1['entryPostimages'],
+    parentAuthorities:
+      operation.parentAuthorities as ExecutionEffectPersistenceOperationV1['parentAuthorities'],
+    nativeReceiptDigest: receipt.receiptDigest as ExecutionEffectPersistenceDigest,
+    durabilityEvidenceDigest: receipt.durabilityEvidenceDigest as ExecutionEffectPersistenceDigest,
+  });
+}
+
+function createExactDockerEffectTerminalSeal(input: Readonly<{
+  readonly scope: PreparedExactDockerCustodyScope;
+  readonly captured: ExactDockerEffectReadyAuthorityV1;
+  readonly storeAdapter: ExecutionEffectStoreAdapterV1;
+  readonly receipt: ExecutionEffectLandingReceiptV1;
+  readonly projectRoot: string;
+}>): ExecutionEffectLandingTerminalSealV1 {
+  const transaction = input.receipt.transaction;
+  const preparedKey = exactDockerEffectJournalKey(transaction.transactionDigest, 'prepared');
+  const committedKey = exactDockerEffectJournalKey(transaction.transactionDigest, 'committed');
+  const preparedRaw = readExactDockerEffectJournalRecord(input.storeAdapter, preparedKey);
+  const committedRaw = readExactDockerEffectJournalRecord(input.storeAdapter, committedKey);
+  if (!preparedRaw || !committedRaw
+    || preparedRaw.kind !== 'execution-effect-landing-prepared'
+    || preparedRaw.phase !== 'PREPARED'
+    || committedRaw.kind !== 'execution-effect-landing-committed'
+    || committedRaw.phase !== 'COMMITTED'
+    || canonicalJson(preparedRaw.transaction) !== canonicalJson(transaction)
+    || canonicalJson(committedRaw.transaction) !== canonicalJson(transaction)
+    || committedRaw.recordDigest !== input.receipt.committedJournalDigest
+    || !Array.isArray(preparedRaw.operations)
+    || committedRaw.disposition !== input.receipt.state
+    || !Array.isArray(committedRaw.operationReceiptDigests)
+    || canonicalJson(committedRaw.operationReceiptDigests)
+      !== canonicalJson(input.receipt.operationReceiptDigests)) {
+    throw new ExactDockerCustodyFailure('EXACT_DOCKER_OBSERVATION_INVALID', true);
+  }
+  const prepared = preparedRaw as unknown as ExactDockerEffectPreparedJournalV1;
+  const committed = committedRaw as unknown as ExactDockerEffectCommittedJournalV1;
+  if (!isExactDigest(prepared.recordDigest)
+    || committed.preparedJournalDigest !== prepared.recordDigest
+    || !isExactDigest(committed.recordDigest)
+    || !Number.isFinite(Date.parse(committed.committedAt))
+    || committed.transaction.transactionDigest !== transaction.transactionDigest
+    || prepared.operations.length !== input.receipt.operationReceiptDigests.length) {
+    throw new ExactDockerCustodyFailure('EXACT_DOCKER_OBSERVATION_INVALID', true);
+  }
+  const preparedRef = input.storeAdapter.readJournalReference(preparedKey, prepared.recordDigest);
+  const committedRef = input.storeAdapter.readJournalReference(committedKey, committed.recordDigest);
+  if (!preparedRef || !committedRef) {
+    throw new ExactDockerCustodyFailure('EXACT_DOCKER_OBSERVATION_INVALID', true);
+  }
+  const stepRecords: ExactDockerEffectStepJournalV1[] = [];
+  const stepRefs = [] as NonNullable<ExecutionEffectLandingTerminalSealV1['journalArtifacts']['steps']>[number][];
+  for (let index = 0; index < prepared.operations.length; index += 1) {
+    const key = exactDockerEffectJournalKey(
+      transaction.transactionDigest,
+      `step-${String(index).padStart(7, '0')}`,
+    );
+    const raw = readExactDockerEffectJournalRecord(input.storeAdapter, key);
+    if (!raw || raw.kind !== 'execution-effect-landing-step' || raw.phase !== 'STEP'
+      || raw.index !== index || !isExactDigest(raw.recordDigest)
+      || !isExactDigest(raw.operationDigest) || !raw.nativeReceipt
+      || typeof raw.nativeReceipt !== 'object') {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_OBSERVATION_INVALID', true);
+    }
+    const record = raw as unknown as ExactDockerEffectStepJournalV1;
+    if (record.operationDigest !== prepared.operations[index]?.operationDigest
+      || record.nativeReceipt.receiptDigest !== input.receipt.operationReceiptDigests[index]) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_OBSERVATION_INVALID', true);
+    }
+    const ref = input.storeAdapter.readJournalReference(key, record.recordDigest);
+    if (!ref) throw new ExactDockerCustodyFailure('EXACT_DOCKER_OBSERVATION_INVALID', true);
+    stepRecords.push(record);
+    stepRefs.push(ref);
+  }
+  let applyingRef: ExecutionEffectLandingTerminalSealV1['journalArtifacts']['applying'] = null;
+  if (prepared.operations.length > 0) {
+    const applyingKey = exactDockerEffectJournalKey(transaction.transactionDigest, 'applying');
+    const applyingRaw = readExactDockerEffectJournalRecord(input.storeAdapter, applyingKey);
+    if (!applyingRaw || applyingRaw.kind !== 'execution-effect-landing-applying'
+      || applyingRaw.phase !== 'APPLYING' || !isExactDigest(applyingRaw.recordDigest)
+      || applyingRaw.recordDigest !== committed.applyingJournalDigest) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_OBSERVATION_INVALID', true);
+    }
+    applyingRef = input.storeAdapter.readJournalReference(
+      applyingKey,
+      applyingRaw.recordDigest as ExecutionEffectPersistenceDigest,
+    );
+    if (!applyingRef) throw new ExactDockerCustodyFailure('EXACT_DOCKER_OBSERVATION_INVALID', true);
+  } else if (committed.applyingJournalDigest !== null) {
+    throw new ExactDockerCustodyFailure('EXACT_DOCKER_OBSERVATION_INVALID', true);
+  }
+  const operations = prepared.operations.map((operation, index) => (
+    persistenceOperationFromExactDockerJournal(operation, stepRecords[index]!.nativeReceipt)
+  ));
+  const nativeEvidence = operations.map((operation, index) => (
+    createExecutionEffectLandingNativeReceiptEvidenceV1({
+      operation,
+      entryPostimages: stepRecords[index]!.nativeReceipt.entryPostimages as Parameters<
+        typeof createExecutionEffectLandingNativeReceiptEvidenceV1
+      >[0]['entryPostimages'],
+      durabilityEvidenceDigest: stepRecords[index]!.nativeReceipt
+        .durabilityEvidenceDigest as ExecutionEffectPersistenceDigest,
+    })
+  ));
+  const nativeReceiptRefs = nativeEvidence.map((evidence, index) => (
+    input.storeAdapter.publishNativeReceiptEvidence({
+      artifactKey: `effect-native-${transaction.transactionDigest.slice(7, 31)}-${index.toString(36)}`,
+      capturedAt: committed.committedAt,
+      operation: operations[index]!,
+      evidence,
+    })
+  ));
+  let finalEvidenceRef: ExecutionEffectLandingTerminalSealV1['receiptArtifacts']['finalVerificationReceipt'] = null;
+  if (operations.length > 0) {
+    const finalReceipt = committed.finalVerificationReceipt;
+    if (!finalReceipt || finalReceipt.receiptDigest !== input.receipt.finalVerificationReceiptDigest) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_OBSERVATION_INVALID', true);
+    }
+    const evidence = createExecutionEffectLandingFinalReceiptEvidenceV1({
+      transactionDigest: transaction.transactionDigest as ExecutionEffectPersistenceDigest,
+      planDigest: transaction.planDigest as ExecutionEffectPersistenceDigest,
+      operations,
+      nativeReceipts: nativeEvidence,
+      durabilityEvidenceDigest: finalReceipt.durabilityEvidenceDigest as ExecutionEffectPersistenceDigest,
+    });
+    if (evidence.receiptDigest !== finalReceipt.receiptDigest) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_OBSERVATION_INVALID', true);
+    }
+    finalEvidenceRef = input.storeAdapter.publishFinalReceiptEvidence({
+      artifactKey: `effect-final-${transaction.transactionDigest.slice(7, 39)}`,
+      capturedAt: committed.committedAt,
+      transactionDigest: transaction.transactionDigest as ExecutionEffectPersistenceDigest,
+      planDigest: transaction.planDigest as ExecutionEffectPersistenceDigest,
+      operations,
+      nativeReceipts: nativeEvidence,
+      evidence,
+    });
+  } else if (committed.finalVerificationReceipt !== null
+    || input.receipt.finalVerificationReceiptDigest !== null) {
+    throw new ExactDockerCustodyFailure('EXACT_DOCKER_OBSERVATION_INVALID', true);
+  }
+  const boundaryId = executionEffectLandingDeterministicBoundaryIdV1(
+    transaction.transactionDigest as ExecutionEffectPersistenceDigest,
+  );
+  const terminalEvent = readCompletedExecutionLockBoundary(input.projectRoot, boundaryId);
+  if (!terminalEvent || terminalEvent.action !== 'completed'
+    || !('evidenceRefs' in terminalEvent.payload)
+    || terminalEvent.quarantineId !== boundaryId
+    || terminalEvent.payload.quarantineId !== boundaryId) {
+    throw new ExactDockerCustodyFailure('EXACT_DOCKER_OBSERVATION_INVALID', true);
+  }
+  const leaseTerminal = input.receipt.state === 'COMMITTED'
+    ? 'COMPLETED' as const : 'RELEASED_NO_CHANGE' as const;
+  const leaseEvidence = createExecutionEffectLandingLeaseTerminalReceiptEvidenceV1({
+    transactionDigest: transaction.transactionDigest as ExecutionEffectPersistenceDigest,
+    terminal: leaseTerminal,
+    committedJournalDigest: committed.recordDigest,
+    eventId: terminalEvent.eventId,
+    quarantineId: terminalEvent.quarantineId,
+    fencingToken: terminalEvent.fencingToken,
+    occurredAt: terminalEvent.occurredAt,
+    evidenceRefs: Object.freeze([...terminalEvent.payload.evidenceRefs].sort((left, right) => (
+      left < right ? -1 : left > right ? 1 : 0
+    ))),
+  });
+  if (leaseEvidence.terminalReceiptDigest !== input.receipt.leaseTerminalReceiptDigest) {
+    throw new ExactDockerCustodyFailure('EXACT_DOCKER_OBSERVATION_INVALID', true);
+  }
+  const leaseEvidenceRef = input.storeAdapter.publishLeaseTerminalReceiptEvidence({
+    artifactKey: `effect-lease-${transaction.transactionDigest.slice(7, 39)}`,
+    capturedAt: terminalEvent.occurredAt,
+    evidence: leaseEvidence,
+  });
+  return createExecutionEffectLandingTerminalSealV1({
+    attempt: input.captured.workspaceSnapshot.attempt,
+    attemptDigest: input.captured.workspaceSnapshot.attemptDigest as ExecutionEffectPersistenceDigest,
+    disposition: input.receipt.state,
+    workspaceSnapshotSealDigest: input.captured.workspaceSnapshot.sealDigest as ExecutionEffectPersistenceDigest,
+    baselineManifestDigest: input.captured.baselineManifest.digest as ExecutionEffectPersistenceDigest,
+    finalManifestDigest: input.captured.finalManifest.digest as ExecutionEffectPersistenceDigest,
+    effectDecisionDigest: input.captured.decision.decisionDigest as ExecutionEffectPersistenceDigest,
+    planId: transaction.planId,
+    operations,
+    preparedJournalDigest: prepared.recordDigest,
+    applyingJournalDigest: committed.applyingJournalDigest,
+    stepJournalDigests: Object.freeze(stepRecords.map(record => record.recordDigest)),
+    committedJournalDigest: committed.recordDigest,
+    finalVerificationReceiptDigest: input.receipt.finalVerificationReceiptDigest,
+    journalArtifacts: Object.freeze({
+      prepared: preparedRef,
+      applying: applyingRef,
+      steps: Object.freeze(stepRefs),
+      committed: committedRef,
+    }),
+    receiptArtifacts: Object.freeze({
+      nativeReceipts: Object.freeze(nativeReceiptRefs),
+      finalVerificationReceipt: finalEvidenceRef,
+      leaseTerminalReceipt: leaseEvidenceRef,
+    }),
+    leaseTerminal,
+    leaseTerminalReceiptDigest: input.receipt.leaseTerminalReceiptDigest,
+    committedAt: committed.committedAt,
+  });
+}
+
+function createExactDockerEffectLandingRecoveryContext(input: Readonly<{
+  readonly receipt: ExecutionEffectLandingReceiptV1;
+  readonly terminalSeal: ExecutionEffectLandingTerminalSealV1;
+  readonly storeAdapter: ExecutionEffectStoreAdapterV1;
+}>): ExecutionEffectLandingLeaseResumeContextV1 {
+  const transaction = input.receipt.transaction;
+  const preparedRaw = readExactDockerEffectJournalRecord(
+    input.storeAdapter,
+    input.terminalSeal.journalArtifacts.prepared.artifactKey,
+  );
+  const committedRaw = readExactDockerEffectJournalRecord(
+    input.storeAdapter,
+    input.terminalSeal.journalArtifacts.committed.artifactKey,
+  );
+  const applyingRaw = input.terminalSeal.journalArtifacts.applying
+    ? readExactDockerEffectJournalRecord(
+      input.storeAdapter,
+      input.terminalSeal.journalArtifacts.applying.artifactKey,
+    ) : null;
+  if (!preparedRaw || !committedRaw
+    || preparedRaw.recordDigest !== input.terminalSeal.preparedJournalDigest
+    || committedRaw.recordDigest !== input.terminalSeal.committedJournalDigest
+    || (input.receipt.state === 'COMMITTED') !== (applyingRaw !== null)
+    || (applyingRaw && applyingRaw.recordDigest !== input.terminalSeal.applyingJournalDigest)) {
+    throw new ExactDockerCustodyFailure('EXACT_DOCKER_OBSERVATION_INVALID', true);
+  }
+  const journalRef = (
+    phase: 'PREPARED' | 'APPLYING' | 'COMMITTED',
+    artifact: ExecutionEffectLandingTerminalSealV1['journalArtifacts']['prepared'],
+    recordDigest: ExecutionEffectPersistenceDigest,
+  ) => Object.freeze({
+    phase,
+    artifactKey: artifact.artifactKey,
+    artifactReceiptDigest: artifact.artifactReceiptDigest,
+    contentDigest: artifact.contentDigest,
+    byteLength: artifact.byteLength,
+    recordDigest,
+  });
+  const applyingArtifact = input.terminalSeal.journalArtifacts.applying;
+  return createExecutionEffectLandingLeaseResumeContextV1({
+    transaction,
+    priorLease: preparedRaw.acquiredLease as ExecutionEffectLandingLeaseV1,
+    prepared: journalRef(
+      'PREPARED',
+      input.terminalSeal.journalArtifacts.prepared,
+      input.terminalSeal.preparedJournalDigest,
+    ),
+    applying: applyingArtifact && applyingRaw
+      ? Object.freeze({
+        journal: journalRef(
+          'APPLYING', applyingArtifact,
+          input.terminalSeal.applyingJournalDigest as ExecutionEffectPersistenceDigest,
+        ),
+        previousBoundary: applyingRaw.boundary as ExecutionEffectLandingBoundaryV1,
+      }) : null,
+    committed: Object.freeze({
+      journal: journalRef(
+        'COMMITTED',
+        input.terminalSeal.journalArtifacts.committed,
+        input.terminalSeal.committedJournalDigest,
+      ),
+      disposition: input.receipt.state,
+    }),
+  });
+}
+
+interface ExactDockerProviderInvocation {
+  readonly binary: string;
+  readonly args: readonly string[];
+  readonly promptFeed: 'stdin' | 'inline' | 'argument';
+}
+
+const EXACT_DOCKER_INLINE_PROMPT_SENTINEL = '{DECKENT_EXACT_PROMPT_CONTENT}';
+
+/** Array-native provider invocation; no shell reparse or public prompt file authority. */
+export function buildExactDockerProviderInvocation(
+  spec: ProviderCommandSpec,
+  apiId: string,
+  options: Readonly<{
+    allowedTools?: string;
+    availableTools?: string;
+    isolatedContext?: boolean;
+    reasoningEffort?: string;
+    excludeDynamicPromptSections?: boolean;
+    systemPromptCorePresent?: boolean;
+    codexCoreChannel?: boolean;
+    codexSuppressProjectDoc?: boolean;
+  }> = {},
+): ExactDockerProviderInvocation {
+  const baseArgs = spec.binary === 'claude'
+    ? claudeStreamJsonBaseArgs(spec.baseArgs)
+    : [...spec.baseArgs];
+  const corePath = '/run/deckent/system-core.md';
+  const coreArgs = options.systemPromptCorePresent
+    ? spec.binary === 'claude'
+      ? ['--system-prompt-file', corePath, '--disable-slash-commands']
+      : options.codexCoreChannel && spec.systemPromptCoreArgs
+        ? spec.systemPromptCoreArgs(corePath)
+        : []
+    : [];
+  const args = [
+    ...coreArgs,
+    ...(spec.binary === 'codex' && options.codexSuppressProjectDoc
+      ? spec.contextSuppressionArgs ?? []
+      : []),
+    ...baseArgs.map(arg => arg === PROMPT_CAT_TOKEN
+      ? EXACT_DOCKER_INLINE_PROMPT_SENTINEL
+      : arg),
+    spec.modelFlag,
+    apiId,
+  ];
+  if (spec.allowedToolsFlag && options.allowedTools) {
+    args.push(spec.allowedToolsFlag, options.allowedTools);
+  }
+  if (spec.availableToolsFlag && options.availableTools) {
+    args.push(spec.availableToolsFlag, options.availableTools);
+  }
+  if (options.isolatedContext) args.push(...spec.isolatedContextArgs);
+  args.push(...spec.approvalArgs);
+  if (options.reasoningEffort && spec.reasoningEffortArgs) {
+    args.push(...spec.reasoningEffortArgs(options.reasoningEffort));
+  }
+  if (options.excludeDynamicPromptSections && spec.excludeDynamicPromptSectionsFlag) {
+    args.push(spec.excludeDynamicPromptSectionsFlag);
+  }
+  if (spec.promptFeed === 'argument') {
+    args.push('--', EXACT_DOCKER_INLINE_PROMPT_SENTINEL);
+  }
+  return Object.freeze({
+    binary: spec.binary,
+    args: Object.freeze(args),
+    promptFeed: spec.promptFeed,
+  });
+}
+
+export function buildExactDockerRunnerSource(input: Readonly<{
+  taskId: string;
+  model: string;
+  provider: string;
+  invocation: ExactDockerProviderInvocation;
+  timeoutSeconds: number;
+  authBootstrapLines: readonly string[];
+  authWritebackLines: readonly string[];
+}>): string {
+  const config = JSON.stringify(input);
+  return String.raw`
+import { spawn } from 'node:child_process';
+import { readFileSync, writeFileSync, unlinkSync, existsSync } from 'node:fs';
+const config = Object.freeze(${config});
+const outputRoot = '/workspace/.tasks';
+const resultPath = outputRoot + '/task-' + config.taskId + '.result';
+const partialPath = outputRoot + '/task-' + config.taskId + '.partial-result';
+const timeoutPath = outputRoot + '/task-' + config.taskId + '.timeout';
+const heartbeatPath = outputRoot + '/task-' + config.taskId + '.hb';
+const SHELL_PHASE_OUTPUT_MAX_BYTES = 1024 * 1024;
+const SHELL_PHASE_TIMEOUT_MS = Math.min(60_000, config.timeoutSeconds * 1000);
+const shellPhase = lines => new Promise(resolve => {
+  if (!Array.isArray(lines) || lines.length === 0) { resolve(true); return; }
+  let child;
+  let settled = false;
+  let forcedFailure = false;
+  let outputBytes = 0;
+  let phaseTimeout;
+  const finish = ok => {
+    if (settled) return;
+    settled = true;
+    if (phaseTimeout) clearTimeout(phaseTimeout);
+    resolve(ok);
+  };
+  const observe = (stream, destination) => stream?.on('data', chunk => {
+    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    outputBytes += bytes.byteLength;
+    if (!Number.isSafeInteger(outputBytes) || outputBytes > SHELL_PHASE_OUTPUT_MAX_BYTES) {
+      forcedFailure = true;
+      try { child.kill('SIGKILL'); } catch { finish(false); }
+      return;
+    }
+    destination.write(bytes);
+  });
+  try {
+    child = spawn('sh', ['-c', lines.join('\n')], {
+      shell: false,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch { finish(false); return; }
+  observe(child.stdout, process.stdout);
+  observe(child.stderr, process.stderr);
+  child.once('error', () => finish(false));
+  child.once('close', (code, signal) => finish(
+    forcedFailure === false && code === 0 && signal === null,
+  ));
+  phaseTimeout = setTimeout(() => {
+    forcedFailure = true;
+    try { child.kill('SIGKILL'); } catch { finish(false); }
+  }, SHELL_PHASE_TIMEOUT_MS);
+});
+if (!await shellPhase(config.authBootstrapLines)) process.exit(78);
+const prompt = readFileSync('/run/deckent/prompt.txt', 'utf8');
+const args = config.invocation.args.map(arg => arg === ${JSON.stringify(EXACT_DOCKER_INLINE_PROMPT_SENTINEL)} ? prompt : arg);
+const partial = { taskId: config.taskId, selfAssessment: 'NO_GO', partialMarker: true,
+  notes: 'EXACT_DOCKER_PROVIDER_STARTED_WITHOUT_TERMINAL_RESULT',
+  tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0,
+    provider: config.provider, model: config.model } };
+writeFileSync(partialPath, JSON.stringify(partial) + '\n', { flag: 'wx', mode: 0o600 });
+let sequence = 0;
+const heartbeat = () => writeFileSync(heartbeatPath, JSON.stringify({
+  schemaVersion: 1, taskId: config.taskId, status: 'working', sequence: ++sequence,
+  timestamp: new Date().toISOString(), currentAction: 'exact-provider-execution',
+}) + '\n', { mode: 0o600 });
+heartbeat();
+const timer = setInterval(heartbeat, 15_000);
+const child = spawn(config.invocation.binary, args, {
+  cwd: '/workspace', env: process.env, stdio: [config.invocation.promptFeed === 'stdin' ? 'pipe' : 'ignore', 'inherit', 'inherit'],
+});
+if (config.invocation.promptFeed === 'stdin') child.stdin.end(prompt);
+let timedOut = false;
+const timeout = setTimeout(() => { timedOut = true; child.kill('SIGTERM'); }, config.timeoutSeconds * 1000);
+const forward = signal => { try { child.kill(signal); } catch {} };
+process.on('SIGTERM', () => forward('SIGTERM'));
+process.on('SIGINT', () => forward('SIGINT'));
+child.on('error', () => process.exit(79));
+child.on('exit', async (code, signal) => {
+  clearInterval(timer); clearTimeout(timeout);
+  if (!await shellPhase(config.authWritebackLines)) code = 78;
+  if (timedOut) writeFileSync(timeoutPath, 'WORKER_TIMEOUT\n', { flag: 'wx', mode: 0o600 });
+  if (!existsSync(resultPath)) {
+    const marker = { taskId: config.taskId, workerId: 'docker-' + config.taskId,
+      filesChanged: [], linesAdded: 0, linesRemoved: 0, testsPassed: false,
+      selfAssessment: 'NO_GO', markerType: timedOut ? 'WORKER_TIMEOUT' : 'EXIT_WITHOUT_RESULT',
+      exitCode: code ?? (signal ? 128 : 79), notes: timedOut
+        ? 'EXACT_DOCKER_PROVIDER_TIMEOUT'
+        : 'EXACT_DOCKER_PROVIDER_EXITED_WITHOUT_RESULT',
+      tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0,
+        provider: config.provider, model: config.model } };
+    writeFileSync(resultPath, JSON.stringify(marker) + '\n', { flag: 'wx', mode: 0o600 });
+  }
+  try { unlinkSync(partialPath); } catch {}
+  process.exit(signal ? 128 : (code ?? 79));
+});
+`;
+}
+
+/** Host-global, project-namespaced state; never below the worker-mounted project. */
+export function resolveExactDockerCustodyRoot(
+  projectRoot: string,
+  options: Readonly<{
+    platform?: NodeJS.Platform;
+    env?: NodeJS.ProcessEnv;
+    stateDir?: string;
+  }> = {},
+): string {
+  const canonicalRoot = canonicalExactDockerProjectRoot(projectRoot);
+  const projectDigest = createHash('sha256').update(canonicalRoot).digest('hex');
+  const env = options.env ?? process.env;
+  const stateDir = options.stateDir ?? resolveGlobalScopePaths(
+    normalizeGlobalScopePlatform(options.platform ?? process.platform, env),
+    env,
+  ).stateDir;
+  return join(stateDir, 'runtime', EXACT_DOCKER_CUSTODY_STATE_DIR, projectDigest);
+}
+
+const EXACT_DOCKER_CUSTODY_LABELS = Object.freeze({
+  managed: 'io.deckent.exact-custody.managed',
+  rootId: 'io.deckent.exact-custody.root-id',
+  scopeDigest: 'io.deckent.exact-custody.scope-digest',
+  effectOpDigest: 'io.deckent.exact-custody.effect-op-digest',
+  attemptId: 'io.deckent.exact-custody.attempt-id',
+  generation: 'io.deckent.exact-custody.generation',
+  releaseNonceSha256: 'io.deckent.exact-custody.release-nonce-sha256',
+  providerInvocationDigest: 'io.deckent.exact-custody.provider-invocation-digest',
+  pid1Sha256: 'io.deckent.exact-custody.pid1-sha256',
+  workspaceVolume: 'io.deckent.exact-custody.workspace-volume',
+  dependencyVolume: 'io.deckent.exact-custody.dependency-volume',
+  preparedWorkspace: 'io.deckent.exact-custody.prepared-workspace-authority',
+  workspaceResourceInstance: 'io.deckent.exact-custody.workspace-resource-instance',
+  dependencyResourceInstance: 'io.deckent.exact-custody.dependency-resource-instance',
+} as const);
+
+const EXACT_DOCKER_WORKSPACE_VOLUME_PREFIX = 'deckent-xw-';
+const EXACT_DOCKER_DEPENDENCY_VOLUME_PREFIX = 'deckent-xd-';
+
+/**
+ * Daemon-global resource identity for one exact attempt. The name contains no
+ * project path and is reproducible after a host-process restart.
+ */
+export function exactDockerWorkspaceVolumeName(input: Readonly<{
+  readonly identity: TaskAttemptCustodyIdentityV2;
+  readonly admissionRefDigest: Sha256Digest;
+}>): string {
+  if (!isExactDigest(input.admissionRefDigest)
+    || input.identity.backend !== 'docker'
+    || !Number.isSafeInteger(input.identity.generation)
+    || input.identity.generation <= 0) {
+    throw new ExactDockerCustodyFailure('EXACT_DOCKER_INPUT_INVALID', true);
+  }
+  const suffix = createHash('sha256').update(canonicalJson({
+    projectRootSha256: input.identity.projectRootSha256,
+    projectId: input.identity.projectId,
+    taskId: input.identity.taskId,
+    attemptId: input.identity.attemptId,
+    generation: input.identity.generation,
+    admissionRefDigest: input.admissionRefDigest,
+  })).digest('hex').slice(0, 48);
+  return `${EXACT_DOCKER_WORKSPACE_VOLUME_PREFIX}${suffix}`;
+}
+
+/** Attempt-private image-owned dependency authority; never a host-path projection. */
+export function exactDockerDependencyVolumeName(input: Readonly<{
+  readonly identity: TaskAttemptCustodyIdentityV2;
+  readonly admissionRefDigest: Sha256Digest;
+}>): string {
+  if (!isExactDigest(input.admissionRefDigest)
+    || input.identity.backend !== 'docker'
+    || !Number.isSafeInteger(input.identity.generation)
+    || input.identity.generation <= 0) {
+    throw new ExactDockerCustodyFailure('EXACT_DOCKER_INPUT_INVALID', true);
+  }
+  const suffix = createHash('sha256').update(canonicalJson({
+    resource: 'image-owned-node-modules',
+    projectRootSha256: input.identity.projectRootSha256,
+    projectId: input.identity.projectId,
+    taskId: input.identity.taskId,
+    attemptId: input.identity.attemptId,
+    generation: input.identity.generation,
+    admissionRefDigest: input.admissionRefDigest,
+  })).digest('hex').slice(0, 48);
+  return `${EXACT_DOCKER_DEPENDENCY_VOLUME_PREFIX}${suffix}`;
+}
+
+function exactDockerCustodyAuthorityLabels(
+  input: TaskAttemptCustodyPosixMountConsumerInput,
+  launch: ExactDockerCustodyLaunchContext,
+): Readonly<Record<string, string>> {
+  return Object.freeze({
+    [EXACT_DOCKER_CUSTODY_LABELS.managed]: 'true',
+    [EXACT_DOCKER_CUSTODY_LABELS.rootId]: input.rootId,
+    [EXACT_DOCKER_CUSTODY_LABELS.scopeDigest]: input.scopeDigest,
+    [EXACT_DOCKER_CUSTODY_LABELS.effectOpDigest]: input.effectOpDigest,
+    [EXACT_DOCKER_CUSTODY_LABELS.attemptId]: input.attemptId,
+    [EXACT_DOCKER_CUSTODY_LABELS.generation]: String(input.generation),
+    [EXACT_DOCKER_CUSTODY_LABELS.releaseNonceSha256]: launch.releaseCommitTokenSha256,
+    [EXACT_DOCKER_CUSTODY_LABELS.providerInvocationDigest]: launch.providerInvocationDigest,
+    [EXACT_DOCKER_CUSTODY_LABELS.pid1Sha256]: exactCustodyDigest(EXACT_DOCKER_PID1_SOURCE),
+    [EXACT_DOCKER_CUSTODY_LABELS.workspaceVolume]: launch.workspaceVolumeName,
+    [EXACT_DOCKER_CUSTODY_LABELS.dependencyVolume]: launch.dependencyVolumeName,
+    [EXACT_DOCKER_CUSTODY_LABELS.preparedWorkspace]:
+      launch.effect.preparedWorkspace.authorityDigest,
+    [EXACT_DOCKER_CUSTODY_LABELS.workspaceResourceInstance]:
+      launch.effect.prepared.workspacePlan.workspaceResourceInstanceDigest,
+    [EXACT_DOCKER_CUSTODY_LABELS.dependencyResourceInstance]:
+      launch.effect.prepared.workspacePlan.dependencyResourceInstanceDigest,
+  });
+}
+
+/** Source paths enter and leave only inside the adapter callback. */
+export function buildExactDockerCustodyMountArgs(
+  input: TaskAttemptCustodyPosixMountConsumerInput,
+  workspaceVolumeName: string,
+  dependencyVolumeName: string,
+): readonly string[] {
+  if (!/^deckent-xw-[a-f0-9]{48}$/u.test(workspaceVolumeName)
+    || !/^deckent-xd-[a-f0-9]{48}$/u.test(dependencyVolumeName)) {
+    throw new ExactDockerCustodyFailure('EXACT_DOCKER_INPUT_INVALID', true);
+  }
+  return Object.freeze([
+    '--mount',
+    `type=volume,src=${workspaceVolumeName},dst=${CONTAINER_WORKSPACE},volume-nocopy`,
+    '--mount',
+    `type=volume,src=${dependencyVolumeName},dst=${CONTAINER_WORKSPACE}/node_modules,readonly,volume-nocopy`,
+    '--mount',
+    `type=bind,src=${input.taskSnapshot.sourcePath},dst=${EXACT_DOCKER_TASK_SNAPSHOT_PATH},readonly,bind-propagation=rprivate`,
+    '--mount',
+    `type=bind,src=${input.workerOutput.sourcePath},dst=${EXACT_DOCKER_WORKER_OUTPUT_PATH},bind-propagation=rprivate`,
+  ]);
+}
+
+interface ExactDockerInspectProjection {
+  readonly containerId: string;
+  readonly imageDigest: Sha256Digest;
+  readonly labels: Readonly<Record<string, string>>;
+  readonly workspaceMount: Readonly<{
+    name: string | null;
+    source: string;
+    destination: string;
+    rw: boolean;
+    propagation: string;
+    type: string;
+  }>;
+  readonly dependencyMount: Readonly<{
+    name: string | null;
+    source: string;
+    destination: string;
+    rw: boolean;
+    propagation: string;
+    type: string;
+  }>;
+  readonly taskMount: Readonly<{
+    name: string | null;
+    source: string;
+    destination: string;
+    rw: boolean;
+    propagation: string;
+    type: string;
+  }>;
+  readonly outputMount: Readonly<{
+    name: string | null;
+    source: string;
+    destination: string;
+    rw: boolean;
+    propagation: string;
+    type: string;
+  }>;
+  readonly mounts: readonly Readonly<{
+    name: string | null;
+    source: string;
+    destination: string;
+    rw: boolean;
+    propagation: string;
+    type: string;
+  }>[];
+  readonly entrypoint: readonly string[];
+  readonly command: readonly string[];
+}
+
+export function parseExactDockerCustodyInspect(
+  raw: string,
+): ExactDockerInspectProjection | null {
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); } catch { return null; }
+  const row = Array.isArray(parsed) && parsed.length === 1 ? parsed[0] : null;
+  if (!row || typeof row !== 'object') return null;
+  const record = row as Record<string, unknown>;
+  const config = record.Config as Record<string, unknown> | null;
+  const mounts = Array.isArray(record.Mounts) ? record.Mounts : [];
+  const taskMount = mounts.find(value => (
+    value && typeof value === 'object'
+      && (value as Record<string, unknown>).Destination === EXACT_DOCKER_TASK_SNAPSHOT_PATH
+  )) as Record<string, unknown> | undefined;
+  const outputMount = mounts.find(value => (
+    value && typeof value === 'object'
+      && (value as Record<string, unknown>).Destination === EXACT_DOCKER_WORKER_OUTPUT_PATH
+  )) as Record<string, unknown> | undefined;
+  const workspaceMount = mounts.find(value => (
+    value && typeof value === 'object'
+      && (value as Record<string, unknown>).Destination === CONTAINER_WORKSPACE
+  )) as Record<string, unknown> | undefined;
+  const dependencyMount = mounts.find(value => (
+    value && typeof value === 'object'
+      && (value as Record<string, unknown>).Destination === `${CONTAINER_WORKSPACE}/node_modules`
+  )) as Record<string, unknown> | undefined;
+  if (
+    typeof record.Id !== 'string'
+    || !/^[a-f0-9]{64}$/u.test(record.Id)
+    || typeof record.Image !== 'string'
+    || !/^sha256:[a-f0-9]{64}$/u.test(record.Image)
+    || !config
+    || !config.Labels
+    || typeof config.Labels !== 'object'
+    || !taskMount
+    || !outputMount
+    || !workspaceMount
+    || !dependencyMount
+    || !Array.isArray(config.Entrypoint)
+    || !config.Entrypoint.every(value => typeof value === 'string')
+    || !Array.isArray(config.Cmd)
+    || !config.Cmd.every(value => typeof value === 'string')
+  ) return null;
+  const mountProjection = (mount: Record<string, unknown>) => ({
+    name: typeof mount.Name === 'string' ? mount.Name : null,
+    source: mount.Source,
+    destination: mount.Destination,
+    rw: mount.RW,
+    propagation: mount.Propagation,
+    type: mount.Type,
+  });
+  const allMounts = mounts.map(value => mountProjection(value as Record<string, unknown>));
+  const task = mountProjection(taskMount);
+  const output = mountProjection(outputMount);
+  const workspace = mountProjection(workspaceMount);
+  const dependency = mountProjection(dependencyMount);
+  if (
+    typeof task.source !== 'string'
+    || typeof task.destination !== 'string'
+    || typeof task.rw !== 'boolean'
+    || typeof task.propagation !== 'string'
+    || typeof task.type !== 'string'
+    || typeof output.source !== 'string'
+    || typeof output.destination !== 'string'
+    || typeof output.rw !== 'boolean'
+    || typeof output.propagation !== 'string'
+    || typeof output.type !== 'string'
+    || typeof workspace.source !== 'string'
+    || typeof workspace.destination !== 'string'
+    || typeof workspace.rw !== 'boolean'
+    || typeof workspace.propagation !== 'string'
+    || typeof workspace.type !== 'string'
+    || typeof dependency.source !== 'string'
+    || typeof dependency.destination !== 'string'
+    || typeof dependency.rw !== 'boolean'
+    || typeof dependency.propagation !== 'string'
+    || typeof dependency.type !== 'string'
+    || allMounts.some(mount => typeof mount.source !== 'string'
+      || typeof mount.destination !== 'string'
+      || typeof mount.rw !== 'boolean'
+      || typeof mount.propagation !== 'string'
+      || typeof mount.type !== 'string')
+  ) return null;
+  return Object.freeze({
+    containerId: record.Id,
+    imageDigest: record.Image as Sha256Digest,
+    labels: Object.freeze({ ...(config.Labels as Record<string, string>) }),
+    workspaceMount: Object.freeze(workspace as ExactDockerInspectProjection['workspaceMount']),
+    dependencyMount: Object.freeze(
+      dependency as ExactDockerInspectProjection['dependencyMount'],
+    ),
+    taskMount: Object.freeze(task as ExactDockerInspectProjection['taskMount']),
+    outputMount: Object.freeze(output as ExactDockerInspectProjection['outputMount']),
+    mounts: Object.freeze(allMounts.map(mount => Object.freeze({
+      name: mount.name,
+      source: mount.source as string,
+      destination: mount.destination as string,
+      rw: mount.rw as boolean,
+      propagation: mount.propagation as string,
+      type: mount.type as string,
+    }))),
+    entrypoint: Object.freeze([...(config.Entrypoint as string[])]),
+    command: Object.freeze([...(config.Cmd as string[])]),
+  });
+}
+
+function exactDockerMountAliasesCanonicalProject(
+  mount: ExactDockerInspectProjection['mounts'][number],
+  canonicalProjectRoot: string,
+): boolean {
+  if (mount.type !== 'bind') return false;
+  let source: string;
+  try { source = realpathSync.native(mount.source); } catch { return true; }
+  const relativeSource = relative(canonicalProjectRoot, source);
+  return relativeSource === ''
+    || (relativeSource !== '..'
+      && !relativeSource.startsWith(`..${sep}`)
+      && !isAbsolute(relativeSource));
+}
+
+interface ExactDockerNativeProbeProjection {
+  readonly taskIdentity: TaskAttemptCustodyPosixDockerMountObservation['taskSnapshotMount']['identity'];
+  readonly outputIdentity: TaskAttemptCustodyPosixDockerMountObservation['workerOutputMount']['identity'];
+  readonly taskContentDigest: Sha256Digest;
+  readonly bootstrap: TaskAttemptCustodyPosixDockerMountObservation['bootstrap'];
+}
+
+export function parseExactDockerNativeProbe(
+  raw: string,
+): ExactDockerNativeProbeProjection | null {
+  let value: unknown;
+  try { value = JSON.parse(raw.trim()); } catch { return null; }
+  if (!value || typeof value !== 'object' || nodeTypes.isProxy(value)) return null;
+  const record = value as Record<string, unknown>;
+  const snapshotIdentity = (
+    candidate: unknown,
+    expectedObjectType: 'REGULAR_FILE' | 'DIRECTORY',
+  ): TaskAttemptCustodyPosixDockerMountObservation['taskSnapshotMount']['identity'] | null => {
+    if (!candidate || typeof candidate !== 'object' || nodeTypes.isProxy(candidate)) return null;
+    const identity = candidate as Record<string, unknown>;
+    if (
+      identity.platform !== 'linux'
+      || identity.objectType !== expectedObjectType
+      || !['dev', 'ino', 'mntId', 'fsMagic', 'ownerUid', 'mode', 'size', 'linkCount']
+        .every(key => typeof identity[key] === 'string')
+    ) return null;
+    return Object.freeze({
+      schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+      kind: 'task-attempt-custody-posix-mounted-identity' as const,
+      platform: 'linux' as const,
+      objectType: expectedObjectType,
+      dev: identity.dev as string,
+      ino: identity.ino as string,
+      mntId: identity.mntId as string,
+      fsMagic: identity.fsMagic as string,
+      ownerUid: identity.ownerUid as string,
+      mode: identity.mode as string,
+      size: identity.size as string,
+      linkCount: identity.linkCount as string,
+    });
+  };
+  const taskIdentity = snapshotIdentity(record.taskIdentity, 'REGULAR_FILE');
+  const outputIdentity = snapshotIdentity(record.outputIdentity, 'DIRECTORY');
+  const bootstrap = record.bootstrap as Record<string, unknown> | null;
+  if (
+    !taskIdentity
+    || !outputIdentity
+    || typeof record.taskContentDigest !== 'string'
+    || !/^sha256:[a-f0-9]{64}$/u.test(record.taskContentDigest)
+    || !bootstrap
+    || typeof bootstrap.abiName !== 'string'
+    || typeof bootstrap.abiVersion !== 'string'
+    || typeof bootstrap.napiVersion !== 'number'
+    || typeof bootstrap.handleAbi !== 'string'
+    || typeof bootstrap.packageName !== 'string'
+    || typeof bootstrap.packageVersion !== 'string'
+    || bootstrap.platform !== 'linux'
+    || typeof bootstrap.arch !== 'string'
+    || typeof bootstrap.binarySha256 !== 'string'
+    || !/^sha256:[a-f0-9]{64}$/u.test(bootstrap.binarySha256)
+    || !Number.isSafeInteger(bootstrap.rootSeparationEvidenceBits)
+  ) return null;
+  return Object.freeze({
+    taskIdentity,
+    outputIdentity: outputIdentity as ExactDockerNativeProbeProjection['outputIdentity'],
+    taskContentDigest: record.taskContentDigest as Sha256Digest,
+    bootstrap: Object.freeze({
+      abiName: bootstrap.abiName,
+      abiVersion: bootstrap.abiVersion,
+      napiVersion: bootstrap.napiVersion,
+      handleAbi: bootstrap.handleAbi,
+      packageName: bootstrap.packageName,
+      packageVersion: bootstrap.packageVersion,
+      platform: 'linux' as const,
+      arch: bootstrap.arch,
+      binarySha256: bootstrap.binarySha256 as Sha256Digest,
+      rootSeparationEvidenceBits: bootstrap.rootSeparationEvidenceBits as number,
+    }),
+  });
+}
 
 /** Shared by the in-container producer and the host ingestion seam. */
 export const PROVIDER_EXECUTION_OBSERVATION_DIR_NAME = 'provider-execution-observations';
@@ -2636,6 +6510,175 @@ async function blobNumstat(
   return { added: Number(addedRaw), removed: Number(removedRaw) };
 }
 
+async function measureExactDockerHostWorkAttribution(input: Readonly<{
+  projectRoot: string;
+  identity: TaskAttemptCustodyIdentityV2;
+  admissionRefDigest: Sha256Digest;
+  dispatchRequestId: string;
+  scopeFilesWrite: readonly string[];
+  scopeBaseline: string;
+  scopeBaselineSha256: Sha256Digest;
+  providerExitObservationReceiptDigest: Sha256Digest;
+}>): Promise<ExactDockerHostWorkAttributionV2> {
+  let scopeFiles: string[] = [];
+  let expectedScopeDigest = ''.padStart(64, '0');
+  const baselineSha256 = createHash('sha256').update(input.scopeBaseline).digest('hex');
+  const finish = (
+    state: 'VERIFIED' | 'HOLD',
+    reasonCode: ExactDockerHostWorkAttributionV2['reasonCode'],
+    filesChanged: ExactDockerHostWorkAttributionV2['filesChanged'] = [],
+  ): ExactDockerHostWorkAttributionV2 => {
+    const body = Object.freeze({
+      schemaVersion: 2 as const,
+      kind: 'exact-docker-host-work-attribution' as const,
+      state,
+      attemptId: input.identity.attemptId,
+      dispatchRequestId: input.dispatchRequestId,
+      admissionRefDigest: input.admissionRefDigest,
+      providerExitObservationReceiptDigest: input.providerExitObservationReceiptDigest,
+      baselineRef: `task-attempt-custody-provider-exit:${input.providerExitObservationReceiptDigest}#scope-baseline:sha256:${baselineSha256}`,
+      baselineSha256,
+      scopeDigest: expectedScopeDigest,
+      filesChanged: Object.freeze(filesChanged.map(change => Object.freeze({ ...change }))),
+      totalLinesAdded: filesChanged.reduce((total, change) => total + change.linesAdded, 0),
+      totalLinesRemoved: filesChanged.reduce((total, change) => total + change.linesRemoved, 0),
+      reasonCode,
+    });
+    return Object.freeze({ ...body, evidenceDigest: exactCustodyJsonDigest(body) });
+  };
+  let lines: string[];
+  try {
+    scopeFiles = normalizedScopeFiles(input.scopeFilesWrite);
+    expectedScopeDigest = scopeAttributionDigest(scopeFiles);
+    if (input.scopeBaselineSha256 !== `sha256:${baselineSha256}`) {
+      return finish('HOLD', 'BASELINE_INVALID');
+    }
+    lines = input.scopeBaseline.split(/\r?\n/u);
+    const [marker, subject, manifestScopeDigest] = (lines.shift() ?? '')
+      .split(SCOPE_BASELINE_DELIM);
+    if (marker !== SCOPE_ATTRIBUTION_HEADER
+      || subject !== input.dispatchRequestId
+      || manifestScopeDigest !== expectedScopeDigest) {
+      return finish('HOLD', 'BASELINE_INVALID');
+    }
+  } catch {
+    return finish('HOLD', 'BASELINE_INVALID');
+  }
+  const scopeSet = new Set(scopeFiles);
+  const baseline = new Map<string, string>();
+  for (const line of lines!) {
+    if (!line) continue;
+    const delimiter = line.indexOf(SCOPE_BASELINE_DELIM);
+    const path = delimiter > 0 ? line.slice(0, delimiter) : '';
+    const hash = delimiter > 0 ? line.slice(delimiter + 1) : '';
+    if (!scopeSet.has(path) || baseline.has(path) || !/^[0-9a-f]{40,64}$/u.test(hash)) {
+      return finish('HOLD', 'BASELINE_INVALID');
+    }
+    baseline.set(path, hash);
+  }
+  const changes: Array<{
+    path: string;
+    status: 'added' | 'modified' | 'deleted';
+    linesAdded: number;
+    linesRemoved: number;
+  }> = [];
+  try {
+    for (const path of scopeFiles) {
+      const beforeHash = baseline.get(path) ?? null;
+      const afterHash = await gitBlobHash(input.projectRoot, path);
+      if (beforeHash === afterHash) continue;
+      const counts = beforeHash === null
+        ? { added: countTextLines(readFileSync(resolve(input.projectRoot, path))), removed: 0 }
+        : afterHash === null
+          ? { added: 0, removed: await gitBlobLineCount(input.projectRoot, beforeHash) }
+          : await blobNumstat(input.projectRoot, beforeHash, afterHash);
+      changes.push({
+        path,
+        status: beforeHash === null ? 'added' : afterHash === null ? 'deleted' : 'modified',
+        linesAdded: counts.added,
+        linesRemoved: counts.removed,
+      });
+    }
+  } catch (error) {
+    debugLog('docker-backend:exact-host-work-attribution', error);
+    return finish('HOLD', 'DIFF_UNMEASURABLE');
+  }
+  return finish('VERIFIED', 'NONE', changes);
+}
+
+function exactCanonicalHostWorkAuthority(
+  evidence: ExactDockerHostWorkAttributionV2,
+  scope: PreparedExactDockerCustodyScope,
+  providerExit: ExactDockerProviderExitObservationRefV2,
+): CanonicalIngressCustodyAuthority['hostWorkAuthority'] | null {
+  const record = exactOwnDataRecord(evidence, [
+    'schemaVersion', 'kind', 'state', 'attemptId', 'dispatchRequestId',
+    'admissionRefDigest', 'providerExitObservationReceiptDigest', 'baselineRef',
+    'baselineSha256', 'scopeDigest', 'filesChanged', 'totalLinesAdded',
+    'totalLinesRemoved', 'reasonCode', 'evidenceDigest',
+  ]);
+  if (!record || record.schemaVersion !== 2
+    || record.kind !== 'exact-docker-host-work-attribution'
+    || record.state !== 'VERIFIED' || record.reasonCode !== 'NONE'
+    || record.attemptId !== scope.identity.attemptId
+    || record.dispatchRequestId !== scope.admissionRef.dispatchRequestId
+    || record.admissionRefDigest !== scope.admissionRef.refDigest
+    || record.providerExitObservationReceiptDigest
+      !== providerExit.observationReceiptDigest
+    || record.baselineSha256
+      !== scope.taskSnapshot.dispatch.scopeBaselineSha256.slice('sha256:'.length)
+    || record.scopeDigest
+      !== scopeAttributionDigest(scope.taskSnapshot.material.dispatch.scope.filesWrite)
+    || record.baselineRef
+      !== `task-attempt-custody-provider-exit:${providerExit.observationReceiptDigest}#scope-baseline:sha256:${String(record.baselineSha256)}`
+    || !Array.isArray(record.filesChanged)
+    || !Number.isSafeInteger(record.totalLinesAdded)
+    || !Number.isSafeInteger(record.totalLinesRemoved)
+    || !isExactDigest(record.evidenceDigest)) return null;
+  const scopeSet = new Set(normalizedScopeFiles(
+    scope.taskSnapshot.material.dispatch.scope.filesWrite,
+  ));
+  const filesChanged = record.filesChanged.flatMap((entry) => {
+    const change = exactOwnDataRecord(entry, [
+      'path', 'status', 'linesAdded', 'linesRemoved',
+    ]);
+    if (!change || typeof change.path !== 'string' || !scopeSet.has(change.path)
+      || !['added', 'modified', 'deleted'].includes(String(change.status))
+      || !Number.isSafeInteger(change.linesAdded) || Number(change.linesAdded) < 0
+      || !Number.isSafeInteger(change.linesRemoved) || Number(change.linesRemoved) < 0) return [];
+    return [Object.freeze({
+      path: change.path,
+      status: change.status as 'added' | 'modified' | 'deleted',
+      linesAdded: Number(change.linesAdded),
+      linesRemoved: Number(change.linesRemoved),
+    })];
+  });
+  if (filesChanged.length !== record.filesChanged.length
+    || filesChanged.reduce((sum, change) => sum + change.linesAdded, 0)
+      !== record.totalLinesAdded
+    || filesChanged.reduce((sum, change) => sum + change.linesRemoved, 0)
+      !== record.totalLinesRemoved) return null;
+  const { evidenceDigest: _evidenceDigest, ...body } = evidence;
+  if (exactCustodyJsonDigest(body) !== record.evidenceDigest) return null;
+  const authorityBody = Object.freeze({
+    filesChanged: Object.freeze(filesChanged),
+    totalLinesAdded: Number(record.totalLinesAdded),
+    totalLinesRemoved: Number(record.totalLinesRemoved),
+    workAttribution: Object.freeze({
+      state: 'VERIFIED' as const,
+      attemptId: scope.identity.attemptId,
+      baselineRef: record.baselineRef as string,
+      baselineSha256: record.baselineSha256 as string,
+      scopeDigest: record.scopeDigest as string,
+    }),
+    providerExitObservationReceiptDigest: providerExit.observationReceiptDigest,
+  });
+  return Object.freeze({
+    ...authorityBody,
+    evidenceDigest: exactCustodyJsonDigest(authorityBody),
+  });
+}
+
 function resultClaimedPaths(result: Record<string, unknown>): string[] {
   if (!Array.isArray(result.filesChanged)) return [];
   return result.filesChanged.flatMap((entry) => {
@@ -4596,6 +8639,10 @@ export interface DockerSpawnBackendConstructionOptions {
   readonly platform?: NodeJS.Platform;
   /** Test-only HOME projection; production defaults to the host HOME. */
   readonly homeDir?: string;
+  /** Hermetic state-root injection; production resolves the platform-global state dir. */
+  readonly custodyStateDir?: string;
+  /** Async, bounded git/docker seam for exact private-workspace lifecycle. */
+  readonly exactWorkspaceCommandRunner?: ExactDockerWorkspaceCommandRunnerV1;
 }
 
 /** Result of a streamed docker-logs capture. */
@@ -4958,6 +9005,65 @@ export class DockerSpawnBackend implements SpawnBackend {
   private readonly reachabilityProbeCommandRunner: DockerReachabilityProbeCommandRunner;
   private readonly platform: NodeJS.Platform;
   private readonly homeDir: string;
+  private readonly custodyStateDir: string | undefined;
+  private readonly exactWorkspaceCommandRunner: ExactDockerWorkspaceCommandRunnerV1;
+  private readonly exactCustodyScopes = new WeakMap<object, PreparedExactDockerCustodyScope>();
+  private readonly exactCustodyTokens = new WeakMap<object, Readonly<{
+    releaseIntent: Uint8Array;
+    releaseCommit: Uint8Array;
+    providerStart: Uint8Array;
+    executionCommit: Uint8Array;
+  }>>();
+  private readonly exactCustodyPreparedByRequest = new Map<string, Readonly<{
+    inputDigest: Sha256Digest;
+    prepared: PreparedExactDockerCustodyV2;
+  }>>();
+  private readonly exactCustodyCompletions = new Map<Sha256Digest, Readonly<{
+    scope: PreparedExactDockerCustodyScope;
+    query: ExactDockerCustodyTerminalQueryV2;
+    providerStartReceipt: Readonly<{ ref: Sha256Digest; digest: Sha256Digest }>;
+    providerExecutionReceipt: Readonly<{ ref: Sha256Digest; digest: Sha256Digest }>;
+    promise: Promise<ExactDockerCustodyCompletionV2>;
+  }>>();
+  private readonly exactCustodyProviderStarts = new Map<
+    Sha256Digest,
+    Readonly<{ ref: Sha256Digest; digest: Sha256Digest }>
+  >();
+  private readonly exactCustodyProviderExecutions = new Map<
+    Sha256Digest,
+    Readonly<{ ref: Sha256Digest; digest: Sha256Digest }>
+  >();
+  /** Serializes restart installation for one durable admission within this backend. */
+  private readonly exactCustodyRecoverySetups = new Map<Sha256Digest, Promise<void>>();
+  private readonly exactCustodyAcceptanceSetups = new Map<
+    Sha256Digest,
+    Promise<ExactDockerAcceptResultOutcomeV2>
+  >();
+  /** Terminal production acceptance, retained so callers observe failures instead of debug-only loss. */
+  private readonly exactCustodyAutomaticAcceptances = new Map<
+    Sha256Digest,
+    Promise<ExactDockerAcceptResultOutcomeV2>
+  >();
+  /** Keeps the opaque reader capability alive after a cold durable acceptance reread. */
+  private readonly exactRecoveredAcceptedResults = new Map<
+    Sha256Digest,
+    Readonly<{
+      query: ExactDockerCustodyTerminalQueryV2;
+      authority: CanonicalIngressAuthority;
+      accepted: ExactDockerAcceptedResultV2;
+    }>
+  >();
+  private readonly exactAcceptedResultReaders = new WeakMap<object, Readonly<{
+    scope: PreparedExactDockerCustodyScope;
+    query: ExactDockerCustodyTerminalQueryV2;
+    acceptedResultRef: ExactAcceptedTaskResultRefV2;
+    acceptedResultChainDigest: Sha256Digest;
+    resultDigest: Sha256Digest;
+    providerStream: ExactDockerVerifiedArtifactRefV2;
+    providerExit: ExactDockerProviderExitObservationRefV2;
+    hostBillingAuthority: ExactDockerAcceptedResultV2['hostBillingAuthority'];
+    hostEffectAuthority: ExactDockerAcceptedResultV2['hostEffectAuthority'];
+  }>>();
   /**
    * Son spawn'ın async-kuyruğu (capture + launch). Üretim fire-and-forget'tir ve
    * bunu BEKLEMEZ; test/exact-xverify tüketicileri tamamlanma/red gözlemi için
@@ -5036,6 +9142,5708 @@ export class DockerSpawnBackend implements SpawnBackend {
       opts?.reachabilityProbeCommandRunner ?? runBoundedReachabilityProbeCommand;
     this.platform = opts?.platform ?? process.platform;
     this.homeDir = opts?.homeDir ?? homedir();
+    this.custodyStateDir = opts?.custodyStateDir;
+    this.exactWorkspaceCommandRunner =
+      opts?.exactWorkspaceCommandRunner ?? runExactDockerWorkspaceCommand;
+  }
+
+  async prepareExactDockerCustody(
+    input: PrepareExactDockerCustodyInputV2,
+  ): Promise<PreparedExactDockerCustodyV2> {
+    const trustedInput = parseExactDockerCustodyPrepareInput(input);
+    const record = trustedInput ? exactOwnDataRecord(trustedInput, [
+      'dispatchRequestId', 'projectId', 'taskId',
+      'approvedTaskMaterial', 'approvedTaskMaterialDigest',
+      'dispatchTaskMaterial', 'dispatchTaskMaterialDigest',
+      'lineageMaterial', 'lineageMaterialDigest',
+      'prompt', 'promptDeliveryAuthority', 'systemPromptCore', 'model', 'execution', 'predecessor',
+    ]) : null;
+    if (!record
+      || typeof record.dispatchRequestId !== 'string'
+      || typeof record.projectId !== 'string'
+      || typeof record.taskId !== 'string'
+      || typeof record.prompt !== 'string'
+      || (record.systemPromptCore !== null && typeof record.systemPromptCore !== 'string')
+      || typeof record.model !== 'string'
+      || !isExactDigest(record.approvedTaskMaterialDigest)
+      || !isExactDigest(record.dispatchTaskMaterialDigest)
+      || !isExactDigest(record.lineageMaterialDigest)
+      || exactCustodyJsonDigest(record.approvedTaskMaterial) !== record.approvedTaskMaterialDigest
+      || exactCustodyJsonDigest(record.dispatchTaskMaterial) !== record.dispatchTaskMaterialDigest
+      || exactCustodyJsonDigest(record.lineageMaterial) !== record.lineageMaterialDigest
+      || !parseExactDockerPromptDeliveryAuthority(
+        record.promptDeliveryAuthority,
+        record.prompt as string,
+        record.dispatchTaskMaterial as Task,
+      )
+    ) throw new ExactDockerCustodyFailure('EXACT_DOCKER_INPUT_INVALID', false);
+    if (record.projectId !== attendedExecutionProjectId(this.projectDir)) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_INPUT_INVALID', false);
+    }
+
+    const execution = exactOwnDataRecord(record.execution, [
+      'allowedTools', 'availableTools', 'authMode', 'isolatedContext',
+      'reasoningEffort', 'excludeDynamicPromptSections', 'taskTimeoutSeconds',
+      'actionId', 'executionBudget', 'executionLandingPolicy',
+      'executionAdmissionMode', 'executionApprovalEvidenceRef',
+      'finalOnlyUsageContainment',
+    ]);
+    if (!execution
+      || (execution.allowedTools !== null && typeof execution.allowedTools !== 'string')
+      || (execution.availableTools !== null && typeof execution.availableTools !== 'string')
+      || !['api', 'subscription'].includes(String(execution.authMode))
+      || typeof execution.isolatedContext !== 'boolean'
+      || (execution.reasoningEffort !== null && typeof execution.reasoningEffort !== 'string')
+      || typeof execution.excludeDynamicPromptSections !== 'boolean'
+      || !Number.isSafeInteger(execution.taskTimeoutSeconds)
+      || (execution.taskTimeoutSeconds as number) <= 0
+      || (execution.actionId !== null && typeof execution.actionId !== 'string')
+      || (execution.executionBudget !== null
+        && (!execution.executionBudget || typeof execution.executionBudget !== 'object'))
+      || (execution.executionLandingPolicy !== null
+        && !isExactDockerEffectLandingPolicyAdmitted(execution.executionLandingPolicy))
+      || (execution.executionAdmissionMode !== null
+        && typeof execution.executionAdmissionMode !== 'string')
+      || (execution.executionApprovalEvidenceRef !== null
+        && typeof execution.executionApprovalEvidenceRef !== 'string')
+      || (execution.finalOnlyUsageContainment !== null
+        && !exactOwnDataRecord(execution.finalOnlyUsageContainment, [
+          'maxWallClockSeconds', 'profileRef', 'policyDigest',
+        ]))
+    ) throw new ExactDockerCustodyFailure('EXACT_DOCKER_INPUT_INVALID', false);
+
+    const task = record.dispatchTaskMaterial as Task;
+    if (!task || typeof task !== 'object' || nodeTypes.isProxy(task)
+      || !hasOnlyExactOwnKeys(task, EXACT_DOCKER_TASK_KEYS)
+      || !hasExactAcceptedAuthorityTaskFields(task)
+      || task.id !== record.taskId
+      || !task.scope || !hasOnlyExactOwnKeys(task.scope, ['directories', 'filesRead', 'filesWrite'])
+      || !Array.isArray(task.scope.directories)
+      || !task.scope.directories.every(value => typeof value === 'string')
+      || !Array.isArray(task.scope.filesRead)
+      || !Array.isArray(task.scope.filesWrite)
+      || !task.scope.filesRead.every(value => typeof value === 'string')
+      || !task.scope.filesWrite.every(value => typeof value === 'string')
+      || !hasOnlyExactOwnKeys(task.goNogo, [
+        'goCriteria', 'noGoCriteria', 'techDebtAcceptable', 'items',
+      ])) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_INPUT_INVALID', false);
+    }
+    const inputDigest = exactCustodyJsonDigest(record);
+    const processReplay = this.exactCustodyPreparedByRequest.get(record.dispatchRequestId);
+    if (processReplay) {
+      if (processReplay.inputDigest !== inputDigest) {
+        throw new ExactDockerCustodyFailure('EXACT_DOCKER_IDEMPOTENCY_REPLAY_MISMATCH', false);
+      }
+      return processReplay.prepared;
+    }
+    const model = record.model as ModelType;
+    const modelDefinition = modelRegistry.get(model);
+    const provider = modelDefinition?.provider;
+    const providerSpec = provider ? getProviderCommandSpec(provider) : null;
+    if (!modelDefinition || !provider || !providerSpec) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_PROVIDER_UNAVAILABLE', false);
+    }
+    const typedExecution = record.execution as PrepareExactDockerCustodyInputV2['execution'];
+    const exactPrompt = typedExecution.executionLandingPolicy === null
+      ? record.prompt
+      : `${record.prompt}\n\n${buildExactExecutionLandingProposalPromptSegment(
+          record.taskId,
+          record.dispatchRequestId,
+        )}`;
+    const providerAuth = buildProviderAuthIsolation(
+      this.homeDir,
+      provider,
+      providerSpec.oauthHomeDir ?? undefined,
+      typedExecution.authMode === 'api',
+    );
+    if (provider === 'gemini' && typedExecution.authMode === 'subscription') {
+      const selection = buildGeminiAuthSelectionBootstrap(this.homeDir);
+      if (selection) providerAuth.bootstrapLines.push(...selection.bootstrapLines);
+    }
+    const invocation = buildExactDockerProviderInvocation(
+      providerSpec,
+      modelDefinition.apiId,
+      {
+        ...(typedExecution.allowedTools ? { allowedTools: typedExecution.allowedTools } : {}),
+        ...(typedExecution.availableTools ? { availableTools: typedExecution.availableTools } : {}),
+        isolatedContext: typedExecution.isolatedContext,
+        ...(typedExecution.reasoningEffort ? { reasoningEffort: typedExecution.reasoningEffort } : {}),
+        excludeDynamicPromptSections: typedExecution.excludeDynamicPromptSections,
+        systemPromptCorePresent: record.systemPromptCore !== null,
+        codexCoreChannel: this.codexCoreChannel,
+        codexSuppressProjectDoc: this.codexSuppressProjectDoc,
+      },
+    );
+    const providerInvocationDigest = exactCustodyJsonDigest(invocation);
+    const releaseIntentToken = randomBytes(32);
+    const releaseCommitToken = randomBytes(32);
+    const providerStartToken = randomBytes(32);
+    const executionCommitToken = randomBytes(32);
+    const releaseIntentNonceSha256 = exactCustodyDigest(releaseIntentToken);
+    const releaseCommitNonceSha256 = exactCustodyDigest(releaseCommitToken);
+    const providerStartNonceSha256 = exactCustodyDigest(providerStartToken);
+    const executionCommitNonceSha256 = exactCustodyDigest(executionCommitToken);
+    const runnerSource = buildExactDockerRunnerSource({
+      taskId: record.taskId,
+      model,
+      provider,
+      invocation,
+      timeoutSeconds: typedExecution.taskTimeoutSeconds,
+      authBootstrapLines: providerAuth.bootstrapLines,
+      authWritebackLines: providerAuth.writebackLines ?? [],
+    });
+    const canonicalProjectRoot = canonicalExactDockerProjectRoot(this.projectDir);
+    const scopeBaseline = await captureScopeAttributionManifest(
+      canonicalProjectRoot,
+      record.dispatchRequestId,
+      [...task.scope.filesWrite],
+    );
+    const taskSnapshot: ExactDockerDispatchSnapshotV2 = Object.freeze({
+      schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+      kind: 'exact-docker-dispatch-snapshot',
+      dispatchRequestId: record.dispatchRequestId,
+      projectId: record.projectId,
+      taskId: record.taskId,
+      material: Object.freeze({
+        approved: record.approvedTaskMaterial,
+        approvedSha256: record.approvedTaskMaterialDigest,
+        dispatch: task,
+        dispatchSha256: record.dispatchTaskMaterialDigest,
+        lineage: record.lineageMaterial,
+        lineageSha256: record.lineageMaterialDigest,
+      }),
+      dispatch: Object.freeze({
+        model,
+        provider,
+        execution: typedExecution,
+        prompt: exactPrompt,
+        promptSha256: exactCustodyDigest(exactPrompt),
+        promptDeliveryAuthority:
+          record.promptDeliveryAuthority as ExactDockerPromptDeliveryAuthorityV2,
+        systemPromptCore: record.systemPromptCore as string | null,
+        systemPromptCoreSha256: record.systemPromptCore === null
+          ? null : exactCustodyDigest(record.systemPromptCore as string),
+        scopeBaseline,
+        scopeBaselineSha256: exactCustodyDigest(scopeBaseline),
+        runnerSource,
+        runnerSourceSha256: exactCustodyDigest(runnerSource),
+        providerInvocationDigest,
+        releaseIntentNonceSha256,
+        releaseCommitNonceSha256,
+        providerStartNonceSha256,
+        executionCommitNonceSha256,
+      }),
+    });
+    let envelope!: ExactDockerCustodyDispatchEnvelopeV2;
+    const adapter = createTaskAttemptCustodyPosixAdapter({
+      mountConsumer: mountInput => this.consumeExactDockerCustodyMount(envelope, mountInput),
+    });
+    const store = TaskAttemptCustodyStore.open({
+      adapter,
+      absoluteRoot: resolveExactDockerCustodyRoot(canonicalProjectRoot, {
+        platform: this.platform,
+        env: process.env,
+        ...(this.custodyStateDir ? { stateDir: this.custodyStateDir } : {}),
+      }),
+      canonicalProjectRoot,
+      projectId: record.projectId,
+      create: true,
+    });
+    const policy = createExactDockerCustodyPolicy();
+    let predecessor: TaskAttemptCustodyDispatchPredecessorRefV2 | null = null;
+    if (record.predecessor !== null) {
+      const predecessorRecord = exactOwnDataRecord(record.predecessor, [
+        'dispatchRequestId', 'identity', 'admissionReceiptDigest', 'admissionRefDigest',
+        'providerStartReceipt',
+      ]);
+      const predecessorStart = exactOwnDataRecord(
+        predecessorRecord?.providerStartReceipt,
+        ['ref', 'digest'],
+      );
+      if (!predecessorRecord || !predecessorStart
+        || typeof predecessorRecord.dispatchRequestId !== 'string'
+        || !isExactDigest(predecessorStart.ref)
+        || !isExactDigest(predecessorStart.digest)) {
+        throw new ExactDockerCustodyFailure('EXACT_DOCKER_PREDECESSOR_INVALID', false);
+      }
+      const prior = store.readDispatchAdmission({
+        dispatchRequestId: predecessorRecord.dispatchRequestId,
+        policy,
+      });
+      if (prior.state !== 'admitted'
+        || canonicalJson(prior.ref.identity) !== canonicalJson(predecessorRecord.identity)
+        || prior.ref.admissionReceiptDigest !== predecessorRecord.admissionReceiptDigest
+        || prior.ref.refDigest !== predecessorRecord.admissionRefDigest) {
+        throw new ExactDockerCustodyFailure('EXACT_DOCKER_PREDECESSOR_INVALID', false);
+      }
+      const priorStart = store.readDispatchObservation({
+        admissionRef: prior.ref,
+        policy,
+        observationClass: 'PROVIDER_START',
+        receiptDigest: predecessorStart.ref,
+      });
+      if (priorStart.receipt.evidenceDigest !== predecessorStart.digest) {
+        throw new ExactDockerCustodyFailure('EXACT_DOCKER_PREDECESSOR_INVALID', false);
+      }
+      predecessor = Object.freeze({
+        schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+        kind: 'task-attempt-custody-dispatch-predecessor-ref',
+        identity: prior.ref.identity,
+        admissionReceiptDigest: prior.ref.admissionReceiptDigest,
+      });
+    }
+    const dispatchRequestMaterial = Object.freeze({
+      schemaVersion: 2,
+      kind: 'exact-docker-dispatch-request',
+      dispatchRequestId: record.dispatchRequestId,
+      projectId: record.projectId,
+      taskId: record.taskId,
+      approvedTaskMaterialDigest: record.approvedTaskMaterialDigest,
+      dispatchTaskMaterialDigest: record.dispatchTaskMaterialDigest,
+      lineageMaterialDigest: record.lineageMaterialDigest,
+      promptSha256: taskSnapshot.dispatch.promptSha256,
+      promptDeliveryReceiptIdentity:
+        taskSnapshot.dispatch.promptDeliveryAuthority.receiptIdentity,
+      promptDeliveryAuthorityDigest:
+        taskSnapshot.dispatch.promptDeliveryAuthority.authorityDigest,
+      systemPromptCoreSha256: taskSnapshot.dispatch.systemPromptCoreSha256,
+      model,
+      provider,
+      execution: typedExecution,
+      providerInvocationDigest,
+      predecessor,
+    });
+    const durableReplay = store.readDispatchAdmission({
+      dispatchRequestId: record.dispatchRequestId,
+      policy,
+    });
+    if (durableReplay.state !== 'absent') {
+      if (durableReplay.state !== 'admitted') {
+        throw new ExactDockerCustodyFailure(
+          'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED', false,
+        );
+      }
+      if (durableReplay.reservation.dispatchRequestMaterialDigest
+        !== exactCustodyJsonDigest(dispatchRequestMaterial)) {
+        throw new ExactDockerCustodyFailure(
+          'EXACT_DOCKER_IDEMPOTENCY_REPLAY_MISMATCH', true,
+        );
+      }
+      const durableSnapshotRead = store.readTaskSnapshot({
+        identity: durableReplay.ref.identity,
+        policy,
+        admissionReceiptDigest: durableReplay.ref.admissionReceiptDigest,
+      });
+      const durableSnapshot = durableSnapshotRead
+        ? parseExactDockerDispatchSnapshot(durableSnapshotRead.bytes)
+        : null;
+      if (!durableSnapshot
+        || durableSnapshot.kind !== 'exact-docker-dispatch-snapshot'
+        || durableSnapshot.dispatchRequestId !== record.dispatchRequestId
+        || durableSnapshot.projectId !== record.projectId
+        || durableSnapshot.taskId !== record.taskId
+        || durableSnapshot.material.approvedSha256 !== record.approvedTaskMaterialDigest
+        || durableSnapshot.material.dispatchSha256 !== record.dispatchTaskMaterialDigest
+        || durableSnapshot.material.lineageSha256 !== record.lineageMaterialDigest
+        || durableSnapshot.dispatch.promptSha256 !== exactCustodyDigest(exactPrompt)
+        || canonicalJson(durableSnapshot.dispatch.promptDeliveryAuthority)
+          !== canonicalJson(record.promptDeliveryAuthority)
+        || durableSnapshot.dispatch.systemPromptCoreSha256 !== taskSnapshot.dispatch.systemPromptCoreSha256
+        || durableSnapshot.dispatch.model !== model
+        || durableSnapshot.dispatch.provider !== provider
+        || canonicalJson(durableSnapshot.dispatch.execution) !== canonicalJson(typedExecution)) {
+        throw new ExactDockerCustodyFailure('EXACT_DOCKER_IDEMPOTENCY_REPLAY_MISMATCH', true);
+      }
+      const durableAccess = store.openAttemptAccess({
+        identity: durableReplay.ref.identity,
+        policy,
+        admissionReceiptDigest: durableReplay.ref.admissionReceiptDigest,
+      });
+      if (!durableAccess) {
+        throw new ExactDockerCustodyFailure('EXACT_DOCKER_PRIVATE_ADMISSION_HOLD', true);
+      }
+      const authority = store.readDispatchAuthority({
+        admissionRef: durableReplay.ref,
+        policy,
+      });
+      if (authority.state === 'absent' || authority.state === 'transition-pending') {
+        throw new ExactDockerCustodyFailure(
+          'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED', true,
+        );
+      }
+      envelope = Object.freeze(Object.create(null)) as ExactDockerCustodyDispatchEnvelopeV2;
+      const replayScope: PreparedExactDockerCustodyScope = {
+        store,
+        policy,
+        identity: durableReplay.ref.identity,
+        admission: durableReplay.admission,
+        admissionRef: durableReplay.ref,
+        access: durableAccess,
+        taskSnapshot: durableSnapshot,
+        model: durableSnapshot.dispatch.model,
+        provider: durableSnapshot.dispatch.provider,
+        providerSpec,
+        providerAuth,
+        execution: durableSnapshot.dispatch.execution,
+        state: authority.state === 'terminal' && authority.authority.state === 'RELEASED'
+          ? 'RELEASED' : 'HOLD',
+        launch: null,
+        mountTransferReceipt: null,
+      };
+      this.exactCustodyScopes.set(envelope, replayScope);
+      const prepared = Object.freeze({
+        kind: 'exact-docker-custody-prepared' as const,
+        dispatchEnvelope: envelope,
+        admissionRef: Object.freeze({
+          dispatchRequestId: durableReplay.ref.dispatchRequestId,
+          dispatchRequestMaterialDigest: durableReplay.ref.dispatchRequestMaterialDigest,
+          admissionRefDigest: durableReplay.ref.refDigest,
+        }),
+        preparationRef: this.exactPreparationProjection(replayScope),
+      }) satisfies PreparedExactDockerCustodyV2;
+      this.exactCustodyPreparedByRequest.set(record.dispatchRequestId, Object.freeze({
+        inputDigest,
+        prepared,
+      }));
+      return prepared;
+    }
+    const admitted = store.reserveDispatchAdmission({
+      dispatchRequestId: record.dispatchRequestId,
+      dispatchRequestMaterial,
+      taskId: record.taskId,
+      taskSnapshot,
+      policy,
+      reservedAt: new Date().toISOString(),
+      predecessor,
+    });
+    const access = store.openAttemptAccess({
+      identity: admitted.ref.identity,
+      policy,
+      admissionReceiptDigest: admitted.ref.admissionReceiptDigest,
+    });
+    const verifiedSnapshot = store.readTaskSnapshot({
+      identity: admitted.ref.identity,
+      policy,
+      admissionReceiptDigest: admitted.ref.admissionReceiptDigest,
+    });
+    const trustedTaskSnapshot = verifiedSnapshot
+      ? parseExactDockerDispatchSnapshot(verifiedSnapshot.bytes)
+      : null;
+    if (!access || !verifiedSnapshot || !trustedTaskSnapshot
+      || canonicalJson(trustedTaskSnapshot) !== canonicalJson(taskSnapshot)) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_PRIVATE_ADMISSION_HOLD', true);
+    }
+    envelope = Object.freeze(Object.create(null)) as ExactDockerCustodyDispatchEnvelopeV2;
+    this.exactCustodyTokens.set(envelope, Object.freeze({
+      releaseIntent: Uint8Array.from(releaseIntentToken),
+      releaseCommit: Uint8Array.from(releaseCommitToken),
+      providerStart: Uint8Array.from(providerStartToken),
+      executionCommit: Uint8Array.from(executionCommitToken),
+    }));
+    const preparedScope: PreparedExactDockerCustodyScope = {
+      store,
+      policy,
+      identity: admitted.ref.identity,
+      admission: admitted.admission,
+      admissionRef: admitted.ref,
+      access,
+      taskSnapshot: trustedTaskSnapshot,
+      model: trustedTaskSnapshot.dispatch.model,
+      provider: trustedTaskSnapshot.dispatch.provider,
+      providerSpec,
+      providerAuth,
+      execution: trustedTaskSnapshot.dispatch.execution,
+      state: 'PREPARED',
+      launch: null,
+      mountTransferReceipt: null,
+    };
+    this.exactCustodyScopes.set(envelope, preparedScope);
+    const prepared = Object.freeze({
+      kind: 'exact-docker-custody-prepared',
+      dispatchEnvelope: envelope,
+      admissionRef: Object.freeze({
+        dispatchRequestId: admitted.ref.dispatchRequestId,
+        dispatchRequestMaterialDigest: admitted.ref.dispatchRequestMaterialDigest,
+        admissionRefDigest: admitted.ref.refDigest,
+      }),
+      preparationRef: this.exactPreparationProjection(preparedScope),
+    }) satisfies PreparedExactDockerCustodyV2;
+    this.exactCustodyPreparedByRequest.set(record.dispatchRequestId, Object.freeze({
+      inputDigest,
+      prepared,
+    }));
+    return prepared;
+  }
+
+  private async consumeExactDockerCustodyMount(
+    envelope: object,
+    input: TaskAttemptCustodyPosixMountConsumerInput,
+  ): Promise<TaskAttemptCustodyPosixDockerMountObservation> {
+    const scope = this.exactCustodyScopes.get(envelope);
+    if (!scope || scope.state !== 'PREPARED' || !scope.launch) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_MOUNT_RECONCILIATION_REQUIRED', true);
+    }
+    scope.state = 'MOUNT_CONSUMING';
+    const launch = scope.launch;
+    const labels = exactDockerCustodyAuthorityLabels(input, launch);
+    const authorityLabelsDigest = exactCustodyJsonDigest(labels);
+    const authorityLabels = Object.freeze({
+      rootId: input.rootId,
+      scopeDigest: input.scopeDigest,
+      effectOpDigest: input.effectOpDigest,
+      attemptId: input.attemptId,
+      generation: input.generation,
+    });
+    const callbackLocalArgs = [
+      ...launch.dockerBaseArgs,
+      ...Object.entries(labels).flatMap(([key, value]) => ['--label', `${key}=${value}`]),
+      ...buildExactDockerCustodyMountArgs(
+        input,
+        launch.workspaceVolumeName,
+        launch.dependencyVolumeName,
+      ),
+      '-e', `DECKENT_CUSTODY_ADMISSION_REF_DIGEST=${scope.admissionRef.refDigest}`,
+      '-e', `DECKENT_CUSTODY_PID1_SHA256=${exactCustodyDigest(EXACT_DOCKER_PID1_SOURCE)}`,
+      '-e', `DECKENT_CUSTODY_TASK_SNAPSHOT_SHA256=${scope.admission.taskSnapshot.sha256}`,
+      '-e', `DECKENT_CUSTODY_LABELS_DIGEST=${authorityLabelsDigest}`,
+      '--entrypoint', 'node',
+      launch.image,
+      '--input-type=module', '-e', EXACT_DOCKER_PID1_SOURCE,
+    ];
+    let started: ExactDockerWorkspaceCommandResultV1;
+    try {
+      started = await this.exactWorkspaceCommandRunner(Object.freeze({
+        command: 'docker',
+        args: Object.freeze(callbackLocalArgs),
+        stdin: Buffer.alloc(0),
+        timeoutMs: 30_000,
+        stdoutCeiling: 1024,
+        stderrCeiling: 64 * 1024,
+      }));
+    } catch {
+      scope.state = 'HOLD';
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_MOUNT_RECONCILIATION_REQUIRED', true);
+    }
+    const containerId = exactDockerWorkspaceCommandStdout(started).trim();
+    if (!exactDockerWorkspaceCommandSucceeded(started) || !/^[a-f0-9]{64}$/u.test(containerId)) {
+      scope.state = 'HOLD';
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_MOUNT_RECONCILIATION_REQUIRED', true);
+    }
+    launch.spawnOutcome = Object.freeze({ containerId, imageDigest: null });
+    const inspected = await this.exactWorkspaceCommandRunner(Object.freeze({
+      command: 'docker',
+      args: Object.freeze(['inspect', containerId]),
+      stdin: Buffer.alloc(0),
+      timeoutMs: 10_000,
+      stdoutCeiling: 8 * 1024 * 1024,
+      stderrCeiling: 64 * 1024,
+    }));
+    const daemon = exactDockerWorkspaceCommandSucceeded(inspected)
+      ? parseExactDockerCustodyInspect(exactDockerWorkspaceCommandStdout(inspected))
+      : null;
+    const labelsMatch = daemon !== null && Object.entries(labels).every(
+      ([key, expected]) => daemon.labels[key] === expected,
+    );
+    if (
+      !daemon
+      || daemon.containerId !== containerId
+      || !labelsMatch
+      || daemon.workspaceMount.name !== launch.workspaceVolumeName
+      || daemon.workspaceMount.destination !== CONTAINER_WORKSPACE
+      || daemon.workspaceMount.type !== 'volume'
+      || daemon.workspaceMount.rw !== true
+      || daemon.mounts.filter(mount => mount.destination === CONTAINER_WORKSPACE).length !== 1
+      || daemon.dependencyMount.name !== launch.dependencyVolumeName
+      || daemon.dependencyMount.destination !== `${CONTAINER_WORKSPACE}/node_modules`
+      || daemon.dependencyMount.type !== 'volume'
+      || daemon.dependencyMount.rw !== false
+      || daemon.mounts.filter(
+        mount => mount.destination === `${CONTAINER_WORKSPACE}/node_modules`,
+      ).length !== 1
+      || daemon.mounts.some(mount => exactDockerMountAliasesCanonicalProject(
+        mount,
+        canonicalExactDockerProjectRoot(this.projectDir),
+      ))
+      || daemon.taskMount.source !== input.taskSnapshot.sourcePath
+      || daemon.taskMount.destination !== EXACT_DOCKER_TASK_SNAPSHOT_PATH
+      || daemon.taskMount.type !== 'bind'
+      || daemon.taskMount.propagation !== 'rprivate'
+      || daemon.taskMount.rw !== false
+      || daemon.mounts.filter(
+        mount => mount.destination === EXACT_DOCKER_TASK_SNAPSHOT_PATH,
+      ).length !== 1
+      || daemon.outputMount.source !== input.workerOutput.sourcePath
+      || daemon.outputMount.destination !== EXACT_DOCKER_WORKER_OUTPUT_PATH
+      || daemon.outputMount.type !== 'bind'
+      || daemon.outputMount.propagation !== 'rprivate'
+      || daemon.outputMount.rw !== true
+      || daemon.mounts.filter(
+        mount => mount.destination === EXACT_DOCKER_WORKER_OUTPUT_PATH,
+      ).length !== 1
+      || canonicalJson(daemon.entrypoint) !== canonicalJson(['node'])
+      || canonicalJson(daemon.command)
+        !== canonicalJson(['--input-type=module', '-e', EXACT_DOCKER_PID1_SOURCE])
+    ) {
+      scope.state = 'HOLD';
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_MOUNT_RECONCILIATION_REQUIRED', true);
+    }
+    launch.spawnOutcome = Object.freeze({ containerId, imageDigest: daemon.imageDigest });
+    const probed = await this.exactWorkspaceCommandRunner(Object.freeze({
+      command: 'docker',
+      args: Object.freeze([
+        'exec', containerId, 'node', '--input-type=module', '-e', EXACT_DOCKER_NATIVE_PROBE_SOURCE,
+      ]),
+      stdin: Buffer.alloc(0),
+      timeoutMs: 30_000,
+      stdoutCeiling: 1024 * 1024,
+      stderrCeiling: 64 * 1024,
+    }));
+    const native = exactDockerWorkspaceCommandSucceeded(probed)
+      ? parseExactDockerNativeProbe(exactDockerWorkspaceCommandStdout(probed))
+      : null;
+    if (!native
+      || native.taskContentDigest !== scope.admission.taskSnapshot.sha256
+      || native.bootstrap.rootSeparationEvidenceBits <= 0) {
+      scope.state = 'HOLD';
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_MOUNT_RECONCILIATION_REQUIRED', true);
+    }
+    const observation: TaskAttemptCustodyPosixDockerMountObservation = Object.freeze({
+      schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+      kind: 'task-attempt-custody-posix-docker-mount-observation',
+      state: 'MOUNTED_GATED',
+      backend: 'docker',
+      containerId,
+      imageDigest: daemon.imageDigest,
+      authorityLabels,
+      taskSnapshotMount: Object.freeze({
+        sourcePath: input.taskSnapshot.sourcePath,
+        targetPath: EXACT_DOCKER_TASK_SNAPSHOT_PATH,
+        mountType: 'bind',
+        propagation: 'rprivate',
+        readOnly: true,
+        access: 'READ_ONLY',
+        identity: native.taskIdentity,
+        contentDigest: native.taskContentDigest,
+      }),
+      workerOutputMount: Object.freeze({
+        sourcePath: input.workerOutput.sourcePath,
+        targetPath: EXACT_DOCKER_WORKER_OUTPUT_PATH,
+        mountType: 'bind',
+        propagation: 'rprivate',
+        readOnly: false,
+        access: 'READ_WRITE',
+        identity: native.outputIdentity,
+      }),
+      bootstrap: native.bootstrap,
+      daemon: Object.freeze({
+        containerId,
+        imageDigest: daemon.imageDigest,
+        authorityLabels,
+        taskSnapshotMount: Object.freeze({
+          sourcePath: input.taskSnapshot.sourcePath,
+          targetPath: EXACT_DOCKER_TASK_SNAPSHOT_PATH,
+          mountType: 'bind',
+          propagation: 'rprivate',
+          readOnly: true,
+        }),
+        workerOutputMount: Object.freeze({
+          sourcePath: input.workerOutput.sourcePath,
+          targetPath: EXACT_DOCKER_WORKER_OUTPUT_PATH,
+          mountType: 'bind',
+          propagation: 'rprivate',
+          readOnly: false,
+        }),
+      }),
+    });
+    // The callback-local observation carries adapter-required source identities.
+    // Retained launch state deliberately contains only daemon-native IDs/digests.
+    launch.authorityLabelsDigest = authorityLabelsDigest;
+    scope.state = 'MOUNTED_GATED';
+    return observation;
+  }
+
+  private exactAdmissionProjection(scope: PreparedExactDockerCustodyScope) {
+    return Object.freeze({
+      dispatchRequestId: scope.admissionRef.dispatchRequestId,
+      dispatchRequestMaterialDigest: scope.admissionRef.dispatchRequestMaterialDigest,
+      admissionRefDigest: scope.admissionRef.refDigest,
+    });
+  }
+
+  private exactPreparationProjection(
+    scope: PreparedExactDockerCustodyScope,
+  ): ExactDockerCustodyPreparationRefV2 {
+    return createExecutionLandingPreparationRefV2({
+      dispatchRequestId: scope.admissionRef.dispatchRequestId,
+      dispatchRequestMaterialDigest: scope.admissionRef.dispatchRequestMaterialDigest,
+      privateIdentity: scope.identity,
+      admissionReceiptDigest: scope.admissionRef.admissionReceiptDigest,
+      admissionRefDigest: scope.admissionRef.refDigest,
+      admittedAt: scope.admission.admittedAt,
+      policyDigest: scope.policy.policyDigest,
+      taskSnapshotDigest: scope.admission.taskSnapshot.sha256,
+      providerInvocationDigest: scope.taskSnapshot.dispatch.providerInvocationDigest,
+    });
+  }
+
+  private exactCustodyProjection(
+    scope: PreparedExactDockerCustodyScope,
+  ): ExactDockerCustodyIdentityRefV2 {
+    return Object.freeze({
+      dispatchRequestId: scope.admissionRef.dispatchRequestId,
+      identity: scope.identity,
+      admissionReceiptDigest: scope.admissionRef.admissionReceiptDigest,
+      admissionRefDigest: scope.admissionRef.refDigest,
+    });
+  }
+
+  private exactReleasedCustodyProjection(
+    scope: PreparedExactDockerCustodyScope,
+    providerStartReceipt: Readonly<{ ref: Sha256Digest; digest: Sha256Digest }>,
+  ): ExactDockerCustodyRefV2 {
+    return Object.freeze({
+      ...this.exactCustodyProjection(scope),
+      providerStartReceipt,
+    });
+  }
+
+  private publishAndRereadExactObservation<T extends object>(
+    scope: PreparedExactDockerCustodyScope,
+    observationClass: TaskAttemptCustodyDispatchObservationClass,
+    bundle: T,
+    observedAt: string,
+  ) {
+    const roundTrip = strictRoundTrip(bundle);
+    const receipt = scope.store.publishDispatchObservation({
+      admissionRef: scope.admissionRef,
+      policy: scope.policy,
+      observationClass,
+      observedAt,
+      bytes: roundTrip.bytes,
+    });
+    const verified = scope.store.readDispatchObservation({
+      admissionRef: scope.admissionRef,
+      policy: scope.policy,
+      observationClass,
+      receiptDigest: receipt.receiptDigest,
+    });
+    if (verified.receipt.evidenceDigest !== receipt.evidenceDigest
+      || Buffer.compare(Buffer.from(verified.bytes), Buffer.from(roundTrip.bytes)) !== 0
+      || canonicalJson(JSON.parse(Buffer.from(verified.bytes).toString('utf8')))
+        !== canonicalJson(roundTrip.value)) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_OBSERVATION_REREAD_INVALID', true);
+    }
+    return Object.freeze({
+      ...verified.receipt,
+      bytes: Uint8Array.from(verified.bytes),
+    });
+  }
+
+  private async deliverExactDockerExecutionCommit(
+    scope: PreparedExactDockerCustodyScope,
+    launch: ExactDockerCustodyLaunchContext,
+    containerId: string,
+    providerStartObservation: Readonly<{
+      readonly receiptDigest: Sha256Digest;
+      readonly evidenceDigest: Sha256Digest;
+      readonly bytes: Uint8Array;
+    }>,
+    startBundle: ExactDockerProviderStartBundleV2,
+  ): Promise<void> {
+    // Re-read at the exact irreversible delivery boundary. The earlier
+    // publish helper is not enough: no raw commit byte may cross into PID1 if
+    // the Store receipt disappeared, drifted, or belongs to a sibling admission.
+    const durable = scope.store.readDispatchObservation({
+      admissionRef: scope.admissionRef,
+      policy: scope.policy,
+      observationClass: 'PROVIDER_START',
+      receiptDigest: providerStartObservation.receiptDigest,
+    });
+    let durableBundle: unknown;
+    try { durableBundle = JSON.parse(Buffer.from(durable.bytes).toString('utf8')) as unknown; }
+    catch { durableBundle = null; }
+    if (durable.receipt.receiptDigest !== providerStartObservation.receiptDigest
+      || durable.receipt.evidenceDigest !== providerStartObservation.evidenceDigest
+      || Buffer.compare(Buffer.from(durable.bytes), Buffer.from(providerStartObservation.bytes)) !== 0
+      || !durableBundle
+      || canonicalJson(durableBundle) !== canonicalJson(startBundle)
+      || startBundle.admissionRefDigest !== scope.admissionRef.refDigest
+      || startBundle.taskSnapshotSha256 !== scope.admission.taskSnapshot.sha256
+      || startBundle.startAuthorizationDigest
+        !== exactCustodyDigest(Buffer.from(canonicalJson({
+          schemaVersion: 2,
+          kind: 'exact-docker-provider-start-authorization',
+          nonce: Buffer.from(launch.providerStartToken).toString('hex'),
+          admissionRefDigest: startBundle.admissionRefDigest,
+          taskSnapshotSha256: startBundle.taskSnapshotSha256,
+          providerInvocationDigest: startBundle.providerInvocationDigest,
+          authorityLabelsDigest: startBundle.authorityLabelsDigest,
+          executionCommitNonceSha256: startBundle.executionCommitNonceSha256,
+          providerExecutionAttemptId: startBundle.providerExecutionAttemptId,
+          providerExecutionAttemptIdentityDigest:
+            startBundle.providerExecutionAttemptIdentityDigest,
+          dispatchReceiptDigest: startBundle.dispatchReceiptDigest,
+          releaseReceiptRef: startBundle.releaseReceiptRef,
+          releaseReceiptDigest: startBundle.releaseReceiptDigest,
+          projectionFence: startBundle.projectionFence,
+        }), 'utf8'))
+      || !verifyExactDockerExecutionCommit(
+        launch.executionCommitToken,
+        startBundle.executionCommitNonceSha256,
+      )) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_OBSERVATION_REREAD_INVALID', true);
+    }
+    const commit = await this.exactWorkspaceCommandRunner(Object.freeze({
+      command: 'docker',
+      args: Object.freeze(['exec', '-i', containerId, 'sh', '-c',
+        `umask 077; cat > ${EXACT_DOCKER_EXECUTION_COMMIT_FILE}`]),
+      stdin: Buffer.from(launch.executionCommitToken),
+      timeoutMs: 10_000,
+      stdoutCeiling: 64 * 1024,
+      stderrCeiling: 64 * 1024,
+    }));
+    if (!exactDockerWorkspaceCommandSucceeded(commit)) {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_EXECUTION_COMMIT_RECONCILIATION_REQUIRED', true,
+      );
+    }
+  }
+
+  private async observeExactDockerProviderExecution(
+    scope: PreparedExactDockerCustodyScope,
+    containerId: string,
+    startBundle: ExactDockerProviderStartBundleV2,
+    providerStartAckBytes: string,
+  ): Promise<Readonly<{ ref: Sha256Digest; digest: Sha256Digest }>> {
+    const executionAckRead = await this.exactWorkspaceCommandRunner(Object.freeze({
+      command: 'docker' as const,
+      args: Object.freeze(['exec', containerId, 'sh', '-c',
+        `i=0; while [ "$i" -lt 400 ]; do if [ -f ${EXACT_DOCKER_PROVIDER_EXECUTION_ACK_FILE} ]; then exec cat ${EXACT_DOCKER_PROVIDER_EXECUTION_ACK_FILE}; fi; i=$((i+1)); sleep 0.025; done; exit 79`]),
+      stdin: Buffer.alloc(0),
+      timeoutMs: 15_000,
+      stdoutCeiling: 1024 * 1024,
+      stderrCeiling: 64 * 1024,
+    }));
+    const rawAckBytes = Buffer.from(exactDockerWorkspaceCommandStdout(executionAckRead), 'utf8');
+    let ack: unknown = null;
+    try { ack = JSON.parse(rawAckBytes.toString('utf8')) as unknown; } catch { ack = null; }
+    const expected: ExactDockerProviderExecutionAckExpectationV2 = Object.freeze({
+      admissionRefDigest: startBundle.admissionRefDigest,
+      taskSnapshotSha256: startBundle.taskSnapshotSha256,
+      providerInvocationDigest: startBundle.providerInvocationDigest,
+      authorityLabelsDigest: startBundle.authorityLabelsDigest,
+      executionCommitNonceSha256: startBundle.executionCommitNonceSha256,
+      providerExecutionAttemptId: startBundle.providerExecutionAttemptId,
+      providerExecutionAttemptIdentityDigest:
+        startBundle.providerExecutionAttemptIdentityDigest,
+      dispatchReceiptDigest: startBundle.dispatchReceiptDigest,
+      releaseReceiptRef: startBundle.releaseReceiptRef,
+      releaseReceiptDigest: startBundle.releaseReceiptDigest,
+      projectionFence: startBundle.projectionFence,
+      startAuthorizationDigest: startBundle.startAuthorizationDigest,
+      providerStartAckBytesSha256: exactCustodyDigest(
+        Buffer.from(providerStartAckBytes, 'utf8'),
+      ),
+    });
+    if (!exactDockerWorkspaceCommandSucceeded(executionAckRead)
+      || !verifyExactDockerProviderExecutionAck(ack, expected)) {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_PROVIDER_START_RECONCILIATION_REQUIRED', true,
+      );
+    }
+    const observedAt = new Date().toISOString();
+    const bundle: ExactDockerProviderExecutionBundleV2 = Object.freeze({
+      ...(ack as ExactDockerProviderExecutionAckV2),
+      containerId,
+      providerExecutionAckBytesSha256: exactCustodyDigest(rawAckBytes),
+      observedAt,
+    });
+    const observation = this.publishAndRereadExactObservation(
+      scope, 'PROVIDER_EXECUTION', bundle, observedAt,
+    );
+    return Object.freeze({
+      ref: observation.receiptDigest,
+      digest: observation.evidenceDigest,
+    });
+  }
+
+  private async settleExactNoEffect(
+    scope: PreparedExactDockerCustodyScope,
+    reasonCode: TaskAttemptCustodyNotDispatchedReasonCode,
+    preMountCompensation: ExactDockerEffectPreparationCompensationRefV1 | null = null,
+  ): Promise<ExactDockerCustodyDispatchOutcomeV2> {
+    const containerName = `deckent-x-${scope.identity.attemptId.replace(/[^a-zA-Z0-9_.-]/gu, '').slice(-40)}`;
+    const inspection = await this.exactWorkspaceCommandRunner(Object.freeze({
+      command: 'docker',
+      args: Object.freeze(['inspect', '--type', 'container', containerName]),
+      stdin: Buffer.alloc(0),
+      timeoutMs: 10_000,
+      stdoutCeiling: 8 * 1024 * 1024,
+      stderrCeiling: 64 * 1024,
+    }));
+    const projectedInspection = exactDockerWorkspaceCommandObservation(inspection);
+    const absent = isExactDockerContainerAbsent(projectedInspection, containerName);
+    if (!absent) {
+      return await this.recordExactAmbiguity(
+        scope,
+        'PRE_MOUNT_RECONCILIATION_REQUIRED',
+        'NOT_ATTEMPTED',
+      );
+    }
+    const observedAt = new Date().toISOString();
+    const daemonProbe = Object.freeze({
+      command: 'docker-inspect-exact-container',
+      containerName,
+      status: inspection.status,
+      stdoutSha256: exactCustodyDigest(projectedInspection.stdout),
+      stderrSha256: exactCustodyDigest(projectedInspection.stderr),
+    });
+    const providerProbe = Object.freeze({
+      admissionRefDigest: scope.admissionRef.refDigest,
+      mountState: 'ABSENT',
+      providerReleaseState: 'ABSENT',
+    });
+    const daemonInspectionReceiptDigest = exactCustodyJsonDigest(daemonProbe);
+    const providerReleaseProbeEvidenceDigest = exactCustodyJsonDigest(providerProbe);
+    const backendProbeEvidenceDigest = exactCustodyJsonDigest({ daemonProbe, providerProbe });
+    const containmentEvidenceDigest = exactCustodyJsonDigest({
+      admissionRefDigest: scope.admissionRef.refDigest,
+      containerName,
+      daemonInspectionReceiptDigest,
+      providerReleaseProbeEvidenceDigest,
+      reasonCode,
+      preMountCompensation,
+    });
+    const bundle: ExactDockerNoEffectBundleV2 = Object.freeze({
+      schemaVersion: 2,
+      kind: 'exact-docker-no-effect',
+      admissionRefDigest: scope.admissionRef.refDigest,
+      reasonCode,
+      containerName,
+      daemonContainerState: 'ABSENT',
+      providerReleaseState: 'ABSENT',
+      daemonInspectionReceiptDigest,
+      providerReleaseProbeEvidenceDigest,
+      backendProbeEvidenceDigest,
+      containmentEvidenceDigest,
+      preMountCompensation,
+      observedAt,
+    });
+    const observation = this.publishAndRereadExactObservation(
+      scope, 'NO_EFFECT', bundle, observedAt,
+    );
+    const authority = scope.store.settleNotDispatched({
+      admissionRef: scope.admissionRef,
+      policy: scope.policy,
+      reasonCode,
+      noEffectObservation: {
+        schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+        kind: 'task-attempt-custody-no-effect-observation',
+        daemonContainerState: 'ABSENT',
+        providerReleaseState: 'ABSENT',
+        daemonInspectionReceiptDigest,
+        providerReleaseProbeEvidenceDigest,
+        backendProbeEvidenceDigest,
+        containmentEvidenceDigest,
+        observationReceiptDigest: observation.receiptDigest,
+        observationEvidenceDigest: observation.evidenceDigest,
+        observedAt,
+      },
+    });
+    scope.state = 'HOLD';
+    return Object.freeze({
+      kind: 'not-dispatched',
+      admissionRef: this.exactAdmissionProjection(scope),
+      custodyRef: this.exactCustodyProjection(scope),
+      providerAttemptCount: 0,
+      providerExecutionAttempt: null,
+      reasonCode: authority.reasonCode,
+      zeroWorkReceipt: Object.freeze({
+        ref: authority.receiptDigest,
+        digest: authority.noEffectEvidence.evidenceDigest,
+      }),
+      projectionFence: authority.projectionFence,
+    });
+  }
+
+  private async recordExactAmbiguity(
+    scope: PreparedExactDockerCustodyScope,
+    reasonCode: TaskAttemptCustodyAmbiguousReasonCode,
+    releaseState: ExactDockerReconciliationBundleV2['releaseState'],
+  ): Promise<ExactDockerCustodyDispatchOutcomeV2> {
+    const spawned = scope.launch?.spawnOutcome ?? null;
+    const inspected = spawned
+      ? await this.exactWorkspaceCommandRunner(Object.freeze({
+        command: 'docker',
+        args: Object.freeze(['inspect', spawned.containerId]),
+        stdin: Buffer.alloc(0),
+        timeoutMs: 10_000,
+        stdoutCeiling: 8 * 1024 * 1024,
+        stderrCeiling: 64 * 1024,
+      }))
+      : null;
+    const projectedInspection = inspected
+      ? exactDockerWorkspaceCommandObservation(inspected) : null;
+    const daemon = inspected && exactDockerWorkspaceCommandSucceeded(inspected)
+      ? parseExactDockerCustodyInspect(exactDockerWorkspaceCommandStdout(inspected)) : null;
+    const containerState = daemon ? 'PRESENT' as const
+      : projectedInspection && spawned
+        && isExactDockerContainerAbsent(projectedInspection, spawned.containerId)
+        ? 'ABSENT' as const : 'UNKNOWN' as const;
+    const observedAt = new Date().toISOString();
+    const backendProbeEvidenceDigest = exactCustodyJsonDigest({
+      containerState,
+      expectedContainerId: spawned?.containerId ?? null,
+      status: inspected?.status ?? null,
+      stdoutSha256: exactCustodyDigest(projectedInspection?.stdout ?? ''),
+      stderrSha256: exactCustodyDigest(projectedInspection?.stderr ?? ''),
+    });
+    const containmentEvidenceDigest = exactCustodyJsonDigest({
+      admissionRefDigest: scope.admissionRef.refDigest,
+      containerState,
+      containerId: daemon?.containerId ?? spawned?.containerId ?? null,
+      releaseState,
+      reasonCode,
+    });
+    const bundle: ExactDockerReconciliationBundleV2 = Object.freeze({
+      schemaVersion: 2,
+      kind: 'exact-docker-reconciliation',
+      admissionRefDigest: scope.admissionRef.refDigest,
+      reasonCode,
+      containerState,
+      containerId: daemon?.containerId ?? spawned?.containerId ?? null,
+      imageDigest: daemon?.imageDigest ?? spawned?.imageDigest ?? null,
+      mountReceiptDigest: scope.mountTransferReceipt?.receiptDigest ?? null,
+      releaseState,
+      releaseNonceDigest: scope.launch?.releaseCommitTokenSha256 ?? null,
+      providerInvocationDigest: scope.launch?.providerInvocationDigest ?? null,
+      containmentEvidenceDigest,
+      backendProbeEvidenceDigest,
+      observedAt,
+    });
+    const observation = this.publishAndRereadExactObservation(
+      scope, 'RECONCILIATION', bundle, observedAt,
+    );
+    const reconciliation = scope.store.recordAmbiguousDispatch({
+      admissionRef: scope.admissionRef,
+      policy: scope.policy,
+      reasonCode,
+      reconciliationEvidence: {
+        containerState,
+        containerId: bundle.containerId,
+        imageDigest: bundle.imageDigest,
+        mountReceiptDigest: bundle.mountReceiptDigest,
+        releaseState,
+        releaseNonceDigest: bundle.releaseNonceDigest,
+        providerInvocationDigest: bundle.providerInvocationDigest,
+        containmentEvidenceDigest,
+        backendProbeEvidenceDigest,
+        observationReceiptDigest: observation.receiptDigest,
+        observationEvidenceDigest: observation.evidenceDigest,
+        observedAt,
+      },
+    });
+    scope.state = 'HOLD';
+    return Object.freeze({
+      kind: 'ambiguous',
+      admissionRef: this.exactAdmissionProjection(scope),
+      custodyRef: this.exactCustodyProjection(scope),
+      reasonCode: reconciliation.reasonCode,
+      reconciliationReceipt: Object.freeze({
+        ref: reconciliation.reconciliationRef,
+        digest: reconciliation.receiptDigest,
+      }),
+      projectionFence: reconciliation.reconciliationRef,
+    });
+  }
+
+  private async compensateExactDockerEffectPreparation(
+    scope: PreparedExactDockerCustodyScope,
+    resources: Readonly<{
+      readonly workspace: Readonly<{
+        readonly name: string;
+        readonly labels: Readonly<Record<string, string>>;
+        readonly labelsDigest: Sha256Digest;
+        readonly resourceInstanceDigest: Sha256Digest;
+        readonly mountPlanDigest: Sha256Digest;
+      }>;
+      readonly dependency: Readonly<{
+        readonly name: string;
+        readonly labels: Readonly<Record<string, string>>;
+        readonly labelsDigest: Sha256Digest;
+        readonly resourceInstanceDigest: Sha256Digest;
+        readonly mountPlanDigest: Sha256Digest;
+      }>;
+    }>,
+    storeAdapter: ExecutionEffectStoreAdapterV1,
+  ): Promise<ExactDockerEffectPreparationCompensationRefV1 | null> {
+    try {
+      const durableProgress = <T extends {
+        readonly progress: { readonly progressDigest: string };
+      }>(publication: T): T['progress'] | null => {
+        const reread = storeAdapter.readLatestCompensationProgress();
+        return reread && reread.progressDigest === publication.progress.progressDigest
+          && canonicalJson(reread) === canonicalJson(publication.progress)
+          ? publication.progress : null;
+      };
+      const observeVolume = async (
+        expected: typeof resources.workspace,
+        authorityDigest: Sha256Digest,
+      ) => {
+        const result = await this.exactWorkspaceCommandRunner(Object.freeze({
+          command: 'docker' as const,
+          args: Object.freeze(['volume', 'inspect', expected.name]),
+          stdin: Buffer.alloc(0), timeoutMs: 10_000,
+          stdoutCeiling: 1024 * 1024, stderrCeiling: 64 * 1024,
+        }));
+        const observedAt = new Date().toISOString();
+        if (isExactDockerVolumeAbsent(
+          exactDockerWorkspaceCommandObservation(result), expected.name,
+        )) {
+          return createExecutionEffectDockerVolumeObservationV1({
+            state: 'ABSENT', authorityDigest, volumeName: expected.name,
+            resourceInstanceDigest: expected.resourceInstanceDigest, observedAt,
+          });
+        }
+        const volume = exactDockerWorkspaceCommandSucceeded(result)
+          ? parseExactDockerWorkspaceVolumeInspect(exactDockerWorkspaceCommandStdout(result))
+          : null;
+        if (!volume || !verifyExactDockerWorkspaceVolumeInspect(volume, {
+          name: expected.name,
+          labels: expected.labels,
+          canonicalProjectRoot: canonicalExactDockerProjectRoot(this.projectDir),
+        })) return null;
+        const identityDigest = exactDockerEffectVolumeIdentity(volume, expected);
+        return createExecutionEffectDockerVolumeObservationV1({
+          state: 'PRESENT', authorityDigest, volumeName: expected.name,
+          driver: 'local', scope: 'local', labelsDigest: expected.labelsDigest,
+          resourceInstanceDigest: expected.resourceInstanceDigest,
+          mountPlanDigest: expected.mountPlanDigest,
+          volumeIdentityDigest: identityDigest, daemonCreatedAt: volume.createdAt, observedAt,
+        });
+      };
+      const cleanupVolume = async (
+        resourceKind: 'workspace-volume' | 'dependency-volume',
+        expected: typeof resources.workspace,
+        resourceIdentityDigest: Sha256Digest | null,
+        cleanupAuthorityDigest: Sha256Digest,
+        deleteIntentDigest: Sha256Digest,
+      ): Promise<Parameters<
+        ExecutionEffectStoreAdapterV1['publishCleanupAbsence']
+      >[0]['evidence'] | null> => {
+        const before = await this.exactWorkspaceCommandRunner(Object.freeze({
+          command: 'docker' as const,
+          args: Object.freeze(['volume', 'inspect', expected.name]),
+          stdin: Buffer.alloc(0), timeoutMs: 10_000,
+          stdoutCeiling: 1024 * 1024, stderrCeiling: 64 * 1024,
+        }));
+        if (isExactDockerVolumeAbsent(
+          exactDockerWorkspaceCommandObservation(before), expected.name,
+        )) {
+          return Object.freeze({
+            disposition: 'RECONCILED_ABSENCE' as const,
+            absence: createExecutionEffectDockerReconciledAbsenceReceiptV1({
+              resourceKind, resourceName: expected.name, resourceIdentityDigest,
+              cleanupAuthorityDigest, deleteIntentDigest,
+              observedAt: new Date().toISOString(),
+            }),
+          });
+        }
+        const observed = exactDockerWorkspaceCommandSucceeded(before)
+          ? parseExactDockerWorkspaceVolumeInspect(exactDockerWorkspaceCommandStdout(before))
+          : null;
+        if (!observed || !resourceIdentityDigest
+          || !verifyExactDockerWorkspaceVolumeInspect(observed, {
+            name: expected.name,
+            labels: expected.labels,
+            canonicalProjectRoot: canonicalExactDockerProjectRoot(this.projectDir),
+          }) || exactDockerEffectVolumeIdentity(observed, expected) !== resourceIdentityDigest) {
+          return null;
+        }
+        const deleted = await this.exactWorkspaceCommandRunner(Object.freeze({
+          command: 'docker' as const,
+          args: Object.freeze(['volume', 'rm', expected.name]),
+          stdin: Buffer.alloc(0), timeoutMs: 30_000,
+          stdoutCeiling: 1024, stderrCeiling: 64 * 1024,
+        }));
+        if (!exactDockerWorkspaceCommandSucceeded(deleted)
+          || exactDockerWorkspaceCommandStdout(deleted).trim() !== expected.name) return null;
+        const deletion = createExecutionEffectDockerResourceDeletionReceiptV1({
+          resourceKind, resourceName: expected.name, resourceIdentityDigest,
+          cleanupAuthorityDigest, deleteIntentDigest, deletedAt: new Date().toISOString(),
+        });
+        const after = await this.exactWorkspaceCommandRunner(Object.freeze({
+          command: 'docker' as const,
+          args: Object.freeze(['volume', 'inspect', expected.name]),
+          stdin: Buffer.alloc(0), timeoutMs: 10_000,
+          stdoutCeiling: 1024 * 1024, stderrCeiling: 64 * 1024,
+        }));
+        if (!isExactDockerVolumeAbsent(
+          exactDockerWorkspaceCommandObservation(after), expected.name,
+        )) return null;
+        const absence = createExecutionEffectDockerResourceAbsenceReceiptV1({
+          resourceKind, resourceName: expected.name, resourceIdentityDigest,
+          deleteIntentDigest, deletionReceiptDigest: deletion.receiptDigest,
+          observedAt: new Date().toISOString(),
+        });
+        return Object.freeze({ disposition: 'EXECUTED_DELETION' as const, deletion, absence });
+      };
+      let progress = storeAdapter.readLatestCompensationProgress();
+      if (!progress) {
+        const lifecycle = storeAdapter.readLatestLifecycleAuthority();
+        if (!lifecycle || (lifecycle.state !== 'ALLOCATING' && lifecycle.state !== 'PREPARED'
+          && lifecycle.state !== 'PROVIDER_START_AUTHORIZED')) {
+          return null;
+        }
+        const observationAuthorityDigest = exactEffectDomainDigest(
+          'execution-effect-docker-compensation-observation-authority-v1',
+          {
+            admissionReceiptDigest: scope.admissionRef.admissionReceiptDigest,
+            lifecycleAuthorityDigest: lifecycle.authorityDigest,
+          },
+        ) as Sha256Digest;
+        const workspaceObservation = await observeVolume(
+          resources.workspace, observationAuthorityDigest,
+        );
+        const dependencyObservation = await observeVolume(
+          resources.dependency, observationAuthorityDigest,
+        );
+        if (!workspaceObservation || !dependencyObservation) return null;
+        progress = durableProgress(storeAdapter.publishCompensationPrepared({
+          lifecycleAuthorityDigest: lifecycle.authorityDigest as Sha256Digest,
+          workspaceObservation,
+          dependencyObservation,
+          progressedAt: [workspaceObservation.observedAt, dependencyObservation.observedAt]
+            .sort().at(-1)!,
+        }));
+      }
+      for (;;) {
+        if (!progress) return null;
+        if (progress.state === 'COMPENSATED') break;
+        if (progress.state === 'COMPENSATION_PREPARED'
+          || progress.state === 'COMPENSATION_WORKSPACE_VOLUME_ABSENT') {
+          progress = durableProgress(storeAdapter.publishCleanupDeleteIntent({
+            mode: 'COMPENSATION',
+            resourceKind: progress.state === 'COMPENSATION_PREPARED'
+              ? 'workspace-volume' : 'dependency-volume',
+            progressedAt: new Date().toISOString(),
+          }));
+          continue;
+        }
+        if (progress.state === 'COMPENSATION_DEPENDENCY_VOLUME_ABSENT') {
+          progress = durableProgress(storeAdapter.publishCleanupTerminal({
+            mode: 'COMPENSATION', progressedAt: new Date().toISOString(),
+          }));
+          continue;
+        }
+        if (!progress.deleteIntentDigest) return null;
+        const target = progress.state === 'COMPENSATION_WORKSPACE_VOLUME_DELETE_INTENT'
+          ? Object.freeze({ kind: 'workspace-volume' as const, expected: resources.workspace })
+          : progress.state === 'COMPENSATION_DEPENDENCY_VOLUME_DELETE_INTENT'
+            ? Object.freeze({ kind: 'dependency-volume' as const, expected: resources.dependency })
+            : null;
+        if (!target) return null;
+        const resource = progress.resources.find(entry => entry.resourceKind === target.kind);
+        if (!resource) return null;
+        const evidence = await cleanupVolume(
+          target.kind,
+          target.expected,
+          resource.resourceIdentityDigest,
+          progress.lifecycleAuthorityDigest,
+          progress.deleteIntentDigest,
+        );
+        if (!evidence) return null;
+        progress = durableProgress(storeAdapter.publishCleanupAbsence({
+          mode: 'COMPENSATION', evidence, progressedAt: new Date().toISOString(),
+        }));
+      }
+      const artifactKey = executionEffectStoreCleanupArtifactKeyV1(
+        scope.admissionRef.admissionReceiptDigest,
+        'COMPENSATION',
+        'COMPENSATED',
+      );
+      const receipt = scope.store.readArtifactReceipt({
+        identity: scope.identity,
+        policy: scope.policy,
+        artifactClass: 'execution-effect-lifecycle-authority',
+        artifactKey,
+      });
+      if (!receipt) return null;
+      const reread = scope.store.readVerifiedArtifact({
+        identity: scope.identity,
+        policy: scope.policy,
+        artifactClass: 'execution-effect-lifecycle-authority',
+        artifactKey,
+        receiptDigest: receipt.receiptDigest,
+      });
+      if (!reread || reread.proof.sha256 !== receipt.artifact.sha256
+        || canonicalJson(JSON.parse(Buffer.from(reread.bytes).toString('utf8')))
+          !== canonicalJson(progress)) return null;
+      return Object.freeze({
+        artifactKey,
+        artifactReceiptDigest: receipt.receiptDigest,
+        evidenceDigest: reread.proof.sha256,
+      });
+    } catch (error) {
+      debugLog('docker-backend:exact-effect-preparation-compensation-hold', error);
+      return null;
+    }
+  }
+
+  async dispatchExactDockerCustody(
+    envelope: ExactDockerCustodyDispatchEnvelopeV2,
+  ): Promise<ExactDockerCustodyDispatchOutcomeV2> {
+    const scope = this.exactCustodyScopes.get(envelope);
+    if (!scope) throw new ExactDockerCustodyFailure('EXACT_DOCKER_ENVELOPE_INVALID', false);
+    const preparedCache = this.exactCustodyPreparedByRequest.get(
+      scope.admissionRef.dispatchRequestId,
+    );
+    if (preparedCache?.prepared.dispatchEnvelope === envelope) {
+      // Dispatch consumes the only process-local replay shortcut. Durable Store
+      // admission remains the authority for every later/restart query.
+      this.exactCustodyPreparedByRequest.delete(scope.admissionRef.dispatchRequestId);
+    }
+    const existing = scope.store.readDispatchAuthority({
+      admissionRef: scope.admissionRef,
+      policy: scope.policy,
+    });
+    if (existing.state === 'terminal') {
+      const authority = existing.authority;
+      if (authority.state === 'NOT_DISPATCHED') {
+        return Object.freeze({
+          kind: 'not-dispatched',
+          admissionRef: this.exactAdmissionProjection(scope),
+          custodyRef: this.exactCustodyProjection(scope),
+          providerAttemptCount: 0,
+          providerExecutionAttempt: null,
+          reasonCode: authority.reasonCode,
+          zeroWorkReceipt: Object.freeze({
+            ref: authority.receiptDigest,
+            digest: authority.noEffectEvidence.evidenceDigest,
+          }),
+          projectionFence: authority.projectionFence,
+        });
+      }
+      const providerStartReceipt = this.exactCustodyProviderStarts.get(
+        scope.admissionRef.refDigest,
+      );
+      const providerExecutionReceipt = this.exactCustodyProviderExecutions.get(
+        scope.admissionRef.refDigest,
+      );
+      const completionEntry = this.exactCustodyCompletions.get(
+        scope.admissionRef.refDigest,
+      );
+      const completionScopeMatches = completionEntry
+        && completionEntry.scope.admissionRef.refDigest === scope.admissionRef.refDigest
+        && completionEntry.scope.admissionRef.dispatchRequestId
+          === scope.admissionRef.dispatchRequestId
+        && completionEntry.scope.admissionRef.admissionReceiptDigest
+          === scope.admissionRef.admissionReceiptDigest
+        && completionEntry.scope.policy.policyDigest === scope.policy.policyDigest
+        && canonicalJson(completionEntry.scope.identity) === canonicalJson(scope.identity)
+        && completionEntry.scope.admission.taskSnapshot.sha256
+          === scope.admission.taskSnapshot.sha256;
+      if (!providerStartReceipt || !providerExecutionReceipt
+        || !completionEntry || !completionScopeMatches) {
+        throw new ExactDockerCustodyFailure(
+          'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED', true,
+        );
+      }
+      const providerStart = scope.store.readDispatchObservation({
+        admissionRef: scope.admissionRef,
+        policy: scope.policy,
+        observationClass: 'PROVIDER_START',
+        receiptDigest: providerStartReceipt.ref,
+      });
+      if (providerStart.receipt.evidenceDigest !== providerStartReceipt.digest) {
+        throw new ExactDockerCustodyFailure(
+          'EXACT_DOCKER_PROVIDER_START_RECONCILIATION_REQUIRED', true,
+        );
+      }
+      const providerExecution = scope.store.readDispatchObservation({
+        admissionRef: scope.admissionRef,
+        policy: scope.policy,
+        observationClass: 'PROVIDER_EXECUTION',
+        receiptDigest: providerExecutionReceipt.ref,
+      });
+      if (providerExecution.receipt.evidenceDigest !== providerExecutionReceipt.digest) {
+        throw new ExactDockerCustodyFailure(
+          'EXACT_DOCKER_PROVIDER_START_RECONCILIATION_REQUIRED', true,
+        );
+      }
+      const replayQuery: ExactDockerCustodyTerminalQueryV2 = Object.freeze({
+        custodyRef: this.exactReleasedCustodyProjection(scope, providerStartReceipt),
+        releaseReceipt: Object.freeze({
+          ref: authority.releaseReceiptDigest,
+          digest: authority.releaseEvidenceDigest,
+        }),
+        providerStartReceipt,
+        projectionFence: authority.projectionFence,
+      });
+      if (canonicalJson(completionEntry.query) !== canonicalJson(replayQuery)
+        || canonicalJson(completionEntry.providerStartReceipt)
+          !== canonicalJson(providerStartReceipt)
+        || canonicalJson(completionEntry.providerExecutionReceipt)
+          !== canonicalJson(providerExecutionReceipt)) {
+        throw new ExactDockerCustodyFailure(
+          'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED', true,
+        );
+      }
+      return Object.freeze({
+        kind: 'released',
+        settlementRef: createTaskResultSettlementRefForAttempt(
+          this.projectDir,
+          scope.identity.taskId,
+          authority.providerExecutionAttempt.providerExecutionAttemptId,
+        ),
+        admissionRef: this.exactAdmissionProjection(scope),
+        preparationRef: this.exactPreparationProjection(scope),
+        custodyRef: replayQuery.custodyRef,
+        providerExecutionAttempt: authority.providerExecutionAttempt,
+        backendExecutionId: authority.backendExecutionId,
+        mountReceiptDigest: authority.mountReceiptDigest,
+        dispatchReceipt: Object.freeze({ ref: authority.receiptDigest, digest: authority.receiptDigest }),
+        releaseReceipt: replayQuery.releaseReceipt,
+        providerStartReceipt,
+        projectionFence: authority.projectionFence,
+        releasedAt: authority.releaseEvidence.releasedAt,
+        providerStartAcceptedAt: providerStart.receipt.observedAt,
+      });
+    }
+    if (existing.state === 'ambiguous') {
+      return Object.freeze({
+        kind: 'ambiguous',
+        admissionRef: this.exactAdmissionProjection(scope),
+        custodyRef: this.exactCustodyProjection(scope),
+        reasonCode: existing.reconciliation.reasonCode,
+        reconciliationReceipt: Object.freeze({
+          ref: existing.reconciliation.reconciliationRef,
+          digest: existing.reconciliation.receiptDigest,
+        }),
+        projectionFence: existing.reconciliation.reconciliationRef,
+      });
+    }
+    if (existing.state === 'transition-pending') {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_RECONCILIATION_REQUIRED', true);
+    }
+    if (scope.state !== 'PREPARED') {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_ENVELOPE_CONSUMED', true);
+    }
+    if (this.platform !== 'linux') return this.settleExactNoEffect(scope, 'PLATFORM_UNSUPPORTED');
+    if (!isExactDockerEffectLandingPolicyAdmitted(scope.execution.executionLandingPolicy)) {
+      return this.settleExactNoEffect(scope, 'EXECUTION_POLICY_REJECTED');
+    }
+    const providerSpec = scope.providerSpec;
+    const providerAuth = scope.providerAuth;
+    if (!providerSpec || !providerAuth) {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+        true,
+      );
+    }
+    if (providerAuth.missingRequiredFiles.length > 0
+      || (scope.execution.authMode === 'api'
+        && !process.env[(BASE_PROVIDER_CREDENTIAL_ENV as Record<string, string | undefined>)[scope.provider] ?? ''])) {
+      return this.settleExactNoEffect(scope, 'PROVIDER_AUTH_UNAVAILABLE');
+    }
+    const daemonPreflight = await this.exactWorkspaceCommandRunner(Object.freeze({
+      command: 'docker',
+      args: Object.freeze(['info', '--format', '{{.ServerVersion}}']),
+      stdin: Buffer.alloc(0),
+      timeoutMs: 10_000,
+      stdoutCeiling: 64 * 1024,
+      stderrCeiling: 64 * 1024,
+    }));
+    if (!exactDockerWorkspaceCommandSucceeded(daemonPreflight)
+      || exactDockerWorkspaceCommandStdout(daemonPreflight).trim().length === 0) {
+      return this.settleExactNoEffect(scope, 'DAEMON_ABSENT');
+    }
+    const imageCheck = await this.exactWorkspaceCommandRunner(Object.freeze({
+      command: 'docker',
+      args: Object.freeze(['image', 'inspect', this.image]),
+      stdin: Buffer.alloc(0),
+      timeoutMs: 10_000,
+      stdoutCeiling: 8 * 1024 * 1024,
+      stderrCeiling: 64 * 1024,
+    }));
+    if (!exactDockerWorkspaceCommandSucceeded(imageCheck)) {
+      return this.settleExactNoEffect(scope, 'PROVIDER_UNAVAILABLE');
+    }
+    const effectImageAuthority = parseExactDockerEffectImageAuthority(
+      exactDockerWorkspaceCommandStdout(imageCheck),
+    );
+    if (!effectImageAuthority) {
+      return this.settleExactNoEffect(scope, 'PROVIDER_UNAVAILABLE');
+    }
+
+    const hostNativeAuthority = loadExecAuthorityNative();
+    if (!hostNativeAuthority.available
+      || !hostNativeAuthority.manifest.effectContract.available) {
+      return this.settleExactNoEffect(scope, 'PROVIDER_UNAVAILABLE');
+    }
+    const nativeCapabilityDigest = exactEffectDomainDigest(
+      'execution-effect-docker-image-native-capability-v1',
+      hostNativeAuthority.manifest,
+    );
+
+    const workspaceInventory = await readExactDockerWorkspaceInventory(
+      canonicalExactDockerProjectRoot(this.projectDir),
+      this.exactWorkspaceCommandRunner,
+    );
+    if (!workspaceInventory) {
+      return this.settleExactNoEffect(scope, 'PRE_MOUNT_ABORTED');
+    }
+
+    const uid = process.getuid?.() ?? 1000;
+    const gid = process.getgid?.() ?? 1000;
+    const containerHome = '/tmp/deckent-home';
+    const containerName = `deckent-x-${scope.identity.attemptId.replace(/[^a-zA-Z0-9_.-]/gu, '').slice(-40)}`;
+    const workspaceVolumeName = exactDockerWorkspaceVolumeName({
+      identity: scope.identity,
+      admissionRefDigest: scope.admissionRef.refDigest,
+    });
+    const dependencyVolumeName = exactDockerDependencyVolumeName({
+      identity: scope.identity,
+      admissionRefDigest: scope.admissionRef.refDigest,
+    });
+    const effectBaseLabels = Object.freeze({
+      'io.deckent.execution-effect.managed': 'true',
+      'io.deckent.execution-effect.project': scope.identity.projectRootSha256,
+      'io.deckent.execution-effect.attempt': scope.identity.attemptId,
+      'io.deckent.execution-effect.generation': String(scope.identity.generation),
+      'io.deckent.execution-effect.admission': scope.admissionRef.refDigest,
+    });
+    const workspaceResourceInstanceNonce = randomBytes(32).toString('hex');
+    const dependencyResourceInstanceNonce = randomBytes(32).toString('hex');
+    let effectPlan: ExecutionEffectDockerWorkspacePlanV1;
+    let effectPrepared: ExactDockerEffectPreparedV1;
+    const captureLimits = Object.freeze({ ...EXECUTION_EFFECT_CAPTURE_HARD_LIMITS });
+    const lifecyclePlatform = process.env.WSL_DISTRO_NAME
+      ? 'wsl2-linux' as const : 'linux' as const;
+    const effectLifecycleAdapter = createExactDockerEffectLifecycleAdapterV1({
+      canonicalProjectRoot: canonicalExactDockerProjectRoot(this.projectDir),
+      imageAuthority: effectImageAuthority,
+      inventory: workspaceInventory,
+      runner: this.exactWorkspaceCommandRunner,
+      nowIso: () => new Date().toISOString(),
+    });
+    try {
+      effectPlan = createExecutionEffectDockerWorkspacePlanV1({
+        imageReference: effectImageAuthority.imageReference,
+        imageDigest: effectImageAuthority.imageDigest,
+        volumeName: workspaceVolumeName,
+        baseLabels: effectBaseLabels,
+        workspaceResourceInstanceNonce,
+        dependencyResourceInstanceNonce,
+        mountPlan: Object.freeze({
+          type: 'volume' as const,
+          providerTarget: '/workspace' as const,
+          providerAccess: 'read-write' as const,
+          helperTarget: '/workspace' as const,
+          helperAccess: 'read-only' as const,
+        }),
+        dependencyPlan: Object.freeze({
+          sourceAuthority: 'image-owned-read-only-volume' as const,
+          imageSource: '/app/node_modules' as const,
+          volumeName: dependencyVolumeName,
+          populationTarget: '/dependencies' as const,
+          providerTarget: '/workspace/node_modules' as const,
+          providerAccess: 'read-only' as const,
+          networkAccess: 'none' as const,
+          manifestScope: 'excluded-mount-overlay' as const,
+        }),
+        inventoryPaths: workspaceInventory.paths,
+      });
+    } catch {
+      return this.settleExactNoEffect(scope, 'PRE_MOUNT_ABORTED');
+    }
+    const preparationResources = Object.freeze({
+      workspace: Object.freeze({
+        name: workspaceVolumeName,
+        labels: effectPlan.workspaceLabels,
+        labelsDigest: effectPlan.workspaceLabelsDigest as Sha256Digest,
+        resourceInstanceDigest: effectPlan.workspaceResourceInstanceDigest as Sha256Digest,
+        mountPlanDigest: effectPlan.mountPlanDigest as Sha256Digest,
+      }),
+      dependency: Object.freeze({
+        name: dependencyVolumeName,
+        labels: effectPlan.dependencyLabels,
+        labelsDigest: effectPlan.dependencyLabelsDigest as Sha256Digest,
+        resourceInstanceDigest: effectPlan.dependencyResourceInstanceDigest as Sha256Digest,
+        mountPlanDigest: effectPlan.dependencyPlanDigest as Sha256Digest,
+      }),
+    });
+    const lifecycleStoreAdapter = createExecutionEffectLifecycleStoreAdmissionAdapterV1({
+      store: scope.store,
+      identity: scope.identity,
+      policy: scope.policy,
+      admissionReceiptDigest: scope.admissionRef.admissionReceiptDigest,
+      platform: lifecyclePlatform,
+      now: () => new Date().toISOString(),
+    });
+    try {
+      const allocation = allocateExecutionEffectDockerWorkspaceV1({
+        platform: process.env.WSL_DISTRO_NAME ? 'wsl' : 'linux',
+        attempt: Object.freeze({
+          projectId: scope.identity.projectId,
+          taskId: scope.identity.taskId,
+          attemptId: scope.identity.attemptId,
+          generation: scope.identity.generation,
+        }),
+        admissionReceiptDigest: scope.admissionRef.admissionReceiptDigest,
+        custodyPolicyDigest: scope.policy.policyDigest,
+        admittedAt: scope.admission.admittedAt,
+        filesWrite: scope.taskSnapshot.material.dispatch.scope.filesWrite,
+        nativeCapabilityDigest,
+        workspacePlan: effectPlan,
+        captureLimits,
+      });
+      if (allocation.state !== 'ALLOCATING') {
+        return this.settleExactNoEffect(scope, 'PRE_MOUNT_ABORTED');
+      }
+      const allocatingPublication = lifecycleStoreAdapter.publishLifecycleAuthority(
+        allocation.lifecycleAuthority,
+      );
+      const allocatingReread = lifecycleStoreAdapter.readLifecycleAuthority('ALLOCATING');
+      if (!allocatingReread
+        || allocatingReread.authorityDigest !== allocation.lifecycleAuthority.authorityDigest
+        || allocatingPublication.authority.authorityDigest !== allocatingReread.authorityDigest) {
+        throw new ExactDockerCustodyFailure(
+          'EXACT_DOCKER_MOUNT_RECONCILIATION_REQUIRED',
+          true,
+        );
+      }
+      const durableAllocation = authorizeDurableExecutionEffectDockerAllocationV1(
+        allocation.session,
+        lifecycleStoreAdapter,
+      );
+      if ('state' in durableAllocation && durableAllocation.state === 'HOLD') {
+        throw new ExactDockerCustodyFailure(
+          'EXACT_DOCKER_MOUNT_RECONCILIATION_REQUIRED',
+          true,
+        );
+      }
+      const nativeProbe = await this.exactWorkspaceCommandRunner(Object.freeze({
+        command: 'docker' as const,
+        args: Object.freeze([
+          'run', '--rm', '--network', 'none', '--read-only', '--cap-drop', 'ALL',
+          '--security-opt', 'no-new-privileges',
+          '--memory', '256m', '--memory-swap', '256m', '--pids-limit', '64',
+          '--tmpfs', '/tmp:size=16m,mode=0700',
+          effectImageAuthority.imageReference,
+          'node', '--input-type=module', '-e', EXACT_DOCKER_EFFECT_NATIVE_PROBE_HELPER,
+        ]),
+        stdin: Buffer.alloc(0), timeoutMs: 30_000,
+        stdoutCeiling: 1024 * 1024, stderrCeiling: 64 * 1024,
+      }));
+      let nativeProbeRecord: Record<string, unknown> | null = null;
+      try {
+        nativeProbeRecord = exactOwnDataRecord(
+          JSON.parse(exactDockerWorkspaceCommandStdout(nativeProbe)),
+          ['manifest'],
+        );
+      } catch { nativeProbeRecord = null; }
+      if (!exactDockerWorkspaceCommandSucceeded(nativeProbe) || !nativeProbeRecord
+        || !nativeProbeRecord.manifest || typeof nativeProbeRecord.manifest !== 'object'
+        || !verifyExactDockerEffectNativeManifestParity(
+          nativeProbeRecord.manifest,
+          hostNativeAuthority.manifest,
+        )) {
+        throw new ExactDockerCustodyFailure(
+          'EXACT_DOCKER_PROVIDER_UNAVAILABLE',
+          true,
+        );
+      }
+      const durableAllocationSession = durableAllocation as Parameters<
+        typeof prepareAllocatedExecutionEffectDockerWorkspaceV1
+      >[0];
+      const preparedEffect = await prepareAllocatedExecutionEffectDockerWorkspaceV1(
+        durableAllocationSession,
+        effectLifecycleAdapter,
+        Object.freeze({ nowIso: () => new Date().toISOString() }),
+      );
+      if (preparedEffect.state !== 'PREPARED') {
+        const compensated = await this.compensateExactDockerEffectPreparation(
+          scope,
+          preparationResources,
+          lifecycleStoreAdapter,
+        );
+        return compensated
+          ? this.settleExactNoEffect(scope, 'PRE_MOUNT_ABORTED', compensated)
+          : this.recordExactAmbiguity(
+              scope,
+              'MOUNT_RECONCILIATION_REQUIRED',
+              'NOT_ATTEMPTED',
+            );
+      }
+      effectPrepared = preparedEffect;
+      const preparedPublication = lifecycleStoreAdapter.publishLifecycleAuthority(
+        preparedEffect.lifecycleAuthority,
+      );
+      const preparedReread = lifecycleStoreAdapter.readLifecycleAuthority('PREPARED');
+      if (!preparedReread
+        || preparedReread.authorityDigest !== preparedEffect.lifecycleAuthority.authorityDigest
+        || preparedPublication.authority.authorityDigest !== preparedReread.authorityDigest) {
+        throw new ExactDockerCustodyFailure(
+          'EXACT_DOCKER_MOUNT_RECONCILIATION_REQUIRED',
+          true,
+        );
+      }
+    } catch {
+      const compensated = await this.compensateExactDockerEffectPreparation(
+        scope,
+        preparationResources,
+        lifecycleStoreAdapter,
+      );
+      return compensated
+        ? this.settleExactNoEffect(scope, 'PRE_MOUNT_ABORTED', compensated)
+        : this.recordExactAmbiguity(
+            scope,
+            'MOUNT_RECONCILIATION_REQUIRED',
+            'NOT_ATTEMPTED',
+          );
+    }
+    let effectStoreAdapter: ExecutionEffectStoreAdapterV1;
+    let preparedWorkspaceAuthority: ExecutionEffectStorePreparedWorkspaceAuthorityV1;
+    let effectStagingRoot: string;
+    let effectClock: ExecutionEffectNativeAdapterClockV1;
+    let effectLimits: ExecutionEffectNativeAdapterLimitsV1;
+    let landingCapabilityDigest: Sha256Digest;
+    try {
+      const custodyRoot = resolveExactDockerCustodyRoot(this.projectDir, {
+        platform: this.platform,
+        env: process.env,
+        ...(this.custodyStateDir ? { stateDir: this.custodyStateDir } : {}),
+      });
+      effectStagingRoot = join(
+        custodyRoot,
+        'execution-effect-staging',
+        scope.identity.attemptId,
+      );
+      mkdirSync(effectStagingRoot, { recursive: true, mode: 0o700 });
+      chmodSync(effectStagingRoot, 0o700);
+      let clockMs = Date.now();
+      effectClock = Object.freeze({
+        nowIso(): string {
+          clockMs = Date.now();
+          return new Date(clockMs).toISOString();
+        },
+        nowUnixMs(): number { return clockMs; },
+      });
+      effectLimits = Object.freeze({
+        maxStagedChunkBytes:
+          scope.policy.artifactLimits['execution-effect-staged-content'].maxBytes,
+        maxOperations: EXECUTION_EFFECT_LANDING_HARD_MAX_OPERATIONS,
+        maxPlanEnvelopeBytes: EXECUTION_EFFECT_LANDING_HARD_MAX_PLAN_ENVELOPE_BYTES,
+        sourceReadTimeoutMs: 60_000,
+        dockerTimeoutMs: 60_000,
+        dockerReceiptMaxBytes: 1024 * 1024,
+      });
+      const baselineRuntime: ExecutionEffectDockerWorkspaceRuntimeV1 = Object.freeze({
+        version: 1,
+        state: 'SEALED',
+        imageReference: effectImageAuthority.imageReference,
+        imageDigest: effectImageAuthority.imageDigest,
+        volumeName: workspaceVolumeName,
+        volumeNameDigest: effectPrepared.workspaceSnapshot.workspaceResource.volumeNameDigest,
+        volumeIdentityDigest: effectPrepared.volumeCreationReceipt.volumeIdentityDigest,
+        mountTarget: '/workspace',
+        mountIdentityDigest: effectPlan.mountPlanDigest,
+        workspaceResourceDigest: effectPrepared.workspaceSnapshot.workspaceResource.resourceDigest,
+        workspaceSnapshotSealDigest: effectPrepared.workspaceSnapshot.sealDigest,
+        manifestDigest: effectPrepared.baselineManifest.digest as ExecutionEffectPersistenceDigest,
+      });
+      const provisional = await createExecutionEffectLandingNativeAdapterV1(Object.freeze({
+        platform: process.env.WSL_DISTRO_NAME ? 'wsl' as const : 'linux' as const,
+        canonicalProjectRoot: canonicalExactDockerProjectRoot(this.projectDir),
+        hostPrivateStagingRoot: effectStagingRoot,
+        attempt: Object.freeze({
+          projectId: scope.identity.projectId,
+          taskId: scope.identity.taskId,
+          attemptId: scope.identity.attemptId,
+          generation: scope.identity.generation,
+        }),
+        identity: scope.identity,
+        admission: scope.admission,
+        policy: scope.policy,
+        workspaceSnapshot: effectPrepared.workspaceSnapshot,
+        workspaceRuntime: baselineRuntime,
+        sourceAuthorities: Object.freeze([]),
+        store: scope.store,
+        clock: effectClock,
+        limits: effectLimits,
+      }));
+      if (provisional.state !== 'READY') {
+        throw new ExactDockerCustodyFailure(
+          'EXACT_DOCKER_MOUNT_RECONCILIATION_REQUIRED',
+          true,
+        );
+      }
+      landingCapabilityDigest =
+        provisional.adapter.capability.capabilityDigest as Sha256Digest;
+      effectStoreAdapter = createExecutionEffectStoreAdapterV1({
+        store: scope.store,
+        identity: scope.identity,
+        policy: scope.policy,
+        admissionReceiptDigest: scope.admissionRef.admissionReceiptDigest,
+        projectRootIdentityDigest:
+          provisional.adapter.capability.projectRootIdentityDigest as Sha256Digest,
+        platform: effectPrepared.workspaceSnapshot.platform,
+        now: () => new Date().toISOString(),
+      });
+      const lifecyclePrepared = effectStoreAdapter.readLifecycleAuthority('PREPARED');
+      if (!lifecyclePrepared
+        || lifecyclePrepared.authorityDigest
+          !== effectPrepared.lifecycleAuthority.authorityDigest) {
+        throw new ExactDockerCustodyFailure(
+          'EXACT_DOCKER_MOUNT_RECONCILIATION_REQUIRED',
+          true,
+        );
+      }
+      preparedWorkspaceAuthority = effectStoreAdapter.publishPreparedWorkspace({
+        workspaceSnapshot: effectPrepared.workspaceSnapshot,
+        baseline: effectPrepared.baselineManifest,
+        baselineCapturedAt: effectPrepared.baselineManifest.captureAuthority.completedAt,
+        lifecycleAuthority: lifecyclePrepared,
+      });
+      const durablePrepared = effectStoreAdapter.readPreparedWorkspace();
+      if (!durablePrepared
+        || canonicalJson(durablePrepared) !== canonicalJson(preparedWorkspaceAuthority)) {
+        throw new ExactDockerCustodyFailure(
+          'EXACT_DOCKER_MOUNT_RECONCILIATION_REQUIRED',
+          true,
+        );
+      }
+    } catch {
+      const compensated = await this.compensateExactDockerEffectPreparation(
+        scope,
+        preparationResources,
+        lifecycleStoreAdapter,
+      );
+      return compensated
+        ? this.settleExactNoEffect(scope, 'PRE_MOUNT_ABORTED', compensated)
+        : this.recordExactAmbiguity(
+            scope,
+            'MOUNT_RECONCILIATION_REQUIRED',
+            'NOT_ATTEMPTED',
+          );
+    }
+    const dockerBaseArgs: string[] = [
+      'run', '-d', '--name', containerName,
+      '--user', `${uid}:${gid}`,
+      '-e', `HOME=${containerHome}`,
+      '-e', `DECKENT_TASK_ID=${scope.identity.taskId}`,
+      '-e', `DECKENT_PROJECT_ROOT=${CONTAINER_WORKSPACE}`,
+      '-e', `DECKENT_AUTH_MODE=${scope.execution.authMode}`,
+      '-e', `TASK_TIMEOUT=${scope.execution.taskTimeoutSeconds}`,
+      '-e', WORKER_NODE_OPTIONS,
+      '--memory', this.memoryLimit,
+      '--memory-swap', this.memorySwap,
+      '--tmpfs', `${containerHome}:size=${this.homeTmpfsSize},uid=${uid},gid=${gid}`,
+      '--tmpfs', `/run/deckent:size=64m,uid=${uid},gid=${gid},mode=0700`,
+      '--tmpfs', `${CONTAINER_WORKSPACE}/.locks:size=16m,uid=${uid},gid=${gid},mode=0700`,
+      ...providerAuth.mountArgs,
+      '-w', CONTAINER_WORKSPACE,
+    ];
+    if (existsSync(join(this.projectDir, DECK_FILE_NAME))) {
+      dockerBaseArgs.push('--mount', `type=bind,src=/dev/null,dst=${CONTAINER_WORKSPACE}/${DECK_FILE_NAME},readonly`);
+    }
+    const credentialEnv = (BASE_PROVIDER_CREDENTIAL_ENV as Record<string, string | undefined>)[scope.provider];
+    if (scope.execution.authMode === 'api' && credentialEnv && process.env[credentialEnv]) {
+      dockerBaseArgs.push('-e', `${credentialEnv}=${process.env[credentialEnv]}`);
+    }
+    if (scope.taskSnapshot.dispatch.systemPromptCore !== null && providerSpec.binary === 'claude') {
+      dockerBaseArgs.push('-e', 'CLAUDE_CODE_DISABLE_CLAUDE_MDS=1');
+    }
+    scope.launch = {
+      taskId: scope.identity.taskId,
+      image: effectImageAuthority.imageReference,
+      dockerBaseArgs: Object.freeze(dockerBaseArgs),
+      providerInvocationDigest: scope.taskSnapshot.dispatch.providerInvocationDigest,
+      releaseIntentToken: randomBytes(0),
+      releaseIntentTokenSha256: scope.taskSnapshot.dispatch.releaseIntentNonceSha256,
+      releaseCommitToken: randomBytes(0),
+      releaseCommitTokenSha256: scope.taskSnapshot.dispatch.releaseCommitNonceSha256,
+      providerStartToken: randomBytes(0),
+      providerStartTokenSha256: scope.taskSnapshot.dispatch.providerStartNonceSha256,
+      executionCommitToken: randomBytes(0),
+      executionCommitTokenSha256: scope.taskSnapshot.dispatch.executionCommitNonceSha256,
+      expectedContainerName: containerName,
+      workspaceVolumeName,
+      dependencyVolumeName,
+      workspaceInventory,
+      effect: {
+        imageAuthority: effectImageAuthority,
+        captureLimits,
+        lifecycleAdapter: effectLifecycleAdapter,
+        prepared: effectPrepared,
+        preparedWorkspace: preparedWorkspaceAuthority,
+        storeAdapter: effectStoreAdapter,
+        stagingRoot: effectStagingRoot,
+        clock: effectClock,
+        limits: effectLimits,
+        landingCapabilityDigest,
+        authorized: null,
+        ready: null,
+      },
+      authorityLabelsDigest: null,
+      spawnOutcome: null,
+    };
+    // Raw nonces are process-local only. Re-derive is impossible by design; the
+    // prepare scope therefore retains them outside every durable/public value.
+    const preparedTokens = this.exactCustodyTokens.get(envelope);
+    if (!preparedTokens) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_RELEASE_AUTHORITY_MISSING', true);
+    }
+    scope.launch = { ...scope.launch,
+      releaseIntentToken: preparedTokens.releaseIntent,
+      releaseCommitToken: preparedTokens.releaseCommit,
+      providerStartToken: preparedTokens.providerStart,
+      executionCommitToken: preparedTokens.executionCommit,
+    };
+    const launch = scope.launch;
+    let transfer: TaskAttemptCustodyBackendMountTransferReceipt;
+    try {
+      const authorizedEffect = await authorizeExecutionEffectDockerProviderStartV1(
+        launch.effect.prepared.session!,
+      );
+      if (authorizedEffect.state !== 'PROVIDER_START_AUTHORIZED'
+        || authorizedEffect.workspacePlan.volumeName !== launch.workspaceVolumeName
+        || authorizedEffect.workspacePlan.dependencyPlan.volumeName
+          !== launch.dependencyVolumeName) {
+        const compensated = await this.compensateExactDockerEffectPreparation(
+          scope,
+          preparationResources,
+          lifecycleStoreAdapter,
+        );
+        return compensated
+          ? this.settleExactNoEffect(scope, 'PRE_MOUNT_ABORTED', compensated)
+          : this.recordExactAmbiguity(
+              scope,
+              'MOUNT_RECONCILIATION_REQUIRED',
+              'NOT_ATTEMPTED',
+            );
+      }
+      const providerPublication = launch.effect.storeAdapter.publishLifecycleAuthority(
+        authorizedEffect.lifecycleAuthority,
+      );
+      const providerReread = launch.effect.storeAdapter.readLifecycleAuthority(
+        'PROVIDER_START_AUTHORIZED',
+      );
+      if (!providerReread
+        || providerReread.authorityDigest
+          !== authorizedEffect.lifecycleAuthority.authorityDigest
+        || providerPublication.authority.authorityDigest !== providerReread.authorityDigest) {
+        throw new ExactDockerCustodyFailure(
+          'EXACT_DOCKER_MOUNT_RECONCILIATION_REQUIRED',
+          true,
+        );
+      }
+      launch.effect.authorized = authorizedEffect;
+      const lease = scope.store.issueAttemptMountLease({ access: scope.access, policy: scope.policy });
+      transfer = await scope.store.consumeAttemptMountLease(lease);
+      scope.mountTransferReceipt = transfer;
+    } catch (error) {
+      if (launch.spawnOutcome === null) {
+        const compensated = await this.compensateExactDockerEffectPreparation(
+          scope,
+          preparationResources,
+          lifecycleStoreAdapter,
+        );
+        if (compensated) {
+          return this.settleExactNoEffect(scope, 'PRE_MOUNT_ABORTED', compensated);
+        }
+      }
+      if (error instanceof TaskAttemptCustodyHold) {
+        return this.recordExactAmbiguity(scope, 'MOUNT_RECONCILIATION_REQUIRED', 'NOT_ATTEMPTED');
+      }
+      throw error;
+    }
+    const spawned = launch.spawnOutcome;
+    if (!spawned?.imageDigest
+      || transfer.state !== 'CONSUMED'
+      || transfer.backendExecutionId !== spawned.containerId
+      || transfer.backendImageDigest !== spawned.imageDigest
+      || !transfer.backendAuthorityLabelDigest
+      || !transfer.backendBootstrapProbeEvidenceDigest) {
+      return this.recordExactAmbiguity(scope, 'DAEMON_EFFECT_UNCONFIRMED', 'NOT_ATTEMPTED');
+    }
+    const releaseIntent = await this.exactWorkspaceCommandRunner(Object.freeze({
+      command: 'docker',
+      args: Object.freeze(['exec', '-i', spawned.containerId, 'sh', '-c',
+        `umask 077; cat > ${EXACT_DOCKER_RELEASE_INTENT_FILE}`]),
+      stdin: Buffer.from(launch.releaseIntentToken),
+      timeoutMs: 10_000,
+      stdoutCeiling: 64 * 1024,
+      stderrCeiling: 64 * 1024,
+    }));
+    if (!exactDockerWorkspaceCommandSucceeded(releaseIntent)) {
+      return this.recordExactAmbiguity(scope, 'PROVIDER_RELEASE_UNCONFIRMED', 'UNCONFIRMED');
+    }
+    const gateRead = await this.exactWorkspaceCommandRunner(Object.freeze({
+      command: 'docker',
+      args: Object.freeze(['exec', spawned.containerId, 'sh', '-c',
+        `i=0; while [ "$i" -lt 400 ]; do if [ -f ${EXACT_DOCKER_GATE_ACK_FILE} ]; then exec cat ${EXACT_DOCKER_GATE_ACK_FILE}; fi; i=$((i+1)); sleep 0.025; done; exit 79`]),
+      stdin: Buffer.alloc(0),
+      timeoutMs: 15_000,
+      stdoutCeiling: 1024 * 1024,
+      stderrCeiling: 64 * 1024,
+    }));
+    let pid1Ack: Record<string, unknown> | null = null;
+    try { pid1Ack = exactOwnDataRecord(JSON.parse(exactDockerWorkspaceCommandStdout(gateRead)), [
+      'schemaVersion', 'kind', 'admissionRefDigest', 'releaseIntentNonceSha256',
+      'releaseCommitNonceSha256', 'providerInvocationDigest', 'pid1Sha256',
+      'taskSnapshotSha256', 'state', 'providerState',
+    ]); } catch { pid1Ack = null; }
+    if (!exactDockerWorkspaceCommandSucceeded(gateRead) || !pid1Ack
+      || pid1Ack.schemaVersion !== 2 || pid1Ack.kind !== 'exact-docker-pid1-gate-ack'
+      || pid1Ack.admissionRefDigest !== scope.admissionRef.refDigest
+      || pid1Ack.releaseIntentNonceSha256 !== launch.releaseIntentTokenSha256
+      || pid1Ack.releaseCommitNonceSha256 !== launch.releaseCommitTokenSha256
+      || pid1Ack.providerInvocationDigest !== launch.providerInvocationDigest
+      || pid1Ack.pid1Sha256 !== exactCustodyDigest(EXACT_DOCKER_PID1_SOURCE)
+      || pid1Ack.taskSnapshotSha256 !== scope.admission.taskSnapshot.sha256
+      || pid1Ack.state !== 'GATED_ACKNOWLEDGED' || pid1Ack.providerState !== 'NOT_STARTED') {
+      return this.recordExactAmbiguity(scope, 'PROVIDER_RELEASE_UNCONFIRMED', 'UNCONFIRMED');
+    }
+    const preGateObservedAt = new Date().toISOString();
+    const preGateAckDigest = exactCustodyJsonDigest(pid1Ack);
+    const commit = await this.exactWorkspaceCommandRunner(Object.freeze({
+      command: 'docker',
+      args: Object.freeze(['exec', '-i', spawned.containerId, 'sh', '-c',
+        `umask 077; cat > ${EXACT_DOCKER_RELEASE_COMMIT_FILE}`]),
+      stdin: Buffer.from(launch.releaseCommitToken),
+      timeoutMs: 10_000,
+      stdoutCeiling: 64 * 1024,
+      stderrCeiling: 64 * 1024,
+    }));
+    const releaseArmedRead = exactDockerWorkspaceCommandSucceeded(commit)
+      ? await this.exactWorkspaceCommandRunner(Object.freeze({
+        command: 'docker',
+        args: Object.freeze(['exec', spawned.containerId, 'sh', '-c',
+          `i=0; while [ "$i" -lt 400 ]; do if [ -f ${EXACT_DOCKER_RELEASE_ARMED_ACK_FILE} ]; then exec cat ${EXACT_DOCKER_RELEASE_ARMED_ACK_FILE}; fi; i=$((i+1)); sleep 0.025; done; exit 79`]),
+        stdin: Buffer.alloc(0),
+        timeoutMs: 15_000,
+        stdoutCeiling: 1024 * 1024,
+        stderrCeiling: 64 * 1024,
+      })) : null;
+    let releaseArmedAck: Record<string, unknown> | null = null;
+    try { releaseArmedAck = releaseArmedRead
+      ? exactOwnDataRecord(JSON.parse(exactDockerWorkspaceCommandStdout(releaseArmedRead)), [
+      'schemaVersion', 'kind', 'admissionRefDigest', 'providerInvocationDigest',
+      'releaseCommitNonceSha256', 'state', 'providerState',
+    ]) : null; } catch { releaseArmedAck = null; }
+    if (!releaseArmedRead || !exactDockerWorkspaceCommandSucceeded(releaseArmedRead) || !releaseArmedAck
+      || releaseArmedAck.schemaVersion !== 2
+      || releaseArmedAck.kind !== 'exact-docker-pid1-release-armed-ack'
+      || releaseArmedAck.admissionRefDigest !== scope.admissionRef.refDigest
+      || releaseArmedAck.providerInvocationDigest !== launch.providerInvocationDigest
+      || releaseArmedAck.releaseCommitNonceSha256 !== launch.releaseCommitTokenSha256
+      || releaseArmedAck.state !== 'RELEASE_ARMED'
+      || releaseArmedAck.providerState !== 'NOT_STARTED') {
+      return this.recordExactAmbiguity(scope, 'PROVIDER_RELEASE_UNCONFIRMED', 'UNCONFIRMED');
+    }
+    const releaseArmedAt = new Date().toISOString();
+    const releaseArmedAckDigest = exactCustodyJsonDigest(releaseArmedAck);
+    const gateBundle: ExactDockerGateAckBundleV2 = Object.freeze({
+      schemaVersion: 2,
+      kind: 'exact-docker-gate-ack',
+      admissionRefDigest: scope.admissionRef.refDigest,
+      containerId: spawned.containerId,
+      imageDigest: spawned.imageDigest,
+      mountTransferReceiptDigest: transfer.receiptDigest,
+      mountTransferEvidenceDigest: transfer.transferEvidenceDigest,
+      daemonAuthorityLabelDigest: transfer.backendAuthorityLabelDigest,
+      releaseIntentNonceSha256: launch.releaseIntentTokenSha256,
+      releaseCommitNonceSha256: launch.releaseCommitTokenSha256,
+      providerInvocationDigest: launch.providerInvocationDigest,
+      pid1Sha256: exactCustodyDigest(EXACT_DOCKER_PID1_SOURCE),
+      taskSnapshotSha256: scope.admission.taskSnapshot.sha256,
+      nativeBootstrapEvidenceDigest: transfer.backendBootstrapProbeEvidenceDigest,
+      preGateAckDigest,
+      releaseArmedAckDigest,
+      providerState: 'NOT_STARTED',
+      releaseState: 'ARMED',
+      preGateObservedAt,
+      releaseArmedAt,
+      observedAt: releaseArmedAt,
+    });
+    const gateObservation = this.publishAndRereadExactObservation(
+      scope, 'GATE_ACK', gateBundle, releaseArmedAt,
+    );
+    const releasedAt = new Date().toISOString();
+    const authority = scope.store.settleReleasedDispatch({
+      admissionRef: scope.admissionRef,
+      policy: scope.policy,
+      mountTransferReceipt: transfer,
+      releaseEvidence: {
+        containerId: spawned.containerId,
+        imageDigest: spawned.imageDigest,
+        mountReceiptDigest: transfer.receiptDigest,
+        mountTransferEvidenceDigest: transfer.transferEvidenceDigest,
+        daemonAuthorityLabelDigest: transfer.backendAuthorityLabelDigest,
+        releaseNonceDigest: launch.releaseCommitTokenSha256,
+        providerInvocationDigest: launch.providerInvocationDigest,
+        gateAckReceiptDigest: gateObservation.receiptDigest,
+        gateAckEvidenceDigest: gateObservation.evidenceDigest,
+        releasedAt,
+        ackMethod: 'HOST_RELEASE_GATE',
+        ackStatus: 'ACKNOWLEDGED',
+      },
+      recordedAt: releasedAt,
+    });
+    scope.state = 'RELEASED';
+    const reread = scope.store.readDispatchAuthority({
+      admissionRef: scope.admissionRef,
+      policy: scope.policy,
+    });
+    if (reread.state !== 'terminal'
+      || reread.authority.state !== 'RELEASED'
+      || reread.authority.receiptDigest !== authority.receiptDigest
+      || reread.authority.releaseReceiptDigest !== authority.releaseReceiptDigest
+      || reread.authority.releaseEvidenceDigest !== authority.releaseEvidenceDigest
+      || reread.authority.projectionFence !== authority.projectionFence
+      || reread.authority.providerExecutionAttempt.identityDigest
+        !== authority.providerExecutionAttempt.identityDigest) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_RELEASE_REREAD_HOLD', true);
+    }
+    if (!launch.authorityLabelsDigest) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_PROVIDER_START_GATE_UNCONFIRMED', true);
+    }
+    const startAuthorization = Object.freeze({
+      schemaVersion: 2,
+      kind: 'exact-docker-provider-start-authorization',
+      nonce: Buffer.from(launch.providerStartToken).toString('hex'),
+      admissionRefDigest: scope.admissionRef.refDigest,
+      taskSnapshotSha256: scope.admission.taskSnapshot.sha256,
+      providerInvocationDigest: launch.providerInvocationDigest,
+      authorityLabelsDigest: launch.authorityLabelsDigest,
+      executionCommitNonceSha256: launch.executionCommitTokenSha256,
+      providerExecutionAttemptId:
+        authority.providerExecutionAttempt.providerExecutionAttemptId,
+      providerExecutionAttemptIdentityDigest:
+        authority.providerExecutionAttempt.identityDigest,
+      dispatchReceiptDigest: authority.receiptDigest,
+      releaseReceiptRef: authority.releaseReceiptDigest,
+      releaseReceiptDigest: authority.releaseEvidenceDigest,
+      projectionFence: authority.projectionFence,
+    });
+    const startAuthorizationBytes = Buffer.from(canonicalJson(startAuthorization), 'utf8');
+    const startAuthorizationDigest = exactCustodyDigest(startAuthorizationBytes);
+    const startWrite = await this.exactWorkspaceCommandRunner(Object.freeze({
+      command: 'docker',
+      args: Object.freeze(['exec', '-i', spawned.containerId, 'sh', '-c',
+        `umask 077; cat > ${EXACT_DOCKER_PROVIDER_START_FILE}`]),
+      stdin: startAuthorizationBytes,
+      timeoutMs: 10_000,
+      stdoutCeiling: 64 * 1024,
+      stderrCeiling: 64 * 1024,
+    }));
+    const startAckRead = exactDockerWorkspaceCommandSucceeded(startWrite)
+      ? await this.exactWorkspaceCommandRunner(Object.freeze({
+        command: 'docker',
+        args: Object.freeze(['exec', spawned.containerId, 'sh', '-c',
+          `i=0; while [ "$i" -lt 400 ]; do if [ -f ${EXACT_DOCKER_PROVIDER_START_ACK_FILE} ]; then exec cat ${EXACT_DOCKER_PROVIDER_START_ACK_FILE}; fi; i=$((i+1)); sleep 0.025; done; exit 79`]),
+        stdin: Buffer.alloc(0),
+        timeoutMs: 15_000,
+        stdoutCeiling: 1024 * 1024,
+        stderrCeiling: 64 * 1024,
+      })) : null;
+    let startAck: unknown = null;
+    try { startAck = startAckRead
+      ? JSON.parse(exactDockerWorkspaceCommandStdout(startAckRead)) as unknown
+      : null; } catch { startAck = null; }
+    const startAckExpected: ExactDockerProviderStartAckExpectationV2 = Object.freeze({
+      admissionRefDigest: startAuthorization.admissionRefDigest,
+      taskSnapshotSha256: startAuthorization.taskSnapshotSha256,
+      providerInvocationDigest: startAuthorization.providerInvocationDigest,
+      authorityLabelsDigest: startAuthorization.authorityLabelsDigest,
+      providerStartNonceSha256: launch.providerStartTokenSha256,
+      executionCommitNonceSha256: launch.executionCommitTokenSha256,
+      providerExecutionAttemptId: startAuthorization.providerExecutionAttemptId,
+      providerExecutionAttemptIdentityDigest:
+        startAuthorization.providerExecutionAttemptIdentityDigest,
+      dispatchReceiptDigest: startAuthorization.dispatchReceiptDigest,
+      releaseReceiptRef: startAuthorization.releaseReceiptRef,
+      releaseReceiptDigest: startAuthorization.releaseReceiptDigest,
+      projectionFence: startAuthorization.projectionFence,
+      startAuthorizationDigest,
+    });
+    if (!startAckRead || !exactDockerWorkspaceCommandSucceeded(startAckRead)
+      || !verifyExactDockerProviderStartAck(startAck, startAckExpected)) {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_PROVIDER_START_GATE_UNCONFIRMED', true,
+      );
+    }
+    const providerStartObservedAt = new Date().toISOString();
+    const startBundle: ExactDockerProviderStartBundleV2 = Object.freeze({
+      schemaVersion: 2,
+      kind: 'exact-docker-provider-start',
+      admissionRefDigest: scope.admissionRef.refDigest,
+      containerId: spawned.containerId,
+      taskSnapshotSha256: scope.admission.taskSnapshot.sha256,
+      providerInvocationDigest: launch.providerInvocationDigest,
+      authorityLabelsDigest: launch.authorityLabelsDigest,
+      providerStartNonceSha256: launch.providerStartTokenSha256,
+      executionCommitNonceSha256: launch.executionCommitTokenSha256,
+      providerExecutionAttemptId:
+        authority.providerExecutionAttempt.providerExecutionAttemptId,
+      providerExecutionAttemptIdentityDigest:
+        authority.providerExecutionAttempt.identityDigest,
+      dispatchReceiptDigest: authority.receiptDigest,
+      releaseReceiptRef: authority.releaseReceiptDigest,
+      releaseReceiptDigest: authority.releaseEvidenceDigest,
+      projectionFence: authority.projectionFence,
+      startAuthorizationDigest,
+      pid1StartAckDigest: exactCustodyJsonDigest(startAck),
+      state: 'START_AUTHORIZATION_ACCEPTED',
+      providerState: 'NOT_STARTED',
+      observedAt: providerStartObservedAt,
+    });
+    const providerStartObservation = this.publishAndRereadExactObservation(
+      scope, 'PROVIDER_START', startBundle, providerStartObservedAt,
+    );
+    const startStored = exactOwnDataRecord(
+      JSON.parse(Buffer.from(providerStartObservation.bytes).toString('utf8')),
+      [
+        'schemaVersion', 'kind', 'admissionRefDigest', 'containerId',
+        'taskSnapshotSha256', 'providerInvocationDigest', 'authorityLabelsDigest',
+        'providerStartNonceSha256', 'executionCommitNonceSha256',
+        'providerExecutionAttemptId',
+        'providerExecutionAttemptIdentityDigest', 'dispatchReceiptDigest',
+        'releaseReceiptRef', 'releaseReceiptDigest', 'projectionFence',
+        'startAuthorizationDigest', 'pid1StartAckDigest', 'state',
+        'providerState', 'observedAt',
+      ],
+    );
+    if (!startStored || canonicalJson(startStored) !== canonicalJson(startBundle)) {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_PROVIDER_START_GATE_UNCONFIRMED', true,
+      );
+    }
+    await this.deliverExactDockerExecutionCommit(
+      scope,
+      launch,
+      spawned.containerId,
+      providerStartObservation,
+      startBundle,
+    );
+    const providerExecutionReceipt = await this.observeExactDockerProviderExecution(
+      scope,
+      spawned.containerId,
+      startBundle,
+      exactDockerWorkspaceCommandStdout(startAckRead),
+    );
+    const providerStartReceipt = Object.freeze({
+      ref: providerStartObservation.receiptDigest,
+      digest: providerStartObservation.evidenceDigest,
+    });
+    this.exactCustodyTokens.delete(envelope);
+    this.exactCustodyProviderStarts.set(scope.admissionRef.refDigest, providerStartReceipt);
+    this.exactCustodyProviderExecutions.set(
+      scope.admissionRef.refDigest, providerExecutionReceipt,
+    );
+    const terminalQuery = Object.freeze({
+      custodyRef: this.exactReleasedCustodyProjection(scope, providerStartReceipt),
+      releaseReceipt: Object.freeze({
+        ref: authority.releaseReceiptDigest,
+        digest: authority.releaseEvidenceDigest,
+      }),
+      providerStartReceipt,
+      projectionFence: authority.projectionFence,
+    });
+    const completion = this.monitorExactDockerCustody(
+      scope,
+      spawned.containerId,
+      terminalQuery,
+      providerExecutionReceipt,
+    );
+    this.exactCustodyCompletions.set(scope.admissionRef.refDigest, Object.freeze({
+      scope,
+      query: terminalQuery,
+      providerStartReceipt,
+      providerExecutionReceipt,
+      promise: completion,
+    }));
+    this.observeExactDockerCompletionAcceptance(scope, terminalQuery, completion);
+    return Object.freeze({
+      kind: 'released',
+      settlementRef: createTaskResultSettlementRefForAttempt(
+        this.projectDir, scope.identity.taskId,
+        authority.providerExecutionAttempt.providerExecutionAttemptId,
+      ),
+      admissionRef: this.exactAdmissionProjection(scope),
+      preparationRef: this.exactPreparationProjection(scope),
+      custodyRef: this.exactReleasedCustodyProjection(scope, providerStartReceipt),
+      providerExecutionAttempt: authority.providerExecutionAttempt,
+      backendExecutionId: authority.backendExecutionId,
+      mountReceiptDigest: authority.mountReceiptDigest,
+      dispatchReceipt: Object.freeze({ ref: authority.receiptDigest, digest: authority.receiptDigest }),
+      releaseReceipt: Object.freeze({
+        ref: authority.releaseReceiptDigest,
+        digest: authority.releaseEvidenceDigest,
+      }),
+      providerStartReceipt,
+      projectionFence: authority.projectionFence,
+      releasedAt: authority.releaseEvidence.releasedAt,
+      providerStartAcceptedAt: providerStartObservation.observedAt,
+    });
+  }
+
+  async awaitExactDockerCustodyTerminal(
+    query: ExactDockerCustodyTerminalQueryV2,
+  ): Promise<ExactDockerCustodyCompletionV2> {
+    const observed = await this.awaitExactDockerCustodyTerminalInternal(query, false);
+    const acceptance = this.exactCustodyAutomaticAcceptances.get(
+      query.custodyRef.admissionRefDigest,
+    );
+    if (!acceptance || observed.kind === 'capture-hold') return observed;
+    const accepted = await acceptance;
+    if (accepted.kind === 'accepted-result') return observed;
+    return Object.freeze({
+      kind: 'capture-hold',
+      custodyRef: observed.custodyRef,
+      releaseReceipt: observed.releaseReceipt,
+      projectionFence: observed.projectionFence,
+      reasonCode: accepted.reasonCode === 'HOST_WORK_ATTRIBUTION_HOLD'
+        ? 'HOST_WORK_ATTRIBUTION_HOLD'
+        : 'EFFECT_PUBLICATION_HOLD',
+      evidence: Object.freeze({
+        kind: 'provider-exit-observation' as const,
+        providerExit: observed.providerExit,
+      }),
+    });
+  }
+
+  async awaitExactDockerAcceptedResult(
+    query: ExactDockerCustodyTerminalQueryV2,
+  ): Promise<ExactDockerAcceptResultOutcomeV2> {
+    const completion = await this.awaitExactDockerCustodyTerminal(query);
+    if (completion.kind === 'capture-hold') {
+      return Object.freeze({
+        kind: 'capture-hold',
+        reasonCode: completion.reasonCode,
+        custodyRef: completion.custodyRef,
+        releaseReceipt: completion.releaseReceipt,
+        projectionFence: completion.projectionFence,
+      });
+    }
+    const admissionRefDigest = query.custodyRef.admissionRefDigest;
+    const cached = this.exactRecoveredAcceptedResults.get(admissionRefDigest);
+    if (cached) {
+      if (canonicalJson(cached.query) !== canonicalJson(query)) {
+        throw new ExactDockerCustodyFailure(
+          'EXACT_DOCKER_COMPLETION_IDENTITY_MISMATCH',
+          true,
+        );
+      }
+      return this.readExactDockerAcceptedResult(cached.accepted.reader);
+    }
+    const acceptance = this.exactCustodyAutomaticAcceptances.get(admissionRefDigest);
+    if (!acceptance) {
+      return Object.freeze({
+        kind: 'capture-hold',
+        reasonCode: 'EFFECT_PUBLICATION_HOLD',
+        custodyRef: query.custodyRef,
+        releaseReceipt: query.releaseReceipt,
+        projectionFence: query.projectionFence,
+      });
+    }
+    const accepted = await acceptance;
+    return accepted.kind === 'accepted-result'
+      ? this.readExactDockerAcceptedResult(accepted.reader)
+      : accepted;
+  }
+
+  private async awaitExactDockerCustodyTerminalInternal(
+    query: ExactDockerCustodyTerminalQueryV2,
+    evictCompleted: boolean,
+  ): Promise<ExactDockerCustodyCompletionV2> {
+    const querySnapshot = snapshotExactPlainData(query);
+    if (!querySnapshot.ok) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_COMPLETION_IDENTITY_MISMATCH', true);
+    }
+    query = querySnapshot.value as ExactDockerCustodyTerminalQueryV2;
+    const queryRecord = exactOwnDataRecord(query, [
+      'custodyRef', 'releaseReceipt', 'providerStartReceipt', 'projectionFence',
+    ]);
+    const custodyRecord = exactOwnDataRecord(queryRecord?.custodyRef, [
+      'dispatchRequestId', 'identity', 'admissionReceiptDigest', 'admissionRefDigest',
+      'providerStartReceipt',
+    ]);
+    const releaseRecord = exactOwnDataRecord(queryRecord?.releaseReceipt, ['ref', 'digest']);
+    const providerStartRecord = exactOwnDataRecord(
+      queryRecord?.providerStartReceipt,
+      ['ref', 'digest'],
+    );
+    const custodyStartRecord = exactOwnDataRecord(
+      custodyRecord?.providerStartReceipt,
+      ['ref', 'digest'],
+    );
+    if (!queryRecord || !custodyRecord || !releaseRecord
+      || !providerStartRecord || !custodyStartRecord
+      || typeof custodyRecord.dispatchRequestId !== 'string'
+      || !isExactDigest(custodyRecord.admissionReceiptDigest)
+      || !isExactDigest(custodyRecord.admissionRefDigest)
+      || !isExactDigest(releaseRecord.ref)
+      || !isExactDigest(releaseRecord.digest)
+      || !isExactDigest(providerStartRecord.ref)
+      || !isExactDigest(providerStartRecord.digest)
+      || canonicalJson(providerStartRecord) !== canonicalJson(custodyStartRecord)
+      || !isExactDigest(queryRecord.projectionFence)) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_COMPLETION_IDENTITY_MISMATCH', true);
+    }
+    const entry = this.exactCustodyCompletions.get(custodyRecord.admissionRefDigest);
+    if (!entry) {
+      return Object.freeze({
+        kind: 'capture-hold',
+        custodyRef: query.custodyRef,
+        releaseReceipt: query.releaseReceipt,
+        projectionFence: query.projectionFence,
+        reasonCode: 'LIVE_MONITOR_UNAVAILABLE',
+        evidence: Object.freeze({
+          kind: 'release-authority',
+          receipt: query.releaseReceipt,
+        }),
+      });
+    }
+    if (canonicalJson(entry.query) !== canonicalJson(query)) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_COMPLETION_IDENTITY_MISMATCH', true);
+    }
+    const authorityRead = entry.scope.store.readDispatchAuthority({
+      admissionRef: entry.scope.admissionRef,
+      policy: entry.scope.policy,
+    });
+    if (authorityRead.state !== 'terminal'
+      || authorityRead.authority.state !== 'RELEASED'
+      || canonicalJson(authorityRead.authority.admissionRef.identity)
+        !== canonicalJson(query.custodyRef.identity)
+      || authorityRead.authority.admissionRef.admissionReceiptDigest
+        !== query.custodyRef.admissionReceiptDigest
+      || authorityRead.authority.admissionRef.refDigest
+        !== query.custodyRef.admissionRefDigest
+      || authorityRead.authority.admissionRef.dispatchRequestId
+        !== query.custodyRef.dispatchRequestId
+      || authorityRead.authority.releaseReceiptDigest !== query.releaseReceipt.ref
+      || authorityRead.authority.releaseEvidenceDigest !== query.releaseReceipt.digest
+      || authorityRead.authority.projectionFence !== query.projectionFence) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_COMPLETION_IDENTITY_MISMATCH', true);
+    }
+    const providerStart = entry.scope.store.readDispatchObservation({
+      admissionRef: entry.scope.admissionRef,
+      policy: entry.scope.policy,
+      observationClass: 'PROVIDER_START',
+      receiptDigest: query.providerStartReceipt.ref,
+    });
+    if (providerStart.receipt.evidenceDigest !== query.providerStartReceipt.digest
+      || canonicalJson(entry.providerStartReceipt)
+        !== canonicalJson(query.providerStartReceipt)) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_COMPLETION_IDENTITY_MISMATCH', true);
+    }
+    const providerExecution = entry.scope.store.readDispatchObservation({
+      admissionRef: entry.scope.admissionRef,
+      policy: entry.scope.policy,
+      observationClass: 'PROVIDER_EXECUTION',
+      receiptDigest: entry.providerExecutionReceipt.ref,
+    });
+    if (providerExecution.receipt.evidenceDigest !== entry.providerExecutionReceipt.digest) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_COMPLETION_IDENTITY_MISMATCH', true);
+    }
+    const observed = await entry.promise;
+    if (canonicalJson(observed.custodyRef) !== canonicalJson(query.custodyRef)
+      || canonicalJson(observed.releaseReceipt) !== canonicalJson(query.releaseReceipt)
+      || observed.projectionFence !== query.projectionFence) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_COMPLETION_IDENTITY_MISMATCH', true);
+    }
+    if (evictCompleted && observed.kind !== 'capture-hold') {
+      const terminalReread = entry.scope.store.readDispatchAuthority({
+        admissionRef: entry.scope.admissionRef,
+        policy: entry.scope.policy,
+      });
+      const startReread = entry.scope.store.readDispatchObservation({
+        admissionRef: entry.scope.admissionRef,
+        policy: entry.scope.policy,
+        observationClass: 'PROVIDER_START',
+        receiptDigest: query.providerStartReceipt.ref,
+      });
+      if (terminalReread.state !== 'terminal'
+        || terminalReread.authority.state !== 'RELEASED'
+        || terminalReread.authority.admissionRef.refDigest
+          !== query.custodyRef.admissionRefDigest
+        || terminalReread.authority.projectionFence !== query.projectionFence
+        || startReread.receipt.evidenceDigest !== query.providerStartReceipt.digest) {
+        throw new ExactDockerCustodyFailure('EXACT_DOCKER_COMPLETION_IDENTITY_MISMATCH', true);
+      }
+      this.exactCustodyCompletions.delete(query.custodyRef.admissionRefDigest);
+      this.exactCustodyProviderStarts.delete(query.custodyRef.admissionRefDigest);
+      this.exactCustodyProviderExecutions.delete(query.custodyRef.admissionRefDigest);
+    }
+    return observed;
+  }
+
+  async acceptExactDockerCustodyResult(
+    input: AcceptExactDockerCustodyResultInputV2,
+  ): Promise<ExactDockerAcceptResultOutcomeV2> {
+    const snapshot = snapshotExactPlainData(input);
+    const inputRecord = snapshot.ok
+      ? exactOwnDataRecord(snapshot.value, ['query', 'authority']) : null;
+    const queryRecord = exactOwnDataRecord(inputRecord?.query, [
+      'custodyRef', 'releaseReceipt', 'providerStartReceipt', 'projectionFence',
+    ]);
+    const custodyRecord = exactOwnDataRecord(queryRecord?.custodyRef, [
+      'dispatchRequestId', 'identity', 'admissionReceiptDigest', 'admissionRefDigest',
+      'providerStartReceipt',
+    ]);
+    if (!inputRecord || !custodyRecord || !isExactDigest(custodyRecord.admissionRefDigest)) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_INPUT_INVALID', true);
+    }
+    const admissionRefDigest = custodyRecord.admissionRefDigest;
+    const cached = this.exactRecoveredAcceptedResults.get(admissionRefDigest);
+    if (cached) {
+      if (canonicalJson(cached.query) !== canonicalJson(inputRecord.query)
+        || canonicalJson(cached.authority) !== canonicalJson(inputRecord.authority)) {
+        throw new ExactDockerCustodyFailure(
+          'EXACT_DOCKER_COMPLETION_IDENTITY_MISMATCH',
+          true,
+        );
+      }
+      return cached.accepted;
+    }
+    const inFlight = this.exactCustodyAcceptanceSetups.get(admissionRefDigest);
+    if (inFlight) return await inFlight;
+    const acceptance = this.acceptExactDockerCustodyResultInternal(
+      inputRecord as unknown as AcceptExactDockerCustodyResultInputV2,
+    );
+    this.exactCustodyAcceptanceSetups.set(admissionRefDigest, acceptance);
+    try {
+      const accepted = await acceptance;
+      if (accepted.kind === 'accepted-result') {
+        this.exactRecoveredAcceptedResults.set(admissionRefDigest, Object.freeze({
+          query: inputRecord.query as ExactDockerCustodyTerminalQueryV2,
+          authority: inputRecord.authority as CanonicalIngressAuthority,
+          accepted,
+        }));
+      } else {
+        this.clearExactDockerLiveAttempt(admissionRefDigest);
+      }
+      return accepted;
+    } finally {
+      if (this.exactCustodyAcceptanceSetups.get(admissionRefDigest) === acceptance) {
+        this.exactCustodyAcceptanceSetups.delete(admissionRefDigest);
+      }
+    }
+  }
+
+  private async acceptExactDockerCustodyResultInternal(
+    input: AcceptExactDockerCustodyResultInputV2,
+  ): Promise<ExactDockerAcceptResultOutcomeV2> {
+    const snapshot = snapshotExactPlainData(input);
+    const inputRecord = snapshot.ok
+      ? exactOwnDataRecord(snapshot.value, ['query', 'authority']) : null;
+    const authority = inputRecord?.authority;
+    const authorityKeys = [
+      'taskId', 'workerId', 'provider', 'model', 'sprintId', 'promptCompilePlanId',
+      'verificationCommands', 'isPriorityFix', 'fixForTaskId',
+    ] as const;
+    if (!inputRecord || !hasOnlyExactOwnKeys(authority, authorityKeys)) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_INPUT_INVALID', true);
+    }
+    const authorityRecord = authority as Record<string, unknown>;
+    if (typeof authorityRecord.taskId !== 'string'
+      || typeof authorityRecord.workerId !== 'string'
+      || typeof authorityRecord.provider !== 'string'
+      || typeof authorityRecord.model !== 'string'
+      || (authorityRecord.sprintId !== undefined && typeof authorityRecord.sprintId !== 'string')
+      || (authorityRecord.promptCompilePlanId !== undefined
+        && typeof authorityRecord.promptCompilePlanId !== 'string')
+      || (authorityRecord.verificationCommands !== undefined
+        && (!Array.isArray(authorityRecord.verificationCommands)
+          || !authorityRecord.verificationCommands.every(value => typeof value === 'string')))
+      || (authorityRecord.isPriorityFix !== undefined
+        && typeof authorityRecord.isPriorityFix !== 'boolean')
+      || (authorityRecord.fixForTaskId !== undefined
+        && authorityRecord.fixForTaskId !== null
+        && typeof authorityRecord.fixForTaskId !== 'string')) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_INPUT_INVALID', true);
+    }
+    const query = inputRecord.query as ExactDockerCustodyTerminalQueryV2;
+    const completion = await this.awaitExactDockerCustodyTerminalInternal(query, false);
+    if (completion.kind === 'capture-hold') {
+      return Object.freeze({
+        kind: 'capture-hold',
+        reasonCode: completion.reasonCode,
+        custodyRef: completion.custodyRef,
+        releaseReceipt: completion.releaseReceipt,
+        projectionFence: completion.projectionFence,
+      });
+    }
+    const entry = this.exactCustodyCompletions.get(
+      completion.custodyRef.admissionRefDigest,
+    );
+    if (!entry || entry.query.custodyRef.admissionRefDigest
+      !== completion.custodyRef.admissionRefDigest
+      ) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_COMPLETION_IDENTITY_MISMATCH', true);
+    }
+    this.rereadExactProviderExitObservation(entry.scope, completion.providerExit);
+    const hostWorkAuthority = exactCanonicalHostWorkAuthority(
+      completion.hostWorkAttribution,
+      entry.scope,
+      completion.providerExit,
+    );
+    if (!hostWorkAuthority) {
+      return Object.freeze({
+        kind: 'capture-hold',
+        reasonCode: 'HOST_WORK_ATTRIBUTION_HOLD',
+        custodyRef: completion.custodyRef,
+        releaseReceipt: completion.releaseReceipt,
+        projectionFence: completion.projectionFence,
+      });
+    }
+    const hostWorkArtifactKey = `host-work-${entry.scope.identity.attemptId}`;
+    const hostWorkReceipt = entry.scope.store.readArtifactReceipt({
+      identity: entry.scope.identity,
+      policy: entry.scope.policy,
+      artifactClass: 'host-work-attribution',
+      artifactKey: hostWorkArtifactKey,
+    });
+    const hostWorkArtifact = hostWorkReceipt ? entry.scope.store.readVerifiedArtifact({
+      identity: entry.scope.identity,
+      policy: entry.scope.policy,
+      artifactClass: 'host-work-attribution',
+      artifactKey: hostWorkArtifactKey,
+      receiptDigest: hostWorkReceipt.receiptDigest,
+    }) : null;
+    const expectedHostWorkBytes = canonicalTaskAttemptCustodyJson(
+      completion.hostWorkAttribution,
+      entry.scope.policy.jsonBounds,
+    );
+    if (!hostWorkReceipt || !hostWorkArtifact
+      || hostWorkReceipt.capturedAt !== completion.providerExit.observedAt
+      || Buffer.compare(
+        Buffer.from(hostWorkArtifact.bytes),
+        Buffer.from(expectedHostWorkBytes),
+      ) !== 0) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_COMPLETION_IDENTITY_MISMATCH', true);
+    }
+    const hostWorkArtifactBinding = Object.freeze({
+      artifactClass: 'host-work-attribution' as const,
+      artifactKey: hostWorkReceipt.artifactKey,
+      artifactReceiptDigest: hostWorkReceipt.receiptDigest,
+      artifactSha256: hostWorkReceipt.artifact.sha256,
+      byteLength: hostWorkReceipt.artifact.byteLength,
+    });
+    const durableAuthority = this.exactCanonicalIngressAuthority(entry.scope);
+    if (canonicalJson(authorityRecord) !== canonicalJson(durableAuthority)) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_COMPLETION_IDENTITY_MISMATCH', true);
+    }
+    const hostPromptDeliveryAuthority = this.exactCanonicalHostPromptDeliveryAuthority(
+      entry.scope,
+      query,
+    );
+    const source = entry.scope.store.readVerifiedArtifact({
+      identity: entry.scope.identity,
+      policy: entry.scope.policy,
+      artifactClass: 'worker-result',
+      artifactKey: completion.resultArtifact.artifactKey,
+      receiptDigest: completion.resultArtifact.receiptDigest,
+    });
+    if (!source
+      || source.receipt.receiptDigest !== completion.result.sourceResult.artifactReceiptDigest
+      || source.receipt.artifact.sha256 !== completion.result.sourceResult.artifactSha256
+      || source.receipt.artifact.byteLength !== completion.result.sourceResult.byteLength
+      || source.receipt.capturedAt !== completion.providerExit.observedAt
+      || source.receipt.admissionReceiptDigest !== entry.scope.admissionRef.admissionReceiptDigest
+      || source.receipt.policyDigest !== entry.scope.policy.policyDigest
+      || canonicalJson(source.receipt.identity) !== canonicalJson(entry.scope.identity)) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_COMPLETION_IDENTITY_MISMATCH', true);
+    }
+    const providerStream = entry.scope.store.readVerifiedArtifact({
+      identity: entry.scope.identity,
+      policy: entry.scope.policy,
+      artifactClass: 'pristine-provider-stream',
+      artifactKey: completion.providerStream.artifactKey,
+      receiptDigest: completion.providerStream.receiptDigest,
+    });
+    if (!providerStream
+      || providerStream.receipt.receiptDigest
+        !== completion.providerBilling.providerStreamReceiptDigest
+      || providerStream.receipt.artifact.sha256 !== completion.providerStream.contentDigest
+      || providerStream.receipt.artifact.sha256 !== exactCustodyDigest(providerStream.bytes)
+      || providerStream.receipt.artifact.byteLength !== completion.providerStream.byteLength
+      || providerStream.receipt.artifact.byteLength !== providerStream.bytes.byteLength
+      || providerStream.receipt.capturedAt !== completion.providerStream.capturedAt
+      || providerStream.receipt.admissionReceiptDigest
+        !== entry.scope.admissionRef.admissionReceiptDigest
+      || providerStream.receipt.policyDigest !== entry.scope.policy.policyDigest
+      || canonicalJson(providerStream.receipt.identity) !== canonicalJson(entry.scope.identity)) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_COMPLETION_IDENTITY_MISMATCH', true);
+    }
+    const durableBilling = extractProviderBillingEvidence(
+      entry.scope.provider,
+      Buffer.from(providerStream.bytes).toString('utf8'),
+      providerStream.receipt.capturedAt,
+    );
+    if (!durableBilling
+      || exactCustodyJsonDigest(durableBilling) !== completion.providerBilling.evidenceDigest) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_COMPLETION_IDENTITY_MISMATCH', true);
+    }
+    let decoded: unknown;
+    try { decoded = JSON.parse(Buffer.from(source.bytes).toString('utf8')) as unknown; }
+    catch { decoded = null; }
+    const ingressSnapshot = snapshotExactPlainData(decoded);
+    if (!ingressSnapshot.ok || !ingressSnapshot.value
+      || typeof ingressSnapshot.value !== 'object'
+      || Array.isArray(ingressSnapshot.value)) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_INPUT_INVALID', true);
+    }
+    const scopeSet = new Set(normalizedScopeFiles(
+      entry.scope.taskSnapshot.material.dispatch.scope.filesWrite,
+    ));
+    if (resultClaimedPaths(ingressSnapshot.value as Record<string, unknown>)
+      .some(path => !scopeSet.has(path))) {
+      return Object.freeze({
+        kind: 'capture-hold',
+        reasonCode: 'WORKER_SCOPE_CLAIM_HOLD',
+        custodyRef: completion.custodyRef,
+        releaseReceipt: completion.releaseReceipt,
+        projectionFence: completion.projectionFence,
+      });
+    }
+    const durableAttemptCustody = Object.freeze({
+      version: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+      identity: entry.scope.identity,
+      policyDigest: entry.scope.policy.policyDigest,
+      admissionReceiptDigest: entry.scope.admissionRef.admissionReceiptDigest,
+      sourceResult: Object.freeze({
+        artifactClass: 'worker-result' as const,
+        artifactKey: source.receipt.artifactKey,
+        artifactReceiptDigest: source.receipt.receiptDigest,
+        artifactSha256: source.receipt.artifact.sha256,
+        byteLength: source.receipt.artifact.byteLength,
+      }),
+    });
+    if (canonicalJson(completion.result) !== canonicalJson(durableAttemptCustody)) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_COMPLETION_IDENTITY_MISMATCH', true);
+    }
+    const result = assembleCanonicalIngressResultV2(
+      ingressSnapshot.value as Record<string, unknown>,
+      durableAuthority,
+      Object.freeze({
+        attemptCustody: durableAttemptCustody,
+        hostWorkArtifact: hostWorkArtifactBinding,
+        jsonBounds: entry.scope.policy.jsonBounds,
+        hostTerminalBilling: Object.freeze({
+          evidence: Object.freeze(durableBilling),
+          evidenceDigest: completion.providerBilling.evidenceDigest,
+          providerStreamReceiptDigest: completion.providerBilling.providerStreamReceiptDigest,
+          billingMode: entry.scope.execution.authMode,
+        }),
+        hostWorkAuthority,
+        hostPromptDeliveryAuthority,
+        hostEffectAuthority: completion.hostEffectAuthority,
+      }),
+    );
+    const acceptedBytes = canonicalTaskAttemptCustodyJson(result, entry.scope.policy.jsonBounds);
+    const effectLanding = entry.scope.store.readVerifiedEffectLanding({
+      identity: entry.scope.identity,
+      policy: entry.scope.policy,
+      artifactKey: completion.hostEffectAuthority.binding.landingArtifactKey,
+    });
+    const effectLandingChain = entry.scope.store.readChain(
+      entry.scope.identity,
+      entry.scope.policy,
+      'effect-landing',
+    );
+    if (!effectLanding || !effectLandingChain
+      || effectLanding.landing.receiptDigest
+        !== completion.hostEffectAuthority.binding.landingReceiptDigest
+      || effectLandingChain.receiptDigest
+        !== completion.hostEffectAuthority.binding.effectLandingChainDigest
+      || effectLandingChain.artifactReceiptDigest
+        !== completion.hostEffectAuthority.binding.landingArtifactReceiptDigest
+      || effectLandingChain.occurredAt !== effectLanding.landing.releasedAt
+      || Date.parse(effectLanding.landing.releasedAt) < Date.parse(source.receipt.capturedAt)
+      || Date.parse(effectLanding.landing.releasedAt) < Date.parse(durableBilling.capturedAt)) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_COMPLETION_IDENTITY_MISMATCH', true);
+    }
+    // The accepted stage follows effect-landing, so its deterministic time and
+    // predecessor come from that durable stage—not the earlier provider EXIT.
+    const capturedAt = effectLanding.landing.releasedAt;
+    const acceptedArtifact = entry.scope.store.publishHostArtifact({
+      identity: entry.scope.identity,
+      policy: entry.scope.policy,
+      admissionReceiptDigest: entry.scope.admissionRef.admissionReceiptDigest,
+      artifactClass: 'canonical-accepted-result',
+      artifactKey: `accepted-${entry.scope.identity.attemptId}`,
+      capturedAt,
+      bytes: acceptedBytes,
+    });
+    const acceptedChain = entry.scope.store.appendChain({
+      identity: entry.scope.identity,
+      policy: entry.scope.policy,
+      admissionReceiptDigest: entry.scope.admissionRef.admissionReceiptDigest,
+      stage: 'accepted-result',
+      occurredAt: capturedAt,
+      predecessorDigest: effectLandingChain.receiptDigest,
+      artifactReceipt: acceptedArtifact,
+    });
+    const acceptedResultRef = createExactAcceptedTaskResultRefV2(acceptedArtifact);
+    const reader = Object.freeze(Object.create(null)) as ExactDockerAcceptedResultReaderV2;
+    const resultDigest = taskResultV2Digest(result, entry.scope.policy.jsonBounds);
+    const hostBillingAuthority = Object.freeze({
+      evidenceDigest: completion.providerBilling.evidenceDigest,
+      providerStreamReceiptDigest: completion.providerBilling.providerStreamReceiptDigest,
+      acceptedResultArtifactReceiptDigest: acceptedResultRef.artifactReceiptDigest,
+      acceptedResultChainDigest: acceptedChain.receiptDigest,
+      bindingDigest: exactCustodyJsonDigest({
+        evidenceDigest: completion.providerBilling.evidenceDigest,
+        providerStreamReceiptDigest: completion.providerBilling.providerStreamReceiptDigest,
+        acceptedResultArtifactReceiptDigest: acceptedResultRef.artifactReceiptDigest,
+        acceptedResultChainDigest: acceptedChain.receiptDigest,
+      }),
+    });
+    this.exactAcceptedResultReaders.set(reader, Object.freeze({
+      scope: entry.scope,
+      query: entry.query,
+      acceptedResultRef,
+      acceptedResultChainDigest: acceptedChain.receiptDigest,
+      resultDigest,
+      providerStream: completion.providerStream,
+      providerExit: completion.providerExit,
+      hostBillingAuthority,
+      hostEffectAuthority: completion.hostEffectAuthority,
+    }));
+    const reread = this.readExactDockerAcceptedResult(reader);
+    this.exactCustodyCompletions.delete(completion.custodyRef.admissionRefDigest);
+    this.exactCustodyProviderStarts.delete(completion.custodyRef.admissionRefDigest);
+    this.exactCustodyProviderExecutions.delete(completion.custodyRef.admissionRefDigest);
+    return reread;
+  }
+
+  readExactDockerAcceptedResult(
+    reader: ExactDockerAcceptedResultReaderV2,
+  ): ExactDockerAcceptedResultV2 {
+    if (!reader || typeof reader !== 'object' || nodeTypes.isProxy(reader)) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_ACCEPTED_RESULT_READER_INVALID', true);
+    }
+    const entry = this.exactAcceptedResultReaders.get(reader);
+    if (!entry) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_ACCEPTED_RESULT_READER_INVALID', true);
+    }
+    this.rereadExactProviderExitObservation(entry.scope, entry.providerExit);
+    const hostPromptDeliveryAuthority = this.exactCanonicalHostPromptDeliveryAuthority(
+      entry.scope,
+      entry.query,
+    );
+    const terminal = entry.scope.store.readDispatchAuthority({
+      admissionRef: entry.scope.admissionRef,
+      policy: entry.scope.policy,
+    });
+    const artifact = entry.scope.store.readVerifiedArtifact({
+      identity: entry.scope.identity,
+      policy: entry.scope.policy,
+      artifactClass: 'canonical-accepted-result',
+      artifactKey: entry.acceptedResultRef.artifactKey,
+      receiptDigest: entry.acceptedResultRef.artifactReceiptDigest,
+    });
+    const chain = entry.scope.store.readChain(
+      entry.scope.identity,
+      entry.scope.policy,
+      'accepted-result',
+    );
+    const providerStream = entry.scope.store.readVerifiedArtifact({
+      identity: entry.scope.identity,
+      policy: entry.scope.policy,
+      artifactClass: 'pristine-provider-stream',
+      artifactKey: entry.providerStream.artifactKey,
+      receiptDigest: entry.providerStream.receiptDigest,
+    });
+    const effectLanding = entry.scope.store.readVerifiedEffectLanding({
+      identity: entry.scope.identity,
+      policy: entry.scope.policy,
+      artifactKey: entry.hostEffectAuthority.binding.landingArtifactKey,
+    });
+    const effectLandingChain = entry.scope.store.readChain(
+      entry.scope.identity,
+      entry.scope.policy,
+      'effect-landing',
+    );
+    if (terminal.state !== 'terminal' || terminal.authority.state !== 'RELEASED'
+      || terminal.authority.admissionRef.refDigest !== entry.query.custodyRef.admissionRefDigest
+      || terminal.authority.projectionFence !== entry.query.projectionFence
+      || !artifact
+      || artifact.receipt.receiptDigest !== entry.acceptedResultRef.artifactReceiptDigest
+      || artifact.receipt.artifactClass !== 'canonical-accepted-result'
+      || artifact.receipt.captureMode !== 'host-authority-publication'
+      || artifact.receipt.artifactKey !== entry.acceptedResultRef.artifactKey
+      || canonicalJson(artifact.receipt.identity) !== canonicalJson(entry.scope.identity)
+      || artifact.receipt.admissionReceiptDigest
+        !== entry.scope.admissionRef.admissionReceiptDigest
+      || artifact.receipt.policyDigest !== entry.scope.policy.policyDigest
+      || artifact.receipt.artifact.sha256 !== exactCustodyDigest(artifact.bytes)
+      || artifact.receipt.artifact.byteLength !== artifact.bytes.byteLength
+      || !chain
+      || chain.receiptDigest !== entry.acceptedResultChainDigest
+      || !effectLanding
+      || !effectLandingChain
+      || effectLanding.landing.receiptDigest
+        !== entry.hostEffectAuthority.binding.landingReceiptDigest
+      || effectLandingChain.receiptDigest
+        !== entry.hostEffectAuthority.binding.effectLandingChainDigest
+      || chain.predecessorDigest !== effectLandingChain.receiptDigest
+      || chain.artifactReceiptDigest !== entry.acceptedResultRef.artifactReceiptDigest
+      || chain.artifactKey !== entry.acceptedResultRef.artifactKey
+      || chain.occurredAt !== artifact.receipt.capturedAt
+      || artifact.receipt.capturedAt !== effectLanding.landing.releasedAt
+      || !providerStream
+      || providerStream.receipt.receiptDigest
+        !== entry.hostBillingAuthority.providerStreamReceiptDigest
+      || providerStream.receipt.artifact.sha256 !== entry.providerStream.contentDigest
+      || providerStream.receipt.artifact.sha256 !== exactCustodyDigest(providerStream.bytes)
+      || providerStream.receipt.artifact.byteLength !== entry.providerStream.byteLength
+      || providerStream.receipt.capturedAt !== entry.providerExit.observedAt
+      || providerStream.receipt.admissionReceiptDigest
+        !== entry.scope.admissionRef.admissionReceiptDigest
+      || providerStream.receipt.policyDigest !== entry.scope.policy.policyDigest
+      || canonicalJson(providerStream.receipt.identity) !== canonicalJson(entry.scope.identity)
+      || entry.hostBillingAuthority.bindingDigest !== exactCustodyJsonDigest({
+        evidenceDigest: entry.hostBillingAuthority.evidenceDigest,
+        providerStreamReceiptDigest: entry.hostBillingAuthority.providerStreamReceiptDigest,
+        acceptedResultArtifactReceiptDigest: entry.acceptedResultRef.artifactReceiptDigest,
+        acceptedResultChainDigest: chain.receiptDigest,
+      })) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_ACCEPTED_RESULT_READER_INVALID', true);
+    }
+    const durableBilling = extractProviderBillingEvidence(
+      entry.scope.provider,
+      Buffer.from(providerStream.bytes).toString('utf8'),
+      providerStream.receipt.capturedAt,
+    );
+    if (!durableBilling
+      || exactCustodyJsonDigest(durableBilling) !== entry.hostBillingAuthority.evidenceDigest) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_ACCEPTED_RESULT_READER_INVALID', true);
+    }
+    let decoded: unknown;
+    try { decoded = JSON.parse(Buffer.from(artifact.bytes).toString('utf8')) as unknown; }
+    catch { decoded = null; }
+    const result = validateProductionTaskResultV2(decoded, entry.scope.policy.jsonBounds);
+    const immutableResult = result.ok ? snapshotExactPlainData(result.value) : { ok: false } as const;
+    if (!result.ok || !immutableResult.ok
+      || (immutableResult.value as TaskResultV2).attemptCustody.admissionReceiptDigest
+        !== entry.scope.admissionRef.admissionReceiptDigest
+      || canonicalJson((immutableResult.value as TaskResultV2).attemptCustody.identity)
+        !== canonicalJson(entry.scope.identity)
+      || (immutableResult.value as TaskResultV2).attemptCustody.policyDigest
+        !== entry.scope.policy.policyDigest
+      || exactCustodyJsonDigest((immutableResult.value as TaskResultV2).providerBilling)
+        !== entry.hostBillingAuthority.evidenceDigest
+      || taskResultV2Digest(immutableResult.value as TaskResultV2, entry.scope.policy.jsonBounds)
+        !== entry.resultDigest
+      || Buffer.compare(
+        Buffer.from(canonicalTaskAttemptCustodyJson(
+          immutableResult.value as TaskResultV2,
+          entry.scope.policy.jsonBounds,
+        )),
+        Buffer.from(artifact.bytes),
+      ) !== 0) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_ACCEPTED_RESULT_READER_INVALID', true);
+    }
+    const acceptedResult = immutableResult.value as TaskResultV2;
+    const hostWorkAuthority = this.exactCanonicalHostWorkAuthorityFromAccepted(
+      entry.scope,
+      entry.providerExit,
+      acceptedResult,
+      hostPromptDeliveryAuthority,
+    );
+    const hostWorkBinding = acceptedResult.attemptCustody.hostWorkAttribution;
+    const durableHostWork = entry.scope.store.readVerifiedArtifact({
+      identity: entry.scope.identity,
+      policy: entry.scope.policy,
+      artifactClass: 'host-work-attribution',
+      artifactKey: hostWorkBinding.artifactKey,
+      receiptDigest: hostWorkBinding.artifactReceiptDigest as Sha256Digest,
+    });
+    let decodedHostWork: unknown = null;
+    try {
+      decodedHostWork = durableHostWork
+        ? JSON.parse(Buffer.from(durableHostWork.bytes).toString('utf8')) : null;
+    } catch { decodedHostWork = null; }
+    const hostWorkSnapshot = snapshotExactPlainData(decodedHostWork);
+    const durableHostWorkAuthority = hostWorkSnapshot.ok
+      ? exactCanonicalHostWorkAuthority(
+          hostWorkSnapshot.value as ExactDockerHostWorkAttributionV2,
+          entry.scope,
+          entry.providerExit,
+        )
+      : null;
+    if (!durableHostWork
+      || durableHostWork.receipt.artifactClass !== 'host-work-attribution'
+      || durableHostWork.receipt.artifactKey !== hostWorkBinding.artifactKey
+      || durableHostWork.receipt.receiptDigest !== hostWorkBinding.artifactReceiptDigest
+      || durableHostWork.receipt.artifact.sha256 !== hostWorkBinding.artifactSha256
+      || durableHostWork.receipt.artifact.byteLength !== hostWorkBinding.byteLength
+      || durableHostWork.receipt.capturedAt !== entry.providerExit.observedAt
+      || !durableHostWorkAuthority
+      || canonicalJson(durableHostWorkAuthority) !== canonicalJson(hostWorkAuthority)) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_ACCEPTED_RESULT_READER_INVALID', true);
+    }
+    const sourceBinding = acceptedResult.attemptCustody.sourceResult;
+    const source = entry.scope.store.readVerifiedArtifact({
+      identity: entry.scope.identity,
+      policy: entry.scope.policy,
+      artifactClass: 'worker-result',
+      artifactKey: sourceBinding.artifactKey,
+      receiptDigest: sourceBinding.artifactReceiptDigest as Sha256Digest,
+    });
+    if (!source
+      || source.receipt.receiptDigest !== sourceBinding.artifactReceiptDigest
+      || source.receipt.artifactClass !== 'worker-result'
+      || source.receipt.artifactKey !== sourceBinding.artifactKey
+      || source.receipt.artifact.sha256 !== sourceBinding.artifactSha256
+      || source.receipt.artifact.sha256 !== exactCustodyDigest(source.bytes)
+      || source.receipt.artifact.byteLength !== sourceBinding.byteLength
+      || source.receipt.admissionReceiptDigest
+        !== entry.scope.admissionRef.admissionReceiptDigest
+      || source.receipt.policyDigest !== entry.scope.policy.policyDigest
+      || canonicalJson(source.receipt.identity) !== canonicalJson(entry.scope.identity)
+      || source.receipt.capturedAt !== entry.providerExit.observedAt
+      || Date.parse(artifact.receipt.capturedAt) < Date.parse(entry.providerExit.observedAt)) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_ACCEPTED_RESULT_READER_INVALID', true);
+    }
+    let sourceDecoded: unknown;
+    try { sourceDecoded = JSON.parse(Buffer.from(source.bytes).toString('utf8')) as unknown; }
+    catch { sourceDecoded = null; }
+    const sourceSnapshot = snapshotExactPlainData(sourceDecoded);
+    if (!sourceSnapshot.ok || !sourceSnapshot.value
+      || typeof sourceSnapshot.value !== 'object' || Array.isArray(sourceSnapshot.value)) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_ACCEPTED_RESULT_READER_INVALID', true);
+    }
+    let reassembled: TaskResultV2;
+    try {
+      reassembled = assembleCanonicalIngressResultV2(
+        sourceSnapshot.value as Record<string, unknown>,
+        this.exactCanonicalIngressAuthority(entry.scope),
+        Object.freeze({
+          attemptCustody: Object.freeze({
+            version: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+            identity: entry.scope.identity,
+            policyDigest: entry.scope.policy.policyDigest,
+            admissionReceiptDigest: entry.scope.admissionRef.admissionReceiptDigest,
+            sourceResult: Object.freeze({
+              artifactClass: 'worker-result' as const,
+              artifactKey: source.receipt.artifactKey,
+              artifactReceiptDigest: source.receipt.receiptDigest,
+              artifactSha256: source.receipt.artifact.sha256,
+              byteLength: source.receipt.artifact.byteLength,
+            }),
+          }),
+          hostWorkArtifact: acceptedResult.attemptCustody.hostWorkAttribution,
+          jsonBounds: entry.scope.policy.jsonBounds,
+          hostTerminalBilling: Object.freeze({
+            evidence: Object.freeze(durableBilling),
+            evidenceDigest: entry.hostBillingAuthority.evidenceDigest,
+            providerStreamReceiptDigest:
+              entry.hostBillingAuthority.providerStreamReceiptDigest,
+            billingMode: entry.scope.execution.authMode,
+          }),
+          hostWorkAuthority,
+          hostPromptDeliveryAuthority,
+          hostEffectAuthority: entry.hostEffectAuthority,
+        }),
+      );
+    } catch {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_ACCEPTED_RESULT_READER_INVALID', true);
+    }
+    if (Buffer.compare(
+      Buffer.from(canonicalTaskAttemptCustodyJson(reassembled, entry.scope.policy.jsonBounds)),
+      Buffer.from(artifact.bytes),
+    ) !== 0
+      || taskResultV2Digest(reassembled, entry.scope.policy.jsonBounds) !== entry.resultDigest) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_ACCEPTED_RESULT_READER_INVALID', true);
+    }
+    return Object.freeze({
+      kind: 'accepted-result',
+      acceptedResultRef: entry.acceptedResultRef,
+      acceptedResultChainDigest: entry.acceptedResultChainDigest,
+      resultDigest: entry.resultDigest,
+      result: acceptedResult,
+      hostBillingAuthority: entry.hostBillingAuthority,
+      hostEffectAuthority: entry.hostEffectAuthority,
+      reader,
+    });
+  }
+
+  /**
+   * Rebuild the opaque read capability for an already accepted attempt from
+   * durable Store authority only. No provider, Docker resource, registry,
+   * credential or current host-work measurement participates in this path.
+   */
+  private readColdExactDockerAcceptedResult(
+    scope: PreparedExactDockerCustodyScope,
+    query: ExactDockerCustodyTerminalQueryV2,
+    providerExit: ExactDockerProviderExitObservationRefV2,
+  ): ExactDockerAcceptedResultV2 | null {
+    const artifactKey = `accepted-${scope.identity.attemptId}`;
+    const acceptedReceipt = scope.store.readArtifactReceipt({
+      identity: scope.identity,
+      policy: scope.policy,
+      artifactClass: 'canonical-accepted-result',
+      artifactKey,
+    });
+    let acceptedChain = scope.store.readChain(
+      scope.identity,
+      scope.policy,
+      'accepted-result',
+    );
+    if (!acceptedReceipt && !acceptedChain) return null;
+    if (!acceptedReceipt) {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+        true,
+      );
+    }
+    const acceptedArtifact = scope.store.readVerifiedArtifact({
+      identity: scope.identity,
+      policy: scope.policy,
+      artifactClass: 'canonical-accepted-result',
+      artifactKey,
+      receiptDigest: acceptedReceipt.receiptDigest,
+    });
+    if (!acceptedArtifact
+      || (acceptedChain !== null
+        && (acceptedChain.artifactReceiptDigest !== acceptedReceipt.receiptDigest
+          || acceptedChain.artifactKey !== artifactKey
+          || acceptedChain.occurredAt !== acceptedArtifact.receipt.capturedAt))) {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+        true,
+      );
+    }
+    let decoded: unknown = null;
+    try { decoded = JSON.parse(Buffer.from(acceptedArtifact.bytes).toString('utf8')); }
+    catch { decoded = null; }
+    const parsed = validateProductionTaskResultV2(decoded, scope.policy.jsonBounds);
+    if (!parsed.ok) {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+        true,
+      );
+    }
+    const result = parsed.value;
+    const effectBinding = result.attemptCustody.effectLanding;
+    const lifecycleStoreAdapter = createExecutionEffectLifecycleStoreAdmissionAdapterV1({
+      store: scope.store,
+      identity: scope.identity,
+      policy: scope.policy,
+      admissionReceiptDigest: scope.admissionRef.admissionReceiptDigest,
+      platform: process.env.WSL_DISTRO_NAME ? 'wsl2-linux' : 'linux',
+      now: () => new Date().toISOString(),
+    });
+    let acceptedEffect: ExecutionEffectStoreAcceptedAuthorityV1;
+    try {
+      acceptedEffect = lifecycleStoreAdapter.readAcceptedAuthority(
+        effectBinding.landingArtifactKey,
+      );
+    } catch {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+        true,
+      );
+    }
+    if (canonicalJson(acceptedEffect.binding) !== canonicalJson(effectBinding)
+      || (acceptedChain !== null && acceptedChain.predecessorDigest
+        !== acceptedEffect.binding.effectLandingChainDigest)
+      || acceptedArtifact.receipt.capturedAt
+        !== acceptedEffect.verifiedLanding.landing.releasedAt
+      || Date.parse(acceptedArtifact.receipt.capturedAt) < Date.parse(providerExit.observedAt)) {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+        true,
+      );
+    }
+    if (!acceptedChain) {
+      acceptedChain = scope.store.appendChain({
+        identity: scope.identity,
+        policy: scope.policy,
+        admissionReceiptDigest: scope.admissionRef.admissionReceiptDigest,
+        stage: 'accepted-result',
+        occurredAt: acceptedArtifact.receipt.capturedAt,
+        predecessorDigest: acceptedEffect.binding.effectLandingChainDigest,
+        artifactReceipt: acceptedReceipt,
+      });
+    }
+    const streamArtifactKey = `provider-${scope.identity.attemptId}`;
+    const streamReceipt = scope.store.readArtifactReceipt({
+      identity: scope.identity,
+      policy: scope.policy,
+      artifactClass: 'pristine-provider-stream',
+      artifactKey: streamArtifactKey,
+    });
+    const providerStream = streamReceipt ? scope.store.readVerifiedArtifact({
+      identity: scope.identity,
+      policy: scope.policy,
+      artifactClass: 'pristine-provider-stream',
+      artifactKey: streamArtifactKey,
+      receiptDigest: streamReceipt.receiptDigest,
+    }) : null;
+    if (!providerStream || providerStream.receipt.capturedAt !== providerExit.observedAt) {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+        true,
+      );
+    }
+    const billing = extractProviderBillingEvidence(
+      scope.provider,
+      Buffer.from(providerStream.bytes).toString('utf8'),
+      providerStream.receipt.capturedAt,
+    );
+    if (!billing
+      || exactCustodyJsonDigest(billing) !== exactCustodyJsonDigest(result.providerBilling)) {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+        true,
+      );
+    }
+    const acceptedResultRef = createExactAcceptedTaskResultRefV2(acceptedReceipt);
+    const hostBillingAuthority = Object.freeze({
+      evidenceDigest: exactCustodyJsonDigest(billing),
+      providerStreamReceiptDigest: providerStream.receipt.receiptDigest,
+      acceptedResultArtifactReceiptDigest: acceptedResultRef.artifactReceiptDigest,
+      acceptedResultChainDigest: acceptedChain.receiptDigest,
+      bindingDigest: exactCustodyJsonDigest({
+        evidenceDigest: exactCustodyJsonDigest(billing),
+        providerStreamReceiptDigest: providerStream.receipt.receiptDigest,
+        acceptedResultArtifactReceiptDigest: acceptedResultRef.artifactReceiptDigest,
+        acceptedResultChainDigest: acceptedChain.receiptDigest,
+      }),
+    });
+    const reader = Object.freeze(Object.create(null)) as ExactDockerAcceptedResultReaderV2;
+    this.exactAcceptedResultReaders.set(reader, Object.freeze({
+      scope,
+      query,
+      acceptedResultRef,
+      acceptedResultChainDigest: acceptedChain.receiptDigest,
+      resultDigest: taskResultV2Digest(result, scope.policy.jsonBounds),
+      providerStream: this.exactArtifactProjection(providerStream.receipt) as
+        ExactDockerVerifiedArtifactRefV2,
+      providerExit,
+      hostBillingAuthority,
+      hostEffectAuthority: Object.freeze({
+        projection: acceptedEffect.projection,
+        binding: acceptedEffect.binding,
+      }),
+    }));
+    return this.readExactDockerAcceptedResult(reader);
+  }
+
+  /**
+   * Recover the narrow crash window after durable effect release but before
+   * canonical accepted-result publication. Every input was persisted before
+   * cleanup; current host disk and removed Docker resources are never sampled.
+   */
+  private readColdExactDockerCompletion(
+    scope: PreparedExactDockerCustodyScope,
+    query: ExactDockerCustodyTerminalQueryV2,
+    providerExit: ExactDockerProviderExitObservationRefV2,
+  ): ExactDockerCustodyCompletionV2 | null {
+    const hostWorkArtifactKey = `host-work-${scope.identity.attemptId}`;
+    const hostWorkReceipt = scope.store.readArtifactReceipt({
+      identity: scope.identity,
+      policy: scope.policy,
+      artifactClass: 'host-work-attribution',
+      artifactKey: hostWorkArtifactKey,
+    });
+    if (!hostWorkReceipt) return null;
+    const hostWorkArtifact = scope.store.readVerifiedArtifact({
+      identity: scope.identity,
+      policy: scope.policy,
+      artifactClass: 'host-work-attribution',
+      artifactKey: hostWorkArtifactKey,
+      receiptDigest: hostWorkReceipt.receiptDigest,
+    });
+    let decodedHostWork: unknown = null;
+    try {
+      decodedHostWork = hostWorkArtifact
+        ? JSON.parse(Buffer.from(hostWorkArtifact.bytes).toString('utf8')) : null;
+    } catch { decodedHostWork = null; }
+    const hostWorkSnapshot = snapshotExactPlainData(decodedHostWork);
+    const hostWorkAttribution = hostWorkSnapshot.ok
+      ? hostWorkSnapshot.value as ExactDockerHostWorkAttributionV2 : null;
+    if (!hostWorkArtifact || hostWorkArtifact.receipt.capturedAt !== providerExit.observedAt
+      || !hostWorkAttribution
+      || !exactCanonicalHostWorkAuthority(hostWorkAttribution, scope, providerExit)) {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+        true,
+      );
+    }
+    const lifecycleStoreAdapter = createExecutionEffectLifecycleStoreAdmissionAdapterV1({
+      store: scope.store,
+      identity: scope.identity,
+      policy: scope.policy,
+      admissionReceiptDigest: scope.admissionRef.admissionReceiptDigest,
+      platform: process.env.WSL_DISTRO_NAME ? 'wsl2-linux' : 'linux',
+      now: () => new Date().toISOString(),
+    });
+    const recoveryAnchor = lifecycleStoreAdapter.readLandingRecoveryAnchor();
+    if (!recoveryAnchor) return null;
+    const landingArtifactKey =
+      `effect-landing-${recoveryAnchor.transactionDigest.slice(7, 39)}`;
+    let acceptedEffect: ExecutionEffectStoreAcceptedAuthorityV1;
+    try {
+      acceptedEffect = lifecycleStoreAdapter.readAcceptedAuthority(landingArtifactKey);
+    } catch {
+      // Host-work is published before cleanup. Its presence with no accepted
+      // effect means release did not finish and the live lifecycle must resume.
+      return null;
+    }
+    const streamArtifactKey = `provider-${scope.identity.attemptId}`;
+    const resultArtifactKey = `result-${scope.identity.attemptId}`;
+    const landingProposalArtifactKey = `landing-${scope.identity.attemptId}`;
+    const landingRequired = scope.execution.executionLandingPolicy !== null;
+    const streamReceipt = scope.store.readArtifactReceipt({
+      identity: scope.identity,
+      policy: scope.policy,
+      artifactClass: 'pristine-provider-stream',
+      artifactKey: streamArtifactKey,
+    });
+    const resultReceipt = scope.store.readArtifactReceipt({
+      identity: scope.identity,
+      policy: scope.policy,
+      artifactClass: 'worker-result',
+      artifactKey: resultArtifactKey,
+    });
+    const landingReceipt = scope.store.readArtifactReceipt({
+      identity: scope.identity,
+      policy: scope.policy,
+      artifactClass: 'worker-landing-proposal',
+      artifactKey: landingProposalArtifactKey,
+    });
+    const streamArtifact = streamReceipt ? scope.store.readVerifiedArtifact({
+      identity: scope.identity,
+      policy: scope.policy,
+      artifactClass: 'pristine-provider-stream',
+      artifactKey: streamArtifactKey,
+      receiptDigest: streamReceipt.receiptDigest,
+    }) : null;
+    const resultArtifact = resultReceipt ? scope.store.readVerifiedArtifact({
+      identity: scope.identity,
+      policy: scope.policy,
+      artifactClass: 'worker-result',
+      artifactKey: resultArtifactKey,
+      receiptDigest: resultReceipt.receiptDigest,
+    }) : null;
+    const landingArtifact = landingReceipt ? scope.store.readVerifiedArtifact({
+      identity: scope.identity,
+      policy: scope.policy,
+      artifactClass: 'worker-landing-proposal',
+      artifactKey: landingProposalArtifactKey,
+      receiptDigest: landingReceipt.receiptDigest,
+    }) : null;
+    if (!streamReceipt || !streamArtifact || !resultReceipt || !resultArtifact
+      || (landingRequired && (!landingReceipt || !landingArtifact))
+      || (!landingRequired && (landingReceipt !== null || landingArtifact !== null))
+      || streamReceipt.capturedAt !== providerExit.observedAt
+      || resultReceipt.capturedAt !== providerExit.observedAt
+      || (landingReceipt !== null
+        && landingReceipt.capturedAt !== providerExit.observedAt)) {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+        true,
+      );
+    }
+    const billing = extractProviderBillingEvidence(
+      scope.provider,
+      Buffer.from(streamArtifact.bytes).toString('utf8'),
+      streamReceipt.capturedAt,
+    );
+    let proposal: ExactExecutionLandingProposalV3 | null = null;
+    if (landingArtifact) {
+      try {
+        proposal = parseExactExecutionLandingProposalJsonV3(
+          Buffer.from(landingArtifact.bytes).toString('utf8'),
+          {
+            taskId: scope.identity.taskId,
+            dispatchRequestId: scope.admissionRef.dispatchRequestId,
+          },
+        );
+      } catch { proposal = null; }
+    }
+    if (!billing || (landingRequired && !proposal)) {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+        true,
+      );
+    }
+    const sourceBinding = Object.freeze({
+      version: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+      identity: scope.identity,
+      policyDigest: scope.policy.policyDigest,
+      admissionReceiptDigest: scope.admissionRef.admissionReceiptDigest,
+      sourceResult: Object.freeze({
+        artifactClass: 'worker-result' as const,
+        artifactKey: resultReceipt.artifactKey,
+        artifactReceiptDigest: resultReceipt.receiptDigest,
+        artifactSha256: resultReceipt.artifact.sha256,
+        byteLength: resultReceipt.artifact.byteLength,
+      }),
+    });
+    const base = Object.freeze({
+      custodyRef: query.custodyRef,
+      releaseReceipt: query.releaseReceipt,
+      projectionFence: query.projectionFence,
+      providerExit,
+      hostWorkAttribution,
+      hostEffectAuthority: Object.freeze({
+        projection: acceptedEffect.projection,
+        binding: acceptedEffect.binding,
+      }),
+      providerStream: this.exactArtifactProjection(streamReceipt) as
+        ExactDockerProviderStreamRefV2,
+      result: sourceBinding,
+      resultArtifact: this.exactArtifactProjection(resultReceipt) as
+        Extract<ExactDockerCustodyCompletionV2, { kind: 'result-captured' }>['resultArtifact'],
+      providerBilling: Object.freeze({
+        evidence: billing,
+        evidenceDigest: exactCustodyJsonDigest(billing),
+        providerStreamReceiptDigest: streamReceipt.receiptDigest,
+      }),
+    });
+    if (!landingRequired) {
+      return Object.freeze({ kind: 'result-captured' as const, ...base });
+    }
+    if (!landingReceipt || !proposal) {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+        true,
+      );
+    }
+    return Object.freeze({
+      kind: 'landing-captured' as const,
+      ...base,
+      landingProposal: Object.freeze({
+        artifact: this.exactArtifactProjection(landingReceipt) as
+          ExactDockerLandingProposalArtifactRefV2,
+        proposal: Object.freeze(proposal),
+        verifiedAt: providerExit.observedAt,
+      }),
+    });
+  }
+
+  private exactCanonicalIngressAuthority(
+    scope: PreparedExactDockerCustodyScope,
+  ): CanonicalIngressAuthority {
+    const durableTask = scope.taskSnapshot.material.dispatch;
+    const durableWorkerId = durableTask.assignedWorker;
+    if (!hasExactAcceptedAuthorityTaskFields(durableTask)
+      || !durableWorkerId || durableWorkerId.trim().length === 0) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_INPUT_INVALID', true);
+    }
+    return Object.freeze({
+      taskId: scope.identity.taskId,
+      workerId: durableWorkerId,
+      provider: scope.provider,
+      model: scope.model,
+      ...(durableTask.sprintId ? { sprintId: durableTask.sprintId } : {}),
+      ...(durableTask.promptCompilePlanId
+        ? { promptCompilePlanId: durableTask.promptCompilePlanId } : {}),
+      ...(durableTask.verification
+        ? { verificationCommands: Object.freeze([...durableTask.verification.commands]) } : {}),
+      isPriorityFix: durableTask.isPriorityFix ?? false,
+      fixForTaskId: durableTask.fixForTaskId ?? null,
+    });
+  }
+
+  private rereadExactTaskSnapshot(
+    scope: PreparedExactDockerCustodyScope,
+  ): ExactDockerDispatchSnapshotV2 {
+    const durable = scope.store.readTaskSnapshot({
+      identity: scope.identity,
+      policy: scope.policy,
+      admissionReceiptDigest: scope.admissionRef.admissionReceiptDigest,
+    });
+    const snapshot = durable ? parseExactDockerDispatchSnapshot(durable.bytes) : null;
+    if (!durable || !snapshot
+      || durable.admission.receiptDigest !== scope.admissionRef.admissionReceiptDigest
+      || durable.proof.sha256 !== scope.admission.taskSnapshot.sha256
+      || durable.proof.sha256 !== exactCustodyDigest(durable.bytes)
+      || durable.proof.byteLength !== durable.bytes.byteLength
+      || canonicalJson(snapshot) !== canonicalJson(scope.taskSnapshot)) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_ACCEPTED_RESULT_READER_INVALID', true);
+    }
+    return snapshot;
+  }
+
+  private rereadExactProviderStartObservation(
+    scope: PreparedExactDockerCustodyScope,
+    query: ExactDockerCustodyTerminalQueryV2,
+    taskSnapshot = this.rereadExactTaskSnapshot(scope),
+  ): ExactDockerProviderStartBundleV2 {
+    const terminal = scope.store.readDispatchAuthority({
+      admissionRef: scope.admissionRef,
+      policy: scope.policy,
+    });
+    const observation = scope.store.readDispatchObservation({
+      admissionRef: scope.admissionRef,
+      policy: scope.policy,
+      observationClass: 'PROVIDER_START',
+      receiptDigest: query.providerStartReceipt.ref,
+    });
+    let decoded: unknown;
+    try { decoded = JSON.parse(Buffer.from(observation.bytes).toString('utf8')) as unknown; }
+    catch { decoded = null; }
+    const record = exactOwnDataRecord(decoded, [
+      'schemaVersion', 'kind', 'admissionRefDigest', 'containerId',
+      'taskSnapshotSha256', 'providerInvocationDigest', 'authorityLabelsDigest',
+      'providerStartNonceSha256', 'executionCommitNonceSha256',
+      'providerExecutionAttemptId', 'providerExecutionAttemptIdentityDigest',
+      'dispatchReceiptDigest', 'releaseReceiptRef', 'releaseReceiptDigest',
+      'projectionFence', 'startAuthorizationDigest', 'pid1StartAckDigest',
+      'state', 'providerState', 'observedAt',
+    ]);
+    if (terminal.state !== 'terminal' || terminal.authority.state !== 'RELEASED'
+      || !record || record.schemaVersion !== 2
+      || record.kind !== 'exact-docker-provider-start'
+      || observation.receipt.receiptDigest !== query.providerStartReceipt.ref
+      || observation.receipt.evidenceDigest !== query.providerStartReceipt.digest
+      || record.admissionRefDigest !== scope.admissionRef.refDigest
+      || record.containerId !== terminal.authority.backendExecutionId
+      || record.taskSnapshotSha256 !== scope.admission.taskSnapshot.sha256
+      || record.providerInvocationDigest !== taskSnapshot.dispatch.providerInvocationDigest
+      || record.providerInvocationDigest
+        !== terminal.authority.releaseEvidence.providerInvocationDigest
+      || record.authorityLabelsDigest
+        !== terminal.authority.releaseEvidence.daemonAuthorityLabelDigest
+      || record.providerStartNonceSha256
+        !== taskSnapshot.dispatch.providerStartNonceSha256
+      || record.executionCommitNonceSha256
+        !== taskSnapshot.dispatch.executionCommitNonceSha256
+      || record.providerExecutionAttemptId
+        !== terminal.authority.providerExecutionAttempt.providerExecutionAttemptId
+      || record.providerExecutionAttemptIdentityDigest
+        !== terminal.authority.providerExecutionAttempt.identityDigest
+      || record.dispatchReceiptDigest !== terminal.authority.receiptDigest
+      || record.releaseReceiptRef !== terminal.authority.releaseReceiptDigest
+      || record.releaseReceiptDigest !== terminal.authority.releaseEvidenceDigest
+      || record.projectionFence !== terminal.authority.projectionFence
+      || record.projectionFence !== query.projectionFence
+      || !isExactDigest(record.startAuthorizationDigest)
+      || !isExactDigest(record.pid1StartAckDigest)
+      || record.state !== 'START_AUTHORIZATION_ACCEPTED'
+      || record.providerState !== 'NOT_STARTED'
+      || typeof record.observedAt !== 'string'
+      || observation.receipt.observedAt !== record.observedAt
+      || !Number.isFinite(Date.parse(record.observedAt))) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_ACCEPTED_RESULT_READER_INVALID', true);
+    }
+    return record as unknown as ExactDockerProviderStartBundleV2;
+  }
+
+  private exactCanonicalHostPromptDeliveryAuthority(
+    scope: PreparedExactDockerCustodyScope,
+    query: ExactDockerCustodyTerminalQueryV2,
+  ): CanonicalIngressCustodyAuthority['hostPromptDeliveryAuthority'] {
+    const taskSnapshot = this.rereadExactTaskSnapshot(scope);
+    const providerStart = this.rereadExactProviderStartObservation(
+      scope,
+      query,
+      taskSnapshot,
+    );
+    const basePrompt = exactDockerBasePromptFromDispatchedPrompt(
+      taskSnapshot.dispatch.prompt,
+      taskSnapshot.dispatch.execution.executionLandingPolicy,
+      taskSnapshot.taskId,
+      taskSnapshot.dispatchRequestId,
+    );
+    const authority = basePrompt === null ? null : parseExactDockerPromptDeliveryAuthority(
+      taskSnapshot.dispatch.promptDeliveryAuthority,
+      basePrompt,
+      taskSnapshot.material.dispatch,
+    );
+    if (!authority) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_ACCEPTED_RESULT_READER_INVALID', true);
+    }
+    const bindingBody = Object.freeze({
+      promptDeliveryAttribution: Object.freeze({ state: 'CURRENT' as const }),
+      agentId: authority.deliveredAgentId,
+      skillIds: Object.freeze([...authority.deliveredSkillIds]),
+      promptCompilePlanId: authority.promptCompilePlanId,
+      receiptIdentity: authority.receiptIdentity,
+      promptDeliveryAuthorityDigest: authority.authorityDigest,
+      basePromptSha256: authority.basePromptSha256,
+      segmentManifestDigest: authority.segmentManifestDigest,
+      taskSnapshotSha256: providerStart.taskSnapshotSha256,
+      providerInvocationDigest: providerStart.providerInvocationDigest,
+      providerStartObservationReceiptDigest: query.providerStartReceipt.ref,
+      providerStartObservationEvidenceDigest: query.providerStartReceipt.digest,
+      executionCommitNonceSha256: providerStart.executionCommitNonceSha256,
+    });
+    return Object.freeze({
+      ...bindingBody,
+      bindingDigest: exactCustodyJsonDigest(bindingBody),
+    });
+  }
+
+  private rereadExactProviderExitObservation(
+    scope: PreparedExactDockerCustodyScope,
+    providerExit: ExactDockerProviderExitObservationRefV2,
+  ): void {
+    const observation = scope.store.readDispatchObservation({
+      admissionRef: scope.admissionRef,
+      policy: scope.policy,
+      observationClass: 'PROVIDER_EXIT',
+      receiptDigest: providerExit.observationReceiptDigest,
+    });
+    let decoded: unknown;
+    try { decoded = JSON.parse(Buffer.from(observation.bytes).toString('utf8')) as unknown; }
+    catch { decoded = null; }
+    const record = exactOwnDataRecord(decoded, [
+      'schemaVersion', 'kind', 'admissionRefDigest', 'containerId', 'exitCode',
+      'dockerWaitProcessExitCode', 'dockerWaitSignal', 'stdoutSha256',
+      'stderrSha256', 'waitEvidenceDigest', 'observedAt',
+    ]);
+    const waitEvidence = record ? Object.freeze({
+      admissionRefDigest: record.admissionRefDigest,
+      containerId: record.containerId,
+      exitCode: record.exitCode,
+      dockerWaitProcessExitCode: record.dockerWaitProcessExitCode,
+      dockerWaitSignal: record.dockerWaitSignal,
+      stdoutSha256: record.stdoutSha256,
+      stderrSha256: record.stderrSha256,
+      observedAt: record.observedAt,
+    }) : null;
+    if (!record || !waitEvidence
+      || observation.receipt.receiptDigest !== providerExit.observationReceiptDigest
+      || observation.receipt.evidenceDigest !== providerExit.observationEvidenceDigest
+      || record.schemaVersion !== 2 || record.kind !== 'exact-docker-provider-exit'
+      || record.admissionRefDigest !== scope.admissionRef.refDigest
+      || record.containerId !== providerExit.containerId
+      || record.exitCode !== providerExit.exitCode
+      || record.dockerWaitProcessExitCode !== 0 || record.dockerWaitSignal !== null
+      || !isExactDigest(record.stdoutSha256) || !isExactDigest(record.stderrSha256)
+      || record.waitEvidenceDigest !== providerExit.waitEvidenceDigest
+      || record.waitEvidenceDigest !== exactCustodyJsonDigest(waitEvidence)
+      || observation.receipt.observedAt !== providerExit.observedAt
+      || record.observedAt !== providerExit.observedAt) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_PROVIDER_EXIT_OBSERVATION_INVALID', true);
+    }
+  }
+
+  private exactCanonicalHostWorkAuthorityFromAccepted(
+    scope: PreparedExactDockerCustodyScope,
+    providerExit: ExactDockerProviderExitObservationRefV2,
+    result: TaskResultV2,
+    prompt: CanonicalIngressCustodyAuthority['hostPromptDeliveryAuthority'],
+  ): CanonicalIngressCustodyAuthority['hostWorkAuthority'] {
+    const work = result.workAttribution;
+    const scopeFiles = normalizedScopeFiles(
+      scope.taskSnapshot.material.dispatch.scope.filesWrite,
+    );
+    const scopeSet = new Set(scopeFiles);
+    const expectedBaselineSha256 = scope.taskSnapshot.dispatch.scopeBaselineSha256
+      .slice('sha256:'.length);
+    const expectedBaselineRef = `task-attempt-custody-provider-exit:${providerExit.observationReceiptDigest}#scope-baseline:sha256:${expectedBaselineSha256}`;
+    if (!work || work.state !== 'VERIFIED'
+      || work.attemptId !== scope.identity.attemptId
+      || work.baselineRef !== expectedBaselineRef
+      || work.baselineSha256 !== expectedBaselineSha256
+      || work.scopeDigest !== scopeAttributionDigest(scopeFiles)
+      || result.diskVerified !== true || result.boundaryViolations.length !== 0
+      || result.promptDeliveryAttribution?.state !== 'CURRENT'
+      || result.agent !== prompt.agentId
+      || canonicalJson(result.skills) !== canonicalJson(prompt.skillIds)
+      || result.hostTerminalProjection !== undefined
+      || result.filesChanged.some(change => !scopeSet.has(change.path))
+      || new Set(result.filesChanged.map(change => change.path)).size
+        !== result.filesChanged.length
+      || result.filesChanged.reduce((sum, change) => sum + change.linesAdded, 0)
+        !== result.totalLinesAdded
+      || result.filesChanged.reduce((sum, change) => sum + change.linesRemoved, 0)
+        !== result.totalLinesRemoved) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_ACCEPTED_RESULT_READER_INVALID', true);
+    }
+    const authorityBody = Object.freeze({
+      filesChanged: Object.freeze(result.filesChanged.map(change => Object.freeze({ ...change }))),
+      totalLinesAdded: result.totalLinesAdded,
+      totalLinesRemoved: result.totalLinesRemoved,
+      workAttribution: Object.freeze({
+        state: 'VERIFIED' as const,
+        attemptId: work.attemptId,
+        baselineRef: work.baselineRef,
+        baselineSha256: work.baselineSha256,
+        scopeDigest: work.scopeDigest,
+      }),
+      providerExitObservationReceiptDigest: providerExit.observationReceiptDigest,
+    });
+    return Object.freeze({
+      ...authorityBody,
+      evidenceDigest: exactCustodyJsonDigest(authorityBody),
+    });
+  }
+
+  private exactArtifactProjection(
+    receipt: TaskAttemptCustodyArtifactReceiptV2,
+  ): ExactDockerVerifiedArtifactRefV2 {
+    if (![
+      'worker-result', 'worker-partial-result', 'worker-landing-proposal',
+      'worker-provider-observation', 'worker-timeout', 'pristine-provider-stream',
+    ].includes(receipt.artifactClass)) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_ARTIFACT_CLASS_INVALID', true);
+    }
+    return Object.freeze({
+      identity: receipt.identity,
+      admissionReceiptDigest: receipt.admissionReceiptDigest,
+      policyDigest: receipt.policyDigest,
+      artifactClass: receipt.artifactClass as ExactDockerVerifiedArtifactRefV2['artifactClass'],
+      artifactKey: receipt.artifactKey,
+      contentDigest: receipt.artifact.sha256,
+      byteLength: receipt.artifact.byteLength,
+      capturedAt: receipt.capturedAt,
+      receiptDigest: receipt.receiptDigest,
+    });
+  }
+
+  private async commitExactDockerEffectLanding(
+    scope: PreparedExactDockerCustodyScope,
+    providerExit: ExactDockerProviderExitObservationRefV2,
+  ): Promise<ExactDockerCommittedEffectLandingV1 | null> {
+    const launch = scope.launch;
+    const spawned = launch?.spawnOutcome;
+    if (!launch || !spawned || spawned.containerId !== providerExit.containerId
+      || !spawned.imageDigest || !launch.authorityLabelsDigest) return null;
+    try {
+      let captured = launch.effect.ready;
+      if (captured) {
+        if (captured.lifecycleAuthority.providerStopped.containerName
+          !== launch.expectedContainerName
+          || captured.lifecycleAuthority.providerStopped.exitCode !== providerExit.exitCode
+          || captured.lifecycleAuthority.providerStopped.exitObservationReceiptDigest
+            !== providerExit.observationReceiptDigest) return null;
+      } else {
+        const authorized = launch.effect.authorized;
+        if (!authorized) return null;
+        const providerStartAuthorityDigest = authorized.providerStartAuthorityDigest;
+        const containerIdentityDigest = exactEffectDomainDigest(
+          'execution-effect-docker-provider-container-identity-v1',
+          {
+            containerId: spawned.containerId,
+            containerName: launch.expectedContainerName,
+            imageReference: launch.effect.imageAuthority.imageReference,
+            imageDigest: spawned.imageDigest,
+            authorityLabelsDigest: launch.authorityLabelsDigest,
+            providerStartAuthorityDigest,
+          },
+        ) as Sha256Digest;
+        const stopped = createExecutionEffectDockerProviderStoppedReceiptV1({
+          providerStartAuthorityDigest,
+          containerName: launch.expectedContainerName,
+          containerIdentityDigest,
+          exitCode: providerExit.exitCode,
+          exitObservationReceiptDigest: providerExit.observationReceiptDigest,
+          stoppedAt: providerExit.observedAt,
+        });
+        const finalCapture = await captureExecutionEffectDockerFinalV1(
+          authorized.session,
+          stopped,
+        );
+        if (finalCapture.state !== 'READY_FOR_LANDING') return null;
+        const readyPublication = launch.effect.storeAdapter.publishLifecycleAuthority(
+          finalCapture.lifecycleAuthority,
+        );
+        const readyReread = launch.effect.storeAdapter.readLifecycleAuthority('READY_FOR_LANDING');
+        if (!readyReread
+          || readyReread.authorityDigest !== finalCapture.lifecycleAuthority.authorityDigest
+          || readyPublication.authority.authorityDigest !== readyReread.authorityDigest) return null;
+        captured = finalCapture;
+        launch.effect.ready = finalCapture;
+      }
+      const containerIdentityDigest = exactEffectDomainDigest(
+        'execution-effect-docker-provider-container-identity-v1',
+        {
+          containerId: spawned.containerId,
+          containerName: launch.expectedContainerName,
+          imageReference: launch.effect.imageAuthority.imageReference,
+          imageDigest: spawned.imageDigest,
+          authorityLabelsDigest: launch.authorityLabelsDigest,
+          providerStartAuthorityDigest:
+            captured.lifecycleAuthority.providerStartAuthorityDigest,
+        },
+      ) as Sha256Digest;
+      const workspaceRuntime: ExecutionEffectDockerWorkspaceRuntimeV1 = Object.freeze({
+        version: 1,
+        state: 'SEALED',
+        imageReference: launch.effect.imageAuthority.imageReference,
+        imageDigest: launch.effect.imageAuthority.imageDigest,
+        volumeName: launch.workspaceVolumeName,
+        volumeNameDigest: captured.workspaceSnapshot.workspaceResource.volumeNameDigest,
+        volumeIdentityDigest:
+          launch.effect.prepared.volumeCreationReceipt.volumeIdentityDigest,
+        mountTarget: '/workspace',
+        mountIdentityDigest: captured.workspacePlan.mountPlanDigest,
+        workspaceResourceDigest: captured.workspaceSnapshot.workspaceResource.resourceDigest,
+        workspaceSnapshotSealDigest: captured.workspaceSnapshot.sealDigest,
+        manifestDigest: captured.finalManifest.digest as ExecutionEffectPersistenceDigest,
+      });
+      const platform = process.env.WSL_DISTRO_NAME ? 'wsl' as const : 'linux' as const;
+      const attempt = Object.freeze({
+        projectId: scope.identity.projectId,
+        taskId: scope.identity.taskId,
+        attemptId: scope.identity.attemptId,
+        generation: scope.identity.generation,
+      });
+      const nativeInput = (sourceAuthorities: readonly ExecutionEffectNativeSourceAuthorityV1[]) =>
+        Object.freeze({
+          platform,
+          canonicalProjectRoot: canonicalExactDockerProjectRoot(this.projectDir),
+          hostPrivateStagingRoot: launch.effect.stagingRoot,
+          attempt,
+          identity: scope.identity,
+          admission: scope.admission,
+          policy: scope.policy,
+          workspaceSnapshot: captured.workspaceSnapshot,
+          workspaceRuntime,
+          sourceAuthorities,
+          store: scope.store,
+          clock: launch.effect.clock,
+          limits: launch.effect.limits,
+        });
+      const planId = `effect-${scope.admissionRef.refDigest.slice(7, 39)}`;
+      const landingIntentDigest = executionEffectLandingIntentDigestV1({
+        attemptDigest: captured.baselineManifest.attemptDigest as ExecutionEffectPersistenceDigest,
+        baselineManifestDigest: captured.baselineManifest.digest as ExecutionEffectPersistenceDigest,
+        finalManifestDigest: captured.finalManifest.digest as ExecutionEffectPersistenceDigest,
+        containmentDecisionDigest: captured.decision.decisionDigest as ExecutionEffectPersistenceDigest,
+        planId,
+        nativeCapabilityDigest: launch.effect.landingCapabilityDigest,
+      });
+      const sourceAuthorities = captured.decision.effects.flatMap(effect => (
+        (effect.kind === 'add' || effect.kind === 'modify')
+          && effect.after?.kind === 'regular-file'
+          ? [Object.freeze({
+              path: effect.path,
+              entry: effect.after,
+              landingIntentDigest,
+            })]
+          : []
+      ));
+      const finalNative = await createExecutionEffectLandingNativeAdapterV1(
+        nativeInput(Object.freeze(sourceAuthorities)),
+      );
+      if (finalNative.state !== 'READY'
+        || finalNative.adapter.capability.capabilityDigest
+          !== launch.effect.landingCapabilityDigest) return null;
+      const durablePrepared = launch.effect.storeAdapter.readPreparedWorkspace();
+      if (!durablePrepared
+        || canonicalJson(durablePrepared)
+          !== canonicalJson(launch.effect.preparedWorkspace)) return null;
+      const storeAdapter = launch.effect.storeAdapter;
+      const lease = createExecutionEffectLockAdapterV1(this.projectDir, {
+        projectRootIdentityDigest: finalNative.adapter.capability.projectRootIdentityDigest,
+      });
+      const adapters = Object.freeze({
+        native: finalNative.adapter,
+        journal: storeAdapter.journal,
+        lease,
+      });
+      const located = readExecutionEffectLandingLocatorV1({
+        projectId: scope.identity.projectId,
+        taskId: scope.identity.taskId,
+        attemptId: scope.identity.attemptId,
+        generation: scope.identity.generation,
+        attemptDigest: captured.baselineManifest.attemptDigest,
+        baselineManifestDigest: captured.baselineManifest.digest,
+        finalManifestDigest: captured.finalManifest.digest,
+        containmentDecisionDigest: captured.decision.decisionDigest,
+        planId,
+        nativeCapabilityDigest: launch.effect.landingCapabilityDigest,
+        adapters,
+      });
+      let outcome: ExecutionEffectLandingOutcomeV1;
+      if (located.state === 'LOCATED') {
+        outcome = await reconcileExecutionEffectLandingV1({
+          transaction: located.transaction,
+          adapters,
+        });
+      } else {
+        const prepared = await prepareExecutionEffectLandingV1({
+          planId,
+          baseline: captured.baselineManifest,
+          final: captured.finalManifest,
+          decision: captured.decision,
+          adapters,
+        });
+        if (prepared.state !== 'PREPARED') return null;
+        outcome = await applyExecutionEffectLandingV1(prepared.session);
+        if (outcome.state !== 'COMMITTED' && outcome.state !== 'COMMITTED_NO_CHANGE') {
+          outcome = await reconcileExecutionEffectLandingV1({
+            transaction: prepared.transaction,
+            adapters,
+          });
+        }
+      }
+      if (outcome.state !== 'COMMITTED' && outcome.state !== 'COMMITTED_NO_CHANGE') return null;
+      const receipt: ExecutionEffectLandingReceiptV1 = outcome;
+      const terminalSeal = createExactDockerEffectTerminalSeal({
+        scope,
+        captured,
+        storeAdapter,
+        receipt,
+        projectRoot: this.projectDir,
+      });
+      const recoveryContext = createExactDockerEffectLandingRecoveryContext({
+        receipt,
+        terminalSeal,
+        storeAdapter,
+      });
+      const recoveryAnchor = storeAdapter.publishLandingRecoveryAnchor({
+        readyLifecycleAuthorityDigest: captured.lifecycleAuthority.authorityDigest as Sha256Digest,
+        transactionDigest: receipt.transaction.transactionDigest as Sha256Digest,
+        resumeContext: recoveryContext,
+        publishedAt: terminalSeal.committedAt,
+      });
+      const durableRecoveryAnchor = storeAdapter.readLandingRecoveryAnchor();
+      if (!durableRecoveryAnchor
+        || durableRecoveryAnchor.anchorDigest !== recoveryAnchor.anchorDigest
+        || canonicalJson(durableRecoveryAnchor) !== canonicalJson(recoveryAnchor)) return null;
+      return Object.freeze({
+        captured,
+        receipt,
+        terminalSeal,
+        storeAdapter,
+        containerIdentityDigest,
+      });
+    } catch (error) {
+      debugLog('docker-backend:exact-effect-landing-hold', error);
+      return null;
+    }
+  }
+
+  private async releaseExactDockerEffectLanding(
+    scope: PreparedExactDockerCustodyScope,
+    committed: ExactDockerCommittedEffectLandingV1,
+  ): Promise<ExecutionEffectStoreAcceptedAuthorityV1 | null> {
+    const dispatch = scope.store.readDispatchAuthority({
+      admissionRef: scope.admissionRef,
+      policy: scope.policy,
+    });
+    const ready = committed.captured.lifecycleAuthority;
+    const preparedWorkspace = committed.storeAdapter.readPreparedWorkspace();
+    if (dispatch.state !== 'terminal' || dispatch.authority.state !== 'RELEASED'
+      || typeof dispatch.authority.backendExecutionId !== 'string'
+      || !dispatch.authority.releaseEvidence.imageDigest
+      || !dispatch.authority.releaseEvidence.daemonAuthorityLabelDigest
+      || ready.state !== 'READY_FOR_LANDING'
+      || ready.providerStopped.containerIdentityDigest !== committed.containerIdentityDigest
+      || !preparedWorkspace
+      || preparedWorkspace.workspaceSnapshotSealDigest !== ready.workspaceSnapshot.sealDigest
+      || preparedWorkspace.baselineManifestDigest !== ready.baselineManifest.digest) return null;
+    const containerName = ready.providerStopped.containerName;
+    const containerId = dispatch.authority.backendExecutionId;
+    const imageDigest = dispatch.authority.releaseEvidence.imageDigest;
+    const authorityLabelsDigest = dispatch.authority.releaseEvidence.daemonAuthorityLabelDigest;
+    const run = this.exactWorkspaceCommandRunner;
+    const landingReceiptDigest = committed.receipt.receiptDigest as Sha256Digest;
+    const durableProgress = <T extends { readonly progress: { readonly progressDigest: string } }>(
+      publication: T,
+    ): T['progress'] | null => {
+      const reread = committed.storeAdapter.readLatestReleaseProgress();
+      return reread && reread.progressDigest === publication.progress.progressDigest
+        && canonicalJson(reread) === canonicalJson(publication.progress)
+        ? publication.progress : null;
+    };
+    const deleteContainer = async (deleteIntentDigest: Sha256Digest) => {
+      const before = await run(Object.freeze({
+        command: 'docker' as const,
+        args: Object.freeze(['inspect', containerName]),
+        stdin: Buffer.alloc(0), timeoutMs: 10_000,
+        stdoutCeiling: 8 * 1024 * 1024, stderrCeiling: 64 * 1024,
+      }));
+      if (isExactDockerContainerAbsent(
+        exactDockerWorkspaceCommandObservation(before), containerName,
+      )) {
+        return Object.freeze({
+          disposition: 'RECONCILED_ABSENCE' as const,
+          absence: createExecutionEffectDockerReconciledAbsenceReceiptV1({
+            resourceKind: 'provider-container',
+            resourceName: containerName,
+            resourceIdentityDigest: committed.containerIdentityDigest,
+            cleanupAuthorityDigest: landingReceiptDigest,
+            deleteIntentDigest,
+            observedAt: new Date().toISOString(),
+          }),
+        });
+      }
+      const daemon = exactDockerWorkspaceCommandSucceeded(before)
+        ? parseExactDockerCustodyInspect(exactDockerWorkspaceCommandStdout(before)) : null;
+      if (!daemon || daemon.containerId !== containerId
+        || daemon.imageDigest !== imageDigest
+        || exactCustodyJsonDigest(daemon.labels) !== authorityLabelsDigest) return null;
+      const deleted = await run(Object.freeze({
+        command: 'docker' as const,
+        args: Object.freeze(['rm', containerId]),
+        stdin: Buffer.alloc(0), timeoutMs: 30_000,
+        stdoutCeiling: 1024, stderrCeiling: 64 * 1024,
+      }));
+      if (!exactDockerWorkspaceCommandSucceeded(deleted)
+        || exactDockerWorkspaceCommandStdout(deleted).trim() !== containerId) return null;
+      const deletion = createExecutionEffectDockerResourceDeletionReceiptV1({
+        resourceKind: 'provider-container',
+        resourceName: containerName,
+        resourceIdentityDigest: committed.containerIdentityDigest,
+        cleanupAuthorityDigest: landingReceiptDigest,
+        deleteIntentDigest,
+        deletedAt: new Date().toISOString(),
+      });
+      const inspected = await run(Object.freeze({
+        command: 'docker' as const,
+        args: Object.freeze(['inspect', containerName]),
+        stdin: Buffer.alloc(0), timeoutMs: 10_000,
+        stdoutCeiling: 1024 * 1024, stderrCeiling: 64 * 1024,
+      }));
+      if (!isExactDockerContainerAbsent(
+        exactDockerWorkspaceCommandObservation(inspected),
+        containerName,
+      )) return null;
+      const absence = createExecutionEffectDockerResourceAbsenceReceiptV1({
+        resourceKind: 'provider-container',
+        resourceName: containerName,
+        resourceIdentityDigest: committed.containerIdentityDigest,
+        deleteIntentDigest,
+        deletionReceiptDigest: deletion.receiptDigest,
+        observedAt: new Date().toISOString(),
+      });
+      return Object.freeze({ disposition: 'EXECUTED_DELETION' as const, deletion, absence });
+    };
+    const deleteVolume = async (
+      resourceKind: 'workspace-volume' | 'dependency-volume',
+      volumeName: string,
+      identityDigest: Sha256Digest,
+      labels: Readonly<Record<string, string>>,
+      labelsDigest: Sha256Digest,
+      resourceInstanceDigest: Sha256Digest,
+      mountPlanDigest: Sha256Digest,
+      deleteIntentDigest: Sha256Digest,
+    ) => {
+      const before = await run(Object.freeze({
+        command: 'docker' as const,
+        args: Object.freeze(['volume', 'inspect', volumeName]),
+        stdin: Buffer.alloc(0), timeoutMs: 10_000,
+        stdoutCeiling: 1024 * 1024, stderrCeiling: 64 * 1024,
+      }));
+      if (isExactDockerVolumeAbsent(
+        exactDockerWorkspaceCommandObservation(before), volumeName,
+      )) {
+        return Object.freeze({
+          disposition: 'RECONCILED_ABSENCE' as const,
+          absence: createExecutionEffectDockerReconciledAbsenceReceiptV1({
+            resourceKind,
+            resourceName: volumeName,
+            resourceIdentityDigest: identityDigest,
+            cleanupAuthorityDigest: landingReceiptDigest,
+            deleteIntentDigest,
+            observedAt: new Date().toISOString(),
+          }),
+        });
+      }
+      const observation = exactDockerWorkspaceCommandSucceeded(before)
+        ? parseExactDockerWorkspaceVolumeInspect(exactDockerWorkspaceCommandStdout(before)) : null;
+      if (!observation || !verifyExactDockerWorkspaceVolumeInspect(observation, {
+        name: volumeName,
+        labels,
+        canonicalProjectRoot: canonicalExactDockerProjectRoot(this.projectDir),
+      }) || exactDockerEffectVolumeIdentity(observation, {
+        labelsDigest,
+        resourceInstanceDigest,
+        mountPlanDigest,
+      }) !== identityDigest) return null;
+      const deleted = await run(Object.freeze({
+        command: 'docker' as const,
+        args: Object.freeze(['volume', 'rm', volumeName]),
+        stdin: Buffer.alloc(0), timeoutMs: 30_000,
+        stdoutCeiling: 1024, stderrCeiling: 64 * 1024,
+      }));
+      if (!exactDockerWorkspaceCommandSucceeded(deleted)
+        || exactDockerWorkspaceCommandStdout(deleted).trim() !== volumeName) return null;
+      const deletion = createExecutionEffectDockerResourceDeletionReceiptV1({
+        resourceKind,
+        resourceName: volumeName,
+        resourceIdentityDigest: identityDigest,
+        cleanupAuthorityDigest: landingReceiptDigest,
+        deleteIntentDigest,
+        deletedAt: new Date().toISOString(),
+      });
+      const after = await run(Object.freeze({
+        command: 'docker' as const,
+        args: Object.freeze(['volume', 'inspect', volumeName]),
+        stdin: Buffer.alloc(0), timeoutMs: 10_000,
+        stdoutCeiling: 1024 * 1024, stderrCeiling: 64 * 1024,
+      }));
+      if (!isExactDockerVolumeAbsent(exactDockerWorkspaceCommandObservation(after), volumeName)) {
+        return null;
+      }
+      const absence = createExecutionEffectDockerResourceAbsenceReceiptV1({
+        resourceKind,
+        resourceName: volumeName,
+        resourceIdentityDigest: identityDigest,
+        deleteIntentDigest,
+        deletionReceiptDigest: deletion.receiptDigest,
+        observedAt: new Date().toISOString(),
+      });
+      return Object.freeze({ disposition: 'EXECUTED_DELETION' as const, deletion, absence });
+    };
+    try {
+      const landingArtifactKey =
+        `effect-landing-${committed.receipt.transaction.transactionDigest.slice(7, 39)}`;
+      try {
+        return committed.storeAdapter.readAcceptedAuthority(landingArtifactKey);
+      } catch { /* Release cleanup may still be in progress. */ }
+      let progress = committed.storeAdapter.readLatestReleaseProgress();
+      if (!progress) {
+        const preparedPublication = committed.storeAdapter.publishReleasePrepared({
+          lifecycleAuthorityDigest: committed.captured.lifecycleAuthority
+            .authorityDigest as Sha256Digest,
+          landingReceipt: committed.receipt,
+          terminalSeal: committed.terminalSeal,
+          // Stable replay authority: this timestamp is part of the immutable committed seal.
+          progressedAt: committed.terminalSeal.committedAt,
+        });
+        progress = durableProgress(preparedPublication);
+      }
+      for (;;) {
+        if (!progress) return null;
+        if (progress.state === 'RELEASED') break;
+        if (progress.state === 'RELEASE_PREPARED'
+          || progress.state === 'CONTAINER_ABSENT'
+          || progress.state === 'WORKSPACE_VOLUME_ABSENT') {
+          const resourceKind = progress.state === 'RELEASE_PREPARED'
+            ? 'provider-container' as const
+            : progress.state === 'CONTAINER_ABSENT'
+              ? 'workspace-volume' as const : 'dependency-volume' as const;
+          progress = durableProgress(committed.storeAdapter.publishCleanupDeleteIntent({
+            mode: 'RELEASE', resourceKind, progressedAt: new Date().toISOString(),
+          }));
+          continue;
+        }
+        if (!progress.deleteIntentDigest) return null;
+        let evidence: Parameters<
+          ExecutionEffectStoreAdapterV1['publishCleanupAbsence']
+        >[0]['evidence'] | null = null;
+        if (progress.state === 'CONTAINER_DELETE_INTENT') {
+          evidence = await deleteContainer(progress.deleteIntentDigest);
+        } else if (progress.state === 'WORKSPACE_VOLUME_DELETE_INTENT') {
+          evidence = await deleteVolume(
+            'workspace-volume',
+            ready.workspacePlan.volumeName,
+            ready.presentObservation.volumeIdentityDigest as Sha256Digest,
+            committed.captured.workspacePlan.workspaceLabels,
+            committed.captured.workspacePlan.workspaceLabelsDigest as Sha256Digest,
+            committed.captured.workspacePlan.workspaceResourceInstanceDigest as Sha256Digest,
+            committed.captured.workspacePlan.mountPlanDigest as Sha256Digest,
+            progress.deleteIntentDigest,
+          );
+        } else if (progress.state === 'DEPENDENCY_VOLUME_DELETE_INTENT') {
+          evidence = await deleteVolume(
+            'dependency-volume',
+            ready.workspacePlan.dependencyPlan.volumeName,
+            ready.dependencyAuthority.volumeIdentityDigest as Sha256Digest,
+            committed.captured.workspacePlan.dependencyLabels,
+            committed.captured.workspacePlan.dependencyLabelsDigest as Sha256Digest,
+            committed.captured.workspacePlan.dependencyResourceInstanceDigest as Sha256Digest,
+            committed.captured.workspacePlan.dependencyPlanDigest as Sha256Digest,
+            progress.deleteIntentDigest,
+          );
+        } else if (progress.state === 'DEPENDENCY_VOLUME_ABSENT') {
+          progress = durableProgress(committed.storeAdapter.publishCleanupTerminal({
+            mode: 'RELEASE', progressedAt: new Date().toISOString(),
+          }));
+          continue;
+        } else {
+          return null;
+        }
+        if (!evidence) return null;
+        progress = durableProgress(committed.storeAdapter.publishCleanupAbsence({
+          mode: 'RELEASE', evidence, progressedAt: new Date().toISOString(),
+        }));
+      }
+      const outcomes = committed.storeAdapter.readReleaseOutcomes();
+      if (outcomes.releasedProgressDigest !== progress.progressDigest) return null;
+      const released = committed.storeAdapter.projectWorkspaceReleaseFromDurableCleanup();
+      if (released.state !== 'RELEASED') return null;
+      const published = committed.storeAdapter.publishLanding({
+        preparedWorkspace,
+        final: committed.captured.finalManifest,
+        finalCapturedAt: committed.captured.finalManifest.captureAuthority.completedAt,
+        terminalSeal: committed.terminalSeal,
+        workspaceRelease: released.workspaceRelease,
+        landingArtifactKey,
+      });
+      const reread = committed.storeAdapter.readAcceptedAuthority(landingArtifactKey);
+      if (canonicalJson(reread.projection) !== canonicalJson(published.projection)
+        || canonicalJson(reread.binding) !== canonicalJson(published.binding)
+        || reread.verifiedLanding.landing.receiptDigest
+          !== published.verifiedLanding.landing.receiptDigest) return null;
+      return reread;
+    } catch (error) {
+      debugLog('docker-backend:exact-effect-release-hold', error);
+      return null;
+    }
+  }
+
+  private async resumeExactDockerEffectRelease(
+    scope: PreparedExactDockerCustodyScope,
+  ): Promise<ExecutionEffectStoreAcceptedAuthorityV1 | null> {
+    const releasePreparedKey = executionEffectStoreCleanupArtifactKeyV1(
+      scope.admissionRef.admissionReceiptDigest,
+      'RELEASE',
+      'RELEASE_PREPARED',
+    );
+    const releasePrepared = scope.store.readArtifactReceipt({
+      identity: scope.identity,
+      policy: scope.policy,
+      artifactClass: 'execution-effect-lifecycle-authority',
+      artifactKey: releasePreparedKey,
+    });
+    // Absence means cleanup never crossed its first durable boundary, so normal
+    // READY rehydration remains the only legal path. Once the receipt exists,
+    // every parse/reread failure below is a typed recovery HOLD rather than a
+    // fallback to live-volume rehydration after a possible delete.
+    if (!releasePrepared) return null;
+    const storeAdapter = createExecutionEffectLifecycleStoreAdmissionAdapterV1({
+      store: scope.store,
+      identity: scope.identity,
+      policy: scope.policy,
+      admissionReceiptDigest: scope.admissionRef.admissionReceiptDigest,
+      platform: process.env.WSL_DISTRO_NAME ? 'wsl2-linux' : 'linux',
+      now: () => new Date().toISOString(),
+    });
+    const recovery = storeAdapter.readReleaseRecoveryAuthority();
+    if (!recovery) return null;
+    const ready = recovery.readyLifecycleAuthority;
+    const captured: ExactDockerEffectReadyAuthorityV1 = Object.freeze({
+      state: 'READY_FOR_LANDING',
+      landingAuthorityDigest: ready.landingAuthorityDigest,
+      baselineManifest: ready.baselineManifest,
+      finalManifest: ready.finalManifest,
+      decision: ready.decision,
+      exclusiveAttachmentReceipt: ready.postProviderAttachmentReceipt,
+      quiescenceSeal: ready.quiescenceSeal,
+      finalCaptureReceipt: ready.finalCaptureReceipt,
+      workspacePlan: ready.workspacePlan,
+      dependencyAuthority: ready.dependencyAuthority,
+      workspaceSnapshot: ready.workspaceSnapshot,
+      lifecycleAuthority: ready,
+      session: null,
+    });
+    return this.releaseExactDockerEffectLanding(scope, Object.freeze({
+      captured,
+      receipt: recovery.landingReceipt,
+      terminalSeal: recovery.terminalSeal,
+      storeAdapter,
+      containerIdentityDigest:
+        ready.providerStopped.containerIdentityDigest as Sha256Digest,
+    }));
+  }
+
+  private openExactDockerRecoveryStore(): Readonly<{
+    store: TaskAttemptCustodyStore;
+    policy: TaskAttemptCustodyPolicyV2;
+  }> | null {
+    const canonicalProjectRoot = canonicalExactDockerProjectRoot(this.projectDir);
+    const absoluteRoot = resolveExactDockerCustodyRoot(canonicalProjectRoot, {
+      platform: this.platform,
+      env: process.env,
+      ...(this.custodyStateDir ? { stateDir: this.custodyStateDir } : {}),
+    });
+    if (!existsSync(absoluteRoot)) return null;
+    const adapter = createTaskAttemptCustodyPosixAdapter({
+      mountConsumer: async () => {
+        throw new ExactDockerCustodyFailure(
+          'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+          true,
+        );
+      },
+    });
+    return Object.freeze({
+      store: TaskAttemptCustodyStore.open({
+        adapter,
+        absoluteRoot,
+        canonicalProjectRoot,
+        projectId: attendedExecutionProjectId(this.projectDir),
+        create: false,
+      }),
+      policy: createExactDockerCustodyPolicy(),
+    });
+  }
+
+  private reconstructExactDockerRecoveryScope(
+    store: TaskAttemptCustodyStore,
+    policy: TaskAttemptCustodyPolicyV2,
+    admitted: ExactDockerDurableAdmissionV2,
+  ): PreparedExactDockerCustodyScope {
+    const durableSnapshot = store.readTaskSnapshot({
+      identity: admitted.ref.identity,
+      policy,
+      admissionReceiptDigest: admitted.ref.admissionReceiptDigest,
+    });
+    const taskSnapshot = durableSnapshot
+      ? parseExactDockerDispatchSnapshot(durableSnapshot.bytes) : null;
+    const access = store.openAttemptAccess({
+      identity: admitted.ref.identity,
+      policy,
+      admissionReceiptDigest: admitted.ref.admissionReceiptDigest,
+    });
+    if (!taskSnapshot || !access
+      || taskSnapshot.dispatchRequestId !== admitted.ref.dispatchRequestId
+      || taskSnapshot.projectId !== admitted.ref.identity.projectId
+      || taskSnapshot.taskId !== admitted.ref.identity.taskId
+      || taskSnapshot.projectId !== attendedExecutionProjectId(this.projectDir)
+      || durableSnapshot?.proof.sha256 !== admitted.admission.taskSnapshot.sha256) {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+        true,
+      );
+    }
+    // Restart recovery consumes the provider/model authority that was admitted
+    // into the durable task snapshot. It must not re-resolve today's registry,
+    // command installation or credentials: recovery never starts a provider,
+    // and those mutable capabilities may legitimately differ after a restart.
+    const provider = taskSnapshot.dispatch.provider;
+    return {
+      store,
+      policy,
+      identity: admitted.ref.identity,
+      admission: admitted.admission,
+      admissionRef: admitted.ref,
+      access,
+      taskSnapshot,
+      model: taskSnapshot.dispatch.model,
+      provider,
+      providerSpec: null,
+      providerAuth: null,
+      execution: taskSnapshot.dispatch.execution,
+      state: 'RELEASED',
+      launch: null,
+      mountTransferReceipt: null,
+    };
+  }
+
+  private readExactDockerRecoveryProviderExecution(
+    scope: PreparedExactDockerCustodyScope,
+    start: ExactDockerProviderStartBundleV2,
+  ): Readonly<{ ref: Sha256Digest; digest: Sha256Digest }> {
+    const terminal = scope.store.readDispatchAuthority({
+      admissionRef: scope.admissionRef,
+      policy: scope.policy,
+    });
+    const observation = scope.store.readDispatchObservationByClass({
+      admissionRef: scope.admissionRef,
+      policy: scope.policy,
+      observationClass: 'PROVIDER_EXECUTION',
+    });
+    let decoded: unknown = null;
+    try {
+      decoded = observation
+        ? JSON.parse(Buffer.from(observation.bytes).toString('utf8')) : null;
+    } catch { decoded = null; }
+    const record = exactOwnDataRecord(decoded, [
+      'schemaVersion', 'kind', 'admissionRefDigest', 'taskSnapshotSha256',
+      'providerInvocationDigest', 'authorityLabelsDigest',
+      'executionCommitNonceSha256', 'providerExecutionAttemptId',
+      'providerExecutionAttemptIdentityDigest', 'dispatchReceiptDigest',
+      'releaseReceiptRef', 'releaseReceiptDigest', 'projectionFence',
+      'startAuthorizationDigest', 'providerStartAckBytesSha256', 'childPid',
+      'state', 'providerState', 'containerId',
+      'providerExecutionAckBytesSha256', 'observedAt',
+    ]);
+    if (!observation || !record
+      || terminal.state !== 'terminal' || terminal.authority.state !== 'RELEASED'
+      || record.schemaVersion !== 2
+      || record.kind !== 'exact-docker-pid1-provider-execution-ack'
+      || record.admissionRefDigest !== scope.admissionRef.refDigest
+      || record.taskSnapshotSha256 !== scope.admission.taskSnapshot.sha256
+      || record.providerInvocationDigest !== start.providerInvocationDigest
+      || record.authorityLabelsDigest !== start.authorityLabelsDigest
+      || record.executionCommitNonceSha256 !== start.executionCommitNonceSha256
+      || record.providerExecutionAttemptId !== start.providerExecutionAttemptId
+      || record.providerExecutionAttemptIdentityDigest
+        !== start.providerExecutionAttemptIdentityDigest
+      || record.dispatchReceiptDigest !== terminal.authority.receiptDigest
+      || record.releaseReceiptRef !== terminal.authority.releaseReceiptDigest
+      || record.releaseReceiptDigest !== terminal.authority.releaseEvidenceDigest
+      || record.projectionFence !== terminal.authority.projectionFence
+      || record.startAuthorizationDigest !== start.startAuthorizationDigest
+      || !isExactDigest(record.providerStartAckBytesSha256)
+      || !Number.isSafeInteger(record.childPid) || Number(record.childPid) <= 0
+      || record.state !== 'PROVIDER_PROCESS_SPAWNED'
+      || record.providerState !== 'STARTED'
+      || record.containerId !== terminal.authority.backendExecutionId
+      || !isExactDigest(record.providerExecutionAckBytesSha256)
+      || typeof record.observedAt !== 'string'
+      || observation.receipt.observedAt !== record.observedAt
+      || !Number.isFinite(Date.parse(record.observedAt))
+      || Date.parse(record.observedAt) < Date.parse(start.observedAt)) {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_PROVIDER_START_RECONCILIATION_REQUIRED',
+        true,
+      );
+    }
+    return Object.freeze({
+      ref: observation.receipt.receiptDigest,
+      digest: observation.receipt.evidenceDigest,
+    });
+  }
+
+  private readExactDockerRecoveryProviderExit(
+    scope: PreparedExactDockerCustodyScope,
+  ): ExactDockerProviderExitObservationRefV2 | null {
+    const observation = scope.store.readDispatchObservationByClass({
+      admissionRef: scope.admissionRef,
+      policy: scope.policy,
+      observationClass: 'PROVIDER_EXIT',
+    });
+    if (!observation) return null;
+    let decoded: unknown = null;
+    try { decoded = JSON.parse(Buffer.from(observation.bytes).toString('utf8')); }
+    catch { decoded = null; }
+    const record = exactOwnDataRecord(decoded, [
+      'schemaVersion', 'kind', 'admissionRefDigest', 'containerId', 'exitCode',
+      'dockerWaitProcessExitCode', 'dockerWaitSignal', 'stdoutSha256',
+      'stderrSha256', 'waitEvidenceDigest', 'observedAt',
+    ]);
+    if (!record || record.schemaVersion !== 2
+      || record.kind !== 'exact-docker-provider-exit'
+      || record.admissionRefDigest !== scope.admissionRef.refDigest
+      || typeof record.containerId !== 'string'
+      || !Number.isSafeInteger(record.exitCode)
+      || !isExactDigest(record.waitEvidenceDigest)
+      || typeof record.observedAt !== 'string'
+      || observation.receipt.observedAt !== record.observedAt) {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_PROVIDER_EXIT_OBSERVATION_INVALID',
+        true,
+      );
+    }
+    const providerExit: ExactDockerProviderExitObservationRefV2 = Object.freeze({
+      containerId: record.containerId,
+      exitCode: Number(record.exitCode),
+      observedAt: record.observedAt,
+      waitEvidenceDigest: record.waitEvidenceDigest,
+      observationReceiptDigest: observation.receipt.receiptDigest,
+      observationEvidenceDigest: observation.receipt.evidenceDigest,
+    });
+    this.rereadExactProviderExitObservation(scope, providerExit);
+    return providerExit;
+  }
+
+  private async rehydrateExactDockerEffectLaunch(
+    scope: PreparedExactDockerCustodyScope,
+    terminal: Extract<
+      ReturnType<TaskAttemptCustodyStore['readDispatchAuthority']>,
+      { readonly state: 'terminal' }
+    >['authority'] & { readonly state: 'RELEASED' },
+    start: ExactDockerProviderStartBundleV2,
+  ): Promise<void> {
+    const lifecyclePlatform = process.env.WSL_DISTRO_NAME
+      ? 'wsl2-linux' as const : 'linux' as const;
+    const lifecycleStoreAdapter = createExecutionEffectLifecycleStoreAdmissionAdapterV1({
+      store: scope.store,
+      identity: scope.identity,
+      policy: scope.policy,
+      admissionReceiptDigest: scope.admissionRef.admissionReceiptDigest,
+      platform: lifecyclePlatform,
+      now: () => new Date().toISOString(),
+    });
+    const latest = lifecycleStoreAdapter.readLatestLifecycleAuthority();
+    const preparedLifecycle = lifecycleStoreAdapter.readLifecycleAuthority('PREPARED');
+    if (!latest || !preparedLifecycle
+      || (latest.state !== 'PROVIDER_START_AUTHORIZED'
+        && latest.state !== 'READY_FOR_LANDING')) {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+        true,
+      );
+    }
+    const workspaceInventory = exactDockerWorkspaceInventoryFromPaths(
+      latest.workspacePlan.inventoryPaths,
+    );
+    if (!workspaceInventory) {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+        true,
+      );
+    }
+    const imageAuthority: ExactDockerEffectImageAuthorityV1 = Object.freeze({
+      imageReference: latest.imageObservation.imageReference,
+      imageDigest: latest.imageObservation.imageDigest as Sha256Digest,
+      imageIdentityDigest: latest.imageObservation.imageIdentityDigest as Sha256Digest,
+    });
+    const lifecycleAdapter = createExactDockerEffectLifecycleAdapterV1({
+      canonicalProjectRoot: canonicalExactDockerProjectRoot(this.projectDir),
+      imageAuthority,
+      inventory: workspaceInventory,
+      runner: this.exactWorkspaceCommandRunner,
+      nowIso: () => new Date().toISOString(),
+    });
+    let clockMs = Date.now();
+    const clock: ExecutionEffectNativeAdapterClockV1 = Object.freeze({
+      nowIso(): string {
+        clockMs = Date.now();
+        return new Date(clockMs).toISOString();
+      },
+      nowUnixMs(): number { return clockMs; },
+    });
+    const limits: ExecutionEffectNativeAdapterLimitsV1 = Object.freeze({
+      maxStagedChunkBytes:
+        scope.policy.artifactLimits['execution-effect-staged-content'].maxBytes,
+      maxOperations: EXECUTION_EFFECT_LANDING_HARD_MAX_OPERATIONS,
+      maxPlanEnvelopeBytes: EXECUTION_EFFECT_LANDING_HARD_MAX_PLAN_ENVELOPE_BYTES,
+      sourceReadTimeoutMs: 60_000,
+      dockerTimeoutMs: 60_000,
+      dockerReceiptMaxBytes: 1024 * 1024,
+    });
+    const custodyRoot = resolveExactDockerCustodyRoot(this.projectDir, {
+      platform: this.platform,
+      env: process.env,
+      ...(this.custodyStateDir ? { stateDir: this.custodyStateDir } : {}),
+    });
+    const stagingRoot = join(
+      custodyRoot,
+      'execution-effect-staging',
+      scope.identity.attemptId,
+    );
+    mkdirSync(stagingRoot, { recursive: true, mode: 0o700 });
+    chmodSync(stagingRoot, 0o700);
+    const workspaceRuntime: ExecutionEffectDockerWorkspaceRuntimeV1 = Object.freeze({
+      version: 1,
+      state: 'SEALED',
+      imageReference: imageAuthority.imageReference,
+      imageDigest: imageAuthority.imageDigest,
+      volumeName: latest.workspacePlan.volumeName,
+      volumeNameDigest: latest.workspaceSnapshot.workspaceResource.volumeNameDigest,
+      volumeIdentityDigest: latest.creationReceipt.volumeIdentityDigest,
+      mountTarget: '/workspace',
+      mountIdentityDigest: latest.workspacePlan.mountPlanDigest,
+      workspaceResourceDigest: latest.workspaceSnapshot.workspaceResource.resourceDigest,
+      workspaceSnapshotSealDigest: latest.workspaceSnapshot.sealDigest,
+      manifestDigest: latest.baselineManifest.digest as ExecutionEffectPersistenceDigest,
+    });
+    const provisional = await createExecutionEffectLandingNativeAdapterV1(Object.freeze({
+      platform: process.env.WSL_DISTRO_NAME ? 'wsl' as const : 'linux' as const,
+      canonicalProjectRoot: canonicalExactDockerProjectRoot(this.projectDir),
+      hostPrivateStagingRoot: stagingRoot,
+      attempt: Object.freeze({
+        projectId: scope.identity.projectId,
+        taskId: scope.identity.taskId,
+        attemptId: scope.identity.attemptId,
+        generation: scope.identity.generation,
+      }),
+      identity: scope.identity,
+      admission: scope.admission,
+      policy: scope.policy,
+      workspaceSnapshot: latest.workspaceSnapshot,
+      workspaceRuntime,
+      sourceAuthorities: Object.freeze([]),
+      store: scope.store,
+      clock,
+      limits,
+    }));
+    if (provisional.state !== 'READY') {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+        true,
+      );
+    }
+    const storeAdapter = createExecutionEffectStoreAdapterV1({
+      store: scope.store,
+      identity: scope.identity,
+      policy: scope.policy,
+      admissionReceiptDigest: scope.admissionRef.admissionReceiptDigest,
+      projectRootIdentityDigest:
+        provisional.adapter.capability.projectRootIdentityDigest as Sha256Digest,
+      platform: latest.workspaceSnapshot.platform,
+      now: () => new Date().toISOString(),
+    });
+    const preparedWorkspace = storeAdapter.readPreparedWorkspace();
+    if (!preparedWorkspace) {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+        true,
+      );
+    }
+    const rehydrated = await rehydrateExecutionEffectDockerLifecycleV1({
+      authority: latest,
+      adapter: lifecycleAdapter,
+      clock: Object.freeze({ nowIso: () => new Date().toISOString() }),
+    });
+    if (rehydrated.state !== 'REHYDRATED' || rehydrated.phase !== latest.state) {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+        true,
+      );
+    }
+    let authorized: ExactDockerEffectAuthorizedV1 | null = null;
+    let ready: ExactDockerEffectReadyAuthorityV1 | null = null;
+    if (latest.state === 'PROVIDER_START_AUTHORIZED'
+      && rehydrated.phase === 'PROVIDER_START_AUTHORIZED') {
+      authorized = Object.freeze({
+        state: 'PROVIDER_START_AUTHORIZED',
+        providerStartAuthorityDigest: latest.providerStartAuthorityDigest,
+        exclusiveAttachmentReceipt: latest.preProviderAttachmentReceipt,
+        baselineRevalidationReceipt: latest.baselineRevalidationReceipt,
+        authorizedAt: latest.authorizedAt,
+        workspacePlan: latest.workspacePlan,
+        dependencyAuthority: latest.dependencyAuthority,
+        workspaceSnapshot: latest.workspaceSnapshot,
+        lifecycleAuthority: latest,
+        session: rehydrated.session,
+      });
+    } else if (latest.state === 'READY_FOR_LANDING'
+      && rehydrated.phase === 'READY_FOR_LANDING') {
+      ready = Object.freeze({
+        state: 'READY_FOR_LANDING',
+        landingAuthorityDigest: latest.landingAuthorityDigest,
+        baselineManifest: latest.baselineManifest,
+        finalManifest: latest.finalManifest,
+        decision: latest.decision,
+        exclusiveAttachmentReceipt: latest.postProviderAttachmentReceipt,
+        quiescenceSeal: latest.quiescenceSeal,
+        finalCaptureReceipt: latest.finalCaptureReceipt,
+        workspacePlan: latest.workspacePlan,
+        dependencyAuthority: latest.dependencyAuthority,
+        workspaceSnapshot: latest.workspaceSnapshot,
+        lifecycleAuthority: latest,
+        session: rehydrated.session,
+      });
+    } else {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+        true,
+      );
+    }
+    const prepared: ExactDockerEffectPreparedAuthorityV1 = Object.freeze({
+      state: 'PREPARED',
+      preparationAuthorityDigest: preparedLifecycle.preparationAuthorityDigest,
+      workspacePlan: preparedLifecycle.workspacePlan,
+      imageObservation: preparedLifecycle.imageObservation,
+      dependencyAuthority: preparedLifecycle.dependencyAuthority,
+      volumeCreationReceipt: preparedLifecycle.creationReceipt,
+      populationReceipt: preparedLifecycle.populationReceipt,
+      baselineManifest: preparedLifecycle.baselineManifest,
+      workspaceResource: preparedLifecycle.workspaceResource,
+      workspaceSnapshot: preparedLifecycle.workspaceSnapshot,
+      lifecycleAuthority: preparedLifecycle,
+      session: null,
+    });
+    const expectedContainerName = `deckent-x-${scope.identity.attemptId
+      .replace(/[^a-zA-Z0-9_.-]/gu, '').slice(-40)}`;
+    if (start.containerId !== terminal.backendExecutionId
+      || (latest.state === 'READY_FOR_LANDING'
+        && latest.providerStopped.containerName !== expectedContainerName)) {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+        true,
+      );
+    }
+    scope.launch = {
+      taskId: scope.identity.taskId,
+      image: imageAuthority.imageReference,
+      dockerBaseArgs: Object.freeze([]),
+      providerInvocationDigest: scope.taskSnapshot.dispatch.providerInvocationDigest,
+      releaseIntentToken: new Uint8Array(),
+      releaseIntentTokenSha256: scope.taskSnapshot.dispatch.releaseIntentNonceSha256,
+      releaseCommitToken: new Uint8Array(),
+      releaseCommitTokenSha256: scope.taskSnapshot.dispatch.releaseCommitNonceSha256,
+      providerStartToken: new Uint8Array(),
+      providerStartTokenSha256: scope.taskSnapshot.dispatch.providerStartNonceSha256,
+      executionCommitToken: new Uint8Array(),
+      executionCommitTokenSha256: scope.taskSnapshot.dispatch.executionCommitNonceSha256,
+      expectedContainerName,
+      workspaceVolumeName: latest.workspacePlan.volumeName,
+      dependencyVolumeName: latest.workspacePlan.dependencyPlan.volumeName,
+      workspaceInventory,
+      effect: {
+        imageAuthority,
+        captureLimits: latest.captureLimits,
+        lifecycleAdapter,
+        prepared,
+        preparedWorkspace,
+        storeAdapter,
+        stagingRoot,
+        clock,
+        limits,
+        landingCapabilityDigest:
+          provisional.adapter.capability.capabilityDigest as Sha256Digest,
+        authorized,
+        ready,
+      },
+      authorityLabelsDigest: start.authorityLabelsDigest,
+      spawnOutcome: Object.freeze({
+        containerId: terminal.backendExecutionId,
+        imageDigest: terminal.releaseEvidence.imageDigest,
+      }),
+    };
+  }
+
+  private clearExactDockerLiveAttempt(admissionRefDigest: Sha256Digest): void {
+    this.exactCustodyCompletions.delete(admissionRefDigest);
+    this.exactCustodyProviderStarts.delete(admissionRefDigest);
+    this.exactCustodyProviderExecutions.delete(admissionRefDigest);
+  }
+
+  /**
+   * Canonical production consumer for exact monitor completion. A completed
+   * provider attempt is not accepted by the monitor's self-report: it must
+   * traverse the same durable ingress authority used by explicit callers.
+   */
+  private observeExactDockerCompletionAcceptance(
+    scope: PreparedExactDockerCustodyScope,
+    query: ExactDockerCustodyTerminalQueryV2,
+    completion: Promise<ExactDockerCustodyCompletionV2>,
+  ): void {
+    const acceptance = completion.then(async observed => {
+      if (observed.kind === 'capture-hold') {
+        this.clearExactDockerLiveAttempt(scope.admissionRef.refDigest);
+        return Object.freeze({
+          kind: 'capture-hold' as const,
+          reasonCode: observed.reasonCode,
+          custodyRef: observed.custodyRef,
+          releaseReceipt: observed.releaseReceipt,
+          projectionFence: observed.projectionFence,
+        });
+      }
+      const accepted = await this.acceptExactDockerCustodyResult({
+        query,
+        authority: this.exactCanonicalIngressAuthority(scope),
+      });
+      if (accepted.kind !== 'accepted-result') {
+        this.clearExactDockerLiveAttempt(scope.admissionRef.refDigest);
+      }
+      return accepted;
+    });
+    this.exactCustodyAutomaticAcceptances.set(scope.admissionRef.refDigest, acceptance);
+    void acceptance.catch(error => {
+      this.clearExactDockerLiveAttempt(scope.admissionRef.refDigest);
+      debugLog('docker-backend:exact-custody-monitor-acceptance', error);
+    });
+  }
+
+  /**
+   * Owner-authorized containment stops only the exact durable container and
+   * records its terminal observation. It never lands effects, accepts a
+   * result, removes the container/volumes, or dispatches replacement work.
+   */
+  private async containExactDockerCustodyAttempt(
+    scope: PreparedExactDockerCustodyScope,
+    terminal: Extract<
+      ReturnType<TaskAttemptCustodyStore['readDispatchAuthority']>,
+      { readonly state: 'terminal' }
+    >['authority'] & { readonly state: 'RELEASED' },
+    start: ExactDockerProviderStartBundleV2,
+    recoveredExit: ExactDockerProviderExitObservationRefV2 | null,
+  ): Promise<ExactDockerProviderExitObservationRefV2> {
+    if (recoveredExit) return recoveredExit;
+    await this.rehydrateExactDockerEffectLaunch(scope, terminal, start);
+    const containerId = terminal.backendExecutionId;
+    if (typeof containerId !== 'string') {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+        true,
+      );
+    }
+    const inspect = await this.exactWorkspaceCommandRunner(Object.freeze({
+      command: 'docker' as const,
+      args: Object.freeze([
+        'inspect', '--format', '{{.State.Running}}|{{.State.ExitCode}}', containerId,
+      ]),
+      stdin: Buffer.alloc(0),
+      timeoutMs: 10_000,
+      stdoutCeiling: 1024,
+      stderrCeiling: 64 * 1024,
+    }));
+    const state = exactDockerWorkspaceCommandSucceeded(inspect)
+      ? parseInspectOutput(exactDockerWorkspaceCommandStdout(inspect)) : null;
+    if (!state) {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+        true,
+      );
+    }
+    if (state.running) {
+      const stopped = await this.exactWorkspaceCommandRunner(Object.freeze({
+        command: 'docker' as const,
+        args: Object.freeze([
+          'stop', `--time=${this.gracefulTimeoutSeconds}`, containerId,
+        ]),
+        stdin: Buffer.alloc(0),
+        timeoutMs: (this.gracefulTimeoutSeconds + 10) * 1_000,
+        stdoutCeiling: 1024,
+        stderrCeiling: 64 * 1024,
+      }));
+      if (!exactDockerWorkspaceCommandSucceeded(stopped)) {
+        throw new ExactDockerCustodyFailure(
+          'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+          true,
+        );
+      }
+    }
+    const wait = await this.exactWorkspaceCommandRunner(Object.freeze({
+      command: 'docker' as const,
+      args: Object.freeze(['wait', containerId]),
+      stdin: Buffer.alloc(0),
+      timeoutMs: 30_000,
+      stdoutCeiling: 1024,
+      stderrCeiling: 64 * 1024,
+    }));
+    const exitText = exactDockerWorkspaceCommandStdout(wait).trim();
+    const exitCode = exactDockerWorkspaceCommandSucceeded(wait)
+      && /^(?:0|[1-9][0-9]{0,2})$/u.test(exitText)
+      ? Number(exitText) : Number.NaN;
+    if (!Number.isSafeInteger(exitCode) || exitCode < 0 || exitCode > 255) {
+      throw new ExactDockerCustodyFailure(
+        'EXACT_DOCKER_PROVIDER_EXIT_OBSERVATION_INVALID',
+        true,
+      );
+    }
+    const observedAt = new Date().toISOString();
+    const waitStdout = exactDockerWorkspaceCommandStdout(wait);
+    const waitStderr = Buffer.from(wait.stderr).toString('utf8');
+    const waitEvidence = Object.freeze({
+      admissionRefDigest: scope.admissionRef.refDigest,
+      containerId,
+      exitCode,
+      dockerWaitProcessExitCode: 0 as const,
+      dockerWaitSignal: null,
+      stdoutSha256: exactCustodyDigest(waitStdout),
+      stderrSha256: exactCustodyDigest(waitStderr),
+      observedAt,
+    });
+    const bundle: ExactDockerProviderExitBundleV2 = Object.freeze({
+      schemaVersion: 2,
+      kind: 'exact-docker-provider-exit',
+      ...waitEvidence,
+      waitEvidenceDigest: exactCustodyJsonDigest(waitEvidence),
+    });
+    const observation = this.publishAndRereadExactObservation(
+      scope,
+      'PROVIDER_EXIT',
+      bundle,
+      observedAt,
+    );
+    const providerExit = Object.freeze({
+      containerId,
+      exitCode,
+      observedAt,
+      waitEvidenceDigest: bundle.waitEvidenceDigest,
+      observationReceiptDigest: observation.receiptDigest,
+      observationEvidenceDigest: observation.evidenceDigest,
+    });
+    this.rereadExactProviderExitObservation(scope, providerExit);
+    return providerExit;
+  }
+
+  private exactDockerRecoveryHasProviderObservation(
+    scope: PreparedExactDockerCustodyScope,
+  ): boolean {
+    return (['PROVIDER_START', 'PROVIDER_EXECUTION', 'PROVIDER_EXIT'] as const).some(
+      observationClass => scope.store.readDispatchObservationByClass({
+        admissionRef: scope.admissionRef,
+        policy: scope.policy,
+        observationClass,
+      }) !== null,
+    );
+  }
+
+  private async exactDockerRecoveryResourcesAreAbsent(
+    scope: PreparedExactDockerCustodyScope,
+  ): Promise<boolean> {
+    const containerName = `deckent-x-${scope.identity.attemptId
+      .replace(/[^a-zA-Z0-9_.-]/gu, '').slice(-40)}`;
+    const workspaceVolumeName = exactDockerWorkspaceVolumeName({
+      identity: scope.identity,
+      admissionRefDigest: scope.admissionRef.refDigest,
+    });
+    const dependencyVolumeName = exactDockerDependencyVolumeName({
+      identity: scope.identity,
+      admissionRefDigest: scope.admissionRef.refDigest,
+    });
+    const observations = await Promise.all([
+      this.exactWorkspaceCommandRunner(Object.freeze({
+        command: 'docker' as const,
+        args: Object.freeze(['inspect', '--type', 'container', containerName]),
+        stdin: Buffer.alloc(0), timeoutMs: 10_000,
+        stdoutCeiling: 8 * 1024 * 1024, stderrCeiling: 64 * 1024,
+      })),
+      ...[workspaceVolumeName, dependencyVolumeName].map(volumeName => (
+        this.exactWorkspaceCommandRunner(Object.freeze({
+          command: 'docker' as const,
+          args: Object.freeze(['volume', 'inspect', volumeName]),
+          stdin: Buffer.alloc(0), timeoutMs: 10_000,
+          stdoutCeiling: 1024 * 1024, stderrCeiling: 64 * 1024,
+        }))
+      )),
+    ]);
+    return isExactDockerContainerAbsent(
+      exactDockerWorkspaceCommandObservation(observations[0]!), containerName,
+    ) && isExactDockerVolumeAbsent(
+      exactDockerWorkspaceCommandObservation(observations[1]!), workspaceVolumeName,
+    ) && isExactDockerVolumeAbsent(
+      exactDockerWorkspaceCommandObservation(observations[2]!), dependencyVolumeName,
+    );
+  }
+
+  private completePendingExactDockerNoEffect(
+    scope: PreparedExactDockerCustodyScope,
+    transition: Extract<
+      ReturnType<TaskAttemptCustodyStore['readDispatchAuthority']>,
+      { readonly state: 'transition-pending' }
+    >['transition'] & { readonly state: 'NOT_DISPATCHED_CLAIMED' },
+  ): boolean {
+    const observation = scope.store.readDispatchObservationByClass({
+      admissionRef: scope.admissionRef,
+      policy: scope.policy,
+      observationClass: 'NO_EFFECT',
+    });
+    let decoded: unknown = null;
+    try {
+      decoded = observation
+        ? JSON.parse(Buffer.from(observation.bytes).toString('utf8')) : null;
+    } catch { decoded = null; }
+    const record = exactOwnDataRecord(decoded, [
+      'schemaVersion', 'kind', 'admissionRefDigest', 'reasonCode', 'containerName',
+      'daemonContainerState', 'providerReleaseState', 'daemonInspectionReceiptDigest',
+      'providerReleaseProbeEvidenceDigest', 'backendProbeEvidenceDigest',
+      'containmentEvidenceDigest', 'preMountCompensation', 'observedAt',
+    ]);
+    if (!observation || !record || transition.reasonCode === null
+      || record.schemaVersion !== 2 || record.kind !== 'exact-docker-no-effect'
+      || record.admissionRefDigest !== scope.admissionRef.refDigest
+      || record.reasonCode !== transition.reasonCode
+      || record.daemonContainerState !== 'ABSENT'
+      || record.providerReleaseState !== 'ABSENT'
+      || !isExactDigest(record.daemonInspectionReceiptDigest)
+      || !isExactDigest(record.providerReleaseProbeEvidenceDigest)
+      || !isExactDigest(record.backendProbeEvidenceDigest)
+      || !isExactDigest(record.containmentEvidenceDigest)
+      || typeof record.observedAt !== 'string'
+      || record.observedAt !== observation.receipt.observedAt) return false;
+    const authority = scope.store.settleNotDispatched({
+      admissionRef: scope.admissionRef,
+      policy: scope.policy,
+      reasonCode: transition.reasonCode,
+      noEffectObservation: {
+        schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+        kind: 'task-attempt-custody-no-effect-observation',
+        daemonContainerState: 'ABSENT',
+        providerReleaseState: 'ABSENT',
+        daemonInspectionReceiptDigest: record.daemonInspectionReceiptDigest,
+        providerReleaseProbeEvidenceDigest: record.providerReleaseProbeEvidenceDigest,
+        backendProbeEvidenceDigest: record.backendProbeEvidenceDigest,
+        containmentEvidenceDigest: record.containmentEvidenceDigest,
+        observationReceiptDigest: observation.receipt.receiptDigest,
+        observationEvidenceDigest: observation.receipt.evidenceDigest,
+        observedAt: record.observedAt,
+      },
+    });
+    const reread = scope.store.readDispatchAuthority({
+      admissionRef: scope.admissionRef,
+      policy: scope.policy,
+    });
+    return reread.state === 'terminal' && reread.authority.state === 'NOT_DISPATCHED'
+      && reread.authority.receiptDigest === authority.receiptDigest;
+  }
+
+  private async reconcileExactDockerPreProviderAdmission(
+    scope: PreparedExactDockerCustodyScope,
+    authorityRead: ReturnType<TaskAttemptCustodyStore['readDispatchAuthority']>,
+  ): Promise<boolean> {
+    if (authorityRead.state === 'ambiguous') return false;
+    if (authorityRead.state === 'transition-pending') {
+      if (authorityRead.transition.state !== 'NOT_DISPATCHED_CLAIMED'
+        || authorityRead.mountEffectState !== 'ABSENT'
+        || this.exactDockerRecoveryHasProviderObservation(scope)) return false;
+      return this.completePendingExactDockerNoEffect(
+        scope,
+        authorityRead.transition as typeof authorityRead.transition & {
+          readonly state: 'NOT_DISPATCHED_CLAIMED';
+        },
+      );
+    }
+    if (authorityRead.state !== 'absent'
+      || this.exactDockerRecoveryHasProviderObservation(scope)) return false;
+    const storeAdapter = createExecutionEffectLifecycleStoreAdmissionAdapterV1({
+      store: scope.store,
+      identity: scope.identity,
+      policy: scope.policy,
+      admissionReceiptDigest: scope.admissionRef.admissionReceiptDigest,
+      platform: process.env.WSL_DISTRO_NAME ? 'wsl2-linux' : 'linux',
+      now: () => new Date().toISOString(),
+    });
+    const lifecycle = storeAdapter.readLatestLifecycleAuthority();
+    const reasonCode = isExactDockerEffectLandingPolicyAdmitted(
+      scope.execution.executionLandingPolicy,
+    ) ? 'PRE_MOUNT_ABORTED' as const : 'EXECUTION_POLICY_REJECTED' as const;
+    if (!lifecycle) {
+      if (!(await this.exactDockerRecoveryResourcesAreAbsent(scope))) return false;
+      const settled = await this.settleExactNoEffect(scope, reasonCode);
+      return settled.kind === 'not-dispatched';
+    }
+    if (lifecycle.state !== 'ALLOCATING' && lifecycle.state !== 'PREPARED'
+      && lifecycle.state !== 'PROVIDER_START_AUTHORIZED') return false;
+    const resources = Object.freeze({
+      workspace: Object.freeze({
+        name: lifecycle.workspacePlan.volumeName,
+        labels: lifecycle.workspacePlan.workspaceLabels,
+        labelsDigest: lifecycle.workspacePlan.workspaceLabelsDigest as Sha256Digest,
+        resourceInstanceDigest:
+          lifecycle.workspacePlan.workspaceResourceInstanceDigest as Sha256Digest,
+        mountPlanDigest: lifecycle.workspacePlan.mountPlanDigest as Sha256Digest,
+      }),
+      dependency: Object.freeze({
+        name: lifecycle.workspacePlan.dependencyPlan.volumeName,
+        labels: lifecycle.workspacePlan.dependencyLabels,
+        labelsDigest: lifecycle.workspacePlan.dependencyLabelsDigest as Sha256Digest,
+        resourceInstanceDigest:
+          lifecycle.workspacePlan.dependencyResourceInstanceDigest as Sha256Digest,
+        mountPlanDigest: lifecycle.workspacePlan.dependencyPlanDigest as Sha256Digest,
+      }),
+    });
+    const compensated = await this.compensateExactDockerEffectPreparation(
+      scope,
+      resources,
+      storeAdapter,
+    );
+    if (!compensated) return false;
+    const settled = await this.settleExactNoEffect(scope, reasonCode, compensated);
+    return settled.kind === 'not-dispatched';
+  }
+
+  /**
+   * Rebuild process-local exact-attempt monitors from the host-private Store.
+   *
+   * The Store remains the only durable authority. Discovery is deliberately
+   * unavailable to leadership-free and containment sweeps: neither may adopt
+   * a provider process or advance landing/release state.
+   */
+  private async reconcileExactDockerCustodyAdmissions(
+    report: SpawnBackendRecoveryReport,
+    options: SpawnBackendRecoveryOptions,
+  ): Promise<void> {
+    if (options.mode === 'terminal-only') return;
+    const appendHold = (hold: SpawnBackendRecoveryHold): void => {
+      const held = report.held ?? (report.held = []);
+      if (held.some(existing => existing.dispatchRequestId === hold.dispatchRequestId
+        && existing.authorityState === hold.authorityState
+        && existing.reasonCode === hold.reasonCode)) return;
+      held.push(Object.freeze({ ...hold }));
+    };
+    const opened = this.openExactDockerRecoveryStore();
+    if (!opened) return;
+    const discovered = opened.store.listDispatchAdmissions({
+      policy: opened.policy,
+      maxEntries: 100_000,
+      maxNameBytes: 128,
+      deadlineAt: new Date(Date.now() + 10_000).toISOString(),
+    });
+    for (const entry of discovered.entries) {
+      let holdAuthorityState: SpawnBackendRecoveryHoldAuthorityState = 'RECOVERY_ENTRY_FAILED';
+      let holdReasonCode: SpawnBackendRecoveryHoldReasonCode = 'ENTRY_RECONCILIATION_FAILED';
+      try {
+        if (entry.state !== 'admitted') {
+          appendHold(Object.freeze({
+            kind: 'spawn-backend-recovery-hold' as const,
+            backend: 'docker' as const,
+            dispatchRequestId: entry.reservation.dispatchRequestId,
+            taskId: entry.reservation.identity.taskId,
+            admissionRefDigest: null,
+            authorityState: 'RESERVED_PENDING_ADMISSION' as const,
+            reasonCode: 'ADMISSION_RECONCILIATION_REQUIRED' as const,
+          }));
+          debugLog(
+            'docker-backend:exact-custody-recovery-entry-hold',
+            `dispatchRequestId=${entry.reservation.dispatchRequestId};state=${entry.state}`,
+          );
+          continue;
+        }
+        const scope = this.reconstructExactDockerRecoveryScope(
+          opened.store,
+          opened.policy,
+          entry,
+        );
+        const authorityRead = opened.store.readDispatchAuthority({
+          admissionRef: entry.ref,
+          policy: opened.policy,
+        });
+        holdAuthorityState = authorityRead.state === 'absent' ? 'DISPATCH_ABSENT'
+          : authorityRead.state === 'transition-pending' ? 'DISPATCH_TRANSITION_PENDING'
+            : authorityRead.state === 'ambiguous' ? 'DISPATCH_AMBIGUOUS'
+              : 'DISPATCH_TERMINAL';
+        if (authorityRead.state !== 'terminal') {
+          holdReasonCode = 'PRE_PROVIDER_RECONCILIATION_REQUIRED';
+          const reconciled = options.mode !== 'contain'
+            && await this.reconcileExactDockerPreProviderAdmission(scope, authorityRead);
+          if (reconciled) {
+            if (!report.closedNotDispatched.includes(scope.identity.taskId)) {
+              report.closedNotDispatched.push(scope.identity.taskId);
+            }
+          } else {
+            appendHold(Object.freeze({
+              kind: 'spawn-backend-recovery-hold' as const,
+              backend: 'docker' as const,
+              dispatchRequestId: entry.ref.dispatchRequestId,
+              taskId: entry.ref.identity.taskId,
+              admissionRefDigest: entry.ref.refDigest,
+              authorityState: holdAuthorityState,
+              reasonCode: holdReasonCode,
+            }));
+            debugLog(
+              'docker-backend:exact-custody-recovery-entry-hold',
+              `dispatchRequestId=${entry.ref.dispatchRequestId};authorityState=${authorityRead.state}`,
+            );
+          }
+          continue;
+        }
+        holdReasonCode = 'TERMINAL_RECONCILIATION_REQUIRED';
+        if (authorityRead.authority.state === 'NOT_DISPATCHED') {
+        const lifecycleObservations = [
+          'PROVIDER_START', 'PROVIDER_EXECUTION', 'PROVIDER_EXIT',
+        ] as const;
+        if (lifecycleObservations.some(observationClass => (
+          opened.store.readDispatchObservationByClass({
+            admissionRef: entry.ref,
+            policy: opened.policy,
+            observationClass,
+          }) !== null
+        ))) {
+          throw new ExactDockerCustodyFailure(
+            'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+            true,
+          );
+        }
+        if (!report.closedNotDispatched.includes(entry.ref.identity.taskId)) {
+          report.closedNotDispatched.push(entry.ref.identity.taskId);
+        }
+        continue;
+        }
+        const releasedAuthority = authorityRead.authority;
+        if (releasedAuthority.state !== 'RELEASED'
+          || typeof releasedAuthority.backendExecutionId !== 'string'
+          || !isExactDockerEffectLandingPolicyAdmitted(
+            scope.execution.executionLandingPolicy,
+          )) {
+          throw new ExactDockerCustodyFailure(
+            'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+            true,
+          );
+        }
+      const startObservation = opened.store.readDispatchObservationByClass({
+        admissionRef: scope.admissionRef,
+        policy: scope.policy,
+        observationClass: 'PROVIDER_START',
+      });
+      if (!startObservation) {
+        throw new ExactDockerCustodyFailure(
+          'EXACT_DOCKER_PROVIDER_START_RECONCILIATION_REQUIRED',
+          true,
+        );
+      }
+      const providerStartReceipt = Object.freeze({
+        ref: startObservation.receipt.receiptDigest,
+        digest: startObservation.receipt.evidenceDigest,
+      });
+      const query: ExactDockerCustodyTerminalQueryV2 = Object.freeze({
+        custodyRef: this.exactReleasedCustodyProjection(scope, providerStartReceipt),
+        releaseReceipt: Object.freeze({
+          ref: releasedAuthority.releaseReceiptDigest,
+          digest: releasedAuthority.releaseEvidenceDigest,
+        }),
+        providerStartReceipt,
+        projectionFence: releasedAuthority.projectionFence,
+      });
+      const start = this.rereadExactProviderStartObservation(scope, query);
+      const providerExit = this.readExactDockerRecoveryProviderExit(scope);
+      if (options.mode === 'contain') {
+        await this.containExactDockerCustodyAttempt(
+          scope,
+          releasedAuthority,
+          start,
+          providerExit,
+        );
+        if (!report.adopted.includes(scope.identity.taskId)) {
+          report.adopted.push(scope.identity.taskId);
+        }
+        continue;
+      }
+      const providerExecutionReceipt = this.readExactDockerRecoveryProviderExecution(
+        scope,
+        start,
+      );
+      if (providerExit) {
+        const coldAccepted = this.readColdExactDockerAcceptedResult(
+          scope,
+          query,
+          providerExit,
+        );
+        if (coldAccepted) {
+          this.exactRecoveredAcceptedResults.set(scope.admissionRef.refDigest, Object.freeze({
+            query,
+            authority: this.exactCanonicalIngressAuthority(scope),
+            accepted: coldAccepted,
+          }));
+          if (!report.closedAbsentAfterExit.includes(scope.identity.taskId)) {
+            report.closedAbsentAfterExit.push(scope.identity.taskId);
+          }
+          continue;
+        }
+        const coldCompletion = this.readColdExactDockerCompletion(
+          scope,
+          query,
+          providerExit,
+        );
+        if (coldCompletion) {
+          const completion = Promise.resolve(coldCompletion);
+          this.exactCustodyProviderStarts.set(
+            scope.admissionRef.refDigest,
+            providerStartReceipt,
+          );
+          this.exactCustodyProviderExecutions.set(
+            scope.admissionRef.refDigest,
+            providerExecutionReceipt,
+          );
+          this.exactCustodyCompletions.set(scope.admissionRef.refDigest, Object.freeze({
+            scope,
+            query,
+            providerStartReceipt,
+            providerExecutionReceipt,
+            promise: completion,
+          }));
+          this.observeExactDockerCompletionAcceptance(scope, query, completion);
+          if (!report.adopted.includes(scope.identity.taskId)) {
+            report.adopted.push(scope.identity.taskId);
+          }
+          continue;
+        }
+        const resumedEffectRelease = await this.resumeExactDockerEffectRelease(scope);
+        if (resumedEffectRelease) {
+          const resumedCompletion = this.readColdExactDockerCompletion(
+            scope,
+            query,
+            providerExit,
+          );
+          if (!resumedCompletion) {
+            throw new ExactDockerCustodyFailure(
+              'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+              true,
+            );
+          }
+          const completion = Promise.resolve(resumedCompletion);
+          this.exactCustodyProviderStarts.set(
+            scope.admissionRef.refDigest,
+            providerStartReceipt,
+          );
+          this.exactCustodyProviderExecutions.set(
+            scope.admissionRef.refDigest,
+            providerExecutionReceipt,
+          );
+          this.exactCustodyCompletions.set(scope.admissionRef.refDigest, Object.freeze({
+            scope,
+            query,
+            providerStartReceipt,
+            providerExecutionReceipt,
+            promise: completion,
+          }));
+          this.observeExactDockerCompletionAcceptance(scope, query, completion);
+          if (!report.adopted.includes(scope.identity.taskId)) {
+            report.adopted.push(scope.identity.taskId);
+          }
+          continue;
+        }
+      }
+      const existingCompletion = this.exactCustodyCompletions.get(
+        scope.admissionRef.refDigest,
+      );
+      if (existingCompletion) {
+        if (canonicalJson(existingCompletion.query) !== canonicalJson(query)
+          || canonicalJson(existingCompletion.providerStartReceipt)
+            !== canonicalJson(providerStartReceipt)
+          || canonicalJson(existingCompletion.providerExecutionReceipt)
+            !== canonicalJson(providerExecutionReceipt)) {
+          throw new ExactDockerCustodyFailure(
+            'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+            true,
+          );
+        }
+      } else {
+        const recoveryKey = scope.admissionRef.refDigest;
+        let setup = this.exactCustodyRecoverySetups.get(recoveryKey);
+        if (!setup) {
+          setup = (async () => {
+            await this.rehydrateExactDockerEffectLaunch(
+              scope,
+              releasedAuthority,
+              start,
+            );
+            if (this.exactCustodyCompletions.has(recoveryKey)) return;
+            const completion = this.monitorExactDockerCustody(
+              scope,
+              releasedAuthority.backendExecutionId,
+              query,
+              providerExecutionReceipt,
+              providerExit,
+            );
+            this.exactCustodyProviderStarts.set(recoveryKey, providerStartReceipt);
+            this.exactCustodyProviderExecutions.set(recoveryKey, providerExecutionReceipt);
+            this.exactCustodyCompletions.set(recoveryKey, Object.freeze({
+              scope,
+              query,
+              providerStartReceipt,
+              providerExecutionReceipt,
+              promise: completion,
+            }));
+            this.observeExactDockerCompletionAcceptance(scope, query, completion);
+          })();
+          this.exactCustodyRecoverySetups.set(recoveryKey, setup);
+        }
+        try {
+          await setup;
+        } finally {
+          if (this.exactCustodyRecoverySetups.get(recoveryKey) === setup) {
+            this.exactCustodyRecoverySetups.delete(recoveryKey);
+          }
+        }
+      }
+        if (!report.adopted.includes(scope.identity.taskId)) {
+          report.adopted.push(scope.identity.taskId);
+        }
+      } catch (error) {
+        appendHold(Object.freeze({
+          kind: 'spawn-backend-recovery-hold' as const,
+          backend: 'docker' as const,
+          dispatchRequestId: entry.state === 'admitted'
+            ? entry.ref.dispatchRequestId : entry.reservation.dispatchRequestId,
+          taskId: entry.state === 'admitted'
+            ? entry.ref.identity.taskId : entry.reservation.identity.taskId,
+          admissionRefDigest: entry.state === 'admitted' ? entry.ref.refDigest : null,
+          authorityState: holdAuthorityState,
+          reasonCode: holdReasonCode,
+        }));
+        debugLog('docker-backend:exact-custody-recovery-entry-hold', error);
+      }
+    }
+  }
+
+  private async monitorExactDockerCustody(
+    scope: PreparedExactDockerCustodyScope,
+    containerId: string,
+    query: ExactDockerCustodyTerminalQueryV2,
+    providerExecutionReceipt: Readonly<{ ref: Sha256Digest; digest: Sha256Digest }>,
+    recoveredProviderExit: ExactDockerProviderExitObservationRefV2 | null = null,
+  ): Promise<ExactDockerCustodyCompletionV2> {
+    const providerExecution = scope.store.readDispatchObservation({
+      admissionRef: scope.admissionRef,
+      policy: scope.policy,
+      observationClass: 'PROVIDER_EXECUTION',
+      receiptDigest: providerExecutionReceipt.ref,
+    });
+    if (providerExecution.receipt.evidenceDigest !== providerExecutionReceipt.digest) {
+      throw new ExactDockerCustodyFailure('EXACT_DOCKER_OBSERVATION_REREAD_INVALID', true);
+    }
+    const hold = (
+      reasonCode: Extract<ExactDockerCustodyCompletionV2, { kind: 'capture-hold' }>['reasonCode'],
+      providerExit: ExactDockerProviderExitObservationRefV2 | null = null,
+    ): ExactDockerCustodyCompletionV2 => Object.freeze({
+      kind: 'capture-hold',
+      custodyRef: query.custodyRef,
+      releaseReceipt: query.releaseReceipt,
+      projectionFence: query.projectionFence,
+      reasonCode,
+      evidence: providerExit
+        ? Object.freeze({ kind: 'provider-exit-observation' as const, providerExit })
+        : Object.freeze({
+            kind: 'release-authority' as const,
+            receipt: query.releaseReceipt,
+          }),
+    });
+    let providerExit = recoveredProviderExit;
+    if (providerExit) {
+      if (providerExit.containerId !== containerId) {
+        throw new ExactDockerCustodyFailure(
+          'EXACT_DOCKER_PROVIDER_EXIT_OBSERVATION_INVALID',
+          true,
+        );
+      }
+      this.rereadExactProviderExitObservation(scope, providerExit);
+    } else {
+      const wait = await new Promise<Readonly<{
+      stdout: string;
+      stderr: string;
+      processExitCode: number | null;
+      signal: NodeJS.Signals | null;
+      error: boolean;
+      overflow: boolean;
+      }>>(resolveWait => {
+      const child = nodeSpawn('docker', ['wait', containerId], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      const ceiling = 4 * 1024;
+      let stdout: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+      let stderr: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+      let overflow = false;
+      let error = false;
+      let settled = false;
+      const append = (
+        current: Buffer<ArrayBufferLike>,
+        chunk: Buffer<ArrayBufferLike>,
+      ): Buffer<ArrayBufferLike> => {
+        if (current.byteLength + chunk.byteLength > ceiling) {
+          overflow = true;
+          try { child.kill('SIGKILL'); } catch { /* bounded wait capture */ }
+          return current;
+        }
+        return Buffer.concat([current, chunk]);
+      };
+      child.stdout?.on('data', (chunk: Buffer) => { stdout = append(stdout, chunk); });
+      child.stderr?.on('data', (chunk: Buffer) => { stderr = append(stderr, chunk); });
+      child.once('error', () => { error = true; });
+      child.once('close', (processExitCode, signal) => {
+        if (settled) return;
+        settled = true;
+        resolveWait(Object.freeze({
+          stdout: stdout.toString('utf8'),
+          stderr: stderr.toString('utf8'),
+          processExitCode,
+          signal,
+          error,
+          overflow,
+        }));
+      });
+      });
+      if (wait.error) return hold('DOCKER_WAIT_UNAVAILABLE');
+      const exitText = wait.stdout.trim();
+      const exitCode = /^(?:0|[1-9][0-9]{0,2})$/u.test(exitText)
+        ? Number(exitText) : Number.NaN;
+      if (wait.overflow || wait.processExitCode !== 0 || wait.signal !== null
+        || !Number.isSafeInteger(exitCode) || exitCode < 0 || exitCode > 255) {
+        return hold('DOCKER_WAIT_INVALID');
+      }
+      const observedAt = new Date().toISOString();
+      const waitEvidence = Object.freeze({
+        admissionRefDigest: scope.admissionRef.refDigest,
+        containerId,
+        exitCode,
+        dockerWaitProcessExitCode: 0 as const,
+        dockerWaitSignal: null,
+        stdoutSha256: exactCustodyDigest(wait.stdout),
+        stderrSha256: exactCustodyDigest(wait.stderr),
+        observedAt,
+      });
+      const exitBundle: ExactDockerProviderExitBundleV2 = Object.freeze({
+        schemaVersion: 2,
+        kind: 'exact-docker-provider-exit',
+        ...waitEvidence,
+        waitEvidenceDigest: exactCustodyJsonDigest(waitEvidence),
+      });
+      const exitObservation = this.publishAndRereadExactObservation(
+        scope,
+        'PROVIDER_EXIT',
+        exitBundle,
+        observedAt,
+      );
+      const exitRecord = exactOwnDataRecord(
+        JSON.parse(Buffer.from(exitObservation.bytes).toString('utf8')),
+        [
+          'schemaVersion', 'kind', 'admissionRefDigest', 'containerId', 'exitCode',
+          'dockerWaitProcessExitCode', 'dockerWaitSignal', 'stdoutSha256',
+          'stderrSha256', 'waitEvidenceDigest', 'observedAt',
+        ],
+      );
+      if (!exitRecord
+        || exitRecord.schemaVersion !== 2
+        || exitRecord.kind !== 'exact-docker-provider-exit'
+        || exitRecord.admissionRefDigest !== scope.admissionRef.refDigest
+        || exitRecord.containerId !== containerId
+        || exitRecord.exitCode !== exitCode
+        || exitRecord.dockerWaitProcessExitCode !== 0
+        || exitRecord.dockerWaitSignal !== null
+        || exitRecord.stdoutSha256 !== waitEvidence.stdoutSha256
+        || exitRecord.stderrSha256 !== waitEvidence.stderrSha256
+        || exitRecord.waitEvidenceDigest !== exactCustodyJsonDigest(waitEvidence)
+        || exitRecord.observedAt !== observedAt) {
+        throw new ExactDockerCustodyFailure(
+          'EXACT_DOCKER_PROVIDER_EXIT_OBSERVATION_INVALID',
+          true,
+        );
+      }
+      providerExit = Object.freeze({
+        containerId,
+        exitCode,
+        observedAt,
+        waitEvidenceDigest: exitBundle.waitEvidenceDigest,
+        observationReceiptDigest: exitObservation.receiptDigest,
+        observationEvidenceDigest: exitObservation.evidenceDigest,
+      });
+    }
+    const committedEffect = await this.commitExactDockerEffectLanding(scope, providerExit);
+    if (!committedEffect) return hold('EFFECT_LANDING_HOLD', providerExit);
+    const retainOnHold = async (
+      reasonCode: Extract<ExactDockerCustodyCompletionV2, { kind: 'capture-hold' }>['reasonCode'],
+    ): Promise<ExactDockerCustodyCompletionV2> => hold(reasonCode, providerExit);
+    let streamReceipt: TaskAttemptCustodyArtifactReceiptV2;
+    let streamBytes: Uint8Array;
+    const streamArtifactKey = `provider-${scope.identity.attemptId}`;
+    try {
+      const existing = scope.store.readArtifactReceipt({
+        identity: scope.identity,
+        policy: scope.policy,
+        artifactClass: 'pristine-provider-stream',
+        artifactKey: streamArtifactKey,
+      });
+      if (existing) {
+        const verified = scope.store.readVerifiedArtifact({
+          identity: scope.identity,
+          policy: scope.policy,
+          artifactClass: 'pristine-provider-stream',
+          artifactKey: streamArtifactKey,
+          receiptDigest: existing.receiptDigest,
+        });
+        if (!verified || verified.receipt.capturedAt !== providerExit.observedAt) {
+          return await retainOnHold('PRISTINE_PROVIDER_STREAM_INCOMPLETE');
+        }
+        streamReceipt = verified.receipt;
+        streamBytes = Uint8Array.from(verified.bytes);
+      } else {
+        const capture = await captureDockerLogs(containerId);
+        if (capture.captureIncomplete) {
+          return await retainOnHold('PRISTINE_PROVIDER_STREAM_INCOMPLETE');
+        }
+        streamBytes = Buffer.from(capture.content, 'utf8');
+        streamReceipt = scope.store.publishProviderStreamCapture({
+          admissionRef: scope.admissionRef,
+          policy: scope.policy,
+          artifactKey: streamArtifactKey,
+          capturedAt: providerExit.observedAt,
+          bytes: streamBytes,
+        });
+      }
+    } catch {
+      return await retainOnHold('PRISTINE_PROVIDER_STREAM_INCOMPLETE');
+    }
+    const billing = extractProviderBillingEvidence(
+      scope.provider,
+      Buffer.from(streamBytes).toString('utf8'),
+      streamReceipt.capturedAt,
+    );
+    if (!billing) return await retainOnHold('PROVIDER_BILLING_UNAVAILABLE');
+    let resultReceipt: TaskAttemptCustodyArtifactReceiptV2;
+    try {
+      const artifactKey = `result-${scope.identity.attemptId}`;
+      const existing = scope.store.readArtifactReceipt({
+        identity: scope.identity,
+        policy: scope.policy,
+        artifactClass: 'worker-result',
+        artifactKey,
+      });
+      if (existing) {
+        const verified = scope.store.readVerifiedArtifact({
+          identity: scope.identity,
+          policy: scope.policy,
+          artifactClass: 'worker-result',
+          artifactKey,
+          receiptDigest: existing.receiptDigest,
+        });
+        if (!verified || verified.receipt.capturedAt !== providerExit.observedAt) {
+          throw new Error('worker result durable reread failed');
+        }
+        resultReceipt = verified.receipt;
+      } else {
+        const source = scope.store.issueAttemptOutputCaptureSource({
+          access: scope.access,
+          childRelativePath: `task-${scope.identity.taskId}.result`,
+          artifactClass: 'worker-result',
+          artifactKey,
+        });
+        resultReceipt = scope.store.captureAttemptOutputArtifact({
+          identity: scope.identity,
+          policy: scope.policy,
+          admissionReceiptDigest: scope.admissionRef.admissionReceiptDigest,
+          artifactClass: 'worker-result',
+          artifactKey,
+          capturedAt: providerExit.observedAt,
+          source,
+        });
+      }
+    } catch {
+      return await retainOnHold('WORKER_RESULT_CAPTURE_HOLD');
+    }
+    let landingProposal: Extract<
+      ExactDockerCustodyCompletionV2,
+      { kind: 'landing-captured' }
+    >['landingProposal'] | null = null;
+    if (scope.execution.executionLandingPolicy !== null) {
+      let landingReceipt: TaskAttemptCustodyArtifactReceiptV2;
+      try {
+        const artifactKey = `landing-${scope.identity.attemptId}`;
+        const existing = scope.store.readArtifactReceipt({
+          identity: scope.identity,
+          policy: scope.policy,
+          artifactClass: 'worker-landing-proposal',
+          artifactKey,
+        });
+        if (existing) {
+          const verified = scope.store.readVerifiedArtifact({
+            identity: scope.identity,
+            policy: scope.policy,
+            artifactClass: 'worker-landing-proposal',
+            artifactKey,
+            receiptDigest: existing.receiptDigest,
+          });
+          if (!verified || verified.receipt.capturedAt !== providerExit.observedAt) {
+            throw new Error('landing proposal durable reread failed');
+          }
+          landingReceipt = verified.receipt;
+        } else {
+          const source = scope.store.issueAttemptOutputCaptureSource({
+            access: scope.access,
+            childRelativePath: `task-${scope.identity.taskId}.landing-proposal.json`,
+            artifactClass: 'worker-landing-proposal',
+            artifactKey,
+          });
+          landingReceipt = scope.store.captureAttemptOutputArtifact({
+            identity: scope.identity,
+            policy: scope.policy,
+            admissionReceiptDigest: scope.admissionRef.admissionReceiptDigest,
+            artifactClass: 'worker-landing-proposal',
+            artifactKey,
+            capturedAt: providerExit.observedAt,
+            source,
+          });
+        }
+      } catch {
+        return await retainOnHold('LANDING_PROPOSAL_CAPTURE_HOLD');
+      }
+      const verifiedLanding = scope.store.readVerifiedArtifact({
+        identity: scope.identity,
+        policy: scope.policy,
+        artifactClass: 'worker-landing-proposal',
+        artifactKey: landingReceipt.artifactKey,
+        receiptDigest: landingReceipt.receiptDigest,
+      });
+      const landingVerifiedAt = providerExit.observedAt;
+      let proposal;
+      try {
+        proposal = verifiedLanding
+          ? parseExactExecutionLandingProposalJsonV3(
+              Buffer.from(verifiedLanding.bytes).toString('utf8'),
+              {
+                taskId: scope.identity.taskId,
+                dispatchRequestId: scope.admissionRef.dispatchRequestId,
+              },
+            )
+          : null;
+      } catch {
+        proposal = null;
+      }
+      if (!verifiedLanding
+        || verifiedLanding.receipt.receiptDigest !== landingReceipt.receiptDigest
+        || verifiedLanding.proof.sha256 !== landingReceipt.artifact.sha256
+        || !proposal) {
+        return await retainOnHold('LANDING_PROPOSAL_CAPTURE_HOLD');
+      }
+      landingProposal = Object.freeze({
+        artifact: this.exactArtifactProjection(landingReceipt) as
+          ExactDockerLandingProposalArtifactRefV2,
+        proposal: Object.freeze(proposal),
+        verifiedAt: landingVerifiedAt,
+      });
+    }
+    const hostWorkAttribution = await measureExactDockerHostWorkAttribution({
+      projectRoot: this.projectDir,
+      identity: scope.identity,
+      admissionRefDigest: scope.admissionRef.refDigest,
+      dispatchRequestId: scope.admissionRef.dispatchRequestId,
+      scopeFilesWrite: scope.taskSnapshot.material.dispatch.scope.filesWrite,
+      scopeBaseline: scope.taskSnapshot.dispatch.scopeBaseline,
+      scopeBaselineSha256: scope.taskSnapshot.dispatch.scopeBaselineSha256,
+      providerExitObservationReceiptDigest: providerExit.observationReceiptDigest,
+    });
+    if (hostWorkAttribution.state !== 'VERIFIED') {
+      return await retainOnHold('HOST_WORK_ATTRIBUTION_HOLD');
+    }
+    const hostWorkArtifactKey = `host-work-${scope.identity.attemptId}`;
+    try {
+      const hostWorkBytes = canonicalTaskAttemptCustodyJson(
+        hostWorkAttribution,
+        scope.policy.jsonBounds,
+      );
+      const existingHostWork = scope.store.readArtifactReceipt({
+        identity: scope.identity,
+        policy: scope.policy,
+        artifactClass: 'host-work-attribution',
+        artifactKey: hostWorkArtifactKey,
+      });
+      const hostWorkReceipt = existingHostWork ?? scope.store.publishHostArtifact({
+        identity: scope.identity,
+        policy: scope.policy,
+        admissionReceiptDigest: scope.admissionRef.admissionReceiptDigest,
+        artifactClass: 'host-work-attribution',
+        artifactKey: hostWorkArtifactKey,
+        capturedAt: providerExit.observedAt,
+        bytes: hostWorkBytes,
+      });
+      const verifiedHostWork = scope.store.readVerifiedArtifact({
+        identity: scope.identity,
+        policy: scope.policy,
+        artifactClass: 'host-work-attribution',
+        artifactKey: hostWorkArtifactKey,
+        receiptDigest: hostWorkReceipt.receiptDigest,
+      });
+      if (!verifiedHostWork
+        || verifiedHostWork.receipt.capturedAt !== providerExit.observedAt
+        || Buffer.compare(Buffer.from(verifiedHostWork.bytes), Buffer.from(hostWorkBytes)) !== 0) {
+        return await retainOnHold('HOST_WORK_ATTRIBUTION_HOLD');
+      }
+    } catch {
+      return await retainOnHold('HOST_WORK_ATTRIBUTION_HOLD');
+    }
+    const acceptedEffect = await this.releaseExactDockerEffectLanding(scope, committedEffect);
+    if (!acceptedEffect) return hold('EFFECT_RELEASE_HOLD', providerExit);
+    const base = Object.freeze({
+      custodyRef: query.custodyRef,
+      releaseReceipt: query.releaseReceipt,
+      projectionFence: query.projectionFence,
+      providerExit,
+      hostWorkAttribution,
+      hostEffectAuthority: Object.freeze({
+        projection: acceptedEffect.projection,
+        binding: acceptedEffect.binding,
+      }),
+      providerStream: this.exactArtifactProjection(streamReceipt) as
+        Extract<ExactDockerCustodyCompletionV2, { kind: 'result-captured' }>['providerStream'],
+      result: Object.freeze({
+        version: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+        identity: resultReceipt.identity,
+        policyDigest: resultReceipt.policyDigest,
+        admissionReceiptDigest: resultReceipt.admissionReceiptDigest,
+        sourceResult: Object.freeze({
+          artifactClass: 'worker-result' as const,
+          artifactKey: resultReceipt.artifactKey,
+          artifactReceiptDigest: resultReceipt.receiptDigest,
+          artifactSha256: resultReceipt.artifact.sha256,
+          byteLength: resultReceipt.artifact.byteLength,
+        }),
+      }),
+      resultArtifact: this.exactArtifactProjection(resultReceipt) as
+        Extract<ExactDockerCustodyCompletionV2, { kind: 'result-captured' }>['resultArtifact'],
+      providerBilling: Object.freeze({
+        evidence: Object.freeze(billing),
+        evidenceDigest: exactCustodyJsonDigest(billing),
+        providerStreamReceiptDigest: streamReceipt.receiptDigest,
+      }),
+    });
+    return landingProposal
+      ? Object.freeze({ kind: 'landing-captured' as const, ...base, landingProposal })
+      : Object.freeze({ kind: 'result-captured' as const, ...base });
   }
 
   /**
@@ -5270,7 +15078,9 @@ export class DockerSpawnBackend implements SpawnBackend {
       closedAbsentAfterExit: [],
       retiredLanded: [],
       resumedContinuations: [],
+      held: [],
     };
+    await this.reconcileExactDockerCustodyAdmissions(report, options);
     const tasksDir = join(this.projectDir, TASKS_DIR);
     const resumedAttemptIds = new Set<string>();
     const continuationRecoveryByKey =
@@ -5309,6 +15119,7 @@ export class DockerSpawnBackend implements SpawnBackend {
           projectRoot: this.projectDir,
           checkpointRef: landed.checkpoint.checkpoint,
           backend: this,
+          historicalV1Recovery: true,
         });
       } catch (error) {
         const reason = error instanceof Error ? error.message : String(error);

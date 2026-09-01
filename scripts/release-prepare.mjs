@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * release-prepare.mjs — atomic release-notes + version-triple prep (task 414-002, RC4B / REL-03/04)
+ * release-prepare.mjs — fail-closed release-notes + version-triple prep (task 414-002, RC4B / REL-03/04)
  *
- * Sole responsibility: given `--version vX.Y.Z[-prerelease][+build]`, atomically update the three
+ * Sole responsibility: given `--version vX.Y.Z[-prerelease][+build]`, prevalidate and update the three
  * files .github/workflows/release.yml's "Verify release integrity" step (REL-01) demands agree
- * exactly — package.json, package-lock.json (both its top-level `.version` AND
+ * exactly — package.json, npm-shrinkwrap.json (both its top-level `.version` AND
  * `.packages[""].version`), and CHANGELOG.md (a new, exact-anchor-compatible `## [VERSION] — DATE`
  * section skeleton) — and nothing else. It replaces scripts/bump-version.sh, which only ever
  * touched package.json, silently dropped prerelease/build metadata, and created its own git tag.
@@ -62,7 +62,7 @@ export function parseVersionArg(raw) {
   return stripped;
 }
 
-// ─── package.json / package-lock.json version mutation ─────────────────────
+// ─── package.json / npm-shrinkwrap.json version mutation ───────────────────
 
 /**
  * @param {string} pkgJsonText
@@ -78,22 +78,22 @@ export function applyVersionToPackageJson(pkgJsonText, version) {
 /**
  * Updates BOTH version fields npm lockfile-v3 carries for the root package: the top-level
  * `.version` and `.packages[""].version`. Leaves every nested dependency's `.version` untouched.
- * @param {string} lockJsonText
+ * @param {string} shrinkwrapJsonText
  * @param {string} version
- * @returns {string} updated package-lock.json text
+ * @returns {string} updated npm-shrinkwrap.json text
  */
-export function applyVersionToPackageLock(lockJsonText, version) {
-  const lock = JSON.parse(lockJsonText);
-  lock.version = version;
+export function applyVersionToNpmShrinkwrap(shrinkwrapJsonText, version) {
+  const shrinkwrap = JSON.parse(shrinkwrapJsonText);
+  shrinkwrap.version = version;
   if (
-    lock.packages &&
-    typeof lock.packages === 'object' &&
-    lock.packages[''] &&
-    typeof lock.packages[''] === 'object'
+    shrinkwrap.packages &&
+    typeof shrinkwrap.packages === 'object' &&
+    shrinkwrap.packages[''] &&
+    typeof shrinkwrap.packages[''] === 'object'
   ) {
-    lock.packages[''].version = version;
+    shrinkwrap.packages[''].version = version;
   }
-  return `${JSON.stringify(lock, null, 2)}\n`;
+  return `${JSON.stringify(shrinkwrap, null, 2)}\n`;
 }
 
 // ─── CHANGELOG.md exact-anchor section contract ─────────────────────────────
@@ -195,16 +195,16 @@ export function prepareRelease(opts) {
   const today = opts.today ?? new Date().toISOString().slice(0, 10);
 
   const pkgPath = join(root, 'package.json');
-  const lockPath = join(root, 'package-lock.json');
+  const shrinkwrapPath = join(root, 'npm-shrinkwrap.json');
   const changelogPath = join(root, 'CHANGELOG.md');
-  for (const p of [pkgPath, lockPath, changelogPath]) {
+  for (const p of [pkgPath, shrinkwrapPath, changelogPath]) {
     if (!existsSync(p)) {
       return { ok: false, error: `missing required file: ${p}` };
     }
   }
 
   const pkgText = readFileSync(pkgPath, 'utf-8');
-  const lockText = readFileSync(lockPath, 'utf-8');
+  const shrinkwrapText = readFileSync(shrinkwrapPath, 'utf-8');
   const changelogText = readFileSync(changelogPath, 'utf-8');
 
   const existingFormat = validateChangelogSectionFormat(changelogText, version);
@@ -216,20 +216,23 @@ export function prepareRelease(opts) {
   }
 
   const newPkgText = applyVersionToPackageJson(pkgText, version);
-  const newLockText = applyVersionToPackageLock(lockText, version);
+  const newShrinkwrapText = applyVersionToNpmShrinkwrap(shrinkwrapText, version);
   const sectionText = buildChangelogSectionSkeleton(version, today);
   const newChangelogText = insertChangelogSection(changelogText, sectionText);
 
   // Self-check: the SAME triple-equality gate REL-01 enforces at tag-push time, verified here
-  // BEFORE anything is written, plus the section-format contract. Any failure aborts with zero
-  // writes — this is what makes the operation atomic.
+  // BEFORE anything is written, plus the section-format contract. Validation failure aborts with
+  // zero writes. Each individual replacement is atomic; an external process termination between
+  // files can leave a partial triple, which REL-01 must reject rather than misreport as prepared.
   const pkgVersion = JSON.parse(newPkgText).version;
-  const lockVersion = JSON.parse(newLockText).version;
-  const lockPkgVersion = JSON.parse(newLockText).packages?.['']?.version;
-  if (pkgVersion !== version || lockVersion !== version || lockPkgVersion !== version) {
+  const shrinkwrapVersion = JSON.parse(newShrinkwrapText).version;
+  const shrinkwrapPackageVersion = JSON.parse(newShrinkwrapText).packages?.['']?.version;
+  if (pkgVersion !== version
+    || shrinkwrapVersion !== version
+    || shrinkwrapPackageVersion !== version) {
     return {
       ok: false,
-      error: `post-write version-triple-equality self-check failed: package.json=${pkgVersion} package-lock.json=${lockVersion} package-lock.json#packages['']=${lockPkgVersion} target=${version}`,
+      error: `post-write version-triple-equality self-check failed: package.json=${pkgVersion} npm-shrinkwrap.json=${shrinkwrapVersion} npm-shrinkwrap.json#packages['']=${shrinkwrapPackageVersion} target=${version}`,
     };
   }
   const newFormat = validateChangelogSectionFormat(newChangelogText, version);
@@ -238,21 +241,28 @@ export function prepareRelease(opts) {
   }
 
   if (opts.dryRun) {
-    return { ok: true, version, changed: [pkgPath, lockPath, changelogPath], dryRun: true };
+    return {
+      ok: true,
+      version,
+      changed: [pkgPath, shrinkwrapPath, changelogPath],
+      dryRun: true,
+    };
   }
 
   writeAtomic(pkgPath, newPkgText);
-  writeAtomic(lockPath, newLockText);
+  writeAtomic(shrinkwrapPath, newShrinkwrapText);
   writeAtomic(changelogPath, newChangelogText);
 
-  return { ok: true, version, changed: [pkgPath, lockPath, changelogPath] };
+  return {
+    ok: true,
+    version,
+    changed: [pkgPath, shrinkwrapPath, changelogPath],
+  };
 }
 
 // ─── CLI entry point ─────────────────────────────────────────────────────────
 
-const entryArg = process.argv[1] ?? '';
-if (entryArg.endsWith('release-prepare.mjs')) {
-  const cliArgs = process.argv.slice(2);
+function runCli(cliArgs) {
   const versionIdx = cliArgs.indexOf('--version');
   const rootIdx = cliArgs.indexOf('--root');
   const dryRun = cliArgs.includes('--dry-run');
@@ -261,7 +271,7 @@ if (entryArg.endsWith('release-prepare.mjs')) {
 
   if (!rawVersion) {
     console.error(USAGE);
-    process.exit(1);
+    return 1;
   }
 
   let result;
@@ -270,19 +280,19 @@ if (entryArg.endsWith('release-prepare.mjs')) {
   } catch (err) {
     console.error(`❌ release-prepare failed: ${err.message}`);
     console.error(USAGE);
-    process.exit(1);
+    return 1;
   }
 
   if (!result.ok) {
     console.error(`❌ release-prepare failed: ${result.error}`);
-    process.exit(1);
+    return 1;
   }
 
   if (result.dryRun) {
     console.log(`📝 Dry-run: would update to ${result.version} in:`);
     for (const f of result.changed) console.log(`   ${f}`);
     console.log('\nRun without --dry-run to apply.');
-    process.exit(0);
+    return 0;
   }
 
   console.log(`✅ release-prepare complete — ${result.version}`);
@@ -293,11 +303,16 @@ if (entryArg.endsWith('release-prepare.mjs')) {
   console.log('Next steps:');
   console.log(`  1. Fill in the CHANGELOG.md [${result.version}] section with real release notes.`);
   console.log(
-    `  2. git add package.json package-lock.json CHANGELOG.md && git commit -m "chore(release): prepare v${result.version}"`,
+    `  2. git add package.json npm-shrinkwrap.json CHANGELOG.md && git commit -m "chore(release): prepare v${result.version}"`,
   );
   console.log('  3. Owner-manual publish from a validated tree (no automatic publish, no --provenance):');
   console.log('       npm run build:all && npm run validate:publish');
   console.log('       npm publish --access public --ignore-scripts');
   console.log('     The release.yml workflow only builds/validates/attests — it never publishes.');
-  process.exit(0);
+  return 0;
+}
+
+const entryArg = process.argv[1] ?? '';
+if (entryArg !== '' && fileURLToPath(import.meta.url) === resolve(entryArg)) {
+  process.exitCode = runCli(process.argv.slice(2));
 }

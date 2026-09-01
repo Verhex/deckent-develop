@@ -621,12 +621,14 @@ export function registerStart(program: Command, runtime: StartCommandRuntime = {
                   ? { sourceAuthority: approvedSnapshot.sourceAuthority }
                   : {}),
               },
-              onExactPlanMaterialize: () => {
+              onExactPlanMaterialize: (_sprint, materializationOptions) =>
                 materializeExactPlanTaskArtifacts(root, {
                   capability,
                   approvedSnapshot: approvedSnapshot!,
-                });
-              },
+                  ...(materializationOptions?.publicationMode !== undefined
+                    ? { publicationMode: materializationOptions.publicationMode }
+                    : {}),
+                }),
               onExecutionAdmitted: async () => {
                 const gitBase = await captureGitBase(root);
                 const admitted = admitExactRunAttempt({

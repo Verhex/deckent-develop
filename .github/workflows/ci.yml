@@ -1,5 +1,9 @@
 name: CI
 
+# Repository policy classifies remote workflow availability/quota as REMOTE_ADVISORY.
+# A runner/quota failure is not a product success or product-failure settlement; the
+# proof steps below still fail closed whenever they actually run.
+
 on:
   push:
     branches: [main]
@@ -29,7 +33,7 @@ jobs:
     # (main-push still runs the full matrix).
     if: github.event_name != 'merge_group'
     runs-on: ubuntu-latest
-    # Root cause of the months-long CI outage: package-lock.json drifted from
+    # Root cause of the months-long CI outage: the root lockfile drifted from
     # package.json, so every job's `npm ci` failed with a cryptic EUSAGE error.
     # This guard runs FIRST and FAST, turning that failure into an actionable
     # message before the heavy test matrix ever spins up. `npm ci` itself still
@@ -40,16 +44,21 @@ jobs:
         with:
           node-version: '24.x'
           cache: npm
-      - name: Verify package-lock.json is in sync with package.json
+          cache-dependency-path: npm-shrinkwrap.json
+      - name: Verify npm-shrinkwrap.json is in sync with package.json
         run: |
           npm install --package-lock-only --ignore-scripts
-          if ! git diff --quiet -- package-lock.json; then
-            echo "::error file=package-lock.json::package-lock.json is out of sync with package.json. Run 'npm install' locally and commit the regenerated package-lock.json."
-            echo "--- drift (package-lock.json) ---"
-            git --no-pager diff --stat -- package-lock.json
+          if [ -e package-lock.json ]; then
+            echo "::error file=package-lock.json::Root package-lock.json was generated even though npm-shrinkwrap.json is the sole root lock authority. Remove package-lock.json and repair the lock-sync command before merging."
             exit 1
           fi
-          echo "package-lock.json is in sync with package.json."
+          if ! git diff --quiet -- npm-shrinkwrap.json; then
+            echo "::error file=npm-shrinkwrap.json::npm-shrinkwrap.json is out of sync with package.json. Run 'npm install' locally and commit the regenerated npm-shrinkwrap.json."
+            echo "--- drift (npm-shrinkwrap.json) ---"
+            git --no-pager diff --stat -- npm-shrinkwrap.json
+            exit 1
+          fi
+          echo "npm-shrinkwrap.json is in sync with package.json."
 
   typecheck:
     name: Type Check
@@ -65,6 +74,9 @@ jobs:
         with:
           node-version: '24.x'
           cache: npm
+          cache-dependency-path: |
+            npm-shrinkwrap.json
+            src/dashboard/package-lock.json
       - run: npm ci
       - run: npm run ci:rebuild-native
       - name: Install dashboard dependencies
@@ -87,6 +99,7 @@ jobs:
         with:
           node-version: '24.x'
           cache: npm
+          cache-dependency-path: npm-shrinkwrap.json
       - run: npm ci
       - run: npm run ci:rebuild-native
       - name: Dependency audit (fail-closed, signed-exception allowlist; SEC-05)
@@ -116,6 +129,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
+          cache-dependency-path: npm-shrinkwrap.json
       - run: npm ci
       - run: npm run ci:rebuild-native
       - name: Run core tests
@@ -140,10 +154,12 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
+          cache-dependency-path: npm-shrinkwrap.json
       - run: npm ci
       - run: npm run ci:rebuild-native
       - name: Build dist (real-binary tests need dist/cli/entry.js)
         run: |
+          npm run build:native
           npx tsc
           node scripts/copy-assets.mjs
       - name: Run orchestra tests
@@ -173,10 +189,12 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
+          cache-dependency-path: npm-shrinkwrap.json
       - run: npm ci
       - run: npm run ci:rebuild-native
       - name: Build dist (real-binary tests need dist/cli/entry.js)
         run: |
+          npm run build:native
           npx tsc
           node scripts/copy-assets.mjs
       - name: Run CLI tests
@@ -201,6 +219,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
+          cache-dependency-path: npm-shrinkwrap.json
       - run: npm ci
       - run: npm run ci:rebuild-native
       - name: Run remaining tests
@@ -226,6 +245,7 @@ jobs:
         with:
           node-version: '24.x'
           cache: npm
+          cache-dependency-path: npm-shrinkwrap.json
       - run: npm ci
       - run: npm run ci:rebuild-native
       - name: Run docs and scripts tests
@@ -260,10 +280,13 @@ jobs:
         with:
           node-version: '24.x'
           cache: npm
+          cache-dependency-path: |
+            npm-shrinkwrap.json
+            src/dashboard/package-lock.json
       - run: npm ci
       - run: npm run ci:rebuild-native
       - name: Install dashboard dependencies
-        run: npm install --prefix src/dashboard --ignore-scripts
+        run: npm ci --prefix src/dashboard --ignore-scripts
       - name: Run dashboard tests
         run: npm run test:dashboard
         timeout-minutes: 5
@@ -292,6 +315,7 @@ jobs:
         with:
           node-version: '24.x'
           cache: npm
+          cache-dependency-path: npm-shrinkwrap.json
       - run: npm ci
       - run: npm run ci:rebuild-native
       - name: Run core tests (Windows informational)
@@ -315,11 +339,17 @@ jobs:
         with:
           node-version: '24.x'
           cache: npm
+          cache-dependency-path: |
+            npm-shrinkwrap.json
+            src/dashboard/package-lock.json
       - run: npm ci
       - run: npm run ci:rebuild-native
       - name: Install dashboard dependencies
-        run: npm install --prefix src/dashboard --ignore-scripts
-      - run: npm run build
+        run: npm ci --prefix src/dashboard --ignore-scripts
+      # build:all owns the canonical clean → pinned/offline native builder →
+      # TypeScript/assets → dashboard order. Calling node-gyp directly here would
+      # create a second toolchain/download authority and is intentionally forbidden.
+      - run: npm run build:all
       - name: Verify dist
         run: |
           test -f dist/cli/index.js
@@ -329,13 +359,79 @@ jobs:
           head -1 dist/cli/entry.js | grep -q "#!/usr/bin/env node"
           head -1 dist/mcp/server.js | grep -q "#!/usr/bin/env node"
 
+      - name: Prove packed Linux native package contract (networkless, fresh private cache)
+        shell: bash
+        env:
+          PACKED_NETWORKLESS_RECEIPT: ${{ runner.temp }}/ci-linux-packed-networkless-receipt.json
+        run: |
+          set -euo pipefail
+          SOURCE_PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          node scripts/verify-packed-networkless-install.mjs --expected-environment linux --receipt-file "$PACKED_NETWORKLESS_RECEIPT"
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const receipt = JSON.parse(readFileSync(process.argv[1], "utf8"));
+            const sourcePackageVersion = process.argv[2];
+            const sha256 = /^sha256:[0-9a-f]{64}$/u;
+            const expectedTopLevelFields = [
+              "cacheAuthority",
+              "event",
+              "expectedEnvironmentKind",
+              "installedCliReceipt",
+              "installedNpmShrinkwrapSha256",
+              "installNetworkMode",
+              "nativeReceipt",
+              "schemaVersion",
+              "sourceNpmShrinkwrapSha256",
+              "tarballSha256",
+            ].sort();
+            const expectedInstalledCliFields = [
+              "event",
+              "outputSha256",
+              "packageVersion",
+              "schemaVersion",
+            ].sort();
+            const nativeReceipt = receipt.nativeReceipt;
+            const installedCliReceipt = receipt.installedCliReceipt;
+            if (JSON.stringify(Object.keys(receipt).sort()) !== JSON.stringify(expectedTopLevelFields)
+              || receipt.schemaVersion !== 1
+              || receipt.event !== "DECKENT_PACKED_NETWORKLESS_INSTALL_VERIFIED"
+              || receipt.expectedEnvironmentKind !== "linux"
+              || receipt.installNetworkMode !== "OFFLINE"
+              || receipt.cacheAuthority !== "FRESH_PRIVATE_PREWARMED"
+              || !sha256.test(receipt.sourceNpmShrinkwrapSha256)
+              || !sha256.test(receipt.installedNpmShrinkwrapSha256)
+              || receipt.installedNpmShrinkwrapSha256 !== receipt.sourceNpmShrinkwrapSha256
+              || !sha256.test(receipt.tarballSha256)
+              || JSON.stringify(Object.keys(installedCliReceipt ?? {}).sort()) !== JSON.stringify(expectedInstalledCliFields)
+              || installedCliReceipt?.schemaVersion !== 1
+              || installedCliReceipt.event !== "DECKENT_INSTALLED_CLI_VERIFIED"
+              || installedCliReceipt.packageVersion !== sourcePackageVersion
+              || !sha256.test(installedCliReceipt.outputSha256)
+              || nativeReceipt?.event !== "EXEC_AUTHORITY_NATIVE_INSTALLED_PACKAGE_VERIFIED"
+              || nativeReceipt.npmShrinkwrapSha256 !== receipt.sourceNpmShrinkwrapSha256
+              || nativeReceipt.platform !== "linux"
+              || nativeReceipt.environment?.environmentKind !== "linux"
+              || nativeReceipt.environment?.expectedEnvironmentKind !== "linux"
+              || nativeReceipt.installTimeNativeBuild !== "ABSENT"
+              || nativeReceipt.installTimeNativeDownload !== "ABSENT"
+              || nativeReceipt.lifecycle?.state !== "PUBLISHED_READ_VERIFIED") process.exit(1);
+          ' "$PACKED_NETWORKLESS_RECEIPT" "$SOURCE_PACKAGE_VERSION"
+
+      - name: Upload CI packed-networkless receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ci-linux-packed-networkless-receipt
+          path: ${{ runner.temp }}/ci-linux-packed-networkless-receipt.json
+          if-no-files-found: error
+          retention-days: 30
+
   shards-green:
     name: Shards Green
     # D5 aggregate required check (owner decision 2026-08-11). Incident class:
     # PR #120 merged with red shards because the ruleset required only Type Check
-    # and the three Validator legs. This job fans in every test shard, so the
-    # ruleset needs exactly ONE new required context and never has to be re-edited
-    # when the matrix changes.
+    # and the three Validator legs. This job fans in every test shard plus the
+    # production build/installed-native proof, so the ruleset cannot promote a
+    # test-only green result when the packaged binary is absent.
     #
     # always() is what makes the gate real: without it a failed shard would leave
     # this job skipped, and a skipped required check reports as passing.
@@ -351,6 +447,7 @@ jobs:
       - test-docs-scripts
       - test-dashboard
       - test-windows
+      - build
     steps:
       - name: Assert every shard concluded green
         env:
@@ -359,8 +456,8 @@ jobs:
           # above shrinks this object, and the gate then fails instead of
           # reporting green on a matrix that no longer covers the repo.
           # tests/scripts/ci-aggregate-gate.test.ts pins this number to the live
-          # `Tests —` job inventory.
-          MINIMUM_SHARDS: '7'
+          # fan-in inventory (test shards plus production proof).
+          MINIMUM_SHARDS: '8'
         run: |
           node -e '
             const needs = JSON.parse(process.env.NEEDS_JSON || "{}");

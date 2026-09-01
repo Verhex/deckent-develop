@@ -36,7 +36,8 @@
 // contacted) and points the caller back at the deterministic branch in
 // `handleWorkerQuestion` (ipc-registry.ts), which remains their single owner.
 
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { types as nodeTypes } from 'node:util';
 import type { ApprovalBrokerLike } from '../core/approval-worker-gate.js';
 import type { ApprovalRequestInput } from '../core/approval-broker.js';
 import type {
@@ -142,6 +143,28 @@ export interface QuestionBridgeOptions {
   now?: () => Date;
   /** Id generator seam for deterministic tests. Defaults to `randomUUID`. */
   idFactory?: () => string;
+  /** Exact normal-Docker question authority. WorkerQuestion itself remains an
+   *  identity-free payload and cannot populate these fields. */
+  exactAttemptBinding?: QuestionApprovalExactAttemptBinding;
+  /** Re-read the host-private receipt/fence after the external decision. An
+   *  exact binding without this seam fails closed before broker submission. */
+  revalidateExactAttemptBinding?: (
+    binding: QuestionApprovalExactAttemptBinding,
+  ) => boolean | Promise<boolean>;
+}
+
+export interface QuestionApprovalExactAttemptBinding {
+  readonly schemaVersion: 2;
+  readonly projectRootSha256: string;
+  readonly projectId: string;
+  readonly taskId: string;
+  readonly attemptId: string;
+  readonly generation: number;
+  readonly admissionReceiptDigest: `sha256:${string}`;
+  readonly fenceDigest: `sha256:${string}`;
+  readonly questionReceiptDigest: `sha256:${string}`;
+  readonly questionEnvelopeDigest: `sha256:${string}`;
+  readonly sequence: number;
 }
 
 /** The question was bridged: submitted, decided (by a human, a policy channel,
@@ -160,7 +183,18 @@ export interface QuestionBridgeRejection {
   readonly note: string;
 }
 
-export type QuestionBridgeResult = QuestionBridgeAnswer | QuestionBridgeRejection;
+export interface QuestionBridgeAuthorityHold {
+  readonly kind: 'authority-hold';
+  readonly reasonCode:
+    | 'EXACT_QUESTION_BINDING_INVALID'
+    | 'EXACT_QUESTION_REVALIDATOR_UNAVAILABLE'
+    | 'EXACT_QUESTION_AUTHORITY_CHANGED';
+}
+
+export type QuestionBridgeResult =
+  | QuestionBridgeAnswer
+  | QuestionBridgeRejection
+  | QuestionBridgeAuthorityHold;
 
 // ─── WorkerQuestion → ApprovalRequestInput ────────────────────────────────────
 
@@ -187,6 +221,7 @@ export function questionToApprovalRequest(
     userId: string;
     createdAt: Date;
     expiresAt: Date;
+    exactAttemptBinding?: QuestionApprovalExactAttemptBinding;
   },
 ): ApprovalRequestInput {
   const masked = maskArgs({
@@ -195,6 +230,12 @@ export function questionToApprovalRequest(
   });
   const maskedQuestion = typeof masked['question'] === 'string' ? masked['question'] : '';
 
+  const exactAttempt = opts.exactAttemptBinding === undefined
+    ? undefined
+    : snapshotQuestionApprovalExactAttemptBinding(opts.exactAttemptBinding, question.taskId);
+  if (opts.exactAttemptBinding !== undefined && exactAttempt === null) {
+    throw new TypeError('EXACT_QUESTION_BINDING_INVALID');
+  }
   return {
     id: opts.id,
     requester: {
@@ -211,8 +252,11 @@ export function questionToApprovalRequest(
       suggestedAction: question.suggestedAction ?? null,
       questionTimestamp: question.timestamp,
       source: 'worker-question',
+      ...(exactAttempt ? { exactAttempt } : {}),
     },
-    scopeId: question.taskId,
+    scopeId: exactAttempt
+      ? exactAttemptApprovalScopeId(exactAttempt)
+      : question.taskId,
     scope: 'lifecycle',
     risk: deriveQuestionRisk(question),
     policy: 'require-approval',
@@ -227,6 +271,20 @@ export function questionToApprovalRequest(
     maskedArgs: masked,
     rawArgsRef: null,
   };
+}
+
+function exactAttemptApprovalScopeId(binding: QuestionApprovalExactAttemptBinding): string {
+  const hash = createHash('sha256');
+  hash.update('deckent.question-approval.exact-attempt-scope.v2', 'utf8');
+  hash.update(Buffer.from([0]));
+  hash.update(JSON.stringify([
+    binding.projectRootSha256,
+    binding.projectId,
+    binding.taskId,
+    binding.attemptId,
+    binding.generation,
+  ]), 'utf8');
+  return `ipc-question:${hash.digest('hex')}`;
 }
 
 // ─── ApprovalDecision → BrainAnswer ───────────────────────────────────────────
@@ -303,6 +361,21 @@ export async function bridgeQuestionToApproval(
     return { kind: 'npm-advisory-rejected', note: NPM_ADVISORY_REJECTION_NOTE };
   }
 
+  const exactAttemptBinding = opts.exactAttemptBinding === undefined
+    ? undefined
+    : snapshotQuestionApprovalExactAttemptBinding(opts.exactAttemptBinding, question.taskId);
+  if (opts.exactAttemptBinding !== undefined) {
+    if (exactAttemptBinding === null) {
+      return { kind: 'authority-hold', reasonCode: 'EXACT_QUESTION_BINDING_INVALID' };
+    }
+    if (opts.revalidateExactAttemptBinding === undefined) {
+      return {
+        kind: 'authority-hold',
+        reasonCode: 'EXACT_QUESTION_REVALIDATOR_UNAVAILABLE',
+      };
+    }
+  }
+
   const now = opts.now ?? (() => new Date());
   const idFactory = opts.idFactory ?? randomUUID;
   const timeoutMs = Math.max(1, opts.timeoutMs ?? DEFAULT_TIMEOUT_MS);
@@ -315,16 +388,96 @@ export async function bridgeQuestionToApproval(
       userId: opts.userId ?? 'operator',
       createdAt,
       expiresAt: new Date(createdAt.getTime() + timeoutMs),
+      ...(exactAttemptBinding ? { exactAttemptBinding } : {}),
     }),
   );
 
   const decision = await awaitDecisionOrFallback(broker, request.id, timeoutMs, now);
+  if (
+    exactAttemptBinding !== undefined
+    && exactAttemptBinding !== null
+    && !await opts.revalidateExactAttemptBinding!(exactAttemptBinding)
+  ) {
+    return { kind: 'authority-hold', reasonCode: 'EXACT_QUESTION_AUTHORITY_CHANGED' };
+  }
   return {
     kind: 'bridged',
     answer: decisionToBrainAnswer(decision, question, now),
     decision,
     request,
   };
+}
+
+const SHA256_DIGEST_PATTERN = /^sha256:[a-f0-9]{64}$/u;
+const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/u;
+const EXACT_BINDING_KEYS = Object.freeze([
+  'schemaVersion',
+  'projectRootSha256',
+  'projectId',
+  'taskId',
+  'attemptId',
+  'generation',
+  'admissionReceiptDigest',
+  'fenceDigest',
+  'questionReceiptDigest',
+  'questionEnvelopeDigest',
+  'sequence',
+] as const);
+
+function boundedIdentity(value: unknown): value is string {
+  return typeof value === 'string'
+    && value === value.trim()
+    && value.length > 0
+    && Buffer.byteLength(value, 'utf8') <= 128;
+}
+
+function snapshotQuestionApprovalExactAttemptBinding(
+  value: QuestionApprovalExactAttemptBinding,
+  expectedTaskId: string,
+): QuestionApprovalExactAttemptBinding | null {
+  if (
+    value === null
+    || typeof value !== 'object'
+    || nodeTypes.isProxy(value)
+    || (Object.getPrototypeOf(value) !== Object.prototype
+      && Object.getPrototypeOf(value) !== null)
+  ) return null;
+  const keys = Reflect.ownKeys(value);
+  if (
+    keys.length !== EXACT_BINDING_KEYS.length
+    || keys.some(key => typeof key !== 'string' || !EXACT_BINDING_KEYS.includes(key as never))
+  ) return null;
+  for (const key of EXACT_BINDING_KEYS) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !('value' in descriptor) || descriptor.get || descriptor.set) return null;
+  }
+  if (!(value.schemaVersion === 2
+    && SHA256_HEX_PATTERN.test(value.projectRootSha256)
+    && boundedIdentity(value.projectId)
+    && value.taskId === expectedTaskId
+    && boundedIdentity(value.taskId)
+    && boundedIdentity(value.attemptId)
+    && Number.isSafeInteger(value.generation)
+    && value.generation > 0
+    && Number.isSafeInteger(value.sequence)
+    && value.sequence > 0
+    && SHA256_DIGEST_PATTERN.test(value.admissionReceiptDigest)
+    && SHA256_DIGEST_PATTERN.test(value.fenceDigest)
+    && SHA256_DIGEST_PATTERN.test(value.questionReceiptDigest)
+    && SHA256_DIGEST_PATTERN.test(value.questionEnvelopeDigest))) return null;
+  return Object.freeze({
+    schemaVersion: 2,
+    projectRootSha256: value.projectRootSha256,
+    projectId: value.projectId,
+    taskId: value.taskId,
+    attemptId: value.attemptId,
+    generation: value.generation,
+    admissionReceiptDigest: value.admissionReceiptDigest,
+    fenceDigest: value.fenceDigest,
+    questionReceiptDigest: value.questionReceiptDigest,
+    questionEnvelopeDigest: value.questionEnvelopeDigest,
+    sequence: value.sequence,
+  });
 }
 
 /** Race the broker's decision against the timeout (WorkerApprovalGate's

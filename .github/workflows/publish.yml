@@ -45,6 +45,7 @@ jobs:
         with:
           node-version: '24.x'
           cache: npm
+          cache-dependency-path: npm-shrinkwrap.json
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies

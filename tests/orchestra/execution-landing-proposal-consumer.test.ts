@@ -21,10 +21,14 @@ import type {
 } from '../../src/orchestra/runtime-budget-monitor.js';
 
 const roots: string[] = [];
+const originalDeckentHome = process.env.DECKENT_HOME;
 
 function fixture() {
-  const root = mkdtempSync(join(tmpdir(), 'landing-proposal-consumer-'));
-  roots.push(root);
+  const base = mkdtempSync(join(tmpdir(), 'landing-proposal-consumer-'));
+  roots.push(base);
+  const root = join(base, 'project');
+  process.env.DECKENT_HOME = join(base, 'host-state');
+  mkdirSync(root, { recursive: true });
   mkdirSync(join(root, '.tasks'));
   writeFileSync(join(root, 'source.ts'), 'export const value = 1;\n');
   const task: Task = {
@@ -134,6 +138,8 @@ function fixture() {
 }
 
 afterEach(() => {
+  if (originalDeckentHome === undefined) delete process.env.DECKENT_HOME;
+  else process.env.DECKENT_HOME = originalDeckentHome;
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 

@@ -53,8 +53,11 @@ import {
 } from './run-flow-plan-service.js';
 import type { PlanPreviewOptions } from './plan-preview-service.js';
 import {
+  inspectStructuredCriteriaProjectionAdoption,
+  inspectTaskArtifactsDeferred,
   migrateStructuredCriteriaProjection,
   publishTaskArtifactsNoClobber,
+  readTaskArtifactProjectionSet,
   TaskArtifactProjectionError,
 } from './task-artifact-projection.js';
 import {
@@ -646,6 +649,8 @@ export function prepareInProcessExactRun(input: PrepareInProcessExactRunInput): 
 export interface MaterializeExactPlanTaskArtifactsInput {
   readonly capability: ExactStartCapability;
   readonly approvedSnapshot: StoredApprovedSnapshot;
+  /** Exact Docker defers public task projection until per-task RELEASED. */
+  readonly publicationMode?: 'publish' | 'defer';
 }
 
 export interface ExactPlanTaskMaterialization {
@@ -653,6 +658,8 @@ export interface ExactPlanTaskMaterialization {
   readonly created: readonly string[];
   readonly idempotent: readonly string[];
   readonly migrated?: readonly string[];
+  readonly deferred?: readonly string[];
+  readonly existingContentDigests?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -726,6 +733,56 @@ export function materializeExactPlanTaskArtifacts(
   try {
     let migrated: readonly string[] | undefined;
     const adoption = approvedSnapshot.projectionAdoption;
+    if (input.publicationMode === 'defer') {
+      if (adoption) {
+        if (
+          adoption.schemaVersion !== 1
+          || adoption.kind !== 'structured-criteria-projection'
+          || adoption.sprintId !== approvedSnapshot.sprint.id
+          || adoption.taskCount !== approvedSnapshot.sprint.tasks.length
+          || adoption.expectedPlanDigest !== approvedSnapshot.planDigest
+        ) {
+          throw new TaskArtifactProjectionError('TASK_ARTIFACT_CONTENT_CONFLICT', {
+            reason: 'approved_adoption_record_invalid',
+          });
+        }
+        const inspected = inspectStructuredCriteriaProjectionAdoption(
+          root,
+          approvedSnapshot.sprint.id,
+          approvedSnapshot.sprint.tasks,
+        );
+        if (
+          inspected.legacyProjectionDigest !== adoption.legacyProjectionDigest
+          || inspected.canonicalProjectionDigest !== adoption.canonicalProjectionDigest
+        ) {
+          throw new TaskArtifactProjectionError('TASK_ARTIFACT_CONTENT_CONFLICT', {
+            reason: 'approved_adoption_digest_mismatch',
+          });
+        }
+        const observed = readTaskArtifactProjectionSet(
+          root,
+          approvedSnapshot.sprint.tasks.map(task => task.id),
+        );
+        return {
+          taskIds: observed.taskIds,
+          created: [],
+          idempotent: observed.taskIds,
+          deferred: observed.taskIds,
+          existingContentDigests: observed.contentDigests,
+        };
+      }
+      const inspected = inspectTaskArtifactsDeferred(
+        root,
+        approvedSnapshot.sprint.tasks,
+      );
+      return {
+        taskIds: inspected.taskIds,
+        created: [],
+        idempotent: inspected.idempotent,
+        deferred: inspected.taskIds,
+        existingContentDigests: inspected.contentDigests,
+      };
+    }
     if (adoption) {
       if (
         adoption.schemaVersion !== 1
@@ -1046,7 +1103,9 @@ export interface CanonicalExactRuntimeContext {
   readonly source: CanonicalExactSprintExecutionIngress;
   readonly capability: ExactStartCapability;
   readonly process: StartAttemptProcessIdentity;
-  readonly onExactPlanMaterialize: () => ExactPlanTaskMaterialization;
+  readonly onExactPlanMaterialize: (
+    options?: Pick<MaterializeExactPlanTaskArtifactsInput, 'publicationMode'>,
+  ) => ExactPlanTaskMaterialization;
   readonly onExecutionAdmitted: (handle: RunHandle, gitBase?: string) => void;
 }
 
@@ -1377,9 +1436,12 @@ export function createCanonicalExactSprintExecutor(
             source: source.ingress,
             capability: prepared.capability,
             process: prepared.attempt.process!,
-            onExactPlanMaterialize: () => materializeExactPlanTaskArtifacts(input.projectRoot, {
+            onExactPlanMaterialize: (options) => materializeExactPlanTaskArtifacts(input.projectRoot, {
               capability: prepared.capability,
               approvedSnapshot: snapshot,
+              ...(options?.publicationMode !== undefined
+                ? { publicationMode: options.publicationMode }
+                : {}),
             }),
             onExecutionAdmitted: (handle, gitBase) => {
               const result = admitExactRunAttempt({

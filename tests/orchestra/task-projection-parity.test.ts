@@ -10,6 +10,7 @@ import {
   assertTaskProjectionParity,
   TaskProjectionParityError,
 } from '../../src/orchestra/sprint-spawner.js';
+import { shouldDeferTaskArtifactProjection } from '../../src/orchestra/sprint-planner.js';
 import type { Sprint } from '../../src/core/types.js';
 
 function sprintOf(ids: string[]): Sprint {
@@ -24,6 +25,12 @@ function seed(root: string, ids: string[], extraFiles: string[] = []): void {
 }
 
 describe('KN3 — assertTaskProjectionParity', () => {
+  it('defers the plan for either a run-level exact request or a task-level Docker pin', () => {
+    expect(shouldDeferTaskArtifactProjection([{ backend: 'tmux' }], true)).toBe(true);
+    expect(shouldDeferTaskArtifactProjection([{ backend: 'docker' }], false)).toBe(true);
+    expect(shouldDeferTaskArtifactProjection([{ backend: 'subprocess' }], false)).toBe(false);
+  });
+
   it('parity: plan == disk → silent (byte-identical behaviour)', () => {
     const root = mkdtempSync(join(tmpdir(), 'kn3-'));
     try {
@@ -71,6 +78,26 @@ describe('KN3 — assertTaskProjectionParity', () => {
     try {
       expect(() => assertTaskProjectionParity(root, sprintOf(['001-001'])))
         .toThrowError(TaskProjectionParityError);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it('exact pre-publication mode permits only explicitly deferred ids while retaining stray detection', () => {
+    const root = mkdtempSync(join(tmpdir(), 'kn3-'));
+    try {
+      seed(root, []);
+      const sprint = sprintOf(['001-001', '001-002']);
+      expect(() => assertTaskProjectionParity(
+        root,
+        sprint,
+        new Set(['001-001', '001-002']),
+      )).not.toThrow();
+
+      writeFileSync(join(root, '.tasks', 'task-001-999.json'), JSON.stringify({ id: '001-999' }));
+      expect(() => assertTaskProjectionParity(
+        root,
+        sprint,
+        new Set(['001-001', '001-002']),
+      )).toThrowError(/NOT in this plan: \[001-999\]/u);
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 });

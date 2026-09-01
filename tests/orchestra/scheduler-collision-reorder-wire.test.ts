@@ -6,6 +6,7 @@ import { reduceSchedulerTick } from '../../src/orchestra/scheduler-reducer.js';
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { vi } from "vitest";
+import { SpawnBackendRecoveryHoldError } from "../../src/orchestra/spawn-backend.js";
 import type { SpawnBackend } from "../../src/orchestra/spawn-backend.js";
 import { reconcileSpawnBackendBeforeRestore } from "../../src/orchestra/sprint-controller.js";
 
@@ -179,6 +180,7 @@ describe('runSprint restart reconciliation seam', () => {
             closedAbsentAfterExit: [],
             retiredLanded: [],
             resumedContinuations: [],
+            held: [],
         }));
         await reconcileSpawnBackendBeforeRestore(backend(reconcile));
         expect(reconcile).toHaveBeenCalledTimes(1);
@@ -187,6 +189,29 @@ describe('runSprint restart reconciliation seam', () => {
         const error = new Error('DECKENT_E091:ambiguous-dispatch-container-absent');
         const reconcile = vi.fn(async () => { throw error; });
         await expect(reconcileSpawnBackendBeforeRestore(backend(reconcile))).rejects.toBe(error);
+    });
+    it('turns a returned exact recovery HOLD into a typed startup failure', async () => {
+        const hold = {
+            kind: 'spawn-backend-recovery-hold' as const,
+            backend: 'docker' as const,
+            dispatchRequestId: `dreq-${'a'.repeat(64)}`,
+            taskId: 'task-held',
+            admissionRefDigest: `sha256:${'b'.repeat(64)}`,
+            authorityState: 'DISPATCH_AMBIGUOUS' as const,
+            reasonCode: 'PRE_PROVIDER_RECONCILIATION_REQUIRED' as const,
+        };
+        const reconcile = vi.fn(async () => ({
+            adopted: [],
+            closedNotDispatched: [],
+            closedAbsentAfterExit: [],
+            retiredLanded: [],
+            resumedContinuations: [],
+            held: [hold],
+        }));
+        await expect(reconcileSpawnBackendBeforeRestore(backend(reconcile))).rejects.toMatchObject({
+            name: SpawnBackendRecoveryHoldError.name,
+            holds: [hold],
+        });
     });
     it('is a no-op for backends without a durable attempt journal', async () => {
         await expect(reconcileSpawnBackendBeforeRestore(backend())).resolves.toBeUndefined();

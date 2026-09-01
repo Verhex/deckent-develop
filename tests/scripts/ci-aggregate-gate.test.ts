@@ -18,16 +18,15 @@
  * .github/workflows/ci.yml is written in.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-
-const execFileAsync = promisify(execFile);
+import { closeSync, mkdtempSync, openSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { spawn } from 'node:child_process';
 
 const CI_WORKFLOW_PATH = resolve('.github/workflows/ci.yml');
 const AGGREGATE_JOB_ID = 'shards-green';
 const AGGREGATE_JOB_NAME = 'Shards Green';
+const PRODUCTION_PROOF_JOB_ID = 'build';
 /** Every test shard is named `Tests — …` in ci.yml; that prefix is the inventory key. */
 const SHARD_NAME_PREFIX = 'Tests —';
 
@@ -151,18 +150,28 @@ async function runGate(
   script: string,
   env: { NEEDS_JSON: string; MINIMUM_SHARDS: string; GITHUB_EVENT_NAME: string }
 ): Promise<GateOutcome> {
-  try {
-    const { stdout, stderr } = await execFileAsync(process.execPath, ['-e', script], {
+  return new Promise((resolvePromise, rejectPromise) => {
+    const outputRoot = mkdtempSync(join(tmpdir(), 'deckent-ci-gate-output-'));
+    const outputPath = join(outputRoot, 'gate.log');
+    const outputFd = openSync(outputPath, 'w');
+    const child = spawn(process.execPath, ['-e', script], {
       env: { ...process.env, ...env },
+      stdio: ['ignore', outputFd, outputFd],
     });
-    return { exitCode: 0, output: `${stdout}${stderr}` };
-  } catch (error) {
-    const failure = error as { code?: number | string; stdout?: string; stderr?: string };
-    return {
-      exitCode: typeof failure.code === 'number' ? failure.code : 1,
-      output: `${failure.stdout ?? ''}${failure.stderr ?? ''}`,
-    };
-  }
+    closeSync(outputFd);
+    child.on('error', (error) => {
+      rmSync(outputRoot, { recursive: true, force: true });
+      rejectPromise(error);
+    });
+    child.on('close', (code) => {
+      const output = readFileSync(outputPath, 'utf-8');
+      rmSync(outputRoot, { recursive: true, force: true });
+      resolvePromise({
+        exitCode: typeof code === 'number' ? code : 1,
+        output,
+      });
+    });
+  });
 }
 
 function needsFixture(ids: string[], results: Record<string, string> = {}): string {
@@ -192,7 +201,7 @@ describe('CI aggregate required check — Shards Green (D5)', () => {
     expect(aggregate?.name).toBe(AGGREGATE_JOB_NAME);
   });
 
-  it('fans in every `Tests —` shard job, with no shard left out', () => {
+  it('fans in every `Tests —` shard plus the production packed-networkless proof', () => {
     const shardIds = shardJobs.map((job) => job.id).sort();
     expect(shardIds).toEqual([
       'test-cli',
@@ -203,13 +212,70 @@ describe('CI aggregate required check — Shards Green (D5)', () => {
       'test-remaining',
       'test-windows',
     ]);
-    expect([...(aggregate?.needs ?? [])].sort()).toEqual(shardIds);
+    expect([...(aggregate?.needs ?? [])].sort()).toEqual([
+      ...shardIds,
+      PRODUCTION_PROOF_JOB_ID,
+    ].sort());
+  });
+
+  it('pins the build fan-in to the canonical fresh-cache networkless receipt', () => {
+    const build = jobById.get(PRODUCTION_PROOF_JOB_ID);
+    expect(build).toBeDefined();
+    expect(build?.continueOnError).toBe(false);
+    expect(build?.body).toContain('npm ci --prefix src/dashboard --ignore-scripts');
+    expect(build?.body).toContain('npm run build:all');
+    expect(build?.body).toContain(
+      'node scripts/verify-packed-networkless-install.mjs --expected-environment linux',
+    );
+    expect(build?.body).toContain('DECKENT_PACKED_NETWORKLESS_INSTALL_VERIFIED');
+    expect(build?.body).toContain('receipt.installNetworkMode !== "OFFLINE"');
+    expect(build?.body).toContain('receipt.cacheAuthority !== "FRESH_PRIVATE_PREWARMED"');
+    expect(build?.body).toContain(
+      'receipt.installedNpmShrinkwrapSha256 !== receipt.sourceNpmShrinkwrapSha256',
+    );
+    const topLevelFields = build?.body
+      .match(/const expectedTopLevelFields = \[([\s\S]*?)\]\.sort\(\);/u)?.[1]
+      .match(/"([^"]+)"/gu)
+      ?.map((field) => field.slice(1, -1))
+      .sort();
+    expect(topLevelFields).toEqual([
+      'cacheAuthority',
+      'event',
+      'expectedEnvironmentKind',
+      'installNetworkMode',
+      'installedCliReceipt',
+      'installedNpmShrinkwrapSha256',
+      'nativeReceipt',
+      'schemaVersion',
+      'sourceNpmShrinkwrapSha256',
+      'tarballSha256',
+    ].sort());
+    expect(build?.body).toContain('JSON.stringify(Object.keys(receipt).sort())');
+    expect(build?.body).toContain('SOURCE_PACKAGE_VERSION=$(node -p "require(\'./package.json\').version")');
+    expect(build?.body).toContain('installedCliReceipt?.schemaVersion !== 1');
+    expect(build?.body).toContain('installedCliReceipt.event !== "DECKENT_INSTALLED_CLI_VERIFIED"');
+    expect(build?.body).toContain('installedCliReceipt.packageVersion !== sourcePackageVersion');
+    expect(build?.body).toContain('!sha256.test(installedCliReceipt.outputSha256)');
+    expect(build?.body).toContain(
+      'nativeReceipt.npmShrinkwrapSha256 !== receipt.sourceNpmShrinkwrapSha256',
+    );
+    expect(build?.body).toContain('EXEC_AUTHORITY_NATIVE_INSTALLED_PACKAGE_VERIFIED');
+    expect(build?.body).toContain('nativeReceipt.lifecycle?.state !== "PUBLISHED_READ_VERIFIED"');
+    expect(build?.body).toContain('nativeReceipt.installTimeNativeBuild !== "ABSENT"');
+    expect(build?.body).toContain('nativeReceipt.installTimeNativeDownload !== "ABSENT"');
+    expect(build?.body).toContain('nativeReceipt.environment?.environmentKind !== "linux"');
+    expect(build?.body).toContain(
+      'path: ${{ runner.temp }}/ci-linux-packed-networkless-receipt.json',
+    );
+    expect(build?.body).not.toContain('npm_config_offline:');
+    expect(build?.body).not.toContain('npm install -g');
+    expect(build?.body).not.toContain('verify-exec-authority-native-package.mjs');
   });
 
   it('declares a minimum fan-in count equal to the live shard inventory', () => {
     const declared = stepEnv(aggregate?.body ?? '', 'MINIMUM_SHARDS');
     expect(declared).not.toBeNull();
-    expect(Number(declared)).toBe(shardJobs.length);
+    expect(Number(declared)).toBe(shardJobs.length + 1);
     expect(Number(declared)).toBe(aggregate?.needs.length);
   });
 
@@ -243,12 +309,12 @@ describe('CI aggregate required check — Shards Green (D5)', () => {
 
 describe('Shards Green gate script — executed against fixtures', () => {
   const script = extractGateScript(aggregate?.body ?? '');
-  const shardIds = shardJobs.map((job) => job.id);
-  const minimum = String(shardJobs.length);
+  const fanInIds = aggregate?.needs ?? [];
+  const minimum = String(fanInIds.length);
 
   it('passes when every shard concluded green', async () => {
     const result = await runGate(script, {
-      NEEDS_JSON: needsFixture(shardIds),
+      NEEDS_JSON: needsFixture(fanInIds),
       MINIMUM_SHARDS: minimum,
       GITHUB_EVENT_NAME: 'pull_request',
     });
@@ -258,7 +324,7 @@ describe('Shards Green gate script — executed against fixtures', () => {
 
   it('fails when a shard failed', async () => {
     const result = await runGate(script, {
-      NEEDS_JSON: needsFixture(shardIds, { 'test-orchestra': 'failure' }),
+      NEEDS_JSON: needsFixture(fanInIds, { 'test-orchestra': 'failure' }),
       MINIMUM_SHARDS: minimum,
       GITHUB_EVENT_NAME: 'pull_request',
     });
@@ -266,9 +332,19 @@ describe('Shards Green gate script — executed against fixtures', () => {
     expect(result.output).toContain('test-orchestra=failure');
   });
 
+  it('fails when the production installed-native proof failed', async () => {
+    const result = await runGate(script, {
+      NEEDS_JSON: needsFixture(fanInIds, { [PRODUCTION_PROOF_JOB_ID]: 'failure' }),
+      MINIMUM_SHARDS: minimum,
+      GITHUB_EVENT_NAME: 'pull_request',
+    });
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain(`${PRODUCTION_PROOF_JOB_ID}=failure`);
+  });
+
   it('fails when a shard was cancelled', async () => {
     const result = await runGate(script, {
-      NEEDS_JSON: needsFixture(shardIds, { 'test-cli': 'cancelled' }),
+      NEEDS_JSON: needsFixture(fanInIds, { 'test-cli': 'cancelled' }),
       MINIMUM_SHARDS: minimum,
       GITHUB_EVENT_NAME: 'pull_request',
     });
@@ -278,7 +354,7 @@ describe('Shards Green gate script — executed against fixtures', () => {
 
   it('fails when a shard skipped outside the merge queue (upstream never ran it)', async () => {
     const result = await runGate(script, {
-      NEEDS_JSON: needsFixture(shardIds, { 'test-core': 'skipped' }),
+      NEEDS_JSON: needsFixture(fanInIds, { 'test-core': 'skipped' }),
       MINIMUM_SHARDS: minimum,
       GITHUB_EVENT_NAME: 'pull_request',
     });
@@ -287,7 +363,7 @@ describe('Shards Green gate script — executed against fixtures', () => {
   });
 
   it('fails when a shard is silently dropped from the fan-in, even if the rest are green', async () => {
-    const dropped = shardIds.filter((id) => id !== 'test-remaining');
+    const dropped = fanInIds.filter((id) => id !== 'test-remaining');
     const result = await runGate(script, {
       NEEDS_JSON: needsFixture(dropped),
       MINIMUM_SHARDS: minimum,
@@ -298,9 +374,9 @@ describe('Shards Green gate script — executed against fixtures', () => {
   });
 
   it('tolerates skipped shards only when the event itself is merge_group', async () => {
-    const allSkipped = Object.fromEntries(shardIds.map((id) => [id, 'skipped']));
+    const allSkipped = Object.fromEntries(fanInIds.map((id) => [id, 'skipped']));
     const result = await runGate(script, {
-      NEEDS_JSON: needsFixture(shardIds, allSkipped),
+      NEEDS_JSON: needsFixture(fanInIds, allSkipped),
       MINIMUM_SHARDS: minimum,
       GITHUB_EVENT_NAME: 'merge_group',
     });
@@ -309,7 +385,7 @@ describe('Shards Green gate script — executed against fixtures', () => {
 
   it('still fails a merge_group run when a shard actually failed', async () => {
     const result = await runGate(script, {
-      NEEDS_JSON: needsFixture(shardIds, { 'test-dashboard': 'failure' }),
+      NEEDS_JSON: needsFixture(fanInIds, { 'test-dashboard': 'failure' }),
       MINIMUM_SHARDS: minimum,
       GITHUB_EVENT_NAME: 'merge_group',
     });
@@ -319,7 +395,7 @@ describe('Shards Green gate script — executed against fixtures', () => {
 
   it('fails closed when the declared minimum is not a positive integer', async () => {
     const result = await runGate(script, {
-      NEEDS_JSON: needsFixture(shardIds),
+      NEEDS_JSON: needsFixture(fanInIds),
       MINIMUM_SHARDS: '',
       GITHUB_EVENT_NAME: 'pull_request',
     });

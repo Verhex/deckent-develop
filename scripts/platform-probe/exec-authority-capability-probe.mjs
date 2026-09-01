@@ -2,12 +2,15 @@
 /**
  * exec-authority-capability-probe.mjs — W2 (PLATFORM-EXEC-AUTH-W2-PROBE-001)
  *
- * MEASUREMENT, NOT A GATE. Runs on real macOS/Windows CI runners and records
+ * MEASUREMENT, NOT A GATE. Runs on real platform hosts and records
  * the platform facts the W3/W4 adapter designs depend on
  * (docs/analysis/platform-execution-authority-adapters-2026-08-05.md §5 W2).
  * Always exits 0 when the probe itself ran; every capability result is a
  * recorded observation ('supported' | 'unsupported' | 'error:<code>'), never
- * an assertion. The JSON artifact is the deliverable.
+ * an assertion. The JSON artifact is the deliverable. Native/package proof is
+ * intentionally owned by verify-exec-authority-native-package.mjs; this probe
+ * has no gate mode and refuses arguments so measurement cannot be promoted by
+ * an undocumented switch.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -30,12 +33,70 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { loadExecAuthorityNative } from '../../native/exec-authority/index.mjs';
+
+if (process.argv.length !== 2) {
+  process.stderr.write('E_EXEC_AUTHORITY_PROBE_ARGUMENT: measurement probe accepts no arguments\n');
+  process.exit(2);
+}
+
+function environmentKind() {
+  if (process.platform !== 'linux') return process.platform;
+  try {
+    const kernelRelease = readFileSync('/proc/sys/kernel/osrelease', 'utf8').trim();
+    return /microsoft.*wsl2/iu.test(kernelRelease) ? 'wsl2' : 'linux';
+  } catch {
+    return 'linux-unknown';
+  }
+}
+
+const nativeState = loadExecAuthorityNative();
+const nativeContract = nativeState.available
+  ? {
+    compiledBinaryLoaded: true,
+    installedPackageVerified: false,
+    state: 'AVAILABLE',
+    abiName: nativeState.manifest.abiName,
+    abiVersion: nativeState.manifest.abiVersion,
+    handleAbi: nativeState.manifest.handleAbi,
+    exportSet: nativeState.manifest.exportSet,
+    features: nativeState.manifest.features,
+    executionEffect: {
+      available: nativeState.manifest.effectContract.available,
+      abiName: nativeState.manifest.effectContract.abiName,
+      abiVersion: nativeState.manifest.effectContract.abiVersion,
+      handleAbi: nativeState.manifest.effectContract.handleAbi,
+      trustDomain: nativeState.manifest.effectContract.trustDomain,
+      operations: nativeState.manifest.effectContract.operations,
+      facadeState: nativeState.manifest.effectContract.available ? 'PRESENT' : 'UNSUPPORTED',
+      sourceReadCursorState: nativeState.manifest.effectContract.available
+        && ['begin-source-read', 'next-source-chunk', 'finish-source-read'].every(
+          operation => nativeState.manifest.effectContract.operations.includes(operation),
+        ) ? 'PRESENT' : 'UNSUPPORTED',
+    },
+  }
+  : {
+    compiledBinaryLoaded: false,
+    installedPackageVerified: false,
+    state: 'UNAVAILABLE',
+    reason: nativeState.reason,
+    executionEffect: {
+      available: false,
+      facadeState: 'UNAVAILABLE',
+      sourceReadCursorState: 'UNAVAILABLE',
+    },
+  };
 
 const results = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   probe: 'exec-authority-capability-probe',
   workId: 'PLATFORM-EXEC-AUTH-W2-PROBE-001',
+  mode: 'measurement',
+  evidenceClass: 'CAPABILITY_MEASUREMENT_ONLY',
+  promotionEligible: false,
+  nativeContract,
   platform: process.platform,
+  environmentKind: environmentKind(),
   release: process.getSystemVersion?.() ?? null,
   arch: process.arch,
   node: process.version,

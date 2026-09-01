@@ -129,7 +129,9 @@ describe('Docker build context exclusions', () => {
     ];
     const requiredBuildInputs = [
       'package.json',
-      'package-lock.json',
+      'npm-shrinkwrap.json',
+      'src/dashboard/package-lock.json',
+      'src/desktop/package-lock.json',
       'src/cli/index.ts',
       'src/core/config.ts',
     ];
@@ -140,5 +142,13 @@ describe('Docker build context exclusions', () => {
     for (const path of requiredBuildInputs) {
       expect(isExcluded(path, rules), `${path} must remain in the build context`).toBe(false);
     }
+  });
+});
+
+describe('root lockfile secret-scan exclusions', () => {
+  it('skips both npm lockfile names without weakening other tracked-file scans', () => {
+    const scanner = readFileSync('scripts/security/secret-baseline.mjs', 'utf8');
+    expect(scanner).toContain("'package-lock.json'");
+    expect(scanner).toContain("'npm-shrinkwrap.json'");
   });
 });

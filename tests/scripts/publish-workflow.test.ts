@@ -22,8 +22,12 @@ describe('.github/workflows/publish.yml', () => {
   });
 
   it('should have permissions set correctly', () => {
-    expect(workflowContent).toContain('contents: read');
-    expect(workflowContent).toContain('id-token: write');
+    const permissions = workflowContent.slice(
+      workflowContent.indexOf('permissions:'),
+      workflowContent.indexOf('\njobs:'),
+    );
+    expect(permissions).toContain('contents: read');
+    expect(permissions).not.toContain('id-token: write');
   });
 
   it('should use Node.js 24.x', () => {
@@ -42,14 +46,19 @@ describe('.github/workflows/publish.yml', () => {
     expect(workflowContent).toContain('vitest run');
   });
 
-  it('should have publish step with provenance', () => {
-    expect(workflowContent).toContain('npm publish --provenance');
+  it('is dry-run-only and never executes a provenance publish', () => {
+    expect(workflowContent).toContain('npm publish --dry-run --access public');
+    expect(workflowContent).not.toMatch(/^\s*run:.*npm publish --provenance/m);
   });
 
-  it('uses OIDC trusted publishing — no long-lived registry token (414-001 SEC-06)', () => {
+  it('uses no publish credential or OIDC grant in the retired validation-only workflow', () => {
     expect(workflowContent).not.toContain('NODE_AUTH_TOKEN');
     expect(workflowContent).not.toContain('secrets.NPM_TOKEN');
-    expect(workflowContent).toContain('id-token: write');
+    const permissions = workflowContent.slice(
+      workflowContent.indexOf('permissions:'),
+      workflowContent.indexOf('\njobs:'),
+    );
+    expect(permissions).not.toContain('id-token: write');
   });
 
   it('should have registry-url set to npmjs.org', () => {
@@ -71,5 +80,11 @@ describe('.github/workflows/publish.yml', () => {
 
   it('should have cache enabled for npm', () => {
     expect(workflowContent).toContain('cache: npm');
+  });
+
+  it('should key the npm cache explicitly from the canonical root shrinkwrap', () => {
+    expect(workflowContent).toMatch(
+      /cache: npm\s*\n\s*cache-dependency-path: npm-shrinkwrap\.json/u,
+    );
   });
 });

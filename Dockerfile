@@ -1,4 +1,4 @@
-FROM node:22-slim
+FROM node:24-slim
 
 # Install tmux and git
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Copy package files
-COPY package*.json ./
+COPY package.json npm-shrinkwrap.json ./
 
 # Install dependencies
 RUN npm ci
@@ -33,4 +33,4 @@ USER deckent
 WORKDIR /workspace
 
 # Entrypoint
-ENTRYPOINT ["node", "/app/dist/cli/index.js"]
+ENTRYPOINT ["node", "/app/dist/cli/entry.js"]

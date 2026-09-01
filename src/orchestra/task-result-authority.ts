@@ -12,6 +12,20 @@ import {
 import { projectDockerRecoveryPreDispatchSettlement } from '../core/pre-dispatch-settlement.js';
 import { createExecutionAuthorityError } from '../core/errors.js';
 import { readJsonSafe } from '../core/utils.js';
+import type {
+  Sha256Digest,
+  TaskAttemptCustodyIdentityV2,
+} from '../core/task-attempt-custody-store.js';
+import type { TaskResultV2 } from '../core/task-result-schema.js';
+import {
+  inspectExactAcceptedTaskResultAuthority,
+  inspectExactTaskResultSettlementAuthority,
+  type ExactAcceptedTaskResultRefV2,
+  type ExactTaskResultSettlementRefV2,
+  type InspectExactAcceptedTaskResultAuthorityInput,
+  type InspectExactTaskResultAttemptSettlementInput,
+  type InspectExactTaskResultSettlementAuthorityInput,
+} from '../core/task-settlement-authority.js';
 import {
   readRuntimeBudgetExhaustion,
   type RuntimeBudgetStopEvidence,
@@ -19,15 +33,71 @@ import {
 
 export type TaskResultAuthorityState =
   | 'settled'
+  | 'exact-accepted'
+  | 'exact-settled'
   | 'pending-settlement'
+  | 'not-dispatched'
+  | 'authority-hold'
   | 'legacy'
   | 'absent';
+
+export interface ExactTaskResultAuthorityMetadata {
+  readonly executionMode: 'normal-docker';
+  readonly identity: TaskAttemptCustodyIdentityV2;
+  readonly admissionReceiptDigest: Sha256Digest;
+  readonly settlementRef: ExactTaskResultSettlementRefV2;
+  readonly settlementDigest: Sha256Digest;
+  readonly resultDigest: Sha256Digest;
+  readonly acceptedResultChainDigest: Sha256Digest;
+  readonly evaluationChainDigest: Sha256Digest;
+  readonly finalizerChainDigest: Sha256Digest;
+  readonly evaluationArtifact: {
+    readonly artifactReceiptDigest: Sha256Digest;
+    readonly chainDigest: Sha256Digest;
+    readonly artifactSha256: Sha256Digest;
+    readonly byteLength: number;
+  };
+  readonly finalizerArtifact: {
+    readonly artifactReceiptDigest: Sha256Digest;
+    readonly chainDigest: Sha256Digest;
+    readonly artifactSha256: Sha256Digest;
+    readonly byteLength: number;
+  };
+}
+
+export interface ExactAcceptedTaskResultAuthorityMetadata {
+  readonly executionMode: 'normal-docker';
+  readonly identity: TaskAttemptCustodyIdentityV2;
+  readonly admissionReceiptDigest: Sha256Digest;
+  readonly acceptedResultRef: ExactAcceptedTaskResultRefV2;
+  readonly acceptedResultChainDigest: Sha256Digest;
+  readonly resultDigest: Sha256Digest;
+}
+
+export type ExactAuthoritativeTaskResult<T> = T & {
+  readonly exactSettlementAuthority: ExactTaskResultAuthorityMetadata;
+};
+
+export type ExactAcceptedAuthoritativeTaskResult<T> = T & {
+  readonly exactAcceptedResultAuthority: ExactAcceptedTaskResultAuthorityMetadata;
+};
+
+export type ReadExactAuthoritativeTaskResultInput =
+  | InspectExactAcceptedTaskResultAuthorityInput
+  | Exclude<
+      InspectExactTaskResultSettlementAuthorityInput,
+      InspectExactTaskResultAttemptSettlementInput
+    >;
 
 export interface TaskResultAuthorityRead<T> {
   state: TaskResultAuthorityState;
   result: T | null;
   settlementRef: TaskResultSettlementRefV1 | null;
   rawResultPath: string;
+  exactAuthority?: ExactTaskResultAuthorityMetadata;
+  exactAcceptedAuthority?: ExactAcceptedTaskResultAuthorityMetadata;
+  holdReason?: string;
+  attemptCount?: number;
 }
 
 export interface RuntimeBudgetEvaluationAuthority {
@@ -82,6 +152,156 @@ export function readAuthoritativeTaskResult<T>(
   return legacy === null
     ? { state: 'absent', result: null, settlementRef: null, rawResultPath }
     : { state: 'legacy', result: legacy, settlementRef: null, rawResultPath };
+}
+
+/**
+ * Explicit execution-mode boundary for new exact-attempt consumers. Normal
+ * Docker delegates only to host-private custody inspection; public `.tasks`
+ * bytes are read solely by the separately named legacy non-Docker arm.
+ */
+export function readExactAuthoritativeTaskResult<T = unknown>(
+  input: ReadExactAuthoritativeTaskResultInput,
+): TaskResultAuthorityRead<T> {
+  const rawResultPath = join(input.projectRoot, TASKS_DIR, `task-${input.taskId}.result`);
+  if (input.executionMode === 'normal-docker' && input.authorityKind === 'accepted-result') {
+    const inspected = inspectExactAcceptedTaskResultAuthority(input);
+    if (inspected.state === 'hold') {
+      return {
+        state: 'authority-hold',
+        result: null,
+        settlementRef: null,
+        rawResultPath,
+        holdReason: inspected.reasonCode,
+      };
+    }
+    const exactAcceptedAuthority: ExactAcceptedTaskResultAuthorityMetadata = Object.freeze({
+      executionMode: 'normal-docker',
+      identity: Object.freeze({ ...inspected.identity }),
+      admissionReceiptDigest: inspected.admissionReceiptDigest,
+      acceptedResultRef: Object.freeze({
+        ...inspected.acceptedResultRef,
+        identity: Object.freeze({ ...inspected.acceptedResultRef.identity }),
+      }),
+      acceptedResultChainDigest: inspected.acceptedResultChainDigest,
+      resultDigest: inspected.resultDigest,
+    });
+    return {
+      state: 'exact-accepted',
+      result: projectExactAcceptedTaskResult(inspected.result, exactAcceptedAuthority) as T,
+      settlementRef: null,
+      rawResultPath,
+      exactAcceptedAuthority,
+    };
+  }
+  const inspected = inspectExactTaskResultSettlementAuthority(input);
+  if (inspected.state === 'not-dispatched') {
+    return {
+      state: 'not-dispatched',
+      result: null,
+      settlementRef: null,
+      rawResultPath,
+      attemptCount: inspected.attemptCount,
+    };
+  }
+  if (inspected.state === 'hold') {
+    return {
+      state: 'authority-hold',
+      result: null,
+      settlementRef: null,
+      rawResultPath,
+      holdReason: inspected.reasonCode,
+    };
+  }
+  return inspected.result === null
+    ? { state: 'absent', result: null, settlementRef: null, rawResultPath }
+    : { state: 'legacy', result: inspected.result as T, settlementRef: null, rawResultPath };
+}
+
+/** Downstream-only terminal settlement reader; collector must not call this. */
+export function readExactSettledTaskResult<T = unknown>(
+  input: InspectExactTaskResultAttemptSettlementInput,
+): TaskResultAuthorityRead<T> {
+  const rawResultPath = join(input.projectRoot, TASKS_DIR, `task-${input.taskId}.result`);
+  const inspected = inspectExactTaskResultSettlementAuthority(input);
+  if (inspected.state === 'hold') {
+    return {
+      state: 'authority-hold',
+      result: null,
+      settlementRef: null,
+      rawResultPath,
+      holdReason: inspected.reasonCode,
+    };
+  }
+  if (inspected.state !== 'accepted') {
+    return { state: 'authority-hold', result: null, settlementRef: null, rawResultPath };
+  }
+  const exactAuthority: ExactTaskResultAuthorityMetadata = Object.freeze({
+    executionMode: 'normal-docker',
+    identity: Object.freeze({ ...inspected.identity }),
+    admissionReceiptDigest: inspected.admissionReceiptDigest,
+    settlementRef: Object.freeze({
+      ...inspected.settlementRef,
+      identity: Object.freeze({ ...inspected.settlementRef.identity }),
+    }),
+    settlementDigest: inspected.settlementDigest,
+    resultDigest: inspected.settlement.resultDigest,
+    acceptedResultChainDigest: inspected.settlement.chain.acceptedResultChainDigest,
+    evaluationChainDigest: inspected.settlement.chain.evaluationChainDigest,
+    finalizerChainDigest: inspected.settlement.chain.finalizerChainDigest,
+    evaluationArtifact: Object.freeze({ ...inspected.evaluationArtifact }),
+    finalizerArtifact: Object.freeze({ ...inspected.finalizerArtifact }),
+  });
+  return {
+    state: 'exact-settled',
+    result: projectExactTaskResult(inspected.result, exactAuthority) as T,
+    settlementRef: null,
+    rawResultPath,
+    exactAuthority,
+  };
+}
+
+function projectCompatibleTaskResult(result: TaskResultV2): Record<string, unknown> {
+  const {
+    attemptCustody: _attemptCustody,
+    brainEvaluation: _brainEvaluation,
+    brainEvaluationReason: _brainEvaluationReason,
+    rubricScores: _rubricScores,
+    totalScore: _totalScore,
+    filesChanged,
+    totalLinesAdded,
+    totalLinesRemoved,
+    tests,
+    ...compatible
+  } = result;
+  return {
+    ...compatible,
+    filesChanged: filesChanged.map(change => change.path),
+    linesAdded: totalLinesAdded,
+    linesRemoved: totalLinesRemoved,
+    testsPassed: result.testVerification?.outcome === 'PASSED'
+      || (result.testVerification === undefined && tests.outcome === 'PASSED'),
+    coverage: tests.coverage ?? 0,
+  };
+}
+
+function projectExactAcceptedTaskResult(
+  result: TaskResultV2,
+  exactAcceptedResultAuthority: ExactAcceptedTaskResultAuthorityMetadata,
+): ExactAcceptedAuthoritativeTaskResult<Record<string, unknown>> {
+  return {
+    ...projectCompatibleTaskResult(result),
+    exactAcceptedResultAuthority,
+  };
+}
+
+function projectExactTaskResult(
+  result: TaskResultV2,
+  exactSettlementAuthority: ExactTaskResultAuthorityMetadata,
+): ExactAuthoritativeTaskResult<Record<string, unknown>> {
+  return {
+    ...projectCompatibleTaskResult(result),
+    exactSettlementAuthority,
+  };
 }
 
 /**

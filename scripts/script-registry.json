@@ -169,6 +169,16 @@
    "notes": "design-tokens-pipeline skill contract; --check is wired into lint:gates."
   },
   {
+   "file": "scripts/build-exec-authority-native.mjs",
+   "class": "gate",
+   "owner": "exec-authority-native-delivery",
+   "npmScript": "build:native, clean:native (build:native is in build/build:all; nested native build/clean delegate here)",
+   "input": "pinned native/exec-authority source tree, root/native package metadata, local node-gyp 12.2.0 and local Node headers",
+   "output": "atomically installed native/exec-authority/prebuilds/<platform>-<arch>/napi-v8 artifact.json + exec_authority.node with exact source/binary identity",
+   "expiry": "none — permanent fail-closed native prebuild producer",
+   "notes": "TN-PACKAGE builder; offline local-toolchain build only, validates the raw ABI before replacing the single admitted platform artifact pair."
+  },
+  {
    "file": "scripts/build.mjs",
    "class": "gate",
    "owner": "build-pipeline",
@@ -839,6 +849,16 @@
    "notes": "583/N4 real-binary smoke, two legs (CLI + dispatcher)."
   },
   {
+   "file": "scripts/npm-shrinkwrap-contract.mjs",
+   "class": "gate",
+   "owner": "published-dependency-authority",
+   "npmScript": null,
+   "input": "one canonical package root containing package.json + npm-shrinkwrap.json and no root package-lock.json",
+   "output": "fail-closed schema-v3 shrinkwrap identity binding stable bytes, sha256, byte length, package count and root dependency-map parity",
+   "expiry": "none — permanent shared publish/install dependency-authority gate",
+   "notes": "TN-PACKAGE Option A sole lock authority; consumed by validate-publish, installed-native verifier, networkless proof and xplat supporting smoke."
+  },
+  {
    "file": "scripts/nova-tasarim-loop.mjs",
    "class": "one-shot",
    "owner": "nova-design-loop",
@@ -884,7 +904,7 @@
    "owner": "release-engineering",
    "npmScript": null,
    "input": "--version vX.Y.Z[-pre][+build] CLI arg",
-   "output": "atomically updated package.json, package-lock.json (both version fields), CHANGELOG.md skeleton section",
+   "output": "prevalidated package.json, npm-shrinkwrap.json (both version fields), and CHANGELOG.md replacements; REL-01 rejects any interruption-created partial triple",
    "expiry": "none — manual utility, run once per release cycle by the owner",
    "notes": "Task 414-002 RC4B/REL-03-04; replaces scripts/bump-version.sh. Never tags/pushes/publishes — release.yml remains sole-publish-authority (born-608)."
   },
@@ -1102,11 +1122,31 @@
    "file": "scripts/validate-publish.mjs",
    "class": "gate",
    "owner": "publish-readiness",
-   "npmScript": "validate:publish (in release)",
-   "input": "npm pack output, package.json, ADR/link lint results",
-   "output": "6 readiness gates (pack size, engines.node, entry points, no internal-state leak, adr_lint, link_lint)",
-   "expiry": "none — permanent gate, blocks release",
-   "notes": "Sprint 180 W5-1 Crisis Stabilization §6."
+   "npmScript": "validate:publish (in prepublishOnly + release)",
+   "input": "real npm pack inventory, package/root-native metadata and bytes, immutable pack baseline, builtins drift, CHANGELOG, ADR/link lint and readiness inputs",
+   "output": "base readiness plus critical-file, exact native artifact/source, pack-category, builtins-drift and release-notes gates; nonzero exit on any blocking mismatch",
+   "expiry": "none — permanent gate, blocks prepublish and release",
+   "notes": "Sprint 180 W5-1 Crisis Stabilization §6; TN-PACKAGE adds the installed-product native payload and exact current-platform artifact gate."
+  },
+  {
+   "file": "scripts/verify-exec-authority-native-package.mjs",
+   "class": "gate",
+   "owner": "exec-authority-native-delivery",
+   "npmScript": null,
+   "input": "one exact absolute installed Deckent package root, expected environment kind and expected canonical npm-shrinkwrap sha256",
+   "output": "fail-closed JSON receipt binding dependency-lock, ABI/N-API/platform/features, artifact, binary and source hashes plus a nonce-bound isolated-child native custody lifecycle",
+   "expiry": "none — permanent installed-package native delivery gate",
+   "notes": "TN-PACKAGE verifier; rejects the live repo, source/build fallbacks, lock drift and symlink roots, and is invoked after isolated install by the networkless proof and xplat supporting smoke."
+  },
+  {
+   "file": "scripts/verify-packed-networkless-install.mjs",
+   "class": "recurring-proof",
+   "owner": "installed-package-networkless-proof",
+   "npmScript": null,
+   "input": "already-built repository package, canonical root npm-shrinkwrap, --expected-environment and optional absolute --receipt-file",
+   "output": "one DECKENT_PACKED_NETWORKLESS_INSTALL_VERIFIED JSON receipt binding immutable exact-tarball cache warmup, separate offline install, source/installed shrinkwrap sha256, tarball sha256, installed CLI receipt and isolated native lifecycle receipt; optional durable no-overwrite receipt file",
+   "expiry": "none — permanent Linux/WSL2 installed-product proof",
+   "notes": "TN-PACKAGE/TN-PROOF-SEAL active proof; a digest-bound loopback source warms a fresh private cache and may resolve dependencies from the registry, then closes before the separate global install is forced offline with lifecycle scripts disabled."
   },
   {
    "file": "scripts/verify-gitignore.mjs",
@@ -1133,10 +1173,10 @@
    "class": "recurring-proof",
    "owner": "xplat-install-smoke",
    "npmScript": null,
-   "input": "npm pack tarball of the already-built repo (isolated npm_config_prefix + HOME)",
-   "output": "PASS/FAIL proving `npm install -g` + `deckent init --yes` works on the current OS (Linux/macOS/Windows)",
+   "input": "npm pack tarball of the already-built repo (isolated npm_config_prefix + HOME), canonical source/installed shrinkwrap and exact installed-package native verifier",
+   "output": "PASS/FAIL proving network-enabled isolated `npm install -g`, source/installed dependency-lock parity, installed dist→native ABI/hash/lifecycle verification, and `deckent init --yes` on the current OS",
    "expiry": "none — rerun on demand, one leg per platform in CI",
-   "notes": "XPLAT-01 (Task 415-001); every OS branch lives inside this script, none in CI YAML."
+   "notes": "XPLAT-01 + TN-PACKAGE supporting smoke; explicitly not the networkless proof. Every OS branch lives inside this script, none in CI YAML, and missing native delivery cannot be skipped or promoted to success."
   },
   {
    "file": "scripts/zero-hardcode-audit.mjs",

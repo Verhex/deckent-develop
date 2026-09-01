@@ -312,7 +312,7 @@ Ana ürün metriği ekran/component sayısı değil, Golden Workflow'un Desktop 
 
 ### 8.2 Geçişte doğrulanması gereken mevcut gerçek
 
-- `package.json` ve `package-lock.json` artık `0.100.0` taşır (2026-08-14 rebaseline package'ı yanlış `1.0.0-beta.1` anlatısını iptal etti; **tagless** — git tag / GitHub Release / npm publish YOK, canonical publish owner-manual).
+- `package.json` ve yayımlanan canonical root dependency authority `npm-shrinkwrap.json` artık `0.100.0` taşır; root `package-lock.json` kaldırılmıştır, Dashboard/Desktop kendi bağımsız `package-lock.json` dosyalarını korur (2026-08-14 rebaseline package'ı yanlış `1.0.0-beta.1` anlatısını iptal etti; **tagless** — git tag / GitHub Release / npm publish YOK, canonical publish owner-manual).
 - Kök `CHANGELOG.md` canonical per-version product release notes'tur; `## [0.100.0] — 2026-08-14` + `## [Unreleased]` eklendi, eski `## [1.0.0-beta.1] (current)` bölümü historical'a düşürüldü.
 - `docs/CHANGELOG.md` sprint-level engineering ledger'a reset edildi; 277 `1.0.0-beta.1-sprintNNN` kaydı `docs/archive/docs-pre-reset-2026-08-14/CHANGELOG.md`'e arşivlendi. Sprint settlement automation'ı (`doc-updaters/changelog.ts`) artık product-version-shaped header üretmez (`## [sprintNN]`).
 - Release workflow'un otomatik `npm publish` + `Create GitHub Release` adımları kaldırıldı; `validate:publish` verify-only ve version-bump'ın root CHANGELOG entry'si eksikse fail eden `changelog_section` gate'i eklendi. **Rebaseline receipt:** bu §12.2-sonrası version/changelog/publish-sınırı outcome'una bağlıdır (MASTER `RELEASE-001` 2026-08-14 dimension).

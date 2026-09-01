@@ -153,18 +153,18 @@ describe('checkEnginesNode', () => {
 // ─── checkPackSizeAndCount ─────────────────────────────────────────────────
 
 describe('checkPackSizeAndCount', () => {
-  it('passes for a sane package size under the 6 MB ceiling', () => {
+  it('passes for a sane package size under the 7 MB ceiling', () => {
     const result = checkPackSizeAndCount(CLEAN_PACK);
     expect(result.gate).toBe('pack_size_and_count');
     expect(result.ok).toBe(true);
   });
 
-  it('fails when the package size exceeds the 6 MB ceiling', () => {
+  it('fails when the package size exceeds the 7 MB ceiling', () => {
     const oversized = CLEAN_PACK.replace('package size: 2.7 MB', 'package size: 9.9 MB');
     const result = checkPackSizeAndCount(oversized);
     expect(result.ok).toBe(false);
     expect(result.severity).toBe('error');
-    expect(result.message).toMatch(/6 MB limit/i);
+    expect(result.message).toMatch(/7 MB limit/i);
   });
 
   it('errors when the package size cannot be parsed', () => {

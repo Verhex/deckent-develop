@@ -18,6 +18,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
+import { readCanonicalNpmShrinkwrapIdentity } from '../../scripts/npm-shrinkwrap-contract.mjs';
 
 // ─── Project root ─────────────────────────────────────────────────────────────
 
@@ -62,10 +63,12 @@ let packDir = '';
 let extractDir = '';
 let tarballPath = '';
 let packageVersion = '';
+let sourceNpmShrinkwrapSha256 = '';
 
 // ─── Setup / teardown ─────────────────────────────────────────────────────────
 
 beforeAll(async () => {
+  sourceNpmShrinkwrapSha256 = readCanonicalNpmShrinkwrapIdentity(PROJECT_ROOT).sha256;
   tmpRoot = mkdtempSync(join(tmpdir(), 'deckent-pack-smoke-'));
   packDir = join(tmpRoot, 'pack');
   extractDir = join(tmpRoot, 'extracted');
@@ -108,6 +111,13 @@ beforeAll(async () => {
   if (tarResult.exitCode !== 0) {
     throw new Error(`tar extract failed:\n${tarResult.stderr}`);
   }
+  const extractedPackageRoot = join(extractDir, 'package');
+  const extractedNpmShrinkwrapIdentity = readCanonicalNpmShrinkwrapIdentity(extractedPackageRoot);
+  if (extractedNpmShrinkwrapIdentity.sha256 !== sourceNpmShrinkwrapSha256) {
+    throw new Error(
+      `E_NPM_PACK_SMOKE_SHRINKWRAP_MISMATCH:${sourceNpmShrinkwrapSha256}:${extractedNpmShrinkwrapIdentity.sha256}`,
+    );
+  }
 }, 90_000);
 
 afterAll(() => {
@@ -128,6 +138,21 @@ describe('npm pack smoke — hermetic install verification', () => {
     expect(stats.size, 'tarball should be larger than 100 KB').toBeGreaterThan(100_000);
 
     expect(packageVersion).toMatch(/^\d+\.\d+\.\d+/);
+  });
+
+  it('tarball ships the exact canonical shrinkwrap and no competing root lock', () => {
+    const packageRoot = join(extractDir, 'package');
+    expect(readCanonicalNpmShrinkwrapIdentity(packageRoot).sha256)
+      .toBe(sourceNpmShrinkwrapSha256);
+    for (const forbiddenLock of [
+      'package-lock.json',
+      'pnpm-lock.yaml',
+      'yarn.lock',
+      'bun.lock',
+      'bun.lockb',
+    ]) {
+      expect(existsSync(join(packageRoot, forbiddenLock))).toBe(false);
+    }
   });
 
   // T2: Tarball preserves exec-bit on the CLI and MCP entry points
@@ -208,6 +233,10 @@ describe('npm pack smoke — hermetic install verification', () => {
         entryMode & 0o111,
         `installed dist/cli/entry.js must have exec bit; mode: ${(entryMode & 0o777).toString(8)}`,
       ).not.toBe(0);
+
+      const installedRoot = join(installDir, 'node_modules', 'deckent');
+      expect(readCanonicalNpmShrinkwrapIdentity(installedRoot).sha256)
+        .toBe(sourceNpmShrinkwrapSha256);
 
       // Run the binary and verify it prints a semver version string
       const versionResult = await runCmd(

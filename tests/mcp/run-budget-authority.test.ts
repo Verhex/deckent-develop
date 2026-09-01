@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdirSync, writeFileSync } from 'node:fs';
 
+const ingressHarness = vi.hoisted(() => ({ execute: vi.fn() }));
+
 vi.mock('node:fs', () => ({
   mkdirSync: vi.fn(),
   writeFileSync: vi.fn(),
@@ -13,6 +15,7 @@ vi.mock('../../src/core/constants.js', () => ({
 }));
 
 vi.mock('../../src/mcp/tools/job-runner.js', () => ({
+  createJobId: vi.fn(() => 'job-1780659451558-11111111-1111-4111-8111-111111111111'),
   writeJobState: vi.fn(),
 }));
 
@@ -38,6 +41,11 @@ vi.mock('../../src/core/config.js', () => ({
 
 vi.mock('../../src/cli/commands/spawn.js', () => ({
   spawnWorkerMultiProvider: vi.fn().mockResolvedValue({ backend: 'subprocess' }),
+}));
+
+vi.mock('../../src/orchestra/task-mode-runner.js', () => ({
+  executeTaskIngress: ingressHarness.execute,
+  readTaskIngressErrorAuthority: (error: any) => error?.taskIngressAuthority,
 }));
 
 vi.mock('../../src/core/agent-pool.js', () => ({
@@ -76,6 +84,7 @@ import { spawnWorkerMultiProvider } from '../../src/cli/commands/spawn.js';
 import { writeJobState } from '../../src/mcp/tools/job-runner.js';
 import { buildWorkerPrompt } from '../../src/orchestra/brain.js';
 import { routeSingleTaskV3 } from '../../src/orchestra/routing-plan-adapter.js';
+import { applyWorkerExecutionBudgetPolicy } from '../../src/core/execution-plan-digest.js';
 
 type ToolResult = {
   content: Array<{ type: string; text: string }>;
@@ -107,11 +116,8 @@ async function getHandler(runtime: Record<string, unknown> = {}): Promise<ToolHa
 }
 
 function writtenTask(): Record<string, unknown> {
-  const call = vi.mocked(writeFileSync).mock.calls.find(
-    ([path]) => typeof path === 'string' && path.endsWith('.json'),
-  );
-  expect(call).toBeDefined();
-  return JSON.parse(call![1] as string) as Record<string, unknown>;
+  expect(ingressHarness.execute).toHaveBeenCalledOnce();
+  return ingressHarness.execute.mock.calls[0]![0].task as Record<string, unknown>;
 }
 
 function spawnOptions(): Record<string, unknown> {
@@ -132,6 +138,53 @@ describe('deckent_run MCP — owner budget authority', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(spawnWorkerMultiProvider).mockResolvedValue({ backend: 'subprocess' } as never);
+    ingressHarness.execute.mockImplementation(async (input: any) => {
+      if (input.providerAuthority?.state === 'hold') {
+        throw new Error(
+          `provider execution authority is not ready: ${input.providerAuthority.reasonCode}`,
+        );
+      }
+      const [policy] = applyWorkerExecutionBudgetPolicy(
+        [input.task],
+        input.config.execution_budget,
+        input.task.provider,
+      );
+      if (policy?.state === 'hold') throw new Error(`execution budget policy: ${policy.reasonCode}`);
+      const routed = await routeSingleTaskV3(input.task, input.projectRoot);
+      input.task.assignedAgent = routed.agentId;
+      input.task.assignedSkills = routed.skillIds;
+      mkdirSync(`${input.projectRoot}/.tasks`, { recursive: true });
+      writeFileSync(`${input.projectRoot}/.tasks/task-${input.task.id}.json`, JSON.stringify(input.task));
+      const prompt = buildWorkerPrompt(input.task, undefined, [], input.projectRoot);
+      const spawned = await spawnWorkerMultiProvider(
+        input.task.id,
+        input.task.model,
+        prompt,
+        input.projectRoot,
+        {
+          autoApprove: input.autoApprove,
+          provider: input.task.provider,
+          modelEffort: input.task.modelEffort,
+          executionBudget: input.task.budget,
+          attendedExecutionApprovalAuthority: input.attendedExecutionApprovalAuthority,
+          executionTenantId: input.executionTenantId ?? input.task.actor?.tenantId ?? 'local',
+          executionRunId: input.executionRunId ?? input.task.sprintId ?? input.task.id,
+        },
+      );
+      return {
+        disposition: { kind: 'spawned', taskId: input.task.id },
+        executionMode: 'legacy-non-docker',
+        backend: spawned.backend,
+        provider: input.task.provider,
+        invocation: {
+          receiptRef: { schemaVersion: 1, invocationId: `test:${input.task.id}`, tenantId: 'local', projectId: 'test' },
+          executionBackend: 'host-subprocess',
+          transport: 'mcp',
+          state: 'dispatch-started',
+          executionEvidenceRef: `test:${input.task.id}`,
+        },
+      };
+    });
   });
 
   it('persists and dispatches the same owner-authored remote ceiling', async () => {
@@ -200,7 +253,7 @@ describe('deckent_run MCP — owner budget authority', () => {
     expect(result.isError).not.toBe(true);
     expect(spawnOptions()['attendedExecutionApprovalAuthority']).toBe(authority);
     expect(spawnOptions()['executionTenantId']).toBe('local');
-    expect(spawnOptions()['executionRunId']).toMatch(/^run-run-/);
+    expect(spawnOptions()['executionRunId']).toMatch(/^run-job-/);
   });
 
   it.each([

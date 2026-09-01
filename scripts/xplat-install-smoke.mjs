@@ -11,13 +11,17 @@
 //   2. npm install -g <tarball> — isolated prefix (npm_config_prefix + HOME
 //                                  override) so nothing touches real global npm
 //                                  state ("global-kirlilik YOK").
-//   3. deckent init --yes       — non-interactive flow (413-001). Asserts the
+//   3. installed native verify  — imports the installed dist/core adapter,
+//                                  proves the packaged artifact/source/binary
+//                                  identity, and executes one bounded native
+//                                  custody publication/read lifecycle.
+//   4. deckent init --yes       — non-interactive flow (413-001). Asserts the
 //                                  outcome-block is printed and the exit code
 //                                  matches the 3-state contract: READY=0 and
 //                                  SETUP_INCOMPLETE=2 are both accepted (a
 //                                  provider-less CI env legitimately lands on
 //                                  SETUP_INCOMPLETE); FAILED=1 fails the step.
-//   4. deckent doctor            — runs to completion (informational). Its own
+//   5. deckent doctor            — runs to completion (informational). Its own
 //                                  verdict/exit code is logged, not gated — a
 //                                  freshly `--yes`-initialized env with no
 //                                  provider credentials can legitimately report
@@ -32,9 +36,10 @@
 
 import { spawn } from 'node:child_process';
 import { mkdtempSync, mkdirSync, existsSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { release as osRelease, tmpdir } from 'node:os';
 import { join, resolve, dirname, delimiter } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readCanonicalNpmShrinkwrapIdentity } from './npm-shrinkwrap-contract.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
@@ -47,6 +52,12 @@ function platformLabel() {
 }
 
 const PLATFORM = platformLabel();
+
+function expectedInstalledEnvironmentKind() {
+  if (process.platform === 'darwin' || process.platform === 'win32') return process.platform;
+  const kernelRelease = osRelease().toLowerCase();
+  return kernelRelease.includes('microsoft') && kernelRelease.includes('wsl2') ? 'wsl2' : 'linux';
+}
 
 function stepLog(step, msg) {
   process.stderr.write(`[xplat-smoke:${PLATFORM}] ${step} — ${msg}\n`);
@@ -123,11 +134,87 @@ function candidateBinPaths(prefixDir) {
   return globalBinDirs(prefixDir).flatMap((dir) => names.map((n) => join(dir, n)));
 }
 
+/** npm global installs have one platform-specific package-root layout. */
+function installedPackageRoot(prefixDir) {
+  const candidates = IS_WIN
+    ? [join(prefixDir, 'node_modules', 'deckent'), join(prefixDir, 'lib', 'node_modules', 'deckent')]
+    : [join(prefixDir, 'lib', 'node_modules', 'deckent'), join(prefixDir, 'node_modules', 'deckent')];
+  const present = candidates.filter((candidate) => existsSync(candidate));
+  if (present.length !== 1) {
+    throw new SmokeStepError(
+      'native-package',
+      `expected exactly one installed package root; observed ${present.length}; probed:\n${candidates.join('\n')}`,
+    );
+  }
+  return present[0];
+}
+
+function validateNativeVerifierReceipt(stdout, expectedShrinkwrapSha256) {
+  const lines = stdout.split(/\r?\n/u).filter((line) => line.length > 0);
+  if (lines.length !== 1) {
+    throw new SmokeStepError(
+      'native-package',
+      `verifier emitted ${lines.length} non-empty stdout lines instead of one exact receipt`,
+    );
+  }
+  let receipt;
+  try {
+    receipt = JSON.parse(lines[0]);
+  } catch (error) {
+    throw new SmokeStepError('native-package', `verifier receipt is not JSON: ${error.message}`);
+  }
+  const isDigest = (value) => typeof value === 'string' && /^sha256:[0-9a-f]{64}$/u.test(value);
+  const expectedFeatures = process.platform === 'win32'
+    ? ['custody-win32-v1']
+    : ['custody-posix-v1', 'legacy-posix-fd-v1'];
+  const expectedEnvironment = expectedInstalledEnvironmentKind();
+  if (receipt === null
+    || typeof receipt !== 'object'
+    || Array.isArray(receipt)
+    || receipt.schemaVersion !== 1
+    || receipt.event !== 'EXEC_AUTHORITY_NATIVE_INSTALLED_PACKAGE_VERIFIED'
+    || receipt.rootPackageName !== 'deckent'
+    || receipt.nativePackageName !== '@deckent/exec-authority-native'
+    || receipt.platform !== process.platform
+    || receipt.arch !== process.arch
+    || receipt.environment?.environmentKind !== expectedEnvironment
+    || receipt.environment?.expectedEnvironmentKind !== expectedEnvironment
+    || !/^0x[0-9a-f]+$/u.test(receipt.environment?.packageFilesystemType ?? '')
+    || (process.platform === 'linux' && !isDigest(receipt.environment?.bootIdentitySha256))
+    || !isDigest(receipt.environmentEvidenceSha256)
+    || receipt.abiVersion !== '1.0.0'
+    || receipt.napiVersion !== 8
+    || !Array.isArray(receipt.features)
+    || receipt.features.length !== expectedFeatures.length
+    || receipt.features.some((feature, index) => feature !== expectedFeatures[index])
+    || !Number.isSafeInteger(receipt.runtimeNapiVersion)
+    || receipt.runtimeNapiVersion < 8
+    || receipt.installTimeNativeBuild !== 'ABSENT'
+    || receipt.installTimeNativeDownload !== 'ABSENT'
+    || receipt.nativeArtifactOrigin !== 'PACKAGED_PREBUILD'
+    || !isDigest(receipt.artifactSha256)
+    || !isDigest(receipt.binarySha256)
+    || !isDigest(receipt.nativeSourceTreeSha256)
+    || !isDigest(receipt.packageEvidenceSha256)
+    || receipt.npmShrinkwrapSha256 !== expectedShrinkwrapSha256
+    || receipt.lifecycle?.state !== 'PUBLISHED_READ_VERIFIED'
+    || !/^0x[0-9a-f]+$/u.test(receipt.lifecycle?.filesystemType ?? '')
+    || !isDigest(receipt.lifecycle?.payloadSha256)
+    || !isDigest(receipt.lifecycle?.evidenceSha256)) {
+    throw new SmokeStepError('native-package', 'verifier receipt contract mismatch');
+  }
+  return receipt;
+}
+
 async function main() {
   stepLog('start', `platform=${process.platform} node=${process.version} repoRoot=${REPO_ROOT}`);
 
   let tmpRoot = null;
   try {
+    // This remains the network-enabled cross-platform supporting smoke. The
+    // fresh-cache/offline product proof is owned exclusively by
+    // verify-packed-networkless-install.mjs and must not be inferred here.
+    const sourceNpmShrinkwrapIdentity = readCanonicalNpmShrinkwrapIdentity(REPO_ROOT);
     tmpRoot = mkdtempSync(join(tmpdir(), 'deckent-xplat-'));
     const npmHomeDir = join(tmpRoot, 'npm-home');
     mkdirSync(npmHomeDir, { recursive: true });
@@ -202,7 +289,49 @@ async function main() {
       PATH: [...globalBinDirs(globalPrefix), process.env.PATH].join(delimiter),
     };
 
-    // ── Step 3: deckent init --yes (413-001 non-interactive flow) ──────────
+    // ── Step 3: installed-package native proof (TN-PACKAGE) ───────────────
+    const installedRoot = installedPackageRoot(globalPrefix);
+    const installedNpmShrinkwrapIdentity = readCanonicalNpmShrinkwrapIdentity(installedRoot);
+    if (installedNpmShrinkwrapIdentity.sha256 !== sourceNpmShrinkwrapIdentity.sha256) {
+      throw new SmokeStepError(
+        'native-package',
+        `source/installed npm-shrinkwrap digest mismatch: ${sourceNpmShrinkwrapIdentity.sha256} != ${installedNpmShrinkwrapIdentity.sha256}`,
+      );
+    }
+    const nativeVerifier = join(REPO_ROOT, 'scripts', 'verify-exec-authority-native-package.mjs');
+    stepLog('native-package', `verify exact installed root ${installedRoot}`);
+    const nativeVerifyStart = Date.now();
+    const nativeVerifyResult = await runCmd(
+      process.execPath,
+      [
+        nativeVerifier,
+        '--package-root',
+        installedRoot,
+        '--expected-environment',
+        expectedInstalledEnvironmentKind(),
+        '--expected-shrinkwrap-sha256',
+        sourceNpmShrinkwrapIdentity.sha256,
+      ],
+      tmpRoot,
+      120_000,
+      runnerEnv,
+    );
+    if (nativeVerifyResult.exitCode !== 0) {
+      throw new SmokeStepError(
+        'native-package',
+        `installed native verifier ${failDetail(nativeVerifyResult, Date.now() - nativeVerifyStart)}`,
+      );
+    }
+    const nativeReceipt = validateNativeVerifierReceipt(
+      nativeVerifyResult.stdout,
+      sourceNpmShrinkwrapIdentity.sha256,
+    );
+    stepLog(
+      'native-package',
+      `OK — ${nativeReceipt.platform}/${nativeReceipt.arch} ABI ${nativeReceipt.abiVersion} N-API ${nativeReceipt.napiVersion}`,
+    );
+
+    // ── Step 4: deckent init --yes (413-001 non-interactive flow) ──────────
     const initTarget = join(tmpRoot, 'init-target');
     mkdirSync(initTarget, { recursive: true });
     stepLog('init', `deckent init --yes (non-interactive) in ${initTarget}`);
@@ -239,7 +368,7 @@ async function main() {
     }
     stepLog('init', `OK — exit ${initResult.exitCode}, outcome-block present`);
 
-    // ── Step 4: deckent doctor (runs + exits — informational) ──────────────
+    // ── Step 5: deckent doctor (runs + exits — informational) ──────────────
     stepLog('doctor', 'deckent doctor');
     const doctorResult = await runCmd('deckent', ['doctor'], initTarget, 60_000, runnerEnv);
     if (doctorResult.exitCode === -1) {

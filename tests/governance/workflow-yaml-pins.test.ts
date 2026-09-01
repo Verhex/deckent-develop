@@ -764,70 +764,90 @@ const WORKFLOW_FILENAMES = [
   'secret-scan.yml',
 ].filter((f) => existsSync(resolve(WORKFLOWS_DIR, f)));
 
-describe('live repo-wide pin — packed-install retry-hardening (task 434-001 contract)', () => {
+describe('live repo-wide pin — packed-install networkless wrapper contract', () => {
   const xplat = readWorkflow('cross-platform-e2e.yml');
   const packedInstall = xplat.jobs?.['packed-install'];
   const steps = packedInstall?.steps ?? [];
 
-  it('packed-install job exists with the expected required-check name', () => {
+  it('packed-install job exists with the active Linux proof name', () => {
     expect(packedInstall).toBeDefined();
-    expect(String(packedInstall?.name ?? '')).toContain('Packed Install');
+    expect(String(packedInstall?.name ?? '')).toBe('Linux Installed Native Package Proof');
   });
 
-  it('npm ci step is a bounded 2-attempt retry loop, sleep only reachable between attempts', () => {
-    const step = steps.find((s) => /npm ci/i.test(s.name ?? '') && /retry/i.test(s.name ?? ''));
-    expect(step, 'expected an "npm ci ... retry" step').toBeDefined();
-    expect(step!.shell, 'must pin bash — windows-latest default shell is pwsh, not bash').toBe('bash');
-    const analysis = analyzeBoundedRetryLoop(step!.run);
-    expect(analysis.found).toBe(true);
-    expect(analysis.maxAttempts).toBe(2);
-    expect(analysis.sleepSeconds).toEqual([30]);
-    expect(analysis.sleepReachableAfterExhaustion).toBe(false);
-    expect(analysis.unboundedLoop).toBe(false);
+  it('setup-node cache authority binds root shrinkwrap plus the independent dashboard lock', () => {
+    const setup = steps.find((step) => (step.uses ?? '').startsWith('actions/setup-node'));
+    expect(setup).toBeDefined();
+    const dependencyPaths = String(setup?.with?.['cache-dependency-path'] ?? '');
+    expect(dependencyPaths).toContain('npm-shrinkwrap.json');
+    expect(dependencyPaths).toContain('src/dashboard/package-lock.json');
   });
 
-  it('packed-install smoke step is a bounded 2-attempt retry loop, sleep only reachable between attempts', () => {
-    const step = steps.find((s) => /packed-install smoke/i.test(s.name ?? ''));
-    expect(step, 'expected a "packed-install smoke" step').toBeDefined();
-    expect(step!.shell, 'must pin bash — windows-latest default shell is pwsh, not bash').toBe('bash');
-    const analysis = analyzeBoundedRetryLoop(step!.run);
-    expect(analysis.found).toBe(true);
-    expect(analysis.maxAttempts).toBe(2);
-    expect(analysis.sleepSeconds).toEqual([30]);
-    expect(analysis.sleepReachableAfterExhaustion).toBe(false);
-    expect(analysis.unboundedLoop).toBe(false);
+  it('delegates pack/cache/install/native proof to one exact networkless wrapper invocation', () => {
+    const wrapper = steps.find((step) => /networklessly/i.test(step.name ?? ''));
+    expect(wrapper).toBeDefined();
+    expect(wrapper?.shell).toBe('bash');
+    expect(wrapper?.run).toContain(
+      'node scripts/verify-packed-networkless-install.mjs --expected-environment linux',
+    );
+    expect(wrapper?.run).toContain('DECKENT_PACKED_NETWORKLESS_INSTALL_VERIFIED');
+    expect(wrapper?.run).toContain('receipt.installNetworkMode !== "OFFLINE"');
+    expect(wrapper?.run).toContain('receipt.cacheAuthority !== "FRESH_PRIVATE_PREWARMED"');
+    expect(wrapper?.run).toContain(
+      'receipt.installedNpmShrinkwrapSha256 !== receipt.sourceNpmShrinkwrapSha256',
+    );
+    const topLevelFields = wrapper?.run
+      ?.match(/const expectedTopLevelFields = \[([\s\S]*?)\]\.sort\(\);/u)?.[1]
+      .match(/"([^"]+)"/gu)
+      ?.map((field) => field.slice(1, -1))
+      .sort();
+    expect(topLevelFields).toEqual([
+      'cacheAuthority',
+      'event',
+      'expectedEnvironmentKind',
+      'installNetworkMode',
+      'installedCliReceipt',
+      'installedNpmShrinkwrapSha256',
+      'nativeReceipt',
+      'schemaVersion',
+      'sourceNpmShrinkwrapSha256',
+      'tarballSha256',
+    ].sort());
+    expect(wrapper?.run).toContain('JSON.stringify(Object.keys(receipt).sort())');
+    expect(wrapper?.run).toContain('SOURCE_PACKAGE_VERSION=$(node -p "require(\'./package.json\').version")');
+    expect(wrapper?.run).toContain('installedCliReceipt?.schemaVersion !== 1');
+    expect(wrapper?.run).toContain('installedCliReceipt.event !== "DECKENT_INSTALLED_CLI_VERIFIED"');
+    expect(wrapper?.run).toContain('installedCliReceipt.packageVersion !== sourcePackageVersion');
+    expect(wrapper?.run).toContain('!sha256.test(installedCliReceipt.outputSha256)');
+    expect(wrapper?.run).toContain(
+      'nativeReceipt.npmShrinkwrapSha256 !== receipt.sourceNpmShrinkwrapSha256',
+    );
+    expect(wrapper?.run).not.toContain('npm install -g');
+    expect(wrapper?.run).not.toContain('verify-exec-authority-native-package.mjs');
   });
 
-  it('npm install, dashboard install and npm pack/install-smoke are SEPARATE bounded-retry flows (not one shared loop)', () => {
-    // 531 süpürme: the packed-install job gained a third receipted bounded-retry
-    // flow (dashboard `npm ci --prefix src/dashboard`, CI-PACKED-DASHBOARD-
-    // TOOLCHAIN-001) — the pin tracks the measured set, still all separate.
-    const retrySteps = steps.filter((s) => analyzeBoundedRetryLoop(s.run).found);
-    expect(retrySteps.length).toBe(3);
-  });
-
-  it('job env carries bounded npm fetch-retry/timeout settings', () => {
-    expect(isBoundedFetchRetryConfig(packedInstall?.env ?? {})).toBe(true);
-  });
-
-  it('diagnostic artifact upload is failure()-only, SHA-pinned, covers npm logs, tolerates missing optional logs', () => {
-    const result = analyzeDiagnosticArtifactStep(steps);
-    expect(result.found).toBe(true);
-    expect(result.isFailureOnly).toBe(true);
-    expect(result.isFullShaPinned).toBe(true);
-    expect(result.coversNpmLogs).toBe(true);
-    expect(result.toleratesMissingOptionalLogs).toBe(true);
-  });
-
-  it('diagnostic artifact reuses the EXISTING upload-artifact SHA pin (release.yml) — no divergent new pin', () => {
+  it('uploads the wrapper receipt fail-closed and reuses the existing action SHA pin', () => {
     const release = readWorkflow('release.yml');
     const releaseUpload = collectSteps(release).find((s) => (s.uses ?? '').startsWith('actions/upload-artifact'));
-    const xplatUpload = steps.find(
-      (s) => (s.uses ?? '').startsWith('actions/upload-artifact') && /failure\(\)/.test(String(s.if ?? '')),
+    const receiptUpload = steps.find(
+      (step) => /packed-networkless receipt/i.test(step.name ?? ''),
     );
     expect(releaseUpload).toBeDefined();
-    expect(xplatUpload).toBeDefined();
-    expect(actionRefPin(xplatUpload!.uses!)).toBe(actionRefPin(releaseUpload!.uses!));
+    expect(receiptUpload).toBeDefined();
+    expect(receiptUpload?.with?.path).toBe(
+      '${{ runner.temp }}/linux-packed-networkless-receipt.json',
+    );
+    expect(receiptUpload?.with?.['if-no-files-found']).toBe('error');
+    expect(actionRefPin(receiptUpload!.uses!)).toBe(actionRefPin(releaseUpload!.uses!));
+  });
+
+  it('keeps diagnostics failure-only even though the proof receipt uploads on success', () => {
+    const collect = steps.find((step) => step.name === 'Collect diagnostics into workspace');
+    const upload = steps.find((step) => step.name === 'Upload diagnostics on failure');
+    expect(collect?.if).toBe('failure()');
+    expect(upload?.if).toBe('failure()');
+    expect(isFullShaPinned(upload?.uses ?? '')).toBe(true);
+    expect(String(upload?.with?.path ?? '')).toContain('xplat-diag');
+    expect(upload?.with?.['if-no-files-found']).toBe('ignore');
   });
 
   it('required-status semantics are not relaxed: zero continue-on-error in this workflow', () => {

@@ -5,11 +5,14 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { runLandingProposalEntry } from '../../src/agents/landing-proposal-entry.js';
 import {
+  buildExactExecutionLandingProposalPromptSegment,
   buildExecutionLandingProposalPromptSegment,
   executionLandingProposalPath,
   LANDING_PROPOSAL_MALFORMED,
   LandingProposalMalformedError,
+  parseExactExecutionLandingProposalV3,
   parseLandingProposalV2,
   parseExecutionLandingProposal,
   readExecutionLandingProposal,
@@ -57,23 +60,48 @@ function proposalV2(overrides: Record<string, unknown> = {}): Record<string, unk
   };
 }
 
+function proposalV3(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    version: 3,
+    taskId: 'm1-007',
+    dispatchRequestId: 'dispatch-request-m1-007-1',
+    sequence: 2,
+    summary: 'Checkpoint-ready exact custody state.',
+    completedWork: ['captured private worker output'],
+    remainingWork: ['host checkpoint stamp'],
+    nextAction: 'wait for host custody verification',
+    unresolvedRisks: [],
+    updatedAt: T1,
+    ...overrides,
+  };
+}
+
 interface EntryExecution {
   code: number | null;
   stderr: string;
 }
 
+function entryEnv(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  for (const key of [
+    'VITEST', 'VITEST_POOL_ID', 'VITEST_WORKER_ID', 'NODE_ENV',
+    'DECKENT_TEST_HERMETICITY', 'NODE_OPTIONS', 'NODE_CHANNEL_FD',
+    'NODE_CHANNEL_SERIALIZATION_MODE',
+  ]) delete env[key];
+  return env;
+}
+
 function executeEntry(
   projectRoot: string,
   input: string,
-  argv: readonly string[] = [],
 ): Promise<EntryExecution> {
   const entryPath = join(process.cwd(), 'src/agents/landing-proposal-entry.ts');
   const tsxLoader = pathToFileURL(join(process.cwd(), 'node_modules/tsx/dist/loader.mjs')).href;
   return new Promise((resolveExecution, reject) => {
     const child = execFile(
       process.execPath,
-      ['--import', tsxLoader, entryPath, 'm1-007', ATTEMPT, ...argv],
-      { cwd: projectRoot, encoding: 'utf8' },
+      ['--import', tsxLoader, entryPath, 'm1-007', ATTEMPT, input],
+      { cwd: projectRoot, encoding: 'utf8', env: entryEnv() },
       (error, _stdout, stderr) => {
         if (error && error.code === 'ENOENT') {
           reject(error);
@@ -82,7 +110,28 @@ function executeEntry(
         resolveExecution({ code: child.exitCode, stderr });
       },
     );
-    child.stdin?.end(input);
+  });
+}
+
+function executeExactEntry(projectRoot: string, input: string): Promise<EntryExecution> {
+  const entryPath = join(process.cwd(), 'src/agents/landing-proposal-entry.ts');
+  const tsxLoader = pathToFileURL(join(process.cwd(), 'node_modules/tsx/dist/loader.mjs')).href;
+  return new Promise((resolveExecution, reject) => {
+    const child = execFile(
+      process.execPath,
+      [
+        '--import', tsxLoader, entryPath, '--exact', 'm1-007',
+        'dispatch-request-m1-007-1', input,
+      ],
+      { cwd: projectRoot, encoding: 'utf8', env: entryEnv() },
+      (error, _stdout, stderr) => {
+        if (error && error.code === 'ENOENT') {
+          reject(error);
+          return;
+        }
+        resolveExecution({ code: child.exitCode, stderr: stderr || error?.message || '' });
+      },
+    );
   });
 }
 
@@ -91,6 +140,42 @@ afterEach(() => {
 });
 
 describe('execution landing proposal', () => {
+  it('accepts only the path-free dispatch-bound V3 proposal', async () => {
+    expect(parseExactExecutionLandingProposalV3(proposalV3(), {
+      taskId: 'm1-007',
+      dispatchRequestId: 'dispatch-request-m1-007-1',
+    })).toEqual(proposalV3());
+    expect(() => parseExactExecutionLandingProposalV3({
+      ...proposalV3(),
+      attemptId: ATTEMPT,
+    })).toThrow(/exact custody V3 schema/);
+    expect(() => parseExactExecutionLandingProposalV3({
+      ...proposalV3(),
+      resultReference: { relativePath: '.tasks/task-m1-007.result' },
+    })).toThrow(/exact custody V3 schema/);
+
+    const projectRoot = root();
+    const execution = await executeExactEntry(projectRoot, JSON.stringify(proposalV3()));
+    expect(execution).toEqual({ code: 0, stderr: '' });
+    expect(JSON.parse(readFileSync(
+      executionLandingProposalPath(projectRoot, 'm1-007'),
+      'utf8',
+    ))).toEqual(proposalV3());
+  });
+
+  it('emits a private-output exact protocol with no public attempt or result authority', () => {
+    const segment = buildExactExecutionLandingProposalPromptSegment(
+      'm1-007',
+      'dispatch-request-m1-007-1',
+    );
+    expect(segment).toContain('--exact');
+    expect(segment).toContain('dispatch-request-m1-007-1');
+    expect(segment).toContain('attempt-private output mount');
+    expect(segment).not.toContain(ATTEMPT);
+    expect(segment).not.toContain('resultReference');
+    expect(segment).not.toContain('generation');
+  });
+
   it('validates and atomically replaces a structured V2 proposal', () => {
     const projectRoot = root();
     const first = proposalV2();
@@ -239,7 +324,7 @@ describe('execution landing proposal', () => {
     expect(segment.length).toBeLessThan(4_000);
   });
 
-  it('publishes valid stdin through the real Node entry without partial files', async () => {
+  it('publishes valid structured input through the real Node entry without partial files', async () => {
     const projectRoot = root();
     const raw = JSON.stringify(proposal());
     const observed: string[] = [];
@@ -263,9 +348,9 @@ describe('execution landing proposal', () => {
     ['oversize', 'x'.repeat(64 * 1024 + 1)],
   ])('rejects %s entry input with a typed diagnostic and no publication', async (_name, raw) => {
     const projectRoot = root();
-    const execution = await executeEntry(projectRoot, raw);
-    expect(execution.code).not.toBe(0);
-    expect(execution.stderr).toContain('LANDING_PROPOSAL_MALFORMED');
+    const execution = await runLandingProposalEntry(['m1-007', ATTEMPT, raw], projectRoot);
+    expect(execution.exitCode).toBe(1);
+    expect(execution.diagnostic).toContain('LANDING_PROPOSAL_MALFORMED');
     expect(() => readFileSync(executionLandingProposalPath(projectRoot, 'm1-007'))).toThrow();
     expect(readdirSync(join(projectRoot, '.tasks'))).toEqual([]);
   });

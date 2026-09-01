@@ -187,7 +187,14 @@ describe('SAN-1 membership diff — the five SILENT sanitizer rules now BLOCK (s
   // the render removed it, no BLOCK fired, and the worker was handed a task it
   // could not satisfy — honest NO_GO, burnt FIX budget, paused run.
   const KEEP = 'src/core/keep.ts';
-  const TRACKED = [KEEP, 'package.json', 'tsconfig.json', 'config.json', 'package-lock.json'];
+  const TRACKED = [
+    KEEP,
+    'package.json',
+    'tsconfig.json',
+    'config.json',
+    'package-lock.json',
+    'npm-shrinkwrap.json',
+  ];
 
   function dropsFor(id: string, filesWrite: string[]) {
     const res = evaluatePromptGate({
@@ -204,6 +211,7 @@ describe('SAN-1 membership diff — the five SILENT sanitizer rules now BLOCK (s
     ['Rule 6 — GLOBAL_PROTECTED package.json (the 708-003 case)', 'package.json'],
     ['Rule 6 — GLOBAL_PROTECTED tsconfig.json', 'tsconfig.json'],
     ['Rule 6 — GLOBAL_PROTECTED lockfile', 'package-lock.json'],
+    ['Rule 6 — GLOBAL_PROTECTED npm shrinkwrap', 'npm-shrinkwrap.json'],
     ['Rule 3 — dist/ prefix', 'dist/core/x.js'],
     ['Rule 4 — extension-only token', '.ts'],
     ['Rule 9 — JS property-access pattern', '.directories'],

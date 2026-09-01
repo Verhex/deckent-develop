@@ -256,6 +256,7 @@ describe('sanitizeReadScope — exact project-file authority', () => {
       'package.json',
       'tsconfig.json',
       'package-lock.json',
+      'npm-shrinkwrap.json',
       'src/core/config.ts',
       'foo..bar.ts',
       ' PACKAGE.JSON ',
@@ -265,12 +266,18 @@ describe('sanitizeReadScope — exact project-file authority', () => {
       'package.json',
       'tsconfig.json',
       'package-lock.json',
+      'npm-shrinkwrap.json',
       'src/core/config.ts',
       'foo..bar.ts',
     ]);
     expect(read.warnings).toEqual([]);
     expect(read.rejected).toEqual([]);
-    expect(sanitizeScope(['package.json', 'tsconfig.json']).filesWrite).toEqual([]);
+    expect(sanitizeScope([
+      'package.json',
+      'tsconfig.json',
+      'package-lock.json',
+      'npm-shrinkwrap.json',
+    ]).filesWrite).toEqual([]);
   });
 
   it('rejects cross-platform absolute, traversal, glob, control and directory-shaped reads', () => {

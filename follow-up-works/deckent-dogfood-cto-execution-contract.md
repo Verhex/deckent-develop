@@ -251,6 +251,20 @@ Test çalıştırma ritmi:
 6. Test yeşil olsa bile real binary, real Docker/process, physical custody, disk effect,
    receipt ve restart kanıtı yoksa closure verilmez.
 
+Source/build ritmi:
+
+1. `src/**` değişikliği yapan bağımlı lane'ler önce exact scope içinde fan-in olur; yarım bir
+   dependency zinciri için eski `dist/**` çıktısı güncelmiş gibi sunulmaz.
+2. Anlamlı bir source basamağı tamamlandığında ve aktif Deckent run/worker/coordinator/container
+   kalmadığı diskten doğrulandığında `npm run build` çalıştırılır.
+3. Build sonrası source ile `dist/**` projection'ının eşliği, compiled entrypoint ve değişen gerçek
+   ürün yüzeyi ayrıca çalıştırılarak doğrulanır. Build'in exit code'u tek başına başarı değildir.
+4. Uzun DAG boyunca her küçük dosya değişikliğinde tekrar build alınmaz; dependency fan-in veya
+   closure checkpoint'i beklenir. Böylece hem eski kodla canary yapma hem de aktif worker'ın
+   ESM/cache state'ini build ile bozma engellenir.
+5. Build başarısızsa basamak `DONE` değildir. Hata exact source/baseline fingerprint'iyle aynı
+   bounded implementation paketinde giderilir; sessizce eski `dist/**` ile devam edilmez.
+
 GitHub Actions aylık kota nedeniyle 2026-09-01'e kadar kırmızı/unavailable ise durum yalnız
 `REMOTE_ADVISORY / QUOTA_UNAVAILABLE` olarak raporlanır. Local gerçek kanıtın yerine geçmez ve
 tek başına regression sayılmaz.

@@ -1198,12 +1198,21 @@ describe('Docker monitor settlement authority wiring', () => {
     });
     expect(readTaskResultSettlement(ref)).toBeNull();
     expect(readTaskResultSettlementClosure(ref)).toBeNull();
-    expect(existsSync(join(tasks, `task-${taskId}.result`))).toBe(false);
+    const heldResultPath = join(tasks, `task-${taskId}.result`);
+    expect(JSON.parse(readFileSync(heldResultPath, 'utf8'))).toMatchObject({
+      taskId,
+      selfAssessment: 'NO_GO',
+      continuationHeld: {
+        version: 1,
+        reason: expect.stringMatching(/async exact-custody continuation port/),
+      },
+    });
     // PROD-LANDED-FENCE-ORDER-001: born-468 retired the raw `.hb` shell writer,
     // so a LANDED retirement is proven by the WorkerHeartbeatAuthorityStore
-    // exact-attempt record, and the continuation MUST be dispatched
-    // (MASTER-PLAN 664: a held continuation may never stay silent and
-    // non-terminal). Production captures the observe fence BEFORE the
+    // exact-attempt record. A V1 landing is historical authority now: normal
+    // Docker MUST NOT redispatch it through generic spawn, and the bounded
+    // compatibility result above makes that typed hold non-silent. Production
+    // captures the observe fence BEFORE the
     // retirement closes the active claim chain; the record is read back with
     // the same pre-retirement fence captured at the top of this test.
     const landedHeartbeat = new WorkerHeartbeatAuthorityStore(
@@ -1220,15 +1229,7 @@ describe('Docker monitor settlement authority wiring', () => {
       workerTaskVerdict: 'hold',
       liveness: 'not-alive',
     });
-    expect(continuationSpawn).toHaveBeenCalledTimes(1);
-    expect(continuationSpawn).toHaveBeenCalledWith(
-      taskId,
-      'claude-fable-5',
-      expect.any(String),
-      expect.objectContaining({
-        executionBudget: { maxCacheReadTokens: 250 },
-      }),
-    );
+    expect(continuationSpawn).not.toHaveBeenCalled();
     expect(backend.executionLandingCapability).toBe('checkpoint-stop');
   });
 

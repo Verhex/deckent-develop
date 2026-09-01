@@ -143,8 +143,11 @@ import {
   describeSpawnSkip,
   spawnSkipFromDisposition,
   publishSchedulerSpawnSkips,
+  type ExactNormalDockerExecutionRegistryV2,
+  type ExactTaskProjectionAdmissionV2,
   type SchedulerSpawnSkip,
 } from './scheduler-effects.js';
+import { inspectTaskArtifactsDeferred } from './task-artifact-projection.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../core/provider-authority-composition.js';
 
 // ─── Tmux ────────────────────────────────────────────────────────
@@ -663,6 +666,8 @@ export async function spawnWorkers(
     attendedExecutionApprovalAuthority?: AttendedExecutionApprovalAuthority;
     providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
     exactPlanAuthority?: ExactPlanSpawnAuthority;
+    exactDockerRegistry?: ExactNormalDockerExecutionRegistryV2;
+    exactTaskProjectionAdmission?: ExactTaskProjectionAdmissionV2;
   },
 ): Promise<Task[]> {
   const backend = spawnOpts?.spawnBackend;
@@ -1008,6 +1013,48 @@ export async function spawnWorkers(
     if (spawnedThisWave > 0 && throttleFloorMs > 0) {
       const delayMs = nextDelayMs(null, 0, throttleFloorMs);
       await sleep(delayMs);
+    }
+
+    // T6 exact normal-Docker cutover: initial-wave work uses the same executor
+    // as dependency-ready/queued work. This branch intentionally runs before
+    // any public task read, prompt receipt, TASK_ASSIGN or EXECUTING write.
+    if (spawnOpts?.exactDockerRegistry) {
+      let taskTimeoutSeconds: number | undefined;
+      try {
+        taskTimeoutSeconds = emitTimeoutEvents(
+          task,
+          config,
+          sprintHistory,
+          projectRoot,
+          getCurrentSprintId(projectRoot) ?? sprint.id,
+        );
+      } catch (e) { debugLog('spawn:timeoutEstimate', e); }
+      const disposition = await executeSpawnTask(
+        { task, taskTimeoutSeconds },
+        {
+          projectRoot,
+          sprintFallbackId: sprint.id,
+          config,
+          spawnOpts,
+          backend,
+          resolveAgentPrompt,
+          resolveSkillPrompts,
+          buildWriteTargets: buildAllowedWriteTargets,
+          collisionAuthority: { tasks: sprint.tasks, collectedIds: new Set<string>() },
+          exactDockerRegistry: spawnOpts.exactDockerRegistry,
+          ...(spawnOpts.exactTaskProjectionAdmission
+            ? { exactTaskProjectionAdmission: spawnOpts.exactTaskProjectionAdmission }
+            : {}),
+        },
+      );
+      if (disposition.kind !== 'spawned') {
+        const skip = spawnSkipFromDisposition(disposition, task);
+        if (skip) waveSkips.push(skip);
+        continue;
+      }
+      spawnedThisWave += 1;
+      spawnedTasks.push(task);
+      continue;
     }
 
     // Sprint 168 W2.5 — C0c wire: fresh disk read of task.json (RC3).
@@ -1610,6 +1657,8 @@ export async function respawnEligibleTasks(
     spawnBackend?: SpawnBackend;
     attendedExecutionApprovalAuthority?: AttendedExecutionApprovalAuthority;
     providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+    exactDockerRegistry?: ExactNormalDockerExecutionRegistryV2;
+    exactTaskProjectionAdmission?: ExactTaskProjectionAdmissionV2;
   },
   onWaveTransition?: (durationMs: number, fromWave: string, toWave: string) => void,
 ): Promise<string[]> {
@@ -1696,6 +1745,16 @@ export async function respawnEligibleTasks(
   const slotsAvailable = Math.max(0, maxWorkers - currentlyExecuting);
 
   const toSpawn = nowEligible.slice(0, slotsAvailable);
+  const existingProjectionDigests = new Map<string, string>();
+  if (spawnOpts?.exactDockerRegistry) {
+    const approvedPlanIds = new Set(spawnOpts.exactTaskProjectionAdmission?.taskIds ?? []);
+    for (const task of toSpawn) {
+      if (approvedPlanIds.has(task.id)) continue;
+      const observed = inspectTaskArtifactsDeferred(projectRoot, [task]);
+      const digest = observed.contentDigests[task.id];
+      if (digest !== undefined) existingProjectionDigests.set(task.id, digest);
+    }
+  }
   // Row 3309 S6/S7 — the measured stall: dependency-clear, unblocked, and still
   // not spawned because the fleet is full. Previously this returned an empty
   // array with no trace at all, which is exactly what the 92 empty watcher
@@ -1719,11 +1778,13 @@ export async function respawnEligibleTasks(
   for (const task of toSpawn) {
     if (task.status !== TaskStatus.PAUSED) continue;
     task.status = TaskStatus.PENDING;
-    writeFileSync(
-      join(projectRoot, TASKS_DIR, `task-${task.id}.json`),
-      JSON.stringify(task, null, 2),
-      'utf-8',
-    );
+    if (!spawnOpts?.exactDockerRegistry) {
+      writeFileSync(
+        join(projectRoot, TASKS_DIR, `task-${task.id}.json`),
+        JSON.stringify(task, null, 2),
+        'utf-8',
+      );
+    }
     writeEvent(
       projectRoot,
       sprintIdForDeps,
@@ -1795,8 +1856,15 @@ export async function respawnEligibleTasks(
     // task persistence all happen inside executeSpawnTask now (previously
     // duplicated inline here AND diverged from the local queue path's
     // spawnIfNotAssigned in result-collector.ts).
+    const existingTaskProjectionContentDigest = existingProjectionDigests.get(task.id);
     const disposition = await executeSpawnTask(
-      { task, taskTimeoutSeconds },
+      {
+        task,
+        taskTimeoutSeconds,
+        ...(existingTaskProjectionContentDigest !== undefined
+          ? { existingTaskProjectionContentDigest }
+          : {}),
+      },
       {
         projectRoot,
         sprintFallbackId: sprint.id,
@@ -1807,6 +1875,10 @@ export async function respawnEligibleTasks(
         resolveSkillPrompts,
         buildWriteTargets: buildAllowedWriteTargets,
         collisionAuthority: { tasks: sprint.tasks, collectedIds },
+        exactDockerRegistry: spawnOpts?.exactDockerRegistry,
+        ...(spawnOpts?.exactTaskProjectionAdmission
+          ? { exactTaskProjectionAdmission: spawnOpts.exactTaskProjectionAdmission }
+          : {}),
       },
     );
 
@@ -2767,12 +2839,17 @@ function derivePlanCandidateId(tasksPath: string, filename: string): string | nu
  * id string — sprint ids are free-form. Cross-sprint files are ignored (same
  * rule as the planner's orphan cleanup).
  */
-export function assertTaskProjectionParity(projectRoot: string, sprint: Sprint): void {
+export function assertTaskProjectionParity(
+  projectRoot: string,
+  sprint: Sprint,
+  allowedMissingTaskIds: ReadonlySet<string> = new Set(),
+): void {
   const tasksPath = join(projectRoot, TASKS_DIR);
   const plannedIds = new Set(sprint.tasks.map((t) => t.id));
   if (plannedIds.size === 0) return; // nothing planned — nothing to compare
 
   const missingOnDisk = [...plannedIds]
+    .filter((id) => !allowedMissingTaskIds.has(id))
     .filter((id) => !existsSync(join(tasksPath, `task-${id}.json`)))
     .sort();
 

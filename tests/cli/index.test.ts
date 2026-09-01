@@ -142,6 +142,27 @@ describe('CLI index — buildProgram()', () => {
     expect(call?.[0]).toBeInstanceOf(Command);
   });
 
+  it('threads provider authority into both run and manual spawn composition roots', () => {
+    const providerAuthority = {
+      state: 'hold' as const,
+      reasonCode: 'keyring_unavailable' as const,
+      authorityEvidenceRef: 'provider-authority:test',
+      retryable: false,
+      close: vi.fn(),
+    };
+
+    buildProgram({ providerAuthority });
+
+    expect(registerSpawn).toHaveBeenCalledWith(
+      expect.any(Command),
+      { providerAuthority },
+    );
+    expect(registerRun).toHaveBeenCalledWith(
+      expect.any(Command),
+      expect.objectContaining({ providerAuthority }),
+    );
+  });
+
   it('calling buildProgram multiple times creates independent programs', () => {
     const p1 = buildProgram();
     const p2 = buildProgram();

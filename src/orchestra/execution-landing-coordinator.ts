@@ -8,16 +8,33 @@ import {
   createExecutionLandingContext,
   executionLandingContextRef,
   executionLandingDiskEvidenceRef,
+  openOrCreateExecutionLandingContextV2,
   readExecutionLandingContext,
+  readExecutionLandingContextV2,
   writeExecutionLandingContextAtomic,
   writeExecutionLandingDiskEvidenceAtomic,
+  writeExecutionLandingDiskEvidenceAtomicV2,
+  type CreateExecutionLandingPreparationPayloadV2Input,
   type ExecutionLandingContextEnvelopeV1,
+  type ExecutionLandingContextEnvelopeV2,
 } from '../core/execution-landing-context.js';
 import {
   createExecutionLandingCheckpoint,
+  createExecutionLandingCheckpointV2,
+  createExecutionLandingCustodyRefV2,
+  createExecutionLandingOperationalPayloadV2,
+  createExecutionLandingResultSourceBindingV2,
+  createExecutionLandingVerifiedArtifactBindingV2,
+  readExecutionLandingCheckpointV2,
+  writeExecutionAttemptRetirementAtomicV2,
   writeExecutionLandingCheckpointAtomic,
+  writeExecutionLandingCheckpointAtomicV2,
+  type CreateExecutionLandingOperationalPayloadV2Input,
   type ExecutionLandingCheckpointEnvelopeV1,
+  type ExecutionLandingCheckpointEnvelopeV2,
+  type ExecutionLandingCustodyRefV2,
   type ExecutionLandingCheckpointRefV1,
+  type ExecutionAttemptRetirementV2,
 } from '../core/execution-landing-checkpoint.js';
 import {
   buildExecutionLandingProposalPromptSegment,
@@ -37,9 +54,268 @@ import type {
   RuntimeBudgetLandingEvidence,
   RuntimeBudgetUsageEvidence,
 } from './runtime-budget-monitor.js';
+import type {
+  ExactDockerCustodyCompletionV2,
+  ExactDockerCustodyDispatchOutcomeV2,
+  PreparedExactDockerCustodyV2,
+} from './spawn-backend.js';
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
+}
+
+export interface ExactDockerExecutionLandingCaptureV2 {
+  readonly dispatch: Extract<ExactDockerCustodyDispatchOutcomeV2, { kind: 'released' }>;
+  readonly terminal: Extract<ExactDockerCustodyCompletionV2, { kind: 'landing-captured' }>;
+}
+
+export interface PrepareExactDockerExecutionLandingContextV2Input {
+  readonly projectRoot: string;
+  readonly prepared: PreparedExactDockerCustodyV2;
+  readonly preparationInput: CreateExecutionLandingPreparationPayloadV2Input;
+}
+
+function hostTimestampAtOrAfter(...lowerBounds: readonly string[]): string {
+  const lowerBound = lowerBounds.reduce(
+    (latest, value) => Math.max(latest, Date.parse(value)),
+    Number.NEGATIVE_INFINITY,
+  );
+  if (!Number.isFinite(lowerBound)) {
+    throw createExecutionAuthorityError('Exact Docker landing lifecycle time is invalid');
+  }
+  return new Date(Math.max(Date.now(), lowerBound)).toISOString();
+}
+
+/**
+ * Persists the pre-provider operational authority and disk baseline. This must
+ * run after Store admission but before dispatch/start. `preparedAt` is the real
+ * baseline-capture time; the durable context is the retry authority.
+ */
+export function prepareExactDockerExecutionLandingContextV2(
+  input: PrepareExactDockerExecutionLandingContextV2Input,
+): ExecutionLandingContextEnvelopeV2 {
+  const preparedAt = hostTimestampAtOrAfter(input.prepared.preparationRef.admittedAt);
+  return openOrCreateExecutionLandingContextV2(input.projectRoot, {
+    preparationRef: input.prepared.preparationRef,
+    preparationInput: input.preparationInput,
+    preparedAt,
+  });
+}
+
+export type ExactDockerExecutionLandingOperationalInputV2 = Omit<
+  CreateExecutionLandingOperationalPayloadV2Input,
+  'attemptId' | 'landedAt' | 'diskEvidenceDigest'
+>;
+
+export interface StampExactDockerExecutionLandingCheckpointV2Input {
+  readonly projectRoot: string;
+  readonly capture: ExactDockerExecutionLandingCaptureV2;
+  readonly operationalInput: ExactDockerExecutionLandingOperationalInputV2;
+}
+
+export interface ExactDockerExecutionLandingCheckpointResultV2 {
+  readonly custodyRef: ExecutionLandingCustodyRefV2;
+  readonly checkpoint: ExecutionLandingCheckpointEnvelopeV2;
+  readonly retirement: ExecutionAttemptRetirementV2;
+}
+
+/**
+ * Fail-closed equality gate between the released Store authority and the
+ * terminal artifacts. It deliberately does not read public `.tasks` state.
+ */
+export function assertExactDockerExecutionLandingCaptureV2(
+  input: ExactDockerExecutionLandingCaptureV2,
+): void {
+  const { dispatch, terminal } = input;
+  const preparation = dispatch.preparationRef;
+  const identity = dispatch.custodyRef.identity;
+  const result = terminal.result;
+  const resultArtifact = terminal.resultArtifact;
+  const landingArtifact = terminal.landingProposal.artifact;
+  const times = [
+    dispatch.releasedAt,
+    dispatch.providerStartAcceptedAt,
+    terminal.providerExit.observedAt,
+    terminal.providerStream.capturedAt,
+    resultArtifact.capturedAt,
+    landingArtifact.capturedAt,
+    terminal.landingProposal.verifiedAt,
+  ];
+  if (
+    canonicalJson(terminal.custodyRef) !== canonicalJson(dispatch.custodyRef)
+    || canonicalJson(terminal.releaseReceipt) !== canonicalJson(dispatch.releaseReceipt)
+    || terminal.projectionFence !== dispatch.projectionFence
+    || preparation.dispatchRequestId !== dispatch.admissionRef.dispatchRequestId
+    || preparation.dispatchRequestMaterialDigest
+      !== dispatch.admissionRef.dispatchRequestMaterialDigest
+    || preparation.admissionRefDigest !== dispatch.admissionRef.admissionRefDigest
+    || canonicalJson(preparation.privateIdentity) !== canonicalJson(identity)
+    || preparation.admissionReceiptDigest !== dispatch.custodyRef.admissionReceiptDigest
+    || preparation.admissionRefDigest !== dispatch.custodyRef.admissionRefDigest
+    || preparation.policyDigest !== result.policyDigest
+    || canonicalJson(dispatch.providerStartReceipt)
+      !== canonicalJson(dispatch.custodyRef.providerStartReceipt)
+    || canonicalJson(dispatch.providerExecutionAttempt.custodyIdentity)
+      !== canonicalJson(identity)
+    || dispatch.providerExecutionAttempt.admissionReceiptDigest
+      !== preparation.admissionReceiptDigest
+    || dispatch.providerExecutionAttempt.backendExecutionId !== dispatch.backendExecutionId
+    || dispatch.settlementRef.taskId !== identity.taskId
+    || dispatch.settlementRef.attemptId
+      !== dispatch.providerExecutionAttempt.providerExecutionAttemptId
+    || terminal.providerExit.containerId !== dispatch.backendExecutionId
+    || canonicalJson(result.identity) !== canonicalJson(identity)
+    || result.admissionReceiptDigest !== preparation.admissionReceiptDigest
+    || canonicalJson(resultArtifact.identity) !== canonicalJson(identity)
+    || resultArtifact.artifactClass !== 'worker-result'
+    || resultArtifact.admissionReceiptDigest !== preparation.admissionReceiptDigest
+    || resultArtifact.policyDigest !== preparation.policyDigest
+    || resultArtifact.artifactKey !== result.sourceResult.artifactKey
+    || resultArtifact.receiptDigest !== result.sourceResult.artifactReceiptDigest
+    || resultArtifact.contentDigest !== result.sourceResult.artifactSha256
+    || resultArtifact.byteLength !== result.sourceResult.byteLength
+    || canonicalJson(landingArtifact.identity) !== canonicalJson(identity)
+    || landingArtifact.artifactClass !== 'worker-landing-proposal'
+    || landingArtifact.admissionReceiptDigest !== preparation.admissionReceiptDigest
+    || landingArtifact.policyDigest !== preparation.policyDigest
+    || terminal.landingProposal.proposal.taskId !== identity.taskId
+    || terminal.landingProposal.proposal.dispatchRequestId
+      !== preparation.dispatchRequestId
+    || canonicalJson(terminal.providerStream.identity) !== canonicalJson(identity)
+    || terminal.providerStream.admissionReceiptDigest !== preparation.admissionReceiptDigest
+    || terminal.providerStream.policyDigest !== preparation.policyDigest
+    || terminal.providerStream.artifactClass !== 'pristine-provider-stream'
+    || terminal.providerBilling.providerStreamReceiptDigest
+      !== terminal.providerStream.receiptDigest
+    || terminal.providerBilling.evidence.capturedAt !== terminal.providerStream.capturedAt
+    || times.some(value => !Number.isFinite(Date.parse(value)))
+    || times.some((value, index) => index > 0
+      && Date.parse(value) < Date.parse(times[index - 1]!))
+  ) {
+    throw createExecutionAuthorityError(
+      'Exact Docker landing capture does not match released custody authority',
+    );
+  }
+}
+
+/**
+ * Converts only a fully verified released+terminal capture into the canonical
+ * path-free V2 custody/checkpoint chain. Public `.tasks` state is never read.
+ */
+export function stampExactDockerExecutionLandingCheckpointV2(
+  input: StampExactDockerExecutionLandingCheckpointV2Input,
+): ExactDockerExecutionLandingCheckpointResultV2 {
+  assertExactDockerExecutionLandingCaptureV2(input.capture);
+  const { dispatch, terminal } = input.capture;
+  if (terminal.providerBilling.evidence.provider
+    !== input.operationalInput.identity.calledProvider) {
+    throw createExecutionAuthorityError(
+      'Exact Docker landing provider billing identity does not match operational authority',
+    );
+  }
+  const resultArtifact = terminal.resultArtifact;
+  const resultSource = createExecutionLandingResultSourceBindingV2({
+    artifactClass: 'worker-result',
+    artifactKey: resultArtifact.artifactKey,
+    identity: resultArtifact.identity,
+    admissionReceiptDigest: resultArtifact.admissionReceiptDigest,
+    policyDigest: resultArtifact.policyDigest,
+    artifactReceiptDigest: resultArtifact.receiptDigest,
+    contentDigest: resultArtifact.contentDigest,
+    byteLength: resultArtifact.byteLength,
+    capturedAt: resultArtifact.capturedAt,
+  });
+  const landing = terminal.landingProposal;
+  const landingArtifact = createExecutionLandingVerifiedArtifactBindingV2({
+    artifactClass: 'worker-landing-proposal',
+    artifactKey: landing.artifact.artifactKey,
+    identity: landing.artifact.identity,
+    admissionReceiptDigest: landing.artifact.admissionReceiptDigest,
+    policyDigest: landing.artifact.policyDigest,
+    artifactReceiptDigest: landing.artifact.receiptDigest,
+    contentDigest: landing.artifact.contentDigest,
+    byteLength: landing.artifact.byteLength,
+    capturedAt: landing.artifact.capturedAt,
+    verifiedAt: landing.verifiedAt,
+  });
+  const custodyRef = createExecutionLandingCustodyRefV2({
+    dispatchState: 'RELEASED',
+    preparationRef: dispatch.preparationRef,
+    providerExecutionAttemptId:
+      dispatch.providerExecutionAttempt.providerExecutionAttemptId,
+    providerExecutionAttemptIdentityDigest:
+      dispatch.providerExecutionAttempt.identityDigest,
+    dispatchAuthorityReceiptDigest: dispatch.dispatchReceipt.digest,
+    releaseReceiptRefDigest: dispatch.releaseReceipt.ref,
+    releaseEvidenceDigest: dispatch.releaseReceipt.digest,
+    releasedAt: dispatch.releasedAt,
+    providerStartReceiptRefDigest: dispatch.providerStartReceipt.ref,
+    providerStartEvidenceDigest: dispatch.providerStartReceipt.digest,
+    providerStartAcceptedAt: dispatch.providerStartAcceptedAt,
+    projectionFence: dispatch.projectionFence,
+    resultSource,
+    landingArtifact,
+  });
+  const context = readExecutionLandingContextV2(
+    input.projectRoot,
+    dispatch.preparationRef,
+  );
+  const diskCapturedAt = hostTimestampAtOrAfter(
+    terminal.landingProposal.verifiedAt,
+    context.context.preparedAt,
+  );
+  const diskEvidence = writeExecutionLandingDiskEvidenceAtomicV2(
+    input.projectRoot,
+    context,
+    custodyRef,
+    diskCapturedAt,
+  );
+  const landedAt = hostTimestampAtOrAfter(diskCapturedAt);
+  const operationalPayload = createExecutionLandingOperationalPayloadV2(
+    input.projectRoot,
+    {
+      ...input.operationalInput,
+      attemptId: dispatch.providerExecutionAttempt.providerExecutionAttemptId,
+      diskEvidenceDigest: diskEvidence.evidenceDigest,
+      landedAt,
+    },
+  );
+  const checkpoint = createExecutionLandingCheckpointV2(input.projectRoot, {
+    custodyRef,
+    operationalPayload,
+    contextDigest: context.contextDigest,
+    diskEvidenceDigest: diskEvidence.evidenceDigest,
+    landedAt,
+  });
+  writeExecutionLandingCheckpointAtomicV2(input.projectRoot, checkpoint);
+  const durable = readExecutionLandingCheckpointV2(
+    input.projectRoot,
+    checkpoint.checkpoint.ref,
+  );
+  if (!durable || durable.checkpointDigest !== checkpoint.checkpointDigest) {
+    throw createExecutionAuthorityError(
+      'Exact Docker landing checkpoint failed durable reread',
+    );
+  }
+  const retirement = writeExecutionAttemptRetirementAtomicV2(
+    input.projectRoot,
+    durable.checkpoint.ref,
+    {
+      checkpointDigest: durable.checkpointDigest,
+      runtimeDisposition: 'checkpointed-process-exited',
+      resourcesReleased: true,
+      evidenceDigests: Object.freeze([
+        terminal.providerExit.observationReceiptDigest,
+        terminal.providerStream.receiptDigest,
+        terminal.resultArtifact.receiptDigest,
+        terminal.landingProposal.artifact.receiptDigest,
+        terminal.providerBilling.evidenceDigest,
+        diskEvidence.evidenceDigest,
+      ]),
+      retiredAt: hostTimestampAtOrAfter(landedAt),
+    },
+  );
+  return Object.freeze({ custodyRef, checkpoint: durable, retirement });
 }
 
 function landingRef(ref: TaskResultSettlementRefV1): ExecutionLandingCheckpointRefV1 {

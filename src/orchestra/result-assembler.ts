@@ -31,7 +31,12 @@ import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { debugLog } from '../core/utils.js';
-import type { Task, TaskScope } from '../core/task-types.js';
+import type {
+  ProductionWiringResultEvidence,
+  RunPolicyResultEvidence,
+  Task,
+  TaskScope,
+} from '../core/task-types.js';
 import type { TokenUsage } from '../core/token-usage.js';
 import {
   validateTaskResult,
@@ -44,7 +49,12 @@ import { getDefaultProviderName } from './sprint-utils.js';
 
 // Compat re-exports — canonical ingress moved to result-ingress.ts (SCC fix);
 // shared shapes moved to core/task-result-schema.ts. Existing importers keep working.
-export { assembleCanonicalIngressResult, type CanonicalIngressAuthority } from './result-ingress.js';
+export {
+  assembleCanonicalIngressResult,
+  assembleCanonicalIngressResultV2,
+  type CanonicalIngressAuthority,
+  type CanonicalIngressCustodyAuthority,
+} from './result-ingress.js';
 export { AssemblerError, type FileChange } from '../core/task-result-schema.js';
 
 // ─── Input contract ──────────────────────────────────────────────────────────
@@ -112,6 +122,10 @@ export interface WorkerSubjective {
     linesAdded?: number | null;
     linesRemoved?: number | null;
   };
+  /** Worker observation only; host settlement decides production wiring. */
+  productionWiringEvidence?: ProductionWiringResultEvidence;
+  /** Worker digest echo only; host settlement decides policy parity. */
+  runPolicyEvidence?: RunPolicyResultEvidence;
 }
 
 /**
@@ -300,6 +314,10 @@ export async function assembleResult(input: AssembleInput): Promise<TaskResultV1
 
     // auditor (2nd layer) — filled post-write
     auditorValidation: null,
+    ...(ws.productionWiringEvidence
+      ? { productionWiringEvidence: ws.productionWiringEvidence }
+      : {}),
+    ...(ws.runPolicyEvidence ? { runPolicyEvidence: ws.runPolicyEvidence } : {}),
   };
 
   // 5. Validate before returning — never emit an invalid result.

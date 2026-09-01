@@ -26,9 +26,25 @@ import { tmpdir } from 'node:os';
 
 // ─── Mocks (hoisted before imports) ────────────────────────────────────────
 
-vi.mock('../../src/cli/commands/spawn.js', () => ({
-  spawnWorkerMultiProvider: vi.fn().mockResolvedValue({ backend: 'subprocess', provider: 'claude' }),
-}));
+const backendHarness = vi.hoisted(() => ({ spawn: vi.fn(), kill: vi.fn() }));
+
+vi.mock('../../src/orchestra/spawn-backend.js', async (importOriginal) => {
+  const actual = await importOriginal() as Record<string, unknown>;
+  return {
+    ...actual,
+    SpawnBackendFactory: {
+      create: vi.fn(() => ({
+        name: 'subprocess',
+        liveUsageBudgetSupport: 'measured-stream',
+        executionLandingCapability: 'cooperative-landing',
+        spawn: backendHarness.spawn,
+        kill: backendHarness.kill,
+        list: () => [],
+        isAvailable: async () => true,
+      })),
+    },
+  };
+});
 
 vi.mock('../../src/orchestra/task-builder.js', async (importOriginal) => {
   const actual = await importOriginal() as Record<string, unknown>;
@@ -51,6 +67,7 @@ import type { Task, TaskResult } from '../../src/core/types.js';
 function makeTaskConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
   return {
     deckent_style: 'task',
+    spawn_backend: 'subprocess',
     execution_budget: {
       roles: { worker: { default: { maxTokens: 100_000, maxTurns: 10 } } },
       landing: { reserve_ratio: 0.25 },

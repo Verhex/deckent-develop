@@ -29,6 +29,9 @@ jobs:
         with:
           node-version: '24.x'
           cache: npm
+          cache-dependency-path: |
+            npm-shrinkwrap.json
+            src/dashboard/package-lock.json
       - run: npm ci
       - run: npm run ci:rebuild-native
       - name: Install dashboard dependencies (for build:all → dashboard bundle)

@@ -46,6 +46,28 @@ import {
   type RunPolicyResultEvidence,
 } from './task-types.js';
 import type { ExecutionBudget } from './work-model.js';
+import {
+  canonicalTaskAttemptCustodyJson,
+  parseTaskAttemptCustodyAdmissionV2,
+  parseTaskAttemptCustodyArtifactReceiptV2,
+  parseTaskAttemptCustodyChainReceiptV2,
+  taskAttemptCustodyDigest,
+  type CanonicalJsonBounds,
+  type Sha256Digest,
+  type TaskAttemptCustodyAdmissionV2,
+  type TaskAttemptCustodyArtifactReceiptV2,
+  type TaskAttemptCustodyChainReceiptV2,
+  type TaskAttemptCustodyIdentityV2,
+  type TaskAttemptCustodyPolicyV2,
+  type TaskAttemptCustodyStore,
+  type TaskAttemptCustodyVerifiedArtifact,
+} from './task-attempt-custody-store.js';
+import {
+  taskResultAttemptCustodyIdentitySchemaV2,
+  taskResultV2Digest,
+  validateProductionTaskResultV2,
+  type TaskResultV2,
+} from './task-result-schema.js';
 
 export const TASK_RESULT_SETTLEMENT_SCHEMA_VERSION = 1 as const;
 export const TASK_RESULT_SETTLEMENT_LIFECYCLE_VERSION = 1 as const;
@@ -240,6 +262,66 @@ export interface TaskResultSettlementV1 extends TaskResultSettlementRefV1 {
   resultSha256: string;
   result: Record<string, unknown>;
 }
+
+/** Additive V2 settlement. V1 disk bytes and APIs remain historical compatibility. */
+export const TASK_RESULT_SETTLEMENT_SCHEMA_VERSION_V2 = 2 as const;
+
+export interface TaskResultSettlementV2Chain {
+  readonly acceptedResultChainDigest: Sha256Digest;
+  readonly evaluationChainDigest: Sha256Digest;
+  readonly finalizerChainDigest: Sha256Digest;
+}
+
+export interface TaskResultSettlementV2 {
+  readonly schemaVersion: typeof TASK_RESULT_SETTLEMENT_SCHEMA_VERSION_V2;
+  readonly kind: 'task-result-settlement-v2';
+  readonly state: 'settled';
+  readonly identity: TaskAttemptCustodyIdentityV2;
+  readonly settledAt: string;
+  readonly exitCode: number | null;
+  readonly policyDigest: Sha256Digest;
+  readonly admissionReceiptDigest: Sha256Digest;
+  readonly sourceResultArtifactReceiptDigest: Sha256Digest;
+  readonly resultDigest: Sha256Digest;
+  readonly result: TaskResultV2;
+  readonly chain: TaskResultSettlementV2Chain;
+}
+
+export interface CreateTaskResultSettlementV2Input {
+  readonly custodyStore: TaskAttemptCustodyStore;
+  readonly policy: TaskAttemptCustodyPolicyV2;
+  readonly admission: TaskAttemptCustodyAdmissionV2;
+  readonly sourceResultArtifact: TaskAttemptCustodyArtifactReceiptV2;
+  readonly acceptedResultArtifact: TaskAttemptCustodyArtifactReceiptV2;
+  readonly acceptedResultChain: TaskAttemptCustodyChainReceiptV2;
+  readonly evaluationArtifact: TaskAttemptCustodyArtifactReceiptV2;
+  readonly evaluationChain: TaskAttemptCustodyChainReceiptV2;
+  readonly finalizerArtifact: TaskAttemptCustodyArtifactReceiptV2;
+  readonly finalizerChain: TaskAttemptCustodyChainReceiptV2;
+  readonly settledAt: string;
+  readonly exitCode: number | null;
+  readonly result: TaskResultV2;
+}
+
+export interface TaskResultSettlementV2ArchivePayload {
+  readonly schemaVersion: 2;
+  readonly kind: 'task-result-settlement-v2-archive';
+  readonly state: 'archived';
+  readonly identity: TaskAttemptCustodyIdentityV2;
+  readonly predecessorDigest: Sha256Digest;
+  readonly externalAuthorityRefs: readonly [{
+    readonly authorityType: 'task-result-settlement-v2';
+    readonly digest: Sha256Digest;
+  }];
+}
+
+export type TaskResultSettlementV2ChainVerification =
+  | {
+      readonly ok: true;
+      readonly settlementDigest: Sha256Digest;
+      readonly archiveChainDigest: Sha256Digest;
+    }
+  | { readonly ok: false; readonly reason: string };
 
 /** Host-attested execution of the plan's exact canonical consumer. */
 export interface ProductionWiringHostConsumerExecutionEvidenceV1 {
@@ -2494,4 +2576,713 @@ export function listPendingTaskResultSettlementAttempts(
     a.attempt.createdAt.localeCompare(b.attempt.createdAt)
       || a.attempt.attemptId.localeCompare(b.attempt.attemptId)
   ));
+}
+
+// ─── Pure exact-attempt settlement V2 (normal Docker cutover) ──────────────
+
+function v2HasExactKeys(record: Record<string, unknown>, keys: readonly string[]): boolean {
+  try {
+    const ownKeys = Reflect.ownKeys(record);
+    if (ownKeys.some(key => typeof key !== 'string')) return false;
+    const actual = (ownKeys as string[]).sort();
+    const expected = [...keys].sort();
+    return actual.length === expected.length
+      && actual.every((key, index) => {
+        if (key !== expected[index]) return false;
+        const descriptor = Object.getOwnPropertyDescriptor(record, key);
+        return descriptor !== undefined && descriptor.enumerable && 'value' in descriptor;
+      });
+  } catch {
+    return false;
+  }
+}
+
+function v2IsRecord(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  try {
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null;
+  } catch {
+    return false;
+  }
+}
+
+function v2IsDigest(value: unknown): value is Sha256Digest {
+  return typeof value === 'string' && /^sha256:[a-f0-9]{64}$/u.test(value);
+}
+
+function v2IsTimestamp(value: unknown): value is string {
+  if (
+    typeof value !== 'string'
+    || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u.test(value)
+  ) return false;
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return false;
+  const normalized = new Date(timestamp).toISOString();
+  return normalized === value || normalized === value.replace(/Z$/u, '.000Z');
+}
+
+function v2SameIdentity(
+  left: Readonly<TaskAttemptCustodyIdentityV2>,
+  right: Readonly<TaskAttemptCustodyIdentityV2>,
+): boolean {
+  return left.schemaVersion === right.schemaVersion
+    && left.backend === right.backend
+    && left.projectRootSha256 === right.projectRootSha256
+    && left.projectId === right.projectId
+    && left.taskId === right.taskId
+    && left.attemptId === right.attemptId
+    && left.generation === right.generation;
+}
+
+function v2SameEffectIdentity(
+  left: Readonly<{ projectId: string; taskId: string; attemptId: string; generation: number }>,
+  right: Readonly<TaskAttemptCustodyIdentityV2>,
+): boolean {
+  return left.projectId === right.projectId
+    && left.taskId === right.taskId
+    && left.attemptId === right.attemptId
+    && left.generation === right.generation;
+}
+
+function v2RawSha256(bytes: Uint8Array): Sha256Digest {
+  return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+}
+
+function v2SameCanonicalBytes(
+  left: unknown,
+  right: unknown,
+  bounds: CanonicalJsonBounds,
+): boolean {
+  return Buffer.from(canonicalTaskAttemptCustodyJson(left, bounds)).equals(
+    Buffer.from(canonicalTaskAttemptCustodyJson(right, bounds)),
+  );
+}
+
+function v2ReceiptIdentityMatches(
+  identity: TaskAttemptCustodyIdentityV2,
+  ...records: readonly (
+    | TaskAttemptCustodyAdmissionV2
+    | TaskAttemptCustodyArtifactReceiptV2
+    | TaskAttemptCustodyChainReceiptV2
+  )[]
+): boolean {
+  return records.every(record => v2SameIdentity(record.identity, identity));
+}
+
+function v2ReadPersistedArtifact(
+  store: TaskAttemptCustodyStore,
+  policy: TaskAttemptCustodyPolicyV2,
+  receipt: TaskAttemptCustodyArtifactReceiptV2,
+): TaskAttemptCustodyVerifiedArtifact | null {
+  if (receipt.artifactClass === 'task-admission-snapshot') return null;
+  return store.readVerifiedArtifact({
+    identity: receipt.identity,
+    policy,
+    artifactClass: receipt.artifactClass,
+    artifactKey: receipt.artifactKey,
+    receiptDigest: receipt.receiptDigest,
+  });
+}
+
+function v2PersistedArtifactMatches(
+  expected: TaskAttemptCustodyArtifactReceiptV2,
+  observed: TaskAttemptCustodyVerifiedArtifact | null,
+  bounds: CanonicalJsonBounds,
+): observed is TaskAttemptCustodyVerifiedArtifact {
+  return observed !== null
+    && observed.receipt.receiptDigest === expected.receiptDigest
+    && v2SameCanonicalBytes(observed.receipt, expected, bounds);
+}
+
+function v2PersistedChainMatches(
+  expected: TaskAttemptCustodyChainReceiptV2,
+  observed: TaskAttemptCustodyChainReceiptV2 | null,
+  bounds: CanonicalJsonBounds,
+): observed is TaskAttemptCustodyChainReceiptV2 {
+  return observed !== null
+    && observed.receiptDigest === expected.receiptDigest
+    && v2SameCanonicalBytes(observed, expected, bounds);
+}
+
+function v2ValidatePreSettlementChain(
+  input: CreateTaskResultSettlementV2Input,
+): string | null {
+  const admission = parseTaskAttemptCustodyAdmissionV2(input.admission, input.policy);
+  const source = parseTaskAttemptCustodyArtifactReceiptV2(
+    input.sourceResultArtifact,
+    input.policy,
+  );
+  const acceptedArtifact = parseTaskAttemptCustodyArtifactReceiptV2(
+    input.acceptedResultArtifact,
+    input.policy,
+  );
+  const acceptedChain = parseTaskAttemptCustodyChainReceiptV2(
+    input.acceptedResultChain,
+    input.policy,
+  );
+  const evaluationArtifact = parseTaskAttemptCustodyArtifactReceiptV2(
+    input.evaluationArtifact,
+    input.policy,
+  );
+  const evaluationChain = parseTaskAttemptCustodyChainReceiptV2(
+    input.evaluationChain,
+    input.policy,
+  );
+  const finalizerArtifact = parseTaskAttemptCustodyArtifactReceiptV2(
+    input.finalizerArtifact,
+    input.policy,
+  );
+  const finalizerChain = parseTaskAttemptCustodyChainReceiptV2(
+    input.finalizerChain,
+    input.policy,
+  );
+  if (
+    !admission
+    || !source
+    || !acceptedArtifact
+    || !acceptedChain
+    || !evaluationArtifact
+    || !evaluationChain
+    || !finalizerArtifact
+    || !finalizerChain
+  ) return 'invalid-custody-receipt';
+  const identity = admission.identity;
+  if (!v2ReceiptIdentityMatches(
+    identity,
+    source,
+    acceptedArtifact,
+    acceptedChain,
+    evaluationArtifact,
+    evaluationChain,
+    finalizerArtifact,
+    finalizerChain,
+  )) return 'identity-mismatch';
+  const resultValidation = validateProductionTaskResultV2(input.result, input.policy.jsonBounds);
+  if (!resultValidation.ok) return 'invalid-task-result-v2';
+  const binding = resultValidation.value.attemptCustody;
+  if (
+    !v2SameIdentity(binding.identity, identity)
+    || binding.policyDigest !== input.policy.policyDigest
+    || binding.admissionReceiptDigest !== admission.receiptDigest
+    || binding.sourceResult.artifactClass !== 'worker-result'
+    || binding.sourceResult.artifactKey !== source.artifactKey
+    || binding.sourceResult.artifactReceiptDigest !== source.receiptDigest
+    || binding.sourceResult.artifactSha256 !== source.artifact.sha256
+    || binding.sourceResult.byteLength !== source.artifact.byteLength
+  ) return 'task-result-custody-binding-mismatch';
+  const effectLandingBinding = binding.effectLanding;
+  const persistedEffectLandingArtifact = input.custodyStore.readVerifiedArtifact({
+    identity,
+    policy: input.policy,
+    artifactClass: 'execution-effect-landing-receipt',
+    artifactKey: effectLandingBinding.landingArtifactKey,
+    receiptDigest: effectLandingBinding.landingArtifactReceiptDigest,
+  });
+  const persistedEffectLanding = input.custodyStore.readEffectLandingReceipt({
+    identity,
+    policy: input.policy,
+    artifactKey: effectLandingBinding.landingArtifactKey,
+  });
+  const persistedEffectLandingChain = input.custodyStore.readChain(
+    identity,
+    input.policy,
+    'effect-landing',
+  );
+  if (
+    !v2SameEffectIdentity(effectLandingBinding.identity, identity)
+    || effectLandingBinding.admissionReceiptDigest !== admission.receiptDigest
+    || effectLandingBinding.custodyPolicyDigest !== input.policy.policyDigest
+    || persistedEffectLandingArtifact === null
+    || persistedEffectLandingArtifact.receipt.receiptDigest
+      !== effectLandingBinding.landingArtifactReceiptDigest
+    || persistedEffectLanding === null
+    || persistedEffectLanding.receiptDigest !== effectLandingBinding.landingReceiptDigest
+    || persistedEffectLanding.disposition !== effectLandingBinding.disposition
+    || persistedEffectLanding.effectDecisionDigest !== effectLandingBinding.effectDecisionDigest
+    || persistedEffectLanding.transactionDigest !== effectLandingBinding.transactionDigest
+    || persistedEffectLandingChain === null
+    || persistedEffectLandingChain.receiptDigest !== effectLandingBinding.effectLandingChainDigest
+    || persistedEffectLandingChain.stage !== 'effect-landing'
+    || persistedEffectLandingChain.predecessorDigest !== admission.receiptDigest
+    || persistedEffectLandingChain.artifactKey !== effectLandingBinding.landingArtifactKey
+    || persistedEffectLandingChain.artifactReceiptDigest
+      !== effectLandingBinding.landingArtifactReceiptDigest
+  ) return 'effect-landing-binding-mismatch';
+  const records = [source, acceptedArtifact, evaluationArtifact, finalizerArtifact] as const;
+  if (records.some(record => (
+    record.policyDigest !== input.policy.policyDigest
+    || record.admissionReceiptDigest !== admission.receiptDigest
+  ))) return 'admission-or-policy-mismatch';
+  if (
+    source.artifactClass !== 'worker-result'
+    || acceptedArtifact.artifactClass !== 'canonical-accepted-result'
+    || evaluationArtifact.artifactClass !== 'evaluation-receipt'
+    || finalizerArtifact.artifactClass !== 'finalizer-receipt'
+  ) return 'artifact-class-mismatch';
+  const persistedAdmission = input.custodyStore.readAdmission(identity, input.policy);
+  const persistedSource = v2ReadPersistedArtifact(input.custodyStore, input.policy, source);
+  const persistedAcceptedArtifact = v2ReadPersistedArtifact(
+    input.custodyStore,
+    input.policy,
+    acceptedArtifact,
+  );
+  const persistedEvaluationArtifact = v2ReadPersistedArtifact(
+    input.custodyStore,
+    input.policy,
+    evaluationArtifact,
+  );
+  const persistedFinalizerArtifact = v2ReadPersistedArtifact(
+    input.custodyStore,
+    input.policy,
+    finalizerArtifact,
+  );
+  const persistedAcceptedChain = input.custodyStore.readChain(
+    identity,
+    input.policy,
+    'accepted-result',
+  );
+  const persistedEvaluationChain = input.custodyStore.readChain(
+    identity,
+    input.policy,
+    'evaluation',
+  );
+  const persistedFinalizerChain = input.custodyStore.readChain(
+    identity,
+    input.policy,
+    'finalizer',
+  );
+  if (
+    persistedAdmission === null
+    || persistedAdmission.receiptDigest !== admission.receiptDigest
+    || !v2SameCanonicalBytes(persistedAdmission, admission, input.policy.jsonBounds)
+    || !v2PersistedArtifactMatches(source, persistedSource, input.policy.jsonBounds)
+    || !v2PersistedArtifactMatches(
+      acceptedArtifact,
+      persistedAcceptedArtifact,
+      input.policy.jsonBounds,
+    )
+    || !v2PersistedArtifactMatches(
+      evaluationArtifact,
+      persistedEvaluationArtifact,
+      input.policy.jsonBounds,
+    )
+    || !v2PersistedArtifactMatches(
+      finalizerArtifact,
+      persistedFinalizerArtifact,
+      input.policy.jsonBounds,
+    )
+    || !v2PersistedChainMatches(
+      acceptedChain,
+      persistedAcceptedChain,
+      input.policy.jsonBounds,
+    )
+    || !v2PersistedChainMatches(
+      evaluationChain,
+      persistedEvaluationChain,
+      input.policy.jsonBounds,
+    )
+    || !v2PersistedChainMatches(
+      finalizerChain,
+      persistedFinalizerChain,
+      input.policy.jsonBounds,
+    )
+  ) return 'unpersisted-or-mismatched-custody';
+  const canonicalResultBytes = canonicalTaskAttemptCustodyJson(
+    resultValidation.value,
+    input.policy.jsonBounds,
+  );
+  if (
+    acceptedArtifact.artifact.sha256 !== v2RawSha256(canonicalResultBytes)
+    || acceptedArtifact.artifact.byteLength !== canonicalResultBytes.byteLength
+    || !Buffer.from(persistedAcceptedArtifact.bytes).equals(Buffer.from(canonicalResultBytes))
+  ) return 'accepted-result-payload-mismatch';
+  if (
+    acceptedChain.stage !== 'accepted-result'
+    || acceptedChain.predecessorDigest !== persistedEffectLandingChain.receiptDigest
+    || acceptedChain.artifactReceiptDigest !== acceptedArtifact.receiptDigest
+    || acceptedChain.artifactKey !== acceptedArtifact.artifactKey
+    || acceptedChain.admissionReceiptDigest !== admission.receiptDigest
+    || evaluationChain.stage !== 'evaluation'
+    || evaluationChain.predecessorDigest !== acceptedChain.receiptDigest
+    || evaluationChain.artifactReceiptDigest !== evaluationArtifact.receiptDigest
+    || evaluationChain.artifactKey !== evaluationArtifact.artifactKey
+    || evaluationChain.admissionReceiptDigest !== admission.receiptDigest
+    || finalizerChain.stage !== 'finalizer'
+    || finalizerChain.predecessorDigest !== evaluationChain.receiptDigest
+    || finalizerChain.artifactReceiptDigest !== finalizerArtifact.receiptDigest
+    || finalizerChain.artifactKey !== finalizerArtifact.artifactKey
+    || finalizerChain.admissionReceiptDigest !== admission.receiptDigest
+  ) return 'predecessor-chain-mismatch';
+  const timeline = [
+    admission.admittedAt,
+    source.capturedAt,
+    persistedEffectLanding.committedAt,
+    persistedEffectLandingChain.occurredAt,
+    acceptedArtifact.capturedAt,
+    acceptedChain.occurredAt,
+    evaluationArtifact.capturedAt,
+    evaluationChain.occurredAt,
+    finalizerArtifact.capturedAt,
+    finalizerChain.occurredAt,
+  ].map(timestamp => Date.parse(timestamp));
+  if (timeline.some((timestamp, index) => index > 0 && timestamp < timeline[index - 1]!)) {
+    return 'non-monotonic-custody-time';
+  }
+  return null;
+}
+
+export function createTaskResultSettlementV2(
+  input: CreateTaskResultSettlementV2Input,
+): TaskResultSettlementV2 {
+  const chainError = v2ValidatePreSettlementChain(input);
+  if (chainError) {
+    throw createExecutionAuthorityError(`Invalid TaskResult settlement V2 chain: ${chainError}`);
+  }
+  if (
+    !v2IsTimestamp(input.settledAt)
+    || Date.parse(input.settledAt) < Date.parse(input.finalizerChain.occurredAt)
+    || (input.exitCode !== null
+      && (!Number.isInteger(input.exitCode) || !Number.isSafeInteger(input.exitCode)))
+  ) throw createExecutionAuthorityError('Invalid TaskResult settlement V2 terminal metadata');
+  const resultValidation = validateProductionTaskResultV2(input.result, input.policy.jsonBounds);
+  if (!resultValidation.ok) {
+    throw createExecutionAuthorityError('Invalid TaskResult settlement V2 result');
+  }
+  const settlement: TaskResultSettlementV2 = Object.freeze({
+    schemaVersion: TASK_RESULT_SETTLEMENT_SCHEMA_VERSION_V2,
+    kind: 'task-result-settlement-v2',
+    state: 'settled',
+    identity: Object.freeze({ ...input.admission.identity }),
+    settledAt: input.settledAt,
+    exitCode: input.exitCode,
+    policyDigest: input.policy.policyDigest,
+    admissionReceiptDigest: input.admission.receiptDigest,
+    sourceResultArtifactReceiptDigest: input.sourceResultArtifact.receiptDigest,
+    resultDigest: taskResultV2Digest(resultValidation.value, input.policy.jsonBounds),
+    result: resultValidation.value,
+    chain: Object.freeze({
+      acceptedResultChainDigest: input.acceptedResultChain.receiptDigest,
+      evaluationChainDigest: input.evaluationChain.receiptDigest,
+      finalizerChainDigest: input.finalizerChain.receiptDigest,
+    }),
+  });
+  const parsed = parseTaskResultSettlementV2(settlement, input.policy.jsonBounds);
+  if (!parsed) throw createExecutionAuthorityError('TaskResult settlement V2 creation failed');
+  return parsed;
+}
+
+export function parseTaskResultSettlementV2(
+  value: unknown,
+  jsonBounds: CanonicalJsonBounds,
+): TaskResultSettlementV2 | null {
+  if (!v2IsRecord(value) || !v2HasExactKeys(value, [
+    'schemaVersion',
+    'kind',
+    'state',
+    'identity',
+    'settledAt',
+    'exitCode',
+    'policyDigest',
+    'admissionReceiptDigest',
+    'sourceResultArtifactReceiptDigest',
+    'resultDigest',
+    'result',
+    'chain',
+  ])) return null;
+  const identity = taskResultAttemptCustodyIdentitySchemaV2.safeParse(value.identity);
+  const result = validateProductionTaskResultV2(value.result, jsonBounds);
+  if (
+    !identity.success
+    || !result.ok
+    || value.schemaVersion !== TASK_RESULT_SETTLEMENT_SCHEMA_VERSION_V2
+    || value.kind !== 'task-result-settlement-v2'
+    || value.state !== 'settled'
+    || !v2IsTimestamp(value.settledAt)
+    || (value.exitCode !== null
+      && (typeof value.exitCode !== 'number'
+        || !Number.isInteger(value.exitCode)
+        || !Number.isSafeInteger(value.exitCode)))
+    || !v2IsDigest(value.policyDigest)
+    || !v2IsDigest(value.admissionReceiptDigest)
+    || !v2IsDigest(value.sourceResultArtifactReceiptDigest)
+    || !v2IsDigest(value.resultDigest)
+    || !v2IsRecord(value.chain)
+    || !v2HasExactKeys(value.chain, [
+      'acceptedResultChainDigest',
+      'evaluationChainDigest',
+      'finalizerChainDigest',
+    ])
+    || !v2IsDigest(value.chain.acceptedResultChainDigest)
+    || !v2IsDigest(value.chain.evaluationChainDigest)
+    || !v2IsDigest(value.chain.finalizerChainDigest)
+  ) return null;
+  if (
+    !v2SameIdentity(result.value.attemptCustody.identity, identity.data)
+    || result.value.attemptCustody.policyDigest !== value.policyDigest
+    || result.value.attemptCustody.admissionReceiptDigest !== value.admissionReceiptDigest
+    || result.value.attemptCustody.sourceResult.artifactReceiptDigest
+      !== value.sourceResultArtifactReceiptDigest
+    || taskResultV2Digest(result.value, jsonBounds) !== value.resultDigest
+  ) return null;
+  const normalized: TaskResultSettlementV2 = {
+    schemaVersion: TASK_RESULT_SETTLEMENT_SCHEMA_VERSION_V2,
+    kind: 'task-result-settlement-v2',
+    state: 'settled',
+    identity: identity.data,
+    settledAt: value.settledAt,
+    exitCode: value.exitCode,
+    policyDigest: value.policyDigest,
+    admissionReceiptDigest: value.admissionReceiptDigest,
+    sourceResultArtifactReceiptDigest: value.sourceResultArtifactReceiptDigest,
+    resultDigest: value.resultDigest,
+    result: result.value,
+    chain: {
+      acceptedResultChainDigest: value.chain.acceptedResultChainDigest,
+      evaluationChainDigest: value.chain.evaluationChainDigest,
+      finalizerChainDigest: value.chain.finalizerChainDigest,
+    },
+  };
+  try {
+    if (!v2SameCanonicalBytes(value, normalized, jsonBounds)) return null;
+  } catch {
+    return null;
+  }
+  return Object.freeze({
+    ...normalized,
+    identity: Object.freeze({ ...normalized.identity }),
+    chain: Object.freeze({ ...normalized.chain }),
+  });
+}
+
+export function taskResultSettlementV2Digest(
+  settlement: TaskResultSettlementV2,
+  jsonBounds: CanonicalJsonBounds,
+): Sha256Digest {
+  const parsed = parseTaskResultSettlementV2(settlement, jsonBounds);
+  if (!parsed) throw createExecutionAuthorityError('Invalid TaskResult settlement V2 digest input');
+  return taskAttemptCustodyDigest('task-result-settlement', parsed, jsonBounds);
+}
+
+export function taskResultSettlementV2EvidenceRef(
+  settlement: TaskResultSettlementV2,
+  jsonBounds: CanonicalJsonBounds,
+): string {
+  return `task-result-settlement-v2:${taskResultSettlementV2Digest(settlement, jsonBounds)}`;
+}
+
+/** Explicit historical alias. It never interprets a V2 record as V1 or vice versa. */
+export function parseHistoricalTaskResultSettlementV1(
+  value: unknown,
+): TaskResultSettlementV1 | null {
+  return parseTaskResultSettlement(value);
+}
+
+function v2ParseArchivePayload(
+  value: unknown,
+  bounds: CanonicalJsonBounds,
+): TaskResultSettlementV2ArchivePayload | null {
+  if (!v2IsRecord(value) || !v2HasExactKeys(value, [
+    'schemaVersion',
+    'kind',
+    'state',
+    'identity',
+    'predecessorDigest',
+    'externalAuthorityRefs',
+  ])) return null;
+  const identity = taskResultAttemptCustodyIdentitySchemaV2.safeParse(value.identity);
+  if (
+    !identity.success
+    || value.schemaVersion !== 2
+    || value.kind !== 'task-result-settlement-v2-archive'
+    || value.state !== 'archived'
+    || !v2IsDigest(value.predecessorDigest)
+    || !Array.isArray(value.externalAuthorityRefs)
+    || value.externalAuthorityRefs.length !== 1
+  ) return null;
+  const authority = value.externalAuthorityRefs[0];
+  if (
+    !v2IsRecord(authority)
+    || !v2HasExactKeys(authority, ['authorityType', 'digest'])
+    || authority.authorityType !== 'task-result-settlement-v2'
+    || !v2IsDigest(authority.digest)
+  ) return null;
+  const normalized: TaskResultSettlementV2ArchivePayload = {
+    schemaVersion: 2,
+    kind: 'task-result-settlement-v2-archive',
+    state: 'archived',
+    identity: identity.data,
+    predecessorDigest: value.predecessorDigest,
+    externalAuthorityRefs: [{
+      authorityType: 'task-result-settlement-v2',
+      digest: authority.digest,
+    }],
+  };
+  try {
+    return v2SameCanonicalBytes(value, normalized, bounds) ? normalized : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Full independent verifier including settlement publication and archive tail. */
+export function verifyTaskResultSettlementV2Chain(input: {
+  readonly creation: CreateTaskResultSettlementV2Input;
+  readonly settlement: TaskResultSettlementV2;
+  readonly settlementArtifact: TaskAttemptCustodyArtifactReceiptV2;
+  readonly settlementChain: TaskAttemptCustodyChainReceiptV2;
+  readonly archivePayload: TaskResultSettlementV2ArchivePayload;
+  readonly archiveArtifact: TaskAttemptCustodyArtifactReceiptV2;
+  readonly archiveChain: TaskAttemptCustodyChainReceiptV2;
+}): TaskResultSettlementV2ChainVerification {
+  try {
+    const expected = createTaskResultSettlementV2(input.creation);
+    const parsed = parseTaskResultSettlementV2(
+      input.settlement,
+      input.creation.policy.jsonBounds,
+    );
+    if (!parsed || !v2SameCanonicalBytes(expected, parsed, input.creation.policy.jsonBounds)) {
+      return { ok: false, reason: 'settlement-mismatch' };
+    }
+    const settlementDigest = taskResultSettlementV2Digest(
+      parsed,
+      input.creation.policy.jsonBounds,
+    );
+    const settlementArtifact = parseTaskAttemptCustodyArtifactReceiptV2(
+      input.settlementArtifact,
+      input.creation.policy,
+    );
+    const settlementChain = parseTaskAttemptCustodyChainReceiptV2(
+      input.settlementChain,
+      input.creation.policy,
+    );
+    const archiveArtifact = parseTaskAttemptCustodyArtifactReceiptV2(
+      input.archiveArtifact,
+      input.creation.policy,
+    );
+    const archiveChain = parseTaskAttemptCustodyChainReceiptV2(
+      input.archiveChain,
+      input.creation.policy,
+    );
+    const archivePayload = v2ParseArchivePayload(
+      input.archivePayload,
+      input.creation.policy.jsonBounds,
+    );
+    if (
+      !settlementArtifact
+      || !settlementChain
+      || !archiveArtifact
+      || !archiveChain
+      || !archivePayload
+      || !v2ReceiptIdentityMatches(
+        parsed.identity,
+        settlementArtifact,
+        settlementChain,
+        archiveArtifact,
+        archiveChain,
+      )
+      || settlementArtifact.artifactClass !== 'settlement-receipt'
+      || settlementArtifact.admissionReceiptDigest !== parsed.admissionReceiptDigest
+      || settlementArtifact.policyDigest !== input.creation.policy.policyDigest
+      || settlementArtifact.artifact.sha256 !== v2RawSha256(
+        canonicalTaskAttemptCustodyJson(parsed, input.creation.policy.jsonBounds),
+      )
+      || settlementChain.stage !== 'settlement'
+      || settlementChain.admissionReceiptDigest !== parsed.admissionReceiptDigest
+      || settlementChain.predecessorDigest !== input.creation.finalizerChain.receiptDigest
+      || settlementChain.artifactReceiptDigest !== settlementArtifact.receiptDigest
+      || settlementChain.artifactKey !== settlementArtifact.artifactKey
+      || archiveArtifact.artifactClass !== 'archive-receipt'
+      || archiveArtifact.admissionReceiptDigest !== parsed.admissionReceiptDigest
+      || archiveArtifact.policyDigest !== input.creation.policy.policyDigest
+      || archiveArtifact.artifact.sha256 !== v2RawSha256(
+        canonicalTaskAttemptCustodyJson(archivePayload, input.creation.policy.jsonBounds),
+      )
+      || archiveChain.stage !== 'archive'
+      || archiveChain.admissionReceiptDigest !== parsed.admissionReceiptDigest
+      || archiveChain.predecessorDigest !== settlementChain.receiptDigest
+      || archiveChain.artifactReceiptDigest !== archiveArtifact.receiptDigest
+      || archiveChain.artifactKey !== archiveArtifact.artifactKey
+      || !v2SameIdentity(archivePayload.identity, parsed.identity)
+      || archivePayload.predecessorDigest !== settlementChain.receiptDigest
+      || archivePayload.externalAuthorityRefs[0].digest !== settlementDigest
+    ) return { ok: false, reason: 'archive-tail-mismatch' };
+    const persistedSettlementArtifact = v2ReadPersistedArtifact(
+      input.creation.custodyStore,
+      input.creation.policy,
+      settlementArtifact,
+    );
+    const persistedSettlementChain = input.creation.custodyStore.readChain(
+      parsed.identity,
+      input.creation.policy,
+      'settlement',
+    );
+    const persistedArchiveArtifact = v2ReadPersistedArtifact(
+      input.creation.custodyStore,
+      input.creation.policy,
+      archiveArtifact,
+    );
+    const persistedArchiveChain = input.creation.custodyStore.readChain(
+      parsed.identity,
+      input.creation.policy,
+      'archive',
+    );
+    if (
+      !v2PersistedArtifactMatches(
+        settlementArtifact,
+        persistedSettlementArtifact,
+        input.creation.policy.jsonBounds,
+      )
+      || !v2PersistedChainMatches(
+        settlementChain,
+        persistedSettlementChain,
+        input.creation.policy.jsonBounds,
+      )
+      || !v2PersistedArtifactMatches(
+        archiveArtifact,
+        persistedArchiveArtifact,
+        input.creation.policy.jsonBounds,
+      )
+      || !v2PersistedChainMatches(
+        archiveChain,
+        persistedArchiveChain,
+        input.creation.policy.jsonBounds,
+      )
+    ) return { ok: false, reason: 'unpersisted-or-mismatched-archive-tail' };
+    const settlementBytes = canonicalTaskAttemptCustodyJson(
+      parsed,
+      input.creation.policy.jsonBounds,
+    );
+    const archiveBytes = canonicalTaskAttemptCustodyJson(
+      archivePayload,
+      input.creation.policy.jsonBounds,
+    );
+    if (
+      settlementArtifact.artifact.byteLength !== settlementBytes.byteLength
+      || !Buffer.from(persistedSettlementArtifact.bytes).equals(Buffer.from(settlementBytes))
+      || archiveArtifact.artifact.byteLength !== archiveBytes.byteLength
+      || !Buffer.from(persistedArchiveArtifact.bytes).equals(Buffer.from(archiveBytes))
+    ) return { ok: false, reason: 'archive-tail-payload-mismatch' };
+    const timeline = [
+      input.creation.finalizerChain.occurredAt,
+      parsed.settledAt,
+      settlementArtifact.capturedAt,
+      settlementChain.occurredAt,
+      archiveArtifact.capturedAt,
+      archiveChain.occurredAt,
+    ].map(timestamp => Date.parse(timestamp));
+    if (timeline.some((timestamp, index) => index > 0 && timestamp < timeline[index - 1]!)) {
+      return { ok: false, reason: 'non-monotonic-archive-tail-time' };
+    }
+    return {
+      ok: true,
+      settlementDigest,
+      archiveChainDigest: archiveChain.receiptDigest,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error instanceof Error ? error.message : 'invalid-settlement-chain',
+    };
+  }
 }

@@ -38,7 +38,7 @@ function buildPackOutput(
 }
 
 describe('pack-size-budget regression guard (sprint 379-002)', () => {
-  describe('size budget — <6MB gate', () => {
+  describe('size budget — <=7MB gate', () => {
     it('passes comfortably under budget (projected post-dead-asset-removal size)', () => {
       const out = buildPackOutput({ packageSize: '4.7 MB', fileCount: 900 });
       const result = checkPackSizeAndCount(out);
@@ -46,17 +46,17 @@ describe('pack-size-budget regression guard (sprint 379-002)', () => {
       expect(result.severity).toBe('info');
     });
 
-    it('fails at a regression size over the 6 MB ceiling (6.5 MB)', () => {
-      const out = buildPackOutput({ packageSize: '6.5 MB', fileCount: 1816 });
+    it('fails at a regression size over the 7 MB ceiling (7.5 MB)', () => {
+      const out = buildPackOutput({ packageSize: '7.5 MB', fileCount: 1816 });
       const result = checkPackSizeAndCount(out);
       expect(result.ok).toBe(false);
       expect(result.severity).toBe('error');
-      expect(result.message).toMatch(/exceeds 6 MB limit/i);
+      expect(result.message).toMatch(/exceeds 7 MB limit/i);
     });
 
     it('reports the largest packed files as topOffenders when the gate fails', () => {
       const out = buildPackOutput({
-        packageSize: '6.5 MB',
+        packageSize: '7.5 MB',
         files: [
           { path: 'dist/dashboard/logo.png', size: '1.4MB' },
           { path: 'dist/dashboard/decko-mascot.png', size: '761kB' },

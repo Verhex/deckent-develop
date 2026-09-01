@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { writeFileSync } from 'node:fs';
 
+const ingressHarness = vi.hoisted(() => ({ execute: vi.fn() }));
+
 // ─── Mocks ──────────────────────────────────────────────────────────
 
 vi.mock('node:fs', () => ({
@@ -15,6 +17,7 @@ vi.mock('../../../src/core/constants.js', () => ({
 }));
 
 vi.mock('../../../src/mcp/tools/job-runner.js', () => ({
+  createJobId: vi.fn(() => 'job-1780659451558-11111111-1111-4111-8111-111111111111'),
   writeJobState: vi.fn(),
 }));
 
@@ -40,6 +43,11 @@ vi.mock('../../../src/core/config.js', () => ({
 
 vi.mock('../../../src/cli/commands/spawn.js', () => ({
   spawnWorkerMultiProvider: vi.fn().mockResolvedValue({ backend: 'subprocess' }),
+}));
+
+vi.mock('../../../src/orchestra/task-mode-runner.js', () => ({
+  executeTaskIngress: ingressHarness.execute,
+  readTaskIngressErrorAuthority: (error: any) => error?.taskIngressAuthority,
 }));
 
 // WM-1b routing mocks
@@ -93,6 +101,30 @@ describe('deckent_run MCP — WM-1b routing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(routeSingleTaskV3).mockResolvedValue({ agentId: 'bug-fixer', skillIds: ['typescript-expert'], confidence: 0.8, workType: 'build', escalation: null, storySummary: '' });
+    ingressHarness.execute.mockImplementation(async (input: any) => {
+      let routed: Awaited<ReturnType<typeof routeSingleTaskV3>>;
+      try {
+        routed = await routeSingleTaskV3(input.task, input.projectRoot);
+      } catch (error) {
+        throw new Error(`routing authority rejected: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      input.task.assignedAgent = routed.agentId;
+      input.task.assignedSkills = routed.skillIds;
+      writeFileSync(`${input.projectRoot}/.tasks/task-${input.task.id}.json`, JSON.stringify(input.task));
+      return {
+        disposition: { kind: 'spawned', taskId: input.task.id },
+        executionMode: 'legacy-non-docker',
+        backend: 'subprocess',
+        provider: input.task.provider,
+        invocation: {
+          receiptRef: { schemaVersion: 1, invocationId: `test:${input.task.id}`, tenantId: 'local', projectId: 'test' },
+          executionBackend: 'host-subprocess',
+          transport: 'mcp',
+          state: 'dispatch-started',
+          executionEvidenceRef: `test:${input.task.id}`,
+        },
+      };
+    });
   });
 
   it('sets assignedAgent and assignedSkills from routeSingleTaskV3 decision', async () => {

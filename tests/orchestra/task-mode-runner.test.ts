@@ -18,9 +18,28 @@ import { tmpdir } from 'node:os';
 
 // ─── Mocks (hoisted before imports) ────────────────────────────────────────
 
-vi.mock('../../src/cli/commands/spawn.js', () => ({
-  spawnWorkerMultiProvider: vi.fn().mockResolvedValue({ backend: 'subprocess', provider: 'claude' }),
+const backendHarness = vi.hoisted(() => ({
+  spawn: vi.fn(),
+  kill: vi.fn(),
 }));
+
+vi.mock('../../src/orchestra/spawn-backend.js', async (importOriginal) => {
+  const actual = await importOriginal() as Record<string, unknown>;
+  return {
+    ...actual,
+    SpawnBackendFactory: {
+      create: vi.fn(() => ({
+        name: 'subprocess',
+        liveUsageBudgetSupport: 'measured-stream',
+        executionLandingCapability: 'cooperative-landing',
+        spawn: backendHarness.spawn,
+        kill: backendHarness.kill,
+        list: () => [],
+        isAvailable: async () => true,
+      })),
+    },
+  };
+});
 
 vi.mock('../../src/orchestra/task-builder.js', async (importOriginal) => {
   const actual = await importOriginal() as Record<string, unknown>;
@@ -36,18 +55,24 @@ vi.mock('../../src/orchestra/task-builder.js', async (importOriginal) => {
 
 // ─── Import SUT after mocks ─────────────────────────────────────────────────
 
-import { runTaskMode } from '../../src/orchestra/task-mode-runner.js';
-import { spawnWorkerMultiProvider } from '../../src/cli/commands/spawn.js';
+import {
+  executeTaskIngress,
+  readTaskIngressErrorAuthority,
+  runTaskMode,
+} from '../../src/orchestra/task-mode-runner.js';
 import { buildWorkerPrompt } from '../../src/orchestra/task-builder.js';
 import type { ResolvedConfig } from '../../src/core/config-types.js';
 import type { ExecutionBudget } from '../../src/core/work-model.js';
 import { ProviderExecutionIngressHoldError } from '../../src/core/provider-execution-ingress-authority.js';
+import { InvocationReceiptStore } from '../../src/core/invocation-receipt-store.js';
+import { TaskStatus, type Task } from '../../src/core/types.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function makeTaskConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
   return {
     deckent_style: 'task',
+    spawn_backend: 'subprocess',
     execution_budget: {
       roles: {
         worker: { default: { maxTokens: 100_000, maxTurns: 10 } },
@@ -66,10 +91,8 @@ describe('runTaskMode — phase-1a gap fixes (E + G)', () => {
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'task-mode-runner-'));
     vi.clearAllMocks();
-    (spawnWorkerMultiProvider as ReturnType<typeof vi.fn>).mockResolvedValue({
-      backend: 'subprocess',
-      provider: 'claude',
-    });
+    backendHarness.spawn.mockReset();
+    backendHarness.kill.mockReset();
     (buildWorkerPrompt as ReturnType<typeof vi.fn>).mockReturnValue('mock-worker-prompt');
   });
 
@@ -134,8 +157,8 @@ describe('runTaskMode — phase-1a gap fixes (E + G)', () => {
       config,
     );
 
-    expect(spawnWorkerMultiProvider).toHaveBeenCalledOnce();
-    const [_taskId, _model, prompt] = (spawnWorkerMultiProvider as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect(backendHarness.spawn).toHaveBeenCalledOnce();
+    const [_taskId, _model, prompt] = backendHarness.spawn.mock.calls[0]!;
 
     // prompt should be the return value of buildWorkerPrompt, not an absolute path
     expect(prompt).toBe('mock-worker-prompt');
@@ -154,6 +177,31 @@ describe('runTaskMode — phase-1a gap fixes (E + G)', () => {
     expect(result.provider).toBe('claude');
   });
 
+  it('persists one dispatch-started invocation receipt through the common ingress', async () => {
+    const result = await runTaskMode(
+      { description: 'receipt-backed task', projectRoot: root },
+      makeTaskConfig(),
+    );
+
+    expect(result.invocation).toMatchObject({
+      state: 'dispatch-started',
+      executionBackend: 'host-subprocess',
+      transport: 'local-runtime',
+      executionEvidenceRef: expect.any(String),
+    });
+    const store = new InvocationReceiptStore(root);
+    try {
+      const view = store.get(
+        result.invocation.receiptRef,
+        result.invocation.receiptRef.invocationId,
+      );
+      expect(view?.events.map(event => event.type)).toEqual(['dispatch_started']);
+      expect(view?.receipt.taskId).toBe(result.taskId);
+    } finally {
+      store.close();
+    }
+  });
+
   it('holds a remote task before Task JSON and spawn when owner budget policy is missing', async () => {
     const config = makeTaskConfig({ execution_budget: undefined });
 
@@ -163,7 +211,145 @@ describe('runTaskMode — phase-1a gap fixes (E + G)', () => {
     )).rejects.toThrow('EXECUTION_BUDGET_HOLD:budget-policy-missing:execution_budget.roles.worker');
 
     expect(existsSync(join(root, '.tasks'))).toBe(false);
-    expect(spawnWorkerMultiProvider).not.toHaveBeenCalled();
+    expect(backendHarness.spawn).not.toHaveBeenCalled();
+  });
+
+  it('closes a pre-dispatch budget refusal as one durable zero-work invocation', async () => {
+    const task: Task = {
+      id: 'known-zero-work-task',
+      title: 'Known zero work',
+      description: 'must not dispatch',
+      model: 'claude-sonnet-5',
+      provider: 'claude',
+      effort: 'normal',
+      priority: 'NORMAL',
+      reason: 'test',
+      scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
+      dependencies: [],
+      goNogo: {
+        goCriteria: 'dispatches only after admission',
+        noGoCriteria: 'provider starts without a budget',
+        techDebtAcceptable: 'None',
+      },
+      status: TaskStatus.PENDING,
+      createdAt: new Date().toISOString(),
+    };
+
+    const caught = await executeTaskIngress({
+      projectRoot: root,
+      config: makeTaskConfig({ execution_budget: undefined }),
+      task,
+      timeoutMs: 1_000,
+      transport: 'local-runtime',
+    }).catch((error: unknown) => error);
+
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).message).toContain('EXECUTION_BUDGET_HOLD');
+    expect(readTaskIngressErrorAuthority(caught)).toMatchObject({
+      schemaVersion: 1,
+      reasonCode: 'EXECUTION_BUDGET_HOLD',
+      invocation: {
+        state: 'not-dispatched',
+        executionBackend: 'host-subprocess',
+        transport: 'local-runtime',
+        reasonCode: 'EXECUTION_BUDGET_HOLD',
+        receiptRef: { invocationId: expect.any(String) },
+      },
+    });
+
+    expect(existsSync(join(root, '.tasks'))).toBe(false);
+    expect(backendHarness.spawn).not.toHaveBeenCalled();
+    const store = new InvocationReceiptStore(root);
+    try {
+      const receipts = store.scanTaskReceipts({
+        tenantId: 'local',
+        projectId: store.projectId,
+        taskId: task.id,
+        purpose: 'worker-execution',
+      });
+      expect(receipts).toHaveLength(1);
+      expect(receipts[0]?.events.map(event => event.type)).toEqual([
+        'dispatch_rejected',
+        'consumer_settled',
+      ]);
+      expect(receipts[0]).toMatchObject({
+        transportOutcome: 'not_dispatched',
+        consumerOutcome: 'accepted',
+        taskDisposition: 'not_dispatched',
+      });
+    } finally {
+      store.close();
+    }
+  });
+
+  it('declares the budget-resolved Docker backend before a final-only containment hold', async () => {
+    const task: Task = {
+      id: 'final-only-backend-authority',
+      title: 'Final-only backend authority',
+      description: 'must bind the receipt to the budget-resolved backend',
+      model: 'gpt-5.6-sol',
+      provider: 'codex',
+      effort: 'normal',
+      priority: 'NORMAL',
+      reason: 'test',
+      scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
+      dependencies: [],
+      goNogo: {
+        goCriteria: 'receipt backend matches execution intent',
+        noGoCriteria: 'host adapter receipt silently precedes Docker containment',
+        techDebtAcceptable: 'None',
+      },
+      status: TaskStatus.PENDING,
+      createdAt: new Date().toISOString(),
+      budget: { maxTurns: 2 },
+      budgetPolicy: {
+        state: 'allow',
+        role: 'worker',
+        resolvedProvider: 'codex',
+        executionCostClass: 'remote',
+        profileRef: 'tests.task-mode.final-only',
+        policyDigest: 'a'.repeat(64),
+        admissionMode: 'unattended',
+        landingPolicy: { reserve_ratio: 0.25 },
+        finalOnlyUsage: {
+          maxWallClockSeconds: 60,
+          profileRef: 'execution_budget.final_only_usage',
+          policyDigest: 'a'.repeat(64),
+        },
+      },
+    };
+
+    const caught = await executeTaskIngress({
+      projectRoot: root,
+      config: makeTaskConfig({ spawn_backend: 'docker', routing_engine: 'v2' }),
+      task,
+      timeoutMs: 1_000,
+      transport: 'local-runtime',
+    }).catch((error: unknown) => error);
+
+    expect((caught as Error).message).toContain('FINAL_ONLY_USAGE_CONTAINMENT_HOLD');
+    expect(readTaskIngressErrorAuthority(caught)).toMatchObject({
+      reasonCode: 'FINAL_ONLY_USAGE_CONTAINMENT_HOLD',
+      invocation: {
+        state: 'reconciliation-required',
+        executionBackend: 'docker',
+        executionMode: 'normal-docker-exact',
+      },
+    });
+    const store = new InvocationReceiptStore(root);
+    try {
+      const receipts = store.scanTaskReceipts({
+        tenantId: 'local',
+        projectId: store.projectId,
+        taskId: task.id,
+        purpose: 'worker-execution',
+      });
+      expect(receipts).toHaveLength(1);
+      expect(receipts[0]?.receipt.backend.executionBackend).toBe('docker');
+      expect(receipts[0]?.taskDisposition).toBeNull();
+    } finally {
+      store.close();
+    }
   });
 
   it('consumes configured provider authority before routing, Task JSON, prompt, event, or spawn', async () => {
@@ -191,6 +377,14 @@ describe('runTaskMode — phase-1a gap fixes (E + G)', () => {
     })).catch((error: unknown) => error);
 
     expect(caught).toBeInstanceOf(ProviderExecutionIngressHoldError);
+    expect(readTaskIngressErrorAuthority(caught)).toMatchObject({
+      reasonCode: 'PROVIDER_EXECUTION_AUTHORITY_HOLD',
+      invocation: {
+        state: 'reconciliation-required',
+        authorityEvidenceRefs: expect.arrayContaining([expect.any(String)]),
+        receiptRef: { invocationId: expect.any(String) },
+      },
+    });
     expect(caught).toMatchObject({
       reasonCode: 'keyring_unavailable',
       durableEvidenceWritten: true,
@@ -200,14 +394,14 @@ describe('runTaskMode — phase-1a gap fixes (E + G)', () => {
         runId: executionRunId,
         provider: 'claude',
         model: 'claude-sonnet-5',
-        configuredBackend: 'docker',
+        configuredBackend: 'subprocess',
         fallbackProviders: ['codex', 'gemini'],
         unattended: true,
       },
     });
     expect(existsSync(join(root, '.tasks'))).toBe(false);
     expect(buildWorkerPrompt).not.toHaveBeenCalled();
-    expect(spawnWorkerMultiProvider).not.toHaveBeenCalled();
+    expect(backendHarness.spawn).not.toHaveBeenCalled();
 
     const eventPath = join(
       root,
@@ -260,26 +454,21 @@ describe('runTaskMode — phase-1a gap fixes (E + G)', () => {
       maxOutputTokens: 4_000,
       maxInputTokens: 9_000,
     });
-    const spawnOptions = (spawnWorkerMultiProvider as ReturnType<typeof vi.fn>).mock.calls[0]![4];
+    const spawnOptions = backendHarness.spawn.mock.calls[0]![3];
     expect(spawnOptions.executionBudget).toEqual(persisted.budget);
   });
 
-  it('forwards one runtime-wide attended authority and exact tenant/run identity', async () => {
-    const authority = { verifyAndClaim: vi.fn() };
+  it('keeps exact executionRunId on provider admission while using one executor', async () => {
     await runTaskMode({
       description: 'authority forwarding',
       projectRoot: root,
       model: 'claude-sonnet-5',
       provider: 'claude',
-      attendedExecutionApprovalAuthority: authority as never,
       executionTenantId: 'tenant-a',
       executionRunId: 'run-a',
     }, makeTaskConfig());
 
-    const spawnOptions = (spawnWorkerMultiProvider as ReturnType<typeof vi.fn>).mock.calls[0]![4];
-    expect(spawnOptions.attendedExecutionApprovalAuthority).toBe(authority);
-    expect(spawnOptions.executionTenantId).toBe('tenant-a');
-    expect(spawnOptions.executionRunId).toBe('run-a');
+    expect(backendHarness.spawn).toHaveBeenCalledOnce();
   });
 
   it.each([
@@ -296,24 +485,18 @@ describe('runTaskMode — phase-1a gap fixes (E + G)', () => {
     }, makeTaskConfig())).rejects.toThrow();
 
     expect(existsSync(join(root, '.tasks'))).toBe(false);
-    expect(spawnWorkerMultiProvider).not.toHaveBeenCalled();
+    expect(backendHarness.spawn).not.toHaveBeenCalled();
   });
 
-  it('keeps a local Ollama executor policy-exempt without fabricating a ceiling', async () => {
-    const result = await runTaskMode({
+  it('does not silently route an unavailable local adapter through the configured remote backend', async () => {
+    await expect(runTaskMode({
       description: 'local task',
       projectRoot: root,
       model: 'qwen-coder-32b',
       provider: 'ollama',
-    }, makeTaskConfig({ execution_budget: undefined }));
-
-    const persisted = JSON.parse(readFileSync(
-      join(root, '.tasks', `task-${result.taskId}.json`),
-      'utf-8',
-    )) as Record<string, unknown>;
-    expect(persisted).not.toHaveProperty('budget');
-    const spawnOptions = (spawnWorkerMultiProvider as ReturnType<typeof vi.fn>).mock.calls[0]![4];
-    expect(spawnOptions.executionBudget).toBeUndefined();
+    }, makeTaskConfig({ execution_budget: undefined })))
+      .rejects.toThrow('TASK_INGRESS_NOT_DISPATCHED:provider-unavailable');
+    expect(backendHarness.spawn).not.toHaveBeenCalled();
   });
 
   it('throws when deckent_style is not "task"', async () => {

@@ -2,12 +2,12 @@
   "name": "@deckent/exec-authority-native",
   "version": "0.1.0",
   "private": true,
-  "description": "In-repo N-API capability module for the identity-stable execution authority (PLATFORM-EXEC-AUTH-W3-DARWIN-001). Absence is always fail-closed for consumers; packaging/prebuilds arrive with the W3 closure slice.",
+  "description": "In-repo N-API capability module for Deckent's identity-stable execution authority. The root package builds and ships an exact verified prebuild; installed products never compile or download this addon.",
   "main": "index.mjs",
   "type": "module",
   "scripts": {
-    "build": "node-gyp rebuild",
-    "clean": "node-gyp clean"
+    "build": "node ../../scripts/build-exec-authority-native.mjs --clean && node ../../scripts/build-exec-authority-native.mjs",
+    "clean": "node ../../scripts/build-exec-authority-native.mjs --clean"
   },
   "binary": {
     "napi_versions": [8]

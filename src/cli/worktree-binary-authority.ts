@@ -14,7 +14,7 @@ import { dirname, join, posix, relative, resolve, win32 } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { detectDeckentRepo } from '../orchestra/self-modifying-detector.js';
 
-export const BUILD_IDENTITY_SCHEMA_VERSION = 2 as const;
+export const BUILD_IDENTITY_SCHEMA_VERSION = 3 as const;
 export const BUILD_IDENTITY_RELATIVE_PATH = join('dist', 'build-identity.json');
 export const CROSS_CHECKOUT_BINARY_OVERRIDE_ENV = 'DECKENT_ALLOW_CROSS_CHECKOUT_BINARY' as const;
 
@@ -34,11 +34,18 @@ export interface DeckentBuildIdentity {
   readonly sourceRootSha256: string;
   readonly sourceTreeSha256: string;
   readonly sourceTreeFileCount: number;
+  readonly nativeSourceTreeSha256: string;
+  readonly nativeSourceTreeFileCount: number;
 }
 
 export interface DeckentSourceTreeIdentity {
   readonly sourceTreeSha256: string;
   readonly sourceTreeFileCount: number;
+}
+
+export interface DeckentNativeSourceTreeIdentity {
+  readonly nativeSourceTreeSha256: string;
+  readonly nativeSourceTreeFileCount: number;
 }
 
 export type WorktreeBinaryIssue =
@@ -75,6 +82,7 @@ interface EvaluateWorktreeBinaryAuthorityOptions {
   readonly isDeckentCheckout?: boolean;
   readonly projectRootSha256?: string;
   readonly projectSourceTreeIdentity?: DeckentSourceTreeIdentity;
+  readonly projectNativeSourceTreeIdentity?: DeckentNativeSourceTreeIdentity;
 }
 
 interface ResolveWorktreeBinaryAuthorityOptions {
@@ -109,6 +117,7 @@ export interface RuntimeBuildIdentityAdoptionBinding {
   readonly buildIdentityPath: string;
   readonly buildIdentity: DeckentBuildIdentity;
   readonly currentSourceTreeIdentity: DeckentSourceTreeIdentity;
+  readonly currentNativeSourceTreeIdentity: DeckentNativeSourceTreeIdentity;
   readonly buildIdentitySha256: string;
   readonly entrypointSha256: string;
 }
@@ -137,6 +146,16 @@ const SOURCE_INPUT_FILE_LIMIT = 100_000;
 const SOURCE_INPUT_MAX_BYTES = 64 * 1024 * 1024;
 const BUILD_IDENTITY_MAX_BYTES = 64 * 1024;
 const RUNTIME_ENTRYPOINT_MAX_BYTES = 64 * 1024 * 1024;
+const NATIVE_SOURCE_RELATIVE_ROOT = join('native', 'exec-authority');
+const NATIVE_SOURCE_ROOT_FILES = Object.freeze([
+  'binding.gyp',
+  'index.mjs',
+  'package.json',
+]);
+const NATIVE_SOURCE_EXTENSIONS = Object.freeze(['.c', '.h']);
+const NATIVE_SOURCE_FILE_LIMIT = 256;
+const NATIVE_SOURCE_FILE_MAX_BYTES = 8 * 1024 * 1024;
+const NATIVE_SOURCE_TOTAL_MAX_BYTES = 32 * 1024 * 1024;
 
 class BoundedReadError extends Error {}
 
@@ -288,6 +307,116 @@ export function buildSourceTreeIdentity(root: string): DeckentSourceTreeIdentity
   });
 }
 
+function assertNativeSourceDirectory(path: string): void {
+  const stat = lstatSync(path, { bigint: true });
+  if (
+    !stat.isDirectory()
+    || stat.isSymbolicLink()
+    || realpathSync.native(path) !== path
+  ) throw new Error(`E_NATIVE_SOURCE_DIRECTORY_UNSAFE:${path}`);
+}
+
+export function nativeSourceRelativePaths(root: string): readonly string[] {
+  const canonical = realpathSync.native(root);
+  const nativeRoot = join(canonical, NATIVE_SOURCE_RELATIVE_ROOT);
+  assertNativeSourceDirectory(nativeRoot);
+  const paths = NATIVE_SOURCE_ROOT_FILES.map(name => join(nativeRoot, name));
+  const sourceRoot = join(nativeRoot, 'src');
+  assertNativeSourceDirectory(sourceRoot);
+
+  const visit = (directory: string): void => {
+    assertNativeSourceDirectory(directory);
+    for (const entry of readdirSync(directory).sort()) {
+      const path = join(directory, entry);
+      const stat = lstatSync(path, { bigint: true });
+      if (stat.isSymbolicLink()) throw new Error(`E_NATIVE_SOURCE_SYMLINK:${path}`);
+      if (stat.isDirectory()) {
+        visit(path);
+      } else if (
+        stat.isFile()
+        && NATIVE_SOURCE_EXTENSIONS.some(extension => entry.endsWith(extension))
+      ) {
+        paths.push(path);
+      } else {
+        throw new Error(`E_NATIVE_SOURCE_ENTRY_UNSUPPORTED:${path}`);
+      }
+      if (paths.length > NATIVE_SOURCE_FILE_LIMIT) {
+        throw new Error('E_NATIVE_SOURCE_FILE_LIMIT');
+      }
+    }
+  };
+  visit(sourceRoot);
+  return Object.freeze(paths
+    .map(path => relative(canonical, path).split(/[\\/]/u).join('/'))
+    .sort((left, right) => left.localeCompare(right)));
+}
+
+function nativeSourceBytes(path: string): Buffer {
+  const named = lstatSync(path, { bigint: true });
+  if (
+    !named.isFile()
+    || named.isSymbolicLink()
+    || named.nlink !== 1n
+    || named.size <= 0n
+    || named.size > BigInt(NATIVE_SOURCE_FILE_MAX_BYTES)
+  ) throw new Error(`E_NATIVE_SOURCE_FILE_UNSAFE:${path}`);
+
+  let fd: number | undefined;
+  try {
+    fd = openSync(path, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0));
+    const before = fstatSync(fd, { bigint: true });
+    if (
+      !before.isFile()
+      || before.nlink !== 1n
+      || before.dev !== named.dev
+      || before.ino !== named.ino
+      || before.size !== named.size
+      || before.mtimeNs !== named.mtimeNs
+    ) throw new Error(`E_NATIVE_SOURCE_FILE_CHANGED:${path}`);
+    const bytes = readFileSync(fd);
+    const after = fstatSync(fd, { bigint: true });
+    const afterPath = lstatSync(path, { bigint: true });
+    if (
+      after.dev !== before.dev
+      || after.ino !== before.ino
+      || after.size !== before.size
+      || after.mtimeNs !== before.mtimeNs
+      || afterPath.dev !== before.dev
+      || afterPath.ino !== before.ino
+      || afterPath.size !== before.size
+      || afterPath.mtimeNs !== before.mtimeNs
+      || BigInt(bytes.byteLength) !== before.size
+    ) throw new Error(`E_NATIVE_SOURCE_FILE_CHANGED:${path}`);
+    return bytes;
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
+}
+
+export function buildNativeSourceTreeIdentity(root: string): DeckentNativeSourceTreeIdentity {
+  const canonical = realpathSync.native(root);
+  const paths = nativeSourceRelativePaths(canonical);
+  const hash = createHash('sha256');
+  let totalBytes = 0;
+  for (const relativePath of paths) {
+    const bytes = nativeSourceBytes(join(canonical, ...relativePath.split('/')));
+    totalBytes += bytes.byteLength;
+    if (totalBytes > NATIVE_SOURCE_TOTAL_MAX_BYTES) {
+      throw new Error('E_NATIVE_SOURCE_BYTE_LIMIT');
+    }
+    hash.update(relativePath);
+    hash.update('\0');
+    hash.update(String(bytes.byteLength));
+    hash.update('\0');
+    hash.update(createHash('sha256').update(bytes).digest('hex'));
+    hash.update('\n');
+  }
+  return Object.freeze({
+    nativeSourceTreeSha256: `sha256:${hash.digest('hex')}`,
+    nativeSourceTreeFileCount: paths.length,
+  });
+}
+
 export function buildSourceRootSha256(root: string): string {
   return createHash('sha256').update(canonicalRoot(root)).digest('hex');
 }
@@ -304,6 +433,8 @@ export function parseBuildIdentity(raw: string): DeckentBuildIdentity | undefine
   const record = value as Record<string, unknown>;
   const keys = Object.keys(record).sort();
   const expectedKeys = [
+    'nativeSourceTreeFileCount',
+    'nativeSourceTreeSha256',
     'packageName',
     'packageVersion',
     'schemaVersion',
@@ -325,6 +456,10 @@ export function parseBuildIdentity(raw: string): DeckentBuildIdentity | undefine
     || !/^[a-f0-9]{64}$/u.test(record['sourceTreeSha256'])
     || !Number.isSafeInteger(record['sourceTreeFileCount'])
     || (record['sourceTreeFileCount'] as number) < 1
+    || typeof record['nativeSourceTreeSha256'] !== 'string'
+    || !/^sha256:[a-f0-9]{64}$/u.test(record['nativeSourceTreeSha256'])
+    || !Number.isSafeInteger(record['nativeSourceTreeFileCount'])
+    || (record['nativeSourceTreeFileCount'] as number) < NATIVE_SOURCE_ROOT_FILES.length + 1
   ) {
     return undefined;
   }
@@ -336,6 +471,8 @@ export function parseBuildIdentity(raw: string): DeckentBuildIdentity | undefine
     sourceRootSha256: record['sourceRootSha256'],
     sourceTreeSha256: record['sourceTreeSha256'],
     sourceTreeFileCount: record['sourceTreeFileCount'] as number,
+    nativeSourceTreeSha256: record['nativeSourceTreeSha256'],
+    nativeSourceTreeFileCount: record['nativeSourceTreeFileCount'] as number,
   };
 }
 
@@ -421,11 +558,21 @@ export function evaluateWorktreeBinaryAuthority(
     return decisionForIssue('build-root-mismatch', options);
   }
 
-  const sourceTree = options.projectSourceTreeIdentity
-    ?? buildSourceTreeIdentity(options.projectRoot);
+  let sourceTree: DeckentSourceTreeIdentity;
+  let nativeSourceTree: DeckentNativeSourceTreeIdentity;
+  try {
+    sourceTree = options.projectSourceTreeIdentity
+      ?? buildSourceTreeIdentity(options.projectRoot);
+    nativeSourceTree = options.projectNativeSourceTreeIdentity
+      ?? buildNativeSourceTreeIdentity(options.projectRoot);
+  } catch {
+    return decisionForIssue('build-source-mismatch', options);
+  }
   if (
     options.buildIdentity.sourceTreeSha256 !== sourceTree.sourceTreeSha256
     || options.buildIdentity.sourceTreeFileCount !== sourceTree.sourceTreeFileCount
+    || options.buildIdentity.nativeSourceTreeSha256 !== nativeSourceTree.nativeSourceTreeSha256
+    || options.buildIdentity.nativeSourceTreeFileCount !== nativeSourceTree.nativeSourceTreeFileCount
   ) {
     return decisionForIssue('build-source-mismatch', options);
   }
@@ -507,18 +654,23 @@ export function readRuntimeBuildIdentity(
   }
 
   let currentSourceTreeIdentity: DeckentSourceTreeIdentity;
+  let currentNativeSourceTreeIdentity: DeckentNativeSourceTreeIdentity;
   try {
     currentSourceTreeIdentity = buildSourceTreeIdentity(runtimePackageRoot);
+    currentNativeSourceTreeIdentity = buildNativeSourceTreeIdentity(runtimePackageRoot);
   } catch {
     return { status: 'hold', issue: 'build-source-unreadable' };
   }
   if (
     buildIdentity.sourceTreeSha256 !== currentSourceTreeIdentity.sourceTreeSha256
     || buildIdentity.sourceTreeFileCount !== currentSourceTreeIdentity.sourceTreeFileCount
+    || buildIdentity.nativeSourceTreeSha256 !== currentNativeSourceTreeIdentity.nativeSourceTreeSha256
+    || buildIdentity.nativeSourceTreeFileCount !== currentNativeSourceTreeIdentity.nativeSourceTreeFileCount
   ) return { status: 'hold', issue: 'build-source-mismatch' };
 
   const normalizedIdentity = Object.freeze({ ...buildIdentity });
   const normalizedSourceTree = Object.freeze({ ...currentSourceTreeIdentity });
+  const normalizedNativeSourceTree = Object.freeze({ ...currentNativeSourceTreeIdentity });
   return {
     status: 'adopt',
     binding: Object.freeze({
@@ -527,6 +679,7 @@ export function readRuntimeBuildIdentity(
       buildIdentityPath,
       buildIdentity: normalizedIdentity,
       currentSourceTreeIdentity: normalizedSourceTree,
+      currentNativeSourceTreeIdentity: normalizedNativeSourceTree,
       buildIdentitySha256: createHash('sha256').update(buildIdentityBytes).digest('hex'),
       entrypointSha256: createHash('sha256').update(entrypointBytes).digest('hex'),
     }),

@@ -28,6 +28,7 @@ import {
 } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { nativeSourceTreeIdentity } from './build-exec-authority-native.mjs';
 
 const ROOT = join(import.meta.dirname ?? dirname(new URL(import.meta.url).pathname), '..');
 const DEFAULT_DIST = join(ROOT, 'dist');
@@ -264,13 +265,16 @@ export function writeBuildIdentity(
     throw new Error('Cannot write Deckent build identity: package version is missing');
   }
   const sourceTree = buildSourceTreeIdentity(canonicalRoot);
+  const nativeSourceTree = nativeSourceTreeIdentity(canonicalRoot);
   const manifest = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     packageName: 'deckent',
     packageVersion: pkg.version,
     sourceRootSha256: createHash('sha256').update(canonicalRoot).digest('hex'),
     sourceTreeSha256: sourceTree.sourceTreeSha256,
     sourceTreeFileCount: sourceTree.sourceTreeFileCount,
+    nativeSourceTreeSha256: nativeSourceTree.sha256,
+    nativeSourceTreeFileCount: nativeSourceTree.fileCount,
   };
   assertDirectoryBinding(outputBinding);
   const manifestPath = join(outputBinding.path, 'build-identity.json');

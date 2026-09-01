@@ -162,7 +162,7 @@ describe('validate-publish.mjs exports smoke', () => {
 
 // ─── checkPackSizeAndCount: threshold boundary ────────────────────────────
 
-describe('checkPackSizeAndCount — 6 MB threshold (0.100.0 rebaseline)', () => {
+describe('checkPackSizeAndCount — 7 MB threshold (native-custody calibration)', () => {
   // Sprint 271 raised the threshold from 3 MB → 5 MB because the full build
   // includes the Vite dashboard bundle (~3 MB, incl. public image assets).
   // These tests document the intentional boundary and protect against regression.
@@ -182,17 +182,17 @@ describe('checkPackSizeAndCount — 6 MB threshold (0.100.0 rebaseline)', () => 
     expect(result.ok).toBe(true);
   });
 
-  it('passes at 5.9 MB (just under the 6 MB ceiling)', () => {
-    const result = checkPackSizeAndCount(makeOutput('5.9 MB'));
-    // 0.100.0 rebaseline: MAX is now 6 * 1024 * 1024 = 6291456; 5.9 MB is under it.
+  it('passes at 6.9 MB (just under the 7 MB ceiling)', () => {
+    const result = checkPackSizeAndCount(makeOutput('6.9 MB'));
+    // Native-custody calibration: MAX is 7 * 1024 * 1024; 6.9 MB is under it.
     expect(result.ok).toBe(true);
   });
 
-  it('fails at 6.1 MB (just over the 6 MB ceiling)', () => {
-    const result = checkPackSizeAndCount(makeOutput('6.1 MB'));
+  it('fails at 7.1 MB (just over the 7 MB ceiling)', () => {
+    const result = checkPackSizeAndCount(makeOutput('7.1 MB'));
     expect(result.ok).toBe(false);
     expect(result.severity).toBe('error');
-    expect(result.message).toMatch(/6 MB limit/i);
+    expect(result.message).toMatch(/7 MB limit/i);
   });
 
   it('passes at 1.8 MB (base dist without dashboard build)', () => {

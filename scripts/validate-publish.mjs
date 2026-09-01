@@ -5,7 +5,7 @@
  * Sprint 180 W5-1 — Crisis Stabilization §6.
  *
  * 6 readiness gates:
- *   1. pack_size_and_count     — npm pack package size <= 3 MB (see calibration note below)
+ *   1. pack_size_and_count     — npm pack package size <= calibrated ceiling below
  *   2. engines_node            — engines.node >= 24
  *   3. entry_points            — package.json main + types declared
  *   4. no_internal_state_leak  — no .deckent/ .brain/ .tasks/ .locks/ in tarball
@@ -24,9 +24,33 @@
  */
 
 import { execSync, spawn } from 'node:child_process';
-import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import {
+  closeSync,
+  constants as fsConstants,
+  fstatSync,
+  lstatSync,
+  openSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  EXEC_AUTHORITY_ABI_NAME,
+  EXEC_AUTHORITY_ABI_VERSION,
+  EXEC_AUTHORITY_HANDLE_ABI,
+  EXEC_AUTHORITY_NAPI_VERSION,
+  EXEC_AUTHORITY_NATIVE_PACKAGE,
+  nativeSourceTreeIdentity,
+} from './build-exec-authority-native.mjs';
+import {
+  NPM_SHRINKWRAP_FILENAME,
+  readCanonicalNpmShrinkwrapIdentity,
+} from './npm-shrinkwrap-contract.mjs';
 
 const SCRIPT_DIR = resolve(fileURLToPath(import.meta.url), '..');
 
@@ -79,7 +103,11 @@ export const BIN_FILES = ['dist/cli/entry.js', 'dist/mcp/server.js'];
 // no docs/ or archive in the tarball; `files` is dist/bin/assets/README/LICENSE only).
 // 6 MB gives ~17% headroom while staying far below npm's 50 MB warning — same calibration
 // pattern as the earlier 2→3→5 MB bumps, not a way to hide a real bloat regression.
-const MAX_PACK_BYTES = 6 * 1024 * 1024; // 6 MB (see 0.100.0 rebaseline calibration above)
+// 2026-09-01 native-custody delivery re-calibration: the exact publish inventory now
+// deliberately includes the versioned native ABI source plus one complete current-host
+// Release artifact pair. The real packed tarball is 6,436,995 bytes; 7 MB leaves 14.0%
+// headroom while the category ratchet still detects unadmitted files or category growth.
+const MAX_PACK_BYTES = 7 * 1024 * 1024; // 7 MB (native-custody delivery calibration above)
 
 // Sprint 413 (413-002, PUB-02): the absolute file-count pin (920±800, upper bound
 // 1720) is retired — it WARNed on the honest, all-legitimate 1853-file compiled
@@ -658,6 +686,409 @@ export function checkCriticalFilesInTarball(packOutput, pkg) {
   };
 }
 
+const ROOT_DEPENDENCY_LOCK_FILES = Object.freeze([
+  NPM_SHRINKWRAP_FILENAME,
+  'package-lock.json',
+  'pnpm-lock.yaml',
+  'yarn.lock',
+  'bun.lock',
+  'bun.lockb',
+]);
+
+/**
+ * The published package has exactly one dependency-resolution authority: the
+ * canonical root npm-shrinkwrap.json. npm pack's JSON inventory supplies only
+ * paths and byte lengths, so this gate binds that inventory to a stable-read
+ * source identity produced by npm-shrinkwrap-contract.mjs.
+ * @param {string | ReturnType<typeof parsePackJson>} packOutput
+ * @param {{ name?: string, version?: string }} pkg
+ * @param {string} root
+ * @returns {{ gate: string, ok: boolean, severity: 'info'|'error', message: string, missing: string[], unexpected: string[], npmShrinkwrapIdentity?: ReturnType<typeof readCanonicalNpmShrinkwrapIdentity> }}
+ */
+export function checkNpmShrinkwrapTarball(packOutput, pkg, root = process.cwd()) {
+  const gate = 'npm_shrinkwrap_tarball';
+  const fail = (message, missing = [], unexpected = []) => ({
+    gate,
+    ok: false,
+    severity: 'error',
+    message,
+    missing,
+    unexpected,
+  });
+  const parsed = normalizeParsed(packOutput);
+  const entries = parsed.fileSizes.map(({ path, bytes }) => ({
+    path: path.replace(/^\.\//u, ''),
+    bytes,
+  }));
+  const shrinkwrapEntries = entries.filter(entry => entry.path === NPM_SHRINKWRAP_FILENAME);
+  const unexpected = entries
+    .filter(entry => ROOT_DEPENDENCY_LOCK_FILES.includes(entry.path)
+      && entry.path !== NPM_SHRINKWRAP_FILENAME)
+    .map(entry => entry.path);
+  const missing = shrinkwrapEntries.length === 0 ? [NPM_SHRINKWRAP_FILENAME] : [];
+  if (shrinkwrapEntries.length !== 1 || unexpected.length > 0) {
+    const duplicate = shrinkwrapEntries.length > 1
+      ? [`${NPM_SHRINKWRAP_FILENAME} (${shrinkwrapEntries.length} entries)`]
+      : [];
+    return fail(
+      `packed dependency lock authority mismatch${missing.length > 0 ? `; missing: ${missing.join(', ')}` : ''}${duplicate.length > 0 ? `; duplicate: ${duplicate.join(', ')}` : ''}${unexpected.length > 0 ? `; unexpected root lock: ${unexpected.join(', ')}` : ''}`,
+      missing,
+      [...duplicate, ...unexpected],
+    );
+  }
+  let npmShrinkwrapIdentity;
+  try {
+    npmShrinkwrapIdentity = readCanonicalNpmShrinkwrapIdentity(resolve(root));
+  } catch (error) {
+    return fail(`canonical npm shrinkwrap is unsafe or invalid: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  if (pkg?.name !== npmShrinkwrapIdentity.name
+    || pkg?.version !== npmShrinkwrapIdentity.version) {
+    return fail('npm pack package identity differs from canonical npm shrinkwrap identity');
+  }
+  if (shrinkwrapEntries[0].bytes !== npmShrinkwrapIdentity.byteLength) {
+    return fail(`packed byte count differs from source file: ${NPM_SHRINKWRAP_FILENAME}`);
+  }
+  return {
+    gate,
+    ok: true,
+    severity: 'info',
+    message: `${NPM_SHRINKWRAP_FILENAME} is the sole packed root lock (${npmShrinkwrapIdentity.byteLength} bytes, ${npmShrinkwrapIdentity.packageCount} packages, ${npmShrinkwrapIdentity.sha256})`,
+    missing: [],
+    unexpected: [],
+    npmShrinkwrapIdentity,
+  };
+}
+
+const NATIVE_ARTIFACT_KEYS = Object.freeze([
+  'schemaVersion',
+  'kind',
+  'abiName',
+  'abiVersion',
+  'handleAbi',
+  'napiVersion',
+  'packageName',
+  'packageVersion',
+  'rootPackageName',
+  'rootPackageVersion',
+  'platform',
+  'arch',
+  'buildType',
+  'binaryFile',
+  'binaryByteLength',
+  'binarySha256',
+  'nativeSourceTreeSha256',
+]);
+const NATIVE_BINARY_FILE = 'exec_authority.node';
+const NATIVE_ARTIFACT_FILE = 'artifact.json';
+const NATIVE_BINARY_MAX_BYTES = 128 * 1024 * 1024;
+const NATIVE_MANIFEST_MAX_BYTES = 1024 * 1024;
+const NATIVE_RUNTIME_METADATA_MAX_BYTES = 16 * 1024;
+const NATIVE_SOURCE_FILE_MAX_BYTES = 8 * 1024 * 1024;
+const SHA256_WITH_PREFIX_RE = /^sha256:[a-f0-9]{64}$/u;
+
+function exactObjectKeys(value, expectedKeys) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  const keys = Object.keys(value).sort();
+  const expected = [...expectedKeys].sort();
+  return keys.length === expected.length
+    && keys.every((key, index) => key === expected[index]);
+}
+
+function validNativePackageVersion(value) {
+  return typeof value === 'string'
+    && value.length > 0
+    && value.length <= 128
+    && !value.includes('\0');
+}
+
+function readStablePublishFile(root, relativePath, maximumBytes) {
+  const canonicalRoot = realpathSync.native(root);
+  const path = join(canonicalRoot, ...relativePath.split('/'));
+  const named = lstatSync(path, { bigint: true });
+  if (!named.isFile() || named.isSymbolicLink() || named.nlink !== 1n
+    || named.size <= 0n || named.size > BigInt(maximumBytes)
+    || realpathSync.native(path) !== path) {
+    throw new Error(`E_PUBLISH_NATIVE_FILE_UNSAFE:${relativePath}`);
+  }
+  let fd;
+  try {
+    fd = openSync(path, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0));
+    const before = fstatSync(fd, { bigint: true });
+    if (!before.isFile() || before.nlink !== 1n
+      || before.dev !== named.dev || before.ino !== named.ino
+      || before.size !== named.size || before.mtimeNs !== named.mtimeNs) {
+      throw new Error(`E_PUBLISH_NATIVE_FILE_CHANGED:${relativePath}`);
+    }
+    const bytes = readFileSync(fd);
+    const after = fstatSync(fd, { bigint: true });
+    const afterPath = lstatSync(path, { bigint: true });
+    if (after.dev !== before.dev || after.ino !== before.ino
+      || after.size !== before.size || after.mtimeNs !== before.mtimeNs
+      || afterPath.dev !== before.dev || afterPath.ino !== before.ino
+      || afterPath.size !== before.size || afterPath.mtimeNs !== before.mtimeNs
+      || BigInt(bytes.byteLength) !== before.size) {
+      throw new Error(`E_PUBLISH_NATIVE_FILE_CHANGED:${relativePath}`);
+    }
+    return bytes;
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
+}
+
+function validateNativeArtifact(
+  artifact,
+  nativePackageVersion,
+  rootPackageVersion,
+  platform,
+  arch,
+  binaryBytes,
+  nativeSourceSha256,
+) {
+  if (!exactObjectKeys(artifact, NATIVE_ARTIFACT_KEYS)
+    || Object.keys(artifact).some((key, index) => key !== NATIVE_ARTIFACT_KEYS[index])) return false;
+  if (artifact.schemaVersion !== 1
+    || artifact.kind !== 'deckent-exec-authority-native-artifact'
+    || artifact.abiName !== EXEC_AUTHORITY_ABI_NAME
+    || artifact.abiVersion !== EXEC_AUTHORITY_ABI_VERSION
+    || artifact.handleAbi !== EXEC_AUTHORITY_HANDLE_ABI
+    || artifact.napiVersion !== EXEC_AUTHORITY_NAPI_VERSION
+    || artifact.packageName !== EXEC_AUTHORITY_NATIVE_PACKAGE
+    || artifact.packageVersion !== nativePackageVersion
+    || artifact.rootPackageName !== 'deckent'
+    || artifact.rootPackageVersion !== rootPackageVersion
+    || artifact.platform !== platform
+    || artifact.arch !== arch
+    || artifact.buildType !== 'Release'
+    || artifact.binaryFile !== NATIVE_BINARY_FILE
+    || !Number.isSafeInteger(artifact.binaryByteLength)
+    || artifact.binaryByteLength <= 0
+    || typeof artifact.binarySha256 !== 'string'
+    || !SHA256_WITH_PREFIX_RE.test(artifact.binarySha256)
+    || artifact.nativeSourceTreeSha256 !== nativeSourceSha256) {
+    return false;
+  }
+  return artifact.binaryByteLength === binaryBytes.byteLength
+    && artifact.binarySha256
+      === `sha256:${createHash('sha256').update(binaryBytes).digest('hex')}`;
+}
+
+/**
+ * Standalone native-delivery publish gate. `npm pack --dry-run --json` exposes
+ * only path and byte-count inventory, so this binds that inventory to the exact
+ * owner-local files while the installed-package verifier remains responsible
+ * for re-reading bytes from the extracted package. No absent/partial prebuild,
+ * generated build tree, Debug output, symlink, hard link, or stale source digest
+ * is accepted here.
+ *
+ * @param {string | ReturnType<typeof parsePackJson>} packOutput
+ * @param {{ name?: string, version?: string }} pkg
+ * @param {string} root
+ * @param {NodeJS.Platform} [platform]
+ * @param {string} [arch]
+ * @returns {{ gate: string, ok: boolean, severity: 'info'|'error', message: string, missing: string[], unexpected: string[] }}
+ */
+export function checkNativeExecAuthorityTarball(
+  packOutput,
+  pkg,
+  root = process.cwd(),
+  platform = process.platform,
+  arch = process.arch,
+) {
+  const gate = 'native_exec_authority_tarball';
+  const fail = (message, missing = [], unexpected = []) => ({
+    gate,
+    ok: false,
+    severity: 'error',
+    message,
+    missing,
+    unexpected,
+  });
+  if (pkg?.name !== 'deckent' || !validNativePackageVersion(pkg?.version)) {
+    return fail('root package identity is missing or invalid');
+  }
+  if (!['linux', 'darwin', 'win32'].includes(platform)
+    || !['x64', 'arm64', 'ia32', 'arm'].includes(arch)) {
+    return fail(`current native platform is unsupported: ${platform}-${arch}`);
+  }
+
+  const parsed = normalizeParsed(packOutput);
+  const normalizedEntries = parsed.fileSizes.map(({ path, bytes }) => ({
+    path: path.replace(/^\.\//u, ''),
+    bytes,
+  }));
+  const packedSizes = new Map();
+  const duplicatePaths = [];
+  for (const entry of normalizedEntries) {
+    if (packedSizes.has(entry.path)) duplicatePaths.push(entry.path);
+    packedSizes.set(entry.path, entry.bytes);
+  }
+  if (duplicatePaths.length > 0) {
+    return fail(`duplicate native pack inventory path(s): ${duplicatePaths.join(', ')}`, [], duplicatePaths);
+  }
+
+  let sourceIdentity;
+  try {
+    sourceIdentity = nativeSourceTreeIdentity(root);
+  } catch (error) {
+    return fail(`native source identity unreadable: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  const prebuildRoot = `native/exec-authority/prebuilds/${platform}-${arch}/napi-v${EXEC_AUTHORITY_NAPI_VERSION}`;
+  const artifactPath = `${prebuildRoot}/${NATIVE_ARTIFACT_FILE}`;
+  const binaryPath = `${prebuildRoot}/${NATIVE_BINARY_FILE}`;
+  const required = ['package.json', ...sourceIdentity.paths, artifactPath, binaryPath];
+  const missing = required.filter(path => !packedSizes.has(path));
+
+  const packedNativeSource = normalizedEntries
+    .map(entry => entry.path)
+    .filter(path => path === 'native/exec-authority/package.json'
+      || path === 'native/exec-authority/binding.gyp'
+      || path === 'native/exec-authority/index.mjs'
+      || path.startsWith('native/exec-authority/src/'))
+    .sort();
+  const expectedNativeSource = [...sourceIdentity.paths].sort();
+  const unexpectedSource = packedNativeSource.filter(path => !expectedNativeSource.includes(path));
+
+  const nativePaths = normalizedEntries
+    .map(entry => entry.path)
+    .filter(path => path.startsWith('native/exec-authority/'));
+  const unexpectedNativeRoot = nativePaths.filter(path => !expectedNativeSource.includes(path)
+    && !path.startsWith('native/exec-authority/prebuilds/'));
+  const generatedLeak = nativePaths.filter(path => path.startsWith('native/exec-authority/build/')
+    || path.includes('/Debug/')
+    || /\/prebuilds\/(?:\.next-|\.backup-|\.staging-|\.tmp-)/u.test(path));
+  const prebuildFiles = nativePaths.filter(path => path.startsWith('native/exec-authority/prebuilds/'));
+  const invalidPrebuildLayout = prebuildFiles.filter(path => !/^native\/exec-authority\/prebuilds\/[^/]+\/napi-v8\/(?:artifact\.json|exec_authority\.node)$/u.test(path));
+  const prebuildDirectories = new Map();
+  for (const path of prebuildFiles) {
+    const directory = path.slice(0, path.lastIndexOf('/'));
+    const names = prebuildDirectories.get(directory) ?? new Set();
+    names.add(path.slice(path.lastIndexOf('/') + 1));
+    prebuildDirectories.set(directory, names);
+  }
+  const partialPrebuilds = [];
+  for (const [directory, names] of prebuildDirectories) {
+    if (!names.has(NATIVE_ARTIFACT_FILE) || !names.has(NATIVE_BINARY_FILE)) {
+      partialPrebuilds.push(directory);
+    }
+  }
+  // TN-PACKAGE currently publishes one host-built, current-platform pair.
+  // Accepting additional complete directories here would let validate:publish
+  // return GO while the installed-package verifier (correctly) rejects the
+  // ambiguous payload. A future signed multi-platform artifact aggregator must
+  // introduce its own authority before this exact-one contract can widen.
+  const unexpectedPrebuildDirectories = [...prebuildDirectories.keys()]
+    .filter(directory => directory !== prebuildRoot);
+  const unexpected = [...new Set([
+    ...unexpectedSource,
+    ...unexpectedNativeRoot,
+    ...generatedLeak,
+    ...invalidPrebuildLayout,
+    ...partialPrebuilds,
+    ...unexpectedPrebuildDirectories,
+  ])].sort();
+  if (missing.length > 0 || unexpected.length > 0) {
+    return fail(
+      `native package inventory mismatch${missing.length > 0 ? `; missing: ${missing.join(', ')}` : ''}${unexpected.length > 0 ? `; unsafe/unexpected: ${unexpected.join(', ')}` : ''}`,
+      missing,
+      unexpected,
+    );
+  }
+
+  try {
+    for (const relativePath of required) {
+      const maximumBytes = relativePath === binaryPath
+        ? NATIVE_BINARY_MAX_BYTES
+        : relativePath === artifactPath
+          || relativePath === 'package.json'
+          || relativePath === 'native/exec-authority/package.json'
+          ? NATIVE_RUNTIME_METADATA_MAX_BYTES
+        : sourceIdentity.paths.includes(relativePath)
+          ? NATIVE_SOURCE_FILE_MAX_BYTES
+          : NATIVE_MANIFEST_MAX_BYTES;
+      const bytes = readStablePublishFile(root, relativePath, maximumBytes);
+      if (packedSizes.get(relativePath) !== bytes.byteLength) {
+        return fail(`packed byte count differs from source file: ${relativePath}`);
+      }
+    }
+    const rootPackage = JSON.parse(
+      readStablePublishFile(root, 'package.json', NATIVE_RUNTIME_METADATA_MAX_BYTES)
+        .toString('utf8'),
+    );
+    const nativePackage = JSON.parse(
+      readStablePublishFile(
+        root,
+        'native/exec-authority/package.json',
+        NATIVE_RUNTIME_METADATA_MAX_BYTES,
+      )
+        .toString('utf8'),
+    );
+    const nativeScripts = nativePackage?.scripts;
+    const nativeBinary = nativePackage?.binary;
+    if (nativePackage?.name !== EXEC_AUTHORITY_NATIVE_PACKAGE
+      || !validNativePackageVersion(nativePackage?.version)
+      || nativePackage.private !== true
+      || nativePackage.main !== 'index.mjs'
+      || nativePackage.type !== 'module'
+      || !exactObjectKeys(nativeBinary, ['napi_versions'])
+      || !Array.isArray(nativeBinary.napi_versions)
+      || nativeBinary.napi_versions.length !== 1
+      || nativeBinary.napi_versions[0] !== EXEC_AUTHORITY_NAPI_VERSION
+      || nativeScripts === null
+      || typeof nativeScripts !== 'object'
+      || Array.isArray(nativeScripts)
+      || ['preinstall', 'install', 'postinstall'].some(name => Object.hasOwn(nativeScripts, name))) {
+      return fail('nested native package identity is invalid');
+    }
+    const rootScripts = rootPackage?.scripts;
+    if (rootPackage?.name !== 'deckent'
+      || rootPackage?.version !== pkg.version
+      || !validNativePackageVersion(rootPackage?.version)
+      || rootPackage?.type !== 'module'
+      || rootPackage?.gypfile === true
+      || (rootScripts !== undefined && (rootScripts === null
+        || typeof rootScripts !== 'object'
+        || Array.isArray(rootScripts)))
+      || (rootScripts !== undefined
+        && ['preinstall', 'install', 'postinstall'].some(name => Object.hasOwn(rootScripts, name)))) {
+      return fail('root package native install lifecycle is invalid');
+    }
+    const artifactBytes = readStablePublishFile(
+      root,
+      artifactPath,
+      NATIVE_RUNTIME_METADATA_MAX_BYTES,
+    );
+    const binaryBytes = readStablePublishFile(root, binaryPath, NATIVE_BINARY_MAX_BYTES);
+    const artifact = JSON.parse(artifactBytes.toString('utf8'));
+    if (artifactBytes.toString('utf8') !== `${JSON.stringify(artifact, null, 2)}\n`) {
+      return fail('current-platform native artifact JSON is not canonical');
+    }
+    if (!validateNativeArtifact(
+      artifact,
+      nativePackage.version,
+      rootPackage.version,
+      platform,
+      arch,
+      binaryBytes,
+      sourceIdentity.sha256,
+    )) {
+      return fail('current-platform native artifact schema or byte identity is invalid');
+    }
+  } catch (error) {
+    return fail(`native package bytes are unsafe or invalid: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  return {
+    gate,
+    ok: true,
+    severity: 'info',
+    message: `native source and ${platform}-${arch}/napi-v${EXEC_AUTHORITY_NAPI_VERSION} artifact pair are exactly packed`,
+    missing: [],
+    unexpected: [],
+  };
+}
+
 // ─── PKG-02: pack category-baseline delta ratchet (standalone diagnostic) ────
 //
 // Replaces the retired absolute file-count pin (see MAX_PACK_BYTES comment above).
@@ -795,9 +1226,10 @@ export function buildCategoryInventory(fileSizes) {
 /**
  * @param {Array<{ path: string, bytes: number }>} fileSizes
  * @param {{ categories: Record<string, { count: number, bytes: number }>, totalBytes: number } | null | undefined} baseline
+ * @param {readonly string[]} [admittedNewCategories]
  * @returns {{ gate: string, ok: boolean, severity: 'info'|'warning'|'error', message: string, newCategories: string[], grown: string[] }}
  */
-export function checkPackCategoryBaseline(fileSizes, baseline) {
+export function checkPackCategoryBaseline(fileSizes, baseline, admittedNewCategories = []) {
   if (!fileSizes || fileSizes.length === 0) {
     return {
       gate: 'pack_category_baseline',
@@ -821,7 +1253,9 @@ export function checkPackCategoryBaseline(fileSizes, baseline) {
   }
 
   const current = buildCategoryInventory(fileSizes);
-  const newCategories = Object.keys(current.categories).filter((key) => !(key in baseline.categories));
+  const admitted = new Set(admittedNewCategories);
+  const newCategories = Object.keys(current.categories)
+    .filter((key) => !(key in baseline.categories) && !admitted.has(key));
 
   /** @type {string[]} */
   const grown = [];
@@ -1004,41 +1438,75 @@ export async function runCli(projectRoot) {
     projectRoot: root,
   });
 
-  const categoryBaselineCheck = checkPackCategoryBaseline(parsedPack.fileSizes, loadPackBaseline());
+  const nativeExecAuthorityCheck = checkNativeExecAuthorityTarball(parsedPack, pkg, root);
+  const npmShrinkwrapCheck = checkNpmShrinkwrapTarball(parsedPack, pkg, root);
+  // The immutable historical pack baseline predates the owner-admitted native
+  // payload. Only the two categories fully proven by the exact native gate may
+  // bypass "new category" rejection; all other new categories and the global
+  // byte-growth ratchet remain enforced.
+  const admittedNativeCategories = nativeExecAuthorityCheck.ok
+    ? ['native/exec-authority::.json', 'native/exec-authority::asset']
+    : [];
+  const categoryBaselineCheck = checkPackCategoryBaseline(
+    parsedPack.fileSizes,
+    loadPackBaseline(),
+    admittedNativeCategories,
+  );
   const builtinsDriftCheck = checkBuiltinsDrift(builtinsDriftResult);
 
-  return { ...result, packOutput: parsedPack, pkg, categoryBaselineCheck, builtinsDriftCheck };
+  return {
+    ...result,
+    packOutput: parsedPack,
+    pkg,
+    categoryBaselineCheck,
+    builtinsDriftCheck,
+    nativeExecAuthorityCheck,
+    npmShrinkwrapCheck,
+  };
 }
 
 /**
  * `--write-baseline`: run a REAL `npm pack --dry-run --json` and (re)write
- * scripts/pack-baseline.json from it. Refuses to write on an empty/invalid pack
- * result — a baseline must always be pack-generated, never fabricated.
+ * scripts/pack-baseline.json from it. Refuses to write unless every normal
+ * readiness, builtins, critical-file, native-package, and changelog gate passes.
+ * The category-delta gate is deliberately excluded because accepting that exact
+ * measured delta is the purpose of this owner-invoked operation. A baseline must
+ * always be pack-generated, never fabricated or used to launder another failed gate.
  * @param {string} projectRoot
  * @returns {Promise<number>} process exit code
  */
-async function writePackBaseline(projectRoot) {
+export async function writePackBaseline(projectRoot) {
   const root = resolve(projectRoot);
-  const packResult = await spawnAsync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], root);
-  const parsedPack = parsePackJson(packResult.stdout);
-
-  if (parsedPack.fileSizes.length === 0) {
+  const validation = await runCli(root);
+  const criticalFiles = checkCriticalFilesInTarball(validation.packOutput, validation.pkg);
+  const changelog = checkChangelogSectionForVersion(root);
+  const admissionChecks = [
+    ...validation.checks,
+    validation.builtinsDriftCheck,
+    validation.npmShrinkwrapCheck,
+    validation.nativeExecAuthorityCheck,
+    criticalFiles,
+    changelog,
+  ];
+  const blockers = admissionChecks.filter(check => !check.ok);
+  if (blockers.length > 0) {
     console.error(
-      `Refusing to write baseline: npm pack produced no files (empty/invalid output).\n${packResult.stderr.slice(0, 500)}`,
+      `Refusing to write baseline: publish admission failed (${blockers.map(check => check.gate).join(', ')}).`,
     );
     return 1;
   }
 
-  const inventory = buildCategoryInventory(parsedPack.fileSizes);
+  const inventory = buildCategoryInventory(validation.packOutput.fileSizes);
   const baseline = {
     generatedAt: new Date().toISOString(),
     totalBytes: inventory.totalBytes,
     totalFiles: inventory.totalFiles,
     categories: inventory.categories,
   };
-  writeFileSync(BASELINE_PATH, `${JSON.stringify(baseline, null, 2)}\n`, 'utf-8');
+  const baselinePath = join(root, 'scripts', 'pack-baseline.json');
+  writeFileSync(baselinePath, `${JSON.stringify(baseline, null, 2)}\n`, 'utf-8');
   console.log(
-    `Wrote ${BASELINE_PATH}: ${inventory.totalFiles} files, ${Object.keys(inventory.categories).length} categories, ${(inventory.totalBytes / (1024 * 1024)).toFixed(2)} MB unpacked.`,
+    `Wrote ${baselinePath}: ${inventory.totalFiles} files, ${Object.keys(inventory.categories).length} categories, ${(inventory.totalBytes / (1024 * 1024)).toFixed(2)} MB unpacked.`,
   );
   return 0;
 }
@@ -1086,7 +1554,13 @@ if (entryArg !== '' && fileURLToPath(import.meta.url) === resolve(entryArg)) {
   console.log(`  [${driftTag}] ${driftCheck.gate}: ${driftCheck.message}`);
 
   const criticalFiles = checkCriticalFilesInTarball(result.packOutput, result.pkg);
-  const extraChecks = [criticalFiles, result.categoryBaselineCheck, checkChangelogSectionForVersion(projectRoot)];
+  const extraChecks = [
+    criticalFiles,
+    result.npmShrinkwrapCheck,
+    result.nativeExecAuthorityCheck,
+    result.categoryBaselineCheck,
+    checkChangelogSectionForVersion(projectRoot),
+  ];
   for (const check of extraChecks) {
     if (!check.ok) {
       console.log(`  [\x1b[31mFAIL\x1b[0m] ${check.gate}: ${check.message}`);

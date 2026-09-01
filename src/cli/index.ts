@@ -251,7 +251,11 @@ export function buildProgram(runtime: CliProgramRuntime = {}): Command {
   });
   registerInspect(program);
   registerAttach(program);
-  registerSpawn(program);
+  registerSpawn(program, {
+    ...(runtime.providerAuthority
+      ? { providerAuthority: runtime.providerAuthority }
+      : {}),
+  });
   registerKill(program);
   registerRetro(program);
   registerCleanup(program);

@@ -103,20 +103,20 @@ describe('checkPackSizeAndCount (Gate 1)', () => {
     expect(result.severity).toBe('info');
   });
 
-  it('accepts a pack exactly at the 6 MB ceiling (0.100.0 rebaseline calibration)', () => {
-    // 0.100.0 raised the ceiling 5 MB → 6 MB (measured 0.100.0 pack ~5.4 MB, all dist/).
-    const out = buildPackOutput({ packageSize: '6.0 MB', fileCount: 900 });
+  it('accepts a pack exactly at the 7 MB ceiling (native-custody calibration)', () => {
+    // Native custody ships source plus one exact current-host Release pair.
+    const out = buildPackOutput({ packageSize: '7.0 MB', fileCount: 900 });
     const result = checkPackSizeAndCount(out);
     expect(result.ok).toBe(true);
     expect(result.severity).toBe('info');
   });
 
-  it('fails when package size exceeds the 6 MB threshold', () => {
-    const out = buildPackOutput({ packageSize: '6.1 MB', fileCount: 900 });
+  it('fails when package size exceeds the 7 MB threshold', () => {
+    const out = buildPackOutput({ packageSize: '7.1 MB', fileCount: 900 });
     const result = checkPackSizeAndCount(out);
     expect(result.ok).toBe(false);
     expect(result.severity).toBe('error');
-    expect(result.message).toMatch(/exceeds|6\s*MB/i);
+    expect(result.message).toMatch(/exceeds|7\s*MB/i);
   });
 });
 

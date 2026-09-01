@@ -26,8 +26,29 @@ import {
   InvocationReceiptStoreError,
 } from './invocation-receipt-store.js';
 import {
+  TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+  TaskAttemptCustodyHold,
+  canonicalTaskAttemptCustodyJson,
+  parseTaskAttemptCustodyAdmissionV2,
+  parseTaskAttemptCustodyIdentityV2,
+  type Sha256Digest,
+  type TaskAttemptCustodyAdmissionV2,
+  type TaskAttemptCustodyArtifactReceiptV2,
+  type TaskAttemptCustodyIdentityV2,
+  type TaskAttemptCustodyPolicyV2,
+  type TaskAttemptCustodyStore,
+} from './task-attempt-custody-store.js';
+import {
+  taskResultV2Digest,
+  validateProductionTaskResultV2,
+  type TaskResultV2,
+} from './task-result-schema.js';
+import {
   dockerContainerNameForTask,
   inspectTaskResultSettlementAuthority,
+  parseTaskResultSettlementV2,
+  taskResultSettlementV2Digest,
+  type TaskResultSettlementV2,
   type TaskResultSettlementAuthorityInspection,
 } from './task-result-settlement.js';
 import { validateTaskId } from './validators.js';
@@ -243,6 +264,11 @@ export interface SettleNotDispatchedInput extends InspectTaskSettlementInput {
   readonly apply?: boolean;
   /** Caller-observed settlement time. Fresh receipt events share this exact instant. */
   readonly occurredAt?: string;
+  /**
+   * Opaque durable refs produced by the execution backend while proving zero
+   * provider work. They augment — never replace — the host absence probes.
+   */
+  readonly authorityEvidenceRefs?: readonly string[];
 }
 
 /** 2026-08-28 (F5): a one-shot dispatch whose worker died without writing a result.
@@ -317,6 +343,172 @@ export interface OpenTaskSettlementProjectionResult {
   ): readonly TaskSettlementProjection[];
   close(): void;
 }
+
+/** Compact host-private reference to one immutable V2 settlement artifact. */
+export interface ExactTaskResultSettlementRefV2 {
+  readonly schemaVersion: typeof TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION;
+  readonly kind: 'task-result-settlement-v2-ref';
+  readonly identity: TaskAttemptCustodyIdentityV2;
+  readonly artifactKey: string;
+  readonly artifactReceiptDigest: Sha256Digest;
+}
+
+/** Exact pre-evaluation authority over one canonical accepted TaskResultV2 artifact. */
+export interface ExactAcceptedTaskResultRefV2 {
+  readonly schemaVersion: typeof TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION;
+  readonly kind: 'task-accepted-result-v2-ref';
+  readonly identity: TaskAttemptCustodyIdentityV2;
+  readonly artifactKey: string;
+  readonly artifactReceiptDigest: Sha256Digest;
+}
+
+export interface InspectExactAcceptedTaskResultAuthorityInput {
+  readonly executionMode: 'normal-docker';
+  readonly authorityKind: 'accepted-result';
+  /** Diagnostic scope only. Exact inspection never reads public project artifacts. */
+  readonly projectRoot: string;
+  readonly taskId: string;
+  readonly custodyStore: TaskAttemptCustodyStore;
+  readonly policy: TaskAttemptCustodyPolicyV2;
+  readonly expectedIdentity: TaskAttemptCustodyIdentityV2;
+  readonly admission: TaskAttemptCustodyAdmissionV2;
+  readonly acceptedResultRef: ExactAcceptedTaskResultRefV2;
+  readonly expectedAcceptedResultChainDigest: Sha256Digest;
+}
+
+export type ExactAcceptedTaskResultAuthorityHoldReason =
+  | 'invalid-input'
+  | 'identity-mismatch'
+  | 'stale-attempt'
+  | 'sibling-attempt'
+  | 'admission-mismatch'
+  | 'accepted-result-missing'
+  | 'accepted-result-spoofed'
+  | 'accepted-result-chain-mismatch'
+  | 'custody-hold';
+
+export type ExactAcceptedTaskResultAuthorityInspection =
+  | {
+      readonly state: 'accepted-result';
+      readonly executionMode: 'normal-docker';
+      readonly identity: TaskAttemptCustodyIdentityV2;
+      readonly admissionReceiptDigest: Sha256Digest;
+      readonly acceptedResultRef: ExactAcceptedTaskResultRefV2;
+      readonly acceptedResultChainDigest: Sha256Digest;
+      readonly resultDigest: Sha256Digest;
+      readonly result: TaskResultV2;
+    }
+  | {
+      readonly state: 'hold';
+      readonly executionMode: 'normal-docker';
+      readonly taskId: string;
+      readonly reasonCode: ExactAcceptedTaskResultAuthorityHoldReason;
+    };
+
+export interface ExactTaskResultHostArtifactAuthorityV2 {
+  readonly artifactReceiptDigest: Sha256Digest;
+  readonly chainDigest: Sha256Digest;
+  readonly artifactSha256: Sha256Digest;
+  readonly byteLength: number;
+}
+
+/**
+ * Host-produced pre-dispatch truth. The null fields are intentional: a task
+ * that never dispatched cannot acquire an attempt, settlement ref, or digest.
+ */
+export interface ExactTaskNotDispatchedAuthorityV2 {
+  readonly schemaVersion: typeof TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION;
+  readonly kind: 'task-not-dispatched-v2';
+  readonly state: 'NOT_DISPATCHED';
+  readonly taskId: string;
+  readonly attemptCount: 0;
+  readonly reasonCode: string;
+  readonly evidenceRef: string;
+  readonly attemptIdentity: null;
+  readonly settlementRef: null;
+  readonly settlementDigest: null;
+}
+
+export interface InspectExactTaskResultAttemptSettlementInput {
+  readonly executionMode: 'normal-docker';
+  readonly authorityKind: 'attempt-settlement';
+  /** Diagnostic scope only. Normal Docker inspection never reads public project artifacts. */
+  readonly projectRoot: string;
+  readonly taskId: string;
+  readonly custodyStore: TaskAttemptCustodyStore;
+  readonly policy: TaskAttemptCustodyPolicyV2;
+  readonly expectedIdentity: TaskAttemptCustodyIdentityV2;
+  readonly admission: TaskAttemptCustodyAdmissionV2;
+  readonly settlementRef: ExactTaskResultSettlementRefV2;
+  readonly expectedSettlementDigest: Sha256Digest;
+}
+
+export interface InspectExactTaskNotDispatchedInput {
+  readonly executionMode: 'normal-docker';
+  readonly authorityKind: 'not-dispatched';
+  readonly projectRoot: string;
+  readonly taskId: string;
+  readonly authority: ExactTaskNotDispatchedAuthorityV2;
+}
+
+export interface InspectLegacyNonDockerTaskResultInput {
+  readonly executionMode: 'legacy-non-docker';
+  readonly projectRoot: string;
+  readonly taskId: string;
+}
+
+export type InspectExactTaskResultSettlementAuthorityInput =
+  | InspectExactTaskResultAttemptSettlementInput
+  | InspectExactTaskNotDispatchedInput
+  | InspectLegacyNonDockerTaskResultInput;
+
+export type ExactTaskResultSettlementHoldReason =
+  | 'invalid-input'
+  | 'identity-mismatch'
+  | 'stale-attempt'
+  | 'sibling-attempt'
+  | 'admission-mismatch'
+  | 'settlement-missing'
+  | 'spoofed-settlement'
+  | 'settlement-chain-mismatch'
+  | 'evaluation-authority-invalid'
+  | 'finalizer-authority-invalid'
+  | 'custody-hold'
+  | 'not-dispatched-attempt-conflict';
+
+export type ExactTaskResultSettlementInspection =
+  | {
+      readonly state: 'accepted';
+      readonly executionMode: 'normal-docker';
+      readonly identity: TaskAttemptCustodyIdentityV2;
+      readonly admissionReceiptDigest: Sha256Digest;
+      readonly settlementRef: ExactTaskResultSettlementRefV2;
+      readonly settlementDigest: Sha256Digest;
+      readonly result: TaskResultV2;
+      readonly settlement: TaskResultSettlementV2;
+      readonly evaluationArtifact: ExactTaskResultHostArtifactAuthorityV2;
+      readonly finalizerArtifact: ExactTaskResultHostArtifactAuthorityV2;
+    }
+  | {
+      readonly state: 'not-dispatched';
+      readonly executionMode: 'normal-docker';
+      readonly taskId: string;
+      readonly attemptCount: 0;
+      readonly reasonCode: string;
+      readonly evidenceRef: string;
+    }
+  | {
+      readonly state: 'hold';
+      readonly executionMode: 'normal-docker';
+      readonly taskId: string;
+      readonly reasonCode: ExactTaskResultSettlementHoldReason;
+    }
+  | {
+      readonly state: 'legacy';
+      readonly executionMode: 'legacy-non-docker';
+      readonly result: unknown | null;
+      readonly rawResultPath: string;
+    };
 
 export class TaskSettlementProjectionError extends Error {
   constructor(
@@ -480,6 +672,718 @@ function exactOwnKeys(value: object, keys: readonly string[]): boolean {
   const expected = [...keys].sort();
   return actual.length === expected.length
     && actual.every((key, index) => key === expected[index]);
+}
+
+const CUSTODY_SHA256_RE = /^sha256:[a-f0-9]{64}$/u;
+const CUSTODY_ARTIFACT_KEY_RE = /^[a-z0-9][a-z0-9._-]{0,127}$/u;
+
+function plainRecord(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  try {
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null;
+  } catch {
+    return false;
+  }
+}
+
+function sameCustodyIdentity(
+  left: TaskAttemptCustodyIdentityV2,
+  right: TaskAttemptCustodyIdentityV2,
+): boolean {
+  return left.schemaVersion === right.schemaVersion
+    && left.backend === right.backend
+    && left.projectRootSha256 === right.projectRootSha256
+    && left.projectId === right.projectId
+    && left.taskId === right.taskId
+    && left.attemptId === right.attemptId
+    && left.generation === right.generation;
+}
+
+function custodyIdentityHoldReason(
+  expected: TaskAttemptCustodyIdentityV2,
+  observed: TaskAttemptCustodyIdentityV2,
+): 'identity-mismatch' | 'stale-attempt' | 'sibling-attempt' | null {
+  if (
+    expected.schemaVersion !== observed.schemaVersion
+    || expected.backend !== observed.backend
+    || expected.projectRootSha256 !== observed.projectRootSha256
+    || expected.projectId !== observed.projectId
+    || expected.taskId !== observed.taskId
+  ) return 'identity-mismatch';
+  if (expected.attemptId !== observed.attemptId) return 'sibling-attempt';
+  if (expected.generation !== observed.generation) {
+    return observed.generation < expected.generation ? 'stale-attempt' : 'sibling-attempt';
+  }
+  return null;
+}
+
+function parseExactTaskResultSettlementRefV2(
+  value: unknown,
+): ExactTaskResultSettlementRefV2 | null {
+  if (!plainRecord(value) || !exactOwnKeys(value, [
+    'schemaVersion',
+    'kind',
+    'identity',
+    'artifactKey',
+    'artifactReceiptDigest',
+  ])) return null;
+  const identity = parseTaskAttemptCustodyIdentityV2(value.identity);
+  if (
+    !identity
+    || value.schemaVersion !== TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION
+    || value.kind !== 'task-result-settlement-v2-ref'
+    || typeof value.artifactKey !== 'string'
+    || !CUSTODY_ARTIFACT_KEY_RE.test(value.artifactKey)
+    || typeof value.artifactReceiptDigest !== 'string'
+    || !CUSTODY_SHA256_RE.test(value.artifactReceiptDigest)
+  ) return null;
+  return Object.freeze({
+    schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+    kind: 'task-result-settlement-v2-ref',
+    identity: Object.freeze({ ...identity }),
+    artifactKey: value.artifactKey,
+    artifactReceiptDigest: value.artifactReceiptDigest as Sha256Digest,
+  });
+}
+
+export function createExactTaskResultSettlementRefV2(
+  settlementArtifact: TaskAttemptCustodyArtifactReceiptV2,
+): ExactTaskResultSettlementRefV2 {
+  if (
+    !plainRecord(settlementArtifact)
+    || settlementArtifact.schemaVersion !== TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION
+    || settlementArtifact.artifactClass !== 'settlement-receipt'
+    || settlementArtifact.captureMode !== 'host-authority-publication'
+  ) throw new TypeError('TASK_RESULT_SETTLEMENT_EXACT_REF_INVALID_ARTIFACT');
+  const ref = parseExactTaskResultSettlementRefV2({
+    schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+    kind: 'task-result-settlement-v2-ref',
+    identity: settlementArtifact.identity,
+    artifactKey: settlementArtifact.artifactKey,
+    artifactReceiptDigest: settlementArtifact.receiptDigest,
+  });
+  if (!ref) throw new TypeError('TASK_RESULT_SETTLEMENT_EXACT_REF_INVALID_ARTIFACT');
+  return ref;
+}
+
+function parseExactAcceptedTaskResultRefV2(
+  value: unknown,
+): ExactAcceptedTaskResultRefV2 | null {
+  if (!plainRecord(value) || !exactOwnKeys(value, [
+    'schemaVersion',
+    'kind',
+    'identity',
+    'artifactKey',
+    'artifactReceiptDigest',
+  ])) return null;
+  const identity = parseTaskAttemptCustodyIdentityV2(value.identity);
+  if (
+    !identity
+    || value.schemaVersion !== TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION
+    || value.kind !== 'task-accepted-result-v2-ref'
+    || typeof value.artifactKey !== 'string'
+    || !CUSTODY_ARTIFACT_KEY_RE.test(value.artifactKey)
+    || typeof value.artifactReceiptDigest !== 'string'
+    || !CUSTODY_SHA256_RE.test(value.artifactReceiptDigest)
+  ) return null;
+  return Object.freeze({
+    schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+    kind: 'task-accepted-result-v2-ref',
+    identity: Object.freeze({ ...identity }),
+    artifactKey: value.artifactKey,
+    artifactReceiptDigest: value.artifactReceiptDigest as Sha256Digest,
+  });
+}
+
+export function createExactAcceptedTaskResultRefV2(
+  acceptedResultArtifact: TaskAttemptCustodyArtifactReceiptV2,
+): ExactAcceptedTaskResultRefV2 {
+  if (
+    !plainRecord(acceptedResultArtifact)
+    || acceptedResultArtifact.schemaVersion !== TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION
+    || acceptedResultArtifact.artifactClass !== 'canonical-accepted-result'
+    || acceptedResultArtifact.captureMode !== 'host-authority-publication'
+  ) throw new TypeError('TASK_ACCEPTED_RESULT_EXACT_REF_INVALID_ARTIFACT');
+  const ref = parseExactAcceptedTaskResultRefV2({
+    schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+    kind: 'task-accepted-result-v2-ref',
+    identity: acceptedResultArtifact.identity,
+    artifactKey: acceptedResultArtifact.artifactKey,
+    artifactReceiptDigest: acceptedResultArtifact.receiptDigest,
+  });
+  if (!ref) throw new TypeError('TASK_ACCEPTED_RESULT_EXACT_REF_INVALID_ARTIFACT');
+  return ref;
+}
+
+function exactAcceptedTaskResultHold(
+  taskId: string,
+  reasonCode: ExactAcceptedTaskResultAuthorityHoldReason,
+): ExactAcceptedTaskResultAuthorityInspection {
+  return Object.freeze({
+    state: 'hold',
+    executionMode: 'normal-docker',
+    taskId,
+    reasonCode,
+  });
+}
+
+function rawCustodySha256(bytes: Uint8Array): Sha256Digest {
+  return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+}
+
+/**
+ * Exact pre-evaluation consumer boundary. It terminates at accepted-result and
+ * deliberately cannot observe evaluation/finalizer/settlement stages.
+ */
+export function inspectExactAcceptedTaskResultAuthority(
+  input: InspectExactAcceptedTaskResultAuthorityInput,
+): ExactAcceptedTaskResultAuthorityInspection {
+  if (!plainRecord(input)) return exactAcceptedTaskResultHold('unknown', 'invalid-input');
+  const taskId = typeof input.taskId === 'string' ? input.taskId : 'unknown';
+  try {
+    if (
+      !exactOwnKeys(input, [
+        'executionMode',
+        'authorityKind',
+        'projectRoot',
+        'taskId',
+        'custodyStore',
+        'policy',
+        'expectedIdentity',
+        'admission',
+        'acceptedResultRef',
+        'expectedAcceptedResultChainDigest',
+      ])
+      || input.executionMode !== 'normal-docker'
+      || input.authorityKind !== 'accepted-result'
+      || typeof input.projectRoot !== 'string'
+      || input.projectRoot.trim().length === 0
+      || taskId === 'unknown'
+    ) return exactAcceptedTaskResultHold(taskId, 'invalid-input');
+    validateTaskId(taskId);
+    const expectedIdentity = parseTaskAttemptCustodyIdentityV2(input.expectedIdentity);
+    const acceptedResultRef = parseExactAcceptedTaskResultRefV2(input.acceptedResultRef);
+    if (
+      !expectedIdentity
+      || expectedIdentity.backend !== 'docker'
+      || expectedIdentity.taskId !== taskId
+      || !acceptedResultRef
+      || typeof input.expectedAcceptedResultChainDigest !== 'string'
+      || !CUSTODY_SHA256_RE.test(input.expectedAcceptedResultChainDigest)
+      || !input.custodyStore
+      || typeof input.custodyStore !== 'object'
+      || typeof input.custodyStore.readAdmission !== 'function'
+      || typeof input.custodyStore.readVerifiedArtifact !== 'function'
+      || typeof input.custodyStore.readChain !== 'function'
+      || typeof input.policy !== 'object'
+      || input.policy === null
+    ) return exactAcceptedTaskResultHold(taskId, 'invalid-input');
+    const refIdentityReason = custodyIdentityHoldReason(
+      expectedIdentity,
+      acceptedResultRef.identity,
+    );
+    if (refIdentityReason) return exactAcceptedTaskResultHold(taskId, refIdentityReason);
+    const admission = parseTaskAttemptCustodyAdmissionV2(input.admission, input.policy);
+    if (!admission) return exactAcceptedTaskResultHold(taskId, 'admission-mismatch');
+    const admissionIdentityReason = custodyIdentityHoldReason(
+      expectedIdentity,
+      admission.identity,
+    );
+    if (admissionIdentityReason) {
+      return exactAcceptedTaskResultHold(taskId, admissionIdentityReason);
+    }
+    const persistedAdmission = input.custodyStore.readAdmission(
+      expectedIdentity,
+      input.policy,
+    );
+    if (
+      persistedAdmission === null
+      || persistedAdmission.receiptDigest !== admission.receiptDigest
+      || !Buffer.from(canonicalTaskAttemptCustodyJson(
+        persistedAdmission,
+        input.policy.jsonBounds,
+      )).equals(Buffer.from(canonicalTaskAttemptCustodyJson(
+        admission,
+        input.policy.jsonBounds,
+      )))
+    ) return exactAcceptedTaskResultHold(taskId, 'admission-mismatch');
+
+    const acceptedArtifact = input.custodyStore.readVerifiedArtifact({
+      identity: expectedIdentity,
+      policy: input.policy,
+      artifactClass: 'canonical-accepted-result',
+      artifactKey: acceptedResultRef.artifactKey,
+      receiptDigest: acceptedResultRef.artifactReceiptDigest,
+    });
+    if (acceptedArtifact === null) {
+      return exactAcceptedTaskResultHold(taskId, 'accepted-result-missing');
+    }
+    if (
+      acceptedArtifact.receipt.receiptDigest !== acceptedResultRef.artifactReceiptDigest
+      || acceptedArtifact.receipt.admissionReceiptDigest !== admission.receiptDigest
+      || acceptedArtifact.receipt.policyDigest !== input.policy.policyDigest
+      || !sameCustodyIdentity(acceptedArtifact.receipt.identity, expectedIdentity)
+      || acceptedArtifact.receipt.artifact.sha256 !== rawCustodySha256(acceptedArtifact.bytes)
+      || acceptedArtifact.receipt.artifact.byteLength !== acceptedArtifact.bytes.byteLength
+    ) return exactAcceptedTaskResultHold(taskId, 'accepted-result-spoofed');
+    let decoded: unknown;
+    try {
+      decoded = JSON.parse(Buffer.from(acceptedArtifact.bytes).toString('utf8'));
+    } catch {
+      return exactAcceptedTaskResultHold(taskId, 'accepted-result-spoofed');
+    }
+    const result = validateProductionTaskResultV2(decoded, input.policy.jsonBounds);
+    if (!result.ok) return exactAcceptedTaskResultHold(taskId, 'accepted-result-spoofed');
+    if (
+      !sameCustodyIdentity(result.value.attemptCustody.identity, expectedIdentity)
+      || result.value.attemptCustody.policyDigest !== input.policy.policyDigest
+      || result.value.attemptCustody.admissionReceiptDigest !== admission.receiptDigest
+      || !Buffer.from(canonicalTaskAttemptCustodyJson(
+        result.value,
+        input.policy.jsonBounds,
+      )).equals(Buffer.from(acceptedArtifact.bytes))
+    ) return exactAcceptedTaskResultHold(taskId, 'accepted-result-spoofed');
+    const sourceBinding = result.value.attemptCustody.sourceResult;
+    const sourceArtifact = input.custodyStore.readVerifiedArtifact({
+      identity: expectedIdentity,
+      policy: input.policy,
+      artifactClass: 'worker-result',
+      artifactKey: sourceBinding.artifactKey,
+      receiptDigest: sourceBinding.artifactReceiptDigest as Sha256Digest,
+    });
+    if (
+      sourceArtifact === null
+      || sourceArtifact.receipt.admissionReceiptDigest !== admission.receiptDigest
+      || sourceArtifact.receipt.policyDigest !== input.policy.policyDigest
+      || !sameCustodyIdentity(sourceArtifact.receipt.identity, expectedIdentity)
+      || sourceArtifact.receipt.artifact.sha256 !== sourceBinding.artifactSha256
+      || sourceArtifact.receipt.artifact.byteLength !== sourceBinding.byteLength
+      || Date.parse(sourceArtifact.receipt.capturedAt)
+        > Date.parse(acceptedArtifact.receipt.capturedAt)
+    ) return exactAcceptedTaskResultHold(taskId, 'accepted-result-spoofed');
+    const acceptedChain = input.custodyStore.readChain(
+      expectedIdentity,
+      input.policy,
+      'accepted-result',
+    );
+    if (
+      acceptedChain === null
+      || acceptedChain.receiptDigest !== input.expectedAcceptedResultChainDigest
+      || acceptedChain.predecessorDigest
+        !== result.value.attemptCustody.effectLanding.effectLandingChainDigest
+      || acceptedChain.artifactKey !== acceptedResultRef.artifactKey
+      || acceptedChain.artifactReceiptDigest !== acceptedResultRef.artifactReceiptDigest
+    ) return exactAcceptedTaskResultHold(taskId, 'accepted-result-chain-mismatch');
+    return Object.freeze({
+      state: 'accepted-result',
+      executionMode: 'normal-docker',
+      identity: Object.freeze({ ...expectedIdentity }),
+      admissionReceiptDigest: admission.receiptDigest,
+      acceptedResultRef,
+      acceptedResultChainDigest: acceptedChain.receiptDigest,
+      resultDigest: taskResultV2Digest(result.value, input.policy.jsonBounds),
+      result: result.value,
+    });
+  } catch (error) {
+    if (error instanceof TaskAttemptCustodyHold) {
+      const reason = custodyHoldReason(error);
+      return exactAcceptedTaskResultHold(
+        taskId,
+        reason === 'admission-mismatch'
+          ? reason
+          : reason === 'settlement-chain-mismatch'
+            ? 'accepted-result-chain-mismatch'
+            : reason === 'spoofed-settlement'
+              ? 'accepted-result-spoofed'
+              : 'custody-hold',
+      );
+    }
+    return exactAcceptedTaskResultHold(taskId, 'invalid-input');
+  }
+}
+
+function exactTaskResultSettlementHold(
+  taskId: string,
+  reasonCode: ExactTaskResultSettlementHoldReason,
+): ExactTaskResultSettlementInspection {
+  return Object.freeze({
+    state: 'hold',
+    executionMode: 'normal-docker',
+    taskId,
+    reasonCode,
+  });
+}
+
+function custodyHoldReason(error: TaskAttemptCustodyHold): ExactTaskResultSettlementHoldReason {
+  if (error.code === 'ADMISSION_REQUIRED' || error.code === 'ADMISSION_MISMATCH') {
+    return 'admission-mismatch';
+  }
+  if (
+    error.code === 'CHAIN_PREDECESSOR_MISMATCH'
+    || error.code === 'INCOMPLETE_PUBLICATION'
+  ) return 'settlement-chain-mismatch';
+  if (
+    error.code === 'ARTIFACT_REPLAY_MISMATCH'
+    || error.code === 'ARTIFACT_CHANGED'
+    || error.code === 'CORRUPT_CUSTODY_RECORD'
+    || error.code === 'FIRST_WRITER_COLLISION'
+  ) return 'spoofed-settlement';
+  return 'custody-hold';
+}
+
+function inspectExactNotDispatched(
+  input: Record<string, unknown>,
+  taskId: string,
+): ExactTaskResultSettlementInspection {
+  if (!exactOwnKeys(input, [
+    'executionMode',
+    'authorityKind',
+    'projectRoot',
+    'taskId',
+    'authority',
+  ])) return exactTaskResultSettlementHold(taskId, 'invalid-input');
+  const authority = input.authority;
+  if (!plainRecord(authority) || !exactOwnKeys(authority, [
+    'schemaVersion',
+    'kind',
+    'state',
+    'taskId',
+    'attemptCount',
+    'reasonCode',
+    'evidenceRef',
+    'attemptIdentity',
+    'settlementRef',
+    'settlementDigest',
+  ])) return exactTaskResultSettlementHold(taskId, 'invalid-input');
+  if (
+    authority.attemptCount !== 0
+    || authority.attemptIdentity !== null
+    || authority.settlementRef !== null
+    || authority.settlementDigest !== null
+  ) return exactTaskResultSettlementHold(taskId, 'not-dispatched-attempt-conflict');
+  if (
+    authority.schemaVersion !== TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION
+    || authority.kind !== 'task-not-dispatched-v2'
+    || authority.state !== 'NOT_DISPATCHED'
+    || authority.taskId !== taskId
+    || typeof authority.reasonCode !== 'string'
+    || authority.reasonCode.trim().length === 0
+    || authority.reasonCode !== authority.reasonCode.trim()
+    || typeof authority.evidenceRef !== 'string'
+    || authority.evidenceRef.trim().length === 0
+    || authority.evidenceRef !== authority.evidenceRef.trim()
+    || authority.evidenceRef.length > 512
+  ) return exactTaskResultSettlementHold(taskId, 'invalid-input');
+  return Object.freeze({
+    state: 'not-dispatched',
+    executionMode: 'normal-docker',
+    taskId,
+    attemptCount: 0,
+    reasonCode: authority.reasonCode,
+    evidenceRef: authority.evidenceRef,
+  });
+}
+
+function readExactHostArtifactAuthority(input: {
+  readonly store: TaskAttemptCustodyStore;
+  readonly policy: TaskAttemptCustodyPolicyV2;
+  readonly identity: TaskAttemptCustodyIdentityV2;
+  readonly admissionReceiptDigest: Sha256Digest;
+  readonly artifactClass: 'evaluation-receipt' | 'finalizer-receipt';
+  readonly artifactKey: string;
+  readonly artifactReceiptDigest: Sha256Digest;
+  readonly chainDigest: Sha256Digest;
+}): ExactTaskResultHostArtifactAuthorityV2 | null {
+  const artifact = input.store.readVerifiedArtifact({
+    identity: input.identity,
+    policy: input.policy,
+    artifactClass: input.artifactClass,
+    artifactKey: input.artifactKey,
+    receiptDigest: input.artifactReceiptDigest,
+  });
+  if (
+    artifact === null
+    || artifact.receipt.receiptDigest !== input.artifactReceiptDigest
+    || artifact.receipt.admissionReceiptDigest !== input.admissionReceiptDigest
+    || artifact.receipt.policyDigest !== input.policy.policyDigest
+    || !sameCustodyIdentity(artifact.receipt.identity, input.identity)
+    || artifact.receipt.artifact.sha256 !== rawCustodySha256(artifact.bytes)
+    || artifact.receipt.artifact.byteLength !== artifact.bytes.byteLength
+  ) return null;
+  return Object.freeze({
+    artifactReceiptDigest: artifact.receipt.receiptDigest,
+    chainDigest: input.chainDigest,
+    artifactSha256: artifact.receipt.artifact.sha256,
+    byteLength: artifact.receipt.artifact.byteLength,
+  });
+}
+
+function inspectExactAttemptSettlement(
+  input: Record<string, unknown>,
+  taskId: string,
+): ExactTaskResultSettlementInspection {
+  if (!exactOwnKeys(input, [
+    'executionMode',
+    'authorityKind',
+    'projectRoot',
+    'taskId',
+    'custodyStore',
+    'policy',
+    'expectedIdentity',
+    'admission',
+    'settlementRef',
+    'expectedSettlementDigest',
+  ])) return exactTaskResultSettlementHold(taskId, 'invalid-input');
+  const expectedIdentity = parseTaskAttemptCustodyIdentityV2(input.expectedIdentity);
+  const settlementRef = parseExactTaskResultSettlementRefV2(input.settlementRef);
+  if (
+    !expectedIdentity
+    || expectedIdentity.backend !== 'docker'
+    || expectedIdentity.taskId !== taskId
+    || !settlementRef
+    || typeof input.projectRoot !== 'string'
+    || input.projectRoot.trim().length === 0
+    || typeof input.expectedSettlementDigest !== 'string'
+    || !CUSTODY_SHA256_RE.test(input.expectedSettlementDigest)
+    || !input.custodyStore
+    || typeof input.custodyStore !== 'object'
+    || typeof (input.custodyStore as TaskAttemptCustodyStore).readAdmission !== 'function'
+    || typeof input.policy !== 'object'
+    || input.policy === null
+  ) return exactTaskResultSettlementHold(taskId, 'invalid-input');
+  const projectRoot = input.projectRoot;
+  const refIdentityReason = custodyIdentityHoldReason(expectedIdentity, settlementRef.identity);
+  if (refIdentityReason) return exactTaskResultSettlementHold(taskId, refIdentityReason);
+
+  const store = input.custodyStore as TaskAttemptCustodyStore;
+  const policy = input.policy as TaskAttemptCustodyPolicyV2;
+  const admission = parseTaskAttemptCustodyAdmissionV2(input.admission, policy);
+  if (!admission) return exactTaskResultSettlementHold(taskId, 'admission-mismatch');
+  const admissionIdentityReason = custodyIdentityHoldReason(
+    expectedIdentity,
+    admission.identity,
+  );
+  if (admissionIdentityReason) {
+    return exactTaskResultSettlementHold(taskId, admissionIdentityReason);
+  }
+  try {
+    const persistedAdmission = store.readAdmission(expectedIdentity, policy);
+    if (
+      persistedAdmission === null
+      || persistedAdmission.receiptDigest !== admission.receiptDigest
+      || !Buffer.from(canonicalTaskAttemptCustodyJson(
+        persistedAdmission,
+        policy.jsonBounds,
+      )).equals(Buffer.from(canonicalTaskAttemptCustodyJson(admission, policy.jsonBounds)))
+    ) return exactTaskResultSettlementHold(taskId, 'admission-mismatch');
+
+    const artifact = store.readVerifiedArtifact({
+      identity: expectedIdentity,
+      policy,
+      artifactClass: 'settlement-receipt',
+      artifactKey: settlementRef.artifactKey,
+      receiptDigest: settlementRef.artifactReceiptDigest,
+    });
+    if (artifact === null) return exactTaskResultSettlementHold(taskId, 'settlement-missing');
+    if (
+      artifact.receipt.receiptDigest !== settlementRef.artifactReceiptDigest
+      || artifact.receipt.admissionReceiptDigest !== admission.receiptDigest
+      || artifact.receipt.policyDigest !== policy.policyDigest
+      || !sameCustodyIdentity(artifact.receipt.identity, expectedIdentity)
+    ) return exactTaskResultSettlementHold(taskId, 'spoofed-settlement');
+
+    let decoded: unknown;
+    try {
+      decoded = JSON.parse(Buffer.from(artifact.bytes).toString('utf8'));
+    } catch {
+      return exactTaskResultSettlementHold(taskId, 'spoofed-settlement');
+    }
+    const settlement = parseTaskResultSettlementV2(decoded, policy.jsonBounds);
+    if (!settlement) return exactTaskResultSettlementHold(taskId, 'spoofed-settlement');
+    const settlementIdentityReason = custodyIdentityHoldReason(
+      expectedIdentity,
+      settlement.identity,
+    );
+    if (settlementIdentityReason) {
+      return exactTaskResultSettlementHold(taskId, settlementIdentityReason);
+    }
+    const settlementDigest = taskResultSettlementV2Digest(settlement, policy.jsonBounds);
+    if (
+      settlementDigest !== input.expectedSettlementDigest
+      || settlement.admissionReceiptDigest !== admission.receiptDigest
+      || settlement.policyDigest !== policy.policyDigest
+    ) return exactTaskResultSettlementHold(taskId, 'spoofed-settlement');
+
+    const acceptedChain = store.readChain(expectedIdentity, policy, 'accepted-result');
+    const evaluationChain = store.readChain(expectedIdentity, policy, 'evaluation');
+    const finalizerChain = store.readChain(expectedIdentity, policy, 'finalizer');
+    const settlementChain = store.readChain(expectedIdentity, policy, 'settlement');
+    if (
+      acceptedChain === null
+      || evaluationChain === null
+      || finalizerChain === null
+      || settlementChain === null
+      || settlement.chain.acceptedResultChainDigest !== acceptedChain.receiptDigest
+      || settlement.chain.evaluationChainDigest !== evaluationChain.receiptDigest
+      || settlement.chain.finalizerChainDigest !== finalizerChain.receiptDigest
+      || settlementChain.predecessorDigest !== finalizerChain.receiptDigest
+      || settlementChain.artifactKey !== settlementRef.artifactKey
+      || settlementChain.artifactReceiptDigest !== settlementRef.artifactReceiptDigest
+      || Date.parse(settlement.settledAt) > Date.parse(artifact.receipt.capturedAt)
+      || Date.parse(artifact.receipt.capturedAt) > Date.parse(settlementChain.occurredAt)
+    ) return exactTaskResultSettlementHold(taskId, 'settlement-chain-mismatch');
+
+    let acceptedArtifact;
+    try {
+      acceptedArtifact = store.readVerifiedArtifact({
+        identity: expectedIdentity,
+        policy,
+        artifactClass: 'canonical-accepted-result',
+        artifactKey: acceptedChain.artifactKey,
+        receiptDigest: acceptedChain.artifactReceiptDigest,
+      });
+    } catch {
+      return exactTaskResultSettlementHold(taskId, 'settlement-chain-mismatch');
+    }
+    if (!acceptedArtifact) {
+      return exactTaskResultSettlementHold(taskId, 'settlement-chain-mismatch');
+    }
+    const acceptedAuthority = inspectExactAcceptedTaskResultAuthority({
+      executionMode: 'normal-docker',
+      authorityKind: 'accepted-result',
+      projectRoot,
+      taskId,
+      custodyStore: store,
+      policy,
+      expectedIdentity,
+      admission,
+      acceptedResultRef: createExactAcceptedTaskResultRefV2(acceptedArtifact.receipt),
+      expectedAcceptedResultChainDigest: acceptedChain.receiptDigest,
+    });
+    if (
+      acceptedAuthority.state !== 'accepted-result'
+      || settlement.resultDigest !== acceptedAuthority.resultDigest
+      || !Buffer.from(canonicalTaskAttemptCustodyJson(
+        settlement.result,
+        policy.jsonBounds,
+      )).equals(Buffer.from(canonicalTaskAttemptCustodyJson(
+        acceptedAuthority.result,
+        policy.jsonBounds,
+      )))
+    ) return exactTaskResultSettlementHold(taskId, 'spoofed-settlement');
+
+    let evaluationArtifact: ExactTaskResultHostArtifactAuthorityV2 | null;
+    try {
+      evaluationArtifact = readExactHostArtifactAuthority({
+        store,
+        policy,
+        identity: expectedIdentity,
+        admissionReceiptDigest: admission.receiptDigest,
+        artifactClass: 'evaluation-receipt',
+        artifactKey: evaluationChain.artifactKey,
+        artifactReceiptDigest: evaluationChain.artifactReceiptDigest,
+        chainDigest: evaluationChain.receiptDigest,
+      });
+    } catch {
+      return exactTaskResultSettlementHold(taskId, 'evaluation-authority-invalid');
+    }
+    if (!evaluationArtifact) {
+      return exactTaskResultSettlementHold(taskId, 'evaluation-authority-invalid');
+    }
+    let finalizerArtifact: ExactTaskResultHostArtifactAuthorityV2 | null;
+    try {
+      finalizerArtifact = readExactHostArtifactAuthority({
+        store,
+        policy,
+        identity: expectedIdentity,
+        admissionReceiptDigest: admission.receiptDigest,
+        artifactClass: 'finalizer-receipt',
+        artifactKey: finalizerChain.artifactKey,
+        artifactReceiptDigest: finalizerChain.artifactReceiptDigest,
+        chainDigest: finalizerChain.receiptDigest,
+      });
+    } catch {
+      return exactTaskResultSettlementHold(taskId, 'finalizer-authority-invalid');
+    }
+    if (!finalizerArtifact) {
+      return exactTaskResultSettlementHold(taskId, 'finalizer-authority-invalid');
+    }
+
+    return Object.freeze({
+      state: 'accepted',
+      executionMode: 'normal-docker',
+      identity: Object.freeze({ ...expectedIdentity }),
+      admissionReceiptDigest: admission.receiptDigest,
+      settlementRef,
+      settlementDigest,
+      result: settlement.result,
+      settlement,
+      evaluationArtifact,
+      finalizerArtifact,
+    });
+  } catch (error) {
+    if (error instanceof TaskAttemptCustodyHold) {
+      return exactTaskResultSettlementHold(taskId, custodyHoldReason(error));
+    }
+    return exactTaskResultSettlementHold(taskId, 'invalid-input');
+  }
+}
+
+/**
+ * One result-consumer boundary for exact normal Docker truth and explicit
+ * historical non-Docker compatibility. Normal Docker never opens `.tasks`.
+ */
+export function inspectExactTaskResultSettlementAuthority(
+  input: InspectExactTaskResultSettlementAuthorityInput,
+): ExactTaskResultSettlementInspection {
+  if (!plainRecord(input)) {
+    return exactTaskResultSettlementHold('unknown', 'invalid-input');
+  }
+  const taskId = typeof input.taskId === 'string' ? input.taskId : 'unknown';
+  if (
+    typeof input.projectRoot !== 'string'
+    || input.projectRoot.trim().length === 0
+    || taskId === 'unknown'
+  ) return exactTaskResultSettlementHold(taskId, 'invalid-input');
+  try {
+    validateTaskId(taskId);
+  } catch {
+    return exactTaskResultSettlementHold(taskId, 'invalid-input');
+  }
+  try {
+    if (input.executionMode === 'normal-docker') {
+      if (input.authorityKind === 'not-dispatched') {
+        return inspectExactNotDispatched(input, taskId);
+      }
+      if (input.authorityKind === 'attempt-settlement') {
+        return inspectExactAttemptSettlement(input, taskId);
+      }
+      return exactTaskResultSettlementHold(taskId, 'invalid-input');
+    }
+  } catch (error) {
+    return exactTaskResultSettlementHold(
+      taskId,
+      error instanceof TaskAttemptCustodyHold ? custodyHoldReason(error) : 'invalid-input',
+    );
+  }
+  if (
+    input.executionMode !== 'legacy-non-docker'
+    || !exactOwnKeys(input, ['executionMode', 'projectRoot', 'taskId'])
+  ) return exactTaskResultSettlementHold(taskId, 'invalid-input');
+  const rawResultPath = join(input.projectRoot, TASKS_DIR, `task-${taskId}.result`);
+  let result: unknown | null = null;
+  try {
+    result = JSON.parse(readFileSync(rawResultPath, 'utf8')) as unknown;
+  } catch {
+    result = null;
+  }
+  return Object.freeze({
+    state: 'legacy',
+    executionMode: 'legacy-non-docker',
+    result,
+    rawResultPath,
+  });
 }
 
 function evaluateProbe(snapshot: TaskSettlementProbeSnapshot): {
@@ -959,6 +1863,15 @@ class TaskSettlementAuthorityService implements TaskSettlementAuthority {
     input: SettleAbandonedDispatchInput,
   ): Promise<TaskSettlementInspection> {
     if (!this.projectRoot) return this.hold(input.rawStatus, 'probe-unsupported');
+    // Historical public-result recovery is an explicit non-Docker compatibility
+    // boundary. Normal Docker must enter through exact attempt custody V2 above;
+    // a worker-writable `.tasks/*.result` can never be promoted here.
+    if (
+      input.executionBackend !== 'host-subprocess'
+      && input.executionBackend !== 'tmux'
+    ) {
+      return this.hold(input.rawStatus, 'unsupported-task-domain');
+    }
     const views = this.resolveViews(input);
     if (views.length === 0) return this.hold(input.rawStatus, 'receipt-missing');
     if (views.length > 1) return this.hold(input.rawStatus, 'receipt-ambiguous');
@@ -1131,13 +2044,34 @@ class TaskSettlementAuthorityService implements TaskSettlementAuthority {
     if (input.occurredAt !== undefined && !validTimestamp(input.occurredAt)) {
       throw new TypeError('TASK_SETTLEMENT_INVALID_TIMESTAMP');
     }
+    const authorityEvidenceRefs = input.authorityEvidenceRefs === undefined
+      ? Object.freeze([] as string[])
+      : boundedEvidenceRefs(input.authorityEvidenceRefs);
+    if (!authorityEvidenceRefs) {
+      throw new TypeError('TASK_SETTLEMENT_INVALID_EVIDENCE');
+    }
     const inspection = await this.inspectTaskSettlement(input);
-    if (inspection.decision !== 'eligible' || input.apply !== true) return inspection;
+    if (inspection.decision !== 'eligible' || input.apply !== true) {
+      if (
+        inspection.decision === 'already-settled'
+        && authorityEvidenceRefs.some(ref => !inspection.evidenceRefs.includes(ref))
+      ) {
+        throw new TypeError('TASK_SETTLEMENT_EVIDENCE_CONFLICT');
+      }
+      return inspection;
+    }
+    const settlementEvidenceRefs = boundedEvidenceRefs([
+      ...inspection.evidenceRefs,
+      ...authorityEvidenceRefs,
+    ]);
+    if (!settlementEvidenceRefs) {
+      throw new TypeError('TASK_SETTLEMENT_INVALID_EVIDENCE');
+    }
     if (!this.verifyCurrentTaskSnapshot(input)) {
       return this.hold(
         input.rawStatus,
         'task-content-mismatch',
-        inspection.evidenceRefs,
+        settlementEvidenceRefs,
       );
     }
     try {
@@ -1149,7 +2083,7 @@ class TaskSettlementAuthorityService implements TaskSettlementAuthority {
             return this.hold(
               input.rawStatus,
               'pre-dispatch-reason-required',
-              inspection.evidenceRefs,
+              settlementEvidenceRefs,
             );
           }
           const occurredAt = input.occurredAt ?? this.now();
@@ -1160,13 +2094,13 @@ class TaskSettlementAuthorityService implements TaskSettlementAuthority {
             eventId: eventId('dispatch-rejected', [
               view.receipt.invocationId,
               input.reasonCode,
-              ...inspection.evidenceRefs,
+              ...settlementEvidenceRefs,
             ]),
             type: 'dispatch_rejected',
             occurredAt,
             payload: {
               reasonCode: input.reasonCode,
-              evidenceRefs: inspection.evidenceRefs,
+              evidenceRefs: settlementEvidenceRefs,
             },
           };
           const result = this.ledger.writeAtomic({
@@ -1177,16 +2111,20 @@ class TaskSettlementAuthorityService implements TaskSettlementAuthority {
               this.notDispatchedConsumerEvent(
                 view.receipt,
                 rejectedEvent.eventId,
-                inspection.evidenceRefs,
+                settlementEvidenceRefs,
                 input.reasonCode,
                 occurredAt,
               ),
             ],
           });
-          return this.inspectionFromView(result.view, input.rawStatus, inspection.evidenceRefs);
+          return this.inspectionFromView(
+            result.view,
+            input.rawStatus,
+            this.viewEvidenceRefs(result.view),
+          );
         }
         if (!rejection || rejection.type !== 'dispatch_rejected') {
-          return this.hold(input.rawStatus, 'receipt-ambiguous', inspection.evidenceRefs);
+          return this.hold(input.rawStatus, 'receipt-ambiguous', settlementEvidenceRefs);
         }
         const rejectionPayload = rejection.payload as Extract<
           InvocationEvent,
@@ -1206,8 +2144,13 @@ class TaskSettlementAuthorityService implements TaskSettlementAuthority {
           return this.hold(
             input.rawStatus,
             'absence-evidence-incomplete',
-            inspection.evidenceRefs,
+            settlementEvidenceRefs,
           );
+        }
+        if (
+          authorityEvidenceRefs.some(ref => !rejectionEvidence.includes(ref))
+        ) {
+          throw new TypeError('TASK_SETTLEMENT_EVIDENCE_CONFLICT');
         }
         const result = this.ledger.writeAtomic({
           receipt: view.receipt,
@@ -1220,7 +2163,11 @@ class TaskSettlementAuthorityService implements TaskSettlementAuthority {
             rejection.occurredAt,
           )],
         });
-        return this.inspectionFromView(result.view, input.rawStatus, inspection.evidenceRefs);
+        return this.inspectionFromView(
+          result.view,
+          input.rawStatus,
+          this.viewEvidenceRefs(result.view),
+        );
       }
       return this.settleLegacy(input, inspection);
     } catch (error) {
@@ -1232,7 +2179,7 @@ class TaskSettlementAuthorityService implements TaskSettlementAuthority {
           return this.hold(
             input.rawStatus,
             'task-content-mismatch',
-            inspection.evidenceRefs,
+            settlementEvidenceRefs,
           );
         }
         return this.inspectTaskSettlement(input);

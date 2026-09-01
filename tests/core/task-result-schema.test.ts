@@ -5,11 +5,21 @@
 import { describe, it, expect } from 'vitest';
 import {
   taskResultSchema,
+  TASK_RESULT_SCHEMA_VERSION_V2,
+  createProductionTaskResultV2,
+  taskResultV2Digest,
+  validateProductionTaskResultV2,
   validateTaskResult,
   getRequiredTaskResultFields,
   TASK_RESULT_SCHEMA_VERSION,
   type TaskResultV1,
 } from '../../src/core/task-result-schema.js';
+import type {
+  CanonicalJsonBounds,
+  TaskAttemptCustodyIdentityV2,
+} from '../../src/core/task-attempt-custody-store.js';
+import { TASK_ATTEMPT_CUSTODY_MAX_LINEAGE_DEPTH } from '../../src/core/task-attempt-custody-store.js';
+import { createTaskAttemptEffectLandingBindingV2 } from '../../src/core/execution-effect-persistence-contract.js';
 // Reachability of the single-source re-export (the wipe that prompted this xfix
 // removed exactly this surface from types.ts — guard it with a real import).
 import {
@@ -250,5 +260,276 @@ describe('task-result-schema (Worker Output Contract spine)', () => {
     expect(VERSION_VIA_TYPES).toBe('1.0');
     const res = validateViaTypes(validResult());
     expect(res.ok).toBe(true);
+  });
+});
+
+const V2_JSON_BOUNDS: CanonicalJsonBounds = Object.freeze({
+  maxDepth: 30,
+  maxNodes: 20_000,
+  maxStringBytes: 16 * 1024,
+  maxArrayLength: 2_000,
+  maxObjectKeys: 256,
+  maxCanonicalBytes: 512 * 1024,
+});
+
+const V2_IDENTITY: TaskAttemptCustodyIdentityV2 = Object.freeze({
+  schemaVersion: 2,
+  backend: 'docker',
+  projectRootSha256: 'a'.repeat(64),
+  projectId: 'project-schema-v2',
+  taskId: '326-001',
+  attemptId: '123e4567-e89b-42d3-a456-426614174000',
+  generation: 7,
+});
+
+function canonicalV1Result(): Record<string, unknown> {
+  const parsed = validateTaskResult({ ...validResult(), attempt: 3 });
+  if (!parsed.ok) throw new Error(parsed.errors.join('; '));
+  return parsed.value as unknown as Record<string, unknown>;
+}
+
+function custodyBinding() {
+  return {
+    version: 2 as const,
+    identity: V2_IDENTITY,
+    policyDigest: `sha256:${'b'.repeat(64)}` as const,
+    admissionReceiptDigest: `sha256:${'c'.repeat(64)}` as const,
+    sourceResult: {
+      artifactClass: 'worker-result' as const,
+      artifactKey: 'primary',
+      artifactReceiptDigest: `sha256:${'d'.repeat(64)}` as const,
+      artifactSha256: `sha256:${'e'.repeat(64)}` as const,
+      byteLength: 512,
+    },
+    hostWorkAttribution: {
+      artifactClass: 'host-work-attribution' as const,
+      artifactKey: `host-work-${V2_IDENTITY.attemptId}`,
+      artifactReceiptDigest: `sha256:${'6'.repeat(64)}` as const,
+      artifactSha256: `sha256:${'7'.repeat(64)}` as const,
+      byteLength: 256,
+    },
+    effectLanding: createTaskAttemptEffectLandingBindingV2({
+      identity: {
+        projectId: V2_IDENTITY.projectId,
+        taskId: V2_IDENTITY.taskId,
+        attemptId: V2_IDENTITY.attemptId,
+        generation: V2_IDENTITY.generation,
+      },
+      admissionReceiptDigest: `sha256:${'c'.repeat(64)}`,
+      custodyPolicyDigest: `sha256:${'b'.repeat(64)}`,
+      landingArtifactKey: 'primary-landing',
+      landingArtifactReceiptDigest: `sha256:${'1'.repeat(64)}`,
+      landingReceiptDigest: `sha256:${'2'.repeat(64)}`,
+      effectLandingChainDigest: `sha256:${'3'.repeat(64)}`,
+      readyLifecycleAuthorityDigest: `sha256:${'8'.repeat(64)}`,
+      disposition: 'COMMITTED',
+      effectDecisionDigest: `sha256:${'4'.repeat(64)}`,
+      transactionDigest: `sha256:${'5'.repeat(64)}`,
+    }),
+  };
+}
+
+describe('task-result-schema V2 exact attempt custody', () => {
+  it('creates a strict host-bound V2 result without changing V1 behavior', () => {
+    const result = createProductionTaskResultV2({
+      result: canonicalV1Result(),
+      attemptCustody: custodyBinding(),
+      jsonBounds: V2_JSON_BOUNDS,
+    });
+    expect(result.schemaVersion).toBe(TASK_RESULT_SCHEMA_VERSION_V2);
+    expect(result.attempt).toBe(3);
+    expect(result.attemptCustody.identity.generation).toBe(7);
+    expect(result.taskId).toBe(result.attemptCustody.identity.taskId);
+    expect(result.attemptCustody.hostPromotion).toMatchObject({
+      version: 2,
+      kind: 'task-result-host-promotion',
+      authority: 'host-canonical-ingress-assembler',
+    });
+
+    const v1 = validateTaskResult(validResult());
+    expect(v1.ok && v1.value.schemaVersion).toBe('1.0');
+  });
+
+  it('allows legacy attempt projection to differ from custody generation', () => {
+    const result = createProductionTaskResultV2({
+      result: canonicalV1Result(),
+      attemptCustody: custodyBinding(),
+      jsonBounds: V2_JSON_BOUNDS,
+    });
+    expect(result.attempt).toBe(3);
+    expect(result.attemptCustody.identity.generation).toBe(7);
+  });
+
+  it('produces a key-order-stable domain-separated digest', () => {
+    const result = createProductionTaskResultV2({
+      result: canonicalV1Result(),
+      attemptCustody: custodyBinding(),
+      jsonBounds: V2_JSON_BOUNDS,
+    });
+    const reordered = Object.fromEntries(Object.entries(result).reverse());
+    const parsed = validateProductionTaskResultV2(reordered, V2_JSON_BOUNDS);
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(taskResultV2Digest(parsed.value, V2_JSON_BOUNDS)).toBe(
+      taskResultV2Digest(result, V2_JSON_BOUNDS),
+    );
+  });
+
+  it('rejects missing V2 identity, binding, or explicit attempt', () => {
+    const result = createProductionTaskResultV2({
+      result: canonicalV1Result(),
+      attemptCustody: custodyBinding(),
+      jsonBounds: V2_JSON_BOUNDS,
+    }) as unknown as Record<string, unknown>;
+    const withoutBinding = { ...result };
+    delete withoutBinding.attemptCustody;
+    expect(validateProductionTaskResultV2(withoutBinding, V2_JSON_BOUNDS).ok).toBe(false);
+    const withoutAttempt = { ...result };
+    delete withoutAttempt.attempt;
+    expect(validateProductionTaskResultV2(withoutAttempt, V2_JSON_BOUNDS).ok).toBe(false);
+    const malformedIdentity = {
+      ...result,
+      attemptCustody: { ...custodyBinding(), identity: { ...V2_IDENTITY, generation: 0 } },
+    };
+    expect(validateProductionTaskResultV2(malformedIdentity, V2_JSON_BOUNDS).ok).toBe(false);
+    const withoutHostWorkAttribution = {
+      ...result,
+      attemptCustody: { ...custodyBinding(), hostWorkAttribution: undefined },
+    };
+    expect(validateProductionTaskResultV2(
+      withoutHostWorkAttribution,
+      V2_JSON_BOUNDS,
+    ).ok).toBe(false);
+  });
+
+  it('rejects task/sibling identity mismatch and malformed digests', () => {
+    const source = canonicalV1Result();
+    expect(() => createProductionTaskResultV2({
+      result: source,
+      attemptCustody: {
+        ...custodyBinding(),
+        identity: { ...V2_IDENTITY, taskId: 'sibling-task' },
+      },
+      jsonBounds: V2_JSON_BOUNDS,
+    })).toThrow(/custody identity mismatch/u);
+    expect(() => createProductionTaskResultV2({
+      result: source,
+      attemptCustody: { ...custodyBinding(), admissionReceiptDigest: 'sha256:not-valid' },
+      jsonBounds: V2_JSON_BOUNDS,
+    })).toThrow(/validation failed/u);
+    const binding = custodyBinding();
+    const {
+      version: _version,
+      kind: _kind,
+      bindingDigest: _bindingDigest,
+      ...effectLandingBody
+    } = binding.effectLanding;
+    const foreignEffectLanding = createTaskAttemptEffectLandingBindingV2({
+      ...effectLandingBody,
+      identity: { ...effectLandingBody.identity, generation: 8 },
+    });
+    expect(() => createProductionTaskResultV2({
+      result: source,
+      attemptCustody: { ...binding, effectLanding: foreignEffectLanding },
+      jsonBounds: V2_JSON_BOUNDS,
+    })).toThrow(/exact attempt authority mismatch/u);
+  });
+
+  it('uses the custody parser byte, UUID and lineage bounds without a weaker schema copy', () => {
+    const result = createProductionTaskResultV2({
+      result: canonicalV1Result(),
+      attemptCustody: custodyBinding(),
+      jsonBounds: V2_JSON_BOUNDS,
+    });
+    const invalidIdentities: TaskAttemptCustodyIdentityV2[] = [
+      { ...V2_IDENTITY, attemptId: V2_IDENTITY.attemptId.toUpperCase() },
+      { ...V2_IDENTITY, projectId: 'ğ'.repeat(257) },
+      { ...V2_IDENTITY, taskId: 'ğ'.repeat(257) },
+      { ...V2_IDENTITY, generation: TASK_ATTEMPT_CUSTODY_MAX_LINEAGE_DEPTH + 1 },
+    ];
+    for (const identity of invalidIdentities) {
+      const candidate = {
+        ...result,
+        taskId: identity.taskId,
+        attemptCustody: { ...custodyBinding(), identity },
+      };
+      expect(validateProductionTaskResultV2(candidate, V2_JSON_BOUNDS).ok).toBe(false);
+    }
+    expect(() => createProductionTaskResultV2({
+      result: canonicalV1Result(),
+      attemptCustody: {
+        ...custodyBinding(),
+        sourceResult: {
+          ...custodyBinding().sourceResult,
+          byteLength: Number.MAX_SAFE_INTEGER + 1,
+        },
+      },
+      jsonBounds: V2_JSON_BOUNDS,
+    })).toThrow(/source custody binding validation failed/u);
+  });
+
+  it('recomputes the host-assembled V1 promotion digest instead of trusting a supplied marker', () => {
+    const result = createProductionTaskResultV2({
+      result: canonicalV1Result(),
+      attemptCustody: custodyBinding(),
+      jsonBounds: V2_JSON_BOUNDS,
+    });
+    const tampered = {
+      ...result,
+      attemptCustody: {
+        ...result.attemptCustody,
+        hostPromotion: {
+          ...result.attemptCustody.hostPromotion,
+          assembledV1Digest: `sha256:${'0'.repeat(64)}`,
+        },
+      },
+    };
+    const validation = validateProductionTaskResultV2(tampered, V2_JSON_BOUNDS);
+    expect(validation.ok).toBe(false);
+    if (!validation.ok) {
+      expect(validation.errors.join(' ')).toMatch(/assembled V1 digest mismatch/u);
+    }
+  });
+
+  it('rejects nested unknown fields instead of silently stripping them', () => {
+    const result = createProductionTaskResultV2({
+      result: canonicalV1Result(),
+      attemptCustody: custodyBinding(),
+      jsonBounds: V2_JSON_BOUNDS,
+    });
+    const withNestedUnknown = {
+      ...result,
+      tokenUsage: { ...result.tokenUsage, forgedAuthority: true },
+    };
+    const validated = validateProductionTaskResultV2(withNestedUnknown, V2_JSON_BOUNDS);
+    expect(validated.ok).toBe(false);
+    if (!validated.ok) expect(validated.errors.join(' ')).toMatch(/non-canonical|repaired/u);
+  });
+
+  it('refuses a worker-supplied custody binding or non-canonical V1 source', () => {
+    expect(() => createProductionTaskResultV2({
+      result: { ...canonicalV1Result(), attemptCustody: custodyBinding() },
+      attemptCustody: custodyBinding(),
+      jsonBounds: V2_JSON_BOUNDS,
+    })).toThrow(/supplied by the host/u);
+    const source = canonicalV1Result();
+    delete source.attempt;
+    expect(() => createProductionTaskResultV2({
+      result: source,
+      attemptCustody: custodyBinding(),
+      jsonBounds: V2_JSON_BOUNDS,
+    })).toThrow(/explicit canonical V1/u);
+
+    const accessorSource = canonicalV1Result();
+    Object.defineProperty(accessorSource, 'notes', {
+      enumerable: true,
+      configurable: true,
+      get: () => 'forged-through-accessor',
+    });
+    expect(() => createProductionTaskResultV2({
+      result: accessorSource,
+      attemptCustody: custodyBinding(),
+      jsonBounds: V2_JSON_BOUNDS,
+    })).toThrow(/canonical data/u);
   });
 });

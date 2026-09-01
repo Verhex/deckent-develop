@@ -9,7 +9,9 @@ import {
   buildSourceTreeIdentity,
   writeBuildIdentity,
 } from '../../scripts/copy-assets.mjs';
+import { nativeSourceTreeIdentity } from '../../scripts/build-exec-authority-native.mjs';
 import {
+  buildNativeSourceTreeIdentity,
   buildSourceTreeIdentity as buildRuntimeSourceTreeIdentity,
   parseBuildIdentity,
   readRuntimeBuildIdentity,
@@ -22,6 +24,7 @@ function fixtureRoot(version = '9.8.7'): string {
   roots.push(root);
   mkdirSync(join(root, 'dist'), { recursive: true });
   mkdirSync(join(root, 'src'), { recursive: true });
+  mkdirSync(join(root, 'native', 'exec-authority', 'src'), { recursive: true });
   writeFileSync(
     join(root, 'package.json'),
     `${JSON.stringify({ name: 'deckent', version })}\n`,
@@ -29,7 +32,31 @@ function fixtureRoot(version = '9.8.7'): string {
   );
   writeFileSync(join(root, 'tsconfig.json'), `${JSON.stringify({ include: ['src/**/*.ts'] })}\n`);
   writeFileSync(join(root, 'src', 'entry.ts'), 'export const value = 1;\n');
+  writeFileSync(join(root, 'native', 'exec-authority', 'binding.gyp'), '{}\n');
+  writeFileSync(join(root, 'native', 'exec-authority', 'index.mjs'), 'export {};\n');
+  writeFileSync(
+    join(root, 'native', 'exec-authority', 'package.json'),
+    `${JSON.stringify({ name: '@deckent/exec-authority-native', version: '0.1.0' })}\n`,
+  );
+  for (const source of [
+    'custody_common.h',
+    'custody_posix.c',
+    'custody_win32.c',
+    'exec_authority.c',
+  ]) {
+    writeFileSync(
+      join(root, 'native', 'exec-authority', 'src', source),
+      `/* exact fixture: ${source} */\n`,
+    );
+  }
   return root;
+}
+
+function writeRuntimeEntrypoint(root: string): string {
+  const entrypoint = join(root, 'dist', 'cli', 'entry.js');
+  mkdirSync(join(root, 'dist', 'cli'), { recursive: true });
+  writeFileSync(entrypoint, 'export {};\n');
+  return entrypoint;
 }
 
 afterEach(() => {
@@ -48,19 +75,33 @@ describe('copy-assets build identity', () => {
       .update(realpathSync.native(root))
       .digest('hex');
     const sourceTree = buildSourceTreeIdentity(root);
-    const entrypoint = join(root, 'dist', 'cli', 'entry.js');
-    mkdirSync(join(root, 'dist', 'cli'), { recursive: true });
-    writeFileSync(entrypoint, 'export {};\n');
+    const nativeSourceTree = nativeSourceTreeIdentity(root);
+    const entrypoint = writeRuntimeEntrypoint(root);
     expect(buildRuntimeSourceTreeIdentity(root)).toEqual(sourceTree);
+    expect(buildNativeSourceTreeIdentity(root)).toEqual({
+      nativeSourceTreeSha256: nativeSourceTree.sha256,
+      nativeSourceTreeFileCount: nativeSourceTree.fileCount,
+    });
+    expect(nativeSourceTree.paths).toEqual([
+      'native/exec-authority/binding.gyp',
+      'native/exec-authority/index.mjs',
+      'native/exec-authority/package.json',
+      'native/exec-authority/src/custody_common.h',
+      'native/exec-authority/src/custody_posix.c',
+      'native/exec-authority/src/custody_win32.c',
+      'native/exec-authority/src/exec_authority.c',
+    ]);
 
     expect(written).toBe(join(root, BUILD_IDENTITY_RELATIVE_PATH));
     expect(parsed).toEqual({
-      schemaVersion: 2,
+      schemaVersion: 3,
       packageName: 'deckent',
       packageVersion: '9.8.7',
       sourceRootSha256: expectedDigest,
       sourceTreeSha256: sourceTree.sourceTreeSha256,
       sourceTreeFileCount: sourceTree.sourceTreeFileCount,
+      nativeSourceTreeSha256: nativeSourceTree.sha256,
+      nativeSourceTreeFileCount: nativeSourceTree.fileCount,
     });
     expect(raw).not.toContain(root);
     expect(readRuntimeBuildIdentity({
@@ -77,6 +118,61 @@ describe('copy-assets build identity', () => {
     const first = raw;
     writeBuildIdentity(root);
     expect(readFileSync(written, 'utf-8')).toBe(first);
+  });
+
+  it('rejects missing, partial and artifact-drifted schema-v3 identity data', () => {
+    const root = fixtureRoot();
+    const written = writeBuildIdentity(root);
+    const valid = JSON.parse(readFileSync(written, 'utf-8')) as Record<string, unknown>;
+
+    expect(parseBuildIdentity(JSON.stringify({ ...valid, schemaVersion: 2 }))).toBeUndefined();
+    const partial = { ...valid };
+    delete partial.nativeSourceTreeFileCount;
+    expect(parseBuildIdentity(JSON.stringify(partial))).toBeUndefined();
+    const artifactDrift = {
+      ...valid,
+      nativeSourceTreeSha256: `sha256:${'0'.repeat(64)}`,
+    };
+    expect(parseBuildIdentity(JSON.stringify(artifactDrift))).toEqual(expect.objectContaining({
+      nativeSourceTreeSha256: `sha256:${'0'.repeat(64)}`,
+    }));
+
+    const entrypoint = writeRuntimeEntrypoint(root);
+    writeFileSync(written, `${JSON.stringify(artifactDrift)}\n`);
+    expect(readRuntimeBuildIdentity({
+      projectRoot: root,
+      runtimeModuleUrl: pathToFileURL(entrypoint).href,
+    })).toEqual({ status: 'hold', issue: 'build-source-mismatch' });
+
+    writeFileSync(written, `${JSON.stringify({
+      ...valid,
+      nativeSourceTreeSha256: 'not-a-digest',
+    })}\n`);
+    expect(readRuntimeBuildIdentity({
+      projectRoot: root,
+      runtimeModuleUrl: pathToFileURL(entrypoint).href,
+    })).toEqual({ status: 'hold', issue: 'build-identity-invalid' });
+
+    rmSync(written);
+    expect(readRuntimeBuildIdentity({
+      projectRoot: root,
+      runtimeModuleUrl: pathToFileURL(entrypoint).href,
+    })).toEqual({ status: 'hold', issue: 'build-identity-missing' });
+  });
+
+  it('fails closed when exact native source bytes drift after the manifest is written', () => {
+    const root = fixtureRoot();
+    writeBuildIdentity(root);
+    const entrypoint = writeRuntimeEntrypoint(root);
+    writeFileSync(
+      join(root, 'native', 'exec-authority', 'src', 'custody_posix.c'),
+      '/* drifted after build */\n',
+    );
+
+    expect(readRuntimeBuildIdentity({
+      projectRoot: root,
+      runtimeModuleUrl: pathToFileURL(entrypoint).href,
+    })).toEqual({ status: 'hold', issue: 'build-source-mismatch' });
   });
 
   it('rejects a non-Deckent package instead of minting a misleading identity', () => {

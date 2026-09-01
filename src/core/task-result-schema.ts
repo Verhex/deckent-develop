@@ -14,6 +14,19 @@
 import { z } from 'zod';
 import { CRITERION_APPLICABILITY, WORK_ATTRIBUTION_REASON_CODES } from './task-types.js';
 import { VERIFICATION_EXECUTION_OUTCOME, projectTestsPassed } from './prompt-compile-plan.js';
+import {
+  TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+  canonicalTaskAttemptCustodyJson,
+  parseTaskAttemptCustodyIdentityV2,
+  taskAttemptCustodyDigest,
+  type CanonicalJsonBounds,
+  type Sha256Digest,
+  type TaskAttemptCustodyIdentityV2,
+} from './task-attempt-custody-store.js';
+import {
+  parseTaskAttemptEffectLandingBindingV2,
+  type TaskAttemptEffectLandingBindingV2,
+} from './execution-effect-persistence-contract.js';
 
 /** Contract version stamped on every `TaskResultV1`. Bump on a breaking shape change. */
 export const TASK_RESULT_SCHEMA_VERSION = '1.0';
@@ -402,6 +415,263 @@ export function getRequiredTaskResultFields(): string[] {
 /** The canonical worker-result type — inferred from {@link taskResultSchema}. */
 export type TaskResultV1 = z.infer<typeof taskResultSchema>;
 
+// ─── Exact-attempt production result V2 ────────────────────────────────────
+
+/** V1 remains the historical/public compatibility contract; normal Docker custody writes V2. */
+export const TASK_RESULT_SCHEMA_VERSION_V2 = '2.0' as const;
+
+const custodySha256DigestSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/u);
+const custodyArtifactKeySchema = z.string().regex(/^[a-z0-9][a-z0-9._-]{0,127}$/u);
+
+export const taskResultAttemptCustodyIdentitySchemaV2 = z
+  .custom<TaskAttemptCustodyIdentityV2>(
+    value => parseTaskAttemptCustodyIdentityV2(value) !== null,
+    { message: 'Invalid exact task-attempt custody identity' },
+  )
+  .transform(value => parseTaskAttemptCustodyIdentityV2(value) as TaskAttemptCustodyIdentityV2);
+
+/** Host-derived binding to the immutable worker-result artifact; never accepted from worker trust. */
+export const taskResultAttemptCustodySourceBindingSchemaV2 = z.object({
+  version: z.literal(TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION),
+  identity: taskResultAttemptCustodyIdentitySchemaV2,
+  policyDigest: custodySha256DigestSchema,
+  admissionReceiptDigest: custodySha256DigestSchema,
+  sourceResult: z.object({
+    artifactClass: z.literal('worker-result'),
+    artifactKey: custodyArtifactKeySchema,
+    artifactReceiptDigest: custodySha256DigestSchema,
+    artifactSha256: custodySha256DigestSchema,
+    byteLength: z.number().int().nonnegative().safe(),
+  }).strict(),
+  hostWorkAttribution: z.object({
+    artifactClass: z.literal('host-work-attribution'),
+    artifactKey: custodyArtifactKeySchema,
+    artifactReceiptDigest: custodySha256DigestSchema,
+    artifactSha256: custodySha256DigestSchema,
+    byteLength: z.number().int().nonnegative().safe(),
+  }).strict().optional(),
+  effectLanding: z
+    .custom<TaskAttemptEffectLandingBindingV2>(
+      value => parseTaskAttemptEffectLandingBindingV2(value) !== null,
+      { message: 'Invalid exact effect-landing binding' },
+    )
+    .transform(value => parseTaskAttemptEffectLandingBindingV2(value) as TaskAttemptEffectLandingBindingV2)
+    .optional(),
+}).strict();
+
+export const taskResultHostPromotionSchemaV2 = z.object({
+  version: z.literal(TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION),
+  kind: z.literal('task-result-host-promotion'),
+  /** Producer identity is a causation marker; T4 must prove its actual authority inputs. */
+  authority: z.literal('host-canonical-ingress-assembler'),
+  assembledV1Digest: custodySha256DigestSchema,
+}).strict();
+
+export const taskResultAttemptCustodyBindingSchemaV2 =
+  taskResultAttemptCustodySourceBindingSchemaV2.extend({
+    hostPromotion: taskResultHostPromotionSchemaV2,
+    effectLanding: z
+      .custom<TaskAttemptEffectLandingBindingV2>(
+        value => parseTaskAttemptEffectLandingBindingV2(value) !== null,
+        { message: 'Invalid exact effect-landing binding' },
+      )
+      .transform(value => parseTaskAttemptEffectLandingBindingV2(value) as TaskAttemptEffectLandingBindingV2),
+    hostWorkAttribution: z.object({
+      artifactClass: z.literal('host-work-attribution'),
+      artifactKey: custodyArtifactKeySchema,
+      artifactReceiptDigest: custodySha256DigestSchema,
+      artifactSha256: custodySha256DigestSchema,
+      byteLength: z.number().int().nonnegative().safe(),
+    }).strict(),
+  }).strict();
+
+export type TaskResultAttemptCustodySourceBindingV2 = z.output<
+  typeof taskResultAttemptCustodySourceBindingSchemaV2
+>;
+
+export type TaskResultAttemptCustodyBindingV2 = z.output<
+  typeof taskResultAttemptCustodyBindingSchemaV2
+>;
+
+function taskResultHostAssembledV1Digest(
+  result: Readonly<Record<string, unknown>>,
+  jsonBounds: CanonicalJsonBounds,
+): Sha256Digest {
+  return taskAttemptCustodyDigest('host-assembled-task-result-v1', result, jsonBounds);
+}
+
+function taskResultV2HostAssembledProjection(result: TaskResultV2): Record<string, unknown> {
+  const { attemptCustody: _attemptCustody, ...resultFields } = result;
+  return { ...resultFields, schemaVersion: TASK_RESULT_SCHEMA_VERSION };
+}
+
+/**
+ * Additive strict V2 contract. Existing V1 schemas, defaults, parsers and call sites remain
+ * untouched. Exact canonical round-trip below rejects every nested default/unknown-field repair.
+ */
+export const taskResultSchemaV2 = z.object({
+  ...taskResultSchema.shape,
+  schemaVersion: z.literal(TASK_RESULT_SCHEMA_VERSION_V2),
+  attempt: z.number().int().positive(),
+  attemptCustody: taskResultAttemptCustodyBindingSchemaV2,
+}).strict();
+
+export type TaskResultV2 = z.output<typeof taskResultSchemaV2>;
+
+export type ValidateProductionTaskResultV2 =
+  | { readonly ok: true; readonly value: TaskResultV2 }
+  | { readonly ok: false; readonly errors: readonly string[] };
+
+function taskResultV2Errors(error: z.ZodError): string[] {
+  return error.issues.map(issue => {
+    const path = issue.path.length > 0 ? issue.path.join('.') : '(root)';
+    return `${path}: ${issue.message}`;
+  });
+}
+
+/** Strict parse: no unknown stripping, default insertion, shape repair or non-canonical bytes. */
+export function validateProductionTaskResultV2(
+  value: unknown,
+  jsonBounds: CanonicalJsonBounds,
+): ValidateProductionTaskResultV2 {
+  let inputBytes: Uint8Array;
+  try {
+    inputBytes = canonicalTaskAttemptCustodyJson(value, jsonBounds);
+  } catch (error) {
+    return {
+      ok: false,
+      errors: [error instanceof Error ? error.message : '(root): invalid canonical V2 result'],
+    };
+  }
+  const parsed = taskResultSchemaV2.safeParse(value);
+  if (!parsed.success) return { ok: false, errors: taskResultV2Errors(parsed.error) };
+  if (parsed.data.taskId !== parsed.data.attemptCustody.identity.taskId) {
+    return { ok: false, errors: ['taskId: custody identity mismatch'] };
+  }
+  const effectLanding = parsed.data.attemptCustody.effectLanding;
+  const hostWorkAttribution = parsed.data.attemptCustody.hostWorkAttribution;
+  if (
+    effectLanding.identity.projectId !== parsed.data.attemptCustody.identity.projectId
+    || effectLanding.identity.taskId !== parsed.data.attemptCustody.identity.taskId
+    || effectLanding.identity.attemptId !== parsed.data.attemptCustody.identity.attemptId
+    || effectLanding.identity.generation !== parsed.data.attemptCustody.identity.generation
+    || effectLanding.admissionReceiptDigest
+      !== parsed.data.attemptCustody.admissionReceiptDigest
+    || effectLanding.custodyPolicyDigest !== parsed.data.attemptCustody.policyDigest
+    || hostWorkAttribution.artifactKey
+      !== `host-work-${parsed.data.attemptCustody.identity.attemptId}`
+  ) {
+    return {
+      ok: false,
+      errors: ['attemptCustody.effectLanding: exact attempt authority mismatch'],
+    };
+  }
+  const hostAssembledProjection = taskResultV2HostAssembledProjection(parsed.data);
+  if (
+    parsed.data.attemptCustody.hostPromotion.assembledV1Digest
+      !== taskResultHostAssembledV1Digest(hostAssembledProjection, jsonBounds)
+  ) {
+    return { ok: false, errors: ['attemptCustody.hostPromotion: assembled V1 digest mismatch'] };
+  }
+  try {
+    const parsedBytes = canonicalTaskAttemptCustodyJson(parsed.data, jsonBounds);
+    if (!Buffer.from(inputBytes).equals(Buffer.from(parsedBytes))) {
+      return { ok: false, errors: ['(root): non-canonical or repaired V2 result'] };
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      errors: [error instanceof Error ? error.message : '(root): invalid canonical V2 result'],
+    };
+  }
+  return { ok: true, value: parsed.data };
+}
+
+export interface CreateProductionTaskResultV2Input {
+  readonly result: Readonly<Record<string, unknown>>;
+  readonly attemptCustody: TaskResultAttemptCustodySourceBindingV2;
+  readonly jsonBounds: CanonicalJsonBounds;
+}
+
+/** Host-only promotion from an already canonical result plus a verified custody binding. */
+export function createProductionTaskResultV2(
+  input: CreateProductionTaskResultV2Input,
+): TaskResultV2 {
+  try {
+    canonicalTaskAttemptCustodyJson(input.result, input.jsonBounds);
+  } catch (error) {
+    throw new AssemblerError(
+      'Production TaskResultV2 source result must be canonical data',
+      [],
+      [error instanceof Error ? error.message : 'source result is not canonical data'],
+    );
+  }
+  if (Object.prototype.hasOwnProperty.call(input.result, 'attemptCustody')) {
+    throw new AssemblerError(
+      'Production TaskResultV2 custody binding must be supplied by the host',
+      [],
+      ['attemptCustody: worker-supplied custody binding is forbidden'],
+    );
+  }
+  if (
+    !Object.prototype.hasOwnProperty.call(input.result, 'attempt')
+    || input.result.schemaVersion !== TASK_RESULT_SCHEMA_VERSION
+  ) {
+    throw new AssemblerError(
+      'Production TaskResultV2 requires an explicit canonical V1 source result',
+      [],
+      ['schemaVersion/attempt: missing or non-canonical source result'],
+    );
+  }
+  const sourceBinding = taskResultAttemptCustodySourceBindingSchemaV2.safeParse(
+    input.attemptCustody,
+  );
+  if (!sourceBinding.success) {
+    throw new AssemblerError(
+      'Production TaskResultV2 source custody binding validation failed',
+      [],
+      taskResultV2Errors(sourceBinding.error),
+    );
+  }
+  const candidate = {
+    ...input.result,
+    schemaVersion: TASK_RESULT_SCHEMA_VERSION_V2,
+    attemptCustody: {
+      ...sourceBinding.data,
+      hostPromotion: {
+        version: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+        kind: 'task-result-host-promotion' as const,
+        authority: 'host-canonical-ingress-assembler' as const,
+        assembledV1Digest: taskResultHostAssembledV1Digest(input.result, input.jsonBounds),
+      },
+    },
+  };
+  const validated = validateProductionTaskResultV2(candidate, input.jsonBounds);
+  if (!validated.ok) {
+    throw new AssemblerError(
+      `Production TaskResultV2 validation failed: ${validated.errors.join('; ')}`,
+      [],
+      [...validated.errors],
+    );
+  }
+  return validated.value;
+}
+
+export function taskResultV2Digest(
+  result: TaskResultV2,
+  jsonBounds: CanonicalJsonBounds,
+): Sha256Digest {
+  const validated = validateProductionTaskResultV2(result, jsonBounds);
+  if (!validated.ok) {
+    throw new AssemblerError(
+      `Invalid Production TaskResultV2 digest input: ${validated.errors.join('; ')}`,
+      [],
+      [...validated.errors],
+    );
+  }
+  return taskAttemptCustodyDigest('task-result', validated.value, jsonBounds);
+}
+
 /**
  * Human-first canonical field order for `.result` files on disk (owner
  * decision 2026-08-25): identity → verdict → narrative → evidence → change →
@@ -413,7 +683,7 @@ export type TaskResultV1 = z.infer<typeof taskResultSchema>;
  */
 export const TASK_RESULT_FIELD_ORDER: readonly string[] = [
   // kimlik
-  'schemaVersion', 'taskId', 'sprintId', 'attempt', 'attemptId', 'isPriorityFix', 'fixForTaskId',
+  'schemaVersion', 'taskId', 'sprintId', 'attempt', 'attemptId', 'attemptCustody', 'isPriorityFix', 'fixForTaskId',
   // verdict
   'selfAssessment', 'brainEvaluation', 'brainEvaluationReason', 'totalScore', 'rubricScores', 'honestGate',
   // anlatı

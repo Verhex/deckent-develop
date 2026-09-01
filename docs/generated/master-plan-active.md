@@ -5,21 +5,21 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):724e71702142dca454e1a2398826af27d32cf2dde998e7343bb88c4efa913346`
+**Source digest:** `sha256(normalized-lf-utf8):aa8b0d46ae96bdc65e1b9dcd7042fd82e1cb88318f589ac52ff82d021bd51c5a`
 
-**Rows:** 562 total · 474 active · 88 terminal
+**Rows:** 568 total · 480 active · 88 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 362 |
+| OPEN | 366 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 69 |
 | VERIFY | 43 |
 | DONE | 88 |
-| DEFERRED | 0 |
+| DEFERRED | 2 |
 | DISPOSED | 0 |
 
 ## Active ledger
@@ -281,6 +281,10 @@
 | 3322 | `RECOVERY-BORN-522-DOCTOR-AUTHORITY-COVERAGE-001` | BLOCKED | P1 | OBS | — | `OWNER_CLOSURE_SIGNATURE_REQUIRED` | `deckent doctor` provider-limit-authority kapısını görmüyor ve operatörü yanlış remedy'ye (`keyring init`) yönlendiriyor |
 | 3323 | `RECOVERY-BORN-523-XVERIFY-PRODUCER-MISMATCH-001` | OPEN | P1 | OBS | — | — | Sprint-içi mandatory cross-verify üç nesildir hiç çalışmadı: settlement-sonrası result-zenginleştirme producer-fencing'i sistemik kırıyor |
 | 3324 | `RECOVERY-BORN-523-ATTRIBUTION-UNMEASURABLE-001` | OPEN | P1 | OBS | — | — | Provider-limit ölümüyle sıfır-yazım attempt'te claim-time attribution ölçülemiyor; lineage FIX'e ham teşhisle düşüyor |
+| 3326 | `RECOVERY-BORN-711-NORMAL-DOCKER-EXACT-ATTEMPT-CUSTODY-001` | OPEN | P0 | KERNEL | — | — | Normal Docker task, attempt, worker output, provider capture, result, evaluation, finalizer, settlement ve restart tek host-private exact-attempt custody zincirinde kapanır |
+| 3327 | `RECOVERY-BORN-711-LINUX-INSTALLED-CUSTODY-PROOF-001` | OPEN | P0 | XPLAT | — | — | Linux installed-package native custody zinciri gerçek Linux userspace ve filesystem üzerinde kapanır |
+| 3328 | `RECOVERY-BORN-711-WSL2-NATIVE-CUSTODY-PROOF-001` | OPEN | P0 | XPLAT | `RECOVERY-BORN-711-LINUX-INSTALLED-CUSTODY-PROOF-001` | — | WSL2 host native custody ve filesystem capability sonucu gerçek compiled binary ile kanıtlanır |
+| 3329 | `RECOVERY-BORN-711-WSL2-DOCKER-CUSTODY-CANARY-001` | OPEN | P0 | ASSURANCE | `RECOVERY-BORN-711-LINUX-INSTALLED-CUSTODY-PROOF-001`, `RECOVERY-BORN-711-WSL2-NATIVE-CUSTODY-PROOF-001` | — | WSL2 üzerindeki gerçek Docker Engine normal task custody zincirini ağsız compiled canary ile uçtan uca kanıtlar |
 | 3343 | `PLATFORM-CLEAN-IDENTITY-ADAPTER-001` | OPEN | P1 | KERNEL | — | — | identity-stable delete adapter'ı Linux-only (/proc/self/fd + fdinfo mnt_id): macOS ve Windows'ta clean.mjs dürüst HOLD (E_CLEAN_IDENTITY_STABLE_DELETE_UNSUPPORTED) — cross-platform-e2e'nin TÜM macos/windows job'ları npm run clean'de düşüyor (08-03'ten beri 40/40 kırmızı aile) |
 | 3345 | `COMPOSITE-WORKER-001` | OPEN | P1 | KERNEL | `KERNEL-ATTEMPT-001` | — | Composite worker / nested team delegasyon kontratı: parent-child execution, authority tavanı, bütçe tavanı, concurrency limiti, completion/failure policy ve nested evidence tree |
 | 3347 | `PLATFORM-EXEC-AUTH-W3-DARWIN-001` | OPEN | P1 | KERNEL | `PLATFORM-EXEC-AUTH-W1-INTERFACE-001`, `PLATFORM-EXEC-AUTH-W2-PROBE-001` | — | Darwin execution-authority adapter'ı: native openat-ailesi N-API modülü + W1 arayüzünün darwin impl'i + gerçek-Mac real-binary clean/lock kanıtı (W2 ölçümü: /dev/fd yolu ölü — native tek yol) |
@@ -439,6 +443,8 @@
 | 8010 | `ENV-ADAPTER-001` | OPEN | P0 | XPLAT | `KERNEL-001`, `AUTHORITY-001` | — | PlatformAdapter contracts for process, paths, locks, IPC, credentials, terminal and services |
 | 8020 | `INSTALL-SCOPE-001` | OPEN | P0 | ONBOARDING | `ENV-ADAPTER-001`, `MEMORY-AUTHORITY-001` | — | Global install plus project-scoped state and learning |
 | 8030 | `PLATFORM-PROOF-001` | OPEN | P0 | XPLAT | `ENV-ADAPTER-001`, `TEST-PLATFORM-001` | — | Cross-platform CI, real-binary and hardware/OS certification |
+| 8031 | `RECOVERY-BORN-711-MACOS-NATIVE-CUSTODY-PROOF-001` | DEFERRED | P1 | XPLAT | `RECOVERY-BORN-711-NORMAL-DOCKER-EXACT-ATTEMPT-CUSTODY-001` | — | macOS native custody adapterı ve installed-package yaşam döngüsü gerçek Apple hostta kanıtlanır |
+| 8032 | `RECOVERY-BORN-711-WINDOWS-NATIVE-CUSTODY-PROOF-001` | DEFERRED | P1 | XPLAT | `RECOVERY-BORN-711-NORMAL-DOCKER-EXACT-ATTEMPT-CUSTODY-001` | — | Windows-native custody trust bootstrap, handle-pinned adapter ve installed-package yaşam döngüsü gerçek Windows hostta kapanır |
 | 8040 | `PACKAGING-001` | OPEN | P0 | RELEASE | `INSTALL-SCOPE-001`, `SUPPLY-CHAIN-001` | — | CLI, daemon, Desktop, service and container packaging supply chain |
 | 8050 | `DOCS-PRODUCT-001` | BLOCKED | P0 | DOCS | `DOCS-ADR-SYNC-001`, `DOCS-I18N-001`, `SURFACE-PARITY-001` | `DEPENDENCY_UNSATISFIED` | Current code-truth architecture, guide, reference and operations docs |
 | 8051 | `AGENT-DOCS-TRUTH-001` | OPEN | P0 | DOCS | `AGENT-CATALOG-AUTHORITY-001`, `AGENT-CUSTOM-MANAGEMENT-001`, `AGENT-PROMPT-SYNC-001`, `AGENT-ROUTING-ELIGIBILITY-001`, `AGENT-EVOLUTION-LIFECYCLE-001`, `AGENT-STATE-MIGRATION-001`, `DOCS-RELEASE-TRUTH-001`, `DOCS-I18N-001` | — | Agent catalog, routing, prompt ve lifecycle için user ve AI documentation code-truth ile hermetic tutulur |

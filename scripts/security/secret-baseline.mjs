@@ -24,7 +24,13 @@ const PATTERNS = [
 
 const SKIP_PREFIXES = ['node_modules/', 'dist/', '.brain/memory.db'];
 const SKIP_SUFFIXES = ['.lock', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.woff', '.woff2', '.ttf', '.eot', '.pdf', '.zip', '.tar', '.gz', '.mp4', '.webp', '.db'];
-const SKIP_EXACT = new Set(['.secrets-baseline', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml']);
+const SKIP_EXACT = new Set([
+  '.secrets-baseline',
+  'package-lock.json',
+  'npm-shrinkwrap.json',
+  'yarn.lock',
+  'pnpm-lock.yaml',
+]);
 const MAX_FILE_BYTES = 2 * 1024 * 1024; // 2 MB cap to keep scan fast and avoid binaries
 
 function loadBaseline() {

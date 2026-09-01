@@ -7,7 +7,8 @@ on:
       - 'src/dashboard/**'
       - 'tests/dashboard/**'
       - 'package.json'
-      - 'package-lock.json'
+      - 'npm-shrinkwrap.json'
+      - 'src/dashboard/package-lock.json'
       - '.github/workflows/dashboard-build.yml'
   pull_request:
     branches: [main]
@@ -15,7 +16,8 @@ on:
       - 'src/dashboard/**'
       - 'tests/dashboard/**'
       - 'package.json'
-      - 'package-lock.json'
+      - 'npm-shrinkwrap.json'
+      - 'src/dashboard/package-lock.json'
       - '.github/workflows/dashboard-build.yml'
 
 permissions:
@@ -47,6 +49,9 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
+          cache-dependency-path: |
+            npm-shrinkwrap.json
+            src/dashboard/package-lock.json
 
       - name: Install root dependencies
         run: npm ci
@@ -104,6 +109,9 @@ jobs:
         with:
           node-version: '24.x'
           cache: npm
+          cache-dependency-path: |
+            npm-shrinkwrap.json
+            src/dashboard/package-lock.json
 
       - name: Install root dependencies
         run: npm ci

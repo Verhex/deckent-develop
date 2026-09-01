@@ -5,6 +5,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { writeFileSync } from 'node:fs';
 
+const ingressHarness = vi.hoisted(() => ({ execute: vi.fn() }));
+
 // ─── Mocks (mirror tests/mcp/tools/run.test.ts) ─────────────────────
 
 vi.mock('node:fs', () => ({
@@ -19,6 +21,7 @@ vi.mock('../../src/core/constants.js', () => ({
 }));
 
 vi.mock('../../src/mcp/tools/job-runner.js', () => ({
+  createJobId: vi.fn(() => 'job-1780659451558-11111111-1111-4111-8111-111111111111'),
   writeJobState: vi.fn(),
 }));
 
@@ -44,6 +47,11 @@ vi.mock('../../src/core/config.js', () => ({
 
 vi.mock('../../src/cli/commands/spawn.js', () => ({
   spawnWorkerMultiProvider: vi.fn().mockResolvedValue({ backend: 'subprocess' }),
+}));
+
+vi.mock('../../src/orchestra/task-mode-runner.js', () => ({
+  executeTaskIngress: ingressHarness.execute,
+  readTaskIngressErrorAuthority: (error: any) => error?.taskIngressAuthority,
 }));
 
 // keep=false background cleanup path (lazy-imported by the tool)
@@ -83,6 +91,9 @@ import { waitForRunResult, cleanupRunTask } from '../../src/cli/commands/run.js'
 // path applies to modelEffort (resolveReasoningEffort SSOT, F1-RE 268-003).
 import { resolveReasoningEffort } from '../../src/core/reasoning-effort.js';
 import { buildParametricModel, modelRegistry } from '../../src/core/model-registry.js';
+import { applyWorkerExecutionBudgetPolicy } from '../../src/core/execution-plan-digest.js';
+import { routeSingleTaskV3 } from '../../src/orchestra/routing-plan-adapter.js';
+import { buildWorkerPrompt } from '../../src/orchestra/brain.js';
 
 const REMOTE_WORKER_CONFIG = {
   spawn_backend: 'subprocess',
@@ -123,11 +134,8 @@ async function getHandler(server: MockServer): Promise<ToolHandler> {
 }
 
 function writtenTaskJson(): Record<string, unknown> {
-  const call = vi.mocked(writeFileSync).mock.calls.find(
-    (c) => typeof c[0] === 'string' && (c[0] as string).endsWith('.json'),
-  );
-  expect(call).toBeDefined();
-  return JSON.parse(call![1] as string) as Record<string, unknown>;
+  expect(ingressHarness.execute).toHaveBeenCalledOnce();
+  return ingressHarness.execute.mock.calls[0]![0].task as Record<string, unknown>;
 }
 
 function spawnOpts(): Record<string, unknown> {
@@ -145,6 +153,47 @@ describe('deckent_run MCP — modelEffort/timeoutMs/keep parity (269-004)', () =
     vi.mocked(loadConfig).mockResolvedValue(REMOTE_WORKER_CONFIG as never);
     vi.mocked(spawnWorkerMultiProvider).mockResolvedValue({ backend: 'subprocess' } as never);
     vi.mocked(waitForRunResult).mockResolvedValue(null);
+    ingressHarness.execute.mockImplementation(async (input: any) => {
+      const [policy] = applyWorkerExecutionBudgetPolicy(
+        [input.task],
+        input.config.execution_budget,
+        input.task.provider,
+      );
+      if (policy?.state === 'hold') throw new Error(`execution budget policy: ${policy.reasonCode}`);
+      const routed = await routeSingleTaskV3(input.task, input.projectRoot);
+      input.task.assignedAgent = routed.agentId;
+      input.task.assignedSkills = routed.skillIds;
+      writeFileSync(`${input.projectRoot}/.tasks/task-${input.task.id}.json`, JSON.stringify(input.task));
+      const prompt = buildWorkerPrompt(input.task, undefined, [], input.projectRoot);
+      const spawned = await spawnWorkerMultiProvider(
+        input.task.id,
+        input.task.model,
+        prompt,
+        input.projectRoot,
+        {
+          autoApprove: input.autoApprove,
+          provider: input.task.provider,
+          modelEffort: input.task.modelEffort,
+          executionBudget: input.task.budget,
+          attendedExecutionApprovalAuthority: input.attendedExecutionApprovalAuthority,
+          executionTenantId: input.executionTenantId ?? input.task.actor?.tenantId ?? 'local',
+          executionRunId: input.executionRunId ?? input.task.sprintId ?? input.task.id,
+        },
+      );
+      return {
+        disposition: { kind: 'spawned', taskId: input.task.id },
+        executionMode: 'legacy-non-docker',
+        backend: spawned.backend,
+        provider: input.task.provider,
+        invocation: {
+          receiptRef: { schemaVersion: 1, invocationId: `test:${input.task.id}`, tenantId: 'local', projectId: 'test' },
+          executionBackend: 'host-subprocess',
+          transport: 'mcp',
+          state: 'dispatch-started',
+          executionEvidenceRef: `test:${input.task.id}`,
+        },
+      };
+    });
     server = createMockServer();
   });
 

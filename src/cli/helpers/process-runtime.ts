@@ -89,9 +89,8 @@ export async function buildProcessController(projectRoot: string): Promise<Proce
               : {}),
           },
           flowId: context.exactRef.flowId,
-          onExactPlanMaterialize: () => {
-            context.onExactPlanMaterialize();
-          },
+          onExactPlanMaterialize: (_sprint, materializationOptions) =>
+            context.onExactPlanMaterialize(materializationOptions),
           onExecutionAdmitted: (sprint) => {
             context.onExecutionAdmitted({
               flowId: context.exactRef.flowId,

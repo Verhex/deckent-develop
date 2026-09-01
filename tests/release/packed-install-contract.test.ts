@@ -12,26 +12,39 @@
 // Dockerfile contract holds. It also asserts no dev-only source (`tests/`, `src/`,
 // `.deckent/`, `.brain/`, `.tasks/`) leaked into the tarball.
 //
-// Escape hatch: DECKENT_SKIP_PACK_TESTS=1 skips this whole suite (heavy: real `npm
-// pack` + tar extract + N real subprocess imports). Windows is skipped honestly —
-// tar/symlink semantics for node_modules differ there and are not worth emulating
-// for a packaging-contract test that already runs on macOS/Linux CI.
+// T20 active proof is Linux-only. macOS and Windows-native remain explicit
+// residuals and are not simulated here. On Linux there is deliberately no skip
+// escape hatch: an absent tarball, native artifact or verifier receipt must fail.
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import {
-  mkdtempSync, rmSync, mkdirSync, readdirSync, statSync, existsSync, symlinkSync, readFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { release as osRelease, tmpdir } from 'node:os';
 import { join, resolve, dirname, relative, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawn } from 'node:child_process';
+import { readCanonicalNpmShrinkwrapIdentity } from '../../scripts/npm-shrinkwrap-contract.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = resolve(__dirname, '..', '..');
 
-const SKIP_ENV = process.env.DECKENT_SKIP_PACK_TESTS === '1';
-const IS_WINDOWS = process.platform === 'win32';
-const SKIP = SKIP_ENV || IS_WINDOWS;
+const ACTIVE_LINUX_PROOF = process.platform === 'linux';
+
+function expectedEnvironmentKind(): 'darwin' | 'linux' | 'win32' | 'wsl2' {
+  if (process.platform === 'darwin' || process.platform === 'win32') return process.platform;
+  const kernelRelease = osRelease().toLowerCase();
+  return kernelRelease.includes('microsoft') && kernelRelease.includes('wsl2') ? 'wsl2' : 'linux';
+}
 
 // ─── Async subprocess helper (no spawnSync — hermeticity rule) ────────────────
 
@@ -85,13 +98,16 @@ function walkAll(root: string): string[] {
 let tmpRoot = '';
 let pkgDir = '';
 let extractedPaths: string[] = [];
+let sourceNpmShrinkwrapSha256 = '';
 let pkg: {
   exports?: Record<string, { import?: string; types?: string }>;
   bin?: Record<string, string>;
 };
 
 beforeAll(async () => {
-  if (SKIP) return;
+  if (!ACTIVE_LINUX_PROOF) return;
+
+  sourceNpmShrinkwrapSha256 = readCanonicalNpmShrinkwrapIdentity(PROJECT_ROOT).sha256;
 
   tmpRoot = mkdtempSync(join(tmpdir(), 'deckent-pkg01-'));
   const packDir = join(tmpRoot, 'pack');
@@ -121,9 +137,29 @@ beforeAll(async () => {
   if (packResult.exitCode !== 0) {
     throw new Error(`npm pack failed (exit ${packResult.exitCode}):\n${packResult.stderr}`);
   }
-  const packData = JSON.parse(packResult.stdout);
-  const entry = Array.isArray(packData) ? packData[0] : packData;
-  const tarballPath = join(packDir, entry.filename as string);
+  if (packResult.stdout.trim() === '') {
+    throw new Error('E_PACKED_INSTALL_PACK_JSON_EMPTY');
+  }
+  let packData: unknown;
+  try {
+    packData = JSON.parse(packResult.stdout);
+  } catch {
+    throw new Error('E_PACKED_INSTALL_PACK_JSON_INVALID');
+  }
+  if (!Array.isArray(packData) || packData.length !== 1) {
+    throw new Error('E_PACKED_INSTALL_PACK_JSON_EMPTY_OR_AMBIGUOUS');
+  }
+  const entry = packData[0];
+  const filename = entry !== null && typeof entry === 'object'
+    ? (entry as { filename?: unknown }).filename
+    : undefined;
+  if (typeof filename !== 'string' || filename.length === 0) {
+    throw new Error('E_PACKED_INSTALL_PACK_FILENAME_INVALID');
+  }
+  const tarballPath = resolve(packDir, filename);
+  if (dirname(tarballPath) !== packDir || !existsSync(tarballPath)) {
+    throw new Error('E_PACKED_INSTALL_TARBALL_MISSING_OR_OUTSIDE_DESTINATION');
+  }
 
   // 2) Real extraction — system tar (no npm devDep ships a tar library).
   const tarResult = await runCmd('tar', ['xzf', tarballPath, '-C', extractDir], extractDir, 30_000);
@@ -145,6 +181,12 @@ beforeAll(async () => {
     throw new Error(`package.json not found in extracted tarball at ${pkgJsonPath}`);
   }
   pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf-8'));
+  const installedNpmShrinkwrapIdentity = readCanonicalNpmShrinkwrapIdentity(pkgDir);
+  if (installedNpmShrinkwrapIdentity.sha256 !== sourceNpmShrinkwrapSha256) {
+    throw new Error(
+      `E_PACKED_INSTALL_SHRINKWRAP_MISMATCH:${sourceNpmShrinkwrapSha256}:${installedNpmShrinkwrapIdentity.sha256}`,
+    );
+  }
 
   // Symlink node_modules from the live workspace so the real-import checks below
   // resolve external bare specifiers (better-sqlite3, commander, ws, ...) without
@@ -161,13 +203,67 @@ afterAll(() => {
   if (tmpRoot) rmSync(tmpRoot, { recursive: true, force: true });
 });
 
+async function runInstalledNativeVerifier(packageRoot: string): Promise<CmdResult> {
+  return runCmd(
+    process.execPath,
+    [
+      join(PROJECT_ROOT, 'scripts', 'verify-exec-authority-native-package.mjs'),
+      '--package-root',
+      packageRoot,
+      '--expected-environment',
+      expectedEnvironmentKind(),
+      '--expected-shrinkwrap-sha256',
+      sourceNpmShrinkwrapSha256,
+    ],
+    tmpRoot,
+    120_000,
+  );
+}
+
+function rejectedVerifierCode(result: CmdResult): string {
+  expect(result.exitCode).not.toBe(0);
+  const lines = result.stderr.trim().split(/\r?\n/u).filter(Boolean);
+  expect(lines).toHaveLength(1);
+  const receipt = JSON.parse(lines[0]) as { event?: unknown; code?: unknown };
+  expect(receipt.event).toBe('EXEC_AUTHORITY_NATIVE_INSTALLED_PACKAGE_REJECTED');
+  expect(receipt.code).toMatch(/^E_NATIVE_VERIFY_/u);
+  return receipt.code as string;
+}
+
+function cloneExtractedPackage(label: string): string {
+  const cloneRoot = join(tmpRoot, label);
+  cpSync(pkgDir, cloneRoot, {
+    recursive: true,
+    dereference: false,
+    filter: (source) => source !== join(pkgDir, 'node_modules'),
+  });
+  return cloneRoot;
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
-describe.skipIf(SKIP)('packed-install-contract (PKG-01) — real tarball, extracted', () => {
+describe.runIf(ACTIVE_LINUX_PROOF)(
+  'packed-install-contract (PKG-01/T20) — real Linux tarball, extracted',
+  () => {
   it('produced a real tarball and extracted it to package/', () => {
     expect(pkgDir, 'pkgDir must be set by beforeAll').not.toBe('');
     expect(existsSync(pkgDir)).toBe(true);
     expect(extractedPaths.length, 'extracted tarball must not be empty').toBeGreaterThan(0);
+  });
+
+  it('ships one canonical shrinkwrap and no competing root lock authority', () => {
+    expect(readCanonicalNpmShrinkwrapIdentity(pkgDir).sha256)
+      .toBe(sourceNpmShrinkwrapSha256);
+    expect(extractedPaths.filter(path => path === 'npm-shrinkwrap.json')).toHaveLength(1);
+    for (const forbiddenLock of [
+      'package-lock.json',
+      'pnpm-lock.yaml',
+      'yarn.lock',
+      'bun.lock',
+      'bun.lockb',
+    ]) {
+      expect(extractedPaths).not.toContain(forbiddenLock);
+    }
   });
 
   it(
@@ -252,6 +348,87 @@ describe.skipIf(SKIP)('packed-install-contract (PKG-01) — real tarball, extrac
     expect(existsSync(dockerfilePath), 'assets/Dockerfile.worker missing from extracted tarball').toBe(true);
   });
 
+  it('runs the installed-package native verifier unconditionally and accepts one exact receipt', async () => {
+    const result = await runInstalledNativeVerifier(pkgDir);
+    expect(result.exitCode, result.stderr).toBe(0);
+    const lines = result.stdout.trim().split(/\r?\n/u).filter(Boolean);
+    expect(lines).toHaveLength(1);
+    expect(JSON.parse(lines[0])).toMatchObject({
+      schemaVersion: 1,
+      event: 'EXEC_AUTHORITY_NATIVE_INSTALLED_PACKAGE_VERIFIED',
+      rootPackageName: 'deckent',
+      nativePackageName: '@deckent/exec-authority-native',
+      platform: 'linux',
+      arch: process.arch,
+      environment: {
+        environmentKind: expectedEnvironmentKind(),
+        expectedEnvironmentKind: expectedEnvironmentKind(),
+      },
+      environmentEvidenceSha256: expect.stringMatching(/^sha256:[0-9a-f]{64}$/u),
+      npmShrinkwrapSha256: sourceNpmShrinkwrapSha256,
+      npmShrinkwrapByteLength: statSync(join(pkgDir, 'npm-shrinkwrap.json')).size,
+      npmShrinkwrapPackageCount: expect.any(Number),
+      nativeArtifactOrigin: 'PACKAGED_PREBUILD',
+      installTimeNativeBuild: 'ABSENT',
+      installTimeNativeDownload: 'ABSENT',
+      lifecycle: {
+        state: 'PUBLISHED_READ_VERIFIED',
+        filesystemType: expect.stringMatching(/^0x[0-9a-f]+$/u),
+      },
+    });
+  }, 120_000);
+
+  it('rejects missing, partial, artifact, source and shrinkwrap drift', async () => {
+    const relativeArtifactRoot = join(
+      'native',
+      'exec-authority',
+      'prebuilds',
+      `linux-${process.arch}`,
+      'napi-v8',
+    );
+
+    const missing = cloneExtractedPackage('missing-native-payload');
+    rmSync(join(missing, 'native', 'exec-authority', 'prebuilds'), {
+      recursive: true,
+      force: true,
+    });
+    expect(rejectedVerifierCode(await runInstalledNativeVerifier(missing)))
+      .toBe('E_NATIVE_VERIFY_PREBUILD_LAYOUT');
+
+    const partial = cloneExtractedPackage('partial-native-payload');
+    rmSync(join(partial, relativeArtifactRoot, 'exec_authority.node'));
+    expect(rejectedVerifierCode(await runInstalledNativeVerifier(partial)))
+      .toBe('E_NATIVE_VERIFY_PREBUILD_LAYOUT');
+
+    const artifactDrift = cloneExtractedPackage('artifact-drift-native-payload');
+    const artifactPath = join(artifactDrift, relativeArtifactRoot, 'artifact.json');
+    const artifact = JSON.parse(readFileSync(artifactPath, 'utf-8')) as Record<string, unknown>;
+    writeFileSync(artifactPath, `${JSON.stringify({
+      ...artifact,
+      binarySha256: `sha256:${'0'.repeat(64)}`,
+    }, null, 2)}\n`);
+    expect(rejectedVerifierCode(await runInstalledNativeVerifier(artifactDrift)))
+      .toBe('E_NATIVE_VERIFY_BINARY_IDENTITY');
+
+    const sourceDrift = cloneExtractedPackage('source-drift-native-payload');
+    writeFileSync(
+      join(sourceDrift, 'native', 'exec-authority', 'src', 'custody_posix.c'),
+      '/* source drift after artifact build */\n',
+    );
+    expect(rejectedVerifierCode(await runInstalledNativeVerifier(sourceDrift)))
+      .toBe('E_NATIVE_VERIFY_SOURCE_IDENTITY');
+
+    const shrinkwrapDrift = cloneExtractedPackage('shrinkwrap-drift-native-payload');
+    const shrinkwrapPath = join(shrinkwrapDrift, 'npm-shrinkwrap.json');
+    const shrinkwrap = JSON.parse(readFileSync(shrinkwrapPath, 'utf-8')) as {
+      packages: Record<string, unknown>;
+    };
+    shrinkwrap.packages['node_modules/unauthorized-drift'] = { version: '1.0.0' };
+    writeFileSync(shrinkwrapPath, `${JSON.stringify(shrinkwrap, null, 2)}\n`);
+    expect(rejectedVerifierCode(await runInstalledNativeVerifier(shrinkwrapDrift)))
+      .toBe('E_NATIVE_VERIFY_NPM_SHRINKWRAP_DIGEST_MISMATCH');
+  }, 120_000);
+
   it('no dev-only source (.deckent/ .brain/ .tasks/ tests/ src/) leaked into the tarball root', () => {
     // Checked at the TOP LEVEL of the packaged tree only (package.json "files" controls
     // exactly what ships at the root) — NOT as "any path segment anywhere", which would
@@ -266,4 +443,5 @@ describe.skipIf(SKIP)('packed-install-contract (PKG-01) — real tarball, extrac
       `internal/dev-source dir(s) leaked into the tarball root: ${offenders.join(', ')}`,
     ).toEqual([]);
   });
-});
+  },
+);

@@ -1,5 +1,8 @@
 name: Cross-Platform E2E
 
+# Remote runner availability/quota is REMOTE_ADVISORY evidence, not product settlement.
+# Executed proof cells remain fail-closed; an unrun/queued cell never becomes success.
+
 on:
   push:
     branches: [main]
@@ -42,6 +45,7 @@ jobs:
         with:
           node-version: '24'
           cache: npm
+          cache-dependency-path: npm-shrinkwrap.json
 
       - run: npm ci
       - run: npm run ci:rebuild-native
@@ -62,6 +66,8 @@ jobs:
             echo "::error::clean-less macOS build requires an absent dist/ directory"
             exit 1
           fi
+          # Source build only; macOS installed-package/native closure remains deferred.
+          npm run build:native
           npx tsc
           node scripts/copy-assets.mjs
 
@@ -97,9 +103,9 @@ jobs:
   # rather than silently skipping. The validator is dependency-free, so no native rebuild is
   # needed here.
   #
-  # WSL parity follows the same documented reasoning as the packed-install note below: WSL2 runs
-  # a real Linux kernel and is covered by the ubuntu leg; a synthetic in-runner WSL is not a
-  # faithful proxy. That remains a declared gap, not a silent one.
+  # This matrix does not claim WSL2 proof. A hosted Ubuntu runner is not the owner's current WSL2
+  # host/filesystem. Current-WSL proof must run the compiled installed-package verifier on that
+  # exact host; until its receipt exists the WSL2 cell is an explicit HOLD.
   #
   # Windows status 2026-08-03: GATING. All three legs are blocking — 3/3 green with zero skips
   # on e1eb9d0ea (73 passed (73) on ubuntu, macOS AND Windows). No `continue-on-error` here by
@@ -161,141 +167,121 @@ jobs:
         with:
           node-version: '24'
           cache: npm
+          cache-dependency-path: npm-shrinkwrap.json
 
       - run: npm ci
 
       - name: Run MASTER validator contract suite
         run: npx vitest run tests/scripts/lint-master-plan.test.ts --reporter=verbose
 
-  # WSL-note (XPLAT-01, honest-gap disclosure): this matrix intentionally has NO
-  # separate WSL leg. Installing/bootstrapping WSL2 inside a windows-latest GitHub
-  # Actions runner is fragile and would not be a faithful proxy for a real user's
-  # WSL environment. WSL evidence instead comes from (a) Alperen's own local WSL2
-  # environment and (b) POSIX-parity: WSL2 runs a real Linux kernel, so the
-  # ubuntu-latest leg below already exercises the same code path WSL2 users hit.
-  # This is a documented, deliberate gap — not a silent omission.
+  # WSL-note (TN-PROOF-SEAL): GitHub-hosted runners cannot prove the owner's current
+  # WSL2 host/filesystem. This job proves only the network-disabled Linux installed
+  # package cell. WSL2 requires a separate exact-host receipt from the same installed
+  # verifier. macOS and Windows-native package/runtime proof are deferred MASTER
+  # residuals; generic E2E/validator/probe observations above are not native success.
   packed-install:
-    name: Packed Install — ${{ matrix.os }}
+    name: Linux Installed Native Package Proof
     # 535 (CI-ACTIONS-ECONOMY-001): macos-heavy legs ran on every PR and every
     # merge-queue entry. They now run on main-push and explicit dispatch — a
     # train that needs platform proof triggers `gh workflow run -r <branch>`.
     # Validator Contract (the required check) is untouched and runs everywhere.
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-    # born-695: 20 → 28. The smoke's install timeout grew 180s→360s (slow
-    # windows runners legitimately need ~5min for the native-binding install)
-    # and the bounded ×2 retry doubles that worst case — the old 20min ceiling
-    # would have converted a slow-but-passing second attempt into a job kill.
-    # Required-status stays untouched; this is only the time budget.
-    timeout-minutes: 28
-    env:
-      # Real npm-level retry (make-fetch-happen) layered under the bounded
-      # bash retry loops below — absorbs transient registry blips inside a
-      # single npm invocation. Job-scoped so it also reaches the npm pack /
-      # npm install -g calls xplat-install-smoke.mjs makes internally (it
-      # inherits process.env) without editing that script (out of scope here).
-      npm_config_fetch_retries: '3'
-      npm_config_fetch_retry_factor: '2'
-      npm_config_fetch_retry_mintimeout: '5000'
-      npm_config_fetch_retry_maxtimeout: '60000'
-      npm_config_fetch_timeout: '300000'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-        env:
-          GIT_CONFIG_COUNT: ${{ runner.os == 'Windows' && '1' || '0' }}
-          GIT_CONFIG_KEY_0: core.longpaths
-          GIT_CONFIG_VALUE_0: 'true'
 
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: npm
+          cache-dependency-path: |
+            npm-shrinkwrap.json
+            src/dashboard/package-lock.json
 
-      - name: npm install (npm ci, bounded retry)
-        shell: bash
-        run: |
-          set -uo pipefail
-          max_attempts=2
-          attempt=1
-          until npm ci; do
-            if [ "$attempt" -ge "$max_attempts" ]; then
-              echo "::error::npm ci failed after ${max_attempts} attempt(s)" >&2
-              exit 1
-            fi
-            attempt=$((attempt + 1))
-            echo "npm ci failed — retrying (attempt ${attempt}/${max_attempts}) after 30s..." >&2
-            sleep 30
-          done
+      - name: Install dependencies
+        run: npm ci
 
       - run: npm run ci:rebuild-native
 
-      # CI-PACKED-DASHBOARD-TOOLCHAIN-001: build:all ends in build:dashboard,
-      # whose hardened script requires src/dashboard's own toolchain
-      # (typescript + vite) preinstalled — it never auto-installs. Same bounded
-      # retry as the root install; src/dashboard has its own package-lock.json.
-      - name: npm ci (dashboard toolchain, bounded retry)
-        shell: bash
-        run: |
-          set -uo pipefail
-          max_attempts=2
-          attempt=1
-          until npm ci --prefix src/dashboard; do
-            if [ "$attempt" -ge "$max_attempts" ]; then
-              echo "::error::dashboard npm ci failed after ${max_attempts} attempt(s)" >&2
-              exit 1
-            fi
-            attempt=$((attempt + 1))
-            echo "dashboard npm ci failed — retrying (attempt ${attempt}/${max_attempts}) after 30s..." >&2
-            sleep 30
-          done
+      - name: Install dashboard toolchain
+        run: npm ci --prefix src/dashboard --ignore-scripts
 
-      # Linux retains the canonical clean authority. macOS/Windows currently
-      # lack the secure-open maintenance adapter, so a fresh-checkout-only
-      # build runs the same compile/copy/dashboard payload without claiming
-      # clean authority. A pre-existing dist fails closed instead of going stale.
-      - name: Build dist + dashboard (Linux guarded clean)
-        if: runner.os == 'Linux'
+      # build:all is the single canonical clean → pinned/offline native builder →
+      # TypeScript/assets → dashboard chain. No node-gyp/npx/download fallback.
+      - name: Build dist + packaged Linux native prebuild
         run: npm run build:all
 
-      - name: Build dist + dashboard without clean (macOS/Windows fresh checkout)
-        if: runner.os != 'Linux'
+      - name: Validate packed native inventory
+        run: npm run validate:publish
+
+      - name: Verify packed install networklessly with a fresh private prewarmed cache
         shell: bash
+        env:
+          PACKED_NETWORKLESS_RECEIPT: ${{ runner.temp }}/linux-packed-networkless-receipt.json
         run: |
           set -euo pipefail
-          if [ -e dist ]; then
-            echo "::error::clean-less non-Linux build requires an absent dist/ directory"
-            exit 1
-          fi
-          npx tsc
-          node scripts/copy-assets.mjs
-          npm run build:dashboard
+          SOURCE_PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          node scripts/verify-packed-networkless-install.mjs --expected-environment linux --receipt-file "$PACKED_NETWORKLESS_RECEIPT"
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const receipt = JSON.parse(readFileSync(process.argv[1], "utf8"));
+            const sourcePackageVersion = process.argv[2];
+            const sha256 = /^sha256:[0-9a-f]{64}$/u;
+            const expectedTopLevelFields = [
+              "cacheAuthority",
+              "event",
+              "expectedEnvironmentKind",
+              "installedCliReceipt",
+              "installedNpmShrinkwrapSha256",
+              "installNetworkMode",
+              "nativeReceipt",
+              "schemaVersion",
+              "sourceNpmShrinkwrapSha256",
+              "tarballSha256",
+            ].sort();
+            const expectedInstalledCliFields = [
+              "event",
+              "outputSha256",
+              "packageVersion",
+              "schemaVersion",
+            ].sort();
+            const nativeReceipt = receipt.nativeReceipt;
+            const installedCliReceipt = receipt.installedCliReceipt;
+            if (JSON.stringify(Object.keys(receipt).sort()) !== JSON.stringify(expectedTopLevelFields)
+              || receipt.schemaVersion !== 1
+              || receipt.event !== "DECKENT_PACKED_NETWORKLESS_INSTALL_VERIFIED"
+              || receipt.expectedEnvironmentKind !== "linux"
+              || receipt.installNetworkMode !== "OFFLINE"
+              || receipt.cacheAuthority !== "FRESH_PRIVATE_PREWARMED"
+              || !sha256.test(receipt.sourceNpmShrinkwrapSha256)
+              || !sha256.test(receipt.installedNpmShrinkwrapSha256)
+              || receipt.installedNpmShrinkwrapSha256 !== receipt.sourceNpmShrinkwrapSha256
+              || !sha256.test(receipt.tarballSha256)
+              || JSON.stringify(Object.keys(installedCliReceipt ?? {}).sort()) !== JSON.stringify(expectedInstalledCliFields)
+              || installedCliReceipt?.schemaVersion !== 1
+              || installedCliReceipt.event !== "DECKENT_INSTALLED_CLI_VERIFIED"
+              || installedCliReceipt.packageVersion !== sourcePackageVersion
+              || !sha256.test(installedCliReceipt.outputSha256)
+              || nativeReceipt?.event !== "EXEC_AUTHORITY_NATIVE_INSTALLED_PACKAGE_VERIFIED"
+              || nativeReceipt.npmShrinkwrapSha256 !== receipt.sourceNpmShrinkwrapSha256
+              || nativeReceipt.platform !== "linux"
+              || nativeReceipt.environment?.environmentKind !== "linux"
+              || nativeReceipt.environment?.expectedEnvironmentKind !== "linux"
+              || nativeReceipt.installTimeNativeBuild !== "ABSENT"
+              || nativeReceipt.installTimeNativeDownload !== "ABSENT"
+              || nativeReceipt.lifecycle?.state !== "PUBLISHED_READ_VERIFIED") process.exit(1);
+          ' "$PACKED_NETWORKLESS_RECEIPT" "$SOURCE_PACKAGE_VERSION"
 
-      - name: Packed-install smoke — npm pack → isolated-prefix global install → deckent init --yes → deckent doctor (bounded retry)
-        shell: bash
-        timeout-minutes: 18
-        run: |
-          set -uo pipefail
-          max_attempts=2
-          attempt=1
-          until node scripts/xplat-install-smoke.mjs; do
-            if [ "$attempt" -ge "$max_attempts" ]; then
-              echo "::error::packed-install smoke (npm pack path) failed after ${max_attempts} attempt(s)" >&2
-              exit 1
-            fi
-            attempt=$((attempt + 1))
-            echo "packed-install smoke failed — retrying (attempt ${attempt}/${max_attempts}) after 30s..." >&2
-            sleep 30
-          done
+      - name: Upload Linux packed-networkless receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: linux-packed-networkless-receipt
+          path: ${{ runner.temp }}/linux-packed-networkless-receipt.json
+          if-no-files-found: error
+          retention-days: 30
 
-      # born-695: upload-artifact v4 rejects files OUTSIDE the workspace
-      # ("rootDirectory is not a parent directory" — the windows npm cache
-      # lives at C:\npm\cache while the workspace is on D:), which silently
-      # destroyed the diagnostics on the exact failure they were added for.
-      # Copy everything INTO the workspace first, then upload from there.
+      # Copy dependency/install diagnostics into the workspace before upload.
       - name: Collect diagnostics into workspace
         if: failure()
         shell: bash
@@ -316,12 +302,10 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: packed-install-diagnostics-${{ matrix.os }}
+          name: linux-installed-native-diagnostics
           # npm debug log (registry/pack/install failures) + any tmux
-          # pipe-pane worker log the smoke run may have produced
-          # (src/orchestra/tmux.ts) — no dedicated "server log" file exists
-          # in this codebase; if-no-files-found: ignore keeps this honest
-          # for legs where neither path materializes.
+          # logs produced before the strict installed verifier rejected the
+          # package. if-no-files-found keeps diagnostics separate from proof.
           path: xplat-diag/**
           if-no-files-found: ignore
           retention-days: 7
@@ -362,6 +346,18 @@ jobs:
         run: |
           mkdir -p probe-artifacts
           PROBE_ARTIFACT_DIR=probe-artifacts node scripts/platform-probe/exec-authority-capability-probe.mjs
+          node --input-type=module -e '
+            import { readFileSync, readdirSync } from "node:fs";
+            const files = readdirSync("probe-artifacts").filter(name => name.startsWith("exec-auth-probe-"));
+            if (files.length !== 1) process.exit(1);
+            const artifact = JSON.parse(readFileSync(`probe-artifacts/${files[0]}`, "utf8"));
+            if (artifact.mode !== "measurement"
+              || artifact.evidenceClass !== "CAPABILITY_MEASUREMENT_ONLY"
+              || artifact.promotionEligible !== false
+              || artifact.nativeContract?.state !== "NOT_EVALUATED"
+              || artifact.nativeContract?.compiledBinaryLoaded !== false
+              || artifact.nativeContract?.installedPackageVerified !== false) process.exit(1);
+          '
 
       # born-695: upload-artifact v4 rejects paths outside the workspace —
       # the artifact dir stays workspace-relative on purpose.
@@ -371,22 +367,16 @@ jobs:
           path: probe-artifacts/exec-auth-probe-*.json
           retention-days: 30
 
-  # W3-PR-A (PLATFORM-EXEC-AUTH-W3-DARWIN-001): compile the in-repo N-API
-  # capability module and run its primitive suite on the two POSIX targets.
-  # Non-required; the addon's ABSENCE is the product's fail-closed contract,
-  # so this job proves buildability+behavior, it does not gate admission.
+  # Source/build supporting evidence only. Deferred macOS/Windows-native
+  # residuals are deliberately absent rather than simulated or promoted.
   exec-auth-native-build:
-    name: Exec-Authority Native Build — ${{ matrix.os }}
+    name: Exec-Authority Linux Native Source Check (non-promotion)
     # 535 (CI-ACTIONS-ECONOMY-001): macos-heavy legs ran on every PR and every
     # merge-queue entry. They now run on main-push and explicit dispatch — a
     # train that needs platform proof triggers `gh workflow run -r <branch>`.
     # Validator Contract (the required check) is untouched and runs everywhere.
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -395,6 +385,7 @@ jobs:
         with:
           node-version: '24'
           cache: npm
+          cache-dependency-path: npm-shrinkwrap.json
 
       - name: npm ci (bounded retry)
         shell: bash
@@ -411,18 +402,17 @@ jobs:
             sleep 30
           done
 
-      - name: Build native addon
-        run: npx node-gyp rebuild
-        working-directory: native/exec-authority
+      - name: Build native addon with canonical pinned/offline builder
+        run: |
+          npm run clean:native
+          npm run build:native
 
       - name: Run native primitive suite
         run: npx vitest run tests/native/exec-authority-native.test.ts
         env:
           VITEST_MAX_FORKS: '2'
 
-      # W3-PR-B slice-2: with the binding built above, this exercises the
-      # binding-backed ops-v2 parity block on ubuntu and the real-Darwin
-      # pinned-handle lifecycle block on macos.
+      # Binding-backed ops-v2 parity is supporting Linux source evidence only.
       - name: Run execution-authority adapter parity suite
         run: npx vitest run tests/core/execution-authority-adapter-parity.test.ts
         env:

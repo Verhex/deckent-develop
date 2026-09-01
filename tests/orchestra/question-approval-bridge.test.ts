@@ -24,6 +24,7 @@ import type { ApprovalBrokerLike } from '../../src/core/approval-worker-gate.js'
 import type { ApprovalRequestInput, ApprovalDecisionInput } from '../../src/core/approval-broker.js';
 import type { ApprovalDecision, ApprovalRequest } from '../../src/core/approval-contract.js';
 import type { WorkerQuestion } from '../../src/core/task-types.js';
+import type { QuestionApprovalExactAttemptBinding } from '../../src/orchestra/question-approval-bridge.js';
 
 // ─── FakeApprovalBroker — in-memory, zero fs I/O ─────────────────────────────
 
@@ -374,5 +375,130 @@ describe('isQuestionBridgeEnabled', () => {
     expect(isQuestionBridgeEnabled({ approval: { question_bridge: 'true' } })).toBe(false);
     expect(isQuestionBridgeEnabled({ approval: { question_bridge: 1 } })).toBe(false);
     expect(isQuestionBridgeEnabled({ approval: { question_bridge: true } })).toBe(true);
+  });
+});
+
+// ─── Exact-attempt approval binding ─────────────────────────────────────────
+
+const exactBinding: QuestionApprovalExactAttemptBinding = {
+  schemaVersion: 2,
+  projectRootSha256: 'a'.repeat(64),
+  projectId: 'project-a',
+  taskId: '357-004',
+  attemptId: 'attempt-3',
+  generation: 3,
+  admissionReceiptDigest: `sha256:${'b'.repeat(64)}`,
+  fenceDigest: `sha256:${'c'.repeat(64)}`,
+  questionReceiptDigest: `sha256:${'d'.repeat(64)}`,
+  questionEnvelopeDigest: `sha256:${'e'.repeat(64)}`,
+  sequence: 2,
+};
+
+describe('question approval exact-attempt binding', () => {
+  it('binds the approval request to exact attempt/fence/question receipt data', () => {
+    const request = questionToApprovalRequest(buildQuestion(), {
+      id: 'req-exact',
+      tenantId: 'local',
+      userId: 'operator',
+      createdAt: new Date('2026-07-02T10:00:00.000Z'),
+      expiresAt: new Date('2026-07-02T10:01:00.000Z'),
+      exactAttemptBinding: exactBinding,
+    });
+
+    expect(request.scopeId).toMatch(/^ipc-question:[a-f0-9]{64}$/u);
+    expect(request.details).toMatchObject({
+      source: 'worker-question',
+      exactAttempt: exactBinding,
+    });
+  });
+
+  it('returns typed authority-hold when the exact question changes after the decision', async () => {
+    const broker = new FakeApprovalBroker();
+    const revalidate = vi.fn(() => false);
+    const resultPromise = bridgeQuestionToApproval(
+      buildQuestion({ suggestedAction: 'skip' }),
+      broker,
+      {
+        timeoutMs: 60_000,
+        exactAttemptBinding: exactBinding,
+        revalidateExactAttemptBinding: revalidate,
+      },
+    );
+
+    broker.decide(broker.submitted[0].id, {
+      decision: 'allow',
+      decidedBy: 'alperen',
+      channel: 'terminal',
+      decidedAt: DECIDED_AT,
+    });
+
+    const result = await resultPromise;
+    expect(revalidate).toHaveBeenCalledWith(exactBinding);
+    expect(result).toEqual({
+      kind: 'authority-hold',
+      reasonCode: 'EXACT_QUESTION_AUTHORITY_CHANGED',
+    });
+  });
+
+  it('fails closed before broker submission when exact binding lacks revalidation', async () => {
+    const broker = new FakeApprovalBroker();
+    const result = await bridgeQuestionToApproval(
+      buildQuestion(),
+      broker,
+      { exactAttemptBinding: exactBinding },
+    );
+
+    expect(result).toEqual({
+      kind: 'authority-hold',
+      reasonCode: 'EXACT_QUESTION_REVALIDATOR_UNAVAILABLE',
+    });
+    expect(broker.submitted).toHaveLength(0);
+  });
+
+  it('rejects extra-key and proxied exact bindings before durable approval submission', async () => {
+    const extraKeyBroker = new FakeApprovalBroker();
+    const extraKey = { ...exactBinding, injectedAuthority: 'worker-self-report' };
+    await expect(bridgeQuestionToApproval(buildQuestion(), extraKeyBroker, {
+      exactAttemptBinding: extraKey as QuestionApprovalExactAttemptBinding,
+      revalidateExactAttemptBinding: () => true,
+    })).resolves.toEqual({
+      kind: 'authority-hold',
+      reasonCode: 'EXACT_QUESTION_BINDING_INVALID',
+    });
+    expect(extraKeyBroker.submitted).toHaveLength(0);
+
+    const proxiedBroker = new FakeApprovalBroker();
+    const proxied = new Proxy(exactBinding, {});
+    await expect(bridgeQuestionToApproval(buildQuestion(), proxiedBroker, {
+      exactAttemptBinding: proxied,
+      revalidateExactAttemptBinding: () => true,
+    })).resolves.toEqual({
+      kind: 'authority-hold',
+      reasonCode: 'EXACT_QUESTION_BINDING_INVALID',
+    });
+    expect(proxiedBroker.submitted).toHaveLength(0);
+  });
+
+  it('snapshots exact binding before submit so caller mutation cannot alter durable details', async () => {
+    const broker = new FakeApprovalBroker();
+    const mutable = { ...exactBinding };
+    const resultPromise = bridgeQuestionToApproval(buildQuestion(), broker, {
+      exactAttemptBinding: mutable,
+      revalidateExactAttemptBinding: () => true,
+      timeoutMs: 60_000,
+    });
+
+    mutable.attemptId = 'mutated-after-submit';
+    broker.decide(broker.submitted[0].id, {
+      decision: 'allow',
+      decidedBy: 'alperen',
+      channel: 'terminal',
+      decidedAt: DECIDED_AT,
+    });
+
+    const result = await resultPromise;
+    expect(result.kind).toBe('bridged');
+    expect((broker.submitted[0].details as Record<string, unknown>)['exactAttempt'])
+      .toMatchObject({ attemptId: 'attempt-3' });
   });
 });

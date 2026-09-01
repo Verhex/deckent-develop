@@ -21,6 +21,21 @@ import {
 import { resolveHostExecutionBudget } from './runtime-budget-monitor.js';
 import type { TaskResultSettlementRefV1 } from '../core/task-result-settlement.js';
 import type { ExecutionLandingContextEnvelopeV1 } from '../core/execution-landing-context.js';
+import type { ProviderBillingEvidence } from '../core/provider-billing-evidence.js';
+import type { TaskResultAttemptCustodySourceBindingV2 } from '../core/task-result-schema.js';
+import type { TaskResultV2 } from '../core/task-result-schema.js';
+import type { CanonicalIngressAuthority } from './result-ingress.js';
+import type { CanonicalIngressEffectAuthorityV1 } from './result-ingress.js';
+import type { ExactAcceptedTaskResultRefV2 } from '../core/task-settlement-authority.js';
+import type { ExactExecutionLandingProposalV3 } from '../core/execution-landing-proposal.js';
+import type { ExecutionLandingPreparationRefV2 } from '../core/execution-landing-checkpoint.js';
+import type {
+  Sha256Digest,
+  TaskAttemptCustodyAmbiguousReasonCode,
+  TaskAttemptCustodyIdentityV2,
+  TaskAttemptCustodyNotDispatchedReasonCode,
+  TaskAttemptCustodyProviderExecutionAttemptV2,
+} from '../core/task-attempt-custody-store.js';
 import { authHealthCheck } from '../agents/worker.js';
 
 export type { SandboxOptions };
@@ -45,6 +60,46 @@ export interface SpawnBackendRecoveryReport {
   closedAbsentAfterExit: string[];
   retiredLanded: string[];
   resumedContinuations: string[];
+  /**
+   * Exact backend entries that were discovered but could not be reconciled.
+   * Optional only for backward compatibility with non-exact custom backends;
+   * the canonical Docker backend always returns the field, including `[]`.
+   */
+  held?: SpawnBackendRecoveryHold[];
+}
+
+export type SpawnBackendRecoveryHoldAuthorityState =
+  | 'RESERVED_PENDING_ADMISSION'
+  | 'DISPATCH_ABSENT'
+  | 'DISPATCH_TRANSITION_PENDING'
+  | 'DISPATCH_AMBIGUOUS'
+  | 'DISPATCH_TERMINAL'
+  | 'RECOVERY_ENTRY_FAILED';
+
+export type SpawnBackendRecoveryHoldReasonCode =
+  | 'ADMISSION_RECONCILIATION_REQUIRED'
+  | 'PRE_PROVIDER_RECONCILIATION_REQUIRED'
+  | 'TERMINAL_RECONCILIATION_REQUIRED'
+  | 'ENTRY_RECONCILIATION_FAILED';
+
+export interface SpawnBackendRecoveryHold {
+  readonly kind: 'spawn-backend-recovery-hold';
+  readonly backend: 'docker';
+  readonly dispatchRequestId: string;
+  readonly taskId: string;
+  readonly admissionRefDigest: string | null;
+  readonly authorityState: SpawnBackendRecoveryHoldAuthorityState;
+  readonly reasonCode: SpawnBackendRecoveryHoldReasonCode;
+}
+
+export class SpawnBackendRecoveryHoldError extends Error {
+  readonly holds: readonly SpawnBackendRecoveryHold[];
+
+  constructor(holds: readonly SpawnBackendRecoveryHold[]) {
+    super('DECKENT_E091:spawn-backend-recovery-hold');
+    this.name = 'SpawnBackendRecoveryHoldError';
+    this.holds = Object.freeze([...holds]);
+  }
 }
 
 export interface SpawnBackendRecoveryOptions {
@@ -54,6 +109,325 @@ export interface SpawnBackendRecoveryOptions {
    */
   mode?: 'resume' | 'contain' | 'terminal-only';
 }
+
+declare const exactDockerCustodyDispatchEnvelopeBrand: unique symbol;
+declare const exactDockerAcceptedResultReaderBrand: unique symbol;
+
+/** Process-local, single-backend authority. It intentionally exposes no Store path/capability. */
+export interface ExactDockerCustodyDispatchEnvelopeV2 {
+  readonly [exactDockerCustodyDispatchEnvelopeBrand]: true;
+}
+
+/** Process-local read capability; contains no Store path or generic publication authority. */
+export interface ExactDockerAcceptedResultReaderV2 {
+  readonly [exactDockerAcceptedResultReaderBrand]: true;
+}
+
+export interface ExactDockerAcceptedResultV2 {
+  readonly kind: 'accepted-result';
+  readonly acceptedResultRef: ExactAcceptedTaskResultRefV2;
+  readonly acceptedResultChainDigest: Sha256Digest;
+  readonly resultDigest: Sha256Digest;
+  readonly result: TaskResultV2;
+  readonly hostBillingAuthority: Readonly<{
+    readonly evidenceDigest: Sha256Digest;
+    readonly providerStreamReceiptDigest: Sha256Digest;
+    readonly acceptedResultArtifactReceiptDigest: Sha256Digest;
+    readonly acceptedResultChainDigest: Sha256Digest;
+    readonly bindingDigest: Sha256Digest;
+  }>;
+  readonly hostEffectAuthority: CanonicalIngressEffectAuthorityV1;
+  readonly reader: ExactDockerAcceptedResultReaderV2;
+}
+
+export type ExactDockerAcceptResultOutcomeV2 = ExactDockerAcceptedResultV2 | Readonly<{
+  readonly kind: 'capture-hold';
+  readonly reasonCode:
+    | Extract<ExactDockerCustodyCompletionV2, { kind: 'capture-hold' }>['reasonCode']
+    | 'HOST_WORK_ATTRIBUTION_HOLD'
+    | 'WORKER_SCOPE_CLAIM_HOLD';
+  readonly custodyRef: ExactDockerCustodyRefV2;
+  readonly releaseReceipt: ExactDockerCustodyReceiptRefV2;
+  readonly projectionFence: Sha256Digest;
+}>;
+
+export interface AcceptExactDockerCustodyResultInputV2 {
+  readonly query: ExactDockerCustodyTerminalQueryV2;
+  readonly authority: CanonicalIngressAuthority;
+}
+
+export interface ExactDockerCustodyExecutionMaterialV2 {
+  readonly allowedTools: string | null;
+  readonly availableTools: string | null;
+  readonly authMode: 'subscription' | 'api';
+  readonly isolatedContext: boolean;
+  readonly reasoningEffort: string | null;
+  readonly excludeDynamicPromptSections: boolean;
+  readonly taskTimeoutSeconds: number;
+  readonly actionId: string | null;
+  readonly executionBudget: unknown | null;
+  readonly executionLandingPolicy: unknown | null;
+  readonly executionAdmissionMode: string | null;
+  readonly executionApprovalEvidenceRef: string | null;
+  readonly finalOnlyUsageContainment: Readonly<{
+    readonly maxWallClockSeconds: number;
+    readonly profileRef: string;
+    readonly policyDigest: string;
+  }> | null;
+}
+
+export interface ExactDockerPromptDeliveryAuthorityV2 {
+  readonly schemaVersion: 2;
+  readonly kind: 'exact-docker-prompt-delivery-authority';
+  readonly receiptVersion: 2;
+  /** Path-free, content-addressed identity of the compile-time delivery receipt. */
+  readonly receiptIdentity: `prompt-delivery-receipt:sha256:${string}`;
+  readonly taskId: string;
+  readonly basePromptSha256: Sha256Digest;
+  readonly promptCompilePlanId: string;
+  readonly rolePolicyIdentity: string;
+  readonly assignedAgentId: string | null;
+  readonly deliveredAgentId: string | null;
+  readonly personaSegmentSha256: Sha256Digest | null;
+  readonly assignedSkillIds: readonly string[];
+  readonly deliveredSkillIds: readonly string[];
+  readonly forcedSkillIds: readonly string[];
+  readonly undeliveredForcedSkillIds: readonly string[];
+  readonly segmentManifest: readonly Readonly<{
+    readonly ordinal: number;
+    readonly tier: 'T0' | 'T1' | 'T2';
+    readonly kind: string;
+    readonly contentSha256: Sha256Digest;
+    readonly byteLength: number;
+  }>[];
+  readonly segmentManifestDigest: Sha256Digest;
+  readonly authorityDigest: Sha256Digest;
+}
+
+export interface ExactDockerCustodyIdentityRefV2 {
+  readonly dispatchRequestId: string;
+  readonly identity: TaskAttemptCustodyIdentityV2;
+  readonly admissionReceiptDigest: Sha256Digest;
+  readonly admissionRefDigest: Sha256Digest;
+}
+
+export interface ExactDockerCustodyRefV2 extends ExactDockerCustodyIdentityRefV2 {
+  readonly providerStartReceipt: ExactDockerCustodyReceiptRefV2;
+}
+
+/**
+ * Logical producer material only. T5/Store, never the producer, allocates the
+ * custody attempt/generation/admission timestamp and predecessor identity.
+ */
+export interface PrepareExactDockerCustodyInputV2 {
+  readonly dispatchRequestId: string;
+  readonly projectId: string;
+  readonly taskId: string;
+  readonly approvedTaskMaterial: unknown;
+  readonly approvedTaskMaterialDigest: Sha256Digest;
+  readonly dispatchTaskMaterial: unknown;
+  readonly dispatchTaskMaterialDigest: Sha256Digest;
+  readonly lineageMaterial: unknown;
+  readonly lineageMaterialDigest: Sha256Digest;
+  readonly prompt: string;
+  readonly promptDeliveryAuthority: ExactDockerPromptDeliveryAuthorityV2;
+  readonly systemPromptCore: string | null;
+  readonly model: ModelType;
+  readonly execution: ExactDockerCustodyExecutionMaterialV2;
+  readonly predecessor: ExactDockerCustodyRefV2 | null;
+}
+
+export interface ExactDockerCustodyAdmissionRefV2 {
+  readonly dispatchRequestId: string;
+  readonly dispatchRequestMaterialDigest: Sha256Digest;
+  readonly admissionRefDigest: Sha256Digest;
+}
+
+/** Alias only: core owns the single pre-provider landing preparation authority. */
+export type ExactDockerCustodyPreparationRefV2 = ExecutionLandingPreparationRefV2;
+
+export interface PreparedExactDockerCustodyV2 {
+  readonly kind: 'exact-docker-custody-prepared';
+  readonly dispatchEnvelope: ExactDockerCustodyDispatchEnvelopeV2;
+  readonly admissionRef: ExactDockerCustodyAdmissionRefV2;
+  readonly preparationRef: ExactDockerCustodyPreparationRefV2;
+}
+
+export interface ExactDockerCustodyReceiptRefV2 {
+  readonly ref: Sha256Digest;
+  readonly digest: Sha256Digest;
+}
+
+export interface ExactDockerVerifiedArtifactRefV2 {
+  readonly identity: TaskAttemptCustodyIdentityV2;
+  readonly admissionReceiptDigest: Sha256Digest;
+  readonly policyDigest: Sha256Digest;
+  readonly artifactClass:
+    | 'worker-result'
+    | 'worker-partial-result'
+    | 'worker-landing-proposal'
+    | 'worker-provider-observation'
+    | 'worker-timeout'
+    | 'pristine-provider-stream';
+  readonly artifactKey: string;
+  readonly contentDigest: Sha256Digest;
+  readonly byteLength: number;
+  readonly capturedAt: string;
+  readonly receiptDigest: Sha256Digest;
+}
+
+export type ExactDockerProviderStreamRefV2 = ExactDockerVerifiedArtifactRefV2 & Readonly<{
+  readonly artifactClass: 'pristine-provider-stream';
+}>;
+
+export type ExactDockerWorkerResultArtifactRefV2 = ExactDockerVerifiedArtifactRefV2 & Readonly<{
+  readonly artifactClass: 'worker-result';
+}>;
+
+export type ExactDockerLandingProposalArtifactRefV2 = ExactDockerVerifiedArtifactRefV2 & Readonly<{
+  readonly artifactClass: 'worker-landing-proposal';
+}>;
+
+export interface ExactDockerProviderExitObservationRefV2 {
+  readonly containerId: string;
+  readonly exitCode: number;
+  readonly observedAt: string;
+  readonly waitEvidenceDigest: Sha256Digest;
+  readonly observationReceiptDigest: Sha256Digest;
+  readonly observationEvidenceDigest: Sha256Digest;
+}
+
+export interface ExactDockerHostWorkAttributionV2 {
+  readonly schemaVersion: 2;
+  readonly kind: 'exact-docker-host-work-attribution';
+  readonly state: 'VERIFIED' | 'HOLD';
+  readonly attemptId: string;
+  readonly dispatchRequestId: string;
+  readonly admissionRefDigest: Sha256Digest;
+  readonly providerExitObservationReceiptDigest: Sha256Digest;
+  readonly baselineRef: string;
+  readonly baselineSha256: string;
+  readonly scopeDigest: string;
+  readonly filesChanged: readonly Readonly<{
+    readonly path: string;
+    readonly status: 'added' | 'modified' | 'deleted';
+    readonly linesAdded: number;
+    readonly linesRemoved: number;
+  }>[];
+  readonly totalLinesAdded: number;
+  readonly totalLinesRemoved: number;
+  readonly reasonCode: 'NONE' | 'BASELINE_INVALID' | 'DIFF_UNMEASURABLE';
+  readonly evidenceDigest: Sha256Digest;
+}
+
+export interface ExactDockerCustodyTerminalQueryV2 {
+  readonly custodyRef: ExactDockerCustodyRefV2;
+  readonly releaseReceipt: ExactDockerCustodyReceiptRefV2;
+  readonly providerStartReceipt: ExactDockerCustodyReceiptRefV2;
+  readonly projectionFence: Sha256Digest;
+}
+
+export type ExactDockerCustodyTerminalHoldReasonCodeV2 =
+  | 'DOCKER_WAIT_UNAVAILABLE'
+  | 'DOCKER_WAIT_INVALID'
+  | 'PRISTINE_PROVIDER_STREAM_INCOMPLETE'
+  | 'PROVIDER_BILLING_UNAVAILABLE'
+  | 'HOST_WORK_ATTRIBUTION_HOLD'
+  | 'WORKER_RESULT_CAPTURE_HOLD'
+  | 'LANDING_PROPOSAL_CAPTURE_HOLD'
+  | 'LIVE_MONITOR_UNAVAILABLE'
+  | 'EFFECT_PREPARE_HOLD'
+  | 'EFFECT_PROVIDER_START_HOLD'
+  | 'EFFECT_FINAL_CAPTURE_HOLD'
+  | 'EFFECT_LANDING_HOLD'
+  | 'EFFECT_RELEASE_HOLD'
+  | 'EFFECT_PUBLICATION_HOLD';
+
+interface ExactDockerCustodyTerminalBaseV2 {
+  readonly custodyRef: ExactDockerCustodyRefV2;
+  readonly releaseReceipt: ExactDockerCustodyReceiptRefV2;
+  readonly projectionFence: Sha256Digest;
+}
+
+interface ExactDockerCustodyCapturedTerminalBaseV2
+  extends ExactDockerCustodyTerminalBaseV2 {
+  readonly providerExit: ExactDockerProviderExitObservationRefV2;
+  readonly hostWorkAttribution: ExactDockerHostWorkAttributionV2;
+  readonly hostEffectAuthority: CanonicalIngressEffectAuthorityV1;
+  readonly providerStream: ExactDockerProviderStreamRefV2;
+  readonly result: TaskResultAttemptCustodySourceBindingV2;
+  /** Receipt projection carrying the Store-authoritative result capture time. */
+  readonly resultArtifact: ExactDockerWorkerResultArtifactRefV2;
+  readonly providerBilling: Readonly<{
+    readonly evidence: ProviderBillingEvidence;
+    readonly evidenceDigest: Sha256Digest;
+    readonly providerStreamReceiptDigest: Sha256Digest;
+  }>;
+}
+
+export type ExactDockerCustodyCompletionV2 =
+  | Readonly<ExactDockerCustodyCapturedTerminalBaseV2 & {
+      readonly kind: 'result-captured';
+    }>
+  | Readonly<ExactDockerCustodyCapturedTerminalBaseV2 & {
+      readonly kind: 'landing-captured';
+      readonly landingProposal: Readonly<{
+        readonly artifact: ExactDockerLandingProposalArtifactRefV2;
+        readonly proposal: ExactExecutionLandingProposalV3;
+        /** Host timestamp taken only after Store verified the immutable bytes. */
+        readonly verifiedAt: string;
+      }>;
+    }>
+  | Readonly<ExactDockerCustodyTerminalBaseV2 & {
+      readonly kind: 'capture-hold';
+      readonly reasonCode: ExactDockerCustodyTerminalHoldReasonCodeV2;
+      readonly evidence:
+        | Readonly<{
+            readonly kind: 'release-authority';
+            readonly receipt: ExactDockerCustodyReceiptRefV2;
+          }>
+        | Readonly<{
+            readonly kind: 'provider-exit-observation';
+            readonly providerExit: ExactDockerProviderExitObservationRefV2;
+          }>;
+    }>;
+
+export type ExactDockerCustodyDispatchOutcomeV2 =
+  | Readonly<{
+      kind: 'released';
+      settlementRef: TaskResultSettlementRefV1;
+      admissionRef: ExactDockerCustodyAdmissionRefV2;
+      preparationRef: ExactDockerCustodyPreparationRefV2;
+      custodyRef: ExactDockerCustodyRefV2;
+      providerExecutionAttempt: TaskAttemptCustodyProviderExecutionAttemptV2;
+      backendExecutionId: string;
+      mountReceiptDigest: Sha256Digest;
+      dispatchReceipt: ExactDockerCustodyReceiptRefV2;
+      releaseReceipt: ExactDockerCustodyReceiptRefV2;
+      providerStartReceipt: ExactDockerCustodyReceiptRefV2;
+      projectionFence: Sha256Digest;
+      readonly releasedAt: string;
+      /** Trusted PID1 accepted the one-shot start authorization; process proof is separate. */
+      readonly providerStartAcceptedAt: string;
+    }>
+  | Readonly<{
+      kind: 'not-dispatched';
+      admissionRef: ExactDockerCustodyAdmissionRefV2;
+      custodyRef: ExactDockerCustodyIdentityRefV2;
+      providerAttemptCount: 0;
+      providerExecutionAttempt: null;
+      reasonCode: TaskAttemptCustodyNotDispatchedReasonCode;
+      zeroWorkReceipt: ExactDockerCustodyReceiptRefV2;
+      projectionFence: Sha256Digest;
+    }>
+  | Readonly<{
+      kind: 'ambiguous';
+      admissionRef: ExactDockerCustodyAdmissionRefV2;
+      custodyRef: ExactDockerCustodyIdentityRefV2;
+      reasonCode: TaskAttemptCustodyAmbiguousReasonCode;
+      reconciliationReceipt: ExactDockerCustodyReceiptRefV2;
+      projectionFence: Sha256Digest;
+    }>;
 
 // ─── SpawnBackend Interface ───────────────────────────────────────────────────
 
@@ -91,6 +465,45 @@ export interface SpawnBackend {
    * @param opts    Optional spawn options (projectDir, allowedTools, autoApprove)
    */
   spawn(taskId: string, model: ModelType, prompt: string, opts?: SpawnBackendOptions): void;
+
+  /**
+   * Docker-only pre-publication admission seam. Other backends omit it and the
+   * producer must return a typed unsupported/HOLD instead of synthesizing a
+   * public attempt or falling back to shared `.tasks`.
+   */
+  /**
+   * Async normal-Docker cutover port. Producers publish TASK_ASSIGN/EXECUTING
+   * only after `released`; `not-dispatched` is zero provider work and
+   * `ambiguous` is a typed HOLD. The historical synchronous `spawn()` remains
+   * only for callers not yet moved by T6/T7.
+   */
+  prepareExactDockerCustody?(
+    input: PrepareExactDockerCustodyInputV2,
+  ): Promise<PreparedExactDockerCustodyV2>;
+
+  dispatchExactDockerCustody?(
+    envelope: ExactDockerCustodyDispatchEnvelopeV2,
+  ): Promise<ExactDockerCustodyDispatchOutcomeV2>;
+
+  awaitExactDockerCustodyTerminal?(
+    query: ExactDockerCustodyTerminalQueryV2,
+  ): Promise<ExactDockerCustodyCompletionV2>;
+
+  /**
+   * Backend-owned acceptance/read port for normal producers. It never exposes
+   * the private CanonicalIngressAuthority or lets a caller mint a reader.
+   */
+  awaitExactDockerAcceptedResult?(
+    query: ExactDockerCustodyTerminalQueryV2,
+  ): Promise<ExactDockerAcceptResultOutcomeV2>;
+
+  acceptExactDockerCustodyResult?(
+    input: AcceptExactDockerCustodyResultInputV2,
+  ): Promise<ExactDockerAcceptResultOutcomeV2>;
+
+  readExactDockerAcceptedResult?(
+    reader: ExactDockerAcceptedResultReaderV2,
+  ): ExactDockerAcceptedResultV2;
 
   /**
    * Kill a running worker by task ID.

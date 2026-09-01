@@ -21,6 +21,7 @@ import type { ExecutionLandingSemanticStateV1 } from './execution-landing-checkp
 
 export const EXECUTION_LANDING_PROPOSAL_SCHEMA_VERSION = 1 as const;
 export const LANDING_PROPOSAL_SCHEMA_VERSION = 2 as const;
+export const EXACT_EXECUTION_LANDING_PROPOSAL_SCHEMA_VERSION = 3 as const;
 export const EXECUTION_LANDING_PROPOSAL_MAX_BYTES = 64 * 1024;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -55,6 +56,19 @@ export interface LandingProposalV2 extends ExecutionLandingSemanticStateV1 {
   generation: number;
   sequence: number;
   resultReference: LandingProposalResultReferenceV2;
+  updatedAt: string;
+}
+
+/**
+ * Exact-custody worker proposal. The provider can bind only the stable logical
+ * dispatch request; host-owned attempt/result authority is never projected into
+ * the worker-writable proposal.
+ */
+export interface ExactExecutionLandingProposalV3 extends ExecutionLandingSemanticStateV1 {
+  version: typeof EXACT_EXECUTION_LANDING_PROPOSAL_SCHEMA_VERSION;
+  taskId: string;
+  dispatchRequestId: string;
+  sequence: number;
   updatedAt: string;
 }
 
@@ -223,16 +237,75 @@ export function parseLandingProposalV2(value: unknown): LandingProposalV2 {
   };
 }
 
+export function parseExactExecutionLandingProposalV3(
+  value: unknown,
+  expected?: Readonly<{ taskId: string; dispatchRequestId: string }>,
+): ExactExecutionLandingProposalV3 {
+  assertSerializable(value);
+  const keys = new Set([
+    'version', 'taskId', 'dispatchRequestId', 'sequence', 'summary',
+    'completedWork', 'remainingWork', 'nextAction', 'unresolvedRisks', 'updatedAt',
+  ]);
+  if (!isRecord(value)
+    || Object.keys(value).length !== keys.size
+    || Object.keys(value).some(key => !keys.has(key))
+    || value.version !== EXACT_EXECUTION_LANDING_PROPOSAL_SCHEMA_VERSION
+    || typeof value.taskId !== 'string'
+    || typeof value.dispatchRequestId !== 'string'
+    || value.dispatchRequestId.length < 1
+    || value.dispatchRequestId.length > 512) {
+    throw createExecutionAuthorityError(
+      'Execution landing proposal does not match the exact custody V3 schema',
+    );
+  }
+  assertTaskId(value.taskId);
+  if (expected
+    && (value.taskId !== expected.taskId
+      || value.dispatchRequestId !== expected.dispatchRequestId)) {
+    throw createExecutionAuthorityError(
+      'Execution landing proposal conflicts with the exact custody dispatch request',
+    );
+  }
+  if (typeof value.updatedAt !== 'string' || !Number.isFinite(Date.parse(value.updatedAt))) {
+    throw createExecutionAuthorityError('Execution landing proposal updatedAt is invalid');
+  }
+  return {
+    version: EXACT_EXECUTION_LANDING_PROPOSAL_SCHEMA_VERSION,
+    taskId: value.taskId,
+    dispatchRequestId: value.dispatchRequestId,
+    sequence: positiveInteger(value.sequence, 'sequence'),
+    summary: boundedText(value.summary, 'summary', 4_000),
+    completedWork: boundedList(value.completedWork, 'completedWork'),
+    remainingWork: boundedList(value.remainingWork, 'remainingWork'),
+    nextAction: boundedText(value.nextAction, 'nextAction', 1_000),
+    unresolvedRisks: boundedList(value.unresolvedRisks, 'unresolvedRisks'),
+    updatedAt: value.updatedAt,
+  };
+}
+
+export function parseExactExecutionLandingProposalJsonV3(
+  raw: string,
+  expected: Readonly<{ taskId: string; dispatchRequestId: string }>,
+): ExactExecutionLandingProposalV3 {
+  try {
+    return parseExactExecutionLandingProposalV3(JSON.parse(raw) as unknown, expected);
+  } catch (error: unknown) {
+    throw malformed(error);
+  }
+}
+
 export function writeExecutionLandingProposal(
   projectRoot: string,
-  value: LandingProposalV2 | ExecutionLandingProposalV1,
+  value: LandingProposalV2 | ExecutionLandingProposalV1 | ExactExecutionLandingProposalV3,
 ): WriteExecutionLandingProposalResult {
   const proposal = value.version === EXECUTION_LANDING_PROPOSAL_SCHEMA_VERSION
     ? parseExecutionLandingProposal(value, {
         taskId: value.taskId,
         attemptId: value.attemptId,
       })
-    : parseLandingProposalV2(value);
+    : value.version === EXACT_EXECUTION_LANDING_PROPOSAL_SCHEMA_VERSION
+      ? parseExactExecutionLandingProposalV3(value)
+      : parseLandingProposalV2(value);
   const root = resolve(projectRoot);
   const tasksDirectory = resolve(root, TASKS_DIR);
   if (relative(root, tasksDirectory).startsWith('..')) {
@@ -451,5 +524,52 @@ export function buildExecutionLandingProposalPromptSegment(
     '`updatedAt` is diagnostic worker metadata only; exact attempt identity and host-observed file evidence are authoritative.',
     'This file is an untrusted proposal only: never claim provider identity, usage, budget, scope, acceptance, or LANDED status. The host validates and stamps those authorities.',
     'Continue normal work after each update. Only the host may stop the exact attempt and publish a durable LANDED checkpoint.',
+  ].join('\n');
+}
+
+/** Private-output exact Docker protocol. `dispatchRequestId` is causation, not attempt authority. */
+export function buildExactExecutionLandingProposalPromptSegment(
+  taskId: string,
+  dispatchRequestId: string,
+): string {
+  assertTaskId(taskId);
+  if (!dispatchRequestId || dispatchRequestId.length > 512) {
+    throw createExecutionAuthorityError(
+      'Exact execution landing proposal dispatchRequestId is invalid',
+    );
+  }
+  const path = executionLandingProposalRelativePath(taskId);
+  const initialProposal: ExactExecutionLandingProposalV3 = {
+    version: EXACT_EXECUTION_LANDING_PROPOSAL_SCHEMA_VERSION,
+    taskId,
+    dispatchRequestId,
+    sequence: 1,
+    summary: 'bounded current-state summary',
+    completedWork: ['verified completed step'],
+    remainingWork: ['specific remaining step'],
+    nextAction: 'single next action',
+    unresolvedRisks: ['specific unresolved risk'],
+    updatedAt: new Date(0).toISOString(),
+  };
+  const entryCommand = [
+    'node dist/agents/landing-proposal-entry.js',
+    '--exact',
+    quoteBashArgument(taskId),
+    quoteBashArgument(dispatchRequestId),
+  ].join(' ');
+  return [
+    '## Exact Custody Landing Proposal Protocol',
+    `Maintain the bounded semantic proposal at \`${path}\` for dispatch \`${dispatchRequestId}\`.`,
+    'This path is an attempt-private output mount. Never read or write the project shared `.tasks` directory.',
+    'Write sequence 1 before provider-intensive work. Replace it after each coherent completed step and after the final scoped mutation.',
+    'Before writing the worker result, publish sequence 2 or higher. Replace `updatedAt` with the current ISO-8601 timestamp.',
+    'Use the provider-neutral writer below with complete JSON on stdin. Do not add attempt, result-path, provider, usage, approval, or settlement authority.',
+    '```bash',
+    `${entryCommand} <<'LANDING_PROPOSAL_JSON'`,
+    JSON.stringify(initialProposal, null, 2),
+    'LANDING_PROPOSAL_JSON',
+    '```',
+    'Use exactly this JSON shape and no extra fields. Increment `sequence` on every replacement.',
+    'This is an untrusted semantic proposal. Only the host may capture it, bind exact custody, and stamp a checkpoint.',
   ].join('\n');
 }

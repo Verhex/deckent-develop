@@ -7,6 +7,7 @@ import {
   promptDeliveryReceiptPath,
   readPromptDeliveryReceipt,
   writePromptDeliveryReceipt,
+  type PromptDeliveryReceipt,
 } from '../core/prompt-delivery-receipt.js';
 import { DeckentError } from '../core/errors.js';
 import { existsSync, readdirSync, readFileSync, appendFileSync, mkdirSync, writeFileSync, renameSync } from 'node:fs';
@@ -55,7 +56,16 @@ import { BRAIN_DIR, EVALUATIONS_DIR, MEMORY_DB_FILE, PROJECT_CONFIG_PATH, TASKS_
 import { selectRelevantAdrs, buildAdrPromptSection, classifyInjectionTier } from './adr-selector.js';
 import type { AdrRelevance } from './adr-selector.js';
 import type { RunFlowPlanSourceAuthority } from '../core/run-flow-contract.js';
-import type { WorkerExactExecutionAuthority } from './prompt-god-template.js';
+import type { SegmentedPrompt, WorkerExactExecutionAuthority } from './prompt-god-template.js';
+
+/**
+ * Synchronous prompt composition can re-enter {@link logInjectionAudit} through
+ * prompt-god-template's historical circular import. The exact Docker admission
+ * path must compile before any public/runtime projection exists, so that one
+ * bounded synchronous call suppresses observation writes without weakening the
+ * compatibility path. No await occurs while the depth is non-zero.
+ */
+let deferredPromptObservationDepth = 0;
 
 /**
  * PCOMP-W3 (injection audit): persist every ADR-injection decision so a false
@@ -69,6 +79,7 @@ export function logInjectionAudit(
   task: { title?: string; description?: string } & { id?: string },
   ranked: AdrRelevance[],
 ): void {
+  if (deferredPromptObservationDepth > 0) return;
   try {
     const dir = join(projectRoot, '.deckent', 'prompts');
     mkdirSync(dir, { recursive: true });
@@ -2579,6 +2590,23 @@ export interface SkillDeliveryProbe {
   promptCompilePlanId?: string;
 }
 
+/** In-memory output of a pre-publication prompt compilation. */
+export interface WorkerPromptCompilationSinkV2 {
+  artifact?: SegmentedPrompt;
+  receipt?: PromptDeliveryReceipt;
+}
+
+/**
+ * Exact callers supply accepted dependency evidence and defer every compile-
+ * time observation until the backend has durably released the attempt.
+ */
+export interface WorkerPromptCompilationOptionsV2 {
+  readonly publicationMode?: 'compatibility' | 'deferred';
+  readonly dependencyIds?: readonly string[];
+  readonly dependencyResults?: ReadonlyMap<string, DependencyResultEntry>;
+  readonly sink?: WorkerPromptCompilationSinkV2;
+}
+
 /** `.tasks/task-<id>.skill-delivery.json` — stable compatibility sidecar path. */
 export function skillDeliveryEvidencePath(projectRoot: string, taskId: string): string {
   return promptDeliveryReceiptPath(projectRoot, taskId);
@@ -2709,8 +2737,10 @@ export function buildWorkerPrompt(
    * stays inline rather than being suppressed with no channel to carry it.
    */
   spawnBackendKind?: string,
+  compilationOptions?: WorkerPromptCompilationOptionsV2,
 ): string {
-  const publishDeliveryReceipt = projectRoot !== undefined;
+  const deferredPublication = compilationOptions?.publicationMode === 'deferred';
+  const publishDeliveryReceipt = projectRoot !== undefined && !deferredPublication;
   projectRoot ??= process.cwd();
   // Legacy task JSON may predate Task.verification and carry `Test:` only in
   // description prose. Migrate exactly once at the production ingress; the
@@ -2844,7 +2874,7 @@ export function buildWorkerPrompt(
     projectRoot,
     exactPlanAuthority,
   );
-  if (exactExecutionAuthority) {
+  if (exactExecutionAuthority && !deferredPublication) {
     try {
       const auditDir = join(projectRoot, '.deckent', 'runtime', 'prompt-authority');
       mkdirSync(auditDir, { recursive: true });
@@ -2871,7 +2901,7 @@ export function buildWorkerPrompt(
   // the authoritative prompt-compile evidence authority is MASTER 9024
   // (PROMPT-COMPILE-EVIDENCE-AUTHORITY-001). Enforcement lives in the
   // settlement parity chain, not here.
-  if (task.runPolicy) {
+  if (task.runPolicy && !deferredPublication) {
     try {
       const auditDir = join(projectRoot, '.deckent', 'runtime', 'prompt-authority');
       mkdirSync(auditDir, { recursive: true });
@@ -2893,10 +2923,13 @@ export function buildWorkerPrompt(
     }
   }
 
-  const promptDependencyIds = resolvePromptDependencyIds(projectRoot, task);
-  const dependencyResults = promptDependencyIds.length > 0
-    ? collectDependencyResultEntries(projectRoot, task.sprintId)
-    : new Map<string, DependencyResultEntry>();
+  const promptDependencyIds = compilationOptions?.dependencyResults
+    ? [...new Set(compilationOptions.dependencyIds ?? task.dependencies ?? [])]
+    : resolvePromptDependencyIds(projectRoot, task);
+  const dependencyResults = compilationOptions?.dependencyResults
+    ?? (promptDependencyIds.length > 0
+      ? collectDependencyResultEntries(projectRoot, task.sprintId)
+      : new Map<string, DependencyResultEntry>());
   if (promptDependencyIds.length > 0) {
     const dependencyIds = new Set(promptDependencyIds);
     const dependencyReadPaths = [...dependencyResults.entries()].flatMap(([attemptId, entry]) => {
@@ -2959,7 +2992,13 @@ export function buildWorkerPrompt(
     ),
     exactExecutionAuthority,
   };
-  const artifact = buildTaskPromptSegmented(task, ctx);
+  let artifact: SegmentedPrompt;
+  if (deferredPublication) deferredPromptObservationDepth += 1;
+  try {
+    artifact = buildTaskPromptSegmented(task, ctx);
+  } finally {
+    if (deferredPublication) deferredPromptObservationDepth -= 1;
+  }
 
   // Single accurate token estimate from the actual assembled prompt.
   task.estimatedTokens = artifact.metadata.estimatedTokens;
@@ -2979,6 +3018,10 @@ export function buildWorkerPrompt(
     forcedSkillIds: task.forceSkills,
     segments: artifact.segments,
   });
+  if (compilationOptions?.sink) {
+    compilationOptions.sink.artifact = artifact;
+    compilationOptions.sink.receipt = receipt;
+  }
   if (publishDeliveryReceipt && !writePromptDeliveryReceipt(projectRoot, receipt)) {
     throw new DeckentError('DECKENT_E077', `PROMPT_DELIVERY_RECEIPT_WRITE_HOLD:${task.id}`);
   }
@@ -3001,8 +3044,9 @@ export function buildWorkerPrompt(
     // reads it. Set DECKENT_PROMPT_LINT_LEDGER=0 to lint without recording.
     // A1-İz#3 (2026-07-14): vitest fixture-çağrıları defteri kirletiyordu
     // (186/193 sahte-W6, taskId=025-* foo.ts) — test-ortamında ledger kapalı.
-    const ledgerEnabled =
-      process.env['DECKENT_PROMPT_LINT_LEDGER'] !== '0' && process.env['VITEST'] === undefined;
+    const ledgerEnabled = !deferredPublication
+      && process.env['DECKENT_PROMPT_LINT_LEDGER'] !== '0'
+      && process.env['VITEST'] === undefined;
     const findings = lintWorkerPromptContract(task, trackedFiles);
     if (findings.length > 0 && ledgerEnabled) {
       for (const f of findings) {

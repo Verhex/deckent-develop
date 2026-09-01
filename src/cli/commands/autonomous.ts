@@ -152,9 +152,8 @@ function createLiveAutonomousExactSprintExecutor(input: {
               : {}),
           },
           flowId: context.exactRef.flowId,
-          onExactPlanMaterialize: () => {
-            context.onExactPlanMaterialize();
-          },
+          onExactPlanMaterialize: (_sprint, materializationOptions) =>
+            context.onExactPlanMaterialize(materializationOptions),
           onExecutionAdmitted: (admittedSprint) => {
             context.onExecutionAdmitted({
               flowId: context.exactRef.flowId,

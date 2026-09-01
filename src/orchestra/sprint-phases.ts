@@ -221,7 +221,12 @@ import type {
 // dependents PAUSED and DONE → dependents PENDING actually fire.
 import { applyCascadeToSprint, applyUnblockToSprint, respawnEligibleTasks, assertTaskProjectionParity } from './sprint-spawner.js';
 // Row 3309 — typed spawn-skip observability for waves this phase drives.
-import { describeSpawnSkip, publishSchedulerSpawnSkips } from './scheduler-effects.js';
+import {
+  describeSpawnSkip,
+  publishSchedulerSpawnSkips,
+  type ExactNormalDockerExecutionRegistryV2,
+  type ExactTaskProjectionAdmissionV2,
+} from './scheduler-effects.js';
 import { writeEvent, getCurrentSprintId, readEvents, SCOPE_INSUFFICIENT_CHANNEL } from './event-stream.js';
 import { verifyProofOfFunction } from './proof-of-function.js';
 import { checkWorkerLiveness } from './worker-liveness.js';
@@ -1505,6 +1510,7 @@ export async function runPlanPhase(
   _opts: RunSprintOptions | undefined,
   _activeProvider: ProviderAdapter | null,
   rollbackEnabled: boolean,
+  deferTaskArtifactProjection = false,
 ): Promise<PlanPhaseResult> {
   try {
     const context = readContext(projectRoot);
@@ -1514,7 +1520,9 @@ export async function runPlanPhase(
       modelConstraint: null,
       reason: 'No usage constraints',
     };
-    const sprint = await planSprint(projectRoot, config, context, recommendation);
+    const sprint = await planSprint(projectRoot, config, context, recommendation, {
+      deferTaskArtifactProjection,
+    });
     sprint.startedAt = now();
 
     // PLAN creates project-conventions in the routing catalog only. The worker
@@ -1576,6 +1584,8 @@ export async function runSpawnPhase(
   config: ResolvedConfig,
   opts: RunSprintOptions | undefined,
   spawnBackend: SpawnBackend | undefined,
+  exactDockerRegistry?: ExactNormalDockerExecutionRegistryV2,
+  exactTaskProjectionAdmission?: ExactTaskProjectionAdmissionV2,
 ): Promise<SpawnPhaseResult> {
   let scanInterval: ReturnType<typeof setInterval> | null = null;
   let taskQueue: Task[] = [];
@@ -1602,7 +1612,13 @@ export async function runSpawnPhase(
       // production plan paths (planSprint task-write; exact-plan artifact
       // projection) write files BEFORE this point; parity keeps behaviour
       // byte-identical. FIX/re-dispatch respawns are typed remaining scope.
-      assertTaskProjectionParity(projectRoot, sprint);
+      assertTaskProjectionParity(
+        projectRoot,
+        sprint,
+        exactDockerRegistry
+          ? new Set(sprint.tasks.map(task => task.id))
+          : undefined,
+      );
       taskQueue = await spawnWorkers(projectRoot, sprint, config, {
         autoApprove: opts?.autoApprove,
         spawnBackend,
@@ -1611,6 +1627,8 @@ export async function runSpawnPhase(
         ...(opts?.exactPlanAuthority
           ? { exactPlanAuthority: opts.exactPlanAuthority }
           : {}),
+        ...(exactDockerRegistry ? { exactDockerRegistry } : {}),
+        ...(exactTaskProjectionAdmission ? { exactTaskProjectionAdmission } : {}),
       });
       // Spawn succeeded — promote to ACTIVE and re-persist.
       persistPhaseTransition(projectRoot, sprint, SprintPhase.SPAWN, SprintStatus.ACTIVE);

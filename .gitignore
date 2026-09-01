@@ -270,6 +270,8 @@ docs/analysis/
 
 # W3: in-repo native addon build output (compiled per-host, never committed)
 native/exec-authority/build/
+native/exec-authority/prebuilds/
+native/exec-authority/.build-stage-*/
 
 # SQLite WAL side-files (runtime churn, never committed)
 .deckent/*.db-shm

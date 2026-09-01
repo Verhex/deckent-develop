@@ -611,7 +611,7 @@ export function assertReachabilityResult(result: ReachabilityResult): void {
   if (!(['subscription', 'api', 'hybrid', 'local', 'unknown'] as const).includes(result.auth.mode)) {
     throw providerTruthError('Unknown auth mode');
   }
-  if (!(['cli', 'api', 'http', 'local-runtime'] as const).includes(result.backend.transport)) {
+  if (!(['cli', 'mcp', 'api', 'http', 'local-runtime'] as const).includes(result.backend.transport)) {
     throw providerTruthError('Unknown transport');
   }
   if (!(['host-subprocess', 'docker', 'tmux', 'api', 'in-process', 'unknown'] as const)
@@ -630,7 +630,7 @@ export function assertReachabilityResult(result: ReachabilityResult): void {
   if (result.executionProfile.allowed.length === 0) throw providerTruthError('Execution profile has no allowed tuple');
   for (const item of result.executionProfile.allowed) {
     if (!(['subscription', 'api', 'hybrid', 'local', 'unknown'] as const).includes(item.authMode)
-      || !(['cli', 'api', 'http', 'local-runtime'] as const).includes(item.transport)
+      || !(['cli', 'mcp', 'api', 'http', 'local-runtime'] as const).includes(item.transport)
       || !(['host-subprocess', 'docker', 'tmux', 'api', 'in-process', 'unknown'] as const)
         .includes(item.executionBackend)) {
       throw providerTruthError('Execution profile contains an unknown tuple');

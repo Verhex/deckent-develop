@@ -283,19 +283,33 @@ export function readContext(projectRoot: string): BrainContext {
  * @returns The planned sprint with all tasks
  * @throws {BrainError} When AI planner fails in 'ai' mode or circular dependencies detected
  */
+export function shouldDeferTaskArtifactProjection(
+  tasks: readonly Pick<Task, 'backend'>[],
+  requested: boolean | undefined,
+): boolean {
+  return requested === true || tasks.some(task => task.backend === 'docker');
+}
+
 export async function planSprint(
   projectRoot: string,
   config: ResolvedConfig,
   context: BrainContext,
   recommendation: SprintSizeRecommendation,
-  options?: { mode?: BrainPlanningMode; asDraft?: boolean; dryRun?: boolean; acknowledgePromptGate?: boolean },
+  options?: {
+    mode?: BrainPlanningMode;
+    asDraft?: boolean;
+    dryRun?: boolean;
+    acknowledgePromptGate?: boolean;
+    /** Exact normal-Docker runs publish public task compatibility files only after RELEASED. */
+    deferTaskArtifactProjection?: boolean;
+  },
 ): Promise<Sprint> {
   const sprintId = getNextSprintId(projectRoot);
   // G-series plan-time prompt-gate result (persona/decision-space); computed after
   // routing inside the pool try-block, attached to the returned Sprint below.
   let promptGate: PromptGateResult | undefined;
   // A preview is not a run: it must leave no raw event/sequence allocator evidence.
-  if (!options?.dryRun) {
+  if (!options?.dryRun && !options?.deferTaskArtifactProjection) {
     emitProgress({ phase: 'PLAN', root: projectRoot, sprintId });
   }
   const plannerTaskModelPolicy = createPlannerTaskModelPolicy(
@@ -1056,8 +1070,17 @@ export async function planSprint(
     );
   }
 
-  // Write task files (skip in dry-run mode)
-  if (!options?.dryRun) {
+  // A task-level Docker pin can select exact custody even when the run's
+  // default backend is not Docker. Defer the whole plan's compatibility
+  // projection in that case; the canonical executor publishes legacy tasks
+  // before their legacy dispatch and exact tasks only after RELEASED.
+  const deferTaskArtifactProjection = shouldDeferTaskArtifactProjection(
+    tasks,
+    options?.deferTaskArtifactProjection,
+  );
+
+  // Write task files (skip in dry-run or exact pre-publication mode)
+  if (!options?.dryRun && !deferTaskArtifactProjection) {
     const tasksPath = join(projectRoot, TASKS_DIR);
     mkdirSync(tasksPath, { recursive: true });
     for (const task of tasks) {

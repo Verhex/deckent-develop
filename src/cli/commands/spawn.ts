@@ -18,8 +18,6 @@ import { getLanguage, getMessage } from '../helpers/messages.js';
 import { TaskStatus, getProviderForModel } from '../../core/task-types.js';
 import { TASKS_DIR } from '../../core/constants.js';
 import { readJsonSafe, debugLog } from '../../core/utils.js';
-import { buildWorkerPrompt } from '../../orchestra/task-builder.js';
-import { resolveAgentPrompt, resolveSkillPrompts } from '../../orchestra/sprint-controller.js';
 import { SpawnBackendError, SpawnBackendFactory, type HostTerminalResultContractV1 } from '../../orchestra/spawn-backend.js';
 import { isAdapterProvider, getProviderAdapterForTask } from '../../orchestra/sprint-utils.js';
 import { getProviderCommandSpec } from '../../core/provider-command-spec.js';
@@ -47,12 +45,15 @@ import {
 } from '../../core/attended-execution-approval.js';
 import {
   assertAttendedExecutionProposalMaterial,
-  createAttendedExecutionProposalMaterialFromTask,
   type AttendedExecutionProposalMaterial,
   type AttendedExecutionProposalReference,
 } from '../../core/attended-execution-proposal.js';
 import { resolveHostExecutionBudget } from '../../orchestra/runtime-budget-monitor.js';
 import { resolveProviderExecutionCostClass } from '../../core/provider-execution-profile.js';
+import {
+  executeTaskIngress,
+  readTaskIngressErrorAuthority,
+} from '../../orchestra/task-mode-runner.js';
 import {
   createTaskResultSettlementRef,
   createTaskResultSettlementRefForAttempt,
@@ -64,9 +65,11 @@ import {
   withExecutionLock,
 } from '../../core/file-lock.js';
 import { openTaskSettlementProjection } from '../../core/task-settlement-authority.js';
-import { resolveTenant } from '../../core/tenant-context.js';
 import { finalizeTaskStatusFromSettlement } from '../../orchestra/task-settlement-projection.js';
 import { cliContractMessage, bindArgumentDescriptions } from '../helpers/message-catalog/cli-run.js';
+import { ProviderExecutionIngressHoldError } from '../../core/provider-execution-ingress-authority.js';
+import { bootstrapApprovalAuthority } from '../../core/approval-authority-bootstrap.js';
+import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provider-authority-composition.js';
 
 export { finalizeTaskStatusFromSettlement } from '../../orchestra/task-settlement-projection.js';
 
@@ -680,7 +683,12 @@ export function finalizeTaskStatusFromResult(root: string, taskId: string): Task
   }
 }
 
-export function registerSpawn(program: Command): void {
+export interface SpawnCommandRuntime {
+  readonly providerAuthority?: ProviderAuthorityRuntimeServiceOpenResult;
+  readonly attendedExecutionApprovalAuthority?: AttendedExecutionApprovalAuthority;
+}
+
+export function registerSpawn(program: Command, runtime: SpawnCommandRuntime = {}): void {
   const helpLang = getLanguage(undefined);
   bindArgumentDescriptions(program.command('spawn <taskId>'), helpLang, { taskId: 'cliContract.spawn.arg.taskId' })
     // NOTE: with the docker backend this command BLOCKS until the worker
@@ -696,35 +704,57 @@ export function registerSpawn(program: Command): void {
 
       try {
         const task = readTask(root, taskId);
-        const config = await loadConfig(root).catch(() => ({ language: 'en' }));
-        lang = (config as Record<string, unknown>).language as string ?? 'en';
+        const config = await loadConfig(root);
+        lang = config.language ?? 'en';
 
         // Status checks
         if (task.status === TaskStatus.EXECUTING) {
-          printError(`Task ${taskId} is already running. Kill first with \`deckent kill ${taskId}\`.`);
+          printError(cliContractMessage('cliContract.spawn.already_running', lang, { taskId }));
           process.exitCode = 1;
           return;
         }
 
         if ((task.status === TaskStatus.DONE || task.status === TaskStatus.NO_GO) && !opts.force) {
-          printError(`Task ${taskId} already ${task.status}. Use --force to respawn.`);
+          printError(cliContractMessage('cliContract.spawn.already_terminal', lang, {
+            taskId,
+            status: task.status,
+          }));
           process.exitCode = 1;
           return;
         }
 
-        // Build rich prompt
-        const agentPrompt = await resolveAgentPrompt(root, task);
-        const skillPrompts = await resolveSkillPrompts(root, task);
-        const prompt = buildWorkerPrompt(
-          task,
-          agentPrompt,
-          skillPrompts,
-          root,
-          'prompt' in config ? config : undefined,
-        );
-
-        // Derive scope-based allowedTools for boundary enforcement
-        const allowedTools = buildAllowedToolsFromScope(task);
+        const configuredBackend = SpawnBackendFactory.create({
+          backend: task.backend ?? config.spawn_backend,
+          projectDir: root,
+          dockerImage: config.docker_image,
+          dockerTimeoutSeconds: config.docker_timeout,
+          dockerMemoryLimit: config.worker_memory_limit,
+          dockerHomeTmpfsSize: config.worker_home_tmpfs_size,
+          dockerMemorySwap: config.worker_memory_swap,
+          dockerKindMemoryLimits: config.worker_memory_limit_by_kind,
+        });
+        const taskProvider = task.provider ?? getProviderForModel(task.model);
+        const finalOnlyContainment = requireFinalOnlyUsageContainment({
+          role: 'worker',
+          provider: taskProvider,
+          providerCommand: getProviderCommandSpec(taskProvider),
+          executor: configuredBackend.name === 'docker'
+            ? { executor: 'docker', finalOnlyUsageContainment: 'wall-clock' }
+            : undefined,
+          budget: task.budget,
+          budgetPolicy: task.budgetPolicy,
+        });
+        const exactDockerIntent = configuredBackend.name === 'docker'
+          && !(isAdapterProvider(taskProvider) && !task.backend && !finalOnlyContainment);
+        if (
+          opts.force
+          && exactDockerIntent
+          && (task.status === TaskStatus.DONE || task.status === TaskStatus.NO_GO)
+        ) {
+          printError(cliContractMessage('cliContract.spawn.exact_force_hold', lang, { taskId }));
+          process.exitCode = 1;
+          return;
+        }
 
         // Stale-result guard for the post-spawn finalize below: a pre-existing
         // .result (e.g. --force respawn of a DONE/NO_GO task) must not be read
@@ -734,54 +764,69 @@ export function registerSpawn(program: Command): void {
         let preSpawnResultMtime: number | null = null;
         try { preSpawnResultMtime = statSync(resultPath).mtimeMs; } catch { /* no prior result */ }
 
-        // Spawn via config-aware backend (respects spawn_backend setting).
-        // Docker backend: this call starts the container and the process then
-        // stays alive until the container exits (`docker wait` monitor) — i.e.
-        // `deckent spawn` is BLOCKING on docker. tmux/subprocess: fire-and-forget.
-        const cfgAny = config as { spawn_backend?: string; docker_image?: string; docker_timeout?: number };
-        const { backend, provider, settlementRef } = await spawnWorkerMultiProvider(taskId, task.model, prompt, root, {
+        const approvalBootstrap = runtime.attendedExecutionApprovalAuthority
+          ? { state: 'disabled' as const }
+          : bootstrapApprovalAuthority(root, config);
+        const attendedExecutionApprovalAuthority = runtime.attendedExecutionApprovalAuthority
+          ?? (approvalBootstrap.state === 'ready'
+            ? approvalBootstrap.runtime.attendedExecutionApprovalAuthority
+            : undefined);
+        const execution = await executeTaskIngress({
+          projectRoot: root,
+          config,
+          task,
+          timeoutMs: (config.docker_timeout ?? 1200) * 1_000,
           autoApprove: opts.autoApprove ?? false,
-          allowedTools,
-          spawnBackend: cfgAny.spawn_backend,
-          dockerImage: cfgAny.docker_image,
-          dockerTimeout: cfgAny.docker_timeout,
-          // F1-RE (268-003): forward the task's reasoning-depth override so the
-          // manual spawn path emits the provider flag like the sprint path does.
-          modelEffort: task.modelEffort,
-          executionBudget: task.budget,
-          executionLandingPolicy: task.budgetPolicy?.landingPolicy,
-          executionBudgetProfileRef: task.budgetPolicy?.profileRef,
-          executionBudgetPolicyDigest: task.budgetPolicy?.policyDigest,
-          executionAdmissionMode: task.budgetPolicy?.admissionMode,
-          executionApprovalEvidenceRef: task.budgetPolicy?.approvalEvidenceRef,
-          executionApprovalProposal: task.budgetPolicy?.approvalProposal,
-          executionApprovalMaterial: createAttendedExecutionProposalMaterialFromTask(
-            task as unknown as Record<string, unknown>,
-            prompt,
-          ),
-          // OPENROUTER-PROVIDER (row 477): forward the task's OWN provider. Without
-          // it the on-demand registration branches in spawnWorkerMultiProvider
-          // (`opts.provider === 'ollama' | 'openrouter'`) never fired on this path,
-          // so `deckent spawn <taskId>` threw UnknownModelError for any dynamic id
-          // — ollama tags included. Unlike `deckent run`, this path never calls
-          // `resolveExecutionModelIdentity`, so nothing else registers the model here.
-          provider: task.provider,
-          taskBudgetPolicy: task.budgetPolicy ?? null,
-          executionTenantId: resolveTenant(root, {
-            ...(task.actor?.tenantId ? { tenantId: task.actor.tenantId } : {}),
-          }).tenantId,
+          ...(attendedExecutionApprovalAuthority
+            ? { attendedExecutionApprovalAuthority }
+            : {}),
+          ...(runtime.providerAuthority ? { providerAuthority: runtime.providerAuthority } : {}),
+          transport: 'cli',
+          onDispatchBoundary: (boundary, invocation) => {
+            print(getMessage('spawn.worker_spawned', lang, { taskId, model: task.model }));
+            print(`  ${cliContractMessage('cliContract.spawn.backend', lang, {
+              backend: boundary.backend,
+            })}`);
+            print(`  ${cliContractMessage('cliContract.spawn.provider', lang, {
+              provider: boundary.provider,
+            })}`);
+            print(`  ${getMessage('run.settlement_declared', lang, {
+              receiptId: invocation.receiptRef.invocationId,
+            })}`);
+            if (task.scope.directories.length > 0) {
+              print(`  ${cliContractMessage('cliContract.spawn.scope_dirs', lang, {
+                paths: task.scope.directories.join(', '),
+              })}`);
+            }
+            if (task.scope.filesWrite.length > 0) {
+              print(`  ${cliContractMessage('cliContract.spawn.write_files', lang, {
+                paths: task.scope.filesWrite.join(', '),
+              })}`);
+            }
+          },
         });
-
-        print(getMessage('spawn.worker_spawned', lang, { taskId, model: task.model }));
-        print(`  Backend: ${backend}`);
-        print(`  Provider: ${provider}`);
-
-        // Show scope info
-        if (task.scope.directories.length > 0) {
-          print(`  Scope dirs: ${task.scope.directories.join(', ')}`);
+        if (execution.disposition.kind !== 'spawned') {
+          printError(cliContractMessage('cliContract.run.ingress_hold', lang, {
+            reason: execution.invocation.reasonCode ?? execution.disposition.kind,
+          }));
+          print(`  ${getMessage('run.settlement_declared', lang, {
+            receiptId: execution.invocation.receiptRef.invocationId,
+          })}`);
+          process.exitCode = 1;
+          return;
         }
-        if (task.scope.filesWrite.length > 0) {
-          print(`  Write files: ${task.scope.filesWrite.join(', ')}`);
+        const settlementRef = execution.disposition.legacySettlementRef;
+
+        if (execution.executionMode === 'normal-docker-exact') {
+          if (execution.resultAuthority?.state !== 'exact-accepted') {
+            throw new DeckentError(
+              'E_SPAWN_EXACT_RESULT_AUTHORITY_HOLD',
+              `EXACT_RESULT_AUTHORITY_HOLD:${execution.resultAuthority?.state ?? 'missing'}`,
+            );
+          }
+          print(`  ${cliContractMessage('cliContract.run.exact_accepted_pending', lang)}`);
+          process.exitCode = 1;
+          return;
         }
 
         // 268-003 completion finalize: when the worker's .result appears, derive
@@ -804,7 +849,9 @@ export function registerSpawn(program: Command): void {
               ? finalizeTaskStatusFromResult(root, taskId)
               : null;
           if (finalized !== null) {
-            print(`  Task status finalized: ${finalized}`);
+            print(`  ${cliContractMessage('cliContract.spawn.status_finalized', lang, {
+              status: finalized,
+            })}`);
             return true;
           }
           return false;
@@ -816,7 +863,7 @@ export function registerSpawn(program: Command): void {
           // The receipt lives in host-global state, outside the worker-mounted
           // project tree. Poll the exact attempt reference; raw result writes,
           // stale attempts and heartbeat transitions are deliberately ignored.
-          const deadline = Date.now() + ((cfgAny.docker_timeout ?? 1200) * 1000) + 30_000;
+          const deadline = Date.now() + ((config.docker_timeout ?? 1200) * 1000) + 30_000;
           const timer = setInterval(() => {
             if (tryFinalize() || Date.now() >= deadline) clearInterval(timer);
           }, 100);
@@ -838,9 +885,45 @@ export function registerSpawn(program: Command): void {
           }
         }
       } catch (error) {
-        printError(error instanceof FinalOnlyUsageContainmentHoldError
-          ? getMessage('spawn.final_only_containment_hold', lang, { reasonCode: error.reasonCode })
-          : error);
+        const ingressErrorAuthority = readTaskIngressErrorAuthority(error);
+        if (ingressErrorAuthority) {
+          const { invocation } = ingressErrorAuthority;
+          if (invocation.state === 'reconciliation-required') {
+            print(getMessage('run.settlement_reconciliation_required', lang, {
+              receiptId: invocation.receiptRef.invocationId,
+              evidence: invocation.executionEvidenceRef ?? 'unknown',
+            }));
+          } else {
+            print(getMessage('run.settlement_declared', lang, {
+              receiptId: invocation.receiptRef.invocationId,
+            }));
+          }
+        }
+        if (error instanceof FinalOnlyUsageContainmentHoldError) {
+          printError(getMessage('spawn.final_only_containment_hold', lang, {
+            reasonCode: error.reasonCode,
+          }));
+        } else if (error instanceof ProviderExecutionIngressHoldError) {
+          printError(new Error(getMessage('run.provider_authority_hold', lang, {
+            reason: error.reasonCode,
+            evidence: error.authorityEvidenceRefs.join(','),
+          })));
+        } else if (error instanceof DeckentError && error.code === 'EXECUTION_BUDGET_HOLD') {
+          const [, reason = 'unknown', profile = 'execution_budget.roles.worker'] =
+            error.message.split(':');
+          printError(new Error(getMessage('run.budget_hold', lang, { reason, profile })));
+        } else if (
+          error instanceof DeckentError
+          && (error.code.startsWith('TASK_INGRESS_')
+            || error.code.startsWith('E_SPAWN_TASK_INGRESS_')
+            || error.code === 'E_SPAWN_EXACT_RESULT_AUTHORITY_HOLD')
+        ) {
+          printError(new Error(cliContractMessage('cliContract.run.ingress_hold', lang, {
+            reason: error.code,
+          })));
+        } else {
+          printError(error);
+        }
         process.exitCode = 1;
       }
     });

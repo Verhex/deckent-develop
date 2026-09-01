@@ -61,7 +61,36 @@ vi.mock('../../src/orchestra/task-builder.js', () => ({
     forcedSkillIds: [...(task?.forceSkills ?? [])],
     undeliveredForcedSkillIds: (task?.forceSkills ?? []).filter((id) => !(delivered ?? []).includes(id)),
   }),
-  buildWorkerPrompt: vi.fn(() => 'mock-prompt'),
+  buildWorkerPrompt: vi.fn((...args: unknown[]) => {
+    const options = args[8] as {
+      sink?: { artifact?: unknown; receipt?: unknown };
+    } | undefined;
+    if (options?.sink) {
+      options.sink.artifact = {
+        planId: `prompt-compile-plan:sha256:${'1'.repeat(64)}`,
+        prompt: 'mock-prompt',
+        compilePlan: { rolePolicyIdentity: 'worker:generic' },
+        segments: [{ tier: 'T0', kind: 'worker-contract', content: 'mock-prompt' }],
+        metadata: { estimatedTokens: 3 },
+      };
+      options.sink.receipt = {
+        version: 2,
+        taskId: (args[0] as { id: string }).id,
+        source: 'worker-prompt',
+        promptSha256: '1'.repeat(64),
+        promptCompilePlanId: `prompt-compile-plan:sha256:${'1'.repeat(64)}`,
+        rolePolicyIdentity: 'worker:generic',
+        assignedAgentId: 'generic',
+        deliveredAgentId: null,
+        personaSegmentSha256: null,
+        assignedSkillIds: [],
+        deliveredSkillIds: [],
+        forcedSkillIds: [],
+        undeliveredForcedSkillIds: [],
+      };
+    }
+    return 'mock-prompt';
+  }),
 }));
 
 vi.mock('../../src/orchestra/tmux.js', () => ({
@@ -79,11 +108,17 @@ vi.mock('../../src/orchestra/result-watcher.js', () => ({
 import { TaskStatus, SprintPhase, SprintStatus } from '../../src/core/types.js';
 import type { Task, ResolvedConfig, Sprint } from '../../src/core/types.js';
 import type { SpawnBackend, SpawnBackendOptions } from '../../src/orchestra/spawn-backend.js';
-import { executeSpawnTask, type SpawnTaskDeps } from '../../src/orchestra/scheduler-effects.js';
+import {
+  createExactNormalDockerExecutionRegistry,
+  executeSpawnTask,
+  type SpawnTaskDeps,
+} from '../../src/orchestra/scheduler-effects.js';
 import { spawnWorker } from '../../src/orchestra/tmux.js';
 import { waitForResults } from '../../src/orchestra/result-collector.js';
 import { buildWorkerPrompt } from '../../src/orchestra/task-builder.js';
 import { ProviderExecutionIngressHoldError } from '../../src/core/provider-execution-ingress-authority.js';
+import { providerRegistry } from '../../src/core/provider.js';
+import type { ProviderAdapter } from '../../src/core/provider.js';
 import { CHANNELS, readEvents } from '../../src/orchestra/event-stream.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -149,7 +184,7 @@ function makeMockBackend(): SpawnBackend & { calls: MockSpawnCall[] } {
     spawn(taskId, model, prompt, opts) {
       calls.push({ taskId, model: model as unknown as string, prompt, opts });
     },
-    kill() { /* no-op */ },
+    kill: vi.fn(),
     list() { return calls.map(c => c.taskId); },
     isAvailable() { return Promise.resolve(true); },
     calls,
@@ -231,6 +266,54 @@ describe('executeSpawnTask — provider-authority ingress', () => {
     expect(task.status).toBe(TaskStatus.PENDING);
   });
 
+  it('binds final-only adapter admission to Docker rather than the ordinary host adapter', async () => {
+    const task = makeTask('700-AUTH-FINAL-ONLY', {
+      model: 'gpt-5.6-sol',
+      provider: 'codex',
+      budgetPolicy: {
+        ...makeTask('final-only-authority-template').budgetPolicy!,
+        resolvedProvider: 'codex',
+        finalOnlyUsage: {
+          maxWallClockSeconds: 600,
+          profileRef: 'execution_budget.final_only_usage',
+          policyDigest: '9'.repeat(64),
+        },
+      },
+    });
+    const backend = makeMockBackend();
+    Object.defineProperty(backend, 'name', { value: 'docker' });
+    const authority = {
+      state: 'hold',
+      reasonCode: 'keyring_unavailable',
+      authorityEvidenceRef: `provider-authority:${'b'.repeat(64)}`,
+      retryable: false,
+      close: vi.fn(),
+    } as const;
+
+    const caught = await executeSpawnTask(
+      { task },
+      baseDeps(root, {
+        backend,
+        config: {
+          spawn_backend: 'docker',
+          worker_provider: 'codex',
+        } as unknown as ResolvedConfig,
+        spawnOpts: { providerAuthority: authority },
+      }),
+    ).catch(error => error);
+
+    expect(caught).toBeInstanceOf(ProviderExecutionIngressHoldError);
+    expect(caught).toMatchObject({
+      request: {
+        taskId: task.id,
+        provider: 'codex',
+        configuredBackend: 'docker',
+      },
+    });
+    expect(buildWorkerPrompt).not.toHaveBeenCalled();
+    expect(backend.calls).toHaveLength(0);
+  });
+
   it('preserves the existing executor behavior when provider authority is not configured', async () => {
     const task = makeTask('700-AUTH-ABSENT', { provider: 'claude' });
     const backend = makeMockBackend();
@@ -242,6 +325,366 @@ describe('executeSpawnTask — provider-authority ingress', () => {
 
     expect(buildWorkerPrompt).toHaveBeenCalledOnce();
     expect(backend.calls).toHaveLength(1);
+  });
+});
+
+describe('executeSpawnTask — resolved host-adapter precedence', () => {
+  let root: string;
+  let priorOllama: ProviderAdapter | null;
+  let adapterSpawn: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    root = makeTmpDir('sched3-host-adapter-precedence');
+    priorOllama = providerRegistry.hasProvider('ollama')
+      ? providerRegistry.getProvider('ollama')
+      : null;
+    adapterSpawn = vi.fn();
+    providerRegistry.registerProvider({
+      name: 'ollama',
+      supportedModels: ['qwen3.8:27b' as Task['model']],
+      executionCostClass: 'local',
+      spawn: adapterSpawn,
+      kill: vi.fn(),
+      listWorkers: () => [],
+      isAvailable: async () => true,
+      buildCommand: () => 'ollama',
+    });
+  });
+
+  afterEach(() => {
+    if (priorOllama) providerRegistry.registerProvider(priorOllama);
+    else providerRegistry.unregisterProvider('ollama');
+    rmSync(root, { recursive: true, force: true });
+    vi.clearAllMocks();
+  });
+
+  it('routes an adapter provider to its host adapter even when config resolved Docker', async () => {
+    const task = makeTask('700-HOST-PRECEDENCE', {
+      provider: 'ollama',
+      model: 'qwen3.8:27b' as Task['model'],
+      budget: undefined,
+      budgetPolicy: undefined,
+    });
+    const backend = makeMockBackend();
+    Object.defineProperty(backend, 'name', { value: 'docker' });
+    const registry = createExactNormalDockerExecutionRegistry(root);
+
+    const disposition = await executeSpawnTask(
+      { task },
+      baseDeps(root, {
+        backend,
+        config: { spawn_backend: 'docker' } as ResolvedConfig,
+        exactDockerRegistry: registry,
+      }),
+    );
+
+    expect(disposition).toMatchObject({
+      kind: 'spawned',
+      taskId: task.id,
+      executionMode: 'legacy-non-docker',
+      executionBackend: 'host-adapter',
+      provider: 'ollama',
+    });
+    expect(adapterSpawn).toHaveBeenCalledOnce();
+    expect(backend.calls).toHaveLength(0);
+    expect(registry.isExactTask(task.id)).toBe(false);
+    expect(registry.resolveLifecycleOwner(task.id)?.name).toBe('ollama');
+  });
+
+  it('keeps an explicit task-level Docker override on the exact route', async () => {
+    const task = makeTask('700-EXPLICIT-DOCKER', {
+      provider: 'ollama',
+      model: 'qwen3.8:27b' as Task['model'],
+      backend: 'docker',
+      budget: undefined,
+      budgetPolicy: undefined,
+    });
+    const backend = makeMockBackend();
+    Object.defineProperty(backend, 'name', { value: 'docker' });
+
+    const disposition = await executeSpawnTask(
+      { task },
+      baseDeps(root, {
+        backend,
+        config: { spawn_backend: 'docker' } as ResolvedConfig,
+        exactDockerRegistry: createExactNormalDockerExecutionRegistry(root),
+      }),
+    );
+
+    expect(disposition).toMatchObject({
+      kind: 'ambiguous',
+      taskId: task.id,
+      reasonCode: 'EXACT_DOCKER_PORT_SET_UNAVAILABLE',
+      executionMode: 'normal-docker-exact',
+      executionBackend: 'docker',
+    });
+    expect(adapterSpawn).not.toHaveBeenCalled();
+    expect(backend.calls).toHaveLength(0);
+  });
+});
+
+describe('executeSpawnTask — exact normal-Docker publication order', () => {
+  let root: string;
+
+  beforeEach(() => { root = makeTmpDir('sched3-exact-order'); });
+  afterEach(() => { rmSync(root, { recursive: true, force: true }); vi.clearAllMocks(); });
+
+  it('keeps public task/receipt absent through prepare+dispatch and publishes only after RELEASED', async () => {
+    const task = makeTask('700-EXACT', { provider: 'claude' });
+    const taskPath = join(root, '.tasks', `task-${task.id}.json`);
+    const receiptPath = join(root, '.tasks', `task-${task.id}.skill-delivery.json`);
+    const observations: string[] = [];
+    const digest = `sha256:${'a'.repeat(64)}` as const;
+    const identity = {
+      schemaVersion: 2 as const,
+      backend: 'docker' as const,
+      projectRootSha256: 'b'.repeat(64),
+      projectId: 'project-test',
+      taskId: task.id,
+      attemptId: 'attempt-exact-1',
+      generation: 1,
+    };
+    const custodyRef = {
+      dispatchRequestId: `dreq-${'c'.repeat(64)}`,
+      identity,
+      admissionReceiptDigest: digest,
+      admissionRefDigest: digest,
+      providerStartReceipt: { ref: digest, digest },
+    };
+    const backend = {
+      name: 'docker',
+      liveUsageBudgetSupport: 'measured-stream',
+      executionLandingCapability: 'cooperative-landing',
+      spawn: vi.fn(),
+      kill: vi.fn(),
+      list: () => [],
+      isAvailable: async () => true,
+      prepareExactDockerCustody: vi.fn(async () => {
+        observations.push(`prepare:${existsSync(taskPath)}:${existsSync(receiptPath)}`);
+        return {
+          kind: 'exact-docker-custody-prepared' as const,
+          dispatchEnvelope: {} as never,
+          admissionRef: {
+            dispatchRequestId: custodyRef.dispatchRequestId,
+            dispatchRequestMaterialDigest: digest,
+            admissionRefDigest: digest,
+          },
+          preparationRef: {} as never,
+        };
+      }),
+      dispatchExactDockerCustody: vi.fn(async () => {
+        observations.push(`dispatch:${existsSync(taskPath)}:${existsSync(receiptPath)}`);
+        return {
+          kind: 'released' as const,
+          settlementRef: {} as never,
+          admissionRef: {
+            dispatchRequestId: custodyRef.dispatchRequestId,
+            dispatchRequestMaterialDigest: digest,
+            admissionRefDigest: digest,
+          },
+          preparationRef: {} as never,
+          custodyRef,
+          providerExecutionAttempt: {} as never,
+          backendExecutionId: 'container-exact-1',
+          mountReceiptDigest: digest,
+          dispatchReceipt: { ref: digest, digest },
+          releaseReceipt: { ref: digest, digest },
+          providerStartReceipt: { ref: digest, digest },
+          projectionFence: digest,
+          releasedAt: '2026-09-01T00:00:00.000Z',
+          providerStartAcceptedAt: '2026-09-01T00:00:00.000Z',
+        };
+      }),
+      awaitExactDockerAcceptedResult: vi.fn(async () => ({
+        kind: 'capture-hold' as const,
+        reasonCode: 'EFFECT_PUBLICATION_HOLD' as const,
+        custodyRef,
+        releaseReceipt: { ref: digest, digest },
+        projectionFence: digest,
+      })),
+    } satisfies SpawnBackend;
+    const config = {
+      spawn_backend: 'docker',
+      docker_timeout: 60,
+      auth_mode: 'subscription',
+      prompt: { worker_core_system_prompt: false },
+    } as unknown as ResolvedConfig;
+    const registry = createExactNormalDockerExecutionRegistry(root);
+
+    const disposition = await executeSpawnTask(
+      { task, taskTimeoutSeconds: 60 },
+      baseDeps(root, {
+        backend,
+        config,
+        exactDockerRegistry: registry,
+        exactTaskProjectionAdmission: {
+          taskIds: [task.id],
+          existingContentDigests: {},
+        },
+      }),
+    );
+
+    expect(disposition).toMatchObject({
+      kind: 'spawned',
+      taskId: task.id,
+      executionMode: 'normal-docker-exact',
+      executionBackend: 'docker',
+      exactDispatchOutcome: {
+        kind: 'released',
+        projectionFence: digest,
+        releaseReceipt: { ref: digest, digest },
+      },
+    });
+    expect(observations).toEqual(['prepare:false:false', 'dispatch:false:false']);
+    expect(backend.spawn).not.toHaveBeenCalled();
+    expect(existsSync(taskPath)).toBe(true);
+    expect(existsSync(receiptPath)).toBe(true);
+    expect(JSON.parse(readFileSync(taskPath, 'utf-8'))).toMatchObject({
+      id: task.id,
+      status: TaskStatus.EXECUTING,
+      assignedWorker: `w-${task.id}`,
+    });
+    expect(readEvents(root, 'sprint-sched3', { channel: CHANNELS.TASK_ASSIGN }))
+      .toHaveLength(1);
+    await expect(registry.awaitTaskResultAuthority(task.id)).resolves.toMatchObject({
+      state: 'authority-hold',
+      holdReason: 'EFFECT_PUBLICATION_HOLD',
+    });
+
+    const zeroWorkTask = makeTask('700-EXACT-ZERO', { provider: 'claude' });
+    const zeroWorkOutcome = {
+      kind: 'not-dispatched' as const,
+      admissionRef: {
+        dispatchRequestId: custodyRef.dispatchRequestId,
+        dispatchRequestMaterialDigest: digest,
+        admissionRefDigest: digest,
+      },
+      custodyRef,
+      providerAttemptCount: 0 as const,
+      providerExecutionAttempt: null,
+      reasonCode: 'PRE_MOUNT_ABORTED' as const,
+      zeroWorkReceipt: { ref: digest, digest },
+      projectionFence: digest,
+    };
+    backend.dispatchExactDockerCustody.mockResolvedValueOnce(zeroWorkOutcome as never);
+    const zeroWorkDisposition = await executeSpawnTask(
+      { task: zeroWorkTask, taskTimeoutSeconds: 60 },
+      baseDeps(root, {
+        backend,
+        config,
+        exactDockerRegistry: registry,
+        exactTaskProjectionAdmission: {
+          taskIds: [zeroWorkTask.id],
+          existingContentDigests: {},
+        },
+      }),
+    );
+    expect(zeroWorkDisposition).toMatchObject({
+      kind: 'not-dispatched',
+      taskId: zeroWorkTask.id,
+      executionMode: 'normal-docker-exact',
+      executionBackend: 'docker',
+      exactDispatchOutcome: zeroWorkOutcome,
+    });
+    expect(zeroWorkDisposition.kind).toBe('not-dispatched');
+    if (zeroWorkDisposition.kind !== 'not-dispatched') throw new Error('expected exact zero work');
+    expect(zeroWorkDisposition.exactDispatchOutcome).toBe(zeroWorkOutcome);
+    expect(existsSync(join(root, '.tasks', `task-${zeroWorkTask.id}.json`))).toBe(false);
+
+    const ambiguousTask = makeTask('700-EXACT-AMBIGUOUS', { provider: 'claude' });
+    const ambiguousOutcome = {
+      kind: 'ambiguous' as const,
+      admissionRef: zeroWorkOutcome.admissionRef,
+      custodyRef,
+      reasonCode: 'MOUNT_RECONCILIATION_REQUIRED' as const,
+      reconciliationReceipt: { ref: digest, digest },
+      projectionFence: digest,
+    };
+    backend.dispatchExactDockerCustody.mockResolvedValueOnce(ambiguousOutcome as never);
+    const ambiguousDisposition = await executeSpawnTask(
+      { task: ambiguousTask, taskTimeoutSeconds: 60 },
+      baseDeps(root, {
+        backend,
+        config,
+        exactDockerRegistry: registry,
+        exactTaskProjectionAdmission: {
+          taskIds: [ambiguousTask.id],
+          existingContentDigests: {},
+        },
+      }),
+    );
+    expect(ambiguousDisposition).toMatchObject({
+      kind: 'ambiguous',
+      taskId: ambiguousTask.id,
+      executionMode: 'normal-docker-exact',
+      executionBackend: 'docker',
+      exactDispatchOutcome: ambiguousOutcome,
+    });
+    expect(ambiguousDisposition.kind).toBe('ambiguous');
+    if (ambiguousDisposition.kind !== 'ambiguous') throw new Error('expected exact ambiguity');
+    expect(ambiguousDisposition.exactDispatchOutcome).toBe(ambiguousOutcome);
+    expect(existsSync(join(root, '.tasks', `task-${ambiguousTask.id}.json`))).toBe(false);
+  });
+
+  it('keeps a task-level legacy route readable without treating it as exact pending work', async () => {
+    const task = makeTask('700-MIXED-LEGACY', { provider: 'claude' });
+    const taskPath = join(root, '.tasks', `task-${task.id}.json`);
+    const backend = makeMockBackend();
+    const registry = createExactNormalDockerExecutionRegistry(root);
+
+    const disposition = await executeSpawnTask(
+      { task },
+      baseDeps(root, {
+        backend,
+        config: { spawn_backend: 'docker' } as ResolvedConfig,
+        exactDockerRegistry: registry,
+      }),
+    );
+
+    expect(disposition).toMatchObject({ kind: 'spawned', taskId: task.id });
+    expect(registry.isExactTask(task.id)).toBe(false);
+    expect(registry.resolveLifecycleOwner(task.id)).toBe(backend);
+    expect(backend.calls).toHaveLength(1);
+    expect(existsSync(taskPath)).toBe(true);
+    expect(registry.readTaskResultAuthority(task.id).state).not.toBe('pending-settlement');
+  });
+
+  it('turns missing exact dependency authority into a durable registry HOLD', async () => {
+    const task = makeTask('700-EXACT-DEPENDENT', {
+      provider: 'claude',
+      dependencies: ['700-EXACT-MISSING'],
+    });
+    const backend = makeMockBackend();
+    Object.defineProperties(backend, {
+      name: { value: 'docker' },
+      prepareExactDockerCustody: { value: vi.fn() },
+      dispatchExactDockerCustody: { value: vi.fn() },
+      awaitExactDockerAcceptedResult: { value: vi.fn() },
+    });
+    const registry = createExactNormalDockerExecutionRegistry(root);
+
+    const disposition = await executeSpawnTask(
+      { task, taskTimeoutSeconds: 60 },
+      baseDeps(root, {
+        backend,
+        config: {
+          spawn_backend: 'docker',
+          auth_mode: 'subscription',
+        } as ResolvedConfig,
+        exactDockerRegistry: registry,
+      }),
+    );
+
+    expect(disposition).toEqual({
+      executionMode: 'normal-docker-exact',
+      executionBackend: 'docker',
+      kind: 'exact-dependency-authority-hold',
+      taskId: task.id,
+    });
+    expect(registry.readTaskResultAuthority(task.id)).toMatchObject({
+      state: 'authority-hold',
+      holdReason: 'EXACT_DEPENDENCY_TERMINAL_AUTHORITY_UNAVAILABLE',
+    });
   });
 });
 
@@ -272,6 +715,8 @@ describe('executeSpawnTask — canonical write collision admission', () => {
     );
 
     expect(disposition).toEqual({
+      executionMode: 'legacy-non-docker',
+      executionBackend: 'mock-backend',
       kind: 'collision-held',
       taskId: candidate.id,
       blockerTaskIds: [active.id],
@@ -593,9 +1038,19 @@ describe('waitForResults — queue-completion trigger (processQueue) delegates t
     );
 
     const backend = makeMockBackend();
-    await waitForResults(root, sprint, 300, [fixTask], { spawnBackend: backend });
+    const completedTaskOwner = makeMockBackend();
+    const registry = createExactNormalDockerExecutionRegistry(root);
+    registry.registerLegacy(active.id, completedTaskOwner);
+    await waitForResults(root, sprint, 300, [fixTask], {
+      spawnBackend: backend,
+      ipcExecutionMode: 'legacy-non-docker',
+      exactDockerRegistry: registry,
+    });
 
     expect(backend.calls.map(call => call.taskId)).toContain('702-001-fix');
+    expect(completedTaskOwner.kill).toHaveBeenCalledWith(active.id);
+    expect(backend.kill).not.toHaveBeenCalledWith(active.id);
+    expect(registry.resolveLifecycleOwner(fixTask.id)).toBe(backend);
     expect(vi.mocked(spawnWorker)).not.toHaveBeenCalled();
     expect(fixTask.provider).toBe('claude');
     expect(fixTask.modelEffort).toBe('high');
@@ -741,7 +1196,7 @@ describe('waitForResults — dep-ready trigger (dispatchReadyTasks) delegates to
       sprint,
       300,
       undefined,
-      { spawnBackend: backend },
+      { spawnBackend: backend, ipcExecutionMode: 'legacy-non-docker' },
       undefined,
       config,
     );

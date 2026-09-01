@@ -55,6 +55,19 @@ export interface TaskArtifactProjectionInspection {
   readonly missing: readonly string[];
 }
 
+export interface DeferredTaskArtifactProjectionInspection
+  extends TaskArtifactProjectionInspection {
+  /** Stable canonical-json digests for projections that already exist. */
+  readonly contentDigests: Readonly<Record<string, string>>;
+}
+
+export interface TaskArtifactProjectionCasResult {
+  readonly taskId: string;
+  readonly previousContentDigest: string;
+  readonly publishedContentDigest: string;
+  readonly state: 'transitioned' | 'idempotent-resume';
+}
+
 export interface TaskArtifactProjectionSet<T extends { readonly id: string }> {
   readonly taskIds: readonly string[];
   readonly tasks: readonly T[];
@@ -274,6 +287,65 @@ export function readTaskArtifactProjectionSet<T extends { readonly id: string }>
     taskIds: [...expectedTaskIds],
     tasks,
     projectionDigest: projectionDigest(tasks, contentDigests),
+    contentDigests: Object.freeze({ ...contentDigests }),
+  };
+}
+
+/**
+ * Inspect exact task projections without creating `.tasks` or publishing any
+ * task. Existing content must be byte-semantically identical to the approved
+ * task; missing content remains an explicit deferred slot.
+ */
+export function inspectTaskArtifactsDeferred<T extends { readonly id: string }>(
+  root: string,
+  tasks: readonly T[],
+): DeferredTaskArtifactProjectionInspection {
+  const taskIds = tasks.map(task => task.id);
+  const fileNames = assertPortableTargetSet(taskIds);
+  const tasksDir = join(root, TASKS_DIR);
+  if (!existsSync(tasksDir)) {
+    return {
+      taskIds,
+      idempotent: [],
+      missing: taskIds,
+      contentDigests: Object.freeze({}),
+    };
+  }
+  const tasksReal = resolveTasksDirectory(root, false);
+  const existingNames = new Map(
+    readdirSync(tasksReal).map(name => [name.toLocaleLowerCase('en-US'), name] as const),
+  );
+  const idempotent: string[] = [];
+  const missing: string[] = [];
+  const contentDigests: Record<string, string> = {};
+  for (let index = 0; index < tasks.length; index++) {
+    const task = tasks[index]!;
+    const fileName = fileNames[index]!;
+    const caseFoldMatch = existingNames.get(fileName.toLocaleLowerCase('en-US'));
+    if (caseFoldMatch === undefined) {
+      missing.push(task.id);
+      continue;
+    }
+    if (caseFoldMatch !== fileName) {
+      throw new TaskArtifactProjectionError('TASK_ARTIFACT_CONTENT_CONFLICT', {
+        taskId: task.id,
+        reason: 'portable_case_fold_collision',
+      });
+    }
+    const observed = readStableTaskArtifact<T>(join(tasksReal, fileName), task.id);
+    if (!matchesTaskPayload(observed, task)) {
+      throw new TaskArtifactProjectionError('TASK_ARTIFACT_CONTENT_CONFLICT', {
+        taskId: task.id,
+        reason: 'existing_payload_differs',
+      });
+    }
+    idempotent.push(task.id);
+    contentDigests[task.id] = observed.contentDigest;
+  }
+  return {
+    taskIds,
+    idempotent,
+    missing,
     contentDigests: Object.freeze({ ...contentDigests }),
   };
 }
@@ -565,6 +637,274 @@ export function migrateStructuredCriteriaProjection(
   return {
     migrated,
     idempotent,
+  };
+}
+
+/**
+ * Compare-and-publish transition for a task projection that existed before
+ * private execution admission. The old inode is retained under a deterministic
+ * predecessor name; the public target is created with a no-clobber hard link.
+ * A concurrent writer, symlink, digest change, or ambiguous crash residue is a
+ * typed HOLD — never an overwrite.
+ */
+export function transitionTaskArtifactProjectionCas<T extends { readonly id: string }>(
+  root: string,
+  task: T,
+  expectedContentDigest: string,
+  namespace: string,
+): TaskArtifactProjectionCasResult {
+  if (!/^[a-f0-9]{64}$/.test(expectedContentDigest)) {
+    throw new TaskArtifactProjectionError('TASK_ARTIFACT_CONTENT_CONFLICT', {
+      taskId: task.id,
+      reason: 'cas_expected_digest_invalid',
+    });
+  }
+  const tasksReal = resolveTasksDirectory(root, false);
+  const target = join(tasksReal, safeTaskFileName(task.id));
+  const publishedContentDigest = createHash('sha256')
+    .update(canonicalJson(task))
+    .digest('hex');
+  const taskHash = createHash('sha256').update(task.id).digest('hex').slice(0, 24);
+  const namespaceHash = createHash('sha256').update(namespace).digest('hex').slice(0, 24);
+  const predecessorPath = join(
+    tasksReal,
+    `.task-cas-${taskHash}-${namespaceHash}-${expectedContentDigest}.previous`,
+  );
+  let releasePath: string | undefined;
+  let releaseState: 'none' | 'private-marker' | 'unknown-authority' | 'expected-predecessor' = 'none';
+
+  const readPredecessor = (): { readonly task: T; readonly contentDigest: string } => {
+    const predecessor = readStableTaskArtifact<T>(predecessorPath, task.id);
+    if (predecessor.contentDigest !== expectedContentDigest) {
+      throw new TaskArtifactProjectionError('TASK_ARTIFACT_CONTENT_CONFLICT', {
+        taskId: task.id,
+        reason: 'cas_predecessor_digest_mismatch',
+      });
+    }
+    return predecessor;
+  };
+
+  if (existsSync(target)) {
+    const current = readStableTaskArtifact<T>(target, task.id);
+    if (current.contentDigest === publishedContentDigest) {
+      if (!existsSync(predecessorPath)) {
+        throw new TaskArtifactProjectionError('TASK_ARTIFACT_CONTENT_CONFLICT', {
+          taskId: task.id,
+          reason: 'cas_predecessor_missing_for_published_target',
+        });
+      }
+      readPredecessor();
+      return {
+        taskId: task.id,
+        previousContentDigest: expectedContentDigest,
+        publishedContentDigest,
+        state: 'idempotent-resume',
+      };
+    }
+    if (current.contentDigest !== expectedContentDigest) {
+      throw new TaskArtifactProjectionError('TASK_ARTIFACT_CONTENT_CONFLICT', {
+        taskId: task.id,
+        reason: 'cas_target_digest_mismatch',
+      });
+    }
+
+    if (!existsSync(predecessorPath)) {
+      try {
+        linkSync(target, predecessorPath);
+        fsyncDirectory(tasksReal);
+      } catch (cause) {
+        if ((cause as NodeJS.ErrnoException).code !== 'EEXIST') {
+          throw new TaskArtifactProjectionError(
+            'TASK_ARTIFACT_DURABILITY_HOLD',
+            { taskId: task.id, reason: 'cas_predecessor_link_unavailable' },
+            { cause },
+          );
+        }
+      }
+    }
+    readPredecessor();
+    const currentStat = lstatSync(target);
+    const predecessorStat = lstatSync(predecessorPath);
+    const currentAgain = readStableTaskArtifact<T>(target, task.id);
+    if (
+      currentStat.dev !== predecessorStat.dev
+      || currentStat.ino !== predecessorStat.ino
+      || currentAgain.contentDigest !== expectedContentDigest
+    ) {
+      throw new TaskArtifactProjectionError('TASK_ARTIFACT_CONTENT_CONFLICT', {
+        taskId: task.id,
+        reason: 'cas_target_changed_before_release',
+      });
+    }
+    // Detach the public name with rename, never unlink. If a writer replaces
+    // target after the final check, rename preserves that writer's bytes in
+    // releasePath so they can be restored (or retained for recovery) instead
+    // of being silently deleted by the old check→unlink sequence.
+    releasePath = join(tasksReal, `.task-cas-release-${randomUUID()}.tmp`);
+    let releaseFd: number | undefined;
+    try {
+      releaseFd = openSync(releasePath, 'wx', 0o600);
+      writeFileSync(releaseFd, 'deckent-task-cas-private-release\n', 'utf8');
+      fsyncSync(releaseFd);
+      closeSync(releaseFd);
+      releaseFd = undefined;
+      releaseState = 'private-marker';
+      renameSync(target, releasePath);
+      releaseState = 'unknown-authority';
+      fsyncDirectory(tasksReal);
+    } catch (cause) {
+      if (releaseFd !== undefined) closeSync(releaseFd);
+      if (releaseState === 'private-marker' && releasePath) {
+        try {
+          unlinkSync(releasePath);
+        } catch {
+          // The marker is private CAS state. Failure to remove it is residue,
+          // not permission to touch any public or concurrently-written bytes.
+        }
+      }
+      if (cause instanceof TaskArtifactProjectionError) throw cause;
+      throw new TaskArtifactProjectionError(
+        'TASK_ARTIFACT_DURABILITY_HOLD',
+        { taskId: task.id, reason: 'cas_target_release_unavailable' },
+        { cause },
+      );
+    }
+
+    const preserveReleasedWriter = (
+      reason: string,
+      cause?: unknown,
+    ): never => {
+      let restored = false;
+      try {
+        linkSync(releasePath!, target);
+        fsyncDirectory(tasksReal);
+        restored = true;
+      } catch (restoreCause) {
+        if ((restoreCause as NodeJS.ErrnoException).code !== 'EEXIST') {
+          throw new TaskArtifactProjectionError(
+            'TASK_ARTIFACT_DURABILITY_HOLD',
+            {
+              taskId: task.id,
+              reason: 'cas_released_writer_restore_unavailable',
+              releasedWriterRetained: true,
+            },
+            { cause: restoreCause },
+          );
+        }
+      }
+      throw new TaskArtifactProjectionError(
+        'TASK_ARTIFACT_CONTENT_CONFLICT',
+        {
+          taskId: task.id,
+          reason,
+          releasedWriterRetained: true,
+          releasedWriterRestored: restored,
+        },
+        cause === undefined ? undefined : { cause },
+      );
+    };
+
+    const releasedStat = lstatSync(releasePath);
+    const predecessorAfterReleaseStat = lstatSync(predecessorPath);
+    if (
+      releasedStat.dev !== predecessorAfterReleaseStat.dev
+      || releasedStat.ino !== predecessorAfterReleaseStat.ino
+    ) {
+      preserveReleasedWriter('cas_target_changed_during_release');
+    }
+    let released: { readonly task: T; readonly contentDigest: string } | undefined;
+    try {
+      released = readStableTaskArtifact<T>(releasePath, task.id);
+    } catch (cause) {
+      preserveReleasedWriter('cas_target_changed_during_release', cause);
+    }
+    if (released === undefined || released.contentDigest !== expectedContentDigest) {
+      preserveReleasedWriter('cas_target_changed_during_release');
+    }
+    releaseState = 'expected-predecessor';
+  } else {
+    if (!existsSync(predecessorPath)) {
+      throw new TaskArtifactProjectionError('TASK_ARTIFACT_CONTENT_CONFLICT', {
+        taskId: task.id,
+        reason: 'cas_target_and_predecessor_missing',
+      });
+    }
+    readPredecessor();
+  }
+
+  const stagePath = join(tasksReal, `.task-cas-${randomUUID()}.tmp`);
+  let staged = false;
+  try {
+    const fd = openSync(stagePath, 'wx', 0o600);
+    try {
+      writeFileSync(fd, JSON.stringify(task, null, 2), 'utf8');
+      fsyncSync(fd);
+    } finally {
+      closeSync(fd);
+    }
+    staged = true;
+    try {
+      linkSync(stagePath, target);
+    } catch (cause) {
+      throw new TaskArtifactProjectionError(
+        'TASK_ARTIFACT_CONTENT_CONFLICT',
+        {
+          taskId: task.id,
+          reason: existsSync(target)
+            ? 'cas_target_recreated'
+            : 'cas_no_clobber_publish_failed',
+        },
+        { cause },
+      );
+    }
+    fsyncDirectory(tasksReal);
+    const published = readStableTaskArtifact<T>(target, task.id);
+    if (published.contentDigest !== publishedContentDigest) {
+      throw new TaskArtifactProjectionError('TASK_ARTIFACT_CONTENT_CONFLICT', {
+        taskId: task.id,
+        reason: 'cas_publication_digest_mismatch',
+      });
+    }
+  } catch (cause) {
+    if (cause instanceof TaskArtifactProjectionError) throw cause;
+    throw new TaskArtifactProjectionError(
+      'TASK_ARTIFACT_DURABILITY_HOLD',
+      { taskId: task.id, reason: 'cas_publication_unavailable' },
+      { cause },
+    );
+  } finally {
+    if (staged) {
+      try {
+        unlinkSync(stagePath);
+      } catch {
+        // Private staging residue is never public task authority.
+      }
+    }
+    if (releaseState === 'expected-predecessor' && releasePath) {
+      try {
+        const released = readStableTaskArtifact<T>(releasePath, task.id);
+        const releasedStat = lstatSync(releasePath);
+        const predecessorStat = lstatSync(predecessorPath);
+        if (
+          released.contentDigest === expectedContentDigest
+          && releasedStat.dev === predecessorStat.dev
+          && releasedStat.ino === predecessorStat.ino
+        ) {
+          unlinkSync(releasePath);
+          fsyncDirectory(tasksReal);
+        }
+      } catch {
+        // Never clean an unproven release artifact: it may contain bytes from
+        // a concurrent writer. The predecessor still makes expected residue
+        // harmless, while retained unknown bytes remain recoverable.
+      }
+    }
+  }
+  return {
+    taskId: task.id,
+    previousContentDigest: expectedContentDigest,
+    publishedContentDigest,
+    state: 'transitioned',
   };
 }
 

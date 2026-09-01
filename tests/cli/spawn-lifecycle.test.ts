@@ -21,7 +21,7 @@ import { Command } from 'commander';
 
 // ─── Mocks (hoisted — only `state` from vi.hoisted may be referenced) ────────
 
-const state = vi.hoisted(() => ({ base: '', root: '' }));
+const state = vi.hoisted(() => ({ base: '', root: '', executeTaskIngress: vi.fn() }));
 
 vi.mock('../../src/cli/helpers/process.js', () => ({
   resolveProjectRoot: () => state.root,
@@ -47,6 +47,11 @@ vi.mock('../../src/orchestra/spawn-backend.js', async (importOriginal) => {
   return { ...actual, SpawnBackendFactory: { create: vi.fn() } };
 });
 
+vi.mock('../../src/orchestra/task-mode-runner.js', () => ({
+  executeTaskIngress: state.executeTaskIngress,
+  readTaskIngressErrorAuthority: (error: any) => error?.taskIngressAuthority,
+}));
+
 // ─── Imports after mocks ──────────────────────────────────────────────────────
 
 import {
@@ -67,6 +72,8 @@ import {
   type TaskResultSettlementRefV1,
 } from '../../src/core/task-result-settlement.js';
 import { TEST_DOCKER_EXECUTION_OPTIONS } from '../helpers/budgeted-docker-execution-fixture.js';
+import { resolveReasoningEffort } from '../../src/core/reasoning-effort.js';
+import { print } from '../../src/cli/helpers/output.js';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -212,6 +219,67 @@ beforeEach(() => {
       landing: { reserve_ratio: 0.25 },
     },
   } as never);
+  state.executeTaskIngress.mockImplementation(async (input: any) => {
+    const finalOnlyUsage = input.task.budgetPolicy?.finalOnlyUsage;
+    const backend = SpawnBackendFactory.create({
+      backend: input.task.backend ?? input.config.spawn_backend,
+      projectDir: input.projectRoot,
+    }) as any;
+    if (input.task.budgetPolicy?.executionCostClass === 'remote'
+      && input.task.provider === 'codex') {
+      if (!finalOnlyUsage || backend.name !== 'docker') {
+        throw new Error('final-only usage containment requires Docker and an exact grant');
+      }
+    }
+    const taskPath = join(input.projectRoot, '.tasks', `task-${input.task.id}.json`);
+    try {
+      readFileSync(taskPath, 'utf-8');
+    } catch {
+      writeFileSync(taskPath, JSON.stringify(input.task, null, 2), 'utf-8');
+    }
+    const invocation = {
+      receiptRef: {
+        schemaVersion: 1,
+        invocationId: `test:${input.task.id}`,
+        tenantId: 'local',
+        projectId: 'test',
+      },
+      executionBackend: backend.name === 'docker' ? 'docker' : 'host-subprocess',
+      transport: 'cli',
+      state: 'dispatch-started',
+      executionMode: 'legacy-non-docker',
+      executionEvidenceRef: `test:${input.task.id}`,
+      dispatchStartedAt: new Date().toISOString(),
+    };
+    await input.onDispatchBoundary?.({
+      taskId: input.task.id,
+      provider: input.task.provider ?? 'claude',
+      model: input.task.model,
+      backend: backend.name,
+      executionEvidenceRef: invocation.executionEvidenceRef,
+    }, invocation);
+    backend.spawn(input.task.id, input.task.model, 'prompt', {
+      projectDir: input.projectRoot,
+      autoApprove: input.autoApprove,
+      reasoningEffort: resolveReasoningEffort(
+        input.task.provider ?? 'claude',
+        input.task.modelEffort,
+      ),
+      ...(finalOnlyUsage ? { finalOnlyUsageContainment: finalOnlyUsage } : {}),
+    });
+    return {
+      disposition: {
+        kind: 'spawned',
+        taskId: input.task.id,
+        executionMode: 'legacy-non-docker',
+        executionBackend: backend.name,
+      },
+      executionMode: 'legacy-non-docker',
+      backend: backend.name,
+      provider: input.task.provider ?? 'claude',
+      invocation,
+    };
+  });
 });
 
 afterEach(() => {
@@ -291,13 +359,44 @@ describe('registerSpawn — task-json modelEffort path', () => {
     const opts = backendSpawn.mock.calls[0]?.[3] as { reasoningEffort?: string };
     expect(opts.reasoningEffort).toBeUndefined();
   });
+
+  it('retains the invocation receipt when common ingress throws before dispatch', async () => {
+    writeTaskJson('268-903');
+    const error = new Error('provider authority unavailable') as Error & Record<string, unknown>;
+    error.taskIngressAuthority = {
+      schemaVersion: 1,
+      reasonCode: 'PROVIDER_EXECUTION_AUTHORITY_HOLD',
+      invocation: {
+        receiptRef: {
+          schemaVersion: 1,
+          invocationId: 'zero:manual-spawn-hold',
+          tenantId: 'local',
+          projectId: 'test',
+        },
+        executionBackend: 'docker',
+        transport: 'cli',
+        state: 'not-dispatched',
+        executionMode: 'normal-docker-exact',
+        reasonCode: 'PROVIDER_EXECUTION_AUTHORITY_HOLD',
+      },
+    };
+    state.executeTaskIngress.mockRejectedValueOnce(error);
+
+    await runCommand(['spawn', '268-903']);
+
+    expect(backendSpawn).not.toHaveBeenCalled();
+    expect(vi.mocked(print)).toHaveBeenCalledWith(
+      expect.stringContaining('zero:manual-spawn-hold'),
+    );
+    expect(process.exitCode).toBe(1);
+  });
 });
 
 
 // ─── 3. registerSpawn — final-only containment ───────────────────────────────
 
 describe('registerSpawn — final-only containment', () => {
-  it('uses the task-stamped exact grant to route a forced final-only task through Docker', async () => {
+  it('rejects forced exact respawn until a new generation identity is available', async () => {
     writeTaskJson('628-005-valid', {
       model: 'gpt-4.1',
       provider: 'codex',
@@ -307,13 +406,8 @@ describe('registerSpawn — final-only containment', () => {
 
     await runCommand(['spawn', '628-005-valid', '--force']);
 
-    expect(backendSpawn).toHaveBeenCalledOnce();
-    const backendOptions = backendSpawn.mock.calls[0]?.[3] as {
-      finalOnlyUsageContainment?: unknown;
-    };
-    expect(backendOptions.finalOnlyUsageContainment).toEqual(
-      finalOnlyBudgetPolicy().finalOnlyUsage,
-    );
+    expect(backendSpawn).not.toHaveBeenCalled();
+    expect(process.exitCode).toBe(1);
   });
 
   it('fails closed before provider work when a final-only task has no grant', async () => {
@@ -462,6 +556,20 @@ describe('registerSpawn — status finalize when .result appears', () => {
     // nothing — the stale DONE-less result must NOT flip the status.
     writeTaskJson('268-923', { status: TaskStatus.NO_GO });
     writeResult('268-923', 'DONE'); // stale artifact from a previous run
+    vi.mocked(loadConfig).mockResolvedValue({
+      language: 'en',
+      spawn_backend: 'subprocess',
+      execution_budget: {
+        roles: { worker: { default: { maxTurns: 1 } } },
+        landing: { reserve_ratio: 0.25 },
+      },
+    } as never);
+    vi.mocked(SpawnBackendFactory.create).mockReturnValue({
+      name: 'subprocess',
+      liveUsageBudgetSupport: 'measured-stream',
+      executionLandingCapability: 'cooperative-landing',
+      spawn: backendSpawn,
+    } as never);
     backendSpawn.mockImplementation(() => { /* new worker still running */ });
 
     await runCommand(['spawn', '268-923', '--force']);

@@ -15,16 +15,32 @@ import type { ResolvedConfig } from '../../src/core/config-types.js';
 
 // ─── Mocks ──────────────────────────────────────────────────────────
 
-// Mock spawn backend to prevent actual process spawning.
-// spawnWorkerMultiProvider is now async — return a resolved promise so
-// runTaskMode (also now async) can await it correctly.
-vi.mock('../../src/cli/commands/spawn.js', () => ({
-  spawnWorkerMultiProvider: vi.fn().mockResolvedValue({
-    backend: 'subprocess',
-    provider: 'claude',
-  }),
-  buildAllowedToolsFromScope: vi.fn(() => undefined),
+const backendHarness = vi.hoisted(() => ({
+  spawn: vi.fn(),
+  kill: vi.fn(),
+  create: vi.fn(),
 }));
+
+vi.mock('../../src/orchestra/spawn-backend.js', async (importOriginal) => {
+  const actual = await importOriginal() as Record<string, unknown>;
+  return {
+    ...actual,
+    SpawnBackendFactory: {
+      create: (options: unknown) => {
+        backendHarness.create(options);
+        return {
+          name: 'subprocess',
+          liveUsageBudgetSupport: 'measured-stream',
+          executionLandingCapability: 'cooperative-landing',
+          spawn: backendHarness.spawn,
+          kill: backendHarness.kill,
+          list: () => [],
+          isAvailable: async () => true,
+        };
+      },
+    },
+  };
+});
 
 // Mock task-builder to avoid reading filesystem
 vi.mock('../../src/orchestra/task-builder.js', () => ({
@@ -83,13 +99,13 @@ vi.mock('../../src/cli/commands/run.js', () => {
 
 import { runTaskMode } from '../../src/orchestra/task-mode-runner.js';
 import type { TaskModeContext } from '../../src/orchestra/task-mode-runner.js';
-import { spawnWorkerMultiProvider } from '../../src/cli/commands/spawn.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
 function makeConfig(overrides: Partial<ResolvedConfig> = {}): ResolvedConfig {
   return {
     deckent_style: 'sprint',
+    spawn_backend: 'subprocess',
     max_workers: 3,
     coverage_threshold: 90,
     brain_provider: 'claude',
@@ -157,7 +173,7 @@ describe('Mode-Aware Routing', () => {
 
       const result = await runTaskMode(ctx, config);
 
-      expect(result.taskId).toMatch(/^run-test-/);
+      expect(result.taskId).toMatch(/^run-/);
       expect(result.backend).toBe('subprocess');
       expect(result.provider).toBe('claude');
     });
@@ -206,13 +222,12 @@ describe('Mode-Aware Routing', () => {
 
       await runTaskMode(ctx, config);
 
-      // Verify spawnWorkerMultiProvider was called directly (no plan/spawn/evaluate phases)
-      expect(spawnWorkerMultiProvider).toHaveBeenCalledTimes(1);
-      expect(spawnWorkerMultiProvider).toHaveBeenCalledWith(
-        expect.stringMatching(/^run-test-/),
+      // One canonical executor dispatch, without sprint phases.
+      expect(backendHarness.spawn).toHaveBeenCalledTimes(1);
+      expect(backendHarness.spawn).toHaveBeenCalledWith(
+        expect.stringMatching(/^run-/),
         'claude-opus-5', // canonical default model (MASTER-PLAN 670 designation)
         'mock-prompt',
-        testRoot,
         expect.objectContaining({ autoApprove: false }),
       );
 
@@ -240,7 +255,7 @@ describe('Mode-Aware Routing', () => {
         'deckent-event',
         expect.objectContaining({
           type: 'TASK_MODE_START',
-          taskId: expect.stringMatching(/^run-test-/),
+          taskId: expect.stringMatching(/^run-/),
           style: 'task',
           description: 'Event payload check',
           model: 'claude-opus-4-8',
@@ -253,7 +268,7 @@ describe('Mode-Aware Routing', () => {
     it('should forward scope and options to spawn backend', async () => {
       const config = makeConfig({
         deckent_style: 'task',
-        spawn_backend: 'docker',
+        spawn_backend: 'subprocess',
         docker_image: 'deckent:latest',
         docker_timeout: 60,
       });
@@ -267,17 +282,16 @@ describe('Mode-Aware Routing', () => {
 
       await runTaskMode(ctx, config);
 
-      expect(spawnWorkerMultiProvider).toHaveBeenCalledWith(
+      expect(backendHarness.create).toHaveBeenCalledWith(expect.objectContaining({
+        backend: 'subprocess',
+        dockerImage: 'deckent:latest',
+        dockerTimeoutSeconds: 60,
+      }));
+      expect(backendHarness.spawn).toHaveBeenCalledWith(
         expect.any(String),
         'claude-opus-4-8',
         'mock-prompt',
-        testRoot,
-        expect.objectContaining({
-          autoApprove: true,
-          spawnBackend: 'docker',
-          dockerImage: 'deckent:latest',
-          dockerTimeout: 60,
-        }),
+        expect.objectContaining({ autoApprove: true }),
       );
     });
   });

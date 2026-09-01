@@ -27,6 +27,9 @@ function fixtureRoot(): string {
   roots.push(root);
   mkdirSync(join(root, 'scripts'), { recursive: true });
   mkdirSync(join(root, 'src', 'core'), { recursive: true });
+  mkdirSync(join(root, 'native', 'exec-authority', 'src'), {
+    recursive: true,
+  });
   mkdirSync(
     join(root, 'node_modules', 'typescript', 'bin'),
     { recursive: true },
@@ -35,11 +38,28 @@ function fixtureRoot(): string {
     join(root, 'package.json'),
     `${JSON.stringify({ name: 'deckent', version: '9.8.7' })}\n`,
   );
-  writeFileSync(join(root, 'package-lock.json'), '{"lockfileVersion":3}\n');
+  writeFileSync(join(root, 'npm-shrinkwrap.json'), '{"lockfileVersion":3}\n');
   writeFileSync(join(root, 'tsconfig.json'), '{}\n');
   writeFileSync(join(root, 'scripts', 'build.mjs'), 'export {};\n');
   writeFileSync(join(root, 'src', 'core', 'main.ts'), 'export {};\n');
   writeFileSync(join(root, 'src', 'core', 'schema.json'), '{"ok":true}\n');
+  writeFileSync(join(root, 'native', 'exec-authority', 'binding.gyp'), '{}\n');
+  writeFileSync(join(root, 'native', 'exec-authority', 'index.mjs'), 'export {};\n');
+  writeFileSync(
+    join(root, 'native', 'exec-authority', 'package.json'),
+    '{"name":"@deckent/exec-authority-native","version":"9.8.7"}\n',
+  );
+  for (const source of [
+    'custody_common.h',
+    'custody_posix.c',
+    'custody_win32.c',
+    'exec_authority.c',
+  ]) {
+    writeFileSync(
+      join(root, 'native', 'exec-authority', 'src', source),
+      `/* exact fixture: ${source} */\n`,
+    );
+  }
   writeFileSync(
     join(root, 'node_modules', 'typescript', 'bin', 'tsc'),
     '#!/usr/bin/env node\n',
@@ -182,6 +202,25 @@ afterEach(() => {
 });
 
 describe('transactional build lifecycle', () => {
+  it('requires the canonical root npm shrinkwrap before authority acquisition', async () => {
+    const root = fixtureRoot();
+    const events: string[] = [];
+    rmSync(join(root, 'npm-shrinkwrap.json'));
+
+    await expect(runTransactionalBuild({
+      root,
+      allowFixtureRoot: true,
+      scope: 'core',
+      runId: 'run-missing-shrinkwrap',
+      authority: fakeAuthority(events),
+      runTool: fakeTypeScript,
+    })).rejects.toMatchObject({
+      code: 'E_BUILD_INPUT_MISSING',
+    });
+
+    expect(events).toEqual([]);
+  });
+
   it('requires the core runner before authority or staging mutation', async () => {
     const root = fixtureRoot();
     const events: string[] = [];
@@ -365,6 +404,42 @@ describe('transactional build lifecycle', () => {
       .toBe('export const value = "original";\n');
     expect(readFileSync(sourcePath, 'utf8'))
       .toBe('export const value = "original";\n');
+  });
+
+  it('copies and digests the canonical root npm shrinkwrap as a build input', async () => {
+    const root = fixtureRoot();
+    const events: string[] = [];
+    const shrinkwrapPath = join(root, 'npm-shrinkwrap.json');
+    let workspaceShrinkwrap = '';
+
+    await expect(runTransactionalBuild({
+      root,
+      allowFixtureRoot: true,
+      scope: 'core',
+      runId: 'run-shrinkwrap-drift',
+      authority: fakeAuthority(events),
+      runTool: async (
+        entrypoint: string,
+        args: readonly string[],
+        cwd: string,
+      ) => {
+        workspaceShrinkwrap = readFileSync(
+          join(cwd, 'npm-shrinkwrap.json'),
+          'utf8',
+        );
+        writeFileSync(
+          shrinkwrapPath,
+          '{"lockfileVersion":3,"packages":{}}\n',
+        );
+        await fakeTypeScript(entrypoint, args);
+      },
+      stdio: 'ignore',
+    })).rejects.toMatchObject({
+      code: 'E_BUILD_SOURCE_DRIFT_BEFORE_COMMIT',
+    });
+
+    expect(workspaceShrinkwrap).toBe('{"lockfileVersion":3}\n');
+    expect(events).toEqual(['acquire', 'release']);
   });
 
   it('attested recovery restores the authenticated old artifact after backup-phase failure', async () => {

@@ -84,6 +84,12 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
       expect(workflowContent).toMatch(/Setup Node\.js[\s\S]*?cache: npm/)
     })
 
+    it('should key npm cache from root shrinkwrap plus the independent dashboard lock', () => {
+      expect(workflowContent).toMatch(
+        /cache: npm\s*\n\s*cache-dependency-path: \|\s*\n\s*npm-shrinkwrap\.json\s*\n\s*src\/dashboard\/package-lock\.json/u,
+      )
+    })
+
     it('should configure registry-url for npm', () => {
       expect(workflowContent).toContain("registry-url: 'https://registry.npmjs.org'")
     })
@@ -101,14 +107,18 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
       expect(workflowContent).toMatch(/Verify release integrity[\s\S]*?TAG_VERSION="\$\{GITHUB_REF_NAME#v\}"/)
     })
 
-    it('should read package.json and package-lock.json versions', () => {
+    it('should read package.json and npm-shrinkwrap.json versions', () => {
       expect(workflowContent).toContain("require('./package.json').version")
-      expect(workflowContent).toContain("require('./package-lock.json').version")
+      expect(workflowContent).toContain("require('./npm-shrinkwrap.json').version")
+      expect(workflowContent).toContain("require('./npm-shrinkwrap.json').packages[''].version")
+      expect(workflowContent).not.toContain("require('./package-lock.json').version")
     })
 
-    it('should triple-compare tag/package/lock and fail on mismatch', () => {
+    it('should compare tag/package/shrinkwrap top-level/root-package versions and fail with exact evidence', () => {
       expect(workflowContent).toMatch(/TAG_VERSION" != "\$PKG_VERSION"/)
       expect(workflowContent).toMatch(/TAG_VERSION" != "\$LOCK_VERSION"/)
+      expect(workflowContent).toMatch(/TAG_VERSION" != "\$LOCK_ROOT_PACKAGE_VERSION"/)
+      expect(workflowContent).toContain("npm-shrinkwrap.json#packages[''].version=${LOCK_ROOT_PACKAGE_VERSION}")
       expect(workflowContent).toMatch(/Verify release integrity[\s\S]*?exit 1/)
     })
 
@@ -139,12 +149,14 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
       expect(workflowContent).toMatch(/CI_SUCCESS_COUNT.*-lt 1[\s\S]*?::error::REL-02 /)
     })
 
-    it('should ALSO query gh run list for the Cross-Platform E2E workflow, same commit SHA (415-001 packed-install matrix)', () => {
+    it('should ALSO query gh run list for the Cross-Platform E2E workflow, same commit SHA (T20 active Linux proof)', () => {
       expect(workflowContent).toContain('gh run list --repo "${GITHUB_REPOSITORY}" --commit "${GITHUB_SHA}" --workflow "Cross-Platform E2E"')
     })
 
     it('should require at least one successful Cross-Platform E2E run and fail with a distinctly-named REL-02B error', () => {
       expect(workflowContent).toMatch(/XPLAT_SUCCESS_COUNT.*-lt 1[\s\S]*?::error::REL-02B /)
+      expect(workflowContent).toMatch(/active Linux installed-package native proof must exist/iu)
+      expect(workflowContent).toMatch(/deferred macOS\/Windows-native rows are not substitutes/iu)
     })
 
     it('CI check and Cross-Platform E2E check are two separate named errors on two separate log lines — not merged', () => {
@@ -215,8 +227,70 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
   })
 
   describe('Build Step', () => {
-    it('should run npm run build', () => {
-      expect(workflowContent).toMatch(/Build[\s\S]*?run: npm run build/)
+    it('should run the canonical build:all chain including native package production', () => {
+      expect(workflowContent).toMatch(/- name: Build\s*\n\s*run: npm run build:all/)
+    })
+
+    it('should validate then prove the packed Linux package networklessly from a fresh private cache', () => {
+      const validateIdx = workflowContent.indexOf('- name: Validate publish readiness')
+      const nativeProofIdx = workflowContent.indexOf('- name: Prove packed Linux native package contract')
+      const smokeIdx = workflowContent.indexOf('- name: Release smoke test-gate')
+      expect(validateIdx).toBeGreaterThan(-1)
+      expect(nativeProofIdx).toBeGreaterThan(validateIdx)
+      expect(smokeIdx).toBeGreaterThan(nativeProofIdx)
+      const nativeProofBlock = workflowContent.slice(nativeProofIdx, smokeIdx)
+      expect(nativeProofBlock).toContain('node scripts/verify-packed-networkless-install.mjs --expected-environment linux')
+      expect(nativeProofBlock).toContain('--receipt-file "$PACKED_NETWORKLESS_RECEIPT"')
+      expect(nativeProofBlock).toContain('PACKED_NETWORKLESS_RECEIPT: ${{ runner.temp }}/release-linux-packed-networkless-receipt.json')
+      expect(nativeProofBlock).not.toMatch(/verify-packed-networkless-install\.mjs[^\n]*>/u)
+      expect(nativeProofBlock).toContain('DECKENT_PACKED_NETWORKLESS_INSTALL_VERIFIED')
+      expect(nativeProofBlock).toContain('receipt.installNetworkMode !== "OFFLINE"')
+      expect(nativeProofBlock).toContain('receipt.cacheAuthority !== "FRESH_PRIVATE_PREWARMED"')
+      expect(nativeProofBlock).toContain('receipt.installedNpmShrinkwrapSha256 !== receipt.sourceNpmShrinkwrapSha256')
+      const topLevelFields = nativeProofBlock
+        .match(/const expectedTopLevelFields = \[([\s\S]*?)\]\.sort\(\);/u)?.[1]
+        .match(/"([^"]+)"/gu)
+        ?.map((field) => field.slice(1, -1))
+        .sort()
+      expect(topLevelFields).toEqual([
+        'cacheAuthority',
+        'event',
+        'expectedEnvironmentKind',
+        'installNetworkMode',
+        'installedCliReceipt',
+        'installedNpmShrinkwrapSha256',
+        'nativeReceipt',
+        'schemaVersion',
+        'sourceNpmShrinkwrapSha256',
+        'tarballSha256',
+      ].sort())
+      const installedCliFields = nativeProofBlock
+        .match(/const expectedInstalledCliFields = \[([\s\S]*?)\]\.sort\(\);/u)?.[1]
+        .match(/"([^"]+)"/gu)
+        ?.map((field) => field.slice(1, -1))
+        .sort()
+      expect(installedCliFields).toEqual([
+        'event',
+        'outputSha256',
+        'packageVersion',
+        'schemaVersion',
+      ].sort())
+      expect(nativeProofBlock).toContain('JSON.stringify(Object.keys(receipt).sort())')
+      expect(nativeProofBlock).toContain('JSON.stringify(Object.keys(installedCliReceipt ?? {}).sort())')
+      expect(nativeProofBlock).toContain('SOURCE_PACKAGE_VERSION=$(node -p "require(\'./package.json\').version")')
+      expect(nativeProofBlock).toContain('installedCliReceipt?.schemaVersion !== 1')
+      expect(nativeProofBlock).toContain('installedCliReceipt.event !== "DECKENT_INSTALLED_CLI_VERIFIED"')
+      expect(nativeProofBlock).toContain('installedCliReceipt.packageVersion !== sourcePackageVersion')
+      expect(nativeProofBlock).toContain('!sha256.test(installedCliReceipt.outputSha256)')
+      expect(nativeProofBlock).toContain('nativeReceipt.npmShrinkwrapSha256 !== receipt.sourceNpmShrinkwrapSha256')
+      expect(nativeProofBlock).toContain('EXEC_AUTHORITY_NATIVE_INSTALLED_PACKAGE_VERIFIED')
+      expect(nativeProofBlock).toContain('nativeReceipt.lifecycle?.state !== "PUBLISHED_READ_VERIFIED"')
+      expect(nativeProofBlock).toContain('nativeReceipt.installTimeNativeBuild !== "ABSENT"')
+      expect(nativeProofBlock).toContain('nativeReceipt.installTimeNativeDownload !== "ABSENT"')
+      expect(nativeProofBlock).toContain('nativeReceipt.environment?.environmentKind !== "linux"')
+      expect(nativeProofBlock).not.toContain('npm_config_offline:')
+      expect(nativeProofBlock).not.toContain('npm install -g')
+      expect(nativeProofBlock).not.toContain('verify-exec-authority-native-package.mjs')
     })
   })
 
@@ -294,7 +368,8 @@ describe('Release Workflow (.github/workflows/release.yml)', () => {
     })
 
     it('should upload dist directory', () => {
-      expect(workflowContent).toMatch(/Upload dist artifacts[\s\S]*?path: dist\//)
+      expect(workflowContent).toMatch(/Upload dist artifacts[\s\S]*?path:\s*\|\s*\n\s*dist\//)
+      expect(workflowContent).toMatch(/Upload dist artifacts[\s\S]*?runner\.temp }}\/release-linux-packed-networkless-receipt\.json/)
     })
 
     it('should set retention to 30 days', () => {
