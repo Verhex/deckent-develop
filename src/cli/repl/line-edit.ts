@@ -34,6 +34,55 @@ function toUtf16Cursor(state: CursorState): number {
   return state.graphemes.slice(0, state.cursor).join('').length;
 }
 
+// ─── TERMINAL-TOOLS-009 — multi-line draft geometry (pure, UTF-16 offsets) ───
+// A draft may hold '\n' (Shift/Alt+Enter, Ctrl-J, trailing `\` + Enter, paste).
+// Lines are the '\n'-separated segments; columns are counted in grapheme
+// clusters so vertical movement never lands inside an emoji.
+
+/** UTF-16 offset where the line containing `cursor` starts. */
+export function lineStartOf(buffer: string, cursor: number): number {
+  return buffer.lastIndexOf('\n', cursor - 1) + 1;
+}
+
+/** UTF-16 offset where the line containing `cursor` ends (exclusive, before its '\n'). */
+export function lineEndOf(buffer: string, cursor: number): number {
+  const nl = buffer.indexOf('\n', cursor);
+  return nl < 0 ? buffer.length : nl;
+}
+
+/** Grapheme column of `cursor` within its line. */
+function columnOf(buffer: string, cursor: number): number {
+  return segmentGraphemes(buffer.slice(lineStartOf(buffer, cursor), cursor)).length;
+}
+
+/** UTF-16 offset of grapheme column `column` on the line starting at `lineStart` (clamped to the line). */
+function offsetAtColumn(buffer: string, lineStart: number, column: number): number {
+  const line = buffer.slice(lineStart, lineEndOf(buffer, lineStart));
+  return lineStart + segmentGraphemes(line).slice(0, column).join('').length;
+}
+
+/**
+ * Move the cursor one line up (-1) or down (+1) inside a multi-line draft,
+ * keeping the grapheme column (clamped to the target line). Returns `null`
+ * when there is no line in that direction — the caller falls back to history
+ * navigation, exactly the single-line behavior.
+ */
+export function moveVertical(buffer: string, cursor: number, direction: -1 | 1): number | null {
+  const start = lineStartOf(buffer, cursor);
+  const column = columnOf(buffer, cursor);
+  if (direction === -1) {
+    if (start === 0) return null;
+    return offsetAtColumn(buffer, lineStartOf(buffer, start - 1), column);
+  }
+  const end = lineEndOf(buffer, cursor);
+  if (end >= buffer.length) return null;
+  return offsetAtColumn(buffer, end + 1, column);
+}
+
+function insertText(state: InputState, text: string): InputState {
+  return { buffer: state.buffer.slice(0, state.cursor) + text + state.buffer.slice(state.cursor), cursor: state.cursor + text.length };
+}
+
 /** Result of feeding one key to the input editor. */
 export interface EditResult {
   state: InputState;
@@ -60,8 +109,9 @@ export function editInput(state: InputState, key: Key): EditResult {
       case 'c': return { state: EMPTY_INPUT, signal: 'int' };
       case 'd': return buffer.length === 0 ? { state, signal: 'eof' } : { state };
       case 'u': return { state: EMPTY_INPUT };
-      case 'a': return { state: { buffer, cursor: 0 } };
-      case 'e': return { state: { buffer, cursor: buffer.length } };
+      // Line-local (TERMINAL-TOOLS-009): on a single-line draft identical to 0 / length.
+      case 'a': return { state: { buffer, cursor: lineStartOf(buffer, cursor) } };
+      case 'e': return { state: { buffer, cursor: lineEndOf(buffer, cursor) } };
       default: return { state };
     }
   }
@@ -69,8 +119,19 @@ export function editInput(state: InputState, key: Key): EditResult {
   switch (name) {
     case 'return':
     case 'enter': {
+      // TERMINAL-TOOLS-009 — newline vs submit. `enter` is Ink's name for a
+      // bare linefeed (Ctrl-J); Shift+Enter arrives as return+shift (kitty
+      // CSI-u) and Alt/Option+Enter as return+meta (ESC CR — also what Claude
+      // Code's terminal-setup maps Shift+Enter to). A trailing `\` + Enter
+      // continues the line: the backslash becomes the newline.
+      if (name === 'enter' || key.shift === true || key.meta === true) {
+        return { state: insertText(state, '\n') };
+      }
+      if (cursor === buffer.length && buffer.endsWith('\\')) {
+        return { state: { buffer: `${buffer.slice(0, -1)}\n`, cursor } };
+      }
       const line = buffer;
-      return { state: EMPTY_INPUT, submit: line.length > 0 ? line : undefined };
+      return { state: EMPTY_INPUT, submit: line.trim().length > 0 ? line : undefined };
     }
     case 'backspace': {
       const edited = applyCursorEdit(toCursorState(buffer, cursor), 'backspace');
@@ -93,13 +154,20 @@ export function editInput(state: InputState, key: Key): EditResult {
       return { state: { buffer, cursor: toUtf16Cursor(moved.state) } };
     }
     case 'home':
-      return { state: { buffer, cursor: 0 } };
+      return { state: { buffer, cursor: lineStartOf(buffer, cursor) } };
     case 'end':
-      return { state: { buffer, cursor: buffer.length } };
-    case 'up':
-      return { state, history: -1 };
-    case 'down':
-      return { state, history: 1 };
+      return { state: { buffer, cursor: lineEndOf(buffer, cursor) } };
+    // TERMINAL-TOOLS-009 — inside a multi-line draft ↑/↓ move between lines;
+    // only past the first/last line do they navigate history (Claude Code's
+    // contract; a single-line draft is byte-identical to before).
+    case 'up': {
+      const moved = moveVertical(buffer, cursor, -1);
+      return moved === null ? { state, history: -1 } : { state: { buffer, cursor: moved } };
+    }
+    case 'down': {
+      const moved = moveVertical(buffer, cursor, 1);
+      return moved === null ? { state, history: 1 } : { state: { buffer, cursor: moved } };
+    }
     default: {
       // Printable sequence (incl. pasted text — comes as a multi-char `sequence`).
       const ch = key.sequence;

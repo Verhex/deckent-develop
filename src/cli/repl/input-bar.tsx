@@ -198,7 +198,11 @@ export function inkToKey(input: string, key: Parameters<Parameters<typeof useInp
   if (key.rightArrow) return { name: 'right' } as Key;
   if (key.upArrow) return { name: 'up' } as Key;
   if (key.downArrow) return { name: 'down' } as Key;
-  if (key.return) return { name: 'return' } as Key;
+  // TERMINAL-TOOLS-009 — modifiers on Enter reach the reducer (Shift+Enter via
+  // kitty CSI-u, Alt/Option+Enter via ESC CR); a bare linefeed (Ctrl-J) is
+  // Ink's 'enter' name and inserts a newline (line-edit.ts).
+  if (key.return) return { name: 'return', shift: key.shift === true, meta: key.meta === true } as Key;
+  if (input === '\n') return { name: 'enter' } as Key;
   if (key.backspace) return { name: 'backspace' } as Key;
   if (key.delete) return { name: 'delete' } as Key;
   if (key.home || input === '\x1b[H' || input === '\x1b[1~' || input === '\x1bOH') return { name: 'home' } as Key;
@@ -337,7 +341,8 @@ export function InputBar(props: InputBarProps): ReactElement {
 
     // A batched chunk that contains a newline (a real lone Enter keystroke is
     // key.return, handled by editInput below) — classify via resolvePasteChunk.
-    if (!key.return && /[\r\n]/.test(input)) {
+    // (TERMINAL-TOOLS-009: a bare '\n' is the Ctrl-J newline key, not a paste.)
+    if (!key.return && input !== '\n' && /[\r\n]/.test(input)) {
       const result = resolvePasteChunk(stateRef.current.buffer, input);
       if (result.kind === 'insert') {
         const s = stateRef.current;
