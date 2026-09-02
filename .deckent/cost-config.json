@@ -44,6 +44,25 @@
           "_source": "model-registry (Fable-5 integration 2026-06-09; $10/$50 per MTok, free on subscription until 2026-06-22)",
           "_verified_at": "2026-06-10"
         },
+        "claude-fable-5-1": {
+          "input_cost_per_token": 1e-05,
+          "output_cost_per_token": 5e-05,
+          "cache_creation_input_token_cost": 1.25e-05,
+          "cache_creation_input_token_cost_above_1hr": 2e-05,
+          "cache_read_input_token_cost": 2.5e-07,
+          "max_input_tokens": 1000000,
+          "max_output_tokens": 128000,
+          "supports_prompt_caching": true,
+          "supports_reasoning": false,
+          "supports_vision": true,
+          "supports_tool_choice": true,
+          "deckent_tier": "premium_plus",
+          "deckent_aliases": [],
+          "enabled": true,
+          "_source": "anthropic-docs",
+          "_verified_at": "2026-09-02",
+          "_notes": "Claude Fable 5.1 (claude-fable-5-1), released 2026-09-01 (Active, latest). $10/$50 per MTok; 5m cache write $12.50, 1h cache write $20, cache read $0.25 (0.025x); batch $5/$25; 1M context; 128K max output; adaptive thinking always-on (no extended thinking); default effort high. Breaking vs Fable 5: forced tool_choice any/tool rejected; thinking blocks bound to the producing model. Source: platform.claude.com/docs/en/models/fable-5-1/overview + /docs/en/about-claude/pricing. No alias: `fable` stays Fable 5."
+        },
         "claude-haiku-4-5": {
           "input_cost_per_token": 1e-06,
           "output_cost_per_token": 5e-06,

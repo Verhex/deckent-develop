@@ -330,7 +330,7 @@ describe('model-equivalence', () => {
 
     it('premium_plus tier exposes every registered canonical API id', () => {
       expect(getModelsInTier('premium_plus')).toEqual([
-        'claude-fable-5', 'o3', 'gemini-3.1-pro-preview', 'gpt-5.6-sol',
+        'claude-fable-5', 'claude-fable-5-1', 'o3', 'gemini-3.1-pro-preview', 'gpt-5.6-sol',
         'cursor-grok-4.6-xhigh',
       ]);
     });
@@ -338,9 +338,9 @@ describe('model-equivalence', () => {
 
   // ─── getProviderModels ────────────────────────────────────────────
   describe('getProviderModels', () => {
-    it('claude has 5 models', () => {
+    it('claude has 6 models (Fable 5.1 registered 2026-09-02, primary-source verified)', () => {
       expect(getProviderModels('claude')).toEqual([
-        'claude-fable-5', 'claude-opus-4-8', 'claude-opus-5',
+        'claude-fable-5', 'claude-fable-5-1', 'claude-opus-4-8', 'claude-opus-5',
         'claude-sonnet-5', 'claude-haiku-4-5-20251001',
       ]);
     });
@@ -365,7 +365,7 @@ describe('model-equivalence', () => {
 
     it('total model count includes the versioned 5.6 family, Opus 5, and Cursor Grok family', () => {
       const total = Object.values(MODEL_TIERS).reduce((sum, models) => sum + models.length, 0);
-      expect(total).toBe(22);
+      expect(total).toBe(23);
     });
 
     it('every model in MODEL_TIERS has a provider', () => {

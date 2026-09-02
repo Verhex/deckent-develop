@@ -41,6 +41,15 @@ export type {
 export const CLAUDE_FABLE_API_ID = 'claude-fable-5' as const;
 
 /**
+ * Canonical provider API identity for Claude Fable 5.1 — a distinct pinned
+ * snapshot (Anthropic models overview + fable-5-1 model page, verified
+ * 2026-09-02: released 2026-09-01, status Active/latest). It is NOT an alias of
+ * `CLAUDE_FABLE_API_ID` and never substitutes for it: routing, quota scope and
+ * cross-verify tier resolution treat the two as separate catalog identities.
+ */
+export const CLAUDE_FABLE_5_1_API_ID = 'claude-fable-5-1' as const;
+
+/**
  * Compatibility metadata for explicit config/active-work migration only.
  * Normal registry lookup never consumes this table and therefore never turns
  * an authored legacy alias into a different wire model silently.
@@ -166,6 +175,36 @@ export const BUILTIN_MODELS: readonly ModelDefinition[] = [
     // 1M context (Opus 4.7 tokenizer), adaptive thinking always-on, no extended thinking.
     id: CLAUDE_FABLE_API_ID,
     apiId: CLAUDE_FABLE_API_ID,
+    provider: 'claude',
+    tier: 'premium_plus',
+    // Paket 2 (owner decision 2026-09-02): with Claude Fable 5.1 joining the same
+    // claude/premium_plus set, tier equivalence must not fall back to registration
+    // order. Fable 5 stays the designated generation for tier resolution — the
+    // owner directed that the new model is neither a default nor a forced route;
+    // promoting 5.1 to `preferredForTier` is a separate owner decision.
+    preferredForTier: true,
+    contextWindow: 1_000_000,
+    costPerMillion: { input: 10, output: 50 },
+    capabilities: { streaming: true, toolUse: true, vision: true, codeExecution: true, reasoning: false },
+    status: 'ga',
+    maxOutputTokens: 128_000,
+  },
+  {
+    // Claude Fable 5.1 — primary source: platform.claude.com/docs/en/models/fable-5-1/overview
+    // and /docs/en/about-claude/pricing (fetched 2026-09-02). Released 2026-09-01,
+    // status Active (latest); $10/$50 per MTok (cache write $12.50 / $20, cache read
+    // $0.25 = 0.025×, batch $5/$25 — cost SSOT: pricing-data-baseline.json); 1M
+    // context (Opus 4.7 tokenizer); 128K max output; adaptive thinking always on
+    // (`reasoning:false` keeps the registry's extended-thinking semantics, same
+    // as Fable 5 / Opus 5); default effort `high`; retirement not before
+    // 2027-09-01. Breaking vs Fable 5: forced tool_choice (`any`/`tool`) rejected,
+    // thinking blocks bound to the producing model. Selectable only by exact id
+    // through effective config / owner activation — no alias, no tier preference,
+    // no route change (owner contract). Subscription quota-window membership
+    // (`claude.week-fable`) is deliberately NOT asserted for this id: typed HOLD
+    // until a real usage snapshot proves it (claude-subscription-limit-evidence.ts).
+    id: CLAUDE_FABLE_5_1_API_ID,
+    apiId: CLAUDE_FABLE_5_1_API_ID,
     provider: 'claude',
     tier: 'premium_plus',
     contextWindow: 1_000_000,

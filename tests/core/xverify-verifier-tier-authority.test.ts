@@ -59,7 +59,10 @@ describe('xverify verifier tier authority', () => {
     expect(validateXVerifyVerifierTierAuthority(authority([{ ...allow, verifier_model: 'not-registered' }]))).toEqual(expect.arrayContaining([expect.stringContaining('exact canonical registry identity')]));
     expect(validateXVerifyVerifierTierAuthority(authority([{ ...allow, verifier_model: 'gpt-5.6-terra' }]))).toEqual(expect.arrayContaining([expect.stringContaining('different providers')]));
     expect(validateXVerifyVerifierTierAuthority(authority([{ ...allow, decision_ref: ' not canonical ' }]))).toEqual(expect.arrayContaining([expect.stringContaining('canonical decision reference')]));
-    modelRegistry.register({ ...modelRegistry.getOrThrow('claude-fable-5'), id: 'deprecated-test-verifier', apiId: 'deprecated-test-verifier', status: 'deprecated' });
+    // The fixture clones Fable 5, which (since Fable 5.1 joined claude/premium_plus,
+    // 2026-09-02) carries `preferredForTier`; a clone must not claim the tier
+    // preference too, or the registry's sole-preference guard rejects it.
+    modelRegistry.register({ ...modelRegistry.getOrThrow('claude-fable-5'), id: 'deprecated-test-verifier', apiId: 'deprecated-test-verifier', status: 'deprecated', preferredForTier: false });
     try {
       expect(validateXVerifyVerifierTierAuthority(authority([{ ...allow, verifier_model: 'deprecated-test-verifier' }]))).toEqual(expect.arrayContaining([expect.stringContaining('must not be deprecated')]));
     } finally { modelRegistry.unregister('deprecated-test-verifier'); }

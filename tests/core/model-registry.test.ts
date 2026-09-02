@@ -13,15 +13,16 @@ import {
 // ─── Builtin catalog tests ───────────────────────────────────────────
 
 describe('BUILTIN_MODELS catalog', () => {
-  it('contains exactly 15 models', () => {
-    expect(BUILTIN_MODELS).toHaveLength(15);
+  it('contains exactly 16 models (Claude Fable 5.1 added 2026-09-02, primary-source verified)', () => {
+    expect(BUILTIN_MODELS).toHaveLength(16);
   });
 
-  it('has 5 Claude models', () => {
+  it('has 6 Claude models', () => {
     const claude = BUILTIN_MODELS.filter(m => m.provider === 'claude');
-    expect(claude).toHaveLength(5);
+    expect(claude).toHaveLength(6);
     expect(claude.map(m => m.id).sort()).toEqual([
       'claude-fable-5',
+      'claude-fable-5-1',
       'claude-haiku-4-5-20251001',
       'claude-opus-4-8',
       'claude-opus-5',
@@ -139,8 +140,8 @@ describe('ModelRegistry', () => {
   // ── getByProvider ──
 
   describe('getByProvider()', () => {
-    it('returns 5 models for claude', () => {
-      expect(registry.getByProvider('claude')).toHaveLength(5);
+    it('returns 6 models for claude', () => {
+      expect(registry.getByProvider('claude')).toHaveLength(6);
     });
 
     it('returns all 9 canonical Codex models', () => {
@@ -567,9 +568,9 @@ describe('ModelRegistry', () => {
   // ── getAllModelIds / getAllModels / getAllProviders ──
 
   describe('getAllModelIds()', () => {
-    it('returns the 15 core, 3 Codex parity and 4 Cursor parity model ids', () => {
+    it('returns the 16 core, 3 Codex parity and 4 Cursor parity model ids', () => {
       const ids = registry.getAllModelIds();
-      expect(ids).toHaveLength(22);
+      expect(ids).toHaveLength(23);
       expect(ids).toContain('claude-fable-5');
       expect(ids).toContain('claude-opus-4-8');
       expect(ids).toContain('claude-opus-5');
@@ -584,7 +585,7 @@ describe('ModelRegistry', () => {
   describe('getAllModels()', () => {
     it('returns all canonical model definitions', () => {
       const models = registry.getAllModels();
-      expect(models).toHaveLength(22);
+      expect(models).toHaveLength(23);
       for (const m of models) {
         expect(m.id).toBeDefined();
         expect(m.apiId).toBeDefined();
@@ -752,7 +753,7 @@ describe('Cursor parity family', () => {
     // BUILTIN_MODELS stays the 15-model bundled snapshot — canonical bootstrap
     // membership is a separate, wider set.
     expect(BUILTIN_MODELS.some(m => (m.provider as string) === 'cursor')).toBe(false);
-    expect(BUILTIN_MODELS).toHaveLength(15);
+    expect(BUILTIN_MODELS).toHaveLength(16);
 
     // Every registry built the default way carries the family identically —
     // membership is a property of the catalog, not of call order.
@@ -784,6 +785,6 @@ describe('modelRegistry singleton', () => {
   });
 
   it('has the complete canonical offline catalog', () => {
-    expect(modelRegistry.getAllModelIds()).toHaveLength(22);
+    expect(modelRegistry.getAllModelIds()).toHaveLength(23);
   });
 });
