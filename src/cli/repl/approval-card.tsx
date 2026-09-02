@@ -18,7 +18,7 @@
 
 import { Box, Text, useInput } from 'ink';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
-import type { ApprovalRequest, ApprovalRisk } from '../../core/approval-contract.js';
+import type { ApprovalRequest, ApprovalRequestV2, ApprovalRisk } from '../../core/approval-contract.js';
 import type { ApprovalDecisionInput } from '../../core/approval-broker.js';
 import type { ApprovalStreamEvent } from '../../core/approval-eventstream.js';
 
@@ -168,10 +168,100 @@ function summarizeMaskedArgs(maskedArgs: Record<string, unknown>): string {
   return flat.length > MAX_SUMMARY_LEN ? `${flat.slice(0, MAX_SUMMARY_LEN - 1)}…` : flat;
 }
 
+// ─── §4 shared focus-rail facts (TERMINAL-TOOLS-012) ─────────────────────────
+//
+// Single-surface contract §4 "Approval": requestor and responsible principal ·
+// proposed action and affected resource · tenant/workspace and bounded scope ·
+// source policy and effective authority · expiry, risk and timeout/default
+// outcome · downstream consequence and known rollback/reconciliation limit ·
+// safe, redacted arguments. Every row is a pure projection of the contract;
+// a fact the producer did not declare renders as `notDeclared` — never invented.
+
+/** Localized fact labels (all required — i18n-first, no English defaults). */
+export interface ApprovalFactLabels {
+  requester: string;
+  action: string;
+  tenant: string;
+  policy: string;
+  lifecycle: string;
+  expiry: string;
+  consequence: string;
+  rollback: string;
+  /** Rendered when `details.consequence` / `details.rollbackLimit` are absent. */
+  notDeclared: string;
+  /** Template with `{duration}` (e.g. "in {duration}"). */
+  expiresIn: string;
+  expired: string;
+  units: { hours: string; minutes: string; seconds: string };
+  policyLabels: Record<ApprovalRequest['policy'], string>;
+  actionLabels: Record<ApprovalRequest['defaultAction'], string>;
+  scopeLabels: Record<ApprovalRequest['scope'], string>;
+  riskTierLabels: Record<ApprovalRequestV2['riskTier'], string>;
+  blockingLabels: Record<ApprovalRequestV2['blocking'], string>;
+  originLabels: Record<ApprovalRequestV2['origin'], string>;
+  slaStageLabels: Record<ApprovalRequestV2['slaStage'], string>;
+  timeoutDispositionLabels: Record<ApprovalRequestV2['lifecycleProfile']['timeoutDisposition'], string>;
+}
+
+export type ApprovalFactKey = 'requester' | 'action' | 'tenant' | 'policy' | 'lifecycle' | 'expiry' | 'consequence' | 'rollback';
+export interface ApprovalFact { key: ApprovalFactKey; label: string; value: string }
+
+/** Coarse-to-fine remaining time with catalog unit suffixes; the past clamps to zero. */
+export function formatRemaining(ms: number, units: ApprovalFactLabels['units']): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (h > 0) return `${h}${units.hours} ${m}${units.minutes}`;
+  if (m > 0) return `${m}${units.minutes} ${s}${units.seconds}`;
+  return `${s}${units.seconds}`;
+}
+
+const isV2 = (request: ApprovalRequest): request is ApprovalRequestV2 => 'origin' in request;
+
+/** The §4 field set for one request at `nowMs` (pure — unit-testable without Ink). */
+export function buildApprovalFacts(request: ApprovalRequest, labels: ApprovalCardLabels, nowMs: number): ApprovalFact[] {
+  const f = labels.facts;
+  const declared = (key: 'consequence' | 'rollbackLimit'): string => {
+    const value = request.details[key];
+    return typeof value === 'string' && value.trim().length > 0 ? value : f.notDeclared;
+  };
+  const outcome = f.actionLabels[request.defaultAction];
+  const remainingMs = Date.parse(request.expiresAt) - nowMs;
+  let expiry = remainingMs > 0
+    ? `${f.expiresIn.replace('{duration}', formatRemaining(remainingMs, f.units))} → ${outcome}`
+    : `${f.expired} → ${outcome}`;
+  if (isV2(request)) expiry += ` (${f.timeoutDispositionLabels[request.lifecycleProfile.timeoutDisposition]})`;
+  const facts: ApprovalFact[] = [
+    { key: 'requester', label: f.requester, value: `${request.requester.role} · ${request.requester.instanceId}` },
+    { key: 'action', label: f.action, value: `${f.scopeLabels[request.scope]} · ${request.scopeId}` },
+    { key: 'tenant', label: f.tenant, value: `${request.tenantId} · ${request.userId}` },
+    { key: 'policy', label: f.policy, value: f.policyLabels[request.policy] },
+  ];
+  if (isV2(request)) {
+    facts.push({
+      key: 'lifecycle',
+      label: f.lifecycle,
+      value: `${f.originLabels[request.origin]} · ${f.riskTierLabels[request.riskTier]} · ${f.blockingLabels[request.blocking]} · ${f.slaStageLabels[request.slaStage]}`,
+    });
+  }
+  facts.push(
+    { key: 'expiry', label: f.expiry, value: expiry },
+    { key: 'consequence', label: f.consequence, value: declared('consequence') },
+    { key: 'rollback', label: f.rollback, value: declared('rollbackLimit') },
+  );
+  return facts;
+}
+
+/** Countdown refresh cadence while a card is pending (unref'd — never keeps the process alive). */
+const FACTS_REFRESH_MS = 1000;
+
 // ─── Props ──────────────────────────────────────────────────────────────────
 
 /** Localized labels — injected by the caller (i18n-first; component is string-free). */
 export interface ApprovalCardLabels {
+  /** TERMINAL-TOOLS-012 — §4 fact rows (see {@link buildApprovalFacts}). */
+  facts: ApprovalFactLabels;
   /** e.g. "(y = onayla · n = reddet · a = benzerlerini onayla · d = detay)" */
   hint: string;
   /** i18n template, e.g. "[{index}/{total}]" */
@@ -211,14 +301,26 @@ export interface ApprovalCardProps {
    *  defaults to true — omitting it keeps every existing caller/test
    *  byte-identical to the pre-born-508 behavior. */
   isActive?: boolean;
+  /** Clock for the expiry countdown (TERMINAL-TOOLS-012) — injectable for
+   *  deterministic tests; defaults to Date.now. */
+  now?: () => number;
 }
 
 // ─── ApprovalCard ───────────────────────────────────────────────────────────
 
 export function ApprovalCard(props: ApprovalCardProps): ReactElement | null {
-  const { events, onDecide, onClosure, decidedBy, channel, labels, isActive: mutexActive = true } = props;
+  const { events, onDecide, onClosure, decidedBy, channel, labels, isActive: mutexActive = true, now = Date.now } = props;
   const [head, setHead] = useState<ApprovalCardHead | null>(null);
   const [expanded, setExpanded] = useState(false);
+  // TERMINAL-TOOLS-012 — re-render once a second while a card is pending so the
+  // expiry countdown stays honest (a frozen "in 14m" is a stale fact).
+  const [, setClockTick] = useState(0);
+  useEffect(() => {
+    if (!head) return undefined;
+    const timer = setInterval(() => setClockTick((n) => n + 1), FACTS_REFRESH_MS);
+    timer.unref?.();
+    return () => clearInterval(timer);
+  }, [head]);
   const queueRef = useRef<ApprovalCardQueue | null>(null);
   if (!queueRef.current) {
     queueRef.current = createApprovalCardQueue(() => setHead(queueRef.current!.head()));
@@ -282,6 +384,7 @@ export function ApprovalCard(props: ApprovalCardProps): ReactElement | null {
 
   const { request, index, total } = head;
   const riskColor = RISK_COLORS[request.risk];
+  const facts = buildApprovalFacts(request, labels, now());
 
   return (
     <Box flexDirection="column" borderStyle="round" borderColor={riskColor} paddingX={1}>
@@ -289,6 +392,9 @@ export function ApprovalCard(props: ApprovalCardProps): ReactElement | null {
         <Text color={riskColor} bold>{`${labels.riskLabels[request.risk]} `}</Text>
         <Text>{request.summary}</Text>
       </Box>
+      {facts.map((fact) => (
+        <Text key={fact.key} dimColor>{`${fact.label}: ${fact.value}`}</Text>
+      ))}
       <Text dimColor>{request.maskedArgs ? summarizeMaskedArgs(request.maskedArgs) : labels.noArgs}</Text>
       {expanded && (
         <Box flexDirection="column" marginTop={1}>

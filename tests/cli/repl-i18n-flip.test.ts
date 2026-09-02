@@ -113,7 +113,10 @@ describe('buildReplLabels / buildApprovalLabels — lang=en stays byte-identical
   });
 
   it('ApprovalCard labels match the pre-387-001 English strings exactly (the mechanism owns no default object since TERMINAL-TOOLS-002)', () => {
-    expect(approvalEn).toEqual({
+    // TERMINAL-TOOLS-012 added the required §4 `facts` group; the five original keys stay byte-identical.
+    const { facts: _facts, ...legacyEn } = approvalEn;
+    expect(_facts.requester.length).toBeGreaterThan(0);
+    expect(legacyEn).toEqual({
       hint: '(y = approve · n = deny · a = approve similar · d = details)',
       progress: '[{index}/{total}]',
       detailsHeading: 'Details',

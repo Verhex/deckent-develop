@@ -273,6 +273,73 @@ export function createScopedAtRefReader(resolveCwd: () => string): (rel: string)
  */
 export function buildApprovalLabels(t: (key: string) => string): ApprovalCardLabels {
   return {
+    // TERMINAL-TOOLS-012 — §4 shared focus-rail fact rows (approval-card.tsx
+    // buildApprovalFacts). Units reuse the live-footer duration suffixes.
+    facts: {
+      requester: t('tui.approval_card.fact_requester'),
+      action: t('tui.approval_card.fact_action'),
+      tenant: t('tui.approval_card.fact_tenant'),
+      policy: t('tui.approval_card.fact_policy'),
+      lifecycle: t('tui.approval_card.fact_lifecycle'),
+      expiry: t('tui.approval_card.fact_expiry'),
+      consequence: t('tui.approval_card.fact_consequence'),
+      rollback: t('tui.approval_card.fact_rollback'),
+      notDeclared: t('tui.approval_card.not_declared'),
+      expiresIn: t('tui.approval_card.expires_in'),
+      expired: t('tui.approval_card.expired'),
+      units: { hours: t('live_footer.unit_hours'), minutes: t('live_footer.unit_minutes'), seconds: t('live_footer.unit_seconds') },
+      policyLabels: {
+        'auto-approve': t('tui.approval_card.policy.auto_approve'),
+        notify: t('tui.approval_card.policy.notify'),
+        'require-approval': t('tui.approval_card.policy.require_approval'),
+        deny: t('tui.approval_card.policy.deny'),
+      },
+      actionLabels: {
+        allow: t('tui.approval_card.action.allow'),
+        deny: t('tui.approval_card.action.deny'),
+        defer: t('tui.approval_card.action.defer'),
+        escalate: t('tui.approval_card.action.escalate'),
+      },
+      scopeLabels: {
+        'file-read': t('tui.approval_card.scope.file_read'),
+        'file-write': t('tui.approval_card.scope.file_write'),
+        'shell-exec': t('tui.approval_card.scope.shell_exec'),
+        'git-mutation': t('tui.approval_card.scope.git_mutation'),
+        network: t('tui.approval_card.scope.network'),
+        credential: t('tui.approval_card.scope.credential'),
+        lifecycle: t('tui.approval_card.scope.lifecycle'),
+      },
+      riskTierLabels: {
+        routine: t('tui.approval_card.risk_tier.routine'),
+        elevated: t('tui.approval_card.risk_tier.elevated'),
+        critical: t('tui.approval_card.risk_tier.critical'),
+      },
+      blockingLabels: {
+        request: t('tui.approval_card.blocking.request'),
+        trigger: t('tui.approval_card.blocking.trigger'),
+        run: t('tui.approval_card.blocking.run'),
+        security: t('tui.approval_card.blocking.security'),
+      },
+      originLabels: {
+        confirmation: t('tui.approval_card.origin.confirmation'),
+        'autonomous-trigger': t('tui.approval_card.origin.autonomous_trigger'),
+        'gateway-pairing': t('tui.approval_card.origin.gateway_pairing'),
+        'broker-native': t('tui.approval_card.origin.broker_native'),
+      },
+      slaStageLabels: {
+        initial: t('tui.approval_card.sla_stage.initial'),
+        renotify: t('tui.approval_card.sla_stage.renotify'),
+        'alternate-channel': t('tui.approval_card.sla_stage.alternate_channel'),
+        'park-alert': t('tui.approval_card.sla_stage.park_alert'),
+        expired: t('tui.approval_card.sla_stage.expired'),
+      },
+      timeoutDispositionLabels: {
+        'request-default': t('tui.approval_card.timeout.request_default'),
+        'park-alert': t('tui.approval_card.timeout.park_alert'),
+        'park-undecidable': t('tui.approval_card.timeout.park_undecidable'),
+        'deny-expire': t('tui.approval_card.timeout.deny_expire'),
+      },
+    },
     hint: t('tui.approval_card_hint'),
     progress: t('tui.confirm_progress'),
     detailsHeading: t('tui.approval_card_details_heading'),
