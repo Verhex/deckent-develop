@@ -21,6 +21,7 @@ import {
 const EN: LiveFooterLabels = {
   idle: 'idle', running: 'Running', elapsed: 'Elapsed', provider: 'Provider', auth: 'Auth', next: 'Next',
   healthy: 'healthy', degraded: 'degraded', unknown: 'unknown', loggedIn: 'logged-in', loggedOut: 'logged-out',
+  unitHours: 'h', unitMinutes: 'm', unitSeconds: 's',
 };
 
 // eslint-disable-next-line no-control-regex

@@ -4,7 +4,7 @@
  *
  * Round-6 TERM tasks' .result notes were mined for reported i18n key needs
  * (see .tasks/task-353-016.plan for the source citations):
- *   - 353-007 (TERM-LIVE / live-footer.ts)   -> live_footer.* (11 keys)
+ *   - 353-007 (TERM-LIVE / live-footer.ts)   -> live_footer.* (14 keys — the 3 elapsed unit suffixes joined 2026-09-02)
  *   - 353-010 (TERM-CONNECT / connect-wizard.ts) -> connect.step.* (7 keys)
  * 353-008/353-009/353-012 reported no specific key needs (docImpact: none or
  * unspecified) and are intentionally NOT represented here — inventing keys
@@ -40,6 +40,10 @@ const LIVE_FOOTER_KEYS = [
   'live_footer.unknown',
   'live_footer.logged_in',
   'live_footer.logged_out',
+  // elapsed-time unit suffixes (XVerify closure, 2026-09-02)
+  'live_footer.unit_hours',
+  'live_footer.unit_minutes',
+  'live_footer.unit_seconds',
 ] as const;
 
 // Maps each live_footer.* key to the LiveFooterLabels field run.tsx's
@@ -60,6 +64,9 @@ const LIVE_FOOTER_KEY_TO_LABEL_FIELD: Record<
   'live_footer.unknown': 'unknown',
   'live_footer.logged_in': 'loggedIn',
   'live_footer.logged_out': 'loggedOut',
+  'live_footer.unit_hours': 'unitHours',
+  'live_footer.unit_minutes': 'unitMinutes',
+  'live_footer.unit_seconds': 'unitSeconds',
 };
 
 describe('live_footer.* keys (353-007 docImpact — cited by source task)', () => {

@@ -50,12 +50,18 @@ export interface LiveFooterLabels {
   unknown: string;
   loggedIn: string;
   loggedOut: string;
+  /** Elapsed-time unit suffixes (`2h 5m`, `10m`, `30s`) — catalog rows
+   *  live_footer.unit_*; the mechanism owns no `h`/`m`/`s` literal. */
+  unitHours: string;
+  unitMinutes: string;
+  unitSeconds: string;
 }
 
 /** Every LiveFooterLabels field, in render order — the guard below checks each. */
 export const LIVE_FOOTER_LABEL_FIELDS: readonly (keyof LiveFooterLabels)[] = Object.freeze([
   'idle', 'running', 'elapsed', 'provider', 'auth', 'next',
   'healthy', 'degraded', 'unknown', 'loggedIn', 'loggedOut',
+  'unitHours', 'unitMinutes', 'unitSeconds',
 ] as const);
 
 export interface LiveFooterOptions {
@@ -81,18 +87,18 @@ function requireLiveFooterLabels(labels: LiveFooterLabels | undefined): LiveFoot
 
 // ─── Formatting helpers ─────────────────────────────────────────────────────
 
-function formatElapsed(startedAt: string, now: Date, unknownLabel: string): string {
+function formatElapsed(startedAt: string, now: Date, labels: LiveFooterLabels): string {
   const startMs = new Date(startedAt).getTime();
-  if (Number.isNaN(startMs)) return unknownLabel;
+  if (Number.isNaN(startMs)) return labels.unknown;
   const ms = now.getTime() - startMs;
-  if (ms < 0) return '0s';
+  if (ms < 0) return `0${labels.unitSeconds}`;
   const totalSeconds = Math.floor(ms / 1000);
   const totalMinutes = Math.floor(totalSeconds / 60);
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  if (totalMinutes > 0) return `${totalMinutes}m`;
-  return `${totalSeconds}s`;
+  if (hours > 0) return `${hours}${labels.unitHours} ${minutes}${labels.unitMinutes}`;
+  if (totalMinutes > 0) return `${totalMinutes}${labels.unitMinutes}`;
+  return `${totalSeconds}${labels.unitSeconds}`;
 }
 
 function truncate(text: string, width: number): string {
@@ -147,7 +153,7 @@ export function buildLiveFooter(state: LiveFooterState, options: LiveFooterOptio
     lines.push({ text: `${labels.running}: ${state.running}` });
   }
   if (state.startedAt !== undefined) {
-    lines.push({ text: `${labels.elapsed}: ${formatElapsed(state.startedAt, now, labels.unknown)}` });
+    lines.push({ text: `${labels.elapsed}: ${formatElapsed(state.startedAt, now, labels)}` });
   }
   if (state.provider !== undefined) {
     lines.push(providerLine(state.provider, labels));

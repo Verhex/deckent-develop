@@ -56,6 +56,7 @@ import {
 const EN: LiveFooterLabels = {
   idle: 'idle', running: 'Running', elapsed: 'Elapsed', provider: 'Provider', auth: 'Auth', next: 'Next',
   healthy: 'healthy', degraded: 'degraded', unknown: 'unknown', loggedIn: 'logged-in', loggedOut: 'logged-out',
+  unitHours: 'h', unitMinutes: 'm', unitSeconds: 's',
 };
 import { theme } from '../../../src/cli/helpers/theme.js';
 

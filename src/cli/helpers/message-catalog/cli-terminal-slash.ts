@@ -49,6 +49,14 @@ export const CLI_TERMINAL_SLASH_MESSAGES: MessageFamily = Object.freeze({
   'tui.ctrl_c_interrupt': { en: 'interrupt requested · Ctrl-C again to exit', tr: 'kesme istendi · çıkmak için tekrar Ctrl-C' },
   'tui.ctrl_c_arm': { en: 'Ctrl-C again to exit', tr: 'çıkmak için tekrar Ctrl-C' },
 
+  // ── live-footer elapsed-time unit suffixes (helpers/live-footer.ts
+  //    formatElapsed — `2h 5m`, `10m`, `30s`). XVerify (codex/gpt-5.6-sol,
+  //    2026-09-02) flagged them as the last mechanism-owned user-facing
+  //    literals; same abbreviations as tui.inbox_time_* (sa / dk). ──────────
+  'live_footer.unit_hours': { en: 'h', tr: 'sa' },
+  'live_footer.unit_minutes': { en: 'm', tr: 'dk' },
+  'live_footer.unit_seconds': { en: 's', tr: 'sn' },
+
   // ── TERMINAL-TOOLS-007 — native engine BOOT outcomes (run.tsx
   //    localizeNativeError phase 'boot'). Same error codes as the
   //    `native.switch.*` rows in messages.ts, but a boot failure is not a

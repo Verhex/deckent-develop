@@ -29,6 +29,9 @@ const KEY_BY_FIELD: Record<keyof LiveFooterLabels, string> = {
   unknown: 'live_footer.unknown',
   loggedIn: 'live_footer.logged_in',
   loggedOut: 'live_footer.logged_out',
+  unitHours: 'live_footer.unit_hours',
+  unitMinutes: 'live_footer.unit_minutes',
+  unitSeconds: 'live_footer.unit_seconds',
 };
 
 describe('buildLiveFooterLabels — live_footer.* catalog wire', () => {
@@ -58,6 +61,6 @@ describe('buildLiveFooterLabels — live_footer.* catalog wire', () => {
     const now = new Date('2026-09-02T00:01:00Z');
     const lines = buildLiveFooter({ running: 'task-1', startedAt: '2026-09-02T00:00:00Z' }, { labels: tr, width: 120, now });
     expect(lines[0]).toBe(`${tr.running}: task-1`);
-    expect(lines[1]).toBe(`${tr.elapsed}: 1m`);
+    expect(lines[1]).toBe(`${tr.elapsed}: 1${tr.unitMinutes}`);
   });
 });

@@ -221,6 +221,9 @@ export function buildLiveFooterLabels(t: (key: string) => string): LiveFooterLab
     unknown: t('live_footer.unknown'),
     loggedIn: t('live_footer.logged_in'),
     loggedOut: t('live_footer.logged_out'),
+    unitHours: t('live_footer.unit_hours'),
+    unitMinutes: t('live_footer.unit_minutes'),
+    unitSeconds: t('live_footer.unit_seconds'),
   };
 }
 
