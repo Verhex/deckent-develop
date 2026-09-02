@@ -56,6 +56,10 @@ export interface InputBarProps {
   /** Caret carrier — 'inverse' (default) or 'marker' when the color gate is
    * suppressed (run.tsx resolves it from theme.ts; see CaretText). */
   caretStyle?: CaretStyle;
+  /** TERMINAL-TOOLS-010 — `?` on an EMPTY composer toggles this catalog-built
+   * shortcuts panel above the box (Esc or `?` closes it). String-free: the
+   * mechanism renders the injected rows verbatim. Absent → `?` is plain text. */
+  shortcutsPanel?: ShortcutsPanel;
   /** Project root for persistent history (`.deckent/settings/repl-history`).
    * Injectable for tests (tmpdir); defaults to `process.cwd()` — the real
    * REPL's project root — when the caller (app.tsx) doesn't override it. */
@@ -222,6 +226,12 @@ export function inkToKey(input: string, key: Parameters<Parameters<typeof useInp
 export type CaretStyle = 'inverse' | 'marker';
 export const CARET_MARKER = '|';
 
+/** TERMINAL-TOOLS-010 — caller-built keyboard help (run.tsx buildShortcutsPanel). */
+export interface ShortcutsPanel {
+  title: string;
+  rows: ReadonlyArray<{ keys: string; action: string }>;
+}
+
 /** Render the buffer with a visible caret at the cursor cell. TERMINAL-TOOLS-005:
  *  the caret cell is the whole grapheme cluster under the cursor (an emoji, a
  *  ZWJ family, a flag) — `slice(cursor, cursor + 1)` used to take half of a
@@ -250,7 +260,11 @@ export function formatMenuMore(template: string, n: number): string {
 }
 
 export function InputBar(props: InputBarProps): ReactElement {
-  const { active, onSubmit, onInterrupt, onClear, onEscape, slashRegistry, menuHint, pathProvider, atMenuHint } = props;
+  const { active, onSubmit, onInterrupt, onClear, onEscape, slashRegistry, menuHint, pathProvider, atMenuHint, shortcutsPanel } = props;
+  // TERMINAL-TOOLS-010 — `?` shortcuts panel (open/closed).
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const shortcutsOpenRef = useRef(false);
+  const setShortcuts = (open: boolean): void => { shortcutsOpenRef.current = open; setShortcutsOpen(open); };
   // TERMINAL-TOOLS-001 — string-free mechanism: no English fallback here. A
   // caller that forgets the catalog labels gets a typed error through the
   // REPL error boundary, never a silently English menu.
@@ -283,6 +297,16 @@ export function InputBar(props: InputBarProps): ReactElement {
     }
 
     if (key.ctrl && (input === 'l' || input === '\f')) { onClear?.(); return; } // Ctrl-L → clear
+
+    // ── TERMINAL-TOOLS-010: `?` shortcuts panel — only on an EMPTY composer,
+    // so a `?` inside a sentence stays text. Esc or `?` closes it. ──
+    if (shortcutsPanel) {
+      if (shortcutsOpenRef.current && (key.escape || input === '?')) { setShortcuts(false); return; }
+      if (input === '?' && !key.ctrl && !key.meta && stateRef.current.buffer.length === 0 && !searchRef.current) {
+        setShortcuts(true);
+        return;
+      }
+    }
 
     // ── Ctrl-R reverse history search ──
     if (key.ctrl && input === 'r') {
@@ -407,8 +431,21 @@ export function InputBar(props: InputBarProps): ReactElement {
   const searchMatch = searchHits.length > 0 ? (searchHits[search!.idx % searchHits.length] ?? '') : '';
 
   // claude-code-style framed input box, with the interactive menu ABOVE it.
+  const keysWidth = shortcutsPanel ? Math.max(...shortcutsPanel.rows.map((r) => r.keys.length), 0) : 0;
   return (
     <Box flexDirection="column">
+      {/* TERMINAL-TOOLS-010: `?` shortcuts panel (caller-built rows, no mechanism text). */}
+      {shortcutsOpen && shortcutsPanel ? (
+        <Box flexDirection="column" marginBottom={0}>
+          <Text color={GOLD} bold>{`  ${shortcutsPanel.title}`}</Text>
+          {shortcutsPanel.rows.map((row) => (
+            <Text key={row.keys}>
+              <Text color={TEAL}>{`  ${row.keys.padEnd(keysWidth)}`}</Text>
+              <Text dimColor>{`  ${row.action}`}</Text>
+            </Text>
+          ))}
+        </Box>
+      ) : null}
       {search ? (
         <Box>
           <Text color={GOLD}>{`${reverseSearchLabel} `}</Text>

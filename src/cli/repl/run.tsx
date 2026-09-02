@@ -17,7 +17,9 @@ import {
 } from './native-transport.js';
 import { loadDeckSecrets } from '../../core/deck-file.js';
 import { buildNativeToolRegistry, resolveToolSurfaceOptions, resolveRunFlowEnabled } from './native-tool-registry.js';
-import { createNativeEngine, resolveCostCeilingUsd, type NativeEngineDeps, type ReplEngine } from './native-agent-bridge.js';
+import { createNativeEngine, resolveCostCeilingUsd, type NativeEngineDeps, type ReplEngine, type ContextSnapshot } from './native-agent-bridge.js';
+import type { ShortcutsPanel } from './input-bar.js';
+export type { ShortcutsPanel } from './input-bar.js';
 import { createRunFlowController, type RunFlowController, type RunFlowControllerDeps } from './run-flow-controller.js';
 import { buildPlanPreviewCardLabels } from './plan-preview-card.js';
 import type { RunFlowMountLabels, DoSlashLabels } from './app.js';
@@ -386,6 +388,132 @@ export function withRenewSlash(engine: ReplEngine, labels: RenewSlashLabels): Re
     (wrapped as unknown as Record<string, unknown>)[key] = engine[key];
   }
   return wrapped;
+}
+
+// ─── TERMINAL-TOOLS-010 — `/context` · `/compact` (local slashes) ────────────
+//
+// Parity with Claude Code (/context, /compact), Codex CLI (/status token
+// usage, /compact) and Hermes (/compress). Both are answered locally through
+// the native engine's seams (contextSnapshot / compactContext); `/context`
+// makes zero provider calls, `/compact` makes exactly the one checkpoint call
+// the session's epoch path already owns. Labels come from the catalog
+// (`native-context.slash.*`, `native-context.compact.*`); an engine without
+// the seam (legacy loop) gets the honest "not available" line.
+
+export interface ContextSlashLabels {
+  header: string;         // "Context"
+  window: string;         // "window: {window} tokens"
+  measured: string;       // "in use: {used} tokens ({percent}%)"
+  measuredUnknown: string; // "in use: {unknown} (no measurement authority)"
+  epoch: string;          // "epoch: {epoch}"
+  messages: string;       // "messages: {messages} · checkpoint preamble: {preamble}"
+  checkpoint: string;     // "checkpoint: {status}"
+  highWater: string;      // "auto-compaction at {percent}% of the window"
+  refreshPlanned: string; // "a compaction is planned for the next turn"
+  unknown: string;        // "unknown"
+  unavailable: string;    // "/context is not available on this engine"
+  compacted: string;      // "context compacted — epoch {epoch}, checkpoint saved"
+  compactDegraded: string; // "compaction degraded — …; epoch {epoch} kept"
+  compactUnavailable: string; // "/compact is not available — no scratch store on this engine"
+}
+
+export function buildContextSlashLabels(t: (key: string) => string): ContextSlashLabels {
+  return {
+    header: t('native-context.slash.header'),
+    window: t('native-context.slash.window'),
+    measured: t('native-context.slash.measured'),
+    measuredUnknown: t('native-context.slash.measured_unknown'),
+    epoch: t('native-context.slash.epoch'),
+    messages: t('native-context.slash.messages'),
+    checkpoint: t('native-context.slash.checkpoint'),
+    highWater: t('native-context.slash.high_water'),
+    refreshPlanned: t('native-context.slash.refresh_planned'),
+    unknown: t('native-context.slash.unknown'),
+    unavailable: t('native-context.slash.unavailable'),
+    compacted: t('native-context.compact.compacted'),
+    compactDegraded: t('native-context.compact.degraded'),
+    compactUnavailable: t('native-context.compact.unavailable'),
+  };
+}
+
+/** Pure formatter for a snapshot (exported for tests). */
+export function formatContextSnapshot(snapshot: ContextSnapshot, labels: ContextSlashLabels): string {
+  const lines = [labels.header];
+  lines.push(`  ${labels.window.replace('{window}', snapshot.window === undefined ? labels.unknown : String(snapshot.window))}`);
+  if (snapshot.window !== undefined && snapshot.measuredInputTokens !== undefined) {
+    const percent = Math.round((snapshot.measuredInputTokens / snapshot.window) * 100);
+    lines.push(`  ${labels.measured.replace('{used}', String(snapshot.measuredInputTokens)).replace('{percent}', String(percent))}`);
+  } else {
+    lines.push(`  ${labels.measuredUnknown.replace('{unknown}', labels.unknown)}`);
+  }
+  lines.push(`  ${labels.epoch.replace('{epoch}', String(snapshot.epoch))}`);
+  lines.push(`  ${labels.messages.replace('{messages}', String(snapshot.messages)).replace('{preamble}', String(snapshot.preambleMessages))}`);
+  lines.push(`  ${labels.checkpoint.replace('{status}', snapshot.checkpoint)}`);
+  lines.push(`  ${labels.highWater.replace('{percent}', String(Math.round(snapshot.highWaterRatio * 100)))}`);
+  if (snapshot.refreshPlanned) lines.push(`  ${labels.refreshPlanned}`);
+  return lines.join('\n');
+}
+
+export async function resolveContextSlash(
+  trimmed: string,
+  engine: Pick<ReplEngine, 'contextSnapshot'> | undefined,
+  labels: ContextSlashLabels,
+): Promise<string | undefined> {
+  if (trimmed.trim().toLowerCase() !== '/context') return undefined;
+  const snapshot = engine?.contextSnapshot;
+  if (!snapshot) return labels.unavailable;
+  return formatContextSnapshot(await snapshot(), labels);
+}
+
+export async function resolveCompactSlash(
+  trimmed: string,
+  engine: Pick<ReplEngine, 'compactContext'> | undefined,
+  labels: ContextSlashLabels,
+): Promise<string | undefined> {
+  if (trimmed.trim().toLowerCase() !== '/compact') return undefined;
+  const compact = engine?.compactContext;
+  if (!compact) return labels.compactUnavailable;
+  const result = await compact();
+  if (result.outcome === 'compacted') return labels.compacted.replace('{epoch}', String(result.epoch));
+  if (result.outcome === 'degraded') return labels.compactDegraded.replace('{epoch}', String(result.epoch));
+  return labels.compactUnavailable;
+}
+
+/** Wrap an engine so `/context` and `/compact` are answered locally; every
+ *  other input passes through; every engine member is forwarded. */
+export function withContextSlashes(engine: ReplEngine, labels: ContextSlashLabels): ReplEngine {
+  const wrapped: ReplEngine = async (input, cbs) => {
+    const line = (await resolveContextSlash(input, engine, labels)) ?? (await resolveCompactSlash(input, engine, labels));
+    if (line === undefined) {
+      await engine(input, cbs);
+      return;
+    }
+    cbs.output(line);
+    cbs.onTurnEnd({ inputTokens: 0, outputTokens: 0 });
+  };
+  for (const key of Object.keys(engine) as (keyof ReplEngine)[]) {
+    (wrapped as unknown as Record<string, unknown>)[key] = engine[key];
+  }
+  return wrapped;
+}
+
+// ─── TERMINAL-TOOLS-010 — `?` shortcuts panel (catalog-built) ───────────────
+//
+// Keyboard help is discoverable and scoped (terminal design contract): `?` on
+// an empty composer opens a panel listing the composer's own bindings. The
+// mechanism (input-bar.tsx) renders whatever rows it is given; the rows and
+// the title are catalog text (`tui.shortcuts.*`) resolved here.
+
+const SHORTCUT_ROW_IDS = [
+  'submit', 'newline', 'newline_alt', 'newline_ctrl_j', 'newline_backslash', 'interrupt', 'ctrl_c', 'ctrl_d',
+  'history', 'history_search', 'clear_screen', 'slash', 'at_ref', 'line_edit', 'help',
+] as const;
+
+export function buildShortcutsPanel(t: (key: string) => string): ShortcutsPanel {
+  return {
+    title: t('tui.shortcuts.title'),
+    rows: SHORTCUT_ROW_IDS.map((id) => ({ keys: t(`tui.shortcuts.${id}.keys`), action: t(`tui.shortcuts.${id}.action`) })),
+  };
 }
 
 /**
@@ -1325,6 +1453,9 @@ export async function runInkRepl(
   // never gains it. Renewal stays strictly user-initiated — the wrapper is the
   // ONLY caller of the session's renewBudgetEpoch seam.
   if (nativeEngine) nativeEngine = withRenewSlash(nativeEngine, buildRenewSlashLabels(t));
+  // TERMINAL-TOOLS-010 — `/context` · `/compact` on the native path only (the
+  // legacy loop has no engine here and therefore no seam to answer them).
+  if (nativeEngine) nativeEngine = withContextSlashes(nativeEngine, buildContextSlashLabels(t));
 
   // Alternate-screen mode (OPT-IN: DECKENT_ALTSCREEN=1). It fixed the WSL
   // drift/blank but REMOVES native scrollback — long replies couldn't be scrolled
@@ -1378,6 +1509,7 @@ export async function runInkRepl(
       atRefPathProvider={atRefPathProvider}
       atRefReader={atRefReader}
       caretStyle={isColorSuppressed() ? 'marker' : 'inverse'}
+      shortcutsPanel={buildShortcutsPanel(t)}
       {...(nativeEngine ? { nativeEngine } : {})}
       replSurfaceEnabled={replSurfaceEnabled}
       {...(stateFeed ? { stateFeed } : {})}

@@ -224,7 +224,38 @@ export interface AgentSession {
   /** The cross-turn transcript (a copy) — for trace recording. */
   transcript(): ProviderMessage[];
   latestCheckpoint(): CheckpointReadResult;
+  /**
+   * TERMINAL-TOOLS-010 — read-only context occupancy for the `/context`
+   * surface: measured (never guessed) input tokens of the current transcript
+   * against the context authority's window, plus epoch/transcript/checkpoint
+   * state. `window`/`measuredInputTokens` are undefined when no authority or
+   * measurement exists — the caller renders "unknown", never an estimate.
+   */
+  contextSnapshot(): Promise<ContextSnapshot>;
+  /** Plan a context-epoch refresh for the NEXT send() — the `/renew` side
+   *  effect without the working-budget renewal. */
+  planContextRefresh(): void;
+  /**
+   * TERMINAL-TOOLS-010 — take a context epoch NOW (`/compact`): the same
+   * bounded-delta checkpoint path the proactive high-water trigger uses
+   * (one checkpoint provider call, usage emitted and accrued, durable write,
+   * transcript compacted onto intent + lineage + checkpoint). Without a
+   * scratch store it yields the typed `native.compact.unavailable` notice.
+   */
+  compactContext(): AsyncIterable<AgentSessionEvent>;
   close(options?: { keepForRecoveryMs?: number }): void;
+}
+
+/** TERMINAL-TOOLS-010 — `/context` read model (see AgentSession.contextSnapshot). */
+export interface ContextSnapshot {
+  window: number | undefined;
+  measuredInputTokens: number | undefined;
+  epoch: number;
+  messages: number;
+  preambleMessages: number;
+  checkpoint: CheckpointReadResult['status'];
+  refreshPlanned: boolean;
+  highWaterRatio: number;
 }
 
 export function createAgentSession(deps: AgentSessionDeps): AgentSession {
@@ -252,6 +283,8 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
   let contextEpoch = 1;
   /** `/renew` asked for a safe context refresh; the next send performs it. */
   let contextRefreshPlanned = false;
+  /** TERMINAL-TOOLS-010 — turn ids for explicit `/compact` epochs. */
+  let compactSequence = 0;
   /** Reference identity accumulated across the session, keyed path\0digest. */
   const references = new Map<string, TurnReference>();
   let lastRawIntent = '';
@@ -313,6 +346,9 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
       messages,
       tools: [],
       model: deps.getModel?.() ?? deps.model,
+      // TERMINAL-TOOLS-010 — the checkpoint call rides the same abort seam as
+      // the turn (or the explicit /compact) it belongs to, so Esc cancels it.
+      ...(turnAbort?.signal ? { signal: turnAbort.signal } : {}),
     };
     let text = '';
     for await (const response of adapter.send(request)) {
@@ -609,6 +645,34 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
       return transcript.toProviderMessages();
     },
     latestCheckpoint(): CheckpointReadResult { return checkpointDegradation ?? scratch?.readLatestCheckpoint() ?? { status: 'empty' }; },
+    async contextSnapshot(): Promise<ContextSnapshot> {
+      const window = deps.getContextBudgetTokens?.();
+      const measured = await measureContext();
+      return {
+        window: window !== undefined && window > 0 ? window : undefined,
+        measuredInputTokens: measured?.inputTokens,
+        epoch: contextEpoch,
+        messages: transcript.toProviderMessages().length,
+        preambleMessages: epochPreambleLength,
+        checkpoint: (checkpointDegradation ?? scratch?.readLatestCheckpoint() ?? { status: 'empty' }).status,
+        refreshPlanned: contextRefreshPlanned,
+        highWaterRatio: CONTEXT_HIGH_WATER_RATIO,
+      };
+    },
+    planContextRefresh(): void {
+      contextRefreshPlanned = true;
+    },
+    compactContext(): AsyncIterable<AgentSessionEvent> {
+      if (!scratch || !scratchDeps) {
+        return (async function* unavailable(): AsyncIterable<AgentSessionEvent> {
+          yield { type: 'notice', code: 'native.compact.unavailable', message: 'compaction unavailable — no scratch store on this session' };
+        })();
+      }
+      compactSequence++;
+      // A fresh abort seam for the explicit compaction (cancel() aborts it).
+      turnAbort = new AbortController();
+      return takeContextEpoch(`compact-${compactSequence}`);
+    },
     close(options = {}): void {
       const keep = options.keepForRecoveryMs ?? 0;
       // Fail-open, and only on a real teardown: a kept scratchpad's checkpoints

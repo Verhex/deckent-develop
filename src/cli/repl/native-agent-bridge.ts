@@ -11,6 +11,7 @@ import {
   createAgentSession,
   REFERENCE_EXCERPT_CHARS,
   type AgentSessionEvent,
+  type ContextSnapshot,
   type SessionBudgetExhaustedEvent,
   type StructuredTurnInput,
   type TurnReference,
@@ -57,6 +58,14 @@ const UNRESOLVED_PROVIDER = 'unknown';
  *  `tests/cli/native-agent-bridge.test.ts`'s exact `toEqual({inputTokens, outputTokens})`
  *  assertion on the raw engine contract. Leave as-is; see the divergence entry for the
  *  full disk-verified rationale. */
+export type { ContextSnapshot } from '../../agent/session.js';
+
+/** TERMINAL-TOOLS-010 — what an explicit `/compact` actually did. */
+export interface CompactOutcome {
+  outcome: 'compacted' | 'degraded' | 'unavailable';
+  epoch: number;
+}
+
 export interface ReplEngine {
   (
     input: string,
@@ -104,6 +113,11 @@ export interface ReplEngine {
    * and the REPL must say so instead of claiming a stop.
    */
   cancelTurn?: () => boolean;
+  /** TERMINAL-TOOLS-010 — `/context` read model (session.contextSnapshot). */
+  contextSnapshot?: () => Promise<ContextSnapshot>;
+  /** TERMINAL-TOOLS-010 — `/compact`: take a context epoch now; the outcome
+   *  names what really happened (checkpoint saved / degraded / no store). */
+  compactContext?: () => Promise<CompactOutcome>;
   /** 7087 (562-001 hand-completion) — the SAME context-budget authority the
    *  loop's admission uses (run.tsx getContextBudgetTokens), exposed so the
    *  @ref expansion in app.tsx can size its inline-vs-descriptor decision
@@ -918,6 +932,36 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
           await runTurn(formatBgTurnInput(payload), cbs);
         }
       };
+  // TERMINAL-TOOLS-010 — `/context` and `/compact` seams (run.tsx withContextSlashes).
+  engine.contextSnapshot = () => session.contextSnapshot();
+  engine.compactContext = async () => {
+    let outcome: CompactOutcome['outcome'] = 'unavailable';
+    // Counts as in flight so Esc / Ctrl-C (cancelTurn) can abort the
+    // checkpoint provider call the same way they abort a turn.
+    turnsInFlight++;
+    try {
+      for await (const ev of session.compactContext()) {
+        if (ev.type !== 'notice') continue;
+        if (ev.code === 'native.checkpoint.saved') outcome = 'compacted';
+        else if (ev.code === 'native.checkpoint.degraded') outcome = 'degraded';
+        // Same durable audit record the turn path writes for a context epoch
+        // (stable code only — never checkpoint text).
+        if (ev.code.startsWith('native.checkpoint.')) {
+          writeAuditEvent(deps.cwd, NATIVE_AGENT_AUDIT_PARTITION, {
+            tenantId: deps.scratch?.tenantId ?? 'local',
+            actor: 'native-agent',
+            action: ev.code,
+            target: deps.scratch?.sessionId ?? 'session',
+            metadata: { trigger: 'slash-compact' },
+          });
+        }
+      }
+    } finally {
+      turnsInFlight--;
+    }
+    const snapshot = await session.contextSnapshot();
+    return { outcome, epoch: snapshot.epoch };
+  };
   // TERMINAL-TOOLS-008 — see the ReplEngine.cancelTurn doc comment above.
   engine.cancelTurn = () => {
     if (turnsInFlight === 0) return false;

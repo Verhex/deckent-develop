@@ -365,6 +365,19 @@ const SLASH_CATALOG: readonly SlashCatalogEntry[] = [
     descKey: 'tui.slash.desc.renew',
   },
   {
+    // TERMINAL-TOOLS-010 — answered locally by run.tsx's withContextSlashes on
+    // the native engine (read-only context occupancy; zero provider calls).
+    // Listed for /help + menu + Tab-complete only, no agenticTool.
+    name: '/context',
+    descKey: 'tui.slash.desc.context',
+  },
+  {
+    // TERMINAL-TOOLS-010 — explicit context-epoch compaction (one checkpoint
+    // call through the session's bounded-delta path). Same local routing.
+    name: '/compact',
+    descKey: 'tui.slash.desc.compact',
+  },
+  {
     // Meta-command: handled in app.tsx handleSubmit BEFORE resolveSlash
     // (parseTermCommand, term-mode.ts). Listed for /help + menu visibility +
     // Tab-complete only — no agenticTool, so resolveSlash falls through to

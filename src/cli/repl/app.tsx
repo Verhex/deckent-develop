@@ -17,7 +17,7 @@ import {
   buildNervousOutput, buildInterrogateOutput, resolveNativeSlashText,
 } from '../commands/chat-native.js';
 import { renderMarkdown } from '../commands/chat-render.js';
-import { InputBar, type CaretStyle } from './input-bar.js';
+import { InputBar, type CaretStyle, type ShortcutsPanel } from './input-bar.js';
 import { StatusRow } from './status-row.js';
 import { resolveCtrlC, CTRL_C_EXIT_WINDOW_MS } from './interrupt-policy.js';
 import { useTerminalColumns } from './use-terminal-columns.js';
@@ -1153,6 +1153,9 @@ export interface ReplAppProps {
    * when theme.ts reports color suppression (NO_COLOR / --no-color), so the
    * caret keeps a non-color carrier once Ink's inverse attribute is gone. */
   caretStyle: CaretStyle;
+  /** TERMINAL-TOOLS-010 — catalog-built `?` shortcuts panel (run.tsx
+   * buildShortcutsPanel); required so keyboard help is always discoverable. */
+  shortcutsPanel: ShortcutsPanel;
 }
 
 const AT_REF_OUTPUT_RESERVE_TOKENS = 32_000;
@@ -1269,7 +1272,7 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
 }
 
 export function ReplApp(props: ReplAppProps): ReactElement {
-  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle } = props;
+  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle, shortcutsPanel } = props;
   const { exit } = useApp();
   // TERMINAL-TOOLS-004 — live width for the status row + queue preview (reflows on resize).
   const columns = useTerminalColumns();
@@ -2138,6 +2141,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         menuMoreBelow={labels.menuMoreBelow}
         reverseSearchLabel={labels.reverseSearch}
         caretStyle={caretStyle}
+        shortcutsPanel={shortcutsPanel}
         // TERM-AT-REF (583/N2b): `@` path menu — inert (menu never opens)
         // unless run.tsx injects a provider; hint via the same labels route.
         pathProvider={atRefPathProvider}
