@@ -66,6 +66,10 @@ export type ConfirmTrigger = (summary: string, toolName?: string) => Promise<Con
 export interface ConfirmRequest {
   summary: string;
   toolName?: string;
+  /** TERMINAL-TOOLS-013 — a one-time card (the operator's own `!` shell line):
+   *  no "always" option, an 'a' answer resolves as 'y', never cascades and
+   *  never reaches the allow-list. §4: "A longer grant is a separate governed flow." */
+  oneTime?: boolean;
   resolve: (answer: ConfirmAnswer) => void;
 }
 
@@ -74,6 +78,7 @@ export interface ConfirmHead {
   summary: string;
   index: number;   // 1-based position of this card within the active burst
   total: number;   // total cards in the active burst (grows if more arrive mid-burst)
+  oneTime: boolean;
 }
 
 /** FIFO confirm queue (view-layer authority). */
@@ -107,7 +112,7 @@ export function createConfirmQueue(onChange: () => void): ConfirmQueue {
   const head = (): ConfirmHead | null => {
     const h = pending[0];
     if (!h) return null;
-    return { summary: h.summary, index: answered + 1, total: answered + pending.length };
+    return { summary: h.summary, index: answered + 1, total: answered + pending.length, oneTime: h.oneTime === true };
   };
 
   const enqueue = (req: ConfirmRequest): void => {
@@ -119,11 +124,13 @@ export function createConfirmQueue(onChange: () => void): ConfirmQueue {
     const current = pending.shift();
     if (!current) return;
     answered += 1;
-    current.resolve(a);
+    // TERMINAL-TOOLS-013 — a one-time card cannot grant: 'a' collapses to 'y'.
+    const effective: ConfirmAnswer = a === 'a' && current.oneTime ? 'y' : a;
+    current.resolve(effective);
     // "always" applies to the same-tool remainder: queued requests for the SAME
     // tool already cleared run.tsx's perms gate and won't re-check it, so resolve
     // them here with the same allow decision (claude-code "always allow" feel).
-    if (a === 'a' && current.toolName) {
+    if (effective === 'a' && current.toolName) {
       for (let i = pending.length - 1; i >= 0; i--) {
         if (pending[i]!.toolName === current.toolName) {
           const [same] = pending.splice(i, 1);
@@ -416,12 +423,14 @@ export function steerNotesToInputs(drained: readonly string[], pendingQueue: rea
 export function confirmKeyToAnswer(
   input: string,
   key: { return?: boolean; escape?: boolean; ctrl?: boolean; meta?: boolean },
+  opts: { oneTime?: boolean } = {},
 ): ConfirmAnswer | null {
   if (key.return || key.escape) return 'n'; // default = deny (hint shows capital N)
   if (key.ctrl || key.meta) return null;    // shortcuts/sequences never decide a card
   const ch = input.toLowerCase();
   if (ch === 'y') return 'y';
-  if (ch === 'a') return 'a';
+  // TERMINAL-TOOLS-013 — a one-time card has no "always": the key is ignored.
+  if (ch === 'a') return opts.oneTime ? null : 'a';
   if (ch === 'n') return 'n';
   return null; // arrows, Tab, stray/pasted text → card stays pending
 }
@@ -771,6 +780,10 @@ export interface ReplLabels {
   ready: string;        // "hazır · sıra sende"
   queued: string;       // "kuyrukta"
   confirmHint: string;  // "(y = izin · a = hep izin · N = reddet)"
+  /** TERMINAL-TOOLS-013 — hint for a one-time card (no "always"). */
+  confirmHintOnce: string;
+  /** TERMINAL-TOOLS-013 — status anchor while a card owns stdin ("input paused · …"). */
+  inputPaused: string;
   confirmProgress: string; // "[{index}/{total}]" — per-card position (i18n template)
   menuHint: string;     // "↑↓ gez · Enter seç · Tab tamamla · Esc kapat"
   /** `/` menu scroll hints, `{n}` templates (tui.menu_more_above/below) —
@@ -1336,6 +1349,9 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   termModeRef.current = termMode;
   /** `!` shell outputs waiting to ride ahead of the next prompt (bounded). */
   const shellNotesRef = useRef<ShellNote[]>([]);
+  /** TERMINAL-TOOLS-013 — true only while the operator's own `!` line is being
+   *  dispatched, so its confirm card is enqueued one-time (no "always" grant). */
+  const shellConfirmRef = useRef(false);
   const denyLine = (gate: Extract<TermGateDecision, { kind: 'deny' }>, target: string): string =>
     renderTermGateDenied(gate, target, {
       template: labels.termGateDenied,
@@ -1439,7 +1455,14 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         const gate = gateAction(termModeRef.current, { tool: toolName, args: {} });
         if (gate.kind === 'deny') { pushTurn('seg', denyLine(gate, toolName)); resolve('n'); return; }
       }
-      confirmQueue.current!.enqueue({ summary, resolve, ...(toolName ? { toolName } : {}) });
+      confirmQueue.current!.enqueue({
+        summary,
+        resolve,
+        ...(toolName ? { toolName } : {}),
+        // TERMINAL-TOOLS-013 — the operator's own `!` line is a one-time
+        // decision: no "always", nothing reaches the allow-list.
+        oneTime: shellConfirmRef.current && toolName === 'deckent_bash',
+      });
     }));
   }, [registerConfirm]);
 
@@ -1722,9 +1745,14 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       pushTurn('user', trimmed);
       const gate = gateAction(termModeRef.current, { tool: 'deckent_bash', args: { cmd: shellCmd } });
       if (gate.kind === 'deny') { pushTurn('seg', denyLine(gate, trimmed)); return; }
-      const out = await dispatcher.dispatch('deckent_bash', { cmd: shellCmd });
-      pushTurn('seg', out);
-      if (!isDeniedShellOutput(out)) shellNotesRef.current = pushShellNote(shellNotesRef.current, { cmd: shellCmd, output: out });
+      shellConfirmRef.current = true;
+      const out = await dispatcher.dispatch('deckent_bash', { cmd: shellCmd }).finally(() => { shellConfirmRef.current = false; });
+      // A denial already rendered its honest-outcome block (dim ✗ cancelled)
+      // through the dispatcher's toolSink — never echo the raw marker.
+      if (!isDeniedShellOutput(out)) {
+        pushTurn('seg', out);
+        shellNotesRef.current = pushShellNote(shellNotesRef.current, { cmd: shellCmd, output: out });
+      }
       return;
     }
     if (trimmed.toLowerCase() === '/cancel') {
@@ -2027,7 +2055,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // decide a card (case-insensitive y/a/n + Enter/Esc = deny default); stray
   // navigation/typed keys no longer mow the burst down one card per keystroke.
   useInput((input, key) => {
-    const answer = confirmKeyToAnswer(input, key);
+    const answer = confirmKeyToAnswer(input, key, { oneTime: confirm?.oneTime === true });
     if (answer !== null) confirmQueue.current!.answer(answer);
   }, { isActive: stdinOwner.confirmActive });
 
@@ -2102,7 +2130,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       {confirm && (
         <Box flexDirection="column" marginTop={1}>
           <Text color={TEAL}>{confirm.summary}</Text>
-          <Text dimColor>{`${labels.confirmProgress.replace('{index}', String(confirm.index)).replace('{total}', String(confirm.total))} ${labels.confirmHint}`}</Text>
+          <Text dimColor>{`${labels.confirmProgress.replace('{index}', String(confirm.index)).replace('{total}', String(confirm.total))} ${confirm.oneTime ? labels.confirmHintOnce : labels.confirmHint}`}</Text>
         </Box>
       )}
 
@@ -2183,8 +2211,10 @@ export function ReplApp(props: ReplAppProps): ReactElement {
 
       {/* Persistent status anchor (always present → "where am I / busy or done"). */}
       <Box marginTop={1}>
+        {/* TERMINAL-TOOLS-013: while a card owns stdin the anchor SAYS so
+            instead of promising "your turn" (textual carrier, not layout). */}
         {phase === 'idle'
-          ? <Text dimColor>{`✓ ${labels.ready}`}</Text>
+          ? <Text dimColor>{stdinOwner.inputBarActive ? `✓ ${labels.ready}` : labels.inputPaused}</Text>
           : <><Spinner /><Text color={GOLD} bold> deckent </Text><Text dimColor>{`· ${phase === 'thinking' ? labels.thinking : labels.generating}`}</Text></>}
         {/* TERMINAL-TOOLS-006: transient Ctrl-C hint (names the next key). */}
         {interruptHint ? <Text color={GOLD}>{`  · ${interruptHint.text}`}</Text> : null}

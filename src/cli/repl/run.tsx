@@ -185,6 +185,9 @@ export function buildReplLabels(t: (key: string) => string): ReplLabels {
     ctrlCArm: t('tui.ctrl_c_arm'),
     // TERMINAL-TOOLS-011 — Ask/Run/Control gate denial line (term-gate.ts).
     termGateDenied: t('tui.term_gate_denied'),
+    // TERMINAL-TOOLS-013 — one-time confirm hint + paused-input anchor.
+    confirmHintOnce: t('tui.confirm_hint_once'),
+    inputPaused: t('tui.input_paused'),
   };
 }
 
@@ -284,9 +287,12 @@ export function buildApprovalLabels(t: (key: string) => string): ApprovalCardLab
       expiry: t('tui.approval_card.fact_expiry'),
       consequence: t('tui.approval_card.fact_consequence'),
       rollback: t('tui.approval_card.fact_rollback'),
+      age: t('tui.approval_card.fact_age'),
+      ago: t('tui.approval_card.ago'),
+      justNow: t('tui.approval_card.just_now'),
       notDeclared: t('tui.approval_card.not_declared'),
-      expiresIn: t('tui.approval_card.expires_in'),
-      expired: t('tui.approval_card.expired'),
+      expiryOutcome: t('tui.approval_card.expiry_outcome'),
+      expiredOutcome: t('tui.approval_card.expired_outcome'),
       units: { hours: t('live_footer.unit_hours'), minutes: t('live_footer.unit_minutes'), seconds: t('live_footer.unit_seconds') },
       policyLabels: {
         'auto-approve': t('tui.approval_card.policy.auto_approve'),

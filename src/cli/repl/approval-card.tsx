@@ -154,18 +154,19 @@ const RISK_COLORS: Record<ApprovalRisk, string> = {
   critical: '#E0524D',
 };
 
-const MAX_SUMMARY_LEN = 80;
-
 function formatArgValue(value: unknown): string {
   return typeof value === 'string' ? value : JSON.stringify(value);
 }
 
-/** Compact one-line rendering of maskedArgs for the collapsed card. */
+/** One-line `key=value` rendering of maskedArgs for the collapsed card.
+ *  TERMINAL-TOOLS-013: never truncated — the operator decides with `y` from
+ *  this view (§6 "no one-key decision from an unseen summary"); Ink wraps it to
+ *  the terminal's display cells, the old fixed 80-character ceiling was exactly
+ *  the §10.2 #5 class of defect. */
 function summarizeMaskedArgs(maskedArgs: Record<string, unknown>): string {
-  const flat = Object.entries(maskedArgs)
+  return Object.entries(maskedArgs)
     .map(([key, value]) => `${key}=${formatArgValue(value)}`)
     .join(' ');
-  return flat.length > MAX_SUMMARY_LEN ? `${flat.slice(0, MAX_SUMMARY_LEN - 1)}…` : flat;
 }
 
 // ─── §4 shared focus-rail facts (TERMINAL-TOOLS-012) ─────────────────────────
@@ -187,11 +188,18 @@ export interface ApprovalFactLabels {
   expiry: string;
   consequence: string;
   rollback: string;
+  /** §4 "identity, current condition and age" — the row label ("requested"). */
+  age: string;
+  /** Template with `{duration}` (e.g. "{duration} ago") — minute-grained. */
+  ago: string;
+  /** Age under a minute ("just now") — the age row never ticks per second. */
+  justNow: string;
   /** Rendered when `details.consequence` / `details.rollbackLimit` are absent. */
   notDeclared: string;
-  /** Template with `{duration}` (e.g. "in {duration}"). */
-  expiresIn: string;
-  expired: string;
+  /** Worded relation templates (TERMINAL-TOOLS-013: no structural arrow in the
+   *  mechanism): `{remaining}` + `{outcome}`, and `{outcome}` for the expired case. */
+  expiryOutcome: string;
+  expiredOutcome: string;
   units: { hours: string; minutes: string; seconds: string };
   policyLabels: Record<ApprovalRequest['policy'], string>;
   actionLabels: Record<ApprovalRequest['defaultAction'], string>;
@@ -203,57 +211,81 @@ export interface ApprovalFactLabels {
   timeoutDispositionLabels: Record<ApprovalRequestV2['lifecycleProfile']['timeoutDisposition'], string>;
 }
 
-export type ApprovalFactKey = 'requester' | 'action' | 'tenant' | 'policy' | 'lifecycle' | 'expiry' | 'consequence' | 'rollback';
-export interface ApprovalFact { key: ApprovalFactKey; label: string; value: string }
+export type ApprovalFactKey = 'action' | 'requester' | 'tenant' | 'policy' | 'lifecycle' | 'age' | 'expiry' | 'consequence' | 'rollback';
+/** `emphasis` — rendered at normal weight instead of dim: the object of the
+ *  decision (action · resource) always; an UNDECLARED consequence/rollback on a
+ *  high/critical request (the absence is itself a fact the operator must weigh). */
+export interface ApprovalFact { key: ApprovalFactKey; label: string; value: string; emphasis: boolean }
 
-/** Coarse-to-fine remaining time with catalog unit suffixes; the past clamps to zero. */
+/**
+ * Quiet, coarse-to-fine duration with catalog unit suffixes; the past clamps to
+ * zero. Minute-grained above a minute (a pending approval is not a stopwatch —
+ * terminal-design: "avoid rapid live-region-like churn"); second-grained only
+ * inside the last minute, where the exception legitimately changes pace.
+ */
 export function formatRemaining(ms: number, units: ApprovalFactLabels['units']): string {
   const total = Math.max(0, Math.floor(ms / 1000));
   const h = Math.floor(total / 3600);
   const m = Math.floor((total % 3600) / 60);
-  const s = total % 60;
   if (h > 0) return `${h}${units.hours} ${m}${units.minutes}`;
-  if (m > 0) return `${m}${units.minutes} ${s}${units.seconds}`;
-  return `${s}${units.seconds}`;
+  if (m > 0) return `${m}${units.minutes}`;
+  return `${total}${units.seconds}`;
+}
+
+/** Age of the request — never second-grained (an approval's age is context, not urgency). */
+export function formatAge(ms: number, f: Pick<ApprovalFactLabels, 'ago' | 'justNow' | 'units'>): string {
+  return ms < 60_000 ? f.justNow : f.ago.replace('{duration}', formatRemaining(ms, f.units));
 }
 
 const isV2 = (request: ApprovalRequest): request is ApprovalRequestV2 => 'origin' in request;
+const HIGH_RISK: ReadonlySet<ApprovalRisk> = new Set<ApprovalRisk>(['high', 'critical']);
 
 /** The §4 field set for one request at `nowMs` (pure — unit-testable without Ink). */
 export function buildApprovalFacts(request: ApprovalRequest, labels: ApprovalCardLabels, nowMs: number): ApprovalFact[] {
   const f = labels.facts;
-  const declared = (key: 'consequence' | 'rollbackLimit'): string => {
+  const weighty = HIGH_RISK.has(request.risk);
+  const declared = (key: 'consequence' | 'rollbackLimit'): { value: string; emphasis: boolean } => {
     const value = request.details[key];
-    return typeof value === 'string' && value.trim().length > 0 ? value : f.notDeclared;
+    return typeof value === 'string' && value.trim().length > 0
+      ? { value, emphasis: false }
+      : { value: f.notDeclared, emphasis: weighty };
   };
   const outcome = f.actionLabels[request.defaultAction];
   const remainingMs = Date.parse(request.expiresAt) - nowMs;
   let expiry = remainingMs > 0
-    ? `${f.expiresIn.replace('{duration}', formatRemaining(remainingMs, f.units))} → ${outcome}`
-    : `${f.expired} → ${outcome}`;
+    ? f.expiryOutcome.replace('{remaining}', formatRemaining(remainingMs, f.units)).replace('{outcome}', outcome)
+    : f.expiredOutcome.replace('{outcome}', outcome);
   if (isV2(request)) expiry += ` (${f.timeoutDispositionLabels[request.lifecycleProfile.timeoutDisposition]})`;
   const facts: ApprovalFact[] = [
-    { key: 'requester', label: f.requester, value: `${request.requester.role} · ${request.requester.instanceId}` },
-    { key: 'action', label: f.action, value: `${f.scopeLabels[request.scope]} · ${request.scopeId}` },
-    { key: 'tenant', label: f.tenant, value: `${request.tenantId} · ${request.userId}` },
-    { key: 'policy', label: f.policy, value: f.policyLabels[request.policy] },
+    { key: 'action', label: f.action, value: `${f.scopeLabels[request.scope]} · ${request.scopeId}`, emphasis: true },
+    { key: 'requester', label: f.requester, value: `${request.requester.role} · ${request.requester.instanceId}`, emphasis: false },
+    { key: 'tenant', label: f.tenant, value: `${request.tenantId} · ${request.userId}`, emphasis: false },
+    { key: 'policy', label: f.policy, value: f.policyLabels[request.policy], emphasis: false },
   ];
   if (isV2(request)) {
     facts.push({
       key: 'lifecycle',
       label: f.lifecycle,
       value: `${f.originLabels[request.origin]} · ${f.riskTierLabels[request.riskTier]} · ${f.blockingLabels[request.blocking]} · ${f.slaStageLabels[request.slaStage]}`,
+      emphasis: false,
     });
   }
   facts.push(
-    { key: 'expiry', label: f.expiry, value: expiry },
-    { key: 'consequence', label: f.consequence, value: declared('consequence') },
-    { key: 'rollback', label: f.rollback, value: declared('rollbackLimit') },
+    { key: 'age', label: f.age, value: formatAge(nowMs - Date.parse(request.createdAt), f), emphasis: false },
+    { key: 'expiry', label: f.expiry, value: expiry, emphasis: false },
+    { key: 'consequence', label: f.consequence, ...declared('consequence') },
+    { key: 'rollback', label: f.rollback, ...declared('rollbackLimit') },
   );
   return facts;
 }
 
-/** Countdown refresh cadence while a card is pending (unref'd — never keeps the process alive). */
+/** The time-derived carrier of the card at `nowMs` — the countdown re-renders
+ *  ONLY when this string changes (once a minute above a minute). */
+function timeCarrier(request: ApprovalRequest, f: ApprovalFactLabels, nowMs: number): string {
+  return `${formatRemaining(Date.parse(request.expiresAt) - nowMs, f.units)}|${formatAge(nowMs - Date.parse(request.createdAt), f)}`;
+}
+
+/** Clock poll cadence while a card is pending (unref'd — never keeps the process alive). */
 const FACTS_REFRESH_MS = 1000;
 
 // ─── Props ──────────────────────────────────────────────────────────────────
@@ -312,15 +344,21 @@ export function ApprovalCard(props: ApprovalCardProps): ReactElement | null {
   const { events, onDecide, onClosure, decidedBy, channel, labels, isActive: mutexActive = true, now = Date.now } = props;
   const [head, setHead] = useState<ApprovalCardHead | null>(null);
   const [expanded, setExpanded] = useState(false);
-  // TERMINAL-TOOLS-012 — re-render once a second while a card is pending so the
-  // expiry countdown stays honest (a frozen "in 14m" is a stale fact).
+  // TERMINAL-TOOLS-012/013 — keep the expiry/age carrier honest (a frozen
+  // "in 14m" is a stale fact) WITHOUT churn: poll the clock, re-render only when
+  // the rendered duration string actually changes (minute steps above a minute).
   const [, setClockTick] = useState(0);
+  const carrierRef = useRef('');
   useEffect(() => {
     if (!head) return undefined;
-    const timer = setInterval(() => setClockTick((n) => n + 1), FACTS_REFRESH_MS);
+    carrierRef.current = timeCarrier(head.request, labels.facts, now());
+    const timer = setInterval(() => {
+      const next = timeCarrier(head.request, labels.facts, now());
+      if (next !== carrierRef.current) { carrierRef.current = next; setClockTick((n) => n + 1); }
+    }, FACTS_REFRESH_MS);
     timer.unref?.();
     return () => clearInterval(timer);
-  }, [head]);
+  }, [head, labels, now]);
   const queueRef = useRef<ApprovalCardQueue | null>(null);
   if (!queueRef.current) {
     queueRef.current = createApprovalCardQueue(() => setHead(queueRef.current!.head()));
@@ -388,14 +426,24 @@ export function ApprovalCard(props: ApprovalCardProps): ReactElement | null {
 
   return (
     <Box flexDirection="column" borderStyle="round" borderColor={riskColor} paddingX={1}>
-      <Box>
-        <Text color={riskColor} bold>{`${labels.riskLabels[request.risk]} `}</Text>
-        <Text>{request.summary}</Text>
-      </Box>
+      {/* One inline Text: at narrow widths a flex row of two Texts dropped the
+          separating space when the summary wrapped ("HIGHDEMO — …"). */}
+      <Text wrap="wrap">
+        <Text color={riskColor} bold>{labels.riskLabels[request.risk]}</Text>
+        {` ${request.summary}`}
+      </Text>
+      {/* TERMINAL-TOOLS-013 hierarchy: the object of the decision first (action ·
+          resource, then its redacted arguments at normal weight), then who /
+          policy / time, then consequence and rollback. Alignment by a fixed
+          label column, not by color. */}
       {facts.map((fact) => (
-        <Text key={fact.key} dimColor>{`${fact.label}: ${fact.value}`}</Text>
+        <Box key={fact.key} flexDirection="column">
+          <Text dimColor={!fact.emphasis}>{`${fact.label}: ${fact.value}`}</Text>
+          {fact.key === 'action' && (
+            <Text wrap="wrap">{request.maskedArgs ? summarizeMaskedArgs(request.maskedArgs) : labels.noArgs}</Text>
+          )}
+        </Box>
       ))}
-      <Text dimColor>{request.maskedArgs ? summarizeMaskedArgs(request.maskedArgs) : labels.noArgs}</Text>
       {expanded && (
         <Box flexDirection="column" marginTop={1}>
           <Text bold>{labels.detailsHeading}</Text>
