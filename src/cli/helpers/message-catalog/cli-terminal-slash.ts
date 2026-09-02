@@ -48,6 +48,43 @@ export const CLI_TERMINAL_SLASH_MESSAGES: MessageFamily = Object.freeze({
   'tui.ctrl_c_draft_cleared': { en: 'draft discarded · Ctrl-C again to exit', tr: 'taslak silindi · çıkmak için tekrar Ctrl-C' },
   'tui.ctrl_c_interrupt': { en: 'interrupt requested · Ctrl-C again to exit', tr: 'kesme istendi · çıkmak için tekrar Ctrl-C' },
   'tui.ctrl_c_arm': { en: 'Ctrl-C again to exit', tr: 'çıkmak için tekrar Ctrl-C' },
+
+  // ── TERMINAL-TOOLS-007 — native engine BOOT outcomes (run.tsx
+  //    localizeNativeError phase 'boot'). Same error codes as the
+  //    `native.switch.*` rows in messages.ts, but a boot failure is not a
+  //    switch: the engine never started and the legacy loop runs instead. ──
+  'native.boot.missing-api-key': {
+    en: 'native engine not started — {provider} needs an API key: set {detail}. Running the legacy loop instead.',
+    tr: 'native motor başlatılmadı — {provider} için API anahtarı gerekli: {detail} tanımlayın. Bunun yerine eski döngü çalışıyor.',
+  },
+  'native.boot.missing-ollama-host': {
+    en: 'native engine not started — ollama needs a host: set {detail} in .deckent/config.json. Running the legacy loop instead.',
+    tr: 'native motor başlatılmadı — ollama için host gerekli: .deckent/config.json içinde {detail} tanımlayın. Bunun yerine eski döngü çalışıyor.',
+  },
+  'native.boot.missing-local-llm-endpoint': {
+    en: 'native engine not started — local-llm needs an endpoint: set {detail} in .deckent/config.json. Running the legacy loop instead.',
+    tr: 'native motor başlatılmadı — local-llm için endpoint gerekli: .deckent/config.json içinde {detail} tanımlayın. Bunun yerine eski döngü çalışıyor.',
+  },
+  'native.boot.missing-native-model': {
+    en: 'native engine not started — local-llm needs an exact model ID: set {detail} (deckent config set native_model <id>) to one of the endpoint\'s published /models IDs. Running the legacy loop instead.',
+    tr: 'native motor başlatılmadı — local-llm için tam model kimliği gerekli: {detail} değerini (deckent config set native_model <id>) endpoint\'in /models listesindeki kimliklerden biri yapın. Bunun yerine eski döngü çalışıyor.',
+  },
+  'native.boot.unsupported-native-provider': {
+    en: 'native engine not started — "{detail}" has no native tool-use transport; valid: claude, openai, ollama, deepseek, qwen, glm, local-llm. Running the legacy loop instead.',
+    tr: 'native motor başlatılmadı — "{detail}" için native tool-use transport yok; geçerli: claude, openai, ollama, deepseek, qwen, glm, local-llm. Bunun yerine eski döngü çalışıyor.',
+  },
+  'native.boot.legacy-model-alias': {
+    en: 'native engine not started — "{detail}" is a legacy alias; use an exact provider API model ID. Running the legacy loop instead.',
+    tr: 'native motor başlatılmadı — "{detail}" eski bir takma addır; tam sağlayıcı API model kimliği kullanın. Bunun yerine eski döngü çalışıyor.',
+  },
+  'native.boot.unknown-model': {
+    en: 'native engine not started — unknown model "{detail}": use an exact registered provider API model ID. Running the legacy loop instead.',
+    tr: 'native motor başlatılmadı — bilinmeyen model "{detail}": tam kayıtlı sağlayıcı API model kimliği kullanın. Bunun yerine eski döngü çalışıyor.',
+  },
+  'native.boot.no-transport': {
+    en: 'native engine not started — no native transport configured: set ANTHROPIC_API_KEY / OPENAI_API_KEY / openai_base_url / ollama_host. Running the legacy loop instead.',
+    tr: 'native motor başlatılmadı — native transport tanımlı değil: ANTHROPIC_API_KEY / OPENAI_API_KEY / openai_base_url / ollama_host tanımlayın. Bunun yerine eski döngü çalışıyor.',
+  },
   'tui.switch_busy': {
     en: 'cannot switch {kind} while a turn is in progress — wait for it to finish, or /interrupt first',
     tr: 'tur sürerken {kind} değiştirilemez — bitmesini bekleyin ya da önce /interrupt kullanın',

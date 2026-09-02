@@ -132,18 +132,23 @@ describe('buildHealthSnapshot — provider/model/mode field-level fail-soft', ()
     expect(snapshot.model.label).toContain(liveApiId);
   });
 
-  it('non-registry-typed provider (ollama) still resolves the model via the parametric registry path', async () => {
+  // TERMINAL-TOOLS-007: a non-registry provider never borrows the claude
+  // brain_model — its model is the configured native_model, else honestly unknown.
+  it('non-registry-typed provider (ollama) shows native_model when configured, else an honest unknown', async () => {
     const root = makeTmpRoot();
-    const cfg = makeConfig({ brain_provider: 'claude', chat_provider: 'ollama', mode: 'balanced' });
-    const deps: HealthSnapshotDeps = {
+    const base = makeConfig({ brain_provider: 'claude', chat_provider: 'ollama', mode: 'balanced' });
+    const depsFor = (cfg: ResolvedConfig): HealthSnapshotDeps => ({
       loadConfigFn: async () => cfg,
       loadMcpServersFn: NOOP_MCP,
       readMemoryCountFn: () => undefined,
       probeAuthFn: async (): Promise<AuthProbeResult> => ({ state: 'unknown' }),
-    };
-    const snapshot = await buildHealthSnapshot(root, deps);
-    expect(snapshot.provider.label).toBe('ollama');
-    expect(snapshot.model.status).toBe('ok');
+    });
+    const withoutModel = await buildHealthSnapshot(root, depsFor(base));
+    expect(withoutModel.provider.label).toBe('ollama');
+    expect(withoutModel.model.status).toBe('unknown');
+    expect(withoutModel.model.detail).toContain('native_model');
+    const withModel = await buildHealthSnapshot(root, depsFor({ ...base, native_model: 'qwen2.5-coder' } as ResolvedConfig));
+    expect(withModel.model).toMatchObject({ status: 'ok', label: 'qwen2.5-coder' });
   });
 });
 

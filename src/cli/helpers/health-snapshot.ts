@@ -60,6 +60,14 @@ export interface HealthSnapshotDeps {
   readMemoryCountFn?: (root: string) => number | undefined;
   /** 363-011 — active REPL session count (361-015 session-registry). Default: listActive(root). */
   listActiveSessionsFn?: (root: string) => ReplSession[];
+  /**
+   * TERMINAL-TOOLS-007 — the provider the REPL actually resolved (entry.ts
+   * providerName: DECKENT_CHAT_PROVIDER env override, else the config chain).
+   * When given it IS the provider field; the config chain is only the
+   * fallback for callers that have not resolved one. Before this the health
+   * line re-read config and could name a provider that would never answer.
+   */
+  provider?: string;
 }
 
 // ─── Timing budget ───────────────────────────────────────────────────────
@@ -95,36 +103,47 @@ function errorDetail(err: unknown): string {
 
 // ─── Field resolvers ─────────────────────────────────────────────────────
 
-function resolveProviderField(config: ResolvedConfig | undefined): HealthField {
+function resolveProviderField(config: ResolvedConfig | undefined, resolvedProvider: string | undefined): HealthField {
+  if (typeof resolvedProvider === 'string' && resolvedProvider.length > 0) {
+    return { status: 'ok', label: resolvedProvider };
+  }
   if (!config) {
     return { status: 'unknown', label: UNKNOWN_LABEL, detail: 'config unavailable' };
   }
   return { status: 'ok', label: resolveChatProvider(config) };
 }
 
+/** Providers whose model follows `brain_model` through registry tier equivalence. */
+const REGISTRY_EQUIVALENCE_PROVIDERS: ReadonlySet<string> = new Set(['claude', 'codex', 'gemini']);
+
 /**
- * Live model-registry lookup — NEVER a hardcoded model id. `brain_model`
- * (the project's configured tier id, e.g. 'sonnet') is mapped to the
- * REPL's actually-resolved provider via `getEquivalent` (claude/codex/gemini)
- * or `resolve` (ollama / openai-compat presets, outside getEquivalent's
- * provider union) so the displayed model always matches who will answer.
+ * Live model-registry lookup — NEVER a hardcoded model id. For claude/codex/
+ * gemini the project's `brain_model` is mapped to the resolved provider via
+ * `getEquivalent`. TERMINAL-TOOLS-007: for every other provider (ollama,
+ * openai-compat presets, local-llm) the answering model is the configured
+ * `native_model` — the old branch resolved `brain_model` itself and showed a
+ * CLAUDE id under `ollama/…` (real-binary evidence, 2026-09-02). Without a
+ * native_model the field is honestly unknown: the transport picks its default
+ * at boot and the status row shows the live selection.
  */
 function resolveModelField(config: ResolvedConfig | undefined, providerLabel: string): HealthField {
   if (!config) {
     return { status: 'unknown', label: UNKNOWN_LABEL, detail: 'config unavailable' };
+  }
+  if (!REGISTRY_EQUIVALENCE_PROVIDERS.has(providerLabel)) {
+    const nativeModel = (config as { native_model?: unknown }).native_model;
+    if (typeof nativeModel === 'string' && nativeModel.length > 0) {
+      return { status: 'ok', label: nativeModel };
+    }
+    return { status: 'unknown', label: UNKNOWN_LABEL, detail: `no native_model configured for ${providerLabel} (transport default resolved at boot)` };
   }
   const brainModel = config.activeModeConfig?.brain_model;
   if (typeof brainModel !== 'string' || brainModel.length === 0) {
     return { status: 'unknown', label: UNKNOWN_LABEL, detail: 'no brain_model configured' };
   }
   try {
-    let def;
-    if (providerLabel === 'claude' || providerLabel === 'codex' || providerLabel === 'gemini') {
-      const equivalentId = modelRegistry.getEquivalent(brainModel, providerLabel);
-      def = modelRegistry.get(equivalentId) ?? modelRegistry.resolve(equivalentId, { register: false });
-    } else {
-      def = modelRegistry.resolve(brainModel, { register: false });
-    }
+    const equivalentId = modelRegistry.getEquivalent(brainModel, providerLabel as 'claude' | 'codex' | 'gemini');
+    const def = modelRegistry.get(equivalentId) ?? modelRegistry.resolve(equivalentId, { register: false });
     return { status: 'ok', label: `${def.id} (${def.apiId})` };
   } catch (err) {
     return { status: 'unknown', label: UNKNOWN_LABEL, detail: errorDetail(err) };
@@ -245,7 +264,7 @@ export async function buildHealthSnapshot(
     config = undefined;
   }
 
-  const provider = resolveProviderField(config);
+  const provider = resolveProviderField(config, deps.provider);
   const model = resolveModelField(config, provider.label);
   const mcp = resolveMcpField(loadMcpServersFn, root);
   const memory = resolveMemoryField(root, config, readMemoryCountFn);

@@ -86,12 +86,25 @@ export function createResolvedNativeEngine(
   });
 }
 
+/** Every errorCode native-transport.ts can produce (typed for the catalog
+ *  contract test: each needs a `native.switch.*` AND a `native.boot.*` row). */
+export const NATIVE_ERROR_CODES = Object.freeze([
+  'missing-api-key', 'missing-ollama-host', 'missing-local-llm-endpoint', 'missing-native-model',
+  'unsupported-native-provider', 'legacy-model-alias', 'unknown-model', 'no-transport',
+] as const);
+
+/** Where a native-transport resolution failed: at REPL boot (the engine never
+ *  started — the legacy loop runs instead) or on a user `/model`·`/provider`
+ *  switch. TERMINAL-TOOLS-007: the boot outcome used to be worded as a
+ *  "switch failed" nobody made (real-binary evidence, 2026-09-02). */
+export type NativeErrorPhase = 'boot' | 'switch';
+
 /** Localize a native-transport resolution failure by its errorCode
- *  ('native.switch.<code>' message keys); unknown codes fall back to the
+ *  ('native.<phase>.<code>' message keys); unknown codes fall back to the
  *  mechanism's English default sentence. */
-function localizeNativeError(err: ProviderError, lang: string): string {
+export function localizeNativeError(err: ProviderError, lang: string, phase: NativeErrorPhase = 'switch'): string {
   if (!err.errorCode) return err.error;
-  const key = `native.switch.${err.errorCode}`;
+  const key = `native.${phase}.${err.errorCode}`;
   const localized = getMessage(key, lang, { provider: err.provider ?? '', detail: err.detail ?? '' });
   return localized === key ? err.error : localized;
 }
@@ -1081,7 +1094,9 @@ export async function runInkRepl(
     const deckSecrets = loadDeckSecrets(process.cwd());
     const resolved = resolveNativeProvider(process.env, nativeCfg, deckSecrets);
     if ('error' in resolved) {
-      process.stdout.write(`\n${localizeNativeError(resolved, lang)}\n`);
+      // Boot outcome (the native engine did not start; the legacy loop runs
+      // below) — worded as such, never as a "switch" (TERMINAL-TOOLS-007).
+      process.stdout.write(`\n${localizeNativeError(resolved, lang, 'boot')}\n`);
     } else {
       let mcpBridge: import('./native-tool-registry.js').NativeMcpBridge | undefined;
       try {

@@ -693,7 +693,9 @@ export async function launchDefaultRepl(): Promise<void> {
   // boot path emits (health line, banner hint, `/` menu, loop, spinner, ticker).
   const replLang = getLangFromConfig(healthRoot);
   try {
-    const snapshot = await buildHealthSnapshot(healthRoot);
+    // TERMINAL-TOOLS-007 — the snapshot names the provider THIS boot resolved
+    // (env override included), never a second, divergent config read.
+    const snapshot = await buildHealthSnapshot(healthRoot, { provider: providerName });
     process.stdout.write(`${renderHealthSnapshot(snapshot, replLang)}\n`);
   } catch {
     // best-effort UX chrome only
