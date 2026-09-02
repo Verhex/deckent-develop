@@ -1085,8 +1085,8 @@ export interface ReplAppProps {
    * heartbeat/dashboard-state reader is Task 354-014 (STATE-FEED). */
   stateFeed?: () => LiveFooterState;
   /** Localized live-footer labels (run.tsx buildLiveFooterLabels, the
-   * `live_footer.*` catalog rows) — required by contract so the App never
-   * relies on live-footer.ts's English DEFAULT_LIVE_FOOTER_LABELS. */
+   * `live_footer.*` catalog rows) — required; live-footer.ts validates the
+   * full set and owns no English default (TERMINAL-TOOLS-002). */
   liveFooterLabels: LiveFooterLabels;
   /** Registers the sink used to enqueue a background-completed event.
    * Buffered by ChatTurnQueue and drained as brand-new turn(s) at turn-end —

@@ -21,9 +21,10 @@
 import { describe, it, expect } from 'vitest';
 import { getMessage } from '../../src/cli/helpers/messages.js';
 import {
-  DEFAULT_LIVE_FOOTER_LABELS,
+  LIVE_FOOTER_LABEL_FIELDS,
   type LiveFooterLabels,
 } from '../../src/cli/helpers/live-footer.js';
+import { buildLiveFooterLabels } from '../../src/cli/repl/run.js';
 
 // ─── live_footer.* (353-007) ───────────────────────────────────────────────
 
@@ -41,10 +42,9 @@ const LIVE_FOOTER_KEYS = [
   'live_footer.logged_out',
 ] as const;
 
-// Maps each live_footer.* key to the DEFAULT_LIVE_FOOTER_LABELS field it
-// mirrors, proving the en text is byte-identical to the existing string-free
-// default (so a future REPL-wiring task swapping options.labels for
-// getMessage(...) produces no visible diff).
+// Maps each live_footer.* key to the LiveFooterLabels field run.tsx's
+// buildLiveFooterLabels injects. Since TERMINAL-TOOLS-002 the mechanism
+// (live-footer.ts) owns NO default label set — the catalog row IS the label.
 const LIVE_FOOTER_KEY_TO_LABEL_FIELD: Record<
   (typeof LIVE_FOOTER_KEYS)[number],
   keyof LiveFooterLabels
@@ -76,12 +76,17 @@ describe('live_footer.* keys (353-007 docImpact — cited by source task)', () =
   });
 
   it.each(LIVE_FOOTER_KEYS)(
-    '%s en text is byte-identical to DEFAULT_LIVE_FOOTER_LABELS (no visible diff on future wiring)',
+    '%s is exactly what run.tsx buildLiveFooterLabels injects for its field (the mechanism owns no default set)',
     (key) => {
       const field = LIVE_FOOTER_KEY_TO_LABEL_FIELD[key];
-      expect(getMessage(key, 'en')).toBe(DEFAULT_LIVE_FOOTER_LABELS[field]);
+      expect(buildLiveFooterLabels((k) => getMessage(k, 'en'))[field]).toBe(getMessage(key, 'en'));
+      expect(buildLiveFooterLabels((k) => getMessage(k, 'tr'))[field]).toBe(getMessage(key, 'tr'));
     },
   );
+
+  it('the key → field map covers every LiveFooterLabels field', () => {
+    expect(Object.values(LIVE_FOOTER_KEY_TO_LABEL_FIELD).sort()).toEqual([...LIVE_FOOTER_LABEL_FIELDS].sort());
+  });
 
   it('healthy / degraded / unknown / logged_in / logged_out differ between en and tr (genuinely localized)', () => {
     expect(getMessage('live_footer.healthy', 'en')).not.toBe(getMessage('live_footer.healthy', 'tr'));

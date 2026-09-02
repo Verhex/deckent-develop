@@ -112,7 +112,7 @@ describe('buildReplLabels / buildApprovalLabels — lang=en stays byte-identical
       .toBe('steer note queued (#3) — applied at turn end');
   });
 
-  it('ApprovalCard labels match DEFAULT_APPROVAL_CARD_LABELS exactly', () => {
+  it('ApprovalCard labels match the pre-387-001 English strings exactly (the mechanism owns no default object since TERMINAL-TOOLS-002)', () => {
     expect(approvalEn).toEqual({
       hint: '(y = approve · n = deny · a = approve similar · d = details)',
       progress: '[{index}/{total}]',
