@@ -6,6 +6,7 @@ import { CLI_MEMORY_CATALOG_MESSAGES } from './message-catalog/cli-memory-catalo
 import { CLI_GOVERNANCE_MESSAGES } from './message-catalog/cli-governance.js';
 import { CLI_RUNTIME_HELP_MESSAGES } from './message-catalog/cli-runtime-help.js';
 import { CLI_REFERENCE_MESSAGES } from './message-catalog/cli-reference.js';
+import { CLI_TERMINAL_SLASH_MESSAGES } from './message-catalog/cli-terminal-slash.js';
 
 type MessageMap = Record<string, Record<string, string>>;
 
@@ -8819,6 +8820,7 @@ export const MESSAGE_CATALOG_FAMILIES: Readonly<Record<string, MessageCatalogFam
   'cli-governance': CLI_GOVERNANCE_MESSAGES,
   'cli-runtime-help': CLI_RUNTIME_HELP_MESSAGES,
   'cli-reference': CLI_REFERENCE_MESSAGES,
+  'cli-terminal-slash': CLI_TERMINAL_SLASH_MESSAGES,
 });
 
 const MESSAGES: MessageMap = mergeMessageFamilies(BASE_MESSAGES, MESSAGE_CATALOG_FAMILIES);

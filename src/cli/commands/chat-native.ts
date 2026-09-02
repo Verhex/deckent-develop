@@ -477,10 +477,51 @@ export function buildHelpCatalogEntries(registry: SlashRegistry): CatalogRenderE
     });
 }
 
-/** String-free labels for the /help catalog section — see module-header comment above. */
+/**
+ * Trust-tier heading → catalog key (TERMINAL-TOOLS-001 i18n closure). The tier
+ * names themselves stay the English-invariant classification tokens
+ * (tool-catalog.ts); only their /help HEADING is localized. Typed on the same
+ * Record<TrustTier, string> shape as the badge map so a new tier cannot be
+ * added without a heading key.
+ */
+const HELP_CATALOG_TIER_HEADING_KEY: CatalogRenderLabels['tierBadge'] = {
+  Core: 'tui.help.tier.core',
+  Project: 'tui.help.tier.project',
+  MCP: 'tui.help.tier.mcp',
+  Enterprise: 'tui.help.tier.enterprise',
+  Danger: 'tui.help.tier.danger',
+};
+
+/** Stable technical code carried as the error message (no natural language). */
+export const HELP_TIER_UNKNOWN_CODE = 'E_HELP_TIER_UNKNOWN' as const;
+
+/**
+ * Fail-closed guard for the /help tier headings (main-session REVISE,
+ * 2026-09-02): the five-tier map above is exhaustive by type, so a runtime
+ * category outside it is a defect. It must never be rendered as a heading —
+ * the old `key === undefined ? category : …` branch was a silent English
+ * fallback. `message` is the technical code; the offending tier lives in the
+ * structured `tier` field.
+ */
+export class UnknownHelpTierError extends Error {
+  readonly code: typeof HELP_TIER_UNKNOWN_CODE = HELP_TIER_UNKNOWN_CODE;
+  readonly tier: string;
+  constructor(tier: string) {
+    super(HELP_TIER_UNKNOWN_CODE);
+    this.name = 'UnknownHelpTierError';
+    this.tier = tier;
+  }
+}
+
+/** Localized labels for the /help catalog section — see module-header comment above. */
 export function buildHelpCatalogLabels(lang: string): CatalogRenderLabels {
   return {
-    categoryName: (category) => category,
+    categoryName: (category) => {
+      if (!Object.prototype.hasOwnProperty.call(HELP_CATALOG_TIER_HEADING_KEY, category)) {
+        throw new UnknownHelpTierError(category);
+      }
+      return getMessage(HELP_CATALOG_TIER_HEADING_KEY[category as keyof typeof HELP_CATALOG_TIER_HEADING_KEY], lang);
+    },
     entryName: (labelKey) => labelKey,
     tierBadge: HELP_CATALOG_TIER_BADGE,
     riskMarker: HELP_CATALOG_RISK_MARKER,
@@ -505,8 +546,8 @@ export function buildHelpCatalogLabels(lang: string): CatalogRenderLabels {
  * without re-assembling the registry/catalog/labels calls itself.
  */
 export function buildHelpOutput(chatMode: ChatMode, lang: string): string {
-  const visible = getVisibleCommands(chatMode);
-  const sections = [renderHelp(visible)];
+  const visible = getVisibleCommands(chatMode, false, lang);
+  const sections = [renderHelp(visible, lang)];
   const catalogEntries = buildHelpCatalogEntries(visible);
   if (catalogEntries.length > 0) {
     sections.push('', getMessage('nervous.actions_label', lang), renderCatalog(catalogEntries, buildHelpCatalogLabels(lang)));
@@ -972,7 +1013,7 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
       transcript.push({ role: 'user', content: line });
       continue;
     }
-    const slashAction = resolveSlash(line, buildSlashRegistry());
+    const slashAction = resolveSlash(line, buildSlashRegistry(lang));
     if (slashAction.action === 'help') {
       // Sprint 358 T-358-005 — mode-filtered render (357-010) + trust-badged
       // "Tools/Actions" catalog section (357-002/357-001). `slashAction.registry`

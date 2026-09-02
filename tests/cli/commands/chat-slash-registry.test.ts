@@ -17,7 +17,10 @@ import {
 import { buildSlashRegistry as buildSlashRegistry__tsm_003, renderHelp as renderHelp__tsm_003, resolveSlash as resolveSlash__tsm_003, type SlashRegistry } from "../../../src/cli/commands/chat-slash-registry.js";
 
 describe('/do slash command registration (452-002)', () => {
-  const registry = buildSlashRegistry();
+  // Dispatch/collision assertions below are language-invariant; the registry
+  // is still built for an explicit language so nothing here depends on the
+  // process locale (TERMINAL-TOOLS-001: buildSlashRegistry resolves `desc`).
+  const registry = buildSlashRegistry('en');
 
   it('appears in the catalog with a description and NO agenticTool (meta-command)', () => {
     const entry = registry.find((c) => c.name === '/do');
@@ -48,10 +51,19 @@ describe('/do slash command registration (452-002)', () => {
     expect(slashCompleter('/d')[0]).toContain('/do');
   });
 
-  it('renderHelp lists the /do command line', () => {
-    const help = renderHelp(registry);
+  it('renderHelp lists the /do command line with the Turkish description (tr)', () => {
+    const help = renderHelp(buildSlashRegistry('tr'), 'tr');
+    expect(help.startsWith('Komutlar:')).toBe(true);
     expect(help).toContain('/do');
     expect(help).toContain('Bir hedefi planla ve çalıştır');
+  });
+
+  it('renderHelp lists the /do command line with the English header and description (en)', () => {
+    const help = renderHelp(buildSlashRegistry('en'), 'en');
+    expect(help.startsWith('Commands:')).toBe(true);
+    expect(help).toContain('/do');
+    expect(help).toContain('Plan and run a goal');
+    expect(help).not.toContain('Bir hedefi planla ve çalıştır');
   });
 });
 
@@ -115,10 +127,16 @@ describe('buildSlashRegistry — live command catalog', () => {
 
 // ─── renderHelp ──────────────────────────────────────────────────────────────
 describe('renderHelp — /help output formatting', () => {
-    it('starts with "Komutlar:" header', () => {
-        const registry = buildSlashRegistry__tsm_003();
-        const output = renderHelp__tsm_003(registry);
+    it('starts with "Komutlar:" header for lang=tr (explicit — never the process locale)', () => {
+        const registry = buildSlashRegistry__tsm_003('tr');
+        const output = renderHelp__tsm_003(registry, 'tr');
         expect(output.startsWith('Komutlar:')).toBe(true);
+    });
+    it('starts with "Commands:" header for lang=en (explicit — never the process locale)', () => {
+        const registry = buildSlashRegistry__tsm_003('en');
+        const output = renderHelp__tsm_003(registry, 'en');
+        expect(output.startsWith('Commands:')).toBe(true);
+        expect(output).not.toContain('Komutlar:');
     });
     it('lists each command on its own line with name and description', () => {
         const registry = buildSlashRegistry__tsm_003();

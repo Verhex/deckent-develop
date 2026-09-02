@@ -41,6 +41,8 @@ import { buildToolExecLabels } from '../helpers/tool-exec-labels.js';
 import { loadConfig } from '../../core/config.js';
 import { createSwitchableProvider, type ActiveSelection } from './provider-switch.js';
 import { createRunStateFeed } from '../helpers/run-state-feed.js';
+import type { LiveFooterLabels } from '../helpers/live-footer.js';
+import { InjectedLabelMissingError } from '../helpers/injected-label.js';
 import { ApprovalBroker } from '../../core/approval-broker.js';
 import { ApprovalRelay } from '../../core/approval-relay.js';
 import { ApprovalEventStream } from '../../core/approval-eventstream.js';
@@ -111,6 +113,10 @@ export function buildReplLabels(t: (key: string) => string): ReplLabels {
     confirmHint: t('tui.confirm_hint'),
     confirmProgress: t('tui.confirm_progress'),
     menuHint: t('tui.menu_hint'),
+    // TERMINAL-TOOLS-001 — `/` menu scroll hints ("↑ {n} more" / "↓ {n} more")
+    // were hardcoded English inside input-bar.tsx; now catalog rows.
+    menuMoreAbove: t('tui.menu_more_above'),
+    menuMoreBelow: t('tui.menu_more_below'),
     switched: t('tui.switched'),
     switchUsage: t('tui.switch_usage'),
     approvalSet: t('tui.approval_set'),
@@ -149,6 +155,46 @@ export function buildReplLabels(t: (key: string) => string): ReplLabels {
     approvalRejected: t('approval.terminal.rejected'),
     // TERM-AT-REF (583/N2b) — hint under the InputBar's `@` path menu.
     atMenuHint: t('tui.atref_menu_hint'),
+  };
+}
+
+/**
+ * TERMINAL-TOOLS-001 — localized live-footer labels (helpers/live-footer.ts
+ * is a string-free mechanism; DEFAULT_LIVE_FOOTER_LABELS is its English
+ * fallback). The `live_footer.*` keys have been in messages.ts since Task 16
+ * (MESSAGES-KEYS-2) with `en` byte-identical to those defaults, but nothing
+ * ever passed them to buildLiveFooter — a Turkish session rendered a bare
+ * English `idle` line under the `[Sor]` badge (real-binary evidence,
+ * 2026-09-02). Same "pull labels out of the render call" precedent as
+ * buildReplLabels above.
+ */
+/**
+ * TERMINAL-TOOLS-001 — catalog-backed explanation for errors the
+ * ReplErrorBoundary shows. A typed InjectedLabelMissingError (a missing
+ * caller injection — a Deckent defect, not a user problem) renders the
+ * session-language `tui.injected_label_missing` row with the structured
+ * label and code substituted; every other error passes its own message
+ * through unchanged (technical pass-through — no prose is invented here).
+ */
+export function buildReplErrorDescriber(lang: string): (err: Error) => string {
+  return (err) => (err instanceof InjectedLabelMissingError
+    ? getMessage('tui.injected_label_missing', lang, { label: err.label, code: err.code })
+    : err.message);
+}
+
+export function buildLiveFooterLabels(t: (key: string) => string): LiveFooterLabels {
+  return {
+    idle: t('live_footer.idle'),
+    running: t('live_footer.running'),
+    elapsed: t('live_footer.elapsed'),
+    provider: t('live_footer.provider'),
+    auth: t('live_footer.auth'),
+    next: t('live_footer.next'),
+    healthy: t('live_footer.healthy'),
+    degraded: t('live_footer.degraded'),
+    unknown: t('live_footer.unknown'),
+    loggedIn: t('live_footer.logged_in'),
+    loggedOut: t('live_footer.logged_out'),
   };
 }
 
@@ -1265,13 +1311,13 @@ export async function runInkRepl(
   const atRefReader = createScopedAtRefReader(() => process.cwd());
 
   const { unmount, waitUntilExit } = render(
-    <ReplErrorBoundary label={t('tui.render_error')}>
+    <ReplErrorBoundary label={t('tui.render_error')} describeError={buildReplErrorDescriber(lang)}>
     <ReplApp
       provider={switcher.proxy}
       dispatcher={dispatcher}
       providerName={nativeSelection?.provider ?? providerName}
       cwd={process.cwd()}
-      slashRegistry={buildSlashRegistry()}
+      slashRegistry={buildSlashRegistry(lang)}
       initialSelection={nativeSelection ?? switcher.current()}
       onSwitch={(sel) => {
         // Native engine active → the switch must retarget the REAL backend the
@@ -1298,6 +1344,7 @@ export async function runInkRepl(
       {...(nativeEngine ? { nativeEngine } : {})}
       replSurfaceEnabled={replSurfaceEnabled}
       {...(stateFeed ? { stateFeed } : {})}
+      liveFooterLabels={buildLiveFooterLabels(t)}
       approvalsEnabled={approvalsEnabled}
       {...(approvalChannel ? { approvalChannel } : {})}
       {...(bgTurnsEnabled ? { registerBgEventSink: (enqueue: (event: ChatTurnBgEvent) => void) => { bgEventSink = enqueue; } } : {})}

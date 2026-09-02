@@ -27,7 +27,7 @@ import { listLedgerSessions, readLedgerSession, type LedgerStoreOptions } from '
 import type { ActiveSelection } from './provider-switch.js';
 import { createStreamSegmenter, type StreamSegmenter } from './stream-segmenter.js';
 import { measuredOnTurnEnd } from './native-elapsed.js';
-import { buildLiveFooter, type LiveFooterState } from '../helpers/live-footer.js';
+import { buildLiveFooter, type LiveFooterLabels, type LiveFooterState } from '../helpers/live-footer.js';
 import { initialTermModeState, parseTermCommand, applyModeTarget, type TermMode, type TermModeState } from './term-mode.js';
 import { createChatTurnQueue, type ChatTurnQueue, type ChatTurnBgEvent, type ChatTurnPayload } from './chat-turn-queue.js';
 import { createInputQueue, type InputQueue } from './input-queue.js';
@@ -796,6 +796,11 @@ export interface ReplLabels {
   confirmHint: string;  // "(y = izin · a = hep izin · N = reddet)"
   confirmProgress: string; // "[{index}/{total}]" — per-card position (i18n template)
   menuHint: string;     // "↑↓ gez · Enter seç · Tab tamamla · Esc kapat"
+  /** `/` menu scroll hints, `{n}` templates (tui.menu_more_above/below) —
+   * TERMINAL-TOOLS-001; required: InputBar has no fallback text and throws a
+   * typed InjectedLabelMissingError when they are absent. */
+  menuMoreAbove: string; // "↑ {n} daha"
+  menuMoreBelow: string; // "↓ {n} daha"
   switched: string;     // "geçildi"
   switchUsage: string;  // "kullanım: /model <ad> · /provider <ad>"
   approvalSet: string;  // "onay modu"
@@ -1024,11 +1029,28 @@ export function formatTurnErrorLine(message: string, label?: string): string {
  * i18n (269-003): the component is string-free — the caller injects the
  * localized `label` (getMessage('tui.render_error', lang)); English default.
  */
-export class ReplErrorBoundary extends Component<{ children: ReactNode; label?: string }, { err: Error | null }> {
+/**
+ * String-free boundary (TERMINAL-TOOLS-001): `label` is a REQUIRED injected
+ * catalog row (run.tsx `t('tui.render_error')`) — the mechanism owns no
+ * English default any more. `describeError` (run.tsx buildReplErrorDescriber)
+ * turns a typed error into the session-language catalog explanation; without
+ * it the boundary prints the error's own `message` verbatim, which for typed
+ * Deckent errors is a technical code, never authored prose.
+ */
+export interface ReplErrorBoundaryProps {
+  children: ReactNode;
+  label: string;
+  describeError?: (err: Error) => string;
+}
+
+export class ReplErrorBoundary extends Component<ReplErrorBoundaryProps, { err: Error | null }> {
   state: { err: Error | null } = { err: null };
   static getDerivedStateFromError(err: Error): { err: Error } { return { err }; }
   override render(): ReactNode {
-    if (this.state.err) return <Text color="red">{`⚠ ${this.props.label ?? 'REPL render error'}: ${this.state.err.message}`}</Text>;
+    if (this.state.err) {
+      const describe = this.props.describeError ?? ((err: Error): string => err.message);
+      return <Text color="red">{`⚠ ${this.props.label}: ${describe(this.state.err)}`}</Text>;
+    }
     return this.props.children;
   }
 }
@@ -1086,6 +1108,10 @@ export interface ReplAppProps {
    * Polled on an interval while `replSurfaceEnabled` is true; the real
    * heartbeat/dashboard-state reader is Task 354-014 (STATE-FEED). */
   stateFeed?: () => LiveFooterState;
+  /** Localized live-footer labels (run.tsx buildLiveFooterLabels, the
+   * `live_footer.*` catalog rows) — required by contract so the App never
+   * relies on live-footer.ts's English DEFAULT_LIVE_FOOTER_LABELS. */
+  liveFooterLabels: LiveFooterLabels;
   /** Registers the sink used to enqueue a background-completed event.
    * Buffered by ChatTurnQueue and drained as brand-new turn(s) at turn-end —
    * NEVER injected mid-turn (Hermes rule, chat-turn-queue.ts). */
@@ -1262,7 +1288,7 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
 }
 
 export function ReplApp(props: ReplAppProps): ReactElement {
-  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader } = props;
+  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader } = props;
   const { exit } = useApp();
   const [selection, setSelection] = useState<ActiveSelection>(initialSelection);
   const [approval, setApproval] = useState<ApprovalMode>('suggest');
@@ -1422,11 +1448,11 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // real heartbeat/dashboard-state reader; this component only renders it).
   useEffect(() => {
     if (!replSurfaceEnabled || !stateFeed) { setFooterLines([]); return; }
-    const tick = (): void => setFooterLines(buildLiveFooter(stateFeed()));
+    const tick = (): void => setFooterLines(buildLiveFooter(stateFeed(), { labels: liveFooterLabels }));
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [replSurfaceEnabled, stateFeed]);
+  }, [replSurfaceEnabled, stateFeed, liveFooterLabels]);
 
   // Background-completed-work sink: buffered by ChatTurnQueue — never
   // injected mid-turn (drained only at turn-end, see inputIter below).
@@ -2066,6 +2092,8 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         onClear={clearScreen}
         slashRegistry={slashRegistry}
         menuHint={labels.menuHint}
+        menuMoreAbove={labels.menuMoreAbove}
+        menuMoreBelow={labels.menuMoreBelow}
         // TERM-AT-REF (583/N2b): `@` path menu — inert (menu never opens)
         // unless run.tsx injects a provider; hint via the same labels route.
         pathProvider={atRefPathProvider}

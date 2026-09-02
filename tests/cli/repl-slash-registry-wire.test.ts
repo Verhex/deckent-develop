@@ -12,6 +12,7 @@ import {
 } from '../../src/cli/commands/chat-native.js';
 import { getVisibleCommands } from "../../src/cli/commands/chat-mode.js";
 import { buildSlashRegistry } from "../../src/cli/commands/chat-slash-registry.js";
+import { getMessage } from '../../src/cli/helpers/messages.js';
 
 // Sprint 222 T-222-005 — runChatNativeLoop slash-registry wire tests.
 //
@@ -77,9 +78,13 @@ describe('runChatNativeLoop — slash-registry wire (T-222-005)', () => {
     expect(sendSpy).not.toHaveBeenCalled();
     expect(dispatchSpy).not.toHaveBeenCalled();
     // Help line was emitted — must include the header and at least one slash.
+    // The loop's language defaults to 'en' (opts.lang omitted), so the header
+    // is the English catalog row (TERMINAL-TOOLS-001: the old assertion pinned
+    // the hardcoded Turkish 'Komutlar:' that leaked into every en session).
     expect(output).toHaveBeenCalledTimes(1);
     const helpText = output.mock.calls[0]![0] as string;
-    expect(helpText).toContain('Komutlar:');
+    expect(helpText).toContain(getMessage('tui.help.commands_header', 'en'));
+    expect(helpText).not.toContain('Komutlar:');
     expect(helpText).toContain('/help');
     expect(helpText).toContain('/status');
     // /help is a meta command — no transcript turns recorded.

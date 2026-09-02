@@ -31,6 +31,7 @@ import {
   type NervousBridgePlan,
 } from '../repl/nervous-bridge.js';
 import { getCommand, type CommandCategory, type CommandRisk } from '../command-registry.js';
+import { getLanguage, getMessage } from '../helpers/messages.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -38,8 +39,16 @@ import { getCommand, type CommandCategory, type CommandRisk } from '../command-r
 export interface SlashCommand {
   /** Slash name, lowercase (e.g. '/status'). */
   name: string;
-  /** Short description for /help output. */
+  /** Short description for /help output — already resolved for the session
+   * language by buildSlashRegistry(lang) (TERMINAL-TOOLS-001 i18n closure). */
   desc: string;
+  /**
+   * Catalog key the `desc` above was resolved from (`tui.slash.desc.<name>`,
+   * src/cli/helpers/message-catalog/cli-terminal-slash.ts). Always present on
+   * a catalog-derived command; optional only so hand-built test fixtures and
+   * ad-hoc registries can omit it.
+   */
+  descKey?: string;
   /** MCP tool to dispatch when this slash is invoked. Absent for meta-commands. */
   agenticTool?: string;
   /** Default args for the MCP tool. May be extended by inline command args. */
@@ -106,26 +115,37 @@ function tag(commandRegistryName: string): Pick<SlashCommand, 'category' | 'risk
   return cmd ? { category: cmd.category, risk: cmd.risk } : {};
 }
 
-const SLASH_CATALOG: readonly SlashCommand[] = [
+/**
+ * Catalog row shape (TERMINAL-TOOLS-001): a catalog entry carries ONLY the
+ * message key of its description — never resolved text — so a hardcoded
+ * language can no longer leak into the `/` menu or `/help` (proved as a real
+ * binary defect on 2026-09-02: a `language: en` session rendered Turkish
+ * descriptions). `desc` is materialized per language by buildSlashRegistry().
+ * Type-level gate: the resolved text field is structurally absent here; the
+ * text-level gate is scripts/lint-i18n-hardcode.mjs's desc-literal scan.
+ */
+type SlashCatalogEntry = Omit<SlashCommand, 'desc' | 'descKey'> & { readonly descKey: string };
+
+const SLASH_CATALOG: readonly SlashCatalogEntry[] = [
   {
     name: '/help',
-    desc: 'Kullanılabilir komutları listele',
+    descKey: 'tui.slash.desc.help',
   },
   {
     name: '/status',
-    desc: 'Aktif sprint durumunu göster',
+    descKey: 'tui.slash.desc.status',
     agenticTool: 'deckent_status',
     agenticArgs: { root: '.' },
   },
   {
     name: '/recall',
-    desc: 'Hafızada ara (örn: /recall docker)',
+    descKey: 'tui.slash.desc.recall',
     agenticTool: 'deckent_memory_query',
     agenticArgs: {},
   },
   {
     name: '/plan',
-    desc: 'Sprint planla',
+    descKey: 'tui.slash.desc.plan',
     agenticTool: 'deckent_plan',
     agenticArgs: { mode: 'auto' },
   },
@@ -137,71 +157,71 @@ const SLASH_CATALOG: readonly SlashCommand[] = [
     // (no agenticTool, like /model and /cd) for /help + Tab-complete visibility;
     // resolveSlash falls through to { action: 'none' } so the app.tsx branch owns it.
     name: '/do',
-    desc: 'Bir hedefi planla ve çalıştır (örn: /do sağlık ucu ekle) — terminal.run_flow_v2',
+    descKey: 'tui.slash.desc.do',
   },
   {
     name: '/sprint',
-    desc: 'Sprint geçmişini göster',
+    descKey: 'tui.slash.desc.sprint',
     agenticTool: 'deckent_history',
     agenticArgs: { root: '.' },
   },
   {
     name: '/retro',
-    desc: 'Son sprint retrospektifini göster',
+    descKey: 'tui.slash.desc.retro',
     agenticTool: 'deckent_retro',
     agenticArgs: { root: '.' },
   },
   {
     name: '/doctor',
-    desc: 'Codebase sağlığını kontrol et',
+    descKey: 'tui.slash.desc.doctor',
     agenticTool: 'deckent_doctor',
     agenticArgs: { root: '.' },
   },
   {
     name: '/models',
-    desc: 'Model & provider kayıtlarını listele',
+    descKey: 'tui.slash.desc.models',
     agenticTool: 'deckent_models',
     agenticArgs: {},
   },
   {
     name: '/analyze',
-    desc: 'Proje stack & sağlık analizi',
+    descKey: 'tui.slash.desc.analyze',
     agenticTool: 'deckent_analyze_project',
     agenticArgs: { root: '.' },
   },
   {
     name: '/review',
-    desc: 'Son sprint sonucunu değerlendir (GO/NO_GO)',
+    descKey: 'tui.slash.desc.review',
     agenticTool: 'deckent_review',
     agenticArgs: { root: '.' },
   },
   {
     name: '/explain',
-    desc: 'Sprint sonuçlarını açıkla',
+    descKey: 'tui.slash.desc.explain',
     agenticTool: 'deckent_explain',
     agenticArgs: { root: '.' },
   },
   {
     name: '/agents',
-    desc: 'Kayıtlı agent havuzunu listele',
+    descKey: 'tui.slash.desc.agents',
     agenticTool: 'deckent_agent_list',
     agenticArgs: {},
   },
   {
     name: '/skills',
-    desc: 'Kayıtlı skill havuzunu listele',
+    descKey: 'tui.slash.desc.skills',
     agenticTool: 'deckent_skill_list',
     agenticArgs: {},
   },
   {
     name: '/features',
-    desc: 'Özellik manifestini sorgula',
+    descKey: 'tui.slash.desc.features',
     agenticTool: 'deckent_feature_query',
     agenticArgs: {},
   },
   {
     name: '/config',
-    desc: 'Yapılandırmayı göster/değiştir (örn: /config set max_workers 4)',
+    descKey: 'tui.slash.desc.config',
     agenticTool: 'deckent_config',
     agenticArgs: {},
   },
@@ -216,7 +236,7 @@ const SLASH_CATALOG: readonly SlashCommand[] = [
     // Ink native-engine bridge (repl/app.tsx, task 387-002, same helper) — both
     // read the file-backed store directly rather than passing one in.
     name: '/nervous',
-    desc: 'Bekleyen nervous bildirimleri (örn: /nervous accept <id>)',
+    descKey: 'tui.slash.desc.nervous',
     ...tag('nervous'),
   },
   {
@@ -227,7 +247,7 @@ const SLASH_CATALOG: readonly SlashCommand[] = [
     // `buildInterrogateOutput`) and the Ink native-engine bridge
     // (repl/app.tsx, task 387-002, same helper).
     name: '/interrogate',
-    desc: 'DIRECTIVES sorgulama sorularını göster (pre-plan PLAN-INT-1)',
+    descKey: 'tui.slash.desc.interrogate',
   },
   {
     // Meta-command: handled directly BEFORE the registry by whichever REPL
@@ -235,73 +255,73 @@ const SLASH_CATALOG: readonly SlashCommand[] = [
     // native-engine bridge's own picker (repl/app.tsx `resolveResumeCommand`,
     // task 358-006).
     name: '/resume',
-    desc: 'Önceki sohbet oturumunu sürdür (örn: /resume 1)',
+    descKey: 'tui.slash.desc.resume',
   },
   {
     // SURF-3 multi-flow-inbox — meta-command handled BEFORE the registry by both
     // engines (app.tsx native `/runs` branch + chat-native.ts legacy loop), a
     // read-only cross-process list of concurrent run-flows.
     name: '/runs',
-    desc: 'Eşzamanlı koşuların listesi (salt-okuma)',
+    descKey: 'tui.slash.desc.runs',
   },
   {
     name: '/sync',
-    desc: 'Agent/skill manifest + routing senkronize et (onay ister)',
+    descKey: 'tui.slash.desc.sync',
     agenticTool: 'deckent_sync',
     agenticArgs: {},
   },
   {
     name: '/checkpoint',
-    desc: 'Checkpoint onayla/reddet (örn: /checkpoint approve <sprint> <faz>)',
+    descKey: 'tui.slash.desc.checkpoint',
     agenticTool: 'deckent_checkpoint',
     agenticArgs: {},
   },
   {
     name: '/kill',
-    desc: '⚠️ Aktif sprint/worker durdur (her seferinde onay)',
+    descKey: 'tui.slash.desc.kill',
     agenticTool: 'deckent_kill',
     agenticArgs: {},
   },
   {
     name: '/cleanup',
-    desc: '⚠️ Task dosyalarını arşivle, sprint temizle (her seferinde onay)',
+    descKey: 'tui.slash.desc.cleanup',
     agenticTool: 'deckent_cleanup',
     agenticArgs: {},
   },
   {
     name: '/recover',
-    desc: '⚠️ Çökmüş sprint kurtar (örn: /recover sprint-224, her seferinde onay)',
+    descKey: 'tui.slash.desc.recover',
     agenticTool: 'deckent_recover',
     agenticArgs: {},
   },
   {
     name: '/autonomous',
-    desc: 'Otonom motor (örn: /autonomous status · backlog add <başlık> [--cron <expr>] · approve <id>)',
+    descKey: 'tui.slash.desc.autonomous',
     agenticTool: 'deckent_autonomous',
     agenticArgs: {},
     ...tag('autonomous'),
   },
   {
     name: '/audit',
-    desc: 'Sprint audit (örn: /audit gate sprint-269 · query [kanal] · compliance)',
+    descKey: 'tui.slash.desc.audit',
     agenticTool: 'deckent_audit',
     agenticArgs: {},
   },
   {
     name: '/usage',
-    desc: 'Token/limit kullanımını göster (örn: /usage --sprint 275)',
+    descKey: 'tui.slash.desc.usage',
     agenticTool: 'deckent_usage',
     agenticArgs: {},
   },
   {
     name: '/resources',
-    desc: 'MCP kaynak anlık görüntüsü (örn: /resources --log)',
+    descKey: 'tui.slash.desc.resources',
     agenticTool: 'deckent_resources',
     agenticArgs: {},
   },
   {
     name: '/directives',
-    desc: "DIRECTIVES.md göster · '/directives set <metin>' ile yaz (onay ister)",
+    descKey: 'tui.slash.desc.directives',
     agenticTool: 'deckent_set_directives',
     agenticArgs: {},
   },
@@ -321,20 +341,20 @@ const SLASH_CATALOG: readonly SlashCommand[] = [
     // 'mcp-bridge' (the REPL-surface entry, not the CLI-only 'mcp' entry) —
     // matches the actual dispatch-capable risk here.
     name: '/mcp',
-    desc: 'Harici MCP araçları — list · call <tool> [args] (proje .mcp.json)',
+    descKey: 'tui.slash.desc.mcp',
     ...tag('mcp-bridge'),
   },
   {
     name: '/model',
-    desc: 'Modeli değiştir (örn: /model claude-sonnet-5)',
+    descKey: 'tui.slash.desc.model',
   },
   {
     name: '/provider',
-    desc: 'Provider değiştir (örn: /provider codex)',
+    descKey: 'tui.slash.desc.provider',
   },
   {
     name: '/approve',
-    desc: 'Onay modu: suggest | auto-edit | full-auto',
+    descKey: 'tui.slash.desc.approve',
   },
   {
     // NATIVE-BUDGET-RENEWAL (7083, 557-002 discoverability closure): answered
@@ -342,7 +362,7 @@ const SLASH_CATALOG: readonly SlashCommand[] = [
     // resolveSlash — listed here for /help + menu + Tab-complete only, no
     // agenticTool, so resolveSlash falls through exactly like /model and /cd.
     name: '/renew',
-    desc: 'Tükenen working-budget epoch\'unu yenile (billing sayaçları sürer)',
+    descKey: 'tui.slash.desc.renew',
   },
   {
     // Meta-command: handled in app.tsx handleSubmit BEFORE resolveSlash
@@ -350,50 +370,58 @@ const SLASH_CATALOG: readonly SlashCommand[] = [
     // Tab-complete only — no agenticTool, so resolveSlash falls through to
     // { action: 'none' } exactly like /model and /cd.
     name: '/term',
-    desc: 'Terminal modu göster/değiştir: /term ask|run|control',
+    descKey: 'tui.slash.desc.term',
   },
   {
     name: '/cd',
-    desc: 'Çalışma dizinini değiştir (örn: /cd ~/deckent-dev)',
+    descKey: 'tui.slash.desc.cd',
   },
   {
     name: '/cancel',
-    desc: 'Kuyruktaki bekleyen mesajları iptal et',
+    descKey: 'tui.slash.desc.cancel',
   },
   {
     name: '/clear',
-    desc: 'Ekranı temizle',
+    descKey: 'tui.slash.desc.clear',
   },
   {
     name: '/exit',
-    desc: "REPL'den çık (takma ad: /quit)",
+    descKey: 'tui.slash.desc.exit',
   },
   {
     name: '/quit',
-    desc: '/exit takma adı',
+    descKey: 'tui.slash.desc.quit',
   },
 ];
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 /**
- * Build the live slash command registry from SLASH_CATALOG.
+ * Build the live slash command registry from SLASH_CATALOG, resolving every
+ * description for `lang` (TERMINAL-TOOLS-001). `lang` omitted → the process
+ * language (getLanguage(): DECKENT_LANGUAGE > DECKENT_LANG > locale > 'en',
+ * see resolveLanguage in helpers/messages.ts); interactive callers
+ * pass the session language they already resolved so the `/` menu, `/help`
+ * and Tab-completion all speak the same language as the rest of the surface.
  *
  * Returns a new immutable array on each call. Callers should cache the result
  * for the REPL session lifetime rather than calling on every keystroke.
  */
-export function buildSlashRegistry(): SlashRegistry {
-  return SLASH_CATALOG.slice();
+export function buildSlashRegistry(lang?: string): SlashRegistry {
+  const resolvedLang = lang ?? getLanguage();
+  return SLASH_CATALOG.map((entry) => ({ ...entry, desc: getMessage(entry.descKey, resolvedLang) }));
 }
 
 /**
  * Render a compact /help listing from the registry.
  *
  * Output is intentionally terse ("sade-ama-tam") — one line per command.
- * Width is fixed at 12 chars for the name column for alignment.
+ * Width is fixed at 12 chars for the name column for alignment. The header is
+ * localized for `lang` (omitted → process language), matching the registry's
+ * own resolution so a caller cannot pair an English list with a Turkish header.
  */
-export function renderHelp(registry: SlashRegistry): string {
-  const lines: string[] = ['Komutlar:'];
+export function renderHelp(registry: SlashRegistry, lang?: string): string {
+  const lines: string[] = [getMessage('tui.help.commands_header', lang ?? getLanguage())];
   for (const cmd of registry) {
     if (cmd.name === '/quit') continue; // alias — skip in list, shown in /exit desc
     lines.push(`  ${cmd.name.padEnd(10)} ${cmd.desc}`);

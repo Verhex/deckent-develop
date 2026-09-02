@@ -22,13 +22,15 @@ import { join } from 'node:path';
 import type { ReactElement } from 'react';
 
 import { ReplErrorBoundary } from '../../src/cli/repl/app.js';
+import { buildReplErrorDescriber } from '../../src/cli/repl/run.js';
+import { InjectedLabelMissingError, INJECTED_LABEL_MISSING_CODE } from '../../src/cli/helpers/injected-label.js';
 import { getMessage } from '../../src/cli/helpers/messages.js';
 
 const ROOT = join(import.meta.dirname, '..', '..');
 
-function renderCaught(label: string | undefined, errorMessage: string): string {
-  const boundary = new ReplErrorBoundary({ children: null, ...(label !== undefined ? { label } : {}) });
-  boundary.state = ReplErrorBoundary.getDerivedStateFromError(new Error(errorMessage));
+function renderCaught(label: string, error: Error | string, describeError?: (err: Error) => string): string {
+  const boundary = new ReplErrorBoundary({ children: null, label, ...(describeError ? { describeError } : {}) });
+  boundary.state = ReplErrorBoundary.getDerivedStateFromError(typeof error === 'string' ? new Error(error) : error);
   const rendered = boundary.render() as ReactElement<{ children: string }>;
   return rendered.props.children;
 }
@@ -36,7 +38,7 @@ function renderCaught(label: string | undefined, errorMessage: string): string {
 describe('ReplErrorBoundary i18n wiring (born-529)', () => {
   it('run.tsx passes the label prop from getMessage(\'tui.render_error\', lang) — not left unset/hardcoded', () => {
     const src = readFileSync(join(ROOT, 'src', 'cli', 'repl', 'run.tsx'), 'utf-8');
-    expect(src).toMatch(/<ReplErrorBoundary label=\{t\(['"]tui\.render_error['"]\)\}>/);
+    expect(src).toMatch(/<ReplErrorBoundary label=\{t\(['"]tui\.render_error['"]\)\}[^>]*>/);
     // Guard against regressing to the old bare form.
     expect(src).not.toMatch(/<ReplErrorBoundary>\s*\n\s*<ReplApp/);
   });
@@ -59,7 +61,45 @@ describe('ReplErrorBoundary i18n wiring (born-529)', () => {
     expect(renderCaught(enLabel, 'boom')).toBe('⚠ REPL render error: boom');
   });
 
-  it('does not catch/alter behavior — no label falls back to the mechanism\'s own English default (unchanged catch/fallback contract)', () => {
-    expect(renderCaught(undefined, 'boom')).toBe('⚠ REPL render error: boom');
+  // Main-session REVISE (2026-09-02, TERMINAL-TOOLS-001): the boundary is a
+  // string-free mechanism — it owns NO English default. `label` is a required
+  // injected prop and the explanation of a typed error is resolved by the
+  // caller (run.tsx buildReplErrorDescriber) from the message catalog.
+  it('app.tsx carries no mechanism-owned English fallback for the boundary label', () => {
+    const src = readFileSync(join(ROOT, 'src', 'cli', 'repl', 'app.tsx'), 'utf-8');
+    expect(src).not.toContain("'REPL render error'");
+    // Scope the fallback check to the boundary class body itself.
+    const start = src.indexOf('export class ReplErrorBoundary');
+    expect(start).toBeGreaterThan(-1);
+    const end = src.indexOf('\nexport ', start + 1);
+    const boundaryBlock = src.slice(start, end === -1 ? undefined : end);
+    expect(boundaryBlock).not.toMatch(/label\s*\?\?\s*['"]/);
+    expect(boundaryBlock).toMatch(/describeError/);
+  });
+
+  it('run.tsx injects a catalog-backed error describer alongside the label', () => {
+    const src = readFileSync(join(ROOT, 'src', 'cli', 'repl', 'run.tsx'), 'utf-8');
+    expect(src).toMatch(/<ReplErrorBoundary label=\{t\(['"]tui\.render_error['"]\)\} describeError=\{buildReplErrorDescriber\(lang\)\}>/);
+  });
+
+  for (const lang of ['tr', 'en'] as const) {
+    it(`lang=${lang} → an InjectedLabelMissingError renders the ${lang} catalog explanation, never the error's own text`, () => {
+      const label = getMessage('tui.render_error', lang);
+      const err = new InjectedLabelMissingError('menuMoreAbove');
+      const out = renderCaught(label, err, buildReplErrorDescriber(lang));
+      const expected = getMessage('tui.injected_label_missing', lang, { label: 'menuMoreAbove', code: INJECTED_LABEL_MISSING_CODE });
+      expect(out).toBe(`⚠ ${label}: ${expected}`);
+      expect(out).not.toContain('injected label missing');
+      expect(expected).not.toContain(INJECTED_LABEL_MISSING_CODE.toLowerCase());
+    });
+  }
+
+  it('the describer passes an ordinary error message through unchanged (technical pass-through, no invented prose)', () => {
+    expect(buildReplErrorDescriber('tr')(new Error('E_SOMETHING'))).toBe('E_SOMETHING');
+  });
+
+  it('without a describer the boundary renders the typed error\'s technical code only', () => {
+    const out = renderCaught(getMessage('tui.render_error', 'en'), new InjectedLabelMissingError('banner.hint'));
+    expect(out).toBe(`⚠ REPL render error: ${INJECTED_LABEL_MISSING_CODE}`);
   });
 });

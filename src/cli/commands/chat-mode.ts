@@ -138,7 +138,10 @@ export function filterRegistryForSimpleMode(registry: readonly SlashCommand[]): 
  * commands keep working when typed directly in user mode (see filterRegistryByMode
  * doc comment above).
  */
-export function getVisibleCommands(mode: ChatMode, simpleMode = false): readonly SlashCommand[] {
-  const modeFiltered = filterRegistryByMode(buildSlashRegistry(), mode);
+export function getVisibleCommands(mode: ChatMode, simpleMode = false, lang?: string): readonly SlashCommand[] {
+  // `lang` (TERMINAL-TOOLS-001 i18n closure) resolves the catalog descriptions
+  // for the caller's session language; omitted → buildSlashRegistry's own
+  // getLanguage() fallback, so every pre-existing call site keeps its shape.
+  const modeFiltered = filterRegistryByMode(buildSlashRegistry(lang), mode);
   return simpleMode ? filterRegistryForSimpleMode(modeFiltered) : modeFiltered;
 }

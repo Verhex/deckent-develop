@@ -20,6 +20,7 @@ import { mkdtempSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { resolveNativeSlash } from '../../src/cli/repl/app.js';
 import { buildSlashRegistry } from '../../src/cli/commands/chat-slash-registry.js';
+import { getMessage } from '../../src/cli/helpers/messages.js';
 import { createNativeEngine } from '../../src/cli/repl/native-agent-bridge.js';
 import { buildNativeToolRegistry } from '../../src/cli/repl/native-tool-registry.js';
 import type { ProviderAdapter, ProviderEvent } from '../../src/agent/provider-tooluse/types.js';
@@ -38,8 +39,12 @@ function withTmpDir<T>(prefix: string, fn: (dir: string) => T): T {
   }
 }
 
-const REGISTRY = buildSlashRegistry();
-const ctx = (cwd: string) => ({ registry: REGISTRY, cwd, lang: 'en', chatMode: 'user' as const });
+// TERMINAL-TOOLS-001: the registry is language-resolved, so the bridge context
+// carries a registry built for the SAME language it declares — an English
+// context must never be paired with a Turkish catalog (that pairing was the
+// real-binary defect this closure fixed). No implicit process-locale build.
+const REGISTRY_BY_LANG = { en: buildSlashRegistry('en'), tr: buildSlashRegistry('tr') } as const;
+const ctx = (cwd: string, lang: 'en' | 'tr' = 'en') => ({ registry: REGISTRY_BY_LANG[lang], cwd, lang, chatMode: 'user' as const });
 
 describe('resolveNativeSlash', () => {
   it('passes through plain chat text (not a slash line)', () => {
@@ -60,15 +65,29 @@ describe('resolveNativeSlash', () => {
     }
   });
 
-  it('/help renders the full trust-badged catalog, not plain text', () => {
-    const result = resolveNativeSlash('/help', ctx(tmpdir()));
+  it('/help renders the full trust-badged catalog in the context language (en), not plain text', () => {
+    const result = resolveNativeSlash('/help', ctx(tmpdir(), 'en'));
     expect(result.kind).toBe('reply');
     if (result.kind !== 'reply') throw new Error('unreachable');
-    expect(result.text).toContain('Komutlar:');
+    // Header + a description are the English catalog rows — the context says
+    // `lang: 'en'`, so the old hardcoded 'Komutlar:' must not appear.
+    expect(result.text.split('\n')[0]).toBe(getMessage('tui.help.commands_header', 'en'));
+    expect(result.text).toContain(getMessage('tui.slash.desc.help', 'en'));
+    expect(result.text).not.toContain('Komutlar:');
     expect(result.text).toContain('/status');
     // trust-badged catalog section (buildHelpCatalogEntries → renderCatalog) —
     // proves this is the SAME rich output chat-native.ts's loop renders, not
     // a bare renderHelp() fallback.
+    expect(result.text.split('\n').length).toBeGreaterThan(10);
+  });
+
+  it('/help renders the Turkish header and descriptions for a `lang: tr` context (same production chain)', () => {
+    const result = resolveNativeSlash('/help', ctx(tmpdir(), 'tr'));
+    expect(result.kind).toBe('reply');
+    if (result.kind !== 'reply') throw new Error('unreachable');
+    expect(result.text.split('\n')[0]).toBe('Komutlar:');
+    expect(result.text).toContain('Kullanılabilir komutları listele');
+    expect(result.text).not.toContain(getMessage('tui.help.commands_header', 'en'));
     expect(result.text.split('\n').length).toBeGreaterThan(10);
   });
 

@@ -2,8 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { renderBanner, type BannerContext } from '../../src/cli/commands/chat-banner.js';
 import { renderStatusLine, type StatusLineContext } from "../../src/cli/commands/chat-status-line.js";
+import { getMessage } from '../../src/cli/helpers/messages.js';
 
 const ENTRY_SRC = readFileSync('src/cli/entry.ts', 'utf-8');
+// TERMINAL-TOOLS-001: the hint is a required injected label (string-free mechanism).
+const HINT = getMessage('tui.banner.hint', 'en');
 
 describe('repl-banner-wire — entry.ts wires renderBanner', () => {
   it('entry.ts imports renderBanner from chat-banner', () => {
@@ -13,25 +16,29 @@ describe('repl-banner-wire — entry.ts wires renderBanner', () => {
   it('entry.ts calls renderBanner (wire present)', () => {
     expect(ENTRY_SRC).toMatch(/renderBanner\s*\(/);
   });
+
+  it('entry.ts injects the catalog hint (tui.banner.hint) into renderBanner — the mechanism has no fallback text', () => {
+    expect(ENTRY_SRC).toMatch(/renderBanner\s*\([\s\S]*?getMessage\(\s*'tui\.banner\.hint'/);
+  });
 });
 
 describe('repl-banner-wire — renderBanner behaviour in REPL boot context', () => {
   const ctx: BannerContext = { provider: 'claude', dir: '/home/user/project' };
 
   it('returns non-empty banner string when TTY=true (banner is rendered)', () => {
-    const out = renderBanner(ctx, true);
+    const out = renderBanner(ctx, true, HINT);
     expect(out.length).toBeGreaterThan(0);
     expect(out).toContain('deckent');
   });
 
   it('returns empty string when TTY=false (TTY-only, pipe context suppressed)', () => {
-    const out = renderBanner(ctx, false);
+    const out = renderBanner(ctx, false, HINT);
     expect(out).toBe('');
   });
 
   it('reflects the active provider name in banner output', () => {
     const geminiCtx: BannerContext = { provider: 'gemini', dir: '/tmp/proj' };
-    const out = renderBanner(geminiCtx, true);
+    const out = renderBanner(geminiCtx, true, HINT);
     expect(out).toContain('gemini');
   });
 });

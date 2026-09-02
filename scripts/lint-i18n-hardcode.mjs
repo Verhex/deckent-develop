@@ -105,6 +105,19 @@ const DESCRIPTION_PROP_SINGLE_RE = /\bdescription\s*:\s*'([^'\\]*(?:\\.[^'\\]*)*
 const DESCRIPTION_PROP_DOUBLE_RE = /\bdescription\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/g;
 const DESCRIPTION_PROP_TEMPLATE_RE = /\bdescription\s*:\s*`([^`]*)`/g;
 
+// Fourth scan (TERMINAL-TOOLS-001): `desc: '...'` object-literal properties in
+// src/cli/commands/*.ts — the REPL slash catalog's description field
+// (chat-slash-registry.ts SLASH_CATALOG). 39 hardcoded Turkish `desc:`
+// literals lived there for months because the gate only knew commander's
+// `.description(` and MCP's `description:`; a `language: en` session rendered
+// a Turkish `/` menu (real-binary evidence, 2026-09-02). Catalog rows now
+// carry `descKey: 'tui.slash.desc.<name>'` (which this string-first regex
+// structurally never matches — `descKey:` is not `desc:`), so any hit here is
+// a description that bypassed the message catalog.
+const DESC_PROP_SINGLE_RE = /\bdesc\s*:\s*'([^'\\]*(?:\\.[^'\\]*)*)'/g;
+const DESC_PROP_DOUBLE_RE = /\bdesc\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/g;
+const DESC_PROP_TEMPLATE_RE = /\bdesc\s*:\s*`([^`]*)`/g;
+
 // ── commander help-surface patterns (CLI-CONTRACT-001) ──────────────────────
 // The description argument of the remaining commander help surfaces. Each
 // regex skips the FIRST argument (the flags/name/position token — always a
@@ -357,6 +370,15 @@ for (const { filePath, relPath } of descriptionPropScanTargets) {
   scanContentForHits(content, relPath, DESCRIPTION_PROP_TEMPLATE_RE, 'description-prop-template');
 }
 
+// `desc: '...'` slash-catalog scan (TERMINAL-TOOLS-001) — CLI command modules
+// only (the flat src/cli/commands/*.ts list; the slash catalog lives there).
+for (const { filePath, relPath } of cliFiles) {
+  const content = readFileSync(filePath, 'utf8');
+  scanContentForHits(content, relPath, DESC_PROP_SINGLE_RE, 'desc-prop-single-quote');
+  scanContentForHits(content, relPath, DESC_PROP_DOUBLE_RE, 'desc-prop-double-quote');
+  scanContentForHits(content, relPath, DESC_PROP_TEMPLATE_RE, 'desc-prop-template');
+}
+
 // ── commander help-surface scan (CLI-CONTRACT-001) ──────────────────────────
 // Collected SEPARATELY from `hits`: this surface is a ratchet by default (see
 // SURFACE_RATCHET_BASELINE), and only merges into the hard gate under
@@ -541,7 +563,7 @@ console.log('│' + ' i18n Hardcode Lint (gate)'.padEnd(W) + '│');
 console.log('└' + '─'.repeat(W) + '┘');
 console.log('');
 console.log(`  Files scanned  : ${scanTargets.length}  (${cliFiles.length} src/cli/commands + ${desktopFiles.length} src/desktop/src/main)`);
-console.log(`  Description scan: ${descriptionCallScanTargets.length} .description() targets (${cliFiles.length} src/cli/commands + 1 src/cli/index.ts + ${mcpToolsFiles.length} src/mcp/tools), ${descriptionPropScanTargets.length} description: targets (src/mcp/tools)`);
+console.log(`  Description scan: ${descriptionCallScanTargets.length} .description() targets (${cliFiles.length} src/cli/commands + 1 src/cli/index.ts + ${mcpToolsFiles.length} src/mcp/tools), ${descriptionPropScanTargets.length} description: targets (src/mcp/tools), ${cliFiles.length} desc: targets (src/cli/commands slash catalog)`);
 console.log(`  Hits (gated)   : ${hits.length}${suppressed ? `  (+${suppressed} allowlisted)` : ''}`);
 console.log(`  Surface scan   : ${surfaceScanTargets.length} .option/.argument/.helpOption/.addHelpText targets — ${surfaceHits.length} literal(s), ratchet ceiling ${surfaceBaseline}${surfaceGate ? ' (HARD GATE: --surface-gate)' : ''}`);
 console.log('');

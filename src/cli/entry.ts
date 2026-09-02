@@ -716,7 +716,13 @@ export async function launchDefaultRepl(): Promise<void> {
     return;
   }
 
-  process.stdout.write(renderBanner({ provider: providerName, dir: process.cwd() }));
+  // TERMINAL-TOOLS-001 — banner hint in the project's configured language
+  // (same source as the health line and the legacy `/` menu below).
+  process.stdout.write(renderBanner(
+    { provider: providerName, dir: process.cwd() },
+    undefined,
+    getMessage('tui.banner.hint', getLangFromConfig(healthRoot)),
+  ));
 
   // Sprint 224 — interactive REPL render model.
   //
@@ -767,7 +773,9 @@ export async function launchDefaultRepl(): Promise<void> {
   // the Tab completer (224-017). This is the safe wire: no cursor-takeover, so
   // the working line-editing REPL is never destabilised. Off-TTY: no-op.
   if (isTty) {
-    const slashRegistry = buildSlashRegistry();
+    // TERMINAL-TOOLS-001 — the legacy `/` menu renders the catalog descriptions
+    // in the project's configured language (same source the health line uses).
+    const slashRegistry = buildSlashRegistry(getLangFromConfig(healthRoot));
     let menuShownFor: string | null = null;
     process.stdin.on('keypress', () => {
       // Defer so readline has updated rl.line for this keystroke.
@@ -918,6 +926,12 @@ export async function launchDefaultRepl(): Promise<void> {
     // T-224-002 — on an interactive TTY readline already echoes the typed line,
     // so the loop suppresses its own `› line` echo to avoid the double-print.
     interactiveTty: isTty,
+    // TERMINAL-TOOLS-001 — the loop's /help header, catalog descriptions and
+    // every other localized line follow the SAME project-language source the
+    // health line, banner and `/` menu above use. Without this the loop
+    // defaulted to 'en' (chat-native.ts) — the refreshed pipe proof showed an
+    // English "Commands:" list under a Turkish health line.
+    lang: getLangFromConfig(healthRoot),
   });
 
   // Sprint 223 T-223-001 — persistent claude session cleanup. The `:exit`

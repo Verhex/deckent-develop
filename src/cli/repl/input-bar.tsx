@@ -17,6 +17,7 @@ import { appendHistory, HistoryNavigator, loadHistory } from './input-history.js
 import { filterSlashCommands } from '../commands/chat-slash-menu.js';
 import type { SlashRegistry, SlashCommand } from '../commands/chat-slash-registry.js';
 import { activeAtQuery, filterAtPaths, completeAtToken, type ActiveAtToken } from './at-ref.js';
+import { requireInjectedLabel } from '../helpers/injected-label.js';
 
 const TEAL = '#4DB8A4';
 const GOLD = '#C4A855';
@@ -34,6 +35,13 @@ export interface InputBarProps {
   slashRegistry?: SlashRegistry;
   /** Localized hint shown under the menu (e.g. "↑↓ gez · Enter seç · Esc kapat"). */
   menuHint?: string;
+  /** `{n}`-templates for the rows scrolled out of the 8-row `/` menu window
+   * (tui.menu_more_above / tui.menu_more_below via run.tsx buildReplLabels).
+   * REQUIRED injected labels — this mechanism module carries no fallback
+   * text; a missing injection throws InjectedLabelMissingError (surfaced by
+   * ReplErrorBoundary) instead of silently rendering English. */
+  menuMoreAbove: string;
+  menuMoreBelow: string;
   /** Project root for persistent history (`.deckent/settings/repl-history`).
    * Injectable for tests (tmpdir); defaults to `process.cwd()` — the real
    * REPL's project root — when the caller (app.tsx) doesn't override it. */
@@ -200,8 +208,18 @@ function CaretText({ state }: { state: InputState }): ReactElement {
   );
 }
 
+/** Substitute the scrolled-out row count into a `{n}` hint template. */
+export function formatMenuMore(template: string, n: number): string {
+  return template.replace('{n}', String(n));
+}
+
 export function InputBar(props: InputBarProps): ReactElement {
   const { active, onSubmit, onInterrupt, onClear, slashRegistry, menuHint, pathProvider, atMenuHint } = props;
+  // TERMINAL-TOOLS-001 — string-free mechanism: no English fallback here. A
+  // caller that forgets the catalog labels gets a typed error through the
+  // REPL error boundary, never a silently English menu.
+  const menuMoreAbove = requireInjectedLabel('menuMoreAbove', props.menuMoreAbove);
+  const menuMoreBelow = requireInjectedLabel('menuMoreBelow', props.menuMoreBelow);
   const projectRoot = props.historyProjectRoot ?? process.cwd();
   const [state, setState] = useState<InputState>(EMPTY_INPUT);
   const [menuSel, setMenuSel] = useState(0);
@@ -359,7 +377,7 @@ export function InputBar(props: InputBarProps): ReactElement {
         const visible = matches.slice(lo, lo + WINDOW);
         return (
           <Box flexDirection="column" marginBottom={0}>
-            {lo > 0 ? <Text dimColor>{`  ↑ ${lo} more`}</Text> : null}
+            {lo > 0 ? <Text dimColor>{`  ${formatMenuMore(menuMoreAbove, lo)}`}</Text> : null}
             {visible.map((c, vi) => {
               const i = lo + vi;
               return (
@@ -370,7 +388,7 @@ export function InputBar(props: InputBarProps): ReactElement {
                 </Text>
               );
             })}
-            {lo + WINDOW < matches.length ? <Text dimColor>{`  ↓ ${matches.length - lo - WINDOW} more`}</Text> : null}
+            {lo + WINDOW < matches.length ? <Text dimColor>{`  ${formatMenuMore(menuMoreBelow, matches.length - lo - WINDOW)}`}</Text> : null}
             {menuHint ? <Text dimColor>{`  ${menuHint}`}</Text> : null}
           </Box>
         );
