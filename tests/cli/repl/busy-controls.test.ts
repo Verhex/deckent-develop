@@ -84,7 +84,7 @@ describe('busy-controls — /interrupt (busy × idle matrix, injected canceller,
   it('busy + first /interrupt → invokes canceller once, sets interruptRequested', () => {
     const canceller = vi.fn();
     const result = applyInterrupt(busyState(), canceller);
-    expect(result.decision).toEqual({ kind: 'interrupted' });
+    expect(result.decision).toEqual({ kind: 'interrupted', aborted: false }); // vi.fn() returns undefined → no real abort seam
     expect(result.state.interruptRequested).toBe(true);
     expect(canceller).toHaveBeenCalledTimes(1);
   });

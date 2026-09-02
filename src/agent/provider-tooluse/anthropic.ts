@@ -121,6 +121,9 @@ export function createAnthropicAdapter(opts: AnthropicAdapterOptions): ProviderA
           'anthropic-version': opts.version ?? '2023-06-01',
         },
         body: JSON.stringify(body),
+        // TERMINAL-TOOLS-008 — the turn's abort signal: a cancel aborts the
+        // request/stream immediately (AbortError surfaces to the loop).
+        ...(req.signal ? { signal: req.signal } : {}),
       });
       if (!resp.ok) {
         const bodyText = resp.body ? await readBodyText(resp.body as AsyncIterable<Uint8Array>) : '';

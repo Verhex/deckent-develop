@@ -77,11 +77,17 @@ export function resolveQueueCommand(
 
 // ─── /interrupt ──────────────────────────────────────────────────────────
 
-/** Injected by the REPL surface — the actual process/turn cancellation mechanism. */
-export type Canceller = () => void;
+/** Injected by the REPL surface — the actual process/turn cancellation
+ *  mechanism. TERMINAL-TOOLS-008: returns `true` when a REAL abort seam fired
+ *  (the native engine's session.cancel → AbortController); `false`/void when
+ *  only pending input could be cleared (no seam on this engine). */
+export type Canceller = () => boolean | void;
 
 export type InterruptDecision =
-  | { readonly kind: 'interrupted' }
+  /** `aborted` (TERMINAL-TOOLS-008): the canceller reported a REAL abort seam
+   *  fired (native engine → session.cancel → AbortController). False means only
+   *  pending input was cleared — the caller must say so, never claim a stop. */
+  | { readonly kind: 'interrupted'; readonly aborted: boolean }
   | { readonly kind: 'interrupt-noop'; readonly reason: 'idle' | 'already-requested' };
 
 export interface InterruptResult {
@@ -102,10 +108,10 @@ export function applyInterrupt(state: BusyControlsState, canceller: Canceller): 
   if (state.interruptRequested) {
     return { state, decision: { kind: 'interrupt-noop', reason: 'already-requested' } };
   }
-  canceller();
+  const aborted = canceller() === true;
   return {
     state: { ...state, interruptRequested: true },
-    decision: { kind: 'interrupted' },
+    decision: { kind: 'interrupted', aborted },
   };
 }
 

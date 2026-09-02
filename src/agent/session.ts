@@ -235,6 +235,8 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
   const preAnswers = new Map<string, PermissionResponse>();
   let mode: ApprovalMode = deps.policy.defaultMode;
   let cancelled = false;
+  /** TERMINAL-TOOLS-008 — abort seam of the turn in flight (fresh per send()). */
+  let turnAbort: AbortController | undefined;
   let turnSequence = 0;
   let budgetEpoch = 1;
   let exhausted: { code: NativeBudgetTerminalCode; at: number; epoch: number } | undefined;
@@ -530,6 +532,8 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     ...(deps.getProviderToolSchemas ? { getProviderToolSchemas: deps.getProviderToolSchemas } : {}),
     getMode: () => mode,
     isCancelled: () => cancelled,
+    // TERMINAL-TOOLS-008 — the per-turn AbortController's signal (see send()).
+    getTurnSignal: () => turnAbort?.signal,
     requestPermission: (req) =>
       new Promise<PermissionResponse>((resolve) => {
         if (cancelled) { resolve({ decision: 'deny' }); return; }
@@ -543,6 +547,9 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
   return {
     send(userInput: TurnInput): AsyncIterable<AgentSessionEvent> {
       cancelled = false;
+      // TERMINAL-TOOLS-008 — a fresh controller per turn: a late cancel() on a
+      // finished turn can never poison the next one.
+      turnAbort = new AbortController();
       pending.clear();
       preAnswers.clear();
       if (exhausted) {
@@ -584,6 +591,10 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     },
     cancel(): void {
       cancelled = true;
+      // TERMINAL-TOOLS-008 — abort the in-flight provider request/stream NOW
+      // (fetch rejects with AbortError; the loop ends the turn without an
+      // error event). Before this the flag was only honored at the next event.
+      turnAbort?.abort();
       // Deny everything already parked; ids not yet requested are covered by the
       // `if (cancelled)` guard in requestPermission + the loop's isCancelled() checks.
       for (const [id, resolve] of pending) { pending.delete(id); resolve({ decision: 'deny' }); }

@@ -158,6 +158,7 @@ export function buildReplLabels(t: (key: string) => string): ReplLabels {
     busyStateBusy: t('tui.busy_state_busy'),
     busyStateIdle: t('tui.busy_state_idle'),
     busyInterrupted: t('tui.busy_interrupted'),
+    busyInterruptUnavailable: t('tui.busy_interrupt_unavailable'),
     busyInterruptIdle: t('tui.busy_interrupt_idle'),
     busyInterruptDup: t('tui.busy_interrupt_dup'),
     busySteerQueued: t('tui.busy_steer_queued'),
@@ -363,11 +364,15 @@ export function resolveRenewSlash(
  * answered locally (engine seam + confirmation line, zero provider calls) and
  * every other input passes straight through. Applied to the NATIVE engine only
  * — the legacy loop path builds no engine here, so it never gains the command.
- * The optional members are re-exposed so the existing `/approve` bridge
- * (app.tsx) and the teardown's `close()` keep working through the wrapper.
+ * EVERY optional member of the inner engine is forwarded generically
+ * (TERMINAL-TOOLS-008): the former explicit list (setApprovalMode / close /
+ * renewBudgetEpoch) silently dropped `hydrateTranscript`,
+ * `getContextBudgetTokens` and the new `cancelTurn` — the real-binary abort
+ * proof showed Esc reaching the policy while the provider stream kept
+ * running because the wrapper had no `cancelTurn`. A member added to
+ * ReplEngine tomorrow rides through without touching this function.
  */
 export function withRenewSlash(engine: ReplEngine, labels: RenewSlashLabels): ReplEngine {
-  const { setApprovalMode, close, renewBudgetEpoch } = engine;
   const wrapped: ReplEngine = async (input, cbs) => {
     const line = resolveRenewSlash(input, engine, labels);
     if (line === undefined) {
@@ -377,9 +382,9 @@ export function withRenewSlash(engine: ReplEngine, labels: RenewSlashLabels): Re
     cbs.output(line);
     cbs.onTurnEnd({ inputTokens: 0, outputTokens: 0 });
   };
-  if (setApprovalMode) wrapped.setApprovalMode = (mode) => setApprovalMode(mode);
-  if (close) wrapped.close = (options) => close(options);
-  if (renewBudgetEpoch) wrapped.renewBudgetEpoch = () => renewBudgetEpoch();
+  for (const key of Object.keys(engine) as (keyof ReplEngine)[]) {
+    (wrapped as unknown as Record<string, unknown>)[key] = engine[key];
+  }
   return wrapped;
 }
 

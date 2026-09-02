@@ -359,7 +359,7 @@ export function resolveResumeCommand(
 export function renderBusyDecision(
   decision: QueueStatusDecision | InterruptDecision | SteerDecision,
   labels: Pick<ReplLabels,
-    'busyQueueStatus' | 'busyStateBusy' | 'busyStateIdle' | 'busyInterrupted' |
+    'busyQueueStatus' | 'busyStateBusy' | 'busyStateIdle' | 'busyInterrupted' | 'busyInterruptUnavailable' |
     'busyInterruptIdle' | 'busyInterruptDup' | 'busySteerQueued' | 'busySteerIdle' | 'busySteerEmpty'>,
 ): string {
   const need = (field: keyof typeof labels): string => requireInjectedLabel(field, labels[field]);
@@ -371,7 +371,9 @@ export function renderBusyDecision(
         .replace('{state}', state);
     }
     case 'interrupted':
-      return need('busyInterrupted');
+      // TERMINAL-TOOLS-008 — say what actually happened: a real abort, or only
+      // cleared input because this engine has no abort seam.
+      return decision.aborted ? need('busyInterrupted') : need('busyInterruptUnavailable');
     case 'interrupt-noop':
       return decision.reason === 'idle' ? need('busyInterruptIdle') : need('busyInterruptDup');
     case 'steer-queued':
@@ -801,7 +803,10 @@ export interface ReplLabels {
   busyQueueStatus: string; // "queue: {count} background · {state}"
   busyStateBusy: string;   // "busy"
   busyStateIdle: string;   // "idle"
-  busyInterrupted: string; // "interrupt requested — stopping after the current step"
+  busyInterrupted: string; // "interrupted — the provider stream was aborted"
+  /** TERMINAL-TOOLS-008 — the honest line when this engine has no abort seam
+   * (legacy loop): only pending input was cleared. */
+  busyInterruptUnavailable: string;
   busyInterruptIdle: string; // "nothing running to interrupt"
   busyInterruptDup: string;  // "interrupt already requested"
   busySteerQueued: string;   // "steer note queued (#{position}) — applied at turn end"
@@ -1643,6 +1648,14 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // "interrupt" honestly cancels what it CAN — the not-yet-started queued
   // inputs (true mid-turn abort is loop-side follow-up work).
   const cancelPendingInputs = (): void => { queue.current!.clear(); setQueued([]); };
+  // TERMINAL-TOOLS-008 — the interrupt canceller: clear the queue AND abort the
+  // turn in flight (native engine → session.cancel → AbortController → the
+  // provider stream is torn down now). Returns whether a real abort seam fired
+  // so the transcript line stays honest — the legacy engine has none.
+  const cancelActiveTurn = (): boolean => {
+    cancelPendingInputs();
+    return nativeEngine?.cancelTurn?.() ?? false;
+  };
 
   const handleSubmit = async (line: string): Promise<void> => {
     const trimmed = line.trim();
@@ -1663,6 +1676,17 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     // retired /ask·/run·/control transition commands (those names stay free
     // for future first-class commands). Every branch prints a VISIBLE line —
     // a silent badge-only switch reads as "nothing happened".
+    // TERMINAL-TOOLS-008 — `/interrupt` aborts the turn in flight on EVERY
+    // surface-flag state (parity: Esc/`/interrupt` stop the turn in Claude
+    // Code and Codex). /queue and /steer stay behind the surface flag below.
+    const busyAction = parseBusyCommand(trimmed);
+    if (busyAction.kind === 'interrupt') {
+      pushTurn('user', trimmed);
+      const r = applyInterrupt(busyCtl.current, cancelActiveTurn);
+      busyCtl.current = r.state;
+      pushTurn('seg', renderBusyDecision(r.decision, labels));
+      return;
+    }
     // Inert unless replSurfaceEnabled: keeps flag-off behavior byte-identical
     // (the string falls through to a normal chat message, exactly as before).
     if (replSurfaceEnabled) {
@@ -1687,17 +1711,13 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         }
         return;
       }
-      // 358-006: /queue · /interrupt · /steer — busy-controls.ts dispatch.
-      // Same inertness rule: flag off → these fall through to a chat message.
-      const busyAction = parseBusyCommand(trimmed);
-      if (busyAction.kind !== 'none') {
+      // 358-006: /queue · /steer — busy-controls.ts dispatch (`/interrupt` is
+      // handled above, unconditionally). Same inertness rule: flag off →
+      // these fall through to a chat message.
+      if (busyAction.kind === 'queue' || busyAction.kind === 'steer') {
         pushTurn('user', trimmed);
         if (busyAction.kind === 'queue') {
           pushTurn('seg', renderBusyDecision(resolveQueueCommand(busyCtl.current, bgQueue.current!), labels));
-        } else if (busyAction.kind === 'interrupt') {
-          const r = applyInterrupt(busyCtl.current, cancelPendingInputs);
-          busyCtl.current = r.state;
-          pushTurn('seg', renderBusyDecision(r.decision, labels));
         } else {
           const r = applySteer(busyCtl.current, busyAction.message);
           busyCtl.current = r.state;
@@ -1944,12 +1964,17 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // press resolves to interrupt-noop, the canceller never re-fires, and no
   // duplicate line is pushed. Inactive while the confirm modal owns input;
   // inert unless the surface flag is on (flag-off key handling unchanged).
-  useInput((_input, key) => {
-    if (!key.escape) return;
-    const r = applyInterrupt(busyCtl.current, cancelPendingInputs);
+  // TERMINAL-TOOLS-008 — Esc arrives through the composer (InputBar onEscape:
+  // only an Esc no menu consumed), on every surface-flag state; while idle it
+  // is a no-op so a stray Esc never prints a line. The old App-level useInput
+  // was gated behind repl_surface.enabled AND fired even while a menu was
+  // being closed with the same key.
+  const handleEscapeInterrupt = (): void => {
+    if (!working || confirm !== null) return;
+    const r = applyInterrupt(busyCtl.current, cancelActiveTurn);
     busyCtl.current = r.state;
     if (r.decision.kind === 'interrupted') pushTurn('seg', renderBusyDecision(r.decision, labels));
-  }, { isActive: replSurfaceEnabled && working && confirm === null });
+  };
 
   // TERMINAL-TOOLS-006 — Ctrl-C / Ctrl-D policy (interrupt-policy.ts). Ink's
   // exitOnCtrlC is OFF (run.tsx): one Ctrl-C used to tear the session down
@@ -1970,11 +1995,13 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     if (decision.kind === 'exit') { exit(); return; }
     ctrlCArmedAt.current = decision.armedAt;
     if (decision.kind === 'interrupt-turn') {
-      const r = applyInterrupt(busyCtl.current, cancelPendingInputs);
+      const r = applyInterrupt(busyCtl.current, cancelActiveTurn);
       busyCtl.current = r.state;
-      // Honest hint: only a REAL interrupt request says so; a no-op (nothing
-      // to interrupt on this path) falls back to the plain arm hint.
-      setInterruptHint({ text: r.decision.kind === 'interrupted' ? labels.ctrlCInterrupt : labels.ctrlCArm, at: now });
+      // Honest hint: only a REAL abort says so; no seam / nothing to interrupt
+      // falls back to the plain arm hint.
+      const aborted = r.decision.kind === 'interrupted' && r.decision.aborted;
+      if (r.decision.kind === 'interrupted') pushTurn('seg', renderBusyDecision(r.decision, labels));
+      setInterruptHint({ text: aborted ? labels.ctrlCInterrupt : labels.ctrlCArm, at: now });
       return;
     }
     setInterruptHint({ text: decision.kind === 'clear-draft' ? labels.ctrlCDraftCleared : labels.ctrlCArm, at: now });
@@ -2103,6 +2130,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         active={stdinOwner.inputBarActive && !runFlowPending && !inboxOpen}
         onSubmit={handleSubmit}
         onInterrupt={handleInterrupt}
+        onEscape={handleEscapeInterrupt}
         onClear={clearScreen}
         slashRegistry={slashRegistry}
         menuHint={labels.menuHint}

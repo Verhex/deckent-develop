@@ -6190,9 +6190,11 @@ const BASE_MESSAGES: MessageMap = {
   },
   'tui.busy_state_busy': { en: 'busy', tr: 'meşgul' },
   'tui.busy_state_idle': { en: 'idle', tr: 'boşta' },
+  // TERMINAL-TOOLS-008 — a real abort: the provider stream is torn down now
+  // (a tool call already running finishes; nothing new is proposed).
   'tui.busy_interrupted': {
-    en: 'interrupt requested — stopping after the current step',
-    tr: 'kesme istendi — mevcut adımdan sonra durulacak',
+    en: 'interrupted — the provider stream was stopped; pending input cleared',
+    tr: 'kesildi — sağlayıcı akışı durduruldu; bekleyen girdi temizlendi',
   },
   'tui.busy_interrupt_idle': { en: 'nothing running to interrupt', tr: 'kesilecek bir şey çalışmıyor' },
   'tui.busy_interrupt_dup': { en: 'interrupt already requested', tr: 'kesme zaten istendi' },

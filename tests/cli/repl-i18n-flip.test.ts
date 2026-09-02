@@ -57,8 +57,8 @@ describe('buildReplLabels / buildApprovalLabels — lang=tr renders fully Turkis
       .toBe('kuyruk: 2 arkaplan · boşta');
     expect(renderBusyDecision({ kind: 'queue-status', busy: true, pendingBackgroundBuckets: 1 }, labelsTr))
       .toBe('kuyruk: 1 arkaplan · meşgul');
-    expect(renderBusyDecision({ kind: 'interrupted' }, labelsTr))
-      .toBe('kesme istendi — mevcut adımdan sonra durulacak');
+    expect(renderBusyDecision({ kind: 'interrupted', aborted: true }, labelsTr))
+      .toBe('kesildi — sağlayıcı akışı durduruldu; bekleyen girdi temizlendi');
     expect(renderBusyDecision({ kind: 'interrupt-noop', reason: 'idle' }, labelsTr))
       .toBe('kesilecek bir şey çalışmıyor');
     expect(renderBusyDecision({ kind: 'interrupt-noop', reason: 'duplicate' }, labelsTr))
@@ -106,8 +106,8 @@ describe('buildReplLabels / buildApprovalLabels — lang=en stays byte-identical
   it('busy-controls match the old hardcoded English fallback', () => {
     expect(renderBusyDecision({ kind: 'queue-status', busy: false, pendingBackgroundBuckets: 2 }, labelsEn))
       .toBe('queue: 2 background · idle');
-    expect(renderBusyDecision({ kind: 'interrupted' }, labelsEn))
-      .toBe('interrupt requested — stopping after the current step');
+    expect(renderBusyDecision({ kind: 'interrupted', aborted: true }, labelsEn))
+      .toBe('interrupted — the provider stream was stopped; pending input cleared');
     expect(renderBusyDecision({ kind: 'steer-queued', position: 3 }, labelsEn))
       .toBe('steer note queued (#3) — applied at turn end');
   });

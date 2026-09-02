@@ -181,8 +181,12 @@ export function createOpenAIAdapter(opts: OpenAIAdapterOptions): ProviderAdapter
           method: 'POST',
           headers: { 'content-type': 'application/json', ...(opts.apiKey ? { authorization: `Bearer ${opts.apiKey}` } : {}) },
           body: JSON.stringify(body),
+          // TERMINAL-TOOLS-008 — the turn's abort signal (see types.ts).
+          ...(req.signal ? { signal: req.signal } : {}),
         });
       } catch (cause) {
+        // An abort is the caller's own decision, never a connect failure.
+        if (cause instanceof Error && cause.name === 'AbortError') throw cause;
         // Cold-start / connection-refused class: keep the honest low-level cause
         // ('fetch failed', ECONNREFUSED, …) instead of an unhandled rejection.
         const detail = cause instanceof Error ? cause.message : String(cause);

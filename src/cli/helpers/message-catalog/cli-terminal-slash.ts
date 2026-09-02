@@ -48,6 +48,12 @@ export const CLI_TERMINAL_SLASH_MESSAGES: MessageFamily = Object.freeze({
   'tui.ctrl_c_draft_cleared': { en: 'draft discarded · Ctrl-C again to exit', tr: 'taslak silindi · çıkmak için tekrar Ctrl-C' },
   'tui.ctrl_c_interrupt': { en: 'interrupt requested · Ctrl-C again to exit', tr: 'kesme istendi · çıkmak için tekrar Ctrl-C' },
   'tui.ctrl_c_arm': { en: 'Ctrl-C again to exit', tr: 'çıkmak için tekrar Ctrl-C' },
+  // TERMINAL-TOOLS-008 — the honest interrupt line when the engine has no abort
+  // seam (legacy loop): pending input was cleared, the turn itself continues.
+  'tui.busy_interrupt_unavailable': {
+    en: 'interrupt is not available on this engine — the turn will finish; pending input cleared',
+    tr: 'bu motorda kesme yok — tur tamamlanacak; bekleyen girdi temizlendi',
+  },
 
   // ── live-footer elapsed-time unit suffixes (helpers/live-footer.ts
   //    formatElapsed — `2h 5m`, `10m`, `30s`). XVerify (codex/gpt-5.6-sol,

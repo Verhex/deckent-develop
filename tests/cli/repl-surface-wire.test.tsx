@@ -413,13 +413,20 @@ describe('busy matrix — parse → dispatch → renderBusyDecision (render-test
         expect(line).toBe('nothing running to interrupt');
         expect(cancel).not.toHaveBeenCalled();
     });
-    it('busy × /interrupt → interrupt line, canceller invoked exactly once', () => {
-        const cancel = vi.fn();
+    it('busy × /interrupt → interrupt line, canceller invoked exactly once (real abort seam)', () => {
+        const cancel = vi.fn(() => true); // TERMINAL-TOOLS-008: the native engine reports a real abort
         const stateRef = { current: markBusy() };
         const line = dispatchLine(stateRef, '/interrupt', { size: () => 0, cancel });
-        expect(line).toBe('interrupt requested — stopping after the current step');
+        expect(line).toBe('interrupted — the provider stream was stopped; pending input cleared');
         expect(cancel).toHaveBeenCalledTimes(1);
         expect(stateRef.current.interruptRequested).toBe(true);
+    });
+    it('busy × /interrupt on an engine without an abort seam → the honest "not available" line', () => {
+        const cancel = vi.fn(); // returns undefined: only pending input could be cleared
+        const stateRef = { current: markBusy() };
+        const line = dispatchLine(stateRef, '/interrupt', { size: () => 0, cancel });
+        expect(line).toBe('interrupt is not available on this engine — the turn will finish; pending input cleared');
+        expect(cancel).toHaveBeenCalledTimes(1);
     });
     it('double interrupt (Esc then Esc / Esc then /interrupt) is idempotent — canceller fires once', () => {
         const cancel = vi.fn();

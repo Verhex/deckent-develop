@@ -79,7 +79,8 @@ describe('app.tsx helpers fail closed on a missing label', () => {
   });
 
   it('renderBusyDecision', () => {
-    expectMissing(() => renderBusyDecision({ kind: 'interrupted' }, none), 'busyInterrupted');
+    expectMissing(() => renderBusyDecision({ kind: 'interrupted', aborted: true }, none), 'busyInterrupted');
+    expectMissing(() => renderBusyDecision({ kind: 'interrupted', aborted: false }, none), 'busyInterruptUnavailable');
     expectMissing(() => renderBusyDecision({ kind: 'queue-status', busy: true, pendingBackgroundBuckets: 1 }, none), 'busyStateBusy');
     expectMissing(() => renderBusyDecision({ kind: 'steer-noop', reason: 'idle' }, none), 'busySteerIdle');
   });

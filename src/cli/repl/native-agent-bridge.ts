@@ -94,6 +94,16 @@ export interface ReplEngine {
    * `setApprovalMode`/`close` above.
    */
   renewBudgetEpoch?: () => { epoch: number };
+  /**
+   * TERMINAL-TOOLS-008 — abort the turn in flight (session.cancel → the
+   * per-turn AbortController → the provider HTTP stream is torn down at once;
+   * a parked permission prompt is denied; the loop ends the turn with
+   * `turn-end`, never an error). Returns `true` when a turn WAS in flight and
+   * the abort was requested, `false` when idle. Optional for the same
+   * structural reasons as the members above — the legacy engine has no seam,
+   * and the REPL must say so instead of claiming a stop.
+   */
+  cancelTurn?: () => boolean;
   /** 7087 (562-001 hand-completion) — the SAME context-budget authority the
    *  loop's admission uses (run.tsx getContextBudgetTokens), exposed so the
    *  @ref expansion in app.tsx can size its inline-vs-descriptor decision
@@ -710,8 +720,11 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
   // (real and bg-synthetic alike, since both run through `runTurn`). It is the
   // ledger's ordering key, so it must never restart or skip within a session.
   let turnIndex = 0;
+  /** TERMINAL-TOOLS-008 — turns currently inside runTurn (0 or 1 on the REPL
+   *  path; the bg-turn wrapper below runs its drained turns sequentially). */
+  let turnsInFlight = 0;
 
-  const runTurn: ReplEngine = async (input, cbs) => {
+  const runTurnInner: ReplEngine = async (input, cbs) => {
     let inputTokens = 0;
     let outputTokens = 0;
     // 560-004: the three carriers are separated HERE, at the last seam before the
@@ -875,6 +888,16 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
   // supplied, or `bgTurnsEnabled` unset/false → engine stays runTurn
   // unwrapped, so the flag-off path stays byte-identical to pre-356-011 (no
   // extra Promise hops, no queue reads at all).
+  // TERMINAL-TOOLS-008 — in-flight bookkeeping for cancelTurn (below): the
+  // seam must refuse while idle, so a stray Esc never cancels the NEXT turn.
+  const runTurn: ReplEngine = async (input, cbs) => {
+    turnsInFlight++;
+    try {
+      await runTurnInner(input, cbs);
+    } finally {
+      turnsInFlight--;
+    }
+  };
   const bgQueue = deps.bgQueue;
   const engine: ReplEngine = (!bgQueue || !deps.bgTurnsEnabled)
     ? runTurn
@@ -895,6 +918,12 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
           await runTurn(formatBgTurnInput(payload), cbs);
         }
       };
+  // TERMINAL-TOOLS-008 — see the ReplEngine.cancelTurn doc comment above.
+  engine.cancelTurn = () => {
+    if (turnsInFlight === 0) return false;
+    session.cancel();
+    return true;
+  };
   // born-493 (387-002) — see the ReplEngine.setApprovalMode doc comment above.
   engine.setApprovalMode = (mode) => session.setApprovalMode(mode);
   // NT-03 (553-002) — see the ReplEngine.close doc comment above.

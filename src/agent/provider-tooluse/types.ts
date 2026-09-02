@@ -36,6 +36,12 @@ export interface ProviderRequest {
    *  Absent → the field is omitted on the wire and the backend keeps its own
    *  default (behavior unchanged for callers that never set it). */
   outputCeilingTokens?: number;
+  /** TERMINAL-TOOLS-008 — the turn's abort signal. The session owns one
+   *  AbortController per turn; HTTP adapters hand this to fetch so a cancel
+   *  tears the stream down at once (even before the first token) instead of
+   *  waiting for the next event boundary. Absent → no abort seam (legacy
+   *  callers unchanged). */
+  signal?: AbortSignal;
 }
 
 export interface ProviderContextIdentity {

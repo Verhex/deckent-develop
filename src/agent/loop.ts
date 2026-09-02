@@ -96,6 +96,10 @@ export interface LoopDeps {
   requestPermission: (req: PermissionRequestEvent) => Promise<PermissionResponse>;
   /** cooperative cancellation between iterations. */
   isCancelled?: () => boolean;
+  /** TERMINAL-TOOLS-008 — the current turn's abort signal (session-owned
+   *  AbortController), threaded onto every ProviderRequest so the HTTP stream
+   *  itself is torn down on cancel — not only skipped at the next event. */
+  getTurnSignal?: () => AbortSignal | undefined;
   /** Optional per-session cost accumulator. When a hard ceilingUsd is configured
    *  and crossed, the turn aborts mid-stream (not advisory-only). Undefined → no
    *  cost gating at the loop level. */
@@ -280,7 +284,10 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
         const segmentCalls: ProviderToolCall[] = [];
         let segmentStopReason: string | undefined;
         let hiddenReasoningObserved = false;
-        const segmentRequest: ProviderRequest = { ...req, messages: continuationMessages };
+        const turnSignal = deps.getTurnSignal?.();
+        const segmentRequest: ProviderRequest = {
+          ...req, messages: continuationMessages, ...(turnSignal ? { signal: turnSignal } : {}),
+        };
         for await (const ev of adapter.send(segmentRequest)) {
         // Mid-stream cancel(): stop consuming further provider events instead of
         // running the in-flight turn to completion (breaking a for-await triggers
@@ -364,6 +371,12 @@ export async function* runAgentTurn(deps: LoopDeps, transcript: Transcript, user
         ];
       }
     } catch (e) {
+      // TERMINAL-TOOLS-008 — an aborted stream is the user's own cancel, not a
+      // provider failure: end the turn honestly, never as an 'error' event.
+      if (deps.isCancelled?.() || (e instanceof Error && e.name === 'AbortError')) {
+        yield { type: 'turn-end' };
+        return;
+      }
       yield { type: 'error', message: e instanceof Error ? e.message : String(e) };
       yield { type: 'turn-end' };
       return;

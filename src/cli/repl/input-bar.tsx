@@ -34,6 +34,10 @@ export interface InputBarProps {
   onInterrupt: (signal: 'int' | 'eof', draftNonEmpty: boolean) => void;
   /** Ctrl-L → clear the screen/history. */
   onClear?: () => void;
+  /** TERMINAL-TOOLS-008 — Esc that NO composer menu consumed (slash menu,
+   * `@` menu and Ctrl-R search all take Esc first). The caller decides what
+   * it means (app.tsx: interrupt the running turn). */
+  onEscape?: () => void;
   /** Slash command catalog — when set, typing `/` opens an interactive menu. */
   slashRegistry?: SlashRegistry;
   /** Localized hint shown under the menu (e.g. "↑↓ gez · Enter seç · Esc kapat"). */
@@ -242,7 +246,7 @@ export function formatMenuMore(template: string, n: number): string {
 }
 
 export function InputBar(props: InputBarProps): ReactElement {
-  const { active, onSubmit, onInterrupt, onClear, slashRegistry, menuHint, pathProvider, atMenuHint } = props;
+  const { active, onSubmit, onInterrupt, onClear, onEscape, slashRegistry, menuHint, pathProvider, atMenuHint } = props;
   // TERMINAL-TOOLS-001 — string-free mechanism: no English fallback here. A
   // caller that forgets the catalog labels gets a typed error through the
   // REPL error boundary, never a silently English menu.
@@ -349,6 +353,10 @@ export function InputBar(props: InputBarProps): ReactElement {
       }
       return;
     }
+
+    // TERMINAL-TOOLS-008 — a bare Esc reaching this point was consumed by no
+    // menu: hand it to the caller (turn interrupt). Never edits the buffer.
+    if (key.escape) { onEscape?.(); return; }
 
     const res = editInput(stateRef.current, inkToKey(input, key));
     if (res.signal === 'int') {
