@@ -19,6 +19,7 @@ import {
 import { renderMarkdown } from '../commands/chat-render.js';
 import { InputBar, type CaretStyle } from './input-bar.js';
 import { StatusRow } from './status-row.js';
+import { resolveCtrlC, CTRL_C_EXIT_WINDOW_MS } from './interrupt-policy.js';
 import { useTerminalColumns } from './use-terminal-columns.js';
 import { expandAtRefs } from './at-ref.js';
 import { resolveSlash, type SlashRegistry } from '../commands/chat-slash-registry.js';
@@ -825,6 +826,11 @@ export interface ReplLabels {
   /** TERMINAL-TOOLS-002 — the Ctrl-R reverse-history prompt of the composer
    * (tui.reverse_search). Was a readline-ism literal inside input-bar.tsx. */
   reverseSearch: string; // the Ctrl-R prompt text
+  /** TERMINAL-TOOLS-006 — Ctrl-C policy hints (interrupt-policy.ts); each
+   * names the next key, shown for the second-press window (tui.ctrl_c_*). */
+  ctrlCDraftCleared: string; // "draft discarded · Ctrl-C again to exit"
+  ctrlCInterrupt: string;    // "interrupt requested · Ctrl-C again to exit"
+  ctrlCArm: string;          // "Ctrl-C again to exit"
 }
 
 /** TERMINAL-TOOLS-003 — composer caret carrier (input-bar.tsx CaretStyle);
@@ -1945,6 +1951,41 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     if (r.decision.kind === 'interrupted') pushTurn('seg', renderBusyDecision(r.decision, labels));
   }, { isActive: replSurfaceEnabled && working && confirm === null });
 
+  // TERMINAL-TOOLS-006 — Ctrl-C / Ctrl-D policy (interrupt-policy.ts). Ink's
+  // exitOnCtrlC is OFF (run.tsx): one Ctrl-C used to tear the session down
+  // with a half-typed draft. Now: a draft is discarded, a running turn gets
+  // the busy-controls interrupt, an idle empty composer arms — and only a
+  // second press inside CTRL_C_EXIT_WINDOW_MS exits. The hint (catalog,
+  // `tui.ctrl_c_*`) names the next key and lives for the window.
+  const ctrlCArmedAt = useRef<number | null>(null);
+  const [interruptHint, setInterruptHint] = useState<{ text: string; at: number } | null>(null);
+  useEffect(() => {
+    if (interruptHint === null) return;
+    const id = setTimeout(() => { setInterruptHint(null); ctrlCArmedAt.current = null; }, CTRL_C_EXIT_WINDOW_MS);
+    return () => clearTimeout(id);
+  }, [interruptHint]);
+  const handleInterrupt = (signal: 'int' | 'eof', draftNonEmpty: boolean): void => {
+    const now = Date.now();
+    const decision = resolveCtrlC({ signal, draftNonEmpty, working, armedAt: ctrlCArmedAt.current, now });
+    if (decision.kind === 'exit') { exit(); return; }
+    ctrlCArmedAt.current = decision.armedAt;
+    if (decision.kind === 'interrupt-turn') {
+      const r = applyInterrupt(busyCtl.current, cancelPendingInputs);
+      busyCtl.current = r.state;
+      // Honest hint: only a REAL interrupt request says so; a no-op (nothing
+      // to interrupt on this path) falls back to the plain arm hint.
+      setInterruptHint({ text: r.decision.kind === 'interrupted' ? labels.ctrlCInterrupt : labels.ctrlCArm, at: now });
+      return;
+    }
+    setInterruptHint({ text: decision.kind === 'clear-draft' ? labels.ctrlCDraftCleared : labels.ctrlCArm, at: now });
+  };
+  // While a modal/card owns stdin the InputBar is inactive, so Ctrl-C must
+  // still reach the policy (otherwise it would be silently swallowed).
+  const inputBarActiveNow = stdinOwner.inputBarActive && !runFlowPending && !inboxOpen;
+  useInput((input, key) => {
+    if (key.ctrl && input === 'c') handleInterrupt('int', false);
+  }, { isActive: !inputBarActiveNow });
+
   // Persistent phase anchor — the orientation signal ("am I working / done?").
   const phase: 'thinking' | 'generating' | 'idle' =
     busy ? 'thinking' : working ? 'generating' : 'idle';
@@ -2046,6 +2087,8 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         {phase === 'idle'
           ? <Text dimColor>{`✓ ${labels.ready}`}</Text>
           : <><Spinner /><Text color={GOLD} bold> deckent </Text><Text dimColor>{`· ${phase === 'thinking' ? labels.thinking : labels.generating}`}</Text></>}
+        {/* TERMINAL-TOOLS-006: transient Ctrl-C hint (names the next key). */}
+        {interruptHint ? <Text color={GOLD}>{`  · ${interruptHint.text}`}</Text> : null}
       </Box>
 
       {/* Pinned input with a VISIBLE cursor + interactive /menu — always last. */}
@@ -2059,7 +2102,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         // property (`inboxOpen` is false until `--follow`).
         active={stdinOwner.inputBarActive && !runFlowPending && !inboxOpen}
         onSubmit={handleSubmit}
-        onInterrupt={() => exit()}
+        onInterrupt={handleInterrupt}
         onClear={clearScreen}
         slashRegistry={slashRegistry}
         menuHint={labels.menuHint}

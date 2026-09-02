@@ -163,6 +163,10 @@ export function buildReplLabels(t: (key: string) => string): ReplLabels {
     turnError: t('tui.turn_error'),
     switchBusy: t('tui.switch_busy'),
     reverseSearch: t('tui.reverse_search'),
+    // TERMINAL-TOOLS-006 — Ctrl-C policy hints (app.tsx handleInterrupt).
+    ctrlCDraftCleared: t('tui.ctrl_c_draft_cleared'),
+    ctrlCInterrupt: t('tui.ctrl_c_interrupt'),
+    ctrlCArm: t('tui.ctrl_c_arm'),
   };
 }
 
@@ -1366,6 +1370,12 @@ export async function runInkRepl(
       } : {})}
     />
     </ReplErrorBoundary>,
+    // TERMINAL-TOOLS-006 — Ctrl-C is a policy decision (interrupt-policy.ts,
+    // app.tsx handleInterrupt), never Ink's unconditional unmount: a draft is
+    // discarded, a running turn is interrupted, and only a second press
+    // inside the window exits. External SIGINT/SIGTERM still run the
+    // registered teardown (entry.ts onSignal).
+    { exitOnCtrlC: false },
   );
 
   // born-549 (SIGTERM-TEARDOWN) — ONE teardown shared by normal `/exit` and an

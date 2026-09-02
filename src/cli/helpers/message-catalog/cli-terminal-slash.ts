@@ -43,6 +43,11 @@ export const CLI_TERMINAL_SLASH_MESSAGES: MessageFamily = Object.freeze({
   // finding, 2026-09-02). `{error}` = the turn exception text; `{kind}` =
   // the technical switch target token (`model` | `provider`).
   'tui.turn_error': { en: 'turn failed: {error}', tr: 'tur başarısız: {error}' },
+  // TERMINAL-TOOLS-006 — Ctrl-C states its target (interrupt-policy.ts); the
+  // hint names the next key. Shown for the second-press window only.
+  'tui.ctrl_c_draft_cleared': { en: 'draft discarded · Ctrl-C again to exit', tr: 'taslak silindi · çıkmak için tekrar Ctrl-C' },
+  'tui.ctrl_c_interrupt': { en: 'interrupt requested · Ctrl-C again to exit', tr: 'kesme istendi · çıkmak için tekrar Ctrl-C' },
+  'tui.ctrl_c_arm': { en: 'Ctrl-C again to exit', tr: 'çıkmak için tekrar Ctrl-C' },
   'tui.switch_busy': {
     en: 'cannot switch {kind} while a turn is in progress — wait for it to finish, or /interrupt first',
     tr: 'tur sürerken {kind} değiştirilemez — bitmesini bekleyin ya da önce /interrupt kullanın',

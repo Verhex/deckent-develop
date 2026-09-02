@@ -28,8 +28,10 @@ export interface InputBarProps {
   active: boolean;
   /** Submit a completed line (already trimmed by the caller if desired). */
   onSubmit: (line: string) => void;
-  /** Ctrl-C with an empty buffer. */
-  onInterrupt: () => void;
+  /** Ctrl-C ('int') / Ctrl-D on an empty buffer ('eof'). TERMINAL-TOOLS-006:
+   * the bar reports whether a draft was present (it clears the draft itself on
+   * 'int'); the caller decides (interrupt-policy.ts) — never exits blindly. */
+  onInterrupt: (signal: 'int' | 'eof', draftNonEmpty: boolean) => void;
   /** Ctrl-L → clear the screen/history. */
   onClear?: () => void;
   /** Slash command catalog — when set, typing `/` opens an interactive menu. */
@@ -349,8 +351,13 @@ export function InputBar(props: InputBarProps): ReactElement {
     }
 
     const res = editInput(stateRef.current, inkToKey(input, key));
-    if (res.signal === 'int') { onInterrupt(); set(EMPTY_INPUT); setAtDismissedBoth(null); return; }
-    if (res.signal === 'eof') { onInterrupt(); return; }
+    if (res.signal === 'int') {
+      const draftNonEmpty = stateRef.current.buffer.length > 0;
+      set(EMPTY_INPUT); setAtDismissedBoth(null); setSel(0);
+      onInterrupt('int', draftNonEmpty);
+      return;
+    }
+    if (res.signal === 'eof') { onInterrupt('eof', false); return; }
     if (res.history) {
       set(resolveHistoryNav(persistentHistory.navigator, res.history, stateRef.current.buffer));
       return;
