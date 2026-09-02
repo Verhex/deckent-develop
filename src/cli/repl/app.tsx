@@ -32,6 +32,11 @@ import { createStreamSegmenter, type StreamSegmenter } from './stream-segmenter.
 import { measuredOnTurnEnd } from './native-elapsed.js';
 import { buildLiveFooter, type LiveFooterLabels, type LiveFooterState } from '../helpers/live-footer.js';
 import { initialTermModeState, parseTermCommand, applyModeTarget, type TermMode, type TermModeState } from './term-mode.js';
+import {
+  gateAction, resolveShellLine, isDeniedShellOutput, pushShellNote, buildShellNotePrefix, renderTermGateDenied,
+  type ShellNote, type TermGateDecision,
+} from './term-gate.js';
+import { renderCommandRisk } from '../helpers/risk-language.js';
 import { createChatTurnQueue, type ChatTurnQueue, type ChatTurnBgEvent, type ChatTurnPayload } from './chat-turn-queue.js';
 import { createInputQueue, type InputQueue } from './input-queue.js';
 import { listRecentSessions, pickSession, type SessionRecord } from '../helpers/session-resume.js';
@@ -836,6 +841,9 @@ export interface ReplLabels {
   ctrlCDraftCleared: string; // "draft discarded · Ctrl-C again to exit"
   ctrlCInterrupt: string;    // "interrupt requested · Ctrl-C again to exit"
   ctrlCArm: string;          // "Ctrl-C again to exit"
+  /** TERMINAL-TOOLS-011 — Ask/Run/Control gate denial (tui.term_gate_denied;
+   * templates {target} {risk} {mode} {suggested}). */
+  termGateDenied: string;
 }
 
 /** TERMINAL-TOOLS-003 — composer caret carrier (input-bar.tsx CaretStyle);
@@ -1043,6 +1051,11 @@ export interface ReplAppProps {
   providerName: string;
   cwd: string;
   registerConfirm: (trigger: ConfirmTrigger) => void;
+  /** TERMINAL-TOOLS-011 — registers the Ask/Run/Control action gate run.tsx's
+   * askConfirm consults BEFORE any approval-mode shortcut (allow-list,
+   * auto-edit, full-auto): Ask is a real read-only posture on every path. The
+   * gate prints the localized denial line itself and returns false. */
+  registerActionGate?: (gate: (toolName: string, args: Record<string, unknown>) => boolean) => void;
   /** Register the sink the dispatcher calls to render a tool/change block. */
   registerToolSink: (sink: ToolSink) => void;
   /** Slash command catalog for the interactive `/` menu. */
@@ -1272,7 +1285,7 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
 }
 
 export function ReplApp(props: ReplAppProps): ReactElement {
-  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle, shortcutsPanel } = props;
+  const { provider, dispatcher, labels, registerConfirm, registerActionGate, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle, shortcutsPanel } = props;
   const { exit } = useApp();
   // TERMINAL-TOOLS-004 — live width for the status row + queue preview (reflows on resize).
   const columns = useTerminalColumns();
@@ -1317,6 +1330,18 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // REPL-SURFACE-WIRE (354-001) seam state — inert unless replSurfaceEnabled;
   // when it stays false (the default) none of this affects the render output.
   const [termMode, setTermMode] = useState<TermModeState>(initialTermModeState());
+  // TERMINAL-TOOLS-011 — the gate reads the LIVE mode from callbacks registered
+  // once (confirm trigger, action gate), so mirror the state into a ref.
+  const termModeRef = useRef<TermModeState>(termMode);
+  termModeRef.current = termMode;
+  /** `!` shell outputs waiting to ride ahead of the next prompt (bounded). */
+  const shellNotesRef = useRef<ShellNote[]>([]);
+  const denyLine = (gate: Extract<TermGateDecision, { kind: 'deny' }>, target: string): string =>
+    renderTermGateDenied(gate, target, {
+      template: labels.termGateDenied,
+      riskLabel: (risk) => renderCommandRisk(risk, lang ?? 'en').label,
+      modeLabel: (mode) => resolveModeLabel(mode, labels),
+    });
   const [footerLines, setFooterLines] = useState<string[]>([]);
   const bgQueue = useRef<ChatTurnQueue | null>(null);
   if (bgQueue.current === null) bgQueue.current = createChatTurnQueue();
@@ -1407,9 +1432,26 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     // Enqueue instead of overwriting a single slot: N tool calls = N cards, asked
     // in arrival order. The promise resolves when the queue answers this request.
     registerConfirm((summary: string, toolName?: string) => new Promise<ConfirmAnswer>((resolve) => {
+      // TERMINAL-TOOLS-011 — a model-proposed tool that the current terminal
+      // mode does not allow is refused BEFORE a card is queued (Ask = read-only),
+      // with the localized reason instead of a silent 'n'.
+      if (toolName) {
+        const gate = gateAction(termModeRef.current, { tool: toolName, args: {} });
+        if (gate.kind === 'deny') { pushTurn('seg', denyLine(gate, toolName)); resolve('n'); return; }
+      }
       confirmQueue.current!.enqueue({ summary, resolve, ...(toolName ? { toolName } : {}) });
     }));
   }, [registerConfirm]);
+
+  // TERMINAL-TOOLS-011 — the dispatcher-side gate (run.tsx askConfirm): same
+  // ladder, same denial line, consulted before every approval-mode shortcut.
+  useEffect(() => {
+    registerActionGate?.((toolName, args) => {
+      const gate = gateAction(termModeRef.current, { tool: toolName, args });
+      if (gate.kind === 'deny') { pushTurn('seg', denyLine(gate, toolName)); return false; }
+      return true;
+    });
+  }, [registerActionGate]);
 
   // Tool/change blocks: a completed tool action becomes a 'tool' turn in the
   // history (rendered as ● verb target / ⎿ +added -removed). Finalize any live
@@ -1532,9 +1574,14 @@ export function ReplApp(props: ReplAppProps): ReactElement {
             contextBudgetGetter,
             transcriptCharsRef.current + line.length,
           );
-          yield atRefReader && !line.startsWith('/')
+          const expanded = atRefReader && !line.startsWith('/')
             ? expandAtRefs(line, atRefReader, expansionBudgetChars === undefined ? {} : { expansionBudgetChars }).prompt
             : line;
+          // TERMINAL-TOOLS-011 — pending `!` shell outputs ride ahead of this
+          // prompt (chat turns only; a slash line is a command, not a prompt).
+          const shellPrefix = line.startsWith('/') ? '' : buildShellNotePrefix(shellNotesRef.current);
+          if (shellPrefix.length > 0) shellNotesRef.current = [];
+          yield shellPrefix + expanded;
           finalizeReply(); // turn finished streaming → close it out
           // 358-006: turn-end steer drain (busy-controls markIdle) — the SAME
           // "never mid-turn" contract as the ChatTurnQueue drain below: notes
@@ -1664,6 +1711,22 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     const trimmed = line.trim();
     if (trimmed.length === 0) return;
     if (['/exit', '/quit', ':exit', ':quit'].includes(trimmed.toLowerCase())) { exit(); return; }
+    // TERMINAL-TOOLS-011 — `!<cmd>` shell passthrough (parity: Claude Code /
+    // Codex / Hermes). Gated by the Ask/Run/Control ladder (Çalıştır), then
+    // by the SAME exec dispatcher every bash tool call uses (approval modes,
+    // y/n card, cwd scope, timeouts). The output is shown here and, unless
+    // denied, rides ahead of the NEXT prompt as a bounded [shell] note —
+    // never injected as a fabricated transcript entry.
+    const shellCmd = resolveShellLine(trimmed);
+    if (shellCmd !== null) {
+      pushTurn('user', trimmed);
+      const gate = gateAction(termModeRef.current, { tool: 'deckent_bash', args: { cmd: shellCmd } });
+      if (gate.kind === 'deny') { pushTurn('seg', denyLine(gate, trimmed)); return; }
+      const out = await dispatcher.dispatch('deckent_bash', { cmd: shellCmd });
+      pushTurn('seg', out);
+      if (!isDeniedShellOutput(out)) shellNotesRef.current = pushShellNote(shellNotesRef.current, { cmd: shellCmd, output: out });
+      return;
+    }
     if (trimmed.toLowerCase() === '/cancel') {
       pushTurn('user', trimmed);
       queue.current!.clear(); setQueued([]);
@@ -1903,6 +1966,12 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           // real confirm-gated (its 'always' tier ignores full-auto) and
           // makes a 'confirm'-tier tool (e.g. /sync) skip the y/n prompt once
           // /approve full-auto is set (askConfirm already checks the mode).
+          // TERMINAL-TOOLS-011 — the Ask/Run/Control ladder decides first
+          // (§10.2): the slash entry's registry risk tag, else the tool's
+          // confirm tier; a denial names the mode that would allow it.
+          const entry = slashRegistry.find((c) => c.agenticTool === bridged.tool);
+          const gate = gateAction(termModeRef.current, { tool: bridged.tool, args: bridged.args, declaredRisk: entry?.risk });
+          if (gate.kind === 'deny') { pushTurn('seg', denyLine(gate, trimmed)); return; }
           const dispatchResult = await dispatcher.dispatch(bridged.tool, bridged.args);
           pushTurn('seg', dispatchResult);
         }

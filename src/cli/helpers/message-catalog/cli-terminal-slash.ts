@@ -110,6 +110,14 @@ export const CLI_TERMINAL_SLASH_MESSAGES: MessageFamily = Object.freeze({
   'tui.shortcuts.at_ref.action': { en: 'reference a project file', tr: 'proje dosyasına referans ver' },
   'tui.shortcuts.line_edit.keys': { en: 'Home/End · Ctrl+A/E · Ctrl+U', tr: 'Home/End · Ctrl+A/E · Ctrl+U' },
   'tui.shortcuts.line_edit.action': { en: 'line start/end · clear the line', tr: 'satır başı/sonu · satırı temizle' },
+  'tui.shortcuts.shell.keys': { en: '!<command>', tr: '!<komut>' },
+  'tui.shortcuts.shell.action': { en: 'run a shell command here (gated by /term mode and approvals); its output rides with your next message', tr: 'burada kabuk komutu çalıştır (/term modu ve onaylara tabi); çıktısı sonraki mesajınla gider' },
+  // TERMINAL-TOOLS-011 — Ask/Run/Control action gate denial (term-gate.ts).
+  // {risk} = risk-language label, {mode} = current mode label, {suggested} = mode token for /term.
+  'tui.term_gate_denied': {
+    en: '{target}: needs {risk} authority — terminal mode is {mode}; switch with /term {suggested}',
+    tr: '{target}: {risk} yetkisi gerekiyor — terminal modu {mode}; /term {suggested} ile geçin',
+  },
   'tui.shortcuts.help.keys': { en: '?', tr: '?' },
   'tui.shortcuts.help.action': { en: 'this panel (empty composer) · Esc closes', tr: 'bu panel (boş composer) · Esc kapatır' },
 

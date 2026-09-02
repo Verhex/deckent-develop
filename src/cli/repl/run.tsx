@@ -183,6 +183,8 @@ export function buildReplLabels(t: (key: string) => string): ReplLabels {
     ctrlCDraftCleared: t('tui.ctrl_c_draft_cleared'),
     ctrlCInterrupt: t('tui.ctrl_c_interrupt'),
     ctrlCArm: t('tui.ctrl_c_arm'),
+    // TERMINAL-TOOLS-011 — Ask/Run/Control gate denial line (term-gate.ts).
+    termGateDenied: t('tui.term_gate_denied'),
   };
 }
 
@@ -506,7 +508,7 @@ export function withContextSlashes(engine: ReplEngine, labels: ContextSlashLabel
 
 const SHORTCUT_ROW_IDS = [
   'submit', 'newline', 'newline_alt', 'newline_ctrl_j', 'newline_backslash', 'interrupt', 'ctrl_c', 'ctrl_d',
-  'history', 'history_search', 'clear_screen', 'slash', 'at_ref', 'line_edit', 'help',
+  'history', 'history_search', 'clear_screen', 'slash', 'at_ref', 'shell', 'line_edit', 'help',
 ] as const;
 
 export function buildShortcutsPanel(t: (key: string) => string): ShortcutsPanel {
@@ -881,7 +883,7 @@ const NATIVE_SCRATCH_KEEP_MS = 10 * 60_000;
 export interface ToolDispatcherDeps {
   execDispatcher: { dispatch: (toolName: string, args: Record<string, unknown>) => Promise<string> };
   cliDispatcher: { dispatch: (toolName: string, args: Record<string, unknown>) => Promise<string> };
-  askConfirm: (summary: string, toolName: string) => Promise<boolean>;
+  askConfirm: (summary: string, toolName: string, args?: Record<string, unknown>) => Promise<boolean>;
   askConfirmAlways: (summary: string) => Promise<boolean>;
   t: (key: string) => string;
   /** Read the CURRENT sink, not a snapshot — `registerToolSink` assigns it
@@ -932,7 +934,7 @@ export function buildToolDispatcher(deps: ToolDispatcherDeps): { dispatch: (tool
           const summary = `${t('tui.confirm_run')}: deckent ${argv.join(' ')}`;
           const ok = tier === 'always'
             ? await askConfirmAlways(summary)
-            : await askConfirm(summary, toolName);
+            : await askConfirm(summary, toolName, args);
           if (!ok) {
             if (process.stdin.isTTY) { try { process.stdin.setRawMode(true); } catch { /* not a tty */ } }
             // born-528 fix: this early return used to skip the toolSink block
@@ -1151,7 +1153,12 @@ export async function runInkRepl(
   // Approval mode (claude-code style): suggest = always ask · auto-edit = auto
   // file ops, ask shell · full-auto = auto everything. Switched via /approve.
   let approvalMode: 'suggest' | 'auto-edit' | 'full-auto' = 'suggest';
-  const askConfirm = async (summary: string, toolName: string): Promise<boolean> => {
+  // TERMINAL-TOOLS-011 — the Ask/Run/Control action gate (app.tsx registers
+  // it; renders the denial line itself). Consulted BEFORE every shortcut so
+  // Ask stays read-only even under an allow-list or /approve full-auto.
+  let actionGate: ((toolName: string, args: Record<string, unknown>) => boolean) | null = null;
+  const askConfirm = async (summary: string, toolName: string, args: Record<string, unknown> = {}): Promise<boolean> => {
+    if (actionGate && !actionGate(toolName, args)) return false;
     if (perms.isAllowed(toolName)) return true;
     if (approvalMode === 'full-auto') return true;
     if (approvalMode === 'auto-edit' && toolName !== 'deckent_bash') return true;
@@ -1505,6 +1512,7 @@ export async function runInkRepl(
       inboxLabels={buildInboxLabels(t)}
       inboxDecide={(flowId, verb) => executeInboxDecision(process.cwd(), flowId, verb, lang)}
       registerConfirm={(trigger) => { confirmTrigger = trigger; }}
+      registerActionGate={(gate) => { actionGate = gate; }}
       registerToolSink={(sink) => { toolSink = sink; }}
       atRefPathProvider={atRefPathProvider}
       atRefReader={atRefReader}
