@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Key } from 'node:readline';
 import { editInput, EMPTY_INPUT, InputHistory, type InputState } from './line-edit.js';
+import { segmentGraphemes } from './cursor-model.js';
 import { appendHistory, HistoryNavigator, loadHistory } from './input-history.js';
 import { filterSlashCommands } from '../commands/chat-slash-menu.js';
 import type { SlashRegistry, SlashCommand } from '../commands/chat-slash-registry.js';
@@ -211,12 +212,16 @@ export function inkToKey(input: string, key: Parameters<Parameters<typeof useInp
 export type CaretStyle = 'inverse' | 'marker';
 export const CARET_MARKER = '|';
 
-/** Render the buffer with a visible caret at the cursor cell. */
+/** Render the buffer with a visible caret at the cursor cell. TERMINAL-TOOLS-005:
+ *  the caret cell is the whole grapheme cluster under the cursor (an emoji, a
+ *  ZWJ family, a flag) — `slice(cursor, cursor + 1)` used to take half of a
+ *  surrogate pair and the terminal drew garbage. */
 function CaretText({ state, caretStyle }: { state: InputState; caretStyle: CaretStyle }): ReactElement {
   const { buffer, cursor } = state;
   const before = buffer.slice(0, cursor);
-  const at = buffer.slice(cursor, cursor + 1) || ' ';
-  const after = buffer.slice(cursor + 1);
+  const atCluster = segmentGraphemes(buffer.slice(cursor))[0] ?? '';
+  const at = atCluster || ' ';
+  const after = buffer.slice(cursor + atCluster.length);
   if (caretStyle === 'marker') {
     return <Text>{`${before}${CARET_MARKER}${buffer.slice(cursor)}`}</Text>;
   }

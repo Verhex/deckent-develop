@@ -19,7 +19,7 @@
 
 import { Text, type TextProps } from 'ink';
 import type { ReactElement } from 'react';
-import { displayWidth } from './cursor-model.js';
+import { displayWidth, segmentGraphemes } from './cursor-model.js';
 
 const TEAL = '#4DB8A4';
 const GOLD = '#C4A855';
@@ -81,16 +81,16 @@ export function truncateStart(text: string, cells: number): string {
   if (cells <= 0) return '';
   if (displayWidth(text) <= cells) return text;
   if (cells === 1) return ELLIPSIS;
-  const points = [...text];
+  const clusters = segmentGraphemes(text);
   let width = 0;
-  let start = points.length;
+  let start = clusters.length;
   while (start > 0) {
-    const w = displayWidth(points[start - 1] as string);
+    const w = displayWidth(clusters[start - 1] as string);
     if (width + w > cells - 1) break;
     width += w;
     start -= 1;
   }
-  return ELLIPSIS + points.slice(start).join('');
+  return ELLIPSIS + clusters.slice(start).join('');
 }
 
 /** Keep the HEAD of `text` within `cells` display cells, suffixed with `…`. */
@@ -100,11 +100,11 @@ export function truncateEnd(text: string, cells: number): string {
   if (cells === 1) return ELLIPSIS;
   let width = 0;
   let out = '';
-  for (const point of text) {
-    const w = displayWidth(point);
+  for (const cluster of segmentGraphemes(text)) {
+    const w = displayWidth(cluster);
     if (width + w > cells - 1) break;
     width += w;
-    out += point;
+    out += cluster;
   }
   return out + ELLIPSIS;
 }

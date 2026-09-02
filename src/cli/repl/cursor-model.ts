@@ -7,58 +7,70 @@
 // never owns prose. Mirrors the existing pure-core pattern in this directory
 // (input-queue.ts's EnqueueDecision shape) rather than inventing a new one.
 //
-// Why this exists: `line-edit.ts`'s current cursor arithmetic operates on raw
+// Why this exists: `line-edit.ts`'s original cursor arithmetic operated on raw
 // UTF-16 code-unit offsets (`cursor - 1` / `cursor + 1`), so a single Left /
 // Right / Backspace / Delete on an astral-plane character (a surrogate pair,
-// e.g. an emoji) can bisect it, leaving an unpaired surrogate in the buffer
-// (ADR-D-010 KALAN (a)). This model's `CursorState.cursor` indexes into a
-// code-point array instead, so movement and edits are code-point-atomic by
-// construction — the same `[...text]` split `truncateQueuePreview` already
-// uses elsewhere in this directory (app.tsx), not a new trick.
+// e.g. an emoji) could bisect it (ADR-D-010 KALAN (a)). Task 373-006 moved the
+// unit to Unicode CODE POINTS; TERMINAL-TOOLS-005 (2026-09-02, real-binary
+// evidence: a ZWJ family emoji took several ←/→ presses and the caret cell
+// split it) moves it to user-perceived GRAPHEME CLUSTERS via Intl.Segmenter
+// (Node ≥ 24 ships full ICU — no dependency). `CursorState.cursor` indexes
+// into the grapheme array, so movement, edits, width and the caret cell are
+// cluster-atomic by construction: a family emoji, a flag (two regional
+// indicators), a keycap or an NFD combining sequence is ONE unit.
 //
-// Scope note: this is a standalone model + harness, not a line-edit.ts rewrite
-// or an input-bar.tsx wire — wiring a real caller onto this core is next-slice
-// work (task text: "bağlama sonraki dilim, run.tsx/app.tsx CC-işi").
-//
-// Known, stated limitation (KALAN-honesty, not a silent gap): width and
-// movement operate per Unicode CODE POINT, not per user-perceived GRAPHEME
-// CLUSTER. A ZWJ compound emoji (e.g. a family emoji built from several code
-// points joined by U+200D) is still multiple movable units here. That is a
-// materially smaller gap than today's surrogate-pair bisection bug (it never
-// produces an unpaired surrogate / corrupt rendering), but it is not full
-// grapheme-cluster safety — a possible future slice (Intl.Segmenter) if a
-// concrete drift report warrants it.
-//
-// The `codePointWidth` range table is an approximate, hand-maintained subset of
-// the Unicode East-Asian-Width property plus common emoji blocks — enough for
-// terminal caret-column math, not a claim of full Unicode-property conformance.
-// No new dependency was added for it: `string-width`/`wcwidth`-family packages
-// exist only as transitive `node_modules` of `ink`, not a declared
-// package.json dependency, and ADR-D-005 requires a documented rationale + a
-// `docs/en/reference/dependencies.md` entry before adding one — out of this
-// task's write scope. The rest of this directory's pure-core family
-// (input-queue.ts, stream-segmenter.ts) is deliberately dependency-free too.
+// Width: `codePointWidth` keeps the hand-maintained East-Asian-Width + emoji
+// range table (an approximate subset — enough for caret-column math, not a
+// claim of full Unicode conformance); `graphemeWidth` derives a cluster's
+// cells from it (any wide code point or an emoji-presentation selector → 2,
+// only zero-width marks → 0, else 1). No new dependency: `string-width`/
+// `wcwidth` exist only as transitive node_modules of ink, and ADR-D-005
+// requires a documented rationale before adding one. The rest of this
+// directory's pure-core family (input-queue.ts, stream-segmenter.ts) is
+// deliberately dependency-free too.
 
-/** Cursor-position state: `buffer` decomposed into Unicode code points, with `cursor` indexing into that array (0..codePoints.length), never a raw UTF-16 offset. */
+/** Cursor-position state: `buffer` decomposed into user-perceived grapheme clusters, with `cursor` indexing into that array (0..graphemes.length), never a raw UTF-16 offset. */
 export interface CursorState {
-  readonly codePoints: readonly string[];
+  readonly graphemes: readonly string[];
   readonly cursor: number;
 }
 
-function codePointsOf(text: string): string[] {
-  return [...text];
+// One segmenter for the process: locale-independent ('und') grapheme rules.
+const GRAPHEME_SEGMENTER = new Intl.Segmenter('und', { granularity: 'grapheme' });
+
+/** Split `text` into user-perceived grapheme clusters (Intl.Segmenter). */
+export function segmentGraphemes(text: string): string[] {
+  if (text.length === 0) return [];
+  const out: string[] = [];
+  for (const { segment } of GRAPHEME_SEGMENTER.segment(text)) out.push(segment);
+  return out;
 }
 
-/** Build a CursorState from a plain string. `cursor` (if given) is a code-point index, clamped to the valid range; defaults to end-of-buffer. */
+/**
+ * Grapheme index for a UTF-16 offset into the joined buffer. An offset that
+ * falls INSIDE a cluster (a legacy code-unit cursor) snaps to that cluster's
+ * start; offsets past the end clamp to `graphemes.length`.
+ */
+export function graphemeIndexAtUtf16(graphemes: readonly string[], utf16Offset: number): number {
+  let consumed = 0;
+  for (let i = 0; i < graphemes.length; i++) {
+    const next = consumed + (graphemes[i] as string).length;
+    if (utf16Offset < next) return i; // at the start of, or inside, this cluster
+    consumed = next;
+  }
+  return graphemes.length;
+}
+
+/** Build a CursorState from a plain string. `cursor` (if given) is a grapheme index, clamped to the valid range; defaults to end-of-buffer. */
 export function fromBuffer(buffer: string, cursor?: number): CursorState {
-  const codePoints = codePointsOf(buffer);
-  const resolved = cursor === undefined ? codePoints.length : Math.max(0, Math.min(codePoints.length, cursor));
-  return { codePoints, cursor: resolved };
+  const graphemes = segmentGraphemes(buffer);
+  const resolved = cursor === undefined ? graphemes.length : Math.max(0, Math.min(graphemes.length, cursor));
+  return { graphemes, cursor: resolved };
 }
 
 /** Re-join a CursorState back into a plain string. */
 export function toBuffer(state: CursorState): string {
-  return state.codePoints.join('');
+  return state.graphemes.join('');
 }
 
 // ─── 1. Satır-içi hareket (in-line movement) ────────────────────────────────
@@ -70,12 +82,12 @@ export type CursorMoveResult =
   | { readonly kind: 'moved'; readonly state: CursorState }
   | { readonly kind: 'unchanged'; readonly state: CursorState };
 
-function nextCursorFor(codePoints: readonly string[], cursor: number, direction: MoveDirection): number {
+function nextCursorFor(graphemes: readonly string[], cursor: number, direction: MoveDirection): number {
   switch (direction) {
     case 'left': return Math.max(0, cursor - 1);
-    case 'right': return Math.min(codePoints.length, cursor + 1);
+    case 'right': return Math.min(graphemes.length, cursor + 1);
     case 'home': return 0;
-    case 'end': return codePoints.length;
+    case 'end': return graphemes.length;
     default: {
       const exhaustive: never = direction;
       return exhaustive;
@@ -85,9 +97,9 @@ function nextCursorFor(codePoints: readonly string[], cursor: number, direction:
 
 /** Move the cursor one code point (never a partial surrogate pair) in the given direction. */
 export function moveCursor(state: CursorState, direction: MoveDirection): CursorMoveResult {
-  const next = nextCursorFor(state.codePoints, state.cursor, direction);
+  const next = nextCursorFor(state.graphemes, state.cursor, direction);
   if (next === state.cursor) return { kind: 'unchanged', state };
-  return { kind: 'moved', state: { codePoints: state.codePoints, cursor: next } };
+  return { kind: 'moved', state: { graphemes: state.graphemes, cursor: next } };
 }
 
 // ─── 2. Unicode-genişlik (CJK / emoji display width) ────────────────────────
@@ -134,6 +146,7 @@ const WIDE_RANGES: readonly CodePointRange[] = [
   [0x16fe0, 0x16fe4],
   [0x17000, 0x18d08], // Tangut
   [0x1b000, 0x1b2fb], // Kana Supplement, Small Kana, Kana Extended-A
+  [0x1f1e6, 0x1f1ff], // Regional Indicators (a pair forms one 2-cell flag cluster)
   [0x1f200, 0x1f2ff], // Enclosed Ideographic Supplement
   [0x1f300, 0x1f64f], // Misc Symbols & Pictographs, Emoticons
   [0x1f680, 0x1f6ff], // Transport & Map Symbols
@@ -154,12 +167,30 @@ export function codePointWidth(codePoint: number): 0 | 1 | 2 {
   return 1;
 }
 
-/** Sum of each code point's terminal display width across `text`. */
+const EMOJI_PRESENTATION_SELECTOR = 0xfe0f;
+
+/**
+ * Terminal display width of ONE grapheme cluster: 2 when any code point is
+ * wide or the cluster carries the emoji-presentation selector (keycaps,
+ * text-default symbols forced to emoji), 0 when it holds only zero-width
+ * marks, else 1 (a base letter plus combining marks).
+ */
+export function graphemeWidth(cluster: string): 0 | 1 | 2 {
+  let sawNarrow = false;
+  for (const ch of cluster) {
+    const cp = ch.codePointAt(0) ?? 0;
+    if (cp === EMOJI_PRESENTATION_SELECTOR) return 2;
+    const w = codePointWidth(cp);
+    if (w === 2) return 2;
+    if (w === 1) sawNarrow = true;
+  }
+  return sawNarrow ? 1 : 0;
+}
+
+/** Sum of each grapheme cluster's terminal display width across `text`. */
 export function displayWidth(text: string): number {
   let width = 0;
-  for (const ch of text) {
-    width += codePointWidth(ch.codePointAt(0) ?? 0);
-  }
+  for (const cluster of segmentGraphemes(text)) width += graphemeWidth(cluster);
   return width;
 }
 
@@ -179,9 +210,9 @@ export interface WrapLayout {
 }
 
 /**
- * Greedy column-fill wrap: a code point that would not fit the remaining
- * width of the current row starts a new row instead (a wide glyph is never
- * split across two rows). Returns the wrapped rows plus the display (row,
+ * Greedy column-fill wrap: a grapheme cluster that would not fit the remaining
+ * width of the current row starts a new row instead (a wide glyph or a
+ * multi-code-point cluster is never split across two rows). Returns the wrapped rows plus the display (row,
  * column) of `state.cursor`, independent of any actual terminal/renderer.
  */
 export function layoutWrapped(state: CursorState, terminalWidth: number): WrapLayout {
@@ -192,15 +223,15 @@ export function layoutWrapped(state: CursorState, terminalWidth: number): WrapLa
   let col = 0;
   let index = 0;
 
-  for (const cp of state.codePoints) {
-    const w = codePointWidth(cp.codePointAt(0) ?? 0);
+  for (const cluster of state.graphemes) {
+    const w = graphemeWidth(cluster);
     if (col > 0 && col + w > width) {
       row += 1;
       col = 0;
       rows[row] = '';
     }
     boundaries[index] = { row, column: col };
-    rows[row] = (rows[row] ?? '') + cp;
+    rows[row] = (rows[row] ?? '') + cluster;
     col += w;
     index += 1;
   }
@@ -227,24 +258,27 @@ export type CursorEditResult =
  * `text` is required for 'insert' and ignored otherwise.
  */
 export function applyCursorEdit(state: CursorState, operation: EditOperation, text?: string): CursorEditResult {
-  const { codePoints, cursor } = state;
+  const { graphemes, cursor } = state;
   switch (operation) {
     case 'insert': {
       if (text === undefined || text.length === 0) return { kind: 'unchanged', state };
-      const inserted = codePointsOf(text);
-      if (inserted.length === 0) return { kind: 'unchanged', state };
-      const nextCodePoints = [...codePoints.slice(0, cursor), ...inserted, ...codePoints.slice(cursor)];
-      return { kind: 'edited', state: { codePoints: nextCodePoints, cursor: cursor + inserted.length } };
+      // Re-segment around the seam: an inserted combining mark or ZWJ joins
+      // the cluster before it, so the joined buffer is the source of truth.
+      const before = graphemes.slice(0, cursor).join('');
+      const after = graphemes.slice(cursor).join('');
+      const nextGraphemes = segmentGraphemes(before + text + after);
+      const nextCursor = graphemeIndexAtUtf16(nextGraphemes, before.length + text.length);
+      return { kind: 'edited', state: { graphemes: nextGraphemes, cursor: nextCursor } };
     }
     case 'backspace': {
       if (cursor === 0) return { kind: 'unchanged', state };
-      const nextCodePoints = [...codePoints.slice(0, cursor - 1), ...codePoints.slice(cursor)];
-      return { kind: 'edited', state: { codePoints: nextCodePoints, cursor: cursor - 1 } };
+      const nextGraphemes = [...graphemes.slice(0, cursor - 1), ...graphemes.slice(cursor)];
+      return { kind: 'edited', state: { graphemes: nextGraphemes, cursor: cursor - 1 } };
     }
     case 'delete': {
-      if (cursor >= codePoints.length) return { kind: 'unchanged', state };
-      const nextCodePoints = [...codePoints.slice(0, cursor), ...codePoints.slice(cursor + 1)];
-      return { kind: 'edited', state: { codePoints: nextCodePoints, cursor } };
+      if (cursor >= graphemes.length) return { kind: 'unchanged', state };
+      const nextGraphemes = [...graphemes.slice(0, cursor), ...graphemes.slice(cursor + 1)];
+      return { kind: 'edited', state: { graphemes: nextGraphemes, cursor } };
     }
     default: {
       const exhaustive: never = operation;

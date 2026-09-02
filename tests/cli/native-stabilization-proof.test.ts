@@ -269,7 +269,7 @@ describe('native composition — cursor-model families: an edited astral-plane b
     // pipeline (the open question for a flip), not that the UI wiring is done.
     let state: CursorState = fromBuffer('hi !', 3); // cursor between "hi " and "!"
     state = applyCursorEdit(state, 'insert', EMOJI).state;
-    expect(state.codePoints[3]).toBe(EMOJI); // whole code point, never a lone surrogate
+    expect(state.graphemes[3]).toBe(EMOJI); // whole code point, never a lone surrogate
     const moved = moveCursor(state, 'left');
     expect(moved.state.cursor).toBe(3); // one atomic step back over the WHOLE emoji
 

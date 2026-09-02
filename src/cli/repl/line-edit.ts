@@ -6,7 +6,7 @@
 // (scroll-region TUI) so the Ink path owns its line-editing core cleanly.
 
 import type { Key } from 'node:readline';
-import { applyCursorEdit, moveCursor, toBuffer, type CursorState } from './cursor-model.js';
+import { applyCursorEdit, moveCursor, toBuffer, segmentGraphemes, graphemeIndexAtUtf16, type CursorState } from './cursor-model.js';
 import { normalizePasted } from './input-history.js';
 
 /** Editable input-line state (pure). */
@@ -21,14 +21,17 @@ export const EMPTY_INPUT: InputState = Object.freeze({ buffer: '', cursor: 0 });
 // `InputState.cursor` is a raw UTF-16 offset (input-bar.tsx slices `buffer`
 // with it directly), but stepping/editing by 1 UTF-16 unit can bisect a
 // surrogate pair (ADR-D-010 KALAN (a)). These two helpers convert at the
-// boundary so the arithmetic itself runs on cursor-model's code-point-safe
-// `CursorState`, without changing InputState's external UTF-16-offset contract.
+// boundary so the arithmetic itself runs on cursor-model's grapheme-cluster
+// `CursorState` (TERMINAL-TOOLS-005), without changing InputState's external
+// UTF-16-offset contract. An offset that falls inside a cluster (a legacy
+// state) snaps to the cluster start (graphemeIndexAtUtf16).
 function toCursorState(buffer: string, utf16Cursor: number): CursorState {
-  return { codePoints: [...buffer], cursor: [...buffer.slice(0, utf16Cursor)].length };
+  const graphemes = segmentGraphemes(buffer);
+  return { graphemes, cursor: graphemeIndexAtUtf16(graphemes, utf16Cursor) };
 }
 
 function toUtf16Cursor(state: CursorState): number {
-  return state.codePoints.slice(0, state.cursor).join('').length;
+  return state.graphemes.slice(0, state.cursor).join('').length;
 }
 
 /** Result of feeding one key to the input editor. */

@@ -36,7 +36,7 @@ const unchanged = (state: CursorState): CursorMoveResult => ({ kind: 'unchanged'
 describe('cursor-model — fromBuffer / toBuffer', () => {
   it('splits by code point, defaulting cursor to end-of-buffer', () => {
     const state = fromBuffer('ab' + EMOJI);
-    expect(state.codePoints).toEqual(['a', 'b', EMOJI]);
+    expect(state.graphemes).toEqual(['a', 'b', EMOJI]);
     expect(state.cursor).toBe(3); // 3 code points, not 4 UTF-16 units
   });
 
@@ -51,10 +51,10 @@ describe('cursor-model — fromBuffer / toBuffer', () => {
     expect(fromBuffer('abc', 2).cursor).toBe(2);
   });
 
-  it('never bisects a surrogate pair into the codePoints array', () => {
+  it('never bisects a surrogate pair into the graphemes array', () => {
     const state = fromBuffer(EMOJI);
-    expect(state.codePoints).toEqual([EMOJI]);
-    expect(state.codePoints).toHaveLength(1); // not 2 lone surrogates
+    expect(state.graphemes).toEqual([EMOJI]);
+    expect(state.graphemes).toHaveLength(1); // not 2 lone surrogates
   });
 });
 
@@ -96,21 +96,21 @@ describe('cursor-model — in-line movement', () => {
     const afterRight = moveCursor(s, 'right');
     expect(afterRight.kind).toBe('moved');
     expect(afterRight.state.cursor).toBe(2); // past the WHOLE emoji, not into its middle
-    expect(afterRight.state.codePoints[1]).toBe(EMOJI); // never split into lone surrogates
+    expect(afterRight.state.graphemes[1]).toBe(EMOJI); // never split into lone surrogates
     const backLeft = moveCursor(afterRight.state, 'left');
     expect(backLeft.state.cursor).toBe(1); // symmetric: one step removes the whole emoji again
   });
 
-  it('documents the known limitation: a ZWJ-joined compound sequence still moves as separate code points, not one grapheme', () => {
-    // "👨" + ZWJ + "👩" is 3 code points at the model layer even though a terminal
-    // renders it as a single family-emoji glyph — see module header for why this
-    // is an accepted, honestly-documented gap (code-point safety, not full
-    // grapheme-cluster safety).
+  it('a ZWJ-joined compound sequence is ONE grapheme: it moves as a single unit (TERMINAL-TOOLS-005 closed the former code-point gap)', () => {
+    // "👨" + ZWJ + "👩" is 3 code points but one user-perceived glyph; the
+    // model now segments by grapheme cluster (Intl.Segmenter), so ←/→ cross it
+    // in one step and no edit can land inside it.
     const compound = '\u{1F468}' + ZWJ + '\u{1F469}';
     const s = fromBuffer(compound, 0);
-    expect(s.codePoints).toHaveLength(3);
+    expect(s.graphemes).toHaveLength(1);
     const step1 = moveCursor(s, 'right');
-    expect(step1.state.cursor).toBe(1); // stops mid-sequence, not past the whole glyph
+    expect(step1.state.cursor).toBe(1); // past the whole glyph
+    expect(moveCursor(step1.state, 'right').kind).toBe('unchanged');
   });
 });
 
@@ -217,7 +217,7 @@ describe('cursor-model — mid-line editing', () => {
     const s = fromBuffer('a' + 'c', 1);
     const result = applyCursorEdit(s, 'insert', EMOJI);
     expect(toBuffer(result.state)).toBe('a' + EMOJI + 'c');
-    expect(result.state.codePoints).toEqual(['a', EMOJI, 'c']);
+    expect(result.state.graphemes).toEqual(['a', EMOJI, 'c']);
     expect(result.state.cursor).toBe(2); // one step past the emoji, not two
   });
 
