@@ -18,6 +18,8 @@ import {
 } from '../commands/chat-native.js';
 import { renderMarkdown } from '../commands/chat-render.js';
 import { InputBar, type CaretStyle } from './input-bar.js';
+import { StatusRow } from './status-row.js';
+import { useTerminalColumns } from './use-terminal-columns.js';
 import { expandAtRefs } from './at-ref.js';
 import { resolveSlash, type SlashRegistry } from '../commands/chat-slash-registry.js';
 import type { ChatMode } from '../commands/chat-mode.js';
@@ -440,11 +442,18 @@ export function buildSegmentTurns(
 /** Code-point-safe queue-preview truncation. The old inline `q.slice(0, 60)`
  * counted UTF-16 code units and could bisect a surrogate pair (an emoji in a
  * queued message), leaving a lone surrogate that garbles the row. Slices
- * whole code points instead. (Fixed 60-col width is a KNOWN resize gap —
- * width-aware layout is a separate slice, see task notes.) */
+ * whole code points instead. TERMINAL-TOOLS-004: the caller derives `max`
+ * from the live terminal width (queuePreviewCells) — 60 stays the default
+ * for the pure helper's existing callers/tests. */
 export function truncateQueuePreview(text: string, max = 60): string {
   const points = [...text];
   return points.length > max ? points.slice(0, max).join('') + '…' : text;
+}
+
+/** Queue-preview budget for a terminal width: the row prefix (`  ⋯ <label> N: `)
+ *  keeps ~16 cells; never below 20 so a narrow terminal still shows something. */
+export function queuePreviewCells(columns: number): number {
+  return Math.max(20, Math.floor(columns) - 16);
 }
 
 /**
@@ -1251,6 +1260,8 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
 export function ReplApp(props: ReplAppProps): ReactElement {
   const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle } = props;
   const { exit } = useApp();
+  // TERMINAL-TOOLS-004 — live width for the status row + queue preview (reflows on resize).
+  const columns = useTerminalColumns();
   const [selection, setSelection] = useState<ActiveSelection>(initialSelection);
   const [approval, setApproval] = useState<ApprovalMode>('suggest');
   const [cwd, setCwd] = useState(props.cwd);
@@ -1959,7 +1970,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       {queued.length > 0 && (
         <Box flexDirection="column" marginTop={1}>
           {queued.map((q, i) => (
-            <Text key={i} dimColor>{`  ⋯ ${labels.queued} ${i + 1}: ${truncateQueuePreview(q)}`}</Text>
+            <Text key={i} dimColor>{`  ⋯ ${labels.queued} ${i + 1}: ${truncateQueuePreview(q, queuePreviewCells(columns))}`}</Text>
           ))}
         </Box>
       )}
@@ -2062,16 +2073,22 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         atMenuHint={labels.atMenuHint}
       />
 
-      <Box>
-        <Text dimColor>{'deckent  '}</Text>
-        <Text color={TEAL}>{selection.provider}</Text>
-        {selection.model ? <Text color={GOLD}>{` · ${selection.model}`}</Text> : null}
-        <Text dimColor>{`  ${cwd}`}</Text>
-        {sessionTok > 0 ? <Text dimColor>{`  · Σ ${sessionTok} tok`}</Text> : null}
-        {approval !== 'suggest' ? <Text color={GOLD}>{`  · »${approval}`}</Text> : null}
-        {/* 358-006: visible only after a /resume picker switch (gated upstream). */}
-        {activeSessionId && activeSessionId !== sessionId ? <Text dimColor>{`  · ↺ ${activeSessionId}`}</Text> : null}
-      </Box>
+      {/* TERMINAL-TOOLS-004: ONE width-aware line (status-row.tsx) — the old
+          flex row of separate <Text> items lost its spacing and wrapped the cwd
+          at ≤100 columns. `resumedId` is visible only after a /resume picker
+          switch (358-006, gated upstream). */}
+      <StatusRow
+        columns={columns}
+        input={{
+          brand: 'deckent',
+          provider: selection.provider,
+          model: selection.model ?? undefined,
+          cwd,
+          sessionTok,
+          approval: approval !== 'suggest' ? approval : undefined,
+          resumedId: activeSessionId && activeSessionId !== sessionId ? activeSessionId : undefined,
+        }}
+      />
     </Box>
   );
 }
