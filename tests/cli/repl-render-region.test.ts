@@ -1,10 +1,12 @@
 import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { createPromptRegion, createLineQueue, createThinkingTicker, createPasteCoalescer, renderToolActivity, createLineBufferedSink } from '../../src/cli/commands/chat-render-region.js';
-import { buildThinkingVerbs } from '../../src/cli/commands/chat-thinking-verbs.js';
+import { buildThinkingVerbs, buildToolActivityVerbs } from '../../src/cli/commands/chat-thinking-verbs.js';
 
 /** Catalog verb pool (tr) — createThinkingTicker owns no list since TERMINAL-TOOLS-002. */
 const VERBS = buildThinkingVerbs('tr');
+/** Catalog tool-activity verbs (tr) — renderToolActivity owns no table since TERMINAL-TOOLS-002. */
+const TOOL_VERBS = buildToolActivityVerbs('tr');
 
 // Sprint 224 T-224-014 — pinned-prompt render region.
 // Hermetic: fake readline interface + fake write stream, no real TTY.
@@ -190,16 +192,16 @@ describe('createPasteCoalescer — multi-line paste → one message (T-224-004)'
 
 describe('renderToolActivity — live tool activity line (T-224-022)', () => {
   it('known tool → Turkish verb + target (non-TTY plain)', () => {
-    const s = renderToolActivity('deckent_write_file', { path: 'a.md' }, false);
+    const s = renderToolActivity('deckent_write_file', { path: 'a.md' }, false, TOOL_VERBS);
     expect(s).toBe('🔧 dosya yazıyor: a.md…');
   });
 
   it('bash → komut çalıştırıyor + cmd', () => {
-    expect(renderToolActivity('deckent_bash', { cmd: 'ls' }, false)).toBe('🔧 komut çalıştırıyor: ls…');
+    expect(renderToolActivity('deckent_bash', { cmd: 'ls' }, false, TOOL_VERBS)).toBe('🔧 komut çalıştırıyor: ls…');
   });
 
   it('unknown tool → raw name', () => {
-    expect(renderToolActivity('deckent_mystery', {}, false)).toBe('🔧 deckent_mystery…');
+    expect(renderToolActivity('deckent_mystery', {}, false, TOOL_VERBS)).toBe('🔧 deckent_mystery…');
   });
 
   // TERMINAL-TOOLS-003 — dim follows the theme.ts color gate (FORCE_COLOR=1
@@ -209,10 +211,10 @@ describe('renderToolActivity — live tool activity line (T-224-022)', () => {
     try {
       delete process.env['NO_COLOR'];
       process.env['FORCE_COLOR'] = '1';
-      expect(renderToolActivity('deckent_read_file', { path: 'x' }, true)).toMatch(/\x1b\[2m.*\x1b\[0m/);
+      expect(renderToolActivity('deckent_read_file', { path: 'x' }, true, TOOL_VERBS)).toMatch(/\x1b\[2m.*\x1b\[0m/);
       delete process.env['FORCE_COLOR'];
       process.env['NO_COLOR'] = '1';
-      expect(renderToolActivity('deckent_read_file', { path: 'x' }, true)).not.toMatch(/\x1b\[/);
+      expect(renderToolActivity('deckent_read_file', { path: 'x' }, true, TOOL_VERBS)).not.toMatch(/\x1b\[/);
     } finally {
       for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
     }

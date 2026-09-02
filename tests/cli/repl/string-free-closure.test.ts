@@ -20,8 +20,8 @@ import {
   formatApprovalClosure, resolveSwitchGate, formatTurnErrorLine, type ReplLabels,
 } from '../../../src/cli/repl/app.js';
 import { buildReplLabels, buildLiveFooterLabels } from '../../../src/cli/repl/run.js';
-import { buildThinkingVerbs, THINKING_VERBS_KEY } from '../../../src/cli/commands/chat-thinking-verbs.js';
-import { createThinkingTicker } from '../../../src/cli/commands/chat-render-region.js';
+import { buildThinkingVerbs, buildToolActivityVerbs, THINKING_VERBS_KEY, TOOL_ACTIVITY_TOOLS } from '../../../src/cli/commands/chat-thinking-verbs.js';
+import { createThinkingTicker, renderToolActivity } from '../../../src/cli/commands/chat-render-region.js';
 
 const ROOT = join(__dirname, '..', '..', '..');
 const tFor = (lang: string) => (key: string): string => getMessage(key, lang);
@@ -128,6 +128,19 @@ describe('buildThinkingVerbs — legacy ticker verbs come from the catalog', () 
     const out = { isTTY: true, write: () => true } as unknown as NodeJS.WriteStream;
     expectMissing(() => createThinkingTicker(out, { isTty: true, verbs: [] }), 'thinkingVerbs');
   });
+
+  it('buildToolActivityVerbs resolves a verb for every built-in tool in en and tr, and renderToolActivity uses it', () => {
+    const en = buildToolActivityVerbs('en');
+    const tr = buildToolActivityVerbs('tr');
+    for (const tool of TOOL_ACTIVITY_TOOLS) {
+      expect(en[tool], tool).toBeTruthy();
+      expect(tr[tool], tool).toBeTruthy();
+      expect(en[tool], tool).not.toBe(tr[tool]);
+    }
+    expect(renderToolActivity('deckent_bash', { cmd: 'ls' }, false, en)).toBe(`🔧 ${en['deckent_bash']}: ls…`);
+    expect(renderToolActivity('deckent_bash', { cmd: 'ls' }, false, tr)).toBe(`🔧 ${tr['deckent_bash']}: ls…`);
+    expect(renderToolActivity('deckent_mystery', {}, false, tr)).toBe('🔧 deckent_mystery…'); // technical token
+  });
 });
 
 // ─── 5. source scan — mechanism modules own no default label objects ─────────
@@ -147,6 +160,7 @@ describe('mechanism modules carry no English default label objects', () => {
       expect(src).not.toMatch(/export const DEFAULT_[A-Z_]*LABELS\b/);
       expect(src).not.toMatch(/labels\.[A-Za-z]+\s*\?\?\s*['"`]/);
       expect(src).not.toMatch(/export const THINKING_VERBS\b/);
+      expect(src).not.toMatch(/const TOOL_VERBS\b/);
       expect(src).not.toMatch(/\(reverse-i-search\)/);
     });
   }

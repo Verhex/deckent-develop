@@ -10,6 +10,7 @@ import {
 import { handleReplCommand } from './chat-repl-ux.js';
 import { renderUserMessage, renderAssistantHeader, messageSeparator } from './chat-layout.js';
 import { renderToolActivity } from './chat-render-region.js';
+import { buildToolActivityVerbs } from './chat-thinking-verbs.js';
 import { classifyAgenticIntent, dispatchAgenticIntent } from './chat-agentic-dispatch.js';
 import { requireConfirmIfRisky, type AgenticAction } from './agentic-confirm.js';
 import { COMMAND_REGISTRY } from '../command-registry.js';
@@ -743,6 +744,9 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
     : `chat-${Date.now()}`;
   const resumeLimit = opts.resumeLimit ?? 0;
   const lang = opts.lang ?? 'en';
+  // TERMINAL-TOOLS-002 — catalog verbs for the live `🔧 <verb>: <target>…`
+  // line (renderToolActivity is string-free; see chat-thinking-verbs.ts).
+  const toolActivityVerbs = buildToolActivityVerbs(lang);
   // Sprint 358 T-358-005 — see ChatNativeOptions.termMode doc comment.
   const chatMode: ChatMode = (opts.termMode ?? 'ask') === 'control' ? 'enterprise' : 'user';
   // Most recently shown /resume list — lets `/resume <n>` pick by number.
@@ -1206,7 +1210,7 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
           // Sprint 224 T-224-022 — live activity: show what deckent is doing
           // (which tool, on what) while it runs, instead of a silent wait.
           if (layoutOn && opts.interactiveTty === true) {
-            trackedOutput(`\n${renderToolActivity(call.name, call.args, true)}\n`);
+            trackedOutput(`\n${renderToolActivity(call.name, call.args, true, toolActivityVerbs)}\n`);
           }
           const result = await dispatcher.dispatch(call.name, call.args);
           transcript.push({ role: 'tool', content: result, toolUseId: call.id });

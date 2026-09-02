@@ -51,6 +51,17 @@ export const CLI_TERMINAL_SLASH_MESSAGES: MessageFamily = Object.freeze({
     en: 'thinking|rearing up|diving deep|weighing|composing|connecting|distilling|focusing',
     tr: 'düşünüyor|şahlanıyor|derinlere dalıyor|tartıyor|kurguluyor|bağ kuruyor|damıtıyor|yoğunlaşıyor',
   },
+  // Legacy loop live tool-activity line (`🔧 <verb>: <target>…`,
+  // chat-render-region.ts renderToolActivity) — one row per built-in tool;
+  // an unknown tool renders its raw name (technical token, never prose).
+  'tui.tool_activity.deckent_write_file': { en: 'writing file', tr: 'dosya yazıyor' },
+  'tui.tool_activity.deckent_edit_file': { en: 'editing file', tr: 'dosya düzenliyor' },
+  'tui.tool_activity.deckent_read_file': { en: 'reading file', tr: 'dosya okuyor' },
+  'tui.tool_activity.deckent_bash': { en: 'running command', tr: 'komut çalıştırıyor' },
+  'tui.tool_activity.deckent_status': { en: 'reading status', tr: 'durum alıyor' },
+  'tui.tool_activity.deckent_memory_query': { en: 'searching memory', tr: 'hafızada arıyor' },
+  'tui.tool_activity.deckent_history': { en: 'reading history', tr: 'geçmişe bakıyor' },
+  'tui.tool_activity.deckent_plan': { en: 'preparing plan', tr: 'plan hazırlıyor' },
 
   // ── `/help` list header + trust-tier headings ──────────────────────────
   'tui.help.commands_header': { en: 'Commands:', tr: 'Komutlar:' },

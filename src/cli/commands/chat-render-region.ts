@@ -244,30 +244,25 @@ export function createLineBufferedSink(emitLine: (line: string) => void): LineBu
 // (agentic-DO: write/edit/bash/...) düşünme bölgesinde dim bir aktivite satırı
 // gösterir (`🔧 dosya yazıyor: a.md`). claude-code'un adım-görünürlüğü gibi.
 // TTY-only stil; non-TTY düz metin.
-
-const TOOL_VERBS: Readonly<Record<string, string>> = {
-  deckent_write_file: 'dosya yazıyor',
-  deckent_edit_file: 'dosya düzenliyor',
-  deckent_read_file: 'dosya okuyor',
-  deckent_bash: 'komut çalıştırıyor',
-  deckent_status: 'durum alıyor',
-  deckent_memory_query: 'hafızada arıyor',
-  deckent_history: 'geçmişe bakıyor',
-  deckent_plan: 'plan hazırlıyor',
-};
+//
+// TERMINAL-TOOLS-002 — string-free: the tool → verb table is INJECTED
+// (`verbs`, chat-native.ts → chat-thinking-verbs.ts buildToolActivityVerbs →
+// catalog rows `tui.tool_activity.<tool>` for the session language). The
+// Turkish literal table that used to live here rendered in every language.
 
 /**
- * Bir tool dispatch'i için canlı aktivite satırı. Tanınan tool'lar Türkçe fiil
- * alır (deckent_write_file → "dosya yazıyor"); bilinmeyen → ham ad. Hedef
- * (path/cmd) varsa eklenir. TTY → dim; non-TTY → düz.
+ * Bir tool dispatch'i için canlı aktivite satırı. `verbs` içinde tanınan
+ * tool'lar oturum dilindeki fiili alır; bilinmeyen → ham ad (teknik token).
+ * Hedef (path/cmd) varsa eklenir. TTY → dim (renk kapısına bağlı); non-TTY → düz.
  */
 export function renderToolActivity(
   toolName: string,
-  args?: Record<string, unknown>,
-  tty?: boolean,
+  args: Record<string, unknown> | undefined,
+  tty: boolean | undefined,
+  verbs: Readonly<Record<string, string>>,
 ): string {
   const isTty = tty !== undefined ? tty : process.stdout.isTTY === true;
-  const verb = TOOL_VERBS[toolName] ?? toolName;
+  const verb = verbs[toolName] ?? toolName;
   const target =
     (args && (args['path'] ?? args['cmd'] ?? args['command'] ?? args['query'])) ?? '';
   const targetStr = target ? `: ${String(target)}` : '';
