@@ -18,6 +18,7 @@
 import { clearScreenDown, cursorTo, moveCursor, type Interface as ReadlineInterface } from 'node:readline';
 import { debugLog } from '../../core/utils.js';
 import { InjectedLabelMissingError } from '../helpers/injected-label.js';
+import { suppressionTier } from '../helpers/theme.js';
 
 export interface PromptRegion {
   /** Çıktıyı pinli prompt'un ÜSTÜNE yaz, kullanıcının yazdığını koru. */
@@ -117,11 +118,28 @@ const BRAILLE: readonly string[] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '�
 const TICK_MS = 90;
 
 // Kraken marka renkleri (splash.ts ile birebir): gövde teal, DECKENT gold.
-const KRAKEN_TEAL = '\x1b[38;2;77;184;164m';
-const KRAKEN_GOLD = '\x1b[1;38;2;196;168;85m';
+// TERMINAL-TOOLS-003 — renk-kapısı SSOT'u theme.ts'tir: suppressionTier()
+// 'none' ise (NO_COLOR / --no-color / FORCE_COLOR=0) hiç SGR basılmaz;
+// truecolor bilinmiyorsa 16-renk analoğuna düşülür (splash.ts ile aynı).
+// İmleç kontrolü (`\r` + satır-sil) renk DEĞİLDİR ve kapıdan bağımsızdır.
+const KRAKEN_TEAL_TRUECOLOR = '\x1b[38;2;77;184;164m';
+const KRAKEN_GOLD_TRUECOLOR = '\x1b[1;38;2;196;168;85m';
+const KRAKEN_TEAL_16 = '\x1b[36m';
+const KRAKEN_GOLD_16 = '\x1b[1;33m';
+const DIM_C = '\x1b[2m';
 const RESET_C = '\x1b[0m';
-// `● deckent` — `●` teal (kraken gövdesi), `deckent` gold (DECKENT marka).
-const HEADER = `${KRAKEN_TEAL}●${RESET_C} ${KRAKEN_GOLD}deckent${RESET_C}`;
+/** `● deckent` — `●` teal (kraken gövdesi), `deckent` gold (DECKENT marka);
+ *  kapı kapalıysa düz metin. Her çizimde çözülür (env değişebilir). */
+function brandHeader(): string {
+  const tier = suppressionTier();
+  if (tier === 'none') return '● deckent';
+  const teal = tier === 'truecolor' ? KRAKEN_TEAL_TRUECOLOR : KRAKEN_TEAL_16;
+  const gold = tier === 'truecolor' ? KRAKEN_GOLD_TRUECOLOR : KRAKEN_GOLD_16;
+  return `${teal}●${RESET_C} ${gold}deckent${RESET_C}`;
+}
+function dimText(text: string): string {
+  return suppressionTier() === 'none' ? text : `${DIM_C}${text}${RESET_C}`;
+}
 
 export interface ThinkingTicker {
   start(): void;
@@ -151,7 +169,7 @@ export function createThinkingTicker(
   let verb = opts.verb ?? verbs[0] as string;
 
   const paint = (): void => {
-    out.write(`\r\x1b[2K${BRAILLE[frame % BRAILLE.length]} ${HEADER} \x1b[2m· ${verb}…${RESET_C}`);
+    out.write(`\r\x1b[2K${BRAILLE[frame % BRAILLE.length]} ${brandHeader()} ${dimText(`· ${verb}…`)}`);
   };
 
   return {
@@ -173,7 +191,7 @@ export function createThinkingTicker(
       clearInterval(timer);
       timer = null;
       // Fiili sil, sade kraken-renkli `● deckent` + newline → cevap altına akar.
-      out.write(`\r\x1b[2K${HEADER}\n`);
+      out.write(`\r\x1b[2K${brandHeader()}\n`);
     },
   };
 }
@@ -254,7 +272,7 @@ export function renderToolActivity(
     (args && (args['path'] ?? args['cmd'] ?? args['command'] ?? args['query'])) ?? '';
   const targetStr = target ? `: ${String(target)}` : '';
   const line = `🔧 ${verb}${targetStr}…`;
-  return isTty ? `\x1b[2m${line}\x1b[0m` : line;
+  return isTty ? dimText(line) : line; // dim only when the color gate allows it
 }
 
 // ─── Paste coalescer (Sprint 224 T-224-004) ────────────────────────

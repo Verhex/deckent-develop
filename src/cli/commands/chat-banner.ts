@@ -1,10 +1,10 @@
 import { requireInjectedLabel } from '../helpers/injected-label.js';
+import { theme } from '../helpers/theme.js';
 
-// ANSI escape codes — Node built-in, no external deps (ADR-010)
-const RESET  = '\x1b[0m';
-const BOLD   = '\x1b[1m';
-const DIM    = '\x1b[2m';
-const CYAN   = '\x1b[36m';
+// TERMINAL-TOOLS-003 — color goes through the theme.ts SSOT gate (--no-color >
+// FORCE_COLOR > NO_COLOR > TERM=dumb > TTY). The raw BOLD/DIM/CYAN constants
+// this file used to own painted SGR on a dumb terminal and under NO_COLOR
+// (real-binary evidence, 2026-09-02).
 
 /** Context provided to renderBanner by the REPL boot path. */
 export interface BannerContext {
@@ -35,8 +35,9 @@ export interface BannerContext {
  *   <hint>
  *
  * @param ctx  Banner context (provider + dir)
- * @param tty  Whether to apply ANSI color + banner. Defaults to
+ * @param tty  Whether to print the banner at all. Defaults to
  *             process.stdout.isTTY. Pass false explicitly for pipe contexts.
+ *             Color itself is decided by the theme.ts gate, never by `tty`.
  * @param hint Localized hint line (tui.banner.hint) — required.
  */
 export function renderBanner(ctx: BannerContext, tty: boolean | undefined, hint: string): string {
@@ -44,8 +45,8 @@ export function renderBanner(ctx: BannerContext, tty: boolean | undefined, hint:
   const isTTY = tty !== undefined ? tty : process.stdout.isTTY === true;
   if (!isTTY) return '';
 
-  const header = `${BOLD}${CYAN}deckent${RESET}  ${ctx.provider}  ${DIM}${ctx.dir}${RESET}`;
-  const hintLine = `${DIM}${hintText}${RESET}`;
+  const header = `${theme.bold(theme.accent('deckent'))}  ${ctx.provider}  ${theme.muted(ctx.dir)}`;
+  const hintLine = theme.muted(hintText);
 
   return `${header}\n${hintLine}\n`;
 }

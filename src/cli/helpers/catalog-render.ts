@@ -14,7 +14,7 @@
 // Wiring a real catalog + i18n labels into a `/help` command is handled by
 // chat-native.ts, not this module (no command/app.tsx changes here).
 
-import { isNoColor } from './output.js';
+import { shouldUseColor } from './theme.js';
 import type { ToolTrustTier, ToolCatalogEntry } from '../../core/tool-catalog.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────
@@ -61,7 +61,9 @@ export interface CatalogRenderLabels {
 }
 
 export interface CatalogRenderOptions {
-  /** Force ANSI color on/off. Omitted = auto-detect via isNoColor() (NO_COLOR env / --no-color argv). */
+  /** Force ANSI color on/off. Omitted = the project color SSOT (theme.ts
+   *  shouldUseColor: --no-color > FORCE_COLOR > NO_COLOR > TTY) — so a piped
+   *  `/help` is plain, deterministic text (TERMINAL-TOOLS-003). */
   noColor?: boolean;
 }
 
@@ -96,7 +98,7 @@ export function renderCatalog(
 ): string {
   if (entries.length === 0) return labels.emptyState;
 
-  const suppressColor = options.noColor ?? isNoColor();
+  const suppressColor = options.noColor ?? !shouldUseColor();
   const paint = (code: string, text: string): string =>
     suppressColor || code === '' ? text : `${code}${text}\x1b[0m`;
 

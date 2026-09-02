@@ -63,6 +63,7 @@ import { loadConfig } from '../../core/config.js';
 // file; this reverse edge is erased at compile time, so there is no runtime
 // cycle). Used only to duck-type-check `/clear`'s provider — see below.
 import type { PersistentClaudeSession } from './chat-session.js';
+import { theme } from '../helpers/theme.js';
 
 // ═══ chat-native — Path C tool-use loop iskelet (Sprint 203 T-203-005) ═══
 //
@@ -634,7 +635,9 @@ export function renderTurnStatsFooter(
 ): string {
   const parts = [`${(elapsedMs / 1000).toFixed(1)}s`];
   if (usage) parts.push(`${formatTokenCount(usage.outputTokens)} tok`);
-  return `\x1b[2m⏱ ${parts.join(' · ')}\x1b[0m`;
+  // TERMINAL-TOOLS-003 — dim through the theme.ts color gate (NO_COLOR /
+  // --no-color / pipe → plain text); the raw `\x1b[2m` used to leak into pipes.
+  return theme.muted(`⏱ ${parts.join(' · ')}`);
 }
 
 // ─── Fallback Tool-Call Parser ──────────────────────────────────────

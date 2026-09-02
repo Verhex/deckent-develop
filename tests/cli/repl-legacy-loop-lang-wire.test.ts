@@ -29,7 +29,10 @@ describe('repl-legacy-loop-lang-wire — entry.ts hands the project language to 
     // The bare-`deckent` legacy path: `await runChatNativeLoop({ ... })` in
     // launchDefaultRepl must include a `lang:` option sourced from
     // getLangFromConfig (the banner/health-line/menu language authority).
-    expect(ENTRY_SRC).toMatch(/await runChatNativeLoop\(\{[\s\S]*?lang:\s*getLangFromConfig\(/);
+    // TERMINAL-TOOLS-002: the language is resolved ONCE per boot (`replLang`)
+    // from getLangFromConfig and handed to every line the path emits.
+    expect(ENTRY_SRC).toMatch(/const replLang = getLangFromConfig\(healthRoot\);/);
+    expect(ENTRY_SRC).toMatch(/await runChatNativeLoop\(\{[\s\S]*?lang:\s*replLang,/);
   });
 });
 

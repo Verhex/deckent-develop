@@ -46,6 +46,9 @@ export interface InputBarProps {
    * via run.tsx buildReplLabels). REQUIRED injected label; the readline-ism
    * literal that used to live here rendered in every language. */
   reverseSearchLabel: string;
+  /** Caret carrier — 'inverse' (default) or 'marker' when the color gate is
+   * suppressed (run.tsx resolves it from theme.ts; see CaretText). */
+  caretStyle?: CaretStyle;
   /** Project root for persistent history (`.deckent/settings/repl-history`).
    * Injectable for tests (tmpdir); defaults to `process.cwd()` — the real
    * REPL's project root — when the caller (app.tsx) doesn't override it. */
@@ -197,12 +200,26 @@ export function inkToKey(input: string, key: Parameters<Parameters<typeof useInp
   return { name: input, sequence: input } as Key;
 }
 
-/** Render the buffer with a visible inverse-video caret at the cursor cell. */
-function CaretText({ state }: { state: InputState }): ReactElement {
+/**
+ * TERMINAL-TOOLS-003 — caret carrier. 'inverse' is the default (SGR 7 on the
+ * caret cell). When the color gate is suppressed (NO_COLOR / --no-color /
+ * FORCE_COLOR=0 — resolved by run.tsx from theme.ts) chalk drops the inverse
+ * attribute too and the caret would vanish, so 'marker' renders an explicit
+ * ASCII `|` before the caret cell instead: meaning is never carried by color
+ * (or an attribute) alone.
+ */
+export type CaretStyle = 'inverse' | 'marker';
+export const CARET_MARKER = '|';
+
+/** Render the buffer with a visible caret at the cursor cell. */
+function CaretText({ state, caretStyle }: { state: InputState; caretStyle: CaretStyle }): ReactElement {
   const { buffer, cursor } = state;
   const before = buffer.slice(0, cursor);
   const at = buffer.slice(cursor, cursor + 1) || ' ';
   const after = buffer.slice(cursor + 1);
+  if (caretStyle === 'marker') {
+    return <Text>{`${before}${CARET_MARKER}${buffer.slice(cursor)}`}</Text>;
+  }
   return (
     <Text>
       {before}
@@ -413,7 +430,7 @@ export function InputBar(props: InputBarProps): ReactElement {
       )}
       <Box borderStyle="round" borderColor={TEAL} paddingX={1}>
         <Text color={TEAL}>{'› '}</Text>
-        <CaretText state={state} />
+        <CaretText state={state} caretStyle={props.caretStyle ?? 'inverse'} />
       </Box>
     </Box>
   );

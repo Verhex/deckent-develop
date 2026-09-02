@@ -17,7 +17,7 @@ import {
   buildNervousOutput, buildInterrogateOutput, resolveNativeSlashText,
 } from '../commands/chat-native.js';
 import { renderMarkdown } from '../commands/chat-render.js';
-import { InputBar } from './input-bar.js';
+import { InputBar, type CaretStyle } from './input-bar.js';
 import { expandAtRefs } from './at-ref.js';
 import { resolveSlash, type SlashRegistry } from '../commands/chat-slash-registry.js';
 import type { ChatMode } from '../commands/chat-mode.js';
@@ -818,6 +818,10 @@ export interface ReplLabels {
   reverseSearch: string; // the Ctrl-R prompt text
 }
 
+/** TERMINAL-TOOLS-003 — composer caret carrier (input-bar.tsx CaretStyle);
+ *  run.tsx resolves 'marker' when theme.ts reports color suppression. */
+export type { CaretStyle } from './input-bar.js';
+
 /**
  * NATIVE-SLASH-BRIDGE (387-002) — resolve a slash line for the native-engine
  * REPL surface. `handleSubmit` below special-cases ~15 of the 37 SLASH_CATALOG
@@ -1125,6 +1129,10 @@ export interface ReplAppProps {
    * the live cwd, rejects escapes incl. symlinks); absent → submitted lines
    * pass through byte-identical. */
   atRefReader?: (rel: string) => string | null;
+  /** TERMINAL-TOOLS-003 — composer caret carrier; run.tsx passes 'marker'
+   * when theme.ts reports color suppression (NO_COLOR / --no-color), so the
+   * caret keeps a non-color carrier once Ink's inverse attribute is gone. */
+  caretStyle: CaretStyle;
 }
 
 const AT_REF_OUTPUT_RESERVE_TOKENS = 32_000;
@@ -1241,7 +1249,7 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
 }
 
 export function ReplApp(props: ReplAppProps): ReactElement {
-  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader } = props;
+  const { provider, dispatcher, labels, registerConfirm, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle } = props;
   const { exit } = useApp();
   const [selection, setSelection] = useState<ActiveSelection>(initialSelection);
   const [approval, setApproval] = useState<ApprovalMode>('suggest');
@@ -2047,6 +2055,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         menuMoreAbove={labels.menuMoreAbove}
         menuMoreBelow={labels.menuMoreBelow}
         reverseSearchLabel={labels.reverseSearch}
+        caretStyle={caretStyle}
         // TERM-AT-REF (583/N2b): `@` path menu — inert (menu never opens)
         // unless run.tsx injects a provider; hint via the same labels route.
         pathProvider={atRefPathProvider}

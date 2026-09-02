@@ -30,11 +30,23 @@ export function isColorSuppressed(noColorFlag?: boolean): boolean {
 }
 
 /**
- * Renk basılmalı mı? Bastırma zinciri + TTY varsayılanı.
+ * TERMINAL-TOOLS-003 — `TERM=dumb` bir YETENEK sinyalidir (kullanıcı
+ * bastırması değil): terminal SGR'yi de imleç kontrolünü de işleyemez.
+ * FORCE_COLOR açıkça verilmişse (>0) kullanıcı isteği kazanır — supports-color
+ * ekosistem teamülüyle aynı. Yüzey admission'ı da aynı tanımı kullanır
+ * (helpers/terminal-surface.ts resolveTerminalSurface).
+ */
+export function isDumbTerminal(term: string | undefined = process.env['TERM']): boolean {
+  return (term ?? '').trim().toLowerCase() === 'dumb';
+}
+
+/**
+ * Renk basılmalı mı? Bastırma zinciri + dumb-terminal yeteneği + TTY varsayılanı.
  */
 export function shouldUseColor(noColorFlag?: boolean): boolean {
   if (isColorSuppressed(noColorFlag)) return false;
   if (process.env['FORCE_COLOR'] !== undefined) return true; // '0' üstte elendi
+  if (isDumbTerminal()) return false;
   return process.stdout.isTTY === true;
 }
 
@@ -80,6 +92,7 @@ export function colorTier(noColorFlag?: boolean): ColorTier {
  */
 export function suppressionTier(noColorFlag?: boolean): ColorTier {
   if (isColorSuppressed(noColorFlag)) return 'none';
+  if (process.env['FORCE_COLOR'] === undefined && isDumbTerminal()) return 'none';
   return resolveCapability();
 }
 

@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 
+// TERMINAL-TOOLS-003 — MUST stay the first import: projects the theme.ts color
+// gate (NO_COLOR / --no-color) onto chalk before any static import chain
+// (commands/onboard.ts → ink → chalk) evaluates it. See the module header.
+import './helpers/ink-color-preload.js';
 import { createInterface, type ReadLineOptions } from 'node:readline';
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -39,6 +43,8 @@ import { slashCompleter, buildSlashRegistry } from './commands/chat-slash-regist
 import { slashMenuOnKeypress, renderSlashMenu, filterSlashCommands } from './commands/chat-slash-menu.js';
 import { createPromptRegion, createThinkingTicker, createPasteCoalescer, createLineBufferedSink } from './commands/chat-render-region.js';
 import { buildThinkingVerbs } from './commands/chat-thinking-verbs.js';
+import { resolveTerminalSurfaceFromProcess } from './helpers/terminal-surface.js';
+import { theme } from './helpers/theme.js';
 import { createStreamMarkdown } from './commands/chat-render.js';
 import {
   OPENAI_COMPAT_PRESETS,
@@ -699,20 +705,25 @@ export async function launchDefaultRepl(): Promise<void> {
   // produced a visible duplicate. renderStatusLine stays exported for
   // sprint-aware status surfaces.) In TUI mode the banner is skipped — the
   // scroll-region TUI prints its own intro.
-  const isTtyEarly = process.stdin.isTTY === true && process.stdout.isTTY === true;
+  // TERMINAL-TOOLS-003 — capability-gated surface admission (helpers/
+  // terminal-surface.ts): ink | readline | line. `isTTY` alone used to admit
+  // the Ink surface on TERM=dumb (cursor control the terminal cannot honor).
+  const terminalSurface = resolveTerminalSurfaceFromProcess();
 
   // Sprint 224 — Ink REPL (React-for-CLI, the enterprise-grade native foundation
-  // that replaces the hand-rolled raw-ANSI TUI). Opt-in via DECKENT_INK=1 while
-  // it is verified; will become the default once it reaches parity. Dynamic
-  // import keeps Ink/React out of the non-REPL CLI startup path.
+  // that replaces the hand-rolled raw-ANSI TUI). Dynamic import keeps Ink/React
+  // out of the non-REPL CLI startup path.
   // Sprint 224 — the Ink REPL is the DEFAULT for an interactive TTY (enterprise-
   // grade native: markdown/tables/code, interactive /menu, model·provider switch,
   // token footer, agentic diff, paste-as-one, …). The earlier WSL-terminal drift/
   // blank + raw-mode loss are fixed (alt-screen default-on + raw-mode re-assert
   // after subprocess) and verified live by Alperen across all features. Opt out
-  // with DECKENT_INK=0 (legacy readline). Pipe/non-TTY keeps the simple path.
-  const inkMode = isTtyEarly && process.env['DECKENT_INK'] !== '0';
-  if (inkMode) {
+  // with DECKENT_INK=0 (legacy readline). Pipe/non-TTY/dumb keeps the line path.
+  if (terminalSurface.surface === 'ink') {
+    // The theme.ts color verdict (NO_COLOR / --no-color / FORCE_COLOR) reaches
+    // chalk through helpers/ink-color-preload.ts — entry.ts's FIRST import —
+    // because Ink/chalk are already loaded by static import chains long
+    // before this branch runs. Ink ignored NO_COLOR entirely before this.
     const { runInkRepl } = await import('./repl/run.js');
     await runInkRepl(provider, providerName, (sel) =>
       buildReplProvider(sel.provider as ReplProviderName, sel.model ? { model: sel.model } : {}),
@@ -741,8 +752,9 @@ export async function launchDefaultRepl(): Promise<void> {
   // lines typed during a turn so back-to-back sends are processed in order
   // ("art arda"). Non-TTY/pipe keeps the simple line iterator + plain output so
   // tests, HTTP backends and `printf | deckent` smoke runs are byte-for-byte
-  // unchanged (spinner stays a no-op there).
-  const isTty = process.stdin.isTTY === true && process.stdout.isTTY === true;
+  // unchanged (spinner stays a no-op there). A dumb terminal takes the SAME
+  // line path as a pipe (TERMINAL-TOOLS-003): no cursor control is admitted.
+  const isTty = terminalSurface.interactive;
 
   // (Legacy readline path — reached only via DECKENT_INK=0. The experimental
   // scroll-region TUI path was retired in favour of the Ink default.)
@@ -849,8 +861,10 @@ export async function launchDefaultRepl(): Promise<void> {
   // are denied (`[deckent-denied]`), matching a declined interactive prompt.
   const askConfirm = (summary: string, toolName: string): Promise<boolean> => {
     if (perms.isAllowed(toolName)) return Promise.resolve(true);
+    // TERMINAL-TOOLS-003 — color through the theme.ts gate; the hint is the
+    // session-language `tui.confirm_hint` row (it was a Turkish literal here).
     process.stdout.write(
-      `\n\x1b[33m${summary}\x1b[0m\n(y = izin ver · a = bu tool'a hep izin ver · N = reddet) `,
+      `\n${theme.warning(summary)}\n${getMessage('tui.confirm_hint', replLang)} `,
     );
     return new Promise<boolean>((resolve) => {
       pendingAnswer = (line) => {

@@ -37,6 +37,7 @@ import { createPermissionStore } from '../commands/chat-permissions.js';
 import { classifyTool } from './tool-permissions.js';
 import { buildSlashRegistry } from '../commands/chat-slash-registry.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
+import { isColorSuppressed } from '../helpers/theme.js';
 import { buildToolExecLabels } from '../helpers/tool-exec-labels.js';
 import { loadConfig } from '../../core/config.js';
 import { createSwitchableProvider, type ActiveSelection } from './provider-switch.js';
@@ -1349,6 +1350,7 @@ export async function runInkRepl(
       registerToolSink={(sink) => { toolSink = sink; }}
       atRefPathProvider={atRefPathProvider}
       atRefReader={atRefReader}
+      caretStyle={isColorSuppressed() ? 'marker' : 'inverse'}
       {...(nativeEngine ? { nativeEngine } : {})}
       replSurfaceEnabled={replSurfaceEnabled}
       {...(stateFeed ? { stateFeed } : {})}

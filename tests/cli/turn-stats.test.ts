@@ -23,8 +23,24 @@ describe('renderTurnStatsFooter (T-224-021)', () => {
     expect(f).toContain('1.2k tok');
   });
 
-  it('is dim-wrapped (ANSI)', () => {
-    expect(renderTurnStatsFooter(1000)).toMatch(/\x1b\[2m.*\x1b\[0m/);
+  // TERMINAL-TOOLS-003 — dim follows the theme.ts color gate: FORCE_COLOR=1
+  // paints it, NO_COLOR / a pipe (vitest workers are not a TTY) keeps it plain.
+  it('is dim-wrapped only when the color gate allows it (FORCE_COLOR=1); plain under NO_COLOR / off-TTY', () => {
+    const noColor = process.env['NO_COLOR'];
+    const forceColor = process.env['FORCE_COLOR'];
+    try {
+      delete process.env['NO_COLOR'];
+      process.env['FORCE_COLOR'] = '1';
+      expect(renderTurnStatsFooter(1000)).toMatch(/\x1b\[2m.*\x1b\[0m/);
+      delete process.env['FORCE_COLOR'];
+      process.env['NO_COLOR'] = '1';
+      expect(renderTurnStatsFooter(1000)).not.toMatch(/\x1b\[/);
+      delete process.env['NO_COLOR'];
+      expect(renderTurnStatsFooter(1000)).not.toMatch(/\x1b\[/); // off-TTY default
+    } finally {
+      if (noColor === undefined) delete process.env['NO_COLOR']; else process.env['NO_COLOR'] = noColor;
+      if (forceColor === undefined) delete process.env['FORCE_COLOR']; else process.env['FORCE_COLOR'] = forceColor;
+    }
   });
 });
 

@@ -189,6 +189,25 @@ describe('renderCatalog — NO_COLOR handling', () => {
     expect(out).toMatch(ANSI_RE);
   });
 
+  // TERMINAL-TOOLS-003 — the auto-detect default follows the project color
+  // SSOT chain (theme.ts shouldUseColor: --no-color > FORCE_COLOR > NO_COLOR >
+  // TTY), so a piped `/help` is deterministic machine-safe text. Real-binary
+  // evidence (2026-09-02): `printf '/help\n' | deckent` emitted 78 SGR codes.
+  it('emits no ANSI by default when stdout is not a TTY (pipe / redirect determinism)', () => {
+    saveEnv();
+    delete process.env['NO_COLOR'];
+    delete process.env['FORCE_COLOR'];
+    expect(process.stdout.isTTY).not.toBe(true); // vitest workers run piped
+    expect(renderCatalog(ENTRIES, EN_LABELS)).not.toMatch(ANSI_RE);
+  });
+
+  it('FORCE_COLOR=1 re-enables color off-TTY by default (same precedence as theme.ts)', () => {
+    saveEnv();
+    delete process.env['NO_COLOR'];
+    process.env['FORCE_COLOR'] = '1';
+    expect(renderCatalog(ENTRIES, EN_LABELS)).toMatch(ANSI_RE);
+  });
+
   it('colored and non-colored renders carry the same visible text once ANSI is stripped', () => {
     const colored = renderCatalog(ENTRIES, EN_LABELS, { noColor: false });
     const plain = renderCatalog(ENTRIES, EN_LABELS, { noColor: true });

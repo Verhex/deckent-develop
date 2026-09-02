@@ -202,8 +202,20 @@ describe('renderToolActivity — live tool activity line (T-224-022)', () => {
     expect(renderToolActivity('deckent_mystery', {}, false)).toBe('🔧 deckent_mystery…');
   });
 
-  it('TTY → dim-wrapped (ANSI)', () => {
-    expect(renderToolActivity('deckent_read_file', { path: 'x' }, true)).toMatch(/\x1b\[2m.*\x1b\[0m/);
+  // TERMINAL-TOOLS-003 — dim follows the theme.ts color gate (FORCE_COLOR=1
+  // paints; NO_COLOR keeps the line plain even on a TTY).
+  it('TTY → dim-wrapped only when the color gate allows it', () => {
+    const saved = { NO_COLOR: process.env['NO_COLOR'], FORCE_COLOR: process.env['FORCE_COLOR'] };
+    try {
+      delete process.env['NO_COLOR'];
+      process.env['FORCE_COLOR'] = '1';
+      expect(renderToolActivity('deckent_read_file', { path: 'x' }, true)).toMatch(/\x1b\[2m.*\x1b\[0m/);
+      delete process.env['FORCE_COLOR'];
+      process.env['NO_COLOR'] = '1';
+      expect(renderToolActivity('deckent_read_file', { path: 'x' }, true)).not.toMatch(/\x1b\[/);
+    } finally {
+      for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+    }
   });
 });
 
@@ -238,5 +250,45 @@ describe('createLineBufferedSink — pinned-bar line streaming (T-224-019)', () 
     s.feed('x\n');
     s.flush();
     expect(lines).toEqual(['x']);
+  });
+});
+
+// ─── TERMINAL-TOOLS-003 — the legacy ticker honors the color gate ────────────
+// Real-binary finding (2026-09-02): the `● deckent · <verb>…` line carried raw
+// truecolor brand SGR regardless of NO_COLOR. Cursor control (`\r` + erase-line)
+// is NOT color and stays; only SGR is gated through theme.ts's suppression tier.
+describe('createThinkingTicker — color gate (theme.ts suppressionTier)', () => {
+  const withEnv = (patch: Record<string, string | undefined>, fn: () => void): void => {
+    const saved = { NO_COLOR: process.env['NO_COLOR'], FORCE_COLOR: process.env['FORCE_COLOR'] };
+    try {
+      for (const [k, v] of Object.entries(patch)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+      fn();
+    } finally {
+      for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+    }
+  };
+
+  it('NO_COLOR=1 → no SGR at all in the painted line or the finalize line; the erase-line control stays', () => {
+    withEnv({ NO_COLOR: '1', FORCE_COLOR: undefined }, () => {
+      const out = fakeOut(true);
+      const ticker = createThinkingTicker(out, { isTty: true, verb: 'düşünüyor', verbs: VERBS });
+      ticker.start();
+      ticker.stop();
+      const all = out.writes.join('');
+      expect(all).not.toMatch(/\x1b\[[0-9;]*m/);
+      expect(all).toContain('\x1b[2K');
+      expect(all).toContain('● deckent');
+      expect(all).toContain('düşünüyor');
+    });
+  });
+
+  it('FORCE_COLOR=1 → brand SGR present (proves the colored path is reachable)', () => {
+    withEnv({ NO_COLOR: undefined, FORCE_COLOR: '1' }, () => {
+      const out = fakeOut(true);
+      const ticker = createThinkingTicker(out, { isTty: true, verb: 'düşünüyor', verbs: VERBS });
+      ticker.start();
+      ticker.stop();
+      expect(out.writes.join('')).toMatch(/\x1b\[[0-9;]*m/);
+    });
   });
 });
