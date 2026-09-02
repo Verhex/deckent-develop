@@ -32,6 +32,26 @@ export const CLI_TERMINAL_SLASH_MESSAGES: MessageFamily = Object.freeze({
     tr: '"{label}" terminal etiketi enjekte edilmedi ({code}). Bu bir yapılandırma sorunu değil, Deckent kusurudur — kodla birlikte bildirin.',
   },
 
+  // ── TERMINAL-TOOLS-002 string-free closure: the last mechanism-owned
+  //    literals moved here. `tui.reverse_search` is the Ctrl-R prompt of the
+  //    Ink composer (input-bar.tsx); `tui.thinking_verbs` is the `|`-separated
+  //    verb pool of the legacy readline ticker (`● deckent · <verb>…`, one
+  //    verb picked per turn — chat-thinking-verbs.ts splits it). ─────────────
+  'tui.reverse_search': { en: '(reverse-i-search)', tr: '(geriye dönük arama)' },
+  // Never wired before this closure: run.tsx omitted both fields, so app.tsx's
+  // English `??` defaults rendered in every session language (real-binary
+  // finding, 2026-09-02). `{error}` = the turn exception text; `{kind}` =
+  // the technical switch target token (`model` | `provider`).
+  'tui.turn_error': { en: 'turn failed: {error}', tr: 'tur başarısız: {error}' },
+  'tui.switch_busy': {
+    en: 'cannot switch {kind} while a turn is in progress — wait for it to finish, or /interrupt first',
+    tr: 'tur sürerken {kind} değiştirilemez — bitmesini bekleyin ya da önce /interrupt kullanın',
+  },
+  'tui.thinking_verbs': {
+    en: 'thinking|rearing up|diving deep|weighing|composing|connecting|distilling|focusing',
+    tr: 'düşünüyor|şahlanıyor|derinlere dalıyor|tartıyor|kurguluyor|bağ kuruyor|damıtıyor|yoğunlaşıyor',
+  },
+
   // ── `/help` list header + trust-tier headings ──────────────────────────
   'tui.help.commands_header': { en: 'Commands:', tr: 'Komutlar:' },
   'tui.help.tier.core': { en: 'Core', tr: 'Çekirdek' },

@@ -20,7 +20,6 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   resolveFooterLines,
   tapApprovalEvents,
-  DEFAULT_APPROVAL_CARD_LABELS,
 } from '../../src/cli/repl/app.js';
 import { createApprovalCardQueue, mapApprovalKey } from '../../src/cli/repl/approval-card.js';
 import { validateApprovalRequest, type ApprovalRequest } from '../../src/core/approval-contract.js';
@@ -131,25 +130,6 @@ describe('resolveFooterLines — pending compresses to the dual-stream min-1 flo
     const lines = ['a', 'b', 'c', 'd', 'e'];
     const result = resolveFooterLines(lines, true);
     for (const line of result) expect(line).not.toContain('dual-stream-approval-placeholder');
-  });
-});
-
-// ─── DEFAULT_APPROVAL_CARD_LABELS — i18n fallback shape ──────────────────────
-
-describe('DEFAULT_APPROVAL_CARD_LABELS — English fallback until messages round-8', () => {
-  it('supplies every ApprovalCardLabels field non-empty', () => {
-    expect(DEFAULT_APPROVAL_CARD_LABELS.hint.length).toBeGreaterThan(0);
-    expect(DEFAULT_APPROVAL_CARD_LABELS.progress).toContain('{index}');
-    expect(DEFAULT_APPROVAL_CARD_LABELS.progress).toContain('{total}');
-    expect(DEFAULT_APPROVAL_CARD_LABELS.detailsHeading.length).toBeGreaterThan(0);
-    expect(DEFAULT_APPROVAL_CARD_LABELS.noArgs.length).toBeGreaterThan(0);
-  });
-
-  it('supplies a risk label for every ApprovalRisk tier', () => {
-    const tiers = ['none', 'low', 'medium', 'high', 'critical'] as const;
-    for (const tier of tiers) {
-      expect(DEFAULT_APPROVAL_CARD_LABELS.riskLabels[tier].length).toBeGreaterThan(0);
-    }
   });
 });
 

@@ -19,14 +19,13 @@
 // mirroring ApprovalCard's queue-controller/card split. Row bodies come from the
 // SAME formatInboxRowBody the transcript path renders (one source of truth); the
 // card only prepends its focus gutter. i18n-first: string-free — every label
-// arrives via `labels` (defaulting to the English DEFAULT_INBOX_LABELS, the same
-// fallback-until-wired precedent ApprovalCard/PlanPreviewCard use).
+// arrives via the REQUIRED `labels` prop (run.tsx buildInboxLabels);
+// TERMINAL-TOOLS-002 removed the English default object.
 
 import { Box, Text, useInput } from 'ink';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import type { InboxRow, InboxLabels, InboxNavState, InboxDecisionVerb } from './run-flow-inbox.js';
 import {
-  DEFAULT_INBOX_LABELS,
   EMPTY_INBOX_NAV,
   formatInboxRowBody,
   buildInboxDetailLines,
@@ -50,9 +49,9 @@ export interface InboxCardProps {
   /** Returns the CURRENT structured rows (collectInboxRows(...)). Polled on an
    *  interval while open — the card renders + highlights them itself. */
   feed: () => InboxRow[];
-  /** Localized labels — row/detail rendering + footer hints (i18n-first).
-   *  Defaults to the English DEFAULT_INBOX_LABELS when the caller omits it. */
-  labels?: InboxLabels;
+  /** Localized labels — row/detail rendering + footer hints (i18n-first);
+   *  required, injected by run.tsx (buildInboxLabels). */
+  labels: InboxLabels;
   /** Called on Esc while the LIST is showing — the caller closes the card.
    *  (Esc while a detail is open just collapses the detail, handled in-card.) */
   onClose: () => void;
@@ -69,7 +68,7 @@ export interface InboxCardProps {
 }
 
 export function InboxCard(props: InboxCardProps): ReactElement | null {
-  const { open, feed, labels = DEFAULT_INBOX_LABELS, onClose, isActive: mutexActive = true, pollMs = 1000, onDecide } = props;
+  const { open, feed, labels, onClose, isActive: mutexActive = true, pollMs = 1000, onDecide } = props;
   const [rows, setRows] = useState<InboxRow[]>([]);
   const [nav, setNav] = useState<InboxNavState>(EMPTY_INBOX_NAV);
   // SURF-6: the last decision outcome line (honest success/refusal) — cleared

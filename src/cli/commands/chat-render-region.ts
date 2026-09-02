@@ -17,6 +17,7 @@
 
 import { clearScreenDown, cursorTo, moveCursor, type Interface as ReadlineInterface } from 'node:readline';
 import { debugLog } from '../../core/utils.js';
+import { InjectedLabelMissingError } from '../helpers/injected-label.js';
 
 export interface PromptRegion {
   /** Çıktıyı pinli prompt'un ÜSTÜNE yaz, kullanıcının yazdığını koru. */
@@ -100,21 +101,17 @@ export function createPromptRegion(
 // ─── Thinking ticker — `● deckent · <fiil>…` (Sprint 224 T-224-014) ──────────
 //
 // claude-code'un oynak "Pondering…/Noodling…" döngüsü gibi: pinli prompt'un
-// hemen ÜSTÜNDEKİ `● deckent` satırını YERİNDE güncelleyerek dönen Türkçe
-// fiil gösterir. Animasyon o satırda; alttaki `› ` prompt + kullanıcı buffer'ı
-// dokunulmaz (eski stderr braille spinner'ın çakışması YOK). İlk token gelince
-// stop() fiili siler → `● deckent` kalır, cevap altına akar. Non-TTY → no-op.
-
-export const THINKING_VERBS: readonly string[] = [
-  'düşünüyor',
-  'şahlanıyor',
-  'derinlere dalıyor',
-  'tartıyor',
-  'kurguluyor',
-  'bağ kuruyor',
-  'damıtıyor',
-  'yoğunlaşıyor',
-];
+// hemen ÜSTÜNDEKİ `● deckent` satırını YERİNDE güncelleyerek oturum dilindeki
+// bir fiil gösterir. Animasyon o satırda; alttaki `› ` prompt + kullanıcı
+// buffer'ı dokunulmaz (eski stderr braille spinner'ın çakışması YOK). İlk
+// token gelince stop() fiili siler → `● deckent` kalır, cevap altına akar.
+// Non-TTY → no-op.
+//
+// TERMINAL-TOOLS-002 — string-free: the verb pool is INJECTED by the caller
+// (`opts.verbs`, entry.ts → chat-thinking-verbs.ts → catalog row
+// `tui.thinking_verbs` for the session language). The Turkish literal list
+// that used to live here rendered in every language; an empty injection is a
+// typed InjectedLabelMissingError, never a built-in default.
 
 const BRAILLE: readonly string[] = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 const TICK_MS = 90;
@@ -139,16 +136,19 @@ export interface ThinkingTicker {
  * için çakışma yok. stop() → satırı temizleyip kraken-renkli `● deckent` +
  * newline bırakır → cevap altına inline akar. Non-TTY → no-op.
  *
- * `opts.verb` verilirse o kullanılır (deterministik test); yoksa rastgele.
+ * `opts.verbs` = oturum dilindeki fiil havuzu (zorunlu, ≥1); `opts.verb`
+ * verilirse o kullanılır (deterministik test), yoksa havuzdan rastgele.
  */
 export function createThinkingTicker(
   out: NodeJS.WriteStream,
-  opts: { isTty?: boolean; verb?: string } = {},
+  opts: { isTty?: boolean; verb?: string; verbs: readonly string[] },
 ): ThinkingTicker {
   const isTty = opts.isTty ?? out.isTTY === true;
+  const verbs = opts.verbs.filter((v) => v.length > 0);
+  if (verbs.length === 0) throw new InjectedLabelMissingError('thinkingVerbs');
   let timer: ReturnType<typeof setInterval> | null = null;
   let frame = 0;
-  let verb = opts.verb ?? THINKING_VERBS[0] as string;
+  let verb = opts.verb ?? verbs[0] as string;
 
   const paint = (): void => {
     out.write(`\r\x1b[2K${BRAILLE[frame % BRAILLE.length]} ${HEADER} \x1b[2m· ${verb}…${RESET_C}`);
@@ -159,7 +159,7 @@ export function createThinkingTicker(
       if (!isTty || timer !== null) return;
       // Prompt başına SABİT rastgele fiil (sürekli değişmesin — kullanıcı isteği).
       if (opts.verb === undefined) {
-        verb = THINKING_VERBS[Math.floor(Math.random() * THINKING_VERBS.length)] as string;
+        verb = verbs[Math.floor(Math.random() * verbs.length)] as string;
       }
       frame = 0;
       paint();

@@ -17,13 +17,12 @@
  * and no wiring into app.tsx/do.ts (both out of write scope — this task adds
  * translations only).
  *
- * Hermetic: reads committed source + imports getMessage/DEFAULT_APPROVAL_CARD_LABELS/
+ * Hermetic: reads committed source + imports getMessage/
  * formatDoPlanPreview only (all pure, no gitignored state, no Ink render).
  */
 
 import { describe, it, expect } from 'vitest';
 import { getMessage } from '../../src/cli/helpers/messages.js';
-import { DEFAULT_APPROVAL_CARD_LABELS } from '../../src/cli/repl/app.js';
 import { formatDoPlanPreview } from '../../src/cli/commands/do.js';
 import type { GoldenFlowPlanPreview } from '../../src/orchestra/golden-flow.js';
 
@@ -43,7 +42,7 @@ const APPROVAL_CARD_RISK_KEYS = [
   ['approval_card.risk_critical', 'critical'],
 ] as const;
 
-describe('approval_card.* keys (355-011 docImpact — cited by DEFAULT_APPROVAL_CARD_LABELS fallback comment)', () => {
+describe('approval_card.* keys (355-011 docImpact — the only source since TERMINAL-TOOLS-002)', () => {
   it.each(APPROVAL_CARD_TEXT_KEYS)('%s resolves to a non-empty, non-key-echo string in en', (key) => {
     const resolved = getMessage(key, 'en');
     expect(resolved).not.toBe(key);
@@ -78,17 +77,6 @@ describe('approval_card.* keys (355-011 docImpact — cited by DEFAULT_APPROVAL_
     expect(getMessage('approval_card.progress', 'tr')).toBe('[{index}/{total}]');
   });
 
-  it('en text is byte-identical to DEFAULT_APPROVAL_CARD_LABELS (app.tsx real fallback default)', () => {
-    expect(getMessage('approval_card.hint', 'en')).toBe(DEFAULT_APPROVAL_CARD_LABELS.hint);
-    expect(getMessage('approval_card.progress', 'en')).toBe(DEFAULT_APPROVAL_CARD_LABELS.progress);
-    expect(getMessage('approval_card.details_heading', 'en')).toBe(DEFAULT_APPROVAL_CARD_LABELS.detailsHeading);
-    expect(getMessage('approval_card.no_args', 'en')).toBe(DEFAULT_APPROVAL_CARD_LABELS.noArgs);
-    expect(getMessage('approval_card.risk_none', 'en')).toBe(DEFAULT_APPROVAL_CARD_LABELS.riskLabels.none);
-    expect(getMessage('approval_card.risk_low', 'en')).toBe(DEFAULT_APPROVAL_CARD_LABELS.riskLabels.low);
-    expect(getMessage('approval_card.risk_medium', 'en')).toBe(DEFAULT_APPROVAL_CARD_LABELS.riskLabels.medium);
-    expect(getMessage('approval_card.risk_high', 'en')).toBe(DEFAULT_APPROVAL_CARD_LABELS.riskLabels.high);
-    expect(getMessage('approval_card.risk_critical', 'en')).toBe(DEFAULT_APPROVAL_CARD_LABELS.riskLabels.critical);
-  });
 });
 
 // ─── do.* (355-010 GOLDENFLOW-CMD) ──────────────────────────────────────────

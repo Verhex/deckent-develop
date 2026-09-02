@@ -14,11 +14,15 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   runReplDoSlash,
   deriveRunFlowPreview,
-  DEFAULT_DO_SLASH_LABELS,
   type ReplDoSlashDeps,
 } from '../../../src/cli/repl/app.js';
 import type { RunFlowController } from '../../../src/cli/repl/run-flow-controller.js';
 import type { RunFlowContext, PlanPreview } from '../../../src/core/run-flow-contract.js';
+import { buildDoSlashLabels } from '../../../src/cli/repl/run.js';
+import { getMessage } from '../../../src/cli/helpers/messages.js';
+
+/** en `/do` labels — app.tsx owns no default object since TERMINAL-TOOLS-002. */
+const EN_DO_SLASH_LABELS = buildDoSlashLabels((k) => getMessage(k, 'en'));
 
 const PREVIEW: PlanPreview = {
   flowId: 'flow-do-1', revision: 1, planDigest: 'digest-abc',
@@ -39,7 +43,7 @@ function makeHarness(overrides: Partial<ReplDoSlashDeps> = {}): Harness {
   const errors: string[] = [];
   const deps: ReplDoSlashDeps = {
     controller: undefined,
-    labels: DEFAULT_DO_SLASH_LABELS,
+    labels: EN_DO_SLASH_LABELS,
     emit: (t) => emitted.push(t),
     setPreview: (p) => previews.push(p),
     reportError: (m) => errors.push(m),
@@ -65,7 +69,7 @@ describe('runReplDoSlash — flag-off (no controller)', () => {
     const h = makeHarness({ controller: undefined });
     await runReplDoSlash('add a health endpoint', h.deps);
 
-    expect(h.emitted).toEqual([DEFAULT_DO_SLASH_LABELS.flagOff]);
+    expect(h.emitted).toEqual([EN_DO_SLASH_LABELS.flagOff]);
     expect(h.previews).toEqual([]); // no plan-preview ⇒ no card, no proposeRun
     expect(h.errors).toEqual([]);
   });
@@ -78,7 +82,7 @@ describe('runReplDoSlash — empty/whitespace goal (flag-on)', () => {
 
     await runReplDoSlash('', h.deps);
 
-    expect(h.emitted).toEqual([DEFAULT_DO_SLASH_LABELS.usage]);
+    expect(h.emitted).toEqual([EN_DO_SLASH_LABELS.usage]);
     expect(proposeRun).not.toHaveBeenCalled();
     expect(h.previews).toEqual([]);
   });
@@ -89,7 +93,7 @@ describe('runReplDoSlash — empty/whitespace goal (flag-on)', () => {
 
     await runReplDoSlash('   \t  ', h.deps);
 
-    expect(h.emitted).toEqual([DEFAULT_DO_SLASH_LABELS.usage]);
+    expect(h.emitted).toEqual([EN_DO_SLASH_LABELS.usage]);
     expect(proposeRun).not.toHaveBeenCalled();
   });
 });
@@ -137,9 +141,9 @@ describe('runReplDoSlash — controller error is reported, never re-thrown', () 
   });
 });
 
-describe('DEFAULT_DO_SLASH_LABELS', () => {
-  it('both English defaults are non-empty (string-free component fallback)', () => {
-    expect(DEFAULT_DO_SLASH_LABELS.flagOff.length).toBeGreaterThan(0);
-    expect(DEFAULT_DO_SLASH_LABELS.usage.length).toBeGreaterThan(0);
+describe('buildDoSlashLabels (en)', () => {
+  it('both catalog labels are non-empty (the component owns no fallback)', () => {
+    expect(EN_DO_SLASH_LABELS.flagOff.length).toBeGreaterThan(0);
+    expect(EN_DO_SLASH_LABELS.usage.length).toBeGreaterThan(0);
   });
 });

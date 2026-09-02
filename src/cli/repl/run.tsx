@@ -155,13 +155,21 @@ export function buildReplLabels(t: (key: string) => string): ReplLabels {
     approvalRejected: t('approval.terminal.rejected'),
     // TERM-AT-REF (583/N2b) — hint under the InputBar's `@` path menu.
     atMenuHint: t('tui.atref_menu_hint'),
+    // TERMINAL-TOOLS-002 — the three fields the mechanism used to default in
+    // English: turn-exception line (387-003), `/model`·`/provider` busy gate
+    // (388-001) and the composer's Ctrl-R prompt. All ReplLabels fields are
+    // required now; app.tsx throws a typed error on a missing injection.
+    turnError: t('tui.turn_error'),
+    switchBusy: t('tui.switch_busy'),
+    reverseSearch: t('tui.reverse_search'),
   };
 }
 
 /**
  * TERMINAL-TOOLS-001 — localized live-footer labels (helpers/live-footer.ts
- * is a string-free mechanism; DEFAULT_LIVE_FOOTER_LABELS is its English
- * fallback). The `live_footer.*` keys have been in messages.ts since Task 16
+ * is a string-free mechanism; since TERMINAL-TOOLS-002 it has NO English
+ * fallback — the set built here is required and validated field by field).
+ * The `live_footer.*` keys have been in messages.ts since Task 16
  * (MESSAGES-KEYS-2) with `en` byte-identical to those defaults, but nothing
  * ever passed them to buildLiveFooter — a Turkish session rendered a bare
  * English `idle` line under the `[Sor]` badge (real-binary evidence,
@@ -233,8 +241,8 @@ export function createScopedAtRefReader(resolveCwd: () => string): (rel: string)
 /**
  * Build `ApprovalCardLabels` from the resolved language (Task 387-001). Previously
  * `<ReplApp>` never passed an `approvalLabels` prop at all, so `ApprovalCard`
- * always rendered `DEFAULT_APPROVAL_CARD_LABELS` (English, app.tsx) regardless of
- * `lang`. `progress` reuses `tui.confirm_progress` — same "[{index}/{total}]"
+ * always rendered app.tsx's English default object regardless of `lang`
+ * (that object is gone since TERMINAL-TOOLS-002 — the prop is required). `progress` reuses `tui.confirm_progress` — same "[{index}/{total}]"
  * template already used by the legacy confirm modal, no need for a duplicate key.
  */
 export function buildApprovalLabels(t: (key: string) => string): ApprovalCardLabels {
@@ -1348,10 +1356,10 @@ export async function runInkRepl(
       approvalsEnabled={approvalsEnabled}
       {...(approvalChannel ? { approvalChannel } : {})}
       {...(bgTurnsEnabled ? { registerBgEventSink: (enqueue: (event: ChatTurnBgEvent) => void) => { bgEventSink = enqueue; } } : {})}
+      runFlowCardLabels={buildPlanPreviewCardLabels(lang)}
+      runFlowMountLabels={buildRunFlowMountLabels(t)}
       {...(runFlowController ? {
         runFlowController,
-        runFlowCardLabels: buildPlanPreviewCardLabels(lang),
-        runFlowMountLabels: buildRunFlowMountLabels(t),
         registerRunFlowResultSink: (enqueue: (event: ChatTurnBgEvent) => void) => { runFlowResultSink = enqueue; },
       } : {})}
     />

@@ -20,6 +20,9 @@ import { describe, it, expect } from 'vitest';
 import { resolveModeLabel, bgPayloadsToTurnTexts, type ReplLabels } from '../../src/cli/repl/app.js';
 import { initialTermModeState, parseTermCommand, applyModeTarget } from '../../src/cli/repl/term-mode.js';
 import { createChatTurnQueue } from '../../src/cli/repl/chat-turn-queue.js';
+import { buildReplLabels } from '../../src/cli/repl/run.js';
+import { getMessage } from '../../src/cli/helpers/messages.js';
+import { InjectedLabelMissingError } from '../../src/cli/helpers/injected-label.js';
 // ═══ Task 358-006 — APP-SURFACE-WIRE — pure-logic tests ═════════════════════
 //
 // Wires session-resume.ts (startup teaser + /resume picker) and busy-controls.ts
@@ -40,20 +43,24 @@ import { vi, afterEach } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { RESUME_RECENT_LIMIT, buildResumePickerLines, chatSessionsToRecords, hydrateNativeResume, mergeResumeSessionRecords, resolveResumeCommand, renderBusyDecision, steerNotesToInputs, type ReplLabels as ReplLabels__wire_017 } from "../../src/cli/repl/app.js";
+import { RESUME_RECENT_LIMIT, buildResumePickerLines, chatSessionsToRecords, hydrateNativeResume, mergeResumeSessionRecords, resolveResumeCommand, renderBusyDecision, steerNotesToInputs } from "../../src/cli/repl/app.js";
 import { appendLedgerTurn } from "../../src/cli/repl/session-ledger.js";
 import { listRecentSessions, type SessionRecord } from "../../src/cli/helpers/session-resume.js";
 import { initialBusyControlsState, markBusy, markIdle, parseBusyCommand, resolveQueueCommand, applyInterrupt, applySteer, resolveKeyAction, type BusyControlsState } from "../../src/cli/repl/busy-controls.js";
 import { createChatTurnQueue as createChatTurnQueue__wire_017 } from "../../src/cli/repl/chat-turn-queue.js";
 import { JOBS_DIR } from "../../src/core/constants.js";
 
-const NO_LABELS: Pick<ReplLabels, 'modeAsk' | 'modeRun' | 'modeControl'> = {};
+/** The en catalog set (run.tsx buildReplLabels) — app.tsx owns no English
+ *  fallback since TERMINAL-TOOLS-002; a missing field is a typed error. */
+const EN_LABELS = buildReplLabels((k) => getMessage(k, 'en'));
 
 describe('resolveModeLabel — mode-indicator label resolution (Ask/Run/Control)', () => {
-  it('falls back to the English canonical name when no labels are supplied', () => {
-    expect(resolveModeLabel('ask', NO_LABELS)).toBe('Ask');
-    expect(resolveModeLabel('run', NO_LABELS)).toBe('Run');
-    expect(resolveModeLabel('control', NO_LABELS)).toBe('Control');
+  it('throws the typed guard error when no labels are supplied (no English fallback)', () => {
+    const none = {} as Pick<ReplLabels, 'modeAsk' | 'modeRun' | 'modeControl'>;
+    expect(() => resolveModeLabel('ask', none)).toThrow(InjectedLabelMissingError);
+    expect(resolveModeLabel('ask', EN_LABELS)).toBe('Ask');
+    expect(resolveModeLabel('run', EN_LABELS)).toBe('Run');
+    expect(resolveModeLabel('control', EN_LABELS)).toBe('Control');
   });
 
   it('uses caller-supplied labels when present (i18n-first seam)', () => {
@@ -63,9 +70,10 @@ describe('resolveModeLabel — mode-indicator label resolution (Ask/Run/Control)
     expect(resolveModeLabel('control', labels)).toBe('Yönet');
   });
 
-  it('a partial override only replaces the supplied mode, others stay English-default', () => {
-    expect(resolveModeLabel('run', { modeRun: 'Çalıştır' })).toBe('Çalıştır');
-    expect(resolveModeLabel('ask', { modeRun: 'Çalıştır' })).toBe('Ask');
+  it('a partial override replaces only the supplied mode; a mode with no label is a typed error, never English', () => {
+    expect(resolveModeLabel('run', { ...EN_LABELS, modeRun: 'Çalıştır' })).toBe('Çalıştır');
+    const partial = { modeRun: 'Çalıştır' } as Pick<ReplLabels, 'modeAsk' | 'modeRun' | 'modeControl'>;
+    expect(() => resolveModeLabel('ask', partial)).toThrow(InjectedLabelMissingError);
   });
 
   it('composes with term-mode.ts parseTermCommand + applyModeTarget — end-to-end mode-switch flow', () => {
@@ -73,19 +81,19 @@ describe('resolveModeLabel — mode-indicator label resolution (Ask/Run/Control)
     // the target transitions state, then the new mode's label is what the
     // indicator would render.
     const start = initialTermModeState();
-    expect(resolveModeLabel(start.mode, NO_LABELS)).toBe('Ask');
+    expect(resolveModeLabel(start.mode, EN_LABELS)).toBe('Ask');
 
     const runParse = parseTermCommand('/term run');
     expect(runParse).toEqual({ kind: 'switch', target: 'run' });
     const afterRun = applyModeTarget(start, runParse.kind === 'switch' ? runParse.target : 'ask');
     expect(afterRun.changed).toBe(true);
-    expect(resolveModeLabel(afterRun.state.mode, NO_LABELS)).toBe('Run');
+    expect(resolveModeLabel(afterRun.state.mode, EN_LABELS)).toBe('Run');
 
     const controlParse = parseTermCommand('/term control');
     expect(controlParse).toEqual({ kind: 'switch', target: 'control' });
     const afterControl = applyModeTarget(afterRun.state, controlParse.kind === 'switch' ? controlParse.target : 'ask');
     expect(afterControl.changed).toBe(true);
-    expect(resolveModeLabel(afterControl.state.mode, NO_LABELS)).toBe('Control');
+    expect(resolveModeLabel(afterControl.state.mode, EN_LABELS)).toBe('Control');
 
     // Retired transition names no longer parse as /term commands — they stay
     // free for future first-class commands (/run = task execution).
@@ -150,8 +158,8 @@ describe('bgPayloadsToTurnTexts — ChatTurnQueue drain → Turn[\'bg\'] text ma
 });
 
 // WIRE-017: physically merged from tests/cli/repl/app-surface-wire.test.tsx.
+// (Uses the module-level EN_LABELS — the mechanism owns no English fallback.)
 {
-const NO_LABELS: Pick<ReplLabels__wire_017, never> = {};
 
 const record = (id: string, overrides: Partial<SessionRecord> = {}): SessionRecord => ({
     id,
@@ -187,7 +195,7 @@ describe('startup teaser — listRecentSessions → buildResumePickerLines (fixt
         }));
         const sessions = listRecentSessions(root, RESUME_RECENT_LIMIT);
         expect(sessions).toHaveLength(2);
-        const lines = buildResumePickerLines(sessions, [], NO_LABELS);
+        const lines = buildResumePickerLines(sessions, [], EN_LABELS);
         // header + one row per session + hint — the App renders this as ONE turn.
         expect(lines).toHaveLength(4);
         expect(lines[0]).toBe('Recent sessions');
@@ -201,7 +209,7 @@ describe('startup teaser — listRecentSessions → buildResumePickerLines (fixt
         const sessions = listRecentSessions(root, RESUME_RECENT_LIMIT);
         expect(sessions).toEqual([]);
         // [] is exactly the App's "do not render the teaser at all" condition.
-        expect(buildResumePickerLines(sessions, [], NO_LABELS)).toEqual([]);
+        expect(buildResumePickerLines(sessions, [], EN_LABELS)).toEqual([]);
     });
 });
 
@@ -212,7 +220,7 @@ describe('buildResumePickerLines — disk+chat merge, continuous numbering', () 
         const chat = chatSessionsToRecords([
             { sessionId: 'chat-123', lastAt: '2026-06-30T12:00:00.000Z', preview: 'fix the parser' },
         ]);
-        const lines = buildResumePickerLines(disk, chat, NO_LABELS);
+        const lines = buildResumePickerLines(disk, chat, EN_LABELS);
         expect(lines).toHaveLength(5);
         expect(lines[1]).toContain('1. title of sprint-357');
         expect(lines[2]).toContain('2. title of sprint-356');
@@ -304,20 +312,20 @@ describe('resolveResumeCommand — /resume picker decision matrix', () => {
         { sessionId: 'chat-abc', lastAt: '2026-06-30T12:00:00.000Z', preview: 'parser work' },
     ]);
     it('no local sessions at all → passthrough for every form (loop behavior byte-identical)', () => {
-        expect(resolveResumeCommand('', [], [], NO_LABELS)).toEqual({ kind: 'passthrough' });
-        expect(resolveResumeCommand('1', [], [], NO_LABELS)).toEqual({ kind: 'passthrough' });
-        expect(resolveResumeCommand('some-id', [], [], NO_LABELS)).toEqual({ kind: 'passthrough' });
+        expect(resolveResumeCommand('', [], [], EN_LABELS)).toEqual({ kind: 'passthrough' });
+        expect(resolveResumeCommand('1', [], [], EN_LABELS)).toEqual({ kind: 'passthrough' });
+        expect(resolveResumeCommand('some-id', [], [], EN_LABELS)).toEqual({ kind: 'passthrough' });
     });
     it('bare /resume → the numbered picker list (teaser-aligned)', () => {
-        const decision = resolveResumeCommand('', disk, chat, NO_LABELS);
+        const decision = resolveResumeCommand('', disk, chat, EN_LABELS);
         expect(decision.kind).toBe('list');
         if (decision.kind === 'list') {
-            expect(decision.lines).toEqual(buildResumePickerLines(disk, chat, NO_LABELS));
+            expect(decision.lines).toEqual(buildResumePickerLines(disk, chat, EN_LABELS));
         }
     });
     it('numeric pick of a disk row → switch, sessionId CHANGES, no loop forward', () => {
         const launchSessionId = 'chat-launch';
-        const decision = resolveResumeCommand('2', disk, chat, NO_LABELS);
+        const decision = resolveResumeCommand('2', disk, chat, EN_LABELS);
         expect(decision).toEqual({
             kind: 'switch',
             sessionId: 'sprint-356',
@@ -330,23 +338,23 @@ describe('resolveResumeCommand — /resume picker decision matrix', () => {
             expect(decision.sessionId).not.toBe(launchSessionId);
     });
     it('numeric pick of a resumable row → switch for direct hydration (never the raw typed id)', () => {
-        const decision = resolveResumeCommand('3', disk, chat, NO_LABELS);
+        const decision = resolveResumeCommand('3', disk, chat, EN_LABELS);
         expect(decision).toMatchObject({ kind: 'switch', sessionId: 'chat-abc', forwardToLoop: true });
     });
     it('exact session id → switch (id match beats title matching)', () => {
-        const decision = resolveResumeCommand('sprint-357', disk, chat, NO_LABELS);
+        const decision = resolveResumeCommand('sprint-357', disk, chat, EN_LABELS);
         expect(decision).toMatchObject({ kind: 'switch', sessionId: 'sprint-357', forwardToLoop: false });
     });
     it('numeric out-of-range → reject (a number must NEVER pass through to the loop)', () => {
-        const decision = resolveResumeCommand('9', disk, chat, NO_LABELS);
+        const decision = resolveResumeCommand('9', disk, chat, EN_LABELS);
         expect(decision).toEqual({ kind: 'reject', line: 'session not found: 9' });
     });
     it('unknown literal id → passthrough (the loop may know it — behavior-merge)', () => {
-        expect(resolveResumeCommand('chat-very-old', disk, chat, NO_LABELS)).toEqual({ kind: 'passthrough' });
+        expect(resolveResumeCommand('chat-very-old', disk, chat, EN_LABELS)).toEqual({ kind: 'passthrough' });
     });
     it('ambiguous title prefix → reject listing every match', () => {
         const twins = [record('sprint-a', { title: 'deploy fix' }), record('sprint-b', { title: 'deploy docs' })];
-        const decision = resolveResumeCommand('deploy', twins, [], NO_LABELS);
+        const decision = resolveResumeCommand('deploy', twins, [], EN_LABELS);
         expect(decision.kind).toBe('reject');
         if (decision.kind === 'reject') {
             expect(decision.line).toContain('sprint-a');
@@ -354,7 +362,7 @@ describe('resolveResumeCommand — /resume picker decision matrix', () => {
         }
     });
     it('switch/reject lines honor caller labels ({id}/{arg} templates)', () => {
-        const labels = { resumeSwitched: 'devam: {id}', resumeNotFound: 'oturum yok: {arg}' };
+        const labels = { ...EN_LABELS, resumeSwitched: 'devam: {id}', resumeNotFound: 'oturum yok: {arg}' };
         expect(resolveResumeCommand('1', disk, [], labels)).toMatchObject({ line: 'devam: sprint-357' });
         expect(resolveResumeCommand('7', disk, [], labels)).toMatchObject({ line: 'oturum yok: 7' });
     });
@@ -371,17 +379,17 @@ describe('busy matrix — parse → dispatch → renderBusyDecision (render-test
         // Mirrors app.tsx handleSubmit's gated busy-command block 1:1.
         const action = parseBusyCommand(raw);
         if (action.kind === 'queue') {
-            return renderBusyDecision(resolveQueueCommand(stateRef.current, { size: deps.size }), NO_LABELS);
+            return renderBusyDecision(resolveQueueCommand(stateRef.current, { size: deps.size }), EN_LABELS);
         }
         if (action.kind === 'interrupt') {
             const r = applyInterrupt(stateRef.current, deps.cancel);
             stateRef.current = r.state;
-            return renderBusyDecision(r.decision, NO_LABELS);
+            return renderBusyDecision(r.decision, EN_LABELS);
         }
         if (action.kind === 'steer') {
             const r = applySteer(stateRef.current, action.message);
             stateRef.current = r.state;
-            return renderBusyDecision(r.decision, NO_LABELS);
+            return renderBusyDecision(r.decision, EN_LABELS);
         }
         throw new Error(`not a busy command: ${raw}`);
     };
@@ -439,6 +447,7 @@ describe('busy matrix — parse → dispatch → renderBusyDecision (render-test
     });
     it('renderBusyDecision honors caller labels ({count}/{state}/{position} templates)', () => {
         const labels = {
+            ...EN_LABELS,
             busyQueueStatus: 'kuyruk: {count} arkaplan · {state}',
             busyStateBusy: 'meşgul',
             busySteerQueued: 'not sıraya alındı (#{position})',

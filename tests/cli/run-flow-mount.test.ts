@@ -50,7 +50,6 @@ import {
   resolveRunFlowCardActive,
   resolveInboxCardActive,
   formatRunFlowOutcomeLine,
-  DEFAULT_RUN_FLOW_MOUNT_LABELS,
 } from '../../src/cli/repl/app.js';
 import { wireRunFlowMount, buildRunFlowMountLabels } from '../../src/cli/repl/run.js';
 import { createRunFlowController, type RunFlowController, type RunFlowControllerDeps } from '../../src/cli/repl/run-flow-controller.js';
@@ -58,6 +57,9 @@ import { loadApprovedSnapshot, loadRunHandle } from '../../src/core/run-flow-sto
 import type { RunFlowContext } from '../../src/core/run-flow-contract.js';
 import type { RunHandle } from '../../src/orchestra/run-job-service.js';
 import { getMessage } from '../../src/cli/helpers/messages.js';
+
+/** en mount labels — app.tsx owns no default object since TERMINAL-TOOLS-002. */
+const EN_MOUNT_LABELS = buildRunFlowMountLabels((k) => getMessage(k, 'en'));
 import { SprintStatus, SprintPhase, TaskStatus } from '../../src/core/types.js';
 import type { Sprint, Task, ResolvedConfig, BrainContext } from '../../src/core/types.js';
 
@@ -194,17 +196,17 @@ describe('resolveInboxCardActive — live /runs --follow card is the lowest-prio
 
 describe('formatRunFlowOutcomeLine', () => {
   it('started — substitutes {jobId}', () => {
-    expect(formatRunFlowOutcomeLine({ kind: 'started', jobId: 'job-42' }, DEFAULT_RUN_FLOW_MOUNT_LABELS))
+    expect(formatRunFlowOutcomeLine({ kind: 'started', jobId: 'job-42' }, EN_MOUNT_LABELS))
       .toBe('Run started — job job-42.');
   });
 
   it('rejected — static line', () => {
-    expect(formatRunFlowOutcomeLine({ kind: 'rejected' }, DEFAULT_RUN_FLOW_MOUNT_LABELS))
+    expect(formatRunFlowOutcomeLine({ kind: 'rejected' }, EN_MOUNT_LABELS))
       .toBe('Run proposal rejected.');
   });
 
   it('error — substitutes {error}', () => {
-    expect(formatRunFlowOutcomeLine({ kind: 'error', message: 'boom' }, DEFAULT_RUN_FLOW_MOUNT_LABELS))
+    expect(formatRunFlowOutcomeLine({ kind: 'error', message: 'boom' }, EN_MOUNT_LABELS))
       .toBe('Run flow error: boom');
   });
 

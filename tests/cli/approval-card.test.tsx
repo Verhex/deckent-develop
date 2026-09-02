@@ -25,6 +25,7 @@ import {
   type ApprovalCardQueue,
 } from '../../src/cli/repl/approval-card.js';
 import { formatApprovalClosure } from '../../src/cli/repl/app.js';
+import { InjectedLabelMissingError } from '../../src/cli/helpers/injected-label.js';
 import { getMessage } from '../../src/cli/helpers/messages.js';
 import { validateApprovalRequest, type ApprovalRequest } from '../../src/core/approval-contract.js';
 import type { ApprovalStreamEvent } from '../../src/core/approval-eventstream.js';
@@ -261,9 +262,10 @@ describe('formatApprovalClosure — visible terminal closure line (born-697)', (
     expect(line).toBe('✖ Reddedildi — drop table users');
   });
 
-  it('falls back to the English default when labels are absent (i18n-unwired path)', () => {
-    expect(formatApprovalClosure('allow', 'do it', {})).toBe('✅ Approved — do it');
-    expect(formatApprovalClosure('deny', 'do it', {})).toBe('✖ Rejected — do it');
+  it('throws the typed guard error when labels are absent — no English fallback (TERMINAL-TOOLS-002)', () => {
+    const none = {} as Parameters<typeof formatApprovalClosure>[2];
+    expect(() => formatApprovalClosure('allow', 'do it', none)).toThrow(InjectedLabelMissingError);
+    expect(() => formatApprovalClosure('deny', 'do it', none)).toThrow(InjectedLabelMissingError);
   });
 
   it('resolves the approval.terminal.* keys in en + tr with {summary} interpolation', () => {

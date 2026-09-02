@@ -1,6 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { createPromptRegion, createLineQueue, createThinkingTicker, createPasteCoalescer, renderToolActivity, createLineBufferedSink } from '../../src/cli/commands/chat-render-region.js';
+import { buildThinkingVerbs } from '../../src/cli/commands/chat-thinking-verbs.js';
+
+/** Catalog verb pool (tr) — createThinkingTicker owns no list since TERMINAL-TOOLS-002. */
+const VERBS = buildThinkingVerbs('tr');
 
 // Sprint 224 T-224-014 — pinned-prompt render region.
 // Hermetic: fake readline interface + fake write stream, no real TTY.
@@ -84,7 +88,7 @@ describe('createLineQueue — buffered back-to-back input (T-224-014)', () => {
 describe('createThinkingTicker — rotating-verb indicator (T-224-014)', () => {
   it('non-TTY → start/stop are no-ops (no writes, no throw)', () => {
     const out = fakeOut(false);
-    const ticker = createThinkingTicker(out, { isTty: false });
+    const ticker = createThinkingTicker(out, { isTty: false, verbs: VERBS });
     ticker.start();
     ticker.stop();
     expect(out.writes.length).toBe(0);
@@ -94,7 +98,7 @@ describe('createThinkingTicker — rotating-verb indicator (T-224-014)', () => {
     vi.useFakeTimers();
     try {
       const out = fakeOut(true);
-      const ticker = createThinkingTicker(out, { isTty: true, verb: 'şahlanıyor' });
+      const ticker = createThinkingTicker(out, { isTty: true, verb: 'şahlanıyor', verbs: VERBS });
       ticker.start();
       const first = out.writes.join('');
       expect(first).toContain('deckent');
@@ -113,7 +117,7 @@ describe('createThinkingTicker — rotating-verb indicator (T-224-014)', () => {
     vi.useFakeTimers();
     try {
       const out = fakeOut(true);
-      const ticker = createThinkingTicker(out, { isTty: true });
+      const ticker = createThinkingTicker(out, { isTty: true, verbs: VERBS });
       ticker.start();
       out.writes.length = 0;
       ticker.stop();

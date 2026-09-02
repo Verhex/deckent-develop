@@ -19,8 +19,8 @@
 //
 // String-free-ish per CLAUDE.md i18n-first: the one piece of user-facing
 // text this module can emit (the overflow marker) is injectable via
-// `options.labels`, English default — mirrors helpers/live-footer.ts's
-// `LiveFooterLabels` / `DEFAULT_LIVE_FOOTER_LABELS` seam.
+// `options.labels`. The default is the `…` overflow GLYPH (not prose) — the
+// one label object in this directory that legitimately keeps a default.
 
 export interface DualStreamInput {
   /** Run-status / footer lines (e.g. buildLiveFooter() output). */

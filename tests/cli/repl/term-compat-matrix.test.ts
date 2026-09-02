@@ -20,7 +20,7 @@
 //       (no embedded \r/\n) OS paste flows through in the real
 //       src/cli/repl/input-bar.tsx (its own early-return only fires when the
 //       chunk contains \r or \n — see input-bar.tsx:133-146).
-//   - buildLiveFooter + DEFAULT_LIVE_FOOTER_LABELS (src/cli/helpers/live-footer.ts)
+//   - buildLiveFooter + an explicit en label set (src/cli/helpers/live-footer.ts)
 //     → the `width` option is exactly what changes on a terminal resize
 //       (process.stdout.columns re-measure), made deterministic via override.
 //   - theme.strip (src/cli/helpers/theme.ts) → ANSI-safe length assertions,
@@ -48,9 +48,15 @@ import {
 } from '../../../src/cli/repl/line-edit.js';
 import {
   buildLiveFooter,
-  DEFAULT_LIVE_FOOTER_LABELS,
+  type LiveFooterLabels,
   type LiveFooterState,
 } from '../../../src/cli/helpers/live-footer.js';
+
+/** en label set (explicit — the mechanism owns no default since TERMINAL-TOOLS-002). */
+const EN: LiveFooterLabels = {
+  idle: 'idle', running: 'Running', elapsed: 'Elapsed', provider: 'Provider', auth: 'Auth', next: 'Next',
+  healthy: 'healthy', degraded: 'degraded', unknown: 'unknown', loggedIn: 'logged-in', loggedOut: 'logged-out',
+};
 import { theme } from '../../../src/cli/helpers/theme.js';
 
 const state = (buffer: string, cursor: number): InputState => ({ buffer, cursor });
@@ -62,23 +68,23 @@ describe('term-compat — Resize (buildLiveFooter width seam)', () => {
     const footerState: LiveFooterState = {
       running: 'a very long task label that will not fit a narrow terminal width',
     };
-    const [line] = buildLiveFooter(footerState, { width: 20 });
+    const [line] = buildLiveFooter(footerState, { labels: EN, width: 20 });
     const stripped = theme.strip(line ?? '');
     expect(stripped).toHaveLength(20);
-    expect(stripped.startsWith(`${DEFAULT_LIVE_FOOTER_LABELS.running}: `)).toBe(true);
+    expect(stripped.startsWith(`${EN.running}: `)).toBe(true);
     expect(stripped.endsWith('…')).toBe(true);
   });
 
   it('wide width leaves a short line untouched (no truncation)', () => {
     const footerState: LiveFooterState = { running: 'short task' };
-    const [line] = buildLiveFooter(footerState, { width: 200 });
-    expect(theme.strip(line ?? '')).toBe(`${DEFAULT_LIVE_FOOTER_LABELS.running}: short task`);
+    const [line] = buildLiveFooter(footerState, { labels: EN, width: 200 });
+    expect(theme.strip(line ?? '')).toBe(`${EN.running}: short task`);
   });
 
   it('width=1 edge case (resize to minimal size) truncates safely without throwing', () => {
     const footerState: LiveFooterState = { running: 'anything' };
-    expect(() => buildLiveFooter(footerState, { width: 1 })).not.toThrow();
-    const [line] = buildLiveFooter(footerState, { width: 1 });
+    expect(() => buildLiveFooter(footerState, { labels: EN, width: 1 })).not.toThrow();
+    const [line] = buildLiveFooter(footerState, { labels: EN, width: 1 });
     expect(theme.strip(line ?? '')).toBe('R');
   });
 
@@ -91,8 +97,8 @@ describe('term-compat — Resize (buildLiveFooter width seam)', () => {
       auth: 'logged-in',
       next: 'sprint-359 task-008 queued and waiting for dependency resolution',
     };
-    const wide = buildLiveFooter(footerState, { width: 200, now });
-    const narrow = buildLiveFooter(footerState, { width: 8, now });
+    const wide = buildLiveFooter(footerState, { labels: EN, width: 200, now });
+    const narrow = buildLiveFooter(footerState, { labels: EN, width: 8, now });
 
     expect(wide).toHaveLength(5);
     expect(narrow).toHaveLength(5);
@@ -107,9 +113,9 @@ describe('term-compat — Resize (buildLiveFooter width seam)', () => {
   });
 
   it('idle (empty) state single line also respects width after a resize', () => {
-    const wide = buildLiveFooter({}, { width: 80 });
-    const narrow = buildLiveFooter({}, { width: 3 });
-    expect(theme.strip(wide[0] ?? '')).toBe(DEFAULT_LIVE_FOOTER_LABELS.idle);
+    const wide = buildLiveFooter({}, { labels: EN, width: 80 });
+    const narrow = buildLiveFooter({}, { labels: EN, width: 3 });
+    expect(theme.strip(wide[0] ?? '')).toBe(EN.idle);
     expect(theme.strip(narrow[0] ?? '')).toBe('id…');
   });
 });

@@ -17,7 +17,11 @@ import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render } from 'ink-testing-library';
 import { InboxCard } from '../../../src/cli/repl/inbox-card.js';
-import { DEFAULT_INBOX_LABELS, type InboxRow } from '../../../src/cli/repl/run-flow-inbox.js';
+import { buildInboxLabels, type InboxRow } from '../../../src/cli/repl/run-flow-inbox.js';
+import { getMessage } from '../../../src/cli/helpers/messages.js';
+
+/** en inbox labels — the card requires an injected set (TERMINAL-TOOLS-002). */
+const EN_INBOX_LABELS = buildInboxLabels((k) => getMessage(k, 'en'));
 
 const ESC = String.fromCharCode(27);
 const UP = '\x1b[A';
@@ -33,7 +37,7 @@ const feed = (): InboxRow[] => ROWS;
 
 // Never let the 1s interval fire during a test.
 const CARD = (extra: Record<string, unknown> = {}): React.ReactElement => (
-  <InboxCard open feed={feed} labels={DEFAULT_INBOX_LABELS} onClose={() => {}} pollMs={100000} {...extra} />
+  <InboxCard open feed={feed} labels={EN_INBOX_LABELS} onClose={() => {}} pollMs={100000} {...extra} />
 );
 
 describe('InboxCard — render (ink-testing-library proof)', () => {
@@ -46,7 +50,7 @@ describe('InboxCard — render (ink-testing-library proof)', () => {
     const { lastFrame } = render(CARD());
     await tick(); // let the feed-populating useEffect flush + realign to row 0
     const frame = lastFrame() ?? '';
-    expect(frame).toContain(DEFAULT_INBOX_LABELS.header); // "Active runs"
+    expect(frame).toContain(EN_INBOX_LABELS.header); // "Active runs"
     expect(frame).toContain('❯ 1. flow-aaa · running add auth'); // row 0 focused
     expect(frame).toContain('2. flow-bbb · completed (2/2) fix bug'); // row 1 present
     expect(frame).toContain('↑↓ select'); // nav hint (list mode)
@@ -80,7 +84,7 @@ describe('InboxCard — focus navigation (D3b)', () => {
       { flowId: 'run-C', state: 'DETACHED_RUNNING', intentSummary: 'C' },
     ];
     const { lastFrame, stdin } = render(
-      <InboxCard open feed={() => rows} labels={DEFAULT_INBOX_LABELS} onClose={() => {}} pollMs={20} />,
+      <InboxCard open feed={() => rows} labels={EN_INBOX_LABELS} onClose={() => {}} pollMs={20} />,
     );
     await tick();
     stdin.write(DOWN); // focus run-B (index 1)
@@ -110,7 +114,7 @@ describe('InboxCard — focus navigation (D3b)', () => {
     expect(frame).toContain('id: flow-aaa-1'); // full id
     expect(frame).toContain('intent: add auth');
     expect(frame).toContain('↑↓ browse'); // detail hint
-    expect(frame).not.toContain(DEFAULT_INBOX_LABELS.header); // list is hidden
+    expect(frame).not.toContain(EN_INBOX_LABELS.header); // list is hidden
   });
 });
 
@@ -124,7 +128,7 @@ describe('InboxCard — two-level Esc + mutex (D3a/D3b)', () => {
     stdin.write(ESC); // back to list
     await tick(80);
     expect(onClose).not.toHaveBeenCalled();
-    expect(lastFrame() ?? '').toContain(DEFAULT_INBOX_LABELS.header); // list restored
+    expect(lastFrame() ?? '').toContain(EN_INBOX_LABELS.header); // list restored
   });
 
   it('Esc from the LIST invokes onClose (the card closes)', async () => {
@@ -161,7 +165,7 @@ const DECIDE_ROWS: InboxRow[] = [
 ];
 
 const DECIDE_CARD = (extra: Record<string, unknown> = {}): React.ReactElement => (
-  <InboxCard open feed={() => DECIDE_ROWS} labels={DEFAULT_INBOX_LABELS} onClose={() => {}} pollMs={100000} {...extra} />
+  <InboxCard open feed={() => DECIDE_ROWS} labels={EN_INBOX_LABELS} onClose={() => {}} pollMs={100000} {...extra} />
 );
 
 describe('InboxCard — in-card decision (SURF-6)', () => {
@@ -180,7 +184,7 @@ describe('InboxCard — in-card decision (SURF-6)', () => {
     await tick();
     stdin.write(ENTER); // open detail on row 0 (AWAITING_APPROVAL)
     await tick(80);
-    expect(lastFrame() ?? '').toContain(DEFAULT_INBOX_LABELS.decideHintAwaiting);
+    expect(lastFrame() ?? '').toContain(EN_INBOX_LABELS.decideHintAwaiting);
     stdin.write('a');
     await tick(80);
     expect(onDecide).toHaveBeenCalledWith('flow-await-1', 'approve');
@@ -203,7 +207,7 @@ describe('InboxCard — in-card decision (SURF-6)', () => {
     await tick(80);
     stdin.write(ENTER);
     await tick(80);
-    expect(lastFrame() ?? '').toContain(DEFAULT_INBOX_LABELS.decideHintApproved);
+    expect(lastFrame() ?? '').toContain(EN_INBOX_LABELS.decideHintApproved);
     stdin.write('a'); // not offered on APPROVED
     await tick(80);
     expect(onDecide).not.toHaveBeenCalled();
@@ -221,7 +225,7 @@ describe('InboxCard — in-card decision (SURF-6)', () => {
     withDecide.stdin.write(DOWN); await tick(80);
     withDecide.stdin.write(DOWN); await tick(80); // focus row 2 (DETACHED_RUNNING)
     withDecide.stdin.write(ENTER); await tick(80);
-    expect(withDecide.lastFrame() ?? '').not.toContain(DEFAULT_INBOX_LABELS.decideHintAwaiting);
+    expect(withDecide.lastFrame() ?? '').not.toContain(EN_INBOX_LABELS.decideHintAwaiting);
     withDecide.stdin.write('r'); await tick(80);
     expect(onDecide).not.toHaveBeenCalled();
 
@@ -230,7 +234,7 @@ describe('InboxCard — in-card decision (SURF-6)', () => {
     await tick();
     bare.stdin.write(ENTER);
     await tick(80);
-    expect(bare.lastFrame() ?? '').not.toContain(DEFAULT_INBOX_LABELS.decideHintAwaiting);
+    expect(bare.lastFrame() ?? '').not.toContain(EN_INBOX_LABELS.decideHintAwaiting);
   });
 
   it('the outcome notice clears on navigation (never sits under a different run)', async () => {

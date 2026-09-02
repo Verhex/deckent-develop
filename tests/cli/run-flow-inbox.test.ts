@@ -17,7 +17,6 @@ import {
   resolveInboxSelection,
   buildInboxDetailLines,
   renderRunsCommand,
-  DEFAULT_INBOX_LABELS,
   MAX_INBOX_ROWS,
   // D3b — in-card focus-nav pure logic
   mapInboxKey,
@@ -38,6 +37,9 @@ import {
 } from '../../src/cli/repl/run-flow-inbox.js';
 import { sweepStaleRuns } from '../../src/orchestra/run-flow-death-sweep.js';
 import { getMessage } from '../../src/cli/helpers/messages.js';
+
+/** en inbox labels — run-flow-inbox.ts owns no default object since TERMINAL-TOOLS-002. */
+const EN_INBOX_LABELS = buildInboxLabels((k) => getMessage(k, 'en'));
 import { collectAddressableInboxRows, resolveDecideTarget, runDecide } from '../../src/cli/commands/runs.js';
 import { getRunFlowCoordinator, _resetRunFlowCoordinatorsForTests } from '../../src/orchestra/run-flow-coordinator-registry.js';
 import { saveApprovedSnapshot, saveRunHandle } from '../../src/core/run-flow-store.js';
@@ -183,7 +185,7 @@ describe('collectInboxRows — cross-process store-scan + jobs-dir join (SURF-3)
   it('renders a bare do-flow row with no intent (short-id + state only)', () => {
     doFlowOnDisk(root, 'do-flow-render-03', '2026-07-15T12:00:00.000Z');
     _resetRunFlowCoordinatorsForTests();
-    const lines = buildInboxLines(collectInboxRows(root), DEFAULT_INBOX_LABELS);
+    const lines = buildInboxLines(collectInboxRows(root), EN_INBOX_LABELS);
     // short-id + running badge, NO trailing intent text. The pid-less handle
     // earns the honest F-3 unverified mark.
     expect(lines[1]).toBe('  1. do-flow- · running (unverified)');
@@ -197,7 +199,7 @@ describe('collectInboxRows — cross-process store-scan + jobs-dir join (SURF-3)
     _resetRunFlowCoordinatorsForTests();
     const rows = collectInboxRows(root);
     expect(rows[0]).toMatchObject({ flowId: 'do-flow-intent-04', state: 'DETACHED_RUNNING', intentSummary: 'add rate limiting' });
-    const lines = buildInboxLines(rows, DEFAULT_INBOX_LABELS);
+    const lines = buildInboxLines(rows, EN_INBOX_LABELS);
     // (unverified) = F-3 mark: this fixture's handle carries no pid.
     expect(lines[1]).toBe('  1. do-flow- · running (unverified) add rate limiting');
   });
@@ -256,19 +258,19 @@ describe('collectInboxRows — read-only liveness derivation (F-3)', () => {
   it('renders the liveness marks in the row body and the detail lines', () => {
     const dead: InboxRow = { flowId: 'aaaaaaaa-dead', state: 'FAILED', liveness: 'dead', pid: 4242 };
     const unknown: InboxRow = { flowId: 'bbbbbbbb-unkn', state: 'DETACHED_RUNNING', liveness: 'unknown' };
-    const lines = buildInboxLines([dead, unknown], DEFAULT_INBOX_LABELS);
+    const lines = buildInboxLines([dead, unknown], EN_INBOX_LABELS);
     expect(lines[1]).toBe('  1. aaaaaaaa · failed (process died)');
     expect(lines[2]).toBe('  2. bbbbbbbb · running (unverified)');
 
-    expect(buildInboxDetailLines(dead, DEFAULT_INBOX_LABELS)).toContain('  liveness: process died (pid 4242)');
-    expect(buildInboxDetailLines(unknown, DEFAULT_INBOX_LABELS)).toContain(
+    expect(buildInboxDetailLines(dead, EN_INBOX_LABELS)).toContain('  liveness: process died (pid 4242)');
+    expect(buildInboxDetailLines(unknown, EN_INBOX_LABELS)).toContain(
       '  liveness: unverified — the run predates pid tracking',
     );
   });
 });
 
 describe('buildInboxLines — pure render (string-free, SURF-3)', () => {
-  const labels = DEFAULT_INBOX_LABELS;
+  const labels = EN_INBOX_LABELS;
 
   it('empty rows → the single empty notice', () => {
     expect(buildInboxLines([], labels)).toEqual([labels.empty]);
@@ -382,7 +384,7 @@ describe('runs explicit retirement (505-001)', () => {
     mkdirSync(join(root, '.tasks'), { recursive: true });
     writeFileSync(join(root, '.tasks', 'task-626-001.json'), JSON.stringify(task, null, 2));
 
-    runDecide(root, flowId, { retire: true }, 'en', DEFAULT_INBOX_LABELS);
+    runDecide(root, flowId, { retire: true }, 'en', EN_INBOX_LABELS);
 
     expect(getRunFlowCoordinator(root).getFlow(flowId)).toMatchObject({
       state: 'CANCELLED', cancelReason: 'aborted',
@@ -396,12 +398,12 @@ describe('runs explicit retirement (505-001)', () => {
   it('keeps rejection for an awaiting-approval flow and refuses a terminal retirement', () => {
     const rejectableId = 'still-rejectable';
     proposedFlow(root, rejectableId, 'reject me');
-    runDecide(root, rejectableId, { reject: true }, 'en', DEFAULT_INBOX_LABELS);
+    runDecide(root, rejectableId, { reject: true }, 'en', EN_INBOX_LABELS);
     expect(getRunFlowCoordinator(root).getFlow(rejectableId)).toMatchObject({
       state: 'CANCELLED', cancelReason: 'rejected',
     });
 
-    expect(() => runDecide(root, rejectableId, { retire: true }, 'en', DEFAULT_INBOX_LABELS)).toThrow();
+    expect(() => runDecide(root, rejectableId, { retire: true }, 'en', EN_INBOX_LABELS)).toThrow();
     expect(getRunFlowCoordinator(root).getFlow(rejectableId)).toMatchObject({
       state: 'CANCELLED', cancelReason: 'rejected',
     });
@@ -409,7 +411,7 @@ describe('runs explicit retirement (505-001)', () => {
 });
 
 describe('buildInboxDetailLines — compact single-flow detail (D2 + F-3b relabel)', () => {
-  const labels = DEFAULT_INBOX_LABELS;
+  const labels = EN_INBOX_LABELS;
   const NOW = new Date('2026-07-16T10:00:00.000Z').getTime();
 
   it('renders header + full id + intent + progress + honestly-labeled updated line', () => {
@@ -440,7 +442,7 @@ describe('buildInboxDetailLines — compact single-flow detail (D2 + F-3b relabe
 // ─── F-3b — human-readable timestamps, duration, rich detail ─────────────────
 
 describe('formatInboxTimestamp — local absolute + localized relative age (F-3b)', () => {
-  const labels = DEFAULT_INBOX_LABELS;
+  const labels = EN_INBOX_LABELS;
 
   it('renders "YYYY-MM-DD HH:mm (relative)" for each age tier', () => {
     const base = new Date('2026-07-16T10:00:00.000Z').getTime();
@@ -496,15 +498,15 @@ describe('collectRunDetail + buildRunDetailLines — rich `/runs <n>` view (F-3b
     expect(detail.origin).toBe('api'); // the test proposal fixture's origin
     expect(detail.tasksTotal).toBe(0); // captured Sprint has no tasks in this fixture
 
-    const lines = buildRunDetailLines(detail, DEFAULT_INBOX_LABELS, NOW);
+    const lines = buildRunDetailLines(detail, EN_INBOX_LABELS, NOW);
     expect(lines).toContain('  intent: ship the feature');
     expect(lines).toContain('  origin: api');
     expect(lines).toContain('  progress: 4/4');
     // SURF-6 parity line: the FULL plan digest (the same hash Desktop shows).
     expect(lines).toContain('  digest: d-1');
     expect(lines).toContain(
-      DEFAULT_INBOX_LABELS.detailStarted.replace(
-        '{started}', formatInboxTimestamp('2026-07-16T09:00:00.000Z', DEFAULT_INBOX_LABELS, NOW)),
+      EN_INBOX_LABELS.detailStarted.replace(
+        '{started}', formatInboxTimestamp('2026-07-16T09:00:00.000Z', EN_INBOX_LABELS, NOW)),
     );
   });
 
@@ -517,11 +519,11 @@ describe('collectRunDetail + buildRunDetailLines — rich `/runs <n>` view (F-3b
     const rows = collectInboxRows(root);
     expect(rows[0]!.state).toBe('CANCELLED');
     const detail = collectRunDetail(root, rows[0]!);
-    const lines = buildRunDetailLines(detail, DEFAULT_INBOX_LABELS, NOW);
+    const lines = buildRunDetailLines(detail, EN_INBOX_LABELS, NOW);
 
     // REAL start (2026-07-14 from the handle) — NOT the abort stamp.
     expect(lines.find((l) => l.startsWith('  started:'))).toContain(
-      formatInboxTimestamp('2026-07-14T08:33:00.000Z', DEFAULT_INBOX_LABELS, NOW).slice(0, 16),
+      formatInboxTimestamp('2026-07-14T08:33:00.000Z', EN_INBOX_LABELS, NOW).slice(0, 16),
     );
     // Terminal flow → its updatedAt renders under "closed", never "started".
     expect(lines.some((l) => l.startsWith('  closed:'))).toBe(true);
@@ -536,7 +538,7 @@ describe('collectRunDetail + buildRunDetailLines — rich `/runs <n>` view (F-3b
       flowId: 'dur-1', state: 'COMPLETED', done: 1, total: 1, updatedAt: '2026-07-16T09:02:13.000Z',
     };
     const lines = buildRunDetailLines(
-      { row, startedAt: '2026-07-16T09:00:00.000Z' }, DEFAULT_INBOX_LABELS, NOW,
+      { row, startedAt: '2026-07-16T09:00:00.000Z' }, EN_INBOX_LABELS, NOW,
     );
     expect(lines).toContain('  duration: 2:13');
   });
@@ -552,9 +554,9 @@ describe('collectRunDetail + buildRunDetailLines — rich `/runs <n>` view (F-3b
     const rows = collectInboxRows(root);
     expect(rows[0]).toMatchObject({ completedAt: '2026-07-16T09:32:02.000Z', summary: 'Sprint done (32m 2s) — 4/4 tasks' });
 
-    const lines = buildRunDetailLines(collectRunDetail(root, rows[0]!), DEFAULT_INBOX_LABELS, NOW);
+    const lines = buildRunDetailLines(collectRunDetail(root, rows[0]!), EN_INBOX_LABELS, NOW);
     expect(lines.find((l) => l.startsWith('  closed:'))).toContain(
-      formatInboxTimestamp('2026-07-16T09:32:02.000Z', DEFAULT_INBOX_LABELS, NOW),
+      formatInboxTimestamp('2026-07-16T09:32:02.000Z', EN_INBOX_LABELS, NOW),
     );
     expect(lines).toContain('  duration: 32:02');
     expect(lines).toContain('  summary: Sprint done (32m 2s) — 4/4 tasks');
@@ -566,7 +568,7 @@ describe('collectRunDetail + buildRunDetailLines — rich `/runs <n>` view (F-3b
     _resetRunFlowCoordinatorsForTests();
 
     const rows = collectInboxRows(root);
-    const lines = buildRunDetailLines(collectRunDetail(root, rows[0]!), DEFAULT_INBOX_LABELS, NOW);
+    const lines = buildRunDetailLines(collectRunDetail(root, rows[0]!), EN_INBOX_LABELS, NOW);
     expect(lines.some((l) => l.startsWith('  duration:'))).toBe(false);
     expect(lines.some((l) => l.startsWith('  closed:'))).toBe(false); // completion time genuinely unknown
   });
@@ -579,7 +581,7 @@ describe('renderRunsCommand — /runs entry point (D1 list + D2 detail)', () => 
 
   it('bare /runs → the list; /runs <n> → that flow detail; /runs <bad> → not-found', () => {
     proposedFlow(root, 'flow-only', 'the intent');
-    const labels = DEFAULT_INBOX_LABELS;
+    const labels = EN_INBOX_LABELS;
 
     const list = renderRunsCommand(root, '/runs', labels);
     expect(list).toContain(labels.header);
@@ -593,7 +595,7 @@ describe('renderRunsCommand — /runs entry point (D1 list + D2 detail)', () => 
   });
 
   it('empty project → the empty notice for a bare /runs', () => {
-    expect(renderRunsCommand(root, '/runs', DEFAULT_INBOX_LABELS)).toBe(DEFAULT_INBOX_LABELS.empty);
+    expect(renderRunsCommand(root, '/runs', EN_INBOX_LABELS)).toBe(EN_INBOX_LABELS.empty);
   });
 });
 
@@ -619,7 +621,7 @@ describe('buildInboxLabels — i18n (SURF-3)', () => {
 // ─── D3b — in-card focus navigation (pure logic, Ink-free) ───────────────────
 
 describe('formatInboxRowBody — shared row body (no leading indent)', () => {
-  const labels = DEFAULT_INBOX_LABELS;
+  const labels = EN_INBOX_LABELS;
 
   it('renders the SAME body buildInboxLines indents by two spaces (one source of truth)', () => {
     const row: InboxRow = { flowId: '9c3d577a-xyz', state: 'COMPLETED', intentSummary: 'add auth', done: 3, total: 4 };

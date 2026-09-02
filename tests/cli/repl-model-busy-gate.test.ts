@@ -16,8 +16,10 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { resolveSwitchGate, type ReplLabels } from '../../src/cli/repl/app.js';
+import { getMessage } from '../../src/cli/helpers/messages.js';
 
-const NO_LABELS: Pick<ReplLabels, 'switchBusy'> = {};
+/** en gate label — app.tsx owns no English fallback since TERMINAL-TOOLS-002. */
+const EN_LABELS: Pick<ReplLabels, 'switchBusy'> = { switchBusy: getMessage('tui.switch_busy', 'en') };
 
 /** Mirrors app.tsx handleSubmit's `/model`/`/provider` gated block 1:1: only
  * the actual-switch path (an argument present) is gated; a status query never
@@ -38,16 +40,16 @@ function dispatchSwitch(
 
 describe('resolveSwitchGate — busy vs idle (born-533, 388-001)', () => {
   it('idle → apply (idle çalışır tıpkı öncesi gibi, byte-identical path)', () => {
-    expect(resolveSwitchGate(false, 'model', NO_LABELS)).toEqual({ kind: 'apply' });
-    expect(resolveSwitchGate(false, 'provider', NO_LABELS)).toEqual({ kind: 'apply' });
+    expect(resolveSwitchGate(false, 'model', EN_LABELS)).toEqual({ kind: 'apply' });
+    expect(resolveSwitchGate(false, 'provider', EN_LABELS)).toEqual({ kind: 'apply' });
   });
 
-  it('busy → rejected, with the English fallback line naming the switch kind', () => {
-    expect(resolveSwitchGate(true, 'model', NO_LABELS)).toEqual({
+  it('busy → rejected, with the injected en line naming the switch kind', () => {
+    expect(resolveSwitchGate(true, 'model', EN_LABELS)).toEqual({
       kind: 'rejected',
       line: 'cannot switch model while a turn is in progress — wait for it to finish, or /interrupt first',
     });
-    expect(resolveSwitchGate(true, 'provider', NO_LABELS)).toEqual({
+    expect(resolveSwitchGate(true, 'provider', EN_LABELS)).toEqual({
       kind: 'rejected',
       line: 'cannot switch provider while a turn is in progress — wait for it to finish, or /interrupt first',
     });
@@ -73,43 +75,43 @@ describe('resolveSwitchGate — busy vs idle (born-533, 388-001)', () => {
 describe('handleSubmit /model·/provider mirror — no backend splice while busy (race YOK)', () => {
   it('busy /model <arg> → onSwitch is NEVER called; the reject line is returned instead', () => {
     const onSwitch = vi.fn();
-    const line = dispatchSwitch(true, 'model', 'sonnet', onSwitch, NO_LABELS);
+    const line = dispatchSwitch(true, 'model', 'sonnet', onSwitch, EN_LABELS);
     expect(onSwitch).not.toHaveBeenCalled();
     expect(line).toBe('cannot switch model while a turn is in progress — wait for it to finish, or /interrupt first');
   });
 
   it('busy /provider <arg> → onSwitch is NEVER called; the reject line is returned instead', () => {
     const onSwitch = vi.fn();
-    const line = dispatchSwitch(true, 'provider', 'codex', onSwitch, NO_LABELS);
+    const line = dispatchSwitch(true, 'provider', 'codex', onSwitch, EN_LABELS);
     expect(onSwitch).not.toHaveBeenCalled();
     expect(line).toBe('cannot switch provider while a turn is in progress — wait for it to finish, or /interrupt first');
   });
 
   it('idle /model <arg> → onSwitch runs exactly once, no reject line (idle davranışı korunur)', () => {
     const onSwitch = vi.fn();
-    const line = dispatchSwitch(false, 'model', 'opus', onSwitch, NO_LABELS);
+    const line = dispatchSwitch(false, 'model', 'opus', onSwitch, EN_LABELS);
     expect(onSwitch).toHaveBeenCalledTimes(1);
     expect(line).toBeNull();
   });
 
   it('idle /provider <arg> → onSwitch runs exactly once, no reject line', () => {
     const onSwitch = vi.fn();
-    const line = dispatchSwitch(false, 'provider', 'gemini', onSwitch, NO_LABELS);
+    const line = dispatchSwitch(false, 'provider', 'gemini', onSwitch, EN_LABELS);
     expect(onSwitch).toHaveBeenCalledTimes(1);
     expect(line).toBeNull();
   });
 
   it('busy bare /model (no arg) → status query, NOT gated — onSwitch never applicable here', () => {
     const onSwitch = vi.fn();
-    const line = dispatchSwitch(true, 'model', undefined, onSwitch, NO_LABELS);
+    const line = dispatchSwitch(true, 'model', undefined, onSwitch, EN_LABELS);
     expect(onSwitch).not.toHaveBeenCalled();
     expect(line).toBeNull(); // handleSubmit's own else-branch renders the status line, not this gate
   });
 
   it('rapid busy /model then /provider both reject independently — no partial splice of either', () => {
     const onSwitch = vi.fn();
-    const modelLine = dispatchSwitch(true, 'model', 'haiku', onSwitch, NO_LABELS);
-    const providerLine = dispatchSwitch(true, 'provider', 'ollama', onSwitch, NO_LABELS);
+    const modelLine = dispatchSwitch(true, 'model', 'haiku', onSwitch, EN_LABELS);
+    const providerLine = dispatchSwitch(true, 'provider', 'ollama', onSwitch, EN_LABELS);
     expect(onSwitch).not.toHaveBeenCalled();
     expect(modelLine).toContain('model');
     expect(providerLine).toContain('provider');

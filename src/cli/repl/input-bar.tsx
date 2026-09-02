@@ -42,6 +42,10 @@ export interface InputBarProps {
    * ReplErrorBoundary) instead of silently rendering English. */
   menuMoreAbove: string;
   menuMoreBelow: string;
+  /** TERMINAL-TOOLS-002 — the Ctrl-R reverse-history prompt (tui.reverse_search
+   * via run.tsx buildReplLabels). REQUIRED injected label; the readline-ism
+   * literal that used to live here rendered in every language. */
+  reverseSearchLabel: string;
   /** Project root for persistent history (`.deckent/settings/repl-history`).
    * Injectable for tests (tmpdir); defaults to `process.cwd()` — the real
    * REPL's project root — when the caller (app.tsx) doesn't override it. */
@@ -220,6 +224,7 @@ export function InputBar(props: InputBarProps): ReactElement {
   // REPL error boundary, never a silently English menu.
   const menuMoreAbove = requireInjectedLabel('menuMoreAbove', props.menuMoreAbove);
   const menuMoreBelow = requireInjectedLabel('menuMoreBelow', props.menuMoreBelow);
+  const reverseSearchLabel = requireInjectedLabel('reverseSearchLabel', props.reverseSearchLabel);
   const projectRoot = props.historyProjectRoot ?? process.cwd();
   const [state, setState] = useState<InputState>(EMPTY_INPUT);
   const [menuSel, setMenuSel] = useState(0);
@@ -364,7 +369,7 @@ export function InputBar(props: InputBarProps): ReactElement {
     <Box flexDirection="column">
       {search ? (
         <Box>
-          <Text color={GOLD}>{`(reverse-i-search) `}</Text>
+          <Text color={GOLD}>{`${reverseSearchLabel} `}</Text>
           <Text dimColor>{`'${search.q}': `}</Text>
           <Text>{searchMatch || '—'}</Text>
         </Box>

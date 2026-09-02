@@ -10,9 +10,13 @@ import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render } from 'ink-testing-library';
 import { ApprovalCard } from '../../../src/cli/repl/approval-card.js';
-import { DEFAULT_APPROVAL_CARD_LABELS } from '../../../src/cli/repl/app.js';
+import { buildApprovalLabels } from '../../../src/cli/repl/run.js';
+import { getMessage } from '../../../src/cli/helpers/messages.js';
 import { validateApprovalRequest, type ApprovalRequest } from '../../../src/core/approval-contract.js';
 import type { ApprovalStreamEvent } from '../../../src/core/approval-eventstream.js';
+
+/** en card labels — app.tsx owns no default object since TERMINAL-TOOLS-002. */
+const EN_LABELS = buildApprovalLabels((k) => getMessage(k, 'en'));
 
 const tick = (ms = 25): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
@@ -47,12 +51,12 @@ describe('ApprovalCard — render + decide keypress (born-697, ink-testing-libra
   it('renders the pending request summary + risk badge', async () => {
     const req = buildRequest('apr-1');
     const { lastFrame } = render(
-      <ApprovalCard events={oneRequest(req)} onDecide={() => {}} decidedBy="terminal" channel="terminal" labels={DEFAULT_APPROVAL_CARD_LABELS} />,
+      <ApprovalCard events={oneRequest(req)} onDecide={() => {}} decidedBy="terminal" channel="terminal" labels={EN_LABELS} />,
     );
     await tick();
     const frame = lastFrame() ?? '';
     expect(frame).toContain('run rm -rf ./build');
-    expect(frame).toContain(DEFAULT_APPROVAL_CARD_LABELS.riskLabels.high);
+    expect(frame).toContain(EN_LABELS.riskLabels.high);
   });
 
   it('pressing y → onDecide(allow) AND onClosure(request, "allow") both fire', async () => {
@@ -60,7 +64,7 @@ describe('ApprovalCard — render + decide keypress (born-697, ink-testing-libra
     const onDecide = vi.fn();
     const onClosure = vi.fn();
     const { stdin } = render(
-      <ApprovalCard events={oneRequest(req)} onDecide={onDecide} onClosure={onClosure} decidedBy="terminal" channel="terminal" labels={DEFAULT_APPROVAL_CARD_LABELS} />,
+      <ApprovalCard events={oneRequest(req)} onDecide={onDecide} onClosure={onClosure} decidedBy="terminal" channel="terminal" labels={EN_LABELS} />,
     );
     await tick();
     stdin.write('y');
@@ -75,7 +79,7 @@ describe('ApprovalCard — render + decide keypress (born-697, ink-testing-libra
     const req = buildRequest('apr-3');
     const onClosure = vi.fn();
     const { stdin } = render(
-      <ApprovalCard events={oneRequest(req)} onDecide={() => {}} onClosure={onClosure} decidedBy="terminal" channel="terminal" labels={DEFAULT_APPROVAL_CARD_LABELS} />,
+      <ApprovalCard events={oneRequest(req)} onDecide={() => {}} onClosure={onClosure} decidedBy="terminal" channel="terminal" labels={EN_LABELS} />,
     );
     await tick();
     stdin.write('n');
@@ -87,7 +91,7 @@ describe('ApprovalCard — render + decide keypress (born-697, ink-testing-libra
     const req = buildRequest('apr-4');
     const onDecide = vi.fn();
     const { stdin } = render(
-      <ApprovalCard events={oneRequest(req)} onDecide={onDecide} decidedBy="terminal" channel="terminal" labels={DEFAULT_APPROVAL_CARD_LABELS} isActive={false} />,
+      <ApprovalCard events={oneRequest(req)} onDecide={onDecide} decidedBy="terminal" channel="terminal" labels={EN_LABELS} isActive={false} />,
     );
     await tick();
     stdin.write('y');

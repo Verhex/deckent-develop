@@ -9,12 +9,12 @@
 // Contract: run.tsx exposes buildLiveFooterLabels(t) mirroring
 // buildReplLabels(t); every LiveFooterLabels field maps to the pre-existing
 // `live_footer.*` key (messages.ts, Task 16 MESSAGES-KEYS-2 — present in
-// en+tr since then but never consumed), and the English catalog equals the
-// mechanism defaults so the two can never drift.
+// en+tr since then but never consumed); since TERMINAL-TOOLS-002 the mechanism
+// owns NO default set at all — the catalog is the only source.
 
 import { describe, it, expect } from 'vitest';
 import { buildLiveFooterLabels } from '../../../src/cli/repl/run.js';
-import { buildLiveFooter, DEFAULT_LIVE_FOOTER_LABELS, type LiveFooterLabels } from '../../../src/cli/helpers/live-footer.js';
+import { buildLiveFooter, LIVE_FOOTER_LABEL_FIELDS, type LiveFooterLabels } from '../../../src/cli/helpers/live-footer.js';
 import { getMessage, getMessageLanguages } from '../../../src/cli/helpers/messages.js';
 
 const KEY_BY_FIELD: Record<keyof LiveFooterLabels, string> = {
@@ -33,7 +33,7 @@ const KEY_BY_FIELD: Record<keyof LiveFooterLabels, string> = {
 
 describe('buildLiveFooterLabels — live_footer.* catalog wire', () => {
   it('maps every LiveFooterLabels field to a key that resolves in en AND tr', () => {
-    const fields = Object.keys(DEFAULT_LIVE_FOOTER_LABELS) as (keyof LiveFooterLabels)[];
+    const fields = [...LIVE_FOOTER_LABEL_FIELDS];
     expect(Object.keys(KEY_BY_FIELD).sort()).toEqual(fields.slice().sort());
     for (const field of fields) {
       expect(getMessageLanguages(KEY_BY_FIELD[field]), field).toEqual(expect.arrayContaining(['en', 'tr']));
@@ -42,9 +42,9 @@ describe('buildLiveFooterLabels — live_footer.* catalog wire', () => {
     for (const field of fields) expect(tr[field], field).toBe(getMessage(KEY_BY_FIELD[field], 'tr'));
   });
 
-  it('English catalog values equal the mechanism defaults (no drift between catalog and DEFAULT_LIVE_FOOTER_LABELS)', () => {
+  it('every en field is the catalog row itself (the mechanism exports no default set)', () => {
     const en = buildLiveFooterLabels((k) => getMessage(k, 'en'));
-    expect(en).toEqual(DEFAULT_LIVE_FOOTER_LABELS);
+    for (const field of LIVE_FOOTER_LABEL_FIELDS) expect(en[field], field).toBe(getMessage(KEY_BY_FIELD[field], 'en'));
   });
 
   it('Turkish idle line is no longer the English default', () => {

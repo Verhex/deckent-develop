@@ -15,6 +15,7 @@
 // buildSegmentTurns / tapApprovalEvents.
 
 import { describe, it, expect, vi } from 'vitest';
+import { InjectedLabelMissingError } from '../../src/cli/helpers/injected-label.js';
 import {
   runNativeTurnLoop,
   formatTurnErrorLine,
@@ -195,9 +196,10 @@ describe('runNativeTurnLoop — chat persistence (REPL-575 K3)', () => {
   });
 });
 
-describe('formatTurnErrorLine — visible-error i18n fallback (387-003)', () => {
-  it('falls back to the English default template with the message substituted', () => {
-    expect(formatTurnErrorLine('kaboom')).toBe('⚠ turn failed: kaboom');
+describe('formatTurnErrorLine — visible-error line (387-003; string-free since TERMINAL-TOOLS-002)', () => {
+  it('throws the typed guard error when the label is missing — no English fallback', () => {
+    expect(() => formatTurnErrorLine('kaboom', undefined as unknown as string)).toThrow(InjectedLabelMissingError);
+    expect(() => formatTurnErrorLine('kaboom', '')).toThrow(InjectedLabelMissingError);
   });
 
   it('substitutes {error} into a caller-supplied localized label', () => {

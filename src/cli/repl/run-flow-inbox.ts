@@ -236,54 +236,6 @@ export interface InboxLabels {
   timeDaysAgo: string;
 }
 
-/** English-default inbox labels (string-free component; the caller injects a
- *  localized set via run.tsx). Same fallback-until-i18n-wired precedent as
- *  DEFAULT_APPROVAL_CARD_LABELS. */
-export const DEFAULT_INBOX_LABELS: InboxLabels = {
-  header: 'Active runs',
-  hint: 'Tip: `deckent status <id>` follows one',
-  empty: 'No runs yet — start one with `deckent do "<goal>"`',
-  stateLabels: {
-    COLLECTING: 'collecting',
-    PROPOSAL_READY: 'proposed',
-    PREVIEWING: 'previewing',
-    AWAITING_APPROVAL: 'awaiting approval',
-    APPROVED: 'approved',
-    STARTING: 'starting',
-    DETACHED_RUNNING: 'running',
-    COMPLETED: 'completed',
-    FAILED: 'failed',
-    CANCELLED: 'cancelled',
-    BLOCKED: 'blocked',
-  },
-  detailHeader: 'Run {id} · {state}',
-  detailFullId: '  id: {id}',
-  detailIntent: '  intent: {intent}',
-  detailProgress: '  progress: {done}/{total}',
-  detailStarted: '  started: {started}',
-  notFound: 'No run #{arg} — `/runs` lists them',
-  followNavHint: '↑↓ select · ↵ open · Esc close · ⟳ live',
-  followDetailHint: '↑↓ browse · Esc back · ⟳ live',
-  decideHintAwaiting: 'a approve · f full ahead · r reject',
-  decideHintApproved: 's start',
-  livenessDead: 'process died',
-  livenessUnknown: 'unverified',
-  detailLivenessDead: '  liveness: process died (pid {pid})',
-  detailLivenessUnknown: '  liveness: unverified — the run predates pid tracking',
-  detailOrigin: '  origin: {origin}',
-  detailTasks: '  tasks: {count}',
-  detailUpdated: '  updated: {time}',
-  detailClosed: '  closed: {time}',
-  detailDuration: '  duration: {duration}',
-  detailSummary: '  summary: {summary}',
-  detailReason: '  reason: {reason}',
-  detailDigest: '  digest: {digest}',
-  timeJustNow: 'just now',
-  timeMinutesAgo: '{n} min ago',
-  timeHoursAgo: '{n} h ago',
-  timeDaysAgo: '{n} d ago',
-};
-
 const SHORT_ID_LEN = 8;
 
 /** Render one row's BODY (no leading indent): "{n}. {shortId} · {state}{metrics}{intent}".

@@ -38,6 +38,7 @@ import { createPermissionStore } from './commands/chat-permissions.js';
 import { slashCompleter, buildSlashRegistry } from './commands/chat-slash-registry.js';
 import { slashMenuOnKeypress, renderSlashMenu, filterSlashCommands } from './commands/chat-slash-menu.js';
 import { createPromptRegion, createThinkingTicker, createPasteCoalescer, createLineBufferedSink } from './commands/chat-render-region.js';
+import { buildThinkingVerbs } from './commands/chat-thinking-verbs.js';
 import { createStreamMarkdown } from './commands/chat-render.js';
 import {
   OPENAI_COMPAT_PRESETS,
@@ -682,9 +683,12 @@ export async function launchDefaultRepl(): Promise<void> {
   // boxed internally; this try/catch is only a backstop so the snapshot can
   // never block or crash REPL boot.
   const healthRoot = process.cwd();
+  // TERMINAL-TOOLS-002 — ONE session-language resolution for every line this
+  // boot path emits (health line, banner hint, `/` menu, loop, spinner, ticker).
+  const replLang = getLangFromConfig(healthRoot);
   try {
     const snapshot = await buildHealthSnapshot(healthRoot);
-    process.stdout.write(`${renderHealthSnapshot(snapshot, getLangFromConfig(healthRoot))}\n`);
+    process.stdout.write(`${renderHealthSnapshot(snapshot, replLang)}\n`);
   } catch {
     // best-effort UX chrome only
   }
@@ -721,7 +725,7 @@ export async function launchDefaultRepl(): Promise<void> {
   process.stdout.write(renderBanner(
     { provider: providerName, dir: process.cwd() },
     undefined,
-    getMessage('tui.banner.hint', getLangFromConfig(healthRoot)),
+    getMessage('tui.banner.hint', replLang),
   ));
 
   // Sprint 224 — interactive REPL render model.
@@ -775,7 +779,7 @@ export async function launchDefaultRepl(): Promise<void> {
   if (isTty) {
     // TERMINAL-TOOLS-001 — the legacy `/` menu renders the catalog descriptions
     // in the project's configured language (same source the health line uses).
-    const slashRegistry = buildSlashRegistry(getLangFromConfig(healthRoot));
+    const slashRegistry = buildSlashRegistry(replLang);
     let menuShownFor: string | null = null;
     process.stdin.on('keypress', () => {
       // Defer so readline has updated rl.line for this keystroke.
@@ -920,9 +924,12 @@ export async function launchDefaultRepl(): Promise<void> {
     // T-224-014 — rotating-verb ticker animates `● deckent · <fiil>…` on its
     // own line during thinking and finalizes to `● deckent` + newline on the
     // first token (reply then streams inline below). Off-TTY: no-op spinner.
+    // TERMINAL-TOOLS-002 — both indicators take their text from the catalog
+    // for the session language (ticker verb pool + spinner label); neither
+    // mechanism owns a literal any more.
     thinkingIndicator: isTty
-      ? createThinkingTicker(process.stdout, { isTty })
-      : createSpinner('düşünüyor…'),
+      ? createThinkingTicker(process.stdout, { isTty, verbs: buildThinkingVerbs(replLang) })
+      : createSpinner(getMessage('tui.thinking', replLang)),
     // T-224-002 — on an interactive TTY readline already echoes the typed line,
     // so the loop suppresses its own `› line` echo to avoid the double-print.
     interactiveTty: isTty,
@@ -931,7 +938,7 @@ export async function launchDefaultRepl(): Promise<void> {
     // health line, banner and `/` menu above use. Without this the loop
     // defaulted to 'en' (chat-native.ts) — the refreshed pipe proof showed an
     // English "Commands:" list under a Turkish health line.
-    lang: getLangFromConfig(healthRoot),
+    lang: replLang,
   });
 
   // Sprint 223 T-223-001 — persistent claude session cleanup. The `:exit`

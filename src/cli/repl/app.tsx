@@ -41,13 +41,9 @@ import { ApprovalCard, createApprovalCardQueue, type ApprovalCardLabels, type Ap
 import { composeDualStream } from './dual-stream.js';
 import type { ApprovalTerminalChannel } from './approval-terminal-channel.js';
 import type { ApprovalStreamEvent } from '../../core/approval-eventstream.js';
-import type { ApprovalRisk } from '../../core/approval-contract.js';
-import {
-  PlanPreviewCard,
-  buildPlanPreviewCardLabels,
-  type PlanPreviewCardLabels,
-} from './plan-preview-card.js';
+import { PlanPreviewCard, type PlanPreviewCardLabels } from './plan-preview-card.js';
 import { InboxCard } from './inbox-card.js';
+import { requireInjectedLabel } from '../helpers/injected-label.js';
 import type { InboxRow, InboxLabels, InboxDecisionVerb } from './run-flow-inbox.js';
 import type { RunFlowContext, PlanPreview } from '../../core/run-flow-contract.js';
 import type { RunFlowController } from './run-flow-controller.js';
@@ -145,12 +141,13 @@ export function createConfirmQueue(onChange: () => void): ConfirmQueue {
  * `createConfirmQueue` above.
  */
 
-/** Resolve the mode-indicator label (Ask/Run/Control). English fallback until
- * a caller wires localized labels (messages round-7, Task 354-016). */
+/** Resolve the mode-indicator label (Ask/Run/Control) from the injected set
+ * (run.tsx `tui.mode_*`). TERMINAL-TOOLS-002: no English fallback — a missing
+ * injection is a typed InjectedLabelMissingError (REPL error boundary). */
 export function resolveModeLabel(mode: TermMode, labels: Pick<ReplLabels, 'modeAsk' | 'modeRun' | 'modeControl'>): string {
-  if (mode === 'ask') return labels.modeAsk ?? 'Ask';
-  if (mode === 'run') return labels.modeRun ?? 'Run';
-  return labels.modeControl ?? 'Control';
+  if (mode === 'ask') return requireInjectedLabel('modeAsk', labels.modeAsk);
+  if (mode === 'run') return requireInjectedLabel('modeRun', labels.modeRun);
+  return requireInjectedLabel('modeControl', labels.modeControl);
 }
 
 /** Map drained ChatTurnPayloads (ChatTurnQueue.drainAsTurns()) to the flat
@@ -294,11 +291,11 @@ export function buildResumePickerLines(
 ): string[] {
   const combined = [...disk, ...chat];
   if (combined.length === 0) return [];
-  const lines: string[] = [labels.resumeHeader ?? 'Recent sessions'];
+  const lines: string[] = [requireInjectedLabel('resumeHeader', labels.resumeHeader)];
   combined.forEach((s, i) => {
     lines.push(`  ${i + 1}. ${s.title} · ${s.status} · ${shortSessionTime(s.date)}`);
   });
-  lines.push(labels.resumeHint ?? 'Tip: /resume <number> to continue a session');
+  lines.push(requireInjectedLabel('resumeHint', labels.resumeHint));
   return lines;
 }
 
@@ -340,47 +337,44 @@ export function resolveResumeCommand(
       sessionId: picked.session.id,
       // Same-object check is safe: `combined` holds the caller's own records.
       forwardToLoop: chat.includes(picked.session),
-      line: (labels.resumeSwitched ?? 'resumed: {id}').replace('{id}', picked.session.id),
+      line: requireInjectedLabel('resumeSwitched', labels.resumeSwitched).replace('{id}', picked.session.id),
     };
   }
   if (picked.kind === 'ambiguous') {
     const ids = picked.matches.map((m) => m.id).join(' · ');
-    return { kind: 'reject', line: (labels.resumeAmbiguous ?? 'ambiguous — matches: {matches}').replace('{matches}', ids) };
+    return { kind: 'reject', line: requireInjectedLabel('resumeAmbiguous', labels.resumeAmbiguous).replace('{matches}', ids) };
   }
   if (/^\d+$/.test(trimmed)) {
-    return { kind: 'reject', line: (labels.resumeNotFound ?? 'session not found: {arg}').replace('{arg}', trimmed) };
+    return { kind: 'reject', line: requireInjectedLabel('resumeNotFound', labels.resumeNotFound).replace('{arg}', trimmed) };
   }
   return { kind: 'passthrough' };
 }
 
 /** Map a busy-controls decision to its display line (labels injected by the
- * caller; English defaults — same fallback precedent as resolveModeLabel). */
+ * caller — run.tsx `tui.busy_*`; TERMINAL-TOOLS-002: no English defaults, a
+ * missing injection throws the typed guard error). */
 export function renderBusyDecision(
   decision: QueueStatusDecision | InterruptDecision | SteerDecision,
   labels: Pick<ReplLabels,
     'busyQueueStatus' | 'busyStateBusy' | 'busyStateIdle' | 'busyInterrupted' |
     'busyInterruptIdle' | 'busyInterruptDup' | 'busySteerQueued' | 'busySteerIdle' | 'busySteerEmpty'>,
 ): string {
+  const need = (field: keyof typeof labels): string => requireInjectedLabel(field, labels[field]);
   switch (decision.kind) {
     case 'queue-status': {
-      const state = decision.busy ? (labels.busyStateBusy ?? 'busy') : (labels.busyStateIdle ?? 'idle');
-      return (labels.busyQueueStatus ?? 'queue: {count} background · {state}')
+      const state = decision.busy ? need('busyStateBusy') : need('busyStateIdle');
+      return need('busyQueueStatus')
         .replace('{count}', String(decision.pendingBackgroundBuckets))
         .replace('{state}', state);
     }
     case 'interrupted':
-      return labels.busyInterrupted ?? 'interrupt requested — stopping after the current step';
+      return need('busyInterrupted');
     case 'interrupt-noop':
-      return decision.reason === 'idle'
-        ? (labels.busyInterruptIdle ?? 'nothing running to interrupt')
-        : (labels.busyInterruptDup ?? 'interrupt already requested');
+      return decision.reason === 'idle' ? need('busyInterruptIdle') : need('busyInterruptDup');
     case 'steer-queued':
-      return (labels.busySteerQueued ?? 'steer note queued (#{position}) — applied at turn end')
-        .replace('{position}', String(decision.position));
+      return need('busySteerQueued').replace('{position}', String(decision.position));
     case 'steer-noop':
-      return decision.reason === 'idle'
-        ? (labels.busySteerIdle ?? 'nothing running to steer')
-        : (labels.busySteerEmpty ?? 'usage: /steer <message>');
+      return decision.reason === 'idle' ? need('busySteerIdle') : need('busySteerEmpty');
   }
 }
 
@@ -508,30 +502,13 @@ export function isTurnLive(turnEpoch: number, clearEpoch: number): boolean {
  * is not a project dependency, see repl-surface-wire.test.tsx / approval-card.test.tsx).
  */
 
-/** English-default labels for ApprovalCard (string-free component; caller
- * injects labels). Messages round-8 (Task 15, MESSAGES-KEYS-4) wires real
- * en/tr keys through run.tsx and DEPENDS ON this task, so this is the same
- * fallback-until-i18n-wired precedent as resolveModeLabel's English default. */
-export const DEFAULT_APPROVAL_CARD_LABELS: ApprovalCardLabels = {
-  hint: '(y = approve · n = deny · a = approve similar · d = details)',
-  progress: '[{index}/{total}]',
-  detailsHeading: 'Details',
-  noArgs: '(no arguments)',
-  riskLabels: {
-    none: 'NONE',
-    low: 'LOW',
-    medium: 'MEDIUM',
-    high: 'HIGH',
-    critical: 'CRITICAL',
-  } satisfies Record<ApprovalRisk, string>,
-};
-
 /**
  * born-697 (SURF-3 approval last-mile) — build the visible transcript line for a
  * terminal approve/deny. Pure + exported so it is testable without mounting Ink
  * (same "pull decision logic out of the component" seam as confirmKeyToAnswer /
  * buildSegmentTurns). `{summary}` is interpolated from the request; the templates
- * carry English fallbacks until run.tsx wires the approval.terminal.* keys.
+ * are the injected `approval.terminal.*` rows (run.tsx) — TERMINAL-TOOLS-002
+ * removed the English fallbacks (typed guard error instead).
  */
 export function formatApprovalClosure(
   decision: 'allow' | 'deny',
@@ -539,8 +516,8 @@ export function formatApprovalClosure(
   labels: Pick<ReplLabels, 'approvalApproved' | 'approvalRejected'>,
 ): string {
   const template = decision === 'allow'
-    ? (labels.approvalApproved ?? '✅ Approved — {summary}')
-    : (labels.approvalRejected ?? '✖ Rejected — {summary}');
+    ? requireInjectedLabel('approvalApproved', labels.approvalApproved)
+    : requireInjectedLabel('approvalRejected', labels.approvalRejected);
   return template.replace('{summary}', summary);
 }
 
@@ -616,12 +593,6 @@ export function resolveStdinOwner(confirmOpen: boolean, approvalPending: boolean
  * at the two JSX call sites below.
  */
 
-/** English-default labels for PlanPreviewCard, mirroring DEFAULT_APPROVAL_CARD_LABELS's
- *  fallback-until-real-labels-are-wired precedent (run.tsx wires real en/tr via
- *  buildPlanPreviewCardLabels — plan-preview-card.tsx). */
-export const DEFAULT_PLAN_PREVIEW_CARD_LABELS: PlanPreviewCardLabels =
-  buildPlanPreviewCardLabels('en');
-
 /** Derive the PlanPreviewCard's `preview` prop from the controller's live
  *  context — null whenever the flow is not AWAITING_APPROVAL (proposed-but-
  *  not-yet-previewed, approved, rejected, cancelled, …), so the card only
@@ -657,12 +628,6 @@ export interface RunFlowMountLabels {
   error: string;
 }
 
-export const DEFAULT_RUN_FLOW_MOUNT_LABELS: RunFlowMountLabels = {
-  started: 'Run started — job {jobId}.',
-  rejected: 'Run proposal rejected.',
-  error: 'Run flow error: {error}',
-};
-
 /** The outcome of a PlanPreviewCard decision, after the controller's
  *  approve()/startApproved()/reject() calls have run (side effects already
  *  happened by the time this is built — this only formats the RESULT). */
@@ -685,19 +650,14 @@ export function formatRunFlowOutcomeLine(outcome: RunFlowOutcome, labels: RunFlo
 /** Localized labels for the two NON-run edges of the REPL `/do <goal>` slash
  *  (452-002 REPL-DO-SLASH-WIRE). `flagOff` = terminal.run_flow_v2 off (no
  *  controller mounted); `usage` = bare `/do` with no goal. Injected by run.tsx's
- *  `buildDoSlashLabels(t)`; absent → DEFAULT_DO_SLASH_LABELS (English). The RUN
- *  edge carries no string of its own — it reuses the shared RunFlow chain
- *  (proposeRun → deriveRunFlowPreview → PlanPreviewCard), so this component
- *  stays string-free per the i18n-FIRST caller-injects-labels rule. */
+ *  `buildDoSlashLabels(t)` (required — TERMINAL-TOOLS-002 removed the English
+ *  default object). The RUN edge carries no string of its own — it reuses the
+ *  shared RunFlow chain (proposeRun → deriveRunFlowPreview → PlanPreviewCard),
+ *  so this component stays string-free per the i18n-FIRST rule. */
 export interface DoSlashLabels {
   flagOff: string;
   usage: string;
 }
-
-export const DEFAULT_DO_SLASH_LABELS: DoSlashLabels = {
-  flagOff: '/do requires the RunFlow surface — enable terminal.run_flow_v2 in .deckent/config.json.',
-  usage: 'usage: /do <goal> — describe what to plan and run.',
-};
 
 /** Dependency-injected effect seam for the REPL `/do <goal>` slash (452-002),
  *  extracted from handleSubmit so the wiring is unit-testable without mounting
@@ -809,53 +769,53 @@ export interface ReplLabels {
   cdTo: string;         // "dizin"
   cdFail: string;       // "dizin değiştirilemedi"
   /** Mode-indicator labels (Ask/Run/Control) — REPL-SURFACE-WIRE (354-001)
-   * seam; optional, English fallback until messages round-7 (Task 354-016)
-   * wires en/tr keys through run.tsx. */
-  modeAsk?: string;
-  modeRun?: string;
-  modeControl?: string;
+   * seam, wired to tui.mode_* by run.tsx. TERMINAL-TOOLS-002: every field
+   * below is REQUIRED — the mechanism owns no English fallback; a missing
+   * injection throws InjectedLabelMissingError (see helpers/injected-label.ts). */
+  modeAsk: string;
+  modeRun: string;
+  modeControl: string;
   /** `/term` dispatch lines (term-mode.ts refactor — /ask·/run·/control retired).
    * `{mode}`/`{approval}` are i18n templates (same precedent as confirmProgress);
-   * optional with English fallbacks, wired to tui.term_* keys by run.tsx. */
-  termSwitched?: string; // "terminal mode switched: {mode}"
-  termStatus?: string;   // "terminal mode: {mode} · write approval: {approval}"
-  termUsage?: string;    // "usage: /term ask|run|control — ..."
-  /** APP-SURFACE-WIRE (358-006) — resume-teaser/picker + busy-controls labels;
-   * optional, English fallback until a messages round wires en/tr keys through
-   * run.tsx (same seam precedent as the mode labels above). */
-  resumeHeader?: string;    // "Recent sessions"
-  resumeHint?: string;      // "Tip: /resume <number> to continue a session"
-  resumeSwitched?: string;  // "resumed: {id}"
-  resumeNotFound?: string;  // "session not found: {arg}"
-  resumeAmbiguous?: string; // "ambiguous — matches: {matches}"
-  busyQueueStatus?: string; // "queue: {count} background · {state}"
-  busyStateBusy?: string;   // "busy"
-  busyStateIdle?: string;   // "idle"
-  busyInterrupted?: string; // "interrupt requested — stopping after the current step"
-  busyInterruptIdle?: string; // "nothing running to interrupt"
-  busyInterruptDup?: string;  // "interrupt already requested"
-  busySteerQueued?: string;   // "steer note queued (#{position}) — applied at turn end"
-  busySteerIdle?: string;     // "nothing running to steer"
-  busySteerEmpty?: string;    // "usage: /steer <message>"
-  /** REPL-TURN-EXCEPTION-SURFACE (387-003) — turn-loop exception label; optional,
-   * English fallback until a messages round wires a real i18n key (tui.turn_error)
-   * through run.tsx (same seam precedent as the busy-controls labels above). */
-  turnError?: string; // "turn failed: {error}"
-  /** REPL-MODEL-BUSY-GATE (388-001) — `/model`/`/provider` busy-reject warning;
-   * optional, English fallback until a messages round wires a real i18n key
-   * (tui.switch_busy) through run.tsx (same seam precedent as `turnError` above). */
-  switchBusy?: string; // "cannot switch {kind} while a turn is in progress — wait for it to finish, or /interrupt first"
+   * wired to tui.term_* keys by run.tsx. */
+  termSwitched: string; // "terminal mode switched: {mode}"
+  termStatus: string;   // "terminal mode: {mode} · write approval: {approval}"
+  termUsage: string;    // "usage: /term ask|run|control — ..."
+  /** APP-SURFACE-WIRE (358-006) — resume-teaser/picker + busy-controls labels
+   * (tui.resume_picker_* / tui.busy_* keys, run.tsx). */
+  resumeHeader: string;    // "Recent sessions"
+  resumeHint: string;      // "Tip: /resume <number> to continue a session"
+  resumeSwitched: string;  // "resumed: {id}"
+  resumeNotFound: string;  // "session not found: {arg}"
+  resumeAmbiguous: string; // "ambiguous — matches: {matches}"
+  busyQueueStatus: string; // "queue: {count} background · {state}"
+  busyStateBusy: string;   // "busy"
+  busyStateIdle: string;   // "idle"
+  busyInterrupted: string; // "interrupt requested — stopping after the current step"
+  busyInterruptIdle: string; // "nothing running to interrupt"
+  busyInterruptDup: string;  // "interrupt already requested"
+  busySteerQueued: string;   // "steer note queued (#{position}) — applied at turn end"
+  busySteerIdle: string;     // "nothing running to steer"
+  busySteerEmpty: string;    // "usage: /steer <message>"
+  /** REPL-TURN-EXCEPTION-SURFACE (387-003) — turn-loop exception label
+   * (tui.turn_error, `{error}` template). */
+  turnError: string; // "turn failed: {error}"
+  /** REPL-MODEL-BUSY-GATE (388-001) — `/model`/`/provider` busy-reject warning
+   * (tui.switch_busy, `{kind}` template). */
+  switchBusy: string; // "cannot switch {kind} while a turn is in progress — wait for it to finish, or /interrupt first"
   /** born-697 (SURF-3 approval last-mile) — the visible closure line pushed to
    * the transcript when the user decides an approval on the terminal. `{summary}`
-   * is the request summary (i18n template, same precedent as `turnError`).
-   * Without these, a terminal approve/deny silently retired the card with no
-   * confirmation of what was decided. Optional, English fallback until run.tsx
-   * wires the approval.terminal.* keys. */
-  approvalApproved?: string; // "✅ Approved — {summary}"
-  approvalRejected?: string; // "✖ Rejected — {summary}"
+   * is the request summary (approval.terminal.* keys, run.tsx). Without these,
+   * a terminal approve/deny silently retired the card with no confirmation of
+   * what was decided. */
+  approvalApproved: string; // "✅ Approved — {summary}"
+  approvalRejected: string; // "✖ Rejected — {summary}"
   /** TERM-AT-REF (583/N2b) — localized hint under the InputBar's `@` path
    * menu (tui.atref_menu_hint; same injected-labels route as `menuHint`). */
-  atMenuHint?: string;
+  atMenuHint: string;
+  /** TERMINAL-TOOLS-002 — the Ctrl-R reverse-history prompt of the composer
+   * (tui.reverse_search). Was a readline-ism literal inside input-bar.tsx. */
+  reverseSearch: string; // the Ctrl-R prompt text
 }
 
 /**
@@ -948,9 +908,7 @@ export function resolveSwitchGate(
   labels: Pick<ReplLabels, 'switchBusy'>,
 ): SwitchGateDecision {
   if (!working) return { kind: 'apply' };
-  const line = (labels.switchBusy
-    ?? 'cannot switch {kind} while a turn is in progress — wait for it to finish, or /interrupt first'
-  ).replace('{kind}', kind);
+  const line = requireInjectedLabel('switchBusy', labels.switchBusy).replace('{kind}', kind);
   return { kind: 'rejected', line };
 }
 
@@ -1014,12 +972,11 @@ export async function runNativeTurnLoop(
 /** Format a turn-loop exception as the visible error line pushed into the
  * transcript. The `⚠ ` prefix is owned by this function (same prefix
  * ReplErrorBoundary below already uses for render errors) — kept OUT of the
- * label default so a real localized string (messages round + run.tsx wiring,
- * out of this task's scope) is not forced to embed a decorative glyph.
- * `{error}` template + English-fallback follows the same precedent as
- * `resumeSwitched`/`busySteerQueued` above. */
-export function formatTurnErrorLine(message: string, label?: string): string {
-  return `⚠ ${(label ?? 'turn failed: {error}').replace('{error}', message)}`;
+ * label so the localized `tui.turn_error` row (run.tsx) is not forced to
+ * embed a decorative glyph. `label` is the injected `{error}` template;
+ * TERMINAL-TOOLS-002 removed the English fallback (typed guard error). */
+export function formatTurnErrorLine(message: string, label: string): string {
+  return `⚠ ${requireInjectedLabel('turnError', label).replace('{error}', message)}`;
 }
 
 /**
@@ -1086,8 +1043,8 @@ export interface ReplAppProps {
    *  static list. */
   inboxFollowFeed?: () => InboxRow[];
   /** SURF-3 D3b — localized labels for the live inbox card (row/detail render +
-   *  nav footers). Injected by run.tsx; absent → English DEFAULT_INBOX_LABELS. */
-  inboxLabels?: InboxLabels;
+   *  nav footers). Injected by run.tsx (buildInboxLabels) — required. */
+  inboxLabels: InboxLabels;
   /** SURF-6 — in-card decision executor for the live inbox card (approve /
    *  full-ahead / reject / start on the focused run's detail). Injected by
    *  run.tsx (shared decision service); absent → decision keys are inert. */
@@ -1127,10 +1084,9 @@ export interface ReplAppProps {
    * straight through to <ApprovalCard>. Absent -> no card, regardless of
    * `approvalsEnabled` (nothing to subscribe to). */
   approvalChannel?: ApprovalTerminalChannel;
-  /** Optional label override for the approval card; defaults to
-   * DEFAULT_APPROVAL_CARD_LABELS (English) until messages round-8 (Task 15,
-   * MESSAGES-KEYS-4 — depends on this task) wires localized keys through run.tsx. */
-  approvalLabels?: ApprovalCardLabels;
+  /** Localized approval-card labels (run.tsx buildApprovalLabels, the
+   * `approval_card.*` rows) — required; the mechanism owns no English set. */
+  approvalLabels: ApprovalCardLabels;
   /**
    * TERM-FLOW-UNIFY Sprint-4 mount (426-002) — `terminal.run_flow_v2` seam
    * (run.tsx's `wireRunFlowMount`). Present only when the flag is on AND the
@@ -1138,19 +1094,16 @@ export interface ReplAppProps {
    * InputBar/stdin-mutex render stays byte-identical to the pre-426-002 App.
    */
   runFlowController?: RunFlowController;
-  /** Optional label override for the plan-preview card; defaults to
-   * DEFAULT_PLAN_PREVIEW_CARD_LABELS (English) until run.tsx's
-   * buildPlanPreviewCardLabels(lang) supplies real en/tr labels. */
-  runFlowCardLabels?: PlanPreviewCardLabels;
-  /** Optional label override for the approve/reject/error transcript lines;
-   * defaults to DEFAULT_RUN_FLOW_MOUNT_LABELS (English) until run.tsx's
-   * buildRunFlowMountLabels(t) supplies real en/tr labels. */
-  runFlowMountLabels?: RunFlowMountLabels;
+  /** Localized plan-preview card labels (run.tsx buildPlanPreviewCardLabels(lang))
+   * — required regardless of whether a controller is mounted. */
+  runFlowCardLabels: PlanPreviewCardLabels;
+  /** Localized approve/reject/error transcript lines (run.tsx
+   * buildRunFlowMountLabels(t), `runFlow.mount.*`) — required. */
+  runFlowMountLabels: RunFlowMountLabels;
   /** 452-002 — labels for the `/do <goal>` slash's two non-run edges (flag-off
-   * notice + bare-usage hint). Injected by run.tsx's buildDoSlashLabels(t);
-   * absent → DEFAULT_DO_SLASH_LABELS (English). The run edge reuses
-   * `runFlowController` (no new string). */
-  doSlashLabels?: DoSlashLabels;
+   * notice + bare-usage hint). Injected by run.tsx's buildDoSlashLabels(t) —
+   * required. The run edge reuses `runFlowController` (no new string). */
+  doSlashLabels: DoSlashLabels;
   /**
    * TERM5-UI (sprint-427, task 6) — registers the sink run.tsx's
    * `wireRunFlowResultWatch` feeds a flowId-correlated, already-localized
@@ -1691,17 +1644,16 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       const termCmd = parseTermCommand(trimmed);
       if (termCmd.kind !== 'none') {
         pushTurn('user', trimmed);
-        const usage = labels.termUsage
-          ?? 'usage: /term ask|run|control — file-write approval is separate: /approve suggest|auto-edit|full-auto';
+        const usage = requireInjectedLabel('termUsage', labels.termUsage);
         if (termCmd.kind === 'switch') {
           const result = applyModeTarget(termMode, termCmd.target);
           if (result.changed) setTermMode(result.state);
-          pushTurn('seg', (labels.termSwitched ?? 'terminal mode switched: {mode}')
+          pushTurn('seg', requireInjectedLabel('termSwitched', labels.termSwitched)
             .replace('{mode}', resolveModeLabel(result.state.mode, labels)));
         } else if (termCmd.kind === 'status') {
           // Status names BOTH gates: term-mode (command risk) AND the agentic
           // approval mode — file writes are gated by /approve, not /term.
-          const status = (labels.termStatus ?? 'terminal mode: {mode} · write approval: {approval}')
+          const status = requireInjectedLabel('termStatus', labels.termStatus)
             .replace('{mode}', resolveModeLabel(termMode.mode, labels))
             .replace('{approval}', approval);
           pushTurn('seg', `${status}\n${usage}`);
@@ -1764,12 +1716,12 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           pushTurn('user', trimmed);
           const hydrated = hydrateNativeResume(literalId, props.cwd, nativeEngine, memory);
           if (hydrated.source === 'missing') {
-            pushTurn('seg', (labels.resumeNotFound ?? 'session not found: {arg}').replace('{arg}', literalId));
+            pushTurn('seg', requireInjectedLabel('resumeNotFound', labels.resumeNotFound).replace('{arg}', literalId));
           } else {
             setActiveSessionId(literalId);
             activeSessionIdRef.current = literalId;
             setSessionTok(hydrated.outputTokens);
-            pushTurn('seg', (labels.resumeSwitched ?? 'resumed: {id}').replace('{id}', literalId));
+            pushTurn('seg', requireInjectedLabel('resumeSwitched', labels.resumeSwitched).replace('{id}', literalId));
           }
           return;
         }
@@ -1875,11 +1827,11 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       pushTurn('user', trimmed);
       await runReplDoSlash(doMatch[1] ?? '', {
         controller: runFlowController,
-        labels: doSlashLabels ?? DEFAULT_DO_SLASH_LABELS,
+        labels: doSlashLabels,
         emit: (text) => pushTurn('seg', text),
         setPreview: setRunFlowPreview,
         reportError: (message) =>
-          pushTurn('bg', formatRunFlowOutcomeLine({ kind: 'error', message }, runFlowMountLabels ?? DEFAULT_RUN_FLOW_MOUNT_LABELS)),
+          pushTurn('bg', formatRunFlowOutcomeLine({ kind: 'error', message }, runFlowMountLabels)),
       });
       return;
     }
@@ -1922,7 +1874,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // controls decisions already use for system-generated status lines — no
   // new Turn role needed). Errors are caught, never thrown out of the
   // handler (an Ink useInput callback throwing would crash the whole REPL).
-  const mountLabels = runFlowMountLabels ?? DEFAULT_RUN_FLOW_MOUNT_LABELS;
+  const mountLabels = runFlowMountLabels;
   const handleRunFlowApprove = (preview: PlanPreview): void => {
     if (!runFlowController) return;
     setRunFlowPreview(null);
@@ -2022,7 +1974,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           }}
           decidedBy="terminal"
           channel="terminal"
-          labels={approvalLabels ?? DEFAULT_APPROVAL_CARD_LABELS}
+          labels={approvalLabels}
           isActive={stdinOwner.approvalCardActive}
         />
       )}
@@ -2035,7 +1987,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       {runFlowController && runFlowPreview && (
         <PlanPreviewCard
           preview={runFlowPreview}
-          labels={runFlowCardLabels ?? DEFAULT_PLAN_PREVIEW_CARD_LABELS}
+          labels={runFlowCardLabels}
           onApprove={handleRunFlowApprove}
           onReject={handleRunFlowReject}
           isActive={resolveRunFlowCardActive(stdinOwner.confirmActive, approvalPending)}
@@ -2094,6 +2046,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         menuHint={labels.menuHint}
         menuMoreAbove={labels.menuMoreAbove}
         menuMoreBelow={labels.menuMoreBelow}
+        reverseSearchLabel={labels.reverseSearch}
         // TERM-AT-REF (583/N2b): `@` path menu — inert (menu never opens)
         // unless run.tsx injects a provider; hint via the same labels route.
         pathProvider={atRefPathProvider}

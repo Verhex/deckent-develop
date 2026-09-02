@@ -78,6 +78,7 @@ describe('InputBar — `/` menu scroll hint (ink-testing-library)', () => {
         menuHint={tr.menuHint}
         menuMoreAbove={tr.menuMoreAbove}
         menuMoreBelow={tr.menuMoreBelow}
+        reverseSearchLabel={tr.reverseSearch}
         historyProjectRoot={root}
       />,
     );
@@ -106,6 +107,7 @@ describe('InputBar — `/` menu scroll hint (ink-testing-library)', () => {
             onInterrupt={() => {}}
             slashRegistry={TWELVE}
             historyProjectRoot={root}
+            reverseSearchLabel={getMessage('tui.reverse_search', lang)}
             {...missing}
           />
         </ReplErrorBoundary>,
@@ -134,7 +136,7 @@ describe('InputBar — `/` menu scroll hint (ink-testing-library)', () => {
     const missing = {} as Pick<InputBarProps, 'menuMoreAbove' | 'menuMoreBelow'>;
     const { lastFrame, unmount } = render(
       <ReplErrorBoundary label={getMessage('tui.render_error', 'en')}>
-        <InputBar active onSubmit={() => {}} onInterrupt={() => {}} slashRegistry={TWELVE} historyProjectRoot={root} {...missing} />
+        <InputBar active onSubmit={() => {}} onInterrupt={() => {}} slashRegistry={TWELVE} historyProjectRoot={root} reverseSearchLabel={getMessage('tui.reverse_search', 'en')} {...missing} />
       </ReplErrorBoundary>,
     );
     await tick();

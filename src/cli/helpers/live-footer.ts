@@ -6,12 +6,15 @@
 // caller (REPL-wiring, follow-up task) reads heartbeat/dashboard-state and
 // assembles the LiveFooterState seam below.
 //
-// String-free mechanism (CLAUDE.md i18n-first + this task's goNogo, which
-// forbids adding new i18n keys here): labels are injected via `options.labels`
-// with English defaults exported as DEFAULT_LIVE_FOOTER_LABELS. Wiring en/tr
-// through messages.ts is deferred to Task 16.
+// String-free mechanism (CLAUDE.md i18n-first): every label is injected via
+// `options.labels` (run.tsx buildLiveFooterLabels resolves the `live_footer.*`
+// catalog rows for the session language). TERMINAL-TOOLS-002 removed the
+// English DEFAULT_LIVE_FOOTER_LABELS object this module used to fall back to —
+// a missing or empty field is a typed InjectedLabelMissingError, surfaced by
+// the REPL error boundary, never a silently English footer.
 
 import { theme } from './theme.js';
+import { requireInjectedLabel } from './injected-label.js';
 
 // ─── Types (state-feed seam) ───────────────────────────────────────────────
 
@@ -49,27 +52,31 @@ export interface LiveFooterLabels {
   loggedOut: string;
 }
 
-export const DEFAULT_LIVE_FOOTER_LABELS: LiveFooterLabels = {
-  idle: 'idle',
-  running: 'Running',
-  elapsed: 'Elapsed',
-  provider: 'Provider',
-  auth: 'Auth',
-  next: 'Next',
-  healthy: 'healthy',
-  degraded: 'degraded',
-  unknown: 'unknown',
-  loggedIn: 'logged-in',
-  loggedOut: 'logged-out',
-};
+/** Every LiveFooterLabels field, in render order — the guard below checks each. */
+export const LIVE_FOOTER_LABEL_FIELDS: readonly (keyof LiveFooterLabels)[] = Object.freeze([
+  'idle', 'running', 'elapsed', 'provider', 'auth', 'next',
+  'healthy', 'degraded', 'unknown', 'loggedIn', 'loggedOut',
+] as const);
 
 export interface LiveFooterOptions {
   /** Override terminal width for truncation. Defaults to process.stdout.columns ?? 80. */
   width?: number;
   /** Injected clock for deterministic elapsed-time computation in tests. */
   now?: Date;
-  /** String-free seam — caller injects translated labels; see file header. */
-  labels?: Partial<LiveFooterLabels>;
+  /** String-free seam — the caller injects the COMPLETE translated label set
+   *  (see file header); a missing/empty field throws InjectedLabelMissingError. */
+  labels: LiveFooterLabels;
+}
+
+/** Validate the injected set — throws the typed guard error naming the first
+ *  missing field as `liveFooter.<field>`. */
+function requireLiveFooterLabels(labels: LiveFooterLabels | undefined): LiveFooterLabels {
+  const source = (labels ?? {}) as Partial<LiveFooterLabels>;
+  const out = {} as LiveFooterLabels;
+  for (const field of LIVE_FOOTER_LABEL_FIELDS) {
+    out[field] = requireInjectedLabel(`liveFooter.${field}`, source[field]);
+  }
+  return out;
 }
 
 // ─── Formatting helpers ─────────────────────────────────────────────────────
@@ -129,8 +136,8 @@ function authLine(auth: LiveFooterAuthState, labels: LiveFooterLabels): FooterLi
  * entirely empty state honestly collapses to a single "idle" line rather than
  * fabricating data.
  */
-export function buildLiveFooter(state: LiveFooterState, options: LiveFooterOptions = {}): string[] {
-  const labels: LiveFooterLabels = { ...DEFAULT_LIVE_FOOTER_LABELS, ...options.labels };
+export function buildLiveFooter(state: LiveFooterState, options: LiveFooterOptions): string[] {
+  const labels = requireLiveFooterLabels(options.labels);
   const width = options.width ?? process.stdout.columns ?? 80;
   const now = options.now ?? new Date();
 

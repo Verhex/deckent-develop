@@ -48,11 +48,13 @@ describe('tui.mode_* keys (354-001 docImpact — cited by source task)', () => {
     }
   });
 
-  it('en text is byte-identical to resolveModeLabel\'s own fallback default (no visible diff on future wiring)', () => {
-    const noLabels: Pick<ReplLabels, 'modeAsk' | 'modeRun' | 'modeControl'> = {};
-    expect(getMessage('tui.mode_ask', 'en')).toBe(resolveModeLabel('ask', noLabels));
-    expect(getMessage('tui.mode_run', 'en')).toBe(resolveModeLabel('run', noLabels));
-    expect(getMessage('tui.mode_control', 'en')).toBe(resolveModeLabel('control', noLabels));
+  it('resolveModeLabel renders the en rows from an injected set (the mechanism owns no fallback since TERMINAL-TOOLS-002)', () => {
+    const labels: Pick<ReplLabels, 'modeAsk' | 'modeRun' | 'modeControl'> = {
+      modeAsk: getMessage('tui.mode_ask', 'en'), modeRun: getMessage('tui.mode_run', 'en'), modeControl: getMessage('tui.mode_control', 'en'),
+    };
+    expect(resolveModeLabel('ask', labels)).toBe(getMessage('tui.mode_ask', 'en'));
+    expect(resolveModeLabel('run', labels)).toBe(getMessage('tui.mode_run', 'en'));
+    expect(resolveModeLabel('control', labels)).toBe(getMessage('tui.mode_control', 'en'));
   });
 
   it('resolveModeLabel prefers an injected label over the fallback (real caller path, unaffected by these keys)', () => {
