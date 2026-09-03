@@ -24,6 +24,8 @@ import {
 } from './chat-slash-registry.js';
 import { getVisibleCommands, isEnterpriseSlash, type ChatMode } from './chat-mode.js';
 import type { TermMode } from '../repl/term-mode.js';
+import { pickerLinesFor, resolvePickerArg, resolvePickerGlyphs, pickerStateWord, type PickerKind, type PickerSpec } from '../repl/picker.js';
+import type { PickerLabels } from '../repl/picker-labels.js';
 import { classifyTool, type ToolPermission } from '../repl/tool-permissions.js';
 import {
   renderCatalog,
@@ -397,6 +399,23 @@ export interface ChatNativeOptions {
    * backed formatter once that key is added to messages.ts).
    */
   switchUnavailable?: (providerName: string) => string;
+  /**
+   * TERMINAL-PICKER-005 — the readline/line degradation of the interactive
+   * picker: a bare `/model` `/provider` `/approve` `/term` `/config` prints
+   * the same choices as deterministic numbered lines (no cursor control, no
+   * required key input) and a typed `<command> <n|id>` resolves against them.
+   * Builders are evaluated per command (policy/availability re-resolved).
+   * Absent → the loop keeps its pre-picker behaviour for those commands.
+   */
+  pickerSpecs?: Partial<Record<PickerKind, () => PickerSpec>>;
+  /** Localized picker labels (buildPickerLabels) — required with pickerSpecs. */
+  pickerLabels?: PickerLabels;
+  /**
+   * TERMINAL-PICKER-005 — the model switch seam symmetrical to
+   * {@link switchProvider} (createSwitchableProvider's switchTo({ model })).
+   * Omitted → `/model <n|id>` reports honestly that switching is unavailable.
+   */
+  switchModel?: (modelId: string) => void;
 }
 
 const DEFAULT_MAX_TURNS = 50;
@@ -890,11 +909,59 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
     //   - arg, switchProvider     → rebuild in-place (the callback resolves the
     //     name from the registry and THROWS for an unknown provider — never a
     //     silent claude fallback). Success → tui.switched; throw → honest error.
+    // TERMINAL-PICKER-005 — readline/line degradation of the picker: bare
+    // selection commands print numbered lines; `/model <n|id>` resolves and
+    // switches through the injected seam (blocked rows refused with their
+    // typed reason); `/approve` `/term` `/config` list only (no apply seam on
+    // this surface — the typed hint names the honest path).
+    const pickerCmd = line.match(/^\/(model|approve|term|config)(?:\s+(.*))?$/i);
+    if (pickerCmd && opts.pickerSpecs && opts.pickerLabels) {
+      const kind = ({ model: 'model', approve: 'approve', term: 'term', config: 'config-key' } as const)[(pickerCmd[1] as string).toLowerCase() as 'model' | 'approve' | 'term' | 'config'];
+      const command = `/${(pickerCmd[1] as string).toLowerCase()}`;
+      const labels = opts.pickerLabels;
+      const builder = opts.pickerSpecs[kind];
+      const arg = (pickerCmd[2] ?? '').trim();
+      if (builder && (arg.length === 0 || kind === 'model')) {
+        const spec = builder();
+        if (arg.length === 0) {
+          const lines = pickerLinesFor(spec, labels, resolvePickerGlyphs(true), command);
+          if (kind !== 'model') lines.push(labels.unavailableSurface.replace('{command}', command));
+          output(lines.join('\n'));
+          continue;
+        }
+        const hit = resolvePickerArg(arg, spec.candidates);
+        if (hit.kind !== 'found') { output(labels.notFound.replace('{arg}', arg)); continue; }
+        if (hit.candidate.state === 'blocked') { output(pickerStateWord(hit.candidate, labels)); continue; }
+        if (!opts.switchModel) { output(labels.unavailableSurface.replace('{command}', command)); continue; }
+        try {
+          opts.switchModel(hit.candidate.id);
+          output(`${getMessage('tui.switched', lang)}: ${hit.candidate.id}`);
+        } catch (err) {
+          output(getMessage('chat.provider_error', lang, { message: err instanceof Error ? err.message : String(err) }));
+        }
+        continue;
+      }
+    }
     if (line === '/provider' || line.startsWith('/provider ')) {
-      const arg = line.slice('/provider'.length).trim();
+      let arg = line.slice('/provider'.length).trim();
       let replyText: string;
+      // TERMINAL-PICKER-005 — `/provider <n>` resolves its number against the
+      // listed providers (a blocked row is refused with its typed reason).
+      const providerSpec = /^\d+$/.test(arg) && opts.pickerSpecs?.provider ? opts.pickerSpecs.provider() : null;
+      if (providerSpec && opts.pickerLabels) {
+        const hit = resolvePickerArg(arg, providerSpec.candidates);
+        if (hit.kind !== 'found') { output(opts.pickerLabels.notFound.replace('{arg}', arg)); continue; }
+        if (hit.candidate.state === 'blocked') { output(pickerStateWord(hit.candidate, opts.pickerLabels)); continue; }
+        arg = hit.candidate.id;
+      }
       if (arg.length === 0) {
         replyText = getMessage('tui.switch_usage', lang);
+        // The usage line stays first (pinned); the numbered list follows when a
+        // spec builder is injected.
+        const spec = opts.pickerSpecs?.provider?.();
+        if (spec && opts.pickerLabels) {
+          replyText += `\n${pickerLinesFor(spec, opts.pickerLabels, resolvePickerGlyphs(true), '/provider').join('\n')}`;
+        }
       } else if (!opts.switchProvider) {
         replyText = opts.switchUnavailable
           ? opts.switchUnavailable(arg)

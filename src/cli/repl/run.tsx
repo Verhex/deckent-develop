@@ -19,6 +19,7 @@ import {
 } from './native-transport.js';
 // TERMINAL-PICKER-002 — the interactive value picker's data + label seams.
 import { buildPickerLabels } from './picker-labels.js';
+import { buildLegacyPickerSpecs } from './picker-legacy.js';
 import { buildModelPickerSpec, buildProviderPickerSpec, type PickerSpecContext, type ProviderAvailability } from './picker-specs.js';
 import type { PickerKind, PickerSpec } from './picker.js';
 import { resolveActiveModelPolicy } from '../../core/model-activation-store.js';
@@ -159,24 +160,6 @@ export function buildConfigEntries(root: string): ConfigKeyEntry[] {
 /** The CLI's value rule for `config set`: JSON first, else the raw string. */
 export function parseConfigValueText(value: string): unknown {
   try { return JSON.parse(value); } catch { return value; }
-}
-
-/** TERMINAL-PICKER-002 — picker specs for the legacy proxy path (no native
- *  transport): providers and models come from the registry itself; there is no
- *  credential probe here, so rows are `ok` and the switch reports honestly. */
-export function buildLegacyPickerSpecs(current: () => ActiveSelection): Partial<Record<PickerKind, () => PickerSpec>> {
-  const context = (): PickerSpecContext => ({
-    providers: modelRegistry.getAllProviders(),
-    candidatesFor: (provider) => modelRegistry.getByProvider(provider as Parameters<typeof modelRegistry.getByProvider>[0])
-      .map((m) => ({ provider, id: m.id, definition: m })),
-    policy: resolveActiveModelPolicy(process.cwd()),
-    current: { provider: current().provider, model: current().model ?? null },
-    availability: () => ({ ok: true }),
-  });
-  return {
-    model: () => buildModelPickerSpec(context()),
-    provider: () => buildProviderPickerSpec(context()),
-  };
 }
 
 export function localizeNativeError(err: ProviderError, lang: string, phase: NativeErrorPhase = 'switch'): string {

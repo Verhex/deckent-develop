@@ -27,6 +27,8 @@ export interface PickerLabels {
   readonly typedHint: string;
   /** Template with `{command}` — readline/line surfaces without a menu. */
   readonly unavailableSurface: string;
+  /** TERMINAL-PICKER-005 — template with `{arg}`: a typed `<n|id>` that matched nothing. */
+  readonly notFound: string;
   readonly states: Readonly<Record<PickerState, string>>;
   readonly scopes: Readonly<Record<PickerScope, string>>;
   /** Typed blocked reasons by code; unknown codes render `blockedGeneric`. */
@@ -70,6 +72,7 @@ export function buildPickerLabels(t: (key: string) => string): PickerLabels {
     reveal: t('tui.picker.reveal'),
     typedHint: t('tui.picker.typed_hint'),
     unavailableSurface: t('tui.picker.unavailable_surface'),
+    notFound: t('tui.picker.not_found'),
     states: {
       current: t('tui.picker.state.current'),
       ok: t('tui.picker.state.ok'),

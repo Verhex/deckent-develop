@@ -44,6 +44,10 @@ import { slashMenuOnKeypress, renderSlashMenu, filterSlashCommands } from './com
 import { createPromptRegion, createThinkingTicker, createPasteCoalescer, createLineBufferedSink } from './commands/chat-render-region.js';
 import { buildThinkingVerbs } from './commands/chat-thinking-verbs.js';
 import { resolveTerminalSurfaceFromProcess } from './helpers/terminal-surface.js';
+// TERMINAL-PICKER-005 — Ink-free picker seams for the readline/line loop.
+import { createSwitchableProvider } from './repl/provider-switch.js';
+import { buildLegacyPickerSpecs } from './repl/picker-legacy.js';
+import { buildPickerLabels } from './repl/picker-labels.js';
 import { theme } from './helpers/theme.js';
 import { createStreamMarkdown } from './commands/chat-render.js';
 import {
@@ -920,8 +924,26 @@ export async function launchDefaultRepl(): Promise<void> {
     ? createLineBufferedSink((line) => region.writeAbove(streamMd.feed(line) + streamMd.flush()))
     : null;
 
-  await runChatNativeLoop({
+  // TERMINAL-PICKER-005 — the readline/line loop gets the SAME switch seams the
+  // Ink REPL has (createSwitchableProvider: rebuild-on-switch proxy over
+  // buildReplProvider, warm initial adapter reused) plus the picker's
+  // degradation: bare selection commands print numbered lines, `<n|id>`
+  // resolves against them. Closes the long-standing "switching unavailable"
+  // TODO(phase2) on this entry point.
+  const readlineSwitcher = createSwitchableProvider(
+    { provider: providerName, model: null },
+    (sel) => buildReplProvider(sel.provider as ReplProviderName, sel.model ? { model: sel.model } : {}),
     provider,
+  );
+  const throwOnSwitchError = (result: { switchError?: string }): void => {
+    if (result.switchError) throw new Error(result.switchError);
+  };
+  await runChatNativeLoop({
+    provider: readlineSwitcher.proxy,
+    switchProvider: (name) => throwOnSwitchError(readlineSwitcher.switchTo({ provider: name })),
+    switchModel: (modelId) => throwOnSwitchError(readlineSwitcher.switchTo({ model: modelId })),
+    pickerSpecs: buildLegacyPickerSpecs(() => readlineSwitcher.current()),
+    pickerLabels: buildPickerLabels((key) => getMessage(key, replLang)),
     dispatcher,
     input: isTty ? arbitratedInput() : simpleLines(),
     // T-224-011 — on an interactive TTY write provider output RAW (no forced

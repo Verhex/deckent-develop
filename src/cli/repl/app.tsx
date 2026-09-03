@@ -38,7 +38,7 @@ import {
 } from './term-gate.js';
 import { renderCommandRisk } from '../helpers/risk-language.js';
 import { PickerCard } from './picker-card.js';
-import { resolvePickerGlyphs, type PickerKind, type PickerScope, type PickerSpec } from './picker.js';
+import { resolvePickerGlyphs, pickerLinesFor, resolvePickerArg, pickerStateWord, type PickerKind, type PickerScope, type PickerSpec } from './picker.js';
 import type { PickerLabels } from './picker-labels.js';
 import { buildApprovalPickerSpec, buildTermPickerSpec, buildResumePickerSpec, buildConfigKeyPickerSpec, buildConfigValuePickerSpec, type ConfigKeyEntry } from './picker-specs.js';
 import { APPROVAL_MODES, type ApprovalMode } from '../../agent/permission-types.js';
@@ -655,6 +655,14 @@ export function resolveInboxCardActive(confirmOpen: boolean, approvalPending: bo
  *  pinned 3-key shape is untouched. */
 export function resolvePickerCardActive(confirmOpen: boolean, approvalPending: boolean, runFlowPending: boolean, inboxOpen: boolean): boolean {
   return !confirmOpen && !approvalPending && !runFlowPending && !inboxOpen;
+}
+
+/** TERMINAL-PICKER-005 — below 40 display columns a card cannot hold a row
+ *  plus its facts (platform matrix): the same choices print as numbered
+ *  transcript lines and a typed `<n|id>` selects. Pure. */
+export const PICKER_CARD_MIN_COLUMNS = 40;
+export function resolvePickerSurfaceMode(columns: number): 'card' | 'lines' {
+  return columns >= PICKER_CARD_MIN_COLUMNS ? 'card' : 'lines';
 }
 
 /** TERMINAL-PICKER-002 — a BARE selection command opens the picker; a typed
@@ -1413,7 +1421,17 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // TERMINAL-PICKER-002 — ONE apply path for a model/provider switch, shared by
   // the typed `/model <id>` branch and the picker's commit (no duplicated
   // logic). Returns true when the backend actually switched.
-  const runSwitch = (kind: 'model' | 'provider', arg: string): boolean => {
+  const runSwitch = (kind: 'model' | 'provider', rawArg: string): boolean => {
+    // TERMINAL-PICKER-005 — a number typed after a narrow-surface listing of
+    // this kind selects that row (a blocked row is refused with its reason).
+    let arg = rawArg;
+    const listed = narrowPickerRef.current;
+    if (/^\d+$/.test(rawArg) && listed?.kind === kind) {
+      const hit = resolvePickerArg(rawArg, listed.spec.candidates);
+      if (hit.kind !== 'found') { pushTurn('seg', pickerLabels.notFound.replace('{arg}', rawArg)); return false; }
+      if (hit.candidate.state === 'blocked') { pushTurn('seg', pickerStateWord(hit.candidate, pickerLabels)); return false; }
+      arg = hit.candidate.id;
+    }
     // born-533 (388-001): refuse to splice the backend mid-turn — see
     // resolveSwitchGate's doc comment above.
     const gate = resolveSwitchGate(working, kind, labels);
@@ -1606,6 +1624,9 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   const [picker, setPicker] = useState<{ kind: PickerKind; spec: PickerSpec } | null>(null);
   // TERMINAL-PICKER-004 — the setting chosen in the key stage; the value stage applies to it.
   const pickerConfigKey = useRef<ConfigKeyEntry | null>(null);
+  // TERMINAL-PICKER-005 — the last numbered listing printed on a narrow
+  // surface; a following typed `/model <n>` resolves its number against it.
+  const narrowPickerRef = useRef<{ kind: PickerKind; spec: PickerSpec } | null>(null);
 
   // 360-009: turn objects are built BEFORE setTurns so every updater stays
   // pure (append-only) — React may re-invoke an updater, and the previous
@@ -1970,6 +1991,13 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       const spec = buildPickerSpecFor(pickerRequest.kind);
       if (spec) {
         pushTurn('user', trimmed);
+        if (resolvePickerSurfaceMode(columns) === 'lines') {
+          // TERMINAL-PICKER-005 — too narrow for a card: numbered transcript
+          // lines; the next typed `<command> <n|id>` resolves against them.
+          narrowPickerRef.current = { kind: pickerRequest.kind, spec };
+          pushTurn('bg', pickerLinesFor(spec, pickerLabels, resolvePickerGlyphs(pickerAscii), trimmed).join('\n'));
+          return;
+        }
         setPicker({ kind: pickerRequest.kind, spec });
         return;
       }

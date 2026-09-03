@@ -34,6 +34,7 @@ export const CLI_TERMINAL_PICKER_MESSAGES: MessageFamily = Object.freeze({
   'tui.picker.reveal': { en: '{glyph} full id: {id}', tr: '{glyph} tam kimlik: {id}' },
   'tui.picker.typed_hint': { en: 'type {command} <n|id> to choose', tr: 'seçmek için {command} <n|id> yazın' },
   'tui.picker.unavailable_surface': { en: 'the interactive menu is not available on this surface; type {command} <n|id>', tr: 'etkileşimli menü bu yüzeyde yok; {command} <n|id> yazın' },
+  'tui.picker.not_found': { en: 'no such choice: {arg}', tr: 'böyle bir seçenek yok: {arg}' },
 
   // ── state words (every row carries one; color only supplements) ────────
   'tui.picker.state.current': { en: 'current', tr: 'geçerli' },
