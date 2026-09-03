@@ -499,6 +499,16 @@
    "notes": "SP-1 M3 T6; skip-safe when dist/ or node-pty is missing."
   },
   {
+   "file": "scripts/ink-pty-picker-verify.mjs",
+   "class": "recurring-proof",
+   "owner": "repl-pty-smoke",
+   "npmScript": "verify:picker",
+   "input": "dist/cli/entry.js --native (real Ink + the Terminal value picker; only the LLM mocked via DECKENT_NATIVE_MOCK)",
+   "output": "PASS/SKIP/FAIL proving bare /model, /term and /approve open the picker, the paused-input anchor renders, /term applies through the real seam, and no placeholder leaks",
+   "expiry": "none — rerun on demand",
+   "notes": "TERMINAL-PICKER-001…005 (lane native-terminal-fable51-20260902); skip-safe when dist/ or node-pty is missing."
+  },
+  {
    "file": "scripts/ink-pty-test.mjs",
    "class": "recurring-proof",
    "owner": "repl-pty-smoke",
