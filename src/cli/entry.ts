@@ -53,6 +53,16 @@ import { resolveTerminalSurfaceFromProcess } from './helpers/terminal-surface.js
 // TERMINAL-PICKER-005 — Ink-free picker seams for the readline/line loop.
 import { createSwitchableProvider } from './repl/provider-switch.js';
 import { buildLegacyPickerSpecs } from './repl/picker-legacy.js';
+// TERMINAL-SESSION-AUTHORITY-001 — the readline surface applies /term, /approve
+// and /config through the same session authority + config seam the Ink App uses.
+import { createSessionAuthority } from './repl/session-authority.js';
+import { resolveConfiguredPosture, TERM_MODES, ALLOWED_RISKS_BY_MODE, type TermMode } from './repl/term-mode.js';
+import { APPROVAL_MODES } from '../agent/permission-types.js';
+import { loadPolicy } from '../agent/permission-policy.js';
+import { renderCommandRisk } from './helpers/risk-language.js';
+import { buildTermPickerSpec, buildApprovalPickerSpec, buildConfigKeyPickerSpec, buildConfigValuePickerSpec, formatConfigValue } from './repl/picker-specs.js';
+import { buildConfigEntries, parseConfigValueText } from './repl/config-entries.js';
+import { setConfigValues } from './commands/config.js';
 import { buildPickerLabels, PICKER_VIA_KEYS } from './repl/picker-labels.js';
 import { theme } from './helpers/theme.js';
 import { createStreamMarkdown } from './commands/chat-render.js';
@@ -894,13 +904,35 @@ export async function launchDefaultRepl(): Promise<void> {
   // T-224-005 — combined dispatcher: deckent_* action tools (write/edit/read/
   // bash) go to the confirm-gated tool-exec layer; read-only status/recall/
   // history slashes stay on the CLI bridge.
+  // TERMINAL-SESSION-AUTHORITY-001 — ONE session authority for this surface:
+  // the boot posture from `terminal.posture` (the same resolver the Ink REPL
+  // uses), the approval mode from the permission policy default. `/term` and
+  // `/approve` apply to it; the tool confirm below consults it (full-auto →
+  // allow, auto-edit → allow except the shell tool, suggest → ask), exactly
+  // the native engine's rule.
+  const readlineCfg = await loadConfig().catch(() => undefined);
+  const authority = createSessionAuthority({
+    posture: resolveConfiguredPosture((readlineCfg as { terminal?: { posture?: unknown } } | undefined)?.terminal?.posture),
+    approval: loadPolicy(process.cwd()).defaultMode,
+  });
+  // TTY only: the numbered "Choice" question after a bare listing rides the
+  // same answer arbiter the tool confirm uses (single stdin, no second reader).
+  const askChoice = isTty
+    ? (prompt: string): Promise<string> => {
+        process.stdout.write(prompt);
+        return new Promise<string>((resolve) => { pendingAnswer = (line) => resolve(line); });
+      }
+    : undefined;
+
   const cliDispatcher = createCliToolDispatcher();
   const offTtyAutoApprove = shouldAutoApproveOffTty(process.argv.slice(2));
   const execDispatcher = createToolExecDispatcher({
     cwd: process.cwd(),
     // REPL-575 K5 — localized confirm-prompt summaries (i18n-FIRST).
     labels: buildToolExecLabels(getLangFromConfig(process.cwd())),
-    confirm: isTty ? askConfirm : async () => offTtyAutoApprove,
+    confirm: isTty
+      ? (summary, toolName) => (authority.confirmPolicy(toolName) === 'allow' ? Promise.resolve(true) : askConfirm(summary, toolName))
+      : async () => offTtyAutoApprove,
   });
   const EXEC_TOOLS = new Set([
     'deckent_write_file', 'deckent_read_file', 'deckent_edit_file', 'deckent_bash',
@@ -948,7 +980,7 @@ export async function launchDefaultRepl(): Promise<void> {
   // surface: subscription CLIs through the auth probe, Ollama through its host
   // (the DECKENT_OLLAMA_HOST override, else the project setting; neither →
   // no source, rows stay `unknown`). Refreshed at boot and on every listing.
-  const evidenceCfg = await loadConfig().catch(() => undefined);
+  const evidenceCfg = readlineCfg;
   const ollamaEvidenceHost = (process.env['DECKENT_OLLAMA_HOST'] ?? (evidenceCfg as { ollama_host?: string } | undefined)?.ollama_host)?.replace(/\/$/, '');
   const providerEvidence = createProviderEvidence({
     probeAuth: (p, o) => probeProviderAuth(p, o),
@@ -957,19 +989,46 @@ export async function launchDefaultRepl(): Promise<void> {
     providers: modelRegistry.getAllProviders(),
   });
   void providerEvidence.refresh();
+  const readlinePickerLabels = buildPickerLabels((key) => getMessage(key, replLang));
   await runChatNativeLoop({
     provider: readlineSwitcher.proxy,
     switchProvider: (name) => throwOnSwitchError(readlineSwitcher.switchTo({ provider: name })),
     switchModel: (modelId) => throwOnSwitchError(readlineSwitcher.switchTo({ model: modelId })),
-    pickerSpecs: buildLegacyPickerSpecs(
-      () => readlineSwitcher.current(),
-      () => process.cwd(),
-      (n) => getMessage('tui.picker.fact.models', replLang).replace('{n}', String(n)),
-      (via) => getMessage(PICKER_VIA_KEYS[via], replLang),
-      (provider) => providerEvidence.get(provider),
-    ),
+    pickerSpecs: {
+      ...buildLegacyPickerSpecs(
+        () => readlineSwitcher.current(),
+        () => process.cwd(),
+        (n) => getMessage('tui.picker.fact.models', replLang).replace('{n}', String(n)),
+        (via) => getMessage(PICKER_VIA_KEYS[via], replLang),
+        (provider) => providerEvidence.get(provider),
+      ),
+      // TERMINAL-SESSION-AUTHORITY-001 — the same posture / approval / config
+      // candidates the Ink picker offers, built from the live authority + metadata.
+      term: () => buildTermPickerSpec(
+        TERM_MODES,
+        authority.posture(),
+        (mode: TermMode) => [...ALLOWED_RISKS_BY_MODE[mode]].map((risk) => renderCommandRisk(risk, replLang).label).join(' · '),
+        (mode: TermMode) => getMessage(`tui.mode_${mode}`, replLang),
+      ),
+      approve: () => buildApprovalPickerSpec(APPROVAL_MODES, authority.approval(), (mode) => readlinePickerLabels.approveFacts[mode]),
+      'config-key': () => buildConfigKeyPickerSpec(buildConfigEntries(process.cwd()), (e) => [
+        e.category,
+        readlinePickerLabels.configFacts.current.replace('{value}', formatConfigValue(e.current)),
+        readlinePickerLabels.configFacts.default.replace('{value}', formatConfigValue(e.defaultValue)),
+      ]),
+    },
+    configValueSpec: (key) => {
+      const entry = buildConfigEntries(process.cwd()).find((e) => e.key === key);
+      return entry?.options ? buildConfigValuePickerSpec(key, entry.options, entry.current) : null;
+    },
+    applyConfig: (key, value) => {
+      const out = setConfigValues(process.cwd(), { [key]: parseConfigValueText(value) });
+      return out.ok ? { ok: true } : { ok: false, error: out.error };
+    },
+    authority,
+    ...(askChoice ? { askChoice } : {}),
     pickerEvidence: { refresh: () => providerEvidence.refresh(), subscribe: (listener) => providerEvidence.subscribe(listener) },
-    pickerLabels: buildPickerLabels((key) => getMessage(key, replLang)),
+    pickerLabels: readlinePickerLabels,
     dispatcher,
     input: isTty ? arbitratedInput() : simpleLines(),
     // T-224-011 — on an interactive TTY write provider output RAW (no forced

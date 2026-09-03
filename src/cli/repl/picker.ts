@@ -47,6 +47,9 @@ export interface PickerLabels {
   readonly factModels: string;
   /** TERMINAL-PROVIDER-VOCAB-001 — the transport fact words per via kind. */
   readonly via: Readonly<Record<ProviderVia, string>>;
+  /** TERMINAL-SESSION-AUTHORITY-001 — template with `{n}`: the readline
+   *  numbered choice question after a bare listing (Enter cancels). */
+  readonly choicePrompt: string;
   /** TERMINAL-PICKER-007 — in-card reason while a turn is running (non-switch kinds). */
   readonly readOnlyBusy: string;
   /** TERMINAL-PICKER-007 — the config write seam is not wired in this session. */

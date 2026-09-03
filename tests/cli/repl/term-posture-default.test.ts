@@ -53,7 +53,10 @@ describe('wiring', () => {
   it('run.tsx resolves the configured posture and app.tsx starts from it', () => {
     const run = readFileSync(join(ROOT, 'src/cli/repl/run.tsx'), 'utf-8');
     const app = readFileSync(join(ROOT, 'src/cli/repl/app.tsx'), 'utf-8');
-    expect(run).toMatch(/initialTermMode=\{resolveConfiguredPosture\(/);
+    // TERMINAL-SESSION-AUTHORITY-001: the configured posture seeds the session
+    // authority and the App starts from the authority's posture.
+    expect(run).toMatch(/createSessionAuthority\(\{\s*posture: resolveConfiguredPosture\(/);
+    expect(run).toMatch(/initialTermMode=\{sessionAuthority\.posture\(\)\}/);
     expect(app).toMatch(/initialTermModeState\(initialTermMode\)/);
   });
 });

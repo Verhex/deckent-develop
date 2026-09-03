@@ -59,9 +59,9 @@ import { InkPaletteProvider } from './ink-palette-context.js';
 import { resolveHyperlinks } from '../helpers/terminal-links.js';
 import { resolveInkPalette } from './ink-palette.js';
 import { buildToolExecLabels } from '../helpers/tool-exec-labels.js';
-import { loadConfig, listConfigByCategory, getConfigHelp, VALID_PROVIDERS } from '../../core/config.js';
-import { getNestedValue } from '../../core/config-migration.js';
-import type { ConfigKeyEntry } from './picker-specs.js';
+import { loadConfig } from '../../core/config.js';
+import { buildConfigEntries, parseConfigValueText } from './config-entries.js';
+import { createSessionAuthority } from './session-authority.js';
 import { createSwitchableProvider, type ActiveSelection } from './provider-switch.js';
 import { createRunStateFeed } from '../helpers/run-state-feed.js';
 import type { LiveFooterLabels } from '../helpers/live-footer.js';
@@ -74,7 +74,7 @@ import { createApprovalStoreWatch, type ApprovalStoreWatchHandle } from '../../c
 import type { ApprovalRequest } from '../../core/approval-contract.js';
 import { randomUUID } from 'node:crypto';
 import { MemoryStore } from '../../core/memory-store.js';
-import { BRAIN_DIR, MEMORY_DB_FILE, DECKENT_DIR, JOBS_DIR, PROJECT_CONFIG_PATH } from '../../core/constants.js';
+import { BRAIN_DIR, MEMORY_DB_FILE, DECKENT_DIR, JOBS_DIR } from '../../core/constants.js';
 import type { ChatTurnBgEvent } from './chat-turn-queue.js';
 import {
   createRunCompletionWatch,
@@ -133,43 +133,10 @@ export function hasUtf8Locale(env: Record<string, string | undefined>): boolean 
   return /utf-?8/i.test(locale);
 }
 
-/** TERMINAL-PICKER-004 — the raw project config (what `/config` and `deckent
- *  config set` write), read fresh on every menu open; `{}` when absent/broken. */
-export function readProjectConfigRaw(root: string): Record<string, unknown> {
-  const path = join(root, PROJECT_CONFIG_PATH);
-  try { return existsSync(path) ? JSON.parse(readFileSync(path, 'utf-8')) as Record<string, unknown> : {}; } catch { return {}; }
-}
-
-/** TERMINAL-PICKER-004 — CONFIG_METADATA as picker entries: every key of every
- *  category with its type/default, the project-level current value, and the
- *  options when enumerable — provider-typed keys widened to VALID_PROVIDERS
- *  (the validation authority; the metadata literal list is narrower). */
-export function buildConfigEntries(root: string): ConfigKeyEntry[] {
-  const raw = readProjectConfigRaw(root);
-  const entries: ConfigKeyEntry[] = [];
-  for (const keys of Object.values(listConfigByCategory())) {
-    for (const key of keys) {
-      const meta = getConfigHelp(key);
-      if (!meta) continue;
-      const providerTyped = key.endsWith('_provider') && meta.options !== undefined && meta.options.every((o) => (VALID_PROVIDERS as readonly string[]).includes(o));
-      const options = providerTyped ? [...VALID_PROVIDERS] : meta.options;
-      entries.push({
-        key,
-        category: meta.category,
-        type: meta.type,
-        ...(options ? { options } : {}),
-        defaultValue: meta.default,
-        current: key.includes('.') ? getNestedValue(raw, key) : raw[key],
-      });
-    }
-  }
-  return entries;
-}
-
-/** The CLI's value rule for `config set`: JSON first, else the raw string. */
-export function parseConfigValueText(value: string): unknown {
-  try { return JSON.parse(value); } catch { return value; }
-}
+// TERMINAL-SESSION-AUTHORITY-001 — the `/config` entry helpers moved to the
+// Ink-free config-entries.ts so the readline loop lists the SAME keys/values;
+// re-exported here for their existing importers.
+export { readProjectConfigRaw, buildConfigEntries, parseConfigValueText } from './config-entries.js';
 
 export function localizeNativeError(err: ProviderError, lang: string, phase: NativeErrorPhase = 'switch'): string {
   if (!err.errorCode) return err.error;
@@ -1701,6 +1668,12 @@ export async function runInkRepl(
   }
   const hostEvidence = pickerEvidence;
 
+  // TERMINAL-SESSION-AUTHORITY-001 — the session's posture + approval authority
+  // (the same holder the readline surface uses); the App mirrors it.
+  const sessionAuthority = createSessionAuthority({
+    posture: resolveConfiguredPosture((projectCfg as { terminal?: { posture?: unknown } }).terminal?.posture),
+  });
+
   // TERMINAL-READABILITY-001 — the palette is resolved ONCE from the color gate
   // (host-theme-mapped 16-color unless a dark background is proven; nothing
   // when suppressed) and provided to every card through context.
@@ -1751,7 +1724,8 @@ export async function runInkRepl(
         const out = setConfigValues(process.cwd(), patch);
         return out.ok ? { ok: true } : { ok: false, error: out.error };
       }}
-      initialTermMode={resolveConfiguredPosture((projectCfg as { terminal?: { posture?: unknown } }).terminal?.posture)}
+      initialTermMode={sessionAuthority.posture()}
+      sessionAuthority={sessionAuthority}
       configEntries={() => buildConfigEntries(process.cwd())}
       saveConfigValue={(key, value) => {
         const out = setConfigValues(process.cwd(), { [key]: parseConfigValueText(value) });

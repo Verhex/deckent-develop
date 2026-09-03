@@ -54,6 +54,7 @@ export function buildPickerLabels(t: (key: string) => string): PickerLabels {
     hintFilterEsc: t('tui.picker.hint_filter_esc'),
     typedForm: t('tui.picker.typed_form'),
     factModels: t('tui.picker.fact.models'),
+    choicePrompt: t('tui.picker.choice_prompt'),
     via: {
       'host-cli': t(PICKER_VIA_KEYS['host-cli']),
       api: t(PICKER_VIA_KEYS.api),

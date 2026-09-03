@@ -115,7 +115,9 @@ describe('wiring — entry.ts readline path', () => {
     expect(entry).toMatch(/switchModel: /);
     expect(entry).toMatch(/switchProvider: /);
     expect(entry).toMatch(/pickerSpecs: /);
-    expect(entry).toMatch(/pickerLabels: buildPickerLabels\(/);
+    // TERMINAL-SESSION-AUTHORITY-001: the labels are built once and shared by the specs and the loop.
+    expect(entry).toMatch(/readlinePickerLabels = buildPickerLabels\(/);
+    expect(entry).toMatch(/pickerLabels: readlinePickerLabels/);
   });
   it('app.tsx prints pickerLinesFor into the transcript when the surface mode is lines', () => {
     expect(app).toMatch(/resolvePickerSurfaceMode\(columns\)/);

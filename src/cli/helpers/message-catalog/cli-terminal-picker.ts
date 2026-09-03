@@ -66,6 +66,8 @@ export const CLI_TERMINAL_PICKER_MESSAGES: MessageFamily = Object.freeze({
   'tui.picker.fact.via.host_cli': { en: 'via host CLI', tr: 'host CLI üzerinden' },
   'tui.picker.fact.via.api': { en: 'via API', tr: 'API üzerinden' },
   'tui.picker.fact.via.local': { en: 'local', tr: 'yerel' },
+  // ── TERMINAL-SESSION-AUTHORITY-001 — readline numbered choice prompt ──────
+  'tui.picker.choice_prompt': { en: 'Choice (1-{n}, Enter cancels): ', tr: 'Seçim (1-{n}, Enter iptal): ' },
   'tui.picker.seam_missing': { en: 'this session has no config write seam', tr: 'bu oturumda config yazma bağlantısı yok' },
   'tui.picker.read_only_busy': { en: 'read-only while a turn is running', tr: 'bir tur çalışırken salt-okunur' },
   'tui.picker.blocked_generic': { en: 'unavailable ({code})', tr: 'kullanılamaz ({code})' },

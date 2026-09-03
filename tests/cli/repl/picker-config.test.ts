@@ -102,7 +102,11 @@ describe('wiring — app.tsx + run.tsx', () => {
   it('run.tsx injects configEntries (metadata + current values, provider keys widened to VALID_PROVIDERS) and saveConfigValue → setConfigValues', () => {
     expect(run).toMatch(/configEntries=\{/);
     expect(run).toMatch(/saveConfigValue=\{/);
-    expect(run).toMatch(/listConfigByCategory\(\)/);
-    expect(run).toMatch(/VALID_PROVIDERS/);
+    // TERMINAL-SESSION-AUTHORITY-001: the entry builder lives in the Ink-free
+    // config-entries.ts (shared with the readline loop); run.tsx re-exports it.
+    const entriesModule = readFileSync(join(ROOT, 'src/cli/repl/config-entries.ts'), 'utf-8');
+    expect(entriesModule).toMatch(/listConfigByCategory\(\)/);
+    expect(run).toMatch(/export \{ readProjectConfigRaw, buildConfigEntries, parseConfigValueText \} from '\.\/config-entries\.js'/);
+    expect(entriesModule).toMatch(/VALID_PROVIDERS/);
   });
 });

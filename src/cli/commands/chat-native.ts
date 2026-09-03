@@ -23,8 +23,10 @@ import {
   type SlashRegistry,
 } from './chat-slash-registry.js';
 import { getVisibleCommands, isEnterpriseSlash, type ChatMode } from './chat-mode.js';
-import type { TermMode } from '../repl/term-mode.js';
-import { pickerLinesFor, resolvePickerArg, resolvePickerGlyphs, pickerStateWord, type PickerKind, type PickerSpec } from '../repl/picker.js';
+import { TERM_MODES, type TermMode } from '../repl/term-mode.js';
+import { pickerLinesFor, resolvePickerArg, resolvePickerGlyphs, pickerStateWord, pickerBlockedReason, type PickerKind, type PickerSpec } from '../repl/picker.js';
+import type { SessionAuthority } from '../repl/session-authority.js';
+import type { ApprovalMode } from '../../agent/permission-types.js';
 import type { PickerLabels } from '../repl/picker-labels.js';
 import { classifyTool, type ToolPermission } from '../repl/tool-permissions.js';
 import {
@@ -427,6 +429,25 @@ export interface ChatNativeOptions {
     subscribe: (listener: () => void) => () => void;
     refreshTimeoutMs?: number;
   };
+  /**
+   * TERMINAL-SESSION-AUTHORITY-001 — the shared session authority (posture +
+   * approval mode). With it `/term <n|mode>` and `/approve <n|mode>` APPLY on
+   * this surface and the chat mode follows the posture live; without it those
+   * kinds list only and name their typed form.
+   */
+  authority?: SessionAuthority;
+  /** The value candidates of one config key (null → not enumerable here). */
+  configValueSpec?: (key: string) => PickerSpec | null;
+  /** Writes one setting (the same seam as `deckent config set` / the Ink picker). */
+  applyConfig?: (key: string, valueText: string) => { ok: true } | { ok: false; error: string };
+  /** TTY only: ask one numbered question after a bare listing; resolves the
+   *  typed line ('' = cancel). Absent on pipes — no required key input. */
+  askChoice?: (prompt: string) => Promise<string>;
+}
+
+/** The localized posture word (`tui.mode_ask` / `tui.mode_run` / `tui.mode_control`). */
+function postureLabel(mode: TermMode, lang: string): string {
+  return getMessage(`tui.mode_${mode}`, lang);
 }
 
 const DEFAULT_MAX_TURNS = 50;
@@ -791,7 +812,69 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
   // line (renderToolActivity is string-free; see chat-thinking-verbs.ts).
   const toolActivityVerbs = buildToolActivityVerbs(lang);
   // Sprint 358 T-358-005 — see ChatNativeOptions.termMode doc comment.
-  const chatMode: ChatMode = (opts.termMode ?? 'ask') === 'control' ? 'enterprise' : 'user';
+  // TERMINAL-SESSION-AUTHORITY-001 — resolved per use: the shared session
+  // authority's posture (when injected) drives the chat mode live, so
+  // `/term control` reveals the enterprise group on the next `/help`.
+  const chatModeNow = (): ChatMode => ((opts.authority?.posture() ?? opts.termMode ?? 'ask') === 'control' ? 'enterprise' : 'user');
+
+  // ── Readline apply seams for the picker kinds (TERMINAL-SESSION-AUTHORITY-001) ──
+  const applyConfigValue = (key: string, hit: ReturnType<typeof resolvePickerArg>, arg: string): void => {
+    const labels = opts.pickerLabels!;
+    if (hit.kind !== 'found') { output(labels.notFound.replace('{arg}', arg)); return; }
+    if (!opts.applyConfig) { output(labels.seamMissing); return; }
+    const result = opts.applyConfig(key, hit.candidate.id);
+    output(result.ok
+      ? labels.committed.config.replace('{key}', key).replace('{value}', hit.candidate.id)
+      : labels.configWriteFailed.replace('{error}', result.error));
+  };
+  const applyReadlinePick = async (
+    kind: PickerKind,
+    command: string,
+    hit: ReturnType<typeof resolvePickerArg>,
+    arg: string,
+    valueArg: string,
+  ): Promise<void> => {
+    const labels = opts.pickerLabels!;
+    if (hit.kind !== 'found') { output(labels.notFound.replace('{arg}', arg)); return; }
+    if (hit.candidate.state === 'blocked') { output(pickerStateWord(hit.candidate, labels)); return; }
+    const id = hit.candidate.id;
+    if (kind === 'model') {
+      if (!opts.switchModel) { output(labels.unavailableSurface.replace('{command}', command)); return; }
+      try {
+        opts.switchModel(id);
+        output(`${getMessage('tui.switched', lang)}: ${id}`);
+      } catch (err) {
+        output(getMessage('chat.provider_error', lang, { message: err instanceof Error ? err.message : String(err) }));
+      }
+      return;
+    }
+    if (kind === 'term') {
+      if (!opts.authority) { output(labels.unavailableSurface.replace('{command}', command)); return; }
+      const result = opts.authority.setPosture(id as TermMode);
+      output(getMessage('tui.term_switched', lang, { mode: postureLabel(result.state.posture, lang) }));
+      return;
+    }
+    if (kind === 'approve') {
+      if (!opts.authority) { output(labels.unavailableSurface.replace('{command}', command)); return; }
+      const result = opts.authority.setApproval(id as ApprovalMode);
+      if (result.rejected !== undefined) { output(labels.notFound.replace('{arg}', arg)); return; }
+      output(`${getMessage('tui.approval_set', lang)}: ${result.state.approval}`);
+      return;
+    }
+    if (kind === 'config-key') {
+      const valueSpec = opts.configValueSpec?.(id) ?? null;
+      if (!valueSpec) { output(pickerBlockedReason('NOT_ENUMERABLE', labels)); return; }
+      if (valueArg.length === 0) {
+        output(pickerLinesFor(valueSpec, labels, resolvePickerGlyphs(true), `${command} ${id}`, { typedHint: true }).join('\n'));
+        if (opts.askChoice) {
+          const answer = (await opts.askChoice(labels.choicePrompt.replace('{n}', String(valueSpec.candidates.length)))).trim();
+          if (/^\d+$/.test(answer)) applyConfigValue(id, resolvePickerArg(answer, valueSpec.candidates), answer);
+        }
+        return;
+      }
+      applyConfigValue(id, resolvePickerArg(valueArg, valueSpec.candidates), valueArg);
+    }
+  };
   // Most recently shown /resume list — lets `/resume <n>` pick by number.
   let lastResumeList: ReadonlyArray<{ sessionId: string; turnCount: number; lastAt: string; preview: string }> = [];
   // Sprint 280 T-280-004 — lazily-built external-MCP bridge for `/mcp`, cached
@@ -933,42 +1016,51 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
     //   - arg, switchProvider     → rebuild in-place (the callback resolves the
     //     name from the registry and THROWS for an unknown provider — never a
     //     silent claude fallback). Success → tui.switched; throw → honest error.
-    // TERMINAL-PICKER-005 — readline/line degradation of the picker: bare
-    // selection commands print numbered lines; `/model <n|id>` resolves and
-    // switches through the injected seam (blocked rows refused with their
-    // typed reason); `/approve` `/term` `/config` list only (no apply seam on
-    // this surface — the typed hint names the honest path).
+    // TERMINAL-PICKER-005 / TERMINAL-SESSION-AUTHORITY-001 — readline/line
+    // degradation of the picker: a bare selection command prints numbered
+    // lines (and, when an askChoice seam exists — a TTY — asks ONE numbered
+    // question; Enter cancels with zero side effects); `<command> <n|id>`
+    // resolves against them. /model switches through the injected seam,
+    // /term and /approve apply through the shared session authority, /config
+    // lists a key's values and writes through the injected config seam. A
+    // kind without its apply seam still lists and names its typed form.
     const pickerCmd = line.match(/^\/(model|approve|term|config)(?:\s+(.*))?$/i);
     if (pickerCmd && opts.pickerSpecs && opts.pickerLabels) {
-      const kind = ({ model: 'model', approve: 'approve', term: 'term', config: 'config-key' } as const)[(pickerCmd[1] as string).toLowerCase() as 'model' | 'approve' | 'term' | 'config'];
-      const command = `/${(pickerCmd[1] as string).toLowerCase()}`;
+      const word = (pickerCmd[1] as string).toLowerCase() as 'model' | 'approve' | 'term' | 'config';
+      const kind = ({ model: 'model', approve: 'approve', term: 'term', config: 'config-key' } as const)[word];
+      const command = `/${word}`;
       const labels = opts.pickerLabels;
       const builder = opts.pickerSpecs[kind];
-      const arg = (pickerCmd[2] ?? '').trim();
-      if (builder && (arg.length === 0 || kind === 'model')) {
+      const rawArg = (pickerCmd[2] ?? '').trim();
+      const [arg = '', ...rest] = rawArg.length > 0 ? rawArg.split(/\s+/) : [];
+      const valueArg = rest.join(' ');
+      const resolvable = kind === 'model' || (kind === 'config-key' ? opts.configValueSpec !== undefined : opts.authority !== undefined);
+      if (builder) {
         // TERMINAL-PROVIDER-EVIDENCE-001 — a bare listing waits (bounded) for
         // the shared evidence so its rows say ok / blocked, not [unknown].
         if (arg.length === 0 && kind === 'model') await awaitEvidence(opts.pickerEvidence);
-        const spec = builder();
-        if (arg.length === 0) {
-          // TERMINAL-PICKER-007 — the `<n|id>` hint is promised only where a
-          // resolver exists (/model); the other kinds name their typed form.
-          const resolvable = kind === 'model';
-          const lines = pickerLinesFor(spec, labels, resolvePickerGlyphs(true), command, { typedHint: resolvable });
-          if (!resolvable) lines.push(labels.typedForm.replace('{command}', command));
-          output(lines.join('\n'));
+        if (kind === 'term' && arg.length > 0 && !/^\d+$/.test(arg) && !(TERM_MODES as readonly string[]).includes(arg.toLowerCase())) {
+          output(getMessage('tui.term_usage', lang));
           continue;
         }
-        const hit = resolvePickerArg(arg, spec.candidates);
-        if (hit.kind !== 'found') { output(labels.notFound.replace('{arg}', arg)); continue; }
-        if (hit.candidate.state === 'blocked') { output(pickerStateWord(hit.candidate, labels)); continue; }
-        if (!opts.switchModel) { output(labels.unavailableSurface.replace('{command}', command)); continue; }
-        try {
-          opts.switchModel(hit.candidate.id);
-          output(`${getMessage('tui.switched', lang)}: ${hit.candidate.id}`);
-        } catch (err) {
-          output(getMessage('chat.provider_error', lang, { message: err instanceof Error ? err.message : String(err) }));
+        const spec = builder();
+        if (arg.length === 0) {
+          const head: string[] = [];
+          if (kind === 'term' && opts.authority) {
+            head.push(getMessage('tui.term_status', lang, { mode: postureLabel(opts.authority.posture(), lang), approval: opts.authority.approval() }));
+          }
+          // TERMINAL-PICKER-007 — the `<n|id>` hint is promised only where a
+          // resolver exists; the other kinds name their typed form.
+          const lines = pickerLinesFor(spec, labels, resolvePickerGlyphs(true), command, { typedHint: resolvable });
+          if (!resolvable) lines.push(labels.typedForm.replace('{command}', command));
+          output([...head, ...lines].join('\n'));
+          if (resolvable && opts.askChoice) {
+            const answer = (await opts.askChoice(labels.choicePrompt.replace('{n}', String(spec.candidates.length)))).trim();
+            if (/^\d+$/.test(answer)) await applyReadlinePick(kind, command, resolvePickerArg(answer, spec.candidates), answer, '');
+          }
+          continue;
         }
+        await applyReadlinePick(kind, command, resolvePickerArg(arg, spec.candidates), arg, valueArg);
         continue;
       }
     }
@@ -1131,7 +1223,7 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
       // display must go through getVisibleCommands(chatMode) to hide enterprise
       // slashes outside control mode. buildHelpOutput (387-002) is the SAME
       // assembly the Ink native-engine bridge (app.tsx) now also calls.
-      output(buildHelpOutput(chatMode, lang));
+      output(buildHelpOutput(chatModeNow(), lang));
       continue;
     }
     // Sprint 269 T-269-003 — i18n informational/error reply from the registry

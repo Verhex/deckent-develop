@@ -11,6 +11,7 @@
 
 import { Box, Text, Static, useInput, useApp } from 'ink';
 import { InkPaletteContext, useInkPalette } from './ink-palette-context.js';
+import type { SessionAuthority } from './session-authority.js';
 import type { InkPalette } from './ink-palette.js';
 import { useState, useRef, useEffect, Component, type ReactElement, type ReactNode } from 'react';
 import { homedir } from 'node:os';
@@ -1169,6 +1170,10 @@ export interface ReplAppProps {
     refresh: () => Promise<void>;
     subscribe: (listener: () => void) => () => void;
   };
+  /** TERMINAL-SESSION-AUTHORITY-001 — the surface-independent posture +
+   *  approval holder (run.tsx). The App mirrors its own state into it on
+   *  every /term and /approve so both surfaces share one authority. */
+  sessionAuthority?: SessionAuthority;
   /** TERMINAL-PICKER-002 — ASCII glyphs (dumb terminal / no UTF-8 locale). */
   pickerAscii?: boolean;
   /** TERMINAL-PICKER-002 — words-only rendering (NO_COLOR / suppression). */
@@ -1483,6 +1488,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // forms (/approve <mode>, /term <mode>, /resume <n|id>) and the picker.
   const runApprove = (mode: ApprovalMode): void => {
     onApprovalMode(mode); setApproval(mode);
+    props.sessionAuthority?.setApproval(mode);
     // born-493 (387-002) — also retarget the native AgentSession's OWN
     // permission engine (see ReplEngine.setApprovalMode doc comment,
     // native-agent-bridge.ts). No-op for the legacy engine (nativeEngine
@@ -1493,6 +1499,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   const runTerm = (target: TermMode): void => {
     const result = applyModeTarget(termModeRef.current, target);
     if (result.changed) setTermMode(result.state);
+    props.sessionAuthority?.setPosture(target);
     pushTurn('seg', requireInjectedLabel('termSwitched', labels.termSwitched)
       .replace('{mode}', resolveModeLabel(result.state.mode, labels)));
   };
