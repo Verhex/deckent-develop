@@ -21,7 +21,7 @@ import { renderCommandRisk } from '../../../src/cli/helpers/risk-language.js';
 import { getMessage, getMessageLanguages } from '../../../src/cli/helpers/messages.js';
 
 const ROOT = join(__dirname, '..', '..', '..');
-const ask = initialTermModeState();
+const ask = initialTermModeState('ask');
 const run = applyModeTarget(ask, 'run').state;
 const control = applyModeTarget(ask, 'control').state;
 

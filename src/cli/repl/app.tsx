@@ -1149,6 +1149,9 @@ export interface ReplAppProps {
   /** TERMINAL-PICKER-004 — writes one setting through setConfigValues (the
    *  same seam as `deckent config set`); the value is the picked option text. */
   saveConfigValue?: (key: string, value: string) => { ok: true } | { ok: false; error: string };
+  /** TERMINAL-POSTURE-001 — the Ask/Run/Control posture the session starts in
+   *  (run.tsx resolves `terminal.posture`; absent → the term-mode default). */
+  initialTermMode?: TermMode;
   /** TERMINAL-PICKER-002 — ASCII glyphs (dumb terminal / no UTF-8 locale). */
   pickerAscii?: boolean;
   /** TERMINAL-PICKER-002 — words-only rendering (NO_COLOR / suppression). */
@@ -1357,7 +1360,7 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
 }
 
 export function ReplApp(props: ReplAppProps): ReactElement {
-  const { provider, dispatcher, labels, registerConfirm, registerActionGate, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle, shortcutsPanel, pickerLabels, pickerSpecs, saveDefault, configEntries, saveConfigValue, pickerAscii = false, pickerNoColor = false } = props;
+  const { provider, dispatcher, labels, registerConfirm, registerActionGate, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle, shortcutsPanel, pickerLabels, pickerSpecs, saveDefault, configEntries, saveConfigValue, initialTermMode, pickerAscii = false, pickerNoColor = false } = props;
   const { exit } = useApp();
   // TERMINAL-TOOLS-004 — live width for the status row + queue preview (reflows on resize).
   const columns = useTerminalColumns();
@@ -1401,7 +1404,9 @@ export function ReplApp(props: ReplAppProps): ReactElement {
 
   // REPL-SURFACE-WIRE (354-001) seam state — inert unless replSurfaceEnabled;
   // when it stays false (the default) none of this affects the render output.
-  const [termMode, setTermMode] = useState<TermModeState>(initialTermModeState());
+  // TERMINAL-POSTURE-001 — the boot posture comes from config (run.tsx
+  // resolveConfiguredPosture over terminal.posture; default run).
+  const [termMode, setTermMode] = useState<TermModeState>(initialTermModeState(initialTermMode));
   // TERMINAL-TOOLS-011 — the gate reads the LIVE mode from callbacks registered
   // once (confirm trigger, action gate), so mirror the state into a ref.
   const termModeRef = useRef<TermModeState>(termMode);

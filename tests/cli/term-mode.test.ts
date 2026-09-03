@@ -12,8 +12,9 @@ import {
 import { COMMAND_REGISTRY, type CommandRisk } from '../../src/cli/command-registry.js';
 
 describe('term-mode — initial state', () => {
-  it('starts in ask (read-only, safe default)', () => {
-    expect(initialTermModeState()).toEqual({ mode: 'ask' });
+  it('starts in run by default (owner decision 2026-09-03); ask stays an explicit posture', () => {
+    expect(initialTermModeState()).toEqual({ mode: 'run' });
+    expect(initialTermModeState('ask')).toEqual({ mode: 'ask' });
   });
 });
 
@@ -62,7 +63,7 @@ describe('term-mode — applyModeTarget transition matrix (geçiş-matrisi)', ()
 });
 
 describe('term-mode — Ask rejects Değiştir/Çalıştır/Otonom risk (reddet+öner)', () => {
-  const state = initialTermModeState();
+  const state = initialTermModeState('ask');
 
   it('Oku is allowed in ask', () => {
     expect(checkActionAllowed(state, 'Oku')).toEqual({ allowed: true });

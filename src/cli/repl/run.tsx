@@ -20,6 +20,7 @@ import {
 // TERMINAL-PICKER-002 — the interactive value picker's data + label seams.
 import { buildPickerLabels } from './picker-labels.js';
 import { buildLegacyPickerSpecs } from './picker-legacy.js';
+import { resolveConfiguredPosture } from './term-mode.js';
 import { buildModelPickerSpec, buildProviderPickerSpec, type PickerSpecContext, type ProviderAvailability } from './picker-specs.js';
 import type { PickerKind, PickerSpec } from './picker.js';
 import { resolveActiveModelPolicy } from '../../core/model-activation-store.js';
@@ -1694,6 +1695,7 @@ export async function runInkRepl(
         const out = setConfigValues(process.cwd(), patch);
         return out.ok ? { ok: true } : { ok: false, error: out.error };
       }}
+      initialTermMode={resolveConfiguredPosture((projectCfg as { terminal?: { posture?: unknown } }).terminal?.posture)}
       configEntries={() => buildConfigEntries(process.cwd())}
       saveConfigValue={(key, value) => {
         const out = setConfigValues(process.cwd(), { [key]: parseConfigValueText(value) });

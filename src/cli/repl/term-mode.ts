@@ -44,9 +44,22 @@ export interface TermModeState {
   readonly mode: TermMode;
 }
 
-/** `ask` is the safe default — a fresh terminal starts read-only. */
-export function initialTermModeState(): TermModeState {
-  return { mode: 'ask' };
+/** TERMINAL-POSTURE-001 (owner decision 2026-09-03): a fresh terminal starts
+ *  in `run` — reads, edits and execution admitted, autonomous actions still
+ *  need Control. `ask` remains an explicit read-only posture (`/term ask` or
+ *  `terminal.posture` in config). */
+export const DEFAULT_TERM_MODE: TermMode = 'run';
+
+export function initialTermModeState(mode: TermMode = DEFAULT_TERM_MODE): TermModeState {
+  return { mode };
+}
+
+/** The configured posture (`terminal.posture`), case-insensitive; anything
+ *  that is not one of the three tokens resolves to the default. */
+export function resolveConfiguredPosture(value: unknown): TermMode {
+  if (typeof value !== 'string') return DEFAULT_TERM_MODE;
+  const token = value.trim().toLowerCase();
+  return (TERM_MODES as readonly string[]).includes(token) ? (token as TermMode) : DEFAULT_TERM_MODE;
 }
 
 /** Parsed `/term` line — the caller (app.tsx handleSubmit) renders each kind

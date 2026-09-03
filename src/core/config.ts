@@ -1546,6 +1546,17 @@ export function validateConfig(config: DeckentConfig): string[] {
       );
     }
   }
+  // TERMINAL-POSTURE-001 — a typo in the boot posture is refused, never
+  // silently resolved to a posture the operator did not choose.
+  if (config.terminal?.posture !== undefined) {
+    const validPostures = ['ask', 'run', 'control'];
+    const posture = config.terminal.posture;
+    if (typeof posture !== 'string' || !validPostures.includes(posture.toLowerCase())) {
+      errors.push(
+        `Invalid value '${String(posture)}' for field 'terminal.posture'. Valid: ${validPostures.join(', ')}.`,
+      );
+    }
+  }
   if (config.prompt?.adr_render !== undefined) {
     const validAdrRender = ['full', 'operative'];
     if (!validAdrRender.includes(config.prompt.adr_render)) {
@@ -2956,6 +2967,18 @@ export const CONFIG_METADATA: Readonly<Record<string, ConfigMetadataEntry>> = {
     default: DEFAULT_PROMPT_CONFIG.catalog_mount_mask,
     options: ['true', 'false'],
     category: 'Prompt',
+  },
+  // TERMINAL-POSTURE-001 (owner decision 2026-09-03) — the Ask/Run/Control
+  // posture a Terminal session starts in. Absent-by-default in
+  // DEFAULT_TERMINAL_CONFIG (its key-shape is pinned); the REPL resolves the
+  // default (`run`) at boot via term-mode.ts resolveConfiguredPosture.
+  'terminal.posture': {
+    description: 'Authority posture a Terminal session starts in: ask (read-only), run (reads, edits, execution) or control (everything incl. autonomous actions).',
+    descriptionTr: 'Terminal oturumunun başladığı yetki duruşu: ask (salt-okunur), run (okuma, düzenleme, çalıştırma) veya control (otonom eylemler dahil her şey).',
+    type: "'ask' | 'run' | 'control'",
+    default: 'run',
+    options: ['ask', 'run', 'control'],
+    category: 'Terminal',
   },
   mode: {
     description: 'Active plan mode — controls worker count and model tier.',

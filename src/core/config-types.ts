@@ -60,6 +60,10 @@ export interface TimeoutConfig {
 // ─── Terminal Configuration ─────────────────────────────────────────
 export interface TerminalConfig {
   enabled: boolean;
+  /** TERMINAL-POSTURE-001 — the Ask/Run/Control posture a Terminal session
+   *  starts in. Absent-by-default (DEFAULT_TERMINAL_CONFIG's key-shape is
+   *  pinned); the REPL resolves `run` when unset. */
+  posture?: 'ask' | 'run' | 'control';
   /** Bind address for the terminal WS. Default 127.0.0.1. */
   bind: string;
   /** Max concurrent PTY sessions. */

@@ -80,7 +80,7 @@ describe('resolveModeLabel — mode-indicator label resolution (Ask/Run/Control)
     // Mirrors app.tsx's handleSubmit: '/term run' parses to a switch target,
     // the target transitions state, then the new mode's label is what the
     // indicator would render.
-    const start = initialTermModeState();
+    const start = initialTermModeState('ask'); // TERMINAL-POSTURE-001: the default is run; this flow starts from an explicit Ask
     expect(resolveModeLabel(start.mode, EN_LABELS)).toBe('Ask');
 
     const runParse = parseTermCommand('/term run');
