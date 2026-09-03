@@ -1162,6 +1162,13 @@ export interface ReplAppProps {
   /** TERMINAL-READABILITY-002 — OSC 8 hyperlinks in rendered replies; run.tsx
    *  resolves it from the host evidence + `terminal.links` (default: off). */
   hyperlinks?: boolean;
+  /** TERMINAL-PROVIDER-EVIDENCE-001 — the shared provider-evidence store:
+   *  opening /model or /provider kicks a bounded refresh, and an open picker
+   *  is rebuilt (same identity, cursor realigned) when evidence lands. */
+  pickerEvidence?: {
+    refresh: () => Promise<void>;
+    subscribe: (listener: () => void) => () => void;
+  };
   /** TERMINAL-PICKER-002 — ASCII glyphs (dumb terminal / no UTF-8 locale). */
   pickerAscii?: boolean;
   /** TERMINAL-PICKER-002 — words-only rendering (NO_COLOR / suppression). */
@@ -1644,6 +1651,21 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // TERMINAL-PICKER-002 — the open value picker (null = closed). Opened by a
   // bare selection command; closed by Esc / commit / interrupt.
   const [picker, setPicker] = useState<{ kind: PickerKind; spec: PickerSpec } | null>(null);
+  // TERMINAL-PROVIDER-EVIDENCE-001 — when evidence lands while a model /
+  // provider picker is open, rebuild its spec in place: the card keeps its
+  // identity (key = kind) and realigns the cursor by candidate id.
+  const pickerEvidence = props.pickerEvidence;
+  const pickerRef = useRef(picker);
+  pickerRef.current = picker;
+  useEffect(() => {
+    if (!pickerEvidence) return undefined;
+    return pickerEvidence.subscribe(() => {
+      const open = pickerRef.current;
+      if (!open || (open.kind !== 'model' && open.kind !== 'provider')) return;
+      const spec = buildPickerSpecFor(open.kind);
+      if (spec) setPicker({ kind: open.kind, spec });
+    });
+  }, [pickerEvidence]);
   // TERMINAL-PICKER-004 — the setting chosen in the key stage; the value stage applies to it.
   const pickerConfigKey = useRef<ConfigKeyEntry | null>(null);
   // TERMINAL-PICKER-005 — the last numbered listing printed on a narrow
@@ -2013,6 +2035,9 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       const spec = buildPickerSpecFor(pickerRequest.kind);
       if (spec) {
         pushTurn('user', trimmed);
+        // TERMINAL-PROVIDER-EVIDENCE-001 — kick a bounded evidence refresh; the
+        // subscription above rebuilds the open card when it lands.
+        if (pickerRequest.kind === 'model' || pickerRequest.kind === 'provider') void pickerEvidence?.refresh();
         if (resolvePickerSurfaceMode(columns) === 'lines') {
           // TERMINAL-PICKER-005 — too narrow for a card: numbered transcript
           // lines; the next typed `<command> <n|id>` resolves against them.

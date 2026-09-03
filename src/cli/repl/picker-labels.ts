@@ -25,7 +25,7 @@ export const PICKER_VIA_KEYS: Readonly<Record<ProviderVia, string>> = {
   local: 'tui.picker.fact.via.local',
 };
 
-const BLOCKED_CODES = ['MODEL_INACTIVE', 'MODEL_NOT_IN_ACTIVE_SET', 'NO_NATIVE_TRANSPORT', 'MISSING_CREDENTIAL', 'NOT_ENUMERABLE', 'NO_MODELS_LISTED'] as const;
+const BLOCKED_CODES = ['MODEL_INACTIVE', 'MODEL_NOT_IN_ACTIVE_SET', 'NO_NATIVE_TRANSPORT', 'MISSING_CREDENTIAL', 'NOT_ENUMERABLE', 'NO_MODELS_LISTED', 'NOT_LOGGED_IN', 'UNREACHABLE'] as const;
 
 /** Resolve every picker label from the catalog for the session language. */
 export function buildPickerLabels(t: (key: string) => string): PickerLabels {

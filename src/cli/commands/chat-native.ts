@@ -416,9 +416,31 @@ export interface ChatNativeOptions {
    * Omitted → `/model <n|id>` reports honestly that switching is unavailable.
    */
   switchModel?: (modelId: string) => void;
+  /**
+   * TERMINAL-PROVIDER-EVIDENCE-001 — the shared provider-evidence store. A
+   * bare `/model` / `/provider` awaits one bounded refresh before listing so
+   * the rows carry ok / blocked evidence instead of a permanent [unknown];
+   * an overrun never blocks the surface (`refreshTimeoutMs`, default 1500).
+   */
+  pickerEvidence?: {
+    refresh: () => Promise<void>;
+    subscribe: (listener: () => void) => () => void;
+    refreshTimeoutMs?: number;
+  };
 }
 
 const DEFAULT_MAX_TURNS = 50;
+const DEFAULT_EVIDENCE_REFRESH_TIMEOUT_MS = 1_500;
+
+/** Await the evidence refresh, bounded — the listing must never hang on a slow probe. */
+async function awaitEvidence(evidence: ChatNativeOptions['pickerEvidence']): Promise<void> {
+  if (!evidence) return;
+  const timeoutMs = evidence.refreshTimeoutMs ?? DEFAULT_EVIDENCE_REFRESH_TIMEOUT_MS;
+  await new Promise<void>((resolve) => {
+    const timer = setTimeout(resolve, timeoutMs);
+    evidence.refresh().then(() => { clearTimeout(timer); resolve(); }, () => { clearTimeout(timer); resolve(); });
+  });
+}
 const DEFAULT_MAX_TOOL_HOPS = 10;
 const EXIT_COMMANDS: readonly string[] = [':exit', ':quit'];
 
@@ -924,6 +946,9 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
       const builder = opts.pickerSpecs[kind];
       const arg = (pickerCmd[2] ?? '').trim();
       if (builder && (arg.length === 0 || kind === 'model')) {
+        // TERMINAL-PROVIDER-EVIDENCE-001 — a bare listing waits (bounded) for
+        // the shared evidence so its rows say ok / blocked, not [unknown].
+        if (arg.length === 0 && kind === 'model') await awaitEvidence(opts.pickerEvidence);
         const spec = builder();
         if (arg.length === 0) {
           // TERMINAL-PICKER-007 — the `<n|id>` hint is promised only where a
@@ -963,7 +988,9 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
         replyText = getMessage('tui.switch_usage', lang);
         // The usage line stays first (pinned) and names the current selection
         // (its "current:" tail was dangling); the numbered list follows when a
-        // spec builder is injected.
+        // spec builder is injected. TERMINAL-PROVIDER-EVIDENCE-001: the list
+        // waits (bounded) for the shared evidence first.
+        if (opts.pickerSpecs?.provider) await awaitEvidence(opts.pickerEvidence);
         const spec = opts.pickerSpecs?.provider?.();
         if (spec && opts.pickerLabels) {
           const currentRow = spec.candidates.find((c) => c.state === 'current');

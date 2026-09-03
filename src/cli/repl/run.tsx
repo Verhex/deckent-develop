@@ -20,7 +20,10 @@ import {
 } from './native-transport.js';
 // TERMINAL-PICKER-002 — the interactive value picker's data + label seams.
 import { buildPickerLabels, PICKER_VIA_KEYS } from './picker-labels.js';
-import { nativeProviderVia } from '../../core/native-provider-names.js';
+import { AUTH_PROBE_PROVIDERS, nativeProviderVia } from '../../core/native-provider-names.js';
+// TERMINAL-PROVIDER-EVIDENCE-001 — the shared provider-evidence store (read-only probes).
+import { createProviderEvidence, type ProviderEvidenceStore } from './provider-evidence.js';
+import { probeProviderAuth } from '../../core/provider-auth-probe.js';
 import { buildLegacyPickerSpecs } from './picker-legacy.js';
 import { resolveConfiguredPosture } from './term-mode.js';
 import { buildModelPickerSpec, buildProviderPickerSpec, type PickerSpecContext, type ProviderAvailability } from './picker-specs.js';
@@ -1351,6 +1354,10 @@ export async function runInkRepl(
   // Set on the native path below; the legacy proxy path gets a registry-driven
   // fallback after it.
   let pickerSpecs: Partial<Record<PickerKind, () => PickerSpec>> | undefined;
+  // TERMINAL-PROVIDER-EVIDENCE-001 — one evidence store per session (native
+  // or host surface); every picker row's ok / blocked / unknown comes from it.
+  let pickerEvidence: ProviderEvidenceStore | undefined;
+  const ollamaEvidenceHost = (process.env['DECKENT_OLLAMA_HOST'] ?? (projectCfg as { ollama_host?: string }).ollama_host)?.replace(/\/$/, '');
   let nativeSelection: ActiveSelection | undefined;
   // TERM-FLOW-UNIFY Sprint-4 mount (426-002) — `terminal.run_flow_v2` gate;
   // only ever constructed when the native engine is selected (the
@@ -1456,11 +1463,26 @@ export async function runInkRepl(
       // policy (re-resolved per open — the store has no events) and a per-
       // provider availability probe through the SAME resolver the switch uses
       // (sync, network-free), so a missing credential shows in-row before Enter.
+      // TERMINAL-PROVIDER-EVIDENCE-001 — the native universe: only the Ollama
+      // host has an async reachability source here (the API transports are
+      // probed synchronously below); refreshed at boot and on every open.
+      const nativeEvidence = createProviderEvidence({
+        probeAuth: (p, o) => probeProviderAuth(p, o),
+        ...(ollamaEvidenceHost ? { ollamaHost: ollamaEvidenceHost } : {}),
+        hostCliProviders: AUTH_PROBE_PROVIDERS,
+        providers: NATIVE_PROVIDER_NAMES,
+      });
+      pickerEvidence = nativeEvidence;
+      void nativeEvidence.refresh();
       const pickerContext = (): PickerSpecContext => {
         const policy = resolveActiveModelPolicy(process.cwd());
         const availability = (provider: string): ProviderAvailability => {
           const probe = resolveNativeSelection({ provider, model: null }, { env: process.env, config: nativeCfg, secrets: deckSecrets });
-          if (!('error' in probe)) return { ok: true };
+          if (!('error' in probe)) {
+            // Credentials/config resolve; reachability evidence (when it exists) refines the verdict.
+            const evidence = nativeEvidence.get(provider);
+            return evidence.ok === 'unknown' ? { ok: true } : evidence;
+          }
           // A missing credential is an availability FACT, not a failed switch:
           // the row names the credential source (ProviderError.detail), the
           // catalog row supplies the sentence. Other failures keep the
@@ -1665,6 +1687,20 @@ export async function runInkRepl(
   );
   const atRefReader = createScopedAtRefReader(() => process.cwd());
 
+  // TERMINAL-PROVIDER-EVIDENCE-001 — the host (legacy proxy) surface gets its
+  // own store over the registry universe: subscription CLIs via the auth
+  // probe, Ollama via its host; everything else stays `unknown` honestly.
+  if (!pickerEvidence) {
+    pickerEvidence = createProviderEvidence({
+      probeAuth: (p, o) => probeProviderAuth(p, o),
+      ...(ollamaEvidenceHost ? { ollamaHost: ollamaEvidenceHost } : {}),
+      hostCliProviders: AUTH_PROBE_PROVIDERS,
+      providers: modelRegistry.getAllProviders(),
+    });
+    void pickerEvidence.refresh();
+  }
+  const hostEvidence = pickerEvidence;
+
   // TERMINAL-READABILITY-001 — the palette is resolved ONCE from the color gate
   // (host-theme-mapped 16-color unless a dark background is proven; nothing
   // when suppressed) and provided to every card through context.
@@ -1696,7 +1732,14 @@ export async function runInkRepl(
       inboxFollowFeed={() => collectInboxRows(process.cwd())}
       inboxLabels={buildInboxLabels(t)}
       pickerLabels={buildPickerLabels(t)}
-      pickerSpecs={pickerSpecs ?? buildLegacyPickerSpecs(() => switcher.current(), () => process.cwd(), (n) => t('tui.picker.fact.models').replace('{n}', String(n)))}
+      pickerSpecs={pickerSpecs ?? buildLegacyPickerSpecs(
+        () => switcher.current(),
+        () => process.cwd(),
+        (n) => t('tui.picker.fact.models').replace('{n}', String(n)),
+        (via) => t(PICKER_VIA_KEYS[via]),
+        (provider) => hostEvidence.get(provider),
+      )}
+      pickerEvidence={{ refresh: () => hostEvidence.refresh(), subscribe: (listener) => hostEvidence.subscribe(listener) }}
       saveDefault={(kind, id) => {
         // "save as default" pins BOTH keys the boot path reads (resolveNativeProvider
         // → native_provider pin → resolveNativeSelection with native_model): a

@@ -14,6 +14,12 @@ import { interruptActiveSprint } from '../orchestra/sprint-controller.js';
 import { killAllSessions } from '../orchestra/tmux.js';
 import { bootstrapFromCatalog } from '../core/model-catalog.js';
 import { loadConfig, resolveChatProvider, type ChatProviderName } from '../core/config.js';
+// TERMINAL-PROVIDER-EVIDENCE-001 — the readline surface reads the same
+// provider-evidence store the Ink surface does (read-only probes).
+import { createProviderEvidence } from './repl/provider-evidence.js';
+import { probeProviderAuth } from '../core/provider-auth-probe.js';
+import { AUTH_PROBE_PROVIDERS } from '../core/native-provider-names.js';
+import { modelRegistry } from '../core/model-registry.js';
 import { isCatalogDependent } from './command-registry.js';
 import { getMessage } from './helpers/messages.js';
 import { resolveChatAdapter } from './commands/chat-provider-parity.js';
@@ -938,6 +944,19 @@ export async function launchDefaultRepl(): Promise<void> {
   const throwOnSwitchError = (result: { switchError?: string }): void => {
     if (result.switchError) throw new Error(result.switchError);
   };
+  // TERMINAL-PROVIDER-EVIDENCE-001 — the shared evidence store for the host
+  // surface: subscription CLIs through the auth probe, Ollama through its host
+  // (the DECKENT_OLLAMA_HOST override, else the project setting; neither →
+  // no source, rows stay `unknown`). Refreshed at boot and on every listing.
+  const evidenceCfg = await loadConfig().catch(() => undefined);
+  const ollamaEvidenceHost = (process.env['DECKENT_OLLAMA_HOST'] ?? (evidenceCfg as { ollama_host?: string } | undefined)?.ollama_host)?.replace(/\/$/, '');
+  const providerEvidence = createProviderEvidence({
+    probeAuth: (p, o) => probeProviderAuth(p, o),
+    ...(ollamaEvidenceHost ? { ollamaHost: ollamaEvidenceHost } : {}),
+    hostCliProviders: AUTH_PROBE_PROVIDERS,
+    providers: modelRegistry.getAllProviders(),
+  });
+  void providerEvidence.refresh();
   await runChatNativeLoop({
     provider: readlineSwitcher.proxy,
     switchProvider: (name) => throwOnSwitchError(readlineSwitcher.switchTo({ provider: name })),
@@ -947,7 +966,9 @@ export async function launchDefaultRepl(): Promise<void> {
       () => process.cwd(),
       (n) => getMessage('tui.picker.fact.models', replLang).replace('{n}', String(n)),
       (via) => getMessage(PICKER_VIA_KEYS[via], replLang),
+      (provider) => providerEvidence.get(provider),
     ),
+    pickerEvidence: { refresh: () => providerEvidence.refresh(), subscribe: (listener) => providerEvidence.subscribe(listener) },
     pickerLabels: buildPickerLabels((key) => getMessage(key, replLang)),
     dispatcher,
     input: isTty ? arbitratedInput() : simpleLines(),

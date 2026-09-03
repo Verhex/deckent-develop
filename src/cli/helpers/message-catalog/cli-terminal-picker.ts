@@ -57,6 +57,9 @@ export const CLI_TERMINAL_PICKER_MESSAGES: MessageFamily = Object.freeze({
   'tui.picker.blocked.MISSING_CREDENTIAL': { en: 'credential missing — {detail}', tr: 'kimlik bilgisi eksik — {detail}' },
   'tui.picker.blocked.NOT_ENUMERABLE': { en: 'not enumerable here — use deckent config set', tr: 'burada listelenemez — deckent config set kullanın' },
   'tui.picker.blocked.NO_MODELS_LISTED': { en: 'no models are listed for this provider', tr: 'bu sağlayıcı için listelenmiş model yok' },
+  // ── TERMINAL-PROVIDER-EVIDENCE-001 — evidence-store reasons ────────────
+  'tui.picker.blocked.NOT_LOGGED_IN': { en: 'host CLI is not logged in — run its login first', tr: 'host CLI oturumu açık değil — önce giriş yapın' },
+  'tui.picker.blocked.UNREACHABLE': { en: 'unreachable — {detail}', tr: 'erişilemiyor — {detail}' },
   // ── TERMINAL-PICKER-007 — closure rows ─────────────────────────────────
   'tui.picker.fact.models': { en: '{n} models', tr: '{n} model' },
   // ── TERMINAL-PROVIDER-VOCAB-001 — one vocabulary: the transport is a fact ──
