@@ -53,7 +53,7 @@ describe('renderMarkdown — nested-style reset bleed (born-525)', () => {
 
 describe('renderMarkdown — link regex balanced-paren URL (born-525)', () => {
   it('does not truncate a Wikipedia-style URL with a balanced paren', () => {
-    const out = renderMarkdown('[Wiki](https://en.wikipedia.org/wiki/Foo_(bar)) end', true);
+    const out = renderMarkdown('[Wiki](https://en.wikipedia.org/wiki/Foo_(bar)) end', true, { hyperlinks: true });
     expect(out).toContain('\x1b]8;;https://en.wikipedia.org/wiki/Foo_(bar)\x07');
     expect(out).toContain('end');
     // no leaked, un-hyperlinked ')' dangling right after the OSC-8 close
@@ -61,12 +61,12 @@ describe('renderMarkdown — link regex balanced-paren URL (born-525)', () => {
   });
 
   it('still handles a plain URL with no parens (no regression)', () => {
-    const out = renderMarkdown('[Docs](https://example.com/path) end', true);
+    const out = renderMarkdown('[Docs](https://example.com/path) end', true, { hyperlinks: true });
     expect(out).toContain('\x1b]8;;https://example.com/path\x07');
   });
 
   it('still handles a link with a title attribute (no regression)', () => {
-    const out = renderMarkdown('[Docs](https://example.com "Title") end', true);
+    const out = renderMarkdown('[Docs](https://example.com "Title") end', true, { hyperlinks: true });
     expect(out).toContain('\x1b]8;;https://example.com\x07');
   });
 });

@@ -64,6 +64,9 @@ export interface TerminalConfig {
    *  starts in. Absent-by-default (DEFAULT_TERMINAL_CONFIG's key-shape is
    *  pinned); the REPL resolves `run` when unset. */
   posture?: 'ask' | 'run' | 'control';
+  /** TERMINAL-READABILITY-002 — OSC 8 hyperlink policy: auto (host evidence
+   *  decides), on, off. Absent-by-default (resolved to `auto` at boot). */
+  links?: 'auto' | 'on' | 'off';
   /** Bind address for the terminal WS. Default 127.0.0.1. */
   bind: string;
   /** Max concurrent PTY sessions. */

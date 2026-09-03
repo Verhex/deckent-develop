@@ -35,6 +35,7 @@
     "verify:repl-tools": "node scripts/ink-pty-tool-verify.mjs",
     "verify:native-repl": "node scripts/ink-pty-native-verify.mjs",
     "verify:picker": "node scripts/ink-pty-picker-verify.mjs",
+    "verify:readability": "node scripts/ink-pty-readability-verify.mjs",
     "extract:traces": "node scripts/extract-traces.mjs",
     "test:dashboard": "vitest run --config vitest.dashboard.config.ts",
     "build:dashboard": "node scripts/build-dashboard.mjs",

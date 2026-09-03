@@ -126,24 +126,45 @@ describe('renderMarkdown', () => {
 import { renderMarkdown as renderMd2 } from '../../src/cli/commands/chat-render.js';
 
 describe('renderMarkdown — links, URLs, file paths (Sprint 224 readability)', () => {
-  it('markdown link → OSC-8 hyperlink with the underlined link role', () => {
-    const out = renderMd2('see [Docs](https://docs.anthropic.com)', true);
+  // TERMINAL-READABILITY-002 — OSC 8 is capability-gated: the caller passes
+  // `{ hyperlinks: true }` only when the host is proven (helpers/terminal-links);
+  // the default writes NO OSC byte and keeps the URL visible for the IDE's own
+  // link detection.
+  const ON = { hyperlinks: true };
+
+  it('markdown link → OSC-8 hyperlink with the underlined link role (hyperlinks on)', () => {
+    const out = renderMd2('see [Docs](https://docs.anthropic.com)', true, ON);
     expect(out).toContain('\x1b]8;;https://docs.anthropic.com\x07'); // OSC-8 open
     expect(out).toContain(`${LINK}Docs${RESET}`);
     expect(out).toContain('\x1b]8;;\x07'); // OSC-8 close
     expect(out).not.toContain('[Docs]'); // raw markdown gone
   });
 
-  it('bare URL → clickable OSC-8', () => {
-    const out = renderMd2('go to https://github.com/x/y now', true);
-    expect(out).toContain('\x1b]8;;https://github.com/x/y\x07');
+  it('markdown link (hyperlinks off / default) → label in the link role + the URL visible, no OSC byte', () => {
+    const out = renderMd2('see [Docs](https://docs.anthropic.com)', true);
+    expect(out).not.toContain('\x1b]8;;');
+    expect(out).toContain(`${LINK}Docs${RESET} (https://docs.anthropic.com)`);
+    expect(out).not.toContain('[Docs]');
+  });
+
+  it('bare URL → clickable OSC-8 (on); untouched plain URL (off)', () => {
+    expect(renderMd2('go to https://github.com/x/y now', true, ON)).toContain('\x1b]8;;https://github.com/x/y\x07');
+    const off = renderMd2('go to https://github.com/x/y now', true);
+    expect(off).not.toContain('\x1b]8;;');
+    expect(off).toContain('go to https://github.com/x/y now');
   });
 
   it('does NOT double-wrap a URL already inside a markdown link', () => {
-    const out = renderMd2('[API](https://docs.anthropic.com/en/api)', true);
+    const out = renderMd2('[API](https://docs.anthropic.com/en/api)', true, ON);
     // exactly one OSC-8 open for that URL
     const opens = out.split('\x1b]8;;https://docs.anthropic.com/en/api\x07').length - 1;
     expect(opens).toBe(1);
+  });
+
+  it('a file reference is never wrapped in OSC 8 — the host detects path:line:col itself', () => {
+    const out = renderMd2('see src/cli/entry.ts:42:7 now', true, ON);
+    expect(out).not.toContain('\x1b]8;;');
+    expect(out).toContain(`${CODE}src/cli/entry.ts:42:7${RESET}`);
   });
 
   it('project file path → code role', () => {
@@ -169,10 +190,13 @@ describe('renderMarkdown — links, URLs, file paths (Sprint 224 readability)', 
   });
 
   it('does not colorize a path segment inside a URL', () => {
-    const out = renderMd2('https://github.com/anthropics/claude-code', true);
+    const out = renderMd2('https://github.com/anthropics/claude-code', true, { hyperlinks: true });
     // the URL is one hyperlink; no stray path-coloring inside it
     expect(out).toContain('\x1b]8;;https://github.com/anthropics/claude-code\x07');
     expect(out).not.toContain(`${CODE}anthropics`);
+    const off = renderMd2('https://github.com/anthropics/claude-code', true);
+    expect(off).not.toContain(`${CODE}anthropics`);
+    expect(off).toContain('https://github.com/anthropics/claude-code');
   });
 });
 

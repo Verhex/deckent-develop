@@ -1557,6 +1557,17 @@ export function validateConfig(config: DeckentConfig): string[] {
       );
     }
   }
+  // TERMINAL-READABILITY-002 — the hyperlink override is a closed enum; a typo
+  // must not silently fall back to `auto`.
+  if (config.terminal?.links !== undefined) {
+    const validLinks = ['auto', 'on', 'off'];
+    const links = config.terminal.links;
+    if (typeof links !== 'string' || !validLinks.includes(links.toLowerCase())) {
+      errors.push(
+        `Invalid value '${String(links)}' for field 'terminal.links'. Valid: ${validLinks.join(', ')}.`,
+      );
+    }
+  }
   if (config.prompt?.adr_render !== undefined) {
     const validAdrRender = ['full', 'operative'];
     if (!validAdrRender.includes(config.prompt.adr_render)) {
@@ -2978,6 +2989,17 @@ export const CONFIG_METADATA: Readonly<Record<string, ConfigMetadataEntry>> = {
     type: "'ask' | 'run' | 'control'",
     default: 'run',
     options: ['ask', 'run', 'control'],
+    category: 'Terminal',
+  },
+  // TERMINAL-READABILITY-002 — OSC 8 hyperlinks: auto (only on a host proven
+  // to render them: VS Code/Cursor, iTerm2, WezTerm, Ghostty, kitty, Windows
+  // Terminal, VTE ≥ 0.50, Konsole; never through a multiplexer), on, off.
+  'terminal.links': {
+    description: 'Clickable OSC 8 hyperlinks in Terminal replies: auto (only where the host terminal is proven to render them), on, or off (URLs stay visible as text either way).',
+    descriptionTr: 'Terminal cevaplarında tıklanabilir OSC 8 bağlantılar: auto (yalnız host terminalin bunları çizdiği kanıtlıysa), on veya off (URL metni her durumda görünür kalır).',
+    type: "'auto' | 'on' | 'off'",
+    default: 'auto',
+    options: ['auto', 'on', 'off'],
     category: 'Terminal',
   },
   mode: {

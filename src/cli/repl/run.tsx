@@ -51,6 +51,7 @@ import { buildSlashRegistry } from '../commands/chat-slash-registry.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
 import { colorTier, isColorSuppressed, isDumbTerminal } from '../helpers/theme.js';
 import { InkPaletteProvider } from './ink-palette-context.js';
+import { resolveHyperlinks } from '../helpers/terminal-links.js';
 import { resolveInkPalette } from './ink-palette.js';
 import { buildToolExecLabels } from '../helpers/tool-exec-labels.js';
 import { loadConfig, listConfigByCategory, getConfigHelp, VALID_PROVIDERS } from '../../core/config.js';
@@ -1709,6 +1710,11 @@ export async function runInkRepl(
       }}
       pickerAscii={isDumbTerminal() || process.env['DECKENT_ASCII'] === '1' || !hasUtf8Locale(process.env)}
       pickerNoColor={isColorSuppressed()}
+      hyperlinks={resolveHyperlinks({
+        env: process.env,
+        setting: (projectCfg as { terminal?: { links?: unknown } }).terminal?.links,
+        stdoutIsTTY: process.stdout.isTTY === true,
+      }).enabled}
       inboxDecide={(flowId, verb) => executeInboxDecision(process.cwd(), flowId, verb, lang)}
       registerConfirm={(trigger) => { confirmTrigger = trigger; }}
       registerActionGate={(gate) => { actionGate = gate; }}

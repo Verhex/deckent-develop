@@ -1159,6 +1159,9 @@ export interface ReplAppProps {
   /** TERMINAL-POSTURE-001 — the Ask/Run/Control posture the session starts in
    *  (run.tsx resolves `terminal.posture`; absent → the term-mode default). */
   initialTermMode?: TermMode;
+  /** TERMINAL-READABILITY-002 — OSC 8 hyperlinks in rendered replies; run.tsx
+   *  resolves it from the host evidence + `terminal.links` (default: off). */
+  hyperlinks?: boolean;
   /** TERMINAL-PICKER-002 — ASCII glyphs (dumb terminal / no UTF-8 locale). */
   pickerAscii?: boolean;
   /** TERMINAL-PICKER-002 — words-only rendering (NO_COLOR / suppression). */
@@ -1314,7 +1317,7 @@ function DeckentHeader(): ReactElement {
   return <Text><Text {...palette.accent}>● </Text><Text bold>deckent</Text></Text>;
 }
 
-function TurnView({ turn }: { turn: Turn }): ReactElement {
+function TurnView({ turn, hyperlinks }: { turn: Turn; hyperlinks: boolean }): ReactElement {
   const palette = useInkPalette();
   if (turn.role === 'user') {
     return (
@@ -1368,7 +1371,7 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
   }
   // 'seg' — one completed reply line/block, rendered markdown, no margin (flows
   // directly under the head + previous segments).
-  return <Text>{renderMarkdown(turn.text, true)}</Text>;
+  return <Text>{renderMarkdown(turn.text, true, { hyperlinks })}</Text>;
 }
 
 export function ReplApp(props: ReplAppProps): ReactElement {
@@ -2340,7 +2343,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
 
   return (
     <Box flexDirection="column">
-      <Static items={turns}>{(turn) => <TurnView key={turn.id} turn={turn} />}</Static>
+      <Static items={turns}>{(turn) => <TurnView key={turn.id} turn={turn} hyperlinks={props.hyperlinks === true} />}</Static>
 
       {/* In-progress (incomplete) line — the only streamed text in the dynamic
           region (one line). Completed lines/blocks already flowed into <Static>

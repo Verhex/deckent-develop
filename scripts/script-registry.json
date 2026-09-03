@@ -509,6 +509,16 @@
    "notes": "TERMINAL-PICKER-001…005 (lane native-terminal-fable51-20260902); skip-safe when dist/ or node-pty is missing."
   },
   {
+   "file": "scripts/ink-pty-readability-verify.mjs",
+   "class": "recurring-proof",
+   "owner": "repl-pty-smoke",
+   "npmScript": "verify:readability",
+   "input": "dist/cli/entry.js --native under four host environments (vscode · dark-known · nocolor · multiplexer); only the LLM mocked via DECKENT_NATIVE_MOCK",
+   "output": "PASS/SKIP/FAIL proving the host-theme-mapped tier (no truecolor leak, no dim, inverse focus, code/link role), truecolor only on a known-dark background, zero SGR under NO_COLOR, and OSC 8 only on a proven host",
+   "expiry": "none — rerun on demand",
+   "notes": "TERMINAL-READABILITY-001/002 (lane native-terminal-fable51-20260902); skip-safe when dist/ or node-pty is missing."
+  },
+  {
    "file": "scripts/lint-terminal-readability.mjs",
    "class": "gate",
    "owner": "terminal-readability",

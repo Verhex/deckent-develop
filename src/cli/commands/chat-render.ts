@@ -72,12 +72,22 @@ function wrapStyle(open: string, content: string): string {
   return `${open}${content.split(RESET).join(`${RESET}${open}`)}${RESET}`;
 }
 
+/** TERMINAL-READABILITY-002 — renderer options (the caller resolves them once). */
+export interface RenderMarkdownOptions {
+  /** Emit OSC 8 hyperlinks (`\x1b]8;;URL\x07 TEXT \x1b]8;;\x07`). Only when the
+   *  host is proven to render them (helpers/terminal-links resolveHyperlinks);
+   *  off by default so no unproven terminal ever receives the bytes — the URL
+   *  then stays visible as text for the host's own link detection. */
+  hyperlinks?: boolean;
+}
+
 /**
- * Wrap visible text as an OSC-8 terminal hyperlink (clickable in VS Code /
- * iTerm / modern terminals). Falls back gracefully — terminals that ignore
- * OSC-8 just print the visible text. `\x1b]8;;URL\x07 TEXT \x1b]8;;\x07`.
+ * A labeled link: an OSC-8 hyperlink when the host renders them (the label is
+ * the visible text), otherwise the label in the link role followed by the
+ * URL in parentheses — the URL itself is the carrier a host can still detect.
  */
-function hyperlink(url: string, text: string, s: Styles): string {
+function hyperlink(url: string, text: string, s: Styles, enabled: boolean): string {
+  if (!enabled) return text === url ? url : `${style(s.link, text)} (${url})`;
   return `\x1b]8;;${url}\x07${style(s.link, text)}\x1b]8;;\x07`;
 }
 
@@ -199,11 +209,13 @@ const ADMONITIONS: Record<string, { icon: string; role: keyof Styles }> = {
  * @param tty  Whether to apply ANSI styling. Defaults to process.stdout.isTTY.
  *             Styling still obeys the color gate (NO_COLOR / --no-color /
  *             FORCE_COLOR=0 → attribute-free plain text with markers stripped).
+ * @param opts Renderer options — `hyperlinks` (OSC 8) is off unless the caller proved the host.
  */
-export function renderMarkdown(text: string, tty?: boolean): string {
+export function renderMarkdown(text: string, tty?: boolean, opts: RenderMarkdownOptions = {}): string {
   const isTTY = tty !== undefined ? tty : process.stdout.isTTY === true;
   if (!isTTY) return text;
   const s = resolveStyles(suppressionTier());
+  const links = opts.hyperlinks === true;
 
   const blocks: string[] = [];
   const stash = (rendered: string): string => { blocks.push(rendered); return `\x00B${blocks.length - 1}\x00`; };
@@ -246,11 +258,12 @@ export function renderMarkdown(text: string, tty?: boolean): string {
   result = result.replace(
     /\[([^\]\n]+)\]\(((?:[^()\s]|\([^()]*\))+)(?:\s+"[^"]*")?\)/g,
     (_: string, t: string, url: string) =>
-      /^https?:\/\//.test(url) ? hyperlink(url, t, s) : `${style(s.link, t)} ${style(s.muted, `(${url})`)}`,
+      /^https?:\/\//.test(url) ? hyperlink(url, t, s, links) : `${style(s.link, t)} ${style(s.muted, `(${url})`)}`,
   );
 
-  // 6. Bare URLs (http/https) → clickable.
-  result = result.replace(/(?<![;\w])(https?:\/\/[^\s)<>\]]+)/g, (_: string, url: string) => hyperlink(url, url, s));
+  // 6. Bare URLs (http/https) → clickable where proven; otherwise left as the
+  // plain text the host detects itself (never split by a style).
+  if (links) result = result.replace(/(?<![;\w])(https?:\/\/[^\s)<>\]]+)/g, (_: string, url: string) => hyperlink(url, url, s, true));
 
   // 7. Horizontal rule (---, ***, ___) — a decorative frame line.
   result = result.replace(/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/gm, style(s.accent, '─'.repeat(40)));
@@ -297,7 +310,10 @@ export function renderMarkdown(text: string, tty?: boolean): string {
 
   // 13. Project file paths → code role. LAST + ANSI-safe (split on escapes, colour plain only).
   const ANSI_RUN = /(\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07)/;
-  const PATH = /(?<![\w/:.@-])((?:src|docs|tests|scripts|\.brain|\.deckent|\.claude)\/[\w./-]+|[\w-]+\/[\w./-]+\.(?:ts|tsx|md|json|mjs|cjs|js))(?::\d+)?/g;
+  // TERMINAL-READABILITY-002 — the whole `path:line:col` reference is ONE span
+  // (never split by a style) so the host's own link detection opens the file
+  // at the line; OSC 8 is deliberately not used for file references.
+  const PATH = /(?<![\w/:.@-])((?:src|docs|tests|scripts|\.brain|\.deckent|\.claude)\/[\w./-]+|[\w-]+\/[\w./-]+\.(?:ts|tsx|md|json|mjs|cjs|js))(?::\d+(?::\d+)?)?/g;
   result = result
     .split(ANSI_RUN)
     .map((seg) => (ANSI_RUN.test(seg) ? seg : seg.replace(PATH, (m) => style(s.code, m))))
