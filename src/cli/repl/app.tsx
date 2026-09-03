@@ -40,7 +40,7 @@ import { renderCommandRisk } from '../helpers/risk-language.js';
 import { PickerCard } from './picker-card.js';
 import { resolvePickerGlyphs, type PickerKind, type PickerScope, type PickerSpec } from './picker.js';
 import type { PickerLabels } from './picker-labels.js';
-import { buildApprovalPickerSpec, buildTermPickerSpec, buildResumePickerSpec } from './picker-specs.js';
+import { buildApprovalPickerSpec, buildTermPickerSpec, buildResumePickerSpec, buildConfigKeyPickerSpec, buildConfigValuePickerSpec, type ConfigKeyEntry } from './picker-specs.js';
 import { APPROVAL_MODES, type ApprovalMode } from '../../agent/permission-types.js';
 import { createChatTurnQueue, type ChatTurnQueue, type ChatTurnBgEvent, type ChatTurnPayload } from './chat-turn-queue.js';
 import { createInputQueue, type InputQueue } from './input-queue.js';
@@ -667,6 +667,8 @@ export function resolvePickerRequest(trimmed: string): { kind: PickerKind } | nu
   if (bare === '/approve') return { kind: 'approve' };
   if (bare === '/term') return { kind: 'term' };
   if (bare === '/resume') return { kind: 'resume' };
+  // TERMINAL-PICKER-004 — the settings menu (typed /config <sub> stays on the CLI bridge).
+  if (bare === '/config') return { kind: 'config-key' };
   return null;
 }
 
@@ -1132,6 +1134,13 @@ export interface ReplAppProps {
    *  with native_provider / native_model). Absent → only the session scope is
    *  offered. */
   saveDefault?: (kind: 'model' | 'provider', id: string) => { ok: true } | { ok: false; error: string };
+  /** TERMINAL-PICKER-004 — CONFIG_METADATA entries with their current project
+   *  values (run.tsx; provider keys widened to VALID_PROVIDERS). Absent → bare
+   *  `/config` keeps the CLI-bridge path. */
+  configEntries?: () => ConfigKeyEntry[];
+  /** TERMINAL-PICKER-004 — writes one setting through setConfigValues (the
+   *  same seam as `deckent config set`); the value is the picked option text. */
+  saveConfigValue?: (key: string, value: string) => { ok: true } | { ok: false; error: string };
   /** TERMINAL-PICKER-002 — ASCII glyphs (dumb terminal / no UTF-8 locale). */
   pickerAscii?: boolean;
   /** TERMINAL-PICKER-002 — words-only rendering (NO_COLOR / suppression). */
@@ -1340,7 +1349,7 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
 }
 
 export function ReplApp(props: ReplAppProps): ReactElement {
-  const { provider, dispatcher, labels, registerConfirm, registerActionGate, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle, shortcutsPanel, pickerLabels, pickerSpecs, saveDefault, pickerAscii = false, pickerNoColor = false } = props;
+  const { provider, dispatcher, labels, registerConfirm, registerActionGate, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle, shortcutsPanel, pickerLabels, pickerSpecs, saveDefault, configEntries, saveConfigValue, pickerAscii = false, pickerNoColor = false } = props;
   const { exit } = useApp();
   // TERMINAL-TOOLS-004 — live width for the status row + queue preview (reflows on resize).
   const columns = useTerminalColumns();
@@ -1489,6 +1498,19 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       if (records.length === 0) return null;
       return buildResumePickerSpec(records, activeSessionIdRef.current ?? null, (r) => [r.status, shortSessionTime(r.date)]);
     }
+    if (kind === 'config-key') {
+      if (!configEntries) return null;
+      return buildConfigKeyPickerSpec(configEntries(), (e) => [
+        e.category,
+        pickerLabels.configFacts.current.replace('{value}', e.current === undefined || e.current === null ? '-' : String(e.current)),
+        pickerLabels.configFacts.default.replace('{value}', e.defaultValue === undefined || e.defaultValue === null ? '-' : String(e.defaultValue)),
+      ]);
+    }
+    if (kind === 'config-value') {
+      const entry = pickerConfigKey.current;
+      if (!entry?.options) return null;
+      return buildConfigValuePickerSpec(entry.key, entry.options, entry.current);
+    }
     return null;
   };
 
@@ -1504,6 +1526,26 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     if (kind === 'resume') {
       const merged = mergedResumeRecords();
       applyResumeDecision(resolveResumeCommand(id, merged.disk, merged.resumable, labels));
+      return;
+    }
+    // TERMINAL-PICKER-004 — key stage → value stage for that key; value stage
+    // → one write through the injected seam (the confirm scope decided apply).
+    if (kind === 'config-key') {
+      const entry = configEntries?.().find((e) => e.key === id) ?? null;
+      pickerConfigKey.current = entry;
+      const valueSpec = buildPickerSpecFor('config-value');
+      if (valueSpec) setPicker({ kind: 'config-value', spec: valueSpec });
+      return;
+    }
+    if (kind === 'config-value') {
+      const entry = pickerConfigKey.current;
+      pickerConfigKey.current = null;
+      if (!entry || scope !== 'apply') return;
+      if (!saveConfigValue) { pushTurn('seg', pickerLabels.configWriteFailed.replace('{error}', 'no-config-seam')); return; }
+      const out = saveConfigValue(entry.key, id);
+      pushTurn('seg', out.ok
+        ? pickerLabels.committed.config.replace('{key}', entry.key).replace('{value}', id)
+        : pickerLabels.configWriteFailed.replace('{error}', out.error));
       return;
     }
     if (kind !== 'model' && kind !== 'provider') return;
@@ -1562,6 +1604,8 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // TERMINAL-PICKER-002 — the open value picker (null = closed). Opened by a
   // bare selection command; closed by Esc / commit / interrupt.
   const [picker, setPicker] = useState<{ kind: PickerKind; spec: PickerSpec } | null>(null);
+  // TERMINAL-PICKER-004 — the setting chosen in the key stage; the value stage applies to it.
+  const pickerConfigKey = useRef<ConfigKeyEntry | null>(null);
 
   // 360-009: turn objects are built BEFORE setTurns so every updater stays
   // pure (append-only) — React may re-invoke an updater, and the previous

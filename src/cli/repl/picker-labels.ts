@@ -33,10 +33,14 @@ export interface PickerLabels {
   readonly blocked: Readonly<Record<string, string>>;
   /** Template with `{code}`. */
   readonly blockedGeneric: string;
-  /** Templates with `{value}`. */
-  readonly committed: Readonly<Record<'session' | 'default' | 'apply', string>>;
+  /** Templates with `{value}` (`config` also takes `{key}`). */
+  readonly committed: Readonly<Record<'session' | 'default' | 'apply' | 'config', string>>;
   /** Template with `{error}`. */
   readonly defaultWriteFailed: string;
+  /** TERMINAL-PICKER-004 — template with `{error}`. */
+  readonly configWriteFailed: string;
+  /** TERMINAL-PICKER-004 — key-row facts, templates with `{value}`. */
+  readonly configFacts: Readonly<Record<'current' | 'default', string>>;
   /** TERMINAL-PICKER-003 — the meaning of each approval mode (a row fact). */
   readonly approveFacts: Readonly<Record<'suggest' | 'auto-edit' | 'full-auto', string>>;
 }
@@ -84,8 +88,14 @@ export function buildPickerLabels(t: (key: string) => string): PickerLabels {
       session: t('tui.picker.committed.session'),
       default: t('tui.picker.committed.default'),
       apply: t('tui.picker.committed.apply'),
+      config: t('tui.picker.committed.config'),
     },
     defaultWriteFailed: t('tui.picker.default_write_failed'),
+    configWriteFailed: t('tui.picker.config_write_failed'),
+    configFacts: {
+      current: t('tui.picker.fact.config.current'),
+      default: t('tui.picker.fact.config.default'),
+    },
     approveFacts: {
       suggest: t('tui.picker.fact.approve.suggest'),
       'auto-edit': t('tui.picker.fact.approve.auto_edit'),

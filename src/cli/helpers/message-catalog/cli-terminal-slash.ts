@@ -110,7 +110,7 @@ export const CLI_TERMINAL_SLASH_MESSAGES: MessageFamily = Object.freeze({
   'tui.shortcuts.at_ref.action': { en: 'reference a project file', tr: 'proje dosyasına referans ver' },
   'tui.shortcuts.line_edit.keys': { en: 'Home/End · Ctrl+A/E · Ctrl+U', tr: 'Home/End · Ctrl+A/E · Ctrl+U' },
   'tui.shortcuts.line_edit.action': { en: 'line start/end · clear the line', tr: 'satır başı/sonu · satırı temizle' },
-  'tui.shortcuts.picker.keys': { en: '/model · /provider', tr: '/model · /provider' },
+  'tui.shortcuts.picker.keys': { en: '/model /provider /approve /term /resume /config', tr: '/model /provider /approve /term /resume /config' },
   'tui.shortcuts.picker.action': { en: 'open a picker: ↑↓ move · type to filter · Enter select · Esc close', tr: 'seçici aç: ↑↓ gez · yazarak filtrele · Enter seç · Esc kapat' },
   'tui.shortcuts.shell.keys': { en: '!<command>', tr: '!<komut>' },
   'tui.shortcuts.shell.action': { en: 'run a shell command here (gated by /term mode and a one-time approval); its output is attached to your next message', tr: 'burada kabuk komutu çalıştır (/term modu ve tek seferlik onaya tabi); çıktısı bir sonraki mesajına eklenir' },
@@ -262,8 +262,8 @@ export const CLI_TERMINAL_SLASH_MESSAGES: MessageFamily = Object.freeze({
   'tui.slash.desc.skills': { en: 'List the registered skill pool', tr: 'Kayıtlı skill havuzunu listele' },
   'tui.slash.desc.features': { en: 'Query the feature manifest', tr: 'Özellik manifestini sorgula' },
   'tui.slash.desc.config': {
-    en: 'Show/change configuration (e.g. /config set max_workers 4)',
-    tr: 'Yapılandırmayı göster/değiştir (örn: /config set max_workers 4)',
+    en: 'Settings — bare /config opens a menu; /config set <key> <value> writes directly',
+    tr: 'Ayarlar — çıplak /config menü açar; /config set <anahtar> <değer> doğrudan yazar',
   },
   'tui.slash.desc.nervous': {
     en: 'Show pending nervous notifications (e.g. /nervous accept <id>)',

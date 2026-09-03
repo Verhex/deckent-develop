@@ -65,4 +65,9 @@ export const CLI_TERMINAL_PICKER_MESSAGES: MessageFamily = Object.freeze({
   'tui.picker.committed.default': { en: 'saved as default: {value}', tr: 'varsayılan olarak kaydedildi: {value}' },
   'tui.picker.committed.apply': { en: 'applied: {value}', tr: 'uygulandı: {value}' },
   'tui.picker.default_write_failed': { en: 'default not saved ({error}); the session switch stands', tr: 'varsayılan kaydedilemedi ({error}); oturum geçişi geçerli' },
+  // ── /config settings menu (TERMINAL-PICKER-004) ────────────────────────
+  'tui.picker.fact.config.current': { en: 'now {value}', tr: 'şimdi {value}' },
+  'tui.picker.fact.config.default': { en: 'default {value}', tr: 'varsayılan {value}' },
+  'tui.picker.committed.config': { en: 'saved: {key} = {value}', tr: 'kaydedildi: {key} = {value}' },
+  'tui.picker.config_write_failed': { en: 'not saved ({error})', tr: 'kaydedilemedi ({error})' },
 });

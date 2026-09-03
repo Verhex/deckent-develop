@@ -118,6 +118,45 @@ export function buildResumePickerSpec(records: readonly ResumePickerRecord[], cu
   return { kind: 'resume', candidates, initialId, scopes: APPLY_ONLY };
 }
 
+// ─── TERMINAL-PICKER-004 — the /config settings menu (key → value) ──────────
+
+/** One CONFIG_METADATA entry as the picker sees it (built by run.tsx; provider
+ *  keys arrive with their options widened to VALID_PROVIDERS). */
+export interface ConfigKeyEntry {
+  readonly key: string;
+  readonly category: string;
+  readonly type: string;
+  /** Present → enumerable (a value picker can follow); absent → typed path only. */
+  readonly options?: readonly string[];
+  readonly defaultValue: unknown;
+  /** The project-level value today (undefined when unset). */
+  readonly current: unknown;
+}
+
+/** Key picker: enumerable keys are `ok`, the rest stay visible but blocked. */
+export function buildConfigKeyPickerSpec(entries: readonly ConfigKeyEntry[], facts: (entry: ConfigKeyEntry) => readonly string[]): PickerSpec {
+  const candidates: PickerCandidate[] = entries.map((e) => ({
+    id: e.key,
+    label: e.key,
+    facts: facts(e).map((value, i) => ({ key: `f${i}`, value })),
+    ...(e.options && e.options.length > 0 ? { state: 'ok' as const } : { state: 'blocked' as const, blockedCode: 'NOT_ENUMERABLE' }),
+  }));
+  return { kind: 'config-key', candidates, initialId: candidates[0]?.id ?? null, scopes: APPLY_ONLY };
+}
+
+const APPLY_OR_CANCEL: PickerSpec['scopes'] = ['apply', 'cancel'];
+
+/** Value picker for one key: its options with the current value marked; the
+ *  confirm stage offers apply / cancel. */
+export function buildConfigValuePickerSpec(key: string, options: readonly string[], current: unknown): PickerSpec {
+  void key;
+  const currentText = current === undefined || current === null ? null : String(current);
+  const candidates: PickerCandidate[] = options.map((value) => ({
+    id: value, label: value, facts: [], state: value === currentText ? 'current' : 'ok',
+  }));
+  return { kind: 'config-value', candidates, initialId: currentText !== null && options.includes(currentText) ? currentText : null, scopes: APPLY_OR_CANCEL };
+}
+
 export function buildProviderPickerSpec(ctx: PickerSpecContext): PickerSpec {
   const candidates: PickerCandidate[] = orderedProviders(ctx).map((provider) => {
     const availability = ctx.availability(provider);

@@ -49,7 +49,9 @@ import { buildSlashRegistry } from '../commands/chat-slash-registry.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
 import { isColorSuppressed, isDumbTerminal } from '../helpers/theme.js';
 import { buildToolExecLabels } from '../helpers/tool-exec-labels.js';
-import { loadConfig } from '../../core/config.js';
+import { loadConfig, listConfigByCategory, getConfigHelp, VALID_PROVIDERS } from '../../core/config.js';
+import { getNestedValue } from '../../core/config-migration.js';
+import type { ConfigKeyEntry } from './picker-specs.js';
 import { createSwitchableProvider, type ActiveSelection } from './provider-switch.js';
 import { createRunStateFeed } from '../helpers/run-state-feed.js';
 import type { LiveFooterLabels } from '../helpers/live-footer.js';
@@ -62,7 +64,7 @@ import { createApprovalStoreWatch, type ApprovalStoreWatchHandle } from '../../c
 import type { ApprovalRequest } from '../../core/approval-contract.js';
 import { randomUUID } from 'node:crypto';
 import { MemoryStore } from '../../core/memory-store.js';
-import { BRAIN_DIR, MEMORY_DB_FILE, DECKENT_DIR, JOBS_DIR } from '../../core/constants.js';
+import { BRAIN_DIR, MEMORY_DB_FILE, DECKENT_DIR, JOBS_DIR, PROJECT_CONFIG_PATH } from '../../core/constants.js';
 import type { ChatTurnBgEvent } from './chat-turn-queue.js';
 import {
   createRunCompletionWatch,
@@ -119,6 +121,44 @@ export function hasUtf8Locale(env: Record<string, string | undefined>): boolean 
   const locale = env['LC_ALL'] || env['LC_CTYPE'] || env['LANG'];
   if (!locale) return true;
   return /utf-?8/i.test(locale);
+}
+
+/** TERMINAL-PICKER-004 — the raw project config (what `/config` and `deckent
+ *  config set` write), read fresh on every menu open; `{}` when absent/broken. */
+export function readProjectConfigRaw(root: string): Record<string, unknown> {
+  const path = join(root, PROJECT_CONFIG_PATH);
+  try { return existsSync(path) ? JSON.parse(readFileSync(path, 'utf-8')) as Record<string, unknown> : {}; } catch { return {}; }
+}
+
+/** TERMINAL-PICKER-004 — CONFIG_METADATA as picker entries: every key of every
+ *  category with its type/default, the project-level current value, and the
+ *  options when enumerable — provider-typed keys widened to VALID_PROVIDERS
+ *  (the validation authority; the metadata literal list is narrower). */
+export function buildConfigEntries(root: string): ConfigKeyEntry[] {
+  const raw = readProjectConfigRaw(root);
+  const entries: ConfigKeyEntry[] = [];
+  for (const keys of Object.values(listConfigByCategory())) {
+    for (const key of keys) {
+      const meta = getConfigHelp(key);
+      if (!meta) continue;
+      const providerTyped = key.endsWith('_provider') && meta.options !== undefined && meta.options.every((o) => (VALID_PROVIDERS as readonly string[]).includes(o));
+      const options = providerTyped ? [...VALID_PROVIDERS] : meta.options;
+      entries.push({
+        key,
+        category: meta.category,
+        type: meta.type,
+        ...(options ? { options } : {}),
+        defaultValue: meta.default,
+        current: key.includes('.') ? getNestedValue(raw, key) : raw[key],
+      });
+    }
+  }
+  return entries;
+}
+
+/** The CLI's value rule for `config set`: JSON first, else the raw string. */
+export function parseConfigValueText(value: string): unknown {
+  try { return JSON.parse(value); } catch { return value; }
 }
 
 /** TERMINAL-PICKER-002 — picker specs for the legacy proxy path (no native
@@ -1668,6 +1708,11 @@ export async function runInkRepl(
           ? { native_provider: current.provider, native_model: id }
           : { native_provider: id };
         const out = setConfigValues(process.cwd(), patch);
+        return out.ok ? { ok: true } : { ok: false, error: out.error };
+      }}
+      configEntries={() => buildConfigEntries(process.cwd())}
+      saveConfigValue={(key, value) => {
+        const out = setConfigValues(process.cwd(), { [key]: parseConfigValueText(value) });
         return out.ok ? { ok: true } : { ok: false, error: out.error };
       }}
       pickerAscii={isDumbTerminal() || process.env['DECKENT_ASCII'] === '1' || !hasUtf8Locale(process.env)}
