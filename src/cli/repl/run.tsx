@@ -12,9 +12,17 @@ import {
   resolveNativeSelection,
   resolveContextBudgetTokens,
   inferNativeProviderForModel,
+  listNativeModelCandidates,
+  NATIVE_PROVIDER_NAMES,
   type NativeTransportConfig,
   type ProviderError,
 } from './native-transport.js';
+// TERMINAL-PICKER-002 — the interactive value picker's data + label seams.
+import { buildPickerLabels } from './picker-labels.js';
+import { buildModelPickerSpec, buildProviderPickerSpec, type PickerSpecContext, type ProviderAvailability } from './picker-specs.js';
+import type { PickerKind, PickerSpec } from './picker.js';
+import { resolveActiveModelPolicy } from '../../core/model-activation-store.js';
+import { setConfigValues } from '../commands/config.js';
 import { loadDeckSecrets } from '../../core/deck-file.js';
 import { buildNativeToolRegistry, resolveToolSurfaceOptions, resolveRunFlowEnabled } from './native-tool-registry.js';
 import { createNativeEngine, resolveCostCeilingUsd, type NativeEngineDeps, type ReplEngine, type ContextSnapshot } from './native-agent-bridge.js';
@@ -39,7 +47,7 @@ import { createPermissionStore } from '../commands/chat-permissions.js';
 import { classifyTool } from './tool-permissions.js';
 import { buildSlashRegistry } from '../commands/chat-slash-registry.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
-import { isColorSuppressed } from '../helpers/theme.js';
+import { isColorSuppressed, isDumbTerminal } from '../helpers/theme.js';
 import { buildToolExecLabels } from '../helpers/tool-exec-labels.js';
 import { loadConfig } from '../../core/config.js';
 import { createSwitchableProvider, type ActiveSelection } from './provider-switch.js';
@@ -104,6 +112,33 @@ export type NativeErrorPhase = 'boot' | 'switch';
 /** Localize a native-transport resolution failure by its errorCode
  *  ('native.<phase>.<code>' message keys); unknown codes fall back to the
  *  mechanism's English default sentence. */
+/** TERMINAL-PICKER-002 — Unicode glyphs are trusted only under a UTF-8 locale
+ *  (LC_ALL > LC_CTYPE > LANG); an unset locale is treated as UTF-8-capable on
+ *  modern hosts, an explicit non-UTF-8 one is not. */
+export function hasUtf8Locale(env: Record<string, string | undefined>): boolean {
+  const locale = env['LC_ALL'] || env['LC_CTYPE'] || env['LANG'];
+  if (!locale) return true;
+  return /utf-?8/i.test(locale);
+}
+
+/** TERMINAL-PICKER-002 — picker specs for the legacy proxy path (no native
+ *  transport): providers and models come from the registry itself; there is no
+ *  credential probe here, so rows are `ok` and the switch reports honestly. */
+export function buildLegacyPickerSpecs(current: () => ActiveSelection): Partial<Record<PickerKind, () => PickerSpec>> {
+  const context = (): PickerSpecContext => ({
+    providers: modelRegistry.getAllProviders(),
+    candidatesFor: (provider) => modelRegistry.getByProvider(provider as Parameters<typeof modelRegistry.getByProvider>[0])
+      .map((m) => ({ provider, id: m.id, definition: m })),
+    policy: resolveActiveModelPolicy(process.cwd()),
+    current: { provider: current().provider, model: current().model ?? null },
+    availability: () => ({ ok: true }),
+  });
+  return {
+    model: () => buildModelPickerSpec(context()),
+    provider: () => buildProviderPickerSpec(context()),
+  };
+}
+
 export function localizeNativeError(err: ProviderError, lang: string, phase: NativeErrorPhase = 'switch'): string {
   if (!err.errorCode) return err.error;
   const key = `native.${phase}.${err.errorCode}`;
@@ -581,7 +616,7 @@ export function withContextSlashes(engine: ReplEngine, labels: ContextSlashLabel
 
 const SHORTCUT_ROW_IDS = [
   'submit', 'newline', 'newline_alt', 'newline_ctrl_j', 'newline_backslash', 'interrupt', 'ctrl_c', 'ctrl_d',
-  'history', 'history_search', 'clear_screen', 'slash', 'at_ref', 'shell', 'line_edit', 'help',
+  'history', 'history_search', 'clear_screen', 'slash', 'at_ref', 'picker', 'shell', 'line_edit', 'help',
 ] as const;
 
 export function buildShortcutsPanel(t: (key: string) => string): ShortcutsPanel {
@@ -1282,6 +1317,11 @@ export async function runInkRepl(
   // switch only rebuilt the unused legacy proxy while the engine stayed pinned
   // to its boot adapter — "geçildi: claude · fable" was a false positive.
   let nativeSwitch: ((sel: Partial<ActiveSelection>) => ActiveSelection & { switchError?: string }) | undefined;
+  // TERMINAL-PICKER-002 — spec builders for the interactive picker, evaluated
+  // on every open (activation policy + credential availability re-resolved).
+  // Set on the native path below; the legacy proxy path gets a registry-driven
+  // fallback after it.
+  let pickerSpecs: Partial<Record<PickerKind, () => PickerSpec>> | undefined;
   let nativeSelection: ActiveSelection | undefined;
   // TERM-FLOW-UNIFY Sprint-4 mount (426-002) — `terminal.run_flow_v2` gate;
   // only ever constructed when the native engine is selected (the
@@ -1380,6 +1420,40 @@ export async function runInkRepl(
         nativeSelection = { provider: live.provider, model: live.model };
         probeEffectiveContext(next.contextStatus);
         return { provider: live.provider, model: live.model };
+      };
+
+      // TERMINAL-PICKER-002 — picker candidates: NATIVE_PROVIDER_NAMES × the
+      // registry/preset/discovered models, annotated with the owner's activation
+      // policy (re-resolved per open — the store has no events) and a per-
+      // provider availability probe through the SAME resolver the switch uses
+      // (sync, network-free), so a missing credential shows in-row before Enter.
+      const pickerContext = (): PickerSpecContext => {
+        const policy = resolveActiveModelPolicy(process.cwd());
+        const availability = (provider: string): ProviderAvailability => {
+          const probe = resolveNativeSelection({ provider, model: null }, { env: process.env, config: nativeCfg, secrets: deckSecrets });
+          if (!('error' in probe)) return { ok: true };
+          // A missing credential is an availability FACT, not a failed switch:
+          // the row names the credential source (ProviderError.detail), the
+          // catalog row supplies the sentence. Other failures keep the
+          // localized native error.
+          const missingKey = probe.errorCode === 'missing-api-key';
+          return {
+            ok: false,
+            code: missingKey ? 'MISSING_CREDENTIAL' : 'NO_NATIVE_TRANSPORT',
+            detail: missingKey && probe.detail ? probe.detail : localizeNativeError(probe, lang),
+          };
+        };
+        return {
+          providers: NATIVE_PROVIDER_NAMES,
+          candidatesFor: (provider) => listNativeModelCandidates(provider, nativeCfg, provider === 'local-llm' && live.provider === 'local-llm' ? [live.model] : []),
+          policy,
+          current: { provider: live.provider, model: live.model },
+          availability,
+        };
+      };
+      pickerSpecs = {
+        model: () => buildModelPickerSpec(pickerContext()),
+        provider: () => buildProviderPickerSpec(pickerContext()),
       };
 
       // NATIVE-AGENT-HORIZON-001 NT-03 (553-002) — the memory-session id when the chat
@@ -1583,6 +1657,21 @@ export async function runInkRepl(
       runInboxProvider={(input) => renderRunsCommand(process.cwd(), input, buildInboxLabels(t))}
       inboxFollowFeed={() => collectInboxRows(process.cwd())}
       inboxLabels={buildInboxLabels(t)}
+      pickerLabels={buildPickerLabels(t)}
+      pickerSpecs={pickerSpecs ?? buildLegacyPickerSpecs(() => switcher.current())}
+      saveDefault={(kind, id) => {
+        // "save as default" pins BOTH keys the boot path reads (resolveNativeProvider
+        // → native_provider pin → resolveNativeSelection with native_model): a
+        // model pick also records its provider so the next boot lands on it.
+        const current = nativeSelection ?? switcher.current();
+        const patch = kind === 'model'
+          ? { native_provider: current.provider, native_model: id }
+          : { native_provider: id };
+        const out = setConfigValues(process.cwd(), patch);
+        return out.ok ? { ok: true } : { ok: false, error: out.error };
+      }}
+      pickerAscii={isDumbTerminal() || process.env['DECKENT_ASCII'] === '1' || !hasUtf8Locale(process.env)}
+      pickerNoColor={isColorSuppressed()}
       inboxDecide={(flowId, verb) => executeInboxDecision(process.cwd(), flowId, verb, lang)}
       registerConfirm={(trigger) => { confirmTrigger = trigger; }}
       registerActionGate={(gate) => { actionGate = gate; }}

@@ -26,6 +26,7 @@ import {
   OLLAMA_BUILTIN_MODELS,
 } from '../../core/model-registry.js';
 import { OPENAI_COMPAT_PRESET_META } from '../../providers/openai-compatible.js';
+import type { ModelDefinition, RegistryProviderName } from '../../core/model-registry-types.js';
 import { getMessage } from '../helpers/messages.js';
 import { createStreamSegmenter, type Segment } from './stream-segmenter.js';
 import {
@@ -234,6 +235,52 @@ export interface NativeResolveContext {
 /** Providers whose native tool_use transport exists. codex/gemini are
  *  subscription-CLI providers (orchestrator-side) — honestly unsupported here. */
 export const NATIVE_PROVIDER_NAMES = ['claude', 'openai', 'ollama', 'deepseek', 'qwen', 'glm', 'local-llm'] as const;
+
+// ─── TERMINAL-PICKER-002 — candidate listing for the interactive picker ──────
+//
+// The registry owner of a native transport (the activation policy and the
+// catalog key models by REGISTRY provider: OpenAI-API models are owned by the
+// `codex` registry provider). Compat presets (deepseek/qwen/glm) have no
+// registry owner — their models come from OPENAI_COMPAT_PRESET_META.
+const NATIVE_TO_REGISTRY_PROVIDER: Readonly<Record<string, RegistryProviderName>> = {
+  claude: 'claude',
+  openai: 'codex',
+  ollama: 'ollama',
+  'local-llm': 'local-llm',
+};
+
+export function registryProviderFor(nativeProvider: string): RegistryProviderName | null {
+  return NATIVE_TO_REGISTRY_PROVIDER[nativeProvider] ?? null;
+}
+
+export interface NativeModelCandidate {
+  readonly provider: string;
+  readonly id: string;
+  /** Registry metadata when the model is catalogued; null for preset/discovered ids. */
+  readonly definition: ModelDefinition | null;
+}
+
+/**
+ * Every model a native transport could serve for `provider` — registry pool
+ * for claude/openai, the Ollama builtins, the compat preset lists, and the
+ * endpoint's discovered ids for local-llm (the caller passes what the boot
+ * discovery published). Pure listing: availability/policy are judged by the
+ * spec builder, and executability by resolveNativeSelection on commit.
+ */
+export function listNativeModelCandidates(
+  provider: string,
+  config: NativeTransportConfig,
+  discovered: readonly string[] = [],
+): NativeModelCandidate[] {
+  void config;
+  if (provider === 'ollama') return OLLAMA_BUILTIN_MODELS.map((m) => ({ provider, id: m.id, definition: m }));
+  if (provider === 'local-llm') return discovered.map((id) => ({ provider, id, definition: null }));
+  const preset = (OPENAI_COMPAT_PRESET_META as Record<string, { models?: readonly string[] } | undefined>)[provider];
+  if (preset?.models) return preset.models.map((id) => ({ provider, id, definition: null }));
+  const registryProvider = registryProviderFor(provider);
+  if (registryProvider === null) return [];
+  return modelRegistry.getByProvider(registryProvider).map((m) => ({ provider, id: m.id, definition: m }));
+}
 
 export async function probeNativeEndpointHealth(
   endpoint: string,

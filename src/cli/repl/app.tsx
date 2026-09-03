@@ -37,6 +37,9 @@ import {
   type ShellNote, type TermGateDecision,
 } from './term-gate.js';
 import { renderCommandRisk } from '../helpers/risk-language.js';
+import { PickerCard } from './picker-card.js';
+import { resolvePickerGlyphs, type PickerKind, type PickerScope, type PickerSpec } from './picker.js';
+import type { PickerLabels } from './picker-labels.js';
 import { createChatTurnQueue, type ChatTurnQueue, type ChatTurnBgEvent, type ChatTurnPayload } from './chat-turn-queue.js';
 import { createInputQueue, type InputQueue } from './input-queue.js';
 import { listRecentSessions, pickSession, type SessionRecord } from '../helpers/session-resume.js';
@@ -644,6 +647,23 @@ export function resolveInboxCardActive(confirmOpen: boolean, approvalPending: bo
   return !confirmOpen && !approvalPending && !runFlowPending;
 }
 
+/** TERMINAL-PICKER-002 — the value picker is the LOWEST-priority stdin
+ *  consumer: it defers to the confirm modal, ApprovalCard, PlanPreviewCard AND
+ *  the inbox card. Same JSX-AND precedence pattern; `resolveStdinOwner`'s
+ *  pinned 3-key shape is untouched. */
+export function resolvePickerCardActive(confirmOpen: boolean, approvalPending: boolean, runFlowPending: boolean, inboxOpen: boolean): boolean {
+  return !confirmOpen && !approvalPending && !runFlowPending && !inboxOpen;
+}
+
+/** TERMINAL-PICKER-002 — a BARE selection command opens the picker; a typed
+ *  argument keeps the direct path byte-identical. Pure. */
+export function resolvePickerRequest(trimmed: string): { kind: PickerKind } | null {
+  const bare = trimmed.trim().toLowerCase();
+  if (bare === '/model') return { kind: 'model' };
+  if (bare === '/provider') return { kind: 'provider' };
+  return null;
+}
+
 /** Localized labels for the approve/reject/error lines pushed to the
  *  transcript after a PlanPreviewCard decision (buildRunFlowMountLabels, run.tsx).
  *  `started`/`error` are `{jobId}`/`{error}` templates (same convention as
@@ -1095,6 +1115,21 @@ export interface ReplAppProps {
   /** SURF-3 D3b — localized labels for the live inbox card (row/detail render +
    *  nav footers). Injected by run.tsx (buildInboxLabels) — required. */
   inboxLabels: InboxLabels;
+  /** TERMINAL-PICKER-002 — localized labels for the value picker (run.tsx
+   *  buildPickerLabels) — required. */
+  pickerLabels: PickerLabels;
+  /** TERMINAL-PICKER-002 — spec builders per picker kind, evaluated on every
+   *  open (policy/availability re-resolved). Absent → bare `/model` and
+   *  `/provider` keep printing the usage/status line. Injected by run.tsx. */
+  pickerSpecs?: Partial<Record<PickerKind, () => PickerSpec>>;
+  /** TERMINAL-PICKER-002 — the "save as default" seam (run.tsx → setConfigValues
+   *  with native_provider / native_model). Absent → only the session scope is
+   *  offered. */
+  saveDefault?: (kind: 'model' | 'provider', id: string) => { ok: true } | { ok: false; error: string };
+  /** TERMINAL-PICKER-002 — ASCII glyphs (dumb terminal / no UTF-8 locale). */
+  pickerAscii?: boolean;
+  /** TERMINAL-PICKER-002 — words-only rendering (NO_COLOR / suppression). */
+  pickerNoColor?: boolean;
   /** SURF-6 — in-card decision executor for the live inbox card (approve /
    *  full-ahead / reject / start on the focused run's detail). Injected by
    *  run.tsx (shared decision service); absent → decision keys are inert. */
@@ -1298,7 +1333,7 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
 }
 
 export function ReplApp(props: ReplAppProps): ReactElement {
-  const { provider, dispatcher, labels, registerConfirm, registerActionGate, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle, shortcutsPanel } = props;
+  const { provider, dispatcher, labels, registerConfirm, registerActionGate, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle, shortcutsPanel, pickerLabels, pickerSpecs, saveDefault, pickerAscii = false, pickerNoColor = false } = props;
   const { exit } = useApp();
   // TERMINAL-TOOLS-004 — live width for the status row + queue preview (reflows on resize).
   const columns = useTerminalColumns();
@@ -1358,6 +1393,41 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       riskLabel: (risk) => renderCommandRisk(risk, lang ?? 'en').label,
       modeLabel: (mode) => resolveModeLabel(mode, labels),
     });
+
+  // TERMINAL-PICKER-002 — ONE apply path for a model/provider switch, shared by
+  // the typed `/model <id>` branch and the picker's commit (no duplicated
+  // logic). Returns true when the backend actually switched.
+  const runSwitch = (kind: 'model' | 'provider', arg: string): boolean => {
+    // born-533 (388-001): refuse to splice the backend mid-turn — see
+    // resolveSwitchGate's doc comment above.
+    const gate = resolveSwitchGate(working, kind, labels);
+    if (gate.kind === 'rejected') { pushTurn('seg', gate.line); return false; }
+    const next = onSwitch(kind === 'model' ? { model: arg } : { provider: arg });
+    if (next.switchError) {
+      // Honest failure: selection (and status bar) stay on what actually
+      // serves the turns — no false "switched" confirmation.
+      pushTurn('seg', next.switchError);
+      return false;
+    }
+    setSelection({ provider: next.provider, model: next.model });
+    pushTurn('seg', `${labels.switched}: ${next.provider}${next.model ? ` · ${next.model}` : ''}`);
+    return true;
+  };
+
+  // TERMINAL-PICKER-002 — the picker's commit: session switch first; the
+  // `default` scope additionally pins the choice in the project config through
+  // the injected seam. A failed default write never un-switches the session.
+  const commitPicker = (kind: PickerKind, id: string, scope: PickerScope): void => {
+    setPicker(null);
+    if (kind !== 'model' && kind !== 'provider') return;
+    if (!runSwitch(kind, id)) return;
+    if (scope !== 'default') return;
+    if (!saveDefault) { pushTurn('seg', pickerLabels.defaultWriteFailed.replace('{error}', 'no-config-seam')); return; }
+    const out = saveDefault(kind, id);
+    pushTurn('seg', out.ok
+      ? pickerLabels.committed.default.replace('{value}', id)
+      : pickerLabels.defaultWriteFailed.replace('{error}', out.error));
+  };
   const [footerLines, setFooterLines] = useState<string[]>([]);
   const bgQueue = useRef<ChatTurnQueue | null>(null);
   if (bgQueue.current === null) bgQueue.current = createChatTurnQueue();
@@ -1402,6 +1472,9 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // SURF-3 D3a — the live `/runs --follow` inbox card is open (view-only,
   // Esc-close). Only mountable when a feed was injected (flag/wire on).
   const [inboxOpen, setInboxOpen] = useState(false);
+  // TERMINAL-PICKER-002 — the open value picker (null = closed). Opened by a
+  // bare selection command; closed by Esc / commit / interrupt.
+  const [picker, setPicker] = useState<{ kind: PickerKind; spec: PickerSpec } | null>(null);
 
   // 360-009: turn objects are built BEFORE setTurns so every updater stays
   // pure (append-only) — React may re-invoke an updater, and the previous
@@ -1910,6 +1983,16 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       } else { pushTurn('seg', process.cwd()); }
       return;
     }
+    // TERMINAL-PICKER-002 — a BARE /model or /provider opens the interactive
+    // picker (candidates re-resolved on every open). Typed arguments below
+    // keep the direct path byte-identical.
+    const pickerRequest = resolvePickerRequest(trimmed);
+    const pickerBuilder = pickerRequest ? pickerSpecs?.[pickerRequest.kind] : undefined;
+    if (pickerRequest && pickerBuilder) {
+      pushTurn('user', trimmed);
+      setPicker({ kind: pickerRequest.kind, spec: pickerBuilder() });
+      return;
+    }
     // /model <id> · /provider <name> — runtime switch (handled here, not the loop).
     const sw = trimmed.match(/^\/(model|provider)(?:\s+(\S+))?$/i);
     if (sw) {
@@ -1917,19 +2000,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       const arg = sw[2];
       pushTurn('user', trimmed);
       if (arg) {
-        // born-533 (388-001): refuse to splice the backend mid-turn — see
-        // resolveSwitchGate's doc comment above.
-        const gate = resolveSwitchGate(working, kind, labels);
-        if (gate.kind === 'rejected') { pushTurn('seg', gate.line); return; }
-        const next = onSwitch(kind === 'model' ? { model: arg } : { provider: arg });
-        if (next.switchError) {
-          // Honest failure: selection (and status bar) stay on what actually
-          // serves the turns — no false "switched" confirmation.
-          pushTurn('seg', next.switchError);
-        } else {
-          setSelection({ provider: next.provider, model: next.model });
-          pushTurn('seg', `${labels.switched}: ${next.provider}${next.model ? ` · ${next.model}` : ''}`);
-        }
+        runSwitch(kind, arg);
       } else {
         pushTurn('seg', `${labels.switchUsage}\n${selection.provider}${selection.model ? ` · ${selection.model}` : ''}`);
       }
@@ -2108,7 +2179,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   };
   // While a modal/card owns stdin the InputBar is inactive, so Ctrl-C must
   // still reach the policy (otherwise it would be silently swallowed).
-  const inputBarActiveNow = stdinOwner.inputBarActive && !runFlowPending && !inboxOpen;
+  const inputBarActiveNow = stdinOwner.inputBarActive && !runFlowPending && !inboxOpen && picker === null;
   useInput((input, key) => {
     if (key.ctrl && input === 'c') handleInterrupt('int', false);
   }, { isActive: !inputBarActiveNow });
@@ -2196,6 +2267,26 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         />
       )}
 
+      {/* TERMINAL-PICKER-002 — the interactive value picker (bare /model,
+          /provider …). Rendered after the inbox card: the lowest-priority
+          stdin consumer (resolvePickerCardActive). While a turn is in flight
+          the card is read-only and Enter renders the busy reason in-card. */}
+      {picker && (
+        <PickerCard
+          spec={picker.spec}
+          labels={pickerLabels}
+          glyphs={resolvePickerGlyphs(pickerAscii)}
+          columns={columns}
+          rows={process.stdout.rows ?? 24}
+          noColor={pickerNoColor}
+          isActive={resolvePickerCardActive(stdinOwner.confirmActive, approvalPending, runFlowPending, inboxOpen)}
+          readOnlyReason={working ? labels.switchBusy.replace('{kind}', picker.kind) : null}
+          onCommit={(id, scope) => commitPicker(picker.kind, id, scope)}
+          onClose={() => setPicker(null)}
+          onInterrupt={() => { setPicker(null); handleInterrupt('int', true); }}
+        />
+      )}
+
       {/* REPL-SURFACE-WIRE (354-001): mode indicator + live-footer — both
           inert unless replSurfaceEnabled (flag-off render stays byte-identical
           to the pre-354-001 App). Footer lines pass through resolveFooterLines
@@ -2214,7 +2305,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         {/* TERMINAL-TOOLS-013: while a card owns stdin the anchor SAYS so
             instead of promising "your turn" (textual carrier, not layout). */}
         {phase === 'idle'
-          ? <Text dimColor>{stdinOwner.inputBarActive ? `✓ ${labels.ready}` : labels.inputPaused}</Text>
+          ? <Text dimColor>{inputBarActiveNow ? `✓ ${labels.ready}` : labels.inputPaused}</Text>
           : <><Spinner /><Text color={GOLD} bold> deckent </Text><Text dimColor>{`· ${phase === 'thinking' ? labels.thinking : labels.generating}`}</Text></>}
         {/* TERMINAL-TOOLS-006: transient Ctrl-C hint (names the next key). */}
         {interruptHint ? <Text color={GOLD}>{`  · ${interruptHint.text}`}</Text> : null}
@@ -2229,7 +2320,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         // SURF-3 D3a: the live `/runs --follow` card is a fifth consumer —
         // typing is suspended while it is up (Esc closes it), same no-op-when-off
         // property (`inboxOpen` is false until `--follow`).
-        active={stdinOwner.inputBarActive && !runFlowPending && !inboxOpen}
+        active={stdinOwner.inputBarActive && !runFlowPending && !inboxOpen && picker === null}
         onSubmit={handleSubmit}
         onInterrupt={handleInterrupt}
         onEscape={handleEscapeInterrupt}

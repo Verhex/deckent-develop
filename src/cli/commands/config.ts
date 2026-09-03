@@ -1,5 +1,5 @@
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import type { Command } from 'commander';
 import type { DeckentConfig } from '../../core/types.js';
 import { PROJECT_CONFIG_PATH } from '../../core/constants.js';
@@ -12,6 +12,41 @@ import { resolveProjectRoot } from '../helpers/process.js';
 import { ErrorRegistry } from '../../core/errors.js';
 import { cliContractMessage, bindArgumentDescriptions } from '../helpers/message-catalog/cli-run.js';
 import { withConfigWriteLock, writeConfigJsonAtomic } from '../../core/config-write-authority.js';
+
+// ─── TERMINAL-PICKER-002 — the ONE project-config write seam ─────────────────
+//
+// Shared by `deckent config set` and the Terminal picker's "save as default"
+// scope: read the raw project config → apply the patch (dotted keys nest) →
+// validatePartialConfig → withConfigWriteLock(writeConfigJsonAtomic). Typed
+// outcome, never a throw across the seam (the CLI action localizes it).
+
+export type ConfigWriteOutcome =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly code: 'validation' | 'lock' | 'io'; readonly error: string };
+
+export function setConfigValues(root: string, patch: Readonly<Record<string, unknown>>): ConfigWriteOutcome {
+  const configPath = join(root, PROJECT_CONFIG_PATH);
+  try {
+    // The lock and the atomic writer both live beside the file — an
+    // uninitialized project gets its `.deckent/` created, never a lock error.
+    mkdirSync(dirname(configPath), { recursive: true });
+    let existing: Partial<DeckentConfig> = {};
+    if (existsSync(configPath)) {
+      existing = JSON.parse(readFileSync(configPath, 'utf-8')) as Partial<DeckentConfig>;
+    }
+    for (const [key, value] of Object.entries(patch)) {
+      if (key.includes('.')) setNestedValue(existing as Record<string, unknown>, key, value);
+      else (existing as Record<string, unknown>)[key] = value;
+    }
+    validatePartialConfig(existing);
+    withConfigWriteLock(configPath, () => writeConfigJsonAtomic(configPath, existing));
+    return { ok: true };
+  } catch (error) {
+    if (error instanceof ConfigValidationError) return { ok: false, code: 'validation', error: error.errors.join(', ') };
+    const message = error instanceof Error ? error.message : String(error);
+    return { ok: false, code: /lock/i.test(message) ? 'lock' : 'io', error: message };
+  }
+}
 
 /**
  * Strip JSON comments (block and line) from a string.
@@ -115,39 +150,26 @@ export function registerConfig(program: Command): void {
     .action(async (key: string, value: string) => {
       const root = resolveProjectRoot();
       const lang = detectLang(root);
-      const configPath = join(root, PROJECT_CONFIG_PATH);
-
+      // Parse value: try JSON first, fallback to string
+      let parsed: unknown = value;
       try {
-        let existing: Partial<DeckentConfig> = {};
-        if (existsSync(configPath)) {
-          existing = JSON.parse(readFileSync(configPath, 'utf-8')) as Partial<DeckentConfig>;
-        }
-
-        // Parse value: try JSON first, fallback to string
-        let parsed: unknown = value;
-        try {
-          parsed = JSON.parse(value);
-        } catch {
-          // keep as string
-        }
-
-        if (key.includes('.')) {
-          setNestedValue(existing as Record<string, unknown>, key, parsed);
-        } else {
-          (existing as Record<string, unknown>)[key] = parsed;
-        }
-
-        validatePartialConfig(existing);
-        withConfigWriteLock(configPath, () => writeConfigJsonAtomic(configPath, existing));
-        print(getMessage('config.set', lang, { key, value: JSON.stringify(parsed) }));
-      } catch (error) {
-        if (error instanceof ConfigValidationError) {
-          printError(new Error(getMessage('config.invalid', lang, { errors: error.errors.join(', ') })));
-        } else {
-          printError(error);
-        }
-        process.exitCode = 1;
+        parsed = JSON.parse(value);
+      } catch {
+        // keep as string
       }
+
+      // TERMINAL-PICKER-002 — same seam the Terminal picker's "save as default" uses.
+      const outcome = setConfigValues(root, { [key]: parsed });
+      if (outcome.ok) {
+        print(getMessage('config.set', lang, { key, value: JSON.stringify(parsed) }));
+        return;
+      }
+      if (outcome.code === 'validation') {
+        printError(new Error(getMessage('config.invalid', lang, { errors: outcome.error })));
+      } else {
+        printError(new Error(outcome.error));
+      }
+      process.exitCode = 1;
     });
 
   bindArgumentDescriptions(cmd.command('get <key>'), helpLang, { key: 'cliContract.config.arg.key' })

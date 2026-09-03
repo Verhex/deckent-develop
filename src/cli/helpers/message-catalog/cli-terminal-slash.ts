@@ -110,6 +110,8 @@ export const CLI_TERMINAL_SLASH_MESSAGES: MessageFamily = Object.freeze({
   'tui.shortcuts.at_ref.action': { en: 'reference a project file', tr: 'proje dosyasına referans ver' },
   'tui.shortcuts.line_edit.keys': { en: 'Home/End · Ctrl+A/E · Ctrl+U', tr: 'Home/End · Ctrl+A/E · Ctrl+U' },
   'tui.shortcuts.line_edit.action': { en: 'line start/end · clear the line', tr: 'satır başı/sonu · satırı temizle' },
+  'tui.shortcuts.picker.keys': { en: '/model · /provider', tr: '/model · /provider' },
+  'tui.shortcuts.picker.action': { en: 'open a picker: ↑↓ move · type to filter · Enter select · Esc close', tr: 'seçici aç: ↑↓ gez · yazarak filtrele · Enter seç · Esc kapat' },
   'tui.shortcuts.shell.keys': { en: '!<command>', tr: '!<komut>' },
   'tui.shortcuts.shell.action': { en: 'run a shell command here (gated by /term mode and a one-time approval); its output is attached to your next message', tr: 'burada kabuk komutu çalıştır (/term modu ve tek seferlik onaya tabi); çıktısı bir sonraki mesajına eklenir' },
   // TERMINAL-TOOLS-011 — Ask/Run/Control action gate denial (term-gate.ts).
@@ -316,8 +318,8 @@ export const CLI_TERMINAL_SLASH_MESSAGES: MessageFamily = Object.freeze({
     en: 'Use external MCP tools — list · call <tool> [args] (project .mcp.json)',
     tr: 'Harici MCP araçları — list · call <tool> [args] (proje .mcp.json)',
   },
-  'tui.slash.desc.model': { en: 'Switch the model (ids: /models; e.g. /model <model-id>)', tr: 'Modeli değiştir (kimlikler: /models; örn: /model <model-id>)' },
-  'tui.slash.desc.provider': { en: 'Switch the provider (e.g. /provider <name>)', tr: 'Provider değiştir (örn: /provider <ad>)' },
+  'tui.slash.desc.model': { en: 'Switch the model — bare /model opens a picker (ids: /models); /model <model-id> switches directly', tr: 'Modeli değiştir — çıplak /model seçici açar (kimlikler: /models); /model <model-id> doğrudan geçer' },
+  'tui.slash.desc.provider': { en: 'Switch the provider — bare /provider opens a picker; /provider <name> switches directly', tr: 'Sağlayıcıyı değiştir — çıplak /provider seçici açar; /provider <ad> doğrudan geçer' },
   'tui.slash.desc.approve': { en: 'Set the approval mode: suggest | auto-edit | full-auto', tr: 'Onay modu: suggest | auto-edit | full-auto' },
   'tui.slash.desc.renew': {
     en: 'Renew an exhausted working-budget epoch (billing counters keep running)',
