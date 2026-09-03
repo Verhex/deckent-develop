@@ -246,10 +246,12 @@ describe('buildReplProvider — openai-compatible branch (Sprint 221 T-005)', ()
 // ─── 4. Ollama unreachable → NET error (no skeleton) ────────────────────
 
 describe('buildReplProvider — ollama unreachable NET error (Sprint 221 T-005)', () => {
-  it('connection-refused fetch is wrapped with a clear "ollama (...) erişilemedi" message', async () => {
+  // TERMINAL-I18N-NATIVE-001: the hint is the localized `chat.ollama_unreachable`
+  // row (English in the default session language; Turkish under language=tr).
+  it('connection-refused fetch is wrapped with a clear "Ollama (...) is unreachable" message', async () => {
     const adapter = buildReplProvider('ollama', { fetchFn: refusingFetch() });
     await expect(adapter.send([{ role: 'user', content: 'x' }]))
-      .rejects.toThrow(/Ollama \(http:\/\/localhost:11434\) erişilemedi/);
+      .rejects.toThrow(/Ollama \(http:\/\/localhost:11434\) is unreachable/);
   });
 
   it('NET error mentions "ollama serve" hint so the user knows the fix', async () => {

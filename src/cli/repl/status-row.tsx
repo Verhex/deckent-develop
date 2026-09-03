@@ -19,7 +19,7 @@
 
 import { Text } from 'ink';
 import type { ReactElement } from 'react';
-import { displayWidth, segmentGraphemes } from './cursor-model.js';
+import { displayWidth, truncateStart, truncateEnd } from './cursor-model.js';
 import { useInkPalette } from './ink-palette-context.js';
 import type { InkPalette, InkRoleStyle } from './ink-palette.js';
 
@@ -56,7 +56,6 @@ export interface StatusRowLayout {
 const DROP_ORDER: readonly StatusRowOptional[] = ['resumed', 'tokens', 'approval', 'model'];
 /** Cells the cwd keeps before the layout starts dropping optional segments. */
 const MIN_CWD_CELLS = 12;
-const ELLIPSIS = '…';
 const GAP = '  ';
 
 function buildSegments(input: StatusRowInput, dropped: ReadonlySet<StatusRowOptional>): StatusRowSegment[] {
@@ -75,38 +74,9 @@ function buildSegments(input: StatusRowInput, dropped: ReadonlySet<StatusRowOpti
   return segments;
 }
 
-/** Keep the TAIL of `text` within `cells` display cells, prefixed with `…`. */
-export function truncateStart(text: string, cells: number): string {
-  if (cells <= 0) return '';
-  if (displayWidth(text) <= cells) return text;
-  if (cells === 1) return ELLIPSIS;
-  const clusters = segmentGraphemes(text);
-  let width = 0;
-  let start = clusters.length;
-  while (start > 0) {
-    const w = displayWidth(clusters[start - 1] as string);
-    if (width + w > cells - 1) break;
-    width += w;
-    start -= 1;
-  }
-  return ELLIPSIS + clusters.slice(start).join('');
-}
-
-/** Keep the HEAD of `text` within `cells` display cells, suffixed with `…`. */
-export function truncateEnd(text: string, cells: number): string {
-  if (cells <= 0) return '';
-  if (displayWidth(text) <= cells) return text;
-  if (cells === 1) return ELLIPSIS;
-  let width = 0;
-  let out = '';
-  for (const cluster of segmentGraphemes(text)) {
-    const w = displayWidth(cluster);
-    if (width + w > cells - 1) break;
-    width += w;
-    out += cluster;
-  }
-  return out + ELLIPSIS;
-}
+// CLI-INTERACTIVE-001 — the cell-budget truncation helpers moved to the pure
+// cursor-model (Ink-free); re-exported here for their existing importers.
+export { truncateStart, truncateEnd } from './cursor-model.js';
 
 const widthOf = (segments: readonly StatusRowSegment[], skip?: StatusRowRole): number =>
   segments.reduce((sum, s) => (s.role === skip ? sum : sum + displayWidth(s.text)), 0);

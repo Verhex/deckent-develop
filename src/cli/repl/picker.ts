@@ -18,7 +18,9 @@
 // registry / config / policy (picker-specs.ts).
 
 import { displayWidth } from './cursor-model.js';
-import { truncateEnd } from './status-row.js';
+// CLI-INTERACTIVE-001 — the cell helpers live in the pure cursor-model so this
+// core never pulls the Ink status row (and Ink itself) into the plain CLI.
+import { truncateEnd } from './cursor-model.js';
 // TERMINAL-PROVIDER-VOCAB-001 — the label CONTRACT lives in this leaf (the
 // builder + assertion stay in picker-labels.ts) so the mechanism never
 // imports its label module back: no picker ↔ picker-labels cycle.

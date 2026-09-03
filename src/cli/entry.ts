@@ -356,8 +356,8 @@ function subscriptionReplEnv(): NodeJS.ProcessEnv {
  * ADR-083 SSOT). The only REPL-only behavior kept here is Sprint 221 Task
  * 221-005's connection-refused / DNS-failure wrap: the SSOT lets a raw fetch
  * rejection propagate unwrapped (it has no REPL-specific UX concerns), so
- * this wrapper catches ONLY that case and rewraps it with the Turkish
- * `Ollama (<host>) erişilemedi… 'ollama serve' …` hint. An HTTP-status error
+ * this wrapper catches ONLY that case and rewraps it with the localized
+ * `chat.ollama_unreachable` hint (host + reason + 'ollama serve'). An HTTP-status error
  * (`res.ok === false`) already carries a clear `Ollama request failed: …`
  * message from the SSOT and passes through unchanged.
  */
@@ -371,10 +371,9 @@ function buildOllamaReplAdapter(opts?: { fetchFn?: typeof fetch }): ChatProvider
       } catch (err) {
         if (err instanceof Error && err.message.startsWith('Ollama request failed')) throw err;
         const reason = err instanceof Error ? err.message : String(err);
-        throw new Error(
-          `Ollama (${host}) erişilemedi: ${reason}. ` +
-          `'ollama serve' ile başlatın veya DECKENT_OLLAMA_HOST ile farklı host belirtin.`,
-        );
+        // TERMINAL-I18N-NATIVE-001 — the hint is a catalog row in the session
+        // language (it was a Turkish literal rendered in English sessions too).
+        throw new Error(getMessage('chat.ollama_unreachable', getLangFromConfig(process.cwd()), { host, reason }));
       }
     },
   };
@@ -579,7 +578,7 @@ function buildModelOverrideSend(
  *   | claude/codex/gemini, `opts.model` set (Ink model-switcher) | arg table has no `--model` param                                                  | local ({@link buildModelOverrideSend}) |
  *   | claude/codex/gemini `.stream()`                | `.stream()` is raw passthrough w/ ONE fixed arg table — no `--output-format stream-json`, no NDJSON parsing | local ({@link buildCliStream}, shared by every branch below) |
  *   | claude/codex/gemini `.send()`, no `opts.model` | none — arg table (`extraArgsForProvider` ≡ SSOT's internal `cliExtraArgs`), env-stripping, and prompt-building are identical | **delegates to `resolveChatAdapter()`** |
- *   | ollama `.send()`                               | none for the HTTP mechanics; only the Turkish "erişilemedi / ollama serve" hint on network failure is REPL-only UX | **delegates to `resolveChatAdapter()`** (see {@link buildOllamaReplAdapter}) |
+ *   | ollama `.send()`                               | none for the HTTP mechanics; only the localized `chat.ollama_unreachable` hint on network failure is REPL-only UX | **delegates to `resolveChatAdapter()`** (see {@link buildOllamaReplAdapter}) |
  *   | deepseek / qwen / glm                          | SSOT only knows the single generic `'openai-compatible'` provider (one configurable HTTP target via env), not named vendor presets (that logic lives in `providers/openai-compatible.ts`, a separate module) | local |
  */
 export function buildReplProvider(

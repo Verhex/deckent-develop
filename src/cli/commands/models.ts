@@ -1,6 +1,6 @@
 // ─── deckent models CLI Command (Sprint 190 W-F F-9/F-10) ──────────────────
 // ADR-012: register<Name>(program) pattern
-// ADR-010: no new runtime dependencies — ANSI via existing color() helper
+// ADR-010: no new runtime dependencies — colors via the theme.ts palette roles
 // ADR-022-v2: CLI/MCP feature parity with deckent_models MCP tool
 
 import type { Command } from 'commander';
@@ -8,8 +8,17 @@ import {
   loadCatalog,
   type CatalogLoadOptions,
 } from '../../core/model-catalog.js';
-import type { ModelDefinition } from '../../core/model-registry.js';
-import { print, printError, color } from '../helpers/output.js';
+import { modelRegistry, type ModelDefinition } from '../../core/model-registry.js';
+import { print, printError } from '../helpers/output.js';
+// TERMINAL-I18N-MODELS-001 — colors are palette roles through the theme.ts
+// gate (host-theme-mapped; NO_COLOR → plain), never raw SGR literals; every
+// user-facing sentence is a catalog row (cli.memcat.models.out.*).
+import { theme } from '../helpers/theme.js';
+// CLI-INTERACTIVE-001 — a missing model/provider on a terminal is asked as the
+// same numbered choice the Terminal picker offers (shared rows + labels).
+import { chooseFromSpec, askOnStdin, stdinIsInteractive } from '../helpers/prompt-choice.js';
+import { buildPickerLabels } from '../repl/picker-labels.js';
+import type { PickerCandidate, PickerSpec } from '../repl/picker.js';
 import {
   ModelActivationStore,
   resolveActiveModelPolicy,
@@ -18,17 +27,27 @@ import {
 } from '../../core/model-activation-store.js';
 import { resolveProjectRoot } from '../helpers/process.js';
 import { getLanguage, getMessage } from '../helpers/messages.js';
+import { detectLang } from '../helpers/i18n.js';
+
+/** The language OUTPUT lines resolve in: the project's configured language
+ *  (config.json → env), read per invocation like `deckent config` does. */
+function outputLang(): string {
+  return detectLang(resolveProjectRoot());
+}
 import { memoryCatalogMessage } from '../helpers/message-catalog/cli-memory-catalog.js';
 
 // ─── Tier Display ──────────────────────────────────────────────────────────
 
-const TIER_COLORS: Record<string, string> = {
-  premium_plus: '\x1b[35m',
-  premium:      '\x1b[34m',
-  standard:     '\x1b[32m',
-  economy:      '\x1b[33m',
+/** Tier → palette role: the tier WORD is the carrier, the color supplements it
+ *  (readability gate: every role reads on every host theme). */
+const TIER_ROLES: Record<string, (text: string) => string> = {
+  premium_plus: (t) => theme.info(t),
+  premium:      (t) => theme.info(t),
+  standard:     (t) => theme.success(t),
+  economy:      (t) => theme.warning(t),
 };
 
+/** Technical tier tokens (registry ids) — not localized. */
 const TIER_LABELS: Record<string, string> = {
   premium_plus: 'premium+',
   premium:      'premium',
@@ -37,47 +56,47 @@ const TIER_LABELS: Record<string, string> = {
 };
 
 function colorTier(tier: string): string {
-  const code = TIER_COLORS[tier] ?? '\x1b[0m';
+  const paint = TIER_ROLES[tier] ?? ((t: string) => t);
   const label = TIER_LABELS[tier] ?? tier;
-  return color(code, label.padEnd(9));
+  return paint(label.padEnd(9));
 }
 
-/** Known provider display colors — also the SINGLE source for the provider
- *  names quoted in `--provider` help, so the list can never drift out of sync
- *  with what the command can actually colorize. Unlisted providers still render
- *  (uncolored); this map is presentation metadata, not an allowlist. */
-const PROVIDER_COLORS: Record<string, string> = {
-  claude: '\x1b[36m',
-  codex:  '\x1b[32m',
-  gemini: '\x1b[33m',
-  ollama: '\x1b[35m',
-  cursor: '\x1b[34m',
-};
+/** The provider names quoted in `--provider` help come from the registry —
+ *  the presentation can never drift from what the catalog actually knows. */
+function knownProviderNames(): string {
+  return modelRegistry.getAllProviders().join(', ');
+}
 
+/** Provider ids are code-like identifiers → the code role (primary contrast). */
 function colorProvider(provider: string): string {
-  const code = PROVIDER_COLORS[provider] ?? '\x1b[0m';
-  return color(code, provider.padEnd(8));
+  return theme.code(provider.padEnd(8));
 }
 
 function colorStatus(status: string): string {
-  if (status === 'preview') return color('\x1b[33m', status);
-  if (status === 'deprecated') return color('\x1b[31m', status);
-  return color('\x1b[32m', status);
+  if (status === 'preview') return theme.warning(status);
+  if (status === 'deprecated') return theme.error(status);
+  return theme.success(status);
+}
+
+/** `cli.memcat.models.out.<suffix>` in the session language. */
+function out(suffix: string, lang: string, vars?: Record<string, string | number>): string {
+  const text = vars ? Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, String(v)])) : undefined;
+  return memoryCatalogMessage(`cli.memcat.models.out.${suffix}`, lang, text);
 }
 
 // ─── Table Rendering ───────────────────────────────────────────────────────
 
-function renderModelsTable(models: ModelDefinition[]): string {
+function renderModelsTable(models: ModelDefinition[], lang: string = outputLang()): string {
   if (models.length === 0) {
-    return color('\x1b[33m', 'No models found.');
+    return theme.warning(out('no_models', lang));
   }
 
   const header = [
-    color('\x1b[1m', 'ID'.padEnd(32)),
-    color('\x1b[1m', 'PROVIDER'.padEnd(10)),
-    color('\x1b[1m', 'TIER'.padEnd(11)),
-    color('\x1b[1m', 'STATUS'.padEnd(12)),
-    color('\x1b[1m', 'CTX'),
+    theme.bold(out('col.id', lang).padEnd(32)),
+    theme.bold(out('col.provider', lang).padEnd(10)),
+    theme.bold(out('col.tier', lang).padEnd(11)),
+    theme.bold(out('col.status', lang).padEnd(12)),
+    theme.bold(out('col.ctx', lang)),
   ].join('  ');
 
   const sep = '-'.repeat(84);
@@ -104,10 +123,10 @@ function findModel(models: ModelDefinition[], modelId: string): ModelDefinition 
 
 // ─── Source badge ─────────────────────────────────────────────────────────
 
-function sourceBadge(source: string): string {
-  if (source === 'remote') return color('\x1b[32m', 'live');
-  if (source === 'cache') return color('\x1b[33m', 'cached');
-  return color('\x1b[2m', 'bundled');
+function sourceBadge(source: string, lang: string = outputLang()): string {
+  if (source === 'remote') return theme.success(out('badge_live', lang));
+  if (source === 'cache') return theme.warning(out('badge_cached', lang));
+  return theme.muted(out('badge_bundled', lang));
 }
 
 // ─── registerModels ────────────────────────────────────────────────────────
@@ -126,7 +145,7 @@ export function registerModels(program: Command): void {
     .description(getMessage('cli.models.list.desc', getLanguage(undefined)))
     .option(
       '--provider <name>',
-      memoryCatalogMessage('cli.memcat.models.opt.provider_filter', getLanguage(undefined), { providers: Object.keys(PROVIDER_COLORS).join(', ') }),
+      memoryCatalogMessage('cli.memcat.models.opt.provider_filter', getLanguage(undefined), { providers: knownProviderNames() }),
     )
     .option('--offline', memoryCatalogMessage('cli.memcat.models.opt.offline', getLanguage(undefined)))
     .action(async (opts: { provider?: string; offline?: boolean }) => {
@@ -142,14 +161,15 @@ export function registerModels(program: Command): void {
           );
         }
 
-        const badge = sourceBadge(result.source);
-        print(`\n  ${color('\x1b[1m', 'Model Catalog')}  [${badge}]  ${models.length} model(s)\n`);
-        print(renderModelsTable(models));
+        const lang = outputLang();
+        const badge = sourceBadge(result.source, lang);
+        print(`\n  ${theme.bold(out('catalog_header', lang))}  [${badge}]  ${out('model_count', lang, { n: models.length })}\n`);
+        print(renderModelsTable(models, lang));
 
         if (result.warnings.length > 0) {
           print('');
           for (const w of result.warnings) {
-            print(color('\x1b[33m', `  ⚠ ${w}`));
+            print(theme.warning(`  ⚠ ${w}`));
           }
         }
         print('');
@@ -173,15 +193,77 @@ export function registerModels(program: Command): void {
     }
   }
 
+  // CLI-INTERACTIVE-001 — resolve the (provider, model) pair: both given →
+  // use them; a missing one on an interactive terminal → numbered choice
+  // (registry providers, then the catalog's models for that provider, the row
+  // already in the target state marked current); off a terminal → typed error.
+  async function resolveActivationTarget(
+    verb: 'activate' | 'deactivate',
+    model: string | undefined,
+    provider: string | undefined,
+    offline: boolean | undefined,
+    lang: string,
+  ): Promise<{ provider: string; model: string } | null> {
+    if (model && provider) return { provider, model };
+    if (!stdinIsInteractive()) {
+      printError(new Error(out('missing_args', lang, { verb })));
+      return null;
+    }
+    const labels = buildPickerLabels((key) => getMessage(key, lang));
+    const command = `deckent models ${verb}`;
+    const report = (outcome: Awaited<ReturnType<typeof chooseFromSpec>>): PickerCandidate | null => {
+      if (outcome.kind === 'chosen') return outcome.candidate;
+      if (outcome.kind === 'cancelled') print(`  ${out('cancelled', lang)}`);
+      else if (outcome.kind === 'not-found') printError(new Error(out('choice_not_found', lang, { arg: outcome.arg })));
+      else printError(new Error(`${outcome.candidate.id}: ${outcome.candidate.blockedCode ?? ''}`));
+      return null;
+    };
+    let chosenProvider = provider;
+    if (!chosenProvider) {
+      const providers = modelRegistry.getAllProviders();
+      const spec: PickerSpec = {
+        kind: 'provider', initialId: providers[0] ?? null, scopes: ['apply'],
+        candidates: providers.map((p) => ({ id: p, label: p, facts: [{ key: 'models', value: labels.factModels.replace('{n}', String(modelRegistry.getByProvider(p).length)) }], state: 'ok' as const })),
+      };
+      print(`\n  ${theme.bold(out('choose_provider', lang))}`);
+      const picked = report(await chooseFromSpec(spec, labels, `${command} --provider`, print, askOnStdin));
+      if (!picked) return null;
+      chosenProvider = picked.id;
+    }
+    if (model) return { provider: chosenProvider, model };
+    const catalog = await loadCatalog({ offline });
+    const candidates = catalog.models.filter((m) => (m.provider as string) === chosenProvider);
+    if (candidates.length === 0) {
+      printError(new Error(out('no_catalog_models', lang, { provider: chosenProvider })));
+      return null;
+    }
+    const inTargetState = (id: string): boolean => withStore((store) => store.isActive(chosenProvider as string, id)) === (verb === 'activate');
+    const spec: PickerSpec = {
+      kind: 'model', initialId: candidates[0]?.id ?? null, scopes: ['apply'],
+      candidates: candidates.map((m) => ({
+        id: m.id, label: m.id,
+        facts: [{ key: 'provider', value: chosenProvider as string }, { key: 'tier', value: m.tier }, { key: 'status', value: m.status }],
+        state: inTargetState(m.id) ? 'current' as const : 'ok' as const,
+      })),
+    };
+    print(`\n  ${theme.bold(out('choose_model', lang, { provider: chosenProvider }))}`);
+    const picked = report(await chooseFromSpec(spec, labels, command, print, askOnStdin));
+    return picked ? { provider: chosenProvider, model: picked.id } : null;
+  }
+
   models
     .command('activate')
-    .argument('<model>', memoryCatalogMessage('cli.memcat.models.arg.model', getLanguage(undefined)))
+    .argument('[model]', memoryCatalogMessage('cli.memcat.models.arg.model', getLanguage(undefined)))
     .description(getMessage('cli.models.activate.desc', getLanguage(undefined)))
-    .requiredOption('--provider <name>', memoryCatalogMessage('cli.memcat.models.opt.provider_required', getLanguage(undefined)))
-    .action((model: string, opts: { provider: string }) => {
+    .option('--provider <name>', memoryCatalogMessage('cli.memcat.models.opt.provider_required', getLanguage(undefined)))
+    .option('--offline', memoryCatalogMessage('cli.memcat.models.opt.offline', getLanguage(undefined)))
+    .action(async (model: string | undefined, opts: { provider?: string; offline?: boolean }) => {
       try {
-        withStore((store) => store.setActivation(opts.provider, model, true));
-        print(`  ${color('\x1b[32m', '✓')} ${opts.provider}/${model} activated`);
+        const lang = outputLang();
+        const target = await resolveActivationTarget('activate', model, opts.provider, opts.offline, lang);
+        if (!target) { process.exitCode = 1; return; }
+        withStore((store) => store.setActivation(target.provider, target.model, true));
+        print(`  ${theme.success('✓')} ${out('activated', lang, { provider: target.provider, model: target.model })}`);
       } catch (err) {
         printError(err);
         process.exitCode = 1;
@@ -190,13 +272,17 @@ export function registerModels(program: Command): void {
 
   models
     .command('deactivate')
-    .argument('<model>', memoryCatalogMessage('cli.memcat.models.arg.model', getLanguage(undefined)))
+    .argument('[model]', memoryCatalogMessage('cli.memcat.models.arg.model', getLanguage(undefined)))
     .description(getMessage('cli.models.deactivate.desc', getLanguage(undefined)))
-    .requiredOption('--provider <name>', memoryCatalogMessage('cli.memcat.models.opt.provider_required', getLanguage(undefined)))
-    .action((model: string, opts: { provider: string }) => {
+    .option('--provider <name>', memoryCatalogMessage('cli.memcat.models.opt.provider_required', getLanguage(undefined)))
+    .option('--offline', memoryCatalogMessage('cli.memcat.models.opt.offline', getLanguage(undefined)))
+    .action(async (model: string | undefined, opts: { provider?: string; offline?: boolean }) => {
       try {
-        withStore((store) => store.setActivation(opts.provider, model, false));
-        print(`  ${color('\x1b[33m', '✓')} ${opts.provider}/${model} deactivated — it will not be routed`);
+        const lang = outputLang();
+        const target = await resolveActivationTarget('deactivate', model, opts.provider, opts.offline, lang);
+        if (!target) { process.exitCode = 1; return; }
+        withStore((store) => store.setActivation(target.provider, target.model, false));
+        print(`  ${theme.warning('✓')} ${out('deactivated', lang, { provider: target.provider, model: target.model })}`);
       } catch (err) {
         printError(err);
         process.exitCode = 1;
@@ -208,17 +294,18 @@ export function registerModels(program: Command): void {
     .description(getMessage('cli.models.activation.desc', getLanguage(undefined)))
     .action(() => {
       try {
+        const lang = outputLang();
         const records = withStore((store) => store.list());
         if (records.length === 0) {
-          print('\n  No activation decisions recorded — every detected model is active.\n');
+          print(`\n  ${out('no_activation', lang)}\n`);
           return;
         }
-        print(`\n  ${color('\x1b[1m', 'Model Activation')}  ${records.length} decision(s)\n`);
+        print(`\n  ${theme.bold(out('activation_header', lang))}  ${out('decision_count', lang, { n: records.length })}\n`);
         for (const r of records) {
           const mark = r.active
-            ? color('\x1b[32m', 'active  ')
-            : color('\x1b[31m', 'inactive');
-          print(`  ${mark}  ${r.provider}/${r.modelId}  ${color('\x1b[2m', `(${r.actor}, ${r.updatedAt})`)}`);
+            ? theme.success(out('mark_active', lang).padEnd(8))
+            : theme.error(out('mark_inactive', lang).padEnd(8));
+          print(`  ${mark}  ${r.provider}/${r.modelId}  ${theme.muted(`(${r.actor}, ${r.updatedAt})`)}`);
         }
         print('');
       } catch (err) {
@@ -240,33 +327,32 @@ export function registerModels(program: Command): void {
     .description(getMessage('cli.models.policy.desc', getLanguage(undefined)))
     .action((provider: string | undefined, mode: string | undefined) => {
       try {
-        const lang = getLanguage();
+        const lang = outputLang();
         if (!provider) {
           const policies = withStore((store) => store.listProviderPolicies());
-          print(`\n  ${color('\x1b[1m', 'Provider Activation Policy')}`);
-          print(`  ${color('\x1b[2m', getMessage('model_policy.default_not_ceiling', lang))}\n`);
+          print(`\n  ${theme.bold(out('policy_header', lang))}`);
+          print(`  ${theme.muted(getMessage('model_policy.default_not_ceiling', lang))}\n`);
           if (policies.length === 0) {
-            print('  No policy recorded — every provider is implicit-active (default).\n');
+            print(`  ${out('no_policy', lang)}\n`);
             return;
           }
           for (const p of policies) {
-            const badge = p.mode === 'explicit-active'
-              ? color('\x1b[35m', 'explicit-active')
-              : color('\x1b[32m', 'implicit-active');
-            print(`  ${badge}  ${p.provider}  ${color('\x1b[2m', `(${p.actor}, ${p.updatedAt})`)}`);
+            // The mode word is the carrier (a registry token); the color supplements it.
+            const badge = p.mode === 'explicit-active' ? theme.info(p.mode) : theme.success(p.mode);
+            print(`  ${badge}  ${p.provider}  ${theme.muted(`(${p.actor}, ${p.updatedAt})`)}`);
           }
           print('');
           return;
         }
         if (!mode || !PROVIDER_POLICY_MODES.includes(mode as ProviderPolicyMode)) {
-          printError(new Error(`mode must be one of: ${PROVIDER_POLICY_MODES.join(', ')}`));
+          printError(new Error(out('policy_mode_invalid', lang, { modes: PROVIDER_POLICY_MODES.join(', ') })));
           process.exitCode = 1;
           return;
         }
         withStore((store) => store.setProviderPolicy(provider, mode as ProviderPolicyMode));
-        print(`  ${color('\x1b[32m', '✓')} ${provider} → ${mode}`);
+        print(`  ${theme.success('✓')} ${out('policy_set', lang, { provider, mode })}`);
         if (mode === 'explicit-active') {
-          print(`  ${color('\x1b[2m', getMessage('model_policy.explicit_active_set', lang, { provider }))}`);
+          print(`  ${theme.muted(getMessage('model_policy.explicit_active_set', lang, { provider }))}`);
         }
       } catch (err) {
         printError(err);
@@ -282,20 +368,19 @@ export function registerModels(program: Command): void {
     .description(getMessage('cli.models.active_set.desc', getLanguage(undefined)))
     .action(() => {
       try {
-        const lang = getLanguage();
+        const lang = outputLang();
         const policy = resolveActiveModelPolicy(resolveProjectRoot());
-        print(`\n  ${color('\x1b[1m', 'Active Execution Set')}  `
-          + `${color('\x1b[2m', `sha256:${policy.snapshotDigest.slice(0, 16)}…`)}`);
-        print(`  ${color('\x1b[2m', getMessage('model_policy.default_not_ceiling', lang))}\n`);
+        print(`\n  ${theme.bold(out('active_set_header', lang))}  `
+          + `${theme.muted(`sha256:${policy.snapshotDigest.slice(0, 16)}…`)}`);
+        print(`  ${theme.muted(getMessage('model_policy.default_not_ceiling', lang))}\n`);
         const explicit = [...policy.explicitProviders].sort();
         if (explicit.length === 0 && policy.activeModels.length === 0) {
-          print('  No explicit-active policy — every provider implicit-active '
-            + '(all detected models eligible).\n');
+          print(`  ${out('no_explicit_policy', lang)}\n`);
           return;
         }
-        print(`  explicit-active providers: ${explicit.length ? explicit.join(', ') : '(none)'}\n`);
+        print(`  ${out('explicit_providers', lang, { list: explicit.length ? explicit.join(', ') : out('none', lang) })}\n`);
         for (const m of policy.activeModels) {
-          print(`  ${color('\x1b[32m', 'active')}  ${m.provider}/${m.modelId}`);
+          print(`  ${theme.success(out('mark_active', lang))}  ${m.provider}/${m.modelId}`);
         }
         print('');
       } catch (err) {
@@ -310,17 +395,18 @@ export function registerModels(program: Command): void {
     .description(getMessage('cli.models.refresh.desc', getLanguage(undefined)))
     .action(async () => {
       try {
-        print(color('\x1b[2m', '  Refreshing model catalog…'));
+        const lang = outputLang();
+        print(theme.muted(`  ${out('refreshing', lang)}`));
         const result = await loadCatalog({ forceRefresh: true });
-        print(`  ${color('\x1b[32m', '✓')} Catalog refreshed — ${result.models.length} model(s) loaded`);
-        print(`    Source: ${sourceBadge(result.source)}`);
+        print(`  ${theme.success('✓')} ${out('refreshed', lang, { n: result.models.length })}`);
+        print(`    ${out('source', lang, { badge: sourceBadge(result.source, lang) })}`);
         if (result.fetchedAt) {
           const d = new Date(result.fetchedAt);
-          print(`    Fetched: ${d.toISOString()}`);
+          print(`    ${out('fetched', lang, { when: d.toISOString() })}`);
         }
         if (result.warnings.length > 0) {
           for (const w of result.warnings) {
-            print(color('\x1b[33m', `  ⚠ ${w}`));
+            print(theme.warning(`  ⚠ ${w}`));
           }
         }
         print('');
@@ -341,19 +427,25 @@ export function registerModels(program: Command): void {
         const result = await loadCatalog({ offline: opts.offline });
         const found = findModel(result.models, modelId);
 
+        const lang = outputLang();
         if (!found) {
-          printError(new Error(`Model not found: ${modelId}. Run \`deckent models list\` to see available models.`));
+          printError(new Error(out('not_found', lang, { model: modelId })));
           process.exitCode = 1;
           return;
         }
 
-        print(`\n  ${color('\x1b[1m', found.id)}`);
-        print(`    Provider : ${colorProvider(found.provider)}`);
-        print(`    Tier     : ${colorTier(found.tier)}`);
-        print(`    API ID   : ${found.apiId}`);
-        print(`    Status   : ${colorStatus(found.status)}`);
-        print(`    Context  : ${Math.round(found.contextWindow / 1000)}k tokens`);
-        print(`    Cost/M   : $${found.costPerMillion.input} in / $${found.costPerMillion.output} out`);
+        // One label column (widest localized field word) — alignment carries the hierarchy.
+        const fields: Array<[string, string]> = [
+          [out('field.provider', lang), colorProvider(found.provider)],
+          [out('field.tier', lang), colorTier(found.tier)],
+          [out('field.api_id', lang), found.apiId],
+          [out('field.status', lang), colorStatus(found.status)],
+          [out('field.context', lang), out('context_tokens', lang, { k: Math.round(found.contextWindow / 1000) })],
+          [out('field.cost', lang), out('cost_line', lang, { in: found.costPerMillion.input, out: found.costPerMillion.output })],
+        ];
+        const width = Math.max(...fields.map(([label]) => label.length));
+        print(`\n  ${theme.bold(found.id)}`);
+        for (const [label, value] of fields) print(`    ${label.padEnd(width)} : ${value}`);
         print('');
       } catch (err) {
         printError(err);

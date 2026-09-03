@@ -214,6 +214,23 @@ export const CLI_TERMINAL_SLASH_MESSAGES: MessageFamily = Object.freeze({
     en: 'native engine not started — no native transport configured: set ANTHROPIC_API_KEY / OPENAI_API_KEY / openai_base_url / ollama_host. Running the legacy loop instead.',
     tr: 'native motor başlatılmadı — native transport tanımlı değil: ANTHROPIC_API_KEY / OPENAI_API_KEY / openai_base_url / ollama_host tanımlayın. Bunun yerine eski döngü çalışıyor.',
   },
+  // ── TERMINAL-I18N-NATIVE-001 — transport detection reasons (provider-detect.ts reasonCode) ──
+  'native.detect.anthropic-api-key': {
+    en: 'ANTHROPIC_API_KEY is present in the environment',
+    tr: 'ANTHROPIC_API_KEY ortam değişkeni mevcut',
+  },
+  'native.detect.openai-compatible': {
+    en: 'an OpenAI-compatible endpoint is configured (OPENAI_API_KEY or openai_base_url)',
+    tr: 'OpenAI-uyumlu endpoint yapılandırılmış (OPENAI_API_KEY veya openai_base_url)',
+  },
+  'native.detect.ollama-host': {
+    en: 'a local Ollama is configured ({detail})',
+    tr: 'yerel Ollama yapılandırılmış ({detail})',
+  },
+  'native.detect.no-transport': {
+    en: 'no native transport — bind an API or a local model (ANTHROPIC_API_KEY / OPENAI_API_KEY / openai_base_url / ollama_host)',
+    tr: 'native transport yok — bir API veya yerel model bağlayın (ANTHROPIC_API_KEY / OPENAI_API_KEY / openai_base_url / ollama_host)',
+  },
   'tui.switch_busy': {
     en: 'cannot switch {kind} while a turn is in progress — wait for it to finish, or /interrupt first',
     tr: 'tur sürerken {kind} değiştirilemez — bitmesini bekleyin ya da önce /interrupt kullanın',

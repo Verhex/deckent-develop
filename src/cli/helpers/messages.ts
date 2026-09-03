@@ -3466,6 +3466,12 @@ const BASE_MESSAGES: MessageMap = {
     en: '[chat-native] error: {message}',
     tr: '[chat-native] hata: {message}',
   },
+  // TERMINAL-I18N-NATIVE-001 — the readline Ollama network-failure hint (was a
+  // Turkish literal in entry.ts, rendered in English sessions too).
+  'chat.ollama_unreachable': {
+    en: "Ollama ({host}) is unreachable: {reason}. Start it with 'ollama serve' or point DECKENT_OLLAMA_HOST at another host.",
+    tr: "Ollama ({host}) erişilemedi: {reason}. 'ollama serve' ile başlatın veya DECKENT_OLLAMA_HOST ile farklı bir host belirtin.",
+  },
   'chat.no_provider_found': {
     en: 'No AI CLI found. Searched: claude (Anthropic), codex (OpenAI), gemini (Google), cursor (Cursor).\nInstall options:\n  • claude  — https://claude.ai/download  (npm: {claudeHint})\n  • codex   — {codexHint}\n  • gemini  — {geminiHint}\n  • cursor  — {cursorHint}\nAlternatives:\n  • deckent chat --native  — built-in chat (no host CLI required)\n  • deckent serve          — open dashboard chat in your browser',
     tr: 'AI CLI bulunamadı. Arananlar: claude (Anthropic), codex (OpenAI), gemini (Google), cursor (Cursor).\nKurulum seçenekleri:\n  • claude  — https://claude.ai/download  (npm: {claudeHint})\n  • codex   — {codexHint}\n  • gemini  — {geminiHint}\n  • cursor  — {cursorHint}\nAlternatifler:\n  • deckent chat --native  — yerleşik sohbet (host CLI gerekmez)\n  • deckent serve          — dashboard sohbetini tarayıcıda aç',

@@ -286,3 +286,41 @@ export function applyCursorEdit(state: CursorState, operation: EditOperation, te
     }
   }
 }
+
+// ─── Cell-budget truncation (CLI-INTERACTIVE-001: moved here from the Ink
+// status row so the picker core and the plain CLI stay Ink-free) ──────────
+
+const ELLIPSIS = '…';
+
+/** Keep the TAIL of `text` within `cells` display cells, prefixed with `…`. */
+export function truncateStart(text: string, cells: number): string {
+  if (cells <= 0) return '';
+  if (displayWidth(text) <= cells) return text;
+  if (cells === 1) return ELLIPSIS;
+  const clusters = segmentGraphemes(text);
+  let width = 0;
+  let start = clusters.length;
+  while (start > 0) {
+    const w = displayWidth(clusters[start - 1] as string);
+    if (width + w > cells - 1) break;
+    width += w;
+    start -= 1;
+  }
+  return ELLIPSIS + clusters.slice(start).join('');
+}
+
+/** Keep the HEAD of `text` within `cells` display cells, suffixed with `…`. */
+export function truncateEnd(text: string, cells: number): string {
+  if (cells <= 0) return '';
+  if (displayWidth(text) <= cells) return text;
+  if (cells === 1) return ELLIPSIS;
+  let width = 0;
+  let out = '';
+  for (const cluster of segmentGraphemes(text)) {
+    const w = displayWidth(cluster);
+    if (width + w > cells - 1) break;
+    width += w;
+    out += cluster;
+  }
+  return out + ELLIPSIS;
+}
