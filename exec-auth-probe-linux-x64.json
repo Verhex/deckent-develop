@@ -1,13 +1,27 @@
-
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "probe": "exec-authority-capability-probe",
   "workId": "PLATFORM-EXEC-AUTH-W2-PROBE-001",
+  "mode": "measurement",
+  "evidenceClass": "CAPABILITY_MEASUREMENT_ONLY",
+  "promotionEligible": false,
+  "nativeContract": {
+    "compiledBinaryLoaded": false,
+    "installedPackageVerified": false,
+    "state": "UNAVAILABLE",
+    "reason": "binding-package-metadata-invalid",
+    "executionEffect": {
+      "available": false,
+      "facadeState": "UNAVAILABLE",
+      "sourceReadCursorState": "UNAVAILABLE"
+    }
+  },
   "platform": "linux",
+  "environmentKind": "wsl2",
   "release": null,
   "arch": "x64",
   "node": "v24.15.0",
-  "measuredAt": "2026-08-05T08:57:31.353Z",
+  "measuredAt": "2026-09-02T21:05:51.737Z",
   "capabilities": {
     "fdStableDirTraversal": {
       "base": "/proc/self/fd",

@@ -7,6 +7,7 @@ import { SubprocessSpawnBackend, CLAUDE_SUBPROCESS_CONFIG } from '../providers/s
 import type { SubprocessProviderConfig } from '../providers/subprocess.js';
 import { CODEX_USAGE_EMIT_ARGS } from '../providers/codex.js';
 import { DockerSpawnBackend } from './spawn-backend-docker.js';
+import { createExactProductionWiringHostObserver } from './production-wiring-host-observation.js';
 import { assertNotLethalWithoutApproval } from '../nervous/panic-gate.js';
 import { SandboxSpawnBackend } from '../providers/sandbox.js';
 import type { SandboxOptions } from '../providers/sandbox.js';
@@ -26,12 +27,23 @@ import type { TaskResultAttemptCustodySourceBindingV2 } from '../core/task-resul
 import type { TaskResultV2 } from '../core/task-result-schema.js';
 import type { CanonicalIngressAuthority } from './result-ingress.js';
 import type { CanonicalIngressEffectAuthorityV1 } from './result-ingress.js';
+import type {
+  ExactAcceptedTaskResultAuthorityMetadata,
+} from './task-result-authority.js';
+import type {
+  ExactAcceptedTaskTerminalAuthorityRead,
+} from './evaluation-audit-trail.js';
+import type {
+  ExactAcceptedResultTerminalAuthorityV2,
+  SettleExactAcceptedResultOutcome,
+} from './exact-accepted-result-terminal-authority.js';
 import type { ExactAcceptedTaskResultRefV2 } from '../core/task-settlement-authority.js';
 import type { ExactExecutionLandingProposalV3 } from '../core/execution-landing-proposal.js';
 import type { ExecutionLandingPreparationRefV2 } from '../core/execution-landing-checkpoint.js';
 import type {
   Sha256Digest,
   TaskAttemptCustodyAmbiguousReasonCode,
+  TaskAttemptCustodyDispatchNotDispatchedAuthorityV2,
   TaskAttemptCustodyIdentityV2,
   TaskAttemptCustodyNotDispatchedReasonCode,
   TaskAttemptCustodyProviderExecutionAttemptV2,
@@ -66,9 +78,30 @@ export interface SpawnBackendRecoveryReport {
    * the canonical Docker backend always returns the field, including `[]`.
    */
   held?: SpawnBackendRecoveryHold[];
+  /** Opaque process-local exact entries recovered from the same private Store. */
+  exactEntries?: readonly SpawnBackendExactRecoveryEntryV2[];
 }
 
+export type SpawnBackendExactRecoveryEntryV2 =
+  | Readonly<{
+      readonly kind: 'not-dispatched';
+      readonly taskId: string;
+      readonly authority: TaskAttemptCustodyDispatchNotDispatchedAuthorityV2;
+    }>
+  | Readonly<{
+      readonly kind: 'released';
+      readonly taskId: string;
+      readonly query: ExactDockerCustodyTerminalQueryV2;
+    }>
+  | Readonly<{
+      readonly kind: 'accepted';
+      readonly taskId: string;
+      readonly query: ExactDockerCustodyTerminalQueryV2;
+      readonly accepted: ExactDockerAcceptedResultV2;
+    }>;
+
 export type SpawnBackendRecoveryHoldAuthorityState =
+  | 'ADMISSION_DISCOVERY_REJECTED'
   | 'RESERVED_PENDING_ADMISSION'
   | 'DISPATCH_ABSENT'
   | 'DISPATCH_TRANSITION_PENDING'
@@ -77,6 +110,7 @@ export type SpawnBackendRecoveryHoldAuthorityState =
   | 'RECOVERY_ENTRY_FAILED';
 
 export type SpawnBackendRecoveryHoldReasonCode =
+  | 'DISPATCH_DISCOVERY_TAMPERED_CANDIDATE'
   | 'ADMISSION_RECONCILIATION_REQUIRED'
   | 'PRE_PROVIDER_RECONCILIATION_REQUIRED'
   | 'TERMINAL_RECONCILIATION_REQUIRED'
@@ -90,6 +124,7 @@ export interface SpawnBackendRecoveryHold {
   readonly admissionRefDigest: string | null;
   readonly authorityState: SpawnBackendRecoveryHoldAuthorityState;
   readonly reasonCode: SpawnBackendRecoveryHoldReasonCode;
+  readonly custodyHoldCode?: string;
 }
 
 export class SpawnBackendRecoveryHoldError extends Error {
@@ -215,6 +250,16 @@ export interface ExactDockerCustodyRefV2 extends ExactDockerCustodyIdentityRefV2
   readonly providerStartReceipt: ExactDockerCustodyReceiptRefV2;
 }
 
+/** Exact zero-work terminal that may authorize one later Store generation. */
+export interface ExactDockerNotDispatchedPredecessorV2
+  extends ExactDockerCustodyIdentityRefV2 {
+  readonly zeroWorkReceipt: ExactDockerCustodyReceiptRefV2;
+}
+
+export type ExactDockerCustodyPredecessorV2 =
+  | ExactDockerCustodyRefV2
+  | ExactDockerNotDispatchedPredecessorV2;
+
 /**
  * Logical producer material only. T5/Store, never the producer, allocates the
  * custody attempt/generation/admission timestamp and predecessor identity.
@@ -235,6 +280,8 @@ export interface PrepareExactDockerCustodyInputV2 {
   readonly model: ModelType;
   readonly execution: ExactDockerCustodyExecutionMaterialV2;
   readonly predecessor: ExactDockerCustodyRefV2 | null;
+  /** Mutually exclusive zero-work predecessor for one Store-owned later generation. */
+  readonly zeroWorkPredecessor?: ExactDockerNotDispatchedPredecessorV2;
 }
 
 export interface ExactDockerCustodyAdmissionRefV2 {
@@ -504,6 +551,17 @@ export interface SpawnBackend {
   readExactDockerAcceptedResult?(
     reader: ExactDockerAcceptedResultReaderV2,
   ): ExactDockerAcceptedResultV2;
+
+  settleExactDockerAcceptedResult?(
+    reader: ExactDockerAcceptedResultReaderV2,
+    expectedAcceptedAuthority: ExactAcceptedTaskResultAuthorityMetadata,
+  ): Promise<SettleExactAcceptedResultOutcome>;
+
+  readExactDockerAcceptedTaskTerminalAuthority?(input: Readonly<{
+    readonly expectedAcceptedAuthority: ExactAcceptedTaskResultAuthorityMetadata;
+    readonly expectedTerminalAuthority: ExactAcceptedResultTerminalAuthorityV2;
+    readonly reader?: ExactDockerAcceptedResultReaderV2;
+  }>): ExactAcceptedTaskTerminalAuthorityRead;
 
   /**
    * Kill a running worker by task ID.
@@ -1216,6 +1274,9 @@ export class SpawnBackendFactory {
         catalogMountMask: effectiveConfig?.prompt?.catalog_mount_mask,
         codexCoreChannel: effectiveConfig?.prompt?.codex_core_channel,
         codexSuppressProjectDoc: effectiveConfig?.prompt?.codex_suppress_project_doc,
+        productionWiringHostObserverFactory: ({ projectRoot, image, platform }) => (
+          createExactProductionWiringHostObserver({ projectRoot, image, platform })
+        ),
       });
     }
 

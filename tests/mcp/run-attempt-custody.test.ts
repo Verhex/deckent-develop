@@ -207,6 +207,61 @@ describe('deckent_run MCP — exact attempt custody surface', () => {
     expect(harness.writeJobState).not.toHaveBeenCalled();
   });
 
+  it('returns reconciliation-required with its exact receipt instead of calling it zero work', async () => {
+    harness.execute.mockImplementationOnce(async (input: any) => ({
+      disposition: {
+        kind: 'ambiguous',
+        taskId: input.task.id,
+        reasonCode: 'EXACT_DISPATCH_OUTCOME_AMBIGUOUS',
+        executionMode: 'normal-docker-exact',
+        executionBackend: 'docker',
+      },
+      executionMode: 'normal-docker-exact',
+      backend: 'docker',
+      provider: input.task.provider,
+      invocation: {
+        receiptRef: {
+          schemaVersion: 1,
+          invocationId: `reconcile:${input.task.id}`,
+          tenantId: 'local',
+          projectId: 'test-project',
+        },
+        executionBackend: 'docker',
+        transport: 'mcp',
+        state: 'reconciliation-required',
+        executionMode: 'normal-docker-exact',
+        reasonCode: 'EXACT_DISPATCH_OUTCOME_AMBIGUOUS',
+        authorityEvidenceRefs: [
+          'reconciliation-receipt:mcp-fixture',
+          `sha256:${'c'.repeat(64)}`,
+        ],
+      },
+    }));
+    const { registerRunTool } = await import('../../src/mcp/tools/run.js');
+    const server = serverFixture();
+    registerRunTool(server as never);
+
+    const response = await server.tools.get('deckent_run')!({
+      description: 'must reconcile',
+      model: 'claude-sonnet-5',
+      autoApprove: true,
+    });
+    const body = JSON.parse(response.content[0]!.text) as Record<string, any>;
+
+    expect(response.isError).toBe(true);
+    expect(body).toMatchObject({
+      code: 'TASK_INGRESS_RECONCILIATION_REQUIRED',
+      disposition: 'ambiguous',
+      executionMode: 'normal-docker-exact',
+      invocation: {
+        state: 'reconciliation-required',
+        receiptRef: { invocationId: expect.stringMatching(/^reconcile:/) },
+        authorityEvidenceRefs: [expect.any(String), expect.any(String)],
+      },
+    });
+    expect(harness.writeJobState).not.toHaveBeenCalled();
+  });
+
   it('serializes receipt authority when admission throws before dispatch', async () => {
     const error = new Error('provider authority unavailable') as Error & Record<string, unknown>;
     error.taskIngressAuthority = {

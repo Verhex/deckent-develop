@@ -41,8 +41,10 @@ import { SPRINT_TERMINAL_PUBLICATION_VERSION } from '../core/sprint-terminal-pub
 import type { SprintTerminalReceiptV1 } from '../core/sprint-terminal-publication.js';
 import {
   evaluationAuditPath,
+  type ExactAcceptedTaskTerminalAuthorityRead,
   type EvaluationAuditRecord,
 } from './evaluation-audit-trail.js';
+import type { ExactAcceptedResultTerminalAuthorityV2 } from './exact-accepted-result-terminal-authority.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
 import { debugLog, readJsonSafe, updateLastSprintId } from '../core/utils.js';
@@ -60,7 +62,7 @@ import type { ProviderAdapter } from '../core/provider.js';
 import { providerRegistry } from '../core/provider.js';
 
 // ─── Spawn backend abstraction ───────────────────────────────────
-import type { SpawnBackend } from './spawn-backend.js';
+import type { SpawnBackend, SpawnBackendRecoveryReport } from './spawn-backend.js';
 import { SpawnBackendFactory, SpawnBackendRecoveryHoldError } from './spawn-backend.js';
 import { DockerSpawnBackend } from './spawn-backend-docker.js';
 
@@ -157,7 +159,12 @@ import { createResourceMonitor } from './resource-monitor.js';
 import type { ResourceMonitor, ResourceMonitorOpts } from './resource-monitor.js';
 
 // ─── Sprint Checkpoint (phase-transition auto-checkpoint) ────────
-import { writePhaseCheckpoint, restoreSprintFromCheckpoint } from './sprint-checkpoint.js';
+import {
+  readCheckpoint,
+  writePhaseCheckpoint,
+  restoreSprintFromCheckpoint,
+} from './sprint-checkpoint.js';
+import { terminalizeCompletedCheckpointRun } from './completed-checkpoint-terminalizer.js';
 
 // ─── Event Bus (nervous system lifecycle hooks) ─────────────────
 import { eventBus } from './event-bus.js';
@@ -186,7 +193,8 @@ import { resetDashboard, updateDashboard } from '../monitor/auditor.js';
 import {
   BrainError,
   setActiveSprint, clearActiveSprint, safeDashboardUpdate,
-  waitForHumanApproval, pauseSprint,
+  waitForHumanApproval, pauseSprint, pauseSprintExact,
+  prepareExactSprintLifecycle,
 } from './sprint-lifecycle.js';
 import { getMessage } from '../cli/helpers/messages.js';
 import { detectLang } from '../cli/helpers/i18n.js';
@@ -223,7 +231,8 @@ export { spawnWorkers, respawnEligibleTasks, validateTaskDependencies, routeSpri
 // --- sprint-lifecycle.ts ---
 export {
   BrainError, setActiveSprint, clearActiveSprint, resetInterruptState,
-  isInterrupted, interruptActiveSprint, cleanup, pauseSprint, resumeSprint,
+  isInterrupted, interruptActiveSprint, cleanup, pauseSprint, pauseSprintExact,
+  resumeSprint, resumeSprintExact, prepareExactSprintLifecycle,
   waitForHumanApproval, safeDashboardUpdate,
 } from './sprint-lifecycle.js';
 export type { PauseState, CheckpointPhase } from './sprint-lifecycle.js';
@@ -306,19 +315,15 @@ export function resolveRepairQuiescence(
     ).length,
     authorizedRepairDecisions: openRecords.length,
   });
-  // Only never-dispatched admissions block here: they are the acceptance's exact
-  // concern ("dispatched before quiescence") and they are still drainable. An
-  // attempt that was dispatched but never settled cannot make progress by
-  // draining; it belongs to the existing lineage/circuit-breaker gates, which
-  // receive this snapshot and settle it into a resumable typed PAUSE instead of
-  // stranding the run outside the recovery path.
-  if (snapshot.pendingAdmittedRepairs === 0) {
+  // Quiescence means no unsettled admission at all. A dispatched repair is
+  // still active custody, not permission to close the run around it.
+  if (snapshot.authorizedRepairDecisions === 0) {
     return { kind: 'QUIESCENT', snapshot };
   }
   return {
     kind: 'DRAIN_REQUIRED',
     reason: 'ADMITTED_REPAIR_QUEUE_NOT_DRAINED',
-    pendingQueueCount: snapshot.pendingAdmittedRepairs,
+    pendingQueueCount: snapshot.authorizedRepairDecisions,
     snapshot,
     message: getMessage('repair.quiescence_drain_blocked', lang, {
       count: String(snapshot.authorizedRepairDecisions),
@@ -817,12 +822,13 @@ export function decidePromptGateBlock(
  */
 export async function reconcileSpawnBackendBeforeRestore(
   spawnBackend: SpawnBackend | undefined,
-): Promise<void> {
-  if (!spawnBackend?.reconcilePendingAttempts) return;
+): Promise<SpawnBackendRecoveryReport | null> {
+  if (!spawnBackend?.reconcilePendingAttempts) return null;
   const report = await spawnBackend.reconcilePendingAttempts();
   if (report.held && report.held.length > 0) {
     throw new SpawnBackendRecoveryHoldError(report.held);
   }
+  return report;
 }
 
 // ═══ RunSprintOptions ═════════════════════════════════════════════
@@ -1021,6 +1027,7 @@ export function wireHandoffsForCompletedTasks(
   projectRoot: string,
   sprint: Sprint,
   results: TaskResult[],
+  exactDockerRegistry?: ExactNormalDockerExecutionRegistryV2,
 ): void {
   if (!sprint.tasks || sprint.tasks.length === 0) return;
 
@@ -1035,8 +1042,19 @@ export function wireHandoffsForCompletedTasks(
     }
   }
 
-  for (const result of results) {
-    if (result.selfAssessment === 'NO_GO') continue;
+  for (const collectedResult of results) {
+    let result = collectedResult;
+    if (exactDockerRegistry?.isExactTask(collectedResult.taskId)) {
+      const terminal = exactDockerRegistry.readExactTerminalAuthority(collectedResult.taskId);
+      if (terminal.state !== 'current') {
+        throw new DeckentError(
+          'DECKENT_E077',
+          `EXACT_HANDOFF_TERMINAL_AUTHORITY_HOLD:${collectedResult.taskId}:${terminal.reasonCode}`,
+        );
+      }
+      if (terminal.evaluationReceipt.verdict === 'NO_GO') continue;
+      result = terminal.projectedResult;
+    } else if (result.selfAssessment === 'NO_GO') continue;
     const artifacts = (result.filesChanged ?? []).filter(Boolean);
     if (artifacts.length === 0) continue;
     const dependents = dependentsOf.get(result.taskId) ?? [];
@@ -1229,6 +1247,10 @@ export async function waitForResults(
   const collectorSpawnOpts = spawnOpts?.exactDockerRegistry
     ? {
         ...spawnOpts,
+        settleExactAcceptedResult:
+          spawnOpts.exactDockerRegistry.settleExactAcceptedResult,
+        revalidateExactAcceptedResultTerminalAuthority:
+          spawnOpts.exactDockerRegistry.revalidateExactAcceptedResultTerminalAuthority,
         readTaskResultAuthority: (taskId: string) =>
           spawnOpts.exactDockerRegistry!.readTaskResultAuthority(taskId),
         ipcExecutionMode: 'normal-docker' as const,
@@ -1247,6 +1269,122 @@ export async function waitForResults(
       config,
     ),
   );
+}
+
+function snapshotExactTerminalAuthorities(
+  registry: ExactNormalDockerExecutionRegistryV2,
+): ReadonlyMap<string, ExactAcceptedTaskTerminalAuthorityRead> {
+  const snapshot = registry.snapshotExactTerminalAuthorities();
+  const current = new Map<string, ExactAcceptedTaskTerminalAuthorityRead>();
+  for (const [taskId, authority] of snapshot) {
+    if (authority.state === 'current') {
+      current.set(taskId, authority);
+      continue;
+    }
+    const resultAuthority = registry.readTaskResultAuthority(taskId);
+    if (resultAuthority.state === 'authority-hold') {
+      throw new DeckentError(
+        'DECKENT_E077',
+        `EXACT_TERMINAL_AUTHORITY_HOLD:${taskId}:${authority.reasonCode}`,
+      );
+    }
+  }
+  return current;
+}
+
+function snapshotExactCheckpointAuthorities(
+  registry: ExactNormalDockerExecutionRegistryV2,
+  sprint: Sprint,
+): ReadonlyMap<string, ExactAcceptedResultTerminalAuthorityV2> {
+  const checkpointAuthorities = new Map<string, ExactAcceptedResultTerminalAuthorityV2>();
+  for (const [taskId, authority] of snapshotExactTerminalAuthorities(registry)) {
+    if (authority.state === 'current') {
+      checkpointAuthorities.set(taskId, authority.terminalAuthority);
+    }
+  }
+  for (const task of sprint.tasks) {
+    const terminal = task.status === TaskStatus.DONE || task.status === TaskStatus.NO_GO;
+    if (terminal && registry.isExactTask(task.id) && !checkpointAuthorities.has(task.id)) {
+      throw new DeckentError(
+        'DECKENT_E077',
+        `EXACT_CHECKPOINT_TERMINAL_AUTHORITY_MISSING:${task.id}`,
+      );
+    }
+  }
+  return checkpointAuthorities;
+}
+
+function writeExactPhaseCheckpoint(
+  projectRoot: string,
+  sprint: Sprint,
+  registry: ExactNormalDockerExecutionRegistryV2,
+): void {
+  writePhaseCheckpoint(
+    projectRoot,
+    sprint,
+    sprint.phase,
+    undefined,
+    undefined,
+    snapshotExactCheckpointAuthorities(registry, sprint),
+  );
+}
+
+function exactTaskRequiresTerminalAuthority(
+  registry: ExactNormalDockerExecutionRegistryV2,
+  taskId: string,
+): boolean {
+  return registry.isExactTask(taskId)
+    && registry.readTaskResultAuthority(taskId).state !== 'not-dispatched';
+}
+
+function seedExactNotDispatchedEvaluations(
+  sprint: Sprint,
+  evaluations: Map<string, TaskEvaluation>,
+  registry: ExactNormalDockerExecutionRegistryV2,
+): void {
+  for (const task of sprint.tasks) {
+    if (
+      registry.isExactTask(task.id)
+      && registry.readTaskResultAuthority(task.id).state === 'not-dispatched'
+    ) {
+      evaluations.set(task.id, TaskEvaluation.NOT_DISPATCHED);
+      task.status = TaskStatus.PAUSED;
+    }
+  }
+}
+
+/** @internal Exported for cold-restart fan-in behavior tests. */
+export async function settleRecoveredExactTerminalAuthorities(
+  registry: ExactNormalDockerExecutionRegistryV2,
+): Promise<void> {
+  const recoveredTaskIds = [...registry.snapshotExactTerminalAuthorities().keys()];
+  for (const taskId of recoveredTaskIds) {
+    const resultAuthority = await registry.awaitTaskResultAuthority(taskId);
+    if (resultAuthority.state === 'not-dispatched') continue;
+    if (resultAuthority.state === 'exact-accepted' && resultAuthority.exactAcceptedAuthority) {
+      const settled = await registry.settleExactAcceptedResult({
+        acceptedAuthority: resultAuthority.exactAcceptedAuthority,
+      });
+      if (settled.state !== 'settled') {
+        throw new DeckentError(
+          'DECKENT_E077',
+          `EXACT_RECOVERY_TERMINAL_SETTLEMENT_HOLD:${taskId}:${settled.state}`,
+        );
+      }
+      const current = registry.readExactTerminalAuthority(taskId);
+      if (current.state !== 'current') {
+        throw new DeckentError(
+          'DECKENT_E077',
+          `EXACT_RECOVERY_TERMINAL_REVALIDATION_HOLD:${taskId}:${current.reasonCode}`,
+        );
+      }
+      continue;
+    }
+    throw new DeckentError(
+      'DECKENT_E077',
+      `EXACT_RECOVERY_ATTEMPT_HOLD:${taskId}:${resultAuthority.state}`,
+    );
+  }
 }
 
 /**
@@ -1470,6 +1608,55 @@ export async function retryEvaluateIfEmpty(
  * Returns true when the sprint was paused after FIX exhaustion (caller skips
  * RETRO/CLEANUP and preserves recovery evidence).
  */
+export interface CircuitBreakerTaskEvidence {
+  readonly result: TaskResult | undefined;
+  readonly policyTerminal: boolean;
+}
+
+/**
+ * Resolve circuit-breaker predicates without letting worker-writable public
+ * result bytes shape an exact task. Legacy tasks retain their historical file
+ * projection; exact tasks use only registry/Store-revalidated authority.
+ * @internal Exported for tamper-regression behavior tests.
+ */
+export function resolveCircuitBreakerTaskEvidence(
+  projectRoot: string,
+  taskId: string,
+  exactDockerRegistry?: ExactNormalDockerExecutionRegistryV2,
+): CircuitBreakerTaskEvidence {
+  if (!exactDockerRegistry?.isExactTask(taskId)) {
+    const result = readJsonSafe<TaskResult>(
+      join(projectRoot, TASKS_DIR, `task-${taskId}.result`),
+    ) ?? undefined;
+    return {
+      result,
+      policyTerminal: isPolicyTerminalPreDispatchResult(result),
+    };
+  }
+
+  const resultAuthority = exactDockerRegistry.readTaskResultAuthority(taskId);
+  if (resultAuthority.state === 'not-dispatched') {
+    return { result: undefined, policyTerminal: true };
+  }
+  if (resultAuthority.state !== 'exact-accepted') {
+    throw new DeckentError(
+      'DECKENT_E077',
+      `EXACT_CIRCUIT_BREAKER_ATTEMPT_HOLD:${taskId}:${resultAuthority.state}`,
+    );
+  }
+  const terminal = exactDockerRegistry.readExactTerminalAuthority(taskId);
+  if (terminal.state !== 'current' || terminal.projectedResult.taskId !== taskId) {
+    throw new DeckentError(
+      'DECKENT_E077',
+      `EXACT_CIRCUIT_BREAKER_TERMINAL_HOLD:${taskId}:${terminal.state === 'current' ? 'task-mismatch' : terminal.reasonCode}`,
+    );
+  }
+  return {
+    result: terminal.projectedResult,
+    policyTerminal: isPolicyTerminalPreDispatchResult(terminal.projectedResult),
+  };
+}
+
 export function applyCascadeCircuitBreaker(
   projectRoot: string,
   sprint: Sprint,
@@ -1477,13 +1664,15 @@ export function applyCascadeCircuitBreaker(
   policy: FixCircuitBreakerConfig = DEFAULT_FIX_CIRCUIT_BREAKER_CONFIG,
   lang = 'en',
   quiescence?: RepairQuiescenceOutcome,
+  exactDockerRegistry?: ExactNormalDockerExecutionRegistryV2,
 ): boolean {
   if (!pauseAllowedByRepairQuiescence(quiescence)) return false;
+  const evidenceByTaskId = new Map(sprint.tasks.map(task => [
+    task.id,
+    resolveCircuitBreakerTaskEvidence(projectRoot, task.id, exactDockerRegistry),
+  ]));
   const eligibleRootTasks = sprint.tasks.filter(task => {
-    const result = readJsonSafe<TaskResult>(
-      join(projectRoot, TASKS_DIR, `task-${task.id}.result`),
-    );
-    return result?.cascadeSkipped !== true;
+    return evidenceByTaskId.get(task.id)?.result?.cascadeSkipped !== true;
   });
   const redispatchAttemptedIds = new Set(
     eligibleRootTasks
@@ -1492,9 +1681,7 @@ export function applyCascadeCircuitBreaker(
   );
   const policyTerminalIds = new Set(
     eligibleRootTasks
-      .filter(task => isPolicyTerminalPreDispatchResult(readJsonSafe<TaskResult>(
-        join(projectRoot, TASKS_DIR, `task-${task.id}.result`),
-      ) ?? undefined))
+      .filter(task => evidenceByTaskId.get(task.id)?.policyTerminal === true)
       .map(task => task.id),
   );
   // Truth-normalizasyonu (3301): policy-terminal pre-dispatch sonucun tek dürüst
@@ -1536,7 +1723,13 @@ export function applyCascadeCircuitBreaker(
         ratioThreshold: String(policy.min_unresolved_ratio_percent),
       });
   debugLog('runSprint:fix-circuit-breaker', reason);
-  pauseSprint(projectRoot, sprint, reason, 'post-fix-unresolved-lineages');
+  pauseSprint(
+    projectRoot,
+    sprint,
+    reason,
+    'post-fix-unresolved-lineages',
+    exactDockerRegistry,
+  );
   try {
     writeEvent(
       projectRoot,
@@ -1568,13 +1761,15 @@ export function applyUnresolvedLineageOperatorHold(
   policy: FixCircuitBreakerConfig = DEFAULT_FIX_CIRCUIT_BREAKER_CONFIG,
   lang = 'en',
   quiescence?: RepairQuiescenceOutcome,
+  exactDockerRegistry?: ExactNormalDockerExecutionRegistryV2,
 ): boolean {
   if (!pauseAllowedByRepairQuiescence(quiescence)) return false;
+  const evidenceByTaskId = new Map(sprint.tasks.map(task => [
+    task.id,
+    resolveCircuitBreakerTaskEvidence(projectRoot, task.id, exactDockerRegistry),
+  ]));
   const eligibleRootTasks = sprint.tasks.filter(task => {
-    const result = readJsonSafe<TaskResult>(
-      join(projectRoot, TASKS_DIR, `task-${task.id}.result`),
-    );
-    return result?.cascadeSkipped !== true;
+    return evidenceByTaskId.get(task.id)?.result?.cascadeSkipped !== true;
   });
   const redispatchAttemptedIds = new Set(
     eligibleRootTasks
@@ -1583,9 +1778,7 @@ export function applyUnresolvedLineageOperatorHold(
   );
   const policyTerminalIds = new Set(
     eligibleRootTasks
-      .filter(task => isPolicyTerminalPreDispatchResult(readJsonSafe<TaskResult>(
-        join(projectRoot, TASKS_DIR, `task-${task.id}.result`),
-      ) ?? undefined))
+      .filter(task => evidenceByTaskId.get(task.id)?.policyTerminal === true)
       .map(task => task.id),
   );
   // Truth-normalizasyonu (3301): policy-terminal pre-dispatch sonucun tek dürüst
@@ -1607,7 +1800,13 @@ export function applyUnresolvedLineageOperatorHold(
   const reason = getMessage('pause.unresolved_lineage_operator_decision_reason', lang, {
     unresolvedTasks: decision.unresolvedTaskIds.join(', '),
   });
-  pauseSprint(projectRoot, sprint, reason, 'unresolved-lineage-operator-decision');
+  pauseSprint(
+    projectRoot,
+    sprint,
+    reason,
+    'unresolved-lineage-operator-decision',
+    exactDockerRegistry,
+  );
   try {
     writeEvent(
       projectRoot,
@@ -2078,7 +2277,11 @@ export async function runSprint(
         dockerTimeoutSeconds: config.docker_timeout,
         dockerMemoryLimit: config.worker_memory_limit,
       });
-  await reconcileSpawnBackendBeforeRestore(recoveryBackend);
+  const recoveryReport = await reconcileSpawnBackendBeforeRestore(recoveryBackend);
+  if (recoveryReport) {
+    exactDockerRegistry.rehydrateRecovery(recoveryReport, recoveryBackend);
+    await settleRecoveredExactTerminalAuthorities(exactDockerRegistry);
+  }
 
   // ═══ State Recovery on Brain Restart (Sprint 162 — Task T-004) ════
   // Pair with T-002 (checkpoint loop) and T-001 (exception handler).
@@ -2092,15 +2295,30 @@ export async function runSprint(
     const prevState = readSprintState(projectRoot);
     const prevSprintId = prevState?.sprintId;
     if (prevSprintId) {
-      const recovery = restoreSprintFromCheckpoint(projectRoot, prevSprintId);
+      const recovery = restoreSprintFromCheckpoint(projectRoot, prevSprintId, {
+        terminalAuthorities: snapshotExactTerminalAuthorities(exactDockerRegistry),
+        isExactTask: (taskId: string) => exactDockerRegistry.isExactTask(taskId),
+      });
       if (recovery.restored) {
         if (recovery.action === 'complete') {
           emitSprintEvent('SPRINT_RESUME_COMPLETE', { sprintId: prevSprintId });
-          const completed = recovery.restoredSprint!;
-          completed.completedAt = now();
+          const checkpoint = readCheckpoint(projectRoot, prevSprintId);
+          if (!checkpoint) {
+            throw new DeckentError(
+              'DECKENT_E077',
+              `COMPLETED_CHECKPOINT_RECOVERY_AUTHORITY_MISSING:${prevSprintId}`,
+            );
+          }
+          const completed = await terminalizeCompletedCheckpointRun(
+            projectRoot,
+            checkpoint,
+            config,
+            checkpoint.executionMode,
+            ({ taskId }) => exactDockerRegistry.readExactTerminalAuthority(taskId),
+            (taskId: string) => exactDockerRegistry.isExactTask(taskId),
+          );
           releaseSprintLock(projectRoot);
           clearActiveSprint();
-          clearSprintState(projectRoot);
           return completed;
         }
         if (recovery.action === 'resume-evaluate') {
@@ -2117,7 +2335,14 @@ export async function runSprint(
           isResumeEvaluate = true;
           recoveredSprint = recovery.restoredSprint ?? null;
           if (recoveredSprint) {
+            const exactRecoveryAuthorities = snapshotExactTerminalAuthorities(exactDockerRegistry);
             for (const t of recoveredSprint.tasks) {
+              const exactAuthority = exactRecoveryAuthorities.get(t.id);
+              if (exactAuthority?.state === 'current') {
+                resumeResults.push(exactAuthority.projectedResult);
+                continue;
+              }
+              if (exactDockerRegistry.isExactTask(t.id)) continue;
               const authority = readAuthoritativeTaskResult<TaskResult>(projectRoot, t.id);
               const r = normalizeTaskResultShape(authority.result);
               if (r) resumeResults.push(r);
@@ -2477,7 +2702,13 @@ export async function runSprint(
       });
       let pausePublicationError: unknown = null;
       try {
-        pauseSprint(projectRoot, sprint, routingFailure, 'provider-routing-hold');
+        await pauseSprintExact(
+          projectRoot,
+          sprint,
+          routingFailure,
+          'provider-routing-hold',
+          exactDockerRegistry,
+        );
         emitSprintEvent('SPRINT_PAUSED', {
           sprintId: sprint.id,
           reason: 'provider-routing-hold',
@@ -2511,7 +2742,10 @@ export async function runSprint(
     }
 
     // Phase-transition checkpoint: PLAN complete
-    try { writePhaseCheckpoint(projectRoot, sprint, sprint.phase); } catch (e) { debugLog('runSprint:checkpoint:plan', e); }
+    try { writeExactPhaseCheckpoint(projectRoot, sprint, exactDockerRegistry); } catch (e) {
+      if (e instanceof DeckentError && e.code === 'DECKENT_E077') throw e;
+      debugLog('runSprint:checkpoint:plan', e);
+    }
 
     // Nervous System: PLAN→SPAWN + SPRINT_STARTED
     emitPhaseChange(SprintPhase.PLAN, SprintPhase.SPAWN, sprint.id);
@@ -2597,7 +2831,10 @@ export async function runSprint(
     } catch (e) { debugLog('runSprint:wireAssignedWorker', e); }
 
     // Phase-transition checkpoint: SPAWN complete
-    try { writePhaseCheckpoint(projectRoot, sprint, sprint.phase); } catch (e) { debugLog('runSprint:checkpoint:spawn', e); }
+    try { writeExactPhaseCheckpoint(projectRoot, sprint, exactDockerRegistry); } catch (e) {
+      if (e instanceof DeckentError && e.code === 'DECKENT_E077') throw e;
+      debugLog('runSprint:checkpoint:spawn', e);
+    }
 
     // Nervous System: SPAWN→EXECUTE
     emitPhaseChange(SprintPhase.SPAWN, SprintPhase.EXECUTE, sprint.id);
@@ -2726,7 +2963,10 @@ export async function runSprint(
         config,
       );
     } catch (err) {
-      if (err instanceof ProviderExecutionIngressHoldError) throw err;
+      if (
+        err instanceof ProviderExecutionIngressHoldError
+        || (err instanceof DeckentError && err.code === 'DECKENT_E077')
+      ) throw err;
       // EXECUTE-ERROR-SURFACE (born-453, sprint-351 live case — sibling of the
       // 350-002 finalize fix): this catch used to swallow a mid-EXECUTE throw
       // into a dashboard line that the COMPLETE-time dashboard overwrite then
@@ -2749,11 +2989,15 @@ export async function runSprint(
       const preGraceCollectedIds = new Set(results.map(r => r.taskId));
       for (const task of sprint.tasks) {
         if (preGraceCollectedIds.has(task.id)) continue;
+        if (exactDockerRegistry.isExactTask(task.id)) continue;
         const authority = readAuthoritativeTaskResult<TaskResult>(projectRoot, task.id);
         const lateResult = normalizeTaskResultShape(authority.result);
         if (lateResult) results.push(lateResult);
       }
-    } catch (e) { debugLog('postCollect:main', e); }
+    } catch (e) {
+      if (e instanceof DeckentError && e.code === 'DECKENT_E077') throw e;
+      debugLog('postCollect:main', e);
+    }
 
     // MASTER-PLAN 664/665: a single unsettled Docker attempt used to abort the
     // WHOLE run here, so healthy independent tasks in later waves never ran
@@ -2765,11 +3009,16 @@ export async function runSprint(
     // never authoritative.
     try {
       await reconcileSpawnBackendBeforeRestore(spawnBackend);
-    } catch (e) { debugLog('postCollect:reconcile', e); }
+    } catch (e) {
+      if (e instanceof SpawnBackendRecoveryHoldError) throw e;
+      debugLog('postCollect:reconcile', e);
+    }
 
     assertTaskResultAuthoritiesReady(
       projectRoot,
-      sprint.tasks.map(task => task.id),
+      sprint.tasks
+        .filter(task => !exactDockerRegistry.isExactTask(task.id))
+        .map(task => task.id),
       'post-collect',
     );
 
@@ -2779,6 +3028,7 @@ export async function runSprint(
       const staleWorkers: Task[] = [];
       for (const t of sprint.tasks) {
         if (collectedIds.has(t.id)) continue;
+        if (exactDockerRegistry.isExactTask(t.id)) continue;
         const hbPath = join(projectRoot, TASKS_DIR, `task-${t.id}.hb`);
         const resultAuthority = readAuthoritativeTaskResult<TaskResult>(projectRoot, t.id);
         const hbExists = await stat(hbPath).then(() => true, () => false);
@@ -2953,7 +3203,10 @@ export async function runSprint(
           }
         }
       }
-    } catch (e) { debugLog('graceKill:main', e); }
+    } catch (e) {
+      if (e instanceof DeckentError && e.code === 'DECKENT_E077') throw e;
+      debugLog('graceKill:main', e);
+    }
 
     // Results discovered outside the collector callback (post-collect,
     // controller grace and synthetic kill settlement) cross the identical
@@ -2961,6 +3214,7 @@ export async function runSprint(
     // A missing receipt is a hard HOLD: no raw worker claim is publishable.
     for (const result of results) {
       if (evaluations.has(result.taskId)) continue;
+      if (exactDockerRegistry.isExactTask(result.taskId)) continue;
       const task = sprint.tasks.find(candidate => candidate.id === result.taskId);
       if (!task) {
         throw new DeckentError(
@@ -2973,11 +3227,17 @@ export async function runSprint(
 
     // Wire handoffs for completed tasks → dependent tasks (EXECUTE/WAVE_BUILD transition)
     try {
-      wireHandoffsForCompletedTasks(projectRoot, sprint, results);
-    } catch (e) { debugLog('runSprint:wireHandoffs', e); }
+      wireHandoffsForCompletedTasks(projectRoot, sprint, results, exactDockerRegistry);
+    } catch (e) {
+      if (e instanceof DeckentError && e.code === 'DECKENT_E077') throw e;
+      debugLog('runSprint:wireHandoffs', e);
+    }
 
     // Phase-transition checkpoint: EXECUTE complete
-    try { writePhaseCheckpoint(projectRoot, sprint, sprint.phase); } catch (e) { debugLog('runSprint:checkpoint:execute', e); }
+    try { writeExactPhaseCheckpoint(projectRoot, sprint, exactDockerRegistry); } catch (e) {
+      if (e instanceof DeckentError && e.code === 'DECKENT_E077') throw e;
+      debugLog('runSprint:checkpoint:execute', e);
+    }
 
     // Nervous System: EXECUTE→EVALUATE
     emitPhaseChange(SprintPhase.EXECUTE, SprintPhase.EVALUATE, sprint.id);
@@ -2999,6 +3259,7 @@ export async function runSprint(
     const collectedResultIds = new Set(results.map(r => r.taskId));
     for (const t of sprint.tasks) {
       if (collectedResultIds.has(t.id)) continue;
+      if (exactDockerRegistry.isExactTask(t.id)) continue;
       const resultAuthority = readAuthoritativeTaskResult<TaskResult>(projectRoot, t.id);
       if (resultAuthority.result) continue;
       const hbPath = join(projectRoot, TASKS_DIR, `task-${t.id}.hb`);
@@ -3031,7 +3292,9 @@ export async function runSprint(
   // EVALUATE only for tasks that still need a missing/deferred branch.
   const aggregateCrossVerifyInvocationFactory =
     await ensureCrossVerifyInvocationFactory();
+  seedExactNotDispatchedEvaluations(sprint, evaluations, exactDockerRegistry);
   if (evaluations.size < sprint.tasks.length) {
+    const exactTerminalAuthorities = snapshotExactTerminalAuthorities(exactDockerRegistry);
     await runEvaluatePhase(
       projectRoot, sprint, results, evaluations, config.coverage_hard_floor,
       config, undefined, deferredTaskIds, {
@@ -3042,6 +3305,10 @@ export async function runSprint(
         crossVerifyInvocationFactory: aggregateCrossVerifyInvocationFactory,
         skipPreviouslyEvaluated: true,
         runtimeState: evaluationRuntimeState,
+        exactTerminalAuthorities,
+        isExactTaskAuthority: (taskId: string) => exactDockerRegistry.isExactTask(taskId),
+        requireExactTerminalAuthority: (taskId: string) =>
+          exactTaskRequiresTerminalAuthority(exactDockerRegistry, taskId),
       },
     );
   }
@@ -3081,7 +3348,13 @@ export async function runSprint(
         },
       ))
       .join(' ');
-    pauseSprint(projectRoot, sprint, reason, 'provider-execution-hold');
+    await pauseSprintExact(
+      projectRoot,
+      sprint,
+      reason,
+      'provider-execution-hold',
+      exactDockerRegistry,
+    );
     emitSprintEvent('SPRINT_PAUSED', {
       sprintId: sprint.id,
       reason: 'provider-execution-hold',
@@ -3157,7 +3430,10 @@ export async function runSprint(
   }
 
   // Phase-transition checkpoint: EVALUATE complete
-  try { writePhaseCheckpoint(projectRoot, sprint, sprint.phase); } catch (e) { debugLog('runSprint:checkpoint:evaluate', e); }
+  try { writeExactPhaseCheckpoint(projectRoot, sprint, exactDockerRegistry); } catch (e) {
+    if (e instanceof DeckentError && e.code === 'DECKENT_E077') throw e;
+    debugLog('runSprint:checkpoint:evaluate', e);
+  }
 
   // Nervous System: EVALUATE→FIX
   emitPhaseChange(SprintPhase.EVALUATE, SprintPhase.FIX, sprint.id);
@@ -3187,10 +3463,14 @@ export async function runSprint(
     opts,
     routingVersionForFix,
     spawnBackend,
+    exactDockerRegistry,
   );
 
   // Phase-transition checkpoint: FIX complete
-  try { writePhaseCheckpoint(projectRoot, sprint, sprint.phase); } catch (e) { debugLog('runSprint:checkpoint:fix', e); }
+  try { writeExactPhaseCheckpoint(projectRoot, sprint, exactDockerRegistry); } catch (e) {
+    if (e instanceof DeckentError && e.code === 'DECKENT_E077') throw e;
+    debugLog('runSprint:checkpoint:fix', e);
+  }
 
   // ─── 455-003 (TERMINAL-LIFECYCLE-TRUTH): FIX spawn/preflight failure gate ───
   // If the FIX phase could not even SPAWN a fix worker (docker daemon down /
@@ -3231,11 +3511,12 @@ export async function runSprint(
       // show WHERE it died, and use the same durable continuation authority as
       // cascade pauses (pause-state + checkpoint + notification + status).
       sprint.phase = SprintPhase.FIX;
-      pauseSprint(
+      await pauseSprintExact(
         projectRoot,
         sprint,
         `${fixSpawnFailure.code}: ${fixSpawnFailure.message}`,
         'fix-spawn-failure',
+        exactDockerRegistry,
       );
 
       emitSprintEvent('SPRINT_PAUSED', {
@@ -3303,6 +3584,7 @@ export async function runSprint(
     try { clearPid(projectRoot, sprint.id); } catch (e) { debugLog('runSprint:repair-quiescence:clearPid', e); }
     return sprint;
   }
+  await prepareExactSprintLifecycle(exactDockerRegistry, 'contain');
   if (applyCascadeCircuitBreaker(
     projectRoot,
     sprint,
@@ -3310,6 +3592,7 @@ export async function runSprint(
     fixCircuitPolicy,
     config.language,
     repairQuiescence,
+    exactDockerRegistry,
   ) || applyUnresolvedLineageOperatorHold(
     projectRoot,
     sprint,
@@ -3317,6 +3600,7 @@ export async function runSprint(
     fixCircuitPolicy,
     config.language,
     repairQuiescence,
+    exactDockerRegistry,
   )) {
     if (heartbeatDaemon) {
       try { heartbeatDaemon.stop(); } catch (e) { debugLog('runSprint:post-fix-pause:hb-stop', e); }
@@ -3420,6 +3704,9 @@ export async function runSprint(
     opts?.testMode,
     opts?.flowId,
     true,
+    snapshotExactTerminalAuthorities(exactDockerRegistry),
+    (taskId: string) => exactDockerRegistry.isExactTask(taskId),
+    (taskId: string) => exactTaskRequiresTerminalAuthority(exactDockerRegistry, taskId),
   );
 
   // Nervous System: RETRO complete + RETRO→DECAY

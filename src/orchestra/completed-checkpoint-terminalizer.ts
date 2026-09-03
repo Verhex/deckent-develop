@@ -9,7 +9,15 @@ import {
   type TaskResult,
 } from '../core/types.js';
 import {
+  isCurrentExactAcceptedTaskTerminalAuthorityRead,
+  type ExactAcceptedTaskTerminalAuthorityRead,
+} from './evaluation-audit-trail.js';
+import {
   buildPreplannedResumeSprint,
+  readResumeTaskResultAuthority,
+  resolveCheckpointExactTaskDisposition,
+  type IsCheckpointExactTask,
+  type RevalidateCheckpointExactTerminalAuthority,
   type SprintCheckpoint,
 } from './sprint-checkpoint.js';
 import {
@@ -25,7 +33,6 @@ import {
   resolveSprintTerminalHandoff,
 } from './sprint-controller.js';
 import { runCleanupPhase } from './sprint-phases.js';
-import { readAuthoritativeTaskResult } from './task-result-authority.js';
 import { CHANNELS, writeEvent } from '../core/event-stream.js';
 import { DeckentError } from '../core/errors.js';
 
@@ -53,12 +60,63 @@ function emitRecoveryEvent(
 function completedCheckpointEvidence(
   projectRoot: string,
   sprint: Sprint,
-): { results: TaskResult[]; evaluations: Map<string, TaskEvaluation>; taskCount: number } {
+  checkpoint: SprintCheckpoint,
+  revalidateExactTerminalAuthority?: RevalidateCheckpointExactTerminalAuthority,
+  isExactTask?: IsCheckpointExactTask,
+): {
+  results: TaskResult[];
+  evaluations: Map<string, TaskEvaluation>;
+  exactTerminalAuthorities: ReadonlyMap<string, ExactAcceptedTaskTerminalAuthorityRead>;
+  taskCount: number;
+} {
   const results: TaskResult[] = [];
   const evaluations = new Map<string, TaskEvaluation>();
+  const exactTerminalAuthorities = new Map<string, ExactAcceptedTaskTerminalAuthorityRead>();
+  const checkpointStateById = new Map(
+    (checkpoint.taskStates ?? []).map(state => [state.id, state]),
+  );
   const attemptTasks = loadFinalizerAttemptTasks(projectRoot, sprint);
   for (const task of attemptTasks) {
-    const authority = readAuthoritativeTaskResult<TaskResult>(projectRoot, task.id);
+    const exactTerminalAuthority = checkpointStateById.get(task.id)?.exactTerminalAuthority;
+    if (exactTerminalAuthority !== undefined) {
+      if (!revalidateExactTerminalAuthority) {
+        throw new DeckentError(
+          'E_TERMINALIZATION_EXACT_AUTHORITY_UNAVAILABLE',
+          `TERMINALIZATION_EXACT_AUTHORITY_UNAVAILABLE:${task.id}`,
+        );
+      }
+      const current = revalidateExactTerminalAuthority({
+        taskId: task.id,
+        expectedTerminalAuthority: exactTerminalAuthority,
+      });
+      if (!isCurrentExactAcceptedTaskTerminalAuthorityRead(
+        task.id,
+        exactTerminalAuthority,
+        current,
+      )) {
+        throw new DeckentError(
+          'E_TERMINALIZATION_EXACT_AUTHORITY_STALE',
+          `TERMINALIZATION_EXACT_AUTHORITY_STALE:${task.id}`,
+        );
+      }
+      results.push(current.projectedResult);
+      evaluations.set(task.id, current.evaluationReceipt.verdict as TaskEvaluation);
+      exactTerminalAuthorities.set(task.id, current);
+      continue;
+    }
+    if (resolveCheckpointExactTaskDisposition(task.id, isExactTask) === 'exact') {
+      throw new DeckentError(
+        'E_TERMINALIZATION_EXACT_AUTHORITY_REFERENCE_MISSING',
+        `TERMINALIZATION_EXACT_AUTHORITY_REFERENCE_MISSING:${task.id}`,
+      );
+    }
+    const authority = readResumeTaskResultAuthority(projectRoot, task.id);
+    if (authority.state !== 'terminal') {
+      throw new DeckentError(
+        'E_TERMINALIZATION_RESULT_AUTHORITY_MISSING',
+        `TERMINALIZATION_RESULT_AUTHORITY_MISSING:${task.id}:${authority.state}`,
+      );
+    }
     const result = normalizeTaskResultShape(authority.result);
     if (!result) throw new DeckentError('E_TERMINALIZATION_RESULT_AUTHORITY_MISSING', `TERMINALIZATION_RESULT_AUTHORITY_MISSING:${task.id}:${authority.state}`);
     const recorded = (result as TaskResult & { brainEvaluation?: TaskEvaluation }).brainEvaluation
@@ -75,7 +133,12 @@ function completedCheckpointEvidence(
     results.push(result);
     evaluations.set(task.id, recorded as TaskEvaluation);
   }
-  return { results, evaluations, taskCount: attemptTasks.length };
+  return {
+    results,
+    evaluations,
+    exactTerminalAuthorities,
+    taskCount: attemptTasks.length,
+  };
 }
 
 function testTerminalMetrics(
@@ -116,6 +179,8 @@ export async function terminalizeCompletedCheckpointRun(
   checkpoint: SprintCheckpoint,
   config: ResolvedConfig,
   legacyMode?: 'standard' | 'test',
+  revalidateExactTerminalAuthority?: RevalidateCheckpointExactTerminalAuthority,
+  isExactTask?: IsCheckpointExactTask,
 ): Promise<Sprint> {
   let stage: RecoveryTerminalizationStage = 'initialize';
   emitRecoveryEvent(
@@ -131,7 +196,13 @@ export async function terminalizeCompletedCheckpointRun(
   );
 
   try {
-    const sprint = buildPreplannedResumeSprint(projectRoot, checkpoint, []);
+    const sprint = buildPreplannedResumeSprint(
+      projectRoot,
+      checkpoint,
+      [],
+      revalidateExactTerminalAuthority,
+      isExactTask,
+    );
     const executionMode = checkpoint.executionMode ?? legacyMode;
     if (!executionMode) throw new DeckentError('E_TERMINALIZATION_EXECUTION_MODE_UNAVAILABLE', 'TERMINALIZATION_EXECUTION_MODE_UNAVAILABLE');
     sprint.executionMode = executionMode;
@@ -140,13 +211,21 @@ export async function terminalizeCompletedCheckpointRun(
     sprint.skipCleanup = checkpoint.skipCleanup ?? true;
 
     stage = 'evidence';
-    const { results, evaluations, taskCount } = completedCheckpointEvidence(projectRoot, sprint);
+    const { results, evaluations, exactTerminalAuthorities, taskCount } = completedCheckpointEvidence(
+      projectRoot,
+      sprint,
+      checkpoint,
+      revalidateExactTerminalAuthority,
+      isExactTask,
+    );
     emitRecoveryEvent(
       projectRoot,
       sprint.id,
       CHANNELS.RECOVERY_EVIDENCE_REUSED,
       {
-        source: 'persisted-task-result-and-brain-evaluation',
+        source: checkpoint.taskStates?.some(state => state.exactTerminalAuthority !== undefined)
+          ? 'store-revalidated-exact-terminal-authority'
+          : 'persisted-task-result-and-brain-evaluation',
         taskCount,
         resultCount: results.length,
         evaluationCount: evaluations.size,
@@ -163,12 +242,16 @@ export async function terminalizeCompletedCheckpointRun(
         sprint,
         evaluations,
         results,
-        { defaultAuthMode: config.auth_mode },
+        {
+          defaultAuthMode: config.auth_mode,
+          exactTerminalAuthorities,
+        },
       );
       metrics = testTerminalMetrics(sprint, settlement);
     } else {
       metrics = await finalizeSprint(projectRoot, sprint, evaluations, results, {
         config,
+        exactTerminalAuthorities,
         deferTerminalAuthority: true,
         lifecycleContext: 'completed-checkpoint-recovery',
       });

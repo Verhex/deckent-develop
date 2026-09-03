@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createXVerifyTaskSettlement,
+  parseXVerifyTaskSettlement,
   type CreateXVerifyTaskSettlementInput,
   type XVerifyTaskDispatchOutcome,
 } from '../../src/core/xverify-task-settlement.js';
@@ -168,5 +169,32 @@ describe('XVerify internal task settlement', () => {
     });
     expect(confirmed.noReplay.replayKey).not.toBe(refuted.noReplay.replayKey);
     expect(confirmed.noReplay.replayKey).not.toBe(nextGeneration.noReplay.replayKey);
+  });
+
+  it('round-trips only a byte-semantic valid persisted receipt', () => {
+    const receipt = createXVerifyTaskSettlement({
+      ...base,
+      authorityEvidenceRef: 'owner-live:xverify-tier-authority',
+      dispatchOutcome: adjudicated('confirmed'),
+    });
+    const parsed = parseXVerifyTaskSettlement(JSON.parse(JSON.stringify(receipt)));
+    expect(parsed).toEqual(receipt);
+    expect(Object.isFrozen(parsed)).toBe(true);
+  });
+
+  it.each([
+    ['settlement digest', (receipt: Record<string, unknown>) => {
+      receipt.settlementDigest = `sha256:${'b'.repeat(64)}`;
+    }],
+    ['replay key', (receipt: Record<string, unknown>) => {
+      (receipt.noReplay as Record<string, unknown>).replayKey = `sha256:${'b'.repeat(64)}`;
+    }],
+    ['unknown field', (receipt: Record<string, unknown>) => {
+      receipt.publicResultPath = '.tasks/task-1.result';
+    }],
+  ] as const)('rejects persisted %s tampering', (_label, mutate) => {
+    const receipt = JSON.parse(JSON.stringify(settle(adjudicated('confirmed')))) as Record<string, unknown>;
+    mutate(receipt);
+    expect(parseXVerifyTaskSettlement(receipt)).toBeNull();
   });
 });

@@ -21,7 +21,7 @@ const stripAnsi = (s) =>
   s.replace(/\x1b\][^\x07]*\x07/g, '').replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').replace(/\r/g, '\n');
 
 // ─── Scenario ────────────────────────────────────────────────────────────────
-// A fresh tmp project (no config → English, Ask posture). The mock provider is
+// A fresh tmp project (no config → English, Run posture). The mock provider is
 // never asked anything: every step is a picker interaction.
 const scenarioCwd = mkdtempSync(join(tmpdir(), 'pty-picker-verify-'));
 const mockScript = JSON.stringify([[{ type: 'text-delta', text: 'unused' }, { type: 'done' }]]);
@@ -50,7 +50,7 @@ p.onExit(() => { exited = true; });
 
 // Steps (ms after spawn):
 //   /model⏎ → the model picker · Esc closes it
-//   /term⏎  → the posture picker · ↓ Enter → Run
+//   /term⏎  → the posture picker · ↓ Enter → Control
 //   /approve⏎ → the approval-mode picker · Esc
 //   Ctrl-C ×2 → exit
 const steps = [
@@ -86,8 +86,8 @@ if (!(result.includes('Choose a model') && /\[(current|ok|blocked|unknown)\]/.te
 // (b) while a picker owns stdin the anchor says so (textual carrier)
 if (!result.includes('input paused')) failures.push('(b) "input paused" anchor never rendered');
 // (c) the posture picker applied its pick through the real seam
-if (!(result.includes('Choose the terminal authority posture') && result.includes('terminal mode switched: Run'))) {
-  failures.push('(c) /term picker did not switch the posture to Run');
+if (!(result.includes('Choose the terminal authority posture') && result.includes('terminal mode switched: Control'))) {
+  failures.push('(c) /term picker did not switch the posture from Run to Control');
 }
 // (d) the approval-mode picker opened with its mode meanings
 if (!(result.includes('Choose the approval mode') && result.includes('ask before every tool call'))) {
@@ -104,7 +104,7 @@ if (failures.length === 0) {
   console.log('PASS: Terminal value picker (/model · /term · /approve) real-binary round-trip');
   console.log('  (a) model picker opened with state words');
   console.log('  (b) "input paused" anchor while a picker owns stdin');
-  console.log('  (c) /term picker switched the posture to Run');
+  console.log('  (c) /term picker switched the posture from Run to Control');
   console.log('  (d) /approve picker opened with mode meanings');
   console.log('  (e) no placeholder leaked');
   process.exit(0);

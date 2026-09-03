@@ -6,7 +6,6 @@
 // ─── Node Builtins ─────────────────────────────────────────────────
 import { stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { types as nodeTypes } from 'node:util';
 
 // ─── Observability (Sprint 134) ───────────────────────────────────
 import { metric } from '../core/observability.js';
@@ -92,10 +91,21 @@ import { hasLiveUsageCeiling } from '../core/live-execution-budget.js';
 import {
   readAuthoritativeTaskResult,
   type ExactAcceptedTaskResultAuthorityMetadata,
-  type ExactTaskResultAuthorityMetadata,
   type TaskResultAuthorityRead,
 } from './task-result-authority.js';
-import type { ExactTaskTerminalDecisionAuthorityV2 } from './task-settlement-projection.js';
+import {
+  hasExactAuthorityKeys,
+  isBoundedExactAuthorityPlainData,
+  isExactAcceptedResultTerminalAuthorityV2,
+  type ExactAcceptedResultTerminalAuthorityV2,
+  type RevalidateExactAcceptedResultTerminalAuthority,
+  type SettleExactAcceptedResult,
+} from './exact-accepted-result-terminal-authority.js';
+export type {
+  ExactAcceptedResultTerminalAuthorityV2,
+  RevalidateExactAcceptedResultTerminalAuthority,
+  SettleExactAcceptedResult,
+} from './exact-accepted-result-terminal-authority.js';
 
 // born-611 B-katmanı: soru-köprüsü timeout'u gate'in 5dk insan-penceresiyle hizalı
 // (bridge'in kendi default'u 60sn — insan-karar için kısa; advisor S3).
@@ -1312,374 +1322,6 @@ export function buildSpawnWriteTargets(task: Pick<Task, 'scope'>): string[] {
   return ['.tasks/', ...directories, ...filesWrite].filter(Boolean);
 }
 
-/** T11-owned terminal settlement authority over one exact accepted result. */
-export interface ExactAcceptedResultTerminalAuthorityV2 {
-  readonly schemaVersion: 2;
-  readonly kind: 'exact-accepted-result-terminal-authority-v2';
-  readonly acceptedAuthority: ExactAcceptedTaskResultAuthorityMetadata;
-  /** Must originate from readExactSettledTaskResult/core custody inspection. */
-  readonly terminalResultAuthority: ExactTaskResultAuthorityMetadata;
-  /** Must originate from the T11 receipt parser over that exact artifact. */
-  readonly terminalDecisionAuthority: ExactTaskTerminalDecisionAuthorityV2;
-}
-
-export type SettleExactAcceptedResult = (input: {
-  readonly task: Task;
-  readonly result: TaskResult;
-  readonly acceptedAuthority: ExactAcceptedTaskResultAuthorityMetadata;
-}) => ExactAcceptedResultTerminalAuthorityV2
-  | Promise<ExactAcceptedResultTerminalAuthorityV2>;
-
-export type RevalidateExactAcceptedResultTerminalAuthority = (input: {
-  readonly taskId: string;
-  readonly expectedAcceptedAuthority: ExactAcceptedTaskResultAuthorityMetadata;
-  readonly expectedTerminalAuthority: ExactAcceptedResultTerminalAuthorityV2;
-}) =>
-  | {
-      readonly state: 'current';
-      readonly terminalAuthority: ExactAcceptedResultTerminalAuthorityV2;
-    }
-  | { readonly state: 'hold'; readonly reasonCode: string }
-  | Promise<
-      | {
-          readonly state: 'current';
-          readonly terminalAuthority: ExactAcceptedResultTerminalAuthorityV2;
-        }
-      | { readonly state: 'hold'; readonly reasonCode: string }
-    >;
-
-function isSha256Digest(value: unknown): value is `sha256:${string}` {
-  return typeof value === 'string' && /^sha256:[a-f0-9]{64}$/u.test(value);
-}
-
-const EXACT_AUTHORITY_MAX_DEPTH = 12;
-const EXACT_AUTHORITY_MAX_NODES = 4096;
-const EXACT_AUTHORITY_MAX_KEYS_PER_OBJECT = 64;
-const EXACT_AUTHORITY_MAX_TOTAL_KEYS = 512;
-const EXACT_AUTHORITY_MAX_STRING_BYTES = 32 * 1024;
-const EXACT_AUTHORITY_MAX_TOTAL_STRING_BYTES = 256 * 1024;
-
-interface ExactAuthorityPlainDataBudget {
-  nodes: number;
-  keys: number;
-  stringBytes: number;
-  active: WeakSet<object>;
-}
-
-function consumeExactAuthorityString(
-  value: string,
-  budget: ExactAuthorityPlainDataBudget,
-): boolean {
-  if (value.length > EXACT_AUTHORITY_MAX_STRING_BYTES) return false;
-  const bytes = Buffer.byteLength(value, 'utf8');
-  if (bytes > EXACT_AUTHORITY_MAX_STRING_BYTES) return false;
-  budget.stringBytes += bytes;
-  return budget.stringBytes <= EXACT_AUTHORITY_MAX_TOTAL_STRING_BYTES;
-}
-
-function isPlainData(
-  value: unknown,
-  depth = 0,
-  budget: ExactAuthorityPlainDataBudget = {
-    nodes: 0,
-    keys: 0,
-    stringBytes: 0,
-    active: new WeakSet<object>(),
-  },
-): boolean {
-  budget.nodes += 1;
-  if (budget.nodes > EXACT_AUTHORITY_MAX_NODES || depth > EXACT_AUTHORITY_MAX_DEPTH) {
-    return false;
-  }
-  if (value === null) return true;
-  if (typeof value === 'string') return consumeExactAuthorityString(value, budget);
-  if (typeof value === 'boolean') return true;
-  if (typeof value === 'number') return Number.isFinite(value);
-  if (typeof value !== 'object' || Array.isArray(value) || nodeTypes.isProxy(value)) return false;
-  if (budget.active.has(value)) return false;
-  budget.active.add(value);
-  try {
-    let keys: readonly PropertyKey[];
-    try {
-      keys = Reflect.ownKeys(value);
-    } catch {
-      return false;
-    }
-    if (keys.length > EXACT_AUTHORITY_MAX_KEYS_PER_OBJECT) return false;
-    budget.keys += keys.length;
-    if (budget.keys > EXACT_AUTHORITY_MAX_TOTAL_KEYS) return false;
-    for (const key of keys) {
-      if (typeof key !== 'string' || !consumeExactAuthorityString(key, budget)) return false;
-    }
-
-    let prototype: object | null;
-    let descriptors: Record<string, PropertyDescriptor>;
-    try {
-      prototype = Object.getPrototypeOf(value);
-      if (prototype !== Object.prototype && prototype !== null) return false;
-      descriptors = Object.getOwnPropertyDescriptors(value);
-    } catch {
-      return false;
-    }
-    return keys.every(key => {
-      const descriptor = descriptors[key as string];
-      return descriptor !== undefined
-        && descriptor.get === undefined
-        && descriptor.set === undefined
-        && descriptor.enumerable === true
-        && 'value' in descriptor
-        && isPlainData(descriptor.value, depth + 1, budget);
-    });
-  } finally {
-    budget.active.delete(value);
-  }
-}
-
-function exactKeys(value: object, expected: readonly string[]): boolean {
-  if (nodeTypes.isProxy(value)) return false;
-  let keys: readonly PropertyKey[];
-  try {
-    keys = Reflect.ownKeys(value);
-  } catch {
-    return false;
-  }
-  if (keys.length !== expected.length) return false;
-  const expectedKeys = new Set(expected);
-  return keys.every(key => typeof key === 'string' && expectedKeys.has(key));
-}
-
-function isPositiveByteLength(value: unknown): value is number {
-  return Number.isSafeInteger(value) && Number(value) > 0;
-}
-
-function isExactCustodyIdentity(value: unknown): boolean {
-  if (
-    value === null
-    || typeof value !== 'object'
-    || Array.isArray(value)
-    || !exactKeys(value, [
-      'schemaVersion',
-      'backend',
-      'projectRootSha256',
-      'projectId',
-      'taskId',
-      'attemptId',
-      'generation',
-    ])
-    || !isPlainData(value)
-  ) return false;
-  const identity = value as Record<string, unknown>;
-  return identity.schemaVersion === 2
-    && identity.backend === 'docker'
-    && typeof identity.projectRootSha256 === 'string'
-    && /^[a-f0-9]{64}$/u.test(identity.projectRootSha256)
-    && typeof identity.projectId === 'string'
-    && identity.projectId.length > 0
-    && typeof identity.taskId === 'string'
-    && identity.taskId.length > 0
-    && typeof identity.attemptId === 'string'
-    && identity.attemptId.length > 0
-    && Number.isSafeInteger(identity.generation)
-    && Number(identity.generation) > 0;
-}
-
-function isExactAuthorityArtifact(value: unknown): boolean {
-  if (
-    value === null
-    || typeof value !== 'object'
-    || Array.isArray(value)
-    || !exactKeys(value, [
-      'artifactReceiptDigest',
-      'chainDigest',
-      'artifactSha256',
-      'byteLength',
-    ])
-    || !isPlainData(value)
-  ) return false;
-  const artifact = value as Record<string, unknown>;
-  return isSha256Digest(artifact.artifactReceiptDigest)
-    && isSha256Digest(artifact.chainDigest)
-    && isSha256Digest(artifact.artifactSha256)
-    && isPositiveByteLength(artifact.byteLength);
-}
-
-function isExactAcceptedAuthorityMetadata(
-  value: unknown,
-): value is ExactAcceptedTaskResultAuthorityMetadata {
-  if (
-    value === null
-    || typeof value !== 'object'
-    || Array.isArray(value)
-    || !exactKeys(value, [
-      'executionMode',
-      'identity',
-      'admissionReceiptDigest',
-      'acceptedResultRef',
-      'acceptedResultChainDigest',
-      'resultDigest',
-    ])
-    || !isPlainData(value)
-  ) return false;
-  const accepted = value as Record<string, unknown>;
-  const ref = accepted.acceptedResultRef;
-  if (
-    !isExactCustodyIdentity(accepted.identity)
-    || ref === null
-    || typeof ref !== 'object'
-    || Array.isArray(ref)
-    || !exactKeys(ref, [
-      'schemaVersion',
-      'kind',
-      'identity',
-      'artifactKey',
-      'artifactReceiptDigest',
-    ])
-    || !isPlainData(ref)
-  ) return false;
-  const acceptedRef = ref as Record<string, unknown>;
-  return accepted.executionMode === 'normal-docker'
-    && isSha256Digest(accepted.admissionReceiptDigest)
-    && acceptedRef.schemaVersion === 2
-    && acceptedRef.kind === 'task-accepted-result-v2-ref'
-    && isExactCustodyIdentity(acceptedRef.identity)
-    && JSON.stringify(acceptedRef.identity) === JSON.stringify(accepted.identity)
-    && typeof acceptedRef.artifactKey === 'string'
-    && acceptedRef.artifactKey.length > 0
-    && isSha256Digest(acceptedRef.artifactReceiptDigest)
-    && isSha256Digest(accepted.acceptedResultChainDigest)
-    && isSha256Digest(accepted.resultDigest);
-}
-
-function isExactTerminalAuthorityMetadata(
-  value: unknown,
-): value is ExactTaskResultAuthorityMetadata {
-  if (
-    value === null
-    || typeof value !== 'object'
-    || Array.isArray(value)
-    || !exactKeys(value, [
-      'executionMode',
-      'identity',
-      'admissionReceiptDigest',
-      'settlementRef',
-      'settlementDigest',
-      'resultDigest',
-      'acceptedResultChainDigest',
-      'evaluationChainDigest',
-      'finalizerChainDigest',
-      'evaluationArtifact',
-      'finalizerArtifact',
-    ])
-    || !isPlainData(value)
-  ) return false;
-  const terminal = value as Record<string, unknown>;
-  const ref = terminal.settlementRef;
-  if (
-    !isExactCustodyIdentity(terminal.identity)
-    || ref === null
-    || typeof ref !== 'object'
-    || Array.isArray(ref)
-    || !exactKeys(ref, [
-      'schemaVersion',
-      'kind',
-      'identity',
-      'artifactKey',
-      'artifactReceiptDigest',
-    ])
-    || !isPlainData(ref)
-  ) return false;
-  const settlementRef = ref as Record<string, unknown>;
-  return terminal.executionMode === 'normal-docker'
-    && isSha256Digest(terminal.admissionReceiptDigest)
-    && settlementRef.schemaVersion === 2
-    && settlementRef.kind === 'task-result-settlement-v2-ref'
-    && isExactCustodyIdentity(settlementRef.identity)
-    && JSON.stringify(settlementRef.identity) === JSON.stringify(terminal.identity)
-    && typeof settlementRef.artifactKey === 'string'
-    && settlementRef.artifactKey.length > 0
-    && isSha256Digest(settlementRef.artifactReceiptDigest)
-    && isSha256Digest(terminal.settlementDigest)
-    && isSha256Digest(terminal.resultDigest)
-    && isSha256Digest(terminal.acceptedResultChainDigest)
-    && isSha256Digest(terminal.evaluationChainDigest)
-    && isSha256Digest(terminal.finalizerChainDigest)
-    && isExactAuthorityArtifact(terminal.evaluationArtifact)
-    && isExactAuthorityArtifact(terminal.finalizerArtifact);
-}
-
-function isExactAcceptedResultTerminalAuthority(
-  value: unknown,
-  expected: ExactAcceptedTaskResultAuthorityMetadata,
-): value is ExactAcceptedResultTerminalAuthorityV2 {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-    return false;
-  }
-  if (!exactKeys(value, [
-    'schemaVersion',
-    'kind',
-    'acceptedAuthority',
-    'terminalResultAuthority',
-    'terminalDecisionAuthority',
-  ]) || !isPlainData(value)) return false;
-  const candidate = value as Partial<ExactAcceptedResultTerminalAuthorityV2>;
-  const terminal = candidate.terminalResultAuthority;
-  const decision = candidate.terminalDecisionAuthority;
-  return candidate.schemaVersion === 2
-    && candidate.kind === 'exact-accepted-result-terminal-authority-v2'
-    && isExactAcceptedAuthorityMetadata(candidate.acceptedAuthority)
-    && JSON.stringify(candidate.acceptedAuthority) === JSON.stringify(expected)
-    && isExactTerminalAuthorityMetadata(terminal)
-    && decision !== undefined
-    && exactKeys(decision, [
-      'schemaVersion',
-      'kind',
-      'identity',
-      'evaluationReceipt',
-      'finalizerReceipt',
-    ])
-    && exactKeys(decision.evaluationReceipt, [
-      'verdict',
-      'artifactReceiptDigest',
-      'artifactSha256',
-      'byteLength',
-      'chainDigest',
-    ])
-    && exactKeys(decision.finalizerReceipt, [
-      'state',
-      'artifactReceiptDigest',
-      'artifactSha256',
-      'byteLength',
-      'chainDigest',
-    ])
-    && isExactCustodyIdentity(decision.identity)
-    && JSON.stringify(terminal.identity) === JSON.stringify(expected.identity)
-    && terminal.admissionReceiptDigest === expected.admissionReceiptDigest
-    && terminal.acceptedResultChainDigest === expected.acceptedResultChainDigest
-    && terminal.resultDigest === expected.resultDigest
-    && isSha256Digest(terminal.settlementDigest)
-    && JSON.stringify(terminal.settlementRef.identity) === JSON.stringify(expected.identity)
-    && JSON.stringify(decision.identity) === JSON.stringify(expected.identity)
-    && (
-      decision.evaluationReceipt.verdict === 'DONE'
-      || decision.evaluationReceipt.verdict === 'GO_WITH_TECH_DEBT'
-      || decision.evaluationReceipt.verdict === 'NO_GO'
-    )
-    && decision.evaluationReceipt.artifactReceiptDigest
-      === terminal.evaluationArtifact.artifactReceiptDigest
-    && decision.evaluationReceipt.artifactSha256
-      === terminal.evaluationArtifact.artifactSha256
-    && decision.evaluationReceipt.byteLength === terminal.evaluationArtifact.byteLength
-    && decision.evaluationReceipt.chainDigest === terminal.evaluationChainDigest
-    && decision.evaluationReceipt.chainDigest === terminal.evaluationArtifact.chainDigest
-    && decision.finalizerReceipt.state === 'terminal-ready'
-    && decision.finalizerReceipt.artifactReceiptDigest
-      === terminal.finalizerArtifact.artifactReceiptDigest
-    && decision.finalizerReceipt.artifactSha256 === terminal.finalizerArtifact.artifactSha256
-    && decision.finalizerReceipt.byteLength === terminal.finalizerArtifact.byteLength
-    && decision.finalizerReceipt.chainDigest === terminal.finalizerChainDigest
-    && decision.finalizerReceipt.chainDigest === terminal.finalizerArtifact.chainDigest;
-}
-
 /**
  * Wait for task result files to appear on disk using fs.watch with fallback polling.
  * Supports queued task execution: as workers finish, queued tasks are spawned.
@@ -1869,19 +1511,21 @@ export async function waitForResults(
     const taskRef = taskMap.get(taskId);
     if (!taskRef) return;
     if (exactAcceptedAuthority) {
+      const exactSettler = spawnOpts?.settleExactAcceptedResult
+        ?? spawnOpts?.exactDockerRegistry?.settleExactAcceptedResult;
+      const exactRevalidator = spawnOpts?.revalidateExactAcceptedResultTerminalAuthority
+        ?? spawnOpts?.exactDockerRegistry?.revalidateExactAcceptedResultTerminalAuthority;
       if (
-        !spawnOpts?.settleExactAcceptedResult
-        || !spawnOpts.revalidateExactAcceptedResultTerminalAuthority
+        !exactSettler
+        || !exactRevalidator
       ) {
         throw createExecutionAuthorityError(
           `Task ${taskId} exact accepted-result HOLD: terminal settlement authority is required`,
         );
       }
-      let evaluated: ExactAcceptedResultTerminalAuthorityV2;
+      let outcome: unknown;
       try {
-        evaluated = await spawnOpts.settleExactAcceptedResult({
-          task: taskRef,
-          result,
+        outcome = await exactSettler({
           acceptedAuthority: exactAcceptedAuthority,
         });
       } catch (error) {
@@ -1890,7 +1534,35 @@ export async function waitForResults(
           + `${error instanceof Error ? error.message : String(error)}`,
         );
       }
-      if (!isExactAcceptedResultTerminalAuthority(evaluated, exactAcceptedAuthority)) {
+      if (
+        !isBoundedExactAuthorityPlainData(outcome)
+        || outcome === null
+        || typeof outcome !== 'object'
+        || Array.isArray(outcome)
+      ) throw createExecutionAuthorityError(
+        `Task ${taskId} exact accepted-result terminal HOLD: foreign or invalid settlement authority`,
+      );
+      if (hasExactAuthorityKeys(outcome, ['state', 'reasonCode'])) {
+        const state = (outcome as { readonly state?: unknown }).state;
+        const reasonCode = (outcome as { readonly reasonCode?: unknown }).reasonCode;
+        if (
+          (state === 'hold' || state === 'route-required')
+          && typeof reasonCode === 'string'
+          && reasonCode.length > 0
+        ) throw createExecutionAuthorityError(
+          `Task ${taskId} exact accepted-result terminal HOLD: ${state}:${reasonCode}`,
+        );
+      }
+      if (
+        !hasExactAuthorityKeys(outcome, ['state', 'authority'])
+        || (outcome as { readonly state?: unknown }).state !== 'settled'
+      ) throw createExecutionAuthorityError(
+        `Task ${taskId} exact accepted-result terminal HOLD: foreign or invalid settlement authority`,
+      );
+      const evaluated = (outcome as {
+        readonly authority: ExactAcceptedResultTerminalAuthorityV2;
+      }).authority;
+      if (!isExactAcceptedResultTerminalAuthorityV2(evaluated, exactAcceptedAuthority)) {
         throw createExecutionAuthorityError(
           `Task ${taskId} exact accepted-result terminal HOLD: foreign or invalid settlement authority`,
         );
@@ -1898,7 +1570,7 @@ export async function waitForResults(
       const revalidate = async (): Promise<void> => {
         let validation;
         try {
-          validation = await spawnOpts.revalidateExactAcceptedResultTerminalAuthority!({
+          validation = await exactRevalidator({
             taskId,
             expectedAcceptedAuthority: exactAcceptedAuthority,
             expectedTerminalAuthority: evaluated,
@@ -1914,9 +1586,9 @@ export async function waitForResults(
             `Task ${taskId} exact accepted-result terminal revalidation HOLD: invalid-authority`,
           );
         }
-        const holdShape = exactKeys(validation, ['state', 'reasonCode']);
-        const currentShape = exactKeys(validation, ['state', 'terminalAuthority']);
-        if ((!holdShape && !currentShape) || !isPlainData(validation)) {
+        const holdShape = hasExactAuthorityKeys(validation, ['state', 'reasonCode']);
+        const currentShape = hasExactAuthorityKeys(validation, ['state', 'terminalAuthority']);
+        if ((!holdShape && !currentShape) || !isBoundedExactAuthorityPlainData(validation)) {
           throw createExecutionAuthorityError(
             `Task ${taskId} exact accepted-result terminal revalidation HOLD: invalid-authority`,
           );
@@ -1939,7 +1611,7 @@ export async function waitForResults(
         if (
           validation.state !== 'current'
           || !currentShape
-          || !isExactAcceptedResultTerminalAuthority(
+          || !isExactAcceptedResultTerminalAuthorityV2(
             validation.terminalAuthority,
             exactAcceptedAuthority,
           )
@@ -1960,18 +1632,6 @@ export async function waitForResults(
       } catch (error) {
         taskRef.status = previousStatus;
         throw error;
-      }
-      try {
-        spawnOpts.exactDockerRegistry?.recordTerminalDecision(
-          taskId,
-          evaluated.terminalDecisionAuthority.evaluationReceipt.verdict,
-        );
-      } catch (error) {
-        taskRef.status = previousStatus;
-        throw createExecutionAuthorityError(
-          `Task ${taskId} exact terminal decision registry HOLD: `
-          + `${error instanceof Error ? error.message : String(error)}`,
-        );
       }
       return;
     }

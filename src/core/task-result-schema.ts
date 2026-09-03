@@ -812,12 +812,15 @@ function safeJsonStringify(value: unknown): string {
  * explicit assessment: NO_GO means false; DONE/GO_WITH_TECH_DEBT means true.
  * This does not elevate the final verdict — Brain still applies disk, scope,
  * rubric, and honesty gates — it only restores the intended scalar claim.
- * Mutates in place (results are plain parsed JSON) and passes `null` through
- * so it composes with `readJsonSafe`'s miss contract.
+ * Returns a detached working copy and passes `null` through so it composes
+ * with `readJsonSafe`'s miss contract. Exact custody readers deliberately
+ * freeze verified authority objects; normalization must never mutate that
+ * durable evidence (or any other caller-owned result).
  */
 export function normalizeTaskResultShape<T extends { notes?: unknown }>(result: T | null): T | null {
   if (result === null || typeof result !== 'object') return result;
-  const record = result as Record<string, unknown>;
+  const normalized = structuredClone(result) as T;
+  const record = normalized as Record<string, unknown>;
   const coerced = coerceNotesToString(record['notes']);
   if (coerced !== record['notes']) {
     record['notes'] = coerced;
@@ -836,7 +839,7 @@ export function normalizeTaskResultShape<T extends { notes?: unknown }>(result: 
     ) {
       record['testCommands'] = [...commands];
       record['testsPassed'] = projectTestsPassed({ outcome: outcome as 'PASSED' | 'FAILED' | 'NOT_EXECUTED' });
-      return result;
+      return normalized;
     }
   }
 
@@ -854,7 +857,7 @@ export function normalizeTaskResultShape<T extends { notes?: unknown }>(result: 
   };
   record['testCommands'] = commands;
   record['testsPassed'] = projectTestsPassed({ outcome });
-  return result;
+  return normalized;
 }
 
 // ─── Shared result shapes (spec §1.2) ────────────────────────────────────────

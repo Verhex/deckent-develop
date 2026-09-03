@@ -280,6 +280,28 @@ describe('xverify approval-phase timeout — --timeout bounds, never extends', (
     // Nothing held during preparation, so there is no preparation detail.
     expect(result.detail).toBeNull();
   });
+
+  it('projects an exact runner HOLD detail without requiring public result mutation', async () => {
+    const root = makeRoot('exact-runner-detail');
+    const result = await runXverifyForResult('Claim whose exact composition held.', {
+      author: 'claude',
+      verifier: 'codex',
+      files: 'src/core/a.ts',
+    }, approvalDeps(root, {
+      prepareCandidateEvidenceFn: decidedFastPath,
+      runCrossVerifyFn: vi.fn(async () => ({
+        outcome: 'unavailable' as const,
+        disposition: 'hold' as const,
+        ran: false,
+        skippedReason: 'verifier-exact-invocation-composition-hold',
+        detail: 'xverify_execution_profile_unavailable',
+        refuted: false,
+        blocked: true,
+      })),
+    }));
+
+    expect(result.detail).toBe('xverify_execution_profile_unavailable');
+  });
 });
 
 // ─── 3. `--json` stays machine-clean and backward compatible ────────────

@@ -20,7 +20,17 @@ import { isAbsolute, posix, resolve } from 'node:path';
 
 import type { Task, TaskResult } from '../core/types.js';
 import type { GoNoGoCriterionItem } from '../core/task-types.js';
+import type { TaskResultV2 } from '../core/task-result-schema.js';
 import type { ConfirmationAdapter } from '../core/acceptance-matrix.js';
+import {
+  executionEffectPolicyAllowsPath,
+} from '../core/execution-write-scope-policy.js';
+import {
+  taskAttemptCustodyDigest,
+  type Sha256Digest,
+  type TaskAttemptCustodyPolicyV2,
+  type TaskAttemptCustodyVerifiedEffectLandingV2,
+} from '../core/task-attempt-custody-store.js';
 
 /**
  * How a criterion's satisfaction is confirmed. Only `deterministic` runs in
@@ -54,6 +64,29 @@ export interface CriterionEvaluationOutcome {
   readonly decided: number;
   readonly total: number;
 }
+
+export interface ExactCriterionEvaluationAuthorityV2 {
+  readonly schemaVersion: 2;
+  readonly kind: 'exact-criterion-evaluation-authority-v2';
+  readonly taskId: string;
+  readonly attemptId: string;
+  readonly generation: number;
+  readonly effectLandingReceiptDigest: Sha256Digest;
+  readonly finalManifestDigest: string;
+  readonly writePolicyDigest: string;
+  readonly outcome: CriterionEvaluationOutcome | null;
+  readonly authorityDigest: Sha256Digest;
+}
+
+export type EvaluateExactGoNogoCriteriaResult =
+  | {
+      readonly state: 'evaluated';
+      readonly authority: ExactCriterionEvaluationAuthorityV2;
+    }
+  | {
+      readonly state: 'hold';
+      readonly reasonCode: 'effect-landing-identity-mismatch' | 'effect-manifest-invalid';
+    };
 
 /**
  * Return the sole deterministic locator: a normalized, repo-relative path
@@ -149,6 +182,66 @@ function evaluateItem(
   return { itemId: item.id, polarity: item.polarity, mode: 'deterministic', status, evidence };
 }
 
+function evaluateExactItem(
+  item: GoNoGoCriterionItem,
+  finalManifest: TaskAttemptCustodyVerifiedEffectLandingV2['verifiedBundle']['final'],
+): CriterionVerdict {
+  const requirements = item.evidenceRequirements ?? [];
+  if (requirements.length === 0) {
+    return {
+      itemId: item.id,
+      polarity: item.polarity,
+      mode: 'deterministic',
+      status: 'undecidable',
+      evidence: ['no evidence requirements authored'],
+    };
+  }
+  const entries = new Map(finalManifest.entries.map(entry => [entry.path, entry]));
+  const evidence: string[] = [];
+  let decidable = 0;
+  let held = 0;
+  for (const requirement of requirements) {
+    const path = requirementPath(requirement);
+    if (path === null) {
+      evidence.push(`undecidable (non-deterministic requirement): ${displayRequirement(requirement)}`);
+      continue;
+    }
+    const entry = entries.get(path);
+    if (entry?.kind === 'regular-file') {
+      decidable += 1;
+      held += 1;
+      evidence.push(`present in committed final manifest: ${path}`);
+      continue;
+    }
+    if (entry?.kind === 'directory') {
+      evidence.push(`undecidable (file requirement resolved to directory): ${path}`);
+      continue;
+    }
+    if (!executionEffectPolicyAllowsPath(finalManifest.policy, path)) {
+      evidence.push(`undecidable (outside captured write policy): ${path}`);
+      continue;
+    }
+    decidable += 1;
+    evidence.push(`absent from committed final manifest: ${path}`);
+  }
+  if (decidable === 0) {
+    return {
+      itemId: item.id,
+      polarity: item.polarity,
+      mode: 'llm',
+      status: 'undecidable',
+      evidence,
+    };
+  }
+  return {
+    itemId: item.id,
+    polarity: item.polarity,
+    mode: 'deterministic',
+    status: held > 0 ? 'satisfied' : 'unsatisfied',
+    evidence,
+  };
+}
+
 /**
  * True when the rubric score list carries a deterministic typed-contract
  * failure (`goNogo:<id>` row with passed=false). Such a NO_GO is CONCRETE
@@ -193,4 +286,73 @@ export function evaluateGoNogoCriteria(
     decided,
     total: verdicts.length,
   });
+}
+
+/**
+ * Exact normal-Docker criterion authority. It never reads the mutable host
+ * project tree: file facts come only from the verified COMMITTED final
+ * manifest and its exact write-policy coverage.
+ */
+export function evaluateExactGoNogoCriteria(input: {
+  readonly task: Task;
+  readonly result: TaskResultV2;
+  readonly effectLanding: TaskAttemptCustodyVerifiedEffectLandingV2;
+  readonly policy: TaskAttemptCustodyPolicyV2;
+}): EvaluateExactGoNogoCriteriaResult {
+  try {
+    const identity = input.result.attemptCustody.identity;
+    const bundle = input.effectLanding.verifiedBundle;
+    const attempt = bundle.final.attempt;
+    if (
+      input.task.id !== input.result.taskId
+      || input.task.id !== attempt.taskId
+      || identity.projectId !== attempt.projectId
+      || identity.taskId !== attempt.taskId
+      || identity.attemptId !== attempt.attemptId
+      || identity.generation !== attempt.generation
+      || input.effectLanding.landing.identity.taskId !== identity.taskId
+      || input.effectLanding.landing.identity.attemptId !== identity.attemptId
+      || input.effectLanding.landing.identity.generation !== identity.generation
+    ) return { state: 'hold', reasonCode: 'effect-landing-identity-mismatch' };
+    const items = input.task.goNogo?.items;
+    const outcome = !items || items.length === 0
+      ? null
+      : Object.freeze({
+          items: Object.freeze(items.map(item => evaluateExactItem(item, bundle.final))),
+          decisiveNoGo: false,
+          decided: 0,
+          total: items.length,
+        });
+    const resolvedOutcome = outcome === null ? null : Object.freeze({
+      ...outcome,
+      decisiveNoGo: outcome.items.some(item =>
+        (item.polarity === 'no-go' && item.status === 'satisfied')
+        || (item.polarity === 'go' && item.status === 'unsatisfied')),
+      decided: outcome.items.filter(item => item.status !== 'undecidable').length,
+    });
+    const body = Object.freeze({
+      schemaVersion: 2 as const,
+      kind: 'exact-criterion-evaluation-authority-v2' as const,
+      taskId: input.task.id,
+      attemptId: identity.attemptId,
+      generation: identity.generation,
+      effectLandingReceiptDigest: input.effectLanding.landing.receiptDigest,
+      finalManifestDigest: bundle.final.digest,
+      writePolicyDigest: bundle.final.policy.digest,
+      outcome: resolvedOutcome,
+    });
+    return Object.freeze({
+      state: 'evaluated' as const,
+      authority: Object.freeze({
+        ...body,
+        authorityDigest: taskAttemptCustodyDigest(
+          'exact-criterion-evaluation-authority-v2',
+          body,
+          input.policy.jsonBounds,
+        ),
+      }),
+    });
+  } catch {
+    return { state: 'hold', reasonCode: 'effect-manifest-invalid' };
+  }
 }

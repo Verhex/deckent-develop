@@ -4,6 +4,11 @@
 
 import type { CapabilityTarget, ActorContext } from '../../core/work-model.js';
 import type { ExactPlanReferenceV1 } from '../../core/run-flow-contract.js';
+import type {
+  InvocationExecutionBackend,
+  InvocationReceiptRef,
+  InvocationTransport,
+} from '../../core/invocation-receipt.js';
 
 export type BacklogKind = 'task' | 'sprint' | 'capability' | 'process';
 export type BacklogPolicy = 'auto' | 'approval-required' | 'risk-tagged';
@@ -106,6 +111,22 @@ export interface BacklogEntry {
       readonly schemaVersion: 1;
       readonly reasonCode: 'attempt-authority-unavailable';
       readonly heldAt: string;
+    };
+    /**
+     * Host-authored task-ingress disposition.  This is the durable distinction
+     * between proven zero work and an uncertain dispatch that must remain
+     * parked for reconciliation; public task/result files cannot recreate it.
+     */
+    taskIngressDisposition?: {
+      readonly schemaVersion: 1;
+      readonly state: 'not-dispatched' | 'reconciliation-required';
+      readonly reasonCode: string;
+      readonly receiptRef: InvocationReceiptRef;
+      readonly executionBackend: InvocationExecutionBackend;
+      readonly transport: InvocationTransport;
+      readonly executionMode?: 'normal-docker-exact' | 'legacy-non-docker';
+      readonly executionEvidenceRef?: string;
+      readonly authorityEvidenceRefs: readonly string[];
     };
   } | null;
 }

@@ -533,10 +533,18 @@ export function createLiveDockerCrossVerifyExecutionProfileAuthority(input: {
   });
 }
 
-function exactVerifierProvider(task: Task, config: ResolvedConfig): ProviderName | null {
-  const taskProvider = task.provider;
+function exactProducerProvider(task: Task): ProviderName | null {
+  const modelProvider = modelRegistry.get(task.model)?.provider;
+  if (!modelProvider || (task.provider !== undefined && task.provider !== modelProvider)) return null;
+  return task.provider ?? modelProvider;
+}
+
+function exactVerifierProvider(
+  producerProvider: ProviderName,
+  config: ResolvedConfig,
+): ProviderName | null {
   const authored = config.cross_verify?.verifier_priority ?? [];
-  const selected = authored.find(provider => provider !== taskProvider);
+  const selected = authored.find(provider => provider !== producerProvider);
   return selected as ProviderName | undefined ?? null;
 }
 
@@ -621,7 +629,16 @@ implements MandatoryCrossVerifyInvocationFactory {
     if (producerSettlement.state === 'hold') {
       return hold(producerSettlement.reasonCode, producerSettlement.detail);
     }
-    const provider = exactVerifierProvider(input.task, input.config);
+    const producerProvider = exactProducerProvider(input.task);
+    if (!producerProvider) {
+      return hold('xverify_producer_provider_identity_mismatch', {
+        taskId: input.task.id,
+        taskProvider: input.task.provider ?? null,
+        taskModel: input.task.model,
+        modelProvider: modelRegistry.get(input.task.model)?.provider ?? null,
+      });
+    }
+    const provider = exactVerifierProvider(producerProvider, input.config);
     if (!provider) {
       return hold('xverify_provider_scope_unavailable', input.task.id);
     }
@@ -1114,6 +1131,7 @@ implements MandatoryCrossVerifyInvocationFactory {
           source: source.authorityEvidenceRef,
         }),
         composition: {
+          producerProvider,
           coordinator,
           input: {
             projection: projected,

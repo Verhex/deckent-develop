@@ -8,7 +8,7 @@ import {
   type SprintContext,
 } from '../../src/orchestra/prompt-god-template.js';
 import type { ProductionWiringPlanEvidence, Task } from '../../src/core/task-types.js';
-import { TaskStatus, createProductionWiringPlanEvidence } from '../../src/core/task-types.js';
+import { TaskStatus, createProductionWiringPlanEvidence, createProductionWiringPlanEvidenceV2 } from '../../src/core/task-types.js';
 import type {
   ProductionWiringContract,
   ProductionWiringEvidence,
@@ -71,6 +71,33 @@ function makeEvidence(
   contract: ProductionWiringContract = makeContract(),
 ): ProductionWiringPlanEvidence {
   return createProductionWiringPlanEvidence(contract);
+}
+
+function makeV2Evidence(): ProductionWiringPlanEvidence {
+  const probe = (kind: 'producer' | 'canonical-consumer' | 'affected-ingress' | 'enablement-authority' | 'proof-target', targetId: string) => ({
+    target: { kind, targetId }, observationGroupId: kind === 'producer' || kind === 'canonical-consumer' ? 'runtime-path-observation' : `${kind}:${targetId}`, harnessPath: 'scripts/production-wiring-proof.mjs', verifierAssetPaths: ['scripts/production-wiring-proof.mjs'],
+    args: kind === 'producer' || kind === 'canonical-consumer' ? ['observe-runtime-relation'] : ['observe', targetId], cwd: '.', timeoutMs: 30_000, outputLimitBytes: 1_048_576,
+    expectation: { kind: 'adapter-structured-outcome' as const, schemaId: 'deckent.production-wiring-observation.v1', outcome: 'observed' as const },
+  });
+  return createProductionWiringPlanEvidenceV2({
+    version: 2, changeKind: 'runtime-addition', producer: { producerId: 'planner' },
+    canonicalConsumer: { consumerId: 'compiled worker prompt', relationship: 'invokes-producer' },
+    affectedIngresses: [{ ingressId: 'initial', kind: 'ingress' }, { ingressId: 'FIX', kind: 'ingress' }],
+    enablementAuthority: { authorityId: 'exact contract digest', mechanism: 'unconditional' },
+    disposition: { kind: 'production-wiring' },
+    proofTargets: [{ proofTargetId: 'production-wiring-prompt', kind: 'consumer-execution' }],
+    hostProofProgram: { network: 'forbidden', verifierAssets: [{ path: 'scripts/production-wiring-proof.mjs', sha256: `sha256:${'a'.repeat(64)}`, role: 'trusted-harness' }], platforms: [
+      { platform: 'linux', state: 'unsupported', reasonCode: 'environment-unavailable' },
+      { platform: 'wsl2-linux', state: 'supported', runnerAdapterId: 'native-v1', probes: [
+        probe('producer', 'planner'),
+        probe('canonical-consumer', 'compiled worker prompt'), probe('affected-ingress', 'initial'),
+        probe('affected-ingress', 'FIX'), probe('enablement-authority', 'exact contract digest'),
+        probe('proof-target', 'production-wiring-prompt'),
+      ] },
+      { platform: 'darwin', state: 'unsupported', reasonCode: 'owner-deferred' },
+      { platform: 'win32', state: 'unsupported', reasonCode: 'owner-deferred' },
+    ] },
+  });
 }
 
 function makeTask(overrides: Partial<Task> = {}): Task {
@@ -143,6 +170,18 @@ describe('production-wiring prompt block — rendering', () => {
     const evidence = makeEvidence();
     expect(buildProductionWiringAuthorityBlock(evidence))
       .toBe(buildProductionWiringAuthorityBlock(makeEvidence()));
+  });
+
+  it('renders V2 topology and proof digest without presenting plan/worker refs as host evidence', () => {
+    const evidence = makeV2Evidence();
+    const block = buildProductionWiringAuthorityBlock(evidence);
+
+    expect(block.startsWith(PRODUCTION_WIRING_BLOCK_HEADING)).toBe(true);
+    expect(block).toContain(`Host proof program: sha256:${evidence.contract.hostProofProgram.programDigest}`);
+    expect(block).toContain('wsl2-linux:supported/native-v1');
+    expect(block).toContain('darwin:unsupported/owner-deferred');
+    expect(block).not.toContain('evidenceRefs');
+    expect(block).not.toContain('refs:');
   });
 
   it('renders identities verbatim and never invents one from task prose', () => {

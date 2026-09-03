@@ -184,6 +184,28 @@ describe('exec-authority native loader (fail-closed contract)', () => {
     }
   });
 
+  it('does not downgrade a built Linux prebuild to metadata-unavailable on read-only foreign-owned mount ancestors', () => {
+    const prebuildRoot = join(
+      PROJECT_ROOT,
+      'native',
+      'exec-authority',
+      'prebuilds',
+      'linux-x64',
+      'napi-v8',
+    );
+    if (ACTIVE_LINUX_NATIVE_RUNTIME
+      && existsSync(join(prebuildRoot, 'artifact.json'))
+      && existsSync(join(prebuildRoot, 'exec_authority.node'))) {
+      expect(loaded).toMatchObject({
+        available: true,
+        manifest: {
+          platform: 'linux',
+          arch: 'x64',
+        },
+      });
+    }
+  });
+
   it('keeps malformed root-separation results and alias ambiguity fail-closed', () => {
     const loaderSource = readFileSync(
       new URL('../../native/exec-authority/index.mjs', import.meta.url),
@@ -215,6 +237,29 @@ describe('exec-authority native loader (fail-closed contract)', () => {
     expect(posixSource.slice(proofStart, proofEnd)).not.toMatch(
       /(?:realpath|mountinfo|\/proc\/)/u,
     );
+  });
+
+  it('transfers POSIX created-directory rollback authority to the common result gate', () => {
+    const posixSource = readFileSync(
+      new URL('../../native/exec-authority/src/custody_posix.c', import.meta.url),
+      'utf8',
+    );
+    expect(posixSource).toContain('resolve_named_create_guard');
+    expect(posixSource).toContain('deckent_native_bind_created_result_guard(');
+    expect(posixSource).not.toContain('DECKENT_NATIVE_CREATE_DIAG');
+  });
+
+  it('sizes the common effect dispatch argv for the full source-read contract', () => {
+    const commonSource = readFileSync(
+      new URL('../../native/exec-authority/src/exec_authority.c', import.meta.url),
+      'utf8',
+    );
+    const effectInvoke = commonSource.slice(
+      commonSource.indexOf('static napi_value EffectInvoke'),
+      commonSource.indexOf('static napi_value EffectCloseHandle'),
+    );
+    expect(effectInvoke).toContain('size_t argc = 8u;');
+    expect(effectInvoke).toContain('napi_value argv[8];');
   });
 
   it('derives the binary build type from the exact node-gyp configuration', () => {
@@ -291,7 +336,7 @@ describe.runIf(ACTIVE_LINUX_NATIVE_RUNTIME && loaded.available)(
         const opened = state.effect.openRoot('WORKSPACE', root);
         nativeCode(
           () => state.effect.captureTree(Object.freeze({}), limits()),
-          /^E_EXEC_AUTH_NATIVE_HANDLE_FORGED$/u,
+          /^E_EXEC_AUTH_NATIVE_HANDLE_(?:FORGED|FOREIGN)$/u,
         );
         state.effect.closeHandle(opened.handle);
         nativeCode(
@@ -533,6 +578,10 @@ describe('execution-effect native v2 source contract', () => {
     expect(posixSource).toContain('O_PATH | O_NOFOLLOW | O_CLOEXEC');
     expect(posixSource).toContain('effect_same_root_mount');
     expect(posixSource).toContain('DECKENT_EFFECT_MAX_ENTRIES 1000000u');
+    expect(typedSource).toContain('count > 1_000_000');
+    expect(typedSource).toContain('record.maxEntries > 1_000_000');
+    expect(loaderSource).toContain('entries > 1_000_000');
+    expect(loaderSource).toContain('expectedCount > 1_000_000');
     expect(posixSource).toContain('DECKENT_EFFECT_MAX_TOTAL_BYTES UINT64_C(274877906944)');
     expect(posixSource).toContain('DECKENT_EFFECT_MAX_DEPTH 256u');
     expect(posixSource).toContain('DECKENT_EFFECT_MAX_PATH_BYTES 16384u');
@@ -566,6 +615,16 @@ describe('execution-effect native v2 source contract', () => {
     expect(handleFactory.indexOf('napi_wrap')).toBeGreaterThan(
       handleFactory.indexOf('napi_object_freeze'),
     );
+  });
+
+  it('reopens the pinned capture root without sharing directory offsets', () => {
+    const capture = posixSource.slice(
+      posixSource.indexOf('static napi_value effect_capture_tree'),
+      posixSource.indexOf('#define DECKENT_EFFECT_OPERATION_HEADER_BYTES'),
+    );
+    expect(capture).toContain('stack[0].directory_fd = openat(');
+    expect(capture).toContain('O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC');
+    expect(capture).not.toContain('stack[0].directory_fd = dup(root->fd)');
   });
 
   it('pins the bounded source-read cursor to workspace custody and before/after identity', () => {
@@ -692,6 +751,11 @@ describe('custody bounded dispatch discovery source contract', () => {
     expect(loaderSource).toContain("case 'scan-directory-bounded'");
     expect(loaderSource).toContain('CUSTODY_DIRECTORY_SCAN_RESULT_KEYS');
     expect(loaderSource).toContain('args[2] <= 128');
+    const facadeKeys = loaderSource.slice(
+      loaderSource.indexOf('const CUSTODY_FACADE_KEYS'),
+      loaderSource.indexOf('const EFFECT_FACADE_KEYS'),
+    );
+    expect(facadeKeys).toContain("'scanDirectoryBounded'");
     expect(typedSource).toContain("readonly 'scan-directory-bounded': ExecAuthorityNativeScanDirectoryInput");
     expect(typedSource).toContain('validateDirectoryScanResult');
     expect(typedSource).toContain('scanDirectoryBounded');
@@ -737,6 +801,7 @@ describe.runIf(ACTIVE_LINUX_NATIVE_RUNTIME && loaded.available)(
   'exec-authority active Linux native primitives (supporting runtime evidence)',
   () => {
   const native = (loaded as { available: true; binding: Record<string, CallableFunction> }).binding;
+  const custody = (loaded as Extract<typeof loaded, { available: true }>).custody;
 
   function withTempTree<T>(fn: (root: string) => T): T {
     const root = mkdtempSync(join(tmpdir(), 'exec-auth-native-'));
@@ -766,6 +831,53 @@ describe.runIf(ACTIVE_LINUX_NATIVE_RUNTIME && loaded.available)(
       } finally {
         native.closeFd(rootFd);
       }
+    });
+  });
+
+  it('creates a directory only after the common guard accepts its rollback authority', () => {
+    withTempTree(root => {
+      const parentTransport = custody.openRoot(
+        root,
+        'OPEN_EXISTING',
+        'OWNER_PRIVATE',
+      );
+      expect(parentTransport.accepted).toBe(true);
+      const parent = parentTransport.value as {
+        readonly handle: object;
+      };
+      try {
+        const createdTransport = custody.openDirectoryAt(
+          parent.handle,
+          'created',
+          'OPEN_OR_CREATE',
+          'OWNER_PRIVATE',
+        );
+        expect(createdTransport.accepted).toBe(true);
+        const created = createdTransport.value as {
+          readonly state: string;
+          readonly identity: { readonly objectType: string };
+          readonly handle: object;
+        };
+        expect(created.state).toBe('CREATED');
+        expect(created.identity.objectType).toBe('DIRECTORY');
+        expect(existsSync(join(root, 'created'))).toBe(true);
+        custody.closeHandle(created.handle);
+      } finally {
+        custody.closeHandle(parent.handle);
+      }
+
+      const reopenedTransport = custody.openRoot(
+        join(root, 'created'),
+        'OPEN_EXISTING',
+        'OWNER_PRIVATE',
+      );
+      expect(reopenedTransport.accepted).toBe(true);
+      const reopened = reopenedTransport.value as {
+        readonly state: string;
+        readonly handle: object;
+      };
+      expect(reopened.state).toBe('OPENED');
+      custody.closeHandle(reopened.handle);
     });
   });
 

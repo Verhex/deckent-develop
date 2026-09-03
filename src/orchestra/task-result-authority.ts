@@ -16,7 +16,12 @@ import type {
   Sha256Digest,
   TaskAttemptCustodyIdentityV2,
 } from '../core/task-attempt-custody-store.js';
-import type { TaskResultV2 } from '../core/task-result-schema.js';
+import {
+  taskResultV2Digest,
+  validateProductionTaskResultV2,
+  type TaskResultV2,
+} from '../core/task-result-schema.js';
+import type { TaskResult } from '../core/task-types.js';
 import {
   inspectExactAcceptedTaskResultAuthority,
   inspectExactTaskResultSettlementAuthority,
@@ -99,6 +104,14 @@ export interface TaskResultAuthorityRead<T> {
   holdReason?: string;
   attemptCount?: number;
 }
+
+export type ReadExactAcceptedTaskResultV2 = TaskResultAuthorityRead<TaskResultV2> & {
+  readonly state: 'exact-accepted' | 'authority-hold';
+};
+
+export type ReadExactSettledTaskResultV2 = TaskResultAuthorityRead<TaskResultV2> & {
+  readonly state: 'exact-settled' | 'authority-hold';
+};
 
 export interface RuntimeBudgetEvaluationAuthority {
   settlementRef: TaskResultSettlementRefV1;
@@ -260,44 +273,219 @@ export function readExactSettledTaskResult<T = unknown>(
   };
 }
 
-function projectCompatibleTaskResult(result: TaskResultV2): Record<string, unknown> {
-  const {
-    attemptCustody: _attemptCustody,
-    brainEvaluation: _brainEvaluation,
-    brainEvaluationReason: _brainEvaluationReason,
-    rubricScores: _rubricScores,
-    totalScore: _totalScore,
-    filesChanged,
-    totalLinesAdded,
-    totalLinesRemoved,
-    tests,
-    ...compatible
-  } = result;
+/**
+ * Raw accepted-result reader for the exact normal-Docker evaluation boundary.
+ * Unlike the compatibility reader above, this API never removes V2 custody or
+ * evidence fields and has no generic result cast.
+ */
+export function readExactAcceptedTaskResultV2(
+  input: InspectExactAcceptedTaskResultAuthorityInput,
+): ReadExactAcceptedTaskResultV2 {
+  const rawResultPath = join(input.projectRoot, TASKS_DIR, `task-${input.taskId}.result`);
+  const inspected = inspectExactAcceptedTaskResultAuthority(input);
+  if (inspected.state === 'hold') {
+    return {
+      state: 'authority-hold',
+      result: null,
+      settlementRef: null,
+      rawResultPath,
+      holdReason: inspected.reasonCode,
+    };
+  }
+  const exactAcceptedAuthority = createExactAcceptedAuthorityMetadata(inspected);
   return {
-    ...compatible,
-    filesChanged: filesChanged.map(change => change.path),
-    linesAdded: totalLinesAdded,
-    linesRemoved: totalLinesRemoved,
-    testsPassed: result.testVerification?.outcome === 'PASSED'
-      || (result.testVerification === undefined && tests.outcome === 'PASSED'),
-    coverage: tests.coverage ?? 0,
+    state: 'exact-accepted',
+    result: inspected.result,
+    settlementRef: null,
+    rawResultPath,
+    exactAcceptedAuthority,
   };
 }
 
-function projectExactAcceptedTaskResult(
+/**
+ * Raw terminal settlement reader for exact consumers. Compatibility projections
+ * are deliberately excluded so attemptCustody and evidence remain re-readable.
+ */
+export function readExactSettledTaskResultV2(
+  input: InspectExactTaskResultAttemptSettlementInput,
+): ReadExactSettledTaskResultV2 {
+  const rawResultPath = join(input.projectRoot, TASKS_DIR, `task-${input.taskId}.result`);
+  const inspected = inspectExactTaskResultSettlementAuthority(input);
+  if (inspected.state !== 'accepted') {
+    return {
+      state: 'authority-hold',
+      result: null,
+      settlementRef: null,
+      rawResultPath,
+      ...(inspected.state === 'hold' ? { holdReason: inspected.reasonCode } : {}),
+    };
+  }
+  const exactAuthority = createExactSettlementAuthorityMetadata(inspected);
+  return {
+    state: 'exact-settled',
+    result: inspected.result,
+    settlementRef: null,
+    rawResultPath,
+    exactAuthority,
+  };
+}
+
+/**
+ * Build the legacy evaluator view from an already host-inspected V2 result.
+ * Worker-authored brainEvaluation/rubricScores/totalScore fields never enter
+ * the canonical evaluator. Identity, admission and digest are checked again at
+ * this boundary so a sibling result cannot be projected under a valid ref.
+ */
+export function projectExactTaskResultV2ForEvaluation(input: {
+  readonly result: TaskResultV2;
+  readonly acceptedAuthority: ExactAcceptedTaskResultAuthorityMetadata;
+  readonly jsonBounds: Parameters<typeof validateProductionTaskResultV2>[1];
+}): TaskResult | null {
+  const validated = validateProductionTaskResultV2(input.result, input.jsonBounds);
+  if (!validated.ok) return null;
+  const identity = validated.value.attemptCustody.identity;
+  if (
+    !sameExactTaskResultIdentity(identity, input.acceptedAuthority.identity)
+    || validated.value.attemptCustody.admissionReceiptDigest
+      !== input.acceptedAuthority.admissionReceiptDigest
+    || taskResultV2Digest(validated.value, input.jsonBounds)
+      !== input.acceptedAuthority.resultDigest
+  ) return null;
+  return projectCompatibleTaskResult(validated.value);
+}
+
+function projectCompatibleTaskResult(result: TaskResultV2): TaskResult {
+  const effectLanding = result.attemptCustody.effectLanding;
+  if (result.diskVerified !== true
+    || (effectLanding.disposition !== 'COMMITTED'
+      && effectLanding.disposition !== 'COMMITTED_NO_CHANGE')) {
+    throw createExecutionAuthorityError(
+      `Task ${result.taskId} exact compatibility projection lacks committed disk authority`,
+    );
+  }
+  return {
+    taskId: result.taskId,
+    workerId: result.workerId,
+    ...(result.promptCompilePlanId !== undefined
+      ? { promptCompilePlanId: result.promptCompilePlanId }
+      : {}),
+    filesChanged: result.filesChanged.map(change => change.path),
+    linesAdded: result.totalLinesAdded,
+    linesRemoved: result.totalLinesRemoved,
+    // This field is emitted only after strict TaskResultV2 validation and an
+    // exact COMMITTED effect-landing binding. Worker-authored disk claims never
+    // reach this projection.
+    diskVerified: true,
+    ...(result.workAttribution !== undefined
+      ? { workAttribution: result.workAttribution }
+      : {}),
+    ...(result.preDispatchSettlement !== undefined
+      ? { preDispatchSettlement: result.preDispatchSettlement }
+      : {}),
+    testsPassed: result.testVerification?.outcome === 'PASSED'
+      || (result.testVerification === undefined && result.tests.outcome === 'PASSED'),
+    ...(result.tests.command !== null ? { testCommands: [result.tests.command] } : {}),
+    ...(result.testVerification !== undefined
+      ? { testVerification: result.testVerification }
+      : {}),
+    criteriaEvidence: result.criteriaEvidence,
+    techDebtCriterionIds: result.techDebtCriterionIds,
+    coverage: result.tests.coverage ?? 0,
+    selfAssessment: result.selfAssessment,
+    notes: result.notes,
+    ...(result.promptDeliveryAttribution !== undefined
+      ? { promptDeliveryAttribution: result.promptDeliveryAttribution }
+      : {}),
+    ...(result.completedAt !== undefined ? { completedAt: result.completedAt } : {}),
+    ...(result.durationMs !== undefined ? { durationMs: result.durationMs } : {}),
+    tokenUsage: result.tokenUsage,
+    cost: result.cost,
+    ...(result.providerBilling !== undefined ? { providerBilling: result.providerBilling } : {}),
+    ...(result.productionWiringEvidence !== undefined
+      ? { productionWiringEvidence: result.productionWiringEvidence }
+      : {}),
+    ...(result.runPolicyEvidence !== undefined
+      ? { runPolicyEvidence: result.runPolicyEvidence }
+      : {}),
+  };
+}
+
+function sameExactTaskResultIdentity(
+  left: TaskAttemptCustodyIdentityV2,
+  right: TaskAttemptCustodyIdentityV2,
+): boolean {
+  return left.schemaVersion === right.schemaVersion
+    && left.backend === right.backend
+    && left.projectRootSha256 === right.projectRootSha256
+    && left.projectId === right.projectId
+    && left.taskId === right.taskId
+    && left.attemptId === right.attemptId
+    && left.generation === right.generation;
+}
+
+function createExactAcceptedAuthorityMetadata(
+  inspected: Extract<
+    ReturnType<typeof inspectExactAcceptedTaskResultAuthority>,
+    { readonly state: 'accepted-result' }
+  >,
+): ExactAcceptedTaskResultAuthorityMetadata {
+  return Object.freeze({
+    executionMode: 'normal-docker',
+    identity: Object.freeze({ ...inspected.identity }),
+    admissionReceiptDigest: inspected.admissionReceiptDigest,
+    acceptedResultRef: Object.freeze({
+      ...inspected.acceptedResultRef,
+      identity: Object.freeze({ ...inspected.acceptedResultRef.identity }),
+    }),
+    acceptedResultChainDigest: inspected.acceptedResultChainDigest,
+    resultDigest: inspected.resultDigest,
+  });
+}
+
+function createExactSettlementAuthorityMetadata(
+  inspected: Extract<
+    ReturnType<typeof inspectExactTaskResultSettlementAuthority>,
+    { readonly state: 'accepted' }
+  >,
+): ExactTaskResultAuthorityMetadata {
+  return Object.freeze({
+    executionMode: 'normal-docker',
+    identity: Object.freeze({ ...inspected.identity }),
+    admissionReceiptDigest: inspected.admissionReceiptDigest,
+    settlementRef: Object.freeze({
+      ...inspected.settlementRef,
+      identity: Object.freeze({ ...inspected.settlementRef.identity }),
+    }),
+    settlementDigest: inspected.settlementDigest,
+    resultDigest: inspected.settlement.resultDigest,
+    acceptedResultChainDigest: inspected.settlement.chain.acceptedResultChainDigest,
+    evaluationChainDigest: inspected.settlement.chain.evaluationChainDigest,
+    finalizerChainDigest: inspected.settlement.chain.finalizerChainDigest,
+    evaluationArtifact: Object.freeze({ ...inspected.evaluationArtifact }),
+    finalizerArtifact: Object.freeze({ ...inspected.finalizerArtifact }),
+  });
+}
+
+/**
+ * Project one backend-verified V2 accepted result onto the compatibility shape
+ * consumed by non-terminal surfaces.  The exact metadata object is carried by
+ * reference so a process-local consumer can prove the projection and its
+ * authority were produced together; callers must not reconstruct either side.
+ */
+export function projectExactAcceptedTaskResult(
   result: TaskResultV2,
   exactAcceptedResultAuthority: ExactAcceptedTaskResultAuthorityMetadata,
-): ExactAcceptedAuthoritativeTaskResult<Record<string, unknown>> {
-  return {
+): ExactAcceptedAuthoritativeTaskResult<TaskResult> {
+  return Object.freeze({
     ...projectCompatibleTaskResult(result),
     exactAcceptedResultAuthority,
-  };
+  });
 }
 
 function projectExactTaskResult(
   result: TaskResultV2,
   exactSettlementAuthority: ExactTaskResultAuthorityMetadata,
-): ExactAuthoritativeTaskResult<Record<string, unknown>> {
+): ExactAuthoritativeTaskResult<TaskResult> {
   return {
     ...projectCompatibleTaskResult(result),
     exactSettlementAuthority,

@@ -8,6 +8,7 @@ import {
   type EvaluationResult,
   type Task,
 } from '../../src/core/types.js';
+import { createProductionWiringPlanEvidenceV2 } from '../../src/core/task-types.js';
 import type { ProductionWiringContractV1 } from '../../src/core/production-wiring-contract.js';
 import type { ProductionWiringResultSettlementDecision } from '../../src/core/task-result-settlement.js';
 
@@ -89,6 +90,78 @@ function settled(taskWithAuthority: Task): ProductionWiringResultSettlementDecis
     state: 'PRODUCTION_WIRED',
     contractDigest,
     evidenceRefs: ['host:brain-result-evaluator:consumer-execution'],
+  };
+}
+
+function v2Task(): Task {
+  const common = {
+    observationGroupId: 'runtime-observation',
+    harnessPath: 'scripts/trusted-host-proof.mjs',
+    verifierAssetPaths: ['scripts/trusted-host-proof.mjs'],
+    args: ['observe'],
+    cwd: '.',
+    timeoutMs: 30_000,
+    outputLimitBytes: 64 * 1024,
+    expectation: {
+      kind: 'adapter-structured-outcome' as const,
+      schemaId: 'deckent.test.production-wiring.v1',
+      outcome: 'observed' as const,
+    },
+  };
+  const targets = [
+    { kind: 'producer' as const, targetId: 'settled wiring evidence' },
+    { kind: 'canonical-consumer' as const, targetId: 'Brain result evaluator' },
+    { kind: 'affected-ingress' as const, targetId: 'Run' },
+    { kind: 'enablement-authority' as const, targetId: 'production mutation' },
+    { kind: 'proof-target' as const, targetId: 'production-wiring-evaluator-gate' },
+  ];
+  const authority = createProductionWiringPlanEvidenceV2({
+    version: 2,
+    changeKind: 'runtime-change',
+    producer: { producerId: 'settled wiring evidence' },
+    canonicalConsumer: {
+      consumerId: 'Brain result evaluator',
+      relationship: 'invokes-producer',
+    },
+    affectedIngresses: [{ ingressId: 'Run', kind: 'ingress' }],
+    enablementAuthority: { authorityId: 'production mutation', mechanism: 'policy' },
+    disposition: { kind: 'production-wiring' },
+    proofTargets: [{
+      proofTargetId: 'production-wiring-evaluator-gate',
+      kind: 'consumer-execution',
+    }],
+    hostProofProgram: {
+      network: 'forbidden',
+      verifierAssets: [{
+        path: common.harnessPath,
+        sha256: `sha256:${'a'.repeat(64)}`,
+        role: 'trusted-harness',
+      }],
+      platforms: [{
+        platform: 'linux',
+        state: 'supported',
+        runnerAdapterId: 'docker-readonly-host-proof-v1',
+        probes: targets.map(target => ({ target, ...common })),
+      },
+      { platform: 'wsl2-linux', state: 'unsupported', reasonCode: 'owner-deferred' },
+      { platform: 'darwin', state: 'unsupported', reasonCode: 'owner-deferred' },
+      { platform: 'win32', state: 'unsupported', reasonCode: 'owner-deferred' }],
+    },
+  });
+  return { ...task(), productionWiring: authority };
+}
+
+function v2Settled(taskWithAuthority: Task): ProductionWiringResultSettlementDecision {
+  const authority = taskWithAuthority.productionWiring;
+  if (!authority || authority.version !== 2) throw new Error('V2 authority required');
+  return {
+    state: 'PRODUCTION_WIRED',
+    contractDigest: authority.contractDigest,
+    hostProofProgramDigest: authority.hostProofProgramDigest,
+    effectLandingReceiptDigest: `sha256:${'b'.repeat(64)}`,
+    effectLandingChainDigest: `sha256:${'c'.repeat(64)}`,
+    proofRunDigest: `sha256:${'d'.repeat(64)}`,
+    evidenceRefs: ['host-proof:bound'],
   };
 }
 
@@ -181,4 +254,38 @@ describe('Brain production wiring evaluator gate', () => {
     expect(gateProductionWiringVerdict(debt, productionTask, settled(productionTask))).toBe(debt);
     expect(gateProductionWiringVerdict(doneCandidate(), legacyTask, undefined)).toEqual(doneCandidate());
   });
+
+  it('preserves V2 DONE only when host proof and COMMITTED effect bindings are present', () => {
+    const inputTask = v2Task();
+    expect(gateProductionWiringVerdict(doneCandidate(), inputTask, v2Settled(inputTask)))
+      .toMatchObject({ decision: 'DONE' });
+  });
+
+  it('fails closed when a V2 settlement omits or replays its proof authority', () => {
+    const inputTask = v2Task();
+    const complete = v2Settled(inputTask);
+    const { proofRunDigest: _proofRunDigest, ...missingProof } = complete.state === 'PRODUCTION_WIRED'
+      ? complete
+      : neverReached();
+    const wrongProgram = complete.state === 'PRODUCTION_WIRED'
+      ? { ...complete, hostProofProgramDigest: 'e'.repeat(64) }
+      : neverReached();
+    const malformedEffect = complete.state === 'PRODUCTION_WIRED'
+      ? { ...complete, effectLandingChainDigest: 'host-claimed-current' as never }
+      : neverReached();
+
+    expect(gateProductionWiringVerdict(
+      doneCandidate(), inputTask, missingProof as ProductionWiringResultSettlementDecision,
+    ).rubricScores.at(-1)?.reason).toBe('HOLD:host-settlement-proof-authority-mismatch');
+    expect(gateProductionWiringVerdict(
+      doneCandidate(), inputTask, wrongProgram,
+    ).rubricScores.at(-1)?.reason).toBe('HOLD:host-settlement-proof-authority-mismatch');
+    expect(gateProductionWiringVerdict(
+      doneCandidate(), inputTask, malformedEffect,
+    ).rubricScores.at(-1)?.reason).toBe('HOLD:host-settlement-proof-authority-mismatch');
+  });
 });
+
+function neverReached(): never {
+  throw new Error('fixture settlement must be PRODUCTION_WIRED');
+}

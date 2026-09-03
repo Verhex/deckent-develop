@@ -13,12 +13,17 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { evaluateGoNogoCriteria, hasUnsalvageableContractFailure } from '../../src/orchestra/criterion-evaluation.js';
+import {
+  evaluateExactGoNogoCriteria,
+  evaluateGoNogoCriteria,
+  hasUnsalvageableContractFailure,
+} from '../../src/orchestra/criterion-evaluation.js';
 import { evaluateWithRubric, reconcileEvaluationSpuriousNoGo } from '../../src/orchestra/result-evaluator.js';
 import { reconcileRubricNoGo } from '../../src/orchestra/mid-sprint-adapter.js';
 import { createGoNoGoCriterionItem } from '../../src/core/task-types.js';
 import { TaskStatus } from '../../src/core/types.js';
 import type { Task, TaskResult } from '../../src/core/types.js';
+import { createTaskResultSettlementV2Fixture } from '../helpers/task-result-settlement-v2-fixture.js';
 
 let root: string;
 
@@ -237,5 +242,109 @@ describe('rubric bridge — typed contract caps the verdict', () => {
     ]);
     const evaluation = evaluateWithRubric(makeResult(), task);
     expect(evaluation.rubricScores.some(score => score.criterion.startsWith('goNogo:'))).toBe(false);
+  });
+});
+
+describe('exact criterion authority — committed manifest only', () => {
+  function exactFixture() {
+    const fixture = createTaskResultSettlementV2Fixture({
+      terminal: 'accepted-only',
+      tailArtifactKey: 'criterion-exact',
+    });
+    const binding = fixture.result.attemptCustody.effectLanding;
+    if (!binding) throw new Error('effect landing binding missing');
+    const landing = fixture.store.readVerifiedEffectLanding({
+      identity: fixture.identity,
+      policy: fixture.policy,
+      artifactKey: binding.landingArtifactKey,
+    });
+    if (!landing) throw new Error('verified effect landing missing');
+    return { fixture, landing };
+  }
+
+  function exactTask(
+    requirement: { kind: 'file'; value: string },
+  ): Task {
+    return makeTask([createGoNoGoCriterionItem({
+      polarity: 'go',
+      statement: 'exact file exists',
+      evidenceRequirements: [requirement],
+    })], {
+      id: 'fixture-001',
+      sprintId: 'fixture-sprint',
+      type: 'code-development',
+      scope: {
+        directories: ['tests/helpers'],
+        filesRead: ['tests/helpers/input.ts'],
+        filesWrite: ['tests/helpers/output.ts'],
+      },
+    });
+  }
+
+  it('marks an in-policy absent file unsatisfied without reading the host tree', () => {
+    const { fixture, landing } = exactFixture();
+    const read = evaluateExactGoNogoCriteria({
+      task: exactTask({ kind: 'file', value: 'tests/helpers/output.ts' }),
+      result: fixture.result,
+      effectLanding: landing,
+      policy: fixture.policy,
+    });
+    expect(read).toMatchObject({
+      state: 'evaluated',
+      authority: { outcome: { decisiveNoGo: true, decided: 1 } },
+    });
+    if (read.state !== 'evaluated') return;
+    expect(read.authority.outcome?.items[0]).toMatchObject({
+      status: 'unsatisfied', mode: 'deterministic',
+    });
+  });
+
+  it('leaves an out-of-policy file undecidable instead of asserting absence', () => {
+    const { fixture, landing } = exactFixture();
+    const read = evaluateExactGoNogoCriteria({
+      task: exactTask({ kind: 'file', value: 'docs/outside.md' }),
+      result: fixture.result,
+      effectLanding: landing,
+      policy: fixture.policy,
+    });
+    expect(read).toMatchObject({
+      state: 'evaluated',
+      authority: { outcome: { decisiveNoGo: false, decided: 0 } },
+    });
+  });
+
+  it('accepts a regular file only when it is present in the committed final manifest', () => {
+    const { fixture, landing } = exactFixture();
+    const effectLanding = {
+      ...landing,
+      verifiedBundle: {
+        ...landing.verifiedBundle,
+        final: {
+          ...landing.verifiedBundle.final,
+          entries: [
+            ...landing.verifiedBundle.final.entries,
+            {
+              path: 'tests/helpers/output.ts',
+              kind: 'regular-file' as const,
+              mode: 0o644,
+              size: 4,
+              contentDigest: 'sha256:present',
+            },
+          ],
+        },
+      },
+    };
+    const read = evaluateExactGoNogoCriteria({
+      task: exactTask({ kind: 'file', value: 'tests/helpers/output.ts' }),
+      result: fixture.result,
+      effectLanding,
+      policy: fixture.policy,
+    });
+    expect(read).toMatchObject({
+      state: 'evaluated',
+      authority: { outcome: { decisiveNoGo: false, decided: 1 } },
+    });
+    if (read.state !== 'evaluated') return;
+    expect(read.authority.outcome?.items[0]?.status).toBe('satisfied');
   });
 });

@@ -27,7 +27,7 @@ function topLevelCommand(argv: readonly string[]): string | undefined {
   return argv.slice(2).find(argument => !argument.startsWith('-'));
 }
 
-const PROVIDER_AUTHORITY_COMMANDS = new Set(['run', 'start', 'do', 'xverify']);
+const PROVIDER_AUTHORITY_COMMANDS = new Set(['run', 'spawn', 'start', 'do', 'xverify']);
 
 /**
  * Canonical Brain front-door for CLI planning surfaces. It checks authority
@@ -103,7 +103,7 @@ export function createLazyDockerReachabilityTransportResolver(
 
 /**
  * Own the single provider-authority lifecycle for one CLI process invocation.
- * Non-provider commands do not load config or open custody. `run|start|do|xverify`
+ * Non-provider commands do not load config or open custody. `run|spawn|start|do|xverify`
  * receive the exact open result and the root closes it after command
  * settlement, including failures.
  */

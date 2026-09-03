@@ -31,6 +31,10 @@ export const EXEC_AUTHORITY_ABI_VERSION = '1.0.0';
 export const EXEC_AUTHORITY_HANDLE_ABI = 'deckent.exec-authority.opaque-generation.v1';
 export const EXEC_AUTHORITY_NATIVE_PACKAGE = '@deckent/exec-authority-native';
 export const EXEC_AUTHORITY_NODE_GYP_VERSION = '12.2.0';
+export const EXECUTION_EFFECT_ABI_NAME = 'deckent.execution-effect';
+export const EXECUTION_EFFECT_ABI_VERSION = '2.1.0';
+export const EXECUTION_EFFECT_HANDLE_ABI = 'deckent.execution-effect.opaque-generation.v2';
+export const EXECUTION_EFFECT_TRUST_DOMAIN = 'execution-effect-linux-v1';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const NATIVE_RELATIVE_ROOT = 'native/exec-authority';
@@ -51,6 +55,8 @@ const EXPECTED_EXPORT_SET = Object.freeze([
   'closeFd',
   'custodyCloseHandle',
   'custodyInvoke',
+  'effectCloseHandle',
+  'effectInvoke',
   'fdPath',
   'fstatIdentity',
   'hostBootIdentity',
@@ -59,6 +65,20 @@ const EXPECTED_EXPORT_SET = Object.freeze([
   'readdirFd',
   'renameAt',
   'unlinkAt',
+]);
+const EXPECTED_EFFECT_OPERATION_SET = Object.freeze([
+  'append-stage',
+  'apply-operation',
+  'begin-source-read',
+  'begin-stage',
+  'capture-tree',
+  'finish-source-read',
+  'inspect-entry',
+  'next-source-chunk',
+  'open-root',
+  'reconcile-operation',
+  'seal-stage',
+  'verify-postimages',
 ]);
 const ARTIFACT_KEYS = Object.freeze([
   'abiName',
@@ -232,7 +252,14 @@ export function expectedNativeArch() {
 }
 
 export function expectedNativeFeatures(platform = expectedNativePlatform()) {
-  if (platform === 'linux' || platform === 'darwin') {
+  if (platform === 'linux') {
+    return Object.freeze([
+      'custody-posix-v1',
+      EXECUTION_EFFECT_TRUST_DOMAIN,
+      'legacy-posix-fd-v1',
+    ]);
+  }
+  if (platform === 'darwin') {
     return Object.freeze(['custody-posix-v1', 'legacy-posix-fd-v1']);
   }
   if (platform === 'win32') return Object.freeze(['custody-win32-v1']);
@@ -284,8 +311,13 @@ function validateRawBinding(raw, nativeVersion, platform, arch) {
   }
   const manifest = raw.capabilityManifest;
   const keys = [
-    'abiName', 'abiVersion', 'arch', 'buildType', 'exportSet', 'features', 'handleAbi',
-    'napiVersion', 'packageName', 'packageVersion', 'platform', 'schemaVersion',
+    'abiName', 'abiVersion', 'arch', 'buildType', 'effectContract', 'exportSet', 'features',
+    'handleAbi', 'napiVersion', 'packageName', 'packageVersion', 'platform', 'schemaVersion',
+  ];
+  const effectContract = manifest?.effectContract;
+  const effectKeys = [
+    'abiName', 'abiVersion', 'available', 'handleAbi', 'operations', 'schemaVersion',
+    'trustDomain',
   ];
   if (!exactKeys(manifest, keys) || !Object.isFrozen(manifest)
     || manifest.schemaVersion !== 1
@@ -297,6 +329,15 @@ function validateRawBinding(raw, nativeVersion, platform, arch) {
     || manifest.packageVersion !== nativeVersion
     || manifest.platform !== platform || manifest.arch !== arch
     || manifest.buildType !== 'Release'
+    || !exactKeys(effectContract, effectKeys)
+    || !Object.isFrozen(effectContract)
+    || effectContract.schemaVersion !== 1
+    || effectContract.abiName !== EXECUTION_EFFECT_ABI_NAME
+    || effectContract.abiVersion !== EXECUTION_EFFECT_ABI_VERSION
+    || effectContract.handleAbi !== EXECUTION_EFFECT_HANDLE_ABI
+    || effectContract.trustDomain !== EXECUTION_EFFECT_TRUST_DOMAIN
+    || effectContract.available !== (platform === 'linux')
+    || !exactFrozenStringArray(effectContract.operations, EXPECTED_EFFECT_OPERATION_SET)
     || !exactFrozenStringArray(manifest.features, expectedNativeFeatures(platform))
     || !exactFrozenStringArray(manifest.exportSet, EXPECTED_EXPORT_SET)) {
     fail('E_NATIVE_BINDING_MANIFEST_CONTRACT');

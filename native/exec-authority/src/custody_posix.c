@@ -1217,6 +1217,26 @@ static bool rollback_named_create_guard(
   return rolled_back && closed;
 }
 
+static deckent_native_created_guard_result resolve_named_create_guard(
+  uintptr_t opaque_guard,
+  bool accept
+) {
+  deckent_posix_named_create_guard *guard =
+    (deckent_posix_named_create_guard *)opaque_guard;
+  bool confirmed;
+  if (guard == NULL || !guard->active) {
+    return DECKENT_NATIVE_CREATED_GUARD_INVALID;
+  }
+  confirmed = accept
+    ? release_named_create_guard(guard)
+    : rollback_named_create_guard(guard);
+  free(guard);
+  if (!confirmed) return DECKENT_NATIVE_CREATED_GUARD_UNCONFIRMED;
+  return accept
+    ? DECKENT_NATIVE_CREATED_GUARD_ACCEPTED
+    : DECKENT_NATIVE_CREATED_GUARD_ROLLED_BACK;
+}
+
 static napi_value finish_open_failure(
   napi_env env,
   bool created,
@@ -1429,7 +1449,7 @@ static bool mount_alias_is_ambiguous(
   const deckent_posix_identity_snapshot *left,
   const deckent_posix_identity_snapshot *right
 ) {
-  return left->status.st_dev == right->status.st_dev
+  return same_physical_directory(left, right)
     && left->mount_id != right->mount_id;
 }
 
@@ -2031,11 +2051,10 @@ static napi_value return_open_result(
   napi_value saved;
   deckent_native_handle_kind kind = resource->kind;
   deckent_native_retire_result cleanup;
-  deckent_posix_named_create_guard guard;
+  deckent_posix_named_create_guard *guard = NULL;
   bool guard_partial_cleanup = true;
   bool rolled_back;
   bool resource_closed;
-  initialize_named_create_guard(&guard);
   if (created) {
     resource->target_name = strdup(created_name);
     if (resource->target_name == NULL) {
@@ -2061,12 +2080,34 @@ static napi_value return_open_result(
     }
     resource->named_create_identity = *created_identity;
     resource->named_create_identity_valid = true;
+    guard = (deckent_posix_named_create_guard *)calloc(1u, sizeof(*guard));
+    if (guard == NULL) {
+      rolled_back = rollback_created_directory(
+        resource->fd,
+        resource->parent_fd,
+        created_name,
+        created_identity
+      );
+      resource_closed = close_posix_resource((uintptr_t)resource) == 0;
+      if (!rolled_back || !resource_closed) {
+        return throw_typed(
+          env,
+          DECKENT_NATIVE_ERROR_CREATE_UNCONFIRMED,
+          "POSIX custody create guard allocation cleanup was not confirmed"
+        );
+      }
+      return throw_typed(
+        env,
+        "E_EXEC_AUTH_NATIVE_ALLOCATION",
+        "POSIX custody create guard allocation failed"
+      );
+    }
   }
   if (created && !arm_named_create_guard(
         resource,
         created_name,
         created_identity,
-        &guard,
+        guard,
         &guard_partial_cleanup
       )) {
     rolled_back = rollback_created_directory(
@@ -2076,6 +2117,8 @@ static napi_value return_open_result(
       created_identity
     );
     resource_closed = close_posix_resource((uintptr_t)resource) == 0;
+    free(guard);
+    guard = NULL;
     if (!rolled_back || !resource_closed || !guard_partial_cleanup) {
       return throw_typed(
         env,
@@ -2101,7 +2144,9 @@ static napi_value return_open_result(
         &identity.status
       ))) {
     saved = take_pending_exception(env);
-    rolled_back = !created || rollback_named_create_guard(&guard);
+    rolled_back = !created || rollback_named_create_guard(guard);
+    free(guard);
+    guard = NULL;
     resource_closed = close_posix_resource((uintptr_t)resource) == 0;
     if (created && (!rolled_back || !resource_closed)) {
       return throw_typed(
@@ -2127,7 +2172,9 @@ static napi_value return_open_result(
   result = deckent_native_create_result_record(env);
   if (result == NULL || !create_identity_record(env, &identity, &identity_record)) {
     saved = take_pending_exception(env);
-    rolled_back = !created || rollback_named_create_guard(&guard);
+    rolled_back = !created || rollback_named_create_guard(guard);
+    free(guard);
+    guard = NULL;
     resource_closed = close_posix_resource((uintptr_t)resource) == 0;
     if (created && (!rolled_back || !resource_closed)) {
       return throw_typed(
@@ -2160,7 +2207,9 @@ static napi_value return_open_result(
   );
   if (handle == NULL) {
     saved = take_pending_exception(env);
-    rolled_back = !created || rollback_named_create_guard(&guard);
+    rolled_back = !created || rollback_named_create_guard(guard);
+    free(guard);
+    guard = NULL;
     if (created && !rolled_back) {
       return throw_typed(
         env,
@@ -2184,10 +2233,11 @@ static napi_value return_open_result(
         result,
         "state",
         created ? "CREATED" : "OPENED"
-      )
-      || !deckent_native_finalize_result_record(env, result, operation)) {
+      )) {
     saved = take_pending_exception(env);
-    rolled_back = !created || rollback_named_create_guard(&guard);
+    rolled_back = !created || rollback_named_create_guard(guard);
+    free(guard);
+    guard = NULL;
     cleanup = retire_returned_handle(env, state, handle, kind);
     if (created && (!rolled_back || cleanup != DECKENT_NATIVE_RETIRE_CONFIRMED)) {
       return throw_typed(
@@ -2210,25 +2260,54 @@ static napi_value return_open_result(
       "POSIX custody open result could not be finalized"
     );
   }
-  if (created && !release_named_create_guard(&guard)) {
-    rolled_back = rollback_created_directory(
-      resource->fd,
-      resource->parent_fd,
-      created_name,
-      created_identity
-    );
+  if (created && !deckent_native_bind_created_result_guard(
+        env,
+        state,
+        result,
+        operation,
+        handle,
+        (uintptr_t)guard,
+        resolve_named_create_guard
+      )) {
+    saved = take_pending_exception(env);
+    rolled_back = rollback_named_create_guard(guard);
+    free(guard);
+    guard = NULL;
     cleanup = retire_returned_handle(env, state, handle, kind);
     if (!rolled_back || cleanup != DECKENT_NATIVE_RETIRE_CONFIRMED) {
       return throw_typed(
         env,
         DECKENT_NATIVE_ERROR_CREATE_UNCONFIRMED,
-        "POSIX custody create rollback after guard cleanup was not confirmed"
+        "POSIX custody created-result guard binding cleanup was not confirmed"
       );
     }
-    return throw_typed(
+    return restore_pending_or_throw(
       env,
-      DECKENT_NATIVE_ERROR_CREATE_UNCONFIRMED,
-      "POSIX custody create rollback-authority cleanup was not confirmed"
+      saved,
+      "E_EXEC_AUTH_NATIVE_BACKEND_ABI",
+      "POSIX custody created-result guard could not be bound"
+    );
+  }
+  if (created) guard = NULL;
+  if (!deckent_native_finalize_result_record(env, result, operation)) {
+    if (created) {
+      /* Common boundary owns the guard and will rollback before rethrow. */
+      return NULL;
+    }
+    saved = take_pending_exception(env);
+    cleanup = retire_returned_handle(env, state, handle, kind);
+    if (cleanup != DECKENT_NATIVE_RETIRE_CONFIRMED) {
+      return throw_typed(
+        env,
+        "E_EXEC_AUTH_NATIVE_CLOSE_UNCONFIRMED",
+        "POSIX custody rejected open handle cleanup was not confirmed"
+      );
+    }
+    return restore_pending_or_throw(
+      env,
+      saved,
+      "E_EXEC_AUTH_NATIVE_BACKEND_ABI",
+      "POSIX custody open result could not be finalized"
     );
   }
   return result;
@@ -7366,7 +7445,18 @@ static napi_value effect_capture_tree(
   }
   stack[0].depth = 0u;
   stack_count = 1u;
-  stack[0].directory_fd = dup(root->fd);
+  /*
+   * `dup(root->fd)` would share the directory stream offset with the durable
+   * root handle. A completed capture could then make the next capture observe
+   * an empty directory. Reopen `.` relative to the pinned root so every
+   * invocation owns an independent open-file description while retaining the
+   * descriptor-relative/no-follow boundary.
+   */
+  stack[0].directory_fd = openat(
+    root->fd,
+    ".",
+    O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC
+  );
   if (stack[0].directory_fd < 0) {
     throw_errno_typed(env, errno);
     goto failed;

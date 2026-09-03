@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "outcomeId": "RECOVERY-BORN-711-NORMAL-DOCKER-EXACT-ATTEMPT-CUSTODY-001",
   "capturedAt": "2026-08-30T21:44:06+03:00",
-  "scopeRevisedAt": "2026-09-01T23:28:49+03:00",
+  "scopeRevisedAt": "2026-09-02T19:05:06+03:00",
   "state": "ADMISSION_ONLY_NOT_EXECUTED",
   "baselineAuthority": {
     "kind": "git-tree-plus-explicit-dirty-governance",
@@ -11,13 +11,13 @@
     "originSha": "33b0f04919ae413e0e3d607a9e8abe265a8eee54",
     "previousManifestAlgorithm": "prior accepted manifestSha256",
     "scopeRevisionAlgorithm": "sha256(lexicographically-sorted add|lane|kind|path|baselineSha256 + LF and transfer|fromLane|toLane|kind|path|baselineSha256 + LF)",
-    "manifestAlgorithm": "sha256(previous|previousManifestSha256 + LF + revision|scopeRevisionSha256 + LF + production|71 + LF + mutationSupport|213 + LF + duplicate|0 + LF + unassigned|0 + LF)",
-    "previousManifestSha256": "7ced1c26ff55e3bb13651af55cbca6720138fe919c1118eb9489469a492ad252",
-    "scopeRevisionSha256": "0e1887d8471ad9bc221392ac46edacc862b713707bc5261cfb92cc91dd5cad44",
-    "manifestSha256": "7cc6a97771ce506163114b77200525bf92abd2be485c03d44f650d16df39cfc7",
-    "ownerDecisionRef": "owner-live-2026-09-01-harika-devam",
-    "productionCount": 71,
-    "mutationSupportCount": 213,
+    "manifestAlgorithm": "sha256(previous|previousManifestSha256 + LF + revision|scopeRevisionSha256 + LF + production|91 + LF + mutationSupport|245 + LF + duplicate|0 + LF + unassigned|0 + LF)",
+    "previousManifestSha256": "e1d37bf8e8d563de36667b4107b5ce273bde01bba7d796d5d1aef5fa94f8980c",
+    "scopeRevisionSha256": "d73278c8b73b159d0d0e99159028640f5b7562c13cecfe0cfc60d8e1a03e704d",
+    "manifestSha256": "931d5e552d4c6f22bbaf1dfd5700178a8a160fdc0f7018f8cf8071aab1c406eb",
+    "ownerDecisionRef": "owner-live-2026-09-02-approve-scope-revision-033-t13-exact-result-consumer-projection",
+    "productionCount": 91,
+    "mutationSupportCount": 245,
     "duplicateCount": 0,
     "unassignedCount": 0
   },
@@ -35,6 +35,11 @@
     "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
     "tests/integration/task-attempt-custody-cutover.integration.test.ts",
     "tests/orchestra/debt-manager-attempt-custody.test.ts",
+    "src/orchestra/exact-accepted-result-terminal-authority.ts",
+    "src/orchestra/repair-birth-authority.ts",
+    "tests/orchestra/exact-accepted-result-terminal-authority.test.ts",
+    "tests/orchestra/exact-accepted-result-evaluation-settlement.test.ts",
+    "tests/orchestra/repair-birth-authority.test.ts",
     "native/exec-authority/src/custody_common.h",
     "native/exec-authority/src/custody_posix.c",
     "native/exec-authority/src/custody_win32.c",
@@ -50,19 +55,32 @@
     "src/orchestra/execution-effect-landing-coordinator.ts",
     "tests/core/execution-effect-containment.test.ts",
     "tests/orchestra/execution-effect-landing-coordinator.test.ts",
-    "tests/orchestra/exact-docker-effect-containment.test.ts"
+    "tests/orchestra/exact-docker-effect-containment.test.ts",
+    "src/orchestra/exact-docker-dispatch-task-authority.ts",
+    "tests/orchestra/exact-docker-dispatch-task-authority.test.ts",
+    "src/orchestra/exact-docker-provider-exit-authority.ts",
+    "src/orchestra/exact-evaluation-policy-authority.ts",
+    "tests/orchestra/exact-docker-provider-exit-authority.test.ts",
+    "tests/orchestra/exact-evaluation-policy-authority.test.ts",
+    "src/orchestra/production-wiring-host-observation.ts",
+    "tests/orchestra/exact-controller-terminal-fanin.test.ts",
+    "tests/orchestra/exact-production-wiring-host-settlement.test.ts",
+    "tests/orchestra/exact-pause-resume-custody.test.ts",
+    "src/core/production-wiring-host-proof.ts",
+    "src/orchestra/production-wiring-host-proof-runner.ts",
+    "tests/orchestra/production-wiring-host-proof-runner.test.ts",
+    "tests/orchestra/production-wiring-production-composition.test.ts",
+    "scripts/production-wiring-host-proof-harness.mjs",
+    "tests/scripts/production-wiring-host-proof-harness.test.ts"
   ],
   "productionByLane": {
     "T1": [],
     "T2": [],
     "T3": [],
     "T4": [
-      "src/core/task-types.ts",
       "src/orchestra/ipc-registry.ts",
       "src/orchestra/question-approval-bridge.ts",
-      "src/orchestra/result-assembler.ts",
-      "src/orchestra/task-result-authority.ts",
-      "src/orchestra/task-settlement-projection.ts"
+      "src/orchestra/result-assembler.ts"
     ],
     "T5": [
       "src/agents/landing-proposal-entry.ts",
@@ -83,10 +101,8 @@
       "src/core/execution-write-scope-policy.ts",
       "src/core/file-lock.ts",
       "src/core/task-attempt-custody-posix-adapter.ts",
-      "src/core/task-attempt-custody-store.ts",
       "src/core/task-attempt-custody-win32-adapter.ts",
       "src/core/task-result-schema.ts",
-      "src/core/task-result-settlement.ts",
       "src/orchestra/execution-effect-landing-coordinator.ts",
       "src/orchestra/execution-effect-docker-lifecycle.ts",
       "src/orchestra/execution-effect-lock-adapter.ts",
@@ -100,19 +116,10 @@
       "src/cli/commands/start.ts",
       "src/cli/helpers/process-runtime.ts",
       "src/orchestra/exact-plan-start-service.ts",
-      "src/orchestra/scheduler-effects.ts",
-      "src/orchestra/result-collector.ts",
-      "src/orchestra/spawn-backend-docker.ts",
-      "src/orchestra/spawn-backend.ts",
-      "src/orchestra/sprint-controller.ts",
-      "src/orchestra/sprint-phases.ts",
-      "src/orchestra/sprint-planner.ts",
-      "src/orchestra/sprint-spawner.ts",
-      "src/orchestra/task-artifact-projection.ts",
-      "src/orchestra/task-builder.ts"
+      "src/orchestra/task-artifact-projection.ts"
     ],
     "T7": [
-      "src/cli/index.ts",
+      "src/cli/provider-authority-process-runtime.ts",
       "src/cli/commands/run.ts",
       "src/cli/commands/spawn.ts",
       "src/cli/helpers/message-catalog/cli-run.ts",
@@ -121,30 +128,65 @@
       "src/core/task-settlement-authority.ts",
       "src/mcp/tools/run.ts",
       "src/mcp/tools/job-runner.ts",
-      "src/orchestra/task-mode-runner.ts"
+      "src/orchestra/task-mode-runner.ts",
+      "src/orchestra/autonomous/backlog-types.ts"
     ],
     "T8": [
+      "src/cli/commands/xverify.ts",
+      "src/core/xverify-task-settlement.ts",
       "src/orchestra/cross-verify-docker-runtime-authority.ts",
       "src/orchestra/cross-verify-production-ingress-authority.ts",
       "src/orchestra/cross-verify-runner.ts"
     ],
     "T9": [
-      "src/orchestra/debt-manager.ts"
+      "src/orchestra/debt-manager.ts",
+      "src/orchestra/repair-birth-authority.ts"
     ],
     "T10": [
       "src/cli/commands/finalize.ts",
-      "src/cli/commands/resume.ts",
       "src/orchestra/completed-checkpoint-terminalizer.ts",
-      "src/orchestra/sprint-checkpoint.ts",
       "src/orchestra/sprint-finalizer.ts"
     ],
     "T11": [
       "src/orchestra/acceptance-enforcement.ts",
-      "src/orchestra/evaluation-audit-trail.ts"
+      "src/orchestra/criterion-evaluation.ts",
+      "src/orchestra/exact-accepted-result-terminal-authority.ts",
+      "src/orchestra/exact-docker-provider-exit-authority.ts",
+      "src/orchestra/exact-evaluation-policy-authority.ts",
+      "src/orchestra/task-settlement-projection.ts"
     ],
-    "T12": [],
+    "T12": [
+      "scripts/production-wiring-host-proof-harness.mjs",
+      "src/cli/commands/resume.ts",
+      "src/cli/index.ts",
+      "src/core/production-wiring-contract.ts",
+      "src/core/production-wiring-host-proof.ts",
+      "src/core/task-attempt-custody-store.ts",
+      "src/core/task-result-settlement.ts",
+      "src/core/task-types.ts",
+      "src/orchestra/evaluation-audit-trail.ts",
+      "src/orchestra/exact-docker-dispatch-task-authority.ts",
+      "src/orchestra/planner.ts",
+      "src/orchestra/production-wiring-host-observation.ts",
+      "src/orchestra/production-wiring-host-proof-runner.ts",
+      "src/orchestra/prompt-god-template.ts",
+      "src/orchestra/result-collector.ts",
+      "src/orchestra/result-evaluator.ts",
+      "src/orchestra/spawn-backend-docker.ts",
+      "src/orchestra/spawn-backend.ts",
+      "src/orchestra/sprint-checkpoint.ts",
+      "src/orchestra/sprint-controller.ts",
+      "src/orchestra/sprint-lifecycle.ts",
+      "src/orchestra/sprint-planner.ts",
+      "src/orchestra/sprint-phases.ts",
+      "src/orchestra/sprint-spawner.ts",
+      "src/orchestra/task-builder.ts"
+    ],
     "T13": [
-      "src/orchestra/autonomous/execute-dispatcher.ts"
+      "src/orchestra/autonomous/execute-dispatcher.ts",
+      "src/orchestra/process-runtime.ts",
+      "src/orchestra/scheduler-effects.ts",
+      "src/orchestra/task-result-authority.ts"
     ],
     "T14": [],
     "T15": [
@@ -176,8 +218,7 @@
       "tests/orchestra/ipc-worker-question-action.test.ts",
       "tests/orchestra/question-approval-bridge.test.ts",
       "tests/orchestra/result-assembler.test.ts",
-      "tests/orchestra/result-collector.test.ts",
-      "tests/orchestra/task-result-authority.test.ts"
+      "tests/orchestra/result-collector.test.ts"
     ],
     "T5": [
       "tests/core/execution-landing-checkpoint.test.ts",
@@ -209,12 +250,10 @@
       "tests/core/execution-write-scope-policy.test.ts",
       "tests/core/task-attempt-custody-posix-adapter.test.ts",
       "tests/core/task-execution-fence.test.ts",
-      "tests/core/task-attempt-custody-store.test.ts",
       "tests/core/task-attempt-custody-win32-adapter.test.ts",
       "tests/core/task-result-schema.test.ts",
       "tests/core/task-result-settlement.test.ts",
       "tests/native/exec-authority-native.test.ts",
-      "tests/orchestra/docker-restart-reconcile.test.ts",
       "tests/orchestra/exact-docker-effect-containment.test.ts",
       "tests/orchestra/execution-effect-landing-coordinator.test.ts",
       "tests/orchestra/execution-effect-docker-lifecycle.test.ts",
@@ -222,26 +261,22 @@
       "tests/orchestra/execution-effect-native-adapter.test.ts",
       "tests/orchestra/execution-effect-store-adapter.test.ts",
       "tests/orchestra/execution-landing-coordinator.test.ts",
-      "tests/helpers/task-result-settlement-v2-fixture.ts",
       "tests/orchestra/spawn-backend-docker.test.ts"
     ],
     "T6": [
       "tests/orchestra/dependency-aggregate-fix-aware.test.ts",
       "tests/orchestra/exact-plan-start-service.test.ts",
-      "tests/orchestra/production-wiring-task-builder.test.ts",
       "tests/orchestra/scheduler-cascade-composition.test.ts",
       "tests/orchestra/scheduler-collision-reorder-wire.test.ts",
       "tests/orchestra/scheduler-driver-composition.test.ts",
       "tests/orchestra/scheduler-single-truth.test.ts",
-      "tests/orchestra/scheduler-spawn-executor.test.ts",
-      "tests/orchestra/spawn-backend-docker-mounts.test.ts",
       "tests/orchestra/spawn-spawner-wire.test.ts",
-      "tests/orchestra/result-collector-settlement-authority.test.ts",
       "tests/orchestra/task-artifact-projection.test.ts",
       "tests/orchestra/task-projection-parity.test.ts"
     ],
     "T7": [
       "tests/cli/index.test.ts",
+      "tests/cli/provider-authority-process-runtime.test.ts",
       "tests/cli/run-attempt-custody.test.ts",
       "tests/cli/run-result-settlement.test.ts",
       "tests/cli/run.test.ts",
@@ -257,12 +292,15 @@
       "tests/core/task-settlement-authority.test.ts",
       "tests/orchestra/mode-aware-routing.test.ts",
       "tests/orchestra/fix-spawn-observability.test.ts",
+      "tests/orchestra/autonomous/execute-dispatcher-eval.test.ts",
       "tests/orchestra/task-mode-agent-inject.test.ts",
       "tests/orchestra/task-mode-runner.test.ts",
       "tests/orchestra/task-mode-tokenusage.test.ts"
     ],
     "T8": [
+      "tests/cli/xverify-waiting-signal.test.ts",
       "tests/core/cross-verify-evidence-broker.test.ts",
+      "tests/core/xverify-task-settlement.test.ts",
       "tests/integration/xverify-claude-model-limit-window.integration.test.ts",
       "tests/integration/xverify-owner-tier-authority.integration.test.ts",
       "tests/orchestra/cross-verify-docker-runtime-authority.test.ts",
@@ -270,6 +308,7 @@
       "tests/orchestra/cross-verify-owner-tier-authority.test.ts",
       "tests/orchestra/cross-verify-production-ingress-authority.test.ts",
       "tests/orchestra/cross-verify-provider-observation-retirement.test.ts",
+      "tests/orchestra/cross-verify-task-settlement.test.ts",
       "tests/orchestra/cross-verify-wire.test.ts",
       "tests/orchestra/xverify-producer-fencing.test.ts"
     ],
@@ -283,6 +322,7 @@
       "tests/orchestra/fix-task-enrichment.test.ts",
       "tests/orchestra/fix-task-force-skills.test.ts",
       "tests/orchestra/gwtd-fix-trigger.test.ts",
+      "tests/orchestra/repair-birth-authority.test.ts",
       "tests/orchestra/repair-task-constraint-inheritance.test.ts"
     ],
     "T10": [
@@ -296,7 +336,6 @@
       "tests/orchestra/completed-checkpoint-terminalizer-events.test.ts",
       "tests/orchestra/finalize-coordinator-retirement.test.ts",
       "tests/orchestra/finalize-sprint.test.ts",
-      "tests/orchestra/sprint-checkpoint.test.ts",
       "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
       "tests/orchestra/sprint-finalizer-task-projection.test.ts",
       "tests/orchestra/sprint-finalizer-terminal-publication.test.ts",
@@ -307,31 +346,66 @@
     "T11": [
       "tests/orchestra/acceptance-enforcement-canary.test.ts",
       "tests/orchestra/acceptance-enforcement.test.ts",
+      "tests/orchestra/criterion-evaluation.test.ts",
       "tests/orchestra/evaluate-enforcement-gates.test.ts",
       "tests/orchestra/evaluate-trigger-gate.test.ts",
+      "tests/orchestra/exact-accepted-result-evaluation-settlement.test.ts",
+      "tests/orchestra/exact-accepted-result-terminal-authority.test.ts",
+      "tests/orchestra/exact-docker-provider-exit-authority.test.ts",
+      "tests/orchestra/exact-evaluation-policy-authority.test.ts",
       "tests/orchestra/evaluation-audit-trail.test.ts",
-      "tests/orchestra/evaluation-honesty-negative-replay.test.ts"
+      "tests/orchestra/evaluation-honesty-negative-replay.test.ts",
+      "tests/orchestra/spawn-backend-docker-mounts.test.ts"
     ],
     "T12": [
+      "tests/cli/commands/resume.test.ts",
       "tests/backends/docker-corrupt-result-recovery.test.ts",
       "tests/cli/run-pre-dispatch-settlement.test.ts",
+      "tests/core/production-wiring-adapters.test.ts",
+      "tests/core/production-wiring-contract.test.ts",
+      "tests/core/production-wiring-evidence-schema.test.ts",
+      "tests/core/production-wiring-result-settlement.test.ts",
+      "tests/core/spawn-backend.test.ts",
+      "tests/core/task-attempt-custody-store.test.ts",
+      "tests/helpers/task-result-settlement-v2-fixture.ts",
       "tests/orchestra/acceptance-authority-restart.integration.test.ts",
       "tests/orchestra/acceptance-controller-settlement.test.ts",
       "tests/orchestra/cascade-unblock-wire.test.ts",
       "tests/orchestra/evaluate-phase-idempotency.test.ts",
+      "tests/orchestra/exact-controller-terminal-fanin.test.ts",
+      "tests/orchestra/exact-pause-resume-custody.test.ts",
+      "tests/orchestra/exact-production-wiring-host-settlement.test.ts",
       "tests/orchestra/execute-fix-quiescence.integration.test.ts",
       "tests/orchestra/fix-dispatch-continuation.test.ts",
       "tests/orchestra/fix-phase-map.test.ts",
+      "tests/orchestra/planner.test.ts",
       "tests/orchestra/planner-evaluation-recovery.integration.test.ts",
+      "tests/orchestra/pause-resume.test.ts",
+      "tests/orchestra/post-settlement-planner-wire.test.ts",
       "tests/orchestra/postfix-pending-scan.test.ts",
+      "tests/orchestra/production-wiring-evaluator-gate.test.ts",
+      "tests/orchestra/production-wiring-host-proof-runner.test.ts",
+      "tests/orchestra/production-wiring-outer-barrier.test.ts",
+      "tests/orchestra/production-wiring-production-composition.test.ts",
+      "tests/orchestra/production-wiring-prompt.test.ts",
+      "tests/orchestra/production-wiring-task-builder.test.ts",
       "tests/orchestra/recovery-truth-nine-case.integration.test.ts",
       "tests/orchestra/repair-dispatch-chain-seal.test.ts",
       "tests/orchestra/repair-overflow-dispatch.test.ts",
       "tests/orchestra/repair-quiescence-gate.test.ts",
-      "tests/orchestra/sprint-terminal-settlement-hold.test.ts"
+      "tests/orchestra/exact-docker-dispatch-task-authority.test.ts",
+      "tests/orchestra/result-collector-settlement-authority.test.ts",
+      "tests/orchestra/docker-restart-reconcile.test.ts",
+      "tests/orchestra/sprint-checkpoint.test.ts",
+      "tests/orchestra/sprint-terminal-settlement-hold.test.ts",
+      "tests/scripts/production-wiring-host-proof-harness.test.ts"
     ],
     "T13": [
-      "tests/integration/task-attempt-custody-cutover.integration.test.ts"
+      "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+      "tests/orchestra/autonomous/execute-dispatcher.test.ts",
+      "tests/orchestra/process-runtime.test.ts",
+      "tests/orchestra/scheduler-spawn-executor.test.ts",
+      "tests/orchestra/task-result-authority.test.ts"
     ],
     "T14": [
       "scripts/lint-test-hermeticity.mjs",
@@ -1255,6 +1329,890 @@
         "tests/core/provider-truth.test.ts": "0ff6a22230f99464a37f23a83a27201c7219a1de528a8164c5ee4169547d0588",
         "tests/orchestra/fix-spawn-observability.test.ts": "41cc0d65e117af89bf3bec065057748a4fef5c92a7536e50a6645950072aba2d"
       }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-019-T7-PRODUCTION-CONSUMER-CLOSURE",
+      "capturedAt": "2026-09-02T00:18:33+03:00",
+      "ownerDecisionRef": "owner-live-2026-09-02-continue-after-checkpoint",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "7cc6a97771ce506163114b77200525bf92abd2be485c03d44f650d16df39cfc7",
+      "revisionSha256": "1a45c509ebaef12083b5bdfdb33c99576b4c264f70a35e3b2ae66ab5d6fea5b8",
+      "resultingManifestSha256": "6246ceac0fa85aa001c527c0a10376498f2424ad39f1c860530139088eab1881",
+      "resultingCounts": {
+        "production": 73,
+        "mutationSupport": 217,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 73,
+        "productionAbsent": 0,
+        "mutationSupportPresent": 212,
+        "mutationSupportAbsent": 5
+      },
+      "absentAtRevision": [
+        "tests/orchestra/debt-manager-attempt-custody.test.ts",
+        "tests/cli/finalize-attempt-custody.test.ts",
+        "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+        "package-lock.json"
+      ],
+      "authorityTransfers": [
+        {
+          "path": "src/orchestra/autonomous/execute-dispatcher.ts",
+          "kind": "production",
+          "fromLane": "T13",
+          "toLane": "T7",
+          "baselineSha256": "a2cbd15426bcf0edb6e2fe6e8ebccda3b1c96a9d17355b47534775f5fb2b9391"
+        }
+      ],
+      "addedBaselineSha256": {
+        "src/cli/provider-authority-process-runtime.ts": "7587c965d6b2e87643a58ffa7de2f071c40e353dfff6342934714ed05b5639ef",
+        "src/orchestra/process-runtime.ts": "0cae5b39b4079485f4e2611a8df4d36112560f23a5b3de8adf73b25efa16c25d",
+        "tests/cli/provider-authority-process-runtime.test.ts": "cf252944492ee9f142b1bc6d97511290f9d3ded195fd32b930c429cc36487181",
+        "tests/orchestra/autonomous/execute-dispatcher-eval.test.ts": "a36558a14709120244e1fdf00813f83e98a7fce54013e21273343b108eb2a343",
+        "tests/orchestra/autonomous/execute-dispatcher.test.ts": "fdbdb5f2008a8a5e641616ddad687cbcb1b64542496f4b0f8638772559d86436",
+        "tests/orchestra/process-runtime.test.ts": "8b045f3a2427bebf6901bdd4d8a23d6d0e166fea9d9ff3556f4347f589d83a1e"
+      }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-020-T7-RECONCILIATION-DURABILITY",
+      "capturedAt": "2026-09-02T00:44:12+03:00",
+      "ownerDecisionRef": "owner-live-2026-09-02-continue-after-checkpoint",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "6246ceac0fa85aa001c527c0a10376498f2424ad39f1c860530139088eab1881",
+      "revisionSha256": "8c122586e141b560ec32196919eb7cf5f0d6336a68a78f3cb9047fafa60822f4",
+      "resultingManifestSha256": "852d48cb3ffe90eba0c8a2ef58025585e512cde7acaf9140ee7fd800f60dcd9f",
+      "resultingCounts": {
+        "production": 74,
+        "mutationSupport": 217,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 74,
+        "productionAbsent": 0,
+        "mutationSupportPresent": 212,
+        "mutationSupportAbsent": 5
+      },
+      "absentAtRevision": [
+        "tests/orchestra/debt-manager-attempt-custody.test.ts",
+        "tests/cli/finalize-attempt-custody.test.ts",
+        "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+        "package-lock.json"
+      ],
+      "authorityTransfers": [],
+      "addedBaselineSha256": {
+        "src/orchestra/autonomous/backlog-types.ts": "1bc768123624c6147294ec28a90303604b8408fb0e652ffbcc1310f7587d4386"
+      }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-021-T8-PRIVATE-SETTLEMENT-CUTOVER",
+      "capturedAt": "2026-09-02T01:11:14+03:00",
+      "ownerDecisionRef": "owner-live-2026-09-02-continue-after-checkpoint",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "852d48cb3ffe90eba0c8a2ef58025585e512cde7acaf9140ee7fd800f60dcd9f",
+      "revisionSha256": "24220dab59c176665a47deae15136a08ffd4a3e142acac906185a68d456d093a",
+      "resultingManifestSha256": "af51e6c3e8ad04722f21c2d549ea964316a1901a87cd3ad5545de63ef4521f4e",
+      "resultingCounts": {
+        "production": 76,
+        "mutationSupport": 219,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 76,
+        "productionAbsent": 0,
+        "mutationSupportPresent": 214,
+        "mutationSupportAbsent": 5
+      },
+      "absentAtRevision": [
+        "tests/orchestra/debt-manager-attempt-custody.test.ts",
+        "tests/cli/finalize-attempt-custody.test.ts",
+        "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+        "package-lock.json"
+      ],
+      "authorityTransfers": [],
+      "addedBaselineSha256": {
+        "src/cli/commands/xverify.ts": "e664329d657545e36f16a4e903842d3f107041a580f0a4f1f7887545580a564d",
+        "src/core/xverify-task-settlement.ts": "a51d3ef415abaf7997e57695a9731c06820626c1dc710d40c9f947a28800b1ee",
+        "tests/cli/xverify-waiting-signal.test.ts": "bbc5f45a48c710bd3d422f88b351e6ae1c5c398245ec1d9648db03a6a6f94fca",
+        "tests/core/xverify-task-settlement.test.ts": "17ccc4f0a60f1b890f83534312f488ade5cd37d08cf6fbe2673361a664bf9997"
+      }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-022-T8-TRACKED-SETTLEMENT-CONTRACT",
+      "capturedAt": "2026-09-02T01:37:22+03:00",
+      "ownerDecisionRef": "owner-live-2026-09-02-continue-after-checkpoint",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "af51e6c3e8ad04722f21c2d549ea964316a1901a87cd3ad5545de63ef4521f4e",
+      "revisionSha256": "c703e087296aedbf1224222c262fd824f6fb4ab8afba53ecb1d6d26368657949",
+      "resultingManifestSha256": "7a4ba774cb0806d85041ce3be384f09882beea791c23d505077ad1a761bead2f",
+      "resultingCounts": {
+        "production": 76,
+        "mutationSupport": 220,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 76,
+        "productionAbsent": 0,
+        "mutationSupportPresent": 215,
+        "mutationSupportAbsent": 5
+      },
+      "absentAtRevision": [
+        "tests/orchestra/debt-manager-attempt-custody.test.ts",
+        "tests/cli/finalize-attempt-custody.test.ts",
+        "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+        "package-lock.json"
+      ],
+      "authorityTransfers": [],
+      "addedBaselineSha256": {
+        "tests/orchestra/cross-verify-task-settlement.test.ts": "1bf3fa128ba650127d54d004bd31ea900e95fc92d103220550cd55c0c368266c"
+      }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-023-T9-EXACT-REPAIR-BIRTH-AUTHORITY",
+      "capturedAt": "2026-09-02T02:13:28+03:00",
+      "ownerDecisionRef": "owner-live-2026-09-02-continue-after-checkpoint",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "7a4ba774cb0806d85041ce3be384f09882beea791c23d505077ad1a761bead2f",
+      "revisionSha256": "5f73d96f0c62d210d3e18fc9c704f58d27529bcd53348d21a05b09605624c108",
+      "resultingManifestSha256": "f330560c915135f3c97cd52f478dd44f1ddd22a3c9c14eb5bf345a365f0b31fd",
+      "resultingCounts": {
+        "production": 78,
+        "mutationSupport": 222,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 76,
+        "productionAbsent": 2,
+        "mutationSupportPresent": 215,
+        "mutationSupportAbsent": 7
+      },
+      "absentAtRevision": [
+        "src/orchestra/exact-accepted-result-terminal-authority.ts",
+        "src/orchestra/repair-birth-authority.ts",
+        "tests/orchestra/debt-manager-attempt-custody.test.ts",
+        "tests/orchestra/exact-accepted-result-terminal-authority.test.ts",
+        "tests/orchestra/repair-birth-authority.test.ts",
+        "tests/cli/finalize-attempt-custody.test.ts",
+        "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+        "package-lock.json"
+      ],
+      "authorityTransfers": [
+        {
+          "path": "src/orchestra/result-collector.ts",
+          "kind": "production",
+          "fromLane": "T6",
+          "toLane": "T9",
+          "baselineSha256": "25f7e2c8f109e016ab3cd2967ada751b3029ced3cdc05c2f394ec2d0392ea61c"
+        }
+      ],
+      "addedBaselineSha256": {
+        "src/orchestra/exact-accepted-result-terminal-authority.ts": "ABSENT",
+        "src/orchestra/repair-birth-authority.ts": "ABSENT",
+        "tests/orchestra/exact-accepted-result-terminal-authority.test.ts": "ABSENT",
+        "tests/orchestra/repair-birth-authority.test.ts": "ABSENT"
+      }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-024-T10-T11-T12-AUTHORITY-ORDERING",
+      "capturedAt": "2026-09-02T03:00:38+03:00",
+      "ownerDecisionRef": "owner-live-2026-09-02-continue-after-checkpoint",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "f330560c915135f3c97cd52f478dd44f1ddd22a3c9c14eb5bf345a365f0b31fd",
+      "revisionSha256": "1936e80e79e37621abf9bbd73ff51553c172ea92f36d4ce0327b91ae1f31f2ba",
+      "resultingManifestSha256": "4962baab4ba45095411dd3c8749ca0c339130b23b699d5857a573f0807cfb39d",
+      "resultingCounts": {
+        "production": 79,
+        "mutationSupport": 222,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 79,
+        "productionAbsent": 0,
+        "mutationSupportPresent": 218,
+        "mutationSupportAbsent": 4
+      },
+      "absentAtRevision": [
+        "tests/cli/finalize-attempt-custody.test.ts",
+        "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+        "package-lock.json"
+      ],
+      "authorityTransfers": [
+        {
+          "path": "src/orchestra/sprint-controller.ts",
+          "kind": "production",
+          "fromLane": "T6",
+          "toLane": "T12",
+          "baselineSha256": "23c63425beeaeca857ea6ef0641f79caf991f3ed9be206e9756bb622d92fc0d5"
+        },
+        {
+          "path": "src/orchestra/sprint-phases.ts",
+          "kind": "production",
+          "fromLane": "T6",
+          "toLane": "T12",
+          "baselineSha256": "3194ea9a2cb395e6702da56f1e82609b7384d60d93c686a7209a9e878a291e33"
+        },
+        {
+          "path": "src/orchestra/sprint-spawner.ts",
+          "kind": "production",
+          "fromLane": "T6",
+          "toLane": "T12",
+          "baselineSha256": "9047aed9ea7e2c6bc93eea6b56886589dab35ce38ab3f4af67b3ca391c15daaa"
+        },
+        {
+          "path": "src/orchestra/result-collector.ts",
+          "kind": "production",
+          "fromLane": "T9",
+          "toLane": "T12",
+          "baselineSha256": "18e824ee885c87a3200023827ca88bb08cbd8f91e14c1dd1d30e6b5e027aa2df"
+        }
+      ],
+      "addedBaselineSha256": {
+        "src/orchestra/sprint-lifecycle.ts": "de2f5b2ef79b56e8550ede4076c9ebc475dba3520ff2bd38ae77308fe7df976d"
+      }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-025-T11-EXACT-EVALUATOR-INPUT",
+      "capturedAt": "2026-09-02T03:18:40+03:00",
+      "ownerDecisionRef": "owner-live-2026-09-02-continue-after-checkpoint",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "4962baab4ba45095411dd3c8749ca0c339130b23b699d5857a573f0807cfb39d",
+      "revisionSha256": "4582653ddf83b45c9f45509c2a228cc108e16b68936396bd853e5d9dc4c4be06",
+      "resultingManifestSha256": "aaca6350f65bb28b6f5b2f1b4abcd75067bfc1916a97f1fa2df8b14dd2a9adec",
+      "resultingCounts": {
+        "production": 80,
+        "mutationSupport": 222,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 80,
+        "productionAbsent": 0,
+        "mutationSupportPresent": 218,
+        "mutationSupportAbsent": 4
+      },
+      "absentAtRevision": [
+        "tests/cli/finalize-attempt-custody.test.ts",
+        "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+        "package-lock.json"
+      ],
+      "authorityTransfers": [
+        {
+          "path": "src/orchestra/task-result-authority.ts",
+          "kind": "production",
+          "fromLane": "T4",
+          "toLane": "T11",
+          "baselineSha256": "35db4255ce6281372dc68d83b88c1d9cea91f8ea62648c1ed10a247fca8af35a"
+        }
+      ],
+      "addedBaselineSha256": {
+        "src/orchestra/result-evaluator.ts": "0a222ba02c11c2e6214ce16901328c0466d5657277e1d7ceeb8bf941038ab290"
+      }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-026-T11-CANONICAL-DISPATCH-TASK-AUTHORITY",
+      "capturedAt": "2026-09-02T03:40:05+03:00",
+      "ownerDecisionRef": "owner-live-2026-09-02-continue-after-checkpoint",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "aaca6350f65bb28b6f5b2f1b4abcd75067bfc1916a97f1fa2df8b14dd2a9adec",
+      "revisionSha256": "20c3f16987535e0309b91a33f5fbb81fb13a4e3d7f134297650b220bc0f8d951",
+      "resultingManifestSha256": "0b66d3f01e8868084dcb273cd52de2cd231f54f201580a77d83dcad2ef219897",
+      "resultingCounts": {
+        "production": 81,
+        "mutationSupport": 223,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 80,
+        "productionAbsent": 1,
+        "mutationSupportPresent": 218,
+        "mutationSupportAbsent": 5
+      },
+      "absentAtRevision": [
+        "src/orchestra/exact-docker-dispatch-task-authority.ts",
+        "tests/orchestra/exact-docker-dispatch-task-authority.test.ts",
+        "tests/cli/finalize-attempt-custody.test.ts",
+        "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+        "package-lock.json"
+      ],
+      "authorityTransfers": [
+        {
+          "path": "src/orchestra/task-settlement-projection.ts",
+          "kind": "production",
+          "fromLane": "T4",
+          "toLane": "T11",
+          "baselineSha256": "1ec44e10d655610538da45203dcf7fcc418bddf00a18a0585976ed001b80d712"
+        },
+        {
+          "path": "src/orchestra/spawn-backend-docker.ts",
+          "kind": "production",
+          "fromLane": "T6",
+          "toLane": "T11",
+          "baselineSha256": "956bac1d171c5222562c87b54f86af7b0f52e67b0370e499587bf8507657cd82"
+        },
+        {
+          "path": "src/orchestra/exact-accepted-result-terminal-authority.ts",
+          "kind": "production",
+          "fromLane": "T9",
+          "toLane": "T11",
+          "baselineSha256": "1c95bcdd915b5e0aaa71b94720d782e59a27b8c38257574f872db97bc1ea1bbc"
+        },
+        {
+          "path": "tests/orchestra/task-result-authority.test.ts",
+          "kind": "mutationSupport",
+          "fromLane": "T4",
+          "toLane": "T11",
+          "baselineSha256": "a708b4e0643fe7d9401cd1b74ec78e7ebd1fa2f5e04a3ad498cc0071fc2a0d98"
+        },
+        {
+          "path": "tests/helpers/task-result-settlement-v2-fixture.ts",
+          "kind": "mutationSupport",
+          "fromLane": "T5E",
+          "toLane": "T11",
+          "baselineSha256": "c56eda338f314583835d2379dcc7a0c7d9b51819168d69791eab5cb08a4a492a"
+        },
+        {
+          "path": "tests/orchestra/spawn-backend-docker-mounts.test.ts",
+          "kind": "mutationSupport",
+          "fromLane": "T6",
+          "toLane": "T11",
+          "baselineSha256": "90fdcd851a76ebd8495065a4783ac49da1363bbe0ddc4f8650507d7c6363a203"
+        },
+        {
+          "path": "tests/orchestra/exact-accepted-result-terminal-authority.test.ts",
+          "kind": "mutationSupport",
+          "fromLane": "T9",
+          "toLane": "T11",
+          "baselineSha256": "44124a934fcedacf48946bab124b04809dd77634ea7e2863d831c483da03d5fe"
+        }
+      ],
+      "addedBaselineSha256": {
+        "src/orchestra/exact-docker-dispatch-task-authority.ts": "ABSENT",
+        "tests/orchestra/exact-docker-dispatch-task-authority.test.ts": "ABSENT"
+      }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-027-T11-EXACT-EVALUATION-SETTLEMENT-PROOF",
+      "capturedAt": "2026-09-02T04:06:55+03:00",
+      "ownerDecisionRef": "owner-live-2026-09-02-continue-main-after-side-session-prompt",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "0b66d3f01e8868084dcb273cd52de2cd231f54f201580a77d83dcad2ef219897",
+      "revisionSha256": "13f0b2cf062c244e1ffb99dd87ba17d5cf68c18c11773dba6f1fb33f4ace343d",
+      "resultingManifestSha256": "3c21f2d8988d6f1393edea25fec96196fad5337c79fa5aca0e31a5a38c38f0c8",
+      "resultingCounts": {
+        "production": 81,
+        "mutationSupport": 224,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 81,
+        "productionAbsent": 0,
+        "mutationSupportPresent": 220,
+        "mutationSupportAbsent": 4
+      },
+      "absentAtRevision": [
+        "tests/cli/finalize-attempt-custody.test.ts",
+        "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+        "package-lock.json"
+      ],
+      "authorityTransfers": [],
+      "addedBaselineSha256": {
+        "tests/orchestra/exact-accepted-result-evaluation-settlement.test.ts": "ABSENT"
+      }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-028-T11-DURABLE-POLICY-PROVIDER-EFFECT-FANIN",
+      "capturedAt": "2026-09-02T04:33:56+03:00",
+      "ownerDecisionRef": "owner-live-2026-09-02-continue-main-after-side-session-prompt",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "3c21f2d8988d6f1393edea25fec96196fad5337c79fa5aca0e31a5a38c38f0c8",
+      "revisionSha256": "ae8e425fa9f1be92d28f038181eddddffd2f5e462d68d1c10f606ae51e6097a4",
+      "resultingManifestSha256": "43c1ce39893d4889242a605fa46decb3c9cb5d21743867535b4c19082cae8389",
+      "resultingCounts": {
+        "production": 84,
+        "mutationSupport": 227,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 82,
+        "productionAbsent": 2,
+        "mutationSupportPresent": 221,
+        "mutationSupportAbsent": 6
+      },
+      "absentAtRevision": [
+        "src/orchestra/exact-docker-provider-exit-authority.ts",
+        "src/orchestra/exact-evaluation-policy-authority.ts",
+        "tests/cli/finalize-attempt-custody.test.ts",
+        "tests/orchestra/sprint-finalizer-attempt-custody.test.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+        "package-lock.json",
+        "tests/orchestra/exact-docker-provider-exit-authority.test.ts",
+        "tests/orchestra/exact-evaluation-policy-authority.test.ts"
+      ],
+      "authorityTransfers": [
+        {
+          "path": "src/orchestra/scheduler-effects.ts",
+          "kind": "production",
+          "fromLane": "T6",
+          "toLane": "T11",
+          "baselineSha256": "7e9db63d57103c5a8c0c368811eeac669caeeb6167c37e6b9be2827e413d9ab0"
+        },
+        {
+          "path": "src/orchestra/result-collector.ts",
+          "kind": "production",
+          "fromLane": "T12",
+          "toLane": "T11",
+          "baselineSha256": "18e824ee885c87a3200023827ca88bb08cbd8f91e14c1dd1d30e6b5e027aa2df"
+        },
+        {
+          "path": "tests/orchestra/result-collector-settlement-authority.test.ts",
+          "kind": "mutationSupport",
+          "fromLane": "T6",
+          "toLane": "T11",
+          "baselineSha256": "e9128042e4f955b5ff745e40c107c65cfd99aa8762c053383bfd20d913ac7feb"
+        },
+        {
+          "path": "tests/orchestra/scheduler-spawn-executor.test.ts",
+          "kind": "mutationSupport",
+          "fromLane": "T6",
+          "toLane": "T11",
+          "baselineSha256": "2346aa2ec4c962707f57b1634a34d2b98e125d87803545d18f71a00a72da8061"
+        }
+      ],
+      "addedBaselineSha256": {
+        "src/orchestra/criterion-evaluation.ts": "1fe9dda591fdccab8902436a35a3cdba41c5f2dbd6d582764474779556a4e795",
+        "src/orchestra/exact-docker-provider-exit-authority.ts": "ABSENT",
+        "src/orchestra/exact-evaluation-policy-authority.ts": "ABSENT",
+        "tests/orchestra/criterion-evaluation.test.ts": "92baf3ca103653656dff8fff6eff5f3f62db4310ecf1d949ad02a478e5528189",
+        "tests/orchestra/exact-docker-provider-exit-authority.test.ts": "ABSENT",
+        "tests/orchestra/exact-evaluation-policy-authority.test.ts": "ABSENT"
+      }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-029-T12-EXACT-LIFECYCLE-PRODUCTION-FANIN",
+      "capturedAt": "2026-09-02T06:19:18+03:00",
+      "ownerDecisionRef": "owner-live-2026-09-02-continue-main-after-side-session-prompt",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "43c1ce39893d4889242a605fa46decb3c9cb5d21743867535b4c19082cae8389",
+      "revisionSha256": "019698663fd02d30ca6fc0af6f90bed845be2c40a5434acb295796dc2f2d7360",
+      "resultingManifestSha256": "7819f9403fffd6b3cb2ab8b4a3b105f446204a1254b82d63964f0fa1e074aec4",
+      "resultingCounts": {
+        "production": 85,
+        "mutationSupport": 236,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 84,
+        "productionAbsent": 1,
+        "mutationSupportPresent": 231,
+        "mutationSupportAbsent": 5
+      },
+      "absentAtRevision": [
+        "src/orchestra/production-wiring-host-observation.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+        "package-lock.json",
+        "tests/orchestra/exact-controller-terminal-fanin.test.ts",
+        "tests/orchestra/exact-production-wiring-host-settlement.test.ts",
+        "tests/orchestra/exact-pause-resume-custody.test.ts"
+      ],
+      "authorityTransfers": [
+        {
+          "path": "src/orchestra/scheduler-effects.ts",
+          "kind": "production",
+          "fromLane": "T11",
+          "toLane": "T12",
+          "baselineSha256": "844401a38636f3124ba0b22931fd445476aa65a5a1679506e86f4aeeb515eaae"
+        },
+        {
+          "path": "src/orchestra/result-collector.ts",
+          "kind": "production",
+          "fromLane": "T11",
+          "toLane": "T12",
+          "baselineSha256": "9fbb66785881688c038f0b5311279aa37f5d8da1e87a8f5f4cecc6d9fe0ae72b"
+        },
+        {
+          "path": "src/orchestra/spawn-backend.ts",
+          "kind": "production",
+          "fromLane": "T6",
+          "toLane": "T12",
+          "baselineSha256": "1988c6918a5cb49692ea95b4702e276b66f8a9cb90fdf889436f6e65a526e25a"
+        },
+        {
+          "path": "src/orchestra/spawn-backend-docker.ts",
+          "kind": "production",
+          "fromLane": "T11",
+          "toLane": "T12",
+          "baselineSha256": "7a29dc73220734305194e7acab8142574ffb84bb29ec32010a8f987084064224"
+        },
+        {
+          "path": "src/orchestra/evaluation-audit-trail.ts",
+          "kind": "production",
+          "fromLane": "T11",
+          "toLane": "T12",
+          "baselineSha256": "a006ab8d57191415d34b1df0f59de94196db6840c126c7a4e4ee1ca6410d2403"
+        },
+        {
+          "path": "src/orchestra/sprint-checkpoint.ts",
+          "kind": "production",
+          "fromLane": "T10",
+          "toLane": "T12",
+          "baselineSha256": "c4c9df8405f57b611a99b35aac46de7d7451e1edcfea13567632608b134f2f60"
+        },
+        {
+          "path": "src/cli/commands/resume.ts",
+          "kind": "production",
+          "fromLane": "T10",
+          "toLane": "T12",
+          "baselineSha256": "5f70b29873afd3e9b30ab83756259774fdc72606c7c80cacf43f11ebe938642f"
+        },
+        {
+          "path": "src/cli/index.ts",
+          "kind": "production",
+          "fromLane": "T7",
+          "toLane": "T12",
+          "baselineSha256": "8f8d49ad5a775666fa0441dea0adc741c7080a0303dace93481a4621516949ac"
+        },
+        {
+          "path": "src/core/task-attempt-custody-store.ts",
+          "kind": "production",
+          "fromLane": "T5E",
+          "toLane": "T12",
+          "baselineSha256": "e9aa3963530ed40c799ef5ce012df157a9a5ea36d98ce4e02f9be77c1fac996b"
+        },
+        {
+          "path": "tests/orchestra/result-collector-settlement-authority.test.ts",
+          "kind": "mutationSupport",
+          "fromLane": "T11",
+          "toLane": "T12",
+          "baselineSha256": "5fef123ba9d37462d4c8a2248d39f8dbbaff41affe1da04302f4280163d6bc6e"
+        },
+        {
+          "path": "tests/orchestra/scheduler-spawn-executor.test.ts",
+          "kind": "mutationSupport",
+          "fromLane": "T11",
+          "toLane": "T12",
+          "baselineSha256": "2346aa2ec4c962707f57b1634a34d2b98e125d87803545d18f71a00a72da8061"
+        },
+        {
+          "path": "tests/orchestra/docker-restart-reconcile.test.ts",
+          "kind": "mutationSupport",
+          "fromLane": "T5E",
+          "toLane": "T12",
+          "baselineSha256": "50cb2c1b5cb50ba1c3a610c719c7292071a9e81c9d0ae3f4671bd1f6ee4f407b"
+        },
+        {
+          "path": "tests/orchestra/sprint-checkpoint.test.ts",
+          "kind": "mutationSupport",
+          "fromLane": "T10",
+          "toLane": "T12",
+          "baselineSha256": "8e5a51fee5307ae5cf3aee3bf9008bf65d3398aa2aba0854fa7fa4f5d5b50427"
+        },
+        {
+          "path": "tests/core/task-attempt-custody-store.test.ts",
+          "kind": "mutationSupport",
+          "fromLane": "T5E",
+          "toLane": "T12",
+          "baselineSha256": "0e38b86f9642003274fed0d84ae61eeabdc06acc38a0faefce499ee30746218a"
+        }
+      ],
+      "addedBaselineSha256": {
+        "src/orchestra/production-wiring-host-observation.ts": "ABSENT",
+        "tests/cli/commands/resume.test.ts": "30ea28c7904e601abdfd358415bc8b123159d2d5ec9952e8e57226f787d99134",
+        "tests/core/production-wiring-adapters.test.ts": "29f931df1cae0a1ce4ae3624f0858d85b95165aa553077595bca9d47dccbee9c",
+        "tests/core/production-wiring-result-settlement.test.ts": "4dfb30dca111aaecbd01ec852ee1b4ea097f0f0e86768ffe84566b9d040787b7",
+        "tests/orchestra/production-wiring-evaluator-gate.test.ts": "69e84436e940c4468dd80a8fe4b2157888dd2b8f372c15921e772d7014e120f1",
+        "tests/orchestra/production-wiring-outer-barrier.test.ts": "f23c0443b1cda3f16aa6b924f5f5ae664086fb5c6b20cc0eec88eea72bdc643a",
+        "tests/orchestra/pause-resume.test.ts": "12e2bf7f4da708ff652ed200d6d27ce76033ca4531671be9cf093f45dc023b57",
+        "tests/orchestra/exact-controller-terminal-fanin.test.ts": "ABSENT",
+        "tests/orchestra/exact-production-wiring-host-settlement.test.ts": "ABSENT",
+        "tests/orchestra/exact-pause-resume-custody.test.ts": "ABSENT"
+      }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-030-T12-PRODUCTION-WIRING-REAL-STORE-FIXTURE",
+      "capturedAt": "2026-09-02T06:42:45+03:00",
+      "ownerDecisionRef": "owner-live-2026-09-02-continue-main-after-side-session-prompt",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "7819f9403fffd6b3cb2ab8b4a3b105f446204a1254b82d63964f0fa1e074aec4",
+      "revisionSha256": "88a3e46ecb85eaa5fa6b31f85def0192696867c3beb932d2b1b5e0b20816dd0f",
+      "resultingManifestSha256": "9c3e0315ba883bcae298835a18da01378d4bfb9c19459711b604956312555f19",
+      "resultingCounts": {
+        "production": 85,
+        "mutationSupport": 236,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 85,
+        "productionAbsent": 0,
+        "mutationSupportPresent": 232,
+        "mutationSupportAbsent": 4
+      },
+      "absentAtRevision": [
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+        "package-lock.json",
+        "tests/orchestra/exact-controller-terminal-fanin.test.ts",
+        "tests/orchestra/exact-pause-resume-custody.test.ts"
+      ],
+      "authorityTransfers": [
+        {
+          "path": "tests/helpers/task-result-settlement-v2-fixture.ts",
+          "kind": "mutationSupport",
+          "fromLane": "T11",
+          "toLane": "T12",
+          "baselineSha256": "1a499956768af78e85430e902d30513c0485871e0880b479440d373cdb6978ff"
+        }
+      ],
+      "addedBaselineSha256": {}
+    },
+    {
+      "revisionId": "SCOPE-REVISION-031-T12-REAL-HOST-PROOF-AUTHORITY",
+      "capturedAt": "2026-09-02T11:56:21+03:00",
+      "ownerDecisionRef": "owner-live-2026-09-02-approve-scope-revision-031-real-host-proof",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "9c3e0315ba883bcae298835a18da01378d4bfb9c19459711b604956312555f19",
+      "revisionSha256": "fc59f63bc519b5d358e4103af32f66ed7438cc5efd8dd41de67edee1a89bcbf9",
+      "resultingManifestSha256": "d07be54a0f54fbef507b6c3e95a09e595bb5097b60473b32eea61227caaa3b3b",
+      "resultingCounts": {
+        "production": 90,
+        "mutationSupport": 244,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 88,
+        "productionAbsent": 2,
+        "mutationSupportPresent": 240,
+        "mutationSupportAbsent": 4
+      },
+      "absentAtRevision": [
+        "src/core/production-wiring-host-proof.ts",
+        "src/orchestra/production-wiring-host-proof-runner.ts",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+        "package-lock.json",
+        "tests/orchestra/production-wiring-host-proof-runner.test.ts",
+        "tests/orchestra/production-wiring-production-composition.test.ts"
+      ],
+      "authorityTransfers": [
+        {
+          "path": "src/core/task-types.ts",
+          "kind": "production",
+          "fromLane": "T4",
+          "toLane": "T12",
+          "baselineSha256": "6464e2a31dec696a3ac1c59f676f1d28165b5ba4cbed7e7b1b4a7b75a113ea8a"
+        },
+        {
+          "path": "src/core/task-result-settlement.ts",
+          "kind": "production",
+          "fromLane": "T5E",
+          "toLane": "T12",
+          "baselineSha256": "c3507b631587ae9a031368f4abfdad671ea05466514f5a357e20345bb90ebb52"
+        },
+        {
+          "path": "src/orchestra/sprint-planner.ts",
+          "kind": "production",
+          "fromLane": "T6",
+          "toLane": "T12",
+          "baselineSha256": "dc0bcc2bbe334daa5a9f5e5e3e36edd6111fa629ed37d51664dc441444d4aac3"
+        },
+        {
+          "path": "src/orchestra/task-builder.ts",
+          "kind": "production",
+          "fromLane": "T6",
+          "toLane": "T12",
+          "baselineSha256": "8d2eb19cc2204aa7e65ad2ce617306ed15e52691e1b74ede4656b76be98e186b"
+        },
+        {
+          "path": "src/orchestra/exact-docker-dispatch-task-authority.ts",
+          "kind": "production",
+          "fromLane": "T11",
+          "toLane": "T12",
+          "baselineSha256": "e3dca8b7a10203a171e4707943db06e927ae80633113df59b623252238af7cd2"
+        },
+        {
+          "path": "src/orchestra/result-evaluator.ts",
+          "kind": "production",
+          "fromLane": "T11",
+          "toLane": "T12",
+          "baselineSha256": "f4982240c44630cdaa3ae050a503a8285515afcc42593429cb792dbfa301deab"
+        },
+        {
+          "path": "tests/orchestra/production-wiring-task-builder.test.ts",
+          "kind": "mutationSupport",
+          "fromLane": "T6",
+          "toLane": "T12",
+          "baselineSha256": "8896240f8cf1788fc635d3d5f4b8ad3abe43c432876cb57ca9c5d0fadc18fbbc"
+        },
+        {
+          "path": "tests/orchestra/exact-docker-dispatch-task-authority.test.ts",
+          "kind": "mutationSupport",
+          "fromLane": "T11",
+          "toLane": "T12",
+          "baselineSha256": "d499d14f9f4c6a3166d95468b9648ed2b295ebc67be64e6dca7074aa0e5adf0c"
+        }
+      ],
+      "addedBaselineSha256": {
+        "src/core/production-wiring-contract.ts": "29ef3d7f90a90e3c498f8942c180a98b209f072df258063e79db5137ff36a17b",
+        "src/core/production-wiring-host-proof.ts": "ABSENT",
+        "src/orchestra/planner.ts": "8d32bbcb201061978b3ee6bf827d83b591e284be53351efc0756a43bb29c5eef",
+        "src/orchestra/production-wiring-host-proof-runner.ts": "ABSENT",
+        "src/orchestra/prompt-god-template.ts": "aec3bfa2c766dd4d59bbcad7c17cccf52fdc0affc108bc82ab014f8432618926",
+        "tests/core/production-wiring-contract.test.ts": "615fbcaad3d23b44be6cb648a109687a7d538b43b1ce77603c38416d5d78d424",
+        "tests/core/production-wiring-evidence-schema.test.ts": "fa656c05f0283bd7033b7d489fbe1c2aa1e601cf172e6c7e650d1648b6a1520b",
+        "tests/core/spawn-backend.test.ts": "b8a5b320f46b55460201d549793f0057b90fd593b42b5439defa9daa9154b230",
+        "tests/orchestra/planner.test.ts": "3a69b017aed614aab34167bfa613a4e40ebfa57966d4e631392f1eea057194ef",
+        "tests/orchestra/post-settlement-planner-wire.test.ts": "23df261a43d25e01e5a2e9e1088514fb670698bfe54530d6cd8631c5275954b",
+        "tests/orchestra/production-wiring-host-proof-runner.test.ts": "ABSENT",
+        "tests/orchestra/production-wiring-production-composition.test.ts": "ABSENT",
+        "tests/orchestra/production-wiring-prompt.test.ts": "799f110b0c1653c3a44b343770620335af6838fe3017e1ae3fb3ed2ade542235"
+      }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-032-CANONICAL-HOST-PROOF-HARNESS",
+      "capturedAt": "2026-09-02T16:29:01+03:00",
+      "ownerDecisionRef": "owner-live-2026-09-02-approve-scope-revision-032-canonical-host-proof-harness",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "d07be54a0f54fbef507b6c3e95a09e595bb5097b60473b32eea61227caaa3b3b",
+      "revisionSha256": "4189876986d1b8b0c5a144dbb5e875169992ebb4ec4870f34e1e5ca69a1d88bc",
+      "resultingManifestSha256": "e1d37bf8e8d563de36667b4107b5ce273bde01bba7d796d5d1aef5fa94f8980c",
+      "resultingCounts": {
+        "production": 91,
+        "mutationSupport": 245,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 90,
+        "productionAbsent": 1,
+        "mutationSupportPresent": 242,
+        "mutationSupportAbsent": 3
+      },
+      "absentAtRevision": [
+        "scripts/production-wiring-host-proof-harness.mjs",
+        "tests/integration/task-attempt-custody-cutover.integration.test.ts",
+        "package-lock.json",
+        "tests/scripts/production-wiring-host-proof-harness.test.ts"
+      ],
+      "authorityTransfers": [],
+      "addedBaselineSha256": {
+        "scripts/production-wiring-host-proof-harness.mjs": "ABSENT",
+        "tests/scripts/production-wiring-host-proof-harness.test.ts": "ABSENT"
+      }
+    },
+    {
+      "revisionId": "SCOPE-REVISION-033-T13-EXACT-RESULT-CONSUMER-PROJECTION",
+      "capturedAt": "2026-09-02T19:05:06+03:00",
+      "ownerDecisionRef": "owner-live-2026-09-02-approve-scope-revision-033-t13-exact-result-consumer-projection",
+      "decision": "APPROVED",
+      "executionStateAtRevision": "RECOVERY_IN_PROGRESS",
+      "previousManifestSha256": "e1d37bf8e8d563de36667b4107b5ce273bde01bba7d796d5d1aef5fa94f8980c",
+      "revisionSha256": "d73278c8b73b159d0d0e99159028640f5b7562c13cecfe0cfc60d8e1a03e704d",
+      "resultingManifestSha256": "931d5e552d4c6f22bbaf1dfd5700178a8a160fdc0f7018f8cf8071aab1c406eb",
+      "resultingCounts": {
+        "production": 91,
+        "mutationSupport": 245,
+        "duplicate": 0,
+        "unassigned": 0
+      },
+      "presenceAtRevision": {
+        "productionPresent": 91,
+        "productionAbsent": 0,
+        "mutationSupportPresent": 244,
+        "mutationSupportAbsent": 1
+      },
+      "absentAtRevision": [
+        "package-lock.json"
+      ],
+      "authorityTransfers": [
+        {
+          "path": "src/orchestra/autonomous/execute-dispatcher.ts",
+          "kind": "production",
+          "fromLane": "T7",
+          "toLane": "T13",
+          "baselineSha256": "a2cbd15426bcf0edb6e2fe6e8ebccda3b1c96a9d17355b47534775f5fb2b9391"
+        },
+        {
+          "path": "src/orchestra/process-runtime.ts",
+          "kind": "production",
+          "fromLane": "T7",
+          "toLane": "T13",
+          "baselineSha256": "0cae5b39b4079485f4e2611a8df4d36112560f23a5b3de8adf73b25efa16c25d"
+        },
+        {
+          "path": "src/orchestra/task-result-authority.ts",
+          "kind": "production",
+          "fromLane": "T11",
+          "toLane": "T13",
+          "baselineSha256": "7498c92d7cc8a6ce5afd3b5d66a4d2410680ab11fdc2563a42f22caecf500fab"
+        },
+        {
+          "path": "src/orchestra/scheduler-effects.ts",
+          "kind": "production",
+          "fromLane": "T12",
+          "toLane": "T13",
+          "baselineSha256": "7b47ca230d0e34dbf3ac9542b8ece8384692cb7aa6a1f53b0bb9605fb2e6cf83"
+        },
+        {
+          "path": "tests/orchestra/autonomous/execute-dispatcher.test.ts",
+          "kind": "mutationSupport",
+          "fromLane": "T7",
+          "toLane": "T13",
+          "baselineSha256": "fdbdb5f2008a8a5e641616ddad687cbcb1b64542496f4b0f8638772559d86436"
+        },
+        {
+          "path": "tests/orchestra/process-runtime.test.ts",
+          "kind": "mutationSupport",
+          "fromLane": "T7",
+          "toLane": "T13",
+          "baselineSha256": "8b045f3a2427bebf6901bdd4d8a23d6d0e166fea9d9ff3556f4347f589d83a1e"
+        },
+        {
+          "path": "tests/orchestra/task-result-authority.test.ts",
+          "kind": "mutationSupport",
+          "fromLane": "T11",
+          "toLane": "T13",
+          "baselineSha256": "2aa5ecb5df49803e84fac23506823a163d009a3853093826a124abddc71a469d"
+        },
+        {
+          "path": "tests/orchestra/scheduler-spawn-executor.test.ts",
+          "kind": "mutationSupport",
+          "fromLane": "T12",
+          "toLane": "T13",
+          "baselineSha256": "704f957e2165dc603d6ccb87306aee5adeb4c09f3f863c7252f4e65ac9954cee"
+        }
+      ],
+      "addedBaselineSha256": {}
     }
   ],
   "preserveExcludedRuntime": [

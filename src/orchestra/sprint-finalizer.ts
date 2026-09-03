@@ -788,6 +788,10 @@ import { clearPid } from './sprint-pid-manager.js';
 // checkpoint and run a phantom 0/0 "complete" restore that exits before
 // the new sprint starts. Covers normal completion AND `finalize --force`.
 import { cleanupCheckpointFiles } from './sprint-checkpoint.js';
+import {
+  isCurrentExactAcceptedTaskTerminalAuthorityRead,
+  type ExactAcceptedTaskTerminalAuthorityRead,
+} from './evaluation-audit-trail.js';
 
 
 // ═══ Types ════════════════════════════════════════════════════════
@@ -845,6 +849,12 @@ export interface FinalizeSprintOptions {
    * recovery-specific events can continue the original monotonic stream.
    */
   lifecycleContext?: 'live-execution' | 'completed-checkpoint-recovery';
+  /**
+   * Store-revalidated T11 terminal reads for normal-docker exact attempts.
+   * Their receipts, result projection and attempt identity replace every
+   * caller/public-result verdict at the sprint terminal boundary.
+   */
+  exactTerminalAuthorities?: ReadonlyMap<string, ExactAcceptedTaskTerminalAuthorityRead>;
 }
 
 const TSC_SETTLEMENT_TIMEOUT_MS = 240_000;
@@ -1978,6 +1988,30 @@ export interface FinalizerTerminalTruthCounts {
   readonly cascadeSkippedLineages: number;
 }
 
+/**
+ * Digest-only custody projection retained by the sprint receipt. It carries
+ * every immutable T11 boundary independently so archive readers can prove
+ * which accepted result, evaluation, finalizer and settlement were closed;
+ * the combined logical digest is not asked to stand in for those identities.
+ */
+export interface FinalizerExactCustodyDigestBundle {
+  readonly taskId: string;
+  readonly attemptId: string;
+  readonly generation: number;
+  readonly admissionReceiptDigest: string;
+  readonly acceptedResultArtifactReceiptDigest: string;
+  readonly acceptedResultChainDigest: string;
+  readonly resultDigest: string;
+  readonly evaluationArtifactReceiptDigest: string;
+  readonly evaluationChainDigest: string;
+  readonly evaluationReceiptDigest: string;
+  readonly finalizerArtifactReceiptDigest: string;
+  readonly finalizerChainDigest: string;
+  readonly finalizerReceiptDigest: string;
+  readonly settlementArtifactReceiptDigest: string;
+  readonly settlementDigest: string;
+}
+
 export interface FinalizerTerminalTruth {
   readonly attempts: readonly ExactAttemptEvidence<TaskResult>[];
   readonly terminalEvidence: SprintTerminalEvidence<TaskResult>;
@@ -1987,6 +2021,7 @@ export interface FinalizerTerminalTruth {
   readonly logicalEvaluations: ReadonlyMap<string, TaskEvaluation>;
   readonly lineageUsage: readonly LineageUsageAuthorityAggregate[];
   readonly usageTotals: UsageTotals;
+  readonly exactCustodyDigests: readonly FinalizerExactCustodyDigestBundle[];
   readonly logicalSettlementDigest: string;
 }
 
@@ -2507,6 +2542,7 @@ interface PersistedSprintTerminalReceipt {
   readonly logicalProgress: LogicalProgressProjection;
   readonly terminalTruth: FinalizerTerminalTruthCounts;
   readonly lineageUsage: readonly LineageUsageAuthorityAggregate[];
+  readonly exactCustodyDigests: readonly FinalizerExactCustodyDigestBundle[];
   readonly writtenAt: string;
 }
 
@@ -2719,6 +2755,13 @@ function asTerminalVerdict(
   return null;
 }
 
+function requiresExactTerminalAuthority(result: TaskResult | undefined): boolean {
+  if (!result || typeof result !== 'object') return false;
+  return Object.prototype.hasOwnProperty.call(result, 'exactAcceptedResultAuthority')
+    || (result as TaskResult & { exactCustodyTerminalAuthorityRequired?: unknown })
+      .exactCustodyTerminalAuthorityRequired === true;
+}
+
 /**
  * Merge PLAN-time roots with runtime-born FIX/FIX-FIX task artifacts. FIX
  * attempts are intentionally not appended to `sprint.tasks`; final settlement
@@ -2872,6 +2915,7 @@ function terminalAttemptEvidence(
   evaluations: ReadonlyMap<string, TaskEvaluation>,
   results: readonly TaskResult[],
   notDispatchedSettlements: ReadonlyMap<string, NotDispatchedSettlement>,
+  exactTerminalAuthorities: ReadonlyMap<string, ExactAcceptedTaskTerminalAuthorityRead>,
 ): readonly ExactAttemptEvidence<TaskResult>[] {
   const tasksById = new Map(tasks.map(task => [task.id, task]));
   const resultsById = new Map(results.map(result => [result.taskId, result]));
@@ -2879,8 +2923,16 @@ function terminalAttemptEvidence(
     ...tasks.map(task => task.id),
     ...evaluations.keys(),
     ...results.map(result => result.taskId),
+    ...exactTerminalAuthorities.keys(),
   ]);
   const identityFor = (taskId: string): ExactAttemptIdentity => {
+    const exactTerminal = exactTerminalAuthorities.get(taskId);
+    if (exactTerminal?.state === 'current') {
+      return {
+        taskId,
+        attemptId: exactTerminal.terminalAuthority.acceptedAuthority.identity.attemptId,
+      };
+    }
     const result = resultsById.get(taskId);
     const work = projectAttributedTaskWork(result);
     const preDispatchSettlement = resolveHostPreDispatchSettlement(result);
@@ -2899,8 +2951,16 @@ function terminalAttemptEvidence(
 
   return [...candidateIds].sort().map(taskId => {
     const task = tasksById.get(taskId);
-    const result = resultsById.get(taskId);
-    const evaluation = evaluations.get(taskId);
+    const exactTerminal = exactTerminalAuthorities.get(taskId);
+    const publicResult = resultsById.get(taskId);
+    const result = exactTerminal?.state === 'current'
+      ? exactTerminal.projectedResult
+      : publicResult;
+    const exactAuthorityMissing = exactTerminal === undefined
+      && requiresExactTerminalAuthority(publicResult);
+    const evaluation = exactTerminal?.state === 'current'
+      ? exactTerminal.evaluationReceipt.verdict as TaskEvaluation
+      : evaluations.get(taskId);
     const verdict = asTerminalVerdict(evaluation);
     const identity = identityFor(taskId);
     const work = projectAttributedTaskWork(result);
@@ -2918,7 +2978,20 @@ function terminalAttemptEvidence(
     const parentId = task?.fixForTaskId;
     const supersedes = parentId && tasksById.has(parentId) ? identityFor(parentId) : null;
 
-    const authority: ExactAttemptEvidence<TaskResult>['authority'] = hostTerminalNotDispatched
+    const authority: ExactAttemptEvidence<TaskResult>['authority'] = exactAuthorityMissing
+      ? { state: 'UNKNOWN', reasonCode: 'EXACT_TERMINAL_AUTHORITY_REQUIRED' }
+      : exactTerminal?.state === 'hold'
+      ? { state: 'UNKNOWN', reasonCode: `EXACT_TERMINAL_AUTHORITY_HOLD:${exactTerminal.reasonCode}` }
+      : exactTerminal?.state === 'current'
+      ? {
+          state: 'TERMINAL',
+          verdict: exactTerminal.evaluationReceipt.verdict,
+          evidenceRef: sha256EvidenceRef(
+            'exact-terminal-authority',
+            exactTerminal.terminalAuthority,
+          ),
+        }
+      : hostTerminalNotDispatched
       ? {
           state: 'TERMINAL',
           verdict: 'NO_GO',
@@ -2938,7 +3011,32 @@ function terminalAttemptEvidence(
       : evaluation === undefined
         ? { state: 'UNKNOWN', reasonCode: 'FINAL_EVALUATION_UNAVAILABLE' }
         : { state: 'UNSETTLED', evidenceRef: sha256EvidenceRef('evaluation', { identity, evaluation }) };
-    const resultEvidence: ExactAttemptEvidence<TaskResult>['result'] = hostTerminalNotDispatched
+    const resultEvidence: ExactAttemptEvidence<TaskResult>['result'] = exactAuthorityMissing
+      ? result
+        ? {
+            state: 'PARTIAL',
+            payload: result,
+            evidenceRef: sha256EvidenceRef('unsettled-exact-result', result),
+            reasonCode: 'EXACT_TERMINAL_AUTHORITY_REQUIRED',
+          }
+        : { state: 'ABSENT' }
+      : exactTerminal?.state === 'hold'
+      ? result
+        ? {
+            state: 'PARTIAL',
+            payload: result,
+            evidenceRef: sha256EvidenceRef('untrusted-exact-result', result),
+            reasonCode: `EXACT_TERMINAL_AUTHORITY_HOLD:${exactTerminal.reasonCode}`,
+          }
+        : { state: 'ABSENT' }
+      : exactTerminal?.state === 'current'
+      ? {
+          state: 'COMPLETE',
+          verdict: exactTerminal.evaluationReceipt.verdict,
+          evidenceRef: `exact-settled-result:${exactTerminal.terminalResultAuthority.settlementDigest}`,
+          payload: exactTerminal.projectedResult,
+        }
+      : hostTerminalNotDispatched
       ? {
           state: 'NOT_APPLICABLE',
           reasonCode: hostTerminalReasonCode,
@@ -2962,7 +3060,14 @@ function terminalAttemptEvidence(
             payload: result,
             reasonCode: 'FINAL_EVALUATION_UNAVAILABLE',
           };
-    const attribution: ExactAttemptEvidence<TaskResult>['attribution'] = hostTerminalNotDispatched
+    const attribution: ExactAttemptEvidence<TaskResult>['attribution'] = exactAuthorityMissing
+      ? { state: 'HOLD', reasonCode: 'EXACT_TERMINAL_AUTHORITY_REQUIRED' }
+      : exactTerminal?.state === 'hold'
+      ? {
+          state: 'HOLD',
+          reasonCode: `EXACT_TERMINAL_AUTHORITY_HOLD:${exactTerminal.reasonCode}`,
+        }
+      : hostTerminalNotDispatched
       ? {
           state: 'VERIFIED',
           evidenceRef: hostTerminalEvidenceRef ?? sha256EvidenceRef('not-dispatched-zero-work-attribution', {
@@ -3114,10 +3219,12 @@ function enforceRunPolicyParityOnTerminalInputs(
   tasks: readonly Task[],
   evaluations: ReadonlyMap<string, TaskEvaluation>,
   results: readonly TaskResult[],
+  exactTerminalAuthorities: ReadonlyMap<string, ExactAcceptedTaskTerminalAuthorityRead>,
 ): ReadonlyMap<string, TaskEvaluation> {
   let vetoed: Map<string, TaskEvaluation> | null = null;
   const resultsById = new Map(results.map(result => [result.taskId, result]));
   for (const task of tasks) {
+    if (exactTerminalAuthorities.get(task.id)?.state === 'current') continue;
     if (!task.runPolicy) continue;
     const evaluation = evaluations.get(task.id);
     if (evaluation !== TaskEvaluation.DONE && evaluation !== TaskEvaluation.GO_WITH_TECH_DEBT) {
@@ -3139,6 +3246,58 @@ function enforceRunPolicyParityOnTerminalInputs(
   return vetoed ?? evaluations;
 }
 
+function projectExactCustodyDigestBundles(
+  authorities: ReadonlyMap<string, ExactAcceptedTaskTerminalAuthorityRead>,
+): readonly FinalizerExactCustodyDigestBundle[] {
+  return [...authorities.entries()]
+    .filter((entry): entry is [
+      string,
+      Extract<ExactAcceptedTaskTerminalAuthorityRead, { readonly state: 'current' }>,
+    ] => entry[1].state === 'current')
+    .map(([taskId, authority]) => {
+      const accepted = authority.terminalAuthority.acceptedAuthority;
+      const terminal = authority.terminalResultAuthority;
+      return Object.freeze({
+        taskId,
+        attemptId: accepted.identity.attemptId,
+        generation: accepted.identity.generation,
+        admissionReceiptDigest: accepted.admissionReceiptDigest,
+        acceptedResultArtifactReceiptDigest: accepted.acceptedResultRef.artifactReceiptDigest,
+        acceptedResultChainDigest: accepted.acceptedResultChainDigest,
+        resultDigest: accepted.resultDigest,
+        evaluationArtifactReceiptDigest: terminal.evaluationArtifact.artifactReceiptDigest,
+        evaluationChainDigest: terminal.evaluationChainDigest,
+        evaluationReceiptDigest: authority.evaluationReceipt.receiptDigest,
+        finalizerArtifactReceiptDigest: terminal.finalizerArtifact.artifactReceiptDigest,
+        finalizerChainDigest: terminal.finalizerChainDigest,
+        finalizerReceiptDigest: authority.finalizerReceipt.receiptDigest,
+        settlementArtifactReceiptDigest: terminal.settlementRef.artifactReceiptDigest,
+        settlementDigest: terminal.settlementDigest,
+      });
+    })
+    .sort((left, right) => left.taskId.localeCompare(right.taskId)
+      || left.attemptId.localeCompare(right.attemptId)
+      || left.generation - right.generation);
+}
+
+function projectFinalizerAuthoritativeInputs(
+  truth: FinalizerTerminalTruth,
+): {
+  readonly results: TaskResult[];
+  readonly evaluations: Map<string, TaskEvaluation>;
+} {
+  const results: TaskResult[] = [];
+  const evaluations = new Map<string, TaskEvaluation>();
+  for (const attempt of truth.attempts) {
+    if (attempt.authority.state !== 'TERMINAL') continue;
+    evaluations.set(attempt.identity.taskId, attempt.authority.verdict as TaskEvaluation);
+    if (attempt.result.state === 'COMPLETE') {
+      results.push(attempt.result.payload);
+    }
+  }
+  return { results, evaluations };
+}
+
 export function buildFinalizerTerminalTruth(input: {
   readonly tasks: readonly Task[];
   readonly evaluations: ReadonlyMap<string, TaskEvaluation>;
@@ -3146,17 +3305,46 @@ export function buildFinalizerTerminalTruth(input: {
   readonly defaultAuthMode?: 'subscription' | 'api' | 'hybrid';
   readonly coordinatorEvidence?: readonly CoordinatorTerminalEvidence[];
   readonly notDispatchedSettlements?: ReadonlyMap<string, NotDispatchedSettlement>;
+  readonly exactTerminalAuthorities?: ReadonlyMap<string, ExactAcceptedTaskTerminalAuthorityRead>;
 }): FinalizerTerminalTruth {
+  const exactTerminalAuthorities = new Map<string, ExactAcceptedTaskTerminalAuthorityRead>();
+  const plannedTaskIds = new Set(input.tasks.map(task => task.id));
+  for (const [taskId, authority] of input.exactTerminalAuthorities ?? new Map()) {
+    exactTerminalAuthorities.set(
+      taskId,
+      !plannedTaskIds.has(taskId)
+        ? { state: 'hold', reasonCode: 'terminal-authority-task-unplanned' }
+        : authority.state === 'current'
+        && !isCurrentExactAcceptedTaskTerminalAuthorityRead(
+          taskId,
+          authority.terminalAuthority,
+          authority,
+        )
+        ? { state: 'hold', reasonCode: 'terminal-authority-read-invalid' }
+        : authority,
+    );
+  }
+  const authorityResultsByTaskId = new Map(
+    input.results.map(result => [result.taskId, result]),
+  );
+  for (const [taskId, authority] of exactTerminalAuthorities) {
+    if (authority.state === 'current') {
+      authorityResultsByTaskId.set(taskId, authority.projectedResult);
+    }
+  }
+  const authorityResults = [...authorityResultsByTaskId.values()];
   const evaluations = enforceRunPolicyParityOnTerminalInputs(
     input.tasks,
     input.evaluations,
-    input.results,
+    authorityResults,
+    exactTerminalAuthorities,
   );
   const attempts = terminalAttemptEvidence(
     input.tasks,
     evaluations,
-    input.results,
+    authorityResults,
     input.notDispatchedSettlements ?? new Map(),
+    exactTerminalAuthorities,
   );
   const terminalEvidence = assembleSprintTerminalEvidence({
     attempts,
@@ -3180,7 +3368,7 @@ export function buildFinalizerTerminalTruth(input: {
     throw new FinalizerTerminalEvidenceError(progressResult.diagnostic);
   }
 
-  const resultsByTaskId = new Map(input.results.map(result => [result.taskId, result]));
+  const resultsByTaskId = new Map(authorityResults.map(result => [result.taskId, result]));
   const currentCoverage = terminalEvidence.logicalTasks.reduce((sum, logicalTask) => {
     const taskId = logicalTask.resolvingAttempt?.taskId
       ?? logicalTask.attempts.at(-1)?.taskId;
@@ -3209,11 +3397,12 @@ export function buildFinalizerTerminalTruth(input: {
     .filter(value => value === TaskEvaluation.GO_WITH_TECH_DEBT).length;
   const lineageUsage = buildLineageUsage(
     input.tasks,
-    input.results,
+    authorityResults,
     attempts,
     input.defaultAuthMode,
   );
   const usageTotals = usageTotalsFromLineages(lineageUsage);
+  const exactCustodyDigests = projectExactCustodyDigestBundles(exactTerminalAuthorities);
   const logicalMetrics: FinalizerLogicalMetrics = {
     totalTasks: progressResult.projection.total,
     completedTasks: progressResult.projection.done,
@@ -3248,6 +3437,7 @@ export function buildFinalizerTerminalTruth(input: {
     logicalEvaluations,
     lineageUsage,
     usageTotals,
+    exactCustodyDigests,
     logicalSettlementDigest,
   };
 }
@@ -3410,6 +3600,7 @@ function publishFencedTerminalReceipt(
     logicalProgress: input.truth.logicalProgress,
     terminalTruth: input.truth.terminalTruth,
     lineageUsage: input.truth.lineageUsage,
+    exactCustodyDigests: input.truth.exactCustodyDigests,
     writtenAt: input.now?.() ?? new Date().toISOString(),
   };
   const tempPath = `${artifactPath}.tmp-${process.pid}-${randomUUID()}`;
@@ -3451,6 +3642,7 @@ export function publishTestModeSprintTerminalReceipt(
     readonly defaultAuthMode?: 'subscription' | 'api' | 'hybrid';
     readonly runId?: string;
     readonly coordinatorGeneration?: number;
+    readonly exactTerminalAuthorities?: ReadonlyMap<string, ExactAcceptedTaskTerminalAuthorityRead>;
   } = {},
 ): TestModeSprintTerminalSettlement {
   const attemptTasks = loadFinalizerAttemptTasks(projectRoot, sprint);
@@ -3459,6 +3651,7 @@ export function publishTestModeSprintTerminalReceipt(
     evaluations: normalizePolicyTerminalEvaluations(evaluations, derivePolicyTerminalIdsFromResults(results)),
     results,
     defaultAuthMode: opts.defaultAuthMode,
+    exactTerminalAuthorities: opts.exactTerminalAuthorities,
     notDispatchedSettlements: projectNotDispatchedSettlements(
       attemptTasks,
       normalizePolicyTerminalEvaluations(evaluations, derivePolicyTerminalIdsFromResults(results)),
@@ -3509,6 +3702,7 @@ export function forceAbortSprint(
      */
     readonly coordinatorRetirementEvidence?: CoordinatorTerminalEvidence;
     readonly requireCoordinatorRetirementEvidence?: boolean;
+    readonly exactTerminalAuthorities?: ReadonlyMap<string, ExactAcceptedTaskTerminalAuthorityRead>;
   } = {},
 ): ForceAbortSprintSettlement {
   const coordinatorRetirementEvidence = opts.coordinatorRetirementEvidence;
@@ -3532,6 +3726,7 @@ export function forceAbortSprint(
     coordinatorEvidence: coordinatorRetirementEvidence
       ? [coordinatorRetirementEvidence]
       : [],
+    exactTerminalAuthorities: opts.exactTerminalAuthorities,
     notDispatchedSettlements: projectNotDispatchedSettlements(
       attemptTasks,
       normalizePolicyTerminalEvaluations(evaluations, derivePolicyTerminalIdsFromResults(results)),
@@ -4172,7 +4367,7 @@ export async function finalizeSprint(
   }
 
   // Build O(1) lookup index from results array — eliminates O(n²) linear scans
-  const resultsMap = buildResultsMap(results);
+  const callerResultsMap = buildResultsMap(results);
 
   // Settlement truth gate: a dirty or unexecutable compiler may not be
   // represented as a pure COMPLETE. Reuse the existing per-task tech-debt
@@ -4187,7 +4382,7 @@ export async function finalizeSprint(
       const candidate = sprint.tasks.find(task => evaluations.get(task.id) === TaskEvaluation.DONE);
       if (candidate) {
         evaluations.set(candidate.id, TaskEvaluation.GO_WITH_TECH_DEBT);
-        const result = resultsMap.get(candidate.id);
+        const result = callerResultsMap.get(candidate.id);
         if (result) {
           const detail = [tscGate.code, ...tscGate.errors].join('\n');
           result.selfAssessment = 'GO_WITH_TECH_DEBT';
@@ -4213,22 +4408,12 @@ export async function finalizeSprint(
   // its logical root id. This prevents original + FIX attempts from inflating
   // jobs, KPI measurements, coverage, or rich output.
   const attemptTasks = loadFinalizerAttemptTasks(projectRoot, sprint);
-  const deliveryByAttempt = new Map(attemptTasks.map(task => {
-    const result = resultsMap.get(task.id);
-    const delivery = resolvePromptDeliveryAttribution({
-      projectRoot,
-      taskId: task.id,
-      requireCurrentReceipt: typeof task.promptCompilePlanId === 'string',
-      legacyAgentId: result?.agentId ?? task.assignedAgent ?? null,
-      legacySkillIds: result?.skillIds ?? task.assignedSkills,
-    });
-    return [task.id, delivery] as const;
-  }));
   const terminalTruth = buildFinalizerTerminalTruth({
     tasks: attemptTasks,
     evaluations: normalizePolicyTerminalEvaluations(evaluations, derivePolicyTerminalIdsFromResults(results)),
     results,
     defaultAuthMode: opts?.config?.auth_mode,
+    exactTerminalAuthorities: opts?.exactTerminalAuthorities,
     notDispatchedSettlements: projectNotDispatchedSettlements(
       attemptTasks,
       normalizePolicyTerminalEvaluations(evaluations, derivePolicyTerminalIdsFromResults(results)),
@@ -4240,13 +4425,31 @@ export async function finalizeSprint(
       derivePolicyTerminalIdsFromResults(results),
     ),
   });
+  // From this boundary onward, caller/public arrays are no longer outcome
+  // inputs. Every result and verdict is projected back out of the classified
+  // attempt truth; exact attempts therefore carry only the Store-revalidated
+  // T11 payload and receipt verdict into logs, retro, docs, learning and audit.
+  const authoritativeInputs = projectFinalizerAuthoritativeInputs(terminalTruth);
+  const authoritativeResults = authoritativeInputs.results;
+  const authoritativeEvaluations = authoritativeInputs.evaluations;
+  const authoritativeResultsById = buildResultsMap(authoritativeResults);
+  const deliveryByAttempt = new Map(attemptTasks.map(task => {
+    const result = authoritativeResultsById.get(task.id);
+    const delivery = resolvePromptDeliveryAttribution({
+      projectRoot,
+      taskId: task.id,
+      requireCurrentReceipt: typeof task.promptCompilePlanId === 'string',
+      legacyAgentId: result?.agentId ?? task.assignedAgent ?? null,
+      legacySkillIds: result?.skillIds ?? task.assignedSkills,
+    });
+    return [task.id, delivery] as const;
+  }));
   const tasksById = new Map(attemptTasks.map(task => [task.id, task]));
-  const resultsById = new Map(results.map(result => [result.taskId, result]));
   const logicalTasks = projectFinalizerLogicalTasks(terminalTruth.terminalEvidence, attemptTasks);
   const logicalResults = terminalTruth.terminalEvidence.logicalTasks.flatMap(logicalTask => {
     const resolvingTaskId = logicalTask.resolvingAttempt?.taskId
       ?? logicalTask.attempts.at(-1)?.taskId;
-    const result = resolvingTaskId ? resultsById.get(resolvingTaskId) : undefined;
+    const result = resolvingTaskId ? authoritativeResultsById.get(resolvingTaskId) : undefined;
     return result ? [{ ...result, taskId: logicalTask.logicalTaskId }] : [];
   });
   const logicalResultsMap = buildResultsMap(logicalResults);
@@ -4310,7 +4513,7 @@ export async function finalizeSprint(
   // 0. Legacy ambient code observation (diagnostic-only). It deliberately runs
   // after the immutable replay branch so sealed re-entry remains observational.
   const codeVerifiedTasks: string[] = [];
-  for (const [taskId, evaluation] of evaluations) {
+  for (const [taskId, evaluation] of authoritativeEvaluations) {
     if (evaluation !== TaskEvaluation.NO_GO) continue;
     try {
       const verifyResult = await tryCodeVerifiedDone(taskId, projectRoot);
@@ -4394,7 +4597,7 @@ export async function finalizeSprint(
 
   // 2. Write sprint log
   try {
-    writeSprintLog(projectRoot, sprint, metrics, evaluations);
+    writeSprintLog(projectRoot, logicalSprint, metrics, logicalEvaluations);
   } catch (e) { debugLog('finalizeSprint:writeSprintLog', e); }
 
   // ─── SPRINT_PHASE_CHANGE: EVALUATE → RETRO ──────────────────────
@@ -4414,13 +4617,13 @@ export async function finalizeSprint(
   // tests/orchestra/retro-dual-write.test.ts. Do NOT split the call
   // (Sprint 167 regression — DB+FS came out of sync when the wire was
   // partial). Unconditional invocation per ADR-046 §"Mimari Prensipler".
-  debugLog('finalizeSprint:preRetro', `evaluations.size=${evaluations.size} keys=[${[...evaluations.keys()].join(',')}]`);
+  debugLog('finalizeSprint:preRetro', `evaluations.size=${logicalEvaluations.size} keys=[${[...logicalEvaluations.keys()].join(',')}]`);
   let sprintLogPersisted = false;
   try {
     // Build skillMap from delivered prompt identities for Skill Performance.
     const skillMap = new Map<string, string[]>();
-    for (const task of sprint.tasks) {
-      const delivered = deliveryByAttempt.get(task.id)?.skillIds ?? [];
+    for (const task of logicalTasks) {
+      const delivered = logicalDelivery.get(task.id)?.skillIds ?? [];
       if (delivered.length > 0) {
         skillMap.set(task.id, [...delivered]);
       }
@@ -4430,10 +4633,10 @@ export async function finalizeSprint(
     // a first-ever sprint on a fresh project now lands sprint-log + retro
     // + mem rows.
     const retroWriteResult = writeRetrospective(
-      projectRoot, sprint, evaluations, metrics,
+      projectRoot, logicalSprint, logicalEvaluations, metrics,
       undefined,
       skillMap.size > 0 ? skillMap : undefined,
-      results,
+      logicalResults,
       { createIfMissing: true },
     );
     sprintLogPersisted = retroWriteResult.sprintLogWritten;
@@ -4487,7 +4690,7 @@ export async function finalizeSprint(
   // Best-effort + fail-safe: never blocks finalize. Helper cost is kept SEPARATE from
   // buildUsageTotals/KPI (which stays primary-only) so it is added exactly once.
   try {
-    const helper = collectHelperCost(projectRoot, results);
+    const helper = collectHelperCost(projectRoot, authoritativeResults);
     if (helper.helperUsd > 0) {
       writeEvent(
         projectRoot, sprintIdForEvents, 'brain', '*',
@@ -4500,9 +4703,9 @@ export async function finalizeSprint(
         },
       );
     }
-    const attributed = projectSprintWorkAttribution(results);
+    const attributed = projectSprintWorkAttribution(authoritativeResults);
     const excluded = attributed.heldAttempts + attributed.unavailableAttempts;
-    const section = buildFilesChangedCostSection(results, {
+    const section = buildFilesChangedCostSection(authoritativeResults, {
       helperCostUsd: helper.helperUsd,
       requireVerifiedAttribution: true,
       ...(excluded > 0
@@ -4788,7 +4991,12 @@ export async function finalizeSprint(
   // 9. Update project docs
   if (opts?.config) {
     try {
-      updateProjectDocs(projectRoot, { sprint, evaluations, metrics }, opts.config, results);
+      updateProjectDocs(
+        projectRoot,
+        { sprint: logicalSprint, evaluations: logicalEvaluations, metrics },
+        opts.config,
+        logicalResults,
+      );
     } catch (e) { debugLog('finalizeSprint:updateProjectDocs', e); }
   }
 
@@ -4894,7 +5102,7 @@ export async function finalizeSprint(
       currentInput,
       evaluate: async () => {
         evaluatedEvidence = await runSelfAuditGate(sprint.id, projectRoot, {
-          scopedManifest: deriveScopedSelfAuditManifest(attemptTasks, results),
+          scopedManifest: deriveScopedSelfAuditManifest(attemptTasks, authoritativeResults),
           selfAuditEcosystem: resolveSelfAuditEcosystem(projectRoot ?? process.cwd()),
         });
         return evaluatedEvidence.overallGate === 'PASS' ? 'PASS' : 'FAIL';

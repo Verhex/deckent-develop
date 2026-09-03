@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { basename, dirname } from 'node:path';
 import { types as mutableNodeTypes } from 'node:util';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -15,6 +16,7 @@ vi.mock('../../src/core/exec-authority-native.js', async importOriginal => {
 
 import {
   createTaskAttemptCustodyPosixAdapter,
+  taskAttemptCustodyPosixDockerAuthorityLabelDigestV2,
   type TaskAttemptCustodyPosixMountConsumerInput,
   type TaskAttemptCustodyPosixDockerMountObservation,
   type TaskAttemptCustodyPosixMountedIdentityObservation,
@@ -82,6 +84,7 @@ class FakeNativeCustody {
   closeFaultAtCall: number | null = null;
   readonly openFileFaults = new Map<string, string>();
   readonly readFaults = new Map<string, string>();
+  readonly openRootInputs: Array<Readonly<{ path: string; disposition: string }>> = [];
   directoryScanFault: string | null = null;
   private nextId = 1;
 
@@ -92,12 +95,19 @@ class FakeNativeCustody {
         switch (operation) {
           case 'open-root': {
             const path = input.path as string;
-            let node = this.roots.get(path);
+            this.openRootInputs.push(Object.freeze({
+              path,
+              disposition: String(input.disposition),
+            }));
+            let node = this.findAbsolute(path);
             let state: 'OPENED' | 'CREATED' = 'OPENED';
             if (node === undefined) {
               if (input.disposition === 'OPEN_EXISTING') throw nativeError('ENOENT');
-              node = this.node('DIRECTORY', null, '', 0, '0700');
-              this.roots.set(path, node);
+              const parent = this.findAbsolute(dirname(path));
+              if (parent === undefined) throw nativeError('ENOENT');
+              const name = basename(path);
+              node = this.node('DIRECTORY', parent, name, 0, '0700');
+              parent.children.set(name, node);
               state = 'CREATED';
             }
             return this.openResult(node, state);
@@ -378,6 +388,10 @@ class FakeNativeCustody {
     } as unknown as ExecAuthorityNativeAvailable);
   }
 
+  seedRoot(path: string): void {
+    this.roots.set(path, this.node('DIRECTORY', null, basename(path), 0, '0700'));
+  }
+
   writeAbsolute(path: string, bytes: Uint8Array): void {
     const rootEntry = [...this.roots.entries()]
       .find(([root]) => path === root || path.startsWith(`${root}/`));
@@ -434,6 +448,22 @@ class FakeNativeCustody {
       current = next;
     }
     return current;
+  }
+
+  private findAbsolute(path: string): FakeNode | undefined {
+    const rootEntry = [...this.roots.entries()]
+      .filter(([root]) => path === root || path.startsWith(`${root}/`))
+      .sort(([left], [right]) => right.length - left.length)[0];
+    if (rootEntry === undefined) return undefined;
+    const [rootPath, root] = rootEntry;
+    try {
+      return this.findNode(
+        root,
+        path === rootPath ? [] : path.slice(rootPath.length + 1).split('/'),
+      );
+    } catch {
+      return undefined;
+    }
   }
 
   private findNode(root: FakeNode, components: readonly string[]): FakeNode {
@@ -499,7 +529,9 @@ class FakeNativeCustody {
       platform: this.platform,
       objectType: node.kind === 'DIRECTORY' ? 'DIRECTORY' : 'REGULAR_FILE',
       size: String(node.bytes.byteLength),
-      linkCount: '1',
+      linkCount: node.kind === 'DIRECTORY'
+        ? String(2 + [...node.children.values()].filter(child => child.kind === 'DIRECTORY').length)
+        : '1',
       mntId: '1',
       dev: '7',
       ino: String(node.id),
@@ -613,6 +645,24 @@ function fixedDigest(character: string): Sha256Digest {
   return `sha256:${character.repeat(64)}` as Sha256Digest;
 }
 
+function mountIdentityTuple(identity: TaskAttemptCustodyPosixMountedIdentityObservation) {
+  return [
+    identity.platform, identity.objectType, identity.dev, identity.ino, identity.mntId,
+    identity.fsMagic, identity.ownerUid, identity.mode, identity.size, identity.linkCount,
+  ];
+}
+
+function mountSeparationDigest(
+  output: TaskAttemptCustodyPosixMountedIdentityObservation,
+  workspace: TaskAttemptCustodyPosixMountedIdentityObservation,
+): Sha256Digest {
+  return `sha256:${createHash('sha256')
+    .update('execution-effect-docker-mount-separation-v1')
+    .update('\0')
+    .update(JSON.stringify([mountIdentityTuple(output), mountIdentityTuple(workspace)]))
+    .digest('hex')}` as Sha256Digest;
+}
+
 function mountedIdentity(
   identity: ExecAuthorityNativeIdentity,
 ): TaskAttemptCustodyPosixMountedIdentityObservation {
@@ -652,8 +702,8 @@ function dockerObservation(
     generation: input.generation,
   });
   const taskDaemonMount = Object.freeze({
-    sourcePath: input.taskSnapshot.sourcePath,
-    targetPath: '/run/deckent/task.json' as const,
+    sourceDirectoryPath: dirname(input.taskSnapshot.sourcePath),
+    targetDirectoryPath: '/run/deckent/snapshot' as const,
     mountType: 'bind' as const,
     propagation: 'rprivate' as const,
     readOnly: true as const,
@@ -667,6 +717,13 @@ function dockerObservation(
   });
   const containerId = 'a'.repeat(64);
   const imageDigest = fixedDigest('b');
+  const outputIdentity = mountedIdentity(fake.identityAtAbsolute(input.workerOutput.sourcePath));
+  const workspaceIdentity = Object.freeze({
+    ...outputIdentity,
+    dev: '987654',
+    ino: '987655',
+    mntId: '987656',
+  });
   return Object.freeze({
     schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
     kind: 'task-attempt-custody-posix-docker-mount-observation',
@@ -676,7 +733,13 @@ function dockerObservation(
     imageDigest,
     authorityLabels,
     taskSnapshotMount: Object.freeze({
-      ...taskDaemonMount,
+      sourcePath: input.taskSnapshot.sourcePath,
+      sourceDirectoryPath: taskDaemonMount.sourceDirectoryPath,
+      targetPath: '/run/deckent/snapshot/task.json' as const,
+      targetDirectoryPath: taskDaemonMount.targetDirectoryPath,
+      mountType: taskDaemonMount.mountType,
+      propagation: taskDaemonMount.propagation,
+      readOnly: taskDaemonMount.readOnly,
       access: 'READ_ONLY' as const,
       identity: mountedIdentity(fake.identityAtAbsolute(input.taskSnapshot.sourcePath)),
       contentDigest: fake.contentDigestAtAbsolute(input.taskSnapshot.sourcePath),
@@ -684,8 +747,9 @@ function dockerObservation(
     workerOutputMount: Object.freeze({
       ...outputDaemonMount,
       access: 'READ_WRITE' as const,
-      identity: mountedIdentity(fake.identityAtAbsolute(input.workerOutput.sourcePath)),
+      identity: outputIdentity,
     }),
+    workspaceIdentity,
     bootstrap: Object.freeze({
       abiName: 'deckent_exec_authority_native',
       abiVersion: '1.0.0',
@@ -696,7 +760,7 @@ function dockerObservation(
       platform: 'linux' as const,
       arch: 'x64',
       binarySha256: fixedDigest('c'),
-      rootSeparationEvidenceBits: 31,
+      mountSeparationEvidenceDigest: mountSeparationDigest(outputIdentity, workspaceIdentity),
     }),
     daemon: Object.freeze({
       containerId,
@@ -732,7 +796,10 @@ type ObservationTamper =
   | 'output-link-leading-zero'
   | 'output-link-negative'
   | 'output-link-overflow'
-  | 'output-link-nonnumeric';
+  | 'output-link-nonnumeric'
+  | 'workspace-physical-alias'
+  | 'workspace-mount-alias'
+  | 'separation-digest';
 
 function tamperedDockerObservation(
   fake: FakeNativeCustody,
@@ -812,6 +879,45 @@ function tamperedDockerObservation(
         ...base.taskSnapshotMount,
         contentDigest: fixedDigest('f'),
       }) });
+    case 'workspace-physical-alias': {
+      const workspaceIdentity = Object.freeze({ ...base.workerOutputMount.identity });
+      return Object.freeze({
+        ...base,
+        workspaceIdentity,
+        bootstrap: Object.freeze({
+          ...base.bootstrap,
+          mountSeparationEvidenceDigest: mountSeparationDigest(
+            base.workerOutputMount.identity,
+            workspaceIdentity,
+          ),
+        }),
+      });
+    }
+    case 'workspace-mount-alias': {
+      const workspaceIdentity = Object.freeze({
+        ...base.workspaceIdentity,
+        mntId: base.workerOutputMount.identity.mntId,
+      });
+      return Object.freeze({
+        ...base,
+        workspaceIdentity,
+        bootstrap: Object.freeze({
+          ...base.bootstrap,
+          mountSeparationEvidenceDigest: mountSeparationDigest(
+            base.workerOutputMount.identity,
+            workspaceIdentity,
+          ),
+        }),
+      });
+    }
+    case 'separation-digest':
+      return Object.freeze({
+        ...base,
+        bootstrap: Object.freeze({
+          ...base.bootstrap,
+          mountSeparationEvidenceDigest: fixedDigest('d'),
+        }),
+      });
     case 'extra':
       return Object.freeze({ ...base, transferEvidenceDigest: fixedDigest('d') });
     case 'accessor': {
@@ -988,7 +1094,58 @@ describe('POSIX task-attempt custody adapter — typed native facade', () => {
 
   beforeEach(() => {
     fake = new FakeNativeCustody();
+    fake.seedRoot('/workspace');
     nativeState.current = fake.available();
+  });
+
+  it('shares one domain-separated semantic Docker label digest across custody boundaries', () => {
+    const labels = Object.freeze({
+      rootId: fixedDigest('1'),
+      scopeDigest: fixedDigest('2'),
+      effectOpDigest: fixedDigest('3'),
+      attemptId: randomUUID(),
+      generation: 1,
+    });
+    const first = taskAttemptCustodyPosixDockerAuthorityLabelDigestV2(labels);
+    const second = taskAttemptCustodyPosixDockerAuthorityLabelDigestV2(labels);
+    const changed = taskAttemptCustodyPosixDockerAuthorityLabelDigestV2(Object.freeze({
+      ...labels,
+      effectOpDigest: fixedDigest('4'),
+    }));
+
+    expect(first).toMatch(/^sha256:[a-f0-9]{64}$/u);
+    expect(second).toBe(first);
+    expect(changed).not.toBe(first);
+    expect(() => taskAttemptCustodyPosixDockerAuthorityLabelDigestV2(Object.freeze({
+      ...labels,
+      generation: 0,
+    }))).toThrowError('Invalid POSIX Docker authority labels');
+  });
+
+  it('creates a missing private root hierarchy from a native-pinned existing ancestor', () => {
+    const store = openStore();
+
+    expect(store.root.platform).toBe('posix');
+    expect(fake.identityAtAbsolute('/workspace/custody').objectType).toBe('DIRECTORY');
+  });
+
+  it('reopens a recursively created hierarchy through the native root-handle contract', () => {
+    const absoluteRoot = '/workspace/global/runtime/task-attempt-custody/project';
+    const adapter = createTaskAttemptCustodyPosixAdapter();
+
+    const proof = adapter.openRoot({
+      absoluteRoot,
+      canonicalProjectRoot: '/workspace/project',
+      projectId: 'posix-project',
+      create: true,
+    });
+
+    expect(proof.platform).toBe('posix');
+    expect(fake.identityAtAbsolute(absoluteRoot).objectType).toBe('DIRECTORY');
+    expect(fake.openRootInputs.at(-1)).toEqual({
+      path: absoluteRoot,
+      disposition: 'OPEN_EXISTING',
+    });
   });
 
   it('fails honestly when the canonical loader or effective probe cannot prove custody', () => {
@@ -1006,11 +1163,13 @@ describe('POSIX task-attempt custody adapter — typed native facade', () => {
     expectHold(() => openStore(), 'NATIVE_CAPABILITY_UNAVAILABLE');
 
     fake = new FakeNativeCustody();
+    fake.seedRoot('/workspace');
     fake.probeAvailable = false;
     nativeState.current = fake.available();
     expectHold(() => openStore(), 'UNSUPPORTED_FILESYSTEM');
 
     fake = new FakeNativeCustody();
+    fake.seedRoot('/workspace');
     fake.platform = 'darwin';
     fake.probeAvailable = true;
     nativeState.current = fake.available();
@@ -1069,6 +1228,25 @@ describe('POSIX task-attempt custody adapter — typed native facade', () => {
         deadlineUnixMs,
       }), holdCode);
     }
+  });
+
+  it('keeps a private directory identity stable while its child namespace changes', () => {
+    const adapter = createTaskAttemptCustodyPosixAdapter();
+    const root = adapter.openRoot({
+      absoluteRoot: '/workspace/custody',
+      canonicalProjectRoot: '/workspace/project',
+      projectId: 'posix-project',
+      create: true,
+    });
+    const directory = taskAttemptCustodyRelativePath('v2/mutable-worker-output');
+    const created = adapter.ensurePrivateDirectory(root, directory);
+
+    adapter.ensurePrivateDirectory(
+      root,
+      taskAttemptCustodyRelativePath(`${directory}/provider-result-child`),
+    );
+
+    expect(adapter.readPrivateDirectory(root, directory)).toEqual(created);
   });
 
   it('wires Store admission, durable markers, first-writer publication and verified reads', () => {
@@ -1437,6 +1615,10 @@ describe('POSIX task-attempt custody adapter — typed native facade', () => {
     expect(receipt.backendExecutionId).toBe('a'.repeat(64));
     expect(receipt.backendImageDigest).toBe(fixedDigest('b'));
     expect(fake.rootSeparationCalls).toBe(3);
+    expect(fake.openRootInputs.filter(input => (
+      input.path === '/workspace/custody'
+      && input.disposition === 'OPEN_EXISTING'
+    )).length).toBeGreaterThanOrEqual(6);
     expect(observedInputs[0]?.taskSnapshot.sourcePath).toContain('/workspace/custody/');
     expect(observedInputs[0]?.workerOutput.sourcePath).toContain('/workspace/custody/');
     const source = store.issueAttemptOutputCaptureSource({
@@ -1535,16 +1717,24 @@ describe('POSIX task-attempt custody adapter — typed native facade', () => {
     const adapter = createTaskAttemptCustodyPosixAdapter({
       mountConsumer: async input => {
         const observation = dockerObservation(fake, input);
+        const outputIdentity = Object.freeze({
+          ...observation.workerOutputMount.identity,
+          mntId: uint64Max,
+          size: uint64Max,
+          linkCount: uint64Max,
+        });
         return Object.freeze({
           ...observation,
           workerOutputMount: Object.freeze({
             ...observation.workerOutputMount,
-            identity: Object.freeze({
-              ...observation.workerOutputMount.identity,
-              mntId: uint64Max,
-              size: uint64Max,
-              linkCount: uint64Max,
-            }),
+            identity: outputIdentity,
+          }),
+          bootstrap: Object.freeze({
+            ...observation.bootstrap,
+            mountSeparationEvidenceDigest: mountSeparationDigest(
+              outputIdentity,
+              observation.workspaceIdentity,
+            ),
           }),
         });
       },
@@ -1697,6 +1887,7 @@ describe('POSIX task-attempt custody adapter — typed native facade', () => {
     'output-size-overflow', 'output-size-nonnumeric',
     'output-link-leading-zero', 'output-link-negative',
     'output-link-overflow', 'output-link-nonnumeric',
+    'workspace-physical-alias', 'workspace-mount-alias', 'separation-digest',
   ])('rejects %s Docker observation without laundering it as consumed', async tamper => {
     const adapter = createTaskAttemptCustodyPosixAdapter({
       mountConsumer: async input => tamperedDockerObservation(

@@ -27,8 +27,11 @@ import {
 import {
   type ExactAuthoritativeTaskResult,
   type ExactTaskResultAuthorityMetadata,
+  projectExactTaskResultV2ForEvaluation,
   readAuthoritativeTaskResult,
+  readExactAcceptedTaskResultV2,
   readExactAuthoritativeTaskResult,
+  readExactSettledTaskResultV2,
   readExactSettledTaskResult,
 } from '../../src/orchestra/task-result-authority.js';
 import {
@@ -134,6 +137,7 @@ describe('task result authority', () => {
         taskId: exact.identity.taskId,
         selfAssessment: 'DONE',
         notes: '',
+        diskVerified: true,
         exactAcceptedResultAuthority: {
           acceptedResultRef,
         },
@@ -141,7 +145,79 @@ describe('task result authority', () => {
     });
     expect((authority.result as Record<string, unknown>)['evaluationDecision']).toBeUndefined();
     expect((authority.result as Record<string, unknown>)['brainEvaluation']).toBeUndefined();
-  });
+  }, 60_000);
+
+  it('keeps V2 custody/evidence in the raw accepted reader and strips terminal self-claims only at evaluator projection', () => {
+    const exact = createTaskResultSettlementV2Fixture({
+      terminal: 'accepted-only',
+      tailArtifactKey: 'raw-accepted-v2',
+    });
+    const acceptedResultRef = createExactAcceptedTaskResultRefV2(exact.acceptedResultArtifact);
+    const read = readExactAcceptedTaskResultV2({
+      executionMode: 'normal-docker',
+      authorityKind: 'accepted-result',
+      projectRoot: '/fixture/project',
+      taskId: exact.identity.taskId,
+      custodyStore: exact.store,
+      policy: exact.policy,
+      expectedIdentity: exact.identity,
+      admission: exact.admission,
+      acceptedResultRef,
+      expectedAcceptedResultChainDigest: exact.acceptedResultChain.receiptDigest,
+    });
+    expect(read.state).toBe('exact-accepted');
+    expect(read.result?.attemptCustody.identity).toEqual(exact.identity);
+    expect(read.result?.attemptCustody.effectLanding.disposition).toBe('COMMITTED_NO_CHANGE');
+    if (read.state !== 'exact-accepted' || read.result === null
+      || read.exactAcceptedAuthority === undefined) return;
+
+    const projected = projectExactTaskResultV2ForEvaluation({
+      result: read.result,
+      acceptedAuthority: read.exactAcceptedAuthority,
+      jsonBounds: exact.policy.jsonBounds,
+    });
+    expect(projected).not.toBeNull();
+    expect((projected as Record<string, unknown>).attemptCustody).toBeUndefined();
+    expect((projected as Record<string, unknown>).brainEvaluation).toBeUndefined();
+    expect((projected as Record<string, unknown>).rubricScores).toBeUndefined();
+    expect((projected as Record<string, unknown>).totalScore).toBeUndefined();
+    expect(projected?.diskVerified).toBe(true);
+
+    expect(projectExactTaskResultV2ForEvaluation({
+      result: { ...read.result, brainEvaluation: 'DONE' } as unknown as typeof read.result,
+      acceptedAuthority: read.exactAcceptedAuthority,
+      jsonBounds: exact.policy.jsonBounds,
+    })).toBeNull();
+    expect(projectExactTaskResultV2ForEvaluation({
+      result: { ...read.result, diskVerified: false },
+      acceptedAuthority: read.exactAcceptedAuthority,
+      jsonBounds: exact.policy.jsonBounds,
+    })).toBeNull();
+  }, 60_000);
+
+  it('keeps V2 custody/evidence intact in the raw settled reader', () => {
+    const exact = createTaskResultSettlementV2Fixture({ tailArtifactKey: 'raw-settled-v2' });
+    const settlementRef = createExactTaskResultSettlementRefV2(exact.settlementArtifact);
+    const read = readExactSettledTaskResultV2({
+      executionMode: 'normal-docker',
+      authorityKind: 'attempt-settlement',
+      projectRoot: '/fixture/project',
+      taskId: exact.identity.taskId,
+      custodyStore: exact.store,
+      policy: exact.policy,
+      expectedIdentity: exact.identity,
+      admission: exact.admission,
+      settlementRef,
+      expectedSettlementDigest: taskResultSettlementV2Digest(
+        exact.settlement,
+        exact.policy.jsonBounds,
+      ),
+    });
+    expect(read.state).toBe('exact-settled');
+    expect(read.result?.attemptCustody.identity).toEqual(exact.identity);
+    expect(read.result?.criteriaEvidence).toEqual(exact.result.criteriaEvidence);
+    expect(read.exactAuthority?.settlementRef).toEqual(settlementRef);
+  }, 60_000);
 
   it('keeps no-dispatch truth at zero attempts without reading a public result', () => {
     const { root, tasksDir } = fixture();

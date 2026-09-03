@@ -133,10 +133,37 @@ const validPlannerJSON = JSON.stringify({
       scope: { directories: ['src/'], filesRead: [], filesWrite: ['src/feature.ts'] },
       dependencies: [],
       goNogo: { goCriteria: 'Tests pass', noGoCriteria: 'Build fails', techDebtAcceptable: 'Minor' },
+      productionWiring: productionWiringInput(),
     },
   ],
   reasoning: 'Single task for the directive',
 });
+
+function productionWiringInput() {
+  const probe = (kind: 'producer' | 'canonical-consumer' | 'affected-ingress' | 'enablement-authority' | 'proof-target', targetId: string) => ({
+    target: { kind, targetId }, observationGroupId: kind === 'producer' || kind === 'canonical-consumer' ? 'runtime-path-observation' : `${kind}:${targetId}`, harnessPath: 'scripts/production-wiring-proof.mjs', verifierAssetPaths: ['scripts/production-wiring-proof.mjs'],
+    args: kind === 'producer' || kind === 'canonical-consumer' ? ['observe-runtime-relation'] : ['observe', targetId], cwd: '.', timeoutMs: 30_000, outputLimitBytes: 1_048_576,
+    expectation: { kind: 'adapter-structured-outcome', schemaId: 'deckent.production-wiring-observation.v1', outcome: 'observed' },
+  });
+  return {
+    version: 2, changeKind: 'runtime-change', producer: { producerId: 'planner' },
+    canonicalConsumer: { consumerId: 'task-builder', relationship: 'invokes-producer' },
+    affectedIngresses: [{ ingressId: 'ai-plan', kind: 'ingress' }],
+    enablementAuthority: { authorityId: 'production-classification', mechanism: 'policy' },
+    disposition: { kind: 'production-wiring' },
+    proofTargets: [{ proofTargetId: 'ai-plan-proof', kind: 'consumer-execution' }],
+    hostProofProgram: { network: 'forbidden', verifierAssets: [{ path: 'scripts/production-wiring-proof.mjs', sha256: `sha256:${'a'.repeat(64)}`, role: 'trusted-harness' }], platforms: [
+      { platform: 'linux', state: 'unsupported', reasonCode: 'environment-unavailable' },
+      { platform: 'wsl2-linux', state: 'supported', runnerAdapterId: 'native-v1', probes: [
+        probe('producer', 'planner'),
+        probe('canonical-consumer', 'task-builder'), probe('affected-ingress', 'ai-plan'),
+        probe('enablement-authority', 'production-classification'), probe('proof-target', 'ai-plan-proof'),
+      ] },
+      { platform: 'darwin', state: 'unsupported', reasonCode: 'owner-deferred' },
+      { platform: 'win32', state: 'unsupported', reasonCode: 'owner-deferred' },
+    ] },
+  };
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -171,6 +198,16 @@ describe('buildPlanPrompt', () => {
     const prompt = buildPlanPrompt(makeContext(), makeRecommendation(), 'test');
     expect(prompt).toContain('"tasks"');
     expect(prompt).toContain('"reasoning"');
+  });
+
+  it('requires canonical V2 production-wiring authoring with the complete platform matrix', () => {
+    const prompt = buildPlanPrompt(makeContext(), makeRecommendation(), 'test');
+    expect(prompt).toContain('"productionWiring"');
+    expect(prompt).toContain('hostProofProgram');
+    for (const platform of ['linux', 'wsl2-linux', 'darwin', 'win32']) {
+      expect(prompt).toContain(platform);
+    }
+    expect(prompt).toContain('Never emit evidenceRefs');
   });
 
   it('includes memory when present', () => {
@@ -222,6 +259,48 @@ describe('buildPlanPrompt', () => {
 });
 
 describe('parsePlannerResponse', () => {
+  it('canonicalizes AI-authored V2 wiring and derives both digests on the host', () => {
+    const parsed = JSON.parse(validPlannerJSON) as { tasks: Array<Record<string, unknown>>; reasoning: string };
+    parsed.tasks[0]!.productionWiring = productionWiringInput();
+    const result = parsePlannerResponse(JSON.stringify(parsed));
+
+    expect(result?.tasks[0]?.productionWiring).toMatchObject({ version: 2 });
+    expect(result?.tasks[0]?.productionWiring?.contractDigest).toMatch(/^[a-f0-9]{64}$/u);
+    expect(result?.tasks[0]?.productionWiring?.hostProofProgramDigest).toBe(
+      result?.tasks[0]?.productionWiring?.contract.hostProofProgram.programDigest,
+    );
+    expect(JSON.stringify(result?.tasks[0]?.productionWiring)).not.toContain('evidenceRefs');
+  });
+
+  it('rejects an AI production-write task that omits V2 instead of trusting planner prose', () => {
+    const parsed = JSON.parse(validPlannerJSON) as { tasks: Array<Record<string, unknown>>; reasoning: string };
+    delete parsed.tasks[0]!.productionWiring;
+    expect(parsePlannerResponse(JSON.stringify(parsed))).toBeNull();
+  });
+
+  it('admits an omitted contract only for a host-proven test-only scope', () => {
+    const parsed = JSON.parse(validPlannerJSON) as { tasks: Array<Record<string, unknown>>; reasoning: string };
+    delete parsed.tasks[0]!.productionWiring;
+    parsed.tasks[0]!.scope = {
+      directories: ['tests/orchestra/'], filesRead: [], filesWrite: ['tests/orchestra/planner.test.ts'],
+    };
+    const result = parsePlannerResponse(JSON.stringify(parsed));
+    expect(result?.tasks[0]?.productionWiring).toBeUndefined();
+    expect(result?.tasks[0]?.productionWiringApplicability).toEqual({
+      state: 'not-applicable', reasonCode: 'test-only-scope',
+    });
+  });
+
+  it('rejects AI wiring whose supported platform does not cover every exact target', () => {
+    const parsed = JSON.parse(validPlannerJSON) as { tasks: Array<Record<string, unknown>>; reasoning: string };
+    const wiring = productionWiringInput();
+    const supported = wiring.hostProofProgram.platforms.find(entry => entry.state === 'supported');
+    if (!supported || supported.state !== 'supported') throw new Error('fixture');
+    supported.probes.pop();
+    parsed.tasks[0]!.productionWiring = wiring;
+    expect(parsePlannerResponse(JSON.stringify(parsed))).toBeNull();
+  });
+
   it('parses valid JSON', () => {
     const result = parsePlannerResponse(validPlannerJSON);
     expect(result).not.toBeNull();

@@ -71,6 +71,7 @@ import {
   type ExecutionEffectManifest,
 } from '../../src/core/execution-effect-containment.js';
 import { compileExecutionEffectWritePolicy } from '../../src/core/execution-write-scope-policy.js';
+import { DockerSpawnBackend } from '../../src/orchestra/spawn-backend-docker.js';
 
 function sha256(bytes: Uint8Array): Sha256Digest {
   return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
@@ -1017,7 +1018,7 @@ function publishEffectLanding(input: {
       nativeEntryIdentitySetDigest: domainDigest('test-native-entry-identities', phase),
       startedAt: '2026-08-30T20:01:00.000Z',
       completedAt: phase === 'baseline'
-        ? '2026-08-30T20:02:00.000Z' : '2026-08-30T20:03:00.000Z',
+        ? '2026-08-30T20:01:59.500Z' : '2026-08-30T20:03:00.000Z',
       deadlineAt: '2026-08-30T20:10:00.000Z',
       limits: Object.freeze({
         maxEntries: 100,
@@ -1105,7 +1106,7 @@ function publishEffectLanding(input: {
   const baselineManifest = publish(
     'execution-effect-manifest',
     `${keyPrefix}-baseline`,
-    '2026-08-30T20:02:00.000Z',
+    baseline.captureAuthority.completedAt,
     Buffer.from(baselineBytes).toString('utf8'),
   );
   const finalManifest = publish(
@@ -1867,6 +1868,8 @@ describe('TaskAttemptCustodyStore V2 kernel', () => {
   });
 
   it('keeps frozen artifact authority stable under exported and Array prototype mutation', () => {
+    expect(TASK_ATTEMPT_CUSTODY_HOST_AUTHORITY_ARTIFACT_CLASSES)
+      .toContain('production-wiring-host-settlement');
     for (const projection of [
       TASK_ATTEMPT_CUSTODY_ARTIFACT_CLASSES,
       TASK_ATTEMPT_CUSTODY_ATTEMPT_OUTPUT_ARTIFACT_CLASSES,
@@ -5436,6 +5439,68 @@ describe('TaskAttemptCustodyStore V2 kernel', () => {
     expect(discovered.entries[0]?.state).toBe('reserved-pending-admission');
   });
 
+  it('isolates an identity-bound unreadable admission during recovery without trusting or suppressing its valid sibling', () => {
+    const adapter = new InMemoryCustodyAdapter();
+    const { store } = openedStore(adapter);
+    const taskPolicy = policy();
+    const broken = reserveDispatch({
+      store,
+      policy: taskPolicy,
+      requestId: dispatchId('1'),
+    });
+    const valid = reserveDispatch({
+      store,
+      policy: taskPolicy,
+      requestId: dispatchId('2'),
+    });
+    adapter.files.delete(broken.admission.taskSnapshot.relativePath);
+    const input = {
+      policy: taskPolicy,
+      maxEntries: 32,
+      maxNameBytes: 128,
+      deadlineAt: '2099-09-01T00:00:00.000Z',
+    } as const;
+
+    expectHold(
+      () => store.listDispatchAdmissions(input),
+      'DISPATCH_DISCOVERY_TAMPERED_CANDIDATE',
+    );
+
+    const recovered = store.listDispatchAdmissionsForRecovery(input);
+    expect(recovered).toMatchObject({
+      kind: 'task-attempt-custody-dispatch-recovery-list',
+      state: 'scanned-with-isolated-holds',
+      candidateCount: 2,
+      admittedCount: 1,
+      pendingAdmissionCount: 0,
+      heldAdmissionCount: 1,
+    });
+    expect(recovered.entries).toEqual([
+      expect.objectContaining({
+        state: 'admitted',
+        ref: expect.objectContaining({
+          dispatchRequestId: valid.ref.dispatchRequestId,
+          refDigest: valid.ref.refDigest,
+        }),
+      }),
+    ]);
+    expect(recovered.heldAdmissions).toEqual([
+      expect.objectContaining({
+        state: 'admission-hold',
+        reservation: expect.objectContaining({
+          dispatchRequestId: broken.ref.dispatchRequestId,
+          identity: broken.ref.identity,
+        }),
+        candidateLocatorDigest: expect.stringMatching(/^sha256:[0-9a-f]{64}$/u),
+        custodyHoldCode: 'INCOMPLETE_PUBLICATION',
+      }),
+    ]);
+    expect(Object.isFrozen(recovered)).toBe(true);
+    expect(Object.isFrozen(recovered.entries)).toBe(true);
+    expect(Object.isFrozen(recovered.heldAdmissions)).toBe(true);
+    expect(Object.isFrozen(recovered.heldAdmissions[0])).toBe(true);
+  });
+
   it('distinguishes malformed and hash-tampered dispatch discovery candidates', () => {
     const taskPolicy = policy();
     const malformedAdapter = new InMemoryCustodyAdapter();
@@ -6461,6 +6526,116 @@ describe('TaskAttemptCustodyStore V2 kernel', () => {
       admissionRef: admitted.ref,
       policy: taskPolicy,
     }), 'DISPATCH_RESERVATION_RECONCILIATION_REQUIRED');
+  });
+
+  it('lets Docker reserve generation+1 only from the exact durable NOT_DISPATCHED receipt', () => {
+    const { store } = openedStore();
+    const taskPolicy = policy();
+    const admitted = reserveDispatch({ store, policy: taskPolicy });
+    const durableNoEffect = publishNoEffectObservation({
+      store,
+      admissionRef: admitted.ref,
+      policy: taskPolicy,
+    });
+    const terminal = store.settleNotDispatched({
+      admissionRef: admitted.ref,
+      policy: taskPolicy,
+      reasonCode: 'PROVIDER_UNAVAILABLE',
+      noEffectObservation: durableNoEffect,
+    });
+    const backend = new DockerSpawnBackend('/test/project', { custodyStateDir: '/test/state' });
+    const resolvePredecessor = (backend as unknown as {
+      resolveExactDockerCustodyPredecessor(input: {
+        store: TaskAttemptCustodyStore;
+        policy: TaskAttemptCustodyPolicyV2;
+        releasedPredecessor: unknown;
+        zeroWorkPredecessor: unknown;
+      }): {
+        schemaVersion: 2;
+        kind: 'task-attempt-custody-dispatch-predecessor-ref';
+        identity: TaskAttemptCustodyIdentityV2;
+        admissionReceiptDigest: Sha256Digest;
+      } | null;
+    }).resolveExactDockerCustodyPredecessor.bind(backend);
+    const zeroWorkPredecessor = {
+      dispatchRequestId: admitted.ref.dispatchRequestId,
+      identity: admitted.ref.identity,
+      admissionReceiptDigest: admitted.ref.admissionReceiptDigest,
+      admissionRefDigest: admitted.ref.refDigest,
+      zeroWorkReceipt: {
+        ref: terminal.receiptDigest,
+        digest: terminal.noEffectEvidence.evidenceDigest,
+      },
+    };
+    const predecessor = resolvePredecessor({
+      store,
+      policy: taskPolicy,
+      releasedPredecessor: null,
+      zeroWorkPredecessor,
+    });
+    expect(predecessor).toMatchObject({
+      identity: admitted.ref.identity,
+      admissionReceiptDigest: admitted.ref.admissionReceiptDigest,
+    });
+    if (predecessor === null) throw new Error('zero-work predecessor missing');
+    const child = store.reserveDispatchAdmission({
+      dispatchRequestId: dispatchId('2'),
+      dispatchRequestMaterial: {
+        approvedTaskMaterialDigest: repeatedDigest('7'),
+        dispatchTaskMaterialDigest: repeatedDigest('8'),
+        derivationAuthorityDigest: repeatedDigest('9'),
+      },
+      taskId: admitted.ref.identity.taskId,
+      taskSnapshot: {
+        id: admitted.ref.identity.taskId,
+        scope: { filesRead: ['src/core/a.ts'], filesWrite: ['src/core/b.ts'] },
+      },
+      policy: taskPolicy,
+      reservedAt: '2026-08-30T20:02:00.000Z',
+      predecessor,
+    });
+    expect(child.ref.identity).toMatchObject({
+      attemptId: admitted.ref.identity.attemptId,
+      generation: 2,
+    });
+
+    for (const invalid of [
+      {
+        ...zeroWorkPredecessor,
+        zeroWorkReceipt: { ...zeroWorkPredecessor.zeroWorkReceipt, digest: repeatedDigest('0') },
+      },
+      {
+        ...zeroWorkPredecessor,
+        identity: { ...zeroWorkPredecessor.identity, taskId: 'foreign-task' },
+      },
+      {
+        ...zeroWorkPredecessor,
+        zeroWorkReceipt: { ...zeroWorkPredecessor.zeroWorkReceipt, ref: repeatedDigest('0') },
+      },
+    ]) {
+      expect(() => resolvePredecessor({
+        store,
+        policy: taskPolicy,
+        releasedPredecessor: null,
+        zeroWorkPredecessor: invalid,
+      })).toThrow(/EXACT_DOCKER_PREDECESSOR_INVALID/u);
+    }
+    expectHold(() => store.reserveDispatchAdmission({
+      dispatchRequestId: dispatchId('3'),
+      dispatchRequestMaterial: {
+        approvedTaskMaterialDigest: repeatedDigest('7'),
+        dispatchTaskMaterialDigest: repeatedDigest('8'),
+        derivationAuthorityDigest: repeatedDigest('9'),
+      },
+      taskId: admitted.ref.identity.taskId,
+      taskSnapshot: {
+        id: admitted.ref.identity.taskId,
+        scope: { filesRead: ['src/core/a.ts'], filesWrite: ['src/core/b.ts'] },
+      },
+      policy: taskPolicy,
+      reservedAt: '2026-08-30T20:03:00.000Z',
+      predecessor,
+    }), 'DISPATCH_REQUEST_CONFLICT');
   });
 
   it('arbitrates NOT observation versus MOUNT claim with one immutable winner', () => {

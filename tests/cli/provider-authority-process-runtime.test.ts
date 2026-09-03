@@ -63,7 +63,7 @@ describe('withCliProviderAuthority', () => {
     expect(action).toHaveBeenCalledWith(undefined);
   });
 
-  it.each(['run', 'start', 'do', 'xverify'])(
+  it.each(['run', 'spawn', 'start', 'do', 'xverify'])(
     'opens once before %s, injects the exact result, and closes after settlement',
     async (command) => {
     const events: string[] = [];

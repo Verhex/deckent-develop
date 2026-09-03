@@ -111,6 +111,8 @@ function artifactLimits(maxBytes: number): Record<
 interface FakeNativeOptions {
   readonly closeFailure?: boolean;
   readonly separationFailure?: boolean;
+  readonly separationDirectorySize?: string;
+  readonly separationDirectoryLinkCount?: string;
 }
 
 interface FakeNativeControl {
@@ -295,6 +297,32 @@ function fakeNative(options: FakeNativeOptions = {}): FakeNativeControl {
       });
     },
   };
+  const rootIdentity = (root: 'staging' | 'project') => ({
+    schemaVersion: 1,
+    kind: 'custody-identity',
+    platform: 'linux',
+    objectType: 'DIRECTORY',
+    size: options.separationDirectorySize ?? '4096',
+    linkCount: options.separationDirectoryLinkCount ?? '2',
+    mntId: '41',
+    dev: '2049',
+    ino: root === 'staging' ? '101' : '202',
+    fsMagic: '0xef53',
+    mode: root === 'staging' ? '0700' : '0755',
+    ownerUid: '1000',
+    volumeId: null,
+    fileId: null,
+    reparseTag: null,
+    ownerSid: null,
+    daclPresent: null,
+    daclProtected: null,
+    daclEntryCount: null,
+    daclOwnerAllowMask: null,
+    daclCanonicalHash: null,
+    volumeRemote: null,
+    volumeCapabilities: ['STABLE_OBJECT_ID'],
+    featureEvidenceBits: 7,
+  });
   const custody = {
     invoke(operation: string) {
       if (operation === 'open-root') return { handle: {} };
@@ -303,8 +331,8 @@ function fakeNative(options: FakeNativeOptions = {}): FakeNativeControl {
       });
       return {
         state: 'CONFIRMED',
-        custodyIdentity: { root: 'staging' },
-        projectIdentity: { root: 'project' },
+        custodyIdentity: rootIdentity('staging'),
+        projectIdentity: rootIdentity('project'),
         featureEvidenceBits: 1,
       };
     },
@@ -365,6 +393,8 @@ function dockerExecutor(
         maxChunkBytes: _maxChunkBytes,
         timeoutMs: _timeoutMs,
         receiptMaxBytes: _receiptMaxBytes,
+        workspaceOwnerUid: _workspaceOwnerUid,
+        workspaceOwnerGid: _workspaceOwnerGid,
         ...body
       } = input;
       return createExecutionEffectDockerSourceReceiptV1({
@@ -500,6 +530,8 @@ async function adapterFixture(
     workspaceRuntime: {
       version: 1,
       state: 'SEALED',
+      workspaceOwnerUid: process.getuid?.() ?? 1000,
+      workspaceOwnerGid: process.getgid?.() ?? 1000,
       imageReference: `deckent/runtime@${imageDigest}`,
       imageDigest,
       volumeName: resource.volumeName,
@@ -714,6 +746,8 @@ function dockerCaptureFixture(
     workspaceRuntime: {
       version: 1,
       state: 'SEALED',
+      workspaceOwnerUid: process.getuid?.() ?? 1000,
+      workspaceOwnerGid: process.getgid?.() ?? 1000,
       imageReference: `deckent/runtime@${imageDigest}`,
       imageDigest,
       volumeName: resource.volumeName,
@@ -1022,6 +1056,25 @@ describe('execution effect native adapter', () => {
   it('rejects root-separation uncertainty before Docker or Store access', async () => {
     const native = fakeNative({ separationFailure: true });
     await expect(adapterFixture(Buffer.from('x'), { native })).rejects.toThrow('fixture HOLD: ROOT_IDENTITY_MISMATCH');
+  });
+
+  it('keeps capability identity stable when only root directory cardinality metadata changes', async () => {
+    const firstNative = fakeNative({
+      separationDirectorySize: '4096',
+      separationDirectoryLinkCount: '2',
+    });
+    const fixture = await adapterFixture(Buffer.from('root-metadata'), { native: firstNative });
+    const secondNative = fakeNative({
+      separationDirectorySize: '12288',
+      separationDirectoryLinkCount: '9',
+    });
+    const restarted = await createExecutionEffectLandingNativeAdapterV1(fixture.input, {
+      loadNative: () => secondNative.state,
+      docker: dockerExecutor(Buffer.from('root-metadata')),
+    });
+    expect(restarted.state).toBe('READY');
+    if (restarted.state !== 'READY') return;
+    expect(restarted.adapter.capability).toEqual(fixture.adapter.capability);
   });
 
   it('treats native handle-close uncertainty as HOLD', async () => {

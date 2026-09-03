@@ -25,7 +25,7 @@ import type {
 
 import {
   TASKS_DIR, TASK_FILE_EXTENSIONS,
-  LOCKS_DIR, DECISIONS_LOG_DIR,
+  LOCKS_DIR, DECISIONS_LOG_DIR, SPRINT_STATE_FILE,
 } from '../core/constants.js';
 
 // ─── Core — utils ─────────────────────────────────────────────────
@@ -62,6 +62,8 @@ import { publishCanonicalRunStatusReadModel } from '../core/run-status-read-mode
 
 // ─── Spawn backend abstraction ───────────────────────────────────
 import type { SpawnBackend } from './spawn-backend.js';
+import type { ExactNormalDockerExecutionRegistryV2 } from './scheduler-effects.js';
+import type { ExactAcceptedResultTerminalAuthorityV2 } from './exact-accepted-result-terminal-authority.js';
 
 // ─── Spawn backend tmpfile archive ────────────────────────────────
 import { archivePromptFiles } from './spawn-backend-docker.js';
@@ -112,6 +114,109 @@ export interface PauseState {
 
 /** Valid checkpoint phases that can require human approval. */
 export type CheckpointPhase = 'plan' | 'evaluate' | 'fix';
+
+function readLifecycleFileSnapshot(path: string): string | null {
+  try {
+    return existsSync(path) ? readFileSync(path, 'utf-8') : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function prepareExactSprintLifecycle(
+  registry: ExactNormalDockerExecutionRegistryV2,
+  mode: 'resume' | 'contain',
+): Promise<void> {
+  await registry.reconcileExactLifecycle(mode);
+}
+
+/** Exact Docker pause is an async containment transaction; it never falls into tmux kill. */
+export async function pauseSprintExact(
+  projectRoot: string,
+  sprint: Sprint,
+  reason: string,
+  reasonCode: string,
+  registry: ExactNormalDockerExecutionRegistryV2,
+): Promise<PauseState> {
+  await prepareExactSprintLifecycle(registry, 'contain');
+  for (const task of sprint.tasks) {
+    if (!registry.isExactTask(task.id)) continue;
+    const resultAuthority = registry.readTaskResultAuthority(task.id);
+    if (resultAuthority.state === 'exact-accepted' && resultAuthority.exactAcceptedAuthority) {
+      const settled = await registry.settleExactAcceptedResult({
+        acceptedAuthority: resultAuthority.exactAcceptedAuthority,
+      });
+      if (settled.state !== 'settled') {
+        throw new DeckentError(
+          'DECKENT_E077',
+          `EXACT_PAUSE_SETTLEMENT_HOLD:${task.id}:${settled.state}`,
+        );
+      }
+      const current = registry.readExactTerminalAuthority(task.id);
+      if (current.state !== 'current') {
+        throw new DeckentError(
+          'DECKENT_E077',
+          `EXACT_PAUSE_TERMINAL_REVALIDATION_HOLD:${task.id}:${current.reasonCode}`,
+        );
+      }
+      task.status = current.evaluationReceipt.verdict === 'NO_GO'
+        ? TaskStatus.NO_GO
+        : TaskStatus.DONE;
+      continue;
+    }
+    if (resultAuthority.state === 'pending-settlement') {
+      throw new DeckentError(
+        'DECKENT_E077',
+        `EXACT_PAUSE_ACTIVE_ATTEMPT_HOLD:${task.id}`,
+      );
+    }
+    if (resultAuthority.state === 'authority-hold') {
+      throw new DeckentError(
+        'DECKENT_E077',
+        `EXACT_PAUSE_ATTEMPT_HOLD:${task.id}:${resultAuthority.holdReason ?? 'unknown'}`,
+      );
+    }
+  }
+  return pauseSprint(projectRoot, sprint, reason, reasonCode, registry);
+}
+
+/** Exact Docker resume reconciles private Store/runtime custody before any requeue. */
+export async function resumeSprintExact(
+  projectRoot: string,
+  sprint: Sprint,
+  registry: ExactNormalDockerExecutionRegistryV2,
+): Promise<PauseState | null> {
+  await prepareExactSprintLifecycle(registry, 'resume');
+  return resumeSprint(projectRoot, sprint, registry);
+}
+
+function exactLifecycleCheckpointAuthorities(
+  sprint: Sprint,
+  registry: ExactNormalDockerExecutionRegistryV2 | undefined,
+): ReadonlyMap<string, ExactAcceptedResultTerminalAuthorityV2> | undefined {
+  if (!registry) return undefined;
+  const current = new Map<string, ExactAcceptedResultTerminalAuthorityV2>();
+  for (const [taskId, authority] of registry.snapshotExactTerminalAuthorities()) {
+    if (authority.state !== 'current') {
+      if (registry.readTaskResultAuthority(taskId).state !== 'authority-hold') continue;
+      throw new DeckentError(
+        'DECKENT_E077',
+        `EXACT_LIFECYCLE_CHECKPOINT_AUTHORITY_HOLD:${taskId}:${authority.reasonCode}`,
+      );
+    }
+    current.set(taskId, authority.terminalAuthority);
+  }
+  for (const task of sprint.tasks) {
+    const terminal = task.status === TaskStatus.DONE || task.status === TaskStatus.NO_GO;
+    if (terminal && registry.isExactTask(task.id) && !current.has(task.id)) {
+      throw new DeckentError(
+        'DECKENT_E077',
+        `EXACT_LIFECYCLE_CHECKPOINT_AUTHORITY_MISSING:${task.id}`,
+      );
+    }
+  }
+  return current;
+}
 
 interface CheckpointFile {
   phase: string;
@@ -720,9 +825,56 @@ export function pauseSprint(
   sprint: Sprint,
   reason: string = 'Manual pause',
   reasonCode: string = 'manual-pause',
+  exactDockerRegistry?: ExactNormalDockerExecutionRegistryV2,
 ): PauseState {
   const tasksPath = join(projectRoot, TASKS_DIR);
   const pausedTaskIds: string[] = [];
+  if (exactDockerRegistry) {
+    for (const task of sprint.tasks) {
+      if (!exactDockerRegistry.isExactTask(task.id)) continue;
+      const authority = exactDockerRegistry.readTaskResultAuthority(task.id);
+      if (authority.state === 'exact-accepted') {
+        const current = exactDockerRegistry.readExactTerminalAuthority(task.id);
+        if (current.state === 'current') continue;
+        throw new DeckentError(
+          'DECKENT_E077',
+          `EXACT_PAUSE_UNSETTLED_ACCEPTED_HOLD:${task.id}:${current.reasonCode}`,
+        );
+      }
+      if (authority.state === 'pending-settlement') {
+        throw new DeckentError(
+          'DECKENT_E077',
+          `EXACT_PAUSE_UNCONTAINED_ATTEMPT_HOLD:${task.id}:${authority.state}`,
+        );
+      }
+      if (authority.state === 'authority-hold') {
+        throw new DeckentError(
+          'DECKENT_E077',
+          `EXACT_PAUSE_ATTEMPT_HOLD:${task.id}:${authority.holdReason ?? 'unknown'}`,
+        );
+      }
+    }
+  }
+  // Exact authority is read before the first mutation. A held/stale Store read
+  // cannot leave a half-paused task projection behind.
+  const exactTerminalAuthorities = exactLifecycleCheckpointAuthorities(
+    sprint,
+    exactDockerRegistry,
+  );
+  const originalSprintStatus = sprint.status;
+  const originalTaskStatus = new Map(sprint.tasks.map(task => [task.id, task.status]));
+  const originalTaskFiles = new Map<string, string | null>();
+  const originalPausedMarkers = new Map<string, string | null>();
+  for (const task of sprint.tasks) {
+    const taskPath = join(tasksPath, `task-${task.id}.json`);
+    const markerPath = join(tasksPath, `task-${task.id}.paused`);
+    originalTaskFiles.set(task.id, readLifecycleFileSnapshot(taskPath));
+    originalPausedMarkers.set(task.id, readLifecycleFileSnapshot(markerPath));
+  }
+  const pauseStatePathBefore = join(projectRoot, PAUSE_STATE_FILE);
+  const originalPauseState = readLifecycleFileSnapshot(pauseStatePathBefore);
+  const sprintStatePathBefore = join(projectRoot, SPRINT_STATE_FILE);
+  const originalSprintState = readLifecycleFileSnapshot(sprintStatePathBefore);
 
   for (const task of sprint.tasks) {
     if (
@@ -757,7 +909,10 @@ export function pauseSprint(
 
       // Send PAUSE via IPC if a channel is registered for this task (subprocess backend)
       const channel = getChannelRegistry().get(task.id);
-      if (channel) {
+      if (exactDockerRegistry?.isExactTask(task.id)) {
+        // Exact Docker lifecycle is already contained by pauseSprintExact;
+        // a foreign IPC channel is never authority for that backend attempt.
+      } else if (channel) {
         try { channel.pause(); } catch (e) { debugLog('pauseSprint:channelPause', e); }
       } else {
         // No IPC channel -> tmux backend worker -- kill the session to stop execution
@@ -796,8 +951,42 @@ export function pauseSprint(
   // capture a continuation checkpoint after task markers are committed.
   try { writeSprintState(projectRoot, sprint); } catch (e) { debugLog('pauseSprint:writeSprintState', e); }
   try {
-    writeCheckpoint(projectRoot, sprint, computeEventStreamOffset(projectRoot, sprint.id));
-  } catch (e) { debugLog('pauseSprint:writeCheckpoint', e); }
+    writeCheckpoint(
+      projectRoot,
+      sprint,
+      computeEventStreamOffset(projectRoot, sprint.id),
+      undefined,
+      exactTerminalAuthorities,
+    );
+  } catch (e) {
+    if (exactDockerRegistry) {
+      sprint.status = originalSprintStatus;
+      for (const task of sprint.tasks) {
+        task.status = originalTaskStatus.get(task.id) ?? task.status;
+        const taskPath = join(tasksPath, `task-${task.id}.json`);
+        const markerPath = join(tasksPath, `task-${task.id}.paused`);
+        const taskBytes = originalTaskFiles.get(task.id) ?? null;
+        const markerBytes = originalPausedMarkers.get(task.id) ?? null;
+        if (taskBytes === null) {
+          if (existsSync(taskPath)) unlinkSync(taskPath);
+        } else writeFileSync(taskPath, taskBytes, 'utf-8');
+        if (markerBytes === null) {
+          if (existsSync(markerPath)) unlinkSync(markerPath);
+        } else writeFileSync(markerPath, markerBytes, 'utf-8');
+      }
+      if (originalPauseState === null) {
+        if (existsSync(pauseStatePathBefore)) unlinkSync(pauseStatePathBefore);
+      } else writeFileSync(pauseStatePathBefore, originalPauseState, 'utf-8');
+      if (originalSprintState === null) {
+        if (existsSync(sprintStatePathBefore)) unlinkSync(sprintStatePathBefore);
+      } else writeFileSync(sprintStatePathBefore, originalSprintState, 'utf-8');
+      throw new DeckentError(
+        'DECKENT_E077',
+        `EXACT_PAUSE_CHECKPOINT_HOLD:${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+    debugLog('pauseSprint:writeCheckpoint', e);
+  }
 
   // Update dashboard to reflect PAUSED status
   try {
@@ -897,8 +1086,49 @@ export function pauseSprint(
 export function resumeSprint(
   projectRoot: string,
   sprint: Sprint,
+  exactDockerRegistry?: ExactNormalDockerExecutionRegistryV2,
 ): PauseState | null {
   const tasksPath = join(projectRoot, TASKS_DIR);
+  const exactTerminalAuthorities = exactLifecycleCheckpointAuthorities(
+    sprint,
+    exactDockerRegistry,
+  );
+  const originalSprintStatus = sprint.status;
+  const originalTaskStatus = new Map(sprint.tasks.map(task => [task.id, task.status]));
+  const originalTaskFiles = new Map<string, string | null>();
+  const originalPausedMarkers = new Map<string, string | null>();
+  for (const task of sprint.tasks) {
+    const taskPath = join(tasksPath, `task-${task.id}.json`);
+    const markerPath = join(tasksPath, `task-${task.id}.paused`);
+    originalTaskFiles.set(task.id, readLifecycleFileSnapshot(taskPath));
+    originalPausedMarkers.set(task.id, readLifecycleFileSnapshot(markerPath));
+  }
+  const pauseStatePathBefore = join(projectRoot, PAUSE_STATE_FILE);
+  const originalPauseState = readLifecycleFileSnapshot(pauseStatePathBefore);
+  const sprintStatePathBefore = join(projectRoot, SPRINT_STATE_FILE);
+  const originalSprintState = readLifecycleFileSnapshot(sprintStatePathBefore);
+  const rollbackResumeProjection = (): void => {
+    sprint.status = originalSprintStatus;
+    for (const task of sprint.tasks) {
+      task.status = originalTaskStatus.get(task.id) ?? task.status;
+      const taskPath = join(tasksPath, `task-${task.id}.json`);
+      const markerPath = join(tasksPath, `task-${task.id}.paused`);
+      const taskBytes = originalTaskFiles.get(task.id) ?? null;
+      const markerBytes = originalPausedMarkers.get(task.id) ?? null;
+      if (taskBytes === null) {
+        if (existsSync(taskPath)) unlinkSync(taskPath);
+      } else writeFileSync(taskPath, taskBytes, 'utf-8');
+      if (markerBytes === null) {
+        if (existsSync(markerPath)) unlinkSync(markerPath);
+      } else writeFileSync(markerPath, markerBytes, 'utf-8');
+    }
+    if (originalPauseState === null) {
+      if (existsSync(pauseStatePathBefore)) unlinkSync(pauseStatePathBefore);
+    } else writeFileSync(pauseStatePathBefore, originalPauseState, 'utf-8');
+    if (originalSprintState === null) {
+      if (existsSync(sprintStatePathBefore)) unlinkSync(sprintStatePathBefore);
+    } else writeFileSync(sprintStatePathBefore, originalSprintState, 'utf-8');
+  };
 
   // Load saved pause state (if available)
   const pauseState = readJsonSafe<PauseState>(join(projectRoot, PAUSE_STATE_FILE));
@@ -907,7 +1137,35 @@ export function resumeSprint(
 
   for (const task of sprint.tasks) {
     if (task.status === TaskStatus.PAUSED) {
-      task.status = TaskStatus.PENDING;
+      const exactTerminal = exactTerminalAuthorities?.get(task.id);
+      if (exactTerminal && exactDockerRegistry?.isExactTask(task.id)) {
+        const current = exactDockerRegistry.readExactTerminalAuthority(task.id);
+        if (current.state !== 'current') {
+          throw new DeckentError(
+            'DECKENT_E077',
+            `EXACT_RESUME_TERMINAL_AUTHORITY_HOLD:${task.id}:${current.reasonCode}`,
+          );
+        }
+        task.status = current.evaluationReceipt.verdict === 'NO_GO'
+          ? TaskStatus.NO_GO
+          : TaskStatus.DONE;
+      } else if (exactDockerRegistry?.isExactTask(task.id)) {
+        const authority = exactDockerRegistry.readTaskResultAuthority(task.id);
+        if (authority.state === 'authority-hold') {
+          throw new DeckentError(
+            'DECKENT_E077',
+            `EXACT_RESUME_ATTEMPT_HOLD:${task.id}:${authority.state}`,
+          );
+        }
+        // Released/accepted exact work remains the backend's attempt. Keep it
+        // active for reconciliation/collection instead of creating PENDING
+        // duplicate execution. Only a proven never-dispatched entry may queue.
+        task.status = authority.state === 'not-dispatched'
+          ? TaskStatus.PENDING
+          : TaskStatus.EXECUTING;
+      } else {
+        task.status = TaskStatus.PENDING;
+      }
 
       // Write updated task JSON
       try {
@@ -924,11 +1182,13 @@ export function resumeSprint(
         try { unlinkSync(pausedMarker); } catch (e) { debugLog('resumeSprint:unlinkPausedMarker', e); }
       }
 
-      resumedTaskIds.push(task.id);
+      if (task.status === TaskStatus.PENDING || task.status === TaskStatus.EXECUTING) {
+        resumedTaskIds.push(task.id);
+      }
 
       // Send RESUME via IPC if a channel is registered for this task (subprocess backend).
       const channel = getChannelRegistry().get(task.id);
-      if (channel) {
+      if (channel && !exactDockerRegistry?.isExactTask(task.id)) {
         try { channel.resume(); } catch (e) { debugLog('resumeSprint:channelResume', e); }
       }
     }
@@ -956,8 +1216,23 @@ export function resumeSprint(
   // status/recover disagreed immediately after a successful resume.
   try { writeSprintState(projectRoot, sprint); } catch (e) { debugLog('resumeSprint:writeSprintState', e); }
   try {
-    writeCheckpoint(projectRoot, sprint, computeEventStreamOffset(projectRoot, sprint.id));
-  } catch (e) { debugLog('resumeSprint:writeCheckpoint', e); }
+    writeCheckpoint(
+      projectRoot,
+      sprint,
+      computeEventStreamOffset(projectRoot, sprint.id),
+      undefined,
+      exactTerminalAuthorities,
+    );
+  } catch (e) {
+    if (exactDockerRegistry) {
+      rollbackResumeProjection();
+      throw new DeckentError(
+        'DECKENT_E077',
+        `EXACT_RESUME_CHECKPOINT_HOLD:${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+    debugLog('resumeSprint:writeCheckpoint', e);
+  }
 
   // Update dashboard to reflect ACTIVE status
   try {
@@ -983,30 +1258,7 @@ export function resumeSprint(
     // Resume is transactional with its durable PAUSED authority. If the new
     // read model cannot be published, restore task markers + pause/state bytes
     // so recover remains possible and no half-resumed run is advertised.
-    sprint.status = SprintStatus.PAUSED;
-    for (const taskId of resumedTaskIds) {
-      const task = sprint.tasks.find(candidate => candidate.id === taskId);
-      if (!task) continue;
-      task.status = TaskStatus.PAUSED;
-      writeFileSync(
-        join(tasksPath, `task-${task.id}.json`),
-        JSON.stringify(task, null, 2),
-        'utf-8',
-      );
-      writeFileSync(
-        join(tasksPath, `task-${task.id}.paused`),
-        JSON.stringify({ taskId: task.id, previousStatus: TaskStatus.PENDING, pausedAt: now() }, null, 2),
-        'utf-8',
-      );
-    }
-    if (pauseState) {
-      writeFileSync(
-        join(projectRoot, PAUSE_STATE_FILE),
-        JSON.stringify(pauseState, null, 2),
-        'utf-8',
-      );
-    }
-    writeSprintState(projectRoot, sprint);
+    rollbackResumeProjection();
     try { publishCanonicalRunStatusReadModel(projectRoot); } catch { /* preserve primary failure */ }
     throw e;
   }

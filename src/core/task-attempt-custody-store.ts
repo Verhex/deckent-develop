@@ -269,6 +269,7 @@ const TASK_ATTEMPT_CUSTODY_ARTIFACT_CLASS_AUTHORITY = intrinsicObjectFreeze([
   'execution-effect-landing-receipt-evidence',
   'execution-effect-landing-receipt',
   'canonical-accepted-result',
+  'production-wiring-host-settlement',
   'evaluation-receipt',
   'finalizer-receipt',
   'settlement-receipt',
@@ -303,6 +304,7 @@ const TASK_ATTEMPT_CUSTODY_HOST_AUTHORITY_ARTIFACT_CLASS_AUTHORITY = intrinsicOb
   'execution-effect-landing-receipt-evidence',
   'execution-effect-landing-receipt',
   'canonical-accepted-result',
+  'production-wiring-host-settlement',
   'evaluation-receipt',
   'finalizer-receipt',
   'settlement-receipt',
@@ -962,6 +964,18 @@ export type TaskAttemptCustodyDispatchDiscoveryEntryV2 =
       readonly ref: TaskAttemptCustodyDispatchAdmissionRefV2;
     }>;
 
+/**
+ * An identity-bound admission that recovery discovered but could not reread.
+ * The reservation has already passed the canonical path/hash/project checks;
+ * no admission or terminal authority is inferred from this diagnostic.
+ */
+export interface TaskAttemptCustodyDispatchRecoveryHoldV2 {
+  readonly state: 'admission-hold';
+  readonly reservation: TaskAttemptCustodyDispatchReservationV2;
+  readonly candidateLocatorDigest: Sha256Digest;
+  readonly custodyHoldCode: TaskAttemptCustodyHoldCode;
+}
+
 export interface TaskAttemptCustodyDispatchAdmissionListV2 {
   readonly schemaVersion: typeof TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION;
   readonly kind: 'task-attempt-custody-dispatch-admission-list';
@@ -973,6 +987,26 @@ export interface TaskAttemptCustodyDispatchAdmissionListV2 {
   readonly candidateCount: number;
   readonly admittedCount: number;
   readonly pendingAdmissionCount: number;
+  readonly maxEntries: number;
+  readonly maxNameBytes: number;
+  readonly deadlineAt: string;
+  readonly directoryScanReceiptDigest: Sha256Digest;
+  readonly receiptDigest: Sha256Digest;
+}
+
+export interface TaskAttemptCustodyDispatchRecoveryListV2 {
+  readonly schemaVersion: typeof TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION;
+  readonly kind: 'task-attempt-custody-dispatch-recovery-list';
+  readonly state: 'scanned-with-isolated-holds';
+  readonly projectId: string;
+  readonly projectRootSha256: string;
+  readonly policyDigest: Sha256Digest;
+  readonly entries: readonly TaskAttemptCustodyDispatchDiscoveryEntryV2[];
+  readonly heldAdmissions: readonly TaskAttemptCustodyDispatchRecoveryHoldV2[];
+  readonly candidateCount: number;
+  readonly admittedCount: number;
+  readonly pendingAdmissionCount: number;
+  readonly heldAdmissionCount: number;
   readonly maxEntries: number;
   readonly maxNameBytes: number;
   readonly deadlineAt: string;
@@ -4369,6 +4403,7 @@ function artifactCaptureModeForClass(
     case 'execution-effect-landing-receipt-evidence':
     case 'execution-effect-landing-receipt':
     case 'canonical-accepted-result':
+    case 'production-wiring-host-settlement':
     case 'evaluation-receipt':
     case 'finalizer-receipt':
     case 'settlement-receipt':
@@ -5360,7 +5395,9 @@ export class TaskAttemptCustodyStore {
       operation,
       'DISPATCH_RESERVATION_RECONCILIATION_REQUIRED',
     );
-    if (existing !== null) return existing;
+    if (existing !== null) {
+      return existing;
+    }
     let createdValue: TaskAttemptCustodyDirectoryProof;
     try {
       createdValue = this.adapter.ensurePrivateDirectory(this.root, relativePath);
@@ -5402,7 +5439,9 @@ export class TaskAttemptCustodyStore {
       operation,
       'DISPATCH_RESERVATION_RECONCILIATION_REQUIRED',
     );
-    if (preexisting !== null) return preexisting;
+    if (preexisting !== null) {
+      return preexisting;
+    }
     const adapterBytes = Uint8Array.from(authorityBytes);
     let publicationValue: TaskAttemptCustodyPublication | null = null;
     try {
@@ -5867,6 +5906,40 @@ export class TaskAttemptCustodyStore {
     readonly maxNameBytes: number;
     readonly deadlineAt: string;
   }): TaskAttemptCustodyDispatchAdmissionListV2 {
+    const scanned = this.scanDispatchAdmissions(input, false);
+    if (scanned.kind !== 'task-attempt-custody-dispatch-admission-list') {
+      hold('DISPATCH_DISCOVERY_TAMPERED_CANDIDATE', 'list-dispatch');
+    }
+    return scanned;
+  }
+
+  /**
+   * Recovery-only discovery. A candidate whose canonical reservation identity
+   * is proven but whose admission graph cannot be reread becomes an explicit
+   * per-entry HOLD. Malformed or identity-unbound directory candidates still
+   * fail the whole scan closed.
+   */
+  listDispatchAdmissionsForRecovery(input: {
+    readonly policy: TaskAttemptCustodyPolicyV2;
+    readonly maxEntries: number;
+    readonly maxNameBytes: number;
+    readonly deadlineAt: string;
+  }): TaskAttemptCustodyDispatchRecoveryListV2 {
+    const scanned = this.scanDispatchAdmissions(input, true);
+    if (scanned.kind !== 'task-attempt-custody-dispatch-recovery-list') {
+      hold('DISPATCH_DISCOVERY_TAMPERED_CANDIDATE', 'list-dispatch');
+    }
+    return scanned;
+  }
+
+  private scanDispatchAdmissions(input: {
+    readonly policy: TaskAttemptCustodyPolicyV2;
+    readonly maxEntries: number;
+    readonly maxNameBytes: number;
+    readonly deadlineAt: string;
+  }, isolateAdmissionHolds: boolean):
+    | TaskAttemptCustodyDispatchAdmissionListV2
+    | TaskAttemptCustodyDispatchRecoveryListV2 {
     const inputRecord = requireExactDataRecord(input, [
       'policy',
       'maxEntries',
@@ -5968,6 +6041,7 @@ export class TaskAttemptCustodyStore {
     }
 
     const entries: TaskAttemptCustodyDispatchDiscoveryEntryV2[] = [];
+    const heldAdmissions: TaskAttemptCustodyDispatchRecoveryHoldV2[] = [];
     let admittedCount = 0;
     let pendingAdmissionCount = 0;
     for (let index = 0; index < names.length; index += 1) {
@@ -6025,6 +6099,19 @@ export class TaskAttemptCustodyStore {
         });
       } catch (error) {
         if (error instanceof TaskAttemptCustodyHold) {
+          if (isolateAdmissionHolds) {
+            heldAdmissions.push(freezeObject({
+              state: 'admission-hold' as const,
+              reservation,
+              candidateLocatorDigest: taskAttemptCustodyDigest(
+                'dispatch-recovery-candidate-locator',
+                { candidateName, directoryScanReceiptDigest },
+                policy.jsonBounds,
+              ),
+              custodyHoldCode: error.code,
+            }));
+            continue;
+          }
           hold('DISPATCH_DISCOVERY_TAMPERED_CANDIDATE', 'list-dispatch');
         }
         throw error;
@@ -6032,11 +6119,40 @@ export class TaskAttemptCustodyStore {
       if (admitted.state === 'absent') {
         hold('DISPATCH_DISCOVERY_TAMPERED_CANDIDATE', 'list-dispatch');
       }
-      entries[index] = admitted;
+      entries.push(admitted);
       if (admitted.state === 'admitted') admittedCount += 1;
       else pendingAdmissionCount += 1;
     }
     const frozenEntries = freezeObject(entries);
+    if (isolateAdmissionHolds) {
+      const frozenHeldAdmissions = freezeObject(heldAdmissions);
+      const recoveryBody = freezeObject({
+        schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
+        kind: 'task-attempt-custody-dispatch-recovery-list' as const,
+        state: 'scanned-with-isolated-holds' as const,
+        projectId: this.expectedProjectId,
+        projectRootSha256: this.expectedProjectRootSha256,
+        policyDigest: policy.policyDigest,
+        entries: frozenEntries,
+        heldAdmissions: frozenHeldAdmissions,
+        candidateCount: names.length,
+        admittedCount,
+        pendingAdmissionCount,
+        heldAdmissionCount: frozenHeldAdmissions.length,
+        maxEntries,
+        maxNameBytes,
+        deadlineAt,
+        directoryScanReceiptDigest,
+      });
+      return freezeObject({
+        ...recoveryBody,
+        receiptDigest: taskAttemptCustodyDigest(
+          'dispatch-recovery-list-receipt',
+          recoveryBody,
+          policy.jsonBounds,
+        ),
+      });
+    }
     const body = freezeObject({
       schemaVersion: TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION,
       kind: 'task-attempt-custody-dispatch-admission-list' as const,
@@ -6197,7 +6313,9 @@ export class TaskAttemptCustodyStore {
       !isDispatchObservationClass(inputRecord.observationClass)
       || !isTimestamp(inputRecord.observedAt)
       || Date.parse(inputRecord.observedAt) < Date.parse(admitted.admission.admittedAt)
-    ) hold('DISPATCH_AUTHORITY_INVALID', 'settle-dispatch');
+    ) {
+      hold('DISPATCH_AUTHORITY_INVALID', 'settle-dispatch');
+    }
     const observationClass = inputRecord.observationClass;
     if (
       observationClass === 'PROVIDER_START'
@@ -6218,7 +6336,9 @@ export class TaskAttemptCustodyStore {
         Date.parse(inputRecord.observedAt) < Date.parse(dispatchAuthority.authority.recordedAt)
         || Date.parse(inputRecord.observedAt)
           < Date.parse(dispatchAuthority.authority.releaseEvidence.releasedAt)
-      ) hold('DISPATCH_AUTHORITY_INVALID', 'settle-dispatch');
+      ) {
+        hold('DISPATCH_AUTHORITY_INVALID', 'settle-dispatch');
+      }
       const current = this.readOptionalDispatchObservation(
         admitted,
         policy,
@@ -6246,7 +6366,9 @@ export class TaskAttemptCustodyStore {
             && (providerStart === null || providerExit !== null))
           || (observationClass === 'PROVIDER_EXIT'
             && (providerStart === null || providerExecution === null))
-        ) hold('DISPATCH_TRANSITION_INVALID', 'settle-dispatch');
+        ) {
+          hold('DISPATCH_TRANSITION_INVALID', 'settle-dispatch');
+        }
         if (
           (providerStart !== null
             && observedUnixMs < (intrinsicReflectApply(
@@ -6260,7 +6382,9 @@ export class TaskAttemptCustodyStore {
               Date,
               [providerExecution.receipt.observedAt],
             ) as number))
-        ) hold('DISPATCH_AUTHORITY_INVALID', 'settle-dispatch');
+        ) {
+          hold('DISPATCH_AUTHORITY_INVALID', 'settle-dispatch');
+        }
       }
     }
     const bytes = snapshotAuthorityBytes(
@@ -9766,9 +9890,9 @@ export class TaskAttemptCustodyStore {
     const committedTime = Date.parse(landing.committedAt);
     const releasedTime = Date.parse(landing.releasedAt);
     if (
-      workspaceTime < admissionTime
-      || baselineTime < workspaceTime
-      || finalTime < baselineTime
+      baselineTime < admissionTime
+      || workspaceTime < baselineTime
+      || finalTime < workspaceTime
       || journalTime < finalTime
       || committedTime < journalTime
       || releasedTime < committedTime
@@ -10183,7 +10307,9 @@ export class TaskAttemptCustodyStore {
       operation,
       operation === 'seal-stream' ? 'PUBLISHED_UNCONFIRMED' : 'DURABILITY_UNCONFIRMED',
     );
-    if (observed === null) hold('DURABILITY_UNCONFIRMED', operation);
+    if (observed === null) {
+      hold('DURABILITY_UNCONFIRMED', operation);
+    }
     assertBytesWithinLimit(observed.bytes, policy);
     if (!sameProof(publicationSnapshot.proof, observed.proof)) {
       hold('ARTIFACT_CHANGED', operation);

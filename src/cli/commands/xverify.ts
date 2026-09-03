@@ -190,10 +190,9 @@ export function resolveApprovalDecisionWindowMs(input: {
 }
 
 /**
- * Reads back the composition hold detail the runner durably merged into the
- * evidence task result. Defensive on purpose: `detail` is written as an
- * intersection over `CrossVerifyEvidence`, so it is not a declared field and
- * must never be hard-cast. Any read failure is simply "no detail".
+ * Reads a legacy advisory hold detail from the task result. Exact execution
+ * returns detail structurally and never rewrites a settled public result; this
+ * reader remains only for pre-cutover advisory artifacts.
  */
 function readDurableHoldDetail(root: string, taskId: string): string | null {
   try {
@@ -435,8 +434,8 @@ export interface XverifyResult {
    *   1. the candidate-evidence preparation hold's `detailCode` — the root
    *      cause, and on approval holds it IS the approval request id, so a
    *      `--json` caller reads the exact id `deckent approvals decide` takes;
-   *   2. otherwise the composition hold detail the runner persists into
-   *      `.tasks/task-<id>.result` → `crossVerify.detail`.
+   *   2. otherwise the exact runner's structured `detail`;
+   *   3. finally a legacy advisory `.result` projection.
    * `null` when neither exists (a clean run has no hold detail to report).
    */
   detail: string | null;
@@ -1038,7 +1037,7 @@ export async function runXverifyForResult(
     report: reportPath,
     // Appended last on purpose: every key above keeps its exact prior position
     // and value, so an existing `--json` consumer reads byte-identical fields.
-    detail: preparationHoldDetail ?? readDurableHoldDetail(root, id),
+    detail: preparationHoldDetail ?? outcome.detail ?? readDurableHoldDetail(root, id),
   };
 }
 

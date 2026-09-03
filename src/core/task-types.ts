@@ -12,9 +12,14 @@ import type { ExecutionAdmissionMode } from './execution-admission.js';
 import type { AttendedExecutionProposalReference } from './attended-execution-proposal.js';
 import type { InvocationReceiptRef } from './invocation-receipt.js';
 import type { FinalOnlyUsageAuthorization } from './execution-budget-policy.js';
-import type {
-  ProductionWiringContract,
-  ProductionWiringEvidence,
+import {
+  createProductionWiringContractV2,
+  parseProductionWiringContractV2,
+  type ProductionWiringContract,
+  type ProductionWiringContractV1,
+  type ProductionWiringContractV2,
+  type ProductionWiringContractV2Input,
+  type ProductionWiringEvidence,
 } from './production-wiring-contract.js';
 import {
   POST_SETTLEMENT_MAX_ARG_BYTES,
@@ -426,12 +431,69 @@ export interface GoNoGoCriteria {
 }
 
 export const PRODUCTION_WIRING_EVIDENCE_VERSION = 1 as const;
+export const PRODUCTION_WIRING_PLAN_EVIDENCE_V2_VERSION = 2 as const;
 
-/** Plan-time wiring authority bound to the exact canonical contract bytes. */
-export interface ProductionWiringPlanEvidence {
+/** Historical plan authority. It remains readable but cannot admit new exact work. */
+export interface ProductionWiringPlanEvidenceV1 {
   readonly version: typeof PRODUCTION_WIRING_EVIDENCE_VERSION;
   readonly contractDigest: string;
-  readonly contract: ProductionWiringContract;
+  readonly contract: ProductionWiringContractV1;
+}
+
+/** Current plan authority, bound to both canonical topology and executable proof program. */
+export interface ProductionWiringPlanEvidenceV2 {
+  readonly version: typeof PRODUCTION_WIRING_PLAN_EVIDENCE_V2_VERSION;
+  readonly contractDigest: string;
+  readonly hostProofProgramDigest: string;
+  readonly contract: ProductionWiringContractV2;
+}
+
+export type ProductionWiringPlanEvidence =
+  | ProductionWiringPlanEvidenceV1
+  | ProductionWiringPlanEvidenceV2;
+
+export type ProductionWiringApplicability =
+  | { readonly state: 'required'; readonly reasonCode: 'production-write-scope' }
+  | {
+      readonly state: 'not-applicable';
+      readonly reasonCode: 'no-write-scope' | 'test-only-scope' | 'documentation-only-scope';
+    };
+
+function productionWiringScopePath(value: string): string {
+  return value.replaceAll('\\', '/').replace(/^\.\//u, '').replace(/\/+$/u, '')
+    .normalize('NFC').toLowerCase();
+}
+
+/** Conservative host classifier: only no-write, docs-only, and tests-only scopes are exempt. */
+export function deriveProductionWiringApplicability(scope: TaskScope): ProductionWiringApplicability {
+  const paths = [...scope.directories, ...scope.filesWrite]
+    .map(productionWiringScopePath).filter(Boolean);
+  if (paths.length === 0) return { state: 'not-applicable', reasonCode: 'no-write-scope' };
+  const isTest = (path: string): boolean => path === 'test' || path === 'tests'
+    || path.startsWith('test/') || path.startsWith('tests/');
+  const isDocs = (path: string): boolean => path === 'docs' || path.startsWith('docs/');
+  if (paths.every(isTest)) return { state: 'not-applicable', reasonCode: 'test-only-scope' };
+  if (paths.every(isDocs)) return { state: 'not-applicable', reasonCode: 'documentation-only-scope' };
+  return { state: 'required', reasonCode: 'production-write-scope' };
+}
+
+/** Return the first trusted verifier asset reachable by the task's write authority. */
+export function productionWiringVerifierAssetWriteScopeOverlap(
+  scope: TaskScope,
+  authority: ProductionWiringPlanEvidenceV2,
+): string | null {
+  const exactWrites = new Set(scope.filesWrite.map(productionWiringScopePath));
+  const writableTrees = [
+    ...scope.directories.map(productionWiringScopePath),
+    ...scope.filesWrite.filter(value => /(?:\/|\/\*\*?|\*)$/u.test(value.trim()))
+      .map(value => productionWiringScopePath(value.replace(/(?:\/\*\*?|\*)$/u, ''))),
+  ].filter(Boolean);
+  for (const asset of authority.contract.hostProofProgram.verifierAssets) {
+    const key = productionWiringScopePath(asset.path);
+    if (exactWrites.has(key)
+      || writableTrees.some(tree => key === tree || key.startsWith(`${tree}/`))) return asset.path;
+  }
+  return null;
 }
 
 /**
@@ -459,14 +521,41 @@ function canonicalJson(value: unknown): string {
 
 /** Build the only supported plan evidence shape; callers never author its digest. */
 export function createProductionWiringPlanEvidence(
+  contract: ProductionWiringContractV1,
+): ProductionWiringPlanEvidenceV1;
+export function createProductionWiringPlanEvidence(
+  contract: ProductionWiringContractV2,
+): ProductionWiringPlanEvidenceV2;
+export function createProductionWiringPlanEvidence(
+  contract: ProductionWiringContract,
+): ProductionWiringPlanEvidence;
+export function createProductionWiringPlanEvidence(
   contract: ProductionWiringContract,
 ): ProductionWiringPlanEvidence {
+  if (contract.version === PRODUCTION_WIRING_PLAN_EVIDENCE_V2_VERSION) {
+    const canonical = parseProductionWiringContractV2(contract);
+    if (canonical === null) throw new TypeError('invalid production-wiring contract v2');
+    const contractDigest = createHash('sha256').update(canonicalJson(canonical)).digest('hex');
+    return {
+      version: PRODUCTION_WIRING_PLAN_EVIDENCE_V2_VERSION,
+      contractDigest,
+      hostProofProgramDigest: canonical.hostProofProgram.programDigest,
+      contract: canonical,
+    };
+  }
   const contractDigest = createHash('sha256').update(canonicalJson(contract)).digest('hex');
   return {
     version: PRODUCTION_WIRING_EVIDENCE_VERSION,
     contractDigest,
     contract,
   };
+}
+
+/** Common AI/DIRECTIVES authoring boundary; all digests are host-derived. */
+export function createProductionWiringPlanEvidenceV2(
+  input: ProductionWiringContractV2Input,
+): ProductionWiringPlanEvidenceV2 {
+  return createProductionWiringPlanEvidence(createProductionWiringContractV2(input));
 }
 
 // ─── Run-policy authority (486-017 producer → RUN-POLICY-DELIVERY-001 consumer) ──
@@ -800,6 +889,8 @@ export interface Task {
   budgetPolicy?: TaskExecutionBudgetPolicySnapshot;
   /** Digest-bound production-wiring authority supplied by the planner/host. */
   productionWiring?: ProductionWiringPlanEvidence;
+  /** Host-derived applicability; absent only on historical task artifacts. */
+  productionWiringApplicability?: ProductionWiringApplicability;
   /**
    * Task-carried run execution policy (RUN-POLICY-DELIVERY-001). Resolved once
    * at plan time for the whole run and stamped on every task, so the compiled
@@ -1094,6 +1185,12 @@ export interface TaskResult {
   filesChanged: string[];
   linesAdded: number;
   linesRemoved: number;
+  /**
+   * Host-authored disk/effect verification projection. Exact normal-Docker
+   * results may set this only after the accepted V2 result is bound to a
+   * COMMITTED effect-landing receipt; legacy results may omit it.
+   */
+  diskVerified?: boolean;
   /** Host-authored claim-time work attribution. Worker prose is never authority. */
   workAttribution?: {
     state: 'VERIFIED' | 'HOLD';
@@ -1213,6 +1310,10 @@ export interface PlannerTask {
   scope: TaskScope;
   dependencies: string[];
   goNogo: GoNoGoCriteria;
+  /** Canonical V2 plan authority; AI output is canonicalized before entering this type. */
+  productionWiring?: ProductionWiringPlanEvidenceV2;
+  /** Host-derived after AI parse; planner prose cannot choose this value. */
+  productionWiringApplicability?: ProductionWiringApplicability;
   /** User-specified model constraint from planner/directive output. */
   forceModel?: ModelType;
   /** User-specified agent override from AI planner output */

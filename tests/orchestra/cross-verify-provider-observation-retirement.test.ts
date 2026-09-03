@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   PROVIDER_EXECUTION_OBSERVATION_DATABASE_PATH,
@@ -31,6 +31,13 @@ import { retireSettledCrossVerifyProviderObservation } from '../../src/orchestra
 
 const roots: string[] = [];
 const principal = 'a'.repeat(64);
+const originalDeckentHome = process.env.DECKENT_HOME;
+
+beforeEach(() => {
+  const hostStateRoot = mkdtempSync(join(tmpdir(), 'xverify-provider-observation-host-state-'));
+  roots.push(hostStateRoot);
+  process.env.DECKENT_HOME = join(hostStateRoot, '.deckent');
+});
 
 function begin(root: string, taskId: string): TaskResultSettlementRefV1 {
   const ref = createTaskResultSettlementRefForAttempt(root, taskId, randomUUID());
@@ -63,7 +70,11 @@ async function openInterval(root: string, ref: TaskResultSettlementRefV1, store:
   expect(ingestDockerProviderExecutionObservations({ tasksDir, settlementRef: ref, binding, store })).toMatchObject({ ingested: 1, rejected: 0 });
 }
 
-afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
+afterEach(() => {
+  if (originalDeckentHome === undefined) delete process.env.DECKENT_HOME;
+  else process.env.DECKENT_HOME = originalDeckentHome;
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+});
 
 describe('XVerify provider-observation retirement', () => {
   it('retires only the exact closed verifier attempt, preserves a foreign row, and replays as a no-op', async () => {

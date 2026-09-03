@@ -166,6 +166,7 @@ import {
 } from './task-builder.js';
 import { readPromptDeliveryReceipt } from '../core/prompt-delivery-receipt.js';
 import { hasSettlementReceipt } from './evaluation-audit-trail.js';
+import type { ExactAcceptedResultTerminalAuthorityV2 } from './exact-accepted-result-terminal-authority.js';
 
 // ─── Planner dependency normalization (323-031 wire) ──────────────
 import { normalizePlannerDependencies } from './planner.js';
@@ -1931,7 +1932,40 @@ export async function respawnEligibleTasks(
   if (terminalCount > 0 && terminalCount % CHECKPOINT_INTERVAL === 0) {
     const sprintId = getCurrentSprintId(projectRoot) ?? sprint.id;
     const eventOffset = readSequence(projectRoot, sprintId);
-    writeCheckpoint(projectRoot, sprint, eventOffset);
+    let exactTerminalAuthorities:
+      | ReadonlyMap<string, ExactAcceptedResultTerminalAuthorityV2>
+      | undefined;
+    if (spawnOpts?.exactDockerRegistry) {
+      const snapshot = spawnOpts.exactDockerRegistry.snapshotExactTerminalAuthorities();
+      const current = new Map<string, ExactAcceptedResultTerminalAuthorityV2>();
+      for (const [taskId, authority] of snapshot) {
+        if (authority.state !== 'current') {
+          if (spawnOpts.exactDockerRegistry.readTaskResultAuthority(taskId).state !== 'authority-hold') {
+            continue;
+          }
+          throw new DeckentError(
+            'DECKENT_E077',
+            `EXACT_RESPAWN_CHECKPOINT_AUTHORITY_HOLD:${taskId}:${authority.reasonCode}`,
+          );
+        }
+        current.set(taskId, authority.terminalAuthority);
+      }
+      for (const task of sprint.tasks) {
+        const terminal = task.status === TaskStatus.DONE || task.status === TaskStatus.NO_GO;
+        if (
+          terminal
+          && spawnOpts.exactDockerRegistry.isExactTask(task.id)
+          && !current.has(task.id)
+        ) {
+          throw new DeckentError(
+            'DECKENT_E077',
+            `EXACT_RESPAWN_CHECKPOINT_AUTHORITY_MISSING:${task.id}`,
+          );
+        }
+      }
+      exactTerminalAuthorities = current;
+    }
+    writeCheckpoint(projectRoot, sprint, eventOffset, undefined, exactTerminalAuthorities);
     debugLog('respawnEligibleTasks:checkpoint', `Checkpoint written at ${terminalCount} completed tasks`);
   }
 

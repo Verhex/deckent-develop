@@ -19,6 +19,7 @@ import {
   executionEffectLandingIntentDigestV1,
   executionEffectLandingOperationDigestV1,
   executionEffectStageAuthorityDigestV1,
+  executionEffectWorkspaceAuthorityDigestV1,
   parseExecutionEffectLandingLeaseResumeResultV1,
   type ExecutionEffectPersistenceDigest,
   type ExecutionEffectLandingBoundaryV1,
@@ -700,18 +701,7 @@ function validateSimpleCapability(
 export function executionEffectLandingWorkspaceIdentityDigestV1(
   workspaceIdentity: ExecutionEffectManifest['workspaceIdentity'],
 ): string {
-  if (!exactDataObject(workspaceIdentity, [
-    'filesystemId', 'directoryId', 'rootHandleEvidenceDigest',
-  ]) || typeof workspaceIdentity.filesystemId !== 'string'
-    || typeof workspaceIdentity.directoryId !== 'string'
-    || !isDigest(workspaceIdentity.rootHandleEvidenceDigest)) {
-    throw new TypeError('Invalid execution effect workspace identity');
-  }
-  return digest('execution-effect-workspace-identity-v1', {
-    filesystemId: workspaceIdentity.filesystemId,
-    directoryId: workspaceIdentity.directoryId,
-    rootHandleEvidenceDigest: workspaceIdentity.rootHandleEvidenceDigest,
-  });
+  return executionEffectWorkspaceAuthorityDigestV1(workspaceIdentity);
 }
 
 export function createExecutionEffectLandingNativeCapabilityV1(
@@ -1342,8 +1332,11 @@ async function buildOperations(
   workspaceIdentityDigest: string,
   landingIntentDigest: string,
 ): Promise<readonly ExecutionEffectLandingOperationV1[] | null> {
+  const reject = (_reason: string): null => {
+    return null;
+  };
   const seeds = operationSeeds(effects);
-  if (!seeds) return null;
+  if (!seeds) return reject('OPERATION_SEEDS');
   const before = new Map(baseline.entries.map(entry => [entry.path, entry]));
   const after = new Map(final.entries.map(entry => [entry.path, entry]));
   const expandedSeeds = [...seeds];
@@ -1355,7 +1348,7 @@ async function buildOperations(
     if (seed.kind !== 'ADD' && seed.kind !== 'ADD_DIRECTORY') continue;
     let candidate = parentPath(seed.path);
     while (candidate !== '.' && !before.has(candidate) && !realDirectoryAdds.has(candidate)) {
-      if (after.get(candidate)?.kind !== 'directory') return null;
+      if (after.get(candidate)?.kind !== 'directory') return reject(`DERIVED_PARENT:${candidate}`);
       const evidence = derivedParents.get(candidate) ?? [];
       evidence.push(...seed.effectDigests);
       derivedParents.set(candidate, evidence);
@@ -1386,13 +1379,15 @@ async function buildOperations(
   const directoryAdds = new Map<string, ExecutionEffectLandingOperationV1>();
   for (let index = 0; index < expandedSeeds.length; index += 1) {
     const seed = expandedSeeds[index]!;
-    if (seed.path === '.') return null;
+    if (seed.path === '.') return reject('ROOT_OPERATION');
     const affected = [seed.path];
     const preimages: ExecutionEffectLandingPathStateV1[] = [];
     const postimages: ExecutionEffectLandingExpectedPathStateV1[] = [];
     for (const path of affected) {
       const observed = inspect(native, path);
-      if (!observed || !stateMatchesEntry(observed, before.get(path))) return null;
+      if (!observed || !stateMatchesEntry(observed, before.get(path))) {
+        return reject(`PREIMAGE:${path}:${observed?.state ?? 'UNAVAILABLE'}`);
+      }
       preimages.push(pathState(path, observed));
       const expectedAfter = after.get(path);
       postimages.push(expectedPathState(path, expectedState(expectedAfter)));
@@ -1418,9 +1413,14 @@ async function buildOperations(
           || stagedSource.landingIntentDigest !== landingIntentDigest
           || stagedSource.chunks.some(chunk =>
             chunk.byteLength > native.capability.maxStagedChunkBytes)
-          || native.verifyStagedSource(stagedSource) !== true) return null;
-      } catch {
-        return null;
+          || native.verifyStagedSource(stagedSource) !== true) {
+          return reject(`STAGED_SOURCE_AUTHORITY:${seed.path}`);
+        }
+      } catch (error) {
+        const code = error && typeof error === 'object' && 'code' in error
+          ? String(Reflect.get(error, 'code'))
+          : error instanceof Error ? error.name : typeof error;
+        return reject(`STAGE_SOURCE:${seed.path}:${code}`);
       }
     }
     const parents = [...new Set(affected.map(parentPath))].sort(compareCodePoint);
@@ -1436,7 +1436,7 @@ async function buildOperations(
       const parentAdd = directoryAdds.get(path);
       const expectedDirectory = after.get(path);
       if (observed?.state !== 'ABSENT' || !parentAdd || expectedDirectory?.kind !== 'directory') {
-        return null;
+        return reject(`PARENT:${path}:${observed?.state ?? 'UNAVAILABLE'}`);
       }
       parentAuthorities.push(objectFreeze({
         path,
@@ -2504,8 +2504,7 @@ export async function prepareExecutionEffectLandingV1(
       adapters.native.capability.capabilityDigest,
     ]);
   }
-  const workspaceIdentityDigest = digest(
-    'execution-effect-workspace-identity-v1',
+  const workspaceIdentityDigest = executionEffectWorkspaceAuthorityDigestV1(
     bundle.final.workspaceIdentity,
   );
   if (adapters.native.capability.workspaceIdentityDigest !== workspaceIdentityDigest) {

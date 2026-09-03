@@ -185,6 +185,7 @@ import { ResultMerger } from './result-merger.js';
 import {
   writeEvaluationAudit,
   buildDecisionRationale,
+  type ExactAcceptedTaskTerminalAuthorityRead,
   type AuditCriterionScore,
   type AuditDecision,
   type AuditRuleSet,
@@ -286,6 +287,71 @@ function toTaskEvaluation(evalResult: EvaluationResult): TaskEvaluation {
     case 'NO_GO': return TaskEvaluation.NO_GO;
     default: return TaskEvaluation.NO_GO;
   }
+}
+
+/**
+ * Project a Store-revalidated exact terminal receipt into the lifecycle maps.
+ * This is deliberately not an evaluator: the T11 receipt already owns the
+ * verdict, and re-running the public rubric here would create a second terminal
+ * decision authority.
+ */
+function consumeExactTerminalAuthorities(
+  sprint: Sprint,
+  results: TaskResult[],
+  evaluations: Map<string, TaskEvaluation>,
+  authorities: ReadonlyMap<string, ExactAcceptedTaskTerminalAuthorityRead> | undefined,
+  isExactTaskAuthority?: (taskId: string) => boolean,
+  requireExactTerminalAuthority?: (taskId: string) => boolean,
+): Set<string> {
+  const exactTaskIds = new Set<string>();
+  if (isExactTaskAuthority) {
+    for (const task of sprint.tasks) {
+      if (!isExactTaskAuthority(task.id)) continue;
+      exactTaskIds.add(task.id);
+      if ((requireExactTerminalAuthority?.(task.id) ?? true) && !authorities?.has(task.id)) {
+        throw createExecutionAuthorityError(
+          `Task ${task.id} exact lifecycle terminal authority is missing`,
+        );
+      }
+    }
+  }
+  if (!authorities) return exactTaskIds;
+
+  for (const [taskId, authority] of authorities) {
+    const task = sprint.tasks.find(candidate => candidate.id === taskId);
+    if (!task) {
+      throw createExecutionAuthorityError(
+        `Exact terminal authority references task outside sprint: ${taskId}`,
+      );
+    }
+    if (
+      authority.state !== 'current'
+      || authority.result.taskId !== taskId
+      || authority.projectedResult.taskId !== taskId
+      || authority.terminalAuthority.acceptedAuthority.identity.taskId !== taskId
+      || authority.evaluationReceipt.verdict !== authority.finalizerReceipt.verdict
+    ) {
+      throw createExecutionAuthorityError(
+        `Task ${taskId} exact lifecycle terminal authority is not current`,
+      );
+    }
+
+    const evaluation = authority.evaluationReceipt.verdict === 'DONE'
+      ? TaskEvaluation.DONE
+      : authority.evaluationReceipt.verdict === 'GO_WITH_TECH_DEBT'
+        ? TaskEvaluation.GO_WITH_TECH_DEBT
+        : TaskEvaluation.NO_GO;
+    task.status = evaluation === TaskEvaluation.NO_GO
+      ? TaskStatus.NO_GO
+      : TaskStatus.DONE;
+    evaluations.set(taskId, evaluation);
+
+    const resultIndex = results.findIndex(result => result.taskId === taskId);
+    if (resultIndex >= 0) results[resultIndex] = authority.projectedResult;
+    else results.push(authority.projectedResult);
+    exactTaskIds.add(taskId);
+  }
+  return exactTaskIds;
 }
 
 /**
@@ -2007,6 +2073,12 @@ export async function runEvaluatePhase(
     skipPreviouslyEvaluated?: boolean;
     /** Sprint-wide billed verification counter shared across incremental calls. */
     runtimeState?: { verificationsDispatched: number };
+    /** Fresh Store-reread T11 terminal authorities; exact tasks never use public evaluation. */
+    exactTerminalAuthorities?: ReadonlyMap<string, ExactAcceptedTaskTerminalAuthorityRead>;
+    /** Registry discriminator closes the missing-map public fallback. */
+    isExactTaskAuthority?: (taskId: string) => boolean;
+    /** Exact never-dispatched entries are skipped without pretending to be terminal. */
+    requireExactTerminalAuthority?: (taskId: string) => boolean;
   },
 ): Promise<void> {
   // ─── Idempotency Guard (Sprint 157 Task 002) ───────────────────
@@ -2039,11 +2111,19 @@ export async function runEvaluatePhase(
       && (resolvedConfig?.max_fix_retries ?? 2) > 0,
   };
   try {
+    const exactTaskIds = consumeExactTerminalAuthorities(
+      sprint,
+      results,
+      evaluations,
+      options?.exactTerminalAuthorities,
+      options?.isExactTaskAuthority,
+      options?.requireExactTerminalAuthority,
+    );
     const authorityTaskIds = options?.incrementalTaskIds
       ? sprint.tasks
-          .filter(task => options.incrementalTaskIds?.has(task.id))
+          .filter(task => options.incrementalTaskIds?.has(task.id) && !exactTaskIds.has(task.id))
           .map(task => task.id)
-      : sprint.tasks.map(task => task.id);
+      : sprint.tasks.filter(task => !exactTaskIds.has(task.id)).map(task => task.id);
     assertTaskResultAuthoritiesReady(
       projectRoot,
       authorityTaskIds,
@@ -2119,6 +2199,7 @@ export async function runEvaluatePhase(
     const resultsMap = buildResultsMap(results);
     const collectedIds = new Set(results.map(r => r.taskId));
     const evaluatedThisInvocation = new Set<string>();
+    for (const taskId of exactTaskIds) evaluatedThisInvocation.add(taskId);
     debugLog('runEvaluatePhase:start', `totalTasks=${sprint.tasks.length} collectedResults=${results.length} collectedIds=[${[...collectedIds].join(',')}]`);
 
     // Resolve CI guardian config once for all tasks
@@ -2141,6 +2222,7 @@ export async function runEvaluatePhase(
 
     for (const task of sprint.tasks) {
       if (options?.incrementalTaskIds && !options.incrementalTaskIds.has(task.id)) continue;
+      if (exactTaskIds.has(task.id)) continue;
       if (options?.skipPreviouslyEvaluated && evaluations.has(task.id)) continue;
       if (collectedIds.has(task.id)) {
         const rawResult = resultsMap.get(task.id);
@@ -3442,8 +3524,37 @@ export async function runFixPhase(
   opts: RunSprintOptions | undefined,
   routingVersionForFix: string,
   spawnBackend: SpawnBackend | undefined,
+  exactDockerRegistry?: ExactNormalDockerExecutionRegistryV2,
 ): Promise<FixPhaseFailureOutcome | undefined> {
   try {
+    if (exactDockerRegistry) {
+      const current = new Map<string, ExactAcceptedTaskTerminalAuthorityRead>();
+      for (const task of sprint.tasks) {
+        if (!exactDockerRegistry.isExactTask(task.id)) continue;
+        const authority = exactDockerRegistry.readExactTerminalAuthority(task.id);
+        if (authority.state === 'current') {
+          current.set(task.id, authority);
+          continue;
+        }
+        const resultAuthority = exactDockerRegistry.readTaskResultAuthority(task.id);
+        if (resultAuthority.state === 'not-dispatched') {
+          evaluations.set(task.id, TaskEvaluation.NOT_DISPATCHED);
+          task.status = TaskStatus.PAUSED;
+          continue;
+        }
+        throw createExecutionAuthorityError(
+          `Task ${task.id} FIX entry exact terminal authority HOLD: ${authority.reasonCode}`,
+        );
+      }
+      consumeExactTerminalAuthorities(
+        sprint,
+        results,
+        evaluations,
+        current,
+        taskId => exactDockerRegistry.isExactTask(taskId),
+        taskId => exactDockerRegistry.readTaskResultAuthority(taskId).state !== 'not-dispatched',
+      );
+    }
     // Sprint 161 Task 2 (T-003): FIX entry — phase reaches disk so
     // observers see the EVALUATE→FIX transition.
     persistPhaseTransition(projectRoot, sprint, SprintPhase.FIX, SprintStatus.FIXING);
@@ -3517,7 +3628,7 @@ export async function runFixPhase(
     // therefore phase-scoped: every wave ingests under the same authority, and
     // the verdict cache spans them so each attempt is scored exactly once (the
     // post-wave loops reuse it instead of re-running the rubric).
-    const fixVerdicts = new Map<string, { evaluation: TaskEvaluation; rubric: EvaluationResult; prepared: PreparedResultEvaluationAttempt }>();
+    const fixVerdicts = new Map<string, { evaluation: TaskEvaluation; rubric: EvaluationResult }>();
     const repairQueueIds = new Map<string, string>();
     const admitRepair = (
       task: Task,
@@ -3575,9 +3686,10 @@ export async function runFixPhase(
               ) < maxFixRetries }
             : undefined,
         });
-        fixVerdicts.set(ingestTask.id, { evaluation, rubric: prepared.rubric, prepared });
+        fixVerdicts.set(ingestTask.id, { evaluation, rubric: prepared.rubric });
         return evaluation;
       } catch (e) {
+        if (e instanceof DeckentError && e.code === 'DECKENT_E077') throw e;
         // Fail-honest: an unscoreable attempt is DEFERRED (→ PAUSED), never a
         // release and never a fabricated blame verdict.
         debugLog('runFixPhase:fixIngestEvaluation', e);
@@ -3587,6 +3699,34 @@ export async function runFixPhase(
         // on the unscoreable path would fence every later quiescence check of
         // this run behind a repair that can no longer make progress.
         markRepairSettled(ingestTask.id);
+      }
+    };
+    const consumeExactFixWave = (waveTasks: readonly Task[]): void => {
+      if (!exactDockerRegistry) return;
+      const authorities = exactDockerRegistry.snapshotExactTerminalAuthorities();
+      for (const task of waveTasks) {
+        if (!exactDockerRegistry.isExactTask(task.id)) continue;
+        const authority = authorities.get(task.id);
+        if (authority?.state !== 'current') {
+          const read = exactDockerRegistry.readTaskResultAuthority(task.id);
+          if (read.state === 'not-dispatched') continue;
+          throw createExecutionAuthorityError(
+            `Task ${task.id} FIX exact terminal authority is not current`,
+          );
+        }
+        const evaluation = authority.evaluationReceipt.verdict === 'DONE'
+          ? TaskEvaluation.DONE
+          : authority.evaluationReceipt.verdict === 'GO_WITH_TECH_DEBT'
+            ? TaskEvaluation.GO_WITH_TECH_DEBT
+            : TaskEvaluation.NO_GO;
+        fixVerdicts.set(task.id, {
+          evaluation,
+          rubric: authority.evaluationReceipt.evaluationSnapshot,
+        });
+        const aggregateIndex = results.findIndex(result => result.taskId === task.id);
+        if (aggregateIndex >= 0) results[aggregateIndex] = authority.projectedResult;
+        else results.push(authority.projectedResult);
+        markRepairSettled(task.id);
       }
     };
 
@@ -3723,6 +3863,20 @@ export async function runFixPhase(
           currentRootIds.has(ancestorId),
         ),
       );
+      if (exactDockerRegistry) {
+        for (const fixTask of fixTasks) {
+          const exactAncestor = resolveFixAncestorIds(fixTask, taskIndex)
+            .find(ancestorId => exactDockerRegistry.isExactTask(ancestorId));
+          if (
+            exactAncestor
+            && !(fixTask as Task & { exactRepairBirthAuthority?: unknown }).exactRepairBirthAuthority
+          ) {
+            throw createExecutionAuthorityError(
+              `Task ${fixTask.id} FIX birth lacks exact terminal authority for ${exactAncestor}`,
+            );
+          }
+        }
+      }
       const dispositionGate = partitionFixTasksByFailureDisposition(
         fixTasks,
         results,
@@ -3840,6 +3994,7 @@ export async function runFixPhase(
         spawnBackend,
         attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,
         providerAuthority: opts?.providerAuthority,
+        exactDockerRegistry,
       });
       for (const task of fixTasks) {
         if (task.status === TaskStatus.EXECUTING) markRepairDispatched(task.id);
@@ -3874,9 +4029,11 @@ export async function runFixPhase(
           attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,
           providerAuthority: opts?.providerAuthority,
           evaluateCollectedResult: evaluateFixIngest,
+          exactDockerRegistry,
         },
         config,
       );
+      consumeExactFixWave(fixTasks);
       const tasksById = new Map(allSprintTasks.map(task => [task.id, task]));
       const sprintIdForUnblock = getCurrentSprintId(projectRoot) ?? sprint.id;
       for (const fixTask of fixTasks) {
@@ -4128,6 +4285,7 @@ export async function runFixPhase(
             spawnBackend,
             attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,
             providerAuthority: opts?.providerAuthority,
+            exactDockerRegistry,
           });
           for (const task of eligible) {
             if (task.status === TaskStatus.EXECUTING) markRepairDispatched(task.id);
@@ -4158,9 +4316,11 @@ export async function runFixPhase(
               // authority as the main FIX wave — its raw self-claim must never
               // be the thing that releases a dependant.
               evaluateCollectedResult: evaluateFixIngest,
+              exactDockerRegistry,
             },
             config,
           );
+          consumeExactFixWave(eligible);
 
           for (const rTask of eligible) {
             const rResult = reDispatchResults.find(r => r.taskId === rTask.id);
@@ -4236,7 +4396,10 @@ export async function runFixPhase(
         } catch (e) { debugLog('runFixPhase:reDispatchResult:event', e); }
       }
     } catch (e) {
-      if (e instanceof ProviderExecutionIngressHoldError) throw e;
+      if (
+        e instanceof ProviderExecutionIngressHoldError
+        || (e instanceof DeckentError && e.code === 'DECKENT_E077')
+      ) throw e;
       debugLog('runFixPhase:reDispatchExecution', e);
     }
 
@@ -4266,6 +4429,7 @@ export async function runFixPhase(
           spawnBackend,
           attendedExecutionApprovalAuthority: opts?.attendedExecutionApprovalAuthority,
           providerAuthority: opts?.providerAuthority,
+          exactDockerRegistry,
         },
         );
         if (postFixSpawnedIds.length === 0) break;
@@ -4297,9 +4461,11 @@ export async function runFixPhase(
             // shortest path from "worker said DONE" to a released dependant, so
             // it carries the same Brain authority as every other FIX wave.
             evaluateCollectedResult: evaluateFixIngest,
+            exactDockerRegistry,
           },
           config,
         );
+        consumeExactFixWave(postFixTasks);
 
         let succeeded = 0;
         let failed = 0;
@@ -4356,10 +4522,14 @@ export async function runFixPhase(
         }
       }
     } catch (e) {
-      if (e instanceof ProviderExecutionIngressHoldError) throw e;
+      if (
+        e instanceof ProviderExecutionIngressHoldError
+        || (e instanceof DeckentError && e.code === 'DECKENT_E077')
+      ) throw e;
       debugLog('runFixPhase:postFixPendingScan', e);
     }
   } catch (err) {
+    if (err instanceof DeckentError && err.code === 'DECKENT_E077') throw err;
     const message = err instanceof Error ? err.message : String(err);
     const taskIdMatch = /FIX_EXECUTION_BUDGET_HOLD:([^:]+):/.exec(message);
     const code = err instanceof ProviderExecutionIngressHoldError
@@ -4671,11 +4841,22 @@ export async function runRetroPhase(
   testMode?: boolean,
   flowId?: string,
   deferTerminalAuthority = false,
+  exactTerminalAuthorities?: ReadonlyMap<string, ExactAcceptedTaskTerminalAuthorityRead>,
+  isExactTaskAuthority?: (taskId: string) => boolean,
+  requireExactTerminalAuthority?: (taskId: string) => boolean,
 ): Promise<SprintMetrics | RetroPhaseFailure | undefined> {
+  const exactTaskIds = consumeExactTerminalAuthorities(
+    sprint,
+    results,
+    evaluations,
+    exactTerminalAuthorities,
+    isExactTaskAuthority,
+    requireExactTerminalAuthority,
+  );
   if (!testMode) {
     assertTaskResultAuthoritiesReady(
       projectRoot,
-      sprint.tasks.map(task => task.id),
+      sprint.tasks.filter(task => !exactTaskIds.has(task.id)).map(task => task.id),
       'retro-entry',
     );
     try {
@@ -4701,6 +4882,7 @@ export async function runRetroPhase(
         const haveStubCheck = typeof isConfirmedStub === 'function';
         if (haveSentinel || haveStubCheck) {
           for (const task of sprint.tasks) {
+            if (exactTaskIds.has(task.id)) continue;
             const authority = readAuthoritativeTaskResult<TaskResult>(projectRoot, task.id);
             const persistedResult = authority.result;
             if (!persistedResult) {
@@ -4771,6 +4953,7 @@ export async function runRetroPhase(
         onRuleRegen: async (root: string): Promise<void> => { await regenerateRules(root); },
         flowId,
         deferTerminalAuthority,
+        exactTerminalAuthorities,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -4803,6 +4986,7 @@ export async function runRetroPhase(
       publishTestModeSprintTerminalReceipt(projectRoot, sprint, evaluations, results, {
         defaultAuthMode: config.auth_mode,
         ...(flowId ? { runId: flowId } : {}),
+        exactTerminalAuthorities,
       });
       return metrics;
     } catch (e) {

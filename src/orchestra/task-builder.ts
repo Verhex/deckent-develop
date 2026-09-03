@@ -22,8 +22,11 @@ import type {
 } from '../core/types.js';
 import {
   createGoNoGoCriterionItem,
+  deriveProductionWiringApplicability,
+  productionWiringVerifierAssetWriteScopeOverlap,
   createPostSettlementPlanProjection,
   createProductionWiringPlanEvidence,
+  createProductionWiringPlanEvidenceV2,
 } from '../core/task-types.js';
 import type { PostSettlementIngress } from '../core/post-settlement-verification.js';
 import {
@@ -32,8 +35,12 @@ import {
 } from '../core/post-settlement-verification.js';
 import {
   resolveProductionWiringContract,
+  parseProductionWiringContractV2Input,
   type ProductionWiringDecision,
 } from '../core/production-wiring-contract.js';
+import {
+  validateProductionWiringHostProofAdapterAdmission,
+} from '../core/production-wiring-host-proof.js';
 import { shellSplit } from './proof-of-function.js';
 import { isFileScopeToken } from './scope-sanitizer.js';
 import { TaskStatus, PROVIDER_MODEL_MAP } from '../core/types.js';
@@ -473,13 +480,39 @@ export class ProductionWiringTaskHoldError extends DeckentError {
 function validateProductionWiringAuthority(
   title: string,
   authority: ProductionWiringPlanEvidence | undefined,
+  scope: TaskScope,
 ): ProductionWiringPlanEvidence | undefined {
-  if (!authority) return undefined;
+  const applicability = deriveProductionWiringApplicability(scope);
+  if (!authority) {
+    if (applicability.state === 'required') {
+      throw new DeckentError(
+        'E_PRODUCTION_WIRING_REQUIRED',
+        `Production mutation task "${title}" requires canonical V2 wiring authority.`,
+      );
+    }
+    return undefined;
+  }
 
-  const canonical = createProductionWiringPlanEvidence(authority.contract);
+  if (authority.version !== 2 || authority.contract.version !== 2) {
+    throw new DeckentError(
+      'E_PRODUCTION_WIRING_V1_HISTORICAL_ONLY',
+      `Production mutation task "${title}" uses historical V1 wiring evidence and cannot enter a new exact execution.`,
+    );
+  }
+
+  let canonical: ProductionWiringPlanEvidence;
+  try {
+    canonical = createProductionWiringPlanEvidence(authority.contract);
+  } catch {
+    throw new DeckentError(
+      'E_PRODUCTION_WIRING_DIGEST_MISMATCH',
+      `Production mutation task "${title}" has stale or malformed plan wiring authority.`,
+    );
+  }
   if (
     authority.version !== canonical.version
     || authority.contractDigest !== canonical.contractDigest
+    || authority.hostProofProgramDigest !== canonical.hostProofProgramDigest
   ) {
     throw new DeckentError(
       'E_PRODUCTION_WIRING_DIGEST_MISMATCH',
@@ -490,6 +523,22 @@ function validateProductionWiringAuthority(
   const decision = resolveProductionWiringContract(authority.contract);
   if (decision.decision !== 'complete' && decision.decision !== 'staged-foundation') {
     throw new ProductionWiringTaskHoldError(title, decision);
+  }
+  if (canonical.version === 2
+    && productionWiringVerifierAssetWriteScopeOverlap(scope, canonical) !== null) {
+    throw new DeckentError(
+      'E_PRODUCTION_WIRING_VERIFIER_ASSET_WRITE_SCOPE',
+      `Production mutation task "${title}" can write a trusted verifier asset.`,
+    );
+  }
+  if (canonical.version === 2
+    && validateProductionWiringHostProofAdapterAdmission(
+      canonical.contract.hostProofProgram,
+    ).state !== 'valid') {
+    throw new DeckentError(
+      'E_PRODUCTION_WIRING_HOST_PROOF_ADAPTER_UNREGISTERED',
+      `Production mutation task "${title}" names a host-proof adapter that is not code-owned and owner-admitted.`,
+    );
   }
   return canonical;
 }
@@ -526,6 +575,42 @@ export interface ParsedDirectiveTask {
    * directive line via {@link extractPromotionProofDeclaration}.
    */
   postSettlementProjection?: PostSettlementPlanProjection;
+  /** Canonical V2 authority parsed from an exact ProductionWiring JSON declaration. */
+  productionWiring?: ProductionWiringPlanEvidence;
+  /** Host-derived from exact scope; directive prose cannot grant an exemption. */
+  productionWiringApplicability: ReturnType<typeof deriveProductionWiringApplicability>;
+}
+
+function parseProductionWiringDirective(
+  lines: readonly string[],
+  title: string,
+): ProductionWiringPlanEvidence | undefined {
+  const raw = findDirectiveValue(lines, 'productionwiring');
+  if (raw === undefined) return undefined;
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(raw);
+  } catch {
+    throw new DeckentError(
+      'E_PRODUCTION_WIRING_DIRECTIVE_INVALID',
+      `Production mutation task "${title}" has malformed ProductionWiring JSON.`,
+    );
+  }
+  const input = parseProductionWiringContractV2Input(decoded);
+  if (input === null) {
+    throw new DeckentError(
+      'E_PRODUCTION_WIRING_DIRECTIVE_INVALID',
+      `Production mutation task "${title}" has invalid ProductionWiring V2 authority.`,
+    );
+  }
+  try {
+    return createProductionWiringPlanEvidenceV2(input);
+  } catch {
+    throw new DeckentError(
+      'E_PRODUCTION_WIRING_DIRECTIVE_HOLD',
+      `Production mutation task "${title}" has incomplete ProductionWiring proof coverage.`,
+    );
+  }
 }
 
 /**
@@ -1272,7 +1357,6 @@ export function createTask(params: CreateTaskParams, sequence: number): Task & {
   }
 
   const provider = params.provider;
-  const productionWiring = validateProductionWiringAuthority(params.title, params.productionWiring);
 
   // Sprint 196 WP-3: Derive test scope for audit trail (scopeDerivation).
   // Actual scope.filesWrite enrichment happens in enrichScopeWithTestFiles at parse-time.
@@ -1288,6 +1372,12 @@ export function createTask(params: CreateTaskParams, sequence: number): Task & {
   // Sprint 260 BOUNDARY-TEST-PATTERN: auto-add mirrored tests/ dirs for code-development tasks
   // so workers adding a test alongside their fix stay in-scope without a BOUNDARY_VIOLATION.
   const normalizedScope = mirrorTestScope(params.scope, canonicalKind);
+  const productionWiringApplicability = deriveProductionWiringApplicability(normalizedScope);
+  const productionWiring = validateProductionWiringAuthority(
+    params.title,
+    params.productionWiring,
+    normalizedScope,
+  );
   const verificationCommands = [...new Set((params.verificationCommands ?? [])
     .map(command => command.replace(/\r\n?/g, '\n').trim())
     .filter(Boolean))];
@@ -1328,6 +1418,7 @@ export function createTask(params: CreateTaskParams, sequence: number): Task & {
     routingMeta: scopeDerivation !== undefined ? { scopeDerivation } : undefined,
     smoke: params.smoke,
     productionWiring,
+    productionWiringApplicability,
     postSettlementProjection: params.postSettlementProjection,
   };
 }
@@ -1973,7 +2064,8 @@ export function parseStructuredDirectives(content: string): ParsedDirectiveTask[
     // (warn + emit, obligations as authored) until the two fixtures that still encode
     // the in-sprint dist/ shape are restaged — see ProofStagingOptions.enforce.
     const proofStaging = stageDirectiveProofObligations(block, enrichedScope, title);
-    tasks.push({ title, description, meta: parsedMeta, scope: enrichedScope, testTarget, provider: parsedProvider, forceModel: parsedForceModel, forceEffort: parsedForceEffort, forceAgent, forceSkills, excludeSkills, dependencies, priority: parsedPriority, authMode: parsedAuthMode, backend: parsedBackend, modelEffort: parsedModelEffort, smoke: proofStaging.smoke, postSettlementProjection: proofStaging.postSettlementProjection });
+    const productionWiring = parseProductionWiringDirective(lines, title);
+    tasks.push({ title, description, meta: parsedMeta, scope: enrichedScope, testTarget, provider: parsedProvider, forceModel: parsedForceModel, forceEffort: parsedForceEffort, forceAgent, forceSkills, excludeSkills, dependencies, priority: parsedPriority, authMode: parsedAuthMode, backend: parsedBackend, modelEffort: parsedModelEffort, smoke: proofStaging.smoke, postSettlementProjection: proofStaging.postSettlementProjection, productionWiring, productionWiringApplicability: deriveProductionWiringApplicability(enrichedScope) });
   }
   return tasks;
 }
@@ -2099,6 +2191,7 @@ export function parseBulletOrNumberedTasks(content: string): ParsedDirectiveTask
         const parsedAuthModeBullet = parseAuthModeDirective(authLineBullet);
 
         const enrichedScope = enrichScopeWithTestFiles(scope, scope.filesWrite);
+        const productionWiring = parseProductionWiringDirective(allLines, title);
         tasks.push({
           title,
           description: allLines.join('\n').trim(),
@@ -2114,6 +2207,8 @@ export function parseBulletOrNumberedTasks(content: string): ParsedDirectiveTask
           priority: parsedPriorityBullet,
           authMode: parsedAuthModeBullet,
           smoke: extractSmoke(allLines.join('\n')),
+          productionWiring,
+          productionWiringApplicability: deriveProductionWiringApplicability(enrichedScope),
         });
 
         i = j;
@@ -2138,7 +2233,6 @@ export function parseBulletOrNumberedTasks(content: string): ParsedDirectiveTask
 export function plannerTaskToParams(
   pt: PlannerTask & {
     smoke?: { command: string; expect: string };
-    productionWiring?: ProductionWiringPlanEvidence;
   },
   sprintId: string,
   modelOverride: ModelType,

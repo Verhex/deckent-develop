@@ -170,9 +170,12 @@ function timestampNotBefore(reference: string): string {
 
 export class TaskIngressDispositionError extends DeckentError {
   constructor(readonly execution: TaskIngressExecutionResult) {
+    const code = execution.invocation.state === 'not-dispatched'
+      ? 'TASK_INGRESS_NOT_DISPATCHED'
+      : 'TASK_INGRESS_RECONCILIATION_REQUIRED';
     super(
-      'TASK_INGRESS_NOT_DISPATCHED',
-      `TASK_INGRESS_NOT_DISPATCHED:${execution.disposition.kind}:`
+      code,
+      `${code}:${execution.disposition.kind}:`
       + `${execution.disposition.taskId}`,
     );
     this.name = 'TaskIngressDispositionError';
@@ -194,6 +197,13 @@ export function readTaskIngressErrorAuthority(
   error: unknown,
 ): TaskIngressErrorAuthority | undefined {
   if (!error || typeof error !== 'object') return undefined;
+  if (error instanceof TaskIngressDispositionError) {
+    return {
+      schemaVersion: 1,
+      reasonCode: error.execution.invocation.reasonCode ?? error.code,
+      invocation: error.execution.invocation,
+    };
+  }
   const authority = (error as Partial<ErrorWithTaskIngressAuthority>).taskIngressAuthority;
   if (
     !authority

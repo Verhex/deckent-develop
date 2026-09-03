@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -51,8 +51,17 @@ const TOOL_PROFILE_DIGEST = 'd'.repeat(64);
 const STABLE_ACCOUNT_SUBJECT = 'claude-subscription-window-fixture';
 
 const tempRoots: string[] = [];
+const originalDeckentHome = process.env.DECKENT_HOME;
+
+beforeEach(() => {
+  const hostStateRoot = mkdtempSync(join(tmpdir(), 'deckent-xverify-window-host-state-'));
+  tempRoots.push(hostStateRoot);
+  process.env.DECKENT_HOME = join(hostStateRoot, '.deckent');
+});
 
 afterEach(() => {
+  if (originalDeckentHome === undefined) delete process.env.DECKENT_HOME;
+  else process.env.DECKENT_HOME = originalDeckentHome;
   for (const root of tempRoots.splice(0)) {
     rmSync(root, { recursive: true, force: true });
   }

@@ -105,7 +105,12 @@ vi.mock('../../src/orchestra/result-watcher.js', () => ({
   })),
 }));
 
-import { TaskStatus, SprintPhase, SprintStatus } from '../../src/core/types.js';
+import {
+  TaskStatus,
+  SprintPhase,
+  SprintStatus,
+  deriveProductionWiringApplicability,
+} from '../../src/core/types.js';
 import type { Task, ResolvedConfig, Sprint } from '../../src/core/types.js';
 import type { SpawnBackend, SpawnBackendOptions } from '../../src/orchestra/spawn-backend.js';
 import {
@@ -118,6 +123,7 @@ import { waitForResults } from '../../src/orchestra/result-collector.js';
 import { buildWorkerPrompt } from '../../src/orchestra/task-builder.js';
 import { ProviderExecutionIngressHoldError } from '../../src/core/provider-execution-ingress-authority.js';
 import { providerRegistry } from '../../src/core/provider.js';
+import { createTaskResultSettlementV2Fixture } from '../helpers/task-result-settlement-v2-fixture.js';
 import type { ProviderAdapter } from '../../src/core/provider.js';
 import { CHANNELS, readEvents } from '../../src/orchestra/event-stream.js';
 
@@ -429,8 +435,228 @@ describe('executeSpawnTask — exact normal-Docker publication order', () => {
   beforeEach(() => { root = makeTmpDir('sched3-exact-order'); });
   afterEach(() => { rmSync(root, { recursive: true, force: true }); vi.clearAllMocks(); });
 
+  it('snapshots every exact non-terminal entry as typed HOLD instead of dropping to legacy', () => {
+    const registry = createExactNormalDockerExecutionRegistry(root);
+    registry.registerNotDispatched('exact-zero-work');
+    registry.registerHold('exact-authority-hold', 'EXACT_FIXTURE_HOLD');
+
+    expect([...registry.snapshotExactTerminalAuthorities()]).toEqual([
+      ['exact-zero-work', { state: 'hold', reasonCode: 'exact-not-dispatched' }],
+      ['exact-authority-hold', { state: 'hold', reasonCode: 'EXACT_FIXTURE_HOLD' }],
+    ]);
+    expect(registry.isExactTask('exact-zero-work')).toBe(true);
+    expect(registry.isExactTask('exact-authority-hold')).toBe(true);
+  });
+
+  it('CAS-fences exact terminal replay instead of overwriting attempt authority', () => {
+    const backend = makeMockBackend();
+    backend.awaitExactDockerAcceptedResult = vi.fn(() => new Promise(() => undefined));
+    const query = { custodyRef: { identity: { taskId: 'exact-cas' } } } as never;
+
+    const acceptedRace = createExactNormalDockerExecutionRegistry(root);
+    acceptedRace.registerReleased('exact-cas', backend, query);
+    acceptedRace.registerNotDispatched('exact-cas', backend);
+    expect(acceptedRace.readTaskResultAuthority('exact-cas')).toMatchObject({
+      state: 'authority-hold',
+      holdReason: 'EXACT_NOT_DISPATCHED_REGISTRY_REPLAY_MISMATCH',
+    });
+
+    const retryRace = createExactNormalDockerExecutionRegistry(root);
+    retryRace.registerNotDispatched('exact-cas', backend);
+    retryRace.registerReleased('exact-cas', backend, query);
+    expect(retryRace.readTaskResultAuthority('exact-cas')).toMatchObject({
+      state: 'authority-hold',
+      holdReason: 'EXACT_DISPATCH_REGISTRY_REPLAY_MISMATCH',
+    });
+  });
+
+  it('rehydrates durable exact NOT_DISPATCHED and scans one project owner across backend instances', async () => {
+    const registry = createExactNormalDockerExecutionRegistry(root);
+    const first = makeMockBackend();
+    const second = makeMockBackend();
+    Object.defineProperty(first, 'name', { value: 'docker' });
+    Object.defineProperty(second, 'name', { value: 'docker' });
+    const recoveryDigest = `sha256:${'a'.repeat(64)}` as const;
+    const notDispatched = (taskId: string) => ({
+      kind: 'not-dispatched' as const,
+      taskId,
+      authority: {
+        state: 'NOT_DISPATCHED',
+        admissionRef: {
+          dispatchRequestId: `dreq-${'b'.repeat(64)}`,
+          identity: {
+            schemaVersion: 2,
+            backend: 'docker',
+            projectRootSha256: 'c'.repeat(64),
+            projectId: 'project-test',
+            taskId,
+            attemptId: `attempt-${taskId}`,
+            generation: 1,
+          },
+          admissionReceiptDigest: recoveryDigest,
+          refDigest: recoveryDigest,
+        },
+        receiptDigest: recoveryDigest,
+        noEffectEvidence: { evidenceDigest: recoveryDigest },
+      } as never,
+    });
+    const report = {
+      adopted: [],
+      closedNotDispatched: ['exact-cold-a', 'exact-cold-b'],
+      closedAbsentAfterExit: [],
+      retiredLanded: [],
+      resumedContinuations: [],
+      held: [],
+      exactEntries: [notDispatched('exact-cold-a'), notDispatched('exact-cold-b')],
+    };
+    first.reconcilePendingAttempts = vi.fn(async () => report);
+    second.reconcilePendingAttempts = vi.fn(async () => {
+      throw new Error('second project-wide adoption scan must not run');
+    });
+    registry.registerNotDispatched('exact-cold-a', first);
+    registry.registerNotDispatched('exact-cold-b', second);
+
+    await expect(registry.reconcileExactLifecycle('resume')).resolves.toEqual([report]);
+    expect(first.reconcilePendingAttempts).toHaveBeenCalledOnce();
+    expect(second.reconcilePendingAttempts).not.toHaveBeenCalled();
+    for (const taskId of ['exact-cold-a', 'exact-cold-b']) {
+      expect(registry.isExactTask(taskId)).toBe(true);
+      expect(registry.readTaskResultAuthority(taskId)).toMatchObject({
+        state: 'not-dispatched',
+        attemptCount: 0,
+      });
+      expect(registry.readExactTerminalAuthority(taskId)).toEqual({
+        state: 'hold',
+        reasonCode: 'exact-not-dispatched',
+      });
+    }
+
+    registry.rehydrateRecovery({
+      ...report,
+      exactEntries: [{
+        kind: 'not-dispatched',
+        taskId: 'exact-corrupt',
+        authority: { state: 'NOT_DISPATCHED' } as never,
+      }],
+    }, first);
+    expect(registry.readTaskResultAuthority('exact-corrupt')).toMatchObject({
+      state: 'authority-hold',
+      holdReason: 'EXACT_RECOVERY_NOT_DISPATCHED_MISMATCH',
+    });
+  });
+
+  it('preserves and freshly revalidates a current terminal across accepted recovery ownership transfer', async () => {
+    const registry = createExactNormalDockerExecutionRegistry(root);
+    const taskId = 'exact-recovered-terminal';
+    const digest = `sha256:${'a'.repeat(64)}` as const;
+    const identity = {
+      schemaVersion: 2 as const,
+      backend: 'docker' as const,
+      projectRootSha256: 'b'.repeat(64),
+      projectId: 'project-test',
+      taskId,
+      attemptId: 'attempt-recovered-terminal',
+      generation: 1,
+    };
+    const query = {
+      custodyRef: {
+        identity,
+        admissionReceiptDigest: digest,
+      },
+    } as never;
+    const initialReader = Object.freeze({});
+    const recoveredReader = Object.freeze({});
+    const acceptedFixture = createTaskResultSettlementV2Fixture({
+      terminal: 'accepted-only',
+      tailArtifactKey: 'scheduler-recovered-terminal',
+    });
+    const accepted = {
+      kind: 'accepted-result' as const,
+      reader: initialReader,
+      result: { ...acceptedFixture.result, taskId },
+      acceptedResultRef: {
+        schemaVersion: 2,
+        kind: 'task-accepted-result-v2-ref',
+        identity,
+        artifactKey: 'primary',
+        artifactReceiptDigest: digest,
+      },
+      acceptedResultChainDigest: digest,
+      resultDigest: digest,
+    } as never;
+    const initial = makeMockBackend();
+    Object.defineProperty(initial, 'name', { value: 'docker' });
+    initial.awaitExactDockerAcceptedResult = vi.fn(async () => accepted);
+    const readBefore = registry.readTaskResultAuthority.bind(registry);
+    registry.registerReleased(taskId, initial, query);
+    await registry.awaitTaskResultAuthority(taskId);
+    const acceptedRead = readBefore(taskId);
+    if (acceptedRead.state !== 'exact-accepted' || !acceptedRead.exactAcceptedAuthority) {
+      throw new Error('fixture exact accepted authority unavailable');
+    }
+    const terminalAuthority = {
+      schemaVersion: 2,
+      kind: 'exact-accepted-result-terminal-authority-v2',
+      acceptedAuthority: acceptedRead.exactAcceptedAuthority,
+      terminalResultAuthority: {},
+      terminalDecisionAuthority: {},
+    } as never;
+    const currentRead = {
+      state: 'current' as const,
+      terminalAuthority,
+      terminalResultAuthority: {},
+      evaluationReceipt: {},
+      finalizerReceipt: {},
+      result: accepted.result,
+      projectedResult: accepted.result,
+    } as never;
+    initial.settleExactDockerAcceptedResult = vi.fn(async () => ({
+      state: 'settled' as const,
+      authority: terminalAuthority,
+    }));
+    initial.readExactDockerAcceptedTaskTerminalAuthority = vi.fn(() => currentRead);
+    await expect(registry.settleExactAcceptedResult({
+      acceptedAuthority: acceptedRead.exactAcceptedAuthority,
+    })).resolves.toMatchObject({ state: 'settled' });
+
+    const recoveredAccepted = Object.freeze({ ...accepted, reader: recoveredReader });
+    const recovery = makeMockBackend();
+    Object.defineProperty(recovery, 'name', { value: 'docker' });
+    recovery.readExactDockerAcceptedResult = vi.fn(() => recoveredAccepted);
+    recovery.readExactDockerAcceptedTaskTerminalAuthority = vi.fn(() => currentRead);
+    registry.rehydrateRecovery({
+      adopted: [],
+      closedNotDispatched: [],
+      closedAbsentAfterExit: [taskId],
+      retiredLanded: [],
+      resumedContinuations: [],
+      held: [],
+      exactEntries: [{
+        kind: 'accepted',
+        taskId,
+        query,
+        accepted: recoveredAccepted,
+      }],
+    }, recovery);
+
+    expect(registry.readExactTerminalAuthority(taskId)).toBe(currentRead);
+    expect(recovery.readExactDockerAcceptedTaskTerminalAuthority)
+      .toHaveBeenCalledWith(expect.objectContaining({
+        reader: recoveredReader,
+        expectedAcceptedAuthority: acceptedRead.exactAcceptedAuthority,
+        expectedTerminalAuthority: terminalAuthority,
+      }));
+  });
+
   it('keeps public task/receipt absent through prepare+dispatch and publishes only after RELEASED', async () => {
-    const task = makeTask('700-EXACT', { provider: 'claude' });
+    const task = makeTask('700-EXACT', {
+      provider: 'claude',
+      productionWiringApplicability: deriveProductionWiringApplicability({
+        directories: [],
+        filesRead: [],
+        filesWrite: [],
+      }),
+    });
     const taskPath = join(root, '.tasks', `task-${task.id}.json`);
     const receiptPath = join(root, '.tasks', `task-${task.id}.skill-delivery.json`);
     const observations: string[] = [];
@@ -451,6 +677,20 @@ describe('executeSpawnTask — exact normal-Docker publication order', () => {
       admissionRefDigest: digest,
       providerStartReceipt: { ref: digest, digest },
     };
+    const preparationRef = {
+      schemaVersion: 2 as const,
+      kind: 'execution-landing-preparation-ref' as const,
+      dispatchRequestId: custodyRef.dispatchRequestId,
+      dispatchRequestMaterialDigest: digest,
+      privateIdentity: identity,
+      admissionReceiptDigest: digest,
+      admissionRefDigest: digest,
+      admittedAt: '2026-09-01T00:00:00.000Z',
+      policyDigest: digest,
+      taskSnapshotDigest: digest,
+      providerInvocationDigest: digest,
+      preparationRefDigest: digest,
+    };
     const backend = {
       name: 'docker',
       liveUsageBudgetSupport: 'measured-stream',
@@ -469,7 +709,7 @@ describe('executeSpawnTask — exact normal-Docker publication order', () => {
             dispatchRequestMaterialDigest: digest,
             admissionRefDigest: digest,
           },
-          preparationRef: {} as never,
+          preparationRef,
         };
       }),
       dispatchExactDockerCustody: vi.fn(async () => {
@@ -482,7 +722,7 @@ describe('executeSpawnTask — exact normal-Docker publication order', () => {
             dispatchRequestMaterialDigest: digest,
             admissionRefDigest: digest,
           },
-          preparationRef: {} as never,
+          preparationRef,
           custodyRef,
           providerExecutionAttempt: {} as never,
           backendExecutionId: 'container-exact-1',
@@ -551,21 +791,56 @@ describe('executeSpawnTask — exact normal-Docker publication order', () => {
       holdReason: 'EFFECT_PUBLICATION_HOLD',
     });
 
-    const zeroWorkTask = makeTask('700-EXACT-ZERO', { provider: 'claude' });
+    const zeroWorkTask = makeTask('700-EXACT-ZERO', {
+      provider: 'claude',
+      productionWiringApplicability: deriveProductionWiringApplicability({
+        directories: [],
+        filesRead: [],
+        filesWrite: [],
+      }),
+    });
+    const zeroIdentityV1 = {
+      ...identity,
+      taskId: zeroWorkTask.id,
+      attemptId: 'attempt-exact-zero',
+      generation: 1,
+    };
+    const zeroAdmissionDigestV1 = `sha256:${'d'.repeat(64)}` as const;
+    const zeroAdmissionRefDigestV1 = `sha256:${'e'.repeat(64)}` as const;
+    const zeroCustodyRefV1 = {
+      dispatchRequestId: `dreq-${'d'.repeat(64)}`,
+      identity: zeroIdentityV1,
+      admissionReceiptDigest: zeroAdmissionDigestV1,
+      admissionRefDigest: zeroAdmissionRefDigestV1,
+    };
+    const zeroPreparationRefV1 = {
+      ...preparationRef,
+      dispatchRequestId: zeroCustodyRefV1.dispatchRequestId,
+      privateIdentity: zeroIdentityV1,
+      admissionReceiptDigest: zeroAdmissionDigestV1,
+      admissionRefDigest: zeroAdmissionRefDigestV1,
+      preparationRefDigest: zeroAdmissionRefDigestV1,
+    };
     const zeroWorkOutcome = {
       kind: 'not-dispatched' as const,
       admissionRef: {
-        dispatchRequestId: custodyRef.dispatchRequestId,
+        dispatchRequestId: zeroCustodyRefV1.dispatchRequestId,
         dispatchRequestMaterialDigest: digest,
-        admissionRefDigest: digest,
+        admissionRefDigest: zeroAdmissionRefDigestV1,
       },
-      custodyRef,
+      custodyRef: zeroCustodyRefV1,
       providerAttemptCount: 0 as const,
       providerExecutionAttempt: null,
       reasonCode: 'PRE_MOUNT_ABORTED' as const,
       zeroWorkReceipt: { ref: digest, digest },
       projectionFence: digest,
     };
+    backend.prepareExactDockerCustody.mockResolvedValueOnce({
+      kind: 'exact-docker-custody-prepared' as const,
+      dispatchEnvelope: {} as never,
+      admissionRef: zeroWorkOutcome.admissionRef,
+      preparationRef: zeroPreparationRefV1,
+    });
     backend.dispatchExactDockerCustody.mockResolvedValueOnce(zeroWorkOutcome as never);
     const zeroWorkDisposition = await executeSpawnTask(
       { task: zeroWorkTask, taskTimeoutSeconds: 60 },
@@ -590,16 +865,146 @@ describe('executeSpawnTask — exact normal-Docker publication order', () => {
     if (zeroWorkDisposition.kind !== 'not-dispatched') throw new Error('expected exact zero work');
     expect(zeroWorkDisposition.exactDispatchOutcome).toBe(zeroWorkOutcome);
     expect(existsSync(join(root, '.tasks', `task-${zeroWorkTask.id}.json`))).toBe(false);
+    const exactDispatchCount = backend.dispatchExactDockerCustody.mock.calls.length;
+    backend.prepareExactDockerCustody.mockResolvedValueOnce({
+      kind: 'exact-docker-custody-prepared' as const,
+      dispatchEnvelope: {} as never,
+      admissionRef: zeroWorkOutcome.admissionRef,
+      preparationRef: zeroPreparationRefV1,
+    });
+    const staleRetry = await executeSpawnTask(
+      { task: zeroWorkTask, taskTimeoutSeconds: 60 },
+      baseDeps(root, {
+        backend,
+        config,
+        exactDockerRegistry: registry,
+        exactTaskProjectionAdmission: {
+          taskIds: [zeroWorkTask.id],
+          existingContentDigests: {},
+        },
+      }),
+    );
+    expect(staleRetry).toMatchObject({
+      kind: 'ambiguous',
+      taskId: zeroWorkTask.id,
+      reasonCode: 'EXACT_REDISPATCH_GENERATION_MISMATCH',
+    });
+    expect(backend.dispatchExactDockerCustody).toHaveBeenCalledTimes(exactDispatchCount);
+    expect(backend.prepareExactDockerCustody.mock.calls.at(-1)?.[0]).toMatchObject({
+      predecessor: null,
+      zeroWorkPredecessor: {
+        identity: zeroIdentityV1,
+        admissionReceiptDigest: zeroAdmissionDigestV1,
+        admissionRefDigest: zeroAdmissionRefDigestV1,
+        zeroWorkReceipt: zeroWorkOutcome.zeroWorkReceipt,
+      },
+    });
 
-    const ambiguousTask = makeTask('700-EXACT-AMBIGUOUS', { provider: 'claude' });
+    const zeroIdentityV2 = { ...zeroIdentityV1, generation: 2 };
+    const zeroAdmissionDigestV2 = `sha256:${'f'.repeat(64)}` as const;
+    const zeroAdmissionRefDigestV2 = `sha256:${'c'.repeat(64)}` as const;
+    const zeroCustodyRefV2 = {
+      dispatchRequestId: `dreq-${'e'.repeat(64)}`,
+      identity: zeroIdentityV2,
+      admissionReceiptDigest: zeroAdmissionDigestV2,
+      admissionRefDigest: zeroAdmissionRefDigestV2,
+      providerStartReceipt: { ref: zeroAdmissionDigestV2, digest: zeroAdmissionDigestV2 },
+    };
+    const zeroPreparationRefV2 = {
+      ...preparationRef,
+      dispatchRequestId: zeroCustodyRefV2.dispatchRequestId,
+      privateIdentity: zeroIdentityV2,
+      admissionReceiptDigest: zeroAdmissionDigestV2,
+      admissionRefDigest: zeroAdmissionRefDigestV2,
+      preparationRefDigest: zeroAdmissionRefDigestV2,
+    };
+    const zeroReleasedV2 = {
+      kind: 'released' as const,
+      settlementRef: {} as never,
+      admissionRef: {
+        dispatchRequestId: zeroCustodyRefV2.dispatchRequestId,
+        dispatchRequestMaterialDigest: digest,
+        admissionRefDigest: zeroAdmissionRefDigestV2,
+      },
+      preparationRef: zeroPreparationRefV2,
+      custodyRef: zeroCustodyRefV2,
+      providerExecutionAttempt: {} as never,
+      backendExecutionId: 'container-exact-zero-v2',
+      mountReceiptDigest: digest,
+      dispatchReceipt: { ref: digest, digest },
+      releaseReceipt: { ref: digest, digest },
+      providerStartReceipt: zeroCustodyRefV2.providerStartReceipt,
+      projectionFence: digest,
+      releasedAt: '2026-09-01T00:00:01.000Z',
+      providerStartAcceptedAt: '2026-09-01T00:00:01.000Z',
+    };
+    backend.prepareExactDockerCustody.mockResolvedValueOnce({
+      kind: 'exact-docker-custody-prepared' as const,
+      dispatchEnvelope: {} as never,
+      admissionRef: zeroReleasedV2.admissionRef,
+      preparationRef: zeroPreparationRefV2,
+    });
+    backend.dispatchExactDockerCustody.mockResolvedValueOnce(zeroReleasedV2 as never);
+    const validRetry = await executeSpawnTask(
+      { task: zeroWorkTask, taskTimeoutSeconds: 60 },
+      baseDeps(root, {
+        backend,
+        config,
+        exactDockerRegistry: registry,
+        exactTaskProjectionAdmission: {
+          taskIds: [zeroWorkTask.id],
+          existingContentDigests: {},
+        },
+      }),
+    );
+    expect(validRetry).toMatchObject({
+      kind: 'spawned',
+      taskId: zeroWorkTask.id,
+      exactDispatchOutcome: { custodyRef: { identity: zeroIdentityV2 } },
+    });
+    expect(backend.dispatchExactDockerCustody).toHaveBeenCalledTimes(exactDispatchCount + 1);
+
+    const ambiguousTask = makeTask('700-EXACT-AMBIGUOUS', {
+      provider: 'claude',
+      productionWiringApplicability: deriveProductionWiringApplicability({
+        directories: [],
+        filesRead: [],
+        filesWrite: [],
+      }),
+    });
+    const ambiguousIdentity = {
+      ...identity,
+      taskId: ambiguousTask.id,
+      attemptId: 'attempt-exact-ambiguous',
+    };
+    const ambiguousCustodyRef = {
+      ...custodyRef,
+      dispatchRequestId: `dreq-${'f'.repeat(64)}`,
+      identity: ambiguousIdentity,
+    };
+    const ambiguousPreparationRef = {
+      ...preparationRef,
+      dispatchRequestId: ambiguousCustodyRef.dispatchRequestId,
+      privateIdentity: ambiguousIdentity,
+    };
     const ambiguousOutcome = {
       kind: 'ambiguous' as const,
-      admissionRef: zeroWorkOutcome.admissionRef,
-      custodyRef,
+      admissionRef: {
+        ...zeroWorkOutcome.admissionRef,
+        dispatchRequestId: ambiguousCustodyRef.dispatchRequestId,
+        admissionRefDigest: ambiguousCustodyRef.admissionRefDigest,
+      },
+      custodyRef: ambiguousCustodyRef,
       reasonCode: 'MOUNT_RECONCILIATION_REQUIRED' as const,
       reconciliationReceipt: { ref: digest, digest },
       projectionFence: digest,
     };
+    backend.prepareExactDockerCustody.mockResolvedValueOnce({
+      kind: 'exact-docker-custody-prepared' as const,
+      dispatchEnvelope: {} as never,
+      admissionRef: ambiguousOutcome.admissionRef,
+      preparationRef: ambiguousPreparationRef,
+    });
     backend.dispatchExactDockerCustody.mockResolvedValueOnce(ambiguousOutcome as never);
     const ambiguousDisposition = await executeSpawnTask(
       { task: ambiguousTask, taskTimeoutSeconds: 60 },

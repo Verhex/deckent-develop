@@ -13,6 +13,7 @@ import type { BacklogEntry } from '../../src/orchestra/autonomous/backlog-types.
 import type { TaskResult } from '../../src/core/types.js';
 import type { ResolvedConfig } from '../../src/core/config-types.js';
 import type { TaskResultSettlementRefV1 } from '../../src/core/task-result-settlement.js';
+import type { ExactAcceptedTaskResultAuthorityMetadata } from '../../src/orchestra/task-result-authority.js';
 
 const dirs: string[] = [];
 function tmp(): string { const d = mkdtempSync(join(tmpdir(), 'proc-rt-')); dirs.push(d); return d; }
@@ -33,6 +34,35 @@ const doneResult = (taskId: string): TaskResult => ({
   taskId, workerId: 'w', filesChanged: [`f-${taskId}.ts`], linesAdded: 1, linesRemoved: 0,
   testsPassed: true, coverage: 0, selfAssessment: 'DONE', notes: 'ok',
 });
+
+function exactAcceptedAuthorityFor(
+  taskId: string,
+): ExactAcceptedTaskResultAuthorityMetadata {
+  const digest = `sha256:${'a'.repeat(64)}` as const;
+  const identity = Object.freeze({
+    schemaVersion: 2 as const,
+    backend: 'docker' as const,
+    projectRootSha256: 'b'.repeat(64),
+    projectId: 'fixture-project',
+    taskId,
+    attemptId: `attempt-${taskId}`,
+    generation: 1,
+  });
+  return Object.freeze({
+    executionMode: 'normal-docker' as const,
+    identity,
+    admissionReceiptDigest: digest,
+    acceptedResultRef: Object.freeze({
+      schemaVersion: 2 as const,
+      kind: 'task-accepted-result-v2-ref' as const,
+      identity,
+      artifactKey: 'primary',
+      artifactReceiptDigest: digest,
+    }),
+    acceptedResultChainDigest: digest,
+    resultDigest: digest,
+  });
+}
 
 const settlementRef = (taskId: string): TaskResultSettlementRefV1 => ({
   schemaVersion: 1,
@@ -121,6 +151,92 @@ describe('runProcess — sequential execution + envelope', () => {
       600_000,
       { settlementRef: ref },
     );
+  });
+
+  it('consumes an exact accepted result directly without reading the public result projection', async () => {
+    const root = tmp();
+    const acceptedResult = doneResult('t-exact');
+    const exactAcceptedAuthority = exactAcceptedAuthorityFor('t-exact');
+    const waitForResult = vi.fn();
+    const entry = processEntry({ steps: [{ description: 'exact step' }] });
+
+    const res = await runProcess(entry, {
+      projectRoot: root,
+      config: cfg,
+      runTask: vi.fn().mockResolvedValue({
+        taskId: 't-exact',
+        executionMode: 'normal-docker-exact',
+        resultAuthority: {
+          state: 'exact-accepted',
+          result: Object.freeze({
+            ...acceptedResult,
+            exactAcceptedResultAuthority: exactAcceptedAuthority,
+          }),
+          settlementRef: null,
+          rawResultPath: join(root, '.tasks', 'task-t-exact.result'),
+          exactAcceptedAuthority,
+        },
+      }),
+      waitForResult,
+    });
+
+    expect(res.selfAssessment).toBe('DONE');
+    expect(res.filesChanged).toEqual(acceptedResult.filesChanged);
+    expect(waitForResult).not.toHaveBeenCalled();
+  });
+
+  it('rejects a metadata-less exact accepted projection without polling public bytes', async () => {
+    const root = tmp();
+    const waitForResult = vi.fn().mockResolvedValue(doneResult('t-exact-unbound'));
+    const entry = processEntry({ steps: [{ description: 'exact unbound' }] });
+
+    const res = await runProcess(entry, {
+      projectRoot: root,
+      config: cfg,
+      runTask: vi.fn().mockResolvedValue({
+        taskId: 't-exact-unbound',
+        executionMode: 'normal-docker-exact',
+        resultAuthority: {
+          state: 'exact-accepted',
+          result: doneResult('t-exact-unbound'),
+          settlementRef: null,
+          rawResultPath: join(root, '.tasks', 'task-t-exact-unbound.result'),
+        },
+      }),
+      waitForResult,
+    });
+
+    expect(res.selfAssessment).toBe('NO_GO');
+    expect(res.notes).toContain('projection-or-identity-mismatch');
+    expect(waitForResult).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when an exact launch has no accepted-result authority', async () => {
+    const root = tmp();
+    const waitForResult = vi.fn().mockResolvedValue(doneResult('t-exact-hold'));
+    const entry = processEntry({ steps: [{ description: 'exact hold' }] });
+
+    const res = await runProcess(entry, {
+      projectRoot: root,
+      config: cfg,
+      runTask: vi.fn().mockResolvedValue({
+        taskId: 't-exact-hold',
+        executionMode: 'normal-docker-exact',
+        resultAuthority: {
+          state: 'authority-hold',
+          result: null,
+          settlementRef: null,
+          rawResultPath: join(root, '.tasks', 'task-t-exact-hold.result'),
+          holdReason: 'ACCEPTED_RESULT_RECEIPT_MISSING',
+        },
+      }),
+      waitForResult,
+    });
+
+    expect(res.selfAssessment).toBe('NO_GO');
+    expect(res.notes).toContain('EXACT_RESULT_AUTHORITY_HOLD:authority-hold');
+    expect(res.notes).toContain('ACCEPTED_RESULT_RECEIPT_MISSING');
+    expect(waitForResult).not.toHaveBeenCalled();
   });
 });
 

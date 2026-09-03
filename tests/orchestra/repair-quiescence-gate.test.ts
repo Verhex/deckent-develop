@@ -126,18 +126,22 @@ describe('repair quiescence pause gate', () => {
     })).toContain('1 authorized repair decision');
   });
 
-  // Only a never-dispatched admission is drainable, so only it fences here. A
-  // dispatched attempt that never settled cannot progress by draining: fencing
-  // it would strand the run outside the resumable PAUSE path, so it is handed
-  // to the existing lineage/circuit-breaker gates instead.
-  it('does not fence a dispatched attempt that has not settled', () => {
+  // A dispatched repair still owns a provider attempt. RETRO/finalization may
+  // not race it merely because it left the queue: quiescence requires terminal
+  // settlement, not dispatch acknowledgement.
+  it('keeps a dispatched attempt fenced until it settles', () => {
     const projectRoot = root();
     const queueId = admit(projectRoot);
     transitionRepairQueueRecord(projectRoot, queueId, 'dispatched');
 
     expect(resolveRepairQuiescence(projectRoot)).toMatchObject({
-      kind: 'QUIESCENT',
-      snapshot: { pendingAdmittedRepairs: 0, activeAttempts: 1 },
+      kind: 'DRAIN_REQUIRED',
+      reason: 'ADMITTED_REPAIR_QUEUE_NOT_DRAINED',
+      snapshot: {
+        pendingAdmittedRepairs: 0,
+        activeAttempts: 1,
+        authorizedRepairDecisions: 1,
+      },
     });
   });
 

@@ -34,6 +34,32 @@ import { DeckentError } from '../../core/errors.js';
 import { resolveTaskArtifactReadDirs } from '../../core/sprint-archive.js';
 import { readSprintTerminalReceiptSummary } from '../../core/sprint-terminal-publication-status.js';
 import { renderContractHelp } from '../helpers/message-catalog/cli-run.js';
+import type { ExactAcceptedTaskTerminalAuthorityRead } from '../../orchestra/evaluation-audit-trail.js';
+
+type FinalizeTaskResult = TaskResult & {
+  /** Process-local host marker: raw V2 custody bytes require T11 Store authority. */
+  exactCustodyTerminalAuthorityRequired?: true;
+};
+
+export type FinalizeExactTaskTerminalAuthorityRead =
+  | Readonly<{ state: 'legacy' }>
+  | Readonly<{ state: 'exact' }>
+  | ExactAcceptedTaskTerminalAuthorityRead;
+
+export type ReadFinalizeExactTaskTerminalAuthority = (
+  taskId: string,
+) => FinalizeExactTaskTerminalAuthorityRead;
+
+function readFinalizeTaskResult(path: string): FinalizeTaskResult | null {
+  const raw = readJsonSafe<unknown>(path);
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const result = normalizeTaskResultShape(raw as Record<string, unknown>) as FinalizeTaskResult | null;
+  if (!result) return null;
+  if (
+    Object.prototype.hasOwnProperty.call(raw, 'attemptCustody')
+  ) result.exactCustodyTerminalAuthorityRequired = true;
+  return result;
+}
 
 /**
  * Project the task record a surviving `.result` proves must have existed, for
@@ -87,16 +113,19 @@ function recoveredTaskFromResult(result: TaskResult, sprintId: string): Task {
  */
 export function buildSprintFromTasks(root: string, sprintFilter?: string, options: {
   readonly recoverOrphanResults?: boolean;
+  readonly readExactTaskTerminalAuthority?: ReadFinalizeExactTaskTerminalAuthority;
 } = {}): {
   sprintId: string;
   tasks: Task[];
   results: TaskResult[];
   evaluations: Map<string, TaskEvaluation>;
+  exactTerminalAuthorities: ReadonlyMap<string, ExactAcceptedTaskTerminalAuthorityRead>;
 } {
   const tasksDir = join(root, TASKS_DIR);
   const tasks: Task[] = [];
   const results: TaskResult[] = [];
   const evaluations = new Map<string, TaskEvaluation>();
+  const exactTerminalAuthorities = new Map<string, ExactAcceptedTaskTerminalAuthorityRead>();
 
   const readCanonicalTaskArtifact = (dir: string, filename: string): Task | null => {
     try {
@@ -130,7 +159,9 @@ export function buildSprintFromTasks(root: string, sprintFilter?: string, option
   // Without a .tasks/ dir AND without an explicit --sprint filter there is no
   // way to locate the per-sprint archive dir either — nothing to finalize.
   if (!tasksDirExists && !sprintFilter) {
-    return { sprintId: 'sprint-unknown', tasks, results, evaluations };
+    return {
+      sprintId: 'sprint-unknown', tasks, results, evaluations, exactTerminalAuthorities,
+    };
   }
 
   // Read all task JSON files from .tasks/ (priority location)
@@ -174,7 +205,7 @@ export function buildSprintFromTasks(root: string, sprintFilter?: string, option
   if (tasksDirExists) {
     const resultFiles = readdirSync(tasksDir).filter(f => f.startsWith('task-') && f.endsWith('.result'));
     for (const file of resultFiles) {
-      const result = normalizeTaskResultShape(readJsonSafe<TaskResult>(join(tasksDir, file)));
+      const result = readFinalizeTaskResult(join(tasksDir, file));
       if (result && seenTaskIds.has(result.taskId)) {
         results.push(result);
         seenResultIds.add(result.taskId);
@@ -184,7 +215,7 @@ export function buildSprintFromTasks(root: string, sprintFilter?: string, option
   for (const path of archivedFiles) {
       const file = basename(path);
       if (!file.startsWith('task-') || !file.endsWith('.result')) continue;
-      const result = normalizeTaskResultShape(readJsonSafe<TaskResult>(path));
+      const result = readFinalizeTaskResult(path);
       if (result && seenTaskIds.has(result.taskId) && !seenResultIds.has(result.taskId)) {
         results.push(result);
         seenResultIds.add(result.taskId);
@@ -210,7 +241,7 @@ export function buildSprintFromTasks(root: string, sprintFilter?: string, option
     for (const path of recoveryFiles) {
         const file = basename(path);
         if (!file.startsWith(resultPrefix) || !file.endsWith('.result')) continue;
-        const result = normalizeTaskResultShape(readJsonSafe<TaskResult>(path));
+        const result = readFinalizeTaskResult(path);
         if (!result || typeof result.taskId !== 'string') continue;
         if (!result.taskId.startsWith(`${sprintSegment}-`)) continue;
         if (seenTaskIds.has(result.taskId)) continue;
@@ -234,6 +265,28 @@ export function buildSprintFromTasks(root: string, sprintFilter?: string, option
 
   // Evaluate each task
   for (const task of tasks) {
+    const exactAuthority = options.readExactTaskTerminalAuthority?.(task.id);
+    if (exactAuthority && exactAuthority.state !== 'legacy') {
+      const terminalAuthority = exactAuthority.state === 'exact'
+        ? Object.freeze({
+            state: 'hold' as const,
+            reasonCode: 'exact-terminal-reference-required',
+          })
+        : exactAuthority;
+      exactTerminalAuthorities.set(task.id, terminalAuthority);
+      if (terminalAuthority.state !== 'current') {
+        evaluations.set(task.id, TaskEvaluation.DEFERRED);
+        continue;
+      }
+      const publicResultIndex = results.findIndex(result => result.taskId === task.id);
+      if (publicResultIndex >= 0) results[publicResultIndex] = terminalAuthority.projectedResult;
+      else results.push(terminalAuthority.projectedResult);
+      evaluations.set(
+        task.id,
+        terminalAuthority.evaluationReceipt.verdict as TaskEvaluation,
+      );
+      continue;
+    }
     // Review-rejected tasks → NO_GO regardless of result
     if (rejectedTaskIds.has(task.id)) {
       evaluations.set(task.id, TaskEvaluation.NO_GO);
@@ -241,6 +294,10 @@ export function buildSprintFromTasks(root: string, sprintFilter?: string, option
     }
     const result = results.find(r => r.taskId === task.id);
     if (result) {
+      if ((result as FinalizeTaskResult).exactCustodyTerminalAuthorityRequired === true) {
+        evaluations.set(task.id, TaskEvaluation.DEFERRED);
+        continue;
+      }
       if (result.cascadeSkipped === true) {
         evaluations.set(task.id, TaskEvaluation.DEFERRED);
         continue;
@@ -274,7 +331,7 @@ export function buildSprintFromTasks(root: string, sprintFilter?: string, option
     }
   }
 
-  return { sprintId, tasks, results, evaluations };
+  return { sprintId, tasks, results, evaluations, exactTerminalAuthorities };
 }
 
 /** Check if a sprint has already been finalized by checking sprint log */
@@ -427,7 +484,17 @@ export async function proveForceFinalizeCoordinatorRetirement(
   };
 }
 
-export function registerFinalize(program: Command): void {
+export interface FinalizeExactTerminalAuthorityDependencies {
+  readonly readExactTaskTerminalAuthority?: ReadFinalizeExactTaskTerminalAuthority;
+  readonly resolveExactTaskTerminalAuthorityReader?: (
+    projectRoot: string,
+  ) => ReadFinalizeExactTaskTerminalAuthority;
+}
+
+export function registerFinalize(
+  program: Command,
+  exactDependencies: FinalizeExactTerminalAuthorityDependencies = {},
+): void {
   const helpLang = getLanguage(undefined);
   program
     .command('finalize')
@@ -442,10 +509,18 @@ export function registerFinalize(program: Command): void {
       const lang = getLangFromConfig(root);
 
       try {
-        const { sprintId, tasks, results, evaluations } = buildSprintFromTasks(
+        const readExactTaskTerminalAuthority =
+          exactDependencies.readExactTaskTerminalAuthority
+          ?? exactDependencies.resolveExactTaskTerminalAuthorityReader?.(root);
+        const {
+          sprintId, tasks, results, evaluations, exactTerminalAuthorities,
+        } = buildSprintFromTasks(
           root,
           opts.sprint,
-          { recoverOrphanResults: opts.force === true },
+          {
+            recoverOrphanResults: opts.force === true,
+            ...(readExactTaskTerminalAuthority ? { readExactTaskTerminalAuthority } : {}),
+          },
         );
 
         if (tasks.length === 0) {
@@ -560,6 +635,7 @@ export function registerFinalize(program: Command): void {
               flowId: priorTerminal.runId,
               coordinatorGeneration: priorTerminal.coordinatorGeneration,
               resumeTerminalReceipt: priorTerminal,
+              exactTerminalAuthorities,
               onRuleRegen: async (projectRoot: string): Promise<void> => {
                 await regenerateRules(projectRoot);
               },
@@ -579,6 +655,7 @@ export function registerFinalize(program: Command): void {
             coordinatorGeneration: Math.max(1, identity.generation),
             coordinatorRetirementEvidence,
             requireCoordinatorRetirementEvidence: true,
+            exactTerminalAuthorities,
           });
           const metrics = settlement.terminalTruth.logicalMetrics;
           print(getMessage('finalize.aborted', lang, {
@@ -600,6 +677,7 @@ export function registerFinalize(program: Command): void {
           skipDecay: opts.skipDecay,
           skipHooks: opts.skipHooks,
           config,
+          exactTerminalAuthorities,
           onRuleRegen: async (projectRoot: string): Promise<void> => {
             await regenerateRules(projectRoot);
           },

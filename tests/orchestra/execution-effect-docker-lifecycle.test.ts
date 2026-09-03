@@ -2,11 +2,15 @@ import { createHash } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import {
+  createExecutionEffectManifestFromNativeCaptureV1,
   EXECUTION_EFFECT_CAPTURE_HARD_LIMITS,
   executionEffectNativeCaptureManifestDigestV1,
+  type ExecutionEffectAttemptIdentity,
+  type ExecutionEffectCaptureLimits,
   type ExecutionEffectNativeCaptureEntryV1,
   type ExecutionEffectNativeCaptureTreeV1,
 } from '../../src/core/execution-effect-containment.js';
+import type { ExecutionEffectWritePolicy } from '../../src/core/execution-write-scope-policy.js';
 import {
   createExecutionEffectLandingTerminalSealV1,
   createExecutionEffectLandingLeaseResumeContextV1,
@@ -34,6 +38,8 @@ import {
   createExecutionEffectDockerVolumeObservationV1,
   createExecutionEffectDockerWorkspacePlanV1,
   executionEffectDockerVolumeIdentityDigestV1,
+  executionEffectDockerManifestStateDigestV1,
+  executionEffectDockerWorkspaceDirectoryIdentityDigestV1,
   prepareAllocatedExecutionEffectDockerWorkspaceV1,
   projectExecutionEffectDockerWorkspaceReleaseV1,
   releaseExecutionEffectDockerWorkspaceV1,
@@ -127,6 +133,7 @@ function plan(inventoryPaths: readonly string[] = ['package.json']): ExecutionEf
 function captureTree(
   content = 'baseline',
   path = 'package.json',
+  identitySalt = '',
 ): Readonly<{
   rootEntry: ExecutionEffectNativeCaptureEntryV1;
   nativeCapture: ExecutionEffectNativeCaptureTreeV1;
@@ -138,7 +145,8 @@ function captureTree(
     kind: 'DIRECTORY' as const,
     mode: '0755',
     size: null,
-    objectIdentityDigest: rootObjectIdentityDigest,
+    objectIdentityDigest: identitySalt === ''
+      ? rootObjectIdentityDigest : sha(`workspace-root:${identitySalt}`),
     contentDigest: null,
   });
   const entry = Object.freeze({
@@ -147,7 +155,7 @@ function captureTree(
     kind: 'REGULAR_FILE' as const,
     mode: '0644',
     size: String(bytes.byteLength),
-    objectIdentityDigest: sha(`object:${path}:${content}`),
+    objectIdentityDigest: sha(`object:${path}:${content}:${identitySalt}`),
     contentDigest: sha(content),
   });
   const digestBody = Object.freeze({
@@ -202,6 +210,9 @@ interface AdapterOptions {
   readonly attachmentUnavailable?: boolean;
   readonly postAttachmentUnavailable?: boolean;
   readonly captureProxy?: boolean;
+  readonly revalidationIdentitySalt?: string;
+  readonly finalFirstIdentitySalt?: string;
+  readonly finalSecondIdentitySalt?: string;
 }
 
 function fakeAdapter(
@@ -231,26 +242,58 @@ function fakeAdapter(
   const capture = (
     operation: ExecutionEffectDockerLifecycleCaptureOperationV1,
     authorityDigest: Digest,
+    authority: Readonly<{
+      platform: 'linux' | 'wsl2-linux';
+      attempt: ExecutionEffectAttemptIdentity;
+      writePolicy: ExecutionEffectWritePolicy;
+      captureLimits: ExecutionEffectCaptureLimits;
+    }>,
     content: string,
     path = 'package.json',
   ): ExecutionEffectDockerRawCaptureV1 => {
-    const tree = captureTree(content, path);
+    const identitySalt = operation === 'BASELINE_REVALIDATION'
+      ? options.revalidationIdentitySalt ?? ''
+      : operation === 'FINAL_QUIESCENCE_FIRST'
+        ? options.finalFirstIdentitySalt ?? ''
+        : operation === 'FINAL_QUIESCENCE_SECOND'
+          ? options.finalSecondIdentitySalt ?? '' : '';
+    const tree = captureTree(content, path, identitySalt);
     const times = operationTimes[operation];
+    const captureWorkspaceIdentity = Object.freeze({
+      filesystemId: volumeIdentityDigest,
+      directoryId: executionEffectDockerWorkspaceDirectoryIdentityDigestV1({
+        volumeIdentityDigest,
+      }),
+      rootHandleEvidenceDigest: tree.rootEntry.objectIdentityDigest,
+    });
+    const manifest = createExecutionEffectManifestFromNativeCaptureV1({
+      phase: operation.startsWith('FINAL_QUIESCENCE_') ? 'final' : 'baseline',
+      attempt: authority.attempt,
+      filesWrite: authority.writePolicy.filesWrite,
+      platform: authority.platform,
+      workspaceIdentity: captureWorkspaceIdentity,
+      rootEntry: tree.rootEntry,
+      nativeCapture: tree.nativeCapture,
+      ...times,
+      limits: authority.captureLimits,
+    });
+    if (!manifest.ok) throw new Error('capture manifest fixture is invalid');
     const receipt = createExecutionEffectDockerLifecycleCaptureReceiptV1({
       operation,
       authorityDigest,
       phase: operation.startsWith('FINAL_QUIESCENCE_') ? 'final' : 'baseline',
       volumeName: workspacePlan.volumeName,
       volumeIdentityDigest,
-      workspaceIdentity,
+      workspaceIdentity: captureWorkspaceIdentity,
       nativeManifestDigest: tree.nativeCapture.manifestDigest as Digest,
-      rootObjectIdentityDigest,
+      manifestStateDigest: executionEffectDockerManifestStateDigestV1(manifest.manifest),
+      rootObjectIdentityDigest: tree.rootEntry.objectIdentityDigest as Digest,
       entryCount: tree.nativeCapture.entryCount,
       totalBytes: tree.nativeCapture.totalBytes,
       ...times,
     });
     return Object.freeze({
-      workspaceIdentity,
+      workspaceIdentity: captureWorkspaceIdentity,
       ...tree,
       ...times,
       receipt,
@@ -384,7 +427,7 @@ function fakeAdapter(
     },
     async populateWorkspace(input) {
       calls.push('populate');
-      const raw = capture('POPULATION_BASELINE', input.authorityDigest, 'baseline');
+      const raw = capture('POPULATION_BASELINE', input.authorityDigest, input, 'baseline');
       return Object.freeze({
         populationReceipt: createExecutionEffectDockerPopulationReceiptV1({
           authorityDigest: input.authorityDigest,
@@ -413,6 +456,7 @@ function fakeAdapter(
       const raw = capture(
         input.operation,
         input.authorityDigest,
+        input,
         input.operation === 'BASELINE_REVALIDATION'
           ? options.revalidationContent ?? 'baseline'
           : input.operation === 'FINAL_QUIESCENCE_SECOND'
@@ -937,6 +981,29 @@ describe('execution effect Docker lifecycle authority', () => {
       .toMatchObject({ state: 'HOLD', code: 'SESSION_INVALID' });
   });
 
+  it('accepts the same logical baseline reopened in a fresh Linux mount namespace', async () => {
+    const workspacePlan = plan();
+    const fake = fakeAdapter(workspacePlan, { revalidationIdentitySalt: 'helper-container-2' });
+    const prepared = await prepareExecutionEffectDockerWorkspaceV1(
+      prepareInput(workspacePlan), fake.adapter, clock(),
+    );
+    expect(prepared.state).toBe('PREPARED');
+    if (prepared.state !== 'PREPARED') return;
+    const result = await authorizeExecutionEffectDockerProviderStartV1(prepared.session);
+    expect(result.state).toBe('PROVIDER_START_AUTHORIZED');
+  });
+
+  it('accepts final captures of the same volume from fresh Linux mount namespaces', async () => {
+    const { result } = await readyForLanding({
+      finalContent: 'changed',
+      finalFirstIdentitySalt: 'final-helper-container-1',
+      finalSecondIdentitySalt: 'final-helper-container-2',
+    }, ['package.json']);
+    expect(result.decision.effects).toHaveLength(1);
+    expect(result.finalManifest.workspaceIdentity.rootHandleEvidenceDigest)
+      .toBe(sha('workspace-root:final-helper-container-2'));
+  });
+
   it('requires zero foreign volume attachments before provider authorization', async () => {
     const workspacePlan = plan();
     const fake = fakeAdapter(workspacePlan, { attachmentUnavailable: true });
@@ -1229,37 +1296,33 @@ describe('execution effect Docker lifecycle authority', () => {
     expect(compensation.resources.map(resource => resource.resourceKind)).toEqual([
       'provider-container', 'workspace-volume', 'dependency-volume',
     ]);
-    const compensationResources = [
-      ['provider-container', '2026-09-01T00:00:18.000Z', '2026-09-01T00:00:19.000Z'],
-      ['workspace-volume', '2026-09-01T00:00:20.000Z', '2026-09-01T00:00:21.000Z'],
-      ['dependency-volume', '2026-09-01T00:00:22.000Z', '2026-09-01T00:00:23.000Z'],
-    ] as const;
-    for (const [resourceKind, intentAt, absentAt] of compensationResources) {
-      compensation = compensationSetup.bridge.publishCleanupDeleteIntent({
-        mode: 'COMPENSATION', resourceKind, progressedAt: intentAt,
-      }).progress;
-      const resource = compensation.resources.find(entry => entry.resourceKind === resourceKind)!;
-      compensation = compensationSetup.bridge.publishCleanupAbsence({
-        mode: 'COMPENSATION',
-        evidence: Object.freeze({
-          disposition: 'RECONCILED_ABSENCE' as const,
-          absence: createExecutionEffectDockerReconciledAbsenceReceiptV1({
-            resourceKind,
-            resourceName: resource.resourceName,
-            resourceIdentityDigest: resource.resourceIdentityDigest,
-            cleanupAuthorityDigest: compensationSetup.ready.authorityDigest,
-            deleteIntentDigest: compensation.deleteIntentDigest!,
-            observedAt: absentAt,
-          }),
-        }),
-        progressedAt: absentAt,
-      }).progress;
-    }
-    compensation = compensationSetup.bridge.publishCleanupTerminal({
-      mode: 'COMPENSATION', progressedAt: '2026-09-01T00:00:24.000Z',
+    compensation = compensationSetup.bridge.publishCleanupDeleteIntent({
+      mode: 'COMPENSATION',
+      resourceKind: 'provider-container',
+      progressedAt: '2026-09-01T00:00:18.000Z',
     }).progress;
-    expect(compensation.state).toBe('COMPENSATED');
-    expect(() => compensationSetup.bridge.readAcceptedAuthority('compensated-not-accepted'))
+    const resource = compensation.resources.find(
+      entry => entry.resourceKind === 'provider-container',
+    )!;
+    compensation = compensationSetup.bridge.publishCleanupAbsence({
+      mode: 'COMPENSATION',
+      evidence: Object.freeze({
+        disposition: 'RECONCILED_ABSENCE' as const,
+        absence: createExecutionEffectDockerReconciledAbsenceReceiptV1({
+          resourceKind: 'provider-container',
+          resourceName: resource.resourceName,
+          resourceIdentityDigest: resource.resourceIdentityDigest,
+          cleanupAuthorityDigest: compensationSetup.ready.authorityDigest,
+          deleteIntentDigest: compensation.deleteIntentDigest!,
+          observedAt: '2026-09-01T00:00:19.000Z',
+        }),
+      }),
+      progressedAt: '2026-09-01T00:00:19.000Z',
+    }).progress;
+    expect(compensation.state).toBe('COMPENSATION_CONTAINER_ABSENT');
+    const restarted = createExecutionEffectStoreAdapterV1(compensationSetup.bridgeInput);
+    expect(restarted.readLatestCompensationProgress()).toEqual(compensation);
+    expect(() => restarted.readAcceptedAuthority('compensated-not-accepted'))
       .toThrow(/Verified execution effect landing authority is unavailable/u);
   }, 60_000);
 

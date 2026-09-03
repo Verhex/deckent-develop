@@ -73,7 +73,7 @@ import {
 } from '../../src/core/task-result-settlement.js';
 import { TEST_DOCKER_EXECUTION_OPTIONS } from '../helpers/budgeted-docker-execution-fixture.js';
 import { resolveReasoningEffort } from '../../src/core/reasoning-effort.js';
-import { print } from '../../src/cli/helpers/output.js';
+import { print, printError } from '../../src/cli/helpers/output.js';
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -387,6 +387,77 @@ describe('registerSpawn — task-json modelEffort path', () => {
     expect(backendSpawn).not.toHaveBeenCalled();
     expect(vi.mocked(print)).toHaveBeenCalledWith(
       expect.stringContaining('zero:manual-spawn-hold'),
+    );
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('renders exact zero-work and ambiguous dispatch as distinct evidence-bearing outcomes', async () => {
+    writeTaskJson('268-904');
+    state.executeTaskIngress.mockResolvedValueOnce({
+      disposition: {
+        kind: 'not-dispatched',
+        taskId: '268-904',
+        reasonCode: 'EXACT_PROVIDER_START_NOT_PROVEN',
+        executionMode: 'normal-docker-exact',
+        executionBackend: 'docker',
+      },
+      executionMode: 'normal-docker-exact',
+      backend: 'docker',
+      provider: 'claude',
+      invocation: {
+        receiptRef: {
+          schemaVersion: 1,
+          invocationId: 'zero:manual-spawn',
+          tenantId: 'local',
+          projectId: 'test',
+        },
+        executionBackend: 'docker',
+        transport: 'cli',
+        state: 'not-dispatched',
+        reasonCode: 'EXACT_PROVIDER_START_NOT_PROVEN',
+        authorityEvidenceRefs: ['zero-work:fixture', `sha256:${'c'.repeat(64)}`],
+      },
+    });
+
+    await runCommand(['spawn', '268-904']);
+
+    expect(vi.mocked(printError)).toHaveBeenCalledWith(expect.stringContaining('did not start'));
+    expect(vi.mocked(printError)).toHaveBeenCalledWith(expect.stringContaining('zero-work:fixture'));
+
+    writeTaskJson('268-905');
+    state.executeTaskIngress.mockResolvedValueOnce({
+      disposition: {
+        kind: 'ambiguous',
+        taskId: '268-905',
+        reasonCode: 'EXACT_DISPATCH_OUTCOME_AMBIGUOUS',
+        executionMode: 'normal-docker-exact',
+        executionBackend: 'docker',
+      },
+      executionMode: 'normal-docker-exact',
+      backend: 'docker',
+      provider: 'claude',
+      invocation: {
+        receiptRef: {
+          schemaVersion: 1,
+          invocationId: 'reconcile:manual-spawn',
+          tenantId: 'local',
+          projectId: 'test',
+        },
+        executionBackend: 'docker',
+        transport: 'cli',
+        state: 'reconciliation-required',
+        reasonCode: 'EXACT_DISPATCH_OUTCOME_AMBIGUOUS',
+        authorityEvidenceRefs: ['reconciliation-receipt:fixture', `sha256:${'d'.repeat(64)}`],
+      },
+    });
+
+    await runCommand(['spawn', '268-905']);
+
+    expect(vi.mocked(printError)).toHaveBeenCalledWith(
+      expect.stringContaining('requires reconciliation'),
+    );
+    expect(vi.mocked(printError)).toHaveBeenCalledWith(
+      expect.stringContaining('reconciliation-receipt:fixture'),
     );
     expect(process.exitCode).toBe(1);
   });

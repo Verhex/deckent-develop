@@ -28,7 +28,11 @@ import {
 } from './backlog-eval.js';
 import type { FlowReporter } from './flow-reporter.js';
 import { getCurrentSprintId } from '../../core/event-stream.js';
-import { runProcess } from '../process-runtime.js';
+import {
+  inspectTaskLaunchResultAuthority,
+  runProcess,
+  type TaskExecutionLaunchResult,
+} from '../process-runtime.js';
 import { enrichResultTokenUsage } from '../result-collector.js';
 import type { Task } from '../../core/task-types.js';
 import { evaluatePolicy } from '../../core/policy-engine.js';
@@ -44,6 +48,7 @@ import type {
   CanonicalExactSprintExecutor,
 } from '../exact-plan-start-service.js';
 import type { ExactPlanReferenceV1 } from '../../core/run-flow-contract.js';
+import { readTaskIngressErrorAuthority } from '../task-mode-runner.js';
 
 /** Action id the backlog-trigger sets on every entry-driven trigger. */
 export const AUTONOMOUS_EXECUTE_ACTION = 'autonomous.execute';
@@ -90,7 +95,7 @@ export interface ExecuteDispatcherDeps {
   runTask: (
     ctx: { projectRoot: string; description: string; model?: string; provider?: string; scope?: { directories: string[] } },
     config: ResolvedConfig,
-  ) => Promise<{ taskId?: string; settlementRef?: TaskResultSettlementRefV1 } | null | undefined>;
+  ) => Promise<TaskExecutionLaunchResult | null | undefined>;
   /** Canonical plan-authoring + exact-start authority (kind=sprint). A fresh
    *  lifecycle function is intentionally not accepted at this boundary. */
   executeSprint: CanonicalExactSprintExecutor['execute'];
@@ -626,35 +631,51 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
             // Read back the just-written spawn event's hmac — used as causationId for the
             // result event so buildCausalChain can reconstruct the spawn→result chain.
             const spawnEventHmac = readLastAuditHmac(deps.projectRoot, auditSprintId);
-            // Gap F: wait for real done/failed (not just launched)
-            const resultAuthority = r.settlementRef
+            // Exact Docker carries the host-private accepted result with the launch.
+            // It must never fall back to the worker-writable public `.result` path.
+            // Legacy/non-Docker and V1 settlement consumers retain their existing wait.
+            const launchAuthority = inspectTaskLaunchResultAuthority(r);
+            const legacySettlementAuthority = r.settlementRef
               ? { settlementRef: r.settlementRef }
               : undefined;
-            let result = resultAuthority
-              ? await deps.waitForResult(deps.projectRoot, taskId, timeoutMs, resultAuthority)
-              : await deps.waitForResult(deps.projectRoot, taskId, timeoutMs);
-            if (!result) {
-              // false-FAILURE fix: a real worker can write its .result seconds after the
-              // window closes — observed 9s past a 600s timeout (2026-06-17 dogfood).
-              // Grace re-poll once before failing (disk-verify outranks the timeout).
-              result = resultAuthority
-                ? await deps.waitForResult(deps.projectRoot, taskId, GRACE_RESULT_MS, resultAuthority)
-                : await deps.waitForResult(deps.projectRoot, taskId, GRACE_RESULT_MS);
+            let result: TaskResult | null = launchAuthority.state === 'exact-accepted'
+              ? launchAuthority.result
+              : null;
+            const resultAuthorityHold = launchAuthority.state === 'exact-hold'
+              ? launchAuthority.holdReason
+              : undefined;
+            if (launchAuthority.state === 'legacy') {
+              result = legacySettlementAuthority
+                ? await deps.waitForResult(deps.projectRoot, taskId, timeoutMs, legacySettlementAuthority)
+                : await deps.waitForResult(deps.projectRoot, taskId, timeoutMs);
+              if (!result) {
+                // false-FAILURE fix: a real legacy worker can write its .result seconds
+                // after the window closes. Exact Docker does not use this public-file poll.
+                result = legacySettlementAuthority
+                  ? await deps.waitForResult(deps.projectRoot, taskId, GRACE_RESULT_MS, legacySettlementAuthority)
+                  : await deps.waitForResult(deps.projectRoot, taskId, GRACE_RESULT_MS);
+              }
             }
 
-            if (result) {
+            if (resultAuthorityHold) {
+              ok = false;
+              reason = resultAuthorityHold;
+            } else if (result) {
               // TOK-AUT: mirror the sprint path (result-collector.ts:632) — fill tokenUsage
               // from measured CLI log tokens when available; honest-zero when not (WP-4).
               // Best-effort: token enrichment must NEVER fail the task — a throw here was
               // caught by the dispatch try/catch and flipped a completed task to 'failed'
               // (Sprint 290 regression, found via process-controller.test.ts reversible-scope).
-              try {
-                const taskStub: Task | undefined = (entry.model || entry.provider)
-                  ? { id: result.taskId ?? entry.id, provider: entry.provider, model: entry.model as Task['model'] } as unknown as Task
-                  : undefined;
-                enrichResultTokenUsage(result, taskStub, deps.projectRoot);
-              } catch (e) {
-                console.warn(`[execute-dispatcher] token enrichment failed (non-fatal): ${e instanceof Error ? e.message : String(e)}`);
+              // Exact accepted bytes are digest-bound authority and are never mutated.
+              if (launchAuthority.state === 'legacy') {
+                try {
+                  const taskStub: Task | undefined = (entry.model || entry.provider)
+                    ? { id: result.taskId ?? entry.id, provider: entry.provider, model: entry.model as Task['model'] } as unknown as Task
+                    : undefined;
+                  enrichResultTokenUsage(result, taskStub, deps.projectRoot);
+                } catch (e) {
+                  console.warn(`[execute-dispatcher] token enrichment failed (non-fatal): ${e instanceof Error ? e.message : String(e)}`);
+                }
               }
               // CORE-UNIFORMITY: a finished autonomous task passes through the SAME
               // Brain-Eval + Auditor + Cross-Verify sprint mode applies (mode-independent
@@ -698,7 +719,9 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
               };
               // Brain-assessment writeback: attach the orchestrator's verdict to the worker
               // .result alongside the worker's selfAssessment (traceability + AI-operator data).
-              writeBrainAssessmentToResult(deps.projectRoot, result.taskId, richResult);
+              if (launchAuthority.state === 'legacy') {
+                writeBrainAssessmentToResult(deps.projectRoot, result.taskId, richResult);
+              }
 
               // ENT-3: write a result audit event with causationId = spawn event's hmac so
               // buildCausalChain can reconstruct the spawn→result causal link (A→B pattern).
@@ -740,13 +763,77 @@ export function makeExecuteDispatcher(deps: ExecuteDispatcherDeps): ActionHandle
 
         return ok ? { outcome: 'success' } : { outcome: 'failure', error: reason };
       } catch (err: unknown) {
-        const reason = err instanceof Error ? err.message : String(err);
+        const ingressAuthority = readTaskIngressErrorAuthority(err);
+        const invocation = ingressAuthority?.invocation;
+        const reconciliationRequired = invocation?.state === 'reconciliation-required'
+          || invocation?.state === 'dispatch-started';
+        const authorityEvidenceRefs = invocation
+          ? Array.from(new Set([
+              ...(invocation.authorityEvidenceRefs ?? []),
+              ...(invocation.executionEvidenceRef ? [invocation.executionEvidenceRef] : []),
+            ]))
+          : [];
+        const reason = ingressAuthority && invocation
+          ? `${reconciliationRequired ? 'TASK_INGRESS_RECONCILIATION_REQUIRED' : 'TASK_INGRESS_NOT_DISPATCHED'}:`
+            + `${ingressAuthority.reasonCode}:receipt=${invocation.receiptRef.invocationId}`
+            + `${authorityEvidenceRefs.length > 0 ? `:evidence=${authorityEvidenceRefs.join(',')}` : ''}`
+          : err instanceof Error ? err.message : String(err);
         // Gap B — error path writeback
+        let writebackFailure: unknown;
         try {
           const blErr: BacklogFile = loadBacklog(deps.backlogPath);
-          updateStatus(deps.backlogPath, blErr, entry.id, 'failed', { ok: false, reason });
-        } catch {
-          // Never let the writeback failure mask the original error
+          updateStatus(
+            deps.backlogPath,
+            blErr,
+            entry.id,
+            reconciliationRequired ? 'parked' : 'failed',
+            {
+              ok: false,
+              reason,
+              ...(ingressAuthority && invocation
+                ? {
+                    taskIngressDisposition: {
+                      schemaVersion: 1,
+                      state: reconciliationRequired
+                        ? 'reconciliation-required' as const
+                        : 'not-dispatched' as const,
+                      reasonCode: ingressAuthority.reasonCode,
+                      receiptRef: invocation.receiptRef,
+                      executionBackend: invocation.executionBackend,
+                      transport: invocation.transport,
+                      ...(invocation.executionMode ? { executionMode: invocation.executionMode } : {}),
+                      ...(invocation.executionEvidenceRef
+                        ? { executionEvidenceRef: invocation.executionEvidenceRef }
+                        : {}),
+                      authorityEvidenceRefs,
+                    },
+                  }
+                : {}),
+            },
+          );
+        } catch (writeError) {
+          writebackFailure = writeError;
+        }
+        if (ingressAuthority && invocation && writebackFailure) {
+          // The source receipt is still known, but the autonomous durable
+          // projection is not.  Do not claim parked/failed and do not run
+          // terminal cleanup; surface a typed HOLD that preserves the receipt.
+          const durabilityReason = 'AUTONOMOUS_TASK_INGRESS_DISPOSITION_DURABILITY_HOLD:'
+            + `${ingressAuthority.reasonCode}:receipt=${invocation.receiptRef.invocationId}`
+            + `${authorityEvidenceRefs.length > 0 ? `:evidence=${authorityEvidenceRefs.join(',')}` : ''}`;
+          console.warn(
+            `[execute-dispatcher] ${durabilityReason}: ${
+              writebackFailure instanceof Error ? writebackFailure.message : String(writebackFailure)
+            }`,
+          );
+          return { outcome: 'failure', error: durabilityReason };
+        }
+        if (reconciliationRequired) {
+          // A reconciliation HOLD is non-terminal.  Do not run terminal
+          // cleanup/decay: attempt evidence must remain available to the
+          // recovery authority that will classify the uncertain dispatch.
+          deps.flow?.step('parked', entry.id, reason);
+          return { outcome: 'failure', error: reason };
         }
         // Post-item lifecycle still runs on the error path — a crashed item can leak
         // task-run-* / _*.pid artifacts too. Idempotent + fail-safe.

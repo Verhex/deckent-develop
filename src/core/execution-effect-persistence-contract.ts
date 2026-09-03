@@ -46,6 +46,31 @@ export function executionEffectPersistenceRawDigest(
   return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
 }
 
+/**
+ * Restart-stable authority for one Docker workspace root.
+ *
+ * `rootHandleEvidenceDigest` proves the exact descriptor used by an individual
+ * native capture. It is deliberately excluded here because helper containers
+ * run in distinct mount namespaces and therefore produce distinct local handle
+ * evidence for the same daemon-owned volume directory.
+ */
+export function executionEffectWorkspaceAuthorityDigestV1(
+  workspaceIdentity: ExecutionEffectManifest['workspaceIdentity'],
+): ExecutionEffectPersistenceDigest {
+  const record = exact(workspaceIdentity, [
+    'filesystemId', 'directoryId', 'rootHandleEvidenceDigest',
+  ]);
+  if (record === null || typeof record.filesystemId !== 'string'
+    || record.filesystemId.length === 0 || typeof record.directoryId !== 'string'
+    || record.directoryId.length === 0 || !isDigest(record.rootHandleEvidenceDigest)) {
+    throw new TypeError('Invalid execution effect workspace authority');
+  }
+  return digest('execution-effect-workspace-authority-v1', Object.freeze({
+    filesystemId: record.filesystemId,
+    directoryId: record.directoryId,
+  }));
+}
+
 export interface ExecutionEffectLandingIntentDigestInputV1 {
   readonly attemptDigest: ExecutionEffectPersistenceDigest;
   readonly baselineManifestDigest: ExecutionEffectPersistenceDigest;
@@ -2878,7 +2903,8 @@ export function verifyExecutionEffectPersistenceBundleV1(input: Readonly<{
     || baseline.attemptDigest !== workspace.attemptDigest || final.attemptDigest !== workspace.attemptDigest
     || baseline.policy.digest !== workspace.writePolicyDigest || final.policy.digest !== workspace.writePolicyDigest
     || canonicalJson(baseline.workspaceIdentity) !== canonicalJson(workspace.workspaceIdentity)
-    || canonicalJson(final.workspaceIdentity) !== canonicalJson(workspace.workspaceIdentity)) return null;
+    || executionEffectWorkspaceAuthorityDigestV1(final.workspaceIdentity)
+      !== executionEffectWorkspaceAuthorityDigestV1(workspace.workspaceIdentity)) return null;
   const decision = evaluateExecutionEffectContainment({
     baseline: { ok: true, manifest: baseline },
     final: { ok: true, manifest: final },
@@ -3042,7 +3068,8 @@ export function verifyExecutionEffectPersistenceBundleV1(input: Readonly<{
       if (!entry || entry.kind !== 'regular-file'
         || entry.size !== operation.stagedSource.byteLength
         || entry.contentDigest !== operation.stagedSource.contentDigest
-        || operation.stagedSource.workspaceIdentityDigest !== workspace.workspaceIdentityDigest
+        || operation.stagedSource.workspaceIdentityDigest
+          !== executionEffectWorkspaceAuthorityDigestV1(workspace.workspaceIdentity)
         || operation.stagedSource.attemptDigest !== workspace.attemptDigest
         || operation.stagedSource.admissionReceiptDigest !== workspace.admissionReceiptDigest
         || operation.stagedSource.custodyPolicyDigest !== workspace.custodyPolicyDigest

@@ -18,6 +18,7 @@ import {
   PRODUCTION_WIRING_EVIDENCE_VERSION,
   createGoNoGoCriterionItem,
   createProductionWiringPlanEvidence,
+  PRODUCTION_WIRING_PLAN_EVIDENCE_V2_VERSION,
 } from '../core/task-types.js';
 import type { GoNoGoCriterionItem } from '../core/task-types.js';
 import {
@@ -1956,6 +1957,32 @@ function formatWiringEvidence(evidence: ProductionWiringEvidence): string {
 
 /** Render the exact producer→consumer→ingress→enablement→proof identity chain. */
 function formatWiringChain(contract: ProductionWiringContract): string {
+  if (contract.version === 2) {
+    const lines: string[] = [
+      `- Producer: \`${contract.producer.producerId}\``,
+      `- Canonical consumer: \`${contract.canonicalConsumer.consumerId}\` (${contract.canonicalConsumer.relationship})`,
+    ];
+    const ingresses = contract.affectedIngresses.slice(0, PRODUCTION_WIRING_MAX_INGRESSES);
+    for (const ingress of ingresses) {
+      lines.push(`- Affected ingress: \`${ingress.ingressId}\` (${ingress.kind})`);
+    }
+    const omittedIngresses = contract.affectedIngresses.length - ingresses.length;
+    if (omittedIngresses > 0) lines.push(`- (+${omittedIngresses} further affected ingress(es) bound by the contract digest above but not reproduced here — they are still in scope.)`);
+    lines.push(`- Enablement authority: \`${contract.enablementAuthority.authorityId}\` (${contract.enablementAuthority.mechanism})`);
+    const proofTargets = contract.proofTargets.slice(0, PRODUCTION_WIRING_MAX_PROOF_TARGETS);
+    for (const target of proofTargets) {
+      lines.push(`- Proof target: \`${target.proofTargetId}\` (${target.kind})`);
+    }
+    const omittedTargets = contract.proofTargets.length - proofTargets.length;
+    if (omittedTargets > 0) lines.push(`- (+${omittedTargets} further proof target(s) bound by the contract digest above but not reproduced here — they are still in scope.)`);
+    const matrix = contract.hostProofProgram.platforms
+      .map(platform => platform.state === 'supported'
+        ? `${platform.platform}:supported/${platform.runnerAdapterId}`
+        : `${platform.platform}:unsupported/${platform.reasonCode}`)
+      .join(', ');
+    lines.push(`- Host proof program: sha256:${contract.hostProofProgram.programDigest} (${matrix})`);
+    return lines.join('\n');
+  }
   const lines: string[] = [
     `- Producer: \`${contract.producer.producerId}\` ${formatWiringEvidence(contract.producer.evidence)}`,
     `- Canonical consumer: \`${contract.canonicalConsumer.consumerId}\` (${contract.canonicalConsumer.relationship}) ${formatWiringEvidence(contract.canonicalConsumer.evidence)}`,
@@ -2008,10 +2035,24 @@ export function buildProductionWiringAuthorityBlock(
   if (!evidence) return '';
 
   const boundDigest = evidence.contractDigest;
-  const rederived = createProductionWiringPlanEvidence(evidence.contract).contractDigest;
-  if (evidence.version !== PRODUCTION_WIRING_EVIDENCE_VERSION || rederived !== boundDigest) {
-    const reason = evidence.version !== PRODUCTION_WIRING_EVIDENCE_VERSION
-      ? `unsupported-evidence-version (bound version ${String(evidence.version)}, supported ${PRODUCTION_WIRING_EVIDENCE_VERSION})`
+  let rederived: string | null = null;
+  try {
+    const rederivedAuthority = evidence.contract.version === 2
+      ? createProductionWiringPlanEvidence(evidence.contract)
+      : createProductionWiringPlanEvidence(evidence.contract);
+    rederived = rederivedAuthority.contractDigest;
+  } catch {
+    rederived = null;
+  }
+  const supportedVersion = evidence.version === PRODUCTION_WIRING_EVIDENCE_VERSION
+    || evidence.version === PRODUCTION_WIRING_PLAN_EVIDENCE_V2_VERSION;
+  const programDigestMatches = evidence.version !== PRODUCTION_WIRING_PLAN_EVIDENCE_V2_VERSION
+    || (evidence.contract.version === 2
+      && evidence.hostProofProgramDigest === evidence.contract.hostProofProgram.programDigest);
+  if (!supportedVersion || evidence.version !== evidence.contract.version
+    || rederived !== boundDigest || !programDigestMatches) {
+    const reason = !supportedVersion || evidence.version !== evidence.contract.version
+      ? `unsupported-evidence-version (bound version ${String(evidence.version)})`
       : 'contract-digest-mismatch';
     return `${PRODUCTION_WIRING_UNWIRED_HEADING}
 Bound digest: sha256:${boundDigest} · re-derived digest: sha256:${rederived}

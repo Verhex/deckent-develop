@@ -215,8 +215,11 @@ export function readJobState(projectRoot: string, jobId: string): JobState | nul
 
 /**
  * Build TaskSummary array from sprint tasks + result files on disk.
- * Notes are truncated to 200 characters. Falls back gracefully when result
- * files are missing (e.g., after cleanup).
+ * Public worker-writable result files are observational only: they may provide
+ * bounded notes but can never provide a host evaluation decision.  Until a
+ * host-private settlement authority is supplied to this projection, the
+ * summary remains UNKNOWN rather than manufacturing terminal truth.  Falls
+ * back gracefully when result files are missing (e.g., after cleanup).
  */
 export function buildTaskSummaries(
   projectRoot: string,
@@ -224,19 +227,13 @@ export function buildTaskSummaries(
 ): TaskSummary[] {
   return tasks.map(task => {
     const resultPath = join(projectRoot, TASKS_DIR, `task-${task.id}.result`);
-    let evaluation = 'UNKNOWN';
+    const evaluation = 'UNKNOWN';
     let notes = '';
     if (existsSync(resultPath)) {
       try {
         const result = JSON.parse(readFileSync(resultPath, 'utf-8')) as {
-          evaluationDecision?: unknown;
           notes?: unknown;
         };
-        if (
-          result.evaluationDecision === 'DONE'
-          || result.evaluationDecision === 'GO_WITH_TECH_DEBT'
-          || result.evaluationDecision === 'NO_GO'
-        ) evaluation = result.evaluationDecision;
         notes = typeof result.notes === 'string' ? result.notes.substring(0, 200) : '';
       } catch { /* skip malformed result file */ }
     }

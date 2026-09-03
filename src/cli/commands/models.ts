@@ -184,8 +184,13 @@ export function registerModels(program: Command): void {
   // the owner ALLOWS. First-class surface so model/provider management never
   // requires editing a file (dual-lens: the same store governs dogfood runs).
   // A model with NO record is active, so an untouched project is unchanged.
-  function withStore<T>(fn: (store: ModelActivationStore) => T): T {
-    const store = new ModelActivationStore(resolveProjectRoot());
+  function withStore<T>(
+    fn: (store: ModelActivationStore) => T,
+    options: { readOnly?: boolean } = {},
+  ): T {
+    const store = new ModelActivationStore(resolveProjectRoot(), {
+      readOnly: options.readOnly === true,
+    });
     try {
       return fn(store);
     } finally {
@@ -295,7 +300,7 @@ export function registerModels(program: Command): void {
     .action(() => {
       try {
         const lang = outputLang();
-        const records = withStore((store) => store.list());
+        const records = withStore((store) => store.list(), { readOnly: true });
         if (records.length === 0) {
           print(`\n  ${out('no_activation', lang)}\n`);
           return;
@@ -329,7 +334,10 @@ export function registerModels(program: Command): void {
       try {
         const lang = outputLang();
         if (!provider) {
-          const policies = withStore((store) => store.listProviderPolicies());
+          const policies = withStore(
+            (store) => store.listProviderPolicies(),
+            { readOnly: true },
+          );
           print(`\n  ${theme.bold(out('policy_header', lang))}`);
           print(`  ${theme.muted(getMessage('model_policy.default_not_ceiling', lang))}\n`);
           if (policies.length === 0) {
@@ -344,7 +352,26 @@ export function registerModels(program: Command): void {
           print('');
           return;
         }
-        if (!mode || !PROVIDER_POLICY_MODES.includes(mode as ProviderPolicyMode)) {
+        if (!mode) {
+          const policy = withStore(
+            (store) => ({
+              mode: store.getProviderPolicy(provider),
+              record: store.listProviderPolicies().find((entry) => entry.provider === provider),
+            }),
+            { readOnly: true },
+          );
+          const badge = policy.mode === 'explicit-active'
+            ? theme.info(policy.mode)
+            : theme.success(policy.mode);
+          print(`\n  ${theme.bold(out('policy_header', lang))}`);
+          print(`  ${theme.muted(getMessage('model_policy.default_not_ceiling', lang))}\n`);
+          const provenance = policy.record
+            ? theme.muted(`(${policy.record.actor}, ${policy.record.updatedAt})`)
+            : '';
+          print(`  ${badge}  ${provider}${provenance ? `  ${provenance}` : ''}\n`);
+          return;
+        }
+        if (!PROVIDER_POLICY_MODES.includes(mode as ProviderPolicyMode)) {
           printError(new Error(out('policy_mode_invalid', lang, { modes: PROVIDER_POLICY_MODES.join(', ') })));
           process.exitCode = 1;
           return;

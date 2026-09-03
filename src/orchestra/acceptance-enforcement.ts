@@ -21,9 +21,21 @@
 //   ACCEPT — verdict untouched.
 // HOLD projections never reach this layer (DecidableVerdict typing).
 
-import type { Task, TaskResult } from '../core/types.js';
+import { createHash } from 'node:crypto';
+
+import type { Task, TaskResult as LegacyTaskResult } from '../core/types.js';
 import type { EvaluationResult } from '../core/task-types.js';
 import type { ResolvedConfig } from '../core/config-types.js';
+import {
+  canonicalTaskAttemptCustodyJson,
+  type CanonicalJsonBounds,
+  type Sha256Digest,
+} from '../core/task-attempt-custody-store.js';
+import {
+  taskResultV2Digest,
+  validateProductionTaskResultV2,
+  type TaskResultV2,
+} from '../core/task-result-schema.js';
 import {
   normalizeAcceptanceOverride,
   resolveAcceptance,
@@ -44,6 +56,8 @@ import {
   parseAcceptanceConfirmationLineage,
   type AcceptanceConfirmationLineage,
 } from '../core/acceptance-confirmation-contract.js';
+import type { ExactAcceptedTaskResultAuthorityMetadata } from './task-result-authority.js';
+import type { ExactTaskEvaluationPolicyAuthorityV2 } from './exact-evaluation-policy-authority.js';
 
 export interface AcceptanceRouteAuthority {
   readonly tenantId: string;
@@ -78,6 +92,48 @@ export interface AcceptanceEnforcementResult {
 }
 
 type AcceptanceConfig = Pick<ResolvedConfig, 'acceptance_matrix' | 'acceptance_enforcement'>;
+type AcceptanceResultInput = LegacyTaskResult | TaskResultV2;
+
+export type ExactAcceptanceEnforcementHoldReason =
+  | 'invalid-exact-result'
+  | 'task-identity-mismatch'
+  | 'attempt-identity-mismatch'
+  | 'admission-mismatch'
+  | 'result-digest-mismatch'
+  | 'evaluation-policy-mismatch'
+  | 'route-authority-unavailable';
+
+export type ExactAcceptanceEnforcementResult =
+  | {
+      readonly state: 'applied';
+      readonly enforcement: AcceptanceEnforcementResult;
+    }
+  | {
+      readonly state: 'hold';
+      readonly reasonCode: ExactAcceptanceEnforcementHoldReason;
+    };
+
+/** Host-revalidated projection of the immutable exact Docker dispatch snapshot. */
+export interface ExactAcceptanceTaskAuthority {
+  readonly task: Task;
+  readonly taskSnapshotSha256: Sha256Digest;
+  readonly dispatchTaskMaterialDigest: Sha256Digest;
+  readonly sprintId: string;
+  readonly evaluationPolicy: ExactTaskEvaluationPolicyAuthorityV2;
+}
+
+function sameExactIdentity(
+  left: ExactAcceptedTaskResultAuthorityMetadata['identity'],
+  right: ExactAcceptedTaskResultAuthorityMetadata['identity'],
+): boolean {
+  return left.schemaVersion === right.schemaVersion
+    && left.backend === right.backend
+    && left.projectRootSha256 === right.projectRootSha256
+    && left.projectId === right.projectId
+    && left.taskId === right.taskId
+    && left.attemptId === right.attemptId
+    && left.generation === right.generation;
+}
 
 /**
  * Resolve and (in enforce mode) apply the acceptance policy for one
@@ -87,10 +143,121 @@ type AcceptanceConfig = Pick<ResolvedConfig, 'acceptance_matrix' | 'acceptance_e
 export function applyAcceptanceEnforcement(
   evaluation: EvaluationResult,
   task: Task,
-  result: TaskResult,
+  result: LegacyTaskResult,
   sprintId: string,
   config?: AcceptanceConfig,
   routeAuthority?: AcceptanceRouteAuthority,
+): AcceptanceEnforcementResult {
+  return applyAcceptanceEnforcementWithAttempt(
+    evaluation,
+    task,
+    result,
+    sprintId,
+    config,
+    routeAuthority,
+    undefined,
+  );
+}
+
+/**
+ * Exact normal-Docker acceptance boundary. The accepted-result digest and full
+ * attempt identity are revalidated before any matrix decision can become a T11
+ * receipt input. Public/worker attempt fields cannot mint this authority.
+ */
+export function applyExactAcceptanceEnforcement(input: {
+  readonly evaluation: EvaluationResult;
+  readonly taskAuthority: ExactAcceptanceTaskAuthority;
+  readonly result: TaskResultV2;
+  readonly acceptedAuthority: ExactAcceptedTaskResultAuthorityMetadata;
+  readonly jsonBounds: CanonicalJsonBounds;
+}): ExactAcceptanceEnforcementResult {
+  const validated = validateProductionTaskResultV2(input.result, input.jsonBounds);
+  if (!validated.ok) return { state: 'hold', reasonCode: 'invalid-exact-result' };
+  const identity = validated.value.attemptCustody.identity;
+  let observedTaskDigest: Sha256Digest;
+  try {
+    observedTaskDigest = `sha256:${createHash('sha256')
+      .update(canonicalTaskAttemptCustodyJson(input.taskAuthority.task, input.jsonBounds))
+      .digest('hex')}`;
+  } catch {
+    return { state: 'hold', reasonCode: 'task-identity-mismatch' };
+  }
+  if (
+    input.taskAuthority.task.id !== validated.value.taskId
+    || input.acceptedAuthority.identity.taskId !== validated.value.taskId
+    || (validated.value.sprintId !== undefined
+      && validated.value.sprintId !== input.taskAuthority.sprintId)
+    || observedTaskDigest !== input.taskAuthority.dispatchTaskMaterialDigest
+  ) return { state: 'hold', reasonCode: 'task-identity-mismatch' };
+  if (
+    !sameExactIdentity(identity, input.acceptedAuthority.identity)
+    || !sameExactIdentity(
+      input.acceptedAuthority.acceptedResultRef.identity,
+      input.acceptedAuthority.identity,
+    )
+  ) return { state: 'hold', reasonCode: 'attempt-identity-mismatch' };
+  if (
+    validated.value.attemptCustody.admissionReceiptDigest
+      !== input.acceptedAuthority.admissionReceiptDigest
+  ) return { state: 'hold', reasonCode: 'admission-mismatch' };
+  if (taskResultV2Digest(validated.value, input.jsonBounds) !== input.acceptedAuthority.resultDigest) {
+    return { state: 'hold', reasonCode: 'result-digest-mismatch' };
+  }
+  const kind = resolveCanonicalTaskKind(input.taskAuthority.task);
+  const evaluationPolicy = input.taskAuthority.evaluationPolicy;
+  if (
+    evaluationPolicy.taskId !== input.taskAuthority.task.id
+    || evaluationPolicy.sprintId !== input.taskAuthority.sprintId
+    || evaluationPolicy.dispatchTaskMaterialDigest
+      !== input.taskAuthority.dispatchTaskMaterialDigest
+    || evaluationPolicy.taskKind !== kind
+  ) return { state: 'hold', reasonCode: 'evaluation-policy-mismatch' };
+  const undecidable = input.evaluation.contractSummary?.undecidableItems ?? [];
+  const verdict = undecidable.length > 0
+    ? 'UNDECIDABLE'
+    : fromRubricDecision(input.evaluation.decision);
+  if (verdict === 'HOLD') return { state: 'hold', reasonCode: 'evaluation-policy-mismatch' };
+  const cell = evaluationPolicy.acceptance.row[verdict];
+  if (cell === undefined) return { state: 'hold', reasonCode: 'evaluation-policy-mismatch' };
+  const outcome: AcceptanceOutcome = Object.freeze({
+    kind,
+    verdict,
+    action: cell.action,
+    ...(cell.adapter !== null ? { adapter: cell.adapter } : {}),
+    source: cell.source,
+  });
+  const enforcement = applyResolvedAcceptanceEnforcementWithAttempt(
+    input.evaluation,
+    input.taskAuthority.task,
+    validated.value,
+    input.taskAuthority.sprintId,
+    outcome,
+    evaluationPolicy.acceptance.enforcement === 'enforce',
+    {
+      tenantId: input.taskAuthority.task.actor?.tenantId ?? 'local',
+      projectId: identity.projectId,
+      generation: identity.generation,
+    },
+    Object.freeze({ attemptId: identity.attemptId, generation: identity.generation }),
+  );
+  if (
+    evaluationPolicy.acceptance.enforcement === 'enforce'
+    && enforcement.outcome.action === 'ROUTE'
+    && enforcement.evaluation.decision !== 'NO_GO'
+    && (enforcement.routeClaim === undefined
+      || enforcement.pendingConfirmation === undefined)
+  ) return { state: 'hold', reasonCode: 'route-authority-unavailable' };
+  return { state: 'applied', enforcement };
+}
+
+function applyAcceptanceEnforcementWithAttempt(
+  evaluation: EvaluationResult,
+  task: Task,
+  result: AcceptanceResultInput,
+  sprintId: string,
+  config?: AcceptanceConfig,
+  routeAuthority?: AcceptanceRouteAuthority,
+  exactAttempt?: Readonly<{ readonly attemptId: string; readonly generation: number }>,
 ): AcceptanceEnforcementResult {
   const kind = resolveCanonicalTaskKind(task);
   const { override, rejected } = normalizeAcceptanceOverride(config?.acceptance_matrix);
@@ -118,6 +285,31 @@ export function applyAcceptanceEnforcement(
     };
   }
   const outcome = resolveAcceptance(kind, verdict, override);
+  return applyResolvedAcceptanceEnforcementWithAttempt(
+    evaluation,
+    task,
+    result,
+    sprintId,
+    outcome,
+    config?.acceptance_enforcement === 'enforce',
+    routeAuthority,
+    exactAttempt,
+  );
+}
+
+function applyResolvedAcceptanceEnforcementWithAttempt(
+  evaluation: EvaluationResult,
+  task: Task,
+  result: AcceptanceResultInput,
+  sprintId: string,
+  outcome: AcceptanceOutcome,
+  enforce: boolean,
+  routeAuthority?: AcceptanceRouteAuthority,
+  exactAttempt?: Readonly<{ readonly attemptId: string; readonly generation: number }>,
+): AcceptanceEnforcementResult {
+  const kind = outcome.kind;
+  const verdict = outcome.verdict;
+  const undecidable = evaluation.contractSummary?.undecidableItems ?? [];
   // Keep the immutable rubric verdict and the exact resolved cell together.
   // This is intent only: the EVALUATE service remains the durability boundary
   // that decides whether a routed downgrade can become authoritative.
@@ -127,7 +319,6 @@ export function applyAcceptanceEnforcement(
     confirmation: { status: 'MISSING' },
   });
 
-  const enforce = config?.acceptance_enforcement === 'enforce';
   if (!enforce || outcome.action === 'ACCEPT') {
     return { evaluation, outcome, settlement, enforced: false };
   }
@@ -155,9 +346,9 @@ export function applyAcceptanceEnforcement(
 
   // ROUTE — never on a NO_GO (there is nothing to confirm into acceptance).
   if (evaluation.decision === 'NO_GO') return { evaluation, outcome, settlement, enforced: false };
-  const attemptId = result.workAttribution?.state === 'VERIFIED'
+  const attemptId = exactAttempt?.attemptId ?? (result.workAttribution?.state === 'VERIFIED'
     ? result.workAttribution.attemptId
-    : undefined;
+    : undefined);
   if (!routeAuthority || !attemptId) {
     // A route without explicit tenancy/project/generation and verified attempt
     // identity cannot be made canonical. Do not manufacture defaults and do
@@ -212,6 +403,13 @@ export function applyAcceptanceEnforcement(
   const statements = undecidable.length > 0
     ? undecidable.map(item => item.statement)
     : [task.goNogo?.goCriteria ?? task.title];
+  const authorProvider = 'provider' in result && typeof result.provider === 'string'
+    ? result.provider
+    : result.tokenUsage !== undefined
+      && 'provider' in result.tokenUsage
+      && typeof result.tokenUsage.provider === 'string'
+      ? result.tokenUsage.provider
+      : undefined;
   const routed: AcceptanceEnforcementResult = {
     evaluation: {
       ...evaluation,
@@ -241,7 +439,7 @@ export function applyAcceptanceEnforcement(
       source: 'acceptance-matrix',
       // Provider identity for the llm adapter's cross-provider separation;
       // absent identity stays absent (no guessed default).
-      ...(result.tokenUsage?.provider ? { authorProvider: result.tokenUsage.provider } : {}),
+      ...(authorProvider !== undefined ? { authorProvider } : {}),
     },
     ...(evaluation.decision === 'DONE'
       ? { postRubricCause: `acceptance-policy:route:${outcome.adapter}` }

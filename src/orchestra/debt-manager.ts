@@ -19,6 +19,7 @@ import { MemoryStore } from '../core/memory-store.js';
 import type { MemoryEntryV2, CreateEntryInput } from '../core/memory-types.js';
 import { extractSprintFromDebtId } from '../core/memory-import.js';
 import { readJsonSafe, debugLog } from '../core/utils.js';
+import { canonicalJson } from '../core/audit-writer.js';
 import { getAgentRole } from '../core/agent-role-contract.js';
 import { classifyFixFailure } from './fix-failure-classification.js';
 import { deriveAcceptanceFailureFingerprint } from './result-evaluator.js';
@@ -38,6 +39,19 @@ import { resolveFixRepairAuthority } from './fix-repair-authority.js';
 import type {
   FixRepairAuthorityInput, FixRepairEvidence, FixRepairAuthorityResult,
 } from './fix-repair-authority.js';
+import {
+  isExactAcceptedResultTerminalAuthorityV2,
+  isBoundedExactAuthorityPlainData,
+  type ExactAcceptedResultTerminalAuthorityV2,
+} from './exact-accepted-result-terminal-authority.js';
+import {
+  isExactRepairBirthAuthorityV1,
+  resolveExactRepairBirthAuthority,
+  type ExactRepairBirthAuthorityV1,
+  type ExactRepairFailureDomain,
+  type ExactRepairSemanticEvidenceV1,
+} from './repair-birth-authority.js';
+import type { ExactAcceptedTaskResultAuthorityMetadata } from './task-result-authority.js';
 
 // ═══ Internal Helpers ══════════════════════════════════════════════
 
@@ -225,6 +239,147 @@ function buildFixRepairAuthority(
     unresolvedPromptFindings,
     originalAcceptance,
   };
+}
+
+function buildExactFixRepairScope(
+  task: Task,
+  authority: ExactRepairBirthAuthorityV1,
+): FixRepairAuthorityReview {
+  const filesRead = [...new Set(task.scope?.filesRead ?? [])].sort();
+  const filesWrite = [...new Set(task.scope?.filesWrite ?? [])].sort();
+  return {
+    state: 'accepted',
+    authorityFingerprint: authority.semanticFailureFingerprint.slice('sha256:'.length),
+    inheritedFilesRead: filesRead,
+    inheritedFilesWrite: filesWrite,
+    filesRead,
+    filesWrite,
+    addedReadPaths: [],
+    addedWritePaths: [],
+    evidenceWritePaths: [],
+    unresolvedFindings: [],
+    unresolvedPromptFindings: [],
+    originalAcceptance: {
+      taskId: task.id,
+      state: 'none',
+      filesRead: [],
+      filesWrite: [],
+    },
+  };
+}
+
+export interface ExactFixRepairBirthContext {
+  readonly failedTerminalAuthority: ExactAcceptedResultTerminalAuthorityV2;
+  readonly failureDomain: ExactRepairFailureDomain;
+  readonly semanticEvidence: ExactRepairSemanticEvidenceV1;
+  readonly lineageRootTaskId: string;
+  readonly predecessorRepairAuthority?: ExactRepairBirthAuthorityV1 | null;
+}
+
+export interface HandleEvaluationPolicy {
+  readonly allowPriorityFixCreation?: boolean;
+  /** T11-owned immutable receipt fan-in. Required whenever the result is exact. */
+  readonly exactRepairBirth?: ExactFixRepairBirthContext;
+}
+
+export interface ExactCrossRepairBirthContext extends ExactFixRepairBirthContext {
+  readonly targetTerminalAuthorities: ReadonlyMap<
+    string,
+    ExactAcceptedResultTerminalAuthorityV2
+  >;
+  readonly predecessorRepairAuthoritiesByTargetTaskId?: ReadonlyMap<
+    string,
+    ExactRepairBirthAuthorityV1
+  >;
+}
+
+export interface HandleCrossDependenciesPolicy {
+  /** T11-owned immutable XFIX fan-in, keyed by the failed downstream task. */
+  readonly exactRepairBirthByFailedTaskId?: ReadonlyMap<
+    string,
+    ExactCrossRepairBirthContext
+  >;
+}
+
+function exactAcceptedResultProjection(
+  result: TaskResult,
+): ExactAcceptedTaskResultAuthorityMetadata | null {
+  const candidate = (result as TaskResult & {
+    exactAcceptedResultAuthority?: unknown;
+  }).exactAcceptedResultAuthority;
+  if (candidate === undefined) return null;
+  return isBoundedExactAuthorityPlainData(candidate)
+    ? candidate as ExactAcceptedTaskResultAuthorityMetadata
+    : null;
+}
+
+function claimsExactResult(result: TaskResult): boolean {
+  return Object.prototype.hasOwnProperty.call(result, 'exactAcceptedResultAuthority')
+    || Object.prototype.hasOwnProperty.call(result, 'exactSettlementProjection');
+}
+
+function carriesExactSettlementProjection(value: unknown): boolean {
+  return value !== null
+    && typeof value === 'object'
+    && Object.prototype.hasOwnProperty.call(value, 'exactSettlementProjection');
+}
+
+function holdExactRepairBirth(
+  projectRoot: string,
+  task: Task,
+  workerId: string,
+  reasonCode: string,
+): void {
+  updateTaskStatus(projectRoot, task.id, TaskStatus.PAUSED);
+  releaseAllLocks(projectRoot, workerId);
+  debugLog(
+    'handleEvaluation:exactRepairBirthHold',
+    `task=${task.id} reason=${reasonCode}; PAUSED without repair child`,
+  );
+}
+
+function writeExactRepairTaskNoClobber(
+  projectRoot: string,
+  taskId: string,
+  payload: unknown,
+  authority: ExactRepairBirthAuthorityV1,
+): 'created' | 'idempotent' | 'conflict' {
+  const path = join(projectRoot, TASKS_DIR, `task-${taskId}.json`);
+  try {
+    writeFileSync(path, `${JSON.stringify(payload, null, 2)}\n`, {
+      encoding: 'utf-8',
+      flag: 'wx',
+    });
+    return 'created';
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException | null)?.code !== 'EEXIST') throw error;
+    const existing = readJsonSafe<{
+      id?: unknown;
+      createdAt?: unknown;
+      exactRepairBirthAuthority?: unknown;
+    }>(path);
+    const existingExecution = existing && typeof existing === 'object'
+      ? Object.fromEntries(Object.entries(existing).filter(([key]) => key !== 'createdAt'))
+      : null;
+    const persistedPayload = payload !== null && typeof payload === 'object' && !Array.isArray(payload)
+      ? JSON.parse(JSON.stringify(payload)) as Record<string, unknown>
+      : null;
+    const expectedExecution = persistedPayload
+      ? Object.fromEntries(Object.entries(persistedPayload).filter(([key]) => key !== 'createdAt'))
+      : null;
+    return existing?.id === taskId
+      && isExactRepairBirthAuthorityV1(existing.exactRepairBirthAuthority)
+      && existing.exactRepairBirthAuthority.receiptDigest === authority.receiptDigest
+      // createdAt is observational metadata and intentionally absent from the
+      // semantic repair identity. Every execution-bearing field (scope,
+      // routing, verification, run policy, status and lineage) must remain
+      // byte-semantically identical for an EEXIST replay to be idempotent.
+      && existingExecution !== null
+      && expectedExecution !== null
+      && canonicalJson(existingExecution) === canonicalJson(expectedExecution)
+      ? 'idempotent'
+      : 'conflict';
+  }
 }
 
 /**
@@ -707,7 +862,7 @@ export function handleEvaluation(
   task: Task,
   evaluation: TaskEvaluation,
   result: TaskResult,
-  policy: { allowPriorityFixCreation?: boolean } = {},
+  policy: HandleEvaluationPolicy = {},
 ): void {
   const workerId = task.assignedWorker ?? `w-${task.id}`;
 
@@ -777,6 +932,44 @@ export function handleEvaluation(
     return;
   }
 
+  let exactRepairBirthAuthority: ExactRepairBirthAuthorityV1 | null = null;
+  if (claimsExactResult(result) || policy.exactRepairBirth !== undefined) {
+    const context = policy.exactRepairBirth;
+    const acceptedProjection = exactAcceptedResultProjection(result);
+    if (!context) {
+      holdExactRepairBirth(projectRoot, task, workerId, 'MISSING_EXACT_REPAIR_BIRTH_AUTHORITY');
+      return;
+    }
+    if (Object.prototype.hasOwnProperty.call(result, 'exactAcceptedResultAuthority')
+      && (
+        acceptedProjection === null
+        || !isExactAcceptedResultTerminalAuthorityV2(
+          context.failedTerminalAuthority,
+          acceptedProjection,
+        )
+      )) {
+      holdExactRepairBirth(projectRoot, task, workerId, 'ACCEPTED_RESULT_AUTHORITY_MISMATCH');
+      return;
+    }
+    const exactDecision = resolveExactRepairBirthAuthority({
+      repairKind: 'FIX',
+      failureDomain: context.failureDomain,
+      sprintId: task.sprintId ?? '',
+      lineageRootTaskId: context.lineageRootTaskId,
+      failedTaskId: task.id,
+      targetTaskId: task.id,
+      failedTerminalAuthority: context.failedTerminalAuthority,
+      targetTerminalAuthority: null,
+      evidence: context.semanticEvidence,
+      predecessorRepairAuthority: context.predecessorRepairAuthority,
+    });
+    if (exactDecision.state === 'hold') {
+      holdExactRepairBirth(projectRoot, task, workerId, exactDecision.reasonCode);
+      return;
+    }
+    exactRepairBirthAuthority = exactDecision.authority;
+  }
+
   // ── Failure classification decides the route (owner decision 2026-08-10) ──
   // A retry is right when the ENVIRONMENT failed and wrong when the task or its
   // scope is what broke. Until this gate existed, every NO_GO that was not a
@@ -790,25 +983,35 @@ export function handleEvaluation(
   // path yet, so they park as typed PAUSED for an operator/Brain decision rather
   // than silently degrading into the retry this gate exists to prevent. That is
   // the conservative direction: fewer fix tasks, more honest stops.
-  const acceptanceFailureFingerprint = deriveAcceptanceFailureFingerprint(task, result, projectRoot);
+  const acceptanceFailureFingerprint = exactRepairBirthAuthority === null
+    ? deriveAcceptanceFailureFingerprint(task, result, projectRoot)
+    : null;
   const priorAcceptanceFailureFingerprint = (task as Task & {
     acceptanceFailureFingerprint?: string;
   }).acceptanceFailureFingerprint;
-  const failureClass = classifyFixFailure({
-    result,
-    exitCode: (result as { exitCode?: number | null } | null | undefined)?.exitCode ?? null,
-    priorZeroDiffAttempts: countZeroDiffAttempts(projectRoot, task.id),
-    acceptanceFailureFingerprint,
-    priorAcceptanceFailureFingerprint,
-    evidence: {
-      testVerification: result.testVerification,
-      criteriaEvidence: result.criteriaEvidence,
-      attribution: result.workAttribution,
-      dependencyLineage: (result as TaskResult & {
-        dependencyLineage?: { failedUpstreamTaskId?: string };
-      }).dependencyLineage,
-    },
-  });
+  const failureClass = exactRepairBirthAuthority === null
+    ? classifyFixFailure({
+        result,
+        exitCode: (result as { exitCode?: number | null } | null | undefined)?.exitCode ?? null,
+        priorZeroDiffAttempts: countZeroDiffAttempts(projectRoot, task.id),
+        acceptanceFailureFingerprint,
+        priorAcceptanceFailureFingerprint,
+        evidence: {
+          testVerification: result.testVerification,
+          criteriaEvidence: result.criteriaEvidence,
+          attribution: result.workAttribution,
+          dependencyLineage: (result as TaskResult & {
+            dependencyLineage?: { failedUpstreamTaskId?: string };
+          }).dependencyLineage,
+        },
+      })
+    : {
+        disposition: 'narrowCorrection' as const,
+        code: 'EXACT_PRODUCT_DEFECT_REPAIR_ADMITTED',
+        reason: 'immutable exact terminal evidence admitted a changed product-defect repair',
+        allowsFixTask: true,
+        repairTarget: 'current' as const,
+      };
   if (!failureClass.allowsFixTask) {
     updateTaskStatus(projectRoot, task.id, TaskStatus.PAUSED);
     releaseAllLocks(projectRoot, workerId);
@@ -923,10 +1126,13 @@ export function handleEvaluation(
     ...(task.assignedSkills ?? []),
     ...rotationStrategy.addedSkills,
   ]));
-  const repairAuthority = buildFixRepairAuthority(projectRoot, task, result);
+  const repairAuthority = exactRepairBirthAuthority
+    ? buildExactFixRepairScope(task, exactRepairBirthAuthority)
+    : buildFixRepairAuthority(projectRoot, task, result);
+  const fixTaskId = exactRepairBirthAuthority?.childTaskId ?? `${task.id}-fix`;
 
   const fixTask: Task = {
-    id: `${task.id}-fix`,
+    id: fixTaskId,
     title: `Fix: ${task.title}`,
     description: fixDescription,
     model: rotationStrategy.rotatedModel,
@@ -934,11 +1140,17 @@ export function handleEvaluation(
     effort: task.effort,
     priority: 'CRITICAL',
     reason: enrichedReason,
-    scope: regateInheritedScope(projectRoot, `${task.id}-fix`, {
-      ...task.scope,
-      filesRead: [...repairAuthority.filesRead],
-      filesWrite: [...repairAuthority.filesWrite],
-    }),
+    scope: exactRepairBirthAuthority
+      ? {
+          ...task.scope,
+          filesRead: [...repairAuthority.filesRead],
+          filesWrite: [...repairAuthority.filesWrite],
+        }
+      : regateInheritedScope(projectRoot, fixTaskId, {
+          ...task.scope,
+          filesRead: [...repairAuthority.filesRead],
+          filesWrite: [...repairAuthority.filesWrite],
+        }),
     dependencies: [],
     goNogo: task.goNogo,
     status: TaskStatus.PENDING,
@@ -990,10 +1202,26 @@ export function handleEvaluation(
     ...fixTask,
     rotationStrategy,
     repairAuthority,
-    ...(acceptanceFailureFingerprint ? { acceptanceFailureFingerprint } : {}),
+    ...(exactRepairBirthAuthority
+      ? { exactRepairBirthAuthority }
+      : acceptanceFailureFingerprint
+        ? { acceptanceFailureFingerprint }
+        : {}),
   };
 
   mkdirSync(join(projectRoot, TASKS_DIR), { recursive: true });
+  if (exactRepairBirthAuthority) {
+    const writeDecision = writeExactRepairTaskNoClobber(
+      projectRoot,
+      fixTask.id,
+      fixTaskPayload,
+      exactRepairBirthAuthority,
+    );
+    if (writeDecision === 'conflict') {
+      holdExactRepairBirth(projectRoot, task, workerId, 'REPAIR_CHILD_ID_CONFLICT');
+    }
+    return;
+  }
   writeFileSync(
     join(projectRoot, TASKS_DIR, `task-${fixTask.id}.json`),
     JSON.stringify(fixTaskPayload, null, 2),
@@ -1014,6 +1242,7 @@ export function handleCrossDependencies(
   projectRoot: string,
   sprint: Sprint,
   evaluations: Map<string, TaskEvaluation>,
+  policy: HandleCrossDependenciesPolicy = {},
 ): Task[] {
   const fixTasks: Task[] = [];
   const noGoTasks = sprint.tasks.filter(t => evaluations.get(t.id) === TaskEvaluation.NO_GO);
@@ -1042,7 +1271,18 @@ export function handleCrossDependencies(
     const noGoResult = readJsonSafe<TaskResult>(
       join(projectRoot, TASKS_DIR, `task-${noGoTask.id}.result`),
     );
-    if (isCascadeSkippedResult(noGoResult)) continue;
+    const exactContext = policy.exactRepairBirthByFailedTaskId?.get(noGoTask.id);
+    const exactClaim = exactContext !== undefined
+      || carriesExactSettlementProjection(noGoTask)
+      || (noGoResult !== null && claimsExactResult(noGoResult));
+    if (exactClaim && exactContext === undefined) {
+      debugLog(
+        'handleCrossDependencies:exactRepairBirthHold',
+        `task=${noGoTask.id} reason=MISSING_EXACT_XFIX_AUTHORITY`,
+      );
+      continue;
+    }
+    if (!exactClaim && isCascadeSkippedResult(noGoResult)) continue;
     // A direct fix is the first recovery authority for an observed task
     // failure. Do not concurrently blame and rewrite its already-successful
     // dependencies while that direct fix is still pending: that creates
@@ -1051,7 +1291,7 @@ export function handleCrossDependencies(
     // attempt has produced terminal evidence.
     const directFixPath =
       join(projectRoot, TASKS_DIR, `task-${noGoTask.id}-fix.json`);
-    if (existsSync(directFixPath)) continue;
+    if (existsSync(directFixPath) || repairRoots.has(noGoTask.id)) continue;
     for (const depId of noGoTask.dependencies) {
       const depEval = evaluations.get(depId);
       if (depEval === TaskEvaluation.DONE || depEval === TaskEvaluation.GO_WITH_TECH_DEBT) {
@@ -1064,6 +1304,31 @@ export function handleCrossDependencies(
         if (repairRoots.has(depId)) continue;
         if (existsSync(join(projectRoot, TASKS_DIR, `task-${depId}-xfix.json`))) continue;
 
+        let exactRepairBirthAuthority: ExactRepairBirthAuthorityV1 | null = null;
+        if (exactContext) {
+          const exactDecision = resolveExactRepairBirthAuthority({
+            repairKind: 'XFIX',
+            failureDomain: exactContext.failureDomain,
+            sprintId: sprint.id,
+            lineageRootTaskId: exactContext.lineageRootTaskId,
+            failedTaskId: noGoTask.id,
+            targetTaskId: depId,
+            failedTerminalAuthority: exactContext.failedTerminalAuthority,
+            targetTerminalAuthority: exactContext.targetTerminalAuthorities.get(depId) ?? null,
+            evidence: exactContext.semanticEvidence,
+            predecessorRepairAuthority:
+              exactContext.predecessorRepairAuthoritiesByTargetTaskId?.get(depId) ?? null,
+          });
+          if (exactDecision.state === 'hold') {
+            debugLog(
+              'handleCrossDependencies:exactRepairBirthHold',
+              `task=${noGoTask.id} target=${depId} reason=${exactDecision.reasonCode}`,
+            );
+            continue;
+          }
+          exactRepairBirthAuthority = exactDecision.authority;
+        }
+
         // Apply fresh-eyes rotation to cross-fix tasks too — same retry
         // rationale as the direct NO_GO fix path.
         const rotationStrategy = applyFreshEyesRotation(depTask);
@@ -1073,7 +1338,7 @@ export function handleCrossDependencies(
         ]));
 
         const fixTask: Task = {
-          id: `${depId}-xfix`,
+          id: exactRepairBirthAuthority?.childTaskId ?? `${depId}-xfix`,
           title: `Cross-fix: ${depTask.title}`,
           description: `Cross-dependency fix: ${noGoTask.id} (NO_GO) depends on ${depId}`,
           model: rotationStrategy.rotatedModel,
@@ -1081,7 +1346,13 @@ export function handleCrossDependencies(
           effort: depTask.effort,
           priority: 'CRITICAL',
           reason: `Cross-dependency: ${noGoTask.id} failed, may be caused by ${depId}`,
-          scope: regateInheritedScope(projectRoot, `${depId}-xfix`, depTask.scope),
+          scope: exactRepairBirthAuthority
+            ? {
+                ...depTask.scope,
+                filesRead: [...new Set(depTask.scope?.filesRead ?? [])].sort(),
+                filesWrite: [...new Set(depTask.scope?.filesWrite ?? [])].sort(),
+              }
+            : regateInheritedScope(projectRoot, `${depId}-xfix`, depTask.scope),
           dependencies: [],
           goNogo: depTask.goNogo,
           status: TaskStatus.PENDING,
@@ -1104,16 +1375,37 @@ export function handleCrossDependencies(
             : {}),
           createdAt: now(),
         };
-        fixTasks.push(fixTask);
-        tasksById.set(fixTask.id, fixTask);
-        repairRoots.add(depId);
-
         const fixTaskPayload: unknown = {
           ...fixTask,
           rotationStrategy,
+          ...(exactRepairBirthAuthority ? { exactRepairBirthAuthority } : {}),
         };
 
         mkdirSync(join(projectRoot, TASKS_DIR), { recursive: true });
+        if (exactRepairBirthAuthority) {
+          const writeDecision = writeExactRepairTaskNoClobber(
+            projectRoot,
+            fixTask.id,
+            fixTaskPayload,
+            exactRepairBirthAuthority,
+          );
+          if (writeDecision === 'created') {
+            fixTasks.push(fixTask);
+            tasksById.set(fixTask.id, fixTask);
+            repairRoots.add(depId);
+          } else if (writeDecision === 'idempotent') {
+            repairRoots.add(depId);
+          } else {
+            debugLog(
+              'handleCrossDependencies:exactRepairBirthHold',
+              `task=${noGoTask.id} target=${depId} reason=REPAIR_CHILD_ID_CONFLICT`,
+            );
+          }
+          continue;
+        }
+        fixTasks.push(fixTask);
+        tasksById.set(fixTask.id, fixTask);
+        repairRoots.add(depId);
         writeFileSync(
           join(projectRoot, TASKS_DIR, `task-${fixTask.id}.json`),
           JSON.stringify(fixTaskPayload, null, 2),

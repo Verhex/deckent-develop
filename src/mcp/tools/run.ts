@@ -137,7 +137,9 @@ export function registerRunTool(
               type: 'text' as const,
               text: JSON.stringify({
                 error: true,
-                code: 'TASK_INGRESS_NOT_DISPATCHED',
+                code: execution.invocation.state === 'not-dispatched'
+                  ? 'TASK_INGRESS_NOT_DISPATCHED'
+                  : 'TASK_INGRESS_RECONCILIATION_REQUIRED',
                 taskId,
                 disposition: execution.disposition.kind,
                 executionMode: execution.executionMode,

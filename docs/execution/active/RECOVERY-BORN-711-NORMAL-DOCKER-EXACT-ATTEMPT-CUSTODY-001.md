@@ -111,6 +111,114 @@ Deckent dogfood'a verilmez.
   `SCOPE-REVISION-018`, MCP transport enum'unun provider-truth validator'ında ve zorunlu
   disposition metadata'sının eski observability testinde aynı anlamı taşımasını sağlar. Bu yalnız
   revision 017'nin doğrudan compile tüketicisidir; T8 veya runtime admissionı açmaz.
+- T7 production-consumer closure scope kararı:
+  `owner-live-2026-09-02-continue-after-checkpoint`. `SCOPE-REVISION-019`, gerçek CLI `spawn`
+  provider-authority lifecycle'ını, autonomous/process exact-result tüketicilerini ve dört doğrudan
+  testi T7'ye bağlar. `src/orchestra/autonomous/execute-dispatcher.ts` current tek-yazıcı olarak
+  T13'ten T7'ye devredilir; T13 yalnız kapanmış contractı downstream tüketir. CLI reconciliation
+  evidence'ı ve MCP host-decision anlamı aynı closure'a dahildir. Bu revizyon T8, build, runtime,
+  dogfood run veya closure authority üretmez.
+- T7 reconciliation durability scope kararı:
+  `owner-live-2026-09-02-continue-after-checkpoint`. Fresh bağımsız audit'in tek kalan blocker'ı için
+  `SCOPE-REVISION-020`, `src/orchestra/autonomous/backlog-types.ts` yolunu T7'ye ekler. Exact
+  task-ingress `not-dispatched` ve `reconciliation-required` receipt/evidence'ı generic hata metnine
+  indirgenemez; belirsiz dispatch durable structured kanıtla `parked` kalır. T8/runtime yetkisi açılmaz.
+- T8 private-settlement cutover scope kararı:
+  `owner-live-2026-09-02-continue-after-checkpoint`. Fresh bağımsız source audit'in iki blocker'ından
+  settlement-sonrası public result mutationını kapatmak için `SCOPE-REVISION-021`,
+  `src/core/xverify-task-settlement.ts`, `src/cli/commands/xverify.ts` ve iki doğrudan kanıt dosyasını
+  T8'e ekler. Exact XVerify sonucu yalnız verifier attempt'ına bağlı host-private immutable receipt'te
+  kalır; CLI typed HOLD detail'i runner sonucundan tüketir. Bu revizyon build, live provider call,
+  runtime veya dogfood yetkisi üretmez.
+- T8 tracked settlement-contract scope kararı:
+  `owner-live-2026-09-02-continue-after-checkpoint`. Revision 021 sonrası fresh bağımsız audit'in
+  bulduğu batarya-dışı stale public-result testi için `SCOPE-REVISION-022`,
+  `tests/orchestra/cross-verify-task-settlement.test.ts` dosyasını T8'e ekler. Test yalnız gerçek
+  attempt claim/closure ve host-private immutable receipt sözleşmesini kanıtlayabilir; public
+  `.result` projectionına geri dönemez. Bu revizyon build, live provider call, runtime veya dogfood
+  yetkisi üretmez.
+- T9 exact repair-birth scope kararı:
+  `owner-live-2026-09-02-continue-after-checkpoint`. `SCOPE-REVISION-023`, collector içindeki exact
+  terminal authority parser'ını tek ortak contracta taşır ve T9'a evidence-changed FIX/XFIX birth
+  authority modülleri ile doğrudan testlerini ekler. Collector T6'dan T9'a yalnız bu parser fan-in'i
+  için devredilir. T10/T11 producer zinciri bağlanmadan bu foundation production-complete, runtime
+  veya dogfood authority sayılmaz.
+- T10/T11/T12 authority-ordering scope kararı:
+  `owner-live-2026-09-02-continue-after-checkpoint`. Fresh boundary audit'in bulduğu ters producer /
+  consumer dependency'si için `SCOPE-REVISION-024`, canonical sırayı `T9 -> T11 -> T10 -> T12`
+  yapar. T11 tek immutable terminal decision/evaluation/finalizer/settlement producer'ı, T10 exact
+  checkpoint/resume/finalize/archive tüketicisi, T12 yalnız production composition/fan-in katmanıdır.
+  `sprint-controller`, `sprint-phases`, `sprint-spawner` T6'dan; `result-collector` T9'dan T12'ye
+  devredilir ve `sprint-lifecycle` T12'ye eklenir. Bu revizyon build, runtime veya dogfood yetkisi
+  üretmez.
+- T11 exact evaluator-input scope kararı:
+  `owner-live-2026-09-02-continue-after-checkpoint`. Producer implementation sırasında fresh audit,
+  caller/public `Task` ile dışarıda üretilmiş `EvaluationResult`ın exact terminal receipt basabileceğini
+  buldu. `SCOPE-REVISION-025`, `task-result-authority.ts` dosyasını T4'ten T11'e devreder ve
+  `result-evaluator.ts` dosyasını T11'e ekler. Karar yalnız Store-inspected V2 result, admission
+  snapshot task material ve canonical rubric evaluator girdisinden doğabilir; T12 wiring/build/runtime
+  yetkisi açılmaz.
+- T11 canonical dispatch-task authority scope kararı:
+  `owner-live-2026-09-02-continue-after-checkpoint`. Fresh parser audit'i, T11'in valid Task içindeki
+  array alanlarını reddettiğini; Docker parserının ise zorunlu Task alanlarını tam doğrulamadan ve
+  unknown alanları sessiz düşürerek ikinci bir doğruluk kaynağı oluşturduğunu buldu.
+  `SCOPE-REVISION-026`, policy-resolved canonical JSON bounds kullanan tek ortak dispatch-task
+  authority parserını T11'e ekler. `spawn-backend-docker.ts`, exact terminal authority/type yönü ve
+  doğrudan parser/result fixture testleri T11'e devredilir. T12 wiring/build/runtime yetkisi açılmaz.
+- T11 exact evaluation-settlement proof scope kararı:
+  `owner-live-2026-09-02-continue-main-after-side-session-prompt`. Owner ana recovery akışına devam
+  yetkisini korurken `SCOPE-REVISION-027`, accepted-result'tan Store-owned evaluation, finalizer ve
+  settlement üreten exact producer'ın ayrı negatif/replay testini T11 support kapsamına ekler.
+  Caller-supplied result/evaluation receipt girdisi değildir; yarım publication aynı deterministic
+  artifact ve chain üzerinden benimsenir. T12 wiring/build/runtime yetkisi açılmaz.
+- T11 durable policy/provider/effect fan-in scope kararı:
+  `owner-live-2026-09-02-continue-main-after-side-session-prompt`. Fresh source/wiring audit;
+  mutable caller config/rubric/exit/project-root girdilerini, Store'daki provider-exit/effect
+  kanıtını tüketmeyen yolu ve production-wiring kapısının sessiz atlanmasını blocker olarak doğruladı.
+  `SCOPE-REVISION-028`, dispatch-frozen evaluation policy, Store-owned provider-exit authority ve
+  manifest-temelli criterion adapterını T11'e ekler; scheduler/collector sınırlarını geçici olarak
+  T11'e devreder. Missing/corrupt/sibling/replay evidence başarı değil typed HOLD'dur. T12 gerçek host
+  wiring kanıtını üretir; T11 karar authority'sini paylaşmaz. Build/runtime/dogfood yetkisi açılmaz.
+- T12 exact lifecycle/production fan-in scope kararı:
+  `owner-live-2026-09-02-continue-main-after-side-session-prompt`. İki fresh bağımsız audit;
+  controller'ın T11 settler/revalidator portlarını enjekte etmediğini, registry'nin tam terminal
+  receipt yerine gevşek verdict tuttuğunu, restart/checkpoint/FIX/RETRO/pause-resume yollarının
+  public authority'ye dönebildiğini ve production-wiring'in durable host observation üreticisi
+  olmadığını doğruladı. `SCOPE-REVISION-029`, backend-owned opaque reader → T11 settlement/reread
+  bridge'ini, tam terminal authority registry'sini, exact checkpoint/finalizer fan-in'ini ve gerçek
+  consumer gözlemi yokken fail-closed kalan attempt-bound host wiring receipt'ini T12'ye bağlar.
+  Build, WSL2 runtime canary ve dogfood admissionı bu revizyonla açılmaz.
+- T12 real-Store fixture scope kararı:
+  aynı owner continuation authority altında `SCOPE-REVISION-030`, production-wiring positive
+  roundtrip'ının mock yerine accepted-only gerçek custody fixture'ında kurulması için yalnız
+  `tests/helpers/task-result-settlement-v2-fixture.ts` yolunu T11'den T12'ye devreder. Production
+  path/count değişmez; sahte green kabul edilmez.
+- T12 real-host-proof scope kararı:
+  `owner-live-2026-09-02-approve-scope-revision-031-real-host-proof`. Fresh independent audit,
+  mevcut observer'ın normal factory tarafından compose edilmediğini ve gerçek canonical
+  consumer/ingress/enablement/proof-target çalışmasını gözlemlemediğini doğruladı.
+  `SCOPE-REVISION-031`, digest-bound plan proof programı, shell-free/secret-free bounded platform
+  runner'ı, normal production composition ve accepted-attempt/effect-bound durable receipt için
+  exact path authority'sini T12'ye açar. Worker/plan evidenceRef echo'su, ambient env, unbounded
+  output, blind retry ve unsupported platform success'i yasaktır. Build/runtime/dogfood yetkisi
+  açılmaz.
+- T12 canonical host-proof harness scope kararı:
+  `owner-live-2026-09-02-approve-scope-revision-032-canonical-host-proof-harness`. Rev031 runner
+  audit'i, repoda gerçek ürün yüzeyini gözleyerek versioned structured outcome üreten immutable
+  trusted harness bulunmadığını doğruladı; yalnız test fixture'ları authority değildir.
+  `SCOPE-REVISION-032`, yalnız canonical harness scripti ve doğrudan testine authority açar.
+  Harness plan hedeflerini echo edemez, arbitrary command/shell çalıştıramaz ve yalnız allowlisted
+  read-only adapterlardan gerçek surface/receipt observation kabul eder. Yeni domain adapterı ayrıca
+  owner-admitted asset olmadan eklenemez; build/runtime/dogfood yetkisi açılmaz.
+- T13 exact-result consumer projection scope kararı:
+  `owner-live-2026-09-02-approve-scope-revision-033-t13-exact-result-consumer-projection`.
+  Planned integration proof, normal exact registry'nin Store-verified V2 sonucu `TaskResult` diye
+  cast ettiğini; autonomous consumerın attempt metadata'sını kaybettiğini ve public-result dışı
+  doğru byte'ları legacy evaluator biçiminde tüketemediğini doğruladı. `SCOPE-REVISION-033`,
+  `task-result-authority`, `scheduler-effects`, `process-runtime`, autonomous dispatcher ve dört
+  doğrudan support testinin writer authority'sini T13'e devreder. Tek canonical projection exact
+  identity/digest metadata'sını taşır; metadata'sız exact success ve fixture-local dönüşüm
+  yasaktır. T14/build/runtime/dogfood yetkisi açılmaz.
 - Main workspace tercihi owner'ın canlı kararıdır; bu recovery `/tmp` veya eksik kopyada değil,
   root `main` üzerinde yürür.
 - Source tamamlanıp runtime quiescent olduğunda `npm run build`, source/dist parity ve compiled
@@ -126,9 +234,9 @@ Deckent dogfood'a verilmez.
 Full path/baseline authority:
 `RECOVERY-BORN-711-NORMAL-DOCKER-EXACT-ATTEMPT-CUSTODY-001.expected-red.json`.
 
-- Production: 62 unique path; son scope-revision anında 60 present, 2 absent.
-- Test/script conditional mutation allowlist: 197 unique path; son scope-revision anında 188
-  present, 9 absent.
+- Production: 90 unique path; son scope-revision anında 88 present, 2 absent.
+- Test/script conditional mutation allowlist: 244 unique path; son scope-revision anında 240
+  present, 4 absent. Önceki revision'ların tarihsel presence kayıtları değiştirilmedi.
 - Governance transaction: `DIRECTIVES.md`, `docs/MASTER-PLAN.md`, iki generated projection,
   bu capsule, expected-red sidecar ve `follow-up-works/current-flow.md`.
 - Her implementation path tam bir task lane'inin tek writer'ına aittir. Allowlist'te bulunmak dosyayı
@@ -236,6 +344,28 @@ canary ayrı supervisor proof'udur.
   DB rollback ve başka oturum değişiklikleri yasak alandır.
 
 ## DONE
+
+### Final local closure evidence — 2026-09-03
+
+- T14 source fan-in sonrası `npm run build:all` PASS; compiled CLI ve binary-contract scripti PASS.
+  Native binary digest `sha256:4e4dd558785cced4688979b219ac2648623f8bbf1f89a9f9fba8abab9913597f`,
+  native source-tree digest `sha256:ef06f44f070e07061cacb7672e0812a88f44a8235e7002f338c2786f32d69a8d`.
+- Final WSL2/Docker normal exact attempt `canary-1788433556479` /
+  `b6d8aa45-19e0-89d3-8ede-fac68c18c8ad`: `diskVerified:true`, single admitted file effect,
+  collector `DONE`, evaluation verdict `DONE`, durable landing→accepted→evaluation→finalizer→
+  settlement→archive chain ve fresh-process terminal reread PASS. Container/volume residue yok.
+  Machine evidence sha256 `02836a467b6eae81689fa1bd3434311f0a49640f8179d27acba39e2e3bf84f82`.
+- Final networkless installed-package proof `DECKENT_PACKED_NETWORKLESS_INSTALL_VERIFIED`:
+  WSL2 native `LANDING_VERIFIED`, packaged prebuild, install-time build/download absent; receipt
+  sha256 `3da177733c030dfe694499340b594ad044600b584d8dab6f5c29f1db7dae5ea4`.
+- Frozen exact Store result collector boundary'sinde mutate edilmiyor; normalization detached copy
+  üzerinden çalışıyor. Gerçek collector proof 1 read, 1 settlement, 2 independent terminal reread
+  ve task `DONE` taşıyor.
+- Local recovery verdict `GO / DOGFOOD_READY`. Capsule henüz tüketilmez: MASTER 3327/3328/3329
+  canonical authenticated settlement beklediği için `OPEN`; 8031/8032 owner-deferred kalır.
+  Commit/push ve ilk dogfood run ayrıca owner action'dır.
+- `RELATED_BUT_NONBLOCKING`: gerçek Store terminal closure reread'i dakikalar ölçeğinde; ayrı
+  performans outcome'una owner admission gerekir. Doğruluk/finite completion sonucunu değiştirmez.
 
 Bu capsule ancak aşağıdakilerin tamamı sağlanınca tüketilir:
 

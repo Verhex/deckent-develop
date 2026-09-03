@@ -10,9 +10,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { appendFileSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import {
+  readCrossVerifyTaskSettlement,
   runCrossVerify,
   type CrossVerifyInvocationReceiptContext,
   type MandatoryCrossVerifyInvocationComposition,
@@ -35,6 +36,7 @@ import {
   createTaskResultSettlement,
   createTaskResultSettlementRef,
   createTaskResultSettlementRefForAttempt,
+  taskResultSettlementPath,
   writeTaskResultSettlementAtomic,
   writeTaskResultSettlementAttemptAtomic,
   writeTaskResultSettlementClosureAtomic,
@@ -292,12 +294,22 @@ function mandatoryComposition(
   execute: ReturnType<typeof vi.fn>;
   launcher: ReturnType<typeof vi.fn>;
 } {
+  if (!(result instanceof Error) && result.state !== 'settled') {
+    const ref = createTaskResultSettlementRefForAttempt(
+      root,
+      '276-001-xverify',
+      '11111111-1111-4111-8111-111111111111',
+    );
+    writeTaskResultSettlementAttemptAtomic(ref);
+    claimTaskResultSettlementAttemptAtomic(ref);
+  }
   const execute = vi.fn(async () => {
     if (result instanceof Error) throw result;
     return result;
   });
   const launcher = vi.fn();
   const composition: MandatoryCrossVerifyInvocationComposition = {
+    producerProvider: 'claude',
     coordinator: { execute },
     input: {
       executionContract: {
@@ -1360,6 +1372,73 @@ describe('runCrossVerify — dispatch + advisory write', () => {
 });
 
 describe('runCrossVerify — mandatory exact-coordinator enforcement', () => {
+  it('holds an injected same-provider composition before coordinator execution', async () => {
+    writeResultFile('276-001', makeResult());
+    const exact = mandatoryComposition(
+      exactCoordinatorSettled('VERDICT: CONFIRMED must not execute'),
+    );
+    const task = makeTask({ model: 'gpt-5.6-sol', provider: 'codex' });
+    const res = await runCrossVerify(
+      root,
+      task,
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true, enforce_refuted: true }),
+      {
+        mandatoryInvocation: {
+          ...exact.composition,
+          producerProvider: 'codex',
+        },
+      },
+    );
+
+    expect(res).toMatchObject({
+      ran: false,
+      outcome: 'unavailable',
+      disposition: 'hold',
+      blocked: true,
+      skippedReason: 'verifier-exact-producer-provider-identity-hold',
+      detail: 'verifier-exact-producer-provider-identity-hold',
+    });
+    expect(exact.execute).not.toHaveBeenCalled();
+    expect(readResultFile('276-001').crossVerify).toBeUndefined();
+  });
+
+  it.each([
+    ['unsupported actual provider', 'foreign-provider', 'verifier-exact-invocation-called-provider-unsupported'],
+    ['producer self-verification', 'claude', 'verifier-exact-called-provider-identity-hold'],
+  ] as const)(
+    'keeps %s diagnostic-only and refuses exact settlement authority',
+    async (_case, calledProvider, reason) => {
+      writeResultFile('276-001', makeResult());
+      const exact = mandatoryComposition(exactCoordinatorSettled(
+        'VERDICT: CONFIRMED identity drift cannot authorize this verdict',
+        { calledProvider },
+      ));
+
+      const res = await runCrossVerify(
+        root,
+        makeTask(),
+        makeResult(),
+        TaskEvaluation.DONE,
+        makeConfig({ enabled: true, enforce_refuted: true }),
+        { mandatoryInvocation: exact.composition },
+      );
+
+      expect(res).toMatchObject({
+        ran: true,
+        outcome: 'unavailable',
+        disposition: 'hold',
+        blocked: true,
+        evidencePersisted: false,
+        skippedReason: reason,
+        detail: reason,
+      });
+      expect(res.taskSettlementReceipt).toBeUndefined();
+      expect(readResultFile('276-001').crossVerify).toBeUndefined();
+    },
+  );
+
   it('allows only a typed host-derived confirmation with a durable verdict receipt', async () => {
     writeResultFile('276-001', makeResult());
     const typed = typedAdjudicationFixture('supported');
@@ -1467,12 +1546,12 @@ describe('runCrossVerify — mandatory exact-coordinator enforcement', () => {
       claimDigest: typed.contract.claimDigest,
       evidenceManifestDigest: typed.contract.evidenceManifestDigest,
     });
-    expect(readResultFile('276-001').crossVerify).toMatchObject({
-      outcome: 'confirmed',
-      verifier: 'codex',
-      verifierModel: 'gpt-5.6-sol',
-      execution: { terminalAttemptId: '11111111-1111-4111-8111-111111111111' },
-    });
+    expect(readResultFile('276-001').crossVerify).toBeUndefined();
+    expect(readCrossVerifyTaskSettlement({
+      projectRoot: root,
+      taskId: '276-001-xverify',
+      attemptId: '11111111-1111-4111-8111-111111111111',
+    })?.settlementDigest).toBe(res.taskSettlementReceipt?.settlementDigest);
     expect(JSON.parse(readFileSync(
       join(root, TASKS_DIR, 'task-276-001-xverify.json'),
       'utf-8',
@@ -1581,7 +1660,7 @@ describe('runCrossVerify — mandatory exact-coordinator enforcement', () => {
       reasonCode: 'response-invalid',
       reason: expectedParseError,
     });
-    expect(readResultFile('276-001').crossVerify?.reason).toBe(expectedParseError);
+    expect(readResultFile('276-001').crossVerify).toBeUndefined();
     const report = JSON.parse(readFileSync(
       join(root, '.analysis/xverify/task-276-001-adjudication.json'),
       'utf-8',
@@ -1685,14 +1764,7 @@ describe('runCrossVerify — mandatory exact-coordinator enforcement', () => {
     );
     expect(fn).not.toHaveBeenCalled();
     expect(exact.launcher).not.toHaveBeenCalled();
-    expect(readResultFile('276-001').crossVerify).toMatchObject({
-      outcome: 'confirmed',
-      verifier: 'codex',
-      verifierModel: 'gpt-5.6-sol',
-      invocationReceiptRef: {
-        invocationId: 'invocation-mandatory-xverify',
-      },
-    });
+    expect(readResultFile('276-001').crossVerify).toBeUndefined();
   });
 
   it.each([
@@ -1773,14 +1845,11 @@ describe('runCrossVerify — mandatory exact-coordinator enforcement', () => {
           execution: { outcome: executionOutcome },
         },
       });
-      expect(readResultFile('276-001').crossVerify).toMatchObject({
-        outcome: 'unclear',
-        verdict: 'unclear',
-      });
+      expect(readResultFile('276-001').crossVerify).toBeUndefined();
     },
   );
 
-  it('holds mandatory confirmation when canonical evidence cannot be persisted', async () => {
+  it('persists mandatory confirmation without requiring a mutable public result', async () => {
     const exact = mandatoryComposition(
       exactCoordinatorSettled('VERDICT: CONFIRMED provider text is not enough'),
     );
@@ -1796,14 +1865,13 @@ describe('runCrossVerify — mandatory exact-coordinator enforcement', () => {
 
     expect(res).toMatchObject({
       ran: true,
-      outcome: 'unavailable',
-      disposition: 'hold',
-      blocked: true,
+      outcome: 'confirmed',
+      disposition: 'allow',
+      blocked: false,
       refuted: false,
-      evidencePersisted: false,
+      evidencePersisted: true,
       advisory: {
-        verdict: 'unclear',
-        reason: 'verifier-evidence-persistence-failed',
+        verdict: 'confirmed',
       },
     });
   });
@@ -1847,7 +1915,7 @@ describe('runCrossVerify — mandatory exact-coordinator enforcement', () => {
       );
 
       expect(res).toMatchObject({
-        ran: false,
+        ran: coordinatorResult.state === 'reconciliation-required',
         outcome: 'unavailable',
         disposition: 'hold',
         blocked: true,
@@ -1856,6 +1924,11 @@ describe('runCrossVerify — mandatory exact-coordinator enforcement', () => {
       });
       expect(exact.execute).toHaveBeenCalledOnce();
       expect(fn).not.toHaveBeenCalled();
+      expect(res.taskSettlementReceipt?.projection).toMatchObject({
+        terminal: false,
+        status: 'HOLD',
+        resumable: true,
+      });
     },
   );
 
@@ -1885,6 +1958,87 @@ describe('runCrossVerify — mandatory exact-coordinator enforcement', () => {
     });
     expect(exact.execute).toHaveBeenCalledOnce();
     expect(fn).not.toHaveBeenCalled();
+    expect(readResultFile('276-001').crossVerify).toBeUndefined();
+  });
+
+  it('keeps a completed exact call fail-closed when its private receipt path is occupied', async () => {
+    writeResultFile('276-001', makeResult());
+    const coordinated = exactCoordinatorSettled(
+      'VERDICT: CONFIRMED exact provider call completed',
+    );
+    const receiptPath = join(
+      dirname(taskResultSettlementPath(coordinated.terminalSettlementRef)),
+      'xverify-task-settlement.json',
+    );
+    const foreignBytes = '{"foreign":true}\n';
+    writeFileSync(receiptPath, foreignBytes, { encoding: 'utf-8', mode: 0o640 });
+    const exact = mandatoryComposition(coordinated);
+
+    const res = await runCrossVerify(
+      root,
+      makeTask(),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true, enforce_refuted: true }),
+      { mandatoryInvocation: exact.composition },
+    );
+
+    expect(res).toMatchObject({
+      ran: true,
+      outcome: 'unavailable',
+      disposition: 'hold',
+      blocked: true,
+      evidencePersisted: false,
+    });
+    expect(res.skippedReason).toContain('Conflicting or unverifiable immutable XVerify task settlement');
+    expect(res.taskSettlementReceipt).toBeUndefined();
+    expect(readFileSync(receiptPath, 'utf-8')).toBe(foreignBytes);
+    expect(readResultFile('276-001').crossVerify).toBeUndefined();
+  });
+
+  it('preserves post-dispatch truth when a reconciliation HOLD receipt conflicts', async () => {
+    writeResultFile('276-001', makeResult());
+    const attemptId = '11111111-1111-4111-8111-111111111111';
+    const coordinatorResult = {
+      state: 'reconciliation-required' as const,
+      reasonCode: 'XVERIFY_INVOCATION_OBSERVATION_HOLD:settlement_incomplete',
+      authorityEvidenceRef: 'xverify-authority-reconcile:receipt-conflict',
+      invocationReceiptRef: {
+        schemaVersion: 1 as const,
+        tenantId: 'tenant-a',
+        projectId: 'project-a',
+        invocationId: 'invocation-mandatory-xverify',
+      },
+      providerLimitDispatchEvidenceRef: 'provider-limit-dispatch:receipt-conflict',
+    };
+    const exact = mandatoryComposition(coordinatorResult);
+    const ref = createTaskResultSettlementRefForAttempt(root, '276-001-xverify', attemptId);
+    const receiptPath = join(
+      dirname(taskResultSettlementPath(ref)),
+      'xverify-task-settlement.json',
+    );
+    const foreignBytes = '{"foreign":"reconciliation"}\n';
+    writeFileSync(receiptPath, foreignBytes, { encoding: 'utf-8', mode: 0o640 });
+
+    const res = await runCrossVerify(
+      root,
+      makeTask(),
+      makeResult(),
+      TaskEvaluation.DONE,
+      makeConfig({ enabled: true, enforce_refuted: true }),
+      { mandatoryInvocation: exact.composition },
+    );
+
+    expect(res).toMatchObject({
+      ran: true,
+      outcome: 'unavailable',
+      disposition: 'hold',
+      blocked: true,
+      evidencePersisted: false,
+    });
+    expect(res.taskSettlementReceipt).toBeUndefined();
+    expect(readFileSync(receiptPath, 'utf-8')).toBe(foreignBytes);
+    expect(readResultFile('276-001').crossVerify).toBeUndefined();
   });
 
   it('keeps config default-off ahead of the exact coordinator', async () => {
@@ -1933,10 +2087,8 @@ describe('runCrossVerify — mandatory exact-coordinator enforcement', () => {
     expect(fn).not.toHaveBeenCalled();
     const persisted = readResultFile('276-001');
     expect(persisted.selfAssessment).toBe('DONE');
-    expect(persisted.crossVerify).toEqual({
-      outcome: 'unavailable',
-      reason: 'verifier-exact-invocation-coordinator-not-composed',
-    });
+    expect(persisted.crossVerify).toBeUndefined();
+    expect(res.detail).toBe('verifier-exact-invocation-coordinator-not-composed');
   });
 
   it('does not let a legacy CONFIRMED spawn fabricate mandatory success', async () => {
@@ -2354,10 +2506,8 @@ describe('runCrossVerify — honest-skip paths', () => {
       evidencePersisted: true,
     });
     expect(calls).toHaveLength(0);
-    expect(readResultFile('276-001').crossVerify).toEqual({
-      outcome: 'unavailable',
-      reason: 'verifier-exact-invocation-coordinator-not-composed',
-    });
+    expect(readResultFile('276-001').crossVerify).toBeUndefined();
+    expect(res.detail).toBe('verifier-exact-invocation-coordinator-not-composed');
   });
 
   it('does not let exact evidence plus a legacy receipt bypass the mandatory coordinator', async () => {
@@ -2385,10 +2535,8 @@ describe('runCrossVerify — honest-skip paths', () => {
       skippedReason: 'verifier-exact-invocation-coordinator-not-composed',
     });
     expect(calls).toHaveLength(0);
-    expect(readResultFile('276-001').crossVerify).toEqual({
-      outcome: 'unavailable',
-      reason: 'verifier-exact-invocation-coordinator-not-composed',
-    });
+    expect(readResultFile('276-001').crossVerify).toBeUndefined();
+    expect(res.detail).toBe('verifier-exact-invocation-coordinator-not-composed');
     expect(invocation.store.get(
       { tenantId: 'tenant-a', projectId: invocation.store.projectId },
       'inv-xverify-276-001',
@@ -2852,6 +3000,7 @@ describe('runCrossVerify — fail-safe + verifier selection', () => {
       state: 'hold' as const,
       reasonCode: 'xverify_execution_profile_unavailable',
       authorityEvidenceRef: 'xverify-production-ingress:test-hold',
+      detail: 'profile missing',
       verifierProvider: 'codex' as const,
       verifierModel: 'gpt-5.6-sol',
     }));
@@ -2881,12 +3030,8 @@ describe('runCrossVerify — fail-safe + verifier selection', () => {
       verifierModel: 'gpt-5.6-sol',
       skippedReason: expect.stringContaining('xverify_execution_profile_unavailable'),
     });
-    expect(readResultFile('276-001').crossVerify).toMatchObject({
-      outcome: 'unavailable',
-      verifier: 'codex',
-      verifierModel: 'gpt-5.6-sol',
-      authorityEvidenceRef: 'xverify-production-ingress:test-hold',
-    });
+    expect(readResultFile('276-001').crossVerify).toBeUndefined();
+    expect(mandatory.detail).toBe('profile missing');
 
     compose.mockClear();
     const advisory = await runCrossVerify(
@@ -2931,10 +3076,7 @@ describe('runCrossVerify — fail-safe + verifier selection', () => {
         reason: 'exact bounded evidence is insufficient',
       },
     });
-    expect(readResultFile('276-001').crossVerify).toMatchObject({
-      outcome: 'unclear',
-      verdict: 'unclear',
-    });
+    expect(readResultFile('276-001').crossVerify).toBeUndefined();
   });
 
   it('verifier_priority config is respected when several providers qualify', async () => {

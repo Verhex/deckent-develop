@@ -19,6 +19,7 @@ import {
   createTaskAttemptEffectLandingBindingV2,
   executionEffectLandingIntentDigestV1,
   executionEffectPersistenceRawDigest,
+  executionEffectWorkspaceAuthorityDigestV1,
   executionEffectLandingDeterministicBoundaryIdV1,
   extractTaskAttemptEffectLandingBindingV2,
   parseExecutionEffectLandingTerminalSealV1,
@@ -227,7 +228,9 @@ function changedBundle() {
     path: 'out.bin',
     byteLength: sourceBytes.byteLength,
     contentDigest: executionEffectPersistenceRawDigest(sourceBytes),
-    workspaceIdentityDigest: workspace.workspaceIdentityDigest,
+    workspaceIdentityDigest: executionEffectWorkspaceAuthorityDigestV1(
+      workspace.workspaceIdentity,
+    ),
     attemptDigest: workspace.attemptDigest,
     admissionReceiptDigest: workspace.admissionReceiptDigest,
     custodyPolicyDigest: workspace.custodyPolicyDigest,
@@ -626,6 +629,44 @@ describe('execution-effect persistence contract', () => {
     } as never)).toThrow(/landing intent authority/u);
     expect(() => executionEffectLandingIntentDigestV1(new Proxy(input, {})))
       .toThrow(/landing intent authority/u);
+  });
+
+  it('separates restart-stable workspace authority from capture-local root evidence', () => {
+    const fixture = changedBundle();
+    const recapturedIdentity = Object.freeze({
+      ...fixture.workspace.workspaceIdentity,
+      rootHandleEvidenceDigest: digestValue('2'),
+    });
+    expect(executionEffectWorkspaceAuthorityDigestV1(recapturedIdentity)).toBe(
+      executionEffectWorkspaceAuthorityDigestV1(fixture.workspace.workspaceIdentity),
+    );
+
+    const recapturedWorkspace = createExecutionEffectWorkspaceSnapshotSealV1({
+      attempt: fixture.workspace.attempt,
+      admissionReceiptDigest: fixture.workspace.admissionReceiptDigest,
+      custodyPolicyDigest: fixture.workspace.custodyPolicyDigest,
+      writePolicyDigest: fixture.workspace.writePolicyDigest,
+      workspaceIdentity: recapturedIdentity,
+      workspaceResource: fixture.workspace.workspaceResource,
+      dependencyResource: fixture.workspace.dependencyResource,
+      nativeCapabilityDigest: fixture.workspace.nativeCapabilityDigest,
+      platform: fixture.workspace.platform,
+      sealedAt: fixture.workspace.sealedAt,
+    });
+    expect(recapturedWorkspace.workspaceIdentityDigest)
+      .not.toBe(fixture.workspace.workspaceIdentityDigest);
+    expect(recapturedWorkspace.sealDigest).not.toBe(fixture.workspace.sealDigest);
+
+    expect(executionEffectWorkspaceAuthorityDigestV1({
+      ...fixture.workspace.workspaceIdentity,
+      directoryId: 'ino:foreign',
+    })).not.toBe(executionEffectWorkspaceAuthorityDigestV1(
+      fixture.workspace.workspaceIdentity,
+    ));
+    expect(() => executionEffectWorkspaceAuthorityDigestV1({
+      ...fixture.workspace.workspaceIdentity,
+      rootHandleEvidenceDigest: 'invalid',
+    })).toThrow(/workspace authority/u);
   });
 
   it('binds one strict dependency resource into workspace seal and post-commit release', () => {

@@ -33,7 +33,11 @@ import type {
   InvocationExecutionBackend,
 } from '../../core/invocation-receipt.js';
 import { canonicalJson } from '../../core/audit-writer.js';
-import { cliContractMessage, renderContractHelp } from '../helpers/message-catalog/cli-run.js';
+import {
+  cliContractMessage,
+  cliTaskIngressDispositionMessage,
+  renderContractHelp,
+} from '../helpers/message-catalog/cli-run.js';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -581,12 +585,18 @@ export function registerRun(
             };
           }
           if (execution.disposition.kind !== 'spawned') {
-            printError(new Error(cliContractMessage('cliContract.run.ingress_hold', lang, {
-              reason: execution.invocation.reasonCode ?? execution.disposition.kind,
-            })));
-            print(getMessage('run.settlement_declared', lang, {
-              receiptId: execution.invocation.receiptRef.invocationId,
-            }));
+            const evidence = execution.invocation.authorityEvidenceRefs?.join(',')
+              ?? execution.invocation.executionEvidenceRef
+              ?? '—';
+            printError(new Error(cliTaskIngressDispositionMessage(
+              execution.invocation.state,
+              lang,
+              {
+                receiptId: execution.invocation.receiptRef.invocationId,
+                reason: execution.invocation.reasonCode ?? execution.disposition.kind,
+                evidence,
+              },
+            )));
             process.exitCode = 1;
             return;
           }
@@ -716,17 +726,14 @@ export function registerRun(
           const { invocation } = ingressErrorAuthority;
           dispatchStarted = invocation.state === 'dispatch-started';
           dispatchUncertain = invocation.state === 'reconciliation-required';
-          if (dispatchStarted || dispatchUncertain) {
-            reconciliationRequired = true;
-            print(getMessage('run.settlement_reconciliation_required', lang, {
-              receiptId: invocation.receiptRef.invocationId,
-              evidence: invocation.executionEvidenceRef ?? 'unknown',
-            }));
-          } else {
-            print(getMessage('run.settlement_declared', lang, {
-              receiptId: invocation.receiptRef.invocationId,
-            }));
-          }
+          reconciliationRequired = dispatchStarted || dispatchUncertain;
+          print(cliTaskIngressDispositionMessage(invocation.state, lang, {
+            receiptId: invocation.receiptRef.invocationId,
+            reason: invocation.reasonCode ?? ingressErrorAuthority.reasonCode,
+            evidence: invocation.authorityEvidenceRefs?.join(',')
+              ?? invocation.executionEvidenceRef
+              ?? '—',
+          }));
         }
         if (settlementContext && (dispatchStarted || dispatchUncertain)) {
           reconciliationRequired = true;

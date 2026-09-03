@@ -66,7 +66,11 @@ import {
 } from '../../core/file-lock.js';
 import { openTaskSettlementProjection } from '../../core/task-settlement-authority.js';
 import { finalizeTaskStatusFromSettlement } from '../../orchestra/task-settlement-projection.js';
-import { cliContractMessage, bindArgumentDescriptions } from '../helpers/message-catalog/cli-run.js';
+import {
+  bindArgumentDescriptions,
+  cliContractMessage,
+  cliTaskIngressDispositionMessage,
+} from '../helpers/message-catalog/cli-run.js';
 import { ProviderExecutionIngressHoldError } from '../../core/provider-execution-ingress-authority.js';
 import { bootstrapApprovalAuthority } from '../../core/approval-authority-bootstrap.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../../core/provider-authority-composition.js';
@@ -806,12 +810,13 @@ export function registerSpawn(program: Command, runtime: SpawnCommandRuntime = {
           },
         });
         if (execution.disposition.kind !== 'spawned') {
-          printError(cliContractMessage('cliContract.run.ingress_hold', lang, {
-            reason: execution.invocation.reasonCode ?? execution.disposition.kind,
-          }));
-          print(`  ${getMessage('run.settlement_declared', lang, {
+          printError(cliTaskIngressDispositionMessage(execution.invocation.state, lang, {
             receiptId: execution.invocation.receiptRef.invocationId,
-          })}`);
+            reason: execution.invocation.reasonCode ?? execution.disposition.kind,
+            evidence: execution.invocation.authorityEvidenceRefs?.join(',')
+              ?? execution.invocation.executionEvidenceRef
+              ?? '—',
+          }));
           process.exitCode = 1;
           return;
         }
@@ -888,16 +893,13 @@ export function registerSpawn(program: Command, runtime: SpawnCommandRuntime = {
         const ingressErrorAuthority = readTaskIngressErrorAuthority(error);
         if (ingressErrorAuthority) {
           const { invocation } = ingressErrorAuthority;
-          if (invocation.state === 'reconciliation-required') {
-            print(getMessage('run.settlement_reconciliation_required', lang, {
-              receiptId: invocation.receiptRef.invocationId,
-              evidence: invocation.executionEvidenceRef ?? 'unknown',
-            }));
-          } else {
-            print(getMessage('run.settlement_declared', lang, {
-              receiptId: invocation.receiptRef.invocationId,
-            }));
-          }
+          print(cliTaskIngressDispositionMessage(invocation.state, lang, {
+            receiptId: invocation.receiptRef.invocationId,
+            reason: invocation.reasonCode ?? ingressErrorAuthority.reasonCode,
+            evidence: invocation.authorityEvidenceRefs?.join(',')
+              ?? invocation.executionEvidenceRef
+              ?? '—',
+          }));
         }
         if (error instanceof FinalOnlyUsageContainmentHoldError) {
           printError(getMessage('spawn.final_only_containment_hold', lang, {

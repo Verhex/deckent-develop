@@ -223,7 +223,10 @@ describe('result collector settlement authority wire', () => {
     expect(validTerminalAuthority.terminalDecisionAuthority.identity).toBe(
       validTerminalAuthority.terminalResultAuthority.identity,
     );
-    const settleExactAcceptedResult = vi.fn(async () => validTerminalAuthority);
+    const settleExactAcceptedResult = vi.fn(async () => ({
+      state: 'settled' as const,
+      authority: validTerminalAuthority,
+    }));
 
     expect(exactAuthority).toMatchObject({
       state: 'exact-accepted',
@@ -236,6 +239,11 @@ describe('result collector settlement authority wire', () => {
       },
     });
     const results = await waitForResults(root, sprint, 250, [], {
+      ipcExecutionMode: 'normal-docker',
+      resolveExactAttemptIpcAuthority: () => ({
+        state: 'absent',
+        identity: exact.identity,
+      }),
       readTaskResultAuthority: () => exactAuthority,
       evaluateCollectedResult,
       settleExactAcceptedResult,
@@ -255,12 +263,9 @@ describe('result collector settlement authority wire', () => {
     });
 
     expect(evaluateCollectedResult).not.toHaveBeenCalled();
-    expect(settleExactAcceptedResult).toHaveBeenCalledWith(expect.objectContaining({
+    expect(settleExactAcceptedResult).toHaveBeenCalledWith({
       acceptedAuthority: exactAuthority.exactAcceptedAuthority,
-      result: expect.objectContaining({
-        exactAcceptedResultAuthority: exactAuthority.exactAcceptedAuthority,
-      }),
-    }));
+    });
     expect(task.status).toBe(TaskStatus.DONE);
     expect(existsSync(join(tasksDir, `task-${taskId}.result`))).toBe(false);
     expect(JSON.parse(readFileSync(
@@ -396,8 +401,16 @@ describe('result collector settlement authority wire', () => {
       getterSpoof,
     ]) {
       await expect(waitForResults(root, sprint, 250, [], {
+        ipcExecutionMode: 'normal-docker',
+        resolveExactAttemptIpcAuthority: () => ({
+          state: 'absent',
+          identity: exact.identity,
+        }),
         readTaskResultAuthority: () => exactAuthority,
-        settleExactAcceptedResult: async () => invalid,
+        settleExactAcceptedResult: async () => ({
+          state: 'settled' as const,
+          authority: invalid,
+        }),
         revalidateExactAcceptedResultTerminalAuthority: async ({
           expectedTerminalAuthority,
         }) => ({
@@ -474,8 +487,16 @@ describe('result collector settlement authority wire', () => {
     for (const invalid of [hugeFlat, oversizedHold, cyclicCurrent, getterCurrent]) {
       let revalidationCount = 0;
       await expect(waitForResults(root, sprint, 250, [], {
+        ipcExecutionMode: 'normal-docker',
+        resolveExactAttemptIpcAuthority: () => ({
+          state: 'absent',
+          identity: exact.identity,
+        }),
         readTaskResultAuthority: () => exactAuthority,
-        settleExactAcceptedResult: async () => valid,
+        settleExactAcceptedResult: async () => ({
+          state: 'settled' as const,
+          authority: valid,
+        }),
         revalidateExactAcceptedResultTerminalAuthority: async () => {
           revalidationCount += 1;
           return revalidationCount === 1
@@ -510,6 +531,11 @@ describe('result collector settlement authority wire', () => {
     });
 
     await expect(waitForResults(root, sprint, 250, [], {
+      ipcExecutionMode: 'normal-docker',
+      resolveExactAttemptIpcAuthority: () => ({
+        state: 'absent',
+        identity: exact.identity,
+      }),
       readTaskResultAuthority: () => exactAuthority,
     })).rejects.toThrow(/terminal settlement authority is required/);
   });

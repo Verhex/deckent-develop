@@ -819,6 +819,24 @@ export function executionEffectDockerVolumeIdentityDigestV1(input: Readonly<{
   }));
 }
 
+/**
+ * Stable identity for the canonical root of one daemon-verified workspace volume.
+ * Native root identities remain capture-local because Linux mount ids are namespace-local.
+ */
+export function executionEffectDockerWorkspaceDirectoryIdentityDigestV1(input: Readonly<{
+  readonly volumeIdentityDigest: Digest;
+}>): Digest {
+  const record = exactRecord(input, ['volumeIdentityDigest']);
+  if (!record || !isDigest(record.volumeIdentityDigest)) {
+    throw new TypeError('Invalid Docker workspace directory identity authority');
+  }
+  return digest('execution-effect-docker-workspace-directory-identity-v1', Object.freeze({
+    volumeIdentityDigest: record.volumeIdentityDigest,
+    mountTarget: HELPER_MOUNT_TARGET,
+    rootPath: '.',
+  }));
+}
+
 export function createExecutionEffectDockerVolumeObservationV1(input: Readonly<{
   readonly state: 'ABSENT' | 'PRESENT';
   readonly authorityDigest: Digest;
@@ -1056,6 +1074,7 @@ export interface ExecutionEffectDockerLifecycleCaptureReceiptV1 {
   readonly volumeIdentityDigest: Digest;
   readonly workspaceIdentity: ExecutionEffectManifest['workspaceIdentity'];
   readonly nativeManifestDigest: Digest;
+  readonly manifestStateDigest: Digest;
   readonly rootObjectIdentityDigest: Digest;
   readonly entryCount: number;
   readonly totalBytes: number;
@@ -1071,8 +1090,9 @@ export function createExecutionEffectDockerLifecycleCaptureReceiptV1(input: Omit
 >): ExecutionEffectDockerLifecycleCaptureReceiptV1 {
   const record = exactRecord(input, [
     'operation', 'authorityDigest', 'phase', 'volumeName', 'volumeIdentityDigest',
-    'workspaceIdentity', 'nativeManifestDigest', 'rootObjectIdentityDigest', 'entryCount',
-    'totalBytes', 'startedAt', 'completedAt', 'deadlineAt',
+    'workspaceIdentity', 'nativeManifestDigest', 'manifestStateDigest',
+    'rootObjectIdentityDigest', 'entryCount', 'totalBytes', 'startedAt', 'completedAt',
+    'deadlineAt',
   ]);
   const workspaceIdentity = snapshotWorkspaceIdentity(record?.workspaceIdentity);
   const operation = record?.operation;
@@ -1084,7 +1104,14 @@ export function createExecutionEffectDockerLifecycleCaptureReceiptV1(input: Omit
     || operation.startsWith('FINAL_QUIESCENCE_') !== (phase === 'final')
     || !isDigest(record.authorityDigest) || !VOLUME_NAME.test(record.volumeName as string)
     || !isDigest(record.volumeIdentityDigest) || !isDigest(record.nativeManifestDigest)
+    || !isDigest(record.manifestStateDigest)
     || !isDigest(record.rootObjectIdentityDigest)
+    || workspaceIdentity.filesystemId !== record.volumeIdentityDigest
+    || workspaceIdentity.directoryId
+      !== executionEffectDockerWorkspaceDirectoryIdentityDigestV1({
+        volumeIdentityDigest: record.volumeIdentityDigest as Digest,
+      })
+    || workspaceIdentity.rootHandleEvidenceDigest !== record.rootObjectIdentityDigest
     || !Number.isSafeInteger(record.entryCount) || (record.entryCount as number) < 0
     || (record.entryCount as number) > EXECUTION_EFFECT_CAPTURE_HARD_LIMITS.maxEntries
     || !Number.isSafeInteger(record.totalBytes) || (record.totalBytes as number) < 0
@@ -1106,6 +1133,7 @@ export function createExecutionEffectDockerLifecycleCaptureReceiptV1(input: Omit
     volumeIdentityDigest: record.volumeIdentityDigest,
     workspaceIdentity,
     nativeManifestDigest: record.nativeManifestDigest,
+    manifestStateDigest: record.manifestStateDigest,
     rootObjectIdentityDigest: record.rootObjectIdentityDigest,
     entryCount: record.entryCount as number,
     totalBytes: record.totalBytes as number,
@@ -1125,8 +1153,8 @@ function parseCaptureReceipt(
   const record = exactRecord(value, [
     'version', 'kind', 'state', 'operation', 'authorityDigest', 'phase', 'volumeName',
     'volumeIdentityDigest', 'workspaceIdentity', 'nativeManifestDigest',
-    'rootObjectIdentityDigest', 'entryCount', 'totalBytes', 'startedAt', 'completedAt',
-    'deadlineAt', 'receiptDigest',
+    'manifestStateDigest', 'rootObjectIdentityDigest', 'entryCount', 'totalBytes',
+    'startedAt', 'completedAt', 'deadlineAt', 'receiptDigest',
   ]);
   if (record === null || record.version !== 1
     || record.kind !== 'execution-effect-docker-lifecycle-capture-receipt'
@@ -1140,6 +1168,7 @@ function parseCaptureReceipt(
       volumeIdentityDigest: record.volumeIdentityDigest as Digest,
       workspaceIdentity: record.workspaceIdentity as ExecutionEffectManifest['workspaceIdentity'],
       nativeManifestDigest: record.nativeManifestDigest as Digest,
+      manifestStateDigest: record.manifestStateDigest as Digest,
       rootObjectIdentityDigest: record.rootObjectIdentityDigest as Digest,
       entryCount: record.entryCount as number,
       totalBytes: record.totalBytes as number,
@@ -1509,6 +1538,7 @@ export interface ExecutionEffectDockerLifecycleAdapterV1 {
     readonly absenceObservationDigest: Digest;
   }>): Promise<unknown>;
   populateWorkspace(input: Readonly<{
+    readonly platform: 'linux' | 'wsl2-linux';
     readonly authorityDigest: Digest;
     readonly plan: ExecutionEffectDockerWorkspacePlanV1;
     readonly attempt: ExecutionEffectAttemptIdentity;
@@ -1520,6 +1550,7 @@ export interface ExecutionEffectDockerLifecycleAdapterV1 {
     readonly captureLimits: ExecutionEffectCaptureLimits;
   }>): Promise<unknown>;
   captureWorkspace(input: Readonly<{
+    readonly platform: 'linux' | 'wsl2-linux';
     readonly operation:
       | 'BASELINE_REVALIDATION'
       | 'FINAL_QUIESCENCE_FIRST'
@@ -1536,16 +1567,29 @@ export interface ExecutionEffectDockerLifecycleAdapterV1 {
   }>): Promise<unknown>;
 }
 
-/** Capture timestamps attest each observation; this digest isolates the immutable tree state. */
+/**
+ * Capture receipts attest the native object identities observed inside one helper container.
+ * Linux mount ids are namespace-local, so those identities legitimately change when the same
+ * Docker volume is reopened by the next helper container.  The revalidation digest therefore
+ * binds the stable Docker volume identity and the complete logical tree state, while each raw
+ * capture keeps its own native identity evidence and digest for race/tamper validation.
+ */
 export function executionEffectDockerManifestStateDigestV1(
   manifest: ExecutionEffectManifest,
 ): Digest {
   return digest('execution-effect-docker-manifest-state-v1', {
     version: manifest.version,
     phaseIndependentAttemptDigest: manifest.attemptDigest,
-    workspaceIdentity: manifest.workspaceIdentity,
-    nativeManifestDigest: manifest.captureAuthority.nativeManifestDigest,
-    nativeEntryIdentitySetDigest: manifest.captureAuthority.nativeEntryIdentitySetDigest,
+    workspaceVolumeIdentityDigest: manifest.workspaceIdentity.filesystemId,
+    captureSemantics: {
+      adapter: manifest.captureAuthority.adapter,
+      platform: manifest.captureAuthority.platform,
+      traversal: manifest.captureAuthority.traversal,
+      sameFilesystem: manifest.captureAuthority.sameFilesystem,
+      mountBoundaryPolicy: manifest.captureAuthority.mountBoundaryPolicy,
+      hardlinkPolicy: manifest.captureAuthority.hardlinkPolicy,
+      cancellationState: manifest.captureAuthority.cancellationState,
+    },
     captureLimits: manifest.captureAuthority.limits,
     landingSemantics: manifest.landingSemantics,
     writePolicyDigest: manifest.policy.digest,
@@ -2267,10 +2311,10 @@ export function createExecutionEffectDockerLifecycleAuthorityV1(
     || baselineRevalidationReceipt.volumeName !== common.workspacePlan.volumeName
     || baselineRevalidationReceipt.volumeIdentityDigest
       !== common.presentObservation.volumeIdentityDigest
-    || baselineRevalidationReceipt.nativeManifestDigest
-      !== common.baselineManifest.captureAuthority.nativeManifestDigest
-    || !sameCanonical(baselineRevalidationReceipt.workspaceIdentity,
-      common.baselineManifest.workspaceIdentity)
+    || baselineRevalidationReceipt.workspaceIdentity.filesystemId
+      !== common.presentObservation.volumeIdentityDigest
+    || baselineRevalidationReceipt.manifestStateDigest
+      !== executionEffectDockerManifestStateDigestV1(common.baselineManifest)
     || !isTimestamp(record.authorizedAt)) {
     throw new TypeError('Invalid Docker provider lifecycle authority');
   }
@@ -2340,6 +2384,8 @@ export function createExecutionEffectDockerLifecycleAuthorityV1(
     || quiescenceSeal.attachmentReceiptDigest !== postProviderAttachmentReceipt.receiptDigest
     || quiescenceSeal.firstCaptureReceiptDigest !== firstFinalCaptureReceipt.receiptDigest
     || quiescenceSeal.secondCaptureReceiptDigest !== finalCaptureReceipt.receiptDigest
+    || firstFinalCaptureReceipt.manifestStateDigest !== quiescenceSeal.manifestStateDigest
+    || finalCaptureReceipt.manifestStateDigest !== quiescenceSeal.manifestStateDigest
     || quiescenceSeal.manifestStateDigest !== executionEffectDockerManifestStateDigestV1(finalManifest)
     || !timestampAtOrAfter(providerStopped.stoppedAt, record.authorizedAt as string)
     || !timestampAtOrAfter(postProviderAttachmentReceipt.observedAt, providerStopped.stoppedAt)
@@ -2896,6 +2942,7 @@ export async function prepareAllocatedExecutionEffectDockerWorkspaceV1(
     });
     const populationRaw = await Reflect.apply(adapters.populateWorkspace, adapters.adapterThis, [
       Object.freeze({
+        platform: base.platform,
         authorityDigest: populationAuthorityDigest,
         plan,
         attempt: base.attempt,
@@ -2937,7 +2984,9 @@ export async function prepareAllocatedExecutionEffectDockerWorkspaceV1(
       });
     }
     const baselineManifest = manifestFromRaw(base, 'baseline', rawCapture);
-    if (!baselineManifest || baselineManifest.policy.digest !== base.writePolicy.digest) {
+    if (!baselineManifest || baselineManifest.policy.digest !== base.writePolicy.digest
+      || rawCapture.receipt.manifestStateDigest
+        !== executionEffectDockerManifestStateDigestV1(baselineManifest)) {
       return hold('CAPTURE_HOLD', {
         stage: 'baseline-manifest', captureReceiptDigest: rawCapture.receipt.receiptDigest,
       });
@@ -3024,7 +3073,7 @@ export async function prepareAllocatedExecutionEffectDockerWorkspaceV1(
       lifecycleAuthority,
       session: opaque,
     });
-  } catch {
+  } catch (error) {
     return hold('ADAPTER_UNAVAILABLE', {
       stage: 'prepare-call', preparationAuthorityDigest: base.preparationAuthorityDigest,
     });
@@ -3104,6 +3153,7 @@ export async function authorizeExecutionEffectDockerProviderStartV1(
       authority.adapters.captureWorkspace,
       authority.adapters.adapterThis,
       [Object.freeze({
+        platform: authority.platform,
         operation: 'BASELINE_REVALIDATION' as const,
         authorityDigest: captureAuthorityDigest,
         plan: authority.workspacePlan,
@@ -3126,10 +3176,17 @@ export async function authorizeExecutionEffectDockerProviderStartV1(
       volumeIdentityDigest: authority.presentObservation.volumeIdentityDigest,
     });
     const manifest = captured ? manifestFromRaw(authority, 'baseline', captured) : null;
+    const observedStateDigest = manifest
+      ? executionEffectDockerManifestStateDigestV1(manifest) : null;
+    const expectedStateDigest = executionEffectDockerManifestStateDigestV1(
+      authority.baselineManifest,
+    );
+    const timestampValid = captured
+      ? timestampAtOrAfter(captured.startedAt, preProviderAttachmentReceipt.observedAt) : false;
     if (!captured || !manifest
-      || executionEffectDockerManifestStateDigestV1(manifest)
-        !== executionEffectDockerManifestStateDigestV1(authority.baselineManifest)
-      || !timestampAtOrAfter(captured.startedAt, preProviderAttachmentReceipt.observedAt)) {
+      || observedStateDigest !== expectedStateDigest
+      || captured.receipt.manifestStateDigest !== observedStateDigest
+      || !timestampValid) {
       return hold('CAPTURE_HOLD', {
         stage: 'baseline-revalidation', authorityDigest: captureAuthorityDigest,
       });
@@ -3345,6 +3402,7 @@ export async function captureExecutionEffectDockerFinalV1(
       authority.adapters.captureWorkspace,
       authority.adapters.adapterThis,
       [Object.freeze({
+        platform: authority.platform,
         operation: 'FINAL_QUIESCENCE_FIRST' as const,
         authorityDigest: firstCaptureAuthorityDigest,
         plan: authority.workspacePlan,
@@ -3366,6 +3424,8 @@ export async function captureExecutionEffectDockerFinalV1(
     });
     const firstManifest = firstCaptured ? manifestFromRaw(authority, 'final', firstCaptured) : null;
     if (!firstCaptured || !firstManifest
+      || firstCaptured.receipt.manifestStateDigest
+        !== executionEffectDockerManifestStateDigestV1(firstManifest)
       || !timestampAtOrAfter(firstCaptured.startedAt, postProviderAttachmentReceipt.observedAt)) {
       return hold('CAPTURE_HOLD', {
         stage: 'final-quiescence-first', authorityDigest: firstCaptureAuthorityDigest,
@@ -3384,6 +3444,7 @@ export async function captureExecutionEffectDockerFinalV1(
       authority.adapters.captureWorkspace,
       authority.adapters.adapterThis,
       [Object.freeze({
+        platform: authority.platform,
         operation: 'FINAL_QUIESCENCE_SECOND' as const,
         authorityDigest: secondCaptureAuthorityDigest,
         plan: authority.workspacePlan,
@@ -3407,6 +3468,7 @@ export async function captureExecutionEffectDockerFinalV1(
     const finalManifestStateDigest = finalManifest
       ? executionEffectDockerManifestStateDigestV1(finalManifest) : null;
     if (!secondCaptured || !finalManifest || finalManifestStateDigest !== firstManifestStateDigest
+      || secondCaptured.receipt.manifestStateDigest !== finalManifestStateDigest
       || !timestampAtOrAfter(secondCaptured.startedAt, firstCaptured.completedAt)) {
       return hold('QUIESCENCE_HOLD', {
         stage: 'final-quiescence-second', authorityDigest: secondCaptureAuthorityDigest,
@@ -3504,7 +3566,7 @@ export async function captureExecutionEffectDockerFinalV1(
       lifecycleAuthority,
       session: opaque,
     });
-  } catch {
+  } catch (error) {
     return hold('ADAPTER_UNAVAILABLE', {
       stage: 'final-quiescence-call', authorityDigest: attachmentAuthorityDigest,
     });
@@ -3783,6 +3845,7 @@ export async function rehydrateExecutionEffectDockerLifecycleV1(input: Readonly<
     if (authority.state === 'PREPARED') {
       const captureRaw = await Reflect.apply(adapters.captureWorkspace, adapters.adapterThis, [
         Object.freeze({
+          platform: authority.platform,
           operation: 'BASELINE_REVALIDATION' as const,
           authorityDigest: observationAuthorityDigest,
           plan: authority.workspacePlan,
@@ -3805,8 +3868,10 @@ export async function rehydrateExecutionEffectDockerLifecycleV1(input: Readonly<
         volumeIdentityDigest: authority.presentObservation.volumeIdentityDigest,
       });
       const manifest = captured ? manifestFromRaw(prepared, 'baseline', captured) : null;
-      if (!manifest || executionEffectDockerManifestStateDigestV1(manifest)
-        !== executionEffectDockerManifestStateDigestV1(authority.baselineManifest)) {
+      if (!manifest || captured?.receipt.manifestStateDigest
+        !== executionEffectDockerManifestStateDigestV1(manifest)
+        || executionEffectDockerManifestStateDigestV1(manifest)
+          !== executionEffectDockerManifestStateDigestV1(authority.baselineManifest)) {
         return hold('AUTHORITY_MISMATCH', {
           stage: 'rehydrate-baseline', authorityDigest: authority.authorityDigest,
         });
@@ -3839,6 +3904,7 @@ export async function rehydrateExecutionEffectDockerLifecycleV1(input: Readonly<
     }
     const captureRaw = await Reflect.apply(adapters.captureWorkspace, adapters.adapterThis, [
       Object.freeze({
+        platform: authority.platform,
         operation: 'FINAL_QUIESCENCE_SECOND' as const,
         authorityDigest: observationAuthorityDigest,
         plan: authority.workspacePlan,
@@ -3861,8 +3927,10 @@ export async function rehydrateExecutionEffectDockerLifecycleV1(input: Readonly<
       volumeIdentityDigest: authority.presentObservation.volumeIdentityDigest,
     });
     const manifest = captured ? manifestFromRaw(provider, 'final', captured) : null;
-    if (!manifest || executionEffectDockerManifestStateDigestV1(manifest)
-      !== executionEffectDockerManifestStateDigestV1(authority.finalManifest)) {
+    if (!manifest || captured?.receipt.manifestStateDigest
+      !== executionEffectDockerManifestStateDigestV1(manifest)
+      || executionEffectDockerManifestStateDigestV1(manifest)
+        !== executionEffectDockerManifestStateDigestV1(authority.finalManifest)) {
       return hold('AUTHORITY_MISMATCH', {
         stage: 'rehydrate-final', authorityDigest: authority.authorityDigest,
       });

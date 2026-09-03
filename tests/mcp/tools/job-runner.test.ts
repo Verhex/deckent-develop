@@ -35,7 +35,7 @@ afterEach(() => {
 });
 
 describe('buildTaskSummaries', () => {
-  it('uses only host evaluationDecision as terminal summary truth', () => {
+  it('does not trust a terminal decision stored in the worker-writable result projection', () => {
     const projectRoot = root();
     writeResult(projectRoot, '067-001', {
       selfAssessment: 'NO_GO',
@@ -51,7 +51,7 @@ describe('buildTaskSummaries', () => {
     }])).toEqual([{
       taskId: '067-001',
       title: 'Fix bug',
-      evaluation: 'DONE',
+      evaluation: 'UNKNOWN',
       agent: 'bug-fixer',
       skills: ['typescript-expert'],
       notes: 'Host accepted the exact result.',
@@ -84,7 +84,7 @@ describe('buildTaskSummaries', () => {
       notes: 'A'.repeat(500),
     });
     const [summary] = buildTaskSummaries(projectRoot, [{ id: '067-005', title: 'Bounded' }]);
-    expect(summary?.evaluation).toBe('GO_WITH_TECH_DEBT');
+    expect(summary?.evaluation).toBe('UNKNOWN');
     expect(summary?.notes).toBe('A'.repeat(200));
     expect(summary?.agent).toBe('generic');
     expect(summary?.skills).toEqual([]);

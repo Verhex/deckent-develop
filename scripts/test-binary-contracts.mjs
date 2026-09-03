@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { processStartToken } from '../dist/core/pid-ownership.js';
+import { resolveTaskArtifactArchiveDir } from '../dist/core/sprint-archive.js';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const entryPath = join(repoRoot, 'dist', 'cli', 'entry.js');
@@ -173,7 +174,13 @@ async function verifyForceFinalizeContainmentBinary() {
   let coordinator;
   try {
     mkdirSync(join(root, '.deckent', 'pids'), { recursive: true });
+    mkdirSync(join(root, '.brain'), { recursive: true });
     mkdirSync(join(root, '.tasks'), { recursive: true });
+    // The production terminal archive requires a repo-local Brain database
+    // before it can atomically adopt the archive index.  This is a disposable
+    // scratch product database, not a copy/projection of the repository DB;
+    // MemoryStore initializes its schema during the real compiled flow.
+    writeFileSync(join(root, '.brain', 'memory.db'), Buffer.alloc(0), { mode: 0o600 });
     writeFileSync(join(root, 'package.json'), JSON.stringify({
       name: 'deckent-finalize-binary-contract',
       version: '1.0.0',
@@ -296,15 +303,26 @@ async function verifyForceFinalizeContainmentBinary() {
     assert(exists(receiptPath), 'finalize: terminal receipt was not published before archive completion');
     const receipt = JSON.parse(readFileSync(receiptPath, 'utf8'));
     assert(receipt.receipt?.sprintId === 'sprint-992', 'finalize: terminal receipt sprint identity mismatch');
+    const archivedTaskRoot = resolveTaskArtifactArchiveDir(root, 'sprint-992');
+    const archivedLandingProposalPath = join(
+      archivedTaskRoot,
+      'task-992-001.landing-proposal.json',
+    );
+    const archivedTemporaryResiduePath = join(
+      archivedTaskRoot,
+      'task-992-001.result.tmp',
+    );
     assert(
-      readFileSync(landingProposalPath, 'utf8') === landingProposalBytes
-        && readFileSync(temporaryResiduePath, 'utf8') === '{incomplete terminal residue',
-      'finalize: landing proposal or temporary residue was treated as an archival task record',
+      !exists(landingProposalPath)
+        && !exists(temporaryResiduePath)
+        && readFileSync(archivedLandingProposalPath, 'utf8') === landingProposalBytes
+        && readFileSync(archivedTemporaryResiduePath, 'utf8') === '{incomplete terminal residue',
+      'finalize: landing proposal or temporary residue was not retired byte-exactly',
     );
     const terminal = JSON.parse(readFileSync(statePath, 'utf8'));
     assert(
-      terminal.status === 'COMPLETE' && terminal.phase === 'COMPLETE',
-      'finalize: terminal state was not published after containment',
+      terminal.status === 'ABORTED' && terminal.phase === 'EVALUATE',
+      'finalize: exact ABORTED containment truth was not published',
     );
     writeFileSync(join(root, '.dashboard'), JSON.stringify({
       sprint: { id: 'sprint-992', phase: 'EXECUTE', status: 'EXECUTING' },
@@ -313,10 +331,11 @@ async function verifyForceFinalizeContainmentBinary() {
     }));
     const status = await runBinary(['status', '--json'], root);
     const statusPayload = parseNonEmptyJson(status, 'status --json after terminal publication');
-    assert(statusPayload.lifecycle === 'COMPLETE', 'status: stale residue regressed canonical COMPLETE');
+    assert(statusPayload.lifecycle === 'ABORTED', 'status: stale residue regressed canonical ABORTED');
     assert(
       statusPayload.terminalPublication?.state === 'receipt-observed'
-        && statusPayload.terminalPublication.receipt?.sprintId === 'sprint-992',
+        && statusPayload.terminalPublication.receipt?.sprintId === 'sprint-992'
+        && statusPayload.terminalPublication.receipt?.terminalOutcome === 'ABORTED',
       'status: terminal receipt was not projected after cleanup residue',
     );
   } finally {

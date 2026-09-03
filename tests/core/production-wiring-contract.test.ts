@@ -2,10 +2,19 @@ import { describe, expect, it } from 'vitest';
 
 import {
   PRODUCTION_WIRING_CONTRACT_VERSION,
+  createProductionWiringContractV2,
+  parseProductionWiringContractV2,
   resolveProductionWiringContract,
+  type ProductionWiringContractV2Input,
   type ProductionWiringContractV1,
   type ProductionWiringEvidence,
 } from '../../src/core/production-wiring-contract.js';
+import {
+  createProductionWiringHostProofProgram,
+  parseProductionWiringHostProofProgram,
+  parseProductionWiringHostProofProgramInput,
+  validateProductionWiringHostProofCoverage,
+} from '../../src/core/production-wiring-host-proof.js';
 
 const completeAuthorityEvidence: ProductionWiringEvidence = {
   state: 'complete',
@@ -54,7 +63,142 @@ function contract(
   };
 }
 
+function v2Input(): ProductionWiringContractV2Input {
+  const probe = (kind: 'producer' | 'canonical-consumer' | 'affected-ingress' | 'enablement-authority' | 'proof-target', targetId: string) => ({
+    target: { kind, targetId },
+    observationGroupId: kind === 'producer' || kind === 'canonical-consumer' ? 'runtime-path-observation' : `${kind}:${targetId}`,
+    harnessPath: 'scripts/production-wiring-proof.mjs',
+    verifierAssetPaths: ['scripts/production-wiring-proof.mjs'],
+    args: kind === 'producer' || kind === 'canonical-consumer' ? ['observe-runtime-relation'] : ['observe', targetId],
+    cwd: '.',
+    timeoutMs: 30_000,
+    outputLimitBytes: 1024 * 1024,
+    expectation: { kind: 'adapter-structured-outcome' as const, schemaId: 'deckent.production-wiring-observation.v1', outcome: 'observed' as const },
+  });
+  return {
+    version: 2,
+    changeKind: 'runtime-change',
+    producer: { producerId: 'runtime.producer' },
+    canonicalConsumer: { consumerId: 'runtime.consumer', relationship: 'invokes-producer' },
+    affectedIngresses: [{ ingressId: 'terminal.entrypoint', kind: 'entrypoint' }],
+    enablementAuthority: { authorityId: 'effective-config.policy', mechanism: 'policy' },
+    disposition: { kind: 'production-wiring' },
+    proofTargets: [{ proofTargetId: 'terminal-to-consumer', kind: 'ingress-execution' }],
+    hostProofProgram: {
+      network: 'forbidden',
+      verifierAssets: [{ path: 'scripts/production-wiring-proof.mjs', sha256: `sha256:${'a'.repeat(64)}`, role: 'trusted-harness' }],
+      platforms: [
+        { platform: 'linux', state: 'unsupported', reasonCode: 'environment-unavailable' },
+        {
+          platform: 'wsl2-linux',
+          state: 'supported',
+          runnerAdapterId: 'native-bounded-process-v1',
+          probes: [
+            probe('producer', 'runtime.producer'),
+            probe('canonical-consumer', 'runtime.consumer'),
+            probe('affected-ingress', 'terminal.entrypoint'),
+            probe('enablement-authority', 'effective-config.policy'),
+            probe('proof-target', 'terminal-to-consumer'),
+          ],
+        },
+        { platform: 'darwin', state: 'unsupported', reasonCode: 'owner-deferred' },
+        { platform: 'win32', state: 'unsupported', reasonCode: 'owner-deferred' },
+      ],
+    },
+  };
+}
+
 describe('production wiring contract', () => {
+  it('canonicalizes a V2 read-only proof program and resolves only exact declared coverage', () => {
+    const canonical = createProductionWiringContractV2(v2Input());
+    const decision = resolveProductionWiringContract(canonical);
+
+    expect(decision).toMatchObject({ version: 2, decision: 'complete' });
+    expect(canonical.hostProofProgram).toMatchObject({
+      executionClass: 'read-only-idempotent',
+      effect: 'read-only',
+      replayPolicy: 'reuse-terminal-receipt',
+      shell: 'forbidden',
+      ambientEnvironment: 'forbidden',
+    });
+    expect(canonical.hostProofProgram.programDigest).toMatch(/^[a-f0-9]{64}$/u);
+    expect(JSON.stringify(canonical)).not.toContain('evidenceRefs');
+    expect(parseProductionWiringContractV2(structuredClone(canonical))).toEqual(canonical);
+  });
+
+  it('holds missing, duplicate, and unexpected host proof target coverage', () => {
+    const input = v2Input();
+    const program = createProductionWiringHostProofProgram(input.hostProofProgram);
+    const supported = program.platforms.find(entry => entry.state === 'supported');
+    if (!supported || supported.state !== 'supported') throw new Error('supported fixture absent');
+    const baseCoverage = {
+      producerId: 'runtime.producer',
+      canonicalConsumerId: 'runtime.consumer',
+      canonicalConsumerRelationship: 'invokes-producer' as const,
+      affectedIngressIds: ['terminal.entrypoint'],
+      enablementAuthorityId: 'effective-config.policy',
+      proofTargets: [{ proofTargetId: 'terminal-to-consumer', kind: 'ingress-execution' }],
+    };
+    expect(validateProductionWiringHostProofCoverage(program, baseCoverage)).toEqual({ state: 'valid' });
+
+    const missingProgram = { ...program, platforms: program.platforms.map(entry => entry.state !== 'supported'
+      ? entry : { ...entry, probes: entry.probes.slice(1) }) };
+    expect(validateProductionWiringHostProofCoverage(missingProgram, baseCoverage)).toMatchObject({
+      state: 'hold', reasonCode: 'missing-proof-target', platform: 'wsl2-linux',
+    });
+
+    const duplicateProgram = { ...program, platforms: program.platforms.map(entry => entry.state !== 'supported'
+      ? entry : { ...entry, probes: [...entry.probes, entry.probes[0]!] }) };
+    expect(validateProductionWiringHostProofCoverage(duplicateProgram, baseCoverage)).toMatchObject({
+      state: 'hold', reasonCode: 'duplicate-proof-target', platform: 'wsl2-linux',
+    });
+  });
+
+  it('rejects a missing producer target and an unbound producer-consumer relationship', () => {
+    const missing = v2Input();
+    const supported = missing.hostProofProgram.platforms.find(entry => entry.state === 'supported');
+    if (!supported || supported.state !== 'supported') throw new Error('fixture');
+    (supported as unknown as { probes: typeof supported.probes }).probes =
+      supported.probes.filter(probe => probe.target.kind !== 'producer');
+    expect(() => createProductionWiringContractV2(missing)).toThrow(/coverage/u);
+
+    const unbound = v2Input();
+    const unboundSupported = unbound.hostProofProgram.platforms.find(entry => entry.state === 'supported');
+    if (!unboundSupported || unboundSupported.state !== 'supported') throw new Error('fixture');
+    const consumer = unboundSupported.probes.find(probe => probe.target.kind === 'canonical-consumer');
+    if (!consumer) throw new Error('fixture');
+    (consumer as unknown as { observationGroupId: string }).observationGroupId = 'separate-self-assertion';
+    expect(() => createProductionWiringContractV2(unbound)).toThrow(/coverage/u);
+  });
+
+  it('rejects ambiguous adapter authority and divergent execution within one observation group', () => {
+    const extraAdapter = v2Input().hostProofProgram;
+    const supported = extraAdapter.platforms.find(entry => entry.state === 'supported');
+    if (!supported || supported.state !== 'supported') throw new Error('fixture');
+    (supported.probes[0] as unknown as Record<string, unknown>).adapterId = 'second-authority';
+    expect(parseProductionWiringHostProofProgramInput(extraAdapter)).toBeNull();
+
+    const divergent = v2Input().hostProofProgram;
+    const divergentSupported = divergent.platforms.find(entry => entry.state === 'supported');
+    if (!divergentSupported || divergentSupported.state !== 'supported') throw new Error('fixture');
+    const consumer = divergentSupported.probes.find(probe => probe.target.kind === 'canonical-consumer');
+    if (!consumer) throw new Error('fixture');
+    (consumer as unknown as { args: string[] }).args = ['self-assert-consumer'];
+    expect(parseProductionWiringHostProofProgramInput(divergent)).toBeNull();
+  });
+
+  it('rejects a mutated host program digest rather than repairing it', () => {
+    const program = createProductionWiringHostProofProgram(v2Input().hostProofProgram);
+    expect(parseProductionWiringHostProofProgram({
+      ...program,
+      programDigest: 'f'.repeat(64),
+    })).toBeNull();
+    expect(parseProductionWiringHostProofProgram({
+      ...program,
+      verifierAssets: [{ ...program.verifierAssets[0]!, sha256: `sha256:${'b'.repeat(64)}` }],
+    })).toBeNull();
+  });
+
   it('resolves a fully evidenced production path without a generic wired boolean', () => {
     const decision = resolveProductionWiringContract(contract());
 

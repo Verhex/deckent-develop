@@ -1,6 +1,6 @@
 import { Buffer as NodeBuffer } from 'node:buffer';
 import { createHash } from 'node:crypto';
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { types as nodeTypes } from 'node:util';
 
 import {
@@ -65,7 +65,8 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3
 const CONTAINER_ID_PATTERN = /^[a-f0-9]{64}$/u;
 const UNSIGNED_DECIMAL_PATTERN = /^(?:0|[1-9][0-9]{0,19})$/u;
 const UINT64_MAX_DECIMAL = '18446744073709551615';
-const TASK_SNAPSHOT_CONTAINER_PATH = '/run/deckent/task.json';
+const TASK_SNAPSHOT_CONTAINER_DIRECTORY = '/run/deckent/snapshot';
+const TASK_SNAPSHOT_CONTAINER_PATH = `${TASK_SNAPSHOT_CONTAINER_DIRECTORY}/task.json`;
 const WORKER_OUTPUT_CONTAINER_PATH = '/workspace/.tasks';
 
 const intrinsicObjectPrototype = Object.prototype;
@@ -74,6 +75,7 @@ const intrinsicObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 const intrinsicObjectIsFrozen = Object.isFrozen;
 const intrinsicObjectCreate = Object.create;
 const intrinsicObjectFreeze = Object.freeze;
+const intrinsicJsonStringify = JSON.stringify;
 const intrinsicArrayIsArray = Array.isArray;
 const intrinsicArrayPrototype = Array.prototype;
 const intrinsicArraySort = intrinsicArrayPrototype.sort;
@@ -164,7 +166,9 @@ export interface TaskAttemptCustodyPosixDockerMountObservation {
   readonly authorityLabels: TaskAttemptCustodyPosixAuthorityLabelsObservation;
   readonly taskSnapshotMount: Readonly<{
     readonly sourcePath: string;
+    readonly sourceDirectoryPath: string;
     readonly targetPath: typeof TASK_SNAPSHOT_CONTAINER_PATH;
+    readonly targetDirectoryPath: typeof TASK_SNAPSHOT_CONTAINER_DIRECTORY;
     readonly mountType: 'bind';
     readonly propagation: 'rprivate';
     readonly readOnly: true;
@@ -181,6 +185,7 @@ export interface TaskAttemptCustodyPosixDockerMountObservation {
     readonly access: 'READ_WRITE';
     readonly identity: TaskAttemptCustodyPosixMountedIdentityObservation;
   }>;
+  readonly workspaceIdentity: TaskAttemptCustodyPosixMountedIdentityObservation;
   readonly bootstrap: Readonly<{
     readonly abiName: string;
     readonly abiVersion: string;
@@ -191,15 +196,15 @@ export interface TaskAttemptCustodyPosixDockerMountObservation {
     readonly platform: 'linux';
     readonly arch: string;
     readonly binarySha256: Sha256Digest;
-    readonly rootSeparationEvidenceBits: number;
+    readonly mountSeparationEvidenceDigest: Sha256Digest;
   }>;
   readonly daemon: Readonly<{
     readonly containerId: string;
     readonly imageDigest: Sha256Digest;
     readonly authorityLabels: TaskAttemptCustodyPosixAuthorityLabelsObservation;
     readonly taskSnapshotMount: Readonly<{
-      readonly sourcePath: string;
-      readonly targetPath: typeof TASK_SNAPSHOT_CONTAINER_PATH;
+      readonly sourceDirectoryPath: string;
+      readonly targetDirectoryPath: typeof TASK_SNAPSHOT_CONTAINER_DIRECTORY;
       readonly mountType: 'bind';
       readonly propagation: 'rprivate';
       readonly readOnly: true;
@@ -229,7 +234,6 @@ interface NativeRootBinding {
   readonly projectId: string;
   readonly native: ExecAuthorityNativeAvailable;
   readonly custody: ExecAuthorityNativeCustodyFacade;
-  readonly rootHandle: ExecAuthorityNativeCustodyHandle;
   readonly rootIdentity: ExecAuthorityNativeIdentity;
   readonly rootSeparation: ExecAuthorityNativeRootSeparation;
   readonly rootSeparationEvidenceDigest: Sha256Digest;
@@ -318,6 +322,40 @@ function isCanonicalUint64Decimal(value: unknown): value is string {
       value.length < UINT64_MAX_DECIMAL.length
       || (value.length === UINT64_MAX_DECIMAL.length && value <= UINT64_MAX_DECIMAL)
     );
+}
+
+export interface TaskAttemptCustodyPosixDockerAuthorityLabelsV2 {
+  readonly rootId: Sha256Digest;
+  readonly scopeDigest: Sha256Digest;
+  readonly effectOpDigest: Sha256Digest;
+  readonly attemptId: string;
+  readonly generation: number;
+}
+
+/**
+ * Shared digest authority for the semantic label subset verified during mount
+ * transfer and re-verified before destructive daemon-resource cleanup.
+ */
+export function taskAttemptCustodyPosixDockerAuthorityLabelDigestV2(
+  value: TaskAttemptCustodyPosixDockerAuthorityLabelsV2,
+): Sha256Digest {
+  const labels = snapshotFrozenExactRecord(value, [
+    'rootId', 'scopeDigest', 'effectOpDigest', 'attemptId', 'generation',
+  ]);
+  if (labels === null
+    || !isDigest(labels.rootId)
+    || !isDigest(labels.scopeDigest)
+    || !isDigest(labels.effectOpDigest)
+    || typeof labels.attemptId !== 'string'
+    || !matchesPattern(UUID_PATTERN, labels.attemptId)
+    || !Number.isSafeInteger(labels.generation)
+    || (labels.generation as number) <= 0) {
+    throw new TypeError('Invalid POSIX Docker authority labels');
+  }
+  return digest(
+    'docker-authority-label-observation',
+    labels,
+  );
 }
 
 function snapshotExactRecord(
@@ -411,6 +449,37 @@ function sameObservedMountIdentity(
     ));
 }
 
+function dockerMountIdentityTuple(identity: Readonly<Record<string, unknown>>): readonly unknown[] {
+  return freezeObject([
+    identity.platform,
+    identity.objectType,
+    identity.dev,
+    identity.ino,
+    identity.mntId,
+    identity.fsMagic,
+    identity.ownerUid,
+    identity.mode,
+    identity.size,
+    identity.linkCount,
+  ]);
+}
+
+function dockerMountSeparationEvidenceDigest(
+  outputIdentity: Readonly<Record<string, unknown>>,
+  workspaceIdentity: Readonly<Record<string, unknown>>,
+): Sha256Digest {
+  const tuples = freezeObject([
+    dockerMountIdentityTuple(outputIdentity),
+    dockerMountIdentityTuple(workspaceIdentity),
+  ]);
+  const serialized = intrinsicReflectApply(intrinsicJsonStringify, JSON, [tuples]) as string;
+  return `sha256:${createHash('sha256')
+    .update('execution-effect-docker-mount-separation-v1')
+    .update('\0')
+    .update(serialized)
+    .digest('hex')}` as Sha256Digest;
+}
+
 function validateAuthorityLabels(
   value: unknown,
   expected: Readonly<{
@@ -448,9 +517,13 @@ function validateDockerMountObservation(
     generation: number;
   }>,
 ): ValidatedBackendMountEvidence | null {
+  const reject = (_stage: string, _failed: readonly string[] = []): null => {
+    return null;
+  };
   const observation = snapshotFrozenExactRecord(value, [
     'schemaVersion', 'kind', 'state', 'backend', 'containerId', 'imageDigest',
-    'authorityLabels', 'taskSnapshotMount', 'workerOutputMount', 'bootstrap', 'daemon',
+    'authorityLabels', 'taskSnapshotMount', 'workerOutputMount', 'workspaceIdentity',
+    'bootstrap', 'daemon',
   ]);
   if (
     observation === null
@@ -461,12 +534,12 @@ function validateDockerMountObservation(
     || typeof observation.containerId !== 'string'
     || !matchesPattern(CONTAINER_ID_PATTERN, observation.containerId)
     || !isDigest(observation.imageDigest)
-  ) return null;
+  ) return reject('observation-envelope');
 
   const labels = validateAuthorityLabels(observation.authorityLabels, expected);
   const task = snapshotFrozenExactRecord(observation.taskSnapshotMount, [
-    'sourcePath', 'targetPath', 'mountType', 'propagation', 'readOnly',
-    'access', 'identity', 'contentDigest',
+    'sourcePath', 'sourceDirectoryPath', 'targetPath', 'targetDirectoryPath',
+    'mountType', 'propagation', 'readOnly', 'access', 'identity', 'contentDigest',
   ]);
   const output = snapshotFrozenExactRecord(observation.workerOutputMount, [
     'sourcePath', 'targetPath', 'mountType', 'propagation', 'readOnly',
@@ -480,34 +553,111 @@ function validateDockerMountObservation(
     'schemaVersion', 'kind', 'platform', 'objectType', 'dev', 'ino', 'mntId',
     'fsMagic', 'ownerUid', 'mode', 'size', 'linkCount',
   ]);
+  const workspaceIdentity = snapshotFrozenExactRecord(observation.workspaceIdentity, [
+    'schemaVersion', 'kind', 'platform', 'objectType', 'dev', 'ino', 'mntId',
+    'fsMagic', 'ownerUid', 'mode', 'size', 'linkCount',
+  ]);
+  const expectedSnapshotDirectory = dirname(expected.taskSnapshotPath);
   if (
     labels === null
     || task === null
     || output === null
     || taskIdentity === null
     || outputIdentity === null
-    || task.sourcePath !== expected.taskSnapshotPath
-    || task.targetPath !== TASK_SNAPSHOT_CONTAINER_PATH
-    || task.mountType !== 'bind'
-    || task.propagation !== 'rprivate'
-    || task.readOnly !== true
-    || task.access !== 'READ_ONLY'
-    || !isDigest(task.contentDigest)
-    || task.contentDigest !== mount.taskSnapshot.contentDigest
-    || !sameObservedMountIdentity(mount.taskSnapshot.identity, taskIdentity, true)
-    || output.sourcePath !== expected.workerOutputPath
-    || output.targetPath !== WORKER_OUTPUT_CONTAINER_PATH
-    || output.mountType !== 'bind'
-    || output.propagation !== 'rprivate'
-    || output.readOnly !== false
-    || output.access !== 'READ_WRITE'
-    || outputIdentity.objectType !== 'DIRECTORY'
-    || !sameObservedMountIdentity(mount.workerOutput.identity, outputIdentity, false)
-  ) return null;
+    || workspaceIdentity === null
+  ) {
+    return reject('mount-records', [
+      labels === null ? 'authority-labels' : null,
+      task === null ? 'task-record' : null,
+      output === null ? 'output-record' : null,
+      taskIdentity === null ? 'task-identity-record' : null,
+      outputIdentity === null ? 'output-identity-record' : null,
+      workspaceIdentity === null ? 'workspace-identity-record' : null,
+    ].filter((failure): failure is string => failure !== null));
+  }
+  const mountFailures = [
+    task.sourcePath !== expected.taskSnapshotPath ? 'task-source' : null,
+    task.sourceDirectoryPath !== expectedSnapshotDirectory
+      ? 'task-source-directory'
+      : null,
+    task.targetPath !== TASK_SNAPSHOT_CONTAINER_PATH ? 'task-target' : null,
+    task.targetDirectoryPath !== TASK_SNAPSHOT_CONTAINER_DIRECTORY
+      ? 'task-target-directory'
+      : null,
+    task.mountType !== 'bind' ? 'task-mount-type' : null,
+    task.propagation !== 'rprivate' ? 'task-propagation' : null,
+    task.readOnly !== true ? 'task-read-only' : null,
+    task.access !== 'READ_ONLY' ? 'task-access' : null,
+    !isDigest(task.contentDigest) ? 'task-content-digest-shape' : null,
+    task.contentDigest !== mount.taskSnapshot.contentDigest
+      ? 'task-content-digest'
+      : null,
+    !sameObservedMountIdentity(mount.taskSnapshot.identity, taskIdentity, true)
+      ? 'task-host-container-identity'
+      : null,
+    output.sourcePath !== expected.workerOutputPath ? 'output-source' : null,
+    output.targetPath !== WORKER_OUTPUT_CONTAINER_PATH ? 'output-target' : null,
+    output.mountType !== 'bind' ? 'output-mount-type' : null,
+    output.propagation !== 'rprivate' ? 'output-propagation' : null,
+    output.readOnly !== false ? 'output-read-only' : null,
+    output.access !== 'READ_WRITE' ? 'output-access' : null,
+    outputIdentity.objectType !== 'DIRECTORY'
+      ? 'output-object-type'
+      : null,
+    !sameObservedMountIdentity(mount.workerOutput.identity, outputIdentity, false)
+      ? 'output-host-container-identity'
+      : null,
+    workspaceIdentity.schemaVersion !== TASK_ATTEMPT_CUSTODY_SCHEMA_VERSION
+      ? 'workspace-schema'
+      : null,
+    workspaceIdentity.kind !== 'task-attempt-custody-posix-mounted-identity'
+      ? 'workspace-kind'
+      : null,
+    workspaceIdentity.platform !== 'linux'
+      ? 'workspace-platform'
+      : null,
+    workspaceIdentity.objectType !== 'DIRECTORY'
+      ? 'workspace-object-type'
+      : null,
+    !isCanonicalUint64Decimal(workspaceIdentity.dev)
+      ? 'workspace-dev'
+      : null,
+    !isCanonicalUint64Decimal(workspaceIdentity.ino)
+      ? 'workspace-ino'
+      : null,
+    !isCanonicalUint64Decimal(workspaceIdentity.mntId)
+      ? 'workspace-mnt-id'
+      : null,
+    (
+      typeof workspaceIdentity.fsMagic !== 'string'
+      || !matchesPattern(/^0x(?:0|[1-9a-f][0-9a-f]*)$/u, workspaceIdentity.fsMagic)
+    ) ? 'workspace-fs-magic' : null,
+    !isCanonicalUint64Decimal(workspaceIdentity.ownerUid)
+      ? 'workspace-owner'
+      : null,
+    (
+      typeof workspaceIdentity.mode !== 'string'
+      || !matchesPattern(/^0[0-7]{3}$/u, workspaceIdentity.mode)
+    ) ? 'workspace-mode' : null,
+    !isCanonicalUint64Decimal(workspaceIdentity.size)
+      ? 'workspace-size'
+      : null,
+    !isCanonicalUint64Decimal(workspaceIdentity.linkCount)
+      ? 'workspace-link-count'
+      : null,
+    outputIdentity.dev === workspaceIdentity.dev
+      && outputIdentity.ino === workspaceIdentity.ino
+      ? 'output-workspace-object-alias'
+      : null,
+    outputIdentity.mntId === workspaceIdentity.mntId
+      ? 'output-workspace-mount-alias'
+      : null,
+  ].filter((failure): failure is string => failure !== null);
+  if (mountFailures.length > 0) return reject('mount-evidence', mountFailures);
 
   const bootstrap = snapshotFrozenExactRecord(observation.bootstrap, [
     'abiName', 'abiVersion', 'napiVersion', 'handleAbi', 'packageName', 'packageVersion',
-    'platform', 'arch', 'binarySha256', 'rootSeparationEvidenceBits',
+    'platform', 'arch', 'binarySha256', 'mountSeparationEvidenceDigest',
   ]);
   const manifest = binding.native.manifest;
   if (
@@ -521,8 +671,9 @@ function validateDockerMountObservation(
     || bootstrap.platform !== manifest.platform
     || bootstrap.arch !== manifest.arch
     || !isDigest(bootstrap.binarySha256)
-    || bootstrap.rootSeparationEvidenceBits !== binding.rootSeparation.featureEvidenceBits
-  ) return null;
+    || bootstrap.mountSeparationEvidenceDigest
+      !== dockerMountSeparationEvidenceDigest(outputIdentity, workspaceIdentity)
+  ) return reject('bootstrap');
 
   const daemon = snapshotFrozenExactRecord(observation.daemon, [
     'containerId', 'imageDigest', 'authorityLabels', 'taskSnapshotMount', 'workerOutputMount',
@@ -532,7 +683,7 @@ function validateDockerMountObservation(
     : validateAuthorityLabels(daemon.authorityLabels, expected);
   const daemonTask = daemon === null ? null : snapshotFrozenExactRecord(
     daemon.taskSnapshotMount,
-    ['sourcePath', 'targetPath', 'mountType', 'propagation', 'readOnly'],
+    ['sourceDirectoryPath', 'targetDirectoryPath', 'mountType', 'propagation', 'readOnly'],
   );
   const daemonOutput = daemon === null ? null : snapshotFrozenExactRecord(
     daemon.workerOutputMount,
@@ -545,8 +696,8 @@ function validateDockerMountObservation(
     || daemonOutput === null
     || daemon.containerId !== observation.containerId
     || daemon.imageDigest !== observation.imageDigest
-    || daemonTask.sourcePath !== expected.taskSnapshotPath
-    || daemonTask.targetPath !== TASK_SNAPSHOT_CONTAINER_PATH
+    || daemonTask.sourceDirectoryPath !== expectedSnapshotDirectory
+    || daemonTask.targetDirectoryPath !== TASK_SNAPSHOT_CONTAINER_DIRECTORY
     || daemonTask.mountType !== 'bind'
     || daemonTask.propagation !== 'rprivate'
     || daemonTask.readOnly !== true
@@ -555,12 +706,15 @@ function validateDockerMountObservation(
     || daemonOutput.mountType !== 'bind'
     || daemonOutput.propagation !== 'rprivate'
     || daemonOutput.readOnly !== false
-  ) return null;
+  ) return reject('daemon');
 
   return freezeObject({
     backendExecutionId: observation.containerId,
     backendImageDigest: observation.imageDigest,
-    backendAuthorityLabelDigest: digest('docker-authority-label-observation', labels),
+    backendAuthorityLabelDigest:
+      taskAttemptCustodyPosixDockerAuthorityLabelDigestV2(
+        labels as unknown as TaskAttemptCustodyPosixDockerAuthorityLabelsV2,
+      ),
     taskSnapshotMountEvidenceDigest: digest('docker-task-snapshot-mount-observation', {
       mount: task,
       hostIdentity: stableIdentityEvidence(mount.taskSnapshot.identity),
@@ -572,6 +726,7 @@ function validateDockerMountObservation(
     }),
     backendBootstrapProbeEvidenceDigest: digest('docker-bootstrap-observation', {
       bootstrap,
+      workspaceIdentity,
       pinnedRootSeparationEvidenceDigest: binding.rootSeparationEvidenceDigest,
     }),
     daemonMountReceiptDigest: digest('docker-daemon-raw-observation', daemon),
@@ -714,9 +869,16 @@ abstract class PosixTaskAttemptCustodyAdapterCore implements TaskAttemptCustodyA
     let opened: OpenedNativeObject | null = null;
     try {
       opened = this.openDirectory(binding, path, 'OPEN_EXISTING');
-      binding.custody.invoke('sync', { handle: opened.handle });
       const identity = binding.custody.invoke('identity', { handle: opened.handle });
-      if (!sameObjectIdentity(opened.identity, identity)) hold('ARTIFACT_CHANGED', 'read');
+      // Store directories are intentionally mutable namespaces. In particular,
+      // the provider writes its result into worker-output while the host rereads
+      // admission authority. Re-fsyncing and comparing size/link-count here
+      // creates a false durability race with that legitimate child publication.
+      // Creation is durably synced by ensurePrivateDirectory; rereads prove the
+      // same private physical directory and stable mount/owner/mode identity.
+      if (!sameMutableDirectoryIdentity(opened.identity, identity)) {
+        hold('ARTIFACT_CHANGED', 'read');
+      }
       const proof = this.directoryProof(binding, path, identity);
       this.closeNativeHandle(binding.custody, opened.handle, 'read');
       opened = null;
@@ -1262,7 +1424,9 @@ abstract class PosixTaskAttemptCustodyAdapterCore implements TaskAttemptCustodyA
       policy: input.policy,
     });
     if (observed === null) return null;
-    if (!sameProof(observed.proof, input.proof)) hold('ARTIFACT_CHANGED', 'read');
+    if (!sameProof(observed.proof, input.proof)) {
+      hold('ARTIFACT_CHANGED', 'read');
+    }
     return observed;
   }
 
@@ -1515,6 +1679,21 @@ function sameObjectIdentity(
     && left.linkCount === right.linkCount;
 }
 
+function sameMutableDirectoryIdentity(
+  left: ExecAuthorityNativeIdentity,
+  right: ExecAuthorityNativeIdentity,
+): boolean {
+  return left.objectType === 'DIRECTORY'
+    && right.objectType === 'DIRECTORY'
+    && left.platform === right.platform
+    && left.dev === right.dev
+    && left.ino === right.ino
+    && left.mntId === right.mntId
+    && left.fsMagic === right.fsMagic
+    && left.ownerUid === right.ownerUid
+    && left.mode === right.mode;
+}
+
 function sameImmutableFileIdentity(
   left: ExecAuthorityNativeIdentity,
   right: ExecAuthorityNativeIdentity,
@@ -1534,6 +1713,21 @@ function stableIdentityEvidence(identity: ExecAuthorityNativeIdentity): Readonly
     mode: identity.mode,
     linkCount: identity.linkCount,
     size: identity.size,
+  });
+}
+
+function stableMutableDirectoryIdentityEvidence(
+  identity: ExecAuthorityNativeIdentity,
+): Readonly<Record<string, unknown>> {
+  return freezeObject({
+    platform: identity.platform,
+    objectType: identity.objectType,
+    dev: identity.dev,
+    ino: identity.ino,
+    mntId: identity.mntId,
+    fsMagic: identity.fsMagic,
+    ownerUid: identity.ownerUid,
+    mode: identity.mode,
   });
 }
 
@@ -1587,6 +1781,101 @@ function parseDurableMarker(value: unknown): TaskAttemptCustodyDurableEffectMark
 }
 
 class PosixTaskAttemptCustodyAdapter extends PosixTaskAttemptCustodyAdapterCore {
+  private openNativeRoot(
+    native: ExecAuthorityNativeAvailable,
+    absoluteRoot: string,
+    create: boolean,
+  ): OpenedNativeObject {
+    try {
+      const opened = native.custody.invoke('open-root', {
+        path: absoluteRoot,
+        disposition: create ? 'OPEN_OR_CREATE' : 'OPEN_EXISTING',
+        privacyPolicy: 'OWNER_PRIVATE',
+      });
+      return { handle: opened.handle, identity: opened.identity };
+    } catch (error) {
+      if (!create || !isNativeMissing(error)) throw error;
+    }
+
+    // Native OPEN_OR_CREATE intentionally creates one leaf only. Build a missing
+    // hierarchy from the nearest already-existing owner-private ancestor while
+    // retaining native no-follow directory handles for every step. Path probes
+    // select an ancestor only; all trust and mutation decisions remain native.
+    const missing: string[] = [basename(absoluteRoot)];
+    let ancestorPath = dirname(absoluteRoot);
+    let ancestor: OpenedNativeObject | null = null;
+    while (ancestorPath !== dirname(ancestorPath) && missing.length <= 256) {
+      try {
+        const opened = native.custody.invoke('open-root', {
+          path: ancestorPath,
+          disposition: 'OPEN_EXISTING',
+          privacyPolicy: 'OWNER_PRIVATE',
+        });
+        ancestor = { handle: opened.handle, identity: opened.identity };
+        break;
+      } catch (error) {
+        if (!isNativeMissing(error)) throw error;
+        missing.push(basename(ancestorPath));
+        ancestorPath = dirname(ancestorPath);
+      }
+    }
+    if (ancestor === null || missing.length > 256) {
+      hold('UNSAFE_ROOT', 'open-root');
+    }
+
+    let current = ancestor;
+    let currentHandleOpen = true;
+    try {
+      for (const component of missing.reverse()) {
+        let child: OpenedNativeObject | null = null;
+        try {
+          const opened = native.custody.invoke('open-directory-at', {
+            parent: current.handle,
+            name: component,
+            disposition: 'OPEN_OR_CREATE',
+            privacyPolicy: 'OWNER_PRIVATE',
+          });
+          child = { handle: opened.handle, identity: opened.identity };
+          native.custody.invoke('apply-private', { handle: child.handle });
+          native.custody.invoke('sync', { handle: child.handle });
+          const identity = native.custody.invoke('identity', { handle: child.handle });
+          if (identity.objectType !== 'DIRECTORY') {
+            throw new TaskAttemptCustodyHold('NOT_REGULAR_FILE', 'open-root');
+          }
+          child = { handle: child.handle, identity };
+        } catch (error) {
+          if (child !== null) {
+            try { this.closeNativeHandle(native.custody, child.handle, 'open-root'); } catch {
+              hold('CLEANUP_UNCONFIRMED', 'open-root');
+            }
+          }
+          throw error;
+        }
+        this.closeNativeHandle(native.custody, current.handle, 'open-root');
+        current = child;
+      }
+      // `open-directory-at` returns a directory-scoped handle. The public root
+      // contract requires the distinct root handle kind, so a hierarchy created
+      // from an ancestor must be closed and reopened through `open-root` before
+      // any root-only operation such as `probe` or `prove-root-separation`.
+      this.closeNativeHandle(native.custody, current.handle, 'open-root');
+      currentHandleOpen = false;
+      const reopened = native.custody.invoke('open-root', {
+        path: absoluteRoot,
+        disposition: 'OPEN_EXISTING',
+        privacyPolicy: 'OWNER_PRIVATE',
+      });
+      return { handle: reopened.handle, identity: reopened.identity };
+    } catch (error) {
+      if (currentHandleOpen) {
+        try { this.closeNativeHandle(native.custody, current.handle, 'open-root'); } catch {
+          hold('CLEANUP_UNCONFIRMED', 'open-root');
+        }
+      }
+      throw error;
+    }
+  }
+
   openRoot(input: {
     readonly absoluteRoot: string;
     readonly canonicalProjectRoot: string;
@@ -1632,12 +1921,7 @@ class PosixTaskAttemptCustodyAdapter extends PosixTaskAttemptCustodyAdapterCore 
 
     let root: OpenedNativeObject | null = null;
     try {
-      const opened = native.custody.invoke('open-root', {
-        path: record.absoluteRoot,
-        disposition: record.create ? 'OPEN_OR_CREATE' : 'OPEN_EXISTING',
-        privacyPolicy: 'OWNER_PRIVATE',
-      });
-      root = { handle: opened.handle, identity: opened.identity };
+      root = this.openNativeRoot(native, record.absoluteRoot, record.create);
       const probe = native.custody.invoke('probe', { handle: root.handle });
       if (!probe.available || probe.identity === null) {
         this.closeNativeHandle(native.custody, root.handle, 'open-root');
@@ -1648,7 +1932,7 @@ class PosixTaskAttemptCustodyAdapter extends PosixTaskAttemptCustodyAdapterCore 
       const rootIdentity = native.custody.invoke('identity', { handle: root.handle });
       if (
         rootIdentity.objectType !== 'DIRECTORY'
-        || !sameObjectIdentity(probe.identity, rootIdentity)
+        || !sameMutableDirectoryIdentity(probe.identity, rootIdentity)
       ) hold('CAPABILITY_UNVERIFIED', 'open-root');
       const rootSeparation = native.custody.invoke('prove-root-separation', {
         custodyRoot: root.handle,
@@ -1657,12 +1941,12 @@ class PosixTaskAttemptCustodyAdapter extends PosixTaskAttemptCustodyAdapterCore 
       if (
         rootSeparation.state !== 'CONFIRMED'
         || rootSeparation.projectIdentity.objectType !== 'DIRECTORY'
-        || !sameObjectIdentity(rootIdentity, rootSeparation.custodyIdentity)
+        || !sameMutableDirectoryIdentity(rootIdentity, rootSeparation.custodyIdentity)
       ) hold('CAPABILITY_UNVERIFIED', 'open-root');
       const rootSeparationEvidenceDigest = digest('root-separation', {
         state: rootSeparation.state,
-        custodyIdentity: stableIdentityEvidence(rootSeparation.custodyIdentity),
-        projectIdentity: stableIdentityEvidence(rootSeparation.projectIdentity),
+        custodyIdentity: stableMutableDirectoryIdentityEvidence(rootSeparation.custodyIdentity),
+        projectIdentity: stableMutableDirectoryIdentityEvidence(rootSeparation.projectIdentity),
         featureEvidenceBits: rootSeparation.featureEvidenceBits,
       });
       const canonicalProjectRootSha256 = createHash('sha256')
@@ -1698,13 +1982,20 @@ class PosixTaskAttemptCustodyAdapter extends PosixTaskAttemptCustodyAdapterCore 
         directoryId,
         capabilityEvidenceDigest,
       });
+      // A directory's size and link count legitimately change as the custody
+      // store publishes children. Retaining the opening handle would therefore
+      // pin mutable directory metadata in the native registry and make later
+      // root operations report a false stale-handle condition. The initial
+      // handle is authority only for this opening proof; every subsequent
+      // root-relative operation reopens and revalidates the same object.
+      this.closeNativeHandle(native.custody, root.handle, 'open-root');
+      root = null;
       this.binding = freezeObject({
         absoluteRoot: record.absoluteRoot,
         canonicalProjectRoot: record.canonicalProjectRoot,
         projectId: record.projectId,
         native,
         custody: native.custody,
-        rootHandle: root.handle,
         rootIdentity,
         rootSeparation,
         rootSeparationEvidenceDigest,
@@ -2094,11 +2385,8 @@ class PosixTaskAttemptCustodyAdapter extends PosixTaskAttemptCustodyAdapterCore 
     componentCount: number,
     disposition: 'OPEN_EXISTING' | 'OPEN_OR_CREATE',
   ): OpenedNativeObject {
-    let current: OpenedNativeObject = {
-      handle: binding.rootHandle,
-      identity: binding.rootIdentity,
-    };
-    let currentOwned = false;
+    let current = this.openFreshBoundRoot(binding, 'create-directory');
+    let currentOwned = true;
     try {
       for (let index = 0; index < componentCount; index += 1) {
         const opened = binding.custody.invoke('open-directory-at', {
@@ -2141,10 +2429,11 @@ class PosixTaskAttemptCustodyAdapter extends PosixTaskAttemptCustodyAdapterCore 
     const name = components[components.length - 1];
     if (name === undefined) hold('UNSAFE_RELATIVE_PATH', 'seal-stream');
     if (components.length === 1) {
+      const root = this.openFreshBoundRoot(binding, 'seal-stream');
       return {
-        handle: binding.rootHandle,
-        identity: binding.rootIdentity,
-        owned: false,
+        handle: root.handle,
+        identity: root.identity,
+        owned: true,
         name,
       };
     }
@@ -2239,7 +2528,10 @@ class PosixTaskAttemptCustodyAdapter extends PosixTaskAttemptCustodyAdapterCore 
     if (identity.objectType !== 'DIRECTORY' || identity.mode !== '0700') {
       hold('PRIVACY_UNVERIFIED', 'probe');
     }
-    const identityEvidence = stableIdentityEvidence(identity);
+    // Directory entry count and size change as children are published. They are
+    // not part of directory identity; retaining them in the proof made a valid
+    // private output directory appear replaced after its first child write.
+    const identityEvidence = stableMutableDirectoryIdentityEvidence(identity);
     return freezeObject({
       relativePath: path,
       volumeId: identityVolumeId(identity),
@@ -2303,6 +2595,34 @@ class PosixTaskAttemptCustodyAdapter extends PosixTaskAttemptCustodyAdapterCore 
     }
   }
 
+  private openFreshBoundRoot(
+    binding: NativeRootBinding,
+    operation: TaskAttemptCustodyOperation,
+  ): OpenedNativeObject {
+    let opened: OpenedNativeObject | null = null;
+    try {
+      const result = binding.custody.invoke('open-root', {
+        path: binding.absoluteRoot,
+        disposition: 'OPEN_EXISTING',
+        privacyPolicy: 'OWNER_PRIVATE',
+      });
+      opened = { handle: result.handle, identity: result.identity };
+      if (!sameMutableDirectoryIdentity(binding.rootIdentity, opened.identity)) {
+        this.closeNativeHandle(binding.custody, opened.handle, operation);
+        opened = null;
+        hold('CAPABILITY_UNVERIFIED', operation);
+      }
+      return opened;
+    } catch (error) {
+      if (opened !== null) {
+        try { this.closeNativeHandle(binding.custody, opened.handle, operation); } catch {
+          return hold('CLEANUP_UNCONFIRMED', operation);
+        }
+      }
+      return mappedNativeHold(error, operation);
+    }
+  }
+
   protected requirePathCapability(
     capability: TaskAttemptCustodyPathCapability,
     binding: NativeRootBinding,
@@ -2351,28 +2671,44 @@ class PosixTaskAttemptCustodyAdapter extends PosixTaskAttemptCustodyAdapterCore 
   }
 
   protected revalidateRootSeparation(binding: NativeRootBinding): void {
+    let root: OpenedNativeObject | null = null;
     try {
+      root = this.openFreshBoundRoot(binding, 'resolve-mount');
       const separation = binding.custody.invoke('prove-root-separation', {
-        custodyRoot: binding.rootHandle,
+        custodyRoot: root.handle,
         canonicalProjectRoot: binding.canonicalProjectRoot,
       });
       const evidenceDigest = digest('root-separation', {
         state: separation.state,
-        custodyIdentity: stableIdentityEvidence(separation.custodyIdentity),
-        projectIdentity: stableIdentityEvidence(separation.projectIdentity),
+        custodyIdentity: stableMutableDirectoryIdentityEvidence(separation.custodyIdentity),
+        projectIdentity: stableMutableDirectoryIdentityEvidence(separation.projectIdentity),
         featureEvidenceBits: separation.featureEvidenceBits,
       });
-      if (
-        separation.state !== 'CONFIRMED'
-        || !sameObjectIdentity(binding.rootIdentity, separation.custodyIdentity)
-        || !sameObjectIdentity(
+      const failures = [
+        separation.state !== 'CONFIRMED' ? 'state' : null,
+        !sameMutableDirectoryIdentity(binding.rootIdentity, separation.custodyIdentity)
+          ? 'custody-identity'
+          : null,
+        !sameMutableDirectoryIdentity(
           binding.rootSeparation.projectIdentity,
           separation.projectIdentity,
-        )
-        || separation.featureEvidenceBits !== binding.rootSeparation.featureEvidenceBits
-        || evidenceDigest !== binding.rootSeparationEvidenceDigest
-      ) hold('CAPABILITY_UNVERIFIED', 'resolve-mount');
+        ) ? 'project-identity' : null,
+        separation.featureEvidenceBits !== binding.rootSeparation.featureEvidenceBits
+          ? 'feature-bits'
+          : null,
+        evidenceDigest !== binding.rootSeparationEvidenceDigest ? 'evidence-digest' : null,
+      ].filter((failure): failure is string => failure !== null);
+      if (failures.length > 0) {
+        hold('CAPABILITY_UNVERIFIED', 'resolve-mount');
+      }
+      this.closeNativeHandle(binding.custody, root.handle, 'resolve-mount');
+      root = null;
     } catch (error) {
+      if (root !== null) {
+        try { this.closeNativeHandle(binding.custody, root.handle, 'resolve-mount'); } catch {
+          return hold('CLEANUP_UNCONFIRMED', 'resolve-mount');
+        }
+      }
       return mappedNativeHold(error, 'resolve-mount');
     }
   }
@@ -2380,15 +2716,7 @@ class PosixTaskAttemptCustodyAdapter extends PosixTaskAttemptCustodyAdapterCore 
   protected revalidateRootPath(binding: NativeRootBinding): void {
     let reopened: OpenedNativeObject | null = null;
     try {
-      const result = binding.custody.invoke('open-root', {
-        path: binding.absoluteRoot,
-        disposition: 'OPEN_EXISTING',
-        privacyPolicy: 'OWNER_PRIVATE',
-      });
-      reopened = { handle: result.handle, identity: result.identity };
-      if (!sameObjectIdentity(binding.rootIdentity, reopened.identity)) {
-        hold('CAPABILITY_UNVERIFIED', 'resolve-mount');
-      }
+      reopened = this.openFreshBoundRoot(binding, 'resolve-mount');
       this.closeNativeHandle(binding.custody, reopened.handle, 'resolve-mount');
       reopened = null;
     } catch (error) {

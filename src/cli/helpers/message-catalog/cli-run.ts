@@ -437,6 +437,14 @@ export const CLI_RUN_MESSAGES: MessageFamily = Object.freeze({
     en: 'The task did not start because the shared execution gate held it ({reason}). No success was recorded.',
     tr: 'Ortak yürütme kapısı görevi beklettiği için iş başlamadı ({reason}). Başarı kaydı oluşturulmadı.',
   },
+  'cliContract.run.not_dispatched_receipt': {
+    en: 'The task did not start. receipt={receiptId} · reason={reason} · evidence={evidence}. No success was recorded.',
+    tr: 'Görev başlamadı. receipt={receiptId} · neden={reason} · kanıt={evidence}. Başarı kaydı oluşturulmadı.',
+  },
+  'cliContract.run.reconciliation_required_receipt': {
+    en: 'Dispatch state is uncertain and requires reconciliation. receipt={receiptId} · reason={reason} · evidence={evidence}. Task evidence was preserved.',
+    tr: 'Dispatch durumu belirsiz ve uzlaştırma gerekiyor. receipt={receiptId} · neden={reason} · kanıt={evidence}. Görev kanıtı korundu.',
+  },
   'cliContract.run.invalid_timeout': {
     en: 'Invalid timeout value: {value}',
     tr: 'Geçersiz zaman aşımı değeri: {value}',
@@ -2110,3 +2118,17 @@ export const CLI_RUN_FAMILY_CONTRACTS: readonly CliContractRow[] = Object.freeze
 export const CLI_RUN_FAMILY_PATHS: readonly string[] = Object.freeze(
   CLI_RUN_FAMILY_CONTRACTS.map((row) => cliContractPathKey(row.path)),
 );
+
+export function cliTaskIngressDispositionMessage(
+  state: 'not-dispatched' | 'dispatch-started' | 'reconciliation-required',
+  language: string,
+  vars: Readonly<{ receiptId: string; reason: string; evidence: string }>,
+): string {
+  return cliContractMessage(
+    state === 'not-dispatched'
+      ? 'cliContract.run.not_dispatched_receipt'
+      : 'cliContract.run.reconciliation_required_receipt',
+    language,
+    vars,
+  );
+}

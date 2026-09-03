@@ -195,6 +195,47 @@ describe('CrossVerifyProductionIngressAuthority', () => {
     });
   });
 
+  it('excludes the model-owned producer provider when task.provider is absent', async () => {
+    const ingress = new CrossVerifyProductionIngressAuthority({});
+    await expect(ingress.compose({
+      projectRoot: '/tmp/provider-free-xverify',
+      task: { ...task(), provider: undefined },
+      result: result(),
+      config: {
+        ...config(true),
+        cross_verify: {
+          ...config(true).cross_verify!,
+          verifier_priority: ['claude'],
+        },
+      },
+      operationClass: 'adjudicate-claim',
+      timeoutMs: 120_000,
+    })).resolves.toMatchObject({
+      state: 'hold',
+      reasonCode: 'xverify_provider_scope_unavailable',
+    });
+  });
+
+  it('holds before provider authority when task.provider contradicts its model registry identity', async () => {
+    const providerAuthority = new Proxy({}, {
+      get() {
+        throw new Error('provider identity mismatch advanced to provider authority');
+      },
+    }) as ProviderAuthorityRuntimeServiceOpenResult;
+    const ingress = new CrossVerifyProductionIngressAuthority({ providerAuthority });
+    await expect(ingress.compose({
+      projectRoot: '/tmp/provider-free-xverify',
+      task: { ...task(), provider: 'codex' },
+      result: result(),
+      config: config(true),
+      operationClass: 'adjudicate-claim',
+      timeoutMs: 120_000,
+    })).resolves.toMatchObject({
+      state: 'hold',
+      reasonCode: 'xverify_producer_provider_identity_mismatch',
+    });
+  });
+
   it('holds implementation verification before provider authority without a closed producer settlement', async () => {
     const providerAuthority = {
       state: 'ready',

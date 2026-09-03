@@ -123,6 +123,20 @@ function success(manifestValue: ExecutionEffectManifest): ExecutionEffectManifes
   return Object.freeze({ ok: true, manifest: manifestValue });
 }
 
+function withWorkspaceIdentity(
+  source: ExecutionEffectManifest,
+  workspaceIdentity: ExecutionEffectManifest['workspaceIdentity'],
+): ExecutionEffectManifest {
+  const { digest: _discardedDigest, ...body } = source;
+  const unsigned = Object.freeze({ ...body, workspaceIdentity: Object.freeze(workspaceIdentity) });
+  const parsed = parseExecutionEffectManifest(Object.freeze({
+    ...unsigned,
+    digest: digest('execution-effect-manifest-v1', unsigned),
+  }));
+  if (parsed === null) throw new Error('invalid workspace identity test manifest');
+  return parsed;
+}
+
 describe('execution effect containment', () => {
   it('binds the complete ordered native capture body before projecting a canonical manifest', () => {
     const limits = Object.freeze({
@@ -321,6 +335,33 @@ describe('execution effect containment', () => {
     expect(decision.effects.map(value => value.kind).sort()).toEqual(['add', 'delete', 'mode', 'modify']);
     expect(final.landingSemantics.unsupportedMetadata)
       .toBe('strip-xattr-acl-capability-sparse-ads-owner-times');
+  });
+
+  it('keeps capture-local root evidence separate from durable workspace identity', () => {
+    const baseline = manifest('baseline', ['file.txt'], [directory('.'), file('file.txt', 'before')]);
+    const finalSource = manifest('final', ['file.txt'], [directory('.'), file('file.txt', 'after')]);
+    const final = withWorkspaceIdentity(finalSource, {
+      ...finalSource.workspaceIdentity,
+      rootHandleEvidenceDigest: digest('test-root-handle', 'fresh-mount-namespace'),
+    });
+    const verified = evaluateExecutionEffectContainment({
+      baseline: success(baseline),
+      final: success(final),
+    });
+    expect(verified.state).toBe('VERIFIED');
+
+    const foreignDirectory = withWorkspaceIdentity(final, {
+      ...final.workspaceIdentity,
+      directoryId: 'ino:foreign',
+    });
+    const held = evaluateExecutionEffectContainment({
+      baseline: success(baseline),
+      final: success(foreignDirectory),
+    });
+    expect(held.state).toBe('HOLD');
+    if (held.state === 'HOLD') {
+      expect(held.holds).toContainEqual({ code: 'WORKSPACE_IDENTITY_MISMATCH' });
+    }
   });
 
   it('keeps content-equal delete and add separate because content cannot prove rename', () => {

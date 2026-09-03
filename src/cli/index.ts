@@ -50,6 +50,10 @@ import { registerRemember } from './commands/remember.js';
 import { registerMemory } from './commands/memory.js';
 import { registerTraceExtract } from './commands/trace-extract.js';
 import { registerResume } from './commands/resume.js';
+import {
+  createExactDockerTaskAuthorityDiscriminator,
+  createExactDockerTerminalAuthorityRevalidator,
+} from '../orchestra/spawn-backend-docker.js';
 import { registerHelp } from './commands/help.js';
 import { registerNervous } from './commands/nervous.js';
 import { registerConfigNervous } from './commands/config-nervous.js';
@@ -284,7 +288,10 @@ export function buildProgram(runtime: CliProgramRuntime = {}): Command {
   registerAgent(program);
   registerSkill(program);
   registerReview(program);
-  registerFinalize(program);
+  registerFinalize(program, {
+    resolveExactTaskTerminalAuthorityReader:
+      createExactDockerTaskAuthorityDiscriminator,
+  });
   registerExplain(program);
   registerSetDirectives(program);
   registerConnect(program);
@@ -315,7 +322,11 @@ export function buildProgram(runtime: CliProgramRuntime = {}): Command {
   registerRemember(program);
   registerMemory(program);
   registerTraceExtract(program);
-  registerResume(program);
+  registerResume(program, {
+    resolveExactTerminalAuthorityRevalidator:
+      createExactDockerTerminalAuthorityRevalidator,
+    resolveIsExactTask: createExactDockerTaskAuthorityDiscriminator,
+  });
   registerNervous(program);
   registerConfigNervous(program);
   registerMode(program);

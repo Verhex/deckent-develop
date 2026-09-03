@@ -2,7 +2,7 @@
 // Tests for write/read roundtrip, resume state derivation, and fallback.
 // Sprint 139 Task 030: dep graph resume restore tests added.
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mkdirSync, rmSync, existsSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -38,6 +38,8 @@ import {
   writeTaskResultSettlementAttemptAtomic,
   writeTaskResultSettlementClosureAtomic,
 } from '../../src/core/task-result-settlement.js';
+import type { ExactAcceptedResultTerminalAuthorityV2 } from '../../src/orchestra/exact-accepted-result-terminal-authority.js';
+import type { ExactAcceptedTaskTerminalAuthorityRead } from '../../src/orchestra/evaluation-audit-trail.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
@@ -75,6 +77,92 @@ function makeMinimalSprint(tasks: Task[], phase = SprintPhase.EXECUTE): Sprint {
   };
 }
 
+const exactDigest = (character: string): `sha256:${string}` =>
+  `sha256:${character.repeat(64)}`;
+
+function exactCheckpointAuthority(
+  taskId: string,
+  verdict: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO' = 'DONE',
+): ExactAcceptedResultTerminalAuthorityV2 {
+  const identity = {
+    schemaVersion: 2 as const,
+    backend: 'docker' as const,
+    projectRootSha256: 'a'.repeat(64),
+    projectId: 'checkpoint-project',
+    taskId,
+    attemptId: `exact-attempt:${taskId}`,
+    generation: 1,
+  };
+  const accepted = {
+    executionMode: 'normal-docker' as const,
+    identity,
+    admissionReceiptDigest: exactDigest('1'),
+    acceptedResultRef: {
+      schemaVersion: 2 as const,
+      kind: 'task-accepted-result-v2-ref' as const,
+      identity,
+      artifactKey: 'accepted-result',
+      artifactReceiptDigest: exactDigest('2'),
+    },
+    acceptedResultChainDigest: exactDigest('3'),
+    resultDigest: exactDigest('4'),
+  };
+  const terminal = {
+    executionMode: 'normal-docker' as const,
+    identity,
+    admissionReceiptDigest: accepted.admissionReceiptDigest,
+    settlementRef: {
+      schemaVersion: 2 as const,
+      kind: 'task-result-settlement-v2-ref' as const,
+      identity,
+      artifactKey: 'settlement',
+      artifactReceiptDigest: exactDigest('5'),
+    },
+    settlementDigest: exactDigest('6'),
+    resultDigest: accepted.resultDigest,
+    acceptedResultChainDigest: accepted.acceptedResultChainDigest,
+    evaluationChainDigest: exactDigest('7'),
+    finalizerChainDigest: exactDigest('8'),
+    evaluationArtifact: {
+      artifactReceiptDigest: exactDigest('9'),
+      chainDigest: exactDigest('7'),
+      artifactSha256: exactDigest('a'),
+      byteLength: 128,
+    },
+    finalizerArtifact: {
+      artifactReceiptDigest: exactDigest('b'),
+      chainDigest: exactDigest('8'),
+      artifactSha256: exactDigest('c'),
+      byteLength: 96,
+    },
+  };
+  return {
+    schemaVersion: 2,
+    kind: 'exact-accepted-result-terminal-authority-v2',
+    acceptedAuthority: accepted,
+    terminalResultAuthority: terminal,
+    terminalDecisionAuthority: {
+      schemaVersion: 2,
+      kind: 'exact-task-terminal-decision-authority-v2',
+      identity,
+      evaluationReceipt: {
+        verdict,
+        artifactReceiptDigest: terminal.evaluationArtifact.artifactReceiptDigest,
+        artifactSha256: terminal.evaluationArtifact.artifactSha256,
+        byteLength: terminal.evaluationArtifact.byteLength,
+        chainDigest: terminal.evaluationChainDigest,
+      },
+      finalizerReceipt: {
+        state: 'terminal-ready',
+        artifactReceiptDigest: terminal.finalizerArtifact.artifactReceiptDigest,
+        artifactSha256: terminal.finalizerArtifact.artifactSha256,
+        byteLength: terminal.finalizerArtifact.byteLength,
+        chainDigest: terminal.finalizerChainDigest,
+      },
+    },
+  };
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────
 
 describe('writeCheckpoint + readCheckpoint', () => {
@@ -102,6 +190,217 @@ describe('writeCheckpoint + readCheckpoint', () => {
     expect(read!.completedTasks).toEqual(written!.completedTasks);
     expect(read!.pendingTasks).toEqual(written!.pendingTasks);
     expect(read!.eventStreamOffset).toBe(42);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('persists exact terminal authority and requires Store revalidation before resume', () => {
+    const root = makeTempDir();
+    mkdirSync(join(root, '.tasks'), { recursive: true });
+    const terminalTask = makeMinimalTask('138-901', TaskStatus.DONE);
+    terminalTask.sprintId = 'sprint-138';
+    writeFileSync(
+      join(root, '.tasks', 'task-138-901.json'),
+      `${JSON.stringify(terminalTask, null, 2)}\n`,
+      'utf-8',
+    );
+    writeFileSync(
+      join(root, '.tasks', 'task-138-901.result'),
+      JSON.stringify({ taskId: terminalTask.id, selfAssessment: 'DONE' }),
+      'utf-8',
+    );
+    const authority = exactCheckpointAuthority(terminalTask.id, 'NO_GO');
+    const written = writeCheckpoint(
+      root,
+      makeMinimalSprint([terminalTask]),
+      0,
+      undefined,
+      new Map([[terminalTask.id, authority]]),
+    );
+    expect(written?.taskStates?.[0]?.exactTerminalAuthority).toEqual(authority);
+    const checkpoint = readCheckpoint(root, 'sprint-138');
+    expect(checkpoint?.taskStates?.[0]?.exactTerminalAuthority).toEqual(authority);
+    expect(() => buildPreplannedResumeSprint(root, checkpoint!, []))
+      .toThrow(/requires Store revalidation/);
+
+    const revalidate = vi.fn(() => ({
+      state: 'current',
+      terminalAuthority: authority,
+      terminalResultAuthority: authority.terminalResultAuthority,
+      evaluationReceipt: { verdict: 'NO_GO', receiptDigest: exactDigest('d') },
+      finalizerReceipt: { verdict: 'NO_GO' },
+      result: {
+        taskId: terminalTask.id,
+        attemptCustody: { identity: authority.acceptedAuthority.identity },
+      },
+      projectedResult: {
+        taskId: terminalTask.id,
+        workerId: `w-${terminalTask.id}`,
+        filesChanged: [], linesAdded: 0, linesRemoved: 0,
+        testsPassed: false, coverage: 0, selfAssessment: 'DONE', notes: 'exact projection',
+      },
+    } as unknown as ExactAcceptedTaskTerminalAuthorityRead));
+    const restored = buildPreplannedResumeSprint(root, checkpoint!, [], revalidate);
+    expect(restored.tasks[0]?.status).toBe(TaskStatus.NO_GO);
+    expect(revalidate).toHaveBeenCalledWith({
+      taskId: terminalTask.id,
+      expectedTerminalAuthority: authority,
+    });
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('restores exact terminal status from fresh Store authority, not a stale public result', () => {
+    const root = makeTempDir();
+    mkdirSync(join(root, '.tasks'), { recursive: true });
+    const task = makeMinimalTask('138-902', TaskStatus.DONE);
+    task.sprintId = 'sprint-138';
+    writeFileSync(join(root, '.tasks', 'task-138-902.json'), JSON.stringify(task), 'utf-8');
+    writeFileSync(join(root, '.tasks', 'task-138-902.result'), JSON.stringify({
+      taskId: task.id,
+      selfAssessment: 'NO_GO',
+    }), 'utf-8');
+    const terminalAuthority = exactCheckpointAuthority(task.id, 'DONE');
+    writeCheckpoint(
+      root,
+      makeMinimalSprint([task]),
+      0,
+      undefined,
+      new Map([[task.id, terminalAuthority]]),
+    );
+    const current = {
+      state: 'current',
+      terminalAuthority,
+      terminalResultAuthority: terminalAuthority.terminalResultAuthority,
+      evaluationReceipt: { verdict: 'DONE', receiptDigest: exactDigest('d') },
+      finalizerReceipt: { verdict: 'DONE' },
+      result: {
+        taskId: task.id,
+        attemptCustody: { identity: terminalAuthority.acceptedAuthority.identity },
+      },
+      projectedResult: {
+        taskId: task.id,
+        workerId: `w-${task.id}`,
+        filesChanged: [], linesAdded: 0, linesRemoved: 0,
+        testsPassed: true, coverage: 100, selfAssessment: 'DONE', notes: 'exact Store projection',
+      },
+    } as unknown as ExactAcceptedTaskTerminalAuthorityRead;
+
+    const restored = restoreSprintFromCheckpoint(root, 'sprint-138', {
+      terminalAuthorities: new Map([[task.id, current]]),
+      isExactTask: taskId => taskId === task.id,
+    });
+
+    expect(restored.action).toBe('complete');
+    expect(restored.restoredSprint?.tasks[0]?.status).toBe(TaskStatus.DONE);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('parks recovered exact work without current authority before public cascade', () => {
+    const root = makeTempDir();
+    mkdirSync(join(root, '.tasks'), { recursive: true });
+    const upstream = makeMinimalTask('138-903', TaskStatus.NO_GO);
+    upstream.sprintId = 'sprint-138';
+    const downstream = makeMinimalTask('138-904', TaskStatus.PENDING);
+    downstream.sprintId = 'sprint-138';
+    downstream.dependencies = [upstream.id];
+    for (const task of [upstream, downstream]) {
+      writeFileSync(
+        join(root, '.tasks', `task-${task.id}.json`),
+        JSON.stringify(task),
+        'utf-8',
+      );
+    }
+    writeFileSync(join(root, '.tasks', `task-${upstream.id}.result`), JSON.stringify({
+      taskId: upstream.id,
+      selfAssessment: 'NO_GO',
+    }), 'utf-8');
+    writeCheckpoint(root, makeMinimalSprint([upstream, downstream]), 0);
+
+    const restored = restoreSprintFromCheckpoint(root, 'sprint-138', {
+      terminalAuthorities: new Map(),
+      isExactTask: taskId => taskId === upstream.id,
+    });
+
+    expect(restored.cascadeSkippedTasks).toEqual([]);
+    expect(restored.restoredSprint?.tasks.find(task => task.id === upstream.id)?.status)
+      .toBe(TaskStatus.PAUSED);
+    expect(restored.restoredSprint?.tasks.find(task => task.id === downstream.id)?.status)
+      .toBe(TaskStatus.PENDING);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('rejects a checkpoint whose exact terminal authority was tampered', () => {
+    const root = makeTempDir();
+    const terminalTask = makeMinimalTask('138-902', TaskStatus.DONE);
+    const authority = exactCheckpointAuthority(terminalTask.id);
+    const written = writeCheckpoint(
+      root,
+      makeMinimalSprint([terminalTask]),
+      0,
+      undefined,
+      new Map([[terminalTask.id, authority]]),
+    );
+    const checkpointPath = join(root, '.deckent', 'sprint-138-checkpoint.json');
+    const tampered = JSON.parse(readFileSync(checkpointPath, 'utf-8')) as SprintCheckpoint;
+    const exact = tampered.taskStates?.[0]?.exactTerminalAuthority;
+    if (!exact) throw new Error('exact checkpoint fixture missing');
+    (exact.terminalDecisionAuthority.evaluationReceipt as { artifactSha256: string })
+      .artifactSha256 = exactDigest('f');
+    writeFileSync(checkpointPath, `${JSON.stringify(tampered, null, 2)}\n`, 'utf-8');
+
+    expect(written).not.toBeNull();
+    expect(readCheckpoint(root, 'sprint-138')).toBeNull();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('rejects a checkpoint whose payload names a different sprint', () => {
+    const root = makeTempDir();
+    const written = writeCheckpoint(
+      root,
+      makeMinimalSprint([makeMinimalTask('138-904', TaskStatus.DONE)]),
+      0,
+    );
+    expect(written).not.toBeNull();
+    const filePath = join(root, '.deckent', 'sprint-138-checkpoint.json');
+    const foreign = JSON.parse(readFileSync(filePath, 'utf-8')) as SprintCheckpoint;
+    foreign.sprintId = 'sprint-foreign';
+    writeFileSync(filePath, `${JSON.stringify(foreign, null, 2)}\n`, 'utf-8');
+
+    expect(readCheckpoint(root, 'sprint-138')).toBeNull();
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('throws instead of silently dropping an exact terminal authority write failure', () => {
+    const root = makeTempDir();
+    const task = makeMinimalTask('138-905', TaskStatus.DONE);
+    const foreignAuthority = exactCheckpointAuthority('138-foreign');
+
+    expect(() => writeCheckpoint(
+      root,
+      makeMinimalSprint([task]),
+      0,
+      undefined,
+      new Map([[task.id, foreignAuthority]]),
+    )).toThrow(/exact terminal authority is invalid/u);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('parks a raw exact-custody result instead of trusting its public self-assessment', () => {
+    const root = makeTempDir();
+    mkdirSync(join(root, '.tasks'), { recursive: true });
+    writeFileSync(
+      join(root, '.tasks', 'task-138-903.result'),
+      JSON.stringify({
+        taskId: '138-903',
+        selfAssessment: 'DONE',
+        attemptCustody: { identity: { taskId: '138-903' } },
+      }),
+      'utf-8',
+    );
+
+    expect(readResumeTaskResultAuthority(root, '138-903')).toEqual({
+      state: 'pending-settlement',
+      result: null,
+    });
     rmSync(root, { recursive: true, force: true });
   });
 
@@ -634,6 +933,34 @@ describe('resetInterruptedWorkersToPending + deriveResumableTaskIds (455-001)', 
     const restored = buildPreplannedResumeSprint(root, cp, []);
     expect(restored.tasks).toHaveLength(1);
     expect(restored.tasks[0]?.status).toBe(TaskStatus.NO_GO);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('never restores an exact task from a forged public verdict when its checkpoint ref is missing', () => {
+    const root = setupRoot();
+    writeTaskJson(root, '455-003x', TaskStatus.DONE);
+    writeFileSync(
+      join(root, '.tasks', 'task-455-003x.result'),
+      JSON.stringify({
+        taskId: '455-003x',
+        selfAssessment: 'DONE',
+        brainEvaluation: 'DONE',
+      }),
+      'utf-8',
+    );
+    const cp = baseCp({
+      completedTasks: ['455-003x'],
+      schemaVersion: 2,
+      taskStates: [{ id: '455-003x', status: TaskStatus.DONE }],
+    });
+
+    expect(() => buildPreplannedResumeSprint(
+      root,
+      cp,
+      [],
+      undefined,
+      taskId => taskId === '455-003x',
+    )).toThrow(/exact checkpoint terminal authority reference is missing/u);
     rmSync(root, { recursive: true, force: true });
   });
 

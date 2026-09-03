@@ -168,11 +168,23 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { updateDashboard } from '../../src/monitor/auditor.js';
+import { killWorker } from '../../src/orchestra/tmux.js';
+import type { ExactNormalDockerExecutionRegistryV2 } from '../../src/orchestra/scheduler-effects.js';
+import {
+  registerWorkerChannel,
+  unregisterWorkerChannel,
+} from '../../src/orchestra/ipc-registry.js';
+import type { WorkerChannel } from '../../src/agents/worker-ipc.js';
+import * as sprintCheckpoint from '../../src/orchestra/sprint-checkpoint.js';
 
 import {
   pauseSprint,
   resumeSprint,
 } from '../../src/orchestra/brain.js';
+import {
+  pauseSprintExact,
+  resumeSprintExact,
+} from '../../src/orchestra/sprint-lifecycle.js';
 
 const mockedUpdateDashboard = vi.mocked(updateDashboard);
 
@@ -655,5 +667,148 @@ describe('pauseSprint + resumeSprint roundtrip', () => {
 
     expect(tasks[0].status).toBe(TaskStatus.DONE);
     expect(tasks[1].status).toBe(TaskStatus.PENDING);
+  });
+
+  it('contains exact Docker custody without tmux kill or duplicate pending spawn', async () => {
+    const task = makeTask('001', TaskStatus.PENDING);
+    const sprint = makeSprint([task]);
+    const reconcileExactLifecycle = vi.fn(async () => []);
+    const foreignChannel = { pause: vi.fn(), close: vi.fn() } as unknown as WorkerChannel;
+    registerWorkerChannel(task.id, foreignChannel);
+    const registry = {
+      isExactTask: (taskId: string) => taskId === task.id,
+      reconcileExactLifecycle,
+      snapshotExactTerminalAuthorities: () => new Map([[task.id, {
+        state: 'hold',
+        reasonCode: 'exact-not-dispatched',
+      }]]),
+      readTaskResultAuthority: () => ({
+        state: 'not-dispatched',
+        result: null,
+        settlementRef: null,
+        rawResultPath: join(projectRoot, '.tasks', `task-${task.id}.result`),
+        attemptCount: 0,
+      }),
+    } as unknown as ExactNormalDockerExecutionRegistryV2;
+
+    await pauseSprintExact(projectRoot, sprint, 'owner pause', 'manual-pause', registry);
+    expect(task.status).toBe(TaskStatus.PAUSED);
+    expect(killWorker).not.toHaveBeenCalled();
+    expect(foreignChannel.pause).not.toHaveBeenCalled();
+    expect(reconcileExactLifecycle).toHaveBeenNthCalledWith(1, 'contain');
+
+    await resumeSprintExact(projectRoot, sprint, registry);
+    expect(task.status).toBe(TaskStatus.PENDING);
+    expect(reconcileExactLifecycle).toHaveBeenNthCalledWith(2, 'resume');
+    unregisterWorkerChannel(task.id);
+  });
+
+  it('keeps a reconciliable exact accepted attempt EXECUTING on resume', async () => {
+    const task = makeTask('002', TaskStatus.PAUSED);
+    const sprint = makeSprint([task]);
+    const registry = {
+      isExactTask: (taskId: string) => taskId === task.id,
+      reconcileExactLifecycle: vi.fn(async () => []),
+      snapshotExactTerminalAuthorities: () => new Map([[task.id, {
+        state: 'hold', reasonCode: 'exact-terminal-awaiting-settlement',
+      }]]),
+      readTaskResultAuthority: () => ({
+        state: 'exact-accepted',
+        result: { taskId: task.id },
+        settlementRef: null,
+        rawResultPath: join(projectRoot, '.tasks', `task-${task.id}.result`),
+        exactAcceptedAuthority: { identity: { taskId: task.id } },
+      }),
+    } as unknown as ExactNormalDockerExecutionRegistryV2;
+
+    await resumeSprintExact(projectRoot, sprint, registry);
+
+    expect(task.status).toBe(TaskStatus.EXECUTING);
+    expect(task.status).not.toBe(TaskStatus.PENDING);
+  });
+
+  it('settles and fresh-revalidates an accepted exact attempt before pause projection', async () => {
+    const task = makeTask('accepted-001', TaskStatus.EXECUTING);
+    const sprint = makeSprint([task]);
+    const terminalAuthority = { acceptedAuthority: { identity: { taskId: task.id } } };
+    const current = {
+      state: 'current',
+      terminalAuthority,
+      evaluationReceipt: { verdict: 'DONE' },
+      finalizerReceipt: { verdict: 'DONE' },
+    };
+    const settleExactAcceptedResult = vi.fn(async () => ({
+      state: 'settled', terminalAuthority,
+    }));
+    const readExactTerminalAuthority = vi.fn(() => current);
+    const registry = {
+      isExactTask: (taskId: string) => taskId === task.id,
+      reconcileExactLifecycle: vi.fn(async () => []),
+      settleExactAcceptedResult,
+      readExactTerminalAuthority,
+      snapshotExactTerminalAuthorities: () => new Map([[task.id, current]]),
+      readTaskResultAuthority: () => ({
+        state: 'exact-accepted',
+        result: { taskId: task.id },
+        settlementRef: null,
+        rawResultPath: join(projectRoot, '.tasks', `task-${task.id}.result`),
+        exactAcceptedAuthority: { identity: { taskId: task.id } },
+      }),
+    } as unknown as ExactNormalDockerExecutionRegistryV2;
+    const checkpointSpy = vi.spyOn(sprintCheckpoint, 'writeCheckpoint')
+      .mockReturnValue(null);
+    try {
+      await pauseSprintExact(projectRoot, sprint, 'owner pause', 'manual-pause', registry);
+    } finally {
+      checkpointSpy.mockRestore();
+    }
+
+    expect(settleExactAcceptedResult).toHaveBeenCalledTimes(1);
+    expect(readExactTerminalAuthority).toHaveBeenCalled();
+    expect(task.status).toBe(TaskStatus.DONE);
+    expect(killWorker).not.toHaveBeenCalled();
+  });
+
+  it('rolls exact resume projection back when checkpoint persistence holds', async () => {
+    const task = makeTask('003', TaskStatus.PAUSED);
+    const sprint = makeSprint([task]);
+    writeFileSync(
+      join(projectRoot, '.tasks', `task-${task.id}.json`),
+      JSON.stringify(task),
+      'utf-8',
+    );
+    writeFileSync(
+      join(projectRoot, '.tasks', `task-${task.id}.paused`),
+      JSON.stringify({ taskId: task.id, previousStatus: TaskStatus.PENDING }),
+      'utf-8',
+    );
+    const terminalAuthority = { acceptedAuthority: { identity: { taskId: task.id } } };
+    const current = {
+      state: 'current',
+      terminalAuthority,
+      evaluationReceipt: { verdict: 'DONE' },
+      finalizerReceipt: { verdict: 'DONE' },
+    };
+    const registry = {
+      isExactTask: (taskId: string) => taskId === task.id,
+      reconcileExactLifecycle: vi.fn(async () => []),
+      snapshotExactTerminalAuthorities: () => new Map([[task.id, current]]),
+      readExactTerminalAuthority: () => current,
+      readTaskResultAuthority: () => ({
+        state: 'exact-accepted', result: { taskId: task.id }, settlementRef: null,
+        rawResultPath: join(projectRoot, '.tasks', `task-${task.id}.result`),
+        exactAcceptedAuthority: terminalAuthority.acceptedAuthority,
+      }),
+    } as unknown as ExactNormalDockerExecutionRegistryV2;
+    process.env.DECKENT_CHECKPOINT_V1 = '1';
+    try {
+      await expect(resumeSprintExact(projectRoot, sprint, registry))
+        .rejects.toMatchObject({ code: 'DECKENT_E077' });
+    } finally {
+      delete process.env.DECKENT_CHECKPOINT_V1;
+    }
+
+    expect(task.status).toBe(TaskStatus.PAUSED);
+    expect(existsSync(join(projectRoot, '.tasks', `task-${task.id}.paused`))).toBe(true);
   });
 });

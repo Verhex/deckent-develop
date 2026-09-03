@@ -22,6 +22,7 @@ import {
   writeTaskResultSettlementClosureAtomic,
 } from '../../src/core/task-result-settlement.js';
 import {
+  readCrossVerifyTaskSettlement,
   runCrossVerify,
   type MandatoryCrossVerifyAdjudicationAuthority,
   type MandatoryCrossVerifyInvocationComposition,
@@ -34,13 +35,22 @@ const DECISION_REF = 'owner-live-2026-08-24-opus5-xverify-accepted';
 const ATTEMPT_ID = '22222222-2222-4222-8222-222222222222';
 
 let checkout = '';
+let hostStateRoot = '';
+const originalDeckentHome = process.env.DECKENT_HOME;
 
 beforeEach(() => {
   checkout = mkdtempSync(join(tmpdir(), 'deckent-xverify-owner-authority-'));
+  hostStateRoot = mkdtempSync(join(tmpdir(), 'deckent-xverify-owner-authority-host-state-'));
+  process.env.DECKENT_HOME = join(hostStateRoot, '.deckent');
   mkdirSync(join(checkout, TASKS_DIR), { recursive: true });
 });
 
-afterEach(() => rmSync(checkout, { recursive: true, force: true }));
+afterEach(() => {
+  if (originalDeckentHome === undefined) delete process.env.DECKENT_HOME;
+  else process.env.DECKENT_HOME = originalDeckentHome;
+  rmSync(checkout, { recursive: true, force: true });
+  rmSync(hostStateRoot, { recursive: true, force: true });
+});
 
 function exactAuthority(
   overrides: Partial<CrossVerifyConfig['verifier_tier_authority']['decisions'][number]> = {},
@@ -207,6 +217,7 @@ function composition(
 ) {
   const execute = vi.fn(async () => coordinatorResult);
   const composed: MandatoryCrossVerifyInvocationComposition = {
+    producerProvider: 'codex',
     coordinator: { execute },
     input: {
       executionContract: { verifierTaskId: `${id}-xverify`, attemptId: ATTEMPT_ID, provider: 'claude' },
@@ -265,11 +276,11 @@ describe('XVerify owner-tier authority production fan-in', () => {
       taskSettlementReceipt: { authorityEvidenceRef: `${DECISION_REF}-reloaded` },
     });
     expect(run.validatedAdjudicationReceipt?.verdictReceiptSha256).toBe('a'.repeat(64));
-    const stored = JSON.parse(readFileSync(
-      join(checkout, TASKS_DIR, `task-${id}-xverify.result`),
-      'utf8',
-    )) as { xverifyTaskSettlement?: { authorityEvidenceRef?: string; settlementDigest?: string } };
-    expect(stored.xverifyTaskSettlement).toMatchObject({
+    expect(readCrossVerifyTaskSettlement({
+      projectRoot: checkout,
+      taskId: `${id}-xverify`,
+      attemptId: ATTEMPT_ID,
+    })).toMatchObject({
       authorityEvidenceRef: `${DECISION_REF}-reloaded`,
       settlementDigest: run.taskSettlementReceipt?.settlementDigest,
     });
@@ -308,7 +319,7 @@ describe('XVerify owner-tier authority production fan-in', () => {
     );
 
     expect(exact.execute).toHaveBeenCalledOnce();
-    expect(run).toMatchObject({ outcome: 'unavailable', ran: false, blocked: true });
+    expect(run).toMatchObject({ outcome: 'unavailable', ran: true, blocked: true });
     expect(run.skippedReason).toContain('xverify_verifier_tier_below_author');
   });
 
@@ -339,7 +350,12 @@ describe('XVerify owner-tier authority production fan-in', () => {
       { verifierModel: VERIFIER_MODEL, mandatoryInvocation: exact.composed },
     );
 
-    expect(run).toMatchObject({ outcome: 'unavailable', disposition: 'hold', ran: false, blocked: true });
+    expect(run).toMatchObject({
+      outcome: 'unavailable',
+      disposition: 'hold',
+      ran: coordinatorResult.state === 'reconciliation-required',
+      blocked: true,
+    });
     expect(exact.execute).toHaveBeenCalledOnce();
   });
 
@@ -355,7 +371,7 @@ describe('XVerify owner-tier authority production fan-in', () => {
         { verifierModel: VERIFIER_MODEL, mandatoryInvocation: exact.composed },
       );
 
-      expect(run).toMatchObject({ outcome: 'unavailable', disposition: 'hold', ran: false, blocked: true });
+      expect(run).toMatchObject({ outcome: 'unavailable', disposition: 'hold', ran: true, blocked: true });
       expect(run.skippedReason).toContain('verifier-adjudication-receipt-persistence-failed');
     },
   );

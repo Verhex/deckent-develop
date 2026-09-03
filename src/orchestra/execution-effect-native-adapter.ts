@@ -19,10 +19,12 @@ import {
   type ExecAuthorityNativeEffectHandle,
   type ExecAuthorityNativeCustodyFacade,
   type ExecAuthorityNativeCustodyHandle,
+  type ExecAuthorityNativeIdentity,
   type ExecAuthorityNativeState,
 } from '../core/exec-authority-native.js';
 import {
   createExecutionEffectStagedSourceSealV1,
+  executionEffectWorkspaceAuthorityDigestV1,
   executionEffectLandingOperationDigestV1,
   parseExecutionEffectLandingTransactionRefV1,
   parseExecutionEffectWorkspaceSnapshotSealV1,
@@ -81,6 +83,8 @@ const MAX_NATIVE_CHUNK_BYTES = 64 * 1024 * 1024;
 const MAX_DOCKER_CAPTURE_BYTES = 16 * 1024 * 1024;
 const HELPER_MOUNT_TARGET = '/workspace' as const;
 const ADAPTER_ID = 'execution-effect-native-linux-v1' as const;
+export const EXECUTION_EFFECT_DOCKER_NATIVE_SNAPSHOT_DIRECTORY = '/run/deckent-native-snapshot';
+const EXECUTION_EFFECT_DOCKER_NATIVE_SNAPSHOT_TMPFS_SIZE = '2m';
 
 const objectEntries = Object.entries;
 const objectFreeze = Object.freeze;
@@ -90,6 +94,33 @@ const objectGetPrototypeOf = Object.getPrototypeOf;
 const objectKeys = Object.keys;
 const objectPrototype = Object.prototype;
 const reflectOwnKeys = Reflect.ownKeys;
+
+/**
+ * One canonical Docker argument contract for the verified executable native
+ * snapshot. Both workspace capture and landing source-read helpers use it.
+ */
+export function executionEffectDockerNativeSnapshotTmpfs(
+  uid?: number,
+  gid?: number,
+): string {
+  if ((uid === undefined) !== (gid === undefined)
+    || (uid !== undefined && (!Number.isSafeInteger(uid) || uid < 0))
+    || (gid !== undefined && (!Number.isSafeInteger(gid) || gid < 0))) {
+    throw new TypeError('Invalid execution-effect Docker native snapshot owner');
+  }
+  const ownership = uid === undefined || gid === undefined ? '' : `,uid=${uid},gid=${gid}`;
+  return `${EXECUTION_EFFECT_DOCKER_NATIVE_SNAPSHOT_DIRECTORY}:rw,exec,nosuid,nodev,size=${EXECUTION_EFFECT_DOCKER_NATIVE_SNAPSHOT_TMPFS_SIZE},mode=0700${ownership}`;
+}
+
+export function buildExecutionEffectDockerNativeSnapshotArgs(
+  uid?: number,
+  gid?: number,
+): readonly string[] {
+  return objectFreeze([
+    '-e', `TMPDIR=${EXECUTION_EFFECT_DOCKER_NATIVE_SNAPSHOT_DIRECTORY}`,
+    '--tmpfs', executionEffectDockerNativeSnapshotTmpfs(uid, gid),
+  ]);
+}
 
 function compareCodePoint(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -245,6 +276,8 @@ function fail(
 export interface ExecutionEffectDockerWorkspaceRuntimeV1 {
   readonly version: 1;
   readonly state: 'SEALED';
+  readonly workspaceOwnerUid: number;
+  readonly workspaceOwnerGid: number;
   readonly imageReference: string;
   readonly imageDigest: ExecutionEffectPersistenceDigest;
   readonly volumeName: string;
@@ -378,6 +411,8 @@ export interface ExecutionEffectDockerSourceInvocationV1 extends Omit<
   DockerReceiptBody,
   'sourceObjectIdentityDigest' | 'chunkCount'
 > {
+  readonly workspaceOwnerUid: number;
+  readonly workspaceOwnerGid: number;
   readonly destinationFd: number;
   readonly deadlineUnixMs: number;
   readonly maxChunkBytes: number;
@@ -463,6 +498,8 @@ function defaultDockerExecutor(): ExecutionEffectDockerSourceExecutorV1 {
       delete authority.destinationFd;
       delete authority.timeoutMs;
       delete authority.receiptMaxBytes;
+      delete authority.workspaceOwnerUid;
+      delete authority.workspaceOwnerGid;
       const encoded = Buffer.from(JSON.stringify(authority), 'utf8').toString('base64url');
       const containerName = `deckent-effect-read-${input.invocationDigest.slice(7, 39)}`;
       return new Promise((resolve, reject) => {
@@ -470,6 +507,11 @@ function defaultDockerExecutor(): ExecutionEffectDockerSourceExecutorV1 {
           'run', '--rm', '--name', containerName,
           '--network', 'none', '--read-only', '--cap-drop', 'ALL',
           '--security-opt', 'no-new-privileges',
+          '--user', `${input.workspaceOwnerUid}:${input.workspaceOwnerGid}`,
+          ...buildExecutionEffectDockerNativeSnapshotArgs(
+            input.workspaceOwnerUid,
+            input.workspaceOwnerGid,
+          ),
           '--mount', `type=volume,src=${input.volumeName},dst=${input.mountTarget},readonly`,
           input.imageReference, 'node', '--input-type=module', '-e', DOCKER_SOURCE_HELPER,
           encoded,
@@ -926,10 +968,17 @@ function runtimeSnapshot(
   workspace: ExecutionEffectWorkspaceSnapshotSealV1,
 ): ExecutionEffectDockerWorkspaceRuntimeV1 | null {
   if (!exactDataObject(value, [
-    'version', 'state', 'imageReference', 'imageDigest', 'volumeName', 'volumeNameDigest',
+    'version', 'state', 'workspaceOwnerUid', 'workspaceOwnerGid',
+    'imageReference', 'imageDigest', 'volumeName', 'volumeNameDigest',
     'volumeIdentityDigest', 'mountTarget', 'mountIdentityDigest', 'workspaceResourceDigest',
     'workspaceSnapshotSealDigest', 'manifestDigest',
   ]) || value.version !== 1 || value.state !== 'SEALED'
+    || !Number.isSafeInteger(value.workspaceOwnerUid)
+    || (value.workspaceOwnerUid as number) < 0
+    || (value.workspaceOwnerUid as number) >= 0xffffffff
+    || !Number.isSafeInteger(value.workspaceOwnerGid)
+    || (value.workspaceOwnerGid as number) < 0
+    || (value.workspaceOwnerGid as number) >= 0xffffffff
     || typeof value.imageReference !== 'string' || !DOCKER_IMAGE.test(value.imageReference)
     || typeof value.volumeName !== 'string' || !SAFE_RESOURCE.test(value.volumeName)
     || value.mountTarget !== HELPER_MOUNT_TARGET
@@ -948,6 +997,8 @@ function runtimeSnapshot(
   return objectFreeze({
     version: 1,
     state: 'SEALED',
+    workspaceOwnerUid: value.workspaceOwnerUid as number,
+    workspaceOwnerGid: value.workspaceOwnerGid as number,
     imageReference: value.imageReference,
     imageDigest: value.imageDigest as ExecutionEffectPersistenceDigest,
     volumeName: value.volumeName,
@@ -1074,9 +1125,37 @@ function proveRootSeparation(
       canonicalProjectRoot,
     });
     if (proof.state !== 'CONFIRMED') fail('ROOT_IDENTITY_MISMATCH', 'root-separation');
-    return digest('execution-effect-root-separation-evidence-v1', {
-      custodyIdentity: proof.custodyIdentity,
-      projectIdentity: proof.projectIdentity,
+    const stableIdentity = (identity: ExecAuthorityNativeIdentity) => objectFreeze({
+      schemaVersion: identity.schemaVersion,
+      kind: identity.kind,
+      platform: identity.platform,
+      objectType: identity.objectType,
+      mntId: identity.mntId,
+      dev: identity.dev,
+      ino: identity.ino,
+      fsMagic: identity.fsMagic,
+      mode: identity.mode,
+      ownerUid: identity.ownerUid,
+      volumeId: identity.volumeId,
+      fileId: identity.fileId,
+      reparseTag: identity.reparseTag,
+      ownerSid: identity.ownerSid,
+      daclPresent: identity.daclPresent,
+      daclProtected: identity.daclProtected,
+      daclEntryCount: identity.daclEntryCount,
+      daclOwnerAllowMask: identity.daclOwnerAllowMask,
+      daclCanonicalHash: identity.daclCanonicalHash,
+      volumeRemote: identity.volumeRemote,
+      volumeCapabilities: objectFreeze([...identity.volumeCapabilities]),
+      featureEvidenceBits: identity.featureEvidenceBits,
+    });
+    // Directory size and link count are observation-local metadata: creating
+    // staged artifacts legitimately changes them.  The native proof above
+    // still compares the complete before/after identity during every call;
+    // only the restart-stable authority digest excludes those volatile fields.
+    return digest('execution-effect-root-separation-authority-v2', {
+      custodyIdentity: stableIdentity(proof.custodyIdentity),
+      projectIdentity: stableIdentity(proof.projectIdentity),
       featureEvidenceBits: proof.featureEvidenceBits,
     });
   } catch (error) {
@@ -1399,6 +1478,8 @@ function sourceInvocationBody(
   landingIntentDigest: ExecutionEffectPersistenceDigest,
   deadlineUnixMs: number,
 ): Omit<DockerReceiptBody, 'sourceObjectIdentityDigest' | 'chunkCount'> & Readonly<{
+  readonly workspaceOwnerUid: number;
+  readonly workspaceOwnerGid: number;
   readonly deadlineUnixMs: number;
   readonly maxChunkBytes: number;
 }> {
@@ -1419,7 +1500,9 @@ function sourceInvocationBody(
     attemptDigest: authority.workspaceSnapshot.attemptDigest,
     admissionReceiptDigest: authority.admission.receiptDigest,
     custodyPolicyDigest: authority.policy.policyDigest,
-    workspaceIdentityDigest: authority.workspaceSnapshot.workspaceIdentityDigest,
+    workspaceIdentityDigest: executionEffectWorkspaceAuthorityDigestV1(
+      authority.workspaceSnapshot.workspaceIdentity,
+    ),
     landingIntentDigest,
     path,
     mode: entry.mode,
@@ -1428,15 +1511,21 @@ function sourceInvocationBody(
   };
   const invocationDigest = digest('execution-effect-docker-source-invocation-v1', {
     ...base,
+    workspaceOwnerUid: authority.workspaceRuntime.workspaceOwnerUid,
+    workspaceOwnerGid: authority.workspaceRuntime.workspaceOwnerGid,
     deadlineUnixMs,
     maxChunkBytes: authority.limits.maxStagedChunkBytes,
   });
   return objectFreeze({
     ...base,
     invocationDigest,
+    workspaceOwnerUid: authority.workspaceRuntime.workspaceOwnerUid,
+    workspaceOwnerGid: authority.workspaceRuntime.workspaceOwnerGid,
     deadlineUnixMs,
     maxChunkBytes: authority.limits.maxStagedChunkBytes,
   }) as Omit<DockerReceiptBody, 'sourceObjectIdentityDigest' | 'chunkCount'> & Readonly<{
+    readonly workspaceOwnerUid: number;
+    readonly workspaceOwnerGid: number;
     readonly deadlineUnixMs: number;
     readonly maxChunkBytes: number;
   }>;
@@ -1548,6 +1637,8 @@ function validateDockerReceipt(
   delete expected.maxChunkBytes;
   delete expected.timeoutMs;
   delete expected.receiptMaxBytes;
+  delete expected.workspaceOwnerUid;
+  delete expected.workspaceOwnerGid;
   const actual = { ...receipt } as Record<string, unknown>;
   delete actual.sourceObjectIdentityDigest;
   delete actual.chunkCount;
@@ -1666,7 +1757,9 @@ function stageRequestSnapshot(
     'path', 'entry', 'workspaceIdentityDigest', 'landingIntentDigest',
   ]) || !safeRelativePath(input.path) || input.path === '.'
     || !isDigest(input.workspaceIdentityDigest) || !isDigest(input.landingIntentDigest)
-    || input.workspaceIdentityDigest !== authority.workspaceSnapshot.workspaceIdentityDigest) {
+    || input.workspaceIdentityDigest !== executionEffectWorkspaceAuthorityDigestV1(
+      authority.workspaceSnapshot.workspaceIdentity,
+    )) {
     fail('AUTHORITY_MISMATCH', 'stage-source-input');
   }
   if (!exactDataObject(input.entry, ['path', 'kind', 'mode', 'size', 'contentDigest'])
@@ -1786,7 +1879,9 @@ async function captureStageSource(
     path: entry.path,
     byteLength: entry.size,
     contentDigest: entry.contentDigest as ExecutionEffectPersistenceDigest,
-    workspaceIdentityDigest: authority.workspaceSnapshot.workspaceIdentityDigest,
+    workspaceIdentityDigest: executionEffectWorkspaceAuthorityDigestV1(
+      authority.workspaceSnapshot.workspaceIdentity,
+    ),
     attemptDigest: authority.workspaceSnapshot.attemptDigest,
     admissionReceiptDigest: authority.admission.receiptDigest,
     custodyPolicyDigest: authority.policy.policyDigest,
@@ -1840,7 +1935,9 @@ function sourceSeal(
       })),
     });
     if (seal.stageAuthorityDigest !== source.stageAuthorityDigest
-      || seal.workspaceIdentityDigest !== authority.workspaceSnapshot.workspaceIdentityDigest
+      || seal.workspaceIdentityDigest !== executionEffectWorkspaceAuthorityDigestV1(
+        authority.workspaceSnapshot.workspaceIdentity,
+      )
       || seal.attemptDigest !== authority.workspaceSnapshot.attemptDigest
       || seal.admissionReceiptDigest !== authority.admission.receiptDigest
       || seal.custodyPolicyDigest !== authority.policy.policyDigest) return null;
@@ -2595,7 +2692,9 @@ export async function createExecutionEffectLandingNativeAdapterV1(
       adapterId: ADAPTER_ID,
       platform: authority.platform,
       projectRootIdentityDigest: authority.projectRootIdentityDigest,
-      workspaceIdentityDigest: authority.workspaceSnapshot.workspaceIdentityDigest,
+      workspaceIdentityDigest: executionEffectWorkspaceAuthorityDigestV1(
+        authority.workspaceSnapshot.workspaceIdentity,
+      ),
       attemptDigest: authority.workspaceSnapshot.attemptDigest,
       admissionReceiptDigest: authority.admission.receiptDigest,
       custodyPolicyDigest: authority.policy.policyDigest,

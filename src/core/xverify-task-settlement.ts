@@ -168,6 +168,152 @@ function freeze<T>(value: T): Readonly<T> {
   return value;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function hasExactKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
+  const actual = Object.keys(value).sort();
+  const expected = [...keys].sort();
+  return actual.length === expected.length
+    && actual.every((key, index) => key === expected[index]);
+}
+
+/**
+ * Parse and independently re-derive a persisted XVerify settlement receipt.
+ * Unknown fields, malformed projections, digest drift and replay-key drift all
+ * fail closed; callers never gain authority from a type assertion over JSON.
+ */
+export function parseXVerifyTaskSettlement(
+  value: unknown,
+): Readonly<XVerifyTaskSettlementReceipt> | null {
+  try {
+    if (!isRecord(value)) return null;
+    const hasAuthority = value.authorityEvidenceRef !== undefined;
+    if (!hasExactKeys(value, [
+      'schemaVersion',
+      'state',
+      'taskId',
+      'invocationId',
+      'attemptId',
+      'generation',
+      'outcome',
+      'producerProvider',
+      'verifierProvider',
+      ...(hasAuthority ? ['authorityEvidenceRef'] : []),
+      'evidenceRefs',
+      'projection',
+      'noReplay',
+      'settlementDigest',
+    ])) return null;
+    if (value.schemaVersion !== XVERIFY_TASK_SETTLEMENT_SCHEMA_VERSION
+      || value.state !== 'settled'
+      || typeof value.taskId !== 'string'
+      || typeof value.invocationId !== 'string'
+      || typeof value.attemptId !== 'string'
+      || typeof value.generation !== 'number'
+      || typeof value.producerProvider !== 'string'
+      || typeof value.verifierProvider !== 'string'
+      || typeof value.settlementDigest !== 'string') return null;
+
+    const identity: XVerifyTaskInvocationIdentity = {
+      taskId: value.taskId,
+      invocationId: value.invocationId,
+      attemptId: value.attemptId,
+      generation: value.generation,
+    };
+    assertIdentity(identity);
+    assertId('producerProvider', value.producerProvider);
+    assertId('verifierProvider', value.verifierProvider);
+    if (value.producerProvider === value.verifierProvider) return null;
+    if (hasAuthority) {
+      if (typeof value.authorityEvidenceRef !== 'string') return null;
+      assertEvidenceRef('authorityEvidenceRef', value.authorityEvidenceRef);
+    }
+    if (!Array.isArray(value.evidenceRefs) || value.evidenceRefs.length === 0
+      || value.evidenceRefs.some(ref => typeof ref !== 'string')) return null;
+    const evidenceRefs = value.evidenceRefs as string[];
+    for (const ref of evidenceRefs) assertEvidenceRef('evidenceRef', ref);
+    if (new Set(evidenceRefs).size !== evidenceRefs.length) return null;
+    if (hasAuthority && !evidenceRefs.includes(value.authorityEvidenceRef as string)) return null;
+
+    if (!isRecord(value.projection)) return null;
+    const outcome = value.outcome;
+    let projection: XVerifyTaskProjection;
+    if (outcome === 'HOLD') {
+      if (!hasExactKeys(value.projection, [
+        'terminal', 'status', 'resumable', 'resumeToken', 'nextAttemptId', 'nextGeneration',
+      ])
+        || value.projection.terminal !== false
+        || value.projection.status !== 'HOLD'
+        || value.projection.resumable !== true
+        || typeof value.projection.resumeToken !== 'string'
+        || typeof value.projection.nextAttemptId !== 'string'
+        || typeof value.projection.nextGeneration !== 'number') return null;
+      assertId('resumeToken', value.projection.resumeToken);
+      assertId('nextAttemptId', value.projection.nextAttemptId);
+      if (!Number.isSafeInteger(value.projection.nextGeneration)
+        || value.projection.nextGeneration <= identity.generation
+        || value.projection.nextAttemptId === identity.attemptId) return null;
+      projection = {
+        terminal: false,
+        status: 'HOLD',
+        resumable: true,
+        resumeToken: value.projection.resumeToken,
+        nextAttemptId: value.projection.nextAttemptId,
+        nextGeneration: value.projection.nextGeneration,
+      };
+    } else {
+      if (outcome !== 'confirmed' && outcome !== 'refuted'
+        && outcome !== 'unclear' && outcome !== 'unavailable') return null;
+      const expectedStatus = outcome === 'confirmed' ? 'DONE' : 'NO_GO';
+      if (!hasExactKeys(value.projection, ['terminal', 'status', 'resumable'])
+        || value.projection.terminal !== true
+        || value.projection.status !== expectedStatus
+        || value.projection.resumable !== false) return null;
+      projection = { terminal: true, status: expectedStatus, resumable: false };
+    }
+
+    if (!isRecord(value.noReplay)
+      || !hasExactKeys(value.noReplay, ['policy', 'replayKey', 'onReplay'])
+      || value.noReplay.policy !== 'consume-once'
+      || value.noReplay.onReplay !== 'reject'
+      || typeof value.noReplay.replayKey !== 'string') return null;
+    assertDigest('settlementDigest', value.settlementDigest);
+
+    const parsedOutcome = outcome as XVerifyTaskSettlementOutcome;
+    const body = {
+      schemaVersion: XVERIFY_TASK_SETTLEMENT_SCHEMA_VERSION,
+      state: 'settled' as const,
+      ...identity,
+      outcome: parsedOutcome,
+      producerProvider: value.producerProvider,
+      verifierProvider: value.verifierProvider,
+      ...(hasAuthority ? { authorityEvidenceRef: value.authorityEvidenceRef as string } : {}),
+      evidenceRefs: [...evidenceRefs],
+      projection,
+    };
+    if (digest(body) !== value.settlementDigest) return null;
+    const expectedReplayKey = digest({
+      ...identity,
+      settlementDigest: value.settlementDigest,
+    });
+    if (value.noReplay.replayKey !== expectedReplayKey) return null;
+
+    return freeze({
+      ...body,
+      noReplay: {
+        policy: 'consume-once',
+        replayKey: value.noReplay.replayKey,
+        onReplay: 'reject',
+      },
+      settlementDigest: value.settlementDigest,
+    });
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Reduce every dispatch result to either a terminal task projection or an
  * explicit resumable HOLD.  The returned replay key is identity- and
@@ -259,9 +405,9 @@ export function createXVerifyTaskSettlement(
     }
   }
 
-  const boundEvidenceRefs = input.authorityEvidenceRef === undefined
+  const boundEvidenceRefs = [...new Set(input.authorityEvidenceRef === undefined
     ? evidenceRefs
-    : [...evidenceRefs, input.authorityEvidenceRef];
+    : [...evidenceRefs, input.authorityEvidenceRef])];
   const body = {
     schemaVersion: XVERIFY_TASK_SETTLEMENT_SCHEMA_VERSION,
     state: 'settled' as const,

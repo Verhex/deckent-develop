@@ -332,10 +332,36 @@ export interface ProductionWiringHostConsumerExecutionEvidenceV1 {
   readonly evidenceRefs: readonly string[];
 }
 
+/**
+ * Current host-owned wiring evidence.  The executable proof run is bound to
+ * the immutable V2 plan and to the COMMITTED effect-landing authority that
+ * preceded the accepted result; worker-provided references cannot populate
+ * any of these fields.
+ */
+export interface ProductionWiringHostConsumerExecutionEvidenceV2 {
+  readonly version: 2;
+  readonly contractDigest: string;
+  readonly hostProofProgramDigest: string;
+  readonly observedBy: 'host';
+  readonly consumerId: string;
+  readonly effectLandingReceiptDigest: Sha256Digest;
+  readonly effectLandingChainDigest: Sha256Digest;
+  readonly proofRunDigest: Sha256Digest;
+  readonly evidenceRefs: readonly string[];
+}
+
+export type ProductionWiringHostConsumerExecutionEvidence =
+  | ProductionWiringHostConsumerExecutionEvidenceV1
+  | ProductionWiringHostConsumerExecutionEvidenceV2;
+
 export type ProductionWiringResultSettlementDecision =
   | {
       readonly state: 'PRODUCTION_WIRED';
       readonly contractDigest: string;
+      readonly hostProofProgramDigest?: string;
+      readonly effectLandingReceiptDigest?: Sha256Digest;
+      readonly effectLandingChainDigest?: Sha256Digest;
+      readonly proofRunDigest?: Sha256Digest;
       readonly evidenceRefs: readonly string[];
     }
   | {
@@ -349,7 +375,9 @@ export type ProductionWiringResultSettlementDecision =
         | 'missing-host-consumer-execution'
         | 'invalid-host-consumer-execution'
         | 'host-contract-mismatch'
-        | 'host-consumer-identity-mismatch';
+        | 'host-consumer-identity-mismatch'
+        | 'host-proof-program-mismatch'
+        | 'host-effect-authority-invalid';
     };
 
 function sha256(value: string): string {
@@ -379,16 +407,26 @@ function hasValidWorkerWiringEvidence(
 }
 
 function hasValidHostConsumerExecutionEvidence(
-  value: ProductionWiringHostConsumerExecutionEvidenceV1,
+  value: ProductionWiringHostConsumerExecutionEvidence,
 ): boolean {
   const evidence = value as unknown as Record<string, unknown>;
-  return evidence.version === 1
-    && typeof evidence.contractDigest === 'string'
+  const common = typeof evidence.contractDigest === 'string'
     && /^[a-f0-9]{64}$/.test(evidence.contractDigest)
     && evidence.observedBy === 'host'
     && typeof evidence.consumerId === 'string'
     && evidence.consumerId.trim().length > 0
     && hasNonBlankEvidenceRefs(evidence.evidenceRefs);
+  if (evidence.version === 1) return common;
+  return evidence.version === 2
+    && common
+    && typeof evidence.hostProofProgramDigest === 'string'
+    && /^[a-f0-9]{64}$/.test(evidence.hostProofProgramDigest)
+    && typeof evidence.effectLandingReceiptDigest === 'string'
+    && /^sha256:[a-f0-9]{64}$/.test(evidence.effectLandingReceiptDigest)
+    && typeof evidence.effectLandingChainDigest === 'string'
+    && /^sha256:[a-f0-9]{64}$/.test(evidence.effectLandingChainDigest)
+    && typeof evidence.proofRunDigest === 'string'
+    && /^sha256:[a-f0-9]{64}$/.test(evidence.proofRunDigest);
 }
 
 /**
@@ -399,7 +437,7 @@ function hasValidHostConsumerExecutionEvidence(
 export function settleProductionWiringResultEvidence(input: {
   readonly plan: ProductionWiringPlanEvidence;
   readonly workerEvidence?: ProductionWiringResultEvidence;
-  readonly hostConsumerExecution?: ProductionWiringHostConsumerExecutionEvidenceV1;
+  readonly hostConsumerExecution?: ProductionWiringHostConsumerExecutionEvidence;
 }): ProductionWiringResultSettlementDecision {
   const expectedPlan = createProductionWiringPlanEvidence(input.plan.contract);
   if (
@@ -431,6 +469,29 @@ export function settleProductionWiringResultEvidence(input: {
   }
   if (hostConsumerExecution.consumerId !== input.plan.contract.canonicalConsumer.consumerId) {
     return { state: 'HOLD', reason: 'host-consumer-identity-mismatch' };
+  }
+  if (expectedPlan.version === 2) {
+    if (hostConsumerExecution.version !== 2
+      || hostConsumerExecution.hostProofProgramDigest !== expectedPlan.hostProofProgramDigest) {
+      return { state: 'HOLD', reason: 'host-proof-program-mismatch' };
+    }
+    if (hostConsumerExecution.effectLandingReceiptDigest.length === 0
+      || hostConsumerExecution.effectLandingChainDigest.length === 0
+      || hostConsumerExecution.proofRunDigest.length === 0) {
+      return { state: 'HOLD', reason: 'host-effect-authority-invalid' };
+    }
+    return {
+      state: 'PRODUCTION_WIRED',
+      contractDigest: expectedPlan.contractDigest,
+      hostProofProgramDigest: expectedPlan.hostProofProgramDigest,
+      effectLandingReceiptDigest: hostConsumerExecution.effectLandingReceiptDigest,
+      effectLandingChainDigest: hostConsumerExecution.effectLandingChainDigest,
+      proofRunDigest: hostConsumerExecution.proofRunDigest,
+      evidenceRefs: [...hostConsumerExecution.evidenceRefs],
+    };
+  }
+  if (hostConsumerExecution.version !== 1) {
+    return { state: 'HOLD', reason: 'invalid-host-consumer-execution' };
   }
   return {
     state: 'PRODUCTION_WIRED',

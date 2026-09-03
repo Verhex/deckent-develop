@@ -1727,7 +1727,7 @@ function validateEffectEntryArray(
   count: number,
 ): readonly ExecAuthorityNativeEffectEntry[] | null {
   if (!arrayIsArray(value) || !objectIsFrozen(value) || value.length !== count
-    || count > 100_000) return null;
+    || count > 1_000_000) return null;
   let pathBytes = 0;
   for (let index = 0; index < count; index += 1) {
     const descriptor = objectGetOwnPropertyDescriptor(value, String(index));
@@ -3551,7 +3551,7 @@ function effectLimitsSnapshot(value: unknown): ExecAuthorityNativeEffectLimits |
     || !isSafePositiveInteger(record.maxNameBytes)
     || !isSafePositiveInteger(record.maxPathBytes)
     || !isSafePositiveInteger(record.maxTotalBytes)
-    || record.maxEntries > 100_000 || record.maxDepth > 1024
+    || record.maxEntries > 1_000_000 || record.maxDepth > 1024
     || record.maxPathBytes > 1_048_576 || record.maxNameBytes > 4096
     || record.maxFileBytes > 17_179_869_184
     || record.maxTotalBytes > 1_099_511_627_776

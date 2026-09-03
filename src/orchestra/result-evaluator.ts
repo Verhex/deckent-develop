@@ -4,7 +4,10 @@
 // tryCodeVerifiedDone migrated to auditor.ts (Sprint 138) — re-exported here.
 // No side effects, no file writes — evaluation logic only.
 
-import { normalizeChangedPaths } from '../core/task-result-schema.js';
+import {
+  normalizeChangedPaths,
+  type TaskResultV2,
+} from '../core/task-result-schema.js';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { isAbsolute, join, posix, resolve } from 'node:path';
@@ -34,7 +37,11 @@ import {
 import { CRITERION_APPLICABILITY } from '../core/task-types.js';
 import type { DiskVerifyResult } from './disk-verify.js';
 import { verifyDiskAgainstClaim } from './disk-verify.js';
-import { evaluateGoNogoCriteria, hasUnsalvageableContractFailure } from './criterion-evaluation.js';
+import {
+  evaluateGoNogoCriteria,
+  hasUnsalvageableContractFailure,
+  type ExactCriterionEvaluationAuthorityV2,
+} from './criterion-evaluation.js';
 import {
   buildAcceptanceFailureFingerprint,
   classifyFixFailure,
@@ -53,6 +60,11 @@ import {
   resolveHostPreDispatchFailureDisposition,
   type FailureDispositionPolicyConfig,
 } from '../core/failure-disposition-policy.js';
+import type { CanonicalJsonBounds } from '../core/task-attempt-custody-store.js';
+import {
+  projectExactTaskResultV2ForEvaluation,
+  type ExactAcceptedTaskResultAuthorityMetadata,
+} from './task-result-authority.js';
 
 export type TolerantResultJsonParse =
   | { state: 'parsed'; result: TaskResult; sanitized: boolean }
@@ -1549,6 +1561,13 @@ export function gateProductionWiringVerdict(
     reason = settlement.reason;
   } else if (settlement.contractDigest !== expectedPlan.contractDigest) {
     reason = 'host-settlement-contract-mismatch';
+  } else if (expectedPlan.version === 2 && (
+    settlement.hostProofProgramDigest !== expectedPlan.hostProofProgramDigest
+    || !/^sha256:[a-f0-9]{64}$/u.test(settlement.effectLandingReceiptDigest ?? '')
+    || !/^sha256:[a-f0-9]{64}$/u.test(settlement.effectLandingChainDigest ?? '')
+    || !/^sha256:[a-f0-9]{64}$/u.test(settlement.proofRunDigest ?? '')
+  )) {
+    reason = 'host-settlement-proof-authority-mismatch';
   } else if (
     settlement.evidenceRefs.length === 0
     || settlement.evidenceRefs.some(ref => typeof ref !== 'string' || ref.trim().length === 0)
@@ -1898,6 +1917,107 @@ export function evaluateWithRubric(
     task,
     result.runPolicyEvidence,
   );
+}
+
+export type EvaluateExactAcceptedResultWithRubric =
+  | {
+      readonly state: 'evaluated';
+      readonly evaluation: EvaluationResult;
+    }
+  | {
+      readonly state: 'hold';
+      readonly reasonCode:
+        | 'accepted-result-projection-invalid'
+        | 'task-identity-mismatch'
+        | 'criterion-authority-mismatch';
+    };
+
+function applyExactCriterionAuthority(
+  evaluation: EvaluationResult,
+  task: Task,
+  result: TaskResult,
+  resultIdentity: TaskResultV2['attemptCustody']['identity'],
+  authority: ExactCriterionEvaluationAuthorityV2,
+): EvaluationResult | null {
+  if (
+    authority.taskId !== task.id
+    || authority.attemptId !== resultIdentity.attemptId
+    || authority.generation !== resultIdentity.generation
+  ) return null;
+  const items = task.goNogo?.items ?? [];
+  if ((items.length === 0) !== (authority.outcome === null)) return null;
+  if (authority.outcome === null) return evaluation;
+  const criterionIds = [...items.map(item => item.id)].sort();
+  const outcomeIds = [...authority.outcome.items.map(item => item.itemId)].sort();
+  if (
+    criterionIds.length !== outcomeIds.length
+    || criterionIds.some((id, index) => id !== outcomeIds[index])
+  ) return null;
+  const rubricScores = [...evaluation.rubricScores];
+  for (const item of authority.outcome.items) {
+    rubricScores.push({
+      criterion: `goNogo:${item.itemId}`,
+      score: item.status === 'satisfied' ? 100 : item.status === 'unsatisfied' ? 0 : 50,
+      passed: item.status !== 'unsatisfied',
+      reason: `${item.polarity} · ${item.mode} · ${item.status} — ${item.evidence.join('; ')}`,
+    });
+  }
+  const withContract: EvaluationResult = {
+    ...evaluation,
+    decision: authority.outcome.decisiveNoGo ? 'NO_GO' : evaluation.decision,
+    rubricScores,
+    contractSummary: {
+      decided: authority.outcome.decided,
+      total: authority.outcome.total,
+      undecidableItems: authority.outcome.items
+        .filter(item => item.status === 'undecidable')
+        .map(item => ({
+          itemId: item.itemId,
+          statement: items.find(candidate => candidate.id === item.itemId)?.statement
+            ?? item.itemId,
+        })),
+    },
+  };
+  return withContract.decision === 'NO_GO'
+    ? enrichEvaluationWithCategory(withContract, result, task)
+    : withContract;
+}
+
+/**
+ * Canonical evaluator bridge for one host-inspected exact accepted result.
+ * Worker-authored brainEvaluation/rubricScores/totalScore fields are removed by
+ * the projector before the existing rubric is invoked; no second grader exists.
+ */
+export function evaluateExactAcceptedResultWithRubric(input: {
+  readonly result: TaskResultV2;
+  readonly acceptedAuthority: ExactAcceptedTaskResultAuthorityMetadata;
+  readonly task: Task;
+  readonly jsonBounds: CanonicalJsonBounds;
+  readonly rubric: EvaluationRubric;
+  readonly criterionAuthority: ExactCriterionEvaluationAuthorityV2;
+}): EvaluateExactAcceptedResultWithRubric {
+  if (
+    input.task.id !== input.result.taskId
+    || input.task.id !== input.acceptedAuthority.identity.taskId
+  ) return { state: 'hold', reasonCode: 'task-identity-mismatch' };
+  const projected = projectExactTaskResultV2ForEvaluation({
+    result: input.result,
+    acceptedAuthority: input.acceptedAuthority,
+    jsonBounds: input.jsonBounds,
+  });
+  if (projected === null) {
+    return { state: 'hold', reasonCode: 'accepted-result-projection-invalid' };
+  }
+  const evaluation = applyExactCriterionAuthority(
+    evaluateWithRubric(projected, input.task, input.rubric),
+    input.task,
+    projected,
+    input.result.attemptCustody.identity,
+    input.criterionAuthority,
+  );
+  return evaluation === null
+    ? { state: 'hold', reasonCode: 'criterion-authority-mismatch' }
+    : Object.freeze({ state: 'evaluated' as const, evaluation });
 }
 
 /**

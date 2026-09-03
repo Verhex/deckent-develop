@@ -5688,8 +5688,9 @@ static bool parse_effect_operation(
 }
 
 static napi_value EffectInvoke(napi_env env, napi_callback_info info) {
-  size_t argc = 4u;
-  napi_value argv[4];
+  /* operation name + the largest exact positional contract (source-read: 7). */
+  size_t argc = 8u;
+  napi_value argv[8];
   deckent_native_state *state;
   deckent_effect_operation operation;
   const deckent_effect_input_contract *contract;

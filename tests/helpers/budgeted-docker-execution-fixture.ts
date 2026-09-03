@@ -1,4 +1,5 @@
 import { RuntimeBudgetMonitor } from '../../src/orchestra/runtime-budget-monitor.js';
+import { deriveProductionWiringApplicability } from '../../src/core/task-types.js';
 
 export const TEST_REMOTE_EXECUTION_BUDGET = { maxTurns: 1 } as const;
 export const TEST_EXECUTION_LANDING_POLICY = { reserve_ratio: 0.25 } as const;
@@ -68,6 +69,7 @@ export function budgetedDockerTaskJson(
   if (!match) return '{}';
   const id = match[1]!;
   const model = input.model ?? 'claude-sonnet-5';
+  const scope = { directories: [], filesRead: [], filesWrite: [] };
   return JSON.stringify({
     id,
     title: 'Budgeted Docker unit fixture',
@@ -77,7 +79,8 @@ export function budgetedDockerTaskJson(
     priority: 'NORMAL',
     reason: 'ADR-G-037 fixture parity',
     type: 'code-development',
-    scope: { directories: [], filesRead: [], filesWrite: [] },
+    scope,
+    productionWiringApplicability: deriveProductionWiringApplicability(scope),
     dependencies: [],
     goNogo: {
       goCriteria: 'the isolated Docker behavior is observed',

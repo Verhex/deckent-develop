@@ -192,8 +192,8 @@ const PROMOTION_PROOF_DIRECTIVES = [
   '## Task 1: Post-settlement proof task',
   '- Model: claude-sonnet-5',
   '- Effort: normal',
-  '- Files: src/api/server.ts',
-  '- Scope: src/api/',
+  '- Files: tests/api/server.test.ts',
+  '- Scope: tests/api/',
   '',
   '### Description',
   'Wire up post-settlement promotion verification.',
@@ -207,11 +207,50 @@ const NO_PROMOTION_PROOF_DIRECTIVES = [
   '## Task 1: internal refactor',
   '- Model: claude-haiku-4-5-20251001',
   '- Effort: low',
-  '- Files: src/core/types.ts',
-  '- Scope: src/core/',
+  '- Files: tests/core/types.test.ts',
+  '- Scope: tests/core/',
   '',
   '### Description',
   'Rename a few internal types — no promotion proof declared.',
+].join('\n');
+
+function productionWiringAuthoringInput() {
+  const probe = (kind: 'producer' | 'canonical-consumer' | 'affected-ingress' | 'enablement-authority' | 'proof-target', targetId: string) => ({
+    target: { kind, targetId }, observationGroupId: kind === 'producer' || kind === 'canonical-consumer' ? 'runtime-path-observation' : `${kind}:${targetId}`, harnessPath: 'scripts/production-wiring-proof.mjs', verifierAssetPaths: ['scripts/production-wiring-proof.mjs'],
+    args: kind === 'producer' || kind === 'canonical-consumer' ? ['observe-runtime-relation'] : ['observe', targetId], cwd: '.', timeoutMs: 30_000, outputLimitBytes: 1_048_576,
+    expectation: { kind: 'adapter-structured-outcome', schemaId: 'deckent.production-wiring-observation.v1', outcome: 'observed' },
+  });
+  return {
+    version: 2, changeKind: 'runtime-change', producer: { producerId: 'structured-directive' },
+    canonicalConsumer: { consumerId: 'planSprint', relationship: 'invokes-producer' },
+    affectedIngresses: [{ ingressId: 'structured-plan', kind: 'ingress' }],
+    enablementAuthority: { authorityId: 'production-wiring-directive', mechanism: 'policy' },
+    disposition: { kind: 'production-wiring' },
+    proofTargets: [{ proofTargetId: 'structured-plan-proof', kind: 'consumer-execution' }],
+    hostProofProgram: { network: 'forbidden', verifierAssets: [{ path: 'scripts/production-wiring-proof.mjs', sha256: `sha256:${'a'.repeat(64)}`, role: 'trusted-harness' }], platforms: [
+      { platform: 'linux', state: 'unsupported', reasonCode: 'environment-unavailable' },
+      { platform: 'wsl2-linux', state: 'supported', runnerAdapterId: 'native-v1', probes: [
+        probe('producer', 'structured-directive'),
+        probe('canonical-consumer', 'planSprint'), probe('affected-ingress', 'structured-plan'),
+        probe('enablement-authority', 'production-wiring-directive'), probe('proof-target', 'structured-plan-proof'),
+      ] },
+      { platform: 'darwin', state: 'unsupported', reasonCode: 'owner-deferred' },
+      { platform: 'win32', state: 'unsupported', reasonCode: 'owner-deferred' },
+    ] },
+  };
+}
+
+const PRODUCTION_WIRING_DIRECTIVES = [
+  '# DIRECTIVES — exact production wiring plan',
+  '',
+  '## Task 1: Exact production wiring task',
+  '- Model: claude-sonnet-5',
+  '- Effort: normal',
+  '- Files: src/orchestra/sprint-planner.ts',
+  `- ProductionWiring: ${JSON.stringify(productionWiringAuthoringInput())}`,
+  '',
+  '### Description',
+  'Wire the structured authority through planSprint.',
 ].join('\n');
 
 let errorSpy: ReturnType<typeof vi.spyOn>;
@@ -240,7 +279,7 @@ describe('488-014 — structured planSprint propagates PromotionProof: into task
     const proj = t!.postSettlementProjection!;
     expect(proj.ingress).toBe('sprint');
     expect(proj.platformCapability).toBe('any');
-    expect(proj.command).toEqual({ executable: 'npm', args: ['run', 'verify'], cwdRef: 'src/api/' });
+    expect(proj.command).toEqual({ executable: 'npm', args: ['run', 'verify'], cwdRef: 'tests/api/' });
     expect(proj.contractDigest).toMatch(/^[a-f0-9]{64}$/);
   });
 
@@ -271,5 +310,18 @@ describe('488-014 — structured planSprint propagates PromotionProof: into task
     const t = sprint.tasks.find((x) => x.title === 'Post-settlement proof task');
     expect(t!.postSettlementProjection).toBeDefined();
     expect(t!.postSettlementProjection!.ingress).toBe('sprint');
+  });
+});
+
+describe('T12 — structured planSprint preserves canonical V2 production wiring authority', () => {
+  it('carries the host-derived contract and proof-program digests without a hidden task', async () => {
+    const sprint = await planSprint(ROOT, makeConfig(), makeContext(PRODUCTION_WIRING_DIRECTIVES), recommendation, { mode: 'structured' });
+    expect(sprint.tasks).toHaveLength(1);
+    const authority = sprint.tasks[0]?.productionWiring;
+    expect(authority).toMatchObject({ version: 2 });
+    expect(authority?.contractDigest).toMatch(/^[a-f0-9]{64}$/u);
+    expect(authority?.version === 2 && authority.hostProofProgramDigest).toBe(
+      authority?.contract.version === 2 ? authority.contract.hostProofProgram.programDigest : undefined,
+    );
   });
 });

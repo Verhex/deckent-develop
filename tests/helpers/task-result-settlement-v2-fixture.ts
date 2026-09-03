@@ -59,12 +59,18 @@ import {
   type TaskResultV2,
 } from '../../src/core/task-result-schema.js';
 import {
+  deriveProductionWiringApplicability,
+  type ProductionWiringPlanEvidence,
+  type ProductionWiringResultEvidence,
+} from '../../src/core/task-types.js';
+import {
   createTaskResultSettlementV2,
   taskResultSettlementV2Digest,
   type CreateTaskResultSettlementV2Input,
   type TaskResultSettlementV2,
   type TaskResultSettlementV2ArchivePayload,
 } from '../../src/core/task-result-settlement.js';
+import { createExactNormalTaskApprovedMaterialV3 } from '../../src/orchestra/exact-evaluation-policy-authority.js';
 
 function rawSha256(bytes: Uint8Array): Sha256Digest {
   return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
@@ -549,15 +555,22 @@ export function createTaskResultSettlementV2TestPolicy(): TaskAttemptCustodyPoli
   });
 }
 
-export interface TaskResultSettlementV2Fixture {
+export interface TaskResultAcceptedV2Fixture {
   readonly adapter: InMemoryTaskAttemptCustodyAdapter;
   readonly store: TaskAttemptCustodyStore;
   readonly policy: TaskAttemptCustodyPolicyV2;
   readonly identity: TaskAttemptCustodyIdentityV2;
-  readonly creation: CreateTaskResultSettlementV2Input;
+  readonly admission: ReturnType<TaskAttemptCustodyStore['createAdmission']>;
   readonly rawWorkerResultBytes: Uint8Array;
+  readonly sourceResultArtifact: ReturnType<TaskAttemptCustodyStore['publishHostArtifact']>;
   readonly hostWorkAttributionArtifact: ReturnType<TaskAttemptCustodyStore['publishHostArtifact']>;
   readonly result: TaskResultV2;
+  readonly acceptedResultArtifact: ReturnType<TaskAttemptCustodyStore['publishHostArtifact']>;
+  readonly acceptedResultChain: ReturnType<TaskAttemptCustodyStore['appendChain']>;
+}
+
+export interface TaskResultSettlementV2Fixture extends TaskResultAcceptedV2Fixture {
+  readonly creation: CreateTaskResultSettlementV2Input;
   readonly settlement: TaskResultSettlementV2;
   readonly settlementArtifact: ReturnType<TaskAttemptCustodyStore['publishHostArtifact']>;
   readonly settlementChain: ReturnType<TaskAttemptCustodyStore['appendChain']>;
@@ -569,16 +582,37 @@ export interface TaskResultSettlementV2Fixture {
 export interface TaskResultSettlementV2FixtureOptions {
   readonly tailArtifactKey?: string;
   readonly archiveCapturedAt?: string;
+  readonly terminal?: 'full' | 'accepted-only';
+  /** Optional sibling-attempt identity for replay-boundary fixtures. */
+  readonly attemptId?: string;
+  /** Optional exact plan material persisted inside every admitted generation. */
+  readonly productionWiring?: ProductionWiringPlanEvidence;
+  /** Optional immutable worker observation persisted inside the accepted result. */
+  readonly productionWiringEvidence?: ProductionWiringResultEvidence;
 }
 
-const taskResultSettlementV2FixtureCache = new Map<string, TaskResultSettlementV2Fixture>();
+const taskResultSettlementV2FixtureCache = new Map<
+  string,
+  TaskResultSettlementV2Fixture | TaskResultAcceptedV2Fixture
+>();
+
+export function createTaskResultSettlementV2Fixture(
+  options: TaskResultSettlementV2FixtureOptions & { readonly terminal: 'accepted-only' },
+): TaskResultAcceptedV2Fixture;
+export function createTaskResultSettlementV2Fixture(
+  options?: TaskResultSettlementV2FixtureOptions & { readonly terminal?: 'full' },
+): TaskResultSettlementV2Fixture;
 
 export function createTaskResultSettlementV2Fixture(
   options: TaskResultSettlementV2FixtureOptions = {},
-): TaskResultSettlementV2Fixture {
+): TaskResultSettlementV2Fixture | TaskResultAcceptedV2Fixture {
   const cacheKey = fixtureCanonicalJson({
     tailArtifactKey: options.tailArtifactKey ?? null,
     archiveCapturedAt: options.archiveCapturedAt ?? null,
+    terminal: options.terminal ?? 'full',
+    attemptId: options.attemptId ?? null,
+    productionWiring: options.productionWiring ?? null,
+    productionWiringEvidence: options.productionWiringEvidence ?? null,
   });
   const cached = taskResultSettlementV2FixtureCache.get(cacheKey);
   if (cached) return cached;
@@ -601,26 +635,94 @@ export function createTaskResultSettlementV2Fixture(
     projectRootSha256,
     projectId: 'fixture-project',
     taskId: 'fixture-001',
-    attemptId: '123e4567-e89b-42d3-a456-426614174000',
+    attemptId: options.attemptId ?? '123e4567-e89b-42d3-a456-426614174000',
     generation: 4,
   };
   let predecessorIdentity: TaskAttemptCustodyIdentityV2 | null = null;
   let predecessorDigest: Sha256Digest | null = null;
   let admission: ReturnType<TaskAttemptCustodyStore['createAdmission']> | null = null;
+  const taskScope = options.productionWiring === undefined
+    ? Object.freeze({
+        directories: Object.freeze(['tests/helpers']),
+        filesRead: Object.freeze(['tests/helpers/input.ts']),
+        filesWrite: Object.freeze(['tests/helpers/output.ts']),
+      })
+    : Object.freeze({
+        directories: Object.freeze(['src/orchestra']),
+        filesRead: Object.freeze(['src/orchestra/input.ts']),
+        filesWrite: Object.freeze(['src/orchestra/output.ts']),
+      });
   for (let generation = 1; generation <= identity.generation; generation += 1) {
     const generationIdentity = { ...identity, generation };
+    const dispatchTask = Object.freeze({
+      id: identity.taskId,
+      title: 'Fixture exact Docker task',
+      description: 'Exercise accepted-result evaluation from immutable custody.',
+      model: 'fixture-model',
+      effort: 'normal',
+      priority: 'NORMAL',
+      reason: 'fixture exact custody',
+      scope: taskScope,
+      dependencies: Object.freeze([]),
+      goNogo: Object.freeze({
+        goCriteria: 'accepted authority evaluates and settles',
+        noGoCriteria: 'worker self-report decides terminal truth',
+        techDebtAcceptable: 'none',
+      }),
+      status: 'EXECUTING',
+      assignedWorker: 'worker-fixture-001',
+      sprintId: 'fixture-sprint',
+      type: 'code-development',
+      provider: 'fixture-provider',
+      budget: Object.freeze({ maxTurns: 2 }),
+      budgetPolicy: Object.freeze({
+        state: 'allow',
+        role: 'worker',
+        taskKind: 'code-development',
+        resolvedProvider: 'fixture-provider',
+        executionCostClass: 'local',
+        profileRef: 'fixture-local-exempt',
+        policyDigest: 'a'.repeat(64),
+        admissionMode: 'unattended',
+      }),
+      // Exact-dispatch authority: derive this from the same immutable scope.
+      productionWiringApplicability: deriveProductionWiringApplicability(taskScope),
+      ...(options.productionWiring === undefined
+        ? {}
+        : { productionWiring: options.productionWiring }),
+    });
+    const lineage = Object.freeze({ generation, predecessorDigest });
+    const dispatchSha256 = rawSha256(canonicalTaskAttemptCustodyJson(dispatchTask, policy.jsonBounds));
+    const approved = createExactNormalTaskApprovedMaterialV3({
+      sprintId: 'fixture-sprint',
+      task: dispatchTask,
+      dispatchTaskMaterialDigest: dispatchSha256,
+      policy,
+    });
+    const approvedSha256 = rawSha256(canonicalTaskAttemptCustodyJson(approved, policy.jsonBounds));
+    const lineageSha256 = rawSha256(canonicalTaskAttemptCustodyJson(lineage, policy.jsonBounds));
     admission = store.createAdmission({
       identity: generationIdentity,
       policy,
       admittedAt: `2026-08-30T20:00:0${generation - 1}.000Z`,
       predecessorDigest,
       predecessorIdentity,
-      taskSnapshot: {
-        id: identity.taskId,
-        generation,
-        description: 'fixture task',
-        scope: { filesRead: ['src/core/input.ts'], filesWrite: ['src/core/output.ts'] },
-      },
+      taskSnapshot: Object.freeze({
+        schemaVersion: 2,
+        kind: 'exact-docker-dispatch-snapshot',
+        dispatchRequestId: `fixture-dispatch-request-${generation}`,
+        projectId: identity.projectId,
+        taskId: identity.taskId,
+        material: Object.freeze({
+          approved,
+          approvedSha256,
+          dispatch: dispatchTask,
+          dispatchSha256,
+          lineage,
+          lineageSha256,
+        }),
+        dispatch: Object.freeze({ backend: 'docker', fixture: true }),
+      }),
     });
     predecessorIdentity = generationIdentity;
     predecessorDigest = admission.receiptDigest;
@@ -635,6 +737,7 @@ export function createTaskResultSettlementV2Fixture(
     filesChanged: [],
     totalLinesAdded: 0,
     totalLinesRemoved: 0,
+    diskVerified: true,
     tokenUsage: {
       inputTokens: 10,
       outputTokens: 5,
@@ -645,6 +748,9 @@ export function createTaskResultSettlementV2Fixture(
     tests: { passed: 0, failed: 0, total: 0, outcome: 'NOT_EXECUTED' },
     tsc: { clean: true, errors: 0 },
     selfAssessment: 'DONE',
+    ...(options.productionWiringEvidence === undefined
+      ? {}
+      : { productionWiringEvidence: options.productionWiringEvidence }),
   });
   if (!canonicalV1.ok) throw new Error(canonicalV1.errors.join('; '));
   const sourceBytes = Buffer.from(JSON.stringify({
@@ -683,7 +789,7 @@ export function createTaskResultSettlementV2Fixture(
     'fixture-provider-exit-observation-receipt-v2',
     { identity, observedAt: providerExitObservedAt },
   );
-  const scopeFilesWrite = ['src/core/output.ts'];
+  const scopeFilesWrite = [...taskScope.filesWrite];
   const scopeDigest = createHash('sha256')
     .update(fixtureCanonicalJson(scopeFilesWrite), 'utf8')
     .digest('hex');
@@ -731,7 +837,7 @@ export function createTaskResultSettlementV2Fixture(
     attemptId: identity.attemptId,
     generation: identity.generation,
   });
-  const effectPolicy = compileExecutionEffectWritePolicy(['src/core/output.ts']);
+  const effectPolicy = compileExecutionEffectWritePolicy(scopeFilesWrite);
   if (!effectPolicy.ok) throw new Error('fixture execution-effect policy is invalid');
   const workspaceIdentity = Object.freeze({
     filesystemId: 'fixture-device:2049',
@@ -1171,6 +1277,23 @@ export function createTaskResultSettlementV2Fixture(
     predecessorDigest: effectLandingChain.receiptDigest,
     artifactReceipt: acceptedResultArtifact,
   });
+  const acceptedFixture = Object.freeze({
+    adapter,
+    store,
+    policy,
+    identity,
+    admission,
+    rawWorkerResultBytes: Uint8Array.from(sourceBytes),
+    sourceResultArtifact,
+    hostWorkAttributionArtifact,
+    result,
+    acceptedResultArtifact,
+    acceptedResultChain,
+  });
+  if (options.terminal === 'accepted-only') {
+    taskResultSettlementV2FixtureCache.set(cacheKey, acceptedFixture);
+    return acceptedFixture;
+  }
   const evaluationArtifact = store.publishHostArtifact({
     identity,
     policy,
@@ -1271,14 +1394,8 @@ export function createTaskResultSettlementV2Fixture(
     artifactReceipt: archiveArtifact,
   });
   const fixture = Object.freeze({
-    adapter,
-    store,
-    policy,
-    identity,
+    ...acceptedFixture,
     creation,
-    rawWorkerResultBytes: Uint8Array.from(sourceBytes),
-    hostWorkAttributionArtifact,
-    result,
     settlement,
     settlementArtifact,
     settlementChain,

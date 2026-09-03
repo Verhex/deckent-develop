@@ -141,9 +141,11 @@ import {
   isExactDockerVolumeAbsent,
   parseExactDockerWorkspaceVolumeInspect,
   exactDockerEffectVolumeIdentity,
+  exactDockerCausalObservedAt,
   createExactDockerEffectLifecycleAdapterV1,
   verifyExactDockerWorkspaceVolumeInspect,
   buildExactDockerWorkspaceVolumeCreateArgs,
+  buildExactDockerNativeSnapshotArgs,
   parseExactDockerCustodyInspect,
   parseExactDockerWorkspaceInventory,
   readExactDockerWorkspaceInventory,
@@ -160,6 +162,8 @@ import {
 import { createTaskResultSettlementV2TestPolicy } from '../helpers/task-result-settlement-v2-fixture.js';
 import { taskResultV2Digest } from '../../src/core/task-result-schema.js';
 import { assembleCanonicalIngressResultV2 } from '../../src/orchestra/result-ingress.js';
+import { parseExactDockerDispatchTaskSnapshotAuthority } from '../../src/orchestra/exact-docker-dispatch-task-authority.js';
+import { createExactNormalTaskApprovedMaterialV3 } from '../../src/orchestra/exact-evaluation-policy-authority.js';
 import {
   createExecutionEffectResultProjectionV1,
   createTaskAttemptEffectLandingBindingV2,
@@ -275,6 +279,15 @@ function releasedReplayFixture() {
           : providerStartReceipt.digest,
         observedAt: '2026-09-01T00:00:01.000Z',
       },
+    })),
+    readDispatchObservationByClass: vi.fn((input: { observationClass: string }) => ({
+      receipt: {
+        evidenceDigest: input.observationClass === 'PROVIDER_EXECUTION'
+          ? providerExecutionReceipt.digest
+          : providerStartReceipt.digest,
+        observedAt: '2026-09-01T00:00:01.000Z',
+      },
+      bytes: Buffer.from('{}'),
     })),
     readArtifactReceipt: vi.fn(() => null),
     readChain: vi.fn(() => null),
@@ -592,6 +605,21 @@ function coldExactDockerCompletionFixture(timestampOverrides: Readonly<{
 }
 
 describe('exact Docker custody mounts', () => {
+  it('keeps causal custody time ordered when the WSL2 wall clock steps backwards', () => {
+    expect(exactDockerCausalObservedAt(
+      () => '2026-09-03T06:12:26.740Z',
+      '2026-09-03T06:12:28.319Z',
+    )).toBe('2026-09-03T06:12:28.319Z');
+    expect(exactDockerCausalObservedAt(
+      () => '2026-09-03T06:12:29.001Z',
+      '2026-09-03T06:12:28.319Z',
+    )).toBe('2026-09-03T06:12:29.001Z');
+    expect(() => exactDockerCausalObservedAt(
+      () => '2026-09-03T06:12:29.001Z',
+      'not-a-canonical-timestamp',
+    )).toThrow('EXACT_DOCKER_OBSERVATION_INVALID');
+  });
+
   it('admits zero-byte staged effect content without weakening nonempty metadata artifacts', () => {
     const policy = createExactDockerCustodyPolicy();
     expect(policy.artifactLimits['execution-effect-staged-content'].minBytes).toBe(0);
@@ -614,6 +642,15 @@ describe('exact Docker custody mounts', () => {
       status: 1, stdout: '', stderr: `Error response from daemon: No such container: ${name}`,
     }, name)).toBe(true);
     expect(isExactDockerContainerAbsent({
+      status: 1, stdout: '[]\n', stderr: `error: no such object: ${name}`,
+    }, name)).toBe(true);
+    expect(isExactDockerContainerAbsent({
+      status: 1, stdout: '[]\n', stderr: `Error: No such object: ${name}`,
+    }, name)).toBe(true);
+    expect(isExactDockerContainerAbsent({
+      status: 1, stdout: '[{}]\n', stderr: `Error: No such object: ${name}`,
+    }, name)).toBe(false);
+    expect(isExactDockerContainerAbsent({
       status: 1, stdout: '', stderr: 'Cannot connect to the Docker daemon',
     }, name)).toBe(false);
     expect(isExactDockerContainerAbsent({
@@ -630,7 +667,22 @@ describe('exact Docker custody mounts', () => {
       status: 1, stdout: '', stderr: `Error: No such volume: ${name}`,
     }, name)).toBe(true);
     expect(isExactDockerVolumeAbsent({
+      status: 1,
+      stdout: '[]\n',
+      stderr: `Error response from daemon: get ${name}: no such volume`,
+    }, name)).toBe(true);
+    expect(isExactDockerVolumeAbsent({
       status: 1, stdout: '', stderr: `Error: No such volume: ${name}-foreign`,
+    }, name)).toBe(false);
+    expect(isExactDockerVolumeAbsent({
+      status: 1,
+      stdout: '[]\n',
+      stderr: `Error response from daemon: get ${name}-foreign: no such volume`,
+    }, name)).toBe(false);
+    expect(isExactDockerVolumeAbsent({
+      status: 1,
+      stdout: '[{}]\n',
+      stderr: `Error response from daemon: get ${name}: no such volume`,
     }, name)).toBe(false);
     expect(isExactDockerVolumeAbsent({
       status: 1, stdout: '', stderr: 'Cannot connect to the Docker daemon',
@@ -793,7 +845,7 @@ describe('exact Docker custody mounts', () => {
     const workspaceVolumeName = `deckent-xw-${'a'.repeat(48)}`;
     const dependencyVolumeName = `deckent-xd-${'b'.repeat(48)}`;
     const args = buildExactDockerCustodyMountArgs({
-      taskSnapshot: { sourcePath: '/private/store/snapshot.json' },
+      taskSnapshot: { sourcePath: '/private/store/snapshot/task.json' },
       workerOutput: { sourcePath: '/private/store/output' },
     } as never, workspaceVolumeName, dependencyVolumeName);
 
@@ -803,7 +855,7 @@ describe('exact Docker custody mounts', () => {
       '--mount',
       `type=volume,src=${dependencyVolumeName},dst=/workspace/node_modules,readonly,volume-nocopy`,
       '--mount',
-      'type=bind,src=/private/store/snapshot.json,dst=/run/deckent/task.json,readonly,bind-propagation=rprivate',
+      'type=bind,src=/private/store/snapshot,dst=/run/deckent/snapshot,readonly,bind-propagation=rprivate',
       '--mount',
       'type=bind,src=/private/store/output,dst=/workspace/.tasks,bind-propagation=rprivate',
     ]);
@@ -857,8 +909,8 @@ describe('exact Docker custody mounts', () => {
           Destination: '/workspace/node_modules', RW: false, Propagation: '',
         },
         {
-          Type: 'bind', Source: '/private/store/snapshot.json',
-          Destination: '/run/deckent/task.json', RW: false, Propagation: 'rprivate',
+          Type: 'bind', Source: '/private/store/snapshot',
+          Destination: '/run/deckent/snapshot', RW: false, Propagation: 'rprivate',
         },
         {
           Type: 'bind', Source: '/private/store/output',
@@ -888,11 +940,14 @@ describe('exact Docker custody mounts', () => {
     expect(source).toContain('opendirSync(absolute)');
     expect(source).toContain('if (names.length > MAX_ENTRIES) process.exit(78)');
     expect(source).toContain('readSync(fd, buffer, 0, buffer.length, null)');
-    expect(source).toContain('if (stat.nlink !== 1 || stat.size > MAX_FILE_BYTES) process.exit(78)');
+    expect(source).toContain('if (stat.size > MAX_FILE_BYTES) process.exit(78)');
+    expect(source).not.toContain('stat.nlink');
+    expect(source).toContain('cpSync writes');
     expect(source).toContain("update(JSON.stringify(authority.limits), 'utf8')");
     expect(source).toContain('const before = tree(source)');
     expect(source).toContain('const after = tree(destination)');
     expect(source).toContain('before.digest !== after.digest');
+    expect(source).toContain('verbatimSymlinks: true');
     expect(source).not.toContain('readFileSync(absolute)');
   });
 
@@ -900,10 +955,17 @@ describe('exact Docker custody mounts', () => {
     const source = exactDockerEffectPopulationHelperSource();
     const pre = source.indexOf("const sourcePre = scan('/source', true)");
     const copy = source.indexOf('for (const relative of paths)', pre + 1);
+    const mountPoints = source.indexOf('for (const relative of infrastructureMountPoints)', copy);
+    const rootModeSeal = source.indexOf("chmodSync('/workspace', 0o700)", copy);
+    const directoryOwnership = source.indexOf('for (const directory of [...ownedDirectories]', copy);
     const destination = source.indexOf("const destination = scan('/workspace', false)");
     const post = source.indexOf("const sourcePost = scan('/source', false)");
     expect(pre).toBeGreaterThan(0);
     expect(copy).toBeGreaterThan(pre);
+    expect(mountPoints).toBeGreaterThan(copy);
+    expect(rootModeSeal).toBeGreaterThan(mountPoints);
+    expect(rootModeSeal).toBeGreaterThan(copy);
+    expect(directoryOwnership).toBeGreaterThan(rootModeSeal);
     expect(destination).toBeGreaterThan(copy);
     expect(post).toBeGreaterThan(destination);
     expect(source).toContain('execution-effect-population-content-manifest-v1');
@@ -915,11 +977,37 @@ describe('exact Docker custody mounts', () => {
     expect(source).toContain('Date.now() > authority.deadlineUnixMs');
     expect(source).toContain("content.update(buffer.subarray(0, count))");
     expect(source).toContain('const entries = retainEntries ? new Map() : null');
+    expect(source).toContain("const ownedDirectories = new Set(['/workspace'])");
+    expect(source).toContain(
+      "const infrastructureMountPoints = Object.freeze(['.locks', '.tasks', 'node_modules'])",
+    );
+    expect(source).toContain("path === relative || path.startsWith(relative + '/')");
+    expect(source).toContain('mkdirSync(absolute, { recursive: false, mode: 0o755 })');
+    expect(source).toContain('Number(stat.mode & 0o777n) !== 0o755');
+    expect(source).toContain('ownedDirectories.add(absolute)');
+    expect(source).toContain('chownSync(destination, authority.workspaceOwnerUid');
+    expect(source).toContain("chmodSync('/workspace', 0o700)");
+    expect(source).toContain('process.setgroups([])');
+    expect(source).toContain('process.setgid(authority.workspaceOwnerGid)');
+    expect(source).toContain('process.setuid(authority.workspaceOwnerUid)');
+    expect(source).toContain('ownedRoot.uid !== BigInt(authority.workspaceOwnerUid)');
+    expect(source).toContain('ownedRoot.gid !== BigInt(authority.workspaceOwnerGid)');
+    expect(source).not.toContain("'--cap-add', 'FOWNER'");
     expect(source).toContain('sourcePre.entries.clear()');
     expect(source).toContain("const destination = scan('/workspace', false)");
     expect(source).toContain("const sourcePost = scan('/source', false)");
     expect(source).toContain('if (!Number.isSafeInteger(written) || written <= 0) process.exit(78)');
     expect(source).not.toContain('readFileSync(absolute)');
+  });
+
+  it('gives populate and capture helpers an owner-private executable native snapshot tmpfs', () => {
+    const source = createExactDockerEffectLifecycleAdapterV1.toString();
+    expect(source).toMatch(
+      /\.\.\.buildExactDockerNativeSnapshotArgs\(\s*input\.workspaceOwnerUid,\s*input\.workspaceOwnerGid\s*\)/u,
+    );
+    expect(source).toMatch(/["']--cap-add["'],\s*["']DAC_READ_SEARCH["']/u);
+    expect(source.match(/DAC_READ_SEARCH/gu)).toHaveLength(1);
+    expect(source).toContain('dst=/source,readonly,bind-propagation=rprivate');
   });
 
   it('runs exact provider auth phases asynchronously with bounded output and lifetime', () => {
@@ -1027,8 +1115,129 @@ describe('exact Docker custody mounts', () => {
     );
   });
 
+  it('contains only the durable-identity-matched pre-provider container before volume compensation', async () => {
+    const attemptId = '23ed8b85-d2e9-8401-8d61-d2dc5b665858';
+    const containerName = `deckent-x-${attemptId}`;
+    const containerId = 'a'.repeat(64);
+    const imageDigest = digest('b');
+    const imageReference = `deckent-worker@${imageDigest}`;
+    const workspaceVolumeName = `deckent-xw-${'c'.repeat(48)}`;
+    const dependencyVolumeName = `deckent-xd-${'d'.repeat(48)}`;
+    const rootId = digest('1');
+    const scopeDigest = digest('2');
+    const releaseNonceSha256 = digest('3');
+    const providerInvocationDigest = digest('4');
+    const preparedWorkspaceAuthorityDigest = digest('5');
+    const workspaceResourceInstanceDigest = digest('6');
+    const dependencyResourceInstanceDigest = digest('7');
+    const labels = {
+      'io.deckent.exact-custody.managed': 'true',
+      'io.deckent.exact-custody.root-id': rootId,
+      'io.deckent.exact-custody.scope-digest': scopeDigest,
+      'io.deckent.exact-custody.effect-op-digest': digest('8'),
+      'io.deckent.exact-custody.attempt-id': attemptId,
+      'io.deckent.exact-custody.generation': '1',
+      'io.deckent.exact-custody.release-nonce-sha256': releaseNonceSha256,
+      'io.deckent.exact-custody.provider-invocation-digest': providerInvocationDigest,
+      'io.deckent.exact-custody.pid1-sha256': digest('9'),
+      'io.deckent.exact-custody.workspace-volume': workspaceVolumeName,
+      'io.deckent.exact-custody.dependency-volume': dependencyVolumeName,
+      'io.deckent.exact-custody.prepared-workspace-authority':
+        preparedWorkspaceAuthorityDigest,
+      'io.deckent.exact-custody.workspace-resource-instance':
+        workspaceResourceInstanceDigest,
+      'io.deckent.exact-custody.dependency-resource-instance':
+        dependencyResourceInstanceDigest,
+    };
+    const inspection = (running: boolean, observedLabels = labels) => JSON.stringify([{
+      Id: containerId,
+      Name: `/${containerName}`,
+      Image: imageDigest,
+      Config: { Image: imageReference, Labels: observedLabels },
+      State: { Running: running },
+    }]);
+    const commandResult = (
+      status: number,
+      stdout: string,
+      stderr = '',
+    ) => ({
+      status, signal: null, stdout: Buffer.from(stdout), stderr: Buffer.from(stderr),
+      error: false, overflow: false,
+    });
+    let inspectCount = 0;
+    const exactWorkspaceCommandRunner = vi.fn(async (input: { args: readonly string[] }) => {
+      if (input.args[0] === 'inspect') {
+        inspectCount += 1;
+        if (inspectCount === 1) return commandResult(0, inspection(true));
+        if (inspectCount === 2) return commandResult(0, inspection(false));
+        return commandResult(1, '', `Error: No such object: ${containerName}`);
+      }
+      if (input.args[0] === 'stop') return commandResult(0, `${containerId}\n`);
+      if (input.args[0] === 'rm') return commandResult(0, `${containerId}\n`);
+      throw new Error(`unexpected pre-provider cleanup command: ${input.args.join(' ')}`);
+    });
+    const backend = new DockerSpawnBackend('/test/project', {
+      custodyStateDir: '/test/state', exactWorkspaceCommandRunner,
+    });
+    const internals = backend as unknown as {
+      ensureExactDockerPreProviderContainerAbsent(
+        scope: unknown,
+        lifecycle: unknown,
+        storeAdapter: unknown,
+      ): Promise<boolean>;
+    };
+    const scope = {
+      identity: { attemptId, generation: 1 },
+      store: { root: { rootId } },
+      access: { scopeDigest },
+      taskSnapshot: { dispatch: {
+        releaseCommitNonceSha256: releaseNonceSha256,
+        providerInvocationDigest,
+      } },
+    };
+    const lifecycle = {
+      state: 'PROVIDER_START_AUTHORIZED',
+      workspacePlan: {
+        imageReference,
+        imageDigest,
+        volumeName: workspaceVolumeName,
+        workspaceResourceInstanceDigest,
+        dependencyResourceInstanceDigest,
+        dependencyPlan: { volumeName: dependencyVolumeName },
+      },
+    };
+    const storeAdapter = {
+      readPreparedWorkspace: () => ({ authorityDigest: preparedWorkspaceAuthorityDigest }),
+    };
+    await expect(internals.ensureExactDockerPreProviderContainerAbsent(
+      scope,
+      lifecycle,
+      storeAdapter,
+    )).resolves.toBe(true);
+    expect(exactWorkspaceCommandRunner.mock.calls.map(([input]) => input.args[0]))
+      .toEqual(['inspect', 'stop', 'inspect', 'rm', 'inspect']);
+
+    const foreignRunner = vi.fn(async () => commandResult(0, inspection(true, {
+      ...labels,
+      'io.deckent.exact-custody.workspace-resource-instance': digest('f'),
+    })));
+    const foreignBackend = new DockerSpawnBackend('/test/project', {
+      custodyStateDir: '/test/state', exactWorkspaceCommandRunner: foreignRunner,
+    }) as unknown as typeof internals;
+    await expect(foreignBackend.ensureExactDockerPreProviderContainerAbsent(
+      scope,
+      lifecycle,
+      storeAdapter,
+    )).resolves.toBe(false);
+    expect(foreignRunner).toHaveBeenCalledTimes(1);
+  });
+
   it('freshly rereads each exact volume generation around helpers and quiescence checks', () => {
     const source = createExactDockerEffectLifecycleAdapterV1.toString();
+    expect(source).toMatch(/"run",\s*\.\.\.populate \? \["-i"\] : \[\]/u);
+    expect(source).toContain('stdin: populate ? input.inventory.nulDelimitedPaths : Buffer.alloc(0)');
+    expect(source).toContain('EXACT_DOCKER_EFFECT_CLOCK_REGRESSION_TOLERANCE_MS');
+    expect(source).toContain('return new Date(lastTimestampMs).toISOString()');
     const captureBefore = source.indexOf('const beforeGeneration = await inspectExactVolumeGeneration');
     const helperRun = source.indexOf('const result = await run', captureBefore);
     const captureAfter = source.indexOf('const afterGeneration = await inspectExactVolumeGeneration', helperRun);
@@ -1134,8 +1343,27 @@ describe('exact Docker custody mounts', () => {
     const source = exactDockerCustodyNativeProbeSource();
     expect(source).toContain("from '/app/dist/core/exec-authority-native.js'");
     expect(source).toContain("'/app/native/exec-authority/build/Release'");
+    expect(source).toContain("path: '/run/deckent/snapshot'");
+    expect(source).toContain("name: 'task.json'");
+    expect(source).toContain("path: '/workspace/.tasks'");
+    expect(source).toContain("path: '/workspace'");
+    expect(source).toContain('execution-effect-docker-mount-separation-v1');
+    expect(source).not.toContain('prove-root-separation');
     expect(source).not.toContain('/workspace/dist');
     expect(source).not.toContain('/workspace/native');
+    expect(buildExactDockerNativeSnapshotArgs()).toEqual([
+      '-e', 'TMPDIR=/run/deckent-native-snapshot',
+      '--tmpfs', '/run/deckent-native-snapshot:rw,exec,nosuid,nodev,size=2m,mode=0700',
+    ]);
+    expect(buildExactDockerNativeSnapshotArgs(1000, 1000)).toEqual([
+      '-e', 'TMPDIR=/run/deckent-native-snapshot',
+      '--tmpfs',
+      '/run/deckent-native-snapshot:rw,exec,nosuid,nodev,size=2m,mode=0700,uid=1000,gid=1000',
+    ]);
+    expect(() => buildExactDockerNativeSnapshotArgs(1000)).toThrow('EXACT_DOCKER_INPUT_INVALID');
+    expect(() => buildExactDockerNativeSnapshotArgs(-1, 1000)).toThrow(
+      'EXACT_DOCKER_INPUT_INVALID',
+    );
   });
 
   it('rejects missing, wrong and early execution commits and delivers only after durable reread', async () => {
@@ -1657,14 +1885,23 @@ describe('exact Docker custody mounts', () => {
     const reread = source.indexOf('readDispatchAuthority', settle);
     const startWrite = source.indexOf('EXACT_DOCKER_PROVIDER_START_FILE', reread);
     const startObservation = source.indexOf('PROVIDER_START', startWrite);
+    const executionAckObserver = source.indexOf(
+      'beginExactDockerProviderExecutionAckObservation', startObservation,
+    );
     const executionCommit = source.indexOf('deliverExactDockerExecutionCommit', startObservation);
+    const executionObservationPublication = source.indexOf(
+      'observeExactDockerProviderExecution', executionCommit,
+    );
     const durableStartReceipt = source.indexOf('exactCustodyProviderStarts.set', executionCommit);
     expect(settle).toBeGreaterThan(0);
     expect(reread).toBeGreaterThan(settle);
     expect(startWrite).toBeGreaterThan(reread);
     expect(startObservation).toBeGreaterThan(startWrite);
+    expect(executionAckObserver).toBeGreaterThan(startObservation);
+    expect(executionAckObserver).toBeLessThan(executionCommit);
     expect(executionCommit).toBeGreaterThan(startObservation);
-    expect(durableStartReceipt).toBeGreaterThan(startObservation);
+    expect(executionObservationPublication).toBeGreaterThan(executionCommit);
+    expect(durableStartReceipt).toBeGreaterThan(executionObservationPublication);
     expect(source).toContain('EXACT_DOCKER_PROVIDER_START_RECONCILIATION_REQUIRED');
     expect(source).not.toContain('this.spawn(');
   });
@@ -1673,11 +1910,102 @@ describe('exact Docker custody mounts', () => {
     const source = (DockerSpawnBackend.prototype as unknown as {
       recordExactAmbiguity: (...args: unknown[]) => unknown;
     }).recordExactAmbiguity.toString();
-    expect(source).toContain('isExactDockerContainerAbsent(projectedInspection, spawned.containerId)');
+    expect(source).toContain('isExactDockerContainerAbsent(projectedInspection, inspectSelector)');
     expect(source).not.toContain("inspected.status !== 0 ? 'ABSENT'");
     expect(isExactDockerContainerAbsent({
       status: 1, stdout: '', stderr: 'permission denied by daemon',
     }, 'container-1')).toBe(false);
+  });
+
+  it('keeps pre-release reconciliation evidence internally consistent', async () => {
+    const attemptId = 'attempt-release-not-started';
+    const admissionRef = {
+      dispatchRequestId: 'dreq-release-not-started',
+      identity: {
+        schemaVersion: 2 as const,
+        backend: 'docker' as const,
+        projectRootSha256: digest('1'),
+        projectId: digest('1'),
+        taskId: 'task-release-not-started',
+        attemptId,
+        generation: 1,
+      },
+      reservationReceiptDigest: digest('2'),
+      admissionReceiptDigest: digest('3'),
+      dispatchRequestMaterialDigest: digest('4'),
+      refDigest: digest('5'),
+    };
+    let observationBytes = new Uint8Array();
+    let reconciliationEvidence: Record<string, unknown> | null = null;
+    const backend = new DockerSpawnBackend('/test/project', {
+      custodyStateDir: '/test/state',
+      exactWorkspaceCommandRunner: async input => ({
+        status: 1,
+        stdout: Buffer.from('[]\n'),
+        stderr: Buffer.from(`error: no such object: ${input.args.at(-1)}`),
+        timedOut: false,
+        stdoutTruncated: false,
+        stderrTruncated: false,
+      }),
+    });
+    const store = {
+      publishDispatchObservation: vi.fn((input: { bytes: Uint8Array }) => {
+        observationBytes = Uint8Array.from(input.bytes);
+        return { receiptDigest: digest('6'), evidenceDigest: digest('7') };
+      }),
+      readDispatchObservation: vi.fn(() => ({
+        receipt: {
+          receiptDigest: digest('6'),
+          evidenceDigest: digest('7'),
+          observedAt: '2026-09-03T00:00:00.000Z',
+        },
+        bytes: observationBytes,
+      })),
+      recordAmbiguousDispatch: vi.fn((input: {
+        reconciliationEvidence: Record<string, unknown>;
+        reasonCode: string;
+      }) => {
+        reconciliationEvidence = input.reconciliationEvidence;
+        return {
+          reasonCode: input.reasonCode,
+          reconciliationRef: digest('8'),
+          receiptDigest: digest('9'),
+        };
+      }),
+    };
+    const scope = {
+      identity: admissionRef.identity,
+      admission: { admittedAt: '2026-09-03T00:00:00.000Z' },
+      admissionRef,
+      policy: {},
+      store,
+      state: 'PREPARED',
+      mountTransferReceipt: null,
+      launch: {
+        spawnOutcome: null,
+        releaseCommitTokenSha256: digest('a'),
+        providerInvocationDigest: digest('b'),
+      },
+    };
+    await (backend as unknown as {
+      recordExactAmbiguity(
+        scope: typeof scope,
+        reasonCode: 'MOUNT_RECONCILIATION_REQUIRED',
+        releaseState: 'NOT_ATTEMPTED',
+      ): Promise<unknown>;
+    }).recordExactAmbiguity(scope, 'MOUNT_RECONCILIATION_REQUIRED', 'NOT_ATTEMPTED');
+
+    const observation = JSON.parse(Buffer.from(observationBytes).toString('utf8')) as {
+      releaseNonceDigest: unknown;
+      providerInvocationDigest: unknown;
+    };
+    expect(observation.releaseNonceDigest).toBeNull();
+    expect(observation.providerInvocationDigest).toBeNull();
+    expect(reconciliationEvidence).toMatchObject({
+      releaseState: 'NOT_ATTEMPTED',
+      releaseNonceDigest: null,
+      providerInvocationDigest: null,
+    });
   });
 
   it('rejects corrupt Store observation bytes or receipt evidence before release projection', () => {
@@ -1796,7 +2124,7 @@ describe('exact Docker custody mounts', () => {
     };
     const store = {
       ...fixture.store,
-      listDispatchAdmissions: vi.fn(() => ({ entries: [admitted] })),
+      listDispatchAdmissionsForRecovery: vi.fn(() => ({ entries: [admitted], heldAdmissions: [] })),
       readDispatchObservationByClass: vi.fn(() => startObservation),
     };
     const scope = { ...fixture.scope, store };
@@ -2033,7 +2361,7 @@ describe('exact Docker custody mounts', () => {
     };
     const store = {
       ...fixture.store,
-      listDispatchAdmissions: vi.fn(() => ({ entries: [admitted] })),
+      listDispatchAdmissionsForRecovery: vi.fn(() => ({ entries: [admitted], heldAdmissions: [] })),
       readDispatchObservationByClass: vi.fn(() => null),
     };
     const backend = new DockerSpawnBackend('/test/project', { custodyStateDir: '/test/state' });
@@ -2083,10 +2411,13 @@ describe('exact Docker custody mounts', () => {
     ));
     const store = {
       ...fixture.store,
-      listDispatchAdmissions: vi.fn(() => ({ entries: [admitted] })),
+      listDispatchAdmissionsForRecovery: vi.fn(() => ({ entries: [admitted], heldAdmissions: [] })),
       readDispatchAuthority: vi.fn(() => ({
         state: 'terminal' as const,
-        authority: { state: 'NOT_DISPATCHED' as const },
+        authority: {
+          state: 'NOT_DISPATCHED' as const,
+          admissionRef: fixture.admissionRef,
+        },
       })),
       readDispatchObservationByClass,
     };
@@ -2129,10 +2460,13 @@ describe('exact Docker custody mounts', () => {
     };
     const store = {
       ...fixture.store,
-      listDispatchAdmissions: vi.fn(() => ({ entries: [pending, admitted] })),
+      listDispatchAdmissionsForRecovery: vi.fn(() => ({ entries: [pending, admitted], heldAdmissions: [] })),
       readDispatchAuthority: vi.fn(() => ({
         state: 'terminal' as const,
-        authority: { state: 'NOT_DISPATCHED' as const },
+        authority: {
+          state: 'NOT_DISPATCHED' as const,
+          admissionRef: fixture.admissionRef,
+        },
       })),
       readDispatchObservationByClass: vi.fn(() => null),
     };
@@ -2166,6 +2500,72 @@ describe('exact Docker custody mounts', () => {
     expect(internals.reconstructExactDockerRecoveryScope).toHaveBeenCalledTimes(1);
   });
 
+  it('reports one identity-bound discovery HOLD and still reconciles its valid sibling', async () => {
+    const fixture = releasedReplayFixture();
+    const rejectedReservation = {
+      dispatchRequestId: `dreq-${'4'.repeat(64)}`,
+      identity: {
+        ...fixture.identity,
+        taskId: 'identity-bound-unreadable-admission',
+      },
+    };
+    const admitted = {
+      state: 'admitted' as const,
+      ref: fixture.admissionRef,
+      admission: fixture.scope.admission,
+      reservation: {},
+    };
+    const store = {
+      ...fixture.store,
+      listDispatchAdmissionsForRecovery: vi.fn(() => ({
+        entries: [admitted],
+        heldAdmissions: [{
+          state: 'admission-hold' as const,
+          reservation: rejectedReservation,
+          candidateLocatorDigest: digest('4'),
+          custodyHoldCode: 'INCOMPLETE_PUBLICATION' as const,
+        }],
+      })),
+      readDispatchAuthority: vi.fn(() => ({
+        state: 'terminal' as const,
+        authority: {
+          state: 'NOT_DISPATCHED' as const,
+          admissionRef: fixture.admissionRef,
+        },
+      })),
+      readDispatchObservationByClass: vi.fn(() => null),
+    };
+    const backend = new DockerSpawnBackend('/test/project', { custodyStateDir: '/test/state' });
+    const internals = backend as unknown as {
+      openExactDockerRecoveryStore: ReturnType<typeof vi.fn>;
+      reconstructExactDockerRecoveryScope: ReturnType<typeof vi.fn>;
+    };
+    internals.openExactDockerRecoveryStore = vi.fn(() => ({
+      store,
+      policy: fixture.scope.policy,
+    }));
+    internals.reconstructExactDockerRecoveryScope = vi.fn(() => ({
+      ...fixture.scope,
+      store,
+    }));
+
+    await expect(backend.reconcilePendingAttempts()).resolves.toMatchObject({
+      adopted: [],
+      closedNotDispatched: [fixture.identity.taskId],
+      held: [{
+        kind: 'spawn-backend-recovery-hold',
+        dispatchRequestId: rejectedReservation.dispatchRequestId,
+        taskId: rejectedReservation.identity.taskId,
+        admissionRefDigest: null,
+        authorityState: 'ADMISSION_DISCOVERY_REJECTED',
+        reasonCode: 'DISPATCH_DISCOVERY_TAMPERED_CANDIDATE',
+        custodyHoldCode: 'INCOMPLETE_PUBLICATION',
+      }],
+    });
+    expect(store.readDispatchAuthority).toHaveBeenCalledTimes(1);
+    expect(internals.reconstructExactDockerRecoveryScope).toHaveBeenCalledTimes(1);
+  });
+
   it('HOLDs a released exact attempt whose admitted landing policy is missing', async () => {
     const fixture = releasedReplayFixture();
     const admitted = {
@@ -2176,7 +2576,7 @@ describe('exact Docker custody mounts', () => {
     };
     const store = {
       ...fixture.store,
-      listDispatchAdmissions: vi.fn(() => ({ entries: [admitted] })),
+      listDispatchAdmissionsForRecovery: vi.fn(() => ({ entries: [admitted], heldAdmissions: [] })),
     };
     const backend = new DockerSpawnBackend('/test/project', { custodyStateDir: '/test/state' });
     const internals = backend as unknown as {
@@ -2229,7 +2629,7 @@ describe('exact Docker custody mounts', () => {
     };
     const store = {
       ...fixture.store,
-      listDispatchAdmissions: vi.fn(() => ({ entries: [admitted] })),
+      listDispatchAdmissionsForRecovery: vi.fn(() => ({ entries: [admitted], heldAdmissions: [] })),
       readDispatchObservationByClass: vi.fn(() => startObservation),
     };
     const scope = { ...fixture.scope, store };
@@ -2249,12 +2649,6 @@ describe('exact Docker custody mounts', () => {
       monitorExactDockerCustody: ReturnType<typeof vi.fn>;
       commitExactDockerEffectLanding: ReturnType<typeof vi.fn>;
     };
-    const containSource = internals.containExactDockerCustodyAttempt.toString();
-    expect(containSource).toContain('rehydrateExactDockerEffectLaunch');
-    expect(containSource).toMatch(/["']stop["']/u);
-    expect(containSource).toContain('publishAndRereadExactObservation');
-    expect(containSource).not.toContain('monitorExactDockerCustody');
-    expect(containSource).not.toContain('commitExactDockerEffectLanding');
     internals.openExactDockerRecoveryStore = vi.fn(() => ({
       store,
       policy: fixture.scope.policy,
@@ -2265,11 +2659,14 @@ describe('exact Docker custody mounts', () => {
       () => fixture.providerExecutionReceipt,
     );
     internals.readExactDockerRecoveryProviderExit = vi.fn(() => null);
-    internals.containExactDockerCustodyAttempt = vi.fn(async () => undefined);
+    internals.containExactDockerCustodyAttempt = vi.fn(async () => ({
+      containerId: fixture.authority.backendExecutionId,
+    }));
     internals.rehydrateExactDockerEffectLaunch = vi.fn(async () => undefined);
     internals.monitorExactDockerCustody = vi.fn();
     internals.commitExactDockerEffectLanding = vi.fn();
 
+    expect(backend.workerInventoryState(fixture.identity.taskId)).toBe('unknown');
     await expect(backend.reconcilePendingAttempts({ mode: 'contain' }))
       .resolves.toMatchObject({ adopted: [fixture.identity.taskId] });
     expect(internals.containExactDockerCustodyAttempt).toHaveBeenCalledWith(
@@ -2281,6 +2678,141 @@ describe('exact Docker custody mounts', () => {
     expect(internals.rehydrateExactDockerEffectLaunch).not.toHaveBeenCalled();
     expect(internals.monitorExactDockerCustody).not.toHaveBeenCalled();
     expect(internals.commitExactDockerEffectLanding).not.toHaveBeenCalled();
+    expect(backend.workerInventoryState(fixture.identity.taskId)).toBe('absent');
+    expect(backend.workerInventoryState('never-observed')).toBe('unknown');
+  });
+
+  it('contains a live exact container through async inspect-stop-wait and durable exit reread', async () => {
+    const fixture = releasedReplayFixture();
+    const commandResult = (stdout = '') => ({
+      status: 0,
+      signal: null,
+      stdout: Buffer.from(stdout),
+      stderr: Buffer.alloc(0),
+      error: false,
+      overflow: false,
+    });
+    const exactWorkspaceCommandRunner = vi.fn(async (input: { args: readonly string[] }) => {
+      if (input.args[0] === 'inspect') return commandResult('true|0\n');
+      if (input.args[0] === 'stop') return commandResult();
+      if (input.args[0] === 'wait') return commandResult('143\n');
+      throw new Error(`unexpected exact containment command: ${input.args.join(' ')}`);
+    });
+    const backend = new DockerSpawnBackend('/test/project', {
+      custodyStateDir: '/test/state',
+      exactWorkspaceCommandRunner,
+    });
+    const internals = backend as unknown as {
+      rehydrateExactDockerEffectLaunch: ReturnType<typeof vi.fn>;
+      publishAndRereadExactObservation: ReturnType<typeof vi.fn>;
+      rereadExactProviderExitObservation: ReturnType<typeof vi.fn>;
+      monitorExactDockerCustody: ReturnType<typeof vi.fn>;
+      commitExactDockerEffectLanding: ReturnType<typeof vi.fn>;
+      containExactDockerCustodyAttempt: (
+        scope: unknown,
+        terminal: unknown,
+        start: unknown,
+        recoveredExit: null,
+      ) => Promise<{ containerId: string; exitCode: number }>;
+    };
+    internals.rehydrateExactDockerEffectLaunch = vi.fn(async () => undefined);
+    internals.publishAndRereadExactObservation = vi.fn(() => ({
+      receiptDigest: digest('8'),
+      evidenceDigest: digest('9'),
+    }));
+    internals.rereadExactProviderExitObservation = vi.fn();
+    internals.monitorExactDockerCustody = vi.fn();
+    internals.commitExactDockerEffectLanding = vi.fn();
+
+    const providerExit = await internals.containExactDockerCustodyAttempt(
+      fixture.scope,
+      fixture.authority,
+      {
+        containerId: fixture.authority.backendExecutionId,
+        observedAt: '2026-09-01T00:00:00.500Z',
+      },
+      null,
+    );
+
+    expect(exactWorkspaceCommandRunner.mock.calls.map(([input]) => input.args[0]))
+      .toEqual(['inspect', 'stop', 'wait']);
+    expect(providerExit).toMatchObject({
+      containerId: fixture.authority.backendExecutionId,
+      exitCode: 143,
+    });
+    expect(internals.publishAndRereadExactObservation).toHaveBeenCalledWith(
+      fixture.scope,
+      'PROVIDER_EXIT',
+      expect.objectContaining({
+        kind: 'exact-docker-provider-exit',
+        containerId: fixture.authority.backendExecutionId,
+        exitCode: 143,
+      }),
+      expect.any(String),
+    );
+    expect(internals.rereadExactProviderExitObservation).toHaveBeenCalledWith(
+      fixture.scope,
+      expect.objectContaining({
+        containerId: fixture.authority.backendExecutionId,
+        exitCode: 143,
+      }),
+    );
+    expect(internals.monitorExactDockerCustody).not.toHaveBeenCalled();
+    expect(internals.commitExactDockerEffectLanding).not.toHaveBeenCalled();
+  });
+
+  it('re-observes Docker before accepting a recovered provider-exit as contained', async () => {
+    const fixture = releasedReplayFixture();
+    const commandResult = (stdout: string) => ({
+      status: 0,
+      signal: null,
+      stdout: Buffer.from(stdout),
+      stderr: Buffer.alloc(0),
+      error: false,
+      overflow: false,
+    });
+    const exactWorkspaceCommandRunner = vi.fn(async () => commandResult('false|0\n'));
+    const backend = new DockerSpawnBackend('/test/project', {
+      custodyStateDir: '/test/state',
+      exactWorkspaceCommandRunner,
+    });
+    const internals = backend as unknown as {
+      rehydrateExactDockerEffectLaunch: ReturnType<typeof vi.fn>;
+      containExactDockerCustodyAttempt: (
+        scope: unknown,
+        terminal: unknown,
+        start: unknown,
+        recoveredExit: unknown,
+      ) => Promise<unknown>;
+    };
+    internals.rehydrateExactDockerEffectLaunch = vi.fn(async () => undefined);
+    const recoveredExit = {
+      containerId: fixture.authority.backendExecutionId,
+      exitCode: 0,
+      observedAt: '2026-09-01T00:00:03.000Z',
+    };
+
+    await expect(internals.containExactDockerCustodyAttempt(
+      fixture.scope,
+      fixture.authority,
+      { containerId: fixture.authority.backendExecutionId },
+      recoveredExit,
+    )).resolves.toBe(recoveredExit);
+    expect(exactWorkspaceCommandRunner).toHaveBeenCalledWith(expect.objectContaining({
+      command: 'docker',
+      args: ['inspect', '--format', '{{.State.Running}}|{{.State.ExitCode}}',
+        fixture.authority.backendExecutionId],
+    }));
+
+    exactWorkspaceCommandRunner.mockResolvedValueOnce(commandResult('true|0\n'));
+    await expect(internals.containExactDockerCustodyAttempt(
+      fixture.scope,
+      fixture.authority,
+      { containerId: fixture.authority.backendExecutionId },
+      recoveredExit,
+    )).rejects.toMatchObject({
+      reasonCode: 'EXACT_DOCKER_RESTART_RECONCILIATION_REQUIRED',
+    });
   });
 
   it('retains observed completion until accepted-result consumption and keeps HOLD state', async () => {
@@ -2577,7 +3109,14 @@ describe('exact Docker custody mounts', () => {
     const scopeBaseline = `#deckent-scope-attribution-v1\t${query.custodyRef.dispatchRequestId}\t${scopeDigest}\n`;
     const scopeBaselineSha256 = `sha256:${createHash('sha256')
       .update(scopeBaseline).digest('hex')}` as const;
-    const approved = { taskId: identity.taskId, authority: 'approved' };
+    const dispatchTaskMaterialDigest = `sha256:${createHash('sha256')
+      .update(canonicalJson(task)).digest('hex')}` as const;
+    const approved = createExactNormalTaskApprovedMaterialV3({
+      sprintId: task.sprintId ?? 'sprint-fixture',
+      task,
+      dispatchTaskMaterialDigest,
+      policy,
+    });
     const lineage = { ordinal: 1 };
     const runnerSource = 'export const exactRunner = true;';
     const taskSnapshot = {
@@ -2591,8 +3130,7 @@ describe('exact Docker custody mounts', () => {
         approvedSha256: `sha256:${createHash('sha256')
           .update(canonicalJson(approved)).digest('hex')}` as const,
         dispatch: task,
-        dispatchSha256: `sha256:${createHash('sha256')
-          .update(canonicalJson(task)).digest('hex')}` as const,
+        dispatchSha256: dispatchTaskMaterialDigest,
         lineage,
         lineageSha256: `sha256:${createHash('sha256')
           .update(canonicalJson(lineage)).digest('hex')}` as const,
@@ -2620,6 +3158,29 @@ describe('exact Docker custody mounts', () => {
     let taskSnapshotBytes = Buffer.from(canonicalJson(taskSnapshot));
     const taskSnapshotSha256 = `sha256:${createHash('sha256')
       .update(taskSnapshotBytes).digest('hex')}` as const;
+    const persistedTaskAuthority = parseExactDockerDispatchTaskSnapshotAuthority(
+      taskSnapshotBytes,
+      policy,
+    );
+    if (persistedTaskAuthority === null) {
+      throw new Error('persisted exact task snapshot fixture is invalid');
+    }
+    const persistedTaskSnapshot = {
+      schemaVersion: 2 as const,
+      kind: 'exact-docker-dispatch-snapshot' as const,
+      dispatchRequestId: persistedTaskAuthority.dispatchRequestId,
+      projectId: persistedTaskAuthority.projectId,
+      taskId: persistedTaskAuthority.taskId,
+      material: {
+        approved: persistedTaskAuthority.approved,
+        approvedSha256: persistedTaskAuthority.approvedDigest,
+        dispatch: persistedTaskAuthority.task,
+        dispatchSha256: persistedTaskAuthority.taskDigest,
+        lineage: persistedTaskAuthority.lineage,
+        lineageSha256: persistedTaskAuthority.lineageDigest,
+      },
+      dispatch: persistedTaskAuthority.dispatch,
+    };
     const providerExecutionAttempt = {
       providerExecutionAttemptId: 'provider-attempt-fixture-001',
       identityDigest: digest('e'),
@@ -2858,7 +3419,7 @@ describe('exact Docker custody mounts', () => {
         admissionReceiptDigest,
         refDigest: admissionRefDigest,
       },
-      taskSnapshot,
+      taskSnapshot: persistedTaskSnapshot,
       provider: 'fixture-provider',
       model: 'fixture-model',
       execution: exactExecution,

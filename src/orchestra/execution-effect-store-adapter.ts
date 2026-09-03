@@ -8,6 +8,7 @@ import {
 import {
   createTaskAttemptEffectLandingBindingV2,
   executionEffectPersistenceRawDigest,
+  executionEffectWorkspaceAuthorityDigestV1,
   parseExecutionEffectLandingFinalReceiptEvidenceV1,
   parseExecutionEffectLandingReceiptV1,
   parseExecutionEffectLandingLeaseResumeContextV1,
@@ -953,9 +954,12 @@ export class ExecutionEffectStoreAdapterV1 {
   #readCleanupProgress(
     mode: ExecutionEffectStoreCleanupModeV1,
     state: ExecutionEffectStoreCleanupStateV1,
+    cache: Map<string, ExecutionEffectStoreCleanupProgressV1 | null> = new Map(),
   ): ExecutionEffectStoreCleanupProgressV1 | null {
+    const cacheKey = `${mode}:${state}`;
+    if (cache.has(cacheKey)) return cache.get(cacheKey) ?? null;
     const compensationPrepared = mode === 'COMPENSATION' && state !== 'COMPENSATION_PREPARED'
-      ? this.#readCleanupProgress('COMPENSATION', 'COMPENSATION_PREPARED') : null;
+      ? this.#readCleanupProgress('COMPENSATION', 'COMPENSATION_PREPARED', cache) : null;
     const compensationHasProviderContainer = compensationPrepared
       ? compensationPrepared.resources.some(entry => entry.resourceKind === 'provider-container')
       : true;
@@ -963,11 +967,17 @@ export class ExecutionEffectStoreAdapterV1 {
       mode, compensationHasProviderContainer,
     ) as readonly ExecutionEffectStoreCleanupStateV1[];
     const stateIndex = sequence.indexOf(state);
-    if (stateIndex < 0) return null;
+    if (stateIndex < 0) {
+      cache.set(cacheKey, null);
+      return null;
+    }
     const verified = this.#readArtifact(
       'execution-effect-lifecycle-authority', this.#cleanupArtifactKey(mode, state),
     );
-    if (!verified) return null;
+    if (!verified) {
+      cache.set(cacheKey, null);
+      return null;
+    }
     let value: unknown;
     try { value = JSON.parse(Buffer.from(verified.bytes).toString('utf8')); } catch {
       throw new TypeError('Execution effect cleanup progress artifact is invalid');
@@ -1056,7 +1066,7 @@ export class ExecutionEffectStoreAdapterV1 {
     }
     const predecessorState = stateIndex === 0 ? null : sequence[stateIndex - 1]!;
     const predecessor = predecessorState === null ? null
-      : this.#readCleanupProgress(mode, predecessorState);
+      : this.#readCleanupProgress(mode, predecessorState, cache);
     if ((predecessor === null) !== (stateIndex === 0)
       || progress.predecessorProgressDigest !== (predecessor?.progressDigest ?? null)
       || (predecessor && (predecessor.lifecycleAuthorityDigest
@@ -1166,7 +1176,15 @@ export class ExecutionEffectStoreAdapterV1 {
         }
       }
     }
-    if (mode === 'RELEASE') {
+    // Every later release state is already bound byte-for-byte to its recursively
+    // verified predecessor above (shared lifecycle/anchor/landing refs, resources,
+    // and monotonic timestamp). Re-reading the same READY manifest, landing receipt,
+    // terminal seal, and recovery anchor once per state made an eight-state release
+    // chain repeatedly traverse the same large immutable artifacts. Verify that
+    // shared authority once at RELEASE_PREPARED; all successors inherit it only
+    // through the exact predecessor digest chain. A fresh top-level read still
+    // starts with an empty cache and therefore revalidates disk truth.
+    if (mode === 'RELEASE' && stateIndex === 0) {
       if (!landingRef || !progress.landingReceiptDigest || preparationRefs.length !== 1) {
         throw new TypeError('Release cleanup landing authority is unavailable');
       }
@@ -1234,7 +1252,7 @@ export class ExecutionEffectStoreAdapterV1 {
         || !this.#sameCleanupResources(
           resources, this.#releaseCleanupResources(ready.authority),
         )) throw new TypeError('Release cleanup authority binding mismatch');
-    } else {
+    } else if (mode === 'COMPENSATION') {
       if (landingRef || progress.landingReceiptDigest !== null
         || progress.landingRecoveryAnchorDigest !== null
         || preparationRefs.length !== 2) {
@@ -1264,14 +1282,16 @@ export class ExecutionEffectStoreAdapterV1 {
         throw new TypeError('Compensation cleanup authority binding mismatch');
       }
     }
+    cache.set(cacheKey, progress);
     return progress;
   }
 
-  readLatestCleanupProgress(
+  #readLatestCleanupProgress(
     mode: ExecutionEffectStoreCleanupModeV1,
+    cache: Map<string, ExecutionEffectStoreCleanupProgressV1 | null>,
   ): ExecutionEffectStoreCleanupProgressV1 | null {
     const prepared = mode === 'COMPENSATION'
-      ? this.#readCleanupProgress('COMPENSATION', 'COMPENSATION_PREPARED') : null;
+      ? this.#readCleanupProgress('COMPENSATION', 'COMPENSATION_PREPARED', cache) : null;
     if (mode === 'COMPENSATION' && prepared
       && !prepared.resources.some(entry => entry.resourceKind === 'provider-container')) {
       for (const forbidden of [
@@ -1289,7 +1309,7 @@ export class ExecutionEffectStoreAdapterV1 {
     let latest: ExecutionEffectStoreCleanupProgressV1 | null = null;
     let gap = false;
     for (const state of sequence) {
-      const current = this.#readCleanupProgress(mode, state);
+      const current = this.#readCleanupProgress(mode, state, cache);
       if (!current) {
         gap = true;
         continue;
@@ -1298,6 +1318,12 @@ export class ExecutionEffectStoreAdapterV1 {
       latest = current;
     }
     return latest;
+  }
+
+  readLatestCleanupProgress(
+    mode: ExecutionEffectStoreCleanupModeV1,
+  ): ExecutionEffectStoreCleanupProgressV1 | null {
+    return this.#readLatestCleanupProgress(mode, new Map());
   }
 
   readLatestReleaseProgress(): ExecutionEffectStoreCleanupProgressV1 | null {
@@ -1314,8 +1340,9 @@ export class ExecutionEffectStoreAdapterV1 {
 
   #readReleaseOutcome(
     state: 'CONTAINER_ABSENT' | 'WORKSPACE_VOLUME_ABSENT' | 'DEPENDENCY_VOLUME_ABSENT',
+    cache: Map<string, ExecutionEffectStoreCleanupProgressV1 | null> = new Map(),
   ): ExecutionEffectDockerResourceReleaseOutcomeV1 {
-    const progress = this.#readCleanupProgress('RELEASE', state);
+    const progress = this.#readCleanupProgress('RELEASE', state, cache);
     if (!progress?.absenceEvidenceArtifact || !progress.absenceDisposition) {
       throw new TypeError('Release cleanup outcome is unavailable');
     }
@@ -1338,17 +1365,23 @@ export class ExecutionEffectStoreAdapterV1 {
     return Object.freeze({ disposition: 'EXECUTED_DELETION' as const, deletion, absence });
   }
 
-  readReleaseOutcomes(): ExecutionEffectStoreReleaseOutcomesV1 {
-    const terminal = this.readLatestReleaseProgress();
+  #readReleaseOutcomes(
+    cache: Map<string, ExecutionEffectStoreCleanupProgressV1 | null>,
+  ): ExecutionEffectStoreReleaseOutcomesV1 {
+    const terminal = this.#readLatestCleanupProgress('RELEASE', cache);
     if (terminal?.state !== 'RELEASED') {
       throw new TypeError('Release cleanup terminal authority is unavailable');
     }
     return Object.freeze({
-      providerContainerOutcome: this.#readReleaseOutcome('CONTAINER_ABSENT'),
-      workspaceVolumeOutcome: this.#readReleaseOutcome('WORKSPACE_VOLUME_ABSENT'),
-      dependencyVolumeOutcome: this.#readReleaseOutcome('DEPENDENCY_VOLUME_ABSENT'),
+      providerContainerOutcome: this.#readReleaseOutcome('CONTAINER_ABSENT', cache),
+      workspaceVolumeOutcome: this.#readReleaseOutcome('WORKSPACE_VOLUME_ABSENT', cache),
+      dependencyVolumeOutcome: this.#readReleaseOutcome('DEPENDENCY_VOLUME_ABSENT', cache),
       releasedProgressDigest: terminal.progressDigest,
     });
+  }
+
+  readReleaseOutcomes(): ExecutionEffectStoreReleaseOutcomesV1 {
+    return this.#readReleaseOutcomes(new Map());
   }
 
   /**
@@ -1357,9 +1390,12 @@ export class ExecutionEffectStoreAdapterV1 {
    * consumed; it performs no Docker or filesystem effect.
    */
   projectWorkspaceReleaseFromDurableCleanup(): ReleaseExecutionEffectDockerWorkspaceV1Result {
+    const cleanupCache = new Map<string, ExecutionEffectStoreCleanupProgressV1 | null>();
     const ready = this.#readLifecyclePublication('READY_FOR_LANDING');
-    const prepared = this.#readCleanupProgress('RELEASE', 'RELEASE_PREPARED');
-    const terminal = this.readLatestReleaseProgress();
+    const prepared = this.#readCleanupProgress(
+      'RELEASE', 'RELEASE_PREPARED', cleanupCache,
+    );
+    const terminal = this.#readLatestCleanupProgress('RELEASE', cleanupCache);
     if (!ready || !prepared?.landingReceiptArtifact || terminal?.state !== 'RELEASED') {
       throw new TypeError('Durable workspace release authority is unavailable');
     }
@@ -1376,7 +1412,7 @@ export class ExecutionEffectStoreAdapterV1 {
       || terminal.lifecycleAuthorityDigest !== ready.authority.authorityDigest) {
       throw new TypeError('Durable workspace release authority mismatch');
     }
-    const outcomes = this.readReleaseOutcomes();
+    const outcomes = this.#readReleaseOutcomes(cleanupCache);
     return projectExecutionEffectDockerWorkspaceReleaseV1(
       ready.authority as ExecutionEffectDockerReadyLifecycleAuthorityV1,
       Object.freeze({
@@ -2816,6 +2852,7 @@ export class ExecutionEffectStoreAdapterV1 {
   }
 
   publishLanding(input: PublishExecutionEffectStoreLandingV1Input): ExecutionEffectStoreLandingPublicationV1 {
+    const cleanupCache = new Map<string, ExecutionEffectStoreCleanupProgressV1 | null>();
     const record = exactRecord(input, [
       'preparedWorkspace', 'final', 'finalCapturedAt',
       'terminalSeal', 'workspaceRelease', 'landingArtifactKey',
@@ -2833,10 +2870,10 @@ export class ExecutionEffectStoreAdapterV1 {
     const release = record && parseExecutionEffectWorkspaceReleaseV1(record.workspaceRelease);
     const preparedLifecycle = this.#readLifecyclePublication('PREPARED');
     const ready = this.#readLifecyclePublication('READY_FOR_LANDING');
-    const releaseProgress = this.readLatestReleaseProgress();
+    const releaseProgress = this.#readLatestCleanupProgress('RELEASE', cleanupCache);
     const recoveryAnchor = this.#readLandingRecoveryAnchor();
     const releaseOutcomes = releaseProgress?.state === 'RELEASED'
-      ? this.readReleaseOutcomes() : null;
+      ? this.#readReleaseOutcomes(cleanupCache) : null;
     if (!record || !preparedAuthority || !preparedBundle || !workspace || !baseline
       || !final || !terminal || !release || !preparedLifecycle || !ready || !recoveryAnchor
       || releaseProgress?.state !== 'RELEASED' || !releaseOutcomes
@@ -2876,8 +2913,8 @@ export class ExecutionEffectStoreAdapterV1 {
         !== workspace.workspaceIdentity.rootHandleEvidenceDigest
       || final.workspaceIdentity.filesystemId !== workspace.workspaceIdentity.filesystemId
       || final.workspaceIdentity.directoryId !== workspace.workspaceIdentity.directoryId
-      || final.workspaceIdentity.rootHandleEvidenceDigest
-        !== workspace.workspaceIdentity.rootHandleEvidenceDigest
+      || executionEffectWorkspaceAuthorityDigestV1(final.workspaceIdentity)
+        !== executionEffectWorkspaceAuthorityDigestV1(workspace.workspaceIdentity)
       || workspace.workspaceResource.baselineManifestDigest !== baseline.digest
       || terminal.workspaceSnapshotSealDigest !== workspace.sealDigest
       || terminal.baselineManifestDigest !== baseline.digest
@@ -3022,13 +3059,16 @@ export class ExecutionEffectStoreAdapterV1 {
       this.#policy,
       'effect-landing',
     );
+    if (verifiedLanding === null || landingArtifact === null || effectLandingChain === null) {
+      throw new TypeError('Verified execution effect landing authority is unavailable');
+    }
+    const cleanupCache = new Map<string, ExecutionEffectStoreCleanupProgressV1 | null>();
     const ready = this.#readLifecyclePublication('READY_FOR_LANDING');
-    const releaseProgress = this.readLatestReleaseProgress();
+    const releaseProgress = this.#readLatestCleanupProgress('RELEASE', cleanupCache);
     const recoveryAnchor = this.#readLandingRecoveryAnchor();
     const releaseOutcomes = releaseProgress?.state === 'RELEASED'
-      ? this.readReleaseOutcomes() : null;
-    if (verifiedLanding === null || landingArtifact === null || effectLandingChain === null
-      || !ready || !recoveryAnchor || releaseProgress?.state !== 'RELEASED' || !releaseOutcomes
+      ? this.#readReleaseOutcomes(cleanupCache) : null;
+    if (!ready || !recoveryAnchor || releaseProgress?.state !== 'RELEASED' || !releaseOutcomes
       || !this.#workspaceReleaseMatchesCleanupOutcomes(
         verifiedLanding.workspaceRelease, releaseOutcomes,
       )

@@ -159,15 +159,65 @@ describe('deckent run — exact attempt custody surface', () => {
       'node', 'deckent', 'run', 'must remain zero work', '--model', 'claude-sonnet-5',
     ]);
 
-    expect(harness.printError).toHaveBeenCalledWith(
-      expect.objectContaining({
-        message: expect.stringContaining('did not start'),
-      }),
-    );
+    expect(harness.printError).toHaveBeenCalledWith(expect.objectContaining({
+      message: expect.stringContaining('did not start'),
+    }));
+    expect(harness.printError).toHaveBeenCalledWith(expect.objectContaining({
+      message: expect.stringContaining(`sha256:${'a'.repeat(64)}`),
+    }));
     expect(harness.print).not.toHaveBeenCalledWith(
       expect.stringContaining('started'),
     );
-    expect(harness.print).toHaveBeenCalledWith(expect.stringContaining('zero:'));
+    expect(harness.printError).toHaveBeenCalledWith(expect.objectContaining({
+      message: expect.stringContaining('zero:'),
+    }));
+    expect(process.exitCode).toBe(1);
+  });
+
+  it('distinguishes reconciliation-required from zero work and preserves both receipt refs', async () => {
+    harness.execute.mockImplementationOnce(async (input: any) => ({
+      disposition: {
+        kind: 'ambiguous',
+        taskId: input.task.id,
+        reasonCode: 'EXACT_DISPATCH_OUTCOME_AMBIGUOUS',
+        executionMode: 'normal-docker-exact',
+        executionBackend: 'docker',
+      },
+      executionMode: 'normal-docker-exact',
+      backend: 'docker',
+      provider: input.task.provider,
+      invocation: {
+        receiptRef: {
+          schemaVersion: 1,
+          invocationId: `reconcile:${input.task.id}`,
+          tenantId: 'local',
+          projectId: 'test-project',
+        },
+        executionBackend: 'docker',
+        transport: 'cli',
+        state: 'reconciliation-required',
+        executionMode: 'normal-docker-exact',
+        reasonCode: 'EXACT_DISPATCH_OUTCOME_AMBIGUOUS',
+        authorityEvidenceRefs: ['reconciliation-receipt:fixture', `sha256:${'b'.repeat(64)}`],
+      },
+    }));
+    const program = new Command();
+    program.exitOverride();
+    registerRun(program);
+
+    await program.parseAsync([
+      'node', 'deckent', 'run', 'must reconcile', '--model', 'claude-sonnet-5',
+    ]);
+
+    expect(harness.printError).toHaveBeenCalledWith(expect.objectContaining({
+      message: expect.stringContaining('requires reconciliation'),
+    }));
+    expect(harness.printError).toHaveBeenCalledWith(expect.objectContaining({
+      message: expect.stringContaining('reconciliation-receipt:fixture'),
+    }));
+    expect(harness.printError).toHaveBeenCalledWith(expect.objectContaining({
+      message: expect.stringContaining(`sha256:${'b'.repeat(64)}`),
+    }));
     expect(process.exitCode).toBe(1);
   });
 

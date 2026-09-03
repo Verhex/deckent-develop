@@ -30,6 +30,8 @@ import type { BacklogEntry, BacklogFile } from '../../../src/orchestra/autonomou
 import type { TaskResult } from '../../../src/core/types.js';
 import type { ExecutionPool } from '../../../src/orchestra/autonomous/execution-pool.js';
 import type { TaskResultSettlementRefV1 } from '../../../src/core/task-result-settlement.js';
+import { TaskIngressDispositionError } from '../../../src/orchestra/task-mode-runner.js';
+import type { ExactAcceptedTaskResultAuthorityMetadata } from '../../../src/orchestra/task-result-authority.js';
 
 // ─── Shared helpers ──────────────────────────────────────────────────
 
@@ -71,6 +73,35 @@ const noGoResult: TaskResult = {
   filesChanged: [], notes: '', linesAdded: 0, linesRemoved: 0,
 };
 
+function exactAcceptedAuthorityFor(
+  taskId: string,
+): ExactAcceptedTaskResultAuthorityMetadata {
+  const digest = `sha256:${'a'.repeat(64)}` as const;
+  const identity = Object.freeze({
+    schemaVersion: 2 as const,
+    backend: 'docker' as const,
+    projectRootSha256: 'b'.repeat(64),
+    projectId: 'fixture-project',
+    taskId,
+    attemptId: `attempt-${taskId}`,
+    generation: 1,
+  });
+  return Object.freeze({
+    executionMode: 'normal-docker' as const,
+    identity,
+    admissionReceiptDigest: digest,
+    acceptedResultRef: Object.freeze({
+      schemaVersion: 2 as const,
+      kind: 'task-accepted-result-v2-ref' as const,
+      identity,
+      artifactKey: 'primary',
+      artifactReceiptDigest: digest,
+    }),
+    acceptedResultChainDigest: digest,
+    resultDigest: digest,
+  });
+}
+
 // CORE-UNIFORMITY (slice 1): the task branch now runs the real Brain-Eval kernel,
 // which schema-rejects the minimal fixtures above. These deterministic stubs keep the
 // task-branch wiring tests hermetic (they assert dispatch/status flow, not the kernel).
@@ -85,6 +116,53 @@ const settlementRef = (taskId: string): TaskResultSettlementRefV1 => ({
   projectRootSha256: 'a'.repeat(64),
   attemptId: '00000000-0000-4000-8000-000000000001',
 });
+
+function taskIngressDispositionError(
+  taskId: string,
+  state: 'not-dispatched' | 'reconciliation-required',
+): TaskIngressDispositionError {
+  const ambiguous = state === 'reconciliation-required';
+  const reasonCode = ambiguous
+    ? 'EXACT_DISPATCH_OUTCOME_AMBIGUOUS'
+    : 'EXACT_PROVIDER_START_NOT_PROVEN';
+  return new TaskIngressDispositionError({
+    disposition: ambiguous
+      ? {
+          kind: 'ambiguous',
+          taskId,
+          reasonCode,
+          executionMode: 'normal-docker-exact',
+          executionBackend: 'docker',
+        }
+      : {
+          kind: 'not-dispatched',
+          taskId,
+          reasonCode,
+          executionMode: 'normal-docker-exact',
+          executionBackend: 'docker',
+        },
+    executionMode: 'normal-docker-exact',
+    backend: 'docker',
+    provider: 'claude',
+    invocation: {
+      receiptRef: {
+        schemaVersion: 1,
+        invocationId: `${ambiguous ? 'reconcile' : 'zero'}:${taskId}`,
+        tenantId: 'local',
+        projectId: 'test',
+      },
+      executionBackend: 'docker',
+      transport: 'local-runtime',
+      state,
+      executionMode: 'normal-docker-exact',
+      reasonCode,
+      authorityEvidenceRefs: [
+        `${ambiguous ? 'reconciliation' : 'zero-work'}-receipt:${taskId}`,
+        `sha256:${ambiguous ? 'd'.repeat(64) : 'c'.repeat(64)}`,
+      ],
+    },
+  });
+}
 
 // ─── Tmpdir management ───────────────────────────────────────────────
 
@@ -412,6 +490,97 @@ describe('execute-dispatcher', () => {
     );
   });
 
+  it('uses exact accepted-result authority without polling the public result projection', async () => {
+    const backlogPath = seedBacklog(tmpDir, taskEntry);
+    const waitForResult = vi.fn();
+    const exactAcceptedAuthority = exactAcceptedAuthorityFor('t-exact');
+    const handler = makeExecuteDispatcher({
+      projectRoot: tmpDir,
+      config: {} as never,
+      runTask: vi.fn().mockResolvedValue({
+        taskId: 't-exact',
+        executionMode: 'normal-docker-exact',
+        resultAuthority: {
+          state: 'exact-accepted',
+          result: Object.freeze({
+            ...doneResult,
+            taskId: 't-exact',
+            exactAcceptedResultAuthority: exactAcceptedAuthority,
+          }),
+          settlementRef: null,
+          rawResultPath: join(tmpDir, '.tasks', 'task-t-exact.result'),
+          exactAcceptedAuthority,
+        },
+      }),
+      executeSprint: vi.fn(),
+      backlogPath,
+      waitForResult,
+      evaluate: okEval,
+      audit: okAudit,
+      crossVerify: skipXVerify,
+    });
+
+    expect((await handler('autonomous.execute', { entry: taskEntry })).outcome).toBe('success');
+    expect(waitForResult).not.toHaveBeenCalled();
+    expect(loadBacklog(backlogPath).entries.find((x) => x.id === 'e')?.status).toBe('done');
+  });
+
+  it('rejects a metadata-less exact accepted projection without polling public bytes', async () => {
+    const backlogPath = seedBacklog(tmpDir, taskEntry);
+    const waitForResult = vi.fn().mockResolvedValue(doneResult);
+    const handler = makeExecuteDispatcher({
+      projectRoot: tmpDir,
+      config: {} as never,
+      runTask: vi.fn().mockResolvedValue({
+        taskId: 't-exact-unbound',
+        executionMode: 'normal-docker-exact',
+        resultAuthority: {
+          state: 'exact-accepted',
+          result: { ...doneResult, taskId: 't-exact-unbound' },
+          settlementRef: null,
+          rawResultPath: join(tmpDir, '.tasks', 'task-t-exact-unbound.result'),
+        },
+      }),
+      executeSprint: vi.fn(),
+      backlogPath,
+      waitForResult,
+    });
+
+    const outcome = await handler('autonomous.execute', { entry: taskEntry });
+    expect(outcome.outcome).toBe('failure');
+    expect(outcome.error).toContain('projection-or-identity-mismatch');
+    expect(waitForResult).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when exact accepted-result authority is unavailable', async () => {
+    const backlogPath = seedBacklog(tmpDir, taskEntry);
+    const waitForResult = vi.fn().mockResolvedValue(doneResult);
+    const handler = makeExecuteDispatcher({
+      projectRoot: tmpDir,
+      config: {} as never,
+      runTask: vi.fn().mockResolvedValue({
+        taskId: 't-exact-hold',
+        executionMode: 'normal-docker-exact',
+        resultAuthority: {
+          state: 'authority-hold',
+          result: null,
+          settlementRef: null,
+          rawResultPath: join(tmpDir, '.tasks', 'task-t-exact-hold.result'),
+          holdReason: 'ACCEPTED_RESULT_RECEIPT_MISSING',
+        },
+      }),
+      executeSprint: vi.fn(),
+      backlogPath,
+      waitForResult,
+    });
+
+    const outcome = await handler('autonomous.execute', { entry: taskEntry });
+    expect(outcome.outcome).toBe('failure');
+    expect(outcome.error).toContain('EXACT_RESULT_AUTHORITY_HOLD:authority-hold');
+    expect(waitForResult).not.toHaveBeenCalled();
+    expect(loadBacklog(backlogPath).entries.find((x) => x.id === 'e')?.status).toBe('failed');
+  });
+
   it('kind=task: selfAssessment=NO_GO → entry failed, outcome=failure', async () => {
     const backlogPath = seedBacklog(tmpDir, taskEntry);
     const runTask = vi.fn().mockResolvedValue({ taskId: 't' });
@@ -421,6 +590,9 @@ describe('execute-dispatcher', () => {
       projectRoot: tmpDir, config: {} as never,
       runTask, executeSprint: vi.fn(),
       backlogPath, waitForResult,
+      evaluate: () => ({ decision: 'NO_GO', quality: 0, reconciled: false, reason: 'worker failed' }),
+      audit: okAudit,
+      crossVerify: skipXVerify,
     });
 
     const res = await handler('autonomous.execute', { entry: taskEntry });
@@ -472,6 +644,117 @@ describe('execute-dispatcher', () => {
 
     const bl = loadBacklog(backlogPath);
     expect(bl.entries.find((x) => x.id === 'e')?.status).toBe('failed');
+  });
+
+  it('persists proven zero-work ingress evidence as failed without calling the result waiter', async () => {
+    const backlogPath = seedBacklog(tmpDir, taskEntry);
+    const waitForResult = vi.fn();
+    const error = taskIngressDispositionError('t-zero', 'not-dispatched');
+    const handler = makeExecuteDispatcher({
+      projectRoot: tmpDir,
+      config: {} as never,
+      runTask: vi.fn().mockRejectedValue(error),
+      executeSprint: vi.fn(),
+      backlogPath,
+      waitForResult,
+    });
+
+    const outcome = await handler('autonomous.execute', { entry: taskEntry });
+    const persisted = loadBacklog(backlogPath).entries.find((x) => x.id === 'e');
+
+    expect(error.code).toBe('TASK_INGRESS_NOT_DISPATCHED');
+    expect(outcome.outcome).toBe('failure');
+    expect(waitForResult).not.toHaveBeenCalled();
+    expect(persisted).toMatchObject({
+      status: 'failed',
+      lastResult: {
+        taskIngressDisposition: {
+          state: 'not-dispatched',
+          reasonCode: 'EXACT_PROVIDER_START_NOT_PROVEN',
+          receiptRef: { invocationId: 'zero:t-zero' },
+          authorityEvidenceRefs: expect.arrayContaining([
+            expect.stringContaining('zero-work-receipt:t-zero'),
+          ]),
+        },
+      },
+    });
+  });
+
+  it('parks process execution with durable reconciliation evidence instead of generic failure', async () => {
+    const entry: BacklogEntry = {
+      ...processEntry,
+      spec: { steps: [{ description: 'exact child' }] } as BacklogEntry['spec'],
+    };
+    const backlogPath = seedBacklog(tmpDir, entry);
+    const waitForResult = vi.fn();
+    const runBudgetedDecay = vi.fn();
+    const error = taskIngressDispositionError('t-ambiguous', 'reconciliation-required');
+    const handler = makeExecuteDispatcher({
+      projectRoot: tmpDir,
+      config: {} as never,
+      runTask: vi.fn().mockRejectedValue(error),
+      executeSprint: vi.fn(),
+      backlogPath,
+      waitForResult,
+      runBudgetedDecay,
+    });
+
+    const outcome = await handler('autonomous.execute', { entry });
+    const persisted = loadBacklog(backlogPath).entries.find((x) => x.id === entry.id);
+
+    expect(error.code).toBe('TASK_INGRESS_RECONCILIATION_REQUIRED');
+    expect(outcome.outcome).toBe('failure');
+    expect(outcome.error).toContain('TASK_INGRESS_RECONCILIATION_REQUIRED');
+    expect(waitForResult).not.toHaveBeenCalled();
+    expect(runBudgetedDecay).not.toHaveBeenCalled();
+    expect(persisted).toMatchObject({
+      status: 'parked',
+      lastResult: {
+        taskIngressDisposition: {
+          state: 'reconciliation-required',
+          reasonCode: 'EXACT_DISPATCH_OUTCOME_AMBIGUOUS',
+          receiptRef: { invocationId: 'reconcile:t-ambiguous' },
+          authorityEvidenceRefs: expect.arrayContaining([
+            expect.stringContaining('reconciliation-receipt:t-ambiguous'),
+          ]),
+        },
+      },
+    });
+  });
+
+  it('returns a typed durability HOLD and emits no parked claim when backlog publication fails', async () => {
+    const backlogPath = seedBacklog(tmpDir, taskEntry);
+    const runBudgetedDecay = vi.fn();
+    const flowStep = vi.fn();
+    const error = taskIngressDispositionError('t-write-failure', 'reconciliation-required');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const handler = makeExecuteDispatcher({
+      projectRoot: tmpDir,
+      config: {} as never,
+      runTask: vi.fn().mockImplementation(async () => {
+        rmSync(backlogPath);
+        throw error;
+      }),
+      executeSprint: vi.fn(),
+      backlogPath,
+      waitForResult: vi.fn(),
+      runBudgetedDecay,
+      flow: { step: flowStep },
+    });
+
+    try {
+      const outcome = await handler('autonomous.execute', { entry: taskEntry });
+
+      expect(outcome).toMatchObject({
+        outcome: 'failure',
+        error: expect.stringContaining('AUTONOMOUS_TASK_INGRESS_DISPOSITION_DURABILITY_HOLD'),
+      });
+      expect(outcome.error).toContain('receipt=reconcile:t-write-failure');
+      expect(flowStep).not.toHaveBeenCalledWith('parked', expect.anything(), expect.anything());
+      expect(runBudgetedDecay).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('kind=sprint success → entry done, outcome=success', async () => {

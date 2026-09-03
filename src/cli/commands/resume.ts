@@ -22,6 +22,8 @@ import {
   resetInterruptedWorkersToPending,
   hasValidResult,
   buildPreplannedResumeSprint,
+  type IsCheckpointExactTask,
+  type RevalidateCheckpointExactTerminalAuthority,
 } from '../../orchestra/sprint-checkpoint.js';
 import { clearSprintState, readSprintState } from '../../orchestra/sprint-utils.js';
 import { SprintStatus, TaskStatus, type Sprint } from '../../core/types.js';
@@ -245,7 +247,19 @@ function printResumeOutcome(outcome: RecoveryResumeOutcome, lang: string): void 
   process.exitCode = outcome.exitCode;
 }
 
-export function registerResume(program: Command): void {
+export interface ResumeExactTerminalAuthorityDependencies {
+  readonly revalidateExactTerminalAuthority?: RevalidateCheckpointExactTerminalAuthority;
+  readonly isExactTask?: IsCheckpointExactTask;
+  readonly resolveExactTerminalAuthorityRevalidator?: (
+    projectRoot: string,
+  ) => RevalidateCheckpointExactTerminalAuthority;
+  readonly resolveIsExactTask?: (projectRoot: string) => IsCheckpointExactTask;
+}
+
+export function registerResume(
+  program: Command,
+  exactDependencies: ResumeExactTerminalAuthorityDependencies = {},
+): void {
   const helpLang = getLanguage(undefined);
   const command = bindArgumentDescriptions(program.command('resume <sprintId>'), helpLang, { sprintId: 'cliContract.resume.arg.sprintId' })
     .description(getMessage('cli.resume.desc', helpLang))
@@ -258,6 +272,11 @@ export function registerResume(program: Command): void {
   command.action(async (sprintId: string, opts: { autoApprove: boolean; dryRun: boolean; forceScope: boolean; testMode?: boolean; root?: string; outcomeFile?: string }) => {
       const projectRoot = opts.root ?? resolveProjectRoot();
       const lang = detectLang(projectRoot);
+      const revalidateExactTerminalAuthority =
+        exactDependencies.revalidateExactTerminalAuthority
+        ?? exactDependencies.resolveExactTerminalAuthorityRevalidator?.(projectRoot);
+      const isExactTask = exactDependencies.isExactTask
+        ?? exactDependencies.resolveIsExactTask?.(projectRoot);
 
       if (!/^sprint-\d+$/.test(sprintId)) {
         printError(getMessage('resume.invalid_sprint_id', lang, { sprintId }));
@@ -408,12 +427,29 @@ export function registerResume(program: Command): void {
             sprintId: checkpoint.sprintId,
             mode: executionMode,
           }));
-          const terminalized = await terminalizeCompletedCheckpointRun(
-            projectRoot,
-            checkpoint,
-            config,
-            executionMode,
-          );
+          const terminalized = isExactTask
+            ? await terminalizeCompletedCheckpointRun(
+                projectRoot,
+                checkpoint,
+                config,
+                executionMode,
+                revalidateExactTerminalAuthority,
+                isExactTask,
+              )
+            : revalidateExactTerminalAuthority
+              ? await terminalizeCompletedCheckpointRun(
+                  projectRoot,
+                  checkpoint,
+                  config,
+                  executionMode,
+                  revalidateExactTerminalAuthority,
+                )
+              : await terminalizeCompletedCheckpointRun(
+                projectRoot,
+                checkpoint,
+                config,
+                executionMode,
+              );
           const outcome = publishResumeOutcome(
             projectRoot,
             checkpoint.sprintId,
@@ -520,7 +556,22 @@ export function registerResume(program: Command): void {
 
       let preplannedSprint;
       try {
-        preplannedSprint = buildPreplannedResumeSprint(projectRoot, resumeCheckpoint, resumableIds);
+        preplannedSprint = isExactTask
+          ? buildPreplannedResumeSprint(
+              projectRoot,
+              resumeCheckpoint,
+              resumableIds,
+              revalidateExactTerminalAuthority,
+              isExactTask,
+            )
+          : revalidateExactTerminalAuthority
+            ? buildPreplannedResumeSprint(
+                projectRoot,
+                resumeCheckpoint,
+                resumableIds,
+                revalidateExactTerminalAuthority,
+              )
+            : buildPreplannedResumeSprint(projectRoot, resumeCheckpoint, resumableIds);
         authorizePreplannedResumeTasks(projectRoot, preplannedSprint, config);
       } catch (e) {
         printError(getMessage('resume.preplanned_failed', lang, { error: e instanceof Error ? e.message : String(e) }));

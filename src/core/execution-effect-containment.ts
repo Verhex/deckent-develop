@@ -856,12 +856,13 @@ export function evaluateExecutionEffectContainment(input: Readonly<{
   const holds: ExecutionEffectHold[] = [];
   if (!sameAttempt(baseline.attempt, final.attempt)) holds.push({ code: 'ATTEMPT_IDENTITY_MISMATCH' });
   if (baseline.policy.digest !== final.policy.digest) holds.push({ code: 'WRITE_POLICY_MISMATCH' });
-  if (
-    baseline.workspaceIdentity.filesystemId !== final.workspaceIdentity.filesystemId
-    || baseline.workspaceIdentity.directoryId !== final.workspaceIdentity.directoryId
-    || baseline.workspaceIdentity.rootHandleEvidenceDigest
-      !== final.workspaceIdentity.rootHandleEvidenceDigest
-  ) holds.push({ code: 'WORKSPACE_IDENTITY_MISMATCH' });
+  // filesystemId + directoryId identify the durable workspace. The native root-handle digest
+  // proves each capture's descriptor-relative root, but is intentionally capture-local: Linux
+  // mount ids change when the same Docker volume is reopened in a fresh helper namespace.
+  if (baseline.workspaceIdentity.filesystemId !== final.workspaceIdentity.filesystemId
+    || baseline.workspaceIdentity.directoryId !== final.workspaceIdentity.directoryId) {
+    holds.push({ code: 'WORKSPACE_IDENTITY_MISMATCH' });
+  }
 
   const beforeByPath = new Map(baseline.entries.map(entry => [entry.path, entry]));
   const afterByPath = new Map(final.entries.map(entry => [entry.path, entry]));

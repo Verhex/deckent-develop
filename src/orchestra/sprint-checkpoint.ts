@@ -43,11 +43,22 @@ import {
   type TaskResultAuthorityRead,
 } from './task-result-authority.js';
 import {
+  isExactAcceptedResultTerminalAuthorityV2,
+  type ExactAcceptedResultTerminalAuthorityV2,
+} from './exact-accepted-result-terminal-authority.js';
+import type {
+  ExactAcceptedTaskTerminalAuthorityRead,
+} from './evaluation-audit-trail.js';
+import { isCurrentExactAcceptedTaskTerminalAuthorityRead } from './evaluation-audit-trail.js';
+import {
   readLatestTaskResultSettlementRef,
   readTaskResultSettlementClosure,
 } from '../core/task-result-settlement.js';
 import { createExecutionAuthorityError } from '../core/errors.js';
-import { applyTerminalTaskOutcome } from '../core/task-terminal-outcome.js';
+import {
+  applyTerminalTaskOutcome,
+  taskStatusForTerminalResult,
+} from '../core/task-terminal-outcome.js';
 import { DeckentError } from '../core/errors.js';
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -72,6 +83,37 @@ export interface CheckpointTaskState {
   id: string;
   status: TaskStatus;
   fixForTaskId?: string;
+  /** Digest-only/private-artifact refs; never a copied verdict from public result bytes. */
+  exactTerminalAuthority?: ExactAcceptedResultTerminalAuthorityV2;
+}
+
+export type RevalidateCheckpointExactTerminalAuthority = (input: {
+  readonly taskId: string;
+  readonly expectedTerminalAuthority: ExactAcceptedResultTerminalAuthorityV2;
+}) => ExactAcceptedTaskTerminalAuthorityRead;
+
+export type CheckpointExactTaskDisposition =
+  | Readonly<{ state: 'exact' }>
+  | Readonly<{ state: 'legacy' }>
+  | Readonly<{ state: 'hold'; reasonCode: string }>;
+
+/** Durable execution-mode discriminator supplied by the exact custody owner. */
+export type IsCheckpointExactTask = (
+  taskId: string,
+) => boolean | CheckpointExactTaskDisposition;
+
+export function resolveCheckpointExactTaskDisposition(
+  taskId: string,
+  discriminator?: IsCheckpointExactTask,
+): 'exact' | 'legacy' {
+  const disposition = discriminator?.(taskId);
+  if (disposition === true) return 'exact';
+  if (disposition === false || disposition === undefined) return 'legacy';
+  if (disposition.state === 'exact') return 'exact';
+  if (disposition.state === 'legacy') return 'legacy';
+  throw createExecutionAuthorityError(
+    `Task ${taskId} exact execution discriminator is unavailable: ${disposition.reasonCode}`,
+  );
 }
 
 /**
@@ -275,7 +317,9 @@ export function writeCheckpoint(
   sprint: Sprint,
   eventStreamOffset: number,
   graph?: DependencyGraph,
+  exactTerminalAuthorities?: ReadonlyMap<string, ExactAcceptedResultTerminalAuthorityV2>,
 ): SprintCheckpoint | null {
+  const exactAuthorityPersistenceRequired = (exactTerminalAuthorities?.size ?? 0) > 0;
   try {
     mkdirSync(join(projectRoot, DECKENT_DIR), { recursive: true });
 
@@ -285,6 +329,16 @@ export function writeCheckpoint(
     const completedTasks = checkpointTasks
       .filter(t => isTerminalStatus(t.status))
       .map(t => t.id);
+    if (exactAuthorityPersistenceRequired) {
+      const checkpointTaskIds = new Set(checkpointTasks.map(task => task.id));
+      for (const taskId of exactTerminalAuthorities!.keys()) {
+        if (!checkpointTaskIds.has(taskId)) {
+          throw createExecutionAuthorityError(
+            `Task ${taskId} exact terminal authority is outside the checkpoint task universe`,
+          );
+        }
+      }
+    }
 
     // Pending: never-started tasks. EXECUTING/CLAIMED tasks are tracked
     // separately in `activeWorkers` so the three sets stay disjoint.
@@ -333,11 +387,29 @@ export function writeCheckpoint(
       checkpoint.taskStates = checkpointTasks.map(t => {
         const state: CheckpointTaskState = { id: t.id, status: t.status };
         if (t.fixForTaskId) state.fixForTaskId = t.fixForTaskId;
+        const exactTerminalAuthority = exactTerminalAuthorities?.get(t.id);
+        if (exactTerminalAuthority !== undefined) {
+          if (
+            !isTerminalStatus(t.status)
+            || exactTerminalAuthority.acceptedAuthority.identity.taskId !== t.id
+            || !isExactAcceptedResultTerminalAuthorityV2(
+              exactTerminalAuthority,
+              exactTerminalAuthority.acceptedAuthority,
+            )
+          ) throw createExecutionAuthorityError(
+            `Task ${t.id} checkpoint exact terminal authority is invalid`,
+          );
+          state.exactTerminalAuthority = exactTerminalAuthority;
+        }
         return state;
       });
       // Live queue wiring is dilim-6 — this is a best-effort proxy.
       checkpoint.remainingQueue = pendingTasks;
       checkpoint.lastDecisionSeq = 0;
+    } else if (exactAuthorityPersistenceRequired) {
+      throw createExecutionAuthorityError(
+        'Exact terminal authority cannot be persisted by the checkpoint-v1 writer',
+      );
     }
 
     // Atomic write: tmp → rename. Cleans up tmp on rename failure.
@@ -353,8 +425,17 @@ export function writeCheckpoint(
     debugLog('sprint-checkpoint:write', `Checkpoint #${checkpointNumber} written for ${sprint.id}`);
     return checkpoint;
   } catch (e) {
-    // Fail-safe: never crash sprint due to checkpoint I/O
+    // Legacy checkpoints remain best-effort. Exact accepted-result authority
+    // is different: returning null would silently discard the only Store-
+    // revalidatable terminal reference and later permit a public-result
+    // fallback. Propagate a typed HOLD to the production caller instead.
     debugLog('sprint-checkpoint:write:error', e);
+    if (exactAuthorityPersistenceRequired) {
+      if (e instanceof DeckentError) throw e;
+      throw createExecutionAuthorityError(
+        `Exact terminal checkpoint persistence failed: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
     return null;
   }
 }
@@ -373,8 +454,38 @@ export function readCheckpoint(
     const raw = readFileSync(filePath, 'utf-8');
     const parsed = JSON.parse(raw) as SprintCheckpoint;
     // Basic structural validation
-    if (!parsed.sprintId || !parsed.checkpointNumber || !parsed.brainPhase) {
+    if (
+      !parsed.sprintId
+      || parsed.sprintId !== sprintId
+      || !parsed.checkpointNumber
+      || !parsed.brainPhase
+    ) {
       debugLog('sprint-checkpoint:read', `Malformed checkpoint for ${sprintId}`);
+      return null;
+    }
+    const seenTaskStateIds = new Set<string>();
+    if (parsed.taskStates !== undefined && (
+      !Array.isArray(parsed.taskStates)
+      || parsed.taskStates.some(state => {
+        if (!state || typeof state !== 'object' || typeof state.id !== 'string') return true;
+        if (seenTaskStateIds.has(state.id)) return true;
+        seenTaskStateIds.add(state.id);
+        const authority = state.exactTerminalAuthority;
+        return authority !== undefined && (
+          !isTerminalStatus(state.status)
+          || !Array.isArray(parsed.completedTasks)
+          || !parsed.completedTasks.includes(state.id)
+          || authority === null
+          || typeof authority !== 'object'
+          || authority.acceptedAuthority?.identity.taskId !== state.id
+          || !isExactAcceptedResultTerminalAuthorityV2(
+            authority,
+            authority.acceptedAuthority,
+          )
+        );
+      })
+    )) {
+      debugLog('sprint-checkpoint:read', `Invalid exact authority in checkpoint ${sprintId}`);
       return null;
     }
     return parsed;
@@ -655,6 +766,7 @@ export function writePhaseCheckpoint(
   brainPhase: SprintPhase,
   eventStreamOffset?: number,
   graph?: DependencyGraph,
+  exactTerminalAuthorities?: ReadonlyMap<string, ExactAcceptedResultTerminalAuthorityV2>,
 ): SprintCheckpoint | null {
   debugLog('sprint-checkpoint:phaseTransition', `Phase ${String(brainPhase)} → writing checkpoint`);
 
@@ -669,7 +781,13 @@ export function writePhaseCheckpoint(
     sprint.phase = brainPhase;
   }
   try {
-    return writeCheckpoint(projectRoot, sprint, offset, graph);
+    return writeCheckpoint(
+      projectRoot,
+      sprint,
+      offset,
+      graph,
+      exactTerminalAuthorities,
+    );
   } finally {
     if (brainPhase !== originalPhase) {
       sprint.phase = originalPhase;
@@ -809,6 +927,20 @@ export function readResumeTaskResultAuthority(
   projectRoot: string,
   taskId: string,
 ): ResumeTaskResultAuthority {
+  const rawResult = readJsonSafe<unknown>(
+    join(projectRoot, TASKS_DIR, `task-${taskId}.result`),
+  );
+  if (
+    rawResult !== null
+    && typeof rawResult === 'object'
+    && !Array.isArray(rawResult)
+    && Object.prototype.hasOwnProperty.call(rawResult, 'attemptCustody')
+  ) {
+    // A public V2 projection proves only that exact custody exists. Resume
+    // must obtain the checkpoint-bound T11 Store receipt; selfAssessment in
+    // these bytes is never a terminal/re-dispatch authority.
+    return { state: 'pending-settlement', result: null };
+  }
   let authority: TaskResultAuthorityRead<TaskResult>;
   try {
     authority = readAuthoritativeTaskResult<TaskResult>(projectRoot, taskId);
@@ -1148,6 +1280,8 @@ export function buildPreplannedResumeSprint(
   projectRoot: string,
   checkpoint: SprintCheckpoint,
   resumableIds: readonly string[],
+  revalidateExactTerminalAuthority?: RevalidateCheckpointExactTerminalAuthority,
+  isExactTask?: IsCheckpointExactTask,
 ): Sprint {
   const orderedIds = checkpoint.taskStates?.map(state => state.id) ?? [
     ...checkpoint.completedTasks,
@@ -1156,6 +1290,9 @@ export function buildPreplannedResumeSprint(
   ];
   const uniqueIds = [...new Set(orderedIds)];
   const resumable = new Set(resumableIds);
+  const checkpointStateById = new Map(
+    (checkpoint.taskStates ?? []).map(state => [state.id, state]),
+  );
   const tasks = uniqueIds.map(taskId => {
     const taskPath = join(projectRoot, TASKS_DIR, `task-${taskId}.json`);
     const task = readJsonSafe<Task>(taskPath);
@@ -1165,6 +1302,41 @@ export function buildPreplannedResumeSprint(
       task.status = TaskStatus.PENDING;
       delete task.assignedWorker;
       return task;
+    }
+
+    const exactTerminalAuthority = checkpointStateById.get(taskId)?.exactTerminalAuthority;
+    if (exactTerminalAuthority !== undefined) {
+      if (!revalidateExactTerminalAuthority) {
+        throw createExecutionAuthorityError(
+          `Task ${taskId} exact checkpoint terminal authority requires Store revalidation`,
+        );
+      }
+      const current = revalidateExactTerminalAuthority({
+        taskId,
+        expectedTerminalAuthority: exactTerminalAuthority,
+      });
+      if (!isCurrentExactAcceptedTaskTerminalAuthorityRead(
+        taskId,
+        exactTerminalAuthority,
+        current,
+      )) throw createExecutionAuthorityError(
+        `Task ${taskId} exact checkpoint terminal authority is stale or invalid`,
+      );
+      const verdict = current.evaluationReceipt.verdict;
+      task.status = verdict === 'NO_GO' ? TaskStatus.NO_GO : TaskStatus.DONE;
+      return task;
+    }
+
+
+    // A missing checkpoint ref cannot demote an exact attempt into the legacy
+    // public-result authority domain.  The registry/Store discriminator is
+    // deliberately independent from the checkpoint projection so deletion or
+    // truncation of that projection fails closed instead of accepting a forged
+    // brainEvaluation/selfAssessment.
+    if (resolveCheckpointExactTaskDisposition(taskId, isExactTask) === 'exact') {
+      throw createExecutionAuthorityError(
+        `Task ${taskId} exact checkpoint terminal authority reference is missing`,
+      );
     }
 
     const authority = readResumeTaskResultAuthority(projectRoot, taskId);
@@ -1243,6 +1415,13 @@ export interface RestoreResult {
    * resume path skips PLAN/SPAWN/EXECUTE entirely.
    */
   cascadeSkippedTasks: string[];
+}
+
+export interface RestoreExactTerminalAuthorityDependencies {
+  /** Fresh full terminal reads produced by the run-scoped exact registry. */
+  readonly terminalAuthorities: ReadonlyMap<string, ExactAcceptedTaskTerminalAuthorityRead>;
+  /** Distinguishes exact in-flight work from legacy work during replay. */
+  readonly isExactTask: (taskId: string) => boolean;
 }
 
 function parseSprintNumber(sprintId: string): number {
@@ -1476,6 +1655,7 @@ function cascadeSkipPendingDescendants(
 export function restoreSprintFromCheckpoint(
   projectRoot: string,
   sprintId: string,
+  exactDependencies?: RestoreExactTerminalAuthorityDependencies,
 ): RestoreResult {
   const cp = readCheckpoint(projectRoot, sprintId);
   if (!cp) {
@@ -1554,6 +1734,7 @@ export function restoreSprintFromCheckpoint(
     if (
       t.status === TaskStatus.PAUSED
       && (checkpointProvesUnfinished || existsSync(pausedMarker))
+      && exactDependencies?.isExactTask(id) !== true
     ) {
       t.status = TaskStatus.PENDING;
       try { writeFileSync(taskPath, JSON.stringify(t, null, 2), 'utf-8'); }
@@ -1570,6 +1751,59 @@ export function restoreSprintFromCheckpoint(
   // closed; syncing before cascade prevents both duplicate spawn and stranded
   // descendants. Pending/corrupt settlement remains a typed HOLD.
   for (const task of tasks) {
+    if (exactDependencies?.isExactTask(task.id)) {
+      const exactAuthority = exactDependencies.terminalAuthorities.get(task.id);
+      if (exactAuthority === undefined) {
+        // A recovered exact entry without a current T11 receipt is neither a
+        // public NO_GO nor resumable PENDING work. Park it before the generic
+        // cascade reducer so stale task/result projections cannot skip its
+        // descendants or authorize duplicate dispatch.
+        task.status = TaskStatus.PAUSED;
+        try {
+          writeFileSync(
+            join(projectRoot, TASKS_DIR, `task-${task.id}.json`),
+            JSON.stringify(task, null, 2),
+            'utf-8',
+          );
+        } catch (e) {
+          debugLog('restoreSprintFromCheckpoint:exactPendingPersist', e);
+          throw createExecutionAuthorityError(
+            `Checkpoint restore HOLD for task ${task.id}: exact pending state could not be persisted`,
+          );
+        }
+        continue;
+      }
+      if (exactAuthority.state !== 'current') {
+        throw createExecutionAuthorityError(
+          `Checkpoint restore HOLD for task ${task.id}: ${exactAuthority.reasonCode}`,
+        );
+      }
+      const exactStatus = taskStatusForTerminalResult(exactAuthority.projectedResult);
+      if (exactStatus === null) {
+        throw createExecutionAuthorityError(
+          `Checkpoint restore HOLD for task ${task.id}: exact terminal outcome is invalid`,
+        );
+      }
+      applyTerminalTaskOutcome(task, exactAuthority.projectedResult);
+      if (task.status !== exactStatus) {
+        throw createExecutionAuthorityError(
+          `Checkpoint restore HOLD for task ${task.id}: exact terminal status did not apply`,
+        );
+      }
+      try {
+        writeFileSync(
+          join(projectRoot, TASKS_DIR, `task-${task.id}.json`),
+          JSON.stringify(task, null, 2),
+          'utf-8',
+        );
+      } catch (e) {
+        debugLog('restoreSprintFromCheckpoint:exactTerminalOutcomePersist', e);
+        throw createExecutionAuthorityError(
+          `Checkpoint restore HOLD for task ${task.id}: exact terminal outcome could not be persisted`,
+        );
+      }
+      continue;
+    }
     const authority = requireRestorableTaskResultAuthority(
       projectRoot,
       task.id,
@@ -1623,6 +1857,15 @@ export function restoreSprintFromCheckpoint(
   const staleTasksMarkedNoGo: string[] = [];
 
   for (const worker of cp.activeWorkers ?? []) {
+    if (exactDependencies?.isExactTask(worker.taskId)) {
+      const exactAuthority = exactDependencies.terminalAuthorities.get(worker.taskId);
+      if (exactAuthority?.state === 'current') {
+        staleTasksWithResult.push(worker.taskId);
+      }
+      // An exact released attempt remains owned by backend recovery. Never
+      // project it to PENDING from heartbeat/public-result absence.
+      continue;
+    }
     const resultAuthority = requireRestorableTaskResultAuthority(
       projectRoot,
       worker.taskId,
@@ -1676,6 +1919,9 @@ export function restoreSprintFromCheckpoint(
     && tasks.length === taskIds.size
     && tasks.every(task => {
     if (!isTerminalStatus(task.status)) return false;
+    if (exactDependencies?.isExactTask(task.id)) {
+      return exactDependencies.terminalAuthorities.get(task.id)?.state === 'current';
+    }
     return readResumeTaskResultAuthority(projectRoot, task.id).state === 'terminal';
   });
   const action: RestoreAction = fullyTerminal ? 'complete' : 'resume-evaluate';

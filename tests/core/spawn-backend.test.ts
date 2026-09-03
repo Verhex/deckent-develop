@@ -92,6 +92,7 @@ vi.mock('../../src/providers/subprocess.js', () => {
 });
 
 import { SubprocessSpawnBackend } from '../../src/providers/subprocess.js';
+import { DockerSpawnBackend } from '../../src/orchestra/spawn-backend-docker.js';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -372,6 +373,20 @@ describe('SpawnBackendFactory', () => {
       mockSpawnSync.mockClear();
       SpawnBackendFactory.create({ projectDir: '/proj' });
       expect(mockSpawnSync).not.toHaveBeenCalledWith('tmux', ['-V'], expect.any(Object));
+    });
+
+    it('composes the trusted production-wiring host observer into the normal Docker backend', () => {
+      SpawnBackendFactory.create({
+        backend: 'docker',
+        projectDir: '/proj',
+        dockerImage: 'deckent-worker:pinned-test',
+      });
+
+      expect(vi.mocked(DockerSpawnBackend)).toHaveBeenCalledOnce();
+      const [projectRoot, options] = vi.mocked(DockerSpawnBackend).mock.calls[0] ?? [];
+      expect(projectRoot).toBe('/proj');
+      expect(options).toMatchObject({ image: 'deckent-worker:pinned-test' });
+      expect(typeof options?.productionWiringHostObserverFactory).toBe('function');
     });
   });
 

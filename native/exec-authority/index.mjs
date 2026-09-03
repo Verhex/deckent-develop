@@ -8,6 +8,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { Buffer as NodeBuffer } from 'node:buffer';
 import {
+  accessSync,
   closeSync,
   constants as fsConstants,
   fchmodSync,
@@ -23,7 +24,7 @@ import {
   writeSync,
 } from 'node:fs';
 import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import process from 'node:process';
 import { types as nodeTypes } from 'node:util';
@@ -102,6 +103,8 @@ const PACKAGE_JSON = join(HERE, 'package.json');
 const ROOT_PACKAGE_JSON = join(HERE, '..', '..', 'package.json');
 const MAX_ARTIFACT_BYTES = 16 * 1024;
 const MAX_BINARY_BYTES = 128 * 1024 * 1024;
+const MAX_MOUNTINFO_BYTES = 4 * 1024 * 1024;
+const MAX_UID_MAP_BYTES = 64 * 1024;
 const ARTIFACT_SHA256_RE = /^sha256:[0-9a-f]{64}$/;
 const OPEN_READ_FLAGS = fsConstants.O_RDONLY
   | (fsConstants.O_CLOEXEC ?? 0)
@@ -309,6 +312,7 @@ const CUSTODY_FACADE_KEYS = Object.freeze([
   'probe',
   'proveRootSeparation',
   'readBounded',
+  'scanDirectoryBounded',
   'sealPublication',
   'sync',
 ]);
@@ -961,17 +965,178 @@ function closeConfirmed(fd) {
   }
 }
 
-function isTrustedOriginDirectory(stat, ownerUid) {
+function readBoundedProcFile(path, maximumBytes) {
+  if (!Number.isSafeInteger(maximumBytes) || maximumBytes <= 0) return null;
+  let fd;
+  try {
+    fd = openSync(path, OPEN_READ_FLAGS);
+  } catch {
+    return null;
+  }
+  const bytes = NodeBuffer.alloc(maximumBytes + 1);
+  let offset = 0;
+  let complete = false;
+  try {
+    while (offset <= maximumBytes) {
+      let observed;
+      try {
+        observed = readSync(fd, bytes, offset, bytes.byteLength - offset, null);
+      } catch (error) {
+        if (ownData(error, 'code') === 'EINTR') continue;
+        return null;
+      }
+      if (!Number.isSafeInteger(observed) || observed < 0) return null;
+      if (observed === 0) {
+        complete = true;
+        break;
+      }
+      offset += observed;
+      if (offset > maximumBytes) return null;
+    }
+  } finally {
+    if (!closeConfirmed(fd)) complete = false;
+  }
+  return complete ? Uint8Array.from(bytes.subarray(0, offset)) : null;
+}
+
+function sameByteSequence(left, right) {
+  if (!(left instanceof Uint8Array)
+    || !(right instanceof Uint8Array)
+    || left.byteLength !== right.byteLength) return false;
+  for (let index = 0; index < left.byteLength; index += 1) {
+    if (left[index] !== right[index]) return false;
+  }
+  return true;
+}
+
+function decodeMountInfoPath(value) {
+  if (typeof value !== 'string' || value.length === 0 || value[0] !== '/') return null;
+  let decoded = '';
+  for (let index = 0; index < value.length; index += 1) {
+    if (value[index] !== '\\') {
+      decoded += value[index];
+      continue;
+    }
+    const escaped = value.slice(index + 1, index + 4);
+    const replacement = escaped === '040' ? ' '
+      : escaped === '011' ? '\t'
+        : escaped === '012' ? '\n'
+          : escaped === '134' ? '\\'
+            : null;
+    if (replacement === null) return null;
+    decoded += replacement;
+    index += 3;
+  }
+  return decoded.length > 0
+    && !decoded.includes('\0')
+    && !decoded.includes('\n')
+    && decoded === resolve(decoded)
+    ? decoded : null;
+}
+
+function parseReadOnlyMountInfo(bytes, path) {
+  let text;
+  try {
+    text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    return false;
+  }
+  const lines = text.split('\n');
+  let selectedLength = -1;
+  let selectedReadOnly = false;
+  let selectedCount = 0;
+  for (const line of lines) {
+    if (line.length === 0) continue;
+    const fields = line.split(' ');
+    let separatorIndex = -1;
+    for (let index = 6; index < fields.length; index += 1) {
+      if (fields[index] === '-') {
+        separatorIndex = index;
+        break;
+      }
+    }
+    if (separatorIndex < 6 || fields.length < separatorIndex + 4) return false;
+    const mountPoint = decodeMountInfoPath(fields[4]);
+    const mountOptions = fields[5];
+    if (mountPoint === null || typeof mountOptions !== 'string') return false;
+    const pathMatches = mountPoint === '/'
+      || path === mountPoint
+      || path.startsWith(`${mountPoint}/`);
+    if (!pathMatches || mountPoint.length < selectedLength) continue;
+    const options = mountOptions.split(',');
+    const readOnly = options.includes('ro') && !options.includes('rw');
+    if (mountPoint.length > selectedLength) {
+      selectedLength = mountPoint.length;
+      selectedReadOnly = readOnly;
+      selectedCount = 1;
+    } else {
+      selectedCount += 1;
+    }
+  }
+  return selectedLength >= 0 && selectedCount === 1 && selectedReadOnly;
+}
+
+function isStableReadOnlyLinuxMount(path) {
+  if (expectedPlatform() !== 'linux'
+    || typeof path !== 'string'
+    || !isAbsolute(path)
+    || path !== resolve(path)) return false;
+  const mountInfoPath = `/proc/${process.pid}/mountinfo`;
+  const first = readBoundedProcFile(mountInfoPath, MAX_MOUNTINFO_BYTES);
+  const second = readBoundedProcFile(mountInfoPath, MAX_MOUNTINFO_BYTES);
+  return first !== null
+    && second !== null
+    && sameByteSequence(first, second)
+    && parseReadOnlyMountInfo(first, path);
+}
+
+function isUnmappedLinuxOverflowUid(uid) {
+  if (expectedPlatform() !== 'linux' || uid !== 65534n) return false;
+  const uidMapPath = `/proc/${process.pid}/uid_map`;
+  const first = readBoundedProcFile(uidMapPath, MAX_UID_MAP_BYTES);
+  const second = readBoundedProcFile(uidMapPath, MAX_UID_MAP_BYTES);
+  if (first === null || second === null || !sameByteSequence(first, second)) return false;
+  let text;
+  try {
+    text = new TextDecoder('utf-8', { fatal: true }).decode(first);
+  } catch {
+    return false;
+  }
+  let sawRange = false;
+  for (const line of text.split('\n')) {
+    if (line.trim().length === 0) continue;
+    const match = /^\s*([0-9]+)\s+([0-9]+)\s+([0-9]+)\s*$/u.exec(line);
+    if (match === null) return false;
+    const insideStart = BigInt(match[1]);
+    const length = BigInt(match[3]);
+    if (length <= 0n || insideStart < 0n || insideStart + length > 4_294_967_296n) {
+      return false;
+    }
+    sawRange = true;
+    if (uid >= insideStart && uid < insideStart + length) return false;
+  }
+  return sawRange;
+}
+
+function isTrustedOriginDirectory(stat, ownerUid, path) {
   // The origin policy excludes other OS principals. The current effective UID
-  // and uid 0 are the explicit trusted mutation boundary for this loader.
+  // and uid 0 are the explicit trusted mutation boundary for writable mounts.
+  // A foreign-owned ancestor is admissible only when the kernel mount table is
+  // read twice unchanged and proves that ancestor's effective mount read-only.
   if (!stat.isDirectory()
     || stat.isSymbolicLink()
-    || (stat.uid !== ownerUid && stat.uid !== 0n)) {
+    || (
+      stat.uid !== ownerUid
+      && stat.uid !== 0n
+      && !isUnmappedLinuxOverflowUid(stat.uid)
+      && !isStableReadOnlyLinuxMount(path)
+    )) {
     return false;
   }
   const mode = modeBits(stat);
   return (mode & 0o022n) === 0n
-    || (stat.uid === 0n && (mode & 0o1000n) !== 0n);
+    || (stat.uid === 0n && (mode & 0o1000n) !== 0n)
+    || (isUnmappedLinuxOverflowUid(stat.uid) && (mode & 0o1000n) !== 0n);
 }
 
 function isTrustedOriginLeaf(stat, ownerUid, maximumBytes) {
@@ -1002,7 +1167,7 @@ function inspectOriginDirectory(directoryPath, ownerUid) {
   let currentPath = '/';
   try {
     const rootStat = lstatBigInt(currentPath);
-    if (!isTrustedOriginDirectory(rootStat, ownerUid)) {
+    if (!isTrustedOriginDirectory(rootStat, ownerUid, currentPath)) {
       return invalidOriginDirectory(true);
     }
     chain.push(Object.freeze({ identity: rootStat, path: currentPath }));
@@ -1028,7 +1193,7 @@ function inspectOriginDirectory(directoryPath, ownerUid) {
       }
       return invalidOriginDirectory(true);
     }
-    if (!isTrustedOriginDirectory(stat, ownerUid)) {
+    if (!isTrustedOriginDirectory(stat, ownerUid, currentPath)) {
       return invalidOriginDirectory(true);
     }
     chain.push(Object.freeze({ identity: stat, path: currentPath }));
@@ -1044,8 +1209,8 @@ function inspectOriginDirectory(directoryPath, ownerUid) {
     const pathStat = lstatBigInt(directoryPath);
     const last = chain.at(-1)?.identity;
     if (last === undefined
-      || !isTrustedOriginDirectory(descriptor, ownerUid)
-      || !isTrustedOriginDirectory(pathStat, ownerUid)
+      || !isTrustedOriginDirectory(descriptor, ownerUid, directoryPath)
+      || !isTrustedOriginDirectory(pathStat, ownerUid, directoryPath)
       || !sameDirectoryIdentity(last, descriptor)
       || !sameDirectoryIdentity(descriptor, pathStat)) {
       closeConfirmed(fd);
@@ -1070,7 +1235,7 @@ function verifyOriginDirectory(origin, ownerUid) {
   try {
     for (const entry of origin.chain) {
       const current = lstatBigInt(entry.path);
-      if (!isTrustedOriginDirectory(current, ownerUid)
+      if (!isTrustedOriginDirectory(current, ownerUid, entry.path)
         || !samePinnedParent(entry.identity, current)) {
         return false;
       }
@@ -1079,8 +1244,8 @@ function verifyOriginDirectory(origin, ownerUid) {
     if (origin.fd === null || origin.identity === null) return false;
     const descriptor = fstatBigInt(origin.fd);
     const pathStat = lstatBigInt(origin.path);
-    return isTrustedOriginDirectory(descriptor, ownerUid)
-      && isTrustedOriginDirectory(pathStat, ownerUid)
+    return isTrustedOriginDirectory(descriptor, ownerUid, origin.path)
+      && isTrustedOriginDirectory(pathStat, ownerUid, origin.path)
       && sameDirectoryIdentity(origin.identity, descriptor)
       && sameDirectoryIdentity(descriptor, pathStat)
       && realpathSync.native(origin.path) === origin.path;
@@ -1430,7 +1595,9 @@ function isControlledSnapshotParent(stat, ownerUid) {
   const mode = modeBits(stat);
   const privateOwnerParent = stat.uid === ownerUid && (mode & 0o022n) === 0n;
   const rootStickyParent = stat.uid === 0n && (mode & 0o1000n) !== 0n;
-  return privateOwnerParent || rootStickyParent;
+  const namespaceOverflowStickyParent = isUnmappedLinuxOverflowUid(stat.uid)
+    && (mode & 0o1000n) !== 0n;
+  return privateOwnerParent || rootStickyParent || namespaceOverflowStickyParent;
 }
 
 function directorySyncResult(fd) {
@@ -1464,23 +1631,31 @@ function posixSnapshotPrimitivesAvailable() {
     && fsConstants.O_DIRECTORY !== 0;
 }
 
-function configuredSnapshotParent() {
-  try {
-    const configured = tmpdir();
-    if (typeof configured !== 'string'
-      || configured.length === 0
-      || configured.length > 4096
-      || configured === '/'
-      || configured.includes('\0')
-      || !isAbsolute(configured)) {
-      return null;
+function configuredSnapshotParent(ownerUid) {
+  const candidates = [process.env.XDG_RUNTIME_DIR, tmpdir(), homedir()];
+  for (const configured of candidates) {
+    try {
+      if (typeof configured !== 'string'
+        || configured.length === 0
+        || configured.length > 4096
+        || configured === '/'
+        || configured.includes('\0')
+        || !isAbsolute(configured)) {
+        continue;
+      }
+      const canonical = resolve(configured);
+      if (canonical === '/'
+        || realpathSync.native(canonical) !== canonical
+        || !isControlledSnapshotParent(lstatBigInt(canonical), ownerUid)) {
+        continue;
+      }
+      accessSync(canonical, fsConstants.W_OK);
+      return canonical;
+    } catch {
+      continue;
     }
-    const canonical = resolve(configured);
-    if (canonical === '/') return null;
-    return realpathSync.native(canonical) === canonical ? canonical : null;
-  } catch {
-    return null;
   }
+  return null;
 }
 
 function emptySnapshotContext() {
@@ -1571,7 +1746,7 @@ function preparePosixSnapshot(binaryBytes, artifact) {
   try {
     if (!posixSnapshotPrimitivesAvailable()) return Object.freeze({ context, ready: false });
     const ownerUid = BigInt(process.geteuid());
-    const parentPath = configuredSnapshotParent();
+    const parentPath = configuredSnapshotParent(ownerUid);
     if (parentPath === null) return Object.freeze({ context, ready: false });
 
     context.ownerUid = ownerUid;
@@ -2843,7 +3018,7 @@ function snapshotEffectLimits(value) {
   }
   if (listSome(snapshot, entry => !isSafePositiveInteger(entry))) return null;
   const [deadline, depth, entries, file, manifest, name, path, total] = snapshot;
-  if (entries > 100_000 || depth > 1024 || path > 1_048_576 || name > 4096
+  if (entries > 1_000_000 || depth > 1024 || path > 1_048_576 || name > 4096
     || file > 17_179_869_184 || total > 1_099_511_627_776
     || manifest > 16_777_216) return null;
   const bytes = new TrustedUint8Array(56);
@@ -2880,7 +3055,7 @@ function validateEffectEntry(value) {
 function validateEffectEntries(value, expectedCount) {
   if (!arrayIsArray(value) || !objectIsFrozen(value)
     || !numberIsSafeInteger(expectedCount) || expectedCount < 0
-    || expectedCount > 100_000 || value.length !== expectedCount) return null;
+    || expectedCount > 1_000_000 || value.length !== expectedCount) return null;
   const entries = [];
   let aggregatePathBytes = 0;
   for (let index = 0; index < expectedCount; index += 1) {

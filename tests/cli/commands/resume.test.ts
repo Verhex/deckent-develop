@@ -104,10 +104,13 @@ const FAKE_CHECKPOINT = {
   eventStreamOffset: 42,
 };
 
-async function runCommand(args: string[]): Promise<void> {
+async function runCommand(
+  args: string[],
+  exactDependencies: Parameters<typeof registerResume>[1] = {},
+): Promise<void> {
   const program = new Command();
   program.exitOverride();
-  registerResume(program);
+  registerResume(program, exactDependencies);
   await program.parseAsync(['node', 'test', 'resume', ...args]);
 }
 
@@ -299,6 +302,62 @@ describe('deckent resume CLI — preplanned exactly-once handoff', () => {
       completed,
       { deckent_style: 'sprint' },
       'test',
+    );
+  });
+
+  it('resolves the private-Store terminal revalidator from the selected project root', async () => {
+    const completed = {
+      ...FAKE_CHECKPOINT,
+      completedTasks: ['321-001', '321-002'],
+      pendingTasks: [],
+      activeWorkers: [],
+    };
+    const revalidate = vi.fn();
+    const resolveExactTerminalAuthorityRevalidator = vi.fn(() => revalidate);
+    mockReadCheckpoint.mockReturnValue(completed);
+    mockDeriveResumeDisposition.mockReturnValue({ resumableIds: [], parkedSettlements: [] });
+
+    await runCommand(['sprint-321', '--test-mode'], {
+      resolveExactTerminalAuthorityRevalidator,
+    });
+
+    expect(resolveExactTerminalAuthorityRevalidator).toHaveBeenCalledWith('/fake/project');
+    expect(mockTerminalizeCompletedCheckpointRun).toHaveBeenCalledWith(
+      '/fake/project',
+      completed,
+      { deckent_style: 'sprint' },
+      'test',
+      revalidate,
+    );
+  });
+
+  it('passes the Store-backed exact discriminator into completed-checkpoint terminalization', async () => {
+    const completed = {
+      ...FAKE_CHECKPOINT,
+      completedTasks: ['321-001', '321-002'],
+      pendingTasks: [],
+      activeWorkers: [],
+    };
+    const revalidate = vi.fn();
+    const classifyExactTask = vi.fn(() => ({ state: 'exact' as const }));
+    const resolveExactTerminalAuthorityRevalidator = vi.fn(() => revalidate);
+    const resolveIsExactTask = vi.fn(() => classifyExactTask);
+    mockReadCheckpoint.mockReturnValue(completed);
+    mockDeriveResumeDisposition.mockReturnValue({ resumableIds: [], parkedSettlements: [] });
+
+    await runCommand(['sprint-321', '--test-mode'], {
+      resolveExactTerminalAuthorityRevalidator,
+      resolveIsExactTask,
+    });
+
+    expect(resolveIsExactTask).toHaveBeenCalledWith('/fake/project');
+    expect(mockTerminalizeCompletedCheckpointRun).toHaveBeenCalledWith(
+      '/fake/project',
+      completed,
+      { deckent_style: 'sprint' },
+      'test',
+      revalidate,
+      classifyExactTask,
     );
   });
 

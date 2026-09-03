@@ -369,7 +369,7 @@ export async function planSprint(
       receiptRef: plannerReceiptRef,
     },
   });
-  if (planMode !== 'structured' && parsedDirectives.some(t => t.provider || t.forceModel || t.forceAgent || t.forceSkills || t.postSettlementProjection)) {
+  if (planMode !== 'structured' && parsedDirectives.some(t => t.provider || t.forceModel || t.forceAgent || t.forceSkills || t.postSettlementProjection || t.productionWiring)) {
     if (planMode === 'ai') {
       void notify(
         'phase-change', sprintId,
@@ -599,7 +599,7 @@ export async function planSprint(
   // Structured fallback (mode === 'structured' || AI fail + auto)
   if (!plannerResult && (planMode === 'structured' || planMode === 'auto')) {
     const structuredTasks = parsedDirectives;
-    const directiveSources: Array<{ title: string; description: string; scope: TaskScope; provider?: import('../core/types.js').ProviderName; forceModel?: import('../core/types.js').ModelType; forceEffort?: import('../core/types.js').TaskEffort; testTarget?: string; forceAgent?: string; forceSkills?: string[]; excludeAgent?: string[]; excludeSkills?: string[]; priority?: import('../core/types.js').TaskPriority; dependencies?: string[]; authMode?: 'subscription' | 'api'; backend?: 'docker' | 'tmux' | 'subprocess'; modelEffort?: string; smoke?: { command: string; expect: string }; postSettlementProjection?: import('../core/task-types.js').PostSettlementPlanProjection }> =
+    const directiveSources: Array<{ title: string; description: string; scope: TaskScope; provider?: import('../core/types.js').ProviderName; forceModel?: import('../core/types.js').ModelType; forceEffort?: import('../core/types.js').TaskEffort; testTarget?: string; forceAgent?: string; forceSkills?: string[]; excludeAgent?: string[]; excludeSkills?: string[]; priority?: import('../core/types.js').TaskPriority; dependencies?: string[]; authMode?: 'subscription' | 'api'; backend?: 'docker' | 'tmux' | 'subprocess'; modelEffort?: string; smoke?: { command: string; expect: string }; postSettlementProjection?: import('../core/task-types.js').PostSettlementPlanProjection; productionWiring?: import('../core/task-types.js').ProductionWiringPlanEvidence }> =
       structuredTasks.length > 0
         ? structuredTasks
         : (() => {
@@ -752,6 +752,7 @@ export async function planSprint(
         // createTask() copies it onto Task.postSettlementProjection, never a
         // hidden Task of its own (see PostSettlementPlanProjection doc comment).
         postSettlementProjection: src.postSettlementProjection,
+        productionWiring: src.productionWiring,
       }, seq++));
     }
   }

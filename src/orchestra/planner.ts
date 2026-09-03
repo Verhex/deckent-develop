@@ -36,8 +36,11 @@ import type {
 } from '../core/task-types.js';
 import {
   createGoNoGoCriterionItem,
+  createProductionWiringPlanEvidenceV2,
+  deriveProductionWiringApplicability,
   getProviderForModel,
 } from '../core/task-types.js';
+import { parseProductionWiringContractV2Input } from '../core/production-wiring-contract.js';
 import {
   INVOCATION_RECEIPT_SCHEMA_VERSION,
   type InvocationAuthMode,
@@ -97,6 +100,7 @@ const PlannerTaskSchema = z.object({
     techDebtAcceptable: z.string(),
     items: z.array(PlannerCriterionItemSchema).optional(),
   }),
+  productionWiring: z.unknown().optional(),
 });
 
 const PlannerResultSchema = z.object({
@@ -340,6 +344,9 @@ RULES:
 - Emit one goNogo.items object per authored criterion. Do not split free text on semicolons.
 - Every item needs a polarity, one atomic statement, and concrete evidenceRequirements.
 - Criterion IDs are host-derived after parsing; do not emit an id field.
+- For every production mutation, emit productionWiring version 2. It must declare exact producer, canonicalConsumer, every affectedIngress, enablementAuthority, proofTargets, and a hostProofProgram covering each declared runtime link exactly once on every supported platform.
+- hostProofProgram must declare linux, wsl2-linux, darwin, and win32 exactly once. Mark unavailable platforms unsupported with a typed reason; never imply success.
+- Host proof probes use only digest-pinned verifierAssets and adapter-structured outcomes. Bind producer and canonical consumer to one byte-identical observationGroup. Never emit evidenceRefs, completion claims, worker observations, secrets, environment variables, shell command strings, arbitrary executable names, or authored program/contract digests.
 
 ${FILE_PATH_RULES}
 
@@ -372,6 +379,17 @@ OUTPUT FORMAT (JSON ONLY, nothing else):
           { "polarity": "go", "statement": "...", "evidenceRequirements": ["..."] },
           { "polarity": "no-go", "statement": "...", "evidenceRequirements": ["..."] }
         ]
+      },
+      "productionWiring": {
+        "version": 2,
+        "changeKind": "runtime-addition|runtime-change|refactor|removal|foundation|public-library|documentation|data",
+        "producer": { "producerId": "..." },
+        "canonicalConsumer": { "consumerId": "...", "relationship": "invokes-producer|removed-or-migrated" },
+        "affectedIngresses": [{ "ingressId": "...", "kind": "ingress|entrypoint" }],
+        "enablementAuthority": { "authorityId": "...", "mechanism": "configuration|policy|registration|unconditional" },
+        "disposition": { "kind": "production-wiring" },
+        "proofTargets": [{ "proofTargetId": "...", "kind": "consumer-execution|ingress-execution|enablement-resolution|removal-verification|platform|scale" }],
+        "hostProofProgram": { "network": "forbidden|loopback-only", "verifierAssets": [{ "path": "scripts/...", "sha256": "sha256:<64 lowercase hex>", "role": "trusted-harness|config-authority" }], "platforms": [{ "platform": "linux", "state": "supported", "runnerAdapterId": "...", "probes": [{ "target": { "kind": "producer|canonical-consumer|affected-ingress|enablement-authority|proof-target", "targetId": "..." }, "observationGroupId": "...", "harnessPath": "scripts/...", "verifierAssetPaths": ["scripts/..."], "args": ["..."], "cwd": ".", "timeoutMs": 30000, "outputLimitBytes": 1048576, "expectation": { "kind": "adapter-structured-outcome", "schemaId": "...", "outcome": "observed" } }] }] }
       }
     }
   ],
@@ -442,17 +460,28 @@ export function parsePlannerResponse(raw: string, adapter?: ProviderAdapter): Pl
       debugLog('parsePlannerResponse:validation', result.error);
       return null;
     }
-    for (const task of result.data.tasks) {
+    const productionWiring = new Map<number, ReturnType<typeof createProductionWiringPlanEvidenceV2>>();
+    for (let index = 0; index < result.data.tasks.length; index++) {
+      const task = result.data.tasks[index]!;
       const provider = modelRegistry.get(task.model)?.provider ?? inferProviderFromId(task.model);
       resolveCanonicalModelIdentity(task.model, {
         ...(provider ? { provider } : {}),
         registerParametric: false,
       });
+      if (task.productionWiring !== undefined) {
+        const input = parseProductionWiringContractV2Input(task.productionWiring);
+        if (input === null) return null;
+        productionWiring.set(index, createProductionWiringPlanEvidenceV2(input));
+      }
+      if (deriveProductionWiringApplicability(task.scope).state === 'required'
+        && !productionWiring.has(index)) return null;
     }
     return {
       ...result.data,
-      tasks: result.data.tasks.map(task => ({
+      tasks: result.data.tasks.map((task, index) => ({
         ...task,
+        productionWiringApplicability: deriveProductionWiringApplicability(task.scope),
+        ...(productionWiring.has(index) ? { productionWiring: productionWiring.get(index)! } : {}),
         goNogo: {
           ...task.goNogo,
           items: canonicalPlannerCriteria(
@@ -1825,6 +1854,9 @@ export function buildZeroConfigFallbackPlan(description: string): PlannerResult 
         priority: 'NORMAL',
         reason: 'Zero-config fallback: single task wrapping the full description',
         scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
+        productionWiringApplicability: deriveProductionWiringApplicability({
+          directories: ['src/'], filesRead: [], filesWrite: [],
+        }),
         dependencies: [],
         goNogo: {
           goCriteria: 'Feature implemented and tests pass',

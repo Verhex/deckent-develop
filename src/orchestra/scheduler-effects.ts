@@ -42,6 +42,7 @@ import {
   type FailureDispositionPolicyConfig,
 } from '../core/failure-disposition-policy.js';
 import { TASKS_DIR } from '../core/constants.js';
+import type { TaskAttemptCustodyDispatchNotDispatchedAuthorityV2 } from '../core/task-attempt-custody-store.js';
 import { resolveLiveTraceEnabled } from '../core/config.js';
 import { debugLog } from '../core/utils.js';
 import { DeckentError } from '../core/errors.js';
@@ -77,7 +78,7 @@ import {
 import {
   resolveTaskProvider, isTmuxProvider, isAdapterProvider, getProviderAdapterForTask,
 } from './sprint-utils.js';
-import type { SpawnBackend } from './spawn-backend.js';
+import type { SpawnBackend, SpawnBackendRecoveryReport } from './spawn-backend.js';
 import { SpawnBackendFactory } from './spawn-backend.js';
 import { resolveReasoningEffort } from '../core/reasoning-effort.js';
 import {
@@ -100,20 +101,39 @@ import {
   transitionTaskArtifactProjectionCas,
 } from './task-artifact-projection.js';
 import {
+  createExactDockerCustodyPolicy,
   createExactDockerDispatchTaskMaterial,
   createExactDockerPromptDeliveryAuthority,
   exactDockerCustodyMaterialDigest,
 } from './spawn-backend-docker.js';
+import {
+  createExactNormalTaskApprovedMaterialV3,
+  ExactEvaluationPolicyFailure,
+  type ExactNormalTaskApprovedMaterialV3,
+} from './exact-evaluation-policy-authority.js';
 import type {
   ExactDockerAcceptedResultV2,
+  ExactDockerCustodyPredecessorV2,
   ExactDockerCustodyDispatchOutcomeV2,
+  ExactDockerCustodyIdentityRefV2,
+  ExactDockerCustodyPreparationRefV2,
   ExactDockerCustodyTerminalQueryV2,
 } from './spawn-backend.js';
 import type {
   ExactAcceptedTaskResultAuthorityMetadata,
   TaskResultAuthorityRead,
 } from './task-result-authority.js';
-import { readAuthoritativeTaskResult } from './task-result-authority.js';
+import {
+  projectExactAcceptedTaskResult,
+  readAuthoritativeTaskResult,
+} from './task-result-authority.js';
+import type {
+  ExactAcceptedTaskTerminalAuthorityRead,
+} from './evaluation-audit-trail.js';
+import type {
+  RevalidateExactAcceptedResultTerminalAuthority,
+  SettleExactAcceptedResult,
+} from './exact-accepted-result-terminal-authority.js';
 import type { DependencyResultEntry } from './prompt-god-template.js';
 import type { SchedulerDecision } from './scheduler-reducer.js';
 import { schedulerShadowJournalPath } from './scheduler-journal.js';
@@ -260,22 +280,37 @@ export interface CanonicalTaskDispatchBoundaryV2 {
 
 type ExactNormalDockerRegistryEntry =
   | Readonly<{
+      state: 'prepared';
+      preparationRef: ExactDockerCustodyPreparationRefV2;
+      backend: SpawnBackend;
+      lifecycleOwner: TaskExecutionLifecycleOwnerV2;
+    }>
+  | Readonly<{
       state: 'pending';
       query: ExactDockerCustodyTerminalQueryV2;
+      backend: SpawnBackend;
       lifecycleOwner: TaskExecutionLifecycleOwnerV2;
     }>
   | Readonly<{
       state: 'accepted';
       query: ExactDockerCustodyTerminalQueryV2;
       accepted: ExactDockerAcceptedResultV2;
-      terminalVerdict: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO' | null;
+      terminal: ExactAcceptedTaskTerminalAuthorityRead | null;
+      backend: SpawnBackend;
       lifecycleOwner: TaskExecutionLifecycleOwnerV2;
     }>
   | Readonly<{ state: 'legacy'; lifecycleOwner: TaskExecutionLifecycleOwnerV2 | null }>
-  | Readonly<{ state: 'not-dispatched' }>
+  | Readonly<{
+      state: 'not-dispatched';
+      authority: TaskAttemptCustodyDispatchNotDispatchedAuthorityV2 | null;
+      predecessor: ExactDockerCustodyPredecessorV2 | null;
+      backend: SpawnBackend | null;
+      lifecycleOwner: TaskExecutionLifecycleOwnerV2 | null;
+    }>
   | Readonly<{
       state: 'hold';
       reasonCode: string;
+      backend: SpawnBackend | null;
       lifecycleOwner: TaskExecutionLifecycleOwnerV2 | null;
     }>;
 
@@ -313,16 +348,31 @@ export interface ExactNormalDockerDependencyContextV2 {
  * accepted result; only the backend-owned reader can populate it.
  */
 export interface ExactNormalDockerExecutionRegistryV2 {
+  resolveExactPredecessor(taskId: string): Readonly<
+    | { state: 'none' }
+    | { state: 'current'; predecessor: ExactDockerCustodyPredecessorV2 }
+    | { state: 'hold'; reasonCode: string }
+  >;
+  admitPreparedAttempt(
+    taskId: string,
+    backend: SpawnBackend,
+    preparationRef: ExactDockerCustodyPreparationRefV2,
+  ): Readonly<{ state: 'admitted' } | { state: 'hold'; reasonCode: string }>;
   registerReleased(
     taskId: string,
     backend: SpawnBackend,
     query: ExactDockerCustodyTerminalQueryV2,
   ): void;
-  registerNotDispatched(taskId: string): void;
+  registerNotDispatched(
+    taskId: string,
+    backend?: SpawnBackend,
+    custodyRef?: ExactDockerCustodyIdentityRefV2,
+    zeroWorkReceipt?: Readonly<{ readonly ref: `sha256:${string}`; readonly digest: `sha256:${string}` }>,
+  ): void;
   registerHold(
     taskId: string,
     reasonCode: string,
-    lifecycleOwner?: TaskExecutionLifecycleOwnerV2,
+    backend?: SpawnBackend,
   ): void;
   registerLegacy(
     taskId: string,
@@ -330,10 +380,15 @@ export interface ExactNormalDockerExecutionRegistryV2 {
   ): boolean;
   isExactTask(taskId: string): boolean;
   resolveLifecycleOwner(taskId: string): TaskExecutionLifecycleOwnerV2 | undefined;
-  recordTerminalDecision(
-    taskId: string,
-    verdict: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO',
-  ): void;
+  readonly settleExactAcceptedResult: SettleExactAcceptedResult;
+  readonly revalidateExactAcceptedResultTerminalAuthority:
+    RevalidateExactAcceptedResultTerminalAuthority;
+  readExactTerminalAuthority(taskId: string): ExactAcceptedTaskTerminalAuthorityRead;
+  snapshotExactTerminalAuthorities(): ReadonlyMap<string, ExactAcceptedTaskTerminalAuthorityRead>;
+  rehydrateRecovery(report: SpawnBackendRecoveryReport, backend: SpawnBackend): void;
+  reconcileExactLifecycle(
+    mode: 'resume' | 'contain',
+  ): Promise<readonly SpawnBackendRecoveryReport[]>;
   readTaskResultAuthority(taskId: string): TaskResultAuthorityRead<TaskResult>;
   awaitTaskResultAuthority(taskId: string): Promise<TaskResultAuthorityRead<TaskResult>>;
   dependencyContext(task: Task): ExactNormalDockerDependencyContextV2 | null;
@@ -358,12 +413,61 @@ export function createExactNormalDockerExecutionRegistry(
 ): ExactNormalDockerExecutionRegistryV2 {
   const entries = new Map<string, ExactNormalDockerRegistryEntry>();
   const terminalWaits = new Map<string, Promise<void>>();
+  /** One project-wide adoption scan per backend kind, regardless of task-local instances. */
+  const recoveryOwners = new Map<string, SpawnBackend>();
+  const preparedMatchesIdentity = (
+    preparationRef: ExactDockerCustodyPreparationRefV2,
+    custodyRef: ExactDockerCustodyIdentityRefV2,
+  ): boolean => JSON.stringify(preparationRef.privateIdentity) === JSON.stringify(custodyRef.identity)
+    && preparationRef.dispatchRequestId === custodyRef.dispatchRequestId
+    && preparationRef.admissionReceiptDigest === custodyRef.admissionReceiptDigest
+    && preparationRef.admissionRefDigest === custodyRef.admissionRefDigest;
+  const predecessorFromNotDispatched = (
+    authority: TaskAttemptCustodyDispatchNotDispatchedAuthorityV2,
+  ): ExactDockerCustodyPredecessorV2 | null => {
+    const admissionRef = authority?.admissionRef;
+    const identity = admissionRef?.identity;
+    const noEffectEvidence = authority?.noEffectEvidence;
+    const isDigest = (value: unknown): value is `sha256:${string}` => typeof value === 'string'
+      && /^sha256:[a-f0-9]{64}$/.test(value);
+    if (authority?.state !== 'NOT_DISPATCHED'
+      || !admissionRef
+      || !identity
+      || !noEffectEvidence
+      || typeof admissionRef.dispatchRequestId !== 'string'
+      || !isDigest(admissionRef.admissionReceiptDigest)
+      || !isDigest(admissionRef.refDigest)
+      || !isDigest(authority.receiptDigest)
+      || !isDigest(noEffectEvidence.evidenceDigest)
+      || identity.schemaVersion !== 2
+      || identity.backend !== 'docker'
+      || typeof identity.projectRootSha256 !== 'string'
+      || !/^[a-f0-9]{64}$/.test(identity.projectRootSha256)
+      || typeof identity.projectId !== 'string'
+      || identity.projectId.length === 0
+      || typeof identity.taskId !== 'string'
+      || identity.taskId.length === 0
+      || typeof identity.attemptId !== 'string'
+      || identity.attemptId.length === 0
+      || !Number.isSafeInteger(identity.generation)
+      || identity.generation < 1) return null;
+    return Object.freeze({
+      dispatchRequestId: admissionRef.dispatchRequestId,
+      identity,
+      admissionReceiptDigest: admissionRef.admissionReceiptDigest,
+      admissionRefDigest: admissionRef.refDigest,
+      zeroWorkReceipt: Object.freeze({
+        ref: authority.receiptDigest,
+        digest: noEffectEvidence.evidenceDigest,
+      }),
+    });
+  };
   const readTaskResultAuthority = (
     taskId: string,
   ): TaskResultAuthorityRead<TaskResult> => {
     const rawResultPath = join(projectRoot, TASKS_DIR, `task-${taskId}.result`);
     const entry = entries.get(taskId);
-    if (!entry || entry.state === 'pending') {
+    if (!entry || entry.state === 'pending' || entry.state === 'prepared') {
       return { state: 'pending-settlement', result: null, settlementRef: null, rawResultPath };
     }
     if (entry.state === 'legacy') {
@@ -387,52 +491,235 @@ export function createExactNormalDockerExecutionRegistry(
         holdReason: entry.reasonCode,
       };
     }
+    const acceptedAuthority = exactAcceptedAuthority(entry.query, entry.accepted);
     return {
       state: 'exact-accepted',
-      result: entry.accepted.result as unknown as TaskResult,
+      result: projectExactAcceptedTaskResult(entry.accepted.result, acceptedAuthority),
       settlementRef: null,
       rawResultPath,
-      exactAcceptedAuthority: exactAcceptedAuthority(entry.query, entry.accepted),
+      exactAcceptedAuthority: acceptedAuthority,
     };
   };
+  const readExactTerminalAuthority = (
+    taskId: string,
+  ): ExactAcceptedTaskTerminalAuthorityRead => {
+    const entry = entries.get(taskId);
+    if (!entry) return Object.freeze({
+      state: 'hold' as const,
+      reasonCode: 'exact-registry-entry-unavailable',
+    });
+    if (entry.state === 'hold') return Object.freeze({
+      state: 'hold' as const,
+      reasonCode: entry.reasonCode,
+    });
+    if (entry.state === 'pending' || entry.state === 'prepared') return Object.freeze({
+      state: 'hold' as const,
+      reasonCode: 'exact-terminal-pending',
+    });
+    if (entry.state === 'not-dispatched') return Object.freeze({
+      state: 'hold' as const,
+      reasonCode: 'exact-not-dispatched',
+    });
+    if (entry.state === 'legacy') return Object.freeze({
+      state: 'hold' as const,
+      reasonCode: 'legacy-task-has-no-exact-terminal',
+    });
+    if (entry.terminal?.state !== 'current') return entry.terminal ?? Object.freeze({
+      state: 'hold' as const,
+      reasonCode: 'exact-terminal-awaiting-settlement',
+    });
+    if (!entry.backend.readExactDockerAcceptedTaskTerminalAuthority) {
+      return Object.freeze({ state: 'hold' as const, reasonCode: 'exact-terminal-port-unavailable' });
+    }
+    const current = entry.backend.readExactDockerAcceptedTaskTerminalAuthority({
+      reader: entry.accepted.reader,
+      expectedAcceptedAuthority: exactAcceptedAuthority(entry.query, entry.accepted),
+      expectedTerminalAuthority: entry.terminal.terminalAuthority,
+    });
+    entries.set(taskId, Object.freeze({ ...entry, terminal: current }));
+    return current;
+  };
+  const settleExactAcceptedResult: SettleExactAcceptedResult = async ({ acceptedAuthority }) => {
+    const entry = entries.get(acceptedAuthority.identity.taskId);
+    if (!entry || entry.state !== 'accepted'
+      || JSON.stringify(exactAcceptedAuthority(entry.query, entry.accepted))
+        !== JSON.stringify(acceptedAuthority)) {
+      return Object.freeze({ state: 'hold' as const, reasonCode: 'accepted-registry-mismatch' });
+    }
+    if (!entry.backend.settleExactDockerAcceptedResult
+      || !entry.backend.readExactDockerAcceptedTaskTerminalAuthority) {
+      return Object.freeze({ state: 'hold' as const, reasonCode: 'exact-settlement-port-unavailable' });
+    }
+    const settled = await entry.backend.settleExactDockerAcceptedResult(
+      entry.accepted.reader,
+      acceptedAuthority,
+    );
+    if (settled.state !== 'settled') return settled;
+    const current = entry.backend.readExactDockerAcceptedTaskTerminalAuthority({
+      reader: entry.accepted.reader,
+      expectedAcceptedAuthority: acceptedAuthority,
+      expectedTerminalAuthority: settled.authority,
+    });
+    entries.set(acceptedAuthority.identity.taskId, Object.freeze({ ...entry, terminal: current }));
+    return current.state === 'current'
+      ? settled
+      : Object.freeze({ state: 'hold' as const, reasonCode: current.reasonCode });
+  };
+  const revalidateExactAcceptedResultTerminalAuthority:
+    RevalidateExactAcceptedResultTerminalAuthority = async ({
+      taskId,
+      expectedAcceptedAuthority,
+      expectedTerminalAuthority,
+    }) => {
+      const entry = entries.get(taskId);
+      if (!entry || entry.state !== 'accepted'
+        || JSON.stringify(exactAcceptedAuthority(entry.query, entry.accepted))
+          !== JSON.stringify(expectedAcceptedAuthority)
+        || !entry.backend.readExactDockerAcceptedTaskTerminalAuthority) {
+        return Object.freeze({ state: 'hold' as const, reasonCode: 'terminal-registry-mismatch' });
+      }
+      const current = entry.backend.readExactDockerAcceptedTaskTerminalAuthority({
+        reader: entry.accepted.reader,
+        expectedAcceptedAuthority,
+        expectedTerminalAuthority,
+      });
+      entries.set(taskId, Object.freeze({ ...entry, terminal: current }));
+      return current.state === 'current'
+        ? Object.freeze({ state: 'current' as const, terminalAuthority: current.terminalAuthority })
+        : current;
+    };
   return Object.freeze({
+    resolveExactPredecessor(taskId: string) {
+      const entry = entries.get(taskId);
+      if (!entry || entry.state === 'legacy') {
+        return Object.freeze({ state: 'none' as const });
+      }
+      if (entry.state === 'not-dispatched') {
+        return entry.predecessor
+          ? Object.freeze({ state: 'current' as const, predecessor: entry.predecessor })
+          : Object.freeze({
+              state: 'hold' as const,
+              reasonCode: 'EXACT_NOT_DISPATCHED_PREDECESSOR_UNAVAILABLE',
+            });
+      }
+      return Object.freeze({
+        state: 'hold' as const,
+        reasonCode: entry.state === 'hold'
+          ? entry.reasonCode
+          : 'EXACT_ATTEMPT_ALREADY_ACTIVE_OR_TERMINAL',
+      });
+    },
+    admitPreparedAttempt(
+      taskId: string,
+      backend: SpawnBackend,
+      preparationRef: ExactDockerCustodyPreparationRefV2,
+    ) {
+      if (preparationRef.privateIdentity.taskId !== taskId) {
+        return Object.freeze({
+          state: 'hold' as const,
+          reasonCode: 'EXACT_PREPARED_IDENTITY_MISMATCH',
+        });
+      }
+      const current = entries.get(taskId);
+      if (current?.state === 'prepared') {
+        return current.backend === backend
+          && JSON.stringify(current.preparationRef) === JSON.stringify(preparationRef)
+          ? Object.freeze({ state: 'admitted' as const })
+          : Object.freeze({
+              state: 'hold' as const,
+              reasonCode: 'EXACT_PREPARED_REPLAY_MISMATCH',
+            });
+      }
+      if (current?.state === 'not-dispatched') {
+        const predecessor = current.predecessor;
+        const next = preparationRef.privateIdentity;
+        if (!predecessor
+          || next.backend !== predecessor.identity.backend
+          || next.projectRootSha256 !== predecessor.identity.projectRootSha256
+          || next.projectId !== predecessor.identity.projectId
+          || next.taskId !== predecessor.identity.taskId
+          || next.attemptId !== predecessor.identity.attemptId
+          || next.generation !== predecessor.identity.generation + 1
+          || preparationRef.admissionReceiptDigest === predecessor.admissionReceiptDigest
+          || preparationRef.admissionRefDigest === predecessor.admissionRefDigest) {
+          return Object.freeze({
+            state: 'hold' as const,
+            reasonCode: 'EXACT_REDISPATCH_GENERATION_MISMATCH',
+          });
+        }
+      } else if (current) {
+        return Object.freeze({
+          state: 'hold' as const,
+          reasonCode: 'EXACT_ATTEMPT_ALREADY_ACTIVE_OR_TERMINAL',
+        });
+      } else if (preparationRef.privateIdentity.generation !== 1) {
+        return Object.freeze({
+          state: 'hold' as const,
+          reasonCode: 'EXACT_INITIAL_GENERATION_MISMATCH',
+        });
+      }
+      if (!recoveryOwners.has(backend.name)) recoveryOwners.set(backend.name, backend);
+      entries.set(taskId, Object.freeze({
+        state: 'prepared' as const,
+        preparationRef,
+        backend,
+        lifecycleOwner: backend,
+      }));
+      return Object.freeze({ state: 'admitted' as const });
+    },
     registerReleased(
       taskId: string,
       backend: SpawnBackend,
       query: ExactDockerCustodyTerminalQueryV2,
     ): void {
+      if (!recoveryOwners.has(backend.name)) recoveryOwners.set(backend.name, backend);
       if (!backend.awaitExactDockerAcceptedResult) {
         entries.set(taskId, Object.freeze({
           state: 'hold',
           reasonCode: 'EXACT_ACCEPTED_RESULT_PORT_UNAVAILABLE',
+          backend,
           lifecycleOwner: backend,
         }));
         return;
       }
       const current = entries.get(taskId);
       if (current) {
+        const preparedRelease = current.state === 'prepared'
+          && current.backend === backend
+          && preparedMatchesIdentity(current.preparationRef, query.custodyRef);
         const samePending = current.state === 'pending'
+          && current.backend === backend
           && JSON.stringify(current.query) === JSON.stringify(query);
         if (samePending) return;
-        entries.set(taskId, Object.freeze({
-          state: 'hold',
-          reasonCode: 'EXACT_DISPATCH_REGISTRY_REPLAY_MISMATCH',
-          lifecycleOwner: backend,
-        }));
-        return;
+        if (preparedRelease) entries.delete(taskId);
+        else {
+          entries.set(taskId, Object.freeze({
+            state: 'hold',
+            reasonCode: 'EXACT_DISPATCH_REGISTRY_REPLAY_MISMATCH',
+            backend: backend ?? null,
+            lifecycleOwner: backend ?? null,
+          }));
+          return;
+        }
       }
       entries.set(taskId, Object.freeze({
         state: 'pending',
         query,
+        backend,
         lifecycleOwner: backend,
       }));
       const terminalWait = backend.awaitExactDockerAcceptedResult(query).then(outcome => {
+        const registered = entries.get(taskId);
+        if (!registered || registered.state !== 'pending'
+          || registered.backend !== backend
+          || JSON.stringify(registered.query) !== JSON.stringify(query)) return;
         if (outcome.kind === 'accepted-result') {
           entries.set(taskId, Object.freeze({
             state: 'accepted',
             query,
             accepted: outcome,
-            terminalVerdict: null,
+            terminal: null,
+            backend,
             lifecycleOwner: backend,
           }));
           return;
@@ -440,25 +727,82 @@ export function createExactNormalDockerExecutionRegistry(
         entries.set(taskId, Object.freeze({
           state: 'hold',
           reasonCode: outcome.reasonCode,
+          backend,
           lifecycleOwner: backend,
         }));
       }).catch((error: unknown) => {
         debugLog('exact-normal-docker-registry:acceptance', error);
+        const registered = entries.get(taskId);
+        if (!registered || registered.state !== 'pending'
+          || registered.backend !== backend
+          || JSON.stringify(registered.query) !== JSON.stringify(query)) return;
         entries.set(taskId, Object.freeze({
           state: 'hold',
           reasonCode: 'EXACT_ACCEPTANCE_FAILED',
+          backend,
           lifecycleOwner: backend,
         }));
       });
       terminalWaits.set(taskId, terminalWait);
     },
-    registerNotDispatched(taskId: string): void {
-      entries.set(taskId, Object.freeze({ state: 'not-dispatched' }));
+    registerNotDispatched(
+      taskId: string,
+      backend?: SpawnBackend,
+      custodyRef?: ExactDockerCustodyIdentityRefV2,
+      zeroWorkReceipt?: Readonly<{
+        readonly ref: `sha256:${string}`;
+        readonly digest: `sha256:${string}`;
+      }>,
+    ): void {
+      const current = entries.get(taskId);
+      const exactTerminal = backend && custodyRef && zeroWorkReceipt
+        ? Object.freeze({ ...custodyRef, zeroWorkReceipt })
+        : null;
+      if (current && exactTerminal) {
+        const validPrepared = current.state === 'prepared'
+          && current.backend === backend
+          && preparedMatchesIdentity(current.preparationRef, custodyRef!);
+        if (!validPrepared) {
+          const sameTerminal = current.state === 'not-dispatched'
+            && JSON.stringify(current.predecessor) === JSON.stringify(exactTerminal);
+          if (sameTerminal) return;
+          entries.set(taskId, Object.freeze({
+            state: 'hold',
+            reasonCode: 'EXACT_NOT_DISPATCHED_REGISTRY_REPLAY_MISMATCH',
+            backend: backend ?? null,
+            lifecycleOwner: backend ?? null,
+          }));
+          return;
+        }
+      } else if (current) {
+        const sameTerminal = current.state === 'not-dispatched'
+          && current.backend === (backend ?? null)
+          && current.predecessor === null;
+        if (sameTerminal) return;
+        entries.set(taskId, Object.freeze({
+          state: 'hold',
+          reasonCode: 'EXACT_NOT_DISPATCHED_REGISTRY_REPLAY_MISMATCH',
+          backend: backend ?? ('backend' in current ? current.backend : null),
+          lifecycleOwner: backend ?? ('lifecycleOwner' in current
+            ? current.lifecycleOwner : null),
+        }));
+        return;
+      }
+      if (backend && !recoveryOwners.has(backend.name)) {
+        recoveryOwners.set(backend.name, backend);
+      }
+      entries.set(taskId, Object.freeze({
+        state: 'not-dispatched',
+        authority: null,
+        predecessor: exactTerminal,
+        backend: backend ?? null,
+        lifecycleOwner: backend ?? null,
+      }));
     },
     registerHold(
       taskId: string,
       reasonCode: string,
-      lifecycleOwner?: TaskExecutionLifecycleOwnerV2,
+      backend?: SpawnBackend,
     ): void {
       const current = entries.get(taskId);
       const currentOwner = current && 'lifecycleOwner' in current
@@ -467,7 +811,8 @@ export function createExactNormalDockerExecutionRegistry(
       entries.set(taskId, Object.freeze({
         state: 'hold',
         reasonCode,
-        lifecycleOwner: lifecycleOwner ?? currentOwner,
+        backend: backend ?? (current && 'backend' in current ? current.backend : null),
+        lifecycleOwner: backend ?? currentOwner,
       }));
     },
     registerLegacy(
@@ -479,6 +824,7 @@ export function createExactNormalDockerExecutionRegistry(
         entries.set(taskId, Object.freeze({
           state: 'hold',
           reasonCode: 'EXECUTION_MODE_AUTHORITY_CHANGED',
+          backend: current && 'backend' in current ? current.backend : null,
           lifecycleOwner: 'lifecycleOwner' in current
             ? current.lifecycleOwner
             : lifecycleOwner ?? null,
@@ -500,18 +846,137 @@ export function createExactNormalDockerExecutionRegistry(
       if (!entry || !('lifecycleOwner' in entry)) return undefined;
       return entry.lifecycleOwner ?? undefined;
     },
-    recordTerminalDecision(
-      taskId: string,
-      verdict: 'DONE' | 'GO_WITH_TECH_DEBT' | 'NO_GO',
-    ): void {
-      const current = entries.get(taskId);
-      if (!current || current.state !== 'accepted') {
-        throw new DeckentError(
-          'DECKENT_E091',
-          `EXACT_TERMINAL_DECISION_WITHOUT_ACCEPTED_RESULT:${taskId}`,
-        );
+    settleExactAcceptedResult,
+    revalidateExactAcceptedResultTerminalAuthority,
+    readExactTerminalAuthority,
+    snapshotExactTerminalAuthorities(): ReadonlyMap<string, ExactAcceptedTaskTerminalAuthorityRead> {
+      const snapshot = new Map<string, ExactAcceptedTaskTerminalAuthorityRead>();
+      for (const [taskId, entry] of entries) {
+        if (entry.state === 'legacy') continue;
+        snapshot.set(taskId, readExactTerminalAuthority(taskId));
       }
-      entries.set(taskId, Object.freeze({ ...current, terminalVerdict: verdict }));
+      return snapshot;
+    },
+    rehydrateRecovery(report: SpawnBackendRecoveryReport, backend: SpawnBackend): void {
+      if (!recoveryOwners.has(backend.name)) recoveryOwners.set(backend.name, backend);
+      for (const recovered of report.exactEntries ?? []) {
+        if (recovered.kind === 'not-dispatched') {
+          const predecessor = predecessorFromNotDispatched(recovered.authority);
+          if (!predecessor || recovered.taskId !== predecessor.identity.taskId) {
+            this.registerHold(recovered.taskId, 'EXACT_RECOVERY_NOT_DISPATCHED_MISMATCH', backend);
+            continue;
+          }
+          const current = entries.get(recovered.taskId);
+          if (current && (current.state !== 'not-dispatched'
+            || (current.authority !== null
+              && JSON.stringify(current.authority) !== JSON.stringify(recovered.authority)))) {
+            this.registerHold(recovered.taskId, 'EXACT_RECOVERY_REGISTRY_CONFLICT', backend);
+            continue;
+          }
+          entries.set(recovered.taskId, Object.freeze({
+            state: 'not-dispatched' as const,
+            authority: recovered.authority,
+            predecessor,
+            backend,
+            lifecycleOwner: backend,
+          }));
+          continue;
+        }
+        if (recovered.kind === 'released') {
+          const current = entries.get(recovered.taskId);
+          if (current) {
+            if (current.state !== 'pending'
+              || JSON.stringify(current.query) !== JSON.stringify(recovered.query)) {
+              this.registerHold(recovered.taskId, 'EXACT_RECOVERY_REGISTRY_CONFLICT', backend);
+              continue;
+            }
+            entries.delete(recovered.taskId);
+          }
+          this.registerReleased(recovered.taskId, backend, recovered.query);
+          continue;
+        }
+        const reread = backend.readExactDockerAcceptedResult?.(recovered.accepted.reader);
+        if (!reread || JSON.stringify(reread) !== JSON.stringify(recovered.accepted)) {
+          this.registerHold(recovered.taskId, 'EXACT_RECOVERY_ACCEPTED_REPLAY_MISMATCH', backend);
+          continue;
+        }
+        const current = entries.get(recovered.taskId);
+        if (current && (current.state !== 'accepted'
+          || JSON.stringify(current.query) !== JSON.stringify(recovered.query)
+          || JSON.stringify(exactAcceptedAuthority(current.query, current.accepted))
+            !== JSON.stringify(exactAcceptedAuthority(recovered.query, recovered.accepted)))) {
+          this.registerHold(recovered.taskId, 'EXACT_RECOVERY_REGISTRY_CONFLICT', backend);
+          continue;
+        }
+        let terminal = current?.state === 'accepted' ? current.terminal : null;
+        if (terminal?.state === 'current') {
+          if (!backend.readExactDockerAcceptedTaskTerminalAuthority) {
+            this.registerHold(
+              recovered.taskId,
+              'EXACT_RECOVERY_TERMINAL_REVALIDATION_UNAVAILABLE',
+              backend,
+            );
+            continue;
+          }
+          terminal = backend.readExactDockerAcceptedTaskTerminalAuthority({
+            reader: recovered.accepted.reader,
+            expectedAcceptedAuthority: exactAcceptedAuthority(
+              recovered.query,
+              recovered.accepted,
+            ),
+            expectedTerminalAuthority: terminal.terminalAuthority,
+          });
+        }
+        entries.set(recovered.taskId, Object.freeze({
+          state: 'accepted' as const,
+          query: recovered.query,
+          accepted: recovered.accepted,
+          terminal,
+          backend,
+          lifecycleOwner: backend,
+        }));
+      }
+    },
+    async reconcileExactLifecycle(
+      mode: 'resume' | 'contain',
+    ): Promise<readonly SpawnBackendRecoveryReport[]> {
+      const backends = new Map<string, SpawnBackend>(recoveryOwners);
+      for (const entry of entries.values()) {
+        if ('backend' in entry && entry.backend && !backends.has(entry.backend.name)) {
+          backends.set(entry.backend.name, entry.backend);
+        }
+      }
+      const reports: SpawnBackendRecoveryReport[] = [];
+      for (const backend of backends.values()) {
+        if (!backend.reconcilePendingAttempts) {
+          for (const [taskId, entry] of entries) {
+            if ('backend' in entry && entry.backend === backend) {
+              this.registerHold(taskId, 'EXACT_LIFECYCLE_RECONCILIATION_UNAVAILABLE', backend);
+            }
+          }
+          throw new DeckentError('DECKENT_E091', 'EXACT_LIFECYCLE_RECONCILIATION_UNAVAILABLE');
+        }
+        const report = await backend.reconcilePendingAttempts({ mode });
+        reports.push(report);
+        this.rehydrateRecovery(report, backend);
+        for (const hold of report.held ?? []) {
+          this.registerHold(hold.taskId, hold.reasonCode, backend);
+        }
+        if ((report.held?.length ?? 0) > 0) {
+          throw new DeckentError('DECKENT_E091', `EXACT_LIFECYCLE_${mode.toUpperCase()}_HOLD`);
+        }
+        if (mode === 'contain') {
+          for (const [taskId, entry] of entries) {
+            if (!('backend' in entry) || entry.backend !== backend) continue;
+            const inventory = backend.workerInventoryState?.(taskId) ?? 'unknown';
+            if (inventory !== 'absent') {
+              this.registerHold(taskId, 'EXACT_CONTAINMENT_INCOMPLETE', backend);
+              throw new DeckentError('DECKENT_E091', 'EXACT_CONTAINMENT_INCOMPLETE');
+            }
+          }
+        }
+      }
+      return Object.freeze(reports);
     },
     readTaskResultAuthority,
     async awaitTaskResultAuthority(taskId: string): Promise<TaskResultAuthorityRead<TaskResult>> {
@@ -526,9 +991,10 @@ export function createExactNormalDockerExecutionRegistry(
       const lineageAuthorities: ExactAcceptedTaskResultAuthorityMetadata[] = [];
       for (const dependencyId of dependencyIds) {
         const entry = entries.get(dependencyId);
-        if (!entry || entry.state !== 'accepted' || entry.terminalVerdict === null) return null;
+        const terminal = readExactTerminalAuthority(dependencyId);
+        if (!entry || entry.state !== 'accepted' || terminal.state !== 'current') return null;
         dependencyResults.set(dependencyId, {
-          verdict: entry.terminalVerdict,
+          verdict: terminal.evaluationReceipt.verdict,
           filesChanged: entry.accepted.result.filesChanged.map(change => change.path),
           linesAdded: entry.accepted.result.totalLinesAdded,
           linesRemoved: entry.accepted.result.totalLinesRemoved,
@@ -1347,24 +1813,57 @@ export async function executeSpawnTask(
       );
     }
     const workerId = `w-${task.id}`;
-    const approvedTask = createExactDockerDispatchTaskMaterial(compileTask, workerId);
     const dispatchTask = createExactDockerDispatchTaskMaterial(compileTask, workerId);
-    const approvedTaskMaterial = Object.freeze({
-      schemaVersion: 2 as const,
-      kind: 'normal-task-approved-material' as const,
-      sprintId: task.sprintId ?? sprintFallbackId,
-      task: approvedTask,
-    });
+    const dispatchTaskMaterialDigest = exactDockerCustodyMaterialDigest(dispatchTask);
+    let approvedTaskMaterial: ExactNormalTaskApprovedMaterialV3;
+    try {
+      approvedTaskMaterial = createExactNormalTaskApprovedMaterialV3({
+        sprintId: task.sprintId ?? sprintFallbackId,
+        task: dispatchTask,
+        dispatchTaskMaterialDigest,
+        config,
+        policy: createExactDockerCustodyPolicy(),
+      });
+    } catch (error) {
+      const reasonCode = error instanceof ExactEvaluationPolicyFailure
+        ? error.code
+        : 'INVALID_EXACT_EVALUATION_POLICY';
+      exactRegistry.registerHold(task.id, reasonCode, exactBackend);
+      return {
+        ...resolvedExecutionIdentity,
+        kind: 'ambiguous',
+        taskId: task.id,
+        reasonCode,
+      };
+    }
+    const predecessorResolution = exactRegistry.resolveExactPredecessor(task.id);
+    if (predecessorResolution.state === 'hold') {
+      return {
+        ...resolvedExecutionIdentity,
+        kind: 'ambiguous',
+        taskId: task.id,
+        reasonCode: predecessorResolution.reasonCode,
+      };
+    }
+    const exactPredecessor = predecessorResolution.state === 'current'
+      ? predecessorResolution.predecessor
+      : null;
+    const releasedPredecessor = exactPredecessor && 'providerStartReceipt' in exactPredecessor
+      ? exactPredecessor
+      : null;
+    const zeroWorkPredecessor = exactPredecessor && 'zeroWorkReceipt' in exactPredecessor
+      ? exactPredecessor
+      : null;
     const lineageMaterial = Object.freeze({
       schemaVersion: 2 as const,
       kind: 'normal-task-lineage-material' as const,
       sprintId: task.sprintId ?? sprintFallbackId,
       taskId: task.id,
       dependencies: dependencyContext!.lineageAuthorities,
-      predecessor: null,
+      predecessor: releasedPredecessor,
+      ...(zeroWorkPredecessor ? { zeroWorkPredecessor } : {}),
     });
     const approvedTaskMaterialDigest = exactDockerCustodyMaterialDigest(approvedTaskMaterial);
-    const dispatchTaskMaterialDigest = exactDockerCustodyMaterialDigest(dispatchTask);
     const lineageMaterialDigest = exactDockerCustodyMaterialDigest(lineageMaterial);
     const promptDeliveryAuthority = createExactDockerPromptDeliveryAuthority({
       taskId: task.id,
@@ -1420,12 +1919,31 @@ export async function executeSpawnTask(
         executionApprovalEvidenceRef: task.budgetPolicy?.approvalEvidenceRef ?? null,
         finalOnlyUsageContainment: finalOnlyUsageContainment ?? null,
       }),
-      predecessor: null,
+      predecessor: releasedPredecessor,
+      ...(zeroWorkPredecessor ? { zeroWorkPredecessor } : {}),
     });
+    const preparedAdmission = exactRegistry.admitPreparedAttempt(
+      task.id,
+      exactBackend,
+      prepared.preparationRef,
+    );
+    if (preparedAdmission.state === 'hold') {
+      return {
+        ...resolvedExecutionIdentity,
+        kind: 'ambiguous',
+        taskId: task.id,
+        reasonCode: preparedAdmission.reasonCode,
+      };
+    }
     deps.onDispatchAttemptBoundary?.({ taskId: task.id, backend: 'docker' });
     const outcome = await exactBackend.dispatchExactDockerCustody(prepared.dispatchEnvelope);
     if (outcome.kind === 'not-dispatched') {
-      exactRegistry.registerNotDispatched(task.id);
+      exactRegistry.registerNotDispatched(
+        task.id,
+        exactBackend,
+        outcome.custodyRef,
+        outcome.zeroWorkReceipt,
+      );
       return {
         ...resolvedExecutionIdentity,
         kind: 'not-dispatched',

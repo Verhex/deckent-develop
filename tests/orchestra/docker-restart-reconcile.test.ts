@@ -60,6 +60,7 @@ import {
 import { RuntimeBudgetMonitor } from '../../src/orchestra/runtime-budget-monitor.js';
 import {
   archiveLandedAttemptArtifacts,
+  createExactDockerTaskAuthorityDiscriminator,
   DockerSpawnBackend,
   DOCKER_ERROR_CODES,
   persistDockerTerminalProviderBillingReceipt,
@@ -298,6 +299,127 @@ beforeEach(() => {
 });
 
 describe('Docker coordinator restart reconciliation', () => {
+  it('discriminates exact task authority read-only and never fail-opens Store errors', () => {
+    const base = mkdtempSync(join(tmpdir(), 'deckent-docker-exact-discriminator-'));
+    roots.push(base);
+    const root = join(base, 'project');
+    mkdirSync(root, { recursive: true });
+    const taskId = 'exact-discriminator-task';
+    const listDispatchAdmissions = vi.fn(() => ({
+      entries: [{ reservation: { identity: { taskId } } }],
+    }));
+    const backend = new DockerSpawnBackend(root, { custodyStateDir: join(base, 'state') });
+    Object.defineProperty(backend, 'openExactDockerRecoveryStore', {
+      value: vi.fn(() => ({
+        store: { listDispatchAdmissions },
+        policy: {},
+      })),
+    });
+
+    expect(backend.readExactDockerTaskAuthorityDiscrimination(taskId))
+      .toEqual({ state: 'exact' });
+    expect(backend.readExactDockerTaskAuthorityDiscrimination('legacy-task'))
+      .toEqual({ state: 'legacy' });
+    expect(listDispatchAdmissions).toHaveBeenCalledOnce();
+    expect(mockSpawnSync).not.toHaveBeenCalled();
+
+    const failingScan = vi.fn(() => {
+      throw new Error('tampered Store scan');
+    });
+    const failingBackend = new DockerSpawnBackend(root, { custodyStateDir: join(base, 'state') });
+    Object.defineProperty(failingBackend, 'openExactDockerRecoveryStore', {
+      value: vi.fn(() => ({
+        store: { listDispatchAdmissions: failingScan },
+        policy: {},
+      })),
+    });
+    expect(failingBackend.readExactDockerTaskAuthorityDiscrimination(taskId))
+      .toEqual({ state: 'hold', reasonCode: 'exact-task-authority-read-failed' });
+    expect(failingBackend.readExactDockerTaskAuthorityDiscrimination('another-task'))
+      .toEqual({ state: 'hold', reasonCode: 'exact-task-authority-read-failed' });
+    expect(failingScan).toHaveBeenCalledOnce();
+    expect(backend.readExactDockerTaskAuthorityDiscrimination(''))
+      .toEqual({ state: 'hold', reasonCode: 'exact-task-authority-task-id-invalid' });
+
+    const missingState = join(base, 'missing-state');
+    const discriminate = createExactDockerTaskAuthorityDiscriminator(root, {
+      custodyStateDir: missingState,
+    });
+    expect(discriminate(taskId)).toEqual({
+      state: 'hold',
+      reasonCode: 'exact-custody-store-unavailable',
+    });
+    expect(existsSync(missingState)).toBe(false);
+  });
+
+  it('publishes worker absence only after an async exact Store reconciliation', async () => {
+    const base = mkdtempSync(join(tmpdir(), 'deckent-docker-exact-inventory-'));
+    roots.push(base);
+    const root = join(base, 'project');
+    mkdirSync(join(root, '.tasks'), { recursive: true });
+    process.env.DECKENT_HOME = join(base, 'host-state');
+    const taskId = 'exact-inventory-not-dispatched';
+    const digest = `sha256:${'a'.repeat(64)}` as const;
+    const identity = {
+      schemaVersion: 2 as const,
+      backend: 'docker' as const,
+      projectRootSha256: 'b'.repeat(64),
+      projectId: 'project-test',
+      taskId,
+      attemptId: 'attempt-exact-inventory',
+      generation: 1,
+    };
+    const admissionRef = {
+      dispatchRequestId: `dreq-${'c'.repeat(64)}`,
+      identity,
+      admissionReceiptDigest: digest,
+      refDigest: digest,
+    };
+    const authority = {
+      state: 'NOT_DISPATCHED' as const,
+      admissionRef,
+      noEffectEvidence: { evidenceDigest: digest },
+      receiptDigest: digest,
+    };
+    const store = {
+      listDispatchAdmissionsForRecovery: vi.fn(() => ({
+        entries: [{
+          state: 'admitted' as const,
+          reservation: { dispatchRequestId: admissionRef.dispatchRequestId, identity },
+          ref: admissionRef,
+        }],
+        heldAdmissions: [],
+      })),
+      readDispatchAuthority: vi.fn(() => ({
+        state: 'terminal' as const,
+        authority,
+      })),
+      readDispatchObservationByClass: vi.fn(() => null),
+    };
+    const backend = new DockerSpawnBackend(root);
+    Object.defineProperty(backend, 'openExactDockerRecoveryStore', {
+      value: vi.fn(() => ({ store, policy: {} })),
+    });
+    Object.defineProperty(backend, 'reconstructExactDockerRecoveryScope', {
+      value: vi.fn(() => ({ store, policy: {}, admissionRef, identity })),
+    });
+
+    expect(backend.workerInventoryState(taskId)).toBe('unknown');
+    expect(backend.workerInventoryState('unobserved-task')).toBe('unknown');
+
+    const report = await backend.reconcilePendingAttempts();
+
+    expect(report.closedNotDispatched).toEqual([taskId]);
+    expect(report.exactEntries).toEqual([expect.objectContaining({
+      kind: 'not-dispatched',
+      taskId,
+    })]);
+    expect(backend.workerInventoryState(taskId)).toBe('absent');
+    expect(backend.workerInventoryState('unobserved-task')).toBe('unknown');
+    expect(store.listDispatchAdmissionsForRecovery).toHaveBeenCalledOnce();
+    expect(mockSpawnSync).not.toHaveBeenCalled();
+  });
+
   it('keeps historical retired landings out of the current task workspace', async () => {
     const taskId = '457-002';
     const base = mkdtempSync(join(tmpdir(), 'deckent-docker-history-'));
@@ -410,6 +532,7 @@ describe('Docker coordinator restart reconciliation', () => {
       closedAbsentAfterExit: [taskId],
       retiredLanded: [],
       resumedContinuations: [],
+      held: [],
     });
     expect(readFileSync(taskResultSettlementPath(ref), 'utf-8')).toBe(settlementBefore);
     expect(readTaskResultSettlementClosure(ref)).toMatchObject({
@@ -431,6 +554,7 @@ describe('Docker coordinator restart reconciliation', () => {
       closedAbsentAfterExit: [],
       retiredLanded: [],
       resumedContinuations: [],
+      held: [],
     });
     expect(mockSpawnSync).not.toHaveBeenCalled();
     expect(readFileSync(taskResultSettlementPath(ref), 'utf-8')).toBe(settlementBefore);
@@ -587,6 +711,7 @@ describe('Docker coordinator restart reconciliation', () => {
       closedAbsentAfterExit: [],
       retiredLanded: [],
       resumedContinuations: [],
+      held: [],
     });
     expect(mockSpawnSync).not.toHaveBeenCalled();
     expect(readTaskResultSettlement(ref)?.result).toMatchObject({
@@ -635,6 +760,7 @@ describe('Docker coordinator restart reconciliation', () => {
       closedAbsentAfterExit: [],
       retiredLanded: [],
       resumedContinuations: [],
+      held: [],
     });
     expect(readFileSync(join(tasks, `task-${taskId}.result`), 'utf-8')).toBe(rawResult);
   });
@@ -736,6 +862,7 @@ describe('Docker coordinator restart reconciliation', () => {
       closedAbsentAfterExit: [],
       retiredLanded: [],
       resumedContinuations: [],
+      held: [],
     });
     expect(mockSpawnSync).not.toHaveBeenCalled();
     expect(readTaskResultSettlement(ref)).toBeNull();

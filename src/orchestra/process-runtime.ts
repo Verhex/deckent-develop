@@ -33,6 +33,8 @@ import type { TaskResult, SelfAssessment } from '../core/types.js';
 import type { BacklogEntry } from './autonomous/backlog-types.js';
 import type { FlowReporter } from './autonomous/flow-reporter.js';
 import type { TaskResultSettlementRefV1 } from '../core/task-result-settlement.js';
+import type { TaskResultAuthorityRead } from './task-result-authority.js';
+import type { TaskModeResult } from './task-mode-runner.js';
 
 /** One step of a process — a code task (default) or a capability invocation. */
 export interface ProcessStep {
@@ -56,6 +58,70 @@ export interface ProcessDefinition {
   steps: ProcessStep[];
 }
 
+/**
+ * Launch projection shared by Autonomous and Process consumers.  The fields are
+ * optional only for legacy injectors/tests; production `runTaskMode` returns the
+ * complete {@link TaskModeResult}.  Exact Docker consumers must inspect
+ * `executionMode` before consulting any public `.result` projection.
+ */
+export interface TaskExecutionLaunchResult {
+  readonly taskId?: string;
+  readonly settlementRef?: TaskResultSettlementRefV1;
+  readonly executionMode?: TaskModeResult['executionMode'];
+  readonly resultAuthority?: TaskResultAuthorityRead<TaskResult>;
+  readonly invocation?: TaskModeResult['invocation'];
+}
+
+export type TaskLaunchResultAuthority =
+  | { readonly state: 'exact-accepted'; readonly result: TaskResult }
+  | { readonly state: 'exact-hold'; readonly holdReason: string }
+  | { readonly state: 'legacy' };
+
+/**
+ * Preserve the execution-mode boundary at every production consumer.  An
+ * exact Docker launch is eligible only when the host-private accepted-result
+ * authority travelled with the launch result; absence or any other authority
+ * state is a typed HOLD and can never fall back to worker-writable bytes.
+ */
+export function inspectTaskLaunchResultAuthority(
+  launched: TaskExecutionLaunchResult,
+): TaskLaunchResultAuthority {
+  if (launched.executionMode !== 'normal-docker-exact') return { state: 'legacy' };
+
+  const authority = launched.resultAuthority;
+  const acceptedMetadata = authority?.exactAcceptedAuthority;
+  const projectedMetadata = authority?.result
+    ? (authority.result as TaskResult & {
+        readonly exactAcceptedResultAuthority?: unknown;
+      }).exactAcceptedResultAuthority
+    : undefined;
+  if (
+    authority?.state === 'exact-accepted'
+    && authority.result
+    && acceptedMetadata
+    && projectedMetadata === acceptedMetadata
+    && authority.result.taskId === acceptedMetadata.identity.taskId
+    && (launched.taskId === undefined || launched.taskId === acceptedMetadata.identity.taskId)
+    && Array.isArray(authority.result.filesChanged)
+    && authority.result.filesChanged.every(path => typeof path === 'string')
+    && typeof authority.result.testsPassed === 'boolean'
+    && Number.isSafeInteger(authority.result.linesAdded)
+    && Number.isSafeInteger(authority.result.linesRemoved)
+  ) {
+    return { state: 'exact-accepted', result: authority.result };
+  }
+
+  const authorityState = authority?.state ?? 'missing';
+  return {
+    state: 'exact-hold',
+    holdReason: authority?.state === 'exact-accepted'
+      ? `EXACT_RESULT_AUTHORITY_HOLD:${authorityState}:projection-or-identity-mismatch`
+      : authority?.holdReason
+      ? `EXACT_RESULT_AUTHORITY_HOLD:${authorityState}:${authority.holdReason}`
+      : `EXACT_RESULT_AUTHORITY_HOLD:${authorityState}`,
+  };
+}
+
 /** Deps for {@link runProcess} — a subset of the execute-dispatcher's deps,
  *  defined locally so process-runtime never imports the dispatcher (no cycle). */
 export interface RunProcessDeps {
@@ -65,7 +131,7 @@ export interface RunProcessDeps {
   runTask: (
     ctx: { projectRoot: string; description: string; model?: string; provider?: string; scope?: { directories: string[] } },
     config: ResolvedConfig,
-  ) => Promise<{ taskId?: string; settlementRef?: TaskResultSettlementRefV1 } | null | undefined>;
+  ) => Promise<TaskExecutionLaunchResult | null | undefined>;
   /** Wait for a launched task's `.result` (null on timeout). */
   waitForResult: (
     projectRoot: string,
@@ -235,14 +301,25 @@ export async function runProcess(entry: BacklogEntry, deps: RunProcessDeps): Pro
     if (!taskId) {
       return makeProcessResult(entry, 'NO_GO', `${label}: runTask returned no taskId (completion not trackable)`, { filesChanged });
     }
-    const result = launched.settlementRef
-      ? await deps.waitForResult(
-          deps.projectRoot,
-          taskId,
-          timeoutMs,
-          { settlementRef: launched.settlementRef },
-        )
-      : await deps.waitForResult(deps.projectRoot, taskId, timeoutMs);
+    const launchAuthority = inspectTaskLaunchResultAuthority(launched);
+    if (launchAuthority.state === 'exact-hold') {
+      return makeProcessResult(
+        entry,
+        'NO_GO',
+        `${label}: ${launchAuthority.holdReason}`,
+        { filesChanged },
+      );
+    }
+    const result = launchAuthority.state === 'exact-accepted'
+      ? launchAuthority.result
+      : launched.settlementRef
+        ? await deps.waitForResult(
+            deps.projectRoot,
+            taskId,
+            timeoutMs,
+            { settlementRef: launched.settlementRef },
+          )
+        : await deps.waitForResult(deps.projectRoot, taskId, timeoutMs);
     if (!result) {
       return makeProcessResult(entry, 'NO_GO', `${label}: timeout — no result within limit`, { filesChanged });
     }

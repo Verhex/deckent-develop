@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createProductionWiringPlanEvidence,
+  createProductionWiringPlanEvidenceV2,
   PRODUCTION_WIRING_EVIDENCE_VERSION,
+  PRODUCTION_WIRING_PLAN_EVIDENCE_V2_VERSION,
   type ProductionWiringResultEvidence,
 } from '../../src/core/task-types.js';
 import {
@@ -10,6 +12,7 @@ import {
   validateTaskResult,
 } from '../../src/core/task-result-schema.js';
 import type { ProductionWiringContractV1 } from '../../src/core/production-wiring-contract.js';
+import type { ProductionWiringContractV2Input } from '../../src/core/production-wiring-contract.js';
 
 const digest = 'a'.repeat(64);
 
@@ -59,7 +62,50 @@ function stagedContract(): ProductionWiringContractV1 {
   };
 }
 
+function v2ContractInput(): ProductionWiringContractV2Input {
+  const probe = (kind: 'producer' | 'canonical-consumer' | 'affected-ingress' | 'enablement-authority' | 'proof-target', targetId: string) => ({
+    target: { kind, targetId }, observationGroupId: kind === 'producer' || kind === 'canonical-consumer' ? 'runtime-path-observation' : `${kind}:${targetId}`, harnessPath: 'scripts/production-wiring-proof.mjs', verifierAssetPaths: ['scripts/production-wiring-proof.mjs'],
+    args: kind === 'producer' || kind === 'canonical-consumer' ? ['observe-runtime-relation'] : ['observe', targetId], cwd: '.', timeoutMs: 30_000, outputLimitBytes: 1_048_576,
+    expectation: { kind: 'adapter-structured-outcome' as const, schemaId: 'deckent.production-wiring-observation.v1', outcome: 'observed' as const },
+  });
+  return {
+    version: 2, changeKind: 'runtime-change', producer: { producerId: 'producer' },
+    canonicalConsumer: { consumerId: 'consumer', relationship: 'invokes-producer' },
+    affectedIngresses: [{ ingressId: 'cli', kind: 'entrypoint' }],
+    enablementAuthority: { authorityId: 'effective-config', mechanism: 'configuration' },
+    disposition: { kind: 'production-wiring' },
+    proofTargets: [{ proofTargetId: 'cli-proof', kind: 'ingress-execution' }],
+    hostProofProgram: { network: 'forbidden', verifierAssets: [{ path: 'scripts/production-wiring-proof.mjs', sha256: `sha256:${'a'.repeat(64)}`, role: 'trusted-harness' }], platforms: [
+      { platform: 'linux', state: 'unsupported', reasonCode: 'environment-unavailable' },
+      { platform: 'wsl2-linux', state: 'supported', runnerAdapterId: 'native-v1', probes: [
+        probe('producer', 'producer'),
+        probe('canonical-consumer', 'consumer'), probe('affected-ingress', 'cli'),
+        probe('enablement-authority', 'effective-config'), probe('proof-target', 'cli-proof'),
+      ] },
+      { platform: 'darwin', state: 'unsupported', reasonCode: 'owner-deferred' },
+      { platform: 'win32', state: 'unsupported', reasonCode: 'owner-deferred' },
+    ] },
+  };
+}
+
 describe('production wiring task/result evidence schema', () => {
+  it('host-derives both V2 contract and proof program digests deterministically', () => {
+    const first = createProductionWiringPlanEvidenceV2(v2ContractInput());
+    const second = createProductionWiringPlanEvidenceV2(structuredClone(v2ContractInput()));
+
+    expect(first.version).toBe(PRODUCTION_WIRING_PLAN_EVIDENCE_V2_VERSION);
+    expect(first.contractDigest).toMatch(/^[a-f0-9]{64}$/u);
+    expect(first.hostProofProgramDigest).toBe(first.contract.hostProofProgram.programDigest);
+    expect(second).toEqual(first);
+    expect(JSON.stringify(first)).not.toContain('evidenceRefs');
+  });
+
+  it('retains V1 as a distinct historical evidence shape', () => {
+    const historical = createProductionWiringPlanEvidence(stagedContract());
+    expect(historical.version).toBe(PRODUCTION_WIRING_EVIDENCE_VERSION);
+    expect(historical).not.toHaveProperty('hostProofProgramDigest');
+  });
+
   it('creates deterministic versioned plan evidence with exact closure tasks and outer barrier', () => {
     const contract = stagedContract();
     const first = createProductionWiringPlanEvidence(contract);

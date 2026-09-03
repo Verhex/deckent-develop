@@ -7,7 +7,19 @@
  * promoted to executed production wiring here.
  */
 
+import { types as nodeTypes } from 'node:util';
+
+import {
+  createProductionWiringHostProofProgram,
+  parseProductionWiringHostProofProgram,
+  parseProductionWiringHostProofProgramInput,
+  validateProductionWiringHostProofCoverage,
+  type ProductionWiringHostProofProgramInput,
+  type ProductionWiringHostProofProgramV1,
+} from './production-wiring-host-proof.js';
+
 export const PRODUCTION_WIRING_CONTRACT_VERSION = 1 as const;
+export const PRODUCTION_WIRING_CONTRACT_V2_VERSION = 2 as const;
 
 export type ProductionWiringChangeKind =
   | 'runtime-addition'
@@ -130,7 +142,43 @@ export interface ProductionWiringContractV1 {
   readonly proofTargets: readonly ProductionWiringProofTarget[];
 }
 
-export type ProductionWiringContract = ProductionWiringContractV1;
+export interface ProductionWiringContractV2 {
+  readonly version: typeof PRODUCTION_WIRING_CONTRACT_V2_VERSION;
+  readonly changeKind: ProductionWiringChangeKind;
+  readonly producer: { readonly producerId: string };
+  readonly canonicalConsumer: {
+    readonly consumerId: string;
+    readonly relationship: 'invokes-producer' | 'removed-or-migrated';
+  };
+  readonly affectedIngresses: readonly {
+    readonly ingressId: string;
+    readonly kind: 'ingress' | 'entrypoint';
+  }[];
+  readonly enablementAuthority: {
+    readonly authorityId: string;
+    readonly mechanism: 'configuration' | 'policy' | 'registration' | 'unconditional';
+  };
+  readonly disposition: ProductionWiringDisposition | StagedFoundationDisposition;
+  readonly proofTargets: readonly {
+    readonly proofTargetId: string;
+    readonly kind: ProductionWiringProofTarget['kind'];
+  }[];
+  readonly hostProofProgram: ProductionWiringHostProofProgramV1;
+}
+
+export interface ProductionWiringContractV2Input {
+  readonly version: typeof PRODUCTION_WIRING_CONTRACT_V2_VERSION;
+  readonly changeKind: ProductionWiringChangeKind;
+  readonly producer: ProductionWiringContractV2['producer'];
+  readonly canonicalConsumer: ProductionWiringContractV2['canonicalConsumer'];
+  readonly affectedIngresses: ProductionWiringContractV2['affectedIngresses'];
+  readonly enablementAuthority: ProductionWiringContractV2['enablementAuthority'];
+  readonly disposition: ProductionWiringContractV2['disposition'];
+  readonly proofTargets: ProductionWiringContractV2['proofTargets'];
+  readonly hostProofProgram: ProductionWiringHostProofProgramInput;
+}
+
+export type ProductionWiringContract = ProductionWiringContractV1 | ProductionWiringContractV2;
 
 export type ProductionWiringIssueTarget =
   | 'contract'
@@ -149,6 +197,12 @@ export type ProductionWiringIssueReason =
   | 'missing-evidence-reference'
   | 'presence-only-evidence'
   | 'proof-target-not-executed'
+  | 'host-proof-program-invalid'
+  | 'host-proof-coverage-missing'
+  | 'host-proof-coverage-unexpected'
+  | 'host-proof-coverage-duplicate'
+  | 'duplicate-affected-ingress'
+  | 'duplicate-proof-target'
   | 'evidence-incomplete'
   | 'evidence-unsupported'
   | 'evidence-contradictory'
@@ -170,13 +224,13 @@ export interface ProductionWiringIssue {
 
 export type ProductionWiringDecision =
   | {
-      readonly version: typeof PRODUCTION_WIRING_CONTRACT_VERSION;
+      readonly version: typeof PRODUCTION_WIRING_CONTRACT_VERSION | typeof PRODUCTION_WIRING_CONTRACT_V2_VERSION;
       readonly decision: 'complete';
       readonly disposition: 'production-wired';
       readonly evidenceRefs: readonly string[];
     }
   | {
-      readonly version: typeof PRODUCTION_WIRING_CONTRACT_VERSION;
+      readonly version: typeof PRODUCTION_WIRING_CONTRACT_VERSION | typeof PRODUCTION_WIRING_CONTRACT_V2_VERSION;
       readonly decision: 'staged-foundation';
       readonly disposition: 'staged-foundation';
       readonly dagId: string;
@@ -186,7 +240,7 @@ export type ProductionWiringDecision =
       readonly evidenceRefs: readonly string[];
     }
   | {
-      readonly version: typeof PRODUCTION_WIRING_CONTRACT_VERSION;
+      readonly version: typeof PRODUCTION_WIRING_CONTRACT_VERSION | typeof PRODUCTION_WIRING_CONTRACT_V2_VERSION;
       readonly decision: 'incomplete' | 'unsupported' | 'contradictory';
       readonly disposition: 'hold';
       readonly outerSettlement: 'blocked';
@@ -204,6 +258,200 @@ function issue(
 
 function isBlank(value: string): boolean {
   return value.trim().length === 0;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== 'object' || Array.isArray(value) || nodeTypes.isProxy(value)) {
+    return false;
+  }
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) return false;
+  let keys: readonly PropertyKey[];
+  try {
+    keys = Reflect.ownKeys(value);
+  } catch {
+    return false;
+  }
+  return keys.every(key => {
+    if (typeof key !== 'string') return false;
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return descriptor !== undefined && descriptor.enumerable && 'value' in descriptor
+      && descriptor.value !== undefined;
+  });
+}
+
+function exactKeys(value: Record<string, unknown>, required: readonly string[]): boolean {
+  const keys = Object.keys(value);
+  return keys.length === required.length && required.every(key => keys.includes(key));
+}
+
+function nonblank(value: unknown): value is string {
+  return typeof value === 'string' && !isBlank(value) && Buffer.byteLength(value, 'utf8') <= 16 * 1024;
+}
+
+function parseIdentityNode(
+  value: unknown,
+  idKey: string,
+  optional: readonly [string, readonly string[]] | null = null,
+): Record<string, string> | null {
+  if (!isRecord(value)) return null;
+  const keys = optional ? [idKey, optional[0]] : [idKey];
+  if (!exactKeys(value, keys) || !nonblank(value[idKey])) return null;
+  if (optional && !optional[1].includes(String(value[optional[0]]))) return null;
+  return Object.fromEntries(keys.map(key => [key, value[key] as string]));
+}
+
+function parseDisposition(value: unknown): ProductionWiringContractV2['disposition'] | null {
+  if (!isRecord(value) || typeof value.kind !== 'string') return null;
+  if (value.kind === 'production-wiring' && exactKeys(value, ['kind'])) {
+    return { kind: 'production-wiring' };
+  }
+  if (!exactKeys(value, [
+    'kind', 'foundationTaskId', 'dagId', 'closureTasks', 'outerSettlementBarrier',
+  ]) || value.kind !== 'staged-foundation' || !nonblank(value.foundationTaskId)
+    || !nonblank(value.dagId) || !Array.isArray(value.closureTasks)
+    || !isRecord(value.outerSettlementBarrier)) return null;
+  const closureTasks = value.closureTasks.map(candidate => {
+    if (!isRecord(candidate) || !exactKeys(candidate, ['taskId', 'dagId'])
+      || !nonblank(candidate.taskId) || !nonblank(candidate.dagId)) return null;
+    return { taskId: candidate.taskId, dagId: candidate.dagId };
+  });
+  if (closureTasks.some(candidate => candidate === null)) return null;
+  const barrier = value.outerSettlementBarrier;
+  if (!exactKeys(barrier, ['kind', 'dagId', 'closureTaskIds'])
+    || barrier.kind !== 'block-until-exact-closure-settles'
+    || !nonblank(barrier.dagId)
+    || !Array.isArray(barrier.closureTaskIds)
+    || !barrier.closureTaskIds.every(nonblank)) return null;
+  return {
+    kind: 'staged-foundation',
+    foundationTaskId: value.foundationTaskId,
+    dagId: value.dagId,
+    closureTasks: closureTasks as StagedFoundationClosureTask[],
+    outerSettlementBarrier: {
+      kind: 'block-until-exact-closure-settles',
+      dagId: barrier.dagId,
+      closureTaskIds: [...barrier.closureTaskIds] as string[],
+    },
+  };
+}
+
+/** Strict authoring parser shared by AI planner and structured DIRECTIVES. */
+export function parseProductionWiringContractV2Input(
+  value: unknown,
+): ProductionWiringContractV2Input | null {
+  if (!isRecord(value) || !exactKeys(value, [
+    'version', 'changeKind', 'producer', 'canonicalConsumer', 'affectedIngresses',
+    'enablementAuthority', 'disposition', 'proofTargets', 'hostProofProgram',
+  ]) || value.version !== PRODUCTION_WIRING_CONTRACT_V2_VERSION
+    || !['runtime-addition', 'runtime-change', 'refactor', 'removal', 'foundation',
+      'public-library', 'documentation', 'data'].includes(String(value.changeKind))) return null;
+  const producer = parseIdentityNode(value.producer, 'producerId');
+  const consumer = parseIdentityNode(value.canonicalConsumer, 'consumerId', [
+    'relationship', ['invokes-producer', 'removed-or-migrated'],
+  ]);
+  const enablement = parseIdentityNode(value.enablementAuthority, 'authorityId', [
+    'mechanism', ['configuration', 'policy', 'registration', 'unconditional'],
+  ]);
+  const disposition = parseDisposition(value.disposition);
+  const hostProofProgram = parseProductionWiringHostProofProgramInput(value.hostProofProgram);
+  if (producer === null || consumer === null || enablement === null
+    || disposition === null || hostProofProgram === null
+    || !Array.isArray(value.affectedIngresses) || value.affectedIngresses.length === 0
+    || !Array.isArray(value.proofTargets) || value.proofTargets.length === 0) return null;
+  const affectedIngresses = value.affectedIngresses.map(entry => parseIdentityNode(
+    entry, 'ingressId', ['kind', ['ingress', 'entrypoint']],
+  ));
+  const proofTargets = value.proofTargets.map(entry => parseIdentityNode(entry, 'proofTargetId', [
+    'kind', ['consumer-execution', 'ingress-execution', 'enablement-resolution',
+      'removal-verification', 'platform', 'scale'],
+  ]));
+  if (affectedIngresses.some(entry => entry === null) || proofTargets.some(entry => entry === null)) return null;
+  return {
+    version: PRODUCTION_WIRING_CONTRACT_V2_VERSION,
+    changeKind: value.changeKind as ProductionWiringChangeKind,
+    producer: producer as unknown as ProductionWiringContractV2['producer'],
+    canonicalConsumer: consumer as unknown as ProductionWiringContractV2['canonicalConsumer'],
+    affectedIngresses: affectedIngresses as unknown as ProductionWiringContractV2['affectedIngresses'],
+    enablementAuthority: enablement as unknown as ProductionWiringContractV2['enablementAuthority'],
+    disposition,
+    proofTargets: proofTargets as unknown as ProductionWiringContractV2['proofTargets'],
+    hostProofProgram,
+  };
+}
+
+function deepFreeze<T>(value: T): T {
+  if (value !== null && typeof value === 'object') {
+    for (const entry of Object.values(value as Record<string, unknown>)) deepFreeze(entry);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+/** Host canonicalizer; authored JSON never supplies a contract or program digest. */
+export function createProductionWiringContractV2(
+  input: ProductionWiringContractV2Input,
+): ProductionWiringContractV2 {
+  const parsed = parseProductionWiringContractV2Input(input);
+  if (parsed === null) throw new TypeError('invalid production-wiring contract v2 input');
+  const contract: ProductionWiringContractV2 = {
+    ...parsed,
+    hostProofProgram: createProductionWiringHostProofProgram(parsed.hostProofProgram),
+  };
+  const coverage = validateProductionWiringHostProofCoverage(contract.hostProofProgram, {
+    producerId: contract.producer.producerId,
+    canonicalConsumerId: contract.canonicalConsumer.consumerId,
+    canonicalConsumerRelationship: contract.canonicalConsumer.relationship,
+    affectedIngressIds: contract.affectedIngresses.map(entry => entry.ingressId),
+    enablementAuthorityId: contract.enablementAuthority.authorityId,
+    proofTargets: contract.proofTargets,
+  });
+  if (coverage.state === 'hold') {
+    throw new TypeError(`invalid production-wiring host proof coverage: ${coverage.reasonCode}`);
+  }
+  return deepFreeze(contract);
+}
+
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value !== null && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entry]) => `${JSON.stringify(key)}:${canonicalJson(entry)}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+/** Strict historical/current reader; it never repairs caller-authored digests. */
+export function parseProductionWiringContractV2(value: unknown): ProductionWiringContractV2 | null {
+  if (!isRecord(value) || !exactKeys(value, [
+    'version', 'changeKind', 'producer', 'canonicalConsumer', 'affectedIngresses',
+    'enablementAuthority', 'disposition', 'proofTargets', 'hostProofProgram',
+  ])) return null;
+  const program = parseProductionWiringHostProofProgram(value.hostProofProgram);
+  if (program === null) return null;
+  const programInput: ProductionWiringHostProofProgramInput = {
+    network: program.network,
+    verifierAssets: program.verifierAssets,
+    platforms: program.platforms.map(platform => platform.state === 'unsupported'
+      ? platform
+      : {
+          platform: platform.platform,
+          state: platform.state,
+          runnerAdapterId: platform.runnerAdapterId,
+          probes: platform.probes.map(({ probeId: _probeId, ...probe }) => probe),
+        }),
+  };
+  const input = parseProductionWiringContractV2Input({ ...value, hostProofProgram: programInput });
+  if (input === null) return null;
+  let canonical: ProductionWiringContractV2;
+  try {
+    canonical = createProductionWiringContractV2(input);
+  } catch {
+    return null;
+  }
+  return canonicalJson(canonical) === canonicalJson(value) ? canonical : null;
 }
 
 function evidenceIssues(
@@ -313,14 +561,106 @@ function classifyDecision(issues: readonly ProductionWiringIssue[]): 'incomplete
   return 'incomplete';
 }
 
+function resolveProductionWiringContractV2(
+  contract: ProductionWiringContractV2,
+): ProductionWiringDecision {
+  const issues: ProductionWiringIssue[] = [];
+  if (contract.version !== PRODUCTION_WIRING_CONTRACT_V2_VERSION) {
+    issues.push(issue('contract', null, 'unsupported-contract-version'));
+  }
+  if (isBlank(contract.producer.producerId)) issues.push(issue('producer', null, 'missing-identity'));
+  if (isBlank(contract.canonicalConsumer.consumerId)) {
+    issues.push(issue('canonical-consumer', null, 'missing-identity'));
+  }
+  if (contract.affectedIngresses.length === 0) {
+    issues.push(issue('affected-ingress', null, 'missing-affected-ingress'));
+  }
+  const ingressIds = contract.affectedIngresses.map(entry => entry.ingressId);
+  if (new Set(ingressIds).size !== ingressIds.length) {
+    issues.push(issue('affected-ingress', null, 'duplicate-affected-ingress'));
+  }
+  for (const ingress of contract.affectedIngresses) {
+    if (isBlank(ingress.ingressId)) issues.push(issue('affected-ingress', null, 'missing-identity'));
+  }
+  if (isBlank(contract.enablementAuthority.authorityId)) {
+    issues.push(issue('enablement-authority', null, 'missing-identity'));
+  }
+  if (contract.proofTargets.length === 0) {
+    issues.push(issue('proof-target', null, 'missing-proof-target'));
+  }
+  const proofTargetIds = contract.proofTargets.map(entry => entry.proofTargetId);
+  if (new Set(proofTargetIds).size !== proofTargetIds.length) {
+    issues.push(issue('proof-target', null, 'duplicate-proof-target'));
+  }
+  for (const proofTarget of contract.proofTargets) {
+    if (isBlank(proofTarget.proofTargetId)) issues.push(issue('proof-target', null, 'missing-identity'));
+  }
+  if (contract.disposition.kind === 'staged-foundation') {
+    issues.push(...stagedDispositionIssues(
+      contract as unknown as ProductionWiringContractV1,
+      contract.disposition,
+    ));
+  } else if (contract.changeKind === 'foundation') {
+    issues.push(issue('disposition', null, 'foundation-disposition-required'));
+  }
+  const coverage = validateProductionWiringHostProofCoverage(contract.hostProofProgram, {
+    producerId: contract.producer.producerId,
+    canonicalConsumerId: contract.canonicalConsumer.consumerId,
+    canonicalConsumerRelationship: contract.canonicalConsumer.relationship,
+    affectedIngressIds: ingressIds,
+    enablementAuthorityId: contract.enablementAuthority.authorityId,
+    proofTargets: contract.proofTargets,
+  });
+  if (coverage.state === 'hold') {
+    const reasonCode = coverage.reasonCode === 'unexpected-proof-target'
+      ? 'host-proof-coverage-unexpected'
+      : coverage.reasonCode === 'duplicate-proof-target'
+        ? 'host-proof-coverage-duplicate'
+        : 'host-proof-coverage-missing';
+    issues.push(issue('proof-target', coverage.targetKey ?? null, reasonCode));
+  }
+  if (issues.length > 0) {
+    return {
+      version: PRODUCTION_WIRING_CONTRACT_V2_VERSION,
+      decision: classifyDecision(issues),
+      disposition: 'hold',
+      outerSettlement: 'blocked',
+      issues,
+    };
+  }
+  if (contract.disposition.kind === 'staged-foundation') {
+    return {
+      version: PRODUCTION_WIRING_CONTRACT_V2_VERSION,
+      decision: 'staged-foundation',
+      disposition: 'staged-foundation',
+      dagId: contract.disposition.dagId,
+      foundationTaskId: contract.disposition.foundationTaskId,
+      closureTaskIds: contract.disposition.closureTasks.map(task => task.taskId),
+      outerSettlement: 'blocked-pending-exact-closure',
+      evidenceRefs: [],
+    };
+  }
+  // `complete` means the immutable plan topology and proof coverage are complete;
+  // runtime success remains impossible without the independent host settlement.
+  return {
+    version: PRODUCTION_WIRING_CONTRACT_V2_VERSION,
+    decision: 'complete',
+    disposition: 'production-wired',
+    evidenceRefs: [],
+  };
+}
+
 /**
  * Resolve one immutable wiring declaration against its bounded evidence.
  * Contradiction outranks unsupported evidence, which outranks incompleteness.
  * A valid staged foundation remains blocked at the outer settlement boundary.
  */
 export function resolveProductionWiringContract(
-  contract: ProductionWiringContractV1,
+  contract: ProductionWiringContract,
 ): ProductionWiringDecision {
+  if (contract.version === PRODUCTION_WIRING_CONTRACT_V2_VERSION) {
+    return resolveProductionWiringContractV2(contract);
+  }
   const issues: ProductionWiringIssue[] = [];
 
   if (contract.version !== PRODUCTION_WIRING_CONTRACT_VERSION) {
