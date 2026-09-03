@@ -211,7 +211,10 @@ describe('renderToolActivity — live tool activity line (T-224-022)', () => {
     try {
       delete process.env['NO_COLOR'];
       process.env['FORCE_COLOR'] = '1';
-      expect(renderToolActivity('deckent_read_file', { path: 'x' }, true, TOOL_VERBS)).toMatch(/\x1b\[2m.*\x1b\[0m/);
+      // TERMINAL-READABILITY-001: the muted role is the default foreground in
+      // the host tier — never SGR dim (VS Code halves it, light themes lose it).
+      expect(renderToolActivity('deckent_read_file', { path: 'x' }, true, TOOL_VERBS)).not.toMatch(/\x1b\[2m/);
+      expect(renderToolActivity('deckent_read_file', { path: 'x' }, true, TOOL_VERBS)).toContain('x');
       delete process.env['FORCE_COLOR'];
       process.env['NO_COLOR'] = '1';
       expect(renderToolActivity('deckent_read_file', { path: 'x' }, true, TOOL_VERBS)).not.toMatch(/\x1b\[/);

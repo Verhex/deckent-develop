@@ -7,20 +7,30 @@
 //   - messageSeparator()      → a thin rule closing the turn
 //
 // TTY-aware (ADR-010, Node built-in ANSI — no deps): on a TTY the prefixes
-// carry colour; on a pipe/non-TTY they degrade to plain text. The separator
-// is pure decoration, so it returns '' on non-TTY (the caller drops empties).
+// carry the palette roles the color gate admits (TERMINAL-READABILITY-001:
+// host-theme-mapped, never a literal, never dim); on a pipe/non-TTY they
+// degrade to plain text. The separator is pure decoration, so it returns ''
+// on non-TTY (the caller drops empties).
 //
 // Mirrors the tty-override convention of chat-render.ts so tests can drive
 // both branches deterministically.
 
+import { roleSgrAt, suppressionTier, type ColorTier } from '../helpers/theme.js';
+import type { PaletteRole } from '../helpers/generated/palette.js';
+
 const RESET = '\x1b[0m';
-const BOLD = '\x1b[1m';
-const DIM = '\x1b[2m';
-const CYAN = '\x1b[36m';
-const MAGENTA = '\x1b[35m';
 
 function resolveTty(tty?: boolean): boolean {
   return tty !== undefined ? tty : process.stdout.isTTY === true;
+}
+
+function paint(role: PaletteRole, text: string, tier: ColorTier): string {
+  const params = roleSgrAt(role, tier);
+  return params === null ? text : `\x1b[${params}m${text}${RESET}`;
+}
+
+function bold(text: string, tier: ColorTier): string {
+  return tier === 'none' ? text : `\x1b[1m${text}${RESET}`;
 }
 
 /**
@@ -31,7 +41,7 @@ function resolveTty(tty?: boolean): boolean {
  */
 export function renderUserMessage(line: string, tty?: boolean): string {
   if (!resolveTty(tty)) return `› ${line}`;
-  return `${CYAN}›${RESET} ${line}`;
+  return `${paint('accent', '›', suppressionTier())} ${line}`;
 }
 
 /**
@@ -41,7 +51,8 @@ export function renderUserMessage(line: string, tty?: boolean): string {
  */
 export function renderAssistantHeader(tty?: boolean): string {
   if (!resolveTty(tty)) return '● deckent';
-  return `${MAGENTA}${BOLD}●${RESET} ${BOLD}deckent${RESET}`;
+  const tier = suppressionTier();
+  return `${paint('accent', '●', tier)} ${bold('deckent', tier)}`;
 }
 
 /**
@@ -52,5 +63,5 @@ export function renderAssistantHeader(tty?: boolean): string {
  */
 export function messageSeparator(tty?: boolean): string {
   if (!resolveTty(tty)) return '';
-  return `${DIM}${'─'.repeat(40)}${RESET}`;
+  return paint('accent', '─'.repeat(40), suppressionTier());
 }

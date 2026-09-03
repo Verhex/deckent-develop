@@ -14,6 +14,7 @@
 
 import { Box, Text, useInput } from 'ink';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { useInkPalette } from './ink-palette-context.js';
 import type { PickerLabels } from './picker-labels.js';
 import { displayWidth } from './cursor-model.js';
 import {
@@ -22,10 +23,9 @@ import {
   type PickerGlyphs, type PickerNav, type PickerScope, type PickerSpec,
 } from './picker.js';
 
-/** Focus color — the GOLD the slash-menu and inbox use for their cursor. */
-const SELECTED_COLOR = '#C4A855';
-/** Card border — the TEAL of the inbox list card. */
-const BORDER_COLOR = '#4DB8A4';
+// TERMINAL-READABILITY-001 — colors come from the Ink palette roles (focus =
+// inverse, the host's own fg/bg pair; frame = the decorative accent; secondary
+// lines = muted). No literal survives a theme the user customized.
 /** Border (2) + paddingX (2) cells the Box consumes around the content. */
 const FRAME_CELLS = 4;
 /** Cursor gutter cells before each row. */
@@ -57,6 +57,7 @@ export interface PickerCardProps {
 export function PickerCard(props: PickerCardProps): ReactElement {
   const { spec, labels, glyphs, columns, rows, isActive = true, noColor = false, readOnlyReason = null, onCommit, onClose, onInterrupt } = props;
   const [nav, setNav] = useState<PickerNav>(() => initialPickerNav(spec));
+  const palette = useInkPalette();
   const navRef = useRef(nav);
   const [notice, setNotice] = useState<string | null>(null);
   const setNavBoth = (next: PickerNav): void => { navRef.current = next; setNav(next); };
@@ -99,9 +100,9 @@ export function PickerCard(props: PickerCardProps): ReactElement {
   const labelWidth = Math.min(Math.floor(rowCells / 2), Math.max(0, ...visible.map((c) => displayWidth(c.label))));
   const title = labels.title[spec.kind].replace('{key}', spec.titleSubject ?? '');
   const hint = nav.stage === 'scope' ? labels.hintScope : nav.query.length > 0 ? labels.hintFilterEsc : labels.hintPick;
-  const focus = noColor ? {} : { color: SELECTED_COLOR };
-  const dim = noColor ? {} : { dimColor: true };
-  const border = noColor ? {} : { borderColor: BORDER_COLOR };
+  const focus = noColor ? {} : palette.focus;
+  const dim = noColor ? {} : palette.muted;
+  const border = noColor || palette.accent.color === undefined ? {} : { borderColor: palette.accent.color };
   const scopeLine = nav.stage === 'scope'
     ? spec.scopes.map((s, i) => `${i === nav.scopeIdx ? glyphs.on : glyphs.off} ${labels.scopes[s]}`).join('   ')
     : null;

@@ -124,21 +124,38 @@ function desktopGenTs({ dictionary }) {
   return `/**\n * ${GENERATED_HEADER}\n * Eşitlik-kilidi: src/desktop/tests/theme-tokens-gen-sync.test.ts\n */\nexport const GEN_PRIMITIVES = {\n${primitives}\n} as const;\n\nexport const GEN_WATCHES = {\n${watches}\n} as const;\n\nexport const GEN_COMPONENT_TOKENS = {\n${components}\n} as const;\n\nexport const GEN_FONT_SETS = {\n${fontSets}\n} as const;\n`;
 }
 
+// TERMINAL-READABILITY-001 — role schema: { primitive?, ansi16, attrs?, class }.
+// `class` is the contrast class the readability gate measures
+// (tests/cli/helpers/terminal-readability-gate.test.ts); `attrs` are
+// tier-independent SGR attributes (1 bold, 4 underline, 7 inverse). SGR 2 (dim)
+// is refused at build time — it is not a carrier on any host theme.
+const PALETTE_CLASSES = new Set(['primary', 'supplemental', 'decorative']);
+const ANSI16_PARAMS = /^(|3[0-7]|9[0-7])$/;
 function terminalPaletteTs({ dictionary }) {
   const map = tokenValueMap(dictionary);
   const roleNames = Object.keys(terminalMap.roles);
   const entries = roleNames
     .map((role) => {
-      const { primitive, ansi16 } = terminalMap.roles[role];
-      const hex = map.get(`color.chart.${primitive}`);
-      if (hex === undefined) throw new Error(`terminal role "${role}" points at unknown primitive "${primitive}"`);
-      return `  ${role}: { hex: '${hex}', ansi256: ${nearestAnsi256(hex)}, ansi16: '${ansi16}' },`;
+      const { primitive, ansi16, attrs = [], class: cls } = terminalMap.roles[role];
+      if (!PALETTE_CLASSES.has(cls)) throw new Error(`terminal role "${role}": class must be primary|supplemental|decorative (got ${cls})`);
+      if (!ANSI16_PARAMS.test(ansi16)) throw new Error(`terminal role "${role}": ansi16 must be '' or a 16-color SGR parameter (got '${ansi16}')`);
+      if (attrs.includes('2')) throw new Error(`terminal role "${role}": SGR 2 (dim) is not a readable carrier`);
+      let hex = null;
+      if (primitive !== undefined) {
+        hex = map.get(`color.chart.${primitive}`);
+        if (hex === undefined) throw new Error(`terminal role "${role}" points at unknown primitive "${primitive}"`);
+      }
+      const hexTs = hex === null ? 'null' : `'${hex}'`;
+      const ansi256Ts = hex === null ? 'null' : String(nearestAnsi256(hex));
+      const attrsTs = `[${attrs.map((a) => `'${a}'`).join(', ')}]`;
+      return `  ${role}: { hex: ${hexTs}, ansi256: ${ansi256Ts}, ansi16: '${ansi16}', attrs: ${attrsTs}, class: '${cls}' },`;
     })
     .join('\n');
   return (
-    `/**\n * ${GENERATED_HEADER}\n * Kapılar (NO_COLOR/FORCE_COLOR/TTY) src/cli/helpers/theme.ts'te kalır;\n * bu dosya yalnız rol→renk verisidir (DT-5 kod-ayağı).\n */\n` +
+    `/**\n * ${GENERATED_HEADER}\n * Kapılar (NO_COLOR/FORCE_COLOR/TTY) src/cli/helpers/theme.ts'te kalır;\n * bu dosya yalnız rol→renk verisidir (DT-5 kod-ayağı; TERMINAL-READABILITY-001 sınıf+öznitelik).\n */\n` +
     `export type PaletteRole = ${roleNames.map((r) => `'${r}'`).join(' | ')};\n\n` +
-    `export interface PaletteEntry {\n  /** Truecolor kademesi (NOVA token değeri). */\n  hex: string;\n  /** En yakın xterm-256 indeksi (build-time hesap). */\n  ansi256: number;\n  /** Bugünkü 16-renk SGR kodu — davranış-koruyucu fallback. */\n  ansi16: string;\n}\n\n` +
+    `/** Kontrast sınıfı — gate: tests/cli/helpers/terminal-readability-gate.test.ts. */\nexport type PaletteClass = 'primary' | 'supplemental' | 'decorative';\n\n` +
+    `export interface PaletteEntry {\n  /** Truecolor kademesi (NOVA token değeri); öznitelik-rolünde null. */\n  hex: string | null;\n  /** En yakın xterm-256 indeksi (build-time hesap); hex yoksa null. */\n  ansi256: number | null;\n  /** Host paletinin boyadığı 16-renk SGR parametresi ('' = varsayılan ön-plan). */\n  ansi16: string;\n  /** Kademeden bağımsız SGR öznitelikleri (1 bold, 4 underline, 7 inverse). */\n  attrs: readonly string[];\n  class: PaletteClass;\n}\n\n` +
     `export const PALETTE: Record<PaletteRole, PaletteEntry> = {\n${entries}\n};\n`
   );
 }

@@ -6,7 +6,7 @@ import { formatHumanSprintComplete } from '../../orchestra/sprint-reporter.js';
 import { MemoryStore } from '../../core/memory-store.js';
 import { BRAIN_DIR, MEMORY_DB_FILE, BRAIN_TOTAL_LINE_BUDGET } from '../../core/constants.js';
 import { ProviderConfigAliasConflictError } from '../../core/provider-config-canonicalizer.js';
-import { isColorSuppressed } from './theme.js';
+import { isColorSuppressed, theme } from './theme.js';
 import { detectLang, getLanguage } from './i18n.js';
 import { getMessage } from './messages.js';
 
@@ -165,14 +165,16 @@ function phaseLabel(phase: SprintPhase): string {
 
 export function formatAgentLabel(assignedAgent?: string): string {
   if (!assignedAgent || assignedAgent === 'generic') {
-    return color('\x1b[2m', 'generic');
+    // TERMINAL-READABILITY-001 — the muted role (default foreground in the host
+    // tier), never SGR dim: VS Code halves dim and light themes lose it.
+    return theme.muted('generic');
   }
   return color('\x1b[36m', assignedAgent);
 }
 
 export function formatSkillsLabel(assignedSkills?: string[]): string {
   if (!assignedSkills || assignedSkills.length === 0) {
-    return color('\x1b[2m', 'none');
+    return theme.muted('none');
   }
   return color('\x1b[33m', assignedSkills.join(', '));
 }

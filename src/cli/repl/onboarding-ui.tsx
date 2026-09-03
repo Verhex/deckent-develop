@@ -32,6 +32,7 @@
 
 import { Box, Text, useInput } from 'ink';
 import { useRef, useState, type ReactElement } from 'react';
+import { resolveInkPalette, type InkPalette, type InkRoleStyle } from './ink-palette.js';
 import type {
   OnboardingConfigWritePlan,
   OnboardingMcpSuggestion,
@@ -86,29 +87,26 @@ export type OnboardingLabelResolver = (key: string, params?: Record<string, stri
 
 // ─── Colors (NO_COLOR-clean by construction) ─────────────────────────────────
 
+/** TERMINAL-READABILITY-001 — the wizard's colors are palette ROLES: the frame
+ *  takes the decorative accent, the cursor row the focus role (inverse), ok /
+ *  warn the supplemental success / warning colors beside their words, and
+ *  secondary rows the muted role. No literal, no dim. */
 export interface OnboardingColorSet {
   border?: string;
-  accent?: string;
+  focus: InkRoleStyle;
   ok?: string;
   warn?: string;
-  /** Gates `dimColor` — false under NO_COLOR so no SGR dim code is emitted. */
-  dim: boolean;
+  muted: InkRoleStyle;
 }
 
-/** Aligned with approval-card.tsx's TEAL/GOLD ladder (the closest palette precedent). */
-const ONBOARDING_PALETTE: OnboardingColorSet = {
-  border: '#4DB8A4',
-  accent: '#C4A855',
-  ok: '#4DB8A4',
-  warn: '#E08A3C',
-  dim: true,
-};
-
-/** All-off palette under NO_COLOR — an `undefined` Ink color prop renders plain
- *  text, so the whole surface degrades to ANSI-free output. The caller passes
- *  the canonical `isNoColor()` verdict (helpers/output.ts, R4-ISNOCOLOR SSOT). */
-export function resolveOnboardingColors(noColor: boolean): OnboardingColorSet {
-  return noColor ? { dim: false } : ONBOARDING_PALETTE;
+/** All-off set under NO_COLOR — an `undefined` Ink color prop and an empty
+ *  style render plain text, so the whole surface degrades to ANSI-free output.
+ *  The caller passes the canonical `isNoColor()` verdict (helpers/output.ts,
+ *  R4-ISNOCOLOR SSOT); `palette` is the tier-resolved Ink palette (default:
+ *  the host-theme-mapped ansi16 palette). */
+export function resolveOnboardingColors(noColor: boolean, palette: InkPalette = resolveInkPalette('ansi16')): OnboardingColorSet {
+  if (noColor) return { focus: {}, muted: {} };
+  return { border: palette.accent.color, focus: palette.focus, ok: palette.success.color, warn: palette.warning.color, muted: palette.muted };
 }
 
 // ─── View models (pure — key + plain string only, never ANSI) ────────────────
@@ -544,8 +542,11 @@ export function createOnboardingUiFlow(
 /** Cursor glyph, not a label — the same inquirer-style marker across terminals. */
 const CURSOR_MARKER = '❯';
 
-function toneColor(tone: OnboardingRowTone, colors: OnboardingColorSet): string | undefined {
-  return tone === 'ok' ? colors.ok : tone === 'warn' ? colors.warn : undefined;
+function toneStyle(tone: OnboardingRowTone, colors: OnboardingColorSet): InkRoleStyle {
+  if (tone === 'ok') return colors.ok === undefined ? {} : { color: colors.ok };
+  if (tone === 'warn') return colors.warn === undefined ? {} : { color: colors.warn };
+  if (tone === 'dim') return colors.muted;
+  return {};
 }
 
 interface InfoRowsProps {
@@ -558,7 +559,7 @@ function InfoRows({ rows, resolveLabel, colors }: InfoRowsProps): ReactElement {
   return (
     <Box flexDirection="column">
       {rows.map((row, i) => (
-        <Text key={i} color={toneColor(row.tone, colors)} dimColor={row.tone === 'dim' && colors.dim}>
+        <Text key={i} {...toneStyle(row.tone, colors)}>
           {resolveLabel(row.labelKey, row.labelParams)}
         </Text>
       ))}
@@ -573,10 +574,10 @@ export interface OnboardingProgressProps {
 }
 
 /** Progress indicator — "step {index}/{total}" chip + the step's title. */
-export function OnboardingProgress({ progress, resolveLabel, colors }: OnboardingProgressProps): ReactElement {
+export function OnboardingProgress({ progress, resolveLabel }: OnboardingProgressProps): ReactElement {
   return (
     <Box>
-      <Text color={colors.accent} bold>
+      <Text bold>
         {resolveLabel('onboarding.ui.progress', {
           index: String(progress.index),
           total: String(progress.total),
@@ -609,11 +610,11 @@ export function OnboardingQuestionCard({
     <Box flexDirection="column">
       <Text bold>{resolveLabel(question.promptKey)}</Text>
       {question.choices.map((choice, i) => (
-        <Text key={choice.value} color={i === cursor ? colors.accent : undefined} bold={i === cursor}>
+        <Text key={choice.value} {...(i === cursor ? colors.focus : {})} bold={i === cursor}>
           {`${i === cursor ? CURSOR_MARKER : ' '} ${resolveLabel(choice.labelKey, choice.labelParams)}`}
         </Text>
       ))}
-      <Text dimColor={colors.dim}>{resolveLabel(hintKey)}</Text>
+      <Text {...colors.muted}>{resolveLabel(hintKey)}</Text>
     </Box>
   );
 }
@@ -701,7 +702,7 @@ export function OnboardingWizardView(props: OnboardingWizardViewProps): ReactEle
       {screen.kind === 'info' && (
         <Box flexDirection="column" marginTop={1}>
           <InfoRows rows={screen.rows} resolveLabel={resolveLabel} colors={colors} />
-          <Text dimColor={colors.dim}>{resolveLabel('onboarding.ui.hint.info')}</Text>
+          <Text {...colors.muted}>{resolveLabel('onboarding.ui.hint.info')}</Text>
         </Box>
       )}
       {screen.kind === 'question' && (

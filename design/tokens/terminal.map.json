@@ -1,15 +1,24 @@
 {
-  "$description": "Terminal semantic rol haritası — src/cli/helpers/theme.ts Theme sınıfının rol sözlüğünü NOVA primitive'lerine bağlar (DT-5 kapanışının kod-ayağı). ansi16 = bugünkü SGR kodu (davranış değişmez — 16-renk kademesinde terminal kendi paletini uygular); hex = truecolor kademesi için NOVA değeri; ansi256 build'de en-yakın-xterm hesabıyla üretilir. NO_COLOR/FORCE_COLOR/TTY kapıları theme.ts'te kalır.",
+  "$description": "Terminal semantic rol haritası — src/cli/helpers/theme.ts Theme sınıfının ve src/cli/repl/ink-palette.ts Ink paletinin rol sözlüğünü NOVA primitive'lerine bağlar (DT-5 kapanışının kod-ayağı; TERMINAL-READABILITY-001 genişletmesi). ansi16 = host paletinin boyadığı 16-renk SGR parametresi ('' = varsayılan ön-plan; IDE terminalleri bu kademeyi alır, kullanıcı teması boyar); hex = truecolor kademesi için NOVA değeri (yalnız zemin koyu bilindiğinde); ansi256 build'de en-yakın-xterm hesabıyla üretilir; attrs = kademeden bağımsız SGR öznitelikleri (1 bold, 4 underline, 7 inverse); class = kontrast sınıfı: primary (tek başına okunan metin, ≥4.5:1 her fikstür temasında), supplemental (metinsel taşıyıcının yanındaki renk, ≥3:1), decorative (çerçeve/ok/madde; eşik yok, dim asla). Gate: tests/cli/helpers/terminal-readability-gate.test.ts. SGR 2 (dim) hiçbir rolde yer alamaz (owner kararı 2026-09-03). NO_COLOR/FORCE_COLOR/TTY kapıları theme.ts'te kalır.",
   "roles": {
-    "success": { "primitive": "novaGo", "ansi16": "32" },
-    "error": { "primitive": "novaAbort", "ansi16": "31" },
-    "warning": { "primitive": "novaAmber", "ansi16": "33" },
+    "success": { "primitive": "novaGo", "ansi16": "32", "class": "supplemental" },
+    "error": { "primitive": "novaAbort", "ansi16": "31", "class": "supplemental" },
+    "warning": { "primitive": "novaAmber", "ansi16": "33", "class": "supplemental" },
     "info": {
       "primitive": "novaGlow",
-      "ansi16": "34",
-      "note": "hex ADAY — NOVA accent-ailesi prototip turunda netleşir; ansi16 bugünkü mavi davranışını korur"
+      "ansi16": "94",
+      "class": "primary",
+      "note": "34 (blue) Campbell/Dark Modern koyu zeminde 2.4–3.5:1 kalıyordu; 94 (bright blue) tüm fikstürlerde ≥4.5:1 geçen tek 16-renk yuvasıdır — ipucu/bilgi metni tek başına okunur."
     },
-    "muted": { "primitive": "novaTextMuted", "ansi16": "2" },
-    "accent": { "primitive": "novaGlow", "ansi16": "36" }
+    "muted": {
+      "primitive": "seaTextMuted",
+      "ansi16": "",
+      "class": "primary",
+      "note": "ikincil metin: host kademesinde varsayılan ön-plan (hiyerarşi hizalama/boşlukla); truecolor-koyu'da seaTextMuted (#7FA3B2) — novaTextMuted Darcula #2B2B2B üstünde 3.9:1 kalıyordu."
+    },
+    "accent": { "primitive": "novaGlow", "ansi16": "36", "class": "decorative" },
+    "focus": { "ansi16": "", "attrs": ["7"], "class": "primary" },
+    "link": { "primitive": "novaGlow", "ansi16": "94", "attrs": ["4"], "class": "primary" },
+    "code": { "primitive": "novaGlowBright", "ansi16": "94", "class": "primary" }
   }
 }

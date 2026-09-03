@@ -19,9 +19,12 @@ import { filterSlashCommands } from '../commands/chat-slash-menu.js';
 import type { SlashRegistry, SlashCommand } from '../commands/chat-slash-registry.js';
 import { activeAtQuery, filterAtPaths, completeAtToken, type ActiveAtToken } from './at-ref.js';
 import { requireInjectedLabel } from '../helpers/injected-label.js';
+import { useInkPalette } from './ink-palette-context.js';
 
-const TEAL = '#4DB8A4';
-const GOLD = '#C4A855';
+// TERMINAL-READABILITY-001 — no color literal: the frame and chevrons take the
+// decorative accent role, the selected menu row the focus role (inverse), key
+// names the code role, descriptions and hints the muted role. The host theme
+// paints all of them; SGR dim is never emitted.
 
 export interface InputBarProps {
   /** Active only when the REPL is accepting input (false during a confirm modal). */
@@ -263,6 +266,7 @@ export function InputBar(props: InputBarProps): ReactElement {
   const { active, onSubmit, onInterrupt, onClear, onEscape, slashRegistry, menuHint, pathProvider, atMenuHint, shortcutsPanel } = props;
   // TERMINAL-TOOLS-010 — `?` shortcuts panel (open/closed).
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const palette = useInkPalette();
   const shortcutsOpenRef = useRef(false);
   const setShortcuts = (open: boolean): void => { shortcutsOpenRef.current = open; setShortcutsOpen(open); };
   // TERMINAL-TOOLS-001 — string-free mechanism: no English fallback here. A
@@ -437,19 +441,19 @@ export function InputBar(props: InputBarProps): ReactElement {
       {/* TERMINAL-TOOLS-010: `?` shortcuts panel (caller-built rows, no mechanism text). */}
       {shortcutsOpen && shortcutsPanel ? (
         <Box flexDirection="column" marginBottom={0}>
-          <Text color={GOLD} bold>{`  ${shortcutsPanel.title}`}</Text>
+          <Text bold>{`  ${shortcutsPanel.title}`}</Text>
           {shortcutsPanel.rows.map((row) => (
             <Text key={row.keys}>
-              <Text color={TEAL}>{`  ${row.keys.padEnd(keysWidth)}`}</Text>
-              <Text dimColor>{`  ${row.action}`}</Text>
+              <Text {...palette.code}>{`  ${row.keys.padEnd(keysWidth)}`}</Text>
+              <Text {...palette.muted}>{`  ${row.action}`}</Text>
             </Text>
           ))}
         </Box>
       ) : null}
       {search ? (
         <Box>
-          <Text color={GOLD}>{`${reverseSearchLabel} `}</Text>
-          <Text dimColor>{`'${search.q}': `}</Text>
+          <Text bold>{`${reverseSearchLabel} `}</Text>
+          <Text {...palette.muted}>{`'${search.q}': `}</Text>
           <Text>{searchMatch || '—'}</Text>
         </Box>
       ) : null}
@@ -461,19 +465,19 @@ export function InputBar(props: InputBarProps): ReactElement {
         const visible = matches.slice(lo, lo + WINDOW);
         return (
           <Box flexDirection="column" marginBottom={0}>
-            {lo > 0 ? <Text dimColor>{`  ${formatMenuMore(menuMoreAbove, lo)}`}</Text> : null}
+            {lo > 0 ? <Text {...palette.muted}>{`  ${formatMenuMore(menuMoreAbove, lo)}`}</Text> : null}
             {visible.map((c, vi) => {
               const i = lo + vi;
               return (
                 <Text key={c.name}>
-                  <Text color={i === sel ? GOLD : TEAL}>{i === sel ? '❯ ' : '  '}</Text>
-                  <Text color={i === sel ? GOLD : undefined} bold={i === sel}>{c.name.padEnd(10)}</Text>
-                  <Text dimColor> {c.desc}</Text>
+                  <Text {...palette.accent}>{i === sel ? '❯ ' : '  '}</Text>
+                  <Text {...(i === sel ? palette.focus : {})} bold={i === sel}>{c.name.padEnd(10)}</Text>
+                  <Text {...palette.muted}> {c.desc}</Text>
                 </Text>
               );
             })}
-            {lo + WINDOW < matches.length ? <Text dimColor>{`  ${formatMenuMore(menuMoreBelow, matches.length - lo - WINDOW)}`}</Text> : null}
-            {menuHint ? <Text dimColor>{`  ${menuHint}`}</Text> : null}
+            {lo + WINDOW < matches.length ? <Text {...palette.muted}>{`  ${formatMenuMore(menuMoreBelow, matches.length - lo - WINDOW)}`}</Text> : null}
+            {menuHint ? <Text {...palette.muted}>{`  ${menuHint}`}</Text> : null}
           </Box>
         );
       })()}
@@ -483,15 +487,15 @@ export function InputBar(props: InputBarProps): ReactElement {
         <Box flexDirection="column" marginBottom={0}>
           {atOpen.matches.map((p, i) => (
             <Text key={p}>
-              <Text color={i === atSel ? GOLD : TEAL}>{i === atSel ? '❯ ' : '  '}</Text>
-              <Text color={i === atSel ? GOLD : undefined} bold={i === atSel}>{p}</Text>
+              <Text {...palette.accent}>{i === atSel ? '❯ ' : '  '}</Text>
+              <Text {...(i === atSel ? palette.focus : {})} bold={i === atSel}>{p}</Text>
             </Text>
           ))}
-          {atMenuHint ? <Text dimColor>{`  ${atMenuHint}`}</Text> : null}
+          {atMenuHint ? <Text {...palette.muted}>{`  ${atMenuHint}`}</Text> : null}
         </Box>
       )}
-      <Box borderStyle="round" borderColor={TEAL} paddingX={1}>
-        <Text color={TEAL}>{'› '}</Text>
+      <Box borderStyle="round" borderColor={palette.accent.color} paddingX={1}>
+        <Text {...palette.accent}>{'› '}</Text>
         <CaretText state={state} caretStyle={props.caretStyle ?? 'inverse'} />
       </Box>
     </Box>

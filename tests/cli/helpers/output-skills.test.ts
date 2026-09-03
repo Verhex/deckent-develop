@@ -51,16 +51,17 @@ describe('formatSkillsLabel', () => {
     else process.env.NO_COLOR = originalNoColor;
   });
 
-  it('returns dim "none" for undefined skills', () => {
+  // TERMINAL-READABILITY-001: muted = default foreground in the host tier, never dim.
+  it('returns muted (plain, never dim) "none" for undefined skills', () => {
     const label = formatSkillsLabel(undefined);
     expect(label).toContain('none');
-    expect(label).toContain('\x1b[2m'); // dim ANSI
+    expect(label).not.toContain('\x1b[2m');
   });
 
-  it('returns dim "none" for empty skills array', () => {
+  it('returns muted (plain, never dim) "none" for empty skills array', () => {
     const label = formatSkillsLabel([]);
     expect(label).toContain('none');
-    expect(label).toContain('\x1b[2m');
+    expect(label).not.toContain('\x1b[2m');
   });
 
   it('returns yellow-highlighted single skill', () => {

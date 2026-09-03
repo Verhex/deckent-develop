@@ -18,15 +18,26 @@ import { getLanguage, getMessage } from '../helpers/messages.js';
 import type { NervousNotification } from '../../core/nervous-types.js';
 import { NERVOUS_PENDING_FILE, NERVOUS_HISTORY_FILE, NERVOUS_IPC_DIR } from '../../core/constants.js';
 import { isNervousPollerAlive } from '../../nervous/ipc-queue.js';
+import { roleSgrAt, suppressionTier } from '../helpers/theme.js';
+import type { PaletteRole } from '../helpers/generated/palette.js';
 
 // ─── ANSI (Node built-in, ADR-010) ──────────────────────────────────────────
+//
+// TERMINAL-READABILITY-001 — colors are palette ROLES through the theme.ts
+// color gate (host-theme-mapped; NO_COLOR → plain): the header word carries
+// the warning color, ids take the code role, hints the muted role (default
+// foreground, never dim), decisions success / error beside their words.
 
 const RESET  = '\x1b[0m';
 const BOLD   = '\x1b[1m';
-const DIM    = '\x1b[2m';
-const YELLOW = '\x1b[33m';
-const GREEN  = '\x1b[32m';
-const RED    = '\x1b[31m';
+function role(name: PaletteRole): string {
+  const params = roleSgrAt(name, suppressionTier());
+  return params === null ? '' : `\x1b[${params}m`;
+}
+function painted(name: PaletteRole, text: string): string {
+  const open = role(name);
+  return open === '' ? text : `${open}${text}${RESET}`;
+}
 
 // ─── Severity Icon ───────────────────────────────────────────────────────────
 
@@ -155,13 +166,13 @@ export function renderNervousPrompt(items: NervousNotification[], tty?: boolean)
   }
 
   const lines: string[] = [];
-  lines.push(`${BOLD}${YELLOW}» nervous: ${items.length} pending${RESET}`);
+  lines.push(`${BOLD}${painted('warning', `» nervous: ${items.length} pending`)}${RESET}`);
   for (const n of items) {
     lines.push(
-      `  ${severityPrefix(n.severity)} ${DIM}${n.id.slice(0, 12)}${RESET} ${n.detectorId}`,
+      `  ${severityPrefix(n.severity)} ${painted('code', n.id.slice(0, 12))} ${n.detectorId}`,
     );
   }
-  lines.push(`${DIM}  /nervous accept <id> · /nervous reject <id>${RESET}`);
+  lines.push(painted('muted', '  /nervous accept <id> · /nervous reject <id>'));
   return lines.join('\n');
 }
 
@@ -214,9 +225,8 @@ export function handleNervousSlash(
       ? getMessage('nervous.sent_to_executor', lng, { action: label })
       : getMessage('nervous.dismissed_no_executor', lng, { action: label });
     if (isTTY) {
-      const color = decision === 'accepted' ? GREEN : RED;
       const icon = decision === 'accepted' ? '✓' : '✗';
-      return `${color}${icon} ${decision}: ${label}${RESET}\n${DIM}${statusMsg}${RESET}`;
+      return `${painted(decision === 'accepted' ? 'success' : 'error', `${icon} ${decision}: ${label}`)}\n${painted('muted', statusMsg)}`;
     }
     return `${decision}: ${label}\n${statusMsg}`;
   }
@@ -271,14 +281,14 @@ export function handleNervousSlash(
 
     const label = notification.actions[0]?.id ?? notification.id.slice(0, 12);
     const msg = getMessage('nervous.edited', lng, { action: label });
-    return isTTY ? `${GREEN}${msg}${RESET}` : msg;
+    return isTTY ? painted('success', msg) : msg;
   }
 
   // Default: list pending
   const pending = getPendingNervous(root);
   if (pending.length === 0) {
     const empty = getMessage('nervous.slash_empty', lng);
-    return isTTY ? `${DIM}${empty}${RESET}` : empty;
+    return isTTY ? painted('muted', empty) : empty;
   }
   const lines = pending.map(
     n => `  ${severityPrefix(n.severity)} ${n.id.slice(0, 12)} — ${n.detectorId} [${n.severity}]`,

@@ -49,7 +49,9 @@ import { createPermissionStore } from '../commands/chat-permissions.js';
 import { classifyTool } from './tool-permissions.js';
 import { buildSlashRegistry } from '../commands/chat-slash-registry.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
-import { isColorSuppressed, isDumbTerminal } from '../helpers/theme.js';
+import { colorTier, isColorSuppressed, isDumbTerminal } from '../helpers/theme.js';
+import { InkPaletteProvider } from './ink-palette-context.js';
+import { resolveInkPalette } from './ink-palette.js';
 import { buildToolExecLabels } from '../helpers/tool-exec-labels.js';
 import { loadConfig, listConfigByCategory, getConfigHelp, VALID_PROVIDERS } from '../../core/config.js';
 import { getNestedValue } from '../../core/config-migration.js';
@@ -1656,7 +1658,11 @@ export async function runInkRepl(
   );
   const atRefReader = createScopedAtRefReader(() => process.cwd());
 
+  // TERMINAL-READABILITY-001 — the palette is resolved ONCE from the color gate
+  // (host-theme-mapped 16-color unless a dark background is proven; nothing
+  // when suppressed) and provided to every card through context.
   const { unmount, waitUntilExit } = render(
+    <InkPaletteProvider palette={resolveInkPalette(colorTier())}>
     <ReplErrorBoundary label={t('tui.render_error')} describeError={buildReplErrorDescriber(lang)}>
     <ReplApp
       provider={switcher.proxy}
@@ -1725,7 +1731,8 @@ export async function runInkRepl(
         registerRunFlowResultSink: (enqueue: (event: ChatTurnBgEvent) => void) => { runFlowResultSink = enqueue; },
       } : {})}
     />
-    </ReplErrorBoundary>,
+    </ReplErrorBoundary>
+    </InkPaletteProvider>,
     // TERMINAL-TOOLS-006 — Ctrl-C is a policy decision (interrupt-policy.ts,
     // app.tsx handleInterrupt), never Ink's unconditional unmount: a draft is
     // discarded, a running turn is interrupted, and only a second press

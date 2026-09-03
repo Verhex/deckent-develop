@@ -1,13 +1,37 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createStreamMarkdown } from '../../src/cli/commands/chat-render.js';
 
 // Sprint 224 T-224-023 — streaming markdown renderer.
-// Hermetic: tty forced via the param, no real terminal.
+// Hermetic: tty forced via the param, no real terminal. TERMINAL-READABILITY-001:
+// inline code streams as the code role (94, host-theme-mapped tier pinned by
+// FORCE_COLOR=1 with no background hint) — never SGR dim.
 const BOLD = '\x1b[1m';
-const DIM = '\x1b[2m';
+const CODE = '\x1b[94m';
 const RESET = '\x1b[0m';
 
+const ENV_KEYS = ['NO_COLOR', 'FORCE_COLOR', 'COLORTERM', 'COLORFGBG', 'TERM'] as const;
+let saved: Record<string, string | undefined> = {};
+beforeEach(() => {
+  saved = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
+  for (const k of ENV_KEYS) delete process.env[k];
+  process.env['FORCE_COLOR'] = '1';
+});
+afterEach(() => {
+  for (const k of ENV_KEYS) {
+    if (saved[k] === undefined) delete process.env[k];
+    else process.env[k] = saved[k];
+  }
+});
+
 describe('createStreamMarkdown (T-224-023)', () => {
+  it('TTY under NO_COLOR → markers stripped, no ANSI (the gate applies to streaming too)', () => {
+    delete process.env['FORCE_COLOR'];
+    process.env['NO_COLOR'] = '1';
+    const md = createStreamMarkdown(true);
+    const out = md.feed('hi **there** `x`') + md.flush();
+    expect(out).toBe('hi there x');
+  });
+
   it('non-TTY → passthrough (no ANSI, flush empty)', () => {
     const md = createStreamMarkdown(false);
     expect(md.feed('**bold** and `code`')).toBe('**bold** and `code`');
@@ -38,10 +62,10 @@ describe('createStreamMarkdown (T-224-023)', () => {
     expect(out).toBe('rate is 5*');
   });
 
-  it('TTY → `code` renders DIM…RESET', () => {
+  it('TTY → `code` renders the code role…RESET (never dim)', () => {
     const md = createStreamMarkdown(true);
     const out = md.feed('run `npm test` now') + md.flush();
-    expect(out).toBe(`run ${DIM}npm test${RESET} now`);
+    expect(out).toBe(`run ${CODE}npm test${RESET} now`);
   });
 
   it('TTY → flush closes an unclosed bold (no style leak)', () => {

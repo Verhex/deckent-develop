@@ -119,8 +119,10 @@ describe('Theme — palet-parite (16-renk davranışı flip-öncesiyle birebir)'
     expect(theme.success('x')).toBe('\x1b[32mx\x1b[0m');
     expect(theme.error('x')).toBe('\x1b[31mx\x1b[0m');
     expect(theme.warning('x')).toBe('\x1b[33mx\x1b[0m');
-    expect(theme.info('x')).toBe('\x1b[34mx\x1b[0m');
-    expect(theme.muted('x')).toBe('\x1b[2mx\x1b[0m');
+    // TERMINAL-READABILITY-001: info → 94 (reads on every host theme), muted →
+    // default foreground (never dim); success/error/warning/accent unchanged.
+    expect(theme.info('x')).toBe('\x1b[94mx\x1b[0m');
+    expect(theme.muted('x')).toBe('x');
     expect(theme.accent('x')).toBe('\x1b[36mx\x1b[0m');
     expect(theme.bold('x')).toBe('\x1b[1mx\x1b[0m');
   });

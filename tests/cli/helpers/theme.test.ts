@@ -73,16 +73,28 @@ describe('Theme', () => {
       expect(result).toBe('\x1b[33mWARN\x1b[0m');
     });
 
-    it('info wraps text in blue ANSI', () => {
+    // TERMINAL-READABILITY-001: info is bright blue (94) — the one 16-color
+    // slot that reads ≥4.5:1 on every host theme fixture (blue 34 fell to
+    // 2.4:1 on Windows Terminal Campbell).
+    it('info wraps text in bright-blue ANSI', () => {
       const t = new Theme();
       const result = t.info('INFO');
-      expect(result).toBe('\x1b[34mINFO\x1b[0m');
+      expect(result).toBe('\x1b[94mINFO\x1b[0m');
     });
 
-    it('muted wraps text in dim ANSI', () => {
+    // TERMINAL-READABILITY-001: muted is the host's default foreground in the
+    // 16-color tier (hierarchy by alignment); SGR dim is never emitted.
+    it('muted is plain text in the host tier (no dim)', () => {
       const t = new Theme();
-      const result = t.muted('dim');
-      expect(result).toBe('\x1b[2mdim\x1b[0m');
+      const result = t.muted('secondary');
+      expect(result).toBe('secondary');
+    });
+
+    it('link is underlined bright-blue, code is bright-blue, focus is inverse', () => {
+      const t = new Theme();
+      expect(t.link('x')).toBe('\x1b[4;94mx\x1b[0m');
+      expect(t.code('x')).toBe('\x1b[94mx\x1b[0m');
+      expect(t.focus('x')).toBe('\x1b[7mx\x1b[0m');
     });
 
     it('accent wraps text in cyan ANSI', () => {

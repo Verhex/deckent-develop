@@ -18,6 +18,8 @@
 
 import { Box, Text, useInput } from 'ink';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { useInkPalette } from './ink-palette-context.js';
+import type { InkRole } from './ink-palette.js';
 import type { ApprovalRequest, ApprovalRequestV2, ApprovalRisk } from '../../core/approval-contract.js';
 import type { ApprovalDecisionInput } from '../../core/approval-broker.js';
 import type { ApprovalStreamEvent } from '../../core/approval-eventstream.js';
@@ -144,14 +146,16 @@ export function mapApprovalKey(input: string): ApprovalCardAction | null {
 
 // ─── Rendering helpers ────────────────────────────────────────────────────────
 
-/** No existing risk-color convention in this codebase to reuse — chosen to read
- *  as an ascending-severity ladder alongside app.tsx's TEAL/GOLD palette. */
-const RISK_COLORS: Record<ApprovalRisk, string> = {
-  none: '#6B7280',
-  low: '#4DB8A4',
-  medium: '#C4A855',
-  high: '#E08A3C',
-  critical: '#E0524D',
+/** TERMINAL-READABILITY-001 — the risk ladder as palette ROLES (host-theme
+ *  mapped): the risk WORD is the carrier, the color is supplemental (≥3:1 on
+ *  every host theme in the readability gate); critical shares the error role
+ *  and stays distinct by its label. */
+const RISK_ROLES: Record<ApprovalRisk, InkRole> = {
+  none: 'muted',
+  low: 'success',
+  medium: 'warning',
+  high: 'error',
+  critical: 'error',
 };
 
 function formatArgValue(value: unknown): string {
@@ -418,18 +422,19 @@ export function ApprovalCard(props: ApprovalCardProps): ReactElement | null {
     }
   }, { isActive: head !== null && mutexActive });
 
+  const palette = useInkPalette();
   if (!head) return null;
 
   const { request, index, total } = head;
-  const riskColor = RISK_COLORS[request.risk];
+  const riskStyle = palette[RISK_ROLES[request.risk]];
   const facts = buildApprovalFacts(request, labels, now());
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor={riskColor} paddingX={1}>
+    <Box flexDirection="column" borderStyle="round" borderColor={riskStyle.color} paddingX={1}>
       {/* One inline Text: at narrow widths a flex row of two Texts dropped the
           separating space when the summary wrapped ("HIGHDEMO — …"). */}
       <Text wrap="wrap">
-        <Text color={riskColor} bold>{labels.riskLabels[request.risk]}</Text>
+        <Text {...riskStyle} bold>{labels.riskLabels[request.risk]}</Text>
         {` ${request.summary}`}
       </Text>
       {/* TERMINAL-TOOLS-013 hierarchy: the object of the decision first (action ·
@@ -438,7 +443,7 @@ export function ApprovalCard(props: ApprovalCardProps): ReactElement | null {
           label column, not by color. */}
       {facts.map((fact) => (
         <Box key={fact.key} flexDirection="column">
-          <Text dimColor={!fact.emphasis}>{`${fact.label}: ${fact.value}`}</Text>
+          <Text {...(fact.emphasis ? {} : palette.muted)}>{`${fact.label}: ${fact.value}`}</Text>
           {fact.key === 'action' && (
             <Text wrap="wrap">{request.maskedArgs ? summarizeMaskedArgs(request.maskedArgs) : labels.noArgs}</Text>
           )}
@@ -451,7 +456,7 @@ export function ApprovalCard(props: ApprovalCardProps): ReactElement | null {
           <Text>{JSON.stringify(request.details, null, 2)}</Text>
         </Box>
       )}
-      <Text dimColor>
+      <Text {...palette.muted}>
         {`${labels.progress.replace('{index}', String(index)).replace('{total}', String(total))} ${labels.hint}`}
       </Text>
     </Box>

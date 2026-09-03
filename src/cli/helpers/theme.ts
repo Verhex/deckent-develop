@@ -107,25 +107,38 @@ function hexChannels(hex: string): [number, number, number] {
 }
 
 /**
- * Bir palet rolünün etkin kademedeki SGR parametresi (renk kapalıysa null).
- * ansi16 kademesinde üretilmiş paletin SGR kodu = flip-öncesi davranış birebir.
+ * TERMINAL-READABILITY-001 — bir palet rolünün VERİLEN kademedeki SGR
+ * parametre dizisi (öznitelikler + kademe rengi; hiçbiri yoksa null → düz
+ * metin). ansi16'da host paleti boyar ('' = varsayılan ön-plan); truecolor/256
+ * yalnız theme kapısı o kademeyi verdiğinde. Saf — kapıya bakmaz; kapıya
+ * bağlı sürüm paletteSgr'dir.
  */
-export function paletteSgr(role: PaletteRole, noColorFlag?: boolean): string | null {
-  const tier = colorTier(noColorFlag);
+export function roleSgrAt(role: PaletteRole, tier: ColorTier): string | null {
   if (tier === 'none') return null;
   const entry = PALETTE[role];
-  if (tier === 'truecolor') {
+  let color = entry.ansi16;
+  if (tier === 'truecolor' && entry.hex !== null) {
     const [r, g, b] = hexChannels(entry.hex);
-    return `38;2;${r};${g};${b}`;
+    color = `38;2;${r};${g};${b}`;
+  } else if (tier === 'ansi256' && entry.ansi256 !== null) {
+    color = `38;5;${entry.ansi256}`;
   }
-  if (tier === 'ansi256') return `38;5;${entry.ansi256}`;
-  return entry.ansi16;
+  const params = [...entry.attrs, color].filter((p) => p.length > 0);
+  return params.length === 0 ? null : params.join(';');
+}
+
+/**
+ * Bir palet rolünün etkin kademedeki SGR parametresi (renk kapalıysa null).
+ * ansi16 kademesinde üretilmiş paletin SGR kodu = host paletinin boyadığı renk.
+ */
+export function paletteSgr(role: PaletteRole, noColorFlag?: boolean): string | null {
+  return roleSgrAt(role, colorTier(noColorFlag));
 }
 
 // ─── Theme class ────────────────────────────────────────────────────
 
 function wrap(code: string | null, text: string): string {
-  if (code === null) return text;
+  if (code === null || code.length === 0) return text;
   return `\x1b[${code}m${text}\x1b[0m`;
 }
 
@@ -155,9 +168,24 @@ export class Theme {
     return wrap(paletteSgr('muted'), text);
   }
 
-  /** Cyan text (accent, links, highlights). */
+  /** Decorative accent (frames, chevrons, bullets — never the only carrier). */
   accent(text: string): string {
     return wrap(paletteSgr('accent'), text);
+  }
+
+  /** Link text (underlined; readable on every host theme). */
+  link(text: string): string {
+    return wrap(paletteSgr('link'), text);
+  }
+
+  /** Code / identifier / path text (primary contrast class). */
+  code(text: string): string {
+    return wrap(paletteSgr('code'), text);
+  }
+
+  /** Focused / selected item (inverse — the host's own fg/bg pair, theme-agnostic). */
+  focus(text: string): string {
+    return wrap(paletteSgr('focus'), text);
   }
 
   /** Bold text (kademe-bağımsız; renk değil vurgu). */

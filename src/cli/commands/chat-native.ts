@@ -655,8 +655,10 @@ export function renderTurnStatsFooter(
 ): string {
   const parts = [`${(elapsedMs / 1000).toFixed(1)}s`];
   if (usage) parts.push(`${formatTokenCount(usage.outputTokens)} tok`);
-  // TERMINAL-TOOLS-003 — dim through the theme.ts color gate (NO_COLOR /
-  // --no-color / pipe → plain text); the raw `\x1b[2m` used to leak into pipes.
+  // TERMINAL-TOOLS-003 — the muted role through the theme.ts color gate
+  // (NO_COLOR / --no-color / pipe → plain text); a raw SGR used to leak into
+  // pipes. TERMINAL-READABILITY-001: muted is the default foreground in the
+  // host tier — never dim.
   return theme.muted(`⏱ ${parts.join(' · ')}`);
 }
 

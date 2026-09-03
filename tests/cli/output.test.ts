@@ -742,15 +742,17 @@ describe('formatAgentLabel', () => {
             process.env.NO_COLOR = originalEnv;
         process.argv = [...originalArgv];
     });
-    it('returns dim "generic" for undefined agent', () => {
+    // TERMINAL-READABILITY-001: the muted role is the default foreground in the
+    // host tier — SGR dim is never emitted (VS Code halves it, light themes lose it).
+    it('returns muted (plain, never dim) "generic" for undefined agent', () => {
         const label = formatAgentLabel(undefined);
         expect(label).toContain('generic');
-        expect(label).toContain('\x1b[2m'); // dim ANSI code
+        expect(label).not.toContain('\x1b[2m');
     });
-    it('returns dim "generic" for explicit generic value', () => {
+    it('returns muted (plain, never dim) "generic" for explicit generic value', () => {
         const label = formatAgentLabel('generic');
         expect(label).toContain('generic');
-        expect(label).toContain('\x1b[2m');
+        expect(label).not.toContain('\x1b[2m');
     });
     it('returns cyan-highlighted label for specialized agent', () => {
         const label = formatAgentLabel('security-auditor');
@@ -855,7 +857,8 @@ describe('formatDashboard agent column', () => {
                 }],
         });
         const result = formatDashboard(state);
-        expect(result).toContain('\x1b[2m'); // dim
+        expect(result).toContain('generic');
+        expect(result).not.toContain('\x1b[2m'); // TERMINAL-READABILITY-001: never dim
     });
 });
 

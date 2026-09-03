@@ -24,6 +24,7 @@
 
 import { Box, Text, useInput } from 'ink';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { useInkPalette } from './ink-palette-context.js';
 import type { InboxRow, InboxLabels, InboxNavState, InboxDecisionVerb } from './run-flow-inbox.js';
 import {
   EMPTY_INBOX_NAV,
@@ -36,11 +37,9 @@ import {
   mapInboxDecisionKey,
 } from './run-flow-inbox.js';
 
-/** Focus-highlight color for the selected row — the GOLD the slash-menu uses for
- *  its own selection cursor (app-wide selected-item convention). */
-const SELECTED_COLOR = '#C4A855';
-/** The list card's border (D3a teal). */
-const LIST_BORDER = '#4DB8A4';
+// TERMINAL-READABILITY-001 — the focused row is the palette `focus` role
+// (inverse: the host's own fg/bg pair, readable under any theme) beside the ❯
+// gutter marker; frames take the decorative accent; hints the muted role.
 
 export interface InboxCardProps {
   /** When false the card renders nothing and owns no stdin (mirrors
@@ -117,6 +116,7 @@ export function InboxCard(props: InboxCardProps): ReactElement | null {
     setDecideNotice(onDecide(row.flowId, verb));
   }, { isActive: open && mutexActive });
 
+  const palette = useInkPalette();
   if (!open) return null;
 
   const selectedFlowId = realignInboxSelection(nav.selectedFlowId, rows);
@@ -126,21 +126,21 @@ export function InboxCard(props: InboxCardProps): ReactElement | null {
   if (nav.detailOpen && selectedRow) {
     const verbs = onDecide ? decidableInboxVerbs(selectedRow) : [];
     return (
-      <Box flexDirection="column" borderStyle="round" borderColor={SELECTED_COLOR} paddingX={1}>
+      <Box flexDirection="column" borderStyle="round" borderColor={palette.accent.color} paddingX={1}>
         {buildInboxDetailLines(selectedRow, labels).map((line, i) => (
           <Text key={`detail-${i}-${line}`}>{line}</Text>
         ))}
         {decideNotice !== null && <Text>{decideNotice}</Text>}
-        {verbs.includes('approve') && <Text dimColor>{labels.decideHintAwaiting}</Text>}
-        {verbs.includes('start') && !verbs.includes('approve') && <Text dimColor>{labels.decideHintApproved}</Text>}
-        <Text dimColor>{labels.followDetailHint}</Text>
+        {verbs.includes('approve') && <Text {...palette.muted}>{labels.decideHintAwaiting}</Text>}
+        {verbs.includes('start') && !verbs.includes('approve') && <Text {...palette.muted}>{labels.decideHintApproved}</Text>}
+        <Text {...palette.muted}>{labels.followDetailHint}</Text>
       </Box>
     );
   }
 
-  // ── List view — header + rows (focused row gets a ❯ gutter + color). ──
+  // ── List view — header + rows (focused row gets a ❯ gutter + the focus role). ──
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor={LIST_BORDER} paddingX={1}>
+    <Box flexDirection="column" borderStyle="round" borderColor={palette.accent.color} paddingX={1}>
       {rows.length === 0 ? (
         <Text>{labels.empty}</Text>
       ) : (
@@ -149,14 +149,14 @@ export function InboxCard(props: InboxCardProps): ReactElement | null {
           {rows.map((row, i) => {
             const focused = row.flowId === selectedFlowId;
             return (
-              <Text key={row.flowId} color={focused ? SELECTED_COLOR : undefined}>
+              <Text key={row.flowId} {...(focused ? palette.focus : {})}>
                 {(focused ? '❯ ' : '  ') + formatInboxRowBody(row, i, labels)}
               </Text>
             );
           })}
         </>
       )}
-      <Text dimColor>{labels.followNavHint}</Text>
+      <Text {...palette.muted}>{labels.followNavHint}</Text>
     </Box>
   );
 }

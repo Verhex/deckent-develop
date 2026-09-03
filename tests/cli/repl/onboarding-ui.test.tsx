@@ -355,17 +355,20 @@ describe('mapOnboardingKey', () => {
 // ─── NO_COLOR cleanliness ────────────────────────────────────────────────────
 
 describe('NO_COLOR cleanliness', () => {
-  it('resolveOnboardingColors(true) carries no color and disables dim', () => {
-    expect(resolveOnboardingColors(true)).toEqual({ dim: false });
+  // TERMINAL-READABILITY-001: the color set is built from palette ROLES (host
+  // theme-mapped); the cursor row is the inverse focus role; nothing is dim.
+  it('resolveOnboardingColors(true) carries no color and no attribute', () => {
+    expect(resolveOnboardingColors(true)).toEqual({ focus: {}, muted: {} });
   });
 
-  it('resolveOnboardingColors(false) provides the full palette', () => {
+  it('resolveOnboardingColors(false) provides the role palette (named colors, inverse focus, no dim)', () => {
     const colors = resolveOnboardingColors(false);
-    expect(colors.border).toBeDefined();
-    expect(colors.accent).toBeDefined();
-    expect(colors.ok).toBeDefined();
-    expect(colors.warn).toBeDefined();
-    expect(colors.dim).toBe(true);
+    expect(colors.border).toBe('cyan');
+    expect(colors.focus).toEqual({ inverse: true });
+    expect(colors.ok).toBe('green');
+    expect(colors.warn).toBe('yellow');
+    expect(colors.muted).toEqual({});
+    expect(JSON.stringify(colors)).not.toMatch(/#[0-9a-fA-F]{6}|dim/);
   });
 
   it('no screen/view-model ever contains an ANSI escape (string-free + key-only)', async () => {

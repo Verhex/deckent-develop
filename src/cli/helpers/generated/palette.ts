@@ -3,24 +3,33 @@
  * Kaynak: design/tokens/ (DTCG). Değişiklik = kaynakta + `npm run build:tokens`.
  * Wiring: DESIGN-SYSTEM-001 slice 2 (bu dosya henüz tüketilmiyorsa bile drift-gate altındadır).
  * Kapılar (NO_COLOR/FORCE_COLOR/TTY) src/cli/helpers/theme.ts'te kalır;
- * bu dosya yalnız rol→renk verisidir (DT-5 kod-ayağı).
+ * bu dosya yalnız rol→renk verisidir (DT-5 kod-ayağı; TERMINAL-READABILITY-001 sınıf+öznitelik).
  */
-export type PaletteRole = 'success' | 'error' | 'warning' | 'info' | 'muted' | 'accent';
+export type PaletteRole = 'success' | 'error' | 'warning' | 'info' | 'muted' | 'accent' | 'focus' | 'link' | 'code';
+
+/** Kontrast sınıfı — gate: tests/cli/helpers/terminal-readability-gate.test.ts. */
+export type PaletteClass = 'primary' | 'supplemental' | 'decorative';
 
 export interface PaletteEntry {
-  /** Truecolor kademesi (NOVA token değeri). */
-  hex: string;
-  /** En yakın xterm-256 indeksi (build-time hesap). */
-  ansi256: number;
-  /** Bugünkü 16-renk SGR kodu — davranış-koruyucu fallback. */
+  /** Truecolor kademesi (NOVA token değeri); öznitelik-rolünde null. */
+  hex: string | null;
+  /** En yakın xterm-256 indeksi (build-time hesap); hex yoksa null. */
+  ansi256: number | null;
+  /** Host paletinin boyadığı 16-renk SGR parametresi ('' = varsayılan ön-plan). */
   ansi16: string;
+  /** Kademeden bağımsız SGR öznitelikleri (1 bold, 4 underline, 7 inverse). */
+  attrs: readonly string[];
+  class: PaletteClass;
 }
 
 export const PALETTE: Record<PaletteRole, PaletteEntry> = {
-  success: { hex: '#43E39A', ansi256: 78, ansi16: '32' },
-  error: { hex: '#FF6B5E', ansi256: 203, ansi16: '31' },
-  warning: { hex: '#E8B34C', ansi256: 179, ansi16: '33' },
-  info: { hex: '#38D3FF', ansi256: 81, ansi16: '34' },
-  muted: { hex: '#6E8A98', ansi256: 66, ansi16: '2' },
-  accent: { hex: '#38D3FF', ansi256: 81, ansi16: '36' },
+  success: { hex: '#43E39A', ansi256: 78, ansi16: '32', attrs: [], class: 'supplemental' },
+  error: { hex: '#FF6B5E', ansi256: 203, ansi16: '31', attrs: [], class: 'supplemental' },
+  warning: { hex: '#E8B34C', ansi256: 179, ansi16: '33', attrs: [], class: 'supplemental' },
+  info: { hex: '#38D3FF', ansi256: 81, ansi16: '94', attrs: [], class: 'primary' },
+  muted: { hex: '#7FA3B2', ansi256: 109, ansi16: '', attrs: [], class: 'primary' },
+  accent: { hex: '#38D3FF', ansi256: 81, ansi16: '36', attrs: [], class: 'decorative' },
+  focus: { hex: null, ansi256: null, ansi16: '', attrs: ['7'], class: 'primary' },
+  link: { hex: '#38D3FF', ansi256: 81, ansi16: '94', attrs: ['4'], class: 'primary' },
+  code: { hex: '#7BE8FF', ansi256: 117, ansi16: '94', attrs: [], class: 'primary' },
 };

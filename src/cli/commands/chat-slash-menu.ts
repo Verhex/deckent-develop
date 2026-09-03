@@ -11,11 +11,18 @@
 // line-editing'i riske girmesin.
 
 import type { SlashCommand, SlashRegistry } from './chat-slash-registry.js';
+import { roleSgrAt, suppressionTier } from '../helpers/theme.js';
 
+// TERMINAL-READABILITY-001 — the selected row is the palette `focus` role
+// (inverse: the host's own fg/bg pair, readable under any theme) plus bold;
+// the other rows are plain default-foreground text (never dim — VS Code
+// halves it, light themes lose it). Resolved per render through the color gate.
 const RESET = '\x1b[0m';
-const DIM = '\x1b[2m';
-const CYAN = '\x1b[36m';
 const BOLD = '\x1b[1m';
+function focusSgr(): string {
+  const params = roleSgrAt('focus', suppressionTier());
+  return params === null ? '' : `\x1b[${params}m`;
+}
 
 /** Menü durumu — entry.ts keypress-wire bunu tutar, her tuşta reducer üretir. */
 export interface SlashMenuState {
@@ -49,13 +56,14 @@ export function renderSlashMenu(matches: readonly SlashCommand[], selected: numb
   const isTty = tty !== undefined ? tty : process.stdout.isTTY === true;
   if (matches.length === 0) return '';
   const sel = ((selected % matches.length) + matches.length) % matches.length; // güvenli sarma
+  const focus = isTty ? focusSgr() : '';
   const lines = matches.map((c, i) => {
     const marker = i === sel ? '❯' : ' ';
     const name = c.name.padEnd(10);
     if (!isTty) return `${marker} ${name} ${c.desc}`;
     return i === sel
-      ? `${CYAN}${BOLD}${marker} ${name}${RESET} ${c.desc}`
-      : `${DIM}${marker} ${name} ${c.desc}${RESET}`;
+      ? `${focus}${BOLD}${marker} ${name}${RESET} ${c.desc}`
+      : `${marker} ${name} ${c.desc}`;
   });
   return lines.join('\n');
 }

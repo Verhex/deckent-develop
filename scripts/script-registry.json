@@ -509,6 +509,16 @@
    "notes": "TERMINAL-PICKER-001…005 (lane native-terminal-fable51-20260902); skip-safe when dist/ or node-pty is missing."
   },
   {
+   "file": "scripts/lint-terminal-readability.mjs",
+   "class": "gate",
+   "owner": "terminal-readability",
+   "npmScript": "lint:readability (in lint:gates)",
+   "input": "src/cli/repl/**/*.ts(x) + src/cli/commands/chat-*.ts (test files exempt)",
+   "output": "exit 1 on a hex color literal, a named Ink color prop, a raw SGR color sequence, SGR dim (dimColor / \\x1b[2m) or a reason-less `readability-allow` line",
+   "expiry": "none — permanent lint:gates member",
+   "notes": "TERMINAL-READABILITY-001: every Terminal color comes from the generated palette roles (ink-palette / theme.ts) so the host theme paints it; dim is never a carrier. Contrast gate: tests/cli/helpers/terminal-readability-gate.test.ts."
+  },
+  {
    "file": "scripts/ink-pty-test.mjs",
    "class": "recurring-proof",
    "owner": "repl-pty-smoke",

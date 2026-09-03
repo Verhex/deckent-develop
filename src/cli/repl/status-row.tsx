@@ -17,12 +17,11 @@
 // <Text> for role colors) with Ink's truncate wrap as a last-resort guard.
 // String-free: the only words are the product name and caller data.
 
-import { Text, type TextProps } from 'ink';
+import { Text } from 'ink';
 import type { ReactElement } from 'react';
 import { displayWidth, segmentGraphemes } from './cursor-model.js';
-
-const TEAL = '#4DB8A4';
-const GOLD = '#C4A855';
+import { useInkPalette } from './ink-palette-context.js';
+import type { InkPalette, InkRoleStyle } from './ink-palette.js';
 
 export interface StatusRowInput {
   /** Product name — technical brand token, never localized. */
@@ -157,15 +156,19 @@ export function statusRowText(layout: StatusRowLayout): string {
   return layout.segments.map((s) => s.text).join('');
 }
 
-function styleFor(role: StatusRowRole): Pick<TextProps, 'color' | 'dimColor'> {
+/** TERMINAL-READABILITY-001 — segment roles → palette roles. Provider and
+ *  model are read on their own (primary class: default foreground / the code
+ *  role); the approval word carries itself (supplemental warning color);
+ *  secondary facts take the muted role — never dim. */
+function styleFor(role: StatusRowRole, palette: InkPalette): InkRoleStyle {
   switch (role) {
-    case 'provider': return { color: TEAL };
-    case 'model': return { color: GOLD };
-    case 'approval': return { color: GOLD };
-    case 'brand': return { dimColor: true };
-    case 'cwd': return { dimColor: true };
-    case 'tokens': return { dimColor: true };
-    case 'resumed': return { dimColor: true };
+    case 'provider': return {};
+    case 'model': return palette.code;
+    case 'approval': return palette.warning;
+    case 'brand': return palette.muted;
+    case 'cwd': return palette.muted;
+    case 'tokens': return palette.muted;
+    case 'resumed': return palette.muted;
     case 'gap': return {};
   }
 }
@@ -178,11 +181,12 @@ export interface StatusRowProps {
 
 /** ONE inline text node — nested <Text> only colors; it can never become a flex item that wraps. */
 export function StatusRow({ input, columns }: StatusRowProps): ReactElement {
+  const palette = useInkPalette();
   const layout = fitStatusRow(input, columns);
   return (
     <Text wrap="truncate-end">
       {layout.segments.map((s, i) => (
-        <Text key={`${s.role}-${i}`} {...styleFor(s.role)}>{s.text}</Text>
+        <Text key={`${s.role}-${i}`} {...styleFor(s.role, palette)}>{s.text}</Text>
       ))}
     </Text>
   );

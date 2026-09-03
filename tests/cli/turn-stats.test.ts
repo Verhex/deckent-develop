@@ -31,7 +31,10 @@ describe('renderTurnStatsFooter (T-224-021)', () => {
     try {
       delete process.env['NO_COLOR'];
       process.env['FORCE_COLOR'] = '1';
-      expect(renderTurnStatsFooter(1000)).toMatch(/\x1b\[2m.*\x1b\[0m/);
+      // TERMINAL-READABILITY-001: the muted role is the default foreground in
+      // the host tier — the footer is plain text, never SGR dim.
+      expect(renderTurnStatsFooter(1000)).toContain('⏱');
+      expect(renderTurnStatsFooter(1000)).not.toMatch(/\x1b\[2m/);
       delete process.env['FORCE_COLOR'];
       process.env['NO_COLOR'] = '1';
       expect(renderTurnStatsFooter(1000)).not.toMatch(/\x1b\[/);

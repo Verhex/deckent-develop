@@ -10,6 +10,8 @@
 // all user-facing labels arrive via props (getMessage resolved by the caller).
 
 import { Box, Text, Static, useInput, useApp } from 'ink';
+import { InkPaletteContext, useInkPalette } from './ink-palette-context.js';
+import type { InkPalette } from './ink-palette.js';
 import { useState, useRef, useEffect, Component, type ReactElement, type ReactNode } from 'react';
 import { homedir } from 'node:os';
 import {
@@ -1083,11 +1085,16 @@ export interface ReplErrorBoundaryProps {
 
 export class ReplErrorBoundary extends Component<ReplErrorBoundaryProps, { err: Error | null }> {
   state: { err: Error | null } = { err: null };
+  // TERMINAL-READABILITY-001 — a class component reads the palette through
+  // contextType (hooks are unavailable here); unmounted instances (tests
+  // calling render() directly) have no context and paint plain text.
+  static override contextType = InkPaletteContext;
+  declare context: InkPalette | undefined;
   static getDerivedStateFromError(err: Error): { err: Error } { return { err }; }
   override render(): ReactNode {
     if (this.state.err) {
       const describe = this.props.describeError ?? ((err: Error): string => err.message);
-      return <Text color="red">{`⚠ ${this.props.label}: ${describe(this.state.err)}`}</Text>;
+      return <Text {...(this.context?.error ?? {})}>{`⚠ ${this.props.label}: ${describe(this.state.err)}`}</Text>;
     }
     return this.props.children;
   }
@@ -1285,29 +1292,34 @@ interface TurnStats { elapsedMs: number; tokens?: number; }
 // Exported for buildSegmentTurns' tests (360-009) — shape-only, no behavior.
 export interface Turn { id: number; role: 'user' | 'head' | 'seg' | 'foot' | 'tool' | 'bg'; text: string; tool?: ToolInfo; stats?: TurnStats; }
 
-const TEAL = '#4DB8A4';
-const GOLD = '#C4A855';
+// TERMINAL-READABILITY-001 — no color literal in the App: every color is a
+// palette role (ink-palette-context) the host theme paints; emphasis is weight
+// (bold) or the inverse focus role, secondary text is the muted role, and SGR
+// dim is never emitted (VS Code halves it, light themes lose it).
 
 /** Animated braille spinner (no extra dep). */
 function Spinner(): ReactElement {
+  const palette = useInkPalette();
   const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
   const [i, setI] = useState(0);
   useEffect(() => {
     const id = setInterval(() => setI((n) => (n + 1) % frames.length), 80);
     return () => clearInterval(id);
   }, []);
-  return <Text color={TEAL}>{frames[i]}</Text>;
+  return <Text {...palette.accent}>{frames[i]}</Text>;
 }
 
 function DeckentHeader(): ReactElement {
-  return <Text><Text color={TEAL}>● </Text><Text color={GOLD} bold>deckent</Text></Text>;
+  const palette = useInkPalette();
+  return <Text><Text {...palette.accent}>● </Text><Text bold>deckent</Text></Text>;
 }
 
 function TurnView({ turn }: { turn: Turn }): ReactElement {
+  const palette = useInkPalette();
   if (turn.role === 'user') {
     return (
       <Box marginTop={1}>
-        <Text dimColor>{'› '}</Text>
+        <Text {...palette.muted}>{'› '}</Text>
         <Text>{turn.text}</Text>
       </Box>
     );
@@ -1315,24 +1327,24 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
   if (turn.role === 'tool' && turn.tool) {
     const { verb, target, added, removed, note, failed } = turn.tool;
     const hasDelta = added !== undefined || removed !== undefined || note !== undefined;
-    // Denied/errored action: honest dim "✗ verb target" with NO success delta —
+    // Denied/errored action: honest "✗ verb target" with NO success delta —
     // never let a blocked write look like it landed (REPL-TOOL-DEBT-1).
     if (failed) {
       return (
         <Box marginTop={1}>
-          <Text dimColor><Text color="red">✗ </Text>{verb}<Text dimColor> {target}</Text></Text>
+          <Text {...palette.muted}><Text {...palette.error}>✗ </Text>{verb}<Text {...palette.muted}> {target}</Text></Text>
         </Box>
       );
     }
     return (
       <Box flexDirection="column" marginTop={1}>
-        <Text><Text color={TEAL}>● </Text><Text bold>{verb}</Text><Text dimColor> {target}</Text></Text>
+        <Text><Text {...palette.accent}>● </Text><Text bold>{verb}</Text><Text {...palette.muted}> {target}</Text></Text>
         {hasDelta && (
           <Text>
             {'  ⎿ '}
-            {added !== undefined ? <Text color="green">+{added} </Text> : null}
-            {removed !== undefined ? <Text color="red">-{removed} </Text> : null}
-            {note !== undefined ? <Text dimColor>{note}</Text> : null}
+            {added !== undefined ? <Text {...palette.success}>+{added} </Text> : null}
+            {removed !== undefined ? <Text {...palette.error}>-{removed} </Text> : null}
+            {note !== undefined ? <Text {...palette.muted}>{note}</Text> : null}
           </Text>
         )}
       </Box>
@@ -1345,14 +1357,14 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
     return (
       <Box flexDirection="column" marginTop={1}>
         {turn.text.split('\n').map((line, i) => (
-          <Text key={i} dimColor><Text color={GOLD}>{'» '}</Text>{line}</Text>
+          <Text key={i} {...palette.muted}><Text {...palette.accent}>{'» '}</Text>{line}</Text>
         ))}
       </Box>
     );
   }
   if (turn.role === 'foot') {
     const s = turn.stats;
-    return <Text dimColor>{`⏱ ${s ? (s.elapsedMs / 1000).toFixed(1) : '0'}s${s?.tokens ? ` · ${s.tokens} tok` : ''}`}</Text>;
+    return <Text {...palette.muted}>{`⏱ ${s ? (s.elapsedMs / 1000).toFixed(1) : '0'}s${s?.tokens ? ` · ${s.tokens} tok` : ''}`}</Text>;
   }
   // 'seg' — one completed reply line/block, rendered markdown, no margin (flows
   // directly under the head + previous segments).
@@ -1360,6 +1372,7 @@ function TurnView({ turn }: { turn: Turn }): ReactElement {
 }
 
 export function ReplApp(props: ReplAppProps): ReactElement {
+  const palette = useInkPalette();
   const { provider, dispatcher, labels, registerConfirm, registerActionGate, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle, shortcutsPanel, pickerLabels, pickerSpecs, saveDefault, configEntries, saveConfigValue, initialTermMode, pickerAscii = false, pickerNoColor = false } = props;
   const { exit } = useApp();
   // TERMINAL-TOOLS-004 — live width for the status row + queue preview (reflows on resize).
@@ -2337,8 +2350,8 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       {/* Confirm modal — one card per queued tool call, with an [i/N] position. */}
       {confirm && (
         <Box flexDirection="column" marginTop={1}>
-          <Text color={TEAL}>{confirm.summary}</Text>
-          <Text dimColor>{`${labels.confirmProgress.replace('{index}', String(confirm.index)).replace('{total}', String(confirm.total))} ${confirm.oneTime ? labels.confirmHintOnce : labels.confirmHint}`}</Text>
+          <Text {...palette.info}>{confirm.summary}</Text>
+          <Text {...palette.muted}>{`${labels.confirmProgress.replace('{index}', String(confirm.index)).replace('{total}', String(confirm.total))} ${confirm.oneTime ? labels.confirmHintOnce : labels.confirmHint}`}</Text>
         </Box>
       )}
 
@@ -2346,7 +2359,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       {queued.length > 0 && (
         <Box flexDirection="column" marginTop={1}>
           {queued.map((q, i) => (
-            <Text key={i} dimColor>{`  ⋯ ${labels.queued} ${i + 1}: ${truncateQueuePreview(q, queuePreviewCells(columns))}`}</Text>
+            <Text key={i} {...palette.muted}>{`  ⋯ ${labels.queued} ${i + 1}: ${truncateQueuePreview(q, queuePreviewCells(columns))}`}</Text>
           ))}
         </Box>
       )}
@@ -2438,8 +2451,8 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           never fully disappears while the ApprovalCard above it is visible. */}
       {replSurfaceEnabled && (
         <Box flexDirection="column" marginTop={1}>
-          <Text color={GOLD} bold>{`[${resolveModeLabel(termMode.mode, labels)}]`}</Text>
-          {resolveFooterLines(footerLines, approvalPending).map((line, i) => <Text key={i} dimColor>{line}</Text>)}
+          <Text bold>{`[${resolveModeLabel(termMode.mode, labels)}]`}</Text>
+          {resolveFooterLines(footerLines, approvalPending).map((line, i) => <Text key={i} {...palette.muted}>{line}</Text>)}
         </Box>
       )}
 
@@ -2448,10 +2461,10 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         {/* TERMINAL-TOOLS-013: while a card owns stdin the anchor SAYS so
             instead of promising "your turn" (textual carrier, not layout). */}
         {phase === 'idle'
-          ? <Text dimColor>{inputBarActiveNow ? `✓ ${labels.ready}` : labels.inputPaused}</Text>
-          : <><Spinner /><Text color={GOLD} bold> deckent </Text><Text dimColor>{`· ${phase === 'thinking' ? labels.thinking : labels.generating}`}</Text></>}
+          ? <Text {...palette.muted}>{inputBarActiveNow ? `✓ ${labels.ready}` : labels.inputPaused}</Text>
+          : <><Spinner /><Text bold> deckent </Text><Text {...palette.muted}>{`· ${phase === 'thinking' ? labels.thinking : labels.generating}`}</Text></>}
         {/* TERMINAL-TOOLS-006: transient Ctrl-C hint (names the next key). */}
-        {interruptHint ? <Text color={GOLD}>{`  · ${interruptHint.text}`}</Text> : null}
+        {interruptHint ? <Text {...palette.info}>{`  · ${interruptHint.text}`}</Text> : null}
       </Box>
 
       {/* Pinned input with a VISIBLE cursor + interactive /menu — always last. */}

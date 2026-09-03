@@ -26,6 +26,8 @@
 
 import { Box, Text, useInput } from 'ink';
 import { useState, type ReactElement } from 'react';
+import { useInkPalette } from './ink-palette-context.js';
+import type { InkRole } from './ink-palette.js';
 import type { PlanPreview, RunFlowGateResult, RunFlowPolicyDecision } from '../../core/run-flow-contract.js';
 import { getMessage } from '../helpers/messages.js';
 
@@ -46,16 +48,18 @@ export function mapPlanPreviewKey(input: string): PlanPreviewCardAction | null {
 
 // ─── Pure rendering helpers (framework-free — unit-testable without Ink) ───
 
-const GATE_COLORS: Record<RunFlowGateResult, string> = {
-  pass: '#4DB8A4',
-  fail: '#E0524D',
-  skipped: '#6B7280',
+// TERMINAL-READABILITY-001 — gate/policy outcomes as palette ROLES: the label
+// word carries the meaning, the (host-theme-mapped) color supplements it.
+const GATE_ROLES: Record<RunFlowGateResult, InkRole> = {
+  pass: 'success',
+  fail: 'error',
+  skipped: 'muted',
 };
 
-const POLICY_COLORS: Record<RunFlowPolicyDecision, string> = {
-  allow: '#4DB8A4',
-  deny: '#E0524D',
-  'needs-approval': '#C4A855',
+const POLICY_ROLES: Record<RunFlowPolicyDecision, InkRole> = {
+  allow: 'success',
+  deny: 'error',
+  'needs-approval': 'warning',
 };
 
 const DIGEST_SHORT_LEN = 12;
@@ -245,42 +249,44 @@ export function PlanPreviewCard(props: PlanPreviewCardProps): ReactElement | nul
     }
   }, { isActive: preview !== null && mutexActive });
 
+  const palette = useInkPalette();
   if (!preview) return null;
 
-  const gateColor = GATE_COLORS[preview.gateResult];
-  const policyColor = POLICY_COLORS[preview.policyDecision];
+  const gateStyle = palette[GATE_ROLES[preview.gateResult]];
+  const policyStyle = palette[POLICY_ROLES[preview.policyDecision]];
+  const failStyle = palette[GATE_ROLES.fail];
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor={gateColor} paddingX={1}>
+    <Box flexDirection="column" borderStyle="round" borderColor={gateStyle.color} paddingX={1}>
       <Box>
         <Text bold>{labels.heading}</Text>
       </Box>
       {preview.taskSummaries.length === 0 ? (
-        <Text dimColor>{labels.noTasks}</Text>
+        <Text {...palette.muted}>{labels.noTasks}</Text>
       ) : (
         preview.taskSummaries.map((t, i) => (
           <Text key={`${i}-${t.title}`}>{formatTaskSummaryLine(i, t)}</Text>
         ))
       )}
       <Box>
-        <Text color={gateColor} bold>{labels.gateLabels[preview.gateResult]}</Text>
+        <Text {...gateStyle} bold>{labels.gateLabels[preview.gateResult]}</Text>
         <Text>{'  '}</Text>
-        <Text color={policyColor} bold>{labels.policyLabels[preview.policyDecision]}</Text>
+        <Text {...policyStyle} bold>{labels.policyLabels[preview.policyDecision]}</Text>
       </Box>
       {formatScopeGateLines(preview, labels).map((line, i) => (
-        <Text key={`sg-${i}`} color={preview.scopeGateResult === 'fail' ? GATE_COLORS.fail : undefined}>{line}</Text>
+        <Text key={`sg-${i}`} {...(preview.scopeGateResult === 'fail' ? failStyle : {})}>{line}</Text>
       ))}
       {formatTopologyLines(preview, labels).map((line, i) => (
-        <Text key={`tg-${i}`} color={preview.topologyGateResult === 'fail' ? GATE_COLORS.fail : undefined}>{line}</Text>
+        <Text key={`tg-${i}`} {...(preview.topologyGateResult === 'fail' ? failStyle : {})}>{line}</Text>
       ))}
-      <Text dimColor>{`${labels.digestLabel} ${formatDigestShort(preview.planDigest)}`}</Text>
+      <Text {...palette.muted}>{`${labels.digestLabel} ${formatDigestShort(preview.planDigest)}`}</Text>
       {expanded && (
         <Box flexDirection="column" marginTop={1}>
           <Text bold>{labels.detailsHeading}</Text>
           <Text>{JSON.stringify(preview, null, 2)}</Text>
         </Box>
       )}
-      <Text dimColor>{labels.hint}</Text>
+      <Text {...palette.muted}>{labels.hint}</Text>
     </Box>
   );
 }

@@ -1,23 +1,40 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { renderMarkdown } from '../../src/cli/commands/chat-render.js';
 
 // born-525: (1) inline-code/link RESET bleeding through an outer heading/bold
 // span, (2) markdown link regex truncating a balanced-paren URL.
+// TERMINAL-READABILITY-001: inline code is the code role (94) and a level-1
+// heading is bold + the info role (94) in the host-theme-mapped tier — pinned
+// with FORCE_COLOR=1 and no background hint so the SGR codes are exact.
 const RESET = '\x1b[0m';
 const BOLD = '\x1b[1m';
-const DIM = '\x1b[2m';
-const CYAN = '\x1b[36m';
+const CODE = '\x1b[94m';
+const INFO = '\x1b[94m';
+
+const ENV_KEYS = ['NO_COLOR', 'FORCE_COLOR', 'COLORTERM', 'COLORFGBG', 'TERM'] as const;
+let saved: Record<string, string | undefined> = {};
+beforeEach(() => {
+  saved = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
+  for (const k of ENV_KEYS) delete process.env[k];
+  process.env['FORCE_COLOR'] = '1';
+});
+afterEach(() => {
+  for (const k of ENV_KEYS) {
+    if (saved[k] === undefined) delete process.env[k];
+    else process.env[k] = saved[k];
+  }
+});
 
 describe('renderMarkdown — nested-style reset bleed (born-525)', () => {
   it('bold survives an inline-code span nested inside it', () => {
     const out = renderMarkdown('**bold `code` sonrası metin**', true);
-    expect(out).toBe(`${BOLD}bold ${DIM}code${RESET}${BOLD} sonrası metin${RESET}`);
+    expect(out).toBe(`${BOLD}bold ${CODE}code${RESET}${BOLD} sonrası metin${RESET}`);
     expect(out).not.toContain('**');
   });
 
   it('heading style survives an inline-code span nested inside it', () => {
     const out = renderMarkdown('# Title `code` more', true);
-    expect(out).toBe(`${BOLD}${CYAN}Title ${DIM}code${RESET}${BOLD}${CYAN} more${RESET}`);
+    expect(out).toBe(`${BOLD}${INFO}Title ${CODE}code${RESET}${BOLD}${INFO} more${RESET}`);
   });
 
   it('bold style survives a markdown link span nested inside it', () => {
