@@ -55,6 +55,11 @@ export const CLI_TERMINAL_PICKER_MESSAGES: MessageFamily = Object.freeze({
   'tui.picker.blocked.NOT_ENUMERABLE': { en: 'not enumerable here — use deckent config set', tr: 'burada listelenemez — deckent config set kullanın' },
   'tui.picker.blocked_generic': { en: 'unavailable ({code})', tr: 'kullanılamaz ({code})' },
 
+  // ── row facts for the approval-mode picker (TERMINAL-PICKER-003) ───────
+  'tui.picker.fact.approve.suggest': { en: 'ask before every tool call', tr: 'her araç çağrısından önce sor' },
+  'tui.picker.fact.approve.auto_edit': { en: 'file edits run, shell commands ask', tr: 'dosya düzenlemeleri çalışır, kabuk komutları sorar' },
+  'tui.picker.fact.approve.full_auto': { en: 'no prompts (always-confirm tools still ask)', tr: 'soru yok (her-zaman-onay araçları yine sorar)' },
+
   // ── outcomes ───────────────────────────────────────────────────────────
   'tui.picker.committed.session': { en: 'switched for this session: {value}', tr: 'bu oturum için geçildi: {value}' },
   'tui.picker.committed.default': { en: 'saved as default: {value}', tr: 'varsayılan olarak kaydedildi: {value}' },

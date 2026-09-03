@@ -4,6 +4,9 @@
 // All other glob metachars are treated literally (escaped).
 
 export type ApprovalMode = 'suggest' | 'auto-edit' | 'full-auto';
+/** TERMINAL-PICKER-003 — the enum SSOT beside the type (presentation order):
+ *  every surface that lists or parses approval modes derives from this. */
+export const APPROVAL_MODES: readonly ApprovalMode[] = ['suggest', 'auto-edit', 'full-auto'];
 export type PermissionDecision = 'allow' | 'ask' | 'deny';
 
 export interface PermissionRule {

@@ -160,7 +160,9 @@ describe('app.tsx wiring', () => {
   it('/interrupt is handled regardless of repl_surface.enabled', () => {
     // the interrupt branch must appear BEFORE the `if (replSurfaceEnabled) {` term/busy block
     const interruptAt = src.indexOf("busyAction.kind === 'interrupt'");
-    const gateAt = src.indexOf('if (replSurfaceEnabled) {\n      const termCmd = parseTermCommand(trimmed);');
+    // TERMINAL-PICKER-003 hoisted `/term` out of the flag block (the gate applies
+    // everywhere); the ordering contract is unchanged: interrupt first, then term.
+    const gateAt = src.indexOf('const termCmd = parseTermCommand(trimmed);');
     expect(interruptAt).toBeGreaterThan(0);
     expect(gateAt).toBeGreaterThan(0);
     expect(interruptAt).toBeLessThan(gateAt);

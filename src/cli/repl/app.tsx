@@ -31,7 +31,7 @@ import type { ActiveSelection } from './provider-switch.js';
 import { createStreamSegmenter, type StreamSegmenter } from './stream-segmenter.js';
 import { measuredOnTurnEnd } from './native-elapsed.js';
 import { buildLiveFooter, type LiveFooterLabels, type LiveFooterState } from '../helpers/live-footer.js';
-import { initialTermModeState, parseTermCommand, applyModeTarget, type TermMode, type TermModeState } from './term-mode.js';
+import { initialTermModeState, parseTermCommand, applyModeTarget, TERM_MODES, ALLOWED_RISKS_BY_MODE, type TermMode, type TermModeState } from './term-mode.js';
 import {
   gateAction, resolveShellLine, isDeniedShellOutput, pushShellNote, buildShellNotePrefix, renderTermGateDenied,
   type ShellNote, type TermGateDecision,
@@ -40,6 +40,8 @@ import { renderCommandRisk } from '../helpers/risk-language.js';
 import { PickerCard } from './picker-card.js';
 import { resolvePickerGlyphs, type PickerKind, type PickerScope, type PickerSpec } from './picker.js';
 import type { PickerLabels } from './picker-labels.js';
+import { buildApprovalPickerSpec, buildTermPickerSpec, buildResumePickerSpec } from './picker-specs.js';
+import { APPROVAL_MODES, type ApprovalMode } from '../../agent/permission-types.js';
 import { createChatTurnQueue, type ChatTurnQueue, type ChatTurnBgEvent, type ChatTurnPayload } from './chat-turn-queue.js';
 import { createInputQueue, type InputQueue } from './input-queue.js';
 import { listRecentSessions, pickSession, type SessionRecord } from '../helpers/session-resume.js';
@@ -661,6 +663,10 @@ export function resolvePickerRequest(trimmed: string): { kind: PickerKind } | nu
   const bare = trimmed.trim().toLowerCase();
   if (bare === '/model') return { kind: 'model' };
   if (bare === '/provider') return { kind: 'provider' };
+  // TERMINAL-PICKER-003 — the session-only choices.
+  if (bare === '/approve') return { kind: 'approve' };
+  if (bare === '/term') return { kind: 'term' };
+  if (bare === '/resume') return { kind: 'resume' };
   return null;
 }
 
@@ -1248,7 +1254,8 @@ export function deriveAtRefExpansionBudgetChars(
   }
 }
 
-type ApprovalMode = 'suggest' | 'auto-edit' | 'full-auto';
+/** TERMINAL-PICKER-003 — `/approve <mode>` built from the enum SSOT (no literals). */
+const APPROVE_COMMAND_RE = new RegExp(`^\\/approve(?:\\s+(${APPROVAL_MODES.join('|')}))?$`, 'i');
 
 interface TurnStats { elapsedMs: number; tokens?: number; }
 // Streaming model: a reply is a 'head' (● deckent) then a series of 'seg' units
@@ -1417,8 +1424,88 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // TERMINAL-PICKER-002 — the picker's commit: session switch first; the
   // `default` scope additionally pins the choice in the project config through
   // the injected seam. A failed default write never un-switches the session.
+  // TERMINAL-PICKER-003 — the session-only apply closures, shared by the typed
+  // forms (/approve <mode>, /term <mode>, /resume <n|id>) and the picker.
+  const runApprove = (mode: ApprovalMode): void => {
+    onApprovalMode(mode); setApproval(mode);
+    // born-493 (387-002) — also retarget the native AgentSession's OWN
+    // permission engine (see ReplEngine.setApprovalMode doc comment,
+    // native-agent-bridge.ts). No-op for the legacy engine (nativeEngine
+    // undefined) or a test fake that doesn't attach the method.
+    nativeEngine?.setApprovalMode?.(mode);
+    pushTurn('seg', `${labels.approvalSet}: ${mode}`);
+  };
+  const runTerm = (target: TermMode): void => {
+    const result = applyModeTarget(termModeRef.current, target);
+    if (result.changed) setTermMode(result.state);
+    pushTurn('seg', requireInjectedLabel('termSwitched', labels.termSwitched)
+      .replace('{mode}', resolveModeLabel(result.state.mode, labels)));
+  };
+  /** The merged session list the typed /resume resolves against (disk jobs + ledger + memory). */
+  const mergedResumeRecords = () => mergeResumeSessionRecords(
+    recentSessions.current ?? [],
+    chatSessionsToRecords(listLedgerSessions(RESUME_RECENT_LIMIT, { cwd: props.cwd })),
+    chatSessionsToRecords(memory?.listChatSessions?.(RESUME_RECENT_LIMIT) ?? []),
+  );
+  /** Apply a resolved /resume decision — ONE path for the typed form and the picker. */
+  const applyResumeDecision = (decision: ResumeCommandDecision): void => {
+    if (decision.kind === 'passthrough') return;
+    if (decision.kind === 'list') { pushTurn('bg', decision.lines.join('\n')); return; }
+    if (decision.kind === 'reject') { pushTurn('seg', decision.line); return; }
+    setActiveSessionId(decision.sessionId);
+    activeSessionIdRef.current = decision.sessionId;
+    if (decision.forwardToLoop) {
+      if (nativeEngine?.hydrateTranscript) {
+        const hydrated = hydrateNativeResume(decision.sessionId, props.cwd, nativeEngine, memory);
+        setSessionTok(hydrated.outputTokens);
+        pushTurn('seg', decision.line);
+      } else {
+        // Legacy engine retains its own command parser; native mode
+        // never takes this branch and therefore never leaks /resume
+        // into a provider turn.
+        queue.current!.enqueue(`/resume ${decision.sessionId}`);
+        setQueued([...queue.current!.snapshot()]);
+        if (wake.current) { const w = wake.current; wake.current = null; w(); }
+      }
+    } else {
+      // Sprint-session pick: switch the active session pointer locally
+      // (deep context-load for sprint sessions is loop-side follow-up).
+      pushTurn('seg', decision.line);
+    }
+  };
+
+  /** Build the spec for a bare selection command, or null when nothing can be
+   *  offered (no injected builder; /resume without sessions). */
+  const buildPickerSpecFor = (kind: PickerKind): PickerSpec | null => {
+    if (kind === 'model' || kind === 'provider') return pickerSpecs?.[kind]?.() ?? null;
+    if (kind === 'approve') return buildApprovalPickerSpec(APPROVAL_MODES, approval, (m) => pickerLabels.approveFacts[m]);
+    if (kind === 'term') {
+      return buildTermPickerSpec(TERM_MODES, termModeRef.current.mode,
+        (mode) => [...ALLOWED_RISKS_BY_MODE[mode]].map((risk) => renderCommandRisk(risk, lang ?? 'en').label).join(' · '));
+    }
+    if (kind === 'resume') {
+      const merged = mergedResumeRecords();
+      const records = [...merged.disk, ...merged.resumable];
+      if (records.length === 0) return null;
+      return buildResumePickerSpec(records, activeSessionIdRef.current ?? null, (r) => [r.status, shortSessionTime(r.date)]);
+    }
+    return null;
+  };
+
+  // TERMINAL-PICKER-002/003 — the picker's commit. model/provider: session
+  // switch first; the `default` scope additionally pins the choice in the
+  // project config through the injected seam (a failed write never
+  // un-switches the session). approve/term/resume: the same apply closures
+  // the typed forms use.
   const commitPicker = (kind: PickerKind, id: string, scope: PickerScope): void => {
     setPicker(null);
+    if (kind === 'approve') { runApprove(id as ApprovalMode); return; }
+    if (kind === 'term') { runTerm(id as TermMode); return; }
+    if (kind === 'resume') {
+      const merged = mergedResumeRecords();
+      applyResumeDecision(resolveResumeCommand(id, merged.disk, merged.resumable, labels));
+      return;
+    }
     if (kind !== 'model' && kind !== 'provider') return;
     if (!runSwitch(kind, id)) return;
     if (scope !== 'default') return;
@@ -1828,6 +1915,21 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       }
       return;
     }
+    // TERMINAL-PICKER-002/003 — a BARE selection command opens the interactive
+    // picker (candidates re-resolved on every open): /model and /provider from
+    // the injected builders, /approve /term /resume built in-app from the
+    // session's own state. Typed arguments keep their direct paths. A kind
+    // without a buildable spec (e.g. /resume with no sessions) falls through
+    // to its existing handler.
+    const pickerRequest = resolvePickerRequest(trimmed);
+    if (pickerRequest) {
+      const spec = buildPickerSpecFor(pickerRequest.kind);
+      if (spec) {
+        pushTurn('user', trimmed);
+        setPicker({ kind: pickerRequest.kind, spec });
+        return;
+      }
+    }
     if (trimmed.toLowerCase() === '/cancel') {
       pushTurn('user', trimmed);
       queue.current!.clear(); setQueued([]);
@@ -1856,16 +1958,18 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     }
     // Inert unless replSurfaceEnabled: keeps flag-off behavior byte-identical
     // (the string falls through to a normal chat message, exactly as before).
-    if (replSurfaceEnabled) {
+    // TERMINAL-PICKER-003 — `/term` on EVERY surface: the Ask/Run/Control gate
+    // (TERMINAL-TOOLS-011) applies regardless of repl_surface.enabled, so the
+    // posture switch must be reachable without the flag (a default install
+    // starts in Ask). A bare `/term` opened the picker above when a spec could
+    // be built; here it is the typed switch, the status line, or usage.
+    {
       const termCmd = parseTermCommand(trimmed);
       if (termCmd.kind !== 'none') {
         pushTurn('user', trimmed);
         const usage = requireInjectedLabel('termUsage', labels.termUsage);
         if (termCmd.kind === 'switch') {
-          const result = applyModeTarget(termMode, termCmd.target);
-          if (result.changed) setTermMode(result.state);
-          pushTurn('seg', requireInjectedLabel('termSwitched', labels.termSwitched)
-            .replace('{mode}', resolveModeLabel(result.state.mode, labels)));
+          runTerm(termCmd.target);
         } else if (termCmd.kind === 'status') {
           // Status names BOTH gates: term-mode (command risk) AND the agentic
           // approval mode — file writes are gated by /approve, not /term.
@@ -1878,6 +1982,8 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         }
         return;
       }
+    }
+    if (replSurfaceEnabled) {
       // 358-006: /queue · /steer — busy-controls.ts dispatch (`/interrupt` is
       // handled above, unconditionally). Same inertness rule: flag off →
       // these fall through to a chat message.
@@ -1917,11 +2023,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       // memory-backed /resume, byte-identical (also the whole flag-off path).
       const resume = trimmed.match(/^\/resume(?:\s+(.*))?$/i);
       if (resume) {
-        const merged = mergeResumeSessionRecords(
-          recentSessions.current ?? [],
-          chatSessionsToRecords(listLedgerSessions(RESUME_RECENT_LIMIT, { cwd: props.cwd })),
-          chatSessionsToRecords(memory?.listChatSessions?.(RESUME_RECENT_LIMIT) ?? []),
-        );
+        const merged = mergedResumeRecords();
         const decision = resolveResumeCommand(resume[1] ?? '', merged.disk, merged.resumable, labels);
         const literalId = (resume[1] ?? '').trim();
         if (decision.kind === 'passthrough' && literalId.length > 0 && nativeEngine?.hydrateTranscript) {
@@ -1939,32 +2041,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         }
         if (decision.kind !== 'passthrough') {
           pushTurn('user', trimmed);
-          if (decision.kind === 'list') {
-            pushTurn('bg', decision.lines.join('\n'));
-          } else if (decision.kind === 'reject') {
-            pushTurn('seg', decision.line);
-          } else {
-            setActiveSessionId(decision.sessionId);
-            activeSessionIdRef.current = decision.sessionId;
-            if (decision.forwardToLoop) {
-              if (nativeEngine?.hydrateTranscript) {
-                const hydrated = hydrateNativeResume(decision.sessionId, props.cwd, nativeEngine, memory);
-                setSessionTok(hydrated.outputTokens);
-                pushTurn('seg', decision.line);
-              } else {
-                // Legacy engine retains its own command parser; native mode
-                // never takes this branch and therefore never leaks /resume
-                // into a provider turn.
-                queue.current!.enqueue(`/resume ${decision.sessionId}`);
-                setQueued([...queue.current!.snapshot()]);
-                if (wake.current) { const w = wake.current; wake.current = null; w(); }
-              }
-            } else {
-              // Sprint-session pick: switch the active session pointer locally
-              // (deep context-load for sprint sessions is loop-side follow-up).
-              pushTurn('seg', decision.line);
-            }
-          }
+          applyResumeDecision(decision);
           return;
         }
       }
@@ -1983,16 +2060,6 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       } else { pushTurn('seg', process.cwd()); }
       return;
     }
-    // TERMINAL-PICKER-002 — a BARE /model or /provider opens the interactive
-    // picker (candidates re-resolved on every open). Typed arguments below
-    // keep the direct path byte-identical.
-    const pickerRequest = resolvePickerRequest(trimmed);
-    const pickerBuilder = pickerRequest ? pickerSpecs?.[pickerRequest.kind] : undefined;
-    if (pickerRequest && pickerBuilder) {
-      pushTurn('user', trimmed);
-      setPicker({ kind: pickerRequest.kind, spec: pickerBuilder() });
-      return;
-    }
     // /model <id> · /provider <name> — runtime switch (handled here, not the loop).
     const sw = trimmed.match(/^\/(model|provider)(?:\s+(\S+))?$/i);
     if (sw) {
@@ -2007,20 +2074,12 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       return;
     }
     // /approve <mode> — agentic approval mode (suggest / auto-edit / full-auto).
-    const ap = trimmed.match(/^\/approve(?:\s+(suggest|auto-edit|full-auto))?$/i);
+    const ap = trimmed.match(APPROVE_COMMAND_RE);
     if (ap) {
       pushTurn('user', trimmed);
-      const mode = ap[1] as ApprovalMode | undefined;
-      if (mode) {
-        onApprovalMode(mode); setApproval(mode);
-        // born-493 (387-002) — also retarget the native AgentSession's OWN
-        // permission engine (see ReplEngine.setApprovalMode doc comment,
-        // native-agent-bridge.ts). No-op for the legacy engine (nativeEngine
-        // undefined) or a test fake that doesn't attach the method.
-        nativeEngine?.setApprovalMode?.(mode);
-        pushTurn('seg', `${labels.approvalSet}: ${mode}`);
-      }
-      else { pushTurn('seg', `${labels.approvalUsage} (${approval})`); }
+      const mode = ap[1]?.toLowerCase() as ApprovalMode | undefined;
+      if (mode) runApprove(mode);
+      else pushTurn('seg', `${labels.approvalUsage} (${approval})`);
       return;
     }
     // /do <goal> (452-002 REPL-DO-SLASH-WIRE) — drives the SAME RunFlow chain the

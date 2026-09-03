@@ -37,6 +37,8 @@ export interface PickerLabels {
   readonly committed: Readonly<Record<'session' | 'default' | 'apply', string>>;
   /** Template with `{error}`. */
   readonly defaultWriteFailed: string;
+  /** TERMINAL-PICKER-003 — the meaning of each approval mode (a row fact). */
+  readonly approveFacts: Readonly<Record<'suggest' | 'auto-edit' | 'full-auto', string>>;
 }
 
 const BLOCKED_CODES = ['MODEL_INACTIVE', 'MODEL_NOT_IN_ACTIVE_SET', 'NO_NATIVE_TRANSPORT', 'MISSING_CREDENTIAL', 'NOT_ENUMERABLE'] as const;
@@ -84,6 +86,11 @@ export function buildPickerLabels(t: (key: string) => string): PickerLabels {
       apply: t('tui.picker.committed.apply'),
     },
     defaultWriteFailed: t('tui.picker.default_write_failed'),
+    approveFacts: {
+      suggest: t('tui.picker.fact.approve.suggest'),
+      'auto-edit': t('tui.picker.fact.approve.auto_edit'),
+      'full-auto': t('tui.picker.fact.approve.full_auto'),
+    },
   };
 }
 

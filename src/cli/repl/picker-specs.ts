@@ -87,6 +87,37 @@ export function buildModelPickerSpec(ctx: PickerSpecContext): PickerSpec {
   return { kind: 'model', candidates, initialId, scopes: SCOPES };
 }
 
+// ─── TERMINAL-PICKER-003 — session-only choices: approval mode, posture, resume ─
+
+const APPLY_ONLY: PickerSpec['scopes'] = ['apply'];
+
+/** One row per approval mode; `describe` supplies the localized meaning (a fact). */
+export function buildApprovalPickerSpec<M extends string>(modes: readonly M[], current: M, describe: (mode: M) => string): PickerSpec {
+  const candidates: PickerCandidate[] = modes.map((mode) => ({
+    id: mode, label: mode, facts: [{ key: 'meaning', value: describe(mode) }], state: mode === current ? 'current' : 'ok',
+  }));
+  return { kind: 'approve', candidates, initialId: modes.includes(current) ? current : null, scopes: APPLY_ONLY };
+}
+
+/** One row per authority posture; `admits` renders the risk classes it allows. */
+export function buildTermPickerSpec<M extends string>(modes: readonly M[], current: M, admits: (mode: M) => string): PickerSpec {
+  const candidates: PickerCandidate[] = modes.map((mode) => ({
+    id: mode, label: mode, facts: [{ key: 'admits', value: admits(mode) }], state: mode === current ? 'current' : 'ok',
+  }));
+  return { kind: 'term', candidates, initialId: modes.includes(current) ? current : null, scopes: APPLY_ONLY };
+}
+
+export interface ResumePickerRecord { readonly id: string; readonly title: string; readonly date: string; readonly status: string }
+
+/** Sessions as stable identities; `facts` renders status/time per record. */
+export function buildResumePickerSpec(records: readonly ResumePickerRecord[], currentId: string | null, facts: (record: ResumePickerRecord) => readonly string[]): PickerSpec {
+  const candidates: PickerCandidate[] = records.map((r) => ({
+    id: r.id, label: r.title, facts: facts(r).map((value, i) => ({ key: `f${i}`, value })), state: r.id === currentId ? 'current' : 'ok',
+  }));
+  const initialId = currentId !== null && records.some((r) => r.id === currentId) ? currentId : null;
+  return { kind: 'resume', candidates, initialId, scopes: APPLY_ONLY };
+}
+
 export function buildProviderPickerSpec(ctx: PickerSpecContext): PickerSpec {
   const candidates: PickerCandidate[] = orderedProviders(ctx).map((provider) => {
     const availability = ctx.availability(provider);
