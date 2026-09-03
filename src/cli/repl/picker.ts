@@ -49,6 +49,8 @@ export interface PickerSpec {
   readonly initialId: string | null;
   /** Commit scopes; more than one → a second "scope" stage before commit. */
   readonly scopes: readonly PickerScope[];
+  /** Substituted into the kind title's `{key}` (e.g. the setting a value picker is for). */
+  readonly titleSubject?: string;
 }
 
 export interface PickerNav {
@@ -117,10 +119,11 @@ export function mapPickerKey(
   if (key.tab === true || key.leftArrow === true || key.rightArrow === true) return null;
   if (key.ctrl === true || key.meta === true) return null;
   if (input.length === 0) return null;
+  // TERMINAL-PICKER-007 — digits TYPE (rows carry no numbers in the card; a
+  // silent jump would make the row index a selection authority, §6).
   if (ctx.queryEmpty && input.length === 1) {
     if (input === 'j') return { kind: 'move', by: 1 };
     if (input === 'k') return { kind: 'move', by: -1 };
-    if (input >= '1' && input <= '9') return { kind: 'jump', index: Number(input) };
   }
   // A pasted chunk arrives as one multi-character input — it types as a whole.
   for (const ch of input) {
@@ -244,18 +247,28 @@ const GAP = '  ';
  * Facts drop from the END first (the caller orders them most→least useful);
  * only then does the label truncate (`…`). The state word always survives.
  */
-export function fitPickerRow(parts: PickerRowParts, columns: number): FittedPickerRow {
+export function fitPickerRow(parts: PickerRowParts, columns: number, opts: { readonly labelWidth?: number } = {}): FittedPickerRow {
   const stateTag = `[${parts.state}]`;
+  // TERMINAL-PICKER-007 — a shared label column keeps facts and state tags
+  // aligned across rows (§7: alignment before color); it yields when the row
+  // would overflow.
+  const padTo = opts.labelWidth ?? 0;
+  const padded = (label: string): string => {
+    const w = displayWidth(label);
+    return w < padTo ? label + ' '.repeat(padTo - w) : label;
+  };
   const compose = (facts: readonly string[], label: string): string =>
     facts.length > 0 ? `${label}${GAP}${facts.join(FACT_SEP)}${GAP}${stateTag}` : `${label}${GAP}${stateTag}`;
   let facts = [...parts.facts];
-  let line = compose(facts, parts.label);
+  let line = compose(facts, padded(parts.label));
   let dropped = 0;
   while (displayWidth(line) > columns && facts.length > 0) {
     facts = facts.slice(0, -1);
     dropped += 1;
-    line = compose(facts, parts.label);
+    line = compose(facts, padded(parts.label));
   }
+  if (displayWidth(line) <= columns) return { line, dropped, truncated: false };
+  line = compose(facts, parts.label); // give the padding back before truncating
   if (displayWidth(line) <= columns) return { line, dropped, truncated: false };
   const budget = columns - displayWidth(GAP) - displayWidth(stateTag);
   const label = truncateEnd(parts.label, Math.max(1, budget));
@@ -294,15 +307,25 @@ export function pickerBlockedReason(code: string, labels: PickerLabels, detail =
  * [state]` rows, and the typed-argument hint. No cursor control, no required
  * key input (§8) — `resolvePickerArg` answers the typed `<n|id>`.
  */
-export function pickerLinesFor(spec: PickerSpec, labels: PickerLabels, glyphs: PickerGlyphs, command: string): string[] {
+export function pickerLinesFor(
+  spec: PickerSpec,
+  labels: PickerLabels,
+  glyphs: PickerGlyphs,
+  command: string,
+  opts: { readonly width?: number; readonly typedHint?: boolean } = {},
+): string[] {
   void glyphs;
-  const lines: string[] = [labels.title[spec.kind]];
+  const lines: string[] = [labels.title[spec.kind].replace('{key}', spec.titleSubject ?? '')];
+  const prefixCells = displayWidth(`  ${spec.candidates.length}) `);
+  const rowWidth = opts.width !== undefined ? Math.max(8, opts.width - prefixCells) : Number.MAX_SAFE_INTEGER;
   spec.candidates.forEach((c, i) => {
-    const fit = fitPickerRow({ label: c.label, facts: c.facts.map((f) => f.value), state: pickerStateWord(c, labels) }, Number.MAX_SAFE_INTEGER);
+    // TERMINAL-PICKER-007 — under a width budget the facts drop before the
+    // state word wraps; the tag stays the short word (reason lines are for cards).
+    const fit = fitPickerRow({ label: c.label, facts: c.facts.map((f) => f.value), state: opts.width !== undefined ? labels.states[c.state] : pickerStateWord(c, labels) }, rowWidth);
     lines.push(`  ${i + 1}) ${fit.line}`);
   });
   if (spec.candidates.length === 0) lines.push(`  ${labels.empty}`);
-  lines.push(labels.typedHint.replace('{command}', command));
+  if (opts.typedHint !== false) lines.push(labels.typedHint.replace('{command}', command));
   return lines;
 }
 

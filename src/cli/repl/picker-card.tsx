@@ -15,6 +15,7 @@
 import { Box, Text, useInput } from 'ink';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import type { PickerLabels } from './picker-labels.js';
+import { displayWidth } from './cursor-model.js';
 import {
   filterPickerCandidates, fitPickerRow, initialPickerNav, mapPickerKey, pickerBlockedReason,
   realignPickerSelection, reducePicker, resolveMenuWindow,
@@ -76,11 +77,11 @@ export function PickerCard(props: PickerCardProps): ReactElement {
     if (effect === null) { if (action.kind !== 'select') setNotice(null); return; }
     switch (effect.kind) {
       case 'commit': setNotice(null); onCommit(effect.id, effect.scope); return;
-      case 'blocked': {
-        const blockedRow = spec.candidates.find((c) => c.id === effect.id);
-        setNotice(pickerBlockedReason(effect.code, labels, blockedRow?.detail));
+      case 'blocked':
+        // The focused blocked row already carries its reason line under the
+        // cursor — a second copy as a notice would render the reason twice.
+        setNotice(null);
         return;
-      }
       case 'close': onClose(); return;
       case 'interrupt': onInterrupt(); return;
       default: return;
@@ -93,6 +94,11 @@ export function PickerCard(props: PickerCardProps): ReactElement {
   const { lo, hi } = resolveMenuWindow(filtered.length, idx, windowRows);
   const visible = filtered.slice(lo, hi);
   const rowCells = Math.max(8, columns - FRAME_CELLS - GUTTER_CELLS);
+  // TERMINAL-PICKER-007 — one label column for the visible window (capped at
+  // half the row) so facts and state tags line up (§7 alignment before color).
+  const labelWidth = Math.min(Math.floor(rowCells / 2), Math.max(0, ...visible.map((c) => displayWidth(c.label))));
+  const title = labels.title[spec.kind].replace('{key}', spec.titleSubject ?? '');
+  const hint = nav.stage === 'scope' ? labels.hintScope : nav.query.length > 0 ? labels.hintFilterEsc : labels.hintPick;
   const focus = noColor ? {} : { color: SELECTED_COLOR };
   const dim = noColor ? {} : { dimColor: true };
   const border = noColor ? {} : { borderColor: BORDER_COLOR };
@@ -102,7 +108,7 @@ export function PickerCard(props: PickerCardProps): ReactElement {
 
   return (
     <Box flexDirection="column" borderStyle="round" paddingX={1} width={columns} {...border}>
-      <Text bold={!noColor}>{labels.title[spec.kind]}</Text>
+      <Text bold={!noColor}>{title}</Text>
       {nav.query.length > 0 && <Text {...dim}>{labels.hintFilter.replace('{query}', nav.query)}</Text>}
       {filtered.length === 0 && <Text>{labels.empty}</Text>}
       {lo > 0 && <Text {...dim}>{`${' '.repeat(GUTTER_CELLS)}${labels.more.replace('{glyph}', glyphs.up).replace('{n}', String(lo))}`}</Text>}
@@ -111,7 +117,7 @@ export function PickerCard(props: PickerCardProps): ReactElement {
         // The state tag is the short word only; a blocked row's typed reason
         // renders on its own line under the cursor (never inside the tag, so a
         // long reason can never eat the label).
-        const fit = fitPickerRow({ label: c.label, facts: compact ? [] : c.facts.map((f) => f.value), state: labels.states[c.state] }, rowCells);
+        const fit = fitPickerRow({ label: c.label, facts: compact ? [] : c.facts.map((f) => f.value), state: labels.states[c.state] }, rowCells, { labelWidth });
         const gutter = focused ? `${glyphs.cursor} ` : ' '.repeat(GUTTER_CELLS);
         return (
           <Box key={c.id} flexDirection="column">
@@ -131,7 +137,7 @@ export function PickerCard(props: PickerCardProps): ReactElement {
       {hi < filtered.length && <Text {...dim}>{`${' '.repeat(GUTTER_CELLS)}${labels.more.replace('{glyph}', glyphs.down).replace('{n}', String(filtered.length - hi))}`}</Text>}
       {scopeLine !== null && <Text>{scopeLine}</Text>}
       {notice !== null && <Text>{notice}</Text>}
-      <Text {...dim}>{nav.stage === 'scope' ? labels.hintScope : labels.hintPick}</Text>
+      <Text {...dim}>{hint}</Text>
     </Box>
   );
 }

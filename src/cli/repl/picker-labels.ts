@@ -29,6 +29,16 @@ export interface PickerLabels {
   readonly unavailableSurface: string;
   /** TERMINAL-PICKER-005 — template with `{arg}`: a typed `<n|id>` that matched nothing. */
   readonly notFound: string;
+  /** TERMINAL-PICKER-007 — hint while a filter is active (Esc clears it). */
+  readonly hintFilterEsc: string;
+  /** TERMINAL-PICKER-007 — template with `{command}`: the typed form where no resolver exists. */
+  readonly typedForm: string;
+  /** TERMINAL-PICKER-007 — template with `{n}`: the provider row's model count. */
+  readonly factModels: string;
+  /** TERMINAL-PICKER-007 — in-card reason while a turn is running (non-switch kinds). */
+  readonly readOnlyBusy: string;
+  /** TERMINAL-PICKER-007 — the config write seam is not wired in this session. */
+  readonly seamMissing: string;
   readonly states: Readonly<Record<PickerState, string>>;
   readonly scopes: Readonly<Record<PickerScope, string>>;
   /** Typed blocked reasons by code; unknown codes render `blockedGeneric`. */
@@ -47,7 +57,7 @@ export interface PickerLabels {
   readonly approveFacts: Readonly<Record<'suggest' | 'auto-edit' | 'full-auto', string>>;
 }
 
-const BLOCKED_CODES = ['MODEL_INACTIVE', 'MODEL_NOT_IN_ACTIVE_SET', 'NO_NATIVE_TRANSPORT', 'MISSING_CREDENTIAL', 'NOT_ENUMERABLE'] as const;
+const BLOCKED_CODES = ['MODEL_INACTIVE', 'MODEL_NOT_IN_ACTIVE_SET', 'NO_NATIVE_TRANSPORT', 'MISSING_CREDENTIAL', 'NOT_ENUMERABLE', 'NO_MODELS_LISTED'] as const;
 
 /** Resolve every picker label from the catalog for the session language. */
 export function buildPickerLabels(t: (key: string) => string): PickerLabels {
@@ -73,6 +83,11 @@ export function buildPickerLabels(t: (key: string) => string): PickerLabels {
     typedHint: t('tui.picker.typed_hint'),
     unavailableSurface: t('tui.picker.unavailable_surface'),
     notFound: t('tui.picker.not_found'),
+    hintFilterEsc: t('tui.picker.hint_filter_esc'),
+    typedForm: t('tui.picker.typed_form'),
+    factModels: t('tui.picker.fact.models'),
+    readOnlyBusy: t('tui.picker.read_only_busy'),
+    seamMissing: t('tui.picker.seam_missing'),
     states: {
       current: t('tui.picker.state.current'),
       ok: t('tui.picker.state.ok'),

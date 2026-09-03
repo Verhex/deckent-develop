@@ -56,8 +56,11 @@ describe('PickerCard — render', () => {
     await tick();
     const frame = lastFrame() ?? '';
     expect(frame).toContain(EN.title.model);
-    expect(frame).toContain('❯ claude-fable-5-1  claude · premium  [current]');
-    expect(frame).toContain('  claude-sonnet-5  claude · standard  [ok]');
+    // TERMINAL-PICKER-007: labels share one column (padded to the widest visible label).
+    expect(frame).toMatch(/❯ claude-fable-5-1 +claude · premium +\[current\]/);
+    expect(frame).toMatch(/  claude-sonnet-5 +claude · standard +\[ok\]/);
+    const factCol = (id: string): number => { const l = frame.split('\n').find((x) => x.includes(id)) ?? ''; return l.indexOf('claude ·'); };
+    expect(factCol('claude-fable-5-1')).toBe(factCol('claude-sonnet-5'));
     expect(frame).toContain(EN.hintPick);
   });
 

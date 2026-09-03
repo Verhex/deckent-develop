@@ -22,24 +22,26 @@ export const CLI_TERMINAL_PICKER_MESSAGES: MessageFamily = Object.freeze({
   'tui.picker.title.term': { en: 'Choose the terminal authority posture', tr: 'Terminal yetki duruşunu seç' },
   'tui.picker.title.resume': { en: 'Choose a session to resume', tr: 'Sürdürülecek oturumu seç' },
   'tui.picker.title.config_key': { en: 'Choose a setting', tr: 'Ayar seç' },
-  'tui.picker.title.config_value': { en: 'Choose a value', tr: 'Değer seç' },
+  'tui.picker.title.config_value': { en: 'Choose a value for {key}', tr: '{key} için değer seç' },
   'tui.picker.title.confirm': { en: 'Confirm', tr: 'Onayla' },
 
   // ── hints / lines ──────────────────────────────────────────────────────
-  'tui.picker.hint_pick': { en: '↑↓ move · type to filter · Enter select · Esc close', tr: '↑↓ gez · yazarak filtrele · Enter seç · Esc kapat' },
+  'tui.picker.hint_pick': { en: '↑↓ / j k move · type to filter · Enter select · Esc close', tr: '↑↓ / j k gez · yazarak filtrele · Enter seç · Esc kapat' },
+  'tui.picker.hint_filter_esc': { en: 'Esc clears the filter · Enter select', tr: 'Esc filtreyi temizler · Enter seç' },
   'tui.picker.hint_scope': { en: 'Tab/←→ choose scope · Enter confirm · Esc back', tr: 'Tab/←→ kapsam seç · Enter onayla · Esc geri' },
   'tui.picker.hint_filter': { en: 'filter: {query}', tr: 'filtre: {query}' },
   'tui.picker.empty': { en: 'nothing to choose from', tr: 'seçilecek bir şey yok' },
   'tui.picker.more': { en: '{glyph} {n} more', tr: '{glyph} {n} daha' },
   'tui.picker.reveal': { en: '{glyph} full id: {id}', tr: '{glyph} tam kimlik: {id}' },
   'tui.picker.typed_hint': { en: 'type {command} <n|id> to choose', tr: 'seçmek için {command} <n|id> yazın' },
-  'tui.picker.unavailable_surface': { en: 'the interactive menu is not available on this surface; type {command} <n|id>', tr: 'etkileşimli menü bu yüzeyde yok; {command} <n|id> yazın' },
+  'tui.picker.unavailable_surface': { en: 'the interactive menu is not available on this surface', tr: 'etkileşimli menü bu yüzeyde yok' },
+  'tui.picker.typed_form': { en: 'type the value directly: {command} <value>', tr: 'değeri doğrudan yazın: {command} <değer>' },
   'tui.picker.not_found': { en: 'no such choice: {arg}', tr: 'böyle bir seçenek yok: {arg}' },
 
   // ── state words (every row carries one; color only supplements) ────────
-  'tui.picker.state.current': { en: 'current', tr: 'geçerli' },
+  'tui.picker.state.current': { en: 'current', tr: 'etkin' },
   'tui.picker.state.ok': { en: 'ok', tr: 'uygun' },
-  'tui.picker.state.blocked': { en: 'blocked', tr: 'engelli' },
+  'tui.picker.state.blocked': { en: 'blocked', tr: 'engellendi' },
   'tui.picker.state.unknown': { en: 'unknown', tr: 'bilinmiyor' },
 
   // ── commit scopes ──────────────────────────────────────────────────────
@@ -54,6 +56,11 @@ export const CLI_TERMINAL_PICKER_MESSAGES: MessageFamily = Object.freeze({
   'tui.picker.blocked.NO_NATIVE_TRANSPORT': { en: 'no native transport for this provider in the Terminal', tr: 'Terminal için bu sağlayıcıda yerel taşıma yok' },
   'tui.picker.blocked.MISSING_CREDENTIAL': { en: 'credential missing — {detail}', tr: 'kimlik bilgisi eksik — {detail}' },
   'tui.picker.blocked.NOT_ENUMERABLE': { en: 'not enumerable here — use deckent config set', tr: 'burada listelenemez — deckent config set kullanın' },
+  'tui.picker.blocked.NO_MODELS_LISTED': { en: 'no models are listed for this provider', tr: 'bu sağlayıcı için listelenmiş model yok' },
+  // ── TERMINAL-PICKER-007 — closure rows ─────────────────────────────────
+  'tui.picker.fact.models': { en: '{n} models', tr: '{n} model' },
+  'tui.picker.seam_missing': { en: 'this session has no config write seam', tr: 'bu oturumda config yazma bağlantısı yok' },
+  'tui.picker.read_only_busy': { en: 'read-only while a turn is running', tr: 'bir tur çalışırken salt-okunur' },
   'tui.picker.blocked_generic': { en: 'unavailable ({code})', tr: 'kullanılamaz ({code})' },
 
   // ── row facts for the approval-mode picker (TERMINAL-PICKER-003) ───────

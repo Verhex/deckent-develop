@@ -48,7 +48,7 @@ describe('mapPickerKey — documented keys only, never an implicit decision', ()
   it('j/k and 1-9 navigate ONLY while the filter is empty; otherwise they type', () => {
     expect(mapPickerKey('j', {}, pick)).toEqual({ kind: 'move', by: 1 });
     expect(mapPickerKey('k', {}, pick)).toEqual({ kind: 'move', by: -1 });
-    expect(mapPickerKey('3', {}, pick)).toEqual({ kind: 'jump', index: 3 });
+    expect(mapPickerKey('3', {}, pick)).toEqual({ kind: 'type', ch: '3' });   // TERMINAL-PICKER-007: rows carry no numbers → digits type
     const typing = { queryEmpty: false, stage: 'pick' as const };
     expect(mapPickerKey('j', {}, typing)).toEqual({ kind: 'type', ch: 'j' });
     expect(mapPickerKey('3', {}, typing)).toEqual({ kind: 'type', ch: '3' });

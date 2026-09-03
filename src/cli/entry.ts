@@ -942,7 +942,7 @@ export async function launchDefaultRepl(): Promise<void> {
     provider: readlineSwitcher.proxy,
     switchProvider: (name) => throwOnSwitchError(readlineSwitcher.switchTo({ provider: name })),
     switchModel: (modelId) => throwOnSwitchError(readlineSwitcher.switchTo({ model: modelId })),
-    pickerSpecs: buildLegacyPickerSpecs(() => readlineSwitcher.current()),
+    pickerSpecs: buildLegacyPickerSpecs(() => readlineSwitcher.current(), () => process.cwd(), (n) => getMessage('tui.picker.fact.models', replLang).replace('{n}', String(n))),
     pickerLabels: buildPickerLabels((key) => getMessage(key, replLang)),
     dispatcher,
     input: isTty ? arbitratedInput() : simpleLines(),

@@ -1472,6 +1472,7 @@ export async function runInkRepl(
           policy,
           current: { provider: live.provider, model: live.model },
           availability,
+          modelsFact: (n) => t('tui.picker.fact.models').replace('{n}', String(n)),
         };
       };
       pickerSpecs = {
@@ -1681,7 +1682,7 @@ export async function runInkRepl(
       inboxFollowFeed={() => collectInboxRows(process.cwd())}
       inboxLabels={buildInboxLabels(t)}
       pickerLabels={buildPickerLabels(t)}
-      pickerSpecs={pickerSpecs ?? buildLegacyPickerSpecs(() => switcher.current())}
+      pickerSpecs={pickerSpecs ?? buildLegacyPickerSpecs(() => switcher.current(), () => process.cwd(), (n) => t('tui.picker.fact.models').replace('{n}', String(n)))}
       saveDefault={(kind, id) => {
         // "save as default" pins BOTH keys the boot path reads (resolveNativeProvider
         // → native_provider pin → resolveNativeSelection with native_model): a

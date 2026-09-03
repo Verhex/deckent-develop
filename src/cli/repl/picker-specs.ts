@@ -18,7 +18,12 @@ import type { PickerCandidate, PickerFact, PickerSpec } from './picker.js';
 import type { NativeModelCandidate } from './native-transport.js';
 import { registryProviderFor } from './native-transport.js';
 
-export type ProviderAvailability = { readonly ok: true } | { readonly ok: false; readonly code: string; readonly detail: string };
+/** `ok: 'unknown'` — no evidence either way (a surface without a credential
+ *  probe): rows render the `unknown` word, never a false `ok` (RECONCILIATION L204). */
+export type ProviderAvailability =
+  | { readonly ok: true }
+  | { readonly ok: 'unknown' }
+  | { readonly ok: false; readonly code: string; readonly detail: string };
 
 /** A structural subset of ModelActivationPolicy — only what the specs consult. */
 export interface PickerActivationPolicy {
@@ -33,6 +38,8 @@ export interface PickerSpecContext {
   readonly policy: PickerActivationPolicy;
   readonly current: { readonly provider: string; readonly model: string | null };
   readonly availability: (provider: string) => ProviderAvailability;
+  /** Localized "{n} models" fact for provider rows (default: the bare count). */
+  readonly modelsFact?: (n: number) => string;
 }
 
 const SCOPES: PickerSpec['scopes'] = ['session', 'default'];
@@ -71,7 +78,7 @@ export function buildModelPickerSpec(ctx: PickerSpecContext): PickerSpec {
         candidates.push({ id: m.id, label: m.id, facts, state: 'current' });
         continue;
       }
-      if (!availability.ok) {
+      if (availability.ok === false) {
         candidates.push({ id: m.id, label: m.id, facts, state: 'blocked', blockedCode: availability.code, detail: availability.detail });
         continue;
       }
@@ -80,7 +87,7 @@ export function buildModelPickerSpec(ctx: PickerSpecContext): PickerSpec {
         candidates.push({ id: m.id, label: m.id, facts, state: 'blocked', blockedCode: code });
         continue;
       }
-      candidates.push({ id: m.id, label: m.id, facts, state: 'ok' });
+      candidates.push({ id: m.id, label: m.id, facts, state: availability.ok === 'unknown' ? 'unknown' : 'ok' });
     }
   }
   const initialId = ctx.current.model !== null && candidates.some((c) => c.id === ctx.current.model) ? ctx.current.model : null;
@@ -100,9 +107,9 @@ export function buildApprovalPickerSpec<M extends string>(modes: readonly M[], c
 }
 
 /** One row per authority posture; `admits` renders the risk classes it allows. */
-export function buildTermPickerSpec<M extends string>(modes: readonly M[], current: M, admits: (mode: M) => string): PickerSpec {
+export function buildTermPickerSpec<M extends string>(modes: readonly M[], current: M, admits: (mode: M) => string, labelOf: (mode: M) => string = (m) => m): PickerSpec {
   const candidates: PickerCandidate[] = modes.map((mode) => ({
-    id: mode, label: mode, facts: [{ key: 'admits', value: admits(mode) }], state: mode === current ? 'current' : 'ok',
+    id: mode, label: labelOf(mode), facts: [{ key: 'admits', value: admits(mode) }], state: mode === current ? 'current' : 'ok',
   }));
   return { kind: 'term', candidates, initialId: modes.includes(current) ? current : null, scopes: APPLY_ONLY };
 }
@@ -149,21 +156,32 @@ const APPLY_OR_CANCEL: PickerSpec['scopes'] = ['apply', 'cancel'];
 /** Value picker for one key: its options with the current value marked; the
  *  confirm stage offers apply / cancel. */
 export function buildConfigValuePickerSpec(key: string, options: readonly string[], current: unknown): PickerSpec {
-  void key;
   const currentText = current === undefined || current === null ? null : String(current);
   const candidates: PickerCandidate[] = options.map((value) => ({
     id: value, label: value, facts: [], state: value === currentText ? 'current' : 'ok',
   }));
-  return { kind: 'config-value', candidates, initialId: currentText !== null && options.includes(currentText) ? currentText : null, scopes: APPLY_OR_CANCEL };
+  return { kind: 'config-value', candidates, initialId: currentText !== null && options.includes(currentText) ? currentText : null, scopes: APPLY_OR_CANCEL, titleSubject: key };
+}
+
+const CONFIG_VALUE_CELLS = 40;
+
+/** A setting's value as a bounded, honest token: never "[object Object]". */
+export function formatConfigValue(value: unknown): string {
+  if (value === undefined || value === null) return '-';
+  const text = typeof value === 'string' ? value : typeof value === 'object' ? JSON.stringify(value) : String(value);
+  return text.length > CONFIG_VALUE_CELLS ? `${text.slice(0, CONFIG_VALUE_CELLS)}…` : text;
 }
 
 export function buildProviderPickerSpec(ctx: PickerSpecContext): PickerSpec {
   const candidates: PickerCandidate[] = orderedProviders(ctx).map((provider) => {
     const availability = ctx.availability(provider);
-    const facts: PickerFact[] = [{ key: 'models', value: String(ctx.candidatesFor(provider).length) }];
+    const count = ctx.candidatesFor(provider).length;
+    const facts: PickerFact[] = [{ key: 'models', value: ctx.modelsFact ? ctx.modelsFact(count) : String(count) }];
     if (provider === ctx.current.provider) return { id: provider, label: provider, facts, state: 'current' };
-    if (!availability.ok) return { id: provider, label: provider, facts, state: 'blocked', blockedCode: availability.code, detail: availability.detail };
-    return { id: provider, label: provider, facts, state: 'ok' };
+    if (availability.ok === false) return { id: provider, label: provider, facts, state: 'blocked', blockedCode: availability.code, detail: availability.detail };
+    // A provider with nothing to pick is not "ok" (it would claim usability).
+    if (count === 0) return { id: provider, label: provider, facts, state: 'blocked', blockedCode: 'NO_MODELS_LISTED' };
+    return { id: provider, label: provider, facts, state: availability.ok === 'unknown' ? 'unknown' : 'ok' };
   });
   const initialId = candidates.some((c) => c.id === ctx.current.provider) ? ctx.current.provider : null;
   return { kind: 'provider', candidates, initialId, scopes: SCOPES };

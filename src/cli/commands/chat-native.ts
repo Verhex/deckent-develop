@@ -924,8 +924,11 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
       if (builder && (arg.length === 0 || kind === 'model')) {
         const spec = builder();
         if (arg.length === 0) {
-          const lines = pickerLinesFor(spec, labels, resolvePickerGlyphs(true), command);
-          if (kind !== 'model') lines.push(labels.unavailableSurface.replace('{command}', command));
+          // TERMINAL-PICKER-007 — the `<n|id>` hint is promised only where a
+          // resolver exists (/model); the other kinds name their typed form.
+          const resolvable = kind === 'model';
+          const lines = pickerLinesFor(spec, labels, resolvePickerGlyphs(true), command, { typedHint: resolvable });
+          if (!resolvable) lines.push(labels.typedForm.replace('{command}', command));
           output(lines.join('\n'));
           continue;
         }
@@ -956,10 +959,13 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
       }
       if (arg.length === 0) {
         replyText = getMessage('tui.switch_usage', lang);
-        // The usage line stays first (pinned); the numbered list follows when a
+        // The usage line stays first (pinned) and names the current selection
+        // (its "current:" tail was dangling); the numbered list follows when a
         // spec builder is injected.
         const spec = opts.pickerSpecs?.provider?.();
         if (spec && opts.pickerLabels) {
+          const currentRow = spec.candidates.find((c) => c.state === 'current');
+          if (currentRow) replyText += ` ${currentRow.id}`;
           replyText += `\n${pickerLinesFor(spec, opts.pickerLabels, resolvePickerGlyphs(true), '/provider').join('\n')}`;
         }
       } else if (!opts.switchProvider) {

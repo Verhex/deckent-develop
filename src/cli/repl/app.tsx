@@ -40,7 +40,7 @@ import { renderCommandRisk } from '../helpers/risk-language.js';
 import { PickerCard } from './picker-card.js';
 import { resolvePickerGlyphs, pickerLinesFor, resolvePickerArg, pickerStateWord, type PickerKind, type PickerScope, type PickerSpec } from './picker.js';
 import type { PickerLabels } from './picker-labels.js';
-import { buildApprovalPickerSpec, buildTermPickerSpec, buildResumePickerSpec, buildConfigKeyPickerSpec, buildConfigValuePickerSpec, type ConfigKeyEntry } from './picker-specs.js';
+import { buildApprovalPickerSpec, buildTermPickerSpec, buildResumePickerSpec, buildConfigKeyPickerSpec, buildConfigValuePickerSpec, formatConfigValue, type ConfigKeyEntry } from './picker-specs.js';
 import { APPROVAL_MODES, type ApprovalMode } from '../../agent/permission-types.js';
 import { createChatTurnQueue, type ChatTurnQueue, type ChatTurnBgEvent, type ChatTurnPayload } from './chat-turn-queue.js';
 import { createInputQueue, type InputQueue } from './input-queue.js';
@@ -1508,7 +1508,8 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     if (kind === 'approve') return buildApprovalPickerSpec(APPROVAL_MODES, approval, (m) => pickerLabels.approveFacts[m]);
     if (kind === 'term') {
       return buildTermPickerSpec(TERM_MODES, termModeRef.current.mode,
-        (mode) => [...ALLOWED_RISKS_BY_MODE[mode]].map((risk) => renderCommandRisk(risk, lang ?? 'en').label).join(' · '));
+        (mode) => [...ALLOWED_RISKS_BY_MODE[mode]].map((risk) => renderCommandRisk(risk, lang ?? 'en').label).join(' · '),
+        (mode) => resolveModeLabel(mode, labels));
     }
     if (kind === 'resume') {
       const merged = mergedResumeRecords();
@@ -1520,8 +1521,8 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       if (!configEntries) return null;
       return buildConfigKeyPickerSpec(configEntries(), (e) => [
         e.category,
-        pickerLabels.configFacts.current.replace('{value}', e.current === undefined || e.current === null ? '-' : String(e.current)),
-        pickerLabels.configFacts.default.replace('{value}', e.defaultValue === undefined || e.defaultValue === null ? '-' : String(e.defaultValue)),
+        pickerLabels.configFacts.current.replace('{value}', formatConfigValue(e.current)),
+        pickerLabels.configFacts.default.replace('{value}', formatConfigValue(e.defaultValue)),
       ]);
     }
     if (kind === 'config-value') {
@@ -1559,7 +1560,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       const entry = pickerConfigKey.current;
       pickerConfigKey.current = null;
       if (!entry || scope !== 'apply') return;
-      if (!saveConfigValue) { pushTurn('seg', pickerLabels.configWriteFailed.replace('{error}', 'no-config-seam')); return; }
+      if (!saveConfigValue) { pushTurn('seg', pickerLabels.configWriteFailed.replace('{error}', pickerLabels.seamMissing)); return; }
       const out = saveConfigValue(entry.key, id);
       pushTurn('seg', out.ok
         ? pickerLabels.committed.config.replace('{key}', entry.key).replace('{value}', id)
@@ -1569,7 +1570,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     if (kind !== 'model' && kind !== 'provider') return;
     if (!runSwitch(kind, id)) return;
     if (scope !== 'default') return;
-    if (!saveDefault) { pushTurn('seg', pickerLabels.defaultWriteFailed.replace('{error}', 'no-config-seam')); return; }
+    if (!saveDefault) { pushTurn('seg', pickerLabels.defaultWriteFailed.replace('{error}', pickerLabels.seamMissing)); return; }
     const out = saveDefault(kind, id);
     pushTurn('seg', out.ok
       ? pickerLabels.committed.default.replace('{value}', id)
@@ -2404,6 +2405,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           the card is read-only and Enter renders the busy reason in-card. */}
       {picker && (
         <PickerCard
+          key={`${picker.kind}:${picker.spec.titleSubject ?? ''}`}
           spec={picker.spec}
           labels={pickerLabels}
           glyphs={resolvePickerGlyphs(pickerAscii)}
@@ -2411,10 +2413,15 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           rows={process.stdout.rows ?? 24}
           noColor={pickerNoColor}
           isActive={resolvePickerCardActive(stdinOwner.confirmActive, approvalPending, runFlowPending, inboxOpen)}
-          readOnlyReason={working ? labels.switchBusy.replace('{kind}', picker.kind) : null}
+          readOnlyReason={working
+            ? (picker.kind === 'model' || picker.kind === 'provider' ? labels.switchBusy.replace('{kind}', picker.kind) : pickerLabels.readOnlyBusy)
+            : null}
           onCommit={(id, scope) => commitPicker(picker.kind, id, scope)}
           onClose={() => setPicker(null)}
-          onInterrupt={() => { setPicker(null); handleInterrupt('int', true); }}
+          // TERMINAL-PICKER-007 — Ctrl-C only closes the card; the app-level
+          // hook (active while the input bar is not the owner) already arms
+          // the two-press exit policy for the SAME keypress.
+          onInterrupt={() => setPicker(null)}
         />
       )}
 

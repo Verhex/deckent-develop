@@ -14,14 +14,21 @@ import type { ActiveSelection } from './provider-switch.js';
 import type { PickerKind, PickerSpec } from './picker.js';
 import { buildModelPickerSpec, buildProviderPickerSpec, type PickerSpecContext } from './picker-specs.js';
 
-export function buildLegacyPickerSpecs(current: () => ActiveSelection, projectRoot: () => string = () => process.cwd()): Partial<Record<PickerKind, () => PickerSpec>> {
+export function buildLegacyPickerSpecs(
+  current: () => ActiveSelection,
+  projectRoot: () => string = () => process.cwd(),
+  modelsFact?: (n: number) => string,
+): Partial<Record<PickerKind, () => PickerSpec>> {
   const context = (): PickerSpecContext => ({
     providers: modelRegistry.getAllProviders(),
     candidatesFor: (provider) => modelRegistry.getByProvider(provider as Parameters<typeof modelRegistry.getByProvider>[0])
       .map((m) => ({ provider, id: m.id, definition: m })),
     policy: resolveActiveModelPolicy(projectRoot()),
     current: { provider: current().provider, model: current().model ?? null },
-    availability: () => ({ ok: true }),
+    // No credential/reachability probe on these paths → `unknown`, never a
+    // false `ok` (RECONCILIATION L204; TERMINAL-PICKER-007).
+    availability: () => ({ ok: 'unknown' }),
+    ...(modelsFact ? { modelsFact } : {}),
   });
   return {
     model: () => buildModelPickerSpec(context()),

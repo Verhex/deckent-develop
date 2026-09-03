@@ -93,7 +93,8 @@ describe('legacy readline loop — numbered lists + typed resolution', () => {
     const text = out.join('\n');
     expect(text).toContain(EN.title.approve);
     expect(text).toContain('1) suggest  [current]');
-    expect(text).toContain(EN.unavailableSurface.replace('{command}', '/approve'));
+    // TERMINAL-PICKER-007: no `<n|id>` promise where nothing resolves — the typed form instead.
+    expect(text).toContain(EN.typedForm.replace('{command}', '/approve'));
   });
 });
 
