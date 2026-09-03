@@ -475,7 +475,31 @@ scoped selection; the full-suite cadence (5-landing rule) still applies separate
 form: "count/pin tests belong to ALL projection consumers of the touched surface, not to the
 surface's scoped set."
 
+## 33. A model catalog entry is not executable reachability
+
+A model may appear in the registry, activation store and CLI while the real worker still cannot
+execute it. The Fable 5.1 landing exposed four separate boundaries: an explicit XVerify model was
+initially replaced during evidence preparation by the configured default; the worker image carried
+an older provider CLI than the host; a valid provider answer violated an ambiguous result schema;
+and an explicit `--files` request still expanded to unrelated dirty paths. Each failure correctly
+settled as HOLD rather than being treated as model support.
+
+Close model support as one exact chain: registry identity → owner activation → provider command
+argument → worker-image capability → real provider call → provider-reported usage → terminal
+settlement → durable receipt. An explicit verifier model governs both evidence preparation and
+dispatch; explicit files form a closed evidence boundary; the response schema forbids fields that
+do not belong to the selected status. Every executable ingress must then re-read the project-scoped
+owner active set before task publication, provider probing, credential lookup or adapter creation;
+a process-global cache is not sufficient authority for a fresh CLI/MCP/Terminal process. Source
+changes are rebuilt before the proof. Catalog, unit tests and a successful host-only call are
+supporting evidence, never substitutes for that chain.
+
 ## Changelog (update after every sprint experience)
+
+- **2026-09-03 — Terminal surface and Fable 5.1 executable-reachability closure**: Added Lesson 33
+  after the exact verifier identity, worker-image capability, result-schema and evidence-boundary
+  failures were repaired and a different-provider XVerify completed with reported usage,
+  settlement and a durable receipt.
 
 - **2026-08-27 — night-shift directive + landing disciplines**: Added Lesson 31 (task-scoped
   single Test + authority files in Reads; sprint-696 cascade vs sprint-697 2/2 proof) and

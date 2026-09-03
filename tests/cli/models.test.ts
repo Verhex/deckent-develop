@@ -1,7 +1,7 @@
 // ─── CLI models command tests (Sprint 190 190-011) ─────────────────────────
 // Tests: list output format, provider filter, refresh cache invalidate
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Command } from 'commander';
 
 // ─── Hoisted mocks ─────────────────────────────────────────────────────────
@@ -34,6 +34,15 @@ import {
   colorTier,
 } from '../../src/cli/commands/models.js';
 import type { ModelDefinition } from '../../src/core/model-registry.js';
+
+const originalDeckentLanguage = process.env['DECKENT_LANGUAGE'];
+beforeEach(() => {
+  process.env['DECKENT_LANGUAGE'] = 'en';
+});
+afterEach(() => {
+  if (originalDeckentLanguage === undefined) delete process.env['DECKENT_LANGUAGE'];
+  else process.env['DECKENT_LANGUAGE'] = originalDeckentLanguage;
+});
 
 // ─── Fixtures ──────────────────────────────────────────────────────────────
 
@@ -98,7 +107,7 @@ async function runModelsCommand(args: string[]): Promise<void> {
 
 describe('renderModelsTable', () => {
   it('renders header + separator + rows for each model', () => {
-    const table = renderModelsTable([MODEL_OPUS, MODEL_SONNET]);
+    const table = renderModelsTable([MODEL_OPUS, MODEL_SONNET], 'en');
     expect(table).toContain('ID');
     expect(table).toContain('PROVIDER');
     expect(table).toContain('TIER');
@@ -107,7 +116,7 @@ describe('renderModelsTable', () => {
   });
 
   it('returns a "No models found" message when list is empty', () => {
-    const result = renderModelsTable([]);
+    const result = renderModelsTable([], 'en');
     expect(result).toContain('No models found');
   });
 });
@@ -131,15 +140,15 @@ describe('findModel', () => {
 
 describe('sourceBadge', () => {
   it('labels remote source as "live"', () => {
-    expect(sourceBadge('remote')).toContain('live');
+    expect(sourceBadge('remote', 'en')).toContain('live');
   });
 
   it('labels cache source as "cached"', () => {
-    expect(sourceBadge('cache')).toContain('cached');
+    expect(sourceBadge('cache', 'en')).toContain('cached');
   });
 
   it('labels bundled source as "bundled"', () => {
-    expect(sourceBadge('bundled')).toContain('bundled');
+    expect(sourceBadge('bundled', 'en')).toContain('bundled');
   });
 });
 

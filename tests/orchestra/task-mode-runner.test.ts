@@ -12,7 +12,7 @@
 // mocks buildWorkerPrompt to prevent ADR/memory DB reads in CI.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -66,6 +66,7 @@ import type { ExecutionBudget } from '../../src/core/work-model.js';
 import { ProviderExecutionIngressHoldError } from '../../src/core/provider-execution-ingress-authority.js';
 import { InvocationReceiptStore } from '../../src/core/invocation-receipt-store.js';
 import { TaskStatus, type Task } from '../../src/core/types.js';
+import { ModelActivationStore } from '../../src/core/model-activation-store.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -210,6 +211,85 @@ describe('runTaskMode — phase-1a gap fixes (E + G)', () => {
       config,
     )).rejects.toThrow('EXECUTION_BUDGET_HOLD:budget-policy-missing:execution_budget.roles.worker');
 
+    expect(existsSync(join(root, '.tasks'))).toBe(false);
+    expect(backendHarness.spawn).not.toHaveBeenCalled();
+  });
+
+  it('enforces the project active-set even when the process registry was never bootstrapped', async () => {
+    const store = new ModelActivationStore(root);
+    try {
+      store.setProviderPolicy('claude', 'explicit-active');
+      store.setActivation('claude', 'claude-sonnet-5', true);
+    } finally {
+      store.close();
+    }
+    const task: Task = {
+      id: 'project-model-policy-hold',
+      title: 'Project model policy hold',
+      description: 'must not dispatch an inactive exact model',
+      model: 'claude-fable-5-1',
+      provider: 'claude',
+      effort: 'normal',
+      priority: 'NORMAL',
+      reason: 'test',
+      scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
+      dependencies: [],
+      goNogo: {
+        goCriteria: 'inactive model is rejected before dispatch',
+        noGoCriteria: 'inactive model reaches a provider',
+        techDebtAcceptable: 'None',
+      },
+      status: TaskStatus.PENDING,
+      createdAt: new Date().toISOString(),
+    };
+
+    const caught = await executeTaskIngress({
+      projectRoot: root,
+      config: makeTaskConfig(),
+      task,
+      timeoutMs: 1_000,
+      transport: 'local-runtime',
+    }).catch((error: unknown) => error);
+
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as { code?: string }).code).toBe('MODEL_INACTIVE');
+    expect(existsSync(join(root, '.tasks'))).toBe(false);
+    expect(backendHarness.spawn).not.toHaveBeenCalled();
+  });
+
+  it('holds before Task JSON and spawn when the project model authority is unreadable', async () => {
+    mkdirSync(join(root, '.deckent'), { recursive: true });
+    writeFileSync(join(root, '.deckent', 'models.db'), 'not-a-sqlite-database', 'utf8');
+    const task: Task = {
+      id: 'project-model-authority-unavailable',
+      title: 'Project model authority unavailable',
+      description: 'must not dispatch without owner model authority',
+      model: 'claude-fable-5-1',
+      provider: 'claude',
+      effort: 'normal',
+      priority: 'NORMAL',
+      reason: 'test',
+      scope: { directories: ['src/'], filesRead: [], filesWrite: [] },
+      dependencies: [],
+      goNogo: {
+        goCriteria: 'unreadable model authority is a typed hold',
+        noGoCriteria: 'unreadable model authority silently opens execution',
+        techDebtAcceptable: 'None',
+      },
+      status: TaskStatus.PENDING,
+      createdAt: new Date().toISOString(),
+    };
+
+    const caught = await executeTaskIngress({
+      projectRoot: root,
+      config: makeTaskConfig(),
+      task,
+      timeoutMs: 1_000,
+      transport: 'local-runtime',
+    }).catch((error: unknown) => error);
+
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as { code?: string }).code).toBe('MODEL_ACTIVATION_AUTHORITY_UNAVAILABLE');
     expect(existsSync(join(root, '.tasks'))).toBe(false);
     expect(backendHarness.spawn).not.toHaveBeenCalled();
   });

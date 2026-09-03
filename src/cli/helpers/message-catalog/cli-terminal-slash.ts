@@ -210,6 +210,14 @@ export const CLI_TERMINAL_SLASH_MESSAGES: MessageFamily = Object.freeze({
     en: 'native engine not started — unknown model "{detail}": use an exact registered provider API model ID. Running the legacy loop instead.',
     tr: 'native motor başlatılmadı — bilinmeyen model "{detail}": tam kayıtlı sağlayıcı API model kimliği kullanın. Bunun yerine eski döngü çalışıyor.',
   },
+  'native.boot.model-inactive': {
+    en: 'native engine not started — model "{detail}" is inactive under the owner policy. Activate it with deckent models activate. Running the legacy loop instead.',
+    tr: 'native motor başlatılmadı — "{detail}" modeli sahip politikasında pasif. deckent models activate ile etkinleştirin. Bunun yerine eski döngü çalışıyor.',
+  },
+  'native.boot.model-authority-unavailable': {
+    en: 'native engine not started — the project model authority cannot be read safely; no provider call was made. Running the legacy loop instead.',
+    tr: 'native motor başlatılmadı — proje model yetkisi güvenle okunamıyor; sağlayıcı çağrısı yapılmadı. Bunun yerine eski döngü çalışıyor.',
+  },
   'native.boot.no-transport': {
     en: 'native engine not started — no native transport configured: set ANTHROPIC_API_KEY / OPENAI_API_KEY / openai_base_url / ollama_host. Running the legacy loop instead.',
     tr: 'native motor başlatılmadı — native transport tanımlı değil: ANTHROPIC_API_KEY / OPENAI_API_KEY / openai_base_url / ollama_host tanımlayın. Bunun yerine eski döngü çalışıyor.',

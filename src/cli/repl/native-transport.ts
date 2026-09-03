@@ -27,6 +27,7 @@ import {
 } from '../../core/model-registry.js';
 import { OPENAI_COMPAT_PRESET_META } from '../../providers/openai-compatible.js';
 import type { ModelDefinition, RegistryProviderName } from '../../core/model-registry-types.js';
+import { resolveProjectModelExecutionAuthority } from '../../core/model-activation-store.js';
 import { getMessage } from '../helpers/messages.js';
 import { createStreamSegmenter, type Segment } from './stream-segmenter.js';
 import {
@@ -225,6 +226,8 @@ export interface NativeSelectionInput {
 }
 
 export interface NativeResolveContext {
+  /** Project whose owner model-activation decisions govern this selection. */
+  projectRoot: string;
   env: Record<string, string | undefined>;
   config: NativeTransportConfig;
   /** .deck secrets (ADR-G-005) — its documented contract is precedence OVER env. */
@@ -254,6 +257,31 @@ const NATIVE_TO_REGISTRY_PROVIDER: Readonly<Record<string, RegistryProviderName>
 
 export function registryProviderFor(nativeProvider: string): RegistryProviderName | null {
   return NATIVE_TO_REGISTRY_PROVIDER[nativeProvider] ?? null;
+}
+
+function inactiveNativeModel(
+  nativeProvider: string,
+  model: string,
+  projectRoot: string,
+): ProviderError | null {
+  const registryProvider = registryProviderFor(nativeProvider);
+  if (registryProvider === null) return null;
+  const authority = resolveProjectModelExecutionAuthority(projectRoot, registryProvider, model);
+  if (authority.state === 'hold') {
+    return {
+      error: 'E_MODEL_ACTIVATION_AUTHORITY_UNAVAILABLE',
+      errorCode: 'model-authority-unavailable',
+      detail: model,
+      provider: registryProvider,
+    };
+  }
+  if (authority.executable) return null;
+  return {
+    error: 'E_MODEL_INACTIVE',
+    errorCode: 'model-inactive',
+    detail: model,
+    provider: registryProvider,
+  };
 }
 
 export interface NativeModelCandidate {
@@ -551,15 +579,6 @@ export function resolveNativeSelection(
   }
 
   if (provider === 'claude') {
-    const apiKey = secrets['DECKENT_CLAUDE_API_KEY'] || env['DECKENT_CLAUDE_API_KEY'] || env['ANTHROPIC_API_KEY'];
-    if (!apiKey) {
-      return {
-        error: 'claude native transport needs an API key — set DECKENT_CLAUDE_API_KEY in .deck (or ANTHROPIC_API_KEY in the environment)',
-        errorCode: 'missing-api-key',
-        detail: 'DECKENT_CLAUDE_API_KEY (.deck) / ANTHROPIC_API_KEY',
-        provider: 'claude',
-      };
-    }
     const configModel = config.native_model && inferProviderFromId(config.native_model) === 'claude' ? config.native_model : null;
     const wire = resolveClaudeWireModel(requestedModel ?? configModel);
     if ('unresolved' in wire) {
@@ -569,6 +588,17 @@ export function resolveNativeSelection(
         error: `unknown model "${wire.unresolved}" — not a registered Claude API model ID (run deckent models or switch provider first)`,
         errorCode: 'unknown-model',
         detail: wire.unresolved,
+        provider: 'claude',
+      };
+    }
+    const inactive = inactiveNativeModel('claude', wire.apiId, ctx.projectRoot);
+    if (inactive) return inactive;
+    const apiKey = secrets['DECKENT_CLAUDE_API_KEY'] || env['DECKENT_CLAUDE_API_KEY'] || env['ANTHROPIC_API_KEY'];
+    if (!apiKey) {
+      return {
+        error: 'claude native transport needs an API key — set DECKENT_CLAUDE_API_KEY in .deck (or ANTHROPIC_API_KEY in the environment)',
+        errorCode: 'missing-api-key',
+        detail: 'DECKENT_CLAUDE_API_KEY (.deck) / ANTHROPIC_API_KEY',
         provider: 'claude',
       };
     }
@@ -586,6 +616,10 @@ export function resolveNativeSelection(
 
   if (provider === 'openai') {
     const baseUrl = config.openai_base_url ?? 'https://api.openai.com/v1';
+    const configModel = config.native_model && inferProviderFromId(config.native_model) !== 'claude' ? config.native_model : null;
+    const model = requestedModel ?? configModel ?? DEFAULT_MODEL['openai-compatible'];
+    const inactive = inactiveNativeModel('openai', model, ctx.projectRoot);
+    if (inactive) return inactive;
     const apiKey = secrets['DECKENT_OPENAI_API_KEY'] || env['DECKENT_OPENAI_API_KEY'] || env['OPENAI_API_KEY'];
     // A custom base URL (vLLM/OpenRouter/self-hosted) may be keyless; the
     // hosted openai.com endpoint never is.
@@ -597,10 +631,8 @@ export function resolveNativeSelection(
         provider: 'openai',
       };
     }
-    const configModel = config.native_model && inferProviderFromId(config.native_model) !== 'claude' ? config.native_model : null;
     const opts: Parameters<typeof createOpenAIAdapter>[0] = { baseUrl };
     if (apiKey) opts.apiKey = apiKey;
-    const model = requestedModel ?? configModel ?? DEFAULT_MODEL['openai-compatible'];
     return measuredResolved({
       adapter: createOpenAIAdapter(opts), model, providerName: 'openai',
       capability: requestMeasurementCapability({
@@ -639,6 +671,8 @@ export function resolveNativeSelection(
         provider: 'local-llm',
       };
     }
+    const inactive = inactiveNativeModel('local-llm', selectedModel, ctx.projectRoot);
+    if (inactive) return inactive;
     // NT-07 — boot-time effective context resolution lives HERE, at the
     // local-llm resolution: the configured ceiling (narrowest authored knob) is
     // probed against the server-reported n_ctx and reduced by
@@ -727,6 +761,8 @@ export function resolveNativeSelection(
     }
     const configModel = config.native_model && inferProviderFromId(config.native_model) === 'ollama' ? config.native_model : null;
     const model = requestedModel ?? configModel ?? DEFAULT_MODEL.ollama;
+    const inactive = inactiveNativeModel('ollama', model, ctx.projectRoot);
+    if (inactive) return inactive;
     return measuredResolved({
       adapter: createOllamaAdapter({ host: config.ollama_host }), model, providerName: 'ollama',
       capability: requestMeasurementCapability({
@@ -783,6 +819,7 @@ export function resolveContextBudgetTokens(
 export function resolveNativeProvider(
   env: Record<string, string | undefined>,
   config: NativeTransportConfig,
+  projectRoot: string,
   secrets?: Record<string, string>,
 ): ResolvedProvider | ProviderError {
   const mock = env['DECKENT_NATIVE_MOCK'];
@@ -805,7 +842,7 @@ export function resolveNativeProvider(
   if (config.native_provider) {
     return resolveNativeSelection(
       { provider: config.native_provider, model: explicitModel },
-      { env, config, ...(secrets ? { secrets } : {}) },
+      { projectRoot, env, config, ...(secrets ? { secrets } : {}) },
     );
   }
 
@@ -819,7 +856,7 @@ export function resolveNativeProvider(
   };
   return resolveNativeSelection(
     { provider: kindToProvider[detected.kind], model: explicitModel },
-    { env, config, ...(secrets ? { secrets } : {}) },
+    { projectRoot, env, config, ...(secrets ? { secrets } : {}) },
   );
 }
 

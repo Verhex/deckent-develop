@@ -12,7 +12,7 @@
  * Hermetic: spawn + fetch are injected. No real binary, no network.
  */
 
-import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 
 // ─── Hoisted mocks ──────────────────────────────────────────────────────
 
@@ -246,6 +246,16 @@ describe('buildReplProvider — openai-compatible branch (Sprint 221 T-005)', ()
 // ─── 4. Ollama unreachable → NET error (no skeleton) ────────────────────
 
 describe('buildReplProvider — ollama unreachable NET error (Sprint 221 T-005)', () => {
+  let previousDeckentLanguage: string | undefined;
+  beforeEach(() => {
+    previousDeckentLanguage = process.env['DECKENT_LANGUAGE'];
+    process.env['DECKENT_LANGUAGE'] = 'en';
+  });
+  afterEach(() => {
+    if (previousDeckentLanguage === undefined) delete process.env['DECKENT_LANGUAGE'];
+    else process.env['DECKENT_LANGUAGE'] = previousDeckentLanguage;
+  });
+
   // TERMINAL-I18N-NATIVE-001: the hint is the localized `chat.ollama_unreachable`
   // row (English in the default session language; Turkish under language=tr).
   it('connection-refused fetch is wrapped with a clear "Ollama (...) is unreachable" message', async () => {

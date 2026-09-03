@@ -112,7 +112,8 @@ export function createResolvedNativeEngine(
  *  contract test: each needs a `native.switch.*` AND a `native.boot.*` row). */
 export const NATIVE_ERROR_CODES = Object.freeze([
   'missing-api-key', 'missing-ollama-host', 'missing-local-llm-endpoint', 'missing-native-model',
-  'unsupported-native-provider', 'legacy-model-alias', 'unknown-model', 'no-transport',
+  'unsupported-native-provider', 'legacy-model-alias', 'unknown-model', 'model-inactive',
+  'model-authority-unavailable', 'no-transport',
 ] as const);
 
 /** Where a native-transport resolution failed: at REPL boot (the engine never
@@ -1351,7 +1352,7 @@ export async function runInkRepl(
     // .deck secrets (ADR-G-005) — credential source for API-backed transports;
     // documented precedence: .deck over env.
     const deckSecrets = loadDeckSecrets(process.cwd());
-    const resolved = resolveNativeProvider(process.env, nativeCfg, deckSecrets);
+    const resolved = resolveNativeProvider(process.env, nativeCfg, process.cwd(), deckSecrets);
     if ('error' in resolved) {
       // Boot outcome (the native engine did not start; the legacy loop runs
       // below) — worded as such, never as a "switch" (TERMINAL-TOOLS-007).
@@ -1413,7 +1414,7 @@ export async function runInkRepl(
           provider: sel.provider ?? impliedProvider ?? live.provider,
           model: sel.model !== undefined ? sel.model : live.model,
         };
-        const next = resolveNativeSelection(target, { env: process.env, config: nativeCfg, secrets: deckSecrets });
+        const next = resolveNativeSelection(target, { projectRoot: process.cwd(), env: process.env, config: nativeCfg, secrets: deckSecrets });
         if ('error' in next) {
           return { provider: live.provider, model: live.model, switchError: localizeNativeError(next, lang) };
         }
@@ -1444,7 +1445,7 @@ export async function runInkRepl(
       const pickerContext = (): PickerSpecContext => {
         const policy = resolveActiveModelPolicy(process.cwd());
         const availability = (provider: string): ProviderAvailability => {
-          const probe = resolveNativeSelection({ provider, model: null }, { env: process.env, config: nativeCfg, secrets: deckSecrets });
+          const probe = resolveNativeSelection({ provider, model: null }, { projectRoot: process.cwd(), env: process.env, config: nativeCfg, secrets: deckSecrets });
           if (!('error' in probe)) {
             // Credentials/config resolve; reachability evidence (when it exists) refines the verdict.
             const evidence = nativeEvidence.get(provider);

@@ -46,6 +46,7 @@ import type {
 import type { DockerSpawnBackend } from './spawn-backend-docker.js';
 import { atomicWriteFileSync } from '../agents/worker-lifecycle.js';
 import { liveRuleFor } from '../core/approval-rules-engine.js';
+import { resolveProjectModelExecutionAuthority } from '../core/model-activation-store.js';
 
 const DEFAULT_DECISION_WINDOW_MS = 120_000;
 const DEFAULT_DECISION_POLL_MS = 2_000;
@@ -103,6 +104,8 @@ export interface CrossVerifyEvidencePreparationInput {
 }
 
 export type CrossVerifyEvidencePreparationHoldReason =
+  | 'model_activation_authority_unavailable'
+  | 'model_inactive'
   | 'provider_authority_unavailable'
   | 'backend_identity_unavailable'
   | 'budget_profile_unavailable'
@@ -163,6 +166,24 @@ export async function prepareCrossVerifyCandidateEvidence(
 ): Promise<CrossVerifyEvidencePreparationResult> {
   const now = input.now ?? (() => new Date());
   const sleep = input.sleepFn ?? (ms => new Promise<void>(resolve => setTimeout(resolve, ms)));
+
+  const modelAuthority = resolveProjectModelExecutionAuthority(
+    input.projectRoot,
+    input.candidate.provider,
+    input.candidate.model,
+  );
+  if (modelAuthority.state === 'hold') {
+    return hold(
+      'model_activation_authority_unavailable',
+      `${input.candidate.provider}:${input.candidate.model}:${modelAuthority.snapshotDigest}`,
+    );
+  }
+  if (!modelAuthority.executable) {
+    return hold(
+      'model_inactive',
+      `${input.candidate.provider}:${input.candidate.model}:${modelAuthority.snapshotDigest}`,
+    );
+  }
 
   const authority = input.providerAuthority;
   if (!authority || authority.state !== 'ready') {

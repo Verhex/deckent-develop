@@ -23,7 +23,7 @@
 
 import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 /**
@@ -93,6 +93,8 @@ export interface ModelActivationStoreOptions {
   readonly dbPath?: string;
   /** Open without creating: a missing file yields an empty, read-only view. */
   readonly readOnly?: boolean;
+  /** Re-throw policy-table read errors at a final execution boundary. */
+  readonly strictRead?: boolean;
   /** Clock override for deterministic tests. */
   readonly now?: () => string;
 }
@@ -108,9 +110,12 @@ function assertNonEmpty(value: string, field: string): string {
 export class ModelActivationStore {
   private readonly db: Database.Database;
   private readonly now: () => string;
+  private readonly strictRead: boolean;
+  private readonly openedSchemaVersion: number;
 
   constructor(projectRoot: string, options: ModelActivationStoreOptions = {}) {
     this.now = options.now ?? ((): string => new Date().toISOString());
+    this.strictRead = options.strictRead === true;
     const dbPath = options.dbPath ?? join(projectRoot, '.deckent', 'models.db');
     if (!options.readOnly) mkdirSync(dirname(dbPath), { recursive: true });
     this.db = new Database(dbPath, options.readOnly
@@ -121,6 +126,7 @@ export class ModelActivationStore {
       this.db.pragma('synchronous = FULL');
     }
     const version = this.db.pragma('user_version', { simple: true }) as number;
+    this.openedSchemaVersion = version;
     // Forward-incompatible ONLY: a store written by a newer deckent than we
     // understand must never be silently downgraded. Any version at-or-below the
     // current one is migrated in place (read-write) or tolerated (read-only) —
@@ -192,6 +198,15 @@ export class ModelActivationStore {
     `).all() as Array<{
       provider: string; model_id: string; active: number; updated_at: string; actor: string;
     }>;
+    if (this.strictRead && rows.some((row) =>
+      typeof row.provider !== 'string' || row.provider.trim().length === 0
+      || typeof row.model_id !== 'string' || row.model_id.trim().length === 0
+      || (row.active !== 0 && row.active !== 1))) {
+      throw new ModelActivationStoreError(
+        'INVALID_INPUT',
+        'Invalid model activation row in owner authority store',
+      );
+    }
     return rows.map((r) => ({
       provider: r.provider,
       modelId: r.model_id,
@@ -246,7 +261,8 @@ export class ModelActivationStore {
     try {
       row = this.db.prepare('SELECT mode FROM provider_policy WHERE provider = ?').get(provider) as
         { mode: string } | undefined;
-    } catch {
+    } catch (error) {
+      if (this.strictRead && this.openedSchemaVersion >= 2) throw error;
       return undefined;
     }
     if (row === undefined) return undefined;
@@ -262,8 +278,17 @@ export class ModelActivationStore {
         FROM provider_policy
         ORDER BY provider
       `).all() as typeof rows;
-    } catch {
+    } catch (error) {
+      if (this.strictRead && this.openedSchemaVersion >= 2) throw error;
       return [];
+    }
+    if (this.strictRead && rows.some((row) =>
+      typeof row.provider !== 'string' || row.provider.trim().length === 0
+      || !isProviderPolicyMode(row.mode))) {
+      throw new ModelActivationStoreError(
+        'INVALID_INPUT',
+        'Invalid provider policy row in owner authority store',
+      );
     }
     return rows
       .filter((r) => isProviderPolicyMode(r.mode))
@@ -425,6 +450,79 @@ export function resolveActiveModelPolicy(
     return buildPolicy(store.list(), store.listProviderPolicies());
   } catch {
     return emptyModelActivationPolicy();
+  } finally {
+    store?.close();
+  }
+}
+
+/**
+ * Project-scoped final execution decision. Selection pools cache an immutable
+ * activation snapshot at provider bootstrap, but a fresh CLI/MCP/native entry
+ * must not become executable merely because that process has not bootstrapped
+ * the process-wide registry yet. Every side-effecting ingress uses this helper
+ * as the final, multi-project-safe store read; the returned digest lets callers
+ * bind diagnostics to the exact owner decision set they enforced.
+ */
+export interface ProjectModelExecutionAuthority {
+  readonly state: 'ready' | 'hold';
+  readonly executable: boolean;
+  readonly providerMode: ProviderPolicyMode;
+  readonly snapshotDigest: string;
+  readonly reasonCode: 'MODEL_ACTIVATION_AUTHORITY_UNAVAILABLE' | null;
+}
+
+const MODEL_ACTIVATION_AUTHORITY_UNAVAILABLE_DIGEST = createHash('sha256')
+  .update('model-activation-execution-authority unavailable v1')
+  .digest('hex');
+
+export function resolveProjectModelExecutionAuthority(
+  projectRoot: string,
+  provider: string,
+  modelId: string,
+  options: ModelActivationStoreOptions = {},
+): ProjectModelExecutionAuthority {
+  const dbPath = options.dbPath ?? join(projectRoot, '.deckent', 'models.db');
+  let store: ModelActivationStore | undefined;
+  try {
+    store = new ModelActivationStore(projectRoot, {
+      ...options,
+      dbPath,
+      readOnly: true,
+      strictRead: true,
+    });
+    const policy = buildPolicy(store.list(), store.listProviderPolicies());
+    return {
+      state: 'ready',
+      executable: policy.isExecutable(provider, modelId),
+      providerMode: policy.providerMode(provider),
+      snapshotDigest: policy.snapshotDigest,
+      reasonCode: null,
+    };
+  } catch {
+    // A truly absent store is the documented implicit-active default. Inspect
+    // after the failed open so a concurrent create never slips through an
+    // exists-then-open race; every non-ENOENT state is a fail-closed HOLD.
+    try {
+      statSync(dbPath);
+    } catch (presenceError) {
+      if ((presenceError as NodeJS.ErrnoException).code === 'ENOENT') {
+        const policy = emptyModelActivationPolicy();
+        return {
+          state: 'ready',
+          executable: policy.isExecutable(provider, modelId),
+          providerMode: policy.providerMode(provider),
+          snapshotDigest: policy.snapshotDigest,
+          reasonCode: null,
+        };
+      }
+    }
+    return {
+      state: 'hold',
+      executable: false,
+      providerMode: DEFAULT_PROVIDER_POLICY_MODE,
+      snapshotDigest: MODEL_ACTIVATION_AUTHORITY_UNAVAILABLE_DIGEST,
+      reasonCode: 'MODEL_ACTIVATION_AUTHORITY_UNAVAILABLE',
+    };
   } finally {
     store?.close();
   }

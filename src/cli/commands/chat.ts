@@ -109,9 +109,20 @@ async function runConfiguredNativeChat(
     providers: (cfg as { providers?: NativeTransportConfig['providers'] }).providers,
     local_llm: (cfg as { local_llm?: NativeTransportConfig['local_llm'] }).local_llm,
   };
-  const resolved = resolveNativeProvider(process.env, nativeCfg, loadDeckSecrets(projectRoot));
+  const resolved = resolveNativeProvider(process.env, nativeCfg, projectRoot, loadDeckSecrets(projectRoot));
   if ('error' in resolved) {
-    printError(new Error(resolved.error));
+    const message = resolved.errorCode === 'model-inactive'
+      ? getMessage('native.switch.model-inactive', lang, {
+          provider: resolved.provider ?? '',
+          detail: resolved.detail ?? '',
+        })
+      : resolved.errorCode === 'model-authority-unavailable'
+        ? getMessage('native.switch.model-authority-unavailable', lang, {
+            provider: resolved.provider ?? '',
+            detail: resolved.detail ?? '',
+          })
+      : resolved.error;
+    printError(new Error(message));
     process.exitCode = 1;
     return true;
   }

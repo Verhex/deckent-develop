@@ -22,8 +22,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zstd \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Claude Code CLI globally (always present — default lean image)
-RUN npm i -g @anthropic-ai/claude-code
+# Install the exact Claude Code release admitted by the built-in model catalog.
+# Claude Fable 5.1 rejects clients older than 2.1.251; 2.1.259 is the host- and
+# Docker-proven release for this catalog revision (2026-09-03). Pinning keeps a
+# cached rebuild from silently retaining an older, presence-only CLI.
+ARG CLAUDE_CODE_VERSION=2.1.259
+RUN npm i -g @anthropic-ai/claude-code@$CLAUDE_CODE_VERSION
 
 # Optional provider CLIs — default lean (Claude-only). Opt-in via build args:
 #   docker build --build-arg INSTALL_CODEX=true ...

@@ -123,7 +123,7 @@ describe('Cross-environment integration tests', () => {
   // ─── Test 4: Codex config generation ──────────────────────────────────────
   describe('Codex config generation', () => {
     it('creates .codex/config.toml with deckent MCP section', () => {
-      const result = generateCodexConfig(tmpDir);
+      const result = generateCodexConfig(tmpDir, { homeDir: join(tmpDir, 'home') });
 
       expect(result.project).toBe(join(tmpDir, '.codex', 'config.toml'));
       expect(existsSync(result.project)).toBe(true);

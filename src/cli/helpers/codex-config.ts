@@ -15,8 +15,16 @@ tool_timeout_sec = 600`;
  * Generate Codex App MCP config. Creates/updates ~/.codex/config.toml and .codex/config.toml.
  * Preserves existing config — only adds/updates [mcp_servers.deckent] section.
  */
-export function generateCodexConfig(projectRoot: string): { global: string; project: string } {
-  const globalPath = join(homedir(), '.codex', 'config.toml');
+export interface GenerateCodexConfigOptions {
+  /** Injectable for hermetic callers/tests; production keeps the OS home. */
+  homeDir?: string;
+}
+
+export function generateCodexConfig(
+  projectRoot: string,
+  options: GenerateCodexConfigOptions = {},
+): { global: string; project: string } {
+  const globalPath = join(options.homeDir ?? homedir(), '.codex', 'config.toml');
   const projectPath = join(projectRoot, '.codex', 'config.toml');
 
   upsertToml(globalPath);

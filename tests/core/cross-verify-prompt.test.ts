@@ -302,6 +302,13 @@ describe('cross-verify-prompt · typed adjudication v2', () => {
     expect(built.prompt).toContain('at most ONE read-only evidence tool call');
     expect(built.prompt).toContain('no top-level verdict field');
     expect(built.prompt).toContain(
+      'missingRequirementIds is forbidden for these statuses',
+    );
+    expect(built.prompt).toContain(
+      'undecidable results additionally contain a non-empty missingRequirementIds',
+    );
+    expect(built.prompt).toContain('never emit an empty array');
+    expect(built.prompt).toContain(
       `reason must be non-empty, concise, and at\n  most ${CROSS_VERIFY_ADJUDICATION_REASON_MAX_CHARS} characters`,
     );
     // Representation consistency: the decoded filename strips the `sha256:` prefix

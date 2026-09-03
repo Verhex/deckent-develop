@@ -454,7 +454,30 @@ agsk3/4 · sync ailesi) koşulur; tam full-suite kadansı (5-landing kuralı) ay
 Genel biçim: "sayım/pin testleri, dokunulan yüzeyin scoped-seti değil, yüzeyin TÜM
 projeksiyon-tüketicileridir."
 
+## 33. Modelin katalogda görünmesi, gerçekten çalışabildiğini kanıtlamaz
+
+Bir model registry'de, activation store'da ve CLI'da göründüğü hâlde gerçek worker onu
+çalıştıramayabilir. Fable 5.1 landing'i dört ayrı sınırı görünür yaptı: açıkça seçilen XVerify modeli
+kanıt hazırlığında configured default ile değiştiriliyordu; worker image host'tan daha eski bir
+provider CLI taşıyordu; geçerli provider cevabı belirsiz sonuç şemasına takılıyordu; açık `--files`
+isteği ilgisiz kirli yolları da kanıta katıyordu. Her arıza başarı sayılmak yerine doğru biçimde
+HOLD settlement üretti.
+
+Model desteği şu tek ve exact zincirle kapatılır: registry kimliği → owner activation → provider
+komut argümanı → worker-image capability → gerçek provider çağrısı → provider-reported usage →
+terminal settlement → durable receipt. Açık verifier modeli hem kanıt hazırlığını hem dispatch'i
+yönetir; açık dosya listesi kapalı kanıt sınırıdır; cevap şeması seçilen duruma ait olmayan alanları
+yasaklar. Her yürütme girişi ayrıca task yayımından, provider sondasından, credential okumadan veya
+adapter oluşturmadan önce project-scoped owner active-set'i yeniden okumalıdır; process-global cache
+taze CLI/MCP/Terminal süreci için yeterli authority değildir. Kanıttan önce kaynak yeniden build
+edilir. Katalog, unit test ve host'taki başarılı tek çağrı destekleyici kanıttır; bu zincirin yerine
+geçmez.
+
 ## Değişiklik günlüğü (her sprint deneyiminden sonra güncelle)
+
+- **2026-09-03 — Terminal yüzeyi ve Fable 5.1 gerçek yürütme kapanışı**: Exact verifier kimliği,
+  worker-image capability, sonuç şeması ve kanıt sınırı kusurları onarıldıktan; farklı-provider
+  XVerify gerçek kullanım, settlement ve durable receipt ile kapandıktan sonra Ders 33 eklendi.
 
 - **2026-08-27 — gece-vardiyası direktif + landing disiplinleri**: Ders 31 (görev-kapsamlı
   tek Test + otorite dosyaları Reads'te; sprint-696 kaskadı vs sprint-697 2/2 kanıtı) ve

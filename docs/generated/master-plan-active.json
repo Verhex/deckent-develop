@@ -3,11 +3,11 @@
   "generatedFrom": "docs/MASTER-PLAN.md",
   "sourceDigest": {
     "algorithm": "sha256(normalized-lf-utf8)",
-    "value": "aa8b0d46ae96bdc65e1b9dcd7042fd82e1cb88318f589ac52ff82d021bd51c5a"
+    "value": "614a46624ff6cf2bb3c2f0b54a0ab2aaaa8a43316a099d038569113bf4e8b9a1"
   },
   "summary": {
-    "total": 568,
-    "active": 480,
+    "total": 569,
+    "active": 481,
     "terminal": 88,
     "receipts": 214,
     "byState": {
@@ -15,13 +15,13 @@
       "READY": 0,
       "IN_PROGRESS": 0,
       "BLOCKED": 69,
-      "VERIFY": 43,
+      "VERIFY": 44,
       "DONE": 88,
       "DEFERRED": 2,
       "DISPOSED": 0
     },
     "byPriority": {
-      "P0": 361,
+      "P0": 362,
       "P1": 157,
       "P2": 50
     },
@@ -47,7 +47,7 @@
       "ONBOARDING": 1,
       "OPS": 6,
       "PAEP": 35,
-      "PRODUCT": 19,
+      "PRODUCT": 20,
       "PROMPT": 6,
       "PROVIDER": 7,
       "RELEASE": 4,
@@ -5419,6 +5419,17 @@
       "updated": "2026-08-20",
       "definitionDigest": "ab591e96a7ecea61d5481cbc6eb7e9224c4e1dd2af7b3a2603fdc65b0b46bdaa",
       "progressDigest": "0cd65c1788be77f44b003355b8178dd95917ec466a22fae28e61fbfd1b09dbdd",
+      "terminalClosureDigest": null
+    },
+    {
+      "order": 7099,
+      "id": "TERMINAL-OPERATOR-SURFACE-CLOSURE-001",
+      "program": "PRODUCT",
+      "priority": "P0",
+      "state": "VERIFY",
+      "updated": "2026-09-03",
+      "definitionDigest": "5557413f8585e9010315771e332d587ce8a7f0c03fce68c319475d9e11b08fcb",
+      "progressDigest": "fa8d39275d13d789132c83438b1a9f5d3694d2bf1f947d41f19ca0b919c8ed52",
       "terminalClosureDigest": null
     },
     {
@@ -24184,6 +24195,7 @@
         "DEBT-DEPENDENCY-REPAIR-7094R-001",
         "EVALUATOR-HONESTY-GONOGO-001",
         "SKILL-ROUTING-RESIDUAL-MICRO-001",
+        "TERMINAL-OPERATOR-SURFACE-CLOSURE-001",
         "DEP-SUPPLY-DEFENSE-001",
         "A2A-INTEROP-001",
         "SKILLMD-V3-RECONCILIATION-001",
@@ -24241,6 +24253,7 @@
         "AGENT-PERMISSION-MATRIX-001",
         "EVALUATOR-HONESTY-GONOGO-001",
         "SKILL-ROUTING-RESIDUAL-MICRO-001",
+        "TERMINAL-OPERATOR-SURFACE-CLOSURE-001",
         "DEP-SUPPLY-DEFENSE-001",
         "A2A-INTEROP-001",
         "SKILLMD-V3-RECONCILIATION-001",
@@ -24919,7 +24932,8 @@
       "dependsOn": [],
       "dependents": [
         "DECKENT-CORE-MODEL-LIFECYCLE-001",
-        "OWNER-MODEL-POLICY-001"
+        "OWNER-MODEL-POLICY-001",
+        "TERMINAL-OPERATOR-SURFACE-CLOSURE-001"
       ],
       "children": [],
       "gates": [
@@ -25632,6 +25646,42 @@
       "acceptance": "Kabul: literal kanonik-kaynaktan; iki overwrite-site force-preserving merge + pin testleri; mevcut buildWorkerPrompt guard davranisi regresyonsuz",
       "evidence": "Kaynak: debt-561-002 + debt-561-003 residual notlari (dogrulama 2026-08-19: literal ve iki overwrite-site diskte duruyor); uc debt ayni kararla resolved (562-002-fix bayat — 7087 ATREF LANDED kanitiyla) **UYGULANDI 2026-08-20 — ILK DOGFOOD-CANARY (sprint-587):** iki is Deckent'in kendi 8-faz akisiyla kosuldu, 2/2 DONE, 0 fix, 0 NO_GO. (1) profileVersion literal'i kanonik SKILL_PROFILE_VERSION import'una cekildi (brain-skill 13/13 yesil); (2) routing-plan-adapter.ts + task-mode-runner.ts V3 yazim-siteleri force-preserving merge (set-agreement pini: applySkillDirectiveAuthority ile sira-farkli/kume-esit; 61/61 hedef + 67 komsu-consumer yesil, tsc 0). CANARY-BULGUSU KALICI FIX UYGULANDI (owner admission 2026-08-20: '1- fixlensin'): GERCEK KOK ilk teshisten FARKLI cikti — phantom-tail degil, core/test-discovery-contract.ts extractPlannedTestPaths ANAFOR-KORLUGU: prose'daki bare test-dosya-adi (tam-yollu planli teste kisaltilmis atif) ayri kok-seviye 'planned path' sanilip yanlis-pozitif test-discoverability BLOCK uretiyordu. FIX: anafor-bastirma — ayni gorevde tam-yollu karsiligi olan bare ad suzulur; karsiliksiz bare ad DURUST BLOCK olarak kalir (gercek-pozitif korunur). Pin: canary-vakasi + karsiliksiz-bare vakasi, 6/6 yesil; ilk teshisin duzeltilmesi calisma-mantigi'na islendi. Ortak muhur (karar-1+2 tek xverify): codex CONFIRMED `cross-verify-verdict:sha256:84e88e13aa0d14f778b01d11f7b0c69cc7fb64f890c712891f686277e6f7945e`.",
       "updated": "2026-08-20"
+    },
+    {
+      "order": 7099,
+      "id": "TERMINAL-OPERATOR-SURFACE-CLOSURE-001",
+      "parent": "ECOSYSTEM-001",
+      "program": "PRODUCT",
+      "outcome": "**Owner-admitted Terminal operator-surface closure (Alperen 2026-09-03):** TERMINAL-PICKER-001…007, TERMINAL-POSTURE-001, TERMINAL-READABILITY-001/002, PROVIDER-VOCAB-001, PROVIDER-EVIDENCE-001, SESSION-AUTHORITY-001, TERMINAL-I18N-NATIVE-001, TERMINAL-I18N-MODELS-001, CLI-INTERACTIVE-001 ve Claude Fable 5.1 model-katalog/XVerify yürütme zincirini tek production-surface kapanışında uzlaştır",
+      "priority": "P0",
+      "dependsOn": [
+        "MODEL-ACTIVATION-001"
+      ],
+      "dependents": [],
+      "children": [],
+      "gates": [
+        "G1",
+        "G2"
+      ],
+      "state": "VERIFY",
+      "truth": {
+        "C": "1",
+        "W": "1",
+        "E": "1",
+        "H": "1",
+        "L": "1",
+        "X": "?",
+        "S": "?"
+      },
+      "blockerCode": null,
+      "blockerRemedy": null,
+      "closureBlockedBy": [
+        "MODEL-ACTIVATION-001"
+      ],
+      "evidenceReceipts": [],
+      "acceptance": "Linux/WSL2 gerçek binary'de picker, slash/help, approval, posture, readability, provider/model vocabulary, session authority, pipe/readline ve i18n yüzeyleri aynı canonical application-service/config authority'sini tüketir; `claude-fable-5-1` registry→activation→provider argv→worker image→cross-provider XVerify settlement zincirinde exact kimlikle korunur; mock/test tek başına kapanış değildir; macOS, Windows-native ve SSH/tmux yalnız gerçek host kanıtıyla kapanabilir",
+      "evidence": "`historical-authority=owner-live-2026-09-03-terminal-closure;historical-gates=G1,G2;proof=main-67a734c87-xv-cd8236e8-65b5774b-54744c0f-4d39cf2c-ce640622`; Main landing `67a734c87`; lane source chain `26f8f8e99..f147f4e7f`; Linux/WSL2 targeted terminal battery `270 files / 3925 tests`; Fable surface battery `15 files / 368 tests`; inactive and unreadable-authority native binary proofs both stop before provider with typed/localized exit 1; task/XVerify project authority claim `CONFIRMED/ALLOW`, provider usage `22071`, terminal Docker settlement, `receipt=cross-verify-verdict:sha256:54744c0f5088462f78d1a48467c83372e7cb6d7e049eb46c028401ae25fb894d`; cross-ingress corrupt-authority claim `CONFIRMED/ALLOW`, provider usage `24589`, terminal Docker settlement, `receipt=cross-verify-verdict:sha256:4d39cf2cb0a78a1df4bf11a4da7643fe9892e2f324497676cfbbc0a308df61f0`; final strict/race-safe resolver claim `CONFIRMED/ALLOW`, provider usage `19455`, terminal Docker settlement, `receipt=cross-verify-verdict:sha256:ce64062285f89b4a620e80f3e1d5b4e0e2b8124ca2486063606f6e93d37b3736`; exact Fable XVerify `CONFIRMED/ALLOW`, provider-reported usage `29793`, terminal Docker settlement, `receipt=cross-verify-verdict:sha256:cd8236e86091af95148e1da2bacfe83ea6d5587c748e8121c179d817902aa3cd`; picker-card bounded source claim `CONFIRMED/ALLOW`, provider usage `17850`, Docker settlement, `receipt=cross-verify-verdict:sha256:65b5774bd9fd2f463b20f4875f97c8e49b43c6568b83f6746bbe49384111a4a4`; Native Terminal geniş/hassas XVerify denemeleri provider cevabı/evidence-map şema bütünlüğünde `HOLD` kaldı ve kapanış kanıtı sayılmadı; worker image Claude Code 2.1.259 proof; full-suite landing ölçümü `2940 files: 2791 pass / 142 fail / 7 skip`, kırmızılar pre-existing sınıfında ve bu satır için başarı kanıtı sayılmaz; açık platform HOLD: macOS/Windows-native/SSH-tmux; Closure OS authenticated disposition bu VERIFY satırından ayrı authority'dir ve elle üretilmez",
+      "updated": "2026-09-03"
     },
     {
       "order": 7100,
@@ -28722,6 +28772,6 @@
   ],
   "registryIntegrity": {
     "algorithm": "sha256(canonical-json-utf8)",
-    "value": "5f64283d2d7d92606db0d43faa40b3f6bb2dab2c9a72324b1fa43cebd70e3661"
+    "value": "70bf046f6c67842dcad7caf9646917c738673d64aa9fad28e796ff6ee573a7f3"
   }
 }

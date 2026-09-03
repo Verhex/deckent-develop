@@ -609,7 +609,14 @@ export async function runXverifyForResult(
   // ── Synthetic verification envelope around the claim ──
   const id = `xv-${now.getTime()}-${randomUUID()}`;
   const filesFromFlag = (opts.files ?? '').split(',').map((f) => f.trim()).filter(Boolean);
-  const filesFromDiff = opts.diff ? defaultCaptureDiffPaths(root) : [];
+  // --files is an explicit evidence boundary for --diff. The diff capture was
+  // already scoped below, but filesChanged still unioned every dirty path from
+  // the worktree, so unrelated runtime/source files entered the evidence
+  // broker and could push a bounded XVerify over its prompt ceiling. Derive
+  // paths from the whole diff only when the operator did not author --files.
+  const filesFromDiff = opts.diff && filesFromFlag.length === 0
+    ? defaultCaptureDiffPaths(root)
+    : [];
   // Evidence requirements/scope cover both explicitly-changed files AND bounded
   // target paths (dedup) — diff scoping stays --files-only below, since a target
   // path is a read excerpt, not a claim about what changed.
@@ -725,6 +732,19 @@ export async function runXverifyForResult(
       enabled: true,
       high_stakes_only: false,
       verifier_priority: verifierPriority,
+      // The exact CLI model must govern BOTH candidate-evidence preparation
+      // and the eventual verifier dispatch. Previously only the runner option
+      // below saw --verifier-model, while preparation read the configured
+      // provider default; an exact Fable 5.1 request therefore prepared Opus 5
+      // evidence and could only end in candidate_evidence_unavailable.
+      ...(explicitVerifier && opts.verifierModel?.trim()
+        ? {
+            verifier_model: {
+              ...config.cross_verify?.verifier_model,
+              [explicitVerifier]: opts.verifierModel.trim(),
+            },
+          }
+        : {}),
       enforce_refuted: true,
     },
   };

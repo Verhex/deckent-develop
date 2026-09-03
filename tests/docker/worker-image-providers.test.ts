@@ -5,6 +5,7 @@ import { execSync } from 'node:child_process';
 
 const ROOT = join(import.meta.dirname, '..', '..');
 const dockerfileWorkerPath = join(ROOT, 'Dockerfile.worker');
+const packagedDockerfileWorkerPath = join(ROOT, 'assets', 'Dockerfile.worker');
 
 function dockerAvailable(): boolean {
   try {
@@ -42,6 +43,14 @@ describe('Dockerfile.worker — provider CLI readiness (static analysis)', () =>
   it('Dockerfile.worker has Claude CLI install (always present)', () => {
     const content = readFileSync(dockerfileWorkerPath, 'utf-8');
     expect(content).toContain('npm i -g @anthropic-ai/claude-code');
+  });
+
+  it('source and packaged worker images pin the Fable 5.1-proven Claude CLI release', () => {
+    for (const path of [dockerfileWorkerPath, packagedDockerfileWorkerPath]) {
+      const content = readFileSync(path, 'utf-8');
+      expect(content).toContain('ARG CLAUDE_CODE_VERSION=2.1.259');
+      expect(content).toContain('npm i -g @anthropic-ai/claude-code@$CLAUDE_CODE_VERSION');
+    }
   });
 
   it('Dockerfile.worker HEALTHCHECK references claude --version', () => {

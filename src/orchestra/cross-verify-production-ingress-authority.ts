@@ -23,6 +23,7 @@ import type {
   HostRoleInvocationNonReservableSubscription,
 } from '../core/host-role-invocation-admission-runtime.js';
 import { modelRegistry } from '../core/model-registry.js';
+import { resolveProjectModelExecutionAuthority } from '../core/model-activation-store.js';
 import { defaultRoleInvocationPolicy } from '../core/role-invocation-resolver.js';
 import type { ProviderAuthorityRuntimeServiceOpenResult } from '../core/provider-authority-composition.js';
 import {
@@ -658,6 +659,35 @@ implements MandatoryCrossVerifyInvocationFactory {
           'xverify_model_scope_mismatch',
           { provider, model },
           { verifierProvider: provider },
+        );
+      }
+      const executionAuthority = resolveProjectModelExecutionAuthority(
+        input.projectRoot,
+        provider,
+        model,
+      );
+      if (executionAuthority.state === 'hold') {
+        return hold(
+          'xverify_model_activation_authority_unavailable',
+          {
+            provider,
+            model,
+            activationSnapshotDigest: executionAuthority.snapshotDigest,
+            authorityReasonCode: executionAuthority.reasonCode,
+          },
+          { verifierProvider: provider, verifierModel: model },
+        );
+      }
+      if (!executionAuthority.executable) {
+        return hold(
+          'xverify_model_inactive',
+          {
+            provider,
+            model,
+            providerMode: executionAuthority.providerMode,
+            activationSnapshotDigest: executionAuthority.snapshotDigest,
+          },
+          { verifierProvider: provider, verifierModel: model },
         );
       }
     } catch (error) {

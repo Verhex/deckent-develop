@@ -32,6 +32,21 @@ function stripAnsi(s: string): string {
   return s.replace(/\x1b\[[0-9;]*m/g, '');
 }
 
+function withForcedColor<T>(fn: () => T): T {
+  const noColor = process.env['NO_COLOR'];
+  const forceColor = process.env['FORCE_COLOR'];
+  delete process.env['NO_COLOR'];
+  process.env['FORCE_COLOR'] = '1';
+  try {
+    return fn();
+  } finally {
+    if (noColor === undefined) delete process.env['NO_COLOR'];
+    else process.env['NO_COLOR'] = noColor;
+    if (forceColor === undefined) delete process.env['FORCE_COLOR'];
+    else process.env['FORCE_COLOR'] = forceColor;
+  }
+}
+
 function makeAgent(overrides: Partial<AgentInfo> = {}): AgentInfo {
   return {
     id: 'w-001',
@@ -53,15 +68,17 @@ describe('phaseColor', () => {
   });
 
   it('wraps known phases in ANSI color codes when noColor is false', () => {
-    for (const phase of ['PLAN', 'SPAWN', 'EXECUTE', 'EVALUATE', 'FIX', 'RETRO', 'DECAY', 'COMPLETE']) {
-      const colored = phaseColor(phase, false);
-      expect(colored).not.toBe(phase);
-      expect(stripAnsi(colored)).toBe(phase);
-    }
+    withForcedColor(() => {
+      for (const phase of ['PLAN', 'SPAWN', 'EXECUTE', 'EVALUATE', 'FIX', 'RETRO', 'DECAY', 'COMPLETE']) {
+        const colored = phaseColor(phase, false);
+        expect(colored).not.toBe(phase);
+        expect(stripAnsi(colored)).toBe(phase);
+      }
+    });
   });
 
   it('falls back to dim color for an unrecognized phase', () => {
-    const colored = phaseColor('WEIRD', false);
+    const colored = withForcedColor(() => phaseColor('WEIRD', false));
     expect(stripAnsi(colored)).toBe('WEIRD');
     expect(colored).not.toBe('WEIRD');
   });
@@ -128,7 +145,7 @@ describe('costColor', () => {
   });
 
   it('colors green under 50%', () => {
-    const out = costColor(30, 'label', false);
+    const out = withForcedColor(() => costColor(30, 'label', false));
     expect(out).not.toBe('label');
     expect(stripAnsi(out)).toBe('label');
   });
@@ -161,7 +178,7 @@ describe('progressBar', () => {
   });
 
   it('applies color when noColor is false', () => {
-    const bar = progressBar(2, 4, 10, false);
+    const bar = withForcedColor(() => progressBar(2, 4, 10, false));
     expect(stripAnsi(bar)).not.toBe(bar);
   });
 });

@@ -1233,6 +1233,14 @@ const BASE_MESSAGES: MessageMap = {
     en: 'The verifier is a subscription provider whose only limit windows are advisory percent-remaining — never numerically reservable, so the adjudication call cannot open a reservation. Either provision a metered/API path for the verifier (usd/token windows), or set cross_verify.allow_non_reservable_subscription_adjudication: true in the owner config to admit it via the typed non-reservable outcome.',
     tr: 'Hakem, tek limit penceresi advisory yüzde-kalan olan bir abonelik sağlayıcısı — sayısal olarak rezerve edilemez, bu yüzden adjudication çağrısı rezervasyon açamaz. Ya hakem için metered/API yolu sağlayın (usd/token pencereleri), ya da owner config\'inde cross_verify.allow_non_reservable_subscription_adjudication: true yaparak typed non-reservable sonucuyla kabul edin.',
   },
+  'xverify.remedy.model_inactive': {
+    en: 'Missing authority: the verifier model is inactive in the project owner policy. Activate the exact model with deckent models activate, then rerun xverify.',
+    tr: 'Eksik yetki: hakem modeli proje sahibinin politikasında pasif. Tam modeli deckent models activate ile etkinleştirip xverify komutunu yeniden çalıştırın.',
+  },
+  'xverify.remedy.model_activation_authority_unavailable': {
+    en: 'Missing authority: the project model-activation store exists but cannot be read safely. Repair its availability or schema before retrying; no verifier call was made.',
+    tr: 'Eksik yetki: proje model-aktivasyon deposu var ancak güvenle okunamıyor. Yeniden denemeden önce erişimini veya şemasını düzeltin; hakem çağrısı yapılmadı.',
+  },
   'xverify.remedy.usage_unavailable': {
     en: 'The Fable-to-Sol call dispatched, but the canonical transport reported no usable usage, so no numbers were fabricated and the package stays OPEN. Confirm the verifier CLI emits its token counters (provider version/flags), then rerun xverify.',
     tr: 'Fable-Sol çağrısı yapıldı, ancak canonical transport kullanılabilir usage raporlamadı; hiçbir sayı uydurulmadı ve paket OPEN kalıyor. Hakem CLI\'ının token sayaçlarını yaydığını doğrulayın (sağlayıcı sürümü/bayrakları), sonra xverify\'ı yeniden çalıştırın.',
@@ -3345,6 +3353,14 @@ const BASE_MESSAGES: MessageMap = {
   'native.switch.unknown-model': {
     en: 'switch failed — unknown model "{detail}": use an exact registered provider API model ID or switch provider first',
     tr: 'geçiş başarısız — bilinmeyen model "{detail}": tam kayıtlı sağlayıcı API model kimliği kullanın veya önce sağlayıcı değiştirin',
+  },
+  'native.switch.model-inactive': {
+    en: 'switch failed — model "{detail}" is inactive under the owner policy; activate it with deckent models activate',
+    tr: 'geçiş başarısız — "{detail}" modeli sahip politikasında pasif; deckent models activate ile etkinleştirin',
+  },
+  'native.switch.model-authority-unavailable': {
+    en: 'switch failed — the project model authority cannot be read safely; no provider call was made',
+    tr: 'geçiş başarısız — proje model yetkisi güvenle okunamıyor; sağlayıcı çağrısı yapılmadı',
   },
   // native-transport.ts:247 produces errorCode 'no-transport' when detectTransport
   // finds nothing configured at all — this key was missing, so localizeNativeError

@@ -6,7 +6,7 @@ import type { ProviderEvent } from '../../src/agent/provider-tooluse/types.js';
 describe('DECKENT_NATIVE_MOCK', () => {
   it('returns a scripted adapter that replays the mock script, ignoring real transport', async () => {
     const script: ProviderEvent[][] = [[{ type: 'text-delta', text: 'mocked' }, { type: 'done' }]];
-    const r = resolveNativeProvider({ DECKENT_NATIVE_MOCK: JSON.stringify(script) }, {});
+    const r = resolveNativeProvider({ DECKENT_NATIVE_MOCK: JSON.stringify(script) }, {}, process.cwd());
     expect('adapter' in r).toBe(true);
     if ('adapter' in r) {
       const out: ProviderEvent[] = [];

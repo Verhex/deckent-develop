@@ -22,6 +22,7 @@ import { resolveDefaultModel } from '../core/config.js';
 import { applyWorkerExecutionBudgetPolicy } from '../core/execution-plan-digest.js';
 import { buildExecutionRequest, resolveExecutionModelIdentity, resolveToTask } from './execution-request-builder.js';
 import { isModelExecutable } from '../core/model-equivalence.js';
+import { resolveProjectModelExecutionAuthority } from '../core/model-activation-store.js';
 import { DeckentError } from '../core/errors.js';
 import { enrichResultCost, enrichResultTokenUsage, resolveAgentPrompt, resolveSkillPrompts } from './result-collector.js';
 import { eventBus } from './event-bus.js';
@@ -413,11 +414,25 @@ export async function executeTaskIngress(
   const preRoutingProjection = inspectTaskArtifactsDeferred(projectRoot, [task]);
   const existingTaskProjectionContentDigest = preRoutingProjection.contentDigests[task.id];
   const executionIdentity = resolveExecutionModelIdentity(task.model, task.provider);
-  if (!isModelExecutable(executionIdentity.model, executionIdentity.provider)) {
+  const projectModelAuthority = resolveProjectModelExecutionAuthority(
+    projectRoot,
+    executionIdentity.provider,
+    executionIdentity.model,
+  );
+  if (projectModelAuthority.state === 'hold') {
+    throw new DeckentError(
+      'MODEL_ACTIVATION_AUTHORITY_UNAVAILABLE',
+      `Owner model authority is unavailable for '${executionIdentity.provider}/`
+      + `${executionIdentity.model}' (snapshot=${projectModelAuthority.snapshotDigest})`,
+    );
+  }
+  if (!isModelExecutable(executionIdentity.model, executionIdentity.provider)
+    || !projectModelAuthority.executable) {
     throw new DeckentError(
       'MODEL_INACTIVE',
       `Model '${executionIdentity.model}' is not active for provider `
-      + `'${executionIdentity.provider}' under the owner model policy`,
+      + `'${executionIdentity.provider}' under the owner model policy `
+      + `(snapshot=${projectModelAuthority.snapshotDigest})`,
     );
   }
   task.model = executionIdentity.model;

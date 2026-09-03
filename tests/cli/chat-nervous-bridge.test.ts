@@ -53,6 +53,21 @@ function makeNotification(overrides: Partial<NervousNotification> = {}): Nervous
   };
 }
 
+function withForcedColor<T>(fn: () => T): T {
+  const noColor = process.env['NO_COLOR'];
+  const forceColor = process.env['FORCE_COLOR'];
+  delete process.env['NO_COLOR'];
+  process.env['FORCE_COLOR'] = '1';
+  try {
+    return fn();
+  } finally {
+    if (noColor === undefined) delete process.env['NO_COLOR'];
+    else process.env['NO_COLOR'] = noColor;
+    if (forceColor === undefined) delete process.env['FORCE_COLOR'];
+    else process.env['FORCE_COLOR'] = forceColor;
+  }
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe('getPendingNervous', () => {
@@ -110,7 +125,7 @@ describe('renderNervousPrompt', () => {
 
   it('returns ANSI-styled banner on TTY', () => {
     const n = makeNotification();
-    const result = renderNervousPrompt([n], true);
+    const result = withForcedColor(() => renderNervousPrompt([n], true));
     // ADR-G-010 (2026-08-01): emoji glyphs retired to the ASCII family — the
     // banner marker is now `»` (was `⚡`).
     expect(result).toContain('»');
@@ -211,7 +226,7 @@ describe('handleNervousSlash', () => {
   it('returns ANSI-colored output on accept in TTY mode', () => {
     const n = makeNotification();
     writePending(root, [n]);
-    const result = handleNervousSlash(['accept', n.id], root, true);
+    const result = withForcedColor(() => handleNervousSlash(['accept', n.id], root, true));
     expect(result).toContain('\x1b[');
     expect(result).toContain('accepted');
   });

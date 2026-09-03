@@ -8,7 +8,7 @@
 // actually leaves the executable registry (not just the discovery list).
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, existsSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
@@ -19,6 +19,7 @@ import {
   activationKey,
   readInactiveModels,
   resolveActiveModelPolicy,
+  resolveProjectModelExecutionAuthority,
   emptyModelActivationPolicy,
 } from '../../src/core/model-activation-store.js';
 import { detectAndRegisterModels } from '../../src/core/model-auto-detect.js';
@@ -127,6 +128,79 @@ describe('ModelActivationStore — default-preserving activation', () => {
     } finally {
       second.close();
     }
+  });
+});
+
+describe('project-scoped execution authority', () => {
+  it('treats an absent store as the documented implicit-active default', () => {
+    expect(resolveProjectModelExecutionAuthority(root, 'claude', 'claude-fable-5-1'))
+      .toMatchObject({ state: 'ready', executable: true, reasonCode: null });
+  });
+
+  it('reads the exact project store instead of trusting process bootstrap order', () => {
+    const store = open();
+    try {
+      store.setProviderPolicy('claude', 'explicit-active');
+      store.setActivation('claude', 'claude-fable-5', true);
+    } finally {
+      store.close();
+    }
+
+    const inactive = resolveProjectModelExecutionAuthority(
+      root,
+      'claude',
+      'claude-fable-5-1',
+    );
+    expect(inactive).toMatchObject({
+      state: 'ready',
+      executable: false,
+      providerMode: 'explicit-active',
+      reasonCode: null,
+    });
+    expect(inactive.snapshotDigest).toMatch(/^[a-f0-9]{64}$/);
+
+    expect(resolveProjectModelExecutionAuthority(root, 'claude', 'claude-fable-5'))
+      .toMatchObject({ state: 'ready', executable: true, providerMode: 'explicit-active' });
+  });
+
+  it('holds instead of opening every model when an existing store is unreadable', () => {
+    mkdirSync(join(root, '.deckent'), { recursive: true });
+    writeFileSync(join(root, '.deckent', 'models.db'), 'not-a-sqlite-database', 'utf8');
+
+    const authority = resolveProjectModelExecutionAuthority(
+      root,
+      'claude',
+      'claude-fable-5-1',
+    );
+    expect(authority).toMatchObject({
+      state: 'hold',
+      executable: false,
+      reasonCode: 'MODEL_ACTIVATION_AUTHORITY_UNAVAILABLE',
+    });
+    expect(authority.snapshotDigest).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it('holds when a structurally readable store contains an invalid policy decision', () => {
+    const store = open();
+    try {
+      store.setProviderPolicy('claude', 'explicit-active');
+    } finally {
+      store.close();
+    }
+    const db = new Database(join(root, '.deckent', 'models.db'));
+    try {
+      db.prepare('UPDATE provider_policy SET mode = ? WHERE provider = ?')
+        .run('invalid-mode', 'claude');
+    } finally {
+      db.close();
+    }
+
+    expect(resolveProjectModelExecutionAuthority(root, 'claude', 'claude-fable-5-1'))
+      .toMatchObject({
+        state: 'hold',
+        executable: false,
+        reasonCode: 'MODEL_ACTIVATION_AUTHORITY_UNAVAILABLE',
+      });
   });
 });
 

@@ -32,6 +32,7 @@ import {
   CrossVerifyProductionIngressAuthority,
 } from '../../src/orchestra/cross-verify-production-ingress-authority.js';
 import { bootstrapCrossVerifyRuntimeV2 } from '../../src/orchestra/cross-verify-runtime-bootstrap.js';
+import { ModelActivationStore } from '../../src/core/model-activation-store.js';
 
 function task(): Task {
   return {
@@ -394,5 +395,119 @@ describe('CrossVerifyProductionIngressAuthority', () => {
       state: 'hold',
       reasonCode: 'xverify_model_scope_mismatch',
     });
+  });
+
+  it('holds an inactive exact verifier from the project store before profile resolution', async () => {
+    const projectRoot = mkdtempSync(join(tmpdir(), 'deckent-xverify-model-policy-'));
+    try {
+      const store = new ModelActivationStore(projectRoot);
+      try {
+        store.setProviderPolicy('claude', 'explicit-active');
+        store.setActivation('claude', 'claude-fable-5', true);
+      } finally {
+        store.close();
+      }
+      const providerAuthority = {
+        state: 'ready',
+        tenantId: 'tenant-a',
+        projectId: 'project-a',
+        authorityEvidenceRef: 'provider-authority:test',
+        service: new Proxy({}, {
+          get() {
+            throw new Error('inactive model touched provider stores');
+          },
+        }),
+        close() {},
+      } as unknown as ProviderAuthorityRuntimeServiceOpenResult;
+      const executionProfiles = {
+        resolve() {
+          throw new Error('inactive model touched execution profile authority');
+        },
+      };
+      const ingress = new CrossVerifyProductionIngressAuthority({
+        providerAuthority,
+        executionProfiles,
+      });
+      const producer = {
+        ...task(),
+        model: 'gpt-5.6-sol',
+        provider: 'codex',
+      } satisfies Task;
+      const cfg = {
+        ...config(true),
+        cross_verify: {
+          ...config(true).cross_verify,
+          verifier_priority: ['claude'],
+        },
+      } as ResolvedConfig;
+
+      await expect(ingress.compose({
+        projectRoot,
+        task: producer,
+        result: result(),
+        config: cfg,
+        operationClass: 'adjudicate-claim',
+        timeoutMs: 120_000,
+        verifierModel: 'claude-fable-5-1',
+      })).resolves.toMatchObject({
+        state: 'hold',
+        reasonCode: 'xverify_model_inactive',
+        verifierProvider: 'claude',
+        verifierModel: 'claude-fable-5-1',
+      });
+    } finally {
+      rmSync(projectRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('holds an unreadable model authority before profile or provider resolution', async () => {
+    const projectRoot = mkdtempSync(join(tmpdir(), 'deckent-xverify-model-authority-'));
+    try {
+      mkdirSync(join(projectRoot, '.deckent'), { recursive: true });
+      writeFileSync(join(projectRoot, '.deckent', 'models.db'), 'not-a-sqlite-database', 'utf8');
+      const providerAuthority = {
+        state: 'ready',
+        tenantId: 'tenant-a',
+        projectId: 'project-a',
+        authorityEvidenceRef: 'provider-authority:test',
+        service: new Proxy({}, {
+          get() {
+            throw new Error('unreadable model authority touched provider stores');
+          },
+        }),
+        close() {},
+      } as unknown as ProviderAuthorityRuntimeServiceOpenResult;
+      const executionProfiles = {
+        resolve() {
+          throw new Error('unreadable model authority touched execution profiles');
+        },
+      };
+      const ingress = new CrossVerifyProductionIngressAuthority({
+        providerAuthority,
+        executionProfiles,
+      });
+      const producer = { ...task(), model: 'gpt-5.6-sol', provider: 'codex' } satisfies Task;
+      const cfg = {
+        ...config(true),
+        cross_verify: { ...config(true).cross_verify, verifier_priority: ['claude'] },
+      } as ResolvedConfig;
+
+      await expect(ingress.compose({
+        projectRoot,
+        task: producer,
+        result: result(),
+        config: cfg,
+        operationClass: 'adjudicate-claim',
+        timeoutMs: 120_000,
+        verifierModel: 'claude-fable-5-1',
+      })).resolves.toMatchObject({
+        state: 'hold',
+        reasonCode: 'xverify_model_activation_authority_unavailable',
+        verifierProvider: 'claude',
+        verifierModel: 'claude-fable-5-1',
+      });
+    } finally {
+      rmSync(projectRoot, { recursive: true, force: true });
+    }
   });
 });

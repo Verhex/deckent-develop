@@ -1249,6 +1249,16 @@
    "notes": "Registered 2026-08-28 (F3): the file existed since 2026-08-21 with no registry entry. Grants no authority — it only enforces the protocol’s mechanical parts (create-only files, sequence/epoch monotony, digest chaining)."
   },
   {
+   "file": "scripts/production-wiring-host-proof-harness.mjs",
+   "class": "recurring-proof",
+   "owner": "production-wiring-closure",
+   "npmScript": null,
+   "input": "canonical deckent-production-wiring-host-proof-request-v1 JSON on stdin; digest-bound trusted verifier assets; bounded timeout/output policy",
+   "output": "one canonical deckent-production-wiring-host-proof-outcome JSON observation or typed HOLD; never mutates the project or Closure OS ledger",
+   "expiry": "none — permanent trusted-host proof adapter for exact production-wiring closure",
+   "notes": "Registered during the 2026-09-03 main landing closure. The harness validates no-follow asset custody, runs the allowlisted Closure OS authority gate in a bounded child process and rechecks asset identity before returning an observation."
+  },
+  {
    "file": "scripts/lint-cli-surface.mjs",
    "class": "gate",
    "owner": "cli-surface-registry",

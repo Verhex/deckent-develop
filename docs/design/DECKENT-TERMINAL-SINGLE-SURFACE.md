@@ -185,6 +185,10 @@ Keyboard hints are contextual. The interface does not print every shortcut perma
 - No rounded status pills, generic card stack, gradients, glow, emoji icons or decorative spinner.
 - Every semantic color has a word, marker and stable position equivalent. Unicode line glyphs are
   optional decoration with an ASCII fallback, never structural meaning.
+- Terminal color roles are generated from `design/tokens/terminal.map.json`; components consume the
+  generated palette instead of owning color literals. Every role declares one of three visual
+  classes: `primary` (task and decision truth), `supplemental` (supporting evidence), or
+  `decorative` (non-structural affordance). `dim` is not an information-hierarchy mechanism.
 
 ## 8. Environment behavior
 
@@ -219,21 +223,28 @@ selection across live reorder, list/detail navigation, bounded run decisions, se
 references, TTY/non-TTY branching and localization seams. The accepted A+C design re-composes those
 capabilities; it does not claim new backend authority.
 
-The following are implementation blockers for an honest production surface:
+Implementation status of the grounded blockers:
 
-1. `/interrupt` and Escape currently clear pending input but do not abort the active provider turn.
-2. Ask/Run/Control's risk ladder exists as a state machine, but the App does not call its full
-   action gate; Ask and Run therefore do not yet provide the promised authority distinction.
-3. The slash catalog carries a large hardcoded Turkish description surface and incomplete
-   category/risk tagging; it must become localized and context-filterable.
-4. Approval's collapsed render omits requestor, scope, expiry, default outcome, consequence and
-   rollback/reconciliation limits.
-5. Queue preview uses a fixed character ceiling instead of terminal width/display cells.
-6. Approval, plan, inbox, live footer, phase anchor and provider footer are separate vertical
-   layers; stdin ownership is safe, but cognitive priority is still component-order driven.
-7. Terminal semantic colors are component-local literals rather than a generated token projection.
-8. The current inbox is bounded to a local cross-process scan; enterprise history search,
+1. **Closed on Linux/WSL2:** `/interrupt`, Escape and Ctrl-C now resolve an exact action target and
+   abort the active provider turn without conflating input clearing with execution cancellation.
+2. **Closed on Linux/WSL2:** Ask/Run/Control posture and confirmation policy share session authority;
+   the readline surface consumes the same decision rather than maintaining a parallel rule.
+3. **Closed on Linux/WSL2:** slash descriptions, help headings, tier headings and interaction hints
+   resolve from the en/tr message catalog for the current session language.
+4. **Closed on Linux/WSL2:** the approval card carries the bounded request, authority and consequence
+   context required by the accepted design instead of collapsing the decision to a generic prompt.
+5. **Closed on Linux/WSL2:** queue/status rendering is terminal-width and display-cell aware, including
+   grapheme-safe caret placement and narrow-terminal behavior.
+6. **Closed on Linux/WSL2:** the live footer and interactive surfaces use explicit priority and one
+   input owner; picker and non-picker paths preserve the same session state.
+7. **Closed on Linux/WSL2:** semantic color roles are a generated token projection with readability
+   gates and a no-color path; component-local literal ownership is rejected.
+8. **Open:** the current inbox is bounded to a local cross-process scan; enterprise history search,
    pagination and multi-tenant query authority are not yet production-proven.
+
+The closed rows are production-wired and real-binary-verified for Linux/WSL2. macOS,
+Windows-native/ConPTY and SSH/tmux remain explicit platform evidence HOLDs; they are not inferred
+from source parity or simulated green tests.
 
 No prototype interaction may be reported as production-wired until these exact paths have real
 binary evidence.

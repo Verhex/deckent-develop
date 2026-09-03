@@ -6,6 +6,8 @@
 //      (no Ink, no React, no network, no disk I/O).
 
 import { describe, it, expect, vi } from 'vitest';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   resolveNativeProvider,
   createStreamOutputHandler,
@@ -13,13 +15,15 @@ import {
 } from '../../../src/cli/repl/native-transport.js';
 import { resolveNativeProvider as resolveNativeProvider__tsm_007 } from "../../../src/cli/repl/native-transport.js";
 
+const MISSING_POLICY_ROOT = join(tmpdir(), `deckent-native-policy-absent-${process.pid}`);
+
 // ─── resolveNativeProvider — mock path ───────────────────────────────────────
 
 describe('resolveNativeProvider — mock path', () => {
   it('returns a mock adapter when DECKENT_NATIVE_MOCK is set', async () => {
     const events = [[{ type: 'text', text: 'hello' }, { type: 'done' }]];
     const env = { DECKENT_NATIVE_MOCK: JSON.stringify(events) };
-    const result = resolveNativeProvider(env, {});
+    const result = resolveNativeProvider(env, {}, process.cwd());
 
     expect('adapter' in result).toBe(true);
     if (!('adapter' in result)) return;
@@ -35,7 +39,7 @@ describe('resolveNativeProvider — mock path', () => {
 
   it('returns ProviderError when no transport is detected', () => {
     const env: Record<string, string | undefined> = {};
-    const result = resolveNativeProvider(env, {});
+    const result = resolveNativeProvider(env, {}, process.cwd());
     expect('error' in result).toBe(true);
   });
 });
@@ -150,7 +154,7 @@ describe('createStreamOutputHandler — fence/segment/flush', () => {
 {
 describe('resolveNativeProvider', () => {
     it('picks the Anthropic adapter when ANTHROPIC_API_KEY is set', () => {
-        const r = resolveNativeProvider__tsm_007({ ANTHROPIC_API_KEY: 'sk-ant' }, {});
+        const r = resolveNativeProvider__tsm_007({ ANTHROPIC_API_KEY: 'sk-ant' }, {}, MISSING_POLICY_ROOT);
         expect('adapter' in r).toBe(true);
         if ('adapter' in r) {
             expect(r.adapter.name).toBe('anthropic');
@@ -159,19 +163,19 @@ describe('resolveNativeProvider', () => {
         }
     });
     it('picks an OpenAI-compatible adapter for OPENAI_API_KEY', () => {
-        const r = resolveNativeProvider__tsm_007({ OPENAI_API_KEY: 'sk-oai' }, {});
+        const r = resolveNativeProvider__tsm_007({ OPENAI_API_KEY: 'sk-oai' }, {}, MISSING_POLICY_ROOT);
         expect('adapter' in r && r.adapter.name).toBe('openai');
     });
     it('picks Ollama when only ollama_host is configured', () => {
-        const r = resolveNativeProvider__tsm_007({}, { ollama_host: 'http://127.0.0.1:11434' });
+        const r = resolveNativeProvider__tsm_007({}, { ollama_host: 'http://127.0.0.1:11434' }, MISSING_POLICY_ROOT);
         expect('adapter' in r && r.adapter.name).toBe('ollama');
     });
     it('honors DECKENT_NATIVE_MODEL override', () => {
-        const r = resolveNativeProvider__tsm_007({ ANTHROPIC_API_KEY: 'k', DECKENT_NATIVE_MODEL: 'claude-fable-5' }, {});
+        const r = resolveNativeProvider__tsm_007({ ANTHROPIC_API_KEY: 'k', DECKENT_NATIVE_MODEL: 'claude-fable-5' }, {}, MISSING_POLICY_ROOT);
         expect('adapter' in r && r.model).toBe('claude-fable-5');
     });
     it('returns an honest error (no adapter) when no transport is available', () => {
-        const r = resolveNativeProvider__tsm_007({}, {});
+        const r = resolveNativeProvider__tsm_007({}, {}, MISSING_POLICY_ROOT);
         expect('error' in r).toBe(true);
         if ('error' in r)
             expect(r.error).toMatch(/API|yerel|ollama/i);

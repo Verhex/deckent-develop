@@ -431,7 +431,10 @@ object matching this contract:
 - each citation: { evidenceId, locator, evidenceSha256 } — evidenceSha256 is the
   matching evidence-manifest entry's content digest (its \`contentSha256\` value)
   copied verbatim; use the key name \`evidenceSha256\`
-- undecidable results additionally contain exact missingRequirementIds
+- supported or contradicted results contain exactly assertionId, status,
+  citations, and reason; missingRequirementIds is forbidden for these statuses
+- undecidable results additionally contain a non-empty missingRequirementIds;
+  never emit an empty array
 - no top-level verdict field
 
 Line 2 is exactly one terminal integrity assertion:

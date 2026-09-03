@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -13,6 +13,7 @@ import {
   type ReachabilityProbeRequest,
   type ReachabilityResult,
 } from '../../src/core/provider-truth.js';
+import { ModelActivationStore } from '../../src/core/model-activation-store.js';
 
 const NOW = new Date('2026-08-12T12:00:00.000Z');
 const PROFILE_REF = `docker-execution-profile:${'a'.repeat(64)}`;
@@ -176,6 +177,43 @@ async function mintFreshRow(root: string): Promise<ReachabilityResult> {
 }
 
 describe('prepareCrossVerifyCandidateEvidence', () => {
+  it('holds an unreadable project model authority before provider or Docker access', async () => {
+    const root = projectRoot();
+    mkdirSync(join(root, '.deckent'), { recursive: true });
+    writeFileSync(join(root, '.deckent', 'models.db'), 'not-a-sqlite-database', 'utf8');
+    const inspectExactCrossVerifyRuntime = vi.fn();
+    const result = await prepareCrossVerifyCandidateEvidence(baseInput(root, {
+      providerAuthority: undefined,
+      dockerBackend: { inspectExactCrossVerifyRuntime },
+    }));
+    expect(result).toMatchObject({
+      state: 'hold',
+      reasonCode: 'model_activation_authority_unavailable',
+    });
+    expect(inspectExactCrossVerifyRuntime).not.toHaveBeenCalled();
+  });
+
+  it('holds an inactive project model before provider authority or Docker inspection', async () => {
+    const root = projectRoot();
+    const store = new ModelActivationStore(root);
+    try {
+      store.setProviderPolicy('codex', 'explicit-active');
+      store.setActivation('codex', 'gpt-5.6-terra', true);
+    } finally {
+      store.close();
+    }
+    const inspectExactCrossVerifyRuntime = vi.fn();
+    const result = await prepareCrossVerifyCandidateEvidence(baseInput(root, {
+      providerAuthority: undefined,
+      dockerBackend: { inspectExactCrossVerifyRuntime },
+    }));
+    expect(result).toMatchObject({
+      state: 'hold',
+      reasonCode: 'model_inactive',
+    });
+    expect(inspectExactCrossVerifyRuntime).not.toHaveBeenCalled();
+  });
+
   it('holds when the provider authority is absent or held', async () => {
     const root = projectRoot();
     const absent = await prepareCrossVerifyCandidateEvidence(

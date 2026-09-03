@@ -743,7 +743,9 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // A build-free source scan reports zero confirmed live-authority violations;
   // unresolved entries remain exact source-derived fingerprints, never a path
   // allowlist or hand-authored success registry.
-  count: 18130,
+  // 2026-09-03 final model-authority fail-closed proof: 18130→18132 from two
+  // corrupt-existing-store fixtures; both stay tmpdir-owned and provider-free.
+  count: 18132,
   // 2026-08-28 OPERATION-001 O3 ratchet: count unchanged, digest-only —
   // operation-ingress audit moved from report-only proof to a fail-closed
   // lint:gates member with hermetic regression coverage.
@@ -815,7 +817,9 @@ export const UNRESOLVED_BASELINE = Object.freeze({
   // remains exact while this digest seals their final source bytes.
   // 2026-09-03 T14 final seal: recovery-only diagnostic branches were removed
   // before the production build; the exact unresolved count stays unchanged.
-  digest: 'f3080bbdb06a877523d23913904c7f5a5c52a83b3cd996d6f58f2fc08aa3ed43',
+  // 2026-09-03 Terminal/Fable closure: project-scoped active-model guards and
+  // corrupt/invalid-store HOLD tests replace the final fail-open execution edge.
+  digest: '56379ad555f8321c992bbe59bbb3b0ebedc0d1dbfe516e455d32c1304304ab2a',
   // 2026-08-27 04:0x: ayni 16514, digest-only — full-suite hizalama batch'i
   // (pin/mock/census guncellemeleri + sync guard).
   // 2026-08-27 03:1x: ayni 16514, digest-only — CI-hizalama paketi
@@ -1471,7 +1475,17 @@ export const PRODUCTION_INVENTORY_BASELINE = Object.freeze({
   // this digest records the final validator/harness source bytes.
   // 2026-09-03 T14 final seal: diagnostic-only recovery branches were removed
   // before the final binary; the production inventory count stays unchanged.
-  digest: 'bbe77d8e5c5fb7e0bfa5489ae60ce243512a18a912658a7fe9a7f7689db8fea4',
+  // 2026-09-03 Terminal landing closure: generateCodexConfig gained an
+  // injectable homeDir so hermetic tests cannot mutate the operator's real
+  // ~/.codex/config.toml; production behavior remains the OS-home default.
+  // The same closure pass binds an explicit --verifier-model to both candidate
+  // evidence preparation and dispatch, preventing an exact Fable 5.1 request
+  // from preparing evidence for the configured Claude default. The production
+  // site count is unchanged; only its source digest moves. Project-scoped
+  // activation is enforced at task, XVerify and native ingresses; an existing
+  // but unreadable/invalid authority is a typed HOLD rather than implicit
+  // activation; absent-store detection is race-safe.
+  digest: '6b7704db401c4a5850f02614580f6ffb0beca44ff407e3367b8231f260d23847',
   // 2026-08-27 04:0x: ayni 1339, digest-only — sync workspace-guard + drift-normalize.
   // 2026-08-27 03:1x: ayni 1339, digest-only — skill-pool readJsonSafe donusumu.
   // 2026-08-27 02:0x: ayni 1339, digest-only — Dalga-3 src kaymalari

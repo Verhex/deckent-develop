@@ -5,9 +5,9 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):aa8b0d46ae96bdc65e1b9dcd7042fd82e1cb88318f589ac52ff82d021bd51c5a`
+**Source digest:** `sha256(normalized-lf-utf8):614a46624ff6cf2bb3c2f0b54a0ab2aaaa8a43316a099d038569113bf4e8b9a1`
 
-**Rows:** 568 total · 480 active · 88 terminal
+**Rows:** 569 total · 481 active · 88 terminal
 
 ## State summary
 
@@ -17,7 +17,7 @@
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 69 |
-| VERIFY | 43 |
+| VERIFY | 44 |
 | DONE | 88 |
 | DEFERRED | 2 |
 | DISPOSED | 0 |
@@ -433,6 +433,7 @@
 | 7095 | `AGENT-PERMISSION-MATRIX-001` | OPEN | P2 | PRODUCT | — | — | **Post-productization iyilestirme (owner 2026-08-19; URUN KAPSAMINDA DEGIL — bitmis/urunlesmis deckent uzerine):** enterprise-seviye, cok-detayli permission mimarisi: (1) worker TOOLLARI yonetilebilir olur (bugunku 7094-F2a sabit WORKER_AVAILABLE_TOOLS projeksiyonu matris-cozumlu hale gelir); (2) SABIT agent tanimlarina dokulmus **agent×skill matrisi** — agent ise gore skillini matristen alir; (3) agent, isin dogasi geregi VEYA agent-bazli permissionla dogar (orn. yalniz-Read denetci agent); dangerously-skip-permissions sinifinin yerini kademeli permission-dogumu alir; (4) app/CLI uzerinden musteri-customize; permission yapisini istemeyen OFF yapar — OFF ise worker FULL toolla dogar (bugunku davranis, sorun degil); (5) solo→team→enterprise profilleri (LAW 1-2), config-resolved, tek global ayar yok |
 | 7097 | `EVALUATOR-HONESTY-GONOGO-001` | OPEN | P1 | KERNEL | — | — | **Evaluator durustluk + go/nogo kriter mimarisi (owner admission 2026-08-19: "2. maddeyi kapsamli ele alacagiz, go-nogo kriter iyilestirmeleriyle ortusuk bir madde"):** 7096-D2 minimal duzeltmesinin kalici tasarimi — (1) kanitsiz "tests passed" iddiasi CEZALANDIRILIR (test-iddiasi kanit-satiri/receipt ister; yalan-tesvikinin tam tersine cevrilmesi), (2) kriter-setleri gorev-sinifina gore uygulanabilirlik matrisiyle cozulur (testsPassed/coverage yalniz test-yuzeyi olan siniflarda puanlanir; N/A tipi acikca ayrilir), (3) task goNogo kriterleri ile rubrik kriterleri HIZALANIR (bugun iki ayri dogruluk-kaynagi: goCriteria metni vs rubric criterionScores — tek authority + typed eslesme), (4) worker result semasina typed `residualDebt` alani (GO_WITH_TECH_DEBT'in eksigi yapisal yazilir; debt-ledger notu basari-raporu yerine bu alandan beslenir — 7096-D3'un kalici cozumu), (5) fix-task'in evaluator'u attempt-1'le AYNI kuraldan degerlendirmesi dongusel-NO_GO'yu yapisal engeller |
 | 7098 | `SKILL-ROUTING-RESIDUAL-MICRO-001` | OPEN | P2 | KERNEL | — | — | **Debt-561-002/003 residual'larinin owner-onayli MASTER'a tasinmasi (Alperen 2026-08-19: "debtleri onerdigim gibi yonet, mikro isi MASTER'a tasi"):** (1) tests/orchestra/brain-skill.test.ts:187 civari test-local `profileVersion: 3` literal'i kaldirilip kanonik sabitten okunur (0-hardcode KANUN 10 hijyeni, test-locali); (2) assignedSkills WHOLESALE-overwrite kaynak-tarafi duzeltmesi — src/orchestra/routing-plan-adapter.ts:150 ve src/orchestra/task-mode-runner.ts:330 V3 kararini `task.assignedSkills`e toptan yazarken force-skill'leri ezebiliyor; buildWorkerPrompt guard'i bugun downstream onariyor (561-003 kaniti), kaynak-tarafi merge/force-koruma buraya gelir |
+| 7099 | `TERMINAL-OPERATOR-SURFACE-CLOSURE-001` | VERIFY | P0 | PRODUCT | `MODEL-ACTIVATION-001` | — | **Owner-admitted Terminal operator-surface closure (Alperen 2026-09-03):** TERMINAL-PICKER-001…007, TERMINAL-POSTURE-001, TERMINAL-READABILITY-001/002, PROVIDER-VOCAB-001, PROVIDER-EVIDENCE-001, SESSION-AUTHORITY-001, TERMINAL-I18N-NATIVE-001, TERMINAL-I18N-MODELS-001, CLI-INTERACTIVE-001 ve Claude Fable 5.1 model-katalog/XVerify yürütme zincirini tek production-surface kapanışında uzlaştır |
 | 7100 | `DEP-SUPPLY-DEFENSE-001` | OPEN | P1 | SECURITY | — | — | npm dependency supply-chain savunmasını ürün özelliği olarak değerlendir: worker/CI install yollarında install-script guard, lockfile-integrity gate, bilinen-IOC taraması ve editör-hook (workspace-trust) koruması |
 | 7110 | `A2A-INTEROP-001` | OPEN | P2 | ECOSYSTEM | — | — | A2A v1.0 interop yönü: inbound A2A server (Agent Card + task-lifecycle projection) ve outbound A2A provider adapter için owner kararı ve plan admission |
 | 7120 | `SKILLMD-INGEST-001` | BLOCKED | P1 | ECOSYSTEM | — | `SKILL_V3_PROFILE_RECONCILIATION_REQUIRED` | Anthropic Agent-Skills (SKILL.md) open-standard ingest: `deckent skill import --format=skill-md` converter, typed `source` provenance ve frontmatter parser sertleştirmesi |

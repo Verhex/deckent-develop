@@ -106,14 +106,21 @@ describe('xverify diff evidence scope', () => {
     expect(observed.filesRead).toEqual(['changed.ts']); // huge.db elenir
   });
 
-  it('preserves --files paths and unions them with deduplicated diff paths', async () => {
-    const observed = await runWithObservedTask(makeGitRoot(), {
+  it('treats --files as the exact --diff evidence boundary', async () => {
+    const root = makeGitRoot();
+    writeFileSync(join(root, 'unrelated.ts'), 'export const unrelated = 1;\n');
+    execFileSync('git', ['add', 'unrelated.ts'], { cwd: root });
+    execFileSync('git', ['commit', '-m', 'unrelated fixture'], { cwd: root });
+    writeFileSync(join(root, 'unrelated.ts'), 'export const unrelated = 2;\n');
+
+    const observed = await runWithObservedTask(root, {
       diff: true,
       files: 'explicit.ts,changed.ts',
     });
 
     expect(observed.filesRead).toEqual(['explicit.ts', 'changed.ts']);
     expect(observed.filesChanged).toEqual(['explicit.ts', 'changed.ts']);
+    expect(observed.filesRead).not.toContain('unrelated.ts');
   });
 
   it('does not suppress the remedy when neither --files nor --diff is present', async () => {

@@ -281,6 +281,41 @@ describe('xverify approval-phase timeout — --timeout bounds, never extends', (
     expect(result.detail).toBeNull();
   });
 
+  it('prepares the exact --verifier-model instead of the configured provider default', async () => {
+    const root = makeRoot('exact-verifier-model');
+    let preparedCandidate: CrossVerifyEvidencePreparationInput['candidate'] | undefined;
+
+    await runXverifyForResult('Claim with an exact verifier model.', {
+      author: 'claude',
+      verifier: 'codex',
+      verifierModel: 'gpt-5.6-terra',
+      files: 'src/core/a.ts',
+    }, approvalDeps(root, {
+      prepareCandidateEvidenceFn: async (input) => {
+        preparedCandidate = input.candidate;
+        return decidedFastPath();
+      },
+    }));
+
+    expect(preparedCandidate).toEqual({
+      provider: 'codex',
+      model: 'gpt-5.6-terra',
+    });
+    expect(stubRunner).toHaveBeenLastCalledWith(
+      root,
+      expect.any(Object),
+      expect.any(Object),
+      expect.anything(),
+      expect.objectContaining({
+        cross_verify: expect.objectContaining({
+          verifier_priority: ['codex'],
+          verifier_model: expect.objectContaining({ codex: 'gpt-5.6-terra' }),
+        }),
+      }),
+      expect.objectContaining({ verifierModel: 'gpt-5.6-terra' }),
+    );
+  });
+
   it('projects an exact runner HOLD detail without requiring public result mutation', async () => {
     const root = makeRoot('exact-runner-detail');
     const result = await runXverifyForResult('Claim whose exact composition held.', {
