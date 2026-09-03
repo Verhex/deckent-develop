@@ -152,6 +152,8 @@ describe('mechanism modules carry no English default label objects', () => {
     'src/cli/repl/input-bar.tsx',
     'src/cli/repl/inbox-card.tsx',
     'src/cli/repl/run-flow-inbox.ts',
+    'src/cli/repl/picker.ts',
+    'src/cli/repl/picker-card.tsx',
     'src/cli/helpers/live-footer.ts',
     'src/cli/commands/chat-render-region.ts',
   ];

@@ -1,0 +1,101 @@
+// src/cli/repl/picker-labels.ts
+// ═══ TERMINAL-PICKER-001 — PickerLabels contract + builder ═══════════════════
+//
+// The picker mechanism (picker.ts / picker-card.tsx) is string-free; this is
+// the ONE place its user-visible text is assembled from the catalog
+// (`tui.picker.*`, family cli-terminal-picker). Every field is required —
+// `assertPickerLabels` turns a missing injection into the typed
+// InjectedLabelMissingError (E_INJECTED_LABEL_MISSING), never a silent
+// English fallback. Injected as its own prop (like inboxLabels) so the
+// string-free-closure scan of buildReplLabels stays flat.
+
+import { requireInjectedLabel } from '../helpers/injected-label.js';
+import type { PickerKind, PickerScope, PickerState } from './picker.js';
+
+export interface PickerLabels {
+  readonly title: Readonly<Record<PickerKind, string>>;
+  readonly hintPick: string;
+  readonly hintScope: string;
+  /** Template with `{query}`. */
+  readonly hintFilter: string;
+  readonly empty: string;
+  /** Template with `{glyph}` and `{n}` (rows scrolled out of the window). */
+  readonly more: string;
+  /** Template with `{glyph}` and `{id}` (full id of a truncated focused row). */
+  readonly reveal: string;
+  /** Template with `{command}` — the typed-argument path on every surface. */
+  readonly typedHint: string;
+  /** Template with `{command}` — readline/line surfaces without a menu. */
+  readonly unavailableSurface: string;
+  readonly states: Readonly<Record<PickerState, string>>;
+  readonly scopes: Readonly<Record<PickerScope, string>>;
+  /** Typed blocked reasons by code; unknown codes render `blockedGeneric`. */
+  readonly blocked: Readonly<Record<string, string>>;
+  /** Template with `{code}`. */
+  readonly blockedGeneric: string;
+  /** Templates with `{value}`. */
+  readonly committed: Readonly<Record<'session' | 'default' | 'apply', string>>;
+  /** Template with `{error}`. */
+  readonly defaultWriteFailed: string;
+}
+
+const BLOCKED_CODES = ['MODEL_INACTIVE', 'MODEL_NOT_IN_ACTIVE_SET', 'NO_NATIVE_TRANSPORT', 'MISSING_CREDENTIAL', 'NOT_ENUMERABLE'] as const;
+
+/** Resolve every picker label from the catalog for the session language. */
+export function buildPickerLabels(t: (key: string) => string): PickerLabels {
+  const blocked: Record<string, string> = {};
+  for (const code of BLOCKED_CODES) blocked[code] = t(`tui.picker.blocked.${code}`);
+  return {
+    title: {
+      model: t('tui.picker.title.model'),
+      provider: t('tui.picker.title.provider'),
+      approve: t('tui.picker.title.approve'),
+      term: t('tui.picker.title.term'),
+      resume: t('tui.picker.title.resume'),
+      'config-key': t('tui.picker.title.config_key'),
+      'config-value': t('tui.picker.title.config_value'),
+      confirm: t('tui.picker.title.confirm'),
+    },
+    hintPick: t('tui.picker.hint_pick'),
+    hintScope: t('tui.picker.hint_scope'),
+    hintFilter: t('tui.picker.hint_filter'),
+    empty: t('tui.picker.empty'),
+    more: t('tui.picker.more'),
+    reveal: t('tui.picker.reveal'),
+    typedHint: t('tui.picker.typed_hint'),
+    unavailableSurface: t('tui.picker.unavailable_surface'),
+    states: {
+      current: t('tui.picker.state.current'),
+      ok: t('tui.picker.state.ok'),
+      blocked: t('tui.picker.state.blocked'),
+      unknown: t('tui.picker.state.unknown'),
+    },
+    scopes: {
+      session: t('tui.picker.scope.session'),
+      default: t('tui.picker.scope.default'),
+      apply: t('tui.picker.scope.apply'),
+      cancel: t('tui.picker.scope.cancel'),
+    },
+    blocked,
+    blockedGeneric: t('tui.picker.blocked_generic'),
+    committed: {
+      session: t('tui.picker.committed.session'),
+      default: t('tui.picker.committed.default'),
+      apply: t('tui.picker.committed.apply'),
+    },
+    defaultWriteFailed: t('tui.picker.default_write_failed'),
+  };
+}
+
+/** Throw the typed guard error for the first missing/empty label (string-free). */
+export function assertPickerLabels(labels: PickerLabels): void {
+  const walk = (value: unknown, path: string): void => {
+    if (typeof value === 'string') { requireInjectedLabel(path, value); return; }
+    if (value && typeof value === 'object') {
+      for (const [k, v] of Object.entries(value as Record<string, unknown>)) walk(v, `${path}.${k}`);
+      return;
+    }
+    requireInjectedLabel(path, undefined);
+  };
+  walk(labels, 'pickerLabels');
+}
