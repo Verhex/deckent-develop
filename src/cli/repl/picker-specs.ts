@@ -14,7 +14,7 @@
 // are technical tokens (provider, tier, 200k, ga); the availability detail is
 // localized by the caller.
 
-import type { PickerCandidate, PickerFact, PickerSpec } from './picker.js';
+import type { PickerCandidate, PickerFact, PickerSpec, ProviderTransport, ProviderVia } from './picker.js';
 import type { NativeModelCandidate } from './native-transport.js';
 import { registryProviderFor } from './native-transport.js';
 
@@ -40,6 +40,24 @@ export interface PickerSpecContext {
   readonly availability: (provider: string) => ProviderAvailability;
   /** Localized "{n} models" fact for provider rows (default: the bare count). */
   readonly modelsFact?: (n: number) => string;
+  /** TERMINAL-PROVIDER-VOCAB-001 — one vocabulary on every surface: the row
+   *  is LABELED by its registry owner and the transport is a fact; the row id
+   *  stays the value the switch seam consumes. Absent → label = id, no fact. */
+  readonly transport?: (provider: string) => ProviderTransport;
+  /** Localized via fact ("via host CLI" / "via API" / "local"); default: the kind word. */
+  readonly viaFact?: (via: ProviderVia) => string;
+}
+
+export type { ProviderVia, ProviderTransport } from './picker.js';
+
+function ownerOf(ctx: PickerSpecContext, provider: string): string {
+  return ctx.transport?.(provider).owner ?? provider;
+}
+
+function viaFactOf(ctx: PickerSpecContext, provider: string): PickerFact | null {
+  const transport = ctx.transport?.(provider);
+  if (!transport) return null;
+  return { key: 'via', value: ctx.viaFact ? ctx.viaFact(transport.via) : transport.via };
 }
 
 const SCOPES: PickerSpec['scopes'] = ['session', 'default'];
@@ -65,8 +83,10 @@ export function buildModelPickerSpec(ctx: PickerSpecContext): PickerSpec {
   for (const provider of orderedProviders(ctx)) {
     const availability = ctx.availability(provider);
     const policyProvider = policyProviderFor(provider);
+    const via = viaFactOf(ctx, provider);
     for (const m of ctx.candidatesFor(provider)) {
-      const facts: PickerFact[] = [{ key: 'provider', value: provider }];
+      const facts: PickerFact[] = [{ key: 'provider', value: ownerOf(ctx, provider) }];
+      if (via) facts.push(via);
       if (m.definition) {
         facts.push({ key: 'tier', value: m.definition.tier });
         const ctxFact = contextFact(m.definition.contextWindow);
@@ -176,12 +196,17 @@ export function buildProviderPickerSpec(ctx: PickerSpecContext): PickerSpec {
   const candidates: PickerCandidate[] = orderedProviders(ctx).map((provider) => {
     const availability = ctx.availability(provider);
     const count = ctx.candidatesFor(provider).length;
-    const facts: PickerFact[] = [{ key: 'models', value: ctx.modelsFact ? ctx.modelsFact(count) : String(count) }];
-    if (provider === ctx.current.provider) return { id: provider, label: provider, facts, state: 'current' };
-    if (availability.ok === false) return { id: provider, label: provider, facts, state: 'blocked', blockedCode: availability.code, detail: availability.detail };
+    const label = ownerOf(ctx, provider);
+    const via = viaFactOf(ctx, provider);
+    const facts: PickerFact[] = [
+      ...(via ? [via] : []),
+      { key: 'models', value: ctx.modelsFact ? ctx.modelsFact(count) : String(count) },
+    ];
+    if (provider === ctx.current.provider) return { id: provider, label, facts, state: 'current' };
+    if (availability.ok === false) return { id: provider, label, facts, state: 'blocked', blockedCode: availability.code, detail: availability.detail };
     // A provider with nothing to pick is not "ok" (it would claim usability).
-    if (count === 0) return { id: provider, label: provider, facts, state: 'blocked', blockedCode: 'NO_MODELS_LISTED' };
-    return { id: provider, label: provider, facts, state: availability.ok === 'unknown' ? 'unknown' : 'ok' };
+    if (count === 0) return { id: provider, label, facts, state: 'blocked', blockedCode: 'NO_MODELS_LISTED' };
+    return { id: provider, label, facts, state: availability.ok === 'unknown' ? 'unknown' : 'ok' };
   });
   const initialId = candidates.some((c) => c.id === ctx.current.provider) ? ctx.current.provider : null;
   return { kind: 'provider', candidates, initialId, scopes: SCOPES };

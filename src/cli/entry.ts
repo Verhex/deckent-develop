@@ -47,7 +47,7 @@ import { resolveTerminalSurfaceFromProcess } from './helpers/terminal-surface.js
 // TERMINAL-PICKER-005 — Ink-free picker seams for the readline/line loop.
 import { createSwitchableProvider } from './repl/provider-switch.js';
 import { buildLegacyPickerSpecs } from './repl/picker-legacy.js';
-import { buildPickerLabels } from './repl/picker-labels.js';
+import { buildPickerLabels, PICKER_VIA_KEYS } from './repl/picker-labels.js';
 import { theme } from './helpers/theme.js';
 import { createStreamMarkdown } from './commands/chat-render.js';
 import {
@@ -942,7 +942,12 @@ export async function launchDefaultRepl(): Promise<void> {
     provider: readlineSwitcher.proxy,
     switchProvider: (name) => throwOnSwitchError(readlineSwitcher.switchTo({ provider: name })),
     switchModel: (modelId) => throwOnSwitchError(readlineSwitcher.switchTo({ model: modelId })),
-    pickerSpecs: buildLegacyPickerSpecs(() => readlineSwitcher.current(), () => process.cwd(), (n) => getMessage('tui.picker.fact.models', replLang).replace('{n}', String(n))),
+    pickerSpecs: buildLegacyPickerSpecs(
+      () => readlineSwitcher.current(),
+      () => process.cwd(),
+      (n) => getMessage('tui.picker.fact.models', replLang).replace('{n}', String(n)),
+      (via) => getMessage(PICKER_VIA_KEYS[via], replLang),
+    ),
     pickerLabels: buildPickerLabels((key) => getMessage(key, replLang)),
     dispatcher,
     input: isTty ? arbitratedInput() : simpleLines(),

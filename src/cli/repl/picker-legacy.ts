@@ -12,12 +12,14 @@ import { modelRegistry } from '../../core/model-registry.js';
 import { resolveActiveModelPolicy } from '../../core/model-activation-store.js';
 import type { ActiveSelection } from './provider-switch.js';
 import type { PickerKind, PickerSpec } from './picker.js';
-import { buildModelPickerSpec, buildProviderPickerSpec, type PickerSpecContext } from './picker-specs.js';
+import { buildModelPickerSpec, buildProviderPickerSpec, type PickerSpecContext, type ProviderVia } from './picker-specs.js';
+import { hostProviderVia } from '../../core/native-provider-names.js';
 
 export function buildLegacyPickerSpecs(
   current: () => ActiveSelection,
   projectRoot: () => string = () => process.cwd(),
   modelsFact?: (n: number) => string,
+  viaFact?: (via: ProviderVia) => string,
 ): Partial<Record<PickerKind, () => PickerSpec>> {
   const context = (): PickerSpecContext => ({
     providers: modelRegistry.getAllProviders(),
@@ -28,7 +30,11 @@ export function buildLegacyPickerSpecs(
     // No credential/reachability probe on these paths → `unknown`, never a
     // false `ok` (RECONCILIATION L204; TERMINAL-PICKER-007).
     availability: () => ({ ok: 'unknown' }),
+    // TERMINAL-PROVIDER-VOCAB-001 — registry owners ARE the rows here; the
+    // transport fact says how each is reached (host CLI / API / local).
+    transport: (provider) => ({ owner: provider, via: hostProviderVia(provider) }),
     ...(modelsFact ? { modelsFact } : {}),
+    ...(viaFact ? { viaFact } : {}),
   });
   return {
     model: () => buildModelPickerSpec(context()),

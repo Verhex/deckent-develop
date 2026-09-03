@@ -19,7 +19,55 @@
 
 import { displayWidth } from './cursor-model.js';
 import { truncateEnd } from './status-row.js';
-import type { PickerLabels } from './picker-labels.js';
+// TERMINAL-PROVIDER-VOCAB-001 — the label CONTRACT lives in this leaf (the
+// builder + assertion stay in picker-labels.ts) so the mechanism never
+// imports its label module back: no picker ↔ picker-labels cycle.
+export interface PickerLabels {
+  readonly title: Readonly<Record<PickerKind, string>>;
+  readonly hintPick: string;
+  readonly hintScope: string;
+  /** Template with `{query}`. */
+  readonly hintFilter: string;
+  readonly empty: string;
+  /** Template with `{glyph}` and `{n}` (rows scrolled out of the window). */
+  readonly more: string;
+  /** Template with `{glyph}` and `{id}` (full id of a truncated focused row). */
+  readonly reveal: string;
+  /** Template with `{command}` — the typed-argument path on every surface. */
+  readonly typedHint: string;
+  /** Template with `{command}` — readline/line surfaces without a menu. */
+  readonly unavailableSurface: string;
+  /** TERMINAL-PICKER-005 — template with `{arg}`: a typed `<n|id>` that matched nothing. */
+  readonly notFound: string;
+  /** TERMINAL-PICKER-007 — hint while a filter is active (Esc clears it). */
+  readonly hintFilterEsc: string;
+  /** TERMINAL-PICKER-007 — template with `{command}`: the typed form where no resolver exists. */
+  readonly typedForm: string;
+  /** TERMINAL-PICKER-007 — template with `{n}`: the provider row's model count. */
+  readonly factModels: string;
+  /** TERMINAL-PROVIDER-VOCAB-001 — the transport fact words per via kind. */
+  readonly via: Readonly<Record<ProviderVia, string>>;
+  /** TERMINAL-PICKER-007 — in-card reason while a turn is running (non-switch kinds). */
+  readonly readOnlyBusy: string;
+  /** TERMINAL-PICKER-007 — the config write seam is not wired in this session. */
+  readonly seamMissing: string;
+  readonly states: Readonly<Record<PickerState, string>>;
+  readonly scopes: Readonly<Record<PickerScope, string>>;
+  /** Typed blocked reasons by code; unknown codes render `blockedGeneric`. */
+  readonly blocked: Readonly<Record<string, string>>;
+  /** Template with `{code}`. */
+  readonly blockedGeneric: string;
+  /** Templates with `{value}` (`config` also takes `{key}`). */
+  readonly committed: Readonly<Record<'session' | 'default' | 'apply' | 'config', string>>;
+  /** Template with `{error}`. */
+  readonly defaultWriteFailed: string;
+  /** TERMINAL-PICKER-004 — template with `{error}`. */
+  readonly configWriteFailed: string;
+  /** TERMINAL-PICKER-004 — key-row facts, templates with `{value}`. */
+  readonly configFacts: Readonly<Record<'current' | 'default', string>>;
+  /** TERMINAL-PICKER-003 — the meaning of each approval mode (a row fact). */
+  readonly approveFacts: Readonly<Record<'suggest' | 'auto-edit' | 'full-auto', string>>;
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -29,6 +77,17 @@ export type PickerScope = 'session' | 'default' | 'apply' | 'cancel';
 
 /** One fact shown beside a candidate (`value` is already localized by the builder). */
 export interface PickerFact { readonly key: string; readonly value: string }
+
+/** TERMINAL-PROVIDER-VOCAB-001 — how a provider is reached from the Terminal
+ *  (the "via" fact); defined in this leaf so specs and labels share it
+ *  without a cycle. */
+export type ProviderVia = 'host-cli' | 'api' | 'local';
+
+export interface ProviderTransport {
+  /** The registry owner the row is labeled by. */
+  readonly owner: string;
+  readonly via: ProviderVia;
+}
 
 export interface PickerCandidate {
   /** Stable identity (model id, provider name, session id, config key…). */

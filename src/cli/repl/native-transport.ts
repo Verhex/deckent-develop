@@ -233,8 +233,11 @@ export interface NativeResolveContext {
 }
 
 /** Providers whose native tool_use transport exists. codex/gemini are
- *  subscription-CLI providers (orchestrator-side) — honestly unsupported here. */
-export const NATIVE_PROVIDER_NAMES = ['claude', 'openai', 'ollama', 'deepseek', 'qwen', 'glm', 'local-llm'] as const;
+ *  subscription-CLI providers (orchestrator-side) — honestly unsupported here.
+ *  TERMINAL-PROVIDER-VOCAB-001: the array lives in core (config validation
+ *  shares it); re-exported here for the REPL's existing import sites. */
+import { NATIVE_PROVIDER_NAMES } from '../../core/native-provider-names.js';
+export { NATIVE_PROVIDER_NAMES };
 
 // ─── TERMINAL-PICKER-002 — candidate listing for the interactive picker ──────
 //

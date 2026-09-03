@@ -61,9 +61,14 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { scrubCrossProviderEnv } from './provider.js';
+import { AUTH_PROBE_PROVIDERS } from './native-provider-names.js';
 
 /** Providers this probe understands. Anything else → 'unknown'. */
-export type AuthProbeProvider = 'claude' | 'codex' | 'gemini' | 'cursor';
+/** TERMINAL-PROVIDER-VOCAB-001 — the runtime list lives in the leaf module
+ *  core/native-provider-names.ts (the "via host CLI" set); the type derives
+ *  from it so the two can never drift. */
+export { AUTH_PROBE_PROVIDERS };
+export type AuthProbeProvider = (typeof AUTH_PROBE_PROVIDERS)[number];
 
 /** Tri-state login result. */
 export type AuthProbeState = 'logged-in' | 'logged-out' | 'unknown';

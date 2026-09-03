@@ -83,6 +83,7 @@ import type { ModelStrategy } from './mode-presets.js';
 import { metric } from './observability.js';
 import { interpolateConfig } from './deck-interpolation.js';
 import { assertExecutionBudgetPolicyConfig } from './execution-budget-policy.js';
+import { NATIVE_PROVIDER_NAMES, isNativeProviderName } from './native-provider-names.js';
 import {
   assertProviderLimitPolicyLayerPrecedence,
   assertProviderLimitsConfig,
@@ -869,6 +870,13 @@ export function validateConfig(config: DeckentConfig): string[] {
   if (config.brain_provider !== undefined &&
       !VALID_PROVIDERS_ALL.includes(config.brain_provider)) {
     errors.push(`Invalid value '${config.brain_provider}' for field 'brain_provider'. Valid: ${VALID_PROVIDERS_ALL.join(', ')}`);
+  }
+
+  // TERMINAL-PROVIDER-VOCAB-001 — native_provider (the native transport pin
+  // the Terminal picker's "save as default" writes) accepts exactly the native
+  // transport names; a typo is refused, never silently resolved.
+  if (config.native_provider !== undefined && !isNativeProviderName(config.native_provider)) {
+    errors.push(`Invalid value '${String(config.native_provider)}' for field 'native_provider'. Valid: ${NATIVE_PROVIDER_NAMES.join(', ')}`);
   }
 
   // Sprint 220 Task 220-001 — chat_provider validation (optional REPL override).
@@ -2946,7 +2954,22 @@ export interface ConfigMetadataEntry {
  * Metadata for every top-level DeckentConfig key.
  * Consumed by `getConfigHelp`, `listConfigByCategory`, and `generateConfigReference`.
  */
+// TERMINAL-PROVIDER-VOCAB-001 — the provider option lists and their type
+// strings derive from the validation authority (VALID_PROVIDERS_ALL /
+// NATIVE_PROVIDER_NAMES); a literal list here drifted narrower than the
+// values validation accepts (KANUN 10: one source).
+const PROVIDER_TYPE_UNION = VALID_PROVIDERS_ALL.map((p) => `'${p}'`).join(' | ');
+const NATIVE_PROVIDER_TYPE_UNION = NATIVE_PROVIDER_NAMES.map((p) => `'${p}'`).join(' | ');
+
 export const CONFIG_METADATA: Readonly<Record<string, ConfigMetadataEntry>> = {
+  native_provider: {
+    description: 'Native transport the Terminal binds at boot (the /provider picker\'s "save as default" writes it). Only transports with a native tool-use adapter are valid.',
+    descriptionTr: 'Terminal\'in açılışta bağlandığı native taşıma (/provider seçicisinin "varsayılan yap" adımı bunu yazar). Yalnız native araç-kullanım adaptörü olan taşımalar geçerlidir.',
+    type: `${NATIVE_PROVIDER_TYPE_UNION} | undefined`,
+    default: undefined,
+    options: [...NATIVE_PROVIDER_NAMES],
+    category: 'Provider',
+  },
   'prompt.codex_core_channel': {
     description: 'Enable the Codex-owned core prompt channel after an owner-approved canary default decision.',
     descriptionTr: 'Owner onaylı canary default kararından sonra Codex-owned core prompt kanalını etkinleştirir.',
@@ -3049,30 +3072,30 @@ export const CONFIG_METADATA: Readonly<Record<string, ConfigMetadataEntry>> = {
   },
   brain_provider: {
     description: 'AI provider used for the Brain orchestrator (planning and evaluation).',
-    type: "'claude' | 'codex' | 'gemini' | 'ollama'",
+    type: PROVIDER_TYPE_UNION,
     default: 'claude',
-    options: ['claude', 'codex', 'gemini', 'ollama'],
+    options: [...VALID_PROVIDERS_ALL],
     category: 'Provider',
   },
   chat_provider: {
     description: 'Native REPL provider override (deckent argümansız). Fallback chain: chat_provider → brain_provider → claude. Set independently from brain_provider to decouple planner from REPL (e.g. brain=opus, repl=ollama).',
-    type: "'claude' | 'codex' | 'gemini' | 'ollama' | undefined",
+    type: `${PROVIDER_TYPE_UNION} | undefined`,
     default: undefined,
-    options: ['claude', 'codex', 'gemini', 'ollama'],
+    options: [...VALID_PROVIDERS_ALL],
     category: 'Provider',
   },
   worker_provider: {
     description: 'Default AI provider for worker agents executing tasks.',
-    type: "'claude' | 'codex' | 'gemini' | 'ollama'",
+    type: PROVIDER_TYPE_UNION,
     default: 'claude',
-    options: ['claude', 'codex', 'gemini', 'ollama'],
+    options: [...VALID_PROVIDERS_ALL],
     category: 'Provider',
   },
   fallback_provider: {
     description: 'Provider to use when the primary provider is unavailable.',
-    type: "'claude' | 'codex' | 'gemini' | 'ollama' | undefined",
+    type: `${PROVIDER_TYPE_UNION} | undefined`,
     default: undefined,
-    options: ['claude', 'codex', 'gemini', 'ollama'],
+    options: [...VALID_PROVIDERS_ALL],
     category: 'Provider',
   },
   provider_overrides: {

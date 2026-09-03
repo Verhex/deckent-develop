@@ -10,52 +10,20 @@
 // string-free-closure scan of buildReplLabels stays flat.
 
 import { requireInjectedLabel } from '../helpers/injected-label.js';
-import type { PickerKind, PickerScope, PickerState } from './picker.js';
+import type { PickerLabels, ProviderVia } from './picker.js';
 
-export interface PickerLabels {
-  readonly title: Readonly<Record<PickerKind, string>>;
-  readonly hintPick: string;
-  readonly hintScope: string;
-  /** Template with `{query}`. */
-  readonly hintFilter: string;
-  readonly empty: string;
-  /** Template with `{glyph}` and `{n}` (rows scrolled out of the window). */
-  readonly more: string;
-  /** Template with `{glyph}` and `{id}` (full id of a truncated focused row). */
-  readonly reveal: string;
-  /** Template with `{command}` — the typed-argument path on every surface. */
-  readonly typedHint: string;
-  /** Template with `{command}` — readline/line surfaces without a menu. */
-  readonly unavailableSurface: string;
-  /** TERMINAL-PICKER-005 — template with `{arg}`: a typed `<n|id>` that matched nothing. */
-  readonly notFound: string;
-  /** TERMINAL-PICKER-007 — hint while a filter is active (Esc clears it). */
-  readonly hintFilterEsc: string;
-  /** TERMINAL-PICKER-007 — template with `{command}`: the typed form where no resolver exists. */
-  readonly typedForm: string;
-  /** TERMINAL-PICKER-007 — template with `{n}`: the provider row's model count. */
-  readonly factModels: string;
-  /** TERMINAL-PICKER-007 — in-card reason while a turn is running (non-switch kinds). */
-  readonly readOnlyBusy: string;
-  /** TERMINAL-PICKER-007 — the config write seam is not wired in this session. */
-  readonly seamMissing: string;
-  readonly states: Readonly<Record<PickerState, string>>;
-  readonly scopes: Readonly<Record<PickerScope, string>>;
-  /** Typed blocked reasons by code; unknown codes render `blockedGeneric`. */
-  readonly blocked: Readonly<Record<string, string>>;
-  /** Template with `{code}`. */
-  readonly blockedGeneric: string;
-  /** Templates with `{value}` (`config` also takes `{key}`). */
-  readonly committed: Readonly<Record<'session' | 'default' | 'apply' | 'config', string>>;
-  /** Template with `{error}`. */
-  readonly defaultWriteFailed: string;
-  /** TERMINAL-PICKER-004 — template with `{error}`. */
-  readonly configWriteFailed: string;
-  /** TERMINAL-PICKER-004 — key-row facts, templates with `{value}`. */
-  readonly configFacts: Readonly<Record<'current' | 'default', string>>;
-  /** TERMINAL-PICKER-003 — the meaning of each approval mode (a row fact). */
-  readonly approveFacts: Readonly<Record<'suggest' | 'auto-edit' | 'full-auto', string>>;
-}
+// TERMINAL-PROVIDER-VOCAB-001 — the PickerLabels CONTRACT is defined in the
+// mechanism leaf (picker.ts) and re-exported here for its importers; this
+// module owns only the catalog builder, the via keys and the assertion.
+export type { PickerLabels } from './picker.js';
+
+/** Catalog keys of the transport ("via") facts, shared by every surface that
+ *  builds a picker context. */
+export const PICKER_VIA_KEYS: Readonly<Record<ProviderVia, string>> = {
+  'host-cli': 'tui.picker.fact.via.host_cli',
+  api: 'tui.picker.fact.via.api',
+  local: 'tui.picker.fact.via.local',
+};
 
 const BLOCKED_CODES = ['MODEL_INACTIVE', 'MODEL_NOT_IN_ACTIVE_SET', 'NO_NATIVE_TRANSPORT', 'MISSING_CREDENTIAL', 'NOT_ENUMERABLE', 'NO_MODELS_LISTED'] as const;
 
@@ -86,6 +54,11 @@ export function buildPickerLabels(t: (key: string) => string): PickerLabels {
     hintFilterEsc: t('tui.picker.hint_filter_esc'),
     typedForm: t('tui.picker.typed_form'),
     factModels: t('tui.picker.fact.models'),
+    via: {
+      'host-cli': t(PICKER_VIA_KEYS['host-cli']),
+      api: t(PICKER_VIA_KEYS.api),
+      local: t(PICKER_VIA_KEYS.local),
+    },
     readOnlyBusy: t('tui.picker.read_only_busy'),
     seamMissing: t('tui.picker.seam_missing'),
     states: {

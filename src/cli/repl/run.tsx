@@ -13,12 +13,14 @@ import {
   resolveContextBudgetTokens,
   inferNativeProviderForModel,
   listNativeModelCandidates,
+  registryProviderFor,
   NATIVE_PROVIDER_NAMES,
   type NativeTransportConfig,
   type ProviderError,
 } from './native-transport.js';
 // TERMINAL-PICKER-002 — the interactive value picker's data + label seams.
-import { buildPickerLabels } from './picker-labels.js';
+import { buildPickerLabels, PICKER_VIA_KEYS } from './picker-labels.js';
+import { nativeProviderVia } from '../../core/native-provider-names.js';
 import { buildLegacyPickerSpecs } from './picker-legacy.js';
 import { resolveConfiguredPosture } from './term-mode.js';
 import { buildModelPickerSpec, buildProviderPickerSpec, type PickerSpecContext, type ProviderAvailability } from './picker-specs.js';
@@ -1477,6 +1479,10 @@ export async function runInkRepl(
           current: { provider: live.provider, model: live.model },
           availability,
           modelsFact: (n) => t('tui.picker.fact.models').replace('{n}', String(n)),
+          // TERMINAL-PROVIDER-VOCAB-001 — rows are labeled by the REGISTRY owner
+          // of each native transport; the transport itself is the via fact.
+          transport: (provider) => ({ owner: registryProviderFor(provider) ?? provider, via: nativeProviderVia(provider) }),
+          viaFact: (via) => t(PICKER_VIA_KEYS[via]),
         };
       };
       pickerSpecs = {
