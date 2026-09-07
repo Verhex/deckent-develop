@@ -49,6 +49,12 @@ import { createChatTurnQueue, type ChatTurnQueue, type ChatTurnBgEvent, type Cha
 import { createInputQueue, type InputQueue } from './input-queue.js';
 import { listRecentSessions, pickSession, type SessionRecord } from '../helpers/session-resume.js';
 import {
+  appendSprintHistoricalContext,
+  type LoadedSprintHistoricalContext,
+  type SprintHistoricalContextLoadResult,
+  type SprintHistoricalContextSource,
+} from './sprint-context-input.js';
+import {
   initialBusyControlsState, markBusy, markIdle, parseBusyCommand,
   resolveQueueCommand, applyInterrupt, applySteer,
   type BusyControlsState, type QueueStatusDecision, type InterruptDecision, type SteerDecision,
@@ -351,7 +357,7 @@ export function buildResumePickerLines(
 export type ResumeCommandDecision =
   | { readonly kind: 'passthrough' }
   | { readonly kind: 'list'; readonly lines: string[] }
-  | { readonly kind: 'switch'; readonly sessionId: string; readonly forwardToLoop: boolean; readonly line: string }
+  | { readonly kind: 'switch'; readonly sessionId: string; readonly sprintId?: string; readonly forwardToLoop: boolean; readonly line: string }
   | { readonly kind: 'reject'; readonly line: string };
 
 /**
@@ -383,6 +389,7 @@ export function resolveResumeCommand(
     return {
       kind: 'switch',
       sessionId: picked.session.id,
+      ...(picked.session.sprintId ? { sprintId: picked.session.sprintId } : {}),
       // Same-object check is safe: `combined` holds the caller's own records.
       forwardToLoop: chat.includes(picked.session),
       line: requireInjectedLabel('resumeSwitched', labels.resumeSwitched).replace('{id}', picked.session.id),
@@ -913,6 +920,9 @@ export interface ReplLabels {
   resumeAmbiguous: string; // "ambiguous — matches: {matches}"
   resumeFailed: string; // "session could not be resumed: {id}"
   resumeSprintUnavailable: string; // sprint context loading is dependency-bound
+  resumeSprintLoading: string;
+  resumeSprintLoaded: string;
+  resumeSprintSuperseded: string;
   /** Explicitly local detail appended to `/status`; never run-status truth. */
   activeChatContext: string; // "local active chat context: {id}"
   /** Compact caller-owned status-row label for the same local identity. */
@@ -1281,6 +1291,10 @@ export interface ReplAppProps {
   sessionId?: string;
   /** Explicit opt-in for the one-shot startup teaser; `/resume` stays lazy. */
   startupRecentSessions?: boolean;
+  /** Verified, bounded historical sprint context loader resolved by run.tsx. */
+  sprintHistoricalContext?: SprintHistoricalContextSource;
+  /** Caller-owned closed reason-code localization; mechanism remains string-free. */
+  renderSprintContextReason?: (reasonCode: string) => string;
   /** UI language for loop-emitted strings (/resume picker). */
   lang?: string;
   /** When set (native flag on), drives the turn INSTEAD of runChatNativeLoop. */
@@ -1503,7 +1517,7 @@ export async function routeNativeMcpInput(options: NativeMcpRouteOptions): Promi
 
 export function ReplApp(props: ReplAppProps): ReactElement {
   const palette = useInkPalette();
-  const { provider, dispatcher, labels, registerConfirm, registerActionGate, registerToolSink, slashRegistry, nativeMcpSlash, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, startupRecentSessions = false, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle, shortcutsPanel, pickerLabels, pickerSpecs, saveDefault, configEntries, saveConfigValue, initialTermMode, pickerAscii = false, pickerNoColor = false, dualStreamOverflow } = props;
+  const { provider, dispatcher, labels, registerConfirm, registerActionGate, registerToolSink, slashRegistry, nativeMcpSlash, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, startupRecentSessions = false, sprintHistoricalContext, renderSprintContextReason, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle, shortcutsPanel, pickerLabels, pickerSpecs, saveDefault, configEntries, saveConfigValue, initialTermMode, pickerAscii = false, pickerNoColor = false, dualStreamOverflow } = props;
   const { exit } = useApp();
   // TERMINAL-TOOLS-004 — live width for the status row + queue preview (reflows on resize).
   const columns = useTerminalColumns();
@@ -1641,6 +1655,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       if (nativeEngine?.hydrateTranscript) {
         const attempt = attemptNativeResume(decision.sessionId, props.cwd, nativeEngine, memory);
         if (attempt.kind === 'loaded') {
+          invalidateSprintContext();
           setActiveSessionId(decision.sessionId);
           activeSessionIdRef.current = decision.sessionId;
           setSessionTok(attempt.result.outputTokens);
@@ -1659,11 +1674,14 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         if (wake.current) { const w = wake.current; wake.current = null; w(); }
       }
     } else {
-      // L4-B1: a job projection is not resumable chat context. B2 will inject
-      // verified archive context; until then, fail honestly without changing
-      // the local active chat identity or relaunching the sprint.
-      pushTurn('seg', requireInjectedLabel('resumeSprintUnavailable', labels.resumeSprintUnavailable)
-        .replace('{id}', decision.sessionId));
+      const sprintId = decision.sprintId;
+      if (!sprintId) {
+        pushTurn('seg', requireInjectedLabel('resumeSprintUnavailable', labels.resumeSprintUnavailable)
+          .replace('{id}', decision.sessionId)
+          .replace('{reason}', renderSprintContextReason?.('SPRINT_ID_UNAVAILABLE') ?? 'SPRINT_ID_UNAVAILABLE'));
+        return;
+      }
+      void loadSprintHistoricalContext(sprintId);
     }
   };
 
@@ -1759,6 +1777,67 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // the loop), so its persist callback (REPL-575 K3) must read the CURRENT
   // session through this ref, not the stale closure value.
   const activeSessionIdRef = useRef<string | undefined>(sessionId);
+  const sprintContextGenerationRef = useRef(0);
+  const sprintContextLoadRef = useRef<AbortController | null>(null);
+  const pendingSprintContextRef = useRef<LoadedSprintHistoricalContext | null>(null);
+  const invalidateSprintContext = (): boolean => {
+    sprintContextGenerationRef.current += 1;
+    sprintContextLoadRef.current?.abort();
+    sprintContextLoadRef.current = null;
+    const hadPending = pendingSprintContextRef.current !== null;
+    pendingSprintContextRef.current = null;
+    return hadPending;
+  };
+  useEffect(() => () => {
+    sprintContextGenerationRef.current += 1;
+    sprintContextLoadRef.current?.abort();
+    sprintContextLoadRef.current = null;
+  }, []);
+  const loadSprintHistoricalContext = async (sprintId: string): Promise<void> => {
+    const reasonText = (reasonCode: string): string => renderSprintContextReason?.(reasonCode) ?? reasonCode;
+    const source = sprintHistoricalContext;
+    if (source?.availability !== 'enabled' || !source.load) {
+      pushTurn('seg', requireInjectedLabel('resumeSprintUnavailable', labels.resumeSprintUnavailable)
+        .replace('{id}', sprintId).replace('{reason}', reasonText(source?.reasonCode ?? 'SPRINT_CONTEXT_DISABLED')));
+      return;
+    }
+
+    const generation = sprintContextGenerationRef.current + 1;
+    sprintContextGenerationRef.current = generation;
+    sprintContextLoadRef.current?.abort();
+    const controller = new AbortController();
+    sprintContextLoadRef.current = controller;
+    const loadClearEpoch = clearEpoch.current;
+    const loadSessionId = activeSessionIdRef.current;
+    pushTurn('seg', requireInjectedLabel('resumeSprintLoading', labels.resumeSprintLoading).replace('{id}', sprintId));
+
+    let result: SprintHistoricalContextLoadResult;
+    try {
+      result = await source.load(sprintId, controller.signal);
+    } catch {
+      result = { kind: 'hold' as const, reasonCode: 'VERIFICATION_WORKER_FAILED' };
+    }
+    if (sprintContextLoadRef.current === controller) sprintContextLoadRef.current = null;
+    const stale = controller.signal.aborted
+      || sprintContextGenerationRef.current !== generation
+      || clearEpoch.current !== loadClearEpoch
+      || activeSessionIdRef.current !== loadSessionId;
+    if (stale) {
+      // A clear or chat switch owns its own visible transition; do not redraw
+      // an obsolete completion onto the new transcript/session.
+      if (clearEpoch.current === loadClearEpoch && activeSessionIdRef.current === loadSessionId) {
+        pushTurn('seg', requireInjectedLabel('resumeSprintSuperseded', labels.resumeSprintSuperseded).replace('{id}', sprintId));
+      }
+      return;
+    }
+    if (result.kind === 'hold') {
+      pushTurn('seg', requireInjectedLabel('resumeSprintUnavailable', labels.resumeSprintUnavailable)
+        .replace('{id}', sprintId).replace('{reason}', reasonText(result.reasonCode)));
+      return;
+    }
+    pendingSprintContextRef.current = result;
+    pushTurn('seg', requireInjectedLabel('resumeSprintLoaded', labels.resumeSprintLoaded).replace('{id}', sprintId));
+  };
   const localChatContext = (): string | undefined => {
     const id = activeSessionIdRef.current;
     return id ? labels.activeChatContext.replace('{id}', formatSessionIdForTerminal(id)) : undefined;
@@ -1852,6 +1931,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     // recognized as stale by `output`/the tool sink and silently dropped
     // instead of drawing pre-clear content onto the just-cleared screen.
     clearEpoch.current += 1;
+    invalidateSprintContext();
     setTurns([]); setPartial(''); headPushed.current = false;
     segmenter.current = createStreamSegmenter((seg) => pushSegment(seg.markdown));
   };
@@ -2021,7 +2101,11 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           // prompt (chat turns only; a slash line is a command, not a prompt).
           const shellPrefix = line.startsWith('/') ? '' : buildShellNotePrefix(shellNotesRef.current);
           if (shellPrefix.length > 0) shellNotesRef.current = [];
-          yield shellPrefix + expanded;
+          const historicalContext = line.startsWith('/') ? null : pendingSprintContextRef.current;
+          if (historicalContext) pendingSprintContextRef.current = null;
+          yield historicalContext
+            ? appendSprintHistoricalContext(shellPrefix + expanded, historicalContext)
+            : shellPrefix + expanded;
           finalizeReply(); // turn finished streaming → close it out
           // 358-006: turn-end steer drain (busy-controls markIdle) — the SAME
           // "never mid-turn" contract as the ChatTurnQueue drain below: notes
@@ -2120,6 +2204,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         ...(sessionId ? { sessionId } : {}),
         ...(lang ? { lang } : {}),
         onSessionResumed: (id) => {
+          invalidateSprintContext();
           setActiveSessionId(id);
           activeSessionIdRef.current = id;
         },
@@ -2315,6 +2400,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           } else if (attempt.kind === 'failed') {
             pushTurn('seg', requireInjectedLabel('resumeFailed', labels.resumeFailed).replace('{id}', literalId));
           } else {
+            invalidateSprintContext();
             setActiveSessionId(literalId);
             activeSessionIdRef.current = literalId;
             setSessionTok(attempt.result.outputTokens);

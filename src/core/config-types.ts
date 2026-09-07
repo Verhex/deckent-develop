@@ -98,6 +98,18 @@ export interface TerminalConfig {
     recent_sessions?: boolean;
   };
   /**
+   * Explicit, bounded historical sprint context for a resumed chat. The absent
+   * block is disabled; enabling it requires both limits so no unrelated memory
+   * or native-context setting can become an implicit fallback.
+   */
+  resume?: {
+    sprint_context?: {
+      enabled?: boolean;
+      max_bytes?: number;
+      verification_timeout_ms?: number;
+    };
+  };
+  /**
    * TERM-FLOW-UNIFY Sprint-1 dilim (422-001,
    * docs/analysis/term-flow-unify-design-2026-07-11.md): gates the
    * host-owned RunFlow state machine (`core/run-flow-contract.ts` +

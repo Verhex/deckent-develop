@@ -84,6 +84,88 @@ export function resolveProviderDefaultWrite(
   if (kind === 'provider') return { patch: { chat_provider: id } };
   return { errorKey: 'native.boot.legacy-model-default-unsupported' };
 }
+
+export interface SprintHistoricalContextConfig {
+  readonly enabled?: boolean;
+  readonly max_bytes?: number;
+  readonly verification_timeout_ms?: number;
+}
+
+const SPRINT_CONTEXT_REASON_CATEGORY: Readonly<Record<string, 'disabled' | 'authority_unavailable' | 'invalid_evidence' | 'resource_limit' | 'interrupted'>> = {
+  SPRINT_CONTEXT_DISABLED: 'disabled',
+  SPRINT_CONTEXT_LIMIT_UNAVAILABLE: 'resource_limit',
+  SPRINT_CONTEXT_PRINCIPAL_UNVERIFIED: 'authority_unavailable',
+  SPRINT_ID_UNAVAILABLE: 'invalid_evidence',
+  TENANT_SCOPE_UNRESOLVED: 'authority_unavailable',
+  SPRINT_ARCHIVE_TENANT_BINDING_UNAVAILABLE: 'authority_unavailable',
+  INVALID_REQUEST: 'invalid_evidence',
+  UNSAFE_PROJECT_ROOT: 'invalid_evidence',
+  UNSAFE_ARCHIVE_PATH: 'invalid_evidence',
+  MANIFEST_UNAVAILABLE: 'invalid_evidence',
+  ARTIFACT_UNAVAILABLE: 'invalid_evidence',
+  ARCHIVE_VERIFICATION_FAILED: 'invalid_evidence',
+  TERMINAL_VERIFICATION_FAILED: 'invalid_evidence',
+  ARTIFACT_CHANGED: 'invalid_evidence',
+  INVALID_UTF8: 'invalid_evidence',
+  VERIFICATION_WORKER_FAILED: 'invalid_evidence',
+  MANIFEST_TOO_LARGE: 'resource_limit',
+  ARTIFACT_TOO_LARGE: 'resource_limit',
+  VERIFICATION_RESOURCE_LIMIT: 'resource_limit',
+  VERIFICATION_TIMEOUT: 'interrupted',
+  ABORTED: 'interrupted',
+};
+
+export function localizeSprintContextReason(
+  reasonCode: string,
+  t: (key: string) => string,
+): string {
+  if (!Object.hasOwn(SPRINT_CONTEXT_REASON_CATEGORY, reasonCode)) {
+    return t('tui.resume_sprint_context_reason.unknown');
+  }
+  const category = SPRINT_CONTEXT_REASON_CATEGORY[reasonCode] as Exclude<keyof typeof SPRINT_CONTEXT_REASON_CATEGORY, never>;
+  return `${t(`tui.resume_sprint_context_reason.${category}`)} (${reasonCode})`;
+}
+
+/** Resolve the local CLI's authority before exposing any archive read seam. */
+export function buildSprintHistoricalContextSource(
+  projectRoot: string,
+  config: SprintHistoricalContextConfig | undefined,
+  strictTenantIsolation: boolean,
+  reader = readVerifiedSprintHistoricalContext,
+  resolvePrincipal = () => resolveLocalOsPrincipal('cli'),
+): SprintHistoricalContextSource {
+  if (config?.enabled !== true) {
+    return { availability: 'disabled', reasonCode: 'SPRINT_CONTEXT_DISABLED' };
+  }
+  const maxBytes = config.max_bytes;
+  const verificationTimeoutMs = config.verification_timeout_ms;
+  if (!Number.isSafeInteger(maxBytes) || (maxBytes ?? 0) <= 0
+      || !Number.isSafeInteger(verificationTimeoutMs) || (verificationTimeoutMs ?? 0) <= 0) {
+    return { availability: 'unavailable', reasonCode: 'SPRINT_CONTEXT_LIMIT_UNAVAILABLE' };
+  }
+  const principal = resolvePrincipal();
+  if (principal.identityClass !== 'local' || principal.assurance !== 'os-user') {
+    return { availability: 'unavailable', reasonCode: 'SPRINT_CONTEXT_PRINCIPAL_UNVERIFIED' };
+  }
+  try {
+    resolveCallerTenant(principal, strictTenantIsolation);
+  } catch {
+    return { availability: 'unavailable', reasonCode: 'TENANT_SCOPE_UNRESOLVED' };
+  }
+  if (strictTenantIsolation) {
+    return { availability: 'unavailable', reasonCode: 'SPRINT_ARCHIVE_TENANT_BINDING_UNAVAILABLE' };
+  }
+  return {
+    availability: 'enabled',
+    load: (sprintId, signal) => reader({
+      projectRoot,
+      sprintId,
+      maxBytes: maxBytes as number,
+      verificationTimeoutMs: verificationTimeoutMs as number,
+      signal,
+    }),
+  };
+}
 import { createRunFlowController, type RunFlowController, type RunFlowControllerDeps } from './run-flow-controller.js';
 import { ensureProvidersBootstrapped } from './provider-bootstrap.js';
 import { buildPlanPreviewCardLabels } from './plan-preview-card.js';
@@ -141,6 +223,9 @@ import { probeSubscriptionLimits } from '../../core/limit-preflight.js';
 import { resolveNativeAgentBudget } from '../../core/execution-budget-policy.js';
 import { modelRegistry } from '../../core/model-registry.js';
 import { attendedExecutionProjectId } from '../../core/attended-execution-approval.js';
+import { resolveCallerTenant, resolveLocalOsPrincipal } from '../../core/principal.js';
+import { readVerifiedSprintHistoricalContext } from '../../core/sprint-historical-context.js';
+import type { SprintHistoricalContextSource } from './sprint-context-input.js';
 
 const EXEC_TOOLS = new Set(['deckent_write_file', 'deckent_read_file', 'deckent_edit_file', 'deckent_bash']);
 
@@ -243,7 +328,10 @@ export function buildReplLabels(t: (key: string) => string): ReplLabels {
     resumeNotFound: t('tui.resume_picker_not_found'),
     resumeAmbiguous: t('tui.resume_picker_ambiguous'),
     resumeFailed: t('tui.resume_picker_failed'),
-    resumeSprintUnavailable: t('tui.resume_sprint_context_unavailable'),
+    resumeSprintUnavailable: t('tui.resume_sprint_context_unavailable_with_reason'),
+    resumeSprintLoading: t('tui.resume_sprint_context_loading'),
+    resumeSprintLoaded: t('tui.resume_sprint_context_loaded'),
+    resumeSprintSuperseded: t('tui.resume_sprint_context_superseded'),
     activeChatContext: t('tui.active_chat_context'),
     activeChatSession: t('tui.active_chat_session'),
     // busy-controls: /queue /interrupt /steer (renderBusyDecision, app.tsx).
@@ -1211,7 +1299,14 @@ export async function runInkRepl(
   let projectCfg: {
     language?: string;
     repl_surface?: { enabled?: boolean; approvals?: boolean; bg_turns?: boolean };
-    terminal?: { rpc_debug?: boolean; native_agent?: boolean; run_flow_v2?: boolean; startup?: { recent_sessions?: boolean } };
+    terminal?: {
+      rpc_debug?: boolean;
+      native_agent?: boolean;
+      run_flow_v2?: boolean;
+      startup?: { recent_sessions?: boolean };
+      resume?: { sprint_context?: { enabled?: boolean; max_bytes?: number; verification_timeout_ms?: number } };
+    };
+    strict_tenant_isolation?: boolean;
     native_provider?: string;
     native_model?: string;
     native_context_tokens?: number;
@@ -1230,6 +1325,13 @@ export async function runInkRepl(
     process.stdout.write(`\n${nativeBootErrorCode('config-invalid')}: ${t('native.boot.config-invalid')}\n`);
     return { exitCode: 1, errorCode: 'config-invalid' };
   }
+
+  const launchProjectRoot = process.cwd();
+  const sprintHistoricalContext = buildSprintHistoricalContextSource(
+    launchProjectRoot,
+    projectCfg.terminal?.resume?.sprint_context,
+    projectCfg.strict_tenant_isolation === true,
+  );
 
   const nativeSelected = isNativeAgentSelected(process.argv.slice(2), projectCfg);
   const explicitNativeIntent = projectCfg.native_provider !== undefined
@@ -1893,6 +1995,8 @@ export async function runInkRepl(
       onApprovalMode={(m) => { approvalMode = m; }}
       {...(memory ? { memory } : {})}
       {...(sessionId ? { sessionId } : {})}
+      sprintHistoricalContext={sprintHistoricalContext}
+      renderSprintContextReason={(reasonCode) => localizeSprintContextReason(reasonCode, t)}
       lang={lang}
       labels={buildReplLabels(t)}
       approvalLabels={buildApprovalLabels(t)}

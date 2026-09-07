@@ -41,6 +41,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep, win32 } from 'node:path';
+import { TextDecoder } from 'node:util';
 
 import {
   ARCHIVE_DIR,
@@ -174,6 +175,15 @@ export interface SprintArchiveVerificationReport {
   readonly untracked: readonly string[];
   readonly manifestDigestValid: boolean;
 }
+
+export type VerifiedSprintArchiveDocumentRead =
+  | { readonly kind: 'loaded'; readonly sprintId: string; readonly manifestDigest: string;
+      readonly artifactPath: string; readonly sha256: string; readonly bytes: number; readonly text: string }
+  | { readonly kind: 'hold'; readonly reasonCode: 'INVALID_REQUEST' | 'UNSAFE_PROJECT_ROOT'
+      | 'UNSAFE_ARCHIVE_PATH' | 'MANIFEST_UNAVAILABLE' | 'MANIFEST_TOO_LARGE'
+      | 'ARTIFACT_UNAVAILABLE' | 'ARTIFACT_TOO_LARGE' | 'ARCHIVE_VERIFICATION_FAILED'
+      | 'TERMINAL_VERIFICATION_FAILED' | 'VERIFICATION_RESOURCE_LIMIT'
+      | 'ARTIFACT_CHANGED' | 'INVALID_UTF8' };
 
 export interface SprintArchiveArtifactPublication {
   readonly path: string;
@@ -2166,6 +2176,190 @@ export function verifySprintArchiveTerminal(
   hotJournalPath?: string,
 ): SprintArchiveTerminalVerificationReport {
   return verifySprintArchiveTerminalWithProjection(projectRoot, sprintId, hotJournalPath);
+}
+
+function historicalPathState(projectRoot: string, target: string): 'safe' | 'missing' | 'unsafe' {
+  const root = resolve(projectRoot);
+  try {
+    if (realpathSync(root) !== root || lstatSync(root).isSymbolicLink()) return 'unsafe';
+    const projected = relative(root, resolve(target));
+    if (projected === '' || projected.startsWith('..') || isAbsolute(projected)) return 'unsafe';
+    let cursor = root;
+    for (const part of projected.split(sep)) {
+      cursor = join(cursor, part);
+      let metadata: Stats;
+      try { metadata = lstatSync(cursor); } catch { return 'missing'; }
+      if (metadata.isSymbolicLink()) return 'unsafe';
+    }
+    return 'safe';
+  } catch {
+    return 'unsafe';
+  }
+}
+
+/**
+ * Synchronous worker-side primitive for one exact historical document. It is
+ * an integrity reader, never ACL/tenant authority. Callers use the async worker
+ * adapter in sprint-historical-context.ts rather than blocking a UI thread.
+ */
+export function readVerifiedSprintArchiveDocument(input: {
+  readonly projectRoot: string;
+  readonly sprintId: string;
+  readonly maxBytes: number;
+  readonly verificationResourceBytes: number;
+  readonly artifactPath: 'docs/brain-sprint.md';
+}): VerifiedSprintArchiveDocumentRead {
+  if (!SPRINT_ID_PATTERN.test(input.sprintId)
+    || !Number.isSafeInteger(input.maxBytes) || input.maxBytes < 1
+    || !Number.isSafeInteger(input.verificationResourceBytes) || input.verificationResourceBytes < input.maxBytes
+    || input.artifactPath !== 'docs/brain-sprint.md') {
+    return { kind: 'hold', reasonCode: 'INVALID_REQUEST' };
+  }
+  const root = resolve(input.projectRoot);
+  try {
+    if (realpathSync(root) !== root || lstatSync(root).isSymbolicLink()) {
+      return { kind: 'hold', reasonCode: 'UNSAFE_PROJECT_ROOT' };
+    }
+  } catch {
+    return { kind: 'hold', reasonCode: 'UNSAFE_PROJECT_ROOT' };
+  }
+
+  const archiveDir = resolveSprintArchiveDir(root, input.sprintId);
+  const manifestPath = join(archiveDir, SPRINT_ARCHIVE_MANIFEST_FILE);
+  const artifactPath = join(archiveDir, input.artifactPath);
+  const manifestPathState = historicalPathState(root, manifestPath);
+  const artifactPathState = historicalPathState(root, artifactPath);
+  if (manifestPathState === 'unsafe' || artifactPathState === 'unsafe') {
+    return { kind: 'hold', reasonCode: 'UNSAFE_ARCHIVE_PATH' };
+  }
+  if (manifestPathState === 'missing') return { kind: 'hold', reasonCode: 'MANIFEST_UNAVAILABLE' };
+  if (artifactPathState === 'missing') return { kind: 'hold', reasonCode: 'ARTIFACT_UNAVAILABLE' };
+
+  let manifestMetadata: Stats;
+  let artifactMetadata: Stats;
+  try {
+    manifestMetadata = lstatSync(manifestPath);
+    artifactMetadata = lstatSync(artifactPath);
+  } catch {
+    return { kind: 'hold', reasonCode: 'ARTIFACT_UNAVAILABLE' };
+  }
+  if (!manifestMetadata.isFile()) return { kind: 'hold', reasonCode: 'MANIFEST_UNAVAILABLE' };
+  if (!artifactMetadata.isFile()) return { kind: 'hold', reasonCode: 'ARTIFACT_UNAVAILABLE' };
+  if (artifactMetadata.size > input.maxBytes) return { kind: 'hold', reasonCode: 'ARTIFACT_TOO_LARGE' };
+  if (manifestMetadata.size > input.verificationResourceBytes) {
+    return { kind: 'hold', reasonCode: 'MANIFEST_TOO_LARGE' };
+  }
+
+  const manifest = readManifest(manifestPath);
+  if (!manifest || manifest.sprintId !== input.sprintId) {
+    return { kind: 'hold', reasonCode: 'MANIFEST_UNAVAILABLE' };
+  }
+  const artifact = manifest.artifacts.filter(candidate =>
+    candidate.path === input.artifactPath && candidate.family === 'docs');
+  if (artifact.length !== 1) return { kind: 'hold', reasonCode: 'ARTIFACT_UNAVAILABLE' };
+  const expected = artifact[0] as SprintArchiveManifestArtifact;
+  if (expected.bytes > input.maxBytes) return { kind: 'hold', reasonCode: 'ARTIFACT_TOO_LARGE' };
+  if (manifest.artifacts.some(candidate => /\.(?:json|jsonl)$/u.test(candidate.path)
+    && candidate.bytes > input.verificationResourceBytes)) {
+    return { kind: 'hold', reasonCode: 'VERIFICATION_RESOURCE_LIMIT' };
+  }
+  let boundedAllocationBytes = manifestMetadata.size + artifactMetadata.size;
+  for (const sidecar of [TERMINAL_SEAL_RECEIPT_FILE, TERMINAL_SEAL_APPLICATION_FILE]) {
+    try {
+      const path = join(archiveDir, sidecar);
+      const sidecarBytes = lstatSync(path).size;
+      boundedAllocationBytes += sidecarBytes;
+      if (historicalPathState(root, path) !== 'safe'
+        || sidecarBytes > input.verificationResourceBytes
+        || boundedAllocationBytes > input.verificationResourceBytes) {
+        return { kind: 'hold', reasonCode: 'VERIFICATION_RESOURCE_LIMIT' };
+      }
+    } catch {
+      return { kind: 'hold', reasonCode: 'TERMINAL_VERIFICATION_FAILED' };
+    }
+  }
+
+  // The canonical terminal verifier performs full-buffer reads for these
+  // operational files. Bound their actual current metadata before invoking it;
+  // archive hashes are still verified canonically below. A subsequent race is
+  // detected as verification failure, not treated as a stable snapshot.
+  const sealValue = readJson(join(archiveDir, TERMINAL_SEAL_RECEIPT_FILE));
+  const seal = sealValue as Partial<SprintArchiveTerminalSealReceipt> | null;
+  const requiredVerificationPaths = [
+    join(root, DECKENT_DIR, 'recently-works', `${input.sprintId}-terminal-receipt.json`),
+    join(root, DECKENT_DIR, 'recently-works', `${input.sprintId}-events.jsonl`),
+    join(archiveDir, `${input.sprintId}-events.jsonl`),
+    join(archiveDir, `${input.sprintId}-seq`),
+  ];
+  for (const delivery of manifest.artifacts.filter(
+    candidate => candidate.path.endsWith('.prompt-delivery.json'),
+  )) {
+    requiredVerificationPaths.push(resolve(archiveDir, delivery.path));
+  }
+  if (typeof seal?.repairedHistoryPath === 'string') {
+    requiredVerificationPaths.push(resolve(archiveDir, seal.repairedHistoryPath));
+  }
+  if (typeof seal?.repairedSequenceHistoryPath === 'string') {
+    requiredVerificationPaths.push(resolve(archiveDir, seal.repairedSequenceHistoryPath));
+  }
+  if (seal?.brainAdoptionRequired === true) {
+    requiredVerificationPaths.push(join(root, BRAIN_DIR, MEMORY_DB_FILE));
+    const walPath = join(root, BRAIN_DIR, `${MEMORY_DB_FILE}-wal`);
+    if (existsSync(walPath)) requiredVerificationPaths.push(walPath);
+  }
+  for (const path of requiredVerificationPaths) {
+    const state = historicalPathState(root, path);
+    if (state === 'unsafe') return { kind: 'hold', reasonCode: 'UNSAFE_ARCHIVE_PATH' };
+    if (state === 'missing') return { kind: 'hold', reasonCode: 'TERMINAL_VERIFICATION_FAILED' };
+    try {
+      const metadata = lstatSync(path);
+      const immutableSnapshotMultiplier = seal?.brainAdoptionRequired === true
+          && (path === join(root, BRAIN_DIR, MEMORY_DB_FILE)
+            || path === join(root, BRAIN_DIR, `${MEMORY_DB_FILE}-wal`))
+        ? 2 : 1;
+      boundedAllocationBytes += metadata.size * immutableSnapshotMultiplier;
+      if (!metadata.isFile() || metadata.size > input.verificationResourceBytes
+        || boundedAllocationBytes > input.verificationResourceBytes) {
+        return { kind: 'hold', reasonCode: 'VERIFICATION_RESOURCE_LIMIT' };
+      }
+    } catch {
+      return { kind: 'hold', reasonCode: 'TERMINAL_VERIFICATION_FAILED' };
+    }
+  }
+
+  const archiveVerification = verifySprintArchive(root, input.sprintId);
+  if (!archiveVerification.ok) return { kind: 'hold', reasonCode: 'ARCHIVE_VERIFICATION_FAILED' };
+  const terminalVerification = verifySprintArchiveTerminal(root, input.sprintId);
+  if (!terminalVerification.ok || terminalVerification.manifestDigest !== manifest.contentDigest) {
+    return { kind: 'hold', reasonCode: 'TERMINAL_VERIFICATION_FAILED' };
+  }
+
+  let bytes: Buffer;
+  try {
+    if (historicalPathState(root, artifactPath) !== 'safe') {
+      return { kind: 'hold', reasonCode: 'UNSAFE_ARCHIVE_PATH' };
+    }
+    const current = lstatSync(artifactPath);
+    if (!current.isFile() || current.size !== expected.bytes || current.size > input.maxBytes) {
+      return { kind: 'hold', reasonCode: 'ARTIFACT_CHANGED' };
+    }
+    bytes = readFileSync(artifactPath);
+  } catch {
+    return { kind: 'hold', reasonCode: 'ARTIFACT_CHANGED' };
+  }
+  if (bytes.length !== expected.bytes || sha256(bytes) !== expected.sha256) {
+    return { kind: 'hold', reasonCode: 'ARTIFACT_CHANGED' };
+  }
+  let text: string;
+  try {
+    text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    return { kind: 'hold', reasonCode: 'INVALID_UTF8' };
+  }
+  return {
+    kind: 'loaded', sprintId: input.sprintId, manifestDigest: manifest.contentDigest,
+    artifactPath: input.artifactPath, sha256: expected.sha256, bytes: expected.bytes, text,
+  };
 }
 
 /**

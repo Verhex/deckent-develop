@@ -3,7 +3,7 @@ import { join, dirname } from 'node:path';
 import type { Command } from 'commander';
 import type { DeckentConfig } from '../../core/types.js';
 import { PROJECT_CONFIG_PATH } from '../../core/constants.js';
-import { loadConfig, validatePartialConfig, ConfigValidationError, deepMerge, CONFIG_METADATA, listConfigByCategory } from '../../core/config.js';
+import { loadConfig, validatePartialConfig, validateProjectConfigWrite, ConfigValidationError, deepMerge, CONFIG_METADATA, listConfigByCategory } from '../../core/config.js';
 import { migrateConfig, setNestedValue, getNestedValue } from '../../core/config-migration.js';
 import { print, printError } from '../helpers/output.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
@@ -38,7 +38,7 @@ export function setConfigValues(root: string, patch: Readonly<Record<string, unk
       if (key.includes('.')) setNestedValue(existing as Record<string, unknown>, key, value);
       else (existing as Record<string, unknown>)[key] = value;
     }
-    validatePartialConfig(existing);
+    validateProjectConfigWrite(existing);
     withConfigWriteLock(configPath, () => writeConfigJsonAtomic(configPath, existing));
     return { ok: true };
   } catch (error) {

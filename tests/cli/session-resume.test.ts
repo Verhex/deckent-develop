@@ -62,6 +62,7 @@ describe('parseSessionRecord', () => {
     }));
     expect(rec).toEqual<SessionRecord>({
       id: 'sprint-353',
+      sprintId: 'sprint-353',
       title: 'Sprint sprint-353 tamamlandı — 16/16 task başarılı',
       date: '2026-07-01T22:59:04.279Z',
       status: 'COMPLETE',
@@ -82,6 +83,7 @@ describe('parseSessionRecord', () => {
     const rec = parseSessionRecord(record({ jobId: 'sprint-1774178344077', sprintId: 'sprint-033' }));
     expect(rec?.id).toBe('sprint-033');
     expect(rec?.title).toBe('sprint-033');
+    expect(rec?.sprintId).toBe('sprint-033');
   });
 
   it('prefers completedAt, then endedAt, then startedAt for date', () => {

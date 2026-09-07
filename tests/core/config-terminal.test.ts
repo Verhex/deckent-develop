@@ -32,6 +32,7 @@ describe('terminal config', () => {
     expect(terminal.idleTimeoutMs).toBe(1_800_000);
     expect(terminal.scrollbackBytes).toBe(262_144);
     expect(terminal.startup?.recent_sessions).toBe(false);
+    expect(terminal.resume).toBeUndefined();
   });
 
   it('DEFAULT_TERMINAL_CONFIG exposes the canonical secure defaults', () => {
@@ -96,6 +97,36 @@ describe('terminal config', () => {
     expect((mergeConfigs({ terminal: { startup: { recent_sessions: true } } } as DeckentConfig, { terminal: { startup: { recent_sessions: false } } as TerminalConfig }) as ResolvedConfig).terminal?.startup?.recent_sessions).toBe(false);
   });
 
+  it('deep-merges partial sprint-context limits without introducing a default context', () => {
+    const global: Partial<DeckentConfig> = {
+      terminal: { resume: { sprint_context: { max_bytes: 4096, verification_timeout_ms: 1500 } } } as TerminalConfig,
+    };
+    const project: Partial<DeckentConfig> = {
+      terminal: { resume: { sprint_context: { enabled: true } } } as TerminalConfig,
+    };
+    const resolved = mergeConfigs(global, project) as ResolvedConfig;
+    expect(resolved.terminal?.resume?.sprint_context).toEqual({
+      enabled: true,
+      max_bytes: 4096,
+      verification_timeout_ms: 1500,
+    });
+    expect((mergeConfigs(null, null) as ResolvedConfig).terminal?.resume).toBeUndefined();
+  });
+
+  it('gives a project sprint-context limit precedence over the global layer', () => {
+    const global: Partial<DeckentConfig> = {
+      terminal: { resume: { sprint_context: { max_bytes: 4096, verification_timeout_ms: 1500 } } } as TerminalConfig,
+    };
+    const project: Partial<DeckentConfig> = {
+      terminal: { resume: { sprint_context: { enabled: true, max_bytes: 2048 } } } as TerminalConfig,
+    };
+    expect((mergeConfigs(global, project) as ResolvedConfig).terminal?.resume?.sprint_context).toEqual({
+      enabled: true,
+      max_bytes: 2048,
+      verification_timeout_ms: 1500,
+    });
+  });
+
   it('rejects a non-boolean startup teaser preference', () => {
     expect(() => validatePartialConfig({ terminal: { startup: { recent_sessions: 'yes' } } } as unknown as Partial<DeckentConfig>)).toThrow(
       expect.objectContaining({
@@ -116,10 +147,41 @@ describe('terminal config', () => {
     }));
   });
 
+  it('requires finite positive limits before sprint context can be enabled', () => {
+    expect(() => validatePartialConfig({
+      terminal: { resume: { sprint_context: { enabled: true } } },
+    } as Partial<DeckentConfig>)).toThrow(expect.objectContaining({
+      errors: expect.arrayContaining([
+        'terminal.resume.sprint_context.enabled requires max_bytes and verification_timeout_ms.',
+      ]),
+    }));
+    expect(() => validatePartialConfig({
+      language: 'tr',
+      terminal: { resume: { sprint_context: { max_bytes: Number.POSITIVE_INFINITY, verification_timeout_ms: 0 } } },
+    } as Partial<DeckentConfig>)).toThrow(expect.objectContaining({
+      errors: expect.arrayContaining([
+        'terminal.resume.sprint_context.max_bytes pozitif güvenli bir tam sayı olmalıdır.',
+        'terminal.resume.sprint_context.verification_timeout_ms pozitif güvenli bir tam sayı olmalıdır.',
+      ]),
+    }));
+  });
+
   it('publishes the startup preference through localized config metadata', () => {
     const meta = CONFIG_METADATA['terminal.startup.recent_sessions'];
     expect(meta).toMatchObject({ type: 'boolean', default: false, category: 'Terminal' });
     expect(meta?.description).toContain('/resume');
     expect(meta?.descriptionTr).toContain('/resume');
+  });
+
+  it('publishes the bounded sprint-context contract through config metadata', () => {
+    expect(CONFIG_METADATA['terminal.resume.sprint_context.enabled']).toMatchObject({
+      type: 'boolean', default: false, category: 'Terminal',
+    });
+    expect(CONFIG_METADATA['terminal.resume.sprint_context.max_bytes']).toMatchObject({
+      type: 'positive safe integer', default: null, category: 'Terminal',
+    });
+    expect(CONFIG_METADATA['terminal.resume.sprint_context.verification_timeout_ms']).toMatchObject({
+      type: 'positive safe integer', default: null, category: 'Terminal',
+    });
   });
 });

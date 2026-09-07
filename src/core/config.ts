@@ -1635,6 +1635,45 @@ export function validateConfig(config: DeckentConfig): string[] {
       }));
     }
   }
+  if (config.terminal?.resume !== undefined) {
+    const resume = config.terminal.resume;
+    if (typeof resume !== 'object' || resume === null || Array.isArray(resume)) {
+      errors.push(getMessage('config.terminal_resume_invalid_object', config.language ?? DEFAULT_LANGUAGE, {
+        field: 'terminal.resume',
+      }));
+    } else if (resume.sprint_context !== undefined) {
+      const sprintContext = resume.sprint_context;
+      if (typeof sprintContext !== 'object' || sprintContext === null || Array.isArray(sprintContext)) {
+        errors.push(getMessage('config.terminal_resume_sprint_context_invalid_object', config.language ?? DEFAULT_LANGUAGE, {
+          field: 'terminal.resume.sprint_context',
+        }));
+      } else {
+        if (sprintContext.enabled !== undefined && typeof sprintContext.enabled !== 'boolean') {
+          errors.push(getMessage('config.terminal_resume_sprint_context_enabled_invalid_boolean', config.language ?? DEFAULT_LANGUAGE, {
+            field: 'terminal.resume.sprint_context.enabled',
+          }));
+        }
+        const limits = [
+          ['max_bytes', 'config.terminal_resume_sprint_context_max_bytes_invalid_positive_integer'],
+          ['verification_timeout_ms', 'config.terminal_resume_sprint_context_verification_timeout_invalid_positive_integer'],
+        ] as const;
+        for (const [key, messageKey] of limits) {
+          const value = sprintContext[key];
+          if (value !== undefined && (typeof value !== 'number' || !Number.isSafeInteger(value) || value <= 0)) {
+            errors.push(getMessage(messageKey, config.language ?? DEFAULT_LANGUAGE, {
+              field: `terminal.resume.sprint_context.${key}`,
+            }));
+          }
+        }
+        if (sprintContext.enabled === true
+          && (sprintContext.max_bytes === undefined || sprintContext.verification_timeout_ms === undefined)) {
+          errors.push(getMessage('config.terminal_resume_sprint_context_enabled_requires_limits', config.language ?? DEFAULT_LANGUAGE, {
+            field: 'terminal.resume.sprint_context.enabled',
+          }));
+        }
+      }
+    }
+  }
   if (config.prompt?.adr_render !== undefined) {
     const validAdrRender = ['full', 'operative'];
     if (!validAdrRender.includes(config.prompt.adr_render)) {
@@ -2966,7 +3005,7 @@ export async function readAuthMode(
  * @param partial - Partial configuration to validate
  * @throws {ConfigValidationError} When the merged result fails validation
  */
-export function validatePartialConfig(partial: Partial<DeckentConfig>): void {
+function normalizePartialConfigAliases(partial: Partial<DeckentConfig>): void {
   // CFG-1: normalize a legacy `mode` alias (e.g. pro_plan → economic) IN PLACE
   // before validation, mirroring the read path (loadConfig → resolveMode at the
   // top of mergeConfigs). VALID_MODES intentionally lists only canonical names,
@@ -2986,6 +3025,44 @@ export function validatePartialConfig(partial: Partial<DeckentConfig>): void {
   if (['v1', 'v2'].includes((partial as { routing_engine?: string }).routing_engine ?? '')) {
     (partial as { routing_engine?: string }).routing_engine = 'v3';
   }
+}
+
+/**
+ * Validate a project write against the canonical global layer without copying
+ * global values into the project file. This synchronous seam is intentionally
+ * limited to config persistence; it does not run the async bootstrap loader.
+ */
+export function validateProjectConfigWrite(projectConfig: Partial<DeckentConfig>): void {
+  normalizePartialConfigAliases(projectConfig);
+  const globalPath = resolveGlobalConfigReadPath();
+  const language = projectConfig.language === 'tr' ? 'tr' : DEFAULT_LANGUAGE;
+  let globalConfig: Partial<DeckentConfig> = {};
+  if (existsSync(globalPath)) {
+    try {
+      const parsed = JSON.parse(readFileSync(globalPath, 'utf-8')) as unknown;
+      if (!isPlainObject(parsed)) {
+        throw new ConfigValidationError([getMessage('config.global_config_unusable_for_project_validation', language, {
+          path: globalPath,
+          detail: 'invalid_shape',
+        })]);
+      }
+      const { config: providerCanonical } = canonicalizeProviderConfigAliases(parsed, 'global');
+      const { config: canonical } = canonicalizeModelConfigAliases(providerCanonical, 'global');
+      globalConfig = canonical as Partial<DeckentConfig>;
+      normalizePartialConfigAliases(globalConfig);
+    } catch (error) {
+      if (error instanceof ConfigValidationError) throw error;
+      throw new ConfigValidationError([getMessage('config.global_config_unusable_for_project_validation', language, {
+        path: globalPath,
+        detail: error instanceof SyntaxError ? 'malformed_json' : 'unusable',
+      })]);
+    }
+  }
+  validateConfig(deepMerge(createDefaultConfig(), deepMerge(globalConfig, projectConfig)));
+}
+
+export function validatePartialConfig(partial: Partial<DeckentConfig>): void {
+  normalizePartialConfigAliases(partial);
   const merged = deepMerge(createDefaultConfig(), partial);
   validateConfig(merged);
 }
@@ -3209,6 +3286,28 @@ export const CONFIG_METADATA: Readonly<Record<string, ConfigMetadataEntry>> = {
     type: 'boolean',
     default: DEFAULT_TERMINAL_CONFIG.startup?.recent_sessions,
     options: ['true', 'false'],
+    category: 'Terminal',
+  },
+  'terminal.resume.sprint_context.enabled': {
+    description: 'Enable bounded, verified historical sprint context for a resumed Terminal chat. Both limits are required when enabled.',
+    descriptionTr: 'Devam eden bir Terminal sohbeti için sınırlı ve doğrulanmış geçmiş sprint bağlamını etkinleştirir. Etkinken iki sınır da gereklidir.',
+    type: 'boolean',
+    default: false,
+    options: ['true', 'false'],
+    category: 'Terminal',
+  },
+  'terminal.resume.sprint_context.max_bytes': {
+    description: 'Maximum verified historical sprint-context bytes supplied to a resumed Terminal chat. Required when sprint context is enabled.',
+    descriptionTr: 'Devam eden bir Terminal sohbetine sağlanacak doğrulanmış geçmiş sprint bağlamının en fazla bayt sayısı. Sprint bağlamı etkinken zorunludur.',
+    type: 'positive safe integer',
+    default: null,
+    category: 'Terminal',
+  },
+  'terminal.resume.sprint_context.verification_timeout_ms': {
+    description: 'Maximum verification time in milliseconds for historical sprint context. Required when sprint context is enabled.',
+    descriptionTr: 'Geçmiş sprint bağlamı için milisaniye cinsinden en fazla doğrulama süresi. Sprint bağlamı etkinken zorunludur.',
+    type: 'positive safe integer',
+    default: null,
     category: 'Terminal',
   },
   mode: {

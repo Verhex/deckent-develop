@@ -21,6 +21,8 @@ import { JOBS_DIR } from '../../core/constants.js';
 
 export interface SessionRecord {
   readonly id: string;
+  /** Exact producer-authored sprint identity; never inferred from jobId. */
+  readonly sprintId?: string;
   readonly title: string;
   /** ISO 8601 UTC timestamp. */
   readonly date: string;
@@ -80,7 +82,13 @@ export function parseSessionRecord(raw: string): SessionRecord | null {
   if (id === undefined || status === undefined || date === undefined) return null;
 
   const title = firstNonEmptyString(job.summary, job.sprintId, job.jobId) as string;
-  return { id, title, date, status };
+  return {
+    id,
+    ...(typeof job.sprintId === 'string' && job.sprintId.length > 0 ? { sprintId: job.sprintId } : {}),
+    title,
+    date,
+    status,
+  };
 }
 
 // ─── listRecentSessions ─────────────────────────────────────────────────────

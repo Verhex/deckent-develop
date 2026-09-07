@@ -10,6 +10,8 @@ import { buildPickerLabels } from '../../../src/cli/repl/picker-labels.js';
 import { buildReplLabels, buildShortcutsPanel } from '../../../src/cli/repl/run.js';
 import { getMessage } from '../../../src/cli/helpers/messages.js';
 import type { PickerSpec } from '../../../src/cli/repl/picker.js';
+import type { SprintHistoricalContextSource } from '../../../src/cli/repl/sprint-context-input.js';
+import type { ChatProviderAdapter } from '../../../src/cli/commands/chat-native.js';
 
 const tick = (ms = 40): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 const CTRL_C = '\x03';
@@ -18,6 +20,10 @@ const t = (key: string): string => getMessage(key, 'en');
 const labels = buildReplLabels(t);
 const pickerLabels = buildPickerLabels(t);
 const roots: string[] = [];
+type LoadedSprintFixture = {
+  kind: 'loaded'; sprintId: string; manifestDigest: string;
+  artifactPath: 'docs/brain-sprint.md'; sha256: string; bytes: number; text: string;
+};
 
 const MODEL_SPEC: PickerSpec = {
   kind: 'model',
@@ -30,7 +36,7 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
-function mountApp(options: { cwd?: string; sessionId?: string; replSurfaceEnabled?: boolean; startupRecentSessions?: boolean; dispatcher?: { dispatch: (name: string, args: Record<string, unknown>) => Promise<string> }; memory?: Record<string, unknown>; engine?: ReplEngine } = {}) {
+function mountApp(options: { cwd?: string; sessionId?: string; replSurfaceEnabled?: boolean; startupRecentSessions?: boolean; dispatcher?: { dispatch: (name: string, args: Record<string, unknown>) => Promise<string> }; memory?: Record<string, unknown>; engine?: ReplEngine; legacy?: boolean; provider?: ChatProviderAdapter; sprintHistoricalContext?: SprintHistoricalContextSource } = {}) {
   const cwd = options.cwd ?? mkdtempSync(join(tmpdir(), 'deckent-l6-keyboard-'));
   if (!options.cwd) roots.push(cwd);
   let confirmTrigger: ConfirmTrigger | undefined;
@@ -39,7 +45,7 @@ function mountApp(options: { cwd?: string; sessionId?: string; replSurfaceEnable
   }) as unknown as ReplEngine;
   const mounted = render(
     <ReplApp
-      provider={{} as never}
+      provider={options.provider ?? ({} as never)}
       dispatcher={options.dispatcher ?? { dispatch: vi.fn(async () => '') }}
       labels={labels}
       providerName="diagnostic"
@@ -61,11 +67,12 @@ function mountApp(options: { cwd?: string; sessionId?: string; replSurfaceEnable
       caretStyle="marker"
       dualStreamOverflow="..."
       shortcutsPanel={buildShortcutsPanel(t)}
-      nativeEngine={engine}
+      {...(!options.legacy ? { nativeEngine: engine } : {})}
       {...(options.memory ? { memory: options.memory as never } : {})}
       {...(options.sessionId ? { sessionId: options.sessionId } : {})}
       {...(options.replSurfaceEnabled ? { replSurfaceEnabled: true } : {})}
       {...(options.startupRecentSessions ? { startupRecentSessions: true } : {})}
+      {...(options.sprintHistoricalContext ? { sprintHistoricalContext: options.sprintHistoricalContext } : {})}
     />,
   );
   return { ...mounted, getConfirmTrigger: () => confirmTrigger };
@@ -167,8 +174,172 @@ describe('ReplApp mounted keyboard ownership', () => {
     const { stdin, lastFrame, unmount } = mountApp({ cwd, sessionId: 'chat-old', replSurfaceEnabled: true });
     try {
       await tick(); stdin.write('/resume sprint-7098'); stdin.write(ENTER); await tick(100);
-      expect(lastFrame() ?? '').toContain('sprint context is not available to resume yet: sprint-7098');
+      expect(lastFrame() ?? '').toContain(getMessage('tui.resume_sprint_context_unavailable_with_reason', 'en', {
+        id: 'sprint-7098',
+        reason: 'SPRINT_CONTEXT_DISABLED',
+      }));
       expect(lastFrame() ?? '').toContain('chat: chat-old');
+    } finally { unmount(); }
+  });
+
+  it('loads exact sprint context without switching chat identity and injects it only into the next submitted request', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'deckent-l4b2-sprint-')); roots.push(cwd);
+    const jobs = join(cwd, '.deckent', 'runtime', 'jobs'); mkdirSync(jobs, { recursive: true });
+    writeFileSync(join(jobs, 'prior.json'), JSON.stringify({ sprintId: 'sprint-7099', jobId: 'job-not-an-id', status: 'completed', startedAt: '2026-09-07T00:00:00.000Z' }));
+    const requests: string[] = [];
+    const engine = Object.assign(async (input: string, cbs: { onTurnEnd: (stats: { inputTokens: number; outputTokens: number }) => void }) => {
+      requests.push(input); cbs.onTurnEnd({ inputTokens: 1, outputTokens: 1 });
+    }, { close: vi.fn() }) as unknown as ReplEngine;
+    const load = vi.fn(async () => ({
+      kind: 'loaded' as const, sprintId: 'sprint-7099', manifestDigest: 'a'.repeat(64),
+      artifactPath: 'docs/brain-sprint.md' as const, sha256: 'b'.repeat(64), bytes: 15, text: 'sealed history',
+    }));
+    const { stdin, lastFrame, unmount } = mountApp({
+      cwd, sessionId: 'chat-old', replSurfaceEnabled: true, engine,
+      sprintHistoricalContext: { availability: 'enabled', load },
+    });
+    try {
+      await tick(); stdin.write('/resume sprint-7099'); stdin.write(ENTER); await tick(100);
+      expect(load).toHaveBeenCalledWith('sprint-7099', expect.any(AbortSignal));
+      expect(lastFrame() ?? '').toContain('chat: chat-old');
+      stdin.write('first request'); stdin.write(ENTER); await tick(100);
+      stdin.write('second request'); stdin.write(ENTER); await tick(100);
+      expect(requests).toHaveLength(2);
+      expect(requests[0]).toContain('first request');
+      expect(requests[0]).toContain('sealed history');
+      expect(requests[0]).toContain('sprint-id=sprint-7099');
+      expect(requests[1]).toBe('second request');
+    } finally { unmount(); }
+  });
+
+  it('uses the same one-shot annotated request on the legacy provider path', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'deckent-l4b2-legacy-')); roots.push(cwd);
+    const jobs = join(cwd, '.deckent', 'runtime', 'jobs'); mkdirSync(jobs, { recursive: true });
+    writeFileSync(join(jobs, 'prior.json'), JSON.stringify({ sprintId: 'sprint-7099', status: 'completed', startedAt: '2026-09-07T00:00:00.000Z' }));
+    const providerRequests: string[][] = [];
+    const provider: ChatProviderAdapter = {
+      send: vi.fn(async (messages) => {
+        providerRequests.push(messages.filter((message) => message.role === 'user').map((message) => message.content));
+        return { text: 'legacy reply', stopReason: 'end_turn' };
+      }),
+    };
+    const load = vi.fn(async () => ({
+      kind: 'loaded' as const, sprintId: 'sprint-7099', manifestDigest: 'a'.repeat(64),
+      artifactPath: 'docs/brain-sprint.md' as const, sha256: 'b'.repeat(64), bytes: 14, text: 'legacy context',
+    }));
+    const { stdin, unmount } = mountApp({
+      cwd, legacy: true, provider, replSurfaceEnabled: true,
+      sprintHistoricalContext: { availability: 'enabled', load },
+    });
+    try {
+      await tick(); stdin.write('/resume sprint-7099'); stdin.write(ENTER); await tick(100);
+      stdin.write('legacy first'); stdin.write(ENTER); await tick(100);
+      stdin.write('legacy second'); stdin.write(ENTER); await tick(100);
+      expect(providerRequests).toHaveLength(2);
+      expect(providerRequests[0]?.at(-1)).toContain('legacy first');
+      expect(providerRequests[0]?.at(-1)).toContain('legacy context');
+      expect(providerRequests[1]?.at(-1)).toBe('legacy second');
+      // The prior annotated request remains normal conversation history; only
+      // the newly submitted second message must be free of reinjection.
+      expect(providerRequests[1]?.[0]).toContain('legacy context');
+    } finally { unmount(); }
+  });
+
+  it('does not arm a late sprint load after /clear changes the generation', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'deckent-l4b2-clear-')); roots.push(cwd);
+    const jobs = join(cwd, '.deckent', 'runtime', 'jobs'); mkdirSync(jobs, { recursive: true });
+    writeFileSync(join(jobs, 'prior.json'), JSON.stringify({ sprintId: 'sprint-7099', status: 'completed', startedAt: '2026-09-07T00:00:00.000Z' }));
+    let resolveLoad!: (value: { kind: 'loaded'; sprintId: string; manifestDigest: string; artifactPath: 'docs/brain-sprint.md'; sha256: string; bytes: number; text: string }) => void;
+    const load = vi.fn(() => new Promise<Parameters<typeof resolveLoad>[0]>((resolve) => { resolveLoad = resolve; }));
+    const requests: string[] = [];
+    const engine = Object.assign(async (input: string, cbs: { onTurnEnd: (stats: { inputTokens: number; outputTokens: number }) => void }) => {
+      requests.push(input); cbs.onTurnEnd({ inputTokens: 1, outputTokens: 1 });
+    }, { close: vi.fn() }) as unknown as ReplEngine;
+    const { stdin, unmount } = mountApp({ cwd, engine, replSurfaceEnabled: true, sprintHistoricalContext: { availability: 'enabled', load } });
+    try {
+      await tick(); stdin.write('/resume sprint-7099'); stdin.write(ENTER); await tick();
+      stdin.write('/clear'); stdin.write(ENTER); await tick();
+      resolveLoad({ kind: 'loaded', sprintId: 'sprint-7099', manifestDigest: 'a'.repeat(64), artifactPath: 'docs/brain-sprint.md', sha256: 'b'.repeat(64), bytes: 4, text: 'late' });
+      await tick(); stdin.write('fresh'); stdin.write(ENTER); await tick(100);
+      expect(requests.at(-1)).toBe('fresh');
+    } finally { unmount(); }
+  });
+
+  it('binds concurrent loads to the newest generation and never carries the older sprint across it', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'deckent-l4b2-newest-')); roots.push(cwd);
+    const jobs = join(cwd, '.deckent', 'runtime', 'jobs'); mkdirSync(jobs, { recursive: true });
+    for (const sprintId of ['sprint-7098', 'sprint-7099']) {
+      writeFileSync(join(jobs, `${sprintId}.json`), JSON.stringify({ sprintId, status: 'completed', startedAt: sprintId === 'sprint-7099' ? '2026-09-07T01:00:00.000Z' : '2026-09-07T00:00:00.000Z' }));
+    }
+    const resolvers = new Map<string, (value: LoadedSprintFixture) => void>();
+    const load = vi.fn((sprintId: string) => new Promise<LoadedSprintFixture>((resolve) => { resolvers.set(sprintId, resolve); }));
+    const requests: string[] = [];
+    const engine = Object.assign(async (input: string, cbs: { onTurnEnd: (stats: { inputTokens: number; outputTokens: number }) => void }) => {
+      requests.push(input); cbs.onTurnEnd({ inputTokens: 1, outputTokens: 1 });
+    }, { close: vi.fn() }) as unknown as ReplEngine;
+    const { stdin, unmount } = mountApp({ cwd, engine, replSurfaceEnabled: true, sprintHistoricalContext: { availability: 'enabled', load } });
+    const loaded = (sprintId: string) => ({ kind: 'loaded' as const, sprintId, manifestDigest: 'a'.repeat(64), artifactPath: 'docs/brain-sprint.md' as const, sha256: 'b'.repeat(64), bytes: 3, text: sprintId });
+    try {
+      await tick(); stdin.write('/resume sprint-7098'); stdin.write(ENTER); await tick();
+      stdin.write('/resume sprint-7099'); stdin.write(ENTER); await tick();
+      resolvers.get('sprint-7098')?.(loaded('sprint-7098'));
+      resolvers.get('sprint-7099')?.(loaded('sprint-7099'));
+      await tick(); stdin.write('continue'); stdin.write(ENTER); await tick(100);
+      expect(requests.at(-1)).toContain('sprint-id=sprint-7099');
+      expect(requests.at(-1)).not.toContain('sprint-id=sprint-7098');
+    } finally { unmount(); }
+  });
+
+  it('aborts a pending sprint load when a chat resume commits a new identity', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'deckent-l4b2-switch-')); roots.push(cwd);
+    const jobs = join(cwd, '.deckent', 'runtime', 'jobs'); mkdirSync(jobs, { recursive: true });
+    writeFileSync(join(jobs, 'sprint.json'), JSON.stringify({ sprintId: 'sprint-7099', status: 'completed', startedAt: '2026-09-07T00:00:00.000Z' }));
+    let resolveLoad!: (value: LoadedSprintFixture) => void;
+    let observedSignal: AbortSignal | undefined;
+    const load = vi.fn((_sprintId: string, signal: AbortSignal) => {
+      observedSignal = signal;
+      return new Promise<LoadedSprintFixture>((resolve) => { resolveLoad = resolve; });
+    });
+    const requests: string[] = [];
+    const engine = Object.assign(async (input: string, cbs: { onTurnEnd: (stats: { inputTokens: number; outputTokens: number }) => void }) => {
+      requests.push(input); cbs.onTurnEnd({ inputTokens: 1, outputTokens: 1 });
+    }, { close: vi.fn(), hydrateTranscript: vi.fn() }) as unknown as ReplEngine;
+    const memory = {
+      listChatSessions: () => [{ sessionId: 'chat-target', lastAt: '2026-09-07T01:00:00.000Z', preview: 'target' }],
+      getChatHistory: () => [{ role: 'user', content: 'prior' }],
+    };
+    const { stdin, lastFrame, unmount } = mountApp({ cwd, sessionId: 'chat-old', memory, engine, replSurfaceEnabled: true, sprintHistoricalContext: { availability: 'enabled', load } });
+    try {
+      await tick(); stdin.write('/resume sprint-7099'); stdin.write(ENTER); await tick();
+      stdin.write('/resume chat-target'); stdin.write(ENTER); await tick();
+      expect(observedSignal?.aborted).toBe(true);
+      resolveLoad({ kind: 'loaded', sprintId: 'sprint-7099', manifestDigest: 'a'.repeat(64), artifactPath: 'docs/brain-sprint.md', sha256: 'b'.repeat(64), bytes: 4, text: 'late' });
+      await tick(); stdin.write('fresh'); stdin.write(ENTER); await tick(100);
+      expect(lastFrame() ?? '').toContain('chat: chat-target');
+      expect(requests.at(-1)).toBe('fresh');
+    } finally { unmount(); }
+  });
+
+  it('preserves an already loaded pending context when a later archive load holds', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'deckent-l4b2-hold-')); roots.push(cwd);
+    const jobs = join(cwd, '.deckent', 'runtime', 'jobs'); mkdirSync(jobs, { recursive: true });
+    for (const sprintId of ['sprint-7098', 'sprint-7099']) {
+      writeFileSync(join(jobs, `${sprintId}.json`), JSON.stringify({ sprintId, status: 'completed', startedAt: `${sprintId.endsWith('9') ? '2026-09-07T01' : '2026-09-07T00'}:00:00.000Z` }));
+    }
+    const load = vi.fn(async (sprintId: string) => sprintId === 'sprint-7098'
+      ? { kind: 'loaded' as const, sprintId, manifestDigest: 'a'.repeat(64), artifactPath: 'docs/brain-sprint.md' as const, sha256: 'b'.repeat(64), bytes: 5, text: 'prior' }
+      : { kind: 'hold' as const, reasonCode: 'ARCHIVE_VERIFICATION_FAILED' });
+    const requests: string[] = [];
+    const engine = Object.assign(async (input: string, cbs: { onTurnEnd: (stats: { inputTokens: number; outputTokens: number }) => void }) => {
+      requests.push(input); cbs.onTurnEnd({ inputTokens: 1, outputTokens: 1 });
+    }, { close: vi.fn() }) as unknown as ReplEngine;
+    const { stdin, unmount } = mountApp({ cwd, engine, replSurfaceEnabled: true, sprintHistoricalContext: { availability: 'enabled', load } });
+    try {
+      await tick(); stdin.write('/resume sprint-7098'); stdin.write(ENTER); await tick();
+      stdin.write('/resume sprint-7099'); stdin.write(ENTER); await tick();
+      stdin.write('continue'); stdin.write(ENTER); await tick(100);
+      expect(requests.at(-1)).toContain('sprint-id=sprint-7098');
+      expect(requests.at(-1)).not.toContain('sprint-id=sprint-7099');
     } finally { unmount(); }
   });
 

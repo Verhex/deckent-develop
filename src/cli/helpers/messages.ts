@@ -5649,6 +5649,80 @@ const BASE_MESSAGES: MessageMap = {
     en: '{field} must be a boolean.',
     tr: '{field} bir boolean olmalıdır.',
   },
+  'config.terminal_resume_invalid_object': {
+    en: '{field} must be an object.',
+    tr: '{field} bir nesne olmalıdır.',
+  },
+  'config.terminal_resume_sprint_context_invalid_object': {
+    en: '{field} must be an object.',
+    tr: '{field} bir nesne olmalıdır.',
+  },
+  'config.terminal_resume_sprint_context_enabled_invalid_boolean': {
+    en: '{field} must be a boolean.',
+    tr: '{field} bir boolean olmalıdır.',
+  },
+  'config.terminal_resume_sprint_context_max_bytes_invalid_positive_integer': {
+    en: '{field} must be a positive safe integer.',
+    tr: '{field} pozitif güvenli bir tam sayı olmalıdır.',
+  },
+  'config.terminal_resume_sprint_context_verification_timeout_invalid_positive_integer': {
+    en: '{field} must be a positive safe integer.',
+    tr: '{field} pozitif güvenli bir tam sayı olmalıdır.',
+  },
+  'config.terminal_resume_sprint_context_enabled_requires_limits': {
+    en: '{field} requires max_bytes and verification_timeout_ms.',
+    tr: '{field}, max_bytes ve verification_timeout_ms gerektirir.',
+  },
+  'config.global_config_unusable_for_project_validation': {
+    en: 'Global configuration at {path} cannot be used to validate this project configuration ({detail}).',
+    tr: '{path} konumundaki genel yapılandırma bu proje yapılandırmasını doğrulamak için kullanılamıyor ({detail}).',
+  },
+  'tui.resume_sprint_context_loading': {
+    en: 'Verifying historical sprint context for {id}…',
+    tr: '{id} için geçmiş sprint bağlamı doğrulanıyor…',
+  },
+  'tui.resume_sprint_context_loaded': {
+    en: 'Verified historical sprint context is available for {id}.',
+    tr: '{id} için doğrulanmış geçmiş sprint bağlamı kullanılabilir.',
+  },
+  // Existing `tui.resume_sprint_context_unavailable` is consumed by the B1
+  // picker with only {id}; B2's archive reader supplies a typed reason too.
+  'tui.resume_sprint_context_unavailable_with_reason': {
+    en: 'Historical sprint context for {id} is unavailable: {reason}.',
+    tr: '{id} için geçmiş sprint bağlamı kullanılamıyor: {reason}.',
+  },
+  'tui.resume_sprint_context_superseded': {
+    en: 'Historical sprint context for {id} was superseded.',
+    tr: '{id} için geçmiş sprint bağlamı geçersiz kılındı.',
+  },
+  'tui.resume_sprint_context_cleared': {
+    en: 'Pending historical sprint context was discarded.',
+    tr: 'Bekleyen geçmiş sprint bağlamı atıldı.',
+  },
+  'tui.resume_sprint_context_reason.disabled': {
+    en: 'Historical sprint context is disabled.',
+    tr: 'Geçmiş sprint bağlamı devre dışı.',
+  },
+  'tui.resume_sprint_context_reason.authority_unavailable': {
+    en: 'Required authority is unavailable.',
+    tr: 'Gerekli yetki kullanılamıyor.',
+  },
+  'tui.resume_sprint_context_reason.invalid_evidence': {
+    en: 'The historical evidence is unavailable or invalid.',
+    tr: 'Geçmiş kanıt kullanılamıyor veya geçersiz.',
+  },
+  'tui.resume_sprint_context_reason.resource_limit': {
+    en: 'A configured resource limit prevents loading this context.',
+    tr: 'Yapılandırılmış bir kaynak sınırı bu bağlamın yüklenmesini engelliyor.',
+  },
+  'tui.resume_sprint_context_reason.interrupted': {
+    en: 'Verification timed out or was interrupted.',
+    tr: 'Doğrulama zaman aşımına uğradı veya kesintiye uğradı.',
+  },
+  'tui.resume_sprint_context_reason.unknown': {
+    en: 'Historical sprint context is unavailable for an unknown reason.',
+    tr: 'Geçmiş sprint bağlamı bilinmeyen bir nedenle kullanılamıyor.',
+  },
   'config.provider_alias_conflict': {
     en: 'Conflicting provider settings in the {layer} config: {flatKey}={flatValue} differs from {groupedKey}={groupedValue}. Remove one definition or make both values equal.',
     tr: '{layer} yapılandırmasında çakışan provider ayarları var: {flatKey}={flatValue}, {groupedKey}={groupedValue} değerinden farklı. Tanımlardan birini kaldırın veya iki değeri eşitleyin.',

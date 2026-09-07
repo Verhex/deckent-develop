@@ -20,7 +20,7 @@ import { describe, it, expect } from 'vitest';
 import { resolveModeLabel, bgPayloadsToTurnTexts, type ReplLabels } from '../../src/cli/repl/app.js';
 import { initialTermModeState, parseTermCommand, applyModeTarget } from '../../src/cli/repl/term-mode.js';
 import { createChatTurnQueue } from '../../src/cli/repl/chat-turn-queue.js';
-import { buildReplLabels } from '../../src/cli/repl/run.js';
+import { buildReplLabels, buildSprintHistoricalContextSource, localizeSprintContextReason } from '../../src/cli/repl/run.js';
 import { getMessage } from '../../src/cli/helpers/messages.js';
 import { InjectedLabelMissingError } from '../../src/cli/helpers/injected-label.js';
 // ═══ Task 358-006 — APP-SURFACE-WIRE — pure-logic tests ═════════════════════
@@ -53,6 +53,78 @@ import { JOBS_DIR } from "../../src/core/constants.js";
 /** The en catalog set (run.tsx buildReplLabels) — app.tsx owns no English
  *  fallback since TERMINAL-TOOLS-002; a missing field is a typed error. */
 const EN_LABELS = buildReplLabels((k) => getMessage(k, 'en'));
+
+describe('sprint context reason localization', () => {
+    it.each(['en', 'tr'] as const)('maps known and unknown codes without losing the technical identity (%s)', (lang) => {
+        const translate = (key: string) => getMessage(key, lang);
+        const known = localizeSprintContextReason('ARTIFACT_TOO_LARGE', translate);
+        const unknown = localizeSprintContextReason('FUTURE_REASON', translate);
+        expect(known).toContain(getMessage('tui.resume_sprint_context_reason.resource_limit', lang));
+        expect(known).toContain('(ARTIFACT_TOO_LARGE)');
+        expect(unknown).toBe(getMessage('tui.resume_sprint_context_reason.unknown', lang));
+        expect(unknown).not.toContain('FUTURE_REASON');
+    });
+    it.each(['secret\nvalue', '__proto__', 'toString'])('does not reflect an unknown or prototype-shaped reason: %s', (reason) => {
+        const unknown = localizeSprintContextReason(reason, (key) => getMessage(key, 'en'));
+        expect(unknown).toBe(getMessage('tui.resume_sprint_context_reason.unknown', 'en'));
+        expect(unknown).not.toContain(reason);
+    });
+    it('classifies the worker resource-limit reason as a known bounded failure', () => {
+        const output = localizeSprintContextReason('VERIFICATION_RESOURCE_LIMIT', (key) => getMessage(key, 'en'));
+        expect(output).toContain(getMessage('tui.resume_sprint_context_reason.resource_limit', 'en'));
+        expect(output).toContain('(VERIFICATION_RESOURCE_LIMIT)');
+    });
+});
+
+describe('buildSprintHistoricalContextSource — ingress authority and resource gates', () => {
+    const localPrincipal = () => ({
+        id: 'fixture@host', identityClass: 'local' as const, assurance: 'os-user' as const,
+        provenance: 'cli' as const, verifiedBy: 'fixture',
+    });
+
+    it('keeps the default/explicit disabled slot inert before principal or archive access', () => {
+        const reader = vi.fn(); const principal = vi.fn(localPrincipal);
+        expect(buildSprintHistoricalContextSource('/fixture', undefined, false, reader, principal)).toEqual({ availability: 'disabled', reasonCode: 'SPRINT_CONTEXT_DISABLED' });
+        expect(buildSprintHistoricalContextSource('/fixture', { enabled: false }, false, reader, principal)).toEqual({ availability: 'disabled', reasonCode: 'SPRINT_CONTEXT_DISABLED' });
+        expect(reader).not.toHaveBeenCalled(); expect(principal).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        { enabled: true },
+        { enabled: true, max_bytes: 0, verification_timeout_ms: 1 },
+        { enabled: true, max_bytes: 1, verification_timeout_ms: Number.POSITIVE_INFINITY },
+    ])('refuses an incomplete or invalid resolved limit before archive access', (config) => {
+        const reader = vi.fn(); const principal = vi.fn(localPrincipal);
+        expect(buildSprintHistoricalContextSource('/fixture', config, false, reader, principal)).toEqual({ availability: 'unavailable', reasonCode: 'SPRINT_CONTEXT_LIMIT_UNAVAILABLE' });
+        expect(reader).not.toHaveBeenCalled(); expect(principal).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        { id: 'unknown', identityClass: 'local' as const, assurance: 'unverified' as const, provenance: 'cli' as const, verifiedBy: 'fixture' },
+        { id: 'remote', identityClass: 'service' as const, assurance: 'token-verified' as const, provenance: 'cli' as const, verifiedBy: 'fixture' },
+    ])('requires an actual local os-user principal regardless of principal_enforce', (principal) => {
+        const reader = vi.fn();
+        const source = buildSprintHistoricalContextSource('/fixture', { enabled: true, max_bytes: 4096, verification_timeout_ms: 1000 }, false, reader, () => principal);
+        expect(source).toEqual({ availability: 'unavailable', reasonCode: 'SPRINT_CONTEXT_PRINCIPAL_UNVERIFIED' });
+        expect(reader).not.toHaveBeenCalled();
+    });
+
+    it('holds strict tenant isolation before exposing a reader for an unbound archive', () => {
+        const reader = vi.fn();
+        const source = buildSprintHistoricalContextSource('/fixture', { enabled: true, max_bytes: 4096, verification_timeout_ms: 1000 }, true, reader, localPrincipal);
+        expect(source).toEqual({ availability: 'unavailable', reasonCode: 'TENANT_SCOPE_UNRESOLVED' });
+        expect(reader).not.toHaveBeenCalled();
+    });
+
+    it('forwards the immutable root, exact sprint, limits, and AbortSignal to the canonical reader', async () => {
+        const reader = vi.fn(async () => ({ kind: 'hold' as const, reasonCode: 'ARTIFACT_UNAVAILABLE' as const }));
+        const source = buildSprintHistoricalContextSource('/fixture/root', { enabled: true, max_bytes: 4096, verification_timeout_ms: 1200 }, false, reader, localPrincipal);
+        expect(source.availability).toBe('enabled');
+        const controller = new AbortController();
+        await expect(source.load?.('sprint-7099', controller.signal)).resolves.toEqual({ kind: 'hold', reasonCode: 'ARTIFACT_UNAVAILABLE' });
+        expect(reader).toHaveBeenCalledWith({ projectRoot: '/fixture/root', sprintId: 'sprint-7099', maxBytes: 4096, verificationTimeoutMs: 1200, signal: controller.signal });
+    });
+});
 
 describe('resolveModeLabel — mode-indicator label resolution (Ask/Run/Control)', () => {
   it('throws the typed guard error when no labels are supplied (no English fallback)', () => {
@@ -325,7 +397,7 @@ describe('native resume — ledger-first dual-read re-hydration (564-004)', () =
 
 // ─── resolveResumeCommand — picker decisions (merge with loop-side /resume) ──
 describe('resolveResumeCommand — /resume picker decision matrix', () => {
-    const disk = [record('sprint-357'), record('sprint-356')];
+    const disk = [record('sprint-357', { sprintId: 'sprint-357' }), record('sprint-356', { sprintId: 'sprint-356' })];
     const chat = chatSessionsToRecords([
         { sessionId: 'chat-abc', lastAt: '2026-06-30T12:00:00.000Z', preview: 'parser work' },
     ]);
@@ -347,6 +419,7 @@ describe('resolveResumeCommand — /resume picker decision matrix', () => {
         expect(decision).toEqual({
             kind: 'switch',
             sessionId: 'sprint-356',
+            sprintId: 'sprint-356',
             forwardToLoop: false,
             line: 'resumed: sprint-356',
         });
