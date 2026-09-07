@@ -71,6 +71,26 @@ const TERMINAL_NATIVE_PROVIDER_HOST_PROOF_ASSETS = Object.freeze([
   }),
 ]);
 
+const TERMINAL_NATIVE_BOOT_HEALTH_HOST_PROOF_ADAPTER_ID =
+  'deckent-terminal-native-boot-health-source-runtime-v1';
+const TERMINAL_NATIVE_BOOT_HEALTH_HOST_PROOF_GROUP_ID =
+  'deckent:terminal-native-boot-health-source-runtime';
+const TERMINAL_NATIVE_BOOT_HEALTH_HOST_PROOF_SCHEMA_ID =
+  'deckent.host-proof.terminal-native-boot-health-source-runtime.v1';
+const TERMINAL_REPL_SURFACE_HOST_PROOF_ADAPTER_ID = 'deckent-terminal-repl-surface-source-runtime-v1';
+const TERMINAL_REPL_SURFACE_HOST_PROOF_GROUP_ID = 'deckent:terminal-repl-surface-source-runtime';
+const TERMINAL_REPL_SURFACE_HOST_PROOF_SCHEMA_ID = 'deckent.host-proof.terminal-repl-surface-source-runtime.v1';
+const TERMINAL_NATIVE_AUTH_HEALTH_HOST_PROOF_ADAPTER_ID =
+  'deckent-terminal-native-auth-health-source-runtime-v1';
+const TERMINAL_NATIVE_AUTH_HEALTH_HOST_PROOF_GROUP_ID =
+  'deckent:terminal-native-auth-health-source-runtime';
+const TERMINAL_NATIVE_AUTH_HEALTH_HOST_PROOF_SCHEMA_ID =
+  'deckent.host-proof.terminal-native-auth-health-source-runtime.v1';
+const TERMINAL_HEALTH_PROOF_ASSETS = Object.freeze([
+  Object.freeze({ path: CLOSURE_OS_HOST_PROOF_HARNESS_PATH, role: 'trusted-harness' as const }),
+  Object.freeze({ path: 'scripts/terminal-health-config-host-proof-observer.mjs', role: 'trusted-harness' as const }),
+]);
+
 const MEMORY_COMPACT_READ_EXPORT_HOST_PROOF_ADAPTER_ID =
   'deckent-memory-compact-read-export-v1';
 const MEMORY_COMPACT_READ_EXPORT_HOST_PROOF_GROUP_ID =
@@ -138,6 +158,30 @@ export const TERMINAL_NATIVE_PROVIDER_PROOF_IDENTITY: ProductionWiringHostProofI
       }),
     ]),
   });
+
+export const TERMINAL_NATIVE_BOOT_HEALTH_PROOF_IDENTITY: ProductionWiringHostProofIdentity = Object.freeze({
+  producer: Object.freeze({ producerId: 'deckent.terminal.native-provider-authority-resolver' }),
+  canonicalConsumer: Object.freeze({ consumerId: 'deckent.terminal.native-boot-health-composer', relationship: 'invokes-producer' as const }),
+  affectedIngresses: Object.freeze([Object.freeze({ ingressId: 'deckent.native-terminal.entry', kind: 'entrypoint' as const })]),
+  enablementAuthority: Object.freeze({ authorityId: 'deckent.config.native-provider', mechanism: 'configuration' as const }),
+  proofTargets: Object.freeze([Object.freeze({ proofTargetId: 'deckent.terminal.native-boot-health-render', kind: 'ingress-execution' as const })]),
+});
+
+export const TERMINAL_REPL_SURFACE_PROOF_IDENTITY: ProductionWiringHostProofIdentity = Object.freeze({
+  producer: Object.freeze({ producerId: 'deckent.config.resolved-repl-surface' }),
+  canonicalConsumer: Object.freeze({ consumerId: 'deckent.terminal.ink-repl-surface', relationship: 'invokes-producer' as const }),
+  affectedIngresses: Object.freeze([Object.freeze({ ingressId: 'deckent.native-terminal.entry', kind: 'entrypoint' as const })]),
+  enablementAuthority: Object.freeze({ authorityId: 'deckent.config.repl-surface', mechanism: 'configuration' as const }),
+  proofTargets: Object.freeze([Object.freeze({ proofTargetId: 'deckent.terminal.repl-surface-default-and-opt-out', kind: 'ingress-execution' as const })]),
+});
+
+export const TERMINAL_NATIVE_AUTH_HEALTH_PROOF_IDENTITY: ProductionWiringHostProofIdentity = Object.freeze({
+  producer: Object.freeze({ producerId: 'deckent.terminal.native-boot-health-composer' }),
+  canonicalConsumer: Object.freeze({ consumerId: 'deckent.terminal.health-snapshot-renderer', relationship: 'invokes-producer' as const }),
+  affectedIngresses: Object.freeze([Object.freeze({ ingressId: 'deckent.native-terminal.entry', kind: 'entrypoint' as const })]),
+  enablementAuthority: Object.freeze({ authorityId: 'deckent.config.language', mechanism: 'configuration' as const }),
+  proofTargets: Object.freeze([Object.freeze({ proofTargetId: 'deckent.terminal.native-auth-health-en-tr-render', kind: 'ingress-execution' as const })]),
+});
 
 /** Prompt-safe identity for the bounded, source-preserving memory read/export topology. */
 export const MEMORY_COMPACT_READ_EXPORT_PROOF_IDENTITY: ProductionWiringHostProofIdentity =
@@ -652,6 +696,16 @@ const REGISTERED_HOST_PROOF_PROFILES: readonly RegisteredHostProofProfile[] = Ob
     targetKeys: CLOSURE_OS_HOST_PROOF_TARGET_KEYS,
   }),
   Object.freeze({
+    adapterId: TERMINAL_NATIVE_AUTH_HEALTH_HOST_PROOF_ADAPTER_ID,
+    observationGroupId: TERMINAL_NATIVE_AUTH_HEALTH_HOST_PROOF_GROUP_ID,
+    harnessPath: CLOSURE_OS_HOST_PROOF_HARNESS_PATH,
+    schemaId: TERMINAL_NATIVE_AUTH_HEALTH_HOST_PROOF_SCHEMA_ID,
+    assets: TERMINAL_HEALTH_PROOF_ASSETS,
+    targetKeys: Object.freeze(identityTargetKeys(TERMINAL_NATIVE_AUTH_HEALTH_PROOF_IDENTITY)),
+    proposalIdentity: TERMINAL_NATIVE_AUTH_HEALTH_PROOF_IDENTITY,
+    platformPolicy: Object.freeze({ linux: 'supported' as const, 'wsl2-linux': 'supported' as const, darwin: 'capability-unavailable' as const, win32: 'capability-unavailable' as const }),
+  }),
+  Object.freeze({
     adapterId: TERMINAL_NATIVE_PROVIDER_HOST_PROOF_ADAPTER_ID,
     observationGroupId: TERMINAL_NATIVE_PROVIDER_HOST_PROOF_GROUP_ID,
     harnessPath: CLOSURE_OS_HOST_PROOF_HARNESS_PATH,
@@ -665,6 +719,26 @@ const REGISTERED_HOST_PROOF_PROFILES: readonly RegisteredHostProofProfile[] = Ob
       darwin: 'capability-unavailable' as const,
       win32: 'capability-unavailable' as const,
     }),
+  }),
+  Object.freeze({
+    adapterId: TERMINAL_NATIVE_BOOT_HEALTH_HOST_PROOF_ADAPTER_ID,
+    observationGroupId: TERMINAL_NATIVE_BOOT_HEALTH_HOST_PROOF_GROUP_ID,
+    harnessPath: CLOSURE_OS_HOST_PROOF_HARNESS_PATH,
+    schemaId: TERMINAL_NATIVE_BOOT_HEALTH_HOST_PROOF_SCHEMA_ID,
+    assets: TERMINAL_HEALTH_PROOF_ASSETS,
+    targetKeys: Object.freeze(identityTargetKeys(TERMINAL_NATIVE_BOOT_HEALTH_PROOF_IDENTITY)),
+    proposalIdentity: TERMINAL_NATIVE_BOOT_HEALTH_PROOF_IDENTITY,
+    platformPolicy: Object.freeze({ linux: 'supported' as const, 'wsl2-linux': 'supported' as const, darwin: 'capability-unavailable' as const, win32: 'capability-unavailable' as const }),
+  }),
+  Object.freeze({
+    adapterId: TERMINAL_REPL_SURFACE_HOST_PROOF_ADAPTER_ID,
+    observationGroupId: TERMINAL_REPL_SURFACE_HOST_PROOF_GROUP_ID,
+    harnessPath: CLOSURE_OS_HOST_PROOF_HARNESS_PATH,
+    schemaId: TERMINAL_REPL_SURFACE_HOST_PROOF_SCHEMA_ID,
+    assets: TERMINAL_HEALTH_PROOF_ASSETS,
+    targetKeys: Object.freeze(identityTargetKeys(TERMINAL_REPL_SURFACE_PROOF_IDENTITY)),
+    proposalIdentity: TERMINAL_REPL_SURFACE_PROOF_IDENTITY,
+    platformPolicy: Object.freeze({ linux: 'supported' as const, 'wsl2-linux': 'supported' as const, darwin: 'capability-unavailable' as const, win32: 'capability-unavailable' as const }),
   }),
   Object.freeze({
     adapterId: MEMORY_COMPACT_READ_EXPORT_HOST_PROOF_ADAPTER_ID,
@@ -682,6 +756,16 @@ const REGISTERED_HOST_PROOF_PROFILES: readonly RegisteredHostProofProfile[] = Ob
     }),
   }),
 ]);
+
+/**
+ * Prompt-safe projection of the immutable proposal registry. Executable paths,
+ * adapter identities and asset digests deliberately remain host-only.
+ */
+export function listRegisteredProductionWiringHostProofProposalIdentities():
+readonly ProductionWiringHostProofIdentity[] {
+  return Object.freeze(REGISTERED_HOST_PROOF_PROFILES.flatMap(profile =>
+    profile.proposalIdentity === undefined ? [] : [profile.proposalIdentity]));
+}
 
 function profileForTargetKeys(targetKeys: readonly string[]): RegisteredHostProofProfile | null {
   const canonical = canonicalJson([...targetKeys].sort());

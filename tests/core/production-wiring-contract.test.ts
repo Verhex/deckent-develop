@@ -13,9 +13,13 @@ import {
 } from '../../src/core/production-wiring-contract.js';
 import {
   MEMORY_COMPACT_READ_EXPORT_PROOF_IDENTITY,
+  TERMINAL_NATIVE_BOOT_HEALTH_PROOF_IDENTITY,
+  TERMINAL_NATIVE_AUTH_HEALTH_PROOF_IDENTITY,
   TERMINAL_NATIVE_PROVIDER_PROOF_IDENTITY,
+  TERMINAL_REPL_SURFACE_PROOF_IDENTITY,
   createProductionWiringHostProofProgram,
   isProductionWiringHostProofIdentityRegistered,
+  listRegisteredProductionWiringHostProofProposalIdentities,
   parseProductionWiringHostProofProgram,
   parseProductionWiringHostProofProgramInput,
   validateProductionWiringHostProofCoverage,
@@ -133,6 +137,17 @@ describe('production wiring contract', () => {
       TERMINAL_NATIVE_PROVIDER_PROOF_IDENTITY,
     )).toBe(true);
 
+    const identities = listRegisteredProductionWiringHostProofProposalIdentities();
+    expect(identities).toEqual([
+      TERMINAL_NATIVE_AUTH_HEALTH_PROOF_IDENTITY,
+      TERMINAL_NATIVE_PROVIDER_PROOF_IDENTITY,
+      TERMINAL_NATIVE_BOOT_HEALTH_PROOF_IDENTITY,
+      TERMINAL_REPL_SURFACE_PROOF_IDENTITY,
+      MEMORY_COMPACT_READ_EXPORT_PROOF_IDENTITY,
+    ]);
+    expect(Object.isFrozen(identities)).toBe(true);
+    expect(JSON.stringify(identities)).not.toMatch(/adapterId|harnessPath|sha256|schemaId/u);
+
     const terminalContract = completeProductionWiringFromProposal({
       version: 1,
       changeKind: 'runtime-change',
@@ -170,6 +185,54 @@ describe('production wiring contract', () => {
       { platform: 'darwin', state: 'unsupported', reasonCode: 'capability-unavailable' },
       { platform: 'win32', state: 'unsupported', reasonCode: 'capability-unavailable' },
     ]));
+  });
+
+  it.each([
+    ['native boot-health', TERMINAL_NATIVE_BOOT_HEALTH_PROOF_IDENTITY,
+      'deckent.terminal.native-boot-health-render'],
+    ['repl-surface default and opt-out', TERMINAL_REPL_SURFACE_PROOF_IDENTITY,
+      'deckent.terminal.repl-surface-default-and-opt-out'],
+    ['native EN/TR authentication health', TERMINAL_NATIVE_AUTH_HEALTH_PROOF_IDENTITY,
+      'deckent.terminal.native-auth-health-en-tr-render'],
+  ])('admits only the registered Terminal %s identity with capability-scoped platforms',
+    (_label, identity, proofTargetId) => {
+      expect(isProductionWiringHostProofIdentityRegistered(identity)).toBe(true);
+      const completed = completeProductionWiringFromProposal({
+        version: 1,
+        changeKind: 'runtime-change',
+        ...identity,
+        disposition: { kind: 'production-wiring' },
+      }, { projectRoot: process.cwd() });
+      expect(completed.proofTargets).toEqual([
+        expect.objectContaining({ proofTargetId }),
+      ]);
+      expect(completed.hostProofProgram.verifierAssets.map(asset => asset.path)).toEqual([
+        'scripts/production-wiring-host-proof-harness.mjs',
+        'scripts/terminal-health-config-host-proof-observer.mjs',
+      ]);
+      expect(completed.hostProofProgram.platforms).toEqual(expect.arrayContaining([
+        expect.objectContaining({ platform: 'linux', state: 'supported' }),
+        expect.objectContaining({ platform: 'wsl2-linux', state: 'supported' }),
+        { platform: 'darwin', state: 'unsupported', reasonCode: 'capability-unavailable' },
+        { platform: 'win32', state: 'unsupported', reasonCode: 'capability-unavailable' },
+      ]));
+    });
+
+  it('rejects a near-match Terminal health identity rather than borrowing its profile', () => {
+    const nearMatch = {
+      ...TERMINAL_NATIVE_BOOT_HEALTH_PROOF_IDENTITY,
+      canonicalConsumer: {
+        consumerId: 'deckent.terminal.native-boot-health-renderer',
+        relationship: 'invokes-producer' as const,
+      },
+    };
+    expect(isProductionWiringHostProofIdentityRegistered(nearMatch)).toBe(false);
+    expect(() => completeProductionWiringFromProposal({
+      version: 1,
+      changeKind: 'runtime-change',
+      ...nearMatch,
+      disposition: { kind: 'production-wiring' },
+    }, { projectRoot: process.cwd() })).toThrow(/host-proof-profile-unregistered/u);
   });
 
   it('rejects near-match and foreign memory identities instead of borrowing the registered profile', () => {

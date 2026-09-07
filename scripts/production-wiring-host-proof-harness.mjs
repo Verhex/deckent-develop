@@ -25,6 +25,15 @@ export const TERMINAL_NATIVE_PROVIDER_SCHEMA_ID = 'deckent.host-proof.terminal-n
 export const MEMORY_COMPACT_READ_EXPORT_ADAPTER_ID = 'deckent-memory-compact-read-export-v1';
 export const MEMORY_COMPACT_READ_EXPORT_OBSERVATION_GROUP_ID = 'deckent:memory-compact-read-export';
 export const MEMORY_COMPACT_READ_EXPORT_SCHEMA_ID = 'deckent.host-proof.memory-compact-read-export.v1';
+export const TERMINAL_NATIVE_BOOT_HEALTH_ADAPTER_ID = 'deckent-terminal-native-boot-health-source-runtime-v1';
+export const TERMINAL_NATIVE_BOOT_HEALTH_OBSERVATION_GROUP_ID = 'deckent:terminal-native-boot-health-source-runtime';
+export const TERMINAL_NATIVE_BOOT_HEALTH_SCHEMA_ID = 'deckent.host-proof.terminal-native-boot-health-source-runtime.v1';
+export const TERMINAL_REPL_SURFACE_ADAPTER_ID = 'deckent-terminal-repl-surface-source-runtime-v1';
+export const TERMINAL_REPL_SURFACE_OBSERVATION_GROUP_ID = 'deckent:terminal-repl-surface-source-runtime';
+export const TERMINAL_REPL_SURFACE_SCHEMA_ID = 'deckent.host-proof.terminal-repl-surface-source-runtime.v1';
+export const TERMINAL_NATIVE_AUTH_HEALTH_ADAPTER_ID = 'deckent-terminal-native-auth-health-source-runtime-v1';
+export const TERMINAL_NATIVE_AUTH_HEALTH_OBSERVATION_GROUP_ID = 'deckent:terminal-native-auth-health-source-runtime';
+export const TERMINAL_NATIVE_AUTH_HEALTH_SCHEMA_ID = 'deckent.host-proof.terminal-native-auth-health-source-runtime.v1';
 
 const REQUEST_KIND = 'deckent-production-wiring-host-proof-request-v1';
 const OUTCOME_KIND = 'deckent-production-wiring-host-proof-outcome';
@@ -63,6 +72,26 @@ const CLOSURE_OS_TARGET_KEYS = Object.freeze([
 const TERMINAL_NATIVE_PROVIDER_REQUIRED_ASSETS = Object.freeze([
   Object.freeze({ path: 'scripts/production-wiring-host-proof-harness.mjs', role: 'trusted-harness' }),
 ]);
+const TERMINAL_HEALTH_OBSERVER_PATH = 'scripts/terminal-health-config-host-proof-observer.mjs';
+const TERMINAL_HEALTH_REQUIRED_ASSETS = Object.freeze([
+  Object.freeze({ path: 'scripts/production-wiring-host-proof-harness.mjs', role: 'trusted-harness' }),
+  Object.freeze({ path: TERMINAL_HEALTH_OBSERVER_PATH, role: 'trusted-harness' }),
+]);
+const TERMINAL_NATIVE_BOOT_HEALTH_TARGET_KEYS = Object.freeze([
+  'affected-ingress:deckent.native-terminal.entry', 'canonical-consumer:deckent.terminal.native-boot-health-composer',
+  'enablement-authority:deckent.config.native-provider', 'producer:deckent.terminal.native-provider-authority-resolver',
+  'proof-target:deckent.terminal.native-boot-health-render',
+].sort());
+const TERMINAL_REPL_SURFACE_TARGET_KEYS = Object.freeze([
+  'affected-ingress:deckent.native-terminal.entry', 'canonical-consumer:deckent.terminal.ink-repl-surface',
+  'enablement-authority:deckent.config.repl-surface', 'producer:deckent.config.resolved-repl-surface',
+  'proof-target:deckent.terminal.repl-surface-default-and-opt-out',
+].sort());
+const TERMINAL_NATIVE_AUTH_HEALTH_TARGET_KEYS = Object.freeze([
+  'affected-ingress:deckent.native-terminal.entry', 'canonical-consumer:deckent.terminal.health-snapshot-renderer',
+  'enablement-authority:deckent.config.language', 'producer:deckent.terminal.native-boot-health-composer',
+  'proof-target:deckent.terminal.native-auth-health-en-tr-render',
+].sort());
 
 // The verifier logic lives in this digest-pinned harness, outside the product
 // task's write authority. The TypeScript modules are the observed production
@@ -154,6 +183,9 @@ const PROFILES = Object.freeze([
     targetKeys: TERMINAL_NATIVE_PROVIDER_TARGET_KEYS,
     observer: 'terminal-native-provider',
   }),
+  Object.freeze({ adapterId: TERMINAL_NATIVE_BOOT_HEALTH_ADAPTER_ID, schemaId: TERMINAL_NATIVE_BOOT_HEALTH_SCHEMA_ID, observationGroupId: TERMINAL_NATIVE_BOOT_HEALTH_OBSERVATION_GROUP_ID, assets: TERMINAL_HEALTH_REQUIRED_ASSETS, targetKeys: TERMINAL_NATIVE_BOOT_HEALTH_TARGET_KEYS, observer: 'terminal-health-config' }),
+  Object.freeze({ adapterId: TERMINAL_REPL_SURFACE_ADAPTER_ID, schemaId: TERMINAL_REPL_SURFACE_SCHEMA_ID, observationGroupId: TERMINAL_REPL_SURFACE_OBSERVATION_GROUP_ID, assets: TERMINAL_HEALTH_REQUIRED_ASSETS, targetKeys: TERMINAL_REPL_SURFACE_TARGET_KEYS, observer: 'terminal-health-config' }),
+  Object.freeze({ adapterId: TERMINAL_NATIVE_AUTH_HEALTH_ADAPTER_ID, schemaId: TERMINAL_NATIVE_AUTH_HEALTH_SCHEMA_ID, observationGroupId: TERMINAL_NATIVE_AUTH_HEALTH_OBSERVATION_GROUP_ID, assets: TERMINAL_HEALTH_REQUIRED_ASSETS, targetKeys: TERMINAL_NATIVE_AUTH_HEALTH_TARGET_KEYS, observer: 'terminal-health-config' }),
   Object.freeze({
     adapterId: MEMORY_COMPACT_READ_EXPORT_ADAPTER_ID,
     schemaId: MEMORY_COMPACT_READ_EXPORT_SCHEMA_ID,
@@ -455,6 +487,9 @@ function observerInvocation(root, request) {
         && Buffer.from(result.stdout).toString('utf8') === MEMORY_COMPACT_READ_EXPORT_OBSERVATION,
     });
   }
+  if (request.profile.observer === 'terminal-health-config') {
+    return Object.freeze({ executable: process.execPath, args: [resolve(root, TERMINAL_HEALTH_OBSERVER_PATH), request.profile.adapterId], accepts: result => result.stderr.byteLength === 0 && Buffer.from(result.stdout).toString('utf8') === 'observed' });
+  }
   return null;
 }
 
@@ -493,7 +528,6 @@ export async function runProductionWiringHostProofHarness(rawRequest, options = 
       args: invocation.args,
       cwd: root,
       env: Object.freeze({
-        HOME: '/tmp',
         PATH: '/usr/local/bin:/usr/bin:/bin',
         LANG: 'C',
         LC_ALL: 'C',
@@ -501,6 +535,10 @@ export async function runProductionWiringHostProofHarness(rawRequest, options = 
         GIT_TERMINAL_PROMPT: '0',
         GIT_PAGER: 'cat',
         PAGER: 'cat',
+        // The current-source Terminal observer creates its own DECKENT_HOME and XDG
+        // directories below a private tmp root. Do not supply ambient HOME or
+        // CODEX_HOME to that process.
+        ...(request.profile.observer === 'terminal-health-config' ? {} : { HOME: '/tmp' }),
         ...(request.profile.observer === 'terminal-native-provider'
           ? { NODE_ENV: 'test' }
           : {}),

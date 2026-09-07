@@ -1259,6 +1259,16 @@
    "notes": "Registered during the 2026-09-03 main landing closure; expanded by recovery 3333 without generic attestation. The immutable registry currently owns the Closure OS authority observer and the 7099 L1 Terminal native-provider observer. Each adapter fixes its assets, executable, argv, environment, target tuple, schema and success predicate in code; the harness validates no-follow asset custody and rechecks identity before returning an observation."
   },
   {
+   "file": "scripts/terminal-health-config-host-proof-observer.mjs",
+   "class": "recurring-proof",
+   "owner": "terminal-host-proof-registry",
+   "npmScript": null,
+   "input": "current src/cli entry plus isolated temporary project, DECKENT_HOME and XDG directories; profile id from the trusted host-proof harness",
+   "output": "bounded current-source Terminal runtime observation for native boot health or repl_surface config; exits non-zero on unavailable capability or failed observation",
+   "expiry": "none — digest-pinned trusted asset of the registered Terminal proof profiles",
+   "notes": "Never accepts an arbitrary target, argv, config or success predicate. Native proof uses an Ollama pin without credentials or DECKENT_NATIVE_MOCK; repl approval authority is deliberately not attested."
+  },
+  {
    "file": "scripts/lint-cli-surface.mjs",
    "class": "gate",
    "owner": "cli-surface-registry",

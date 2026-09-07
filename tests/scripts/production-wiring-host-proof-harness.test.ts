@@ -21,9 +21,18 @@ import {
   MEMORY_COMPACT_READ_EXPORT_ADAPTER_ID,
   MEMORY_COMPACT_READ_EXPORT_OBSERVATION_GROUP_ID,
   MEMORY_COMPACT_READ_EXPORT_SCHEMA_ID,
+  TERMINAL_NATIVE_BOOT_HEALTH_ADAPTER_ID,
+  TERMINAL_NATIVE_BOOT_HEALTH_OBSERVATION_GROUP_ID,
+  TERMINAL_NATIVE_BOOT_HEALTH_SCHEMA_ID,
+  TERMINAL_NATIVE_AUTH_HEALTH_ADAPTER_ID,
+  TERMINAL_NATIVE_AUTH_HEALTH_OBSERVATION_GROUP_ID,
+  TERMINAL_NATIVE_AUTH_HEALTH_SCHEMA_ID,
   TERMINAL_NATIVE_PROVIDER_ADAPTER_ID,
   TERMINAL_NATIVE_PROVIDER_OBSERVATION_GROUP_ID,
   TERMINAL_NATIVE_PROVIDER_SCHEMA_ID,
+  TERMINAL_REPL_SURFACE_ADAPTER_ID,
+  TERMINAL_REPL_SURFACE_OBSERVATION_GROUP_ID,
+  TERMINAL_REPL_SURFACE_SCHEMA_ID,
   runProductionWiringHostProofHarness,
 } from '../../scripts/production-wiring-host-proof-harness.mjs';
 import {
@@ -62,6 +71,11 @@ const memoryAssets = [
   { path: 'scripts/memory-compact-host-proof-observer.mjs', role: 'trusted-harness' },
 ] as const;
 
+const terminalHealthAssets = [
+  { path: 'scripts/production-wiring-host-proof-harness.mjs', role: 'trusted-harness' },
+  { path: 'scripts/terminal-health-config-host-proof-observer.mjs', role: 'trusted-harness' },
+] as const;
+
 const memoryTargetKeys = [
   'affected-ingress:deckent.memory-export.write-guarded-exports',
   'canonical-consumer:deckent.memory-export.compact-renderers',
@@ -91,6 +105,30 @@ const terminalTargetKeys = [
   'producer:deckent.terminal.native-provider-authority-resolver',
   'proof-target:deckent.terminal.native-provider-resolution-execution',
 ].sort();
+
+const terminalHealthTargetKeys = {
+  [TERMINAL_NATIVE_BOOT_HEALTH_ADAPTER_ID]: [
+    'affected-ingress:deckent.native-terminal.entry',
+    'canonical-consumer:deckent.terminal.native-boot-health-composer',
+    'enablement-authority:deckent.config.native-provider',
+    'producer:deckent.terminal.native-provider-authority-resolver',
+    'proof-target:deckent.terminal.native-boot-health-render',
+  ].sort(),
+  [TERMINAL_REPL_SURFACE_ADAPTER_ID]: [
+    'affected-ingress:deckent.native-terminal.entry',
+    'canonical-consumer:deckent.terminal.ink-repl-surface',
+    'enablement-authority:deckent.config.repl-surface',
+    'producer:deckent.config.resolved-repl-surface',
+    'proof-target:deckent.terminal.repl-surface-default-and-opt-out',
+  ].sort(),
+  [TERMINAL_NATIVE_AUTH_HEALTH_ADAPTER_ID]: [
+    'affected-ingress:deckent.native-terminal.entry',
+    'canonical-consumer:deckent.terminal.health-snapshot-renderer',
+    'enablement-authority:deckent.config.language',
+    'producer:deckent.terminal.native-boot-health-composer',
+    'proof-target:deckent.terminal.native-auth-health-en-tr-render',
+  ].sort(),
+} as const;
 
 function canonicalJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
@@ -122,6 +160,17 @@ function createMemoryFixtureRoot(): string {
   const root = mkdtempSync(join(tmpdir(), 'deckent-memory-host-proof-harness-'));
   roots.push(root);
   for (const asset of memoryAssets) {
+    const absolute = join(root, asset.path);
+    mkdirSync(dirname(absolute), { recursive: true });
+    writeFileSync(absolute, `fixture:${asset.path}\n`);
+  }
+  return root;
+}
+
+function createTerminalHealthFixtureRoot(): string {
+  const root = mkdtempSync(join(tmpdir(), 'deckent-terminal-health-host-proof-harness-'));
+  roots.push(root);
+  for (const asset of terminalHealthAssets) {
     const absolute = join(root, asset.path);
     mkdirSync(dirname(absolute), { recursive: true });
     writeFileSync(absolute, `fixture:${asset.path}\n`);
@@ -176,6 +225,21 @@ function buildMemoryRequest(root: string): string {
   });
 }
 
+function buildTerminalHealthRequest(root: string, adapterId: typeof TERMINAL_NATIVE_BOOT_HEALTH_ADAPTER_ID | typeof TERMINAL_REPL_SURFACE_ADAPTER_ID | typeof TERMINAL_NATIVE_AUTH_HEALTH_ADAPTER_ID): string {
+  return canonicalJson({
+    adapterId,
+    assets: terminalHealthAssets.map(asset => ({
+      path: asset.path,
+      role: asset.role,
+      sha256: sha256(readFileSync(join(root, asset.path))),
+    })),
+    kind: 'deckent-production-wiring-host-proof-request-v1',
+    outputLimitBytes: 64 * 1024,
+    timeoutMs: 60_000,
+    version: 1,
+  });
+}
+
 function commandResult(overrides: Record<string, unknown> = {}) {
   return {
     status: 0,
@@ -218,6 +282,95 @@ afterEach(() => {
 });
 
 describe('canonical production-wiring host-proof harness', () => {
+  it('keeps the Terminal source observer fail-closed on legacy health text, output overflow and errors', () => {
+    const observer = readFileSync(
+      join(repositoryRoot, 'scripts/terminal-health-config-host-proof-observer.mjs'), 'utf8',
+    );
+    expect(observer).toContain(
+      "const NATIVE_HEALTH_LINE = /^ollama\\/qwen2\\.5-coder:7b · auth: unknown(?: ·|$)/mu;",
+    );
+    expect(observer).toContain(
+      "const NATIVE_HEALTH_LINE_TR = /^ollama\\/qwen2\\.5-coder:7b · kimlik doğrulama: bilinmiyor(?: ·|$)/mu;",
+    );
+    expect(observer).toContain('const NATIVE_FALLBACK_BANNER = /native engine not started|yerel motor başlatılamadı|legacy loop/u;');
+    expect(observer).toContain('if (exitWhen(stripAnsi(output))) requestExit();');
+    expect(observer).toContain('if (outputBytes + dataBytes > MAX_PTY_OUTPUT_BYTES) {');
+    expect(observer.indexOf('if (outputBytes + dataBytes > MAX_PTY_OUTPUT_BYTES) {'))
+      .toBeLessThan(observer.indexOf('output += data;'));
+    expect(observer).not.toContain("process.exit(43)");
+    expect(observer).toContain('finally { try { rmSync(root, { recursive: true, force: true }); }');
+  });
+
+  it.each([
+    [TERMINAL_NATIVE_BOOT_HEALTH_ADAPTER_ID, TERMINAL_NATIVE_BOOT_HEALTH_SCHEMA_ID,
+      TERMINAL_NATIVE_BOOT_HEALTH_OBSERVATION_GROUP_ID],
+    [TERMINAL_REPL_SURFACE_ADAPTER_ID, TERMINAL_REPL_SURFACE_SCHEMA_ID,
+      TERMINAL_REPL_SURFACE_OBSERVATION_GROUP_ID],
+    [TERMINAL_NATIVE_AUTH_HEALTH_ADAPTER_ID, TERMINAL_NATIVE_AUTH_HEALTH_SCHEMA_ID,
+      TERMINAL_NATIVE_AUTH_HEALTH_OBSERVATION_GROUP_ID],
+  ] as const)('binds Terminal profile %s to its immutable observer, identity and success token', async (adapterId, schemaId, observationGroupId) => {
+    const root = createTerminalHealthFixtureRoot();
+    const processRunner = vi.fn(async (input: {
+      executable: string;
+      args: readonly string[];
+      cwd: string;
+    }) => {
+      expect(input).toEqual(expect.objectContaining({
+        executable: process.execPath,
+        args: [join(root, 'scripts/terminal-health-config-host-proof-observer.mjs'), adapterId],
+        cwd: root,
+      }));
+      expect(input).not.toHaveProperty('env.HOME');
+      expect(input).not.toHaveProperty('env.CODEX_HOME');
+      return commandResult({ stdout: Buffer.from('observed') });
+    });
+    await expect(runProductionWiringHostProofHarness(buildTerminalHealthRequest(root, adapterId), {
+      root,
+      processRunner,
+    })).resolves.toEqual({
+      state: 'observed',
+      outcome: {
+        version: 1,
+        kind: 'deckent-production-wiring-host-proof-outcome',
+        schemaId,
+        observationGroupId,
+        outcome: 'observed',
+        targetKeys: terminalHealthTargetKeys[adapterId],
+      },
+    });
+    expect(processRunner).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    TERMINAL_NATIVE_BOOT_HEALTH_ADAPTER_ID,
+    TERMINAL_REPL_SURFACE_ADAPTER_ID,
+    TERMINAL_NATIVE_AUTH_HEALTH_ADAPTER_ID,
+  ] as const)('fails closed when Terminal observer %s fails or emits a noncanonical result', async adapterId => {
+    const root = createTerminalHealthFixtureRoot();
+    await expect(runProductionWiringHostProofHarness(buildTerminalHealthRequest(root, adapterId), {
+      root,
+      processRunner: async () => commandResult({ status: 43 }),
+    })).resolves.toEqual({ state: 'hold', reasonCode: 'host-proof-adapter-failed' });
+    await expect(runProductionWiringHostProofHarness(buildTerminalHealthRequest(root, adapterId), {
+      root,
+      processRunner: async () => commandResult({ stdout: Buffer.from('observed\n') }),
+    })).resolves.toEqual({ state: 'hold', reasonCode: 'host-proof-adapter-observation-failed' });
+  });
+
+  it.each([
+    TERMINAL_NATIVE_BOOT_HEALTH_ADAPTER_ID,
+    TERMINAL_REPL_SURFACE_ADAPTER_ID,
+    TERMINAL_NATIVE_AUTH_HEALTH_ADAPTER_ID,
+  ] as const)('refuses Terminal source-runtime profile %s before execution when its observer asset is missing', async adapterId => {
+    const root = createTerminalHealthFixtureRoot();
+    const request = buildTerminalHealthRequest(root, adapterId);
+    rmSync(join(root, 'scripts/terminal-health-config-host-proof-observer.mjs'));
+    const processRunner = vi.fn();
+    await expect(runProductionWiringHostProofHarness(request, { root, processRunner }))
+      .resolves.toEqual({ state: 'hold', reasonCode: 'host-proof-verifier-asset-invalid' });
+    expect(processRunner).not.toHaveBeenCalled();
+  });
+
   it('runs the registered Terminal provider observer with code-owned tests and target identities', async () => {
     await expect(runProductionWiringHostProofHarness(
       buildTerminalRequest(repositoryRoot),
