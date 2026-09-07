@@ -74,6 +74,48 @@ function bounded<T>(work: Promise<T>, timeoutMs: number): Promise<T | undefined>
   });
 }
 
+/**
+ * Probe the local Ollama endpoint with transport containment. Unlike the
+ * subscription auth probe, an HTTP fetch must be aborted when it overruns:
+ * otherwise a hung socket remains the shared in-flight promise forever and
+ * every later refresh merely joins it. A timeout is absence of evidence, not
+ * evidence that the local endpoint is unreachable.
+ */
+function probeOllama(
+  fetchFn: typeof globalThis.fetch,
+  host: string,
+  timeoutMs: number,
+): Promise<ProviderAvailability> {
+  return new Promise((resolve) => {
+    const controller = new AbortController();
+    let settled = false;
+    const settle = (availability: ProviderAvailability): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(availability);
+    };
+    const timer = setTimeout(() => {
+      controller.abort();
+      settle(UNKNOWN);
+    }, timeoutMs);
+
+    // Normalizing through a promise also contains an injected synchronous
+    // fetch throw; it follows the same typed UNREACHABLE path and clears the
+    // deadline rather than escaping before this probe can settle.
+    void Promise.resolve().then(() => fetchFn(`${host}/api/tags`, { signal: controller.signal })).then(
+      (res) => {
+        // This endpoint has no body the evidence store needs. Cancelling it
+        // releases a keep-alive response both after a normal probe and when a
+        // non-compliant fetch resolves after its abort deadline.
+        void res.body?.cancel().catch(() => undefined);
+        settle(res.ok ? { ok: true } : { ok: false, code: 'UNREACHABLE', detail: host });
+      },
+      () => settle({ ok: false, code: 'UNREACHABLE', detail: host }),
+    );
+  });
+}
+
 export function createProviderEvidence(deps: ProviderEvidenceDeps): ProviderEvidenceStore {
   const now = deps.now ?? (() => Date.now());
   const ttlMs = deps.ttlMs ?? DEFAULT_TTL_MS;
@@ -97,14 +139,7 @@ export function createProviderEvidence(deps: ProviderEvidenceDeps): ProviderEvid
     }
     if (provider === OLLAMA_PROVIDER && deps.ollamaHost) {
       const host = deps.ollamaHost;
-      return async () => {
-        try {
-          const res = await fetchFn(`${host}/api/tags`);
-          return res.ok ? { ok: true } : { ok: false, code: 'UNREACHABLE', detail: host };
-        } catch {
-          return { ok: false, code: 'UNREACHABLE', detail: host };
-        }
-      };
+      return () => probeOllama(fetchFn, host, timeoutMs);
     }
     return null;
   };
@@ -124,7 +159,12 @@ export function createProviderEvidence(deps: ProviderEvidenceDeps): ProviderEvid
     if (!run) return Promise.resolve(undefined);
     const full = run().then((availability) => {
       const previous = entries.get(provider)?.availability ?? UNKNOWN;
-      entries.set(provider, { availability, at: now() });
+      // An Ollama deadline is deliberately UNKNOWN rather than unreachable.
+      // It is also not cacheable: retaining it for the TTL would turn a
+      // contained hung socket into a fresh-looking result and suppress the
+      // next readiness lookup.
+      if (provider === OLLAMA_PROVIDER && availability.ok === 'unknown') entries.delete(provider);
+      else entries.set(provider, { availability, at: now() });
       pending.delete(provider);
       const changed = !same(previous, availability);
       if (changed && (waiting.get(provider) ?? 0) === 0) notify();

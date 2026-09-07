@@ -1,7 +1,7 @@
 // tests/cli/native-agent-bridge.test.ts
 import { describe, it, expect } from 'vitest';
 import { tmpdir } from 'node:os';
-import { mkdtempSync, existsSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { createNativeEngine, resolveCostCeilingUsd } from '../../src/cli/repl/native-agent-bridge.js';
 import { buildNativeToolRegistry } from '../../src/cli/repl/native-tool-registry.js';
@@ -13,6 +13,27 @@ function scripted(scripts: ProviderEvent[][]): ProviderAdapter {
 }
 
 describe('createNativeEngine', () => {
+  it('persists a compact checkpoint through the real engine-session-store chain at the canonical project path', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'nb-checkpoint-wire-'));
+    try {
+      const payload = JSON.stringify({
+        schemaVersion: 1, objective: 'wire', findings: [], evidenceRefs: [], decisions: [], unresolved: [],
+        nextActions: [], inspectedAreas: [], toolResultDigests: [], cumulativeCounters: {}, createdAt: '2026-09-07T00:00:00.000Z',
+      });
+      const engine = createNativeEngine({
+        adapter: scripted([[{ type: 'text-delta', text: `\`\`\`json\n${payload}\n\`\`\`` }, { type: 'done' }]]),
+        registry: buildNativeToolRegistry({ cwd: () => dir }), cwd: dir, model: 'm', lang: 'en',
+        confirm: async () => 'y', toolSink: () => {},
+        scratch: { tenantId: 't', projectId: 'p', sessionId: 'session-real', checkpointProjectRoot: dir },
+      });
+      expect(await engine.compactContext!()).toMatchObject({ outcome: 'compacted', epoch: 2 });
+      const checkpointDir = join(dir, '.deckent', 'runtime', 'sessions', 'session-real', 'checkpoints');
+      expect(existsSync(checkpointDir)).toBe(true);
+      expect(readFileSync(join(checkpointDir, readdirSync(checkpointDir)[0]!), 'utf8')).toContain('"objective":"wire"');
+      engine.close?.({ policy: 'delete' });
+      expect(existsSync(checkpointDir)).toBe(true);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
   it('streams text via output and ends the turn', async () => {
     const adapter = scripted([[{ type: 'text-delta', text: 'hi' }, { type: 'usage', inputTokens: 3, outputTokens: 1 }, { type: 'done' }]]);
     const out: string[] = [];

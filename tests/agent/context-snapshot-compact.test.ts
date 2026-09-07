@@ -99,6 +99,79 @@ describe('AgentSession.contextSnapshot()', () => {
 });
 
 describe('AgentSession.compactContext()', () => {
+  it('accepts one complete outer Markdown JSON fence and preserves payload validation', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'deckent-compact-fenced-'));
+    try {
+      const adapter = scriptedAdapter();
+      const send = adapter.send.bind(adapter);
+      adapter.send = async function* (request) {
+        if (request.system === CHECKPOINT_INSTRUCTION) {
+          yield { type: 'text-delta', text: `\`\`\`json\n${checkpointJson()}\n\`\`\`` };
+          yield { type: 'usage', inputTokens: 11, outputTokens: 7 };
+          yield { type: 'done' };
+          return;
+        }
+        yield* send(request);
+      };
+      const s = createAgentSession(deps({ adapter }, { scratchCwd: cwd, window: 100_000 }));
+      const events = await drain(s.compactContext());
+      expect(events.map((event) => event.type)).toEqual(['usage', 'notice']);
+      expect(events.at(-1)).toMatchObject({ type: 'notice', code: 'native.checkpoint.saved' });
+      expect(s.latestCheckpoint().status).toBe('ok');
+      expect(JSON.stringify(s.transcript())).not.toContain('```json');
+    } finally { rmSync(cwd, { recursive: true, force: true }); }
+  });
+
+  it('classifies malformed provider JSON as operational degradation while preserving observed usage', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'deckent-compact-degraded-'));
+    try {
+      const adapter = scriptedAdapter();
+      adapter.send = async function* (request) {
+        if (request.system === CHECKPOINT_INSTRUCTION) {
+          yield { type: 'text-delta', text: '```json\n{"schemaVersion":1}\n``` trailing prose' };
+          yield { type: 'usage', inputTokens: 13, outputTokens: 5 };
+          yield { type: 'done' };
+          return;
+        }
+        yield { type: 'text-delta', text: 'ok' }; yield { type: 'done' };
+      };
+      const s = createAgentSession(deps({ adapter }, { scratchCwd: cwd, window: 100_000 }));
+      const events = await drain(s.compactContext());
+      expect(events).toEqual(expect.arrayContaining([
+        { type: 'usage', inputTokens: 13, outputTokens: 5 },
+        expect.objectContaining({ type: 'notice', code: 'native.checkpoint.degraded' }),
+      ]));
+      expect(s.latestCheckpoint()).toMatchObject({
+        status: 'degraded', reasonCode: 'CHECKPOINT_RESPONSE_INVALID_JSON',
+      });
+      expect((s.latestCheckpoint() as { reason: string }).reason).not.toContain('schemaVersion');
+      expect((await s.contextSnapshot()).epoch).toBe(1);
+    } finally { rmSync(cwd, { recursive: true, force: true }); }
+  });
+
+  it.each([
+    ['partial fence', '```json\n{"schemaVersion":1}', 'CHECKPOINT_RESPONSE_INVALID_JSON'],
+    ['oversized response', 'x'.repeat((256 * 1024) + 1), 'CHECKPOINT_RESPONSE_TOO_LARGE'],
+    ['invalid payload', '{"schemaVersion":1}', 'CHECKPOINT_PAYLOAD_INVALID'],
+  ])('rejects %s with a privacy-safe typed reason', async (_label, response, reasonCode) => {
+    const cwd = mkdtempSync(join(tmpdir(), 'deckent-compact-invalid-'));
+    try {
+      const adapter = scriptedAdapter();
+      adapter.send = async function* (request) {
+        if (request.system === CHECKPOINT_INSTRUCTION) {
+          yield { type: 'text-delta', text: response };
+          yield { type: 'done' };
+          return;
+        }
+        yield { type: 'done' };
+      };
+      const s = createAgentSession(deps({ adapter }, { scratchCwd: cwd, window: 100_000 }));
+      await drain(s.compactContext());
+      expect(s.latestCheckpoint()).toMatchObject({ status: 'degraded', reasonCode });
+      expect((s.latestCheckpoint() as { reason: string }).reason).not.toContain(response.slice(0, 32));
+    } finally { rmSync(cwd, { recursive: true, force: true }); }
+  });
+
   it('without a scratch store it yields the typed unavailable notice and keeps the epoch', async () => {
     const s = createAgentSession(deps({}, { window: 1000 }));
     const events = await drain(s.compactContext());

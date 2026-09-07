@@ -84,6 +84,7 @@ src/desktop/*.tsbuildinfo
 .deckent/runtime/api-token
 .deckent/runtime/terminal-token
 .deckent/runtime/run-flow-store/
+.deckent/runtime/sessions/
 .deckent/runtime/prompt-lint.jsonl
 .deckent/runtime/run-status-read-model.json
 .deckent/runtime/archive/

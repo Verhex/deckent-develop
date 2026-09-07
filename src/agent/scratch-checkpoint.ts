@@ -37,11 +37,14 @@ export interface CheckpointReceipt { path: string; digest: string }
 export type CheckpointReadResult =
   | { status: 'empty' }
   | { status: 'ok'; payload: ScratchCheckpointPayload; receipt: CheckpointReceipt }
-  | { status: 'corrupt'; path: string; reason: string };
+  | { status: 'corrupt'; path: string; reason: string }
+  | { status: 'degraded'; path: string; reasonCode: string; reason: string };
 
 export interface ScratchStoreInfo {
   /** The session scratchpad — everything the agent writes lives under it. */
   root: string;
+  /** Durable checkpoint directory; intentionally outside disposable scratch. */
+  checkpointDir: string;
   /** The `<sessionId>` directory that owns {@link ScratchStoreInfo.root}; the
    *  unit the reaper and `close({policy:'delete'})` operate on. */
   sessionRoot: string;
@@ -71,6 +74,8 @@ export interface ScratchStoreOptions {
   recoveryWindowMs?: number;
   /** Clock seam for the reaper. Absent → `Date.now`. */
   now?: () => number;
+  /** Canonical `<project>/.deckent/runtime/sessions` parent for durable checkpoints. */
+  checkpointProjectRoot?: string;
 }
 
 /** Pure path resolution for one scratch session — no filesystem effect. Callers
@@ -135,6 +140,16 @@ function assertContained(root: string, candidate: string): void {
     cursor = parent;
   }
   if (existsSync(candidate) && lstatSync(candidate).isSymbolicLink()) throw new Error('scratch target is a symlink');
+}
+
+function assertNoSymlinkAncestry(root: string, candidate: string): void {
+  assertContained(root, candidate);
+  let cursor = resolve(root);
+  if (existsSync(cursor) && lstatSync(cursor).isSymbolicLink()) throw new Error('checkpoint project root is a symlink');
+  for (const part of relative(cursor, resolve(candidate)).split(sep).filter(Boolean)) {
+    cursor = join(cursor, part);
+    if (existsSync(cursor) && lstatSync(cursor).isSymbolicLink()) throw new Error('checkpoint path contains a symlink');
+  }
 }
 
 function parsePayload(value: unknown): ScratchCheckpointPayload | undefined {
@@ -237,7 +252,25 @@ export function openScratchStore(ids: ScratchIdentity, options: ScratchStoreOpti
   const recoveryWindowMs = resolveRecoveryWindowMs(options.recoveryWindowMs);
   const now = options.now ?? Date.now;
   const root = layout.root;
-  const checkpointDir = join(root, 'checkpoints');
+  const legacyCheckpointDir = join(root, 'checkpoints');
+  // Scratch lifecycle remains independent even when checkpoints are durable.
+  mkdirSync(root, { recursive: true, mode: 0o700 });
+  const checkpointProjectRoot = options.checkpointProjectRoot === undefined
+    ? undefined
+    : resolve(options.checkpointProjectRoot);
+  const checkpointBaseDir = checkpointProjectRoot === undefined
+    ? undefined
+    : join(checkpointProjectRoot, '.deckent', 'runtime', 'sessions');
+  if (checkpointBaseDir !== undefined) {
+    assertNoSymlinkAncestry(checkpointProjectRoot!, checkpointBaseDir);
+    mkdirSync(checkpointBaseDir, { recursive: true, mode: 0o700 });
+    assertNoSymlinkAncestry(checkpointProjectRoot!, checkpointBaseDir);
+  }
+  const checkpointDir = checkpointBaseDir === undefined
+    ? legacyCheckpointDir
+    : join(checkpointBaseDir, layout.sessionId, 'checkpoints');
+  if (checkpointBaseDir !== undefined) assertNoSymlinkAncestry(checkpointProjectRoot!, checkpointDir);
+  const checkpointBoundary = checkpointBaseDir ?? root;
   // Deterministic, not mkdtemp: an existing directory is REUSED so a recovered
   // session keeps its checkpoint lineage instead of starting a fresh island.
   mkdirSync(checkpointDir, { recursive: true, mode: 0o700 });
@@ -247,7 +280,7 @@ export function openScratchStore(ids: ScratchIdentity, options: ScratchStoreOpti
     }
   }
 
-  const files = (): string[] => readdirSync(checkpointDir)
+  const files = (dir = checkpointDir): string[] => readdirSync(dir)
     .filter((name) => CHECKPOINT_RE.test(name))
     .sort((a, b) => Number(CHECKPOINT_RE.exec(a)![1]) - Number(CHECKPOINT_RE.exec(b)![1]));
 
@@ -267,12 +300,14 @@ export function openScratchStore(ids: ScratchIdentity, options: ScratchStoreOpti
   return {
     info: {
       root,
+      checkpointDir,
       sessionRoot: layout.sessionRoot,
       modeProtection: process.platform === 'win32' ? 'windows-best-effort' : 'posix-enforced',
       retention: RETENTION,
       recoveryWindowMs,
     },
     writeCheckpoint(payload): CheckpointReceipt {
+      if (checkpointProjectRoot !== undefined) assertNoSymlinkAncestry(checkpointProjectRoot, checkpointDir);
       if (!parsePayload(payload)) throw new Error('invalid checkpoint payload');
       const body = JSON.stringify(payload);
       const checksum = digest(body);
@@ -280,14 +315,14 @@ export function openScratchStore(ids: ScratchIdentity, options: ScratchStoreOpti
       const name = `checkpoint-${String(++sequence).padStart(8, '0')}-${checksum}.json`;
       const target = join(checkpointDir, name);
       const temporary = join(checkpointDir, `.${name}.${process.pid}.tmp`);
-      assertContained(root, target);
-      assertContained(root, temporary);
+      assertContained(checkpointBoundary, target);
+      assertContained(checkpointBoundary, temporary);
       writeFileSync(temporary, envelope, { encoding: 'utf8', mode: 0o600, flag: 'wx' });
       renameSync(temporary, target);
       if (process.platform !== 'win32') chmodSync(target, 0o600);
       for (const stale of files().slice(0, -RETENTION)) {
         const stalePath = join(checkpointDir, basename(stale));
-        assertContained(root, stalePath);
+        assertContained(checkpointBoundary, stalePath);
         rmSync(stalePath);
       }
       // Activity stamp: "10 minutes" means ten minutes of INACTIVITY, so a
@@ -297,20 +332,48 @@ export function openScratchStore(ids: ScratchIdentity, options: ScratchStoreOpti
       return { path: target, digest: checksum };
     },
     readLatestCheckpoint(): CheckpointReadResult {
-      const latest = files().at(-1);
-      if (!latest) return { status: 'empty' };
-      const path = join(checkpointDir, basename(latest));
+      const readDegraded = (): CheckpointReadResult => ({
+        status: 'degraded',
+        path: checkpointDir,
+        reasonCode: 'CHECKPOINT_READ_FAILED',
+        reason: 'checkpoint-degraded:checkpoint_read_failed',
+      });
+      let sourceDir: string;
+      let latest: string | undefined;
       try {
-        assertContained(root, path);
-        const parsed = JSON.parse(readFileSync(path, 'utf8')) as { checksum?: unknown; payload?: unknown };
-        const payload = parsePayload(parsed.payload);
-        if (!payload || typeof parsed.checksum !== 'string') return { status: 'corrupt', path, reason: 'invalid schema' };
-        const actual = digest(JSON.stringify(payload));
-        if (actual !== parsed.checksum || !latest.endsWith(`-${actual}.json`)) return { status: 'corrupt', path, reason: 'checksum mismatch' };
-        return { status: 'ok', payload, receipt: { path, digest: actual } };
-      } catch (error) {
-        return { status: 'corrupt', path, reason: error instanceof Error ? error.message : String(error) };
+        if (checkpointProjectRoot !== undefined) assertNoSymlinkAncestry(checkpointProjectRoot, checkpointDir);
+        sourceDir = checkpointDir;
+        latest = files().at(-1);
+        // Read-only compatibility: pre-canonical checkpoints remain recoverable,
+        // but new writes never extend or delete their legacy lineage.
+        if (!latest && checkpointDir !== legacyCheckpointDir && existsSync(legacyCheckpointDir)) {
+          sourceDir = legacyCheckpointDir;
+          latest = files(legacyCheckpointDir).at(-1);
+        }
+      } catch {
+        return readDegraded();
       }
+      if (!latest) return { status: 'empty' };
+      const path = join(sourceDir, basename(latest));
+      let raw: string;
+      try {
+        assertContained(sourceDir === legacyCheckpointDir ? root : checkpointBoundary, path);
+        raw = readFileSync(path, 'utf8');
+      } catch {
+        return readDegraded();
+      }
+      let parsed: unknown;
+      try { parsed = JSON.parse(raw) as unknown; }
+      catch { return { status: 'corrupt', path, reason: 'invalid json' }; }
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        return { status: 'corrupt', path, reason: 'invalid schema' };
+      }
+      const envelope = parsed as { checksum?: unknown; payload?: unknown };
+      const payload = parsePayload(envelope.payload);
+      if (!payload || typeof envelope.checksum !== 'string') return { status: 'corrupt', path, reason: 'invalid schema' };
+      const actual = digest(JSON.stringify(payload));
+      if (actual !== envelope.checksum || !latest.endsWith(`-${actual}.json`)) return { status: 'corrupt', path, reason: 'checksum mismatch' };
+      return { status: 'ok', payload, receipt: { path, digest: actual } };
     },
     close(options): void {
       // A kept scratchpad is not leaked: it is stamped now, and the NEXT session

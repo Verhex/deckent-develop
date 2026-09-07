@@ -9,9 +9,11 @@
 // for Ollama — and `unknown` until evidence lands (never a false `ok`).
 // Read-only probes: no credential mutation, no login. Hermetic (fakes + clock).
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createProviderEvidence, type ProviderEvidenceDeps } from '../../../src/cli/repl/provider-evidence.js';
 import type { AuthProbeResult } from '../../../src/core/provider-auth-probe.js';
+
+afterEach(() => vi.useRealTimers());
 
 function deps(over: Partial<ProviderEvidenceDeps> = {}): ProviderEvidenceDeps & { calls: string[]; clock: { now: number } } {
   const calls: string[] = [];
@@ -68,6 +70,15 @@ describe('createProviderEvidence', () => {
     expect(down.get('ollama')).toEqual({ ok: false, code: 'UNREACHABLE', detail: 'http://down:11434' });
   });
 
+  it('contains a synchronous Ollama fetch throw as typed unreachable evidence', async () => {
+    const store = createProviderEvidence(deps({
+      fetchFn: (() => { throw new Error('sync transport failure'); }) as unknown as typeof globalThis.fetch,
+    }));
+    await store.refresh(['ollama']);
+    expect(store.get('ollama')).toEqual({ ok: false, code: 'UNREACHABLE', detail: 'http://ok:11434' });
+    expect(store.inFlight()).toEqual([]);
+  });
+
   it('a provider with no evidence source stays unknown without any probe call', async () => {
     const d = deps();
     const store = createProviderEvidence(d);
@@ -107,6 +118,41 @@ describe('createProviderEvidence', () => {
     const store = createProviderEvidence(d);
     await store.refresh(['claude']);
     expect(store.get('claude')).toEqual({ ok: 'unknown' });
+  });
+
+  it('aborts a hung Ollama transport, clears pending, and rejects its stale late success', async () => {
+    vi.useFakeTimers();
+    let firstResolve: ((response: Response) => void) | undefined;
+    let firstSignal: AbortSignal | undefined;
+    let calls = 0;
+    const d = deps({
+      timeoutMs: 20,
+      fetchFn: ((_: string, init?: RequestInit) => {
+        calls += 1;
+        if (calls === 1) {
+          firstSignal = init?.signal ?? undefined;
+          return new Promise<Response>((resolve) => { firstResolve = resolve; });
+        }
+        return Promise.resolve({ ok: false, body: { cancel: async () => undefined } } as unknown as Response);
+      }) as typeof globalThis.fetch,
+    });
+    const store = createProviderEvidence(d);
+    const first = store.refresh(['ollama']);
+    await vi.advanceTimersByTimeAsync(20);
+    await first;
+    expect(firstSignal?.aborted).toBe(true);
+    expect(store.get('ollama')).toEqual({ ok: 'unknown' });
+    expect(store.inFlight()).toEqual([]);
+
+    // A later refresh owns a new probe; the ignored abort from the old fetch
+    // must not overwrite its typed result if it resolves afterward.
+    const second = store.refresh(['ollama']);
+    await second;
+    expect(store.get('ollama')).toEqual({ ok: false, code: 'UNREACHABLE', detail: 'http://ok:11434' });
+    firstResolve!({ ok: true, body: { cancel: async () => undefined } } as unknown as Response);
+    await Promise.resolve();
+    expect(store.get('ollama')).toEqual({ ok: false, code: 'UNREACHABLE', detail: 'http://ok:11434' });
+    expect(calls).toBe(2);
   });
 
   it('a throwing probe is evidence of nothing: unknown, not blocked', async () => {

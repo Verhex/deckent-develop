@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import {
   DEFAULT_RECOVERY_WINDOW_MS,
   openScratchStore,
@@ -61,6 +61,35 @@ afterEach(() => {
 });
 
 describe('scratch checkpoint store', () => {
+  it('writes durable checkpoints to the canonical session path without coupling them to scratch deletion', () => {
+    const baseDir = base();
+    const checkpointProjectRoot = join(baseDir, 'project');
+    const checkpointBaseDir = join(checkpointProjectRoot, '.deckent', 'runtime', 'sessions');
+    const store = openScratchStore(
+      { tenantId: 't', projectId: 'p', sessionId: 'sess-canonical', slug: SLUG },
+      { baseDir, checkpointProjectRoot },
+    );
+    const receipt = store.writeCheckpoint(payload());
+    expect(receipt.path).toBe(join(checkpointBaseDir, 'sess-canonical', 'checkpoints', basename(receipt.path)));
+    expect(store.readLatestCheckpoint()).toMatchObject({ status: 'ok', receipt });
+    store.close({ policy: 'delete' });
+    expect(existsSync(receipt.path)).toBe(true);
+  });
+
+  it('reads a legacy scratch checkpoint when the canonical lineage is empty, without migrating it', () => {
+    const baseDir = base();
+    const ids = { tenantId: 't', projectId: 'p', sessionId: 'sess-legacy', slug: SLUG };
+    const legacy = openScratchStore(ids, { baseDir });
+    const receipt = legacy.writeCheckpoint(payload());
+    legacy.close({ policy: 'keep-for-recovery' });
+    const canonical = openScratchStore(ids, {
+      baseDir,
+      checkpointProjectRoot: join(baseDir, 'project'),
+    });
+    expect(canonical.readLatestCheckpoint()).toMatchObject({ status: 'ok', receipt });
+    expect(existsSync(receipt.path)).toBe(true);
+  });
+
   it('atomically writes mode-protected data and verifies its checksum', () => {
     const store = open(); const receipt = store.writeCheckpoint(payload());
     expect(receipt.path.startsWith(store.info.root)).toBe(true);
@@ -74,6 +103,23 @@ describe('scratch checkpoint store', () => {
     expect(store.readLatestCheckpoint()).toMatchObject({ status: 'corrupt', reason: 'checksum mismatch' });
   });
 
+  it('classifies malformed stored JSON without returning parser text or stored bytes', () => {
+    const store = open(); const receipt = store.writeCheckpoint(payload());
+    writeFileSync(receipt.path, '{"private":"DO_NOT_EXPOSE"');
+    const result = store.readLatestCheckpoint();
+    expect(result).toMatchObject({ status: 'corrupt', reason: 'invalid json' });
+    expect(JSON.stringify(result)).not.toContain('DO_NOT_EXPOSE');
+  });
+
+  it.each(['null', 'false', '1', '"string"', '[]'])(
+    'classifies valid non-envelope JSON %s as fixed schema corruption',
+    (stored) => {
+      const store = open(); const receipt = store.writeCheckpoint(payload());
+      writeFileSync(receipt.path, stored);
+      expect(store.readLatestCheckpoint()).toMatchObject({ status: 'corrupt', reason: 'invalid schema' });
+    },
+  );
+
   it('retains only the latest five checkpoints', () => {
     const store = open(); for (let n = 1; n <= 7; n++) store.writeCheckpoint(payload(n));
     expect(readdirSync(join(store.info.root, 'checkpoints'))).toHaveLength(5);
@@ -86,6 +132,49 @@ describe('scratch checkpoint store', () => {
     rmSync(join(store.info.root, 'checkpoints'), { recursive: true });
     symlinkSync(store.info.root, join(store.info.root, 'checkpoints'));
     expect(() => store.writeCheckpoint(payload())).toThrow('symlink');
+  });
+
+  it('rejects a pre-existing symlink inside the canonical checkpoint lineage', () => {
+    const baseDir = base();
+    const checkpointProjectRoot = join(baseDir, 'project');
+    const checkpointBaseDir = join(checkpointProjectRoot, '.deckent', 'runtime', 'sessions');
+    mkdirSync(checkpointBaseDir, { recursive: true });
+    symlinkSync(baseDir, join(checkpointBaseDir, 'sess-linked'));
+    expect(() => openScratchStore(
+      { tenantId: 't', projectId: 'p', sessionId: 'sess-linked', slug: SLUG },
+      { baseDir, checkpointProjectRoot },
+    )).toThrow('symlink');
+  });
+
+  it('rejects a symlink in the canonical ancestry before creating sessions', () => {
+    const baseDir = base();
+    const checkpointProjectRoot = join(baseDir, 'project');
+    mkdirSync(checkpointProjectRoot);
+    symlinkSync(baseDir, join(checkpointProjectRoot, '.deckent'));
+    expect(() => openScratchStore(
+      { tenantId: 't', projectId: 'p', sessionId: 'sess-ancestor', slug: SLUG },
+      { baseDir, checkpointProjectRoot },
+    )).toThrow('symlink');
+  });
+
+  it('returns typed degradation when a canonical parent is replaced by a symlink', () => {
+    const baseDir = base();
+    const checkpointProjectRoot = join(baseDir, 'project');
+    const outside = join(baseDir, 'outside');
+    const store = openScratchStore(
+      { tenantId: 't', projectId: 'p', sessionId: 'sess-replaced', slug: SLUG },
+      { baseDir, checkpointProjectRoot },
+    );
+    store.writeCheckpoint(payload());
+    rmSync(join(checkpointProjectRoot, '.deckent'), { recursive: true });
+    mkdirSync(outside);
+    writeFileSync(join(outside, 'DO_NOT_READ'), 'outside-secret');
+    symlinkSync(outside, join(checkpointProjectRoot, '.deckent'));
+    const result = store.readLatestCheckpoint();
+    expect(result).toMatchObject({
+      status: 'degraded', reasonCode: 'CHECKPOINT_READ_FAILED', reason: 'checkpoint-degraded:checkpoint_read_failed',
+    });
+    expect(JSON.stringify(result)).not.toContain('outside-secret');
   });
 });
 

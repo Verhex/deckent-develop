@@ -58,14 +58,15 @@ describe('native-agent-bridge scratch/audit/close wiring (553-002)', () => {
       lang: 'en',
       confirm: async () => 'y',
       toolSink: () => {},
-      scratch: { tenantId: 'tenant-a', projectId: 'proj-a', sessionId: 'sess-a' },
+      scratch: { tenantId: 'tenant-a', projectId: 'proj-a', sessionId: 'sess-a', checkpointProjectRoot: dir },
     });
     expect(createAgentSession).toHaveBeenCalledTimes(1);
-    const passedDeps = createAgentSession.mock.calls[0]![0] as { scratch?: { tenantId: string; projectId: string; sessionId: string; checkpointInstruction: string } };
+    const passedDeps = createAgentSession.mock.calls[0]![0] as { scratch?: { tenantId: string; projectId: string; sessionId: string; checkpointInstruction: string; checkpointProjectRoot?: string } };
     expect(passedDeps.scratch).toBeDefined();
     expect(passedDeps.scratch!.tenantId).toBe('tenant-a');
     expect(passedDeps.scratch!.projectId).toBe('proj-a');
     expect(passedDeps.scratch!.sessionId).toBe('sess-a');
+    expect(passedDeps.scratch!.checkpointProjectRoot).toBe(dir);
     expect(typeof passedDeps.scratch!.checkpointInstruction).toBe('string');
     expect(passedDeps.scratch!.checkpointInstruction.length).toBeGreaterThan(0);
   });

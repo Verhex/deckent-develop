@@ -198,6 +198,7 @@ export interface AgentSessionDeps {
     sessionId: string;
     checkpointInstruction: string;
     slug?: string;
+    checkpointProjectRoot?: string;
   };
   /** Tool-result overflow store. Owned by the caller (it is built with the
    *  registry, before the session exists — see `resolveScratchRoot`), but
@@ -273,7 +274,10 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
   let exhausted: { code: NativeBudgetTerminalCode; at: number; epoch: number } | undefined;
   const scratchDeps = deps.scratch;
   const scratch: ScratchStore | undefined = scratchDeps
-    ? openScratchStore({ ...scratchDeps, slug: scratchDeps.slug ?? projectSlug(deps.cwd) })
+    ? openScratchStore(
+        { ...scratchDeps, slug: scratchDeps.slug ?? projectSlug(deps.cwd) },
+        { checkpointProjectRoot: scratchDeps.checkpointProjectRoot },
+      )
     : undefined;
   let checkpointDegradation: CheckpointReadResult | undefined;
   /** Messages the LAST epoch compaction installed — the checkpoint delta is
@@ -326,6 +330,28 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
   }
 
   interface UsageTotals { inputTokens: number; outputTokens: number }
+
+  const CHECKPOINT_JSON_RESPONSE_CHAR_CAP = 256 * 1024;
+
+  type CheckpointFailureCode =
+    | 'CHECKPOINT_PROVIDER_FAILED'
+    | 'CHECKPOINT_RESPONSE_MISSING'
+    | 'CHECKPOINT_RESPONSE_TOO_LARGE'
+    | 'CHECKPOINT_RESPONSE_INVALID_JSON'
+    | 'CHECKPOINT_PAYLOAD_INVALID'
+    | 'CHECKPOINT_WRITE_FAILED';
+  class CheckpointFailure extends Error {
+    constructor(readonly code: CheckpointFailureCode) { super(code); }
+  }
+
+  /** Accept raw JSON or one complete outer Markdown JSON fence; never prose or partial fences. */
+  function parseCheckpointPayloadText(text: string): ScratchCheckpointPayload {
+    if (text.length > CHECKPOINT_JSON_RESPONSE_CHAR_CAP) throw new CheckpointFailure('CHECKPOINT_RESPONSE_TOO_LARGE');
+    const trimmed = text.trim();
+    const fenced = trimmed.match(/^```(?:json)?[ \t]*\r?\n([\s\S]*?)\r?\n```[ \t]*$/i);
+    try { return JSON.parse(fenced?.[1]?.trim() ?? trimmed) as ScratchCheckpointPayload; }
+    catch { throw new CheckpointFailure('CHECKPOINT_RESPONSE_INVALID_JSON'); }
+  }
 
   /** One checkpoint provider call. It goes through the SAME adapter as every
    *  other turn — so the same measurement/admission wrapper (native-transport's
@@ -455,11 +481,11 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     if (!scratch || !scratchDeps) return;
     const usage: UsageTotals = { inputTokens: 0, outputTokens: 0 };
     let text: string | undefined;
-    let failure: string | undefined;
+    let failureCode: CheckpointFailureCode | undefined;
     try {
       text = await summarizeBoundedDelta(usage);
-    } catch (error) {
-      failure = error instanceof Error ? error.message : String(error);
+    } catch {
+      failureCode = 'CHECKPOINT_PROVIDER_FAILED';
     }
     if (usage.inputTokens > 0 || usage.outputTokens > 0) {
       if (deps.costGuard) accrue(deps.costGuard, usage);
@@ -467,16 +493,25 @@ export function createAgentSession(deps: AgentSessionDeps): AgentSession {
     }
     if (text !== undefined) {
       try {
-        scratch.writeCheckpoint(JSON.parse(text) as ScratchCheckpointPayload);
+        const payload = parseCheckpointPayloadText(text);
+        try { scratch.writeCheckpoint(payload); }
+        catch (error) {
+          failureCode = error instanceof Error && error.message === 'invalid checkpoint payload'
+            ? 'CHECKPOINT_PAYLOAD_INVALID'
+            : 'CHECKPOINT_WRITE_FAILED';
+        }
+        if (failureCode === undefined) text = JSON.stringify(payload);
       } catch (error) {
-        failure = error instanceof Error ? error.message : String(error);
+        failureCode = error instanceof CheckpointFailure ? error.code : 'CHECKPOINT_WRITE_FAILED';
       }
     }
-    if (failure !== undefined || text === undefined) {
+    if (failureCode !== undefined || text === undefined) {
+      const reasonCode = failureCode ?? 'CHECKPOINT_RESPONSE_MISSING';
       checkpointDegradation = {
-        status: 'corrupt',
-        path: scratch.info.root,
-        reason: `checkpoint-degraded: ${failure ?? 'no checkpoint text'}`,
+        status: 'degraded',
+        path: scratch.info.checkpointDir,
+        reasonCode,
+        reason: `checkpoint-degraded:${reasonCode.toLowerCase()}`,
       };
       // The existing epoch is deliberately left untouched on refusal/corruption.
       yield { type: 'notice', code: 'native.checkpoint.degraded', message: `checkpoint degraded — context epoch ${contextEpoch} kept` };

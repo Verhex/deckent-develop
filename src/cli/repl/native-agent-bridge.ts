@@ -64,6 +64,8 @@ export type { ContextSnapshot } from '../../agent/session.js';
 export interface CompactOutcome {
   outcome: 'compacted' | 'degraded' | 'unavailable';
   epoch: number;
+  /** Stable operational classification; never provider response text. */
+  reasonCode?: string;
 }
 
 export interface ReplEngine {
@@ -228,7 +230,7 @@ export interface NativeEngineDeps {
    * object into `createAgentSession`'s `scratch` dep. Absent → no scratch store
    * opens (session.ts's own byte-identical pre-wire behavior).
    */
-  scratch?: { tenantId: string; projectId: string; sessionId: string };
+  scratch?: { tenantId: string; projectId: string; sessionId: string; checkpointProjectRoot?: string };
   /**
    * 7089 (564-002 hand-completion) — the SAME session-scoped overflow store the
    * caller anchored into `buildNativeToolRegistry`, threaded here so
@@ -872,12 +874,17 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
           // uses. Privacy-safe by construction: the stable CODE only — never the
           // prompt body, the transcript delta or the checkpoint text.
           if (ev.code.startsWith('native.checkpoint.')) {
+            const checkpoint = ev.code === 'native.checkpoint.degraded'
+              ? session.latestCheckpoint()
+              : undefined;
             writeAuditEvent(deps.cwd, NATIVE_AGENT_AUDIT_PARTITION, {
               tenantId: deps.scratch?.tenantId ?? 'local',
               actor: 'native-agent',
               action: ev.code,
               target: deps.scratch?.sessionId ?? 'session',
-              metadata: {},
+              metadata: checkpoint?.status === 'degraded'
+                ? { reasonCode: checkpoint.reasonCode }
+                : {},
             });
           }
           break;
@@ -936,6 +943,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
   engine.contextSnapshot = () => session.contextSnapshot();
   engine.compactContext = async () => {
     let outcome: CompactOutcome['outcome'] = 'unavailable';
+    let reasonCode: string | undefined;
     // Counts as in flight so Esc / Ctrl-C (cancelTurn) can abort the
     // checkpoint provider call the same way they abort a turn.
     turnsInFlight++;
@@ -943,7 +951,13 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
       for await (const ev of session.compactContext()) {
         if (ev.type !== 'notice') continue;
         if (ev.code === 'native.checkpoint.saved') outcome = 'compacted';
-        else if (ev.code === 'native.checkpoint.degraded') outcome = 'degraded';
+        else if (ev.code === 'native.checkpoint.degraded') {
+          outcome = 'degraded';
+          const checkpoint = session.latestCheckpoint();
+          reasonCode = checkpoint.status === 'degraded'
+            ? checkpoint.reasonCode
+            : undefined;
+        }
         // Same durable audit record the turn path writes for a context epoch
         // (stable code only — never checkpoint text).
         if (ev.code.startsWith('native.checkpoint.')) {
@@ -952,7 +966,10 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
             actor: 'native-agent',
             action: ev.code,
             target: deps.scratch?.sessionId ?? 'session',
-            metadata: { trigger: 'slash-compact' },
+            metadata: {
+              trigger: 'slash-compact',
+              ...(reasonCode === undefined ? {} : { reasonCode }),
+            },
           });
         }
       }
@@ -960,7 +977,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
       turnsInFlight--;
     }
     const snapshot = await session.contextSnapshot();
-    return { outcome, epoch: snapshot.epoch };
+    return { outcome, epoch: snapshot.epoch, ...(reasonCode === undefined ? {} : { reasonCode }) };
   };
   // TERMINAL-TOOLS-008 — see the ReplEngine.cancelTurn doc comment above.
   engine.cancelTurn = () => {

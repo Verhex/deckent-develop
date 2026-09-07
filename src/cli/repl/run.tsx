@@ -1522,6 +1522,7 @@ export async function runInkRepl(
         tenantId: scratchTenantId,
         projectId: attendedExecutionProjectId(process.cwd()),
         sessionId: nativeSessionId,
+        checkpointProjectRoot: process.cwd(),
       };
       // 7089 (564-002 hand-completion) — ONE session-scoped overflow store,
       // anchored at the session's scratch root so tool-result spill bytes live
