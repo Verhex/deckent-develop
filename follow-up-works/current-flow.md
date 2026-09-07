@@ -4,7 +4,7 @@
 > Silinme tetiği: onaylı sıra tüketilip kalıcı kanıtlar MASTER/evidence'a işlendiğinde silinir.
 > Ayrıntılı geçmiş Git'te: d10456e99 ve 934dc194f:follow-up-works/current-flow.md.
 
-## Aktif durum — 2026-09-07T04:32Z
+## Aktif durum — 2026-09-07T05:12Z
 
 7099 tek ACTIVE outcome, MASTER VERIFY; bütün ürün/Terminal kapanışı yok.
 DOGFOOD ON, health DEGRADED; owner onaylı bounded ADR-D-007 kaynak yürütmesi.
@@ -23,6 +23,7 @@ Retained728, .tasks, memory.db ve inherited değişiklikler korunur.
 | Q | 59c2c8a04 | Active native cancellation HTTP regression proof |
 | R | 492809cd5 | Native `/mcp` ingress + truthful connection state |
 | S | ee749d056 | Active chat session status/resume visibility |
+| T | 7e415ef115 | L4-A clean-startup preference; sealed archive |
 
 Exact patch/manifest/failure/limit ayrıntıları tek kalıcı capsule'da:
 docs/execution/active/TERMINAL-OPERATOR-SURFACE-CLOSURE-001.md.
@@ -30,11 +31,12 @@ Fable bağımsız review canonical XVerify receipt değildir. Layer9 inherited a
 
 ## Runtime / remote
 
-Stop1075914 → execution ALLOW → build:all04:27–04:28Z PASS → bot1136738 statusPASS.
+Stop1136738 → execution ALLOW → build:all05:04Z PASS → bot1212401 statusPASS.
 Dist main dirty-tree; selected binary ayrıca doğrulandı. MCP reconnect kanıtlanmadı.
 Yeni sprint/worker dispatch yok; retained state temizlenmedi.
 Push TOOL_POLICY_HOLD: owner yetkisine rağmen araç process başlamadan reddetmişti;
-bypass/unchanged retry yok. HEAD ee749d056 ahead21/behind0; remote CI tetiklenmedi.
+bypass/unchanged retry yok. HEAD 7e415ef115 ahead23/behind0; docs commit sonrası ahead24;
+remote CI tetiklenmedi.
 
 ## Şimdi / sonraki sıra
 
@@ -60,9 +62,21 @@ bypass/unchanged retry yok. HEAD ee749d056 ahead21/behind0; remote CI tetiklenme
    tsc/i18n/build ve main first compiled PASS; selected ilk selector FAIL ayrı.
    Kalıcı42dosya arşiv terminal-7099-l4-session-08h6Ft. Full closure değildir.
   Kalan L1 identity/readiness+migration; L3 tool-renderer/approval; L4
-  transactional resume + clean-startup görünürlüğü; diğer
-   reactive state/resume; L5 accounting; L6 verdict/
+   transactional resume; diğer reactive state/resume; L5 accounting; L6 verdict/
    reduced-motion/rows/redaction/platform.
+   L4-A clean-startup source dilimi default-off `terminal.startup.recent_sessions`
+   ile teaserı mevcut `repl_surface` gate'i arkasında tutar; açık `/resume`
+   project-root disk+ledger+memory lazy keşfini korur. Source83 ve candidate
+   compiled EN/TR OFF/ON gözlemi raporlandı; main `7e415ef115` exact8 blob,
+   source83 raw `6e89b417…`, compiled result `18f159ff…`, selected patch
+   `106c8f…` ve manifest `bd021…`. Sealed archive
+   `/home/alperen/deckent-recovery-20260904/terminal-7099-l4a-startup-Ic2tCi`
+   34/34 check PASS (SUMS dahil 35 dosya; manifest `81f72de…`, SUMS `3ee982…`);
+   provider/receipt/persistence veya whole-L4 kapanışı yok.
+   L4-B resume hydration kaynak yazarı `/tmp/deckent-7099-l4b-resume-NLcAvl`
+   (base `7e415ef115`) üzerinde çalışıyor: success yolu ID/ref/token güncellemesinden
+   önce hydrate olur; missing/throw mevcut kimliği korur. Sprint typed-HOLD
+   foundation'dır; B2 historical context hâlâ OPEN'dır.
    Capsule DAG'ı; yeni outcome veya C kuyruğu başlamadı.
 4. Sonra7103 →7101 →7104 →7102 (önce ADR amendment) →4034.
 5. C1→3358; C2+C4→3359; C3→3360; C5→6182; C6→546; C7→547;

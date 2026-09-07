@@ -11,6 +11,50 @@ PREREQUISITE: 3331 (landed 2449b6e4f) → 3332 (landed 13d2c80ef) → 3333 (land
 OWNER_DECISION_REF: owner-live-2026-09-04-terminal-audit-closure-v2
 STATUS: IN_PROGRESS source-work; DOGFOOD_HEALTH=DEGRADED. 2026-09-06T23:10Z sonrası gerçek autonomous dry-plan PASS; exact micro-task proof admission ve çoklu-worker settlement hâlâ açık, yeni worker dispatch yok.
 
+### L4-A clean-startup preference — VERIFY, 2026-09-07
+
+`terminal.startup.recent_sessions` default-off olarak resolved config'e eklendi.
+`run.tsx` yalnız exact `true` değerini App'e iletir; mevcut `repl_surface` gate'i
+korunur. Bu nedenle absent/default/false mount sırasında teaser veya startup
+oturum-liste keşfi başlatmaz. Açık `/resume`, project-root disk, ledger ve MemoryStore
+kaynaklarını shared lazy loader üzerinden keşfetmeye devam eder; startup tercihi
+resume/hydration authority'sini değiştirmez.
+
+Main committed `7e415ef115382a11f95cf2cedd077c8423d7c126`, selected candidate ile exact8
+blob equality PASS'tir. Main source battery 83 test raw SHA256
+`6e89b4176431066ad3bb4d1de6432f9c84d22da75ab061d2ac2abccf1979f558`;
+build SHA256 `86033f74972eb861349c6ad34cc1fc571b520534859e12e3806732a8a6acc09d`,
+build identity `0afce0f87e5bae219e80575d8306c46bc7b7bc47c4d09c3aa71013945cf3e779`
+(05:04:06Z) ve i18n PASS. Fable independent raw case+pin doğrulaması ENTRY680
+olarak destekleyicidir, canonical XVerify receipt değildir. Main compiled gözlem
+dört CLI EN/TR OFF/ON job+ledger ve `/resume` seed'ini, mounted MemoryStore 0→1
+sınırını yürüttü; result SHA256
+`18f159ffab888666689ed982dd5a757ac6a087d2c837f15541d06f8f89d15e03`.
+Config metadata ve entry CLI proof'u değildir.
+No provider turn, receipt, billing, persistence veya whole-L4/7099 closure
+iddiası yapılmaz.
+
+| Evidence | SHA256 / state |
+|---|---|
+| Selected patch | `106c8f66406ef31cde413bf510b7a59c2550256ae306094fbfe779454127b750` |
+| Selected manifest | `bd0214374396bc42df1c25282777943e5d9ee0e2fee91e26b2f7963642fbf04b` |
+| Candidate proof harness | `2364691496e790878e85a80399b0394ee1906d13f02ddaa9dde0e957357b946c` |
+| Candidate compiled proof | `fea3a90e5035711751f7178d705c1869fe071288ce2fed791068c4983e058c76` |
+| Candidate prepared build | `cfa9a524bf85963b24c4b74ebc1b92d347b93c92d30c5dce969bc0bd4d2fc23b` |
+| First build HOLD | `4ca96aee76fbc74eacc85e397f1d5a80f3afb7aa97bbd9a88cf901cab43517a3` |
+| Main source | `7e415ef115382a11f95cf2cedd077c8423d7c126` |
+| Main compiled result | `18f159ffab888666689ed982dd5a757ac6a087d2c837f15541d06f8f89d15e03` |
+| Archive manifest | `81f72de5ba391d388e0f21cb68cd6ce2cc7f29d087dc7d1c1e75a3ced7802779` |
+| Archive SHA256SUMS | `3ee9826399bc1d149aff9b422b6f51a63dda5d8d2e4605792a7940d80fa97915` |
+| Root archive record | `332f9d1083cf096ec5110df22e3740091d8ec6d543b8a5d669328a6d1636b1c1` |
+
+İlk `Rv9rl3` build denemesi missing `node_modules` sonrasında 0-byte execution
+lock DB authority artifact'i bıraktı; artifact korunur. Yeni fresh candidate
+clean authority ALLOW ile bypass'siz kullanıldı. Bu RELATED_BUT_NONBLOCKING build
+prerequisite olayı yeni MASTER satırı veya receipt üretmez; 7099 VERIFY kalır.
+Kalıcı arşiv `/home/alperen/deckent-recovery-20260904/terminal-7099-l4a-startup-Ic2tCi`:
+32 payload + helper + manifest = 34/34 check PASS, SHA256SUMS dahil 35 dosya.
+
 ### Active chat session visibility — 2026-09-07T04:32Z
 
 Main `ee749d056afeb39bdc27967b133839a1a10ce953`, exact8 committed blob
