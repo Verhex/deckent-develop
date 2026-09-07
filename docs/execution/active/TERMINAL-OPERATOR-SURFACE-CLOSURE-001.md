@@ -55,6 +55,42 @@ prerequisite olayı yeni MASTER satırı veya receipt üretmez; 7099 VERIFY kal�
 Kalıcı arşiv `/home/alperen/deckent-recovery-20260904/terminal-7099-l4a-startup-Ic2tCi`:
 32 payload + helper + manifest = 34/34 check PASS, SHA256SUMS dahil 35 dosya.
 
+### L4-B resume hydration — VERIFY, 2026-09-07
+
+Main `0810ce9370a0bbda6320e5d37297d564bdbdaa88` B1 source landing'i native
+resume success yolunda hydrate işlemini active ID/ref/token güncellemesinden önce
+çalıştırır; missing veya throw mevcut kimliği korur. Picker numeric/literal/missing
+ve sprint-refusal EN/TR yüzeyleri kimliği koruyarak gözlendi. Sprint refusal
+localized UI'dır; typed custody receipt değildir. B2 sealed archive notes'un
+untrusted historical-data context'i OPEN'dır; legacy ve exception kapsamı aşağıdadır.
+
+Selected ve main 8-suite/126 test ve i18n PASS'tir; selected `npm run build`, main
+build:all PASS'tir. Selected `g6NRa8/result.json` (`a92416fc…`) ve main
+`g584Zw/result.json` (`44d9163b…`) actual compiled CLI dört EN/TR
+case'i (picker, numeric, literal, missing+sprint refusal) 14 pin ve ham output
+ile PASS gözledi; intentional mock turn selected4/boot0 persistence'dir,
+external provider çağrısı yoktur. İlk executed selected `ybxR37/result.json` (`28d0c091…`) FAIL
+korunur; yalnız fixture `native_context_tokens=131072` düzeltildi, source/gate
+değişmedi. Writer'ın initial46 pass/2 FAIL RCA'sı bağımsız doğrulama değildir;
+final64 ayrı scoped sonuçtur. Root verification record SHA256
+`3a1aa6e944c05492c3aba437d4ee37389971986d99ac5d168b748d3ceaa9afa7`.
+Legacy ve exception dalları source/component seviyesinde doğrulandı; compiled kapsamları
+ayrıca yoktur. B2 OPEN'dır. Provider usage, terminal custody receipt, persistence closure
+veya whole-L4/7099 DONE iddiası yoktur.
+
+| Evidence | SHA256 / state |
+|---|---|
+| Archive manifest | `a6008321b141a034fe69dca7120d05e107063a24d65e9afb0b03364a558ed3dc` |
+| Archive SHA256SUMS | `c717832ea62d1a6281ab21c59ac2cbad2022562c3a944f86097a51d9cf177470` |
+| Final archive helper | `f22d71df` (exact build identity included) |
+| Selected source patch | `97b66b10…` |
+| Selected source manifest | `8a1686b5…` |
+
+Archive `/home/alperen/deckent-recovery-20260904/terminal-7099-l4b-resume-Ym1kT0`:
+42/42 SHA check PASS, SHA256SUMS ile 43 dosya. Candidate126 kanıtı destekleyicidir,
+settlement değildir; Fable698 independent main compiled/source/postcommit PASS canonical
+XVerify receipt değildir.
+
 ### Active chat session visibility — 2026-09-07T04:32Z
 
 Main `ee749d056afeb39bdc27967b133839a1a10ce953`, exact8 committed blob
