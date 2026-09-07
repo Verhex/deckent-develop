@@ -43,7 +43,7 @@ import { vi, afterEach } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { RESUME_RECENT_LIMIT, attemptNativeResume, buildResumePickerLines, chatSessionsToRecords, hydrateNativeResume, mergeResumeSessionRecords, resolveResumeCommand, renderBusyDecision, steerNotesToInputs } from "../../src/cli/repl/app.js";
+import { RESUME_RECENT_LIMIT, attemptNativeResume, buildResumePickerLines, chatSessionsToRecords, hydrateNativeResume, mergeResumeSessionRecords, probeResumeChatContext, resolveResumeCommand, renderBusyDecision, steerNotesToInputs } from "../../src/cli/repl/app.js";
 import { appendLedgerTurn } from "../../src/cli/repl/session-ledger.js";
 import { listRecentSessions, type SessionRecord } from "../../src/cli/helpers/session-resume.js";
 import { initialBusyControlsState, markBusy, markIdle, parseBusyCommand, resolveQueueCommand, applyInterrupt, applySteer, resolveKeyAction, type BusyControlsState } from "../../src/cli/repl/busy-controls.js";
@@ -374,6 +374,41 @@ describe('native resume — ledger-first dual-read re-hydration (564-004)', () =
         const result = attemptNativeResume('missing', join(rootDir, 'project'), { hydrateTranscript }, { getChatHistory: () => [] }, { rootDir });
         expect(result).toEqual({ kind: 'missing', reasonCode: 'RESUME_CONTEXT_MISSING' });
         expect(hydrateTranscript).not.toHaveBeenCalled();
+    });
+    it('permits archive eligibility only after exact ledger and legacy chat are both absent', () => {
+        const rootDir = makeRoot();
+        const cwd = join(rootDir, 'project');
+        expect(probeResumeChatContext('sprint-7099', cwd, { getChatHistory: () => [] }, { rootDir }))
+            .toEqual({ kind: 'absent' });
+
+        appendLedgerTurn({
+            rootDir, cwd, sessionId: 'sprint-7098', turnIndex: 0,
+            ts: '2026-08-18T00:00:00.000Z', provider: 'p', model: 'm', messagesDelta: [], usage: null,
+        });
+        expect(probeResumeChatContext('sprint-7098', cwd, { getChatHistory: () => [] }, { rootDir }))
+            .toEqual({ kind: 'empty' });
+
+        expect(probeResumeChatContext('legacy-only', cwd, {
+            getChatHistory: () => [{ role: 'user', content: 'legacy context' }],
+        }, { rootDir })).toMatchObject({ kind: 'legacy', turnCount: 1 });
+        expect(probeResumeChatContext('legacy-bad', cwd, {
+            getChatHistory: () => [{ role: 'tool', content: 'not legacy history' }],
+        }, { rootDir })).toEqual({ kind: 'failed' });
+    });
+    it('treats an unavailable memory adapter with an existing canonical DB as unknown, not absent', () => {
+        const rootDir = makeRoot();
+        const cwd = join(rootDir, 'project');
+        expect(probeResumeChatContext('sprint-7099', cwd, undefined, { rootDir })).toEqual({ kind: 'absent' });
+        mkdirSync(join(cwd, '.brain'), { recursive: true });
+        writeFileSync(join(cwd, '.brain', 'memory.db'), 'metadata only');
+        expect(probeResumeChatContext('sprint-7099', cwd, undefined, { rootDir })).toEqual({ kind: 'failed' });
+    });
+    it.each([null, undefined, {}, 'history', [null]])('turns malformed runtime history %j into a typed failure', (history) => {
+        const rootDir = makeRoot();
+        const cwd = join(rootDir, 'project');
+        expect(probeResumeChatContext('sprint-7099', cwd, {
+            getChatHistory: () => history as never,
+        }, { rootDir })).toEqual({ kind: 'failed' });
     });
     it('turns read and hydrate exceptions into a typed failed attempt', () => {
         const rootDir = makeRoot();

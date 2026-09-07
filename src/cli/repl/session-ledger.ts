@@ -54,6 +54,13 @@ export interface LedgerSession {
   turnCount: number;
 }
 
+/** Strict, exact-session result for `/resume`; unlike list/read compatibility
+ * helpers it never turns a present malformed ledger into an absent session. */
+export type LedgerResumeReadResult =
+  | { readonly kind: 'found'; readonly session: LedgerSession }
+  | { readonly kind: 'absent' }
+  | { readonly kind: 'failed'; readonly reasonCode: 'LEDGER_READ_FAILED' | 'LEDGER_MALFORMED' | 'LEDGER_SESSION_MISMATCH' };
+
 interface LedgerLine {
   v: typeof LEDGER_VERSION;
   sessionId: string;
@@ -179,6 +186,88 @@ function readLedgerLines(file: string): LedgerLine[] {
   return lines;
 }
 
+function buildLedgerSession(lines: readonly LedgerLine[]): LedgerSession {
+  const totals: LedgerUsageTotals = {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadTokens: 0,
+    cacheCreationTokens: 0,
+  };
+  const messages: ProviderMessage[] = [];
+  let lastModel: string | null = null;
+  for (const line of lines) {
+    messages.push(...line.messagesDelta);
+    lastModel = line.model;
+    if (line.usage) {
+      totals.inputTokens += line.usage.inputTokens;
+      totals.outputTokens += line.usage.outputTokens;
+      totals.cacheReadTokens += line.usage.cacheReadTokens ?? 0;
+      totals.cacheCreationTokens += line.usage.cacheCreationTokens ?? 0;
+    }
+  }
+  return { messages, lastModel, totals, turnCount: lines.length };
+}
+
+function isResumeProviderMessage(value: unknown): value is ProviderMessage {
+  if (!value || typeof value !== 'object') return false;
+  const message = value as Record<string, unknown>;
+  if ((message['role'] !== 'user' && message['role'] !== 'assistant' && message['role'] !== 'tool')
+    || typeof message['content'] !== 'string') return false;
+  if (message['toolCallId'] !== undefined && typeof message['toolCallId'] !== 'string') return false;
+  if (message['toolCalls'] !== undefined) {
+    if (!Array.isArray(message['toolCalls'])) return false;
+    if (!message['toolCalls'].every((call) => call && typeof call === 'object'
+      && typeof (call as Record<string, unknown>)['id'] === 'string'
+      && typeof (call as Record<string, unknown>)['name'] === 'string'
+      && !!(call as Record<string, unknown>)['args']
+      && typeof (call as Record<string, unknown>)['args'] === 'object'
+      && !Array.isArray((call as Record<string, unknown>)['args']))) return false;
+  }
+  return true;
+}
+
+/**
+ * Read one exact ledger file for resume fallback decisions.
+ *
+ * `absent` is intentionally reserved for ENOENT at the exact safe path. A
+ * present empty file is `found` with zero turns; malformed, foreign-session,
+ * permission, and other read failures are typed failures and must not trigger
+ * an archive fallback.
+ */
+export function readLedgerSessionForResume(
+  sessionId: string,
+  options: LedgerStoreOptions = {},
+): LedgerResumeReadResult {
+  const file = ledgerPath(sessionId, options);
+  let content: string;
+  try {
+    content = new TextDecoder('utf-8', { fatal: true }).decode(readFileSync(file));
+  } catch (error) {
+    const code = error && typeof error === 'object' ? (error as { code?: unknown }).code : undefined;
+    return code === 'ENOENT'
+      ? { kind: 'absent' }
+      : { kind: 'failed', reasonCode: 'LEDGER_READ_FAILED' };
+  }
+  const lines: LedgerLine[] = [];
+  for (const raw of content.split('\n')) {
+    if (!raw.trim()) continue;
+    const parsed = parseLedgerLine(raw);
+    if (!parsed) return { kind: 'failed', reasonCode: 'LEDGER_MALFORMED' };
+    if (parsed.sessionId !== sessionId) {
+      return { kind: 'failed', reasonCode: 'LEDGER_SESSION_MISMATCH' };
+    }
+    if (!parsed.messagesDelta.every(isResumeProviderMessage)) {
+      return { kind: 'failed', reasonCode: 'LEDGER_MALFORMED' };
+    }
+    lines.push(parsed);
+  }
+  lines.sort((a, b) => a.turnIndex - b.turnIndex);
+  if (lines.some((line, index) => line.turnIndex !== index)) {
+    return { kind: 'failed', reasonCode: 'LEDGER_MALFORMED' };
+  }
+  return { kind: 'found', session: buildLedgerSession(lines) };
+}
+
 /** Append exactly one complete JSONL record containing only this turn's delta. */
 export function appendLedgerTurn(input: AppendLedgerTurnInput): void {
   ensureLedgerDirectory(input);
@@ -208,25 +297,7 @@ export function readLedgerSession(
   const lines = readLedgerLines(ledgerPath(sessionId, options))
     .filter((line) => line.sessionId === sessionId)
     .sort((a, b) => a.turnIndex - b.turnIndex);
-  const totals: LedgerUsageTotals = {
-    inputTokens: 0,
-    outputTokens: 0,
-    cacheReadTokens: 0,
-    cacheCreationTokens: 0,
-  };
-  const messages: ProviderMessage[] = [];
-  let lastModel: string | null = null;
-  for (const line of lines) {
-    messages.push(...line.messagesDelta);
-    lastModel = line.model;
-    if (line.usage) {
-      totals.inputTokens += line.usage.inputTokens;
-      totals.outputTokens += line.usage.outputTokens;
-      totals.cacheReadTokens += line.usage.cacheReadTokens ?? 0;
-      totals.cacheCreationTokens += line.usage.cacheCreationTokens ?? 0;
-    }
-  }
-  return { messages, lastModel, totals, turnCount: lines.length };
+  return buildLedgerSession(lines);
 }
 
 function messageText(message: ProviderMessage): string {

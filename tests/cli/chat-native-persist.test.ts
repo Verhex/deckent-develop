@@ -1,4 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 
 import {
   runChatNativeLoop,
@@ -9,6 +13,9 @@ import {
   type McpToolDispatcher,
   type ChatMessage,
 } from '../../src/cli/commands/chat-native.js';
+import { getMessage } from '../../src/cli/helpers/messages.js';
+import { appendLedgerTurn } from '../../src/cli/repl/session-ledger.js';
+import type { ProviderMessage } from '../../src/agent/provider-tooluse/types.js';
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -32,10 +39,25 @@ function mockMemory(
   return { adapter, appendSpy, historySpy };
 }
 
+let ledgerRoot: string;
+const ledgerCwd = 'chat-native-persist-project';
+
+beforeEach(() => {
+  ledgerRoot = mkdtempSync(join(tmpdir(), 'deckent-chat-native-ledger-'));
+});
+
+afterEach(() => {
+  rmSync(ledgerRoot, { recursive: true, force: true });
+});
+
 function baseOpts(
   overrides: Partial<ChatNativeOptions> & Pick<ChatNativeOptions, 'provider' | 'dispatcher' | 'input'>,
 ): ChatNativeOptions {
-  return { output: vi.fn(), ...overrides };
+  return {
+    output: vi.fn(),
+    resumeLedgerOptions: { rootDir: ledgerRoot, cwd: ledgerCwd },
+    ...overrides,
+  };
 }
 
 // ─── Test 1: turn persist ────────────────────────────────────────────
@@ -219,6 +241,82 @@ describe('chat-native — /resume slash', () => {
       onSessionResumed: resumed,
     }));
     expect(resumed).not.toHaveBeenCalled();
+  });
+
+  it('restores a strict ledger before legacy memory, preserves tool linkage, and keeps numeric picker precedence', async () => {
+    const output: string[] = [];
+    const resumed = vi.fn();
+    const picked: ProviderMessage[] = [
+      { role: 'user', content: 'ledger question' },
+      { role: 'assistant', content: 'ledger tool request', toolCalls: [{ id: 'tool-1', name: 'deckent_status', args: {} }] },
+      { role: 'tool', content: 'ledger tool result', toolCallId: 'tool-1' },
+    ];
+    appendLedgerTurn({
+      rootDir: ledgerRoot, cwd: ledgerCwd, sessionId: 'picked', turnIndex: 0,
+      ts: '2026-09-07T00:00:00.000Z', provider: 'fixture', model: 'fixture', messagesDelta: picked, usage: null,
+    });
+    // A ledger named "1" must never override the memory picker selection.
+    appendLedgerTurn({
+      rootDir: ledgerRoot, cwd: ledgerCwd, sessionId: '1', turnIndex: 0,
+      ts: '2026-09-07T00:01:00.000Z', provider: 'fixture', model: 'fixture',
+      messagesDelta: [{ role: 'user', content: 'wrong numeric ledger' }], usage: null,
+    });
+    const adapter = mockMemoryWithSessions(
+      [{ sessionId: 'picked', turnCount: 3, lastAt: '2026-09-07T00:00:00Z', preview: 'ledger question' }],
+      { picked: [{ role: 'user', content: 'legacy shadow must not win' }] },
+    );
+    const history = adapter.getChatHistory as ReturnType<typeof vi.fn>;
+
+    const transcript = await runChatNativeLoop(baseOpts({
+      provider: { send: vi.fn(async () => ({ text: '', stopReason: 'end_turn' as const })) },
+      dispatcher: stubDispatcher(), input: lines('/resume 1'), output: (line) => output.push(line),
+      memory: adapter, onSessionResumed: resumed,
+    }));
+
+    expect(resumed).toHaveBeenCalledWith('picked');
+    expect(history).not.toHaveBeenCalled();
+    expect(transcript).toEqual(expect.arrayContaining([
+      expect.objectContaining({ role: 'tool', content: 'ledger tool result', toolUseId: 'tool-1' }),
+    ]));
+    expect(transcript).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ content: 'wrong numeric ledger' }),
+    ]));
+    expect(output.join('\n')).toContain('ledger question');
+  });
+
+  it('restores an exact literal ledger beyond the five recent memory rows', async () => {
+    const resumed = vi.fn();
+    appendLedgerTurn({
+      rootDir: ledgerRoot, cwd: ledgerCwd, sessionId: 'sprint-7099', turnIndex: 0,
+      ts: '2026-09-07T00:00:00.000Z', provider: 'fixture', model: 'fixture',
+      messagesDelta: [{ role: 'user', content: 'older literal ledger' }], usage: null,
+    });
+    const sessions = Array.from({ length: 5 }, (_, index) => ({
+      sessionId: `recent-${index}`, turnCount: 1, lastAt: `2026-09-07T00:0${index}:00Z`, preview: `recent ${index}`,
+    }));
+    const transcript = await runChatNativeLoop(baseOpts({
+      provider: { send: vi.fn(async () => ({ text: '', stopReason: 'end_turn' as const })) }, dispatcher: stubDispatcher(),
+      input: lines('/resume sprint-7099'), memory: mockMemoryWithSessions(sessions, {}), onSessionResumed: resumed,
+    }));
+    expect(resumed).toHaveBeenCalledWith('sprint-7099');
+    expect(transcript).toEqual(expect.arrayContaining([expect.objectContaining({ content: 'older literal ledger' })]));
+  });
+
+  it('treats an empty or malformed present ledger as unavailable instead of falling back', async () => {
+    const outputs: string[] = [];
+    appendLedgerTurn({
+      rootDir: ledgerRoot, cwd: ledgerCwd, sessionId: 'empty-ledger', turnIndex: 0,
+      ts: '2026-09-07T00:00:00.000Z', provider: 'fixture', model: 'fixture', messagesDelta: [], usage: null,
+    });
+    const adapter = mockMemoryWithSessions([], {
+      'empty-ledger': [{ role: 'user', content: 'must not be restored' }],
+    });
+    await runChatNativeLoop(baseOpts({
+      provider: { send: vi.fn(async () => ({ text: '', stopReason: 'end_turn' as const })) }, dispatcher: stubDispatcher(),
+      input: lines('/resume empty-ledger'), output: (line) => outputs.push(line), memory: adapter,
+    }));
+    expect(outputs.join('\n')).toBe(getMessage('tui.resume_picker_failed', 'en', { id: 'empty-ledger' }));
+    expect(adapter.getChatHistory).not.toHaveBeenCalled();
   });
 
   it('appends caller-owned local chat context to /status without interpreting run output', async () => {

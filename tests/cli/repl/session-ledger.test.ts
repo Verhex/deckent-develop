@@ -1,9 +1,11 @@
 import {
   appendFileSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
   statSync,
+  writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -15,6 +17,7 @@ import { projectSlug } from '../../../src/core/project-slug.js';
 import {
   appendLedgerTurn,
   listLedgerSessions,
+  readLedgerSessionForResume,
   readLedgerSession,
 } from '../../../src/cli/repl/session-ledger.js';
 
@@ -150,5 +153,36 @@ describe('session ledger', () => {
       turnCount: 0,
     });
     expect(listLedgerSessions(0, options())).toEqual([]);
+  });
+
+  it('keeps tolerant read compatibility while strict resume reads distinguish absence, empty, and unsafe files', () => {
+    expect(readLedgerSessionForResume('missing', options())).toEqual({ kind: 'absent' });
+
+    const emptyFile = fileFor('empty');
+    mkdirSync(join(rootDir, 'projects', projectSlug(cwd)), { recursive: true });
+    writeFileSync(emptyFile, '', 'utf8');
+    expect(readLedgerSessionForResume('empty', options())).toEqual(expect.objectContaining({
+      kind: 'found', session: expect.objectContaining({ turnCount: 0 }),
+    }));
+
+    writeFileSync(fileFor('malformed'), '{not json}\n', 'utf8');
+    expect(readLedgerSessionForResume('malformed', options())).toEqual({ kind: 'failed', reasonCode: 'LEDGER_MALFORMED' });
+    expect(readLedgerSession('malformed', options()).turnCount).toBe(0);
+
+    writeFileSync(fileFor('other-session'), JSON.stringify({
+      v: 1, sessionId: 'other', turnIndex: 0, ts: 'x', provider: 'p', model: 'm', messagesDelta: [], usage: null,
+    }) + '\n', 'utf8');
+    expect(readLedgerSessionForResume('other-session', options())).toEqual({ kind: 'failed', reasonCode: 'LEDGER_SESSION_MISMATCH' });
+
+    writeFileSync(fileFor('bad-message'), JSON.stringify({
+      v: 1, sessionId: 'bad-message', turnIndex: 0, ts: 'x', provider: 'p', model: 'm', messagesDelta: [{ role: 'user' }], usage: null,
+    }) + '\n', 'utf8');
+    expect(readLedgerSessionForResume('bad-message', options())).toEqual({ kind: 'failed', reasonCode: 'LEDGER_MALFORMED' });
+
+    append('out-of-order', 1, messages.slice(0, 1));
+    expect(readLedgerSessionForResume('out-of-order', options())).toEqual({ kind: 'failed', reasonCode: 'LEDGER_MALFORMED' });
+
+    writeFileSync(fileFor('invalid-utf8'), Buffer.from([0xff]));
+    expect(readLedgerSessionForResume('invalid-utf8', options())).toEqual({ kind: 'failed', reasonCode: 'LEDGER_READ_FAILED' });
   });
 });

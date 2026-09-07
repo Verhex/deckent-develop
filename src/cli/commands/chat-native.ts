@@ -54,6 +54,7 @@ import {
   renderResumedHistory,
 } from './chat-resume.js';
 import { getMessage } from '../helpers/messages.js';
+import { readLedgerSessionForResume, type LedgerStoreOptions } from '../repl/session-ledger.js';
 import { buildInterrogationQuestions } from '../../core/directive-interrogator.js';
 import { buildMcpBridge, type McpConfirmFn } from './chat-mcp-bridge.js';
 import { McpClientBroker } from '../../mcp-client/broker.js';
@@ -340,6 +341,10 @@ export interface ChatNativeOptions {
   lang?: string;
   /** Called only after a memory-backed `/resume` actually switches session. */
   onSessionResumed?: (sessionId: string) => void;
+  /** Exact project scope for strict ledger-backed `/resume` reads. */
+  resumeLedgerOptions?: LedgerStoreOptions;
+  /** Caller-owned honest unavailable text for a present but unusable ledger. */
+  resumeUnavailable?: (sessionId: string) => string;
   /** Caller-local chat identity detail for `/status`; never run-status truth. */
   localStatusDetail?: () => string | undefined;
   /**
@@ -986,27 +991,77 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
     if (line === '/resume' || line.startsWith('/resume ')) {
       const arg = line.slice('/resume'.length).trim();
       let emitText: string;
-      if (!memStore || typeof memStore.listChatSessions !== 'function') {
-        emitText = getMessage('tui.resume_no_memory', lang);
-      } else if (arg.length === 0) {
-        lastResumeList = memStore.listChatSessions(10);
-        emitText = renderSessionList(lastResumeList, lang);
-      } else {
-        const sessions = lastResumeList.length > 0 ? lastResumeList : memStore.listChatSessions(20);
-        const target = resolveResumeTarget(arg, sessions);
-        const history = target ? memStore.getChatHistory(target) : [];
-        if (!target || history.length === 0) {
-          emitText = getMessage('tui.resume_not_found', lang, { session: target ?? arg });
+      if (arg.length === 0) {
+        if (!memStore || typeof memStore.listChatSessions !== 'function') {
+          emitText = getMessage('tui.resume_no_memory', lang);
         } else {
-          // Replace the in-memory transcript with the resumed context and
-          // switch the active session so subsequent turns append/continue it.
+          lastResumeList = memStore.listChatSessions(10);
+          emitText = renderSessionList(lastResumeList, lang);
+        }
+      } else {
+        // Keep numeric picker semantics memory-backed: a numeric token must
+        // resolve through the picker before any ledger lookup. A literal may
+        // still restore a durable ledger when memory is unavailable.
+        if (/^\d+$/u.test(arg) && (!memStore || typeof memStore.listChatSessions !== 'function')) {
+          emitText = getMessage('tui.resume_no_memory', lang);
+          output(emitText);
+          continue;
+        }
+        const sessions = memStore && typeof memStore.listChatSessions === 'function'
+          ? (lastResumeList.length > 0 ? lastResumeList : memStore.listChatSessions(20))
+          : [];
+        const target = resolveResumeTarget(arg, sessions);
+        if (!target) {
+          emitText = getMessage('tui.resume_not_found', lang, { session: arg });
+          output(emitText);
+          continue;
+        }
+        const ledger = readLedgerSessionForResume(target, opts.resumeLedgerOptions);
+        if (ledger.kind === 'failed' || (ledger.kind === 'found' && ledger.session.messages.length === 0)) {
+          emitText = opts.resumeUnavailable?.(target)
+            ?? getMessage('tui.resume_picker_failed', lang, { id: target });
+        } else if (ledger.kind === 'found') {
           transcript.length = 0;
-          for (const turn of history) {
-            transcript.push({ role: turn.role === 'assistant' ? 'assistant' : 'user', content: turn.content });
+          for (const message of ledger.session.messages) {
+            transcript.push({
+              role: message.role,
+              content: message.content,
+              ...(message.toolCalls ? { toolCalls: message.toolCalls.map((call) => ({ ...call })) } : {}),
+              ...(message.toolCallId ? { toolUseId: message.toolCallId } : {}),
+            });
           }
           sessionId = target;
           opts.onSessionResumed?.(target);
-          emitText = renderResumedHistory(target, history, lang);
+          const preview = ledger.session.messages.filter((message) => message.role === 'user' || message.role === 'assistant');
+          emitText = renderResumedHistory(target, preview, lang);
+        } else if (!memStore || typeof memStore.listChatSessions !== 'function') {
+          emitText = getMessage('tui.resume_no_memory', lang);
+        } else {
+          let history: ReadonlyArray<{ role: string; content: string }>;
+          try {
+            history = memStore.getChatHistory(target);
+            if (!Array.isArray(history)) throw new Error('malformed resume history');
+            if (!history.every((turn) => (turn.role === 'user' || turn.role === 'assistant')
+              && typeof turn.content === 'string')) throw new Error('malformed resume history');
+          } catch {
+            emitText = opts.resumeUnavailable?.(target)
+              ?? getMessage('tui.resume_picker_failed', lang, { id: target });
+            output(emitText);
+            continue;
+          }
+          if (history.length === 0) {
+            emitText = getMessage('tui.resume_not_found', lang, { session: target ?? arg });
+          } else {
+            // Replace the in-memory transcript with the resumed context and
+            // switch the active session so subsequent turns append/continue it.
+            transcript.length = 0;
+            for (const turn of history) {
+              transcript.push({ role: turn.role === 'assistant' ? 'assistant' : 'user', content: turn.content });
+            }
+            sessionId = target;
+            opts.onSessionResumed?.(target);
+            emitText = renderResumedHistory(target, history, lang);
+          }
         }
       }
       output(emitText);

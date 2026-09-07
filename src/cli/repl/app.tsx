@@ -15,6 +15,8 @@ import type { SessionAuthority } from './session-authority.js';
 import type { InkPalette } from './ink-palette.js';
 import { useState, useRef, useEffect, Component, type ReactElement, type ReactNode } from 'react';
 import { homedir } from 'node:os';
+import { lstatSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   runChatNativeLoop, type ChatProviderAdapter, type McpToolDispatcher, type ChatMemoryAdapter,
   buildNervousOutput, buildInterrogateOutput, resolveNativeSlashText,
@@ -29,7 +31,8 @@ import { resolveSlash, type SlashRegistry } from '../commands/chat-slash-registr
 import type { ChatMode } from '../commands/chat-mode.js';
 import type { ReplEngine } from './native-agent-bridge.js';
 import type { ProviderMessage } from '../../agent/provider-tooluse/types.js';
-import { listLedgerSessions, readLedgerSession, type LedgerStoreOptions } from './session-ledger.js';
+import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
+import { listLedgerSessions, readLedgerSessionForResume, type LedgerStoreOptions } from './session-ledger.js';
 import type { ActiveSelection } from './provider-switch.js';
 import { createStreamSegmenter, type StreamSegmenter } from './stream-segmenter.js';
 import { measuredOnTurnEnd } from './native-elapsed.js';
@@ -266,6 +269,69 @@ export type NativeResumeAttempt =
   | { readonly kind: 'missing'; readonly reasonCode: 'RESUME_CONTEXT_MISSING' }
   | { readonly kind: 'failed'; readonly reasonCode: 'RESUME_CONTEXT_READ_OR_HYDRATE_FAILED' };
 
+export type ResumeChatContextProbe =
+  | { readonly kind: 'ledger'; readonly messages: ProviderMessage[]; readonly turnCount: number; readonly outputTokens: number }
+  | { readonly kind: 'legacy'; readonly messages: ProviderMessage[]; readonly turnCount: number }
+  | { readonly kind: 'absent' }
+  | { readonly kind: 'empty' }
+  | { readonly kind: 'failed' };
+
+/** Read exact chat sources without changing identity or transcript state. */
+export function probeResumeChatContext(
+  sessionId: string,
+  cwd: string,
+  memory?: Pick<ChatMemoryAdapter, 'getChatHistory'>,
+  ledgerOptions: LedgerStoreOptions = {},
+): ResumeChatContextProbe {
+  const ledger = readLedgerSessionForResume(sessionId, { ...ledgerOptions, cwd });
+  if (ledger.kind === 'failed') return { kind: 'failed' };
+  if (ledger.kind === 'found') {
+    return ledger.session.messages.length === 0
+      ? { kind: 'empty' }
+      : {
+          kind: 'ledger',
+          messages: ledger.session.messages,
+          turnCount: ledger.session.turnCount,
+          outputTokens: ledger.session.totals.outputTokens,
+        };
+  }
+  if (!memory) {
+    // run.tsx intentionally degrades both a missing .brain directory and a
+    // failed MemoryStore open/create to `undefined`.  Archive admission may
+    // treat only a positively absent canonical DB path as absence: a file,
+    // symlink, unreadable path, or metadata failure is unknown chat history.
+    try {
+      lstatSync(join(cwd, BRAIN_DIR, MEMORY_DB_FILE));
+      return { kind: 'failed' };
+    } catch (error) {
+      const code = error && typeof error === 'object' ? (error as { code?: unknown }).code : undefined;
+      return code === 'ENOENT' ? { kind: 'absent' } : { kind: 'failed' };
+    }
+  }
+  let history: unknown;
+  try {
+    history = memory.getChatHistory(sessionId);
+  } catch {
+    return { kind: 'failed' };
+  }
+  if (!Array.isArray(history)) return { kind: 'failed' };
+  if (history.length === 0) return { kind: 'absent' };
+  const messages: ProviderMessage[] = [];
+  for (const message of history) {
+    if (!message || typeof message !== 'object') return { kind: 'failed' };
+    const candidate = message as Record<string, unknown>;
+    if ((candidate['role'] !== 'user' && candidate['role'] !== 'assistant') || typeof candidate['content'] !== 'string') {
+      return { kind: 'failed' };
+    }
+    messages.push({ role: candidate['role'], content: candidate['content'] });
+  }
+  return {
+    kind: 'legacy',
+    messages,
+    turnCount: messages.filter((message) => message.role === 'user').length,
+  };
+}
+
 /** Ledger-first native re-hydration with an in-place legacy dual-read fallback. */
 export function hydrateNativeResume(
   sessionId: string,
@@ -274,33 +340,32 @@ export function hydrateNativeResume(
   memory?: Pick<ChatMemoryAdapter, 'getChatHistory'>,
   ledgerOptions: LedgerStoreOptions = {},
 ): NativeResumeResult {
-  const ledger = readLedgerSession(sessionId, { ...ledgerOptions, cwd });
-  if (ledger.turnCount > 0) {
+  const context = probeResumeChatContext(sessionId, cwd, memory, ledgerOptions);
+  if (context.kind === 'ledger') {
     // 564-004 hand-completion — the ledger's on-disk row count continues the
     // bridge recorder's turn numbering, so post-resume rows never restart at 0
     // and collide with the rows just hydrated. The legacy branch below stays
     // offset-free on purpose: its session has no ledger rows yet, and turnCount
     // there counts user messages, not ledger lines.
-    engine.hydrateTranscript?.(ledger.messages, { nextTurnIndex: ledger.turnCount });
+    engine.hydrateTranscript?.(context.messages, { nextTurnIndex: context.turnCount });
     return {
       source: 'ledger',
-      messages: ledger.messages,
-      turnCount: ledger.turnCount,
-      outputTokens: ledger.totals.outputTokens,
+      messages: context.messages,
+      turnCount: context.turnCount,
+      outputTokens: context.outputTokens,
     };
   }
-  const messages = (memory?.getChatHistory(sessionId) ?? [])
-    .filter((message): message is { role: 'user' | 'assistant'; content: string } =>
-      (message.role === 'user' || message.role === 'assistant') && typeof message.content === 'string')
-    .map((message): ProviderMessage => ({ role: message.role, content: message.content }));
-  if (messages.length > 0) {
-    engine.hydrateTranscript?.(messages);
+  if (context.kind === 'legacy') {
+    engine.hydrateTranscript?.(context.messages);
     return {
       source: 'legacy',
-      messages,
-      turnCount: messages.filter((message) => message.role === 'user').length,
+      messages: context.messages,
+      turnCount: context.turnCount,
       outputTokens: 0,
     };
+  }
+  if (context.kind === 'empty' || context.kind === 'failed') {
+    throw new Error('resume chat context is present but unavailable');
   }
   return { source: 'missing', messages: [], turnCount: 0, outputTokens: 0 };
 }
@@ -1297,6 +1362,8 @@ export interface ReplAppProps {
   renderSprintContextReason?: (reasonCode: string) => string;
   /** UI language for loop-emitted strings (/resume picker). */
   lang?: string;
+  /** Optional test/host ledger root; production keeps the canonical default. */
+  resumeLedgerOptions?: LedgerStoreOptions;
   /** When set (native flag on), drives the turn INSTEAD of runChatNativeLoop. */
   nativeEngine?: ReplEngine;
   /** repl_surface.enabled config-flag seam (default-off). The caller (run.tsx)
@@ -1518,6 +1585,7 @@ export async function routeNativeMcpInput(options: NativeMcpRouteOptions): Promi
 export function ReplApp(props: ReplAppProps): ReactElement {
   const palette = useInkPalette();
   const { provider, dispatcher, labels, registerConfirm, registerActionGate, registerToolSink, slashRegistry, nativeMcpSlash, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, startupRecentSessions = false, sprintHistoricalContext, renderSprintContextReason, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle, shortcutsPanel, pickerLabels, pickerSpecs, saveDefault, configEntries, saveConfigValue, initialTermMode, pickerAscii = false, pickerNoColor = false, dualStreamOverflow } = props;
+  const resumeLedgerOptions: LedgerStoreOptions = { ...props.resumeLedgerOptions, cwd: props.cwd };
   const { exit } = useApp();
   // TERMINAL-TOOLS-004 — live width for the status row + queue preview (reflows on resize).
   const columns = useTerminalColumns();
@@ -1643,35 +1711,51 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   /** The merged session list the typed /resume resolves against (disk jobs + ledger + memory). */
   const mergedResumeRecords = () => mergeResumeSessionRecords(
     loadRecentSessions(),
-    chatSessionsToRecords(listLedgerSessions(RESUME_RECENT_LIMIT, { cwd: props.cwd })),
+    chatSessionsToRecords(listLedgerSessions(RESUME_RECENT_LIMIT, resumeLedgerOptions)),
     chatSessionsToRecords(memory?.listChatSessions?.(RESUME_RECENT_LIMIT) ?? []),
   );
+  /**
+   * Resolve an exact chat id before any sprint-archive admission.  `false`
+   * means only strict absence was observed; every present-but-unusable state
+   * consumes the command with an honest failure rather than becoming archive
+   * evidence.  The native hydration below deliberately re-reads the sources,
+   * so this preflight is never a snapshot claim.
+   */
+  const resumeExactChatContext = (id: string, line: string): boolean => {
+    const context = probeResumeChatContext(id, props.cwd, memory, resumeLedgerOptions);
+    if (context.kind === 'absent') return false;
+    if (context.kind === 'empty' || context.kind === 'failed') {
+      pushTurn('seg', requireInjectedLabel('resumeFailed', labels.resumeFailed).replace('{id}', id));
+      return true;
+    }
+    if (nativeEngine?.hydrateTranscript) {
+      const attempt = attemptNativeResume(id, props.cwd, nativeEngine, memory, resumeLedgerOptions);
+      if (attempt.kind !== 'loaded') {
+        pushTurn('seg', requireInjectedLabel('resumeFailed', labels.resumeFailed).replace('{id}', id));
+        return true;
+      }
+      invalidateSprintContext();
+      setActiveSessionId(id);
+      activeSessionIdRef.current = id;
+      setSessionTok(attempt.result.outputTokens);
+      pushTurn('seg', line);
+      return true;
+    }
+    // The legacy loop owns transcript/session mutation. Its strict reader
+    // repeats the check, so a concurrent corruption cannot become a fallback.
+    queue.current!.enqueue(`/resume ${id}`);
+    setQueued([...queue.current!.snapshot()]);
+    if (wake.current) { const w = wake.current; wake.current = null; w(); }
+    return true;
+  };
   /** Apply a resolved /resume decision — ONE path for the typed form and the picker. */
   const applyResumeDecision = (decision: ResumeCommandDecision): void => {
     if (decision.kind === 'passthrough') return;
     if (decision.kind === 'list') { pushTurn('bg', decision.lines.join('\n')); return; }
     if (decision.kind === 'reject') { pushTurn('seg', decision.line); return; }
     if (decision.forwardToLoop) {
-      if (nativeEngine?.hydrateTranscript) {
-        const attempt = attemptNativeResume(decision.sessionId, props.cwd, nativeEngine, memory);
-        if (attempt.kind === 'loaded') {
-          invalidateSprintContext();
-          setActiveSessionId(decision.sessionId);
-          activeSessionIdRef.current = decision.sessionId;
-          setSessionTok(attempt.result.outputTokens);
-          pushTurn('seg', decision.line);
-        } else if (attempt.kind === 'missing') {
-          pushTurn('seg', requireInjectedLabel('resumeNotFound', labels.resumeNotFound).replace('{arg}', decision.sessionId));
-        } else {
-          pushTurn('seg', requireInjectedLabel('resumeFailed', labels.resumeFailed).replace('{id}', decision.sessionId));
-        }
-      } else {
-        // Legacy engine retains its own command parser; native mode
-        // never takes this branch and therefore never leaks /resume
-        // into a provider turn.
-        queue.current!.enqueue(`/resume ${decision.sessionId}`);
-        setQueued([...queue.current!.snapshot()]);
-        if (wake.current) { const w = wake.current; wake.current = null; w(); }
+      if (!resumeExactChatContext(decision.sessionId, decision.line)) {
+        pushTurn('seg', requireInjectedLabel('resumeNotFound', labels.resumeNotFound).replace('{arg}', decision.sessionId));
       }
     } else {
       const sprintId = decision.sprintId;
@@ -1681,7 +1765,9 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           .replace('{reason}', renderSprintContextReason?.('SPRINT_ID_UNAVAILABLE') ?? 'SPRINT_ID_UNAVAILABLE'));
         return;
       }
-      void loadSprintHistoricalContext(sprintId);
+      if (!resumeExactChatContext(decision.sessionId, decision.line)) {
+        void loadSprintHistoricalContext(sprintId);
+      }
     }
   };
 
@@ -2030,7 +2116,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     const disk = loadRecentSessions();
     const merged = mergeResumeSessionRecords(
       disk,
-      chatSessionsToRecords(listLedgerSessions(RESUME_RECENT_LIMIT, { cwd: props.cwd })),
+      chatSessionsToRecords(listLedgerSessions(RESUME_RECENT_LIMIT, resumeLedgerOptions)),
       chatSessionsToRecords(memory?.listChatSessions?.(RESUME_RECENT_LIMIT) ?? []),
     );
     const lines = buildResumePickerLines(merged.disk, merged.resumable, labels);
@@ -2203,6 +2289,8 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         ...(memory ? { memory } : {}),
         ...(sessionId ? { sessionId } : {}),
         ...(lang ? { lang } : {}),
+        resumeLedgerOptions,
+        resumeUnavailable: (id) => requireInjectedLabel('resumeFailed', labels.resumeFailed).replace('{id}', id),
         onSessionResumed: (id) => {
           invalidateSprintContext();
           setActiveSessionId(id);
@@ -2392,9 +2480,19 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         const merged = mergedResumeRecords();
         const decision = resolveResumeCommand(resume[1] ?? '', merged.disk, merged.resumable, labels);
         const literalId = (resume[1] ?? '').trim();
+        if (decision.kind === 'passthrough' && /^sprint-\d+$/u.test(literalId)) {
+          pushTurn('user', trimmed);
+          if (!resumeExactChatContext(
+            literalId,
+            requireInjectedLabel('resumeSwitched', labels.resumeSwitched).replace('{id}', literalId),
+          )) {
+            void loadSprintHistoricalContext(literalId);
+          }
+          return;
+        }
         if (decision.kind === 'passthrough' && literalId.length > 0 && nativeEngine?.hydrateTranscript) {
           pushTurn('user', trimmed);
-          const attempt = attemptNativeResume(literalId, props.cwd, nativeEngine, memory);
+          const attempt = attemptNativeResume(literalId, props.cwd, nativeEngine, memory, resumeLedgerOptions);
           if (attempt.kind === 'missing') {
             pushTurn('seg', requireInjectedLabel('resumeNotFound', labels.resumeNotFound).replace('{arg}', literalId));
           } else if (attempt.kind === 'failed') {

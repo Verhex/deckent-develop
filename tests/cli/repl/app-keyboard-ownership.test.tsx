@@ -1,10 +1,12 @@
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'ink-testing-library';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ReplApp, type ConfirmTrigger, type ReplEngine } from '../../../src/cli/repl/app.js';
+import { appendLedgerTurn } from '../../../src/cli/repl/session-ledger.js';
+import { projectSlug } from '../../../src/core/project-slug.js';
 import { buildSlashRegistry } from '../../../src/cli/commands/chat-slash-registry.js';
 import { buildPickerLabels } from '../../../src/cli/repl/picker-labels.js';
 import { buildReplLabels, buildShortcutsPanel } from '../../../src/cli/repl/run.js';
@@ -36,9 +38,11 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
-function mountApp(options: { cwd?: string; sessionId?: string; replSurfaceEnabled?: boolean; startupRecentSessions?: boolean; dispatcher?: { dispatch: (name: string, args: Record<string, unknown>) => Promise<string> }; memory?: Record<string, unknown>; engine?: ReplEngine; legacy?: boolean; provider?: ChatProviderAdapter; sprintHistoricalContext?: SprintHistoricalContextSource } = {}) {
+function mountApp(options: { cwd?: string; sessionId?: string; replSurfaceEnabled?: boolean; startupRecentSessions?: boolean; dispatcher?: { dispatch: (name: string, args: Record<string, unknown>) => Promise<string> }; memory?: Record<string, unknown>; engine?: ReplEngine; legacy?: boolean; provider?: ChatProviderAdapter; sprintHistoricalContext?: SprintHistoricalContextSource; ledgerRoot?: string } = {}) {
   const cwd = options.cwd ?? mkdtempSync(join(tmpdir(), 'deckent-l6-keyboard-'));
   if (!options.cwd) roots.push(cwd);
+  const ledgerRoot = options.ledgerRoot ?? mkdtempSync(join(tmpdir(), 'deckent-l4c-ledger-root-'));
+  if (!options.ledgerRoot) roots.push(ledgerRoot);
   let confirmTrigger: ConfirmTrigger | undefined;
   const engine = options.engine ?? Object.assign(async () => {}, {
     close: vi.fn(),
@@ -73,6 +77,7 @@ function mountApp(options: { cwd?: string; sessionId?: string; replSurfaceEnable
       {...(options.replSurfaceEnabled ? { replSurfaceEnabled: true } : {})}
       {...(options.startupRecentSessions ? { startupRecentSessions: true } : {})}
       {...(options.sprintHistoricalContext ? { sprintHistoricalContext: options.sprintHistoricalContext } : {})}
+      resumeLedgerOptions={{ rootDir: ledgerRoot }}
     />,
   );
   return { ...mounted, getConfirmTrigger: () => confirmTrigger };
@@ -179,6 +184,60 @@ describe('ReplApp mounted keyboard ownership', () => {
         reason: 'SPRINT_CONTEXT_DISABLED',
       }));
       expect(lastFrame() ?? '').toContain('chat: chat-old');
+    } finally { unmount(); }
+  });
+
+  it('never admits a recent sprint disk row to archive fallback when its exact ledger is malformed', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'deckent-l4c-recent-malformed-')); roots.push(cwd);
+    const ledgerRoot = mkdtempSync(join(tmpdir(), 'deckent-l4c-ledger-')); roots.push(ledgerRoot);
+    const jobs = join(cwd, '.deckent', 'runtime', 'jobs'); mkdirSync(jobs, { recursive: true });
+    writeFileSync(join(jobs, 'recent.json'), JSON.stringify({ sprintId: 'sprint-7099', status: 'completed', startedAt: '2026-09-07T00:00:00.000Z' }));
+    appendLedgerTurn({
+      rootDir: ledgerRoot, cwd, sessionId: 'sprint-7099', turnIndex: 0,
+      ts: '2026-09-07T00:00:00.000Z', provider: 'fixture', model: 'fixture', messagesDelta: [], usage: null,
+    });
+    const ledgerFile = join(ledgerRoot, 'projects', projectSlug(cwd), 'sprint-7099.jsonl');
+    appendFileSync(ledgerFile, '{malformed}\n');
+    const load = vi.fn(async () => ({
+      kind: 'loaded' as const, sprintId: 'sprint-7099', manifestDigest: 'a'.repeat(64),
+      artifactPath: 'docs/brain-sprint.md' as const, sha256: 'b'.repeat(64), bytes: 4, text: 'must not load',
+    }));
+    const { stdin, lastFrame, unmount } = mountApp({
+      cwd, sessionId: 'chat-old', replSurfaceEnabled: true, ledgerRoot,
+      sprintHistoricalContext: { availability: 'enabled', load },
+    });
+    try {
+      await tick(); stdin.write('/resume sprint-7099'); stdin.write(ENTER); await tick(100);
+      expect(load).not.toHaveBeenCalled();
+      expect(lastFrame() ?? '').toContain(getMessage('tui.resume_picker_failed', 'en', { id: 'sprint-7099' }));
+      expect(lastFrame() ?? '').toContain('chat: chat-old');
+    } finally { unmount(); }
+  });
+
+  it('hydrates an exact native sprint-id ledger beyond the recent-five list instead of loading archive context', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'deckent-l4c-native-literal-')); roots.push(cwd);
+    const ledgerRoot = mkdtempSync(join(tmpdir(), 'deckent-l4c-ledger-')); roots.push(ledgerRoot);
+    for (const [index, sessionId] of ['sprint-7099', 'new-1', 'new-2', 'new-3', 'new-4', 'new-5'].entries()) {
+      appendLedgerTurn({
+        rootDir: ledgerRoot, cwd, sessionId, turnIndex: 0,
+        ts: `2026-09-07T00:0${index}:00.000Z`, provider: 'fixture', model: 'fixture',
+        messagesDelta: [{ role: 'user', content: sessionId === 'sprint-7099' ? 'older literal ledger' : sessionId }], usage: null,
+      });
+    }
+    const hydrateTranscript = vi.fn();
+    const engine = Object.assign(async () => {}, { close: vi.fn(), hydrateTranscript }) as unknown as ReplEngine;
+    const load = vi.fn();
+    const { stdin, lastFrame, unmount } = mountApp({
+      cwd, sessionId: 'chat-old', engine, replSurfaceEnabled: true, ledgerRoot,
+      sprintHistoricalContext: { availability: 'enabled', load },
+    });
+    try {
+      await tick(); stdin.write('/resume sprint-7099'); stdin.write(ENTER); await tick(100);
+      expect(hydrateTranscript).toHaveBeenCalledWith(
+        [expect.objectContaining({ role: 'user', content: 'older literal ledger' })], { nextTurnIndex: 1 },
+      );
+      expect(load).not.toHaveBeenCalled();
+      expect(lastFrame() ?? '').toContain('chat: sprint-7099');
     } finally { unmount(); }
   });
 
@@ -306,7 +365,7 @@ describe('ReplApp mounted keyboard ownership', () => {
     }, { close: vi.fn(), hydrateTranscript: vi.fn() }) as unknown as ReplEngine;
     const memory = {
       listChatSessions: () => [{ sessionId: 'chat-target', lastAt: '2026-09-07T01:00:00.000Z', preview: 'target' }],
-      getChatHistory: () => [{ role: 'user', content: 'prior' }],
+      getChatHistory: (id: string) => id === 'chat-target' ? [{ role: 'user', content: 'prior' }] : [],
     };
     const { stdin, lastFrame, unmount } = mountApp({ cwd, sessionId: 'chat-old', memory, engine, replSurfaceEnabled: true, sprintHistoricalContext: { availability: 'enabled', load } });
     try {
