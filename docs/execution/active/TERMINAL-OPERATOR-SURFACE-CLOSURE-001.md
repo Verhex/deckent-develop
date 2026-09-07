@@ -11,6 +11,54 @@ PREREQUISITE: 3331 (landed 2449b6e4f) → 3332 (landed 13d2c80ef) → 3333 (land
 OWNER_DECISION_REF: owner-live-2026-09-04-terminal-audit-closure-v2
 STATUS: IN_PROGRESS source-work; DOGFOOD_HEALTH=DEGRADED. 2026-09-06T23:10Z sonrası gerçek autonomous dry-plan PASS; exact micro-task proof admission ve çoklu-worker settlement hâlâ açık, yeni worker dispatch yok.
 
+### Recursive i18n ve renderer landing — 2026-09-07T01:45Z
+
+Main commit 9f9fa32395200b9b43e82ebdb0f346542558aaa2; exact9file staged/committed
+blob equality PASS, inherited messages75satır/run7footer satırı seçilmedi.
+REPL .ts/.tsx direct UI sink AST taraması, deterministik JSON, ANSI-normalized
+technical/prose ayrımı mevcut lint:i18n/lint:gates girişinde bağlı; allowlist ve
+surface ceiling370 büyümedi. Bu heuristic/syntactic sink kanıtı, tüm veri akışında
+literal yokluğu veya generic symlink-cycle/platform kanıtı değildir.
+Dört sink kataloglandı: completion, background summary, demo summary/reason,
+dev Ink probe. Controller missing/empty completion label mevcut typed guard ile
+coordinator mutation öncesi durur; raw failure korunur. Verdict kodları değişmedi.
+
+Main exact8suite81/81 + tsc PASS; selected ilk7suite61/61 farklı CLI surface testini
+içeriyordu, eksik exact scripts/lint-cli-surface suite20/20 ayrıca PASS.
+İlk kayıt korunur; manifest-v2 coverageCorrection taşır. Yeni scanner main/selected
+50file/hits0 PASS; mevcut lint-stale-adr real-repo-clean assertion değiştirilmedi.
+Selected build ilk denemede dashboard toolchain eksikliğiyle FAIL; dependency
+fixture bağlantısı sonrası ikinci deneme PASS, source aynı. Main build:all PASS.
+
+| Kanıt | SHA256 |
+|---|---|
+| Assembled9file patch | b7569c89df286d3c1c37402885fab3bfa9ad14391648795903aa08144d57f27b |
+| Selected manifest-v2 | fa25a3c073fab93f70a5692256a235574fc93a88d83649eaa81f7c518e3aab6b |
+| Compiled harness | bf6531c3ec6ad777bf9294be738c58c32c666344e0f442ace8c80d7959348643 |
+| Selected result | ccee0087220da8acbafaccadf87b799a983d7759663cfa1bedfef2ff0feb1771 |
+| Main result | 99a7a44e0640f5311ee6a1ad23df86c456387242a432ebcb1137617c89cf699c |
+| Kalıcı arşiv SHA256SUMS | d217c39c724be5ad7a32dd65c11f284fe8633e6470fa510e4be4f0cd9b2c403b |
+
+Arşiv /home/alperen/deckent-recovery-20260904/terminal-7099-l6-i18n-tkEW0e;
+32payload check PASS; gerçek selected logs/patch/manifest, iki compiled proof ve
+transcript, harness, root tool-output içerir. Root build output son chunk'tır,
+tam standalone stdout log değildir. DB/config/credential kopyalanmadı.
+EN/TR gerçek CLI demo card → details → Esc collapse; formatter isolated child
+ids/counts/verdict/rawerror korur; devprobe natural exit. Tüm fixture child exit0,
+altı bundle before/after sabit. Approval kararı/provider turn/task receipt yok;
+devprobe production consumer iddiası değildir. Fable564 bağımsız digest/blob/proof
+incelemesi PASS; canonical XVerify receipt veya bütün7099 closure yerine geçmez.
+
+Canonical main stop736773 → execution ALLOW → build:all01:38:47Z PASS →
+bot804423. Main binary dirty-tree (inherited kaynak dahil), selected binary ayrı.
+MCP reconnect/platform/multiworker settlement OPEN; retained state temizlenmedi.
+Push TOOL_POLICY_HOLD sürer; son source HEAD ahead9/behind0, remote CI tetiklenmedi.
+7099 VERIFY korunur. All-repl string-free test genişlemesi glyph-only dual-stream
+default'una takıldı; untranslated prose değil. Aynı L6 içinde caller-owned
+ASCII/Unicode marker + grapheme/display-cell width ile dependency-bound devam;
+renaming/allowlist ile test geçirme yok. C kuyruğuna veya başka outcome'a geçilmedi.
+
+
 ### L1/L5 ve L6 bounded landing — 2026-09-07T01:20Z
 
 | Grup | Main commit | Exact scope / selected verification |
