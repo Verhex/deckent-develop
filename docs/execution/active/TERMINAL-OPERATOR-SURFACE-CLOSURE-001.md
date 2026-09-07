@@ -11,6 +11,43 @@ PREREQUISITE: 3331 (landed 2449b6e4f) → 3332 (landed 13d2c80ef) → 3333 (land
 OWNER_DECISION_REF: owner-live-2026-09-04-terminal-audit-closure-v2
 STATUS: IN_PROGRESS source-work; DOGFOOD_HEALTH=DEGRADED. 2026-09-06T23:10Z sonrası gerçek autonomous dry-plan PASS; exact micro-task proof admission ve çoklu-worker settlement hâlâ açık, yeni worker dispatch yok.
 
+### Active chat session visibility — 2026-09-07T04:32Z
+
+Main `ee749d056afeb39bdc27967b133839a1a10ce953`, exact8 committed blob
+equality PASS. Native status row ve `/status` detail aynı caller-local active
+chat session kimliğini gösterir. Resume persistence yalnız source testlerinde
+doğrulanmıştır; compiled turn/persistence iddiası yoktur. Kimlik run authority
+veya persisted history değildir. C0/C1/DEL,
+line-separator ve bidi controls source testlerinde `\uNNNN` olarak escape edilir;
+ordinary generated IDs byte-preserved kalır.
+
+Selected/main 7-suite 94 test, tsc/i18n/build PASS. Corrected selected compiled
+proof EN/TR native boot/status/resume, 18→180 resize ve EN no-memory yüzeyini
+yürüttü; ilk selected FAIL selector assumption idi ve ayrı tutuldu. Main compiled
+first attempt PASS (3 cases, 5 child exit0, 10 before/after pins). Event `atMs`
+wall-clock adjustment içerdiğinden latency iddiası yoktur. Legacy
+`/status` ve resume yalnız source testleriyle kaplıdır; compiled iddiası yoktur.
+
+| Evidence | SHA256 |
+|---|---|
+| Selected V2 patch | aad622a0f0e7f726a3746a3f6e32c69c70676e4c1dcf58aca26d200cbf9d6234 |
+| Selected manifest | c1cafb799139da64dc581386ec4fd3968338322afb7c8215f02d73d705326d35 |
+| Selected first FAIL | 35d8e641ffc40055dccc6f94010f24d78aa8bc272d4238b8f810ce6ef32934b2 |
+| Selected corrected PASS | 9e807b91374fc6a8f52998ddcebda31475da732f36a69a856fa27fa1d3f9f2fa |
+| Final harness | 3ca719721b3abc04165af7de508c7989b1a206beb93d1b980a3ab123a50419c5 |
+| Node permission prerequisite | 9b7e96a3c32d3f71abf3765ca99304cc3ef032a67cb4f548a9ed26dc6a0cddbc |
+| Main compiled PASS | 754b77cd6520222e73bf9af47a74a9a540d24d337c57ce2c51dd4e7f30ac6bc3 |
+| Main 94 raw | c8ac33ea1b7dc31fa829677554c191e112d69d3c7a985f31e4bc02a89985d116 |
+| Main build | d3e113e01093e1ffce4389f226b920085d3bc94e71daae3df9be6d5764dbfde5 |
+| Archive manifest | 636897257b0b505c2d4a7d0dd0d694c04f94f23e46774c6a6252ffbd62cfc453 |
+| Archive SHA256SUMS | 6ca9c5bef8ef874610c02cbe5b30f8feb86f135dbbf19b524fa346f3eb90da0c |
+| Root archive record | 5fa570cb6663ff82325a4d4a0cfc14b076c8fd7364234c034a6d3a6ef5f14926 |
+
+Archive `/home/alperen/deckent-recovery-20260904/terminal-7099-l4-session-08h6Ft`:
+39 payload + helper + manifest = 41/41 checks; SUMS dahil 42 dosya. Provider
+usage, receipt, platform veya whole-7099 closure değildir. Kalan L1/L3/L4,
+L5/L6/platform OPEN; 7099 VERIFY.
+
 ### Native `/mcp` ingress landing — 2026-09-07
 
 Main `492809cd583ec5e29ddac4e01d595304c752b9c6`, exact10 committed blob
