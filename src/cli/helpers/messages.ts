@@ -6274,6 +6274,14 @@ const BASE_MESSAGES: MessageMap = {
     en: 'ambiguous — matches: {matches}',
     tr: 'belirsiz — eşleşenler: {matches}',
   },
+  'tui.resume_picker_failed': {
+    en: 'session could not be resumed: {id}',
+    tr: 'oturum sürdürülemedi: {id}',
+  },
+  'tui.resume_sprint_context_unavailable': {
+    en: 'sprint context is not available to resume yet: {id}',
+    tr: 'sprint bağlamı henüz sürdürülemiyor: {id}',
+  },
   'tui.active_chat_context': { en: 'local active chat context: {id}', tr: 'yerel etkin sohbet bağlamı: {id}' },
   'tui.active_chat_session': { en: 'chat:', tr: 'sohbet:' },
 

@@ -255,6 +255,11 @@ export interface NativeResumeResult {
   outputTokens: number;
 }
 
+export type NativeResumeAttempt =
+  | { readonly kind: 'loaded'; readonly result: NativeResumeResult }
+  | { readonly kind: 'missing'; readonly reasonCode: 'RESUME_CONTEXT_MISSING' }
+  | { readonly kind: 'failed'; readonly reasonCode: 'RESUME_CONTEXT_READ_OR_HYDRATE_FAILED' };
+
 /** Ledger-first native re-hydration with an in-place legacy dual-read fallback. */
 export function hydrateNativeResume(
   sessionId: string,
@@ -292,6 +297,25 @@ export function hydrateNativeResume(
     };
   }
   return { source: 'missing', messages: [], turnCount: 0, outputTokens: 0 };
+}
+
+/** Fail-closed boundary for a UI resume transaction. The caller commits its
+ * active identity/token state only after this function reports `loaded`. */
+export function attemptNativeResume(
+  sessionId: string,
+  cwd: string,
+  engine: Pick<ReplEngine, 'hydrateTranscript'>,
+  memory?: Pick<ChatMemoryAdapter, 'getChatHistory'>,
+  ledgerOptions: LedgerStoreOptions = {},
+): NativeResumeAttempt {
+  try {
+    const result = hydrateNativeResume(sessionId, cwd, engine, memory, ledgerOptions);
+    return result.source === 'missing'
+      ? { kind: 'missing', reasonCode: 'RESUME_CONTEXT_MISSING' }
+      : { kind: 'loaded', result };
+  } catch {
+    return { kind: 'failed', reasonCode: 'RESUME_CONTEXT_READ_OR_HYDRATE_FAILED' };
+  }
 }
 
 /** Compact an ISO timestamp to `YYYY-MM-DD HH:MM`; falls back to the raw value
@@ -887,6 +911,8 @@ export interface ReplLabels {
   resumeSwitched: string;  // "resumed: {id}"
   resumeNotFound: string;  // "session not found: {arg}"
   resumeAmbiguous: string; // "ambiguous — matches: {matches}"
+  resumeFailed: string; // "session could not be resumed: {id}"
+  resumeSprintUnavailable: string; // sprint context loading is dependency-bound
   /** Explicitly local detail appended to `/status`; never run-status truth. */
   activeChatContext: string; // "local active chat context: {id}"
   /** Compact caller-owned status-row label for the same local identity. */
@@ -1611,13 +1637,19 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     if (decision.kind === 'passthrough') return;
     if (decision.kind === 'list') { pushTurn('bg', decision.lines.join('\n')); return; }
     if (decision.kind === 'reject') { pushTurn('seg', decision.line); return; }
-    setActiveSessionId(decision.sessionId);
-    activeSessionIdRef.current = decision.sessionId;
     if (decision.forwardToLoop) {
       if (nativeEngine?.hydrateTranscript) {
-        const hydrated = hydrateNativeResume(decision.sessionId, props.cwd, nativeEngine, memory);
-        setSessionTok(hydrated.outputTokens);
-        pushTurn('seg', decision.line);
+        const attempt = attemptNativeResume(decision.sessionId, props.cwd, nativeEngine, memory);
+        if (attempt.kind === 'loaded') {
+          setActiveSessionId(decision.sessionId);
+          activeSessionIdRef.current = decision.sessionId;
+          setSessionTok(attempt.result.outputTokens);
+          pushTurn('seg', decision.line);
+        } else if (attempt.kind === 'missing') {
+          pushTurn('seg', requireInjectedLabel('resumeNotFound', labels.resumeNotFound).replace('{arg}', decision.sessionId));
+        } else {
+          pushTurn('seg', requireInjectedLabel('resumeFailed', labels.resumeFailed).replace('{id}', decision.sessionId));
+        }
       } else {
         // Legacy engine retains its own command parser; native mode
         // never takes this branch and therefore never leaks /resume
@@ -1627,9 +1659,11 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         if (wake.current) { const w = wake.current; wake.current = null; w(); }
       }
     } else {
-      // Sprint-session pick: switch the active session pointer locally
-      // (deep context-load for sprint sessions is loop-side follow-up).
-      pushTurn('seg', decision.line);
+      // L4-B1: a job projection is not resumable chat context. B2 will inject
+      // verified archive context; until then, fail honestly without changing
+      // the local active chat identity or relaunching the sprint.
+      pushTurn('seg', requireInjectedLabel('resumeSprintUnavailable', labels.resumeSprintUnavailable)
+        .replace('{id}', decision.sessionId));
     }
   };
 
@@ -2275,13 +2309,15 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         const literalId = (resume[1] ?? '').trim();
         if (decision.kind === 'passthrough' && literalId.length > 0 && nativeEngine?.hydrateTranscript) {
           pushTurn('user', trimmed);
-          const hydrated = hydrateNativeResume(literalId, props.cwd, nativeEngine, memory);
-          if (hydrated.source === 'missing') {
+          const attempt = attemptNativeResume(literalId, props.cwd, nativeEngine, memory);
+          if (attempt.kind === 'missing') {
             pushTurn('seg', requireInjectedLabel('resumeNotFound', labels.resumeNotFound).replace('{arg}', literalId));
+          } else if (attempt.kind === 'failed') {
+            pushTurn('seg', requireInjectedLabel('resumeFailed', labels.resumeFailed).replace('{id}', literalId));
           } else {
             setActiveSessionId(literalId);
             activeSessionIdRef.current = literalId;
-            setSessionTok(hydrated.outputTokens);
+            setSessionTok(attempt.result.outputTokens);
             pushTurn('seg', requireInjectedLabel('resumeSwitched', labels.resumeSwitched).replace('{id}', literalId));
           }
           return;

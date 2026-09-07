@@ -43,7 +43,7 @@ import { vi, afterEach } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { RESUME_RECENT_LIMIT, buildResumePickerLines, chatSessionsToRecords, hydrateNativeResume, mergeResumeSessionRecords, resolveResumeCommand, renderBusyDecision, steerNotesToInputs } from "../../src/cli/repl/app.js";
+import { RESUME_RECENT_LIMIT, attemptNativeResume, buildResumePickerLines, chatSessionsToRecords, hydrateNativeResume, mergeResumeSessionRecords, resolveResumeCommand, renderBusyDecision, steerNotesToInputs } from "../../src/cli/repl/app.js";
 import { appendLedgerTurn } from "../../src/cli/repl/session-ledger.js";
 import { listRecentSessions, type SessionRecord } from "../../src/cli/helpers/session-resume.js";
 import { initialBusyControlsState, markBusy, markIdle, parseBusyCommand, resolveQueueCommand, applyInterrupt, applySteer, resolveKeyAction, type BusyControlsState } from "../../src/cli/repl/busy-controls.js";
@@ -295,6 +295,24 @@ describe('native resume — ledger-first dual-read re-hydration (564-004)', () =
             { role: 'user', content: 'legacy question' },
             { role: 'assistant', content: 'legacy answer' },
         ]);
+    });
+    it('reports missing without invoking hydration', () => {
+        const rootDir = makeRoot();
+        const hydrateTranscript = vi.fn();
+        const result = attemptNativeResume('missing', join(rootDir, 'project'), { hydrateTranscript }, { getChatHistory: () => [] }, { rootDir });
+        expect(result).toEqual({ kind: 'missing', reasonCode: 'RESUME_CONTEXT_MISSING' });
+        expect(hydrateTranscript).not.toHaveBeenCalled();
+    });
+    it('turns read and hydrate exceptions into a typed failed attempt', () => {
+        const rootDir = makeRoot();
+        const cwd = join(rootDir, 'project');
+        expect(attemptNativeResume('read-fail', cwd, { hydrateTranscript: vi.fn() }, {
+            getChatHistory: () => { throw new Error('fixture read failed'); },
+        }, { rootDir })).toEqual({ kind: 'failed', reasonCode: 'RESUME_CONTEXT_READ_OR_HYDRATE_FAILED' });
+        expect(attemptNativeResume('hydrate-fail', cwd, {
+            hydrateTranscript: () => { throw new Error('fixture hydrate failed'); },
+        }, { getChatHistory: () => [{ role: 'user', content: 'safe fixture' }] }, { rootDir }))
+            .toEqual({ kind: 'failed', reasonCode: 'RESUME_CONTEXT_READ_OR_HYDRATE_FAILED' });
     });
     it('deduplicates picker ids with ledger precedence', () => {
         const merged = mergeResumeSessionRecords([record('sprint-only')], [record('shared', { title: 'ledger title', status: 'chat' })], [record('shared', { title: 'legacy title', status: 'chat' }), record('legacy-only', { status: 'chat' })]);
