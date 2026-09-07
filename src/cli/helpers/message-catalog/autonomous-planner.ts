@@ -1,4 +1,6 @@
-export const AUTONOMOUS_PLANNER_MESSAGES: Record<string, Record<string, string>> = {
+import type { MessageFamily } from './cli-common.js';
+
+export const AUTONOMOUS_PLANNER_MESSAGES: MessageFamily = Object.freeze({
   'autonomous.planner.spawn_failed': {
     en: 'Planner could not start ({provider}): {reason}',
     tr: 'Planner başlatılamadı ({provider}): {reason}',
@@ -15,4 +17,4 @@ export const AUTONOMOUS_PLANNER_MESSAGES: Record<string, Record<string, string>>
     en: 'Planner exited with status {status} ({provider}): {reason}',
     tr: 'Planner {status} durumuyla sonlandı ({provider}): {reason}',
   },
-};
+});

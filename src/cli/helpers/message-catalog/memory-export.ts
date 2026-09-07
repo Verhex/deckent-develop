@@ -1,4 +1,6 @@
-export const MEMORY_EXPORT_MESSAGES: Record<string, Record<string, string>> = {
+import type { MessageFamily } from './cli-common.js';
+
+export const MEMORY_EXPORT_MESSAGES: MessageFamily = Object.freeze({
   'memory_export.summary_title': { en: 'Brain Summary (auto-generated)', tr: 'Beyin Özeti (otomatik oluşturuldu)' },
   'memory_export.decisions_title': { en: 'Architecture Decision Records (auto-generated)', tr: 'Mimari Karar Kayıtları (otomatik oluşturuldu)' },
   'memory_export.active_architecture_decisions': { en: 'Active Architecture Decisions', tr: 'Etkin Mimari Kararlar' },
@@ -29,4 +31,4 @@ export const MEMORY_EXPORT_MESSAGES: Record<string, Record<string, string>> = {
   'memory_export.priority': { en: 'Priority', tr: 'Öncelik' },
   'memory_export.total_entries_generated': { en: 'Total entries: {total} | Generated: {date}', tr: 'Toplam kayıt: {total} | Oluşturulma: {date}' },
   'memory_export.repeated_pattern': { en: '{title} (×{count} sprints)', tr: '{title} (×{count} sprint)' },
-};
+});

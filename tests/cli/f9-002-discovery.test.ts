@@ -164,7 +164,7 @@ describe('F9-002 — loadAndConnectAll namespaced discovery', () => {
     expect(registry.size).toBe(0);
   });
 
-  it('returns empty list and empty registry when no servers configured', async () => {
+  it('returns an empty raw list and records the no-config observation when no servers are configured', async () => {
     const broker = makeSpyBroker();
     const registry = new McpToolRegistry();
     const bridge = makeBridge(broker, registry);
@@ -175,7 +175,8 @@ describe('F9-002 — loadAndConnectAll namespaced discovery', () => {
     expect(connected).toHaveLength(0);
     expect(registry.size).toBe(0);
     const lines = bridge.listSlashLines();
-    expect(lines).toEqual(['MCP server yok']);
+    expect(lines).toEqual([]);
+    expect(bridge.connectionObservation?.()).toEqual({ configured: 0, connected: 0, failed: 0 });
   });
 
   it('multiple servers → all tools namespaced independently', async () => {
