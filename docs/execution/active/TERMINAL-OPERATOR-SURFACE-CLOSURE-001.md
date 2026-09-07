@@ -11,6 +11,30 @@ PREREQUISITE: 3331 (landed 2449b6e4f) → 3332 (landed 13d2c80ef) → 3333 (land
 OWNER_DECISION_REF: owner-live-2026-09-04-terminal-audit-closure-v2
 STATUS: IN_PROGRESS source-work; DOGFOOD_HEALTH=DEGRADED. 2026-09-06T23:10Z sonrası gerçek autonomous dry-plan PASS; exact micro-task proof admission ve çoklu-worker settlement hâlâ açık, yeni worker dispatch yok.
 
+### Active-turn cancellation proof — 2026-09-07T03:22Z
+
+Test59c2c8a04: exact1blob PASS; main4suite17tests PASS. Production source unchanged.
+Mounted App Ctrl+C → native bridge → session AbortController → production OpenAI
+HTTP adapter → loopback SSE closes before server DONE; rejected late write never
+enters any captured frame; fresh second turn succeeds. EN/TR first compiled run PASS.
+Eleven causal binary pins identical before/after. No provider credentials/real
+billing/task receipt/checkpoint or actual CLI/PTY/platform claim.
+Root+independent Sol review corrected only test timer/barrier/cleanup weaknesses.
+
+| Evidence | SHA256 |
+|---|---|
+| Final test | 8cce684271b398488e8b5a411a52da99d3cb7a014dc56db1442e16676c67e573 |
+| Compiled result | 9f2e1d0323ab3c843d7c776c156efd141fe0c993954167c622ac9d145ae59954 |
+| Harness | 61f02b998483a2a3f97ebe17e8e3c83dd1298599d01892eec742cb15e7cdacfb |
+| Archive SUMS | 878ce6c91bd000eeecf8fbd1f31b6e16dba557301eedce45952e9a1f8147b58f |
+
+Archive /home/alperen/deckent-recovery-20260904/terminal-7099-l2-cancel-fjAx7X:
+8evidence payloads + archive helper + manifest =10checks PASS, originals preserved.
+No source rebuild/restart/dispatch needed; bot976804 unchanged. Existing native
+cancel seam proved, not rewritten. Next L3 missing native /mcp ingress uses the
+already-connected bridge and existing config/posture/confirm authority.
+MASTER7099 remains VERIFY.
+
 ### Native boot intent landing — 2026-09-07T03:16Z
 
 Main cc7102991, exact6committed blob PASS; inherited run.tsx7footer labels excluded.

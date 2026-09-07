@@ -4,7 +4,7 @@
 > Silinme tetiği: onaylı sıra tüketilip kalıcı kanıtlar MASTER/evidence'a işlendiğinde silinir.
 > Ayrıntılı geçmiş Git'te: d10456e99 ve 934dc194f:follow-up-works/current-flow.md.
 
-## Aktif durum — 2026-09-07T03:16Z
+## Aktif durum — 2026-09-07T03:22Z
 
 7099 tek ACTIVE outcome, MASTER VERIFY; bütün ürün/Terminal kapanışı yok.
 DOGFOOD ON, health DEGRADED; owner onaylı bounded ADR-D-007 kaynak yürütmesi.
@@ -19,7 +19,8 @@ Retained728, .tasks, memory.db ve inherited değişiklikler korunur.
 | I/J | 9f9fa3239 / 72cc89ecf | Recursive i18n + docs |
 | K/L | d25c97078 / 0f8c231fb | Dual-stream clipping + docs |
 | M/N | 366637d18 / 9560fc60e | Live-footer resize + docs |
-| O | cc7102991 | Explicit native boot refusal + legacy/native default authority |
+| O/P | cc7102991 / b90854cb2 | Native boot intent + proof docs |
+| Q | 59c2c8a04 | Active native cancellation HTTP regression proof |
 
 Exact patch/manifest/failure/limit ayrıntıları tek kalıcı capsule'da:
 docs/execution/active/TERMINAL-OPERATOR-SURFACE-CLOSURE-001.md.
@@ -31,7 +32,7 @@ Stop892444 → execution ALLOW → build:all03:02–03:03Z PASS → bot976804 st
 Dist main dirty-tree; selected binary ayrıca doğrulandı. MCP reconnect kanıtlanmadı.
 Yeni sprint/worker dispatch yok; retained state temizlenmedi.
 Push TOOL_POLICY_HOLD: owner yetkisine rağmen araç process başlamadan reddetmişti;
-bypass/unchanged retry yok. HEADcc7102991 ahead15/behind0; remote CI tetiklenmedi.
+bypass/unchanged retry yok. HEAD59c2c8a04 ahead17/behind0; remote CI tetiklenmedi.
 
 ## Şimdi / sonraki sıra
 
@@ -42,10 +43,14 @@ bypass/unchanged retry yok. HEADcc7102991 ahead15/behind0; remote CI tetiklenmed
    deprecated, key/value değişmez; blind CLI→API veya brain→native migration yok.
    Kalıcı60payload+manifest arşiv:
    /home/alperen/deckent-recovery-20260904/terminal-7099-l1-native-boot-lmCNbm.
-2. L2 cancellation test-only candidate /tmp/deckent-7099-l2-cancel-ceglYb:
-   mounted App→bridge→session→loopbackHTTP abort→next turn. İlk10testPASS;
-   root review sonrası timer-race/cleanup/bounded-wait proof düzeltmesi sürüyor.
-   Kaynak bug kanıtlanmadı; yeni production refactor yok.
+2. L2 cancellation exact1test landed59c2c8a04. Main17testPASS; compiled mounted
+   EN/TR loopbackHTTP abort/no late render/fresh next turn PASS,11causalpins.
+   Production source/build değişmedi. Kalıcı8payload+helper+manifest arşiv:
+   /home/alperen/deckent-recovery-20260904/terminal-7099-l2-cancel-fjAx7X.
+   L3 worker /tmp/deckent-7099-l3-mcp-4sTuJX: missing native /mcp ingress;
+   one existing bridge+posture+confirm. Configured connection failure ile empty/
+   absent ayrımı ve eski TR hardcode aynı paket içinde düzeltiliyor.
+   Main fan-in yok; yeni MASTER outcome/permission authority yok.
 3. Kalan L1 identity/readiness+migration; L3 tool/MCP/approval; L4 reactive state/
    resume; L5 accounting; L6 verdict/reduced-motion/rows/redaction/platform.
    Capsule DAG'ı; yeni outcome veya C kuyruğu başlamadı.
