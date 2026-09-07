@@ -9,7 +9,7 @@
 // node that cannot wrap. Hermetic: pure function, no Ink, no terminal.
 
 import { describe, it, expect } from 'vitest';
-import { fitStatusRow, statusRowText, type StatusRowInput } from '../../../src/cli/repl/status-row.js';
+import { fitStatusRow, formatSessionIdForTerminal, statusRowText, type StatusRowInput } from '../../../src/cli/repl/status-row.js';
 import { displayWidth } from '../../../src/cli/repl/cursor-model.js';
 
 const base: StatusRowInput = {
@@ -20,8 +20,8 @@ const base: StatusRowInput = {
 
 describe('fitStatusRow — one line, never wider than the terminal', () => {
   it('fits everything when the terminal is wide enough (byte-identical segments)', () => {
-    const row = fitStatusRow({ ...base, cwd: '/work/app', model: 'm1', sessionTok: 1234, approval: 'auto-edit', resumedId: 'abc' }, 200);
-    expect(statusRowText(row)).toBe('deckent  ollama · m1  /work/app  · Σ 1234 tok  · »auto-edit  · ↺ abc');
+    const row = fitStatusRow({ ...base, cwd: '/work/app', model: 'm1', sessionTok: 1234, approval: 'auto-edit', activeSession: { label: 'chat:', id: 'abc', overflowMarker: '...' } }, 200);
+    expect(statusRowText(row)).toBe('deckent  ollama · m1  /work/app  · Σ 1234 tok  · »auto-edit  chat: abc');
     expect(row.dropped).toEqual([]);
   });
 
@@ -34,22 +34,55 @@ describe('fitStatusRow — one line, never wider than the terminal', () => {
     expect(text).not.toContain('\n');
   });
 
-  it('drops optional segments (resumed → tokens → approval → model) before starving the cwd', () => {
-    const input: StatusRowInput = { ...base, cwd: '/home/user/projects/deckent-terminal', model: 'claude-fable-5-1', sessionTok: 987654, approval: 'full-auto', resumedId: 'session-1234' };
+  it('drops optional segments (tokens → approval → model) before active identity or cwd', () => {
+    const input: StatusRowInput = { ...base, cwd: '/home/user/projects/deckent-terminal', model: 'claude-fable-5-1', sessionTok: 987654, approval: 'full-auto', activeSession: { label: 'chat:', id: 'session-1234', overflowMarker: '...' } };
     const row = fitStatusRow(input, 60);
     expect(displayWidth(statusRowText(row))).toBeLessThanOrEqual(60);
-    expect(row.dropped[0]).toBe('resumed');
-    // the cwd tail (the informative part) survives
-    expect(statusRowText(row)).toContain('deckent-terminal');
+    expect(row.dropped).toContain('tokens');
+    expect(statusRowText(row)).toContain('chat:');
   });
 
   it('never exceeds the column budget for any width from 1 to 160', () => {
-    const input: StatusRowInput = { ...base, model: 'gpt-5.6-sol', sessionTok: 42, approval: 'auto-edit', resumedId: 'r1' };
-    for (let columns = 1; columns <= 160; columns++) {
+    const input: StatusRowInput = { ...base, model: 'gpt-5.6-sol', sessionTok: 42, approval: 'auto-edit', activeSession: { label: 'chat:', id: 'r1', overflowMarker: '...' } };
+    for (let columns = 1; columns <= 240; columns++) {
       const text = statusRowText(fitStatusRow(input, columns));
       expect(displayWidth(text), `columns=${columns}`).toBeLessThanOrEqual(columns);
       expect(text).not.toContain('\n');
     }
+  });
+
+  it('reserves a grapheme-safe active-id abbreviation before any final whole-row clip', () => {
+    const id = 'chat-şifre-😀-0123456789abcdef';
+    const row = fitStatusRow({ ...base, activeSession: { label: 'sohbet:', id, overflowMarker: '...' } }, 18);
+    expect(row.segments.map((segment) => segment.role)).toEqual(['session']);
+    expect(statusRowText(row)).toContain('chat-şifre');
+    expect(statusRowText(row)).toContain('...');
+    expect(displayWidth(statusRowText(row))).toBeLessThanOrEqual(18);
+  });
+
+  it('preserves ordinary Unicode IDs and renders terminal controls explicitly', () => {
+    expect(formatSessionIdForTerminal('chat-şifre-😀')).toBe('chat-şifre-😀');
+    expect(formatSessionIdForTerminal('chat\u001b[2J\nnext\u009b')).toBe('chat\\u001b[2J\\u000anext\\u009b');
+  });
+
+  it.each([
+    ['line separator', '\u2028', '\\u2028'],
+    ['paragraph separator', '\u2029', '\\u2029'],
+    ['left-to-right embedding', '\u202a', '\\u202a'],
+    ['right-to-left override', '\u202e', '\\u202e'],
+    ['left-to-right isolate', '\u2066', '\\u2066'],
+    ['pop directional isolate', '\u2069', '\\u2069'],
+    ['left-to-right mark', '\u200e', '\\u200e'],
+    ['right-to-left mark', '\u200f', '\\u200f'],
+    ['Arabic letter mark', '\u061c', '\\u061c'],
+  ])('renders %s explicitly', (_name, control, escaped) => {
+    expect(formatSessionIdForTerminal(`chat${control}id`)).toBe(`chat${escaped}id`);
+  });
+
+  it('keeps an ordinary full identity byte-for-byte in a fitting status row', () => {
+    const id = 'chat-şifre-😀-0123456789abcdef';
+    const row = fitStatusRow({ ...base, cwd: '/w', activeSession: { label: 'sohbet:', id, overflowMarker: '...' } }, 240);
+    expect(statusRowText(row)).toContain(id);
   });
 
   it('measures in display cells — a CJK / emoji path counts double-width glyphs', () => {

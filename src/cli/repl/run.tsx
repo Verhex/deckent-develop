@@ -242,6 +242,8 @@ export function buildReplLabels(t: (key: string) => string): ReplLabels {
     resumeSwitched: t('tui.resume_picker_switched'),
     resumeNotFound: t('tui.resume_picker_not_found'),
     resumeAmbiguous: t('tui.resume_picker_ambiguous'),
+    activeChatContext: t('tui.active_chat_context'),
+    activeChatSession: t('tui.active_chat_session'),
     // busy-controls: /queue /interrupt /steer (renderBusyDecision, app.tsx).
     busyQueueStatus: t('tui.busy_queue_status'),
     busyStateBusy: t('tui.busy_state_busy'),

@@ -6266,6 +6266,8 @@ const BASE_MESSAGES: MessageMap = {
     en: 'ambiguous — matches: {matches}',
     tr: 'belirsiz — eşleşenler: {matches}',
   },
+  'tui.active_chat_context': { en: 'local active chat context: {id}', tr: 'yerel etkin sohbet bağlamı: {id}' },
+  'tui.active_chat_session': { en: 'chat:', tr: 'sohbet:' },
 
   // ─── busy-controls: /queue /interrupt /steer (APP-SURFACE-WIRE 358-006 —
   // ReplLabels.busy*; renderBusyDecision in app.tsx, wired by run.tsx's

@@ -191,6 +191,50 @@ describe('chat-native — /resume slash', () => {
     expect(userAppend?.[0]).toBe('sX');
   });
 
+  it('reports only a successful memory-backed resume through the optional App callback', async () => {
+    const resumed: string[] = [];
+    const adapter = mockMemoryWithSessions(
+      [{ sessionId: 'sX', turnCount: 2, lastAt: '2026-06-03T10:00:00Z', preview: 'first q' }],
+      { sX: [{ role: 'user', content: 'old' }] },
+    );
+    await runChatNativeLoop(baseOpts({
+      provider: { send: vi.fn(async () => ({ text: '', stopReason: 'end_turn' as const })) },
+      dispatcher: stubDispatcher(),
+      input: lines('/resume', '/resume 1'),
+      output: vi.fn(),
+      memory: adapter,
+      onSessionResumed: (id) => resumed.push(id),
+    }));
+    expect(resumed).toEqual(['sX']);
+  });
+
+  it('does not change the App identity callback for missing memory or a failed resume', async () => {
+    const resumed = vi.fn();
+    await runChatNativeLoop(baseOpts({
+      provider: { send: vi.fn(async () => ({ text: '', stopReason: 'end_turn' as const })) },
+      dispatcher: stubDispatcher(),
+      input: lines('/resume missing'),
+      output: vi.fn(),
+      memory: mockMemoryWithSessions([], {}),
+      onSessionResumed: resumed,
+    }));
+    expect(resumed).not.toHaveBeenCalled();
+  });
+
+  it('appends caller-owned local chat context to /status without interpreting run output', async () => {
+    const out: string[] = [];
+    const dispatcher: McpToolDispatcher = { dispatch: vi.fn(async () => 'run truth: unavailable') };
+    await runChatNativeLoop(baseOpts({
+      provider: { send: vi.fn(async () => ({ text: '', stopReason: 'end_turn' as const })) },
+      dispatcher,
+      input: lines('/status'),
+      output: (line) => out.push(line),
+      localStatusDetail: () => 'local active chat context: chat-memory-123',
+    }));
+    expect(out).toEqual(['run truth: unavailable\nlocal active chat context: chat-memory-123']);
+    expect(dispatcher.dispatch).toHaveBeenCalledWith('deckent_status', { root: '.' });
+  });
+
   it('/resume <bad> reports not-found', async () => {
     const out: string[] = [];
     await runChatNativeLoop(baseOpts({

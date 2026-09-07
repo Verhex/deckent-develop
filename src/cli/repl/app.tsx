@@ -21,7 +21,7 @@ import {
 } from '../commands/chat-native.js';
 import { renderMarkdown } from '../commands/chat-render.js';
 import { InputBar, type CaretStyle, type ShortcutsPanel } from './input-bar.js';
-import { StatusRow } from './status-row.js';
+import { StatusRow, formatSessionIdForTerminal } from './status-row.js';
 import { resolveCtrlC, CTRL_C_EXIT_WINDOW_MS } from './interrupt-policy.js';
 import { useTerminalColumns } from './use-terminal-columns.js';
 import { expandAtRefs } from './at-ref.js';
@@ -887,6 +887,10 @@ export interface ReplLabels {
   resumeSwitched: string;  // "resumed: {id}"
   resumeNotFound: string;  // "session not found: {arg}"
   resumeAmbiguous: string; // "ambiguous — matches: {matches}"
+  /** Explicitly local detail appended to `/status`; never run-status truth. */
+  activeChatContext: string; // "local active chat context: {id}"
+  /** Compact caller-owned status-row label for the same local identity. */
+  activeChatSession: string;
   busyQueueStatus: string; // "queue: {count} background · {state}"
   busyStateBusy: string;   // "busy"
   busyStateIdle: string;   // "idle"
@@ -1711,6 +1715,10 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // the loop), so its persist callback (REPL-575 K3) must read the CURRENT
   // session through this ref, not the stale closure value.
   const activeSessionIdRef = useRef<string | undefined>(sessionId);
+  const localChatContext = (): string | undefined => {
+    const id = activeSessionIdRef.current;
+    return id ? labels.activeChatContext.replace('{id}', formatSessionIdForTerminal(id)) : undefined;
+  };
   const busyCtl = useRef<BusyControlsState>(initialBusyControlsState());
 
   // APP-APPROVAL-WIRE (355-011) seam state — inert unless approvalsEnabled AND
@@ -2066,6 +2074,11 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         ...(memory ? { memory } : {}),
         ...(sessionId ? { sessionId } : {}),
         ...(lang ? { lang } : {}),
+        onSessionResumed: (id) => {
+          setActiveSessionId(id);
+          activeSessionIdRef.current = id;
+        },
+        localStatusDetail: localChatContext,
         input: inputIter(),
         // Stream tokens straight through the segmenter: completed lines/blocks flow
         // into the scrollback immediately (real-time readable — Alperen: "yukarıya
@@ -2376,7 +2389,8 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           const gate = gateAction(termModeRef.current, { tool: bridged.tool, args: bridged.args, declaredRisk: entry?.risk });
           if (gate.kind === 'deny') { pushTurn('seg', denyLine(gate, trimmed)); return; }
           const dispatchResult = await dispatcher.dispatch(bridged.tool, bridged.args);
-          pushTurn('seg', dispatchResult);
+          const localDetail = bridged.tool === 'deckent_status' ? localChatContext() : undefined;
+          pushTurn('seg', localDetail ? `${dispatchResult}\n${localDetail}` : dispatchResult);
         }
         return;
       }
@@ -2662,7 +2676,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           cwd,
           sessionTok,
           approval: approval !== 'suggest' ? approval : undefined,
-          resumedId: activeSessionId && activeSessionId !== sessionId ? activeSessionId : undefined,
+          ...(activeSessionId ? { activeSession: { label: labels.activeChatSession, id: activeSessionId, overflowMarker: dualStreamOverflow ?? '...' } } : {}),
         }}
       />
     </Box>

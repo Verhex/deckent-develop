@@ -30,7 +30,7 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
-function mountApp() {
+function mountApp(options: { sessionId?: string; dispatcher?: { dispatch: (name: string, args: Record<string, unknown>) => Promise<string> } } = {}) {
   const cwd = mkdtempSync(join(tmpdir(), 'deckent-l6-keyboard-'));
   roots.push(cwd);
   let confirmTrigger: ConfirmTrigger | undefined;
@@ -40,7 +40,7 @@ function mountApp() {
   const mounted = render(
     <ReplApp
       provider={{} as never}
-      dispatcher={{ dispatch: vi.fn(async () => '') }}
+      dispatcher={options.dispatcher ?? { dispatch: vi.fn(async () => '') }}
       labels={labels}
       providerName="diagnostic"
       cwd={cwd}
@@ -62,6 +62,7 @@ function mountApp() {
       dualStreamOverflow="..."
       shortcutsPanel={buildShortcutsPanel(t)}
       nativeEngine={engine}
+      {...(options.sessionId ? { sessionId: options.sessionId } : {})}
     />,
   );
   return { ...mounted, getConfirmTrigger: () => confirmTrigger };
@@ -75,6 +76,19 @@ async function openPicker(stdin: { write(value: string): void }, lastFrame: () =
 }
 
 describe('ReplApp mounted keyboard ownership', () => {
+  it('native /status preserves run output and appends the full local chat context', async () => {
+    const dispatch = vi.fn(async () => 'run truth: unavailable');
+    const { stdin, lastFrame, unmount } = mountApp({ sessionId: 'chat-memory-123', dispatcher: { dispatch } });
+    await tick();
+    stdin.write('/status');
+    stdin.write(ENTER);
+    await tick(100);
+    expect(dispatch).toHaveBeenCalledWith('deckent_status', { root: '.' });
+    expect(lastFrame() ?? '').toContain('run truth: unavailable');
+    expect(lastFrame() ?? '').toContain('local active chat context: chat-memory-123');
+    unmount();
+  });
+
   it('picker consumes Ctrl-C exactly once, then idle Ctrl-C follows the normal arm policy', async () => {
     const { stdin, lastFrame, unmount } = mountApp();
     await tick();

@@ -20,8 +20,30 @@
 import { Text } from 'ink';
 import type { ReactElement } from 'react';
 import { displayWidth, truncateStart, truncateEnd } from './cursor-model.js';
+import { clipTerminalCells } from './dual-stream.js';
 import { useInkPalette } from './ink-palette-context.js';
 import type { InkPalette, InkRoleStyle } from './ink-palette.js';
+
+/**
+ * Preserve ordinary persisted IDs byte-for-byte while making C0/C1/DEL,
+ * Unicode line separators, and bidirectional-format controls explicit rather
+ * than allowing a caller-supplied identity to move the cursor, split a status
+ * line, or visually reorder an identifier.
+ */
+export function formatSessionIdForTerminal(id: string): string {
+  let safe = '';
+  for (const char of id) {
+    const code = char.codePointAt(0) ?? 0;
+    const unsafeControl = code < 0x20
+      || (code >= 0x7f && code <= 0x9f)
+      || code === 0x2028 || code === 0x2029
+      || (code >= 0x202a && code <= 0x202e)
+      || (code >= 0x2066 && code <= 0x2069)
+      || code === 0x200e || code === 0x200f || code === 0x061c;
+    safe += unsafeControl ? `\\u${code.toString(16).padStart(4, '0')}` : char;
+  }
+  return safe;
+}
 
 export interface StatusRowInput {
   /** Product name — technical brand token, never localized. */
@@ -33,12 +55,12 @@ export interface StatusRowInput {
   sessionTok?: number | undefined;
   /** Agentic approval mode when it is NOT the default (caller decides). */
   approval?: string | undefined;
-  /** Resumed session id when it differs from the boot session (caller decides). */
-  resumedId?: string | undefined;
+  /** Caller-local active chat identity. It is never an optional/drop segment. */
+  activeSession?: { label: string; id: string; overflowMarker: string } | undefined;
 }
 
-export type StatusRowRole = 'brand' | 'gap' | 'provider' | 'model' | 'cwd' | 'tokens' | 'approval' | 'resumed';
-export type StatusRowOptional = 'resumed' | 'tokens' | 'approval' | 'model';
+export type StatusRowRole = 'brand' | 'gap' | 'provider' | 'model' | 'cwd' | 'tokens' | 'approval' | 'session';
+export type StatusRowOptional = 'tokens' | 'approval' | 'model';
 
 export interface StatusRowSegment {
   role: StatusRowRole;
@@ -52,8 +74,8 @@ export interface StatusRowLayout {
   columns: number;
 }
 
-/** Drop order: least informative first. The cwd is never dropped. */
-const DROP_ORDER: readonly StatusRowOptional[] = ['resumed', 'tokens', 'approval', 'model'];
+/** Drop order: least informative first. The active chat identity is never dropped. */
+const DROP_ORDER: readonly StatusRowOptional[] = ['tokens', 'approval', 'model'];
 /** Cells the cwd keeps before the layout starts dropping optional segments. */
 const MIN_CWD_CELLS = 12;
 const GAP = '  ';
@@ -70,7 +92,7 @@ function buildSegments(input: StatusRowInput, dropped: ReadonlySet<StatusRowOpti
     segments.push({ role: 'tokens', text: `${GAP}· Σ ${input.sessionTok} tok` });
   }
   if (input.approval && !dropped.has('approval')) segments.push({ role: 'approval', text: `${GAP}· »${input.approval}` });
-  if (input.resumedId && !dropped.has('resumed')) segments.push({ role: 'resumed', text: `${GAP}· ↺ ${input.resumedId}` });
+  if (input.activeSession) segments.push({ role: 'session', text: `${GAP}${input.activeSession.label} ${formatSessionIdForTerminal(input.activeSession.id)}` });
   return segments;
 }
 
@@ -102,9 +124,24 @@ export function fitStatusRow(input: StatusRowInput, columns: number): StatusRowL
   const available = budget - widthOf(segments, 'cwd');
   segments = segments.map((s) => (s.role === 'cwd' ? { ...s, text: truncateStart(s.text, available) } : s));
 
-  // 3. Last-resort guard: the fixed segments alone may still exceed a tiny budget.
+  // 3. Last-resort guard: an active identity has priority over every other
+  // status fact. A physically tiny terminal cannot show a whole identifier;
+  // keep an honest grapheme-safe abbreviation here, while `/status` exposes
+  // the complete caller-local value on its own wrapped detail line.
   let total = widthOf(segments);
   if (total > budget) {
+    const session = segments.find((s) => s.role === 'session');
+    if (session) {
+      segments = [{
+        ...session,
+        // The compact label never consumes the last usable cells: a narrowed
+        // row carries the safe ID itself plus the caller-resolved ASCII/Unicode
+        // marker. At one cell the marker is the only physically honest output.
+        text: clipTerminalCells(formatSessionIdForTerminal(input.activeSession!.id), budget, input.activeSession!.overflowMarker),
+      }];
+      total = widthOf(segments);
+      return { segments, dropped, columns: budget };
+    }
     const kept: StatusRowSegment[] = [];
     let used = 0;
     for (const s of segments) {
@@ -138,7 +175,7 @@ function styleFor(role: StatusRowRole, palette: InkPalette): InkRoleStyle {
     case 'brand': return palette.muted;
     case 'cwd': return palette.muted;
     case 'tokens': return palette.muted;
-    case 'resumed': return palette.muted;
+    case 'session': return palette.muted;
     case 'gap': return {};
   }
 }

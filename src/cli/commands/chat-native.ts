@@ -338,6 +338,10 @@ export interface ChatNativeOptions {
    * language so /resume output is localized (i18n-first).
    */
   lang?: string;
+  /** Called only after a memory-backed `/resume` actually switches session. */
+  onSessionResumed?: (sessionId: string) => void;
+  /** Caller-local chat identity detail for `/status`; never run-status truth. */
+  localStatusDetail?: () => string | undefined;
   /**
    * Sprint 358 T-358-005 — current terminal risk-ladder mode (term-mode.ts),
    * consumed ONLY to decide `/help` catalog visibility: `'control'` maps to
@@ -1001,6 +1005,7 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
             transcript.push({ role: turn.role === 'assistant' ? 'assistant' : 'user', content: turn.content });
           }
           sessionId = target;
+          opts.onSessionResumed?.(target);
           emitText = renderResumedHistory(target, history, lang);
         }
       }
@@ -1278,11 +1283,13 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
         continue;
       }
       const slashResult = await dispatcher.dispatch(slashAction.tool, slashAction.args);
-      output(slashResult);
+      const localDetail = slashAction.tool === 'deckent_status' ? opts.localStatusDetail?.() : undefined;
+      const outputText = localDetail ? `${slashResult}\n${localDetail}` : slashResult;
+      output(outputText);
       transcript.push({ role: 'user', content: line });
-      transcript.push({ role: 'assistant', content: slashResult });
+      transcript.push({ role: 'assistant', content: outputText });
       memStore?.appendChatTurn(sessionId, 'user', line);
-      memStore?.appendChatTurn(sessionId, 'assistant', slashResult);
+      memStore?.appendChatTurn(sessionId, 'assistant', outputText);
       continue;
     }
     // Sprint 222 T-222-007 — enterprise slash bridge wire. /cost /audit /rbac
