@@ -693,15 +693,6 @@ export function replReadlineOptions(isTty: boolean): ReadLineOptions {
  */
 export async function launchDefaultRepl(): Promise<void> {
   const providerName = await resolveReplProviderForCwd();
-  let provider: ChatProviderAdapter;
-  try {
-    provider = buildReplProvider(providerName);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    process.stderr.write(`deckent REPL: ${msg}\n`);
-    process.exit(1);
-    return;
-  }
   // TERM-1 (Sprint 351) — "hazır mıyım?" health snapshot, printed before EITHER
   // REPL mode mounts (Ink or legacy) so both paths get the same at-a-glance
   // line. buildHealthSnapshot() is already field-level fail-soft and time-
@@ -731,6 +722,32 @@ export async function launchDefaultRepl(): Promise<void> {
   // the Ink surface on TERM=dumb (cursor control the terminal cannot honor).
   const terminalSurface = resolveTerminalSurfaceFromProcess();
 
+  // A native pin is an execution intent, not permission to silently answer on
+  // the legacy host adapter. Non-Ink surfaces cannot construct the native
+  // engine; explicit legacy opt-outs retain the established line/readline path.
+  if (terminalSurface.surface !== 'ink' && !process.argv.includes('--legacy-loop')) {
+    let cfg: Awaited<ReturnType<typeof loadConfig>>;
+    try {
+      cfg = await loadConfig();
+    } catch {
+      process.stderr.write(`NATIVE_BOOT_CONFIG_INVALID: ${getMessage('native.boot.config-invalid', replLang)}\n`);
+      process.exitCode = 1;
+      return;
+    }
+    const nativeOptedOut = cfg.terminal?.native_agent === false;
+    const explicitNativeIntent = cfg.native_provider !== undefined
+      || cfg.native_model !== undefined
+      || process.env['DECKENT_NATIVE_MODEL'] !== undefined;
+    if (!nativeOptedOut && explicitNativeIntent) {
+      process.stderr.write(`NATIVE_BOOT_SURFACE_UNSUPPORTED: ${getMessage('native.boot.surface-unsupported', replLang)}\n`);
+      process.exitCode = 1;
+      return;
+    }
+    if (!nativeOptedOut) {
+      process.stdout.write(`${getMessage('native.boot.legacy-host-surface', replLang, { provider: providerName })}\n`);
+    }
+  }
+
   // The native Ink path emits only after its single authoritative transport
   // resolution. Legacy/pipe paths retain their existing resolved host truth.
   if (terminalSurface.surface !== 'ink') await emitHealth();
@@ -750,10 +767,20 @@ export async function launchDefaultRepl(): Promise<void> {
     // because Ink/chalk are already loaded by static import chains long
     // before this branch runs. Ink ignored NO_COLOR entirely before this.
     const { runInkRepl } = await import('./repl/run.js');
-    await runInkRepl(provider, providerName, (sel) =>
+    const outcome = await runInkRepl(providerName, () => buildReplProvider(providerName), (sel) =>
       buildReplProvider(sel.provider as ReplProviderName, sel.model ? { model: sel.model } : {}),
       registerReplTeardown,
       emitHealth);
+    if (outcome?.exitCode === 1) process.exitCode = 1;
+    return;
+  }
+  let provider: ChatProviderAdapter;
+  try {
+    provider = buildReplProvider(providerName);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`deckent REPL: ${msg}\n`);
+    process.exit(1);
     return;
   }
 

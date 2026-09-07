@@ -181,46 +181,71 @@ export const CLI_TERMINAL_SLASH_MESSAGES: MessageFamily = Object.freeze({
   // ── TERMINAL-TOOLS-007 — native engine BOOT outcomes (run.tsx
   //    localizeNativeError phase 'boot'). Same error codes as the
   //    `native.switch.*` rows in messages.ts, but a boot failure is not a
-  //    switch: the engine never started and the legacy loop runs instead. ──
+  //    switch: the engine never started. Only absent-intent/no-transport may
+  //    continue through the separately labeled legacy-host fallback. ──
   'native.boot.missing-api-key': {
-    en: 'native engine not started — {provider} needs an API key: set {detail}. Running the legacy loop instead.',
-    tr: 'native motor başlatılmadı — {provider} için API anahtarı gerekli: {detail} tanımlayın. Bunun yerine eski döngü çalışıyor.',
+    en: 'native engine not started — {provider} needs an API key: set {detail}, then restart Deckent.',
+    tr: 'native motor başlatılmadı — {provider} için API anahtarı gerekli: {detail} tanımlayıp Deckent\'i yeniden başlatın.',
   },
   'native.boot.missing-ollama-host': {
-    en: 'native engine not started — ollama needs a host: set {detail} in .deckent/config.json. Running the legacy loop instead.',
-    tr: 'native motor başlatılmadı — ollama için host gerekli: .deckent/config.json içinde {detail} tanımlayın. Bunun yerine eski döngü çalışıyor.',
+    en: 'native engine not started — ollama needs a host: set {detail} in .deckent/config.json, then restart Deckent.',
+    tr: 'native motor başlatılmadı — ollama için host gerekli: .deckent/config.json içinde {detail} tanımlayıp Deckent\'i yeniden başlatın.',
   },
   'native.boot.missing-local-llm-endpoint': {
-    en: 'native engine not started — local-llm needs an endpoint: set {detail} in .deckent/config.json. Running the legacy loop instead.',
-    tr: 'native motor başlatılmadı — local-llm için endpoint gerekli: .deckent/config.json içinde {detail} tanımlayın. Bunun yerine eski döngü çalışıyor.',
+    en: 'native engine not started — local-llm needs an endpoint: set {detail} in .deckent/config.json, then restart Deckent.',
+    tr: 'native motor başlatılmadı — local-llm için endpoint gerekli: .deckent/config.json içinde {detail} tanımlayıp Deckent\'i yeniden başlatın.',
   },
   'native.boot.missing-native-model': {
-    en: 'native engine not started — local-llm needs an exact model ID: set {detail} (deckent config set native_model <id>) to one of the endpoint\'s published /models IDs. Running the legacy loop instead.',
-    tr: 'native motor başlatılmadı — local-llm için tam model kimliği gerekli: {detail} değerini (deckent config set native_model <id>) endpoint\'in /models listesindeki kimliklerden biri yapın. Bunun yerine eski döngü çalışıyor.',
+    en: 'native engine not started — local-llm needs an exact model ID: set {detail} (deckent config set native_model <id>) to one of the endpoint\'s published /models IDs, then restart Deckent.',
+    tr: 'native motor başlatılmadı — local-llm için tam model kimliği gerekli: {detail} değerini (deckent config set native_model <id>) endpoint\'in /models listesindeki kimliklerden biri yapıp Deckent\'i yeniden başlatın.',
   },
   'native.boot.unsupported-native-provider': {
-    en: 'native engine not started — "{detail}" has no native tool-use transport; valid: claude, openai, ollama, deepseek, qwen, glm, local-llm. Running the legacy loop instead.',
-    tr: 'native motor başlatılmadı — "{detail}" için native tool-use transport yok; geçerli: claude, openai, ollama, deepseek, qwen, glm, local-llm. Bunun yerine eski döngü çalışıyor.',
+    en: 'native engine not started — "{detail}" has no native tool-use transport; configure one of: claude, openai, ollama, deepseek, qwen, glm, local-llm, then restart Deckent.',
+    tr: 'native motor başlatılmadı — "{detail}" için native tool-use transport yok; claude, openai, ollama, deepseek, qwen, glm veya local-llm yapılandırıp Deckent\'i yeniden başlatın.',
   },
   'native.boot.legacy-model-alias': {
-    en: 'native engine not started — "{detail}" is a legacy alias; use an exact provider API model ID. Running the legacy loop instead.',
-    tr: 'native motor başlatılmadı — "{detail}" eski bir takma addır; tam sağlayıcı API model kimliği kullanın. Bunun yerine eski döngü çalışıyor.',
+    en: 'native engine not started — "{detail}" is a legacy alias; configure an exact provider API model ID, then restart Deckent.',
+    tr: 'native motor başlatılmadı — "{detail}" eski bir takma addır; tam sağlayıcı API model kimliği yapılandırıp Deckent\'i yeniden başlatın.',
   },
   'native.boot.unknown-model': {
-    en: 'native engine not started — unknown model "{detail}": use an exact registered provider API model ID. Running the legacy loop instead.',
-    tr: 'native motor başlatılmadı — bilinmeyen model "{detail}": tam kayıtlı sağlayıcı API model kimliği kullanın. Bunun yerine eski döngü çalışıyor.',
+    en: 'native engine not started — unknown model "{detail}": configure an exact registered provider API model ID, then restart Deckent.',
+    tr: 'native motor başlatılmadı — bilinmeyen model "{detail}": tam kayıtlı sağlayıcı API model kimliği yapılandırıp Deckent\'i yeniden başlatın.',
   },
   'native.boot.model-inactive': {
-    en: 'native engine not started — model "{detail}" is inactive under the owner policy. Activate it with deckent models activate. Running the legacy loop instead.',
-    tr: 'native motor başlatılmadı — "{detail}" modeli sahip politikasında pasif. deckent models activate ile etkinleştirin. Bunun yerine eski döngü çalışıyor.',
+    en: 'native engine not started — model "{detail}" is inactive under the owner policy. Activate it with deckent models activate, then restart Deckent.',
+    tr: 'native motor başlatılmadı — "{detail}" modeli sahip politikasında pasif. deckent models activate ile etkinleştirip Deckent\'i yeniden başlatın.',
   },
   'native.boot.model-authority-unavailable': {
-    en: 'native engine not started — the project model authority cannot be read safely; no provider call was made. Running the legacy loop instead.',
-    tr: 'native motor başlatılmadı — proje model yetkisi güvenle okunamıyor; sağlayıcı çağrısı yapılmadı. Bunun yerine eski döngü çalışıyor.',
+    en: 'native engine not started — the project model authority cannot be read safely; no provider call was made. Repair the model authority, then restart Deckent.',
+    tr: 'native motor başlatılmadı — proje model yetkisi güvenle okunamıyor; sağlayıcı çağrısı yapılmadı. Model yetkisini onarıp Deckent\'i yeniden başlatın.',
   },
   'native.boot.no-transport': {
-    en: 'native engine not started — no native transport configured: set ANTHROPIC_API_KEY / OPENAI_API_KEY / openai_base_url / ollama_host. Running the legacy loop instead.',
-    tr: 'native motor başlatılmadı — native transport tanımlı değil: ANTHROPIC_API_KEY / OPENAI_API_KEY / openai_base_url / ollama_host tanımlayın. Bunun yerine eski döngü çalışıyor.',
+    en: 'native engine not started — no native transport configured. Configure native_provider and its required credential or endpoint, then restart Deckent; or remove the native model setting and use --legacy-loop for the legacy-host surface.',
+    tr: 'native motor başlatılmadı — native transport tanımlı değil. native_provider ile gerekli kimlik bilgisini veya endpoint\'i yapılandırıp Deckent\'i yeniden başlatın; ya da native model ayarını kaldırıp legacy-host yüzeyi için --legacy-loop kullanın.',
+  },
+  'native.boot.config-invalid': {
+    en: 'native engine not started — project configuration is invalid. Fix .deckent/config.json and restart Deckent.',
+    tr: 'native motor başlatılmadı — proje yapılandırması geçersiz. .deckent/config.json dosyasını düzeltip Deckent\'i yeniden başlatın.',
+  },
+  'native.boot.legacy-host-fallback': {
+    en: 'No native transport is configured. Continuing on the legacy-host surface with {provider}. To use the native engine, configure native_provider and its required credential or endpoint, then restart Deckent; or use --legacy-loop to choose the legacy surface explicitly.',
+    tr: 'Native transport yapılandırılmamış. {provider} ile legacy-host yüzeyinde devam ediliyor. Native motoru kullanmak için native_provider ile gerekli kimlik bilgisini veya endpoint\'i yapılandırıp Deckent\'i yeniden başlatın; legacy yüzeyi bilerek seçmek için --legacy-loop kullanın.',
+  },
+  'native.boot.surface-unsupported': {
+    en: 'The native engine requires the interactive Ink Terminal surface. Restart in a supported TTY, or use --legacy-loop to choose the legacy-host surface explicitly.',
+    tr: 'Native motor etkileşimli Ink Terminal yüzeyi gerektirir. Desteklenen bir TTY içinde yeniden başlatın veya legacy-host yüzeyini bilerek seçmek için --legacy-loop kullanın.',
+  },
+  'native.boot.legacy-host-surface': {
+    en: 'Terminal capability selected the legacy-host surface with {provider}. To use the native engine, restart Deckent in a supported interactive TTY with native_provider and its required credential or endpoint configured; or use --legacy-loop to choose this surface explicitly.',
+    tr: 'Terminal yeteneği {provider} ile legacy-host yüzeyini seçti. Native motoru kullanmak için native_provider ile gerekli kimlik bilgisini veya endpoint\'i yapılandırıp Deckent\'i desteklenen etkileşimli bir TTY içinde yeniden başlatın; bu yüzeyi bilerek seçmek için --legacy-loop kullanın.',
+  },
+  'native.boot.legacy-host-unavailable': {
+    en: 'The legacy-host provider {provider} could not be initialized. Check its configuration and availability, then restart Deckent.',
+    tr: 'Legacy-host sağlayıcısı {provider} başlatılamadı. Yapılandırmasını ve kullanılabilirliğini denetleyip Deckent\'i yeniden başlatın.',
+  },
+  'native.boot.legacy-model-default-unsupported': {
+    en: 'The legacy-host surface has no persisted model-default setting. The model changed for this session only; no configuration was written.',
+    tr: 'Legacy-host yüzeyinde kalıcı model varsayılanı ayarı yok. Model yalnız bu oturum için değişti; yapılandırma yazılmadı.',
   },
   // ── TERMINAL-I18N-NATIVE-001 — transport detection reasons (provider-detect.ts reasonCode) ──
   'native.detect.anthropic-api-key': {

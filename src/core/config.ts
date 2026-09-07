@@ -3241,7 +3241,8 @@ export const CONFIG_METADATA: Readonly<Record<string, ConfigMetadataEntry>> = {
     category: 'Provider',
   },
   chat_provider: {
-    description: 'Native REPL provider override (deckent argümansız). Fallback chain: chat_provider → brain_provider → claude. Set independently from brain_provider to decouple planner from REPL (e.g. brain=opus, repl=ollama).',
+    description: 'Deprecated legacy-host REPL provider override. Preserved for backward compatibility; it never selects a native transport. Legacy precedence: chat_provider → brain_provider → claude. Use native_provider for the native Terminal engine.',
+    descriptionTr: 'Kullanımdan kaldırılmış legacy-host REPL sağlayıcı geçersiz kılması. Geriye dönük uyumluluk için korunur; native transport seçmez. Legacy önceliği: chat_provider → brain_provider → claude. Native Terminal motoru için native_provider kullanın.',
     type: `${PROVIDER_TYPE_UNION} | undefined`,
     default: undefined,
     options: [...VALID_PROVIDERS_ALL],

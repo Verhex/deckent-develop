@@ -39,11 +39,16 @@ export type { ShortcutsPanel } from './input-bar.js';
 
 type BootHealthSelection = { provider: HealthField; model: HealthField; auth: HealthField };
 
+export interface NativeBootFailure {
+  exitCode: 1;
+  errorCode: string;
+}
+
 /** Compose health only from the native resolver's already-produced result. */
 export function composeNativeBootHealth(resolved: ResolvedProvider | ProviderError): BootHealthSelection | undefined {
-  // A failed native boot falls back to the live legacy provider. Its localized
-  // native failure is emitted separately; undefined makes health describe the
-  // fallback that will actually answer instead of the failed requested pin.
+  // Only the absent-intent/no-transport compatibility case falls back. Explicit
+  // failures terminate before health emission; undefined lets the permitted
+  // fallback health describe the legacy provider that will actually answer.
   if ('error' in resolved) return undefined;
   return {
     provider: { status: 'ok', label: resolved.providerName },
@@ -51,6 +56,27 @@ export function composeNativeBootHealth(resolved: ResolvedProvider | ProviderErr
     // Resolution proves executability, not a completed auth/reachability probe.
     auth: { status: 'unknown', label: 'unknown', detail: 'not probed' },
   };
+}
+
+export function nativeBootErrorCode(errorCode: string | undefined): string {
+  const stable = (errorCode ?? 'native-boot-failed').toUpperCase().replace(/[^A-Z0-9]+/gu, '_');
+  return `NATIVE_BOOT_${stable}`;
+}
+
+export function resolveProviderDefaultWrite(
+  nativeSelection: ActiveSelection | undefined,
+  kind: 'model' | 'provider',
+  id: string,
+): { patch: Record<string, string> } | { errorKey: 'native.boot.legacy-model-default-unsupported' } {
+  if (nativeSelection) {
+    return {
+      patch: kind === 'model'
+        ? { native_provider: nativeSelection.provider, native_model: id }
+        : { native_provider: id },
+    };
+  }
+  if (kind === 'provider') return { patch: { chat_provider: id } };
+  return { errorKey: 'native.boot.legacy-model-default-unsupported' };
 }
 import { createRunFlowController, type RunFlowController, type RunFlowControllerDeps } from './run-flow-controller.js';
 import { ensureProvidersBootstrapped } from './provider-bootstrap.js';
@@ -136,7 +162,7 @@ export const NATIVE_ERROR_CODES = Object.freeze([
 ] as const);
 
 /** Where a native-transport resolution failed: at REPL boot (the engine never
- *  started — the legacy loop runs instead) or on a user `/model`·`/provider`
+ *  started) or on a user `/model`·`/provider`
  *  switch. TERMINAL-TOOLS-007: the boot outcome used to be worded as a
  *  "switch failed" nobody made (real-binary evidence, 2026-09-02). */
 export type NativeErrorPhase = 'boot' | 'switch';
@@ -792,6 +818,30 @@ export function wireRunFlowResultWatch(
 
 /** Rebuilds a provider adapter for a selection (entry.ts passes buildReplProvider). */
 export type ProviderRebuild = (sel: ActiveSelection) => ChatProviderAdapter;
+export type LegacyProviderFactory = () => ChatProviderAdapter;
+
+/** Defers legacy host construction without letting teardown instantiate it. */
+export function createDeferredLegacyProvider(factory: LegacyProviderFactory): ChatProviderAdapter {
+  let provider: (ChatProviderAdapter & { exit?: () => unknown }) | undefined;
+  let exited = false;
+  const current = (): ChatProviderAdapter => (provider ??= factory());
+  return {
+    send: (messages) => current().send(messages),
+    stream: (messages) => {
+      const active = current();
+      if (active.stream) return active.stream(messages);
+      return (async function* () {
+        const done = await active.send(messages);
+        yield { text: done.text ?? '', done };
+      })();
+    },
+    exit: async () => {
+      if (exited) return;
+      exited = true;
+      if (provider?.exit) await provider.exit();
+    },
+  } as ChatProviderAdapter;
+}
 
 /**
  * M5-NATIVE-FLIP (376-003) — decide whether the native-agent tool-use loop is
@@ -1138,23 +1188,86 @@ export function buildToolDispatcher(deps: ToolDispatcherDeps): { dispatch: (tool
 
 /** Mount the Ink REPL for an interactive TTY and run until the user exits. */
 export async function runInkRepl(
-  provider: ChatProviderAdapter,
   providerName: string,
+  createLegacyProvider: LegacyProviderFactory,
   rebuild: ProviderRebuild,
   registerTeardown: ReplTeardownRegistrar,
   onBootSelection?: (selection?: BootHealthSelection) => Promise<void>,
-): Promise<void> {
-  // Project config is loaded once here and reused by the surface wire below —
-  // a load failure degrades to defaults (lang=en, every surface flag off).
+): Promise<void | NativeBootFailure> {
+  // Project config is loaded once here and reused by boot admission and the
+  // surface wire. A load failure is an honest typed boot refusal: silently
+  // defaulting could erase an authored native pin.
   let projectCfg: {
     language?: string;
     repl_surface?: { enabled?: boolean; approvals?: boolean; bg_turns?: boolean };
     terminal?: { rpc_debug?: boolean; native_agent?: boolean; run_flow_v2?: boolean };
+    native_provider?: string;
+    native_model?: string;
+    native_context_tokens?: number;
+    openai_base_url?: string;
+    ollama_host?: string;
+    providers?: NativeTransportConfig['providers'];
+    local_llm?: NativeTransportConfig['local_llm'];
   } = {};
-  try { projectCfg = await loadConfig() as typeof projectCfg; } catch { /* defaults */ }
+  let configLoadFailed = false;
+  try { projectCfg = await loadConfig() as typeof projectCfg; } catch { configLoadFailed = true; }
   let lang = 'en';
   try { lang = getLanguage(projectCfg.language); } catch { /* default en */ }
   const t = (key: string, vars?: Record<string, string>): string => getMessage(key, lang, vars);
+
+  if (configLoadFailed) {
+    process.stdout.write(`\n${nativeBootErrorCode('config-invalid')}: ${t('native.boot.config-invalid')}\n`);
+    return { exitCode: 1, errorCode: 'config-invalid' };
+  }
+
+  const nativeSelected = isNativeAgentSelected(process.argv.slice(2), projectCfg);
+  const explicitNativeIntent = projectCfg.native_provider !== undefined
+    || projectCfg.native_model !== undefined
+    || process.env['DECKENT_NATIVE_MODEL'] !== undefined;
+  let nativeBoot: ResolvedProvider | ProviderError | undefined;
+  let nativeCfg: NativeTransportConfig | undefined;
+  let deckSecrets: Record<string, string> | undefined;
+  if (nativeSelected) {
+    nativeCfg = {
+      openai_base_url: projectCfg.openai_base_url,
+      ollama_host: projectCfg.ollama_host,
+      native_provider: projectCfg.native_provider,
+      native_model: projectCfg.native_model,
+      native_context_tokens: projectCfg.native_context_tokens,
+      providers: projectCfg.providers,
+      local_llm: projectCfg.local_llm,
+    };
+    deckSecrets = loadDeckSecrets(process.cwd());
+    nativeBoot = resolveNativeProvider(
+      process.env,
+      nativeCfg,
+      process.cwd(),
+      deckSecrets,
+    );
+    if ('error' in nativeBoot) {
+      if (explicitNativeIntent || nativeBoot.errorCode !== 'no-transport') {
+        process.stdout.write(`\n${nativeBootErrorCode(nativeBoot.errorCode)}: ${localizeNativeError(nativeBoot, lang, 'boot')}\n`);
+        return { exitCode: 1, errorCode: nativeBoot.errorCode ?? 'native-boot-failed' };
+      }
+      process.stdout.write(`\n${t('native.boot.legacy-host-fallback', { provider: providerName })}\n`);
+    }
+  }
+
+  let provider: ChatProviderAdapter;
+  if (nativeBoot && !('error' in nativeBoot)) {
+    // Native sessions must not construct a legacy host adapter merely to
+    // satisfy the switcher's stable proxy shape. Teardown never opens this.
+    provider = createDeferredLegacyProvider(createLegacyProvider);
+  } else {
+    try {
+      // Legacy-selected and auto/no-transport compatibility sessions retain
+      // boot-time readiness: construction failure is reported before watchers.
+      provider = createLegacyProvider();
+    } catch {
+      process.stdout.write(`\n${t('native.boot.legacy-host-unavailable', { provider: providerName })}\n`);
+      return { exitCode: 1, errorCode: 'legacy-host-unavailable' };
+    }
+  }
 
   // ─── REPL-SURFACE config→prop wire (repl_surface.*, born: flags landed 354-001/
   // 355-011 as App-prop seams but no caller ever resolved the config — the flag
@@ -1390,26 +1503,15 @@ export async function runInkRepl(
   let runFlowResultSink: ((event: ChatTurnBgEvent) => void) | null = null;
   let runFlowResultWatch: RunCompletionWatchHandle | undefined;
   let bootHealthSelection: BootHealthSelection | undefined;
-  if (isNativeAgentSelected(process.argv.slice(2), projectCfg)) {
-    const cfg = await loadConfig().catch(() => ({} as Record<string, unknown>));
-    const nativeCfg: NativeTransportConfig = {
-      openai_base_url: (cfg as { openai_base_url?: string }).openai_base_url,
-      ollama_host: (cfg as { ollama_host?: string }).ollama_host,
-      native_provider: (cfg as { native_provider?: string }).native_provider,
-      native_model: (cfg as { native_model?: string }).native_model,
-      native_context_tokens: (cfg as { native_context_tokens?: number }).native_context_tokens,
-      providers: (cfg as { providers?: NativeTransportConfig['providers'] }).providers,
-      local_llm: (cfg as { local_llm?: NativeTransportConfig['local_llm'] }).local_llm,
-    };
-    // .deck secrets (ADR-G-005) — credential source for API-backed transports;
-    // documented precedence: .deck over env.
-    const deckSecrets = loadDeckSecrets(process.cwd());
-    const resolved = resolveNativeProvider(process.env, nativeCfg, process.cwd(), deckSecrets);
+  if (nativeSelected && nativeBoot) {
+    const cfg = projectCfg;
+    const resolved = nativeBoot;
     if ('error' in resolved) {
-      // Boot outcome (the native engine did not start; the legacy loop runs
-      // below) — worded as such, never as a "switch" (TERMINAL-TOOLS-007).
-      process.stdout.write(`\n${localizeNativeError(resolved, lang, 'boot')}\n`);
+      // Only the absent-pin/no-transport compatibility case reaches here; its
+      // explicit legacy-host notice was emitted before any session resource.
     } else {
+      const resolvedNativeCfg = nativeCfg as NativeTransportConfig;
+      const resolvedDeckSecrets = deckSecrets;
       bootHealthSelection = composeNativeBootHealth(resolved);
       let mcpBridge: import('./native-tool-registry.js').NativeMcpBridge | undefined;
       try {
@@ -1467,7 +1569,7 @@ export async function runInkRepl(
           provider: sel.provider ?? impliedProvider ?? live.provider,
           model: sel.model !== undefined ? sel.model : live.model,
         };
-        const next = resolveNativeSelection(target, { projectRoot: process.cwd(), env: process.env, config: nativeCfg, secrets: deckSecrets });
+        const next = resolveNativeSelection(target, { projectRoot: process.cwd(), env: process.env, config: resolvedNativeCfg, secrets: resolvedDeckSecrets });
         if ('error' in next) {
           return { provider: live.provider, model: live.model, switchError: localizeNativeError(next, lang) };
         }
@@ -1498,7 +1600,7 @@ export async function runInkRepl(
       const pickerContext = (): PickerSpecContext => {
         const policy = resolveActiveModelPolicy(process.cwd());
         const availability = (provider: string): ProviderAvailability => {
-          const probe = resolveNativeSelection({ provider, model: null }, { projectRoot: process.cwd(), env: process.env, config: nativeCfg, secrets: deckSecrets });
+          const probe = resolveNativeSelection({ provider, model: null }, { projectRoot: process.cwd(), env: process.env, config: resolvedNativeCfg, secrets: resolvedDeckSecrets });
           if (!('error' in probe)) {
             // Credentials/config resolve; reachability evidence (when it exists) refines the verdict.
             const evidence = nativeEvidence.get(provider);
@@ -1517,7 +1619,7 @@ export async function runInkRepl(
         };
         return {
           providers: NATIVE_PROVIDER_NAMES,
-          candidatesFor: (provider) => listNativeModelCandidates(provider, nativeCfg, provider === 'local-llm' && live.provider === 'local-llm' ? [live.model] : []),
+          candidatesFor: (provider) => listNativeModelCandidates(provider, resolvedNativeCfg, provider === 'local-llm' && live.provider === 'local-llm' ? [live.model] : []),
           policy,
           current: { provider: live.provider, model: live.model },
           availability,
@@ -1667,7 +1769,7 @@ export async function runInkRepl(
         // narrows, and a live provider switch re-resolves via `live.model`.
         getContextBudgetTokens: () => resolveContextBudgetTokens(
           live.provider,
-          nativeCfg,
+          resolvedNativeCfg,
           liveEffectiveContext,
           modelRegistry.get(live.model)?.contextWindow ?? null,
         ),
@@ -1781,14 +1883,11 @@ export async function runInkRepl(
       )}
       pickerEvidence={{ refresh: () => hostEvidence.refresh(), subscribe: (listener) => hostEvidence.subscribe(listener) }}
       saveDefault={(kind, id) => {
-        // "save as default" pins BOTH keys the boot path reads (resolveNativeProvider
-        // → native_provider pin → resolveNativeSelection with native_model): a
-        // model pick also records its provider so the next boot lands on it.
-        const current = nativeSelection ?? switcher.current();
-        const patch = kind === 'model'
-          ? { native_provider: current.provider, native_model: id }
-          : { native_provider: id };
-        const out = setConfigValues(process.cwd(), patch);
+        // Native and legacy-host selectors have distinct persisted authority.
+        // A legacy subscription identity must never become an API transport pin.
+        const selection = resolveProviderDefaultWrite(nativeSelection, kind, id);
+        if ('errorKey' in selection) return { ok: false, error: t(selection.errorKey) };
+        const out = setConfigValues(process.cwd(), selection.patch);
         return out.ok ? { ok: true } : { ok: false, error: out.error };
       }}
       initialTermMode={sessionAuthority.posture()}

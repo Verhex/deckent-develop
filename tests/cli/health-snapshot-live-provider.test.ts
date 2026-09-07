@@ -153,9 +153,10 @@ describe('boot-time native engine failure is worded as a boot outcome, not a swi
     expect(localizeNativeError(err, 'en', 'switch')).toBe(getMessage('native.switch.no-transport', 'en', { provider: '', detail: '' }));
   });
 
-  it('run.tsx prints the boot phase at boot; entry.ts hands the resolved provider to the health snapshot', () => {
+  it('run.tsx resolves and refuses native boot before resources; successful selection reaches health', () => {
     const run = readFileSync(join(ROOT, 'src/cli/repl/run.tsx'), 'utf-8');
-    expect(run).toMatch(/localizeNativeError\(resolved, lang, 'boot'\)/);
+    expect(run).toMatch(/nativeBoot = resolveNativeProvider[\s\S]*localizeNativeError\(nativeBoot, lang, 'boot'\)/);
+    expect(run.indexOf('nativeBoot = resolveNativeProvider')).toBeLessThan(run.indexOf('new ApprovalBroker'));
     const entry = readFileSync(join(ROOT, 'src/cli/entry.ts'), 'utf-8');
     expect(entry).toMatch(/terminalSurface\.surface !== 'ink'\) await emitHealth\(\)/);
     expect(entry).toMatch(/registerReplTeardown,\s*emitHealth\)/);
