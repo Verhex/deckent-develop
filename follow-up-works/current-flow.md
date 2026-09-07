@@ -2,61 +2,54 @@
 
 > SSOT: docs/MASTER-PLAN.md. İmleçtir; authority/receipt değildir.
 > Silinme tetiği: onaylı sıra tüketilip kalıcı kanıtlar MASTER/evidence'a işlendiğinde silinir.
-> Ayrıntı ve başarısızlık geçmişi: docs/execution/active/TERMINAL-OPERATOR-SURFACE-CLOSURE-001.md.
+> Ayrıntı ve failure geçmişi: docs/execution/active/TERMINAL-OPERATOR-SURFACE-CLOSURE-001.md.
 
-## Güncel — 2026-09-07 21:50 TR
+## Güncel — 2026-09-07 22:39 TR
 
 7099 tek ACTIVE outcome; MASTER VERIFY. DOGFOOD ON / health DEGRADED.
 Owner-onaylı elle ADR-D-007 devam; bütün program goal'de korunur.
-Sourcecommit ff6b1d409/ahead39: exact18,+2146/-376; root/Fable894doğruladı.
-Owned run26+/2-,messages22+/6-; inheritedrun7/messages73+/10- worktree'de.
-Clean committedtree15file150/150PASS e6f57810,tsc64714/i18nPASS.
-Bu dilimde push yok; docs2commit sırada.
-Main build:all16255PASS; canonicalbotstop2295163→start2611078;
-sourceTreee9779cde = build; botentry35ba88de/module311be99b eşleşiyor.
-MainactualELFUml89c49d4a12/12 + pohZAeaf5dac2c2/2PASS; Fable890doğruladı.
-Mainarchive terminal-7099-approval-main-v8-Hxa2eI:manifest606d95db/SUMS97fab1ef;
-93checksumPASS/94file/28dir0600/0700. Candidatearchive parent bağı korunur.
+Approval source ff6b1d409 exact18 +2146/-376, evidence docs55422e982 committed.
+MASTER admission dd8abc76d exact4 docs: yalnız7142–7146 OPEN; Fable900 doğruladı.
+Canonical HEAD projection500active/589rows/218receipts, receiptRegistry değişmedi.
+Inherited3357/14GR main'de korunur; MASTER residual19satır. Push codex2'de.
 
-Approval A+A1+A2+cross-channel reconciliation main'e TAM18 dosya aktarıldı.
-Main59/59 source pin = candidate freeze-v8 1f131fe5. run/messages inherited
-değişiklikleri korundu; eventual commit yalnız owned delta taşımalı.
-Main15file152/152PASS (4a255c53), tsc96752PASS, i18n gatePASS,
-owned diffcheckPASS. Globaldiffcheck inherited memory export whitespaceFAIL;
-memory.db/export bu dilimde değiştirilmedi. Scoped-green repo-green değildir.
+## Şimdi yürüyen iş
 
-Candidate actual WDbN3v ffa011cc:12/12 EN/TR cancel/expiry/foreign/SIGINT/
-SIGTERM/conflict PASS. Basic zcCXJL a3ab75fb: wrongtoken/allow/deny/
-sameAppdoctor PASS. Conflict'te yerel HOLD korunur; bağımsız yetkili deny,
-yerel child sonucu beklendikten sonra kartı emekliye ayırır ve stdin açılır.
-Source59/compiled11 sabit; childclose/absence/unownedtmux0. Fixture auth insan
-onayı veya production receipt değildir; realproviderturn0. Native B açık.
+7099 Native B: invocation + explicit once/session/always → canonical live-auth
+→ verified decision → exact grant/effect. Nested deckent_call_tool da kapsamda.
+Candidate /tmp/deckent-7099-native-permission-9dahQa, base dd8abc76d.
+B0-R1 corrected source a5551fb0, tek R1 run15/15PASS80ea2183;
+Fable912/913 foundation GO. Önceki iki FAIL ve rejected freeze korunur.
+BG exact2 RuleStore grant-source Fable906 GO, 3file20/20PASS; main'e alınmadı.
+BW signal-capture correction source72d5c006, test14924006;
+v2 report2d4a8ffb30/30PASS, root source/readback PASS, Fable916 foundation GO.
+B1 exact7 session/loop writer Lovelace çalışıyor; B2 scope mapping salt-okuma.
+Exact plan/scope/proof/budget capsule'ın Native permission B bölümünde.
+B0/BG/BW foundation proof, producer/consumer/C proof olmadan UNWIRED/HOLD.
+Yeni approval motoru/top-level schema yok; details canonical digest zaten bağlı.
+Cancel/turn değişimi, stale cevap, yanlış args ve persist failure ayrı testlenir.
 
-Kalıcı candidate v8 archive:
- /home/alperen/deckent-recovery-20260904/terminal-7099-approval-v8-5JqLrk
-manifest5f2c4b8a;SUMS12beaa41;152checksumPASS/153file/43dir0600/0700/no symlinks.
-Önceki v7 bgoN5M, v5 M26L8n ve tüm failure kanıtları korunur.
-Fable883/885 kaynak+actual incelemesi mainfan-in için scoped GO; XVerify receipt değil.
+## Son mühürlü dar kanıt
 
-## Sıradaki sınır
+Approval A clean committedtree15file150/150PASS; main15file152/152PASS
+(fark inherited live-footer2tests). tsc/i18n/scoped diffcheck PASS.
+Main build:all16255PASS; canonicalbotstop2295163→start2611078 (18:37Z).
+Mainactual ELFUml89c49d4a12/12 + pohZAeaf5dac2c2/2PASS; Fable890 doğruladı.
+Bu runtime bilgisi historical proof'tur, bu tur fresh liveness iddiası değildir.
+Main archive terminal-7099-approval-main-v8-Hxa2eI manifest606d95db/SUMS97fab1ef.
+Candidate archive terminal-7099-approval-v8-5JqLrk manifest5f2c4b8a/SUMS12beaa41.
+Önceki v7/v5 ve tüm failure kanıtları korunur. Fixture auth insan onayı veya
+canonical XVerify receipt değildir; native B ve outer7099 henüz kapanmadı.
 
-1. Bounded18 sourcecommit tamam. İlk helperprepare U3messagehunk sayımı2≠4
-   fail-closed geçmişi korunur; v2 exactdelta ilePASS. Cleanverificationtree
-   /tmp/deckent-7099-approval-commit-8JZ5KG 18blob=commit; main59pin değişmedi.
-   Aktif MCP süreçleri için documented reconnect henüz doğrulanmadı.
-2. Main proof/arşiv/sourcecommit tamam; yalnızcapsule/currentflow docs landing.
-   MASTER7142–7146 OPEN admission commit'i ayrı HEAD+exact5 projection gerektirir;
-   inherited3357/14GR ve çalışma ağacındaki projection korunur.
-3. Native B once/session/always intent+auth+grant/effect wiring; A tekbaşına7099 değil.
-4. 7099 kalanL1–L6/multiworker/otomatiknextgoal/durable settlement.
-   İlk güvenli resmi admission sınırında dogfood'a dönüş.
-5. Sonra7103→7101→7104→7102(önceADR)→4034. 9002DONE;9001 gelecekte.
+## Sonraki sıra ve korunan sınırlar
 
-## Korunan sınırlar
-
-L4E2895e2891 ve L3f01d2d28a committed; kanıtları kalıcı arşivde.
-L6 debug candidate frozen/HOLD, bütçesi tüketildi; aynı failure'a körretry yok.
+B0→B1→B2→C compiled/main proof→7099 kalan L1–L6 ve çoklu-worker/next-goal settlement.
+İlk güvenli resmi admission sınırında dogfood'a dönüş; yeni sprint/dispatch yok.
+Ardından7103→7101→7104→7102(önceADR)→4034. 9002DONE;9001 gelecekte.
+7142–7146 ayrı OPEN kuyruk; ikinci ACTIVE outcome veya yeniden sıralama yok.
+L6 debug candidate frozen/HOLD, bütçesi tüketildi; kör retry yok.
+Owner904: MCP reconnect sonraki session boundary; current compiled CLI kullanılır.
+Platform disposable host erişimi gelecek; mevcut local daemon/model bounded
+proof için canonical start/ölç/stop yetkili, henüz başlatılmadı.
 Windows/macOS/SSH realhost proof açık; fullsuite baselineFAILED.
-7142–7146 ayrı OPEN queued işlerdir; ikinciACTIVEoutcome değildir.
-Push owner'ın codex2 koordinasyonunda; önceki TOOL_POLICY_HOLD'a bypass yok.
-Retained728/.tasks/memory.db ve inherited dirt korunur; yeni sprint/dispatch yok.
+Scoped-green repo-green değildir. Retained728/.tasks/memory.db/inherited dirt korunur.

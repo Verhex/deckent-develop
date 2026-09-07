@@ -31,3 +31,24 @@ Beş yeni iş için sıra veya yeni ACTIVE outcome seçimi belirtilmedi. Mevcut 
 Approval kararı mevcut bounded recovery'nin devamıdır, altıncı yeni outcome değildir.
 Bulgu şiddeti, kök neden ve tamamlanma iddiaları ayrıca disk/gerçek-binary kanıt ister.
 Platform proof eksikleri ve baseline test kırmızıları bu belgeyle kapanmaz.
+
+## Operasyon cevapları — ENTRY904, 2026-09-07T19:16Z
+
+Root ENTRY903'ün toplu sorularına owner'ın Fable oturumunda seçtiği cevaplar;
+root 19:18Z okumasında gövde SHA-256
+`36377bca42312e99287080e6bd657fb6eaf53a80cf96817ddb3e4e348fae3db7`
+doğrulandı. Doğrudan relay teyidi yukarıdadır. Bunlar yeni MASTER işi veya
+authenticated approval/handoff/closure receipt değildir.
+
+- Q1: “Disposable test host/runner erişimi vereceksin (Önerilen)”. Owner seçimi
+  macOS/Windows-native/SSH proof için ortam sağlamaktır; exact host/OS/izinli kök
+  ve terminal capability henüz root'a ulaşmadı. Erişim gelene kadar platform HOLD;
+  başka hostta gerçek proof varmış gibi raporlanmaz. Secret bu belge/kanala yazılmaz.
+- Q2: “Sonraki oturum sınırında restart planlansın”. Long-lived MCP reconnect bu
+  oturumda yapılmayacak; güncel compiled CLI kullanılır. Sonraki host restart
+  sonrasında source/runtime kimliği karşılaştırılmadan freshness VERIFIED denmez.
+- Q3: “Bounded proof süresince root canonical start/stop yapabilir (Önerilen)”.
+  Mevcut config-resolved daemon/model için resource admission sonrası yalnız
+  bounded local-provider proof boyunca start → ölç → stop yetkilidir. Yeni model
+  indirme/seçme veya credential mutation kapsamda değildir. Bu kayıt daemon'un
+  başlatıldığını ya da gerçek provider proof'un tamamlandığını iddia etmez.

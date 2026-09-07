@@ -11,6 +11,220 @@ PREREQUISITE: 3331 (landed 2449b6e4f) → 3332 (landed 13d2c80ef) → 3333 (land
 OWNER_DECISION_REF: owner-live-2026-09-04-terminal-audit-closure-v2
 STATUS: IN_PROGRESS source-work; DOGFOOD_HEALTH=DEGRADED. 2026-09-06T23:10Z sonrası gerçek autonomous dry-plan PASS; exact micro-task proof admission ve çoklu-worker settlement hâlâ açık, yeni worker dispatch yok.
 
+### Native B checkpoint — 2026-09-07T19:39Z
+
+B0-R1 exact2 source bağımsız Fable912/913 foundation GO; alias regression
+testleri zaten mevcut, yeni test/audit turu açılmadı. once exact invocation;
+session/always mevcut RuleStore tool-wide '**'. B1 exact7 writer Lovelace,
+19:36Z sonrası private candidate'da admitted implementation yürütüyor.
+BW final source72d5c0067c8a2a2cb3b3f53e7947ebfc03a7ef23cb11c863a6acfe9e85b40731,
+test1492400610529680cff8a28cfabb7efab5da9054fc1f9bb3f117b9be22017894.
+`native-bw-tests-v2.json` sha2d4a8ffb2909f02d3c10fa38930f26529c93a4a9cb8461b47eb5cfa67688d6d6
+30/30PASS, skipped0; v1 report/failure history korunur. Yeni root source evidence
+mutable opts.signal cleanup kimliğini değiştirebiliyordu; tek izinli correction
+const signal capture + mutable-options/pending-settlement cleanup regression.
+Root tam diff ve JSON assertion sonuçlarını okudu, yeniden test koşmadı;
+bağımsız exact2 source incelemesi Fable916 foundation GO ile sonuçlandı. B2 wiring/private compiled
+proof henüz yok; foundation-only main source landing yapılmadı. Native kabiliyet
+kanıtlanamadı; outer7099 VERIFY. Bu checkpoint build/runtime/restart/dispatch değil.
+
+### B1 session consumer admission — 2026-09-07T19:32Z
+
+B0-R1 source a5551fb0967e56dd0f51cb303af2ef3d323cd664069234d25584d3d715f8b83b,
+test709f266425873cf49afc7e16d462b1c0e04f435d3c467c973f4cdc97b47a30b1;
+only authorized R1 test15/15PASS, attempt-4-r1.json
+sha80ea2183fef92394d486bb4a3483af98ac3cbc0645e6bcb387be5a9bb2934959.
+Root exact-source/readback accepts foundation for dependent private B1 work;
+different-provider source review requested, main fan-in/production closure yok.
+
+B1 exact write scope candidate9dahQa: `src/agent/events.ts`, `src/agent/loop.ts`,
+`src/agent/session.ts`, `tests/agent/session.test.ts`, `tests/agent/loop.test.ts`,
+`tests/agent/loop-cancel.test.ts`, `tests/agent/native-permission-session.test.ts`
+(new). Tek writer; B0/BG/BW dosyaları immutable dependency-read-only.
+Session emits invocation identity before operator choice, with fresh process
+instance, turnGeneration, invocationId; existing logical session id reused where
+available. It registers the emitted invocation before yield (legitimate early
+answer works). respondPermission takes exact emitted request/binding, not bare
+provider call id; reject stale/duplicate/unknown/modified request with typed outcome,
+never caches unissued pre-answer. Cancel/close/turn change retire pending and early
+answers; old turn cannot revive under later send's cancellation flag reset.
+
+Top-level loop rehashes args before grant and before handler, validates unchanged
+tool/tier and policy deny/cancel state at effect boundary; no grant after abort.
+Do not emit tool-executing as successful effect. Hold/cancel preserve complete
+tool_use/tool_result transcript pairing. Session-owned nested permission seam
+uses same generation/signal/issued-request owner and callback, not a second
+pending map in Terminal. It must be usable by B2 createParityExecImpl without
+calling send recursively or inventing provider call identity. Nested remains
+explicit once-only; longer choices never silently downgrade. Callback injection
+is a dependency boundary, not authenticated authority by itself.
+
+B2 existing native-agent-bridge.ts call site and run.tsx are exact downstream
+consumers; B1 may leave their type migration pending ONLY in isolated candidate,
+must report it, and cannot claim full tsc/build/production green. B2 will supply
+canonical verified decision callbacks and same ApprovalCard family; no raw local
+confirm fallback in the final chain. Main or foundation-only commit prohibited.
+One implementation+at most2 changed-evidence corrections, at most3 targeted test
+invocations, 35min checkpoint, forks≤2/total≤16GB. Expected tests: actual session
+stream two early/parked orderings, stale/sibling/reused call ID, new turn, cancel
+during approval, cancel at tool-executing yield, args mutation, nested callback,
+zero grant/handler on HOLD and successful existing transcript/permission behavior.
+No build/fullsuite/provider/runtime/credentials/MASTER/communication/commit/push.
+
+### B0-R1 + BW bounded continuation — 2026-09-07T19:27Z
+
+B0 original test budget tüketildi; yeni source evidence bağımsız read-only pass'te
+array non-index collision + exported LIFETIMES runtime-mutation alias olarak
+doğrulandı. B0-R1 exact aynı2 dosya, tek consolidated correction ve tek targeted
+test invocation, 15dk checkpoint. Array own keys yalnız dense indices+length;
+lifetime choices runtime-frozen. Digest/intent equality testleri tüm alanları
+karşılaştırır. Yeni feature, Proxy-hardening turu veya generic framework yok.
+Bu tek correction başarısızsa B0 HOLD kalır, aynı fingerprint tekrar koşulmaz.
+
+BW, B0-R1 ile disjoint aynı B2 consumer dependency: yalnız
+`src/core/approval-broker.ts` awaitDecision optional signal/removal seam ve
+`tests/core/approval-broker.test.ts`. Existing no-options API aynen kalır;
+AbortSignal yalnız exact waiter'ı kaldırır, AbortError ile döner, hiçbir approval
+decision/expiry/deny/receipt oluşturmaz. Aborted-first, parked abort, same-id sibling
+waiter, decided-before-abort, external disk decision, signal-listener release
+testleri. Bir implementation + bir correction; en çok iki targeted test çağrısı,
+20dk checkpoint, forks≤2/combined≤16GB. UI/run.tsx/signing/lifecycle schema ve
+main/runtime/MASTER/channel/build/commit/push negative scope. B2 gerçek native
+cancel consumer bunu kullanmadan BW için production closure iddiası yok.
+
+### Native B checkpoint — source review, 2026-09-07T19:24Z
+
+BG candidate exact2 source review GO (Fable906); source964e56eaefe746e45d03605feb2e235e77af0c15a1d05306afa9082fd5794cde,
+testaac76101420447341eeeaa3a9a0b5fc3ef3f97c99bb767964e44f2a739a59dca.
+3file20/20PASS `native-bg-tests-v1.json` in9dahQa, sha
+3e0c967ff11753ebb53751af6a64436214ee3fb6d22f1ab554818134d3cb1f66.
+Only grant memory update moves after successful persist. Partial disk writes/crash
+durability are NOT proven; no7142closure or production main fan-in yet.
+
+B0 2-file candidate first freeze9b5de6c1/e233f782 is ROOT HOLD, not accepted.
+Reports `/tmp/deckent-7099-native-b0-proof-qppnYG/attempt-{1,2,3}.json`:
+10/14FAIL,10/14FAIL,15/15PASS; finalsha
+636f05a82f714e7edaed49c6b163a90ca4f98da6ddc1efc8fa4dfee5cf812285.
+Worker intermediate '2PASS' was incorrect; root read all three JSON reports and
+retains failures. New source evidence: array extras '-1'/'0.5'/'Infinity' pass
+numeric-coercion validation but canonical array JSON omits them (digest alias).
+One independent source challenge will consolidate exact defects before a single
+bounded correction; original three-test budget is exhausted, no blind retry.
+B1/B2 writers are not started; B0 producer/consumer remains UNWIRED/HOLD.
+
+Additional B2 prerequisite evidence (no new work identity/implementation yet):
+run.tsx wireApprovalCrossProcess currently emits decisions without settling broker
+waiters; awaitDecision has no abort removal seam. Existing OS principal id uses
+username@host but CLI reauth actor uses OS username; identity projection must be
+shared without echoing request identity or inventing a principal. Native tool
+metadata lacks a canonical ApprovalScope mapping. These are exact consumer gaps,
+not permission to add a second broker/store or downgrade raw confirmation.
+
+Owner relay904 accepted, sha36377bca42312e99287080e6bd657fb6eaf53a80cf96817ddb3e4e348fae3db7:
+platform disposable host access to be provided (not yet present), MCP reconnect
+at next session boundary (current CLI until then), existing local daemon/model
+canonical start/measure/stop permitted for bounded proof after resource admission.
+Verbatim provenance: docs/execution/evidence/7099/owner-relay-admission-2026-09-07.md.
+No local daemon start, provider call, main source edit, build, or cleanup in this
+checkpoint. Goal remains active; source development stays within7099.
+
+### Native permission B — bounded dependent contract, 2026-09-07T19:12Z
+
+7099/L3 mevcut owner-onaylı A → B → C zincirinin devamı; yeni outcome değildir.
+A source ff6b1d409 + docs55422e982 main'de; B henüz production-wired değildir.
+Owner relay858: düzeltmeyle devam, mimari değişiklik yok. ADR recall:
+ADR-G-034 (aynı ApprovalBroker), G-020 (principal/scope), G-021 (self-modifying
+always floor), D-007 (bounded manual recovery). Design authority: north-star §25,
+reconciliation §5/7; Terminal tek control surface, Dashboard projection kalır.
+Design-DNA/agentic-UX/enterprise-UX: intent, authentication, grant ve effect ayrı
+durumlar; birinin başarılı olması diğerinin gerçekleştiğini kanıtlamaz.
+
+Base dd8abc76d; isolated candidate `/tmp/deckent-7099-native-permission-9dahQa`.
+Main inherited source/MASTER/runtime korunur. DOGFOOD ON / HEALTH DEGRADED;
+normal dispatch ve çoklu-worker settlement kanıtı hâlâ açık. Bu bölüm yeni run,
+attempt veya custody receipt üretmez; host engineering task kimlikleri aşağıdadır.
+
+**B0 — strict binding foundation (şimdi admitted):** yalnız
+`src/agent/native-permission-binding.ts` ve
+`tests/agent/native-permission-binding.test.ts` (yeni iki dosya); tek writer.
+Shared data contract native invocation'ı sessionId + process-local sessionInstanceId
++ positive turnGeneration + unique invocationId + callId + tool + argument digest
++ tier/elevated/nested ile bağlar. Logical session resume aynı process instance
+değildir. Secret/raw args persisted details'e girmez. `details.nativePermission`
+strict, versioned intent envelope taşır; canonical ApprovalRequest top-level schema
+değişmez. `approvalRequestDigest` v1/v2 zaten details'i, live reauth ve reconciliation
+da exact request digest'ini kapsar. Raw JSON args için domain-separated SHA-256;
+existing audit-writer canonicalJson recursive sıralaması kullanılabilir, yalnız
+önce non-JSON/cyclic/accessor/non-finite input reddedilmelidir. Malformed/unknown
+fields açık typed HOLD; hiçbir hata raw input'u mesajına yansıtmaz.
+
+**BG — existing RuleStore failed-grant containment (B0 ile disjoint admitted):**
+yalnız `src/agent/permission-store.ts` grant branch ve
+`tests/agent/permission-store.test.ts`. Mevcut always persist throw olursa yeni
+rule activeRules'a girmemeli; başarılı persist mevcut reload/lifetime semantiğini
+korumalı. Gerçek private tmpdir path failure ile regression; mevcut store/merge/
+grant testleri. Yeni durability engine, fsync/CAS redesign, revoke/deny-policy
+refactor veya 7142 implementation yok. Bir pass + en çok iki düzeltme / üç scoped
+test koşumu / 20dk checkpoint; candidate exact2 tek writer; main/build/runtime,
+credential/MASTER/commit/push yok. B2/C grant-before-effect negatif proof'a bağımlı;
+yalnız test geçmesi production closure değildir.
+
+**B1 → B2 → C (B0 bağımlı, henüz writer açılmadı):**
+B1 native events/loop/session aynı binding'i emit eder; early answer yalnız o
+emitted invocation'a kabul edilir. Eski/sibling/duplicate call id, session restart,
+turn advance, close/cancel ve argument mutation allow veya grant üretemez.
+B2 run.tsx/native-agent-bridge + aynı ApprovalCard ailesi: explicit lifetime intent
+seçimi → mevcut broker request → A canonical CLI live-auth → current durable
+decision doğrulaması → exact native response → RuleStore/effect. Native nested
+`deckent_call_tool` consumer da aynı adapter'dan geçer, raw confirm fallback yok.
+Caller gerçek OS principal/effective tenant/config'i çözer; engine id insan kimliği
+olmaz. Missing authority, disabled capability, non-TTY veya stale context typed
+HOLD üretir; provider credential/key provision yapılmaz. Consumer scope B0 fan-in
+sonrası exact-path olarak ayrıca sabitlenecek; B0 writer bu yollara dokunmaz.
+
+**Lifetime/effect sözleşmesi:** once yalnız exact invocation, session mevcut
+RuleStore'da tool(**) yalnız yaşayan session, always aynı tool(**) mevcut persisted
+RuleStore. Sonraki farklı resource'a uygulanan tool-wide grant gizlenmez. Native
+always, generic CLI `approvals --always` değildir; generic allow'dan lifetime
+türetilmez. Self-modifying/always-tier floor ve mevcut nested once-only policy
+seçenekler gösterilmeden çözülür; unsupported longer grant sessiz once'a dönmez.
+İzin beklerken args değişimi reddedilir; bilinçli tool-wide sonraki grant bundan
+ayrıdır. Abort/policy deny tekrar grant ve effect sınırında kontrol edilir.
+Persist failure active permission belleğinde başarılı grant bırakamaz. Bu dar
+grant failure-atomicity, B consumer closure'ını bloklarsa aynı slice içinde exact
+scope alır; 7142 genel fsync/runtime uyumluluk outcome'u burada uygulanmaz.
+
+**Proof manifest:** B0 canonical nested-order stability, changed nested value,
+non-JSON rejection, strict envelope, swapped session/turn/call/tool/digest/lifetime,
+floor/nested once-only, secret-free output. B1 gerçek session stream early-answer,
+cancel/late-answer/reused-call-id ve zero-handler/zero-grant negatifleri. B2/C
+compiled actual Terminal + private fixture auth: once/session/always/deny/expiry,
+abort/conflict, persisted reload, policy floor, nested target, EN/TR keyboard ve
+aynı session resume; exact request/auth/grant/effect kanıtları ayrı ölçülür.
+Fixture auth insan onayı veya XVerify receipt değildir. Linux PTY diğer gerçek
+macOS/Windows-native/SSH hostlarını kanıtlamaz; erişilmeyen platformlar HOLD kalır.
+
+**Budget/sınır:** B0 bir implementation + en çok iki changed-evidence correction,
+en çok üç scoped test koşumu, 30dk checkpoint; ≤16GB toplam, forks≤2. Build/fullsuite,
+runtime/credential/MASTER/communication mutation, commit/push worker'a kapalı.
+B0 unit-green FOUNDATION/HOLD'dur, B1/B2/C production closure olmadan LANDED/DONE
+değildir. Root source review ve Fable bağımsız audit sonrasında exact consumer
+fan-in; aynı failure fingerprint'e kör retry yok. İlk güvenli canonical admission
+sınırında dogfood'a dönüş; bu plan onun gerçekleştiği iddiası değildir.
+
+### Five owner admissions — committed, 2026-09-07T19:05Z
+
+dd8abc76d (parent55422e982): exact4 docs path +284/-16; MASTER yalnız7142–7146
+OPEN ekledi. Candidate canonical check PASS: source4a2092257995ba1e24232f24ed3dd9b75165614018a72fca9d9b49144341a68d,
+589rows/500active/218receipts, closure append-only7eventsPASS. Fable900 bağımsız
+HEAD ölçümü: receiptRegistry değişmedi; inherited3357/GR-714 commit dışında;
+main residual MASTER19satır korundu, index boş. Kanıt manifest
+`/tmp/deckent-7099-approval-73zxwUTv/proof/master-five-prepared.json`
+sha c6d58d1b86d50740cdcdc9a8413a75e7632f16404cd059a9a4ee7f594efb0c44.
+İlk stage precheck default1MB git-show buffer ENOBUFS ile index yazmadan durdu;
+bounded16MB async okuma ile precheck geçildi. Ürün/runtime retry veya cleanup yok.
+Bu admission'lar yeni ACTIVE outcome veya closure değildir; 7099 VERIFY korunur.
+
 ### Approval bounded source landing — 2026-09-07T18:50Z
 
 Commit ff6b1d4099ce1929cf511a9c9c5c6f081064a635, parent
