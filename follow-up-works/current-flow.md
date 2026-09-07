@@ -4,7 +4,7 @@
 > Silinme tetiği: onaylı sıra tüketilip kalıcı kanıtlar MASTER/evidence'a işlendiğinde silinir.
 > Önceki ayrıntılar Git ve mevcut7099 capsule'ındadır.
 
-## Aktif durum — 2026-09-07T08:08Z
+## Aktif durum — 2026-09-07T08:35Z
 
 7099 tek ACTIVE outcome, MASTER VERIFY; bütün ürün/Terminal kapanışı yok.
 DOGFOOD ON, health DEGRADED; owner onaylı bounded ADR-D-007 kaynak yürütmesi.
@@ -38,14 +38,24 @@ DB/config/credential kopyalanmadı; 7099 capsule'ı exact kanıt ve sınırları
 
 ## Runtime / remote
 
-Bot1288980 canonical stop → execution ALLOW → main build:all PASS →
-bot1417628 canonical start/status PASS; Fable üç-digest eşliğini doğruladı.
-Main build identity `f9edde1e…`, sourceTree `8e00962d…`.
+Bot1417628 canonical stop → execution ALLOW → main build:all PASS →
+bot1693409 canonical start/status/liveness PASS; Fable runtime digest eşliğini doğruladı.
+Main build identity `a11b5dcb…`, sourceTree `81a049d4…`.
 MCP reconnect kanıtlanmadı. Yeni sprint/worker dispatch veya retained cleanup yok.
-Push TOOL_POLICY_HOLD; unchanged retry/bypass yok. Source HEAD ahead27/behind0
+Push TOOL_POLICY_HOLD; unchanged retry/bypass yok. Source HEAD ahead30/behind0
 ölçüldü; docs commit bunu değiştirebilir. Remote CI tetiklenmedi.
 
 ## Sonraki iş
+
+`7099-CADENCE-FIX-1` source `64562e63d` ile landed; exact4 blob PASS.
+Autonomous + memory-export frozen MessageFamily; mesaj baytları korunur. MCP raw
+no-config testi typed observation ile eşleşir. Guard core-owned memory-read
+kataloğunu statik named re-export üzerinden doğrular; katman sınırı değişmez.
+Selected/main60 test, i18n/typecheck, compiled78 check PASS; ilk iki FAIL korunur.
+Private arşiv:`/home/alperen/deckent-recovery-20260904/terminal-7099-catalog-7LQIzj`
+42checksum/43file;manifest6f287d6e/SUMSbacb401e. Fable748/750 independentPASS;
+provider/MCP network/CLI-entrypoint/whole7099 closure veya canonicalXVerify değildir.
+DB/retainedstate/MASTER korunur. Yeni kaynak ve bot build'i güncellendi.
 
 1. B2 kaynak ve kalıcı evidence/capsule/MASTER kaydı tamamlandı; 7099 VERIFY kalır.
 2. Full-suite cadence ölçümü TAMAM:2979 exact dosya/67 batch,41170 test:
@@ -55,7 +65,7 @@ Push TOOL_POLICY_HOLD; unchanged retry/bypass yok. Source HEAD ahead27/behind0
    Kalıcı private arşiv:`/home/alperen/deckent-recovery-20260904/terminal-7099-cadence-oCU1IZZt`
    289checks/290files;manifest f8978033… /SUMS9318f6f1…;capsule exact kanıtı taşır.
    Yeni baseline aggregate6c878a6e…; Fable736 bağımsız ölçüm, XVerify receipt değil.
-   İlk source dilimi:7099 autonomous-planner catalog convention + f9/MCP fixture.
+   İlk source dilimi CADENCE-FIX-1 ile yerel doğrulandı; genel baseline hâlâ failed.
    Inherited footer/KPI/custody ayrı; tenant failclosed korunur. Diğer triage arşivde.
    Do missing-tasks/output --logs UNRELATED bulgu; otomatik admission/fix yok.
    Hiçbir test retry/build/dispatch yok; tüm başarısızlıklar kapanmış değildir.
@@ -64,6 +74,8 @@ Push TOOL_POLICY_HOLD; unchanged retry/bypass yok. Source HEAD ahead27/behind0
    Sonraki exact L4 gap: son5 dışındaki `/resume sprint-ID` archive reader'a ulaşmıyor.
    Exact chat absence sonrası canonical direct archive lookup; jobs fullscan yok.
    Chat corruption/failure sprint fallback ile gizlenmez. Henüz uygulanmadı.
+   Ek kod kanıtı: session-ledger.ts readLedgerLines read hatalarını ve bozuk satırları
+   boş sonuca indiriyor; archive fallback öncesi typed absence/failed ayrımı gerekir.
    Yeni test bulgusu: memory help arg/options yansıması ürün gap adayı; triage sürüyor.
 4. Sonra7103 →7101 →7104 →7102 (önce ADR amendment) →4034.
 5. C1→3358; C2+C4→3359; C3→3360; C5→6182; C6→546; C7→547;
