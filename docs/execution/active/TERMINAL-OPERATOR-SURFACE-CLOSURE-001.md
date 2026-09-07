@@ -11,6 +11,605 @@ PREREQUISITE: 3331 (landed 2449b6e4f) → 3332 (landed 13d2c80ef) → 3333 (land
 OWNER_DECISION_REF: owner-live-2026-09-04-terminal-audit-closure-v2
 STATUS: IN_PROGRESS source-work; DOGFOOD_HEALTH=DEGRADED. 2026-09-06T23:10Z sonrası gerçek autonomous dry-plan PASS; exact micro-task proof admission ve çoklu-worker settlement hâlâ açık, yeni worker dispatch yok.
 
+### L4-E/L3 bounded commits + A candidate native-read proof — 2026-09-07T17:28Z
+
+Prior verified main slices committed without changing worktree bytes:
+L4-E `2895e2891ec965e5e65e57b057f5444ae91f31f7` (18paths,+1070/-86),
+then L3 `f01d2d28ad71562c06a8dd6fd16c1d2dcb48dba7` (28paths,+3987/-161).
+Root `approval-73zxwUTv/proof/main-bounded-commits.json` proves exact parent
+chain/path sets/blobSHA, unchanged main43 and empty index. Candidate blobs
+were staged directly, no worktree replacement; inherited run.tsx +7 footer
+labels remain unstaged. Fable ENTRY844 scoped GO and850 independent postcommit
+18/18+28/28 corroborate this. Review scope is partial-line/grep where explicitly
+reported, not full-line cross-provider audit or canonical XVerify receipt.
+Known tool-result-broker quotation formatting churn retained and disclosed;
+parent-unexpected-exit detached child custody is RELATED, not auto-admitted.
+Main runtime/build/restart/push were not touched in this segment. Git loose
+object/gc warning retained; no prune or cleanup. 7099 remains VERIFY.
+
+Root index proof helper initially decoded stdout per Buffer chunk, causing
+false INDEX_PIN for UTF8 entry.ts after L3 stage. Direct git-show SHA matched
+candidate e9d60f7. Buffer.concat byte verification fixed the proof helper;
+existing exact28 staged blobs then passed read-only verification. No product
+source change, restage, guard disablement or erased failure.
+
+A candidate `/tmp/deckent-7099-approval-73zxwUTv/candidate` remains separate.
+First native read repair pause→nextTick passed131tests but WzCrLn actual
+failed (79826bb9). Public observer vnStJ3 (a26f6bb6, childrenb75e4135) showed
+pause called with flowing=false/paused=true, no pause event; current Ink
+readable callback still called read before listener bookkeeping nextTick.
+Final exact helper waits nextTick BEFORE pause, then nextTick AFTER it; public
+Readable callback ordering test proves pause event/read-stop boundary before
+spawn. No privatehandles, manual resume/rawmode or node_modules edits.
+Source4bcc3129/test0768bab4; worker10/10PASSf1990d1a, freeze56-v5cb90f76b,
+candidate build20323exit0, sequential13files132/132PASS5273f622.
+
+Actual final-source tests both PASS (Linux private fixtures):
+- MOlnGT result e913919cc84721b97721b7bf42290f53422f0b61206d97ce8836cb0e9fe02fd0
+  observes public pause event/tick before each child spawn; heartbeat continues.
+- ZApQgD result 929df47ed37bc26f4e4fa94e002e550fab3ecd53e4a1de14f711f9381775c06f
+  removes diagnostic stdin method wrapping; same EN/TR matrix passes.
+Each covers wrong token preserving pending request, fresh authorized durable
+allow/deny, same-App doctor read card, normal exit, exact childclose/no-survivor
+and zero providerturns. Source56/compiled10 unchanged. Fixture input is not
+human owner approval or production settlement. Fable847 read-only result pin
+corroboration is not a canonical XVerify receipt. Cancel/expiry/conflict/foreign
+tenant actual tests, nativeB grant lifetime/attribution, mainfan-in and other
+platform evidence remain open. A alone does not close L3 or7099.
+
+Fable D0/D1/D2 independent mechanism evidence is in scratchpad
+`/tmp/claude-1000/-home-alperen-deckent-dev/85e53232-d530-458a-8763-659f981dd78b/scratchpad/susp/`:
+out-D2-inherit-flags.txt8b25223f (sharedTTY nonblocking flag removed by child),
+inherit-flags.mjsbb131d0c, driver3.mjs4d4274f4. Durable copy pending with A
+archive, not silently assumed archived. K3 root scan: REPL capture ingress
+uses ignore/pipe/pipe; no other literal inherit in native/provider/helper
+scope. Standalone chat/do/onboard/watch/plugin/upgrade/provisioner are distinct
+ingresses; scan is not blanket product proof. Root and Fable each reported
+stale channel consume errors; missing content re-published847 and resolved852.
+Root writer now validates every expected ENTRY and matches EOF before replace.
+
+### L3-A canonical child auth proof + context dependency — 2026-09-07T16:23Z
+
+Root exercised existing main compiled approvals decide in private fixtures,
+not a real owner approval: EN/TR8/8, pipe/wrong-token rejected without a durable
+decision, confirmed allow/deny freshly validated through current authority.
+Result `/tmp/deckent-7099-approval-cli-auth-ACWqi4/result.json`, sha256
+9386224f043707098d06514c43ac34f5bd9d96d43e3454894f17ccdf8b7154c8.
+Eight closed/absent children and transcript pinsPASS; five compiled module pins
+unchanged; current main43 source freeze still matches. No source fan-in/build.
+New approvalCard/suspendTerminal wiring, wholeL3/7099 and XVerify remain unproven.
+
+Initial KA2KVE/Ocq60K/FICKKN failures retained: Node24 permission mode forbids
+fsync, so live-session durable CAS cannot run under that diagnostic profile.
+Final explicit private cwd/host/env test allows real fsync; no OS sandbox claim.
+No actual project request, credential, provider operation or settlement touched.
+Full root notes/helper/failure identities in approval candidate's
+`../proof/canonical-cli-auth-review.md`. Automated fixture input is not human auth.
+
+Actual CLI revealed generic file-read incorrectly described as one reachability
+check, with an unsupported execution-start claim after allow. Same7099 current
+closure blocker, no new MASTER. Exact disjoint A1 writer memory_landing_map owns
+approvals.ts, approvals context/prompt/effect keys in messages.ts and new context
+test; scope and finite budget `../proof/approval-context-plan.md`.
+Main messages86b7 dependency copied exactly to candidate; unrelated bytes protected.
+Sol A owns Card/run/App/terminal command/cli-terminal-slash unchanged scope.
+
+A1 source frozen, root-reviewed: approvals.ts d9d241e9, messages.ts3064212c,
+new contexttest4d5ea433. Main-relative messages diff only exact approval keys,
+unrelated inherited main86b7 byte changes preserved. Source test final v3 is
+3files21PASS (nested suite count6 is NOT six files), JSON43e1f780188f84ad33623cbc969f8fe33a239a13694087a38c1fd1a5eb83a5b3.
+v2 15PASS6FAIL56db6b3b retained; missing mock requester fields got localized
+unknown fallback, no authority schema weakened. Source/diff-check evidence
+only; changed compiled CLI proof pending A join. Root review in approval
+proof/approval-context-root-review-v1.md. ActualCardPTY helper syntaxPASS/UNRUN.
+
+### L3-A integration / native-read HOLD — 2026-09-07T17:06Z
+
+L3-A integration status2026-09-07T16:48Z: candidate freeze56 a9d1c005, tsc10423
+and build15209PASS. Root12files105PASS; expanded13files128test127PASS1EscFAIL
+afaabb04 retained. ActualPTY UsVNE5/result.json sha256
+5f3dd7079eead4bc7e011dbc540777acede424cc01881abc3dd87b9509ba635f FAIL:
+EN auth wrong-token/allow/deny correct durabletruth, allchildclosed, provider0;
+after ownaccepted Card cleared but App's separate tracker kept inputpaused,
+so /doctor never spawned. Source+transcript missing consumer edge identified.
+Root bounded repair delegated disjoint App/app-wire and render-test readiness;
+exact scope/budget/history approval proof/root-integration-repair.md. TR and
+fullclosure unproven; no main source/build/restart/commit/newMASTER mutation.
+
+App tracker consumer correction and condition-based render readiness joined
+freeze-v3 66fb60ce (56paths), candidate build89523 exit0. Sequential root
+13files130/130PASS ca7f711f; previous concurrent build/test invocation81358
+was correctly rejected by hermetic dist-drift guard and remains FAILED.
+LmnC46 actualPTY reached /doctor child, proving tracker edge repaired, but
+helper exited before that child's closure. Original FAIL preserved, no claim
+that all children were absent at that report time. Helper now waits exact
+childclose and settled card. EOu07m exposed a separate parent hang.
+
+Unchanged-source native diagnostics:
+- 6LjPIX result0eef4ffe: child beforeExit/processExit1, parent no childclose.
+- XoW2hQ result9d2069cc: parent S/wait_woken/read(fd23), unchanged CPUticks
+  across18s; child Z. Parent timer heartbeat also stopped.
+- NegC8i resultd24638d5/process-snapshotc45187dd: fd23=/dev/pts/11,
+  flags02100002 (O_NONBLOCK absent); parent blocked read, deny child Z.
+  Wrong-token and allow passed in this run, so hang is not wrong-token-only.
+Paths: /tmp/deckent-7099-approval-card-pty-<identity>/result.json and
+en/process-snapshots.json. All invocations terminal; final captured PIDs absent.
+No product-success inference from fixture cleanup. No real provider operation.
+
+Installed Ink pauseInput detaches/unrefs but does not call stdin.pause.
+Node24 getStdin public pause event schedules nextTick readStop. Read ownership
+handoff is therefore the exact new correction scope: only candidate
+approval-terminal-command.ts and its test, Sol writer; public pause completion
+before child spawn, Ink alone resumes, no privatehandles/node_modules mutation.
+One implementation plus at most one new-evidence correction, <=2 targeted
+tests. Root refreeze/build/test/actualPTY sequentially. Approval A still HOLD;
+native B attribution/lifetime and whole7099 not closed. Source scope/budget
+and full prior failures preserved in approval proof/root-integration-repair.md.
+Fable ENTRY837 independently rechecked main43 pins, botdist and prior three
+archives; scoped main source/proof audit continuing, not XVerify receipt.
+
+### L6 debug input privacy — bounded continuation, 2026-09-07 15:45Z
+
+Existing7099 L6 debug redaction, owner-authorized manual continuation; no new
+MASTER row/runtime state. InputBar currently persists raw `{input,key}` on
+each callback. Fragmented secrets cannot be protected by per-chunk regex.
+Selected scope: content-free diagnostic metadata + bounded owned sink + real
+InputBar wire; existing editing and history semantics stay unchanged.
+Exact six-path writer scope/negative scope/preimages/proof/finite budget:
+`/tmp/deckent-7099-l6-debug-kBRu2fMB/proof/plan.md`.
+Candidate detached5f9cc99a2. Main L3/L4E43 frozen; source not yet implemented.
+Root separately traces native approval read-only; no parallel hot-file writer.
+No build/restart/provider call/sprint/cleanup/commit/push admitted to worker.
+Claude20TR review pending; same-provider local checks are not XVerify closure.
+
+Final candidate review,2026-09-07T15:58Z: HOLD, not main. Root exact six-path
+freeze,30tests29PASS/1inherited Enter expectation FAIL, tsc61603 exit0. New
+debug/wire tests pass, but root source-bound injected-fs probe proves queue
+limit closes descriptor before pending write completion. No OS corruption
+claim; ordering violates the declared lifecycle. Two corrections exhausted,
+no further automatic FIX, no build/main fan-in/actual CLI PASS. Prepared CLI
+helper is UNRUN. Durable16payload evidence archive:
+`/home/alperen/deckent-recovery-20260904/terminal-7099-l6-debug-hold-kSb0FZ`,
+manifest b381872423d572f301a351eb7309395827c089edb6022ca78e9ef4fc07e1ee47,
+SUMS f6d7863e59013c612ec0e75073694720b1a59e3a30c2a4a6da73430b518b06c0.
+Root checksumPASS. Snapshot attribution correction:525378fb captured during
+correction2 WIP, not rejected correction1; renamed without byte rewriting.
+Main43 unchanged; other7099 work continues, whole goal remains active.
+
+### L3 native approval wiring — root source finding, 2026-09-07
+
+Existing7099 obligation, BLOCKS_CURRENT_DONE; no new MASTER item or source write.
+Root source trace and separate same-provider read-only challenge agree:
+- Native permission event in native-agent-bridge.ts798 flows via confirmTrigger
+  into session.respondPermission; it is local tool permission, not governed receipt.
+- approval-terminal-channel.ts80 forwards to relay handler; approval-relay.ts227
+  calls broker.decideChecked, not authenticated live-session ingress. The earlier
+  suggestion to reuse this channel as already live-auth protected is REJECTED.
+- approval-card.tsx388 sends then immediately onClosure/retires; relay catches
+  failures into channel-error. App3158 renders successful closure without waiting
+  for durable authority acceptance. Existing tests prove optimistic behavior,
+  not authenticated closure (approval-terminal-channel121, app-approval-wire332,
+  approval-card-render72 and approval-relay238).
+
+Next repair must preserve CLI approvals decide interactive live-auth as governed
+decision authority. No fabricated tenant/principal/receipt and no silent local
+fallback. Separate native local permission presentation from governed decisions;
+use canonical acceptance before success/retirement, keep failure pending/visible.
+UI convergence alone cannot close authority wiring. Analysis is not XVerify.
+
+2026-09-07 continuation: existing public Ink useApp().suspendTerminal confirmed
+in installed AppContext contract and ink.js. A admitted eleven-path governed
+card -> canonicalCLI interactive decision -> verified durable outcome -> same
+session resume, then B native attribution/common card/exact permission lifetime,
+then C full compiled/main proof. A alone cannot close L3/7099. No new signer,
+fake human answer, raw broker fallback, or silent native always-to-once change.
+Exact scope/negative scope/state matrix/finite budget in
+`/tmp/deckent-7099-approval-73zxwUTv/proof/plan.md`.
+Fresh detached candidate at5f9cc99a2 plus exact main43 dependency overlay,
+43/43 hashes verified. Debug-held candidate excluded. Main unchanged.
+
+### L3 structured read-model bridge — candidate implementation/review, 2026-09-07
+
+Same7099 manual owner-authorized continuation; no new outcome or runtime state.
+Candidate `/tmp/deckent-7099-l3-0ytHinmS/candidate` at5f9cc99a2; private
+`../proof/plan.md` SHA e98ab401e655a5b2ca5705486d564d5e1131ec7aeedf0089319910115873f381.
+Full closure dependency: A strict model snapshot/JSON -> B bounded streaming
+capture/same-session full-detail custody -> C canonical typed localized card
+and exact App ingress -> D actual compiled CLI/PTY -> E main proof/review/landing.
+A only admitted now, exact3source+4tests in plan; B/C read-only contract design.
+No lane foundation independently closes capability or7099. Model pool means
+owner-permitted catalog entries, not entitled/reachable/run-ready. Unreadable
+existing activation store remains HOLD; only truly absent store defaults.
+New BLOCKS_CURRENT_DONE: chat-tool-bridge default spawn accumulates stdout and
+stderr unbounded before broker preview containment. L3 must capture incrementally
+and preserve full-detail access or explicit partial truth, never parse a clipped
+preview as complete JSON. Existing session store is the owner; no parallel engine.
+L4-E main18 remain frozen/uncommitted; candidate has not received their overlay.
+Inherited main changes, retained728, .tasks and live memory.db remain untouched.
+Claude unavailable until20TR; local development is not independent XVerify.
+
+2026-09-07 13:02Z update: B amendment46777942 and C amendment503efced admit
+the dependent source chain. Root applied reviewed L4-E18 dependency overlay
+to candidate only, exact18 hashes matched freeze6d12419a; not L3-owned delta.
+A model JSON foundation root-verified4files/58tests PASS, result SHA
+096d31cf40ade35411515c0a2a4fd9139cb5ab4dce196df7e9bf7d655e869a80.
+Root found locale-sensitive digest and mutable policy snapshot; fixed before
+accepting A. Prior v4 customSet matcher FAIL preserved; fixed iterable assertion
+passed in root run. Exact7paths pinned in proof/root-a-review.json. A is not
+actualCLI/main/Fable closure. B1 provisional Sol store was not accepted: unsafe
+whole-file range allocation, UTF8/lifecycle/quota issues were identified. Sole
+B1 writer reassigned to l3_content_store; B2 CLI writer memory_landing_map;
+C card/App writer memory_hold_ui. No overlapping files or new main source
+changes. B/C implementation and whole7099 remain open.
+
+2026-09-07 13:30Z root checkpoint: B1 writer is now root after the replacement
+writer returned partial work. Root integrity-v1 36/36 PASS (18e98f018e2e),
+v2 40/40 PASS (a1d92c7d3711): directory replacement/close, publication collision,
+unsupported no-follow, malformed UTF8 preview bound, line-boundary marker carry
+and trailing exit precedence. Restored unrelated broker formatting to HEAD
+without changing the reviewed legacy mechanism. Candidate only; not main proof.
+B2 v3 59/59 was reopened on concrete review evidence: REAP_UNVERIFIED local
+handles could pin the event loop; capture admission exceptions were untyped.
+Volta v4 reports62/62 PASS, result ca7eacc98ac4a08459c4f37a0db08be588682837f717252afd08ff960c36412a;
+root final source acceptance pending. C raw paging is implemented but NOT frozen:
+root found within-window page skipping, missing execution axis, incomplete
+unknown-schema raw fallback and nested model detail loss. Tests do not override
+these source contradictions. All are BLOCKS_CURRENT_DONE within the same L3 DAG,
+not new MASTER items. No build/restart/dispatch/main source/commit/push this slice.
+
+L3 continuation checkpoint 2026-09-07 14:00Z: candidate A/B/C combined192/192
+PASS ff8c333c; L4-E regression153/153 PASS6ebdff6e; typecheck/i18n PASS. Root
+took final C ownership after incomplete worker passes. Real-store5MiB pager,
+raw unknown schema, expired reference, unmount abort, execution axis and model
+nested fields are source/test verified, not yet actual Terminal closure.
+Actual model CLI first probe fvYEkO/7429c822 exposed entry-level --offline
+bootstrap violation; same-package startup-offline-amendment-1 adds only entry.ts
+and catalog-lazy-bootstrap.test.ts. Parsed Commander offline intent is honored;
+JSON model read actions own their single catalog read, including authority HOLD.
+Root amendment regression76/76 PASS3bb9e59b. SQLite WAL sidecars are recorded as
+coordination artifacts; DB bytes, full ordered rows/policies and schema stay
+unchanged, never immutable=1 or a zero-filesystem-write claim.
+Candidate source freeze-v2 SHA5c671a6353908b4e98465476446dbd4938caa9cf23c08a1290aa88f52976ebec
+pins41paths; original39 unchanged,2startup additions. Candidate core/native
+build exit0. Final actual model CLI6/6 PASS /tmp/deckent-7099-models-cli-proof-D2BLx9/result.json
+SHAa71d11bd96ec402ebbc5e9372dcfd3bb03de181f8e8734ee8e6e216f7add387f.
+Each child close observed; logical authority unchanged, offline notice absent,
+compiled4 direct causal pins unchanged; not full transitive graph/network syscall
+or provider/billing/settlement proof. Root observer field-name TypeError in v2
+is preserved under proof/models-cli-proof-v2-helper-failure.json and crHO5c.
+NativePTY draft is incomplete/UNRUN, not accepted evidence. Remaining C snapshot
+freshness/count metadata and full interaction contract need completion before
+main fan-in/proof. Main18L4E pins unchanged; no main build/restart/dispatch/
+commit/push this slice. Fable review remains HOLD until20TR; whole7099 not DONE.
+
+L3 continuation 2026-09-07 14:40Z — source freeze-v5 d29f5a2c (41 paths,
+protected L4-E14 unchanged); same private candidate, root C ownership. Volta
+metadata pass34 tests was partial: count was not yet rendered on all views and
+stderr body was only preview. Root added count/time header plus full metadata,
+independent opaque ranged stderr, exact typed stderr reader HOLD without losing
+stdout, measured surrounding Workline height and shared Ctrl-C/input ownership.
+Actual agent-list JSON revealed successRate:null for never-used agents; parser
+now retains null rather than rejecting the whole catalog or inventing zero.
+Combined A/B/C/startup/L4-E26 test files352/352 PASS, proof/root-abc-l4e-integrated-v5.json
+SHA1cb1f9b1374c06e5fefc887507abc152172d9bab506a96dbe6965e9b2372cf49.
+Private candidate builds exit0; main18 original pins still unchanged.
+
+Actual native Terminal six read views in both EN/TR reached child close,
+list/detail, Enter/Esc,48→100 content reflow and global Ctrl-C on skills; one
+canonical CLI child each, no provider turn, all observed child PIDs gone.
+/tmp/deckent-7099-l3-pty-sgT4jQ/result.json SHA
+d85f6d90646f18ffe9d0eec32ef1182c2ee8c61af178bd6292bfec072eccc4f8.
+Root independent artifact recalculation (same provider, NOT XVerify) verifies
+41 source,16 direct compiled and28 payload pins: root-actual-pty-recheck-v1.json
+fb6f46636827ea39d41607afa5702635ba3da55b471d607e35235c1cd1a5f7af.
+
+IMPORTANT root semantic audit limits that probe's passed:true: EN7/TR8 CSI3J
+escape sequences occur during width decrease. Its steady250ms predicate never
+covered the transition. root-resize-scrollback-audit-v1.json SHA
+cc3477e7d9e410db0da29d1a9fcb39671cd6d295acc883a9a27a2b349cff461f
+is BLOCKS_CURRENT_DONE/RESIZE_SCROLLBACK_ERASE_OBSERVED. Installed Ink7.1.1
+renderInteractiveFrame clears terminal on prior/new viewport overflow; measured
+reservation removed steady overflow but transition scheduling remains OPEN.
+Do not overwrite passed/failed history, patch node_modules, land this candidate
+or claim complete resize/ASCII/platform/wholeL3/7099 closure. Next same C scope:
+close actual transition and remaining full-field/raw-detail contract before main.
+Earlier actual FAILs retained: DjbvnS/f4d00b1c (observer+steady overflow),
+qUklZv/c85fc1bd (agent nullable ratio); unit observer failure records retain
+whole-screen-versus-fragment and Static-versus-dynamic measurement corrections.
+No main build/restart/dispatch/commit/push, MASTER mutation or synthetic receipt.
+Fable unavailable until20TR; independent/runtime/XVerify closure remains HOLD.
+
+L3 continuation 2026-09-07 15:09Z — candidate source freeze-v8 SHA
+72f41af4bf6ef4a1a4c5361762f78a93700e07d57905335ae6990c8278686f82
+pins43paths; protected dependency14/main18 unchanged. Root completeFields keeps
+all canonical own fields (including nullable/nested/additive metadata) in six
+views; history and skill mandatory shape now matches actual producers. Detail
+wrapping is memoized across page keys. Existing ranged stdout/stderr, immutable
+observation and keyboard ownership remain. Volta implements public Ink resize
+mediator with root-reviewed App rows, pending dispose and external teardown
+corrections: target geometry before flush, renderer extent covers growth,
+shrinking releases rows only after compact frame flush. No dependency patch,
+ANSI filtering, alternate-screen substitution or same-session remount.
+
+Root combined27files367/367 PASS, root-abc-l4e-integrated-v8.json SHA
+36bbebe9e92dcdb5623c20a79340e3d1d75bc3177f084b012fe571bca11707cb.
+Candidate typecheck/build exit0, existing i18n gate PASS (not full REPL/ASCII).
+Actual native v3 probe measures the whole100x32→48x24→100x32 transition:
+/tmp/deckent-7099-l3-pty-5rSTTN/result.json SHA
+fd1607786108db23ec85d9cca074b292b0e3206cccf86a19b7470fc683124f51.
+EN/TR six views12/12 PASS, zeroCSI3J in12 transitions; single canonical CLI
+child each, detail/keyboard and observed child custody/no-survivor PASS,
+zero provider turns. Root recalculation root-actual-pty-recheck-v2.json SHA
+028eb4bb88b4369e6f4afc077b0ed42635994557fbd251fa3128abbfa1cc2e68
+checks106 identities:43source+17compiled+28payload+18protectedmain, all match.
+
+Failure history retained, never rewritten: v6 UzFPMT/cb32066e failed models
+growth transition (old rendererRows24 constrained target32); correction2 grows
+extent before rendering. v7 m5YuNw/08c385d7 passed first5EN views then exposed
+root's wrong skill-disposition string assumption; canonical SkillDisposition
+is an object, fixed with nullable reason/since/supersededBy validation. Exact
+notes proof/root-resize-transition-v6-hold.md and root-skill-schema-v7-hold.md.
+This new fingerprint closes the measured v5/v6 resize and v7 schema defect only
+for this candidate/Linux six-view matrix. No wholeL3/L6/7099/platform/provider
+settlement or XVerify closure. Next: durable evidence archive, bounded main
+fan-in preserving inherited hot-file hunks, main real-binary proof, independent
+Fable20TR review/landing. No main source/build/restart/run/commit/push this slice.
+
+L3 main fan-in/proof 2026-09-07 15:28Z — exact28-file selection applied, patch
+666cf098019970caa6a9a21e5863ff0c59ab78ec3d8a9aaacff81c7b14e983e2.
+Root removed ONLY the inherited-seven removal hunk from candidate→main diff;
+existing footer labels remain and are not L3-owned.28/28 expected hashes match;
+protected L4-E14 unchanged. App/run/catalog supersede their old L4-E bytes;
+new main43 source freeze SHA
+b2c1acd7803ada746b31ea7b7a00399266b5e4f22bbcc592d74362eae56c71ed.
+Main367/367 tests PASS, proof/main-abc-l4e-integrated-v1.json SHA
+d259981030061c1ee63ec3ea090aa95b153d00d7c3fc30e4e185b4c09162dfb9;
+typecheck/i18n/scoped28diff-check PASS. Global diff-check reports inherited
+memory export whitespace; not modified or promoted into a new work item.
+
+Canonical bot stop2058461→freshguardALLOW→main build:all session53684 exit0
+→canonical bot start2295163. Liveness and recorded entrypoint/canonical
+bot-daemon module digests match at15:21Z; buildidentitye46608b2/sourceTree755a54ea.
+Dashboard regenerated successfully with advisory chunk-size warning. MCP host
+reconnect remains UNVERIFIED; no old sprint/task cleanup or new dispatch.
+
+Actual main six read views EN/TR12/12 PASS first run:
+/tmp/deckent-7099-l3-main-pty-X8bBNo/result.json SHA
+693371535ec4849202d657ba0f891b3f39366464c4acaa217603bbda7c91428d.
+Whole12resize transitions zeroCSI3J; one canonical child/command, exit0,
+child close/no-survivor/zero-provider-turn observed. Root recalculation88pins
+(43source17compiled28payload), main-actual-pty-recheck-v1.json SHA
+4e263c86f2e1522383c96f448cae3253f131bedca7093fc2f9f52f124e3e8e8a.
+Main models absent/explicit/corrupt authority6cases PASS:
+/tmp/deckent-7099-models-main-cli-proof-PG8FV9/result.json SHA
+a9d72371af5cbf4fc304f531a83ed0eab77d89b5c101662b0665758c67141392.
+Root direct5compiled+12payload hashes match; fixture logical records/schema
+unchanged. WAL/SHM coordination reported separately, no syscall network claim.
+Main verification summary610f89ca records exact sessions/boundaries.
+
+Durable archives root checksum and permission rechecked:
+
+- Candidate /home/alperen/deckent-recovery-20260904/terminal-7099-l3-candidate-c4V2d0,
+ 193files37dirs, manifestbd8620385c490ffded1be700276d1da1b7995207cc4f3ccd758a0b28ae51690d,
+ SUMS101c38b2c74452b3e06ef21a40c36129ddea3547b077fc91a12db69de4899b5c.
+- Main /home/alperen/deckent-recovery-20260904/terminal-7099-l3-main-ikLQYA,
+ 104files26dirs, manifest0087543d0162a2e0965134abc620ce19191f7d131630a2c3d22cb3715618ce83,
+ SUMS21cc90723f2106f96b9e0230d26fa22d837f912fdb31dacf0f4446732412a5f5.
+Files0600/dirs0700, explicit regular sources only, original failures retained;
+no DB/config/auth/cache/fixture workspace copy. Archives are supportive evidence,
+not settlement/receipt/DONE. Main source remains uncommitted; Fable independent
+review20TR and canonical XVerify closure are not substituted. Remaining L3
+approval/sync/audit, L1/L4/L5/L6, platform and multiworker/automatic-next-goal
+settlement obligations remain OPEN; MASTER7099 VERIFY unchanged.
+
+### L4-E actual request measurement — main LOCAL_VERIFIED, independent runtime audit HOLD, 2026-09-07
+
+Latest checkpoint12:18Z: exact18-path fan-in applied to main; candidate and main
+153/153 targeted tests, typecheck/i18n/build PASS, main build:all PASS. Main
+actual compiled CLI7/7 cases passed on their first main execution. Source remains
+uncommitted; independent runtime audit remains open. Evidence archive was later
+sealed locally as recorded below. Whole7099 VERIFY and DOGFOOD_HEALTH=DEGRADED
+are unchanged. The entries
+below preserve earlier preparation/failure history; their OPEN statements are
+superseded only by the exact main proof record at the end of this section.
+
+Identity `7099-L4-E/request-measurement/attempt1`; base5f9cc99a2.
+Owner-approved same7099 manual ADR-D-007; candidate
+`/tmp/deckent-7099-l4e-WwQjnaSi`, proof contract `-proof/plan.json`
+SHA477eec71. Two disjoint source lanes (provider/session and Terminal consumer),
+separate actualCLI helper. Root owns verification and surgical main fan-in.
+Actual admission measurement must travel once through provider/agent events;
+checkpoint measurements relay live, query reads cached facts without count.
+Last request is not current transcript occupancy or proof of send; usage totals
+remain separately attributed, unknown is not zero. Raw typed transport errors
+must not map into the existing auto-retry code. Billing/cost/retry policies,
+retained728/task/DB/config and inherited hot-file changes remain protected.
+2026-09-07 11:03Z: combined candidate freeze `6d12419a7837e3a26e970f911bb2212d78e87e7a46ee03887fcc7ff8b37a1dc6`
+in `-proof/root-freeze.json`; backend v8 and consumer v4,18 exact paths.
+The extra mounted App regression path was written before the original17-path
+plan was amended; root reviewed it and admitted test-only amendment `8c321cba`
+before this freeze. No retroactive claim that the original scope included it.
+Root independent14-file suite153/153 PASS, typecheck/i18n/build exit0, unchanged
+source pins (`root-{focused,typecheck,i18n,build}.json` in the same proof root).
+Corrections include finally-safe checkpoint cost, operation-scoped measurement
+attribution across resume/proactive planning/chunks, feature-off status and
+actual anchor-width accounting. Real CLI helper v1 remains UNRUN: root rejected
+missing count attribution/readiness/custody verdict gates before execution.
+Compiled CLI proof and main fan-in remain OPEN; no new dispatch or7099 closure.
+2026-09-07 11:24Z: first carrier invocation `924cb83b` preserved at
+`/tmp/deckent-7099-l4e-bs0wTr/result.json`: SETUP_FAILED (`label probe`),
+before actual CLI entry. Private label child exit1; standalone stderr diagnosis
+is authorized, unchanged-fingerprint retry is not. This does not establish a
+production behavior failure. Source freeze remains unchanged. Capacity-row
+comparison now trims only presentation whitespace (`/context` indents while
+`/status` does not); original UNRUN helper115d7b5d is retained. Authority-negative
+helperV3 and its subsequent review patch were rejected UNRUN for lost containment
+and nonapplicable assertions; no evidence credit. Fable808 source GO is supportive,
+not canonical XVerify or compiled/main proof.
+2026-09-07 11:30Z changed-fingerprint carrier `a88a48b0` executed once after
+canonical registry bootstrap correction and bounded label stderr/deadline capture.
+EN actual compiled CLI PASS: `/tmp/deckent-7099-l4e-Qv6Uob/result.json`, SHA
+`66afa56a8c98c023a3b72deaa620abbf39dc5c461ba18cd3443c18cb53024967`.
+Three provider-adapter turns; full-request counts101/202/303 distinct from internal
+planning1/2/3, exact6 template/6 tokenize/3 chat requests; three local queries
+add zero requests. Context/status share the first digest and capacity; the next
+request replaces the digest. Separate reported usage11/7 then24/12 is visible.
+Source18/compiled17 pins unchanged, clean CLI exit, child custody, no observed
+survivors and server close PASS. Root independently read verdict/network records;
+Fable artifact review requested. This is Linux CLI with private loopback counts
+and usage, not provider delivery/billing/settlement. Checkpoint, overflow, authority
+unavailable, TR/narrow, feature-off and main fan-in/proof remain OPEN.
+2026-09-07 11:39Z supplemental carrier43ec80f3 ran once: aggregateFAIL preserved at
+`/tmp/deckent-7099-l4e-C8Wx8m/result.json`, SHA
+`601bd433d1770090dc6a8960035bcf7cb1c17a1c8974059468d616473c3f2d28`.
+Checkpoint case PASS: exact internal/turn/checkpoint sequence1/111/77,3 template/
+3 tokenize/2 chat, localized cumulative usage34/33/reports2, epoch2 success and
+one canonical private checkpoint envelope with verified payload/checksum/path.
+Envelope SHA0038cc103dacd9109deb5e02ddd44c4ad807e11a04d77e8433ebaa4ae2284c81.
+Overflow case timed out on full-string error matching: raw transcript contains
+correct INPUT_CONTEXT_OVERFLOW and next action wrapped across two rows, ready and
+not-admitted999999; actual counts2/2/0. This proves no inference before the timeout,
+not fresh recovery. Query/fresh actions remained UNRUN. Root independently read
+raw transcript and counters; only visual-whitespace-aware overflow carrier fix
+authorized, no source fix and no checkpoint rerun. Source/compiled pins unchanged.
+Owner reports Fable unavailable until20:00 TR; local work continues, mandatory
+cross-provider closure stays HOLD without same-provider substitution.
+Overflow-only changed-fingerprint helper6b2e8a1a then passed once at
+`/tmp/deckent-7099-l4e-hLwQqM/result.json`, SHA
+`36c6836573345f94efbc215a053f685a0421a5384768c412c19f3d68ea8b3b67`.
+Only visual whitespace is normalized; complete localized error/code/denied999999
+remain required. Actual denied boundary2/2/0, context delta0, then separately
+submitted fresh request4/4/1 prove no hidden retry and healthy next operation.
+All action events exist; source18/compiled17 unchanged, exit0/childcustody/no
+survivors PASS. Prior checkpoint subset bound to immutable601bd433 result; it
+was not rerun and the original aggregateFAIL was not rewritten. Local diagnostic
+loopback boundary remains; authority-unavailable/TR/flag-off/main proof OPEN.
+Authority-negative helperc19bb536 (fixturee454db3e) first actual run PASS:
+`/tmp/deckent-7099-l4e-Q2Z4DZ/result.json`, SHA
+`b47f4e03aaf6383d8b46aad3a37246353a80b8b58679e381409211690924d6f8`.
+EN100 and TR48 each run two separately submitted inputs; GET probes3→6→9,
+exactly2 empty-system/no-tools synthetic planning POSTs, zero tokenize/inference/
+otherPOST. Each typed localized error leads to a fresh ready redraw; repeated
+input causes new probes. Source18 and root-bound compiled17 unchanged, exit0,
+childcustody/no survivors/serverclose PASS. This negative proves no measurement
+or inference delivery and is not permission/account/billing settlement proof.
+Main backend/consumer patch dry-apply checks PASS with HEAD5f9cc99a2, empty index
+and inherited run/messages preimages unchanged; no main source mutation yet.
+Remaining candidate matrix: TR measurement/narrow and feature-off. Fable
+runtime artifact audit unavailable until20:00TR; whole7099 VERIFY unchanged.
+TR/off carrier c68b7bde first actual aggregateFAIL preserved at
+`/tmp/deckent-7099-l4e-62C4Bs/result.json`, SHA
+`c323a28391e59e13793190432013b28139b96dfa4baf3faa2d37fa72b0fc568b`.
+TR48 case passes every gate: two attributed turns4/4/2, equal cached digest and
+capacity across context/status, querydelta0, fresh/exit/custody; source18 and
+compiled19 pins unchanged. OFF helper waits for an optional local chat ID that
+is absent here; actual child2047068 exits0, returns canonical no-active-run text
+and ready. Root read transcript and production optional-ID path. OFF context
+and fresh remain UNRUN; only a changed-fingerprint positive status-response
+selector is authorized, preserving firstFAIL and requiring childclose0 before
+absence checks. Main expected18-path freeze272f5eac was derived in an isolated
+temporary index before mutation, preserving inherited7; main runner17fbe1b6
+reviewed but UNRUN. No main source/build/restart/dispatch/commit in this step.
+
+Changed-fingerprint TR/off helper06b5f463 first candidate execution PASS at
+`/tmp/deckent-7099-l4e-wCmv6l/result.json`, SHA
+`767caf3fdc8b03504447ae174468164c2f2d545671e50df34e9e51885aa1b267`.
+The only post-failure change requires the full canonical no-active-run response
+instead of an optional local chat ID; status childclose0 and settled ready precede
+absence assertions. Both cases pass4/4/2 exact counters and fresh turns. The
+original62C4Bs aggregateFAIL remains immutable, not an overwritten success.
+
+#### L4-E main fan-in and actual-surface proof — 2026-09-07 12:18Z
+
+Main proof root `/tmp/deckent-7099-l4e-main-proof-UcT2ZbVu`; base/HEAD remains
+`5f9cc99a252c75d63d9f6d84bd1ca5079b6bf24c`. Reviewed backend patch41743d42 and
+consumer patch9e0bd1f2 applied with preimage checks and apply_patch, not broad
+worktree replacement. Expected main source manifest
+`272f5eaceadcebd638648635136cb6bad666d68acff79cb51c13814e4dc0aafe`
+was derived before mutation;18/18 postimages match. Main run.tsx includes
+protected inherited7 (whole-file SHA d44aac09), while17 other paths equal the
+candidate. Inherited messages.ts86b7cd5d is unchanged and out of scope.
+
+Main runner17fbe1b6:153/153 tests, typecheck/i18n/build:all exit0; source pins
+unchanged before/after each phase. Test report SHA cabf3d87; main build log
+d41ff938. Main compiled17-pin manifest SHA
+`03f945025a2d11c96efd223a3ede934e5ad27402ba9c30dcd67ef4f1e45f22e5`
+was generated after the main build, never copied from the candidate manifest.
+
+Root executed and independently read four main result artifacts (all first-run
+PASS;7 total cases), rehashed transcript/child evidence and checked every core
+compiled pin against the fresh main freeze:
+
+- EN full-request/query: `/tmp/deckent-7099-l4e-yWaF4B/result.json`, SHA
+  `9ce3d43bb023bec8d03b504b20378940f732d0718a11c87e8290b406f470b514`.
+  Three turns6/6/3, separate internal/full counts, cached-query delta0 and changed
+  next-request digest; existing helpera88a48b0 unchanged.
+- TR48/feature-off: `/tmp/deckent-7099-l4e-vIoyhc/result.json`, SHA
+  `d3651dd0a8ce401494d7c1baa57efb00b4fb95a31b72a3531efbfcafe5693636`.
+  Each case4/4/2, local-query delta0, same TR digest/capacity, feature-off status
+  hides new metrics while existing /context and fresh turns work. Helper06b5f463;
+ 19 compiled pins include the two canonical label-width dependencies.
+- Checkpoint/overflow: `/tmp/deckent-7099-l4e-Sdczjm/result.json`, SHA
+  `e0314096326548ccbb3dc891b39b1f723cd645182564c34c1de8e33d70904332`.
+  Combined helper01419a64 uses the proven corrected overflow selector and runs
+  a fresh main checkpoint; candidate checkpoint evidence is not borrowed.
+  Exact checkpoint3/3/2 and canonical342-byte envelope/checksum/path verified;
+  envelope SHA0038cc103dacd9109deb5e02ddd44c4ad807e11a04d77e8433ebaa4ae2284c81.
+  Overflow2/2/0 before denial, context delta0, explicit fresh4/4/1; no hidden retry.
+- Authority unavailable EN/TR: `/tmp/deckent-7099-l4e-QrUiyd/result.json`, SHA
+  `d3188e90af537e41d16010f4c55ec199577a6aa747c855ecbf35d3790de1c86f`.
+  Helperc19bb536 unchanged; each case9GET/2synthetic planningPOST, no tokenize,
+  inference or otherPOST. Two distinct inputs produce typed error/fresh ready.
+
+All7 cases: exit0, child custody, no observed survivors, source18 unchanged;
+core17 compiled hashes unchanged (TR/off19). This is actual main Linux CLI with
+private diagnostic loopback counts/usage, not real-provider delivery, billing,
+settlement, platform-scale or whole7099 completion evidence.
+
+Bot1879419 canonical stop → active-execution guard ALLOW → main build:all →
+bot2058461 canonical start/status/liveness. Buildidentity file31fc2425,
+sourceTreea930e8e4, sourceRootb38d9cf3; loaded entrypoint and canonical
+connectors/bot-daemon module match their recorded digests. An initial read-only
+checker chose cli/commands/bot.js incorrectly; producer source inspection
+corrected the observer, not the runtime. MCP reconnect remains UNVERIFIED.
+No new production dispatch, retained728 cleanup, auth or memory mutation.
+
+Root local review SHA
+`0bf678a3c7b8038102b79bc515678f8622c98f9522875f3620ace249cfeb98f2`
+and runtime-after-build SHA
+`c3afcdade1801deb1c4f3649b589395a650da4825b53cb73c54bb8b2c2d4272c`
+are in the main proof root. Fable808 source GO remains supportive, but new main
+runtime audit is unavailable until20:00TR. No same-provider XVerify substitution,
+canonical receipt, source commit, push or authenticated MASTER closure claimed.
+
+#### L4-E private evidence archive — root verified, independent audit pending
+
+Archive `/home/alperen/deckent-recovery-20260904/terminal-7099-l4e-pkGEev`;
+120 explicitly selected payloads + manifest + SHA256SUMS =122 files/36 directories.
+Root sha256sum --check verified121 entries; all files0600/directories0700,
+no symlinks. Manifest SHA
+`554b0a2f54e1cc95e4ce223ac54df1fc7d7e14073629a7d29ef79a9642a65bd1`;
+SHA256SUMS SHA
+`3fb70691fc73c62553d1306f1458feff474b0251cf35a1d7e806c339ba3d39f9`.
+Sealer fully read by root; final SHA
+`ac398be70f19b6e4c9561c8a7d62643210ee096a4634bead23da473177b3aa4c`.
+
+The map includes reviewed plans/amendment/final patches/freezes/tests/build logs,
+helper programs, all11 pinned candidate/main result JSONs with their referenced
+transcripts/child logs/checkpoint envelopes and exact18 observed main source
+files. Four freeze files,11 result files and referenced transcript/child digests
+were checked before creating the archive; all payloads were snapshotted and
+source/destination hashes rechecked through the copy. Root separately checked
+known helper/source-artifact pins and eight verification log digests.
+
+No recursive fixture/DB/config/auth/node_modules/index copy or deletion. Main
+run.tsx includes observed inherited7 without ownership/commit claim. The old
+bs0wTr child log may contain subsequent standalone-diagnosis observations; its
+archive explicitly does not assert original-run child-count custody. FirstFAIL
+results remain unchanged. Disposition SUPPORTIVE_PRIVATE_EVIDENCE_NOT_SETTLEMENT,
+proofReceipt=false. Independent Fable runtime/archive review unavailable until
+20:00TR; no same-provider replacement, source commit or whole7099 closure here.
+
 ### L4-D native tool activity — bounded source landed, 2026-09-07
 
 Source `2bcac2c8fa62c996881d4e5749fd146ccd1be0a3`: exact6 committed blobs,
@@ -32,7 +631,8 @@ fresh-turn/clean-exit/effect/child-lifecycle/no-survivor checks. Result SHA
 engine→AgentSession→deckent_bash with scripted provider events and a private
 login-shell exclusion adapter, NOT real-provider/billing/settlement proof.
 
-First candidate aggregate FAIL5JHqeI and corrected aggregate FAIL6DmjeJ remain
+First candidate aggregate FAIL5JHqeI (a815ad09) and corrected aggregate
+FAIL6DmjeJ (392eb62d) remain
 unaltered. The first helper confused retained transcript with current activity
 and exited before status-child closure. V2 fully passed5/6; TR resize retained
 historical activity in its simplified screen model, preventing ready detection.
@@ -43,6 +643,9 @@ and negative controls preceded the single main proof. No third candidate run.
 Worker V1–V4 failures and the unrun defensive React-engine-replacement fixture
 are retained. Actual provider switching keeps a stable engine with live getters;
 that artificial replacement fixture is not production provider-switch proof.
+
+Helper V1 6d8ffe29, V2 4a8e6b9d, V3 f9d1d125 and sealer229dc074 are
+all pinned by full SHA256 in the archive manifest, not inferred from result schema.
 
 Fable785 source/product GO,790 main source/runtime/CLI verification and791
 archive verification are independent reviews, not canonical XVerify receipts.
