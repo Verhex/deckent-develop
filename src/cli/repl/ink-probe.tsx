@@ -2,16 +2,17 @@
 import { render, Box, Text } from 'ink';
 import { version as reactVersion } from 'react';
 import { colorTier } from '../helpers/theme.js';
+import { getMessage } from '../helpers/messages.js';
 import { resolveInkPalette } from './ink-palette.js';
 
 /** Renders a tiny Ink frame then unmounts — proves tsc(.tsx)→ESM→ink works.
  *  TERMINAL-READABILITY-001: colors are palette roles for the gate's tier. */
-export async function runInkProbe(): Promise<void> {
+export async function runInkProbe(language: 'en' | 'tr' = 'en'): Promise<void> {
   const palette = resolveInkPalette(colorTier());
   const { unmount, waitUntilExit } = render(
     <Box flexDirection="column" borderStyle="round" borderColor={palette.accent.color} paddingX={1}>
       <Text {...palette.accent} bold>deckent</Text>
-      <Text {...palette.muted}>Ink build probe ✓ — React {reactVersion}</Text>
+      <Text {...palette.muted}>{getMessage('tui.ink_probe.detail', language, { version: reactVersion })}</Text>
     </Box>,
   );
   setTimeout(() => unmount(), 150);

@@ -179,15 +179,21 @@ const CATALOG_STALE_ADR_RE = /ADR-\d{2,3}\b/g;
  * @param {string} raw  string content as it appears inside the quotes
  * @returns {boolean}
  */
-function isNaturalLanguage(raw) {
-  // Strip ANSI escape sequences
-  const stripped = raw
-    .replace(/\\x1[bB][^m]*m/g, '')   // \x1b[...m  (escaped form)
-    .replace(/\x1b\[[^m]*m/g, '')     // actual ESC sequences
-    .replace(/\\u001[bB][^m]*m/g, '') //  form
+function normalizeUiText(raw) {
+  return raw
+    // ANSI CSI: escaped source spellings plus the actual ESC byte. The final
+    // byte range covers color (`m`) and non-color controls such as alternate
+    // screen (`h`/`l`) without consuming adjacent prose.
+    .replace(/\\x1[bB]\[[0-?]*[ -/]*[@-~]/g, '')
+    .replace(/\\u001[bB]\[[0-?]*[ -/]*[@-~]/g, '')
+    .replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '')
     .replace(/\\n|\\r|\\t/g, ' ')     // common control escapes
     .replace(/\$\{[^}]*\}/g, '')      // strip template interpolations
     .trim();
+}
+
+function isNaturalLanguage(raw) {
+  const stripped = normalizeUiText(raw);
 
   if (stripped.length < MIN_WORD_LENGTH) return false;
 
@@ -231,13 +237,14 @@ function collectTsFilesRecursive(dir, results = []) {
     const full = join(dir, entry);
     const st = statSync(full);
     if (st.isDirectory()) collectTsFilesRecursive(full, results);
-    else if (entry.endsWith('.ts') && !entry.endsWith('.d.ts')) results.push(full);
+    else if ((entry.endsWith('.ts') || entry.endsWith('.tsx')) && !entry.endsWith('.d.ts')) results.push(full);
   }
   return results;
 }
 
 const cliDir = join(root, 'src', 'cli', 'commands');
 const desktopMainDir = join(root, 'src', 'desktop', 'src', 'main');
+const replDir = join(root, 'src', 'cli', 'repl');
 
 // CLI side stays a FLAT, non-recursive scan — identical to prior behavior
 // (a subdirectory like src/cli/commands/init-templates/ is not descended into).
@@ -250,6 +257,10 @@ const cliFiles = readdirSync(cliDir)
 const desktopFiles = collectTsFilesRecursive(desktopMainDir)
   .sort()
   .map((filePath) => ({ filePath, relPath: relative(root, filePath).replace(/\\/g, '/') }));
+
+const replFiles = existsSync(replDir) ? collectTsFilesRecursive(replDir)
+  .sort()
+  .map((filePath) => ({ filePath, relPath: relative(root, filePath).replace(/\\/g, '/') })) : [];
 
 const scanTargets = [...cliFiles, ...desktopFiles];
 
@@ -314,6 +325,87 @@ const surfaceBaseline =
 
 /** @type {Array<{file: string, line: number, call: string, text: string}>} */
 const hits = [];
+
+const UI_LABEL_PROPERTIES = new Set(['label', 'title', 'summary', 'hint', 'help', 'placeholder']);
+const UI_OUTPUT_CALLS = new Set(['output', 'pushTurn']);
+let ts;
+
+function isUiProse(raw) {
+  if (!isNaturalLanguage(raw)) return false;
+  const value = normalizeUiText(raw);
+  if (/^[a-z][a-z0-9_.-]*$/u.test(value)) return false;
+  if (/^[\W_]*(?:FAILED|ERROR|HOLD|NO_GO)[\W_]*$/u.test(value)) return false;
+  if (/^(?:[A-Z][A-Z0-9_]*(?:\.[A-Z0-9_]+)*|[a-z0-9_.-]+\/[a-z0-9_./-]+)$/u.test(value)) return false;
+  if (/^(?:https?:\/\/|\/|\.\/|\.\.\/)/u.test(value)) return false;
+  return true;
+}
+
+function literalText(node) {
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
+  if (ts.isTemplateExpression(node)) return [node.head.text, ...node.templateSpans.map((span) => span.literal.text)].join(' ');
+  return undefined;
+}
+
+function literalCandidates(node) {
+  if (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isNonNullExpression(node)) {
+    return literalCandidates(node.expression);
+  }
+  if (ts.isConditionalExpression(node)) {
+    return [...literalCandidates(node.whenTrue), ...literalCandidates(node.whenFalse)];
+  }
+  if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+    const fragments = [];
+    const collect = (part) => {
+      const text = literalText(part);
+      if (text !== undefined) fragments.push(text);
+      else if (ts.isBinaryExpression(part) && part.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+        collect(part.left); collect(part.right);
+      }
+    };
+    collect(node);
+    return fragments.length > 0 ? [{ node, text: fragments.join(' ') }] : [];
+  }
+  const text = literalText(node);
+  return text === undefined ? [] : [{ node, text }];
+}
+
+function scanReplAst(content, relPath) {
+  const source = ts.createSourceFile(relPath, content, ts.ScriptTarget.Latest, true, relPath.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+  const record = (node, category, raw) => {
+    if (!isUiProse(raw)) return;
+    hits.push({ file: relPath, line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1, call: category, text: raw.length > 60 ? raw.slice(0, 57) + '...' : raw });
+  };
+  const visit = (node) => {
+    if (ts.isJsxText(node)) record(node, 'repl-jsx-text', node.getText(source));
+    if (ts.isJsxAttribute(node) && node.initializer) {
+      const name = node.name.getText(source);
+      if (UI_LABEL_PROPERTIES.has(name)) {
+        const expression = ts.isJsxExpression(node.initializer) ? node.initializer.expression : node.initializer;
+        if (expression) for (const candidate of literalCandidates(expression)) record(candidate.node, 'repl-jsx-label', candidate.text);
+      }
+    }
+    if (ts.isJsxExpression(node) && node.expression) {
+      if (ts.isJsxElement(node.parent)) for (const candidate of literalCandidates(node.expression)) record(candidate.node, 'repl-jsx-text', candidate.text);
+    }
+    if (ts.isPropertyAssignment(node)) {
+      const name = node.name.getText(source).replace(/^['"]|['"]$/g, '');
+      if (UI_LABEL_PROPERTIES.has(name)) for (const candidate of literalCandidates(node.initializer)) record(candidate.node, 'repl-label-property', candidate.text);
+    }
+    if (ts.isCallExpression(node)) {
+      const callee = node.expression;
+      const name = ts.isIdentifier(callee) ? callee.text : ts.isPropertyAccessExpression(callee) ? callee.name.text : '';
+      const argument = node.arguments[name === 'pushTurn' ? 1 : 0];
+      if (argument && UI_OUTPUT_CALLS.has(name)) for (const candidate of literalCandidates(argument)) record(candidate.node, `repl-${name}`, candidate.text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+}
+
+if (replFiles.length > 0) {
+  ts = (await import('typescript')).default;
+  for (const { filePath, relPath } of replFiles) scanReplAst(readFileSync(filePath, 'utf8'), relPath);
+}
 
 /**
  * Classify and record a hit in `hits` if the captured string is natural
@@ -552,6 +644,18 @@ hits.sort((a, b) => {
   return a.line - b.line;
 });
 
+if (argv.includes('--json')) {
+  const report = {
+    schemaVersion: 1,
+    decision: hits.length > 0 || surfaceRatchetBroken ? 'FAIL' : 'PASS',
+    replFilesScanned: replFiles.length,
+    hits: hits.map(({ file, line, call, text }) => ({ file, line, category: call, text })),
+    surfaceRatchet: { hits: surfaceHits.length, ceiling: surfaceBaseline, broken: surfaceRatchetBroken },
+  };
+  console.log(JSON.stringify(report, null, 2));
+  process.exitCode = report.decision === 'FAIL' ? 1 : 0;
+} else {
+
 // ── Report ────────────────────────────────────────────────────────────────────
 
 const W = 72;
@@ -616,6 +720,8 @@ if (hits.length > 0) {
 }
 console.log(line);
 console.log('');
+
+}
 
 // Assigning exitCode lets piped stdout/stderr drain. `process.exit(...)` can
 // truncate the short reports produced by hermetic fixtures and CI wrappers.

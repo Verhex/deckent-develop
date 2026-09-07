@@ -109,6 +109,8 @@ describe('createRunFlowController — applyRunCompletion() (TERM5-CTRL, 427-005)
   const nowFn = (): string => new Date(Date.UTC(2026, 0, 1, 0, 0, tick++)).toISOString();
   let root: string;
   let errorSpy: ReturnType<typeof vi.spyOn>;
+  let completedLabel: ReturnType<typeof vi.fn<(jobId: string) => string>>;
+  let failedLabel: ReturnType<typeof vi.fn<(jobId: string) => string>>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -117,6 +119,8 @@ describe('createRunFlowController — applyRunCompletion() (TERM5-CTRL, 427-005)
     mockPlanSprint.mockReturnValue(makeSprint() as any);
     root = mkdtempSync(join(tmpdir(), 'run-flow-controller-complete-test-'));
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    completedLabel = vi.fn((jobId: string) => `Tamamlandı: ${jobId}`);
+    failedLabel = vi.fn((jobId: string) => `Başarısız: ${jobId}`);
   });
 
   afterEach(() => {
@@ -132,6 +136,10 @@ describe('createRunFlowController — applyRunCompletion() (TERM5-CTRL, 427-005)
       generateFlowId: () => 'flow-1',
       forceScope: true,
       scopeEvidence: { status: 'available' as const, trackedFiles: [] },
+      completionLabels: {
+        completed: completedLabel,
+        failed: failedLabel,
+      },
       ...(spawnStart ? { spawnStart } : {}),
     };
   }
@@ -150,6 +158,23 @@ describe('createRunFlowController — applyRunCompletion() (TERM5-CTRL, 427-005)
     return controller;
   }
 
+  async function driveWithoutCompletionLabels(value?: '') {
+    const spawnStart = vi.fn(() => ({ pid: process.pid }));
+    const deps: RunFlowControllerDeps = makeControllerDeps(spawnStart);
+    deps.completionLabels = value === ''
+      ? { completed: () => '', failed: () => '' }
+      : undefined;
+    const controller = createRunFlowController(deps);
+    await controller.proposeRun('Ship the thing');
+    controller.approve({ id: 'alperen' });
+    controller.startApproved!();
+    getRunFlowCoordinator(root).recordRunStarted({
+      handle: { flowId: 'flow-1', jobId: 'job-no-label', logRef: '/fake/log.log' },
+      commandId: 'test-admitted-no-label',
+    });
+    return controller;
+  }
+
   it('DETACHED_RUNNING + status COMPLETE -> COMPLETED via the reducer', async () => {
     const controller = await driveToDetachedRunning();
 
@@ -157,6 +182,7 @@ describe('createRunFlowController — applyRunCompletion() (TERM5-CTRL, 427-005)
 
     expect(result.state).toBe('COMPLETED');
     expect(controller.getContext().state).toBe('COMPLETED');
+    expect(completedLabel).toHaveBeenCalledWith('job-1');
     expect(errorSpy).not.toHaveBeenCalled();
   });
 
@@ -178,8 +204,23 @@ describe('createRunFlowController — applyRunCompletion() (TERM5-CTRL, 427-005)
     const result = controller.applyRunCompletion!(completion({ flowId: 'flow-1', status: 'FAILED', jobId: 'job-xyz' }));
 
     expect(result.state).toBe('FAILED');
-    expect(result.failureReason).toBeTruthy();
-    expect(result.failureReason).toContain('job-xyz');
+    expect(result.failureReason).toBe('Başarısız: job-xyz');
+  });
+
+  it.each([undefined, '' as const])('missing/empty COMPLETE label throws before coordinator mutation (%s)', async (label) => {
+    const controller = await driveWithoutCompletionLabels(label);
+    expect(() => controller.applyRunCompletion!(completion({ flowId: 'flow-1', jobId: 'job-no-label' })))
+      .toThrow('E_INJECTED_LABEL_MISSING');
+    expect(controller.getContext().state).toBe('DETACHED_RUNNING');
+    expect(getRunFlowCoordinator(root).getFlow('flow-1').state).toBe('DETACHED_RUNNING');
+  });
+
+  it.each([undefined, '' as const])('missing/empty FAILED fallback label throws before coordinator mutation (%s)', async (label) => {
+    const controller = await driveWithoutCompletionLabels(label);
+    expect(() => controller.applyRunCompletion!(completion({ flowId: 'flow-1', jobId: 'job-no-label', status: 'FAILED' })))
+      .toThrow('E_INJECTED_LABEL_MISSING');
+    expect(controller.getContext().state).toBe('DETACHED_RUNNING');
+    expect(getRunFlowCoordinator(root).getFlow('flow-1').state).toBe('DETACHED_RUNNING');
   });
 
   it('wrong-flow event: context unchanged, ignored with a loud console.error', async () => {

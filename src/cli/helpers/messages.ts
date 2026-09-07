@@ -22,6 +22,38 @@ type MessageMap = Record<string, Record<string, string>>;
  * `getMessage()`.
  */
 const BASE_MESSAGES: MessageMap = {
+  'tui.ink_probe.detail': {
+    en: 'Ink build probe ready — React {version}',
+    tr: 'Ink build probe hazır — React {version}',
+  },
+  'tui.run_flow.completed': {
+    en: 'Run {jobId} completed',
+    tr: 'Run {jobId} tamamlandı',
+  },
+  'tui.run_flow.failed': {
+    en: 'Run {jobId} failed',
+    tr: 'Run {jobId} başarısız oldu',
+  },
+  'tui.bg_turn.completed': {
+    en: '{source} — {done}/{total} DONE · {techDebt} TECH_DEBT · {noGo} NO_GO',
+    tr: '{source} — {done}/{total} DONE · {techDebt} TECH_DEBT · {noGo} NO_GO',
+  },
+  'tui.bg_turn.failed': {
+    en: '{source} — FAILED',
+    tr: '{source} — FAILED',
+  },
+  'tui.bg_turn.failed_with_error': {
+    en: '{source} — FAILED: {error}',
+    tr: '{source} — FAILED: {error}',
+  },
+  'tui.approval_demo.summary': {
+    en: 'DEMO — permission to run rm -rf ./build (live test card)',
+    tr: 'DEMO — rm -rf ./build çalıştırma izni (canlı test kartı)',
+  },
+  'tui.approval_demo.reason': {
+    en: 'Live verification of repl_surface.approvals',
+    tr: 'repl_surface.approvals canlı doğrulaması',
+  },
   'common.never': {
     en: 'never',
     tr: 'hiç',

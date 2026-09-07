@@ -28,6 +28,7 @@ import {
   type RunCompletionWatchFsWatcher,
 } from '../../src/cli/repl/run-completion-watch.js';
 import { buildBgTurnEvent, wireBgTurnsProducer } from '../../src/cli/repl/run.js';
+import { getMessage } from '../../src/cli/helpers/messages.js';
 
 // ─── fixtures ────────────────────────────────────────────────────────────────
 
@@ -375,6 +376,17 @@ describe('buildBgTurnEvent', () => {
     const info: RunCompletionInfo = { jobId: 'sprint-777', status: 'COMPLETE' };
     expect(buildBgTurnEvent(info).summary).toBe('sprint-777 — 0/0 DONE · 0 TECH_DEBT · 0 NO_GO');
   });
+
+  it('uses the resolved Turkish catalog while preserving ids, counts, verdict codes, and raw error', () => {
+    const complete: RunCompletionInfo = { jobId: 'job-tr', status: 'COMPLETE', totalTasks: 2, done: 1, techDebt: 1, noGo: 0 };
+    expect(buildBgTurnEvent(complete, 'tr').summary).toBe(
+      getMessage('tui.bg_turn.completed', 'tr', { source: 'job-tr', done: '1', total: '2', techDebt: '1', noGo: '0' }),
+    );
+    const failed: RunCompletionInfo = { jobId: 'job-tr', status: 'FAILED', error: 'ham hata' };
+    expect(buildBgTurnEvent(failed, 'tr').summary).toBe(
+      getMessage('tui.bg_turn.failed_with_error', 'tr', { source: 'job-tr', error: 'ham hata' }),
+    );
+  });
 });
 
 // ─── run.tsx: wireBgTurnsProducer — composition-pin ─────────────────────────
@@ -426,6 +438,22 @@ describe('wireBgTurnsProducer — enabled: setup site + enqueueBg feed site', ()
     manual.fire();
 
     expect(enqueueBg).toHaveBeenCalledWith({ source: 'sprint-601', summary: 'sprint-601 — FAILED: boom' });
+    handle!.dispose();
+  });
+
+  it('threads the session language through the watch callback', () => {
+    const manual = makeManualWatch();
+    const enqueueBg = vi.fn();
+    const factory = (dir: string, handlers: { onComplete: (info: RunCompletionInfo) => void }) =>
+      createRunCompletionWatch(dir, handlers, { watch: manual.watch, pollIntervalMs: 999_000 });
+    const handle = wireBgTurnsProducer(true, jobsDir, enqueueBg, factory, 'tr');
+
+    writeJob(jobsDir, 'sprint-tr.json', { status: 'FAILED', sprintId: 'sprint-tr' });
+    manual.fire();
+    expect(enqueueBg).toHaveBeenCalledWith({
+      source: 'sprint-tr',
+      summary: getMessage('tui.bg_turn.failed', 'tr', { source: 'sprint-tr' }),
+    });
     handle!.dispose();
   });
 

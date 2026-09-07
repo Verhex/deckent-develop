@@ -57,6 +57,7 @@ import { readContext } from '../../orchestra/brain.js';
 import { resolveBrainModel } from '../../core/config.js';
 import { getProviderForModel } from '../../core/task-types.js';
 import { buildFlowStartSpawn } from '../helpers/detached-start.js';
+import { requireInjectedLabel } from '../helpers/injected-label.js';
 // TERM5-CTRL (sprint-427, task 5) — the SAME completion-notification shape
 // run.tsx already receives from `createRunCompletionWatch`'s `onComplete`
 // callback (wireBgTurnsProducer, run.tsx) — see applyRunCompletion below.
@@ -166,6 +167,11 @@ export interface RunFlowControllerDeps {
   /** Hermetic/platform scope-evidence adapter forwarded to the canonical
    * plan service. Production normally uses its bounded git adapter. */
   scopeEvidence?: RunFlowScopeEvidence;
+  /** Localized operator-facing completion copy. REPL injects session language. */
+  completionLabels?: {
+    completed: (jobId: string) => string;
+    failed: (jobId: string) => string;
+  };
 }
 
 export interface RunFlowController {
@@ -395,15 +401,25 @@ export function createRunFlowController(deps: RunFlowControllerDeps): RunFlowCon
       return context;
     }
 
+    // Validate presentation dependencies before any coordinator mutation.
+    // A raw provider/worker failure remains authoritative when present; only
+    // the synthesized fallback requires the injected localized label.
+    const completionSummary = event.status === 'COMPLETE'
+      ? requireInjectedLabel('runFlow.completed', deps.completionLabels?.completed(event.jobId))
+      : undefined;
+    const failureReason = event.status === 'FAILED' && event.error === undefined
+      ? requireInjectedLabel('runFlow.failed', deps.completionLabels?.failed(event.jobId))
+      : event.error;
+
     context = event.status === 'COMPLETE'
       ? coordinator.recordCompletion({
           flowId,
-          summary: `run ${event.jobId} completed`,
+          summary: completionSummary,
           commandId: `watch-complete-${flowId}-${event.jobId}`,
         }).context
       : coordinator.recordRunFailure({
           flowId,
-          error: event.error ?? `run ${event.jobId} failed`,
+          error: failureReason!,
           commandId: `watch-failed-${flowId}-${event.jobId}`,
         }).context;
     return context;

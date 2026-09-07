@@ -859,26 +859,42 @@ export function wireApprovalCrossProcess(
 /**
  * born-642 (408-001) BG-TURNS-PRODUCER — formats a `RunCompletionInfo`
  * (run-completion-watch.ts) into the `ChatTurnBgEvent` shape ChatTurnQueue
- * buffers (chat-turn-queue.ts). Deliberately NOT routed through `getMessage`:
- * the summary is built from language-neutral status TOKENS
- * (DONE/TECH_DEBT/NO_GO/FAILED — the SAME literal tokens already surfaced
- * unlocalized elsewhere in the CLI, e.g. TaskEvaluation, JobState.status,
- * `deckent status`'s job field) plus raw counts, not natural-language prose —
- * so no new i18n key is required. `src/cli/helpers/messages.ts` is outside
- * this task's write scope; a future task with write access there can replace
- * this with a fully localized `getMessage` template without touching the
- * wiring around it (see this task's .result notes).
+ * buffers (chat-turn-queue.ts). Human copy is catalog-backed; canonical
+ * verdict tokens (DONE/TECH_DEBT/NO_GO/FAILED), counts, ids, and raw failure
+ * detail remain unchanged inside the localized envelope.
  */
-export function buildBgTurnEvent(info: RunCompletionInfo): ChatTurnBgEvent {
+export function buildBgTurnEvent(info: RunCompletionInfo, language: 'en' | 'tr' = 'en'): ChatTurnBgEvent {
   const source = info.sprintId ?? info.jobId;
   if (info.status === 'FAILED') {
-    return { source, summary: info.error ? `${source} — FAILED: ${info.error}` : `${source} — FAILED` };
+    return {
+      source,
+      summary: getMessage(info.error ? 'tui.bg_turn.failed_with_error' : 'tui.bg_turn.failed', language, {
+        source,
+        ...(info.error ? { error: info.error } : {}),
+      }),
+    };
   }
   const total = info.totalTasks ?? 0;
   const done = info.done ?? 0;
   const techDebt = info.techDebt ?? 0;
   const noGo = info.noGo ?? 0;
-  return { source, summary: `${source} — ${done}/${total} DONE · ${techDebt} TECH_DEBT · ${noGo} NO_GO` };
+  return {
+    source,
+    summary: getMessage('tui.bg_turn.completed', language, {
+      source,
+      done: String(done),
+      total: String(total),
+      techDebt: String(techDebt),
+      noGo: String(noGo),
+    }),
+  };
+}
+
+export function buildApprovalDemoCopy(language: 'en' | 'tr'): { summary: string; reason: string } {
+  return {
+    summary: getMessage('tui.approval_demo.summary', language),
+    reason: getMessage('tui.approval_demo.reason', language),
+  };
 }
 
 /**
@@ -898,10 +914,11 @@ export function wireBgTurnsProducer(
   jobsDir: string,
   enqueueBg: (event: ChatTurnBgEvent) => void,
   watchFactory: typeof createRunCompletionWatch = createRunCompletionWatch,
+  language: 'en' | 'tr' = 'en',
 ): RunCompletionWatchHandle | undefined {
   if (!enabled) return undefined;
   return watchFactory(jobsDir, {
-    onComplete: (info) => enqueueBg(buildBgTurnEvent(info)),
+    onComplete: (info) => enqueueBg(buildBgTurnEvent(info, language)),
   });
 }
 
@@ -1137,7 +1154,7 @@ export async function runInkRepl(
   try { projectCfg = await loadConfig() as typeof projectCfg; } catch { /* defaults */ }
   let lang = 'en';
   try { lang = getLanguage(projectCfg.language); } catch { /* default en */ }
-  const t = (key: string): string => getMessage(key, lang);
+  const t = (key: string, vars?: Record<string, string>): string => getMessage(key, lang, vars);
 
   // ─── REPL-SURFACE config→prop wire (repl_surface.*, born: flags landed 354-001/
   // 355-011 as App-prop seams but no caller ever resolved the config — the flag
@@ -1178,11 +1195,12 @@ export async function runInkRepl(
       // in-process fixture, not a foreign-process record.
       if (process.env['DECKENT_APPROVAL_DEMO'] === '1') {
         const now = new Date();
+        const demoCopy = buildApprovalDemoCopy(lang as 'en' | 'tr');
         broker.submit({
           id: randomUUID(),
           requester: { role: 'worker', instanceId: 'demo-worker' },
-          summary: 'DEMO — rm -rf ./build çalıştırma izni (canlı-test kartı)',
-          details: { reason: 'repl_surface.approvals canlı-doğrulama', task: 'demo-001' },
+          summary: demoCopy.summary,
+          details: { reason: demoCopy.reason, task: 'demo-001' },
           scopeId: 'demo-001',
           scope: 'shell-exec',
           risk: 'high',
@@ -1209,7 +1227,13 @@ export async function runInkRepl(
   let bgEventSink: ((event: ChatTurnBgEvent) => void) | null = null;
   let runCompletionWatch: RunCompletionWatchHandle | undefined;
   try {
-    runCompletionWatch = wireBgTurnsProducer(bgTurnsEnabled, join(process.cwd(), JOBS_DIR), (event) => bgEventSink?.(event));
+    runCompletionWatch = wireBgTurnsProducer(
+      bgTurnsEnabled,
+      join(process.cwd(), JOBS_DIR),
+      (event) => bgEventSink?.(event),
+      createRunCompletionWatch,
+      lang as 'en' | 'tr',
+    );
   } catch { runCompletionWatch = undefined; }
 
   const perms = createPermissionStore(process.cwd());
@@ -1599,6 +1623,10 @@ export async function runInkRepl(
       runFlowController = wireRunFlowMount(resolveRunFlowEnabled(projectCfg.terminal), {
         root: process.cwd(),
         config: cfg as ResolvedConfig,
+        completionLabels: {
+          completed: (jobId) => t('tui.run_flow.completed', { jobId }),
+          failed: (jobId) => t('tui.run_flow.failed', { jobId }),
+        },
       });
       // TERM5-UI (sprint-427, task 6) — connects Task-4/5's ChatTurnQueue.
       // enqueueCorrelatedResult + RunFlowController.applyRunCompletion to a
