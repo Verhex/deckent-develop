@@ -1260,7 +1260,7 @@ export async function runNativeTurnLoop(
      */
     persistTurn?: (userInput: string, assistantText: string) => void;
   },
-  now: () => number = Date.now,
+  now: () => number = () => performance.now(),
 ): Promise<void> {
   let turnId = 0;
   for await (const line of lines) {
@@ -1431,6 +1431,8 @@ export interface ReplAppProps {
   dualStreamOverflow?: string;
   /** TERMINAL-PICKER-002 — words-only rendering (NO_COLOR / suppression). */
   pickerNoColor?: boolean;
+  /** Suppress decorative animation without suppressing semantic live updates. */
+  reducedMotion?: boolean;
   /** SURF-6 — in-card decision executor for the live inbox card (approve /
    *  full-ahead / reject / start on the focused run's detail). Injected by
    *  run.tsx (shared decision service); absent → decision keys are inert. */
@@ -1680,7 +1682,7 @@ export async function routeNativeMcpInput(options: NativeMcpRouteOptions): Promi
 
 export function ReplApp(props: ReplAppProps): ReactElement {
   const palette = useInkPalette();
-  const { provider, dispatcher, labels, registerConfirm, registerActionGate, registerToolSink, slashRegistry, nativeMcpSlash, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, startupRecentSessions = false, sprintHistoricalContext, renderSprintContextReason, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, nativePermissionIntent, registerNativeApprovalRetire, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle, shortcutsPanel, pickerLabels, pickerSpecs, saveDefault, configEntries, saveConfigValue, initialTermMode, pickerAscii = false, pickerNoColor = false, dualStreamOverflow, toolRead } = props;
+  const { provider, dispatcher, labels, registerConfirm, registerActionGate, registerToolSink, slashRegistry, nativeMcpSlash, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, startupRecentSessions = false, sprintHistoricalContext, renderSprintContextReason, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, nativePermissionIntent, registerNativeApprovalRetire, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle, shortcutsPanel, pickerLabels, pickerSpecs, saveDefault, configEntries, saveConfigValue, initialTermMode, pickerAscii = false, pickerNoColor = false, reducedMotion = false, dualStreamOverflow, toolRead } = props;
   const resumeLedgerOptions: LedgerStoreOptions = { ...props.resumeLedgerOptions, cwd: props.cwd };
   const { exit, suspendTerminal } = useApp();
   // TERMINAL-TOOLS-004 — live width for the status row + queue preview (reflows on resize).
@@ -2277,7 +2279,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
 
   useEffect(() => {
     if (!nativeToolActivity || !replSurfaceEnabled) return;
-    const tick = (): void => setNativeToolNow(Date.now());
+    const tick = (): void => setNativeToolNow(performance.now());
     tick();
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
@@ -2449,7 +2451,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
                 compactLabel: event.compactLabel,
                 cancelRequestedLabel: event.cancelRequestedLabel,
                 cancelRequestedCompactLabel: event.cancelRequestedCompactLabel,
-                statusLabel: event.statusLabel, cancelRequested: false, startedAt: Date.now(), generation,
+                statusLabel: event.statusLabel, cancelRequested: false, startedAt: performance.now(), generation,
               };
             });
             return;
@@ -2570,7 +2572,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       && nativeToolActivity !== null;
     if (pendingTool) {
       setNativeToolActivity((current) => current === null ? null : { ...current, cancelRequested: true });
-      const elapsed = `${Math.max(0, Math.floor((Date.now() - nativeToolActivity.startedAt) / 1000))}${liveFooterLabels.unitSeconds}`;
+      const elapsed = `${Math.max(0, Math.floor((performance.now() - nativeToolActivity.startedAt) / 1000))}${liveFooterLabels.unitSeconds}`;
       pushTurn('seg', nativeToolActivity.cancelRequestedLabel
         .replace('{tool}', formatSessionIdForTerminal(nativeToolActivity.tool))
         .replace('{elapsed}', elapsed));
@@ -3171,6 +3173,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       );
     })()
     : null;
+  const animateActivity = !reducedMotion && !pickerAscii && !pickerNoColor;
 
   return (
     <Box flexDirection="column" ref={worklineNode}>
@@ -3324,10 +3327,10 @@ export function ReplApp(props: ReplAppProps): ReactElement {
         {/* TERMINAL-TOOLS-013: while a card owns stdin the anchor SAYS so
             instead of promising "your turn" (textual carrier, not layout). */}
         {nativeToolActivityText
-          ? <><Spinner /><Text bold> deckent </Text><Text {...palette.muted}>{`· ${nativeToolActivityText}`}</Text></>
+          ? <>{animateActivity ? <Spinner /> : null}<Text bold>{`${animateActivity ? ' ' : ''}deckent `}</Text><Text {...palette.muted}>{`· ${nativeToolActivityText}`}</Text></>
           : phase === 'idle'
           ? <Text {...palette.muted}>{inputBarActiveNow ? `✓ ${labels.ready}` : labels.inputPaused}{nativeRequestMetricText ? ` · ${nativeRequestMetricText}` : ''}</Text>
-          : <><Spinner /><Text bold> deckent </Text><Text {...palette.muted}>{`· ${phase === 'thinking' ? labels.thinking : labels.generating}${nativeRequestMetricText ? ` · ${nativeRequestMetricText}` : ''}`}</Text></>}
+          : <>{animateActivity ? <Spinner /> : null}<Text bold>{`${animateActivity ? ' ' : ''}deckent `}</Text><Text {...palette.muted}>{`· ${phase === 'thinking' ? labels.thinking : labels.generating}${nativeRequestMetricText ? ` · ${nativeRequestMetricText}` : ''}`}</Text></>}
         {/* TERMINAL-TOOLS-006: transient Ctrl-C hint (names the next key). */}
         {interruptHint ? <Text {...palette.info}>{`  · ${interruptHint.text}`}</Text> : null}
       </Box>

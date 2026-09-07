@@ -29,6 +29,25 @@ async function* linesOf(...values: string[]): AsyncGenerator<string> {
 }
 
 describe('runNativeTurnLoop — per-turn exception isolation (387-003)', () => {
+  it('uses a monotonic default duration when the wall clock moves backwards', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-08T00:00:00.000Z'));
+    const onTurnStats = vi.fn();
+    const engine: ReplEngine = vi.fn(async (_line, callbacks) => {
+      vi.setSystemTime(new Date('2026-09-07T23:59:00.000Z'));
+      await vi.advanceTimersByTimeAsync(900);
+      callbacks.onTurnEnd({ inputTokens: 1, outputTokens: 7 });
+    });
+    try {
+      await runNativeTurnLoop(linesOf('duration'), engine, {
+        output: () => {}, onTurnStats, onTurnError: () => {},
+      });
+      expect(onTurnStats).toHaveBeenCalledWith({ elapsedMs: 900, tokens: 7 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('surfaces a thrown turn as onTurnError instead of rejecting (görünür hata, sessiz-donma değil)', async () => {
     const engine: ReplEngine = vi.fn(async (line: string) => {
       if (line === 'boom') throw new Error('agent session exploded');

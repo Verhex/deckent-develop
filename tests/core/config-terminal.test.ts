@@ -33,6 +33,7 @@ describe('terminal config', () => {
     expect(terminal.scrollbackBytes).toBe(262_144);
     expect(terminal.startup?.recent_sessions).toBe(false);
     expect(terminal.resume).toBeUndefined();
+    expect(terminal.reduced_motion === true).toBe(false);
   });
 
   it('DEFAULT_TERMINAL_CONFIG exposes the canonical secure defaults', () => {

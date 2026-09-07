@@ -2180,6 +2180,7 @@ export async function runInkRepl(
       pickerAscii={terminalAscii}
       dualStreamOverflow={terminalAscii ? '...' : '…'}
       pickerNoColor={isColorSuppressed()}
+      reducedMotion={(projectCfg as { terminal?: { reduced_motion?: unknown } }).terminal?.reduced_motion === true}
       hyperlinks={resolveHyperlinks({
         env: process.env,
         setting: (projectCfg as { terminal?: { links?: unknown } }).terminal?.links,

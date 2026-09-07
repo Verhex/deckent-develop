@@ -68,6 +68,9 @@ export interface TerminalConfig {
   /** TERMINAL-READABILITY-002 — OSC 8 hyperlink policy: auto (host evidence
    *  decides), on, off. Absent-by-default (resolved to `auto` at boot). */
   links?: 'auto' | 'on' | 'off';
+  /** Reduce decorative Terminal motion without suppressing semantic progress,
+   *  freshness, deadline, or control-state updates. Absent resolves to false. */
+  reduced_motion?: boolean;
   /** Bind address for the terminal WS. Default 127.0.0.1. */
   bind: string;
   /** Max concurrent PTY sessions. */

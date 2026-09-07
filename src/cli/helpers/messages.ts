@@ -5665,6 +5665,14 @@ const BASE_MESSAGES: MessageMap = {
     en: '{field} must be a boolean.',
     tr: '{field} bir boolean olmalıdır.',
   },
+  'config.terminal_reduced_motion_invalid_boolean': {
+    en: '{field} must be a boolean.',
+    tr: '{field} bir boolean olmalıdır.',
+  },
+  'config.terminal_reduced_motion_description': {
+    en: 'Reduce decorative motion in the native Terminal while preserving semantic progress, freshness, deadline, and control-state updates.',
+    tr: 'Anlamsal ilerleme, güncellik, son tarih ve kontrol durumu güncellemelerini korurken native Terminalde dekoratif hareketi azaltır.',
+  },
   'config.terminal_resume_invalid_object': {
     en: '{field} must be an object.',
     tr: '{field} bir nesne olmalıdır.',

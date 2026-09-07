@@ -1623,6 +1623,13 @@ export function validateConfig(config: DeckentConfig): string[] {
       );
     }
   }
+  if (config.terminal?.reduced_motion !== undefined && typeof config.terminal.reduced_motion !== 'boolean') {
+    errors.push(getMessage(
+      'config.terminal_reduced_motion_invalid_boolean',
+      config.language ?? DEFAULT_LANGUAGE,
+      { field: 'terminal.reduced_motion' },
+    ));
+  }
   if (config.terminal?.startup !== undefined) {
     const startup = config.terminal.startup;
     if (typeof startup !== 'object' || startup === null || Array.isArray(startup)) {
@@ -3278,6 +3285,14 @@ export const CONFIG_METADATA: Readonly<Record<string, ConfigMetadataEntry>> = {
     type: "'auto' | 'on' | 'off'",
     default: 'auto',
     options: ['auto', 'on', 'off'],
+    category: 'Terminal',
+  },
+  'terminal.reduced_motion': {
+    description: getMessage('config.terminal_reduced_motion_description', 'en'),
+    descriptionTr: getMessage('config.terminal_reduced_motion_description', 'tr'),
+    type: 'boolean',
+    default: false,
+    options: ['true', 'false'],
     category: 'Terminal',
   },
   'terminal.startup.recent_sessions': {

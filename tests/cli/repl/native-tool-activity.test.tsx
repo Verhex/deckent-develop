@@ -23,7 +23,10 @@ const MODEL_SPEC: PickerSpec = {
   candidates: [{ id: 'fixture', label: 'fixture', state: 'current', facts: [] }],
 };
 
-afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
+afterEach(() => {
+  vi.useRealTimers();
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+});
 
 function mount(engine: ReplEngine, replSurfaceEnabled = true) {
   const cwd = mkdtempSync(join(tmpdir(), 'deckent-l4d-activity-'));
@@ -46,6 +49,36 @@ function mount(engine: ReplEngine, replSurfaceEnabled = true) {
 }
 
 describe('mounted native tool activity', () => {
+  it('advances mounted tool duration monotonically across a backwards wall-clock change', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-08T00:00:00.000Z'));
+    let release: (() => void) | undefined;
+    const engine = Object.assign(async (_input: string, cbs: Parameters<ReplEngine>[1]) => {
+      cbs.onToolActivity?.({
+        kind: 'executing', id: 'monotonic-call', tool: 'deckent_bash',
+        label: 'executing {tool} · {elapsed}', compactLabel: 'executing · {elapsed} · {tool}',
+        cancelRequestedLabel: 'cancel requested {tool} · {elapsed}',
+        cancelRequestedCompactLabel: 'cancel requested · {elapsed} · {tool}', statusLabel: '{tool}',
+      });
+      await new Promise<void>((resolve) => { release = resolve; });
+      cbs.onToolActivity?.({ kind: 'clear', id: 'monotonic-call' });
+      cbs.onTurnEnd({ inputTokens: 0, outputTokens: 0 });
+    }, { close: vi.fn() }) as ReplEngine;
+    const { stdin, lastFrame, unmount } = mount(engine);
+    try {
+      stdin.write('go\r');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(lastFrame() ?? '').toContain('executing deckent_bash · 0s');
+      vi.setSystemTime(new Date('2026-09-07T23:59:00.000Z'));
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(lastFrame() ?? '').toContain('executing deckent_bash · 1s');
+    } finally {
+      release?.();
+      await vi.advanceTimersByTimeAsync(0);
+      unmount();
+    }
+  });
+
   it('drops an old engine callback after that turn has closed before a later turn can own the anchor', async () => {
     const events: string[] = [];
     const activity = (id: string) => ({
