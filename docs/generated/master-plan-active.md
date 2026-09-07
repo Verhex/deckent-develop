@@ -5,15 +5,15 @@
 
 **Schema:** 3
 
-**Source digest:** `sha256(normalized-lf-utf8):642edfe747074065304ab7007b80a9967a2981eac9c58cfcc21d3ec9084ebdba`
+**Source digest:** `sha256(normalized-lf-utf8):49b4eee338dc95206e9bfaa977cb69057c96d07057ab7b55aa19c24aa96942d6`
 
-**Rows:** 578 total · 489 active · 89 terminal
+**Rows:** 584 total · 495 active · 89 terminal
 
 ## State summary
 
 | State | Count |
 |---|---:|
-| OPEN | 367 |
+| OPEN | 373 |
 | READY | 0 |
 | IN_PROGRESS | 0 |
 | BLOCKED | 69 |
@@ -93,6 +93,8 @@
 | 534 | `SSOT-SETTLEMENT-001` | OPEN | P0 | TRUTH | `APPROVAL-001`, `RECEIPT-001`, `KERNEL-SETTLEMENT-001`, `AUDIT-001` | — | MASTER settlement-closure authority: authenticated historical authority, external immutable/self-hosting-safe grant ledger, commit-bound settlement ve Git trust-anchor |
 | 538 | `CI-NIGHTLY-GREEN-001` | OPEN | P1 | TRUTH | — | — | Gece Coverage'ın 3 drift kırığı kapanır: O3 operation-ingress baseline canlıyla eşitlenir (673→674, debt-manager buildReplanProposal yazması), decisions.md'deki Context'siz ADR tamamlanır, KNOWN_ORPHANS pini operation-catalog/index.ts'i kaydeder |
 | 545 | `CLI-SURFACE-REFORM-001` | OPEN | P1 | TRUTH | — | — | CLI yüzeyinin uçtan-uca reformu — dilim-1 "profesyonel ayrım" (owner-admission 2026-08-27) |
+| 546 | `SECRET-SCAN-SIGNAL-REMEDIATION-001` | OPEN | P1 | SECURITY | — | — | Kalıcı Secret Scan kırmızısı exact fixture veya gerçek credential ayrımıyla güvenli biçimde giderilir |
+| 547 | `SEC-DEP-ADVISORY-002` | OPEN | P1 | SECURITY | — | — | Fresh dependency advisory seti güvenli upgrade veya exact SEC-05 exception ile kapatılır |
 | 1000 | `CODEX-MAIN-001` | BLOCKED | P0 | CODEX | `SSOT-003`, `TEST-675`, `TEST-676`, `APPROVAL-001`, `RECEIPT-001`, `LIMIT-001` | `CONFIG_CUTOVER_INCOMPLETE` | Codex-main transition parent |
 | 1010 | `CM-01` | BLOCKED | P0 | CODEX | `SSOT-003` | `CONFIG_CUTOVER_INCOMPLETE` | Canonical resolved provider/model contract across every ingress |
 | 1020 | `CM-02` | OPEN | P0 | CODEX | `CM-01` | — | Sol, Terra and Luna entitlement evidence matrix |
@@ -297,6 +299,9 @@
 | 3354 | `FIX-SPAWN-DEPENDENCY-FRESHNESS-001` | VERIFY | P1 | KERNEL | `ORCHESTRA-RELIABILITY-001` | — | FIX-spawn dependency-settlement tazeliği: FIX dalgası spawn edilirken dependency lineage'ı result-ingest SONRASI taze snapshot'tan okunur; bayat 'Pending' penceresi kapanır |
 | 3355 | `EXECUTION-RESOURCE-REALM-001` | OPEN | P1 | KERNEL | — | — | Docker worker resource-policy + Firecracker execution-realm karar-paketi: kind-attribution telemetri dilimi, bounded light-kind memory-canary, typed ExecutionResourceEnvelope ile aggregate admission, renewable-lease ADR yönü ve KVM capability-probe tek owner-sıralı pakette (gündem-dışı park; owner 2026-08-26: uygun zamanda) |
 | 3356 | `TMP-DOGFOOD-MAIN-CONTROLLED-SYNC-001` | OPEN | P1 | KERNEL | `PROVIDER-OBS-MIGRATION-001` | — | Tmp-dogfood worktree'sinin doğrulanmış source-only işlerinin güncel main'e paket-paket kontrollü yeniden-uygulanması (P1–P5: typed planner-failure evidence, canonical project-root + Docker attempt-identity + route-aware worker-core, hermetik dispatcher-fixture, dar self-audit evidence adapter'ı, docs/rules onarım-sonrası-regen) |
+| 3358 | `GOAL-DISPOSITION-LIFECYCLE-001` | OPEN | P1 | KERNEL | — | — | Autonomous goal cancel, abandon ve reset yaşam döngüsü canonical service üzerinden CLI/MCP parity ile işler |
+| 3359 | `BUILD-SOURCE-SURFACE-IDENTITY-001` | OPEN | P1 | ASSURANCE | — | — | Build identity uncommitted source, Git HEAD ve Terminal/Dashboard/Desktop source-bundle kökenini birbirine karıştırmadan gösterir |
+| 3360 | `RUNFLOW-INGRESS-HOLD-OBSERVABILITY-001` | OPEN | P1 | KERNEL | — | — | do ve plan dispatch öncesi HOLD/failure durumları kalıcı attribution ve ortak operator read-model üzerinden görünür |
 | 4000 | `AUTHORITY-001` | OPEN | P0 | AUTHORITY | `SSOT-003` | — | Unified runtime authority parent |
 | 4020 | `TENANT-001` | VERIFY | P0 | AUTHORITY | `PRINCIPAL-001` | — | Canonical tenant/project/session scope enforcement |
 | 4021 | `AUTONOMOUS-TENANT-AUTHORITY-001` | OPEN | P0 | AUTHORITY | `PRINCIPAL-001` | — | Autonomous read, mutation, approval ve reactive ingress için fail-closed tenant authority |
@@ -398,6 +403,7 @@
 | 6171 | `DESIGN-PRECISION-INSTRUMENT-001` | OPEN | P1 | PRODUCT | `DESKTOP-REBORN-001` | — | Precision Instrument becomes the calm, formal and enterprise-grade default across Desktop and Terminal; NOVA remains only an explicit operator visualization preset |
 | 6180 | `ERP-AGENT-CONTRACT-001` | OPEN | P2 | CONNECTOR | — | — | Enterprise Application Agent Contract: ERP/iş-uygulaması agent'larına (Oracle AI Agent Studio, Fusion/NetSuite sınıfı) karşı discover_capabilities / invoke / stream_status / request_approval / commit_transaction / cancel / compensate_or_rollback / collect_audit sözleşmesi |
 | 6181 | `COMPETITIVE-INTELLIGENCE-WATCH-001` | OPEN | P2 | CONNECTOR | — | — | Competitive Intelligence Watch — kanıt-bağlı baseline + resmi-kaynak sinyal + Memory V2 dedup + günlük Europe/Istanbul otomasyonu |
+| 6182 | `DASHBOARD-MEMORY-UX-RESIDUAL-001` | OPEN | P1 | DASHBOARD | — | — | Dashboard bellek görünümü bütün kaynak kimliğini, typed erişilememe nedenini ve erişilebilir EN/TR sunumu korur |
 | 7000 | `ECOSYSTEM-001` | OPEN | P0 | ECOSYSTEM | `P02-647`, `SURFACE-CUTOVER-001`, `CAPABILITY-001`, `AUDIT-001` | — | Governed agent, skill, plugin, tool, MCP and extension ecosystem |
 | 7010 | `AGENT-SKILL-001` | OPEN | P1 | ECOSYSTEM | `CAPABILITY-001` | — | Role/capability-complete agent and skill catalog |
 | 7011 | `AGENT-CATALOG-AUTHORITY-001` | OPEN | P0 | ECOSYSTEM | — | — | Shipped built-in, project override, learned/runtime ve archive katmanları için tek effective agent catalog authority |
