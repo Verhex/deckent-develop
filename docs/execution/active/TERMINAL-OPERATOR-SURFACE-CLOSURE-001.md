@@ -11,6 +11,302 @@ PREREQUISITE: 3331 (landed 2449b6e4f) → 3332 (landed 13d2c80ef) → 3333 (land
 OWNER_DECISION_REF: owner-live-2026-09-04-terminal-audit-closure-v2
 STATUS: IN_PROGRESS source-work; DOGFOOD_HEALTH=DEGRADED. 2026-09-06T23:10Z sonrası gerçek autonomous dry-plan PASS; exact micro-task proof admission ve çoklu-worker settlement hâlâ açık, yeni worker dispatch yok.
 
+### Native permission main actual + archive — 2026-09-07T22:23Z
+
+Main actual80727exit0 /tmp/deckent-7099-native-permission-pty-YAvYqX/result.json
+SHA0f056775406880deb9762ff83d8ffcac456a3620eff330d5413e7acb25841647:
+22/22 EN/TR PASS,0UNRUN; compiledbefore==after;16privatewrites/16authchildren;
+all cases exit0/closed/childcustodytrue/childaliveafterfalse. ForeignEN/TR CLIexit1,
+decision absent, exact refusal observed and context sentinel absent.
+Mainfreeze4373cd0d80e139c6671f74d6cc6a503ddfeda7176ffac5798caa2497adb16234;
+contract1dcd0174fc380b0a04d2f960be42644fae49ab87814a30b8f731ba4d2e8c0ff1;
+helperf723501ae8e67aa038c3cf4043b827ae9d03b662f8e0a84eb3a42da1c29f16b9.
+Permanent main archive /home/alperen/deckent-recovery-20260904/
+terminal-7099-native-permission-main-v1-mLecFh:405payload files/1963142bytes,
+private0700dirs/0600files; SHA/readback and different-inode checks PASS.
+manifestb8ca3aa6b5fb98eddf254697eb593b3b53633d3ee9670750b681b092410ee617;
+SHA256SUMSa6f712bf5bf447e7d817295d8901ea3b537eeecc874895791165fe0a740fdf12;
+sha256sum --quiet -c SHA256SUMS exit0. Originals and all earlier failures preserved.
+Archive includes actual395files +10 supporting freeze/contract/helper/test/fan-in/
+verification artifacts. Supportive manifest is not canonical receipt/settlement.
+Runtime bot2969555 recorded22:17:38.076Z: entrypoint35ba88de39a1b2a39c50bb8feb97ecfdd958fd9bd39a3dbb9dc87bab39c8ff31;
+buildIdentity311be99b0aa51031d8ff8ffaeefda8aac512b1f8e948528c4e1e81574e7d9ba1;
+projectRootb38d9cf37034a57aa4d557c91b0974cab13ae243f91a6c053611dddebefb5f27,
+all three match current disk and process alive at22:18Z. MCP reconnect remains
+owner-deferred to next session boundary, no stale MCP command used for proof.
+Scope: native permission bounded production-surface LOCAL_VERIFIED; Fable947
+independent candidate GO. Main fan-in evidence sent as one final milestone next.
+Not a paid provider call, human approval, cross-provider receipt, other-platform
+proof or dogfood multiworker/next-goal settlement. 7099 stays VERIFY.
+
+### Native permission main landing — 2026-09-07T22:18Z
+
+Source commit55fd20009e4ac27156995810f383467578bf752d: exact49paths,
+22production+27tests, +3595/-284. Every committed blob SHA equals candidate
+freezev6 pin; main-only messages73/10 and run7/0 remain unstaged unchanged.
+MASTER19/0 and generated206/11 remain inherited; index empty after commit.
+Fable947 a26f7c68039c independently GO for final candidate; no new audit round.
+Main38file396/396PASS handle80886exit0, main-joint-tests-v1.json SHA
+963118aa3fa8aec8ae8d83952e701131dfd7e3ff86caa9279f1820a69e0b6c2e.
+noEmit99105exit0, i18n59REPL/hits0. Canonical botstop2611078 then freshguardALLOW;
+build:all7465exit0 (native/core/assets/dashboard), canonical botstart2969555.
+At22:18Z live bot entrypoint/buildIdentity/projectRoot digests match disk.
+Main actual80727 RUNNING_UNPROVEN; new mainfreeze64pins and maincontract
+1dcd0174fc380b0a04d2f960be42644fae49ab87814a30b8f731ba4d2e8c0ff1.
+Helper allowlist admits exact candidate and main only; freeze.repository must
+match. Candidate helper bytes preserved before adaptation; scenarios/limits unchanged.
+Main landing evidence: /tmp/deckent-7099-native-integration-x3pijq/main-landing-verification-v1.json.
+Permanent candidate archive: /home/alperen/deckent-recovery-20260904/
+terminal-7099-native-permission-candidate-v1-eAmokO; 610 proof files SHA/readback
+equal, original files preserved. manifest d09623f29a8167b06bcb231965e53587b93aae1fa3f238e33ae5c23488db9155;
+28 supporting artifacts separately checked, supporting-manifest
+6d0341579ceadc360947e7b2422ecc2d1dcb9a6cd5cdb716ccb16fbd5f6714c1.
+All diagnostic evidence remains SUPPORTIVE_EVIDENCE_NOT_SETTLEMENT;
+main actual/archive still required, 7099VERIFY and platform/billing/dogfood HOLD preserved.
+
+### Native permission candidate complete proof — 2026-09-07T22:03Z
+
+Freezev6 /tmp/deckent-7099-native-integration-x3pijq/source-freeze-v6.json SHA
+6d015d27af25f5bf39a0351e9e84eb062b850a43469b8a81d4804eda5f66aab9,64pins.
+Root38file396/396PASS0skip, joint-tests-c3-v1.json SHA
+65ca53eebf81e1f13fb99786038f09c1c6d4f67e2b9100ba89a018cf5d251ecd,
+handle32574exit0; noEmit30296exit0; i18n59REPL/hits0; build:all90904exit0.
+Finalactual10953exit0 /tmp/deckent-7099-native-permission-pty-jAJRaR/result.json
+SHA704c8bf15e7e467cbad714a04256d591ac866dc64573a8e44b05ac378b335c13:
+22/22 EN/TR cases PASS,0UNRUN,compiled before==after,16 private writes,
+16 local auth children and all owned children reaped. Foreign context sentinels
+absent, decisions absent; exact refusal present. Once/session/fresh/always/reload/
+deny/cancel/expiry/foreign/conflict/nested tested both languages.
+Contractv4 d9dc98027e907d0588bf4abbcdea189d345ab4c6383399dd45af4b99f2f27054;
+builderd6ecb866/helpera3f98558. Failed prior runs/contracts remain immutable.
+Diagnostic loopback/Linux PTY is NOT real provider billing, dogfood settlement,
+other-platform proof, whole7099 DONE or authenticated closure receipt.
+Fable946 final independent source/actual verdict requested; surgical main fan-in
+PREPARATION only until verdict. Then exact approvedmaincodefan-in, verification,
+canonical bot stop/build/start, main actual proof, bounded source commit.
+All inherited mainchanges/memory/retained728/tasks preserved; push stays codex2.
+Admit permanent private evidence archive under existing owner recovery directory:
+copy exact proof/test/freeze/contract artifacts to new0700subdir, hash/readback;
+no original deletion, no productionkeys/config copying, no dependency/buildcopy.
+
+### C2 actual / foreign native-request context containment — 2026-09-07T21:52Z
+
+Final C2 joint383/383PASS37files f2ccc9ba;freezev5 e6605569/63pins,
+candidate build2308exit0. Actual28633exit1 EPKNxj result SHA
+b2c095a0f44c18ba81ed66e0ef66adf3b4ff800ac3e74aac94a1331010d8124e.
+First8 EN cases PASS: once/session/fresh/always/reload/deny/cancel/expiry;
+foreign exact refusal expectation FAIL;13UNRUN. Existing early gate only checks
+federatedInbox, direct broker target reaches context print before canonical runtime
+rejects unauthorized. No decision/effect/auth bypass; foreign metadata disclosure
+is BLOCKS_CURRENT_DONE security finding in current approval surface.
+Admit C3 exact src/cli/commands/approvals.ts + tests/cli/commands/approvals.test.ts:
+extend existing pre-sweep/pre-context tenant gate to native broker request after
+exact ID resolution; no foreign context/auth/sweep/decision mutation, same localized
+typed refusal. Preserve same-tenant flow and federated lineage guard. One writer,
+one implementation+one observed correction,one targeted invocation,15min/2forks6GB.
+Root final joint/newfreeze/build and unchanged22case actual contract decide closure.
+No helper expectation weakening, new authority/schema, main edit or MASTER mutation.
+Fable945 confirms C2 keyboard closure and CLI foreign disclosure. Its possible TUI
+late-foreign gap is NOT a missing production filter: run.tsx1534-1536 supplies the
+tenant filter to terminal-channel subscription, eventstream ClientQueue.push125
+applies it before enqueue. Admit one test-only extension in existing
+tests/cli/approval-terminal-channel.test.ts: foreign live pending after attachment
+must be dropped while following own-tenant pending arrives and foreign disk truth
+remains unchanged. No global service/schema refactor. Root joint now38files;
+source-freeze-v6 not yet written and no C3 root test was started when channel guard
+detected945. Read/digest verified, response bundled with final proof milestone.
+Foreign actual proof is strengthened to assert seeded summary/path/requester absent
+from CLI transcript; exact refusal/effect/auth/decision checks remain unchanged.
+
+### C2 joint observed / Enter fixture correction — 2026-09-07T21:46Z
+
+Root37file383tests:382PASS/1FAIL, joint-tests-c2-v1.json, handle35934exit1;
+noEmit5024exit0, i18n59REPL/hits0. Actual mounted first-frame native/durable/confirm
+tests PASS. Sole failure input-bar-cluster.test.ts:80 expects only{name:return},
+where HEAD and candidate inkToKey both return explicit shift:false,meta:false.
+Source/base readback proves unchanged Enter producer; no production rollback.
+Admit exact tests/cli/input-bar-cluster.test.ts expectation correction preserving
+strict equality and add explicit Shift/Meta cases. No other source/test changes.
+No worker invocation; root owns ONE changed-fixture37-file joint check, newfreezev5,
+then already admitted candidate build/contractv3/22case actual. Old failures retained.
+
+### C2 root joint / test commit-boundary correction — 2026-09-07T21:44Z
+
+Worker final C2v2 report ad2445dc has7/8PASS, sole failure App test checked
+lastFrame immediately after asynchronous trigger before any commit/key emission.
+This does not contradict production routing; preserve FAILED report. No further
+worker invocation authorized. Root admits exact test-only first-painted-frame
+interception (no timer / no waiting for passive effects) before its already planned
+37-file joint verification. Production delta remains stable3 consumer listeners
+plus App confirm/global interrupt guarded listeners. One test-only correction,
+then root joint decides; no additional standalone worker loop.
+
+### C2 dependent confirm-owner amendment — 2026-09-07T21:41Z
+
+First C2 exact4 supportive7/7PASS e848795e; not full ownership proof.
+Fable943 independently confirms C1 once closure and C2 product race. Root selects
+stable mounted listeners PLUS latest handler guards (not guards with inactive
+listeners, which lose keys). Installed React discreteUpdates does not flush a
+commit synchronously between emitter listeners; explicit single-consumption proof
+still required. Remaining App confirm/global interrupt activation has same defect.
+Extend C2 writer exact scope by src/cli/repl/app.tsx only: both hooks stable with
+latest existing owner/priority checks, no authority/precedence change. Existing new
+transition test must use tmpdir, native hidden-to-visible (not only disabled card)
+and real mounted ReplApp confirm transfer; assert visible frame before first key,
+draft preservation and inverse transfer. No sleep-based production/helper fix.
+One final changed-source worker check permitted, then root37-file joint/noEmit/
+i18n/build/actual matrix. Earlier seven-test result stays immutable supportive proof.
+Picker/inbox/tool-read remaining lifetime behavior is not silently claimed closed.
+
+### C2 visible-card keyboard ownership recovery — 2026-09-07T21:36Z
+
+Same7099/L3+L6 BLOCKS_CURRENT_DONE, owner-authorized ADR-D-007 continuation.
+Root/Wegener agree: Ink useInput subscribes/unsubscribes in passive useEffect;
+visible commit can precede new card subscription / old composer unsubscription.
+AtFZ6E proves input2 in composer while intent visible. No provider/approval policy
+change needed. Exact writer Wegener: src/cli/repl/approval-card.tsx and input-bar.tsx;
+tests/cli/repl/native-permission-card.test.tsx plus new
+tests/cli/repl/approval-keyboard-transition.test.tsx. Existing mounted consumers
+keep listeners stable and guard with latest committed intent/head/mutex/active;
+no permission authority change, global router, Ink private API, delay or helper retry.
+Proof: mounted native/durable/composer ownership both directions, confirm priority,
+single-consumption and draft preservation, then unchanged22-case real CLI matrix
+against NEW source freeze/compiled build. One implementation and one observed-
+failure correction allowed; one worker targeted invocation and one root joint
+invocation per distinct source freeze,2forks/6GB,15min. No main writes/cleanup,
+hostrestart or MASTER mutation. Failure evidence/freezev3 remain immutable.
+
+### C1 actual proof / keyboard transition finding — 2026-09-07T21:33Z
+
+Root281/281PASS28files0skip, joint-tests-c1-v1.json SHA
+80922472c3371109ab375dec16dc0d9efcbeca99416b4f5801db17f71f79add4;
+noEmit60873exit0; i18n59REPLfiles/hits0; candidate build:all88495exit0.
+Main canonical clean guard HOLD only bot-active; candidate ALLOW. Older candidate
+guard on main additionally reports schema mismatch; not a canonical main finding.
+
+Actual55919exit1, /tmp/deckent-7099-native-permission-pty-AtFZ6E/result.json SHA
+fa5832a49189bcdfe4a73fd6090e06f733b0257442e5e065219f243c93aa8329.
+Contractv2 0cd02e1aff2bf9ac440d0c50edfc57777f5bf8eae898605fc84166988654b5a6.
+en-once PASS: two native requests, two auth children, two private effect writes,
+four loopback turns and both tool/completion/ready sequences, all children reaped.
+en-session FAIL: lifetime card visible but key2 enters composer; no native durable
+request/auth/effect, WAIT_TIMEOUT approvalWrite. Remaining20 UNRUN/HOLD.
+Old output-loss fingerprint absent in once case, whole permission matrix not GO.
+New keyboard/render transition finding BLOCKS_CURRENT_DONE; root/Wegener read-only
+RCA before further mutation, no unchanged retry or foundation-only landing.
+Main code untouched. Freeze53/53 parity; selected fan-in45paths (21production,
+24tests); only messages.ts/run.tsx overlap inherited main dirt, patch-check clean.
+Fable requested independent milestone review ENTRY942; no result claimed yet.
+
+### C1 final joint verification admission — 2026-09-07T21:30Z
+
+Root reviewed final adapter/service correction: terminal return guard, same-adapter
+unreaped-child latch, new local decide refusal, post-wait abort/expiry and typed
+union mapping. Final exact4 hashes fbb3857e/f13ee8f1/8d4eddcf/8754f28b;
+guidance lane b9a0de82/aefc6a05/ceaef680/5af8e325/5616340c.
+Freeze source-freeze-v3.json in /tmp/deckent-7099-native-integration-x3pijq
+pins53 paths, including all28 selected test files. Old v1/v2 freezes immutable.
+Admit ONE root28-file joint test invocation (2 forks,6GB heap), concurrent noEmit,
+then scoped i18n. On PASS and fresh no-active-execution check: ONE candidate-only
+canonical build, new contract-v2 and ONE22-case fail-fast compiled PTY proof.
+No main build/restart, provider dispatch, auth mutation, commit/push, MASTER closure
+or retained728/task/memory cleanup in this verification batch. Source edits stop
+during freeze; exact new failure must be classified before any correction/retry.
+Previous257/257 is old-source proof; C1 final and actual matrix remain UNRUN/HOLD.
+
+### C1 final fixture repair + recovery guidance — 2026-09-07T21:18Z
+
+c1-tests-v2.json SHA f6846943cb7778646f80a22d27737dccf0e65a4a5e2d6b60f58f3da8777dfba1,
+actual17/20PASS/3FAIL; no retry. Root JSON/source readback: wrong runtime sibling
+replacement landed in old test; duplicate call is after durable write and therefore
+truthfully request-already-decided; late-cancel fixture expects a code inconsistent
+with current adapter stub. Admit exact fixture correction in existing C1 tests;
+one new targeted invocation only after complete correction, old failures preserved.
+Same C1 service writer normalizes signal cancellation to WAIT_CANCELLED (not stale),
+revalidates binding separately, and preserves untrusted adapter reasonCode instead
+of flattening terminal-restoration-unconfirmed to generic UNTRUSTED.
+
+Fable938 recovery-UX observation accepted BLOCKS_CURRENT_DONE: latched terminal
+restoration uncertainty must tell the user how to recover, not generic HOLD forever.
+Disjoint writer Lovelace exact5 additional paths:
+src/agent/loop.ts, src/cli/repl/native-agent-bridge.ts,
+src/cli/helpers/messages.ts, tests/agent/native-permission-session.test.ts,
+tests/cli/native-agent-bridge.test.ts.
+Map hold reason terminal-restoration-unconfirmed to structured
+native.permission.terminal-unavailable; bridge catalog renders EN/TR guidance to
+start a new terminal session while existing recorded decisions remain intact and
+the current tool continuation is held. No new authority/store/retry, no unsafe
+automatic restart, no App/Ink dependency modification. Only exact known restoration
+reason gets guidance; other failure/cancel/stale semantics remain truthful.
+One implementation + one correction,≤2 targeted invocations/2forks/16GB,15min;
+source candidate only. Root owns joint verification/newfreeze/build/actualproof.
+Other Static producer replay remains report-only; no new MASTER admission.
+
+### C1 readback / C negative contract correction — 2026-09-07T21:12Z
+
+C1 first exact4 freeze supportive17/17PASS reportc1-tests-v1.json
+2b00e68e18df364c241a4a368ff53e0246052c498eed3b6ffcc466d174bd48ba.
+Root readback identifies one bounded correction: no-ceremony path skips already
+aborted signal; service must revalidate after awaited verification; failed terminal
+restoration disposition vanishes on Map delete, allowing a later trust read.
+Keep bounded adapter-level uncertain-restoration latch (not durable authority),
+pre/post-wait abort guards, and same-adapter sibling/throw/expiry/late-cancel tests.
+Unreaped child must not open continuation even if suspension callback returns.
+Old external test used another adapter and did not prove same-adapter matching.
+Wegener has ONE remaining targeted invocation for this exact correction.
+
+Volta C negative expectation readback: expiry must record durable ttl-expire,
+system:expiry actor, not pending/zero decision. Its missing-production-sweep claim
+rejected by root source evidence: approval-store-watch defaultSweep69,
+runScan120, setInterval160 already wire automatic expiry through run.tsx.
+Fable935 independently confirmed C1 race, but repeated the same incorrect expiry
+pending0 expectation; root replied937 with exact producer evidence. Do NOT add
+CLI expiry trigger or product expiry patch to make fixture pass. Conflict actual
+trusted deny is not generic native HOLD; foreign exit1 alone does not prove tenant
+refusal. Exact helper/builder correction admitted: decision action/channel,
+losing local allow child exit, localized exact foreign refusal; keep22cases and
+zero-effect/no-grant/fail-fast. Add terminal-command/native classifier source and
+compiled pins in next manifest. Contractv1/KLQxcE remain unchanged.
+
+Channel936 authored by subagent responding to injected developer hook, confirmed
+via collaboration. Root had verified935; guarded reply failed before stale write.
+Root937 reconciles authorship/digests and supportive-v1 versus final distinction.
+Hook-routing collision is process finding only; no hook/skill edits admitted.
+No retry/build while C1 writer active; root owns newfreeze/compiled verification.
+
+### C1 terminal-return race recovery admission — 2026-09-07T21:04Z
+
+NEW KLQxcE runtime failure traced by Wegener/root: OpenAI-compatible adapter
+emits delta.content before finish_reason; loop and bridge forward it correctly.
+During ApprovalTerminalCommand.decide's suspendTerminal callback, child durable
+allow is observed by the cross-process broker; native permission consumer resumes
+while Ink is still suspended. Ink discards queued renders during suspension;
+Static tool/text updates are lost although durable decision/effect are real.
+Classification BLOCKS_CURRENT_DONE within7099/L3, not fixture protocol mismatch.
+Root reviewed actual parser206–230, run shared adapter1527/1579, terminal command
+420–428/450 and installed Ink suspension/render/resume seam. Main unchanged.
+
+Bounded C1 source correction candidate9dahQa exact four write paths:
+src/cli/repl/approval-terminal-command.ts,
+src/cli/repl/native-permission-approval.ts,
+tests/cli/repl/approval-terminal-command.test.ts,
+tests/cli/repl/native-permission-approval.test.ts.
+Reuse existing per-terminal decision adapter for ephemeral request-bound local
+ceremony ownership, not a new authority/store/schema or polling workflow. Block
+native trusted-decision return until that local suspendTerminal promise has
+completed; cross-process-only decisions without local ceremony remain immediate.
+Re-read durable validity/expiry after waiting, support cancellation and cleanup,
+fail honestly if terminal restoration is uncertain. Never rewrite decision truth
+or delay using guessed sleeps. Prevent deadlock between local decide and watcher.
+No raw-confirm fallback, raw-args persistence, user-string hardcode or Ink patch.
+One writer Wegener;≤25min, one implementation+one evidence-led correction,
+≤2 targeted invocations≤2forks/16GB; no build/PTY/provider/main/MASTER/commit.
+Test actual production adapter pending terminal-return boundary, sibling/external
+decision behavior, abort/throw cleanup, and service prevention of effect continuation
+before release. Root owns new freeze, targeted verification, rebuild and changed-
+fingerprint C proof admission; old257PASS/v2freeze/failedKLQxcE immutable evidence.
+Exact command module source/compiled and tests must join next proof pin set.
+
 ### C actual v1 observed — 2026-09-07T20:58Z
 
 Handle17987 exit1; result /tmp/deckent-7099-native-permission-pty-KLQxcE/result.json

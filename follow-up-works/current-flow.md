@@ -4,7 +4,53 @@
 > Silinme tetiği: onaylı sıra tüketilip kalıcı kanıtlar MASTER/evidence'a işlendiğinde silinir.
 > Ayrıntı ve failure geçmişi: docs/execution/active/TERMINAL-OPERATOR-SURFACE-CLOSURE-001.md.
 
-## Güncel — 2026-09-07 23:58 TR
+## Güncel — 2026-09-08 01:23 TR
+
+Native permission main source55fd20009 exact49 committed blobs==candidate freezev6;
+inherited messages73/10, run7/0, MASTER19/0 ve generated206/11 korunur.
+Main38file396/396PASS963118aa (80886exit0), noEmit99105/i18nPASS;
+canonical botstop2611078→guardALLOW→build:all7465exit0→botstart2969555.
+Bot entrypoint/buildIdentity/projectRoot üç digest eşleşti, liveness doğrulandı.
+Fable947 independent candidateGO; mainactual80727exit0,22/22PASS0UNRUN,
+result0f056775;16privatewrites/16authchildren, allchildcustodyclosed,foreignno-leak.
+Maincontract1dcd0174; mainfreeze4373cd0d; compiledbefore==after.
+Main archive terminal-7099-native-permission-main-v1-mLecFh:405files/1963142bytes;
+manifestb8ca3aa6/SUMSa6f712bf readbackPASS,private0700/0600,originalspreserved.
+Candidate archive terminal-7099-native-permission-candidate-v1-eAmokO preserves failures.
+7099VERIFY; loopback kanıtı dogfood settlement değildir. Push codex2'de.
+Sonraki adım: bounded docs commit → tek Fable milestone → 7099 kalan L1–L6/proof.
+
+## Önceki candidate checkpoint — 2026-09-08 01:03 TR
+
+Native permission final candidate actual22/22PASS0UNRUN jAJRaR result704c8bf1,
+handle10953exit0. C3 root38file396/396PASS65ca53ee; noEmit30296/i18n/build90904PASS.
+Freezev6 64pins6d015d27; contractv4d9dc9802. Foreigncontextabsence EN/TR proven;
+16privatewrites/16local-authchildren, allchildcustodyclosed. Fable946 finalverdict
+pending; mainfan-in PREPARATION only. Main code/runtime untouched,7099VERIFY.
+Below failures are retained history, not latestcandidateverdict. No dogfoodreceipt.
+
+C2 final joint37file383/383PASS0skip f2ccc9ba, handle65950exit0. Enter fixture
+strictshape corrected (+Shift/Meta); productionunchanged from noEmit5024.
+Freezev5 e6605569 (63pins) intact; candidate build:all2308exit0. Contractv3
+7f3682e8 now pins input-bar compiled/source; same22scenario actual running.
+Main source/runtime/build untouched. Prior382/383 report below remains historical.
+
+C2 keyboard-owner fix candidate only: stable card/composer/confirm listeners with
+latest guards. Freezev4 63pins; root37file joint383tests:382PASS/1FAIL, handle35934
+exit1. New mounted first-frame confirm/native tests PASS; sole FAIL existing
+input-bar-cluster Enter-key exact-object assertion (modifier fields), classification
+pending; no retry. noEmit5024exit0, i18n59REPL/hits0. C2 not yet built or actual-run.
+Owner latest: Fable communication only compact outcome/results/block milestones;
+943 read/digest verified; reply bundled with next completed verification milestone.
+
+C1 final root joint28file281/281PASS0skip, report80922472; noEmit60873exit0.
+Freezev3 53/53path intact. i18n59REPLfiles/hits0. Candidate build:all88495exit0
+(native/core/assets/dashboard); main bot/runtime/build untouched.
+Contractv2 0cd02e1a, Cactual55919exit1 AtFZ6E resultfa5832a4: en-once PASS
+(2auth/2writes/4turns/tool+completion visible); en-session FAILED key2 goes to
+composer while lifetime card visible,0auth/0writes;20UNRUN. Keyboard-transition
+RCA read-only with Wegener; no unchanged retry, no main code landing.
+Below earlier Cfailure/Bfreeze records are historical, not current final proof.
 
 7099 tek ACTIVE outcome; MASTER VERIFY. DOGFOOD ON / health DEGRADED.
 Owner-onaylı elle ADR-D-007 devam; bütün program goal'de korunur.
@@ -41,8 +87,13 @@ Docs384b46eaf exact3 +281/-53 committed; Fable918 doğruladı. Main source deği
 C builderaf54081e/helper235fd46b;contract49e4e86022cases frozen.
 Actual17987 exit1: KLQxcE resultb2f86d50;1FAILED/21UNRUN. GerçekCLI auth,
 durable valid allow ve ilk private write kanıtlandı; sonraki provider text
-ekrana gelmedi → completion WAIT_TIMEOUT. Wegener/Fable933 yeni kanıt RCA;
+ekrana gelmedi → completion WAIT_TIMEOUT. RCA: durable allow tüketilirken Ink
+hâlâ auth child için suspended; tool/text Static render kayboluyor. SSE doğru.
+C1 same7099 exact4 adapter/service+test correction Wegener'de; yerel terminal
+geri dönmeden native continuation yok, external decision/cancel truth korunur.
+Volta negatif C senaryolarının exact producer karşılığını salt-okuma kontrol ediyor.
 unchanged retry yok. Once/session/matrix/7099 closure hâlâ HOLD.
+Docs06dc7a39a exact2 +416/-2 committed; yeni C1 admission delta henüz dirty.
 B2 premature typecheck pipeline head yüzünden exit0; tsc diagnostics vardı,
 gerçek exit/timestamp/durable çıktı yok. PASS/baseline kanıtı değildir.
 Exact plan/scope/proof/budget capsule'ın Native permission B bölümünde.
