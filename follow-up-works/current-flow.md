@@ -4,7 +4,7 @@
 > Silinme tetiği: onaylı sıra tüketilip kalıcı kanıtlar MASTER/evidence'a işlendiğinde silinir.
 > Ayrıntılı geçmiş Git'te: d10456e99 ve 934dc194f:follow-up-works/current-flow.md.
 
-## Aktif durum — 2026-09-07T01:45Z
+## Aktif durum — 2026-09-07T02:08Z
 
 7099 tek ACTIVE outcome, MASTER VERIFY; bütün ürün/Terminal kapanışı yok.
 DOGFOOD ON, health DEGRADED; owner onaylı bounded ADR-D-007 kaynak yürütmesi.
@@ -21,6 +21,8 @@ Retained728, .tasks, memory.db ve inherited değişiklikler korunur.
 | F | a4fb47847 | L6 Ctrl+C ownership + approval Esc |
 | G | c19141e51 | Pipe-safe version |
 | I | 9f9fa3239 | Recursive REPL i18n gate + dört renderer sink |
+| J | 72cc89ecf | I kanıtı ve sonraki dilim docs/generated projection |
+| K | d25c97078 | Dual-stream cell/grapheme/ASCII/OSC8 kapanışı |
 
 I exact9blob PASS; main81tests+tsc/build PASS; selected61+supplemental20 PASS.
 Main/selected compiled EN/TR card/details/Esc, formatter ve devprobe PASS;
@@ -32,19 +34,21 @@ Fable bağımsız review canonical XVerify receipt değildir. Layer9 inherited a
 
 ## Runtime / remote
 
-Stop736773 → execution ALLOW → build:all01:38:47Z PASS → bot804423.
+Stop804423 → execution ALLOW → build:all01:59:30Z PASS → bot847750.
 Dist main dirty-tree; selected binary ayrıca doğrulandı. MCP reconnect kanıtlanmadı.
 Yeni sprint/worker dispatch yok; retained state temizlenmedi.
 Push TOOL_POLICY_HOLD: owner yetkisine rağmen araç process başlamadan reddetmişti;
-bypass/unchanged retry yok. Son source HEAD ahead9/behind0; remote CI tetiklenmedi.
+bypass/unchanged retry yok. HEADd25c97078 ahead11/behind0; remote CI tetiklenmedi.
 
 ## Şimdi / sonraki sıra
 
-1. I diliminin yalnız7099+capsule+imleç/generated docs kanıtını mühürle.
-2. Sol: mevcut L6 dual-stream caller-owned ASCII/Unicode marker + display-cell
-   width; mevcut pickerAscii capability ve grapheme helpers, statusmin1 korunur.
-   All-repl string-free test buna bağlıdır. Glyph-only default untranslated prose
-   sayılmaz; regex için rename/allowlist yok. Root docs, worker source writer.
+1. K kaynak mühürlendi; main/selected125tests+tsc/build PASS. Main compiled
+   PTY+mounted+helper PASS. Selected üç aggregate FAIL korunur; run3 ham kanıtı
+   için ayrı offline assertion adjudication var. Kalıcı40payload/SUMS capsule'da.
+2. Sol isolated next L6: live-footer upstream UTF16/hardcoded marker kaldırma;
+   App tek canonical clip callback'ini helper'a enjekte eder, cursor değişmez.
+   Run capability tek çözüm, gerçek Ink columns reflow; helpers→REPL import yok.
+   Main inherited runStatus/labels korunur. Root docs ve fan-in, worker source.
 3. Kalan L1 identity/readiness+migration; L2 active cancellation; L3 tool/MCP/approval;
    L4 reactive state/resume; L5 accounting; L6 verdict/reduced-motion/rows/redaction
    ve platform proof. Capsule DAG'ı; yeni outcome veya C kuyruğu başlamadı.

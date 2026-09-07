@@ -11,6 +11,39 @@ PREREQUISITE: 3331 (landed 2449b6e4f) → 3332 (landed 13d2c80ef) → 3333 (land
 OWNER_DECISION_REF: owner-live-2026-09-04-terminal-audit-closure-v2
 STATUS: IN_PROGRESS source-work; DOGFOOD_HEALTH=DEGRADED. 2026-09-06T23:10Z sonrası gerçek autonomous dry-plan PASS; exact micro-task proof admission ve çoklu-worker settlement hâlâ açık, yeni worker dispatch yok.
 
+### Dual-stream bounded landing — 2026-09-07T02:08Z
+
+Main d25c970788aa5c2b31d7d517783a3a5adfdd373f; exact7blob equality PASS.
+Caller-owned ASCII/Unicode marker, display-cell/grapheme clipping ve OSC8 BEL/ST
+close-before-marker/SGR-reset sırası; statusmin1/approval priority korunur.
+Selected ve main4suite125/125 + tsc + build:all PASS; lint i18n50file/hits0,
+layer9 inherited. Frozen v2 120test; ilk-v3 CJK fixture failure korunur,
+düzeltilmiş v3 125test. Production source v2→v3 değişmedi.
+
+| Kanıt | SHA256 |
+|---|---|
+| Exact7 patch | edface3290876d35cbac2f66b28d444d6233e1e90857eb0e8fdda07c46a08932 |
+| Selected manifest | 420a469029e8bb420174cec09969cda9e4805eaa7de1ecde3b42bc8290ff5ed2 |
+| Main compiled proof | 45c9c64909dc0c3c7bf70fe3f71b064fb1a48ad1cafac76a9bc89777ef6649e1 |
+| Frozen main harness | 6dba512a16c860e22c32f3838930d89c750a8b207f03dc62c538abe26e721250 |
+| Selected run3 supplemental | 77d45faa7c689e3f772c9e942cfd0a80d8307e98c602dfa7f9e811bc658ac8fd |
+| Archive SHA256SUMS | cc0030a93134ccf9d03d30c426c635681986c9cd26c4b9ac69eccdadae1909c8 |
+
+Arşiv /home/alperen/deckent-recovery-20260904/terminal-7099-l6-dual-stream-KC6d7l:
+40payload/hash check PASS; original dosyalar tutuldu, DB/config/credential yok.
+Üç selected compiled aggregate FAIL aynen durur: fixture dil/dependency, Ink
+stdout width ve wrapped-card assertion kusurları. Run3 ham kart/overflow gözlemi
+digest-bound offline adjudication ile doğrulandı; originalAggregate=false.
+Düzeltilmiş assertion ile main ilk run PASS; bağımsız Fable575 bundle18/18 doğruladı.
+Gerçek CLI EN/TR+ASCII PTY yalnız coexistence/resize; compiled ReplApp mount
+long-CJK overflow; direct helper OSC8 bytes. Sınıflar birbirinin yerine geçmez.
+No provider turn/approval decision/task receipt/platform veya bütün7099 closure.
+Canonical stop804423 → ALLOW → build01:59:30Z → bot847750; main dirty-tree binary.
+Salt commit için restart yok; MCP reconnect kanıtlanmadı. Push TOOL_POLICY_HOLD.
+Inherited run7footer satırı seçilmedi. Upstream live-footer UTF16/ellipsis/reflow
+aynı L6 içinde dependency-bound OPEN; sonraki isolated kaynak dilimi bunu ele alır.
+
+
 ### Recursive i18n ve renderer landing — 2026-09-07T01:45Z
 
 Main commit 9f9fa32395200b9b43e82ebdb0f346542558aaa2; exact9file staged/committed
