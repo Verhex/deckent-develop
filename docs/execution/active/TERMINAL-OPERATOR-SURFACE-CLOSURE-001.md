@@ -11,6 +11,50 @@ PREREQUISITE: 3331 (landed 2449b6e4f) → 3332 (landed 13d2c80ef) → 3333 (land
 OWNER_DECISION_REF: owner-live-2026-09-04-terminal-audit-closure-v2
 STATUS: IN_PROGRESS source-work; DOGFOOD_HEALTH=DEGRADED. 2026-09-06T23:10Z sonrası gerçek autonomous dry-plan PASS; exact micro-task proof admission ve çoklu-worker settlement hâlâ açık, yeni worker dispatch yok.
 
+### Native boot intent landing — 2026-09-07T03:16Z
+
+Main cc7102991, exact6committed blob PASS; inherited run.tsx7footer labels excluded.
+Explicit native_provider/native_model/env intent refuses before session resources
+and health chrome when transport cannot start; typed nonzero exit. Absent-intent
+no-transport and non-Ink compatibility paths visibly name the legacy host (EN/TR).
+Native success defers legacy factory; unused teardown never constructs it.
+saveDefault writes native_* only for native selection, chat_provider only for
+legacy provider; unsupported legacy model default returns localized NO_WRITE.
+chat_provider metadata deprecated; no key rename, blind host→API migration or
+brain→native mapping. Global loader healing/idempotence remains unproved.
+
+Selected306tests + corrected test-only7 PASS; Fable independent9suite108 raw PASS;
+main11suite422 + tsc/i18n/build:all PASS. Writer bundle is agent-authored summaries/
+abbreviated logs, not full raw stdout. Main inherited source participates in build.
+Initial selected compiled FAIL is retained: backup-delta/child-vs-factory harness
+assumptions and denied global tmp; corrected selected PASS, source unchanged.
+Main first full attempt13cases PASS; seven binary pins identical before/after.
+Root caught strict-date positive-fixture mismatch before main run; harness-only fix.
+Compiled actual CLI EN/TR pipe/Ink refusal, legacy compatibility and native-mock
+boot are distinct from direct runInk factory1/factory0 and deferred teardown seams.
+
+| Evidence | SHA256 |
+|---|---|
+| Selected6 patch | 5c81f76deac571808be6be1f4c31ac95d32ddd5555a320a1aa987f6d72f39007 |
+| Selected initial FAIL | 2adfaa51f4d26a783076f093985ac8d8b6aadfbdb23af5b464207326514b618e |
+| Selected corrected PASS | a938636c07d601abdcc20e2e1b4f990b0b279a23aee7942108312cc6525d9cc6 |
+| Main compiled PASS | 17acf821c1624c0f8285f985c67d998caf2276fa87124ffd19701b0d19a5a450 |
+| Main frozen harness | 73d6a3516e6b410e8ee4f84be60a7ef09ff9e28a61e758faf3254c3a6bc01a1e |
+| Fable raw108 test log | 0614133981c102069074e95fc2242ed6a11af8be543005448fe05ed739d2ae82 |
+| Archive manifest | 3200c1dcc3ec534cfbd6f1dd592da04d21d0c45c5e13ceb2df4b0ba9cf7159c8 |
+| Archive SHA256SUMS | 0ce17f840b3ba7ccd7e511c9aac95a0ecded0a08c71dfca6829776ced72919c1 |
+
+Archive /home/alperen/deckent-recovery-20260904/terminal-7099-l1-native-boot-lmCNbm:
+60payload + manifest (61 checks); no fixture/config/DB/credential copies.
+Parent Node filesystem restriction is not an OS sandbox; private diagnostic
+provider shims are used. Global MCP deny/fail-soft is not nominal global-MCP proof.
+Same-byte exact timestamped config backups are enumerated, not hidden; no zero-write
+claim. Native success uses diagnostic mock: no real provider usage/task settlement.
+Bot stop892444 → guardALLOW → build03:02–03:03Z → start/status976804.
+MCP reconnect unverified. No fresh worker dispatch or retained728 cleanup.
+Bounded Linux boot defect closed; L2 active cancel proof and remaining L1–L6/
+platform/multiworker closure remain OPEN; MASTER7099 stays VERIFY.
+
 ### Live-footer clip/reflow landing — 2026-09-07T02:22Z
 
 Main366637d1898a03fe0b7d6be2189553814fb77828, exact9committed blob PASS.
