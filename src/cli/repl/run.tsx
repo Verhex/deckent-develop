@@ -1798,6 +1798,7 @@ export async function runInkRepl(
         return out.ok ? { ok: true } : { ok: false, error: out.error };
       }}
       pickerAscii={isDumbTerminal() || process.env['DECKENT_ASCII'] === '1' || !hasUtf8Locale(process.env)}
+      dualStreamOverflow={isDumbTerminal() || process.env['DECKENT_ASCII'] === '1' || !hasUtf8Locale(process.env) ? '...' : '…'}
       pickerNoColor={isColorSuppressed()}
       hyperlinks={resolveHyperlinks({
         env: process.env,

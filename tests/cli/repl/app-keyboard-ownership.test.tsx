@@ -59,6 +59,7 @@ function mountApp() {
       runFlowMountLabels={{} as never}
       doSlashLabels={{} as never}
       caretStyle="marker"
+      dualStreamOverflow="..."
       shortcutsPanel={buildShortcutsPanel(t)}
       nativeEngine={engine}
     />,

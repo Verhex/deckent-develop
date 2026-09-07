@@ -131,6 +131,10 @@ describe('resolveFooterLines — pending compresses to the dual-stream min-1 flo
     const result = resolveFooterLines(lines, true);
     for (const line of result) expect(line).not.toContain('dual-stream-approval-placeholder');
   });
+
+  it('uses actual terminal width and the caller-owned overflow marker', () => {
+    expect(resolveFooterLines(['状态状态状态'], true, 5, '...')).toEqual(['状...']);
+  });
 });
 
 // ─── tapApprovalEvents — forwards unchanged while feeding the tracker ────────

@@ -558,7 +558,7 @@ export function formatApprovalClosure(
 
 /** Sentinel used only to reserve dual-stream "approval wants space" priority
  * below — never rendered (filtered out before the footer maps to <Text>). */
-const DUAL_STREAM_APPROVAL_PLACEHOLDER = '\u0000dual-stream-approval-placeholder';
+const DUAL_STREAM_APPROVAL_PLACEHOLDER = '\u0000';
 
 /**
  * Compress the live-footer (status) region to its dual-stream-tested min-1-line
@@ -571,14 +571,19 @@ const DUAL_STREAM_APPROVAL_PLACEHOLDER = '\u0000dual-stream-approval-placeholder
  * here (verified for any height >= 1 by dual-stream.test.ts), not its actual
  * row budget — ApprovalCard renders its own real Ink box separately.
  */
-export function resolveFooterLines(footerLines: string[], hasPendingApproval: boolean): string[] {
+export function resolveFooterLines(
+  footerLines: string[],
+  hasPendingApproval: boolean,
+  width = 80,
+  overflow?: string,
+): string[] {
   if (!hasPendingApproval) return footerLines;
   const composed = composeDualStream({
     statusLines: footerLines,
     approvalLines: [DUAL_STREAM_APPROVAL_PLACEHOLDER],
-    width: 4096,
+    width,
     height: 2,
-  });
+  }, { labels: { overflow } });
   return composed.filter((line) => line !== DUAL_STREAM_APPROVAL_PLACEHOLDER);
 }
 
@@ -1229,6 +1234,8 @@ export interface ReplAppProps {
   sessionAuthority?: SessionAuthority;
   /** TERMINAL-PICKER-002 — ASCII glyphs (dumb terminal / no UTF-8 locale). */
   pickerAscii?: boolean;
+  /** Caller-owned marker resolved from the same effective terminal capability. */
+  dualStreamOverflow?: string;
   /** TERMINAL-PICKER-002 — words-only rendering (NO_COLOR / suppression). */
   pickerNoColor?: boolean;
   /** SURF-6 — in-card decision executor for the live inbox card (approve /
@@ -1441,7 +1448,7 @@ function TurnView({ turn, hyperlinks }: { turn: Turn; hyperlinks: boolean }): Re
 
 export function ReplApp(props: ReplAppProps): ReactElement {
   const palette = useInkPalette();
-  const { provider, dispatcher, labels, registerConfirm, registerActionGate, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle, shortcutsPanel, pickerLabels, pickerSpecs, saveDefault, configEntries, saveConfigValue, initialTermMode, pickerAscii = false, pickerNoColor = false } = props;
+  const { provider, dispatcher, labels, registerConfirm, registerActionGate, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle, shortcutsPanel, pickerLabels, pickerSpecs, saveDefault, configEntries, saveConfigValue, initialTermMode, pickerAscii = false, pickerNoColor = false, dualStreamOverflow } = props;
   const { exit } = useApp();
   // TERMINAL-TOOLS-004 — live width for the status row + queue preview (reflows on resize).
   const columns = useTerminalColumns();
@@ -2555,7 +2562,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       {replSurfaceEnabled && (
         <Box flexDirection="column" marginTop={1}>
           <Text bold>{`[${resolveModeLabel(termMode.mode, labels)}]`}</Text>
-          {resolveFooterLines(footerLines, approvalPending).map((line, i) => <Text key={i} {...palette.muted}>{line}</Text>)}
+          {resolveFooterLines(footerLines, approvalPending, columns, dualStreamOverflow).map((line, i) => <Text key={i} {...palette.muted}>{line}</Text>)}
         </Box>
       )}
 

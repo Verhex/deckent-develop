@@ -5,12 +5,16 @@
 import { describe, it, expect } from 'vitest';
 import {
   composeDualStream,
-  DEFAULT_DUAL_STREAM_LABELS,
   type DualStreamInput,
 } from '../../src/cli/repl/dual-stream.js';
+import { displayWidth } from '../../src/cli/repl/cursor-model.js';
+import { InjectedLabelMissingError } from '../../src/cli/helpers/injected-label.js';
+import { theme } from '../../src/cli/helpers/theme.js';
 
 const STATUS = ['Running: sprint-354', 'Elapsed: 3m', 'Provider: claude (healthy)'];
 const APPROVAL = ['Approve shell-exec? (y/n/a/d)', 'Risk: Çalıştır', 'cmd: npm test --silent'];
+const UNICODE = { labels: { overflow: '…' } } as const;
+const ASCII = { labels: { overflow: '...' } } as const;
 
 describe('composeDualStream — basic composition', () => {
   it('returns both regions, approval first, when everything fits', () => {
@@ -41,8 +45,8 @@ describe('composeDualStream — approval-yokken tam-status (full status with no 
   });
 
   it('crops status with the overflow marker when status alone exceeds height', () => {
-    const result = composeDualStream({ statusLines: STATUS, approvalLines: [], width: 80, height: 2 });
-    expect(result).toEqual([STATUS[0], DEFAULT_DUAL_STREAM_LABELS.overflow]);
+    const result = composeDualStream({ statusLines: STATUS, approvalLines: [], width: 80, height: 2 }, UNICODE);
+    expect(result).toEqual([STATUS[0], '…']);
   });
 });
 
@@ -84,32 +88,41 @@ describe('composeDualStream — narrow/short terminal allocation matrix', () => 
 
   for (const { width, height } of matrix) {
     it(`fits within height=${height} width=${width}`, () => {
-      const result = composeDualStream({ statusLines: STATUS, approvalLines: APPROVAL, width, height });
+      const result = composeDualStream({ statusLines: STATUS, approvalLines: APPROVAL, width, height }, UNICODE);
       expect(result.length).toBeLessThanOrEqual(height);
       for (const line of result) {
-        expect(line.length).toBeLessThanOrEqual(Math.max(1, width));
+        expect(displayWidth(line)).toBeLessThanOrEqual(Math.max(1, width));
       }
     });
   }
 
   it('truncates individual lines to width with an ellipsis', () => {
-    const result = composeDualStream({ statusLines: ['a very long status line here'], approvalLines: [], width: 10, height: 5 });
+    const result = composeDualStream({ statusLines: ['a very long status line here'], approvalLines: [], width: 10, height: 5 }, UNICODE);
     expect(result).toEqual(['a very lo…']);
     expect(result[0].length).toBe(10);
   });
 
   it('truncates to a single character at width=1', () => {
-    const result = composeDualStream({ statusLines: ['hello'], approvalLines: [], width: 1, height: 5 });
-    expect(result).toEqual(['h']);
+    const result = composeDualStream({ statusLines: ['hello'], approvalLines: [], width: 1, height: 5 }, UNICODE);
+    expect(result).toEqual(['…']);
+  });
+
+  it.each([
+    { width: Number.NaN, height: 2, expected: ['…'] },
+    { width: Number.POSITIVE_INFINITY, height: 2, expected: ['…'] },
+    { width: 8, height: Number.NaN, expected: [] },
+    { width: 8, height: Number.POSITIVE_INFINITY, expected: [] },
+  ])('normalizes non-finite dimensions without unbounded allocation: $width × $height', ({ width, height, expected }) => {
+    expect(composeDualStream({ statusLines: ['long status'], approvalLines: [], width, height }, UNICODE)).toEqual(expected);
   });
 });
 
 describe('composeDualStream — determinism', () => {
   it('returns byte-identical output for identical input across repeated calls', () => {
     const input: DualStreamInput = { statusLines: STATUS, approvalLines: APPROVAL, width: 40, height: 3 };
-    const first = composeDualStream(input);
-    const second = composeDualStream(input);
-    const third = composeDualStream({ ...input, statusLines: [...STATUS], approvalLines: [...APPROVAL] });
+    const first = composeDualStream(input, UNICODE);
+    const second = composeDualStream(input, UNICODE);
+    const third = composeDualStream({ ...input, statusLines: [...STATUS], approvalLines: [...APPROVAL] }, UNICODE);
     expect(first).toEqual(second);
     expect(first).toEqual(third);
   });
@@ -124,19 +137,97 @@ describe('composeDualStream — i18n seam (label injection)', () => {
     expect(result).toEqual([STATUS[0], '(daha fazla)']);
   });
 
-  it('defaults to the English ellipsis marker when no labels are supplied', () => {
-    const result = composeDualStream({ statusLines: STATUS, approvalLines: [], width: 80, height: 2 });
-    expect(result[1]).toBe(DEFAULT_DUAL_STREAM_LABELS.overflow);
+  it('fails closed only when overflow is actually needed and the caller omitted the marker', () => {
+    expect(() => composeDualStream({ statusLines: STATUS, approvalLines: [], width: 80, height: 2 }))
+      .toThrow(InjectedLabelMissingError);
+    expect(composeDualStream({ statusLines: ['fits'], approvalLines: [], width: 80, height: 2 })).toEqual(['fits']);
   });
 });
 
 describe('composeDualStream — approval-region overflow marker (allocated >= 2)', () => {
   it('crops the approval region with a marker when it gets 2+ rows but still overflows', () => {
     const manyApproval = ['a0', 'a1', 'a2', 'a3', 'a4'];
-    const result = composeDualStream({ statusLines: ['s0'], approvalLines: manyApproval, width: 80, height: 5 });
+    const result = composeDualStream({ statusLines: ['s0'], approvalLines: manyApproval, width: 80, height: 5 }, UNICODE);
     // statusFloor=1 -> approvalRows=min(5,4)=4 -> crop: 3 real + marker
     // remainingForStatus=5-4=1 -> statusRows=1 -> [s0] fits, no crop
-    expect(result).toEqual(['a0', 'a1', 'a2', DEFAULT_DUAL_STREAM_LABELS.overflow, 's0']);
+    expect(result).toEqual(['a0', 'a1', 'a2', '…', 's0']);
+  });
+});
+
+describe('composeDualStream — display-cell and grapheme safety', () => {
+  it.each([
+    ['CJK', '状态正常', 5],
+    ['combining', 'Cafe\u0301 status', 6],
+    ['emoji ZWJ', '👨‍👩‍👧‍👦 family status', 5],
+  ])('%s truncation stays within cells and never splits a grapheme', (_name, line, width) => {
+    const result = composeDualStream({ statusLines: [line], approvalLines: [], width, height: 1 }, UNICODE);
+    expect(displayWidth(result[0]!)).toBeLessThanOrEqual(width);
+    expect(result[0]!.endsWith('…')).toBe(true);
+    expect(result[0]!).not.toContain('\uFFFD');
+  });
+
+  it('uses the caller-selected ASCII marker within the same cell budget', () => {
+    const [line] = composeDualStream({ statusLines: ['状态 normal'], approvalLines: [], width: 6, height: 1 }, ASCII);
+    expect(line).toBe('状...');
+    expect(displayWidth(line!)).toBe(5);
+  });
+
+  it.each([
+    ['CJK', '状态x'],
+    ['ZWJ emoji', '👨‍👩‍👧‍👦 family'],
+  ])('renders marker-only when a %s grapheme cannot fit before the width-4 ASCII marker', (_name, text) => {
+    expect(composeDualStream({ statusLines: [text], approvalLines: [], width: 4, height: 1 }, ASCII))
+      .toEqual(['...']);
+  });
+
+  it.each([
+    [1, '…'],
+    [2, '…'],
+  ])('keeps a wide grapheme atomic at width=%i', (width, expected) => {
+    const [line] = composeDualStream({ statusLines: ['状态'], approvalLines: [], width, height: 1 }, UNICODE);
+    expect(line).toBe(expected);
+    expect(displayWidth(line!)).toBeLessThanOrEqual(width);
+  });
+
+  it('does not split ANSI sequences while truncating visible cells', () => {
+    const [line] = composeDualStream({ statusLines: ['\x1b[31m状态abcdef\x1b[0m'], approvalLines: [], width: 6, height: 1 }, UNICODE);
+    expect(line).toMatch(/^\x1b\[31m/);
+    const visible = theme.strip(line!);
+    expect(displayWidth(visible)).toBeLessThanOrEqual(6);
+    expect(visible.endsWith('…')).toBe(true);
+    expect(line!.endsWith('\x1b[0m')).toBe(true);
+  });
+
+  it.each([
+    ['BEL', '\x07'],
+    ['ST', '\x1b\\'],
+  ])('closes an OSC 8 link using its %s terminator before the overflow marker', (_name, terminator) => {
+    const open = `\x1b]8;id=deckent;https://example.invalid${terminator}`;
+    const close = `\x1b]8;;${terminator}`;
+    const [line] = composeDualStream({
+      statusLines: [`${open}abcdef${close}`],
+      approvalLines: [],
+      width: 4,
+      height: 1,
+    }, UNICODE);
+    expect(line).toBe(`${open}abc${close}…`);
+    expect(line!.replace(/\x1b\]8;[^;]*;[^\x07\x1b]*(?:\x07|\x1b\\)/gu, '')).toBe('abc…');
+    expect(displayWidth(line!.replace(/\x1b\]8;[^;]*;[^\x07\x1b]*(?:\x07|\x1b\\)/gu, ''))).toBe(4);
+  });
+
+  it('orders OSC 8 close before marker and SGR reset for combined styled links', () => {
+    const sgrOpen = '\x1b[31m';
+    const oscOpen = '\x1b]8;id=combined;https://example.invalid\x07';
+    const oscClose = '\x1b]8;;\x07';
+    const [line] = composeDualStream({
+      statusLines: [`${sgrOpen}${oscOpen}abcdef${oscClose}\x1b[0m`],
+      approvalLines: [],
+      width: 4,
+      height: 1,
+    }, UNICODE);
+    expect(line).toBe(`${sgrOpen}${oscOpen}abc${oscClose}…\x1b[0m`);
+    expect(line!.indexOf(oscClose)).toBeLessThan(line!.indexOf('…'));
+    expect(line!.indexOf('…')).toBeLessThan(line!.lastIndexOf('\x1b[0m'));
   });
 });
 

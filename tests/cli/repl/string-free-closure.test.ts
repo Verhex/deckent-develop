@@ -9,8 +9,8 @@
 // never a silent fallback string. Hermetic: pure helpers + committed source
 // text only — no Ink mount, no disk state outside the repo checkout.
 
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { getMessage, getMessageLanguages } from '../../../src/cli/helpers/messages.js';
 import { InjectedLabelMissingError, INJECTED_LABEL_MISSING_CODE } from '../../../src/cli/helpers/injected-label.js';
@@ -147,13 +147,11 @@ describe('buildThinkingVerbs — legacy ticker verbs come from the catalog', () 
 // ─── 5. source scan — mechanism modules own no default label objects ─────────
 
 describe('mechanism modules carry no English default label objects', () => {
+  const collect = (dir: string): string[] => readdirSync(dir, { withFileTypes: true })
+    .flatMap((entry) => entry.isDirectory() ? collect(join(dir, entry.name)) :
+      (entry.isFile() && /\.tsx?$/.test(entry.name) && !entry.name.endsWith('.d.ts') ? [join(dir, entry.name)] : []));
   const FILES = [
-    'src/cli/repl/app.tsx',
-    'src/cli/repl/input-bar.tsx',
-    'src/cli/repl/inbox-card.tsx',
-    'src/cli/repl/run-flow-inbox.ts',
-    'src/cli/repl/picker.ts',
-    'src/cli/repl/picker-card.tsx',
+    ...collect(join(ROOT, 'src/cli/repl')).sort().map((file) => relative(ROOT, file).replace(/\\/g, '/')),
     'src/cli/helpers/live-footer.ts',
     'src/cli/commands/chat-render-region.ts',
   ];

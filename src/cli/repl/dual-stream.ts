@@ -17,10 +17,12 @@
 // allocated to it, is cropped with an overflow-marker line (i18n seam below)
 // rather than silently dropping content with no indication.
 //
-// String-free-ish per CLAUDE.md i18n-first: the one piece of user-facing
-// text this module can emit (the overflow marker) is injectable via
-// `options.labels`. The default is the `…` overflow GLYPH (not prose) — the
-// one label object in this directory that legitimately keeps a default.
+// String-free per AGENTS.md i18n-first: the caller owns the overflow glyph,
+// resolved from the effective terminal capability. The mechanism has no
+// hidden Unicode/English fallback.
+
+import { displayWidth, segmentGraphemes } from './cursor-model.js';
+import { requireInjectedLabel } from '../helpers/injected-label.js';
 
 export interface DualStreamInput {
   /** Run-status / footer lines (e.g. buildLiveFooter() output). */
@@ -38,20 +40,62 @@ export interface DualStreamLabels {
   overflow: string;
 }
 
-export const DEFAULT_DUAL_STREAM_LABELS: DualStreamLabels = {
-  overflow: '…',
-};
-
 export interface DualStreamOptions {
   /** String-free i18n seam — caller injects translated labels; see file header. */
   labels?: Partial<DualStreamLabels>;
 }
 
-function truncateToWidth(text: string, width: number): string {
-  const safeWidth = Math.max(1, width);
-  if (text.length <= safeWidth) return text;
-  if (safeWidth === 1) return text.slice(0, 1);
-  return `${text.slice(0, safeWidth - 1)}…`;
+const ANSI_SEQUENCE = /(\x1b\[[0-?]*[ -/]*[@-~]|\x1b\]8;[^\x07\x1b]*(?:\x07|\x1b\\))/gu;
+
+function visibleWidth(text: string): number {
+  return displayWidth(text.replace(ANSI_SEQUENCE, ''));
+}
+
+function closeOpenOsc8(text: string): string {
+  const osc8 = /\x1b\]8;[^;]*;([^\x07\x1b]*)(\x07|\x1b\\)/gu;
+  let open = false;
+  let terminator = '\x07';
+  for (const match of text.matchAll(osc8)) {
+    open = (match[1] ?? '').length > 0;
+    terminator = match[2] ?? '\x07';
+  }
+  return open ? `\x1b]8;;${terminator}` : '';
+}
+
+function clipVisible(text: string, width: number): string {
+  if (width <= 0) return '';
+  let used = 0;
+  let out = '';
+  let cursor = 0;
+  for (const match of text.matchAll(ANSI_SEQUENCE)) {
+    const index = match.index;
+    for (const cluster of segmentGraphemes(text.slice(cursor, index))) {
+      const cells = displayWidth(cluster);
+      if (used + cells > width) return out;
+      out += cluster;
+      used += cells;
+    }
+    out += match[0];
+    cursor = index + match[0].length;
+  }
+  for (const cluster of segmentGraphemes(text.slice(cursor))) {
+    const cells = displayWidth(cluster);
+    if (used + cells > width) break;
+    out += cluster;
+    used += cells;
+  }
+  return out;
+}
+
+function truncateToWidth(text: string, width: number, overflowValue: string | undefined): string {
+  if (visibleWidth(text) <= width) return text;
+  const overflow = requireInjectedLabel('dualStream.overflow', overflowValue);
+  const marker = clipVisible(overflow, width);
+  const contentBudget = Math.max(0, width - visibleWidth(marker));
+  const content = clipVisible(text, contentBudget);
+  const osc8Close = closeOpenOsc8(content);
+  const reset = content.includes('\x1b[') ? '\x1b[0m' : '';
+  return `${content}${osc8Close}${marker}${reset}`;
 }
 
 /**
@@ -64,11 +108,14 @@ function truncateToWidth(text: string, width: number): string {
  * region communicates nothing at all, which is worse than showing its
  * first real line with no marker. Real content always wins that trade-off.
  */
-function allocateRegion(lines: string[], allocated: number, overflowLabel: string): string[] {
+function allocateRegion(lines: string[], allocated: number, overflowValue: string | undefined, width: number): string[] {
   if (allocated <= 0) return [];
   if (lines.length <= allocated) return lines;
   if (allocated === 1) return lines.slice(0, 1);
-  return [...lines.slice(0, allocated - 1), overflowLabel];
+  return [
+    ...lines.slice(0, allocated - 1),
+    truncateToWidth(requireInjectedLabel('dualStream.overflow', overflowValue), width, overflowValue),
+  ];
 }
 
 /**
@@ -76,22 +123,21 @@ function allocateRegion(lines: string[], allocated: number, overflowLabel: strin
  * non-overlapping, region-allocated line-list sized to `{width, height}`.
  */
 export function composeDualStream(input: DualStreamInput, options: DualStreamOptions = {}): string[] {
-  const labels: DualStreamLabels = { ...DEFAULT_DUAL_STREAM_LABELS, ...options.labels };
-  const width = Math.max(1, Math.floor(input.width));
-  const height = Math.max(0, Math.floor(input.height));
+  const width = Number.isFinite(input.width) ? Math.max(1, Math.floor(input.width)) : 1;
+  const height = Number.isFinite(input.height) ? Math.max(0, Math.floor(input.height)) : 0;
   if (height === 0) return [];
 
-  const statusLines = input.statusLines.map((line) => truncateToWidth(line, width));
-  const approvalLines = input.approvalLines.map((line) => truncateToWidth(line, width));
-  const overflowLabel = truncateToWidth(labels.overflow, width);
+  const overflowValue = options.labels?.overflow;
+  const statusLines = input.statusLines.map((line) => truncateToWidth(line, width, overflowValue));
+  const approvalLines = input.approvalLines.map((line) => truncateToWidth(line, width, overflowValue));
 
   const statusFloor = statusLines.length > 0 ? Math.min(1, height) : 0;
   const approvalRows = Math.min(approvalLines.length, Math.max(0, height - statusFloor));
-  const approvalRegion = allocateRegion(approvalLines, approvalRows, overflowLabel);
+  const approvalRegion = allocateRegion(approvalLines, approvalRows, overflowValue, width);
 
   const remainingForStatus = height - approvalRegion.length;
   const statusRows = Math.min(statusLines.length, remainingForStatus);
-  const statusRegion = allocateRegion(statusLines, statusRows, overflowLabel);
+  const statusRegion = allocateRegion(statusLines, statusRows, overflowValue, width);
 
   return [...approvalRegion, ...statusRegion];
 }
