@@ -68,6 +68,43 @@ describe('createNativeEngine', () => {
     }
   });
 
+  it('reports only canonical tool execution, then clears the matching activity after its result', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'nb-tool-activity-'));
+    try {
+      const adapter = scripted([
+        [{ type: 'tool-call', id: 'write-1', name: 'deckent_write_file', args: { path: 'out.txt', content: 'NATIVE' } }, { type: 'done' }],
+        [{ type: 'done' }],
+      ]);
+      const activity: Array<Record<string, string>> = [];
+      const engine = createNativeEngine({
+        adapter, registry: buildNativeToolRegistry({ cwd: () => dir }), cwd: dir, model: 'm', lang: 'en',
+        confirm: async () => 'y', toolSink: () => {},
+        t: (key) => ({
+          'tui.native_tool_executing': 'executing {tool} · {elapsed}',
+          'tui.native_tool_executing_compact': 'executing · {elapsed} · {tool}',
+          'tui.native_tool_cancel_requested': 'cancel requested for {tool} · waiting for the tool to end ({elapsed})',
+          'tui.native_tool_cancel_requested_compact': 'cancel requested · {elapsed} · {tool}',
+          'tui.native_tool_status': 'local active tool: {tool}',
+        })[key] ?? key,
+      });
+      await engine('write it', {
+        output: () => {}, onTurnEnd: () => {},
+        onToolActivity: (event) => activity.push(event as Record<string, string>),
+      });
+      expect(activity).toEqual([
+        expect.objectContaining({
+          kind: 'executing', id: 'write-1', tool: 'deckent_write_file',
+          label: 'executing {tool} · {elapsed}',
+          compactLabel: 'executing · {elapsed} · {tool}',
+          cancelRequestedLabel: 'cancel requested for {tool} · waiting for the tool to end ({elapsed})',
+          cancelRequestedCompactLabel: 'cancel requested · {elapsed} · {tool}',
+          statusLabel: 'local active tool: {tool}',
+        }),
+        { kind: 'clear', id: 'write-1' },
+      ]);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
   it('a "n" answer denies the tool (no write) and feeds a rejection back', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'nb-deny-'));
     try {

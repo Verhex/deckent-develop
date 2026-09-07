@@ -29,7 +29,7 @@ import { useTerminalColumns } from './use-terminal-columns.js';
 import { expandAtRefs } from './at-ref.js';
 import { resolveSlash, type SlashRegistry } from '../commands/chat-slash-registry.js';
 import type { ChatMode } from '../commands/chat-mode.js';
-import type { ReplEngine } from './native-agent-bridge.js';
+import type { NativeToolActivityEvent, ReplEngine } from './native-agent-bridge.js';
 import type { ProviderMessage } from '../../agent/provider-tooluse/types.js';
 import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 import { listLedgerSessions, readLedgerSessionForResume, type LedgerStoreOptions } from './session-ledger.js';
@@ -50,6 +50,7 @@ import { buildApprovalPickerSpec, buildTermPickerSpec, buildResumePickerSpec, bu
 import { APPROVAL_MODES, type ApprovalMode } from '../../agent/permission-types.js';
 import { createChatTurnQueue, type ChatTurnQueue, type ChatTurnBgEvent, type ChatTurnPayload } from './chat-turn-queue.js';
 import { createInputQueue, type InputQueue } from './input-queue.js';
+import { displayWidth } from './cursor-model.js';
 import { listRecentSessions, pickSession, type SessionRecord } from '../helpers/session-resume.js';
 import {
   appendSprintHistoricalContext,
@@ -1186,6 +1187,7 @@ export async function runNativeTurnLoop(
     output: (text: string) => void;
     onTurnStats: (stats: { elapsedMs: number; tokens?: number }) => void;
     onTurnError: (message: string) => void;
+    onToolActivity?: (event: NativeToolActivityEvent, turnId: number) => void;
     /**
      * REPL-575 K3 — chat persistence for the native engine. Called once per
      * completed turn with the user's input line and the assistant text that was
@@ -1197,7 +1199,9 @@ export async function runNativeTurnLoop(
   },
   now: () => number = Date.now,
 ): Promise<void> {
+  let turnId = 0;
   for await (const line of lines) {
+    const currentTurnId = ++turnId;
     const startMs = now();
     // Accumulate the streamed assistant text so the completed turn can be
     // persisted (what the user saw == what /resume replays). A turn that only
@@ -1207,11 +1211,23 @@ export async function runNativeTurnLoop(
     const captureOutput = cbs.persistTurn
       ? (text: string) => { assistantText += text; cbs.output(text); }
       : cbs.output;
+    let turnOpen = true;
     try {
-      await engine(line, { output: captureOutput, onTurnEnd: measuredOnTurnEnd(startMs, now, cbs.onTurnStats) });
+      await engine(line, {
+        output: captureOutput,
+        onTurnEnd: measuredOnTurnEnd(startMs, now, cbs.onTurnStats),
+        ...(cbs.onToolActivity ? {
+          onToolActivity: (event) => {
+            if (turnOpen) cbs.onToolActivity?.(event, currentTurnId);
+          },
+        } : {}),
+      });
       cbs.persistTurn?.(line, assistantText);
     } catch (err) {
       cbs.onTurnError(err instanceof Error ? err.message : String(err));
+    } finally {
+      turnOpen = false;
+      cbs.onToolActivity?.({ kind: 'clear' }, currentTurnId);
     }
   }
 }
@@ -1598,6 +1614,13 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   const [partial, setPartial] = useState(''); // in-progress (incomplete) reply line
   const [busy, setBusy] = useState(false);
   const [working, setWorking] = useState(false); // a turn is in progress (streaming)
+  const [nativeToolActivity, setNativeToolActivity] = useState<{
+    turnId: number; id: string; tool: string; label: string;
+    compactLabel: string; cancelRequestedLabel: string; cancelRequestedCompactLabel: string;
+    statusLabel: string; cancelRequested: boolean; startedAt: number; generation: number;
+  } | null>(null);
+  const [nativeToolNow, setNativeToolNow] = useState(0);
+  const nativeToolGenerationRef = useRef(0);
   const [queued, setQueued] = useState<string[]>([]);
   const [confirm, setConfirm] = useState<ConfirmHead | null>(null);
 
@@ -1926,7 +1949,11 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   };
   const localChatContext = (): string | undefined => {
     const id = activeSessionIdRef.current;
-    return id ? labels.activeChatContext.replace('{id}', formatSessionIdForTerminal(id)) : undefined;
+    const chat = id ? labels.activeChatContext.replace('{id}', formatSessionIdForTerminal(id)) : undefined;
+    const tool = nativeToolActivity && replSurfaceEnabled
+      ? nativeToolActivity.statusLabel.replace('{tool}', formatSessionIdForTerminal(nativeToolActivity.tool))
+      : undefined;
+    return [chat, tool].filter((line): line is string => line !== undefined).join('\n') || undefined;
   };
   const busyCtl = useRef<BusyControlsState>(initialBusyControlsState());
 
@@ -2087,6 +2114,14 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     return () => clearInterval(id);
   }, [replSurfaceEnabled, stateFeed, liveFooterLabels, columns, dualStreamOverflow]);
 
+  useEffect(() => {
+    if (!nativeToolActivity || !replSurfaceEnabled) return;
+    const tick = (): void => setNativeToolNow(Date.now());
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [nativeToolActivity, replSurfaceEnabled]);
+
   // Background-completed-work sink: buffered by ChatTurnQueue — never
   // injected mid-turn (drained only at turn-end, see inputIter below).
   useEffect(() => {
@@ -2234,12 +2269,36 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     };
 
     if (nativeEngine) {
+      const generation = ++nativeToolGenerationRef.current;
+      let nativeLoopActive = true;
       void runNativeTurnLoop(inputIter(), nativeEngine, {
         output,
         onTurnStats: (st) => {
           lastStats.current = { elapsedMs: st.elapsedMs, ...(st.tokens !== undefined ? { tokens: st.tokens } : {}) };
           const tok = st.tokens;
           if (tok) setSessionTok((n) => n + tok);
+        },
+        onToolActivity: (event, turnId) => {
+          if (!nativeLoopActive) return;
+          if (event.kind === 'executing') {
+            setNativeToolActivity((current) => {
+              if (current !== null && current.generation > generation) return current;
+              return {
+                turnId, id: event.id, tool: event.tool, label: event.label,
+                compactLabel: event.compactLabel,
+                cancelRequestedLabel: event.cancelRequestedLabel,
+                cancelRequestedCompactLabel: event.cancelRequestedCompactLabel,
+                statusLabel: event.statusLabel, cancelRequested: false, startedAt: Date.now(), generation,
+              };
+            });
+            return;
+          }
+          setNativeToolActivity((current) => current !== null
+            && current.generation === generation
+            && current.turnId === turnId
+            && (event.id === undefined || current.id === event.id)
+            ? null
+            : current);
         },
         // 387-003: a per-turn exception no longer unwinds the whole loop —
         // flush any in-flight partial/segment first (finalizeReply, same as a
@@ -2265,7 +2324,11 @@ export function ReplApp(props: ReplAppProps): ReactElement {
             } catch { /* persistence is best-effort — never break the loop */ }
           },
         } : {}),
-      }).then(() => exit()).catch(() => exit());
+      }).then(() => { if (nativeLoopActive) exit(); }).catch(() => { if (nativeLoopActive) exit(); });
+      return () => {
+        nativeLoopActive = false;
+        setNativeToolActivity((current) => current?.generation === generation ? null : current);
+      };
     } else {
       void runChatNativeLoop({
         provider,
@@ -2323,6 +2386,27 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   const cancelActiveTurn = (): boolean => {
     cancelPendingInputs();
     return nativeEngine?.cancelTurn?.() ?? false;
+  };
+  /** A native cancel request only tears down a provider stream. A running tool
+   * may still be completing, so retain its activity anchor until the canonical
+   * tool result/error/turn-finally callback clears the matching call id. */
+  const requestActiveTurnInterrupt = () => {
+    const result = applyInterrupt(busyCtl.current, cancelActiveTurn);
+    busyCtl.current = result.state;
+    const pendingTool = result.decision.kind === 'interrupted'
+      && result.decision.aborted
+      && replSurfaceEnabled
+      && nativeToolActivity !== null;
+    if (pendingTool) {
+      setNativeToolActivity((current) => current === null ? null : { ...current, cancelRequested: true });
+      const elapsed = `${Math.max(0, Math.floor((Date.now() - nativeToolActivity.startedAt) / 1000))}${liveFooterLabels.unitSeconds}`;
+      pushTurn('seg', nativeToolActivity.cancelRequestedLabel
+        .replace('{tool}', formatSessionIdForTerminal(nativeToolActivity.tool))
+        .replace('{elapsed}', elapsed));
+    } else if (result.decision.kind === 'interrupted') {
+      pushTurn('seg', renderBusyDecision(result.decision, labels));
+    }
+    return { result, pendingTool };
   };
 
   const handleSubmit = async (line: string): Promise<void> => {
@@ -2405,9 +2489,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     const busyAction = parseBusyCommand(trimmed);
     if (busyAction.kind === 'interrupt') {
       pushTurn('user', trimmed);
-      const r = applyInterrupt(busyCtl.current, cancelActiveTurn);
-      busyCtl.current = r.state;
-      pushTurn('seg', renderBusyDecision(r.decision, labels));
+      requestActiveTurnInterrupt();
       return;
     }
     // Inert unless replSurfaceEnabled: keeps flag-off behavior byte-identical
@@ -2692,9 +2774,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   const handleEscapeInterrupt = (): void => {
     if (pendingSlashPrompt.current) { pendingSlashPrompt.current = null; return; }
     if (!working || confirm !== null) return;
-    const r = applyInterrupt(busyCtl.current, cancelActiveTurn);
-    busyCtl.current = r.state;
-    if (r.decision.kind === 'interrupted') pushTurn('seg', renderBusyDecision(r.decision, labels));
+    requestActiveTurnInterrupt();
   };
 
   // TERMINAL-TOOLS-006 — Ctrl-C / Ctrl-D policy (interrupt-policy.ts). Ink's
@@ -2717,12 +2797,10 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     if (decision.kind === 'exit') { exit(); return; }
     ctrlCArmedAt.current = decision.armedAt;
     if (decision.kind === 'interrupt-turn') {
-      const r = applyInterrupt(busyCtl.current, cancelActiveTurn);
-      busyCtl.current = r.state;
+      const { result: r } = requestActiveTurnInterrupt();
       // Honest hint: only a REAL abort says so; no seam / nothing to interrupt
       // falls back to the plain arm hint.
       const aborted = r.decision.kind === 'interrupted' && r.decision.aborted;
-      if (r.decision.kind === 'interrupted') pushTurn('seg', renderBusyDecision(r.decision, labels));
       setInterruptHint({ text: aborted ? labels.ctrlCInterrupt : labels.ctrlCArm, at: now });
       return;
     }
@@ -2738,6 +2816,20 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // Persistent phase anchor — the orientation signal ("am I working / done?").
   const phase: 'thinking' | 'generating' | 'idle' =
     busy ? 'thinking' : working ? 'generating' : 'idle';
+  const nativeToolActivityText = nativeToolActivity && replSurfaceEnabled
+    ? (() => {
+      const elapsed = `${Math.max(0, Math.floor((nativeToolNow - nativeToolActivity.startedAt) / 1000))}${liveFooterLabels.unitSeconds}`;
+      const tool = formatSessionIdForTerminal(nativeToolActivity.tool);
+      const rich = (nativeToolActivity.cancelRequested ? nativeToolActivity.cancelRequestedLabel : nativeToolActivity.label)
+        .replace('{tool}', tool).replace('{elapsed}', elapsed);
+      const compact = (nativeToolActivity.cancelRequested
+        ? nativeToolActivity.cancelRequestedCompactLabel
+        : nativeToolActivity.compactLabel)
+        .replace('{tool}', tool).replace('{elapsed}', elapsed);
+      const budget = Math.max(1, columns - displayWidth('● deckent · '));
+      return clipTerminalCells(displayWidth(rich) <= budget ? rich : compact, budget, dualStreamOverflow);
+    })()
+    : null;
 
   return (
     <Box flexDirection="column">
@@ -2860,7 +2952,9 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       <Box marginTop={1}>
         {/* TERMINAL-TOOLS-013: while a card owns stdin the anchor SAYS so
             instead of promising "your turn" (textual carrier, not layout). */}
-        {phase === 'idle'
+        {nativeToolActivityText
+          ? <><Spinner /><Text bold> deckent </Text><Text {...palette.muted}>{`· ${nativeToolActivityText}`}</Text></>
+          : phase === 'idle'
           ? <Text {...palette.muted}>{inputBarActiveNow ? `✓ ${labels.ready}` : labels.inputPaused}</Text>
           : <><Spinner /><Text bold> deckent </Text><Text {...palette.muted}>{`· ${phase === 'thinking' ? labels.thinking : labels.generating}`}</Text></>}
         {/* TERMINAL-TOOLS-006: transient Ctrl-C hint (names the next key). */}

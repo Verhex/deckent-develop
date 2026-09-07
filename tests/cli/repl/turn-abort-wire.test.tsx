@@ -167,4 +167,12 @@ describe('app.tsx wiring', () => {
     expect(gateAt).toBeGreaterThan(0);
     expect(interruptAt).toBeLessThan(gateAt);
   });
+
+  it('routes /interrupt, Escape, and Ctrl-C through the same activity-aware interrupt helper', () => {
+    const helperCalls = src.match(/requestActiveTurnInterrupt\(\)/g) ?? [];
+    expect(helperCalls).toHaveLength(3);
+    const clearScreen = src.match(/const clearScreen = \(\): void => \{[\s\S]*?\n  \};/);
+    expect(clearScreen?.[0]).toBeDefined();
+    expect(clearScreen?.[0]).not.toContain('setNativeToolActivity');
+  });
 });

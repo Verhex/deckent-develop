@@ -71,7 +71,11 @@ export interface CompactOutcome {
 export interface ReplEngine {
   (
     input: string,
-    cbs: { output: (text: string) => void; onTurnEnd: (stats: { inputTokens: number; outputTokens: number }) => void },
+    cbs: {
+      output: (text: string) => void;
+      onTurnEnd: (stats: { inputTokens: number; outputTokens: number }) => void;
+      onToolActivity?: (event: NativeToolActivityEvent) => void;
+    },
   ): Promise<void>;
   /**
    * born-493 (387-002) — bridges `/approve <mode>` to the native
@@ -152,6 +156,17 @@ export interface ReplEngine {
     options?: { nextTurnIndex?: number },
   ) => void;
 }
+
+/** Transient, canonical native tool lifecycle facts for an interactive view.
+ * This does not report a result, policy decision, or settled outcome. */
+export type NativeToolActivityEvent =
+  | {
+      readonly kind: 'executing'; readonly id: string; readonly tool: string;
+      readonly label: string; readonly compactLabel: string;
+      readonly cancelRequestedLabel: string; readonly cancelRequestedCompactLabel: string;
+      readonly statusLabel: string;
+    }
+  | { readonly kind: 'clear'; readonly id?: string };
 
 export interface NativeEngineDeps {
   adapter: ProviderAdapter;
@@ -755,8 +770,15 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
     if (descriptorCount > 0) {
       cbs.output(`\n[${t(REFERENCE_DESCRIPTOR_FALLBACK_KEY).replace('{n}', String(descriptorCount))}]\n`);
     }
-    for await (const ev of session.send(lineage) as AsyncIterable<AgentSessionEvent>) {
-      switch (ev.type) {
+    let activeToolId: string | undefined;
+    const clearActiveTool = (): void => {
+      if (activeToolId === undefined) return;
+      cbs.onToolActivity?.({ kind: 'clear', id: activeToolId });
+      activeToolId = undefined;
+    };
+    try {
+      for await (const ev of session.send(lineage) as AsyncIterable<AgentSessionEvent>) {
+        switch (ev.type) {
         case 'text-delta':
           cbs.output(ev.text);
           break;
@@ -766,7 +788,20 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
           break;
         }
         case 'tool-result':
+          if (activeToolId === ev.id) clearActiveTool();
           deps.toolSink({ verb: `${ev.tool} — ${t('native.tool_ran')}`, target: '', ...(ev.ok ? {} : { failed: true }) });
+          break;
+        case 'tool-executing':
+          clearActiveTool();
+          activeToolId = ev.id;
+          cbs.onToolActivity?.({
+            kind: 'executing', id: ev.id, tool: ev.tool,
+            label: t('tui.native_tool_executing'),
+            compactLabel: t('tui.native_tool_executing_compact'),
+            cancelRequestedLabel: t('tui.native_tool_cancel_requested'),
+            cancelRequestedCompactLabel: t('tui.native_tool_cancel_requested_compact'),
+            statusLabel: t('tui.native_tool_status'),
+          });
           break;
         case 'permission-auto-decision':
           // NT-12 (553-002) — the trace snapshot is NOT the audit record: every
@@ -801,6 +836,7 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
           // a crossed hard ceiling arrives here as an 'error' event, printed below.
           break;
         case 'error': {
+          clearActiveTool();
           cbs.output(`\n[${localizeSignal(ev.code, ev.message)}]`);
           // 560-005 (RCA §7) — durable, privacy-safe record of a typed
           // context-lifecycle terminal state (code + measured token counters
@@ -888,9 +924,10 @@ export function createNativeEngine(deps: NativeEngineDeps): ReplEngine {
             });
           }
           break;
-        // 'tool-proposed' / 'tool-executing' are progress-only; 'turn-end' falls through.
+        // 'tool-proposed' is not execution; 'turn-end' falls through.
+        }
       }
-    }
+    } finally { clearActiveTool(); }
     cbs.onTurnEnd({ inputTokens, outputTokens });
     // 7089 — ONE seam: the same accumulated counters `onTurnEnd` just reported
     // now ride into the record layer, so usage reaches disk instead of dying at

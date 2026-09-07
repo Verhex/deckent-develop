@@ -54,6 +54,26 @@ export const CLI_TERMINAL_SLASH_MESSAGES: MessageFamily = Object.freeze({
     en: 'interrupt is not available on this engine — the turn will finish; pending input cleared',
     tr: 'bu motorda kesme yok — tur tamamlanacak; bekleyen girdi temizlendi',
   },
+  'tui.native_tool_executing': {
+    en: 'executing {tool} · {elapsed}',
+    tr: '{tool} çalıştırılıyor · {elapsed}',
+  },
+  'tui.native_tool_cancel_requested': {
+    en: 'cancel requested for {tool} · waiting for the tool to end ({elapsed})',
+    tr: '{tool} için kesme istendi · aracın bitmesi bekleniyor ({elapsed})',
+  },
+  'tui.native_tool_status': {
+    en: 'local active tool: {tool}',
+    tr: 'yerel etkin araç: {tool}',
+  },
+  'tui.native_tool_executing_compact': {
+    en: 'executing · {elapsed} · {tool}',
+    tr: 'çalıştırılıyor · {elapsed} · {tool}',
+  },
+  'tui.native_tool_cancel_requested_compact': {
+    en: 'cancel requested · {elapsed} · {tool}',
+    tr: 'kesme istendi · {elapsed} · {tool}',
+  },
 
   // ── live-footer elapsed-time unit suffixes (helpers/live-footer.ts
   //    formatElapsed — `2h 5m`, `10m`, `30s`). XVerify (codex/gpt-5.6-sol,
