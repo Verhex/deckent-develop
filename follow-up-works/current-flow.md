@@ -4,11 +4,42 @@
 > Silinme tetiği: onaylı sıra tüketilip kalıcı kanıtlar MASTER/evidence'a işlendiğinde silinir.
 > Ayrıntılar mevcut7099 capsule'ında, Git'te ve aşağıdaki kanıt dizinlerindedir.
 
-## Aktif durum — 2026-09-07T09:23Z
+## Aktif durum — 2026-09-07 · L4-D kaynak ve kanıt main'de
 
 7099 tek ACTIVE outcome; MASTER VERIFY, DOGFOOD ON/health DEGRADED.
 Owner-onaylı bounded ADR-D-007; root fan-in, disjoint kaynak worker'ları.
 Retained728, .tasks, memory.db ve inherited dirt korunur; yeni dispatch yok.
+
+## L4-D native tool activity — bounded landing tamam
+
+Source `2bcac2c8fa62c996881d4e5749fd146ccd1be0a3`, exact6 blob +426/-19.
+Canonical tool-executing → bridge → App; gerçek araç adı/süre, matching
+result/finally temizliği, closed-turn callback koruması. Cancel≠completion;
+clear aktif aracı gizlemez; dar ekranda /status tam adı verir; i18n/gate korunur.
+Root candidate/main108/108 + i18n/tsc/build PASS. Main actualCLI EtUC1N6/6
+PASS; result fc166b15;13bundle+6source pin unchanged, fresh/exit/custody/effect
+her case geçti. Fable785/790 bağımsız source/main GO, canonicalXVerify değil.
+İlkcandidate5JHqeI ve V2 6DmjeJ aggregateFAIL kayıtları değiştirilmedi.
+V2TR fresh UNRUN ayrı tutuldu; historical-row selector kusuru offline302375eb
+ve Fable replay ile doğrulandı. V3helper f9d1d125 yalnız3ready-after predicate'i
+son redraw'a sınırlar; offline3704b8e6+negatifkontrol sonrası TEK main koşu.
+Üçüncü candidate retry yok. Real provider/billing/settlement/platform iddiası yok.
+Archive `/home/alperen/deckent-recovery-20260904/terminal-7099-l4d-PHraNL`:
+93check/94file/12dir PASS; manifest dbe11c69/SUMS23709e87,0600/0700.
+Tam kayıt existing7099 capsule'ında. Real terminal reflow UNMEASURED.
+Sonraki işlem kalan7099 actual request measurement/typed error contractı;
+usage/input toplamı ile context doluluğu birleştirilmeyecek.
+
+L4 sonraki bağımlılık salt-okuma haritası: usage loop-round bazlıdır, token parçası
+bazlı değildir; turn boyunca toplanan input usage context doluluğu sayılamaz.
+Session snapshot ayrıca system:''/tools:[] ile transcript-only request kurar;
+orada quality exact olsa bile gerçek wire doluluğu değildir. Canonical kaynak
+native-transport.withMeasuredAdmission'ın zaten ölçtüğü actual full request
+kararıdır: inputTokens/quality/provenance/requestDigest/identity/availableTokens.
+Sonraki dilim bu mevcut ölçümü ikinci count/provider çağrısı olmadan transport
+event → loop → bridge → App'e taşımalı; son request doluluğu ile billing round
+toplamını ayırmalı. Bridge typed error'ları da metne düşürüyor. UI-only yüzde
+veya uydurma next-action kabul edilmez. Henüz uygulama açılmadı.
 
 ## L4-C exact literal resume — kaynak ve kalıcı evidence tamam
 
@@ -39,10 +70,10 @@ Sıradaki işlem: kalan7099 canlı durum/hata/sonraki-eylem sözleşmeleri.
 
 ## Runtime / remote
 
-Bot1693409 stop → ALLOW → main build:all → bot1764892 start/status/liveness PASS.
-Build identity595cf951, sourceTree027dad3b; loaded entry/module digest match.
+Bot1764892 stop → ALLOW → main build:all → bot1879419 start/status/liveness PASS.
+Build identityc69d55af, sourceTreeb2fc49e0; loaded entry/module digest match.
 MCP reconnect UNVERIFIED. Yeni sprint/retained cleanup yok.
-Push TOOL_POLICY_HOLD; değişmemiş retry/bypass yok. Son ölçüm ahead32.
+Push TOOL_POLICY_HOLD; değişmemiş retry/bypass yok. Kaynak commit sonrası ahead34.
 Full-suite baseline hâlâ FAILED:2979dosya/67batch,40396PASS/636FAIL/138pending;
 20collection failure ayrıca kayıtlı. Dashboard/Desktop bu koşuma dahil değil.
 Catalog repair `64562e63d` selected/main60test+compiled78check ile kapandı;

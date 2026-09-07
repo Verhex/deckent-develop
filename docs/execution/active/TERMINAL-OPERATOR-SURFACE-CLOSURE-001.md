@@ -11,6 +11,55 @@ PREREQUISITE: 3331 (landed 2449b6e4f) → 3332 (landed 13d2c80ef) → 3333 (land
 OWNER_DECISION_REF: owner-live-2026-09-04-terminal-audit-closure-v2
 STATUS: IN_PROGRESS source-work; DOGFOOD_HEALTH=DEGRADED. 2026-09-06T23:10Z sonrası gerçek autonomous dry-plan PASS; exact micro-task proof admission ve çoklu-worker settlement hâlâ açık, yeni worker dispatch yok.
 
+### L4-D native tool activity — bounded source landed, 2026-09-07
+
+Source `2bcac2c8fa62c996881d4e5749fd146ccd1be0a3`: exact6 committed blobs,
++426/-19; frozen source SHA44332589, root pre/post-stage pin equality PASS.
+Canonical loop tool-executing → native bridge → App now carries the real tool
+name and elapsed duration. Proposal/permission alone does not start activity.
+Matching result/error/finally clears it; closed-turn callbacks cannot replace a
+later turn. Cancel request is not completion; /clear retains the active anchor.
+EN/TR labels use the existing catalog, narrow output prioritizes state/time,
+/status carries the full sanitized name. Existing repl_surface gate remains.
+
+Root candidate and main:108/108 targeted tests, i18n/typecheck/build PASS;
+main build:all PASS. Main actual CLI `/tmp/deckent-7099-l4d-EtUC1N` passed6/6:
+EN, TR48→36 plus /status child closure, /clear, cancellation while the real
+private tool continues, tool failure→fresh turn, and flag-off. Every case has
+fresh-turn/clean-exit/effect/child-lifecycle/no-survivor checks. Result SHA
+`fc166b15855e3bb0d466cc8bbf90721a0e313779f175d90a80cdb5cbbbd8922b`;
+13 compiled and6 source pins unchanged. This is actual Linux CLI→App→native
+engine→AgentSession→deckent_bash with scripted provider events and a private
+login-shell exclusion adapter, NOT real-provider/billing/settlement proof.
+
+First candidate aggregate FAIL5JHqeI and corrected aggregate FAIL6DmjeJ remain
+unaltered. The first helper confused retained transcript with current activity
+and exited before status-child closure. V2 fully passed5/6; TR resize retained
+historical activity in its simplified screen model, preventing ready detection.
+V2 TR fresh-turn is UNRUN, not borrowed from run1. Root offline302375eb and
+Fable785 independently located the selector defect. V3 f9d1d125 only changes
+three ready-after predicates to the latest redraw region; offline3704b8e6
+and negative controls preceded the single main proof. No third candidate run.
+Worker V1–V4 failures and the unrun defensive React-engine-replacement fixture
+are retained. Actual provider switching keeps a stable engine with live getters;
+that artificial replacement fixture is not production provider-switch proof.
+
+Fable785 source/product GO,790 main source/runtime/CLI verification and791
+archive verification are independent reviews, not canonical XVerify receipts.
+Durable archive `/home/alperen/deckent-recovery-20260904/terminal-7099-l4d-PHraNL`:
+93 SHA256SUMS checks PASS,94 files/12 directories with0600/0700 modes; manifest
+`dbe11c69c86ac712bb2c82bff4109ec0b88d752e80ab5ad6a42e89bda184bef0`,
+SUMS `23709e874e4c159c7259014e97b00cc5c85bf0e51f48dc5169b3d97b8962fba1`.
+Explicit evidence only, no recursive fixture/DB/auth copy; no fabricated receipt.
+
+Bot1764892 canonical stop → active guard ALLOW → build:all → bot1879419
+canonical start/status/liveness PASS; buildidentity c69d55af/sourceTree b2fc49e0,
+loaded entry a167ffb0/module311be99b and root binding match. MCP reconnect remains
+UNVERIFIED. No new production dispatch or retained728/task/DB mutation.
+RELATED_BUT_NONBLOCKING: real terminal emulator resize/reflow is UNMEASURED;
+latest-redraw proof is not a full emulator claim. 7099 remains VERIFY, with
+usage/context/typed-error and remaining L1/L3/L5/L6 obligations OPEN.
+
 ### L4-C exact literal resume — bounded source landed, 2026-09-07
 
 Source `1bfed4296600d38d85dc63aa3beb582003b9c3cd`: exact7 committed blobs,
