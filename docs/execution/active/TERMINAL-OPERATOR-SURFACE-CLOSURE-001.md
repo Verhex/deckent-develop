@@ -11,6 +11,399 @@ PREREQUISITE: 3331 (landed 2449b6e4f) → 3332 (landed 13d2c80ef) → 3333 (land
 OWNER_DECISION_REF: owner-live-2026-09-04-terminal-audit-closure-v2
 STATUS: IN_PROGRESS source-work; DOGFOOD_HEALTH=DEGRADED. 2026-09-06T23:10Z sonrası gerçek autonomous dry-plan PASS; exact micro-task proof admission ve çoklu-worker settlement hâlâ açık, yeni worker dispatch yok.
 
+### C actual v1 observed — 2026-09-07T20:58Z
+
+Handle17987 exit1; result /tmp/deckent-7099-native-permission-pty-KLQxcE/result.json
+SHA b2f86d5019b99aff39d473f92ebe1dd7eef1e7720d7ba4610bfb9c97cffc1661.
+1 attempted en-once FAILED,21 UNRUN/HOLD. Actual entry emitted lifetime card,
+CLI child recorded actor-bound allow, durable authorityValid=true, private
+en-once.txt write-success observed. All children closed/reaped. Only first of
+two intended once invocations reached; this is NOT once/session/fullmatrix PASS.
+Provider round2 text request observed and terminal ready, but expected unique
+text absent: WAIT_TIMEOUT:en:once:provider-complete:1 after21976ms.
+Root requested read-only parser→loop→bridge→App/fixture RCA from Wegener and
+Fable933; no causal product claim until traced. Failed proof and frozen sources
+preserved. No unchanged retry; no main build/source/runtime/auth mutation.
+
+### C actual matrix admission — 2026-09-07T20:57Z
+
+Contract generation exit0: native-permission-contract-v1.json
+49e4e8607704d0d6459905f3653b323be99a522023dd685728eae1bcb97e2996,
+22 explicit EN/TR cases. Builderaf54081e frozen; helper235fd46be0b95226c46442a49103d7c8ce30065fee68c20734ae4a00346394b4
+final syntax/readback; matcher consumes exact matched raw end, preserving same
+chunk trailing completion/ready. Provider98bf5091 unchanged. Independent Fable
+B1/B2 source GO preserved; C contract feedback requested931/932, not yet received.
+Root now admits ONE supportive actual-entry PTY matrix, sequential22cases,
+60s per case/2MiB per process output, fail-fast on first failed case with all
+remaining names UNRUN/HOLD; no retry without changed exact causal evidence.
+Private mkdtemp fixture hosts/projects only; config/key fixtures local synthetic,
+loopback diagnostic provider only (no billing/real-provider/owner-approval claim),
+exact allowlisted private text writes, only owned child stop/reap. Canonical
+main/.tasks/memory.db/bot/local-llm/auth/settings protected. No worker dispatch.
+This proves only compiled Terminal native-permission path where actual evidence
+passes; it cannot close7099, broader platform support, XVerify or settlement.
+
+### Candidate compilation complete / C contract generation — 2026-09-07T20:55Z
+
+Dependency copy handle86351 exit0;15025 files SHA-equal and independent inode,
+19 contained symlinks. Dashboard continuation21564 exit0,2290modules compiled,
+DASHBOARD_BUILD_COMPLETED. Native/tsc/assets82101 + Dashboard21564 collectively
+complete compilation;82101 remains exit1, not rewritten as build:all PASS.
+Vite large-chunk advisory retained; no unrelated optimization admitted.
+Now admit ONE private contract generation from frozen builderaf54081e and source
+freeze-v2 to /tmp/deckent-7099-approval-73zxwUTv/proof/native-permission-contract-v1.json.
+Builder only imports frozen compiled catalog/binding and writes no-clobber0600
+JSON in private evidence; no provider/auth fixture/process spawn or main mutation.
+Actual PTY matrix remains separately unrun pending final helper review/admission.
+
+### Dashboard dependency materialization admission — 2026-09-07T20:54Z
+
+Read-only RCA: candidate/src/dashboard/node_modules absent; root node_modules
+does not supply this wrapper's project-local toolchain. Main/candidate dashboard
+lock exact e7b65713cf939dd02a19286c8e54940dabfc68e3dde73d946e8d5d4da2ce6a65.
+Existing main dashboard dependency tree215MB,15025 regular files/19 internal
+symlinks, no escaping symlink or special entry. Root admits mechanical independent
+copy of that exact existing tree to absent candidate/src/dashboard/node_modules;
+no hardlink, no install/download, no source edit, no main write. This is ordinary
+isolated build preparation under existing build authority, not external-toolchain
+admission or wrapper bypass. Verify copied content/link identities, then ONE
+canonical npm run build:dashboard continuation. Preserve82101 exit1; do not call
+original build:all PASS. No full rebuild/retry of successful native/tsc/assets.
+
+### Candidate build partial / C review — 2026-09-07T20:51Z
+
+Root frozen-source noEmit handle58382 completed exit0; joint257/257 PASS.
+Fresh47-pin verification20:49Z: zero drift; candidate dist/native outputs absent
+before build; retained728 PID ESRCH, bot2611078 alive, local-llm healthy only.
+Candidate-only build:all handle82101: clean ALLOW removed0, native/tsc/assets
+completed, Dashboard E_DASHBOARD_BUILD_TOOLCHAIN_MISSING, actual exit1.
+This is PARTIAL/HOLD, not full build PASS; no main build/restart/run mutation.
+Exact report /tmp/deckent-7099-native-integration-x3pijq/root-verification-v1.json.
+Lovelace checks existing dashboard dependency placement read-only; no install.
+C builder053f8bed/helper8ddffd06 fully read, UNRUN. Root requested exact helper
+preflight compiled-contract comparison, fail-fast matrix preserving UNRUN cases,
+and causal turn-completion before ready acceptance. No production-source change.
+Fable931 requested independent concrete C review; no unchanged product re-audit.
+
+### Joint v2 PASS / C preparation correction — 2026-09-07T20:42Z
+
+27 files257/257PASS,0skip,exit0; joint-tests-v2.json
+a4281a67e6c8953fe9ebdc15f44bc5132b1b863c091f8f69d7bc54de26e20a5c.
+Only one test fixture differs from independent source-reviewed pins; production
+source unchanged. Frozen-source noEmit now admitted/running; build not started.
+
+C builder first draftbfa0915ba0b15122bdb674e2a9cf9ee1fc713317998b84c79b90e8f1cf653099
+was read, NOT run. Exact errors: once pattern expects path instead of canonical
+null; scripted second turn lacks another user input; immediate exit races effect
+completion; reused fixture expected effects omit prior files; uniform1.5s TTL
+makes positive auth expire; deny/conflict/foreign expected request/actor/reason
+states contradict real flow. Earlier root missing-auth-id suspicion RETRACTED:
+current catalog prompt has no id placeholder. No product finding from that claim.
+One consolidated C correction now authorized in existing exact builder and actual
+PTY helper, provider helper read-only,20min, no execution. Derive binds from actual
+bindNativePermissionIntent; waits from actual terminal/provider completion and
+canonical request/decision evidence; positive TTL and deliberate expiry separated.
+Preserve negative fail-closed assertions; unavailable scenario mechanism is HOLD,
+never guessed-success. Explicit case-local fixture config or causal-negative
+action addition permitted ONLY for private proof, not host/runtime product API.
+
+### Joint v1 observed / exact test correction — 2026-09-07T20:39Z
+
+joint-tests-v1.json e8ba4941de75e89ba31f3ddfb5cdf342f61baedc210594f703b9fe3f4bf06697
+exit1,257 tests256PASS/1FAIL/0skip. New nested negative test expected reversed
+literal 'policy denied'; actual canonical prefix is '[denied by policy]'. Exact
+test-only fix imports PARITY_POLICY_DENIAL_PREFIX; both zero-effect/zero-confirm
+assertions preserved. Corrected test SHAe950ce05edf49b0c20263a58cf2244d88151771a1d4d9da118f51564970627b3.
+No production-source change. Frozen v1 and failure preserved; source-freeze-v2.json
+changes only that test hash. One joint-v2 invocation same27files admitted; same
+resource limits and no unchanged retry. Typecheck/build follow only if it passes.
+Fable928 SHA940cc33520e0465dcbfecb07cedb237f87f9b697d30b629652579a7b5026a265
+independent B2 exact12 source GO; source pins unchanged by this test correction.
+
+### Joint verification admission — 2026-09-07T20:35Z
+
+Candidate9dahQa source/tests frozen; exact47 file hashes in private evidence
+/tmp/deckent-7099-native-integration-x3pijq/source-freeze-v1.json.
+B2 close-wait abort and missing negative assertions added AFTER supportive
+69PASS; that report is not final-source proof. Root now owns ONE joint targeted
+invocation (changed tests + original A card/watch/registry dependents), ≤2 forks
+and16GB combined, exact report joint-tests-v1.json in that same evidence directory.
+Then ONE noEmit typecheck of frozen source, with captured actual exit/output;
+no head pipeline. If source/fixture errors remain, preserve failure and enumerate
+exact correction before any retry. No broader suite or live provider invocation.
+
+After joint tests/typecheck and scope integrity pass, ONE candidate build:all is
+admitted to prepare actual compiled C proof. Inspect build scripts/targets first;
+candidate outputs only, no main rebuild/restart. Fresh runtime read20:33Z:
+retained728 lockPID2996159 ESRCH, bot2611078 alive, no Docker worker container;
+existing local-llm container reports healthy (not started/stopped by this work).
+Recheck before build; retained state/host auth/main source remain protected.
+Build success is not permission/worker/settlement proof. C execution requires its
+frozen concrete scenario contract and explicit finite matrix admission separately.
+
+### B1 freeze / C contract preparation — 2026-09-07T20:28Z
+
+B1 source events1cda4435bf439575da41959f3c418862ab9456b910f904cd5bc80ab13561e360,
+loop92c4ce37ce38cbf0c1569e697b01966ba8a543d1788c8933fcb3747ba2f2acf1,
+session5f0e6fcfe779d8c4111af84e0724fda3d3208c872723ca998fe96fddede815c9.
+Root corrected source/fixture/readback PASS; final12files113/113PASS, skip0,
+native-b1-tests-attempt3.json0dd224d81a86d87c1b97468f7a715c34f885c6bac9dbe9888e29ea1923a05544.
+Attempt2 107PASS/6FAIL8f55d605b6cedf82abc25310a0eefaf51acee51b51847614dbbc9642a73677b6
+retained: five existing native-selection fixtures omitted projectRoot; one cancel
+incorrectly gained a HOLD code. B1 budget3 consumed, no rerun. Fable ENTRY925
+digest9cb43baaaeb0dce2ae8b911bba55339fc5e165aea65466ffe102e4758e7a81af
+independent exact3 foundation GO; consumed/ack926. B2 integration still open.
+
+B2 R1 worker report69/69PASS8cff393cdc3612327e124059bf954d159102639f14bd383581ece59e72a78dcd
+includes read-only app-approval-wire (no edit/fallback). Two already requested
+negative assertions were not included: nested live-deny/missing-seam and service
+untrusted verdict. Same writer completes exact2 test files without another worker
+run; root later owns a separately declared joint integration pass. New teardown
+evidence: engine.close only closes session, but top-level decision callback waits
+on a separate bridge controller; abort it before close and regress pending-close.
+Same native-agent-bridge source and test scope, not a new package/retry chain.
+
+C final preparation helper0b0d154342687510acaf58a1e09dca01ce74ce91b45e224a5d71b8b884320082
+root changed-source readback and syntax exit0; provider98bf5091 unchanged.
+No actual execution. Next disjoint preparation exact new helper write path:
+/tmp/deckent-7099-approval-73zxwUTv/proof/native-permission-contract-builder-v1.mjs.
+It builds the fixed22-case EN/TR contract only from explicit frozen source/build
+and actual catalog/CLI inputs, deriving exact bindings/digests via production
+helpers; no fixture-local identity algorithm or provider/auth launch. Include
+all changed load-bearing source/compiled pins, especially messages.ts (native
+intent labels live there, not only split slash catalog). Reuse verified A private
+config/activation/reauth setup, never owner credentials or synthetic human consent.
+Explicit unsupported scenario must remain HOLD, never be substituted by a test
+label with no cause. Builder writer Volta,20min checkpoint, one syntax check
+allowed, no execution/build/main source/runtime writes. Existing two C helpers
+frozen read-only; report exact helper API mismatch rather than editing silently.
+
+### B2/C changed-evidence correction — 2026-09-07T20:20Z
+
+B2 original three-invocation budget exhausted: attempt2 report
+1c6b0f1a502bbc4a58bbaf3b023b93c6c66b3a8d437283fa1d1e10c94e6e5175
+43/47PASS; attempt3-final18b39cad0eb1ad31d5b982197d4f32e5522cb834cf5630a4fe083b3515f35f66
+46/47PASS (root raw JSON/assertion/hash readback verified20:23Z). Last abort fixture passed
+noncanonical lifetime list, so admission returned STALE before tested abort.
+Separate root source evidence: nested bridge retains raw-confirm fallback and
+does not recheck mutable policy after awaiting approval; cross-process watcher
+emits a fixture-driven synthetic decided fallback when durable reconciliation is
+empty. Same B2 owner/exact scope, one consolidated R1 correction + one scoped
+test invocation authorized, 25min checkpoint, old failures preserved. No prod
+compatibility fallback for tests; if legacy test edits exceed scope, enumerate
+exact paths before writing. Root must inspect the corrected source and report.
+
+Root completed the first full B2 diff pass and added exact consumer defects to
+that same R1 before its single test: App gives both durable and intent cards the
+same active flag (two keyboard listeners if requests overlap); local cancel only
+retires App tracker, not ApprovalCard's separate rendered queue. Fix arbitration
+and exact local-view retirement without fabricating a durable terminal event.
+Known CLI docs/audit write producers also need canonical metadata; external
+unknown metadata remains HOLD. New permission outcome reasons must have structured
+carrier and catalog rendering, coordinated across B1 events and B2 bridge/messages;
+no core-to-CLI import or output-string parsing. Real private broker service tests
+must cover v2 publication, cancellation after publication and verification failure;
+two adapter mocks alone do not prove the admitted service integration.
+
+C correction freeze0df01f278e580fc70ab56b44dd2a9d1be8e1e8f5d039d338ce49912bb853ab8c
+and provider98bf5091cf371e61f1436a60ba8ba5e22c0d889e9ccb13dd0f753cdf4b4f9523
+both root node--check exit0, not execution. Root found nested provider allowlist
+checks outer args.path although real deckent_call_tool schema is {name,args};
+all-scenario child-start nonempty overconstrains zero-auth paths; authority-cli
+child output is unbounded and result lacks its final absence/exit evidence.
+Same exact2 helper owner one source correction, no execution, 20min checkpoint;
+required frozen pins must include new approval service/card/catalog and actual
+builtin handler. Root owns final syntax and finite execution admission later.
+
+Premature B2 typecheck provenance corrected: command was
+`npx tsc --noEmit --pretty false 2>&1 | head -120`, 13.6s observed;
+pipeline exit0 masks tsc diagnostics, underlying exit/start time unavailable,
+no durable transcript. Never a PASS/nonzero exit claim or baseline verdict.
+
+### B1 integration correction / fixture migration — 2026-09-07T20:18Z
+
+First B1 exact7 freeze root-readback: native-b1-tests-attempt1.json
+sha e4ad1482e1552700222587a0403ccd54b0b8a557ecb1b285c2d3194342fce799,
+4 files / 32 tests PASS, not production closure. New disk evidence requires one
+consolidated correction in the same owner scope: closed session send currently
+creates a fresh unretired turn (auto-allowed tool path escapes closed check);
+public malformed permission request/response can throw before typed validation;
+B2 classifier now requires the loop's canonical resource as its third argument.
+No rollback of an already authorized longer-lived grant merely because its later
+effect fails; grant and effect truth remain separate. No production unbound-answer
+compatibility fallback.
+
+Exact additional test-only write paths for the same B1 writer:
+tests/agent/loop-exposure-wire.test.ts, loop-honest-signals.test.ts,
+context-lifecycle-battery.test.ts, tool-surface-scale.test.ts,
+qwen-incident-regression.test.ts, bash-perm-resource.test.ts,
+reasoning-continuation.test.ts, context-admission.test.ts (all under tests/agent/).
+These existing direct LoopDeps fixtures need the new issued/bound permission API;
+their old API failures are not baseline failures. Preserve original assertions,
+use production binding helpers, and keep real AgentSession regression proof.
+No new helper path without exact reconciliation. B1 has two targeted invocations
+remaining, at most2 forks/16GB combined, 25min correction checkpoint. Candidate
+only; main/B2/foundations/build/full-tsc/runtime remain outside writer scope.
+
+### Integration checkpoint — 2026-09-07T20:11Z
+
+B1 actual source carrier now includes frozen producer scope/risk and safe masked
+args; session owns rawArgs and exposes non-consuming validatePermissionRequest
+before submission. Final claim rechecks/consumes the exact live invocation.
+Root found resource.trim/mandatory nonempty checks rejected legitimate whitespace
+paths/commands and no-primary-resource calls; exact raw resource string including
+empty is preserved while canonical scope/risk/scopeId remain strict. B2 builtin
+classifier must match native cmd precedence and must not invent '.' resources.
+No new work ID or policy relaxation; full rawArgs digest still binds the call.
+B1 first targeted4file test authorized output candidate/native-b1-tests-attempt1.json;
+no full tsc/build until joint source freeze. Source/worktree changes are private.
+
+B2 worker reports premature `npx tsc --noEmit` nonzero while peer source was mid-edit,
+contrary to freeze instruction. Not a baseline/scoped-green verdict or build;
+original failure output attribution requested, no rerun to recreate evidence.
+UI and lifecycle wiring continue independently; missing producer carrier no longer
+blocks implementation. Same-event double prompt prohibited: top-level yield/bridge
+respond only, nested explicit callback through same session issued registry.
+
+C helper first complete freeze6a455fd178d1f1b5d2bb8540e658b2b231866e35d05913ed9ca52fe082c5d79d
+and provider98bf5091cf371e61f1436a60ba8ba5e22c0d889e9ccb13dd0f753cdf4b4f9523
+were NOT run; root source review HOLD. Remaining concrete proof defects: empty
+source freeze passes, same-fixture reload compares historical records as new,
+foreign/conflict labels lack actual cause injection, positive authority constraints
+are merely expected-data, child custody vacuous when no starts, and provider turn
+target allowlist/effect-attempt versus successful-write distinction missing.
+One consolidated correction same exact2 helpers, no worker execution/syntax rerun;
+20:14Z original checkpoint, at most10min changed-evidence correction if needed.
+Before any C execution root verifies complete preparation, frozen consumer/catalog
+contract, exact source/compiled pins and separately admits finite run matrix.
+
+### C native actual-proof preparation — 2026-09-07T19:50Z
+
+Preparation only, not execution: exact helper write paths outside source candidate
+`/tmp/deckent-7099-approval-73zxwUTv/proof/native-permission-actual-pty-v1.mjs`
+and `native-permission-loopback-provider-v1.mjs` in that same proof directory.
+Reuse A actual entry.js PTY/private cwd/DECKENT_HOME/allowlisted environment and
+bounded child custody; old A helpers/results/archives immutable. Exercise actual
+compiled CLI entry/run/App/native AgentSession/bridge/card/RuleStore/builtin
+file handler, not a hand-wired fake ReplApp or reimplementation. Only provider
+response is diagnostic fixture: label not real provider usage or human approval.
+No helper execution, fixture auth creation, build or runtime launch in preparation.
+
+Matrix: once and second ask; session two calls then fresh session asks; always
+persist/reload and actual tool-wide behavior; deny/cancel/expiry/foreign/conflict
+zero grant/effect; nested target through same native session and same keyboard
+ownership; EN/TR labels, same App subsequent harmless command. Record exact
+binding/request/decision actor and authority verification, effect byte digest,
+grant store presence/readback, provider-fixture requests separately from usage,
+child start/exit/absence, helper/source/compiled pre/post hashes. Canceled lifetime
+intent creates no fabricated approval decision. Explicit resource/output/time
+limits, no host credentials inherited, no broad kill/delete, retain failures.
+Unavailable source freeze/build is UNRUN/HOLD, never SKIP-success. Target only
+candidate9dahQa until root separately authorizes main proof. One writer, 25min
+checkpoint; `node --check` each helper at most once is allowed, no imports/run.
+Actual matrix scope/run budget follows source freeze and root review separately.
+
+### B2 actor dependency freeze — 2026-09-07T19:47Z
+
+Candidate principal source822fee85b5375f63922418aa4025982fe7688a01cd15fafdb18ba5f54947a895;
+CLI approvals source23d9835666e5446e9b71f16ff0e90b00577daec9782c7bdf7e33e904e45695d8.
+Tests principal b2cd5ada2661e1deb819ca3dd2d43879de4a64b0a40c435b8bf2f7eef1a032e0,
+CLI7f5333ed515cdab93cf18e04c64deae037172061152359363d846ac1fe0f4000.
+`native-b2-actor-tests-v1.json` sha69b882e4a10a71c756b50652cbb84d5c40146579e0a9403cca26a0edc9290990
+2 files17/17PASS, skipped0. Root full diff/JSON/hash readback verified. CLI test
+calls helper only, not actual reauth; production CLI wiring is source-reviewed
+and C live-auth proof remains required. Post-test inspection typo `lkj` exit127
+did not affect preceding Vitest exit0; no hidden test rerun. API
+`resolveLocalOsActorId()` actual OS username or null, no synthetic allow identity;
+qualified principal/provenance and admin identity sites unchanged. Fable921 exact4
+foundation GO. B2 consumer writer Wegener; B1 writer Lovelace disjoint.
+
+### B2 Terminal consumer admission — 2026-09-07T19:45Z
+
+7099/L3 same native B producer→consumer→C closure, not a new outcome. Candidate
+9dahQa only; B1 session owner and local-actor dependency owner remain disjoint.
+Exact source write scope: `src/agent/tools/types.ts`,
+`src/agent/native-tool-approval.ts` (new),
+`src/core/approval-command-classification.ts` (new),
+`src/agents/agentic-worker-tools.ts`, `src/agents/worker.ts`,
+`src/cli/repl/native-tool-registry.ts`, `src/cli/repl/native-agent-bridge.ts`,
+`src/cli/repl/native-permission-approval.ts` (new),
+`src/cli/repl/approval-card.tsx`, `src/cli/repl/app.tsx`,
+`src/cli/repl/run.tsx`, `src/cli/helpers/messages.ts`.
+Exact test write scope: `tests/agent/tool-registry.test.ts`,
+`tests/agent/native-tool-approval.test.ts` (new),
+`tests/core/approval-command-classification.test.ts` (new),
+`tests/cli/native-tool-registry.test.ts`, `tests/cli/native-agent-bridge.test.ts`,
+`tests/cli/repl/native-permission-approval.test.ts` (new),
+`tests/cli/repl/native-permission-card.test.tsx` (new),
+`tests/cli/repl/approval-card-async.test.tsx`,
+`tests/cli/repl/approval-card-render.test.tsx`.
+Other targeted tests may be read/run but not edited without exact changed-evidence
+scope reconciliation. B0/B1/BG/BW/principal producer files read-only dependencies.
+
+Same ApprovalCard family handles transient lifetime intent, then the canonical
+immutable request and A live-auth flow; intent is neither a fabricated broker
+request nor permission authority. One keyboard owner; cancel/dispose ends the
+exact wait without fabricated deny/receipt. Once/session/always consequences are
+localized and explicit before authentication; always/elevated/nested once-only.
+ApprovalCard's generic approve-all is not native always. Existing A auth-child
+TTY ownership, durable conflict reconciliation, tenant filter and same-App resume
+must remain intact. Native invocation holds/cancels are shown through catalog keys.
+
+Use same configured ApprovalBroker and decision adapter; broker lifecycle resolved
+from effective config independently of visibility flags. submitLifecycle v2 uses
+existing policy/profile/risk-floor/digest/expiry helpers; no new approval motor,
+store, TTL constant or top-level schema. Native context carries exact B0 binding
+inside details.nativePermission, no raw args/resource/secrets in durable details.
+Rehash before submission and response; verify current durable decision with the
+existing adapter AND exact invocation/lifetime binding before session response.
+Use shared local OS actor helper (separate writer); unavailable identity/config/
+lifecycle/ACL/TTY/decision => typed HOLD, no raw confirm fallback. Cross-process
+decision watcher must settle same broker's waiters through its canonical public
+read reconciliation, not merely emit an event. B1 owns turn/issued/nested guards;
+native bridge consumes them without inventing provider call IDs or a second
+permission registry. Legacy slash confirmation outside native remains unchanged.
+
+Scope/risk belongs to actual tool producer, not user/model description or a
+consumer name-prefix guess. Add optional producer classification contract using
+canonical ApprovalScope/Risk and strict validation; existing registry consumers
+stay compatible. Native builtin declarations follow actual handler effects;
+shell classifier extracted from existing two implementations with each original
+profile behavior preserved (including pip/apt/brew differences). Native shell
+uses existing agentic profile. Nested resolves the actual target. CLI tool
+declarations must follow real dispatch branches; unavailable/malformed metadata
+returns typed classification HOLD. External MCP lacks trusted effect declaration
+today: do not invent a taxonomy or trust descriptive hints as authority; retain
+explicit unsupported HOLD and report this capability gap, not full MCP closure.
+No provider/config/credential mutation or speculative MCP protocol expansion.
+
+One writer, one implementation plus at most2 changed-evidence corrections,
+at most3 scoped test invocations, 40min checkpoint, forks≤2/combined≤16GB. No
+build/fullsuite/runtime/provider/main/docs/channel/MASTER/commit/push. Tests real
+production functions with private tmpdir broker, binding/actor/lifecycle/expiry/
+conflict/cancel/grant failures, early and nested asks, flags-off no raw fallback,
+EN/TR intent/card keyboard, and legacy classifier behavior equality. Mocks do
+not close product wiring; root owns later compiled PTY/private auth/effect proof
+C and main fan-in. Unknown metadata and unavailable real hosts stay honest HOLD.
+
+### B2 local actor projection dependency — 2026-09-07T19:43Z
+
+Same7099 consumer defect: native local principal currently `username@hostname`,
+canonical CLI live-reauth actor currently raw `os.userInfo().username`; request
+actor must match the authenticated OS identity without copying request.userId
+or splitting a qualified principal. Exact candidate write4: `src/core/principal.ts`,
+`src/cli/commands/approvals.ts`, `tests/core/principal.test.ts`,
+`tests/cli/commands/approvals.test.ts`. Shared OS actor helper returns actual
+username or null; unverified fallback must never authorize an approval. Preserve
+principal's qualified id/provenance/assurance and existing non-auth administrative
+call sites. Reauth unknown identity returns null, not synthetic UID or request echo.
+Native B2 imports this same helper at request creation; no foundation-only landing.
+One writer, one implementation + one changed-evidence correction, at most2 scoped
+test invocations, 20min checkpoint, forks≤2/combined≤16GB. B1 session files and
+B0/BG/BW immutable dependencies; main/runtime/auth/config/build/MASTER/commit/push
+negative scope. Tests OS identity parity and unavailable identity fail-closed;
+local mocked reauth is not real human/provider evidence. B2/C remains closure task.
+
 ### Native B checkpoint — 2026-09-07T19:39Z
 
 B0-R1 exact2 source bağımsız Fable912/913 foundation GO; alias regression

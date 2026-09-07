@@ -4,7 +4,7 @@
 > Silinme tetiği: onaylı sıra tüketilip kalıcı kanıtlar MASTER/evidence'a işlendiğinde silinir.
 > Ayrıntı ve failure geçmişi: docs/execution/active/TERMINAL-OPERATOR-SURFACE-CLOSURE-001.md.
 
-## Güncel — 2026-09-07 22:39 TR
+## Güncel — 2026-09-07 23:58 TR
 
 7099 tek ACTIVE outcome; MASTER VERIFY. DOGFOOD ON / health DEGRADED.
 Owner-onaylı elle ADR-D-007 devam; bütün program goal'de korunur.
@@ -23,7 +23,28 @@ Fable912/913 foundation GO. Önceki iki FAIL ve rejected freeze korunur.
 BG exact2 RuleStore grant-source Fable906 GO, 3file20/20PASS; main'e alınmadı.
 BW signal-capture correction source72d5c006, test14924006;
 v2 report2d4a8ffb30/30PASS, root source/readback PASS, Fable916 foundation GO.
-B1 exact7 session/loop writer Lovelace çalışıyor; B2 scope mapping salt-okuma.
+B1 final events1cda4435/loop92c4ce37/session5f0e6fcf frozen;
+12file113/113PASS0dd224d8, root readback + Fable925 foundation GO.
+Closed→send/malformed request + exact8 eski fixture migration tamamlandı.
+B2 Terminal writer Wegener:18PASS→43/47→46/47→R1 69/69PASS8cff393c;
+root-reviewed nested fallback/live-policy, watcher, keyboard/queue düzeltmeleri.
+Eksik negative assertions + bridge-close callback abort tamamlandı; Fable928 GO.
+Root ortak27file257/257PASS, noEmit exit0;47pin source freeze v2 drift yok.
+Candidate build82101 native/tsc/assets PASS, Dashboard toolchain missing exit1.
+Exact existing dependency copy verified; Dashboard continuation21564 exit0.
+Derleme aşamaları tamamlandı; original build:all exit1 kaydı aynen korunur.
+Structured permission reason→catalog ve gerçek private broker testleri kaynakta.
+Foundation-only landing yok; ortak freeze ve kısmi compiled proof var, tam proof yok.
+B2 actor shared OS projection source822fee85/23d98356,2file17/17PASS69b882e4;
+root/Fable921 foundation GO, actual CLI auth proof değil; C kapsamında ölçülecek.
+Docs384b46eaf exact3 +281/-53 committed; Fable918 doğruladı. Main source değişmedi.
+C builderaf54081e/helper235fd46b;contract49e4e86022cases frozen.
+Actual17987 exit1: KLQxcE resultb2f86d50;1FAILED/21UNRUN. GerçekCLI auth,
+durable valid allow ve ilk private write kanıtlandı; sonraki provider text
+ekrana gelmedi → completion WAIT_TIMEOUT. Wegener/Fable933 yeni kanıt RCA;
+unchanged retry yok. Once/session/matrix/7099 closure hâlâ HOLD.
+B2 premature typecheck pipeline head yüzünden exit0; tsc diagnostics vardı,
+gerçek exit/timestamp/durable çıktı yok. PASS/baseline kanıtı değildir.
 Exact plan/scope/proof/budget capsule'ın Native permission B bölümünde.
 B0/BG/BW foundation proof, producer/consumer/C proof olmadan UNWIRED/HOLD.
 Yeni approval motoru/top-level schema yok; details canonical digest zaten bağlı.
