@@ -112,6 +112,13 @@ describe('spawnDetachedDeckent — detached-start.ts', () => {
     expect(options.env[LIVE_TRACE_ENV]).toBe('1');
   });
 
+  it('resolved session language is exported to the detached child', () => {
+    const { handle } = fakeChild(123);
+    const spawnFn = vi.fn().mockReturnValue(handle) as unknown as DetachedSpawnFn;
+    spawnDetachedDeckent(['start'], { projectRoot, spawnFn, language: 'tr' });
+    expect(spawnFn.mock.calls[0]?.[2].env.DECKENT_LANGUAGE).toBe('tr');
+  });
+
   it('liveTrace omitted → env twin ABSENT (programmatic default pinned: SDK/MCP spawns stay off)', () => {
     const { handle } = fakeChild(7);
     const spawnFn = vi.fn().mockReturnValue(handle) as unknown as DetachedSpawnFn;
@@ -191,11 +198,11 @@ describe('createCliToolDispatcher — detached routing (358-003)', () => {
   it('deckent_start → routes through spawnDetachedFn, never touches the synchronous spawnFn', async () => {
     const spawnFn = vi.fn() as unknown as CliToolSpawnFn;
     const spawnDetachedFn = vi.fn().mockReturnValue({ pid: 555, logPath: '/tmp/x/.deckent/recently-works/start-1.log' });
-    const d = createCliToolDispatcher({ spawnFn, spawnDetachedFn });
+    const d = createCliToolDispatcher({ spawnFn, spawnDetachedFn, language: 'tr' });
 
     const out = await d.dispatch('deckent_start', {});
 
-    expect(spawnDetachedFn).toHaveBeenCalledWith(['start'], expect.objectContaining({}));
+    expect(spawnDetachedFn).toHaveBeenCalledWith(['start'], expect.objectContaining({ language: 'tr' }));
     expect(spawnFn).not.toHaveBeenCalled();
     expect(out).toContain('555');
     expect(out).toContain('/tmp/x/.deckent/recently-works/start-1.log');

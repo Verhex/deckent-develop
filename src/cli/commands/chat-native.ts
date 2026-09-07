@@ -526,7 +526,7 @@ function slashCommandCatalogSource(cmd: SlashCommand): ToolCatalogSource {
 /** Builds trust-badged catalog rows from a (mode-filtered) slash registry for /help. */
 export function buildHelpCatalogEntries(registry: SlashRegistry): CatalogRenderEntry[] {
   return registry
-    .filter((cmd) => cmd.name !== '/quit') // alias — renderHelp already skips it too
+    .filter((cmd) => cmd.name !== '/quit' && cmd.discoverable !== false)
     .map((cmd) => {
       const tier = slashCommandRiskTier(cmd);
       const source = slashCommandCatalogSource(cmd);
@@ -609,8 +609,8 @@ export function buildHelpCatalogLabels(lang: string): CatalogRenderLabels {
  * the Ink native-engine bridge (app.tsx) renders byte-identical output
  * without re-assembling the registry/catalog/labels calls itself.
  */
-export function buildHelpOutput(chatMode: ChatMode, lang: string): string {
-  const visible = getVisibleCommands(chatMode, false, lang);
+export function buildHelpOutput(chatMode: ChatMode, lang: string, registry?: SlashRegistry): string {
+  const visible = getVisibleCommands(chatMode, false, lang, registry);
   const sections = [renderHelp(visible, lang)];
   const catalogEntries = buildHelpCatalogEntries(visible);
   if (catalogEntries.length > 0) {
@@ -675,12 +675,12 @@ export function readDirectivesOutput(root: string, lang: string): string {
  * function is the caller-side resolution seam instead.
  */
 export function resolveNativeSlashText(
-  action: Extract<SlashAction, { action: 'help' | 'message' | 'show-directives' }>,
+  action: Extract<SlashAction, { action: 'help' | 'message' | 'show-directives' | 'prompt' }>,
   ctx: { chatMode: ChatMode; lang: string; directivesRoot: string },
 ): string {
-  if (action.action === 'help') return buildHelpOutput(ctx.chatMode, ctx.lang);
+  if (action.action === 'help') return buildHelpOutput(ctx.chatMode, ctx.lang, action.registry);
   if (action.action === 'show-directives') return readDirectivesOutput(ctx.directivesRoot, ctx.lang);
-  return getMessage(action.messageKey, ctx.lang, action.params);
+  return getMessage(action.messageKey, ctx.lang, action.action === 'message' ? action.params : undefined);
 }
 
 // ─── Per-turn stats footer (Sprint 224 T-224-021) ──────────────────
@@ -898,6 +898,7 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
 
   const transcript: ChatMessage[] = [];
   let turnCount = 0;
+  let pendingSlashPrompt: Extract<SlashAction, { action: 'prompt' }> | null = null;
 
   if (memStore && resumeLimit > 0) {
     const history = memStore.getChatHistory(sessionId, resumeLimit);
@@ -910,6 +911,25 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
   for await (const rawLine of input) {
     const line = rawLine.trim();
     if (line.length === 0) continue;
+    if (pendingSlashPrompt && /^\/cancel$/i.test(line)) {
+      pendingSlashPrompt = null;
+      continue;
+    }
+    if (pendingSlashPrompt && !/^\/(?:exit|quit|clear)$/i.test(line)) {
+      const pending = pendingSlashPrompt;
+      pendingSlashPrompt = null;
+      if (line.toLowerCase() === '/cancel') continue;
+      const completed = resolveSlash(`${pending.command} ${line}`, buildSlashRegistry(lang));
+      if (completed.action !== 'agentic') continue;
+      const result = await dispatcher.dispatch(completed.tool, completed.args);
+      output(result);
+      transcript.push({ role: 'user', content: `${pending.command} ${line}` });
+      transcript.push({ role: 'assistant', content: result });
+      memStore?.appendChatTurn(sessionId, 'user', `${pending.command} ${line}`);
+      memStore?.appendChatTurn(sessionId, 'assistant', result);
+      continue;
+    }
+    if (pendingSlashPrompt) pendingSlashPrompt = null;
     // Sprint 221 T-221-001 — slash command wire. Handle /exit, /quit, /clear
     // here so they work for ALL input sources (createReplLines filters them
     // at the readline layer, but HTTP backend / tests / agentic dispatch
@@ -1215,6 +1235,11 @@ export async function runChatNativeLoop(opts: ChatNativeOptions): Promise<ChatMe
       continue;
     }
     const slashAction = resolveSlash(line, buildSlashRegistry(lang));
+    if (slashAction.action === 'prompt') {
+      pendingSlashPrompt = slashAction;
+      output(getMessage(slashAction.messageKey, lang));
+      continue;
+    }
     if (slashAction.action === 'help') {
       // Sprint 358 T-358-005 — mode-filtered render (357-010) + trust-badged
       // "Tools/Actions" catalog section (357-002/357-001). `slashAction.registry`

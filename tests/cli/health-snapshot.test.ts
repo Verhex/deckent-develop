@@ -352,7 +352,7 @@ describe('renderHealthSnapshot', () => {
     const tr = renderHealthSnapshot(snapshot, 'tr');
     expect(en).toContain('auth:');
     expect(en).toContain('mem:');
-    expect(tr).toContain('oturum:');
+    expect(tr).toContain('kimlik doğrulama:');
     expect(tr).toContain('bellek:');
     expect(en).not.toBe(tr);
   });

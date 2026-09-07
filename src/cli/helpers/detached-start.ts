@@ -55,6 +55,8 @@ export type DetachedSpawnFn = (
 export interface SpawnDetachedOptions {
   /** Project root — resolves the detached runtime-log namespace and the child's cwd. Defaults to process.cwd(). */
   projectRoot?: string;
+  /** Session-resolved language exported to the detached CLI child. */
+  language?: string;
   /** Inject a fake spawn for hermetic tests; omit for the real node:child_process spawn. */
   spawnFn?: DetachedSpawnFn;
   /**
@@ -155,9 +157,11 @@ export function spawnDetachedDeckent(
       cwd: projectRoot,
       // 583/N5: interactive-origin spawns export the live-trace env twin to
       // the child tree (see SpawnDetachedOptions.liveTrace).
-      env: opts.liveTrace === true
-        ? { ...process.env, [LIVE_TRACE_ENV]: '1' }
-        : { ...process.env },
+      env: {
+        ...process.env,
+        ...(opts.liveTrace === true ? { [LIVE_TRACE_ENV]: '1' } : {}),
+        ...(opts.language !== undefined ? { DECKENT_LANGUAGE: opts.language } : {}),
+      },
       windowsHide: true,
     });
   } finally {

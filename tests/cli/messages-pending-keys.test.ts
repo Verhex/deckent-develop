@@ -75,9 +75,9 @@ describe('health.* keys: added as genuine en+tr pairs (Task 15 sole-authority ad
     expect(getMessage('health.mode', 'en')).not.toBe(getMessage('health.mode', 'tr'));
   });
 
-  it('preserves the exact pre-migration text (health-snapshot.test.ts substring assertions stay green)', () => {
+  it('names authentication distinctly from a terminal session and preserves other labels', () => {
     expect(getMessage('health.auth', 'en')).toBe('auth');
-    expect(getMessage('health.auth', 'tr')).toBe('oturum');
+    expect(getMessage('health.auth', 'tr')).toBe('kimlik doğrulama');
     expect(getMessage('health.mem', 'en')).toBe('mem');
     expect(getMessage('health.mem', 'tr')).toBe('bellek');
     expect(getMessage('health.unknown', 'tr')).toBe('bilinmiyor');

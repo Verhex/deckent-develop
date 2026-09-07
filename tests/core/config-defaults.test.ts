@@ -67,6 +67,29 @@ describe('memory_export resolved human-view limits', () => {
   });
 });
 
+describe('repl_surface field-level defaults', () => {
+  it('fills missing default-ON fields while preserving explicit false and extra fields', () => {
+    const resolved = mergeConfigs(
+      { repl_surface: { enabled: false } },
+      { repl_surface: { bg_turns: false, future_surface: 'preserved' } as never },
+    );
+    expect(resolved.repl_surface).toEqual({
+      enabled: false,
+      approvals: true,
+      bg_turns: false,
+      future_surface: 'preserved',
+    });
+  });
+
+  it('project explicit false wins while an omitted sibling keeps its default', () => {
+    const resolved = mergeConfigs(
+      { repl_surface: { enabled: true, approvals: true } },
+      { repl_surface: { approvals: false } },
+    );
+    expect(resolved.repl_surface).toEqual({ enabled: true, approvals: false });
+  });
+});
+
 /**
  * Sprint 192 Task 192-002 (Sprint 191 191-002 carry-over):
  * `timeout.runtime_extension_enabled` default flip false → true regression guard.

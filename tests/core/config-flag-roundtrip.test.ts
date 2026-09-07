@@ -160,10 +160,23 @@ describe('config flag round-trip — 11 opt-in blocks through the REAL loadConfi
     }
   });
 
-  it('explicit { enabled: false } still turns the experience layer OFF (opt-out honored)', async () => {
+  it('partial block defaults missing fields while preserving explicit false', async () => {
     writeProjectConfig(projectRoot, { repl_surface: { enabled: false } });
     const resolved = (await loadConfig(projectRoot)) as unknown as Record<string, unknown>;
-    expect(resolved['repl_surface']).toEqual({ enabled: false });
+    expect(resolved['repl_surface']).toEqual({ enabled: false, approvals: true });
+  });
+
+  it('preserves explicit false and unknown extra fields through the real disk resolver', async () => {
+    writeProjectConfig(projectRoot, {
+      repl_surface: { approvals: false, bg_turns: false, future_surface: 'preserved' },
+    });
+    const resolved = (await loadConfig(projectRoot)) as unknown as Record<string, unknown>;
+    expect(resolved['repl_surface']).toEqual({
+      enabled: true,
+      approvals: false,
+      bg_turns: false,
+      future_surface: 'preserved',
+    });
   });
 
   it('explicit tool_surface { enabled: false } still turns the meta-tool surface OFF (opt-out honored)', async () => {

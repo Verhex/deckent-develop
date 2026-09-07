@@ -83,6 +83,16 @@ describe('slash catalog i18n — buildSlashRegistry(lang)', () => {
     expect(en.map((c) => c.risk)).toEqual(tr.map((c) => c.risk));
   });
 
+  it('native-only busy controls are advertised only when their real handlers are mounted', () => {
+    const legacyNames = buildSlashRegistry('en').map((c) => c.name);
+    expect(legacyNames).not.toEqual(expect.arrayContaining(['/queue', '/interrupt', '/steer']));
+    const nativeNames = buildSlashRegistry('en', { busyControls: true, interrupt: true }).map((c) => c.name);
+    expect(nativeNames).toEqual(expect.arrayContaining(['/queue', '/interrupt', '/steer']));
+    const nativeFlagOff = buildSlashRegistry('en', { interrupt: true }).map((c) => c.name);
+    expect(nativeFlagOff).toContain('/interrupt');
+    expect(nativeFlagOff).not.toEqual(expect.arrayContaining(['/queue', '/steer']));
+  });
+
   it('buildSlashRegistry() without a language resolves through getLanguage()', () => {
     const resolved = getLanguage();
     expect(buildSlashRegistry().map((c) => c.desc)).toEqual(buildSlashRegistry(resolved).map((c) => c.desc));
@@ -103,6 +113,14 @@ describe('slash catalog i18n — /help rendering hands the language through', ()
     const out = renderHelp(en, 'en');
     expect(out).toContain(en.find((c) => c.name === '/help')?.desc);
     expect(out).not.toContain('Kullanılabilir komutları listele');
+  });
+
+  it('deprecated commands and compatibility aliases remain routable but are absent from discovery', () => {
+    const registry = buildSlashRegistry('en');
+    const out = renderHelp(registry, 'en');
+    expect(registry.find((c) => c.name === '/checkpoint')?.agenticTool).toBe('deckent_checkpoint');
+    expect(out).not.toMatch(/^\s*\/checkpoint\b/m);
+    expect(out).not.toMatch(/^\s*\/(?:agent|skill)\b/m);
   });
 
   it('getVisibleCommands(mode, simpleMode, lang) builds the catalog for that language', () => {

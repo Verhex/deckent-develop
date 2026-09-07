@@ -5896,7 +5896,7 @@ const BASE_MESSAGES: MessageMap = {
 
   // ─── Open Health Snapshot (Task 15 — MESSAGES-KEYS, migrated from
   // health-snapshot.ts LOCAL_MESSAGES; text byte-identical, see 351-001) ────
-  'health.auth': { en: 'auth', tr: 'oturum' },
+  'health.auth': { en: 'auth', tr: 'kimlik doğrulama' },
   'health.mcp': { en: 'mcp', tr: 'mcp' },
   'health.mem': { en: 'mem', tr: 'bellek' },
   'health.mode': { en: 'mode', tr: 'mod' },

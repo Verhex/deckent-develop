@@ -17,6 +17,7 @@ import {
   NATIVE_PROVIDER_NAMES,
   type NativeTransportConfig,
   type ProviderError,
+  type ResolvedProvider,
 } from './native-transport.js';
 // TERMINAL-PICKER-002 — the interactive value picker's data + label seams.
 import { buildPickerLabels, PICKER_VIA_KEYS } from './picker-labels.js';
@@ -35,6 +36,22 @@ import { buildNativeToolRegistry, resolveToolSurfaceOptions, resolveRunFlowEnabl
 import { createNativeEngine, resolveCostCeilingUsd, type NativeEngineDeps, type ReplEngine, type ContextSnapshot } from './native-agent-bridge.js';
 import type { ShortcutsPanel } from './input-bar.js';
 export type { ShortcutsPanel } from './input-bar.js';
+
+type BootHealthSelection = { provider: HealthField; model: HealthField; auth: HealthField };
+
+/** Compose health only from the native resolver's already-produced result. */
+export function composeNativeBootHealth(resolved: ResolvedProvider | ProviderError): BootHealthSelection | undefined {
+  // A failed native boot falls back to the live legacy provider. Its localized
+  // native failure is emitted separately; undefined makes health describe the
+  // fallback that will actually answer instead of the failed requested pin.
+  if ('error' in resolved) return undefined;
+  return {
+    provider: { status: 'ok', label: resolved.providerName },
+    model: { status: 'ok', label: resolved.model },
+    // Resolution proves executability, not a completed auth/reachability probe.
+    auth: { status: 'unknown', label: 'unknown', detail: 'not probed' },
+  };
+}
 import { createRunFlowController, type RunFlowController, type RunFlowControllerDeps } from './run-flow-controller.js';
 import { ensureProvidersBootstrapped } from './provider-bootstrap.js';
 import { buildPlanPreviewCardLabels } from './plan-preview-card.js';
@@ -42,6 +59,7 @@ import type { RunFlowMountLabels, DoSlashLabels } from './app.js';
 import { renderRunsCommand, buildInboxLabels, collectInboxRows } from './run-flow-inbox.js';
 import { executeInboxDecision } from '../commands/runs.js';
 import type { ResolvedConfig } from '../../core/types.js';
+import type { HealthField } from '../helpers/health-snapshot.js';
 import { buildLedgerRecorder, buildTurnRecorder, composeTurnRecorders, resolveTraceEnabled } from './trace-wire.js';
 import { composeSystemPrompt } from '../../agent/identity.js';
 import { resolveScratchRoot } from '../../agent/scratch-checkpoint.js';
@@ -1107,6 +1125,7 @@ export async function runInkRepl(
   providerName: string,
   rebuild: ProviderRebuild,
   registerTeardown: ReplTeardownRegistrar,
+  onBootSelection?: (selection?: BootHealthSelection) => Promise<void>,
 ): Promise<void> {
   // Project config is loaded once here and reused by the surface wire below —
   // a load failure degrades to defaults (lang=en, every surface flag off).
@@ -1295,7 +1314,7 @@ export async function runInkRepl(
     return answer !== 'n';
   };
 
-  const cliDispatcher = createCliToolDispatcher();
+  const cliDispatcher = createCliToolDispatcher({ language: lang });
   // REPL-575 K5 — localized confirm-prompt summaries (i18n-FIRST).
   const execDispatcher = createToolExecDispatcher({ cwd: () => process.cwd(), confirm: askConfirm, labels: buildToolExecLabels(lang) });
 
@@ -1346,6 +1365,7 @@ export async function runInkRepl(
   // registration-then-set precedent above).
   let runFlowResultSink: ((event: ChatTurnBgEvent) => void) | null = null;
   let runFlowResultWatch: RunCompletionWatchHandle | undefined;
+  let bootHealthSelection: BootHealthSelection | undefined;
   if (isNativeAgentSelected(process.argv.slice(2), projectCfg)) {
     const cfg = await loadConfig().catch(() => ({} as Record<string, unknown>));
     const nativeCfg: NativeTransportConfig = {
@@ -1366,6 +1386,7 @@ export async function runInkRepl(
       // below) — worded as such, never as a "switch" (TERMINAL-TOOLS-007).
       process.stdout.write(`\n${localizeNativeError(resolved, lang, 'boot')}\n`);
     } else {
+      bootHealthSelection = composeNativeBootHealth(resolved);
       let mcpBridge: import('./native-tool-registry.js').NativeMcpBridge | undefined;
       try {
         // 387-013 MCP-CLIENT-GATE wired for real (REPL-575 K1-C smart-split,
@@ -1633,6 +1654,10 @@ export async function runInkRepl(
     }
   }
 
+  // Health is emitted only after the native authority's single boot resolution.
+  // Undefined preserves the legacy host selection/probe path.
+  await onBootSelection?.(bootHealthSelection);
+
   // NATIVE-BUDGET-RENEWAL (557-002) — register `/renew` on the native path ONLY.
   // The command is answered by the wrapper (engine seam + localized confirmation,
   // no provider turn); the legacy loop path builds no engine here and therefore
@@ -1694,7 +1719,10 @@ export async function runInkRepl(
       dispatcher={dispatcher}
       providerName={nativeSelection?.provider ?? providerName}
       cwd={process.cwd()}
-      slashRegistry={buildSlashRegistry(lang)}
+      slashRegistry={buildSlashRegistry(lang, {
+        busyControls: replSurfaceEnabled && nativeEngine !== undefined,
+        interrupt: nativeEngine?.cancelTurn !== undefined,
+      })}
       initialSelection={nativeSelection ?? switcher.current()}
       onSwitch={(sel) => {
         // Native engine active → the switch must retarget the REAL backend the

@@ -15,7 +15,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { buildHealthSnapshot, renderHealthSnapshot } from '../../src/cli/helpers/health-snapshot.js';
-import { localizeNativeError, NATIVE_ERROR_CODES } from '../../src/cli/repl/run.js';
+import { composeNativeBootHealth, localizeNativeError, NATIVE_ERROR_CODES } from '../../src/cli/repl/run.js';
+import { resolveNativeProvider } from '../../src/cli/repl/native-transport.js';
 import { getMessage, getMessageLanguages } from '../../src/cli/helpers/messages.js';
 import type { ResolvedConfig } from '../../src/core/config-types.js';
 
@@ -41,6 +42,62 @@ const deps = (config: ResolvedConfig, extra: Record<string, unknown> = {}) => ({
 });
 
 describe('buildHealthSnapshot — provider is the REPL\'s resolved provider, not a second config read', () => {
+  it('composes health from the canonical native resolver result without another selection', () => {
+    const resolved = resolveNativeProvider({}, {
+      native_provider: 'ollama',
+      native_model: 'qwen2.5-coder',
+      ollama_host: 'http://127.0.0.1:11434',
+    }, '/tmp/x');
+    expect('error' in resolved).toBe(false);
+    expect(composeNativeBootHealth(resolved)).toEqual({
+      provider: { status: 'ok', label: 'ollama' },
+      model: { status: 'ok', label: 'qwen2.5-coder:7b' },
+      auth: { status: 'unknown', label: 'unknown', detail: 'not probed' },
+    });
+  });
+
+  it('uses the actual legacy fallback health context after a native resolution failure', () => {
+    expect(composeNativeBootHealth({
+      error: 'unsupported', errorCode: 'unsupported-native-provider', provider: 'codex',
+    })).toBeUndefined();
+  });
+
+  it('consumes native boot evidence without re-selecting or re-probing auth', async () => {
+    let probes = 0;
+    const snap = await buildHealthSnapshot('/tmp/x', {
+      ...deps(cfg({ native_provider: 'ollama', native_model: 'qwen2.5-coder' }), {
+        probeAuthFn: async () => { probes += 1; return { state: 'logged-in' as const }; },
+      }),
+      provider: 'claude',
+      resolvedSelection: {
+        provider: { status: 'ok', label: 'ollama' },
+        model: { status: 'ok', label: 'qwen2.5-coder' },
+        auth: { status: 'unknown', label: 'unknown', detail: 'not probed' },
+      },
+    } as never);
+    expect(snap.provider).toEqual({ status: 'ok', label: 'ollama' });
+    expect(snap.model).toEqual({ status: 'ok', label: 'qwen2.5-coder' });
+    expect(snap.auth).toEqual({ status: 'unknown', label: 'unknown', detail: 'not probed' });
+    expect(probes).toBe(0);
+  });
+
+  it('keeps a failed explicit native selection unknown and skips auth', async () => {
+    let probes = 0;
+    const snap = await buildHealthSnapshot('/tmp/x', {
+      ...deps(cfg({ native_provider: 'codex' }), {
+        probeAuthFn: async () => { probes += 1; return { state: 'logged-in' as const }; },
+      }),
+      resolvedSelection: {
+        provider: { status: 'unknown', label: 'codex', detail: 'unsupported-native-provider' },
+        model: { status: 'unknown', label: 'unknown', detail: 'unsupported-native-provider' },
+        auth: { status: 'unknown', label: 'unknown', detail: 'unsupported-native-provider' },
+      },
+    } as never);
+    expect(snap.provider.status).toBe('unknown');
+    expect(snap.model.status).toBe('unknown');
+    expect(snap.auth.status).toBe('unknown');
+    expect(probes).toBe(0);
+  });
   it('an injected provider (entry.ts providerName, env override included) wins over config', async () => {
     const snap = await buildHealthSnapshot('/tmp/x', { ...deps(cfg({ chat_provider: 'claude' })), provider: 'ollama' } as never);
     expect(snap.provider).toMatchObject({ status: 'ok', label: 'ollama' });
@@ -57,6 +114,11 @@ describe('buildHealthSnapshot — model never borrows another provider\'s id', (
     const snap = await buildHealthSnapshot('/tmp/x', { ...deps(cfg({})), provider: 'claude' } as never);
     expect(snap.model.status).toBe('ok');
     expect(snap.model.label).toContain('claude-');
+  });
+
+  it('does not duplicate identical registry id/apiId labels', async () => {
+    const snap = await buildHealthSnapshot('/tmp/x', { ...deps(cfg({})), provider: 'claude' } as never);
+    expect(snap.model.label).not.toMatch(/^(.+) \(\1\)$/);
   });
 
   it('a non-registry provider shows its configured native_model', async () => {
@@ -95,6 +157,8 @@ describe('boot-time native engine failure is worded as a boot outcome, not a swi
     const run = readFileSync(join(ROOT, 'src/cli/repl/run.tsx'), 'utf-8');
     expect(run).toMatch(/localizeNativeError\(resolved, lang, 'boot'\)/);
     const entry = readFileSync(join(ROOT, 'src/cli/entry.ts'), 'utf-8');
-    expect(entry).toMatch(/buildHealthSnapshot\(healthRoot, \{ provider: providerName \}\)/);
+    expect(entry).toMatch(/terminalSurface\.surface !== 'ink'\) await emitHealth\(\)/);
+    expect(entry).toMatch(/registerReplTeardown,\s*emitHealth\)/);
+    expect(run).toMatch(/resolveNativeProvider[\s\S]*bootHealthSelection[\s\S]*onBootSelection/);
   });
 });

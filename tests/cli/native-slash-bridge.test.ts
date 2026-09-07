@@ -18,12 +18,13 @@ import { describe, it, expect } from 'vitest';
 import { tmpdir } from 'node:os';
 import { mkdtempSync, writeFileSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { resolveNativeSlash } from '../../src/cli/repl/app.js';
+import { resolveNativeSlash, resolvePendingSlashInput } from '../../src/cli/repl/app.js';
 import { buildSlashRegistry } from '../../src/cli/commands/chat-slash-registry.js';
 import { getMessage } from '../../src/cli/helpers/messages.js';
 import { createNativeEngine } from '../../src/cli/repl/native-agent-bridge.js';
 import { buildNativeToolRegistry } from '../../src/cli/repl/native-tool-registry.js';
 import type { ProviderAdapter, ProviderEvent } from '../../src/agent/provider-tooluse/types.js';
+import { slashMenuMatches } from '../../src/cli/repl/input-bar.js';
 
 function scripted(scripts: ProviderEvent[][]): ProviderAdapter {
   let turn = 0;
@@ -47,6 +48,14 @@ const REGISTRY_BY_LANG = { en: buildSlashRegistry('en'), tr: buildSlashRegistry(
 const ctx = (cwd: string, lang: 'en' | 'tr' = 'en') => ({ registry: REGISTRY_BY_LANG[lang], cwd, lang, chatMode: 'user' as const });
 
 describe('resolveNativeSlash', () => {
+  it('bare /recall resolves to a localized typed prompt instead of dispatch or provider passthrough', () => {
+    expect(resolveNativeSlash('/recall', ctx(tmpdir(), 'tr'))).toEqual({
+      kind: 'prompt',
+      command: '/recall',
+      argument: 'query',
+      text: getMessage('cli.memcat.recall.arg.query', 'tr'),
+    });
+  });
   it('passes through plain chat text (not a slash line)', () => {
     const result = resolveNativeSlash('what does this function do?', ctx(tmpdir()));
     expect(result).toEqual({ kind: 'passthrough' });
@@ -89,6 +98,36 @@ describe('resolveNativeSlash', () => {
     expect(result.text).toContain('Kullanılabilir komutları listele');
     expect(result.text).not.toContain(getMessage('tui.help.commands_header', 'en'));
     expect(result.text.split('\n').length).toBeGreaterThan(10);
+  });
+
+  it('/help consumes the mounted capability registry and hides routable compatibility entries', () => {
+    const registry = buildSlashRegistry('en', { busyControls: true, interrupt: true });
+    const result = resolveNativeSlash('/help', { ...ctx(tmpdir()), registry });
+    expect(result.kind).toBe('reply');
+    if (result.kind !== 'reply') throw new Error('unreachable');
+    expect(result.text).toContain('/interrupt');
+    expect(result.text).toContain('/queue');
+    expect(result.text).toContain('/steer');
+    const rows = result.text.split('\n').map((line) => line.trim());
+    for (const hidden of ['/checkpoint', '/agent', '/skill']) {
+      expect(rows.some((row) => row === hidden || row.startsWith(`${hidden} `) || row.endsWith(` ${hidden}`))).toBe(false);
+    }
+  });
+
+  it('slash completion menu hides compatibility entries while direct routing remains available', () => {
+    const registry = buildSlashRegistry('en');
+    expect(slashMenuMatches(registry, '/check').map((entry) => entry.name)).not.toContain('/checkpoint');
+    expect(slashMenuMatches(registry, '/agen').map((entry) => entry.name)).toEqual(['/agents']);
+    expect(resolveNativeSlash('/checkpoint', { ...ctx(tmpdir()), registry })).toEqual({
+      kind: 'dispatch', tool: 'deckent_checkpoint', args: {},
+    });
+  });
+
+  it('/help does not advertise native busy controls when the mounted registry lacks them', () => {
+    const result = resolveNativeSlash('/help', ctx(tmpdir()));
+    expect(result.kind).toBe('reply');
+    if (result.kind !== 'reply') throw new Error('unreachable');
+    expect(result.text).not.toMatch(/^\s*\/(?:interrupt|queue|steer)\b/m);
   });
 
   it('/kill resolves to a real agentic dispatch (not a no-op enqueue)', () => {
@@ -156,6 +195,27 @@ describe('resolveNativeSlash', () => {
   it('/autonomous status resolves to a read-only agentic dispatch', () => {
     const result = resolveNativeSlash('/autonomous status', ctx(tmpdir()));
     expect(result).toEqual({ kind: 'dispatch', tool: 'deckent_autonomous', args: { action: 'status' } });
+  });
+});
+
+describe('pending native slash argument', () => {
+  const pending = { command: '/recall', argument: 'query' };
+
+  it('synthesizes one canonical command line for normal dispatch and gating', () => {
+    expect(resolvePendingSlashInput('docker heartbeat details', pending)).toEqual({
+      kind: 'complete', line: '/recall docker heartbeat details',
+    });
+  });
+
+  it('releases every canonical control, including argument-bearing steer', () => {
+    for (const line of ['/exit', '/quit', ':exit', ':quit', '/clear', '/interrupt', '/queue', '/steer', '/steer use the safer path']) {
+      expect(resolvePendingSlashInput(line, pending)).toEqual({ kind: 'control', line });
+    }
+  });
+
+  it('cancels locally and leaves non-prompt input unchanged', () => {
+    expect(resolvePendingSlashInput('/cancel', pending)).toEqual({ kind: 'cancel' });
+    expect(resolvePendingSlashInput('/status', null)).toEqual({ kind: 'none', line: '/status' });
   });
 });
 

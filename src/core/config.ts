@@ -2811,7 +2811,11 @@ export async function loadConfig(projectRoot?: string, options?: { force?: boole
     // (live footer, mode indicator, approval card) ships ON by default — months
     // of UX stayed invisible behind absent config blocks (user-truth-audit §2).
     // An explicit { enabled: false } still turns it off (opt-out, not opt-in).
-    repl_surface: config.repl_surface ?? { enabled: true, approvals: true },
+    repl_surface: {
+      ...(config.repl_surface ?? {}),
+      enabled: config.repl_surface?.enabled ?? true,
+      approvals: config.repl_surface?.approvals ?? true,
+    },
     // TOOL-QB-FLIP (376-001, continuing #492's default-flip package): the
     // progressive-disclosure meta-tool surface ships ON by default too — same
     // opt-out rationale as repl_surface above (explicit { enabled: false } still
@@ -3781,7 +3785,11 @@ export function mergeConfigs(
     // (live footer, mode indicator, approval card) ships ON by default — months
     // of UX stayed invisible behind absent config blocks (user-truth-audit §2).
     // An explicit { enabled: false } still turns it off (opt-out, not opt-in).
-    repl_surface: config.repl_surface ?? { enabled: true, approvals: true },
+    repl_surface: {
+      ...(config.repl_surface ?? {}),
+      enabled: config.repl_surface?.enabled ?? true,
+      approvals: config.repl_surface?.approvals ?? true,
+    },
     // TOOL-QB-FLIP (376-001, continuing #492's default-flip package): the
     // progressive-disclosure meta-tool surface ships ON by default too — same
     // opt-out rationale as repl_surface above (explicit { enabled: false } still

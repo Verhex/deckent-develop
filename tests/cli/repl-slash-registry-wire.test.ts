@@ -204,6 +204,43 @@ describe('runChatNativeLoop — slash-registry wire (T-222-005)', () => {
     expect(args).toEqual({ query: 'docker heartbeat' });
     expect(output).toHaveBeenCalledWith('{"found":2}');
   });
+
+  it('bare /recall prompts locally, then dispatches the next full query without a provider turn', async () => {
+    const { adapter, sendSpy } = queuedProvider([]);
+    const { dispatcher, dispatchSpy } = fakeDispatcher('memory-hit');
+    const output = vi.fn();
+    await runChatNativeLoop(baseOpts({
+      provider: adapter,
+      dispatcher,
+      input: lines('/recall', 'docker heartbeat details'),
+      output,
+      lang: 'tr',
+    }));
+    expect(sendSpy).not.toHaveBeenCalled();
+    expect(output).toHaveBeenNthCalledWith(1, getMessage('cli.memcat.recall.arg.query', 'tr'));
+    expect(dispatchSpy).toHaveBeenCalledWith('deckent_memory_query', { query: 'docker heartbeat details' });
+  });
+
+  it('bare /recall followed by /cancel performs no provider or tool call', async () => {
+    const { adapter, sendSpy } = queuedProvider([]);
+    const { dispatcher, dispatchSpy } = fakeDispatcher();
+    await runChatNativeLoop(baseOpts({ provider: adapter, dispatcher, input: lines('/recall', '/cancel') }));
+    expect(sendSpy).not.toHaveBeenCalled();
+    expect(dispatchSpy).not.toHaveBeenCalled();
+  });
+
+  it('bare /recall does not capture canonical /clear or /exit controls as a query', async () => {
+    const { adapter, sendSpy } = queuedProvider([]);
+    const { dispatcher, dispatchSpy } = fakeDispatcher();
+    const transcript = await runChatNativeLoop(baseOpts({
+      provider: adapter,
+      dispatcher,
+      input: lines('/recall', '/clear', '/recall', '/exit'),
+    }));
+    expect(sendSpy).not.toHaveBeenCalled();
+    expect(dispatchSpy).not.toHaveBeenCalled();
+    expect(transcript).toEqual([]);
+  });
 });
 
 // WIRE-016: physically merged from tests/cli/slash-mode-wire.test.ts.

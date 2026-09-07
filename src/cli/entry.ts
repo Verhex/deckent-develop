@@ -711,14 +711,14 @@ export async function launchDefaultRepl(): Promise<void> {
   // TERMINAL-TOOLS-002 — ONE session-language resolution for every line this
   // boot path emits (health line, banner hint, `/` menu, loop, spinner, ticker).
   const replLang = getLangFromConfig(healthRoot);
-  try {
-    // TERMINAL-TOOLS-007 — the snapshot names the provider THIS boot resolved
-    // (env override included), never a second, divergent config read.
-    const snapshot = await buildHealthSnapshot(healthRoot, { provider: providerName });
-    process.stdout.write(`${renderHealthSnapshot(snapshot, replLang)}\n`);
-  } catch {
-    // best-effort UX chrome only
-  }
+  const emitHealth = async (resolvedSelection?: import('./helpers/health-snapshot.js').HealthSnapshotDeps['resolvedSelection']): Promise<void> => {
+    try {
+      // TERMINAL-TOOLS-007 — the snapshot names the provider THIS boot resolved
+      // (env override included), never a second, divergent config read.
+      const snapshot = await buildHealthSnapshot(healthRoot, resolvedSelection ? { resolvedSelection } : { provider: providerName });
+      process.stdout.write(`${renderHealthSnapshot(snapshot, replLang)}\n`);
+    } catch { /* best-effort UX chrome only */ }
+  };
 
   // Welcome chrome. The banner shows `deckent  provider  dir` + the /help hint.
   // (Sprint 222's separate status-line print was dropped here: at boot
@@ -730,6 +730,10 @@ export async function launchDefaultRepl(): Promise<void> {
   // terminal-surface.ts): ink | readline | line. `isTTY` alone used to admit
   // the Ink surface on TERM=dumb (cursor control the terminal cannot honor).
   const terminalSurface = resolveTerminalSurfaceFromProcess();
+
+  // The native Ink path emits only after its single authoritative transport
+  // resolution. Legacy/pipe paths retain their existing resolved host truth.
+  if (terminalSurface.surface !== 'ink') await emitHealth();
 
   // Sprint 224 — Ink REPL (React-for-CLI, the enterprise-grade native foundation
   // that replaces the hand-rolled raw-ANSI TUI). Dynamic import keeps Ink/React
@@ -748,7 +752,8 @@ export async function launchDefaultRepl(): Promise<void> {
     const { runInkRepl } = await import('./repl/run.js');
     await runInkRepl(provider, providerName, (sel) =>
       buildReplProvider(sel.provider as ReplProviderName, sel.model ? { model: sel.model } : {}),
-      registerReplTeardown);
+      registerReplTeardown,
+      emitHealth);
     return;
   }
 

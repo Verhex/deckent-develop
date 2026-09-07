@@ -111,9 +111,9 @@ export function recordHistoryEntry(projectRoot: string, controller: HistoryContr
 
 /** Interactive slash menu is open when the buffer is a bare `/command` prefix
  * (no space/args yet) and at least one command matches. */
-function slashMenuMatches(registry: SlashRegistry | undefined, buffer: string): SlashCommand[] {
+export function slashMenuMatches(registry: SlashRegistry | undefined, buffer: string): SlashCommand[] {
   if (!registry || !buffer.startsWith('/') || buffer.includes(' ')) return [];
-  return filterSlashCommands(registry, buffer);
+  return filterSlashCommands(registry.filter((command) => command.discoverable !== false), buffer);
 }
 
 /** TERM-AT-REF (583/N2b) — the `@` menu's open-state resolution (mirrors

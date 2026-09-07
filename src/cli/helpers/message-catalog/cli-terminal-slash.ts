@@ -271,6 +271,9 @@ export const CLI_TERMINAL_SLASH_MESSAGES: MessageFamily = Object.freeze({
   'tui.slash.desc.help': { en: 'List available commands', tr: 'Kullanılabilir komutları listele' },
   'tui.slash.desc.status': { en: 'Show the active sprint status', tr: 'Aktif sprint durumunu göster' },
   'tui.slash.desc.recall': { en: 'Search memory (e.g. /recall docker)', tr: 'Hafızada ara (örn: /recall docker)' },
+  'tui.slash.desc.queue': { en: 'Show active-turn and background queue status', tr: 'Aktif tur ve arka plan kuyruk durumunu göster' },
+  'tui.slash.desc.interrupt': { en: 'Interrupt the active turn', tr: 'Aktif turu durdur' },
+  'tui.slash.desc.steer': { en: 'Steer the active turn (e.g. /steer <message>)', tr: 'Aktif turu yönlendir (örn: /steer <mesaj>)' },
   'tui.slash.desc.plan': { en: 'Plan a sprint', tr: 'Sprint planla' },
   'tui.slash.desc.do': {
     en: 'Plan and run a goal (e.g. /do add a health endpoint)',

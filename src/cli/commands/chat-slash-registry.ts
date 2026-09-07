@@ -61,6 +61,12 @@ export interface SlashCommand {
    */
   category?: CommandCategory;
   risk?: CommandRisk;
+  /** False keeps a compatibility alias routable without advertising it. */
+  discoverable?: boolean;
+  /** Typed argument request consumed by an interactive surface before dispatch. */
+  requiredArgument?: { readonly name: string; readonly input: 'text' };
+  /** Command is advertised only where its real local handler is mounted. */
+  requiresCapability?: 'busyControls' | 'interrupt';
 }
 
 /** Immutable list of slash commands. */
@@ -71,6 +77,7 @@ export type SlashAction =
   | { action: 'help'; registry: SlashRegistry }
   | { action: 'exit' }
   | { action: 'clear' }
+  | { action: 'prompt'; command: string; argument: string; input: 'text'; messageKey: string }
   | { action: 'agentic'; tool: string; args: Record<string, unknown> }
   /**
    * Sprint 269 T-269-003 — i18n-safe informational/error reply. The registry
@@ -142,7 +149,11 @@ const SLASH_CATALOG: readonly SlashCatalogEntry[] = [
     descKey: 'tui.slash.desc.recall',
     agenticTool: 'deckent_memory_query',
     agenticArgs: {},
+    requiredArgument: { name: 'query', input: 'text' },
   },
+  { name: '/queue', descKey: 'tui.slash.desc.queue', requiresCapability: 'busyControls' },
+  { name: '/interrupt', descKey: 'tui.slash.desc.interrupt', requiresCapability: 'interrupt' },
+  { name: '/steer', descKey: 'tui.slash.desc.steer', requiresCapability: 'busyControls' },
   {
     name: '/plan',
     descKey: 'tui.slash.desc.plan',
@@ -208,10 +219,24 @@ const SLASH_CATALOG: readonly SlashCatalogEntry[] = [
     agenticArgs: {},
   },
   {
+    name: '/agent',
+    descKey: 'tui.slash.desc.agents',
+    agenticTool: 'deckent_agent_list',
+    agenticArgs: {},
+    discoverable: false,
+  },
+  {
     name: '/skills',
     descKey: 'tui.slash.desc.skills',
     agenticTool: 'deckent_skill_list',
     agenticArgs: {},
+  },
+  {
+    name: '/skill',
+    descKey: 'tui.slash.desc.skills',
+    agenticTool: 'deckent_skill_list',
+    agenticArgs: {},
+    discoverable: false,
   },
   {
     name: '/features',
@@ -275,6 +300,7 @@ const SLASH_CATALOG: readonly SlashCatalogEntry[] = [
     descKey: 'tui.slash.desc.checkpoint',
     agenticTool: 'deckent_checkpoint',
     agenticArgs: {},
+    discoverable: false,
   },
   {
     name: '/kill',
@@ -420,9 +446,14 @@ const SLASH_CATALOG: readonly SlashCatalogEntry[] = [
  * Returns a new immutable array on each call. Callers should cache the result
  * for the REPL session lifetime rather than calling on every keystroke.
  */
-export function buildSlashRegistry(lang?: string): SlashRegistry {
+export function buildSlashRegistry(
+  lang?: string,
+  capabilities: { readonly busyControls?: boolean; readonly interrupt?: boolean } = {},
+): SlashRegistry {
   const resolvedLang = lang ?? getLanguage();
-  return SLASH_CATALOG.map((entry) => ({ ...entry, desc: getMessage(entry.descKey, resolvedLang) }));
+  return SLASH_CATALOG
+    .filter((entry) => entry.requiresCapability === undefined || capabilities[entry.requiresCapability] === true)
+    .map((entry) => ({ ...entry, desc: getMessage(entry.descKey, resolvedLang) }));
 }
 
 /**
@@ -436,7 +467,7 @@ export function buildSlashRegistry(lang?: string): SlashRegistry {
 export function renderHelp(registry: SlashRegistry, lang?: string): string {
   const lines: string[] = [getMessage('tui.help.commands_header', lang ?? getLanguage())];
   for (const cmd of registry) {
-    if (cmd.name === '/quit') continue; // alias — skip in list, shown in /exit desc
+    if (cmd.name === '/quit' || cmd.discoverable === false) continue;
     lines.push(`  ${cmd.name.padEnd(10)} ${cmd.desc}`);
   }
   return lines.join('\n');
@@ -456,11 +487,12 @@ export function renderHelp(registry: SlashRegistry, lang?: string): string {
 export function slashCompleter(line: string): [string[], string] {
   if (!line.startsWith('/')) return [[], line];
   const lower = line.toLowerCase();
-  const names = buildSlashRegistry()
+  const discoverableNames = buildSlashRegistry()
+    .filter((c) => c.discoverable !== false)
     .map((c) => c.name)
-    .filter((n) => n !== '/quit'); // alias gizli
-  const hits = names.filter((n) => n.startsWith(lower));
-  return [hits.length > 0 ? hits : names, line];
+    .filter((n) => n !== '/quit');
+  const hits = discoverableNames.filter((n) => n.startsWith(lower));
+  return [hits.length > 0 ? hits : discoverableNames, line];
 }
 
 // ─── Subaction parsers (Sprint 269 T-269-003) ───────────────────────────────
@@ -805,6 +837,15 @@ export function resolveSlash(
 
   const entry = registry.find((r) => r.name.toLowerCase() === name);
   if (entry?.agenticTool) {
+    if (rest.length === 0 && entry.requiredArgument) {
+      return {
+        action: 'prompt',
+        command: entry.name,
+        argument: entry.requiredArgument.name,
+        input: entry.requiredArgument.input,
+        messageKey: 'cli.memcat.recall.arg.query',
+      };
+    }
     const args: Record<string, unknown> = { ...(entry.agenticArgs ?? {}) };
     if (entry.agenticTool === 'deckent_memory_query') {
       if (rest.length > 0) args['query'] = rest.join(' ');

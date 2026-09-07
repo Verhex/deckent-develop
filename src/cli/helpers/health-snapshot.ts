@@ -68,6 +68,16 @@ export interface HealthSnapshotDeps {
    * line re-read config and could name a provider that would never answer.
    */
   provider?: string;
+  /**
+   * Boot selection already resolved by the native transport authority. When
+   * present, health consumes this evidence verbatim and MUST NOT re-select a
+   * provider or re-probe auth merely to paint the status line.
+   */
+  resolvedSelection?: {
+    provider: HealthField;
+    model: HealthField;
+    auth: HealthField;
+  };
 }
 
 // ─── Timing budget ───────────────────────────────────────────────────────
@@ -144,7 +154,7 @@ function resolveModelField(config: ResolvedConfig | undefined, providerLabel: st
   try {
     const equivalentId = modelRegistry.getEquivalent(brainModel, providerLabel as 'claude' | 'codex' | 'gemini');
     const def = modelRegistry.get(equivalentId) ?? modelRegistry.resolve(equivalentId, { register: false });
-    return { status: 'ok', label: `${def.id} (${def.apiId})` };
+    return { status: 'ok', label: def.id === def.apiId ? def.id : `${def.id} (${def.apiId})` };
   } catch (err) {
     return { status: 'unknown', label: UNKNOWN_LABEL, detail: errorDetail(err) };
   }
@@ -264,13 +274,13 @@ export async function buildHealthSnapshot(
     config = undefined;
   }
 
-  const provider = resolveProviderField(config, deps.provider);
-  const model = resolveModelField(config, provider.label);
+  const provider = deps.resolvedSelection?.provider ?? resolveProviderField(config, deps.provider);
+  const model = deps.resolvedSelection?.model ?? resolveModelField(config, provider.label);
   const mcp = resolveMcpField(loadMcpServersFn, root);
   const memory = resolveMemoryField(root, config, readMemoryCountFn);
   const mode = resolveModeField(config);
   const sessions = resolveSessionsField(root, listActiveSessionsFn);
-  const auth = await resolveAuthField(probeAuthFn, provider);
+  const auth = deps.resolvedSelection?.auth ?? await resolveAuthField(probeAuthFn, provider);
 
   return { provider, model, auth, mcp, memory, mode, sessions, cwd: root, elapsedMs: Date.now() - start };
 }

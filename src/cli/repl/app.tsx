@@ -952,8 +952,28 @@ export type { CaretStyle } from './input-bar.js';
  */
 export type NativeSlashResult =
   | { kind: 'reply'; text: string }
+  | { kind: 'prompt'; command: string; argument: string; text: string }
   | { kind: 'dispatch'; tool: string; args: Record<string, unknown> }
   | { kind: 'passthrough' };
+
+export type PendingSlashInputDecision =
+  | { kind: 'none'; line: string }
+  | { kind: 'cancel' }
+  | { kind: 'control'; line: string }
+  | { kind: 'complete'; line: string };
+
+/** Resolve one submitted line against a pending typed slash argument. */
+export function resolvePendingSlashInput(
+  line: string,
+  pending: { command: string; argument: string } | null,
+): PendingSlashInputDecision {
+  if (!pending) return { kind: 'none', line };
+  if (line.toLowerCase() === '/cancel') return { kind: 'cancel' };
+  if (/^(?:\/(?:exit|quit|clear|interrupt|queue)|\/steer(?:\s+.*)?|:(?:exit|quit))$/i.test(line)) {
+    return { kind: 'control', line };
+  }
+  return { kind: 'complete', line: `${pending.command} ${line}` };
+}
 
 export function resolveNativeSlash(
   trimmed: string,
@@ -967,6 +987,14 @@ export function resolveNativeSlash(
     return { kind: 'reply', text: buildInterrogateOutput(ctx.cwd, ctx.lang) };
   }
   const action = resolveSlash(trimmed, ctx.registry);
+  if (action.action === 'prompt') {
+    return {
+      kind: 'prompt',
+      command: action.command,
+      argument: action.argument,
+      text: resolveNativeSlashText(action, { chatMode: ctx.chatMode, lang: ctx.lang, directivesRoot: ctx.cwd }),
+    };
+  }
   if (action.action === 'agentic') return { kind: 'dispatch', tool: action.tool, args: action.args };
   if (action.action === 'help' || action.action === 'message' || action.action === 'show-directives') {
     return {
@@ -1677,6 +1705,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // TERMINAL-PICKER-002 — the open value picker (null = closed). Opened by a
   // bare selection command; closed by Esc / commit / interrupt.
   const [picker, setPicker] = useState<{ kind: PickerKind; spec: PickerSpec } | null>(null);
+  const pendingSlashPrompt = useRef<{ command: string; argument: string } | null>(null);
   // TERMINAL-PROVIDER-EVIDENCE-001 — when evidence lands while a model /
   // provider picker is open, rebuild its spec in place: the card keeps its
   // identity (key = kind) and realigns the cursor by candidate id.
@@ -2026,9 +2055,18 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   };
 
   const handleSubmit = async (line: string): Promise<void> => {
-    const trimmed = line.trim();
+    let trimmed = line.trim();
     if (trimmed.length === 0) return;
     if (['/exit', '/quit', ':exit', ':quit'].includes(trimmed.toLowerCase())) { exit(); return; }
+    const promptInput = resolvePendingSlashInput(trimmed, pendingSlashPrompt.current);
+    if (promptInput.kind !== 'none') {
+      pendingSlashPrompt.current = null;
+      if (promptInput.kind === 'cancel') return;
+      // Re-enter the ONE canonical command path below. This preserves the
+      // normal mode/risk gate and transcript behavior instead of creating a
+      // second direct-dispatch authority for prompted arguments.
+      trimmed = promptInput.line;
+    }
     // TERMINAL-TOOLS-011 — `!<cmd>` shell passthrough (parity: Claude Code /
     // Codex / Hermes). Gated by the Ask/Run/Control ladder (Çalıştır), then
     // by the SAME exec dispatcher every bash tool call uses (approval modes,
@@ -2258,10 +2296,14 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       const chatModeNow: ChatMode = termMode.mode === 'control' ? 'enterprise' : 'user';
       const bridged = resolveNativeSlash(trimmed, { registry: slashRegistry, cwd, lang: lang ?? 'en', chatMode: chatModeNow });
       if (bridged.kind !== 'passthrough') {
-        pushTurn('user', trimmed);
-        if (bridged.kind === 'reply') {
+        if (bridged.kind === 'prompt') {
+          pendingSlashPrompt.current = { command: bridged.command, argument: bridged.argument };
+          pushTurn('seg', bridged.text);
+        } else if (bridged.kind === 'reply') {
+          pushTurn('user', trimmed);
           pushTurn('seg', bridged.text);
         } else {
+          pushTurn('user', trimmed);
           // 'dispatch' — reuse the SAME confirm-gated `dispatcher` the legacy
           // engine already uses for slash-triggered CLI-bridge tools
           // (run.tsx's dispatcher: classifyTool tier → askConfirm/
@@ -2345,6 +2387,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // was gated behind repl_surface.enabled AND fired even while a menu was
   // being closed with the same key.
   const handleEscapeInterrupt = (): void => {
+    if (pendingSlashPrompt.current) { pendingSlashPrompt.current = null; return; }
     if (!working || confirm !== null) return;
     const r = applyInterrupt(busyCtl.current, cancelActiveTurn);
     busyCtl.current = r.state;
@@ -2365,6 +2408,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
     return () => clearTimeout(id);
   }, [interruptHint]);
   const handleInterrupt = (signal: 'int' | 'eof', draftNonEmpty: boolean): void => {
+    pendingSlashPrompt.current = null;
     const now = Date.now();
     const decision = resolveCtrlC({ signal, draftNonEmpty, working, armedAt: ctrlCArmedAt.current, now });
     if (decision.kind === 'exit') { exit(); return; }

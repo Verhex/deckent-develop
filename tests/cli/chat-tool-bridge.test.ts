@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   createCliToolDispatcher,
   cliArgsFor,
+  resolveCliChildEnv,
   type CliToolSpawnFn,
 } from '../../src/cli/commands/chat-tool-bridge.js';
 
@@ -9,6 +10,17 @@ import {
 // the suite is hermetic (no dist/, no deckent state, no network).
 
 describe('createCliToolDispatcher — chat-tool-bridge.ts', () => {
+  it('propagates the resolved session language through the canonical child env', () => {
+    vi.stubEnv('DECKENT_LANGUAGE', 'en');
+    expect(resolveCliChildEnv('tr', { PATH: '/bin', DECKENT_LANGUAGE: 'en' })).toEqual({
+      PATH: '/bin',
+      DECKENT_LANGUAGE: 'tr',
+    });
+    expect(resolveCliChildEnv('en', { DECKENT_LANG: 'tr' }).DECKENT_LANGUAGE).toBe('en');
+    vi.stubEnv('DECKENT_LANGUAGE', 'tr');
+    expect(resolveCliChildEnv('en', {}).DECKENT_LANGUAGE).toBe('en');
+    vi.unstubAllEnvs();
+  });
   it('deckent_status → spawns the `status` subcommand and returns its stdout', async () => {
     const spawnFn = vi.fn().mockResolvedValue('Sprint sprint-223 — 13/13 DONE') as unknown as CliToolSpawnFn;
     const d = createCliToolDispatcher({ spawnFn });

@@ -207,14 +207,18 @@ describe('resolveSlash — /status maps to agentic action', () => {
 });
 
 describe('resolveSlash — /recall with inline query', () => {
-    it('/recall → action:agentic, tool:deckent_memory_query (no query)', () => {
+    it('/recall → typed query prompt; never dispatches an empty query', () => {
         const registry = buildSlashRegistry__tsm_003();
         const result = resolveSlash__tsm_003('/recall', registry);
-        expect(result.action).toBe('agentic');
-        if (result.action === 'agentic') {
-            expect(result.tool).toBe('deckent_memory_query');
-            expect(result.args['query']).toBeUndefined();
-        }
+        expect(result).toEqual({
+            action: 'prompt', command: '/recall', argument: 'query', input: 'text',
+            messageKey: 'cli.memcat.recall.arg.query',
+        });
+    });
+    it('/agent and /skill are compatibility aliases for the canonical plural commands', () => {
+        const registry = buildSlashRegistry__tsm_003();
+        expect(resolveSlash__tsm_003('/agent', registry)).toEqual(resolveSlash__tsm_003('/agents', registry));
+        expect(resolveSlash__tsm_003('/skill', registry)).toEqual(resolveSlash__tsm_003('/skills', registry));
     });
     it('/recall docker heartbeat → extracts query', () => {
         const registry = buildSlashRegistry__tsm_003();

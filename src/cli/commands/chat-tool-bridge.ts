@@ -22,6 +22,7 @@ import { fileURLToPath } from 'node:url';
 import { join, dirname } from 'node:path';
 import type { McpToolDispatcher } from './chat-native.js';
 import { spawnDetachedDeckent, type DetachedSpawnResult } from '../helpers/detached-start.js';
+import { getLanguage } from '../helpers/messages.js';
 // NT-01/04/05 — the ONE tool-result containment chokepoint.
 import {
   brokerToolResult,
@@ -142,6 +143,8 @@ export class CliSpawnTimeoutError extends Error {
 }
 
 export interface CliToolDispatcherOptions {
+  /** Session-resolved UI language propagated to synchronous CLI children. */
+  language?: string;
   /**
    * Inject a fake spawn for hermetic tests; omit for the real child_process
    * spawn. LEGACY string seam: it carries no exit code, so a result from it is
@@ -180,12 +183,22 @@ function resolveEntryPath(): string {
  * one). Rejects with {@link CliSpawnTimeoutError} on the kill-budget and with
  * the raw spawn error (code preserved, born-509) on an OS-level failure.
  */
-export function defaultSpawnOutcomeFn(args: string[]): Promise<CliSpawnOutcome> {
+function resolveCliLanguage(language?: string): string {
+  return language === undefined
+    ? getLanguage()
+    : language.trim().toLowerCase() === 'tr' ? 'tr' : 'en';
+}
+
+export function resolveCliChildEnv(language?: string, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  return { ...base, DECKENT_LANGUAGE: resolveCliLanguage(language) };
+}
+
+export function defaultSpawnOutcomeFn(args: string[], language?: string): Promise<CliSpawnOutcome> {
   return new Promise<CliSpawnOutcome>((resolve, reject) => {
     const entryPath = resolveEntryPath();
     const child = spawn(process.execPath, [entryPath, ...args], {
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env },
+      env: resolveCliChildEnv(language),
     });
     let out = '';
     let errOut = '';
@@ -490,7 +503,7 @@ export function createCliToolDispatcher(opts: CliToolDispatcherOptions = {}): Mc
   // A caller-injected legacy string fn wins (existing hermetic tests); nothing
   // injected → the structured spawn, so production keeps the real exit code.
   const spawnFn = opts.spawnFn;
-  const spawnOutcomeFn = opts.spawnOutcomeFn ?? defaultSpawnOutcomeFn;
+  const spawnOutcomeFn = opts.spawnOutcomeFn ?? ((args) => defaultSpawnOutcomeFn(args, opts.language));
   const spawnDetachedFn = opts.spawnDetachedFn ?? spawnDetachedDeckent;
   const labels: DetachedStartLabels = { ...DEFAULT_DETACHED_START_LABELS, ...opts.detachedLabels };
   const permissionDeniedLabel = opts.permissionDeniedLabel ?? DEFAULT_PERMISSION_DENIED_LABEL;
@@ -530,7 +543,11 @@ export function createCliToolDispatcher(opts: CliToolDispatcherOptions = {}): Mc
         try {
           // 583/N5: REPL-chat-origin start/run/process-submit are interactive —
           // the detached child streams live worker activity (env twin).
-          const result = spawnDetachedFn(cliArgs, { projectRoot: opts.projectRoot, liveTrace: true });
+          const result = spawnDetachedFn(cliArgs, {
+            projectRoot: opts.projectRoot,
+            liveTrace: true,
+            language: resolveCliLanguage(opts.language),
+          });
           // Fire-and-forget: the spawn SUCCEEDED, the sprint's own outcome is
           // reported later through its log — never asserted here.
           return { output: formatDetachedStartMessage(cliArgs, result, labels), ok: true };
