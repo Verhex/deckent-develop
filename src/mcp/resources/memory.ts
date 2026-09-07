@@ -7,7 +7,7 @@ import { readMemoryView, renderMemoryReadView } from '../../core/memory-read-ser
 import { buildMemoryReadLabels } from '../../core/memory-read-labels.js';
 import { attendedExecutionProjectId } from '../../core/attended-execution-approval.js';
 import { resolveMemoryReadConfig } from '../../core/config.js';
-import { getLanguage, getMessage } from '../../cli/helpers/messages.js';
+import { getMemoryReadMessage, resolveMemoryReadAmbientLanguage } from '../../core/memory-read-messages.js';
 
 function resourceMetadata(view: ReturnType<typeof readMemoryView>): Record<string, unknown> {
   if (view.state === 'HOLD') return { schemaVersion: 1, state: view.state, reasonCode: view.reasonCode };
@@ -43,7 +43,7 @@ export function registerMemoryResource(server: McpServer): void {
       } catch {
         return { contents: [{ uri: uri.href, text: JSON.stringify({ metadata: { schemaVersion: 1, state: 'HOLD', reasonCode: 'QUERY_FAILED' } }), mimeType: 'application/json' }] };
       }
-      const lang = getLanguage(config.language);
+      const lang = resolveMemoryReadAmbientLanguage(config.language);
       if (!existsSync(dbPath)) {
         return {
           contents: [{
@@ -71,12 +71,12 @@ export function registerMemoryResource(server: McpServer): void {
           };
         }
         if (view.state === 'ABSENT') {
-          return { contents: [{ uri: uri.href, text: JSON.stringify({ metadata: resourceMetadata(view), rendered: getMessage('memory_read.absent', lang) }), mimeType: 'application/json' }] };
+          return { contents: [{ uri: uri.href, text: JSON.stringify({ metadata: resourceMetadata(view), rendered: getMemoryReadMessage('memory_read.absent', lang) }), mimeType: 'application/json' }] };
         }
         return {
           contents: [{
             uri: uri.href,
-            text: JSON.stringify({ metadata: resourceMetadata(view), rendered: renderMemoryReadView(view, buildMemoryReadLabels(getMessage, lang === 'tr' ? 'tr' : 'en')) }),
+            text: JSON.stringify({ metadata: resourceMetadata(view), rendered: renderMemoryReadView(view, buildMemoryReadLabels(getMemoryReadMessage, lang)) }),
             mimeType: 'application/json',
           }],
         };

@@ -24,7 +24,7 @@ import { attendedExecutionProjectId } from '../core/attended-execution-approval.
 import { BRAIN_DIR, MEMORY_DB_FILE } from '../core/constants.js';
 import { deriveRequestPrincipal } from './auth-me-endpoint.js';
 import { resolveApiCallerTenant } from './tenant-scope.js';
-import { getMessage } from '../cli/helpers/messages.js';
+import { getMemoryReadMessage, resolveMemoryReadLanguage } from '../core/memory-read-messages.js';
 
 function sendJson(res: ServerResponse, data: unknown, status = 200): void {
   const body = JSON.stringify(data);
@@ -138,17 +138,18 @@ export function registerMemorySearch(
     sendJson(res, isDetail
       ? { schemaVersion: 1, detail: view }
       : isMemory
-      ? { content: getMessage('memory_read.hold', 'en', { reason: view.reasonCode }), schemaVersion: 1, view }
+      ? { content: getMemoryReadMessage('memory_read.hold', 'en', { reason: view.reasonCode }), schemaVersion: 1, view }
       : { schemaVersion: 1, view });
     return true;
   }
-  const labels = buildMemoryReadLabels(getMessage, config.language === 'tr' ? 'tr' : 'en');
+  const language = resolveMemoryReadLanguage(config.language);
+  const labels = buildMemoryReadLabels(getMemoryReadMessage, language);
   if (!existsSync(dbPath)) {
     const view = hold(scope, 'QUERY_FAILED');
     sendJson(res, isDetail
       ? { schemaVersion: 1, detail: view }
       : isMemory
-      ? { content: getMessage('memory_read.hold', config.language, { reason: view.reasonCode }), schemaVersion: 1, view }
+      ? { content: getMemoryReadMessage('memory_read.hold', language, { reason: view.reasonCode }), schemaVersion: 1, view }
       : { schemaVersion: 1, view });
     return true;
   }
@@ -200,8 +201,8 @@ export function registerMemorySearch(
       const content = view.state === 'AVAILABLE'
         ? renderMemoryReadView(view, labels)
         : view.state === 'ABSENT'
-          ? getMessage('memory_read.absent', config.language)
-          : getMessage('memory_read.hold', config.language, { reason: view.reasonCode });
+          ? getMemoryReadMessage('memory_read.absent', language)
+          : getMemoryReadMessage('memory_read.hold', language, { reason: view.reasonCode });
       sendJson(res, { content, schemaVersion: 1, view });
     } else {
       sendJson(res, { schemaVersion: 1, view });
@@ -209,7 +210,7 @@ export function registerMemorySearch(
   } catch {
     const view = hold(scope, 'QUERY_FAILED');
     sendJson(res, isDetail ? { schemaVersion: 1, detail: view } : isMemory
-      ? { content: getMessage('memory_read.hold', config.language, { reason: view.reasonCode }), schemaVersion: 1, view }
+      ? { content: getMemoryReadMessage('memory_read.hold', language, { reason: view.reasonCode }), schemaVersion: 1, view }
       : { schemaVersion: 1, view });
   } finally {
     store?.close();

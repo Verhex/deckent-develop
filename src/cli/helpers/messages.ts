@@ -9,7 +9,8 @@ import { CLI_REFERENCE_MESSAGES } from './message-catalog/cli-reference.js';
 import { CLI_TERMINAL_SLASH_MESSAGES } from './message-catalog/cli-terminal-slash.js';
 import { CLI_TERMINAL_PICKER_MESSAGES } from './message-catalog/cli-terminal-picker.js';
 import { MEMORY_EXPORT_MESSAGES } from './message-catalog/memory-export.js';
-import { MEMORY_READ_MESSAGES } from './message-catalog/memory-read.js';
+import { MEMORY_READ_MESSAGES } from '../../core/memory-read-messages.js';
+import { AUTONOMOUS_PLANNER_MESSAGES } from './message-catalog/autonomous-planner.js';
 
 type MessageMap = Record<string, Record<string, string>>;
 
@@ -8855,6 +8856,7 @@ export const MESSAGE_CATALOG_FAMILIES: Readonly<Record<string, MessageCatalogFam
   'cli-terminal-picker': CLI_TERMINAL_PICKER_MESSAGES,
   'memory-export': MEMORY_EXPORT_MESSAGES,
   'memory-read': MEMORY_READ_MESSAGES,
+  'autonomous-planner': AUTONOMOUS_PLANNER_MESSAGES,
 });
 
 const MESSAGES: MessageMap = mergeMessageFamilies(BASE_MESSAGES, MESSAGE_CATALOG_FAMILIES);

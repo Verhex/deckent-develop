@@ -51,8 +51,8 @@ import { loadBacklog, validateBacklogEntry, cleanupAutonomousArtifacts } from '.
 import { planGoal, plannedItemToBacklogEntry, parsePlannedItems } from '../../orchestra/autonomous/goal-planner.js';
 import { extractArtifactSeeds } from '../../orchestra/autonomous/artifact-ref.js';
 import type { LlmComplete, PlannedItem } from '../../orchestra/autonomous/goal-planner-types.js';
-import { resolveAdapter, buildPlannerSpawnArgs } from '../../orchestra/planner.js';
-import { spawnSync } from 'node:child_process';
+import { resolveAdapter, buildPlannerSpawnArgs, createPlannerSpawn, PlannerSpawnOutputLimitError } from '../../orchestra/planner.js';
+import type { PlannerSpawnFn } from '../../orchestra/planner.js';
 import { makeDebtWorkGenerator } from '../../orchestra/autonomous/work-generator-source.js';
 import { recoverBacklog } from '../../orchestra/autonomous/execution-pool.js';
 import { atomicWriteFileSync } from '../../agents/worker-lifecycle.js';
@@ -543,23 +543,40 @@ export async function handlePlan(opts: AutonomousPlanOptions): Promise<void> {
 }
 
 /**
- * Real provider completion for the planner — mirrors planner.ts's spawn path
- * (one-shot CLI call, so spawnSync is acceptable here, matching planner.ts).
+ * Real provider completion for the planner — reuses planner.ts's asynchronous
+ * subprocess transport, including adapter-owned stdin delivery.
  * Used by the `plan` subcommand (Phase 1) and threaded as `jitComplete` into the
  * autonomous loop (Phase 2 JIT detail).
  */
-function realPlannerComplete(model: string): LlmComplete {
+export function realPlannerComplete(
+  model: string,
+  transportOptions: { timeoutMs?: number; maxBufferBytes?: number; plannerSpawn?: PlannerSpawnFn; lang?: string } = {},
+): LlmComplete {
+  const plannerSpawn = transportOptions.plannerSpawn ?? createPlannerSpawn();
+  const timeoutMs = transportOptions.timeoutMs ?? 120_000;
+  const maxBufferBytes = transportOptions.maxBufferBytes ?? 10 * 1024 * 1024;
   return async (prompt: string): Promise<string> => {
     const adapter = resolveAdapter();
     const spawnArgs = buildPlannerSpawnArgs(adapter, prompt, model as ModelType);
-    const r = spawnSync(spawnArgs.command, spawnArgs.args, { encoding: 'utf-8', timeout: 120_000, maxBuffer: 10 * 1024 * 1024 });
+    const r = await plannerSpawn(spawnArgs.command, spawnArgs.args, {
+      timeoutMs,
+      maxOutputBytes: maxBufferBytes,
+      ...(spawnArgs.stdin === undefined ? {} : { stdin: spawnArgs.stdin }),
+    });
     // Diagnostics (do not silently return empty → "no valid items" hides real failures):
     // surface spawn errors, timeouts, and non-zero exits so the operator sees the cause.
-    if (r.error) throw ErrorRegistry.createError('DECKENT_E095', { message: `planner spawn failed (${adapter.name}): ${r.error.message}` });
-    if (r.signal === 'SIGTERM') throw ErrorRegistry.createError('DECKENT_E095', { message: `planner timed out (${adapter.name}) — raise the timeout or narrow the goal` });
+    const lang = getLanguage(transportOptions.lang);
+    if (r.error instanceof PlannerSpawnOutputLimitError) {
+      throw ErrorRegistry.createError('DECKENT_E095', { message: getMessage('autonomous.planner.response_limit', lang, { provider: adapter.name, bytes: String(r.error.maxOutputBytes) }) });
+    }
+    if (r.error) throw ErrorRegistry.createError('DECKENT_E095', { message: getMessage('autonomous.planner.spawn_failed', lang, { provider: adapter.name, reason: r.error.message }) });
+    if (r.signal === 'SIGTERM') throw ErrorRegistry.createError('DECKENT_E095', { message: getMessage('autonomous.planner.timeout', lang, { provider: adapter.name }) });
     const stdout = r.stdout ?? '';
-    if (r.status !== 0 && !stdout) {
-      throw ErrorRegistry.createError('DECKENT_E095', { message: `planner exited status=${r.status ?? 'null'} (${adapter.name}): ${(r.stderr ?? '').slice(0, 300)}` });
+    if (Buffer.byteLength(stdout) + Buffer.byteLength(r.stderr ?? '') > maxBufferBytes) {
+      throw ErrorRegistry.createError('DECKENT_E095', { message: getMessage('autonomous.planner.response_limit', lang, { provider: adapter.name, bytes: String(maxBufferBytes) }) });
+    }
+    if (r.status !== 0) {
+      throw ErrorRegistry.createError('DECKENT_E095', { message: getMessage('autonomous.planner.exit_failed', lang, { provider: adapter.name, status: String(r.status ?? 'null'), reason: (r.stderr ?? '').slice(0, 300) }) });
     }
     // Unwrap the provider-specific envelope (Claude `--output-format json` wraps the
     // model text in `.result`; Gemini/Codex differ) to the inner text — parsePlannedItems
@@ -1149,7 +1166,7 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
         // canonical configured Brain model, resolved + validated before the loop starts
         // — never the 'sonnet' alias literal.
         goalDeps: buildLiveGoalDeps(
-          realPlannerComplete(resolvePlannerModelIdentity(resolvedConfig, lang)),
+          realPlannerComplete(resolvePlannerModelIdentity(resolvedConfig, lang), { lang }),
           {
             admitInvocation: makeGoalRoleAdmissionGuard(
               resolvedConfig,
@@ -1297,7 +1314,7 @@ export async function handleStart(opts: AutonomousStartOptions): Promise<void> {
     // generated by the real provider before they run (title-only fallback on failure).
     // 454-003: canonical configured Brain model, resolved + validated before the loop
     // starts — never the 'sonnet' alias literal.
-    jitComplete: realPlannerComplete(resolvePlannerModelIdentity(resolvedConfig, lang)),
+    jitComplete: realPlannerComplete(resolvePlannerModelIdentity(resolvedConfig, lang), { lang }),
     // CORE-UNIFORMITY (slice 1): live Brain+Auditor+CrossVerify flow on the autonomous
     // terminal (channel 1) + ENT-3 audit JSONL for AI operators (channel 2).
     flow: makeAutonomousFlowReporter(root, lang),
@@ -2109,7 +2126,7 @@ export function registerAutonomous(program: Command): void {
         await handlePlan({
           goal, root, from: o.from, policy: o.policy,
           maxItems: o.maxItems ? parseInt(o.maxItems, 10) : undefined,
-          dryRun: o.dryRun, lang: o.lang, complete: realPlannerComplete(model),
+          dryRun: o.dryRun, lang: o.lang, complete: realPlannerComplete(model, { lang: getLanguage(o.lang) }),
           engine: isV2Engine(config) ? 'v2' : 'v1',
         });
       } catch (err) { printError(err); process.exitCode = 1; }

@@ -9,7 +9,7 @@ import { attendedExecutionProjectId } from '../../core/attended-execution-approv
 import { resolveMemoryReadConfig } from '../../core/config.js';
 import { BRAIN_DIR, MEMORY_DB_FILE } from '../../core/constants.js';
 import { mcpToolDescription } from './description-catalog.js';
-import { getLanguage, getMessage } from '../../cli/helpers/messages.js';
+import { getMemoryReadMessage, resolveMemoryReadAmbientLanguage } from '../../core/memory-read-messages.js';
 
 export function registerMemoryQueryTool(server: McpServer): void {
   server.registerTool(
@@ -42,17 +42,17 @@ export function registerMemoryQueryTool(server: McpServer): void {
         config = resolveMemoryReadConfig(root, 'mcp');
       } catch {
         return {
-          content: [{ type: 'text' as const, text: getMessage('memory_read.hold', getLanguage(), { reason: 'QUERY_FAILED' }) }],
+          content: [{ type: 'text' as const, text: getMemoryReadMessage('memory_read.hold', resolveMemoryReadAmbientLanguage(), { reason: 'QUERY_FAILED' }) }],
           structuredContent: { schemaVersion: 1, view: { state: 'HOLD', reasonCode: 'QUERY_FAILED' } },
           isError: true as const,
         };
       }
-      const lang = getLanguage(config.language);
-      const labels = buildMemoryReadLabels(getMessage, lang === 'tr' ? 'tr' : 'en');
+      const lang = resolveMemoryReadAmbientLanguage(config.language);
+      const labels = buildMemoryReadLabels(getMemoryReadMessage, lang);
 
       if (!existsSync(dbPath)) {
         return {
-          content: [{ type: 'text' as const, text: getMessage('memory_read.hold', lang, { reason: 'QUERY_FAILED' }) }],
+          content: [{ type: 'text' as const, text: getMemoryReadMessage('memory_read.hold', lang, { reason: 'QUERY_FAILED' }) }],
           structuredContent: { schemaVersion: 1, view: { state: 'HOLD', reasonCode: 'QUERY_FAILED' } },
           isError: true as const,
         };
@@ -64,7 +64,7 @@ export function registerMemoryQueryTool(server: McpServer): void {
         if (detail_ref !== undefined) {
           const detail = readMemoryDetail(store, { consumer: 'mcp', scope, detailRef: detail_ref });
           if (detail.state === 'HOLD') {
-            return { content: [{ type: 'text' as const, text: getMessage('memory_read.hold', lang, { reason: detail.reasonCode }) }], structuredContent: { schemaVersion: 1, detail }, isError: true as const };
+            return { content: [{ type: 'text' as const, text: getMemoryReadMessage('memory_read.hold', lang, { reason: detail.reasonCode }) }], structuredContent: { schemaVersion: 1, detail }, isError: true as const };
           }
           return {
             content: [{ type: 'text' as const, text: JSON.stringify({ schemaVersion: 1, detail }) }], structuredContent: { schemaVersion: 1, detail },
@@ -72,7 +72,7 @@ export function registerMemoryQueryTool(server: McpServer): void {
         }
         if (typeof query !== 'string' || query.trim().length === 0) {
           const view = { state: 'HOLD' as const, reasonCode: 'INVALID_REQUEST' };
-          return { content: [{ type: 'text' as const, text: getMessage('memory_read.hold', lang, { reason: 'INVALID_REQUEST' }) }], structuredContent: { schemaVersion: 1, view }, isError: true as const };
+          return { content: [{ type: 'text' as const, text: getMemoryReadMessage('memory_read.hold', lang, { reason: 'INVALID_REQUEST' }) }], structuredContent: { schemaVersion: 1, view }, isError: true as const };
         }
         const configured = config.memory_read;
         const requested = Number.isSafeInteger(limit) && limit > 0 ? limit : configured.maxEntries;
@@ -90,10 +90,10 @@ export function registerMemoryQueryTool(server: McpServer): void {
           ...(cursor !== undefined ? { cursor } : {}),
         });
         if (view.state === 'HOLD') {
-          return { content: [{ type: 'text' as const, text: getMessage('memory_read.hold', lang, { reason: view.reasonCode }) }], structuredContent: { schemaVersion: 1, view }, isError: true as const };
+          return { content: [{ type: 'text' as const, text: getMemoryReadMessage('memory_read.hold', lang, { reason: view.reasonCode }) }], structuredContent: { schemaVersion: 1, view }, isError: true as const };
         }
         if (view.state === 'ABSENT') {
-          return { content: [{ type: 'text' as const, text: getMessage('memory_read.absent', lang) }], structuredContent: { schemaVersion: 1, view } };
+          return { content: [{ type: 'text' as const, text: getMemoryReadMessage('memory_read.absent', lang) }], structuredContent: { schemaVersion: 1, view } };
         }
         return { content: [{ type: 'text' as const, text: renderMemoryReadView(view, labels) }], structuredContent: { schemaVersion: 1, view } };
       } finally {

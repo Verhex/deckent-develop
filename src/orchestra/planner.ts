@@ -1070,8 +1070,23 @@ export interface PlannerSpawnOutcome {
 export type PlannerSpawnFn = (
   command: string,
   args: readonly string[],
-  opts: { timeoutMs: number; stdin?: string },
+  opts: { timeoutMs: number; stdin?: string; maxOutputBytes?: number },
 ) => Promise<PlannerSpawnOutcome>;
+
+/** Typed transport failure emitted when combined stdout/stderr crosses its byte budget. */
+export class PlannerSpawnOutputLimitError extends Error {
+  readonly code = 'DECKENT_PLANNER_OUTPUT_LIMIT' as const;
+
+  constructor(
+    readonly maxOutputBytes: number,
+    readonly reason: 'exceeded' | 'invalid' = 'exceeded',
+  ) {
+    super(reason === 'invalid'
+      ? `Planner maxOutputBytes must be a finite non-negative number; received ${String(maxOutputBytes)}`
+      : `Planner output exceeded ${maxOutputBytes} bytes`);
+    this.name = 'PlannerSpawnOutputLimitError';
+  }
+}
 
 export interface PlannerSpawnDependencies {
   readonly platform?: NodeJS.Platform;
@@ -1087,16 +1102,31 @@ export function createPlannerSpawn(
   return (command, args, opts) => new Promise((resolve) => {
     let stdout = '';
     let stderr = '';
+    let outputBytes = 0;
     let timedOut = false;
+    let outputLimitError: PlannerSpawnOutputLimitError | undefined;
     let settled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let forceKillTimer: ReturnType<typeof setTimeout> | undefined;
     let child;
     const settle = (outcome: PlannerSpawnOutcome): void => {
       if (settled) return;
       settled = true;
       if (timer) clearTimeout(timer);
+      if (forceKillTimer) clearTimeout(forceKillTimer);
       resolve(outcome);
     };
+    if (opts.maxOutputBytes !== undefined
+      && (!Number.isFinite(opts.maxOutputBytes) || opts.maxOutputBytes < 0)) {
+      settle({
+        status: null,
+        signal: null,
+        stdout,
+        stderr,
+        error: new PlannerSpawnOutputLimitError(opts.maxOutputBytes, 'invalid'),
+      });
+      return;
+    }
     try {
       const invocation = buildCliInvocation(command, [...args], platform);
       child = spawnImpl(invocation.command, invocation.args, {
@@ -1114,19 +1144,61 @@ export function createPlannerSpawn(
       } catch {
         // already gone — close will resolve
       }
+      if (!settled) {
+        forceKillTimer = setTimeout(() => {
+          try { child.kill('SIGKILL'); } catch { /* direct child may already have exited */ }
+          settle({ status: null, signal: 'SIGTERM', stdout, stderr });
+        }, 1_000);
+        forceKillTimer.unref?.();
+      }
     }, opts.timeoutMs);
     timer.unref?.();
     child.stdout?.setEncoding('utf-8');
     child.stderr?.setEncoding('utf-8');
-    child.stdout?.on('data', (d: string) => { stdout += d; });
-    child.stderr?.on('data', (d: string) => { stderr += d; });
+    const capture = (stream: 'stdout' | 'stderr', data: string | Buffer): void => {
+      if (settled || timedOut || outputLimitError) return;
+      const chunk = typeof data === 'string' ? data : data.toString('utf-8');
+      const chunkBytes = Buffer.byteLength(chunk);
+      const maxOutputBytes = opts.maxOutputBytes;
+      if (maxOutputBytes !== undefined && outputBytes + chunkBytes > maxOutputBytes) {
+        outputLimitError = new PlannerSpawnOutputLimitError(maxOutputBytes);
+        if (timer) clearTimeout(timer);
+        try { child.kill('SIGTERM'); } catch { /* close/error may already be in flight */ }
+        if (!settled) {
+          forceKillTimer = setTimeout(() => {
+            try { child.kill('SIGKILL'); } catch { /* direct child may already have exited */ }
+            settle({ status: null, signal: 'SIGKILL', stdout, stderr, error: outputLimitError });
+          }, 1_000);
+          forceKillTimer.unref?.();
+        }
+        return;
+      }
+      outputBytes += chunkBytes;
+      if (stream === 'stdout') stdout += chunk;
+      else stderr += chunk;
+    };
+    child.stdout?.on('data', (d: string | Buffer) => { capture('stdout', d); });
+    child.stderr?.on('data', (d: string | Buffer) => { capture('stderr', d); });
     child.on('error', (err) => {
-      settle({ status: null, signal: null, stdout, stderr, error: err });
+      if (outputLimitError || timedOut) return;
+      settle({
+        status: null,
+        signal: null,
+        stdout,
+        stderr,
+        error: err,
+      });
     });
     child.on('close', (code, signal) => {
       // A kill we issued at the deadline is a timeout even if the OS reports
       // the signal differently — keep spawnSync's SIGTERM contract.
-      settle({ status: code, signal: timedOut ? 'SIGTERM' : signal, stdout, stderr });
+      settle({
+        status: outputLimitError ? null : code,
+        signal: outputLimitError ? (signal ?? 'SIGTERM') : (timedOut ? 'SIGTERM' : signal),
+        stdout,
+        stderr,
+        ...(outputLimitError ? { error: outputLimitError } : {}),
+      });
     });
     if (opts.stdin !== undefined) {
       const onStdinError = (error: Error): void => {
@@ -1134,7 +1206,7 @@ export function createPlannerSpawn(
         // The deadline path owns settlement once it has sent SIGTERM. A large
         // in-flight stdin write can then report EPIPE; consuming that stream
         // error must not reclassify the canonical timeout as spawn_error.
-        if (timedOut) return;
+        if (timedOut || outputLimitError) return;
         try { child.kill('SIGTERM'); } catch { /* already gone */ }
         settle({ status: null, signal: null, stdout, stderr, error });
       };

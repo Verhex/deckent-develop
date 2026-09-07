@@ -74,7 +74,7 @@ import { buildMemoryReadLabels } from '../core/memory-read-labels.js';
 import type { MemoryReadEntryV1, MemoryReadScopeV1, MemoryReadViewV1 } from '../core/memory-read-contract.js';
 import { attendedExecutionProjectId } from '../core/attended-execution-approval.js';
 import { createRawFileFirstWriterWins } from '../core/approval-file-cas.js';
-import { getMessage } from '../cli/helpers/messages.js';
+import { getMemoryReadMessage } from '../core/memory-read-messages.js';
 import { BRAIN_DIR, EVALUATIONS_DIR, MEMORY_DB_FILE, PROJECT_CONFIG_PATH, TASKS_DIR } from '../core/constants.js';
 import {
   TASK_TYPE_ADR_PRESETS,
@@ -2356,7 +2356,7 @@ function renderNonAdrMemory(
     entries: Object.freeze(view.entries.filter(({ entry }) => entry.type !== 'adr')),
     deferred: Object.freeze(view.deferred.filter(({ candidate }) => candidate.type !== 'adr')),
   });
-  return renderMemoryReadView(filtered, buildMemoryReadLabels(getMessage, language));
+  return renderMemoryReadView(filtered, buildMemoryReadLabels(getMemoryReadMessage, language));
 }
 
 function readWorkerMemoryContext(
@@ -2434,9 +2434,9 @@ function readWorkerMemoryContext(
       : [];
     const memoryContext = renderNonAdrMemory(view, memoryConfig.language);
     const memoryLabels = {
-      contextHeading: getMessage('memory_read.context_heading', memoryConfig.language),
-      revision: getMessage('memory_read.revision', memoryConfig.language),
-      unavailable: getMessage('memory_read.unavailable', memoryConfig.language),
+      contextHeading: getMemoryReadMessage('memory_read.context_heading', memoryConfig.language),
+      revision: getMemoryReadMessage('memory_read.revision', memoryConfig.language),
+      unavailable: getMemoryReadMessage('memory_read.unavailable', memoryConfig.language),
     };
     return {
       ...(allAdrs.length > 0 ? { allAdrs } : {}),
