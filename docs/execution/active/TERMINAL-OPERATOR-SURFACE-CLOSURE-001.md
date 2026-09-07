@@ -11,6 +11,49 @@ PREREQUISITE: 3331 (landed 2449b6e4f) → 3332 (landed 13d2c80ef) → 3333 (land
 OWNER_DECISION_REF: owner-live-2026-09-04-terminal-audit-closure-v2
 STATUS: IN_PROGRESS source-work; DOGFOOD_HEALTH=DEGRADED. 2026-09-06T23:10Z sonrası gerçek autonomous dry-plan PASS; exact micro-task proof admission ve çoklu-worker settlement hâlâ açık, yeni worker dispatch yok.
 
+### Full-suite cadence measurement — 2026-09-07
+
+Main `5c80ad1cf2165583f1c93155f90df1c28047a5c1` plus preserved inherited dirty
+source was pinned throughout: **2979 exact files /67 sequential batches**, each
+at most100 files/maxWorkers2. Canonical Vitest filesOnly enumeration identified
+one hidden GitHub test absent from the original rg list; appended batch66 covered
+it without repeating tests. Scope is root Vitest config, not Dashboard/Desktop.
+
+**LOCAL_TESTS_FAILED**, not LOCAL_VERIFIED/repo-green: **41170 tests =40396 PASS
++636 failed assertions +138 pending**. Failed files176 =156 assertion-bearing
++20 collection/setup failures. All67 report/log/exit/inventory/source validations
+passed; no missing/duplicate paths, source drift, resource HOLD or blind retry.
+Peak sampled process-tree RSS4193676KiB (~4GiB), not a hard-isolation receipt.
+Batch13 prebirth UNREAD_CHANNEL refusal is preserved; Vitest had not started.
+
+Private archive (raw diagnostics are not approved for publication):
+`/home/alperen/deckent-recovery-20260904/terminal-7099-cadence-oCU1IZZt`
+288 payloads +manifest;289 checksum checks,290 files including SHA256SUMS.
+Manifest `f8978033f43863a1130e152edf1ae9d3a6185a587d7f17ecc46ed3c9535479bb`;
+SUMS `9318f6f14bc503e6df5c29160157c32f2c2ec6e46f42a1163066f892ab124cb2`.
+New baseline aggregate `6c878a6e9a050d366e8cd64a74d76dd8aa2628d7ea028b3e609d6836044e2b7e`.
+Raw67 reports/logs/start/result records, inventories, runner versions and triage
+notes are retained. COMPLETE means measurement coverage, not product settlement.
+Fable ENTRY736 independently recomputed totals, hashes, time windows and unchanged
+runtime bindings; this review is not a canonical XVerify receipt.
+
+| Finding class | Disposition / boundary |
+| --- | --- |
+| 7099 catalog convention / f9-MCP expectation | Next bounded in-package producer/fixture repair; no guard weakening |
+| Tenant-column absence | Producer correctly refuses unfiltered access; old test expectation must not weaken it |
+| Wiring/IPC/prompt authority and partial mocks | Missing test setup can prevent intended behavior from executing; not proof of product success or failure |
+| Inherited footer/KPI/custody changes | Preserve ownership; missing-ID/safeStage behavior deltas unresolved |
+| Missing .github template | Owner-approved cleanup inheritance, not a product runtime regression |
+| Old do missing-tasks / output→watch --logs | UNRELATED findings; no automatic admission/fix |
+| Runtime-hygiene private extra path | Cause HOLD; fixture was removed and exact pathname not retained |
+
+Archived triage notes distinguish source history from captured runtime evidence;
+no comparable old full-suite raw artifact exists. Unclassified failures are not
+assumed harmless. Next: catalog/MCP bounded repair, then canonical exact older-sprint
+lookup after exact chat absence; chat corruption must not fall back silently.
+No source edit/build/new sprint/retained cleanup occurred during cadence; bot1417628
+remained live. MASTER7099 stays VERIFY; wider Terminal/platform closure remains open.
+
 ### L4-B2 historical sprint context — bounded source landed, 2026-09-07
 
 Main `a7f5742b68500dafbc35ac78c198dbbcb81ece79`: exact18 committed blob eşliği

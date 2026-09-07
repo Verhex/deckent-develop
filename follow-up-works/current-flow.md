@@ -4,7 +4,7 @@
 > Silinme tetiği: onaylı sıra tüketilip kalıcı kanıtlar MASTER/evidence'a işlendiğinde silinir.
 > Önceki ayrıntılar Git ve mevcut7099 capsule'ındadır.
 
-## Aktif durum — 2026-09-07T07:08Z
+## Aktif durum — 2026-09-07T08:08Z
 
 7099 tek ACTIVE outcome, MASTER VERIFY; bütün ürün/Terminal kapanışı yok.
 DOGFOOD ON, health DEGRADED; owner onaylı bounded ADR-D-007 kaynak yürütmesi.
@@ -48,11 +48,23 @@ Push TOOL_POLICY_HOLD; unchanged retry/bypass yok. Source HEAD ahead27/behind0
 ## Sonraki iş
 
 1. B2 kaynak ve kalıcı evidence/capsule/MASTER kaydı tamamlandı; 7099 VERIFY kalır.
-2. Full-suite beş-landing cadence borcu: yalnız scoped-green ölçüldü, repo-green yok.
-   Bounded class/shard doğrulaması, toplam en çok iki test worker ve 16 GiB disiplini.
+2. Full-suite cadence ölçümü TAMAM:2979 exact dosya/67 batch,41170 test:
+   40396 PASS/636 failed assertions/138 pending;176failedfile=156assertion+20collection.
+   Verdict LOCAL_TESTS_FAILED, repo-green yok; Dashboard/Desktop ayrıconfigler kapsam dışı.
+   Source/report/log/exit/inventory67/67 PASS; maxWorkers2, peak sampled RSS~4GiB.
+   Kalıcı private arşiv:`/home/alperen/deckent-recovery-20260904/terminal-7099-cadence-oCU1IZZt`
+   289checks/290files;manifest f8978033… /SUMS9318f6f1…;capsule exact kanıtı taşır.
+   Yeni baseline aggregate6c878a6e…; Fable736 bağımsız ölçüm, XVerify receipt değil.
+   İlk source dilimi:7099 autonomous-planner catalog convention + f9/MCP fixture.
+   Inherited footer/KPI/custody ayrı; tenant failclosed korunur. Diğer triage arşivde.
+   Do missing-tasks/output --logs UNRELATED bulgu; otomatik admission/fix yok.
+   Hiçbir test retry/build/dispatch yok; tüm başarısızlıklar kapanmış değildir.
 3. Mevcut7099 L4 turn içi canlı durum/typed hata/next action, kalan L1 kimlik/migrasyon,
    L3 renderer/approval, L5 accounting/checkpoint ve L6 verdict/a11y/platform hükümleri.
-   Aynı DAG'daki exact sonraki dilimi seç; kapanmış B1/B2'yi tekrar uygulama.
+   Sonraki exact L4 gap: son5 dışındaki `/resume sprint-ID` archive reader'a ulaşmıyor.
+   Exact chat absence sonrası canonical direct archive lookup; jobs fullscan yok.
+   Chat corruption/failure sprint fallback ile gizlenmez. Henüz uygulanmadı.
+   Yeni test bulgusu: memory help arg/options yansıması ürün gap adayı; triage sürüyor.
 4. Sonra7103 →7101 →7104 →7102 (önce ADR amendment) →4034.
 5. C1→3358; C2+C4→3359; C3→3360; C5→6182; C6→546; C7→547;
    C8→8030/8040; C9→3220/3332/3333; C10→3357/210/220 QUEUED.
