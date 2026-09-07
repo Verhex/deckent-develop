@@ -11,6 +11,40 @@ PREREQUISITE: 3331 (landed 2449b6e4f) → 3332 (landed 13d2c80ef) → 3333 (land
 OWNER_DECISION_REF: owner-live-2026-09-04-terminal-audit-closure-v2
 STATUS: IN_PROGRESS source-work; DOGFOOD_HEALTH=DEGRADED. 2026-09-06T23:10Z sonrası gerçek autonomous dry-plan PASS; exact micro-task proof admission ve çoklu-worker settlement hâlâ açık, yeni worker dispatch yok.
 
+### Live-footer clip/reflow landing — 2026-09-07T02:22Z
+
+Main366637d1898a03fe0b7d6be2189553814fb77828, exact9committed blob PASS.
+Helper required clip callback alır; App tek canonical clipTerminalCells enjekte
+eder. Local truncate binding inherited runStatus dahil tüm branch'leri kapsar.
+Run ASCII capability bir kez çözer; gerçek Ink columns/marker effect dependency.
+Yeni helpers→REPL crossing, primitives taşıması veya cursor API değişikliği yok.
+Selected8suite211/main8suite213 PASS (+2 inherited runStatus test); tsc/build PASS.
+Main ilk koşu5FAIL ve yanlış cursor-test yolu ayrı tutuldu; v3 yalnız term-compat
+fixture'ını canonical EN label caller'a geçirdi, production byte/build değişmedi.
+
+| Kanıt | SHA256 |
+|---|---|
+| Final9 patch | 4937da5ea2296b00b0dca05b19e4d1dd4796ac51e38b3a6fda2dedb0db748772 |
+| V2 build manifest | abbde8ab9de832f0611a14c176a9ad640b6766e29f72d81b302bb5df3c98746c |
+| V3 fixture manifest | c1a862893e4c6a67f7c2da4e7765ebff9a8071e768c31f8f91d3ede93e7d71d9 |
+| Main compiled | 1fd124bced10413da772ad483ce26a5338d72a9ff707c3c0cf4ecca8a314c42f |
+| Selected compiled | 96f4b9374357e8a502497b69776284d03d1f3c0e0d53c3e373f0cfc64ee88765 |
+| Frozen harness | 4457e89258438734bcf9c3ae13678e9b09db26049bc90c9580d6490da3f544ae |
+| Archive SHA256SUMS | 4f33ea03c7a417bf7a944c8c76fb66849b5fc51d1e53046e0b7e6519bb21609f |
+
+Arşiv /home/alperen/deckent-recovery-20260904/terminal-7099-l6-live-footer-RYyh0h,
+32payload/check PASS; originals korunur; DB/config/credential yok. İlk main
+failure tool-output truncated'tır, full standalone log iddiası yok.
+İki compiled proof tek denemede PASS: actual CLI EN/TR idle resize; aynı mounted
+App32→12→32 full→ASCII/Unicode clipped→full restore, approval olmadan ve saniyelik
+timer öncesi; direct footer/OSC helper. Idle CLI overflow kanıtı diye sunulmaz.
+Fable587 independent9blob/main213/20bundle pin PASS; canonical XVerify receipt değil.
+Stop847750 → ALLOW → build02:17:33Z → bot892444; main inherited source dahil.
+Salt commit restart yok. Clip/reflow seam kapalı; diğer L1-L6/platform/whole7099
+OPEN/VERIFY. Next L1 provider/fallback/migration semantic review; yeni key kabul
+edilmedi, brain→native veya host CLI→API otomatik dönüşümü yok.
+
+
 ### Dual-stream bounded landing — 2026-09-07T02:08Z
 
 Main d25c970788aa5c2b31d7d517783a3a5adfdd373f; exact7blob equality PASS.

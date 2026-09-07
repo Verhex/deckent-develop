@@ -4,7 +4,7 @@
 > Silinme tetiği: onaylı sıra tüketilip kalıcı kanıtlar MASTER/evidence'a işlendiğinde silinir.
 > Ayrıntılı geçmiş Git'te: d10456e99 ve 934dc194f:follow-up-works/current-flow.md.
 
-## Aktif durum — 2026-09-07T02:08Z
+## Aktif durum — 2026-09-07T02:22Z
 
 7099 tek ACTIVE outcome, MASTER VERIFY; bütün ürün/Terminal kapanışı yok.
 DOGFOOD ON, health DEGRADED; owner onaylı bounded ADR-D-007 kaynak yürütmesi.
@@ -23,6 +23,8 @@ Retained728, .tasks, memory.db ve inherited değişiklikler korunur.
 | I | 9f9fa3239 | Recursive REPL i18n gate + dört renderer sink |
 | J | 72cc89ecf | I kanıtı ve sonraki dilim docs/generated projection |
 | K | d25c97078 | Dual-stream cell/grapheme/ASCII/OSC8 kapanışı |
+| L | 0f8c231fb | K kanıtı/docs |
+| M | 366637d18 | Upstream live-footer clipping + immediate resize |
 
 I exact9blob PASS; main81tests+tsc/build PASS; selected61+supplemental20 PASS.
 Main/selected compiled EN/TR card/details/Esc, formatter ve devprobe PASS;
@@ -34,21 +36,21 @@ Fable bağımsız review canonical XVerify receipt değildir. Layer9 inherited a
 
 ## Runtime / remote
 
-Stop804423 → execution ALLOW → build:all01:59:30Z PASS → bot847750.
+Stop847750 → execution ALLOW → build:all02:17:33Z PASS → bot892444.
 Dist main dirty-tree; selected binary ayrıca doğrulandı. MCP reconnect kanıtlanmadı.
 Yeni sprint/worker dispatch yok; retained state temizlenmedi.
 Push TOOL_POLICY_HOLD: owner yetkisine rağmen araç process başlamadan reddetmişti;
-bypass/unchanged retry yok. HEADd25c97078 ahead11/behind0; remote CI tetiklenmedi.
+bypass/unchanged retry yok. HEAD366637d18 ahead13/behind0; remote CI tetiklenmedi.
 
 ## Şimdi / sonraki sıra
 
-1. K kaynak mühürlendi; main/selected125tests+tsc/build PASS. Main compiled
-   PTY+mounted+helper PASS. Selected üç aggregate FAIL korunur; run3 ham kanıtı
-   için ayrı offline assertion adjudication var. Kalıcı40payload/SUMS capsule'da.
-2. Sol isolated next L6: live-footer upstream UTF16/hardcoded marker kaldırma;
-   App tek canonical clip callback'ini helper'a enjekte eder, cursor değişmez.
-   Run capability tek çözüm, gerçek Ink columns reflow; helpers→REPL import yok.
-   Main inherited runStatus/labels korunur. Root docs ve fan-in, worker source.
+1. K+M kaynakları mühürlendi. M selected211/main213 tests+tsc/build PASS;
+   compiled selected/main tek denemede PASS. Aynı mounted App full→clipped→full
+   reflow, canonical clip callback. Kalıcı32payload/SUMS capsule'da; ilk test
+   fixture failure korunur, v3 test-only. Inherited54/42/7/7 satır seçilmedi.
+2. L1 provider/fallback/migration semantiği read-only inceleniyor; entry hostCLI
+   ve run native resolver ayrı. Yeni legacy key henüz kabul edilmedi; native pin
+   bağımsızdır, brain→native / host codex→openai API dönüşümü yok.
 3. Kalan L1 identity/readiness+migration; L2 active cancellation; L3 tool/MCP/approval;
    L4 reactive state/resume; L5 accounting; L6 verdict/reduced-motion/rows/redaction
    ve platform proof. Capsule DAG'ı; yeni outcome veya C kuyruğu başlamadı.
