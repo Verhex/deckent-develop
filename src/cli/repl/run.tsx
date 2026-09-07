@@ -1736,6 +1736,7 @@ export async function runInkRepl(
   const sessionAuthority = createSessionAuthority({
     posture: resolveConfiguredPosture((projectCfg as { terminal?: { posture?: unknown } }).terminal?.posture),
   });
+  const terminalAscii = isDumbTerminal() || process.env['DECKENT_ASCII'] === '1' || !hasUtf8Locale(process.env);
 
   // TERMINAL-READABILITY-001 — the palette is resolved ONCE from the color gate
   // (host-theme-mapped 16-color unless a dark background is proven; nothing
@@ -1797,8 +1798,8 @@ export async function runInkRepl(
         const out = setConfigValues(process.cwd(), { [key]: parseConfigValueText(value) });
         return out.ok ? { ok: true } : { ok: false, error: out.error };
       }}
-      pickerAscii={isDumbTerminal() || process.env['DECKENT_ASCII'] === '1' || !hasUtf8Locale(process.env)}
-      dualStreamOverflow={isDumbTerminal() || process.env['DECKENT_ASCII'] === '1' || !hasUtf8Locale(process.env) ? '...' : '…'}
+      pickerAscii={terminalAscii}
+      dualStreamOverflow={terminalAscii ? '...' : '…'}
       pickerNoColor={isColorSuppressed()}
       hyperlinks={resolveHyperlinks({
         env: process.env,

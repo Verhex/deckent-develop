@@ -47,17 +47,19 @@ import {
   type InputState,
 } from '../../../src/cli/repl/line-edit.js';
 import {
-  buildLiveFooter,
-  type LiveFooterLabels,
+  buildLiveFooter as buildLiveFooterImpl,
+  type LiveFooterOptions,
   type LiveFooterState,
 } from '../../../src/cli/helpers/live-footer.js';
+import { clipTerminalCells } from '../../../src/cli/repl/dual-stream.js';
+import { buildLiveFooterLabels } from '../../../src/cli/repl/run.js';
+import { getMessage } from '../../../src/cli/helpers/messages.js';
 
-/** en label set (explicit — the mechanism owns no default since TERMINAL-TOOLS-002). */
-const EN: LiveFooterLabels = {
-  idle: 'idle', running: 'Running', elapsed: 'Elapsed', provider: 'Provider', auth: 'Auth', next: 'Next',
-  healthy: 'healthy', degraded: 'degraded', unknown: 'unknown', loggedIn: 'logged-in', loggedOut: 'logged-out',
-  unitHours: 'h', unitMinutes: 'm', unitSeconds: 's',
-};
+const buildLiveFooter = (state: LiveFooterState, options: Omit<LiveFooterOptions, 'clip'>) =>
+  buildLiveFooterImpl(state, { ...options, clip: (text, width) => clipTerminalCells(text, width, '…') });
+
+/** Complete catalog-derived set stays current as the footer contract grows. */
+const EN = buildLiveFooterLabels((key) => getMessage(key, 'en'));
 import { theme } from '../../../src/cli/helpers/theme.js';
 
 const state = (buffer: string, cursor: number): InputState => ({ buffer, cursor });
@@ -86,7 +88,7 @@ describe('term-compat — Resize (buildLiveFooter width seam)', () => {
     const footerState: LiveFooterState = { running: 'anything' };
     expect(() => buildLiveFooter(footerState, { labels: EN, width: 1 })).not.toThrow();
     const [line] = buildLiveFooter(footerState, { labels: EN, width: 1 });
-    expect(theme.strip(line ?? '')).toBe('R');
+    expect(theme.strip(line ?? '')).toBe('…');
   });
 
   it('a simulated live resize (width change across two renders) truncates every field independently', () => {

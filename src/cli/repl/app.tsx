@@ -54,7 +54,7 @@ import {
   type BusyControlsState, type QueueStatusDecision, type InterruptDecision, type SteerDecision,
 } from './busy-controls.js';
 import { ApprovalCard, createApprovalCardQueue, type ApprovalCardLabels, type ApprovalCardQueue } from './approval-card.js';
-import { composeDualStream } from './dual-stream.js';
+import { clipTerminalCells, composeDualStream } from './dual-stream.js';
 import type { ApprovalTerminalChannel } from './approval-terminal-channel.js';
 import type { ApprovalStreamEvent } from '../../core/approval-eventstream.js';
 import { PlanPreviewCard, type PlanPreviewCardLabels } from './plan-preview-card.js';
@@ -1836,11 +1836,15 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   // real heartbeat/dashboard-state reader; this component only renders it).
   useEffect(() => {
     if (!replSurfaceEnabled || !stateFeed) { setFooterLines([]); return; }
-    const tick = (): void => setFooterLines(buildLiveFooter(stateFeed(), { labels: liveFooterLabels }));
+    const tick = (): void => setFooterLines(buildLiveFooter(stateFeed(), {
+      labels: liveFooterLabels,
+      width: columns,
+      clip: (text, width) => clipTerminalCells(text, width, dualStreamOverflow),
+    }));
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [replSurfaceEnabled, stateFeed, liveFooterLabels]);
+  }, [replSurfaceEnabled, stateFeed, liveFooterLabels, columns, dualStreamOverflow]);
 
   // Background-completed-work sink: buffered by ChatTurnQueue — never
   // injected mid-turn (drained only at turn-end, see inputIter below).

@@ -11,10 +11,15 @@
 
 import { describe, it, expect, afterEach } from 'vitest';
 import {
-  buildLiveFooter,
+  buildLiveFooter as buildLiveFooterImpl,
+  type LiveFooterOptions,
   type LiveFooterLabels,
   type LiveFooterState,
 } from '../../src/cli/helpers/live-footer.js';
+import { clipTerminalCells } from '../../src/cli/repl/dual-stream.js';
+
+const buildLiveFooter = (state: LiveFooterState, options: Omit<LiveFooterOptions, 'clip'>) =>
+  buildLiveFooterImpl(state, { ...options, clip: (text, width) => clipTerminalCells(text, width, '…') });
 
 /** The en catalog set, spelled out so this pure test stays independent of run.tsx
  *  (the mechanism owns no default set — TERMINAL-TOOLS-002). */
@@ -195,6 +200,13 @@ describe('buildLiveFooter — width truncation', () => {
     );
     // visible text still starts with the truncated content, wrapped in a single valid SGR pair
     expect(lines[0]).toMatch(/^\x1b\[32m.*\x1b\[0m$/);
+  });
+
+  it('uses display cells and the caller marker for CJK, combining, and ZWJ content', () => {
+    const clip = (text: string, width: number) => clipTerminalCells(text, width, '...');
+    expect(buildLiveFooterImpl({ running: '状态状态' }, { labels: EN, width: 10, clip })[0]).toBe('Running...');
+    expect(buildLiveFooterImpl({ running: 'e\u0301e\u0301e\u0301e\u0301' }, { labels: EN, width: 12, clip })[0]).toBe('Running: ...');
+    expect(buildLiveFooterImpl({ running: '👨‍👩‍👧‍👦 family' }, { labels: EN, width: 12, clip })[0]).toBe('Running: ...');
   });
 });
 

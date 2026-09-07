@@ -87,11 +87,12 @@ function clipVisible(text: string, width: number): string {
   return out;
 }
 
-function truncateToWidth(text: string, width: number, overflowValue: string | undefined): string {
-  if (visibleWidth(text) <= width) return text;
+export function clipTerminalCells(text: string, width: number, overflowValue: string | undefined): string {
+  const safeWidth = Number.isFinite(width) ? Math.max(1, Math.floor(width)) : 1;
+  if (visibleWidth(text) <= safeWidth) return text;
   const overflow = requireInjectedLabel('dualStream.overflow', overflowValue);
-  const marker = clipVisible(overflow, width);
-  const contentBudget = Math.max(0, width - visibleWidth(marker));
+  const marker = clipVisible(overflow, safeWidth);
+  const contentBudget = Math.max(0, safeWidth - visibleWidth(marker));
   const content = clipVisible(text, contentBudget);
   const osc8Close = closeOpenOsc8(content);
   const reset = content.includes('\x1b[') ? '\x1b[0m' : '';
@@ -114,7 +115,7 @@ function allocateRegion(lines: string[], allocated: number, overflowValue: strin
   if (allocated === 1) return lines.slice(0, 1);
   return [
     ...lines.slice(0, allocated - 1),
-    truncateToWidth(requireInjectedLabel('dualStream.overflow', overflowValue), width, overflowValue),
+    clipTerminalCells(requireInjectedLabel('dualStream.overflow', overflowValue), width, overflowValue),
   ];
 }
 
@@ -128,8 +129,8 @@ export function composeDualStream(input: DualStreamInput, options: DualStreamOpt
   if (height === 0) return [];
 
   const overflowValue = options.labels?.overflow;
-  const statusLines = input.statusLines.map((line) => truncateToWidth(line, width, overflowValue));
-  const approvalLines = input.approvalLines.map((line) => truncateToWidth(line, width, overflowValue));
+  const statusLines = input.statusLines.map((line) => clipTerminalCells(line, width, overflowValue));
+  const approvalLines = input.approvalLines.map((line) => clipTerminalCells(line, width, overflowValue));
 
   const statusFloor = statusLines.length > 0 ? Math.min(1, height) : 0;
   const approvalRows = Math.min(approvalLines.length, Math.max(0, height - statusFloor));

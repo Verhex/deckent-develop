@@ -14,7 +14,8 @@ import { join, relative } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { getMessage, getMessageLanguages } from '../../../src/cli/helpers/messages.js';
 import { InjectedLabelMissingError, INJECTED_LABEL_MISSING_CODE } from '../../../src/cli/helpers/injected-label.js';
-import { buildLiveFooter, type LiveFooterLabels } from '../../../src/cli/helpers/live-footer.js';
+import { buildLiveFooter as buildLiveFooterImpl, type LiveFooterLabels, type LiveFooterOptions, type LiveFooterState } from '../../../src/cli/helpers/live-footer.js';
+import { clipTerminalCells } from '../../../src/cli/repl/dual-stream.js';
 import {
   resolveModeLabel, buildResumePickerLines, resolveResumeCommand, renderBusyDecision,
   formatApprovalClosure, resolveSwitchGate, formatTurnErrorLine, type ReplLabels,
@@ -22,6 +23,9 @@ import {
 import { buildReplLabels, buildLiveFooterLabels } from '../../../src/cli/repl/run.js';
 import { buildThinkingVerbs, buildToolActivityVerbs, THINKING_VERBS_KEY, TOOL_ACTIVITY_TOOLS } from '../../../src/cli/commands/chat-thinking-verbs.js';
 import { createThinkingTicker, renderToolActivity } from '../../../src/cli/commands/chat-render-region.js';
+
+const buildLiveFooter = (state: LiveFooterState, options: Omit<LiveFooterOptions, 'clip'>) =>
+  buildLiveFooterImpl(state, { ...options, clip: (text, width) => clipTerminalCells(text, width, '…') });
 
 const ROOT = join(__dirname, '..', '..', '..');
 const tFor = (lang: string) => (key: string): string => getMessage(key, lang);

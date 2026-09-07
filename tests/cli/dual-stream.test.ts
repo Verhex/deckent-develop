@@ -4,6 +4,7 @@
 
 import { describe, it, expect } from 'vitest';
 import {
+  clipTerminalCells,
   composeDualStream,
   type DualStreamInput,
 } from '../../src/cli/repl/dual-stream.js';
@@ -155,6 +156,9 @@ describe('composeDualStream — approval-region overflow marker (allocated >= 2)
 });
 
 describe('composeDualStream — display-cell and grapheme safety', () => {
+  it.each([0, -4, Number.NaN, Number.POSITIVE_INFINITY])('direct clip normalizes width=%s to one finite cell', (width) => {
+    expect(clipTerminalCells('状态', width, '…')).toBe('…');
+  });
   it.each([
     ['CJK', '状态正常', 5],
     ['combining', 'Cafe\u0301 status', 6],

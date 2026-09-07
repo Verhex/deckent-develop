@@ -14,8 +14,12 @@
 
 import { describe, it, expect } from 'vitest';
 import { buildLiveFooterLabels } from '../../../src/cli/repl/run.js';
-import { buildLiveFooter, LIVE_FOOTER_LABEL_FIELDS, type LiveFooterLabels } from '../../../src/cli/helpers/live-footer.js';
+import { buildLiveFooter as buildLiveFooterImpl, LIVE_FOOTER_LABEL_FIELDS, type LiveFooterLabels, type LiveFooterOptions, type LiveFooterState } from '../../../src/cli/helpers/live-footer.js';
+import { clipTerminalCells } from '../../../src/cli/repl/dual-stream.js';
 import { getMessage, getMessageLanguages } from '../../../src/cli/helpers/messages.js';
+
+const buildLiveFooter = (state: LiveFooterState, options: Omit<LiveFooterOptions, 'clip'>) =>
+  buildLiveFooterImpl(state, { ...options, clip: (text, width) => clipTerminalCells(text, width, '…') });
 
 const KEY_BY_FIELD: Record<keyof LiveFooterLabels, string> = {
   idle: 'live_footer.idle',

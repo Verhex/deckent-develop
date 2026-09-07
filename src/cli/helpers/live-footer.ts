@@ -72,6 +72,8 @@ export interface LiveFooterOptions {
   /** String-free seam — the caller injects the COMPLETE translated label set
    *  (see file header); a missing/empty field throws InjectedLabelMissingError. */
   labels: LiveFooterLabels;
+  /** Caller-owned canonical terminal-cell clipper (including marker policy). */
+  clip: (text: string, width: number) => string;
 }
 
 /** Validate the injected set — throws the typed guard error naming the first
@@ -99,13 +101,6 @@ function formatElapsed(startedAt: string, now: Date, labels: LiveFooterLabels): 
   if (hours > 0) return `${hours}${labels.unitHours} ${minutes}${labels.unitMinutes}`;
   if (totalMinutes > 0) return `${totalMinutes}${labels.unitMinutes}`;
   return `${totalSeconds}${labels.unitSeconds}`;
-}
-
-function truncate(text: string, width: number): string {
-  const safeWidth = Math.max(1, width);
-  if (text.length <= safeWidth) return text;
-  if (safeWidth === 1) return text.slice(0, 1);
-  return `${text.slice(0, safeWidth - 1)}…`;
 }
 
 interface FooterLine {
@@ -144,6 +139,7 @@ function authLine(auth: LiveFooterAuthState, labels: LiveFooterLabels): FooterLi
  */
 export function buildLiveFooter(state: LiveFooterState, options: LiveFooterOptions): string[] {
   const labels = requireLiveFooterLabels(options.labels);
+  const truncate = options.clip;
   const width = options.width ?? process.stdout.columns ?? 80;
   const now = options.now ?? new Date();
 
