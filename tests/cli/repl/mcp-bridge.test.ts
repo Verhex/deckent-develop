@@ -139,9 +139,10 @@ describe('repl/mcp-bridge — initReplMcpBridge (260-015)', () => {
     });
 
     expect(bridge).not.toBeNull();
-    // No auto-connect: nothing registered because nothing was connected.
+    // No auto-connect: nothing registered. The slash dispatcher, not this
+    // string-free mechanism, owns the localized empty-state message.
     expect(bridge?.listTools()).toEqual([]);
-    expect(bridge?.listSlashLines()).toEqual(['MCP server yok']);
+    expect(bridge?.listSlashLines()).toEqual([]);
   });
 
   it('flag on → composing the bridge does NOT auto-connect the broker', () => {

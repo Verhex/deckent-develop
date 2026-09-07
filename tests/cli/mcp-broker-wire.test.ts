@@ -174,6 +174,16 @@ describe('buildMcpBridge — connectAndRefresh registers namespaced tools', () =
     expect(broker.connectSpy).not.toHaveBeenCalled();
     expect(broker.listToolsSpy).toHaveBeenCalledOnce();
   });
+
+  it('does not render tools retained from a server absent in the latest live set', () => {
+    const registry = new McpToolRegistry();
+    registry.register(SRV, TOOLS);
+    const bridge = buildMcpBridge({ broker: makeSpyBroker(), registry, projectRoot: '/r', audit: vi.fn() });
+    expect(bridge.listSlashLines([SRV]).map((line) => line.split(' — ')[0])).toEqual([
+      `${SRV}__greet`, `${SRV}__compute`,
+    ]);
+    expect(bridge.listSlashLines([])).toEqual([]);
+  });
 });
 
 // ─── 2) dispatch approved → callTool + audit outcome:'ok' ────────────────────
@@ -186,7 +196,6 @@ describe('buildMcpBridge — dispatch gate → callTool → audit (spy)', () => 
 
     const auditSpy = vi.fn((_r: McpAuditRecord): void => undefined);
     const bridge = buildMcpBridge({ broker, registry, projectRoot: '/r', audit: auditSpy });
-
     const result = await bridge.dispatch(
       `${SRV}__greet`,
       { name: 'world' },
@@ -312,6 +321,9 @@ describe('runChatNativeLoop — /mcp with layoutEnabled:true + interactiveTty:tr
     registry.register(SRV, TOOLS);
     const auditSpy = vi.fn();
     const bridge = buildMcpBridge({ broker, registry, projectRoot: '/r', audit: auditSpy });
+    // This case exercises the historical injected duck-type, not production
+    // config discovery; explicitly omit the newer observation capability.
+    Object.defineProperty(bridge, 'connectionObservation', { value: undefined });
 
     // Cast: the loop accepts `ReplMcpBridge` duck-type (same shape).
     const mcpBridge = bridge as unknown as ReplMcpBridge;
@@ -351,6 +363,7 @@ describe('runChatNativeLoop — /mcp with layoutEnabled:true + interactiveTty:tr
       projectRoot: '/r',
       audit: vi.fn(),
     });
+    Object.defineProperty(bridge, 'connectionObservation', { value: undefined });
     const output = vi.fn();
 
     await runChatNativeLoop({
@@ -595,15 +608,15 @@ describe('dispatchMcpSlash', () => {
         expect(bridge.dispatchSpy).not.toHaveBeenCalled();
         expect(out).toBe(getMessage('chat.slash_unknown_subaction', 'en', { command: '/mcp call', sub: '' }));
     });
-    it('broker error is caught — returns [mcp-error] and never throws (fail-safe)', async () => {
+    it('broker error is caught without exposing raw connection details', async () => {
         const bridge = makeFakeBridge({
             loadAndConnectAll: vi.fn(async () => {
                 throw new Error('boom-connect');
             }),
         });
         const out = await dispatchMcpSlash({ args: ['list'], bridge, lang: 'en' });
-        expect(out).toContain('[mcp-error]');
-        expect(out).toContain('boom-connect');
+        expect(out).toBe(getMessage('chat.mcp_operation_failed', 'en'));
+        expect(out).not.toContain('boom-connect');
     });
     it('unknown subaction → localized notice differs by language (i18n tr/en)', async () => {
         const bridge = makeFakeBridge();
@@ -678,6 +691,19 @@ describe('runChatNativeLoop — /mcp server-discovery fall-through (tmpdir)', ()
     });
     afterEach(() => {
         rmSync(root, { recursive: true, force: true });
+    });
+    it('prior success followed by config removal does not render the stale catalogue', async () => {
+        writeFileSync(join(root, '.mcp.local.json'), JSON.stringify({
+            mcpServers: { [SRV]: { command: 'fixture' } },
+        }));
+        const registry = new McpToolRegistry();
+        const bridge = buildMcpBridge({ broker: makeSpyBroker(), registry, projectRoot: root, audit: vi.fn() });
+        expect(await dispatchMcpSlash({ args: ['list'], bridge, lang: 'en' })).toContain(`${SRV}__greet`);
+
+        rmSync(join(root, '.mcp.local.json'));
+        const afterRemoval = await dispatchMcpSlash({ args: ['list'], bridge, lang: 'en' });
+        expect(afterRemoval).toBe(getMessage('chat.mcp_no_servers_configured', 'en'));
+        expect(afterRemoval).not.toContain(`${SRV}__greet`);
     });
     it('no .mcp.json under projectRoot → honest no-server notice (real loadMcpServers)', async () => {
         const { adapter, sendSpy } = idleProvider();

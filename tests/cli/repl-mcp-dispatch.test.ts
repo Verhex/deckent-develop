@@ -102,9 +102,9 @@ describe('chat-mcp-bridge (229-005)', () => {
     expect(lines[0]).toContain('echo the input back');
     expect(lines[1]).toContain('everything__ping');
 
-    // Empty registry path also works.
+    // Mechanism stays string-free; dispatchMcpSlash localizes the empty state.
     const empty = renderMcpSlashLines(new McpToolRegistry());
-    expect(empty).toEqual(['MCP server yok']);
+    expect(empty).toEqual([]);
   });
 
   it('namespaced çağrı → confirm callback is invoked with the resolved action', async () => {

@@ -1175,6 +1175,9 @@ export interface ReplAppProps {
   registerToolSink: (sink: ToolSink) => void;
   /** Slash command catalog for the interactive `/` menu. */
   slashRegistry: SlashRegistry;
+  /** Native Ink `/mcp` ingress. The composition root supplies the session's
+   * single live bridge; absent keeps the catalog's honest not-wired reply. */
+  nativeMcpSlash?: (args: readonly string[]) => Promise<string>;
   /** Initial model/provider selection (shown in the status bar). */
   initialSelection: ActiveSelection;
   /** Switch model/provider; returns the resulting active selection. A present
@@ -1446,9 +1449,29 @@ function TurnView({ turn, hyperlinks }: { turn: Turn; hyperlinks: boolean }): Re
   return <Text>{renderMarkdown(turn.text, true, { hyperlinks })}</Text>;
 }
 
+export interface NativeMcpRouteOptions {
+  input: string;
+  dispatch?: (args: readonly string[]) => Promise<string>;
+  authorizeCall: (tool: string, args: Record<string, unknown>) => string | undefined;
+}
+
+/** Native-only `/mcp` router. `undefined` deliberately delegates to the
+ * existing slash registry when no live bridge was composed. */
+export async function routeNativeMcpInput(options: NativeMcpRouteOptions): Promise<string | undefined> {
+  const match = options.input.trim().match(/^\/mcp(?:\s+(.*))?$/i);
+  if (!match || !options.dispatch) return undefined;
+  const args = (match[1] ?? '').trim().split(/\s+/u).filter(Boolean);
+  if ((args[0] ?? 'list').toLowerCase() === 'call') {
+    const callArgs: Record<string, unknown> = { command: '/mcp', subcommand: 'call' };
+    const denied = options.authorizeCall(args[1] ?? 'mcp', callArgs);
+    if (denied !== undefined) return denied;
+  }
+  return options.dispatch(args);
+}
+
 export function ReplApp(props: ReplAppProps): ReactElement {
   const palette = useInkPalette();
-  const { provider, dispatcher, labels, registerConfirm, registerActionGate, registerToolSink, slashRegistry, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle, shortcutsPanel, pickerLabels, pickerSpecs, saveDefault, configEntries, saveConfigValue, initialTermMode, pickerAscii = false, pickerNoColor = false, dualStreamOverflow } = props;
+  const { provider, dispatcher, labels, registerConfirm, registerActionGate, registerToolSink, slashRegistry, nativeMcpSlash, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle, shortcutsPanel, pickerLabels, pickerSpecs, saveDefault, configEntries, saveConfigValue, initialTermMode, pickerAscii = false, pickerNoColor = false, dualStreamOverflow } = props;
   const { exit } = useApp();
   // TERMINAL-TOOLS-004 — live width for the status row + queue preview (reflows on resize).
   const columns = useTerminalColumns();
@@ -2303,6 +2326,24 @@ export function ReplApp(props: ReplAppProps): ReactElement {
           pushTurn('bg', formatRunFlowOutcomeLine({ kind: 'error', message }, runFlowMountLabels)),
       });
       return;
+    }
+    // Native `/mcp` owns a separate external-tool bridge. Intercept only when
+    // the native engine is active; the legacy loop already handles this family.
+    if (nativeEngine && /^\/mcp(?:\s|$)/i.test(trimmed)) {
+      const result = await routeNativeMcpInput({
+        input: trimmed,
+        dispatch: nativeMcpSlash,
+        authorizeCall: (tool, args) => {
+          const entry = slashRegistry.find((command) => command.name === '/mcp');
+          const gate = gateAction(termModeRef.current, { tool, args, declaredRisk: entry?.risk });
+          return gate.kind === 'deny' ? denyLine(gate, trimmed) : undefined;
+        },
+      });
+      if (result !== undefined) {
+        pushTurn('user', trimmed);
+        pushTurn('seg', result);
+        return;
+      }
     }
     // NATIVE-SLASH-BRIDGE (387-002) — see resolveNativeSlash's doc comment
     // above. Only active when the native engine drives the turn: the legacy

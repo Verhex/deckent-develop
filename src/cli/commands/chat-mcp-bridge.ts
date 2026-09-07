@@ -78,6 +78,13 @@ export interface McpDispatchResult {
   tier?: ToolPermission;
 }
 
+/** Secret-free observation of the most recent configured-server connect pass. */
+export interface McpConnectionObservation {
+  configured: number;
+  connected: number;
+  failed: number;
+}
+
 export interface McpBridgeOptions {
   broker: BridgeBrokerLike;
   registry: McpToolRegistry;
@@ -148,11 +155,9 @@ export function createMcpAuditSink(
  * When `servers` is empty the first line names that fact explicitly so the
  * REPL doesn't show a blank block.
  */
-export function renderMcpSlashLines(registry: McpToolRegistry): string[] {
-  const tools = registry.list();
-  if (tools.length === 0) {
-    return ['MCP server yok'];
-  }
+export function renderMcpSlashLines(registry: McpToolRegistry, connectedServers?: readonly string[]): string[] {
+  const current = connectedServers === undefined ? undefined : new Set(connectedServers);
+  const tools = registry.list().filter((tool) => current === undefined || current.has(tool.server));
   return tools.map((t) => formatTool(t));
 }
 
@@ -209,7 +214,7 @@ const MCP_NS_SEP = '__';
  * startup populates the registry, then `/mcp` listing and dispatch are O(1).
  */
 export function buildMcpBridge(opts: McpBridgeOptions): {
-  listSlashLines(): string[];
+  listSlashLines(connectedServers?: readonly string[]): string[];
   listTools(): NamespacedTool[];
   dispatch(
     namespacedName: string,
@@ -218,9 +223,11 @@ export function buildMcpBridge(opts: McpBridgeOptions): {
   ): Promise<McpDispatchResult>;
   connectAndRefresh(name: string, def: McpServerDef): Promise<NamespacedTool[]>;
   loadAndConnectAll(): Promise<string[]>;
+  connectionObservation?(): McpConnectionObservation;
 } {
   const { broker, registry, projectRoot, sprintId } = opts;
   const includeProjectScope = opts.includeProjectScope ?? true;
+  let connectionObservation: McpConnectionObservation = { configured: 0, connected: 0, failed: 0 };
   const audit =
     opts.audit ??
     ((record: McpAuditRecord): void => {
@@ -235,12 +242,16 @@ export function buildMcpBridge(opts: McpBridgeOptions): {
     });
 
   return {
-    listSlashLines(): string[] {
-      return renderMcpSlashLines(registry);
+    listSlashLines(connectedServers?: readonly string[]): string[] {
+      return renderMcpSlashLines(registry, connectedServers);
     },
 
     listTools(): NamespacedTool[] {
       return registry.list();
+    },
+
+    connectionObservation(): McpConnectionObservation {
+      return { ...connectionObservation };
     },
 
     async connectAndRefresh(
@@ -257,6 +268,7 @@ export function buildMcpBridge(opts: McpBridgeOptions): {
     async loadAndConnectAll(): Promise<string[]> {
       const servers = loadMcpServers(projectRoot, { includeProjectScope });
       const connected: string[] = [];
+      let failed = 0;
       for (const [name, def] of Object.entries(servers)) {
         try {
           if (!broker.isConnected(name)) {
@@ -266,9 +278,15 @@ export function buildMcpBridge(opts: McpBridgeOptions): {
           registerNamespaced(registry, name, tools);
           connected.push(name);
         } catch {
+          failed += 1;
           // Skip a misbehaving server — the REPL stays usable.
         }
       }
+      connectionObservation = {
+        configured: Object.keys(servers).length,
+        connected: connected.length,
+        failed,
+      };
       return connected;
     },
 

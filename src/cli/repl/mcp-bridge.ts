@@ -172,7 +172,7 @@ export function initReplMcpBridge(opts: InitReplMcpBridgeOptions): ReplMcpBridge
 // bridge's confirm-gate + audit path. This is the pure dispatch core — the
 // chat-native loop owns server-discovery + bridge construction and only calls
 // in once it has a bridge. NEVER throws: every broker/connect failure is caught
-// and surfaced as a `[mcp-error] …` string so the REPL stays alive (fail-safe).
+// and surfaced as a localized, secret-free typed state so the REPL stays alive.
 
 /**
  * Parse the trailing words of `/mcp call <tool> [args…]` into a tool-arg
@@ -224,18 +224,48 @@ export interface DispatchMcpSlashOptions {
  * introduced (i18n-first). Dynamic output (tool catalogue, call results) comes
  * straight from the broker and is server-derived data, not localizable text.
  *
- * Fail-safe contract: this function NEVER throws. `loadAndConnectAll` already
- * skips misbehaving servers internally and `bridge.dispatch` encodes errors in
- * its result shape; the outer try/catch is a final backstop for an unexpected
- * throw so the REPL session is never torn down by a `/mcp` line.
+ * Fail-safe contract: this function NEVER throws. Connection/list observations
+ * stay distinct from call outcomes; the outer catch reports only that the
+ * operation outcome is unknown and never reflects raw error/config content.
  */
 export async function dispatchMcpSlash(opts: DispatchMcpSlashOptions): Promise<string> {
   const { bridge, lang } = opts;
   const sub = (opts.args[0] ?? 'list').toLowerCase();
   try {
     if (sub === 'list') {
-      await bridge.loadAndConnectAll();
-      return bridge.listSlashLines().join('\n');
+      const connected = await bridge.loadAndConnectAll();
+      // Filter by THIS refresh's connected set: stale registry entries are not
+      // evidence that their server is live on the current observation.
+      const lines = bridge.listSlashLines(connected);
+      const observed = bridge.connectionObservation?.();
+      // Older injected bridges have no observation API. Preserve their raw
+      // catalogue without manufacturing configured/connected counts.
+      if (!observed) {
+        const legacyLines = bridge.listSlashLines();
+        return legacyLines.length > 0 ? legacyLines.join('\n') : getMessage('chat.mcp_status_unavailable', lang);
+      }
+      if (lines.length > 0) {
+        if (observed.failed > 0) {
+          lines.push(getMessage('chat.mcp_partial_connection', lang, {
+            connected: String(observed.connected),
+            failed: String(observed.failed),
+          }));
+        }
+        return lines.join('\n');
+      }
+      if (observed.configured === 0) return getMessage('chat.mcp_no_servers_configured', lang);
+      if (observed.connected === 0 && observed.failed > 0) {
+        return getMessage('chat.mcp_connection_failed', lang);
+      }
+      if (observed.connected > 0) {
+        const noTools = getMessage('chat.mcp_connected_no_tools', lang);
+        return observed.failed > 0
+          ? `${noTools}\n${getMessage('chat.mcp_partial_connection', lang, {
+              connected: String(observed.connected), failed: String(observed.failed),
+            })}`
+          : noTools;
+      }
+      return getMessage('chat.mcp_status_unavailable', lang);
     }
     if (sub === 'call') {
       const tool = opts.args[1];
@@ -246,15 +276,23 @@ export async function dispatchMcpSlash(opts: DispatchMcpSlashOptions): Promise<s
         });
       }
       // Connect + register first so the namespaced name resolves before dispatch.
-      await bridge.loadAndConnectAll();
+      const connected = await bridge.loadAndConnectAll();
       const callArgs = parseMcpCallArgs(opts.args.slice(2));
+      // An observable production bridge must prove that the cached registry
+      // entry belongs to a server admitted by THIS refresh. Removed or failed
+      // server config cannot dispatch through stale registry state.
+      if (bridge.connectionObservation) {
+        const registered = bridge.listTools().find((entry) => entry.namespacedName === tool);
+        if (!registered || !connected.includes(registered.server)) {
+          return getMessage('chat.mcp_tool_unavailable', lang, { tool });
+        }
+      }
       const confirmFn: McpConfirmFn = opts.confirm ?? (async (): Promise<boolean> => true);
       const result = await bridge.dispatch(tool, callArgs, confirmFn);
       return result.output;
     }
     return getMessage('chat.slash_unknown_subaction', lang, { command: '/mcp', sub });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return `[mcp-error] ${msg}`;
+  } catch {
+    return getMessage('chat.mcp_operation_failed', lang);
   }
 }

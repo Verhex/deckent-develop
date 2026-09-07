@@ -63,6 +63,12 @@ export function nativeBootErrorCode(errorCode: string | undefined): string {
   return `NATIVE_BOOT_${stable}`;
 }
 
+export function resolveNativeMcpUnavailableMessage(plan: McpConnectPlan, lang: string): string | undefined {
+  if (plan.notice) return getMessage('chat.mcp_client_disabled', lang);
+  if (!plan.connect) return getMessage('chat.mcp_no_servers_configured', lang);
+  return undefined;
+}
+
 export function resolveProviderDefaultWrite(
   nativeSelection: ActiveSelection | undefined,
   kind: 'model' | 'provider',
@@ -98,6 +104,7 @@ import { createCachedPathLister, isScopedRelPath } from './at-ref.js';
 import { createPermissionStore } from '../commands/chat-permissions.js';
 import { classifyTool } from './tool-permissions.js';
 import { buildSlashRegistry } from '../commands/chat-slash-registry.js';
+import { dispatchMcpSlash, type McpConnectPlan, type ReplMcpBridge } from './mcp-bridge.js';
 import { getMessage, getLanguage } from '../helpers/messages.js';
 import { colorTier, isColorSuppressed, isDumbTerminal } from '../helpers/theme.js';
 import { InkPaletteProvider } from './ink-palette-context.js';
@@ -1503,6 +1510,8 @@ export async function runInkRepl(
   let runFlowResultSink: ((event: ChatTurnBgEvent) => void) | null = null;
   let runFlowResultWatch: RunCompletionWatchHandle | undefined;
   let bootHealthSelection: BootHealthSelection | undefined;
+  let replMcpBridge: ReplMcpBridge | undefined;
+  let replMcpUnavailableMessage: string | undefined;
   if (nativeSelected && nativeBoot) {
     const cfg = projectCfg;
     const resolved = nativeBoot;
@@ -1522,19 +1531,23 @@ export async function runInkRepl(
         // prints an honest notice instead of silently dropping the tools.
         const { isMcpClientEnabled, planMcpConnect } = await import('./mcp-bridge.js');
         const plan = planMcpConnect(process.cwd(), isMcpClientEnabled(cfg as { mcp_client_enabled?: boolean }));
+        replMcpUnavailableMessage = resolveNativeMcpUnavailableMessage(plan, lang);
         if (plan.connect) {
           const { McpClientBroker } = await import('../../mcp-client/broker.js');
           const { McpToolRegistry } = await import('../../mcp-client/registry.js');
           const { buildMcpBridge } = await import('../commands/chat-mcp-bridge.js');
           mcpClientBroker = new McpClientBroker({});
           const bridge = buildMcpBridge({ broker: mcpClientBroker, registry: new McpToolRegistry(), projectRoot: process.cwd(), includeProjectScope: plan.includeProjectScope });
+          replMcpBridge = bridge;
           const connected = await bridge.loadAndConnectAll();
           if (connected.length > 0) mcpBridge = bridge as unknown as import('./native-tool-registry.js').NativeMcpBridge;
         }
         if (plan.notice) {
-          process.stdout.write(`${getMessage('chat.mcp_client_disabled', lang)}\n`);
+          process.stdout.write(`${replMcpUnavailableMessage}\n`);
         }
-      } catch { /* MCP optional — REPL stays usable */ }
+      } catch {
+        replMcpUnavailableMessage = getMessage('chat.mcp_status_unavailable', lang);
+      }
 
       // Mutable backend the engine reads per turn (via the getters below).
       const live = { adapter: resolved.adapter, model: resolved.model, provider: resolved.providerName };
@@ -1855,6 +1868,16 @@ export async function runInkRepl(
         busyControls: replSurfaceEnabled && nativeEngine !== undefined,
         interrupt: nativeEngine?.cancelTurn !== undefined,
       })}
+      {...(replMcpBridge || replMcpUnavailableMessage ? {
+        nativeMcpSlash: (args: readonly string[]) => replMcpBridge
+          ? dispatchMcpSlash({
+              args,
+              bridge: replMcpBridge,
+              lang,
+              confirm: (action) => askConfirm(action.description, action.name, action.args),
+            })
+          : Promise.resolve(replMcpUnavailableMessage!),
+      } : {})}
       initialSelection={nativeSelection ?? switcher.current()}
       onSwitch={(sel) => {
         // Native engine active → the switch must retarget the REAL backend the

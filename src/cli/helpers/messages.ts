@@ -3934,12 +3934,40 @@ const BASE_MESSAGES: MessageMap = {
     tr: '[agentic] eşleşen niyet yok — sohbete dönülüyor.',
   },
   'chat.mcp_not_wired': {
-    en: 'The external MCP client is not wired into the REPL yet — it is on the roadmap (F9 phase 2). Use `claude mcp add deckent -- npx deckent-mcp` to reach deckent tools from a host CLI.',
-    tr: 'Harici MCP istemcisi REPL\'e henüz bağlı değil — yol haritasında (F9 faz 2). Deckent araçlarına host CLI üzerinden erişmek için: `claude mcp add deckent -- npx deckent-mcp`.',
+    en: 'No external MCP client connection is available in this session. Check MCP configuration and client enablement.',
+    tr: 'Bu oturumda harici MCP istemci bağlantısı kullanılamıyor. MCP yapılandırmasını ve istemci etkinleştirmesini denetleyin.',
   },
   'chat.mcp_client_disabled': {
     en: 'MCP servers are configured but the external MCP client is disabled. Set "mcp_client_enabled": true in .deckent/config.json to connect them.',
     tr: 'MCP sunucuları yapılandırılmış ama harici MCP istemcisi kapalı. Bağlanmak için .deckent/config.json içinde "mcp_client_enabled": true ayarlayın.',
+  },
+  'chat.mcp_connection_failed': {
+    en: 'MCP servers are configured, but none could be connected. Check the server configuration and try /mcp list again.',
+    tr: 'MCP sunucuları yapılandırılmış, ancak hiçbirine bağlanılamadı. Sunucu yapılandırmasını denetleyip /mcp list komutunu yeniden deneyin.',
+  },
+  'chat.mcp_no_servers_configured': {
+    en: 'No MCP servers are configured. Add servers to .mcp.local.json or .mcp.json.',
+    tr: 'Hiçbir MCP sunucusu yapılandırılmamış. .mcp.local.json veya .mcp.json dosyasına sunucu ekleyin.',
+  },
+  'chat.mcp_connected_no_tools': {
+    en: 'MCP connected, but the connected servers published no tools.',
+    tr: 'MCP bağlantısı kuruldu, ancak bağlı sunucular araç yayımlamadı.',
+  },
+  'chat.mcp_partial_connection': {
+    en: 'MCP connection was partial: {connected} connected, {failed} failed. Check the failed server configuration.',
+    tr: 'MCP bağlantısı kısmi kaldı: {connected} bağlandı, {failed} başarısız. Başarısız sunucu yapılandırmasını denetleyin.',
+  },
+  'chat.mcp_status_unavailable': {
+    en: 'MCP status is unavailable for this client bridge.',
+    tr: 'Bu istemci köprüsü için MCP durumu kullanılamıyor.',
+  },
+  'chat.mcp_operation_failed': {
+    en: 'The MCP operation failed. No connection or tool outcome can be confirmed.',
+    tr: 'MCP işlemi başarısız oldu. Bağlantı veya araç sonucu doğrulanamıyor.',
+  },
+  'chat.mcp_tool_unavailable': {
+    en: 'MCP tool "{tool}" is not available from a server connected by the current refresh.',
+    tr: 'MCP aracı "{tool}" geçerli yenilemede bağlanan bir sunucudan kullanılamıyor.',
   },
   // born-697 (SURF-3 approval last-mile) — visible closure line for a terminal
   // approve/deny. Param-free of `{result}` (the worker runs cross-process async,

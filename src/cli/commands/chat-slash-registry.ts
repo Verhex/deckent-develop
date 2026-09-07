@@ -771,8 +771,8 @@ export function resolveNervousSlash(rest: readonly string[], store: NervousPendi
 
 /**
  * `/mcp [list|call ...|restart]` — registry-level FALLBACK notice only. The LIVE
- * external-MCP dispatch (list/call) is chat-native.ts's own wire
- * (dispatchMcpSlash, ../repl/mcp-bridge.js), which intercepts BEFORE resolveSlash
+ * external-MCP dispatch (list/call) is shared by the legacy loop and native Ink
+ * ingress (dispatchMcpSlash, ../repl/mcp-bridge.js); both intercept BEFORE resolveSlash
  * whenever a bridge is configured — this function only runs with no bridge
  * present (or a caller invoking resolveSlash directly). 'restart' has no dispatch
  * surface in mcp-bridge.ts at all, so it gets the existing honest
