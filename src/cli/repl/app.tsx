@@ -661,6 +661,12 @@ export function resolvePickerCardActive(confirmOpen: boolean, approvalPending: b
   return !confirmOpen && !approvalPending && !runFlowPending && !inboxOpen;
 }
 
+export function resolveGlobalInterruptActive(inputBarActive: boolean, pickerActive: boolean): boolean {
+  // Cards without a Ctrl-C handler leave the fallback policy available. The
+  // picker is the sole modal that consumes Ctrl-C itself (as interrupt/close).
+  return !inputBarActive && !pickerActive;
+}
+
 /** TERMINAL-PICKER-005 — below 40 display columns a card cannot hold a row
  *  plus its facts (platform matrix): the same choices print as numbered
  *  transcript lines and a typed `<n|id>` selects. Pure. */
@@ -2430,7 +2436,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   const inputBarActiveNow = stdinOwner.inputBarActive && !runFlowPending && !inboxOpen && picker === null;
   useInput((input, key) => {
     if (key.ctrl && input === 'c') handleInterrupt('int', false);
-  }, { isActive: !inputBarActiveNow });
+  }, { isActive: resolveGlobalInterruptActive(inputBarActiveNow, resolvePickerCardActive(confirm !== null, approvalPending, runFlowPending, inboxOpen) && picker !== null) });
 
   // Persistent phase anchor — the orientation signal ("am I working / done?").
   const phase: 'thinking' | 'generating' | 'idle' =
@@ -2534,9 +2540,8 @@ export function ReplApp(props: ReplAppProps): ReactElement {
             : null}
           onCommit={(id, scope) => commitPicker(picker.kind, id, scope)}
           onClose={() => setPicker(null)}
-          // TERMINAL-PICKER-007 — Ctrl-C only closes the card; the app-level
-          // hook (active while the input bar is not the owner) already arms
-          // the two-press exit policy for the SAME keypress.
+          // TERMINAL-PICKER-007 — Ctrl-C closes only this active card. The
+          // next idle Ctrl-C reaches the normal two-press interrupt policy.
           onInterrupt={() => setPicker(null)}
         />
       )}

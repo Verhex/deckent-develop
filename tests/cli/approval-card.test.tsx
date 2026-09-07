@@ -241,6 +241,10 @@ describe('mapApprovalKey — y/n/a/d key mapping', () => {
   it.each(['x', '', 'q', '1', ''])('unmapped key %j is a no-op (null)', (input) => {
     expect(mapApprovalKey(input)).toBeNull();
   });
+
+  it('keeps Esc pending rather than deciding', () => {
+    expect(mapApprovalKey('', { escape: true })).toBeNull();
+  });
 });
 
 // ─── born-697 (SURF-3 approval last-mile) — visible closure line ─────────────

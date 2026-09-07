@@ -48,6 +48,16 @@ async function* oneRequest(request: ApprovalRequest): AsyncGenerator<ApprovalStr
 }
 
 describe('ApprovalCard — render + decide keypress (born-697, ink-testing-library)', () => {
+  it('Esc collapses expanded details without deciding the pending request', async () => {
+    const req = buildRequest('apr-esc');
+    const onDecide = vi.fn();
+    const { stdin, lastFrame } = render(<ApprovalCard events={oneRequest(req)} onDecide={onDecide} decidedBy="terminal" channel="terminal" labels={EN_LABELS} />);
+    await tick(); stdin.write('d'); await tick();
+    expect(lastFrame() ?? '').toContain(EN_LABELS.detailsHeading);
+    stdin.write(String.fromCharCode(27)); await tick(80);
+    expect(lastFrame() ?? '').not.toContain(EN_LABELS.detailsHeading);
+    expect(onDecide).not.toHaveBeenCalled();
+  });
   it('renders the pending request summary + risk badge', async () => {
     const req = buildRequest('apr-1');
     const { lastFrame } = render(

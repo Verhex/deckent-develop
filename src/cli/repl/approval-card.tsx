@@ -134,7 +134,8 @@ export type ApprovalCardAction = 'approve' | 'deny' | 'approve-all' | 'details';
  *  key is a no-op (returns null) — unlike app.tsx's 3-way confirm modal (which
  *  treats "anything but y/a" as deny), this card has 4 distinct actions, so an
  *  unmapped key must never silently deny. */
-export function mapApprovalKey(input: string): ApprovalCardAction | null {
+export function mapApprovalKey(input: string, key?: { escape?: boolean }): ApprovalCardAction | null {
+  if (key?.escape) return null;
   switch (input.toLowerCase()) {
     case 'y': return 'approve';
     case 'n': return 'deny';
@@ -393,11 +394,14 @@ export function ApprovalCard(props: ApprovalCardProps): ReactElement | null {
     onClosure?.(request, decision);
   };
 
-  useInput((input) => {
+  useInput((input, key) => {
     const current = queueRef.current!.head();
     if (!current) return;
+    // Escape is presentation-only here: collapse details, but keep the live
+    // request pending for explicit approval authority or expiry.
+    if (key.escape) { if (expanded) setExpanded(false); return; }
     const { request } = current;
-    switch (mapApprovalKey(input)) {
+    switch (mapApprovalKey(input, key)) {
       case 'approve':
         sendDecision(request, 'allow');
         queueRef.current!.resolve(request.id);

@@ -17,7 +17,7 @@
 // confirmKeyToAnswer / resolveModeLabel / resolveFooterLines).
 
 import { describe, it, expect } from 'vitest';
-import { resolveStdinOwner } from '../../src/cli/repl/app.js';
+import { resolveGlobalInterruptActive, resolveStdinOwner } from '../../src/cli/repl/app.js';
 import { mapApprovalKey } from '../../src/cli/repl/approval-card.js';
 import { confirmKeyToAnswer } from '../../src/cli/repl/app.js';
 
@@ -98,5 +98,13 @@ describe('born-508 regression — a "yes..." chat message no longer double-fires
     // site is gated by owner.confirmActive, so with confirmActive===false the
     // handler never runs even though the mapper would happily answer 'y'.
     expect(confirmKeyToAnswer('y', {})).toBe('y');
+  });
+});
+
+describe('modal keyboard ownership', () => {
+  it('only suppresses fallback Ctrl-C for the active picker, its actual consumer', () => {
+    expect(resolveGlobalInterruptActive(false, false)).toBe(true);
+    expect(resolveGlobalInterruptActive(false, true)).toBe(false);
+    expect(resolveGlobalInterruptActive(true, false)).toBe(false);
   });
 });
