@@ -11,6 +11,196 @@ PREREQUISITE: 3331 (landed 2449b6e4f) → 3332 (landed 13d2c80ef) → 3333 (land
 OWNER_DECISION_REF: owner-live-2026-09-04-terminal-audit-closure-v2
 STATUS: IN_PROGRESS source-work; DOGFOOD_HEALTH=DEGRADED. 2026-09-06T23:10Z sonrası gerçek autonomous dry-plan PASS; exact micro-task proof admission ve çoklu-worker settlement hâlâ açık, yeni worker dispatch yok.
 
+### L6 source checkpoint landed — 2026-09-08
+
+Source59f8cf581:10files,+276/-8, every committed blob SHA equals reviewed
+candidate freeze/fan-in-v2. Main runtime proof includes explicitly preserved
+inherited source; this is not a clean-commit-tree full-suite claim. Index empty,
+messages73/10+run7/0 unstaged; MASTER/generated/inherited state untouched.
+Fable response still absent; independent review remains OPEN, not self-verified.
+No push (existing codex2 boundary), no MASTER DONE/receipt mutation.
+Git reports pre-existing gc.log/loose-object warning; no manual gc/prune performed.
+
+### L6 local landing authority / independent review still open — 2026-09-08
+
+No Fable response to954/955 at this checkpoint. Root reviewed agent-authored
+source independently, checked exact changed bytes, main126tests and10actual cases.
+Owner's bounded commit authorization and required local verification permit a
+source checkpoint; this is not cross-provider XVerify, design-critic PASS or
+authenticated outcome closure. Sequence updated: local source commit now,
+Fable independent verdict when available,7099 remains VERIFY. No bypass of any
+product approval/receipt gate; no repeated provider request or forced push.
+Exact10 candidate blobs staged; inherited messages73/10,run7/0 remain unstaged.
+
+### L6 main actual PASS / source commit pending — 2026-09-08
+
+Exact10path fan-in applied after preimage+candidate SHA verification; inherited
+messages73/10 and run7/0 changed-line bytes preserved. Main13file126/126PASS
+fbd48559182b95479df6e17df62a8c2ab5cf4ded708aab8d79621711d8ee4536,
+tsc95467exit0; main i18n --json59REPL/0hits PASS. Scoped diff-check PASS;
+whole-tree diff-check reports inherited .brain/exports/memory.md whitespace only.
+Canonical bot2969555stop→guardALLOW→build:all78044exit0→bot3034173start;
+fresh liveness/entrypoint digest match. Bot recorded2026-09-07T23:02:34.991Z,
+entry35ba88de/buildIdentity311be99b/projectRootb38d9cf3; no sprint mutation.
+Mainfreeze4c544438980d8e8bb3d55e69a92a2dca8781cb80f6560bac300507b58ad353b3;
+actual5424exit0 /tmp/deckent-7099-reduced-motion-b1Zm94/result.json SHA
+b74e97d90b3e1de03c16dfb7662c0044b271f1051f65676c4b28f0711d510aba:
+10/10PASS,0UNRUN,source/dist before==after; separate child audit28startups/
+8spawns,0unclosed/0alive. Scope remains local diagnostic, not dogfood settlement.
+
+Durable copy archives; originals preserved, private0700/0600, independent inode
+and SHA/readback verified, SHA256SUMS checks PASS:
+- Candidate /home/alperen/deckent-recovery-20260904/terminal-7099-reduced-motion-candidate-v1-d9QyD1:
+  381files/3322687bytes, manifest17e94c9d20b8e8e615a6cbe3e4140e1c68749c3a4330cd90a26aa89c049996be,
+  SUMSea9da2365b7a221dcdd48ce1304ce9ffa9439382f47e117dba45ddc18d8dcbcc.
+- Main /home/alperen/deckent-recovery-20260904/terminal-7099-reduced-motion-main-v1-laahtD:
+  187files/2940234bytes, manifestfcdc1639a27825181ce8e34a7b25b991f22e53aa5eeeaef2a5e32e35ef6c8658,
+  SUMS7a4b17d5164fb0e6f4866bb2715261d6faa4293afc34097f27ef5837f168904f.
+Fable954 compact milestone requested; no verdict received at this checkpoint.
+No source commit/push or closure mutation yet; index empty. MASTER validator
+590rows/501active/232receipts/13classes PASS;7099VERIFY remains unchanged.
+
+### L6 candidate actual PASS — 2026-09-08
+
+Actual v3 handle55104exit0; /tmp/deckent-7099-reduced-motion-TcZk4w/result.json
+SHA0114a0e71a621701787902e16f695c7d083a7dfbd15f80a80088a6ee148441ae.
+8normal+2invalid EN/TR PASS,0UNRUN; source/compiled before==after. Root separate
+child-log audit:28startups/8spawns,0unclosed/0alive (includes invalid-case children).
+Source unchanged from duration freeze11a606f1; contracteffa6a9744b520602f1efaab39c1befcc230f1d276a96038e18d53a5201991b9;
+helper475df24fa78acbb094f36ab5dca9c5b4473fd962091802ae6bf6ad381a8f5743.
+Normal motion retains changing braille, reduced/ASCII/NO_COLOR removes it while
+busy→completion→ready and positive footer elapsed persist. ASCII claim is only
+decorative activity: existing Unicode footer still present, not global ASCII closure.
+Invalid bare non-TTY entry rejects exact config with localized typed boot refusal
+and no inference; detailed field message is validator evidence only.
+126targeted tests/tsc/build PASS; diagnostic local loopback, not paid provider,
+real human approval, dogfood worker settlement or non-Linux platform proof.
+Main10path fan-in prepared; not applied, independent milestone review pending.
+
+### L6 duration corrected / compiled harness contract correction — 2026-09-08
+
+Duration regression28/28PASS report76c679c2; root13file126/126PASS
+6b390fb5e9af8ff771562da7bf8436f52c3d140bee3ca1e9152d6ee5269f6d5a;
+tsc30220exit0, candidate i18n gate PASS (not main's extended REPL scan).
+Candidate own canonical clean guardALLOW, build5095exit0; source24/compiled10
+freeze11a606f17108957fd0a83bbd16bea8784c9417d7365feeff623155740ed75241.
+Main-version clean inspector against candidate initially SCHEMA_MISMATCH;
+candidate's own inspector and build agreed ALLOW. No authority store changed.
+Actual5293exit1 evidence /tmp/deckent-7099-reduced-motion-Kwz3wG/result.json
+09562379698784781b992ea1d853a7cd88acb39ffb8e120c6db0a380327c49f5:
+all8 normal cases PASS including TR and ASCII/NO_COLOR, elapsed1.6s each;
+EN invalid safely rejected with code1 and NATIVE_BOOT_CONFIG_INVALID, no inference.
+Harness expected field-specific validateConfig text at bare non-TTY ingress,
+but entry.ts754 intentionally exposes localized native.boot.config-invalid.
+Thus harness invalid-message assertion FAIL, TR invalid UNRUN; not source failure.
+One bounded runtime-harness correction: v3 expects exact existing typed boot code
+and localized boot key, retains no-inference/nonzero/reap/output checks. Detailed
+field validation remains config-test evidence, not a bare-CLI message claim.
+No source/build changes or elapsed assertion relaxation. V2 failures preserved;
+one changed-contract actual matrix allowed; unchanged fingerprint stops.
+
+### L6 actual failure / duration-clock correction — 2026-09-08
+
+Actual helper v2 executed once, handle78038 exit1; evidence
+/tmp/deckent-7099-reduced-motion-qFiWvK/result.json SHA
+dff55ee1d02cca0f0e0e23619fc9129f9f802e38a94a89419db5b5b72e4872d1.
+EN default/reduced PASS; TR default showed `⏱ -0.9s · 7 tok`, failing
+elapsed truth while animation, completion and child custody passed. Five normal
+and two invalid-config cases remain UNRUN. Prior UNRUN preparation note below
+is historical. No main fan-in, no whole7099 closure.
+
+Runtime-discovered dependent defect, not a retry of unchanged animation code:
+runNativeTurnLoop defaults to Date.now; measuredOnTurnEnd subtracts wall times.
+This allows negative duration on wall-clock regression; exact OS cause unknown.
+Same App tool-duration start/tick/cancel uses wall time. Owner-approved manual
+7099 continuation authorizes this exact correction; no new MASTER admission.
+Candidate unchanged: /tmp/deckent-7099-reduced-motion-peeTOe.
+One writer: src/cli/repl/app.tsx, tests/cli/repl-turn-exception.test.ts,
+tests/cli/repl/native-tool-activity.test.tsx,
+tests/cli/repl/reduced-motion.test.tsx only if clock fixture requires alignment.
+Use a monotonic duration source, preserve injectable clock and semantic timers;
+do not clamp away the defect or weaken elapsed assertions. Wall timestamps,
+approval expiry, Ctrl-C policy, legacy chat, billing, receipts and runtime state
+are excluded. Root owns proof/freeze/docs and later fan-in.
+Budget: one correction implementation + one changed-evidence corrective pass,
+max two scoped test invocations,20min; root one combined verification and one
+new compiled matrix after changed source. Preserve all original failure bytes.
+Previous config/surface budgets stay exhausted; this scope addresses only the
+new actual duration failure. Unchanged failure stops; no unbounded FIX chain.
+Source v1/fan-in v1 are superseded only after exact new freeze; no blind reuse.
+Safe normal execution return remains dependent multiworker/next-goal/settlement,
+not this diagnostic loopback. DOGFOOD ON / DEGRADED remains unchanged.
+
+### L6 reduced-motion candidate verification — 2026-09-07T22:43Z
+
+Config lane correction1 moved bilingual metadata description to canonical
+getMessage key; no hardcoded new user-facing descriptions. Final config18/18PASS
+fcc902c84daa5f9ff75d4b785f6309d4108ba80a4abdb2444c672a9a9df9ab7f;
+surface3/3PASS702653e3def4ccb871b0cb1c6d8ff1b42a721f17aab66eb9b686505174774efa.
+Surface initial2/3FAIL retained: assertion incorrectly rejected permitted
+executing→generating semantic update; final test checks exact80ms interval
+disposal while1s elapsed and phase progression remain. No production rollback.
+Root10file99/99PASS handle86295exit0, root-joint-tests-v1.json SHA
+9b167e8df8d6dee708d813ad7c07d2b6af59547b4637ab3fc8d1bcf70f1de049;
+noEmit90719exit0/i18n59REPL0hits. Fresh candidate guardALLOW; build99957exit0
+native/core/assets only, candidate Dashboard not built or claimed.
+root-built-freeze-v1.json54aa91f899cbebf762b87ea82af895d0156744792842a669772cbc2f845f70cd
+binds20source/test+10compiled pins. Exact8path main fan-in PREPARED only;
+main runtime/source unchanged, inherited messages/run overlap preserved.
+Actual helper preparation still UNRUN. Reviewed correction1 adds exact invalid
+config EN/TR, NO_COLOR cases, bounded label child/provider teardown, post-completion
+ready boundary, spawn-close+liveness checks and pre-reviewed compiled pins.
+Provider delay measures animation and turn-footer duration; tool elapsed1s is
+mounted-production-component evidence, not a paid provider or actual tool claim.
+Original helper preparations retained; no real CLI verdict until execution.
+
+### L6 reduced-motion — bounded continuation, 2026-09-07T22:29Z
+
+Existing7099 L6 obligation, owner-approved manual ADR-D-007 continuation;
+DOGFOOD ON/DEGRADED, no new MASTER outcome or runtime task identity.
+Main native permission source55fd20009 + docs d24017f17 sealed. Fable950
+ba952b6b482f independently verified exact49/64pins, main396tests,22actual,
+bot identity and405payload archive; LOCAL_VERIFIED, not whole7099 closure.
+Fable951 notes its949 message truncation; no missing owner decision is inferred.
+
+Fresh next defect: TerminalConfig has no reduced_motion preference; App Spinner
+unconditionally starts an80ms interval and both busy anchors consume it.
+User/product result: motion-sensitive users can stop decorative animation while
+still seeing authoritative phase/tool/elapsed/freshness and approval expiry.
+Dogfood result: long operations stay inspectable without decorative redraw churn.
+
+Candidate /tmp/deckent-7099-reduced-motion-peeTOe, detached d24017f17.
+Disjoint source writers:
+A config: src/core/config-types.ts, src/core/config.ts,
+src/cli/helpers/messages.ts; tests/core/config-terminal.test.ts,
+tests/core/config-reduced-motion.test.ts(new).
+B surface: src/cli/repl/app.tsx, src/cli/repl/run.tsx;
+tests/cli/repl/reduced-motion.test.tsx(new).
+Shared interface: optional terminal.reduced_motion boolean, absent resolves false;
+ReplAppProps.reducedMotion optional boolean. Use existing terminal config
+deep-merge/validation/catalog metadata; no alternate preference authority.
+Explicit true suppresses decorative interval; ASCII/words-only degrade without
+braille animation. False/unset normal interactive path retains animation.
+Do not stop duration/freshness/deadline/control timers or alter tool/state truth.
+No new glyph vocabulary, design direction, renderer shell or dependency.
+
+Root owns actual proof helper/evidence/capsule/current-flow, main fan-in/index.
+Negative scope: main source, .brain/.tasks/.deckent runtime, auth/config instance
+files, MASTER, inherited changes, debug-HOLD candidate, other lanes; no worker
+build/restart/provider/sprint/commit/push. Workers return hashes/results only.
+
+Finite budget: one implementation and one root independent review; at most one
+changed-evidence corrective pass per lane, max two scoped test invocations,
+20minutes per lane,2forks/6GB ceiling; unchanged failure or exhausted budget HOLD.
+Root joint config/App regression+tsc+i18n, candidate/main compiled EN/TR actual
+CLI with delayed private loopback, preference on/off, typed invalid preference,
+decorative frame changes vs stable progress, completion/exit/owned-child closure.
+No fake provider billing, human approval or receipt. Linux local PTY only;
+Windows-native/macOS/SSH/other-host claims remain honest HOLD.
+One final independent Fable milestone; no per-test ACK/design loop.
+First safe exact normal execution boundary returns to dogfood; real dependent
+multiworker→next-goal→settlement remains separate unproven7099 closure obligation.
+
 ### Native permission main actual + archive — 2026-09-07T22:23Z
 
 Main actual80727exit0 /tmp/deckent-7099-native-permission-pty-YAvYqX/result.json

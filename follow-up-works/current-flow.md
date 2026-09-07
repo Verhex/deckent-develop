@@ -1,127 +1,64 @@
 # GEÇİCİ AKIŞ — 7099 TERMINAL
 
-> SSOT: docs/MASTER-PLAN.md. İmleçtir; authority/receipt değildir.
+> SSOT: docs/MASTER-PLAN.md. Bu dosya kısa imleçtir; authority/receipt değildir.
 > Silinme tetiği: onaylı sıra tüketilip kalıcı kanıtlar MASTER/evidence'a işlendiğinde silinir.
-> Ayrıntı ve failure geçmişi: docs/execution/active/TERMINAL-OPERATOR-SURFACE-CLOSURE-001.md.
+> Geçmiş ve ayrıntılı kanıt: docs/execution/active/TERMINAL-OPERATOR-SURFACE-CLOSURE-001.md.
+> Önceki imleç geçmişi git d24017f17 ve önceki commit'lerde korunur.
 
-## Güncel — 2026-09-08 01:23 TR
-
-Native permission main source55fd20009 exact49 committed blobs==candidate freezev6;
-inherited messages73/10, run7/0, MASTER19/0 ve generated206/11 korunur.
-Main38file396/396PASS963118aa (80886exit0), noEmit99105/i18nPASS;
-canonical botstop2611078→guardALLOW→build:all7465exit0→botstart2969555.
-Bot entrypoint/buildIdentity/projectRoot üç digest eşleşti, liveness doğrulandı.
-Fable947 independent candidateGO; mainactual80727exit0,22/22PASS0UNRUN,
-result0f056775;16privatewrites/16authchildren, allchildcustodyclosed,foreignno-leak.
-Maincontract1dcd0174; mainfreeze4373cd0d; compiledbefore==after.
-Main archive terminal-7099-native-permission-main-v1-mLecFh:405files/1963142bytes;
-manifestb8ca3aa6/SUMSa6f712bf readbackPASS,private0700/0600,originalspreserved.
-Candidate archive terminal-7099-native-permission-candidate-v1-eAmokO preserves failures.
-7099VERIFY; loopback kanıtı dogfood settlement değildir. Push codex2'de.
-Sonraki adım: bounded docs commit → tek Fable milestone → 7099 kalan L1–L6/proof.
-
-## Önceki candidate checkpoint — 2026-09-08 01:03 TR
-
-Native permission final candidate actual22/22PASS0UNRUN jAJRaR result704c8bf1,
-handle10953exit0. C3 root38file396/396PASS65ca53ee; noEmit30296/i18n/build90904PASS.
-Freezev6 64pins6d015d27; contractv4d9dc9802. Foreigncontextabsence EN/TR proven;
-16privatewrites/16local-authchildren, allchildcustodyclosed. Fable946 finalverdict
-pending; mainfan-in PREPARATION only. Main code/runtime untouched,7099VERIFY.
-Below failures are retained history, not latestcandidateverdict. No dogfoodreceipt.
-
-C2 final joint37file383/383PASS0skip f2ccc9ba, handle65950exit0. Enter fixture
-strictshape corrected (+Shift/Meta); productionunchanged from noEmit5024.
-Freezev5 e6605569 (63pins) intact; candidate build:all2308exit0. Contractv3
-7f3682e8 now pins input-bar compiled/source; same22scenario actual running.
-Main source/runtime/build untouched. Prior382/383 report below remains historical.
-
-C2 keyboard-owner fix candidate only: stable card/composer/confirm listeners with
-latest guards. Freezev4 63pins; root37file joint383tests:382PASS/1FAIL, handle35934
-exit1. New mounted first-frame confirm/native tests PASS; sole FAIL existing
-input-bar-cluster Enter-key exact-object assertion (modifier fields), classification
-pending; no retry. noEmit5024exit0, i18n59REPL/hits0. C2 not yet built or actual-run.
-Owner latest: Fable communication only compact outcome/results/block milestones;
-943 read/digest verified; reply bundled with next completed verification milestone.
-
-C1 final root joint28file281/281PASS0skip, report80922472; noEmit60873exit0.
-Freezev3 53/53path intact. i18n59REPLfiles/hits0. Candidate build:all88495exit0
-(native/core/assets/dashboard); main bot/runtime/build untouched.
-Contractv2 0cd02e1a, Cactual55919exit1 AtFZ6E resultfa5832a4: en-once PASS
-(2auth/2writes/4turns/tool+completion visible); en-session FAILED key2 goes to
-composer while lifetime card visible,0auth/0writes;20UNRUN. Keyboard-transition
-RCA read-only with Wegener; no unchanged retry, no main code landing.
-Below earlier Cfailure/Bfreeze records are historical, not current final proof.
+## Aktif iş
 
 7099 tek ACTIVE outcome; MASTER VERIFY. DOGFOOD ON / health DEGRADED.
-Owner-onaylı elle ADR-D-007 devam; bütün program goal'de korunur.
-Approval source ff6b1d409 exact18 +2146/-376, evidence docs55422e982 committed.
-MASTER admission dd8abc76d exact4 docs: yalnız7142–7146 OPEN; Fable900 doğruladı.
-Canonical HEAD projection500active/589rows/218receipts, receiptRegistry değişmedi.
-Inherited3357/14GR main'de korunur; MASTER residual19satır. Push codex2'de.
+Owner-onaylı bounded elle ADR-D-007; güvenli sınırda dogfood'a dönülür.
+Şimdi: L6 reduced_motion + monotonic duration source59f8cf581 landed; Fable verdict açık.
+Candidate: /tmp/deckent-7099-reduced-motion-peeTOe, base d24017f17.
+İki disjoint writer: config/types/messages/tests ve App/run/tests.
+Root: proof helper gözetimi, joint test, gerçek candidate/main CLI, fan-in ve arşiv.
+Yalnız dekoratif hareket azalır; phase/tool/elapsed/freshness/approval expiry korunur.
+Exact scope/finite budget/negative scope capsule'ın L6 reduced-motion bölümünde.
+Candidate frozen:24source/test+10compiled pins, built-freeze11a606f1.
+Root13files126/126PASS6b390fb5; tsc/i18n ve native/core/assets build5095PASS.
+Actual v3 TcZk4w/result.json0114a0e7:10/10PASS,0UNRUN;28startup/8spawn kapalı.
+Önceki negatif süre dff55ee1 ve harness yanlış mesaj beklentisi09562379 korunur.
+Main10path fan-in uygulandı;126testsfbd48559/tsc/i18n59REPL/build:all78044PASS.
+Main actual b1Zm94/result.jsonb74e97d9:10/10PASS,0UNRUN;28startup/8spawn kapalı.
+Bot3034173 canonical restart sonrası canlı/digest-match.10committed blob == freeze.
+Main archive terminal-7099-reduced-motion-main-v1-laahtD187files/SUMS verified;
+candidate archive ...candidate-v1-d9QyD1 failures dahil381files/SUMS verified.
+Fable954+955 candidate/main birleşik sonuç incelemesi istendi; tekrar ACK yok.
 
-## Şimdi yürüyen iş
+## Son kapanan dar paket
 
-7099 Native B: invocation + explicit once/session/always → canonical live-auth
-→ verified decision → exact grant/effect. Nested deckent_call_tool da kapsamda.
-Candidate /tmp/deckent-7099-native-permission-9dahQa, base dd8abc76d.
-B0-R1 corrected source a5551fb0, tek R1 run15/15PASS80ea2183;
-Fable912/913 foundation GO. Önceki iki FAIL ve rejected freeze korunur.
-BG exact2 RuleStore grant-source Fable906 GO, 3file20/20PASS; main'e alınmadı.
-BW signal-capture correction source72d5c006, test14924006;
-v2 report2d4a8ffb30/30PASS, root source/readback PASS, Fable916 foundation GO.
-B1 final events1cda4435/loop92c4ce37/session5f0e6fcf frozen;
-12file113/113PASS0dd224d8, root readback + Fable925 foundation GO.
-Closed→send/malformed request + exact8 eski fixture migration tamamlandı.
-B2 Terminal writer Wegener:18PASS→43/47→46/47→R1 69/69PASS8cff393c;
-root-reviewed nested fallback/live-policy, watcher, keyboard/queue düzeltmeleri.
-Eksik negative assertions + bridge-close callback abort tamamlandı; Fable928 GO.
-Root ortak27file257/257PASS, noEmit exit0;47pin source freeze v2 drift yok.
-Candidate build82101 native/tsc/assets PASS, Dashboard toolchain missing exit1.
-Exact existing dependency copy verified; Dashboard continuation21564 exit0.
-Derleme aşamaları tamamlandı; original build:all exit1 kaydı aynen korunur.
-Structured permission reason→catalog ve gerçek private broker testleri kaynakta.
-Foundation-only landing yok; ortak freeze ve kısmi compiled proof var, tam proof yok.
-B2 actor shared OS projection source822fee85/23d98356,2file17/17PASS69b882e4;
-root/Fable921 foundation GO, actual CLI auth proof değil; C kapsamında ölçülecek.
-Docs384b46eaf exact3 +281/-53 committed; Fable918 doğruladı. Main source değişmedi.
-C builderaf54081e/helper235fd46b;contract49e4e86022cases frozen.
-Actual17987 exit1: KLQxcE resultb2f86d50;1FAILED/21UNRUN. GerçekCLI auth,
-durable valid allow ve ilk private write kanıtlandı; sonraki provider text
-ekrana gelmedi → completion WAIT_TIMEOUT. RCA: durable allow tüketilirken Ink
-hâlâ auth child için suspended; tool/text Static render kayboluyor. SSE doğru.
-C1 same7099 exact4 adapter/service+test correction Wegener'de; yerel terminal
-geri dönmeden native continuation yok, external decision/cancel truth korunur.
-Volta negatif C senaryolarının exact producer karşılığını salt-okuma kontrol ediyor.
-unchanged retry yok. Once/session/matrix/7099 closure hâlâ HOLD.
-Docs06dc7a39a exact2 +416/-2 committed; yeni C1 admission delta henüz dirty.
-B2 premature typecheck pipeline head yüzünden exit0; tsc diagnostics vardı,
-gerçek exit/timestamp/durable çıktı yok. PASS/baseline kanıtı değildir.
-Exact plan/scope/proof/budget capsule'ın Native permission B bölümünde.
-B0/BG/BW foundation proof, producer/consumer/C proof olmadan UNWIRED/HOLD.
-Yeni approval motoru/top-level schema yok; details canonical digest zaten bağlı.
-Cancel/turn değişimi, stale cevap, yanlış args ve persist failure ayrı testlenir.
+Native permission source55fd20009: exact49 committed blob == candidate freezev6.
+Main38files396/396 test + tsc + i18n + build:all PASS.
+Main actual YAvYqX:22/22 EN/TR PASS,0UNRUN,16write/16auth,child custody kapalı;
+result0f056775, compiled before==after. Diagnostic loopback; dogfood settlement değil.
+Source ve main proof Fable950 tarafından bağımsız LOCAL_VERIFIED.
+Docs d24017f17; main archive terminal-7099-native-permission-main-v1-mLecFh,
+manifestb8ca3aa6/SUMSa6f712bf,405payload SHA/readback PASS.
+Candidate arşivi terminal-7099-native-permission-candidate-v1-eAmokO failure geçmişini korur.
+Bot2969555 canonical restart sonrası22:18Z'de canlı,üç digest diskle eşleşti;
+bu historical proof'tur, fresh liveness beyanı değildir.
+Inherited messages73/10,run7/0,MASTER19/0,generated206/11 korundu.
 
-## Son mühürlü dar kanıt
+## Kalan kapsam / kuyruk
 
-Approval A clean committedtree15file150/150PASS; main15file152/152PASS
-(fark inherited live-footer2tests). tsc/i18n/scoped diffcheck PASS.
-Main build:all16255PASS; canonicalbotstop2295163→start2611078 (18:37Z).
-Mainactual ELFUml89c49d4a12/12 + pohZAeaf5dac2c2/2PASS; Fable890 doğruladı.
-Bu runtime bilgisi historical proof'tur, bu tur fresh liveness iddiası değildir.
-Main archive terminal-7099-approval-main-v8-Hxa2eI manifest606d95db/SUMS97fab1ef.
-Candidate archive terminal-7099-approval-v8-5JqLrk manifest5f2c4b8a/SUMS12beaa41.
-Önceki v7/v5 ve tüm failure kanıtları korunur. Fixture auth insan onayı veya
-canonical XVerify receipt değildir; native B ve outer7099 henüz kapanmadı.
+- L1 legacy migration açık: chat_provider hâlâ legacy resolver/picker girdisi;
+  native intent ayrımı mevcut, native_provider'a kör migration yapılmaz.
+  Sonraki bounded kapsam lossless/idempotent legacy migration + Brain receipt parity.
+- L2 gerçek provider cancellation proof.
+- L3 sync/audit structured renderer; L4 legacy-context provider delivery.
+- L5 failed-compaction accounting ayrımı; L6 reduced-motion/ASCII/debug/platform.
+- S1/S3 source ve S2 üç exact profile landed; eski profile-yok notu güncel engel değil.
+- Gerçek bağımlı multiworker→otomatik next-goal→durable settlement hâlâ kanıtlanmadı.
+- Sonra 7103→7101→7104→7102 (önce ADR)→4034. 9002 DONE;9001 kapsam dışı.
+- 7142–7146 ayrı OPEN kuyruk; otomatik ikinci ACTIVE outcome açılmaz.
 
-## Sonraki sıra ve korunan sınırlar
+## Korunan sınırlar
 
-B0→B1→B2→C compiled/main proof→7099 kalan L1–L6 ve çoklu-worker/next-goal settlement.
-İlk güvenli resmi admission sınırında dogfood'a dönüş; yeni sprint/dispatch yok.
-Ardından7103→7101→7104→7102(önceADR)→4034. 9002DONE;9001 gelecekte.
-7142–7146 ayrı OPEN kuyruk; ikinci ACTIVE outcome veya yeniden sıralama yok.
-L6 debug candidate frozen/HOLD, bütçesi tüketildi; kör retry yok.
-Owner904: MCP reconnect sonraki session boundary; current compiled CLI kullanılır.
-Platform disposable host erişimi gelecek; mevcut local daemon/model bounded
-proof için canonical start/ölç/stop yetkili, henüz başlatılmadı.
-Windows/macOS/SSH realhost proof açık; fullsuite baselineFAILED.
-Scoped-green repo-green değildir. Retained728/.tasks/memory.db/inherited dirt korunur.
+L6 debug candidate archived HOLD; finite correction budget tüketildi, kör retry yok.
+C1 latch yalnız native approval continuationını korur; genel Ink Static replay çözümü değildir.
+Windows-native/macOS/SSH/diğer host proof yok; Linux PTY başka platform kanıtı sayılmaz.
+MCP reconnect owner904 gereği sonraki session boundary; proof fresh compiled CLI ile.
+Local daemon/model bounded proof henüz yapılmadı. Scoped-green repo-green değildir.
+Retained728/.tasks/memory.db/inherited dirt korunur. Root push codex2'de; bypass yok.
+Fable kanalı: yalnız sonuç/kararı etkileyen blocker milestone, kısa kanıt; ara ACK yok.
