@@ -11,6 +11,53 @@ PREREQUISITE: 3331 (landed 2449b6e4f) → 3332 (landed 13d2c80ef) → 3333 (land
 OWNER_DECISION_REF: owner-live-2026-09-04-terminal-audit-closure-v2
 STATUS: IN_PROGRESS source-work; DOGFOOD_HEALTH=DEGRADED. 2026-09-06T23:10Z sonrası gerçek autonomous dry-plan PASS; exact micro-task proof admission ve çoklu-worker settlement hâlâ açık, yeni worker dispatch yok.
 
+### L4-B2 historical sprint context — bounded source landed, 2026-09-07
+
+Main `a7f5742b68500dafbc35ac78c198dbbcb81ece79`: exact18 committed blob eşliği
+PASS; inherited messages/run/MASTER/generated değişiklikleri commit dışında korundu.
+`terminal.resume.sprint_context` default OFF; enabled için explicit positive-safe-integer
+`max_bytes` ve `verification_timeout_ms` gerekir. Global → project effective config
+hem okuma hem proje ayarı yazımında doğrulanır; global değerler projeye kopyalanmaz.
+Bu bağlama launch project/principal ile sabittir; değişiklik yeni Terminal oturumunda
+etkili olur, `/cd` yetkiyi sessizce başka projeye taşımaz. Strict tenant archive binding
+yoksa unavailable/HOLD olur; integrity digest'i ACL veya tenant yetkisi değildir.
+
+Canonical archive + terminal verifier ayrı worker'da tam çalışır. Notes bütçesi
+manifest/verification bütçesinden ayrıdır: hiçbir not kesilmez; sınır aşımı typed HOLD.
+Verification allocation policy 8 MiB taban / 256 MiB tavandır; metadata preflight
+immutable snapshot değildir, sonraki drift canonical doğrulamadan geçmelidir.
+Yüklenen not current chat ID'yi değiştirmez; native/legacy ortak input seam'i yalnız
+sonraki yeni user mesajına whole untrusted DATA + provenance ekler. Normal history
+ilk birleşik user mesajını provenance ile saklar ve tekrar context bütçesi tüketebilir;
+ikinci yeni mesaja yeniden eklenmez. `/clear`, chat switch ve supersession pending
+yüklemeyi geçersiz kılar; başarısız yeni yükleme önceki pending notu bozmaz.
+
+Selected76+95 ve main9suite171 test, i18n, candidate build ve main build:all PASS.
+Selected/main core compiled V2: loaded/read-only/bounds/timeout/midflight abort/tamper
+ve flagsiz worker-unavailable geçer. Actual CLI V7 EN/TR OFF/ON dört-case PASS:
+ilk/ikinci/clear-sonrası yeni user mesajında 1/0/0 DATA, kimlik korunumu, missing/tamper
+HOLD ve her binary'de16/16 child spawn/startup/close eşliği. Main core result
+`f027a13d…`, Terminal result `a01e34df…`; full SHA'lar arşiv manifestindedir.
+Native provider diagnostic mock'tur; external-provider delivery/usage/billing/receipt
+kanıtı değildir. Legacy, strict-tenant ve exception coverage source/component'tir;
+actual CLI strict-tenant/timeout ve diğer platformlar için başarı iddiası yoktur.
+Fixture seal hazırlığı Node permission dışında private subprocess'tedir: scoped
+permission altında `fsyncSync` reddedildiği gerçek deneyle görüldü. Product reader/CLI
+permission altında ölçüldü; durable-writer dağıtım sınırı UNRELATED bulgudur, yeni iş
+admission'ı değildir. Node SecurityWarning ham TUI/stderr'de görünür, bastırılmadı.
+Eski B1 catalog key uyumluluk için kalır; unused cleared key bir kullanıcı bildirimi
+olarak tüketilmez ve `/clear` kanıtı diye sunulmaz. MCP reconnect hâlâ kanıtlanmadı.
+
+Bot1288980 stop → fresh execution ALLOW → main build identity `f9edde1e…`
+→ bot1417628 start/status ve Fable bağımsız üç-digest doğrulaması PASS.
+Fable ENTRY725/727 bağımsız review'dur, canonical XVerify receipt değildir.
+POgomT/mDWdLB/NKmRwE/izB7ya FAIL ve QCBl5i insufficient-custody kayıtları korunur.
+Kalıcı arşiv `/home/alperen/deckent-recovery-20260904/terminal-7099-l4b2-context-7DvOax`:
+106/106 SHA check, SUMS dahil107 dosya; DB/config/credential kopyası yoktur.
+Manifest `6c7ce195719e7035765e6487359738579cb477c61085b938fbaed75333028978`,
+SUMS `f2f994e02afae8eea2be9e3c56efe4df6ab0e4fadb753c0cb41c5e85f5c0d040`.
+7099 VERIFY ve kalan L1/L3/L4/L5/L6/platform/production custody işleri açıktır.
+
 ### L4-A clean-startup preference — VERIFY, 2026-09-07
 
 `terminal.startup.recent_sessions` default-off olarak resolved config'e eklendi.
@@ -62,7 +109,7 @@ resume success yolunda hydrate işlemini active ID/ref/token güncellemesinden �
 çalıştırır; missing veya throw mevcut kimliği korur. Picker numeric/literal/missing
 ve sprint-refusal EN/TR yüzeyleri kimliği koruyarak gözlendi. Sprint refusal
 localized UI'dır; typed custody receipt değildir. B2 sealed archive notes'un
-untrusted historical-data context'i OPEN'dır; legacy ve exception kapsamı aşağıdadır.
+untrusted historical-data context'i bu B1 aşamasında OPEN idi; güncel B2 kanıtı üsttedir.
 
 Selected ve main 8-suite/126 test ve i18n PASS'tir; selected `npm run build`, main
 build:all PASS'tir. Selected `g6NRa8/result.json` (`a92416fc…`) ve main
@@ -75,7 +122,7 @@ değişmedi. Writer'ın initial46 pass/2 FAIL RCA'sı bağımsız doğrulama de�
 final64 ayrı scoped sonuçtur. Root verification record SHA256
 `3a1aa6e944c05492c3aba437d4ee37389971986d99ac5d168b748d3ceaa9afa7`.
 Legacy ve exception dalları source/component seviyesinde doğrulandı; compiled kapsamları
-ayrıca yoktur. B2 OPEN'dır. Provider usage, terminal custody receipt, persistence closure
+ayrıca yoktur. Güncel B2 dar kanıtı üsttedir. Provider usage, terminal custody receipt, persistence closure
 veya whole-L4/7099 DONE iddiası yoktur.
 
 | Evidence | SHA256 / state |
