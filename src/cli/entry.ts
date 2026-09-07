@@ -7,9 +7,10 @@ import './helpers/ink-color-preload.js';
 import { createInterface, type ReadLineOptions } from 'node:readline';
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { constants as osConstants } from 'node:os';
 import { buildProgram } from './index.js';
 import { handleCliError } from './helpers/process.js';
-import { registerShutdownHook, hasShutdownHooks, runShutdownHooks } from './helpers/shutdown-hooks.js';
+import { registerShutdownHook, hasShutdownHooks, hasCommandLocalShutdownOwnership, runShutdownHooks } from './helpers/shutdown-hooks.js';
 import { interruptActiveSprint } from '../orchestra/sprint-controller.js';
 import { killAllSessions } from '../orchestra/tmux.js';
 import { bootstrapFromCatalog } from '../core/model-catalog.js';
@@ -1277,15 +1278,30 @@ export const registerReplTeardown = registerShutdownHook;
 // file's own `process.on` registration below, and the pre-existing
 // tests/cli/sigterm-cleanup.test.ts) keep working unchanged.
 export async function onSignal(signal: string): Promise<void> {
+  // Snapshot ownership before awaiting hooks: the command's finally may release
+  // its scope while cleanup is in flight, but that signal still belongs to the
+  // command and must never spill into sprint/tmux teardown.
+  const commandLocal = hasCommandLocalShutdownOwnership();
   process.stderr.write(`\nReceived ${signal}, exiting…\n`);
   if (hasShutdownHooks()) {
     await runShutdownHooks();
   }
-  // Interrupt active sprint: mark tasks INTERRUPTED, heartbeats ABORTED, release locks
-  try { interruptActiveSprint(); } catch { /* non-fatal */ }
-  // Kill tmux sessions used by workers
-  try { killAllSessions(); } catch { /* non-fatal */ }
-  process.exit(0);
+  if (!commandLocal) {
+    // Interrupt active sprint: mark tasks INTERRUPTED, heartbeats ABORTED, release locks
+    try { interruptActiveSprint(); } catch { /* non-fatal */ }
+    // Kill tmux sessions used by workers
+    try { killAllSessions(); } catch { /* non-fatal */ }
+  }
+  process.exit(commandLocal ? signalExitCode(signal) : 0);
+}
+
+/** Conventional signal exit status; unknown platform signals fail non-zero. */
+export function signalExitCode(
+  signal: string,
+  signals: Readonly<Record<string, number | undefined>> = osConstants.signals as Record<string, number | undefined>,
+): number {
+  const number = signals[signal];
+  return typeof number === 'number' && Number.isInteger(number) && number > 0 ? 128 + number : 1;
 }
 
 /**

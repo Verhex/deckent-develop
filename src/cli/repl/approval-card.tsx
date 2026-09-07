@@ -21,8 +21,14 @@ import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { useInkPalette } from './ink-palette-context.js';
 import type { InkRole } from './ink-palette.js';
 import type { ApprovalRequest, ApprovalRequestV2, ApprovalRisk } from '../../core/approval-contract.js';
-import type { ApprovalDecisionInput } from '../../core/approval-broker.js';
-import type { ApprovalStreamEvent } from '../../core/approval-eventstream.js';
+import type {
+  ApprovalTerminalDecisionResult,
+  ApprovalTerminalObservedDecision,
+  ApprovalTerminalSuspender,
+} from './approval-terminal-command.js';
+import type {
+  ApprovalTerminalEvent,
+} from './approval-terminal-channel.js';
 
 // ─── Pure queue controller (framework-free — unit-testable without Ink) ─────
 
@@ -33,17 +39,26 @@ export interface ApprovalCardHead {
   request: ApprovalRequest;
   index: number;
   total: number;
+  status?: ApprovalCardDecisionStatus;
+}
+
+export interface ApprovalCardDecisionStatus {
+  readonly kind: 'authenticating' | 'hold' | 'expired' | 'cancelled' | 'untrusted';
+  readonly reasonCode?: string;
+  readonly observedDecision?: ApprovalTerminalObservedDecision;
 }
 
 export interface ApprovalCardQueue {
   /** Ingest one stream event: `pending` appends/upserts, `cross-decided` retires
    *  (resolved by ANOTHER channel — e.g. dashboard), `dropped` is a backpressure
    *  counter-only signal and is ignored here. */
-  ingest(event: ApprovalStreamEvent): void;
+  ingest(event: ApprovalTerminalEvent): void;
   /** The card to show now, or null when the queue is empty. */
   head(): ApprovalCardHead | null;
   /** Pending count (including the shown head). */
   size(): number;
+  /** Whether this exact request is still represented by the card queue. */
+  has(id: string): boolean;
   /** Retire `id` locally — called once THIS card has sent its decision.
    *  Advances the burst counter. */
   resolve(id: string): void;
@@ -55,6 +70,8 @@ export interface ApprovalCardQueue {
    *  `similarTo` match, returning every resolved request (target first, then
    *  cascade members in queue order) so the caller can send a decision for each. */
   resolveSimilar(id: string): ApprovalRequest[];
+  /** Keep the request visible while recording an honest non-success state. */
+  setStatus(id: string, status: ApprovalCardDecisionStatus | undefined): void;
 }
 
 /**
@@ -67,6 +84,7 @@ export interface ApprovalCardQueue {
 export function createApprovalCardQueue(onChange: () => void): ApprovalCardQueue {
   const order: string[] = []; // arrival order of ids, oldest-first
   const byId = new Map<string, ApprovalRequest>();
+  const statusById = new Map<string, ApprovalCardDecisionStatus>();
   let answered = 0; // resolved so far in the current burst (drives index/total)
 
   const head = (): ApprovalCardHead | null => {
@@ -74,20 +92,32 @@ export function createApprovalCardQueue(onChange: () => void): ApprovalCardQueue
     if (id === undefined) return null;
     const request = byId.get(id);
     if (!request) return null;
-    return { request, index: answered + 1, total: answered + order.length };
+    const status = statusById.get(id);
+    return { request, index: answered + 1, total: answered + order.length, ...(status ? { status } : {}) };
   };
 
-  const ingest = (event: ApprovalStreamEvent): void => {
+  const ingest = (event: ApprovalTerminalEvent): void => {
     if (event.kind === 'dropped') return;
     const id = event.request.id;
     if (event.kind === 'pending') {
       if (!byId.has(id)) order.push(id);
       byId.set(id, event.request);
-    } else {
+    } else if (event.kind === 'cross-decided') {
       byId.delete(id);
+      statusById.delete(id);
       const idx = order.indexOf(id);
       if (idx !== -1) order.splice(idx, 1);
       if (order.length === 0) answered = 0;
+    } else if (event.kind === 'terminal-outcome') {
+      if (event.outcome === 'untrusted') {
+        statusById.set(id, { kind: 'untrusted', reasonCode: event.reasonCode });
+      } else {
+        byId.delete(id);
+        statusById.delete(id);
+        const idx = order.indexOf(id);
+        if (idx !== -1) order.splice(idx, 1);
+        if (order.length === 0) answered = 0;
+      }
     }
     onChange();
   };
@@ -97,6 +127,7 @@ export function createApprovalCardQueue(onChange: () => void): ApprovalCardQueue
     if (idx === -1) return;
     order.splice(idx, 1);
     byId.delete(id);
+    statusById.delete(id);
     answered += 1;
     if (order.length === 0) answered = 0;
     onChange();
@@ -123,7 +154,23 @@ export function createApprovalCardQueue(onChange: () => void): ApprovalCardQueue
     return [target, ...cascade];
   };
 
-  return { ingest, head, size: () => order.length, resolve: resolveFn, similarTo, resolveSimilar };
+  const setStatus = (id: string, status: ApprovalCardDecisionStatus | undefined): void => {
+    if (!byId.has(id)) return;
+    if (status) statusById.set(id, status);
+    else statusById.delete(id);
+    onChange();
+  };
+
+  return {
+    ingest,
+    head,
+    size: () => order.length,
+    has: (id) => byId.has(id),
+    resolve: resolveFn,
+    similarTo,
+    resolveSimilar,
+    setStatus,
+  };
 }
 
 // ─── Pure key mapper (framework-free — unit-testable without Ink) ───────────
@@ -309,16 +356,30 @@ export interface ApprovalCardLabels {
   noArgs: string;
   /** Badge text per risk tier. */
   riskLabels: Record<ApprovalRisk, string>;
+  status: {
+    authenticating: string;
+    hold: string;
+    expired: string;
+    cancelled: string;
+    untrusted: string;
+    observedDecision: string;
+    terminalExpired: string;
+    terminalDeferred: string;
+    terminalEscalated: string;
+  };
 }
 
 export interface ApprovalCardProps {
   /** A single client's filtered/backfilled event stream — typically
    *  `ApprovalEventStream.subscribe(clientId, filter).events`. This component
    *  owns no subscribe/unsubscribe lifecycle of its own (App-wiring follow-up). */
-  events: AsyncIterable<ApprovalStreamEvent>;
-  /** Seam-injected decide callback — mirrors `ApprovalBroker.decide`'s second
-   *  argument shape. Pass `broker.decide.bind(broker)` in production. */
-  onDecide: (id: string, input: ApprovalDecisionInput) => void;
+  events: AsyncIterable<ApprovalTerminalEvent>;
+  /** Authenticated decision ingress. A void result is treated as typed HOLD. */
+  onDecide: (
+    request: ApprovalRequest,
+    action: 'allow' | 'deny',
+    suspendTerminal: ApprovalTerminalSuspender,
+  ) => ApprovalTerminalDecisionResult | Promise<ApprovalTerminalDecisionResult> | void;
   /** born-697 (SURF-3 approval last-mile) — called once per resolved request
    *  right AFTER its decision is sent, so the caller can render a visible
    *  closure line ("✅ Approved — …" / "✖ Rejected — …"). Without it, a terminal
@@ -326,10 +387,11 @@ export interface ApprovalCardProps {
    *  omitting it keeps every existing caller/test byte-identical. Fires per
    *  request in the approve-all cascade too. */
   onClosure?: (request: ApprovalRequest, decision: 'allow' | 'deny') => void;
-  /** Stamped on every decision this card produces (`ApprovalDecision.decidedBy`). */
-  decidedBy: string;
-  /** Stamped on every decision this card produces (`ApprovalDecision.channel`). */
-  channel: string;
+  /** Durable non-human terminal outcomes become a visible transcript record. */
+  onTerminalOutcome?: (request: ApprovalRequest, message: string) => void;
+  /** Deprecated compatibility props; authority now comes only from the CLI ceremony. */
+  decidedBy?: string;
+  channel?: string;
   labels: ApprovalCardLabels;
   /** born-508 (382-003) stdin-ownership mutex gate — ANDed with this card's OWN
    *  pending-queue state (`head !== null`) below. Lets the caller (app.tsx)
@@ -341,14 +403,28 @@ export interface ApprovalCardProps {
   /** Clock for the expiry countdown (TERMINAL-TOOLS-012) — injectable for
    *  deterministic tests; defaults to Date.now. */
   now?: () => number;
+  /** Public Ink terminal-lending callback, injected by the owning App. */
+  suspendTerminal?: ApprovalTerminalSuspender;
 }
 
 // ─── ApprovalCard ───────────────────────────────────────────────────────────
 
 export function ApprovalCard(props: ApprovalCardProps): ReactElement | null {
-  const { events, onDecide, onClosure, decidedBy, channel, labels, isActive: mutexActive = true, now = Date.now } = props;
+  const {
+    events,
+    onDecide,
+    onClosure,
+    onTerminalOutcome,
+    labels,
+    isActive: mutexActive = true,
+    now = Date.now,
+    suspendTerminal,
+  } = props;
   const [head, setHead] = useState<ApprovalCardHead | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const inFlightRef = useRef<string | null>(null);
+  const eventCallbacksRef = useRef({ onClosure, onTerminalOutcome, labels });
+  eventCallbacksRef.current = { onClosure, onTerminalOutcome, labels };
   // TERMINAL-TOOLS-012/013 — keep the expiry/age carrier honest (a frozen
   // "in 14m" is a stale fact) WITHOUT churn: poll the clock, re-render only when
   // the rendered duration string actually changes (minute steps above a minute).
@@ -376,7 +452,23 @@ export function ApprovalCard(props: ApprovalCardProps): ReactElement | null {
       while (!cancelled) {
         const result = await iterator.next();
         if (cancelled || result.done) break;
-        queueRef.current!.ingest(result.value);
+        const event = result.value;
+        if (event.kind === 'cross-decided'
+          && (event.decision.decision === 'allow' || event.decision.decision === 'deny')
+          && queueRef.current!.has(event.request.id)) {
+          eventCallbacksRef.current.onClosure?.(event.request, event.decision.decision);
+        } else if (event.kind === 'terminal-outcome' && event.outcome !== 'untrusted') {
+          const template = event.outcome === 'expired'
+            ? eventCallbacksRef.current.labels.status.terminalExpired
+            : event.outcome === 'deferred'
+              ? eventCallbacksRef.current.labels.status.terminalDeferred
+              : eventCallbacksRef.current.labels.status.terminalEscalated;
+          eventCallbacksRef.current.onTerminalOutcome?.(
+            event.request,
+            template.replace('{summary}', event.request.summary),
+          );
+        }
+        queueRef.current!.ingest(event);
       }
     })();
     return () => {
@@ -385,13 +477,75 @@ export function ApprovalCard(props: ApprovalCardProps): ReactElement | null {
     };
   }, [events]);
 
-  const sendDecision = (request: ApprovalRequest, decision: 'allow' | 'deny'): void => {
-    onDecide(request.id, { decision, decidedBy, channel, decidedAt: new Date().toISOString(), reason: '' });
-    // born-697 — visible closure on the SAME channel that decided. The relay
-    // deliberately excludes the deciding channel from `cross-decided`
-    // (approval-relay.ts), so without this the terminal never reflected its own
-    // decision; the card just vanished.
+  const markFailure = (request: ApprovalRequest, result: Exclude<ApprovalTerminalDecisionResult, { kind: 'accepted' }>): void => {
+    queueRef.current!.setStatus(request.id, {
+      kind: result.kind,
+      reasonCode: result.reasonCode,
+      ...(result.observedDecision ? { observedDecision: result.observedDecision } : {}),
+    });
+  };
+
+  const decideOne = async (request: ApprovalRequest, decision: 'allow' | 'deny'): Promise<boolean> => {
+    if (!suspendTerminal) {
+      markFailure(request, { kind: 'hold', reasonCode: 'terminal-suspension-unavailable' });
+      return false;
+    }
+    queueRef.current!.setStatus(request.id, { kind: 'authenticating' });
+    let result: ApprovalTerminalDecisionResult | void;
+    try {
+      result = await onDecide(request, decision, suspendTerminal);
+    } catch (error) {
+      result = {
+        kind: 'hold',
+        reasonCode: `decision-handler-failed:${error instanceof Error ? error.name : 'unknown'}`,
+      };
+    }
+    if (!result) result = { kind: 'hold', reasonCode: 'decision-result-unavailable' };
+    if (result.kind === 'expired') {
+      onTerminalOutcome?.(
+        request,
+        labels.status.terminalExpired.replace('{summary}', request.summary),
+      );
+      queueRef.current!.resolve(request.id);
+      return false;
+    }
+    if (result.kind !== 'accepted') {
+      markFailure(request, result);
+      return false;
+    }
+    if (result.decision.requestId !== request.id || result.decision.decision !== decision) {
+      markFailure(request, {
+        kind: 'untrusted',
+        reasonCode: 'accepted-decision-identity-mismatch',
+        observedDecision: {
+          action: result.decision.decision,
+          channel: result.decision.channel,
+          decidedBy: result.decision.decidedBy,
+          decidedAt: result.decision.decidedAt,
+        },
+      });
+      return false;
+    }
     onClosure?.(request, decision);
+    queueRef.current!.resolve(request.id);
+    return true;
+  };
+
+  const startDecision = (requests: readonly ApprovalRequest[], decision: 'allow' | 'deny'): void => {
+    const intentId = requests[0]?.id;
+    if (!intentId || inFlightRef.current !== null) return;
+    inFlightRef.current = intentId;
+    void (async () => {
+      try {
+        for (const request of requests) {
+          const accepted = await decideOne(request, decision);
+          if (!accepted) break;
+        }
+        setExpanded(false);
+      } finally {
+        inFlightRef.current = null;
+      }
+    })();
   };
 
   useInput((input, key) => {
@@ -403,19 +557,13 @@ export function ApprovalCard(props: ApprovalCardProps): ReactElement | null {
     const { request } = current;
     switch (mapApprovalKey(input, key)) {
       case 'approve':
-        sendDecision(request, 'allow');
-        queueRef.current!.resolve(request.id);
-        setExpanded(false);
+        startDecision([request], 'allow');
         return;
       case 'deny':
-        sendDecision(request, 'deny');
-        queueRef.current!.resolve(request.id);
-        setExpanded(false);
+        startDecision([request], 'deny');
         return;
       case 'approve-all': {
-        const resolved = queueRef.current!.resolveSimilar(request.id);
-        for (const r of resolved) sendDecision(r, 'allow');
-        setExpanded(false);
+        startDecision([request, ...queueRef.current!.similarTo(request.id)], 'allow');
         return;
       }
       case 'details':
@@ -424,7 +572,7 @@ export function ApprovalCard(props: ApprovalCardProps): ReactElement | null {
       default:
         return;
     }
-  }, { isActive: head !== null && mutexActive });
+  }, { isActive: head !== null && mutexActive && inFlightRef.current === null });
 
   const palette = useInkPalette();
   if (!head) return null;
@@ -459,6 +607,27 @@ export function ApprovalCard(props: ApprovalCardProps): ReactElement | null {
           <Text>{JSON.stringify(request.maskedArgs ?? {}, null, 2)}</Text>
           <Text>{JSON.stringify(request.details, null, 2)}</Text>
         </Box>
+      )}
+      {head.status && (
+        <Text {...(head.status.kind === 'authenticating' ? palette.info : palette.warning)}>
+          {(() => {
+            const template = head.status.kind === 'authenticating'
+              ? labels.status.authenticating
+              : head.status.kind === 'hold'
+                ? labels.status.hold
+                : head.status.kind === 'expired'
+                  ? labels.status.expired
+                  : head.status.kind === 'cancelled'
+                    ? labels.status.cancelled
+                    : labels.status.untrusted;
+            const base = template.replace('{reason}', head.status.reasonCode ?? '-');
+            return head.status.observedDecision
+              ? `${base} ${labels.status.observedDecision
+                .replace('{action}', labels.facts.actionLabels[head.status.observedDecision.action])
+                .replace('{channel}', head.status.observedDecision.channel)}`
+              : base;
+          })()}
+        </Text>
       )}
       <Text {...palette.muted}>
         {`${labels.progress.replace('{index}', String(index)).replace('{total}', String(total))} ${labels.hint}`}

@@ -1,56 +1,56 @@
-// ─── ApprovalTerminalChannel — Relay↔EventStream↔ApprovalCard bridge (APR-TERM-CHANNEL) ─
-// Governs: strategic-pivot §11.1 (runtime-wide ApprovalBroker follow-up) + ADR-G-020
-// (authority). Built directly on ApprovalRelay (APR-2) + ApprovalEventStream
-// (APR-EVENTSTREAM) via their PUBLIC surfaces only — this module owns ZERO relay or
-// eventstream internals.
-//
-// Pure bridge — deliberately does NOT touch app.tsx or approval-card.tsx (that wiring
-// is follow-up work). It only produces the two pieces ApprovalCard's props already
-// expect (`events` + `onDecide`), sourced from a real relay/eventstream pair:
-//
-//  • Read path (relay-pending -> eventstream-publish -> card-queue enqueue seam):
-//    subscribes ONE client to the given ApprovalEventStream and exposes that
-//    subscription's `events` AsyncIterable verbatim. ApprovalCard's own existing
-//    ingest loop (createApprovalCardQueue) is the consumer — this module owns no
-//    queue of its own, so there is no second, duplicate copy of pending-request state.
-//  • Write path (card-decision -> relay.onDecision): attaches a write-only
-//    RelayChannel to the relay — the mirror image of ApprovalEventStream's read-only
-//    channel (whose `onDecision` is a no-op; here `send` is the no-op, since the read
-//    side already flows through the eventstream subscription above). `onDecision`'s
-//    handler is registered synchronously inside `relay.attachChannel`, so `decide()` is
-//    always wired to it before this factory returns.
+import { isDeepStrictEqual } from 'node:util';
 
 import type { ApprovalDecisionInput } from '../../core/approval-broker.js';
+import type { ApprovalDecision, ApprovalRequest } from '../../core/approval-contract.js';
 import type { ApprovalEventStream, ApprovalStreamEvent, ApprovalStreamFilter } from '../../core/approval-eventstream.js';
-import type { ApprovalRelay, ChannelDecisionInput, RelayChannel } from '../../core/approval-relay.js';
+import type { ApprovalRelay, RelayChannel } from '../../core/approval-relay.js';
+import type {
+  ApprovalTerminalDecisionAdapter,
+  ApprovalTerminalDecisionResult,
+  ApprovalTerminalSuspender,
+} from './approval-terminal-command.js';
+
+export type ApprovalTerminalLifecycleOutcome = 'expired' | 'deferred' | 'escalated' | 'untrusted';
+
+export interface ApprovalTerminalLifecycleEvent {
+  readonly kind: 'terminal-outcome';
+  readonly request: ApprovalRequest;
+  readonly outcome: ApprovalTerminalLifecycleOutcome;
+  readonly reasonCode: string;
+  readonly decision?: ApprovalDecision;
+}
+
+export type ApprovalTerminalEvent = ApprovalStreamEvent | ApprovalTerminalLifecycleEvent;
 
 export interface ApprovalTerminalChannelOptions {
-  /** Relay channel name this bridge attaches under, AND (unless `clientId` overrides
-   *  it) the eventstream client id it subscribes as. Defaults to `'terminal'`. */
   channelName?: string;
-  /** Eventstream client id override, when `channelName` collides with another
-   *  subscriber. Defaults to `channelName`. */
   clientId?: string;
-  /** Forwarded verbatim to `ApprovalEventStream.subscribe`. */
   filter?: ApprovalStreamFilter;
+  /** The only production decision ingress. Absence stays read-only and returns typed HOLD. */
+  decisionAdapter?: ApprovalTerminalDecisionAdapter;
 }
 
 export interface ApprovalTerminalChannel {
-  /** Pass straight through to `ApprovalCardProps.events`. */
-  events: AsyncIterable<ApprovalStreamEvent>;
-  /** Pass straight through to `ApprovalCardProps.onDecide` — same signature. Routes
-   *  the decision through the relay's `terminal` channel (the relay supplies the real
-   *  `channel` name; any `channel` field on `input` is ignored). */
-  decide(id: string, input: ApprovalDecisionInput): void;
-  /** Unsubscribe from the eventstream and detach the relay channel. */
+  events: AsyncIterable<ApprovalTerminalEvent>;
+  decide(
+    request: ApprovalRequest,
+    action: 'allow' | 'deny',
+    suspendTerminal: ApprovalTerminalSuspender,
+  ): Promise<ApprovalTerminalDecisionResult>;
+  /** Legacy call shape remains type-compatible, but can never write a raw broker decision. */
+  decide(id: string, input: ApprovalDecisionInput): Promise<ApprovalTerminalDecisionResult>;
   dispose(): void;
 }
 
+function unavailable(reasonCode: string): ApprovalTerminalDecisionResult {
+  return { kind: 'hold', reasonCode };
+}
+
 /**
- * Wire ONE terminal-surface bridge between `relay` and `eventStream` (APR-TERM-CHANNEL).
- * `eventStream` must already be attached to `relay` (its normal construction contract) —
- * this factory only subscribes a client to it; it never constructs or attaches an
- * eventstream itself.
+ * Read-side relay/event-stream bridge plus an explicitly injected authenticated
+ * decision adapter. The relay channel registered here is deliberately passive:
+ * its onDecision callback is never retained or invoked, so this surface has no
+ * compatibility path to ApprovalRelay's raw broker writer.
  */
 export function createApprovalTerminalChannel(
   relay: ApprovalRelay,
@@ -59,40 +59,111 @@ export function createApprovalTerminalChannel(
 ): ApprovalTerminalChannel {
   const channelName = options.channelName ?? 'terminal';
   const clientId = options.clientId ?? channelName;
-
-  // attachChannel first: in the common (default-name) case a duplicate collides on
-  // this SAME name for both the relay channel and the eventstream client id, so
-  // failing here — before subscribing — never leaves a dangling subscription behind.
-  let decisionHandler: ((input: ChannelDecisionInput) => void) | null = null;
-  const channel: RelayChannel = {
-    send: () => {
-      // Read side flows through the eventstream subscription below — a deliberate
-      // no-op, mirroring ApprovalEventStream's own read-only channel's onDecision no-op.
-    },
-    onDecision: (handler) => {
-      decisionHandler = handler;
-    },
+  const passiveChannel: RelayChannel = {
+    send: () => {},
+    onDecision: () => {},
   };
-  relay.attachChannel(channelName, channel);
-
+  relay.attachChannel(channelName, passiveChannel);
   const subscription = eventStream.subscribe(clientId, options.filter);
+  let disposed = false;
+  const inFlight = new Map<string, {
+    readonly action: 'allow' | 'deny';
+    readonly promise: Promise<ApprovalTerminalDecisionResult>;
+  }>();
 
-  const decide = (id: string, input: ApprovalDecisionInput): void => {
-    // Disposed (or, unreachable in practice, pre-attach) — no live handler to
-    // route through; a no-op rather than a throw keeps a late/racing caller safe.
-    if (!decisionHandler) return;
-    const { channel: _channel, ...rest } = input;
-    decisionHandler({ ...rest, requestId: id });
+  const events: AsyncIterable<ApprovalTerminalEvent> = {
+    async *[Symbol.asyncIterator]() {
+      for await (const event of subscription.events) {
+        if (event.kind !== 'cross-decided') {
+          yield event;
+          continue;
+        }
+        const own = inFlight.get(event.request.id);
+        if (own) {
+          const local = await own.promise;
+          // Only the exact durable acceptance already carried by the local
+          // result is a duplicate. A HOLD/cancel/untrusted result is not a
+          // settlement carrier: its concurrently winning durable event must
+          // continue through the same cross-channel authority verification.
+          if (local.kind === 'accepted'
+            && isDeepStrictEqual(local.decision, event.decision)) {
+            continue;
+          }
+        }
+        if (!options.decisionAdapter) {
+          yield {
+            kind: 'terminal-outcome',
+            request: event.request,
+            outcome: 'untrusted',
+            reasonCode: 'authenticated-decision-adapter-unavailable',
+            decision: event.decision,
+          };
+          continue;
+        }
+        let verification;
+        try {
+          verification = await options.decisionAdapter.verifyCrossDecision(event.request, event.decision);
+        } catch (error) {
+          yield {
+            kind: 'terminal-outcome',
+            request: event.request,
+            outcome: 'untrusted',
+            reasonCode: `cross-verification-failed:${error instanceof Error ? error.name : 'unknown'}`,
+            decision: event.decision,
+          };
+          continue;
+        }
+        if (verification.kind === 'trusted') {
+          yield event;
+        } else {
+          yield {
+            kind: 'terminal-outcome',
+            request: event.request,
+            outcome: verification.kind,
+            reasonCode: verification.kind === 'untrusted'
+              ? verification.reasonCode
+              : `durable-${verification.kind}`,
+            ...(verification.decision ? { decision: verification.decision } : {}),
+          };
+        }
+      }
+    },
   };
+
+  function decide(
+    requestOrId: ApprovalRequest | string,
+    actionOrInput: 'allow' | 'deny' | ApprovalDecisionInput,
+    suspendTerminal?: ApprovalTerminalSuspender,
+  ): Promise<ApprovalTerminalDecisionResult> {
+    if (disposed) return Promise.resolve(unavailable('terminal-channel-disposed'));
+    if (typeof requestOrId === 'string' || typeof actionOrInput !== 'string' || !suspendTerminal) {
+      return Promise.resolve(unavailable('authenticated-decision-adapter-required'));
+    }
+    if (!options.decisionAdapter) {
+      return Promise.resolve(unavailable('authenticated-decision-adapter-unavailable'));
+    }
+    const existing = inFlight.get(requestOrId.id);
+    if (existing) {
+      return existing.action === actionOrInput
+        ? existing.promise
+        : Promise.resolve(unavailable('decision-already-in-flight'));
+    }
+    const promise = options.decisionAdapter
+      .decide(requestOrId, actionOrInput, suspendTerminal)
+      .catch((error: unknown) => unavailable(
+        `decision-adapter-failed:${error instanceof Error ? error.name : 'unknown'}`,
+      ))
+      .finally(() => { inFlight.delete(requestOrId.id); });
+    inFlight.set(requestOrId.id, { action: actionOrInput, promise });
+    return promise;
+  }
 
   const dispose = (): void => {
+    if (disposed) return;
+    disposed = true;
     subscription.unsubscribe();
     relay.detachChannel(channelName);
-    // Drop the reference to the relay's registered handler closure so post-dispose
-    // decide() calls are a no-op instead of silently still routing through the
-    // (now-detached) relay channel — otherwise this is a dangling-handler leak.
-    decisionHandler = null;
   };
 
-  return { events: subscription.events, decide, dispose };
+  return { events, decide, dispose };
 }

@@ -171,6 +171,16 @@ export const CLI_TERMINAL_SLASH_MESSAGES: MessageFamily = Object.freeze({
   // TERMINAL-TOOLS-013 — worded relation (no structural arrow in the mechanism).
   'tui.approval_card.expiry_outcome': { en: 'in {remaining}, then {outcome}', tr: '{remaining} içinde, sonra {outcome}' },
   'tui.approval_card.expired_outcome': { en: 'expired, {outcome} applies', tr: 'süresi doldu, {outcome} uygulanır' },
+  'tui.approval_card.status.authenticating': { en: 'AUTHENTICATING — terminal control is with the approval ceremony', tr: 'KİMLİK DOĞRULANIYOR — terminal denetimi onay işleminde' },
+  'tui.approval_card.status.hold': { en: 'HOLD — decision not accepted ({reason})', tr: 'BEKLEME — karar kabul edilmedi ({reason})' },
+  'tui.approval_card.status.expired': { en: 'EXPIRED — no human decision was accepted ({reason})', tr: 'SÜRESİ DOLDU — insan kararı kabul edilmedi ({reason})' },
+  'tui.approval_card.status.cancelled': { en: 'CANCELLED — approval ceremony did not complete ({reason})', tr: 'İPTAL — onay işlemi tamamlanmadı ({reason})' },
+  'tui.approval_card.status.untrusted': { en: 'UNTRUSTED — durable decision could not be authorized ({reason})', tr: 'GÜVENİLMEZ — kalıcı karar yetkilendirilemedi ({reason})' },
+  'tui.approval_card.status.observed_decision': { en: 'Durable record observed: {action} via {channel}; reconciliation required.', tr: 'Kalıcı kayıt gözlendi: {channel} üzerinden {action}; uzlaştırma gerekli.' },
+  'tui.approval_card.hint_authenticated': { en: '(y = approve · n = deny · a = approve similar individually · d = details)', tr: '(y = onayla · n = reddet · a = benzerlerini ayrı ayrı onayla · d = detay)' },
+  'tui.approval_card.terminal.expired': { en: 'Approval expired — {summary}', tr: 'Onayın süresi doldu — {summary}' },
+  'tui.approval_card.terminal.deferred': { en: 'Approval deferred — {summary}', tr: 'Onay ertelendi — {summary}' },
+  'tui.approval_card.terminal.escalated': { en: 'Approval escalated — {summary}', tr: 'Onay üst seviyeye taşındı — {summary}' },
   // TERMINAL-TOOLS-013 — one-time confirm (operator's own `!` line) + paused-input anchor.
   'tui.confirm_hint_once': { en: '(y = allow once · N = deny)', tr: '(y = bir kez izin · N = reddet)' },
   'tui.input_paused': { en: 'input paused · decide the card above', tr: 'girdi duraklatıldı · yukarıdaki kartı karara bağla' },

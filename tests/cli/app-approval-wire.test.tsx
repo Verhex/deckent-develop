@@ -18,6 +18,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import {
+  retireTerminalApproval,
   resolveFooterLines,
   tapApprovalEvents,
 } from '../../src/cli/repl/app.js';
@@ -37,7 +38,7 @@ import type { ApprovalDecisionInput } from '../../src/core/approval-broker.js';
 // instances over a tmpdir store — mirrors tests/core/approval-store-watch.test.ts's
 // own "a SEPARATE broker instance simulates another process" pattern.
 import { beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, existsSync, readFileSync, readdirSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { wireApprovalCrossProcess } from "../../src/cli/repl/run.js";
@@ -234,6 +235,37 @@ describe('APP-APPROVAL-WIRE end-to-end — pending -> kart görünür -> y/n dec
   });
 });
 
+describe('retireTerminalApproval — local terminal settlement fan-in', () => {
+  it('retires only the exact expired request and keeps stdin/layout pending while another request remains', () => {
+    const first = buildRequest('local-expired-1');
+    const second = buildRequest('local-still-pending-2');
+    const pendingStates: boolean[] = [];
+    let tracker!: ReturnType<typeof createApprovalCardQueue>;
+    tracker = createApprovalCardQueue(() => { pendingStates.push(tracker.head() !== null); });
+    tracker.ingest(pendingEvent(first));
+    tracker.ingest(pendingEvent(second));
+
+    expect(retireTerminalApproval(tracker, first.id)).toBe(true);
+    expect(tracker.head()?.request.id).toBe(second.id);
+    expect(pendingStates.at(-1)).toBe(true);
+
+    expect(retireTerminalApproval(tracker, first.id)).toBe(false);
+    expect(tracker.head()?.request.id).toBe(second.id);
+  });
+
+  it('releases stdin/layout only after the final exact request is accepted', () => {
+    const request = buildRequest('local-final-accepted');
+    const pendingStates: boolean[] = [];
+    let tracker!: ReturnType<typeof createApprovalCardQueue>;
+    tracker = createApprovalCardQueue(() => { pendingStates.push(tracker.head() !== null); });
+    tracker.ingest(pendingEvent(request));
+
+    expect(retireTerminalApproval(tracker, request.id)).toBe(true);
+    expect(tracker.head()).toBeNull();
+    expect(pendingStates.at(-1)).toBe(false);
+  });
+});
+
 // WIRE-018: physically merged from tests/cli/repl/approval-xproc-wire.test.ts.
 {
 // createdAt/expiresAt are computed relative to the REAL wall-clock (this suite
@@ -329,8 +361,8 @@ describe('wireApprovalCrossProcess — cross-process pending → terminal-channe
     });
 });
 
-describe('wireApprovalCrossProcess — terminal decide → decision persisted to the shared store', () => {
-    it('deciding through the terminal channel writes a decision file at the SAME storeDir', async () => {
+describe('wireApprovalCrossProcess — terminal decision ingress stays governed', () => {
+    it('the obsolete raw terminal call cannot persist a decision', async () => {
         const foreignBroker = new ApprovalBroker(projectRoot, { storeDir });
         const req = foreignBroker.submit(buildRequest('apr-xproc-2'));
         const localBroker = new ApprovalBroker(projectRoot, { storeDir });
@@ -341,7 +373,7 @@ describe('wireApprovalCrossProcess — terminal decide → decision persisted to
         await nextEvent(channel.events); // pending observed by this process
         const decisionPath = join(storeDir, `${req.id}.decision.json`);
         expect(existsSync(decisionPath)).toBe(false);
-        channel.decide(req.id, {
+        const outcome = await channel.decide(req.id, {
             decision: 'allow',
             decidedBy: 'test-operator',
             // ApprovalDecisionInput requires `channel`, but ApprovalTerminalChannel's
@@ -351,13 +383,8 @@ describe('wireApprovalCrossProcess — terminal decide → decision persisted to
             decidedAt: '2026-07-02T12:30:00.000Z',
             reason: '',
         });
-        expect(existsSync(decisionPath)).toBe(true);
-        const onDisk = JSON.parse(readFileSync(decisionPath, 'utf-8')) as {
-            decision: string;
-            requestId: string;
-        };
-        expect(onDisk.decision).toBe('allow');
-        expect(onDisk.requestId).toBe(req.id);
+        expect(outcome).toEqual({ kind: 'hold', reasonCode: 'authenticated-decision-adapter-required' });
+        expect(existsSync(decisionPath)).toBe(false);
         handle!.dispose();
         channel.dispose();
     });
@@ -388,7 +415,9 @@ describe('wireApprovalCrossProcess — cross-process decided → card-queue clea
         manual.fire();
         const second = await iterator.next();
         expect(second.value).toMatchObject({
-            kind: 'cross-decided',
+            kind: 'terminal-outcome',
+            outcome: 'untrusted',
+            reasonCode: 'authenticated-decision-adapter-unavailable',
             decision: { decision: 'deny', channel: 'cli' },
             request: { id: req.id },
         });

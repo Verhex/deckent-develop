@@ -14,11 +14,10 @@ import { buildApprovalLabels } from '../../../src/cli/repl/run.js';
 import { getMessage } from '../../../src/cli/helpers/messages.js';
 import { validateApprovalRequest, type ApprovalRequest } from '../../../src/core/approval-contract.js';
 import type { ApprovalStreamEvent } from '../../../src/core/approval-eventstream.js';
+import type { ApprovalTerminalDecisionResult } from '../../../src/cli/repl/approval-terminal-command.js';
 
 /** en card labels — app.tsx owns no default object since TERMINAL-TOOLS-002. */
 const EN_LABELS = buildApprovalLabels((k) => getMessage(k, 'en'));
-
-const tick = (ms = 25): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 function buildRequest(id: string): ApprovalRequest {
   const result = validateApprovalRequest({
@@ -41,72 +40,126 @@ function buildRequest(id: string): ApprovalRequest {
   return result.value;
 }
 
-/** An events stream that delivers one pending request then stays open. */
-async function* oneRequest(request: ApprovalRequest): AsyncGenerator<ApprovalStreamEvent> {
-  yield { kind: 'pending', request };
-  await new Promise<void>(() => { /* keep the card mounted */ });
+/** A pending stream whose lifetime is owned and released by each mounted test. */
+function pendingFixture(request: ApprovalRequest): { events: AsyncGenerator<ApprovalStreamEvent>; release(): void } {
+  let release!: () => void;
+  const closed = new Promise<void>((resolve) => { release = resolve; });
+  async function* events(): AsyncGenerator<ApprovalStreamEvent> {
+    yield { kind: 'pending', request };
+    await closed;
+  }
+  return { events: events(), release };
+}
+
+const waitForText = async (lastFrame: () => string | undefined, text: string): Promise<void> => {
+  await vi.waitFor(() => expect(lastFrame() ?? '').toContain(text), { timeout: 1_000 });
+};
+
+const suspend = async (callback: () => void | Promise<void>): Promise<void> => { await callback(); };
+function accepted(req: ApprovalRequest, action: 'allow' | 'deny'): ApprovalTerminalDecisionResult {
+  return {
+    kind: 'accepted',
+    decision: {
+      requestId: req.id,
+      decision: action,
+      decidedBy: req.userId,
+      channel: 'local-terminal',
+      decidedAt: '2026-07-16T00:01:00.000Z',
+      reason: '',
+    },
+  };
 }
 
 describe('ApprovalCard — render + decide keypress (born-697, ink-testing-library)', () => {
   it('Esc collapses expanded details without deciding the pending request', async () => {
     const req = buildRequest('apr-esc');
     const onDecide = vi.fn();
-    const { stdin, lastFrame } = render(<ApprovalCard events={oneRequest(req)} onDecide={onDecide} decidedBy="terminal" channel="terminal" labels={EN_LABELS} />);
-    await tick(); stdin.write('d'); await tick();
-    expect(lastFrame() ?? '').toContain(EN_LABELS.detailsHeading);
-    stdin.write(String.fromCharCode(27)); await tick(80);
-    expect(lastFrame() ?? '').not.toContain(EN_LABELS.detailsHeading);
-    expect(onDecide).not.toHaveBeenCalled();
+    const fixture = pendingFixture(req);
+    const { stdin, lastFrame, unmount } = render(<ApprovalCard events={fixture.events} onDecide={onDecide} labels={EN_LABELS} suspendTerminal={suspend} />);
+    try {
+      await waitForText(lastFrame, req.summary);
+      stdin.write('d');
+      await waitForText(lastFrame, EN_LABELS.detailsHeading);
+      stdin.write(String.fromCharCode(27));
+      await vi.waitFor(() => {
+        expect(lastFrame() ?? '').toContain(req.summary);
+        expect(lastFrame() ?? '').not.toContain(EN_LABELS.detailsHeading);
+      }, { timeout: 1_000 });
+      expect(onDecide).not.toHaveBeenCalled();
+    } finally {
+      fixture.release();
+      unmount();
+    }
   });
   it('renders the pending request summary + risk badge', async () => {
     const req = buildRequest('apr-1');
-    const { lastFrame } = render(
-      <ApprovalCard events={oneRequest(req)} onDecide={() => {}} decidedBy="terminal" channel="terminal" labels={EN_LABELS} />,
+    const fixture = pendingFixture(req);
+    const { lastFrame, unmount } = render(
+      <ApprovalCard events={fixture.events} onDecide={() => {}} labels={EN_LABELS} suspendTerminal={suspend} />,
     );
-    await tick();
-    const frame = lastFrame() ?? '';
-    expect(frame).toContain('run rm -rf ./build');
-    expect(frame).toContain(EN_LABELS.riskLabels.high);
+    try {
+      await waitForText(lastFrame, req.summary);
+      expect(lastFrame() ?? '').toContain(EN_LABELS.riskLabels.high);
+    } finally {
+      fixture.release();
+      unmount();
+    }
   });
 
   it('pressing y → onDecide(allow) AND onClosure(request, "allow") both fire', async () => {
     const req = buildRequest('apr-2');
-    const onDecide = vi.fn();
+    const onDecide = vi.fn(async () => accepted(req, 'allow'));
     const onClosure = vi.fn();
-    const { stdin } = render(
-      <ApprovalCard events={oneRequest(req)} onDecide={onDecide} onClosure={onClosure} decidedBy="terminal" channel="terminal" labels={EN_LABELS} />,
+    const fixture = pendingFixture(req);
+    const { stdin, lastFrame, unmount } = render(
+      <ApprovalCard events={fixture.events} onDecide={onDecide} onClosure={onClosure} labels={EN_LABELS} suspendTerminal={suspend} />,
     );
-    await tick();
-    stdin.write('y');
-    await tick();
-    expect(onDecide).toHaveBeenCalledTimes(1);
-    expect(onDecide.mock.calls[0]![1]).toMatchObject({ decision: 'allow', channel: 'terminal' });
-    // born-697: the closure callback fires with the request + 'allow'.
-    expect(onClosure).toHaveBeenCalledWith(expect.objectContaining({ id: 'apr-2' }), 'allow');
+    try {
+      await waitForText(lastFrame, req.summary);
+      stdin.write('y');
+      await vi.waitFor(() => expect(onClosure).toHaveBeenCalledWith(expect.objectContaining({ id: 'apr-2' }), 'allow'), { timeout: 1_000 });
+      expect(onDecide).toHaveBeenCalledTimes(1);
+      expect(onDecide.mock.calls[0]![0]).toMatchObject({ id: 'apr-2' });
+      expect(onDecide.mock.calls[0]![1]).toBe('allow');
+    } finally {
+      fixture.release();
+      unmount();
+    }
   });
 
   it('pressing n → onClosure(request, "deny")', async () => {
     const req = buildRequest('apr-3');
     const onClosure = vi.fn();
-    const { stdin } = render(
-      <ApprovalCard events={oneRequest(req)} onDecide={() => {}} onClosure={onClosure} decidedBy="terminal" channel="terminal" labels={EN_LABELS} />,
+    const fixture = pendingFixture(req);
+    const { stdin, lastFrame, unmount } = render(
+      <ApprovalCard events={fixture.events} onDecide={async () => accepted(req, 'deny')} onClosure={onClosure} labels={EN_LABELS} suspendTerminal={suspend} />,
     );
-    await tick();
-    stdin.write('n');
-    await tick();
-    expect(onClosure).toHaveBeenCalledWith(expect.objectContaining({ id: 'apr-3' }), 'deny');
+    try {
+      await waitForText(lastFrame, req.summary);
+      stdin.write('n');
+      await vi.waitFor(() => expect(onClosure).toHaveBeenCalledWith(expect.objectContaining({ id: 'apr-3' }), 'deny'), { timeout: 1_000 });
+    } finally {
+      fixture.release();
+      unmount();
+    }
   });
 
   it('isActive=false → a keypress is ignored (mutex deference)', async () => {
     const req = buildRequest('apr-4');
     const onDecide = vi.fn();
-    const { stdin } = render(
-      <ApprovalCard events={oneRequest(req)} onDecide={onDecide} decidedBy="terminal" channel="terminal" labels={EN_LABELS} isActive={false} />,
+    const fixture = pendingFixture(req);
+    const { stdin, lastFrame, unmount } = render(
+      <ApprovalCard events={fixture.events} onDecide={onDecide} labels={EN_LABELS} isActive={false} suspendTerminal={suspend} />,
     );
-    await tick();
-    stdin.write('y');
-    await tick();
-    expect(onDecide).not.toHaveBeenCalled();
+    try {
+      await waitForText(lastFrame, req.summary);
+      stdin.write('y');
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(onDecide).not.toHaveBeenCalled();
+    } finally {
+      fixture.release();
+      unmount();
+    }
   });
 
   void React;

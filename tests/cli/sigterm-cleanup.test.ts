@@ -45,11 +45,21 @@ vi.mock('../../src/orchestra/sprint-controller.js', () => ({
 vi.mock('../../src/orchestra/tmux.js', () => ({ killAllSessions: hoisted.killAllSessionsMock }));
 vi.mock('../../src/core/model-catalog.js', () => ({ bootstrapFromCatalog: hoisted.bootstrapMock }));
 
-let onSignal: (signal: string) => void;
+let onSignal: (signal: string) => Promise<void>;
+let signalExitCode: (
+  signal: string,
+  signals?: Readonly<Record<string, number | undefined>>,
+) => number;
+let withCommandLocalShutdown: <T>(action: () => Promise<T>) => Promise<T>;
+let registerShutdownHook: (hook: () => Promise<void>) => () => void;
 
 beforeAll(async () => {
   const mod = await import('../../src/cli/entry.js');
   onSignal = mod.onSignal;
+  signalExitCode = mod.signalExitCode;
+  const hooks = await import('../../src/cli/helpers/shutdown-hooks.js');
+  withCommandLocalShutdown = hooks.withCommandLocalShutdown;
+  registerShutdownHook = hooks.registerShutdownHook;
 });
 
 beforeEach(() => {
@@ -126,5 +136,32 @@ describe('onSignal — SIGTERM shares the SIGINT cleanup path (ADR-G-013)', () =
 
     exitSpy.mockRestore();
     vi.mocked(process.stderr.write).mockRestore();
+  });
+
+  it.each(['SIGINT', 'SIGTERM'])('%s under command-local ownership awaits owned hooks and skips sprint/tmux teardown', async (signal) => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(((): never => undefined as never) as never);
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const order: string[] = [];
+    const unregister = registerShutdownHook(async () => { await Promise.resolve(); order.push('hook'); });
+    try {
+      await withCommandLocalShutdown(async () => {
+        await onSignal(signal);
+        order.push('action');
+      });
+      expect(order).toEqual(['hook', 'action']);
+      expect(hoisted.interruptActiveSprintMock).not.toHaveBeenCalled();
+      expect(hoisted.killAllSessionsMock).not.toHaveBeenCalled();
+      expect(exitSpy).toHaveBeenCalledWith(signalExitCode(signal));
+    } finally {
+      unregister();
+      exitSpy.mockRestore();
+      stderrSpy.mockRestore();
+    }
+  });
+
+  it('maps a declared Windows SIGBREAK number and reports unsupported host signals honestly', () => {
+    expect(signalExitCode('SIGBREAK', { SIGBREAK: 21 })).toBe(149);
+    expect(signalExitCode('SIGBREAK', {})).toBe(1);
+    expect(signalExitCode('NOT_A_SIGNAL', {})).toBe(1);
   });
 });

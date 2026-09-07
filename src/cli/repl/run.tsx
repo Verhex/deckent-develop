@@ -210,6 +210,7 @@ import { ApprovalBroker } from '../../core/approval-broker.js';
 import { ApprovalRelay } from '../../core/approval-relay.js';
 import { ApprovalEventStream } from '../../core/approval-eventstream.js';
 import { createApprovalTerminalChannel, type ApprovalTerminalChannel } from './approval-terminal-channel.js';
+import { createApprovalTerminalCommand } from './approval-terminal-command.js';
 import { createApprovalStoreWatch, type ApprovalStoreWatchHandle } from '../../core/approval-store-watch.js';
 import type { ApprovalRequest } from '../../core/approval-contract.js';
 import { randomUUID } from 'node:crypto';
@@ -569,7 +570,7 @@ export function buildApprovalLabels(t: (key: string) => string): ApprovalCardLab
         'deny-expire': t('tui.approval_card.timeout.deny_expire'),
       },
     },
-    hint: t('tui.approval_card_hint'),
+    hint: t('tui.approval_card.hint_authenticated'),
     progress: t('tui.confirm_progress'),
     detailsHeading: t('tui.approval_card_details_heading'),
     noArgs: t('tui.approval_card_no_args'),
@@ -579,6 +580,17 @@ export function buildApprovalLabels(t: (key: string) => string): ApprovalCardLab
       medium: t('tui.approval_risk_medium'),
       high: t('tui.approval_risk_high'),
       critical: t('tui.approval_risk_critical'),
+    },
+    status: {
+      authenticating: t('tui.approval_card.status.authenticating'),
+      hold: t('tui.approval_card.status.hold'),
+      expired: t('tui.approval_card.status.expired'),
+      cancelled: t('tui.approval_card.status.cancelled'),
+      untrusted: t('tui.approval_card.status.untrusted'),
+      observedDecision: t('tui.approval_card.status.observed_decision'),
+      terminalExpired: t('tui.approval_card.terminal.expired'),
+      terminalDeferred: t('tui.approval_card.terminal.deferred'),
+      terminalEscalated: t('tui.approval_card.terminal.escalated'),
     },
   };
 }
@@ -1370,6 +1382,7 @@ export async function runInkRepl(
   // defaulting could erase an authored native pin.
   let projectCfg: {
     language?: string;
+    approval?: ResolvedConfig['approval'];
     repl_surface?: { enabled?: boolean; approvals?: boolean; bg_turns?: boolean };
     terminal?: {
       rpc_debug?: boolean;
@@ -1481,7 +1494,18 @@ export async function runInkRepl(
       broker = new ApprovalBroker(process.cwd());
       const relay = new ApprovalRelay(broker);
       const stream = new ApprovalEventStream(relay);
-      approvalChannel = createApprovalTerminalChannel(relay, stream);
+      const approvalAuthority = projectCfg.approval?.authority;
+      const decisionAdapter = approvalAuthority?.enabled === true && approvalAuthority.tenant_id
+        ? createApprovalTerminalCommand({
+            projectRoot: process.cwd(),
+            tenantId: approvalAuthority.tenant_id,
+          })
+        : undefined;
+      approvalChannel = createApprovalTerminalChannel(relay, stream, {
+        ...(decisionAdapter ? { decisionAdapter } : {}),
+        filter: (notification) => approvalAuthority?.enabled === true
+          && notification.request.tenantId === approvalAuthority.tenant_id,
+      });
       // Cross-process feed (APR-XPROC-WIRE, born-462 dilim-2) — same storeDir
       // the broker above defaults to (it has no public getter, so replicated
       // via the same DECKENT_DIR constant it's built from).

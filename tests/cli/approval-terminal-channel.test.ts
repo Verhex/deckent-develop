@@ -1,227 +1,278 @@
-// ─── ApprovalTerminalChannel tests (APR-TERM-CHANNEL, task 355-004) ─────────
-// Fake end-to-end chain proving the bridge's read path (relay-pending ->
-// eventstream-publish -> bridge.events, the seam ApprovalCard's own ingest loop
-// would consume) and write path (bridge.decide -> the relay's registered
-// 'terminal' onDecision handler -> broker.decide -> cross-broadcast to every
-// OTHER attached channel, including this bridge's own eventstream subscription
-// via the separate 'event-stream' channel ApprovalEventStream itself owns).
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+
 import { ApprovalBroker, type ApprovalRequestInput } from '../../src/core/approval-broker.js';
-import {
-  ApprovalRelay,
-  ApprovalRelayError,
-  type ChannelDecisionInput,
-  type RelayChannel,
-  type RelayNotification,
-} from '../../src/core/approval-relay.js';
-import { ApprovalEventStream, type ApprovalStreamEvent } from '../../src/core/approval-eventstream.js';
-import { createApprovalTerminalChannel } from '../../src/cli/repl/approval-terminal-channel.js';
+import { ApprovalRelay } from '../../src/core/approval-relay.js';
+import { ApprovalEventStream } from '../../src/core/approval-eventstream.js';
+import { createApprovalTerminalChannel, type ApprovalTerminalEvent } from '../../src/cli/repl/approval-terminal-channel.js';
+import type { ApprovalTerminalDecisionAdapter } from '../../src/cli/repl/approval-terminal-command.js';
 
-const CREATED_AT = '2026-07-01T21:00:00.000Z';
-const EXPIRES_AT = '2099-07-01T21:15:00.000Z';
-
-function buildRequest(id: string, overrides: Partial<ApprovalRequestInput> = {}): ApprovalRequestInput {
+function buildRequest(id: string): ApprovalRequestInput {
   return {
     id,
-    requester: { role: 'worker', instanceId: 'w-355-004' },
-    summary: `approval request ${id}`,
-    details: { note: 'test' },
-    scopeId: 'sprint-355',
+    requester: { role: 'worker', instanceId: 'channel-worker' },
+    summary: `approval ${id}`,
+    details: {},
+    scopeId: 'channel-scope',
     scope: 'shell-exec',
     risk: 'high',
     policy: 'require-approval',
     defaultAction: 'deny',
-    tenantId: 'local',
-    userId: 'alperen',
-    createdAt: CREATED_AT,
-    expiresAt: EXPIRES_AT,
-    maskedArgs: { cmd: '***REDACTED***' },
-    ...overrides,
+    tenantId: 'tenant-a',
+    userId: 'operator-a',
+    createdAt: '2026-09-07T12:00:00.000Z',
+    expiresAt: '2099-09-07T13:00:00.000Z',
   };
 }
 
-/** Fake channel: records every notification it receives and exposes a `decide()`
- *  test helper invoking whatever handler the relay registered via `onDecision` —
- *  mirrors tests/core/approval-relay.test.ts's helper. */
-function makeFakeChannel() {
-  const sent: RelayNotification[] = [];
-  let decisionHandler: ((input: ChannelDecisionInput) => void) | undefined;
-  const channel: RelayChannel = {
-    send(notification) {
-      sent.push(notification);
-    },
-    onDecision(handler) {
-      decisionHandler = handler;
-    },
-  };
-  return {
-    channel,
-    sent,
-    decide(input: ChannelDecisionInput) {
-      if (!decisionHandler) throw new Error('onDecision handler was never registered');
-      decisionHandler(input);
-    },
-  };
-}
-
-/** Drain exactly one event from an AsyncIterable's iterator. */
-async function readOne(events: AsyncIterable<ApprovalStreamEvent>): Promise<ApprovalStreamEvent> {
-  const iter = events[Symbol.asyncIterator]();
-  const result = await iter.next();
-  if (result.done) throw new Error('expected an event, got done:true');
+async function readOne(events: AsyncIterable<ApprovalTerminalEvent>): Promise<ApprovalTerminalEvent> {
+  const result = await events[Symbol.asyncIterator]().next();
+  if (result.done) throw new Error('event stream ended');
   return result.value;
 }
 
-let projectRoot: string;
+let root: string;
 let broker: ApprovalBroker;
 let relay: ApprovalRelay;
-let eventStream: ApprovalEventStream;
+let stream: ApprovalEventStream;
 
 beforeEach(() => {
-  projectRoot = mkdtempSync(join(tmpdir(), 'approval-terminal-channel-'));
-  broker = new ApprovalBroker(projectRoot, {
-    storeDir: join(projectRoot, 'approvals'),
-    clock: () => new Date('2026-07-01T21:05:00.000Z'),
-  });
+  root = mkdtempSync(join(tmpdir(), 'approval-terminal-channel-'));
+  broker = new ApprovalBroker(root, { storeDir: join(root, 'approvals') });
   relay = new ApprovalRelay(broker);
-  eventStream = new ApprovalEventStream(relay);
+  stream = new ApprovalEventStream(relay);
 });
 
 afterEach(() => {
-  eventStream.dispose();
+  stream.dispose();
   relay.dispose();
-  rmSync(projectRoot, { recursive: true, force: true });
+  rmSync(root, { recursive: true, force: true });
 });
 
-describe('createApprovalTerminalChannel — read path (relay-pending -> eventstream-publish -> bridge.events)', () => {
-  it('bridge.events yields the pending notification exactly like a raw eventstream subscriber would', async () => {
-    const bridge = createApprovalTerminalChannel(relay, eventStream);
-    const req = broker.submit(buildRequest('term-1'));
-
-    const event = await readOne(bridge.events);
-    expect(event).toMatchObject({ kind: 'pending', request: req });
-
-    bridge.dispose();
+describe('ApprovalTerminalChannel authenticated boundary', () => {
+  it('keeps the event-stream read path and tenant filter intact', async () => {
+    const channel = createApprovalTerminalChannel(relay, stream, {
+      filter: (notification) => notification.request.tenantId === 'tenant-a',
+    });
+    broker.submit(buildRequest('read-a'));
+    expect(await readOne(channel.events)).toMatchObject({ kind: 'pending', request: { id: 'read-a' } });
+    channel.dispose();
   });
 
-  it('late-join backfill: subscribing after a request is already pending still delivers it', async () => {
-    const req = broker.submit(buildRequest('term-backfill'));
-    const bridge = createApprovalTerminalChannel(relay, eventStream);
+  it('routes a card intent only through the injected adapter and never the raw relay writer', async () => {
+    const req = broker.submit(buildRequest('decide-a'));
+    const decide = vi.fn(async () => ({
+      kind: 'accepted' as const,
+      decision: {
+        requestId: req.id, decision: 'allow' as const, decidedBy: req.userId,
+        channel: 'local-terminal', decidedAt: '2026-09-07T12:01:00.000Z', reason: '',
+      },
+    }));
+    const adapter = {
+      decide,
+      verifyCrossDecision: vi.fn(),
+    } as unknown as ApprovalTerminalDecisionAdapter;
+    const channel = createApprovalTerminalChannel(relay, stream, { decisionAdapter: adapter });
+    const suspend = async (callback: () => void | Promise<void>): Promise<void> => { await callback(); };
 
-    const event = await readOne(bridge.events);
-    expect(event).toMatchObject({ kind: 'pending', request: req });
-
-    bridge.dispose();
+    await expect(channel.decide(req, 'allow', suspend)).resolves.toMatchObject({ kind: 'accepted' });
+    expect(decide).toHaveBeenCalledExactlyOnceWith(req, 'allow', suspend);
+    expect(broker.getDecision(req.id)).toBeNull();
+    channel.dispose();
   });
-});
 
-describe('createApprovalTerminalChannel — write path (bridge.decide -> relay.onDecision -> broker -> cross-broadcast)', () => {
-  it('routes a decision through the relay under the "terminal" channel name, ignoring any input.channel', async () => {
-    const bridge = createApprovalTerminalChannel(relay, eventStream);
-    const req = broker.submit(buildRequest('term-2'));
-    await readOne(bridge.events); // drain the pending event
+  it('returns typed HOLD for an absent adapter and for the obsolete raw call shape', async () => {
+    const req = broker.submit(buildRequest('no-adapter'));
+    const channel = createApprovalTerminalChannel(relay, stream);
+    const suspend = async (callback: () => void | Promise<void>): Promise<void> => { await callback(); };
+    await expect(channel.decide(req, 'deny', suspend)).resolves.toEqual({
+      kind: 'hold', reasonCode: 'authenticated-decision-adapter-unavailable',
+    });
+    await expect(channel.decide(req.id, {
+      decision: 'allow', decidedBy: 'fake', channel: 'terminal', decidedAt: new Date().toISOString(), reason: '',
+    })).resolves.toEqual({ kind: 'hold', reasonCode: 'authenticated-decision-adapter-required' });
+    expect(broker.getDecision(req.id)).toBeNull();
+    channel.dispose();
+  });
 
-    const waiting = broker.awaitDecision(req.id);
-    bridge.decide(req.id, {
-      decision: 'allow',
-      decidedBy: 'alperen',
-      channel: 'bogus-should-be-ignored',
-      decidedAt: '2026-07-01T21:05:00.000Z',
-      reason: '',
+  it('does not blindly retire a cross-channel decision that fails durable authorization', async () => {
+    const adapter = {
+      decide: vi.fn(),
+      verifyCrossDecision: vi.fn(async () => ({ kind: 'untrusted' as const, reasonCode: 'integrity-failure' })),
+    } as unknown as ApprovalTerminalDecisionAdapter;
+    const channel = createApprovalTerminalChannel(relay, stream, { decisionAdapter: adapter });
+    const req = broker.submit(buildRequest('cross-untrusted'));
+    await readOne(channel.events);
+    broker.decide(req.id, {
+      decision: 'allow', decidedBy: 'forged', channel: 'dashboard', decidedAt: new Date().toISOString(), reason: '',
+    });
+    expect(await readOne(channel.events)).toMatchObject({
+      kind: 'terminal-outcome', outcome: 'untrusted', reasonCode: 'integrity-failure', request: { id: req.id },
+    });
+    channel.dispose();
+  });
+
+  it('forwards a cross-channel retirement only after exact verification', async () => {
+    const adapter = {
+      decide: vi.fn(),
+      verifyCrossDecision: vi.fn(async (_request, decision) => ({ kind: 'trusted' as const, decision })),
+    } as unknown as ApprovalTerminalDecisionAdapter;
+    const channel = createApprovalTerminalChannel(relay, stream, { decisionAdapter: adapter });
+    const req = broker.submit(buildRequest('cross-trusted'));
+    await readOne(channel.events);
+    broker.decide(req.id, {
+      decision: 'deny', decidedBy: 'operator-a', channel: 'local-terminal', decidedAt: new Date().toISOString(), reason: '',
+    });
+    expect(await readOne(channel.events)).toMatchObject({
+      kind: 'cross-decided', decision: { decision: 'deny' }, request: { id: req.id },
+    });
+    channel.dispose();
+  });
+
+  it('reconciles an independently verified durable winner while the local intent returns HOLD', async () => {
+    const req = broker.submit(buildRequest('cross-inflight-hold'));
+    let finish!: (result: Awaited<ReturnType<ApprovalTerminalDecisionAdapter['decide']>>) => void;
+    const local = new Promise<Awaited<ReturnType<ApprovalTerminalDecisionAdapter['decide']>>>((resolve) => { finish = resolve; });
+    const verifyCrossDecision = vi.fn(async (_request, durable) => ({ kind: 'trusted' as const, decision: durable }));
+    const adapter = {
+      decide: vi.fn(() => local),
+      verifyCrossDecision,
+    } as unknown as ApprovalTerminalDecisionAdapter;
+    const channel = createApprovalTerminalChannel(relay, stream, { decisionAdapter: adapter });
+    const suspend = async (callback: () => void | Promise<void>): Promise<void> => { await callback(); };
+    await readOne(channel.events);
+
+    const localOutcome = channel.decide(req, 'allow', suspend);
+    const durable = broker.decide(req.id, {
+      decision: 'deny', decidedBy: 'operator-a', channel: 'local-terminal', decidedAt: '2026-09-07T12:01:00.000Z', reason: '',
+    });
+    const cross = readOne(channel.events);
+    finish({
+      kind: 'hold',
+      reasonCode: 'child-exit:1',
+      observedDecision: {
+        action: durable.decision,
+        channel: durable.channel,
+        decidedBy: durable.decidedBy,
+        decidedAt: durable.decidedAt,
+      },
     });
 
-    const decision = await waiting;
-    expect(decision.decision).toBe('allow');
-    expect(decision.channel).toBe('terminal');
-
-    bridge.dispose();
-  });
-
-  it('cross-broadcasts the decision to every OTHER attached channel', () => {
-    const other = makeFakeChannel();
-    relay.attachChannel('dashboard', other.channel);
-
-    const bridge = createApprovalTerminalChannel(relay, eventStream);
-    const req = broker.submit(buildRequest('term-3'));
-
-    bridge.decide(req.id, {
-      decision: 'deny',
-      decidedBy: 'alperen',
-      channel: 'irrelevant',
-      decidedAt: '2026-07-01T21:05:00.000Z',
-      reason: 'no',
-    });
-
-    expect(other.sent).toHaveLength(2); // pending, then cross-decided
-    const crossBroadcast = other.sent[1]!;
-    expect(crossBroadcast).toMatchObject({
+    await expect(localOutcome).resolves.toMatchObject({ kind: 'hold', reasonCode: 'child-exit:1' });
+    await expect(cross).resolves.toMatchObject({
       kind: 'cross-decided',
-      request: req,
-      decision: { channel: 'terminal', decision: 'deny' },
+      request: { id: req.id },
+      decision: { decision: 'deny' },
     });
-
-    bridge.dispose();
+    expect(verifyCrossDecision).toHaveBeenCalledExactlyOnceWith(req, durable);
+    channel.dispose();
   });
 
-  it("the bridge's own eventstream subscription also observes the cross-decided notification (fanned via the separate event-stream channel)", async () => {
-    const bridge = createApprovalTerminalChannel(relay, eventStream);
-    const req = broker.submit(buildRequest('term-4'));
-    await readOne(bridge.events); // pending
+  it('keeps an in-flight conflict untrusted when independent verification rejects it', async () => {
+    const req = broker.submit(buildRequest('cross-inflight-untrusted'));
+    let finish!: (result: Awaited<ReturnType<ApprovalTerminalDecisionAdapter['decide']>>) => void;
+    const local = new Promise<Awaited<ReturnType<ApprovalTerminalDecisionAdapter['decide']>>>((resolve) => { finish = resolve; });
+    const adapter = {
+      decide: vi.fn(() => local),
+      verifyCrossDecision: vi.fn(async () => ({ kind: 'untrusted' as const, reasonCode: 'integrity-failure' })),
+    } as unknown as ApprovalTerminalDecisionAdapter;
+    const channel = createApprovalTerminalChannel(relay, stream, { decisionAdapter: adapter });
+    const suspend = async (callback: () => void | Promise<void>): Promise<void> => { await callback(); };
+    await readOne(channel.events);
 
-    bridge.decide(req.id, {
-      decision: 'allow',
-      decidedBy: 'alperen',
-      channel: 'terminal',
-      decidedAt: '2026-07-01T21:05:00.000Z',
-      reason: '',
+    const localOutcome = channel.decide(req, 'allow', suspend);
+    broker.decide(req.id, {
+      decision: 'deny', decidedBy: 'forged', channel: 'local-terminal', decidedAt: '2026-09-07T12:01:00.000Z', reason: '',
     });
+    const cross = readOne(channel.events);
+    finish({ kind: 'hold', reasonCode: 'child-exit:1' });
 
-    const crossEvent = await readOne(bridge.events);
-    expect(crossEvent).toMatchObject({ kind: 'cross-decided', request: req });
-
-    bridge.dispose();
-  });
-});
-
-describe('createApprovalTerminalChannel — channel naming + dispose', () => {
-  it('rejects a duplicate channelName exactly like a raw attachChannel call would, without leaking a subscription', () => {
-    const bridge = createApprovalTerminalChannel(relay, eventStream, { channelName: 'terminal-dup' });
-
-    expect(() => createApprovalTerminalChannel(relay, eventStream, { channelName: 'terminal-dup' })).toThrow(
-      ApprovalRelayError,
-    );
-    // The failed attempt attached nothing and subscribed nothing — only the first
-    // bridge's client id is present.
-    expect(eventStream.clientIds).toEqual(['terminal-dup']);
-
-    bridge.dispose();
+    await expect(localOutcome).resolves.toMatchObject({ kind: 'hold' });
+    await expect(cross).resolves.toMatchObject({
+      kind: 'terminal-outcome',
+      outcome: 'untrusted',
+      reasonCode: 'integrity-failure',
+      request: { id: req.id },
+    });
+    channel.dispose();
   });
 
-  it('dispose() unsubscribes the eventstream client and detaches the relay channel', async () => {
-    const bridge = createApprovalTerminalChannel(relay, eventStream);
-    expect(relay.channelNames).toContain('terminal');
+  it('suppresses only the matching accepted race and forwards an accepted mismatch for verification', async () => {
+    const matching = broker.submit(buildRequest('cross-inflight-accepted'));
+    let finishMatching!: (result: Awaited<ReturnType<ApprovalTerminalDecisionAdapter['decide']>>) => void;
+    const matchingLocal = new Promise<Awaited<ReturnType<ApprovalTerminalDecisionAdapter['decide']>>>((resolve) => { finishMatching = resolve; });
+    const verifyCrossDecision = vi.fn(async (_request, durable) => ({ kind: 'trusted' as const, decision: durable }));
+    const adapter = {
+      decide: vi.fn(() => matchingLocal),
+      verifyCrossDecision,
+    } as unknown as ApprovalTerminalDecisionAdapter;
+    const channel = createApprovalTerminalChannel(relay, stream, { decisionAdapter: adapter });
+    const suspend = async (callback: () => void | Promise<void>): Promise<void> => { await callback(); };
+    await readOne(channel.events);
 
-    bridge.dispose();
-    expect(relay.channelNames).not.toContain('terminal');
+    const matchingOutcome = channel.decide(matching, 'allow', suspend);
+    const matchingDecision = broker.decide(matching.id, {
+      decision: 'allow', decidedBy: 'operator-a', channel: 'local-terminal', decidedAt: '2026-09-07T12:01:00.000Z', reason: '',
+    });
+    const afterSuppressed = readOne(channel.events);
+    finishMatching({ kind: 'accepted', decision: matchingDecision });
+    await expect(matchingOutcome).resolves.toMatchObject({ kind: 'accepted' });
+    const sentinel = broker.submit(buildRequest('cross-after-suppressed'));
+    await expect(afterSuppressed).resolves.toMatchObject({ kind: 'pending', request: { id: sentinel.id } });
+    expect(verifyCrossDecision).not.toHaveBeenCalled();
 
-    const iter = bridge.events[Symbol.asyncIterator]();
-    broker.submit(buildRequest('term-5'));
-    const result = await iter.next();
-    expect(result.done).toBe(true);
+    const mismatch = broker.submit(buildRequest('cross-inflight-mismatch'));
+    await readOne(channel.events);
+    let finishMismatch!: (result: Awaited<ReturnType<ApprovalTerminalDecisionAdapter['decide']>>) => void;
+    const mismatchLocal = new Promise<Awaited<ReturnType<ApprovalTerminalDecisionAdapter['decide']>>>((resolve) => { finishMismatch = resolve; });
+    adapter.decide.mockReturnValueOnce(mismatchLocal);
+    const mismatchOutcome = channel.decide(mismatch, 'allow', suspend);
+    const durableDeny = broker.decide(mismatch.id, {
+      decision: 'deny', decidedBy: 'operator-a', channel: 'local-terminal', decidedAt: '2026-09-07T12:02:00.000Z', reason: '',
+    });
+    const forwarded = readOne(channel.events);
+    finishMismatch({
+      kind: 'accepted',
+      decision: { ...durableDeny, decision: 'allow' },
+    });
+    await expect(mismatchOutcome).resolves.toMatchObject({ kind: 'accepted' });
+    await expect(forwarded).resolves.toMatchObject({
+      kind: 'cross-decided',
+      decision: { decision: 'deny' },
+    });
+    expect(verifyCrossDecision).toHaveBeenCalledExactlyOnceWith(mismatch, durableDeny);
+    channel.dispose();
   });
 
-  it('supports independent instances via channelName overrides (multi-instance scenario)', async () => {
-    const bridgeA = createApprovalTerminalChannel(relay, eventStream, { channelName: 'terminal-a' });
-    const bridgeB = createApprovalTerminalChannel(relay, eventStream, { channelName: 'terminal-b' });
-
-    const req = broker.submit(buildRequest('term-6'));
-    expect(await readOne(bridgeA.events)).toMatchObject({ kind: 'pending', request: req });
-    expect(await readOne(bridgeB.events)).toMatchObject({ kind: 'pending', request: req });
-
-    bridgeA.dispose();
-    bridgeB.dispose();
+  it('deduplicates a concurrent intent and fails closed after dispose', async () => {
+    const req = broker.submit(buildRequest('dedup-a'));
+    let finish!: () => void;
+    const pending = new Promise<void>((resolve) => { finish = resolve; });
+    const adapter = {
+      decide: vi.fn(async () => {
+        await pending;
+        return {
+          kind: 'accepted' as const,
+          decision: {
+            requestId: req.id, decision: 'allow' as const, decidedBy: req.userId,
+            channel: 'local-terminal', decidedAt: '2026-09-07T12:01:00.000Z', reason: '',
+          },
+        };
+      }),
+      verifyCrossDecision: vi.fn(),
+    } as unknown as ApprovalTerminalDecisionAdapter;
+    const channel = createApprovalTerminalChannel(relay, stream, { decisionAdapter: adapter });
+    const suspend = async (callback: () => void | Promise<void>): Promise<void> => { await callback(); };
+    const first = channel.decide(req, 'allow', suspend);
+    const duplicate = channel.decide(req, 'allow', suspend);
+    expect(adapter.decide).toHaveBeenCalledTimes(1);
+    finish();
+    await expect(Promise.all([first, duplicate])).resolves.toHaveLength(2);
+    channel.dispose();
+    await expect(channel.decide(req, 'allow', suspend)).resolves.toEqual({
+      kind: 'hold', reasonCode: 'terminal-channel-disposed',
+    });
   });
 });

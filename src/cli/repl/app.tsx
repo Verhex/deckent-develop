@@ -72,8 +72,7 @@ import {
 } from './busy-controls.js';
 import { ApprovalCard, createApprovalCardQueue, type ApprovalCardLabels, type ApprovalCardQueue } from './approval-card.js';
 import { clipTerminalCells, composeDualStream } from './dual-stream.js';
-import type { ApprovalTerminalChannel } from './approval-terminal-channel.js';
-import type { ApprovalStreamEvent } from '../../core/approval-eventstream.js';
+import type { ApprovalTerminalChannel, ApprovalTerminalEvent } from './approval-terminal-channel.js';
 import { PlanPreviewCard, type PlanPreviewCardLabels } from './plan-preview-card.js';
 import { InboxCard } from './inbox-card.js';
 import { requireInjectedLabel } from '../helpers/injected-label.js';
@@ -946,13 +945,30 @@ export async function runReplDoSlash(goal: string, deps: ReplDoSlashDeps): Promi
  * split delivery between ApprovalCard and the App).
  */
 export async function* tapApprovalEvents(
-  source: AsyncIterable<ApprovalStreamEvent>,
+  source: AsyncIterable<ApprovalTerminalEvent>,
   tracker: ApprovalCardQueue,
-): AsyncGenerator<ApprovalStreamEvent> {
+): AsyncGenerator<ApprovalTerminalEvent> {
   for await (const event of source) {
     tracker.ingest(event);
     yield event;
   }
+}
+
+/**
+ * Fan a locally settled card outcome into App's layout/stdin tracker. The
+ * card owns its render queue, while App owns this second, tapped projection;
+ * both must retire the exact accepted or expired request before input can
+ * resume. Cross-channel events have already retired the tracker in
+ * `tapApprovalEvents`, so the membership guard also makes their later
+ * callback idempotent.
+ */
+export function retireTerminalApproval(
+  tracker: ApprovalCardQueue,
+  requestId: string,
+): boolean {
+  if (!tracker.has(requestId)) return false;
+  tracker.resolve(requestId);
+  return true;
 }
 
 /** A completed tool action, rendered as a claude-code-style change block. The
@@ -1650,7 +1666,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   const palette = useInkPalette();
   const { provider, dispatcher, labels, registerConfirm, registerActionGate, registerToolSink, slashRegistry, nativeMcpSlash, initialSelection, onSwitch, onApprovalMode, memory, sessionId, lang, nativeEngine, replSurfaceEnabled = false, startupRecentSessions = false, sprintHistoricalContext, renderSprintContextReason, stateFeed, liveFooterLabels, registerBgEventSink, approvalsEnabled = false, approvalChannel, approvalLabels, runFlowController, runFlowCardLabels, runFlowMountLabels, doSlashLabels, registerRunFlowResultSink, runInboxProvider, inboxFollowFeed, inboxLabels, inboxDecide, atRefPathProvider, atRefReader, caretStyle, shortcutsPanel, pickerLabels, pickerSpecs, saveDefault, configEntries, saveConfigValue, initialTermMode, pickerAscii = false, pickerNoColor = false, dualStreamOverflow, toolRead } = props;
   const resumeLedgerOptions: LedgerStoreOptions = { ...props.resumeLedgerOptions, cwd: props.cwd };
-  const { exit } = useApp();
+  const { exit, suspendTerminal } = useApp();
   // TERMINAL-TOOLS-004 — live width for the status row + queue preview (reflows on resize).
   const fallbackColumns = useTerminalColumns();
   const mediatedViewport = useContext(TerminalViewportContext);
@@ -2090,7 +2106,7 @@ export function ReplApp(props: ReplAppProps): ReactElement {
   if (approvalTracker.current === null) {
     approvalTracker.current = createApprovalCardQueue(() => setApprovalPending(approvalTracker.current!.head() !== null));
   }
-  const approvalEvents = useRef<AsyncIterable<ApprovalStreamEvent> | null>(null);
+  const approvalEvents = useRef<AsyncIterable<ApprovalTerminalEvent> | null>(null);
   if (approvalsEnabled && approvalChannel && approvalEvents.current === null) {
     approvalEvents.current = tapApprovalEvents(approvalChannel.events, approvalTracker.current);
   }
@@ -3158,17 +3174,20 @@ export function ReplApp(props: ReplAppProps): ReactElement {
       {approvalsEnabled && approvalChannel && approvalEvents.current && (
         <ApprovalCard
           events={approvalEvents.current}
-          onDecide={approvalChannel.decide}
+          onDecide={(request, decision, suspend) => approvalChannel.decide(request, decision, suspend)}
           onClosure={(request, decision) => {
-            // born-697 — reflect the terminal's OWN decision as a visible
-            // transcript line (the relay excludes the deciding channel from
-            // cross-decided, so nothing else would).
+            // Reflect the terminal's accepted durable decision once; the
+            // channel suppresses its raced relay copy for this local intent.
+            retireTerminalApproval(approvalTracker.current!, request.id);
             pushTurn('seg', formatApprovalClosure(decision, request.summary, labels));
           }}
-          decidedBy="terminal"
-          channel="terminal"
+          onTerminalOutcome={(request, message) => {
+            retireTerminalApproval(approvalTracker.current!, request.id);
+            pushTurn('seg', message);
+          }}
           labels={approvalLabels}
           isActive={stdinOwner.approvalCardActive}
+          suspendTerminal={suspendTerminal}
         />
       )}
 

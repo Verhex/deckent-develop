@@ -30,6 +30,7 @@
 export type ShutdownHook = () => Promise<void>;
 
 const hooks: ShutdownHook[] = [];
+let commandLocalShutdownDepth = 0;
 
 /**
  * Bound the WHOLE registered-hook run, not each hook individually (see the
@@ -60,6 +61,25 @@ export function registerShutdownHook(hook: ShutdownHook): () => void {
  */
 export function hasShutdownHooks(): boolean {
   return hooks.length > 0;
+}
+
+/**
+ * Run one command action under command-local signal ownership. Acquisition is
+ * synchronous (before `action` can reach its first await); nesting is reference
+ * counted, and every success/rejection path releases exactly one scope.
+ */
+export async function withCommandLocalShutdown<T>(action: () => Promise<T>): Promise<T> {
+  commandLocalShutdownDepth += 1;
+  try {
+    return await action();
+  } finally {
+    commandLocalShutdownDepth -= 1;
+  }
+}
+
+/** Synchronous snapshot seam used by entry.ts at signal ingress. */
+export function hasCommandLocalShutdownOwnership(): boolean {
+  return commandLocalShutdownDepth > 0;
 }
 
 /** Run every registered hook to settlement (never rejects), bounded overall. */

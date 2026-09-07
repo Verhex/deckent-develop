@@ -21,6 +21,8 @@ import {
   hasShutdownHooks,
   runShutdownHooks,
   SHUTDOWN_HOOKS_TIMEOUT_MS,
+  hasCommandLocalShutdownOwnership,
+  withCommandLocalShutdown,
 } from '../../src/cli/helpers/shutdown-hooks.js';
 
 const cleanups: Array<() => void> = [];
@@ -38,6 +40,26 @@ function track(hook: () => Promise<void>): () => void {
 }
 
 describe('shutdown-hooks registry', () => {
+  it('command-local ownership is acquired before action invocation and unwinds on success and rejection', async () => {
+    expect(hasCommandLocalShutdownOwnership()).toBe(false);
+    await withCommandLocalShutdown(async () => {
+      expect(hasCommandLocalShutdownOwnership()).toBe(true);
+    });
+    expect(hasCommandLocalShutdownOwnership()).toBe(false);
+    await expect(withCommandLocalShutdown(async () => { throw new Error('failure'); })).rejects.toThrow('failure');
+    expect(hasCommandLocalShutdownOwnership()).toBe(false);
+  });
+
+  it('nested command-local scopes retain ownership until the outer scope releases', async () => {
+    await withCommandLocalShutdown(async () => {
+      await withCommandLocalShutdown(async () => {
+        expect(hasCommandLocalShutdownOwnership()).toBe(true);
+      });
+      expect(hasCommandLocalShutdownOwnership()).toBe(true);
+    });
+    expect(hasCommandLocalShutdownOwnership()).toBe(false);
+  });
+
   it('hasShutdownHooks reflects registration and unregistration', () => {
     expect(hasShutdownHooks()).toBe(false);
     const un = track(async () => {});

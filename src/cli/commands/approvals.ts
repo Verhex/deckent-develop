@@ -35,9 +35,15 @@ import type { LocalTerminalReauthenticationProvider } from '../../core/approval-
 import { getLanguage, getMessage } from '../helpers/messages.js';
 import { print, printError } from '../helpers/output.js';
 import { resolveProjectRoot } from '../helpers/process.js';
+import { withCommandLocalShutdown } from '../helpers/shutdown-hooks.js';
 
 const LOCAL_TERMINAL_CHANNEL = 'local-terminal';
 const LOCAL_TERMINAL_AUTHORITY_REF = 'local-terminal:interactive-tty-confirmation:v1';
+export const APPROVAL_CANCELLED_EXIT_CODE = 130;
+
+export function isInteractiveTerminalCancellation(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortError';
+}
 
 /**
  * Human-readable local timestamp (dd.MM.yyyy HH:mm) for the decision card.
@@ -62,6 +68,59 @@ interface ApprovalsDecideOpts {
 
 interface ApprovalsListOpts {
   class?: string;
+}
+
+type ApprovalDecisionAction = 'allow' | 'deny';
+
+/** Build the bounded, request-derived context shown before interactive re-auth. */
+export function buildApprovalDecisionContext(
+  request: ApprovalRequest,
+  action: ApprovalDecisionAction,
+  language: string,
+): string {
+  const unknown = getMessage('approvals.context_unknown', language);
+  const maskedArgs = request.maskedArgs === undefined || request.maskedArgs === null
+    ? getMessage('approvals.context_no_masked_args', language)
+    : JSON.stringify(request.maskedArgs);
+  const requester = request.requester as ApprovalRequest['requester'] | undefined;
+  const base = getMessage('approvals.decide_context', language, {
+    id: request.id,
+    summary: request.summary,
+    requesterRole: requester?.role ?? unknown,
+    requesterInstance: requester?.instanceId ?? unknown,
+    userId: request.userId ?? unknown,
+    tenantId: request.tenantId ?? unknown,
+    action: getMessage(action === 'allow' ? 'approvals.action_allow' : 'approvals.action_deny', language),
+    scope: request.scope ?? unknown,
+    scopeId: request.scopeId ?? unknown,
+    risk: request.risk ?? unknown,
+    maskedArgs,
+    expiresAt: formatDecisionTimestamp(request.expiresAt, language),
+  });
+  const details = request.details as {
+    subject?: {
+      provider?: unknown;
+      model?: unknown;
+      backendScope?: unknown;
+      budget?: { maxTokens?: unknown; timeoutMs?: unknown };
+    };
+  };
+  const subject = details.subject;
+  if (!subject || typeof subject !== 'object') return base;
+  const display = (value: unknown): string => typeof value === 'string' && value.length > 0 ? value : unknown;
+  const maxTokens = typeof subject.budget?.maxTokens === 'number' && Number.isFinite(subject.budget.maxTokens)
+    ? String(subject.budget.maxTokens)
+    : unknown;
+  const timeoutSec = typeof subject.budget?.timeoutMs === 'number' && Number.isFinite(subject.budget.timeoutMs)
+    ? String(Math.round(subject.budget.timeoutMs / 1_000))
+    : unknown;
+  return `${base}\n${getMessage('approvals.decide_context_subject', language, {
+    provider: display(subject.provider),
+    model: display(subject.model),
+    backendScope: display(subject.backendScope),
+    maxTokens,
+    timeoutSec,
+  })}`;
 }
 
 function lifecycleAuditView(
@@ -100,6 +159,7 @@ function createInteractiveTerminalReauthProvider(input: {
   readonly maxAuthAgeSeconds: number;
   readonly confirmPrompt: string;
   readonly confirmToken: string;
+  readonly onCancelled: () => void;
   readonly now?: () => Date;
 }): LocalTerminalReauthenticationProvider {
   return {
@@ -109,6 +169,10 @@ function createInteractiveTerminalReauthProvider(input: {
       let answer: string;
       try {
         answer = (await rl.question(input.confirmPrompt)).trim();
+      } catch (error) {
+        if (!isInteractiveTerminalCancellation(error)) throw error;
+        input.onCancelled();
+        return null;
       } finally {
         rl.close();
       }
@@ -275,7 +339,7 @@ export function registerApprovalsCommand(program: Command): void {
     .option('--deny', getMessage('approvals.opt_deny', lang))
     .option('--reason <text>', getMessage('approvals.opt_reason', lang))
     .option('--always', getMessage('approvals.opt_always', lang))
-    .action(async (requestIdArg: string, opts: ApprovalsDecideOpts) => {
+    .action((requestIdArg: string, opts: ApprovalsDecideOpts) => withCommandLocalShutdown(async () => {
       let requestId = requestIdArg;
       const root = resolveProjectRoot();
       const config = await loadConfig(root);
@@ -445,27 +509,9 @@ export function registerApprovalsCommand(program: Command): void {
         // its ceilings, and what an allow actually grants — before any prompt.
         const request = opened.service.broker.getRequest(requestId);
         if (request) {
-          const details = request.details as {
-            subject?: {
-              provider?: string;
-              model?: string;
-              backendScope?: string;
-              budget?: { maxTokens?: number; timeoutMs?: number };
-            };
-          } | undefined;
-          const subject = details?.subject;
-          print(getMessage('approvals.decide_context', language, {
-            summary: request.summary,
-            provider: subject?.provider ?? '-',
-            model: subject?.model ?? '-',
-            backendScope: subject?.backendScope ?? '-',
-            maxTokens: String(subject?.budget?.maxTokens ?? '-'),
-            timeoutSec: String(subject?.budget?.timeoutMs !== undefined
-              ? Math.round(subject.budget.timeoutMs / 1000)
-              : '-'),
-            expiresAt: formatDecisionTimestamp(request.expiresAt, language),
-          }));
+          print(buildApprovalDecisionContext(request, action, language));
         }
+        let authenticationCancelled = false;
         const outcome = await opened.service.decideTerminal(
           {
             provider: createInteractiveTerminalReauthProvider({
@@ -475,6 +521,7 @@ export function registerApprovalsCommand(program: Command): void {
                 action: actionLabel,
               }),
               confirmToken: 'yes',
+              onCancelled: () => { authenticationCancelled = true; },
             }),
             channel: LOCAL_TERMINAL_CHANNEL,
           },
@@ -558,6 +605,11 @@ export function registerApprovalsCommand(program: Command): void {
           process.exitCode = 1;
           return;
         }
+        if (authenticationCancelled && !opened.service.broker.getDecision(requestId)) {
+          printError(new Error(getMessage('approvals.decision_cancelled', language, { id: requestId })));
+          process.exitCode = APPROVAL_CANCELLED_EXIT_CODE;
+          return;
+        }
         printError(new Error(getMessage('approvals.decision_refused', language, {
           id: requestId,
           kind: outcome.kind,
@@ -567,7 +619,7 @@ export function registerApprovalsCommand(program: Command): void {
       } finally {
         opened.service.close();
       }
-    });
+    }));
 
   const rules = approvals
     .command('rules')

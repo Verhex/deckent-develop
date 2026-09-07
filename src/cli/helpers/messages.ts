@@ -1227,16 +1227,28 @@ const BASE_MESSAGES: MessageMap = {
     tr: '⏳ #{code} · {id} — {summary} (son geçerlilik: {expiresAt})',
   },
   'approvals.decide_context': {
-    en: 'You are deciding: {summary}\n  Target: {provider}/{model} · {backendScope}\n  Ceiling: at most {maxTokens} tokens · at most {timeoutSec}s of run time\n  What it grants: ONE single limited reachability check of exactly this target — nothing else\n  Valid until: {expiresAt}',
-    tr: 'Onayladığın şey: {summary}\n  Hedef: {provider}/{model} · {backendScope}\n  Üst sınır: en çok {maxTokens} jeton · en çok {timeoutSec} saniye çalışma süresi\n  Verdiği yetki: yalnızca bu hedef için TEK bir sınırlı erişim denemesi — başka hiçbir şey değil\n  Son geçerlilik: {expiresAt}',
+    en: 'You are deciding request {id}: {summary}\n  Requested by: {requesterRole}/{requesterInstance}\n  Principal / tenant: {userId} / {tenantId}\n  Decision / scope: {action} · {scope} · {scopeId}\n  Risk / valid until: {risk} · {expiresAt}\n  Masked arguments: {maskedArgs}\n  Meaning: record this decision for this exact request. It does not itself start or prove execution, settlement, reachability, or a persistent grant.',
+    tr: '{id} isteği için karar veriyorsun: {summary}\n  İsteyen: {requesterRole}/{requesterInstance}\n  Principal / tenant: {userId} / {tenantId}\n  Karar / kapsam: {action} · {scope} · {scopeId}\n  Risk / son geçerlilik: {risk} · {expiresAt}\n  Maskelenmiş argümanlar: {maskedArgs}\n  Anlamı: yalnızca bu kesin istek için bu kararı kaydetmek. Bu karar tek başına yürütmeyi başlatmaz; settlement, erişilebilirlik veya kalıcı izin kanıtlamaz.',
+  },
+  'approvals.decide_context_subject': {
+    en: '  Declared target: {provider}/{model} · {backendScope}\n  Declared ceiling: {maxTokens} tokens · {timeoutSec} s',
+    tr: '  Beyan edilen hedef: {provider}/{model} · {backendScope}\n  Beyan edilen üst sınır: {maxTokens} jeton · {timeoutSec} sn',
+  },
+  'approvals.context_unknown': {
+    en: 'unknown',
+    tr: 'bilinmiyor',
+  },
+  'approvals.context_no_masked_args': {
+    en: 'none provided',
+    tr: 'sağlanmadı',
   },
   'approvals.decided_effect': {
-    en: 'What happens now: the waiting job takes this one-time approval, runs the single limited check, and records whether this target is reachable.',
-    tr: 'Şimdi ne olacak: bekleyen iş bu tek kullanımlık onayı alır, tek seferlik sınırlı denemeyi yapar ve bu hedefin erişilebilir olup olmadığını kaydeder.',
+    en: 'The allow decision is recorded. A downstream consumer must verify its authority and apply its own gates before the exact request may continue; execution or settlement is not yet proven.',
+    tr: 'İzin kararı kaydedildi. Kesin isteğin devam edebilmesi için downstream consumer karardaki authority’yi doğrulamalı ve kendi gate’lerini uygulamalıdır; yürütme veya settlement henüz kanıtlanmış değildir.',
   },
   'approvals.confirm_prompt': {
-    en: 'Confirm your identity to {action} this request: type "yes" to approve as the operator at this terminal: ',
-    tr: 'İşlemi {action} için kimliğini doğrula: bu terminaldeki yetkili olarak onaylıyorsan "yes" yaz: ',
+    en: 'Confirm your identity to {action} this request: type "yes" to confirm this decision as the operator at this terminal: ',
+    tr: 'Bu isteği {action} kararı için kimliğini doğrula: bu terminaldeki yetkili olarak kararı doğrulamak için "yes" yaz: ',
   },
   'approvals.action_allow': { en: 'approve', tr: 'onayla' },
   'approvals.action_deny': { en: 'deny', tr: 'reddet' },
@@ -1247,6 +1259,10 @@ const BASE_MESSAGES: MessageMap = {
   'approvals.decision_refused': {
     en: 'The decision was not recorded for {id} — result: {kind}, reason: {reason}',
     tr: '{id} için karar kaydedilmedi — sonuç: {kind}, neden: {reason}',
+  },
+  'approvals.decision_cancelled': {
+    en: 'Approval decision cancelled for {id} — no terminal decision was recorded.',
+    tr: '{id} için onay kararı iptal edildi — terminal kararı kaydedilmedi.',
   },
   'xverify.prepare.approval_summary': {
     en: 'Authorize a bounded reachability probe for verifier {provider}/{model} (docker, owner-budgeted)',
